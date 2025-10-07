@@ -1,0 +1,1089 @@
+/*  Build2 test game by Ken Silverman
+
+            Main Controls:
+-------------------------------------------
+      Arrows or WASD: Move
+               Mouse: Look
+   Left Mouse Button: Shoot
+  Right Mouse Button: Open/Use
+     R.Ctrl or Space: Jump
+       
+           Other Controls:
+-------------------------------------------
+            Keypad 0: Duck
+             L.Shift: Move slower
+             R.Shift: Move faster
+           Caps Lock: No clip cheat
+                
+              Tag list:
+-------------------------------------------
+floor&ceil tag 666: decreases health (lava)
+floor&ceil tag 1: rotating sector
+floor tag 5: elevator
+   sprite tag 5 in sector is level stop
+floor&ceil tag 6: up/down door
+   sprite tag 7 in sector locks door
+floor tag 13: swinging door
+   wall tag != 0 in sector is hinge
+   ceil tag is angle to rotate (deg.)
+   sprite tag 7 in sector locks door
+floor tag 666: animating lava floor
+
+sprite tag 1: moving monster
+sprite tag 2: rpg pickup
+sprite tag 3: end button
+sprite tag 4: shooting monster
+sprite tag 5: moving&shooting monster
+sprite tag 6: medkit pickup
+sprite tag 7: key pickup
+-------------------------------------------
+*/
+
+static sepoff = 0.02, pixoff = 20; //Stereo view settings
+static jumping_counter = 0, jumping_toggle = 0;
+struct { x, y, z; } point3d;
+
+static tim = 0, dtim, sect, ontype, onsect, onind, htype, hsect, hind, but, obut;
+static point3d ipos, irig, idow, ifor;
+static lost = -1, lostang, level = 1;
+static ifat = .25, iheight = 2.0, jumpcnt = -1, onfloor = 0, velx, vely, velz;
+static health, ammonum, keynum, lastshottime = -1, cheat = 0;
+
+struct { sect, goal, z[2], locked, sid, snd; } door_t;
+enum {DOORMAX=256} static door_t door[DOORMAX]; static doornum;
+
+struct { sect, pivx, pivy, locked, curang, totang, goalang; } swing_t;
+enum {SWINGMAX=256} static swing_t swing[SWINGMAX]; static swingnum;
+
+struct { sect, x0, y0, locked, x1, y1, goalx, goaly; } trek_t;
+enum {TREKMAX=256} static trek_t trek[TREKMAX]; static treknum;
+
+enum {ELEMAX=64,ELEMAXSTOP=16}
+struct { sect, z[2], stop[ELEMAXSTOP], numstop, goali, goal; } ele_t;
+static ele_t ele[ELEMAX]; static elenum;
+
+struct { ind, lshot, spitag, spitil, spitfat, stat, health; } mon_t;
+enum {MONMAX =512} static mon_t mon[MONMAX]; static monnum;
+
+enum {ROTMAX =256} static rotsect[ROTMAX], rotnum; //Rotating sectors
+
+struct { up, tag; } pick_t;
+enum {PICKMAX=256} static pick_t pick[PICKMAX]; static picknum; //Rotating powerup items
+
+enum {PBULMAX=256} static pbul[PBULMAX], pbulnum; //Player bullets
+
+enum {ENDMAX = 16} static endind[ENDMAX], endnum; //End level button
+
+struct { ind, xv, yv, zv; } mbul_t;
+enum {MBULMAX=256} static mbul_t mbul[MBULMAX]; static mbulnum; //Monster bullets
+                   
+enum {LAVMAX=256}  static lavind[LAVMAX], lavnum; //Lava sectors
+
+enum {LIGHTMAX=16} static maplight[LIGHTMAX], maplightn;
+static light;
+
+()
+{
+//----------------------------------------------------------------------------------------
+//Init code
+   
+   health = 100;
+   ontype = -1; onsect = -1; onind = -1;
+   htype = -1; hsect = -1; hind = -1;
+
+   mountzip("../Build2"); hang = 0; vang = 0; tilt = 0;
+   if (!mapload("e2l10.map",&sect,&ipos.x,&ipos.y,&ipos.z,&hang,&vang,&tilt))
+      { playtext("Map not found"); return; }
+   parsemap(hang,vang,tilt); //Extract tags to local variables&arrays
+   
+//----------------------------------------------------------------------------------------
+//Main loop begins
+
+   while (1)
+   {
+      if ((USINGSTEREO) && (numframes%2)) dtim = 0; else { dtim = tim; tim = klock(); dtim = tim-dtim; }
+      
+//----------------------------------------------------------------------------------------
+//Moving code
+
+      move_door_updown();
+      move_door_swinging();
+      move_door_trek();
+      move_rotatingsectors();
+      move_elevators();
+      move_monsters();
+      move_monster_buls();
+      move_pickups();
+      move_player_buls();
+      move_lava();
+      move_lights();
+      
+      move_player();
+      
+      mapsetspri(light,MAP_XYZ,ipos.x+irig.x*.5,
+                               ipos.y+irig.y*.5,
+                               ipos.z+irig.z*.5);
+                               
+         //Left Mouse Button: Fire weapon
+      if (((bstatus%2) || (but%2)) && (ammonum > 0) && (lost < 0) && (tim-lastshottime > .25))
+      {
+         lastshottime = tim;
+         player_fire();
+      }
+   
+         //Right Mouse Button: Open/use key
+      if (((bstatus%4)>1) || ((but%8>3) > (obut%8>3)))
+      {
+         if ((bstatus%4)>1) bstatus -= 2;
+         if (lost >= 0) { lost = -1; level = 1; return; }
+         player_use();
+      }
+      
+         //Caps Lock noclip cheat
+      if (keystatus[0x3a]) { keystatus[0x3a] = 0; cheat = 1-cheat; }
+     
+//----------------------------------------------------------------------------------------
+//Drawing code
+
+      //clz(1e32);
+   
+      ster = sgn(numframes%2-.5)*(USINGSTEREO!=0);
+      setview(0,0,xres,yres,xres/2+pixoff*ster,yres/2,xres/2); f = sepoff*ster;
+      setcam(ipos.x+irig.x*f,
+             ipos.y+irig.y*f,
+             ipos.z+irig.z*f,
+             irig.x,irig.y,irig.z,
+             idow.x,idow.y,idow.z,
+             ifor.x,ifor.y,ifor.z);
+   
+      mapdraw();
+   
+      if (lost >= 0)
+      {
+         setfont(12,16);
+         moveto(xres/2-9*6+pixoff*ster/3,yres/2-8); printf("GAME OVER");
+      }
+      
+         //Draw ammo (rpg) at lower-left corner
+      setcam(sepoff*ster,0,0,0,0);
+      if (ammonum > 0)
+      {
+         drawspr("rpg.kv6",-.037,.026,.04,.0025,0,PI/2);
+         setfont(12,16); moveto(48+pixoff*ster/3,yres-48); printf("%g",ammonum);
+      }
+      
+      if (health > 0)
+      {
+         setfont(12,16); moveto(xres/2-60+pixoff*ster/3,yres-32); printf("%g%% Health",ceil(health));
+      }
+      
+      if (keynum > 0)
+      {
+         setfont(12,16); moveto(xres-80+pixoff*ster/3,yres-32);
+         if (keynum == 1) printf("%g Key",keynum);
+                     else printf("%g Keys",keynum);
+      }
+      
+         //Draw gun sight
+      if (lost < 0) { setcol(0xffffff); drawsph(xres/2+pixoff*ster/3,yres/2,-5); }
+      
+//----------------------------------------------------------------------------------------
+      refresh(); //Update screen,mouse,keys,etc..
+   }
+}
+
+   //Rotate vectors a & b around their common plane, by ang
+rotate_vecs (ang,a[3],b[3])
+{
+   c = cos(ang); s = sin(ang);
+   for(i=3-1;i>=0;i--) { f = a[i]; a[i] = f*c + b[i]*s; b[i] = b[i]*c - f*s; }
+}
+
+getsectorcentroid (sec,&cx,&cy,&cz)
+{
+   x = 0; y = 0; n = mapgetsect(sec,MAP_N);
+   for(w=n-1;w>=0;w--) { mapgetwall(sec,w,MAP_XY,&xx,&yy); x += xx; y += yy; }
+   f = 1/n; cx = x*f; cy = y*f;
+   cz = (mapgetsect(sec,MAP_Z+0)+mapgetsect(sec,MAP_Z+1))/2;   
+}
+
+move_player ()
+{
+      //Find distance to ground (things may pass below you but who cares)
+   nsec = sect; nx = ipos.x; ny = ipos.y; nz = ipos.z;
+   ontype = mapcoll(&nsec,&nx,&ny,&nz,0,0,iheight*2,ifat,0,&onsect,&onind);
+   floordist = nz-ipos.z;
+
+   vecx = 0; vecy = 0; vecz = 0;
+   
+   if (lost < 0)
+   {
+      f = .125;
+      if (keystatus[0x2a]) f *= .25;
+      if (keystatus[0x36]) f *= 4.0;
+      x = (keystatus[0xcd]-keystatus[0xcb]+keystatus[0x20]-keystatus[0x1e])*f; //Right-Left+'D'-'A'
+      y = (keystatus[0xc8]-keystatus[0xd0]+keystatus[0x11]-keystatus[0x1f])*f; //   Up-Down+'W'-'S'
+      if (cheat == 0)
+      {
+         velx += ((irig.x*x + ifor.x*y)-velx)*min(dtim*8,1);
+         vely += ((irig.y*x + ifor.y*y)-vely)*min(dtim*8,1);
+         jump_pressed = (keystatus[0x9d] || keystatus[0x39]); // RCtrl or Space
+         if (jump_pressed) // Jump button pressed
+         {
+           if (jumping_toggle == 0) // Button just pressed
+           {
+             if (jumping_counter == 0 && onfloor) // Can start jump
+             {
+               jumping_counter = 1;
+               jumping_toggle = 1;
+             }
+           }
+         }
+         else // Jump button released
+         {
+           if (jumping_toggle == 1)
+             jumping_toggle = 0;
+         }
+         
+         if (jumping_counter && !(jump_pressed))
+           jumping_toggle = 0;
+                       
+         
+          keystatus[0x9d]=0;
+          keystatus[0x39]=0;
+      }
+      else   
+      {
+         z = (keystatus[0x52]-keystatus[0x9d]-keystatus[0x39])*f; //KP0-RCtrl-Space
+         velx += ((irig.x*x + idow.x*z + ifor.x*y)-velx)*min(dtim*8,1);
+         vely += ((irig.y*x + idow.y*z + ifor.y*y)-vely)*min(dtim*8,1);
+         velz += ((irig.z*x + idow.z*z + ifor.z*y)-velz)*min(dtim*8,1);
+      }
+   }
+   else
+   {
+      velx -= velx*min(dtim*8,1);
+      vely -= vely*min(dtim*8,1);
+      if (cheat) velz -= velz*min(dtim*8,1);
+   }
+   if (cheat == 0)
+   {
+   
+      oonfloor = onfloor; onfloor = (floordist <= iheight+.01);
+      if (onfloor > oonfloor) { playsound("tapfloor.flac",max(velz*1000,0)); }
+         
+             //Jumping physics
+
+      if (jumping_counter)
+      {
+         if (!jump_pressed && jumping_toggle == 1)
+            jumping_toggle = 0;
+            
+         if (jumping_counter < 1280) // Duke's (1024+256)
+         {
+            // Water sector check (if using water tag 1)
+            water_sector = (mapgetsect(sect,MAP_TAG+1) == 1);
+            if (water_sector && jumping_counter > 768)
+            {
+               jumping_counter = 0;
+               velz = -8; // Adjusted for evaldraw scale
+            }
+            else
+            {
+               // Duke's sine table lookup: sintable[(2048-128+jumping_counter)&2047]/12
+               angle_index = (2048-128+jumping_counter) % 2048;
+               sine_value = sin(angle_index * PI/1024); // Convert to radians
+               velz -= sine_value * dtim * 100; // Adjusted multiplier for evaldraw
+               jumping_counter += 180; // Frame-rate independent
+               onfloor = 0;
+            }
+         }
+         else
+         {
+            jumping_counter = 0;
+            // Don't reset velz - let gravity handle it
+         }
+      }
+     if (onfloor && jumping_counter == 0)
+   jumping_toggle = 0;
+   
+      niheight = iheight;
+      if (keystatus[0x52] || (lost >= 0)) niheight *= .7; //KP0 (Duck)
+      velz += dtim*8; //falling - gravity
+      if (onfloor) velz += (floordist-niheight)*dtim*8; //legs unbending
+      velz *= pow(.7,dtim*50);
+   }
+
+   if ((lost < 0) && ((mapgetsect(sect,MAP_TAG+0) == 666) || (sect < 0) || //If ceiling tagged = hurts everywhere
+       ((onfloor) && ((ontype == MAP_CEIL) || (ontype == MAP_FLOR)) &&
+       (mapgetsect(onsect,MAP_TAG+1) == 666))))
+   {
+      if (cheat == 0) subhealth(dtim*32); //Caps lock cheat: no hurting
+      if (health <= 0)
+      {
+         playtext("You got toasted. GAME OVER.");
+         lostang = sgn(rnd-.5)/2; lost = tim;
+      }
+   }
+
+
+      //3D mouse code (requires special hardware)
+   f = dtim*48; vecx = velx*f; vecy = vely*f; vecz = velz*f;
+   if ((USING6DOF) && ((USINGSTEREO == 0) || ((numframes%2) == 0)))
+   {
+      mag6d_smoothfactor = 0.5;
+      static  opx, opy, opz, orx, ory, orz, odx, ody, odz, ofx, ofy, ofz;
+      static   px,  py,  pz,  rx,  ry,  rz,  dx,  dy,  dz,  fx,  fy,  fz;
+      static cpx = 0, cpy = 0, cpz = -2, cyaw = -1e32;
+      obut = but; cnt = readmag6d(0,&px,&py,&pz,&rx,&ry,&rz,&dx,&dy,&dz,&fx,&fy,&fz,&but);
+      if ((bstatus%2) > (but%2)) but++;
+      if (((bstatus%4)>1) > ((but%4)>1)) but+=2;
+      if (using6dof < 2)
+      {
+         static mode6dof = 1;
+         if (keystatus[0x9c]) { keystatus[0x9c] = 0; mode6dof = 1-mode6dof; }
+         if (mode6dof == 0)
+         {
+               //Absolute movement
+            if (((but%4) < 2) && (numframes))
+            {
+               f = 16; x = (px-opx)*f; y = (py-opy)*f; z = (pz-opz)*f;
+               vecx = x*irig.x + y*idow.x + z*ifor.x;
+               vecy = x*irig.y + y*idow.y + z*ifor.y;
+               vecz = x*irig.z + y*idow.z + z*ifor.z;
+               for(j=2;j>0;j--) //Multiply orientation offset by 2
+               {
+                  x = irig.x; y = idow.x; z = ifor.x;
+                  x2 = x*orx + y*odx + z*ofx;
+                  y2 = x*ory + y*ody + z*ofy;
+                  z2 = x*orz + y*odz + z*ofz;
+                  irig.x = x2*rx + y2*ry + z2*rz;
+                  idow.x = x2*dx + y2*dy + z2*dz;
+                  ifor.x = x2*fx + y2*fy + z2*fz;
+                  
+                  x = irig.y; y = idow.y; z = ifor.y;
+                  x2 = x*orx + y*odx + z*ofx;
+                  y2 = x*ory + y*ody + z*ofy;
+                  z2 = x*orz + y*odz + z*ofz;
+                  irig.y = x2*rx + y2*ry + z2*rz;
+                  idow.y = x2*dx + y2*dy + z2*dz;
+                  ifor.y = x2*fx + y2*fy + z2*fz;
+                  
+                  x = irig.z; y = idow.z; z = ifor.z;
+                  x2 = x*orx + y*odx + z*ofx;
+                  y2 = x*ory + y*ody + z*ofy;
+                  z2 = x*orz + y*odz + z*ofz;
+                  irig.z = x2*rx + y2*ry + z2*rz;
+                  idow.z = x2*dx + y2*dy + z2*dz;
+                  ifor.z = x2*fx + y2*fy + z2*fz;
+               }
+            }
+         }
+         else
+         {
+            if (cyaw == -1e32) cyaw = atan2(ifor.x,ifor.y);
+            
+               //Relative movement
+            if ((((but%4)<2) > ((obut%4)<2)) || (numframes == 0)) //MMB: Set center pos
+            {
+               cpx = px; cpy = py; cpz = pz;
+               //cyaw = atan2(fx,fz);
+            }
+            px -= cpx; py -= cpy; pz -= cpz;
+            
+            f = dtim*8;
+            //px -= atan(px); py -= atan(py); pz -= atan(pz);
+            vecx = (px*irig.x + py*idow.x + pz*ifor.x)*f;
+            vecy = (px*irig.y + py*idow.y + pz*ifor.y)*f;
+            vecz = (px*irig.z + py*idow.z + pz*ifor.z)*f;
+            
+            if ((but%4) >= 2)
+            {
+               if (((obut%4) < 2) || (numframes == 0))
+                  cyaw = atan2(fx,fz) + atan2(ifor.x,ifor.y);
+               yaw = cyaw - atan2(fx,fz);
+            }
+            else
+            {
+               if (((obut%4) >= 2) || (numframes == 0))
+                  cyaw = atan2(fx,fz);
+               yaw = (atan2(fx,fz)-cyaw)*dtim*-8 + atan2(ifor.x,ifor.y);
+            }
+            pit = atan2(fy,sqrt(fx^2 + fz^2));
+            rol = atan2(ry,dy);
+            irig.x =-cos(yaw); irig.y = sin(yaw); irig.z = 0;
+            idow.x =        0; idow.y =        0; idow.z = 1;
+            ifor.x = sin(yaw); ifor.y = cos(yaw); ifor.z = 0;
+            rotate_vecs(pit*-1,idow,ifor);
+            rotate_vecs(rol*.5,irig,idow);
+         }
+         if (but >= 8) //Nav switch
+         {
+            static xdir[16] = {0,-1,1,0,1,0,1,0,-1,-1};
+            static ydir[16] = {0,-1,-1,-1,1,0,0,0,1,0,0,0,1};
+            x = xdir[but/8]; y = ydir[but/8];
+            vecx += (irig.x*x - ifor.x*y)*dtim*5;
+            vecy += (irig.y*x - ifor.y*y)*dtim*5;
+            vecz += (irig.z*x - ifor.z*y)*dtim*5;
+         }
+      }
+      else
+      {
+         static opx2,opy2,opz2,orx2,ory2,orz2,odx2,ody2,odz2,ofx2,ofy2,ofz2,obut2;
+         static  px2, py2, pz2, rx2, ry2, rz2, dx2, dy2, dz2, fx2, fy2, fz2, but2;
+         obut2 = but2; cnt = readmag6d(1,&px2,&py2,&pz2,&rx2,&ry2,&rz2,&dx2,&dy2,&dz2,&fx2,&fy2,&fz2,&but2);
+         
+         yaw = atan2(fx,fz);
+         pit = atan2(fy,sqrt(fx^2 + fz^2));
+         rol = atan2(ry,dy);
+         vecx = (rol*irig.x + pit*ifor.x)*dtim*16;
+         vecy = (rol*irig.y + pit*ifor.y)*dtim*16;
+         vecz = (rol*irig.z + pit*ifor.z)*dtim*16;
+         
+         yaw = atan2(fx2,fz2)*dtim*-8 + atan2(ifor.x,ifor.y);
+         pit = atan2(fy2,sqrt(fx2^2 + fz2^2));
+         rol = atan2(ry2,dy2);
+         irig.x =-cos(yaw); irig.y = sin(yaw); irig.z = 0;
+         idow.x =        0; idow.y =        0; idow.z = 1;
+         ifor.x = sin(yaw); ifor.y = cos(yaw); ifor.z = 0;
+         rotate_vecs(-pit,idow,ifor);
+         rotate_vecs(rol,irig,idow);
+         
+         opx2 = px2; opy2 = py2; opz2 = pz2;
+         orx2 = rx2; ory2 = ry2; orz2 = rz2;
+         odx2 = dx2; ody2 = dy2; odz2 = dz2;
+         ofx2 = fx2; ofy2 = fy2; ofz2 = fz2;
+      }
+      opx = px; opy = py; opz = pz;
+      orx = rx; ory = ry; orz = rz;
+      odx = dx; ody = dy; odz = dz;
+      ofx = fx; ofy = fy; ofz = fz;
+   }
+   if (USING6DOF == 0)
+   {
+      dx = 0; dy = 0; dz = 0; ax = 0; ay = 0; az = 0; mb = 0;
+      readspacenav(&dx,&dy,&dz,&ax,&ay,&az,&mb);
+      f = dtim*28;
+      vecx += (irig.x*dx + idow.x*dz - ifor.x*dy)*f;
+      vecy += (irig.y*dx + idow.y*dz - ifor.y*dy)*f;
+      vecz += (irig.z*dx + idow.z*dz - ifor.z*dy)*f;
+      rotate_vecs(ay*+dtim*4,idow,ifor);
+      rotate_vecs(ax*+dtim*4,irig,idow);
+      rotate_vecs(az*+dtim*4,ifor,irig);
+      obut = but; but = 0;
+      if (mb%2) but += 1;
+      if ((mb%4)>1) but += 4;
+   }
+
+   if (cheat) { ipos.x += vecx; ipos.y += vecy; ipos.z += vecz; } //Caps lock (noclip cheat)
+   else htype = mapcoll(&sect,&ipos.x,&ipos.y,&ipos.z,vecx,vecy,vecz,ifat,1,&hsect,&hind);
+   if ((htype == MAP_SPRI) && (lost < 0))
+   {
+      for(k=monnum-1;k>=0;k--) if (mon[k].ind == hind) break;
+      if (k >= 0)
+      {
+         subhealth(dtim*512);
+         if (health <= 0)
+         {
+            playtext("You got eaten. GAME OVER.");
+            lostang = sgn(rnd-.5)/2; lost = tim;
+         }
+      }
+   }
+   
+   x = 0; y = 0; if ((USINGSTEREO) && (numframes%2)) ; else readmouse(&x,&y);
+
+   rotate_vecs(x*-.01,irig,ifor);
+   rotate_vecs(y*-.01,idow,ifor);
+   if (lost < 0) { if (USING6DOF == 0) rotate_vecs(irig.z*-5*dtim,irig,idow); }
+            else rotate_vecs((irig.z-lostang)*-5*dtim,irig,idow); //Tilt view upon death
+}
+
+parsemap (hang, vang, tilt)
+{   
+      //Must convert coordinate system:
+      //In Build   , Z=depth into floor
+      //In Evaldraw, Z=depth into screen
+   irig.x = 0; irig.y = 1; irig.z = 0; //Right   vector
+   idow.x = 0; idow.y = 0; idow.z = 1; //Down    vector
+   ifor.x = 1; ifor.y = 0; ifor.z = 0; //Forward vector
+   rotate_vecs(hang,ifor,irig);
+   rotate_vecs(vang,ifor,idow);
+
+   ammonum = 0; keynum = 0;
+   doornum = 0; swingnum = 0; treknum = 0; elenum = 0; monnum = 0;
+   rotnum = 0; picknum = 0; pbulnum = 0;
+   endnum = 0; mbulnum = 0, lavnum = 0;
+   maplightn = 0;
+   
+   for(s=mapnumsects-1;s>=0;s--)
+   {
+      for(i=0;i<2;i++) //Check both ceil&flor
+      {
+         tag = mapgetsect(s,MAP_TAG+i);
+         if (tag == 1) { rotsect[rotnum] = s; rotnum++; }
+         else if (tag == 6)
+         {
+            door[doornum].sect = s;
+            for(j=0;j<2;j++) door[doornum].z[j] = mapgetsect(s,MAP_Z+j);
+            door[doornum].sid = i;
+            door[doornum].goal = door[doornum].z[1-i];
+            
+            door[doornum].locked = 0;
+            for(j=mapgetsect(s,MAP_HEADSPRI);j>=0;j=mapgetspri(j,MAP_N))
+               if (mapgetspri(j,MAP_TAG) == 7)
+                  { mapdelspri(j); door[doornum].locked = 1; break; }
+            
+            mapsetsect(s,MAP_Z+i,door[doornum].goal);
+            doornum++;
+         }
+      }
+      if (tag == 5)
+      {
+         ele[elenum].sect = s;
+         ele[elenum].z[0] = mapgetsect(s,MAP_Z+1);
+         ele[elenum].z[1] = mapgetsect(s,MAP_Z+0);
+         ele[elenum].stop[0] = mapgetsect(s,MAP_Z+1); n = 1;
+         for(i=mapgetsect(s,MAP_HEADSPRI);i>=0;i=j)
+         {
+            j = mapgetspri(i,MAP_N); if (mapgetspri(i,MAP_TAG) != 105) continue;
+            z = mapgetspri(i,MAP_Z);
+            for(k=n-1;(k > 0) && (z > ele[elenum].stop[k]);k--)
+               ele[elenum].stop[k+1] = ele[elenum].stop[k];
+            ele[elenum].stop[k+1] = z; n++; 
+            mapdelspri(i);
+            //mapsetspri(i,MAP_INVISIBLE,1); //hide sprite
+         }
+         ele[elenum].goali = 0; ele[elenum].goal = ele[elenum].stop[0];
+         ele[elenum].numstop = n; elenum++;
+      }
+      else if (tag == 13)
+      {
+         for(w=mapgetsect(s,MAP_N)-1;w>=0;w--) if (mapgetwall(s,w,MAP_TAG)) break;
+         swing[swingnum].sect = s;
+         swing[swingnum].totang = mapgetsect(s,MAP_TAG+0)*PI/180;
+         if (swing[swingnum].totang < 0) w = mapgetwall(s,w,MAP_N);
+         mapgetwall(s,w,MAP_XY,&swing[swingnum].pivx,&swing[swingnum].pivy);
+         swing[swingnum].curang = 0;
+         swing[swingnum].goalang = 0;
+         
+         swing[swingnum].locked = 0;
+            for(j=mapgetsect(s,MAP_HEADSPRI);j>=0;j=mapgetspri(j,MAP_N))
+               if (mapgetspri(j,MAP_TAG) == 7)
+                  { mapdelspri(j); swing[swingnum].locked = 1; break; }
+            
+         swingnum++;
+      }
+      else if (tag == 16)
+      {
+         trek[treknum].sect = s;
+         mapgetwall(s,0,MAP_XY,&trek[treknum].x0,&trek[treknum].y0); w = mapgetwall(s,0,MAP_N);
+         mapgetwall(s,w,MAP_XY,&trek[treknum].x1,&trek[treknum].y1);
+         trek[treknum].goalx = trek[treknum].x0;
+         trek[treknum].goaly = trek[treknum].y0;
+
+         trek[treknum].locked = 0;
+         for(j=mapgetsect(s,MAP_HEADSPRI);j>=0;j=mapgetspri(j,MAP_N))
+            if (mapgetspri(j,MAP_TAG) == 7)
+               { mapdelspri(j); trek[treknum].locked = 1; break; }
+            
+         treknum++;
+      }
+      else if (tag == 666) { lavind[lavnum] = s; lavnum++; }
+               
+         //-------- Process sprite tags --------
+         
+      for(i=mapgetsect(s,MAP_HEADSPRI);i>=0;i=mapgetspri(i,MAP_N))
+      {
+         tag = mapgetspri(i,MAP_TAG);
+         if ((tag == 1) || (tag == 4) || (tag == 5)) //1=moving, 4=shooting, 5=moving&shooting
+         {
+            mon[monnum].ind = i;
+            mon[monnum].health = 100;
+            mon[monnum].lshot = -1e32;
+            mon[monnum].stat = 0;
+            mapsetspri(i,MAP_BLOCK,1);
+            mon[monnum].spitag = 0; //A nearby sprite that monster spits out upon death
+            mapgetspri(i,MAP_XYZ,&ix,&iy,&iz);
+            for(j=mapgetsect(s,MAP_HEADSPRI);j>=0;j=mapgetspri(j,MAP_N))
+            {
+               tag = mapgetspri(j,MAP_TAG); if ((tag != 2) && (tag != 6) && (tag != 7)) continue;
+               mapgetspri(j,MAP_XYZ,&jx,&jy,&jz);
+               if ((ix-jx)^2 + (iy-jy)^2 + (iz-jz)^2 > 1^2) continue;
+               mon[monnum].spitag = tag;
+               mon[monnum].spitil = mapgetspri(j,MAP_TILE);
+               mon[monnum].spitfat = mapgetspri(j,MAP_FAT);
+               mapdelspri(j);
+               break;
+            }
+            monnum++;
+         }
+         if (mapgetspri(i,MAP_LIGHT)) { maplight[maplightn] = i; maplightn++; }
+      }
+      for(i=mapgetsect(s,MAP_HEADSPRI);i>=0;i=mapgetspri(i,MAP_N))
+      {
+         tag = mapgetspri(i,MAP_TAG);
+         if ((tag == 2) || (tag == 6) || (tag == 7))
+            { pick[picknum].up = i; pick[picknum].tag = tag; picknum++; }
+         else if (tag == 3) { endind[endnum] = i; endnum++; }
+      }
+   }
+   
+   if (maplightn == 0)
+   {
+      light = mapinsspri(&sect,ipos.x,ipos.y,ipos.z);
+      mapsetspri(light,MAP_INVISIBLE,1);
+      mapsetspri(light,MAP_RGB,2,2,2);
+      mapsetlight(MAP_AMBIENT,3/128);
+      mapsetlight(MAP_SHADOW,1);
+      mapsetlight(MAP_SPRI,light);
+   } else { light = -1; }
+}
+
+player_fire ()
+{   
+   if (pbulnum >= PBULMAX) return;
+   
+   ammonum--;
+      
+   i = mapinsspri(sect,ipos.x,ipos.y,ipos.z);
+   mapsetspri(i,MAP_FAT,.25);
+   mapsetsprif(i,MAP_FILE,"rpg.kv6");
+   mapsetspri(i,MAP_HVANG,atan2(irig.y,irig.x),-atan2(ifor.z,sqrt(ifor.x^2+ifor.y^2)));
+   pbul[pbulnum] = i; pbulnum++;
+   mapsetspri(i,MAP_RGB,1,1.5,1.5);
+   mapsetlight(MAP_SPRI,i);
+   playsound("shoot.wav");
+}
+
+player_use ()
+{   
+   for(i=doornum-1;i>=0;i--)
+   {
+      if (sect == door[i].sect) continue;
+      cx = 0; cy = 0; cz = 0; getsectorcentroid(door[i].sect,&cx,&cy,&cz);
+      if ((cx-ipos.x)*ifor.x + (cy-ipos.y)*ifor.y < 0) continue;
+      if ((cx-ipos.x)^2 + (cy-ipos.y)^2 + (cz-ipos.z)^2 > 3^2) continue;
+      if (door[i].locked)
+      {
+         if (keynum <= 0) { playtext("The door is locked."); continue; }
+         keynum--; door[i].locked = 0;
+      }
+      if (mapgetsect(door[i].sect,MAP_Z+door[i].sid) != door[i].goal)
+         playsoundupdate(door[i].snd,0);
+      door[i].goal = door[i].z[0]+door[i].z[1]-door[i].goal;
+      door[i].snd = playsound("tapfloor.flac",100,0.13);
+   }
+   
+   for(i=swingnum-1;i>=0;i--)
+   {
+      cx = 0; cy = 0; cz = 0; getsectorcentroid(swing[i].sect,&cx,&cy,&cz);
+      if ((cx-ipos.x)*ifor.x + (cy-ipos.y)*ifor.y < 0) continue;
+      if ((cx-ipos.x)^2 + (cy-ipos.y)^2 > 4^2) continue;
+      if (swing[i].locked)
+      {
+         if (keynum <= 0) { playtext("The door is locked."); continue; }
+         keynum--; swing[i].locked = 0;
+      }
+      swing[i].goalang = swing[i].totang-swing[i].goalang;
+      playsound("tapfloor.flac",100,0.13);
+   }
+   
+   for(i=treknum-1;i>=0;i--)
+   {
+      if (mapgetwall(trek[i].sect,0,MAP_OPPS) == sect) continue;
+      cx = 0; cy = 0; cz = 0; getsectorcentroid(trek[i].sect,&cx,&cy,&cz);
+      if ((cx-ipos.x)*ifor.x + (cy-ipos.y)*ifor.y < 0) continue;
+      if ((cx-ipos.x)^2 + (cy-ipos.y)^2 > 4^2) continue;
+      if (trek[i].locked)
+      {
+         if (keynum <= 0) { playtext("The door is locked."); continue; }
+         keynum--; trek[i].locked = 0;
+      }
+      if ((trek[i].goalx == trek[i].x0) && (trek[i].goaly == trek[i].y0))
+           { trek[i].goalx = trek[i].x1; trek[i].goaly = trek[i].y1; }
+      else { trek[i].goalx = trek[i].x0; trek[i].goaly = trek[i].y0; }
+      playsound("tapfloor.flac",100,0.13);
+   }
+   
+   for(i=elenum-1;i>=0;i--)
+   {
+      if (ele[i].sect == sect)
+      {
+         if ((ifor.z < 0) && (ele[i].goali < ele[i].numstop-1))
+         {
+            ele[i].goali++; ele[i].goal = ele[i].stop[ele[i].goali];
+            playsound("tapfloor.flac",100,0.011*abs(ele[i].goal-mapgetsect(ele[i].sect,MAP_Z+1)));
+         }
+         if ((ifor.z > 0) && (ele[i].goali > 0))
+         {
+            ele[i].goali--; ele[i].goal = ele[i].stop[ele[i].goali];
+            playsound("tapfloor.flac",100,0.011*abs(ele[i].goal-mapgetsect(ele[i].sect,MAP_Z+1)));
+         }
+      }
+      else //Call elevator
+      {
+         cx = 0; cy = 0; cz = 0; getsectorcentroid(ele[i].sect,&cx,&cy,&cz);
+         if ((cx-ipos.x)*ifor.x + (cy-ipos.y)*ifor.y < 0) continue;
+         if ((cx-ipos.x)^2 + (cy-ipos.y)^2 < 4^2)
+         {
+            dmin = 1e32; bestj = 0;
+            for(j=0;j<ele[i].numstop;j++)
+            {
+               d = abs(ele[i].stop[j]-(ipos.z+iheight));
+               if (d < dmin) { dmin = d; bestj = j; }
+            }
+            if (bestj != ele[i].goali)
+            {
+               ele[i].goali = bestj; ele[i].goal = ele[i].stop[bestj];
+               playsound("tapfloor.flac",100,0.011*abs(ele[i].goal-mapgetsect(ele[i].sect,MAP_Z+1)));
+            }
+         }
+      }
+   }
+     
+   for(i=endnum-1;i>=0;i--)
+   {
+      s = endind[i];
+      mapgetspri(s,MAP_SXYZ,&ss,&sx,&sy,&sz);
+      dx = sx-ipos.x;
+      dy = sy-ipos.y;
+      dz = sz-ipos.z;
+      if (dx*ifor.x + dy*ifor.y < 0) continue;
+      if ((ss == sect) && (dx^2 + dy^2 + dz^2 < 2^2))
+      {
+         playtext("You win! Level %g completed.",level); level++;
+         if (level == 2) i = mapload("cage2.map"   ,&sect,&ipos.x,&ipos.y,&ipos.z,&hang,&vang,&tilt);
+         if (i == 0) { playtext("Map not found"); return; }
+         parsemap(hang,vang,tilt); //Extract tags to local variables&arrays
+         return;
+      }
+   }
+}
+
+move_door_updown ()
+{
+   for(i=doornum-1;i>=0;i--)
+   {
+      z = mapgetsect(door[i].sect,MAP_Z+door[i].sid);
+      z += sgn(door[i].goal-z)*dtim*4;
+      mapsetsect(door[i].sect,MAP_Z+door[i].sid,min(max(z,door[i].z[0]),door[i].z[1]));
+   }
+}
+
+move_door_swinging ()
+{
+   for(i=swingnum-1;i>=0;i--)
+   {
+      da = swing[i].goalang-swing[i].curang;
+      if (da > 0) na = min(swing[i].curang + dtim*2,swing[i].goalang);
+             else na = max(swing[i].curang - dtim*2,swing[i].goalang);
+      da = na-swing[i].curang; swing[i].curang = na;
+      s = swing[i].sect; cc = cos(da); ss = sin(da);
+      for(w=mapgetsect(s,MAP_N)-1;w>=0;w--)
+      {
+         mapgetwall(s,w,MAP_XY,&x,&y); x -= swing[i].pivx; y -= swing[i].pivy;
+         mapsetwall(s,w,MAP_XY,x*cc - y*ss + swing[i].pivx,
+                               y*cc + x*ss + swing[i].pivy);
+      }
+   }
+}      
+
+move_door_trek ()
+{
+   for(i=treknum-1;i>=0;i--)
+   {
+      s = trek[i].sect;
+      mapgetwall(s,0,MAP_XY,&dx,&dy);
+      dx = trek[i].goalx-dx;
+      dy = trek[i].goaly-dy;
+      f = dx^2 + dy^2; if (f < .001^2) continue;
+      f = min(dtim*2/sqrt(f),1); dx *= f; dy *= f;
+
+      for(w=mapgetsect(s,MAP_N)-1;w>=0;w--)
+      {
+         mapgetwall(s,w,MAP_XY,&x,&y);
+         mapsetwall(s,w,MAP_XY,x+dx,y+dy);
+      }
+   }
+}      
+
+move_rotatingsectors ()
+{   
+   for(i=rotnum-1;i>=0;i--)
+   {
+      s = rotsect[i];
+      cx = 0; cy = 0; cz = 0; getsectorcentroid(s,&cx,&cy,&cz);
+      ang = dtim*.5; cc = cos(ang); ss = sin(ang);
+      for(w=mapgetsect(s,MAP_N)-1;w>=0;w--)
+      {
+         mapgetwall(s,w,MAP_XY,&x,&y); x -= cx; y -= cy;
+         mapsetwall(s,w,MAP_XY,x*cc - y*ss + cx,
+                               y*cc + x*ss + cy);
+      }
+      mapgetsect(s,MAP_GRADXY+1,&x,&y);
+      mapsetsect(s,MAP_GRADXY+1,x*cc - y*ss,
+                                y*cc + x*ss);
+                                
+         //This hack makes the player move when on a sector inside a rotating sector
+      if (mapgetsect(sect,MAP_RELALIGN+1))
+      {
+         for(w=mapgetsect(sect,MAP_N)-1;w>=0;w--)
+         {
+            ns = sect; nw = w;
+            do { os = ns; ns = mapgetwall(ns,nw,MAP_OPPS); nw = mapgetwall(os,nw,MAP_OPPW); }
+            while ((ns >= 0) && (ns != sect) && (ns != s));
+            if (ns != s) break;
+         }
+         if (w < 0) s = onsect;
+      }
+
+      if ((onsect == s) && (onfloor))
+      {
+         ox = ipos.x-cx; oy = ipos.y-cy;
+         ipos.x = ox*cc - oy*ss + cx;
+         ipos.y = oy*cc + ox*ss + cy;
+         ox = irig.x; oy = irig.y;
+         irig.x = ox*cc - oy*ss;
+         irig.y = oy*cc + ox*ss;
+         ox = idow.x; oy = idow.y;
+         idow.x = ox*cc - oy*ss;
+         idow.y = oy*cc + ox*ss;
+         ox = ifor.x; oy = ifor.y;
+         ifor.x = ox*cc - oy*ss;
+         ifor.y = oy*cc + ox*ss;
+      }
+   }
+}
+
+move_elevators ()
+{
+   for(i=elenum-1;i>=0;i--)
+   {
+      z = mapgetsect(ele[i].sect,MAP_Z+1);
+      dz = ele[i].goal - z;
+      if (dz < 0) dz = max(z-dtim*4,ele[i].goal)-z; //dz = distance to goal
+             else dz = min(z+dtim*4,ele[i].goal)-z;
+      mapsetsect(ele[i].sect,MAP_Z+1,z+dz);
+   }
+}
+
+move_monsters ()
+{   
+   nf8 = (numframes%8);
+   for(i=monnum-1;i>=0;i--)
+   {
+      //if (lost >= 0) continue;
+      s = mon[i].ind;
+      if (mon[i].stat == 0) //Inactive state
+      {
+         if ((i%8) == nf8)
+            if (mapcanc(sect,ipos.x,ipos.y,ipos.z,s))
+            {
+               //playtext("I see you!");
+               mon[i].stat = 1;
+            }
+      }
+      else if (mon[i].stat == 1) //Attack state
+      {
+         st = mapgetspri(s,MAP_TAG);
+         mapgetspri(s,MAP_SXYZ,&ss,&sx,&sy,&sz);
+         dx = ipos.x-sx;
+         dy = ipos.y-sy;
+         dz = ipos.z-sz;
+         ha = atan2(dx,dy); va = atan2(dz,sqrt(dx*dx + dy*dy));
+         if ((st == 1) || (st == 5))
+         {
+            f = dtim*2/sqrt(dx^2 + dy^2 + dz^2);
+            htype = mapcoll(&ss,&sx,&sy,&sz,dx*f,dy*f,dz*f,.75,1,&hsect,&hind);
+            if (htype == MAP_SPRI) //Hit sprite
+            {
+               for(k=pbulnum-1;k>=0;k--)
+                  if (pbul[k] == hind) break;
+               if (k >= 0)
+               {
+                  mapdelspri(hind); pbulnum--; pbul[k] = pbul[pbulnum];
+                  
+                  mon[i].health -= 25;
+                  if (mon[i].health <= 0)
+                  {
+                     mon[i].health = 0; mon[i].stat = 2;
+                     playtext("Down I go.");
+                  }
+                  else playsound("gothit.wav");
+               }
+            }
+            mapsetspri(s,MAP_SXYZ,ss,sx,sy,sz);
+         }
+         if ((st == 4) || (st == 5))
+         {
+            if (tim-mon[i].lshot > 2)
+            {
+               mon[i].lshot = tim;
+               b = mapinsspri(ss,sx,sy,sz);
+               mapsetsprif(b,MAP_FILE,"rpg.kv6");
+               mapsetspri(b,MAP_FAT,.25);
+               f = 12/sqrt(dx^2 + dy^2 + dz^2);
+               mbul[mbulnum].xv = dx*f;
+               mbul[mbulnum].yv = dy*f;
+               mbul[mbulnum].zv = dz*f;
+               mapsetspri(b,MAP_HVANG,PI-ha,-va);
+               mapsetspri(b,MAP_RGB,2,1,1);
+               mapsetlight(MAP_SPRI,b);
+               playsound("shoot.wav");
+               mbul[mbulnum].ind = b; mbulnum++;
+            }
+         }
+         mapsetspri(s,MAP_HVANG,-ha,va);
+         
+         if ((lost < 0) && ((sx-ipos.x)^2+(sy-ipos.y)^2+(sz-ipos.z)^2 < 1^2))
+         {
+            subhealth(dtim*512);
+            if (health <= 0)
+               { playtext("You got eaten. GAME OVER."); lostang = sgn(rnd-.5)/2; lost = tim; }
+         }
+
+         if (mapcanc(sect,ipos.x,ipos.y,ipos.z,s) == 0)
+            mon[i].stat = 0;
+      }
+      else if (mon[i].stat == 2) //Death sequence
+      {
+         mapgetspri(s,MAP_SXYZ,&ss,&sx,&sy,&sz);
+         htype = mapcoll(&ss,&sx,&sy,&sz,0,0,dtim,.1,0,&hsect,&hind);
+         mapsetspri(s,MAP_SXYZ,ss,sx,sy,sz);
+
+         mapsetspri(s,MAP_VANG,mapgetspri(s,MAP_VANG)+dtim*4);
+         mapsetspri(s,MAP_FAT,mapgetspri(s,MAP_FAT)*pow(.25,dtim));
+
+         mon[i].health -= dtim;
+         if (mon[i].health < -1)
+         {
+            if (mon[i].spitag)
+            {
+               j = mapinsspri(ss,sx,sy,sz);
+               pick[picknum].up = j;
+               pick[picknum].tag = mon[i].spitag;
+               mapsetspri(j,MAP_TILE,mon[i].spitil);
+               mapsetspri(j,MAP_FAT,mon[i].spitfat);
+               picknum++;
+               mon[i].spitag = 0;
+            }
+         }
+         if (mon[i].health < -2) //delete monster after 5 seconds of dying
+         {
+            mapdelspri(s); monnum--; mon[i] = mon[monnum];
+         }
+      }
+   }
+}
+
+move_monster_buls ()
+{
+   for(i=mbulnum-1;i>=0;i--)
+   {
+      j = mbul[i].ind;
+      mapgetspri(j,MAP_SXYZ,&s,&x,&y,&z);
+      if (((ipos.x-x)^2 + (ipos.y-y)^2 + (ipos.z-z)^2 < .5^2) && (lost < 0))
+      {
+         subhealth(dtim*512);
+         if (health <= 0)
+         {
+            playtext("You got shot. GAME OVER.");
+            lostang = sgn(rnd-.5)/2; lost = tim;
+         }
+      }
+      htype = mapcoll(&s,&x,&y,&z,mbul[i].xv*dtim,mbul[i].yv*dtim,mbul[i].zv*dtim,.01,0,&hsect,&hind);
+      if (htype == 0)
+         mapsetspri(j,MAP_SXYZ,s,x,y,z);
+      else
+      {
+         mapdelspri(j); mbulnum--; mbul[i] = mbul[mbulnum];
+      }
+   }
+}
+
+move_pickups ()
+{
+   for(i=picknum-1;i>=0;i--)
+   {
+      si = pick[i].up;
+      mapsetspri(si,MAP_HANG,tim);
+      mapgetspri(si,MAP_SXYZ,&s,&x,&y,&z);
+      mapsetspri(si,MAP_Z,min(z+dtim,mapgetsect(s,MAP_Z+1,x,y)-.3));
+      if ((x-ipos.x)^2 + (y-ipos.y)^2 + (z-ipos.z)^2/4 < 1^2)
+      {
+         playsound("pickup.wav");
+         if (pick[i].tag == 2) ammonum += 10;
+         if (pick[i].tag == 6) health = 100;
+         if (pick[i].tag == 7) keynum++;
+         mapdelspri(si);
+         picknum--; pick[i] = pick[picknum];
+      }
+   }
+}
+
+move_player_buls ()
+{
+   for(i=pbulnum-1;i>=0;i--)
+   {
+      s = pbul[i]; f = dtim*64;
+      mapgetspri(s,MAP_SXYZ,&ns,&nx,&ny,&nz);
+      mapgetspri(s,MAP_FXYZ,&vx,&vy,&vz);
+      htype = mapcoll(&ns,&nx,&ny,&nz,vx*f,vy*f,vz*f,.01,0,&hsect,&hind);
+      if (htype == 0)
+         { mapsetspri(s,MAP_SXYZ,ns,nx,ny,nz); }
+      else
+      {
+         if (htype == MAP_SPRI) //Hit sprite
+         {
+            for(k=monnum-1;k>=0;k--)
+               if (mon[k].ind == hind) break;
+            if (k >= 0)
+            {
+               mon[k].health -= 25;
+               if (mon[k].health <= 0)
+               {
+                  mon[k].health = 0; mon[k].stat = 2;
+                  playtext("Down I go.");
+               }
+               else playsound("gothit.wav");
+            }
+         }
+         else
+         {
+            playsound("tapfloor.flac");
+         }
+         mapdelspri(s); pbulnum--; pbul[i] = pbul[pbulnum];
+      }
+   }
+}
+
+move_lava ()
+{
+   for(i=lavnum-1;i>=0;i--)
+   {
+      s = lavind[i];
+      mapsetsect(s,MAP_PANXY+1,tim%1,tim%1); //PANX/Y,SCALEX/Y,SHEARX/Y
+   }
+}
+
+move_lights ()
+{
+   for(i=0;i<maplightn;i++)
+   {
+      j = maplight[i];
+      mapgetspri(j,MAP_SXYZ,&s,&x,&y,&z);
+      f = dtim;
+      vx = (cos(tim+i)+cos(tim*1.2-i*3))*f;
+      vy = sin(tim+i)*f;
+      vz = sin(tim*1.2-i*3)*f;
+      ontype = mapcoll(&s,&x,&y,&z,vx,vy,vz,mapgetspri(j,MAP_FAT),1,&onsect,&onind);
+      mapsetspri(j,MAP_SXYZ,s,x,y,z);
+   }
+}
+
+subhealth (suck)
+{
+   ohealth = health; health -= suck;
+   if (int(health/5) < int(ohealth/5)) playsound("ouch.wav");
+}

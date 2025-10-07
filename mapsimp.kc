@@ -1,0 +1,29 @@
+()
+{
+      //Load Build2 map into memory
+   mountzip("../build2");
+   mapload("doortest.map",&sect,&x,&y,&z,&hang,&vang,&tilt);
+
+   while (1)
+   {
+         //Render Build2 view (cls & clz done inside)
+      mapdraw(x,y,z,hang,vang,tilt);
+      
+         //Rotate with mouse
+      readmouse(mx,my); hang += mx*.01; vang += my*.01;
+      
+         //Generate movement vector (vx,vy,vz) from arrows
+      a = keystatus[0xc8]-keystatus[0xd0]; //Up-Down
+      b = keystatus[0xcd]-keystatus[0xcb]; //Right-Left
+      c = keystatus[0x52]-keystatus[0x9d]; //KP0-RCtrl
+      speed = .02; if (keystatus[0x36]) speed *= 4;
+      vx = (cos(hang)*a - sin(hang)*b)*speed;
+      vy = (sin(hang)*a + cos(hang)*b)*speed;
+      vz = c*speed;
+         
+         //Collision detection
+      mapcoll(&sect,&x,&y,&z,vx,vy,vz,.25,1,&hitsect,&hitind);
+     
+      refresh();
+   }
+}

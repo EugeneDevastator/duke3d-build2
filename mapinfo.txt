@@ -1,0 +1,215 @@
+Notes on using EVALDRAW's Build2 MAP functions.       Written 07/04/2008-06/03/2010 by Ken Silverman
+
+//----------------------------------------- Main Functions -----------------------------------------
+
+   //Load map file into memory
+   //   &sector_index,&posx,&posy,&posz: default starting camera position
+   //   horizontal_ang,vertical_angle,tilt_angle: default starting camera angle in radians
+   //   returns: 1:success, 0:failure
+   //Notes:
+   // * mapnumsects is written inside mapload()
+mapload(filename,&sector_index,&px,&py,&pz,&horizontal_ang,&vertical_angle,&tilt_angle);
+
+   //Render world at given location and set camera to Build2 coordinates
+mapdraw(px,py,pz,horizontal_ang,vertical_ang,tilt_angle);
+
+   //Move object with collision detection; slide smoothly along obstacle if necessary.
+   //Note: variables preceded by a '&' are updated and written to by the function.
+   //   &sector_index,&posx,&posy,&posz: start position; result position written here.
+   //   velx,vely,velz: vector to add to posx,posy,posy.
+   //   radius: spherical fatness of raytrace (typical value: 0.25)
+   //   isslide: 0 to stop at first hit, 1 to slide smoothly along walls.
+   //   returns: 0 (or MAP_NONE) if no object hit, or one of the following values:
+   //      MAP_CEIL: where hitindex = -2
+   //      MAP_FLOR: where hitindex = -1
+   //      MAP_WALL: where hitindex = wall index of sector
+   //      MAP_SPRI: where hitindex = sprite index
+hittype = mapcoll(&sector_index,&posx,&posy,&posz,velx,vely,velz,radius,isslide,&hitsect,&hitindex);
+
+   //Tests whether point can see sprite. Make sure x,y,z point is in specified sector.
+   //Returns 1 if line of sight is unoccluded, else 0
+mapcanc(sector_index,x,y,z,sprite_index);
+
+   //Global variable holding number of sectors in map
+mapnumsects
+
+   //Copies all of Build2's internal map information (sectors, walls, sprites, etc..) to a
+   //   secondary structure in memory. Currently only 2 states are supported: 0 (the default, and
+   //   what mapload() sets and writes to), and 1 (user state). This function is a hack intended
+   //   for client-side prediction, although it could be used for other purposes such as smooth
+   //   transmitioning between levels, or fast backup & restore.
+mapcopystate(dest,src)
+
+   //Sets which game state in memory all map functions (except mapload()) will access.
+   //   Valid values are 0 (the default state) or 1.
+mapsetstate(num)
+
+//---------------------------------------- Sector Functions ----------------------------------------
+//NOTE: For sector fields that may apply to either the ceiling or the floor,
+//the default is the ceiling. To select the floor, add 1 to the field constant.
+//For example:
+//    MAP_Z   selects the ceiling height
+//    MAP_Z+1 selects the floor height
+
+   //Read/write sector field. Incorrect fields will be ignored.
+   //1-parameter fields:
+   //   MAP_Z                        <- height of sector
+   //   MAP_GRADX, MAP_GRADY         <- slope of sector. To calculate slope for any (x,y), use:
+   //                                   hgt(x,y) = (wal[0].x-x)*gradx + (wal[0].y-y)*grady + z
+   //   MAP_TILE                     <- filename index (useful for duplicating)
+   //   MAP_FLAGS                    <- misc. attributes. Contains the following boolean flags:
+   //   MAP_RELALIGN                 <- 1:texture is aligned to hinge wall, 0:axis aligned
+   //   MAP_PARALLAX                 <- 0:standard texture, 1:paper sky, 2:skybox
+   //   MAP_TAG                      <- tag
+   //   MAP_PANX, MAP_PANY           <- texture offset
+   //   MAP_SCALEX, MAP_SCALEY       <- texture scale
+   //   MAP_SHEARX, MAP_SHEARY       <- texture shear
+   //   MAP_RED, MAP_GREEN, MAP_BLUE <- color
+   //1-parameter read-only fields:
+   //   MAP_N                        <- number of walls in sector
+   //   MAP_HEADSPRI                 <- index to first sprite of the sector (-1 if none)
+   //2-parameter read-only fields:
+   //   MAP_Z                        <- calculates z for any x,y (utility function for slopes)
+   //   MAP_SECT                     <- returns 1 if x,y (data1/2) is inside sector, else 0.
+   //2-parameter fields:
+   //   MAP_PANXY                    <- alias for MAP_PANX & MAP_PANY
+   //   MAP_SCALEXY                  <- alias for MAP_SCALEX & MAP_SCALEY
+   //   MAP_SHEARXY                  <- alias for MAP_SHEARX & MAP_SHEARY
+   //   MAP_GRADXY                   <- alias for MAP_GRADX & MAP_GRADY
+   //3-parameter read-only fields:
+   //   MAP_SECT                     <- returns nearest sector containing x,y,z (data1/2/3)
+   //3-parameter fields:
+   //   MAP_RGB                      <- alias for MAP_RED, MAP_GREEN, MAP_BLUE
+mapgetsect(sector_index,field);               //<-returns field value
+mapgetsect(sector_index,field,&data1,&data2); //<-for MAP_Z; returns Z value
+mapgetsect(sector_index,field,&data1,&data2,&data3);
+mapsetsect(sector_index,field,data1);
+mapsetsect(sector_index,field,data1,data2);
+mapsetsect(sector_index,field,data1,data2,data3);
+
+   //Set sector texture file. Supported field: MAP_FILE
+mapsetsectf(sector_index,field,filename);
+
+//----------------------------------------- Wall Functions -----------------------------------------
+
+   //Get wall field. Incorrect fields will be ignored. Supported fields:
+   //1-parameter read-only fields:
+   //   MAP_N, MAP_P                 <- index to next/previous wall (CW/CCW from visible side @ top)
+   //   MAP_OPPS, MAP_OPPW           <- index to attaching sector/wall
+   //1-parameter fields:
+   //   MAP_X, MAP_Y                 <- vertex (left side of wall from inside)
+   //   MAP_TILE                     <- filename index (useful for duplicating)
+   //   MAP_FLAGS                    <- misc. attributes. Contains the following boolean flags:
+   //   MAP_BLOCK                    <- 1:(red/portal) wall blocks player, 0:not
+   //   MAP_RELALIGN                 <- 1:texture align to floor (white) / next sector (red), 0:not
+   //   MAP_1WAY                     <- 1:opaque 1-way, 0:not
+   //   MAP_PARALLAX                 <- 0:standard texture, 1:paper sky, 2:skybox
+   //   MAP_TAG                      <- tag
+   //   MAP_PANX, MAP_PANY           <- texture offset
+   //   MAP_SCALEX, MAP_SCALEY       <- texture scale
+   //   MAP_SHEARX, MAP_SHEARY       <- texture shear
+   //   MAP_RED, MAP_GREEN, MAP_BLUE <- color
+   //2-parameter fields:
+   //   MAP_XY                       <- alias for MAP_X & MAP_Y
+   //   MAP_PANXY                    <- alias for MAP_PANX & MAP_PANY
+   //   MAP_SCALEXY                  <- alias for MAP_SCALEX & MAP_SCALEY
+   //   MAP_SHEARXY                  <- alias for MAP_SHEARX & MAP_SHEARY
+   //3-parameter fields:
+   //   MAP_RGB                      <- alias for MAP_RED, MAP_GREEN, MAP_BLUE
+mapgetwall(sector_index,wall_index,field); //<-returns field value
+mapgetwall(sector_index,wall_index,field,&data1,&data2);
+mapgetwall(sector_index,wall_index,field,&data1,&data2,&data3);
+mapsetwall(sector_index,wall_index,field,data1);
+mapsetwall(sector_index,wall_index,field,data1,data2);
+mapsetwall(sector_index,wall_index,field,data1,data2,data3);
+
+   //This example shows how to visit all walls of a given sector:
+   //   for(w=mapgetsect(s,MAP_N)-1;w>=0;w--)
+   //   {
+   //      /*process sector s, wall w*/
+   //   }
+   //
+
+   //Set wall texture file. Supported field: MAP_FILE
+mapsetwallf(sector_index,wall_index,field,filename);
+
+//---------------------------------------- Sprite Functions ----------------------------------------
+
+   //Get sprite field. Incorrect fields will be ignored. Supported fields:
+   //1-parameter fields:
+   //   MAP_X, MAP_Y, MAP_Z          <- center position
+   //   MAP_RX, MAP_RY, MAP_RZ       <- right   vector
+   //   MAP_DX, MAP_DY, MAP_DZ       <- down    vector
+   //   MAP_FX, MAP_FY, MAP_FZ       <- forward vector
+   //   MAP_HANG, MAP_VANG           <- angle (converts to/from vector form)
+   //   MAP_FAT                      <- collision radius
+   //   MAP_TILE                     <- filename index (useful for duplicating)
+   //   MAP_FLAGS                    <- misc. attributes. Contains the following boolean flags:
+   //   MAP_BLOCK                    <- 1:sprite is blocking (collision enabled), 0:no collision
+   //   MAP_1WAY                     <- 1:sprite is visible only in front (for flat textures), 0:not
+   //   MAP_LIGHT                    <- 1:sprite is a light source, 2-7:spotlight orientation, 0:off
+   //   MAP_SPOTWID                  <- range:0.0-1.0 (0-360 deg respectively)
+   //   MAP_VISIBLE                  <- 1:sprite is visible, 0:sprite is invisible
+   //   MAP_INVISIBLE                <- 1:sprite is invisible, 0:sprite is visible
+   //   MAP_TAG                      <- tag
+   //   MAP_RED, MAP_GREEN, MAP_BLUE <- color
+   //   MAP_SECT                     <- sector of sprite
+   //1-parameter read-only fields:
+   //   MAP_N                        <- next sprite on sector linked list (-1=end)
+   //2-parameter fields:
+   //   MAP_XY                       <- alias for MAP_X & MAP_Y
+   //   MAP_HVANG                    <- alias for MAP_HANG & MAP_VANG
+   //3-parameter fields:
+   //   MAP_XYZ                      <- alias for MAP_X, MAP_Y, MAP_Z
+   //   MAP_RXYZ                     <- alias for MAP_RX, MAP_RY, MAP_RZ
+   //   MAP_DXYZ                     <- alias for MAP_DX, MAP_DY, MAP_DZ
+   //   MAP_FXYZ                     <- alias for MAP_FX, MAP_FY, MAP_FZ
+   //   MAP_RGB                      <- alias for MAP_RED, MAP_GREEN, MAP_BLUE
+   //4-parameter fields:
+   //   MAP_SXYZ                     <- alias for MAP_SECT, MAP_X, MAP_Y, MAP_Z
+mapgetspri(sprite_index,field); //<-returns field value
+mapgetspri(sprite_index,field,&data1,&data2);
+mapgetspri(sprite_index,field,&data1,&data2,&data3);
+mapgetspri(sprite_index,field,&data1,&data2,&data3,&data4);
+mapsetspri(sprite_index,field,data1);
+mapsetspri(sprite_index,field,data1,data2);
+mapsetspri(sprite_index,field,data1,data2,data3);
+mapsetspri(sprite_index,field,data1,data2,data3,data4);
+
+   //This example shows how to visit all sprites of a given sector:
+   //   for(i=mapgetsect(sector_index,MAP_HEADSPRI);i>=0;i=mapgetspri(i,MAP_N))
+   //   {
+   //      /*process sprite i*/
+   //   }
+   //
+   //Be careful when deleting a sprite inside a loop, because the MAP_N of the current sprite will
+   //be corrupted. To avoid this, save the next index before deletion, as in this example:
+   //   for(i=mapgetsect(sector_index,MAP_HEADSPRI);i>=0;i=nexti)
+   //   {
+   //      nexti = mapgetspri(i,MAP_N);
+   //      /*process or delete sprite i*/
+   //   }
+
+   //Set sprite model/texture file. Supported field: MAP_FILE
+mapsetsprif(sprite_index,field,filename);
+
+   //Insert sprite at location. Nearest sector is updated if (x,y,z) is not inside.
+sprite_index = mapinsspri(sector_index,x,y,z);
+
+   //Delete sprite
+mapdelspri(sprite_index);
+
+//----------------------------------------- Light Functions ----------------------------------------
+
+   //Set field. Incorrect fields will be ignored. Supported fields:
+   //   MAP_SPRI                     <- set sprite index as light source (-1 to disable lighting)
+   //   MAP_AMBIENT                  <- set ambience level. Range: {0..1}. Default: 3/128=0.0234375
+   //   MAP_SHADOW                   <- enable (1) / disable (0) shadows
+mapsetlight(field,value);
+
+//The following sprite fields control the light source:
+//   MAP_SECT, MAP_X, MAP_Y, MAP_Z     <- light source position
+//   MAP_RED, MAP_GREEN, MAP_BLUE      <- intensity of light source (use 1.0 as starting value)
+//You must use the sprite functions to modify these fields. Deleting the sprite kills the light.
+
+//--------------------------------------------------------------------------------------------------
