@@ -92,7 +92,7 @@ static light;
    htype = -1; hsect = -1; hind = -1;
 
    mountzip("../Build2"); hang = 0; vang = 0; tilt = 0;
-   if (!mapload("e2l10.map",&sect,&ipos.x,&ipos.y,&ipos.z,&hang,&vang,&tilt))
+   if (!mapload("e1l1a.map",&sect,&ipos.x,&ipos.y,&ipos.z,&hang,&vang,&tilt))
       { playtext("Map not found"); return; }
    parsemap(hang,vang,tilt); //Extract tags to local variables&arrays
    
@@ -293,8 +293,8 @@ move_player ()
                // Duke's sine table lookup: sintable[(2048-128+jumping_counter)&2047]/12
                angle_index = (2048-128+jumping_counter) % 2048;
                sine_value = sin(angle_index * PI/1024); // Convert to radians
-               velz -= sine_value * dtim * 100; // Adjusted multiplier for evaldraw
-               jumping_counter += 180; // Frame-rate independent
+               velz -= sine_value * dtim * 30; // Adjusted multiplier for evaldraw
+               jumping_counter += 120; // Frame-rate independent
                onfloor = 0;
             }
          }
