@@ -41,9 +41,9 @@ void drawframe (cam_t *cc)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <mmsystem.h>             //For refresh locking
-#define DIRECTDRAW_VERSION 0x0300 //For refresh locking
+#define DIRECTDRAW_VERSION 0x0700 //For refresh locking
 #include <ddraw.h>                //For refresh locking
-extern LPDIRECTDRAW lpdd;         //For refresh locking
+extern LPDIRECTDRAW7 lpdd;         //For refresh locking
 
 #define MAXXDIM 2048
 #define MAXYDIM 1536

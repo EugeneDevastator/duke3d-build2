@@ -15,7 +15,7 @@ You may use this code for non-commercial purposes as long as credit is maintaine
 #include <windows.h>
 
 #ifndef NODRAW
-#define DIRECTDRAW_VERSION 0x0300
+#define DIRECTDRAW_VERSION 0x0700
 #include <ddraw.h>
 #endif
 #ifndef NOINPUT
@@ -1420,21 +1420,18 @@ endall8_32b:      sub rysiz, 1 ;/
 #endif
 }
 
-#ifndef REFRESHACK
-		 LPDIRECTDRAW lpdd = 0;
-#else
-		 LPDIRECTDRAW lpdd0 = 0;
-		 LPDIRECTDRAW2 lpdd = 0;
-		 int refreshz = 0;
+LPDIRECTDRAW7 lpdd = 0;
+#ifdef REFRESHACK
+int refreshz = 0;
 #endif
-		 LPDIRECTDRAWSURFACE ddsurf[3] = {0,0,0};
+LPDIRECTDRAWSURFACE7 ddsurf[3] = {0,0,0};
 static LPDIRECTDRAWPALETTE ddpal = 0;
 #ifndef NO_CLIPPER
 static LPDIRECTDRAWCLIPPER ddclip = 0;
 static RGNDATA *ddcliprd = 0;
 static unsigned long ddcliprdbytes = 0;
 #endif
-static DDSURFACEDESC ddsd;
+static DDSURFACEDESC2 ddsd;
 static long ddlocked = 0, ddrawemulbpl = 0;
 static void *ddrawemulbuf = 0;
 
@@ -1463,40 +1460,42 @@ static _inline long bsr (long a) { _asm bsr eax, a } //is it safe to assume eax 
 
 static void grabmodeinfo (long x, long y, DDPIXELFORMAT *ddpf, validmodetype *valptr)
 {
-	memset(valptr,0,sizeof(validmodetype));
+    memset(valptr,0,sizeof(validmodetype));
 
-	valptr->x = x; valptr->y = y;
-	if (ddpf->dwFlags&DDPF_PALETTEINDEXED8) { valptr->c = 8; return; }
-	if (ddpf->dwFlags&DDPF_RGB)
-	{
-		valptr->c = (char)ddpf->dwRGBBitCount;
-		if (ddpf->dwRBitMask)
-		{
-			valptr->r0 = (char)bsf(ddpf->dwRBitMask);
-			valptr->rn = (char)(bsr(ddpf->dwRBitMask)-(valptr->r0)+1);
-		}
-		if (ddpf->dwGBitMask)
-		{
-			valptr->g0 = (char)bsf(ddpf->dwGBitMask);
-			valptr->gn = (char)(bsr(ddpf->dwGBitMask)-(valptr->g0)+1);
-		}
-		if (ddpf->dwBBitMask)
-		{
-			valptr->b0 = (char)bsf(ddpf->dwBBitMask);
-			valptr->bn = (char)(bsr(ddpf->dwBBitMask)-(valptr->b0)+1);
-		}
-		if (ddpf->dwRGBAlphaBitMask)
-		{
-			valptr->a0 = (char)bsf(ddpf->dwRGBAlphaBitMask);
-			valptr->an = (char)(bsr(ddpf->dwRGBAlphaBitMask)-(valptr->a0)+1);
-		}
-	}
+    valptr->x = x; valptr->y = y;
+    if (ddpf->dwFlags&DDPF_PALETTEINDEXED8) { valptr->c = 8; return; }
+    if (ddpf->dwFlags&DDPF_RGB)
+    {
+        valptr->c = (char)ddpf->dwRGBBitCount;
+        if (ddpf->dwRBitMask)
+        {
+            valptr->r0 = (char)bsf(ddpf->dwRBitMask);
+            valptr->rn = (char)(bsr(ddpf->dwRBitMask)-(valptr->r0)+1);
+        }
+        if (ddpf->dwGBitMask)
+        {
+            valptr->g0 = (char)bsf(ddpf->dwGBitMask);
+            valptr->gn = (char)(bsr(ddpf->dwGBitMask)-(valptr->g0)+1);
+        }
+        if (ddpf->dwBBitMask)
+        {
+            valptr->b0 = (char)bsf(ddpf->dwBBitMask);
+            valptr->bn = (char)(bsr(ddpf->dwBBitMask)-(valptr->b0)+1);
+        }
+        if (ddpf->dwRGBAlphaBitMask)
+        {
+            valptr->a0 = (char)bsf(ddpf->dwRGBAlphaBitMask);
+            valptr->an = (char)(bsr(ddpf->dwRGBAlphaBitMask)-(valptr->a0)+1);
+        }
+    }
 }
 
-HRESULT WINAPI lpEnumModesCallback (LPDDSURFACEDESC dsd, LPVOID lpc)
+HRESULT WINAPI lpEnumModesCallback (LPDDSURFACEDESC2 dsd, LPVOID lpc)
 {
-	grabmodeinfo(dsd->dwWidth,dsd->dwHeight,&dsd->ddpfPixelFormat,&validmodelist[validmodecnt]); validmodecnt++;
-	if (validmodecnt >= MAXVALIDMODES) return(DDENUMRET_CANCEL); else return(DDENUMRET_OK);
+    grabmodeinfo(dsd->dwWidth,dsd->dwHeight,&dsd->ddpfPixelFormat,&validmodelist[validmodecnt]); 
+    validmodecnt++;
+    if (validmodecnt >= MAXVALIDMODES) return(DDENUMRET_CANCEL); 
+    else return(DDENUMRET_OK);
 }
 
 long getvalidmodelist (validmodetype **davalidmodelist)
@@ -1661,34 +1660,20 @@ void debugdirectdraw ()
 
 long initdirectdraw (long daxres, long dayres, long dacolbits)
 {
-	HRESULT hr;
-	DDSCAPS ddscaps;
-	char buf[256];
-	long ncolbits;
+    HRESULT hr;
+    DDSCAPS2 ddscaps;  // Already updated
+    char buf[256];
+    long ncolbits;
 
-	xres = daxres; yres = dayres; colbits = dacolbits;
+    xres = daxres; yres = dayres; colbits = dacolbits;
 
-#ifdef USED3D4FULL
-	if (fullscreen)
-	{
-		ddrawdebugmode = -1; ddrawuseemulation = 0;
-		if (d3dinit(ghwnd) < 0) return(-1);
-		return(1);
-	}
-#endif
-
-#ifndef REFRESHACK
-	if ((hr = DirectDrawCreate(0,&lpdd,0)) >= 0)
-	{
-#else
-	if ((hr = DirectDrawCreate(0,&lpdd0,0)) >= 0)
-	{
-		lpdd0->QueryInterface(IID_IDirectDraw2,(void **)&lpdd);
-#endif
-		if (fullscreen)
-		{
-			if ((hr = lpdd->SetCooperativeLevel(ghwnd,DDSCL_EXCLUSIVE|DDSCL_FULLSCREEN)) >= 0)
-			{
+    // This line is already correct - keep it as is:
+    if ((hr = DirectDrawCreateEx(NULL, (void**)&lpdd, IID_IDirectDraw7, NULL)) >= 0)
+    {
+        if (fullscreen)
+        {
+            if ((hr = lpdd->SetCooperativeLevel(ghwnd,DDSCL_EXCLUSIVE|DDSCL_FULLSCREEN)) >= 0)
+            {
 				ddrawdebugmode = -1;
 				ncolbits = dacolbits; ddrawuseemulation = 0;
 				//ncolbits = 8; //HACK FOR TESTING!
@@ -1696,7 +1681,7 @@ long initdirectdraw (long daxres, long dayres, long dacolbits)
 				do
 				{
 #ifndef REFRESHACK
-					if ((hr = lpdd->SetDisplayMode(daxres,dayres,ncolbits)) >= 0)
+					if ((hr = lpdd->SetDisplayMode(daxres,dayres,ncolbits,0,0)) >= 0)
 #else
 					if ((hr = lpdd->SetDisplayMode(daxres,dayres,ncolbits,refreshz,0)) >= 0)
 #endif
@@ -1720,11 +1705,12 @@ long initdirectdraw (long daxres, long dayres, long dacolbits)
 							if (!ddsurf[0]->GetPixelFormat(&ddpf))
 								grabmodeinfo(daxres,dayres,&ddpf,&curvidmodeinfo);
 
-							ddscaps.dwCaps = DDSCAPS_BACKBUFFER;
-							if ((hr = ddsurf[0]->GetAttachedSurface(&ddscaps,&ddsurf[1])) >= 0)
-							{
+								ddscaps.dwCaps = DDSCAPS_BACKBUFFER;
+								ddscaps.dwCaps2 = 0;
+								if ((hr = ddsurf[0]->GetAttachedSurface(&ddscaps,&ddsurf[1])) >= 0)
+								{
 #if (OFFSCREENHACK)
-								DDSURFACEDESC nddsd;
+								DDSURFACEDESC2 nddsd;
 								ddsurf[2] = ddsurf[1];
 								ZeroMemory(&nddsd,sizeof(nddsd));
 								nddsd.dwSize = sizeof(nddsd);
@@ -1926,61 +1912,38 @@ void stopdirectdraw ()
 			return;
 		}
 #endif
-		ddsurf[1]->Unlock(ddsd.lpSurface);
+		ddsurf[1]->Unlock(NULL);
 	}
 }
 
 long startdirectdraw (long *vidplc, long *dabpl, long *daxres, long *dayres)
 {
-	HRESULT hr;
-
-	if (ddlocked) { stopdirectdraw(); ddlocked = 0; }  //{ return(0); }
-
-	if (ddrawuseemulation)
-	{
-		*vidplc = (long)ddrawemulbuf; *dabpl = xres*((colbits+7)>>3);
-		*daxres = xres; *dayres = yres; ddlocked = 1;
-		return(1);
-	}
-
-#ifdef USED3D4FULL
-	if (fullscreen)
-	{
-		D3DLOCKED_RECT r;
-		if (d3dsur->LockRect(&r,0,0) < 0) return(0);
-#ifdef USE3DVISION
-		gpt_r = r;
-		r.pBits = (void *)((unsigned char *)r.pBits + gpt_xres*4*(g3dnumframes&1));
-#endif
-		d3df = (long)r.pBits; d3dp = (long)r.Pitch;
-		(*vidplc) = (long)r.pBits; (*dabpl) = r.Pitch;
-		(*daxres) = xres; (*dayres) = yres; ddlocked = 1;
-#ifndef USE3DVISION
-		d3ddev->BeginScene();
-#endif
-		return(1);
-	}
-#endif
-
-	while (1)
-	{
-		if ((hr = ddsurf[1]->Lock(0,&ddsd,DDLOCK_SURFACEMEMORYPTR|DDLOCK_WAIT,0)) == DD_OK) break;
-		if (hr == DDERR_SURFACELOST)
-		{
-			if (ddsurf[0]->Restore() != DD_OK) return(0);
-			if (ddsurf[1]->Restore() != DD_OK) return(0);
-		}
-		if (hr == DDERR_CANTLOCKSURFACE) return(-1); //if true, set cantlockprimary = 1;
-		if (hr != DDERR_WASSTILLDRAWING) return(0);
-	}
-
-		//DDLOCK_WAIT MANDATORY! (to prevent sudden exit back to windows)!
-	//if (hr = ddsurf[1]->Lock(0,&ddsd,DDLOCK_SURFACEMEMORYPTR|DDLOCK_WAIT,0) != DD_OK)
-	//   return(0);
-
-	*vidplc = (long)ddsd.lpSurface; *dabpl = ddsd.lPitch;
-	*daxres = xres; *dayres = yres; ddlocked = 1;
-	return(1);
+    HRESULT hr;
+    
+    if (ddlocked) { stopdirectdraw(); ddlocked = 0; }
+    
+    if (ddrawuseemulation)
+    {
+        *vidplc = (long)ddrawemulbuf; *dabpl = xres*((colbits+7)>>3);
+        *daxres = xres; *dayres = yres; ddlocked = 1;
+        return(1);
+    }
+    
+    while (1)
+    {
+        if ((hr = ddsurf[1]->Lock(0,&ddsd,DDLOCK_SURFACEMEMORYPTR|DDLOCK_WAIT,0)) == DD_OK) break;
+        if (hr == DDERR_SURFACELOST)
+        {
+            if (ddsurf[0]->Restore() != DD_OK) return(0);
+            if (ddsurf[1]->Restore() != DD_OK) return(0);
+        }
+        if (hr == DDERR_CANTLOCKSURFACE) return(-1);
+        if (hr != DDERR_WASSTILLDRAWING) return(0);
+    }
+    
+    *vidplc = (long)ddsd.lpSurface; *dabpl = ddsd.lPitch;
+    *daxres = xres; *dayres = yres; ddlocked = 1;
+    return(1);
 }
 
 static HDC ghdc;
