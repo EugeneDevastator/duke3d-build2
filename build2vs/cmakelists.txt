@@ -1,0 +1,58 @@
+cmake_minimum_required(VERSION 3.10)
+project(build2)
+
+# Force 32-bit build
+set(CMAKE_GENERATOR_PLATFORM Win32)
+set(CMAKE_SIZEOF_VOID_P 4)
+
+set(CMAKE_CXX_STANDARD 98)
+set(CMAKE_C_STANDARD 90)
+
+# Source files
+set(SOURCES
+    build2.c
+    shadowtest2.c
+    drawpoly.c
+    drawcone.c
+    drawkv6.c
+    morph.c
+    kplib.c
+    winmain.cpp
+)
+
+# Headers
+set(HEADERS
+    build2.h
+    drawpoly.h
+    sysmain.h
+)
+
+# Create Windows executable (not console)
+add_executable(build2 WIN32 ${SOURCES} ${HEADERS})
+
+# Preprocessor definitions
+target_compile_definitions(build2 PRIVATE 
+    USEHEIMAP=0
+    NOSOUND=1
+    OOS_CHECK=0
+    WIN32
+)
+
+# Libraries
+target_link_libraries(build2
+    ddraw
+    dinput8
+    dxguid
+    ole32
+    user32
+    gdi32
+    winmm
+)
+
+# Compile as C++ (like /TP flag)
+set_source_files_properties(${SOURCES} PROPERTIES LANGUAGE CXX)
+
+# 32-bit specific settings
+if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+    target_compile_options(build2 PRIVATE /arch:IA32)
+endif()
