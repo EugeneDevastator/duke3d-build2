@@ -1,0 +1,86 @@
+name: Build and Release BUILD2
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2019
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v1.1
+      
+    - name: Setup Developer Command Prompt
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x86
+        
+    - name: Download DirectX SDK
+      run: |
+        Invoke-WebRequest -Uri "https://download.microsoft.com/download/a/e/7/ae743f1f-632b-4809-87a9-aa1bb3458e31/DXSDK_Jun10.exe" -OutFile "DXSDK_Jun10.exe"
+        Start-Process -FilePath "DXSDK_Jun10.exe" -ArgumentList "/S" -Wait
+      shell: powershell
+      
+    - name: Set DirectX environment
+      run: |
+        echo "DXSDK_DIR=C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\" >> $GITHUB_ENV
+        echo "C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Lib\x86" >> $GITHUB_PATH
+      shell: bash
+      
+    - name: Build BUILD2
+      working-directory: src
+      run: |
+        set INCLUDE=%INCLUDE%;%DXSDK_DIR%Include
+        set LIB=%LIB%;%DXSDK_DIR%Lib\x86
+        nmake build2.c
+      shell: cmd
+      
+    - name: Prepare release files
+      run: |
+        mkdir release
+        copy src\build2.exe release\
+        copy build2.txt release\
+        copy build2.cfg release\ 2>nul || echo "build2.cfg not found, skipping"
+        copy *.map release\ 2>nul || echo "No map files found"
+        xcopy /E /I data release\data 2>nul || echo "data folder not found"
+        xcopy /E /I tex release\tex 2>nul || echo "tex folder not found"
+        xcopy /E /I models release\models 2>nul || echo "models folder not found"
+        xcopy /E /I sounds release\sounds 2>nul || echo "sounds folder not found"
+      shell: cmd
+      
+    - name: Create ZIP archive
+      run: |
+        Compress-Archive -Path release\* -DestinationPath BUILD2-${{ github.ref_name }}.zip
+      shell: powershell
+      
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: |
+          BUILD2-${{ github.ref_name }}.zip
+          src/build2.exe
+        body: |
+          BUILD2 Release ${{ github.ref_name }}
+          
+          BUILD2 engine by Ken Silverman (http://advsys.net/ken)
+          
+          ## Installation
+          1. Extract the ZIP file
+          2. Run build2.exe
+          3. See build2.txt for controls and documentation
+          
+          ## Changes
+          - Automated build from source
+          - Includes all necessary assets and documentation
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
