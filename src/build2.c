@@ -11,7 +11,7 @@ linkopts=
 build2.exe: build2.c\
 		  build2.obj shadowtest2.obj drawpoly.obj drawcone.obj drawkv6.obj morph.obj kplib.obj winmain.obj
 	link build2.obj shadowtest2.obj drawpoly.obj drawcone.obj drawkv6.obj morph.obj kplib.obj winmain.obj\
-	ddraw.lib dinput.lib dxguid.lib ole32.lib user32.lib gdi32.lib winmm.lib $(linkopts)
+	ddraw.lib dinput8.lib dxguid.lib ole32.lib user32.lib gdi32.lib winmm.lib $(linkopts)
 	del build2.obj
 
 #zbufmode=/DUSEINTZ
@@ -3491,19 +3491,19 @@ static HCURSOR gencrosscursor (void)
 	memset(buf1,-1,sizeof(buf1)); memset(buf0,0,sizeof(buf0));
 
 		//   -6-5-4-3-2-1 0+1+2+3+4+5+6
-		//-6   °°                  °°
-		//-5 °°ÛÛ°°              °°ÛÛ°°
-		//-4   °°ÛÛ°°          °°ÛÛ°°
-		//-3     °°ÛÛ°°      °°ÛÛ°°
-		//-2       °°          °°
+		//-6   ï¿½ï¿½                  ï¿½ï¿½
+		//-5 ï¿½ï¿½ï¿½Û°ï¿½              ï¿½ï¿½ï¿½Û°ï¿½
+		//-4   ï¿½ï¿½ï¿½Û°ï¿½          ï¿½ï¿½ï¿½Û°ï¿½
+		//-3     ï¿½ï¿½ï¿½Û°ï¿½      ï¿½ï¿½ï¿½Û°ï¿½
+		//-2       ï¿½ï¿½          ï¿½ï¿½
 		//-1
 		// 0             []
 		//+1
-		//+2       °°          °°
-		//+3     °°ÛÛ°°      °°ÛÛ°°
-		//+4   °°ÛÛ°°          °°ÛÛ°°
-		//+5 °°ÛÛ°°              °°ÛÛ°°
-		//+6   °°                  °°
+		//+2       ï¿½ï¿½          ï¿½ï¿½
+		//+3     ï¿½ï¿½ï¿½Û°ï¿½      ï¿½ï¿½ï¿½Û°ï¿½
+		//+4   ï¿½ï¿½ï¿½Û°ï¿½          ï¿½ï¿½ï¿½Û°ï¿½
+		//+5 ï¿½ï¿½ï¿½Û°ï¿½              ï¿½ï¿½ï¿½Û°ï¿½
+		//+6   ï¿½ï¿½                  ï¿½ï¿½
 		//
 		//buf1 buf0 display:
 		// 0    0   black
@@ -4463,10 +4463,10 @@ static int polbool_splitlinepoint (polbool_lin_t **lin, int *linmal, wall_t *wal
 	return(n);
 }
 
-	// ÚÄÄ¿
-	// ³AÚÅÄ¿
-	// ÀÄÅÙB³
-	//   ÀÄÄÙ
+	// ï¿½ï¿½Ä¿
+	// ï¿½Aï¿½ï¿½Ä¿
+	// ï¿½ï¿½ï¿½ï¿½Bï¿½
+	//   ï¿½ï¿½ï¿½ï¿½
 	//   Collinear line priority:
 	//1st sector (wal0): POLYBOOL_AND, POLYBOOL_SUB, POLYBOOL_OR
 	//2nd sector (wal1): POLYBOOL_SUB2
@@ -6091,10 +6091,10 @@ static double sphpolydist (dpoint3d *p0, dpoint3d *v0, double cr, dpoint3d *pol,
 		j = i+1; if (j >= n) j = 0;
 			//Raytrace to edges (cylinders)
 			//ix = t*v0->x+p0->x  (ix,iy,iz)
-			//iy = t*v0->y+p0->y     /³
+			//iy = t*v0->y+p0->y     /ï¿½
 			//iz = t*v0->z+p0->z   c` cr
-			//                   /`   ³
-			//           p->v[i]ÀÄÄaÄÄÁÄÄÄÄÄÄp->v[j]
+			//                   /`   ï¿½
+			//           p->v[i]ï¿½ï¿½ï¿½aï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½p->v[j]
 			//
 			//a = ((ix-p->v[i].x)*d.x + (iy-p->v[i].y)*dy + (iz-p->v[i].z)*dz) / sqrt(d.x*d.x + dy*dy + dz*dz)
 			//c = sqrt((ix-p->v[i].x)^2 + (iy-p->v[i].y)^2 + (iz-p->v[i].z)^2)
@@ -7389,7 +7389,7 @@ static int loadmap (char *filnam)
 						sur->uv[2].x = sur->uv[2].y; sur->uv[2].y = 0;
 					}
 
-						//FIX:This hack corrects an LHS vs. RHS bug in a later stage of texture mapping (drawsectfill?)
+					//FIX:This hack corrects an LHS vs. RHS bug in a later stage of texture mapping (drawsectfill?)
 					if (sur->uv[1].x*sur->uv[2].y < sur->uv[1].y*sur->uv[2].x)
 						{ sur->uv[2].x *= -1; sur->uv[2].y *= -1; }
 				}
@@ -9058,9 +9058,9 @@ static void executepack (unsigned char *recvbuf, int doplaysound)
 									//start wall: gps->startwall
 									//end wall: bw
 
-									//ÚÄÄÄÂÄÄÄ¿
-									//³   ³   ³
-									//ÀÄÄÄÁÄÄÄÙ
+									//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¿
+									//ï¿½   ï¿½   ï¿½
+									//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
 								if (gst->numsects+2 > gst->malsects)
 								{

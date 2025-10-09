@@ -19,7 +19,7 @@ You may use this code for non-commercial purposes as long as credit is maintaine
 #include <ddraw.h>
 #endif
 #ifndef NOINPUT
-#define DIRECTINPUT_VERSION 0x0300
+#define DIRECTINPUT_VERSION 0x0800
 #include <dinput.h>
 #endif
 #ifndef NOSOUND
@@ -2351,13 +2351,13 @@ long clearscreen (long fillcolor)
 			{
 				j = p+i-12;
 				for(x=p;x<=j;x+=12)
-				{                             //  x-j ³0123³4567³89AB
-					*(long *)(x  ) = dacol[0]; // ÚÄÄÄÄÅÄÄÄÄÅÄÄÄÄÅÄÄÄÄ¿
-					*(long *)(x+4) = dacol[1]; // ³ 12 ³    ³    ³    ³
-					*(long *)(x+8) = dacol[2]; // ³  9 ³BGR ³    ³    ³
-				}                             // ³  6 ³BGRB³GR  ³    ³
-				switch(x-j)                   // ³  3 ³BGRB³GRBG³R   ³
-				{                             // ÀÄÄÄÄÁÄÄÄÄÁÄÄÄÄÁÄÄÄÄÙ
+				{                             //  x-j ï¿½0123ï¿½4567ï¿½89AB
+					*(long *)(x  ) = dacol[0]; // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¿
+					*(long *)(x+4) = dacol[1]; // ï¿½ 12 ï¿½    ï¿½    ï¿½    ï¿½
+					*(long *)(x+8) = dacol[2]; // ï¿½  9 ï¿½BGR ï¿½    ï¿½    ï¿½
+				}                             // ï¿½  6 ï¿½BGRBï¿½GR  ï¿½    ï¿½
+				switch(x-j)                   // ï¿½  3 ï¿½BGRBï¿½GRBGï¿½R   ï¿½
+				{                             // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 					case 9: *(short *)x = (short)dacol[0]; *(char *)(x+2) = (char)dacol[2]; break;
 					case 6: *(long *)x = dacol[0]; *(short *)(x+4) = (short)dacol[1]; break;
 					case 3: *(long *)x = dacol[0]; *(long *)(x+4) = dacol[1]; *(char *)(x+8) = (char)dacol[2]; break;
@@ -2468,14 +2468,13 @@ long mouse_acquire = 1, kbd_acquire = 1;
 static void (*setmousein)(long, long) = NULL;
 static long mouse_out_x, mouse_out_y;
 static HANDLE dinputevent[2] = {0,0};
-
-static LPDIRECTINPUT gpdi = 0;
+static LPDIRECTINPUT8 gpdi = 0;
 long initdirectinput (HWND hwnd)
 {
 	HRESULT hr;
 	char buf[256];
 
-	if ((hr = DirectInputCreate(ghinst,DIRECTINPUT_VERSION,&gpdi,0)) >= 0) return(1);
+	if ((hr = DirectInput8Create(ghinst,DIRECTINPUT_VERSION,IID_IDirectInput8,(void**)&gpdi,0)) >= 0) return(1);
 	wsprintf(buf,"initdirectinput failed: %08lx\n",hr);
 	MessageBox(ghwnd,buf,"ERROR",MB_OK);
 	return(0);
@@ -2487,7 +2486,7 @@ void uninitdirectinput ()
 }
 
 //DirectInput (KEYBOARD) VARIABLES & CODE-------------------------------------------------------
-static LPDIRECTINPUTDEVICE gpKeyboard = 0;
+static LPDIRECTINPUTDEVICE8 gpKeyboard = 0;
 #define KBDBUFFERSIZE 64
 DIDEVICEOBJECTDATA KbdBuffer[KBDBUFFERSIZE];
 
@@ -2500,7 +2499,7 @@ void uninitkeyboard ()
 	{
 		if (dinputevent[1])
 		{
-			gpKeyboard->SetEventNotification(dinputevent[1]);
+gpKeyboard->SetEventNotification(dinputevent[1]);
 			CloseHandle(dinputevent[1]); dinputevent[1] = 0;
 		}
 		gpKeyboard->Unacquire(); gpKeyboard->Release(); gpKeyboard = 0;
@@ -2572,7 +2571,7 @@ long readkeyboard ()
 
 #define USERAWMOUSE 1
 #if (USERAWMOUSE == 0)
-static LPDIRECTINPUTDEVICE gpMouse = 0;
+static LPDIRECTINPUTDEVICE8 gpMouse = 0;
 #define MOUSBUFFERSIZE 64
 DIDEVICEOBJECTDATA MousBuffer[MOUSBUFFERSIZE];
 static long gbstatus = 0, gkillbstatus = 0;
@@ -2584,18 +2583,39 @@ float mousper;
 static float mousince, mougoalx, mougoaly, mougoalz, moutscale;
 static long moult[4], moultavg, moultavgcnt;
 
-void uninitmouse ()
+long initmouse (HWND hwnd)
 {
-	if (gpMouse)
-	{
-		if (dinputevent[0])
-		{
-			gpMouse->SetEventNotification(dinputevent[0]);
-			CloseHandle(dinputevent[0]); dinputevent[0] = 0;
-		}
-		gpMouse->Unacquire(); gpMouse->Release(); gpMouse = 0;
-	}
+	HRESULT hr;
+	DIPROPDWORD dipdw;
+	char buf[256];
+
+	if ((hr = gpdi->CreateDevice(GUID_SysMouse,&gpMouse,0)) < 0) goto initmouse_bad;
+	if ((hr = gpMouse->SetDataFormat(&c_dfDIMouse)) < 0) goto initmouse_bad;
+	if ((hr = gpMouse->SetCooperativeLevel(hwnd,dinputmouseflags)) < 0) goto initmouse_bad;
+
+	dinputevent[0] = CreateEvent(0,0,0,0); if (!dinputevent[0]) goto initmouse_bad;
+	if ((hr = gpMouse->SetEventNotification(dinputevent[0])) < 0) goto initmouse_bad;
+
+	dipdw.diph.dwSize = sizeof(DIPROPDWORD);
+	dipdw.diph.dwHeaderSize = sizeof(DIPROPHEADER);
+	dipdw.diph.dwObj = 0;
+	dipdw.diph.dwHow = DIPH_DEVICE;
+	dipdw.dwData = MOUSBUFFERSIZE;
+	if ((hr = gpMouse->SetProperty(DIPROP_BUFFERSIZE, &dipdw.diph)) < 0) goto initmouse_bad;
+
+	if (mouse_acquire) { gpMouse->Acquire(); gbstatus = 0; }
+	mousper = 1.0; mousince = mougoalx = mougoaly = mougoalz = 0.0;
+	moult[0] = -1; moultavg = moultavgcnt = 0;
+	readklock(&dmoutsc);
+	return(1);
+
+initmouse_bad:;
+	uninitmouse();
+	wsprintf(buf,"initdirectinput(mouse) failed: %08lx\n",hr);
+	MessageBox(ghwnd,buf,"ERROR",MB_OK);
+	return(0);
 }
+
 
 long initmouse (HWND hwnd)
 {
