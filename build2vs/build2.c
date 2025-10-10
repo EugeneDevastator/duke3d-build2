@@ -7365,11 +7365,11 @@ static int loadmap (char *filnam)
 					if (j == 1) // Floor surface
 					{
 						// Merge lotag (lower 16 bits) and hitag (upper 16 bits) into single long
-						sur->tag = ((long)b7wal.hitag << 8) | ((long)b7wal.lotag & 0xFF) | ((long)b7wal.pal << 24);
+						sur->tag = ((long)b7sec.hitag << 8) | ((long)b7sec.lotag & 0xFF) | ((long)b7sec.surf[j].pal << 24);
 					}
 					else // Ceiling surface
 					{
-						sur->tag = 0 | ((long)b7wal.pal << 24); // only pal for ceiling
+						sur->tag = 0 | ((long)b7sec.surf[j].pal << 24); // only pal for ceiling
 					}
 
 					sur->uv[0].x = ((float)b7sec.surf[j].xpanning)/256.0;
@@ -11503,10 +11503,32 @@ static void drawtag_sect (cam_t *cc, long s, long isflor)
 	f = ((float)j)*TAGSIZE;
 	g = TAGSIZE*8; if (!isflor) g = -g;
 	getcentroid(sec[s].wall,sec[s].n,&fp.x,&fp.y);
-	rpol[0].x = fp.x-f; rpol[0].y = fp.y-g;
-	rpol[1].x = fp.x+f; rpol[1].y = fp.y-g;
-	rpol[2].x = fp.x+f; rpol[2].y = fp.y+g;
-	rpol[3].x = fp.x-f; rpol[3].y = fp.y+g;
+	fp.z = getslopez(&sec[s],isflor,fp.x,fp.y);
+	if (!isflor) fp.z += TAGSIZE*8; else fp.z -= TAGSIZE*8;
+
+	// Calculate direction from camera to tag position
+	camdir.x = gdps->ipos.x - fp.x;
+	camdir.y = gdps->ipos.y - fp.y;
+	camdir.z = gdps->ipos.z - fp.z;
+	dist = sqrt(camdir.x*camdir.x + camdir.y*camdir.y + camdir.z*camdir.z);
+	if (dist <= 0.f) return;
+
+	// Normalize and offset tag position toward camera
+	f = TAGSIZE*8/dist;
+	fp.x += camdir.x * f;
+	fp.y += camdir.y * f;
+	fp.z += camdir.z * f;
+
+	// Transform to screen space
+	xformpos(&fp.x, &fp.y, &fp.z);
+
+	// Create screen-aligned billboard quad
+	f = ((float)j)*TAGSIZE;
+	rpol[0].x = fp.x - f; rpol[0].y = fp.y - TAGSIZE*8; rpol[0].z = fp.z;
+	rpol[1].x = fp.x + f; rpol[1].y = fp.y - TAGSIZE*8; rpol[1].z = fp.z;
+	rpol[2].x = fp.x + f; rpol[2].y = fp.y + TAGSIZE*8; rpol[2].z = fp.z;
+	rpol[3].x = fp.x - f; rpol[3].y = fp.y + TAGSIZE*8; rpol[3].z = fp.z;
+
 	rpol[0].u = .5/((float)TAGSIGNX);              rpol[0].v = -.0625; rpol[0].n = 1;
 	rpol[1].u = (((float)j)+.5)/((float)TAGSIGNX); rpol[1].v = -.0625; rpol[1].n = 1;
 	rpol[2].u = rpol[1].u;                         rpol[2].v = 0.9375; rpol[2].n = 1;
@@ -11552,7 +11574,6 @@ static void drawtag_wall (cam_t *cc, long s, long w, float dx, kgln_t *pol)
 	for(j=0;j<4;j++) xformpos(&rpol[j].x,&rpol[j].y,&rpol[j].z);
 	drawpol(cc,rpol,4,&tagtil,0x808080,0,0,0);
 }
-
 static void drawtag_spri (cam_t *cc, long s)
 {
 	kgln_t pol[4];
