@@ -1,0 +1,12 @@
+{
+  "version": "0.2.1",
+  "defaults": {},
+  "configurations": [
+    {
+      "type": "default",
+      "project": "cmakelists.txt",
+      "projectTarget": "build2.exe",
+      "name": "build2.exe"
+    }
+  ]
+}

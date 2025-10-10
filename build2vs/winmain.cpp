@@ -23,7 +23,7 @@ You may use this code for non-commercial purposes as long as credit is maintaine
 #include <dinput.h>
 #endif
 #ifndef NOSOUND
-#define DIRECTSOUND_VERSION 0x0300
+#define DIRECTSOUND_VERSION 0x0700
 #include <mmsystem.h> //dsound.h requires this when using LEAN_AND_MEAN
 #include <dsound.h>
 #ifndef USEKZ
@@ -2462,7 +2462,7 @@ void uninitkeyboard ()
 	{
 		if (dinputevent[1])
 		{
-			gpKeyboard->SetEventNotification(dinputevent[1]);
+gpKeyboard->SetEventNotification(dinputevent[1]);
 			CloseHandle(dinputevent[1]); dinputevent[1] = 0;
 		}
 		gpKeyboard->Unacquire(); gpKeyboard->Release(); gpKeyboard = 0;
