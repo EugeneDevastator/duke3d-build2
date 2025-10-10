@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 project(build2)
-
+set(CMAKE_VERBOSE_MAKEFILE ON)
 # Force 32-bit build
 set(CMAKE_GENERATOR_PLATFORM Win32)
 set(CMAKE_SIZEOF_VOID_P 4)
@@ -33,9 +33,10 @@ add_executable(build2 WIN32 ${SOURCES} ${HEADERS})
 # Preprocessor definitions
 target_compile_definitions(build2 PRIVATE 
     USEHEIMAP=0
-    NOSOUND=1
+    NOSOUND=0
     OOS_CHECK=0
     WIN32
+    _WINDOWS
 )
 
 # Libraries
