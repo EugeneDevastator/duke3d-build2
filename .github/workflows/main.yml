@@ -17,15 +17,15 @@ jobs:
       uses: microsoft/setup-msbuild@v2
     
     - name: Configure CMake
-      working-directory: myreponame/build2vs
+      working-directory: build2vs
       run: cmake -B build -A Win32 -T host=x64
     
     - name: Build
-      working-directory: myreponame/build2vs
+      working-directory: build2vs
       run: cmake --build build --config Release
     
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: build2-windows-x86
-        path: myreponame/build2vs/build/Release/build2.exe
+        path: build2vs/build/Release/build2.exe
