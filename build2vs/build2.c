@@ -7360,6 +7360,18 @@ static int loadmap (char *filnam)
 					if ((unsigned)l >= (unsigned)arttiles) l = 0;
 					sur->tilnum = l; hitile = max(hitile,l);
 
+					// Convert lotag/hitag to single tag field
+					// j=0 is ceiling, j=1 is floor - assign to floor surface only
+					if (j == 1) // Floor surface
+					{
+						// Merge lotag (lower 16 bits) and hitag (upper 16 bits) into single long
+						sur->tag = ((long)b7wal.hitag << 16) | ((long)b7wal.lotag & 0xFFFF) | ((long)b7wal.pal << 32);
+					}
+					else // Ceiling surface
+					{
+						sur->tag = 0 | ((long)b7wal.pal << 32); // only pal for ceiling
+					}
+
 					sur->uv[0].x = ((float)b7sec.surf[j].xpanning)/256.0;
 					sur->uv[0].y = ((float)b7sec.surf[j].ypanning)/256.0;
 					sur->uv[1].y = sur->uv[2].x = 0;
@@ -7399,7 +7411,6 @@ static int loadmap (char *filnam)
 				sec[i].owner = -1;
 				//sec[i].foglev = ?;
 			}
-
 			kzread(&s,2); //numwalls
 			for(i=k=0;i<gst->numsects;i++)
 			{
@@ -7412,6 +7423,10 @@ static int loadmap (char *filnam)
 					sur = &sec[i].wall[j].surf;
 					sur->flags = 0;
 					if (b7wal.cstat&1) sur->flags |= 1;
+
+					// Merge lotag (lower 16 bits) and hitag (upper 16 bits) into single long
+					sur->tag = ((long)b7wal.hitag << 16) | ((long)b7wal.lotag & 0xFFFF) | ((long)b7wal.pal << 32);
+
 					sur->uv[0].x = b7wal.xpanning;
 					sur->uv[0].y = b7wal.ypanning;
 					sur->uv[1].x = b7wal.xrepeat; if (b7wal.cstat&  8) sur->uv[1].x *= -1;
@@ -7428,6 +7443,7 @@ static int loadmap (char *filnam)
 					sec[i].wall[j].surfn = 1;
 					sec[i].wall[j].owner = -1;
 				}
+				// tile adjust?
 				for(j=0;j<sec[i].n;j++)
 				{
 					l = j+sec[i].wall[j].n;
@@ -7518,6 +7534,8 @@ static int loadmap (char *filnam)
 				spr->tilnum = l; hitile = max(hitile,l);
 				spr->sect = b7spr.sectnum;
 				spr->sectn = spr->sectp = -1;
+				spr->tag = ((long)b7spr.hitag << 16) | ((long)b7spr.lotag & 0xFFFF) | ((long)b7spr.pal << 32);
+
 			}
 		}
 		else //CUBES5 map format (.CUB extension)
