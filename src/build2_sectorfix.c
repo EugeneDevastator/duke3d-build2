@@ -30,8 +30,7 @@ winmain.obj:     winmain.cpp                  ; cl /c /TP winmain.cpp   /Ox /Ob2
 
 #define USEHEIMAP 1
 
-#define NOSOUND 1
-#define STANDALONE 1
+//#define NOSOUND 1
 #define OOS_CHECK 1
 #if (OOS_CHECK != 0)
 long dispoos = 0, totcrcbytes = 0;
@@ -7360,6 +7359,18 @@ static int loadmap (char *filnam)
 					if ((unsigned)l >= (unsigned)arttiles) l = 0;
 					sur->tilnum = l; hitile = max(hitile,l);
 
+					// Convert lotag/hitag to single tag field
+					// j=0 is ceiling, j=1 is floor - assign to floor surface only
+					if (j == 1) // Floor surface
+					{
+						// Merge lotag (lower 16 bits) and hitag (upper 16 bits) into single long
+						sur->tag = ((long)b7sec.hitag << 16) | ((long)b7sec.lotag & 0xFFFF);
+					}
+					else // Ceiling surface
+					{
+						sur->tag = 0; // No tag for ceiling
+					}
+
 					sur->uv[0].x = ((float)b7sec.surf[j].xpanning)/256.0;
 					sur->uv[0].y = ((float)b7sec.surf[j].ypanning)/256.0;
 					sur->uv[1].y = sur->uv[2].x = 0;
@@ -7399,7 +7410,6 @@ static int loadmap (char *filnam)
 				sec[i].owner = -1;
 				//sec[i].foglev = ?;
 			}
-
 			kzread(&s,2); //numwalls
 			for(i=k=0;i<gst->numsects;i++)
 			{

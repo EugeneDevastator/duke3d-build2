@@ -1,0 +1,13 @@
+src/*.obj
+build2vs/out/*
+src/.vs/slnx.sqlite
+src/.vs/VSWorkspaceState.json
+src/.vs/src/FileContentIndex/2d048fe5-3a44-4d31-9c17-97727254ef09.vsidx
+src/.vs/src/v17/.wsuo
+src/.vs/src/v17/DocumentLayout.json
+build2vs/.vs/CMake Overview
+build2vs/.vs/cmake.db
+build2vs/.vs/ProjectSettings.json
+build2vs/.vs/slnx.sqlite
+build2vs/.vs/VSWorkspaceState.json
+build2vs/.vs/build2vs/

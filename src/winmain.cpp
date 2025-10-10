@@ -2462,7 +2462,7 @@ void uninitkeyboard ()
 	{
 		if (dinputevent[1])
 		{
-gpKeyboard->SetEventNotification(dinputevent[1]);
+			gpKeyboard->SetEventNotification(dinputevent[1]);
 			CloseHandle(dinputevent[1]); dinputevent[1] = 0;
 		}
 		gpKeyboard->Unacquire(); gpKeyboard->Release(); gpKeyboard = 0;
@@ -4539,6 +4539,7 @@ static _inline void fpuinit (long a)
 
 int WINAPI WinMain (HINSTANCE hinst, HINSTANCE hpinst, LPSTR cmdline, int ncmdshow)
 {
+	OutputDebugString("Application starting...\n");	
 	long i, j, k, inquote, argc;
 	char *argv[MAX_PATH>>1];
 
@@ -4644,6 +4645,7 @@ int WINAPI WinMain (HINSTANCE hinst, HINSTANCE hpinst, LPSTR cmdline, int ncmdsh
 
 #ifndef NODRAW
 	if (!initdirectdraw(xres,yres,colbits)) { DestroyWindow(ghwnd); return(0); }
+	OutputDebugString("DirectDraw initialized\n");
 #endif
 #if defined(_DEBUG) && !defined(NODRAW)
 	debugdirectdraw(); // enable debug mode by default
@@ -4669,7 +4671,8 @@ int WINAPI WinMain (HINSTANCE hinst, HINSTANCE hpinst, LPSTR cmdline, int ncmdsh
 		uninitdirectdraw();
 #endif
 		return(0);
-	}
+	}	
+	OutputDebugString("Input initialized\n");
 	if (!initkeyboard(ghwnd))
 	{
 		uninitdirectinput(); DestroyWindow(ghwnd);

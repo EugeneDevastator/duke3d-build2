@@ -2,7 +2,7 @@
 simple.exe:\
 		  simple.obj build2.obj shadowtest2.obj drawpoly.obj drawcone.obj drawkv6.obj morph.obj kplib.obj winmain.obj
 	link simple.obj build2.obj shadowtest2.obj drawpoly.obj drawcone.obj drawkv6.obj morph.obj kplib.obj winmain.obj\
-	ddraw.lib dinput.lib dxguid.lib ole32.lib user32.lib gdi32.lib winmm.lib /opt:nowin98
+	ddraw.lib dinput8.lib dxguid.lib ole32.lib user32.lib gdi32.lib winmm.lib /opt:nowin98
 	del simple.obj
 simple.obj:      simple.c sysmain.h           ; cl /c /J /TP simple.c      /Ox /Ob2 /G6Fy /Gs /MT
 build2.obj:      build2.c drawpoly.h sysmain.h; cl /c /J /TP build2.c               /G6Fy /Gs /MT
