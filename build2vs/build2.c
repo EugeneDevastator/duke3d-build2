@@ -7365,11 +7365,11 @@ static int loadmap (char *filnam)
 					if (j == 1) // Floor surface
 					{
 						// Merge lotag (lower 16 bits) and hitag (upper 16 bits) into single long
-						sur->tag = ((long)b7wal.hitag << 16) | ((long)b7wal.lotag & 0xFFFF) | ((long)b7wal.pal << 32);
+						sur->tag = ((long)b7wal.hitag << 8) | ((long)b7wal.lotag & 0xFF) | ((long)b7wal.pal << 24);
 					}
 					else // Ceiling surface
 					{
-						sur->tag = 0 | ((long)b7wal.pal << 32); // only pal for ceiling
+						sur->tag = 0 | ((long)b7wal.pal << 24); // only pal for ceiling
 					}
 
 					sur->uv[0].x = ((float)b7sec.surf[j].xpanning)/256.0;
@@ -7425,7 +7425,7 @@ static int loadmap (char *filnam)
 					if (b7wal.cstat&1) sur->flags |= 1;
 
 					// Merge lotag (lower 16 bits) and hitag (upper 16 bits) into single long
-					sur->tag = ((long)b7wal.hitag << 16) | ((long)b7wal.lotag & 0xFFFF) | ((long)b7wal.pal << 32);
+					sur->tag = ((long)b7wal.hitag << 8) | ((long)b7wal.lotag & 0xFF) | ((long)b7wal.pal << 24);
 
 					sur->uv[0].x = b7wal.xpanning;
 					sur->uv[0].y = b7wal.ypanning;
@@ -7534,7 +7534,7 @@ static int loadmap (char *filnam)
 				spr->tilnum = l; hitile = max(hitile,l);
 				spr->sect = b7spr.sectnum;
 				spr->sectn = spr->sectp = -1;
-				spr->tag = ((long)b7spr.hitag << 16) | ((long)b7spr.lotag & 0xFFFF) | ((long)b7spr.pal << 32);
+				spr->tag = ((long)b7spr.hitag << 8) | ((long)b7spr.lotag & 0xFF) | ((long)b7spr.pal << 24);
 
 			}
 		}
@@ -8096,7 +8096,7 @@ static void executepack (unsigned char *recvbuf, int doplaysound)
 				switch(key&255)
 				{
 					case 27: gps->typemode = 0; cptr[0] = 0; break; //ESC
-					case 13: gps->typemode = 0; //Enter
+					case 13: gps->typemode = 0; //Enter here
 						if ((logfilnam[0]) && (gst == &sst))
 						{
 							FILE *fil;
@@ -8181,13 +8181,38 @@ static void executepack (unsigned char *recvbuf, int doplaysound)
 							{
 								if ((unsigned)gps->grabsect < (unsigned)gst->numsects)
 								{
-									i = atol(&cptr[5]);
+									char *ptr = &cptr[5];
+									long lotag = 0, hitag = 0, pal = 0;
+
+									// Parse lotag
+									lotag = atol(ptr);
+
+									// Find next separator
+									while (*ptr && *ptr != ',' && *ptr != ' ' && *ptr != '.') ptr++;
+									while (*ptr && (*ptr == ',' || *ptr == ' ' || *ptr == '.')) ptr++; // skip all separators
+
+									// Parse hitag if present
+									if (*ptr && (*ptr >= '0' && *ptr <= '9' || *ptr == '-'))
+									{
+										hitag = atol(ptr);
+										while (*ptr && *ptr != ',' && *ptr != ' ' && *ptr != '.') ptr++;
+										while (*ptr && (*ptr == ',' || *ptr == ' ' || *ptr == '.')) ptr++; // skip all separators
+									}
+
+									// Parse pal if present
+									if (*ptr && (*ptr >= '0' && *ptr <= '9'))
+									{
+										pal = atol(ptr);
+									}
+
+									long tag = ((long)(pal & 0xFF) << 24) | ((long)(hitag & 0xFFFF) << 8) | ((long)(lotag & 0xFF));
+
 									if ((unsigned)(gps->grabwall-0x40000000) < (unsigned)gst->numspris)
-										gst->spri[gps->grabwall&0x3fffffff].tag = i;
+										gst->spri[gps->grabwall&0x3fffffff].tag = tag;
 									else if ((unsigned)gps->grabwall < (unsigned)gst->sect[gps->grabsect].n)
-										gst->sect[gps->grabsect].wall[gps->grabwall].surf.tag = i;
+										gst->sect[gps->grabsect].wall[gps->grabwall].surf.tag = tag;
 									else
-										gst->sect[gps->grabsect].surf[gps->grabcf&1].tag = i;
+										gst->sect[gps->grabsect].surf[gps->grabcf&1].tag = tag;
 									myplaysound("sounds\\drop1.wav",100,1.0,0,0);
 								}
 								cptr[0] = 0; break;
@@ -10509,10 +10534,17 @@ alts_screwed:  free(sec[gst->numsects].wall);
 											else if (hitwall < 0) i = sec[hitsect].surf[hitwall&1].tag;
 						  else if (hitwall < sec[hitsect].n) i = sec[hitsect].wall[hitwall].surf.tag;
 
+					unsigned short lotag, hitag;
+					unsigned char pal;
+					// Extract tag components
+					lotag = i & 0xFF;
+					hitag = (i >> 8) & 0xFFFF;
+					pal = (i >> 24) & 0xFF;
+
 					gps->grabsect = hitsect; gps->grabwall = hitwall;
 					gps->typemode = 1;
 					gps->typehighlight = 5;
-					sprintf(gst->typemess[curindex],"/tag=%d",i);
+					sprintf(gst->typemess[curindex],"/tag=%d,%d,%d",lotag, hitag, pal);
 					gps->typecurs = strlen(gst->typemess[curindex]);
 					break;
 				}
@@ -11440,9 +11472,9 @@ static long drawtagtexture (unsigned long tagVal)
 	if (gtagnum == tagVal) return(gtagleng);
 
 	// Extract components
-	lotag = tagVal & 0xFFFF;
-	hitag = (tagVal >> 16) & 0xFFFF;
-	pal = (tagVal >> 32) & 0xFF;
+	lotag = tagVal & 0xFF;
+	hitag = (tagVal >> 8) & 0xFFFF;
+	pal = (tagVal >> 24) & 0xFF;
 
 	//Draw tag sign
 	tagtil.tt.f = (long)tagsign;
