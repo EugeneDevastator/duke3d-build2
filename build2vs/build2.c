@@ -11430,25 +11430,33 @@ static char avatarname[MAXPLAYERS][TYPEMESSLENG] = {0};
 static long tagsign[TAGSIGNX*(TAGSIGNY+1)+1];
 static tile_t tagtil;
 static long gtagnum = 0, gtagleng = 0;
-static long drawtagtexture (unsigned long val)
+static long drawtagtexture (unsigned long tagVal)
 {
 	long x, y;
 	char tbuf[64];
+	unsigned short lotag, hitag;
+	unsigned char pal;
 
-	if (gtagnum == val) return(gtagleng);
+	if (gtagnum == tagVal) return(gtagleng);
 
-		//Draw tag sign
+	// Extract components
+	lotag = tagVal & 0xFFFF;
+	hitag = (tagVal >> 16) & 0xFFFF;
+	pal = (tagVal >> 32) & 0xFF;
+
+	//Draw tag sign
 	tagtil.tt.f = (long)tagsign;
 	tagtil.tt.x = TAGSIGNX;
 	tagtil.tt.y = TAGSIGNY;
 	tagtil.tt.p = (tagtil.tt.x<<2);
-	sprintf(tbuf,"%d",val);
-	gtagnum = val; gtagleng = strlen(tbuf)*6;
+	sprintf(tbuf,"%d,%d,%d", lotag, hitag, pal);
+	gtagnum = tagVal; gtagleng = strlen(tbuf)*6;
 	print6x8((tiltyp *)&tagtil.tt,0,0,0xffffff,0,"%s",tbuf);
 	for(x=0;x<gtagleng;x++) if (!tagsign[TAGSIGNX*6+x]) tagsign[TAGSIGNX*6+x] += 0x008080; //Draw underline
 	fixtex4grou((tiltyp *)&tagtil.tt);
 	return(gtagleng);
 }
+
 
 static void drawtag_sect (cam_t *cc, long s, long isflor)
 {
