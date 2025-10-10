@@ -4,7 +4,7 @@
 	#this makefile for VC6 and cwinmain.c/cwinmain.h
 drawcone.exe: drawcone.obj cwinmain.obj kdisasm.obj
 	 link      drawcone.obj cwinmain.obj kdisasm.obj\
-	 ddraw.lib dinput.lib dxguid.lib gdi32.lib user32.lib /opt:nowin98
+	 ddraw.lib dinput8.lib dxguid.lib gdi32.lib user32.lib /opt:nowin98
 	 del drawcone.obj
 drawcone.obj: drawcone.c cwinmain.h; cl /c /TP drawcone.c /Ox /G6Fy /MD /QIfist /DSTANDALONE
 cwinmain.obj: cwinmain.c           ; cl /c /TP cwinmain.c /Ox /G6Fy /MD
