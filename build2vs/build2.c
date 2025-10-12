@@ -7424,6 +7424,10 @@ static int loadmap (char *filnam)
 					sur->flags = 0;
 					if (b7wal.cstat&1) sur->flags |= 1;
 
+					// flag at byte 1 : double split  = 1, one tile = 0
+					// bottom tile is taken from overtile of nextwall(meaning opposite side of the wall)
+					// mask tile is undertile field
+
 					// Merge lotag (lower 16 bits) and hitag (upper 16 bits) into single long
 					sur->tag = ((long)b7wal.hitag << 8) | ((long)b7wal.lotag & 0xFF) | ((long)b7wal.pal << 24);
 

@@ -46,7 +46,7 @@ typedef struct
 typedef struct
 {
 	float x, y;
-	long n, ns, nw; //n:rel. wall ind.; ns&nw:nextsect&nextwall_of_sect
+	long n, ns, nw; //n:rel. wall ind.; ns & nw : nextsect & nextwall_of_sect
 	long owner; //for dragging while editing, other effects during game
 	long surfn;
 	surf_t surf, *xsurf; //additional malloced surfs when (surfn > 1)
