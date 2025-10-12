@@ -37,8 +37,11 @@ EXTERN long gnumtiles, gmaltiles, gtilehashead[1024];
 typedef struct
 {
 	long tilnum, tilanm/*???*/;
-	long flags; //Bit0:Blocking, Bit2:RelativeAlignment, Bit5:1Way, Bit16:IsParallax, Bit17:IsSkybox
-	long tag;
+
+	//Bit0:Blocking, Bit2:RelativeAlignment, Bit5:1Way, Bit16:IsParallax, Bit17:IsSkybox
+	union { long flags; struct { char _f1, _f2, _f3, pal; }; }; // temporary pal storage
+	union { long tag; struct { short lotag, hitag; }; };
+
 	point2d uv[3];
 	unsigned short asc, rsc, gsc, bsc; //4096 is no change
 } surf_t;
@@ -46,7 +49,7 @@ typedef struct
 typedef struct
 {
 	float x, y;
-	long n, ns, nw; //n:rel. wall ind.; ns&nw:nextsect&nextwall_of_sect
+	long n, ns, nw; //n:rel. wall ind.; ns & nw : nextsect & nextwall_of_sect
 	long owner; //for dragging while editing, other effects during game
 	long surfn;
 	surf_t surf, *xsurf; //additional malloced surfs when (surfn > 1)
@@ -59,9 +62,13 @@ typedef struct
 	float fat, mas, moi;     //Physics (moi=moment of inertia)
 	long tilnum;             //Model file. Ex:"TILES000.ART|64","CARDBOARD.PNG","CACO.KV6","HAND.KCM","IMP.MD3"
 	unsigned short asc, rsc, gsc, bsc; //Color scales. 4096 is no change
-	long owner, tag;
+	long owner;
+	union { long tag; struct { short lotag, hitag; }; };
 	long tim, otim;          //Time (in milliseconds) for animation
-	long flags;              //Bit0:Blocking, Bit2:1WayOtherSide, Bit5,Bit4:Face/Wall/Floor/.., Bit6:1side, Bit16:IsLight, Bit17-19:SpotAx(1-6), Bit20-29:SpotWid, Bit31:Invisible
+
+	//Bit0:Blocking, Bit2:1WayOtherSide, Bit5,Bit4:Face/Wall/Floor/.., Bit6:1side, Bit16:IsLight, Bit17-19:SpotAx(1-6), Bit20-29:SpotWid, Bit31:Invisible
+	union { long flags; struct { char _f1, _f2, _f3, pal; }; }; // temporary pal storage
+
 	long sect, sectn, sectp; //Current sector / doubly-linked list of indices
 } spri_t;
 
