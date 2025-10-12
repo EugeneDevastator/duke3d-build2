@@ -7365,12 +7365,11 @@ static int loadmap (char *filnam)
 					if (j == 1) // Floor surface
 					{
 						// Merge lotag (lower 16 bits) and hitag (upper 16 bits) into single long
-						sur->tag = ((long)b7sec.hitag << 8) | ((long)b7sec.lotag & 0xFF) | ((long)b7sec.surf[j].pal << 24);
+						sur->lotag = b7sec.lotag;
+						sur->hitag = b7sec.hitag;
 					}
-					else // Ceiling surface
-					{
-						sur->tag = 0 | ((long)b7sec.surf[j].pal << 24); // only pal for ceiling
-					}
+
+					sur->pal = b7sec.surf[j].pal;
 
 					sur->uv[0].x = ((float)b7sec.surf[j].xpanning)/256.0;
 					sur->uv[0].y = ((float)b7sec.surf[j].ypanning)/256.0;
@@ -7428,8 +7427,9 @@ static int loadmap (char *filnam)
 					// bottom tile is taken from overtile of nextwall(meaning opposite side of the wall)
 					// mask tile is undertile field
 
-					// Merge lotag (lower 16 bits) and hitag (upper 16 bits) into single long
-					sur->tag = ((long)b7wal.hitag << 8) | ((long)b7wal.lotag & 0xFF) | ((long)b7wal.pal << 24);
+					sur->lotag = b7wal.lotag;
+					sur->hitag = b7wal.hitag;
+					sur->pal = b7wal.pal;
 
 					sur->uv[0].x = b7wal.xpanning;
 					sur->uv[0].y = b7wal.ypanning;
@@ -7538,8 +7538,9 @@ static int loadmap (char *filnam)
 				spr->tilnum = l; hitile = max(hitile,l);
 				spr->sect = b7spr.sectnum;
 				spr->sectn = spr->sectp = -1;
-				spr->tag = ((long)b7spr.hitag << 8) | ((long)b7spr.lotag & 0xFF) | ((long)b7spr.pal << 24);
-
+				spr->lotag = b7spr.lotag;
+				spr->hitag = b7spr.hitag;
+				spr->pal = b7spr.pal;
 			}
 		}
 		else //CUBES5 map format (.CUB extension)
@@ -8209,14 +8210,18 @@ static void executepack (unsigned char *recvbuf, int doplaysound)
 										pal = atol(ptr);
 									}
 
-									long tag = ((long)(pal & 0xFF) << 24) | ((long)(hitag & 0xFFFF) << 8) | ((long)(lotag & 0xFF));
-
-									if ((unsigned)(gps->grabwall-0x40000000) < (unsigned)gst->numspris)
-										gst->spri[gps->grabwall&0x3fffffff].tag = tag;
-									else if ((unsigned)gps->grabwall < (unsigned)gst->sect[gps->grabsect].n)
-										gst->sect[gps->grabsect].wall[gps->grabwall].surf.tag = tag;
-									else
-										gst->sect[gps->grabsect].surf[gps->grabcf&1].tag = tag;
+									if ((unsigned)(gps->grabwall-0x40000000) < (unsigned)gst->numspris) {
+										gst->spri[gps->grabwall&0x3fffffff].lotag = lotag;
+										gst->spri[gps->grabwall&0x3fffffff].hitag = hitag;
+									}
+									else if ((unsigned)gps->grabwall < (unsigned)gst->sect[gps->grabsect].n) {
+										gst->sect[gps->grabsect].wall[gps->grabwall].surf.lotag = lotag;
+										gst->sect[gps->grabsect].wall[gps->grabwall].surf.hitag = hitag;
+									}
+									else {
+										gst->sect[gps->grabsect].surf[gps->grabcf&1].lotag = lotag;
+										gst->sect[gps->grabsect].surf[gps->grabcf&1].hitag = hitag;
+									}
 									myplaysound("sounds\\drop1.wav",100,1.0,0,0);
 								}
 								cptr[0] = 0; break;
@@ -10539,16 +10544,14 @@ alts_screwed:  free(sec[gst->numsects].wall);
 						  else if (hitwall < sec[hitsect].n) i = sec[hitsect].wall[hitwall].surf.tag;
 
 					unsigned short lotag, hitag;
-					unsigned char pal;
 					// Extract tag components
-					lotag = i & 0xFF;
-					hitag = (i >> 8) & 0xFFFF;
-					pal = (i >> 24) & 0xFF;
+					lotag = i & 0xFFFF;
+					hitag = (i >> 16) & 0xFFFF;
 
 					gps->grabsect = hitsect; gps->grabwall = hitwall;
 					gps->typemode = 1;
 					gps->typehighlight = 5;
-					sprintf(gst->typemess[curindex],"/tag=%d,%d,%d",lotag, hitag, pal);
+					sprintf(gst->typemess[curindex],"/tag=%d,%d",lotag, hitag);
 					gps->typecurs = strlen(gst->typemess[curindex]);
 					break;
 				}
@@ -11474,11 +11477,6 @@ static long drawtagtexture (unsigned long tagVal)
 	unsigned char pal;
 
 	if (gtagnum == tagVal) return(gtagleng);
-
-	// Extract components
-	lotag = tagVal & 0xFF;
-	hitag = (tagVal >> 8) & 0xFFFF;
-	pal = (tagVal >> 24) & 0xFF;
 
 	//Draw tag sign
 	tagtil.tt.f = (long)tagsign;
@@ -14277,7 +14275,7 @@ void doframe (void)
 				print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"fat:%g, owner:%d",spr->fat,spr->owner); j += 8;
 				if ((unsigned)spr->tilnum < (unsigned)gnumtiles) { print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"file:\"%s\"",gtile[spr->tilnum].filnam); j += 8; }
 				print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"flags:0x%08x",spr->flags); j += 8;
-				print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"tag:%d",spr->tag); j += 8;
+				print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"tags:%d,%d",spr->lotag,spr->hitag); j += 8;
 			}
 			else //wall
 			{
