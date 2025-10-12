@@ -11505,32 +11505,10 @@ static void drawtag_sect (cam_t *cc, long s, long isflor)
 	f = ((float)j)*TAGSIZE;
 	g = TAGSIZE*8; if (!isflor) g = -g;
 	getcentroid(sec[s].wall,sec[s].n,&fp.x,&fp.y);
-	fp.z = getslopez(&sec[s],isflor,fp.x,fp.y);
-	if (!isflor) fp.z += TAGSIZE*8; else fp.z -= TAGSIZE*8;
-
-	// Calculate direction from camera to tag position
-	camdir.x = gdps->ipos.x - fp.x;
-	camdir.y = gdps->ipos.y - fp.y;
-	camdir.z = gdps->ipos.z - fp.z;
-	dist = sqrt(camdir.x*camdir.x + camdir.y*camdir.y + camdir.z*camdir.z);
-	if (dist <= 0.f) return;
-
-	// Normalize and offset tag position toward camera
-	f = TAGSIZE*8/dist;
-	fp.x += camdir.x * f;
-	fp.y += camdir.y * f;
-	fp.z += camdir.z * f;
-
-	// Transform to screen space
-	xformpos(&fp.x, &fp.y, &fp.z);
-
-	// Create screen-aligned billboard quad
-	f = ((float)j)*TAGSIZE;
-	rpol[0].x = fp.x - f; rpol[0].y = fp.y - TAGSIZE*8; rpol[0].z = fp.z;
-	rpol[1].x = fp.x + f; rpol[1].y = fp.y - TAGSIZE*8; rpol[1].z = fp.z;
-	rpol[2].x = fp.x + f; rpol[2].y = fp.y + TAGSIZE*8; rpol[2].z = fp.z;
-	rpol[3].x = fp.x - f; rpol[3].y = fp.y + TAGSIZE*8; rpol[3].z = fp.z;
-
+	rpol[0].x = fp.x-f; rpol[0].y = fp.y-g;
+	rpol[1].x = fp.x+f; rpol[1].y = fp.y-g;
+	rpol[2].x = fp.x+f; rpol[2].y = fp.y+g;
+	rpol[3].x = fp.x-f; rpol[3].y = fp.y+g;
 	rpol[0].u = .5/((float)TAGSIGNX);              rpol[0].v = -.0625; rpol[0].n = 1;
 	rpol[1].u = (((float)j)+.5)/((float)TAGSIGNX); rpol[1].v = -.0625; rpol[1].n = 1;
 	rpol[2].u = rpol[1].u;                         rpol[2].v = 0.9375; rpol[2].n = 1;
