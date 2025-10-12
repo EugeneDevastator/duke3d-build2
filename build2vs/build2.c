@@ -11469,12 +11469,15 @@ static char avatarname[MAXPLAYERS][TYPEMESSLENG] = {0};
 static long tagsign[TAGSIGNX*(TAGSIGNY+1)+1];
 static tile_t tagtil;
 static long gtagnum = 0, gtagleng = 0;
-static long drawtagtexture (unsigned long tagVal)
+static long drawtagtexture (unsigned long tagVal, char pal = 0)
 {
 	long x, y;
 	char tbuf[64];
 	unsigned short lotag, hitag;
-	unsigned char pal;
+
+	// Extract components
+	lotag = tagVal & 0xFFFF;
+	hitag = (tagVal >> 16) & 0xFFFF;
 
 	if (gtagnum == tagVal) return(gtagleng);
 
@@ -11501,7 +11504,7 @@ static void drawtag_sect (cam_t *cc, long s, long isflor)
 	long j;
 
 	sec = gst->sect;
-	j = drawtagtexture(sec[s].surf[isflor].tag);
+	j = drawtagtexture(sec[s].surf[isflor].tag, sec[s].surf[isflor].pal);
 	f = ((float)j)*TAGSIZE;
 	g = TAGSIZE*8; if (!isflor) g = -g;
 	getcentroid(sec[s].wall,sec[s].n,&fp.x,&fp.y);
@@ -11538,7 +11541,7 @@ static void drawtag_wall (cam_t *cc, long s, long w, float dx, kgln_t *pol)
 	fp2.x = pol[1].x-pol[0].x;
 	fp2.y = pol[1].y-pol[0].y;
 	fp2.z = pol[1].z-pol[0].z;
-	j = drawtagtexture(wal[w].surf.tag);
+	j = drawtagtexture(wal[w].surf.tag, wal[w].surf.pal);
 	f = 1.0/dx;
 	fp.x -= fp2.y*f*.001;
 	fp.y += fp2.x*f*.001;
@@ -11568,7 +11571,7 @@ static void drawtag_spri (cam_t *cc, long s)
 	f = fp.x*fp.x + fp.y*fp.y + fp.z*fp.z; if (f <= 0.f) return;
 
 	f = (spr->fat+TAGSIZE*8)/sqrt(f);
-	j = drawtagtexture(spr->tag);
+	j = drawtagtexture(spr->tag, spr->pal);
 	pol[3].x = fp.x*f + spr->p.x;
 	pol[3].y = fp.y*f + spr->p.y;
 	pol[3].z = fp.z*f + spr->p.z; xformpos(&pol[3].x,&pol[3].y,&pol[3].z);
