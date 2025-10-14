@@ -621,9 +621,9 @@ parsemap (hang, vang, tilt)
          if (pivot == -1) continue;
          debugnum2= pivot;
          swing[swingnum].sect = s;
-         swing[swingnum].totang = mapgetsect(s,MAP_TAG+0)*PI/180;
+         swing[swingnum].totang = 90*PI/180;
         // if (swing[swingnum].totang < 0) w = mapgetwall(s,w,MAP_N);
-         mapgetspri(s,pivot,MAP_XY,&swing[swingnum].pivx,&swing[swingnum].pivy);
+         mapgetspri(pivot,MAP_XY,&swing[swingnum].pivx,&swing[swingnum].pivy);
          swing[swingnum].curang = 0;
          swing[swingnum].goalang = 0;
          
