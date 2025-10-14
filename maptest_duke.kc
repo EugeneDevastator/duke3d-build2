@@ -94,7 +94,7 @@ static debugnum1,  debugnum2;
    htype = -1; hsect = -1; hind = -1;
 
    mountzip("../Build2"); hang = 0; vang = 0; tilt = 0;
-   if (!mapload("e1l1a.map",&sect,&ipos.x,&ipos.y,&ipos.z,&hang,&vang,&tilt))
+   if (!mapload("e2l1a.map",&sect,&ipos.x,&ipos.y,&ipos.z,&hang,&vang,&tilt))
       { playtext("Map not found"); return; }
    parsemap(hang,vang,tilt); //Extract tags to local variables&arrays
    
@@ -118,7 +118,7 @@ static debugnum1,  debugnum2;
       move_pickups();
       move_player_buls();
       move_lava();
-      move_lights();
+      //move_lights();
       
       move_player();
       
@@ -159,7 +159,10 @@ static debugnum1,  debugnum2;
              ifor.x,ifor.y,ifor.z);
    
       mapdraw();
-   
+      // debug draw
+      setfont(12,16);
+      moveto(xres/2-9*6+pixoff*ster/3,8); printnum(debugnum1);
+      
       if (lost >= 0)
       {
          setfont(12,16);
@@ -537,21 +540,23 @@ parsemap (hang, vang, tilt)
          tag = mapgetsect(s,MAP_TAG+i);
          if (tag == 1) { rotsect[rotnum] = s; rotnum++; }
          
-         else if (tag == 20)  //  Duke ceil door
+         else if (tag == 20 && i==1)  //  Duke ceil door
          {
             door[doornum].sect = s;
             nearS = get_nearest_sector(s);
             debugnum1  = nearS;
-            for(j=0;j<2;j++) door[doornum].z[j] = mapgetsect(s,MAP_Z+j);
-            door[doornum].sid = i;
-            door[doornum].goal = door[doornum].z[1-i];
+            door[doornum].z[1]  = mapgetsect(s,MAP_Z+1); // floor  as is
+
+            //for(j=0;j<2;j++) door[doornum].z[j] = mapgetsect(s,MAP_Z+j);
+            door[doornum].sid = 0;
+            nearh = mapgetsect(nearS,MAP_Z+0);
             
-            door[doornum].locked = 0;
-            for(j=mapgetsect(s,MAP_HEADSPRI);j>=0;j=mapgetspri(j,MAP_N))
-               if (mapgetspri(j,MAP_TAG) == 7)
-                  { mapdelspri(j); door[doornum].locked = 1; break; }
+            debugnum1=nearh;
+            door[doornum].goal = nearh;
+            door[doornum].z[0] = nearh; // door.z is used as min and max.
             
-            mapsetsect(s,MAP_Z+i,door[doornum].goal);
+            mapsetsect(s,MAP_Z+0,nearh);
+            mapsetsect(s,MAP_Z+1,door[doornum].z[1]);
             doornum++;
          }
 
