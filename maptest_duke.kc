@@ -82,6 +82,8 @@ enum {LAVMAX=256}  static lavind[LAVMAX], lavnum; //Lava sectors
 enum {LIGHTMAX=16} static maplight[LIGHTMAX], maplightn;
 static light;
 
+static debugnum1,  debugnum2;
+
 ()
 {
 //----------------------------------------------------------------------------------------
@@ -116,7 +118,7 @@ static light;
       move_pickups();
       move_player_buls();
       move_lava();
-      move_lights();
+      //move_lights();
       
       move_player();
       
@@ -140,7 +142,7 @@ static light;
       }
       
          //Caps Lock noclip cheat
-      if (keystatus[0x3a]) { keystatus[0x3a] = 0; cheat = 1-cheat; }
+      if (keystatus[0x3a]) { keystatus[0x3a] = 0; cheat = 1-cheat; } 
      
 //----------------------------------------------------------------------------------------
 //Drawing code
@@ -157,7 +159,10 @@ static light;
              ifor.x,ifor.y,ifor.z);
    
       mapdraw();
-   
+      // debug draw
+      setfont(12,16);
+      moveto(xres/2-9*6+pixoff*ster/3,8); printnum(debugnum2);
+      
       if (lost >= 0)
       {
          setfont(12,16);
@@ -190,6 +195,35 @@ static light;
 //----------------------------------------------------------------------------------------
       refresh(); //Update screen,mouse,keys,etc..
    }
+}
+get_nearest_sector(current_sector) {
+    num_walls = mapgetsect(current_sector, MAP_N);
+    
+    for(w = 0; w < num_walls; w++) {
+        opposing_sector = mapgetwall(current_sector, w, MAP_OPPS);
+        if(opposing_sector >= 0) {
+            return opposing_sector;
+        }
+    }
+    
+    return -1; // No adjacent sector found
+}
+get_first_sprite_with_tag(sector_index, tag) {
+    sprite_index;
+    
+    // Iterate through all sprites in the sector
+    for (sprite_index = mapgetsect(sector_index, MAP_HEADSPRI); 
+         sprite_index >= 0; 
+         sprite_index = mapgetspri(sprite_index, MAP_N)) {
+        
+        // Check if sprite has lo-tag 11 
+        if (mapgetspri(sprite_index, MAP_TAG) % 65536 == 11) {
+           debugnum2=sprite_index;
+            return sprite_index;
+        }
+    }
+    
+    return -1; // No sprite with tag 11 found
 }
 
    //Rotate vectors a & b around their common plane, by ang
@@ -522,6 +556,29 @@ parsemap (hang, vang, tilt)
       {
          tag = mapgetsect(s,MAP_TAG+i);
          if (tag == 1) { rotsect[rotnum] = s; rotnum++; }
+         
+         else if (tag == 20 && i==1)  //  Duke ceil door
+         {
+            door[doornum].sect = s;
+            nearS = get_nearest_sector(s);
+            debugnum1  = nearS;
+
+            door[doornum].sid = 0;
+            // ceiling height of a nearby sec
+            nearh = mapgetsect(nearS,MAP_Z+0);
+            
+            debugnum1=nearh;
+
+            door[doornum].z[0] = nearh; // door.z is used as min and max.
+            door[doornum].z[1] = mapgetsect(s,MAP_Z+1); // floor  as is
+            door[doornum].goal = door[doornum].z[1];
+            
+            //  clamp  all to floor
+            mapsetsect(s,MAP_Z+0,door[doornum].z[1]);
+            mapsetsect(s,MAP_Z+1,door[doornum].z[1]);
+            doornum++;
+         }
+
          else if (tag == 6)
          {
             door[doornum].sect = s;
@@ -554,16 +611,23 @@ parsemap (hang, vang, tilt)
             mapdelspri(i);
             //mapsetspri(i,MAP_INVISIBLE,1); //hide sprite
          }
-         ele[elenum].goali = 0; ele[elenum].goal = ele[elenum].stop[0];
+         ele[elenum].goali = 0; ele[elenum].goal = ele[elenum].stop[0]; 
          ele[elenum].numstop = n; elenum++;
       }
-      else if (tag == 13)
+      else if (tag == 23) // duke swing door
       {
-         for(w=mapgetsect(s,MAP_N)-1;w>=0;w--) if (mapgetwall(s,w,MAP_TAG)) break;
+
+         pivot = get_first_sprite_with_tag(s,11); 
+         if (pivot == -1) continue;
+         debugnum2= pivot; 
          swing[swingnum].sect = s;
-         swing[swingnum].totang = mapgetsect(s,MAP_TAG+0)*PI/180;
-         if (swing[swingnum].totang < 0) w = mapgetwall(s,w,MAP_N);
-         mapgetwall(s,w,MAP_XY,&swing[swingnum].pivx,&swing[swingnum].pivy);
+         sori = mapgetspri(pivot,MAP_HANG); // down = 3.14 up = 0 
+         
+
+         debugnum2=sori;
+         swing[swingnum].totang = 90*PI/180;
+         if (abs(sori) > 3) w = swing[swingnum].totang *= -1;
+         mapgetspri(pivot,MAP_XY,&swing[swingnum].pivx,&swing[swingnum].pivy);
          swing[swingnum].curang = 0;
          swing[swingnum].goalang = 0;
          
@@ -671,7 +735,7 @@ player_use ()
       }
       if (mapgetsect(door[i].sect,MAP_Z+door[i].sid) != door[i].goal)
          playsoundupdate(door[i].snd,0);
-      door[i].goal = door[i].z[0]+door[i].z[1]-door[i].goal;
+      door[i].goal = door[i].z[0]+door[i].z[1]-door[i].goal;   
       door[i].snd = playsound("tapfloor.flac",100,0.13);
    }
    
