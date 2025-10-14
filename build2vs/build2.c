@@ -8187,7 +8187,7 @@ static void executepack (unsigned char *recvbuf, int doplaysound)
 								if ((unsigned)gps->grabsect < (unsigned)gst->numsects)
 								{
 									char *ptr = &cptr[5];
-									long lotag = 0, hitag = 0, pal = 0;
+									short lotag = 0, hitag = 0, pal = 0;
 
 									// Parse lotag
 									lotag = atol(ptr);
