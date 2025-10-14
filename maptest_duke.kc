@@ -94,7 +94,7 @@ static debugnum1,  debugnum2;
    htype = -1; hsect = -1; hind = -1;
 
    mountzip("../Build2"); hang = 0; vang = 0; tilt = 0;
-   if (!mapload("e2l1a.map",&sect,&ipos.x,&ipos.y,&ipos.z,&hang,&vang,&tilt))
+   if (!mapload("e1l1a.map",&sect,&ipos.x,&ipos.y,&ipos.z,&hang,&vang,&tilt))
       { playtext("Map not found"); return; }
    parsemap(hang,vang,tilt); //Extract tags to local variables&arrays
    
@@ -142,7 +142,7 @@ static debugnum1,  debugnum2;
       }
       
          //Caps Lock noclip cheat
-      if (keystatus[0x3a]) { keystatus[0x3a] = 0; cheat = 1-cheat; }
+      if (keystatus[0x3a]) { keystatus[0x3a] = 0; cheat = 1-cheat; } 
      
 //----------------------------------------------------------------------------------------
 //Drawing code
@@ -161,7 +161,7 @@ static debugnum1,  debugnum2;
       mapdraw();
       // debug draw
       setfont(12,16);
-      moveto(xres/2-9*6+pixoff*ster/3,8); printnum(debugnum1);
+      moveto(xres/2-9*6+pixoff*ster/3,8); printnum(debugnum2);
       
       if (lost >= 0)
       {
@@ -207,6 +207,23 @@ get_nearest_sector(current_sector) {
     }
     
     return -1; // No adjacent sector found
+}
+get_first_sprite_with_tag(sector_index, tag) {
+    sprite_index;
+    
+    // Iterate through all sprites in the sector
+    for (sprite_index = mapgetsect(sector_index, MAP_HEADSPRI); 
+         sprite_index >= 0; 
+         sprite_index = mapgetspri(sprite_index, MAP_N)) {
+        
+        // Check if sprite has lo-tag 11 
+        if (mapgetspri(sprite_index, MAP_TAG) % 65536 == 11) {
+           debugnum2=sprite_index;
+            return sprite_index;
+        }
+    }
+    
+    return -1; // No sprite with tag 11 found
 }
 
    //Rotate vectors a & b around their common plane, by ang
@@ -597,13 +614,16 @@ parsemap (hang, vang, tilt)
          ele[elenum].goali = 0; ele[elenum].goal = ele[elenum].stop[0];
          ele[elenum].numstop = n; elenum++;
       }
-      else if (tag == 13)
+      else if (tag == 23) // duke swing door
       {
-         for(w=mapgetsect(s,MAP_N)-1;w>=0;w--) if (mapgetwall(s,w,MAP_TAG)) break;
+
+         pivot = get_first_sprite_with_tag(s,11); 
+         if (pivot == -1) continue;
+         debugnum2= pivot;
          swing[swingnum].sect = s;
          swing[swingnum].totang = mapgetsect(s,MAP_TAG+0)*PI/180;
-         if (swing[swingnum].totang < 0) w = mapgetwall(s,w,MAP_N);
-         mapgetwall(s,w,MAP_XY,&swing[swingnum].pivx,&swing[swingnum].pivy);
+        // if (swing[swingnum].totang < 0) w = mapgetwall(s,w,MAP_N);
+         mapgetspri(s,pivot,MAP_XY,&swing[swingnum].pivx,&swing[swingnum].pivy);
          swing[swingnum].curang = 0;
          swing[swingnum].goalang = 0;
          
