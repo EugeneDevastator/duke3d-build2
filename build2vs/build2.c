@@ -7360,6 +7360,17 @@ static int loadmap (char *filnam)
 					if ((unsigned)l >= (unsigned)arttiles) l = 0;
 					sur->tilnum = l; hitile = max(hitile,l);
 
+					// Convert lotag/hitag to single tag field
+					// j=0 is ceiling, j=1 is floor - assign to floor surface only
+					if (j == 1) // Floor surface
+					{
+						// Merge lotag (lower 16 bits) and hitag (upper 16 bits) into single long
+						sur->lotag = b7sec.lotag;
+						sur->hitag = b7sec.hitag;
+					}
+
+					sur->pal = b7sec.surf[j].pal;
+
 					sur->uv[0].x = ((float)b7sec.surf[j].xpanning)/256.0;
 					sur->uv[0].y = ((float)b7sec.surf[j].ypanning)/256.0;
 					sur->uv[1].y = sur->uv[2].x = 0;
@@ -7399,7 +7410,6 @@ static int loadmap (char *filnam)
 				sec[i].owner = -1;
 				//sec[i].foglev = ?;
 			}
-
 			kzread(&s,2); //numwalls
 			for(i=k=0;i<gst->numsects;i++)
 			{
@@ -7412,6 +7422,15 @@ static int loadmap (char *filnam)
 					sur = &sec[i].wall[j].surf;
 					sur->flags = 0;
 					if (b7wal.cstat&1) sur->flags |= 1;
+
+					// flag at byte 1 : double split  = 1, one tile = 0
+					// bottom tile is taken from overtile of nextwall(meaning opposite side of the wall)
+					// mask tile is undertile field
+
+					sur->lotag = b7wal.lotag;
+					sur->hitag = b7wal.hitag;
+					sur->pal = b7wal.pal;
+
 					sur->uv[0].x = b7wal.xpanning;
 					sur->uv[0].y = b7wal.ypanning;
 					sur->uv[1].x = b7wal.xrepeat; if (b7wal.cstat&  8) sur->uv[1].x *= -1;
@@ -7428,6 +7447,7 @@ static int loadmap (char *filnam)
 					sec[i].wall[j].surfn = 1;
 					sec[i].wall[j].owner = -1;
 				}
+				// tile adjust?
 				for(j=0;j<sec[i].n;j++)
 				{
 					l = j+sec[i].wall[j].n;
@@ -7518,6 +7538,9 @@ static int loadmap (char *filnam)
 				spr->tilnum = l; hitile = max(hitile,l);
 				spr->sect = b7spr.sectnum;
 				spr->sectn = spr->sectp = -1;
+				spr->lotag = b7spr.lotag;
+				spr->hitag = b7spr.hitag;
+				spr->pal = b7spr.pal;
 			}
 		}
 		else //CUBES5 map format (.CUB extension)
@@ -8078,7 +8101,7 @@ static void executepack (unsigned char *recvbuf, int doplaysound)
 				switch(key&255)
 				{
 					case 27: gps->typemode = 0; cptr[0] = 0; break; //ESC
-					case 13: gps->typemode = 0; //Enter
+					case 13: gps->typemode = 0; //Enter here
 						if ((logfilnam[0]) && (gst == &sst))
 						{
 							FILE *fil;
@@ -8163,13 +8186,42 @@ static void executepack (unsigned char *recvbuf, int doplaysound)
 							{
 								if ((unsigned)gps->grabsect < (unsigned)gst->numsects)
 								{
-									i = atol(&cptr[5]);
-									if ((unsigned)(gps->grabwall-0x40000000) < (unsigned)gst->numspris)
-										gst->spri[gps->grabwall&0x3fffffff].tag = i;
-									else if ((unsigned)gps->grabwall < (unsigned)gst->sect[gps->grabsect].n)
-										gst->sect[gps->grabsect].wall[gps->grabwall].surf.tag = i;
-									else
-										gst->sect[gps->grabsect].surf[gps->grabcf&1].tag = i;
+									char *ptr = &cptr[5];
+									short lotag = 0, hitag = 0, pal = 0;
+
+									// Parse lotag
+									lotag = atol(ptr);
+
+									// Find next separator
+									while (*ptr && *ptr != ',' && *ptr != ' ' && *ptr != '.') ptr++;
+									while (*ptr && (*ptr == ',' || *ptr == ' ' || *ptr == '.')) ptr++; // skip all separators
+
+									// Parse hitag if present
+									if (*ptr && (*ptr >= '0' && *ptr <= '9' || *ptr == '-'))
+									{
+										hitag = atol(ptr);
+										while (*ptr && *ptr != ',' && *ptr != ' ' && *ptr != '.') ptr++;
+										while (*ptr && (*ptr == ',' || *ptr == ' ' || *ptr == '.')) ptr++; // skip all separators
+									}
+
+									// Parse pal if present
+									if (*ptr && (*ptr >= '0' && *ptr <= '9'))
+									{
+										pal = atol(ptr);
+									}
+
+									if ((unsigned)(gps->grabwall-0x40000000) < (unsigned)gst->numspris) {
+										gst->spri[gps->grabwall&0x3fffffff].lotag = lotag;
+										gst->spri[gps->grabwall&0x3fffffff].hitag = hitag;
+									}
+									else if ((unsigned)gps->grabwall < (unsigned)gst->sect[gps->grabsect].n) {
+										gst->sect[gps->grabsect].wall[gps->grabwall].surf.lotag = lotag;
+										gst->sect[gps->grabsect].wall[gps->grabwall].surf.hitag = hitag;
+									}
+									else {
+										gst->sect[gps->grabsect].surf[gps->grabcf&1].lotag = lotag;
+										gst->sect[gps->grabsect].surf[gps->grabcf&1].hitag = hitag;
+									}
 									myplaysound("sounds\\drop1.wav",100,1.0,0,0);
 								}
 								cptr[0] = 0; break;
@@ -10491,10 +10543,15 @@ alts_screwed:  free(sec[gst->numsects].wall);
 											else if (hitwall < 0) i = sec[hitsect].surf[hitwall&1].tag;
 						  else if (hitwall < sec[hitsect].n) i = sec[hitsect].wall[hitwall].surf.tag;
 
+					unsigned short lotag, hitag;
+					// Extract tag components
+					lotag = i & 0xFFFF;
+					hitag = (i >> 16) & 0xFFFF;
+
 					gps->grabsect = hitsect; gps->grabwall = hitwall;
 					gps->typemode = 1;
 					gps->typehighlight = 5;
-					sprintf(gst->typemess[curindex],"/tag=%d",i);
+					sprintf(gst->typemess[curindex],"/tag=%d,%d",lotag, hitag);
 					gps->typecurs = strlen(gst->typemess[curindex]);
 					break;
 				}
@@ -11412,25 +11469,31 @@ static char avatarname[MAXPLAYERS][TYPEMESSLENG] = {0};
 static long tagsign[TAGSIGNX*(TAGSIGNY+1)+1];
 static tile_t tagtil;
 static long gtagnum = 0, gtagleng = 0;
-static long drawtagtexture (unsigned long val)
+static long drawtagtexture (unsigned long tagVal, char pal = 0)
 {
 	long x, y;
 	char tbuf[64];
+	unsigned short lotag, hitag;
 
-	if (gtagnum == val) return(gtagleng);
+	// Extract components
+	lotag = tagVal & 0xFFFF;
+	hitag = (tagVal >> 16) & 0xFFFF;
 
-		//Draw tag sign
+	if (gtagnum == tagVal) return(gtagleng);
+
+	//Draw tag sign
 	tagtil.tt.f = (long)tagsign;
 	tagtil.tt.x = TAGSIGNX;
 	tagtil.tt.y = TAGSIGNY;
 	tagtil.tt.p = (tagtil.tt.x<<2);
-	sprintf(tbuf,"%d",val);
-	gtagnum = val; gtagleng = strlen(tbuf)*6;
+	sprintf(tbuf,"%d,%d,%d", lotag, hitag, pal);
+	gtagnum = tagVal; gtagleng = strlen(tbuf)*6;
 	print6x8((tiltyp *)&tagtil.tt,0,0,0xffffff,0,"%s",tbuf);
 	for(x=0;x<gtagleng;x++) if (!tagsign[TAGSIGNX*6+x]) tagsign[TAGSIGNX*6+x] += 0x008080; //Draw underline
 	fixtex4grou((tiltyp *)&tagtil.tt);
 	return(gtagleng);
 }
+
 
 static void drawtag_sect (cam_t *cc, long s, long isflor)
 {
@@ -11441,7 +11504,7 @@ static void drawtag_sect (cam_t *cc, long s, long isflor)
 	long j;
 
 	sec = gst->sect;
-	j = drawtagtexture(sec[s].surf[isflor].tag);
+	j = drawtagtexture(sec[s].surf[isflor].tag, sec[s].surf[isflor].pal);
 	f = ((float)j)*TAGSIZE;
 	g = TAGSIZE*8; if (!isflor) g = -g;
 	getcentroid(sec[s].wall,sec[s].n,&fp.x,&fp.y);
@@ -11478,7 +11541,7 @@ static void drawtag_wall (cam_t *cc, long s, long w, float dx, kgln_t *pol)
 	fp2.x = pol[1].x-pol[0].x;
 	fp2.y = pol[1].y-pol[0].y;
 	fp2.z = pol[1].z-pol[0].z;
-	j = drawtagtexture(wal[w].surf.tag);
+	j = drawtagtexture(wal[w].surf.tag, wal[w].surf.pal);
 	f = 1.0/dx;
 	fp.x -= fp2.y*f*.001;
 	fp.y += fp2.x*f*.001;
@@ -11494,7 +11557,6 @@ static void drawtag_wall (cam_t *cc, long s, long w, float dx, kgln_t *pol)
 	for(j=0;j<4;j++) xformpos(&rpol[j].x,&rpol[j].y,&rpol[j].z);
 	drawpol(cc,rpol,4,&tagtil,0x808080,0,0,0);
 }
-
 static void drawtag_spri (cam_t *cc, long s)
 {
 	kgln_t pol[4];
@@ -11509,7 +11571,7 @@ static void drawtag_spri (cam_t *cc, long s)
 	f = fp.x*fp.x + fp.y*fp.y + fp.z*fp.z; if (f <= 0.f) return;
 
 	f = (spr->fat+TAGSIZE*8)/sqrt(f);
-	j = drawtagtexture(spr->tag);
+	j = drawtagtexture(spr->tag, spr->pal);
 	pol[3].x = fp.x*f + spr->p.x;
 	pol[3].y = fp.y*f + spr->p.y;
 	pol[3].z = fp.z*f + spr->p.z; xformpos(&pol[3].x,&pol[3].y,&pol[3].z);
@@ -14194,7 +14256,7 @@ void doframe (void)
 				print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"fat:%g, owner:%d",spr->fat,spr->owner); j += 8;
 				if ((unsigned)spr->tilnum < (unsigned)gnumtiles) { print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"file:\"%s\"",gtile[spr->tilnum].filnam); j += 8; }
 				print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"flags:0x%08x",spr->flags); j += 8;
-				print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"tag:%d",spr->tag); j += 8;
+				print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"tags:%d,%d",spr->lotag,spr->hitag); j += 8;
 			}
 			else //wall
 			{

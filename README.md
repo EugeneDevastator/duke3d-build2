@@ -1,5 +1,5 @@
 # Port of duke3d onto Build2
-build 2 by Ken Silverman: https://www.advsys.net/ken/build.htm
+Build 2 by Ken Silverman: https://www.advsys.net/ken/build.htm
 ## Plan:
 - move all gameplay logic into .kc file, using evaldraw as main engine.
 for now just boilerplate core into **maptest_duke.kc**
