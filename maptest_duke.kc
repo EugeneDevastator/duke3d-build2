@@ -545,17 +545,19 @@ parsemap (hang, vang, tilt)
             door[doornum].sect = s;
             nearS = get_nearest_sector(s);
             debugnum1  = nearS;
-            door[doornum].z[1]  = mapgetsect(s,MAP_Z+1); // floor  as is
 
-            //for(j=0;j<2;j++) door[doornum].z[j] = mapgetsect(s,MAP_Z+j);
             door[doornum].sid = 0;
+            // ceiling height of a nearby sec
             nearh = mapgetsect(nearS,MAP_Z+0);
             
             debugnum1=nearh;
-            door[doornum].goal = nearh;
+
             door[doornum].z[0] = nearh; // door.z is used as min and max.
+            door[doornum].z[1] = mapgetsect(s,MAP_Z+1); // floor  as is
+            door[doornum].goal = door[doornum].z[1];
             
-            mapsetsect(s,MAP_Z+0,nearh);
+            //  clamp  all to floor
+            mapsetsect(s,MAP_Z+0,door[doornum].z[1]);
             mapsetsect(s,MAP_Z+1,door[doornum].z[1]);
             doornum++;
          }
@@ -709,7 +711,7 @@ player_use ()
       }
       if (mapgetsect(door[i].sect,MAP_Z+door[i].sid) != door[i].goal)
          playsoundupdate(door[i].snd,0);
-      door[i].goal = door[i].z[0]+door[i].z[1]-door[i].goal;
+      door[i].goal = door[i].z[0]+door[i].z[1]-door[i].goal;   
       door[i].snd = playsound("tapfloor.flac",100,0.13);
    }
    

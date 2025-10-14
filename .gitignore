@@ -11,3 +11,5 @@ build2vs/.vs/ProjectSettings.json
 build2vs/.vs/slnx.sqlite
 build2vs/.vs/VSWorkspaceState.json
 build2vs/.vs/build2vs/
+*.ART
+PALETTE.DAT
