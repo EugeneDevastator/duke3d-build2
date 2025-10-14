@@ -611,7 +611,7 @@ parsemap (hang, vang, tilt)
             mapdelspri(i);
             //mapsetspri(i,MAP_INVISIBLE,1); //hide sprite
          }
-         ele[elenum].goali = 0; ele[elenum].goal = ele[elenum].stop[0];
+         ele[elenum].goali = 0; ele[elenum].goal = ele[elenum].stop[0]; 
          ele[elenum].numstop = n; elenum++;
       }
       else if (tag == 23) // duke swing door
@@ -619,10 +619,14 @@ parsemap (hang, vang, tilt)
 
          pivot = get_first_sprite_with_tag(s,11); 
          if (pivot == -1) continue;
-         debugnum2= pivot;
+         debugnum2= pivot; 
          swing[swingnum].sect = s;
+         sori = mapgetspri(pivot,MAP_HANG); // down = 3.14 up = 0 
+         
+
+         debugnum2=sori;
          swing[swingnum].totang = 90*PI/180;
-        // if (swing[swingnum].totang < 0) w = mapgetwall(s,w,MAP_N);
+         if (abs(sori) > 3) w = swing[swingnum].totang *= -1;
          mapgetspri(pivot,MAP_XY,&swing[swingnum].pivx,&swing[swingnum].pivy);
          swing[swingnum].curang = 0;
          swing[swingnum].goalang = 0;
