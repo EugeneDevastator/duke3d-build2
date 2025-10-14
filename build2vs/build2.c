@@ -7493,8 +7493,9 @@ static int loadmap (char *filnam)
 				spr->p.y = ((float)b7spr.y)*(1.f/512.f);
 				spr->p.z = ((float)b7spr.z)*(1.f/(512.f*16.f));
 				spr->flags = 0;
-				switch(b7spr.cstat&48)
-				{
+				switch(b7spr.cstat&48)  // https://wiki.eduke32.com/wiki/Cstat_(sprite)
+										// 48  =32  +16 wall or  floor only check
+					{
 					case 0: //Face sprite
 						spr->flags |= 16;
 						//no break intentional
@@ -7514,11 +7515,11 @@ static int loadmap (char *filnam)
 						if (b7spr.cstat&8) { spr->d.x *= -1; spr->d.y *= -1; }
 						break;
 				}
-				if (b7spr.cstat&1) spr->flags |= 1;
-				if (b7spr.cstat&64) spr->flags |= 64;
+				if (b7spr.cstat&1) spr->flags |= 1; // blocking
+				if (b7spr.cstat&64) spr->flags |= 64; // 1 sided
 				if (b7spr.cstat&4) { spr->r.x *= -1; spr->r.y *= -1; spr->r.z *= -1; spr->flags ^= 4; } //&4: x-flipped
-				if (b7spr.cstat&8) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; spr->flags ^= 4; } //&8: x-flipped
-				if (b7spr.cstat&128) { spr->p.z += (b7spr.yrepeat/4096.0*(float)tilesizy[l]); } //&128: real-centered centering (center at center)
+				if (b7spr.cstat&8) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; spr->flags ^= 4; } //&8: y-flipped?
+				if (b7spr.cstat&128) { spr->p.z += (b7spr.yrepeat/4096.0*(float)tilesizy[l]); } //&128: real-centered centering (center at center) - originally half submerged sprite
 
 				if ((unsigned)b7spr.sectnum < (unsigned)gst->numsects) //Make shade relative to sector
 				{
@@ -7526,6 +7527,9 @@ static int loadmap (char *filnam)
 					if (iskenbuild) b7spr.shade += j+6;
 				}
 
+				spr->f.z=3; // sus
+				spr->f.x=cos((float)b7spr.ang*PI/1024.0);
+				spr->f.y=sin((float)b7spr.ang*PI/1024.0);
 				spr->fat = 0.f;
 				spr->asc = 4096;
 				spr->rsc = (32-b7spr.shade)*128;
