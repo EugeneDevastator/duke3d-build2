@@ -1922,17 +1922,16 @@ int getwalls (int s, int w, vertlist_t *ver, int maxverts)
 	// If this wall has a portal lotag, find matching portal wall instead of adjacent sector
 	if (portal_lotag > 0) {
 		vn = 0;
-		// Search all sectors for walls with matching lotag
 		for (i = 0; i < gst->numsects; i++) {
-			if (i == s) continue; // Skip current sector
 			for (j = 0; j < sec[i].n; j++) {
-				if (sec[i].wall[j].surf.lotag == portal_lotag) {
+				if (sec[i].wall[j].surf.lotag == portal_lotag &&
+					!(i == s && j == w)) { // Skip the source wall itself
 					if (vn < maxverts) {
 						ver[vn].s = i;
 						ver[vn].w = j;
 						vn++;
 					}
-				}
+					}
 			}
 		}
 		return vn;

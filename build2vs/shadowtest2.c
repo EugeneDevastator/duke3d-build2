@@ -2637,14 +2637,147 @@ void transform_portal_coords(int src_s, int src_w, int dst_s, int dst_w, double 
 	sect_t *sec = gst->sect;
 	wall_t *src_wal = &sec[src_s].wall[src_w];
 	wall_t *dst_wal = &sec[dst_s].wall[dst_w];
+	wall_t *src_nw = &sec[src_s].wall[src_wal->n + src_w];
+	wall_t *dst_nw = &sec[dst_s].wall[dst_wal->n + dst_w];
 
-	// Simple translation for now - can be enhanced for rotation
-	double dx = dst_wal->x - src_wal->x;
-	double dy = dst_wal->y - src_wal->y;
+	// Calculate portal transformation matrix
+	double src_dx = src_nw->x - src_wal->x;
+	double src_dy = src_nw->y - src_wal->y;
+	double dst_dx = dst_nw->x - dst_wal->x;
+	double dst_dy = dst_nw->y - dst_wal->y;
 
-	*x += dx;
-	*y += dy;
-	// Z transformation could be added based on sector height differences
+	// Normalize vectors
+	double src_len = sqrt(src_dx*src_dx + src_dy*src_dy);
+	double dst_len = sqrt(dst_dx*dst_dx + dst_dy*dst_dy);
+
+	if (src_len > 1e-6 && dst_len > 1e-6) {
+		src_dx /= src_len; src_dy /= src_len;
+		dst_dx /= dst_len; dst_dy /= dst_len;
+
+		// Transform relative to source portal
+		double rel_x = *x - src_wal->x;
+		double rel_y = *y - src_wal->y;
+
+		// Project onto source wall direction
+		double along = rel_x * src_dx + rel_y * src_dy;
+		double perp = rel_x * (-src_dy) + rel_y * src_dx;
+
+		// Apply to destination portal (flipped direction for portal effect)
+		*x = dst_wal->x - along * dst_dx + perp * (-dst_dy);
+		*y = dst_wal->y - along * dst_dy + perp * dst_dx;
+	} else {
+		// Fallback to simple translation
+		*x += dst_wal->x - src_wal->x;
+		*y += dst_wal->y - src_wal->y;
+	}
+
+	// Z transformation based on sector height difference
+	double src_z = getslopez(&sec[src_s], 0, src_wal->x, src_wal->y);
+	double dst_z = getslopez(&sec[dst_s], 0, dst_wal->x, dst_wal->y);
+	*z += dst_z - src_z;
+}
+typedef struct {
+	double matrix[4][4];
+	int src_s, src_w, dst_s, dst_w;
+	int depth;
+} portal_transform_t;
+
+static portal_transform_t portal_stack[8]; // Max 8 portal depth
+static int portal_depth = 0;
+
+void setup_portal_transform(int src_s, int src_w, int dst_s, int dst_w, portal_transform_t *pt)
+{
+	sect_t *sec = gst->sect;
+	wall_t *src_wal = &sec[src_s].wall[src_w];
+	wall_t *dst_wal = &sec[dst_s].wall[dst_w];
+	wall_t *src_nw = &sec[src_s].wall[src_wal->n + src_w];
+	wall_t *dst_nw = &sec[dst_s].wall[dst_wal->n + dst_w];
+
+	// Calculate transformation matrix for portal
+	double src_dx = src_nw->x - src_wal->x;
+	double src_dy = src_nw->y - src_wal->y;
+	double dst_dx = dst_nw->x - dst_wal->x;
+	double dst_dy = dst_nw->y - dst_wal->y;
+
+	double src_len = sqrt(src_dx*src_dx + src_dy*src_dy);
+	double dst_len = sqrt(dst_dx*dst_dx + dst_dy*dst_dy);
+
+	// Simple translation + scale for now
+	pt->matrix[0][0] = dst_len / src_len; pt->matrix[0][1] = 0; pt->matrix[0][2] = 0; pt->matrix[0][3] = dst_wal->x - src_wal->x;
+	pt->matrix[1][0] = 0; pt->matrix[1][1] = dst_len / src_len; pt->matrix[1][2] = 0; pt->matrix[1][3] = dst_wal->y - src_wal->y;
+	pt->matrix[2][0] = 0; pt->matrix[2][1] = 0; pt->matrix[2][2] = 1; pt->matrix[2][3] = 0;
+	pt->matrix[3][0] = 0; pt->matrix[3][1] = 0; pt->matrix[3][2] = 0; pt->matrix[3][3] = 1;
+
+	pt->src_s = src_s; pt->src_w = src_w;
+	pt->dst_s = dst_s; pt->dst_w = dst_w;
+	pt->depth = portal_depth;
+}
+int clip_portal_view(int src_s, int src_w, int *plothead0, int *plothead1)
+{
+	sect_t *sec = gst->sect;
+	wall_t *wal = &sec[src_s].wall[src_w];
+	wall_t *nwal = &sec[src_s].wall[wal->n + src_w];
+
+	// Get portal wall bounds
+	double z0 = getslopez(&sec[src_s], 0, wal->x, wal->y);
+	double z1 = getslopez(&sec[src_s], 1, wal->x, wal->y);
+	double z2 = getslopez(&sec[src_s], 0, nwal->x, nwal->y);
+	double z3 = getslopez(&sec[src_s], 1, nwal->x, nwal->y);
+
+	// Create portal bounds as trapezoid and intersect with current view
+	int new_plothead0, new_plothead1;
+
+	if (!intersect_traps_mono(wal->x, wal->y, nwal->x, nwal->y,
+							 z0, z0, z2, z2,  // Portal floor bounds
+							 z1, z1, z3, z3,  // Portal ceiling bounds
+							 &new_plothead0, &new_plothead1)) {
+		return 0; // No intersection
+							 }
+
+	// Now intersect the portal bounds with existing view frustum
+	// We need to intersect current plotheads with portal bounds
+	if (*plothead0 >= 0 && *plothead1 >= 0) {
+		// Use mono_max to get intersection of two monotonic polygons
+		*plothead0 = mono_max(*plothead0, new_plothead0, -1, 0);
+		*plothead1 = mono_max(*plothead1, new_plothead1, 1, 0);
+
+		if (*plothead0 < 0 || *plothead1 < 0) return 0;
+	} else {
+		*plothead0 = new_plothead0;
+		*plothead1 = new_plothead1;
+	}
+
+	return 1;
+}
+int clip_portal_simple(int src_s, int src_w, int *plothead0, int *plothead1)
+{
+	sect_t *sec = gst->sect;
+	wall_t *wal = &sec[src_s].wall[src_w];
+	wall_t *nwal = &sec[src_s].wall[wal->n + src_w];
+
+	// Create portal quad
+	dpoint3d portal_quad[4];
+	portal_quad[0].x = wal->x;  portal_quad[0].y = wal->y;  portal_quad[0].z = getslopez(&sec[src_s], 0, wal->x, wal->y);
+	portal_quad[1].x = nwal->x; portal_quad[1].y = nwal->y; portal_quad[1].z = getslopez(&sec[src_s], 0, nwal->x, nwal->y);
+	portal_quad[2].x = nwal->x; portal_quad[2].y = nwal->y; portal_quad[2].z = getslopez(&sec[src_s], 1, nwal->x, nwal->y);
+	portal_quad[3].x = wal->x;  portal_quad[3].y = wal->y;  portal_quad[3].z = getslopez(&sec[src_s], 1, wal->x, wal->y);
+
+	// Generate monotonic polygon from portal quad
+	int portal_plothead0, portal_plothead1;
+	mono_genfromloop(&portal_plothead0, &portal_plothead1, portal_quad, 4);
+
+	if (portal_plothead0 < 0 || portal_plothead1 < 0) return 0;
+
+	// Intersect with existing view
+	if (*plothead0 >= 0 && *plothead1 >= 0) {
+		*plothead0 = mono_max(*plothead0, portal_plothead0, -1, 0);
+		*plothead1 = mono_max(*plothead1, portal_plothead1, 1, 0);
+		return (*plothead0 >= 0 && *plothead1 >= 0);
+	} else {
+		*plothead0 = portal_plothead0;
+		*plothead1 = portal_plothead1;
+		return 1;
+	}
 }
 
 static void drawalls (int b)
@@ -2806,14 +2939,59 @@ static void drawalls (int b)
 				gligwall = w; gligslab = m; ns = -1;
 			} else {
 				ns = verts[m>>1].s;
+
 				// Check if this is a portal wall
-				if (wal[w].surf.lotag > 0 && m < vn*2) {
-					// Transform coordinates for portal view
-					// This would require more complex rendering pipeline changes
-					// For now, just render the destination sector
-					ns = verts[m>>1].s;
+				if (wal[w].surf.lotag > 0 && m < vn*2 && portal_depth < 7) {
+					int dst_s = verts[m>>1].s;
+					int dst_w = verts[m>>1].w;
+
+					// Setup portal transformation
+					portal_transform_t pt;
+					setup_portal_transform(s, w, dst_s, dst_w, &pt);
+					portal_stack[portal_depth] = pt;
+					portal_depth++;
+
+					// Clip view to portal bounds
+					int portal_plothead[2];
+					portal_plothead[0] = plothead[0];
+					portal_plothead[1] = plothead[1];
+
+					if (clip_portal_simple(s, w, &portal_plothead[0], &portal_plothead[1])) {
+						// Save current camera state
+						point3d old_cam = gcam.p;
+
+						// Transform camera through portal
+						gcam.p.x = pt.matrix[0][0] * old_cam.x + pt.matrix[0][3];
+						gcam.p.y = pt.matrix[1][1] * old_cam.y + pt.matrix[1][3];
+
+						// Recursively render destination sector through portal
+						int old_gligsect = gligsect;
+						gligsect = dst_s;
+
+						// Create new bunch for portal destination
+						bunch_t portal_bunch;
+						portal_bunch.sec = dst_s;
+						portal_bunch.wal0 = dst_w;
+						portal_bunch.wal1 = dst_w;
+						portal_bunch.fra0 = 0.0;
+						portal_bunch.fra1 = 1.0;
+
+						// Add to bunch array temporarily
+						if (bunchn < 65536) {
+							bunch[bunchn] = portal_bunch;
+							drawalls(bunchn);
+						}
+
+						// Restore state
+						gcam.p = old_cam;
+						gligsect = old_gligsect;
+					}
+
+					portal_depth--;
+					ns = -1; // Don't render as normal wall
 				}
 			}
+
 
 			drawpol_befclip(s,ns,plothead[0],plothead[1],((m>vn)<<2)+3);
 #ifdef STANDALONE
