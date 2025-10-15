@@ -12420,12 +12420,41 @@ skipdrawrooms_lab:;
 						fp.z = gdps->ghz/fp.z;
 						fp.x = fp.x*fp.z + gdps->ghx;
 						fp.y = fp.y*fp.z + gdps->ghy;
-						j = 0x40c0c0; if (spr->owner >= 0) { if (spr->owner == gdps->playerindex) j = flashcol; else j = ((flashcol&0xfefefe)>>1); }
+						j = 0x40c0c0;
+						if (spr->owner >= 0)
+						{
+							if (spr->owner == gdps->playerindex) j = flashcol;
+							else j = ((flashcol & 0xfefefe) >> 1);
+						}
 						drawcirc(&cc->c,fp.x,fp.y,-3-(spr->owner>=0),j);
+
+						// blue axis(f) - rotation around it is ok but displayed improperly by sprite stretch, so prob that is the issue.
+						// note that editor rotation via ,. always happens around vertical axis. needs revision.
 
 						fp2.x = spr->f.x; fp2.y = spr->f.y; fp2.z = spr->f.z;
 						xformrot(&fp2.x,&fp2.y,&fp2.z);
+						f = fp2.x*fp2.x + fp2.y*fp2.y; if (f > 0) f = 16.0/sqrt(f);
+						drawline2d(&cc->c,fp.x,fp.y,fp.x+fp2.x*f,fp.y+fp2.y*f,j);
 
+						j = 0xcc0c040; // looks like blue one is broken
+						if (spr->owner >= 0)
+						{
+							if (spr->owner == gdps->playerindex) j = flashcol;
+							else j = ((flashcol & 0xfefefe) >> 1);
+						}
+						fp2.x = spr->r.x; fp2.y = spr->r.y; fp2.z = spr->r.z;
+						xformrot(&fp2.x,&fp2.y,&fp2.z);
+						f = fp2.x*fp2.x + fp2.y*fp2.y; if (f > 0) f = 16.0/sqrt(f);
+						drawline2d(&cc->c,fp.x,fp.y,fp.x+fp2.x*f,fp.y+fp2.y*f,j);
+
+						j = 0xc040c0;
+						if (spr->owner >= 0)
+						{
+							if (spr->owner == gdps->playerindex) j = flashcol;
+							else j = ((flashcol & 0xfefefe) >> 1);
+						}
+						fp2.x = spr->d.x; fp2.y = spr->d.y; fp2.z = spr->d.z;
+						xformrot(&fp2.x,&fp2.y,&fp2.z);
 						f = fp2.x*fp2.x + fp2.y*fp2.y; if (f > 0) f = 16.0/sqrt(f);
 						drawline2d(&cc->c,fp.x,fp.y,fp.x+fp2.x*f,fp.y+fp2.y*f,j);
 					}
