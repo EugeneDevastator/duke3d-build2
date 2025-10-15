@@ -7493,8 +7493,9 @@ static int loadmap (char *filnam)
 				spr->p.y = ((float)b7spr.y)*(1.f/512.f);
 				spr->p.z = ((float)b7spr.z)*(1.f/(512.f*16.f));
 				spr->flags = 0;
-				switch(b7spr.cstat&48)
-				{
+				switch(b7spr.cstat&48)  // https://wiki.eduke32.com/wiki/Cstat_(sprite)
+										// 48  =32  +16 wall or  floor only check
+					{
 					case 0: //Face sprite
 						spr->flags |= 16;
 						//no break intentional
@@ -7514,11 +7515,11 @@ static int loadmap (char *filnam)
 						if (b7spr.cstat&8) { spr->d.x *= -1; spr->d.y *= -1; }
 						break;
 				}
-				if (b7spr.cstat&1) spr->flags |= 1;
-				if (b7spr.cstat&64) spr->flags |= 64;
+				if (b7spr.cstat&1) spr->flags |= 1; // blocking
+				if (b7spr.cstat&64) spr->flags |= 64; // 1 sided
 				if (b7spr.cstat&4) { spr->r.x *= -1; spr->r.y *= -1; spr->r.z *= -1; spr->flags ^= 4; } //&4: x-flipped
-				if (b7spr.cstat&8) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; spr->flags ^= 4; } //&8: x-flipped
-				if (b7spr.cstat&128) { spr->p.z += (b7spr.yrepeat/4096.0*(float)tilesizy[l]); } //&128: real-centered centering (center at center)
+				if (b7spr.cstat&8) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; spr->flags ^= 4; } //&8: y-flipped?
+				if (b7spr.cstat&128) { spr->p.z += (b7spr.yrepeat/4096.0*(float)tilesizy[l]); } //&128: real-centered centering (center at center) - originally half submerged sprite
 
 				if ((unsigned)b7spr.sectnum < (unsigned)gst->numsects) //Make shade relative to sector
 				{
@@ -7526,6 +7527,9 @@ static int loadmap (char *filnam)
 					if (iskenbuild) b7spr.shade += j+6;
 				}
 
+				spr->f.z=3; // sus
+				spr->f.x=cos((float)b7spr.ang*PI/1024.0);
+				spr->f.y=sin((float)b7spr.ang*PI/1024.0);
 				spr->fat = 0.f;
 				spr->asc = 4096;
 				spr->rsc = (32-b7spr.shade)*128;
@@ -12416,14 +12420,46 @@ skipdrawrooms_lab:;
 						fp.z = gdps->ghz/fp.z;
 						fp.x = fp.x*fp.z + gdps->ghx;
 						fp.y = fp.y*fp.z + gdps->ghy;
-						j = 0x40c0c0; if (spr->owner >= 0) { if (spr->owner == gdps->playerindex) j = flashcol; else j = ((flashcol&0xfefefe)>>1); }
+						j = spr->flags & 1 ? 0xc010e0 : 0x40c0c0;  // Face/forward axis cyan // blue normally
+						if (spr->owner >= 0)
+						{
+							if (spr->owner == gdps->playerindex) j = flashcol;
+							else j = ((flashcol & 0xfefefe) >> 1);
+						}
+
 						drawcirc(&cc->c,fp.x,fp.y,-3-(spr->owner>=0),j);
+
+						// blue axis(f) - rotation around it is ok but displayed improperly by sprite stretch, so prob that is the issue.
+						// note that editor rotation via ,. always happens around vertical axis. needs revision.
 
 						fp2.x = spr->f.x; fp2.y = spr->f.y; fp2.z = spr->f.z;
 						xformrot(&fp2.x,&fp2.y,&fp2.z);
-
-						f = fp2.x*fp2.x + fp2.y*fp2.y; if (f > 0) f = 16.0/sqrt(f);
+						// scaling in depth is not supported so sprite depth axis remains constant length
+						// but that wil be handy for voxels
+						f = 32;//fp2.x*fp2.x + fp2.y*fp2.y; if (f > 0) f = 16.0/sqrt(f);
 						drawline2d(&cc->c,fp.x,fp.y,fp.x+fp2.x*f,fp.y+fp2.y*f,j);
+
+						j = 0xc04040; // right axis - yellow // red normally
+						if (spr->owner >= 0)
+						{
+							if (spr->owner == gdps->playerindex) j = flashcol;
+							else j = ((flashcol & 0xfefefe) >> 1);
+						}
+						fp2.x = spr->r.x; fp2.y = spr->r.y; fp2.z = spr->r.z;
+						xformrot(&fp2.x,&fp2.y,&fp2.z);
+						f = 32;//fp2.x*fp2.x + fp2.y*fp2.y; if (f > 0) f = 16.0/sqrt(f)*(1-fp2.z);
+						drawline2d(&cc->c,fp.x,fp.y,fp.x+fp2.x*f,fp.y+fp2.y*f,j);
+
+						j = 0x40c040; // down axis - magenta // green normally
+						if (spr->owner >= 0)
+						{
+							if (spr->owner == gdps->playerindex) j = flashcol;
+							else j = ((flashcol & 0xfefefe) >> 1);
+						}
+						fp2.x = spr->d.x; fp2.y = spr->d.y; fp2.z = spr->d.z;
+						xformrot(&fp2.x,&fp2.y,&fp2.z);
+						f = 32;// fp2.x*fp2.x + fp2.y*fp2.y  + fp2.z*fp2.z ; //if (f > 0) f = 16.0/sqrt(f);
+						drawline2d(&cc->c,fp.x,fp.y,fp.x+fp2.x*5,fp.y+fp2.y*5,j);
 					}
 				}
 				if ((showedges3d) && (spr->tag)) drawtag_spri(cc,w);
