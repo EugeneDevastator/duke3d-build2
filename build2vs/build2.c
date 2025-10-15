@@ -1914,32 +1914,55 @@ int getwalls (int s, int w, vertlist_t *ver, int maxverts)
 	sect_t *sec;
 	wall_t *wal, *wal2;
 	float fx, fy;
-	int i, j, k, bs, bw, nw, vn;
+	int i, j, k, bs, bw, nw, vn, portal_lotag;
 
 	sec = gst->sect; wal = sec[s].wall; bs = wal[w].ns;
+	portal_lotag = wal[w].surf.lotag;
+
+	// If this wall has a portal lotag, find matching portal wall instead of adjacent sector
+	if (portal_lotag > 0) {
+		vn = 0;
+		// Search all sectors for walls with matching lotag
+		for (i = 0; i < gst->numsects; i++) {
+			if (i == s) continue; // Skip current sector
+			for (j = 0; j < sec[i].n; j++) {
+				if (sec[i].wall[j].surf.lotag == portal_lotag) {
+					if (vn < maxverts) {
+						ver[vn].s = i;
+						ver[vn].w = j;
+						vn++;
+					}
+				}
+			}
+		}
+		return vn;
+	}
+
+	// Original logic for non-portal walls
 	if ((unsigned)bs >= (unsigned)gst->numsects) return(0);
 
 	vn = 0; nw = wal[w].n+w; bw = wal[w].nw;
 	do
 	{
-		wal2 = sec[bs].wall; i = wal2[bw].n+bw; //Make sure it's an opposite wall
+		wal2 = sec[bs].wall; i = wal2[bw].n+bw;
 		if ((wal[w].x == wal2[i].x) && (wal[nw].x == wal2[bw].x) &&
 			 (wal[w].y == wal2[i].y) && (wal[nw].y == wal2[bw].y))
-			{ if (vn < maxverts) { ver[vn].s = bs; ver[vn].w = bw; vn++; } }
+		{ if (vn < maxverts) { ver[vn].s = bs; ver[vn].w = bw; vn++; } }
 		bs = wal2[bw].ns;
 		bw = wal2[bw].nw;
 	} while (bs != s);
 
-		//Sort next sects by order of height in middle of wall (FIX:sort=crap algo)
+	// Sort by height (existing code)
 	fx = (wal[w].x+wal[nw].x)*.5;
 	fy = (wal[w].y+wal[nw].y)*.5;
 	for(k=1;k<vn;k++)
 		for(j=0;j<k;j++)
 			if (getslopez(&sec[ver[j].s],0,fx,fy) + getslopez(&sec[ver[j].s],1,fx,fy) >
 				 getslopez(&sec[ver[k].s],0,fx,fy) + getslopez(&sec[ver[k].s],1,fx,fy))
-				{ tver = ver[j]; ver[j] = ver[k]; ver[k] = tver; }
+			{ tver = ver[j]; ver[j] = ver[k]; ver[k] = tver; }
 	return(vn);
 }
+
 
 #ifdef STANDALONE
 static long gquantstat; //-1=none, 0=vertex, 1=edge (wall)

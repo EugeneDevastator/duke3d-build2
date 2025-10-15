@@ -2632,6 +2632,21 @@ static void gentex_wall (kgln_t *npol2, surf_t *sur)
 	}
 }
 
+void transform_portal_coords(int src_s, int src_w, int dst_s, int dst_w, double *x, double *y, double *z)
+{
+	sect_t *sec = gst->sect;
+	wall_t *src_wal = &sec[src_s].wall[src_w];
+	wall_t *dst_wal = &sec[dst_s].wall[dst_w];
+
+	// Simple translation for now - can be enhanced for rotation
+	double dx = dst_wal->x - src_wal->x;
+	double dy = dst_wal->y - src_wal->y;
+
+	*x += dx;
+	*y += dy;
+	// Z transformation could be added based on sector height differences
+}
+
 static void drawalls (int b)
 {
 	extern void loadpic (tile_t *);
@@ -2789,7 +2804,16 @@ static void drawalls (int b)
 					gflags = 0; gentex_wall(npol2,sur);
 				}
 				gligwall = w; gligslab = m; ns = -1;
-			} else ns = verts[m>>1].s;
+			} else {
+				ns = verts[m>>1].s;
+				// Check if this is a portal wall
+				if (wal[w].surf.lotag > 0 && m < vn*2) {
+					// Transform coordinates for portal view
+					// This would require more complex rendering pipeline changes
+					// For now, just render the destination sector
+					ns = verts[m>>1].s;
+				}
+			}
 
 			drawpol_befclip(s,ns,plothead[0],plothead[1],((m>vn)<<2)+3);
 #ifdef STANDALONE
