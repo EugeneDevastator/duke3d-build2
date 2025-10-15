@@ -12420,12 +12420,13 @@ skipdrawrooms_lab:;
 						fp.z = gdps->ghz/fp.z;
 						fp.x = fp.x*fp.z + gdps->ghx;
 						fp.y = fp.y*fp.z + gdps->ghy;
-						j = 0x40c0c0;
+						j = spr->flags & 1 ? 0xc010e0 : 0x40c0c0;  // Face/forward axis cyan // blue normally
 						if (spr->owner >= 0)
 						{
 							if (spr->owner == gdps->playerindex) j = flashcol;
 							else j = ((flashcol & 0xfefefe) >> 1);
 						}
+
 						drawcirc(&cc->c,fp.x,fp.y,-3-(spr->owner>=0),j);
 
 						// blue axis(f) - rotation around it is ok but displayed improperly by sprite stretch, so prob that is the issue.
@@ -12433,10 +12434,12 @@ skipdrawrooms_lab:;
 
 						fp2.x = spr->f.x; fp2.y = spr->f.y; fp2.z = spr->f.z;
 						xformrot(&fp2.x,&fp2.y,&fp2.z);
-						f = fp2.x*fp2.x + fp2.y*fp2.y; if (f > 0) f = 16.0/sqrt(f);
+						// scaling in depth is not supported so sprite depth axis remains constant length
+						// but that wil be handy for voxels
+						f = 32;//fp2.x*fp2.x + fp2.y*fp2.y; if (f > 0) f = 16.0/sqrt(f);
 						drawline2d(&cc->c,fp.x,fp.y,fp.x+fp2.x*f,fp.y+fp2.y*f,j);
 
-						j = 0xcc0c040; // looks like blue one is broken
+						j = 0xc04040; // right axis - yellow // red normally
 						if (spr->owner >= 0)
 						{
 							if (spr->owner == gdps->playerindex) j = flashcol;
@@ -12444,10 +12447,10 @@ skipdrawrooms_lab:;
 						}
 						fp2.x = spr->r.x; fp2.y = spr->r.y; fp2.z = spr->r.z;
 						xformrot(&fp2.x,&fp2.y,&fp2.z);
-						f = fp2.x*fp2.x + fp2.y*fp2.y; if (f > 0) f = 16.0/sqrt(f);
+						f = 32;//fp2.x*fp2.x + fp2.y*fp2.y; if (f > 0) f = 16.0/sqrt(f)*(1-fp2.z);
 						drawline2d(&cc->c,fp.x,fp.y,fp.x+fp2.x*f,fp.y+fp2.y*f,j);
 
-						j = 0xc040c0;
+						j = 0x40c040; // down axis - magenta // green normally
 						if (spr->owner >= 0)
 						{
 							if (spr->owner == gdps->playerindex) j = flashcol;
@@ -12455,8 +12458,8 @@ skipdrawrooms_lab:;
 						}
 						fp2.x = spr->d.x; fp2.y = spr->d.y; fp2.z = spr->d.z;
 						xformrot(&fp2.x,&fp2.y,&fp2.z);
-						f = fp2.x*fp2.x + fp2.y*fp2.y; if (f > 0) f = 16.0/sqrt(f);
-						drawline2d(&cc->c,fp.x,fp.y,fp.x+fp2.x*f,fp.y+fp2.y*f,j);
+						f = 32;// fp2.x*fp2.x + fp2.y*fp2.y  + fp2.z*fp2.z ; //if (f > 0) f = 16.0/sqrt(f);
+						drawline2d(&cc->c,fp.x,fp.y,fp.x+fp2.x*5,fp.y+fp2.y*5,j);
 					}
 				}
 				if ((showedges3d) && (spr->tag)) drawtag_spri(cc,w);
