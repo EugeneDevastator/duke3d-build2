@@ -199,7 +199,7 @@ static dukemcnt = 0;
       refresh(); //Update screen,mouse,keys,etc..
    }
 }
-dot( v1x,  v1y,  v2x,  v2y) {
+vdot( v1x,  v1y,  v2x,  v2y) {
     return v1x * v2x + v1y * v2y;
 }
 normalize(&vx, &vy) {
@@ -988,15 +988,14 @@ move_monsters ()
     normalize(xd,yd);
     normalize(fx,fy);
 
-    diff = dot(xd,yd,fx,fy);
-
-        adif=abs(diff);
-        if (diff<0)
-        diff = 1-diff;
-        range = abs((diff +1)/2);
+    range = (atan2(fx,fy) - atan2(xd,yd))/PI; // -1 to 1
+// to flip sprite - need to flip its r vector, but then need to store it in monster.
+// flip  based on sign only
+    range = abs(range);
+    tile = montiles[1][1][((range*5) %5) +1]; // +1 because of tag shenanigans. todo: make 0 indexation
     mapsetspri(msprid,MAP_RED,range);
-    tile = montiles[1][1][((range*5) %4) +1];
     debugnum2=tile;
+
     mapsetspri(msprid,MAP_TILE,tile);
    }
 
