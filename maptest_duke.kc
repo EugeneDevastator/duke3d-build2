@@ -34,7 +34,7 @@ sprite tag 2: rpg pickup
 sprite tag 3: end button
 sprite tag 4: shooting monster
 sprite tag 5: moving&shooting monster
-sprite tag 6: medkit pickup
+sprite tag 6: medkit pickup     
 sprite tag 7: key pickup
 -------------------------------------------
 */
@@ -83,7 +83,10 @@ enum {LIGHTMAX=16} static maplight[LIGHTMAX], maplightn;
 static light;
 
 static debugnum1,  debugnum2;
-
+// monster id - state id  -sprite angles
+static montiles[20][20][10];
+static dukemon[MONMAX]; // sprite ids
+static dukemcnt = 0;
 ()
 {
 //----------------------------------------------------------------------------------------
@@ -94,7 +97,7 @@ static debugnum1,  debugnum2;
    htype = -1; hsect = -1; hind = -1;
 
    mountzip("../Build2"); hang = 0; vang = 0; tilt = 0;
-   if (!mapload("e1l1a.map",&sect,&ipos.x,&ipos.y,&ipos.z,&hang,&vang,&tilt))
+   if (!mapload("e1l1m.map",&sect,&ipos.x,&ipos.y,&ipos.z,&hang,&vang,&tilt))
       { playtext("Map not found"); return; }
    parsemap(hang,vang,tilt); //Extract tags to local variables&arrays
    
@@ -196,6 +199,16 @@ static debugnum1,  debugnum2;
       refresh(); //Update screen,mouse,keys,etc..
    }
 }
+dot( v1x,  v1y,  v2x,  v2y) {
+    return v1x * v2x + v1y * v2y;
+}
+normalize(&vx, &vy) {
+   r = sqrt(vx*vx + vy*vy);
+   vx = vx/r;
+   vy= vy/r;
+   return 1;
+}
+
 get_nearest_sector(current_sector) {
     num_walls = mapgetsect(current_sector, MAP_N);
 
@@ -549,7 +562,8 @@ parsemap (hang, vang, tilt)
    rotnum = 0; picknum = 0; pbulnum = 0;
    endnum = 0; mbulnum = 0, lavnum = 0;
    maplightn = 0;
-   
+   dukemcnt = 0;
+
    for(s=mapnumsects-1;s>=0;s--)
    {
       for(i=0;i<2;i++) //Check both ceil&flor
@@ -577,7 +591,6 @@ parsemap (hang, vang, tilt)
             mapsetsect(s,MAP_Z+0,door[doornum].z[1]);
             mapsetsect(s,MAP_Z+1,door[doornum].z[1]);
             doornum++;
-
          }
 
          else if (tag == 6)
@@ -620,10 +633,10 @@ parsemap (hang, vang, tilt)
 
          pivot = get_first_sprite_with_tag(s,11);
          if (pivot == -1) continue;
-         debugnum2= pivot;
+
          swing[swingnum].sect = s;
          sfwrd = mapgetspri(pivot,MAP_FY); // down = 3.14 up = 0
-         debugnum2+=sfwrd;
+
          swing[swingnum].totang = 90*PI/180;
          if (sfwrd < 0.5) w = swing[swingnum].totang *= -1;
          mapgetspri(pivot,MAP_XY,&swing[swingnum].pivx,&swing[swingnum].pivy);
@@ -658,7 +671,23 @@ parsemap (hang, vang, tilt)
          
       for(i=mapgetsect(s,MAP_HEADSPRI);i>=0;i=mapgetspri(i,MAP_N))
       {
+
          tag = mapgetspri(i,MAP_TAG);
+
+   // getting sprite configuration from placed map sprites
+
+           lotag = tag %65536;
+        if (lotag >= 1000) // lotag
+       {
+           monid = lotag / 1000;
+           stateid = lotag % 1000;
+           anm = tag / 65536; //hitag
+           tile = mapgetspri(i,MAP_TILE);
+           montiles[monid%10][stateid%10][anm%7] = tile;
+           debugnum2 = mapgetspri(i,MAP_TILE);
+        }
+
+
          if ((tag == 1) || (tag == 4) || (tag == 5)) //1=moving, 4=shooting, 5=moving&shooting
          {
             mon[monnum].ind = i;
@@ -683,12 +712,19 @@ parsemap (hang, vang, tilt)
          }
          if (mapgetspri(i,MAP_LIGHT)) { maplight[maplightn] = i; maplightn++; }
       }
+     // second parse loop
       for(i=mapgetsect(s,MAP_HEADSPRI);i>=0;i=mapgetspri(i,MAP_N))
       {
          tag = mapgetspri(i,MAP_TAG);
          if ((tag == 2) || (tag == 6) || (tag == 7))
             { pick[picknum].up = i; pick[picknum].tag = tag; picknum++; }
          else if (tag == 3) { endind[endnum] = i; endnum++; }
+       if (mapgetspri(i,MAP_TILE) == montiles[1][1][1])
+         {
+            dukemon[dukemcnt] = i;
+            dukemcnt++;
+         }
+         debugnum2 = dukemcnt;
       }
    }
    
@@ -934,6 +970,36 @@ move_elevators ()
 move_monsters ()
 {   
    nf8 = (numframes%8);
+
+   for(i=0;i<dukemcnt;i++)
+   {
+    msprid = dukemon[i];
+    slookx=0;
+    slooky=0;
+    sx=0;
+    sy=0;
+
+    mapgetspri(msprid,MAP_FXYZ,&fx,&fy,&fz);
+    slooky=mapgetspri(msprid,MAP_FY);
+
+    mapgetspri(msprid,MAP_XY,&sx,&sy);
+    xd = ipos.x-sx;
+    yd = ipos.y-sy;
+    normalize(xd,yd);
+    normalize(fx,fy);
+
+    diff = dot(xd,yd,fx,fy);
+
+        adif=abs(diff);
+        if (diff<0)
+        diff = 1-diff;
+        range = abs((diff +1)/2);
+    mapsetspri(msprid,MAP_RED,range);
+    tile = montiles[1][1][((range*5) %4) +1];
+    debugnum2=tile;
+    mapsetspri(msprid,MAP_TILE,tile);
+   }
+
    for(i=monnum-1;i>=0;i--)
    {
       //if (lost >= 0) continue;
