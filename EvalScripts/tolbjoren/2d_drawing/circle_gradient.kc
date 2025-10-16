@@ -1,0 +1,101 @@
+static gradient = 0;
+()
+cls(0);
+
+   
+if ( gradient == 0 )
+{
+   mx=mousx/xres*6;
+   my=mousy/yres*100;
+   siz =128;
+   cx = siz/2;
+   cy = siz/2;
+   for(y=0; y<siz; y++)
+   for(x=0; x<siz; x++)
+   {
+      dx = (cx-x);
+      dy = (cy-y);
+      t = sqrt( dx^2 + dy^2 )/(siz/2);
+      c = 255-(255)*(t);
+      //( c < 0) c=0;
+      if( c > 255) c = 255;
+      
+      color = rgb(c,c,c);
+      setcol(color);
+      setpix(x,y);
+   }   
+   r=0;g=0;b=0;
+   getpix(mousx,mousy,r,g,b);
+   moveto(0,100);
+   setcol(255,255,255);
+   printf("r=%g",r);
+}
+
+if ( gradient == 1 )
+{
+   mx=mousx/xres*6;
+   my=mousy/yres*100;
+   siz =128;
+   cx = siz/2;
+   cy = siz/2;
+   for(y=0; y<siz; y++)
+   for(x=0; x<siz; x++)
+   {
+      dx = (cx-x);
+      dy = (cy-y);
+      t = sqrt( dx^2 + dy^2 )/(siz/2);
+      c = 255-(255*5)*(t-.1);
+      
+      //a=255-(255*4)*(t^2-.01);
+      a = 255-(t^.15)*255;
+      //( c < 0) c=0;
+      if( c > 255) c = 255;
+      
+      color = rgb(a,a,a);
+      //color = rgb(c,c,c);
+      setcol(color);
+      setpix(x,y);
+   }   
+   r=0;g=0;b=0;
+   getpix(mousx,mousy,r,g,b);
+   moveto(0,100);
+   setcol(255,255,255);
+   printf("r=%g",r);
+}
+
+
+if ( gradient == 2 )
+{
+   siz = 180;
+   sh = siz/2;
+   for(d=siz; d>0; d-=1)
+   for(r=0; r<2*PI; r+=0.02)
+   {
+      x=cos(r) * d;
+      y=sin(r) * d;
+      c=255-d*5;
+      setcol(c-180*noise(10*r,10*r),c-64*noise(3*r,3*r),c-255*noise(-3*r,-3*r) );
+      setpix(sh+x,sh+y);
+   }
+}
+
+if ( gradient == 3 )
+{
+   d=50;
+   nx=300; ny=300;  
+   moveto(nx,ny);
+   for(r=0; r< 2*PI; r+=0.01)
+   {
+      lop = r/(2*PI);
+      
+      x=cos( r+klock()*1 ) * d+100*noise(lop*10,lop*9);
+      y=sin( r+klock()*1 ) * d+100*noise(-lop*10-lop*6);
+      
+      
+      setcol( 128*noise(lop*10), 128+128*noise(lop*20), 128+128*noise(lop*100) );
+      //setcol(0xff);
+      moveto(nx,ny);
+      lineto(nx+x,ny+y);
+      d++;
+   }
+}

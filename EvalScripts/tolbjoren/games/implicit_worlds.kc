@@ -1,0 +1,1007 @@
+/* TODO:
+-make you see futher than you steer, handy for looking round without actually bumping into stuff...
+-make tail use a circular buffer
+-lighting, darkness except player heads
+-corkscrew
+-EPLER! 
+*/
+static msg[16], count[16];
+
+static wonGame = 0;
+static wonTime = 0;
+static baseSpeed = 0.018;
+static turnSpeed = 0.054;
+static snakeRadi = 0.07;
+static shapeType = 0;
+static boost = 0;
+static playerColor[16][3];
+
+// Player position
+static posx[16];
+static posy[16];
+static posz[16];
+// Camera angles
+static posh = 0; // left right
+static posv = -2.0;
+static playerDead[16] = 0;
+
+struct p3d{
+   x,y,z;
+}
+enum{MAX_TAIL = 1024}
+static p3d tail[16][MAX_TAIL];
+static tail_len = 0;
+
+// Torus and sphere sizes
+static minorR = 1.;
+static majorR = 1.2;
+static sphRadi = 3;
+static TAU = 2*PI;
+
+// Network datadescription codes:   
+static msg_description_code = 0;
+static netPlayerCoord  = 1;
+static netPlayerDead = 2;
+static netAppleEaten = 3;
+static netReset = 4;
+// network datatype enumeration
+static net_X = 1;
+static net_Y = 2;
+static net_Z = 3;
+
+static time, timer, sendRatePerSec;
+//static headTimer =0;
+//static sendRateHeadPerSec = 20;
+static resetGame = 0;
+static generateGeometry = 1;
+
+
+static p3d apple_pos;
+static appleRadi = 0.2;
+enum{WORLD_REZ = 16}
+
+() //Instructions:
+{  //1. Connect machines using File..Host/Join
+   //2. use WASD or mouse to steer
+   //3. Press 'F' to mess up sync. Press Ctrl+Enter to reset
+   
+   sendRatePerSec = 6;
+   
+   
+   
+   if (net_me == 0)
+   {
+      for(i=0;i<3;i++){
+         if (keystatus[2+i])
+         {
+            keystatus[2+i] = 0;
+            shapeType = i;
+            resetGame=1;
+            net_send(NET_ALLELSE, netReset);
+            net_send(NET_ALLELSE, shapeType);
+         }
+      }
+   }
+   
+   
+   if(numframes==0 || resetGame)
+   {
+      apple_pos.x = 0;
+      apple_pos.y = nrnd;
+      apple_pos.z = 0;
+   
+      resetGame = 0;
+      wonGame = 0;   
+      boost = 0;
+      tail_len = 0;
+      generateGeometry = 1;
+      for (i=0; i<net_players; i++){
+         playerDead[i] = 0;
+         
+         c = hsv_to_rgb(i/net_players*360,1,1);
+         playerColor[i][0] = c / 2 ^16 % 256;
+         playerColor[i][1] = c / 2^8 % 256;
+         playerColor[i][2] = c % 256;
+      }
+      playnote(0x99,71,127); // Game started!
+      r = -1.5;
+      ang = net_me * TAU / net_players;
+      posx[net_me] = cos( ang ) * r;
+      posy[net_me] = -.5 + .5 * net_me / net_players;
+      posz[net_me] = sin(ang ) * r;
+      posh = ang; // left right
+      posv = pi;
+   }   
+   
+   time = klock();
+   /*
+   if(time > headTimer)
+   {
+      if (!playerDead[net_me] && !wonGame) sendHeadPos();
+      headTimer = time + 1/sendRateHeadPerSec;
+   }
+   */
+   
+   if(time > timer)
+   {
+      timer = time + 1/sendRatePerSec;
+      if (!playerDead[net_me] && !wonGame) sendTailPos();
+      
+      //sendBogus();
+     
+      if (!wonGame) createTail();
+      // why is the sending/rec-ing mixed in net_demo? to get a good packet "flow"?
+      // dont send everything at one, give the other cpu
+      // some time to process incoming?
+   }
+   recvData();
+
+   //cls(0); 
+   clz(1e32);
+   
+   // Apple eaten?
+   if (net_me == 0) // server?
+   {
+      for (i=0; i<net_players; i++)
+      {
+         dsq = (posx[i]-apple_pos.x)^2 + (posy[i]-apple_pos.y)^2 + (posz[i]-apple_pos.z)^2;
+         if (dsq < appleRadi^2)
+         {
+            apple_pos.x = (rnd-.5)*sphRadi*0.8;
+            apple_pos.y = (rnd-.5)*sphRadi*0.8;
+            apple_pos.z = (rnd-.5)*sphRadi*0.8;
+            net_send(NET_ALL, netAppleEaten);
+            net_send(NET_ALL, i);
+            net_send(NET_ALL, apple_pos.x);
+            net_send(NET_ALL, apple_pos.y);
+            net_send(NET_ALL, apple_pos.z);
+            
+            playsound("pickup.wav");
+            boost += 3;
+
+            break;
+         }
+      }
+   }
+
+   // Has the player won?
+   if ( net_players > 1 && !wonGame )
+   {
+      aliveCount = net_players;
+      for (i=0; i<net_players; i++){
+         if (playerDead[i]) aliveCount--;
+      }
+      
+      if ( aliveCount == 1 )
+      {
+         wonGame = 1;
+         playnote(0xc0,126,0); playnote(0x90,60,127); // applaude
+         wonTime = time;
+      }
+   }
+   
+   draw();
+   setfont(6,10);
+   moveto(0,0);
+   setcol(255,255,255);
+   printf("map %g\n", shapeType);
+   //printf("klock, numframes/100 -> %g, %g\n", time, numframes/60);
+   //printf("network send/recv rate = %g times per sec\n", sendRatePerSec );
+   //printf("you are player = %g of %g \n", net_me, net_players );
+   printf("tail length = %g / %g\n", tail_len, MAX_TAIL );
+ 
+   for(i=0; i<net_players; ++i){
+      if (playerDead[i] )
+      printf("player %g is dead\n",i);
+     else
+       printf("player %g is alive and worming away!\n",i);
+   }
+   if (wonGame==1){
+      moveto(xres/2-50,yres/2);
+      setfont(12,16);
+      
+      if (playerDead[net_me])
+      {
+         printf("you lose...\n");
+      }else{
+         printf("YOU WIN!\n");
+      }
+      if (time > wonTime+1) playnote(0xb0,0x7b,0); // stop applause
+   }
+   setfont(12,16);
+   moveto(10, yres-20);
+   printf("%g boost ", boost);
+   
+   while (klock()<numframes/60); //Limit fps
+}
+   
+createTail()
+{
+   if( tail_len < MAX_TAIL )
+   {
+      for(i=0;i<net_players;i++)
+      {
+         tail[i][tail_len].x = posx[i];
+         tail[i][tail_len].y = posy[i];
+         tail[i][tail_len].z = posz[i];
+      }
+      tail_len++;
+   }
+}  
+
+sendHeadPos()
+{
+   net_send(NET_ALLELSE,netPlayerCoord); 
+   net_send(NET_ALLELSE,posx[net_me]);
+   net_send(NET_ALLELSE,posy[net_me]);
+   net_send(NET_ALLELSE,posz[net_me]);
+}
+
+sendTailPos()
+{
+   //sending mousedata to all
+   //tell recv-rs that two coords are on their way
+   net_send(NET_ALLELSE,netPlayerCoord); 
+   net_send(NET_ALLELSE,posx[net_me]);
+   net_send(NET_ALLELSE,posy[net_me]);
+   net_send(NET_ALLELSE,posz[net_me]);
+   j = 115;
+   if (!playerDead[net_me] ){
+   //playnote(0x99,42,127); // hi-hat
+   playnote(0x99,44,127); // pedal hi-hat
+  //playnote(0x99,44,127);
+  //playnote(0x99,69,127);
+  //playnote(0x99,33,127); // metronome
+   }
+}
+
+// Taken from evaldraw net demo:
+// This loop reads a single net_recv message and decides if it
+// 1.   is a beginning of a datastream.
+//      I call the first val recieved the "net_description_code", at this point count is 0
+// 2.   when the descrition code is read, go into one of the if-sentances
+//      that handles a certain code.
+// 3.   for instance. if the following packets are mousecoords
+//      then increase count from 0 to 1
+//      on the next net_recv val contains mx
+//      increase count again
+//      now on the next net_recv val contains my
+//      since we now have counted 2 values (mx,my) we got all we need
+//      reset count to 0 for the next data, be it more
+//      mousecoordinates or a color change.
+
+recvData()
+{
+   from = 0;
+   val = 0;
+   while(net_recv(&from,&val))
+   {
+      
+
+      if( from == NET_ME )
+      {
+         /*while(1)
+         {
+         cls(255,0,0);
+         refresh();
+         }*/
+      }else{
+   
+         // The first message, number 0 is the descriptor.
+         if (count[from] == msg_description_code) 
+            msg[from] = val; // remember the type of message.
+               
+         if (msg[from] == netPlayerCoord) //comparing it to netCoord must be wrong...
+         {
+            if (count[from] == 1) posx[from] = val;
+            if (count[from] == 2) posy[from] = val;
+            if (count[from] == 3) posz[from] = val;
+            
+            count[from]++; //get next message
+            
+            // if we have read XYZ coords
+            // then reset count so that the next message can
+            // be read into val.
+            if (count[from] > 3) count[from] = msg_description_code;
+         }
+         else if(msg[from] == netPlayerDead) 
+         {
+            playerDead[from] = 1;
+            playnote(0x99,79,127);
+            count[from]++; //get next message
+            // only one data, so reset now.
+            if (count[from] > 1) count[from] = msg_description_code; 
+         }
+         else if(msg[from] == netAppleEaten) 
+         {
+            
+            eater = -1;
+            if (count[from] == 1) eater = val;
+            if (count[from] == 2) apple_pos.x = val;
+            if (count[from] == 3) apple_pos.y = val;
+            if (count[from] == 4) apple_pos.z = val;
+            
+            if (eater == NET_ME)
+            {
+               playnote(0x99,44,127);
+               playsound("pickup.wav");
+               boost += 1;
+            }
+
+            count[from]++; //get next message            
+
+            if (count[from] > 4) count[from] = msg_description_code; 
+         }
+         else if(msg[from] == netReset) 
+         {
+            resetGame = 1;
+            if (count[from] == 1) shapeType = val;
+            count[from]++; //get next message            
+
+            if (count[from] > 1) count[from] = msg_description_code; 
+         }         
+
+      }
+
+   }
+   
+}
+
+sendBogus()
+{
+   // if F-key then send bogus data to a random player
+   if (keystatus[0x21]) //'F' up sync; tests Ctrl+Enter
+      net_send(int(net_players*rnd),nrnd*1e3);
+}
+
+draw()
+{
+   glEnable(GL_DEPTH_TEST);
+   
+   
+   if( !playerdead[NET_ME] && !wonGame ) updatePlayer();
+      
+   DrawShape();
+   
+   setcol(255,155,155);
+   drawspr("apple.kv6", apple_pos.x,apple_pos.y,apple_pos.z, appleRadi, time*6, -PI );
+   
+   // draw player tails
+   for(i=0;i<net_players;i++)
+   {
+      
+      // Draw tail
+      
+      for(j=0; j<tail_len; ++j)
+      {
+         fracOfMax = (tail_len-j)/tail_len;
+         c = hsv_to_rgb(i/net_players*360,1-1*fracOfMax,1);
+         setcol( c );      
+
+         //setcol( playercolor[i][0],playercolor[i][1],playercolor[i][2] );
+         //setcol(255,255,255);
+         //setcol(255*tail_len/1024,255,255);
+
+         if( j>1)
+         {
+            x1 = tail[i][j-1].x;
+            y1 = tail[i][j-1].y;
+            z1 = tail[i][j-1].z;
+            x2 = tail[i][j].x;
+            y2 = tail[i][j].y;
+            z2 = tail[i][j].z;
+            //drawsph(x2,y2,z2,snakeRadi*1.2);
+            drawcone(x1,y1,z1,snakeRadi,x2,y2,z2,snakeRadi);//,DRAWCONE_NOCAP);
+         }
+     }
+       if (!playerDead[i])
+       {
+            x1 = tail[i][tail_len-1].x;
+            y1 = tail[i][tail_len-1].y;
+            z1 = tail[i][tail_len-1].z;
+         x2 = posx[i];
+         y2 = posy[i];
+         z2 = posz[i];
+       /*
+         t = (time-timer);// / (1/sendRatePerSec);
+       speed = 0.018;
+         dx = t*(x2-x1) * speed;
+         dy = t*(y2-y1) * speed;
+         dz = t*(z2-z1) * speed;
+       */
+         // TODO send dir vec? ... as this will only look correct when player hasnt changed dir since last send
+          //drawcone(x2,y2,z2,0.05,x2+dx,y2+dy,z2+dz,0.05);
+          //drawsph(x2,y2,z2,snakeRadi*2);
+       }
+      
+   }
+   
+}
+
+DrawShape()
+{
+   enum{dim1=WORLD_REZ, dim2=WORLD_REZ}
+   static px[dim1][dim2];
+   static py[dim1][dim2];
+   static pz[dim1][dim2];
+   static color[dim1][dim2];
+
+   if(numframes==0 || resetGame)
+   {
+      //#define WHITE_TEX
+      #ifdef WHITE_TEX
+         static tex[2][2];
+         c = rgb(200,200,200);
+         tex[0][0] = c;
+         tex[0][1] = c;
+         tex[1][0] = c;
+         tex[1][1] = c;
+         handle=glsettex(tex,2,2);
+      #else 
+         handle=glsettex("wood.png");
+      #endif
+      
+
+      
+
+   }
+
+   if(generateGeometry)
+   {
+      generateGeometry = 0;
+      deltau = 1 / (dim1-1);
+      deltav = 1 / (dim2-1);  
+      startu = 0;
+      startv = 0;  
+      scaler = 1;
+
+      pts = 0;
+      for(i=0; i<dim1; i++)
+      for(j=0; j<dim2; j++)
+      {     
+
+         u = startu + i * deltau;
+         v = startv + j * deltav;
+         x=0; y=0; z=0;
+
+         if( shapeType==0) cylinder(u,v,x,y,z,sphRadi);
+         if (shapeType==1) torus(u,v,x,y,z);
+         if(shapeType==2) sphere(u,v,x,y,z,sphRadi);
+         
+
+         px[i][j] = x*scaler; py[i][j] = y*scaler; pz[i][j] = z*scaler;
+         color[i][j] = hsv_to_rgb( pts/(dim1*dim2) * 360 % 360, 1,1);
+         pts++;
+      }
+   }
+   
+   sc = 16;
+   
+   if( shapeType==0)
+   {
+      draw_floor_ceil(sphRadi);
+      draw_floor_ceil(-sphRadi);
+   }
+   
+
+   glCullface(GL_FRONT);
+   for(i=0; i<dim1-1; i++)
+   {
+      //#define TRI // slower than complex
+      #ifdef TRI
+      glBegin(GL_TRIANGLE_STRIP);
+      for(j=0; j<dim2; j++)  
+      {
+         setcol( color[i][j]  );
+         glTexCoord( sc*i/dim1, sc*j/dim2);
+         glVertex( px[i][j], py[i][j], pz[i][j] );
+         glTexCoord( sc*(i+1)/dim1, sc*j/dim2);
+         glVertex( px[i+1][j], py[i+1][j], pz[i+1][j] );     
+      } 
+      glEnd();
+      #else
+         // when running unbounded I get 4 Mcc with gl_complex and 7-8 with gl_triangle_strip
+         
+         for(j=0; j<dim2; j++)  
+         {
+            glBegin(GL_COMPLEX);
+            
+            /*
+            dx = posx[net_me]-px[i][j];
+            dy = posy[net_me]-py[i][j];
+            dz = posz[net_me]-pz[i][j];
+            dist_to_cam = sqrt(dx^2+dy^2+dz^2);
+            att=255 - 60* dist_to_cam;
+            setcol( att,att,att);
+            */
+            final_r = 0;
+            final_g = 0;
+            final_b = 0;
+            for(k=0; k<net_players; k++)
+            {
+               dx = posx[k]-px[i][j];
+               dy = posy[k]-py[i][j];
+               dz = posz[k]-pz[i][j];
+               dist_to_cam = 1/sqrt(dx^2+dy^2+dz^2);
+               att = dist_to_cam * 1.5;
+               final_r += playercolor[k][0] * att;
+               final_g += playercolor[k][1] * att;
+               final_b += playercolor[k][2] * att;
+            }
+            final_r /= net_players; final_g /= net_players; final_b /= net_players;
+            setcol( final_r, final_g, final_b);
+            //setcol( color[i][j]  );
+            
+            glTexCoord( sc*i/dim1, sc*j/dim2);
+            glVertex( px[i][j], py[i][j], pz[i][j] );
+            glTexCoord( sc*(i+1)/dim1, sc*j/dim2);
+            glVertex( px[i+1][j], py[i+1][j], pz[i+1][j] );   
+            
+            // Lazy indicing using j++ and j--
+            j++;
+            glTexCoord( sc*(i+1)/dim1, sc*j/dim2);
+            glVertex( px[i+1][j], py[i+1][j], pz[i+1][j] );   
+            
+            glTexCoord( sc*i/dim1, sc*j/dim2);
+            glVertex( px[i][j], py[i][j], pz[i][j] );   
+            j--;
+            
+            glEnd();
+         } 
+      #endif
+   }
+   
+   //#define DEBUG_NORMALS
+   #ifdef DEBUG_NORMALS
+   SIZ = 32;
+   min = -sphRadi*1.2;
+   max = sphRadi*1.2;
+   range = max-min;
+
+   for(i=0; i<=SIZ; i++){
+      x = min + range*i/SIZ;  
+      
+      for(j=0; j<=SIZ; j++){
+         y = min + range*j/SIZ;   
+ 
+         for(k=0; k<=SIZ; k++){
+            z = min + range*k/SIZ;
+ 
+            if( !collisionShape(x,y,z) && shape(x,y,z) )
+            {            
+               nx=0; ny=0; nz=0;
+               gradient(x,y,z,nx,ny,nz);
+               len = sqrt(nx^2+ny^2+nz^2);
+               nx/=len;
+               ny/=len;
+               nz/=len;
+               r = 128 + nx*128;
+               g = 128 + ny*128;
+               b = 128 + nz*128;
+               setcol(r,g,b); drawsph(x,y,z,.02);
+               s = 0.1;
+               setcol(255,255,255); moveto(x,y,z); lineto(x+-nx*s,y+-ny*s,z+-nz*s);
+               
+            }
+         }
+      }
+   }
+   #endif
+}
+
+cylinder(u,v,&x, &y, &z, r){
+   s = u*2*PI;
+   t = v*2*PI;
+   x = r * cos(s);
+   y = r * cos(t);
+   z = r * sin(s);
+}
+torus(u,v,&x,&y,&z){
+   u*=2*PI;
+   v*=2*PI;
+   bigR = majorR;
+   r = minorR;
+   x = (bigR+r*cos(v)) * cos(u) ;
+   y = r*sin(v);
+   z = (bigR+r*cos(v)) * sin(u);
+}
+sphere(u,v,&x,&y,&z,r){
+   u*=2*PI;
+   v*=PI;
+   x = r * sin(u) * sin(v);
+   y = r * cos(v);
+   z = r * cos(u) * sin(v);
+}
+
+shape(x,y,z)
+{
+   if (shapeType==0) return insideCylinder(x,y,z,sphRadi);
+   if (shapeType==1) return insideTorus(x,y,z,majorR,minorR);
+   if (shapeType==2) return insideSphere(x,y,z,sphRadi);
+   
+}
+collisionShape(x,y,z)
+{
+   if (shapeType==0){
+      r = sphRadi*0.95;
+      return insideCylinder(x,y,z,r);
+   }else if( shapeType==1)
+   {
+      ma = majorR * 1;
+      mi = minorR * 0.9; // make torus "fatter" -> closer coll
+      return insideTorus(x,y,z,ma,mi);
+   }else if(shapeType==2){   
+      r = sphRadi*0.95;
+      return insideSphere(x,y,z,r);
+   }
+}
+insideTorus(x,y,z,bigR,smallR)
+{
+   s1 = (x^2 + y^2 + z^2 + bigR^2 - smallr^2)^2;
+   s2 = 4 * bigr^2*(x^2 + z^2);
+   return s1<s2;
+}
+insideSphere(x,y,z,r)
+{
+   return ( x^2 + y^2 + z^2 ) < r*r;
+}
+insideCylinder(x,y,z,r)
+{
+   if ( fabs(y) > r ) return 0;
+   return ( x^2 + z^2 ) < r*r;
+   
+}
+gradient(x,y,z,&nx,&ny,&nz)
+{
+   s = .2;
+   nx = collisionShape(x-s,y,z) - collisionShape(x+s,y,z);
+   ny = collisionShape(x,y-s,z) - collisionShape(x,y+s,z);
+   nz = collisionShape(x,y,z-s) - collisionShape(x,y,z+s);     
+}
+
+lerp(a,b,t)
+{
+   return a+(b-a)*t;
+}
+
+// Camera and movement code taken from /games/
+updatePlayer()
+{
+   static oldMouseX;
+   static oldMouseY;
+   static mouseSpeedX;
+   static mouseSpeedY; 
+
+   
+   vx = 0;
+   vy = baseSpeed;
+   vz = 0;
+   
+   static boosting = 0;
+   static boostStart = 0;
+   static boostEnd = 0;
+   static boostFov = 0;
+   static fov;
+   if (numframes==0)
+   {
+    boostFov = xres/2;
+    fov = xres/2;
+   }
+   
+   
+   //if (boost > 0)
+   {
+      boostButton = bstatus || keystatus[57]==1;
+      if (boostButton && !boosting )
+      {
+         boosting = 1;
+         boostStart = 0;
+      }
+      
+      if ( !boostButton && boosting )
+      {
+         boosting = 0;
+         //boostEnd = 1;
+      }
+   }
+   
+/*
+   if (boost <= 0)
+   {
+      boosting = 0;
+      boostEnd = time;
+   }
+*/ 
+   
+
+   if (boosting)
+   {
+     
+     boost -= .01; 
+     boostStart += 0.1;
+     t = boostStart;
+     t = max(0, t);
+     t = min(1, t);
+     boostStart = t;
+     vy = basespeed + basespeed*t;
+     boostFov = lerp(fov, xres/6, t);
+     setview(0,0,xres,yres, xres/2,yres/2, boostFov);
+   }else
+   {
+     boostStart -= 0.1;
+     t = 1-boostStart;
+     t = max(0, t);
+     t = min(1, t);
+     fov = lerp( boostFov, xres/2, t);
+     setview(0,0,xres,yres, xres/2,yres/2, fov);
+   }
+
+   
+   static mat[9]; 
+   ang2mat(posh,posv,mat); // Convert angles to rotation matrix
+   
+   // find new position
+   tx = mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   ty = mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   tz = mat[2]*vx + mat[5]*vz + mat[8]*vy;
+
+      
+   // Collision
+   #define DO_COLLISION
+   #ifdef DO_COLLISION
+   if( !collisionShape(posx[net_me],posy[net_me],posz[net_me] ) )
+   {      
+      x=posx[net_me];
+      y=posy[net_me];
+      z=posz[net_me];
+      
+      nx=0; ny=0; nz=0;
+      gradient(x,y,z,nx,ny,nz);
+      len = sqrt(nx^2+ny^2+nz^2);
+      if( len > 1e-7 )
+      {
+         nx/=len;
+         ny/=len;
+         nz/=len;
+      }
+         
+      // calc dot product of incident vector and base top normal
+      // r = i - 2*n * <i,n>
+      /*
+      dot = tx*nx + ty*ny + tz*nz;
+
+      posx[net_me] += tx - 2*nx*dot;
+      posy[net_me] += ty - 2*ny*dot;
+      posz[net_me] += tz - 2*nz*dot;
+      */
+       
+      vel = sqrt(tx*tx + ty*ty + tz*tz);
+      posx[net_me] -= nx * vel;
+      posy[net_me] -= ny * vel;
+      posz[net_me] -= nz * vel;
+ 
+   }else{
+      posx[net_me] += tx;
+      posy[net_me] += ty;
+      posz[net_me] += tz; 
+   }
+   
+   // Test self against own tail and everyone elses
+   speedup = 0;
+   if( tail_len > 1 )
+   for(i=0; i<net_players; ++i){
+      for(j=1; j<tail_len-1; ++j){
+         dist = distPtOnLine(posx[net_me],posy[net_me],posz[net_me],
+                         tail[i][j-1].x,tail[i][j-1].y,tail[i][j-1].z,
+                         tail[i][j].x,tail[i][j].y,tail[i][j].z);
+         if (dist < snakeRadi )
+         {
+            playnote(0x99,78,127);
+            playerDead[NET_ME] = 1;
+            
+            net_send(NET_ALLELSE,netPlayerDead);
+            net_send(NET_ALLELSE,1); // then insert the data... not needed...
+            //break;
+         }
+         if (speedup == 0 ){//&& i != net_me){
+            if (dist < snakeRadi*2)
+            {
+               speedup = 1;
+               boost+=0.01;
+            }
+         }
+      }
+   }
+
+   #endif
+
+   // mousespeed values are tweaked for 60 fps
+   #define NOT_READMOUSE
+   #ifdef NOT_READMOUSE
+      mouseSpeedX = (mousx - oldMouseX) * 0.01;
+      mouseSpeedY = (mousy - oldMouseY) * 0.01;
+      oldMouseX = mousx;
+      oldMouseY = mousy;
+   #else
+      mx=0;
+      my=0;
+      readmouse(mx,my);
+      mousespeedx = mx * 0.01;
+      mousespeedy = my * 0.01;
+   #endif
+   lim = 0.1;
+   if( fabs(mouseSpeedX) > lim ) mouseSpeedX = lim * sgn(mouseSpeedX);
+   if( fabs(mouseSpeedY) > lim ) mouseSpeedY = lim * sgn(mouseSpeedY);
+   
+   #ifdef NOT_READMOUSE
+      if(bstatus==1)
+   #endif
+   {
+      posh -= mouseSpeedX;
+      posv += mouseSpeedY;
+   }
+   
+   left_right = (keystatus[32]-keystatus[30]);
+   posh -= left_right * turnSpeed; //D-A
+   posv += (keystatus[17]-keystatus[31])*turnSpeed; //W-S  
+   // Right,down,forwards unit vectors.
+   setcam(posx[net_me],posy[net_me],posz[net_me],
+          mat[0],mat[1],mat[2],
+          mat[3],mat[4],mat[5],
+          mat[6],mat[7],mat[8]);
+}
+/* converts horizontal and vertical angles to a 3x3 rotation matrix */
+ang2mat(hang,vang,mat[9])
+{
+   mat[0] = cos(hang); mat[1] = 0; mat[2]=-sin(hang);
+   mat[6] = cos(vang)*sin(hang); mat[7] = sin(vang); mat[8]=cos(vang)*cos(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}
+
+hsv_to_rgb(h,s,v){ 
+   // expects 360deg and 1,1 hue sat max
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   r=int(r*255);
+   g=int(g*255);
+   b=int(b*255);
+   return rgb(r,g,b); 
+}
+
+distPtOnLine(px,py,pz, ax,ay,az, bx,by,bz){
+   cx=0; cy=0; cz=0;
+   closestPtOnLine(px,py,pz, ax,ay,az, bx,by,bz, cx, cy, cz);
+   return sqrt( (cx-px)^2 + (cy-py)^2 + (cz-pz)^2);
+}
+closestPtOnLine(px,py,pz, ax,ay,az, bx,by,bz, &cx,&cy,&cz)
+{
+// from A to P
+   apx = px - ax;
+   apy = py - ay;
+   apz = pz - az;
+   // From A to B
+   nx = bx-ax;
+   ny = by-ay;
+   nz = bz-az;
+   // normalize Dir A to B
+   distAB = sqrt( nx^2+ny^2+nz^2);
+   if( distAB > 1e-7 ){
+      nx/=distAB; ny/=distAB; nz/=distAB;
+   }
+   
+   t = nx*apx + ny*apy + nz*apz; // proj v1 onto norm
+   
+   if( t<= 0){ // A is closest
+      cx = ax; cy = ay; cz = az; return;
+   }
+   
+   if( t>= distAB){ // B is closest
+      cx = bx; cy = by; cz = bz; return;
+   }
+   // create new vec, closest pt
+   cx = ax + nx*t;
+   cy = ay + ny*t;
+   cz = az + nz*t; 
+}
+
+turbulence(x,y,size)
+{
+   value = 0.0; initialSize = size;
+   while(size >= 1)
+   {
+      value += noise( x/size, y/size ) * size;
+      size /= 2.0;
+   }
+   return (128*value/initialSize);
+}
+
+draw_floor_ceil(y)
+{
+      glcullface(GL_NONE);
+      setcol(255,255,255);
+      
+      segs = WORLD_REZ;
+      minim = -3;
+      maxim = 3;
+      range = maxim - minim;
+      sc = 10;
+      
+      for(i=0; i<segs; i++)
+      {
+         for(j=0; j<segs; j++)
+         {
+      
+            u0 = i/segs;
+            v0 = j/segs;
+            
+      
+            u1 = (i+1)/segs;
+            v1 = (j+1)/segs;
+            
+            x1 = minim + range * u0;
+            z1 = minim + range * v0;
+            
+            x2 = minim + range * u1;
+            z2 = minim + range * v0;
+            
+            x3 = minim + range * u1;
+            z3 = minim + range * v1;
+      
+            x4 = minim + range * u0;
+            z4 = minim + range * v1;
+            
+            dx = posx[net_me]-x1;
+            dy = posy[net_me]-y;
+            dz = posz[net_me]-z1;
+            
+            //dist_to_cam = sqrt(dx^2+dy^2+dz^2);
+            //att=255 - 60* dist_to_cam;
+            //setcol( att,att,att);
+            final_r = 0;
+            final_g = 0;
+            final_b = 0;
+            for(k=0; k<net_players; k++)
+            {
+               dx = posx[k]-x1;
+               dy = posy[k]-y;
+               dz = posz[k]-z1;
+               dist_to_cam = 1/sqrt(dx^2+dy^2+dz^2);
+               att = dist_to_cam * 1.5;
+               final_r += playercolor[k][0] * att;
+               final_g += playercolor[k][1] * att;
+               final_b += playercolor[k][2] * att;
+            }
+            final_r /= net_players; final_g /= net_players; final_b /= net_players;
+            setcol( final_r, final_g, final_b);
+                        
+
+
+            glbegin(gl_complex);
+            gltexcoord(sc*u0,sc*v0); glvertex(x1,y,z1); 
+            gltexcoord(sc*u1,sc*v0); glvertex(x2,y,z2);
+            gltexcoord(sc*u1,sc*v1); glvertex(x3,y,z3);
+            gltexcoord(sc*u0,sc*v1); glvertex(x4,y,z4);
+            
+            glend();
+         }
+      }
+}

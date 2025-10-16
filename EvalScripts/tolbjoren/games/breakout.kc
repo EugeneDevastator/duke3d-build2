@@ -1,0 +1,472 @@
+static gameover = 0;
+static insult=0;
+
+static paddlepx = 0;
+static paddlepy = 0;
+static paddleWidth = 100;
+static paddleHeight = 15;
+enum{NORMCOUNT=25}
+static hasHit=0;
+
+struct vec2
+{
+  x,y;
+};
+
+
+static vec2 paddleNormals[NORMCOUNT];
+static vec2 lastNorm;
+static vec2 lastCollide;
+
+struct block{
+   x,y;
+   color;
+   life;
+};
+
+enum{block_w=12, block_h = 8}
+enum{ MAXBLOCKS=block_w*block_h }
+static block grid[MAXBLOCKS];
+
+static ballpx=0;
+static ballpy=0;
+static balldx=0;
+static balldy=0;
+static ballRadi = 8;
+static ballspd = 250;
+static ballHitCount = 0;
+
+static wid,hei;
+
+static tim, oldtim, dt;
+()
+{
+   tim = klock(0); dt = tim-oldtim; oldtim = tim;
+   
+
+   cls(0);
+   
+   if(numframes==0)
+   {
+      paddlepx = xres/2;
+      paddlepy = yres-50;
+   
+      paddlepx = mousx;      
+
+      ballpx = paddlepx;
+      ballpy = paddlepy-paddleheight;
+      
+      ang = -PI/4+ rnd*-PI/2;
+      balldx = cos(ang);
+      balldy = sin(ang);
+      
+      spc = 6;
+      marginx = (xres/10) + spc*block_w;
+      wid = (xres-marginx) / block_w;
+      marginy = (yres/20) + spc*block_h;
+      hei = (yres/2-marginy) / block_h;
+      
+      xs = marginx / 4;
+      ys = marginy / 4;
+            
+      blockId = 0;
+      for(i=0; i<block_w; i++)
+      for(j=0; j<block_h; j++)
+      {
+         grid[i*block_h + j].color = hsv_to_rgb( 60 * blockId / MAXBLOCKS,.9,1);
+         grid[i*block_h + j].x = floor( xs + i*wid + spc*i );
+         grid[i*block_h + j].y = floor( ys + j*hei + spc*j );
+         grid[i*block_h + j].life = 1;
+         blockId++;
+      }
+      
+      
+   }
+   
+   if(gameover==1)
+   {
+      moveto(10*xres/100,yres/2);
+      setfont(18,36,1);
+
+      setcol(128+sin(tim*50)*128,0,0);      
+      if( insult == 0 ) printf("you lose...");
+   }
+   else
+   {
+      drawAll();
+   
+      moveBall();
+
+   
+      if(ballpy > paddlepy+paddleheight/2)
+      {
+         gameover = 1;
+         insult = int( rnd*5 );
+      }
+   
+   }
+}
+
+moveBall()
+{
+   maxDeltaSpeed = 15; // n pixels
+   iters = ballSpd / maxDeltaSpeed;
+   newDelta = dt / iters;
+   
+   for(deltaIter=0; deltaIter < iters; deltaIter++)
+   {
+
+
+   ballBrickCollision();
+   
+   // Move ball
+   ballpx += ballspd * balldx * newDelta;
+   ballpy += ballspd * balldy * newDelta;
+   if(ballpx-ballradi < 0) balldx*=-1;
+   if(ballpx+ballradi > xres) balldx*=-1;
+   if(ballpy-ballradi < 0) balldy*=-1;
+   if(ballpy+ballradi > yres) balldy*=-1;
+   
+   moveto(ballpx,ballpy);
+   lineto(ballpx + ballspd * balldx * newDelta,
+          ballpy + ballspd * balldy * newDelta);
+      
+   paddlepx = mousx;
+   paddlepx = min(xres-paddleWidth/2, max(paddleWidth/2,paddlepx));
+
+   vec2 start;
+   start.x = paddlepx-paddleWidth/2;
+   start.y = paddlepy;
+   
+   vec2 end;
+   end.x = paddlepx+paddleWidth/2;
+   end.y = paddlepy;
+   
+   vec2 ballPt;
+   ballPt.x = ballpx;
+   ballPt.y = ballpy;
+   
+
+   
+   clx=0; cly=0;
+   getClosestPoint(start,end,ballPt, 1, clx, cly);
+   
+   drawsph( clx,cly, -5);
+   
+   dist = sqrt( (clx-ballpx)^2 + (cly-ballpy)^2 );
+   if( dist < ballRadi )
+   {
+      playsound("gothit.wav");
+      lastCollide.x = clx;
+      lastCollide.y = cly;
+      
+      hasHit = tim+.05;
+      normx=0; normy=-1;
+         
+      xp = start.x;
+      yp = start.y;
+      norm = -PI;
+      step = PI / normCOUNT;
+      stepPos = fabs( start.x-end.x ) / normCount;
+      xp = paddleWidth - (clx-start.x);
+      imax = xp/stepPos;
+      
+
+      for(i=0; i<imax; i++)
+      {
+         normx = cos(norm);
+         normy = sin(norm);
+            
+         norm += step;
+         xp += stepPos;
+      }
+
+      //dpr = normx * balldx + normy * balldy;
+      //balldx = balldx - 2*normx * dpr;
+      //balldy = balldy - 2*normy * dpr;
+      
+      normx *=-1;
+      balldx = normx;
+      balldy = normy;
+      
+      lastNorm.x = normx;
+      lastNorm.y = normy;
+      
+      ballHitCount++;
+      if( ballHitCount > 4)
+      {
+         ballHitCount = 0;
+         ballspd *= 1.1;
+         if(ballspd > 600) ballspd = 600;
+      }
+   }
+   
+   }
+}
+
+distSq(x1,y1,x2,y2){
+   return (x1-x2)*(x1-x2) + (y1-y2)*(y1-y2);
+}
+
+ballBallCollision(ball2x, ball2y, ball2Radi)
+{
+
+      dsq = distSq(ballpx,ballpy,ball2x,ball2y);
+      separatingDist = (ballRadi*ballRadi) + ball2radi*ball2radi;
+      if( dsq < separatingDist )
+      {
+         normx = ballpx - ball2x;
+         normy = ballpy - ball2y;
+         
+         len = sqrt(normx*normx + normy*normy);
+         normx/=len;
+         normy/=len; 
+         
+         dpr = normx * balldx + normy * balldy;
+         balldx = balldx - 2*normx * dpr;
+         balldy = balldy - 2*normy * dpr;
+
+         //balldx = normx;
+         //balldy = normy;
+         
+         lastCollide.x = ballpx;
+         lastCollide.y = ballpy;            
+         lastNorm.x = normx;
+         lastNorm.y = normy;
+         return 1;
+      }
+      return 0;
+}
+
+ballBrickCollision()
+{
+   mind = 1e32;
+   closestx=0; closesty=0;
+
+   
+   for(i=0; i<block_w; i++)
+   for(j=0; j<block_h; j++)
+   {
+      idx = i*block_h + j;
+      if( grid[idx].life )
+      {
+         
+         x = floor( grid[idx].x );
+         y = floor( grid[idx].y );
+         setcol( grid[idx].color );
+         tlx = x; tly = y;
+         trx = x+wid; try=y;
+         blx = x; bly = y+hei;
+         brx = x+wid; bry = y+hei;
+         radi = 2;
+         
+
+         drawsph(tlx,tly,radi);
+         drawsph(trx,try,radi);
+         drawsph(blx,bly,radi);
+         drawsph(brx,bry,radi);
+         
+         collide = 0;
+         if( ballBallCollision(tlx,tly,radi) ) collide = 1;
+         if( ballBallCollision(trx,try,radi) ) collide = 1;
+         if( ballBallCollision(blx,bly,radi) ) collide = 1;
+         if( ballBallCollision(brx,bry,radi) ) collide = 1;
+         
+         if( collide )
+         {
+            grid[idx].life = 0;
+            playsound("tapfloor.flac");
+         }
+         
+
+      }
+   }   
+
+   
+   for(i=0; i<block_w; i++)
+   for(j=0; j<block_h; j++)
+   {
+      if( grid[i*block_h + j].life )
+      {
+         x = floor( grid[i*block_h + j].x );
+         y = floor( grid[i*block_h + j].y );
+         
+         dsq = (ballpx-x)*(ballpx-x) + (ballpy-y)*(ballpy-y);
+         if(dsq < mind)
+         {
+            mind = dsq;
+            closestx = x;
+            closesty = y;
+         }
+         
+         ballLeadX = ballpx+balldx*ballRadi;
+         ballLeadY = ballpy+balldy*ballRadi;
+         normx=0; normy=-1;
+         hit = PointInRect(ballLeadX,ballLeadY,x,y,wid,hei,normx,normy);
+         if( hit )
+         {
+            playsound("rulinst.wav");
+            //normx = ballLeadX - (x+wid/2);
+            //normy = ballLeadY - (y+hei/2);
+            //len = sqrt(normx*normx + normy*normy);
+            //normx/=len;
+            //normy/=len; 
+            //normx = 0;
+            //normy = -1;
+                    
+            dpr = normx * balldx + normy * balldy;
+            balldx = balldx - 2*normx * dpr;
+            balldy = balldy - 2*normy * dpr;
+            len = sqrt(balldx^2+balldy^2);
+            balldx/=len;
+            balldy/=len;
+
+            lastCollide.x = ballLeadX;
+            lastCollide.y = ballLeadY;            
+            lastNorm.x = normx;
+            lastNorm.y = normy;
+
+
+            grid[i*block_h + j].life = 0;
+         }
+      }
+   }
+   
+   //moveto(ballpx,ballpy);
+   //lineto(closestx, closesty);
+}
+
+// Doesnt take negative width/height into account
+PointInRect(testx,testy,rx,ry,w,h,&nx,&ny)
+{
+   nx=0; ny=0;
+   withinX = testx > rx && testx < rx+w; 
+   withinY = testy > ry && testy < ry+h;
+   /*
+   left = testx > (rx+w/2);
+   top = testy < (ry+h/2);
+   
+   if( withinX && top ){ nx = 0; ny = 1; }
+   if( withinX && !top ){ nx = 0; ny = -1; }
+   
+   if( withinY && left ){ nx = -1; ny = 0; }
+   if( withinY && !left ){ nx = 1; ny = 0; }
+   */
+   cx = rx+w/2;
+   cy = ry+h/2;
+   nx = testx - cx;
+   ny = testy - cy;
+   //nx = floor(nx);
+   //ny = floor(ny);
+   len = sqrt(nx*nx+ny*ny);
+   nx/=len; ny/=len;
+
+   if(withinX && withinY) return 1; 
+   
+   return 0;
+}
+
+getClosestPoint(vec2 a, vec2 b, vec2 p, segmentClamp, &cx, &cy)
+{
+  vec2 ap;
+  ap.x = p.x-a.x;
+  ap.y = p.y-a.y;
+  vec2 ab;
+  ab.x = b.x-a.x;
+  ab.y = b.y-a.y;
+  double ab2 = ab.x*ab.x + ab.y*ab.y;
+  double ap_ab = ap.x*ab.x + ap.y*ab.y;
+  double t = ap_ab / ab2;
+  if(segmentClamp)
+  {
+    if(t < 0.0) t = 0.0;
+    if(t > 1.0) t = 1.0;
+  }
+  vec2 closest;
+  closest.x = a.x + ab.x * t;
+  closest.y = a.y + ab.y * t;
+  cx = closest.x;
+  cy = closest.y;
+}
+
+
+drawAll()
+{
+   // draw normals
+   setcol(255,255,255);
+   
+   xp = paddlepx-paddleWidth/2;
+   yp = paddlepy;
+   norm = -PI;
+   step = (PI) / normCOUNT;
+   stepPos = fabs( paddlepx - (paddlepx-paddleWidth) ) / normCount;
+   for(i=0; i<NORMCOUNT; i++)
+   {
+      nx = cos(norm);
+      ny = sin(norm);
+      
+      moveto(xp,yp);
+      lineto(xp + nx*15, yp + ny*15);
+      
+      norm += step;
+      xp += stepPos;
+   }
+
+   setcol(255,255,255);
+   moveto(lastCollide.x, lastCollide.y);
+   lineto(lastCollide.x+lastNorm.x*50, lastCollide.y+lastNorm.y*50);
+
+   setcol(0,ballSpd/2,255); drawsph(ballpx,ballpy,ballRadi);
+   setcol(255,rnd*255,0); drawsph(ballpx+balldx*ballRadi, ballpy+balldy*ballRadi,5);
+   setcol(255,0,0); drawrectfill( paddlepx-paddleWidth/2, paddlepy, paddlepx+paddleWidth/2, paddlePy+paddleHeight);
+
+
+
+   for(i=0; i<block_w; i++)
+   for(j=0; j<block_h; j++)
+   {
+      if( grid[i*block_h + j].life )
+      {
+         setcol( grid[i*block_h + j].color );
+         x = floor( grid[i*block_h + j].x );
+         y = floor( grid[i*block_h + j].y );
+         
+         drawrectfill(x,y,x+wid,y+hei);
+      }
+   }
+   
+   moveto(15,yres-25);
+   setcol(255,255,255);
+   setfont(12,16);
+   printf("ball speed: %.2f", ballspd);
+
+}
+
+drawrectfill(x0,y0,x1,y1) { for(y=y0;y<y1;y++) { moveto(x0,y); lineto(x1,y); } }
+drawrectopen(x0,y0,x1,y1) { moveto(x0,y0); lineto(x1,y0); lineto(x1,y1); lineto(x0,y1); lineto(x0,y0); }
+
+hsv_to_rgb(h,s,v){ 
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   r=int(r*255);
+   g=int(g*255);
+   b=int(b*255);
+   return r*2^16 + g*2^8 + b; 
+}

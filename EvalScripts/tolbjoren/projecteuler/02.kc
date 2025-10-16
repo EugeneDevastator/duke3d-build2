@@ -1,0 +1,35 @@
+//Find the sum of all the even-valued terms in the
+// Fibonacci sequence which do not exceed four million.
+()
+{
+   cls(0);
+
+   if(numframes==0)
+   {
+      i = 0;
+      sum = 0;
+      while(sum < 4e6)
+      {
+         
+         f=getFib(i);
+         
+         
+         if( f/2 == int(f/2) )
+         sum+=f;
+   
+   
+         i++;
+      }   
+   }
+   printnum(sum);
+   
+   //sleep(1000);
+}
+
+
+getFib(n)
+{ 
+   if(n<1) return 0;
+   if(n==1) return 1;
+   else return getFib(n-1)+getFib(n-2);
+}

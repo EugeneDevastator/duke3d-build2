@@ -1,0 +1,73 @@
+// written by Torbjoern
+// 9. august 2009. 
+// A ray defined by a distance d from the origin
+// and a normal N.
+// here im just using an angle instead of a real normal.
+()
+{
+   cls(0); setcol(0xffffff);
+   
+   // Normal and distance
+   d = 50;   
+   normAngle = degToRad( klock(0)*30 );
+   
+   normX = cos(normAngle);
+   normY = sin(normAngle);
+   
+   distX = cos(normAngle) * d;
+   distY = sin(normAngle) * d;
+   
+   cx = xres/2; cy = yres/2;
+   
+   // 2. Move d units in angle dir
+   moveto(cx+distX, cy-distY);
+   drawsph(cx+distX, cy-distY, 5); // - causa' cartesian
+   
+   // 3. Line
+   length = 100;
+   lineto(cx+distX + cos(normAngle)*length, cy-distY + sin(normAngle)*length);
+   lineto(cx+distX - cos(normAngle)*length, cy-distY - sin(normAngle)*length);
+   
+   // Show d
+   moveto(cx, cy);
+   lineto(cx+distX, cy-distY);
+   moveto(cx+distX*.5, cy-distY*.5);
+   printf("d");
+   
+   // Show normal
+   arrowX = cx+distX + (cos(normAngle)*length)*.5;
+   arrowY = cy-distY + (sin(normAngle)*length)*.5;
+   drawArrow(arrowX,arrowY, -normAngle-PI/2,60);
+   printf("n");
+
+   // Origin
+   drawsph(cx,cy,-5);
+}
+
+degToRad(deg)
+{
+   r = deg/180*PI;
+}
+
+// start, angle, length
+drawArrow(sx,sy,angle,length)
+{
+   moveto(sx,sy);
+   
+   ex = sx + cos(-angle)*length;
+   ey = sy + sin(-angle)*length;
+   lineto(ex,ey);
+   
+   angle = atan2(ey-sy,ex-sx);
+   //if(angle < 0) angle += 2*PI;
+   ofs=PI*1.3;
+   
+   pointLength = 20;
+   moveto(ex,ey);
+   lineto(ex+cos(angle+ofs)*pointLength, ey+sin(angle+ofs)*pointLength);
+   
+   moveto(ex,ey);
+   lineto(ex+cos(angle-ofs)*pointLength, ey+sin(angle-ofs)*pointLength);
+   
+   moveto(sx,sy);
+}

@@ -1,0 +1,284 @@
+struct vec
+{
+   x,y,z;
+}
+
+
+struct ray_t
+{
+   vec origin;
+   vec dir;
+}
+
+struct sphere_t
+{
+   vec center;
+   radi;
+}
+
+
+struct cylinder_t
+{
+   vec a;
+   vec b;
+   radi;
+}
+
+enum{ MAX_SPHERES = 10}
+static cylinder_t cyl_list[MAX_SPHERES];
+
+static sphere_t sphere_list[MAX_SPHERES];
+
+()
+{   
+   if (numframes == 0)
+   {
+      for (i = 0; i< MAX_SPHERES; i++)
+      {
+         r = 6;
+         a = 2*PI * i/(MAX_SPHERES);
+         //initCylinder( cyl_list[i], r*cos(a),0,r*sin(a), 0.5+rnd );
+         initSphere( sphere_list[i], r*cos(a), 0.0 , r*sin(a), 0.5+rnd );
+      }
+   }
+
+   cls(0); 
+   clz(1e32);
+   glEnable(GL_DEPTH_TEST);
+   
+   setcam(0,-30,0,0,0.5*PI);
+  
+
+   setcam(0,15,0,
+          0,-1.57);                  
+ 
+
+   setcol(255,255,255);
+   
+   drawgridXZ(-20,20);
+   
+
+   p1x = 0;
+   p1y = 0;
+   p1z = 0;
+
+   t = klock(0);
+   a = 6.28 * mousx/xres;
+   r = 10;
+   p2x = p1x+cos(a)*r;
+   p2y = p1y;
+   p2z = p1z+sin(a)*r;
+   
+   ray_t ray;
+   ray.origin.x = p1x;
+   ray.origin.y = p1y;
+   ray.origin.z = p1z;
+   
+   ray.dir.x = (p2x-p1x);
+   ray.dir.y = (p2y-p1y);
+   ray.dir.z = (p2z-p1z);
+   
+   len = sqrt( ray.dir.x^2 + ray.dir.y^2 + ray.dir.z^2 );
+   
+   if(len)
+   {
+      ray.dir.x /= len;
+      ray.dir.y /= len;
+      ray.dir.z /= len;
+   }
+   
+   
+
+   
+   moveto(p1x,p1y,p1z);
+   lineto(p2x,p2y,p2z);
+
+   t = 0;
+   for (i = 0; i< MAX_SPHERES; i++)
+   {
+      
+      if( ray_sphere_isect( ray, sphere_list[i] , t ) != -1 )
+      {
+         
+
+         if ( t >= 0.0 || t < len )
+         {
+         setcol(0,255,0);
+         
+         drawsph( ray.origin.x + ray.dir.x*t,
+                  ray.origin.y + ray.dir.y*t,
+                  ray.origin.z + ray.dir.z*t,
+                  .2 ); 
+                  
+         }
+         
+         setcol(255,0,0);
+      }else{
+         setcol(255,255,255);
+      }
+      
+      //draw_cylinder( cyl_list[i] );  
+      drawsph( sphere_list[i].center.x, sphere_list[i].center.y, sphere_list[i].center.z, sphere_list[i].radi );
+      
+
+      
+   
+   }
+   
+   setcol(0xffffff);
+   moveto( 0,0 );
+   printf("%g\n", len);
+   printf("%g\n", t);
+
+}
+
+
+initSphere(sphere_t s, x,y,z,r)
+{
+   s.center.x = x;
+   s.center.y = y; 
+   s.center.z = z;
+
+   s.radi = r;
+}
+
+initCylinder(cylinder_t cyl, x,y,z,r)
+{
+   cyl.a.x = x;
+   cyl.a.y = y + 1;
+   cyl.a.z = z;
+
+   cyl.b.x = x + 0;
+   cyl.b.y = y + -1; 
+   cyl.b.z = z + nrnd;
+
+   cyl.radi = r;
+}
+
+ray_sphere_isect( ray_t ray, sphere_t sphere, &t)
+{
+   vec v;
+   vecsub( v,  ray.origin, sphere.center );
+   double b = -dot( v, ray.dir );
+   double det = (b * b) - dot( v, v ) + sphere.radi^2;
+   
+   t = -1;
+   if (det > 0)
+   {
+      det = sqrt( det );
+      double i1 = b - det;
+      double i2 = b + det;
+      if (i2 > 0)
+      {
+         if (i1 < 0) 
+         {
+            t = i2; // inside sphere!
+            return -1;   
+         }
+         else
+         {
+            t = i1;
+            return 1;
+            
+         }
+      }
+   }
+   return -1;
+}
+
+
+ray_cylinder_isect( ray_t ray, cylinder_t cyl, &t)
+{
+   vec ab;
+   vec ao;
+   vec aoxab;
+   vec vxab;
+   
+   vecSub( ab, cyl.b, cyl.a );
+   vecSub( ao, ray.origin, cyl.a );
+   
+   vecCross( aoxab, ao, ab );
+   
+   vecCross( vxab, ray.dir, ab );
+ 
+   double ab2 = dot(ab,ab);
+   double a = dot( vxab, vxab );
+   double b = 2 * dot( vxab, aoxab );
+   r = cyl.radi;
+   double c = dot( aoxab, aoxab ) - ( r*r * ab2 );
+   
+   det = 2*a;
+
+   t1 = -b - sqrt( b^2 - 4*a*c ) / det;
+   t2 = -b + sqrt( b^2 - 4*a*c ) / det;
+   
+   if ( det > 0.0 ) // if real soln?
+   {
+      if (t2 > 0)
+      {
+         if(t1 < 0)
+         {
+            t= t2;
+            return -1;
+         }
+         else
+         {
+            t = t1;
+            return 1;
+         }
+      }
+   }
+   return -1;
+}
+
+vecSub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;   
+}
+
+vecCross( vec out, vec a, vec b)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+
+dot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+drawgridXZ(min,max)
+{
+   range = max-min;
+   segs = 5;
+   for(i=0; i<segs; i++)
+   {
+      t = i/(segs-1);
+      moveto(min,0, min + range*t);
+      lineto(max,0, min + range*t);
+   
+      moveto(min + range*t,0, min);
+      lineto(min + range*t,0, max);
+   }
+}
+
+draw_cylinder(cylinder_t cyl )
+{
+   r = cyl.radi;
+   
+   drawcone( cyl.a.x, cyl.a.y, cyl.a.z, -r, 
+              cyl.b.x, cyl.b.y, cyl.b.z, -r );
+}
+
+cyl(u,v,&x,&y,&z)
+{
+   s = u*2*PI;
+   t = v*PI;
+   
+   x = cos(s);
+   y = cos(t);
+   z = sin(s);
+}

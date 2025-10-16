@@ -1,0 +1,137 @@
+struct vec{ x,y,z; };
+
+()
+{
+   cls(0); clz(1e32); glEnable(GL_DEPTH_TEST);
+   
+   vec p,a,b,c;
+   p.x = mousx;
+   p.y = mousy;
+   p.z = 0;
+   
+   cx = xres/2; cy = yres/2;
+   ang = pi/2;
+   r = 100;
+   a.x = cx + cos(ang) * r;
+   a.y = cy + sin(ang) * r;
+   a.z = 0;
+   
+   ang += 2*PI / 3;
+   b.x = cx + cos(ang) * r;
+   b.y = cy + sin(ang) * r;
+   b.z = 0;
+   
+   ang += 2*PI / 3;
+   c.x = cx + cos(ang) * r;
+   c.y = cy + sin(ang) * r;
+   c.z = 0;
+  
+   hit = pointInTriangle3D_dpr(p,a,b,c);
+          
+   if( hit ) 
+   {
+      setcol(255,0,0);
+      glBegin(GL_TRIANGLES);
+      glVertex(a.x, a.y);
+      glVertex(b.x, b.y);
+      glVertex(c.x, c.y);
+      glEnd();
+   }else
+   {
+      setcol(255,255,255);
+      glBegin(GL_LINE_STRIP);
+      glVertex(a.x, a.y);
+      glVertex(b.x, b.y);
+      glVertex(c.x, c.y);
+      glVertex(a.x, a.y);  
+      glEnd();
+   }
+   
+   moveto(a.x,a.y); printf("a");
+   moveto(b.x,b.y); printf("b");
+   moveto(c.x,c.y); printf("c");
+
+}
+
+// if using cross products is fastest
+// requires normals to all point in same dir
+// method: Real Time Coll. Det. by C. Ericson
+// expects a ccw triangle ABC
+pointInTriangle3D_cross(vec p, vec a_in, vec b_in, vec c_in)
+{
+   // translate a,b,c and point to origin
+   vec a; vecsub(a, a_in, p );
+   vec b; vecsub(b, b_in, p );
+   vec c; vecsub(c, c_in, p );
+   
+   // compute normal vectors for triangles pab, pbc
+   vec u; veccross(u, b, c);
+   vec v; veccross(v, c, a);
+   // make sure they both point in same dir
+   if( vecdot(u,v) < 0.0 ) return 0;
+   
+   // compute normal for triangle pca
+   vec w; veccross(w, a, b );
+   // make sure it points in same dir as first two
+   if( vecdot(u,w) < 0.0 ) return 0;
+
+   return 1;
+}
+
+// if using dot products is fastest
+// method: Real Time Coll. Det. by C. Ericson
+// expects a ccw triangle ABC
+pointInTriangle3D_dpr(vec p, vec a_in, vec b_in, vec c_in)
+{
+   // translate a,b,c and point to origin
+   vec a; vecsub(a, a_in, p );
+   vec b; vecsub(b, b_in, p );
+   vec c; vecsub(c, c_in, p );
+   
+   ab = vecdot(a,b);
+   ac = vecdot(a,c);
+   bc = vecdot(b,c);
+   cc = vecdot(c,c);
+   // Make sure plane normals for pab and pbc point in same dir
+   if ( (bc*ac - cc*ab) < 0.0 ) return 0;
+   
+   // Make sure plane normals for pab and pca point in same dir
+   bb = vecdot(b,b);
+   if ( (ab*bc - ac*bb) < 0.0 ) return 0;
+   // otherwise, must be in tri
+   return 1;
+}
+
+// VEC LIB
+vecDot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+length( vec v )
+{
+   return sqrt( vecdot(v,v) );
+}
+
+normalize( vec v )
+{
+   len = length(v);
+   if ( len )
+   {
+      v.x /= len; v.y /= len; v.z /= len;
+   }
+}
+
+vecSub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;   
+}
+
+vecCross( vec out, vec a, vec b)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}

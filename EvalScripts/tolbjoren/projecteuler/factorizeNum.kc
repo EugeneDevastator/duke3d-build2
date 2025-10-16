@@ -1,0 +1,67 @@
+// translated from JS code by
+// 1998 Henry Bottomley (written 23 December)
+
+// could remove duplicate entries...
+enum{NUM_IS_PRIME = -1}
+enum{MAX_FACTORS=100}
+static factors[MAX_FACTORS];
+static num_factors;
+()
+{
+
+   cls(0);
+
+   n = 32;
+   
+   factorize(n);
+   
+
+   if( factors[0] == NUM_IS_PRIME )
+   {
+      printf("%g is prime", n);
+   }else{
+
+      printf("factors of %g: \n", n);
+      for(i=0; i<num_factors; i++;)
+      {
+         
+         printf("%g", factors[i]);
+         if(i<num_factors-1) printf(", ");
+      }   
+   }
+}
+
+
+factorize(num)
+{
+   num_factors = 0;
+   newnum = num;
+   checker=2; // first factor to check
+   while(checker^2 <= newnum) // worth looking for factors?
+   {
+      if(newnum % checker == 0) // is possible factor a factor?
+      {
+         factors[num_factors] = checker;
+         newnum = newnum/checker;
+         
+         if(newnum != 1)
+         {
+            num_factors++; // prep for next factor
+         }
+      }
+      else
+      {
+         checker++; // try next possible factor
+      }
+   }
+   if(newnum != 1) // anything left at the end
+   {
+      factors[num_factors] = newnum; // it must be the last prime factor
+      //num_factors++;
+   }
+   if(factors[num_factors] == num) // the only prime fac is the original
+   {
+      factors[num_factors] = NUM_IS_PRIME;
+   }
+
+}

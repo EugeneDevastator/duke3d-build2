@@ -1,0 +1,320 @@
+struct p3d_t{x,y,z;};
+static p3d_t planeNormal;
+static p3d_t planePos;
+
+enum{MAX_PHYS_OBJS = 1};
+struct phys_obj_t{p3d_t velocity, p3d_t pos, double radius;};
+static phys_obj_t physObjs[MAX_PHYS_OBJS];
+
+static collision = 0; // true false. Evaldraw has 0 and 1 ;)
+enum{CORRECTION=-1;}
+static time, oldtime, dt;
+()
+{
+   time = klock(0); dt = time-oldtime; oldtime = time;
+   enum{imgw=256, imgh=256};
+   static buf[imgh][imgw];
+   //Generate tex
+   if(numframes == 0)
+   {
+      for(y=0;y<imgh;y++)
+         for(x=0;x<imgw;x++)
+         {
+            c = noise(time+1*x/imgh, time+1*y/imgw) *255;
+            color = hsv_to_rgb(c%360, 1,1 );
+            buf[y][x] = color;
+         }   
+   }   
+
+   yofs = 0;
+   //if(bstatus == 1)
+   {
+      yofs = -15+20*mousy/yres;
+   }
+   static tilty,tiltz = 0;
+   
+   uscale = 5;
+   vscale = 5;
+   
+   if(bstatus == 1)
+   {
+      tilty =6*PI*mousx/xres;
+   }
+   if(bstatus == 2)
+   {
+      tiltz =6*PI*mousy/yres;
+   }
+
+   p3d_t u;
+   p3d_t v;
+   set(u, uscale,0,0);
+   set(v, 0, 0,vscale);
+   normalize(u); normalize(v);
+   
+   rotAngle = sin(klock(0)*1);
+   rotz(u,1,0,0,rotAngle); //normalize(u);
+   rotz(v,0,0,1,rotAngle); //normalize(v);
+   //rotz(v,0,1,0);
+   
+   cross(u,v,planeNormal); normalize(planeNormal);
+   
+   set(planePos, 0,0,0);
+   physObjs[0].pos.x = 0;
+   physObjs[0].pos.y = yofs;
+   physObjs[0].pos.z = 0;
+
+   physObjs[0].velocity.x = -2;//cos(time*4)*5;
+   physObjs[0].velocity.y = 5;
+   physObjs[0].velocity.z = 0;   
+
+   physObjs[0].radius = 2;
+   
+   glEnable(GL_DEPTH_TEST);
+   cls(0); clz(1e32);
+   applyCamera();
+   
+
+
+   setcol(0xffffff);
+   tx = xres/2; ty = yres/2;
+   
+   if(collision) setcol(0x50de53);
+   drawsph(physObjs[0].pos.x,physObjs[0].pos.y,physObjs[0].pos.z,physObjs[0].radius);
+   
+   
+   p3d_t s;
+   s.x = physObjs[0].pos.x;
+   s.y = physObjs[0].pos.y;
+   s.z = physObjs[0].pos.z;
+   p3d_t e;
+   e.x = physObjs[0].pos.x + physObjs[0].velocity.x;
+   e.y = physObjs[0].pos.y + physObjs[0].velocity.y;
+   e.z = physObjs[0].pos.z + physObjs[0].velocity.z;
+   arrow(s,e);
+   
+   handle = glsettex(buf,imgw,imgh);
+   setcol(0xffffff);
+   mul(u,5); mul(v,5);
+   plane(planePos.x,planePos.y,planePos.z,u,v);
+   
+   //set(u,3,0,0); set(v,0,3,0);
+   //plane(planePos.x,planePos.y,planePos.z,u,v);
+   
+   //set(u,0,3,0); set(v,0,0,3);
+   //plane(planePos.x,planePos.y,planePos.z,u,v);
+   glremovetex(handle);
+
+   
+   setfont(8,12);
+   collision = 0;
+   x = getCollision(0, 1);
+   moveto(0,0);
+   
+   if(x == CORRECTION)
+   {
+      printf("correct ds");
+   }
+   else
+   {
+   printf("X = %g",x);
+   }
+   printf("\ncollision? %g", collision);
+
+   //sleep(16);  
+}
+
+arrow(p3d_t s, p3d_t e)
+{
+   p3d_t dir;
+   dir.x = e.x - s.x; dir.y = e.y - s.y; dir.z = e.z - s.z; 
+   arrowlen = length(dir);
+   polelen = arrowlen * 0.75;
+   pointerlen = arrowlen - polelen;
+   normalize(dir);
+   
+   r1=.25;
+   drawcone(s.x,s.y,s.z,r1,
+            s.x+dir.x*polelen,s.y+dir.y*polelen,s.z+dir.z*polelen,r1,DRAWCONE_NOCAP1 );         
+   drawcone(s.x+dir.x*polelen,s.y+dir.y*polelen,s.z+dir.z*polelen, -r1*3, 
+            e.x, e.y, e.z, 0.01,DRAWCONE_CENT);
+}
+
+applyCamera(){
+   // rotate around center.
+   static t = 0;
+   if(keystatus[203]) t+= 2*PI/5 * dt;
+   if(keystatus[205]) t-= 2*PI/5 * dt;
+   
+   spd = 2;
+   r=15;
+   offset = 0;
+   
+
+   posx = sin(t*spd) *-r + offset;
+   posy = offset-2;
+   posz = cos(t*spd) *-r + offset;
+   posh = t*spd;
+   posv = 0;
+   setcam(posx,posy,posz,posh,posv); 
+}
+
+getCollision(obj, dt)
+{
+   p3d_t n; copy(n,planeNormal); // n = this.getNormal()
+   p3d_t ds; getDS(obj,dt,ds); // ds = obj.getDS(dt);
+   dsn = dot(ds,n);
+   
+   // Difference in position
+   p3d_t d;
+   d.x = planePos.x - physObjs[obj].pos.x;
+   d.y = planePos.y - physObjs[obj].pos.y;
+   d.z = planePos.z - physObjs[obj].pos.z;
+   dn = dot(d,n);
+
+   // correction
+   if( abs(dsn) < 1e-7 && length(d) < 1e-7 )
+   {
+      // TODO: correct trajectory.
+      dpr = dot(d,n);
+      ds.x -= dpr;
+      ds.y -= dpr;
+      ds.z -= dpr;
+      return CORRECTION;
+   }
+   
+   // check for collision
+   normalize(ds);
+   r = physObjs[obj].radius * dot(ds, n);
+   
+   //x = dn / (dsn+r); // Collision factor
+   x = (dn-r) / (dsn-r); // Collision factor
+   // Checking for collision
+   if(x > 0 && x <= 1)
+   {
+      collision = 1;
+      return x;
+   }
+   
+   return x;
+}
+
+length(p3d_t v){
+   return sqrt(v.x^2 + v.y^2 + v.z^2);
+}
+
+normalize(p3d_t v)
+{
+   len = sqrt(v.x^2+v.y^2+v.z^2); v.x/=len; v.y/=len; v.z/=len;
+}
+dot(p3d_t a, p3d_t b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+cross(p3d_t a, p3d_t b, p3d_t out)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+
+copy(p3d_t src, p3d_t dst){
+   src.x = dst.x;
+   src.y = dst.y;
+   src.z = dst.z;
+}
+set(p3d_t p,x,y,z){
+   p.x = x;
+   p.y = y;
+   p.z = z;
+}
+
+mul(p3d_t v, s)
+{
+   v.x *= s; v.y *= s; v.z *= s;
+}
+
+getDS(obj,dt, p3d_t out)
+{
+   set(out, physObjs[obj].velocity.x*dt, physObjs[obj].velocity.y*dt, physObjs[obj].velocity.z*dt);
+}
+
+plane(x,y,z,p3d_t fu,p3d_t fv)
+{
+   p3d_t p0; set(p0,x,y,z);
+   p3d_t p1; set(p1,p0.x-fu.x-fv.x, p0.y-fu.y-fv.y, p0.z-fu.z-fv.z );
+   p3d_t p2; set(p2,p0.x+fu.x-fv.x, p0.y+fu.y-fv.y, p0.z+fu.z-fv.z );
+   p3d_t p3; set(p3,p0.x+fu.x+fv.x, p0.y+fu.y+fv.y, p0.z+fu.z+fv.z );
+   p3d_t p4; set(p4,p0.x-fu.x+fv.x, p0.y-fu.y+fv.y, p0.z-fu.z+fv.z );
+   
+   // Draw normal
+   p3d_t n; cross(fu,fv,n); normalize(n);
+   p3d_t center; set(center, (p1.x+p3.x)/2, (p1.y+p3.y)/2, (p1.z+p3.z)/2 );
+   moveto(p0.x + center.x, p0.y+center.y, p0.z+center.z);
+   lineto(p0.x+n.x, p0.x+n.y, p0.z+n.z);
+  
+   glEnable(GL_ALPHA_TEST); glCullface(GL_NONE);
+   glBegin(GL_QUADS);
+   glTexCoord(0,0); glVertex(p1.x,p1.y,p1.z);  
+   glTexCoord(1,0); glVertex(p2.x,p2.y,p2.z);  
+   glTexCoord(1,1); glVertex(p3.x,p3.y,p3.z);  
+   glTexCoord(0,1); glVertex(p4.x,p4.y,p4.z);   
+   glEnd();
+}
+
+
+
+rotx(p3d_t p, x, y, z, a)
+{
+   c = cos(a);
+   s = sin(a);
+   
+   p.x = x; 
+   p.y = y * c + z * s;
+   p.z = y * -s + z * c;
+}
+roty(p3d_t p,x,y,z,a)
+{
+   c = cos(a);
+   s = sin(a);
+   
+   p.x = x * c + z* -s; 
+   p.y = y;
+   p.z = x * s + z * c;
+}
+rotz(p3d_t p, x, y, z, a)
+{
+   c = cos(a);
+   s = sin(a);
+   
+   p.x = x * c + y * s; 
+   p.y = x* -s + y * c;
+   p.z = z;
+}
+
+hsv_to_rgb(h,s,v)
+{
+   if(v==0){r=0; g=0; b=0;} // no brightness, black
+   else if(s==0){r=v; g=v; b=v;} // grayscale, no saturation
+   else{
+      hf = h / 60.0;
+      i = floor(hf);
+      f = hf - i;
+      pv = v* (1-s);
+      qv = v * (1-s*f);
+      tv = v * (1-s*(1-f));
+      if(i==0){r=v; g=tv; b=pv;}
+      if(i==1){r=qv; g=v; b=pv;}
+      if(i==2){r=pv; g=v; b=pv;}
+      if(i==3){r=pv; g=qv; b=v;}
+      if(i==4){r=tv; g=pv; b=v;}
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}
+   
+   }
+   r = int(r*255);
+   g = int(g*255);
+   b = int(b*255);
+   col =  rgb(r,g,b); // returns last value
+   //return r*2^16 + g*2^8 + b;
+}

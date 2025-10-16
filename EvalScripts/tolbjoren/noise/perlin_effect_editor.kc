@@ -1,0 +1,382 @@
+// perlin
+enum{SIZE=256};
+static p[size];
+
+static gx[size];
+static gy[size];
+static gz[size];
+
+static MASK = 0xFF;
+// RENDER
+static pix[3];
+static dest[3];
+static mtx[9]; //rotation matrix
+
+//"locals"
+static axis[3];
+
+static intensity = 0;
+static effectNumf = 1;
+static effectNumi = 1;
+static scale = 2;
+static scalef = 0;
+static red,green,blue;
+static speed = 1;
+
+enum{MAXEFFECTS=10};
+static effectSliderLength  = 0;
+//static tex[1];
+
+()
+{
+   cls(0);
+   if(numframes==0)
+   {
+      axis[0] = 0.16; axis[1] = 0.67; axis[2] = 0.43;
+      initRotationMatrix(axis, PI/9);
+      init();
+      effectSliderLength = MAXEFFECTS * 32;
+   }
+   
+   renderNoise(klock()*speed);
+   //tex[0] = glsettex("rhodin.png");
+   //setcol(255-red,255-green,255-blue);
+   //drawspr(128,128,64,0);  
+   
+   setcol(0xffffff);
+   slider(0, intensity, 0, 256+50, 256, "intensity: %g");
+   setcol(255,255,255);
+   slider(1, effectNumf, 0, 256+100, effectSliderLength, "effect number: %g");
+   effectNumi = int(effectNumf/32);
+   printf("\neffectNumi:%g",effectNumi ); 
+   
+
+
+   setcol(255,255,255);
+   slider(2, scalef, 0, 256+150, 256, "scale: %g");
+   scale = scalef/8;
+   printf("scale:%g",scale);
+   if(scale < 1) scale = 1;
+   
+   setcol(255,0,0);
+   slider(3, red, 0, 256+200, 255, "red: %g");
+   setcol(0,255,0);
+   slider(4, green, 0, 256+250, 255, "green: %g");
+   setcol(0,0,255);
+   slider(5, blue, 0, 256+300, 255, "blue: %g");
+   
+   setcol(255,255,255);
+   static speedf = 32;
+   slider(6, speedf, 0, 256+350, 255, "speed: %g");
+   speed = speedf/32;
+   printf("\n%g",speed);
+   
+
+   
+
+}
+
+renderNoise(z)
+{
+   static buf[256];
+   
+   value = intensity/256;
+   
+   for(iy=0; iy < 256; iy++)
+   {
+      y = iy / scale;
+      pix[0] = y*mtx[1] + z*mtx[2];
+      pix[1] = y*mtx[4] + z*mtx[5];
+      pix[2] = y*mtx[7] + z*mtx[8];
+      
+      //motion along x
+      x = 1 / scale;
+      dest[0] = x*mtx[0];
+      dest[1] = x*mtx[3];
+      dest[2] = x*mtx[6];
+      
+      
+      for(ix=0; ix < 256; ix++)
+      {
+         if(effectNumi==0) v = 255 * lumpy( pix[0], pix[1], pix[2] ) / value;
+         else if(effectNumi==1) v = 255 * (lumpy( sin(pix[0]), cos(pix[1]), sin(pix[2]) )) / value;
+         else if(effectNumi==2) v = 255 * abs(lumpy( cos(pix[1])+sin(pix[0]), cos(pix[1])+sin(pix[0]), (pix[2]) )) / value;
+         else if(effectNumi==3) v = 255 * abs(lumpy( cos(pix[0])*sin(pix[1]), cos(pix[0])*sin(pix[1]), pix[2] )) / value;
+         else if(effectNumi==4) v = 255 * abs(lumpy( cos(pix[0])/sin(pix[1]), cos(pix[0])/sin(pix[1]), pix[2] )) / value;
+         else if(effectNumi==5) v = 255 * abs(turbulence( cos(pix[0])+sin(pix[1]), cos(pix[0])+tan(pix[1]), pix[2] )) / value;
+         else if(effectNumi==6) v = 255 * abs(turbulence( cos(pix[0])+sin(pix[0]), cos(pix[1])+sin(pix[1]), pix[2] )) / value;
+         else if(effectNumi==7) v = 255 * -0.5*turbulence(pix[0], pix[1], pix[2]) / value; //crinkly
+         else if(effectNumi==8) v = 255 * marbled( pix[0], pix[1], pix[2] ) / value;   
+         else if(effectNumi==9)
+         {
+            v1 = (noise(pix[0],pix[1],pix[2])+1);
+            v2 = 0.5*(noise(2*pix[0],2*pix[1],2*pix[2])+1);
+            v3 = 0.25*(noise(4*pix[0],4*pix[1],4*pix[2])+1);
+            v = 255*(v1+v2+v3)/(value*3);
+         }
+                
+
+         setcol(v-red,v-green,v-blue);
+         setpix(ix,iy);
+
+         // why does rounding off destroy the image?, isnt much faster drawing with sethlin anyways...
+         /*v = ceil(v);
+         r = v;
+         g = v;
+         b = v;
+         buf[ix] = r*2^16 + g*2^8 + b;
+         */
+         pix[0] += dest[0];
+         pix[1] += dest[1];
+         pix[2] += dest[2]; 
+      }
+      //sethlin(0,iy,buf,256);
+   }
+}
+
+slider(sliderNum, &value,x,y,length,$text)
+{
+   enum{numSliders=7};
+   static mouseLock[numSliders];
+
+   // Constructor, set slider to mid position
+   if(numframes==0)
+   {
+      value = .5 * length;
+      mouseLock[sliderNum] = 0;
+   }  
+   // Draw slider
+   moveto(x,y);
+   lineto(x+length,y);
+   drawsph(x+value,y,-10);
+   moveto(x+value,y+10);
+   printf(text,value);
+   
+   // mouse input
+   //mouseValue = mousx/(xres/2)-1;
+   if(bstatus==1)
+   {
+      mx = mousx; my = mousy; 
+      if(mouseLock[sliderNum]) // mouse has lock-on, move slider
+      {
+         setcol(255,0,0);
+         drawsph(x+value, y,-5);
+         if(mx <= x+length && mx >= x) // limit movement to slider line
+         value = mx-x;
+      }
+      else // check for collision
+      {
+         if( isColliding(mx,my,x+value,y,10) ) mouseLock[sliderNum] = 1; 
+      }
+   }
+   else // mouse released
+   {
+      mouseLock[sliderNum] = 0;
+   }
+
+}
+
+isColliding(x1,y1,x2,y2,radius)
+{
+   if((x1-x2)^2 + (y1-y2)^2 < radius^2 ) return 1;
+   return 0;
+}
+
+lumpy(x,y,z)
+{
+   return noise(x,y,z);
+}
+
+turbulence(x,y,z)
+{
+   
+   tex = -0.5; // pref. double precision float
+   for( f=1; f<= xres/96; f*=2)
+      tex += noise(f*x,f*y,f*z) / f ;
+   return tex;
+}
+
+stripes(x,f)
+{
+   t = .5 + .5 * sin(f * 2*PI * x);
+   ret = t*t -.5;
+   return ret;
+}
+
+marbled(x,y,z)
+{
+   tex = stripes(x + 2*turbulence(x,y,z), .8);
+   return tex;
+}
+
+init()
+{
+   srand( klock() );
+   i=0, j=0, nSwap=0;
+
+
+   // Initialize the permutation table
+   for(i = 0; i < SIZE; i++)
+      p[i] = i;
+
+   for(i = 0; i < SIZE; i++)
+   {
+      j = (rnd*0xffffff) & MASK;
+
+      nSwap = p[i];
+      p[i]  = p[j];
+      p[j]  = nSwap;
+   }
+
+   // Generate the gradient lookup tables
+   for(i = 0; i < SIZE; i++)
+   {
+      // Ken Perlin proposes that the gradients are taken from the unit 
+      // circle/sphere for 2D/3D, but there are no noticable difference 
+      // between that and what I'm doing here. For the sake of generality 
+      // I will not do that.
+
+      gx[i] = nrnd/2; 
+      gy[i] = nrnd/2;
+      gz[i] = nrnd/2;
+   }
+}
+
+
+
+InitRotationMatrix(pAxis[3], r)
+{
+  // The axis vector must be of unit length
+  x=0, y=0, z=0, m=0;
+  m = sqrt(pAxis[0]*pAxis[0] + pAxis[1]*pAxis[1] + pAxis[2]*pAxis[2]);
+  x = pAxis[0]/m;
+  y = pAxis[1]/m;
+  z = pAxis[2]/m;
+
+  // Compute the rotation matrix  
+  c = cos(r);
+  s = sin(r);
+
+  Mtx[0] = (x * x) * (1.0 - c) + c;
+  Mtx[1] = (y * x) * (1.0 - c) + (z * s);
+  Mtx[2] = (z * x) * (1.0 - c) - (y * s);
+
+  Mtx[3] = (x * y) * (1.0 - c) - (z * s);
+  Mtx[4] = (y * y) * (1.0 - c) + c;
+  Mtx[5] = (z * y) * (1.0 - c) + (x * s);
+
+  Mtx[6] = (x * z) * (1.0 - c) + (y * s);
+  Mtx[7] = (y * z) * (1.0 - c) - (x * s);
+  Mtx[8] = (z * z) * (1.0 - c) + c;
+} 
+
+calcNoise(x,y)
+{
+   // compute the integer positions of the four surrounding points
+   qx0 = int( floor(x) );
+   qx1 = int( qx0 + 1);
+   
+   qy0 = int(floor(y));
+   qy1 = int(qy0+1);
+   
+   // Permutate values to get indices to use with the gradient LUT
+   q00 = int( p[(qy0 + p[qx0 % SIZE]) % SIZE] );
+   q01 = int( p[(qy0 + p[qx1 % SIZE]) % SIZE] );
+   
+   q10 = int( p[(qy1 + p[qx0 % SIZE]) % SIZE] );
+   q11 = int( p[(qy1 + p[qx1 % SIZE]) % SIZE] );
+   
+   // Computing vectors from the four points to the input point
+   tx0 = x - floor(x);
+   tx1 = tx0 - 1;
+   
+   ty0 = y - floor(y);
+   ty1 = ty0 - 1;
+   
+   // Compute the dot-product between the vectors and the gradients
+   v00 = gx[q00]*tx0 + gy[q00]*ty0;
+   v01 = gx[q01]*tx1 + gy[q01]*ty0;
+   
+   v10 = gx[q10]*tx0 + gy[q10]*ty1;
+   v11 = gx[q11]*tx1 + gy[q11]*ty1;
+
+   // Do the bi-cubic interpolation to get the final value
+   wx = (3 - 2*tx0)*tx0*tx0;
+   v0 = v00 - wx*(v00 - v01);
+   v1 = v10 - wx*(v10 - v11);
+   
+   wy = (3 - 2*ty0)*ty0*ty0;
+   v = v0 - wy*(v0 - v1);
+   return v;
+}
+
+mNoise3(x, y, z)
+{
+   // Compute what gradients to use
+   qx0 = int(floor(x));
+   qx1 = int(qx0 + 1);
+   tx0 = x - qx0;
+   tx1 = tx0 - 1;
+
+   qy0 = int(floor(y));
+   qy1 = int(qy0 + 1);
+   ty0 = y - qy0;
+   ty1 = ty0 - 1;
+
+   qz0 = int(floor(z));
+   qz1 = int(qz0 + 1);
+   tz0 = z - qz0;
+   tz1 = tz0 - 1;
+
+   // Make sure we don't come outside the lookup table
+   qx0 = qx0 & MASK;
+   qx1 = qx1 & MASK;
+
+   qy0 = qy0 & MASK;
+   qy1 = qy1 & MASK;
+
+   qz0 = qz0 & MASK;
+   qz1 = qz1 & MASK;
+
+   // Permutate values to get pseudo randomly chosen gradients
+   q000 = p[(qz0 + p[(qy0 + p[qx0]) & MASK]) & MASK];
+   q001 = p[(qz0 + p[(qy0 + p[qx1]) & MASK]) & MASK];
+
+   q010 = p[(qz0 + p[(qy1 + p[qx0]) & MASK]) & MASK];
+   q011 = p[(qz0 + p[(qy1 + p[qx1]) & MASK]) & MASK];
+
+   q100 = p[(qz1 + p[(qy0 + p[qx0]) & MASK]) & MASK];
+   q101 = p[(qz1 + p[(qy0 + p[qx1]) & MASK]) & MASK];
+
+   q110 = p[(qz1 + p[(qy1 + p[qx0]) & MASK]) & MASK];
+   q111 = p[(qz1 + p[(qy1 + p[qx1]) & MASK]) & MASK];
+
+   // Compute the dotproduct between the vectors and the gradients
+   v000 = gx[q000]*tx0 + gy[q000]*ty0 + gz[q000]*tz0;
+   v001 = gx[q001]*tx1 + gy[q001]*ty0 + gz[q001]*tz0;  
+
+   v010 = gx[q010]*tx0 + gy[q010]*ty1 + gz[q010]*tz0;
+   v011 = gx[q011]*tx1 + gy[q011]*ty1 + gz[q011]*tz0;
+
+   v100 = gx[q100]*tx0 + gy[q100]*ty0 + gz[q100]*tz1;
+   v101 = gx[q101]*tx1 + gy[q101]*ty0 + gz[q101]*tz1;  
+
+   v110 = gx[q110]*tx0 + gy[q110]*ty1 + gz[q110]*tz1;
+   v111 = gx[q111]*tx1 + gy[q111]*ty1 + gz[q111]*tz1;
+
+   // Modulate with the weight function
+   wx = (3 - 2*tx0)*tx0*tx0;
+   v00 = v000 - wx*(v000 - v001);
+   v01 = v010 - wx*(v010 - v011);
+   v10 = v100 - wx*(v100 - v101);
+   v11 = v110 - wx*(v110 - v111);
+
+   wy = (3 - 2*ty0)*ty0*ty0;
+   v0 = v00 - wy*(v00 - v01);
+   v1 = v10 - wy*(v10 - v11);
+
+   wz = (3 - 2*tz0)*tz0*tz0;
+   v = v0 - wz*(v0 - v1);
+
+   return v;
+}

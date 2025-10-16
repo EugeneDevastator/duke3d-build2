@@ -1,0 +1,214 @@
+struct vec{x,y,z;}
+
+static vec move_pos;
+static lineWidth = 1;
+()
+{
+   cls(0); clz(1e32); glCullface(GL_NONE);
+   setcol( 255,255,255 );
+   
+   radi = -3;
+   ang = 2*PI * mousx/xres;
+   ca = cos(ang) * radi;
+   sa = sin(ang) * radi;
+   setcam( sa, 0, ca, ang, 0);
+   
+   vec p1,p2;
+   vecset(p1, -11, 0, 0 );
+   move2( p1 );
+   segs = 100;
+   periods = 3;
+   for(i=0; i<segs; i++)
+   {
+      t = i / (segs-1);
+      lineWidth = .5;
+      
+      a = 2*PI * t;
+      vecset(p2, -10+20*t, sin(periods * a), sin(.5*pi + periods*a) );
+      line2(p2);
+   }
+
+   vecset(p1, 0,0,0 );
+   vecset(p2, 0,10,0 );
+   move2( p1 );
+   line2( p2 );
+   
+   //drawsph(p1,1);
+   //drawsph(p2,1);
+}
+
+move2( vec p1 )
+{
+   move_pos = p1;
+}
+
+line2( vec p2 )
+{
+   vec p1;
+   p1 = move_pos;
+   
+   vec p1p2;
+   vecsub(p1p2, p2, p1 );
+   
+   vec perp;
+   createPerp( perp, p1, p2 );
+   
+   vec a,b,c,d;
+   a = p1;
+   b = p1;
+   
+   c = p2;
+   d = p2;
+   
+   vec off1, off2;
+   vecscalar(off1, perp, -0.5 * lineWidth);
+   vecscalar(off2, perp, +0.5 * lineWidth);
+   
+   vecadd( a, a, off1 );   
+   vecadd( b, b, off2 );   
+   vecadd( c, c, off2 );   
+   vecadd( d, d, off1 );   
+   
+   #ifdef SHOW_OUTLINE
+   moveto(a);
+   lineto(b);
+   lineto(c);
+   lineto(d);
+   lineto(a);
+   #endif
+
+   
+   
+   linelen = length( p1p2 );
+
+   #define USE_QUADS
+   #ifdef USE_QUADS
+      glBegin(GL_COMPLEX);
+         glTexCoord(0,0); glVertex(a);
+         glTexCoord(lineWidth,0); glVertex(b);
+         glTexCoord(lineWidth,linelen); glVertex(c);
+         glTexCoord(0,linelen); glVertex(d);
+      glEnd();
+   #else
+      triangle(a,b,d);
+      triangle(b,c,d);
+   #endif
+   
+   // Update move pos
+   move_pos = p2;
+}
+
+triangle(vec a, vec b, vec c){
+   glBegin(GL_TRIANGLES);
+      glVertex( a ); glVertex( b ); glVertex( c );
+   glEnd();
+}
+
+
+moveto(vec p){
+   moveto(p.x,p.y,p.z);
+}
+lineto(vec p){
+   lineto(p.x,p.y,p.z);
+}
+glVertex(vec p){
+   glVertex(p.x,p.y,p.z);
+}
+drawsph(vec p,r){
+   drawsph(p.x,p.y,p.z,r);
+}
+
+// given to points p1 and p2 create a vector out
+// that is perpendicular to (p2-p1)
+createPerp(vec out, vec p1, vec p2)
+{
+    
+   //#define NOT_QUITE_RIGHT
+   #ifdef NOT_QUITE_RIGHT
+      // straightforward method where we have a problem
+      // if the line starts/ends in origin
+      // or is linearly dep in other ways
+      vec dir;
+      vecSub( dir, p2, p1 );   
+      normalize(dir);
+   
+      vec normal;
+      vecCross(normal, p1, p2 );
+      normalize(normal);
+      
+      vecCross( out, normal, dir );
+   #else
+
+      vec invec;
+      vecsub(invec, p2, p1 );
+      normalize(invec);
+    
+      vec zdir; vecset( zdir, 0,0,1);
+      
+      veccross(out, invec, zdir );
+      if ( length(out) == 0 )
+      {
+         vec ydir; vecset( ydir, 0,1,0);
+         veccross(out, invec, ydir);
+      }
+   #endif
+
+}
+
+//
+// Vector
+//
+vecScalar( vec out, vec a, s )
+{
+   out.x = a.x * s;
+   out.y = a.y * s;
+   out.z = a.z * s;
+}
+
+vecAdd( vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;   
+}
+vecSub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;   
+}
+
+vecCross( vec out, vec a, vec b)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+
+// all you need is =...
+vecSet(vec a, x,y,z){
+   a.x = x; a.y = y; a.z = z;
+}
+
+vecSet(vec a, vec other){
+   a.x = other.x; a.y = other.y; a.z = other.z;
+}
+
+vecDot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+length( vec v )
+{
+   return sqrt( vecdot(v,v) );
+}
+
+normalize( vec v )
+{
+   len = length(v);
+   if ( len )
+   {
+      v.x /= len; v.y /= len; v.z /= len;
+   }
+}

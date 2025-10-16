@@ -1,0 +1,98 @@
+struct vec{x,y,z;}
+
+enum {NUM_SIDE=7}
+enum {NUM_PTS=NUM_SIDE^2}
+static vec pts[NUM_PTS];
+
+(x,y,z,&r,&g,&b)
+{
+   r = 255;
+
+   // MAP xyz to UV
+   
+   static gen = 0;
+   
+   if ( !gen ) 
+   {
+      gen = 1;
+      cnt = 0;
+      
+      vec p;
+      for (i=0; i<NUM_SIDE; i++)
+      for (j=0; j<NUM_SIDE; j++)
+      {
+         u = 2*PI * i / NUM_SIDE;
+         v = 2*PI * j / NUM_SIDE;
+         pointOnSphere(u,v,p);
+         p.x *= .5;
+         p.y *= .5;
+         p.z *= .5;
+         pts[cnt] = p;
+         cnt++;
+      }
+   }
+   
+
+   mind = 1e32;
+   closest = -1;
+   
+   for (i=0; i<NUM_PTS; i++)
+   {
+      dx = x-pts[i].x;
+      dy = y-pts[i].y;
+      dz = z-pts[i].z;
+      d = (dx^2 + dy^2 + dz^2);
+      if ( d < mind )
+      {
+         mind = d;
+         closest = i;
+      }
+   }
+   
+   if ( closest != -1 ) 
+   {
+      hsv_to_rgb( 270 * closest/(NUM_PTS), 1, 1, r,g,b);
+      
+      //distCent = (x^2 + y^2 + z^2);
+      //if ( distCent > 1^2 ) return 0;
+      //return 1;
+      
+      if ( mind < .1 ) return 1;
+      
+      //if ( dx^2 + dy^2 + dz^2 < .01 ) return 1;
+
+   }
+   
+   return 0;
+}
+
+hsv_to_rgb(h,s,v, &r, &g, &b){ 
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   r*=255; g*=255; b*=255;
+}
+
+
+pointOnSphere(u,v, vec p)
+{
+   p.x = cos(u) * cos(v);
+   p.y = sin(v);
+   p.z = sin(u) * cos(v);
+}

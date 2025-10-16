@@ -1,0 +1,450 @@
+/*
+basic raycaster that traverses voxels discretely
+*/
+
+struct vec{x,y,z;}
+
+enum{BUF_SIZE = 128}
+static horiz_line_buf[BUF_SIZE];
+enum{GRID_SIZ = 64}
+static grid[GRID_SIZ][GRID_SIZ][GRID_SIZ];
+
+static vec light_pos;
+
+//#define DEBUG
+
+struct ray_t
+{
+   vec origin;
+   vec dir;
+};
+
+struct box_t
+{
+   vec pos;
+   vec min,max;
+};
+()
+{
+   cls(0); clz(1e32);
+   static vec cameraPosition, cameraFocus;
+   if ( numframes == 0 ){
+      vecset(cameraFocus, 0, 0, 0 );
+      vecset(light_pos, 0, 10, 0 );
+      
+      fill_grid();
+   }
+   
+   static matrix[9];
+   ang2mat( mousx/xres*2*PI, mousy/yres*2*PI, matrix );
+
+   radius = GRID_SIZ * 2;
+   vecset(cameraPosition, radius*matrix[6], radius*matrix[7], radius*matrix[8] );
+
+   width = BUF_SIZE;
+   height = BUF_SIZE;
+   
+   setcol(0xffffff); setpix(width,height);
+   
+   vec lookDirection, camRight, camUp;
+   
+   vecset(camRight, -matrix[0], -matrix[1], -matrix[2] );
+   vecset(camUp, matrix[3], matrix[4], matrix[5] );
+   vecset(lookDirection, -matrix[6], -matrix[7], -matrix[8] );
+   
+   normalize(camRight);
+   normalize(camUp);
+   normalize(lookDirection);
+
+   double aspect = width / height;
+
+   // compute distance to the camera plane from the field of view, and aspect ratio
+   double fov = 45;
+   double cameraPlaneDistance = 1.0 / (2.0 * tan(fov*PI/180*0.5));
+   
+ 
+   #ifdef DEBUG 
+      drawsph(cameraPosition,1);
+   #endif
+
+   for( py=0; py<height; ++py){
+   for( px=0; px<width; ++px){
+         // Compute the ray direction for this pixel. Same as in standard ray tracing.
+         double u = -.5 + (px+.5) / (width-1);
+         u *= aspect; // Correction for square pixels on non-square image aspect ratio.
+         double v =  .5 - (py+.5) / (height-1);
+
+         vec rayDirection;
+         rayDirection.x = lookDirection.x * cameraPlaneDistance + camRight.x*u + camUp.x*v;
+         rayDirection.y = lookDirection.y * cameraPlaneDistance + camRight.y*u + camUp.y*v;
+         rayDirection.z = lookDirection.z * cameraPlaneDistance + camRight.z*u + camUp.z*v;
+         //normalize(rayDirection); // will cause parabolic projection. not what we want.
+                  
+         #ifdef DEBUG 
+            vec rayDirection2;
+            vecscalar(rayDirection2, rayDirection, 5);
+            drawPoint( rayDirection2, .05 ); 
+         #endif
+         
+         vecscalar(rayDirection, rayDirection, GRID_SIZ*2);
+
+         horiz_line_buf[px] = raycast( cameraPosition.x, cameraPosition.y, cameraPosition.z,
+                                       rayDirection.x, rayDirection.y, rayDirection.z);
+      } // for px
+      sethlin( 0, py, horiz_line_buf, BUF_SIZE );
+   } // for py
+
+   #ifdef DEBUG
+      setcam(0,0,-20,0,0);
+   #endif
+}
+
+drawsph( vec v, r ){
+   drawsph(v.x,v.y,v.z,r);
+}
+drawPoint( vec v, r ){
+   glbegin(GL_POINTS);
+   glvertex(v.x,v.y,v.z);
+}
+
+//
+// Vector
+//
+vecScalar( vec out, vec a, s )
+{
+   out.x = a.x * s;
+   out.y = a.y * s;
+   out.z = a.z * s;
+}
+
+vecAdd( vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;   
+}
+vecSub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;   
+}
+
+vecCross( vec out, vec a, vec b)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+
+vecSet(vec a, x,y,z){
+   a.x = x; a.y = y; a.z = z;
+}
+
+vecSet(vec a, vec other){
+   a.x = other.x; a.y = other.y; a.z = other.z;
+}
+
+vecDot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+length( vec v )
+{
+   return sqrt( vecdot(v,v) );
+}
+
+normalize( vec v )
+{
+   len = length(v);
+   if ( len )
+   {
+      v.x /= len; v.y /= len; v.z /= len;
+   }
+}
+
+rayPoint( vec out, vec pos, vec dir, t ){
+   out.x = pos.x + t*dir.x;
+   out.y = pos.y + t*dir.y;
+   out.z = pos.z + t*dir.z;
+}
+
+fill_grid()
+{
+   for(i=0; i<GRID_SIZ; i++)
+   for(j=0; j<GRID_SIZ; j++)
+   for(k=0; k<GRID_SIZ; k++)
+   {
+      r = 0; g = 0; b = 0;
+      x = i/GRID_SIZ*2-1;
+      y = j/GRID_SIZ*2-1;
+      z = k/GRID_SIZ*2-1;
+      hit = volume( x, y, z, r, g, b );
+      if ( hit ){
+         grid[i][j][k] = rgb( r, g, b );
+      }else{
+         grid[i][j][k] = 0;
+      }
+   }
+}
+
+volume( x,y,z, &r, &g, &b )
+{
+   //return column(x,y,z, r,g,b);
+   return barrel(x,y,z, r,g,b);
+   //return pipes(x,y,z, r,g,b);
+   //return die(x,y,z, r,g,b);
+}
+
+column(x, y, z, &r, &g, &b ){
+   r = 128; g = 144; b = 144;
+   if (fabs(z) > .93)
+   {
+      if (max(fabs(x),fabs(y)) > .38-(1-fabs(z))/3) return(0); //Caps
+   }
+   else
+   {
+      rad = .08 - z^2/36; //overall bulge in middle
+      rad += sqrt(max(.04^2-(fabs(z)-.92)^2,0))*.4; //ring bulges
+      rad -= sqrt(max(.04^2-(fabs(z)-.84)^2,0))*.4; //ring bulges
+      rad += sqrt(max(.04^2-(fabs(z)-.76)^2,0))*.4; //ring bulges
+      if (fabs(z) < .67)
+      {
+         rad += min(cos(atan2(y,x)*13),-.4)*.01; //Vertical ridges
+      }
+      if (x^2 + y^2 > rad) return(0);
+   }
+      //Marble texture
+   v = 0;
+   for(i=1.3;i<=8;i*=1.4) v += exp(noise(x*i,y*i,z*i)^2*-512/i)*30/i;
+   r -= v*1.2; g -= v; b -= v;
+   
+   return(1);
+}
+
+die(x, y, z, &r, &g, &b ){
+   ax = x^2; ax *= ax;
+   ay = y^2; ay *= ay;
+   az = z^2; az *= az;
+   d8 = ax^2+ay^2+az^2;
+   if (d8 > .95^8) return(0);
+   
+   o = 0.5; f = 0.99; r2 = .17^2;
+   xmo = (x-o)^2; xpo = (x+o)^2; xx = x^2; xf = (abs(x)-f)^2;
+   ymo = (y-o)^2; ypo = (y+o)^2; yy = y^2; yf = (abs(y)-f)^2;
+   zmo = (z-o)^2; zpo = (z+o)^2; zz = z^2; zf = (abs(z)-f)^2;
+   
+   if (y > 0) { if (xx+zz                               +yf < r2) return(0); } //1
+         else { if (min(min(xmo,xpo),xx)+min(zmo,zpo)   +yf < r2) return(0); } //6
+   if (z > 0) { if (min(xmo+ypo,xpo+ymo)                +zf < r2) return(0); } //2
+         else { if (min(min(xmo,xpo)+min(ymo,ypo),xx+yy)+zf < r2) return(0); } //5
+   if (x > 0) { if (min(min(ypo+zmo,ymo+zpo),yy+zz)     +xf < r2) return(0); } //3
+         else { if (min(ymo,ypo)+min(zmo,zpo)           +xf < r2) return(0); } //4
+   
+   i = 1-min(max((.90^8-d8)*4,0),1);
+   r = 255 - i* 52 - (x-rnd)* 8;
+   g = 255 - i*154 - (y-rnd)* 5;
+   b = 255 - i*154 - (z-rnd)*13;
+   return(1);
+}
+
+sphere(x, y, z, &r, &g, &b ){
+   r = x*128+128;
+   g = y*128+128;
+   b = z*128+128;
+   return x^2 + y^2 + z^2 < 1;
+}
+
+pipes(x, y, z, &r, &g, &b )
+{
+   if ((abs(x) > .99) || (abs(y) > .99) || (abs(z) > .99)) return(0);
+   r = x*128+128;
+   g = y*128+128;
+   b = z*128+128;
+   if (x^2+y^2+z^2 < .125) { r = rnd*12+130; g = rnd*12+100; b = rnd*12+80; return(1); }
+   if (x^2+y^2 < .25) return(0);
+   if (x^2+z^2 < .25) return(0);
+   if (y^2+z^2 < .25) return(0);
+   if (x^2+y^2 < .5) { r = rnd*12+100; g = rnd*12+150; b = rnd*12+ 80; return(1); }
+   if (x^2+z^2 < .5) { r = rnd*12+150; g = rnd*12+130; b = rnd*12+100; return(1); }
+   if (y^2+z^2 < .5) { r = rnd*12+130; g = rnd*12+100; b = rnd*12+120; return(1); }
+   0
+}
+
+
+barrel(x, y, z, &r, &g, &b ){
+   if (abs(z) > .96) return(0);
+   r2 = (2.5-z*z)/4;
+   
+   xy2 = x^2 + y^2;
+   if (xy2 < r2*.8) //caps
+   {
+      if (abs(z) > .93) return(0);
+      f = cos(xy2*6)*32+144;
+      n = -(noise(x*32,y*32,z*32)-0.7)^2;
+      r = f*.6+n*10;
+      g = f*.5+n*10;
+      b = f*.3+n*10;
+      return(1);
+   }
+   
+      //side wood
+   if (xy2 < r2)
+   {
+      ang = ((atan2(y,x)*12/(PI*2))%1);
+      n = noise(x*24,y*24,z*3)*28;
+      if (ang < .25)
+      {
+         r2sub = (.25/2-fabs(ang-.25/2))*.5;
+         r2 -= r2sub;
+         n -= r2sub*400;
+      }
+      r = 128*.8+n;
+      g =  96*.8+n;
+      b =  64*.8+n;
+      return(xy2 < r2);
+   }
+   
+      //metal bars
+   if ((xy2 < r2+.12) && ((z+.92)%.55 < .16))
+   {
+      ang = ((atan2(y,x)*12/(PI*2))%1);
+      dx = fabs(ang-.6);
+      dy = fabs((z+.92)%.55-.08)*2.5;
+      if (dx^2+dy^2 < .12^2)
+      {
+         r2 += (.12^2-(dx^2+dy^2))*32;
+         n = noise(x*50,y*50,z*240)*20;
+         r = 104+n;
+         g = 104+n;
+         b = 112+n;
+      }
+      else
+      {
+         n = noise(x*8,y*8,z*48)*20;
+         r = 120+n;
+         g = 112+n;
+         b = 112+n;
+      }
+      return(xy2 < r2+.08);
+   }
+}
+
+ang2mat(hang,vang,mat[9])
+{
+   mat[0] = cos(hang); mat[1] = 0; mat[2]=-sin(hang);
+   mat[6] = cos(vang)*sin(hang); mat[7] = sin(vang); mat[8]=cos(vang)*cos(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}
+
+transformPoint(vec v, thisRot[9])
+{
+   NewX = v.x * thisRot[0] + v.y * thisRot[1] + v.z * thisRot[2];
+   NewY = v.x * thisRot[3] + v.y * thisRot[4] + v.z * thisRot[5];
+   NewZ = v.x * thisRot[6] + v.y * thisRot[7] + v.z * thisRot[8];
+   v.x=newx; v.y=newy; v.z=newz;
+}
+
+assert( istrue, err_code )
+{
+  if ( !istrue ) {
+     while( 1 ) {
+      cls(0);
+      moveto(xres/2,yres/2);
+      printf(" time to hunt for error= %g", err_code);
+      refresh();
+    }
+  }
+}
+
+// from-to
+raycast(double x1,double y1,double z1,double x2,double y2,double z2)
+{
+   // translate ray so grid is centered
+   trans = -grid_siz/2;
+   x1 -= trans;
+   y1 -= trans;
+   z1 -= trans;
+
+   x2 -= trans;
+   y2 -= trans;
+   z2 -= trans;
+   
+   // Determine start grid cell coordinates
+   i = int(floor(x1));
+   j = int(floor(y1));
+   k = int(floor(z1));
+
+   // End grid cell coordinates
+   iend = int(floor(x2));
+   jend = int(floor(y2));
+   kend = int(floor(z2));
+
+   // The real-value difference
+   double dx = x2 - x1;
+   double dy = y2 - y1;
+   double dz = z2 - z1;
+      
+   // Determine in which primary dir to step (-1 or +1)
+   di = (dx>0)*2-1;
+   dj = (dy>0)*2-1;
+   dk = (dz>0)*2-1;
+
+   // How much of the line-segment (x1,y1 to x2,y2) do we step in each axis?
+   double deltatx = 1.0 / fabs(dx);
+   double deltaty = 1.0 / fabs(dy);
+   double deltatz = 1.0 / fabs(dz);
+
+   // Determine the parameter t where ray hits cell boundry of each axis; tx,ty,tz
+   // min(x,y,z) determines how far one can travel in that dir before hitting another cell
+   
+   double minx = floor(x1); double maxx = minx + 1.0;
+   double miny = floor(y1); double maxy = miny + 1.0;
+   double minz = floor(z1); double maxz = minz + 1.0;
+
+   double tx,ty,tz;
+   if ( x1>x2 ){ tx=(x1-minx)*deltatx; } else { tx=(maxx-x1)*deltatx; }
+   if ( y1>y2 ){ ty=(y1-miny)*deltaty; } else { ty=(maxy-y1)*deltaty; }
+   if ( z1>z2 ){ tz=(z1-minz)*deltatz; } else { tz=(maxz-z1)*deltatz; }
+
+   // A loop where we visit a cell[i][j][k]
+   // exit the loop under following conditions
+   // * when we've met the desired end point
+   // * we've found what we wanted in cell[i][j][k]
+   // * stepped out of grid
+   while(1)
+   {
+      if( i >= 0 && i < GRID_SIZ )
+      if( j >= 0 && j < GRID_SIZ )
+      if( k >= 0 && k < GRID_SIZ )
+      {
+      
+         // Visit cell
+         voxel_color = grid[i][j][k];
+         if ( voxel_color > 0 )
+         {
+            return voxel_color;
+         }
+      }
+      
+      if(tx <= ty && tx <= tz) // tx smallest, step in x
+      {
+         if(i == iend) break;
+         tx += deltatx;
+         i += di;
+      } else if (ty <= tz)
+      {
+         if(j == jend) break; // ty smallest, step in y
+         ty += deltaty;
+         j += dj;
+      } else 
+      {
+         if(k == kend) break; // tz smallest, step in z
+         tz += deltatz;
+         k += dk;
+      }
+   }
+}

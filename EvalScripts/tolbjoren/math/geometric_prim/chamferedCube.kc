@@ -1,0 +1,134 @@
+()
+{
+ cls(0); clz(1e32);
+x = 0;//(mousx/xres-.5)*8;
+y = 0;//(mousy/yres-.5)*8;
+z = 0;
+
+/*
+static posx, posy, posz = -2, hang, vang, tim;
+dt = tim; tim = klock(); dt = tim-dt;
+f = dt*(keystatus[0x36]+1)*2;
+posy += (keystatus[0xcf]-keystatus[0xc7])*f;
+vang -= (keystatus[0xd1]-keystatus[0xc9])*f;
+vx = (keystatus[0xcd]-keystatus[0xcb])*f;
+vy = (keystatus[0xd0]-keystatus[0xc8])*f;
+if (keystatus[0x9d] == 0) { hang += vx; vx = 0; }
+posx +=-sin(hang)*vy + cos(hang)*vx;
+posz +=-cos(hang)*vy - sin(hang)*vx;
+setcam(posx,posy,posz,hang,vang);
+*/
+   
+   time = klock(0);
+   cang = mousx/xres*2*PI;
+   //cang = time;
+   dst = -7;
+   setcam(sin(cang)*dst,0,cos(cang)*dst,cang,0);
+   
+
+
+   radius = .2;
+   //radius = 2*mousy/yres;   
+
+
+setcol(0x4aea1c);
+
+for(cx=-1;cx<=1;cx+=2)
+   for(cy=-1;cy<=1;cy+=2)
+   {
+      drawcone(x+cx,y+cy,z- 1,radius,x+cx,y+cy,z+ 1,radius,3); //3=nocaps
+      drawcone(x+cy,y- 1,z+cx,radius,x+cy,y+ 1,z+cx,radius,3);
+      drawcone(x- 1,y+cx,z+cy,radius,x+ 1,y+cx,z+cy,radius,3);
+   }
+   
+for(cx=-1;cx<=1;cx+=2)
+   for(cy=-1;cy<=1;cy+=2)
+   {
+      drawsph(x+cx,y+cy,z-1,radius);
+      drawsph(x+cx,y+cy,z+1,radius);
+   }
+   
+   //static pix[1][1];
+   //pix[0][0] = 0x2e0ac0;
+   
+   //texHand=glsettex(pix,1,1);
+   //setcol(0x18d3390);
+   setcol(300,300,300);
+   extFaceCube(radius-0.01);
+   //glremovetex(texHand);
+   
+}
+extFaceCube(radius)
+{
+glBegin(GL_QUADS); 
+x=0; y=0; z=0;
+glTexCoord(0,0); glVertex(x-1,y-1,z-1-radius);
+glTexCoord(1,0); glVertex(x+1,y-1,z-1-radius);
+glTexCoord(1,1); glVertex(x+1,y+1,z-1-radius);
+glTexCoord(0,1); glVertex(x-1,y+1,z-1-radius);
+
+glTexCoord(0,0); glVertex(x-1-radius,y-1,z+1);
+glTexCoord(1,0); glVertex(x-1-radius,y-1,z-1);
+glTexCoord(1,1); glVertex(x-1-radius,y+1,z-1);
+glTexCoord(0,1); glVertex(x-1-radius,y+1,z+1);
+
+glTexCoord(0,0); glVertex(x-1,y-1-radius,z+1);
+glTexCoord(1,0); glVertex(x+1,y-1-radius,z+1);
+glTexCoord(1,1); glVertex(x+1,y-1-radius,z-1);
+glTexCoord(0,1); glVertex(x-1,y-1-radius,z-1);
+
+glTexCoord(0,0); glVertex(x+1,y-1,z+1+radius);
+glTexCoord(1,0); glVertex(x-1,y-1,z+1+radius);
+glTexCoord(1,1); glVertex(x-1,y+1,z+1+radius);
+glTexCoord(0,1); glVertex(x+1,y+1,z+1+radius);
+
+glTexCoord(0,0); glVertex(x+1+radius,y-1,z-1);
+glTexCoord(1,0); glVertex(x+1+radius,y-1,z+1);
+glTexCoord(1,1); glVertex(x+1+radius,y+1,z+1);
+glTexCoord(0,1); glVertex(x+1+radius,y+1,z-1);
+
+glTexCoord(0,0); glVertex(x-1,y+1+radius,z-1);
+glTexCoord(1,0); glVertex(x+1,y+1+radius,z-1);
+glTexCoord(1,1); glVertex(x+1,y+1+radius,z+1);
+glTexCoord(0,1); glVertex(x-1,y+1+radius,z+1);
+
+glEnd();
+}
+
+notexcoords(radius)
+{
+x=0; y=0; z=0;
+glBegin(GL_QUADS); 
+
+ glVertex(x-1,y-1,z-1-radius);
+ glVertex(x+1,y-1,z-1-radius);
+ glVertex(x+1,y+1,z-1-radius);
+ glVertex(x-1,y+1,z-1-radius);
+
+ glVertex(x-1-radius,y-1,z+1);
+ glVertex(x-1-radius,y-1,z-1);
+ glVertex(x-1-radius,y+1,z-1);
+ glVertex(x-1-radius,y+1,z+1);
+
+ glVertex(x-1,y-1-radius,z+1);
+ glVertex(x+1,y-1-radius,z+1);
+ glVertex(x+1,y-1-radius,z-1);
+ glVertex(x-1,y-1-radius,z-1);
+
+ glVertex(x+1,y-1,z+1+radius);
+ glVertex(x-1,y-1,z+1+radius);
+ glVertex(x-1,y+1,z+1+radius);
+ glVertex(x+1,y+1,z+1+radius);
+
+ glVertex(x+1+radius,y-1,z-1);
+ glVertex(x+1+radius,y-1,z+1);
+ glVertex(x+1+radius,y+1,z+1);
+ glVertex(x+1+radius,y+1,z-1);
+
+ glVertex(x-1,y+1+radius,z-1);
+ glVertex(x+1,y+1+radius,z-1);
+ glVertex(x+1,y+1+radius,z+1);
+ glVertex(x-1,y+1+radius,z+1);
+
+glEnd();
+}

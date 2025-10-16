@@ -1,0 +1,226 @@
+// Pixelmorph 3D
+// written by Torbjoern, last update 3/7-2009
+enum{WIDTH=128, HEIGHT=32, STEPS=200}; // Image size and iterpolation steps
+static pixelstart[width*height][3]; // Start-off pos XYZ for all pixels
+static pixeltarg[width*height][3]; // Target vector XYZ for all pixels
+static pixelcol[width*height]; // Our image
+static pixelActive[width*height]; // is pixel to be part of image or skipped? true/false
+
+static tim; 
+static posx, posy, posz, posh, posv; // Camera pos and look-direction
+
+// Tweening
+static Alfa=0; // start tween
+static Beta=200.05; // end tween
+static positions[steps]; // values in range Alfa-Beta
+static dir=1; // tween direction
+static tweenPos = 0; // indexes the positions[] array
+static tweenSpeed = 30;
+
+static point[3]; // store rotation
+()
+{
+   if(numframes==0) setup();
+   cls(0); clz(1e32);
+   otim = tim; tim = klock(); dt = tim-otim;
+
+   UpdateTween(dt);
+   
+   // Get position in time from interpolated values array,
+   // the image will show when this equals steps
+   positionTime = positions[int(tweenPos)];
+     
+   // Go thru all pixels
+   for(i=0; i<width*height; i++){
+      if(pixelActive[i])
+      setmorph(i,positionTime); // set a pixel to a position in time (t)
+   }
+   
+   playercontrols(dt,&posx,&posy,&posz,&posh,&posv);
+   setcam(posx,posy,posz,posh,posv); 
+   
+   // Debug text
+   setcol(0xffffff); moveto(0,100); setfont(18,36);
+   printf("\ntweenPos:%g",tweenPos);
+   printf("\npositionTime=%g",positionTime);
+   printf("\nPoints on screen:%g",width*height);         
+}
+
+UpdateTween(dt)
+{
+   tweenPos += dir * dt * tweenSpeed;
+   // Make shure that we dont index the array
+   // at an illegal position
+   if(tweenPos >= STEPS-1){
+      dir =-dir; // Important. Array goes from 0-N, keep below N-1
+      tweenPos = STEPS-2; // tweenpos may be way over N-1 thanks to dt, so set it manually below.
+   }
+   else if(tweenPos < 1){
+      dir =-dir;
+      tweenPos = 1;
+   }
+}
+
+// Based on the direction vector in pixeltarg[]
+// and the pixelstart position
+// set the pixelsposition for a point t in time
+// the image is fully assembled when t equals steps
+setmorph(i, t)
+{
+   sx = pixelstart[i][0];
+   sy = pixelstart[i][1];
+   sz = pixelstart[i][2];
+   
+   tx = -pixeltarg[i][0] * t + sx;
+   ty = -pixeltarg[i][1] * t + sy;
+   tz = -pixeltarg[i][2] * t + sz;
+   
+
+   r=0,g=0,b=0; hex2rgb(pixelcol[i],r,g,b);
+   setcol(r*1.2,g*1.2,b*1.2); // extra bright colors, setcol(r,g,b) takes nums in 0-511 range
+   //setcol(pixelcol[i]);
+   //setpix(xres/2+tx-width/2,yres/2+ty-height/2); // draw 2d
+   
+   //rotPointY(tx,ty,0,tim*2); // Rotate points, turn this off if you wish
+   drawsph(tx+point[0],ty+point[1],tz,1);
+}
+
+// convert a hexadecimal colour value to RGB (0-255)
+// store RGB values in the passed RGB variables
+// & (ampersand) means "adress-of"
+hex2rgb(colrgb,&r,&g,&b)
+{  
+   r = (colrgb / 2^16);
+   g = (colrgb / 2^8) % 256;
+   b = colrgb % 256;   
+}
+
+// Rotate a point xyz phi radians around the y-axis
+// store the resulting pos in point[]
+rotPointY(x,y,z,phi)
+{
+   c = cos(phi);  s = sin(phi);
+   point[0] = x*c + z*-s;
+   point[1] = y;
+   point[2] = x*s+ z*c;   
+}
+
+// Setup function!
+// 1.
+// Store start pixelposition (for example a random position)
+// and also the final pixelposition when the image is
+// "assembled"
+// Divide the inbetween positions into a number of steps. Store in pixeltarg[]
+// 2.
+// Also, store the color of each pixel in the image
+// 3.
+// Save tween / interpolation positions to array for playback
+setup()
+{
+   i=0;
+   cls(0);
+   moveto(0,0);
+   setcol(255,255,255);
+   printf("HELLO EVERYBODY!");
+   
+   nposx = rnd*xres;
+   nposy = 15;
+   printf("\nHELLO DR. NICK!");   
+
+   for(y=0; y<height; y++)
+   for(x=0; x<width; x++)
+   {
+      // Set start and target positions
+      // Can be anything.
+      sx = rnd*10;
+      sy = rnd*10;
+      sz = 60;
+      
+      // Target position, when the pixel is at this position the image will be visible
+      tx = x-width/2;
+      ty = y-height/2;
+      tz = 50;
+      
+      pixelstart[i][0] = sx; 
+      pixelstart[i][1] = sy;
+      pixelstart[i][2] = sz;
+
+      // calc and store target vector
+      // source/method: Denthor of Asphyxias pixelmorph tutorial
+      // find it on gamedev.net
+      pixeltarg[i][0] = ((sx-tx))/steps;
+      pixeltarg[i][1] = ((sy-ty))/steps;
+      pixeltarg[i][2] = ((sz-tz))/steps;
+      
+
+      // Get the color of the onscreen pixel and store it
+      r=0; g=0; b=0;     
+      getpix(x,y,r,g,b);
+      pixelcol[i] = r*2^16+g*2^8+b;
+      if(r+g+b > 0) pixelActive[i] = 1;
+      i++; 
+
+   }
+
+   // Save tween positions
+   // I used Sols interpolation tutorial for this
+   // check out sol.gfxile.net
+   powerTween();
+   tweenPos = STEPS-2; // Start with explosion
+}
+
+// Camera and movement code taken from /games/
+//Handle input and player movement
+playercontrols(f,&posx,&posy,&posz,&posh,&posv)
+{
+   f *= 100;
+   if (keystatus[0x2a]) f /= 4;
+   if (keystatus[0x36]) f *= 4;
+   vx = (keystatus[0xcd]-keystatus[0xcb])*f; //Right-Left
+   vy = (keystatus[0xc8]-keystatus[0xd0])*f; //Up-Down
+   vx2 = (keystatus[32]-keystatus[30])*f; //D-A
+   vy2 = (keystatus[17]-keystatus[31])*f; //W-S
+   if(vx==0) vx=vx2;
+   if(vy==0) vy=vy2;   
+
+   vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   static mat[9]; ang2mat(posh,posv,mat);
+   nvx = mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   nvy = mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   nvz = mat[2]*vx + mat[5]*vz + mat[8]*vy;
+   
+   d = 1/12;
+   
+   x = posx+nvx;
+   y = posy+nvy;
+   z = posz+nvz;
+   posx = x; posy = y; posz = z;
+
+   if(bstatus==1)
+   {
+      readmouse(&mousx,&mousy);
+      posh += mousx*.01;
+      posv += mousy*.01;
+   }
+}
+ang2mat(hang,vang,mat[9])
+{
+   mat[6] = cos(vang)*sin(hang); mat[0] = cos(hang);
+   mat[7] = sin(vang);           mat[1] = 0;
+   mat[8] = cos(vang)*cos(hang); mat[2] =-sin(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}
+
+powerTween()
+{
+  for (i = 0; i < STEPS; i++)
+  {
+    v = i / STEPS; // range 0-1
+    v = v^5; // The higher the power, the slower the end accel
+    x = (Alfa * v) + (Beta * (1 - v));
+    positions[i] = x;
+  } 
+}
+

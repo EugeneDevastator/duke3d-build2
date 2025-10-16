@@ -1,0 +1,183 @@
+enum{MAX_PTS = 32}
+
+struct quad
+{
+   NW;
+   NE;
+   SW;
+   SE;
+   xmin, xmax;
+   ymin, ymax;
+   pts[MAX_PTS];
+   numpts;
+};
+
+
+enum{MAX_QUADS=128}
+static quad quads[MAX_QUADS];
+static numquads=0;
+
+struct point{
+   x,y;
+};
+
+static point points[MAX_PTS];
+static numpts = 0;
+
+()
+{
+
+   cls(0);
+   
+   if( bstatus == 1 )
+   {
+      bstatus=0;
+      if( numpts < MAX_PTS)
+      {
+         bstatus=0;
+         
+         points[numpts].x = mousx;
+         points[numpts].y = mousy;
+         numpts++;
+      }
+   }   
+
+
+   if( numpts > 2 )
+   {
+   
+   numquads = 0;
+   minx = points[0].x;
+   maxx = points[0].x;
+   miny = points[0].y;
+   maxy = points[0].y;
+   for(i=0; i<numpts; i++)
+   {
+      if( points[i].x < minx ) minx = points[i].x;
+      if( points[i].y < miny ) miny = points[i].y;
+      if( points[i].x > maxx ) maxx = points[i].x;
+      if( points[i].y > maxy ) maxy = points[i].y;
+   }   
+
+   initQuad(0,minx,miny,maxx,maxy);
+   for(i=0; i<numpts; i++){
+      quads[0].pts[i] = i;
+   }
+   quads[0].numpts = numpts;
+   numquads = 1;
+   
+   makeTree( 0 );
+   
+   }
+   
+
+   
+   setcol(0xff0000);
+   for(i=0; i<numquads; i++)
+   {
+      setcol(0xf95404);
+      drawrectopen( quads[i].xmin, quads[i].ymin, 
+                quads[i].xmax, quads[i].ymax );
+                
+      xmid = (quads[i].xmin + quads[i].xmax)/2; 
+      ymid = (quads[i].ymin + quads[i].ymax)/2;
+                
+      setcol(0x20ec25);
+      for(j=0; j<quads[i].numpts; j++)
+      {
+         idx = quads[i].pts[j];
+         moveto( xmid, ymid );
+         lineto( points[idx].x, points[idx].y );
+      }
+   }
+
+   setcol(0xffffff);
+   for(i=0; i<numpts; i++)
+   {
+      //setpix( points[i].x, points[i].y );
+      drawsph( points[i].x, points[i].y, -2 );
+   }
+
+   moveto(0,0); 
+   printf("%g of max %g quads\n", numquads, MAX_QUADS);
+   printf("%g of max %g points\n", numpts, MAX_PTS);
+   
+   if( numquads > MAX_QUADS-4 )
+   {
+      printf("ERROR: not enough space for quads\n");
+   }
+
+}
+
+makeTree( quadidx )
+{
+   if( quads[quadidx].numpts < 2 ) return;
+   if( numquads > MAX_QUADS-4) return;
+   
+   midx = (quads[quadidx].xmax+quads[quadidx].xmin) / 2.0;
+   midy = (quads[quadidx].ymax+quads[quadidx].ymin) / 2.0;
+   
+   minx = quads[quadidx].xmin;
+   miny = quads[quadidx].ymin;
+   maxx = quads[quadidx].xmax;
+   maxy = quads[quadidx].ymax;
+   
+   NW = numquads;
+   NE = numquads+1;
+   SW = numquads+2;
+   SE = numquads+3;
+   numquads = numquads + 4;
+
+   quads[quadidx].NW = NW;
+   quads[quadidx].NE = NE;
+   quads[quadidx].SW = SW;
+   quads[quadidx].SE = SE;
+   
+   initQuad(NW,minx,miny,midx,midy);
+   initQuad(NE,midx,miny,maxx,midy);
+   initQuad(SW,minx,midy,midx,maxy);
+   initQuad(SE,midx,midy,maxx,maxy);  
+
+   for(i=0; i<quads[quadidx].numpts; i++)
+   {
+      idx = quads[quadidx].pts[i];
+      if( points[idx].x >  midx && points[idx].y < midy) addPoint(NE,idx);
+      if( points[idx].x <= midx && points[idx].y < midy) addPoint(NW,idx);
+      if( points[idx].x <= midx && points[idx].y >= midy) addPoint(SW,idx);
+      if( points[idx].x >  midx && points[idx].y >= midy) addPoint(SE,idx);
+      
+      
+   }
+   
+   // Want to remove pts from all except leaf nodes?
+   quads[quadidx].numpts = 0;
+   
+   makeTree(NW);
+   makeTree(NE);
+   makeTree(SW);
+   makeTree(SE);
+}
+
+initQuad(quadidx,minx,miny,maxx,maxy)
+{
+   quads[quadidx].numpts = 0;
+   quads[quadidx].NW = -1;
+   quads[quadidx].NE = -1;
+   quads[quadidx].SW = -1;
+   quads[quadidx].SE = -1;
+   quads[quadidx].xmin = minx;
+   quads[quadidx].ymin = miny;
+   quads[quadidx].xmax = maxx;
+   quads[quadidx].ymax = maxy;
+}
+
+addPoint(quadidx,pt)
+{
+   if( quads[quadidx].numpts > MAX_PTS) return;
+   quads[quadidx].pts[ quads[quadidx].numpts ] = pt;
+   quads[quadidx].numpts++;
+}
+
+drawrectfill(x0,y0,x1,y1) { for(y=y0;y<y1;y++) { moveto(x0,y); lineto(x1,y); } }
+drawrectopen(x0,y0,x1,y1) { moveto(x0,y0); lineto(x1,y0); lineto(x1,y1); lineto(x0,y1); lineto(x0,y0); }
+

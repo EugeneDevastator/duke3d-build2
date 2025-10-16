@@ -1,0 +1,34 @@
+/*
+A little test to show how RSCript handles structs as values, not refs or pointers
+*/
+
+struct thingie_t
+{
+   x;
+};
+
+static thingie_t thingie_list[4];
+()
+{
+   cls(0);
+   
+   thingie_t a;
+   a.x = 42;
+   thingie_list[0] = a;
+   
+   moveto(0,0);
+   printf("%g\n", thingie_list[0].x);
+   
+   for(i=0; i<4; i++)
+   {
+      thingie_t p;
+      p = thingie_list[i]; // copy contents from struct in array into p
+      p.x = 100+i;
+      thingie_list[i] = p; // copy modified struct back into array
+      
+   }
+   
+   printf("%g\n", thingie_list[0].x);
+   
+   
+}

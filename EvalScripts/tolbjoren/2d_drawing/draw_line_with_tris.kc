@@ -1,0 +1,158 @@
+()
+{
+   cls(0);
+   
+   clz(1e32);  
+   
+   
+
+   static hsnd;
+   if ( numframes==0){
+      glEnable(GL_ALPHA_TEST); // supports alpha png. but not gradient :(
+      glDisable(GL_DEPTH_TEST);
+      glCullFace(GL_NONE);
+      //glCullFace(GL_BACK);
+      glsettex("dot.png");
+
+      
+   }
+   
+   cx = xres/2;
+   cy = yres/2;
+
+   rngx = 600;
+   srand(8);
+   for(i=0; i<25; i++){
+      x1 = cx + -rngx*.5 + rnd*rngx;
+      y1 = cy + -rngx*.5 + rnd*rngx;
+      x2 = cx + -rngx*.5 + rnd*rngx;
+      y2 = cy + -rngx*.5 + rnd*rngx;
+      
+      setcol(128+128*rnd,128+128*rnd,128+128*rnd);
+      drawline1(x1,y1,x2,y2);
+   }
+}
+
+rotate(&x,&y,a){
+   ca = cos(a);
+   sa = sin(a);
+   tmpx = ca * x - sa * y;
+   tmpy = sa * x + ca * y;
+   x = tmpx; y = tmpy; // copy transformed values back
+}
+
+drawline1(x1, y1, x2, y2)
+{  
+   dx = x2-x1;
+   dy = y2-y1;
+   a = atan2(dy,dx);
+   
+   w = sqrt( dx^2 + dy^2 );
+   h = .125*w;
+
+   v1x = 0;
+   v1y = -h/2;
+   
+   v2x = 0;
+   v2y = h/2;
+   
+   v3x = w;
+   v3y = h/2;
+   
+   v4x = w;
+   v4y = -h/2;
+   
+   x = x1;
+   y = y1;
+   
+   rotate(v1x, v1y, a);
+   rotate(v2x, v2y, a);
+   rotate(v3x, v3y, a);
+   rotate(v4x, v4y, a);
+   
+
+   glBegin(GL_QUADS);
+   
+   glTexcoord(0,0);
+   glVertex( x+v1x, y+v1y );
+   
+   glTexcoord(0,1);
+   glVertex( x+v2x, y+v2y );
+   
+   glTexcoord(1,1);
+   glVertex( x+v3x, y+v3y );
+   
+   glTexcoord(1,0);
+   glVertex( x+v4x, y+v4y );
+   
+   glEnd();
+
+   
+   setcol(0,255,05);
+   
+   moveto( x+v1x, y+v1y );
+   lineto( x+v2x, y+v2y );
+   lineto( x+v3x, y+v3y );
+   lineto( x+v4x, y+v4y );
+   lineto( x+v1x, y+v1y );
+}
+
+
+drawline2(x1, y1, x2, y2)
+{
+
+   dx = x2-x1;
+   dy = y2-y1;
+
+   length = sqrt( dx^2 + dy^2 );   
+
+   // perp
+   
+   perp_x = -dy;
+   perp_y = dx;
+   if ( length ){
+      perp_x /= length;
+      perp_y /= length;
+   }
+   
+   width_scale = .125*length;
+   
+   perp_x *= width_scale;
+   perp_y *= width_scale;
+
+   v1x = x1 + perp_x*.5;
+   v1y = y1 + perp_y*.5;
+   
+   v2x = x2 + perp_x*.5;
+   v2y = y2 + perp_y*.5;
+   
+   v3x = x2 - perp_x*.5;
+   v3y = y2 - perp_y*.5;
+   
+   v4x = x1 - perp_x*.5;
+   v4y = y1 - perp_y*.5;
+   
+
+   glBegin(GL_QUADS);
+      glTexcoord(1,1);
+      glVertex( v1x, v1y );
+      
+      glTexcoord(0,1);
+      glVertex( v2x, v2y );
+      
+      glTexcoord(0,0);
+      glVertex( v3x, v3y );
+      
+      glTexcoord(1,0);
+      glVertex( v4x, v4y );
+   glEnd();
+
+ 
+   
+   setcol(0,255,05);
+   moveto( v1x, v1y );
+   lineto( v2x, v2y );
+   lineto( v3x, v3y );
+   lineto( v4x, v4y );
+   lineto( v1x, v1y );
+}

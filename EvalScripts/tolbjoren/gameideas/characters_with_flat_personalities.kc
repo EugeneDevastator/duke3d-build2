@@ -1,0 +1,301 @@
+struct vec{ x,y,z; }
+static mtx[9];
+()
+{
+   static time, oldtime, delta;
+   time = klock(0);
+   delta = time - oldtime;
+   oldtime = time;
+
+   static tex0;
+   static tex_char[2];
+   static tex_char_back[2];
+   if (numframes==0)
+   {
+      tex0 = glsettex("cloud.png");
+      tex_char[0] = glsettex("sprites/firion_w1.png");
+      tex_char[1] = glsettex("sprites/firion_w2.png");
+      
+      tex_char_back[0] = glsettex("sprites/firion_b1.png");
+      tex_char_back[1] = glsettex("sprites/firion_b2.png");
+   }
+
+
+   static vec target;
+   if (numframes==0 )
+   {
+      vecset(target,0,-1,0);
+   }
+   
+   static dir = 0;
+   d_forward = keystatus[200] - keystatus[208];
+   d_turn = keystatus[205] - keystatus[203];
+   
+   dir += d_turn * delta * PI; // allow to rotate 90* pr sec
+   
+   vec dirvec, dirvec2, backdir;
+   vecset( dirvec, cos(dir), 0.0, sin(dir) );
+   dir2 = dir+PI/2;
+   vecset( dirvec2, cos(dir2), 0.0, sin(dir2) );
+   vecscalar( backdir, dirvec2, -1.0);
+   
+   if ( fabs(d_forward) )
+   {
+      walk_speed = 1.5; // 1.5 meters per second
+      vec move_delta;
+      vecscalar(move_delta, dirvec, delta*d_forward*walk_speed );
+      vecadd( target, target, move_delta );
+   }
+
+   cls(0x40b8ff); clz(1e32);
+
+   vec eye, worldUp;
+   vecset(eye,1,-2,-2);   
+   vecset(worldUp,0,1,0);
+
+   //lookAt(vec eye, vec pos, vec worldup, mtx[9])
+   lookAt( eye, target, worldUp, mtx );
+   setcam2( eye, mtx );
+
+   
+   //glCullface(GL_NONE); // not actual gl
+   glCullface(GL_BACK);
+   glEnable(GL_ALPHA_TEST);
+   
+   vec pos, normal;
+
+   vecset(pos, 0,0,0);
+   vecset(normal, 0,1,0);
+   glsettex(tex0);
+   drawplane( pos, normal, 25 );
+   
+   
+   //vecset(normal, 0,0,1);
+   
+   veccross( normal, dirvec2, worldUp);
+   glsettex( tex_char[ int( 1 + sin( fabs(d_forward) * 10*time) ) ] );
+   drawplane( target, normal, 1 );
+   
+   veccross( normal, backdir, worldUp);
+   glsettex( tex_char_back[ int( 1 + sin( fabs(d_forward) * 10*time) ) ] );
+   drawplane( target, normal, 1 );
+}
+
+drawplane(vec pos, vec normal, radius)
+{   
+   // Create two vectors a and c, perpendicular to normal
+   vec not_normal;
+   vecset(not_normal, normal);
+   
+   vec perp;
+   vecset( perp, normal );
+   if (not_normal.x == 0 && not_normal.z == 0){
+      not_normal.x += 1;
+   }else{
+      not_normal.y += 1;
+   }
+   
+   vec a, b;
+   veccross(a,perp,not_normal);
+   normalize(a);
+   veccross(b,perp,a);
+    
+   
+   // scale a and b down to 1/2 as we will use
+   // them in +- dir
+   vecscalar(a,a,0.5 * radius);
+   vecscalar(b,b,0.5 * radius);
+   
+   // Create plane vertices from perpendiculars
+   vec neg_a, neg_b;
+   vecscalar(neg_a, a, -1.0);   
+   vecscalar(neg_b, b, -1.0);
+
+   vec ma_mb; // -a - b
+   vec ma_pb; // -a + b
+   vec pa_pb; //  a + b
+   vec pa_mb; //  a - b
+   
+   vecadd( ma_mb, neg_a, neg_b);
+   vecadd( ma_pb, neg_a, b);
+   vecadd( pa_pb, a, b);
+   vecadd( pa_mb, a, neg_b);
+
+   vec u0, u1, u2, u3;
+   vecset(u0, ma_mb);
+   vecset(u1, ma_pb);
+   vecset(u2, pa_pb);
+   vecset(u3, pa_mb);
+
+   // Translate to final position
+   vecadd(u0,pos,u0);
+   vecadd(u1,pos,u1);
+   vecadd(u2,pos,u2);
+   vecadd(u3,pos,u3);
+
+//#define SHOW_VECTORS
+#ifdef SHOW_VECTORS
+   vec end;
+   vecadd(end, pos, normal);
+
+   setcol(255,0,0);
+   drawArrow(pos, end, 0.03);
+
+
+   
+   vecadd(end, pos, a);
+   setcol(0,255,0);
+   drawArrow( pos, end, 0.03);
+   
+   vecadd(end, pos, b);
+   setcol(0,0,255);
+   drawArrow( pos, end, 0.03);
+#endif
+   
+   setcol(255,255,255);
+   
+   glBegin(GL_QUADS);
+      glTexcoord(0,1* radius);
+      glVertex( u0 );   
+      glTexcoord(0,0);
+      glVertex( u1 );
+      glTexcoord(1* radius,0);
+      glVertex( u2 );
+      glTexcoord(1* radius,1* radius);
+      glVertex( u3 );
+   glEnd();
+
+/*
+   glBegin(GL_LINE_LOOP);
+      glTexcoord(0,0);
+      glVertex( u0 );   
+      glTexcoord(0,1);
+      glVertex( u1 );
+      glTexcoord(1,1);
+      glVertex( u2 );
+      glTexcoord(1,0);
+      glVertex( u3 );
+   glEnd();
+*/   
+
+}
+
+glVertex( vec v ){
+   glVertex( v.x, v.y, v.z );
+}
+
+setcam2( vec p, m[9] )
+{
+   setcam(p.x, p.y, p.z,
+          m[0], m[1], m[2],
+          m[3], m[4], m[5],
+          m[6], m[7], m[8]);
+}
+
+lookAt(vec eye, vec pos, vec worldup, mtx[9])
+{
+   vec fwd;
+   vec up;
+   vec side;
+   
+   // find forward dir
+   vecsub( fwd, pos, eye );
+   normalize(fwd);
+   
+   // find up vector as close to world up as possible   
+   dotprod = vecDot(worldUp,fwd);
+   static part2[3];
+   vecscalar( part2, fwd, dotprod);
+   
+   vecsub(up, worldUp, part2);
+   normalize(up);
+
+   static side[3];
+   vecCross(side,fwd,up);
+   normalize(side);
+  
+   buildMatrix( mtx, side, up, fwd ); 
+}
+
+drawArrow(vec s, vec e, scale) // finds direction vector e-s.
+{
+   //moveto(s.x,s.y,s.z);
+   //lineto(e.x,e.y,e.z);
+   vec dir;
+   vecSub(dir, e, s); 
+   
+   arrowlen = length(dir);
+   if(arrowlen < .1) return; // dont draw small arrows.
+   
+   polelen = arrowlen * 0.75;
+   pointerlen = arrowlen - polelen; // not used...
+   normalize(dir);
+   
+   r1=scale;
+   drawcone(s.x,s.y,s.z,r1,
+            s.x+dir.x*polelen,s.y+dir.y*polelen,s.z+dir.z*polelen,r1,DRAWCONE_NOCAP1 );         
+   drawcone(s.x+dir.x*polelen,s.y+dir.y*polelen,s.z+dir.z*polelen, -r1*3, 
+            e.x, e.y, e.z, 0.01,DRAWCONE_CENT);
+   
+}
+
+vecScalar( vec out, vec a, s )
+{
+   out.x = a.x * s;
+   out.y = a.y * s;
+   out.z = a.z * s;
+}
+
+vecAdd( vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;   
+}
+vecSub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;   
+}
+
+vecCross( vec out, vec a, vec b)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+
+vecset(vec a, x,y,z){
+   a.x = x; a.y = y; a.z = z;
+}
+
+vecset(vec a, vec other){
+   a.x = other.x; a.y = other.y; a.z = other.z;
+}
+
+vecDot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+length( vec v )
+{
+   return sqrt( vecdot(v,v) );
+}
+
+normalize( vec v )
+{
+   len = length(v);
+   if ( len )
+   {
+      v.x /= len; v.y /= len; v.z /= len;
+   }
+}
+
+buildMatrix( mtx[9], vec side, vec up, vec fwd )
+{
+   mtx[0] = side.x; mtx[1] = side.y; mtx[2] = side.z;
+   mtx[3] = up.x;   mtx[4] = up.y;   mtx[5] = up.z;
+   mtx[6] = fwd.x;  mtx[7] = fwd.y;  mtx[8] = fwd.z;
+}

@@ -1,0 +1,818 @@
+/*
+   TODO
+   -friction
+   -water
+   -let the user create and save shapes
+   -3d :) if it so only uses sphere collision. sphere plane could be something. 
+   -verlets are lightweight (?) so, they could be used for simple phys objs.
+   -clean code! remove magic numbers.
+   -a way to find the angle of rotation of a body so sprites can be rotated.
+   
+   -added a "planet" ... works by moving the verts towards it.
+   to prevent the "planet" sphere from spinning it is simply ignored by verlet integrator.
+   only collision is active.  
+*/
+
+enum{MAXVERTS=512}
+static px[MAXVERTS];
+static py[MAXVERTS];
+static opx[MAXVERTS];
+static opy[MAXVERTS];
+static ax[MAXVERTS];
+static ay[MAXVERTS];
+static vertParent[MAXVERTS];
+static pointCount = 0;
+
+enum{MAXEDGES=1024}
+static edgeV1[MAXEDGES];
+static edgeV2[MAXEDGES];
+static edgeOriginalLength[MAXEDGES];
+static edgeParent[MAXEDGES];
+static edgeCount = 0;
+
+enum{MAX_BODIES = 100}
+enum{MAX_BODY_VERTS = 40, MAX_BODY_EDGES = 40}
+static physBodyVertCount[MAX_BODIES];
+static physBodyEdgeCount[MAX_BODIES];
+static physBodyVerts[MAX_BODIES][MAX_BODY_VERTS];
+static physBodyEdges[MAX_BODIES][MAX_BODY_EDGES];
+static physBodyCenterX[MAX_BODIES];
+static physBodyCenterY[MAX_BODIES];
+static bodyCount = 0;
+static bodyCollided[MAX_BODIES];
+static bbminx[MAX_BODIES];
+static bbmaxx[MAX_BODIES];
+static bbminy[MAX_BODIES];
+static bbmaxy[MAX_BODIES];
+
+
+static timeStep = 1; // must be high!
+static phys_iterations = 10;
+
+static xmin,xmax,ymin,ymax;
+
+static error = 0; // global that is set to 1 if something should go bump in the night
+
+// added for collision normal info
+static minDistance = 0;
+static collisionDepth = 0;
+static collisionNormalx = 0;
+static collisionNormaly = 0;
+static collisionEdge = -1;
+static collisionVert = -1;
+
+static gravity = 0; //0.0005
+static controlX, controlY;
+static player1 = -1;
+
+static planetTex = -1, moonTex = -1;
+static sphereBody = -1, earthCenter = -1;
+static moonBody = -1, moonCenter = -1;
+
+static paused = -1;
+
+/*
+static gameTime = 0;
+static fps = 60;
+static renderTime;
+static dt;
+static timePerFrame;
+static timePassed = 0;
+static tics = 0;
+*/
+
+static gametime = 0;
+static time,dt,execution_time;
+static TICKTIME;
+static UPDATE_TIME = 100*1;
+()
+{
+   cls(0);
+   TICKTIME = 1.0/UPDATE_TIME;
+   
+   if(numframes==0)
+   {
+      time = klock(0);
+   }
+   
+   if(numframes==0)
+   {
+      // Sprite
+      glCullFace(GL_BACK); 
+      glenable(GL_ALPHA_TEST); //glDisable(GL_ALPHA_TEST);
+      glDisable(GL_DEPTH_TEST);
+      
+      planetTex= glsettex("planetearth.jpg");
+      moonTex= glsettex("moon_90.png");  
+
+      xmin = 10;
+      xmax = xres-10;
+      ymin = 10;
+      ymax = yres-10;   
+
+      player1 = makeBox(xres/2,10, 10,10);
+      
+      // fill 1/2 screen with boxes
+      xpos = xmin;
+      ypos = 5*yres/100;
+      boxSz = 10;
+      
+      boxesWidth = xmax/boxSz;
+      
+      for(i=0; i<40; i++)
+      {
+         makeBox(xpos,ypos,boxSz,boxSz);
+         //foo = createVert(xpos,ypos);
+         //foo = -1;
+         //createSphere(xpos,ypos,boxSz*0.5,foo);
+         xpos += boxSz*2;
+         if(xpos+boxSz > xmax)
+         {
+            xpos = xmin;
+            ypos += boxSz*1.5;
+         } 
+      }
+      sphereBody = createSphere(xres/2, 50*yres/100, 50,earthCenter); 
+      moonBody = createSphere(25*xres/100, 50*yres/100, 25,moonCenter); 
+   }  
+   
+   // calc player speed in pixels per frame
+   centX = physBodyCenterX[player1];
+   centY = physBodyCenterY[player1];
+   v = physBodyVerts[player1][0];
+   //moveto(px[v], py[v]);
+   setcol(0xffffff); 
+   moveto(centX, centY);
+   spdPPF = sqrt( (px[v]-opx[v])^2 + (py[v]-opy[v])^2 );
+   printf("im a playa.");
+   printf("\nspd ppf: %.5f",spdPPF);
+
+
+   if( paused != 1 )
+   {
+      numloops=0;
+      
+      dt = klock(0) - time;
+      time = klock(0);
+      execution_time += dt;
+      
+      while(execution_time >= TICKTIME)
+      {
+         physicsUpdate();  
+         execution_time -= TICKTIME;
+         numloops++;
+         gametime += TICKTIME;
+      }
+   }
+    
+   // draw sprites on bottom
+   //drawSprites();
+   
+   
+   controls();
+   
+   drawBodies();  
+   
+   setcol(0xffffff);
+   moveto(0,0); printf("error: %g",error);
+   printf("\npointCount: %g/%g",pointCount,MAXVERTS);
+   printf("\nedgeCount: %g/%g",edgeCount,MAXEDGES);
+   printf("\nbodyCount: %g/%g",bodyCount,MAX_BODIES);
+   
+   printf("\nDelta timing stuff:");
+   printf("\n         %.5f gametime",gametime);
+   printf("\n         %g numloops", numloops);
+   printf("\n                  1000*dt:     %.5f", 1000*dt);
+   
+   /*
+   printf("\ncollisionDepth: %.3f",collisionDepth);
+   printf("\nminDistance:     %g",minDistance);
+   printf("\ncnx:     %.3f",collisionNormalx);
+   printf("\ncny:     %.3f",collisionNormaly);
+   */
+}
+
+controls(){
+   controlX = keystatus[205] - keystatus[203]; // r-l
+   controlY = keystatus[208] - keystatus[200]; // down-up
+   
+   if(keystatus[57])
+   {
+      keystatus[57] = 0;
+      paused *= -1;
+   }
+}
+
+physicsUpdate(){
+   if(paused != 1)
+   {
+      updateForces();
+      updateVerlet();
+      IterateCollisions();
+   }
+}
+
+updateForces(){
+ for(i=0; i<pointCount; i++){
+    
+    ay[i] = gravity;
+    
+    if( i== earthCenter)
+    {
+
+       px[i] = xres/2;
+       py[i] = 50*yres/100;  
+    }
+    else if(i==moonCenter)
+    {
+       t = gametime/8 - PI;
+       tx = cos( t )*(25*xres/100);
+       ty = sin( t )*(25*xres/100);
+       px[i] = xres/2+tx;
+       py[i] = yres/2+ty;
+    }
+    else
+    {
+       if(vertParent[i]==player1)
+       {
+       px[i]+=controlX*.01;
+       py[i]+=controlY*.01;
+    }
+    
+    //a = atan2( mousy-py[i], mousx-px[i] );
+    // need to calc for every one?
+    a = atan2( py[earthCenter]-py[i], px[earthCenter]-px[i] );
+    dist = (  (px[earthCenter]-px[i])^2 + (py[earthCenter]-py[i])^2 );
+    px[i] += cos(a) * 0.01 * 4000/dist;
+    py[i] += sin(a) * 0.01 * 4000/dist;
+    
+    a = atan2( py[moonCenter]-py[i], px[moonCenter]-px[i] );
+    dist = (  (px[moonCenter]-px[i])^2 + (py[moonCenter]-py[i])^2 );
+    px[i] += cos(a) * 0.01 * 1700/dist;
+    py[i] += sin(a) * 0.01 * 1700/dist;
+    
+    opx[i] += (px[i]-opx[i]) /1500;
+    opy[i] += (py[i]-opy[i]) /1500;
+    }
+ }
+}
+IterateCollisions(){
+for(i=0; i<phys_iterations; i++)
+{
+   for(j=0; j<pointCount; j++)
+   {
+   if(px[j] < xmin) px[j] = xmin;
+   if(px[j] > xmax) px[j] = xmax;      
+   if(py[j] < ymin) py[j] = ymin;
+   if(py[j] > ymax) {py[j] = ymax;}
+   }
+   
+   updateEdges(); 
+   
+   // calc center point of body
+   for(i=0; i<bodyCount; i++)
+   {
+      physBodyCenterX[i] = 0;
+      physBodyCenterY[i] = 0;
+      bbminx[i] = 1e32;
+      bbminy[i] = 1e32;
+      bbmaxx[i] = 1e-32;
+      bbmaxy[i] = 1e-32;      
+
+      for(j=0; j<physBodyVertCount[i]; j++)
+      {
+         // edges come in pairs. the physBodyEdges array points to e1 and e2
+         v = physBodyVerts[i][j];                  
+         physBodyCenterX[i] += px[v];
+         physBodyCenterY[i] += py[v];
+         
+         bbminx[i] = min( bbminx[i], px[v] );
+         bbminy[i] = min( bbminy[i], py[v] );
+         bbmaxx[i] = max( bbmaxx[i], px[v] );
+         bbmaxy[i] = max( bbmaxy[i], py[v] );
+      }   
+      physBodyCenterX[i] /= physBodyVertCount[i];
+      physBodyCenterY[i] /= physBodyVertCount[i];    
+   }
+
+   checkCollision();
+}
+}
+updateVerlet()
+{
+   setcol(0xffffff);
+   for(i=0; i<pointCount; i++)
+   {
+      
+      //if(vertParent[i] != sphereBody && vertParent[i] != moonBody) // hack
+      {
+      tmpx = px[i];
+      tmpy = py[i];
+      px[i] += px[i] - opx[i]; //+ ax[i]*timeStep^2;
+      py[i] += py[i] - opy[i]; //+ ay[i]*timeStep^2;
+      opx[i] = tmpx;
+      opy[i] = tmpy;                
+      }
+      
+   }   
+}
+updateEdges(){
+   for(i=0; i<edgeCount; i++)
+   {
+      edgeV1x = px[edgeV1[i]];  
+      edgeV1y = py[edgeV1[i]];  
+
+      edgeV2x = px[edgeV2[i]];  
+      edgeV2y = py[edgeV2[i]]; 
+
+      // Calculate vector
+      v1v2x = edgeV2x-edgeV1x;
+      v1v2y = edgeV2y-edgeV1y;
+      v1v2length = sqrt( v1v2x^2 + v1v2y^2 );
+      // Calc difference from original length
+      diff = v1v2length - edgeOriginalLength[i];
+      
+      // normalize v1v2
+      v1v2x /= v1v2length;
+      v1v2y /= v1v2length;
+      
+      // Put both vertices apart by half of the differance respectively
+      edgeV1x += v1v2x*diff*0.5;
+      edgeV1y += v1v2y*diff*0.5;
+      edgeV2x -= v1v2x*diff*0.5;
+      edgeV2y -= v1v2y*diff*0.5;
+            
+      // copy constrained values back into points.
+      px[edgeV1[i]] = edgeV1x;
+      py[edgeV1[i]] = edgeV1y;
+      
+      px[edgeV2[i]] = edgeV2x;
+      py[edgeV2[i]] = edgeV2y;
+   }
+}
+drawSprites()
+{
+   // Draw planet sprite in the middle of the screen.
+   setcol(0xffffff);
+   t = glsettex(planetTex); drawspr(px[earthCenter], py[earthCenter], 75, 0+gametime/4); glremovetex(t);  
+   // MOON
+   t = glsettex(moonTex); drawspr(px[moonCenter], py[moonCenter], 28, 0); glremovetex(t); 
+}
+drawBodies()
+{
+   for(i=0; i<bodyCount; i++)
+   {
+      if(i==player1) setcol(0xffff00);
+      else setcol(0xff0000); 
+      
+      if(i==sphereBody || i==moonBody)
+      {
+        //continue; // dont draw lines, futher up a planet sprite is used
+      }     
+
+      for(j=0; j<physBodyEdgeCount[i]; j++)
+      {
+         // edges come in pairs. the physBodyEdges array points to e1 and e2
+         e1 = edgeV1[ physBodyEdges[i][j] ];   
+         e2 = edgeV2[ physBodyEdges[i][j] ];
+         // find point using edge indice
+         edgeV1x = px[e1]; edgeV1y = py[e1];       
+         edgeV2x = px[e2]; edgeV2y = py[e2];        
+         
+         moveto( edgeV1x, edgeV1y );
+         lineto( edgeV2x, edgeV2y );
+
+         
+         //if(bodyCollided[i]==1)
+         //   drawsph(edgeV2x, edgeV2y,3);
+         //else drawsph(edgeV2x, edgeV2y,-3);
+      }   
+      //moveto( physBodyCenterX[i], physBodyCenterY[i]-60 );
+      //printf("%.0f",i);     
+   }
+   if( collisionVert > -1 )
+   {
+      setcol(0xffff00);
+      x = px[collisionVert]; y = py[collisionVert];
+      drawsph(x,y,2);
+   }
+}
+
+// make a rope at x,y with a number of segments with dist between each
+makeRope(x1,y1,x2,y2,segments) // perhaps specify a normal in dir segs are created initially.
+{
+   dx = x2 - x1;
+   dy = y2 - y1;
+   len = sqrt(dx*dx + dy*dy);
+   dx /= len;
+   dy /= len;
+   delta = len / segments;
+
+   p1 = createVert(x1,y1);
+   physBodyVerts[bodyCount][0] = p1;   
+   ropeIdx = p1;
+
+   for(i=1; i<segments; i++)
+   {
+      p2 = createVert(x1 + dx * delta * i,y1 + dy * delta * i);
+      physBodyVerts[bodyCount][i] = p2;
+      
+      e = createContraint(p1,p2,bodyCount);
+      physBodyEdges[bodyCount][i-1] = e;
+
+      p1 = p2;
+   }
+   
+   physBodyVertCount[bodyCount] = segments;    
+   physBodyEdgeCount[bodyCount] = segments-1;
+   bodyCount++;  
+   return ropeIdx;
+}
+createSphere(tx,ty,r,&center) // sphere with a center axle vert. pass in pointer to center vert
+{
+   enum{segments = 11} // must be odd
+   static vtxList[segments];
+   
+   center = createVert(tx,ty);
+   vertParent[center] = bodyCount;
+   physBodyVerts[bodyCount][0] = center;
+   physBodyVertCount[bodyCount]++;
+   
+   // Create verts, add to list
+   for(i=0; i<segments; i++)
+   {
+      x = tx+cos(i*2*PI/(segments-1))*r;
+      y = ty+sin(i*2*PI/(segments-1))*r;
+      v = createVert(x,y);
+      vertParent[v] = bodyCount;
+      vtxList[i+1] = v;
+      physBodyVerts[bodyCount][i+1] = v;
+      physBodyVertCount[bodyCount]++;
+      
+   }
+   
+   // connect each vert to center vert (make wheel spokes)
+   bodyEdges = 0;
+   for(i=0; i<segments; i++)
+   { 
+      v = vtxList[i]; 
+      e = createContraint(v,center,bodyCount); 
+      physBodyEdges[bodyCount][bodyEdges] = e; bodyEdges++;
+      physBodyEdgeCount[bodyCount]++;      
+   }
+   
+   // attach each outer vert to its neighbour
+   for(i=0; i<segments-1; i++)
+   {
+      v1 = vtxList[i+0]; 
+      v2 = vtxList[i+1];
+      e = createContraint(v1,v2,bodyCount);
+      
+      physBodyEdges[bodyCount][bodyEdges] = e; bodyEdges++;
+      physBodyEdgeCount[bodyCount]++;
+   }
+   
+   v1 = vtxList[0]; 
+   v2 = vtxList[segments-1];
+   e = createContraint(v1,v2,bodyCount);
+   
+   physBodyEdges[bodyCount][bodyEdges] = e; bodyEdges++;
+   physBodyEdgeCount[bodyCount]++;
+      
+  
+
+         
+   bodyCount++; 
+   return bodyCount-1;     
+}
+createSphere2(tx,ty,r)
+{
+   enum{segments = 21} // must be odd
+   static vtxList[segments];
+
+   for(i=0; i<segments; i++)
+   {
+      x = tx+cos(i*2*PI/(segments-1))*r;
+      y = ty+sin(i*2*PI/(segments-1))*r;
+      v = createVert(x,y);
+      vtxList[i] = v;
+      physBodyVerts[bodyCount][i] = v;
+      physBodyVertCount[bodyCount]++;
+      
+   }
+   
+   bodyEdges = 0;
+   for(i=0; i<segments-1; i++)
+   {
+      v1 = vtxList[i+0]; 
+      v2 = vtxList[i+1];
+      e = createContraint(v1,v2,bodyCount);
+      
+      physBodyEdges[bodyCount][bodyEdges] = e; bodyEdges++;
+      physBodyEdgeCount[bodyCount]++;
+      
+      if(i<segments/2)
+      {
+         v1 = vtxList[i]; 
+         v2 = vtxList[ i+(segments-1)/2 ];
+         e = createContraint(v1,v2,bodyCount);      
+         physBodyEdges[bodyCount][bodyEdges] = e; bodyEdges++;
+         physBodyEdgeCount[bodyCount]++;
+      }
+      
+   }
+   v1 = vtxList[0]; 
+   v2 = vtxList[segments-2];
+   e = createContraint(v1,v2,bodyCount);
+   
+   physBodyEdges[bodyCount][bodyEdges] = e; bodyEdges++;
+   physBodyEdgeCount[bodyCount]++;
+         
+   bodyCount++; 
+   return bodyCount-1;     
+}
+makeBox(x,y,w,h){
+   v1 = createVert(x,y);
+   v2 = createVert(x+w,y);
+   v3 = createVert(x+w,y+h);
+   v4 = createVert(x,y+h);
+   e1 = createContraint(v1,v2,bodyCount);
+   e2 = createContraint(v2,v3,bodyCount);
+   e3 = createContraint(v3,v4,bodyCount);
+   e4 = createContraint(v4,v1,bodyCount);
+   
+   e5 = createContraint(v1,v3,bodyCount);
+   e6 = createContraint(v2,v4,bodyCount);   
+
+   physBodyVertCount[bodyCount] = 4;
+   physBodyEdgeCount[bodyCount] = 6;
+   physBodyVerts[bodyCount][0] = v1;
+   physBodyVerts[bodyCount][1] = v2;
+   physBodyVerts[bodyCount][2] = v3;
+   physBodyVerts[bodyCount][3] = v4;
+      
+
+   physBodyEdges[bodyCount][0] = e1;
+   physBodyEdges[bodyCount][1] = e2;
+   physBodyEdges[bodyCount][2] = e3;
+   physBodyEdges[bodyCount][3] = e4; 
+   physBodyEdges[bodyCount][4] = e5;
+   physBodyEdges[bodyCount][5] = e6;
+   bodyCount++;
+   return bodyCount-1;
+}
+makeBox2(x,y,w,h){
+      v1x = x-w/2;
+      v1y = y-h/2;
+
+      v2x = x-w/2;
+      v2y = y+h/2;
+
+      v3x = x+w/2;
+      v3y = y+h/2;
+      
+      v4x = x+w/2;
+      v4y = y-h/2;
+      
+      v5x = x; v5y = y;   
+
+      p1 = createVert(v1x,v1y);
+      p2 = createVert(v2x,v2y);
+      p3 = createVert(v3x,v3y);
+      p4 = createVert(v4x,v4y);
+      p5 = createVert(v5x,v5y);
+      
+      e1 = createContraint(p1,p2,bodyCount);
+      e2 = createContraint(p2,p3,bodyCount);
+      e3 = createContraint(p3,p4,bodyCount);
+      e4 = createContraint(p4,p1,bodyCount);
+      
+      // crossbars
+      e5 = createContraint(p1,p5,bodyCount);
+      e6 = createContraint(p2,p5,bodyCount);
+      e7 = createContraint(p3,p5,bodyCount); 
+      e8 = createContraint(p4,p5,bodyCount); 
+      
+      physBodyVertCount[bodyCount] = 5;
+      physBodyEdgeCount[bodyCount] = 8; // 8
+      physBodyVerts[bodyCount][0] = p1;
+      physBodyVerts[bodyCount][1] = p2;
+      physBodyVerts[bodyCount][2] = p3;
+      physBodyVerts[bodyCount][3] = p4;
+      physBodyVerts[bodyCount][4] = p5;
+      
+      physBodyEdges[bodyCount][0] = e1;
+      physBodyEdges[bodyCount][1] = e2;
+      physBodyEdges[bodyCount][2] = e3;
+      physBodyEdges[bodyCount][3] = e4;
+      
+      physBodyEdges[bodyCount][4] = e5;
+      physBodyEdges[bodyCount][5] = e6;
+      physBodyEdges[bodyCount][6] = e7;
+      physBodyEdges[bodyCount][7] = e8;
+      bodyCount++;
+      
+      return p5;
+}
+createVert(x,y){
+   px[pointCount] = x;
+   py[pointCount] = y;
+   opx[pointCount] = x;
+   opy[pointCount] = y;
+   ax[pointCount] = 0;
+   ay[pointCount] = 0;
+   vertParent[pointCount] = bodyCount; // make sure bodycount is only inc when obj is finito
+   pointCount++;
+   return pointCount-1;
+}
+createContraint(p1,p2,parent){
+   edgeV1[edgeCount] = p1;
+   edgeV2[edgeCount] = p2;
+   edgeParent[edgeCount] = parent; 
+
+   edgeOriginalLength[edgeCount] = sqrt( (px[p1]-px[p2])^2 + (py[p1]-py[p2])^2 );
+
+   edgeCount++;
+   return edgeCount-1;
+}
+// 2d projection is the dot product of the projection axis and the point we want to proj.
+projectToAxis(bodyIdx, axisx, axisy, &min, &max)
+{
+   dotP = axisx * px[physBodyVerts[bodyIdx][0]] + axisy * py[physBodyVerts[bodyIdx][0]];
+   
+   // Set max and min values to proj of 1st vert
+   min = dotP;
+   max = dotP;
+   
+   for(i=1; i<physBodyVertCount[bodyIdx]; i++)
+   {
+      dotP = axisx * px[physBodyVerts[bodyIdx][i]] + axisy * py[physBodyVerts[bodyIdx][i]];
+      min = min( dotP, min );  
+      max = max( dotP, max );  
+   }
+}
+
+checkCollision(){
+   for(a=0; a<bodyCount; a++)
+   {
+      bodyCollided[a] = 0; // reset collision
+      for(b=a+1; b<bodyCount; b++)
+      {
+         if( boundsOverlap(a,b) )
+         if( detectCollision2(a,b) )
+         {
+            bodyCollided[a] = 1;
+            processCollision();   
+         } 
+      }
+   }
+}
+
+boundsOverlap(a,b)
+{
+   return bbminx[a] <= bbmaxx[b] && bbminy[a] <= bbmaxy[b] &&
+          bbmaxx[a] >= bbminx[b] && bbmaxy[a] >= bbminy[b]
+      
+}
+
+detectCollision2(body1, body2){
+   minDistance = 10000.0; // init the length of the collision vector to a large value
+   // just a fancy way of iterating through all edges of both bodies at once
+   for(i=0; i<(physBodyEdgeCount[body1] + physBodyEdgeCount[body2]); i++)
+   {
+      edge = -1;
+      // we are looping thru all edges, make sure we index the
+      // one belonging to the right body.
+      if( i < physBodyEdgeCount[body1] ) 
+      {
+         edge = physBodyEdges[body1][ i ];
+      }
+      else
+      {
+         edge = physBodyEdges[body2][i-physBodyEdgeCount[body1]];
+      }
+      
+      // calculate the axis perp to this edge and normalize it
+      // If you get the axis calc wrong then the sim may look ok most of the time
+      // but suddenly explodes... :)
+      axisx = py[edgeV1[edge]] - py[edgeV2[edge]];
+      axisy = px[edgeV2[edge]] - px[edgeV1[edge]]; 
+      len = sqrt(axisx^2 + axisy^2);
+      axisx/=len; axisy/=len;
+      
+      mina=0; minb=0; maxa=0; maxb=0; // project both bodies onto the perp axis
+      projectToAxis(body1, axisx, axisy, mina, maxa);
+      projectToAxis(body2, axisx, axisy, minb, maxb);
+      
+      // calc dist between two intervals
+      distance = intervalDistance(minA, maxA, minB, maxB);
+
+      //notUsedVariable = abs( distance ); // ????
+      //distance = abs(distance); // above line has the same effect this one
+      
+      
+      if(distance > 0.0)
+      {
+          return 0;
+      }
+      else if(  fabs( distance ) < minDistance )
+      { 
+         // if the intervals overlap, check, whether the vector length on this
+         // edge is smaller than the smallest length that has been reported so far      
+
+         minDistance = fabs(distance);
+         collisionNormalX = axisx;
+         collisionNormalY = axisy;
+         collisionEdge = edge;
+      }
+   }
+   collisionDepth = minDistance;
+   
+   // Detect edge and vert
+   
+   // Ensure that the body containing the collision edge lies in B2
+   // and the one containing the coll. vert lies in B1
+   if(edgeParent[collisionEdge] != body2)
+   {
+      temp = body2;
+      body2 = body1;
+      body1 = temp;
+   }
+   
+   // This is needed to make sure that the collision normal is pointing at B1
+   // calc diff between center points
+   // b1.center - b2.center:
+   diffx = physBodyCenterX[body1] - physBodyCenterX[body2];
+   diffy = physBodyCenterY[body1] - physBodyCenterY[body2];
+   sign = sgn( collisionNormalx*diffx + collisionNormaly*diffy );
+   
+   // Remember that the line equation is N*( R - R0 ). We choose B2.center
+   // as R0; the normal N is given by the collision normal
+   
+   if( sign != 1 )
+   {
+      collisionNormalX *= -1;
+      collisionNormalY *= -1;
+   }
+   
+   smallestD = 10000.0; // init the smallest distance to a high value
+   for(i=0; i< physBodyVertCount[body1]; i++)
+   {
+      // measure the dist of the vertex from the line using the line equation
+      diffx = px[ physBodyVerts[body1][i] ] - physBodyCenterX[body2];
+      diffy = py[ physBodyVerts[body1][i] ] - physBodyCenterY[body2];
+      distance = collisionNormalx*diffx + collisionNormaly*diffy; // dot prod
+      
+      // If the measured distance is smaller than the distance reported
+      // so far, set the smallest distance and the collision vector
+      
+      if( distance < smallestD )
+      {
+         smallestD = distance;
+         collisionVert = physBodyVerts[body1][i];
+      }
+   }
+
+   return 1;
+}
+intervalDistance(minA, maxA, minB, maxB){
+   if(minA < minB) return minB-maxA;
+   else return minA - maxB;
+}
+processCollision(){
+   // normalize collision normal
+   len = sqrt(collisionNormalX^2 + collisionNormalY^2);
+   collisionNormalX/=len;
+   collisionNormalY/=len;
+   // scale normal by collision depth / penetration
+   collisionVectorX = collisionNormalX * collisionDepth;
+   collisionVectorY = collisionNormalY * collisionDepth; 
+
+   // Now find the collision edge
+   e1 = edgeV1[collisionEdge];
+   e2 = edgeV2[collisionEdge];
+   T = 0;
+   
+   dx = fabs(px[e1] - px[e2]);
+   dy = fabs(py[e1] - py[e2]);
+   if( dx > dy )
+   {
+      T = (px[collisionVert] - collisionVectorX - px[e1]) / (px[e2]-px[e1]);
+   }
+   else
+   {
+      T = (py[collisionVert] - collisionVectorY - py[e1]) / (py[e2]-py[e1]);
+   }
+   lambda = 1.0/(T^2 + (1-T)^2);
+   
+   px[e1] -= collisionVectorX*(1-T)*0.5*lambda;
+   py[e1] -= collisionVectorY*(1-T)*0.5*lambda;
+   px[e2] -= collisionVectorX*( T)*0.5*lambda;
+   py[e2] -= collisionVectorY*( T)*0.5*lambda;
+   
+   // No need to move every vert in a body upon collision
+   // just move the colliding vert by half the collision vector
+   
+   px[collisionVert] += collisionVectorX * 0.5;  
+   py[collisionVert] += collisionVectorY * 0.5; 
+}

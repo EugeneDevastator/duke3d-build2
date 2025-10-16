@@ -1,0 +1,194 @@
+// written 25. august 2009 by Torbjoern
+// converted from Sol's SDL tutorial at sol.gfxile.net
+enum{NUMVERTS=1000};
+
+// Original vertices:
+static gVtxx[NUMVERTS];
+static gVtxy[NUMVERTS];
+static gVtxz[NUMVERTS];
+// Transformed vertices:
+static gRvtxx[NUMVERTS];
+static gRvtxy[NUMVERTS];
+static gRvtxz[NUMVERTS];
+
+static vec2[2];
+static point[3];
+
+// For sorting, lent from sorttest.kc
+enum {NUM=5,NMAX=1000}
+
+
+/* Things to try:
+1. adusjt num vertices
+2. create different kinds of patterns with the vertices in init
+3. can you optimize the rotations by combining them?
+4. adjust the vertex sizes dep on z-values
+5. growing circles will make our lack of sorting obvious, sort by z. and render
+6. add perspective proj
+
+*/
+()
+{
+   if(numframes==0) init();
+   cls(0);
+   
+   // Copy vertex pos into gRvtx
+   for(i=0; i<NUMVERTS; i++)
+   {
+      grVtxx[i] = gVtxx[i];
+      grVtxy[i] = gVtxy[i];
+      grVtxz[i] = gVtxz[i];
+   }
+   
+   t = klock();
+   rotx = t*0.01;
+   roty = t;
+   rotz = t;
+    
+   
+   rotate_x(rotx);
+   rotate_y(roty);
+   rotate_z(rotz);
+   
+   
+   // Draw
+   for(i=0; i<NUMVERTS; i++)
+   {
+      setcol(0xffffff);
+      if(gRVtxz[i] < 0)
+      {
+         setcol(0x7f7f7f);
+      }
+      
+      /*
+      drawsph(grVtxx[i] * (xres/4)+xres/2,
+              grVtxy[i] * (xres/4)+yres/2,
+              -5); //abs(grVtxz[i]*15)
+      */
+      
+      point[0] = grVtxx[i];
+      point[1] = grVtxy[i];
+      point[2] = grVtxz[i] -2.5;
+      
+      ProjectCorrect( 90, point, xres, yres);
+      setpix( vec2[0], vec2[1] ); 
+      drawsph( vec2[0], vec2[1], -5 ); 
+      
+
+   }
+   
+   // Indicate direction of rotation
+   setcol(0xffffff);
+   drawsph((xres / 3) * cos(rotz) + xres / 2,
+             (xres / 3) * sin(rotz) + yres / 2, 10);
+   
+   
+}
+
+
+
+
+
+// Field of view er definert ved radianer
+ProjectCorrect(fov, input[3], width, height)
+{
+  aspect_w = width / tan(fov / 2);
+  aspect_h = height / tan(fov / 2);
+ 
+  if(input[2] == 0)
+    vector2(0,0);
+  else 
+    vector2((input[0] * aspect_w) / input[2] + width / 2, (input[1] * aspect_h) / input[2] + height / 2);
+ 
+}
+vector2(x,y)
+{
+   vec2[0] = x; vec2[1] = y;
+}
+
+rotate_x(angle)
+{
+   ca = cos(angle);
+   sa = sin(angle);
+   
+   for(i=0; i<NUMVERTS; i++)
+   {
+      y = grVtxy[i] * ca - grVtxz[i] * sa;
+      z = grVtxy[i] * sa + grVtxz[i] * ca;
+      grVtxy[i] = y;
+      grVtxz[i] = z;
+   }
+}
+
+rotate_y(angle)
+{
+   ca = cos(angle);
+   sa = sin(angle);
+   
+   for(i=0; i<NUMVERTS; i++)
+   {
+      z = grVtxz[i] * ca - grVtxx[i] * sa;
+      x = grVtxz[i] * sa + grVtxx[i] * ca;
+      grVtxz[i] = z;
+      grVtxx[i] = x;
+   }
+}
+
+rotate_z(angle)
+{
+   ca = cos(angle);
+   sa = sin(angle);
+   
+   for(i=0; i<NUMVERTS; i++)
+   {
+      x = grVtxx[i] * ca - grVtxy[i] * sa;
+      y = grVtxx[i] * sa + grVtxy[i] * ca;
+      grVtxx[i] = x;
+      grVtxy[i] = y;
+   }
+}
+
+init()
+{
+   for(i=0; i<NUMVERTS; i++)
+   {
+      gVtxx[i] = sin(i*PI/20)*16384;//nrnd*16384;
+      gVtxy[i] = cos(i*PI/20)*16384; //nrnd*16384;
+      gVtxz[i] = (i-500)*120;//nrnd*16384;
+      len = sqrt(gvtxx[i]^2 + gvtxy[i]^2 + gvtxz[i]^2);
+      
+      if(len!=0)
+      {
+         gVtxx[i] /= len;
+         gVtxy[i] /= len;
+         gVtxz[i] /= len;
+      }
+      
+   }   
+}
+
+
+// error here? look at j
+heapsiftdown (a[NMAX],i,e)
+{
+   e=int( (e+1) / 2 );
+   
+   for(k=a[i]; i<e;  i=j)
+   {
+      j=i;
+      a[i]=a[j];
+      j = i*2; j += (a[j+1] > a[j]); //j = argmax(a[j],a[j+1])
+      if (a[j] <= k) break;
+   }
+   a[i] = k;
+}
+
+// Sort values in array a
+// ranging from i0 to i1. For example -100 to 100
+heapsort (a[NMAX],i0,i1)
+{
+   n = i1-i0;
+   for(i=int((n-1)/2);i>=0;i--) heapsiftdown(a,i,n);
+   for(i=n-1;i>0;i--)
+      { t = a[0]; a[0] = a[i]; a[i] = t; heapsiftdown(a,0,i-1); }
+}

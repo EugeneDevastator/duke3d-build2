@@ -1,0 +1,82 @@
+enum{WIDTH=100, HEIGHT=100}
+()
+{
+   
+   static screen[HEIGHT][WIDTH];
+   static buf[WIDTH];
+   static distmax = 0;
+   static sqDistMax = (width-0)^2 + (height-0)^2;
+   cls(0);
+   if(numframes==0)
+   {
+      distmax = sqrt( (width-0)^2 + (height-0)^2 );
+      for(y=0; y<height; y++)
+      for(x=0; x<width; x++)
+      {
+         sqDist = (width-x)^2 + (height-y)^2;
+         d = sqrt( sqDist );
+         nx = x/d;
+         ny = y/d;
+         nd = (d/distmax);
+         screen[y][x] = sqDist;
+      }
+   }
+   
+   if(bstatus==1 && keystatus[57])
+   {
+      for(x=-1; x<=1; x++)
+      for(y=-1; y<=1; y++)
+      screen[mousy+y][mousx+x] = 255;
+   }
+
+   for(y=0; y<height; y++)
+   {
+      for(x=0; x<width; x++)
+      {
+         if(screen[y][x]==255)
+         {
+            buf[x] = rgb(255,255,255);
+         }
+         else
+         buf[x] = rgb( 0, screen[y][x]/(sqDistMax/600), 0);
+      }
+      
+      sethlin(0,y,buf,width);
+   }
+   
+   
+   entx=15; enty=15;
+   setcol(0,0,255);
+   i=0;
+   for(i=0; i < 1000; i++)
+   {
+      //drawsph(entx, enty, .5);
+      setpix(entx,enty);
+      if(screen[enty][entx+1] < screen[enty][entx])
+      {
+         entx++;
+      }
+      if(screen[enty+1][entx] < screen[enty][entx])
+      {
+         enty++;
+      }
+      
+      if(screen[enty][entx-1] < screen[enty][entx])
+      {
+         entx--;
+      }
+      if(screen[enty-1][entx] < screen[enty][entx])
+      {
+         enty--;
+      }
+      d = sqrt( (width-entx)^2 + (height-enty)^2 );
+      if(d < 2) break;
+   }
+   
+
+   
+   moveto(0,0);
+   setcol(0);
+   printf("%1.0f %1.0f\n", mousy,mousx);
+   printf("%1.0f %1.0f", screen[mousy][mousx], i);
+}

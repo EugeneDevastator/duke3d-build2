@@ -1,0 +1,373 @@
+/*this is my version of "achtung die kurve"
+written 24. may 2009 by Torbjoern.
+last updated 28. may 09.
+check out ipcurve. a networked version.
+
+Fixed thanks to Awesoken for pointing them out:
+- Collision, checking square distance instead of sqrt
+- deltaCalc()
+- fillRect()
+*/ 
+
+//todo:
+//choose playern num
+//customize controls
+//network play
+//random obstancles
+//scale according to resolution
+
+enum{maxlength=5000, maxplayers=4};
+static numplayers=2;
+
+// player class
+static plx[maxplayers], ply[maxplayers]; //current pos head
+static playerx[maxlength][maxplayers]; //tail positions
+static playery[maxlength][maxplayers];
+static angle[maxplayers] = 0; // current heading degrees 0-360
+static collided[maxplayers]; // the length of the snake at the point of its death
+static score[maxplayers]; //survive round and get +1 point
+static dead[maxplayers];
+
+static color[4];
+
+// global for all players
+static turnSpeed = 1500;
+static newbit; //index headpos
+static speed= 1200; //player speed in pixels per update, affects collision AND drawing...
+static size = 4; //size of a single snake block in pixels
+static collisionSize = 0.3; // 30 percent of draw size.
+static holeProbability = 0.001;
+static holeSize = 4; //snake bits to remove
+static deadCount = 0; // no. of players dead so far 
+static maxScore = 5;
+
+// global game settings
+static wrapScreenMode = 0;
+static gameState = 0;
+
+
+//
+static fps = 100;
+static renderTime;
+static dt;
+static timePerFrame;
+
+static kb_1 = 2;
+static kb_2 = 3;
+static kb_up = 0xc8;
+static kb_down = 0xd0;
+static kb_left = 0xcb;
+static kb_right = 0xcd;
+static kb_w = 30;
+static kb_d = 32;
+static kb_space = 57;
+()
+{
+   cls(0);
+   if(numframes==0) setup();
+   
+   if(gameState==0){moveto(xres/3, yres/2); printf("press space to start");}
+   if(gameState==1) updateGameLogic();
+   //state 2, show winner
+   
+   
+   updateInput();   
+   drawPlayer();
+   drawStats();
+}
+
+drawStats()
+{
+   setcol(0xffffff);
+   moveto(0,0);
+   setfont(12,16);
+   //printf("\ndt=%g", dt );
+   printf("\nsnake length = %g (%g max)", newbit, maxlength );
+   
+   printf("\n\nSCORE:");
+   for(i=0; i<numplayers; i++)
+   {
+      printf("\n");
+      setcol(color[i]);
+      printf("player %g = %g", i+1, score[i] );
+   }
+   for(i=0; i<numplayers; i++)
+   {
+      if(score[i] > maxScore)
+      {
+         setcol(255,128,32);
+         setfont(28,57,0);
+         moveto(xres/2-xres/3, yres/2-yres/3);
+         printf("Player %g wins!", i+1);
+         printf("\npress space to restart");
+         printf("\n\npress 1-4 for number of players");
+         gameState = 2;
+      }
+   }
+   
+}
+
+// sets up a new round
+setup(){
+   timePerFrame = 1000.0 / fps; //move this to init
+   renderTime = klock();   
+
+   newbit = 0;
+   
+   plx[0]=xres/2+10;
+   ply[0]=yres/2;
+   angle[0] = 0;
+   
+   plx[1]=xres/2-10;
+   ply[1]=yres/2;
+   angle[1] = 180;
+   
+   plx[2]=xres/2;
+   ply[2]=yres/2+10;
+   angle[2] = 90;
+   
+   plx[3]=xres/2;
+   ply[3]=yres/2-10;
+   angle[3] = -90;
+   
+   color[0] = 0x00ff00;
+   color[1] = 0xff0000;
+   color[2] = 0x0000ff;
+   color[3] = 0xffff00;
+   
+   deadCount = 0;
+   
+   //reset collisions
+   for(i=0; i<numplayers; i++){ collided[i] = 0; dead[i] = 0; }
+}
+
+resetGame()
+{
+   //reset scores
+   for(i=0; i<numplayers; i++) score[i] = 0;
+   
+   //and move players back to start
+   setup();  
+}
+
+updateGameLogic()
+{   
+
+      // update player pos
+      for(player=0; player<numplayers; player++)
+      {
+         if(collided[player] > 0) continue; //dont update the dead
+
+         plx[player] = plx[player]+cos(angle[player]*pi/180)*speed*dt;
+         ply[player] = ply[player]+sin(angle[player]*pi/180)*speed*dt;
+            
+         playerx[newbit][player] = plx[player];
+         playery[newbit][player] = ply[player];
+   
+         if(newbit > 10 && rnd<holeProbability)
+         {
+            for(h=0; h<holeSize; h++){
+            playerx[newbit-2-h][player] = -1;
+            playery[newbit-2-h][player] = -1;
+            }
+         } 
+      }
+      // When the snake has gone almost as far as one snake-bit
+      // increase array size.
+      // you could call this "sampling the snake" :P
+      // im saving its position more often than the time it takes to move on snake bit (size)
+      // just dont go lower than collisionSize.
+      static bitsize;
+      bitsize += speed*dt;
+      if(bitsize > size*0.6){
+         newbit++;
+         bitsize=0;
+      }  
+   
+   calcDelta();
+}
+
+calcDelta()
+{
+   time = klock();
+   timePassed = time-renderTime; //time used to do frame
+   dt = timePassed/timePerFrame; // calculate the new delta based on expected time
+   renderTime = time; //ready to compare next frame
+}
+
+updateInput()
+{
+   if(gameState==0 && keystatus[kb_space])
+   {
+      gameState = 1;
+   }  
+   
+   if(gameState==2 && keystatus[kb_space])
+   {
+      gameState = 1;
+      resetGame();
+   }
+   if(gameState==0 || gameState == 2)
+   {
+      //keys 1-4 select number of players
+      if(keystatus[2]){keystatus[2]=0; numplayers=1;}
+      if(keystatus[3]){keystatus[3]=0; numplayers=2;}
+      if(keystatus[4]){keystatus[4]=0; numplayers=3;}
+      if(keystatus[5]){keystatus[5]=0; numplayers=4;}
+   }   
+
+   if(keystatus[kb_left])
+   {
+      angle[0]-=turnSpeed*dt;  
+      //angle[1]-=turnSpeed*dt; //controlling all with one control looks fun :)
+      //angle[2]-=turnSpeed*dt;
+      //angle[3]-=turnSpeed*dt;
+   }
+   if(keystatus[kb_right])
+   {
+      angle[0]+=turnSpeed*dt;  
+      //angle[1]+=turnSpeed*dt;
+      //angle[2]+=turnSpeed*dt;
+      //angle[3]+=turnSpeed*dt;
+   }
+   if(keystatus[kb_w])
+   {
+      angle[1]-=turnSpeed*dt;  
+   }
+   if(keystatus[kb_d])
+   {
+      angle[1]+=turnSpeed*dt;  
+   } 
+   
+   if(keystatus[2])
+   {
+      angle[2]-=turnSpeed*dt;  
+   }
+   if(keystatus[3])
+   {
+      angle[2]+=turnSpeed*dt;  
+   }
+   
+   if(bstatus==1)
+   {
+      angle[3]-=turnSpeed*dt;  
+   }
+   if(bstatus==2)
+   {
+      angle[3]+=turnSpeed*dt;  
+   }
+   
+
+}
+
+// collision takes more cpu power the longer the snakes becomes...
+// .. any optimizations possible? dont check every frame for instance?
+// IDEA: goto head position, check stuff thats around it!
+// not every single snake-piece!
+
+drawPlayer() //and check collision... 
+{
+   setfont(8,12);
+   for(i=0; i<maxlength; i++)
+   {
+      if(i > newbit-1) break;
+      
+      for(player=0; player<numplayers; player++)
+      {
+         if( (i > collided[player]) && dead[player] ) continue;
+         if(deadCount == numplayers-1){ setup(); break; }  //do this before checking skipping holes ;)
+         if( playerx[i][player] ==-1 ) continue; //if there is a "hole" in the snake, dont check coll or draw.
+               
+         //first check collision
+         if(i < (newbit-1) && collided[player]==0)
+         {
+            for(otherPlayer=0; otherPlayer<numplayers; otherPlayer++)
+            { 
+               if(playerCollided( player, playerx[i][otherPlayer], playery[i][otherPlayer] ))
+               {
+                  /*
+                  MEH! in either case, player loses >_<
+                  idea: could perhaps check for ties.
+                  if(player==otherPlayer) //crashed with self. yes. this doesnt make much sense in english.
+                  {
+                     updateScore(player)
+                     setup();
+                     break;
+                  }
+                  else // crashed with enemy, so this player loses.
+                  {
+                     updateScore(player);
+                     setup();
+                     break;
+                  }  
+                  */
+                  updateScore(player);
+                  deadCount++;
+                  dead[player] = 1;
+                  collided[player] = newbit-1; //length at death
+                  break; 
+               } 
+            }
+         }
+         
+         // then draw
+         setcol(color[player]);
+         //fillRect(playerx[i][player]-size/2, playery[i][player]-size/2, size, size);
+         drawsph(playerx[i][player], playery[i][player], size/2); 
+         
+         //moveto(playerx[i-1][player]-size/2, playery[i-1][player]-size/2);
+         //lineto(playerx[i][player]-size/2, playery[i][player]-size/2);        
+
+         setcol(0xffffff);
+         //drawsph(playerx[i][player], playery[i][player], -size/2*collisionSize); //shows collision circle
+         if(i==newbit-1)
+         {
+            moveto(playerx[i][player], playery[i][player]);
+            printf("%g", player+1);
+         }  
+      }
+   }
+}
+
+// returns true if the selected player has collided with point x,y
+playerCollided(player,x,y){
+   // collided with screen edges:
+   if(wrapScreenMode==1)
+   {
+      if(playerx[newbit-1][player] < 1){plx[player]=xres-1; return 0;}
+      if(playerx[newbit-1][player] > xres) {plx[player]=1; return 0;}
+      if(playery[newbit-1][player] < 1) {ply[player]=yres-1; return 0;}
+      if(playery[newbit-1][player] > yres){ply[player]=1; return 0;}
+   }
+   else
+   {
+      if(playerx[newbit-1][player] < 1) return 1;
+      if(playerx[newbit-1][player] > xres) return 1;
+      if(playery[newbit-1][player] < 1) return 1;
+      if(playery[newbit-1][player] > yres) return 1;
+   }
+   dist = ( (playerx[newbit-1][player]-x)^2+(playery[newbit-1][player]-y)^2 );
+   if( dist < (size^2*collisionSize) ) return 1;
+   return 0;
+}
+
+updateScore(collidedPlayer) //everyone except the one that collided scores.
+{
+   for(player=0; player<numplayers; player++)
+   {
+      if(player!=collidedPlayer && dead[player] == 0)
+      {score[player] +=1;}
+   }
+}
+
+fillRect(sx, sy, wx, wy)
+{
+   sx=int(sx); sy=int(sy); wx=int(wx); wy=int(wy);
+   i=0;
+   do
+   {   
+      moveto(sx, sy+i);
+      lineto(sx+wx, sy+i);
+      i++;
+   }while(i<=wy);
+}

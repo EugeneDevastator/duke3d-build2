@@ -1,0 +1,56 @@
+// Check out "Graham scan" for how to do it with more points
+
+struct Point
+{
+   x,y;
+};
+
+static Point pts[3];
+
+()
+{
+   cls(0);
+   
+   if( keystatus[57] )
+   {
+      keystatus[57] = 0;
+      for(i=0; i<3; i++)
+      {
+         pts[i].x = xres/2 + nrnd*100;
+         pts[i].y = yres/2 + nrnd*100;
+      }
+   }
+   
+   for(i=0; i<3; i++)
+   {
+      moveto( pts[i].x, pts[i].y );
+      printf("\n%g",i);
+      setpix( pts[i].x, pts[i].y );
+   }
+   
+   for(i=0; i<2*3; i++)
+   {
+      moveto(0, i*15);
+      
+      isCCW = ccw( pts[i%3], pts[(i+1)%3], pts[(i+2)%3] ) > 0;
+      
+      if(isCCW)
+         printf("ccw: %g %g %g", i%3, (i+1)%3, (i+2)%3);
+      else
+         printf("clk wise: %g %g %g", i%3, (i+1)%3, (i+2)%3);
+   }
+   
+   
+}
+
+lerp(x1,x2,t)
+{
+   return x1 + (x2-x1)*t;
+}
+
+
+// pts are ccw if ccw>0, else clockwise if cc < 0 and colllinear if ccw=0
+ccw(Point p1,Point p2,Point p3)
+{
+   return (p2.x - p1.x)*(p3.y - p1.y) - (p2.y - p1.y) * (p3.x - p1.x); // signed area of triangle
+}

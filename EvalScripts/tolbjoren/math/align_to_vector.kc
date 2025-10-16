@@ -1,0 +1,255 @@
+// Check this out:
+// http://www.physicsforums.com/showthread.php?p=3043307
+// or
+// http://tonyobryan.com/index.php?article=28
+static posx = 0;
+static posy = 10;
+static posz = 10;
+static posh = 0; // left right
+static posv = -2.0;
+
+
+static thisRot[9] = {1,0,0,
+                     0,1,0,
+                     0,0,1};
+()
+{
+   cls(255,255,255); clz(1e32);
+   
+   setcol(255,0,0);
+
+   num = 20;   
+   carpetSize = 10;
+   delta = carpetSize / num;
+
+   for(i=0; i<num; i++){
+      for(j=0; j<num; j++)
+      drawsph(i*delta - carpetSize/2,0,j*delta - carpetSize/2,.5);
+   }
+   
+   gridx = 20;
+   gridy = 20;
+   gridz = 20;
+   
+   time = klock(0);
+   freq = 10 + mousx / xres * 10;
+   
+   //hang = mousx/xres*2*PI; 
+   //vang = mousy/yres*2*PI; 
+   
+   animAngle = time / 10;
+   
+   setcol(0,0,0);
+
+   for(i=0; i<10; i++)
+   {
+      angStep = i / 10 * 2 *PI;
+   t0 = animAngle * 2 * PI;
+   t1 = (animAngle+0.001) * 2 * PI;
+   
+   x0 = 1 * sin(1*t0+angStep);
+   y0 = 1 * cos(1*t0+angStep);
+   
+   x1 = 1 * sin(1*t1+angStep);
+   y1 = 1 * cos(1*t1+angStep);
+   //setcol(255,255,255);
+   drawsph(x0,2,y0,.1);
+   drawsph(x1,2,y1,.1);
+   
+   drawArrow3D( x0, 2, y0, x1, 2, y1 );
+   
+   }
+
+   playercontrols();
+}
+
+drawArrow3d(sx,sy,sz, ex,ey,ez)
+{
+   // Find direction
+   dx = sx - ex;
+   dy = sy - ey;
+   dz = sz - ez;
+
+   // Normalize
+   len = sqrt(dx*dx + dy*dy + dz*dz );   
+   dx /= len;
+   dy /= len;
+   dz /= len;  
+
+
+   //moveto(sx,sy,sz);
+   //lineto(sx+dx,sy+dy,sz+dz);
+   
+   static start[3];
+   static end[3];
+   static headS[3];
+   static headE1[3];
+   static headE2[3];
+   static headE3[3];
+   static headE4[3];
+   static dirVec[3];
+   
+   arrowLen = .5;
+   headLen = 0.1;
+   headWid = 0.05;
+
+   setVec(dirVec,dx,dy,dz);
+   
+   setVec(start,0,.1,0);
+   setVec(end,0,arrowLen,0);
+
+   setVec(headS,0,arrowLen,0);
+   
+   setVec(headE1,+headWid,arrowLen - headLen,0);
+   setVec(headE2,-headWid,arrowLen - headLen,0);  
+   
+   alignToVector(start,dirVec);
+   alignToVector(end,dirVec);
+   alignToVector(headS,dirVec);
+   alignToVector(headE1,dirVec);
+   alignToVector(headE2,dirVec);
+
+   drawSegment(sx,sy,sz,start,end);
+   drawSegment(sx,sy,sz,headS,headE1);
+   drawSegment(sx,sy,sz,headS,headE2);
+   
+}
+
+drawSegment(tx,ty,tz,v1[3],v2[3])
+{
+   moveto(tx+v1[0],ty+v1[1],tz+v1[2]);
+   lineto(tx+v2[0],ty+v2[1],tz+v2[2]);
+}
+
+setVec(v[3],x,y,z)
+{
+   v[0] = x; v[1] = y; v[2] = z;
+}
+
+alignToVector( input[3], dir[3] )
+{
+   static rotAxis[3];
+   cross( input, dir, rotAxis );
+   angle = angleBetween( input, dir ) ;
+
+   static mtx[9];
+   InitRotationMatrix(mtx,angle,rotAxis);
+   
+   transformPoint(input,mtx);
+}
+
+InitRotationMatrix(Mtx[9],r,pAxis[3])
+{
+  // The axis vector must be of unit length
+  x=0, y=0, z=0, m=0;
+  m = sqrt(pAxis[0]*pAxis[0] + pAxis[1]*pAxis[1] + pAxis[2]*pAxis[2]);
+  x = pAxis[0]/m;
+  y = pAxis[1]/m;
+  z = pAxis[2]/m;
+
+  // Compute the rotation matrix  
+  c = cos(r);
+  s = sin(r);
+
+  Mtx[0] = (x * x) * (1.0 - c) + c;
+  Mtx[1] = (y * x) * (1.0 - c) + (z * s);
+  Mtx[2] = (z * x) * (1.0 - c) - (y * s);
+
+  Mtx[3] = (x * y) * (1.0 - c) - (z * s);
+  Mtx[4] = (y * y) * (1.0 - c) + c;
+  Mtx[5] = (z * y) * (1.0 - c) + (x * s);
+
+  Mtx[6] = (x * z) * (1.0 - c) + (y * s);
+  Mtx[7] = (y * z) * (1.0 - c) - (x * s);
+  Mtx[8] = (z * z) * (1.0 - c) + c;
+} 
+
+angleBetween(v1[3], v2[3])
+{
+   ftol = 1e-7;
+   if( fabs(v1[0]-v2[0]) < ftol && fabs(v1[1]-v2[1]) < ftol && fabs(v1[2]-v2[2]) < ftol) return 0;
+   
+   aLen = sqrt(v1[0]^2 + v1[1]^2 + v1[2]^2);
+   bLen = sqrt(v2[0]^2 + v2[1]^2 + v2[2]^2);
+   dotProd = dpr(v1,v2);
+   return acos( dotProd / (aLen*bLen) );
+}
+
+
+dpr(v1[3], v2[3])
+{
+   return v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2];
+}
+
+
+cross(a[3],b[3],p[3])
+{
+   p[0] = a[1]*b[2] - b[1]*a[2]; // yz
+   p[1] = a[2]*b[0] - b[2]*a[0]; // zx
+   p[2] = a[0]*b[1] - b[0]*a[1]; // xy
+}
+
+transformPoint(v[3], thisRot[9])
+{
+   NewX = v[0] * thisRot[0] + v[1] * thisRot[1] + v[2] * thisRot[2];
+   NewY = v[0] * thisRot[3] + v[1] * thisRot[4] + v[2] * thisRot[5];
+   NewZ = v[0] * thisRot[6] + v[1] * thisRot[7] + v[2] * thisRot[8];
+   v[0]=newx; v[1]=newy; v[2]=newz;
+}
+
+transformPoint(&x,&y,&z, thisRot[9])
+{
+   NewX = X * thisRot[0] + Y * thisRot[1] + Z * thisRot[2];
+   NewY = X * thisRot[3] + Y * thisRot[4] + Z * thisRot[5];
+   NewZ = X * thisRot[6] + Y * thisRot[7] + Z * thisRot[8];
+   x=newx; y=newy; z=newz;
+}
+
+// Camera and movement code taken from /games/
+//Handle input and player movement
+playercontrols()
+{
+   static oldMouseX;
+   static oldMouseY;
+   static mouseSpeedX;
+   static mouseSpeedY; 
+
+   f = .0125;
+   if (keystatus[0x2a]) f *= 4;
+   if (keystatus[0x36]) f /= 4;
+   vx = (keystatus[32]-keystatus[30])*f; //D-A
+   vy = (keystatus[17]-keystatus[31])*f; //W-S  
+   vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   
+   static mat[9]; 
+   ang2mat(posh,posv,mat); // Convert angles to rotation matrix
+   
+   // find new position
+   posx += mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   posy += mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   posz += mat[2]*vx + mat[5]*vz + mat[8]*vy; 
+   // mousespeed values are tweaked for 60 fps
+   mouseSpeedX = (mousx - oldMouseX) * 0.01;
+   mouseSpeedY = (mousy - oldMouseY) * 0.01;
+   oldMouseX = mousx;
+   oldMouseY = mousy;
+   if(bstatus==1)
+   {
+      posh -= mouseSpeedX;
+      posv += mouseSpeedY;
+   }
+   // Right,down,forwards unit vectors.
+   setcam(posx,posy,posz,
+          mat[0],mat[1],mat[2],
+          mat[3],mat[4],mat[5],
+          mat[6],mat[7],mat[8]);
+}
+
+ang2mat(hang,vang,mat[9]){
+   mat[6] = cos(vang)*sin(hang); mat[0] = cos(hang);
+   mat[7] = sin(vang);           mat[1] = 0;
+   mat[8] = cos(vang)*cos(hang); mat[2] =-sin(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}

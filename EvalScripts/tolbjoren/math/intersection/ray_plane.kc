@@ -1,0 +1,219 @@
+struct ray_t
+{
+   x0, y0, z0;
+   dx, dy, dz;
+}
+
+struct plane_t
+{
+   x,y,z;
+   nx,ny,nz;
+
+}
+
+()
+{
+   cls(0);
+   clz(1e32);
+   glEnable(GL_DEPTH_TEST);
+
+   t = klock(0);
+   a = t;
+   r = -10;
+   setcam( r*sin(a), -5, r*cos(a), a, 0);
+  
+//#define CAM
+#ifdef CAM
+   setcam(5,15,-18,
+         1,0,0, // right
+         0,-1,0, // down
+         0,0,1); // fwd
+   
+#endif
+
+   setcol(255,255,255);
+   drawgridXZ(-20,20);
+   
+   
+   
+   
+   x=0;
+   y=0;
+   num = 25;
+   inc = 1 / sqrt(num);
+   for(i = 0; i < num; i++ )
+   {
+      sx = (-0.5 + x) * 2;
+      sy = (-0.5 + y) * 2;
+      
+      rx = (-0.5 + x) * 10;
+      ry = (-0.5 + y) * 10;
+      
+      ray_t ray;
+      setRay( ray, sx,sy,0, rx,ry,20 );
+   
+      setcol(255,255,255);
+   
+      drawRay( ray );
+      
+      plane_t plane;
+      plane.x = 0;
+      plane.y = 3;
+      plane.z = 7;
+      plane.nx = 0;
+      plane.ny = 0;
+      plane.nz = -1;
+   
+      drawPlane(plane);
+      
+      t = ray_plane( ray, plane );
+      t = max( 0, t );
+      t = min( 1, t );
+      
+      if ( t >= 0.0  )
+      {
+         setcol(255,0,0);
+         drawsph( ray.x0 + ray.dx*t,
+                  ray.y0 + ray.dy*t,
+                  ray.z0 + ray.dz*t,
+                  .25 ); 
+      }
+   
+
+      x += inc;
+      if( x >= 1 )
+      {
+         x = 0;
+         y+=inc;
+      }
+   }
+}
+
+setRay( ray_t r, x,y,z, dx,dy,dz)
+{
+   r.x0 = x;
+   r.y0 = y;
+   r.z0 = z;
+   r.dx = dx;
+   r.dy = dy;
+   r.dz = dz;
+}
+
+drawRay( ray_t r )
+{
+   moveto( r.x0, r.y0, r.z0 );
+   lineto( r.dx, r.dy, r.dz );
+}
+
+drawPlane( plane_t p )
+{
+   s = 2;
+   drawcone( p.x, p.y, p.z, -0.25,
+             p.x+p.nx, p.y+p.ny, p.z+p.nz, 0.01);
+}
+
+// TODO when ray and plane doint point towards each other
+ray_plane( ray_t ray, plane_t plane )
+{
+   d = plane.nx*ray.dx + plane.ny*ray.dy + plane.nz*ray.dz;
+   
+   if (d != 0.0)
+   {
+      plane_dist_origin = sqrt( plane.x^2 + plane.y^2 + plane.z^2 );
+      planeDotRayorigin = plane.nx*ray.x0 + plane.ny*ray.y0 + plane.nz*ray.z0;
+      dist = -( planeDotRayorigin + plane_dist_origin) / d;
+      if (dist > 0)
+      {
+        return dist;
+      }
+   }
+   return -1;
+}
+
+drawgridXZ(min,max)
+{
+   range = max-min;
+   segs = 5;
+   for(i=0; i<segs; i++)
+   {
+      t = i/(segs-1);
+      moveto(min,0, min + range*t);
+      lineto(max,0, min + range*t);
+   
+      moveto(min + range*t,0, min);
+      lineto(min + range*t,0, max);
+   }
+}
+
+
+
+alignToVector( input[3], dir[3] )
+{
+   static rotAxis[3];
+   cross( input, dir, rotAxis );
+   angle = angleBetween( input, dir ) ;
+
+   static mtx[9];
+   InitRotationMatrix(mtx,angle,rotAxis);
+   
+   transformPoint(input,mtx);
+}
+
+InitRotationMatrix(Mtx[9],r,pAxis[3])
+{
+  // The axis vector must be of unit length
+  x=0, y=0, z=0, m=0;
+  m = sqrt(pAxis[0]*pAxis[0] + pAxis[1]*pAxis[1] + pAxis[2]*pAxis[2]);
+  x = pAxis[0]/m;
+  y = pAxis[1]/m;
+  z = pAxis[2]/m;
+
+  // Compute the rotation matrix  
+  c = cos(r);
+  s = sin(r);
+
+  Mtx[0] = (x * x) * (1.0 - c) + c;
+  Mtx[1] = (y * x) * (1.0 - c) + (z * s);
+  Mtx[2] = (z * x) * (1.0 - c) - (y * s);
+
+  Mtx[3] = (x * y) * (1.0 - c) - (z * s);
+  Mtx[4] = (y * y) * (1.0 - c) + c;
+  Mtx[5] = (z * y) * (1.0 - c) + (x * s);
+
+  Mtx[6] = (x * z) * (1.0 - c) + (y * s);
+  Mtx[7] = (y * z) * (1.0 - c) - (x * s);
+  Mtx[8] = (z * z) * (1.0 - c) + c;
+} 
+
+angleBetween(v1[3], v2[3])
+{
+   ftol = 1e-7;
+   if( fabs(v1[0]-v2[0]) < ftol || fabs(v1[1]-v2[1]) < ftol || fabs(v1[2]-v2[2]) < ftol) return 0;
+   
+   aLen = sqrt(v1[0]^2 + v1[1]^2 + v1[2]^2);
+   bLen = sqrt(v2[0]^2 + v2[1]^2 + v2[2]^2);
+   dotProd = dpr(v1,v2);
+   return acos( dotProd / (aLen*bLen) );
+}
+
+
+dpr(v1[3], v2[3])
+{
+   return v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2];
+}
+
+
+cross(a[3],b[3],p[3])
+{
+   p[0] = a[1]*b[2] - b[1]*a[2]; // yz
+   p[1] = a[2]*b[0] - b[2]*a[0]; // zx
+   p[2] = a[0]*b[1] - b[0]*a[1]; // xy
+}
+
+transformPoint(v[3], thisRot[9])
+{
+   NewX = v[0] * thisRot[0] + v[1] * thisRot[1] + v[2] * thisRot[2];
+   NewY = v[0] * thisRot[3] + v[1] * thisRot[4] + v[2] * thisRot[5];
+   NewZ = v[0] * thisRot[6] + v[1] * thisRot[7] + v[2] * thisRot[8];
+   v[0]=newx; v[1]=newy; v[2]=newz;
+}

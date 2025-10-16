@@ -1,0 +1,252 @@
+/*
+Code by Torbjoern. Written on the 30. of October 2009.
+revisited 16. nov 2011... 
+now it actually can display lineal elements of a
+direction field correctly using finite differences
+to get gradient at a point (x,y)
+*/
+
+static time = 0;
+
+static xMin, yMin;
+static xMax, yMax;
+static xSize, ySize;
+
+static fieldRes = 25;
+
+// fix:
+static lineLen;
+static xStep, yStep;
+
+static e = 2.718281828;
+()
+{
+   time = klock();
+   cls(0);
+
+   halfRes = fieldRes/2;
+   lineLen = xres/(fieldRes-1)/3;
+
+   xStep = xres/(fieldRes-1);
+   yStep = yres/(fieldRes-1);
+   
+   xmin = -2; xmax = -2;
+   ymin = -2; ymax = -2;
+   xsize = abs(xmin)+abs(xmax);
+   ysize = abs(ymin)+abs(ymax);
+
+   drawLineSegs();
+   
+   x=0; y=0;
+   screenToCartesian(mousx,yres-mousy,x,y);
+   f = steepness(x, y);
+   moveto(mousx, mousy);
+   setfont(8,12);
+   setcol(255,255,255);
+   printf("f(%.1f, %.1f) = %.2f", x,y,f);
+
+   setcol(0xffffff);
+   slider(0,fieldRes,20,20,xres/2);   
+
+   sleep(1);
+}
+
+normalize(&x, &y){
+   len = sqrt(x^2+y^2);
+   x /= len;
+   y /= len;
+}
+
+drawLineSegs()
+{
+   isteps = xres/(xStep-1);
+   jsteps = yres/(yStep-1);
+   for(i=0; i<isteps; i++)
+   {
+      for(j=0; j<jsteps; j++)
+      {   
+         screen_x = i * xres/(isteps);
+         screen_y = j * yres/(jsteps);
+         x=0; y=0;
+         screenToCartesian(screen_x,yres-screen_y,x,y);
+
+         dt = 1e-7;
+         grad_x = steepness(x+dt, y) - steepness(x-dt, y);
+         grad_y = steepness(x, y+dt) - steepness(x, y-dt);
+
+         normalize(grad_x,grad_y);
+
+         //setcol(255,255,255);
+         color = clamp( 0, 360, atan2( fabs(grad_y), grad_x)/pi*360 );
+         setcol( hsv_to_rgb( color,1,1) );
+         
+         half_len = lineLen/2;
+         moveto(screen_x, screen_y);
+         lineto(screen_x + grad_x*half_len, screen_y - grad_y*half_len);
+      
+         moveto(screen_x, screen_y);
+         lineto(screen_x - grad_x*half_len, screen_y + grad_y*half_len);
+      }
+   }
+}
+
+steepness(x,y)
+{
+   //x/y + x*y*cos(time); //cool
+   
+   //y^3 + x^3; 
+   //3*y^2 + 3*x^2;
+   
+   //2*x*y + 1;
+   
+   //y * tanh(x) - 2;
+   
+   //(y^2*tanh(x))/2 - 2*y;
+   
+   //0.1 * (1-x^2) - x/y;
+   
+   //x^-1 / (-1*x^-2*y);
+   x*y;
+}
+
+screenToCartesian(xin,yin,&gridx,&gridy)
+{
+   gridx = xmin + (xin/xres) * xsize;
+   gridy = ymin + (yin/yres) * ysize;
+}
+
+cartesianToScreen(gridx,gridy,&xin,&yin)
+{
+   xin = (gridx-xmin)/xsize*xres;
+   yin = yres-(gridy-ymin)/ysize*yres;
+}
+
+clamp(lo,hi,value)
+{
+   return min( hi, max( lo, value ) );
+}
+
+
+sinh(x)
+{
+   0.5*(e^x - e^-x )
+}
+
+cosh(x)
+{
+   0.5*(e^x + e^-x )
+}
+
+tanh(x)
+{
+   return sinh(x) / cosh(x);
+}
+
+
+sliderAdvanced(sliderNum, &value, minval, maxval, x, y, length)
+{
+   intrinsicRatio = (maxval-minval)/(length-0); // intrinsicRatio = (maxvalue-minvalue)/(endpoint2-endpoint1)
+   sliderval = (value-minval) / intrinsicRatio;
+   slider(sliderNum,sliderval,x,y,length); 
+   value = (sliderval) * intrinsicRatio + minval; // Value = (thisPoint - endPoint1) * intrinsicRatio + minValue
+   //printf("\n intRatio:%g", intrinsicRatio);
+   printf("\nvalue=%.3f", value);
+}
+
+slider(sliderNum,&value,x,y,length)
+{
+   enum{numSliders=10};
+   static mouseLock[numSliders];
+
+
+   // Constructor, set slider to mid position
+   if(numframes==0)
+   {
+      //value = .5 * length; // this is what makes the adv slider work. :S
+      mouseLock[sliderNum] = 0;
+   }  
+   // Draw slider
+   setcol(255,255,255);
+   moveto(x,y);
+   lineto(x+length,y);
+   drawsph(x+value,y,-10);
+   moveto(x+value,y+10);
+   printf("value=%g",value);
+   
+   // mouse input
+   //mouseValue = mousx/(xres/2)-1;
+
+   // Check if anyone else has lock, if so exit.
+   if(mouseLock[sliderNum] == 0)
+   for(i=0; i<numSliders; i++)
+   {
+      if(i==sliderNum) continue; // if we have lock no problem
+      if(mouseLock[i]) return; // someone else has lock
+   }   
+
+   if(bstatus==1)
+   {
+      mx = mousx; my = mousy; 
+      if(mouseLock[sliderNum]) // mouse has lock-on, move slider
+      {
+         setcol(255,0,0);
+         drawsph(x+value, y,-5);
+         if(mx <= (x+length) && mx >= x) // limit movement to slider line
+         {
+            intrinsicRatio = (length-0)/( (length+x)-x);
+            value = ( mx-x)*intrinsicRatio + 0;
+         }
+         else if(mx > (x+length) )
+         {
+            value = length;
+         }
+         else if(mx < x)
+         {
+            value = 0;
+         }
+      }
+      else // check for collision
+      {
+         if( isColliding(mx,my,x+value,y,10) ) mouseLock[sliderNum] = 1; 
+      }
+   }
+   else // mouse released
+   {
+      mouseLock[sliderNum] = 0;
+   }
+
+}
+
+isColliding(x1,y1,x2,y2,radius)
+{
+   if((x1-x2)^2 + (y1-y2)^2 < radius^2 ) return 1;
+   return 0;
+}
+
+// this function takes Hue (0-360 degrees), Saturation (0.0-1.0) and Value/brightness (0.0-1.0)
+// and returns a RGB int
+hsv_to_rgb(h,s,v){ 
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   r=int(r*255);
+   g=int(g*255);
+   b=int(b*255);
+   return r*2^16 + g*2^8 + b; 
+}

@@ -1,0 +1,236 @@
+/*
+static tetI[4][4] =
+{
+   0,0,0,0,
+   0,0,0,0,
+   0,0,0,0,
+   1,1,1,1
+};
+
+static tetJ[4][4] =
+{
+   0,0,0,0,
+   0,0,0,0,
+   0,0,1,0,
+   1,1,1,0
+};
+
+static tetL[4][4] =
+{
+   0,0,0,0,
+   0,0,0,0,
+   1,1,1,0,
+   0,0,1,0
+};
+
+static tetO[4][4] =
+{
+   0,0,0,0,
+   0,0,0,0,
+   1,1,0,0,
+   1,1,0,0
+};
+
+static tetS[4][4] =
+{
+   0,0,0,0,
+   0,1,0,0,
+   1,1,0,0,
+   1,0,0,0
+};
+
+static tetZ[4][4] =
+{
+   0,0,0,0,
+   0,0,0,0,
+   1,1,0,0,
+   0,1,1,0
+};
+
+static tetT[4][4] =
+{
+   0,0,0,0,
+   0,0,1,0,
+   0,0,1,1,
+   0,0,1,0
+};
+*/
+static tets[7][4][4] =
+{
+   0,0,0,0,
+   0,0,0,0,
+   1,1,1,1,
+   0,0,0,0,
+   
+   0,0,0,0,
+   0,0,0,1,
+   0,1,1,1,
+   0,0,0,0,
+   
+   0,0,0,0,
+   0,1,1,1,
+   0,0,0,1,
+   0,0,0,0,
+   
+   0,0,0,0,
+   0,1,1,0,
+   0,1,1,0,
+   0,0,0,0,
+   
+   0,0,0,0,
+   0,0,1,0,
+   0,1,1,0,
+   0,1,0,0,
+   
+   0,0,0,0,
+   0,1,0,0,
+   0,1,1,0,
+   0,0,1,0,
+   
+   0,0,0,0,
+   0,1,0,0,
+   0,1,1,0,
+   0,1,0,0
+};
+
+static rots[7];
+()
+{
+   cls(0);
+   
+   if ( keystatus[2] )
+   {
+      keystatus[2]=0;
+      rots[1] += 1;
+   }
+   
+   if ( keystatus[3] )
+   {
+      keystatus[3]=0;
+      rots[1] -= 1;
+   }
+
+
+   secs = floor( 50*klock(0) );
+   static osecs = 0;
+   if ( secs > osecs ) 
+   {
+      osecs = secs;
+      to_rot = secs % 7;
+      rots[to_rot] = rots[to_rot] % 7 + 1;
+   }
+   
+
+   
+   
+
+   for (i=0; i<7; i++) {
+      setcol(128+128*i%3==1, 255*(i%2==1), 255*(i%3==1) );
+      static tmp[4][4];
+      copytet( tmp, i );
+      
+      for(j=0; j<abs(rots[i]); j++){
+         rotate(tmp, sgn(rots[i]) );
+      }
+      draw( tmp, 5+i*100, yres/2-50, hsv_to_rgb( i/7*360, 1,1));
+      
+
+
+      copytet( tmp, i );
+      
+      for(j=0; j< abs(rots[i])+1; j++){
+         rotate(tmp, -sgn(rots[i]) );
+      }
+      draw( tmp, 5+i*100, yres/2-50+100, hsv_to_rgb( i/7*360, 1,1));
+   }
+   
+}
+
+copytet( a[4][4], idx )
+{
+   for(i=0; i<4; i++)
+   for(j=0; j<4; j++)
+   {
+      a[i][j] = tets[idx][i][j];
+   }
+}
+
+rotate( a[4][4], dir )
+{
+   static tmp[4][4];
+   for(i=0; i<4; i++)
+   for(j=0; j<4; j++)
+   {
+      x=i;y=j;
+      if ( dir == 1 ) { 
+         tmp[i][j] = a[3-y][x]; // CCW -y,x
+      } else { 
+         tmp[i][j] = a[y][3-x]; // CW y,-x
+      }
+   }
+
+   for(i=0; i<4; i++)
+   for(j=0; j<4; j++)
+   {
+      a[i][j] = tmp[i][j];
+   }
+   
+}
+
+draw_debug( a[4][4], x,y, color ) 
+{
+   bsiz = 20;
+   margin = 1;
+   for(i=0; i<4; i++)
+   for(j=0; j<4; j++)
+   {
+      ix = bsiz * i + i*margin;
+      iy = bsiz * j + j*margin;
+      if (a[i][j] )
+      {
+         setcol(color);
+      } else {
+         setcol(32,32,32);
+      }
+      drawrectfill(x+ix,y+iy,x+ix+bsiz,y+iy+bsiz);
+   }  
+}
+
+draw( a[4][4], x,y, color ) 
+{
+   setcol(color);
+   bsiz = 20;
+   margin = 1;
+   for(i=0; i<4; i++)
+   for(j=0; j<4; j++)
+   {
+      if (a[i][j] ) { ix = bsiz * i + i*margin; iy = bsiz * j + j*margin; drawrectfill(x+ix,y+iy,x+ix+bsiz,y+iy+bsiz); }
+   }  
+}
+
+drawrectfill(x0,y0,x1,y1) { for(y=y0;y<y1;y++) { moveto(x0,y); lineto(x1,y); } }
+drawrectopen(x0,y0,x1,y1) { moveto(x0,y0); lineto(x1,y0); lineto(x1,y1); lineto(x0,y1); lineto(x0,y0); }
+
+
+hsv_to_rgb(h,s,v){ 
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   return rgb( r*255, g*255, b*255 ); 
+}

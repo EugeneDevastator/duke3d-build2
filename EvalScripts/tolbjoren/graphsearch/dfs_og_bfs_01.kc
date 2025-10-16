@@ -1,0 +1,156 @@
+enum{MAX_NODER = 99};
+static naboer[MAX_NODER][MAX_NODER];
+static nodex[MAX_NODER];
+static nodey[MAX_NODER];
+static nodecol[MAX_NODER];
+static numnodes = 0;
+static nodeRadi = 20;
+
+enum{white=0,gray=1,black=2};
+static vertexstate[MAX_NODER];
+
+static clickedNode = -1;
+()
+{
+   if(numframes==0){
+      setfont(12,16);
+      for(i=0; i<numnodes; i++) vertexstate[i] = WHITE;
+   }
+   
+   
+   // Lage noder
+   // flytte noder
+   // lage connections
+   // gjore sok
+   
+
+
+   // sjekk kollisjon mus -> node
+   if(bstatus==1)
+   {
+      collided = 0;
+      for(i = 0; i<numnodes; i++)
+      {
+      if( ((mousx-nodex[i])^2 + (mousy-nodey[i])^2 ) < nodeRadi^2 )
+           {
+              //nodecol[i] = rgb(rnd*255, rnd*255, rnd*255);
+              collided = 1;
+              if(clickedNode != -1)
+              {
+                 naboer[i][clickedNode] = 1; // make neighbours
+                 naboer[clickedNode][i] = 1;
+                 clickedNode = -1;
+              }
+              else
+              {
+                 clickedNode = i;
+              }
+           }
+      }
+      if(collided == 0 && numnodes < MAX_NODER)
+      {
+          nodex[numnodes] = mousx;
+          nodey[numnodes] = mousy;   
+          nodeCol[numnodes] = 0xffffff;
+          numnodes++;
+      }
+      bstatus = 0;
+   }
+   if(bstatus==2)
+   {
+      minDist = 1e32;
+      closest = -1;
+      
+      for(i = 0; i<numnodes; i++)
+      {
+         dist = ((mousx-nodex[i])^2 + (mousy-nodey[i])^2 ); // < nodeRadi^2;
+         if( dist < minDist )
+         {
+            minDist = dist;
+            closest = i;  
+         }
+
+      }
+      
+      if(closest > -1) // && minDist < 10*nodeRadi^2 )
+      {         
+          nodex[closest] = mousx;
+          nodey[closest] = mousy; 
+      }
+   }
+
+   updateGfx();
+   
+   if(keystatus[57] == 1 )
+   {
+      keystatus[57] = 0;
+      dfs(0);  
+   }
+   
+   if(keystatus[200] == 1 )
+   {
+      keystatus[200] = 0;
+      for(i=0; i<numnodes; i++) vertexstate[i] = WHITE; // reset
+   }
+   
+}
+
+updateGfx()
+{
+   cls(0);
+   for(i = 0; i<numnodes; i++){
+      drawNode(i);
+      for(j=0; j<numnodes;j++)
+      {
+         if(naboer[i][j] == 1){
+         ang = atan2(  nodey[i]-nodey[j], nodex[i]-nodex[j] );
+         setcol(0x777777); drawcone( nodex[i]-cos(ang)*nodeRadi, nodey[i]-sin(ang)*nodeRadi, 2, 
+         nodex[j]+cos(ang)*nodeRadi, nodey[j] + sin(ang)*nodeRadi, 2);
+         }
+      }
+      
+   }
+   refresh();
+}
+
+loadGraphFromDisk()
+{
+}
+
+dfs(root)
+{
+   runDFS(root);
+}
+
+
+runDFS(u)
+{
+   vertexstate[u] = GRAY;
+   updateGfx();
+   sleep(250);
+   
+   for(i=0; i<numnodes; i++)
+   {
+      if( naboer[u][i]==1 && vertexstate[i] == WHITE )
+      {       
+         runDFS(i);
+      }
+   }
+   
+   vertexstate[u] = BLACK;
+   updateGfx();
+   sleep(250);
+}
+
+drawNode(i){
+   if( i < 10 ){moveto( nodex[i]-5, nodey[i]-6 );} else{moveto( nodex[i]-12, nodey[i]-6 );} 
+   
+   if(vertexstate[i] == BLACK ){
+      setcol(0xffffff); drawsph( nodex[i], nodey[i], -nodeRadi); setcol(0xffffff); printf("%g",i);}
+
+   if(vertexstate[i] == GRAY ){
+      setcol(0x777777); drawsph( nodex[i], nodey[i], nodeRadi); setcol(0xffffff); printf("%g",i);}
+   
+   if(vertexstate[i] == WHITE ){
+      setcol(0xffffff); drawsph( nodex[i], nodey[i], nodeRadi); setcol(0x000000); printf("%g",i);}   
+}

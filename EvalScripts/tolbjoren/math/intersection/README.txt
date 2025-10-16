@@ -1,0 +1,1 @@
+line vs some primitive can either be boolean, they intersect. But, dont know where, or the same as a ray vs primive test, we know when/where along the line/ray

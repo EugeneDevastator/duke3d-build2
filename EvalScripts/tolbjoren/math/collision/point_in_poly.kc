@@ -1,0 +1,104 @@
+
+enum{ N = 16}
+
+static verts_x[N];
+static verts_y[N];
+
+static texcoords_x[N];
+static texcoords_y[N];
+()
+{
+
+   cls(0); clz(1e32);
+   t = klock(0) * 1.5;
+   
+   
+   for(i=0; i<N; i++)
+   {
+      ang = 2*PI * i / N ;
+   
+      radius = 100;
+      if ( i%2==0 ){
+         radius = 200;
+      }      
+
+      verts_x[ i ] = xres/2 + cos( ang+t ) * radius;
+      verts_y[ i ] = yres/2 + sin( ang+t ) * radius;
+         
+
+      texcoords_x[ i ] = cos( ang );
+      texcoords_y[ i ] = sin( ang );
+   }
+   
+   ///#define CONCAVE
+   #ifdef CONCAVE
+   for(i=0; i<N; i++)
+   {
+      verts_x[i] = xres/2;
+      verts_y[i] = yres/2;
+   }
+   verts_x[0] -= 50;
+   verts_y[0] -= 50;
+
+   verts_x[1] += 50;
+   verts_y[1] -= 50;
+   
+   verts_x[2] += 50;
+   verts_y[2] += 50;
+   
+   verts_x[3] += 0;
+   verts_y[3] += 0;
+   
+   verts_x[4] -= 50;
+   verts_y[4] += 50;
+   #endif
+
+
+   hit = pnpoly( n, verts_x, verts_y, mousx, mousy );
+
+
+   setcol(255,255,255);
+
+   if ( hit ) 
+   {
+      glbegin( GL_COMPLEX );
+      for(i=0; i<N; i++)
+      {
+         gltexcoord( texcoords_x[ i ], texcoords_y[ i ] );
+         glvertex( verts_x[ i ], verts_y[ i ] );
+      }
+      glend();
+   }  
+   else
+   {
+      
+      for(i=0; i<N; i++)
+      {
+         moveto( verts_x[ i ], verts_y[ i ] );
+         lineto( verts_x[ (i+1)%N ], verts_y[ (i+1)%N ] );
+      }
+
+   }
+   
+   
+
+   if ( hit )
+   {
+      moveto( mousx, mousy );
+      printf("hit");
+   }
+   
+
+}
+
+// http://www.ecse.rpi.edu/Homepages/wrf/Research/Short_Notes/pnpoly.html
+pnpoly(nvert, vertx[N], verty[N], testx, testy)
+{
+  c = 0;
+  for (i = 0, j = nvert-1; i < nvert; j = i++) {
+    if ( ((verty[i]>testy) != (verty[j]>testy)) &&
+    (testx < (vertx[j]-vertx[i]) * (testy-verty[i]) / (verty[j]-verty[i]) + vertx[i]) )
+       c = !c;
+  }
+  return c;
+}

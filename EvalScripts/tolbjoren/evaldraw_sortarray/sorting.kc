@@ -1,0 +1,57 @@
+enum{MAXITEMS = 100}
+static numitems = 50;
+static items[MAXITEMS];
+enum{NMAX=100}
+()
+{
+   cls(0);
+   moveto(0,0);
+   printf("sorted:");
+   for(i=0; i<numitems; i++)
+   {
+      printf("\n%g = %g",i,items[i]);
+   }
+
+   //if(keystatus[57])
+   {
+       keystatus[57]=0;
+
+      for(i=0; i<numitems;i++){
+         items[i]=int(rnd*NMAX);
+      }
+      //inssort (items,0,numitems);  
+      crapsort(items);
+   } 
+}
+
+crapsort(a[NMAX])
+{
+   static iOrder[MAXITEMS];
+   static iData[MAXITEMS];
+   
+   for(i=0; i<numitems; i++){ // set initial order, save data
+      iOrder[i] = i; 
+      iData[i] = items[i];
+   }
+   // now sort based on dist
+
+   for(i=1; i<numitems; i++){
+      for(j=0; j<i; j++){
+         if(iData[iOrder[i]] < iData[iOrder[j]] ) // sort
+         {
+            t = iOrder[i]; iOrder[i] = iOrder[j]; iOrder[j] = t;
+         }
+      }
+   }
+   for(i=0; i<numitems; i++){ // could do this over. writeback.
+      items[i] = iData[ iOrder[i] ];
+   }
+}
+
+
+inssort (a[NMAX],i0,i1)
+{
+   for(j=i0+1;j<i1;j++)
+      for(i=j;(i>i0)&&(a[i]<a[i-1]);i--)
+         { t = a[i]; a[i] = a[i-1]; a[i-1] = t; }
+}

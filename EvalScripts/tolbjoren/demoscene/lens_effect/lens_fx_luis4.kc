@@ -1,0 +1,150 @@
+enum{width=512, height=512, diameter=128};
+static tfm[diameter*diameter];
+static lensEffect[width*height];
+static lensImage[diameter*diameter][2];
+static lensImage2[diameter*diameter];
+
+static lensXPos[2];
+static lensYPos[2];
+()
+{
+   if(numframes==0) setup();
+   cls();
+      
+   draw();
+   
+}
+
+
+// Draw image to lensEffect
+// and create the transformation array tfm[]
+setup()
+{
+   lensXPos[0]=30; lensYPos[0]=30; dx=-1; dy=1;
+   // Load background image
+   for(y=0; y<height; y++)
+   for(x=0; x<width; x++)
+   {
+      r=0; g=0; b=0;
+      pic(x,y,r,g,b);
+      lensEffect[y*width+x] =r*2^16 + g*2^8 + b;
+   }
+   // lens algo (transformation array)
+   mag = 20; //magnification factor
+   r=0; m=0; y=0; x=0; a=0; b=0; //ints
+   s=0; z=0; //floats
+   
+   r = diameter/2;
+   s = sqrt(r^2-mag^2);
+   
+   for(y=-r; y<r; y++)
+   for(x=-r; x<r; x++)
+   {
+      if(x^2 + y^2 >= s^2)
+      {
+         a=x; b=y;
+      }else
+      {
+         z = sqrt( r^2-x^2-y^2 );
+         a = int( (x*mag/z+0.5) ); //should be cast to int
+         b = int( (y*mag/z+0.5) );
+      }
+      tfm[ (y+r)*diameter+(x+r) ] = (b+r)*diameter + (a+r);
+   }   
+}
+
+
+
+
+draw()
+{   
+   if(bstatus==1)
+   {
+      lensXPos[0]=mousx-diameter/2;
+      lensYPos[0]=mousy-diameter/2;
+   }
+   if(bstatus==2)
+   {
+      lensXPos[1]=mousx-diameter/2;
+      lensYPos[1]=mousy-diameter/2;
+   }
+   
+   drawOriginal();
+   //saveBG(0);
+   
+   calcLens(0);
+   calcLens(1);
+   drawLens(0);
+   drawLens(1);
+   
+   //saveBG(1); 
+}
+
+drawOriginal()
+{
+   // just draw original image
+   i=0;
+   for(y=0; y<height; y++)
+   for(x=0; x<width; x++)
+   {
+      setcol(lensEffect[i]);
+      setpix(x,y);
+      i++;
+   }
+}
+
+saveBG(lensNum)
+{
+   xx = lensXPos[lensNum]; yy = lensYPos[lensNum];
+   // save the bg of lensHeight*lensWidth pixels rect at 
+   // the coords where the lens fx will be applied   
+   i=0;
+   for(y=yy; y<yy+diameter; y++)
+   {
+      for(x=xx; x<xx+diameter; x++)
+      {
+      lensImage2[i] = lensEffect[y*width+x];
+      i++;
+      }
+   }
+}
+
+
+calcLens(lensNum)
+{
+   xx = lensXPos[lensNum]; yy = lensYPos[lensNum];
+   // save the bg of lensHeight*lensWidth pixels rect at 
+   // the coords where the lens fx will be applied   
+   i=0;
+   for(y=yy; y<yy+diameter; y++)
+   {
+      for(x=xx; x<xx+diameter; x++)
+      {
+      lensImage2[i]= lensEffect[y*width+x];
+      i++;
+      }
+   }
+
+   // output into a buffered image for reuse
+   // not needed...
+   
+   // for each pixel in the dest rect apply the color
+   // from the appropriate pixel in the saved bg
+   // the tfm array tells the offset into the saved bg
+   for(i=0; i<diameter^2; i++){
+      lensImage[i][lensNum] = lensImage2[ tfm[i] ];
+   }
+}
+
+drawLens(lensNum)
+{
+   // then overlay the deformed lens square
+   i=0;
+   for(y=0; y<diameter; y++)
+   for(x=0; x<diameter; x++)
+   {
+      setcol( lensImage[i][lensNum]);
+      i++;
+      setpix(lensXPos[lensNum]+x,lensYPos[lensNum]+y);
+   } 
+}

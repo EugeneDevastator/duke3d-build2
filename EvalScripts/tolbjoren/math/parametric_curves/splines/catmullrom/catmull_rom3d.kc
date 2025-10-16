@@ -1,0 +1,256 @@
+/* Coefficients for Matrix M */
+static M11 = 0.0;
+static M12 = 1.0;
+static M13 = 0.0;
+static M14 = 0.0;
+static M21 = -0.5;
+static M22 = 0.0;
+static M23 = 0.5;
+static M24 = 0.0;
+static M31 = 1.0;
+static M32 = -2.5;
+static M33 = 2.0;
+static M34 = -0.5;
+static M41 = -0.5;
+static M42 = 1.5;
+static M43 = -1.5;
+static M44 = 0.5;
+
+struct Vec3{
+   x,y,z;
+};
+
+struct Point{
+   x,y,z;
+};
+enum{NUMPTS = 16}
+static Point pts[NUMPTS];
+
+static time, dt;
+static interpolant = 0;
+()
+{
+   now = klock(0);
+   dt = time - now;
+   time = now;
+
+   cls(0); clz(1e32);
+
+   //if( numframes == 0)
+   {
+
+      for(i=0; i<NUMPTS; i++)
+      {
+         ang = i * 2 * PI / NUMPTS;
+         r = 10;
+         pts[i].x = r*cos(ang);
+         pts[i].y = sin(time*5+ang + i^3);
+         pts[i].z = r*sin(ang);
+      }
+   }
+   
+   for(i=-20; i<20; i++){
+      for(j=-20; j<20; j++)
+      drawsph(i,5,j,.2);
+   }
+   
+
+   
+   playerx = 0;
+   playery = 0;
+   playerz = 0;
+   
+   //interpolant = mousx/xres;
+   interpolant -= dt * 0.15;
+   if( interpolant >= 1 ) interpolant = 0;   
+
+   t0 = floor( interpolant * numPts);
+   t1 = ceil( interpolant * numPts);   
+
+   currPt = t1;
+   
+   x = interpolant * numPts;
+   t = (x - t0 ) / (t1 - t0);   
+
+   playerx = catmullRomSpline( t, pts[currPt-1].x, pts[currPt].x, pts[currPt+1].x, pts[currPt+2].x ); 
+   playery = catmullRomSpline( t, pts[currPt-1].y, pts[currPt].y, pts[currPt+1].y, pts[currPt+2].y ); 
+   playerz = catmullRomSpline( t, pts[currPt-1].z, pts[currPt].z, pts[currPt+1].z, pts[currPt+2].z ); 
+   
+   //playerdx = catmullRomSplineDerv( t, pts[currPt-1].x, pts[currPt].x, pts[currPt+1].x, pts[currPt+2].x ); 
+   //playerdy = catmullRomSplineDerv( t, pts[currPt-1].y, pts[currPt].y, pts[currPt+1].y, pts[currPt+2].y ); 
+
+   dx0 = pts[currPt+1].x - pts[currPt-1].x;
+   dy0 = pts[currPt+1].y - pts[currPt-1].y;
+   dz0 = pts[currPt+1].z - pts[currPt-1].z;   
+
+   dx1 = pts[currPt+2].x - pts[currPt].x;
+   dy1 = pts[currPt+2].y - pts[currPt].y;
+   dz1 = pts[currPt+2].z - pts[currPt].z;
+   
+   //len = sqrt(dx*dx+dy*dy);
+   
+   playerdx = dx0 + t*(dx1-dx0);
+   playerdy = dy0 + t*(dy1-dy0);
+   playerdz = dz0 + t*(dz1-dz0);
+   
+   len = sqrt(playerdx^2 + playerdy^2 + playerdz^2);
+   rlen = 1/len;
+   playerdx *= rlen;
+   playerdy *= rlen;
+   playerdz *= rlen;
+
+   setcol(0,255,0);
+   drawsph( playerx, playery, playerz, .5);
+   moveto( playerx, playery, playerz );
+   lineto( playerx + playerdx, playery + playerdy, playerz + playerdz );
+   
+   scaler = 2;
+  drawcone( playerx, playery, playerz, .1,
+            playerx + playerdx*scaler, playery + playerdy*scaler, playerz + playerdz*scaler, .1 );   
+
+
+   upx = 0;
+   upy = 1;
+   upz = 0;
+   
+
+// XYZZY
+   rx = playerdy * upz - playerdz * upy;
+   ry = playerdz * upx - playerdx * upz;
+   rz = playerdx * upy - playerdy * upx;
+   
+   realUpx = playerdy * rz - playerdz * ry;
+   realUpy = playerdz * rx - playerdx * rz;
+   realUpz = playerdx * ry - playerdy * rx;
+   
+   // right, down, forwards, RDF
+   if( 0 )
+   {
+   setcam( playerx, playery-.9, playerz, 
+           -rx, -ry, -rz,
+           -realUpx, -realUpy, -realUpz,
+           playerdx, playerdy, playerdz );
+   }
+   else
+   {
+      setcam(0,-5,-25, 0,0);
+      
+     drawcone( playerx, playery, playerz, .1,
+               playerx + rx*scaler, playery + ry*scaler, playerz + rz*scaler, .1 ); 
+   
+   
+     drawcone( playerx, playery, playerz, .1,
+               playerx + realUpx*scaler, playery + realUpy*scaler, playerz + realUpz*scaler, .1 );
+   }     
+           
+
+   
+ 
+
+   // "Cheating" using evaldraw wraparound when arrays are pow 2
+   // achive same using modulus?
+   iters = 0;
+   for(i=0; i<NUMPTS; i++)
+   {
+      for(t = 0; t < 1; t+= 0.01 )
+      {
+         px = catmullRomSpline( t, pts[i-1].x, pts[i].x, pts[i+1].x, pts[i+2].x ); 
+         py = catmullRomSpline( t, pts[i-1].y, pts[i].y, pts[i+1].y, pts[i+2].y );
+         pz = catmullRomSpline( t, pts[i-1].z, pts[i].z, pts[i+1].z, pts[i+2].z );
+      
+         /*
+         dx = catmullRomSplineDerv( t, pts[i-1].x, pts[i].x, pts[i+1].x, pts[i+2].x ); 
+         dy = catmullRomSplineDerv( t, pts[i-1].y, pts[i].y, pts[i+1].y, pts[i+2].y );   
+
+         tx = catmullRomSplineTang( t, pts[i-1].x, pts[i].x, pts[i+1].x, pts[i+2].x ); 
+         ty = catmullRomSplineTang( t, pts[i-1].y, pts[i].y, pts[i+1].y, pts[i+2].y );   
+         */   
+    
+         if( t == 0 )
+         {
+            moveto( px, py, pz );
+         }else
+         {
+            lineto( px, py, pz );
+         }
+      
+         if( iters % 15 == 0 )
+         {
+            /*
+            if( 0 ) 
+            {
+               setcol(255,0,0);
+               moveto( px,py, pz );
+            
+               // Normalize derivative
+               len = sqrt( dx*dx + dy*dy + dz*dz );
+               dx /= len;
+               dy /= len;
+               dz /= len;
+               
+               lineto( px+dx*15, py+dy*15, pz+dz*15 );     
+            } 
+            
+
+            moveto( px,py,pz );
+            
+            setcol(0,0,255);
+            
+            // Normalize tangent
+            len = sqrt( tx*tx + ty*ty );
+            tx /= len;
+            ty /= len;
+            
+            lineto( px+tx*15, py+ty*15 );  
+            */ 
+         }
+         setcol(255,255,255);
+         setpix(px, py);
+         iters++;
+      }
+      
+   }
+   
+   for(i=0; i<NUMPTS; i++)
+   {
+      drawsph( pts[i].x, pts[i].y, pts[i].z, .1 );
+   }
+}
+
+
+
+catmullRomSpline(x, v0, v1, v2,v3)
+{
+   double c1,c2,c3,c4;
+
+   c1 = M12*v1;
+   c2 = M21*v0          + M23*v2;
+   c3 = M31*v0 + M32*v1 + M33*v2 + M34*v3;
+   c4 = M41*v0 + M42*v1 + M43*v2 + M44*v3;
+
+   return(((c4*x + c3)*x +c2)*x + c1);
+}
+
+catmullRomSplineDerv(x, v0, v1, v2,v3)
+{
+   double c1,c2,c3,c4;
+
+   c1 = M12*v1;
+   c2 = M21*v0          + M23*v2;
+   c3 = M31*v0 + M32*v1 + M33*v2 + M34*v3;
+   c4 = M41*v0 + M42*v1 + M43*v2 + M44*v3;
+
+   return( 3*c4*x^2 + 3*x^2 + c2 );
+}
+
+catmullRomSplineTang(x, v0, v1, v2,v3)
+{
+   double c1,c2,c3,c4;
+
+   c1 = M12*v1;
+   c2 = M21*v0          + M23*v2;
+   c3 = M31*v0 + M32*v1 + M33*v2 + M34*v3;
+   c4 = M41*v0 + M42*v1 + M43*v2 + M44*v3;
+
+   return( 6*c4*x + 6*x );
+}

@@ -1,0 +1,397 @@
+// BACK TO THE DRAWING BOARD!
+// todo speed up
+// todo: make string only extensible to a point
+// dont check collision against all
+// make collision map
+enum{MAXBALLS=50}
+static friction = 0.95;
+
+static mass = 1.0;
+static opx[MAXBALLS];
+static opy[MAXBALLS];
+static px[MAXBALLS];
+static py[MAXBALLS];
+static ax[MAXBALLS];
+static ay[MAXBALLS];
+static vx[MAXBALLS];
+static vy[MAXBALLS];
+static ballRadi = 8;
+static e = 0.30;
+
+
+enum{NUMSTRINGS = 3, NUMPOINTS = 4} // let NUMPOINTS be a power of 2. (want the middle-point be a pow of 2)
+static stringx[NUMSTRINGS][NUMPOINTS];
+static stringy[NUMSTRINGS][NUMPOINTS];
+static stringvx[NUMSTRINGS][NUMPOINTS];
+static stringvy[NUMSTRINGS][NUMPOINTS];
+static copyStringx[NUMSTRINGS][NUMPOINTS]; // temp buffer
+static copyStringy[NUMSTRINGS][NUMPOINTS];
+
+enum{LOOP, LINE}
+static stringTopo[NUMSTRINGS]; // Loop or line?
+
+static normal_length = 30;
+static gravity = 0;
+static damping = 0;
+
+static time, oldTime, dt;
+static collisions;
+
+static   cx = 0;
+static   cy = 0;
+static   drawscale = 1;
+
+// State
+static grabbedPoint = -1; 
+static grabbedString = -1;
+
+static grabX = 15;
+static grabY = 15;
+
+static xmin,xmax,ymin,ymax;
+
+static error = 0;
+()
+{
+   cls(0); 
+   oldTime = time;
+   time = klock(0);   
+   dt = time-oldTime;
+   
+   collisions = 0;
+
+
+   if(numframes==0)
+   {
+      setupBalls();
+      setupStrings();
+   }
+   pollControls();   
+   
+
+   setStringConstraints();
+   doStrings();   
+   ballPhysics();      
+   integrate();
+   drawStrings();
+   
+   moveto(0,0);
+   setcol(0xff0000);
+   printnum(collisions);
+   printnum(dt*1000);
+   setcol(0xffffff);
+   
+   printf("\nerror: %g",error);
+}
+
+dist(x1,y1,x2,y2){
+   return sqrt( (x2-x1)^2 + (y2-y1)^2 );
+}
+
+doStrings(){   // First. Calculate new string node positions:
+   // First. Calculate new string node positions:
+   for(str=0; str < NUMSTRINGS; str++)
+   {
+      for(i=0; i < NUMPOINTS; i++)  
+      {
+         xv = 0;
+         yv = 0;
+         for(j=1; j<2; j++) // j<2 is minimum. increase j to make stiffer   (not quite working yet)
+         {
+            back = i-j;
+            fwd = i+j;
+            
+            // Is the string a loop or a line?
+            if(stringTopo[str] == LOOP){
+               if(back < 0) back = NUMPOINTS-1-j;
+               if(fwd > (NUMPOINTS-1)) fwd = j;  
+            }
+            else if(stringTopo[str] == LINE){
+               if(back < 0) back = j;
+               if(fwd > (NUMPOINTS-1)) fwd = NUMPOINTS-1-j;
+ 
+            }
+            // Check backwards along string
+            xvec1 = stringx[str][back] - stringx[str][i];
+            yvec1 = stringy[str][back] - stringy[str][i];         
+            mag1 = sqrt( xvec1^2 + yvec1^2 );
+            ext1 = mag1 - normal_length;        
+            // Check forwards
+            xvec2 = stringx[str][fwd] - stringx[str][i];
+            yvec2 = stringy[str][fwd] - stringy[str][i];
+            mag2 = sqrt( xvec2^2 + yvec2^2 );
+            ext2 = mag2 - normal_length;
+             
+            xv += (xvec1/mag1*ext1) + (xvec2/mag2*ext2);
+            yv += (yvec1/mag1*ext1) + (yvec2/mag2*ext2) + gravity;
+         }
+         
+         // store new pos in str+1
+         stringvx[str][i] = stringvx[str][i]*damping + (xv * dt);
+         stringvy[str][i] = stringvy[str][i]*damping + (yv * dt);
+         copyStringx[str][i] = stringx[str][i] + stringvx[str][i];
+         copyStringy[str][i] = stringy[str][i] + stringvy[str][i];         
+         
+         if(str==0 && i==0)
+         {
+            vx[1] += stringvx[str][i];
+            vy[1] += stringvy[str][i];
+            moveto(px[1], py[1]);
+            printf("\next1 %.1f", ext1);
+         }
+         if(str==1 && i==0)
+         {
+            vx[2] += stringvx[str][i];
+            vy[2] += stringvy[str][i];
+         }
+         if(str==2 && i==0)
+         {
+            vx[3] += stringvx[str][i];
+            vy[3] += stringvy[str][i];
+         }   
+
+      }
+         
+
+      // copy new position back into working array
+      for(i=0; i<NUMPOINTS; i++)
+      {
+         stringx[str][i] = copyStringx[str][i];
+         stringy[str][i] = copyStringy[str][i];
+      }      
+   }  
+}
+CircleNormalAtPoint(x,y,cx,cy)
+{
+   return (atan2(y-cy, x-cx));        
+}
+mouseDrag()
+{
+   if(bstatus == 1)
+   {
+      // move currently grabbed point
+      if(grabbedPoint > -1)
+      {
+         x = stringx[grabbedString][grabbedPoint]; 
+         y = stringy[grabbedString][grabbedPoint];
+         ang = CircleNormalAtPoint((mousx-cx)/drawscale,(mousy-cy)/drawscale,x,y); // returns angle.
+         distx = (mousx-cx)/drawscale - x;
+         disty = (mousy-cy)/drawscale - y;
+         distance = sqrt(distx^2 + disty^2 );
+
+         stringx[grabbedString][grabbedPoint] += cos(ang) * distance;
+         stringy[grabbedString][grabbedPoint] += sin(ang) * distance;
+         
+      }
+      else if(grabbedPoint < 0) // no point grabbed, but mouse is down, check for collision
+      {
+         for(str=0; str < NUMSTRINGS; str++)
+         for(i=0; i<NUMPOINTS; i++)
+         {
+            x = stringx[str][i]*drawscale+cx; 
+            y = stringy[str][i]*drawscale+cy;
+            
+            if(mousx > x-grabX && mousx < x+grabX && mousy > y-grabY && mousy < y+grabY)
+            {
+               grabbedPoint = i;
+               grabbedString = str;
+               //stringvx[grabbedString][grabbedPoint] = (mousx-cx)/drawscale; //start moving right away.
+               //stringvy[grabbedString][grabbedPoint] = (mousy-cy)/drawscale;
+            }
+            if(grabbedPoint > -1) break;
+         }
+      }
+   }
+   else // mouse not down
+   {
+      grabbedPoint = -1;
+   }
+}
+
+
+ballPhysics(){
+   for(a=0; a<MAXBALLS; a++)
+   {
+      for(b=0; b<MAXBALLS; b++)
+      {
+         if(a==b) continue;
+         
+         // if  A&B are close enough to collide
+         //d = dist( px[a], py[a], px[b], py[b]  );
+         
+         d = (px[a]-px[b])^2 + (py[a]-py[b])^2;
+         if(d < ballRadi^2*4 )
+         {
+            collisions++;
+            d = sqrt(d);
+            vxa = vx[a]; vya = vy[a];
+            vxb = vx[b]; vyb = vy[b];
+            nx = px[b] - px[a];
+            ny = py[b] - py[a];
+            if( fabs(d) > 0.00001)
+            {            
+               cdx = nx/d;
+               cdy = ny/d;
+               
+               dd = ballRadi+ballRadi - d;
+               
+               px[a] -= dd*cdx;
+               py[a] -= dd*cdy;
+               px[b] += dd*cdx;
+               py[b] += dd*cdy;  
+               m = sqrt( vx[a]^2 + vy[a]^2 );
+               if(fabs(m) > 0.0001)
+               {
+                  cosam = (cdx*vx[a] + cdy*vy[a]) * e;
+                  vxa -= cdx*cosam;
+                  vya -= cdy*cosam;
+                  vxb += cdx*cosam;
+                  vyb += cdy*cosam;
+               }
+               m = sqrt( vx[b]^2 + vy[b]^2 );
+               if(fabs(m) > 0.0001)
+               {
+                  cosam = (cdx*vx[b] + cdy*vy[b]) * e;
+                  vxa += cdx*cosam;
+                  vya += cdy*cosam;
+                  vxb -= cdx*cosam;
+                  vyb -= cdy*cosam;
+               }
+            }
+            
+            vx[a] = vxa;
+            vy[a] = vya;
+            vx[b] = vxb;
+            vy[b] = vyb; 
+                      
+         }    
+      }
+   }
+
+}
+
+drawStrings()
+{
+   for(str=0; str < NUMSTRINGS; str++)
+   {
+      if(stringTopo[str] == LOOP) setcol(0xffffff);
+      if(stringTopo[str] == LINE) setcol(0x00ff00);
+      moveto(cx + stringx[str][0]*drawscale, cy + stringy[str][0]*drawscale );
+      //if(stringTopo[str] == LOOP) printf("IM A LOOP");
+      //if(stringTopo[str] == LINE) printf("IM A LINE");
+      for(i=0; i<NUMPOINTS; i++)
+      {
+         xp = cx+stringx[str][i]*drawscale;
+         yp = cy+stringy[str][i]*drawscale;
+         
+         if(i==grabbedPoint && str==grabbedString)
+         {
+            setcol(0xff0000);
+         }
+         else
+         {
+            if(stringTopo[str] == LOOP) setcol(0xffffff);
+            if(stringTopo[str] == LINE) setcol(0x00ff00);
+         }
+         drawsph(xp, yp, -3);
+         
+         lineto(xp,yp);
+      }
+      // If loop, draw line to end.
+      if(stringTopo[str] == LOOP) lineto(cx + stringx[str][0]*drawscale, cy + stringy[str][0]*drawscale);
+   }
+}
+
+setupBalls(){
+   xmin = ballRadi;
+   xmax = xres-ballRadi;
+   ymin = ballRadi;
+   ymax = yres-ballRadi;
+
+      limx = 10;
+      limy = 10;
+      xp=limx; yp=limy;
+      for(a=0; a<MAXBALLS; a++)
+      {
+         px[a] = xp;
+         py[a] = yp;
+         opx[a] = xp; opy[a] = yp;
+         ax[a] = .0;
+         ay[a] = 50;
+         //vx[a] = nrnd;
+         //vy[a] = nrnd;
+         xp += ballRadi*3;
+         if(xp > 10*xres/100)
+         {
+            xp = limx;
+            yp += ballRadi*3;
+         }
+      }
+}
+setupStrings(){
+      for(str=0; str < NUMSTRINGS; str++)
+      {
+         for(i=0; i<NUMPOINTS; i++)
+         {
+            stringTopo[str] = 1; //int(rnd*2); // it might be a line, it might be a loop
+            stringx[str][i] = xres/2 - 50 + str*50; 
+            stringy[str][i] = yres/2+(i)*normal_length; 
+
+
+         }
+      }
+      px[1] = xres/2 - 50;
+      py[1] = yres/2 + numpoints*normal_length;
+      
+      px[2] = xres/2 + 0;
+      py[2] = yres/2 + numpoints*normal_length;
+      
+      px[3] = xres/2 + 50;
+      py[3] = yres/2 + numpoints*normal_length;
+}
+pollControls(){
+   if(keystatus[203]) vx[1] -= 300*dt;
+   if(keystatus[205]) vx[1] += 300*dt;
+   if(keystatus[200]) vy[1] -= 300*dt;
+   if(keystatus[208]) vy[1] += 300*dt;
+   mouseDrag();
+}
+setStringConstraints(){   
+
+   stringx[0][0] = px[1];
+   stringy[0][0] = py[1];
+   stringx[1][0] = px[2];
+   stringy[1][0] = py[2];
+   stringx[2][0] = px[3];
+   stringy[2][0] = py[3];   
+
+
+   stringx[0][NUMPOINTS-1] = xres/2-50;
+   stringy[0][NUMPOINTS-1] = yres/2;
+   stringx[1][NUMPOINTS-1] = xres/2;
+   stringy[1][NUMPOINTS-1] = yres/2;
+}
+integrate(){
+   setcol(0xff0000);
+   for(a=0; a<MAXBALLS; a++)
+   {
+      tempx = ax[a]*dt;
+      px[a] = px[a] + dt*(vx[a]+tempx/2);  
+      vx[a] = vx[a] + tempx;
+  
+      tempy = ay[a]*dt;
+      py[a] = py[a] + dt*(vy[a]+tempy/2);
+      vy[a] = vy[a] + tempy;
+
+      // 4. apply boundy conditions  
+      if( px[a] < xmin ){ px[a] = xmin; vx[a]=-vx[a]*e;}  
+      if( px[a] > xmax ){ px[a] = xmax; vx[a]=-vx[a]*e;}
+      
+      if( py[a] < ymin ){ py[a] = ymin; vy[a]=-vy[a]*e;}   
+      if( py[a] > ymax ){ py[a] = ymax; vy[a]=-vy[a]*e;}
+      
+      
+      drawsph(px[a],py[a], -ballRadi); 
+
+   }
+}

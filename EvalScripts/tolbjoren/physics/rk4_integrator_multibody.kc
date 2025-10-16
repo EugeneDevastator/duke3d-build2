@@ -1,0 +1,581 @@
+// evaldraw version of javascript examples in this article
+// http://codeflow.org/entries/2010/aug/28/integration-by-example-euler-vs-verlet-vs-runge-kutta/#runge-kutta-method
+
+// http://www.gamedev.net/topic/428502-very-basic-overview-of-possible-integrators/
+// how do I calculate the error
+// for each integrator?
+
+struct vec{x,y;}
+
+struct Derivative
+{
+   vec pos;
+   vec vel;
+};
+
+struct body{
+   vec pos;
+   vec vel;
+   
+   Derivative derv[4];
+   
+   vec dtpos;
+   vec dtvel;
+   
+   vec acc;
+   mass;
+};
+
+struct edge{
+   v1,v2;
+   rest_length;
+   stiffness;
+   dampening;
+};
+
+enum{MAX_BODIES = 128, 
+     MAX_EDGES = 128}
+static body bodies[MAX_BODIES];
+static edge edges[MAX_EDGES];
+static alive_bodies[MAX_BODIES];
+static alive_edges[MAX_EDGES];
+
+   
+enum{
+   EULER=1, RK4=2, 
+   INTEGRATOR=1; // <-change this!
+}
+
+
+// Try stiffness = 1, 2, 3, 30 (HIGH!),  0.5
+// 200.000
+
+static spring_stiffness = 10000;
+
+// Try dampening 0, 1e-7, 0.5, 0.9999, 1.0 and higher
+static spring_dampening = 10; 
+
+enum{ updates_pr_sec = 60,
+      dt = 1.0 / updates_pr_sec;
+}
+()
+{
+   setcol(0,255,0);
+
+   
+   if ( numframes == 0 ){
+      // Setup spring graphic & GL state
+         glEnable(GL_ALPHA_TEST);
+         glDisable(GL_DEPTH_TEST);
+         glCullFace(GL_NONE);
+         //glCullFace(GL_BACK);
+         glsettex("demper2.png");
+      // end setup spring
+      
+      cx = xres/2;
+      cy = yres/2;
+
+
+      for(i=0; i<MAX_BODIES; i++){
+         bodies[i].mass = 1;
+      }  
+      
+      #if 0
+         vecset(bodies[0].pos, cx-100, cy-100 );  
+         vecset(bodies[1].pos, cx+100, cy-100 );  // 3 2
+         vecset(bodies[2].pos, cx+100, cy+100 );  // 0 1
+         vecset(bodies[3].pos, cx-100, cy+100 );
+
+         bodies[2].mass = 0;
+         bodies[1].mass = 0;
+         bodies[4].mass = 0;
+   
+         setupEdge(0,0,1,spring_stiffness,spring_dampening);
+         setupEdge(1,0,3,spring_stiffness,spring_dampening);
+         setupEdge(2,2,1,spring_stiffness,spring_dampening);
+         setupEdge(3,2,3,spring_stiffness,spring_dampening);
+         
+         setupEdge(4,0,2,spring_stiffness,spring_dampening);
+         setupEdge(5,3,1,spring_stiffness,spring_dampening);
+         
+         for(i=0; i<4; i++){
+            alive_bodies[i] = 1;
+         }
+
+         for(i=0; i<5; i++){
+            alive_edges[i] = 1;
+         }  
+         
+         bodies[0].pos.x += 30;
+      
+      #else
+         num_bodies = 8;
+         num_edges = num_bodies-1;
+         
+         for(i=0; i<num_bodies; i++){
+            vecset(bodies[i].pos, 50+i*(xres-100)/num_bodies, cy-150 );
+         }
+         
+         
+         for(i=0; i<num_edges; i++){
+            setupEdge(i,i,i+1,spring_stiffness,spring_dampening);
+         }
+         
+         for(i=0; i<num_bodies; i++){
+            alive_bodies[i] = 1;
+         }
+   
+         for(i=0; i<num_edges; i++){
+            alive_edges[i] = 1;
+         }
+         
+         bodies[0].mass = 0;
+         bodies[num_bodies-1].mass = 0;
+      #endif
+      
+      bodies[MAX_BODIES-1].mass = 0;
+      alive_bodies[MAX_BODIES-1] = 0;
+      alive_edges[MAX_EDGES-1] = 0;
+
+
+   }
+   
+   cls(0); clz(1e32);
+   time = klock(0);
+ 
+   #if INTEGRATOR==EULER
+      steps = 8;
+      delta = dt/steps;
+      for(i=0; i<steps; i++){
+         //if ( time < 1 ) continue;
+      
+
+
+         
+         for(j=0; j<MAX_EDGES; j++){
+            if ( alive_edges[j] == 0 ) continue;
+            v1 = edges[j].v1;
+            v2 = edges[j].v2;
+            edge current_edge;
+            current_edge = edges[j];
+            
+                        
+            derivative first_body;
+            derivative second_body;
+
+            setDerv( first_body, bodies[v1].pos, bodies[v1].vel );
+            setDerv( second_body, bodies[v2].pos, bodies[v2].vel );
+            vec acc; acc.x = 0; acc.y = 0;
+            acceleration( acc, second_body, first_body, current_edge );
+            m1 = bodies[v1].mass;
+            m2 = bodies[v2].mass;
+            if ( m1 ){
+               bodies[v1].acc.x += acc.x / m1;
+               bodies[v1].acc.y += acc.y / m1;  
+            }
+            
+            if ( m2 ){
+               bodies[v2].acc.x -= acc.x / m2;
+               bodies[v2].acc.y -= acc.y / m2;  
+            }
+         }
+         
+   
+
+         for(j=0; j<MAX_BODIES; j++){
+            if ( alive_bodies[j] == 0 ) continue;
+            
+            if ( bodies[j].mass )
+               bodies[j].acc.y += 1e3;
+            
+
+            bodies[j].vel.x += bodies[j].acc.x * delta;
+            bodies[j].vel.y += bodies[j].acc.y * delta;   
+   
+            bodies[j].pos.x += bodies[j].vel.x * delta;
+            bodies[j].pos.y += bodies[j].vel.y * delta;
+            
+            bodies[j].acc.x = 0;
+            bodies[j].acc.y = 0;
+
+         }
+         
+         
+
+      }
+      
+         
+
+   #endif
+   
+   #if INTEGRATOR==RK4
+      derivative d0;
+      vecset( d0.pos, 0,0);
+      vecset( d0.vel, 0,0);
+      
+      steps = 4;
+      delta = dt/steps;
+      for(i=0; i<steps; i++){
+      
+         if ( time < 1 ) continue;
+         
+
+         /*
+         
+         calc F_tot for each body at timestep t + 0
+         calc F_tot for each body at timestep t + 0.5 *dt
+         calc F_tot for each body at timestep t + 0.5 *dt
+         calc F_tot for each body at timestep t + 1.0 *dt
+         
+         // need to save pos,vel,acc 4x!
+
+         */
+
+         for(j=0; j<MAX_EDGES; j++){
+            v1 = edges[j].v1;
+            v2 = edges[j].v2;
+            
+
+            derivative first_body;
+            derivative second_body;
+
+            setDerv( first_body, bodies[v1].pos, bodies[v1].vel );
+            setDerv( second_body, bodies[v2].pos, bodies[v2].vel );
+            
+            derivative a1, b1, c1, d1;
+            derivative a2, b2, c2, d2;
+            
+            compute( a1,a2, first_body, second_body, j, delta*0.0, d0, d0 );
+            compute( b1,b2, first_body, second_body, j, delta*0.5, a1, a2 );
+            compute( c1,c2, first_body, second_body, j, delta*0.5, b1, b2 );
+            compute( d1,d2, first_body, second_body, j, delta*1.0, c1, c2 );
+            
+            // Final
+            dxdt = 1.0 / 6.0 * (a1.pos.x + 2.0*(b1.pos.x + c1.pos.x) + d1.pos.x);
+            dydt = 1.0 / 6.0 * (a1.pos.y + 2.0*(b1.pos.y + c1.pos.y) + d1.pos.y);
+            
+            dvxdt = 1.0 / 6.0 * (a1.vel.x + 2.0*(b1.vel.x + c1.vel.x) + d1.vel.x);
+            dvydt = 1.0 / 6.0 * (a1.vel.y + 2.0*(b1.vel.y + c1.vel.y) + d1.vel.y);
+
+            if ( bodies[v1].mass ){
+            
+            #if 1
+            bodies[v1].dtpos.x += dxdt * delta;
+            bodies[v1].dtpos.y += dydt * delta; 
+            bodies[v1].dtvel.x += dvxdt * delta;
+            bodies[v1].dtvel.y += dvydt * delta;
+            #else
+            
+            
+            bodies[v1].pos.x += dxdt * delta;
+            bodies[v1].pos.y += dydt * delta; 
+            bodies[v1].vel.x += dvxdt * delta;
+            bodies[v1].vel.y += dvydt * delta;
+            #endif
+            
+            }
+                       
+            dxdt = 1.0 / 6.0 * (a2.pos.x + 2.0*(b2.pos.x + c2.pos.x) + d2.pos.x);
+            dydt = 1.0 / 6.0 * (a2.pos.y + 2.0*(b2.pos.y + c2.pos.y) + d2.pos.y);
+            
+            dvxdt = 1.0 / 6.0 * (a2.vel.x + 2.0*(b2.vel.x + c2.vel.x) + d2.vel.x);
+            dvydt = 1.0 / 6.0 * (a2.vel.y + 2.0*(b2.vel.y + c2.vel.y) + d2.vel.y);
+          
+            if ( bodies[v2].mass ){
+            
+            #if 1
+            bodies[v2].dtpos.x += dxdt * delta;
+            bodies[v2].dtpos.y += dydt * delta;
+            bodies[v2].dtvel.x += dvxdt * delta;
+            bodies[v2].dtvel.y += dvydt * delta;
+            #else
+
+            bodies[v2].pos.x += dxdt * delta;
+            bodies[v2].pos.y += dydt * delta;
+            bodies[v2].vel.x += dvxdt * delta;
+            bodies[v2].vel.y += dvydt * delta;
+            #endif
+            }
+
+         }
+
+         #if 1
+         for(j=0; j<MAX_BODIES; j++){
+         
+            bodies[j].pos.x += bodies[j].dtpos.x;
+            bodies[j].pos.y += bodies[j].dtpos.y;
+            vecset(bodies[j].dtpos, 0, 0);
+            
+            bodies[j].vel.x += bodies[j].dtvel.x;
+            bodies[j].vel.y += bodies[j].dtvel.y;
+            vecset(bodies[j].dtvel, 0, 0);
+         }
+         #endif
+         
+         
+
+      }
+   #endif
+   
+   
+   for(i=0; i<MAX_EDGES; i++){
+      if ( alive_edges[i] == 0 ) continue;
+      v1 = edges[i].v1;   
+      v2 = edges[i].v2;
+      vec p1,p2;
+      p1 = bodies[v1].pos;
+      p2 = bodies[v2].pos;
+      
+      drawspring(p1.x, p1.y, p2.x, p2.y, .5*edges[i].rest_length );
+      
+
+   }
+   for(i=0; i<MAX_BODIES; i++){
+      vec pos;
+      pos = bodies[i].pos;
+      setcol(255,255,255);
+      drawsph( pos.x, pos.y, 3 );
+      
+      setcol(0,255,0);
+      drawsph( pos.x, pos.y, 2 );
+   }
+   
+
+   setcol(0,255,0);
+   
+   setfont(18,36,1);
+   moveto(xres/2-100, yres-120);
+   if (INTEGRATOR==EULER) {
+      printf("euler\n");
+   }else{ //INTEGRATOR==RK4
+      printf("rungekutta4\n");
+   }
+   
+   setfont(8,12);
+   moveto(120,120);
+   printf("stiffness = %g\n", spring_stiffness );
+   printf("dampening = %g\n", spring_dampening );
+   printf("dt = %.4f\n", dt );
+
+   /*
+   dx = keystatus[205] - keystatus[203];   
+   dy = keystatus[208] - keystatus[200];
+
+   bodies[0].vel.x += 20 * dx;
+   bodies[0].vel.y += 20 * dy;
+   */
+   
+   vec mousepos;
+   vecset(mousepos, mousx, mousy);
+   
+   static grab=-1;
+   
+   if ( bstatus == 1 && grab==-1 ){
+      mind = 1e32;
+      idx = -1;
+      for(i=0; i<MAX_BODIES; i++){
+         if ( i==MAX_BODIES-1 ) continue; // HACK
+         dist = distance( bodies[i].pos, mousepos );
+         if ( dist < mind ) {
+            mind = dist;
+            idx = i;
+         }
+      }
+      
+   
+      
+      if ( idx != -1 ) {
+         grab = idx;
+         
+         alive_bodies[MAX_BODIES-1] = 1;
+         vecset(bodies[MAX_BODIES-1].pos, mousx, mousy );
+         setupEdge(MAX_EDGES-1,idx,MAX_BODIES-1,spring_stiffness,spring_dampening);
+      
+      }
+   }
+   
+   if ( bstatus == 0 ){
+      grab = -1;
+   }
+   
+   if ( grab != -1 ){
+   
+      //bodies[grab].pos.x = mousx;
+      //bodies[grab].pos.y = mousy;
+      vecset(bodies[MAX_BODIES-1].pos, mousx, mousy );
+      
+      alive_edges[MAX_EDGES-1] = 1;
+      
+
+   }else{
+      alive_bodies[MAX_BODIES-1] = 0;
+      alive_edges[MAX_EDGES-1] = 0;
+      //setupEdge(MAX_EDGES-1,MAX_BODIES-1,MAX_BODIES-1,spring_stiffness,spring_dampening);
+   }
+
+
+
+   while( numframes/60 > klock() ) {};
+}
+
+compute( derivative calcDerv1, derivative calcDerv2, 
+         derivative init1, derivative init2, 
+         idx, delta, 
+         derivative derv1, derivative derv2){
+         
+   derivative state1, state2;
+   
+   state1.pos.x = derv1.pos.x * delta + init1.pos.x;
+   state1.pos.y = derv1.pos.y * delta + init1.pos.y;
+   
+   state1.vel.x = derv1.vel.x * delta + init1.vel.x;
+   state1.vel.y = derv1.vel.y * delta + init1.vel.y;
+   
+   state2.pos.x = derv2.pos.x * delta + init2.pos.x;
+   state2.pos.y = derv2.pos.y * delta + init2.pos.y;
+   
+   state2.vel.x = derv2.vel.x * delta + init2.vel.x;
+   state2.vel.y = derv2.vel.y * delta + init2.vel.y;
+
+   vec acc;
+   acceleration( acc, state1, state2, edges[idx] ); 
+
+   calcDerv1.pos = state1.vel;
+   calcDerv1.vel.x = acc.x;
+   calcDerv1.vel.y = acc.y;
+   
+   calcDerv2.pos = state2.vel;
+   calcDerv2.vel.x = -acc.x;
+   calcDerv2.vel.y = -acc.y;
+}
+
+acceleration(vec out, derivative d1, derivative d2, edge cur_edge){
+   vec pos1,pos2;
+   
+   pos1 = d1.pos;
+   pos2 = d2.pos;
+
+   vec vel1,vel2;
+   vel1 = d1.vel;
+   vel2 = d2.vel;
+   
+   xd = pos2.x - pos1.x;
+   yd = pos2.y - pos1.y;
+   
+   vx = vel2.x - vel1.x;
+   vy = vel2.y - vel1.y;
+
+   b = spring_dampening;
+   k = spring_stiffness;
+
+   // maintain distance
+   // F = -k(|x|-d)(x/|x|) - bv
+   dist = sqrt( xd^2 + yd^2 );
+   
+   rest_length = cur_edge.rest_length;
+   
+   vec vel, p1p2;
+   vecset( vel, vx, vy);
+   vecsub( p1p2, pos2, pos1 );
+   
+   v_dot_ext = dot( vel, p1p2 );
+   force_mag = -(k*( dist - rest_length ) + b * v_dot_ext/dist );
+   out.x = force_mag * (xd/dist) - b*vx;
+   out.y = force_mag * (yd/dist) - b*vy; 
+}
+
+
+
+setDerv( derivative d, vec p, vec v )
+{
+   vecset( d.pos, p );
+   vecset( d.vel, v );
+}
+
+
+
+vecset(vec v, x,y){ v.x = x; v.y = y; }
+vecset(vec v, vec other){ v.x = other.x; v.y = other.y; }
+
+vecSub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y; 
+}
+
+dot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y;
+}
+
+length( vec v )
+{
+   return sqrt( dot(v,v) );
+}
+
+distance(vec a, vec b){
+   return sqrt( (a.x - b.x)^2 + (a.y - b.y)^2 );
+}
+distanceSq(vec a, vec b){
+   return (a.x - b.x)^2 + (a.y - b.y)^2;
+}
+
+rotate(&x,&y,a){
+   ca = cos(a);
+   sa = sin(a);
+   tmpx = ca * x - sa * y;
+   tmpy = sa * x + ca * y;
+   x = tmpx; y = tmpy; // copy transformed values back
+}
+
+drawspring(x1, y1, x2, y2, thickness)
+{
+   dx = x2-x1; dy = y2-y1;
+   a = atan2(dy,dx);
+   
+   w = sqrt( dx^2 + dy^2 );
+   h = thickness;
+
+   v1x = 0; v1y = -h/2;
+   v2x = 0; v2y = h/2;
+   v3x = w; v3y = h/2;
+   v4x = w; v4y = -h/2;
+   
+   rotate(v1x, v1y, a);
+   rotate(v2x, v2y, a);
+   rotate(v3x, v3y, a);
+   rotate(v4x, v4y, a);
+   
+   x = x1; y = y1;
+   
+   setcol(255,255,255);
+   glBegin(GL_QUADS);
+      glTexcoord(0,0); glVertex( x+v1x, y+v1y );
+      glTexcoord(0,1); glVertex( x+v2x, y+v2y );
+      glTexcoord(1,1); glVertex( x+v3x, y+v3y );
+      glTexcoord(1,0); glVertex( x+v4x, y+v4y );
+   glEnd();
+   
+   setcol(0,255,0);
+   
+   moveto( x+v1x, y+v1y );
+   lineto( x+v2x, y+v2y );
+   lineto( x+v3x, y+v3y );
+   lineto( x+v4x, y+v4y );
+   lineto( x+v1x, y+v1y );
+   
+}
+
+setupEdge(i,v1,v2,k,d)
+{
+   edges[i].v1 = v1;
+   edges[i].v2 = v2;
+   edges[i].stiffness = k;
+   edges[i].dampening = d;
+   
+   edges[i].rest_length = distance( bodies[v1].pos, bodies[v2].pos );
+}
+
+distance(vec a, vec b){
+   return sqrt( (a.x - b.x)^2 + (a.y - b.y)^2 );
+}

@@ -1,0 +1,86 @@
+enum{w=256, h = 256};
+
+()
+static img[w][h];
+if(numframes==0){
+   for(i=0; i<w; i++)
+   for(j=0; j<h; j++)
+   {
+      img[j][i] = rgb(i,0,255-j);
+   }
+
+   for(i=0; i<w; i++)
+   for(j=0; j<h; j++)
+   {
+      img[j][i] = 0;
+   }
+   
+   x = W/2;
+   y = H/2;
+   img[y][x] = rgb(255,255,255);
+   
+
+   xmin = 0;
+   ymin = 0;
+   
+   xmax = W;
+   ymax = H;
+   
+   numplot = w*5;
+   for(i=0; i<w*5; i++)
+   {
+
+      x = rnd*W;
+      y = rnd*H;
+
+      finish = 0;
+      
+      do
+      {
+   
+         
+         if(x > xmin && x < xmax)
+         {
+            if(y > ymin && y < ymax)
+            {
+               // if near pixel
+               
+               if( 
+                   img[y][x-1] > 0 ||
+                   img[y][x+1] > 0 ||
+                   img[y+1][x] > 0 ||
+                   img[y-1][x] > 0 ||                   
+
+                   img[y-1][x-1] > 0 ||
+                   img[y-1][x+1] > 0 ||
+                   img[y+1][x+1] > 0 ||
+                   img[y+1][x+1] > 0 )
+               {
+               // if pix not blank todo
+               img[y][x] = rgb(255,255,i/numplot);
+               finish = 1;
+               }
+            }
+         }
+         
+         //if(x < 0 || x > W || y < 0 || y > h)
+         else
+         {
+            x = min( max(0,x), w );
+            y = min( max(0,y), h );
+            img[y][x] = rgb(255,255,255);
+            finish = 1;
+         }
+         // move randomly
+         
+         x += int( nrnd );
+         y += int( nrnd );
+      
+      }while(finish==0);
+      
+   }
+}
+cls(0);
+texture = glsettex(img,256,256);
+drawspr(mousx,mousy,128,0);
+glremovetex(texture);

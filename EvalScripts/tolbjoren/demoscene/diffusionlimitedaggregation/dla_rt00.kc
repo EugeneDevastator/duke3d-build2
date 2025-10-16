@@ -1,0 +1,179 @@
+enum{w=256};
+enum{h = w};
+static img[w][h];
+static x,y;
+static iters = 1;
+()
+{
+
+static finish = 0;
+
+
+
+
+time = klock(0);
+
+if(numframes==0){
+
+   
+   initDLA();
+   
+}
+   
+   
+   iters++;
+   if( iters > 200 ) finish = 1;
+   stepsPerIter = 100000;
+   if(finish==0)
+   for(i=0; i<stepsPerIter; i++){
+            
+         if(img[y][x] == 0) // not allready occupied.
+         if( tryToFill(x,y) == 0 )
+         {
+            
+
+         }else
+         {
+            x = rnd*W;
+            y = rnd*H;
+         }
+         // move randomly
+         
+         
+      
+         x += nrnd;
+         y += nrnd;
+
+         if(x < 0 || x > W || y < 0 || y > h)
+         {
+            numNeighbors = 0;
+            do
+            {
+               x = rnd*W;
+               y = rnd*H;
+               
+               numNeighbors = 0;
+               for(ix=-1; ix < 2; ix++)
+               {
+                  for(iy=-1; iy < 2; iy++)
+                  {
+                     //if( ix == 0 && iy == 0 ) continue;
+                     //if( fabs(ix)==1 && fabs(iy)==1 ) continue;
+                     
+                     //if( iy == 0 && fabs(ix)==1 ) continue;
+
+                     if( img[y+iy][x+ix] > 1 ) numNeighbors++;
+                  }
+               }
+
+            }while( img[y][x] != 0 && numNeighbors > 1 );
+         }   
+   }
+   
+    
+   if(finish == 1 && keystatus[57]) // then clear buffer
+   {
+      finish = 0;
+      iters = 0;
+
+      initDLA();
+   }
+   
+   cls(0);
+   texture = glsettex(img,w,h);
+   setcol(0xffffff); 
+   drawspr(xres/2, yres/2, 256, 0);
+   glremovetex(texture);
+   
+   moveto(mousx,mousy);
+   
+   moveto(xres*.17,100);
+   setfont(18*2,36*2,-1);
+   printf("Diffusion Limited Aggregation");
+}
+
+tryToFill(x,y)
+{
+
+xmin = 0;
+ymin = 0;
+
+xmax = W;
+ymax = H;
+
+   if(x > xmin && x < xmax)
+   {
+      if(y > ymin && y < ymax)
+      {
+         numNeighbors = 0;
+            
+         for(ix=-1; ix <= 1; ix++)
+         {
+            for(iy=-1; iy <= 1; iy++)
+            {
+               //if( ix == 0 && iy == 0 ) continue;
+               //if( fabs(ix)==1 && fabs(iy)==1 ) continue;
+                     
+               //if( fabs(ix)==1 && iy == 0 ) continue;
+               //if( ix == 0 && fabs(iy)==1 ) continue;
+
+               if( img[y+iy][x+ix] > 1 ) numNeighbors++;
+            }
+         }
+
+
+         if( numNeighbors == 1 ) 
+         {
+            hue = 360 * iters / 300; 
+            r=0; g=0; b=0;
+            hsv_to_rgb(hue % 360,1,1,r,g,b);
+            img[y][x] = rgb(r,g,b);
+            
+
+            return 1;
+         }
+      }
+   }
+   return 0;
+         
+}
+
+initDLA()
+{
+   for(i=0; i<W; i++)
+   for(j=0; j<H; j++)
+      img[i][j] = 0;
+         
+   x = W/2;
+   y = H/2;
+   img[y][x] = rgb(255,255,255);
+   img[y][x+1] = rgb(255,255,255);
+   
+   x = rnd*W;
+   y = rnd*H;
+}
+
+hsv_to_rgb(hue,sat,val,&r,&g,&b){ 
+   if( val == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( sat==0 ){r=val; g=val; b=val;} //grayscale, no colour saturation
+   else
+   {
+      hf = hue / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = val * ( 1 - sat );
+      qv  = val * ( 1 - sat * f );
+      tv  = val * ( 1 - sat * ( 1 - f ) );
+      if(i==0){r=val; g=tv; b=pv;} 
+      if(i==1){r=qv; g=val; b=pv;} 
+      if(i==2){r=pv; g=val; b=tv;} 
+      if(i==3){r=pv; g=qv; b=val;} 
+      if(i==4){r=tv; g=pv; b=val;} 
+      if(i==5){r=val; g=pv; b=qv;}
+      if(i==6){r=val; g=tv; b=pv;}
+      if(i==-1){r=val; g=tv; b=qv;}    
+   } 
+   r=int(r*255);
+   g=int(g*255);
+   b=int(b*255);
+}

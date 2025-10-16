@@ -1,0 +1,48 @@
+()
+{
+   cls(0);
+   
+   a = klock(0) ;
+   a *= 3;
+   
+   r = 100;
+   
+   cx = xres/2;
+   cy = yres/2;
+   cr = 70;
+   
+   x0 = cx - 90;
+   y0 = cy - 90;
+   x1 = x0 + cos( a ) * r;
+   y1 = y0 + sin( a ) * r;
+   
+   
+   drawsph(cx,cy,-cr);
+
+
+   t = ray_circ(x0,y0,x1,y1,cx,cy,cr);
+   
+   dx = x1-x0;
+   dy = y1-y0;
+   
+   drawsph( x0+dx*t, y0+dy*t, 3 );
+   
+
+   moveto(x0,y0);
+   lineto(x0+dx*t,y0+dy*t);
+}
+
+   // ray_circ function taken from evaldraw slide.kc script
+   //Input: Ray: (x0,y0) to (x1,y1)
+   //    Circle: (cx,cy), cr=radius
+   //Returns: fraction of ray traversed until intersection
+   
+ray_circ (x0,y0,x1,y1,cx,cy,cr)
+{
+      //((x1-x0)*t + x0-cx)^2 + ((y1-y0)*t + y0-cy)^2 = cr^2
+   x10 = x1-x0; y10 = y1-y0; Za = x10*x10 + y10*y10;
+   x0c = x0-cx; y0c = y0-cy; Zb = x10*x0c + y10*y0c;
+   f = (cr*cr - x0c*x0c - y0c*y0c)*Za + Zb*Zb; if (f < 0) return(1);
+   t = (-Zb - sqrt(f))/Za; if (t < 0) return(1);
+   return(max(t,0));
+}

@@ -1,0 +1,185 @@
+() 
+//cls(0x503070);
+cls(0);
+enum{MAXPOLES = 15}
+static poleX[MAXPOLES];
+static poleY[MAXPOLES];
+static polarity[MAXPOLES];
+static positivePole[MAXPOLES];
+static positiveCount = 0;
+
+if(numframes==0)
+{
+   for(i=0; i<MAXPOLES; i++){
+      poleX[i] = rnd*xres;
+      poleY[i] = rnd*yres;
+      polarity[i] = sgn(nrnd);
+   }
+   for(i=0; i<MAXPOLES; i++)
+   {
+      if(polarity[i] == 1)
+      {
+         positivePole[positiveCount] = i;
+         positiveCount++;
+      }
+   }
+   
+}
+
+if (bstatus%2)
+{
+   minDist = 1e32;
+   closest = -1;
+   
+   for(i = 0; i<MAXPOLES; i++){
+      dist = ((mousx-polex[i])^2 + (mousy-poley[i])^2 ); // < 16^2;
+      if( dist < minDist ){
+         minDist = dist;
+         closest = i;  
+      }
+   }
+   if(closest != -1){
+      polex[closest] = mousx;
+      poley[closest] = mousy;
+   }
+}
+{   
+   enum {NUMP=8192}
+   static px[NUMP], py[NUMP], otim;
+   
+   if (numframes==0 || keystatus[57])
+   {
+      j=0;
+      for(i=0;i<NUMP;i++)
+      {
+         p = positivePole[j];
+         px[i] = polex[p];
+         py[i] = poley[p];
+         j++;//evaldraw handles out of bounds.
+      }
+      otim = klock(0);
+   }
+   
+   hx = xres*.5; hy = yres*.5;
+   tim = klock(0); dt = tim-otim; otim = tim;
+   setcol(0xffffff);
+   
+
+if (0)
+{
+  
+   for(y=0;y<yres;y+=16)
+      for(x=0;x<xres;x+=16)
+      {
+
+
+         vx=0;
+         vy=0;
+
+         for(p1=0; p1<MAXPOLES; p1++)
+         {
+            x1 = poleX[p1]; y1 = poleY[p1];
+            dist1 = (x-x1)^2 + (y-y1)^2;
+            nd = 1/dist1;
+            vx += (x-x1)*nd*polarity[p1];
+            vy += (y-y1)*nd*polarity[p1];
+         }    
+         vx /= MAXPOLES;
+         vy /= MAXPOLES;
+         f = 10/sqrt(vx^2+vy^2);
+         vx *= f; vy *= f;    
+         setcol(0x804040);
+         moveto(x,y);
+         lineto(x+vx,y+vy);
+         setcol(0xff7f7f);
+         setpix(x+vx,y+vy);
+      }
+}
+else
+{
+
+   for(i=0;i<NUMP;i++)
+   {
+      x = px[i]; 
+      y = py[i];
+      dead = 0;
+      if( x < -10 || x > xres+10 ) dead = 1;
+      if( y < -10 || y > yres+10 ) dead = 1;
+      
+      
+      /*if ((abs(x-hx) >= hx) || (abs(y-hy) >= hy))
+      {
+         //Select random point on border
+         j = (xres+yres)*2*rnd;
+              if (j < xres) { x = j; y = 0; }
+         else if (j < xres*2)
+            { x = j-xres; y = yres; }
+         else if (j < xres*2+yres)
+            { x = 0; y = j-xres*2; }
+         else { x = xres; y = j-xres*2-yres; }
+      }*/
+        
+
+      dist = 1e32;
+      vx=0;
+      vy=0;
+      if(dead==0)
+      for(p1=0; p1<MAXPOLES; p1++)
+      {
+         if(dead)break;
+         x1 = poleX[p1]; y1 = poleY[p1];
+
+         //dx = x1-x2; dy = y1-y2;
+         //cx = (x1+x2)/2; cy = (y1+y2)/2;
+
+         dist1 = (x-x1)^2 + (y-y1)^2;
+
+         
+         if( polarity[p1] == -1 && dist1 < 16^2){dead=1; break;}
+     
+         nd = 1/dist1;
+         vx += (x-x1)*nd*polarity[p1];
+         vy += (y-y1)*nd*polarity[p1];
+      }      
+
+      //vx /= MAXPOLES;
+      //vy /= MAXPOLES;
+
+      if(dead)
+      {
+         randPole = positivePole[int(rnd*positiveCount)];
+         a = (PI*2.0)*rnd;
+         px[i] = cos(a)*15+polex[randPole];
+         py[i] = sin(a)*15+poley[randPole];
+      }
+      else
+      {
+         d= sqrt(vx^2+vy^2);
+         f = 5/d;
+         //setcol(64+rnd*128, 64+rnd*128, 128+rnd*128);
+         setcol(5*f,2*f, 0);
+         //setcol(2*f,1*f,0);
+         //setcol((i%72)*64+64,(i%80)+128,64);
+         //drawsph(x,y,50*d);
+         moveto(x-vx*f,y-vy*f);
+         lineto(x+vx*f,y+vy*f);
+         
+         f = 128*dt/d;      
+         x += vx*f;
+         y += vy*f;
+         
+         px[i] = x;
+         py[i] = y;
+      }
+   }
+}
+}
+setcol(0xc0c0ff);
+setfont(12,16);
+for(i=0; i<MAXPOLES; i++){
+moveto(poleX[i]-6,poleY[i]-6); 
+if( polarity[i] == 1 ) printchar('+'); else printchar('-');
+}
+
+
+

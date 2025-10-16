@@ -1,0 +1,206 @@
+struct vec{ x,y,z; }
+
+enum{MAX_VERTS = 512}
+static vec vert_list[MAX_VERTS];
+static vec texcoord_list[MAX_VERTS];
+static num_verts = 0;
+
+
+static mtx[9];
+()
+{
+   time = klock(0);
+   cls(0x777777); clz(1e32);
+ 
+   
+   glEnable(GL_ALPHA_TEST); // if tex<1, transparent
+   glEnable(GL_DEPTH_TEST); // take care in what you paint over!
+   
+
+
+   setcol(0xeeeeee);
+ 
+   
+   ang2mat( mousx/xres*2*PI, mousy/yres*2*PI, mtx );
+   cylinder(6,20,16);
+	 moveto(0,20); printnum(num_verts);
+   
+   //cylinderSolid(4.9,5,8);
+
+
+   cang = 0;//time;
+   dst = -30;
+   setcam(sin(cang)*dst,0,cos(cang)*dst,cang,0);
+}
+
+
+cylinderSolid(radius,length,segments)
+{
+   a=0;
+   angInc = 2*PI/(segments-1);
+   //glBegin(GL_TRIANGLE_STRIP);
+   glBegin(GL_TRIANGLE_STRIP);
+   //glTexCoord(0,0); glVertex(radius,0,0);
+   //glTexCoord(0,0); glVertex(radius,length,0);
+   for(i=0; i<segments; i++){
+      x = cos(a)*radius;
+      z = sin(a)*radius;      
+      glTexCoord(a/(2*PI),0); glVertex(x,0,z);
+      glTexCoord(a/(2*PI),1); glVertex(x,length,z);
+      a += angInc;
+   }
+   
+   //glVertex(0,length,0);
+   a=0;
+   glBegin(GL_TRIANGLE_FAN);
+   {
+      for(i=0; i<segments; i++)
+      {
+         x = cos(a)*radius;
+         z = sin(a)*radius;
+         glVertex(x,0,z);
+         a += angInc; 
+      } 
+   }   
+
+   a=0;
+   glBegin(GL_TRIANGLE_FAN);
+   {
+      for(i=0; i<segments; i++)
+      {
+         x = cos(a)*radius;
+         z = sin(a)*radius;
+         glVertex(x,length,z);
+         a += angInc; 
+      } 
+   }
+   glEnd();
+}
+
+wind_cap(windDir, yPos, radius, segments)
+{
+   j = 0;
+   for(i=0; i<segments; i++)
+   {
+      idx = 0;
+      
+      if( i > 0 && i % 2 == 0 )
+      {
+         idx = segments-j+1;
+      }else{
+         
+         idx = j; 
+         j++;
+      }  
+
+      TWO_PI = 2*PI;
+      a = winddir * idx*( TWO_PI/(segments-1) );
+      
+      ca = cos(a);
+      sa = sin(a);
+      x = ca*radius;
+      z = sa*radius;      
+
+      vecset( texcoord_list[ num_verts+0 ], ca/radius, sa/radius, 0 );      
+      vecset( vert_list[ num_verts+0 ], x, yPos, z );      
+      num_verts++;
+   }
+}
+
+draw_verts()
+{
+   for(i=0; i<num_verts; i++)
+   {
+      tform( mtx, vert_list[i] );
+      
+      x = vert_list[i].x;
+      y = vert_list[i].y;
+      z = vert_list[i].z;
+      drawsph(x,y,z, .1 );
+   } 
+   
+
+   if ( bstatus > 0 )
+   {
+      glBegin(GL_TRIANGLE_STRIP);
+   }else{
+      glBegin(GL_LINE_STRIP);
+   }
+   
+   for(i=0; i<num_verts; i++)
+   {
+      glTexCoord( texcoord_list[i].x, texcoord_list[i].y );
+      glVertex( vert_list[i].x, vert_list[i].y, vert_list[i].z );
+   }
+   glEnd();
+}
+
+cylinder(radius,length,segments)
+{
+   moveto(0,0);
+   if ( bstatus < 2 )
+   {
+      glCullFace(GL_BACK); 
+      printf("culling back\n");
+   }else
+   {
+      glCullFace(GL_FRONT); 
+      printf("culling front\n");
+   }   
+
+
+   num_verts = 0;
+   wind_cap(-1, 0, radius, segments);
+   
+   draw_verts(); 
+   
+
+   num_verts = 0;
+   wind_cap(1, length, radius, segments);
+   draw_verts();
+
+   num_verts = 0;
+
+   angInc = 2*PI/(segments-1);   
+   a = 0;
+   for(i=0; i<segments; i++)
+   {
+      x = cos(a)*radius;
+      z = sin(a)*radius;
+
+      vecset( texcoord_list[ num_verts+0 ], a/(2*PI),0, 0 );
+      vecset( texcoord_list[ num_verts+1 ], a/(2*PI),1,0 );
+
+      vecset( vert_list[ num_verts+0 ], x, 0, z );
+      vecset( vert_list[ num_verts+1 ], x, length, z );
+      num_verts+=2;
+
+      a -= angInc;
+   }
+   
+   draw_verts();
+}
+
+vecset( vec v, x,y,z )
+{
+   v.x = x; v.y = y; v.z = z;
+}
+
+tform(m[9], vec v)
+{
+   x = v.x; y = v.y; z = v.z;
+   v.x = m[0] * x + m[1] * y + m[2] * z;
+   v.y = m[3] * x + m[4] * y + m[5] * z;
+   v.z = m[6] * x + m[7] * y + m[8] * z;
+}
+
+
+/* converts horizontal and vertical angles to a 3x3 rotation matrix */
+ang2mat(hang,vang,mat[9])
+{
+   mat[0] = cos(hang); mat[1] = 0; mat[2]=-sin(hang);
+   mat[6] = cos(vang)*sin(hang); mat[7] = sin(vang); mat[8]=cos(vang)*cos(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}

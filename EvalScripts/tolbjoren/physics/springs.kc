@@ -1,0 +1,262 @@
+// Based on an article by SolHSA:
+//http://sol.gfxile.net/springs/index.html
+
+/*
+todo. read up on various integration schemes
+verlet, rk4, euler variations, midpoint
+
+http://gafferongames.com/game-physics/spring-physics/
+
+mathematics for game developers
+
+http://cowboyprogramming.com/2007/01/05/blob-physics/
+
+// Have a look at how Flowrian does this:
+http://www.codeflow.org/entries/2010/sep/01/hard-constraints-easy-solutions/
+
+// Jeff Lander's articles
+http://www.darwin3d.com/gamedev/articles/col0399.pdf
+
+// Time Corrected Verlet, stays witin 2. and 4. order acc
+// when timestep varies! useful in when youre lazy and don't
+// want to use fixed timesteps. or when you want to sim quickly
+// using adaptive timestepping
+http://www.lonesock.net/article/verlet.html
+*/
+
+//#define SOR
+
+struct masspoint
+{
+   x,y;
+   ox,oy;
+   fx,fy;
+};
+
+struct spring
+{
+   p1,p2;
+   desired_d,
+   fx,fy,
+   k;
+};
+
+static masspoint mp[1000];
+static max_mp = 0;
+
+static spring sp[1000];
+static max_spring = 0;
+
+static t,dt,execution_time;
+static TICKTIME;
+static UPDATE_TIME = 100;
+()
+{
+   TICKTIME = 1.0/UPDATE_TIME;
+   
+   if(numframes==0){
+   
+      a=define_masspoint(40,40);
+      b=define_masspoint(180,40);
+      c=define_masspoint(180,180);
+      d=define_masspoint(40,180);
+
+      
+stiffness = 0.5;
+      define_spring(a,b,stiffness);
+      define_spring(b,c,stiffness);
+      define_spring(c,d,stiffness);
+      define_spring(d,a,stiffness);
+      
+      define_spring(a,c,stiffness);
+      define_spring(b,d,stiffness);
+      
+      d=define_masspoint(200,200);
+      e=define_masspoint(240,200);
+      f=define_masspoint(240,240);
+      g=define_masspoint(200,240);
+      
+stiffness = 0.9;
+      define_spring(d,e,stiffness);
+      define_spring(e,f,stiffness);
+      define_spring(f,g,stiffness);
+      define_spring(g,d,stiffness);
+      define_spring(d,f,stiffness);
+      
+   }
+
+   cls(0);
+   for(i=0; i<max_mp; i++)
+      drawsph(mp[i].x, mp[i].y,-5);
+      
+   for(i=0; i<max_spring; i++)
+   {
+      moveto( mp[sp[i].p1].x, mp[sp[i].p1].y);
+      lineto( mp[sp[i].p2].x, mp[sp[i].p2].y);
+   }
+
+   dt = klock(0) - t;
+   t = klock(0);
+   
+   execution_time += dt;
+   
+   numloops=0;
+   while(execution_time >= TICKTIME)
+   {
+      physics_tick();
+      execution_time -= TICKTIME;
+      numloops++;
+   }      
+
+   
+   if(bstatus==1)
+   {
+      closest = 0;
+      mind = 1e32;
+      for(i=0; i<max_mp; i++){
+         dx = mousx - mp[i].x;
+         dy = mousy - mp[i].y;
+         dSq = dx^2 + dy^2;
+         if ( dSq < mind ){
+            closest = i;
+            mind = dSq;
+         }
+      }
+      mp[closest].x = mousx;  
+      mp[closest].y = mousy;  
+   }
+   
+}
+
+
+mp_distance(p1, p2)
+{
+   xd = mp[p1].x-mp[p2].x;
+   yd = mp[p1].y-mp[p2].y;
+   return sqrt(xd^2+yd^2);
+}
+
+define_spring(p1, p2, k)
+{
+    sp[max_spring].p1 = p1;
+    sp[max_spring].p2 = p2;
+    sp[max_spring].desired_d = mp_distance( p1, p2);
+    sp[max_spring].fx = sp[max_spring].fy = 0;
+    sp[max_spring].k = k;
+    max_spring++;
+}
+
+define_masspoint(x,y)
+{
+    mp[max_mp].x = x;
+    mp[max_mp].y = y;
+    mp[max_mp].ox = x;
+    mp[max_mp].oy = y;
+    //mp[max_mp].vx = mp[max_mp].vy = 0;
+    max_mp++;
+    return (max_mp-1);
+}
+
+physics_tick()
+{
+   spring s;
+   for (i = 0; i < max_spring; i++)
+   {
+      s = sp[i]; 
+      dx = mp[s.p1].x - mp[s.p2].x;
+      dy = mp[s.p1].y - mp[s.p2].y;
+      d = sqrt(dx*dx+dy*dy);
+
+      if ( fabs(d - s.desired_d) > 0.1 )
+      {
+         // F = -ky
+         
+         // how much of the force goes to horizontal and vertical vectors..
+         fx = dx / d;
+         fy = dy / d;
+         
+         // helper variable, basically this is the force
+         intensity = s.k * (d - s.desired_d);
+         
+         // apply
+         vx1 = mp[s.p1].x - mp[s.p1].ox;
+         vy1 = mp[s.p1].y - mp[s.p1].oy;
+         
+         vx2 = mp[s.p2].x - mp[s.p2].ox;
+         vy2 = mp[s.p2].y - mp[s.p2].oy;
+         
+         rx = vx2 - vx1;
+         ry = vy2 - vy1;
+         
+         s.fx = fx * intensity ;
+         s.fy = fy * intensity ;
+         
+
+         
+         #ifdef SOR // successive over relaxation for solving a System Of Linear Eqs.
+            s.fx *= 0.5;
+            s.fy *= 0.5;
+            
+            // compare this code to cowboy coders
+            mp[s.p1].x -= s.fx;
+            mp[s.p1].y -= s.fy;
+            mp[s.p2].x += s.fx;
+            mp[s.p2].y += s.fy;
+         #else
+            mp[s.p1].fx -= s.fx;
+            mp[s.p1].fy -= s.fy;
+            mp[s.p2].fx += s.fx;
+            mp[s.p2].fy += s.fy;
+         #endif
+      }
+      sp[i] = s; // copy-value back
+
+    }
+
+   timestep = .1;
+    for (i = 0; i < max_mp; i++)
+    {
+       MassPoint m = mp[i];
+       tmpx = m.x;
+       tmpy = m.y;
+       
+
+       #ifdef SOR
+          timestep = 1;
+          ax = 0;
+          ay = .5;
+          
+          //ax = m.fx;
+          //ay = m.fy;  
+          // for verlet to be 4.order accurate
+          // timestep and accel must stay constant.
+          // so, perfect for rigids and particles,
+          // bad for springs
+          // found out this by experimenting, then reading it...     
+
+          m.x += (m.x - m.ox)*timestep + ax * (timestep^2);
+          m.y += (m.y - m.oy)*timestep + ay * (timestep^2);  
+       #else
+          m.fy += 5;
+          
+          mass = 0.1;
+          ax = m.fx / mass;
+          ay = m.fy / mass;
+          m.x += (m.x - m.ox)*timestep + ax * (timestep^2);
+          m.y += (m.y - m.oy)*timestep + ay * (timestep^2);
+       #endif
+       
+       m.fx = 0;
+       m.fy = 0;
+       m.ox = tmpx;
+       m.oy = tmpy;
+        
+       if (m.y > yres) m.y = yres;
+       if (m.x < 0) m.x = 0;
+       if (m.x > xres) m.x = xres;
+       
+       mp[i]=m; // copy-value back
+    }
+
+
+}

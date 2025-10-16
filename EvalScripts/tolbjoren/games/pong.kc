@@ -1,0 +1,353 @@
+/* 
+TODO: 
+-use GLSL tv noise shader. fuzzyness
+-remove discrete coll code and use continous
+*/
+struct vec2
+{
+   x,y;
+};
+
+struct paddle_t
+{
+   vec2 pos;
+   vec2 normal;
+   state;
+};
+
+enum{TAIL_SIZE=64}
+struct ball_t
+{
+   vec2 pos;
+   vec2 dir;
+   speed;
+   vec2 tail[TAIL_SIZE];
+};
+
+static paddle_t paddle1;
+static paddle_t paddle2;
+
+static paddle_height;
+static paddle_width;
+
+static ball_t ball;
+static ballsize;
+
+
+static start_speed = 1000;
+static max_speed = 2000;
+
+
+static game_running = 0;
+static score_player_1 = 0;
+static score_player_2 = 0;
+
+static time_to_start = 1;
+()
+{
+   static oldtime, delta;
+   time = klock(0);
+   delta = time - oldtime;
+   delta = min( delta, 0.01 );
+   oldtime = time;
+   
+   paddle_width = xres * 0.12;
+   paddle_height = yres * 0.01;
+
+   cls(0);
+   if (numframes==0)
+   {
+      vecset(paddle1.pos, xres/2, yres-paddle_height);
+      paddle1.state = 1;
+      
+      vecset(paddle2.pos, xres/2, paddle_height);
+      paddle2.state = 1;
+      vecset( paddle1.normal, 0, -1 );
+      vecset( paddle2.normal, 0, 1 );
+
+      vecset(ball.pos,xres/2, yres/2);
+      vecset(ball.dir, cos(pi/4), sin(pi/4) );
+      ball.speed = start_speed;
+   }
+   
+   if ( bstatus == 1 )
+   {
+      game_running = 1;
+   }
+
+   if ( game_running )
+   {
+      if ( time_to_start < 0.0 )
+      {
+         update_ball( ball, delta );
+      }else{
+         moveto( ball.pos.x, ball.pos.y );
+         lineto( ball.pos.x + 100*ball.dir.x, ball.pos.y + 100*ball.dir.y);
+      }
+      time_to_start -= delta;
+   }
+   
+   
+   ballsize = xres*0.02;
+   
+   paddle1.pos.x = clamp( 5*sin(time*30)+ball.pos.x, paddle_width/2, xres-paddle_width/2);
+   
+   //paddle1.pos.x = mousx;
+   //paddle1.pos.y = mousy;
+
+   paddle2.pos.x = clamp( 5*sin(time*40)+ball.pos.x , paddle_width/2, xres-paddle_width/2);
+   
+   
+   setcol(255,255,255);
+   drawball( ball,  );
+   
+
+   drawpaddle( paddle1 );
+   drawpaddle( paddle2 );
+
+   setcol(255,255,0);
+   moveto( xres-195, 25 );
+   setfont( 1.7*23, 1.7*32, 1);
+   printf("%2.g:%2.g", score_player_1, score_player_2 );
+   
+   
+   if ( time_to_start > 0.0 )
+   {
+      moveto(xres/2-60, yres/2-50);
+      pulse = sin( time*20 ) * 3.5;
+      setfont( 1.7*23 + pulse, 1.7*32 + pulse, -1);
+      printf("%1.1f", time_to_start);
+   }
+   
+   setfont(8,12);
+   //sleep(16);
+}
+
+reset_match()
+{
+   vecset(ball.pos, xres/2, yres/2);
+   ball.speed = start_speed;
+   time_to_start = 1;
+   game_running = 0;
+}
+
+update_ball( ball_t ball, dt )
+{
+   ball.pos.x += ball.speed * ball.dir.x * dt;
+   ball.pos.y += ball.speed * ball.dir.y * dt;
+   diam = ballsize * 0.5;
+   if(ball.pos.x > xres-diam) ball.dir.x*=-1;
+   if(ball.pos.x < diam) ball.dir.x*=-1;
+   if(ball.pos.y > yres-diam) {ball.dir.y*=-1; score_player_2++; reset_match(); }
+   if(ball.pos.y < diam) {ball.dir.y*=-1; score_player_1++; reset_match(); }
+   
+   frq = (ball.speed) / (max_speed-start_speed);
+   hit = collide_against( paddle1, ball, dt );
+   if ( hit ) playsound("bounce.wav", 100, frq);
+   hit = collide_against( paddle2, ball, dt );
+   if ( hit ) playsound("bounce.wav", 100, frq);
+}
+
+collide_against( paddle_t paddle, ball_t ball, delta )
+{
+   // Is ball going towards paddle?
+   balldir_dot_paddle_up = dot( ball.dir, paddle.normal );
+   going_towards = balldir_dot_paddle_up < 0;
+   
+   if ( going_towards == 1 )
+   {
+      vec2 pad_start, pad_delta ;
+      vecset( pad_start, paddle.pos.x - paddle_width/2, paddle.pos.y + paddle.normal.y*(paddle_height/2) + paddle.normal.y*ballsize*0.5 );
+      vecset( pad_delta, paddle_width, 0 );
+      vec2 ballvelocity;
+      vecset( ballvelocity, ball.dir.x * ball.speed, ball.dir.y * ball.speed );
+      t = isecTime( ball.pos, ballvelocity, pad_start, pad_delta );
+      if ( t < delta )
+      {
+         if ( (ball.pos.x+ballsize*.5) >= pad_start.x && (ball.pos.x-ballsize*.5) <= (pad_start.x + pad_delta.x) )
+         {
+            // R=I-2*N*<D,I>
+            vec2 to_ball;
+            calc_reflect( to_ball, paddle.pos, paddle.normal.y );
+            
+            // works only for real normals... paddle would be (0,1) over whole surface
+            #ifdef REFLECTION_LAW 
+               dpr = dot(ball.dir,to_ball);
+               ball.dir.x = ball.dir.x - 2*to_ball.x*dpr;
+               ball.dir.y = ball.dir.y - 2*to_ball.y*dpr;
+               normalize(ball.dir);
+            #else // set new dir
+               ball.dir.x = to_ball.x;
+               ball.dir.y = to_ball.y;
+            #endif
+            
+            paddle.state *= -1;
+            ball.speed *= 1.1;
+            if ( ball.speed > max_speed ) ball.speed = max_speed;
+            return 1;
+         }
+      }
+   }
+   return 0;
+}
+
+calc_reflect( vec2 to_ball, vec2 pos, ny )
+{
+   halfw = paddle_width/2;
+   lowerbound = pos.x - halfw;
+   cent = pos.x;
+   upperbound = pos.x + halfw;
+   
+   min_angle = pi/8;
+   max_angle = 7/8 * pi;
+   
+   t = 0;
+   if (ball.pos.x < cent )
+   {
+      t = (ball.pos.x-lowerbound) / halfw;
+      t = clamp(t,0,1);
+      //ang = lerp( pi/4, pi/2, t);
+      ang = lerp( min_angle, pi/2, t);
+      if ( ny == -1 ) ang += pi;
+      to_ball.x = cos(ang);
+      to_ball.y = sin(ang);
+   }
+   else if (ball.pos.x >= cent )
+   {
+      t = (upperbound-ball.pos.x) / halfw;
+      t = clamp(t,0,1);
+      //ang = lerp( 3/4*pi , pi/2, t);
+      ang = lerp( max_angle , pi/2, t);
+      if ( ny == -1 ) ang += pi;
+      to_ball.x = cos(ang);
+      to_ball.y = sin(ang);
+
+   }
+   else // ball.pos.x == cent
+   {
+      to_ball.x = 0;
+      to_ball.y = ny;
+   }
+   
+   
+   return t;
+}
+
+dot( vec2 a, vec2 b )
+{
+   return a.x*b.x + a.y*b.y;
+}
+
+distance2d( vec2 a, vec2 b ){
+   return sqrt( (a.x-b.x)^2 + (a.y-b.y)^2 );
+}
+
+drawball( ball_t ball, tween )
+{
+   x = ball.pos.x;
+   y = ball.pos.y;
+
+   drawrectfill( x - ballsize/2, y - ballsize/2,
+                 x + ballsize/2, y + ballsize/2 );  
+              
+   brad = ballsize*0.5;   
+   for(i=TAIL_SIZE-1; i>0; i--)
+   {
+      percent = 1.0-(i / TAIL_SIZE);
+      radi = brad * percent;
+      c = 255 * percent;
+      setcol(c,c,c);
+      
+      x = ball.tail[i].x;
+      y = ball.tail[i].y;
+      drawrectfill( x - radi, y - radi,
+                    x + radi, y + radi );  
+                    
+      
+   }
+   //if ( numframes%2==0 )
+   {
+      for(i=TAIL_SIZE-1; i>0; i--)
+      {
+         ball.tail[i].x = ball.tail[i-1].x;
+         ball.tail[i].y = ball.tail[i-1].y;
+      }
+      ball.tail[0].x = ball.pos.x;
+      ball.tail[0].y = ball.pos.y;
+   }
+}
+
+drawpaddle( paddle_t paddle )
+{
+   if ( paddle.state == 1 )
+   {
+      setcol(255,255,255);
+   }else{
+      setcol(255,0,0);
+   }
+   
+   vec2 pos = paddle.pos;
+   drawrectfill( pos.x - paddle_width/2, pos.y - paddle_height/2,
+                 pos.x + paddle_width/2, pos.y + paddle_height/2 );   
+     
+   vec2 to_ball;
+   t = calc_reflect( to_ball, paddle.pos, paddle.normal.y );
+   
+#define _DEBUG
+#ifdef _DEBUG
+   moveto( pos.x, pos.y );
+   lineto( pos.x + to_ball.x * 50, pos.y + to_ball.y * 50 );
+
+   
+   printf( "%g\n",t );
+#endif
+}
+
+drawrectfill(x0,y0,x1,y1) { for(y=y0;y<y1;y++) { moveto(x0,y); lineto(x1,y); } }
+drawrectopen(x0,y0,x1,y1) { moveto(x0,y0); lineto(x1,y0); lineto(x1,y1); lineto(x0,y1); lineto(x0,y0); }
+
+lerp(a,b,t)
+{
+   return a + (b-a)*t;
+}
+
+clamp(x, lo, hi)
+{
+   x = max(x,lo);
+   x = min(x,hi);
+   return x;
+}
+
+vecset( vec2 v, x,y ){
+   v.x = x; v.y = y;
+}
+
+vecsub( vec2 out, vec2 a, vec2 b ){
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+}
+
+normalize(vec2 v){
+   len = sqrt( v.x^2 + v.y^2 );
+   if(len){
+      v.x /= len; v.y /= len;
+   }
+}
+
+// Taken from Mathematics and Physics for Game Programmers by Danny Kodicek
+isecTime(vec2 p1, vec2 v1, vec2 p2, vec2 v2)
+{
+   sc1 = v2.x; tc1 = v1.x; 
+   sc2 = v2.y; tc2 = v1.y; 
+
+   dx = p2.x - p1.x;
+   dy = p2.y - p1.y;
+
+   det = v2.x*v1.y - v1.x * v2.y; // 2x2 determinant of matrix
+   if( fabs(det) < 1e-7 ) return 1e32; // no isec
+   con = sc1*dy - sc2*dx;
+   t = con / det;
+     
+   return t;
+}
+

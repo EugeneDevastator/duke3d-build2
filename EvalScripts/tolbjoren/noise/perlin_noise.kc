@@ -1,0 +1,237 @@
+// perlin
+enum{SIZE=256};
+static p[size];
+
+static gx[size];
+static gy[size];
+static gz[size];
+
+static MASK = 0xFF;
+// RENDER
+static pix[3];
+static dest[3];
+static mtx[9]; //rotation matrix
+
+//"locals"
+static axis[3];
+()
+{
+   cls(0);
+   if(numframes==0)
+   {
+      axis[0] = 0.16; axis[1] = 0.67; axis[2] = 0.43;
+      initRotationMatrix(axis, 0.34521);
+      init();
+   }
+   
+   renderNoise(klock()/2);
+   
+   if(bstatus == 1){
+      bstatus = 0;
+      init();
+   }
+}
+
+renderNoise(z)
+{
+   for(iy=0; iy < 256; iy++)
+   {
+      y = iy / 16.0;
+      pix[0] = y*mtx[1] + z*mtx[2];
+      pix[1] = y*mtx[4] + z*mtx[5];
+      pix[2] = y*mtx[7] + z*mtx[8];
+      
+      //motion along x
+      x = 1/16.0;
+      dest[0] = x*mtx[0];
+      dest[1] = x*mtx[3];
+      dest[2] = x*mtx[6];
+
+      for(ix=0; ix < 256; ix++)
+      {
+         //v = 255*0.5*calcNoise(pix[0], pix[1])+1; 
+         v = 255*0.5*(mnoise3(pix[0],pix[1],pix[2])+1);
+         //v = 255*0.5*(noise( pix[0], pix[1], pix[2])+1);          
+
+         setcol(255-v,255-v,255);
+         //setcol(v,v,v);
+         setpix(xres/2-128+ix,yres/2-128+iy);
+         
+         pix[0] += dest[0];
+         pix[1] += dest[1];
+         pix[2] += dest[2];
+      }
+   }
+}
+
+init()
+{
+   srand( klock() );
+   i=0, j=0, nSwap=0;
+
+
+   // Initialize the permutation table
+   for(i = 0; i < SIZE; i++)
+      p[i] = i;
+
+   for(i = 0; i < SIZE; i++)
+   {
+      j = (rnd*0xffffff) & MASK;
+
+      nSwap = p[i];
+      p[i]  = p[j];
+      p[j]  = nSwap;
+   }
+
+   // Generate the gradient lookup tables
+   for(i = 0; i < SIZE; i++)
+   {
+      // Ken Perlin proposes that the gradients are taken from the unit 
+      // circle/sphere for 2D/3D, but there are no noticable difference 
+      // between that and what I'm doing here. For the sake of generality 
+      // I will not do that.
+
+      gx[i] = nrnd/2; 
+      gy[i] = nrnd/2;
+      gz[i] = nrnd/2;
+   }
+}
+
+
+
+InitRotationMatrix(pAxis[3], r)
+{
+  // The axis vector must be of unit length
+  x=0, y=0, z=0, m=0;
+  m = sqrt(pAxis[0]*pAxis[0] + pAxis[1]*pAxis[1] + pAxis[2]*pAxis[2]);
+  x = pAxis[0]/m;
+  y = pAxis[1]/m;
+  z = pAxis[2]/m;
+
+  // Compute the rotation matrix  
+  c = cos(r);
+  s = sin(r);
+
+  Mtx[0] = (x * x) * (1.0 - c) + c;
+  Mtx[1] = (y * x) * (1.0 - c) + (z * s);
+  Mtx[2] = (z * x) * (1.0 - c) - (y * s);
+
+  Mtx[3] = (x * y) * (1.0 - c) - (z * s);
+  Mtx[4] = (y * y) * (1.0 - c) + c;
+  Mtx[5] = (z * y) * (1.0 - c) + (x * s);
+
+  Mtx[6] = (x * z) * (1.0 - c) + (y * s);
+  Mtx[7] = (y * z) * (1.0 - c) - (x * s);
+  Mtx[8] = (z * z) * (1.0 - c) + c;
+} 
+
+calcNoise(x,y)
+{
+   // compute the integer positions of the four surrounding points
+   qx0 = int( floor(x) );
+   qx1 = int( qx0 + 1);
+   
+   qy0 = int(floor(y));
+   qy1 = int(qy0+1);
+   
+   // Permutate values to get indices to use with the gradient LUT
+   q00 = int( p[(qy0 + p[qx0 % SIZE]) % SIZE] );
+   q01 = int( p[(qy0 + p[qx1 % SIZE]) % SIZE] );
+   
+   q10 = int( p[(qy1 + p[qx0 % SIZE]) % SIZE] );
+   q11 = int( p[(qy1 + p[qx1 % SIZE]) % SIZE] );
+   
+   // Computing vectors from the four points to the input point
+   tx0 = x - floor(x);
+   tx1 = tx0 - 1;
+   
+   ty0 = y - floor(y);
+   ty1 = ty0 - 1;
+   
+   // Compute the dot-product between the vectors and the gradients
+   v00 = gx[q00]*tx0 + gy[q00]*ty0;
+   v01 = gx[q01]*tx1 + gy[q01]*ty0;
+   
+   v10 = gx[q10]*tx0 + gy[q10]*ty1;
+   v11 = gx[q11]*tx1 + gy[q11]*ty1;
+
+   // Do the bi-cubic interpolation to get the final value
+   wx = (3 - 2*tx0)*tx0*tx0;
+   v0 = v00 - wx*(v00 - v01);
+   v1 = v10 - wx*(v10 - v11);
+   
+   wy = (3 - 2*ty0)*ty0*ty0;
+   v = v0 - wy*(v0 - v1);
+   return v;
+}
+
+mNoise3(x, y, z)
+{
+   // Compute what gradients to use
+   qx0 = int(floor(x));
+   qx1 = int(qx0 + 1);
+   tx0 = x - qx0;
+   tx1 = tx0 - 1;
+
+   qy0 = int(floor(y));
+   qy1 = int(qy0 + 1);
+   ty0 = y - qy0;
+   ty1 = ty0 - 1;
+
+   qz0 = int(floor(z));
+   qz1 = int(qz0 + 1);
+   tz0 = z - qz0;
+   tz1 = tz0 - 1;
+
+   // Make sure we don't come outside the lookup table
+   qx0 = qx0 & MASK;
+   qx1 = qx1 & MASK;
+
+   qy0 = qy0 & MASK;
+   qy1 = qy1 & MASK;
+
+   qz0 = qz0 & MASK;
+   qz1 = qz1 & MASK;
+
+   // Permutate values to get pseudo randomly chosen gradients
+   q000 = p[(qz0 + p[(qy0 + p[qx0]) & MASK]) & MASK];
+   q001 = p[(qz0 + p[(qy0 + p[qx1]) & MASK]) & MASK];
+
+   q010 = p[(qz0 + p[(qy1 + p[qx0]) & MASK]) & MASK];
+   q011 = p[(qz0 + p[(qy1 + p[qx1]) & MASK]) & MASK];
+
+   q100 = p[(qz1 + p[(qy0 + p[qx0]) & MASK]) & MASK];
+   q101 = p[(qz1 + p[(qy0 + p[qx1]) & MASK]) & MASK];
+
+   q110 = p[(qz1 + p[(qy1 + p[qx0]) & MASK]) & MASK];
+   q111 = p[(qz1 + p[(qy1 + p[qx1]) & MASK]) & MASK];
+
+   // Compute the dotproduct between the vectors and the gradients
+   v000 = gx[q000]*tx0 + gy[q000]*ty0 + gz[q000]*tz0;
+   v001 = gx[q001]*tx1 + gy[q001]*ty0 + gz[q001]*tz0;  
+
+   v010 = gx[q010]*tx0 + gy[q010]*ty1 + gz[q010]*tz0;
+   v011 = gx[q011]*tx1 + gy[q011]*ty1 + gz[q011]*tz0;
+
+   v100 = gx[q100]*tx0 + gy[q100]*ty0 + gz[q100]*tz1;
+   v101 = gx[q101]*tx1 + gy[q101]*ty0 + gz[q101]*tz1;  
+
+   v110 = gx[q110]*tx0 + gy[q110]*ty1 + gz[q110]*tz1;
+   v111 = gx[q111]*tx1 + gy[q111]*ty1 + gz[q111]*tz1;
+
+   // Modulate with the weight function
+   wx = (3 - 2*tx0)*tx0*tx0;
+   v00 = v000 - wx*(v000 - v001);
+   v01 = v010 - wx*(v010 - v011);
+   v10 = v100 - wx*(v100 - v101);
+   v11 = v110 - wx*(v110 - v111);
+
+   wy = (3 - 2*ty0)*ty0*ty0;
+   v0 = v00 - wy*(v00 - v01);
+   v1 = v10 - wy*(v10 - v11);
+
+   wz = (3 - 2*tz0)*tz0*tz0;
+   v = v0 - wz*(v0 - v1);
+
+   return v;
+}

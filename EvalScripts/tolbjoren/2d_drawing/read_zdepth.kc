@@ -1,0 +1,44 @@
+()
+{
+   
+   cls(0); clz(1e32);
+   
+   setcam(0,0,-.5, 0,0);
+   setcol(0xffffff);
+   drawsph(0,0,0,.1);
+   drawsph(.5,0,0,.1);
+   drawsph(-.5,0,0,.1);
+   
+   r=0; g=0; b=0; 
+   mz = getpix(mousx, mousy,r,g,b);
+   
+   if(abs(mz) < 10){
+      nx = (mousx-xres/2)/xres;
+      ny = (mousy-yres/2)/yres;   
+
+      setcol(0xff0000); 
+      rad=  0.03;
+      ofsz= sqrt(rad^2) + sqrt(0.1^2);
+      drawsph(nx,ny,mz-0.5,rad);
+   }
+   
+   static buf[200][200];
+   for(y=0; y<200; y++){
+      for(x=0; x<200; x++){
+         
+         buf[y][x] = getpix(x*xres/200, y*yres/200,r,g,b);
+      }
+   }
+   for(y=0; y<200; y++){
+      for(x=0; x<200; x++){
+         z = buf[y][x] * 384;
+         setcol(z,z,z); 
+         setpix(x,y);
+      }
+   }
+   moveto(0,0); setcol(0xff0000); printnum(mz);
+   
+   
+
+   
+}

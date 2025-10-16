@@ -1,0 +1,469 @@
+// physics body can be a rope! but drawbody code isnt made for it. collision works!
+
+enum{MAXVERTS=100}
+static px[MAXVERTS];
+static py[MAXVERTS];
+static opx[MAXVERTS];
+static opy[MAXVERTS];
+static ax[MAXVERTS];
+static ay[MAXVERTS];
+static pointCount = 0;
+
+
+enum{MAXEDGES=200}
+static edgeV1[MAXEDGES];
+static edgeV2[MAXEDGES];
+static edgeOriginalLength[MAXEDGES];
+static edgeCount = 0;
+
+
+enum{MAX_BODIES = 20}
+enum{MAX_BODY_VERTS = 20, MAX_BODY_EDGES = 20}
+static physBodyVertCount[MAX_BODIES];
+static physBodyEdgeCount[MAX_BODIES];
+static physBodyVerts[MAX_BODIES][MAX_BODY_VERTS];
+static physBodyEdges[MAX_BODIES][MAX_BODY_EDGES];
+static physBodyCenterX[MAX_BODIES];
+static physBodyCenterY[MAX_BODIES];
+static bodyCount = 0;
+
+static bodyCollided[MAX_BODIES];
+
+static timeStep = 0.1;
+
+static xmin,xmax,ymin,ymax;
+
+static ropeIndex = 0;
+static boxIdx = 0;
+
+static error = 0; // global that is set to 1 if something should go bump in the night
+
+// added for collision normal info
+static minDistance = 0;
+static collisionDepth = 0;
+static collisionNormalx = 0;
+static collisionNormaly = 0;
+static collisionEdge = -1;
+static collisionVert = -1;
+static collisionEdgeParent = -1;
+
+static phys_iterations = 1;
+()
+{
+   cls(0);
+   
+   if(numframes==0)
+   {
+      xmin = 10;
+      xmax = xres-10;
+      ymin = 10;
+      ymax = yres-50;   
+
+      
+      //boxIdx = makeBox(mousx,mousy, 50,50);
+      
+      for(i=0; i<2; i++)
+      {
+         scale = rnd*0;
+         makeBox(10*xres/100 + i*75, yres/2, 50+scale,50+scale);
+      }
+        
+      ropeIndex = makeRope(40*xres/100, yres/2, 5, 5);
+      
+   }
+   
+   moveto(0,ymax); lineto(xmax,ymax);
+
+   
+   //px[boxIdx] = mousx;
+   //py[boxIdx] = mousy; 
+   px[ropeIndex] = 40*xres/100;
+   py[ropeIndex] = yres/2;
+   
+   controls();
+   
+   updateForces();
+   drawBodies();
+   updateVerlet(); // iterates thru all verts and performs verlet position integration.
+   IterateCollisions();
+   sleep(16);
+
+   moveto(0,0); printf("error: %g",error);
+   printf("\npointCount: %g/%g",pointCount,MAXVERTS);
+   printf("\nedgeCount: %g/%g",edgeCount,MAXEDGES);
+   printf("\nbodyCount: %g/%g",bodyCount,MAX_BODIES);
+   
+   printf("\ncollisionDepth: %.3f",collisionDepth);
+   printf("\nminDistance:     %g",minDistance);
+   printf("\ncnx:     %.3f",collisionNormalx);
+   printf("\ncny:     %.3f",collisionNormaly);
+}
+
+controls(){
+   if(keystatus[203]) px[boxIdx] -= 3*timeStep; // l
+   if(keystatus[205]) px[boxIdx] += 3*timeStep; // r
+   if(keystatus[200]) py[boxIdx] -= 20*timeStep; // u
+   if(keystatus[208]) py[boxIdx] += 20*timeStep; // d
+}
+updateForces(){
+
+}
+IterateCollisions(){
+for(i=0; i<phys_iterations; i++)
+{
+
+   // calc center point of body
+   for(i=0; i<bodyCount; i++)
+   {
+      physBodyCenterX[i] = 0;
+      physBodyCenterY[i] = 0;
+      for(j=0; j<physBodyVertCount[i]; j++)
+      {
+         // edges come in pairs. the physBodyEdges array points to e1 and e2
+         v = physBodyVerts[i][j];                  
+         physBodyCenterX[i] += px[v];
+         physBodyCenterY[i] += py[v];
+      }   
+      physBodyCenterX[i] /= physBodyVertCount[i];
+      physBodyCenterY[i] /= physBodyVertCount[i];    
+   }
+
+   updateEdges(); 
+   checkCollision();
+}
+}
+updateVerlet()
+{
+   for(i=0; i<pointCount; i++)
+   {
+      tmpx = px[i];
+      tmpy = py[i];
+      px[i] += px[i] - opx[i] + ax[i]*timeStep^2;
+      py[i] += py[i] - opy[i] + ay[i]*timeStep^2;
+      opx[i] = tmpx;
+      opy[i] = tmpy;
+      
+      if(px[i] < xmin) px[i] = xmin;
+      if(px[i] > xmax) px[i] = xmax;      
+      if(py[i] < ymin) py[i] = ymin;
+      if(py[i] > ymax) {py[i] = ymax;}
+            
+      //drawsph(px[i], py[i], -5);
+   }   
+}
+updateEdges(){
+   for(i=0; i<edgeCount; i++)
+   {
+      edgeV1x = px[edgeV1[i]];  
+      edgeV1y = py[edgeV1[i]];  
+
+      edgeV2x = px[edgeV2[i]];  
+      edgeV2y = py[edgeV2[i]]; 
+
+      // Calculate vector
+      v1v2x = edgeV1x-edgeV2x;
+      v1v2y = edgeV1y-edgeV2y;
+      v1v2length = sqrt( v1v2x^2 + v1v2y^2 );
+      // Calc difference from original length
+      diff = v1v2length - edgeOriginalLength[i];
+      // normalize v1v2
+      v1v2x /= v1v2length;
+      v1v2y /= v1v2length;
+      
+      // Put both vertices apart by half of the differance respectively
+      edgeV1x -= v1v2x*diff*0.5;
+      edgeV1y -= v1v2y*diff*0.5;
+      edgeV2x += v1v2x*diff*0.5;
+      edgeV2y += v1v2y*diff*0.5;
+            
+      // copy constrained values back into points.
+      px[edgeV1[i]] = edgeV1x;
+      py[edgeV1[i]] = edgeV1y;
+      
+      px[edgeV2[i]] = edgeV2x;
+      py[edgeV2[i]] = edgeV2y;
+   }
+}
+
+drawBodies()
+{
+   for(i=0; i<bodyCount; i++)
+   {
+      for(j=0; j<physBodyEdgeCount[i]; j++)
+      {
+         // edges come in pairs. the physBodyEdges array points to e1 and e2
+         e1 = edgeV1[ physBodyEdges[i][j] ];   
+         e2 = edgeV2[ physBodyEdges[i][j] ];
+         // find point using edge indice
+         edgeV1x = px[e1]; edgeV1y = py[e1];       
+         edgeV2x = px[e2]; edgeV2y = py[e2];        
+         moveto( edgeV1x, edgeV1y );
+         lineto( edgeV2x, edgeV2y );
+         
+         if(bodyCollided[i]==1)
+            drawsph(edgeV2x, edgeV2y,10);
+         else drawsph(edgeV2x, edgeV2y,-10);
+      }   
+      // coulld sum up and find middle point
+      moveto( physBodyCenterX[i], physBodyCenterY[i]-60 );
+      printf("%.0f",i);     
+   }
+   if( collisionVert > -1 )
+   {
+      x = px[collisionVert]; y = py[collisionVert];
+      drawsph(x,y,10);
+   }
+}
+
+checkCollision(){
+   for(a=0; a<bodyCount; a++)
+   {
+   bodyCollided[a] = 0; // reset collision
+   for(b=0; b<bodyCount; b++)
+   {
+      if(a==b) continue;
+      
+      if( detectCollision2(a,b) == 1)
+      {
+         bodyCollided[a] = 1;
+         // normalize collision normal
+         len = sqrt(collisionNormalX^2 + collisionNormalY^2);
+         collisionNormalX/=len;
+         collisionNormalY/=len;
+         // scale normal by collision depth / penetration
+         collisionVectorX = collisionNormalX * collisionDepth;
+         collisionVectorY = collisionNormalY * collisionDepth; 
+
+         // Now find the collision edge
+         e1 = edgeV1[collisionEdge];
+         e2 = edgeV2[collisionEdge];
+         T = 0;
+         
+         if( abs(px[e1] - px[e2]) > abs(py[e1] - py[e2]) )
+         {
+            T = (px[collisionVert] - collisionVectorX - px[e1]) / (px[e2]-px[e1]);
+         }
+         else
+         {
+            T = (py[collisionVert] - collisionVectorY - py[e1]) / (py[e2]-py[e1]);
+         }
+         lambda = 1.0/(T^2 + (1-T)^2);
+         
+         px[e1] -= collisionVectorX*(1-T)*0.5*lambda;
+         py[e1] -= collisionVectorY*(1-T)*0.5*lambda;
+         px[e2] -= collisionVectorX*( T)*0.5*lambda;
+         py[e2] -= collisionVectorY*( T)*0.5*lambda;
+         
+         // No need to move every vert in a body upon collision
+         // just move the colliding vert by half the coll. vector
+         
+         px[collisionVert] += collisionVectorX * 0.5;  
+         py[collisionVert] += collisionVectorY * 0.5;    
+      }
+      
+   }
+   }
+}
+// make a rope at x,y with a number of segments with dist between each
+makeRope(x,y,segments,dist) // perhaps specify a normal in dir segs are created initially.
+{
+   p1 = createPoint(x,y);
+   physBodyVerts[bodyCount][0] = p1;   
+   ropeIdx = p1;
+
+   for(i=1; i<segments; i++)
+   {
+      p2 = createPoint(x,y + i*25);
+      physBodyVerts[bodyCount][i] = p2;
+      
+      e = createContraint(p1,p2);
+      physBodyEdges[bodyCount][i-1] = e;
+      
+      //px[p2] += rnd/2;
+      p1 = p2;
+   }
+   
+   physBodyVertCount[bodyCount] = segments;    
+   physBodyEdgeCount[bodyCount] = segments-1;
+   bodyCount++;  
+   return ropeIdx;
+}
+makeBox(x,y,w,h){
+      v1x = x-w/2;
+      v1y = y-h/2;
+
+      v2x = x-w/2;
+      v2y = y+h/2;
+
+      v3x = x+w/2;
+      v3y = y+h/2;
+      
+      v4x = x+w/2;
+      v4y = y-h/2;
+      
+      v5x = x; v5y = y;   
+
+      p1 = createPoint(v1x,v1y);
+      p2 = createPoint(v2x,v2y);
+      p3 = createPoint(v3x,v3y);
+      p4 = createPoint(v4x,v4y);
+      p5 = createPoint(v5x,v5y);
+      
+      e1 = createContraint(p1,p2);
+      e2 = createContraint(p2,p3);
+      e3 = createContraint(p3,p4);
+      e4 = createContraint(p4,p1);
+      
+      // crossbars
+      e5 = createContraint(p1,p5);
+      e6 = createContraint(p2,p5);
+      e7 = createContraint(p3,p5); 
+      e8 = createContraint(p4,p5); 
+      
+      physBodyVertCount[bodyCount] = 5;
+      physBodyEdgeCount[bodyCount] = 8; // 8
+      physBodyVerts[bodyCount][0] = p1;
+      physBodyVerts[bodyCount][1] = p2;
+      physBodyVerts[bodyCount][2] = p3;
+      physBodyVerts[bodyCount][3] = p4;
+      physBodyVerts[bodyCount][4] = p5;
+      
+      physBodyEdges[bodyCount][0] = e1;
+      physBodyEdges[bodyCount][1] = e2;
+      physBodyEdges[bodyCount][2] = e3;
+      physBodyEdges[bodyCount][3] = e4;
+      
+      physBodyEdges[bodyCount][4] = e5;
+      physBodyEdges[bodyCount][5] = e6;
+      physBodyEdges[bodyCount][6] = e7;
+      physBodyEdges[bodyCount][7] = e8;
+      bodyCount++;
+      
+      return p5;
+}
+createPoint(x,y){
+   px[pointCount] = x;
+   py[pointCount] = y;
+   opx[pointCount] = x;
+   opy[pointCount] = y;
+   ax[pointCount] = 0;
+   ay[pointCount] = 10; // set gravity on point
+   pointCount++;
+   return pointCount-1;
+}
+createContraint(p1,p2){
+   edgeV1[edgeCount] = p1;
+   edgeV2[edgeCount] = p2; 
+
+   edgeOriginalLength[edgeCount] = sqrt( (px[p1]-px[p2])^2 + (py[p1]-py[p2])^2 );
+
+   edgeCount++;
+   return edgeCount-1;
+}
+// 2d projection is the dot product of the projection axis and the point we want to proj.
+projectToAxis(bodyIdx, axisx, axisy, &min, &max)
+{
+   dotP = axisx * px[physBodyVerts[bodyIdx][0]] + axisy * py[physBodyVerts[bodyIdx][0]];
+   
+   // Set max and min values to proj of 1st vert
+   min = dotP;
+   max = dotP;
+   
+   for(i=1; i<physBodyVertCount[bodyIdx]; i++)
+   {
+      dotP = axisx * px[physBodyVerts[bodyIdx][i]] + axisy * py[physBodyVerts[bodyIdx][i]];
+      min = min( dotP, min );  
+      max = max( dotP, max );  
+   }
+}
+
+detectCollision2(body1, body2){
+   minDistance = 10000.0; // init the length of the collision vector to a large value
+   
+   for(i=0; i<physBodyEdgeCount[body1] + physBodyEdgeCount[body2]; i++)
+   {
+      edge = -1;
+      if( i < physBodyEdgeCount[body1] ) 
+         edge = physBodyEdges[body1][i];
+      else edge = physBodyEdges[body2][i-physBodyEdgeCount[body1]];
+      
+      // calculate the axis perp to this edge and normalize it
+      axisx = py[edgeV1[edge]] - py[edgeV2[edge]];
+      axisy = px[edgeV2[edge]] - px[edgeV1[edge]];
+      len = sqrt(axisx^2 + axisy^2);
+      axisx/=len; axisy/=len;
+      
+      mina=0; minb=0; maxa=0; maxb=0; // project both bodies onto the perp axis
+      projectToAxis(body1, axisx, axisy, mina, maxa);
+      projectToAxis(body2, axisx, axisy, minb, maxb);
+      
+      // calc dist between two intervals
+      distance = intervalDistance(minA, maxA, minB, maxB);
+      
+      if(distance > 0.0) return 0;
+      
+      // if the intervals overlap, check, whether the vector length on this
+      // edge is smaller than the smallest length that has been reported so far
+      else if( abs( distance ) < minDistance )
+      {
+         minDistance = abs(distance);
+         collisionNormalX = axisx;
+         collisionNormalY = axisy;
+         collisionEdge = edge;
+      }
+   }
+   collisionDepth = minDistance;
+   
+   // Detect edge and vert
+   
+   // Ensure that the body containing the collision edge lies in B2
+   // and the one containing the coll. vert lies in B1
+   if(collisionEdgeParent != body2)
+   {
+      temp = body2;
+      body2 = body1;
+      body1 = temp;
+   }
+   
+   // This is needed to make sure that the collision normal is pointing at B1
+   // calc diff between center points
+   // b1.center - b2.center:
+   diffx = physBodyCenterX[body1] - physBodyCenterX[body2];
+   diffy = physBodyCenterY[body1] - physBodyCenterY[body2];
+   sign = sgn( collisionNormalx*diffx + collisionNormaly*diffy );
+   
+   // Remember that the line equation is N*( R - R0 ). We choose B2.center
+   // as R0; the normal N is given by the collision normal
+   
+   if( sign != 1 )
+   {
+      collisionNormalx *= -1;
+      collisionNormaly *= -1;
+   }
+   
+   smallestD = 1000.0; // init the smallest distance to a high value
+   for(i=0; i< physBodyVertCount[body1]; i++)
+   {
+      // measure the dist of the vertex from the line using the line equation
+      diffx = px[ physBodyVerts[body1][i] ] - physBodyCenterX[body2];
+      diffy = py[ physBodyVerts[body1][i] ] - physBodyCenterY[body2];
+      distance = collisionNormalx*diffx + collisionNormaly*diffy; // dot prod
+      
+      // If the measured distance is smaller than the distance reported
+      // so far, set the smallest distance and the collision vector
+      
+      if( distance < smallestD )
+      {
+         smallestD = distance;
+         collisionVert = physBodyVerts[body1][i];
+      }
+   }
+
+   return 1;
+}
+
+
+intervalDistance(minA, maxA, minB, maxB){
+   if(minA < minB) return minB-MaxA;
+   else return minA - maxB;
+}

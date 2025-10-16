@@ -1,0 +1,43 @@
+()
+{
+   cls(0);
+   setcol(0xffffff);
+   
+   rectw=200;
+   recth=200;
+   drawsph(320+100,240+100,-100);
+   
+   drawRect(320, 240, rectw, recth);
+   
+   for( i=1; i<9; i++)
+   {
+   
+      drawRect(0, 240, i*10, i*10);
+   }
+   moveto(120,240);
+   printf("Rect area = %g^2\n", rectw*recth);
+   printf("Cirl area = %g^2\n", pi*100*100);
+   printf("leftovers = %g\n", (rectw*recth)-(pi*100*100));
+   ratio = pi*100*100/(rectw*recth);
+   printf("ratio Square Area/Circle area =     %g\n", ratio);
+   printf("ratio*4 =     %g\n", ratio*4);
+}
+
+
+
+drawRect(sx, sy, wx, wy)
+{   
+   moveto(sx, sy);
+   lineto(sx+wx, sy+0);
+   
+   moveto(sx, sy+wy);
+   lineto(sx+wx, sy+wy);
+   
+   moveto(sx, sy);
+   lineto(sx, sy+wy);
+   
+   moveto(sx+wx, sy);
+   lineto(sx+wx, sy+wy);
+}
+
+

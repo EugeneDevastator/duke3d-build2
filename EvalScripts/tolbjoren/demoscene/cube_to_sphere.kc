@@ -1,0 +1,443 @@
+/*
+idea was to have something that morphs between cube/sphere  and has
+faces that extrude in time to music. 
+
+Extrusion length <-> amplitude
+what cube on face <-> frequency
+
+*/
+
+// begin camera
+static posx = 0;
+static posy = 0;
+static posz = -40;
+static posh = 0; // left right
+static posv = 0.0;
+static mat[9]; 
+// end camera
+
+static time, dt, oldtime;
+
+struct vec{ 
+  x,y,z;
+};
+
+
+enum{dim1=11*1, dim2=11*1}
+static px[6][dim1][dim2];
+static py[6][dim1][dim2];
+static pz[6][dim1][dim2];
+
+static nnx[6][dim1][dim2];
+static nny[6][dim1][dim2];
+static nnz[6][dim1][dim2];
+
+static color[6][dim1][dim2];
+
+enum{SIZECOUNT = 10}
+enum{MAXPTS = dim1*dim2*6 }
+static vec cubePts[MAXPTS];
+static vec spherePts[MAXPTS];
+static numPts=0;
+
+// TODO: vertex normals, phong shading
+
+()
+{
+   time = klock(0);
+   dt = time-oldtime;
+   oldtime = time;   
+
+   if( numframes==0 )
+   {
+      genGeo(0);
+      
+   static tex[2][2];
+   c = rgb(255,255,255);
+   tex[0][0] = c;
+   tex[0][1] = c;
+   tex[1][0] = c;
+   tex[1][1] = c;
+
+   handle=glsettex(tex,2,2);
+   }
+
+   cls(0); clz(1e32);
+   glEnable(GL_DEPTH_TEST);
+   glCullface(GL_NONE);
+
+   
+   
+   tExt = mousx/xres;
+
+   targS = 0;
+   targI = int((dim1-1) * mousx/xres);  
+   targJ = int((dim2-1) * mousy/yres);   
+   
+   t = time;
+   targI = int( (0.5+0.5*cos(2*t))*(dim1-1) );
+   targJ = int( (0.5+0.5*sin(t))*(dim2-1) );
+   
+
+genGeo(tExt); 
+
+
+   vec extBL, extBR, extTR, extTL;
+   for(s=0; s<6; s++)
+   {
+   for(i=0; i<dim1-1; i++)
+   {
+      //glBegin(GL_QUADS);
+      glbegin(GL_LINE_STRIP);
+      for(j=0; j<dim2-1; j++)  
+      {                     
+         //targI = i;
+         //targJ = j;
+         if(i==targI && j==targJ)
+         {
+            t = tExt;
+         }else
+         {
+            t=0;
+         }
+
+         if(0)
+         {
+         u=i+0; v=j+0;
+         setcol( color[s][u][v]  );
+         glVertex( px[s][u][v], py[s][u][v], pz[s][u][v] );
+         
+         u=i+1; v=j+0;
+         setcol( color[s][u][v]  );
+         glVertex( px[s][u][v], py[s][u][v], pz[s][u][v] );
+         
+         u=i+1; v=j+1;
+         setcol( color[s][u][v]  );
+         glVertex( px[s][u][v], py[s][u][v], pz[s][u][v] );
+         
+         u=i+0; v=j+1;
+         setcol( color[s][u][v]  );
+         glVertex( px[s][u][v], py[s][u][v], pz[s][u][v] );
+         }
+         else
+         {
+         nx = nnx[s][i][j];
+         ny = nny[s][i][j];
+         nz = nnz[s][i][j];
+         nx *= t;
+         ny *= t;
+         nz *= t;  
+/// Head
+
+         u=i+0; v=j+0;
+         setcol( color[s][u][v]  );
+         glVertex( px[s][u][v]+nx, py[s][u][v]+ny, pz[s][u][v]+nz );
+         vec extBL = {px[s][u][v]+nx, py[s][u][v]+ny, pz[s][u][v]+nz};
+         
+         u=i+1; v=j+0;
+         setcol( color[s][u][v]  );
+         glVertex( px[s][u][v]+nx, py[s][u][v]+ny, pz[s][u][v]+nz );
+         vec extBR = {px[s][u][v]+nx, py[s][u][v]+ny, pz[s][u][v]+nz};
+         
+         u=i+1; v=j+1;
+         setcol( color[s][u][v]  );
+         glVertex( px[s][u][v]+nx, py[s][u][v]+ny, pz[s][u][v]+nz );
+         vec extTR = {px[s][u][v]+nx, py[s][u][v]+ny, pz[s][u][v]+nz};
+         
+         u=i+0; v=j+1;
+         setcol( color[s][u][v]  );
+         glVertex( px[s][u][v]+nx, py[s][u][v]+ny, pz[s][u][v]+nz );
+         vec extTL = {px[s][u][v]+nx, py[s][u][v]+ny, pz[s][u][v]+nz};
+
+////// 1
+         u=i+0; v=j+0;
+         setcol( color[s][u][v]  );
+         glVertex( extTL.x, extTL.y, extTL.z );
+         
+         u=i+1; v=j+0;
+         setcol( color[s][u][v]  );
+         glVertex( extTR.x, extTR.y, extTR.z );
+         
+         u=i+1; v=j+1;
+         setcol( color[s][u][v]  );
+         glVertex( px[s][u][v], py[s][u][v], pz[s][u][v] );
+         
+         u=i+0; v=j+1;
+         setcol( color[s][u][v]  );
+         glVertex( px[s][u][v], py[s][u][v], pz[s][u][v] );
+//////2
+         u=i+0; v=j+0;
+         setcol( color[s][u][v]  );
+         glVertex( px[s][u][v], py[s][u][v], pz[s][u][v] );
+         
+         u=i+1; v=j+0;
+         setcol( color[s][u][v]  );
+         glVertex( px[s][u][v], py[s][u][v], pz[s][u][v] );
+         
+         u=i+1; v=j+1;
+         setcol( color[s][u][v]  );
+         glVertex( extBR.x, extBR.y, extBR.z );
+         
+         u=i+0; v=j+1;
+         setcol( color[s][u][v]  );
+         glVertex( extBL.x, extBL.y, extBL.z );
+//////3
+         u=i+0; v=j+0;
+         setcol( color[s][u][v]  );
+         glVertex( extBR.x, extBR.y, extBR.z );
+         
+         u=i+1; v=j+0;
+         setcol( color[s][u][v]  );
+         glVertex( px[s][u][v], py[s][u][v], pz[s][u][v] );
+         
+         u=i+1; v=j+1;
+         setcol( color[s][u][v]  );
+         glVertex( px[s][u][v], py[s][u][v], pz[s][u][v] ); 
+         
+         u=i+0; v=j+1;
+         setcol( color[s][u][v]  );
+         glVertex( extTR.x, extTR.y, extTR.z );
+//////4
+         u=i+0; v=j+0;
+         setcol( color[s][u][v]  );
+         glVertex( px[s][u][v], py[s][u][v], pz[s][u][v] );
+         
+         u=i+1; v=j+0;
+         setcol( color[s][u][v]  );
+         glVertex( extBR.x, extBR.y, extBR.z );
+         
+         u=i+1; v=j+1;
+         setcol( color[s][u][v]  );
+         glVertex( extTR.x, extTR.y, extTR.z );
+         
+         u=i+0; v=j+1;
+         setcol( color[s][u][v]  );
+         glVertex( px[s][u][v], py[s][u][v], pz[s][u][v] );          
+         }
+      } 
+      glEnd();
+   }
+   }
+   
+   moveto(0,0);
+   setfont(12,16);
+   setcol(255,255,255);
+   printf("move mouse left/right");
+   
+   printf("num pts %g", numPts);
+
+   playercontrols();
+}
+
+drawNum(num, px,py,pz)
+{
+      x = px - posx; 
+      y = py - posy; 
+      z = pz - posz;
+      
+      nx = x * mat[0] + y * mat[1] + z * mat[2]; // dot with Right
+      ny = x * mat[3] + y * mat[4] + z * mat[5]; // dot with Down
+      nz = x * mat[6] + y * mat[7] + z * mat[8]; // dot with Forwards
+      // if behind screen, discard
+      if(nz <= 0.5) return;
+      
+      setcol(0xffffff); 
+      setfont(8*60/nz,12*60/nz, -1);
+      
+      f = xres/2/nz;
+      moveto(nx*f+xres/2, ny*f+yres/2); 
+      printf("%g",num);
+}
+
+// Camera and movement code taken from /games/
+//Handle input and player movement
+playercontrols()
+{
+   static oldMouseX;
+   static oldMouseY;
+   static mouseSpeedX;
+   static mouseSpeedY; 
+   
+   vx=0;
+   vy=0;
+   vz=0;
+
+   if( 0 ) 
+   {
+      f = .1;
+      if (keystatus[0x2a]) f /= 4;
+      if (keystatus[0x36]) f *= 4;
+      vx = (keystatus[32]-keystatus[30])*f; //D-A
+      vy = (keystatus[17]-keystatus[31])*f; //W-S  
+      vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   }else
+   {
+      r = -5;
+      rot = time;
+      posx = sin(rot)*r;
+      posy = 0;
+      posz = cos(rot)*r;
+      posh = rot;
+      posv = 0;
+
+   }
+   
+   ang2mat(posh,posv,mat); // Convert angles to rotation matrix
+   
+   // find new position
+   posx += mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   posy += mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   posz += mat[2]*vx + mat[5]*vz + mat[8]*vy; 
+   
+   // mousespeed values are tweaked for 60 fps
+   mouseSpeedX = (mousx - oldMouseX) * 0.01;
+   mouseSpeedY = (mousy - oldMouseY) * 0.01;
+   oldMouseX = mousx;
+   oldMouseY = mousy;
+   
+   if(bstatus==1)
+   {
+      posh += mouseSpeedX;
+      posv += mouseSpeedY;
+   }
+   // Right,down,forwards unit vectors.
+   setcam(posx,posy,posz,
+          mat[0],mat[1],mat[2],
+          mat[3],mat[4],mat[5],
+          mat[6],mat[7],mat[8]);
+          
+
+}
+/* converts horizontal and vertical angles to a 3x3 rotation matrix */
+ang2mat(hang,vang,mat[9])
+{
+   mat[0] = cos(hang); mat[1] = 0; mat[2]=-sin(hang);
+   mat[6] = cos(vang)*sin(hang); mat[7] = sin(vang); mat[8]=cos(vang)*cos(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}
+
+genGeo(val)
+{   
+  numPts = 0;
+  
+   x=0;
+   y=0;
+   z=0;
+   
+   uux=0;
+   uuy=0;
+   uuz=0;
+   
+   vvx=0;
+   vvy=0;
+   vvz=0;
+   
+   static uvec[3];
+   static vvec[3];
+   static normVec[3];
+   
+   for(side=0; side<6; side++)
+   for(i=0; i<dim1; i++)
+   for(j=0; j<dim2; j++)
+   
+   
+   {
+      s = i/(dim1-1);
+      t = j/(dim2-1);
+      sdt = s + 0.01;
+      tdt = t + 0.01;
+      
+      cube(side,s,t,x,y,z);
+      cube(side,sdt,t,uux,uuy,uuz);
+      cube(side,s,tdt,vvx,vvy,vvz);
+
+      len = sqrt(x*x + y*y + z*z); 
+      nx = x / len;
+      ny = y / len;
+      nz = z / len;
+   
+      color[side][i][j] = rgb(128+nx*128, 128+ny*128, 128+nz*128 );
+      px[side][i][j] = lerp(x,nx,val);
+      py[side][i][j] = lerp(y,ny,val);
+      pz[side][i][j] = lerp(z,nz,val);
+      
+      setVec(normVec,nx,ny,nz);
+      nnx[side][i][j] = normVec[0];
+      nny[side][i][j] = normVec[1];
+      nnz[side][i][j] = normVec[2];
+
+      makeCubePt(x,y,z);
+      makeSpherePt(nx,ny,nz);
+      numPts++;
+   }
+}
+
+lerp(a,b,t)
+{
+   return a + (b-a) * t;
+}
+
+setVec(v[3],x,y,z)
+{
+   v[0] = x; v[1] = y; v[2] = z;
+}
+
+normalize(v[3])
+{
+   l = sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2] );
+   v[0] /= l; v[1] /= l; v[2] /= l;
+}
+
+cross(a[3],b[3],p[3])
+{
+   p[0] = a[1]*b[2] - b[1]*a[2]; // yz
+   p[1] = a[2]*b[0] - b[2]*a[0]; // zx
+   p[2] = a[0]*b[1] - b[0]*a[1]; // xy
+}
+
+// side = front,back,left,right,top,bottom
+cube(side,s,t,&x,&y,&z){
+   if(side==0){
+      x = 1-2*s;
+      y = 1-2*t;
+      z = 1;
+   }else if(side==1){
+      x = 1-2*s;
+      y = 1-2*t;
+      z = -1;
+   }else if(side==2){
+      x = -1;
+      y = 1-2*s;
+      z = 1-2*t;
+   }else if(side==3){
+      x = 1;
+      y = 1-2*s;
+      z = 1-2*t;
+   }else if(side==4){
+      x = 1-2*s;
+      y = 1;
+      z = 1-2*t;
+   }else if(side==5){
+      x = 1-2*s;
+      y = -1;
+      z = 1-2*t;
+   }
+}
+
+
+
+makeCubePt(x,y,z)
+{
+   cubePts[numPts].x = x;
+   cubePts[numPts].y = y;
+   cubePts[numPts].z = z;
+}
+makeSpherePt(x,y,z)
+{
+   spherePts[numPts].x = x;
+   spherePts[numPts].y = y;
+   spherePts[numPts].z = z;
+}
+

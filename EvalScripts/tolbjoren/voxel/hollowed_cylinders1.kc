@@ -1,0 +1,91 @@
+(x,y,z,&r,&g,&b)
+{
+
+   // 6 Cylinders. Implicit cyl is some (axis^2 + otheraxis^2) < radius
+   r0 = 0.05;
+   r1 = 0.03;   
+
+   a0 = x^2 + y^2 < r0;
+   a1 = x^2 + y^2 < r1;
+   
+   b0 = z^2 + y^2 < r0;
+   b1 = z^2 + y^2 < r1;
+   
+   //c0 = x^2 + z^2 < .25;
+   //c1 = x^2 + z^2 < .1;
+   
+   //a = 2*PI * mousx/xres;
+   a = PI/180 * 45;
+   static mtx[9];
+   dx = 1; dy = 1; dz = 0;
+   rlen = 1/sqrt(dx^2+dy^2+dz^2); dx*=rlen; dy*=rlen; dz*=rlen;
+   InitRotationMatrix(mtx, dx,dy,dz, a);
+   rx = x; ry = y; rz = z;
+   transformPoint(rx,ry,rz,mtx);
+   
+   dist = sqrt(rx^2+ry^2+rz^2);
+   c0=0; c1=0;
+   if ( dist < .75 ){
+      c0 = rx^2 + ry^2 < r0;
+      c1 = rx^2 + ry^2 < r1;
+   }
+   
+   f = 15;
+   tex = noise(x*f,y*f,z*f);
+   
+   
+   r=128+(tex+a0)*127;
+   g=128+(tex+b0)*127;
+   b=128+(tex+c0)*127;
+   
+   //c0-c1;
+   (a0-a1-b1-c1) + (b0-b1-a1-c1) + (c0-c1-a1-b1);
+   //(a0+b0+c0) - (a1+b1+c1);
+}
+
+// Takes an axis (ax,ay,az) a length from origin and radii
+pipe( ax,ay,az, len, r0, r1)
+{
+
+}
+
+union(a,b){
+   min(a,b);
+}
+
+isect(a,b){
+   max(a,b);
+}
+
+diff(a,b){
+   max(a,-b);
+}
+
+InitRotationMatrix(mtx[9], x,y,z, r)
+{
+  // assuming the axis vector must be of unit length...
+
+  // Compute the rotation matrix  
+  c = cos(r);
+  s = sin(r);
+
+  Mtx[0] = (x * x) * (1.0 - c) + c;
+  Mtx[1] = (y * x) * (1.0 - c) + (z * s);
+  Mtx[2] = (z * x) * (1.0 - c) - (y * s);
+
+  Mtx[3] = (x * y) * (1.0 - c) - (z * s);
+  Mtx[4] = (y * y) * (1.0 - c) + c;
+  Mtx[5] = (z * y) * (1.0 - c) + (x * s);
+
+  Mtx[6] = (x * z) * (1.0 - c) + (y * s);
+  Mtx[7] = (y * z) * (1.0 - c) - (x * s);
+  Mtx[8] = (z * z) * (1.0 - c) + c;
+} 
+
+transformPoint(&x,&y,&z, thisRot[9])
+{
+   NewX = x * thisRot[0] + y * thisRot[1] + z * thisRot[2];
+   NewY = x * thisRot[3] + y * thisRot[4] + z * thisRot[5];
+   NewZ = x * thisRot[6] + y * thisRot[7] + z * thisRot[8];
+   x=newx; y=newy; z=newz;
+}

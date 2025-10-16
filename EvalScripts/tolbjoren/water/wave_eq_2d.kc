@@ -1,0 +1,40 @@
+enum{len=256}
+static val[len*len];
+static deriv[len*len];
+static oldx,oldy;
+()
+{
+   spd=3*sqrt( (mousx-oldx)^2+(mousy-oldy)^2 );
+   oldx=mousx;
+oldy=mousy;
+   
+   
+   
+   //if(bstatus==1)
+   if(mousx > 0 && mousx < len)
+   if(mousy > 0 && mousy < len)
+   val[mousy*len+mousx] = spd;
+   
+   for(j=0; j<len*len; j++)
+      val[j] += deriv[j];
+      
+   for(j=1; j<len-1; j++)
+   for(i=1; i<len-1; i++)
+   {
+      offset = len*j+i;
+      double avg = (val[offset-1] + val[offset+1] + val[offset-len] + val[offset+len]) / 4.0;
+      deriv[offset] -= 0.5 * (val[offset]-avg);
+      deriv[offset] *= 0.99;
+   }
+   
+   static buf[len];
+   for(j=1; j<len-1; j++)
+   {
+   for(i=1; i<len-1; i++)
+   {
+      c = 255*val[len*j+i];
+      buf[i] = rgb(c,c,c);
+   }
+      sethlin(0,j,buf,len);
+   }
+}

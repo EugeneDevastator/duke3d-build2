@@ -1,0 +1,68 @@
+/*
+
+A ray may be written more
+compactly with vector notation:
+
+   p(t) = p0 + td
+   
+   The ray starts at p0, thus p0 is the start position
+   The "delta vector" d contains length and direction
+   the ray ends at point p(1) = p0 + d
+
+*/
+()
+{
+   cls(0);
+
+   // 2D ray
+   x0 = xres/2; y0 = yres/2;
+   dx = mousx-x0; dy = mousy-y0;
+
+   DrawParametric(x0,y0,dx,dy);
+   
+   a=0; b=0; d=0;
+   ParametricRayToImplicit(x0,y0,dx,dy,a,b,d);
+   moveto(0,0);
+   printf("A= %g", a);
+   printf("B= %g", b);
+   printf("D= %g", d);
+   
+   px = 0; py = 0; dx = 0; dy = 0;
+   //ImplicitToParametric(a,b,d,px,py,dx,dy);
+   //DrawParametric(px,py,dx,dy);
+}
+
+DrawParametric(px,py,dx,dy)
+{
+   l = dist(px,py,px+dx,py+dy);
+
+   for(t=0; t<1; t+=1/(l+1))
+   {
+      xt = px + t * dx;
+      yt = py + t * dy;
+      
+      setpix(xt, yt);
+   }
+}
+
+ParametricRayToImplicit(px,py,dx,dy,&a,&b,&d)
+{
+   a = dy;
+   b = -dx;
+   d = px*dy-py*dx;
+}
+
+// is this possible???
+ImplicitToParametric(a,b,d,&px,&py,&dx,&dy)
+{
+   dy = a;
+   dx = -b;
+   py = 0;
+   px = 0;
+   
+}
+
+dist(x1,y1,x2,y2)
+{
+   d = sqrt( (x1-x2)^2 + (y1-y2)^2 );
+}

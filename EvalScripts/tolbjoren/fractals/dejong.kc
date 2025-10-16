@@ -1,0 +1,89 @@
+// http://local.wasp.uwa.edu.au/~pbourke/fractals/peterdejong/
+
+()
+{
+
+   //cls(255,255,255);
+   cls(0);
+
+   x = rnd;
+   y = 0.1;
+   
+   a = 1.3;
+   b = -5.3;
+   c = 2.4;
+   d = -PI * rnd;
+
+   iters = 1e6;
+
+
+   i=0;
+   //for(i=0; i<iters; i++){
+   while(1){
+   i++;
+
+   xn = sin(a*y) - cos(b*x);
+   yn = sin(c*x) - cos(d*y);
+   
+   x = xn;
+   y = yn;
+   
+   s = 200;
+   
+   rc=yn*300;
+   gc=i* 255 / iters;
+   bc=xn*300;
+
+   plotx=xres/2 + x*s + s/2;
+   ploty=yres/2 + -y*s - s/2 ;
+   disppntsppa(plotx,ploty,rc,gc,bc,0.05);
+
+   r=0;
+   g=0;
+   b=0;
+   //getpix(plotx,ploty,r,g,b);
+   //setcol( rgb( (r+rc)/2 , (g+gc)/2, (b+bc)/2 ) );      
+   //setpix(plotx,ploty);
+   
+   }
+
+
+}
+
+// Antialiased point plotting
+disppntspp(x, y, r, g, b)
+{
+  ix=floor(x); iy=floor(y);
+  shx=x-ix;
+  shy=y-iy;
+  disppnta(ix, iy, r, g, b, (1-shx)*(1-shy));
+  disppnta(ix+1, iy, r, g, b, shx*(1-shy));
+  disppnta(ix, iy+1, r, g, b, (1-shx)*shy);
+  disppnta(ix+1, iy+1, r, g, b, shx*shy);
+}
+
+disppntsppa(x, y, r, g, b, a)
+{
+  ix=floor(x); iy=floor(y);
+  shx=x-ix;
+  shy=y-iy;
+  disppnta(ix, iy, r, g, b, a*((1-shx)*(1-shy)));
+  disppnta(ix+1, iy, r, g, b, a*(shx*(1-shy)));
+  disppnta(ix, iy+1, r, g, b, a*((1-shx)*shy));
+  disppnta(ix+1, iy+1, r, g, b, a*(shx*shy));
+}
+
+
+disppnta(x, y, r, g, b, a)
+{
+  rr=0; rg=0; rb=0;
+  getpix(x,y,rr,rg,rb);
+  r=sqrt(rr*rr+(r*r-rr*rr)*a);
+  g=sqrt(rg*rg+(g*g-rg*rg)*a);
+  b=sqrt(rb*rb+(b*b-rb*rb)*a);
+  //r+=(rr-r)*a;
+  //g+=(rg-g)*a;
+  //b+=(rb-b)*a;
+  setcol(r,g,b);
+  setpix(x,y);
+}

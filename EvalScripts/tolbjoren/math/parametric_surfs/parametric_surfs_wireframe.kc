@@ -1,0 +1,307 @@
+enum{dim=16;}
+enum{dim1=dim, dim2=dim}
+static px[dim1][dim2];
+static py[dim1][dim2];
+static pz[dim1][dim2];
+static color[dim1][dim2];
+()
+{
+   cls(0);
+   clz(1e32);
+   glEnable(GL_DEPTH_TEST);
+   glCullface(GL_NONE);   
+   
+   if(numframes==0)
+   {
+      static tex[2][2];
+      c = rgb(255,255,255);
+      tex[0][0] = c;
+      tex[0][1] = c;
+      tex[1][0] = c;
+      tex[1][1] = c;
+      handle=glsettex(tex,2,2);
+   }
+
+   //if(numframes==0)
+   {
+      deltau = 1 / (dim1-1);
+      deltav = 1 / (dim2-1);  
+      startu = 0;
+      startv = 0;  
+      scaler = 1 + mousx/xres;
+
+      for(i=0; i<dim1; i++)
+      for(j=0; j<dim2; j++)
+      {     
+
+         u = startu + i * deltau;
+         v = startv + j * deltav;
+         x=0; y=0; z=0;
+         //cylinder(u,v,x,y,z);
+         //cool(u,v,x,y,z);
+         //heart(u,v,x,y,z);
+         //helicoid(u,v,x,y,z);
+         sphere(u,v,x,y,z);
+         //torus(u,v,x,y,z);
+         //funky(u,v,x,y,z);
+         //klein_bagel(u,v,x,y,z);       
+         //kleinbottle(u,v,x,y,z);  
+         //boys(u,v,x,y,z);   
+             
+
+         x*=scaler;
+         y*=scaler;
+         z*=scaler;
+         px[i][j] = x; py[i][j] = y; pz[i][j] = z;
+         //color[i][j] = rgb( 511*i/(dim1-1)/2, 511*j/(dim2-1)/2, 0) ;
+         color[i][j] = hsv_to_rgb( (i*dim1+j)/(dim1*dim2) * 360, 1,1);
+      }
+      
+
+   }
+
+
+   sc = 2;
+   for(i=0; i<dim1-1; i++)
+   {
+
+      
+      #define TRI // slower than complex
+      #ifdef TRI
+      glBegin(GL_TRIANGLE_STRIP);
+      for(j=0; j<dim2; j++)  
+			{
+            setcol( color[i][j]  );
+            glTexCoord( sc*i/dim1, sc*j/dim2);
+            glVertex( px[i][j], py[i][j], pz[i][j] );
+            
+            setcol( color[i+1][j] );
+            glTexCoord( sc*(i+1)/dim1, sc*j/dim2);
+            glVertex( px[i+1][j], py[i+1][j], pz[i+1][j] );     
+         
+      } 
+			glEnd();
+      #else
+         // when running unbounded I get 4 Mcc with gl_complex and 7-8 with gl_triangle_strip
+
+         for(j=0; j<dim2; j++)  
+         {
+            //glBegin(GL_COMPLEX);
+            glBegin(GL_LINE_STRIP);
+            setcol( color[j][i]  );
+            
+            glTexCoord( sc*i/dim1, sc*j/dim2);
+            glVertex( px[i][j], py[i][j], pz[i][j] );
+            
+            glTexCoord( sc*(i+1)/dim1, sc*j/dim2);
+            glVertex( px[i+1][j], py[i+1][j], pz[i+1][j] );   
+            
+            glTexCoord( sc*(i+1)/dim1, sc*(j+1)/dim2);
+            glVertex( px[i+1][j+1], py[i+1][j+1], pz[i+1][j+1] );   
+            
+            glTexCoord( sc*i/dim1, sc*(j+1)/dim2);
+            glVertex( px[i][j+1], py[i][j+1], pz[i][j+1] );   
+
+            glEnd();
+         } 
+         
+      #endif
+
+   }
+
+   
+   ang = klock(0); //mousx/xres * 2*PI;
+   r = 5;
+   setcam( sin(ang)*-r, 0,cos(ang)*-r  , ang , 0);
+}
+
+cylinder(u,v,&x, &y, &z) 
+{
+   s = u*2*PI;
+   t = v*PI;
+   
+   x = cos(s);
+   y = cos(t);
+   z = sin(s);
+}
+
+cool(u,v,&x, &y, &z) 
+{
+   s = u*2*PI;
+   t = v*PI;
+   
+   x = cos(s) * sin(t) ;
+   y = cos(t) * sin(t);
+   z = sin(s) * sin(t);
+}
+
+funky(u,v,&x,&y,&z)
+{
+   u*=2*PI;
+   v*=PI;
+   x = sin(u) * cos(v);
+   y = cos(u) * cos(v);
+   z = sin(u);
+}
+
+sphere(u,v,&x,&y,&z)
+{
+   r=1;
+   //#define SPHERICAL
+   #ifdef SPHERICAL
+      u*=2*PI;
+      v*=PI;
+      x = r * cos(u) * sin(v);
+      y = r * sin(u) * sin(v);
+      z = r * cos(v);
+   #else
+      u = -r + u*2*r;
+      v *= 2*PI;
+      x = sqrt(r*r - u*u) * cos(v);
+      y = sqrt(r*r - u*u) * sin(v);
+      z = u;
+   #endif
+}
+
+torus(u,v,&x,&y,&z)
+{
+   u*=2*PI;
+   v*=2*PI;
+   bigR = 1;
+   r = .5;
+   x = (bigR+r*cos(v)) * cos(u) ;
+   y = (bigR+r*cos(v)) * sin(u);  
+   z = r*sin(v);
+}
+
+pilow(u,v,&x,&y,&z)
+{
+   u*=2*PI;
+   v*=2*PI;
+   x = sin(u) * cos(v);
+   y = sin(v);
+   z = cos(u);
+}
+
+helicoid(u,v,&x,&y,&z)
+{
+   u*=2*PI;
+   v*=2*PI;
+   a = 1; b = 1; c = 1;
+   x = a * sin(u)*v;
+   y = b * v * cos(u);
+   z = c * u;
+}
+
+heart2(u,v,&x,&y,&z)
+{
+   u=-0.98 + u*(0.98*2);
+   v=-pi + v*2*pi;
+   r = (4*sqrt(1-u*u)) * pow( sin(abs(v)) , abs(v) );
+   x = r * sin(v);
+   y = r * cos(v);
+   z = v;
+}
+
+heart(u,v,&x, &y, &z)
+{
+   u=-0.98 + u*(0.98*2);
+   v=-pi + v*2*pi;
+   r = (4*sqrt(1-u*u) * pow(sin( abs(v) ), abs(v) ));
+   x = r *sin(v);
+   y = r *cos(v);
+   z = u;
+}
+
+klein_bagel(u,v,&x, &y, &z)
+{   
+   u*=2*PI;
+   v*=2*PI;
+   r=.5 ;
+   expr1 = r+cos(u*.5)*sin(v)-sin(u*.5)*sin(2*v);
+   x = expr1 * cos(u);
+   y = expr1 * sin(u);
+   z = sin(u*.5)*sin(v) + cos(u*.5)*sin(2*v);
+}
+
+klien_fail(u,v,&x, &y, &z)
+{
+   u*=2*PI;
+   v*=2*PI;
+   sq2 = sqrt(2);
+   //((sqrt(2) * f(u) * cos(u)*cos(v)*(3*cos(u)^2-1) - 2*cos*2u
+   
+   fu = 20*u^3 - 65*pi*u^2 + 50*pi^2*u - 16*pi^3;
+   gu = sqrt( 8*cos(2*u)^2 - cos(2*u) * (24*cos(u)^3 - 8*cos(u)+15) +
+    6*cos(u)^4 * (1-3*sin(u)^2) + 17);
+   
+   xn = sq2 * fu * cos(u)*cos(v)*(3*cos(u)^2-1) - 2*cos(2*u);
+   xd = 80 * PI^3 * gu;
+   x = xn/xd - (3*cos(u)-3) / 4;
+   
+   y = -(fu * sin(v) ) / (60*pi^3);
+   
+   zn1 = sq2 * fu * sin(u)*cos(v);
+   zd1 = 15*pi^3 * gu;
+   z = -zn1/zd1 + (sin(u) * cos(u)^2 + sin(u)) / 4 - (sin(u)*cos(u))/2;
+}
+
+kleinbottle(p1,p2,&x, &y, &z)
+{
+   u = p1 * 2*PI;
+   v = p2 * 2*PI;
+
+   r = 4*(1-cos(u)*.5);
+   
+   x=0;
+   y=0;
+   if (u >= 0 && u < PI ){
+      x = 6 * cos(u) * (1+sin(u)) + r*cos(u)*cos(v);  
+      y = 16*sin(u) + r * sin(u)*cos(v);
+   }
+   else{
+      x = 6 * cos(u) * (1+sin(u)) + r*cos(v+pi);
+      y = 16*sin(u);
+   }
+         
+
+   
+   z=r*sin(v);
+}
+
+boys(u,v,&x, &y, &z) // incorrecT?
+{
+   t = u*PI;
+   s = v*PI;
+   x = cos(t) * sin(s);
+   y = sin(t) * sin(s);
+   z = cos(s);
+}
+
+
+hsv_to_rgb(h,s,v){ 
+   // expects 360deg and 1,1 hue sat max
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   r=int(r*255);
+   g=int(g*255);
+   b=int(b*255);
+   return r*2^16 + g*2^8 + b; 
+}

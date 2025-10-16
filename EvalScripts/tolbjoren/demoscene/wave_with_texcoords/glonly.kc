@@ -1,0 +1,330 @@
+//enum{imgW=512, imgH=512, tileSiz = 16}
+enum{imgW=320, imgH=200, tileSiz = 10}
+//enum{imgW=640, imgH=480, tileSiz = 40} // adjust these according to the image size
+
+enum{W = 1+(imgW)/(tileSiz), 
+     H = 1+(imgH)/(tileSiz) };
+
+// The points we aggitate on screen
+static offsX_init[W][H]; 
+static offsY_init[W][H];
+
+static offsX[W][H]; 
+static offsY[W][H];
+
+// points velocity
+static offsXV[W][H]; 
+static offsYV[W][H];
+
+static texture[imgW][imgH]; // texture loaded.
+   
+    // tile desired width, diagonal lengths. optimization.
+static norms[3][3] =
+{
+   0,         tileSiz,          tileSiz*2,
+   tileSiz*1, tileSiz*1.414214, tileSiz*2.236068,
+   tileSiz*2, tileSiz*2.236068, tileSiz*2*1.414214
+};
+
+// Tweak em!
+static useImg = 1; // use pic or generated texture
+static randNodeStart = 1;
+
+static elasticity = 0.000001; // springback used in elasticity()
+static      initK = 0.000005;
+static dampning = 0.9995; // velocity dampening
+
+static movX, movY;
+static isMoving = 0;
+()
+{
+   cls(0); clz(1e32);
+
+   if(numframes==0)
+   {
+   //wid=0; hei=0;
+   //getpicsiz(wid,hei);
+   // moveto(0,yres-25); Printf("pix siz: %gx%g",wid, hei);
+  
+      init();
+      
+      for(x=0; x<imgW; x++)
+      for(y=0; y<imgH; y++)
+      {
+         if(useImg==1) texture[x][y] = pic("pawn1.gif",x,y);  
+         else texture[x][y] = pic(x,y);
+      }  
+   }
+   static screen[imgh][imgw]; // contains texture to fill screen.
+   
+   if(numframes==0)
+   {
+      for(x=0; x<imgw; x++)
+      for(y=0; y<imgh; y++) {
+         screen[y][x] = texture[x][y]; //swap x,y
+      }
+      t = glsettex(screen,imgw,imgh);
+   }
+
+   time = klock(0);
+   setcol(0xffffff);
+
+   perfOgl = klock();   
+      drawTiles();
+      enum{KEY_D = 32}
+      if(keystatus[KEY_D]) drawGrid();
+   perfOgl = klock()-perfOgl;
+    
+    
+    perfGrid = klock();
+   if(keystatus[57])
+   for(i=0; i<10; i++)
+   {
+      Relax();
+   }
+   
+   agitateGrid(); 
+   //movePoint();
+    
+   perfGrid = klock() - perfGrid;
+   tot = perfOgl + perfGrid;
+   partOgl = perfOgl/tot;
+   partGrid = perfGrid/tot;
+    // Draw perf as lines
+   for(i=0; i<2; i++)
+   {
+      setcol(0xffff00);
+      moveto(0, yres-5 -i);
+      lineto(partOgl*xres, yres-5 -i);
+         
+      setcol(0xff0000);
+      moveto(partOgl*xres, yres-5 -i);
+      lineto(partOgl*xres+partGrid*xres, yres-5 -i);   
+   } 
+   setcol(0xffffff); moveto(0, yres-25); printf("spc to move, D - show grid");
+   
+  //drawsph(imgW, imgH, 3);
+
+  while(klock(0) < numframes/60){}
+}
+
+Init()
+{
+   for(x=0; x<W; x++)
+   for(y=0; y<H; y++)
+   {
+      offsX_init[x][y] = x*tileSiz;
+      offsY_init[x][y] = y*tileSiz;
+      offsX[x][y] = offsX_init[x][y];
+      offsY[x][y] = offsY_init[x][y];
+      
+      if ( y > 0 && x > 0 ) {
+         if(randNodeStart==1)// && (x>0 || y>0) && (x<W-1 || y<H-1) )
+         {
+            offsX[x][y] = offsX_init[x][y] + (tileSiz*nrnd*.1);
+            offsY[x][y] = offsY_init[x][y] + (tileSiz*nrnd*.1);
+         } 
+      }
+
+      offsXv[x][y] = 0;
+      offsYv[x][y] = 0;
+   }
+}
+
+drawTiles()
+{
+   tx = 0;
+   ty = 0;
+   setcol(0xffffff);
+
+   xVertScale = tileSiz;
+   yVertScale = tileSiz;
+   
+   xTexScale = imgw;
+   yTexScale = imgh;
+
+   glBegin(GL_POLYGON);   
+   for(x=0; x<W-1; x++)
+   {
+   for(y=0; y<H-1; y++) 
+   {
+      Ax=offsX[x][y] ;
+      Ay=offsY[x][y] ;
+      
+      Bx=offsX[x+1][y] ;
+      By=offsY[x+1][y] ;
+      
+      Cx=offsX[x+1][y+1] ;
+      Cy=offsY[x+1][y+1] ;
+
+      Dx=offsX[x][y+1] ;
+      Dy=offsY[x][y+1] ;
+
+      // Tex coords are warped, but vertexes are where they should be.
+      glTexCoord(Ax/xTexScale, Ay/yTexScale);  glVertex(tx+ x*    xVertScale, ty+ y*    yVertScale);
+      glTexCoord(Bx/xTexScale, By/yTexScale);  glVertex(tx+ (x+1)*xVertScale, ty+ y*    yVertScale);
+      glTexCoord(Cx/xTexScale, Cy/yTexScale);  glVertex(tx+ (x+1)*xVertScale, ty+ (y+1)*yVertScale);
+      glTexCoord(Dx/xTexScale, Dy/yTexScale);  glVertex(tx+ x*     xVertScale, ty+ (y+1)*yVertScale);
+      
+      glnextcontour(); // does what exactly???
+   }
+   }
+   glEnd();
+}
+
+drawGrid(){
+   /*
+   for(x=0; x<W; x++)
+   for(y=0; y<H; y++)
+   {
+      c=255; setcol(c,c,c);
+      setpix( offsX[x][y], offsY[x][y]);
+      //drawsph( offsX[x][y], offsY[x][y], -8);
+   }
+    */
+   
+   setcol(255,0,0);
+   for(x=0; x<W-1; x++)
+   {
+      for(y=0; y<H-1; y++) 
+      {
+         Ax=offsX[x][y] ;
+         Ay=offsY[x][y] ;
+
+         Bx=offsX[x+1][y] ;
+         By=offsY[x+1][y] ;
+
+         Cx=offsX[x+1][y+1] ;
+         Cy=offsY[x+1][y+1] ;
+
+         Dx=offsX[x][y+1] ;
+         Dy=offsY[x][y+1] ;
+         moveto(Ax,Ay);
+         lineto(Bx,By);
+         lineto(Cx,Cy);
+         lineto(Dx,Dy);
+         lineto(Ax,Ay);
+      }
+   }
+}
+
+movePoint(){
+   if(bstatus == 1 && isMoving==0)
+   {
+     isMoving = 1;
+   }
+   if (isMoving){
+      offsX[movX][movY] = mousx;
+      offsY[movX][movY] = mousy; 
+   }
+   
+   if ( bstatus == 0 ) {
+      isMoving = 0;
+      
+      movX = int( (mousx+tileSiz*.5) / tileSiz);
+      movY = int( (mousy+tileSiz*.5) / tileSiz);
+   }
+
+}
+
+agitateGrid(){
+   
+  direction = 0;
+   if(bstatus == 1) {
+      direction = 1;
+   } else if(bstatus == 2) {
+      direction = -1;
+   }
+    
+   if(direction != 0)
+   for(x=1; x<W-1; x++)
+   for(y=1; y<H-1; y++)
+   {
+      mx = mousx; //W*mousx/xres;
+      my = mousy; //H*mousy/yres;
+   
+      //xp = x/W*imgw;
+      //yp = y/H*imgh;
+      
+      xp = x*tileSiz;
+      yp = y*tileSiz;
+      
+      dx = xp-mx;
+      dy = yp-my;
+      dSq = dx^2 + dy^2;
+      d = sqrt( dSq );
+      if ( d < tileSiz*2.5 && d > tileSiz*0.01 ) {
+        amount = .02 * direction;
+        //amount = direction * (tileSiz*0.1) / (d+1);
+        offsXV[x][y] += amount * (dx/d);
+        offsYV[x][y] += amount * (dy/d);
+      }
+   } 
+}
+
+Relax()
+{
+   for(y=0; y<H; y++)
+   {
+      yh = y+2;
+      yl = y-2;
+      if(yl<0) yl=0;
+      if(yh>H-1) yh = H-1;
+      
+      for(x=0; x<W; x++)
+      {
+         xh = x+2;
+         xl = x-2;
+         if(xl<0) xl=0;
+         if(xh>W-1) xh=W-1;
+      
+         for(yi=yl; yi<=yh; yi++)
+         {
+            for(xi=xl; xi<=xh; xi++)
+            {
+               if( (xi != x) || (yi != y) )
+               {
+                  dx = offsX[xi][yi] - offsX[x][y];
+                  dy = offsY[xi][yi] - offsY[x][y];
+                  
+                  norm = norms[abs(xi-x)][abs(yi-y)];
+                  length = sqrt(dx^2 + dy^2);
+                  scaler = (norm-length) * elasticity;
+                  
+                  offsXv[xi][yi] += scaler*dx;
+                  offsYv[xi][yi] += scaler*dy;
+               }   
+            }
+         }
+      }
+   }
+
+
+   // spring back to init pos
+   #if 0
+   for(x=0; x<W; x++)
+   for(y=0; y<H; y++)
+   {
+      dx = (offsX_init[x][y] - offsX[x][y]);
+      dy = (offsY_init[x][y] - offsY[x][y]);
+      
+      norm = tileSiz;
+      length = sqrt( dx^2 + dy^2 );
+      scaler = (norm-length) * initK;
+      
+      offsXv[x][y] += dx*scaler;
+      offsYv[x][y] += dy*scaler;
+   }
+   #endif
+
+   // integrate position
+   for(x=1; x<W-1; x++)
+   for(y=1; y<H-1; y++)
+   {
+      offsX[x][y] += offsXv[x][y];
+      offsY[x][y] += offsYv[x][y];
+      offsXv[x][y] *= dampning;
+      offsYv[x][y] *= dampning;
+   }
+
+}

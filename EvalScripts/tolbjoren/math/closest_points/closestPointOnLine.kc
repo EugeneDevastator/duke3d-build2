@@ -1,0 +1,54 @@
+// from pseudocode by oliii
+// http://www.gamedev.net/community/forums/topic.asp?topic_id=444154
+()
+{
+   cls(0);
+   
+   vec2 a,b;
+   a.x = xres/2-100;
+   a.y = yres/2-150;
+   b.x = a.x + 200;
+   b.y = a.y + 300;
+   
+   vec2 p;
+   p.x = mousx;
+   p.y = mousy;
+   
+   closest_x = 0; closest_y = 0;
+   t = getClosestPoint(a,b,p,0,closest_x, closest_y);
+   moveto(0,0); printnum(t);
+   
+   drawcone(a.x, a.y, 2, b.x, b.y, 2);
+   drawsph(closest_x, closest_y, -10);
+}
+
+struct vec2
+{
+  x,y;
+};
+
+
+getClosestPoint(vec2 a, vec2 b, vec2 p, segmentClamp, &cx, &cy)
+{
+   // // http://www.gamedev.net/community/forums/topic.asp?topic_id=444154
+  vec2 ap;
+  ap.x = p.x-a.x;
+  ap.y = p.y-a.y;
+  vec2 ab;
+  ab.x = b.x-a.x;
+  ab.y = b.y-a.y;
+  double ab2 = ab.x*ab.x + ab.y*ab.y;
+  double ap_ab = ap.x*ab.x + ap.y*ab.y;
+  double t = ap_ab / ab2;
+  if(segmentClamp)
+  {
+    if(t < 0.0) t = 0.0;
+    if(t > 1.0) t = 1.0;
+  }
+  vec2 closest;
+  closest.x = a.x + ab.x * t;
+  closest.y = a.y + ab.y * t;
+  cx = closest.x;
+  cy = closest.y;
+  return t;
+}

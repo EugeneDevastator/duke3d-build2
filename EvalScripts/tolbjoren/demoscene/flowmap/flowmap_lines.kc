@@ -1,0 +1,140 @@
+
+struct v
+{
+   x;
+   y;
+};
+
+enum{FIELD_SIZ=40}
+static v field[FIELD_SIZ][FIELD_SIZ];
+
+
+enum{MAX_PARTICLES = 1000}
+enum{MAX_SEGMENTS = 55}
+static v particles[MAX_PARTICLES][MAX_SEGMENTS];
+
+static scale;
+()
+{
+   cls(0);
+   if(numframes==0)
+   {
+      for(i=0; i<MAX_PARTICLES; i++){      
+         particles[i][0].x = rnd*FIELD_SIZ;
+         particles[i][0].y = rnd*FIELD_SIZ;
+         
+         for(j=1; j<MAX_SEGMENTS-1; j++){
+          particles[i][j].x = particles[i][0].x;
+          particles[i][j].y = particles[i][0].y;
+         } 
+      }   
+   }
+   
+   noisescale = 5;//mousx/xres*10;
+   // Randomize field over time
+   t = klock(0);
+   for(y=0; y<FIELD_SIZ; y++)
+   for(x=0; x<FIELD_SIZ; x++)
+   {
+      field[y][x].x = noise(noisescale*x/FIELD_SIZ/2,noisescale*y/FIELD_SIZ/2,1*t)*2;
+      field[y][x].y = noise(t+noisescale*x/FIELD_SIZ/2,noisescale*y/FIELD_SIZ/2)*2;
+   }
+      
+   
+   scale = (yres/1.5-50)/FIELD_SIZ;
+   
+   
+
+   DrawParticles();
+   DrawField();
+}
+
+
+DrawParticles(){
+
+   for(i=0; i<MAX_PARTICLES; i++){
+      //drawsph(particles[i].x*scale,particles[i].y*scale,1);
+      //pixelRGBA(particles[i].x*scale,particles[i].y*scale,255,2048,255,.01);
+
+      // Update head position      
+      particles[i][0].x += .5 * field[ nrnd+(particles[i][0].y) ][ nrnd+(particles[i][0].x) ].x;
+      particles[i][0].y += .5 * field[ nrnd+(particles[i][0].y) ][ nrnd+(particles[i][0].x) ].y;
+
+      // Update body segments
+      for(j=1; j<MAX_SEGMENTS; j++){
+       particles[i][MAX_SEGMENTS-j].x = particles[i][MAX_SEGMENTS-j-1].x;
+       particles[i][MAX_SEGMENTS-j].y = particles[i][MAX_SEGMENTS-j-1].y;
+      }    
+      
+      scale = (yres/1.5-50)/FIELD_SIZ;
+      
+      
+      
+      setcol(0,0,255);
+      
+      moveto(particles[i][0].x*scale,particles[i][0].y*scale);
+      for(j=1; j<MAX_SEGMENTS; j++){
+         setcol(0,0,255-j*255/MAX_SEGMENTS);
+         lineto( particles[i][j].x * scale, 
+                 particles[i][j].y * scale);
+      }   
+      pixelRGBA(particles[i][0].x*scale,particles[i][0].y*scale,255,2048,255,.01); 
+
+
+
+      if(particles[i][0].x < 0 || particles[i][0].x > FIELD_SIZ ||
+         particles[i][0].y < 0 || particles[i][0].y > FIELD_SIZ)
+      {   
+         ang = rnd*2*PI;
+         particles[i][0].x = FIELD_SIZ/2+cos(ang)*FIELD_SIZ/4+nrnd;
+         particles[i][0].y = FIELD_SIZ/2+sin(ang)*FIELD_SIZ/4+nrnd;
+         
+         for(j=1; j<MAX_SEGMENTS-1; j++){
+          particles[i][j].x = particles[i][0].x;
+          particles[i][j].y = particles[i][0].y;
+         }         
+
+      }
+   }
+}
+
+DrawField(){
+for(y=0; y<FIELD_SIZ; y++)
+   {
+      for(x=0; x<FIELD_SIZ; x++)
+      {
+         ix = x*scale;
+         iy = y*scale;
+         //drawsph(ix,iy,2);
+         setcol(255,255,255);
+         moveto(ix,iy);
+         lineto(ix+field[y][x].x*1,iy+field[y][x].y*1);
+      }
+   }
+   
+}
+
+
+pixelRGBA(x, y, r, g, b, a)
+{
+  ix=floor(x); iy=floor(y);
+  shx=x-ix;
+  shy=y-iy;
+  displaypixelAntialiased2(ix, iy, r, g, b, a*((1-shx)*(1-shy)));
+  displaypixelAntialiased2(ix+1, iy, r, g, b, a*(shx*(1-shy)));
+  displaypixelAntialiased2(ix, iy+1, r, g, b, a*((1-shx)*shy));
+  displaypixelAntialiased2(ix+1, iy+1, r, g, b, a*(shx*shy));
+}
+
+
+
+displaypixelAntialiased2(x, y, r, g, b, a)
+{
+  rr=0; rg=0; rb=0;
+  getpix(x,y,rr,rg,rb);
+  r=sqrt(rr*rr+(r*r-rr*rr)*a);
+  g=sqrt(rg*rg+(g*g-rg*rg)*a);
+  b=sqrt(rb*rb+(b*b-rb*rb)*a);
+  setcol(r,g,b);
+  setpix(x,y);
+}

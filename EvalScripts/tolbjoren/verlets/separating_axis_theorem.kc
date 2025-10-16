@@ -1,0 +1,991 @@
+enum{MAX_BODIES = 1000}
+enum{MAX_BODY_VERTS = 1000, MAX_BODY_EDGES = 1000}
+static physBodyVertCount[MAX_BODIES];
+static physBodyEdgeCount[MAX_BODIES];
+static physBodyVerts[MAX_BODIES][MAX_BODY_VERTS];
+static physBodyEdges[MAX_BODIES][MAX_BODY_EDGES];
+static bodyCount = 0;
+static bodyCollided[MAX_BODIES];
+static physBodyCenterX[MAX_BODIES];
+static physBodyCenterY[MAX_BODIES];
+static physBodyFrozen[MAX_BODIES];
+static physBodyTexcoords[MAX_BODIES][MAX_BODY_VERTS][2];
+static physBodyHandle[MAX_BODIES];
+
+// added for collision normal info
+static minDistance = 0;
+static collisionDepth = 0;
+static collisionNormalx = 0;
+static collisionNormaly = 0;
+static collisionEdge = -1;
+static collisionVert = -1;
+static collisionEdgeParent = -1;
+
+enum{MAX_POINTS=1000, MAX_EDGES = 1000}
+static edgeV1[MAX_EDGES];
+static edgeV2[MAX_EDGES];
+static edgeOriginalLength[MAX_EDGES];
+static edgeIsSelected[MAX_EDGES];
+static stress[MAX_EDGES];
+
+static px[MAX_POINTS];
+static py[MAX_POINTS];
+static opx[MAX_POINTS];
+static opy[MAX_POINTS];
+static ax[MAX_POINTS];
+static ay[MAX_POINTS];
+static vx[MAX_POINTS];
+static vy[MAX_POINTS];
+static pIsFrozen[MAX_POINTS];
+static pointCount = 0;
+static edgeCount = 0;
+
+static linestarted=0;
+static ox,oy;
+
+static grabi = -1;
+enum{COPY=1, MAKEBODY=2}
+static timestep = 0; //tmp
+static timResolveCollision = 0;
+static frameCount = 0;
+
+static mousDirX, mousDirY;
+enum{MOUSE_SAMPLES = 20}
+
+static oldmousx,oldmousy;
+static mouseSampX[MOUSE_SAMPLES], mouseSampY[MOUSE_SAMPLES];
+static samplePos=0;
+
+static dt = 0.01;
+static oldtim;
+
+static accumulator = 0.0; // fix your timestep
+static textures[7];
+
+()
+{
+
+   static roygbiv[256];
+   if(numframes==0)
+   {
+      hue = 0;
+      hueInc = 6/255;
+      v = 1; // value 
+      s = 1; // saturation
+      for(i=0; i<255; i++)
+      {
+         c = v * s;
+         x = c * 1-fabs(fmod(hue,2)-1);
+         x*=255;
+         c*=255;
+         if(hue >= 0 && hue <= 1) roygbiv[i] = rgb(c,x,0); // red->orange
+         if(hue >= 1 && hue <= 2) roygbiv[i] = rgb(x,c,0); // orange->yellow
+         if(hue >= 2 && hue <= 3) roygbiv[i] = rgb(0,c,x); // yellow->green
+         if(hue >= 3 && hue <= 4) roygbiv[i] = rgb(0,x,c); // green->blue
+         if(hue >= 4 && hue <= 5) roygbiv[i] = rgb(x,0,c); // blue->indigo
+         if(hue >= 5 && hue <= 6) roygbiv[i] = rgb(c,0,x); // indigo->violet
+         hue += hueInc;
+      }
+
+   }
+
+   //static tex0[2][2];
+   //c0 = rgb(0,0,0);
+   //c1 = rgb(255,255,255); 
+   //tex0[0][0] = c0; tex0[0][1] = c1;
+   //tex0[1][1] = c0; tex0[1][0] = c1;
+   //texH=glsettex(tex0,2,2);
+   if(numframes==0)
+   {
+      textures[0] = glsettex("cherry.png");
+      textures[1] = glsettex("chem.png");
+      textures[2] = glsettex("tux.png");
+      textures[3] = glsettex("recycle.png");
+      textures[4] = glsettex("wood.png");
+      textures[5] = glsettex("clock.png");
+      textures[6] = glsettex("brick.png");
+   }
+
+   tim = klock(0); dt = tim-oldtim; oldtim = tim;
+   cls(0); clz(1e32); glCullface(GL_NONE);
+   
+   inputMakePoint(); // Make points by LEFT-CLICKing
+   inputDragPoint(); // Drag em about with right mouse
+
+   if( keystatus[3] ){
+      keystatus[3]=0; 
+      s=50; sh=s/2; makeBox(mousx-sh,mousy-sh,s,s); 
+   }
+   
+   // Shoot in mousedir
+   if( keystatus[4] ){
+      keystatus[4]=0; 
+      s=20; sh=s/2; makeBox(mousx-sh,mousy-sh,s,s);
+      
+      for(i=0; i<4; i++){
+         ax[pointCount-1-i] = -(mousDirx)*500*1/dt;
+         ay[pointCount-1-i] = -(mousDiry)*500*1/dt;
+      }
+   }
+   
+   static selstarted = 0;
+   if( keystatus[57] && selstarted == 0 )
+   {
+      selstarted = COPY;
+      ox = mousx; oy = mousy;
+   }
+   if( keystatus[57] == 0 && selstarted==COPY)
+   {
+      findPointsInRect(1);
+      selstarted = 0;
+   }
+   if(selstarted==COPY)
+   {
+      setcol(0,255,0);
+      wx = mousx-ox;
+      wy = mousy-oy;
+      drawRect(ox,oy,wx,wy);
+      
+      findPointsInRect(0);
+   }
+   
+   if( keystatus[48] && selstarted == 0 ) //B
+   {
+      selstarted = MAKEBODY;
+      ox = mousx; oy = mousy;
+   }
+   if(selstarted==MAKEBODY)
+   {
+      setcol(255,255,0);
+      wx = mousx-ox;
+      wy = mousy-oy;
+      drawRect(ox,oy,wx,wy);
+      findPointsInRect(MAKEBODY);
+   }
+   // Release B
+   if(keystatus[48] == 0 && selstarted==MAKEBODY)
+   {
+      keystatus[48] = 0;
+      selstarted = 0;
+      //makeCopy(MAKEBODY);
+      makePhysBodyFromSelected();
+   }
+   
+   // CTRL + C
+   if( keystatus[29] && keystatus[46] )
+   {
+      //keystatus[29] = 0; //ctrl
+      keystatus[46] = 0; //c
+      makeCopy(COPY);
+   }
+
+   updateStress();
+   for(i=0; i<edgeCount; i++)
+   {
+      if (edgeIsSelected[i]==1){ 
+         setcol(255,0,0);
+      }else{
+         setcol(255,255,255);
+      }
+
+      setcol( roygbiv[96 + max(-95, -5*stress[i]*95)] );  
+      //moveto(mousx,mousy); printf("stress: %.10f", stress);
+
+      moveto( px[edgeV1[i]], py[edgeV1[i]] );
+      lineto( px[edgeV2[i]], py[edgeV2[i]] );
+      //drawsph(px[edgeV1[i]], py[edgeV1[i]],3);
+      //drawsph(px[edgeV2[i]], py[edgeV2[i]],3);
+   }
+
+   d=1e32;
+   pt = findClosest(mousx,mousy,d);
+   if( d < 10*10 )
+   {
+      drawsph( px[pt], py[pt], -10);
+      //drawsph( px[edgeV2[i]], py[edgeV2[i]], -10);
+   }
+   
+   setcol(255,255,0);
+   
+   if(keystatus[2]==1)
+   {
+      accumulator+=dt;
+      while(accumulator>=dt)
+      {
+         UpdateVerlet(dt);
+         //t += dt;
+         accumulator -= dt;      
+
+      }
+   }
+   else
+   {
+      for(i=0; i<pointCount; i++) // dont accumulate velocity when not sim.
+      {
+         opx[i] = px[i];
+         opy[i] = py[i];
+      }
+   }
+
+   static avgResolveCollision;
+   static accumFrameTime;
+   static pctOfFrame;
+   if(frameCount > 10)
+   {
+      frameCount = 0;
+      pctOfFrame = (timResolveCollision/accumFrameTime); accumFrameTime = 0;
+      avgResolveCollision = timResolveCollision/100; timResolveCollision = 0; 
+   }
+   
+   IterateCollisions();
+   constrainPoints();
+   
+   drawBodies();
+
+   frameEnd = klock(0);
+
+   setcol(255,255,255);
+   moveto(0,0);
+   setfont(6,10);
+   printf("bodycount %g\n",bodycount);
+   printf("edgecount %g\n",edgecount);
+   printf("pointcount %g\n",pointcount);
+   printf("timestep %g\n",timestep);
+   printf("avgResolveCollision %g\n",avgResolveCollision);
+   printf("FrameDT = %g\n",dt);
+   setcol(0,0,255);
+   moveto(0,70); lineto(pctOfFrame*xres,70);
+   
+   frameCount++;
+   accumFrameTime += dt;
+   
+   // Find movement vector of mouse. Not smoothed.
+   //if( abs(oldMousx-mousx) > .01) mousDirx = mousx-oldMousx;
+   //if( abs(oldMousy-mousy) > .01) mousDiry = mousy-oldMousy;
+   
+   mousDirX=0; mousDirY=0;
+   for(i=0; i<MOUSE_SAMPLES; i++)
+   {
+      mousDirX += mouseSampX[i];///-xres/2; 
+      mousDirY += mouseSampY[i];//-yres/2;
+   }
+   mousDirX /= MOUSE_SAMPLES;
+   mousDirY /= MOUSE_SAMPLES;
+   
+   len = sqrt( abs(mousDirx)^2 + abs(mousDiry)^2);
+   len = max(0.01,len);
+   mousDirx /= len; mousDiry /= len;
+   drawcone(mousx,mousy,3,mousx+mousDirx*30,mousy+mousDiry*30,0.001);
+   moveto(mousx,mousy); lineto(mousx+mousDirx*20,mousy+mousDiry*20);
+
+   if( abs(oldMousx-mousx) > .01 || abs(oldMousy-mousy) > .01)
+   {
+      //mousDirx = mousx-oldMousx;
+      //mousDiry = mousy-oldMousy;
+      mouseSampX[samplePos] = mousx-oldMousx;
+      mouseSampY[samplePos] = mousy-oldMousy;
+      samplePos++;
+      if(samplePos > MOUSE_SAMPLES) samplePos=0;
+   }
+   oldmousx = mousx;
+   oldmousy = mousy;
+}
+
+makeCopy(isCopy)
+{
+   ox=0;
+   oy=0;
+   foundPt = 0;
+   oldEdgeCount = edgeCount;
+   for(i=0; i<oldEdgeCount; i++){
+      if( edgeIsSelected[i] == 1 ){
+         edgeIsSelected[i] = 0;
+         //copyEdge(i);
+         x1 = px[ edgeV1[i] ];
+         y1 = py[ edgeV1[i] ];
+         x2 = px[ edgeV2[i] ];
+         y2 = py[ edgeV2[i] ];
+         
+         if(foundPt==0)
+         {
+            foundPt = 1;
+            ox = x1;
+            oy = y1;
+         }
+         tx = mousx-ox; ty=mousy-oy; // translate to ox,oy
+         edgeIsSelected[edgeCount] = isCopy;//the one we make now is marked.
+         makEdge(x1+tx,y1+ty,x2+tx,y2+ty);
+      }
+   }
+}
+
+makePhysBodyFromSelected()
+{
+      verts = 0;
+      for(i=0; i<edgeCount; i++){
+         if( edgeIsSelected[i] == MAKEBODY ){
+            edgeIsSelected[i] = 0;
+            physBodyEdges[bodyCount][physBodyEdgeCount[bodyCount]] = i; 
+            physBodyEdgeCount[bodyCount]++;
+            physBodyVerts[bodyCount][verts] = edgeV1[i];
+            physBodyVerts[bodyCount][verts+1] = edgeV2[i];
+            s=15;
+            physBodyTexcoords[bodyCount][verts][0] = s*( px[edgeV1[i]]/(xres/2) );
+            physBodyTexcoords[bodyCount][verts][1] = s*( py[edgeV1[i]]/(yres/2) );  
+            
+            physBodyTexcoords[bodyCount][verts+1][0] = s*( px[edgeV2[i]]/(xres/2) );
+            physBodyTexcoords[bodyCount][verts+1][1] = s*( py[edgeV2[i]]/(yres/2) );           
+            physBodyHandle[bodyCount] = int(rnd*6);
+
+            if( pIsFrozen[ edgeV1[i] ] ) physBodyFrozen[bodyCount] = 1;
+            verts+=2;
+         }
+      }
+      physBodyVertCount[bodyCount] = verts;
+      bodyCount++;
+}
+
+updateVerlet(h)
+{
+   for(i=0; i<pointCount; i++)
+   {
+      if(pIsFrozen[i]) continue; // skip if frozen
+      
+      tmpx = px[i];
+      tmpy = py[i]; 
+      px[i] = 2*px[i]-opx[i]-h^2*ax[i];
+      py[i] = 2*py[i]-opy[i]-h^2*ay[i]; 
+      vx[i] = (px[i] - tmpx)/h;
+      vy[i] = (py[i] - tmpy)/h;  
+      
+      // Doesnt work this way.
+      //vx[i] *= (exp(-fabs(vx[i])*0.01));
+      //vy[i] *= (exp(-fabs(vy[i])*0.01));
+
+      vx[i] *= (0.999);
+      vy[i] *= (0.999);
+
+      opx[i] = px[i] - h * vx[i]; 
+      opy[i] = py[i] - h * vy[i];  
+      
+      /* Newton:
+      px[i] = px[i]+h*vx[i]-0.5*h^2*ax[i];
+      py[i] = py[i]+h*vy[i]-0.5*h^2*ay[i];
+      vx[i] += -h*ax[i];
+      vy[i] += -h*ay[i];
+      */
+
+      // Air resistance
+      //opx[i] += h*vx[i] * (1-0.999);
+      //opy[i] += h*vy[i] * (1-0.999);
+      
+
+      
+      /*
+      vx = px[i] - opx[i];
+      vy = py[i] - opy[i];
+      opx[i] = px[i]; 
+      opy[i] = py[i];
+      px[i] += vx - ax[i]*h^2;
+      py[i] += vy - ay[i]*h^2;
+   
+      // Air resistance   
+      opx[i] += vx * (1-0.9998);
+      opy[i] += vy * (1-0.9998);
+      */
+
+      // not made for verlets...
+      //vel2 = (vx^2 + vy^2);
+      //f = 1-exp(-vel2*50)^10; //Give more friction when moving slower. EXPONENTIALLY :D
+      //opx[i] += vx * (1-f,1); //? *= pow(scale_per_second,dtim);
+      //opy[i] += vy * (1-f,1);
+      //if ((vel2 > 0) && (vel2 < .01^2)) { opx[i] = px[i]; opy[i] = py[i]; }
+   }   
+}
+
+drawBodies()
+{
+   setfont(4,6);
+   for(i=0; i<bodyCount; i++)
+   {
+      setcol(0xffffff); glsettex( physBodyHandle[i] ); glBegin(GL_POLYGON); 
+      // sumvxy find avg velocity of pointmasses
+      sumvx = 0; sumvy = 0;
+      for(j=0; j<physBodyVertCount[i]; j++)
+      {
+         glTexCoord( physBodyTexcoords[i][j][0], physBodyTexcoords[i][j][1] );
+         p = physBodyVerts[i][j];
+         glVertex(px[p],py[p]); 
+         sumvx += vx[p];
+         sumvy += vy[p];
+      }
+      glEnd();     
+      sumvx /= physBodyVertCount[i]*2;
+      sumvy /= physBodyVertCount[i]*2;
+      len = sqrt(sumvx^2+sumvy^2); 
+      if(len > 20)
+      {
+         sumvx = 20*sumvx / len; 
+         sumvy = 20*sumvy / len;
+      }
+      
+      // could sum up and find middle point
+      sumx = physBodyCenterX[i];
+      sumy = physBodyCenterY[i];
+      drawcone(sumx,sumy,2,sumx+sumvx,sumy+sumvy,0.01);      
+   }
+}
+
+inputMakePoint(){
+   if( bstatus==1 && linestarted==0 )
+   {
+      bstatus = 0;
+      linestarted = 1;
+      ox = mousx;
+      oy = mousy;
+      
+   }
+   else if( bstatus==1 && linestarted==1 )
+   {
+      bstatus = 0;
+      linestarted = 0;
+      makEdge(ox,oy,mousx,mousy);
+   }
+   
+/* hax*/
+   if( bstatus==4 && linestarted==0 )
+   {
+      bstatus = 0;
+      linestarted = 1;
+      ox = mousx;
+      oy = mousy;
+      
+   }
+   else if( bstatus==4 && linestarted==1 )
+   {
+      bstatus = 0;
+      linestarted = 0;
+      makEdge(ox,oy,mousx,mousy);
+      p1 = edgeV1[edgeCount-1];
+      p2 = edgeV2[edgeCount-1];
+      pIsFrozen[p1] = 1; pIsFrozen[p2] = 1;
+   }   
+
+
+   blink = rnd;
+   setcol(255*blink,255*blink,255*blink);
+   if( linestarted==1)
+   {
+      moveto(ox,oy); 
+      lineto(mousx,mousy);
+   }
+}
+inputDragPoint(){
+   if( bstatus == 2 && grabi == -1 )
+   {
+      closestPt = -1;
+      closestD = 1e32;
+      for(i=0; i<pointCount; i++)
+      {
+         dSq = (px[i]-mousx)^2 + (py[i]-mousy)^2;
+         
+         if( dSq < closestD ){
+            closestD = dSq;
+            closestPt = i;
+         }
+         
+         
+      }
+      
+      if( closestD < 10*10)
+      {
+         grabi = closestPt;
+         px[closestPt] = mousx;
+         py[closestPt] = mousy;
+         opx[closestPt] = mousx;
+         opy[closestPt] = mousy;
+      }
+   }
+   else if(bstatus==0){
+      grabi = -1;
+   }
+   else if( grabi > -1)
+   {
+         px[grabi] = mousx;
+         py[grabi] = mousy;
+         opx[grabi] = mousx;
+         opy[grabi] = mousy;
+   }
+}
+findPointsInRect(markAsSelected)
+{
+   for(i=0; i<edgeCount; i++)
+   {
+      wx = mousx-ox;
+      wy = mousy-oy;
+      v1 = edgeV1[i];
+      edgeIsSelected[i] = 0;
+      if( RectCollide( px[v1], py[v1], ox,oy, wx,wy ) )
+      {
+         edgeIsSelected[i] = markAsSelected;
+         drawsph( px[v1], py[v1], 5);
+      }
+      v2 = edgeV2[i];
+      if( RectCollide( px[v2], py[v2], ox,oy, wx,wy ) )
+      {
+         drawsph( px[v2], py[v2], 5);
+      }
+   }
+}
+RectCollide(testx,testy,rx,ry,w,h) // prolly better ways.
+{
+   gotx=0; goty=0;
+   if(w < 0 )
+   {
+      if(testx <= rx && testx >= rx+w) gotx = 1;
+   }else{
+      if(testx >= rx && testx <= rx+w) gotx = 1;
+   }
+   if(h < 0)
+   {
+      if(testy <= ry && testy >= ry+h) goty = 1;
+   }else{
+      if(testy >= ry && testy <= ry+h) goty  = 1;
+   }
+   if( gotx == 1 && goty == 1 ) return 1;
+}
+drawRect(sx, sy, wx, wy)
+{   
+   moveto(sx, sy);
+   lineto(sx+wx, sy+0);
+   
+   moveto(sx, sy+wy);
+   lineto(sx+wx, sy+wy);
+   
+   moveto(sx, sy);
+   lineto(sx, sy+wy);
+   
+   moveto(sx+wx, sy);
+   lineto(sx+wx, sy+wy);
+}
+
+constrainPoints(){
+   for(i=0; i<pointCount; i++)
+   {
+      // Reset acceleration forces
+      ax[i] = 0;
+      ay[i] = -500;//-1000;//.0001;   
+
+      if(px[i] < 1) px[i] = 1;
+      if(px[i] > xres-1) px[i] = xres-1;
+      if(py[i] < 1) py[i] = 1;
+      if(py[i] > yres-1) py[i] = yres-1;
+   }
+}
+
+findClosest(x,y, &closestD)
+{
+   closestPt = -1;
+   closestD = 1e32;
+   for(i=0; i<pointCount; i++)
+   {
+      dSq = (px[i]-x)^2 + (py[i]-y)^2;
+      
+      if( dSq < closestD ){
+         closestD = dSq;
+         closestPt = i;
+      }
+   }
+   
+   return closestPt;
+}
+
+makPoint(x1,y1)
+{
+   px[pointCount] = x1; py[pointCount] = y1;
+   opx[pointCount] = x1; opy[pointCount] = y1; // make velocity zero by setting now and old same
+   pointCount++;
+   return pointCount-1;
+}
+
+makEdge2(p1,p2)
+{
+   edgeV1[edgeCount] = p1; edgeV2[edgeCount] = p2;
+   edgeOriginalLength[edgeCount] = sqrt( (px[p1]-px[p2])^2 + (py[p1]-py[p2])^2);
+   edgeCount++;
+   return edgeCount-1;
+}
+
+makEdge(x1,y1,x2,y2)
+{
+   // if another point is close enough, merge with it.
+   closestD = 1e32;
+   pt = findClosest(x1,y1, closestD); // merge with start?
+   if(pt != -1 && closestD < 10*10 )
+   {
+      pt2 = findClosest(x2,y2, closestD); // merge with end?
+      if(pt2 != -1 && closestD < 10*10 )
+      {
+         makEdge2( pt, pt2 );
+         return;
+      }
+      else // nop. make new point at end.
+      {
+         p2 = makPoint(x2,y2);
+         makEdge2( pt, p2 );
+         return;
+      }
+   }
+   // did not merge with any, mak 2 new pts.
+   px[pointCount] = x1; py[pointCount] = y1; edgeV1[edgeCount] = pointCount; pointCount++;
+   px[pointCount] = x2; py[pointCount] = y2; edgeV2[edgeCount] = pointCount; pointCount++;
+   edgeOriginalLength[edgeCount] = sqrt( (x1-x2)^2 + (y1-y2)^2);
+   edgeCount++;
+}
+
+// Makes sure springs are correct length
+// modify to make stiffer/softer springs, springs that accelerate.
+// springs that shrink/expand.
+updateEdges(){
+   for(i=0; i<edgeCount; i++)
+   {
+      e1 = edgeV1[i];
+      e2 = edgeV2[i];
+      edgeV1x = px[e1];  
+      edgeV1y = py[e1];  
+
+      edgeV2x = px[e2];  
+      edgeV2y = py[e2]; 
+      
+      // Calculate vector
+      v1v2x = edgeV1x-edgeV2x;
+      v1v2y = edgeV1y-edgeV2y;
+      v1v2length = sqrt( v1v2x^2 + v1v2y^2 );
+      diff = v1v2length - edgeOriginalLength[i];
+      //if( fabs(diff) > 1e-7) // Dont bother relaxing if allready pretty relaxed
+      {
+         // Calc difference from original length
+         // normalize v1v2
+         v1v2x /= v1v2length;
+         v1v2y /= v1v2length;
+         
+         //dx = edgeV2x - edgeV1x;
+         //dy = edgeV2y - edgeV1y;
+         //midx = edgeV1x+(dx)/2;
+         //midy = edgeV1y+(dy)/2;
+         //drawsph(midx,midy,-5);
+         //moveto( midx,midy );
+         //ang = atan2(v1v2y,v1v2x);
+         
+         //lineto( midx+cos(ang-PI/2)*10, midy+sin(ang-PI/2)*10 );
+         
+         // Put both vertices apart by half of the differance respectively
+         if( !pIsFrozen[e1] )
+         {
+            px[e1] -= v1v2x*diff*0.5;
+            py[e1] -= v1v2y*diff*0.5;
+         }
+         if( !pIsFrozen[e2] )
+         {
+            px[e2] += v1v2x*diff*0.5;
+            py[e2] += v1v2y*diff*0.5;
+         }
+      }
+   }
+}
+
+
+updateStress(){
+   for(i=0; i<edgeCount; i++)
+   {
+      e1 = edgeV1[i];
+      e2 = edgeV2[i];
+      edgeV1x = px[e1];  
+      edgeV1y = py[e1];  
+
+      edgeV2x = px[e2];  
+      edgeV2y = py[e2]; 
+      
+      // Calculate vector
+      v1v2x = edgeV1x-edgeV2x;
+      v1v2y = edgeV1y-edgeV2y;
+      v1v2length = sqrt( v1v2x^2 + v1v2y^2 );
+      diff = abs(v1v2length - edgeOriginalLength[i]);
+      stress[i] = diff / edgeOriginalLength[i];
+   }
+}
+
+// 2d projection is the dot product of the projection axis and the point we want to proj.
+projectToAxis(bodyIdx, axisx, axisy, &min, &max)
+{
+   dotP = axisx * px[physBodyVerts[bodyIdx][0]] + axisy * py[physBodyVerts[bodyIdx][0]];
+   
+   // Set max and min values to proj of 1st vert
+   min = dotP;
+   max = dotP;
+   
+   for(i=1; i<physBodyVertCount[bodyIdx]; i++)
+   {
+      dotP = axisx * px[physBodyVerts[bodyIdx][i]] + axisy * py[physBodyVerts[bodyIdx][i]];
+      min = min( dotP, min );  
+      max = max( dotP, max );  
+   }
+}
+
+checkCollision(){
+   timResolveCollisionStart = klock(0);
+   for(a=0; a<bodyCount; a++)
+   {
+   bodyCollided[a] = 0; // reset collision
+   for(b=0; b<bodyCount; b++)
+   {
+      if(a==b) continue;
+      
+      if( detectCollision(a,b) == 1)
+      {
+         handleCollide(a,b);
+      }
+      
+   }
+   }
+   timResolveCollision += klock(0) - timResolveCollisionStart;
+}
+
+handleCollide(a,b)
+{
+         bodyCollided[a] = 1;
+         // normalize collision normal
+         len = sqrt(collisionNormalX^2 + collisionNormalY^2);
+         collisionNormalX/=len;
+         collisionNormalY/=len;
+         // scale normal by collision depth / penetration
+         collisionVectorX = collisionNormalX * collisionDepth;
+         collisionVectorY = collisionNormalY * collisionDepth; 
+
+         // Now find the collision edge
+         e1 = edgeV1[collisionEdge];
+         e2 = edgeV2[collisionEdge];
+         //if( pIsFrozen[e1] || pIsFrozen[e2] ) return;
+         T = 0;
+         
+         // choose axis (x,y) with largest distance.
+         if( abs(px[e1] - px[e2]) > abs(py[e1] - py[e2]) )
+         {
+            T = (px[collisionVert] - collisionVectorX - px[e1]) / (px[e2]-px[e1]);
+         }
+         else
+         {
+            T = (py[collisionVert] - collisionVectorY - py[e1]) / (py[e2]-py[e1]);
+         }
+         lambda = 1.0/(T^2 + (1-T)^2);
+         
+         if( !pIsFrozen[e1])
+         {
+            px[e1] -= collisionVectorX*(1-T)*0.5*lambda;
+            py[e1] -= collisionVectorY*(1-T)*0.5*lambda;
+         }
+         if(!pIsFrozen[e2])
+         {
+            px[e2] -= collisionVectorX*( T)*0.5*lambda;
+            py[e2] -= collisionVectorY*( T)*0.5*lambda;
+         }
+         // No need to move every vert in a body upon collision
+         // just move the colliding vert by half the coll. vector
+         if( !pIsFrozen[collisionVert] )
+         {
+            px[collisionVert] += collisionVectorX * 0.5;  
+            py[collisionVert] += collisionVectorY * 0.5;  
+            
+            // velocity
+            vx = opx[collisionVert]-px[collisionVert];
+            vy = opy[collisionVert]-py[collisionVert];
+            opx[collisionVert] -= vx/100;
+            opy[collisionVert] -= vy/100;  
+         }
+}
+
+detectCollision(body1, body2){
+   minDistance = 10000.0; // init the length of the collision vector to a large value
+   
+   for(i=0; i<physBodyEdgeCount[body1] + physBodyEdgeCount[body2]; i++)
+   {
+      edge = -1;
+      if( i < physBodyEdgeCount[body1] ) 
+         edge = physBodyEdges[body1][i];
+      else edge = physBodyEdges[body2][i-physBodyEdgeCount[body1]];
+      
+      // calculate the axis perp to this edge and normalize it
+      axisx = py[edgeV1[edge]] - py[edgeV2[edge]];
+      axisy = px[edgeV2[edge]] - px[edgeV1[edge]];
+      len = sqrt(axisx^2 + axisy^2);
+      axisx/=len; axisy/=len;
+      
+      mina=0; minb=0; maxa=0; maxb=0; // project both bodies onto the perp axis
+      projectToAxis(body1, axisx, axisy, mina, maxa);
+      projectToAxis(body2, axisx, axisy, minb, maxb);
+      
+      // calc dist between two intervals
+      distance = intervalDistance(minA, maxA, minB, maxB);
+      
+      if(distance > 0.0) return 0;
+      
+      // if the intervals overlap, check, whether the vector length on this
+      // edge is smaller than the smallest length that has been reported so far
+      else if( abs( distance ) < minDistance )
+      {
+         minDistance = abs(distance);
+         collisionNormalX = axisx;
+         collisionNormalY = axisy;
+         collisionEdge = edge;
+      }
+   }
+   collisionDepth = minDistance;
+   
+   // Detect edge and vert
+   
+   // Ensure that the body containing the collision edge lies in B2
+   // and the one containing the coll. vert lies in B1
+   if(collisionEdgeParent != body2)
+   {
+      temp = body2;
+      body2 = body1;
+      body1 = temp;
+   }
+   
+   // This is needed to make sure that the collision normal is pointing at B1
+   // calc diff between center points
+   // b1.center - b2.center:
+   diffx = physBodyCenterX[body1] - physBodyCenterX[body2];
+   diffy = physBodyCenterY[body1] - physBodyCenterY[body2];
+   sign = sgn( collisionNormalx*diffx + collisionNormaly*diffy );
+   
+   // Remember that the line equation is N*( R - R0 ). We choose B2.center
+   // as R0; the normal N is given by the collision normal
+   
+   if( sign != 1 )
+   {
+      collisionNormalx *= -1;
+      collisionNormaly *= -1;
+   }
+   
+   smallestD = 1000.0; // init the smallest distance to a high value
+   for(i=0; i< physBodyVertCount[body1]; i++)
+   {
+      // measure the dist of the vertex from the line using the line equation
+      diffx = px[ physBodyVerts[body1][i] ] - physBodyCenterX[body2];
+      diffy = py[ physBodyVerts[body1][i] ] - physBodyCenterY[body2];
+      distance = collisionNormalx*diffx + collisionNormaly*diffy; // dot prod
+      
+      // If the measured distance is smaller than the distance reported
+      // so far, set the smallest distance and the collision vector
+      
+      if( distance < smallestD )
+      {
+         smallestD = distance;
+         collisionVert = physBodyVerts[body1][i];
+      }
+   }
+
+   return 1;
+}
+
+detectCollisionOLD(body1, body2){
+   for(i=0; i<physBodyEdgeCount[body1] + physBodyEdgeCount[body2]; i++)
+   {
+      edge = -1;
+      if( i < physBodyEdgeCount[body1] ) edge = physBodyEdges[body1][i];
+      else edge = physBodyEdges[body2][i];
+      
+      // calculate the axis perp to this edge and normalize it
+      axisx = py[edgeV1[edge]] - py[edgeV2[edge]];
+      axisy = px[edgeV1[edge]] - px[edgeV2[edge]];
+      len = sqrt(axisx^2 + axisy^2);
+      axisx/=len; axisy/=len;
+      
+      mina=0; minb=0; maxa=0; maxb=0; // project both bodies onto the perp axis
+      projectToAxis(body1, axisx, axisy, mina, maxa);
+      projectToAxis(body2, axisx, axisy, minb, maxb);
+      
+      // calc dist between two intervals
+      distance = intervalDistance(minA, maxA, minB, maxB);
+      
+      if(distance > 0.0) return 0;
+   }
+   return 1;
+}
+
+
+intervalDistance(minA, maxA, minB, maxB){
+   if(minA < minB) return minB-MaxA;
+   else return minA - maxB;
+}
+
+IterateCollisions(){
+   phys_iterations = 10;
+   
+   for(it=0; it<phys_iterations; it++)
+   {
+   
+      // calc center point of body
+      for(i=0; i<bodyCount; i++)
+      {
+         physBodyCenterX[i] = 0;
+         physBodyCenterY[i] = 0;
+         for(j=0; j<physBodyVertCount[i]; j++)
+         {
+            // edges come in pairs. the physBodyEdges array points to e1 and e2
+            v = physBodyVerts[i][j];                  
+            physBodyCenterX[i] += px[v];
+            physBodyCenterY[i] += py[v];
+         }   
+         physBodyCenterX[i] /= physBodyVertCount[i];
+         physBodyCenterY[i] /= physBodyVertCount[i];    
+      }
+      updateEdges(); 
+      checkCollision();
+      
+   }
+}
+
+makeBox(x,y,w,h){
+   v1 = makPoint(x,y);
+   v2 = makPoint(x+w,y);
+   v3 = makPoint(x+w,y+h);
+   v4 = makPoint(x,y+h);
+   e1 = makEdge2(v1,v2);
+   e2 = makEdge2(v2,v3);
+   e3 = makEdge2(v3,v4);
+   e4 = makEdge2(v4,v1);
+   
+   e5 = makEdge2(v1,v3);
+   e6 = makEdge2(v2,v4);
+   edgeIsSelected[e1] = MAKEBODY;
+   edgeIsSelected[e2] = MAKEBODY;
+   edgeIsSelected[e3] = MAKEBODY;
+   edgeIsSelected[e4] = MAKEBODY;
+   edgeIsSelected[e5] = MAKEBODY;
+   edgeIsSelected[e6] = MAKEBODY;
+   makePhysBodyFromSelected();   
+   /*
+   physBodyVertCount[bodyCount] = 4;
+   physBodyEdgeCount[bodyCount] = 6;
+   physBodyVerts[bodyCount][0] = v1;
+   physBodyVerts[bodyCount][1] = v2;
+   physBodyVerts[bodyCount][2] = v3;
+   physBodyVerts[bodyCount][3] = v4;
+      
+
+   physBodyEdges[bodyCount][0] = e1;
+   physBodyEdges[bodyCount][1] = e2;
+   physBodyEdges[bodyCount][2] = e3;
+   physBodyEdges[bodyCount][3] = e4; 
+   physBodyEdges[bodyCount][4] = e5;
+   physBodyEdges[bodyCount][5] = e6;
+   
+   //physBodyVerts[bodyCount][0] = v1; phys
+   bodyCount++;
+   */
+   
+   //return bodyCount-1;
+   
+}

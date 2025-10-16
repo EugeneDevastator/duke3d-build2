@@ -1,0 +1,30 @@
+(x,y,z,&r,&g,&b) //press F1 for help
+{
+   static v1[3] = {+1,0,0}; // light red
+   static v2[3] = {-1,0,0}; // dark green 
+   static v3[3] = {0,+1,0}; // light green
+   static v4[3] = {0,-1,0}; // purple
+   static v5[3] = {0,0,+1}; // light blue
+   static v6[3] = {0,0,-1}; // dark yellow
+   
+   //col( v1, r,g,b);
+   
+   l = 1 - 1e-7;
+   if ( x > +l ) col( v1, r,g,b);
+   if ( x < -l ) col( v2, r,g,b);
+   
+   if ( y > +l ) col( v3, r,g,b);
+   if ( y < -l ) col( v4, r,g,b);
+   
+   if ( z > +l ) col( v5, r,g,b);
+   if ( z < -l ) col( v6, r,g,b);
+   
+   return 1;
+}
+
+col(v[3], &r,&g,&b){
+   r = (v[0]*.5 + 0.5) * 255;
+   g = (v[1]*.5 + 0.5) * 255;
+   b = (v[2]*.5 + 0.5) * 255;
+}
+

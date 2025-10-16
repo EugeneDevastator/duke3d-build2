@@ -1,0 +1,189 @@
+struct vec{x,y,z;}
+static TWOPI = 2*PI;
+()
+{
+   cls(0); clz(1e32); 
+   //glCullface(GL_NONE);
+   glCullface(GL_BACK);
+   
+   
+   angle = mousx/xres * 2 * PI;
+   r = -5;
+   ca = cos( angle ) * r;
+   sa = sin( angle ) * r;
+   setcam( sa, 0, ca, angle, 0 );
+   //setcam(0,0,-10,0,0);
+   
+   vec v1, v2;
+   
+   t = klock(0) * 2;
+   
+   radius = 3;
+   
+   SEGMENTS = 36*2;
+   for( i = 0; i < SEGMENTS ; i++ )
+   {
+      angle1 = (i+0) * 2 * PI / SEGMENTS;
+      angle2 = (i+1) * 2 * PI / SEGMENTS;
+      
+      ca1 = cos( angle1 ) * radius;
+      sa1 = sin( angle1 ) * radius;
+      
+      ca2 = cos( angle2 ) * radius;
+      sa2 = sin( angle2 ) * radius;
+
+      vecset(v1, ca1, sa1, 0 );
+      vecset(v2, ca2, sa2, 0 );
+      
+      
+      setcol(0xffffff);
+      r1 = 0.25;// + 4*angle1/SEGMENTS;
+      r2 = 0.25;// + 4*angle2/SEGMENTS;
+      
+
+      CreateCone(v1,v2,r1,r2,16, 0, 2*PI);
+   }
+
+}
+
+drawcone( vec p1, r1, vec p2, r2 )
+{
+   drawcone(p1.x, p1.y, p1.z, r1,
+            p2.x, p2.y, p2.z, r2, DRAWCONE_NOCAP  );
+}
+
+
+// Based on code by Paul Bourke found at
+// http://paulbourke.net/miscellaneous/sphere_cylinder/opengl.c
+// and
+// http://paulbourke.net/miscellaneous/sphere_cylinder/
+CreateCone(vec p1,vec p2,r1,r2,m,
+           theta1,double theta2)
+{
+   vec p1p2, p, perp;
+
+   /* Normal pointing from p1 to p2 */
+   vecsub(p1p2, p2, p1 );
+
+   /*
+      Create two perpendicular vectors perp and q
+      on the plane of the disk
+   */
+   vecset( perp, p1p2 );
+   if (p1p2.x == 0 && p1p2.z == 0)
+   {
+      p1p2.x += 0.001;
+   }
+   else
+   {
+      p1p2.y += 0.001;
+   }
+   
+   vec a, b;
+   veccross(a,perp, p1p2 );
+   veccross(b,p1p2,A);
+   normalize(a);
+   normalize(b);
+   
+   vec p1a;
+   vecadd(p1a, p1, a);
+   moveto(p1.x, p1.y, p1.z);
+   lineto(p1a.x, p1a.y, p1a.z);
+
+   vec p1b;
+   vecadd(p1b, p1, b);
+   moveto(p1.x, p1.y, p1.z);
+   lineto(p1b.x, p1b.y, p1b.z);
+
+   //glBegin(GL_QUAD_STRIP);
+   
+   //glBegin(GL_POINTS);
+   glBegin(GL_TRIANGLE_STRIP);
+   //for (i=0;i<=m;i++) {
+   for (i=m;i>=0;i--) {
+      theta = theta1 + i * (theta2 - theta1) / m;
+
+      vec normal;
+      normal.x = cos(theta) * a.x + sin(theta) * b.x;
+      normal.y = cos(theta) * a.y + sin(theta) * b.y;
+      normal.z = cos(theta) * a.z + sin(theta) * b.z;
+      normalize(normal);
+
+      p.x = p2.x + r2 * normal.x;
+      p.y = p2.y + r2 * normal.y;
+      p.z = p2.z + r2 * normal.z;
+      setcol(255+255*normal.x, 255+255*normal.y, 255+255*normal.z);
+      //glTexCoord2f(i/(double)m,1.0);
+      glVertex(p.x,p.y,p.z);
+
+      p.x = p1.x + r1 * normal.x;
+      p.y = p1.y + r1 * normal.y;
+      p.z = p1.z + r1 * normal.z;
+      setcol(255+255*normal.x, 255+255*normal.y, 255+255*normal.z);
+      //glTexCoord2f(i/(double)m,0.0);
+      glVertex(p.x,p.y,p.z);
+   }
+   glEnd();
+
+}
+
+vecScalar( vec out, vec a, s )
+{
+   out.x = a.x * s;
+   out.y = a.y * s;
+   out.z = a.z * s;
+}
+
+vecAdd( vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;   
+}
+vecSub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;   
+}
+
+vecCross( vec out, vec a, vec b)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+
+vecset(vec a, x,y,z){
+   a.x = x; a.y = y; a.z = z;
+}
+
+vecset(vec a, vec other){
+   a.x = other.x; a.y = other.y; a.z = other.z;
+}
+
+vecDot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+length( vec v )
+{
+   return sqrt( vecdot(v,v) );
+}
+
+normalize( vec v )
+{
+   len = length(v);
+   if ( len )
+   {
+      v.x /= len; v.y /= len; v.z /= len;
+   }
+}
+
+buildMatrix( mtx[9], vec side, vec up, vec fwd )
+{
+   mtx[0] = side.x; mtx[1] = side.y; mtx[2] = side.z;
+   mtx[3] = up.x;   mtx[4] = up.y;   mtx[5] = up.z;
+   mtx[6] = fwd.x;  mtx[7] = fwd.y;  mtx[8] = fwd.z;
+}

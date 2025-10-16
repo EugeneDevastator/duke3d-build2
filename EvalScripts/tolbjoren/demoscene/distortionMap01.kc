@@ -1,0 +1,95 @@
+()
+{
+ cls(0);
+   
+//Image noisemap; //size is (width + 1) x (height + 1) gray scale values in [0 255] range
+//Image source; //source image
+//Image destination; //destination image
+
+static speed = 1;
+
+static time = 0;
+time = klock(0)*speed;
+
+enum{ sourceWidth = 320,sourceHeight = 200 };
+static noisemap[sourceWidth+1][sourceHeight+1];
+
+amp = mousy/yres*10;
+freq = 1 + mousx/xres*10;
+
+
+{
+   for(x=0; x<sourceWidth+1; x++)
+   for(y=0; y<sourceHeight+1; y++)
+   {
+
+      tx = freq*x/sourceWidth;
+      ty = freq*y/sourceHeight;
+      tz = time;      
+
+      //noiseMap[x][y] = amp*turbulence(tx,ty,tz);
+      noiseMap[x][y] = amp*marbled(tx,ty,tz);
+      //noiseMap[x][y] = amp*noise(tx,ty,tz); // lumpy
+      //noiseMap[x][y] = amp*addComponents(tx,ty,tz);
+   }
+}
+
+
+
+displacementRadius = 10.0; //Displacement amount in pixels
+for (y = 0; y < sourceHeight; y++) {
+    for (x = 0; x < sourceWidth; x++) {
+        n0 = noiseMap[x][y]; // / 255.0;
+        n1 = noiseMap[x+1][y]; // / 255.0;
+        n2 = noiseMap[x][y+1]; // / 255.0;
+        
+        dx = int(floor((n1 - n0) * displacementRadius + 0.5));
+        dy = int(floor((n2 - n0) * displacementRadius + 0.5));
+        
+        sx = min(max(x + dx, 0), sourceWidth - 1); //Clamp
+        sy = min(max(y + dy, 0), sourceHeight - 1); //Clamp
+        
+        //const Pixel& value = source.getValue(sx, sy);
+        //destination.setValue(x, y, value);
+        
+        setcol( pic(sx,sy ) );
+        setpix(x,y);
+    }
+}
+
+}
+
+stripes(x,f)
+{
+   t = .5 + .5 * sin(f * 2*PI * x);
+   ret = t*t -.5;
+   return ret;
+}
+
+marbled(x,y,z)
+{
+   tex = stripes(x + 2*turbulence(x,y,z), .8);
+   return tex;
+}
+
+turbulence(x,y,z)
+{
+   
+   tex = -0.5; // pref. double precision float
+   for( f=1; f<= 1; f*=2) // xres/96
+      tex += noise(f*x,f*y,f*z) / f ;
+   return tex;
+}
+addComponents(tx,ty,tz)
+{         
+   // Add frequency components
+   v1 = (noise(tx,ty,tz));
+   v2 = 0.5*(noise(2*tx,2*ty,2*tz));
+   v3 = 0.25*(noise(4*tx,4*ty,4*tz));
+   v4 = 0.125*(noise(8*tx,8*ty,8*tz));
+   v5 = 1/16*(noise(16*tx,16*ty,16*tz));
+    
+   v = sin( abs(v1)+abs(v2)+abs(v3)+abs(v4)+abs(v5) );
+   return v;
+}
+

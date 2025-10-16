@@ -1,0 +1,342 @@
+// written by Torbjoern Haugen thursday 19. august 2010
+enum{MAX_POINTS}
+enum{sizx=320, sizy=240}
+enum{width=sizx, height=sizy}
+static vscreen[width*height];
+static tracked[width*height];
+
+struct vec2{
+  x,y;
+}
+
+static vec2 variations_cw[16]; // look up table for clockwise traversal
+static vec2 variations_ccw[16]; // counter clockwise traversal
+enum{MAX_PTS=2*4096}
+static vec2 points[MAX_PTS];
+static numPts = 0;
+
+static oldmousx;
+static oldmousy;
+
+static errCase15PixelsAllFilled = 0;
+static errCase0PixelsAllEmpty = 0;
+static marchingSquaresStuck = 0;
+static gotOutline = 0;
+
+static tim, oldtim, dt;
+
+()
+{
+  tim = klock(0); dt = tim-oldtim; oldtim = tim;
+
+  if(numframes==0)
+  {
+    setVec(variations_cw[ 0],  0, 0); // illegal. No way to find direction.
+    setVec(variations_cw[ 1],  1, 0); // r
+    setVec(variations_cw[ 2],  0, 1); // d
+    setVec(variations_cw[ 3],  1, 0); // r
+    setVec(variations_cw[ 4],  0,-1); // l
+    setVec(variations_cw[ 5],  0,-1); // u
+    setVec(variations_cw[ 6],  0,-1); // u
+    setVec(variations_cw[ 7],  0,-1); // u
+    setVec(variations_cw[ 8], -1, 0); // l
+    setVec(variations_cw[ 9],  1, 0); // r
+    setVec(variations_cw[10],  0, 1); // d
+    setVec(variations_cw[11],  1, 0); // r
+    setVec(variations_cw[12], -1, 0); // l
+    setVec(variations_cw[13], -1, 0); // l
+    setVec(variations_cw[14],  0, 1); // u
+    setVec(variations_cw[15],  0, 0); // illegal. 
+  
+    setVec(variations_ccw[ 0],  0, 0); // illegal
+    setVec(variations_ccw[ 1],  0, 1); // d v
+    setVec(variations_ccw[ 2], -1, 0); // l <
+    setVec(variations_ccw[ 3], -1, 0); // l <
+    setVec(variations_ccw[ 4],  1, 0); // r >
+    setVec(variations_ccw[ 5],  0, 1); // d v
+    setVec(variations_ccw[ 6], -1, 0); // l <
+    setVec(variations_ccw[ 7], -1, 0); // l <
+    setVec(variations_ccw[ 8],  0,-1); // u ^
+    setVec(variations_ccw[ 9],  0,-1); // u ^
+    setVec(variations_ccw[10],  0,-1); // u ^
+    setVec(variations_ccw[11],  0,-1); // u ^
+    setVec(variations_ccw[12],  1, 0); // r >
+    setVec(variations_ccw[13],  0, 1); // d v
+    setVec(variations_ccw[14],  1, 0); // r >
+    setVec(variations_ccw[15],  0, 0); // illegal
+
+  }
+
+  if(bstatus==1)
+  if(mousx > 2 && mousx < (width-2))
+  if(mousy > 2 && mousy < (height-2))
+  {
+    gotOutline = 0;
+    /*
+    for(y=50; y<height-50; y++)  
+    for(x=50; x<width-50; x++)
+    {
+      if( noise(  (8*x/(width)), 8*y/(height), tim ) > -0.3 ) vscreen[x*height+y] = 1; else vscreen[x*height+y] = 0;
+    }*/
+
+    /*
+    // plot implicit 2d functions
+    for(y=50; y<height-50; y++)  
+    for(x=50; x<width-50; x++)
+    {
+      nx = (x-width/2)/25;
+      ny = (y-height/2)/25;
+      //func = (x-width/2)^2 + (y-height/2)^2; // circle. set lim=eps=radius
+      //func = cos(nx*ny+tim*2);
+      //func = cos(5*nx+tim)*sin(5*ny);
+      //func = log(nx*ny);
+      func = cos(nx*ny+tim);
+      lim = 0.0;
+      eps = 0.3;
+      if(func > lim-eps && func < lim+eps  ) vscreen[x*height+y] = 1; else vscreen[x*height+y] = 0;
+    }*/
+    paintbrush(mousx,mousy,2.5,1);
+  }
+
+  if(bstatus==2)
+  if(mousx > 2 && mousx < (width-2))
+  if(mousy > 2 && mousy < (height-2))
+  {
+    getOutline=0;
+    paintbrush(mousx,mousy,1,1);
+  }
+
+  cls(0);
+
+  painting = (bstatus > 0);
+
+  if( !painting )
+  {
+    if( !gotOutline ) getOutline();
+    if( gotOutline) drawOutline();
+  }
+
+  
+  setcol(255,255,255);
+  
+
+  if(painting) drawScreen();
+
+  moveto(15,height+15);
+  printf("case 1111 (15): %g\n", errCase15PixelsAllFilled);
+  printf("case 0000 (0):  %g\n", errCase0PixelsAllEmpty);
+  printf("marchingSquaresStuck: %g\n", marchingSquaresStuck);
+  if(numPts >= MAX_PTS) printf("Warning, no more points to draw with, numPts >= MAX_PTS.\n");
+
+  printf("%f\n", 1.0 / dt);
+  printf("%f\n", numPts);
+
+  drawrectopen(0,0,width,height);
+
+  oldmousx=mousx; 
+  oldmousy=mousy;
+}
+
+// Q: How to get the outlines of solid pixels AND enclosed, internal contours?
+// A: search for entry & exit plus this: if( tracked[x*height+y] ) foundExit = 1; x++; // remeber rewind!
+
+
+getOutline()
+{
+  // reset error status
+  errCase15PixelsAllFilled = 0; 
+  errCase0PixelsAllEmpty = 0;
+  marchingSquaresStuck = 0;
+  
+  traceCount = 0;
+
+  numPts = 0;
+
+  for(i=0; i<height*width; i++)    
+    tracked[i] = 0;  // reset tracked
+
+  for(y=1; y<height-1; y++)  
+  for(x=1; x<width-1; x++)
+  {
+    if(vscreen[x*height+y] > 0 && numPts < MAX_PTS)
+    {
+      if(1) // change between 1 and 0 to choose between find outline only and find outter+internal contours
+      {
+        if(!tracked[x*height+y])
+        {
+          marchingSquares(x,y,traceCount);
+          traceCount++;
+        }
+      }/*
+      else
+      {
+        if(tracked[x*height+y]) // entry. expects exit pixel
+        {
+          foundExit = 0;
+          while(!foundExit && x < (width-1) )
+          {
+            // find enclosed surfaces
+            if( tracked[x*height+y] ) foundExit = 1; x++;
+            
+            //x++; if( tracked[x*height+y] ) foundExit = 1;
+          }
+          x--;
+        }
+        else
+        {
+           //marchingSquares(x,y);
+
+          // if any of 8 neighbors are tracked, continue
+          if( 
+              tracked[(x-1)*height+(y+0)] ||
+              tracked[(x+1)*height+(y+0)] ||
+              tracked[(x+0)*height+(y-1)] ||
+              tracked[(x+0)*height+(y+1)] ||
+
+              tracked[(x+1)*height+(y+1)] || 
+              tracked[(x+1)*height+(y-1)] || 
+              tracked[(x-1)*height+(y+1)] || 
+              tracked[(x-1)*height+(y-1)] )
+          {
+          
+          }else{marchingSquares(x,y);}
+        }
+       } */// eof it:find internal contours also?
+    } // x
+  } // y
+}
+
+getNextEdgePoint(x,y, &newx, &newy)
+{
+    index = 0;
+    if( vscreen[(x+1)*height+(y+1)] > 0 ) index += 1;
+
+    if( vscreen[(x)*height+(y+1)] > 0 ) index += 2;
+
+    if( vscreen[(x+1)*height+(y)] > 0 ) index += 4;
+
+    if( vscreen[(x)*height+(y)] > 0 ) index += 8;
+    // Error
+    if( index==15 ){ errCase15PixelsAllFilled+=1;  }
+    if( index==0){ errCase0PixelsAllEmpty+=1; }
+
+    newx += variations_ccw[index].x; newy += variations_ccw[index].y;
+    //newx += variations_cw[index].x; newy += variations_cw[index].y;
+    return index;
+}
+
+marchingSquares(x,y,traceCount)
+{
+  gotOutline = 1;
+  if( numPts >= MAX_PTS) return;
+
+  // set start pixels tracked (2x2). Is it necessary to mark so many pixels as tracked?
+  tracked[x*height+y] = 1;
+  tracked[x*height+(y+1)] = 1;
+  tracked[(x+1)*height+y] = 1;
+  tracked[(x+1)*height+(y+1)] = 1;
+  
+  posx = x-1; posy = y-1; // move back and up from pixel
+
+  startx = posx; starty = posy;
+  firstRun = 1;
+  iters = 0;
+  
+  while(iters < MAX_PTS && numPts < MAX_PTS)
+  {
+    if(firstRun)
+    {
+      firstRun = 0;
+      startx = posx; starty = posy;
+    }
+
+    iters++;
+    if( iters >= (MAX_PTS-2) ) marchingSquaresStuck++; // either we used all the points exactly (improbabble. or inf loop)
+
+    tracked[posx*height+posy] = 1;
+    tracked[posx*height+(posy+1)] = 1;
+    tracked[(posx+1)*height+posy] = 1;
+    tracked[(posx+1)*height+(posy+1)] = 1;
+
+    
+
+    
+    index = getNextEdgePoint(posx, posy, posx, posy); // Move to next pixel
+    if( index==0 || index==15 ) return; // quit if illegal state
+    
+    if(iters > 1){
+      points[numPts].x = posx; points[numPts].y = posy; 
+      numPts++;
+    }
+  
+    // Visualize marching squares progress
+    if(1 && iters>1)
+    {
+      if(index==15) setcol(255,255,255); else setcol(255,traceCount,iters%200);
+      setpix(posx,posy);   
+      if(iters % 5  == 0)
+      {    
+        refresh();
+        sleep(2);
+      }
+    }
+
+    if( posx==startx && posy==starty)
+    { 
+      if(numPts < MAX_PTS && iters > 1)
+      {
+        points[numPts].x = startx; points[numPts].y = starty; 
+        numPts++;
+      }
+      return;  
+    }
+  }
+}
+
+drawOutline()
+{
+  setcol(0,200,0);
+  for(i=0; i<numPts; i++)
+  {
+    setpix( points[i].x, points[i].y);
+  }
+}
+
+drawScreen()
+{
+  for(y=0; y<height; y++)  
+  for(x=0; x<width; x++)
+  {
+    if(vscreen[x*height+y] > 0)
+    {
+      setcol(255,255,255);
+      setpix(x,y);
+    }
+  }
+}
+
+setVec(vec2 v, x,y)
+{
+  v.x = x; v.y = y;
+}
+
+paintbrush(x,y,r,c)
+{
+   i=0; j=0;
+   for(i=0; i<2*r; i++)
+   {
+      len = int( sqrt( cos(0.5*PI*(i-r)/r)) * r * 2 );
+      for(j=0; j<len; j++)
+      {
+         xp = floor(x+j-len/2 + 0.5);
+         yp = floor(y-r+i + 0.5);
+         if(xp > 1 && xp < (width-1) && yp > 1 && yp < (height-2))
+         {
+            vscreen[xp*height+yp] = c;
+         }
+      }
+   }
+}
+
+drawrectfill(x0,y0,x1,y1) { for(y=y0;y<y1;y++) { moveto(x0,y); lineto(x1,y); } }
+drawrectopen(x0,y0,x1,y1) { moveto(x0,y0); lineto(x1,y0); lineto(x1,y1); lineto(x0,y1); lineto(x0,y0); }

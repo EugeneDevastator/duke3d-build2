@@ -1,0 +1,237 @@
+struct Point
+{
+   x,y;
+};
+
+// dead indices, stack + stackptr
+enum{TRAIL_SIZ = 30}
+static Point trail[TRAIL_SIZ];
+
+// possible optim. give each circ a set of lines to use
+// gen positions once, then just translate & draw
+
+// exploiting spatial
+
+struct lineseg{
+   x1,y1,x2,y2;
+   drawme;
+};
+
+enum{MAX_SEGS = 36}
+
+struct sph{
+   x,y;
+   r;
+   tx,ty;
+   lineseg lineSegs[MAX_SEGS];
+};
+
+enum{MAX_CIRCLES=TRAIL_SIZ}
+static sph sphrs[MAX_CIRCLES];
+static margin;
+static interval;
+static outlineFatness = 2;
+
+static time,dt;
+()
+{
+   time = klock(0);
+   //cls(0x3545b5);
+   cls(0);
+   clz(1e32);
+   
+   minradi = 30+(cos(3*time)/2+.5)*2;
+   
+   trail[0].x = mousx;
+   trail[0].y = mousy;
+   
+   for(i=trail_siz-1; i>0; i--)
+   {
+
+      trail[i].x = trail[i-1].x;
+      trail[i].y = trail[i-1].y;
+      //setcol(255,0,0); drawsph(trail[i].x, trail[i].y, 15-i*.20);
+      //setcol(255,255,255); drawsph(trail[i].x, trail[i].y, -(15-i*.20) );  
+   
+   sphrs[i].x = trail[i].x;
+   sphrs[i].y = trail[i].y;
+   sphrs[i].r = minradi-i*.15;
+   }
+   
+   sphrs[0].x = mousx;
+   sphrs[0].y = mousy;
+   sphrs[0].r = minradi;
+
+   if(numframes==0)
+   {
+      margin = 100;
+      interval = min(xres,yres) - 2*margin;    
+
+      for(i=0; i<MAX_CIRCLES; i++)
+      {
+         sphrs[i].x = xres/2;
+         sphrs[i].y = yres/2;
+         sphrs[i].r = 30 + 20*rnd;
+
+         sphrs[i].tx = margin+interval * rnd;
+         sphrs[i].ty = margin+interval * rnd;
+         
+         x=0; y=0;
+         drawCirc( i, sphrs[i].x,sphrs[i].y, sphrs[i].r );
+      }
+      
+   }
+   
+   // update putline circle positions
+   for(i=0; i<MAX_CIRCLES; i++)
+   {
+      x=0; y=0;
+      drawCirc( i, x,y, sphrs[i].r );
+   }
+   
+   for(i=0; i<MAX_CIRCLES; i++)
+   {
+         vecx = sphrs[i].tx - sphrs[i].x;
+         vecy = sphrs[i].ty - sphrs[i].y;
+         dist = sqrt(vecx*vecx + vecy*vecy );
+         vecx /= dist;
+         vecy /= dist;
+         sphrs[i].x += vecx * dt * 100;
+         sphrs[i].y += vecy * dt * 100;      
+         
+         if( dist < 3 )
+         {
+            sphrs[i].tx = margin+interval * rnd;
+            sphrs[i].ty = margin+interval * rnd;
+         }
+   }
+
+   
+   for(i=0; i<MAX_CIRCLES; i++)
+   {
+      x1 = sphrs[i].x; y1 = sphrs[i].y;   
+      r1 = sphrs[i].r;
+      setcol(255,255,255);
+      drawSph( x1, y1, 2 );
+      
+      for(k=0; k<MAX_SEGS; k++)
+      {
+         sphrs[i].lineSegs[k].drawme = 1; // set all drawable
+      }
+   }
+
+   // now, check circle vs circles segments for overlapping and set
+   // not drawable
+   for(i=0; i<MAX_CIRCLES; i++)
+   {
+     x1 = sphrs[i].x;
+     y1 = sphrs[i].y;
+     r1 = sphrs[i].r;
+      for(j=0; j<MAX_CIRCLES; j++)
+      {
+         if(i==j) continue;
+         
+        x2 = sphrs[j].x;
+        y2 = sphrs[j].y;
+        r2 = sphrs[j].r;
+        dx = x1-x2;
+        dy = y1-y2;
+        distSq = dx*dx + dy*dy;
+        sepDist = 2*r1*r1 + 2*r2*r2;
+        if( distSq < sepDist )
+        {
+           //moveto(x1,y1); lineto(x2,y2);
+           
+         for(k=0; k<MAX_SEGS; k++)
+         {
+         px1 = x1 + sphrs[i].lineSegs[k].x1;
+         py1 = y1 + sphrs[i].lineSegs[k].y1;
+         px2 = x1 + sphrs[i].lineSegs[k].x2;
+         py2 = y1 + sphrs[i].lineSegs[k].y2;
+            r3 = r2 - outlineFatness;
+            if( insideCirc(px1,py1,x2,y2,r3) || insideCirc(px2,py2,x2,y2,r3) )
+            {
+               sphrs[i].lineSegs[k].drawme = 0;
+               continue;
+            }
+         }        
+
+        }
+
+
+      }
+   }
+   
+   // Draw circles linesegments
+   for(i=0; i<MAX_CIRCLES; i++)
+   {
+      tx = sphrs[i].x;
+      ty = sphrs[i].y;
+      radi = sphrs[i].r - 1*outlinefatness;
+      
+
+      setcol(255,0,0); drawsph(tx,ty,radi);
+      setcol(255,255,255);
+      
+      for(j=0; j<MAX_SEGS; j++)
+      {
+         if( sphrs[i].lineSegs[j].drawme == 1) 
+         {
+         moveto(tx + sphrs[i].lineSegs[j].x1, ty + sphrs[i].lineSegs[j].y1);
+         lineto(tx + sphrs[i].lineSegs[j].x2, ty + sphrs[i].lineSegs[j].y2);
+         
+         drawcone(tx + sphrs[i].lineSegs[j].x1, ty + sphrs[i].lineSegs[j].y1, outlineFatness,
+         tx + sphrs[i].lineSegs[j].x2, ty + sphrs[i].lineSegs[j].y2, outlineFatness);
+         }
+      }
+
+   }
+   
+   
+   moveto(0,0);
+   num_lines =0;
+   num_lines = MAX_CIRCLES * MAX_SEGS;
+   printf("%g", num_lines);
+}
+
+insideCirc(px,py,cx,cy,r)
+{
+   dx = px-cx;
+   dy = py-cy;
+   distSq = dx*dx + dy*dy;
+   if( distSq < r*r ) return 1;
+   return 0;
+}
+
+drawCirc(parent, x,y,r)
+{
+   num = MAX_SEGS;
+   double f = 2.0*PI/(num-1);
+   double a = cos(f);
+   double b = sin(f);
+   double s = 0.0;
+   double c = 1.0;
+   
+   ox = x+r*s;
+   oy = y+r*c;   
+
+   for( n=0; n < num; n++ )
+   {
+       // do something with s and c
+      xp1 = x+r*s;
+      yp1 = y+r*c;
+      sphrs[parent].lineSegs[n].drawme = 1;
+      sphrs[parent].lineSegs[n].x1 = ox;
+      sphrs[parent].lineSegs[n].y1 = oy;
+      sphrs[parent].lineSegs[n].x2 = xp1;
+      sphrs[parent].lineSegs[n].y2 = yp1;  
+      ox = xp1;
+      oy = yp1;
+
+       double ns = b*c + a*s;
+       double nc = a*c - b*s;
+       c = nc;
+       s = ns;
+   }
+}
+

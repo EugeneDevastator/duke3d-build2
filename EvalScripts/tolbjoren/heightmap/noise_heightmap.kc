@@ -1,0 +1,392 @@
+enum{tsize = 128 }
+enum{terrainGridWidth =tsize, terrainGridLength = tsize}
+enum{terrainSiz = terrainGridWidth*terrainGridLength }
+static terrainHeights[terrainGridWidth*terrainGridLength];
+static terrainColors[terrainGridWidth*terrainGridLength];
+static terrainNormals[terrainGridWidth*terrainGridLength*3];
+static verts[terrainSiz*12];
+static fillCenterX = terrainGridWidth/2;
+static fillCenterY = terrainGridLength/2;
+static fillSiz = 32;
+// Terrain drawing
+static xOffset = 0, yOffset = 0, zOffset = 0;
+// Not really needed
+static startW = terrainGridWidth / 2.0 - terrainGridWidth;
+static startL = -terrainGridLength / 2.0 + terrainGridLength;
+
+// Delta time
+static tim,oldtim,dt;
+
+()
+{
+   if(numframes==0)
+   {
+      loadHeightmap();
+   }
+   dt = tim-oldtim; oldtim = tim; tim = klock() * 1;
+   
+   controls();
+   updateCamera();
+   render();
+   
+}
+controls()
+{
+   controlX = keystatus[205] - keystatus[203]; // r-l
+   controlY = keystatus[208] - keystatus[200]; // down-up
+}
+render()
+{
+   cls(0); clz(1e32);
+   glEnable(GL_DEPTH_TEST); glDisable(GL_ALPHA_TEST); glCullFace(GL_FRONT);
+
+   drawLines();
+   //drawNormals();
+   
+      
+   setfont(12,16);
+   setcol(0xffffff);
+   moveto(0,0);
+   printf("mspf: %.5f", dt*1000);
+}
+
+
+getHeightInt(x,z){
+   // if you get height outside of heightmap
+   if(x < 0 || z < 0 || x > terrainGridWidth || z > terrainGridLength)
+   {
+      return 0;
+   }
+   // using row-major, fastest in c and evaldraw
+   // offset = row*NUMCOLS + column
+   return terrainHeights[z*terrainGridWidth+x];
+}
+// src: http://www.gamedev.net/community/forums/topic.asp?topic_id=451312
+/* bilinear interpolation of a quad height is also explained here
+http://ilovevb.net/Web/blogs/vbxna/archive/2007/12/28/heightmap-collision-sample-posted.aspx
+*/
+getHeight(x,z)
+{  
+   xa = floor(x); za = floor(z);
+   xb = floor(x+1); zb = floor(z+1);   
+
+   xd = x-floor(x);
+   if(xd < 0.0) xd *= -1;
+   zd = z-floor(z);
+   if(zd < 0.0) zd *= -1;
+   // Bilinear interpolation between x and y.
+   b = lerp( getHeightInt(xa,zb), getHeightInt(xb,zb), xd); 
+   a = lerp( getHeightInt(xa,za), getHeightInt(xb,za), xd); 
+   h = lerp(a,b,zd);
+   return h;
+}
+// lerp 1 dimensional. use t-values from 0-1
+lerp(a,b,t)
+{
+   (b-a)*t+a;
+}
+/* get the normal for a quad on the terrain. should really be per triangle. 
+could also interpolate to find best fitting normal like the getHeight func*/
+getNormal(x,z,n[3])
+{
+   if(x < 0 || z < 0 || x > terrainGridWidth || z > terrainGridLength)
+   {
+      nx = 0;
+      ny = 1;
+      nz = 0;
+      return;
+   }
+   x = floor(x); z = floor(z); // hacky?
+   aux = 3*((z)*terrainGridWidth + x);
+   n[0] = terrainNormals[aux+0];
+   n[1] = terrainNormals[aux+1];
+   n[2] = terrainNormals[aux+2];
+}
+/* convert a int to RGB-components. */
+hex2rgb(hex,&r,&g,&b){
+   r = hex / 2^16 % 256;
+   g = hex / 2^8 % 256;
+   b = hex % 256;
+}
+/* normals are drawn with a 0.5 offset in x and z dir to center them on quads. 
+Normals are per quad. should be per triangle in a real app. */
+drawNormals(){
+   setcol(0xffff00);
+   for(i=0; i<terrainGridLength-1; i++)
+   {
+      for(j=0; j<terrainGridWidth; j++)
+      {
+         aux = 3*((i)*terrainGridWidth + j);
+         nx = terrainNormals[aux];
+         ny = terrainNormals[aux+1];
+         nz = terrainNormals[aux+2];
+         siz = .5;
+         nx *= siz;
+         ny *= siz;
+         nz *= siz;
+         
+         x = startW+(j)+xOffset;
+         y = getHeightInt(j,i) + yOffset;   
+         z = startL - (i) + zOffset;   
+         moveto(x,y,z);   
+         
+         x = startW+(j)+xOffset + nx;
+         y = getHeightInt(j,i) + yOffset + ny;   
+         z = startL - (i) + zOffset + nz;     
+         lineto(x,y,z); 
+      } 
+   } 
+}
+// draw bit lower than quads to circumvent z-fighting
+drawLines()
+{
+   lowering = 0; //0.005
+   k = 0;
+   for(i=0; i<terrainGridLength-1; i++)
+   { 
+      for(j=0; j<terrainGridWidth; j++)
+      {
+        setcol( terrainColors[i*terrainGridWidth+j]);
+        // use stored vert pos
+       moveto(verts[k+0], verts[k+1], verts[k+2]);
+       lineto(verts[k+3], verts[k+4], verts[k+5]);        
+       lineto(verts[k+6], verts[k+7], verts[k+8]);
+       k += 12;      
+      } 
+   } 
+}
+/* gets the player controls and sets global camera variables. */
+updateCamera()
+{
+   static posx = 0;
+   static posy = 75;
+   static posz = 70;
+   static posh = 0; // left right
+   static posv = -2.0;
+   playercontrols(&posx,&posy,&posz,&posh,&posv);
+   setcam(posx,posy,posz,posh,posv);
+}
+// Camera and movement code taken from /games/
+//Handle input and player movement
+playercontrols(&posx,&posy,&posz,&posh,&posv)
+{
+   static oldMouseX;
+   static oldMouseY;
+   static mouseSpeedX;
+   static mouseSpeedY; 
+
+   f = 1;
+   if (keystatus[0x2a]) f /= 4;
+   if (keystatus[0x36]) f *= 4;
+   vx = (keystatus[32]-keystatus[30])*f; //D-A
+   vy = (keystatus[17]-keystatus[31])*f; //W-S  
+   vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   static mat[9]; ang2mat(posh,posv,mat); // Convert agnles to matrix
+   // find new position
+   newvx = mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   newvy = mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   newvz = mat[2]*vx + mat[5]*vz + mat[8]*vy; 
+   posx += newvx;
+   posy += newvy;
+   posz += newvz;
+   // mousespeed values are tweaked for 60 fps
+   mouseSpeedX = (mousx - oldMouseX) * 0.01;
+   mouseSpeedY = (mousy - oldMouseY) * 0.01;
+   oldMouseX = mousx;
+   oldMouseY = mousy;
+   if(bstatus==2)
+   {
+      posh -= mouseSpeedX;
+      posv += mouseSpeedY;
+   }
+}
+/* converts horizontal and vertical angles to a 3x3 rotation matrix */
+ang2mat(hang,vang,mat[9])
+{
+   mat[6] = cos(vang)*sin(hang); mat[0] = cos(hang);
+   mat[7] = sin(vang);           mat[1] = 0;
+   mat[8] = cos(vang)*cos(hang); mat[2] =-sin(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}
+hsv_to_rgb(h,s,v,&r,&g,&b){ 
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+}
+/* read png and store color in heightbuffer */
+loadHeightmap(){
+      i=0;
+      
+      for(x=0; x<terrainGridWidth; x++)
+      for(y=0; y<terrainGridLength; y++)
+      {      
+         height = 0;
+         if( 0 )
+         {
+            r=0; g=0; b=0; 
+         //c = pic("heightmap64.png",x,y);
+         //c = pic("heightmap_128warp.png",x,y);
+         //c = pic("heightmap_128tightspiral.png",x,y);
+            c = pic("heightmap_128.png",x,y);
+            //c = pic("lighthouse3d.gif",x,y);
+            
+            hex2rgb(c,r,g,b);
+            terrainHeights[i] = -r/15;  
+         }else{
+            h1 = simplex_noise(4, 1*x/terrainGridWidth, 1*y/terrainGridLength, tim) * 255 / 15;
+            terrainHeights[i] = h1;
+            //-noise(5*x/terrainGridWidth, 5*y/terrainGridLength ) * 255 / 15;
+         }
+                 
+            i++;  
+
+      }
+      storeVerts();
+      calcNormals();
+     calcColors();
+}
+
+
+simplex_noise(octaves, x, y, z){
+    value = 0.0;
+    for(i=0; i<octaves; i++){
+        value += noise(
+            x*pow(2, i),
+            y*pow(2, i),
+            z*pow(2, i)
+        );
+    }
+    return value;
+}
+
+/* stores each quad. gap between each is 1 unit. 1 quad = 12 floats. */
+storeVerts(){
+   k=0;
+   for(i=0; i<terrainGridLength-1; i++) // y
+   {
+      for(j=0; j<terrainGridWidth; j++) // x
+      {
+         x = startW+(j)+xOffset;
+         y = getHeightInt(j,i) + yOffset;   
+         z = startL - (i) + zOffset;  
+
+         verts[k] = x;  
+         verts[k+1] = y; 
+         verts[k+2] = z; 
+         
+         x = startW+(j+1)+xOffset;
+         y = getHeightInt(j+1,i) + yOffset;   
+         z = startL - (i) + zOffset;  
+         
+         verts[k+3] = x;  
+         verts[k+4] = y; 
+         verts[k+5] = z; 
+
+         x = startW+(j+1)+xOffset;
+         y = getHeightInt(j+1,i+1) + yOffset;   
+         z = startL - (i+1) + zOffset;  
+         
+         verts[k+6] = x;  
+         verts[k+7] = y; 
+         verts[k+8] = z;  
+         
+         x = startW+(j)+xOffset;
+         y = getHeightInt(j,i+1) + yOffset;   
+         z = startL - (i+1) + zOffset;  
+         
+         verts[k+9] =  x;  
+         verts[k+10] = y; 
+         verts[k+11] = z; 
+         k+=12;
+      } 
+   } 
+}
+/* go thru all stored verts. For each quad there are 12 floats. xyz*4=12 */
+calcNormals(){
+   j=0;
+   for(i=0; i<terrainSiz*12; i+=12)
+   {
+      static a[3];
+      static b[3];
+      static n1[3];
+      static n2[3];
+      // Calc vectors from vertexes (points)
+      // v1 = t2-t1
+      // v2 = t3-t1
+      a[0] = verts[i+3] - verts[i+0];
+      a[1] = verts[i+4] - verts[i+1];
+      a[2] = verts[i+5] - verts[i+2];
+      b[0] = verts[i+6] - verts[i+0];
+      b[1] = verts[i+7] - verts[i+1];
+      b[2] = verts[i+8] - verts[i+2];
+      cross(a,b,n1);
+      
+      //normalize
+      length = sqrt( n1[0]^2 + n1[1]^2 + n1[2]^2);
+      n1[0] /= length; n1[1] /= length; n1[2] /= length; 
+      
+      terrainNormals[j+0] = n1[0];
+      terrainNormals[j+1] = n1[1];
+      terrainNormals[j+2] = n1[2];
+            
+      j+=3;
+   }   
+
+}
+
+/* Could be put in same loop as store verts, but is on its own for readability.*/
+calcColors()
+{
+   idx = 0;
+   for(i=0; i<terrainGridLength; i++)
+   { 
+      for(j=0; j<terrainGridWidth; j++)
+      {
+         aux = 3*((i)*terrainGridWidth + j);
+                  
+         nx = terrainNormals[aux];
+         ny = terrainNormals[aux+1];
+         nz = terrainNormals[aux+2];
+         s = 60;
+         h = (0+nx*s)+(60+ny+s)+(120+nz*s);
+         r=0; g=0; b=0;
+         hsv_to_rgb(h,1,1,r,g,b);
+         terrainColors[idx] = rgb(r*511,g*511, b*511);
+         idx++;
+      }
+   }
+}
+
+dot(a[3],b[3]) // x1*x2 + y1*y2 + z1*z2
+{
+   return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+}
+
+/* Calc vector cross product. AxB = P*/
+cross(a[3],b[3],p[3]){
+   p[0] = a[1]*b[2]-a[2]*b[1];
+   p[1] = a[2]*b[0]-a[0]*b[2];
+   p[2] = a[0]*b[1]-a[1]*b[0];  
+}
+normalize(vec[3]){
+   length = sqrt( vec[0]^2 + vec[1]^2 + vec[2]^2);
+   vec[0] /= length; vec[1] /= length; vec[2] /= length; 
+}

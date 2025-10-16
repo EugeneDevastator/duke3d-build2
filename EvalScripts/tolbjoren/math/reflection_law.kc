@@ -1,0 +1,183 @@
+/*
+written 30.nov 2011 by Torbjoern.
+
+src of inspiration:
+http://en.wikipedia.org/wiki/Law_of_reflection
+*/
+struct vec{x,y;}
+
+
+struct line_t{
+   vec p1;
+   vec p2;
+}
+struct ray_t{
+   vec origin;
+   vec dir;
+}
+
+()
+{
+   cls(0);
+
+
+   line_t line;
+   vec p1, p2;
+   p1.x = xres/2+100;
+   p2.x = xres/2+100;
+   p1.y = 100;
+   p2.y = yres-100;
+   
+   line.p1 = p1;
+   line.p2 = p2;
+   drawline( line );
+   
+   steps = 10;
+   for(i=0; i<steps; i++){
+   
+   ray_t ray;
+   p1.x = 200;
+   p1.y = yres/2;
+   
+   a = atan2( mousy-p1.y, mousx-p1.x);
+   ang_range = pi/12;
+   a += -ang_range + i*ang_range*2/steps;
+   
+   ray_len = max(2*xres,2*yres);
+   p2.x = cos(a)*ray_len;
+   p2.y = sin(a)*ray_len;
+   ray.origin = p1;
+   ray.dir = p2;
+   
+   
+
+   t = 0;
+   s = 0;
+   // find the to intersection parameters,
+   // t gives ray intersection
+   // s gives line-segment intersection
+   ray_segment( line, ray, t, s );
+   
+   // if ray is hit then t is in interval [0,1]
+   // if line is intersected by ray, then s is also [0,1]
+   
+   if ( t>=0 && t<= 1 && s >=0 && s <= 1 ){
+   
+      vec hit;
+      ray_hit( ray, t, hit ); 
+      //drawsph( hit.x, hit.y, -3 );
+      
+      vec normal;
+      //normal.x = 1;
+      //normal.y = 0;
+      getLineNormal(line.p1, line.p2, normal);
+      
+      vec incoming;
+      incoming = ray.dir;
+      normalize(incoming);
+      dpr = vecdot( normal, incoming );
+  
+      
+      if ( bstatus==0 ){
+         // reflect, R=I-2*<N,I>*N
+         rx = incoming.x - 2 * dpr * normal.x;
+         ry = incoming.y - 2 * dpr * normal.y;
+      }else{ 
+         // refract?
+         rx = -incoming.x + 2 * dpr * normal.x;
+         ry = -incoming.y + 2 * dpr * normal.y;
+      }
+      
+
+      len = (1-t)*length( ray.dir );
+      moveto(hit.x, hit.y);
+      lineto(hit.x + rx*len, hit.y + ry*len);
+   }else{
+      t = 1;
+   }
+   
+   drawray( ray, t );
+   
+   }
+}
+
+ray_hit( ray_t ray, t, vec hit ){
+   
+   hit.x = ray.origin.x + t * ray.dir.x;
+   hit.y = ray.origin.y + t * ray.dir.y;
+}
+
+// find the to intersection parameters,
+// t gives ray intersection
+// s gives line-segment intersection
+ray_segment( line_t line, ray_t ray, &t, &s ){
+   vec d1;
+   d1.x = line.p2.x - line.p1.x;
+   d1.y = line.p2.y - line.p1.y;
+   
+   t = isecTime( ray.origin, ray.dir,line.p1, d1 );
+   s = isecTime( line.p1, d1, ray.origin, ray.dir );
+}
+
+ray_line( line_t line, ray_t ray ){
+   
+   vec d1;
+   d1.x = line.p2.x - line.p1.x;
+   d1.y = line.p2.y - line.p1.y;
+   
+   return isecTime(ray.origin, ray.dir,line.p1, d1 );
+}
+
+// Taken from Mathematics and Physics for Game Programmers by Danny Kodicek
+isecTime(vec p1, vec v1, vec p2, vec v2)
+{
+   dx = p2.x - p1.x;
+   dy = p2.y - p1.y;
+
+   det = v2.x*v1.y - v1.x * v2.y; // 2x2 determinant of matrix
+   if( fabs(det) < 1e-7 ) return 1e32; // no isec
+   con = v2.x*dy - v2.y*dx; // wedge product dir2^dir
+   t = con / det;
+     
+   return t;
+}
+
+wedge(x1,y1,x2,y2){
+   return x1*y2 - y1*x2;
+}
+
+drawline( line_t l ){
+   moveto(l.p1.x, l.p1.y);
+   lineto(l.p2.x, l.p2.y);
+}
+drawray( ray_t r, t ){
+   moveto(r.origin.x, r.origin.y);
+   lineto(r.origin.x+r.dir.x*t, r.origin.y+r.dir.y*t);
+}
+
+vecdot(vec a, vec b){ return a.x*b.x + a.y*b.y; }
+
+length(vec v){
+   return sqrt( vecdot(v,v) );
+}
+
+normalize(vec v){
+   len = length(v);
+   if(len){
+      v.x /= len; v.y /= len;
+   }
+}
+
+getLineNormal(vec a, vec b, vec n){
+   dx = b.x - a.x;
+   dy = b.y - a.y;
+   
+   perp_x = -dy;
+   perp_y = dx;
+   
+   len = sqrt( dx^2 + dy^2 );
+   if (len){
+      n.x = perp_x / len;
+      n.y = perp_y / len;
+   }
+}

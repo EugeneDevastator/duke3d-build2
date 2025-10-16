@@ -1,0 +1,636 @@
+struct vec{x,y,z;}
+
+
+enum{SIZ = 20, WIDTH=SIZ, HEIGHT=SIZ, DEPTH=SIZ}
+enum{MAX_CUBES = WIDTH*HEIGHT*DEPTH}
+static level[MAX_CUBES];
+
+static is_box_hit[MAX_CUBES];
+
+static vec gridpos[MAX_CUBES];
+
+struct ray_t
+{
+   vec origin;
+   vec dir;
+}
+
+struct box_t
+{
+   vec pos;
+   vec dim;
+   vec grid_pos;
+}
+
+struct camera_t
+{
+   vec pos;
+   horiz_angle;
+   verti_angle;
+   matrix[9];
+}
+
+
+static box_t boxes[MAX_CUBES];
+
+static camera_t camera;
+
+struct edit_state
+{
+   slice;
+   brush_type;
+};
+
+static edit_state edit;
+
+enum{MAX_TEXTURES=9}
+static textures[MAX_TEXTURES];
+
+static fov = 0;
+()
+{
+   fov = xres/1.2;
+
+   static oldtime;
+   time = klock(0);
+   delta = time - oldtime;
+   oldtime = time;
+      
+
+   if (numframes==0)
+   {
+      edit.slice = SIZ-1;  
+      edit.brush_type = 0;
+      
+      textures[0] = glsettex("assets/brick.png");
+      textures[1] = glsettex("assets/dirt.png");
+      textures[2] = glsettex("assets/grass.png");
+      textures[3] = glsettex("assets/water.png");
+      textures[4] = glsettex("assets/planks.png");
+      textures[5] = glsettex("assets/trunk.png");
+      textures[6] = glsettex("assets/mossy.png");
+      textures[7] = glsettex("assets/ladder.png");
+      textures[8] = glsettex("assets/gravel.png");
+      
+      vecset( camera.pos, -SIZ*1.5,-SIZ*1.5,-SIZ*1.5 );
+      camera.horiz_angle = pi/4;
+      camera.verti_angle = pi/4;   
+      
+      num = SIZ;
+      range = SIZ;
+      for(i=0; i<num; i++)
+      for(j=0; j<num; j++)
+      for(k=0; k<num; k++)
+      {
+         x = i / (num);
+         y = j / (num);
+         z = k / (num);
+         idx = i + j*WIDTH + k * WIDTH*HEIGHT;
+         level[idx] = 0;
+         if (j==num-1)
+         {
+            level[idx] = 3;
+         }
+         vecset( gridpos[idx], i, j, k);
+      }   
+      
+   /*
+   setview(x0,y0,x1,y1,hx,hy,hz); Also specify offset (hx,hy) and fov/zoom (hz)
+                       The 3D functions use this formula for projection:
+                          screen_x = x/z*hz + hx;
+                          screen_y = y/z*hz + hy;
+                       These defaults are written when using the short form:
+                          hx = xres/2;
+                          hy = yres/2;
+                          hz = hx;  <-90 degree (horiz) field of view (FOV).
+  */
+   setview(0,0,xres,yres,xres/2,yres/2,fov);
+
+   }
+
+   cls(0); clz(1e32); glCullFace(GL_BACK); glEnable(GL_ALPHA_TEST);
+   
+   playercontrols(camera, delta);
+   
+   time = klock(0);
+
+   num_boxes = 0;
+   
+   vec p;
+   
+   num = SIZ;
+   range = SIZ;
+   for(i=0; i<num; i++)
+   for(k=0; k<num; k++)
+   {
+      j = edit.slice;
+      x = i / (num);
+      y = j / (num);
+      z = k / (num);
+      vecset(p, x-.5,y-.5,z-.5);
+      setcolor(p);
+      vecscalar(p,p,2*range);
+      
+      p.x -= 1;
+      p.y -= 1;
+      p.z -= 1;
+      vecset( boxes[num_boxes].pos, p );
+      vecset( boxes[num_boxes].dim, 2,2,2 );
+      vecset( boxes[num_boxes].grid_pos, i, j, k);
+      is_box_hit[num_boxes] = 0;
+      num_boxes++;
+   }
+   
+   // Create ray from mouse
+   x=0; y=0; z=0;
+   screen2world(mousx,mousy,camera.horiz_angle,camera.verti_angle,x,y,z);
+   
+   ray_t ray;
+   vecset( ray.origin, camera.pos );
+   vec pickdir; vecset(pickdir,x,y,z); normalize(pickdir);
+   vecset(ray.dir, pickdir );
+   vecscalar( ray.dir, ray.dir, 1000.0 );
+   
+
+ 
+   
+   closest_t = 1e32;
+   hit = 0;
+   closest_idx = -1;
+   for( i=0; i<num_boxes; i++)
+   {
+
+      t = 0;
+      num_hits = 0;
+      success = isect_ray_box( ray, boxes[i], t );
+   
+      if ( success == 1 )
+      {
+         if( t >= 0 && t <= 1.0 )
+         {
+            hit = 1;
+            if ( t < closest_t )
+            {
+               closest_t = t;
+               closest_idx = i;
+            }
+         }
+      }   
+   }
+   
+   if ( hit ) 
+   {
+      is_box_hit[closest_idx] = 1;
+      setcol(255,0,0);
+      vec point_on_aabb;
+      raypoint( point_on_aabb, ray, closest_t );
+      drawsph( point_on_aabb.x, point_on_aabb.y, point_on_aabb.z, .2 ); 
+ 
+      setcol(512,255,255);
+      drawbox( boxes[closest_idx] );
+   }
+   
+   num = SIZ;
+   range = SIZ;
+   for(i=0; i<num; i++)
+   for(j=0; j<num; j++)
+   for(k=0; k<num; k++)
+   {
+      x = i / (num);
+      y = j / (num);
+      z = k / (num);
+      vec cube_position;
+      vecset(cube_position, x-.5, y-.5, z-.5);
+      vecscalar(cube_position,cube_position,2*range);
+      
+      id = getcell( i,j,k );
+      if ( id != 0 )
+      {
+         setcol(255,255,255);
+         glsettex( textures[id-1] ); // HACK! -1 because idx 0 is interpreted as "air"
+         drawcube( cube_position );      
+      }
+   }
+   
+   static last_flipped = -1;
+   if (keystatus[57] == 0 )
+   {
+      last_flipped = -1; // reset flip so we may hit spacebar twice on same
+   }
+   if ( keystatus[57] && hit)
+   {
+      vec grid_vector = boxes[closest_idx].grid_pos;
+      i = grid_vector.x;
+      j = grid_vector.y;
+      k = grid_vector.z;
+      idx = i + j*WIDTH + k * WIDTH*HEIGHT;
+      
+      if ( idx != last_flipped )
+      {
+         last_flipped = idx;
+         if (level[idx] == 0 )
+         {
+            level[idx] = edit.brush_type+1; // HACK! +1
+         }else{
+            level[idx] = 0;
+         }
+      }
+
+   }
+   
+   for (i=0; i<MAX_TEXTURES; i++)
+   {
+      if (keystatus[i+2] )
+      {
+         edit.brush_type = i;
+      }
+   }
+
+
+   setcol(255,255,255);
+   drawray(ray);
+   
+
+   box_t slice_bounds;
+   vecset( slice_bounds.pos, -SIZ-1, -SIZ-1 + edit.slice*2, -SIZ-1);
+   vecset( slice_bounds.dim, 2*SIZ, 2, 2*SIZ);
+
+   dy = keystatus[208] - keystatus[200];
+   if ( fabs(dy) )
+   {
+      keystatus[200] = 0;
+      keystatus[208] = 0;
+      edit.slice += dy;
+      if ( edit.slice < 0 ) edit.slice = 0;  
+      if ( edit.slice > SIZ-1 ) edit.slice = SIZ-1;
+   }
+
+   drawbox( slice_bounds );
+   
+   moveto( floor(xres/2-5), floor(yres/2-5) );
+   lineto( floor(xres/2+4), floor(yres/2+4) );
+   moveto( floor(xres/2+4), floor(yres/2-4) );
+   lineto( floor(xres/2-5), floor(yres/2+5) );
+   
+   moveto(0,0);
+   printnum(edit.brush_type);
+   
+   for (i=0; i<MAX_TEXTURES; i++ )
+   {
+      glsettex( textures[i] );
+      if ( i == edit.brush_type )
+      {
+         setcol( 355,355,355 );
+      }else{
+         setcol( 192,192,192 );
+      }
+      drawspr(32 + i*2*16, yres-40, 16, 0);
+   }
+}
+
+getCell(i,j,k)
+{
+   id = level[i + j*WIDTH + k * WIDTH*HEIGHT];
+   return id;
+}
+
+setcolor(vec v)
+{
+   setcol( 255+v.x*255, 128+v.y*255, 128+v.z*255);
+}
+
+drawray( ray_t r )
+{
+   drawsph(  r.origin.x, r.origin.y, r.origin.z, .5 );
+
+   vec end;
+   vecAdd( end, r.origin, r.dir );
+   
+   //drawArrow(r.origin, end, 0.2);
+
+   moveto( r.origin.x, r.origin.y, r.origin.z );
+   lineto(end.x, end.y, end.z );
+   
+}
+
+drawArrow(vec s, vec e, scale) // finds direction vector e-s.
+{
+   //moveto(s.x,s.y,s.z);
+   //lineto(e.x,e.y,e.z);
+   vec dir;
+   vecSub(dir, e, s); 
+   
+   arrowlen = length(dir);
+   if(arrowlen < .1) return; // dont draw small arrows.
+   
+   polelen = arrowlen * 0.75;
+   pointerlen = arrowlen - polelen; // not used...
+   normalize(dir);
+   
+   r1=scale;
+   drawcone(s.x,s.y,s.z,r1,
+            s.x+dir.x*polelen,s.y+dir.y*polelen,s.z+dir.z*polelen,r1,DRAWCONE_NOCAP1 );         
+   drawcone(s.x+dir.x*polelen,s.y+dir.y*polelen,s.z+dir.z*polelen, -r1*3, 
+            e.x, e.y, e.z, 0.01,DRAWCONE_CENT);
+   
+}
+
+vecToArray( vec v, a[3] )
+{
+   a[0] = v.x; a[1] = v.y; a[2] = v.z;
+}
+
+isect_ray_box( ray_t ray, box_t box, &t )
+{
+   #define EPSILON 0.0
+   
+   static gotplane_origin[3];
+   static gotplane_dim[3];
+   
+   for(i=0; i<3; i++)
+   {
+      gotplane_origin[i] = 1;
+      gotplane_dim[i] = 1;
+   }
+   
+   static box_pos[3];
+   vecToArray( box.pos, box_pos );
+   
+   static box_dim[3];
+   vecToArray( box.dim, box_dim );
+   
+   static dir[3];
+   vecToArray( ray.dir, dir );
+  
+   static ray_origin[3];
+   vecToArray( ray.origin, ray_origin );
+    
+   static pt[3];
+   
+   for(i=0; i<3; i++)
+   {
+      if ( fabs(dir[i]) <= EPSILON )
+      {
+         gotplane_origin[i] = 0;
+         gotplane_dim[i] = 0;
+      }else{
+      
+         if( dir[i] > 0 ) 
+         {
+            gotplane_dim[i] = 0;
+         }
+      
+         if ( dir[i] < 0 ) 
+         {
+            gotplane_origin[i] = 0;
+         }
+      }
+      
+      if ( gotplane_dim[i]  )
+      {   
+         t = ( (box_pos[i]+box_dim[i]) - ray_origin[i]) / dir[i];
+         raypointArray( pt, ray, t );
+         got1 = pt[ (i+1)%3 ] >= box_pos[ (i+1)%3 ] && pt[ (i+1)%3 ] <= (box_pos[ (i+1)%3 ]+box_dim[ (i+1)%3]) ;
+         got2 = pt[ (i+2)%3 ] >= box_pos[ (i+2)%3 ] && pt[ (i+2)%3 ] <= (box_pos[ (i+2)%3 ]+box_dim[ (i+2)%3]) ;
+         if ( got1 && got2 )
+         {
+            return 1;
+         }
+      }
+      else if ( gotplane_origin[i] )
+      {
+         t = (box_pos[i] - ray_origin[i]) / dir[i];
+         raypointArray( pt, ray, t );
+         got1 = pt[ (i+1)%3 ] >= box_pos[ (i+1)%3 ] && pt[ (i+1)%3 ] <= (box_pos[ (i+1)%3 ]+box_dim[ (i+1)%3]) ;
+         got2 = pt[ (i+2)%3 ] >= box_pos[ (i+2)%3 ] && pt[ (i+2)%3 ] <= (box_pos[ (i+2)%3 ]+box_dim[ (i+2)%3]) ;
+         if ( got1 && got2 )
+         {
+            return 1;
+         }
+      }        
+
+   } // end foreach axis (x,y,z)
+   
+   return 0; 
+}
+
+raypointArray( out[3], ray_t r, t )
+{
+   out[0] = r.origin.x + t * r.dir.x;
+   out[1] = r.origin.y + t * r.dir.y;
+   out[2] = r.origin.z + t * r.dir.z;
+}
+
+raypoint( vec out, ray_t r, t )
+{
+   out.x = r.origin.x + t * r.dir.x;
+   out.y = r.origin.y + t * r.dir.y;
+   out.z = r.origin.z + t * r.dir.z;
+}
+
+
+drawcube(vec pos)
+{
+   glBegin(GL_QUADS); 
+   x=pos.x; y=pos.y; z=pos.z;
+   glTexCoord(0,0); glVertex(x-1,y-1,z-1);
+   glTexCoord(1,0); glVertex(x+1,y-1,z-1);
+   glTexCoord(1,1); glVertex(x+1,y+1,z-1);
+   glTexCoord(0,1); glVertex(x-1,y+1,z-1);
+   
+   glTexCoord(0,0); glVertex(x-1,y-1,z+1);
+   glTexCoord(1,0); glVertex(x-1,y-1,z-1);
+   glTexCoord(1,1); glVertex(x-1,y+1,z-1);
+   glTexCoord(0,1); glVertex(x-1,y+1,z+1);
+   
+   glTexCoord(0,0); glVertex(x-1,y-1,z+1);
+   glTexCoord(1,0); glVertex(x+1,y-1,z+1);
+   glTexCoord(1,1); glVertex(x+1,y-1,z-1);
+   glTexCoord(0,1); glVertex(x-1,y-1,z-1);
+   
+   glTexCoord(0,0); glVertex(x+1,y-1,z+1);
+   glTexCoord(1,0); glVertex(x-1,y-1,z+1);
+   glTexCoord(1,1); glVertex(x-1,y+1,z+1);
+   glTexCoord(0,1); glVertex(x+1,y+1,z+1);
+   
+   glTexCoord(0,0); glVertex(x+1,y-1,z-1);
+   glTexCoord(1,0); glVertex(x+1,y-1,z+1);
+   glTexCoord(1,1); glVertex(x+1,y+1,z+1);
+   glTexCoord(0,1); glVertex(x+1,y+1,z-1);
+   
+   glTexCoord(0,0); glVertex(x-1,y+1,z-1);
+   glTexCoord(1,0); glVertex(x+1,y+1,z-1);
+   glTexCoord(1,1); glVertex(x+1,y+1,z+1);
+   glTexCoord(0,1); glVertex(x-1,y+1,z+1);
+   glEnd();
+}
+
+drawline(x1,y1,z1,x2,y2,z2)
+{
+   s = 1.005;
+   x1 *= s;
+   y1 *= s;
+   z1 *= s;
+   x2 *= s;
+   y2 *= s;
+   z2 *= s;
+   moveto(x1,y1,z1); lineto(x2,y2,z2);
+}
+
+drawBox( box_t b )
+{
+   vec upper;
+   vecadd( upper, b.pos, b.dim );
+   
+   // probably some smart way of looping over xyz axes and (1,1,1) vector to 
+   // produce this:
+   drawline( b.pos.x, b.pos.y, b.pos.z, b.pos.x, b.pos.y, upper.z );
+   drawline( b.pos.x, b.pos.y, b.pos.z, b.pos.x, upper.y, b.pos.z );
+   drawline( b.pos.x, b.pos.y, b.pos.z, upper.x, b.pos.y, b.pos.z );
+
+   drawline( b.pos.x, upper.y, b.pos.z, b.pos.x, upper.y, upper.z );
+   drawline( b.pos.x, upper.y, b.pos.z, upper.x, upper.y, b.pos.z );
+   drawline( b.pos.x, upper.y, upper.z, b.pos.x, b.pos.y, upper.z );
+ 
+   drawline( upper.x, upper.y, upper.z, b.pos.x, upper.y, upper.z );
+   drawline( upper.x, upper.y, upper.z, upper.x, upper.y, b.pos.z );
+   drawline( upper.x, upper.y, b.pos.z, upper.x, b.pos.y, b.pos.z );
+   
+   drawline( upper.x, b.pos.y, upper.z, b.pos.x, b.pos.y, upper.z );
+   drawline( upper.x, b.pos.y, upper.z, upper.x, b.pos.y, b.pos.z );
+   drawline( upper.x, b.pos.y, upper.z, upper.x, upper.y, upper.z );
+ 
+}
+
+vecScalar( vec out, vec a, s )
+{
+   out.x = a.x * s;
+   out.y = a.y * s;
+   out.z = a.z * s;
+}
+
+vecAdd( vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;   
+}
+vecSub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;   
+}
+
+vecCross( vec out, vec a, vec b)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+
+vecset(vec a, x,y,z){
+   a.x = x; a.y = y; a.z = z;
+}
+
+vecset(vec a, vec other){
+   a.x = other.x; a.y = other.y; a.z = other.z;
+}
+
+vecDot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+length( vec v )
+{
+   return sqrt( vecdot(v,v) );
+}
+
+normalize( vec v )
+{
+   len = length(v);
+   if ( len )
+   {
+      v.x /= len; v.y /= len; v.z /= len;
+   }
+}
+
+buildMatrix( mtx[9], vec side, vec up, vec fwd )
+{
+   mtx[0] = side.x; mtx[1] = side.y; mtx[2] = side.z;
+   mtx[3] = up.x;   mtx[4] = up.y;   mtx[5] = up.z;
+   mtx[6] = fwd.x;  mtx[7] = fwd.y;  mtx[8] = fwd.z;
+}
+
+
+
+// Camera and movement code taken from /games/
+//Handle input and player movement
+playercontrols(camera_t cam, delta)
+{
+   static oldMouseX;
+   static oldMouseY;
+   static mouseSpeedX;
+   static mouseSpeedY; 
+
+   f = 10 * delta;
+   if (keystatus[0x2a]) f /= 4;
+   if (keystatus[0x36]) f *= 4;
+   vx = (keystatus[32]-keystatus[30])*f; //D-A
+   vy = (keystatus[17]-keystatus[31])*f; //W-S  
+   vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   
+   static mat[9]; 
+   ang2mat(cam.horiz_angle, cam.verti_angle, mat); // Convert angles to rotation matrix
+   
+   // find new position
+   cam.pos.x += mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   cam.pos.y += mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   cam.pos.z += mat[2]*vx + mat[5]*vz + mat[8]*vy; 
+   // mousespeed values are tweaked for 60 fps
+   mouseSpeedX = (mousx - oldMouseX) * 0.01;
+   mouseSpeedY = (mousy - oldMouseY) * 0.01;
+   oldMouseX = mousx;
+   oldMouseY = mousy;
+   if(bstatus==1)
+   {
+      cam.horiz_angle += mouseSpeedX;
+      cam.verti_angle += mouseSpeedY;
+   }
+   // Right,down,forwards unit vectors.
+   setcam(cam.pos.x, cam.pos.y, cam.pos.z,
+          mat[0],mat[1],mat[2],
+          mat[3],mat[4],mat[5],
+          mat[6],mat[7],mat[8]);
+          
+   for(i=0; i<9; i++)
+   {
+      cam.matrix[i] = mat[i];
+   }
+}
+
+
+
+// Screen2World function taken from evaldraw example Polyproto.kc
+screen2world(sx,sy,hang,vang,&x,&y,&z)
+{
+   vx = sx-xres/2; vy = sy-yres/2; 
+   //vz = xres/2; 
+   vz = fov;
+   static mat[9];
+   ang2mat(hang,vang,mat);
+   x = vx*mat[0] + vy*mat[3] + vz*mat[6];
+   y = vx*mat[1] + vy*mat[4] + vz*mat[7];
+   z = vx*mat[2] + vy*mat[5] + vz*mat[8];
+}
+
+/* converts horizontal and vertical angles to a 3x3 rotation matrix */
+ang2mat(hang,vang,mat[9])
+{
+   mat[0] = cos(hang); mat[1] = 0; mat[2]=-sin(hang);
+   mat[6] = cos(vang)*sin(hang); mat[7] = sin(vang); mat[8]=cos(vang)*cos(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}

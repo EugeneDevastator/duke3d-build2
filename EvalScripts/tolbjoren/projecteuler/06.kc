@@ -1,0 +1,26 @@
+()
+{
+   cls(0);
+   static sumSquared,squares;
+   
+   if(numframes==0)
+   {
+      
+      sumSq = 0;
+      sum = 0;
+      
+      i = 1;
+      while(i < 101)
+      {
+         squares += i*i;
+         sum += i;
+   
+         i++;
+      }   
+      sumSquared = sum*sum;
+   }
+   diff = sumSquared-squares;
+   printnum(diff);
+   
+   //sleep(1000);
+}
