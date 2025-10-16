@@ -325,10 +325,10 @@ move_player ()
             else
             {
                // Duke's sine table lookup: sintable[(2048-128+jumping_counter)&2047]/12
-               angle_index = (2048-128+jumping_counter) % 2048;
+               angle_index = (2048+ jumping_counter*0.9) % 2048;
                sine_value = sin(angle_index * PI/1024); // Convert to radians
-               velz -= sine_value * dtim * 30; // Adjusted multiplier for evaldraw
-               jumping_counter += 120; // Frame-rate independent
+               velz -= sine_value * dtim * 18; // Adjusted multiplier for evaldraw
+               jumping_counter += 1200 * dtim*3  ; // Frame-rate independent
                onfloor = 0;
             }
          }
