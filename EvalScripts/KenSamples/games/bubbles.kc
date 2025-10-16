@@ -1,0 +1,222 @@
+()
+{     //12/07/2006: inspired by a clever lassoo game designed by Tom Dobrowolski
+   enum {LINSIZ=256,MAXANTS=256};
+   static px[LINSIZ], py[LINSIZ], pn = 0;
+   static bubx[64][LINSIZ], buby[64][LINSIZ], bubn[64], bubgot[64], bubc = 0;
+   static obubx[LINSIZ], obuby[LINSIZ];
+   static antx[MAXANTS], anty[MAXANTS], antcap[MAXANTS], antn;
+   static antxv[MAXANTS], antyv[MAXANTS];
+   static tim = 0;
+      
+   ix = 0; iy = 0;
+   
+   antn = 8;
+   for(i=0;i<antn;i++)
+   {
+      antx[i] = xres*rnd;
+      anty[i] = yres*rnd;
+      antxv[i] = nrnd*32;
+      antyv[i] = nrnd*32;
+      antcap[i] = -1;
+   }
+
+   while (1)
+   {
+      cls(0);
+      otim = tim; tim = klock(); dtim = tim-otim;
+      
+      px[pn] = mousx;
+      py[pn] = mousy;
+      pn++;
+      
+      i0 = max(pn-LINSIZ,0);
+      for(i=pn-2;i>i0;i--)
+      {
+         px[i] = (px[i-1]+px[i+1])/2;
+         py[i] = (py[i-1]+py[i+1])/2 + dtim*64;
+      }
+      py[i] += dtim*64;
+   
+      for(i=max(pn-LINSIZ,0);i<pn;i++)
+         for(j=i+3;j<pn-1;j++)
+         {
+            if (intersect(px[i],py[i],px[i+1],py[i+1],px[j],py[j],px[j+1],py[j+1],&ix,&iy) == 0)
+               continue;
+
+            bubx[bubc][0] = ix;
+            buby[bubc][0] = iy;
+            bubn[bubc] = 1;
+            for(j=i+1;j<pn;j++)
+            {
+               bubx[bubc][bubn[bubc]] = px[j];
+               buby[bubc][bubn[bubc]] = py[j];
+               bubn[bubc]++;
+            }
+            
+            areao2 = 0; //f is area of polygon / 2
+            for(i0=bubn[bubc]-2,i1=bubn[bubc]-1,i2=0;i2<bubn[bubc];i0=i1,i1=i2,i2++)
+               areao2 += (bubx[bubc][i0]-bubx[bubc][i2])*buby[bubc][i1];
+            if (abs(areao2) <= 64) continue; //Ignore small loops
+            
+            pn = 0; //pn = i+1;
+            
+            bubgot[bubc] = 0;
+            for(k=0;k<antn;k++)
+            {
+               if (antcap[k] >= 0) continue;
+               c = 0;
+               for(i=bubn[bubc]-1,j=0;i>=0;j=i,i--)
+               {
+                  y0 = buby[bubc][i]-anty[k]; y1 = buby[bubc][j]-anty[k];
+                  if ((y0*y1) >= 0) continue;
+                  x0 = bubx[bubc][i]-antx[k]; x1 = bubx[bubc][j]-antx[k];
+                  if ((x0*x1) >= 0) { if (x0 < 0) c = 1-c; }
+                  else if ((x1*y0-x0*y1)*y0 < 0) c = 1-c;
+               }
+               if (c)
+               {
+                  bubgot[bubc]++;
+                  antcap[k] = bubc;
+                  playsound("rulinst.wav");
+               }
+            }
+            if (bubgot[bubc] == 0) playsound("tapfloor.flac");
+            else if (bubgot[bubc] == 1)
+            {
+               r = int(2*rnd);
+                    if (r == 0) playtext("<pitch middle='+0'/>nice");
+               else if (r == 1) playtext("<pitch middle='+0'/>okay");
+            }
+            else if (bubgot[bubc] == 2)
+            {
+               r = int(3*rnd);
+                    if (r == 0) playtext("<pitch middle='+4'/>Nice shot!");
+               else if (r == 1) playtext("<pitch middle='+4'/>Well done!");
+               else if (r == 2) playtext("<pitch middle='+4'/>Super!");
+            }
+            else playtext("<rate speed='2'/><pitch middle='+6'/>Brilliant! %g captured!",bubgot[bubc]);
+            
+            bubc++;
+            break;
+         }
+   
+      setcol(0xc0a080);
+      for(i=max(pn-LINSIZ,0)+1;i<pn;i++) drawcone(px[i-1],py[i-1],2,px[i],py[i],2);
+   
+      for(j=bubc-1;j>=0;j--)
+      {
+              if (bubgot[j] <= 0) { setcol(255+bubgot[j],64,64); bubgot[j] -= dtim*64; }
+         else if (bubgot[j] == 1) setcol(0x4080ff);
+         else if (bubgot[j] == 2) setcol(0x40ffff);
+         else if (bubgot[j] >= 3) setcol(192+sin(tim*16)*63,192+sin(tim*16)*63,0);
+         if (bubgot[j] <= 0) r = -3; else r = 4;
+         k = bubn[j]-1;
+         for(i=0;i<bubn[j];k=i,i++) drawcone(bubx[j][k],buby[j][k],r,bubx[j][i],buby[j][i],r);
+      
+         maxy = -1;
+         for(i=0;i<bubn[j];i++)
+            { obubx[i] = bubx[j][i]; obuby[i] = buby[j][i]; maxy = max(maxy,obuby[i]); }
+         if (maxy < 0)
+         {
+            bubc--;
+            bubn[j] = bubn[bubc];
+            for(k=bubn[j]-1;k>=0;k--)
+            {
+               bubx[j][k] = bubx[bubc][k];
+               buby[j][k] = buby[bubc][k];
+               bubgot[j] = bubgot[bubc];
+            }
+            for(k=0;k<antn;k++)
+            {
+               if (antcap[k] == j)
+               {
+                  antcap[k] =-1;
+                  antx[k] = xres*rnd;
+                  anty[k] = yres*rnd;
+                  antxv[k] = nrnd*32;
+                  antyv[k] = nrnd*32;
+               }
+               if (antcap[k] == bubc) { antcap[k] = j; }
+            }
+            continue;
+         }
+         for(i0=bubn[j]-2,i1=bubn[j]-1,i2=0;i2<bubn[j];i0=i1,i1=i2,i2++)
+         {
+            if (bubgot[j] <= 0)
+            {
+               bubx[j][i1] += nrnd*.15;
+               buby[j][i1] += nrnd*.15+dtim*128;
+            }
+            else
+            {
+               bubx[j][i1] = (obubx[i0]+obubx[i2])/2;
+               buby[j][i1] = (obuby[i0]+obuby[i2])/2-dtim*128;
+            }
+         }
+         
+         ax = 0; ay = 0;
+         for(k=bubn[j]-1;k>=0;k--)
+         {
+            ax += bubx[j][k];
+            ay += buby[j][k];
+         }
+         f = 1/bubn[j]; ax *= f; ay *= f;
+         setfont(12,16);
+              if (bubgot[j] <= 0) { moveto(ax-12,ay-8); printf(":/"); }
+         else if (bubgot[j] == 1) { moveto(ax-12,ay-8); printf(":)"); }
+         else if (bubgot[j] == 2) { moveto(ax-18,ay-8); printf(":))"); }
+         else                     { moveto(ax-12,ay-8); printf("%g!",bubgot[j]); }
+      }
+      
+      t = sin(tim*12)*1.5;
+      for(i=0;i<antn;i++)
+      {
+         antx[i] += antxv[i]*dtim;
+         anty[i] += antyv[i]*dtim;
+         if (antcap[i] < 0)
+         {
+            if (antx[i] <    0) antx[i] += xres;
+            if (anty[i] <    0) anty[i] += yres;
+            if (antx[i] > xres) antx[i] -= xres;
+            if (anty[i] > yres) anty[i] -= yres;
+            antxv[i] += noise(antx[i]/16,anty[i]/16);
+            antyv[i] += noise(anty[i]/16,antx[i]/16);
+            setcol(0x80ff80);
+         }
+         else
+         {
+            ax = 0; ay = 0; j = antcap[i];
+            for(k=bubn[j]-1;k>=0;k--)
+            {
+               ax += bubx[j][k];
+               ay += buby[j][k];
+            }
+            f = 1/bubn[j]; ax *= f; ay *= f;
+            dx = ax-antx[i]; dy = ay-anty[i];
+            d = dtim*4096/sqrt(dx*dx + dy*dy);
+            antxv[i] += dx*d;
+            antyv[i] += dy*d;
+            antxv[i] = (antxv[i]         )*pow(.5,dtim);
+            antyv[i] = (antyv[i]+dtim*128)*pow(.5,dtim) - dtim*128;
+            setcol(0x0080ff);
+         }
+         
+         drawsph(antx[i]  ,anty[i]+1,3);
+         drawsph(antx[i]+4,anty[i]+t,2);
+         drawsph(antx[i]-4,anty[i]+t,2);
+      }
+      
+      refresh();
+   }
+}
+
+intersect (x0,y0,x1,y1,x2,y2,x3,y3,&ix,&iy)
+{     //(x1-x0)*t + (x2-x3)*u = (x2-x0)
+      //(y1-y0)*t + (y2-y3)*u = (y2-y0)
+   x10 = x1-x0; x23 = x2-x3; x20 = x2-x0;
+   y10 = y1-y0; y23 = y2-y3; y20 = y2-y0;
+   d =  x10*y23 - y10*x23;    if (d == 0) return(0); d = 1/d;
+   t = (x20*y23 - y20*x23)*d; if ((t < 0) || (t >= 1)) return(0);
+   u = (x10*y20 - y10*x20)*d; if ((u < 0) || (u >= 1)) return(0);
+   ix = x10*t + x0; iy = y10*t + y0; return(1);
+}

@@ -1,0 +1,747 @@
+enum {SHOWSEEN=0};
+static hboard, hpic[13], hpic2[2], hside;
+static grid[10][10], seen[10][10]/*0=?,1=mover,2=exact*/, ready[2] = {0,0};
+static pcscore[12] = {1024,5,3,20,18,16,14,12,10,8,15,5};
+()
+{
+   static startpcfrq[12] = {1,6,1,1,1,2,3,4,4,4,5,8};
+   static pcfrq[2][12];
+      
+      //  0:land
+      //  1:water
+      //100:red Flag         (*1)   200:blue "
+      //101:red Bomb         (*6)   201:blue "
+      //102:red Spy          (*1)   202:blue "
+      //103:red 1/Marshall   (*1)   203:blue "
+      //104:red 2/General    (*1)   204:blue "
+      //105:red 3/Colonel    (*2)   205:blue "
+      //106:red 4/Major      (*3)   206:blue "
+      //107:red 5/Captain    (*4)   207:blue "
+      //108:red 6/Lieutenant (*4)   208:blue "
+      //109:red 7/Sergeant   (*4)   209:blue "
+      //110:red 8/Miner      (*5)   210:blue "
+      //111:red 9/Scout      (*8)   211:blue "
+      //112:red (back tex)  212:blue "
+      
+   if (!net_me) { rseed = int((klock(1)*10)%32768); net_send(NET_ALL,rseed); }
+   while (1) { if (net_recv(&from,&rseed)) { if (!from) { srand(rseed); break; } } }
+   
+   for(y=0;y<10;y++)
+      for(x=0;x<10;x++)
+      {
+         grid[y][x] = 0; seen[y][x] = 0;
+         if (min(9-y,y) >= 4) { grid[y][x] = (fabs(min(9-x,x)-2.5) < 1); continue; }
+      }
+   static lst[2][40];
+   for(k=0,i=12-1;i>=0;i--) for(j=startpcfrq[i];j>0;j--,k++) { lst[0][k] = i; lst[1][k] = i; }
+   for(j=2-1;j>=0;j--)
+      for(i=40-1;i>=0;i--)
+      {
+         k = int((i+1)*rnd);
+         grid[int(i/10)+(1-j)*6][i%10] = lst[j][k] + j*100+100;
+         //grid[int(i/10)+(1-j)*6][i%10] = int(3*rnd) + j*100+100;
+         lst[j][k] = lst[j][i];
+      }
+      
+   enum {PARTMAX=16};
+   struct { x, y, z, ha, va, xv, yv, zv, hav, vav, pc; } part_t;
+   static part_t part[PARTMAX];
+   static partn = 0;
+   
+   genpics();
+   glCullFace(GL_NONE);
+   glEnable(GL_ALPHA_TEST);
+   
+   tim = 0; hang = net_me*PI+PI/2; vang = 0.6; grabx = -1; graby = -1; obstatus = 0;
+   turn = 0; movtim = 0; movtimend = 0;
+   while (1)
+   {
+      otim = tim; tim = klock(); dtim = tim-otim;
+      clz(1e32);
+      
+      glsettex("cloud.png"); setcol(0x405060);
+      gltexcoord(tim*.01  ,0); glvertex(   0,   0);
+      gltexcoord(tim*.01+2,0); glvertex(xres,   0);
+      gltexcoord(tim*.01+2,2); glvertex(xres,yres);
+      gltexcoord(tim*.01  ,2); glvertex(   0,yres);
+     
+      hang += (keystatus[0x33]-keystatus[0x34])*dtim;
+      vang += (keystatus[0xc9]-keystatus[0xd1])*dtim;
+
+      cx = 1.8*cos(vang)*cos(hang);
+      cy = 1.8*cos(vang)*sin(hang);
+      cz =-1.8*sin(vang);
+      f = -1/sqrt(cx^2+cy^2+cz^2); fx = cx*f; fy = cy*f; fz = cz*f;
+      rx = sin(hang); ry = -cos(hang); rz = 0;
+      dx = fy*rz - fz*ry;
+      dy = fz*rx - fx*rz;
+      dz = fx*ry - fy*rx;
+      setcam(cx,cy,cz,rx,ry,rz,dx,dy,dz,fx,fy,fz);
+      
+      glsettex(hboard); setcol(0xffffff); 
+      glbegin(GL_QUADS);
+      gltexcoord(0,0); glvertex(-1,-1,0);
+      gltexcoord(1,0); glvertex(+1,-1,0);
+      gltexcoord(1,1); glvertex(+1,+1,0);
+      gltexcoord(0,1); glvertex(-1,+1,0);
+      glend();
+
+      vx = (mousx-xres/2)/(xres/2);
+      vy = (mousy-yres/2)/(xres/2);
+      vz = 1;
+         //ix = (vx*rx + vy*dx + vz*fx)*t + cx;
+         //iy = (vx*ry + vy*dy + vz*fy)*t + cy;
+         //iz = (vx*rz + vy*dz + vz*fz)*t + cz;
+      t = -cz/(vx*rz + vy*dz + fz);
+      mx = (vx*rx + vy*dx + fx)*t + cx;
+      my = (vx*ry + vy*dy + fy)*t + cy;
+      ix = floor(mx*5+5);
+      iy = floor(my*5+5); valmove = 0;
+      if (ready[net_me] == 0)
+      {
+         if ((ix >= 0) && (iy >= 0) && (ix < 10) && (iy < 10) &&
+             (((net_me == 1) && (iy <  4)) ||
+              ((net_me == 0) && (iy >= 6))))
+         {
+            if ((grabx <  0) && ((bstatus%2) > (obstatus%2))) { grabx = ix; graby = iy; }
+            if ((grabx >= 0) && ((bstatus%2) < (obstatus%2)))
+            {
+               net_send(NET_ALL,grabx + graby*10 + ix*100 + iy*1000);
+               grabx = -1;
+            }
+            if (grabx >= 0)
+            {
+               setcol(0xffff00); drawsquare(   ix,   iy,.003);
+               setcol(0xffff00); drawsquare(grabx,graby,.003);
+            }
+         }
+         if ((keystatus[0x1c]) || (keystatus[0x9c]))
+         {
+            keystatus[0x1c] = 0; keystatus[0x9c] = 0;
+            net_send(NET_ALL,-1);
+         }
+      }
+      else
+      {
+         if ((net_players < 2) && (turn == 1) && (movtim >= movtimend))
+         {
+            getcompmove(turn,&mx0,&my0,&mx1,&my1,0);
+            net_send(NET_ALL,mx0 + my0*10 + mx1*100 + my1*1000 + 10000);
+            grabx = -1; goto compmoved;
+         }
+         
+         if ((bstatus>1) && (turn == net_me)) showvalmoves(turn);
+            
+         if ((ix >= 0) && (iy >= 0) && (ix < 10) && (iy < 10) &&
+             ((turn == net_me) || (net_players < 2))) 
+         {
+            do
+            {
+               if (grabx < 0)
+               {
+                  if ((grid[iy][ix] < turn*100+102) || (grid[iy][ix] >= turn*100+200)) continue;
+                  if ((bstatus%2) > (obstatus%2)) { grabx = ix; graby = iy; }
+               }
+               else
+               {
+                  if (!isvalmove(turn,grabx,graby,ix,iy)) continue;
+                  if ((bstatus%2) < (obstatus%2))
+                  {
+                     net_send(NET_ALL,grabx + graby*10 + ix*100 + iy*1000 + 10000);
+                     grabx = -1;
+                  }
+               }
+               setcol(0xffff00); drawsquare(ix,iy,.003); //+sin(tim*8)*.001);
+               valmove = 1;
+            } while (0);
+         }
+      }
+      if (!(bstatus%2)) { grabx = -1; }
+
+compmoved:;      
+      while ((movtim >= movtimend) && (net_recv(&from,&val)))
+      {
+         if (val < 0)
+         {
+            if (ready[from%2] == 0) playsound("pickup.wav");
+            ready[from%2] = 1; if (net_players < 2) ready[1] = 1;
+            if (ready[0]+ready[1] == 2) checkanymove(turn);
+            continue;
+         }
+         if ((ready[0]+ready[1] >= 2) && (from != turn) && (net_players >= 2)) continue;
+         mx0 = int(val/   1)%10;
+         my0 = int(val/  10)%10;
+         mx1 = int(val/ 100)%10;
+         my1 = int(val/1000)%10;
+         seen[my1][mx1] = seen[my0][mx0];
+         if (val < 10000)
+         {
+            t = grid[my0][mx0]; grid[my0][mx0] = grid[my1][mx1]; grid[my1][mx1] = t;
+            playsound("ppbaltab.wav",100,1.5);
+         }
+         else if (ready[1]+ready[2] < 3)
+         {
+            movtim = 0.0;
+            if (grid[my1][mx1] < 100) movtimend = 0.5;
+            else { movtimend = 1.5; playtext_result(grid[my0][mx0]%100,grid[my1][mx1]%100); }
+            if (turn == net_me) playsound("ppbaltab.wav",100,0.5);
+         }
+      }
+      
+      if (movtim < movtimend)
+      {
+         movtim += dtim;
+         if (movtim >= movtimend)
+         {
+            j = grid[my0][mx0];
+            i = grid[my1][mx1]; if ((i == 100) || (i == 200)) ready[turn] = 2;
+            result = movepc(mx0,my0,mx1,my1);
+            if ((result == +1) || (result == 0))
+            {
+               playsound("blowup2.flac",25,1.0);
+               part[partn].x = (mx1-4.5)/5; part[partn].xv = (mx1-mx0)*.5;
+               part[partn].y = (my1-4.5)/5; part[partn].yv = (my1-my0)*.5;
+               part[partn].z = 0; part[partn].zv = -1; 
+               part[partn].ha = (int(j/100)-1==net_me)*PI; part[partn].va = 0;
+               part[partn].hav = (int(rnd*2)-.5)*4;
+               part[partn].vav = (int(rnd*2)-.5)*8;
+               part[partn].pc = i; partn++;
+            }
+            if ((result == -1) || (result == 0))
+            {
+               playsound("gothit.wav",100,1.0);
+               part[partn].x = (mx1-4.5)/5; part[partn].xv = (mx1-mx0)*-.5;
+               part[partn].y = (my1-4.5)/5; part[partn].yv = (my1-my0)*-.5;
+               part[partn].z = -.14; part[partn].zv = -1; 
+               part[partn].ha = (int(j/100)-1!=net_me)*PI; part[partn].va = 0;
+               part[partn].hav = (int(rnd*2)-.5)*4;
+               part[partn].vav = (int(rnd*2)-.5)*8;
+               part[partn].pc = j; partn++;
+            }
+            if ((result == -2) && (turn != net_me)) playsound("ppbaltab.wav",100,1.5);
+            turn = 1-turn; checkanymove(turn);
+         }
+      }
+
+      for(i=0;i<12;i++) { pcfrq[0][i] = 0; pcfrq[1][i] = 0; }
+      for(y=0;y<10;y++)
+         for(x=0;x<10;x++)
+         {
+            i = grid[y][x]; if (i < 100) continue;
+            pcfrq[int(i/100)][i%100]++;
+
+            if ((grabx == x) && (graby == y)) continue;
+            if ((net_players >= 2) || (keystatus[0x1d]+keystatus[0x36]+keystatus[0x7]<3))
+               if (ready[1]+ready[2] < 3)
+                  if ((net_me < 2) && (int(i/100)-1 == 1-net_me)) { i = i+12-(i%100); }
+            nx = x; ny = y; nz = 0; na = 0;
+            if (movtim < movtimend) 
+            {
+               if ((x == mx0) && (y == my0))
+               {
+                  if (turn == net_me) f = 1; else f = min(movtim/.5,1);
+                  nx = (mx1-mx0)*f + mx0;
+                  ny = (my1-my0)*f + my0;
+                  nz = 0;
+                  if (grid[my1][mx1]) nz = -.14*f;
+                  if ((i != grid[y][x]) && (grid[my1][mx1] >= 100))
+                     { na = f*PI; if (na >= PI/2) i = grid[y][x]; }
+                                    
+                  if (!turn) setcol(0xc09090); else setcol(0x9090c0);
+                  dx = (nx-mx0)/5;
+                  dy = (ny-my0)/5; f = .05/sqrt(dx^2+dy^2);
+                  drawcone((mx0-4.5)/5,(my0-4.5)/5,-.01,.01,(nx-4.5)/5-dx*f,(ny-4.5)/5-dy*f,-.01,.01);
+                  drawcone((nx-4.5)/5,(ny-4.5)/5,0,-.01,(nx-4.5)/5-dx*f,(ny-4.5)/5-dy*f,-.01,-.03,DRAWCONE_CENT);
+               }
+               if ((x == mx1) && (y == my1))
+               {
+                  f = min(movtim/.5,1);
+                  if (i != grid[y][x]) { na = f*PI; if (na >= PI/2) i = grid[y][x]; }
+               }
+            }
+            
+            if ((SHOWSEEN) && (seen[ny][nx] == 2)) i = grid[y][x];
+            drawpc((nx-4.5)/5,(ny-4.5)/5,nz,na,0,i);
+            if ((SHOWSEEN) && (seen[ny][nx] == 1) && (i != grid[y][x]))
+               { setcol(0xa08060); drawsph((nx-4.5)/5,(ny-4.5)/5,nz-.15,.01); }
+         }
+      if (grabx >= 0)
+      {
+         if ((grabx != ix) || (graby != iy))
+         {
+            if (!valmove) setcol(0xc06060); else setcol(0xc0c0c0);
+            dx = mx-(grabx-4.5)/5;
+            dy = my-(graby-4.5)/5; f = .05/sqrt(dx^2+dy^2);
+            drawcone((grabx-4.5)/5,(graby-4.5)/5,-.01,.01,mx-dx*f,my-dy*f,-.01,.01);
+            drawcone(mx,my,0,-.01,mx-dx*f,my-dy*f,-.01,-.03,DRAWCONE_CENT);
+         }
+         i = grid[graby][grabx];
+         if ((net_me < 2) && (int(i/100)-1 == 1-net_me)) i = i+12-(i%100);
+         drawpc(mx,my,0,0,0,i);
+      }
+      
+      for(i=partn-1;i>=0;i--)
+      {
+         drawpc(part[i].x,part[i].y,part[i].z,part[i].ha,part[i].va,part[i].pc);
+         part[i].x += part[i].xv*dtim;
+         part[i].y += part[i].yv*dtim;
+         part[i].z += part[i].zv*dtim;
+         part[i].ha += part[i].hav*dtim;
+         part[i].va += part[i].vav*dtim;
+         part[i].zv += dtim*2; //gravity
+         if (part[i].z > .5) { partn--; part[partn] = part[i]; }
+      }
+      
+      if (ready[0]+ready[1] > 2)
+      {
+         siz = 1/16+sin(tim*5)*.001;
+         setfont(xres*siz,yres*siz*2.5,1); moveto(xres/2-xres*siz*4.5,0);
+         if (ready[0] == 2) { setcol(0xffa0a0); printf("Red Wins!"); } 
+                       else { setcol(0xa0c0ff); printf("Blue Wins!"); }
+      }
+      else if ((net_me < 2) && (ready[0]+ready[1] >= 2))
+      {
+         if (turn == 0) setcol(0xffa0a0); else setcol(0xa0c0ff);
+         if (turn == net_me)
+         {
+            siz = 1/16+sin(tim*5)*.001;
+            setfont(xres*siz,yres*siz*2.5,1); moveto(xres/2-xres*siz*5,0);
+            printf("Your Turn!");
+         }
+         else
+         {
+            setfont(xres/32,yres/12,1); moveto(xres/2-xres/32*5,0);
+            if (turn == 0) printf("Red's Turn"); else printf("Blue's Turn");
+         }
+      }
+      else if (net_me < 2)
+      {
+         if (net_me == 0) setcol(0xffa0a0); else setcol(0xa0c0ff);
+         siz = 1/16; setfont(xres*siz,yres*siz*2.5,1); moveto(xres/2-xres*siz*4.5,0);
+         if (ready[net_me]) printf("  Ready\n"); else
+         {
+            printf("Preparing\n");
+            x = xres*.008;
+            if (x > 8) { moveto(xres/2-13*x,yres*siz*2.5); setfont(x,x*1.8,1); }
+                  else { moveto(xres/2-13*6,yres*siz*2.5); setfont(6,8); }
+            printf("Drag mouse to swap pieces.\nPress Enter when finished.");
+         }
+         
+         if (net_players >= 2)
+         {
+            if (1-net_me == 0) setcol(0xffa0a0); else setcol(0xa0c0ff);
+            siz = 1/16; setfont(xres*siz,yres*siz*2.5,1); moveto(xres/2-xres*siz*4.5,yres*siz*2.9);
+            if (ready[1-net_me]) printf("  Ready"); else printf("Preparing");
+         }
+      }
+      
+      if (yres < 600) { fx = 6; fy = 8; setfont(fx,fy); }
+                 else { fx = yres*.015; fy = yres*.025; setfont(fx,fy,1); }
+      for(x=0;x<2;x++)
+      {
+         ox = (1-x)*(xres-yres*.12); oy = yres*.1; moveto(ox,oy);
+         for(y=0;y<12;y++)
+         {
+            j = pcfrq[x][y];
+            for(i=0;i<startpcfrq[y];i++)
+            {
+               if (i < j) { if (x) setcol(0xffa0a0); else setcol(0xa0c0ff); }
+                     else { setcol(0x505050); } //if (x) setcol(0x805050); else setcol(0x506080); }
+               if (y < 2)
+               {
+                  glsettex(hpic2[y]);
+                  if (!y) { drawspr(fx*1.5+ox,oy-fy*.5,fy*.8,fy*1,0); }
+                     else { drawspr((i+.25)*fx*1.3+ox,fy*1.5+oy,fy*.5,fy*.7,0); }
+               }
+               else
+               {
+                  if (y == 2) printf("Spy"); else printf("%g",y-2);
+               }
+            }
+            printf("\n");
+         }
+      }
+
+      obstatus = bstatus; refresh(); Sleep(15);
+   }
+}
+
+genusflag (x,y)
+{
+   if ((x >= .4) || (y >= 7/13)) return((((y*13)%2) >= 1)*0xffff + 0xff0000);
+   xsc = .0333; xx = floor(x/xsc+.5);
+   ysc = .0528; yy = floor(y/ysc+.5);
+   if ((fabs(xx-6) < 6) && (fabs(yy-5) < 5) && ((xx+yy+.5)%2 < 1))
+   {
+      fx = fabs(x-xx*xsc)*86; k0 = fx*sin(PI*.2);
+      fy =     (y-yy*ysc)*48; k1 = fy*cos(PI*.2); k2 = cos(PI*.4);
+      if ((max(k1+k0,-fy) < k2) || (max(k1-k0,fx*sin(PI*.4) - fy*k2) < k2)) return(0xffffff);
+   }
+   return(0x000070);
+}
+
+genpics ()
+{
+   enum {SIZ=1024}; static buf[SIZ][SIZ];
+   for(y=0;y<SIZ;y++)
+      for(x=0;x<SIZ;x++)
+      {
+         sc = 1;
+         sc = min(fabs((x+(SIZ/20))%(SIZ/10)-SIZ/20)*.10+.60,sc);
+         sc = min(fabs((y+(SIZ/20))%(SIZ/10)-SIZ/20)*.10+.60,sc);
+         g = 96;
+         g += noise(x*.01,y*.01)*56;
+         g += noise(x*.03,y*.03)*24;
+         g += noise(x*.12,y*.12)*16; r = g*.8; b = g*.6;
+         d = ((min(x,SIZ-x)+noise(x*.02,y*.03)*(SIZ*.03)-SIZ*.3)^2 +
+             (    y        +noise(x*.03,y*.02)*(SIZ*.03)-SIZ*.5)^2);
+         if (d < (SIZ/12)^2)
+         {
+            d = sqrt(1-d/(SIZ/12)^2);
+            r += (  0-r)*d;
+            g += (  0-g)*d;
+            b += (160-b)*d;
+            sc = 1;
+         }
+         buf[y][x] = rgb(r*sc,g*sc,b*sc);
+      }
+   hboard = glsettex(buf,SIZ,SIZ);
+   
+   enum {SIZ2=64}; static buf2[SIZ2][SIZ2];
+   
+      //gen flag
+   for(y=0;y<SIZ2;y++)
+      for(x=0;x<SIZ2;x++)
+      {
+         buf2[y][x] = 0x808080;
+         if ((fabs(x-SIZ2*.1) < SIZ2*.02) && (y > SIZ2*.2))
+            { buf2[y][x] = 0xc0c0c0; continue; }
+         if ((x-SIZ2*.1)^2 + ((y-SIZ2*.2)*2)^2 < (SIZ2*.03)^2)
+            { buf2[y][x] = 0xffc080; continue; }
+         yy = y+sin(x*(256/SIZ2*.05))*(SIZ2/256*3);
+         if ((x >= SIZ2*.1) && (x < SIZ2*.9) && (yy >= SIZ2*.25) && (yy < SIZ2*.5))
+            buf2[y][x] = genusflag((x-SIZ2*.1)/(SIZ2*.8),(yy-SIZ2*.25)/(SIZ2*.25));
+      }
+   hpic[0] = glsettex(buf2,SIZ2,SIZ2);
+   for(y=0;y<SIZ2;y++) for(x=0;x<SIZ2;x++) if (buf2[y][x] == 0x808080) buf2[y][x] = -1;
+   hpic2[0] = glsettex(buf2,SIZ2,SIZ2);
+   
+      //gen bomb
+   for(y=0;y<SIZ2;y++)
+      for(x=0;x<SIZ2;x++)
+      {
+         buf2[y][x] = 0x808080;
+         r = sqrt((x-SIZ2/2)^2 + ((y-SIZ2/2)*1.5)^2);
+         if ((fabs(y-SIZ2*.30) < SIZ2*.11) && (fabs(x-SIZ2*.7+(y-SIZ2*.32)^2*.02) < SIZ2*.012))
+            { buf2[y][x] = 0xc0a080; continue; }
+         if ((x-SIZ2*.52)^2 + ((y-SIZ2*.38)*2.5)^2 < (SIZ2*.020)^2)
+            { buf2[y][x] = 0xffffc0; continue; }
+         if ((x-SIZ2*.52)^2 + ((y-SIZ2*.38)*2.5)^2 < (SIZ2*.040)^2)
+            { buf2[y][x] = 0xc0c0a0; continue; }
+         if (r < SIZ2/4) { buf2[y][x] = 0x202020; continue; }
+         r = sqrt((x-SIZ2*.58)^2 + ((y-SIZ2*.17)*1.5)^2);
+         a = atan2((y-SIZ2*.17)*1.5,x-SIZ2*.58);
+         if (r < cos(a*7)*SIZ2*.03+SIZ2*.10) { buf2[y][x] = 0xc8c800; continue; }
+         if (r < cos(a*7)*SIZ2*.03+SIZ2*.18) { buf2[y][x] = 0xc80000; continue; }
+      }
+   hpic[1] = glsettex(buf2,SIZ2,SIZ2);
+   for(y=0;y<SIZ2;y++)
+      for(x=0;x<SIZ2;x++)
+      {
+         if (buf2[y][x] == 0x808080) { buf2[y][x] = -1; continue; }
+         getrgb(buf2[y][x],&r,&g,&b); buf2[y][x] = rgb(r/2+128,g/2+128,b/2+128);
+      }
+   hpic2[1] = glsettex(buf2,SIZ2,SIZ2);
+   
+   for(i=2;i<12;i++)
+   {
+      setcol(0x808080); drawcone(0,SIZ2/2,-SIZ2/2,SIZ2,SIZ2/2,-SIZ2/2);
+      setcol(0x6080a0);
+      if (i == 2) { setfont(SIZ2*.3,SIZ2*.4,1); moveto(SIZ2*.08,SIZ2*.32); printf("Spy"); }
+             else { setfont(SIZ2*.5,SIZ2*.7,1); moveto(SIZ2*.26,SIZ2*.26); printf("%g",i-2); }
+      setcol(0xc0e0ff);
+      if (i == 2) { setfont(SIZ2*.3,SIZ2*.4,1); moveto(SIZ2*.06,SIZ2*.30); printf("Spy"); }
+             else { setfont(SIZ2*.5,SIZ2*.7,1); moveto(SIZ2*.24,SIZ2*.24); printf("%g",i-2); }
+
+      moveto(0,0); setcol(0x605040);
+      if (i == 3) { setfont(SIZ2/ 8,SIZ2*.25,1); printf("Marshall");   }
+      if (i == 4) { setfont(SIZ2/ 7,SIZ2*.25,1); printf("General");    }
+      if (i == 5) { setfont(SIZ2/ 7,SIZ2*.25,1); printf("Colonel");    }
+      if (i == 6) { setfont(SIZ2/ 5,SIZ2*.27,1); printf("Major");      }
+      if (i == 7) { setfont(SIZ2/ 7,SIZ2*.25,1); printf("Captain");    }
+      if (i == 8) { setfont(SIZ2/10,SIZ2*.20,1); printf("Lieutenant"); }
+      if (i == 9) { setfont(SIZ2/ 8,SIZ2*.25,1); printf("Sergeant");   }
+      if (i ==10) { setfont(SIZ2/ 5,SIZ2*.27,1); printf("Miner");      }
+      if (i ==11) { setfont(SIZ2/ 5,SIZ2*.27,1); printf("Scout");      }
+            
+      for(y=0;y<SIZ2;y++) gethlin(0,y,&buf2[y][0],SIZ2);
+      hpic[i] = glsettex(buf2,SIZ2,SIZ2);
+   }
+   
+   for(y=0;y<SIZ2;y++)
+      for(x=0;x<SIZ2;x++)
+      {
+         if (fabs(x-SIZ2/2)/(SIZ2/2) < cos(y*PI/SIZ2+PI)*.4+.5)
+              buf2[y][x] = int(noise(x*.1,y*.3)*32)*0x10101 + 0x506070;
+         else buf2[y][x] = -1;
+      }
+   hside = glsettex(buf2,SIZ2,SIZ2);
+   
+   for(y=0;y<SIZ2;y++)
+      for(x=0;x<SIZ2;x++)
+      {
+         buf2[y][x] = int(noise(x*.1,y*.3)*32)*0x10101 + 0x506070;
+      }
+   hpic[12] = glsettex(buf2,SIZ2,SIZ2);
+}
+
+drawpc (x, y, z, ha, va, pc)
+{
+        if (pc < 200) { setcol(0xffa0a0); glsettex(hpic[pc%100]); }
+   else if (pc < 300) { setcol(0xa0c0ff); glsettex(hpic[pc%100]); ha += PI; }
+   
+   rx = cos(ha);
+   ry = sin(ha);
+   rz = 0;
+   dx =-sin(ha)*sin(va);
+   dy = cos(ha)*sin(va);
+   dz = cos(va);
+   fx = ry*dz - rz*dy;
+   fy = rz*dx - rx*dz;
+   fz = rx*dy - ry*dx;
+   
+   f = .03;
+   x -= dx*f; y -= dy*f; z -= dz*f;
+   z -= (.09-f);
+   
+   glbegin(GL_QUADS);
+   gltexcoord(0,0); glvertex(x-rx*.04-dx*.07,y-ry*.04-dy*.07,z-rz*.04-dz*.07);
+   gltexcoord(1,0); glvertex(x+rx*.04-dx*.07,y+ry*.04-dy*.07,z+rz*.04-dz*.07);
+   gltexcoord(1,1); glvertex(x+rx*.04+dx*.07,y+ry*.04+dy*.07,z+rz*.04+dz*.07);
+   gltexcoord(0,1); glvertex(x-rx*.04+dx*.07,y-ry*.04+dy*.07,z-rz*.04+dz*.07);
+   glend();
+               
+   x += dx*.01; y += dy*.01; z += dz*.01;
+   glbegin(GL_QUADS); glsettex(hside);
+   for(f=-1;f<=1;f+=2)
+   {
+      g = f*.041;
+      gltexcoord(.1,.1); glvertex(x-rx*g+fx*.02-dx*.08,y-ry*g+fy*.02-dy*.08,z-rz*g+fz*.02-dz*.08);
+      gltexcoord(.9,.1); glvertex(x-rx*g-fx*.02-dx*.08,y-ry*g-fy*.02-dy*.08,z-rz*g-fz*.02-dz*.08);
+      gltexcoord(.9,.9); glvertex(x-rx*g-fx*.02+dx*.08,y-ry*g-fy*.02+dy*.08,z-rz*g-fz*.02+dz*.08);
+      gltexcoord(.1,.9); glvertex(x-rx*g+fx*.02+dx*.08,y-ry*g+fy*.02+dy*.08,z-rz*g+fz*.02+dz*.08);
+      glend();
+   }
+}
+
+drawsquare (x, y, r)
+{         
+   drawcone((x-5)/5,(y-5)/5,-r,r,(x-4)/5     ,(y-5)/5+1e-6,-r,r);
+   drawcone((x-4)/5,(y-5)/5,-r,r,(x-4)/5+1e-6,(y-4)/5     ,-r,r);
+   drawcone((x-4)/5,(y-4)/5,-r,r,(x-5)/5     ,(y-4)/5+1e-6,-r,r);
+   drawcone((x-5)/5,(y-4)/5,-r,r,(x-5)/5+1e-6,(y-5)/5     ,-r,r);
+}
+
+getresult (pc0, pc1)
+{
+        if (               (pc1 == 0)) result = 1e3; //got flag:game over!
+   else if ((pc0 == 10) && (pc1 == 1)) result = 1;   //miner got bomb
+   else if ((pc0 !=  2) && (pc1 == 2)) result = 1;   //non-spy got spy
+   else if ((pc0 ==  2) && (pc1 == 3)) result = 1e2; //spy got 1
+   else if ( pc0 ==pc1)                result = 0;   //tie:both die
+   else if ((pc0 ==  2) && (pc1 != 3)) result =-1;   //spy got eaten by non-1
+   else if ( pc0 < pc1)                result = 1;   //lower got higher
+   else                                result =-1;   //higher eaten by lower
+   return(result);
+}
+
+playtext_result (pc0, pc1) //0=flag, 1=bomb, 2=spy, 3-11=1-9
+{
+        if ((pc0 == 2) && (pc1 == 0)) playtext(",A spy captured the flag. Game over!");
+   else if ((pc0 == 2) && (pc1 == 1)) playtext(",A spy got blown up by a bomb.");
+   else if ((pc0 == 2) && (pc1 == 2)) playtext(",A spy died with another spy.");
+   else if ((pc0 == 2) && (pc1 == 3)) playtext(",A spy took out a 1!");
+   else if ((pc0 == 2) && (pc1 >= 4)) playtext(",A spy ran into a %g.",pc1-2);
+   else if ((pc0 ==10) && (pc1 == 1)) playtext(",An 8 defused a bomb.");
+   else if ((pc0 >= 3) && (pc1 == 0)) playtext(",A %g captured the flag. Game over!",pc0-2);
+   else if ((pc0 >= 3) && (pc1 == 1)) playtext(",A %g got blown up by a bomb.",pc0-2);
+   else if ((pc0 >= 3) && (pc1 == 2)) playtext(",A %g took out a spy.",pc0-2);
+   else if ((pc0 == pc1            )) playtext(",A %g died with another %g.",pc0-2,pc1-2);
+   else if ((pc0 < pc1             )) playtext(",A %g destroyed a %g.",pc0-2,pc1-2);
+   else if ((pc0 > pc1             )) playtext(",A %g ran into a %g.",pc0-2,pc1-2);
+}
+
+isvalmove (turn, x0, y0, x1, y1)
+{
+   if ((x0 < 0) || (x0 >= 10) || (y0 < 0) || (y0 >= 10)) return(0);
+   if ((x1 < 0) || (x1 >= 10) || (y1 < 0) || (y1 >= 10)) return(0);
+   if ((grid[y0][x0] <  turn*100+102) || (grid[y0][x0] >= turn*100+200)) return(0);
+   if ((grid[y1][x1] >= turn*100+100) && (grid[y1][x1] <  turn*100+200)) return(0);
+   if (grid[y1][x1] == 1) return(0);
+   if (fabs(x1-x0) + fabs(y1-y0) == 1) return(1);
+   if ((grid[y0][x0]%100) != 11) return(0); //return if not '9'
+      
+      //special processing for '9'
+   if ((x1 != x0) && (y1 != y0)) return(0);
+   for(d=fabs(x1-x0)+fabs(y1-y0);d>0;d--)
+      if (grid[sgn(y1-y0)*d+y0][sgn(x1-x0)*d+x0]) return(0);
+   return(1);
+}
+
+showvalmoves (turn)
+{
+   setcol(0xffffff);
+   for(y=10-1;y>=0;y--)
+      for(x=10-1;x>=0;x--)
+      {
+         if (int(grid[y][x]/100)-1 != turn) continue;
+         if (isvalmove(turn,x,y,x-1,y)) drawcone((x-.3-4.5)/5,(y-4.5)/5,-.05,-.01,(x-.7-4.5)/5,(y-4.5)/5,-.05,.00);
+         if (isvalmove(turn,x,y,x+1,y)) drawcone((x+.3-4.5)/5,(y-4.5)/5,-.05,-.01,(x+.7-4.5)/5,(y-4.5)/5,-.05,.00);
+         if (isvalmove(turn,x,y,x,y-1)) drawcone((x-4.5)/5,(y-.3-4.5)/5,-.05,-.01,(x-4.5)/5,(y-.7-4.5)/5,-.05,.00);
+         if (isvalmove(turn,x,y,x,y+1)) drawcone((x-4.5)/5,(y+.3-4.5)/5,-.05,-.01,(x-4.5)/5,(y+.7-4.5)/5,-.05,.00);
+      }
+}
+
+checkanymove (turn)
+{
+   for(y=10-1;y>=0;y--)
+      for(x=10-1;x>=0;x--)
+      {
+         if (int(grid[y][x]/100)-1 != turn) continue;
+         if (isvalmove(turn,x,y,x-1,y)) return;
+         if (isvalmove(turn,x,y,x+1,y)) return;
+         if (isvalmove(turn,x,y,x,y-1)) return;
+         if (isvalmove(turn,x,y,x,y+1)) return;
+      }
+   if (!turn) { playtext(",red cannot move. Blue wins!"); ready[1] = 2; }
+         else { playtext(",blue cannot move. Red wins!"); ready[0] = 2; }
+}
+
+movepc (x0, y0, x1, y1)
+{
+   if (grid[y1][x1] >= 100)
+   {
+      result = getresult(grid[y0][x0]%100,grid[y1][x1]%100);
+           if (result >  0) { grid[y1][x1] = grid[y0][x0]; seen[y1][x1] = 2; }
+      else if (result == 0) { grid[y1][x1] = 0;            seen[y1][x1] = 0; }
+      else if (result <  0) {                              seen[y1][x1] = 2; }
+   }
+   else
+   {
+      result = -2;
+      grid[y1][x1] = grid[y0][x0]; seen[y1][x1] = seen[y0][x0];
+      if (!seen[y1][x1]) seen[y1][x1] = 1; //is mover
+      if (fabs(x1-x0) + fabs(y1-y0) > 1) seen[y1][x1] = 2; //must be 9
+   }
+   grid[y0][x0] = 0; seen[y0][x0] = 0;
+   return(result);
+}
+
+getcompmove (turn, &bx0, &by0, &bx1, &by1, dep)
+{
+   static dirx[4] = {-1,+1,0,0}, diry[4] = {0,0,-1,+1};
+   auto mx0[244], my0[244], mx1[244], my1[244]; //# moves guaranteed <= 244
+   auto othfrq[12];
+   
+   for(i=0;i<12;i++) othfrq[i] = 0;
+   mn = 0;
+   for(y=10-1;y>=0;y--)
+      for(x=10-1;x>=0;x--)
+      {
+         pc = grid[y][x];
+         if (int(pc/100)-1 == 1-turn) othfrq[pc%100]++;
+         if (int(pc/100)-1 !=   turn) continue;
+         for(d=4-1;d>=0;d--)
+         {
+            if (!isvalmove(turn,x,y,x+dirx[d],y+diry[d])) continue;
+            mx0[mn] = x; my0[mn] = y; mx1[mn] = x+dirx[d]; my1[mn] = y+diry[d]; mn++;
+         }
+      }
+
+   bestsc = -1e32; besti = int(mn*rnd); bestn = 0;
+   for(i=mn-1;i>=0;i--)
+   {
+      x0 = mx0[i]; y0 = my0[i]; x1 = mx1[i]; y1 = my1[i];
+      
+      if (grid[y1][x1] < 100) sc = 0;
+      else
+      {
+         pc0 = grid[y0][x0]%100;
+         if (seen[y1][x1] == 2)
+         {
+            pc1 = grid[y1][x1]%100;
+            sc = getresult(pc0,pc1); //sc = pcscore[pc1]*(sc>=0) - pcscore[pc0]*(sc<=0);
+         }
+         else if (seen[y1][x1] == 1)
+         {
+            sct = 0; scn = 0;
+            for(pc1=2;pc1<12;pc1++)
+            {
+               sc = getresult(pc0,pc1); //sc = pcscore[pc1]*(sc>=0) - pcscore[pc0]*(sc<=0);
+               sct += sc*othfrq[pc1]; scn += othfrq[pc1];
+            }
+            sc = sct/scn;
+         }
+         else if (seen[y1][x1] == 0)
+         {
+            sct = 0; scn = 0;
+            for(pc1=0;pc1<12;pc1++)
+            {
+               sc = getresult(pc0,pc1); //sc = pcscore[pc1]*(sc>=0) - pcscore[pc0]*(sc<=0);
+               sct += sc*othfrq[pc1]; scn += othfrq[pc1];
+            }
+            sc = sct/scn;
+         }
+      }
+      
+      //og0 = grid[y0][x0]; os0 = grid[y0][x0];
+      //og1 = grid[y1][x1]; os1 = grid[y1][x1];
+      //result = movepc(x0,y0,x1,y1);
+      //grid[y0][x0] = og0; grid[y0][x0] = os0;
+      //grid[y1][x1] = og1; grid[y1][x1] = os1;
+      
+      //setcol(sc*64+128,sc*64+128,sc*64+128);
+      //drawcone((x0-4.5)/5,(y0-4.5)/5,-.15,-.02,(x1-4.5)/5,(y1-4.5)/5,-.15,-.02);
+
+      if (sc == bestsc) { bestn++; if (int(bestn*rnd) == 0) besti = i; }
+      if (sc > bestsc) { bestsc = sc; besti = i; bestn = 1; }
+   }
+      
+   bx0 = mx0[besti]; by0 = my0[besti]; bx1 = mx1[besti]; by1 = my1[besti]; return(1);
+}
+
+movepc4bak (x0, y0, x1, y1)
+{
+   if (grid[y1][x1] >= 100) result = getresult(grid[y0][x0]%100,grid[y1][x1]%100); else result = 1;
+   if (result == 0) grid[y1][x1] = 0;
+   if (result >  0) grid[y1][x1] = grid[y0][x0];
+   grid[y0][x0] = 0;
+}
+getcompmove_cheat (turn, &bx0, &by0, &bx1, &by1, dep)
+{
+   static dirx[4] = {-1,+1,0,0}, diry[4] = {0,0,-1,+1};
+   auto mx0[244], my0[244], mx1[244], my1[244]; //# moves guaranteed <= 244
+   
+   mn = 0;
+   for(y=10-1;y>=0;y--)
+      for(x=10-1;x>=0;x--)
+         for(d=4-1;d>=0;d--)
+            if (isvalmove(turn,x,y,x+dirx[d],y+diry[d]))
+               { mx0[mn] = x; my0[mn] = y; mx1[mn] = x+dirx[d]; my1[mn] = y+diry[d]; mn++; }
+
+   bestsc = -1e32; besti = int(mn*rnd); bestn = 0;
+   for(i=mn-1;i>=0;i--)
+   {
+      x0 = mx0[i]; y0 = my0[i]; x1 = mx1[i]; y1 = my1[i];
+      if (grid[y1][x1] < 100) sc = 0; else sc = getresult(grid[y0][x0]%100,grid[y1][x1]%100);
+      if (dep < 2)
+      {
+         og0 = grid[y0][x0]; og1 = grid[y1][x1]; movepc4bak(x0,y0,x1,y1);
+         sc -= getcompmove_cheat(1-turn,&nx0,&ny0,&nx1,&ny1,dep+1);
+         grid[y0][x0] = og0; grid[y1][x1] = og1;
+      }
+      if (sc == bestsc) { bestn++; if (int(bestn*rnd) == 0) besti = i; }
+      if (sc > bestsc) { bestsc = sc; besti = i; bestn = 1; }
+   }
+   bx0 = mx0[besti]; by0 = my0[besti]; bx1 = mx1[besti]; by1 = my1[besti]; return(bestsc);
+}

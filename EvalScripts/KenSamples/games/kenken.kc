@@ -1,0 +1,930 @@
+struct
+{
+   o, //ALU operation (ASCII code ' ','+','-','*','/')
+   v, //value of ALU op
+   r, //1=wall on right
+   d  //1=wall on down
+} cel_t;
+#define CELMAX 12
+static cel_t cel[CELMAX][CELMAX];
+static bsrifpow2[2^(CELMAX+1)], pow2[32];
+static testbit[2^(CELMAX+1)][16];
+
+()
+{
+   static rp[CELMAX][CELMAX]; //possible value mask (init:(2^n-1)*2,solved=pow2)
+   static got[CELMAX][CELMAX], xpos[CELMAX^2], ypos[CELMAX^2], oval[CELMAX][CELMAX];
+   static cel_t ocel[CELMAX][CELMAX];
+
+   for(i=0,j=1;i<32;i++,j+=j) pow2[i] = j;
+   for(i=0;i<2^(CELMAX+1);i++) bsrifpow2[i] = 0;
+   for(i=1;i<=CELMAX;i++) bsrifpow2[pow2[i]] = i;
+   for(i=0;i<2^(CELMAX+1);i++)
+      for(j=0;j<16;j++)
+         testbit[i][j] = ((i%pow2[j+1]) >= pow2[j]);
+   
+   keystatus[0x1c] = 0;
+   showtext = 0;
+
+   boardsiz = 5; //{2..CELMAX}
+   editor = 0; //set to 1 to make own kenken; press: number, operator, arrows, enter
+   maxcellarea = 4; //largest area cell (2=easy, 4=default, >4=harder)
+   hints = 1;
+   
+   obstatus = bstatus;
+restart:;
+   maxcellarea = min(maxcellarea,9); //convert 1e32 hack back to 9
+   currow = 0;
+   while (1)
+   {
+      tim = klock();
+
+      i = keystatus[0xcd]-keystatus[0xcb];
+      if (i)
+      {
+         keystatus[0xcb] = 0; keystatus[0xcd] = 0; 
+         if (currow == 0) boardsiz = min(max(boardsiz+i,2),CELMAX);
+         if (currow == 1) maxcellarea = min(max(maxcellarea+i,2),9);
+         if (currow == 2) hints = min(max(hints+i,0),1);
+         if (currow == 3) editor = min(max(editor+i,0),1);
+      }
+      i = keystatus[0xd0]-keystatus[0xc8];
+      if (i)
+      {
+         keystatus[0xc8] = 0; keystatus[0xd0] = 0;
+         currow = min(max(currow+i,0),3);
+      }
+      for(i=2;i<=CELMAX;i++)
+         if (keystatus[i+1])
+         {
+            keystatus[i+1] = 0;
+            if (currow == 0) boardsiz = i;
+            if (currow == 1) maxcellarea = i;
+         }
+      if (keystatus[0x1c] || keystatus[0x9c]) { break; } //Enter
+      
+      cls(0x403020);
+      
+      setfont(xres*.045,yres*.11,1);
+      setcol(0x205060); moveto(xres*.230,yres*.027); printf("KenKen by Ken");
+      setcol(0x407080); moveto(xres*.233,yres*.030); printf("KenKen by Ken");
+      
+      setcol(0x202020);
+      drawcone(xres*.15,yres*.26,yres*.11,
+               xres*.85,yres*.26,yres*.11);
+      drawcone(xres*.15,yres*.50,yres*.11,
+               xres*.85,yres*.50,yres*.11);
+     
+      curscol = int(sin(tim*16)*32+223)*0x10101;
+      sc = xres/10;
+      if (currow < 2)
+      {
+         if (currow == 0) i = boardsiz; else i = maxcellarea;
+         setcol(curscol);
+         drawsph((i-.5)*sc,(currow*.24 + .28)*yres,sc*.5);
+      }
+      for(y=0;y<2;y++)
+         for(i=2;i<=CELMAX;i++)
+         {
+            if ((y) && (i > 9)) continue;
+            sx = (i-.5)*sc;
+            sy = (y*.24 + .28)*yres;
+            setcol(0xa08060);
+            if (((y == 0) && (i == boardsiz)) ||
+                ((y == 1) && (i == maxcellarea) && (!editor))) setcol(0xe0e020);
+            if (i > 9) continue;
+            drawsph(sx,sy,sc*.45);
+            if ((bstatus%2) > (obstatus%2))
+               if ((mousx-sx)^2 + (mousy-sy)^2 < (sc*.45)^2)
+               {
+                  if (y == 0) { boardsiz = i; currow = 0; } 
+                         else { maxcellarea = i; currow = 1; }
+               }
+            
+            setfont(sc*.55,sc*.95,1); j = (i%10)+'0'; if ((i == 9) && (y)) j = '+';
+            setcol(0x805040); moveto(sx-sc*.270,sy-sc*.330); printchar(j);
+            setcol(0xffa080); moveto(sx-sc*.240,sy-sc*.300); printchar(j);
+         }
+      setfont(xres*.03,yres*.08,1); setcol(0x808080);
+      moveto(xres*.43,yres*.16); printf("Size:");
+      moveto(xres*.32,yres*.40); printf("Max Cell Area:");
+      
+      if (((bstatus%2) > (obstatus%2)) && (fabs(mousy-yres*.68) < yres*.06))
+      {
+         if (inscone(mousx,mousy,xres*.24,yres*.71,yres*.07,xres*.47,yres*.71,yres*.07))
+            { hints = 0; currow = 2; }
+         if (inscone(mousx,mousy,xres*.60,yres*.71,yres*.07,xres*.81,yres*.71,yres*.07))
+            { hints = 1; currow = 2; }
+      }
+      if (currow == 2)
+      {
+         setcol(curscol);
+         if (hints == 0) drawcone(xres*.24,yres*.71,yres*.07,xres*.47,yres*.71,yres*.07);
+         if (hints == 1) drawcone(xres*.60,yres*.71,yres*.07,xres*.81,yres*.71,yres*.07);
+      }
+      if (hints == 0) setcol(0xe0e020); else setcol(0x202020);
+      drawcone(xres*.24,yres*.71,yres*.06,xres*.47,yres*.71,yres*.06);
+      if (hints == 1) setcol(0xe0e020); else setcol(0x202020);
+      drawcone(xres*.60,yres*.71,yres*.06,xres*.81,yres*.71,yres*.06);
+      setfont(xres*.03,yres*.08,1); setcol(0x808080);
+      moveto(xres*.22,yres*.68); printf("Hints off");
+      moveto(xres*.59,yres*.68); printf("Hints on");
+
+      if (((bstatus%2) > (obstatus%2)) && (fabs(mousy-yres*.88) < yres*.06))
+      {
+         if (inscone(mousx,mousy,xres*.27,yres*.88,yres*.07,xres*.47,yres*.88,yres*.07))
+            { editor = 0; break; }
+         if (inscone(mousx,mousy,xres*.60,yres*.88,yres*.07,xres*.72,yres*.88,yres*.07))
+            { editor = 1; break; }
+      }
+      if (currow == 3)
+      {
+         setcol(curscol);
+         if (editor == 0) drawcone(xres*.27,yres*.88,yres*.07,xres*.47,yres*.88,yres*.07);
+         if (editor == 1) drawcone(xres*.60,yres*.88,yres*.07,xres*.72,yres*.88,yres*.07);
+      }
+      if (editor == 0) setcol(0xe0e020); else setcol(0x202020);
+      drawcone(xres*.27,yres*.88,yres*.06,xres*.47,yres*.88,yres*.06);
+      if (editor == 1) setcol(0xe0e020); else setcol(0x202020);
+      drawcone(xres*.60,yres*.88,yres*.06,xres*.72,yres*.88,yres*.06);
+      setfont(xres*.03,yres*.08,1); setcol(0x808080);
+      moveto(xres*.25,yres*.85); printf("Generate");
+      moveto(xres*.60,yres*.85); printf("Edit");
+
+      obstatus = bstatus; refresh();
+   }
+   if (maxcellarea == 9) maxcellarea = 1e32;
+
+#if 0
+   n = 5; //simplest puzzle?
+   cel[0][0].o = '+'; cel[0][0].v = 8;
+   cel[2][0].o = '*'; cel[2][0].v = 20736000;
+   cel[4][3].o = '*'; cel[4][3].v = 15;
+   cel[2][4].o = ' '; cel[2][4].v = 5;
+   cel[0][0].d = 1; cel[1][0].r = 1; cel[0][1].r = 1; cel[1][1].r = 1;
+   cel[1][1].d = 1; cel[2][3].d = 1; cel[4][2].d = 1; cel[3][3].r = 1;
+   cel[1][4].r = 1; cel[2][4].r = 1; cel[3][4].r = 1;   
+#endif
+
+   bstatus = 0;
+
+   if (editor == 0)
+   {
+      srand(((klock(-1)*1000)%2^15)*2^16);
+      
+      n = boardsiz;
+      for(y=0;y<n;y++)
+         for(x=0;x<n;x++)
+         {
+            cel[x][y].o = ' ';
+            cel[x][y].v = ((x-y)%n)+1;
+            cel[x][y].r = 1;
+            cel[x][y].d = 1;
+         }
+      for(c=n*n*2;c>0;c--)
+      {
+         do { i0 = int(n*rnd); i1 = int(n*rnd); } while (i0 == i1);
+         s = (rnd < .5);
+         for(i=n-1;i>=0;i--)
+         {
+            if (s) {t=cel[i][i0].v;cel[i][i0].v=cel[i][i1].v;cel[i][i1].v=t;}
+              else {t=cel[i0][i].v;cel[i0][i].v=cel[i1][i].v;cel[i1][i].v=t;}
+         }
+      }
+      for(y=0;y<n;y++) for(x=0;x<n;x++) oval[x][y] = cel[x][y].v;
+      while (1)
+      {
+         tim = klock();
+         if (bstatus) { bstatus = 0; break; }
+         
+         do
+         {
+            for(y=0;y<n;y++) for(x=0;x<n;x++) ocel[x][y] = cel[x][y];
+            
+               //remove random wall
+            do
+            {
+               broke = 0;
+               if (rnd < .5)
+               {     //remove horz wall
+                  xx = int(n*rnd); yy = int((n-1)*rnd);
+                  if (cel[xx][yy].d) { cel[xx][yy].d = 0; broke = 1; }
+               }
+               else
+               {     //remove vert wall
+                  xx = int((n-1)*rnd); yy = int(n*rnd);
+                  if (cel[xx][yy].r) { cel[xx][yy].r = 0; broke = 1; }
+               }
+            } while (!broke);
+                  
+               //floodfill area
+            for(y=0;y<n;y++) for(x=0;x<n;x++) got[x][y] = 0;
+            xpos[0] = xx; ypos[0] = yy; r = 0; w = 1; got[xx][yy] = 1;
+            while (r < w)
+            {
+               x = xpos[r]; y = ypos[r]; r++;
+               for(i=4-1;i>=0;i--)
+               {
+                  if (i < 2) { nx = i*2-1+x; ny = y; }
+                        else { nx = x; ny = i*2-5+y; }
+                  if ((min(nx,ny) < 0) || (max(nx,ny) >= n)) continue;
+                  if (got[nx][ny]) continue;
+                  if (i < 2) { if (cel[x+i-1][y].r) continue; }
+                        else { if (cel[x][y+i-3].d) continue; }
+                  xpos[w] = nx; ypos[w] = ny; w++; got[nx][ny] = 1;
+               }
+            }
+            if (w > maxcellarea)
+            {
+               for(y=0;y<n;y++) for(x=0;x<n;x++) cel[x][y] = ocel[x][y];
+               continue; //limit area (for easier puzzle)
+            }
+         
+               //Clean up unnecessary stray walls
+            for(y=1;y<n;y++)
+               for(x=1;x<n;x++)
+               {
+                  v = cel[x-1][y-1].r + cel[x][y-1].d
+                    + cel[x-1][y-1].d + cel[x-1][y].r;
+                  if (v != 1) continue;
+                  cel[x-1][y-1].r = 0; cel[x][y-1].d = 0;
+                  cel[x-1][y-1].d = 0; cel[x-1][y].r = 0;
+               }
+            
+            if (w > 2) o = 2;
+            else
+            {
+               o = 3;
+               v0 = oval[xpos[0]][ypos[0]];
+               v1 = oval[xpos[1]][ypos[1]];
+               if (!(max(v0,v1)%min(v0,v1))) o = 4;
+            }
+            o = int(o*rnd);
+            if (o == 0)
+            {
+               o = '+';
+               for(v=0,i=0;i<w;i++) v += oval[xpos[i]][ypos[i]];
+            }
+            else if (o == 1)
+            {
+               o = '*';
+               for(v=1,i=0;i<w;i++) v *= oval[xpos[i]][ypos[i]];
+            }
+            else
+            {
+               v0 = oval[xpos[0]][ypos[0]];
+               v1 = oval[xpos[1]][ypos[1]];
+               if (o == 2) { o = '-'; v = fabs(v1-v0); }
+                      else { o = '/'; v = max(v0,v1)/min(v0,v1); }
+            }
+            for(i=0;i<w;i++)
+            {
+               cel[xpos[i]][ypos[i]].o = o;
+               cel[xpos[i]][ypos[i]].v = v;
+            }
+               
+            for(y=0;y<n;y++) for(x=0;x<n;x++) rp[x][y] = (pow2[n]-1)*2;
+            if (comp_solve(rp,n) != 1)
+            {
+               for(y=0;y<n;y++) for(x=0;x<n;x++) cel[x][y] = ocel[x][y];
+            }
+         } while (klock() < tim+.08);
+         
+         cls(0x60a080);
+         sc = min(xres,yres)/n; xof = (xres-sc*n)/2; yof = (yres-sc*n)/2;
+         nsols = -1;
+         drawboard(rp,n,sc,xof,yof,-1,-1,-1);
+         
+         if (keystatus[0x0f]) { keystatus[0x0f] = 0; showtext = 1-showtext; } //Tab
+         if (showtext) { setcol(0xffffff); moveto(0,0); setfont(8,12); }
+         drawtext(showtext,5,3,n);
+         
+         refresh();
+      }
+   }
+   else
+   {
+         //Fast editor; exit to game mode using Tab
+      n = boardsiz;
+      for(y=0;y<n;y++)
+         for(x=0;x<n;x++)
+         {
+            cel[x][y].o = ' ';
+            cel[x][y].v = 0;
+            cel[x][y].r = 1;
+            cel[x][y].d = 1;
+         }
+      cx = 0; cy = 0; latched = 0;
+      while (1)
+      {
+         tim = klock();
+         
+         if (keystatus[0xcb])
+         {
+            keystatus[0xcb] = 0;
+            if (cx >   0) { cx--; if (latched) cel[cx][cy].r = 0; }
+         }
+         if (keystatus[0xcd])
+         {
+            keystatus[0xcd] = 0;
+            if (cx < n-1) { if (latched) cel[cx][cy].r = 0; cx++; }
+         }
+         if (keystatus[0xc8])
+         {
+            keystatus[0xc8] = 0;
+            if (cy >   0) { cy--; if (latched) cel[cx][cy].d = 0; }
+         }
+         if (keystatus[0xd0])
+         {
+            keystatus[0xd0] = 0;
+            if (cy < n-1) { if (latched) cel[cx][cy].d = 0; cy++; }
+         }
+         for(i=0;i<10;i++)
+            if (keystatus[((i-1)%10)+2])
+            {
+               keystatus[((i-1)%10)+2] = 0;
+               cel[cx][cy].v = cel[cx][cy].v*10+i;
+            }
+         if (keystatus[0x0e]) //Backspace
+         {
+            keystatus[0x0e] = 0;
+            cel[cx][cy].v = int(cel[cx][cy].v/10);
+         }
+         if (keystatus[0xd3]) //Del
+         {
+            keystatus[0xd3] = 0;
+            latched = 0;
+            cel[cx][cy].v = 0;
+            cel[cx][cy].o = ' ';
+            cel[cx][cy].r = 1;
+            cel[cx][cy].d = 1;
+            cel[max(cx-1,0)][cy].r = 1;
+            cel[cx][max(cy-1,0)].d = 1;
+         }
+         if (keystatus[0x4e]) { cel[cx][cy].o = '+'; latched = 1; }
+         if (keystatus[0x0d]) { cel[cx][cy].o = '+'; latched = 1; }
+         if (keystatus[0x0c]) { cel[cx][cy].o = '-'; latched = 1; }
+         if (keystatus[0x4a]) { cel[cx][cy].o = '-'; latched = 1; }
+         if (keystatus[0x37]) { cel[cx][cy].o = '*'; latched = 1; }
+         if (keystatus[0x2d]) { cel[cx][cy].o = '*'; latched = 1; }
+         if (keystatus[0x35]) { cel[cx][cy].o = '/'; latched = 1; }
+         if (keystatus[0xb5]) { cel[cx][cy].o = '/'; latched = 1; }
+         if (keystatus[0x39]) { cel[cx][cy].o = ' '; latched = 1; }
+         if (keystatus[0x1c] || keystatus[0x9c]) { latched = 0; } //Enter
+         if (keystatus[0x0f]) break; //Tab
+         
+         cls(0x60a080);
+         sc = min(xres,yres)/n; xof = (xres-sc*n)/2; yof = (yres-sc*n)/2;
+         mx = floor((mousx-xof)/sc);
+         my = floor((mousy-yof)/sc);
+         if (bstatus%2)
+         {
+            bstatus -= 1;
+            mx = floor((mousx-xof)/sc);
+            my = floor((mousy-yof)/sc);
+            if ((min(mx,my) >= 0) && (max(mx,my) < n))
+            {
+               cx = min(max(mx,0),n-1);
+               cy = min(max(my,0),n-1);
+            }
+         }
+   
+         nsols = -1;
+         drawboard(rp,n,sc,xof,yof,cx,cy,tim);
+         
+         if (latched) setcol(0xffffff); else setcol(0x807060);
+         drawcone((cx+0)*sc+xof,(cy+0)*sc+yof,sc*.01,
+                  (cx+1)*sc+xof,(cy+0)*sc+yof,sc*.01);
+         drawcone((cx+0)*sc+xof,(cy+1)*sc+yof,sc*.01,
+                  (cx+1)*sc+xof,(cy+1)*sc+yof,sc*.01);
+         drawcone((cx+0)*sc+xof,(cy+0)*sc+yof,sc*.01,
+                  (cx+0)*sc+xof,(cy+1)*sc+yof,sc*.01);
+         drawcone((cx+1)*sc+xof,(cy+0)*sc+yof,sc*.01,
+                  (cx+1)*sc+xof,(cy+1)*sc+yof,sc*.01);
+   
+         refresh();
+      }
+   }
+
+   nsols = -1; bstatus = 0; refval = 1;
+   for(y=0;y<n;y++) for(x=0;x<n;x++) rp[x][y] = (pow2[n]-1)*2;
+   while (1)
+   {
+      tim = klock();
+
+         //Render..
+      if ((nsols < 0) && (refval == 0)) bcol = 0xc00000;
+                                   else bcol = 0x807060;
+      cls(bcol);
+      
+      sc = min(xres,yres)/n; xof = (xres-sc*n)/2; yof = (yres-sc*n)/2;
+      fmx = (mousx-xof)/sc; mx = floor(fmx); fmx -= mx;
+      fmy = (mousy-yof)/sc; my = floor(fmy); fmy -= my;
+      drawboard(rp,n,sc,xof,yof,mx,my,tim);
+      
+         //manual user interaction
+      if ((mx >= 0) && (my >= 0) && (mx < n) && (my < n))
+      {
+         j = 0;
+         for(i=1;i<=n;i++)
+         {
+            j += testbit[rp[mx][my]][i];
+            if (keystatus[i+1])
+            {
+               keystatus[i+1] = 0;
+               if (keystatus[0x2a] || keystatus[0x36])
+               {
+                  if (testbit[rp[mx][my]][i]) rp[mx][my] -= pow2[i];
+                                         else rp[mx][my] += pow2[i];
+               } else { rp[mx][my] = pow2[i]; }
+            }
+         }
+         if (keystatus[0xd3]) //Del
+         {
+            keystatus[0xd3] = 0;
+            nsols = -1;
+            for(y=0;y<n;y++) for(x=0;x<n;x++) rp[x][y] = (pow2[n]-1)*2;
+         }
+         
+         v = rp[mx][my]; c = 0;
+         for(i=1;i<=n;i++)
+         {
+            if (!testbit[v][i]) continue;
+            x = .2+(c%((n>10)+3))*.2;
+            y = .3+int(c/((n>10)+3))*.18; c++;
+            if ((fmx >= x-.06) && (fmx < x+.13) &&
+                (fmy >= y-.05) && (fmy < y+.12))
+            {
+               setcol(0x000000);
+               if (j > 1) drawsph((x+.03+mx)*sc+xof,(y+.07+my)*sc+yof,sc*-.11);
+               if (bstatus%4)
+               {
+                       if ( bstatus%2      ) { rp[mx][my]  = pow2[i]; }
+                  else if ((bstatus%4) >= 2) { rp[mx][my] -= pow2[i]; }
+                  bstatus = 0; break;
+               }
+            }
+         }
+      }
+
+      if (keystatus[0x39]) { keystatus[0x39] = 0; hints = 1-hints; } //Spc
+      if (keystatus[0x1c] || keystatus[0x9c]) //Enter
+      {
+         keystatus[0x1c] = 0; keystatus[0x9c] = 0;
+         for(y=0;y<n;y++) for(x=0;x<n;x++) rp[x][y] = (pow2[n]-1)*2;
+         t0 = klock(); nsols = comp_solve(rp,n);
+         t1 = klock();
+      }
+      if (nsols >= 0)
+      {
+         setfont(8,12); setcol(0xffffff); moveto(xres-256,0);
+         printf("%.3f ms, ",(t1-t0)*1e3);
+              if (nsols == 0) printf("no solution :/");
+         else if (nsols == 1) printf("1 solution :)");
+         else                 printf(">=2 solutions :/");
+      }
+      else if (hints) refval = comp_refine(rp,n);
+      else refval = 1;
+
+         //Ctrl+Backspace: restart with same options
+      if (keystatus[0x0e] && (keystatus[0x1d] || keystatus[0x9d])) goto restart;
+      
+      if (keystatus[0x0f]) { keystatus[0x0f] = 0; showtext = 1-showtext; } //Tab
+      if (showtext) { setcol(0xffffff); moveto(0,0); setfont(8,12); }
+      drawtext(showtext,5,3,n);
+
+      Sleep(15);
+      refresh();
+   }
+}
+
+drawtext (mode, xsc, ysc, n)
+{
+   y = -1; goto in2y;
+   for(;y<n;y++)
+   {
+      for(j=0;j<ysc-1;j++)
+      {
+         if (mode) fprintf("|"); else fputc(179);
+         for(x=0;x<n;x++)
+         {
+            if ((j == 0) && (cel[x][y].v > 0))
+            {
+               k = int(log(cel[x][y].v+.5,10));
+               for(i=0;i<xsc-1;i++)
+               {
+                  if (i <= k)
+                  {
+                     v = int(cel[x][y].v/10^(k-i))%10;
+                     if (mode) fprintf("%g",v); else fputc(v+48);
+                  }
+                  else if (i == k+1)
+                  {
+                     if (mode)
+                     {
+                             if (cel[x][y].o == '+') fprintf("+");
+                        else if (cel[x][y].o == '*') fprintf("*");
+                        else if (cel[x][y].o == '-') fprintf("-");
+                        else if (cel[x][y].o == '/') fprintf("/");
+                        else fprintf(" ");
+                     } else fputc(cel[x][y].o);
+                  }
+                  else
+                  {
+                     if (mode) fprintf(" "); else fputc(32);
+                  }
+               }
+            }
+            else
+            {
+               for(i=0;i<xsc-1;i++) { if (mode) fprintf(" "); else fputc(32); }
+            }
+            if (cel[x][y].r)
+            {
+               if (mode) fprintf("|"); else fputc(179);
+            } else { if (mode) fprintf(" "); else fputc(32); }
+         }
+         if (mode) fprintf("\n"); else { fputc(13); fputc(10); }
+      }
+in2y:;
+      x = -1; goto in2x;
+      for(;x<n;x++)
+      {
+         for(i=0;i<xsc-1;i++)
+         {
+            if ((y < 0) || (cel[x][y].d))
+            {
+               if (mode) fprintf("-"); else fputc(196);
+            }
+            else { if (mode) fprintf(" "); else fputc(32); }
+         }
+in2x:;      //  4
+            //1   2
+            //  8
+         legs = 15;
+         if ((x <    0) || ((y >= 0) && (!cel[x  ][y  ].d))) legs -= 1;
+         if ((x == n-1) || ((y >= 0) && (!cel[x+1][y  ].d))) legs -= 2;                  
+         if ((y <    0) || ((x >= 0) && (!cel[x  ][y  ].r))) legs -= 4;
+         if ((y == n-1) || ((x >= 0) && (!cel[x  ][y+1].r))) legs -= 8;
+              if (!legs) { if (mode) fprintf(" "); else fputc(32); }
+         else if (mode) fprintf("+");
+         else
+         {
+            static linedrawlut[16] =
+            {
+               197,197,197,196, 197,217,192,193,
+               197,191,218,194, 179,180,195,197,
+            };
+            fputc(linedrawlut[legs]);
+         }
+      }
+      if (mode) fprintf("\n"); else { fputc(13); fputc(10); }
+   }
+}
+
+drawboard (rp[CELMAX][CELMAX], n, sc, xof, yof, mx, my, tim)
+{
+   static got[CELMAX][CELMAX], xpos[CELMAX^2], ypos[CELMAX^2];
+   
+   for(y=0;y<n;y++) for(x=0;x<n;x++) got[x][y] = 0;
+   cnt = 0;
+   for(y=0;y<n;y++)
+      for(x=0;x<n;x++)
+      {
+         if (got[x][y]) continue;
+         xpos[0] = x; ypos[0] = y; r = 0; w = 1; cnt++; got[x][y] = cnt;
+         while (r < w)
+         {
+            xx = xpos[r]; yy = ypos[r]; r++;
+            for(i=4-1;i>=0;i--)
+            {
+               if (i < 2) { nx = i*2-1+xx; ny = yy; }
+                     else { nx = xx; ny = i*2-5+yy; }
+               if ((min(nx,ny) < 0) || (max(nx,ny) >= n)) continue;
+               if (got[nx][ny]) continue;
+               if (i < 2) { if (cel[xx+i-1][yy].r) continue; }
+                     else { if (cel[xx][yy+i-3].d) continue; }
+               cel[nx][ny].o = cel[x][y].o;
+               cel[nx][ny].v = -fabs(cel[x][y].v);
+               xpos[w] = nx; ypos[w] = ny; w++; got[nx][ny] = cnt;
+            }
+         }
+         
+         for(i=w-1;i>=0;i--)
+         {
+            xx = xpos[i]; yy = ypos[i];
+            if ((mx == xx) && (my == yy)) acol = sin(tim*16)*16+16;
+                                     else acol = 0;
+            setcol((cnt* 67+34)%96+128+acol,
+                   (cnt*119+74)%96+128+acol,
+                   (cnt* 70+86)%96+128+acol);
+            drawrectfill((xx+0)*sc+xof,(yy+0)*sc+yof,
+                         (xx+1)*sc+xof,(yy+1)*sc+yof);
+         }
+         cel[xx][yy].v = fabs(cel[xx][yy].v);
+         o = cel[xx][yy].o; v = cel[xx][yy].v;
+         setcol(0);
+         moveto((xx+.1)*sc+xof,(yy+.1)*sc+yof);
+         setfont(sc*.10,sc*.18,1);
+         if (o == ' ') { printf("%.f",v); }
+         if (o == '+') { printf("%.f+",v); }
+         if (o == '-') { printf("%.f-",v); }
+         if (o == '*') { printf("%.f*",v); }
+         if (o == '/') { printf("%.f/",v); }
+      }
+
+   setcol(0); r0 = .5; r1 = sc*.05;
+   for(x=0;x<=n;x++) drawcone(x*sc+xof,0*sc+yof,r0,
+                              x*sc+xof,n*sc+yof,r0);
+   for(y=0;y<=n;y++) drawcone(0*sc+xof,y*sc+yof,r0,
+                              n*sc+xof,y*sc+yof,r0);
+   drawcone(0*sc+xof,0*sc+yof,r1,n*sc+xof,0*sc+yof,r1);
+   drawcone(0*sc+xof,n*sc+yof,r1,n*sc+xof,n*sc+yof,r1);
+   drawcone(0*sc+xof,0*sc+yof,r1,0*sc+xof,n*sc+yof,r1);
+   drawcone(n*sc+xof,0*sc+yof,r1,n*sc+xof,n*sc+yof,r1);
+   setfont(sc*.1,sc*.15,1);
+   for(y=0;y<n;y++)
+      for(x=0;x<n;x++)
+      {
+         if (cel[x][y].r > 0)
+            drawcone((x+1)*sc+xof,(y+0)*sc+yof,r1,
+                     (x+1)*sc+xof,(y+1)*sc+yof,r1);
+         if (cel[x][y].d > 0)
+            drawcone((x+0)*sc+xof,(y+1)*sc+yof,r1,
+                     (x+1)*sc+xof,(y+1)*sc+yof,r1);
+
+         if (tim < 0) continue;
+         v = rp[x][y];
+         if (bsrifpow2[v])
+         {
+            setfont(sc*.40,sc*.72,1);
+            moveto((x+.3-(v>=1024)*.2)*sc+xof,(y+.3)*sc+yof);
+            printf("%g",bsrifpow2[v]);
+         }
+         else
+         {
+            x0 = (x+.2)*sc + xof; xx = 0;
+            y0 = (y+.3)*sc + yof; yy = 0;
+            for(i=1;i<=n;i++)
+            {
+               if (!testbit[v][i]) continue;
+               moveto(x0+xx*sc*.20,y0+yy*sc*.18);
+               setfont(sc*.10,sc*.18,0);
+               if (i < 10) printf("%g",i);
+                      else printchar(i+'A'-10);
+               xx++; if (xx >= (n>10)+3) { xx = 0; yy++; }
+            }
+         }
+      }
+}
+
+drawrectfill (x0, y0, x1, y1)
+   { for(y=int(y0);y<y1;y++) { moveto(x0,y); lineto(x1,y); } }
+
+comp_refine (rp[CELMAX][CELMAX], n)
+{
+   static xpos[CELMAX^2], ypos[CELMAX^2], got[CELMAX][CELMAX];
+   
+   do
+   {
+      refined = 0;
+   
+         //ALU constraints not requiring floodfill search
+      for(y=0;y<n;y++)
+         for(x=0;x<n;x++)
+         {
+            v = fabs(cel[x][y].v);
+            if (cel[x][y].o == ' ')
+            {
+               if (!bsrifpow2[rp[x][y]])
+                  { rp[x][y] = pow2[v]; refined = 1; }
+            }
+            else if (cel[x][y].o == '*')
+            {
+               for(i=1;i<=n;i++)
+                  if ((testbit[rp[x][y]][i]) && (v%i))
+                     { rp[x][y] -= pow2[i]; refined = 1; }
+            }
+            else if (cel[x][y].o == '+')
+            {
+               for(i=1;i<=n;i++)
+                  if ((testbit[rp[x][y]][i]) && (i >= v))
+                     { rp[x][y] -= pow2[i]; refined = 1; }
+            }
+            else if (cel[x][y].o == '/')
+            {
+                  //   v:
+                  //n: 2/     3/    4/   5/ 6/ 7/ 8/ 9/
+                  //3: 12     13
+                  //4: 124    13    14
+                  //5: 124    13    14   15
+                  //6: 12346  1236  14   15 16
+                  //7: 12346  1236  14   15 16 17
+                  //8: 123468 1236  1248 15 16 17 18
+                  //9: 123468 12369 1248 15 16 17 18 19
+               for(i=1;i<=n;i++)
+                  if (testbit[rp[x][y]][i])
+                     if (!((i*v <= n) || (!(i%v))))
+                        { rp[x][y] -= pow2[i]; refined = 1; }
+            }
+            else if (cel[x][y].o == '-')
+            {
+               for(i=1;i<=n;i++)
+                  if (testbit[rp[x][y]][i]) 
+                     if ((i-v < 1) && (i+v > n))
+                        { rp[x][y] -= pow2[i]; refined = 1; }
+            }
+         }
+
+         //Last # on row or column
+      for(y=0;y<n;y++)
+         for(i=1;i<=n;i++)
+         {
+            for(c=0,x=0;x<n;x++)
+               if (testbit[rp[x][y]][i]) { c++; xx = x; }
+            if ((c == 1) && (rp[xx][y] != pow2[i]))
+               { rp[xx][y] = pow2[i]; refined = 1; }
+            if (c == 0) return(0); //invalid puzzle
+         }
+      for(x=0;x<n;x++)
+         for(i=1;i<=n;i++)
+         {
+            for(c=0,y=0;y<n;y++)
+               if (testbit[rp[x][y]][i]) { c++; yy = y; }
+            if ((c == 1) && (rp[x][yy] != pow2[i]))
+               { rp[x][yy] = pow2[i]; refined = 1; }
+            if (c == 0) return(0); //invalid puzzle
+         }
+
+         //Solved cells knock out rest of row&column
+      for(y=0;y<n;y++)
+         for(x=0;x<n;x++)
+         {
+            v = rp[x][y]; lv = bsrifpow2[v]; if (!lv) continue;
+            for(i=0;i<n;i++)
+            {
+               if ((i != y) && (testbit[rp[x][i]][lv]))
+                  { rp[x][i] -= v; refined = 1; }
+               if ((i != x) && (testbit[rp[i][y]][lv]))
+                  { rp[i][y] -= v; refined = 1; }
+            }
+         }
+ 
+         //ALU constraints, floodfill
+      for(y=0;y<n;y++) for(x=0;x<n;x++) got[x][y] = 0;
+      for(y=0;y<n;y++)
+         for(x=0;x<n;x++)
+         {
+            if (got[x][y]) continue;
+            xpos[0] = x; ypos[0] = y; r = 0; w = 1; got[x][y] = 1;
+            while (r < w)
+            {
+               xx = xpos[r]; yy = ypos[r]; r++;
+               for(i=4-1;i>=0;i--)
+               {
+                  if (i < 2) { nx = i*2-1+xx; ny = yy; }
+                        else { nx = xx; ny = i*2-5+yy; }
+                  if ((min(nx,ny) < 0) || (max(nx,ny) >= n)) continue;
+                  if (got[nx][ny]) continue;
+                  if (i < 2) { if (cel[xx+i-1][yy].r) continue; }
+                        else { if (cel[xx][yy+i-3].d) continue; }
+                  xpos[w] = nx; ypos[w] = ny; w++; got[nx][ny] = 1;
+               }
+            }
+            for(i=w-1;i>=0;i--)
+               if (!bsrifpow2[rp[xpos[i]][ypos[i]]]) break;
+            if (i >= 0)
+            {
+               v = fabs(cel[x][y].v);
+               if (cel[x][y].o == '-')
+               {
+                  v0 = rp[xpos[0]][ypos[0]];
+                  v1 = rp[xpos[1]][ypos[1]];
+                  if (bsrifpow2[v0])
+                  {
+                     v0 = bsrifpow2[v0];
+                     for(i=1;i<=n;i++)
+                        if (testbit[rp[xpos[1]][ypos[1]]][i]) 
+                        if (fabs(i-v0) != v)
+                        { rp[xpos[1]][ypos[1]] -= pow2[i]; refined = 1; }
+                  }
+                  else if (bsrifpow2[v1])
+                  {
+                     v1 = bsrifpow2[v1];
+                     for(i=1;i<=n;i++)
+                        if (testbit[rp[xpos[0]][ypos[0]]][i]) 
+                        if (fabs(i-v1) != v)
+                        { rp[xpos[0]][ypos[0]] -= pow2[i]; refined = 1; }
+                  }
+               }
+               else if (cel[x][y].o == '/')
+               {
+                  v0 = rp[xpos[0]][ypos[0]];
+                  v1 = rp[xpos[1]][ypos[1]];
+                  if (bsrifpow2[v0])
+                  {
+                     v0 = bsrifpow2[v0];
+                     for(i=1;i<=n;i++)
+                        if (testbit[rp[xpos[1]][ypos[1]]][i]) 
+                        if ((v*i != v0) && (v*v0 != i))
+                        { rp[xpos[1]][ypos[1]] -= pow2[i]; refined = 1; }
+                  }
+                  else if (bsrifpow2[v1])
+                  {
+                     v1 = bsrifpow2[v1];
+                     for(i=1;i<=n;i++)
+                        if (testbit[rp[xpos[0]][ypos[0]]][i]) 
+                        if ((v*i != v1) && (v*v1 != i))
+                        { rp[xpos[0]][ypos[0]] -= pow2[i]; refined = 1; }
+                  }
+               }
+            }
+            else
+            {
+                  //all cells in floodfill 'solved'
+               v = fabs(cel[x][y].v);
+               if (cel[x][y].o == '+')
+               {
+                  j = 0;
+                  for(i=w-1;i>=0;i--) j += bsrifpow2[rp[xpos[i]][ypos[i]]];
+                  if (j != v) return(0);
+               }
+               else if (cel[x][y].o == '*')
+               {
+                  j = 1;
+                  for(i=w-1;i>=0;i--) j *= bsrifpow2[rp[xpos[i]][ypos[i]]];
+                  if (j != v) return(0);
+               }
+               else if (cel[x][y].o == '-')
+               {
+                  v0 = bsrifpow2[rp[xpos[0]][ypos[0]]];
+                  v1 = bsrifpow2[rp[xpos[1]][ypos[1]]];
+                  if (fabs(v0-v1) != v) return(0);
+               }
+               else if (cel[x][y].o == '/')
+               {
+                  v0 = bsrifpow2[rp[xpos[0]][ypos[0]]];
+                  v1 = bsrifpow2[rp[xpos[1]][ypos[1]]];
+                  if ((v*v1 != v0) && (v*v0 != v1)) return(0);
+               }
+            }
+         }
+      
+      for(y=0;y<n;y++) for(x=0;x<n;x++) if (!rp[x][y]) return(0);
+   } while (0); //refined);
+
+   return(1);
+}
+
+comp_solve (rp[CELMAX][CELMAX], n)
+{
+   static nrp[CELMAX^2][CELMAX][CELMAX], nxx[CELMAX^2], nyy[CELMAX^2], nii[CELMAX^2];
+   
+   comp_refine(rp,n);
+   for(y=0;y<n;y++) for(x=0;x<n;x++) nrp[0][x][y] = rp[x][y];
+   dep = 0; xx = 0; yy = 0; ii = 1; nsols = 0;
+   cnt = 0;
+   while (1)
+   {
+      cnt++; if ((cnt > 1e7) || (bstatus)) return(2);
+      if (!bsrifpow2[nrp[dep][xx][yy]])
+         if (testbit[nrp[dep][xx][yy]][ii])
+         {
+            dep++;
+            for(y=0;y<n;y++)
+               for(x=0;x<n;x++) nrp[dep][x][y] = nrp[dep-1][x][y];
+            nrp[dep][xx][yy] = pow2[ii];
+            nxx[dep] = xx; nyy[dep] = yy; nii[dep] = ii;
+            while (!comp_refine(&nrp[dep][0][0],n))
+            {
+back2it:       xx = nxx[dep]; yy = nyy[dep]; ii = nii[dep];
+               dep--; if (dep < 0) return(nsols);
+               nrp[dep][xx][yy] -= pow2[ii];
+            }
+         }
+              ii++; if (ii <=n) continue;
+      ii = 1; xx++; if (xx < n) continue;
+      xx = 0; yy++; if (yy < n) continue;
+      for(y=0;y<n;y++) for(x=0;x<n;x++) rp[x][y] = nrp[dep][x][y];
+      nsols++; if (nsols < 2) goto back2it;
+   }
+   return(nsols);
+}
+
+inscone (x, y, x0, y0, r0, x1, y1, r1)
+{
+   dx = x1-x0; dy = y1-y0;
+   d = dx*dx + dy*dy;
+   if (d)
+   {
+      t = ((x-x0)*dx + (y-y0)*dy)/d;
+      t = min(max(t,0),1);
+      nx = (x1-x0)*t + x0;
+      ny = (y1-y0)*t + y0;
+      nr = (r1-r0)*t + r0;
+      if ((x-nx)^2 + (y-ny)^2 < nr^2) return(1);
+   }
+   if ((x-x0)^2 + (y-y0)^2 < r0^2) return(1);
+   if ((x-x1)^2 + (y-y1)^2 < r1^2) return(1);
+   return(0);
+}

@@ -1,0 +1,21 @@
+(x,y,z,&r,&g,&b)
+{
+   phi = (sqrt(5)+1)/2; d = 1.07;
+   xx = sin(PI*2/5);   //sin(PI*2/5) = sqrt(phi+2)/2
+   yy = 1-cos(PI*2/5); //cos(PI*2/5) = (phi-1)/2
+   zz = xx*(phi-1);
+   if (abs(z) > d/sqrt(phi*-1.25+3.75)) return(0);
+   
+   zz *= z;
+   for(i=5;i;i--)
+   {
+      if (abs(xx*x + yy*y + zz) > d) return(0);
+      ox = xx;
+      xx = cos(PI*2/5)*xx - sin(PI*2/5)*yy;
+      yy = cos(PI*2/5)*yy + sin(PI*2/5)*ox;
+   }
+   r = x*64+128;
+   g = y*64+128;
+   b = z*64+128;
+   return(1);
+}

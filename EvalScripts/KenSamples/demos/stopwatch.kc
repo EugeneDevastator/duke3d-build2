@@ -1,0 +1,232 @@
+()
+{
+   if (numframes == 0) { playtext(" "); }
+   cls(0); //clz(1e32);
+   static t, ot = 1e32, timhak = 0, hold = 1, holdstart = -1;
+   static times[1024], ntimes = 0;
+   
+   tim = klock();
+   
+   static k39 = 1; ok39 = k39; k39 = keystatus[0x39];
+   if ((k39 > ok39) && (tim > holdstart+1))
+   {
+      hold = 1-hold;
+      if (hold == 0) playtext("<pitch middle='-10'/>Ready?");
+      else
+      {
+         for(i=.5;i<=8;i*=1.1) playsound("rulinst.wav",70,i);
+         holdstart = tim;
+         if (t >= 60)
+         {
+            if (t < 120) playtext("%g minute",int(t/60));
+                    else playtext("%g minutes",int(t/60));
+         }
+         playtext(",%.2f seconds",int((t%60)*100)/100);
+         
+         times[ntimes] = t; ntimes++;
+      }
+   }
+   if (k39 < ok39)
+   {
+      if ((hold == 0) && (tim > holdstart+1))
+         { timhak = tim; ot = -1; playtext("Go!"); }
+   }
+      //Backspace: erase last score
+   if (keystatus[0xe])
+   {
+      keystatus[0xe] = 0; 
+      if (hold == 0) { hold = 1; playsound("ouch.wav"); }
+      else if (ntimes > 0) { ntimes--; playsound("ouch.wav"); }
+   }
+   if (hold == 0) t = tim-timhak;
+   if ((hold == 0) && (k39)) t = 0;
+   while ((int(t*4) >= ot) && (k39 == 0))
+   {
+           if ((ot%8) == 0) playsound("gothit.wav",50,8);
+      else if ((ot%2) == 0) playsound("gothit.wav",10,10);
+      if (((ot+2)%4) == 0) playsound("rulinst.wav",20,8);
+      
+      static note1[16] = {65,  ,  ,65,  ,60,63,64,65,  ,  ,  ,  ,  ,  ,  ,  };
+      static note2[ 8] = {84,  ,87,82,  ,80,  ,  };
+      static note3[16] = {82,  ,80,82,  ,80,82,  ,84,  ,  ,  ,  ,  ,  ,  ,  };
+      static note4[16] = {74,  ,72,74,  ,77,79,  ,80,  ,  ,  ,  ,  ,  ,  ,  };
+          
+      if (note1[ot])
+      {
+         playsound("bass.flac",60,2^((note1[ot]-65.1)/12));
+         playsound("bass.flac",25,2^((note1[ot]-53.1)/12));
+      }
+      if ((int(ot/4)%16) >= 8)
+      {
+         if ((int(ot/4)%16) < 12)
+         {
+            if (note2[ot]) playsound("fminst.flac",70,2^((note2[ot]-77.1)/12));
+         }
+         else
+         {
+            if (note3[ot]) playsound("fminst.flac",60,2^((note3[ot]-77.1)/12));
+            if (note4[ot]) playsound("fminst.flac",60,2^((note4[ot]-77.1)/12));
+         }
+      }
+      
+      ot++;
+      if ((ot%(60*4)) == 0)
+      {
+         if (ot == 60*4) playtext("<pitch middle='-5'/><rate speed='5'/>1 minute");
+            else if (ot) playtext("<pitch middle='-5'/><rate speed='5'/>%g minutes",ot/(60*4));
+      }
+   }
+   
+      //Draw digital clock
+   ysc = xres/yres*.125;
+   if (hold == 0)
+   {
+      setcol(0x60c060); drawdigitime(0-4,yres*(.5-ysc)-4,xres-4,yres*(.5+ysc)-4,t);
+      setcol(0x80ff80); drawdigitime(0+4,yres*(.5-ysc)+4,xres+4,yres*(.5+ysc)+4,t);
+   }
+   else
+   {
+      setcol(0x804040);
+      for(i=1+(tim-t)%(1/3)-1/3;i>0;i-=1/3)
+      {
+         setcol(128-i*128,64-i*64,64-i*64);
+         drawdigitime(xres*(0+.5*i),yres*((.5-ysc)+ysc*i-.3*i),
+                      xres*(1-.5*i),yres*((.5+ysc)-ysc*i-.3*i),t);
+      }
+      setcol(0xc06060); drawdigitime(0-4,yres*(.5-ysc)-4,xres-4,yres*(.5+ysc)-4,t);
+      setcol(0xff8080); drawdigitime(0+4,yres*(.5-ysc)+4,xres+4,yres*(.5+ysc)+4,t);
+   }
+   
+      //Draw old times
+   setcol(0xa08060); setfont(8,12); printf("\n");
+   sum = 0; std = 0; mint = 1e32; maxt = 0;
+   for(i=0;i<ntimes;i++)
+   {
+      if ((i == ntimes-1) && (hold)) setcol(0xffc080);
+      moveto(int(i/12)*112,(i%12)*12);
+      tt = int(times[i]*100)/100;
+      fprintf("%3g: %g:%05.2f\n",i+1,int(tt/60),tt%60);
+      sum += tt; //times[i];
+      if (times[i] < mint) mint = times[i];
+      if (times[i] > maxt) maxt = times[i];
+   }
+   avg = sum/ntimes;
+   if (t > maxt) maxt = t;
+   if (ntimes)
+   {
+      for(i=0;i<ntimes;i++) std += (times[i]-avg)^2;
+      if (ntimes > 1) std = sqrt(std/(ntimes-1));
+
+      moveto(2,yres-64); printf("------------\n");
+      tt = int(mint*100)/100; printf("Min: %g:%05.2f\n",int(tt/60),tt%60);
+      tt = int(avg *100)/100;fprintf("Avg: %g:%05.2f\n",int(tt/60),tt%60);
+      tt = int(maxt*100)/100; printf("Max: %g:%05.2f\n",int(tt/60),tt%60);
+      tt = int(sum *100)/100; printf("Sum: %g:%05.2f\n",int(tt/60),tt%60);
+      if (maxt > 0)
+      {
+         xsc = xres*.6/maxt; xof = xres*.2;
+         
+         setfont(6,8);
+         for(i=0;i<maxt;i++)
+         {
+            x = i*xsc+xof;
+                 if ((i%60) == 0) { setcol(0xffffff); y0 = yres-24; }
+                 if ((i%10) == 0) { setcol(0xa0a0a0); y0 = yres-21;
+                                    moveto(x-floor(log(i+1,10)+1)*3,yres-9); printf("%g",i); }
+            else if ((i% 5) == 0) { setcol(0x808080); y0 = yres-18; }
+            else                  { setcol(0x606060); y0 = yres-15; }
+            moveto(x,y0); lineto(x,yres-12);
+         }
+         
+         setcol(0xa0a0a0);
+         moveto(xres*.8,yres-12);
+         lineto(xres*.2,yres-12);
+         
+         setcol(0xa08060);
+         for(i=0;i<ntimes;i++) drawsph(times[i]*xsc+xof,yres-21,-2);
+         
+         setcol(0xffffff);
+         if (hold == 0)
+         {
+            moveto(t*xsc+xof,yres-20);
+            lineto(t*xsc+xof,yres-12);
+         }
+         else drawsph(times[ntimes-1]*xsc+xof,yres-21,-2);
+         
+         if (hold == 0) //Draw live average on time bar (darker)
+         {
+            navg = (avg*ntimes+t)/(ntimes+1);
+            setcol(0x404020);
+            moveto(navg*xsc+xof,yres-23);
+            lineto(navg*xsc+xof,yres-19);
+         }
+         setcol(0xffff80); //Draw average on time bar
+         moveto(avg*xsc+xof,yres-25);
+         lineto(avg*xsc+xof,yres-17);
+         setcol(0xc0c060);
+         moveto(avg*xsc+xof-8,yres-34); printf("AVG");
+      }
+   }
+   
+      //Draw analog clock
+   cx = xres*.50;
+   cy = yres*.78;
+   rad = yres*.15+(cos(t*(PI*2))+1)^2*4;
+   setcol(0xe0e0e0); drawsph(cx,cy,rad); drawsph(cx,cy,rad*-1.03);
+   setcol(0x000000);
+   for(a=0;a<60;a++)
+   {
+      if ((a%5) == 0) nrad = rad*.85; else nrad = rad*.95;
+      moveto(cx+sin(a*(PI*2/60))*rad ,cy-cos(a*(PI*2/60))*rad );
+      lineto(cx+sin(a*(PI*2/60))*nrad,cy-cos(a*(PI*2/60))*nrad);
+   }
+   for(a=1;a<=12;a++)
+   {
+      sx = cx+sin(a*(PI*2/12))*rad*.72;
+      sy = cy-cos(a*(PI*2/12))*rad*.72;
+      setfont(rad*.16,rad*.24,1);
+      if (a < 10) { moveto(sx-rad*.08,sy-rad*.08); printchar(a+'0'); }
+      else
+      {
+         moveto(sx-rad*.13,sy-rad*.08); printchar('1');
+         moveto(sx-rad*.01,sy-rad*.08); printchar((a%10)+'0');
+      }
+   }
+   if (ntimes > 1)
+   {
+      
+      happy = min(max((avg-t)*2/std,-4),4);
+      setcol(0x404040);
+      drawsph(cx-rad*.25,cy-rad*.25,rad*.07);
+      drawsph(cx+rad*.25,cy-rad*.25,rad*.07);
+      x = 0; y = 0;
+      for(f=-5/16;f<=5/16;f+=1/16)
+      {
+         ox = x; x = cx+rad*f;
+         oy = y; y = cy+rad*.25+(cos(f)-0.98)*rad*happy;
+         if (f > -.30) drawcone(ox,oy,rad*.07,x,y,rad*.07);
+      }
+   }
+   setcol(0x000000); drawcone(cx,cy,3,cx+sin(t*(PI*2/(3600*24)))*rad*.5,cy-cos(t*(PI*2/(3600*24)))*rad*.5,3);
+   setcol(0x000000); drawcone(cx,cy,2,cx+sin(t*(PI*2/3600))*rad*.8,cy-cos(t*(PI*2/3600))*rad*.8,2);
+   setcol(0xff0000); drawcone(cx,cy,1,cx+sin(t*(PI*2/60))*rad*.9,cy-cos(t*(PI*2/60))*rad*.9,1);
+   setcol(0xffffff); gldisable(GL_DEPTH_TEST);
+   glbegin(GL_COMPLEX); glsettex("whitepix.tga");
+   for(a=3.5;a<=4.5;a+=.25) { gltexcoord(0,0); glvertex(cos(a)*rad*.55+cx,sin(a)*rad*.55+cy); }
+   for(a=4.5;a>=3.5;a-=.25) { gltexcoord(0,0); glvertex(cos(a)*rad*.45+cx,sin(a)*rad*.45+cy); }
+   glend();
+
+   if ((hold) && ((holdstart < 0) || (tim > holdstart+1)))
+   {
+      fx = 12; fy = 16; setfont(fx,fy); moveto((xres-fx*33)/2,yres*.25);
+      setcol(0xc0c0c0); printf("Use Space Bar to start/stop timer");
+   }
+
+   Sleep((numframes/100-klock())*1000); //Limit fps to cool CPU
+}
+
+drawdigitime(x0,y0,x1,y1,t)
+{
+   setfont((x1-x0)/7,y1-y0,1); moveto(x0,y0);
+   t = int(t*100)/100; printf("%g:%05.2f",int(t/60),t%60);
+}

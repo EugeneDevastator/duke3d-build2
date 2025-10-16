@@ -1,0 +1,58 @@
+(x,y,z,&r,&g,&b)
+{
+   if (abs(z) > .96) return(0);
+   r2 = (2.5-z*z)/4;
+   
+   xy2 = x^2 + y^2;
+   if (xy2 < r2*.8) //caps
+   {
+      if (abs(z) > .93) return(0);
+      f = cos(xy2*6)*32+144;
+      n = -(noise(x*32,y*32,z*32)-0.7)^2;
+      r = f*.6+n*10;
+      g = f*.5+n*10;
+      b = f*.3+n*10;
+      return(1);
+   }
+   
+      //side wood
+   if (xy2 < r2)
+   {
+      ang = ((atan2(y,x)*12/(PI*2))%1);
+      n = noise(x*24,y*24,z*3)*28;
+      if (ang < .25)
+      {
+         r2sub = (.25/2-fabs(ang-.25/2))*.5;
+         r2 -= r2sub;
+         n -= r2sub*400;
+      }
+      r = 128*.8+n;
+      g =  96*.8+n;
+      b =  64*.8+n;
+      return(xy2 < r2);
+   }
+   
+      //metal bars
+   if ((xy2 < r2+.12) && ((z+.92)%.55 < .16))
+   {
+      ang = ((atan2(y,x)*12/(PI*2))%1);
+      dx = fabs(ang-.6);
+      dy = fabs((z+.92)%.55-.08)*2.5;
+      if (dx^2+dy^2 < .12^2)
+      {
+         r2 += (.12^2-(dx^2+dy^2))*32;
+         n = noise(x*50,y*50,z*240)*20;
+         r = 104+n;
+         g = 104+n;
+         b = 112+n;
+      }
+      else
+      {
+         n = noise(x*8,y*8,z*48)*20;
+         r = 120+n;
+         g = 112+n;
+         b = 112+n;
+      }
+      return(xy2 < r2+.08);
+   }
+}

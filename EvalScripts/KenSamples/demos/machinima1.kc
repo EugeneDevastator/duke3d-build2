@@ -1,0 +1,85 @@
+() //First collaborative-made Evaldraw script by Ken Silverman and Tom Dobrowolski (07/25/2006)
+{
+   static ot, t;
+   clz(1e32);
+   
+   setcam(0,0,0,0,0);
+
+   if (numframes == 0)
+   {
+      playtext("Gee a shiny rocket :)");
+      playsong("fidsong.mid",-50);
+   }
+
+   ot = t; t = klock(0);
+   y = 0;
+
+   t = max(t-2,0);
+
+   if (t < 10) {
+      if (t > 2) y = t-2;
+      drawkv6("caco.kv6",.05,0,y,5,max(t-.5,0)*2,min(t>=2,PI/2));
+   } else if (t > 14) {
+      y = sin((t-14)*4)*2;
+      z = max(16-t,0);
+   }
+   if (t > .5 && ot <= .5)
+      playtext("Oh my god"); // :)) 
+   if (t > 1.9 && ot <= 1.9) //oh.. numframes doesn't work for P3 & P4 :P
+      playtext("Ouch... that really hurts"); // :))
+   if (t > 8 && ot <= 8)
+      playtext("Caco is dead, digging the ground. He will never see the flowers and the sun again.");
+   if (t > 15 && ot <= 15)
+      playtext("Should we pray for his evil soul?");
+   if (t < 2)
+      drawkv6("rpg.kv6",.05,0,1.2-t*.5,2+t,0,0); // no no .. caco will be killed :)
+
+   glsettex("cloud.png");
+   if (t < 2) setcol(255,255,511); else setcol(255,255-(t-2)*128,511-(t-2)*256);
+   glBegin(GL_QUADS);
+   glTexCoord(t*.3+0,t*.3+0); glVertex(-7,-7,5);
+   glTexCoord(t*.3+1,t*.3+0); glVertex(+7,-7,5);
+   glTexCoord(t*.3+1,t*.3+1); glVertex(+7,+7,5);
+   glTexCoord(t*.3+0,t*.3+1); glVertex(-7,+7,5);
+   if (t < 2) setcol(255,255,255); else setcol(255,255-(t-2)*128,255-(t-2)*256);
+
+   //t is already used?
+   //t = klock(0)+11.7; // <- this is for debug
+   if (t > 11.7) { //flower
+      setcol(0xffff00);
+      glBegin(GL_TRIANGLES);
+      dt = t-11.7;
+      for(i=0; i<38; i+=.1) {
+         a = i*pi/18;
+         rad = sin(dt*8)*.3+.7;
+         petal = abs(1.5-cos(a*7)*rad)*(rad+1)*50*min(dt,1);
+         x0 = 0;
+         y0 = 0-1+min(dt,1)*1;
+         x = x0+cos(a+dt)*petal*.01;
+         y = y0+sin(a+dt)*petal*.01;
+         if (i==0) { ox=x; oy=y; }
+         else {
+            glVertex(x0,y0,4);
+            glVertex(ox,oy,4);
+            glVertex(x,y,4);
+            ox = x; oy = y;
+         }
+      }
+   }
+   if (t > 12.5) //sun
+   {
+      setcol(0xffff00);
+      x = 3; y = -4 + min((t-12.5)*2,2); z = 4.5;
+      drawsph(x,y,z,.3);
+      n = 64; zmulk = 2 / n; zaddk = zmulk*.5 - 1.0;
+      for(i=0;i<n;i++)
+      {
+         moveto(x,y,z);
+         vz = i*zmulk + zaddk; r = sqrt(1 - vz*vz);
+         a = i*(1 - 1/((sqrt(5)+1)/2))*PI*2;
+         vx = cos(a)*r;
+         vy = sin(a)*r;
+         lineto(x+vx*.4,y+vy*.4,z+vz*.4);
+      }
+   }
+}

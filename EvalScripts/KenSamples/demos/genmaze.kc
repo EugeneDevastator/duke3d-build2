@@ -1,0 +1,35 @@
+enum{SC=8}
+srand(klock());
+
+static maz[2^20], lst[2^20], nx[4], ny[4], hbuf[2048];
+xnum = ceil(xres/SC); ynum = ceil(yres/SC);
+for(i=xnum*ynum-1;i>=0;i--) maz[i] = 0;
+
+setcol(0x404040);
+for(x=0;x<xres;x++) { if ((x%SC) == 0) hbuf[x] = 0x404040; else hbuf[x] = 0xc0c0c0; }
+for(y=0;y<=ynum;y++)
+{
+   moveto(0,y*SC); lineto(xnum*SC,y*SC);
+   for(yy=y*SC+1,ye=y*SC+SC;yy<ye;yy++) sethlin(0,yy,hbuf,xres);
+}
+
+setcol(0xc0c0c0);
+i = int(xnum*ynum*rnd); maz[i] = 1; lst[0] = i; lstn = 1; i = 0;
+for(cnt=xnum*ynum-1;cnt>0;cnt--)
+{      
+   do
+   {
+      j = lst[i]; y = int(j/xnum); x = j-y*xnum; n = 0;
+      if ((x >      0) && (maz[j-   1] == 0)) { nx[n] = x-1; ny[n] = y; n++; }
+      if ((x < xnum-1) && (maz[j+   1] == 0)) { nx[n] = x+1; ny[n] = y; n++; }
+      if ((y >      0) && (maz[j-xnum] == 0)) { nx[n] = x; ny[n] = y-1; n++; }
+      if ((y < ynum-1) && (maz[j+xnum] == 0)) { nx[n] = x; ny[n] = y+1; n++; }
+      if (n) break;
+      lstn--; lst[i] = lst[lstn];
+      i = int(lstn*rnd);
+   } while (1);
+   i = int(n*rnd); xx = nx[i]; yy = ny[i];
+   if (xx != x) { sx = (x+xx+1)*SC/2; sy = (y+yy)*SC/2+1; moveto(sx,sy); lineto(sx,sy+SC-1); }
+           else { sx = (x+xx)*SC/2+1; sy = (y+yy+1)*SC/2; moveto(sx,sy); lineto(sx+SC-1,sy); }
+   i = yy*xnum+xx; maz[i] = 1; lst[lstn] = i; i = lstn; lstn++;
+}

@@ -1,0 +1,494 @@
+enum {BSIZ=16,NMON=3};
+static board[BSIZ][BSIZ], rocks[BSIZ][BSIZ], numrocks = 0, gotammo = 0;
+static posx, posy, posz, posh, posv = 0, tim, health = 100;
+static monx[NMON], mony[NMON], monz[NMON], monh[NMON], monv[NMON];
+static monstat[NMON], mongoalx[NMON], mongoalz[NMON], monlastsaw[NMON];
+static monhealth[NMON], moncol[NMON];
+static rockon = 0, rockx, rocky, rockz, rockh;
+
+()
+{
+      //Game init
+   if (numframes == 0)
+   {
+      for(i=0;i<BSIZ*BSIZ;i++) board[i] = 0;
+      for(i=BSIZ*BSIZ*.2;i>0;i--) board[rnd*(BSIZ*BSIZ)] = 1;
+      for(i=0;i<BSIZ;i++)
+      {
+         board[     i][     0] = 1;
+         board[     i][BSIZ-1] = 1;
+         board[     0][     i] = 1;
+         board[BSIZ-1][     i] = 1;
+      }
+      
+      do
+      {
+         posx = int(BSIZ*rnd);
+         posz = int(BSIZ*rnd);
+      } while (board[posx][posz]);
+      posx += .5; posz += .5;
+      
+      for(c=0;c<NMON;c++)
+      {
+         do
+         {
+            monx[c] = int(BSIZ*rnd);
+            monz[c] = int(BSIZ*rnd);
+         } while ((board[monx[c]][monz[c]]) || ((monx[c] == posx-.5) && (monz[c] == posz-.5)));
+         monx[c] += .5; mongoalx[c] = monx[c];
+         monz[c] += .5; mongoalz[c] = monz[c];
+         mony[c] = .15;
+         monh[c] = 0;
+         monstat[c] = 0; //0=think,1=turn,2=move,3=attack,4=dying
+         monhealth[c] = 100;
+         i = (c%4);
+         if (i == 0) moncol[c] = 0xffffff;
+         if (i == 1) moncol[c] = 0xffff80;
+         if (i == 2) moncol[c] = 0xff80ff;
+         if (i == 3) moncol[c] = 0x80ffff;
+      }
+      
+         //Check for prison start :P
+      static fifx[BSIZ*BSIZ], fify[BSIZ*BSIZ], fifr, fifw;
+      for(i=0;i<BSIZ*BSIZ;i++) rocks[i] = board[i]; //rocks used as temp here
+      fifx[0] = int(posx-.5); fify[0] = int(posz-.5); fifr = 0; fifw = 1;
+      cnt = 0; for(i=0;i<NMON;i++) { rocks[int(monx[i]-.5)][int(monz[i]-.5)] = 2; }
+      while (fifr < fifw)
+      {
+         x = fifx[fifr]; y = fify[fifr]; fifr++;
+         for(i=4-1;i>=0;i--)
+         {
+            if (i == 0) { xx = x-1; yy = y; }
+            if (i == 1) { xx = x+1; yy = y; }
+            if (i == 2) { xx = x; yy = y-1; }
+            if (i == 3) { xx = x; yy = y+1; }
+            if (rocks[xx][yy] == 1) continue;
+            if (rocks[xx][yy] == 2) cnt++;
+            rocks[xx][yy] = 1;
+            fifx[fifw] = xx; fify[fifw] = yy; fifw++;
+         }
+      }
+      if (cnt < NMON) playtext("%g trapped monsters",NMON-cnt);
+      
+            
+      for(i=0;i<BSIZ*BSIZ;i++)
+      {
+         if (rnd < .1) rocks[i] = 1-board[i]; else rocks[i] = 0;
+         if ((rocks[i]) && (board[i] == 0)) numrocks++;
+      }
+      
+      playsong("fidsong.mid",-30);
+            
+      if (keystatus[0x36]) gotammo = 10000;
+   }
+  
+      //Timing
+   otim = tim; tim = klock(); dt = tim-otim;
+   
+   playercontrols(dt);
+   
+      //Setup drawing
+   clz(1e32);
+   if (posy < -.5)
+      cls(192*.55,((208-64)*health/100+64)*.60,((192-64)*health/100+64));
+   setcam(posx,posy,posz,posh,posv);
+   
+   drawworld();
+   
+      //Rocket pickup logic
+   if (rocks[posx][posz])
+   {
+      rocks[posx][posz] = 0; numrocks--; gotammo++;
+      playsound("pickup.wav");
+      for(c=64;c>0;c--)
+      {
+         i = int((BSIZ*BSIZ)*rnd);
+         if ((rocks[i] == 0) && (board[i] == 0)) { rocks[i] = 1; break; }
+      }
+   }  
+      //Draw rocket pickups
+   setcol(0xffffff);
+   for(y=0;y<BSIZ;y++)
+      for(x=0;x<BSIZ;x++)
+         if (rocks[x][y])
+            drawkv6("rpg.kv6",1/128,x+.5,0.42,y+.5,klock(),0);
+
+   
+      //Shooting logic
+   if ((keystatus[0x1d]) && (gotammo > 0) && (health > 0) && (rockon == 0))
+   {
+      rockx = posx; rocky = posy+.15; rockz = posz; rockh = posh;
+      rockon = 1; gotammo--;
+      playsound("shoot.wav");
+   }
+   
+      //Rocket flying logic
+   if (rockon)
+   {
+      setcol(0xffffff);
+      drawkv6("rpg.kv6",1/128,rockx,rocky,rockz,rockh,0);
+      rockx += sin(rockh)*dt*8;
+      rockz += cos(rockh)*dt*8;
+      for(c=0;c<NMON;c++)
+      {
+         if ((monhealth[c] > 0) && ((rockx-monx[c])^2 + (rockz-monz[c])^2 < .5))
+         {
+            monhealth[c] -= 25;
+            if (monhealth[c] > 0) playsound("gothit.wav");
+            else
+            {
+               enum {NMSG=14};
+               static msglst[NMSG], msglstn = 0;
+               if (msglstn <= 0)
+               {
+                  for(i=NMSG-1;i>=0;i--) msglst[i] = i;
+                  for(i=NMSG-1;i>0;i--)
+                  {
+                     j = int((i+1)*rnd);
+                     k = msglst[i]; msglst[i] = msglst[j]; msglst[j] = k;
+                  }
+                  msglstn = NMSG;
+               }
+               msglstn--; i = msglst[msglstn];
+               if (i == 0) playtext("Oh noes!");
+               if (i == 1) playtext("Down I go.");
+               if (i == 2) playtext("What took you so long.");
+               if (i == 3) playtext("I've got a headache!");
+               if (i == 4) playtext("Good. I'm tired of this music.");
+               if (i == 5) playtext("Now I don't have to put you in my mouth.");
+               if (i == 6) playtext("I like to fall down and get hurt!");
+               if (i == 7) playtext("I forgot to drink my milk today and am now undergoing osteoporosis.");
+               if (i == 8) playtext("I like this floor texture.");
+               if (i == 9) playtext("Let me check if my shoe is untied. Upon further inspection, I'm not wearing shoes.");
+               if (i ==10) playtext("Thanks for saving my demise until right now.");
+               if (i ==11) playtext("I got tired of breathing just before you brutally murdered me. Haha.");
+               if (i ==12) playtext("Your rocket was delicious.");
+               if (i ==13) playtext("At least I didn't die from cancer.");
+               playsound("tapfloor.flac"); monstat[c] = 4;
+            }
+            rockon = 0;
+         }
+      }
+      if (board[rockx][rockz])
+      {
+         rockon = 0;
+         playsound("tapfloor.flac",100,1.5,rockx,rocky,rockz);
+      }
+   }
+
+      //Monster logic
+   for(c=0;c<NMON;c++)
+   { 
+      if (monstat[c] == 0) //think
+      {
+         for(j=10;j>0;j--)
+         {
+            i = int(4*rnd);
+            if (i == 0) { ngoalx = mongoalx[c]-1; ngoalz = mongoalz[c]; }
+            if (i == 1) { ngoalx = mongoalx[c]+1; ngoalz = mongoalz[c]; }
+            if (i == 2) { ngoalx = mongoalx[c]; ngoalz = mongoalz[c]-1; }
+            if (i == 3) { ngoalx = mongoalx[c]; ngoalz = mongoalz[c]+1; }
+            if (board[ngoalx][ngoalz] == 0) 
+            {
+               mongoalx[c] = ngoalx;
+               mongoalz[c] = ngoalz;
+               monstat[c] = 1;
+               break;
+            }
+         }
+      }
+      else if (monstat[c] == 1) //turn
+      {
+         a = atan2(mongoalx[c]-monx[c],mongoalz[c]-monz[c]);
+         monh[c] %= (PI*2);
+         if (abs((a-monh[c]+PI)%(PI*2)-PI) > .2)
+              { monh[c] += sgn((a-monh[c]+PI)%(PI*2)-PI)*dt*4; }
+         else { monstat[c] = 2; }
+      }
+      else if (monstat[c] == 2) //move
+      {
+         dist = sqrt((mongoalx[c]-monx[c])^2+ (mongoalz[c]-monz[c])^2);
+         d = dt/dist;
+         monx[c] += (mongoalx[c]-monx[c])*d;
+         monz[c] += (mongoalz[c]-monz[c])*d;
+         if (dist < .2) monstat[c] = 0;
+         
+         if (cos(monh[c])*(posx-monx[c]) + sin(monh[c])*(posz-monz[c]) > 0)
+            if (cansee(monx[c],monz[c],posx,posz) && (health > 0))
+            {
+               if (abs(monlastsaw[c]-tim) > 2)
+               {
+                  i = int(5*rnd);
+                  if (i == 0) playtext(",I must chase you!");
+                  if (i == 1) playtext(",I see you!");
+                  if (i == 2) playtext(",There he is!");
+                  if (i == 3) playtext(",Hi!");
+                  if (i == 4) playtext(",Roar!");
+                  monlastsaw[c] = tim;
+               }
+               monstat[c] = 3;
+            }
+      }
+      else if (monstat[c] == 3) //attack
+      {
+         dist = sqrt((posx-monx[c])^2 + (posz-monz[c])^2);
+         d = dt/dist;
+         monx[c] += (posx-monx[c])*d;
+         monz[c] += (posz-monz[c])*d;
+         monh[c] = atan2(posx-monx[c],posz-monz[c]);
+         if (cansee(monx[c],monz[c],posx,posz) == 0) monstat[c] = 0;
+         if (dist < 1)
+         {
+            health -= 10;
+            if (health > 0) playsound("ouch.wav"); 
+            else if (health > -10)
+            {
+               playsound("tapfloor.flac");
+               playtext(",You taste like crap! Nevertheless, GAME OVER!");
+            }
+            monstat[c] = 0;
+         }
+      }
+      else if (monstat[c] == 4) //dying
+      {
+         monv[c] = min(monv[c]+dt,PI/2);
+         mony[c] += dt*.1;
+         if (mony[c] > 1.6) //respawn :)
+            { monhealth[c] = 100; monstat[c] = 0; mony[c] = .15; monv[c] = 0; }
+      }
+         //Draw monster
+      setcol(moncol[c]);
+      drawkv6("caco.kv6",1/80,monx[c],mony[c],monz[c],monh[c]+PI,monv[c]);
+   }      
+   
+   setfont(12,16);
+   moveto(xres/2-56,yres-16); setcol(0xffffff);
+        if (gotammo == 1) printf("%g ROCKET",gotammo);
+   else if (gotammo >  1) printf("%g ROCKETS",gotammo);
+   
+   if (health > 0)
+   {
+      moveto(xres/2-72,yres-32);
+      printf("%g%% HEALTH",max(int(health),0));
+   }
+   if (health <= 0)
+   {
+      moveto(xres/2-4.5*12,yres/2-8);
+      printf("GAME OVER");
+   }
+   else if (monhealth[c] <= 0)
+   {
+      moveto(xres/2-4*12,yres/2-8);
+      //printf("GOT HIM!");
+   }
+}
+
+   //Returns non-zero if (x0,z0) and (x1,z1) have direct line of sight
+cansee(x0,z0,x1,z1)
+{
+   for(t=1;t>=0;t-=1/32)
+   {
+      x = (x1-x0)*t + x0;
+      z = (z1-z0)*t + z0;
+      if (board[x][z]) return(0);
+   }
+   return(1);
+}
+
+   //Handle input and player movement
+playercontrols(dt)
+{
+   f = dt*((keystatus[0x2a]||keystatus[0x36])+1)*2;
+   posy = min(max(posy+(keystatus[0xcf]-keystatus[0xc7])*f,-4),+.4);
+   posv = min(max(posv+(keystatus[0xc9]-keystatus[0xd1])*f,-PI/2),PI/2);
+   vx = (keystatus[0xcd]-keystatus[0xcb])*f;
+   vy = (keystatus[0xd0]-keystatus[0xc8])*f;
+   if (keystatus[0x9d] == 0) { posh += vx; vx = 0; }
+   if (health > 0)
+   {
+      if ((vx) || (vy))
+      {
+         posy = min(max(posy+(keystatus[0xcf]-keystatus[0xc7])*f,-4),+.4);
+         posv = min(max(posv+(keystatus[0xc9]-keystatus[0xd1])*f,-PI/2),PI/2);
+      
+         nvx =-sin(posh)*vy + cos(posh)*vx;
+         nvz =-cos(posh)*vy - sin(posh)*vx;
+         for(i=3;i>0;i--) //quick&dirty collision detection
+         {
+            x = posx+nvx*((i == 1) || (i == 3));
+            z = posz+nvz*(i >= 2);
+            if ((board[x-.25][z-.25] == 0) &&
+                (board[x+.25][z-.25] == 0) &&
+                (board[x-.25][z+.25] == 0) &&
+                (board[x+.25][z+.25] == 0))
+               { posx = x; posz = z; break; }
+         }
+      }
+   }
+   else
+   {
+      posy = min(posz+dt,.45);
+      posv = max(posv-dt,-PI/5);
+   }
+}
+
+   //Render walls, sky, floor
+drawworld()
+{
+   glsettex("brick.png");
+   glbegin(GL_QUADS);
+   for(y=0;y<BSIZ;y++)
+      for(x=0;x<BSIZ;x++)
+      {
+         i = board[x][y];
+         setcol(0xffffff);
+         if (board[x+1][y] < i)
+         {
+            gltexcoord(.25,0); glvertex(x+1,-.5,y+.25);
+            gltexcoord(.75,0); glvertex(x+1,-.5,y+.75);
+            gltexcoord(.75,2); glvertex(x+1,+.5,y+.75);
+            gltexcoord(.25,2); glvertex(x+1,+.5,y+.25);
+         }
+         if (board[x-1][y] < i)
+         {
+            gltexcoord(.25,0); glvertex(x,-.5,y+.75);
+            gltexcoord(.75,0); glvertex(x,-.5,y+.25);
+            gltexcoord(.75,2); glvertex(x,+.5,y+.25);
+            gltexcoord(.25,2); glvertex(x,+.5,y+.75);
+         }
+         setcol(0xc0c0c0);
+         if (board[x][y+1] < i)
+         {
+            gltexcoord(.25,0); glvertex(x+.75,-.5,y+1);
+            gltexcoord(.75,0); glvertex(x+.25,-.5,y+1);
+            gltexcoord(.75,2); glvertex(x+.25,+.5,y+1);
+            gltexcoord(.25,2); glvertex(x+.75,+.5,y+1);
+         }
+      if (board[x][y-1] < i)
+      {
+         gltexcoord(.25,0); glvertex(x+.25,-.5,y);
+         gltexcoord(.75,0); glvertex(x+.75,-.5,y);
+         gltexcoord(.75,2); glvertex(x+.75,+.5,y);
+         gltexcoord(.25,2); glvertex(x+.25,+.5,y);
+      }
+      
+      d = board[x][y  ]*1+board[x+1][y  ]*2 
+         +board[x][y+1]*4+board[x+1][y+1]*8;
+      if (d == 0) continue;
+      if (d == 15) continue;
+      if (d == 1)
+      {
+         setcol(0xe0e0e0);
+         gltexcoord( .75,0); glvertex(x+1.00,-.5,y+ .75);
+         gltexcoord(1.25,0); glvertex(x+ .75,-.5,y+1.00);
+         gltexcoord(1.25,2); glvertex(x+ .75,+.5,y+1.00);
+         gltexcoord( .75,2); glvertex(x+1.00,+.5,y+ .75);
+      }
+      if (d == 2)
+      {
+         setcol(0xe0e0e0);
+         gltexcoord( .75,0); glvertex(x+1.25,-.5,y+1.00);
+         gltexcoord(1.25,0); glvertex(x+1.00,-.5,y+ .75);
+         gltexcoord(1.25,2); glvertex(x+1.00,+.5,y+ .75);
+         gltexcoord( .75,2); glvertex(x+1.25,+.5,y+1.00);
+      }
+      if (d == 4)
+      {
+         setcol(0xe0e0e0);
+         gltexcoord( .75,0); glvertex(x+ .75,-.5,y+1.00);
+         gltexcoord(1.25,0); glvertex(x+1.00,-.5,y+1.25);
+         gltexcoord(1.25,2); glvertex(x+1.00,+.5,y+1.25);
+         gltexcoord( .75,2); glvertex(x+ .75,+.5,y+1.00);
+      }
+      if (d == 8)
+      {
+         setcol(0xe0e0e0);
+         gltexcoord( .75,0); glvertex(x+1.00,-.5,y+1.25);
+         gltexcoord(1.25,0); glvertex(x+1.25,-.5,y+1.00);
+         gltexcoord(1.25,2); glvertex(x+1.25,+.5,y+1.00);
+         gltexcoord( .75,2); glvertex(x+1.00,+.5,y+1.25);
+      }
+      
+      if ((d == 6) || (d == 14))
+      {
+         setcol(0xe0e0e0);
+         gltexcoord( .75,0); glvertex(x+ .75,-.5,y+1.00);
+         gltexcoord(1.25,0); glvertex(x+1.00,-.5,y+ .75);
+         gltexcoord(1.25,2); glvertex(x+1.00,+.5,y+ .75);
+         gltexcoord( .75,2); glvertex(x+ .75,+.5,y+1.00);
+      }
+      if ((d == 9) || (d == 13))
+      {
+         setcol(0xe0e0e0);
+         gltexcoord( .75,0); glvertex(x+1.00,-.5,y+ .75);
+         gltexcoord(1.25,0); glvertex(x+1.25,-.5,y+1.00);
+         gltexcoord(1.25,2); glvertex(x+1.25,+.5,y+1.00);
+         gltexcoord( .75,2); glvertex(x+1.00,+.5,y+ .75);
+      }
+      if ((d == 9) || (d == 11))
+      {
+         setcol(0xe0e0e0);
+         gltexcoord( .75,0); glvertex(x+1.00,-.5,y+1.25);
+         gltexcoord(1.25,0); glvertex(x+ .75,-.5,y+1.00);
+         gltexcoord(1.25,2); glvertex(x+ .75,+.5,y+1.00);
+         gltexcoord( .75,2); glvertex(x+1.00,+.5,y+1.25);
+      }
+      if ((d == 6) || (d == 7))
+      {
+         setcol(0xe0e0e0);
+         gltexcoord( .75,0); glvertex(x+1.25,-.5,y+1.00);
+         gltexcoord(1.25,0); glvertex(x+1.00,-.5,y+1.25);
+         gltexcoord(1.25,2); glvertex(x+1.00,+.5,y+1.25);
+         gltexcoord( .75,2); glvertex(x+1.25,+.5,y+1.00);
+      }
+      if (d == 3)
+      {
+         setcol(0xc0c0c0);
+         gltexcoord( .75,0); glvertex(x+1.25,-.5,y+1.00);
+         gltexcoord(1.25,0); glvertex(x+ .75,-.5,y+1.00);
+         gltexcoord(1.25,2); glvertex(x+ .75,+.5,y+1.00);
+         gltexcoord( .75,2); glvertex(x+1.25,+.5,y+1.00);
+      }
+      if (d == 12)
+      {
+         setcol(0xc0c0c0);
+         gltexcoord( .75,0); glvertex(x+ .75,-.5,y+1.00);
+         gltexcoord(1.25,0); glvertex(x+1.25,-.5,y+1.00);
+         gltexcoord(1.25,2); glvertex(x+1.25,+.5,y+1.00);
+         gltexcoord( .75,2); glvertex(x+ .75,+.5,y+1.00);
+      }
+      if (d == 5)
+      {
+         setcol(0xffffff);
+         gltexcoord( .75,0); glvertex(x+1.00,-.5,y+ .75);
+         gltexcoord(1.25,0); glvertex(x+1.00,-.5,y+1.25);
+         gltexcoord(1.25,2); glvertex(x+1.00,+.5,y+1.25);
+         gltexcoord( .75,2); glvertex(x+1.00,+.5,y+ .75);
+      }
+      if (d == 10)
+      {
+         setcol(0xffffff);
+         gltexcoord( .75,0); glvertex(x+1.00,-.5,y+1.25);
+         gltexcoord(1.25,0); glvertex(x+1.00,-.5,y+ .75);
+         gltexcoord(1.25,2); glvertex(x+1.00,+.5,y+ .75);
+         gltexcoord( .75,2); glvertex(x+1.00,+.5,y+1.25);
+      }
+   }
+   
+      //Ceiling
+   glsettex("cloud.png");
+   setcol(192,(208-64)*health/100+64,(384-64)*health/100+64);
+   t = (klock()/32)%1;
+   gltexcoord(   0+t,   0+t); glvertex(BSIZ/2-256,-5,BSIZ/2-256);
+   gltexcoord(BSIZ+t,   0+t); glvertex(BSIZ/2+256,-5,BSIZ/2-256);
+   gltexcoord(BSIZ+t,BSIZ+t); glvertex(BSIZ/2+256,-5,BSIZ/2+256);
+   gltexcoord(   0+t,BSIZ+t); glvertex(BSIZ/2-256,-5,BSIZ/2+256);
+      
+      //Floor
+   glsettex("wood.png");
+   setcol(0xe0c070);
+   gltexcoord(   0,   0); glvertex(0   ,+.5,BSIZ);
+   gltexcoord(BSIZ,   0); glvertex(BSIZ,+.5,BSIZ);
+   gltexcoord(BSIZ,BSIZ); glvertex(BSIZ,+.5,   0);
+   gltexcoord(   0,BSIZ); glvertex(0   ,+.5,   0);
+}

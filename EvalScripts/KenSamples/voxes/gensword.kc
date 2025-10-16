@@ -1,0 +1,41 @@
+(x,y,z,&r,&g,&b)
+ox = x; oy = y; oz = z; x =-oz; y =-ox; z = oy;
+
+if (z > .65)
+   if (x^2 + y^2*2 < sin(z*10-0.3)*.002+sin(z*240)*.0005+.001)
+   {
+      r = 128+noise(x*27,y*15,z*04)*32+nrnd*2;
+      g = 104+noise(x*27,y*15,z*04)*24+nrnd*2;
+      b =  80+noise(x*21,y*23,z*03)*16+nrnd*2;
+      return(1);
+   }
+if ((x < 0) && (sqrt((x+.06)^2 + (z-.81)^2)-.15)^2 + y^2 < .02^2)
+{
+   r = 128+noise(x*27,y*15,z*04)*16+nrnd*2;
+   g = 104+noise(x*27,y*15,z*04)*16+nrnd*2;
+   b =  80+noise(x*21,y*23,z*03)* 4+nrnd*2;
+   return(1);
+}
+if (x^2 + y^2 + (z-.97)^2 < .04^2) //sphere at base
+{
+   r = 128+noise(x*27,y*15,z*04)*16+nrnd*2;
+   g = 104+noise(x*27,y*15,z*04)*16+nrnd*2;
+   b =  80+noise(x*21,y*23,z*03)* 4+nrnd*2;
+   return(1);
+}
+if (((abs(x) < .2) && (x^2/16 + y^2*2 + (z-.62)^2*4 < .06^2)) ||
+   ((abs(x)-.2)^2 + y^2 + (z-.62)^2 < .04^2))
+{
+   r = 128+noise(x*27,y*15,z*04)*16+nrnd*2;
+   g = 104+noise(x*27,y*15,z*04)*16+nrnd*2;
+   b =  80+noise(x*21,y*23,z*03)* 4+nrnd*2;
+   return(1);
+}
+r = .05; if (z < -.6) r *= sin(z*8);
+if ((abs(x)+abs(y)*2 + (x^2+y^2)*.5 < r*1.22) && (z < .62))
+{
+   r = 160+noise(x*15,y*11,z*5)*12+nrnd*2;
+   g = 144+noise(x*14,y* 8,z*3)*24+nrnd*2;
+   b = 128+noise(x*17,y*13,z*6)*16+nrnd*2;
+   return(1);
+}

@@ -1,0 +1,18 @@
+()cls(0,0,0);setcol(255,128,128);
+t = (klock(0)%4);
+hx = xres*.5;
+phi = 1.5-sqrt(1.25);
+n = 8192;
+for(i=0;i<n;i++)
+{
+   vz = (i*2-n+1)/(n-1); r = sqrt(1-vz^2);
+   vx = cos(i*(pi*2*phi))*r;
+   vy = sin(i*(pi*2*phi))*r;
+   
+   tt = sqrt(abs(sin(i*sin(i*.01+t*.0002)))*t)*4;
+   x = (vx)*tt;
+   y = (vy)*tt + t^2*.5;
+   z = (vz)*tt + 5;
+   if (z > 0) setpix(x*hx/z+xres*.5,y*hx/z+yres*.5);
+}
+0

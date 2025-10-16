@@ -1,0 +1,249 @@
+enum {MAXCOEF=16,RES=2^10,DIV=8};
+
+() //Based on POLYAPRX.KC; intended for vpermd/vfmadd###ps; possibly shorts?
+{
+   static f0[RES*DIV+1], g0[RES*DIV+1], coef[DIV][MAXCOEF];
+   
+   n = 3;
+   while (1)
+   {
+      xfrac = mousx/xres;
+      gamma = 2^((xfrac-.5)*4);
+      gamma = int(gamma*50)/50;
+      //gamma = n-1;
+      if (keystatus[0xc9]) { keystatus[0xc9] = 0; n = max(n-1,  0); } //PGUP
+      if (keystatus[0xd1]) { keystatus[0xd1] = 0; n = min(n+1,RES); } //PGDN
+      
+      cls(0);
+      
+      y0 = 1e32; y1 = -1e32;
+      for(i=0;i<=RES*DIV;i++)
+      {
+         x = i/(RES*DIV); g0[i] = 1;
+         
+         f0[i] = pow(x,gamma);
+       //if (x < .04045) f0[i] = x/12.92; else f0[i] = ((x+.055)/1.055)^2.4; //sRGB
+       //f0[i] = sin((x+xfrac)*(PI*2));
+       //f0[i] = sin(x*(PI/2));
+       //f0[i] = cos(x*(PI/2));
+       //f0[i] = tan(x*(PI/4));
+       //f0[i] = asin(x);
+       //f0[i] = acos(x);
+       //f0[i] = atan(x);
+       //f0[i] = acos(x)/sqrt(1-x); if (x == 1) f0[i] = sqrt(2);
+       //f0[i] = 1/(x+1);
+       //f0[i] = log(x+1);
+       //f0[i] = exp(x);
+       //f0[i] = 2^x;
+       //f0[i] = fact(x);
+       
+         y0 = min(y0,f0[i]); y1 = max(y1,f0[i]);
+      }
+      ysc = yres/(y0-y1); yof = yres-1 - y0*ysc;
+
+      emax = 0; bb = 0;
+      for(b=0;b<DIV;b++)
+      {
+         doremez(&f0[b*RES],&g0[b*RES],&coef[b][0],n);
+         e = 0;
+         for(i=0;i<RES;i++)
+         {
+            for(y=0,j=n-1;j>=0;j--) { y = y*i + coef[b][j]; }
+            e = max(e,fabs(f0[i+b*RES]-y));
+         }
+         setcol(0x606060);
+         moveto((b+.5)/DIV*xres-52,yres-256); printf("e=%g\n",e);
+         if (e > emax) { emax = e; bb = b; }
+      }
+
+      for(y=-4;y<=4;y+=.25)
+      {
+         setcol(0x404040);
+         sy = y*ysc + yof; moveto(0,sy); lineto(xres-1,sy);
+      }
+      
+      for(b=0;b<DIV;b++)
+      {
+         setcol(0x404040);
+         moveto((b+1)/DIV*xres,0);
+         lineto((b+1)/DIV*xres,yres-1);
+
+         for(i=0;i<RES;i++)
+         {
+            for(y=0,j=n-1;j>=0;j--) { y = y*i + coef[b][j]; }
+
+            sx = (i/(RES*DIV) + b/DIV)*xres; y2 = f0[i+b*RES];
+            setcol(0x00ffff); setpix(sx,y *ysc + yof);
+            setcol(0xffff00); setpix(sx,y2*ysc + yof);
+            setcol(0xff0000); setpix(sx,yres/2 - (y2-y)*yres/4/max(emax,1e-12));
+         }
+      }
+      
+      //---------------------------------------------------
+         //Transform coef[]'s from int index to nice x={0..1} coords
+      
+         //Scale
+      f = 1;
+      for(j=1;j<n;j++)
+      {
+         f *= RES*DIV;
+         for(b=0;b<DIV;b++) coef[b][j] *= f;
+      }
+      
+         //Offset
+      for(b=0;b<DIV;b++)
+      {
+         x = b/DIV;
+         for(y=0;y<n-1;y++)
+            for(xm=-x,z=1;y+z<n;z++,xm*=-x)
+            {
+               i = near(fact(y+z)/(fact(y)*fact(z))); //Pascal's tri ;P
+               coef[b][y] += xm * i * coef[b][y+z];
+            }
+      }
+      //---------------------------------------------------
+      
+      setcol(0xc0c0c0); 
+      for(i=n-1;i>=0;i--)
+      {
+         for(b=0;b<DIV;b++)
+         {
+            moveto(xres*b/DIV,(n-1-i)*12);  if (!b) fprintf("k%g={",i);
+            fprintf("%+.12f",coef[b][i],i); if (b < DIV-1) fprintf(",");
+         }
+         fprintf("};\n");
+      }
+         
+      moveto(xres-160,yres-128); printf("gamma=%.4f\n",gamma);
+      moveto(xres-160,yres-116); printf("emax=%g\n",emax);
+      moveto((bb+.5)/DIV*xres-52,yres-256); printf("e=%g\n",emax);
+
+      refresh(); Sleep(1);
+   }
+}
+
+points2coefs (px[MAXCOEF], py[MAXCOEF], coef[MAXCOEF], n)
+{
+   static py2[MAXCOEF];
+   
+      //Neville interpolation
+   for(i=0;i<n;i++) py2[i] = py[i];
+   for(j=1;j<n;j++)
+      for(i=n-1;i>=j;i--)
+         py2[i] = (py2[i]-py2[i-1])/(px[i]-px[i-j]);
+      
+      //Generate polynomial coefficients
+   coef[0] = 0;
+   for(i=n-1;i>=0;i--)
+   {
+      j = n-1-i; if (j > 0) coef[j] = coef[j-1];
+      for(j--;j>0;j--) coef[j] = coef[j-1] - coef[j]*px[i];
+      coef[0] = py2[i] - coef[0]*px[i];
+   }
+}
+
+   //inputs: f0[0..RES]
+   //        g0[0..RES] weight func; usually 1.0's
+   //outputs: coef[0..n-1]
+doremez (f0[RES+1], g0[RES+1], coef[MAXCOEF], n)
+{
+   static bxv[MAXCOEF+3], byv[MAXCOEF+3], bdelt, bmaxf, bmaxg;
+   static xv[MAXCOEF+3], yv[MAXCOEF+3];
+   static f1[RES+1], f10[RES+1];
+
+      //Guess initial points as linear spacing
+   for(z=0;z<=n;z++) xv[z] = near(z*RES/n);
+   
+   delt = 1; maxy = -1e32; bdelt = 1e32;
+   bmaxy = 1e32; bmaxf = 0; bmaxg = 1;
+   
+   for(c=0;c<32;c++)
+   {
+         //Given xv(), find equal length (delt) alternating ripples poly fit
+      t = 0; b = 0;
+      for(i=n;i>=0;i--)
+      {
+         f = 1; for(j=n;j>=0;j--) if (i != j) f /= (xv[i]-xv[j]);
+         t += f * f0[xv[i]];
+         b += f * ((i%2)*2-1)*g0[xv[i]];
+      }
+      delt = t/b;
+
+         //Calc cur ripples
+      for(i=n;i>=0;i--) { yv[i] = f0[xv[i]] - delt*((i%2)*2-1)*g0[xv[i]]; }
+
+         //Calc & display poly through cur ripples
+      maxf = 0; maxg = 1; points2coefs(xv,yv,coef,n);
+      for(x=0;x<=RES;x++)
+      {
+         for(y=0,i=n-1;i>=0;i--) y = y*x + coef[i];
+         f1[x] = y; f10[x] = (f1[x]-f0[x]);
+         //d = fabs(f10[x]); if (d > maxy) maxy = d;
+         if (fabs(f10[x]*maxg) > fabs(g0[x]*maxf)) { maxf = f10[x]; maxg = g0[x]; }
+         f10[x] /= g0[x];
+      }
+      
+      if (1) //maxy < bmaxy)
+      {
+         //bmaxy = maxy;
+         bmaxf = maxf; bmaxg = maxg;
+         bdelt = fabs(delt);
+         for(i=0;i<=n;i++) { bxv[i] = xv[i]; byv[i] = yv[i]; }
+      }
+
+         //Find peaks (bad precision may result in false peaks)
+      xv[0] = 0; pcnt = 1; psgn = sgn(f10[0]);
+      for(x=1;x<=RES;x++)
+      {
+         y0 = f10[x-1]; y1 = f10[x]; y2 = f10[x+1];
+         if ((y0 <= y1) && (y1 >= y2) && ((y0 < y1) || (y1 > y2)) && (y1 > 0))
+         {
+            if (psgn <= 0) { xv[pcnt] = x; pcnt++; psgn = 1; }
+                      else { if (y1 > f10[xv[pcnt-1]]) xv[pcnt-1] = x; }
+         }
+         else if ((y0 >= y1) && (y1 <= y2) && ((y0 > y1) || (y1 < y2)) && (y1 < 0))
+         {
+            if (psgn >= 0) { xv[pcnt] = x; pcnt++; psgn = -1; }
+                      else { if (y1 < f10[xv[pcnt-1]]) xv[pcnt-1] = x; }
+         }
+      }
+      y1 = f10[RES];
+      if (sgn(y1) == psgn)
+      {
+         oxv = xv[pcnt-1];
+         if (fabs(y1) > fabs(f10[oxv])) xv[pcnt-1] = RES;
+      }
+      else
+      {
+         xv[pcnt] = RES; pcnt++;
+      }
+
+         //Add points in random places if necessary
+      while (pcnt < n+1)
+      {
+         xv[pcnt] = floor((RES+1)*rnd);
+         for(z=pcnt-1;z>=0;z--) if (xv[z] == xv[pcnt]) break;
+         if (z < 0) pcnt++;
+      }
+
+         //If too many ripples found, eliminate smallest ones
+      while (pcnt > n+1)
+      {
+         minpeakv = fabs(f10[xv[0]]); minpeaki = 0;
+         for(i=1;i<pcnt;i++)
+         {
+            v = fabs(f10[xv[i]]);
+            if (v < minpeakv) { minpeakv = v; minpeaki = i; }
+         }
+         pcnt--; xv[minpeaki] = xv[pcnt];
+      }
+
+         //Bubble sort new x-coords to ensure correct alternation
+      for(i=1;i<=n;i++)
+         for(j=0;j<i;j++)
+            if (xv[i] < xv[j]) { t = xv[i]; xv[i] = xv[j]; xv[j] = t; }
+            
+      if (fabs(bdelt) < 1e-16) break;
+      if (fabs(fabs(bmaxf/bmaxg)-bdelt)/bdelt < 1e-10) break; //close enough
+   }
+}

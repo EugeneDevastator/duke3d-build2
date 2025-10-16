@@ -1,0 +1,123 @@
+//enum {N=20000,COLS=200,BASE=10,FX=4,FY=6}; //Simple PI calculator
+enum {N=20000,COLS=80,BASE=10,FX=12,FY=16}; //Simple PI calculator
+()    
+{     
+   static p[N], a[N], b[N], c[N], d[N], e[N], f[N], t[N]; setfont(FX,FY);
+   bigsub(p,p);
+#if 0
+      //PI using basic Machin formula: PI/4 = 4*atan(1/5) - atan(1/239)
+      //          a:       b:
+      //PI = + (16/5^1 - 4/239^1)/1
+      //     - (16/5^3 - 4/239^3)/3
+      //     + (16/5^5 - 4/239^5)/5 ..
+   bigsub(a,a); a[0] =16; bigdiv(a,5);
+   bigsub(b,b); b[0] = 4; bigdiv(b,239);
+   for(z=1;1;z+=2)
+   {
+      bigcpy(t,a); bigsub(t,b);
+      bigdiv(t,z); if ((z%4) < 2) bigadd(p,t); else bigsub(p,t);
+      bigdiv(a,5*5); bigdiv(b,239*239);
+      if ((z%32) == 1)
+         { cls(0); bigprint(p); moveto(0,yres-16); printf("%g",klock()); refresh(); }
+   }
+#elif 1
+      //PI using Hwang Chien-Lih's Machin-like formula (1997), L(x) = atan(1/x):
+      //PI/4 = 183L(239) + 32L(1023) - 68L(5832) + 12L(110443) - 12L(4841182) - 100L(6826318)
+   bigsub(a,a); a[0] = 183*4; bigdiv(a,    239);
+   bigsub(b,b); b[0] =  32*4; bigdiv(b,   1023);
+   bigsub(c,c); c[0] =  68*4; bigdiv(c,   5832);
+   bigsub(d,d); d[0] =  12*4; bigdiv(d, 110443);
+   bigsub(e,e); e[0] =  12*4; bigdiv(e,4841182);
+   bigsub(f,f); f[0] = 100*4; bigdiv(f,6826318);
+   for(z=1;1;z+=2)
+   {
+      bigcpy(t,a); bigadd(t,b); bigsub(t,c); bigadd(t,d); bigsub(t,e); bigsub(t,f);
+      bigdiv(t,z); if ((z%4) < 2) bigadd(p,t); else bigsub(p,t);
+      if ((z%16) == 1)
+         { cls(0); bigprint(p); moveto(0,yres-16); printf("%g",klock()); refresh(); }
+      bigdiv(a,    239^2); bigdiv(b,   1023^2);
+      bigdiv(c,   5832^2); bigdiv(d, 110443^2);
+      bigdiv(e,4841182^2); bigdiv(f,6826318^2);
+   }
+#elif 0
+      //e = sum(k=0,1,..) 1/k! = 1/0! + 1/1! + 1/2! + ..
+      //e = sum(k=0,1,..) (2k+2)/(2k+1)!
+      //e = sum(k=0,1,..) ((3k)^2+1)/(3k)!
+   bigsub(a,a); a[0] = 1;
+   for(z=1;1;z++)
+   {
+      //bigadd(p,a); bigdiv(a,z); //basic formula
+      bigcpy(b,a); bigmul(b,(z-1)^2*9+1); bigadd(p,b); bigdiv(a,(z*3-2)*(z*3-1)*(z*3)); //faster conv.
+      if ((z%32) == 1)
+         { cls(0); bigprint(p); moveto(0,yres-16); printf("%g",klock()); refresh(); }
+   }
+#elif 0
+      //http://numbers.computation.free.fr/Constants/Sqrt2/sqrt2.html
+      //sqrt(2) = (239/169) / sqrt(1 - 1/57122)
+      //1/sqrt(1-x) = 1 + (1)/(2)x + (1*3)/(2*4)x^2 + (1*3*5)/(2*4*6)x^3 + ..
+      //((1)/(1)/57122^0 + (1)/(2)/57122^1 + (1*3)/(2*4)/57122^2 + (1*3*5)/(2*4*6)/57122^3)*239/169
+   bigsub(a,a); a[0] = 1;
+   bigsub(b,b); b[0] = 1;
+   for(z=1;1;z++)
+   {
+      bigmul(b,z*2-1); bigdiv(b,z*2); bigdiv(b,57122); //b = u(k-1)/57122 * (2k-1)/(2k)
+      bigadd(a,b);
+      if ((z%32) == 1) 
+      {
+         bigcpy(t,a); bigdiv(t,169); bigmul(t,239); //t = (239/169)*r2 (NOTE:must do bigdiv first!)
+         cls(0); bigprint(t); moveto(0,yres-16); printf("%g",klock()); refresh();
+      }  
+   }
+#elif 0
+      //http://numbers.computation.free.fr/Constants/Programs/log2classic.c
+      //log(2) = atanh(1/3)*2 = log((1+1/3)/(1-1/3))
+      //atanh(x) = 1/2*log((1+x)/(1-x)) = x + x^3/3 + x^5/5 + ..
+      //and x=1/p (here p=3)
+      //Also try: log(2) = atanh(1/6)*4 + 2*atanh(1/99) (2 terms one w/p={6,99})
+   p = 3;
+   bigsub(a,a); a[0] = 1; bigdiv(a,p); //a = x = 1/p
+   bigsub(b,b); b[0] = 1; bigdiv(b,p); //b = x = 1/p
+   for(k=3;1;k+=2)
+   {
+      bigdiv(b,p*p); //b = u(k-1)/p^2
+      bigcpy(t,b); bigdiv(t,k); bigadd(a,t); //a += b/k
+      if ((k%64) == 3)
+      {
+         bigcpy(t,a); bigmul(t,2); //t = a*2;
+         cls(0); bigprint(t); moveto(0,yres-16); printf("%g",klock()); refresh();
+      }
+   }
+#else
+      //http://www.numberworld.org/y-cruncher/internals/formulas.html
+      //L(x) = atanh(1/x); //aka coth(x)
+      //atanh(x): s = 0; for(k=0;1;k++) s += x^(k*2+1)/(k*2+1);
+      //log(10) = 239L( 99) -  59L(449) + 113L(4801) -  33L(8749)
+      //log(10) = 478L(251) + 180L(449) - 126L(4801) + 206L(8749)
+   bigsub(p,p); //FYI: log(10) = 2.3025850929940459
+   bigsub(a,a); a[0] = 1; bigdiv(a, 251); bigmul(a,478);
+   bigsub(b,b); b[0] = 1; bigdiv(b, 449); bigmul(b,180); 
+   bigsub(c,c); c[0] = 1; bigdiv(c,4801); bigmul(c,126);
+   bigsub(d,d); d[0] = 1; bigdiv(d,8749); bigmul(d,206);
+   for(z=0;1;z++)
+   {
+      bigcpy(t,a); bigdiv(a, 251* 251);
+      bigadd(t,b); bigdiv(b, 449* 449);
+      bigsub(t,c); bigdiv(c,4801*4801);
+      bigadd(t,d); bigdiv(d,8749*8749);
+      bigdiv(t,z*2+1); bigadd(p,t);
+      if ((z%32) == 1)
+         { cls(0); bigprint(p); moveto(0,yres-16); printf("%g",klock()); refresh(); }
+   }
+#endif
+}
+
+bigcpy (a[N],b[N]) { for(i=0;i<N;i++) a[i] = b[i]; }
+bigadd (a[N],b[N]) { for(c=0,i=N-1;i>=0;i--) { a[i]+=b[i]+c; c=(a[i]>=BASE); a[i]-=c*BASE; }}
+bigsub (a[N],b[N]) { for(c=0,i=N-1;i>=0;i--) { a[i]-=b[i]+c; c=(a[i]<    0); a[i]+=c*BASE; }}
+bigmul (a[N],d) { for(c=0,i=N-1;i>=0;i--) { q = a[i]*d+c; a[i] = q%BASE; c = int(q/BASE); }}
+bigdiv (a[N],d) { for(c=0,i=0;i<N;i++) { q = c*BASE+a[i]; a[i] = int(q/d); c = q-a[i]*d; }}
+bigprint (p[N])
+{
+   for(i=0;i<N;i++)
+      { moveto((i%COLS)*FX,int(i/COLS)*FY); j = (p[i]>9)*7+p[i]+48; printchar(j); fputc(j); }
+}

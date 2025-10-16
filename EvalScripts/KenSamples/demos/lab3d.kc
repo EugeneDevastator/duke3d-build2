@@ -1,0 +1,82 @@
+cls(0,0,0); setcol(255,128,128);
+if (glob[0] == 0) //init posx,posy,posz,ang,totalclock
+{  glob[0] = 18.5; glob[1] = 41.5; glob[2] =.375; glob[3] = PI*.7;
+   glob[4] = klock(0);
+}
+fsynctics = klock(0)-glob[4]; glob[4] += fsynctics;
+iposx = glob[0]; iposy = glob[1]; posz = glob[2]; ang = glob[3];
+
+c = cos(ang); s = sin(ang); hx = xres/2; hy = yres/2;
+vx = c*hx + s*hx;
+vy = s*hx - c*hx;
+
+sipx = int(iposx); spx = iposx-sipx; nspx = 1-spx; sipx += .5;
+sipy = int(iposy); spy = iposy-sipy; nspy = 1-spy; sipy += .5;
+for(sx=0;sx<xres;sx++)
+{
+   ti0 = int(1048576/max(abs(vx),1));
+   ti1 = int(1048576/max(abs(vy),1));
+   if (vx > 0) tp0 = nspx; else tp0 = spx; tp0 = int(tp0*ti0);
+   if (vy > 0) tp1 = nspy; else tp1 = spy; tp1 = int(tp1*ti1);
+   ix = sipx; ixi = sgn(vx);
+   iy = sipy; iyi = sgn(vy); d = 0;
+   while (pic("doubcube.png",ix,iy) != 16777215)
+   {  if (tp1 >= tp0) { hv = 0; d = tp0; tp0 += ti0; ix += ixi; }
+                 else { hv = 1; d = tp1; tp1 += ti1; iy += iyi; }
+   }
+   ix -= .5; iy -= .5;
+   
+   if (hv) { u = (iposx*1048576+d*vx)*sgn(vy)/-32768; }
+      else { u = (iposy*1048576+d*vy)*sgn(vx)/+32768; }
+
+   vi = d/32768; t = 32/vi;
+   fsy0 = hy-t*posz; sy1 = fsy0+t;
+   sy0 = int(fsy0); v = (sy0-fsy0)*vi;
+   if (sy0 < 0) { v -= vi*sy0; sy0 = 0; }
+   sy1 = min(sy1,yres);
+   lightsc = 1/65536-vi/131072-hv/524288;
+   v += (ix*iy+ix+iy)*32;
+   ov = 0;
+   for(sy=sy0;sy<sy1;sy++)
+   {
+      if (v > ov)
+      {
+         ov = ceil(v);
+         i = pic("doubcube.png",u,v)*lightsc; setcol(i,i,i);
+      }
+      v += vi;
+      setpix(sx,sy);
+   }
+
+   vx -= s; vy += c;
+}
+
+movex = 0; movey = 0;
+if ((bstatus == 1) || (bstatus == 3))
+   { movex = (mousx-hx)/hx; movey = (mousy-hy)/hy; }
+if ((keystatus[0x2a]) || (keystatus[0x36])) spd = 1; else spd = .5;
+if (keystatus[0xc8]) movey -= spd;
+if (keystatus[0xd0]) movey += spd;
+if (keystatus[0xcb]) movex -= spd;
+if (keystatus[0xcd]) movex += spd;
+if ((movex) || (movey))
+{
+   t = movex*fsynctics*5; glob[3] += t;
+   t = movey*fsynctics*-5;
+   for(i=3;i>0;i--) //quick&dirty collision detection
+   {
+      x = glob[0]+c*t*((i == 1) || (i == 3));
+      y = glob[1]+s*t*(i >= 2);
+      if ((pic("doubcube.png",x-.25,y-.25) < 16777215) &&
+          (pic("doubcube.png",x+.25,y-.25) < 16777215) &&
+          (pic("doubcube.png",x-.25,y+.25) < 16777215) &&
+          (pic("doubcube.png",x+.25,y+.25) < 16777215))
+         { glob[0] = x; glob[1] = y; break; }
+   }
+}
+if (bstatus >= 2)
+{
+   t = (hy-mousy)/hy*fsynctics*5; glob[2] = min(max(glob[2]-t,0),1);
+}
+
+setcol(128,80,60); moveto(mousx,mousy); lineto(hx,hy);

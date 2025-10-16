@@ -1,0 +1,310 @@
+()
+{
+   enum {MAXSPR=256,BXSIZ=256,BYSIZ=64}
+   static board[BXSIZ][BYSIZ], xoff, yoff, tim;
+   static sprx[MAXSPR], spry[MAXSPR], sprtyp[MAXSPR];
+   static sprvx[MAXSPR], sprvy[MAXSPR], numspr = 0;
+   static posx, posy, velx, vely, gang, ang, injump;
+   if (numframes == 0)
+   {
+      playsong("/games/emu/nesmusic/mario.mid",-20);
+      for(i=0;i<BXSIZ*BYSIZ;i++) board[0][i] = 0;
+      for(y=0;y<BYSIZ;y++) { board[0][y] = 2; board[BXSIZ-1][y] = 2; }
+      for(x=0;x<BXSIZ;x++) { board[x][0] = 2; board[x][BYSIZ-1] = 2; }
+      for(i=1024;i>0;i--)
+      {
+         x0 = int((BXSIZ-2)*rnd)+1;
+         x1 = min(max(x0+int(16*rnd)-8,1),BXSIZ-2);
+         y = int((BYSIZ-2)*rnd)+1;
+         c = int(rnd*1.6)+1; //More likely wood
+         for(x=x0;x<=x1;x++) board[x][y] = c;
+      }
+      for(i=0;i<64;i++)
+      {
+         do
+         {
+            x = int((BXSIZ-2)*rnd)+1;
+            y = int((BYSIZ-2)*rnd)+1;
+         } while (board[x][y]);
+         board[x][y] = -(i%2)-1;
+      }
+      for(i=0;i<64;i++)
+      {
+         do
+         {
+            x = int((BXSIZ-2)*rnd)+1;
+            y = int((BYSIZ-2)*rnd)+1;
+         } while ((board[x][y]) || (board[x][y+1] == 0));
+         sprx[numspr] = x*32+16;
+         spry[numspr] = y*32+16;
+         sprvx[numspr] = sgn(rnd-.5)*64;
+         sprvy[numspr] = 0;
+         sprtyp[numspr] = 4;
+         numspr++;
+      }
+      gang = -PI/2+.1; ang = gang;
+      velx = 0; posx = 2*32-16;
+      vely = 0; posy = (BYSIZ-1)*32-16;
+      x = int(posx/32); y = int(posy/32);
+      board[x][y] = 0; board[x][y-1] = 0; board[x+1][y-1] = 0;
+      tim = klock();
+   }
+   otim = tim; tim = klock(); dtim = tim-otim;
+   
+      
+      //Player physics code:
+   d = 15;
+   onfloor = ((board[(posx-d)/32][(posy+d+1)/32] > 0) ||
+              (board[(posx+d)/32][(posy+d+1)/32] > 0));
+   if (keystatus[0xcb])
+   {
+      if (onfloor) velx -= dtim*96; else velx -= dtim*12;
+      gang = +PI/2-.01;
+   }
+   if (keystatus[0xcd])
+   {
+      if (onfloor) velx += dtim*96; else velx += dtim*12;
+      gang = -PI/2+.01;
+   }
+   if (keystatus[0xd0]) gang = 0;
+   if (keystatus[0xc8])
+   {
+      if ((injump <= 0) && (onfloor)) 
+         { injump = 1; playsound("rulinst.wav",100,1.2); }
+      if (injump > 0)
+      {
+         vely -= dtim*96; injump = max(injump-dtim*8,0);
+      }
+   }
+   else injump = 0;
+   oposx = posx; oposy = posy;
+   nvx = velx*dtim*64;
+   nvy = vely*dtim*64;
+   d = 15;
+   for(i=4-1;i>=0;i--) //quick&dirty collision detection
+   {
+      x = posx+nvx*(i%2);
+      y = posy+nvy*(i>=2);
+      if ((board[(x-d)/32][(y-d)/32] <= 0) &&
+          (board[(x+d)/32][(y-d)/32] <= 0) &&
+          (board[(x-d)/32][(y+d)/32] <= 0) &&
+          (board[(x+d)/32][(y+d)/32] <= 0))
+         { posx = x; posy = y; break; }
+   }
+   velx = (posx-oposx)/(dtim*64);
+   vely = (posy-oposy)/(dtim*64);
+   if (onfloor) velx *= pow(.5,dtim*32);
+   else if (injump <= 0) { vely += dtim*32; if ((posy%32) < 16) posy++;/*hack!*/ }
+      
+   for(i=4-1;i>=0;i--)
+   {
+      x = posx/32+(i%2)-.5;
+      y = posy/32+(i>=2)-.5;
+      if (board[x][y] < 0)
+      {
+         playsound("pickup.wav");
+         board[x][y] = 0;
+      }
+   }
+
+   if (bstatus)
+   {
+      static lastbulshot;
+      t = klock();
+      
+      if (abs(t-lastbulshot) > 1/3)
+      {
+         playsound("shoot.wav");
+         lastbulshot = t;
+         sprx[numspr] = posx;
+         spry[numspr] = posy;
+         sprtyp[numspr] = bstatus;
+         dx = mousx-(posx-xoff);
+         dy = mousy-(posy-yoff);
+         f = 512/sqrt(dx*dx+dy*dy);
+         dx *= f; dy *= f;
+         sprvx[numspr] = dx;
+         sprvy[numspr] = dy;
+         numspr++;
+         if (dx < -.25) gang = +PI/2-.01;
+         if (dx > +.25) gang = -PI/2+.01;
+      }
+   }
+   for(i=numspr-1;i>=0;i--)
+   {
+      if (sprtyp[i] < 4)
+      {
+         ox = int(sprx[i]/32); oy = int(spry[i]/32);
+         sprx[i] += sprvx[i]*dtim;
+         spry[i] += sprvy[i]*dtim;
+         x = int(sprx[i]/32); y = int(spry[i]/32);
+         if (board[x][y] > 0)
+         {
+            if (sprtyp[i] == 2) { playsound("tapfloor.flac"); board[ox][oy] = 1; }
+            else
+            {
+               if (board[x][y] == 1) { playsound("tapfloor.flac"); board[x][y] = 0; }
+                                  else playsound("gothit.wav",100,nrnd*.05+1.2);
+            }
+            numspr--;
+            sprx[i] = sprx[numspr];
+            spry[i] = spry[numspr];
+            sprtyp[i] = sprtyp[numspr];
+            sprvx[i] = sprvx[numspr];
+            sprvy[i] = sprvy[numspr];
+         }
+      }
+      else
+      {
+         sprx[i] += sprvx[i]*dtim;
+         if ((board[sprx[i]/32][spry[i]/32+1] <= 0) ||
+             (board[sprx[i]/32+sgn(sprvx[i])/4][spry[i]/32] > 0))
+            sprvx[i] *= -1;
+         if (board[sprx[i]/32][spry[i]/32+1] <= 0)
+         {
+            spry[i] += sprvy[i]*dtim; sprvy[i] += dtim*256;
+         } else { sprvy[i] = 0; spry[i] += ((int(spry[i]/32)*32+16)-spry[i])*.1; }
+         if ((sprx[i]-posx)^2 + (spry[i]-posy)^2 < 16^2)
+         {
+            playsound("ouch.wav");
+            do
+            {
+               x = int((BXSIZ-2)*rnd)+1;
+               y = int((BYSIZ-2)*rnd)+1;
+            } while ((board[x][y]) || (board[x][y+1] == 0));
+            posx = (x+.5)*32; posy = (y+.5)*32;
+            velx = 0; vely = 0;
+         }
+      }
+   }
+   
+   
+
+      //Rendering code:
+   xoff = max(min(xoff,posx-xres*.25),posx-xres*.75);
+   yoff = max(min(yoff,posy-yres*.25),posy-yres*.75); 
+   xoff = min(max(xoff,0),BXSIZ*32-xres);
+   yoff = min(max(yoff,0),BYSIZ*32-yres);
+   
+   clz(1e32); setcam(0,xres/2,0,0,-PI/2);
+   x0 = max(floor(xoff/32),0); x1 = min(floor((xoff+xres)/32)+1,BXSIZ);
+   y0 = max(floor(yoff/32),0); y1 = min(floor((yoff+yres)/32)+1,BYSIZ);
+   
+   setcol(128,128,192); glsettex("cloud.png");
+   glbegin(GL_QUADS); f = -3/xres; g = (tim/8)%1;
+   gltexcoord(0-xoff*f+g,0-yoff*f); glvertex(-xres/2,0,-yres/2);
+   gltexcoord(4-xoff*f+g,0-yoff*f); glvertex(+xres/2,0,-yres/2);
+   gltexcoord(4-xoff*f+g,3-yoff*f); glvertex(+xres/2,0,+yres/2);
+   gltexcoord(0-xoff*f+g,3-yoff*f); glvertex(-xres/2,0,+yres/2);
+   
+   for(y=y0;y<y1;y++)
+      for(x=x0;x<x1;x++)
+      {
+         b = board[x][y]; if (b == 0) continue;
+         if (b > 0)
+         {
+            setcam(0,xres/2,0,0,-PI/2);
+            if (b == 1) glsettex("wood.png");
+                   else glsettex("brick.png");
+            drawtile(x*32-xoff,y*32-yoff);
+         }
+         else
+         {
+            setcam(xres/2,yres/2,-xres/2,0,0);
+            if (b == -1) setcol(0xffffff);
+                    else setcol(0xff8000);
+            drawkv6("rpg.kv6",.5,(x+.5)*32-xoff,(y+.5)*32-yoff,-16,tim,0);
+         }
+      }
+   
+   setcam(xres/2,yres/2,-xres/2,0,0);
+   
+   if ((gang-ang)%(PI*2) < PI) ang = min(ang+dtim*12,gang);
+                          else ang = max(ang-dtim*12,gang);
+   setcol(0xffffff);
+   drawkv6("caco.kv6",.5,posx-xoff,posy-yoff,-16,ang,0);
+   
+   t = cos(tim*10)*8;
+   for(i=numspr-1;i>=0;i--)
+   {
+      if (sprtyp[i] < 4)
+      {
+         if (sprtyp[i] == 2) setcol(0xff8000);
+                        else setcol(0xffffff);
+         drawkv6("rpg.kv6",.5,sprx[i]-xoff,spry[i]-yoff,-16,PI/2,atan2(-sprvy[i],sprvx[i]));
+      }
+      else
+      {
+         if (sprvy[i] == 0) { c = sgn(sprvx[i]); s = 0; } //not falling
+                       else { c = 0; s = 1; } //falling
+         
+         setcol(0xb06040);
+         drawcone(sprx[i]-xoff,spry[i]-yoff- 8,-16,6, //Bell body
+                  sprx[i]-xoff,spry[i]-yoff+14,-16,-15);
+         
+         drawcone(sprx[i]-xoff-s*4  ,spry[i]-yoff+ 6,-16-c*4,-3, //Legs
+                  sprx[i]-xoff-s*4+t,spry[i]-yoff+15,-16-c*4,-3);
+         drawcone(sprx[i]-xoff+s*4  ,spry[i]-yoff+ 6,-16+c*4,-3,
+                  sprx[i]-xoff+s*4-t,spry[i]-yoff+15,-16+c*4,-3);
+         
+         setcol(0xffffff);
+         drawsph(sprx[i]-xoff+c*5-s*4,spry[i]-yoff-6,-16-c*4-s*5,3); //Eyes
+         drawsph(sprx[i]-xoff+c*5+s*4,spry[i]-yoff-6,-16+c*4-s*5,3);
+         setcol(0x800000);
+         drawsph(sprx[i]-xoff+c*6.5-s*4,spry[i]-yoff-6,-16-c*4-s*6.5,2); //Pupils
+         drawsph(sprx[i]-xoff+c*6.5+s*4,spry[i]-yoff-6,-16+c*4-s*6.5,2);
+
+         setcol(0x604000);
+         drawcone(sprx[i]-xoff+c*10-s*6,spry[i]-yoff+2,-16-c*6-s*10,3,
+                  sprx[i]-xoff+c*10+s*6,spry[i]-yoff+2,-16+c*6-s*10,3);
+         
+      }
+   }
+}
+
+drawtile(x,y)
+{
+   x -= (xres/2-16);
+   y -= (yres/2-16);
+   glbegin(GL_QUADS);
+   
+   setcol(0xc0c0c0); //Front
+   gltexcoord(0,0); glvertex(x-16,36,y-16);
+   gltexcoord(1,0); glvertex(x+16,36,y-16);
+   gltexcoord(1,1); glvertex(x+16,36,y+16);
+   gltexcoord(0,1); glvertex(x-16,36,y+16);
+      
+   if (y > 0)
+   {
+      setcol(0xffffff); //Top
+      gltexcoord(0,0); glvertex(x-16, 4,y-16);
+      gltexcoord(1,0); glvertex(x+16, 4,y-16);
+      gltexcoord(1,1); glvertex(x+16,36,y-16);
+      gltexcoord(0,1); glvertex(x-16,36,y-16);
+   }
+   else
+   {
+      setcol(0x808080); //Bottom
+      gltexcoord(0,0); glvertex(x+16, 4,y+16);
+      gltexcoord(1,0); glvertex(x-16, 4,y+16);
+      gltexcoord(1,1); glvertex(x-16,36,y+16);
+      gltexcoord(0,1); glvertex(x+16,36,y+16);
+   }
+   
+   if (x > 0)
+   {
+      setcol(0xe0e0e0); //Left
+      gltexcoord(0,0); glvertex(x-16, 4,y-16);
+      gltexcoord(1,0); glvertex(x-16,36,y-16);
+      gltexcoord(1,1); glvertex(x-16,36,y+16);
+      gltexcoord(0,1); glvertex(x-16, 4,y+16);
+   }
+   else
+   {   
+      setcol(0xa0a0a0); //Right
+      gltexcoord(0,0); glvertex(x+16, 4,y+16);
+      gltexcoord(1,0); glvertex(x+16,36,y+16);
+      gltexcoord(1,1); glvertex(x+16,36,y-16);
+      gltexcoord(0,1); glvertex(x+16, 4,y-16);
+   }
+}

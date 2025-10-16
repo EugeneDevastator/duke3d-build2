@@ -1,0 +1,176 @@
+enum {MODEL=0}; //{0..2}
+enum {NPTS=2^13};
+struct { x, y, z; } point3d;
+()
+{
+   static point3d pt[NPTS], op, or, od, of, ap, ar, ad, af;
+   static point3d pp = {0,0,-16}, pr = {1,0,0}, pd = {0,1,0}, pf = {0,0,1};
+   static omousx, omousy, tim, otim;
+   static linefit3d_t lf;
+   
+   matrand(or,od,of); op.x = nrnd*4; op.y = nrnd*4; op.z = nrnd*4;
+   scx = nrnd*4; scy = nrnd*4; scz = nrnd*4;
+
+   otim = klock();
+   while (1)
+   {
+      tim = klock(); dtim = tim-otim; otim = tim;
+      cls(0); clz(1e32);
+      
+      readmouse(&mx,&my);
+      
+      setcam(pp.x,pp.y,pp.z,pr.x,pr.y,pr.z,pd.x,pd.y,pd.z,pf.x,pf.y,pf.z);
+      
+      for(i=0;i<NPTS;i++)
+      {
+#if (MODEL == 0)
+         dx = nrnd*scx; dy = nrnd*scy; dz = nrnd*scz;
+#elif (MODEL == 1)
+         dz = rnd*2-1; a = rnd*(PI*2); r = sqrt(1-dz*dz);
+         dx = cos(a)*r*scx;
+         dy = sin(a)*r*scy; dz *= scz;
+#else
+         dx = ((int(i/1)%2)*2-1)*scx;
+         dy = ((int(i/2)%2)*2-1)*scy;
+         dz = ((int(i/4)%2)*2-1)*scz;
+#endif      
+         pt[i].x = dx*or.x + dy*od.x + dz*of.x + op.x;
+         pt[i].y = dx*or.y + dy*od.y + dz*of.y + op.y;
+         pt[i].z = dx*or.z + dy*od.z + dz*of.z + op.z;
+      }
+      
+      setcol(0x807060);
+      linefit3d_init(lf);
+      for(i=0;i<NPTS;i++)
+      {
+         drawsph(pt[i].x,pt[i].y,pt[i].z,.03);
+         linefit3d_addpoint(lf,pt[i].x,pt[i].y,pt[i].z,1);
+      }
+      linefit3d_getaxes(lf,ap,ar,ad,af);
+      
+      setcol(0xc0c0c0); drawsph(0,0,0,.1);
+      setcol(0xc04040); drawcone(0,0,0,.05,1,0,0,.05,DRAWCONE_NOPHONG);
+      setcol(0x40c040); drawcone(0,0,0,.05,0,1,0,.05,DRAWCONE_NOPHONG);
+      setcol(0x4040c0); drawcone(0,0,0,.05,0,0,1,.05,DRAWCONE_NOPHONG);
+      
+      setcol(0xc0c0c0): drawsph(ap.x,ap.y,ap.z,.2);
+      setcol(0xc06060); for(j=-3;j<=3;j++) drawsph(ap.x+ar.x*j,ap.y+ar.y*j,ap.z+ar.z*j,.125);
+      drawcone(ap.x+ar.x*3,ap.y+ar.y*3,ap.z+ar.z*3,.05,ap.x-ar.x*3,ap.y-ar.y*3,ap.z-ar.z*3,.05);
+      setcol(0x60c060); for(j=-3;j<=3;j++) drawsph(ap.x+ad.x*j,ap.y+ad.y*j,ap.z+ad.z*j,.125);
+      drawcone(ap.x+ad.x*3,ap.y+ad.y*3,ap.z+ad.z*3,.05,ap.x-ad.x*3,ap.y-ad.y*3,ap.z-ad.z*3,.05);
+      setcol(0x6060c0); for(j=-3;j<=3;j++) drawsph(ap.x+af.x*j,ap.y+af.y*j,ap.z+af.z*j,.125);
+      drawcone(ap.x+af.x*3,ap.y+af.y*3,ap.z+af.z*3,.05,ap.x-af.x*3,ap.y-af.y*3,ap.z-af.z*3,.05);
+      
+      setcol(0xc0c060);
+      drawcone(op.x+or.x*scx,op.y+or.y*scx,op.z+or.z*scx,-.1,
+               op.x-or.x*scx,op.y-or.y*scx,op.z-or.z*scx,-.1);
+      drawcone(op.x+od.x*scy,op.y+od.y*scy,op.z+od.z*scy,-.1,
+               op.x-od.x*scy,op.y-od.y*scy,op.z-od.z*scy,-.1);
+      drawcone(op.x+of.x*scz,op.y+of.y*scz,op.z+of.z*scz,-.1,
+               op.x-of.x*scz,op.y-of.y*scz,op.z-of.z*scz,-.1);
+      
+      rotvex(mx*.01,pr,pf);
+      rotvex(my*.01,pd,pf);
+      rotvex(pr.y*.01,pr,pd);
+      f = dtim*4;
+      if (keystatus[0x2a]) f *= 1/4;
+      if (keystatus[0x36]) f *= 4/1;
+      x = (keystatus[0xcd]-keystatus[0xcb])*f;
+      y = (keystatus[0x52]-keystatus[0x9d])*f;
+      z = (keystatus[0xc8]-keystatus[0xd0])*f;
+      pp.x += pr.x*x + pd.x*y + pf.x*z;
+      pp.y += pr.y*x + pd.y*y + pf.y*z;
+      pp.z += pr.z*x + pd.z*y + pf.z*z;
+      refresh();
+   }
+}
+
+rotvex (ang, point3d a, point3d b)
+{
+   c = cos(ang); s = sin(ang);
+   t = a.x; a.x = a.x*c - b.x*s; b.x = b.x*c + t*s;
+   t = a.y; a.y = a.y*c - b.y*s; b.y = b.y*c + t*s;
+   t = a.z; a.z = a.z*c - b.z*s; b.z = b.z*c + t*s;
+}
+
+matrand (point3d a, point3d b, point3d c)
+{
+   vecrand(a);
+   vecrand(c);
+   b.x = a.y*c.z - a.z*c.y;
+   b.y = a.z*c.x - a.x*c.z;
+   b.z = a.x*c.y - a.y*c.x;
+   f = 1/sqrt(b.x*b.x + b.y*b.y + b.z*b.z); b.x *= f; b.y *= f; b.z *= f;
+   c.x = a.y*b.z - a.z*b.y;
+   c.y = a.z*b.x - a.x*b.z;
+   c.z = a.x*b.y - a.y*b.x;
+}
+
+vecrand (point3d a)
+{     //UNIFORM spherical randomization (see spherand.c)
+   a.z = rnd*2-1;
+   f = rnd*(PI*2); a.x = cos(f); a.y = sin(f);
+   f = sqrt(1-a.z*a.z); a.x *= f; a.y *= f;
+}
+
+//-----------------------------------------------------------------------------
+struct { s, sx, sy, sz, sxx, syy, szz, sxy, sxz, syz; } linefit3d_t;
+linefit3d_init (linefit3d_t lf)
+{
+   lf.s = 0; lf.sx = 0; lf.sy = 0; lf.sz = 0;
+   lf.sxx = 0; lf.syy = 0; lf.szz = 0;
+   lf.sxy = 0; lf.sxz = 0; lf.syz = 0;
+}
+linefit3d_addpoint (linefit3d_t lf, x, y, z, w)
+{
+   lf.s++;
+   lf.sx += x; lf.sxx += x*x; lf.sxy += x*y;
+   lf.sy += y; lf.syy += y*y; lf.sxz += x*z;
+   lf.sz += z; lf.szz += z*z; lf.syz += y*z;
+}
+linefit3d_getaxes (linefit3d_t lf, point3d pp, point3d rr, point3d dd, point3d ff)
+{
+   static ev[3], mat[9], nx[3], ny[3], nz[3];
+   
+   s = lf.s; sx = lf.sx; sy = lf.sy; sz = lf.sz;
+   sxx = lf.sxx; syy = lf.syy; szz = lf.szz;
+   sxy = lf.sxy; sxz = lf.sxz; syz = lf.syz;
+   
+   r = 1/s; cx = sx*r; cy = sy*r; cz = sz*r; //cx,cy,cz is centroid
+   sxx -= sx*cx; syy -= sy*cy; szz -= sz*cz;
+   sxy -= sx*cy; sxz -= sx*cz; syz -= sy*cz;
+   sxysq = sxy*sxy; sxzsq = sxz*sxz; syzsq = syz*syz; syyzz = syy*szz;
+   
+   t = (sxysq + sxzsq + syzsq - sxx*(syy+szz) - syyzz)*(1/6);
+   o = (sxx+syy+szz)*(-1/3);
+   q = o*o + t + t;
+   r = (t+q)*o + ((syzsq - syyzz)*sxx + sxzsq*syy + sxysq*szz)*.5 - sxy*sxz*syz;
+   ang = atan2(sqrt(max(q*q*q - r*r,0)),r)*(1/3); //acos(x) = atan(sqrt(1-x*x)/x)
+   t = -sqrt(q); cs = cos(ang)*t; sn = sin(ang)*t*sqrt(3);
+   ev[0] = +cs+cs-o; //blue / short axis
+   ev[1] = -cs+sn-o; //green/medium axis
+   ev[2] = -cs-sn-o; //red  /  long axis
+   
+   for(i=0;i<3;i++)
+   {
+      vx = sxx-ev[i];
+      vy = syy-ev[i];
+      vz = szz-ev[i];
+      mat[0] = sxy*syz -  vy*sxz; mat[1] = sxy*sxz -  vx*syz; mat[2] =  vx*vy  - sxy*sxy;
+      mat[3] =  vy*vz  - syz*syz; mat[4] = sxz*syz -  vz*sxy; mat[5] = sxy*syz -  vy*sxz;
+      mat[6] = sxz*syz -  vz*sxy; mat[7] =  vx*vz  - sxz*sxz; mat[8] = sxy*sxz -  vx*syz;
+      k = 0; for(j=9-1;j>0;j--) { if (fabs(mat[j]) > fabs(mat[k])) k = j; } k -= k%3;
+      nx[i] = mat[k+0]; ny[i] = mat[k+1]; nz[i] = mat[k+2];
+      
+      f = sqrt(ev[i]/(s*(nx[i]*nx[i]+ny[i]*ny[i]+nz[i]*nz[i])));
+#if (MODEL == 1)      
+      f *= sqrt(3); //correction hack for ellipsoid
+#endif      
+      nx[i] *= f; ny[i] *= f; nz[i] *= f;
+   }
+   pp.x = cx   ; pp.y = cy   ; pp.z = cz   ;
+   rr.x = nx[0]; rr.y = ny[0]; rr.z = nz[0];
+   dd.x = nx[1]; dd.y = ny[1]; dd.z = nz[1];
+   ff.x = nx[2]; ff.y = ny[2]; ff.z = nz[2];
+}
+//-----------------------------------------------------------------------------x

@@ -1,0 +1,106 @@
+() cls(0); clz(1e32); hx = xres/2; hy = yres/2; hz = hx;enum {n=128};
+t = klock();
+setcam(0,384,128,cos(t),-PI/4);
+static ballx[n], bally[n], ballr[n];
+static ballxv[n], ballyv[n], ballcol[n];
+static tim, otim;
+if (numframes == 0)
+{
+   ballx[0] = mousx; ballxv[0] = 0;
+   bally[0] = mousy; ballyv[0] = 0;
+   ballr[0] = 32;
+   ballcol[0] = 0xc0c0c0;
+   for(i=1;i<n;i++)
+   {
+      cnt = 256;
+      do
+      {
+         ballr[i] = 32*rnd+8;
+         ballx[i] = (xres-ballr[i]*2)*rnd+ballr[i];
+         bally[i] = (yres-ballr[i]*2)*rnd+ballr[i];
+         for(j=i-1;j>=0;j--)
+            if ((ballx[i]-ballx[j])^2 + (bally[i]-bally[j])^2 < (ballr[i]+ballr[j])^2) break;
+         cnt--;
+      } while ((j >= 0) && (cnt > 0));
+      ballxv[i] = 0; //nrnd*64*0;
+      ballyv[i] = 0; //nrnd*64*0;
+      ballcol[i] = (int(128*rnd)+64)*65536+(int(128*rnd)+64)*256+int(128*rnd)+64;
+   }
+   tim = klock();
+}
+otim = tim; tim = klock(); dt = max(tim-otim,1e-4); rdt = 1/dt;
+ballxv[0] = (mousx-ballx[0])*rdt;
+ballyv[0] = (mousy-bally[0])*rdt;
+
+for(i=0;i<n;i++)
+{
+   ballx[i] += ballxv[i]*dt;
+   bally[i] += ballyv[i]*dt;
+   if (ballx[i]-ballr[i] < 0) { ballx[i] = ballr[i]*2-ballx[i]; ballxv[i] = abs(ballxv[i]); }
+   if (bally[i]-ballr[i] < 0) { bally[i] = ballr[i]*2-bally[i]; ballyv[i] = abs(ballyv[i]); }
+   if (ballx[i]+ballr[i] > xres) { ballx[i] = (xres-ballr[i])*2-ballx[i]; ballxv[i] = -abs(ballxv[i]); }
+   if (bally[i]+ballr[i] > yres) { bally[i] = (yres-ballr[i])*2-bally[i]; ballyv[i] = -abs(ballyv[i]); }
+   for(j=0;j<n;j++)
+   {
+      if (i == j) continue;
+      d = sqrt((ballx[i]-ballx[j])^2 + (bally[i]-bally[j])^2) - (ballr[i]+ballr[j]);
+      if (d < 0)
+      {
+         vx = ballx[j]-ballx[i];
+         vy = bally[j]-bally[i];
+         f = 1/(sqrt(vx^2+vy^2)); vx *= f; vy *= f;
+         m = ballr[i]^2 + ballr[j]^2;
+         ballx[i] += vx*d/2; ballxv[i] += vx*d*(ballr[j]^2/m)*rdt;
+         bally[i] += vy*d/2; ballyv[i] += vy*d*(ballr[j]^2/m)*rdt;
+         ballx[j] -= vx*d/2; ballxv[j] -= vx*d*(ballr[i]^2/m)*rdt;
+         bally[j] -= vy*d/2; ballyv[j] -= vy*d*(ballr[i]^2/m)*rdt;
+         ballxv[i] = min(max(ballxv[i],-4096),4096);
+         ballyv[i] = min(max(ballyv[i],-4096),4096);
+         ballxv[j] = min(max(ballxv[j],-4096),4096);
+         ballyv[j] = min(max(ballyv[j],-4096),4096);
+      }
+   }
+   
+      //Friction
+   ballxv[i] *= exp(dt*-.1);
+   ballyv[i] *= exp(dt*-.1);
+      
+   setcol(ballcol[i]);
+   drawsph(ballx[i]-xres/2,bally[i]-yres/2,xres/2-ballr[i],ballr[i]);
+   //moveto(ballx[i]+ballr[i],bally[i]); da = PI*2/64;
+   //for(a=da*.5-PI*2;a<da;a+=da)
+   //   lineto(cos(a)*ballr[i]+ballx[i],sin(a)*ballr[i]+bally[i]);
+}
+
+glsettex("wood.png");
+setcol(0xffffff);
+glBegin(GL_QUADS);
+glTexCoord( 0, 0); glVertex(-hx,-hy,hz);
+glTexCoord(10, 0); glVertex( hx,-hy,hz);
+glTexCoord(10,10); glVertex( hx, hy,hz);
+glTexCoord( 0,10); glVertex(-hx, hy,hz);
+
+setcol(0xc0c0c0);
+glTexCoord( 0,0); glVertex(-hx, hy,hz-40);
+glTexCoord(10,0); glVertex(-hx,-hy,hz-40);
+glTexCoord(10,1); glVertex(-hx,-hy,hz);
+glTexCoord( 0,1); glVertex(-hx, hy,hz);
+
+setcol(0xe0e0e0);
+glTexCoord( 0,0); glVertex( hx,-hy,hz-40);
+glTexCoord(10,0); glVertex( hx, hy,hz-40);
+glTexCoord(10,1); glVertex( hx, hy,hz);
+glTexCoord( 0,1); glVertex( hx,-hy,hz);
+
+setcol(0xe0e0e0);
+glTexCoord( 0,0); glVertex(-hx,-hy,hz-40);
+glTexCoord(10,0); glVertex(+hx,-hy,hz-40);
+glTexCoord(10,1); glVertex(+hx,-hy,hz);
+glTexCoord( 0,1); glVertex(-hx,-hy,hz);
+
+setcol(0xc0c0c0);
+glTexCoord( 0,0); glVertex(-hx,+hy,hz-40);
+glTexCoord(10,0); glVertex(+hx,+hy,hz-40);
+glTexCoord(10,1); glVertex(+hx,+hy,hz);
+glTexCoord( 0,1); glVertex(-hx,+hy,hz);
+glEnd();

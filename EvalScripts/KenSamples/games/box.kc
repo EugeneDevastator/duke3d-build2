@@ -1,0 +1,258 @@
+// My version of the box-packing game.
+// With an auto-solving algorithm.
+//
+// See http://koalalib.org/games/boxpack.php for the original by Tom.
+//
+// -Robert
+
+struct col_t {r,g,b;};
+struct box_t {x,y,w,h; col_t col;};
+static winx, winy, winw, winh;
+
+()
+{
+   static box_t box[32], obox[32], tbox[32];
+   auto perim, grab=-1, grabx, graby;
+   
+   winw=int(xres*.75/4)*4; winh=int(yres*.9/4)*4;
+   winx=int((xres-winw)/32)*4; winy=int((yres-winh)/8)*4;
+   pn=0; mode=0; keystatus[0x13]=1; srand(klock(9));
+
+   do
+   {
+      if (keystatus[0x13])
+      {
+         keystatus[0x13]=0; pn=int(rnd*7)+6; perim=1e32; bestarea=1e32;
+         for (i=0;i<pn;i++)
+         {
+            box[i].col.r=rnd*255;
+            box[i].col.g=rnd*255;
+            box[i].col.b=rnd*255;
+            do
+            {
+               box[i].x=int(rnd*(winw-32))+winx;
+               box[i].y=int(rnd*(winh-32))+winy;
+               box[i].w=int(rnd*min(128-32,(winx+winw-box[i].x-32)))+32;
+               box[i].h=int(rnd*min(128-32,(winy+winh-box[i].y-32)))+32;
+               
+               box[i].x=int(box[i].x/4)*4; box[i].y=int(box[i].y/4)*4;
+               box[i].w=int(box[i].w/4)*4; box[i].h=int(box[i].h/4)*4;
+            }
+            while(!clear(box[i],box,i,i));
+         }
+         obox=box; // copy entire array of structures :) [works for normal arrays without '[]' too]
+      }
+      if (keystatus[0x1f])
+      {
+         tbox=obox; autosolve(tbox,pn);
+         mxo=1e32; myo=1e32; mwo=-1e32; mho=-1e32;
+         mx=1e32; my=1e32; mw=-1e32; mh=-1e32;
+         for (i=0;i<pn;i++)
+         {
+            mx=min(mx,tbox[i].x); mw=max(mw,(tbox[i].x+tbox[i].w));
+            my=min(my,tbox[i].y); mh=max(mh,(tbox[i].y+tbox[i].h));
+            mxo=min(mxo,box[i].x); mwo=max(mwo,(box[i].x+box[i].w));
+            myo=min(myo,box[i].y); mho=max(mho,(box[i].y+box[i].h));
+         }
+         if ((mw-mx)+(mh-my) < (mwo-mxo)+(mho-myo))
+         {
+            box=tbox;
+            for (i=0;i<pn;i++) {box[i].x-=mx-winx; box[i].y-=my-winy;}
+         }
+      }
+      
+      if (bstatus)
+      {
+         if (grab<0)
+         {
+            for (grab=pn-1;grab>=0;grab--)
+            {
+               if (box[grab].x<=mousx && mousx<(box[grab].x+box[grab].w) &&
+                   box[grab].y<=mousy && mousy<(box[grab].y+box[grab].h))
+               {
+                  grabx=mousx-box[grab].x;
+                  graby=mousy-box[grab].y;
+                  break;
+               }
+            }
+         }
+      }
+      else grab=-1;
+
+      if (grab>=0 && bstatus)
+      {
+         dx=int((mousx-(box[grab].x+grabx))/4)*4;
+         dy=int((mousy-(box[grab].y+graby))/4)*4;
+         clipmove(box[grab],box,pn,grab,dx,dy);
+      }
+   
+      cls(0); setfont(8,12);
+      setcol(0xffffff); moveto(winx,winy); lineto(winx+winw,winy);
+      lineto(winx+winw,winy+winh); lineto(winx,winy+winh); lineto(winx,winy);
+      mx=1e32; my=1e32; mw=-1e32; mh=-1e32;
+      for (boxa=0,i=0;i<pn;i++)
+      {
+         drawbox(box[i]);
+         mx=min(mx,box[i].x); mw=max(mw,(box[i].x+box[i].w));
+         my=min(my,box[i].y); mh=max(mh,(box[i].y+box[i].h));
+         boxa+=box[i].w*box[i].h;
+      }
+      setcol(0xff0000);
+      mx=ceil(mx); my=ceil(my); mw=ceil(mw); mh=ceil(mh);
+      moveto(mx-1,my-1); lineto(mw,my-1); lineto(mw,mh);
+      lineto(mx-1,mh); lineto(mx-1,my-1);
+      
+      f=((mw-mx)+(mh-my))*2; perim=min(perim,f);
+      area=((mw-mx)*(mh-my))-boxa; bestarea=min(bestarea,area);
+      
+      setcol(0xcccccc); moveto(winx+winw+16,winy);
+      printf("Boxes: %g\n\nPerim: %g\n Best: %g\n\nOpen area: %g\n    Least: %g\n\nDrag the boxes to\npack them in the\n",pn,f,perim,area,bestarea);
+      printf("smallest possible\nrectangle.\n\nR = New level.\nS = Auto solve.\n(Hold for better\nsolution.)\n\n");
+      printf("Input (x,y,w,h):\n");
+      for (i=0;i<pn;i++) {printf("%g %g %g %g\n",obox[i].x,obox[i].y,obox[i].w,obox[i].h);}
+      printf("\nArrangement:\n");
+      for (i=0;i<pn;i++) {printf("%g %g\n", box[i].x, box[i].y);}
+      
+      refresh();
+   }
+   while(1);
+}
+
+drawbox(box_t b)
+{
+   setcol(b.col.r,b.col.g,b.col.b); x0=ceil(b.x); x1=ceil(b.x+b.w);
+   for (y1=ceil(b.y+b.h),y0=ceil(b.y),i=y0;i<y1;i++) {moveto(x0,i); lineto(x1,i);}
+   setcol((b.col.r-255)*.5+255,(b.col.g-255)*.5+255,(b.col.b-255)*.5+255);
+   for (i=y0;i<(y0+4);i++) {moveto(x0,i); lineto(x1,i);}
+   for (i=y0;i<y1;i++) {moveto(x0,i); lineto(x0+4,i);}
+   setcol(b.col.r*.5,b.col.g*.5,b.col.b*.5);
+   for (i=y0;i<y1;i++) {moveto(x1-min(i-y0,4),i); lineto(x1,i);}
+   for (i=y1-4;i<y1;i++) {moveto(x0+y1-i,i); lineto(x1,i);}
+}
+
+clear(box_t b, box_t src[32], n, excl)
+{
+   b.x=int(b.x/4)*4; b.y=int(b.y/4)*4; // ensure coordinates are always quantized!
+   b.w=int(b.w/4)*4; b.h=int(b.h/4)*4;
+   if (b.x<winx) return(0); if ((b.x+b.w)>(winx+winw)) return(0);
+   if (b.y<winy) return(0); if ((b.y+b.h)>(winy+winh)) return(0);
+   for (i=0;i<n;i++)
+   {
+      if (i == excl) continue;
+      if (b.x >= (src[i].x+src[i].w)) continue;
+      if (b.y >= (src[i].y+src[i].h)) continue;
+      if ((b.x+b.w) < src[i].x) continue;
+      if ((b.y+b.h) < src[i].y) continue;
+      return(0);
+   }
+   return(1);
+}
+
+clipmove(box_t b, box_t src[32], n, excl, dx,dy)
+{
+   odx=dx; ody=dy;
+   if ((b.x+dx)<winx) dx=winx-b.x; if ((b.x+b.w+dx)>(winx+winw)) dx=winx+winw-b.w-b.x;
+   if ((b.y+dy)<winy) dy=winy-b.y; if ((b.y+b.h+dy)>(winy+winh)) dy=winy+winh-b.h-b.y;
+
+   for (i=0;i<n;i++)
+   {
+      if (i == excl) continue;
+      if (min(b.x,b.x+dx) >= (src[i].x+src[i].w)) continue;
+      if (min(b.y,b.y+dy) >= (src[i].y+src[i].h)) continue;
+      if (max(b.x+b.w,b.x+b.w+dx) <= src[i].x) continue;
+      if (max(b.y+b.h,b.y+b.h+dy) <= src[i].y) continue;
+
+      bx = (b.x+b.w*.5)-(src[i].x+src[i].w*.5);
+      by = (b.y+b.h*.5)-(src[i].y+src[i].h*.5);
+      if ((b.x+b.w<=src[i].x && b.x+b.w+dx>src[i].x) ||
+          (b.x>=src[i].x+src[i].w && b.x+dx<src[i].x+src[i].w))
+      {
+         dx=min(dx,max(src[i].x-b.x-b.w,0));
+         dx=max(dx,min(src[i].x+src[i].w-b.x,0));
+      }
+      if ((b.y+b.h<=src[i].y && b.y+b.h+dy>src[i].y) ||
+          (b.y>=src[i].y+src[i].h && b.y+dy<src[i].y+src[i].h))
+      {
+         dy=min(dy,max(src[i].y-b.y-b.h,0));
+         dy=max(dy,min(src[i].y+src[i].h-b.y,0));
+      }
+
+   }
+   clipv=0;
+   if (dx!=odx) clipv=1;
+   if (dy!=ody) clipv+=2;
+   b.x=int((b.x+dx)/4)*4;
+   b.y=int((b.y+dy)/4)*4;
+   return(clipv);
+}
+
+autosolve(box_t box[32], pn) // best-effort random solver
+{
+   static box_t best[32];
+   
+   mx=1e32; my=1e32; mw=-1e32; mh=-1e32; perim=1e32;
+   for (i=0;i<pn;i++) // initial random set
+   {
+      do
+      {
+         box[i].x=int((int(rnd*(winw-box[i].w))+winx)/4)*4;
+         box[i].y=int((int(rnd*(winh-box[i].h))+winy)/4)*4;
+      }
+      while(!clear(box[i],box,pn,i));
+      mx=min(mx,box[i].x); mw=max(mw,box[i].x+box[i].w);
+      my=min(my,box[i].y); mh=max(mh,box[i].y+box[i].h);
+   }
+
+   for (fcnt=16,lf=1e32,j=0;j<256;j++) // try to squeeze together, brute force
+   {
+      for (i=0;i<pn;i++)
+      {
+         vx=(mx+mw)*.5-box[i].x; vy=(my+mh)*.5-box[i].y;
+         k=clipmove(box[i],box,pn,i,vx,vy);
+         if (k%2)
+         {
+            if (vx>0) {clipmove(box[i],box,pn,i,-4,0);}
+            else {clipmove(box[i],box,pn,i,4,0);}
+            clipmove(box[i],box,pn,i,0,4-int(rnd*2)*8);
+         }
+         if ((k%4)>1)
+         {
+            if (vy>0) {clipmove(box[i],box,pn,i,0,-4);}
+            else {clipmove(box[i],box,pn,i,0,4);}
+            clipmove(box[i],box,pn,i,4-int(rnd*2)*8,0);
+         }
+         vx=(mx+mw)*.5-box[i].x; vy=(my+mh)*.5-box[i].y;
+         k=clipmove(box[i],box,pn,i,vx,vy);
+         if (k==3)
+         {
+            if (clipmove(box[i],box,pn,i,vx,0))
+               clipmove(box[i],box,pn,i,0,vy);
+         }
+      }
+
+      mxo=1e32; myo=1e32; mwo=-1e32; mho=-1e32;
+      for (i=0;i<pn;i++)
+      {
+         mxo=min(mxo,box[i].x); mwo=max(mwo,box[i].x+box[i].w);
+         myo=min(myo,box[i].y); mho=max(mho,box[i].y+box[i].h);
+      }
+      f=(mwo-mxo)+(mho-myo);
+      if (f<perim) {best=box; perim=f;}
+      else
+      {
+         if (f==lf)
+         {
+            fcnt--;
+            if (fcnt==8) {mx=mxo; my=myo; mw=mwo; mh=mho;}
+            else if (fcnt<=0)
+            {
+               mx=int((rnd*winw+winx)/4)*4; mw=int((rnd*(winw+winx-mx))/4)*4;
+               my=int((rnd*winh+winy)/4)*4; mh=int((rnd*(winh+winy-my))/4)*4;
+               fcnt=16;
+            }
+         }
+         else {fcnt=16;}
+      }
+      lf=f;
+   }
+}

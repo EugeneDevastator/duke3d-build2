@@ -1,0 +1,48 @@
+()
+{
+   cls(0); clz(1e32);
+   
+   static posx, posy, posz = -2, hang, vang, tim;
+   dt = tim; tim = klock(); dt = tim-dt;
+   f = dt*(keystatus[0x36]+1)*2;
+   posy += (keystatus[0xcf]-keystatus[0xc7])*f;
+   vang -= (keystatus[0xd1]-keystatus[0xc9])*f;
+   vx = (keystatus[0xcd]-keystatus[0xcb])*f;
+   vy = (keystatus[0xd0]-keystatus[0xc8])*f;
+   if (keystatus[0x9d] == 0) { hang += vx; vx = 0; }
+   posx += +cos(hang)*vx - sin(hang)*vy;
+   posz += -sin(hang)*vx - cos(hang)*vy;
+   setcam(posx,posy,posz,hang,vang);
+   drawscene();
+}
+
+drawscene ()
+{   
+   t = klock(); glcullface(GL_NONE);
+   for(z=0;z<4;z++)
+   {
+      setcol(256-z*64,255-z*32,255-z*16);
+      
+      glBegin(GL_COMPLEX);
+      
+         //Outer loop (clockwise)
+      n = 16; f = PI*2/n;
+      for(i=0;i<n;i++)
+      {
+         a = i*f - t; x = cos(a); y = sin(a);
+         glTexCoord(x,y); glVertex(x,y,z);
+      }
+      
+      glnextcontour();
+      
+         //Inner loop (counter-clockwise)
+      n = 12; f = PI*2/n;
+      for(i=n-1;i>=0;i--)
+      {
+         a = i*f + t; x = cos(a)/2; y = sin(a)/2;
+         glTexCoord(x,y); glVertex(x,y,z);
+      }
+      
+      glEnd();
+   }
+}

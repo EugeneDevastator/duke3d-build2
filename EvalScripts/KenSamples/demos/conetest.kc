@@ -1,0 +1,17 @@
+()
+cls(0); clz(1e32);
+setcol(0x808080);
+t = klock();
+a = t/2; setcam(sin(a)*-2,0,cos(a)*-2,a,0);
+da = PI*2/256; t = (t)%(PI*2);
+for(a=0;a<PI*2;a+=da)
+{
+   a0 = a; a1 = a0+da;
+   
+   r0 = exp(-(a0-t)^2*64)*.1+.01;
+   r1 = exp(-(a1-t)^2*64)*.1+.01;
+   
+   setcol(128+r0*512,140-r0*256,128-r0*512);
+   drawcone(cos(a0*4)*sin(a0/2),sin(a0*4)*sin(a0/2),cos(a0/2),r0,
+            cos(a1*4)*sin(a1/2),sin(a1*4)*sin(a1/2),cos(a1/2),r1);
+}

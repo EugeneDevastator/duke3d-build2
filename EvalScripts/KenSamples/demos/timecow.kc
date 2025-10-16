@@ -1,0 +1,97 @@
+// This is a script I wrote a long time ago.
+// It features a few silly characters and
+// an even sillier plot. :)
+//
+// See colacow.kc next.
+//
+// -Robert
+
+()
+{
+   static phase,phtim,sndphase,lrot,stim,snd2;
+   cls(0);clz(1e32);t=klock();p=(PI/5)*7;
+   if (numframes==0)
+   {
+      glsettex("cloud.png");
+      phase=0;phtim=2;
+   }
+   setcol(0xffffff);
+   if (phase==0)
+   {
+      if (sndphase==0) {sndphase=1;playsound("moo.flac");}
+      p=0;if (phtim<=t) {phtim+=(PI/5)*7;phase++;}
+      drawkv6("cow.kv6",.01,0,.5,2,PI*.25-t*PI*.38,0);
+   }
+   else if (phase==1)
+   {
+      if (phtim<=t) {phtim+=1;phase++;} sndphase=0;
+      p=t-2;x=-sin(p*10)*.25;y=abs(sin(p*5)*.35);
+      drawkv6("cow.kv6",.01,x,.5-y,2,-PI*.5,0);
+   }
+   else if (phase==2)
+   {
+      drawkv6("cow.kv6",.01,0,.5,2,-max((phtim-t),0)*PI*.5,0);
+      if (phtim<=t) {phtim+=.2;phase++;}
+   }
+   else if (phase==3)
+   {
+      if (phtim<=t) {phtim+=1;phase++;}
+      drawkv6("cow.kv6",.01,0,.5,2,0,0);
+   }
+   else if (phase==4)
+   {
+      if (sndphase==0) {sndphase=1;playsound("moo2.flac");}
+      drawkv6("cow.kv6",.01,0,.5-sin((phtim-t)*PI),2,0,0);
+      if (phtim<=t) {phtim+=1;phase++;sndphase=0;}
+   }
+   else if (phase==5)
+   {
+      if (phtim<=t) {phtim+=20;phase++;}
+      drawkv6("cow.kv6",.01,0,.5,2,0,0);
+   }
+   else if (phase==6)
+   {
+      x=max((phtim-t),0);
+      if (stim<=t)
+      {
+         stim=t+x*.1;sndphase++;if (x<1 && snd2==0) {playsound("moo2.flac",100,1);snd2=1;}
+         else {playsound("moo.flac",100,sndphase*.1+.5);}
+      }
+      x=20-x;lrot=x^2;drawkv6("cow.kv6",.01,0,.5,2,lrot,0);
+      if (phtim<=t) {phtim+=1;phase++;sndphase=0;playsoundupdate(-1,0);}
+   }
+   else if (phase==7)
+   {
+      if (sndphase==0) {sndphase=1;playsound("blowup2.flac");}
+      if (phtim<=t) {phtim+=1;phase++;} x=1-max((phtim-t),0);
+      drawkv6("cow.kv6",.01,0,.5,2,lrot,0);lrot=rnd*PI*2;
+      setcol(0xff,0xff*x,0xff*x);drawsph(0,.5,2,x^2);
+   }
+   else if (phase==8)
+   {
+      if (phtim<=t) {phase++;} x=1-max((phtim-t),0);
+      setcol(0xff-0xff*x,0xff-0xff*x,0xff-0xff*x);drawsph(0,.5,2,1-x);
+   }
+   setcol(0xa0f0);t*=.125;
+   glBegin(GL_QUADS);
+   glTexCoord( 0+t, 0-t); glVertex(-256,-4, 0);
+   glTexCoord(32+t, 0-t); glVertex(+256,-4, 0);
+   glTexCoord(32+t,16-t); glVertex(+256,+64,256);
+   glTexCoord( 0+t,16-t); glVertex(-256,+64,256);
+   glEnd();setcol(0x20f020);
+   glTexCoord( 0+p, 0); glVertex(-256,+64,256);
+   glTexCoord(32+p, 0); glVertex(+256,+64,256);
+   glTexCoord(32+p,16); glVertex(+256,+8,-8);
+   glTexCoord( 0+p,16); glVertex(-256,+8,-8);
+   glEnd();
+   if (phase==9)
+   {
+      setcol(0x808080);
+      setfont(xres/3,yres,1);
+      moveto(0,0);printf("MOO");
+      setfont(24,32,1);
+      moveto((xres-11*24)*.5,yres*.75-24);
+      setcol(0xa04010);
+      printf("Time travel");
+   }
+}

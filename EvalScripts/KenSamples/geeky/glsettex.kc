@@ -1,0 +1,75 @@
+enum {N=9}; static tex[N], xs[N], ys[N], texn = 0;
+enum {SIZ=64};
+()
+{
+   static buf[SIZ][SIZ]; glenable(GL_ALPHA_TEST);
+   
+   tex[texn] = glsettex("caco.png"    ); xs[texn] =  1; ys[texn] = 1; texn++;
+   tex[texn] = glsettex("wood.png"    ); xs[texn] =  1; ys[texn] = 1; texn++;
+   tex[texn] = glsettex("brick.png"   ); xs[texn] =  1; ys[texn] =.5; texn++;
+   tex[texn] = glsettex("cloud.png"   ); xs[texn] =  1; ys[texn] = 1; texn++;
+   tex[texn] = glsettex("doubcube.png"); xs[texn] =1/6; ys[texn] = 1; texn++;
+   tex[texn] = glsettex("earth.jpg"   ); xs[texn] =  1; ys[texn] =.5; texn++;
+
+   for(y=0;y<SIZ;y++)
+      for(x=0;x<SIZ;x++)
+         buf[y][x] = int(noise(x*.3,y*.3)*32+64)*512;
+   tex[texn] = glsettex(buf,SIZ,SIZ); xs[texn] = 1; ys[texn] = 1; texn++;
+   
+   for(y=0;y<SIZ;y++)
+      for(x=0;x<SIZ;x++)
+      {
+         if ((x-SIZ/2)^2+(y-SIZ/2)^2 < (SIZ/2-1)^2)
+              buf[y][x] = (x*256/SIZ) + (y*256/SIZ)*65536;
+         else buf[y][x] = -1;
+      }
+   tex[texn] = glsettex(buf,SIZ,SIZ); xs[texn] = 1; ys[texn] = 1; texn++;
+   
+   animhand = texn; xs[animhand] = 1; ys[animhand] = 1; texn++;
+   
+   while (1)
+   {
+      cls(0x808080); t = klock();
+      
+         //Generate animated texture:
+      for(y=0;y<SIZ;y++)
+         for(x=0;x<SIZ;x++)
+         {     //Part of this extracted from INTERFERENCE.KC
+            nx = (x-SIZ/2)/24; ny = (y-SIZ/2)/24; yy = ny*ny; d = t*.2;
+            d0 = sqrt((nx-1)^2+yy); d1 = sqrt((nx+1)^2+yy);
+            d0 = (d0-d)*16; d0 = fabs(fadd(d0,3*2^53)-3*2^53-d0)-1;
+            d1 = (d1-d)*16; d1 = fabs(fadd(d1,3*2^53)-3*2^53-d1)-1;
+            buf[y][x] = rgb(d0*64+128,(d0+d1)*64+128,d1*64+128);
+         }
+      tex[animhand] = glsettex(buf,SIZ,SIZ);
+      
+         //Draw all textures at bottom
+      for(i=N-1;i>=0;i--)
+      {
+         glsettex(tex[i]);
+         drawspr((i+.5)*xres/N,
+                 yres-xres*.5/N,
+                 xres*.5/N*xs[i],
+                 xres*.5/N*ys[i],0);
+      }
+
+         //Draw bouncy caco at mouse position
+      glsettex(tex[0]);
+      draw_another_texture((t%N)*xres/N,int(t%N));
+      f = mousy/yres*32;
+      drawspr(mousx,mousy,cos(t*19)*f+64,sin(t*19)*f+64,(mousx/xres-.5)*3);
+      
+         //Must dealloc animating texture to avoid running out of texture handles
+      glremovetex(tex[animhand]);
+      
+      refresh();
+   }
+}
+
+   //Example of backup&restore current texture
+draw_another_texture (x,i)
+{
+   oldtex = glsettex(-1); glsettex(tex[i]);
+   drawspr(x,yres-200,50,0);
+   glsettex(oldtex); 
+}

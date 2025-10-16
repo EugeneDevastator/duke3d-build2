@@ -1,0 +1,297 @@
+   //03/12/2010: Written by Ken Silverman and Jim Grandpre (quite balanced in fact)
+   //Obviously, this is based on the popular game by the same name.
+   //Supports multiplayer, although the gameplay makes little sense!
+
+static grid[16][16], moveseed;
+
+enum {MAXSNOCOL=8};
+static snocol[1+MAXSNOCOL+1] = {0,0xc04040,0x409040,0x4040c0,0xc0c040,0xc040c0,0x40a0a0,0x404040,0xc0c0c0};
+
+()
+{
+   enum {PAKSIZ=5};
+   static lpak[PAKSIZ];
+      
+   enum {MAXPLAYS=16};
+   struct play_t { x,y,tx,ty,ang,obstatus,ncol,hp; };
+   static play_t play[MAXPLAYS];
+
+   enum {MAXSPRS=1024};
+   struct spr_t { x,y,vx,vy,owner,ncol,tim; };
+   static spr_t spr[MAXSPRS];
+   sprn = 0;
+   gtim = 0;
+
+   moveseed = klock(1)%(2^32);
+   if (net_players >= 2)
+   {
+      if (net_me == 0) { net_send(NET_ALLELSE,moveseed); }
+      else { while (net_recv(&from,&moveseed) == 0); }
+   }
+
+   resetboard();
+
+   for(i=0;i<net_players;i++)
+   {
+      play[i].x = .5;
+      play[i].y = 1-(i%2);
+      play[i].tx = 0;
+      play[i].ty = 0;
+      play[i].obstatus = 0;
+      play[i].ncol = int(MAXSNOCOL*krnd(&moveseed))+1;
+      play[i].hp = 1;
+   }
+         
+   tim = 0;
+   while (1)
+   {
+      lpak[0] = mousx/xres;
+      lpak[1] = mousy/yres;
+      if (net_me) { lpak[0] = 1-lpak[0]; lpak[1] = 1-lpak[1]; }
+      lpak[2] = bstatus;
+      otim = tim; tim = klock();
+      lpak[3] = tim-otim;
+      lpak[4] = (keystatus[0xcd]-keystatus[0xcb]); if (net_me) lpak[4] *= -1;
+      net_send(NET_ALL,lpak,PAKSIZ);
+
+      while (net_recv(&from,&lpak,PAKSIZ))
+      {
+         bstat = lpak[2];
+         dtim = lpak[3];
+         
+         play[from].x = min(max(play[from].x+lpak[4]*dtim*.25,0),1);
+         play[from].tx = lpak[0];
+         play[from].ty = lpak[1];
+         play[from].ang = atan2(play[from].ty-play[from].y,play[from].tx-play[from].x);
+         if (((bstat%2) > (play[from].obstatus%2)) && (play[from].hp > 0))
+         {
+            playsound("shoot.wav");
+            spr[sprn].x = play[from].x;
+            spr[sprn].y = play[from].y;
+            vel = .5;
+            spr[sprn].vx = cos(play[from].ang)*vel;
+            spr[sprn].vy = sin(play[from].ang)*vel;
+            spr[sprn].owner = from;
+            spr[sprn].ncol = play[from].ncol;
+            spr[sprn].tim = gtim+4;
+            sprn++;
+            play[from].ncol = int(MAXSNOCOL*krnd(&moveseed))+1;
+         }
+
+         play[from].obstatus = bstat;
+         
+         if (from) continue; //-----------------------------------------------------
+         
+         gtim += dtim;
+         
+         for(i=sprn-1;i>=0;i--)
+         {
+            if (spr[i].tim < gtim) { sprn--; spr[i] = spr[sprn]; playsound("ouch.wav"); continue; }
+            spr[i].x += spr[i].vx*dtim;
+            spr[i].y += spr[i].vy*dtim;
+            evil = -1;
+            if (spr[i].x < 0) { spr[i].x = 0*2 - spr[i].x; spr[i].vx *= -1; playsound("rulinst.wav",100,1.5); }
+            if (spr[i].x > 1) { spr[i].x = 1*2 - spr[i].x; spr[i].vx *= -1; playsound("rulinst.wav",100,1.5); }
+            if (spr[i].y < 0) { spr[i].y = 0*2 - spr[i].y; spr[i].vy *= -1; evil = 0; playsound("rulinst.wav",100,1.5); }
+            if (spr[i].y > 1) { spr[i].y = 1*2 - spr[i].y; spr[i].vy *= -1; evil = 1; playsound("rulinst.wav",100,1.5); }
+            if ((evil >= 0) && (spr[i].owner == evil) && (fabs(spr[i].x-play[1-evil].x) < 1/36))
+            {
+               playsound("ouch.wav");
+               play[1-evil].hp -= 1/16;
+               if (play[1-evil].hp < 0) { playtext("Player %g loses",1-evil); }
+            }
+            
+            dx = spr[i].vx;
+            dy = spr[i].vy;
+            dv = sqrt(dx^2+dy^2); if(dv > 0) dv = 1/dv;
+            dx *= dv; dy *= dv;
+            
+            sprx = spr[i].x + dx*1/36;
+            spry = spr[i].y + dy*1/36;
+            dist = getclosestdist(sprx,spry,&rx,&ry,0);
+            if (dist < (1/36)*1)
+            {
+               if (getclosestdist(spr[i].x,spr[i].y,&rx,&ry,1) < 1e32)
+               {
+                  grid[rx][ry] = spr[i].ncol;
+
+                  static vis[16][16];
+                  mass = ffill(vis,rx,ry,spr[i].ncol);
+                  if(mass >= 3)
+                  {
+                     for(y=0;y<16;y++) for(x=0;x<16;x++) if(vis[x][y]) grid[x][y] = 0;
+                     playsound("pickup.wav");
+
+                       
+                     for(y=0;y<16;y++) for(x=0;x<16;x++) vis[x][y] = 0;
+                     for(y=1;y<16;y+=2)
+                     {
+                        x =  0; if (grid[x][y]) ffill(vis,x,y,-1);
+                        x = 15; if (grid[x][y]) ffill(vis,x,y,-1);
+                     }
+                     got = 0;
+                     for(y=0;y<16;y++) for(x=0;x<16;x++) if ((!vis[x][y]) && (grid[x][y])) { grid[x][y] = 0; got = 1; }
+                     if (got) playsound("blowup2.wav");
+                  }
+                  else
+                     playsound("rulinst.wav");
+                     
+                  sum = 0;
+                  for(y=0;y<16;y++)
+                     for(x=0;x<16;x++)
+                        sum += grid[y][x];
+                  if (sum == 0) resetboard();
+                                    
+                  sprn--; spr[i] = spr[sprn]; continue;
+               }
+            }
+         }
+      }
+      
+//----------------------------------------------------------------------------------
+
+      cls(0);
+      snocol[MAXSNOCOL+1] = 2^24*rnd;
+      
+      xmul = xres*(1-net_me*2); xadd = xres*net_me;
+      ymul = yres*(1-net_me*2); yadd = yres*net_me;
+
+      for(i=0;i<sprn;i++)
+      {
+         setcol(snocol[spr[i].ncol]);
+         drawsno(-1,spr[i].x*xmul+xadd,spr[i].y*ymul+yadd,xres/36);
+      }
+
+      for(i=0;i<net_players;i++)
+      {
+         if (play[i].hp < 0) continue;
+         
+         ang = play[i].ang;
+         setcol(0xc0a080);
+         drawcone((play[i].x              )*xmul+xadd,(play[i].y              )*ymul+yadd,10,
+                  (play[i].x + cos(ang)*.1)*xmul+xadd,(play[i].y + sin(ang)*.1)*ymul+yadd,5);
+         setcol(snocol[play[i].ncol]);
+         drawcone((play[i].x              )*xmul+xadd,(play[i].y              )*ymul+yadd,8,
+                  (play[i].x + cos(ang)*.1)*xmul+xadd,(play[i].y + sin(ang)*.1)*ymul+yadd,3);
+         setcol(0xc0a080);
+         drawcone(play[i].x*xmul+xadd,(play[i].y-.02)*ymul+yadd,xres/-18,
+                  play[i].x*xmul+xadd,(play[i].y    )*ymul+yadd,xres/-18);
+                  
+         setcol(0xff8080);
+         drawcone((play[i].x-play[i].hp*.04)*xmul+xadd,play[i].y*ymul+yadd,xmul/128,
+                  (play[i].x+play[i].hp*.04)*xmul+xadd,play[i].y*ymul+yadd,xmul/128);
+         
+      }
+      
+      for(y=0;y<16;y++)
+         for(x=1-(y%2);x<16;x++)
+         {
+            if (!grid[x][y]) continue;
+            setcol(snocol[grid[x][y]]);
+            nx = (x+(y%2)/2)/16;
+            ny = (y        )/16;
+            drawsno(y*16+x,nx*xmul+xadd,ny*ymul+yadd,xres/36);
+         }
+         
+      refresh(); while (klock()<numframes/60); //Limit fps
+   }
+}
+
+resetboard ()
+{
+   for(y=0;y<16;y++)
+      for(x=0;x<16;x++)
+      {
+         grid[x][y] = 0;
+         if (fabs(y-8) > 2) continue;
+         grid[x][y] = int(MAXSNOCOL*krnd(&moveseed))+1;
+      }
+}
+
+drawsno (ind,x,y,r)
+{
+   if (ind < 0) tim = 0; else tim = sin(klock()+ind)*r*.05;
+   drawsph(x,y,r);
+   for(s=-1;s<=1;s+=2)
+   {
+      setcol(0xffffff); drawsph(x+r*.32*s    ,y-r*.40,r*.20);
+      setcol(0x000000); drawsph(x+r*.32*s+tim,y-r*.40,r*.10);
+      
+      setcol(0x000000);
+      drawcone(x        ,y+r*.38,r*.12,
+               x+r*.20*s,y+r*.36,r*.10);
+      drawcone(x+r*.20*s,y+r*.36,r*.10,
+               x+r*.40*s,y+r*.30,r*.05);
+   }
+   setcol(0xa0a0a0);
+   drawcone(x      ,y-r*.20,r*.01,
+            x      ,y+r*.00,r*.12);
+   setcol(0x404040);
+   drawcone(x+r*.20,y+r*.32      ,r*-.20,
+            x+r*.22,y+r*.55+tim*2,r*+.20);
+   setcol(0xc04040);
+   drawcone(x+r*.20,y+r*.32      ,r*-.16,
+            x+r*.22,y+r*.55+tim*2,r*+.16);
+}
+
+getclosestdist (tx,ty,&rx,&ry,invertgrid)
+{
+   mind2 = 1e32; rx = -1; ry = -1;
+   for(y=0;y<16;y++)
+      for(x=1-(y%2);x<16;x++)
+      {
+         if ((grid[x][y] != 0) == invertgrid) continue;
+         nx = (x+(y%2)/2)/16;
+         ny = (y        )/16;
+         d2 = (nx-tx)^2 + (ny-ty)^2;
+         if (d2 >= mind2) continue;
+         mind2 = d2;
+         rx = x;
+         ry = y;
+      }
+   return(sqrt(mind2));
+}
+
+krnd (&kholdrand) //synced rnd (for movement and definitely NOT drawing&AI)!
+{
+   kholdrand = ((kholdrand*214013)+2531011*2)%(2^32);
+   return(kholdrand/2^32);
+}
+
+ffill (vis[16][16],rx,ry,checkcol)
+{
+   static fifx[256],fify[256];
+   if (checkcol >= 0)
+   {
+      for(y=0;y<16;y++) for(x=0;x<16;x++) vis[x][y] = 0;
+   }
+   vis[rx][ry] = 1;
+   mass = 1;
+   fifx[0] = rx; fify[0] = ry; rp = 0; wp = 1;
+   while(rp < wp)
+   {
+      x = fifx[rp]; y = fify[rp]; rp++;
+      
+      for(yy=-1;yy<=1;yy++)
+         for(xx=-1;xx<=1;xx++)
+         {
+            if ((xx == 0) && (yy == 0)) continue; 
+            if (yy && (xx == 1-(y%2)*2)) continue;
+            if ((x+xx < 0) || (x+xx >= 16) || (y+yy < 0) || (y+yy >= 16)) continue;
+            if (x+xx < 1-((y+yy)%2)) continue;
+            if ((!vis[x+xx][y+yy]) && ((grid[x+xx][y+yy] == checkcol) || (checkcol < 0 && grid[x+xx][y+yy] > 0)))
+            {                            
+               fifx[wp] = x+xx;
+               fify[wp] = y+yy;
+               vis[x+xx][y+yy] = 1;
+               wp++;
+               mass++;
+            }  
+         }
+   }
+   return(mass);
+}
+
+/*
+bind f2 format savetxt "\F"; format shell evaldraw /qme "\F" /host:2:32124
+bind f9 format savetxt "\F"; format shell evaldraw /qme "\F" /join:\S:32124

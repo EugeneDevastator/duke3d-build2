@@ -1,0 +1,412 @@
+()
+{
+   enum {MAXBOD=1024,MAXMINE=64};
+   static iposx, iposy, iposz, ball[3], mine[MAXMINE][3], nummine = 0;
+   static mat[9] = {1,0,0, 0,1,0, 0,0,1}, nmat[9], dizzy = 0;
+   static bodx[MAXBOD], body[MAXBOD], bodz[MAXBOD], bodl, dead = 1;
+   static dirx, diry, dirz, ndirx, ndiry, ndirz, tim, nextmov, startclk = 0, growclk;
+   static sc, bestsc = -1, cubeclk;
+   
+   cls(dizzy^2,0,0); clz(1e32);
+   if (numframes == 0) { tim = klock(); nextmov = tim; }
+   animperiod = 1/6;
+   
+   otim = tim; tim = klock();
+   
+   i = -1;
+   do
+   {
+      if (i < 0) { fx = dirx; fy = diry; fz = dirz; }
+      else { fx = bodx[0]-bodx[1]; fy = body[0]-body[1]; fz = bodz[0]-bodz[1]; }
+      hx = 0; hy = 0; hz = 0;
+      j = max(i,0);
+      if (abs(bodx[j]) > max(abs(body[j]),abs(bodz[j])))
+         { hx = sgn(bodx[0]); }
+      else if (abs(body[j]) > abs(bodz[j]))
+         { hy = sgn(body[j]); }
+      else
+         { hz = sgn(bodz[j]); }
+      sx = hy*fz - hz*fy;
+      sy = hz*fx - hx*fz;
+      sz = hx*fy - hy*fx;
+      i++;
+   } while ((abs(sx)+abs(sy)+abs(sz) == 0) && (i < 2));
+   
+   dir = keystatus[0xcb]-keystatus[0xcd];
+   if (dir)
+   {
+      keystatus[0xcb] = 0; keystatus[0xcd] = 0;
+      ndirx = sx*dir; ndiry = sy*dir; ndirz = sz*dir;
+      playsound("shoot.wav",50,3);
+   }
+      
+   if (tim > nextmov)
+   {
+      if (dead)
+      {
+         nummine = 0;
+         getrandpos(ball);
+         
+         if (dead == 2) playtext("ate yourself");
+         if (dead == 3) playtext("got dizzy");
+         if (dead == 4) playtext("ate a mine");
+         bodl = 4;
+         bodx[0] = 0; body[0] = 3; bodz[0] = -7;
+         bodx[1] = 0; body[1] = 4; bodz[1] = -7;
+         bodx[2] = 0; body[2] = 5; bodz[2] = -7;
+         bodx[3] = 0; body[3] = 6; bodz[3] = -7;
+         dirx = 0; diry = -1; dirz = 0;
+         ndirx = dirx; ndiry = diry; ndirz = dirz;
+         nextmov += 1; startclk = nextmov;
+         dead = 0; sc = 0; dizzy = 0;
+      }
+      else
+      {
+         nextmov += animperiod;
+         for(i=bodl-1;i>0;i--)
+         {
+            bodx[i] = bodx[i-1];
+            body[i] = body[i-1];
+            bodz[i] = bodz[i-1];
+         }
+         
+         odirx = dirx; odiry = diry; odirz = dirz;
+         
+              if ((ndirx == -sx) && (ndiry == -sy) && (ndirz == -sz)) dizzy++;
+         else if ((ndirx == +sx) && (ndiry == +sy) && (ndirz == +sz)) dizzy++;
+         else if (dizzy) dizzy--;
+         if (dizzy >= 16)
+         {
+            playsound("tapfloor.flac",100,.25);
+            playsound("ouch.wav",100,2);
+            dead = 3; nextmov += 1; if (sc > bestsc) bestsc = sc;
+         }
+         
+         bodx[0] += dirx; dirx = ndirx;
+         body[0] += diry; diry = ndiry;
+         bodz[0] += dirz; dirz = ndirz;
+         if ((dirx == -odirx) && (diry == -odiry) && (dirz == -odirz))
+            { dirx = odirx; diry = odiry; dirz = odirz; }
+         
+         for(i=bodl;i>0;i--)
+         {
+            if ((bodx[i] == bodx[0]) && (body[i] == body[0]) && (bodz[i] == bodz[0]))
+            {
+               playsound("tapfloor.flac",100,.25);
+               playsound("ouch.wav",100,2);
+               dead = 2; nextmov += 1; if (sc > bestsc) bestsc = sc;
+               break;
+            }
+         }
+         
+         if (abs(bodx[0]-ball[0])+abs(body[0]-ball[1])+abs(bodz[0]-ball[2]) < .1)
+         {
+            playsound("pickup.wav",100,nrnd*.05+1.2); growclk = tim;
+            do
+            {
+               getrandpos(ball);
+               for(i=bodl-1;i>=0;i--)
+                  if (abs(ball[0]-bodx[i]) +
+                      abs(ball[1]-body[i]) + 
+                      abs(ball[2]-bodz[i]) < .1) break;
+               if (i >= 0) continue;
+               for(i=nummine-1;i>=0;i--)
+                  if (abs(ball[0]-mine[i][0]) +
+                      abs(ball[1]-mine[i][1]) + 
+                      abs(ball[2]-mine[i][2]) < .1) break;
+            } while (i >= 0);
+            sc++; if (sc == 16) { playtext("Hope you have good memory!"); cubeclk = tim; }
+            if (sc == bestsc+1) playtext("A new high score!");
+            for(i=4;i>0;i--)
+            {
+               bodx[bodl] = bodx[bodl-1];
+               body[bodl] = body[bodl-1];
+               bodz[bodl] = bodz[bodl-1];
+               bodl++;
+            }
+         }
+         
+         for(i=0;i<nummine;i++)
+         {
+            if (abs(bodx[0]-mine[i][0])+abs(body[0]-mine[i][1])+abs(bodz[0]-mine[i][2]) < .1)
+            {
+               playsound("tapfloor.flac",100,.25);
+               playsound("ouch.wav",100,2);
+               dead = 4; nextmov += 1; if (sc > bestsc) bestsc = sc;
+               break;
+            }
+         }
+   
+         clipit(bodx[0],body[0],bodz[0],&dirx,&diry,&dirz);
+         
+         dx = abs(bodx[0]+dirx);
+         dy = abs(body[0]+diry);
+         dz = abs(bodz[0]+dirz);
+         if (max(max(dx,dy),dz) != 7) { dirx = odirx; diry = odiry; dirz = odirz; }
+         
+         ndirx = dirx; ndiry = diry; ndirz = dirz;
+      }
+   }
+   else if (dead)
+   {
+      t = 1.2-(nextmov-tim);
+      
+      setcol(0xff8080);
+      phi = 1.5-sqrt(1.25); u = t*4; v = (nextmov-tim)*.1; n = 256;
+      for(i=0;i<n;i++)
+      {
+         vz = (i*2-n+1)/(n-1); r = sqrt(1-vz^2);
+         vx = cos(i*(pi*2*phi))*r;
+         vy = sin(i*(pi*2*phi))*r;
+         drawsph(vx*u+bodx[0],vy*u+body[0],vz*u+bodz[0],v);
+      }
+   }
+   
+   if ((sc > nummine) && (tim > growclk+.5) && (nummine < MAXMINE))
+   {
+      mine[nummine][0] = bodx[bodl-1];
+      mine[nummine][1] = body[bodl-1];
+      mine[nummine][2] = bodz[bodl-1];
+      nummine++;
+   }
+         
+   //fx = 0; fy = 0; fz = 0; readmouse(&fx,&fy);
+   //rotmat2d(mat,0,6,fx*.01);
+   //rotmat2d(mat,3,6,fy*.01);
+   //rotmat2d(mat,0,3,fz*.01);
+   
+   if (dead == 3) rotmat2d(mat,0,3,(tim-otim)*16);
+   
+   animt = (max(tim-nextmov+animperiod,0))/animperiod;
+   
+   nmat[6] = dirx; nmat[7] = diry; nmat[8] = dirz;
+   nmat[3] = 0; nmat[4] = 0; nmat[5] = 0;
+   if (abs(bodx[0]) > max(abs(body[0]),abs(bodz[0]))) nmat[3] = -sgn(bodx[0]);
+   else if (abs(body[0]) > abs(bodz[0]))              nmat[4] = -sgn(body[0]);
+   else                                               nmat[5] = -sgn(bodz[0]);
+   nmat[0] = nmat[4]*nmat[8] - nmat[5]*nmat[7];
+   nmat[1] = nmat[5]*nmat[6] - nmat[3]*nmat[8];
+   nmat[2] = nmat[3]*nmat[7] - nmat[4]*nmat[6];
+      
+   rotmat2d(nmat,6,3,-PI/2);
+
+   for(i=0;i<9;i++) mat[i] += (nmat[i]-mat[i])*.05; //ugly approx.. use slerp :P
+   orthofit(mat);
+   iposx += (dirx*animt+bodx[0]-mat[3]*0.0-mat[6]*5.0 -iposx)*.2;
+   iposy += (diry*animt+body[0]-mat[4]*0.0-mat[7]*5.0 -iposy)*.2;
+   iposz += (dirz*animt+bodz[0]-mat[5]*0.0-mat[8]*5.0 -iposz)*.2;
+   d = 20/sqrt(iposx^2+iposy^2+iposz^2); iposx *= d; iposy *= d; iposz *= d;
+   setcam(iposx,iposy,iposz,mat[0],mat[1],mat[2],mat[3],mat[4],mat[5],mat[6],mat[7],mat[8]);
+   
+   if (sc >= 16) 
+   {
+      t = min(tim-cubeclk,6.46);
+      drawcube(t,1-t/6.46);
+   }
+   
+   setcol(0x686868);
+   for(j=-6.5;j<=6.5;j+=13)
+      for(i=-6.5;i<=6.5;i++)
+      {
+         moveto(i,-6.5,j); lineto(i,+6.5,j);
+         moveto(-6.5,i,j); lineto(+6.5,i,j);
+   
+         moveto(i,j,-6.5); lineto(i,j,+6.5);
+         moveto(-6.5,j,i); lineto(+6.5,j,i);
+   
+         moveto(j,-6.5,i); lineto(j,+6.5,i);
+         moveto(j,i,-6.5); lineto(j,i,+6.5);
+      }
+   
+   setcol(0x505050);
+   for(j=-6.5;j<=6.5;j++)
+      for(i=-6.5;i<=6.5;i++)
+      {
+         drawsph(i,j,-6.5,.1);
+         drawsph(i,j,+6.5,.1);
+         drawsph(i,-6.5,j,.1);
+         drawsph(i,+6.5,j,.1);
+         drawsph(-6.5,i,j,.1);
+         drawsph(+6.5,i,j,.1);
+      }
+   
+   
+   setcol(0x8090a0);
+   if (dead) animt = 0;
+   for(i=bodl-2;i>=0;i--)
+      for(t=0;t<1;t+=1/4)
+      {
+         nt = t-animt;
+         if (nt > 0)
+         {
+            x = (bodx[i+1]-bodx[i])*nt+bodx[i];
+            y = (body[i+1]-body[i])*nt+body[i];
+            z = (bodz[i+1]-bodz[i])*nt+bodz[i];
+         }
+         else
+         {
+            nt++;
+            if (i > 0)
+            {
+               x = (bodx[i]-bodx[i-1])*nt+bodx[i-1];
+               y = (body[i]-body[i-1])*nt+body[i-1];
+               z = (bodz[i]-bodz[i-1])*nt+bodz[i-1];
+            }
+            else
+            {
+               nt = 1-nt;
+               x = dirx*nt+bodx[0];
+               y = diry*nt+body[0];
+               z = dirz*nt+bodz[0];
+            }
+         }
+         if (abs(x) > 6.5) x = sgn(x)*6.5;
+         if (abs(y) > 6.5) y = sgn(y)*6.5;
+         if (abs(z) > 6.5) z = sgn(z)*6.5;
+         drawsph(x,y,z,.4);
+      }
+   setcol(0xc0a080);
+   x = dirx*animt+bodx[0];
+   y = diry*animt+body[0];
+   z = dirz*animt+bodz[0];
+   if (abs(x) > 6.5) x = sgn(x)*6.5;
+   if (abs(y) > 6.5) y = sgn(y)*6.5;
+   if (abs(z) > 6.5) z = sgn(z)*6.5;
+   drawsph(x,y,z,.46);
+   
+   fx = dirx*.3; fy = diry*.3; fz = dirz*.3;
+   hx = 0; hy = 0; hz = 0;
+   if (abs(bodx[0]) > max(abs(body[0]),abs(bodz[0])))
+      { hx = sgn(bodx[0])*.3; }
+   else if (abs(body[0]) > abs(bodz[0]))
+      { hy = sgn(body[0])*.3; }
+   else
+      { hz = sgn(bodz[0])*.3; }
+   sx = (hy*fz - hz*fy)*2.5;
+   sy = (hz*fx - hx*fz)*2.5;
+   sz = (hx*fy - hy*fx)*2.5;
+   setcol(0x6060a0);
+   drawsph(x+fx+hx-sx,y+fy+hy-sy,z+fz+hz-sz,.15);
+   drawsph(x+fx+hx+sx,y+fy+hy+sy,z+fz+hz+sz,.15);
+   setcol(0x707030);
+   sx *= 2; sy *= 2; sz *= 2;
+   for(i=0;i<1.5;i+=1/8)
+   {
+      drawsph(x-fx*i+hx*i-sx*i,y-fy*i+hy*i-sy*i,z-fz*i+hz*i-sz*i,.3-i*.2);
+      drawsph(x-fx*i+hx*i+sx*i,y-fy*i+hy*i+sy*i,z-fz*i+hz*i+sz*i,.3-i*.2);
+   }
+   
+   setcol(0xc0c040);
+   drawsph(min(max(ball[0],-6.5),6.5),
+           min(max(ball[1],-6.5),6.5),
+           min(max(ball[2],-6.5),6.5),.46+sin(klock()*8)*.04);
+   
+   setcol(0xffffff);
+   for(i=0;i<nummine;i++)
+   {
+      drawkv6("kmine.kv6",.035,
+         min(max(mine[i][0],-6.5),6.5),
+         min(max(mine[i][1],-6.5),6.5),
+         min(max(mine[i][2],-6.5),6.5),
+         tim+i,tim-i);
+   }
+   
+   setcol(0xc0c0c0); setfont(12,16);
+   moveto(xres/2-12*4,yres-16); printf("Score:%g",sc);
+   if (bestsc >= 0)
+   {
+      moveto(0,yres-16); setcol(0x00c0c0);
+      printf("Best score:%g",bestsc);
+   }
+}
+
+drawcube(r,vis)
+{
+   glsettex("cloud.png");
+   glbegin(GL_QUADS);
+   t = klock(); u = t*.1; v = t*.1;
+   
+   setcol(int(144*vis)*0x10101);
+   gltexcoord(u+0,v+0); glvertex(-r,-r,-r);
+   gltexcoord(u+1,v+0); glvertex(+r,-r,-r);
+   gltexcoord(u+1,v+1); glvertex(+r,+r,-r);
+   gltexcoord(u+0,v+1); glvertex(-r,+r,-r);
+   gltexcoord(u+0,v+0); glvertex(+r,-r,+r);
+   gltexcoord(u+1,v+0); glvertex(-r,-r,+r);
+   gltexcoord(u+1,v+1); glvertex(-r,+r,+r);
+   gltexcoord(u+0,v+1); glvertex(+r,+r,+r);
+   
+   setcol(int(128*vis)*0x10101);
+   gltexcoord(u+0,v+0); glvertex(-r,-r,+r);
+   gltexcoord(u+1,v+0); glvertex(+r,-r,+r);
+   gltexcoord(u+1,v+1); glvertex(+r,-r,-r);
+   gltexcoord(u+0,v+1); glvertex(-r,-r,-r);
+   gltexcoord(u+0,v+0); glvertex(+r,+r,+r);
+   gltexcoord(u+1,v+0); glvertex(-r,+r,+r);
+   gltexcoord(u+1,v+1); glvertex(-r,+r,-r);
+   gltexcoord(u+0,v+1); glvertex(+r,+r,-r);
+   
+   setcol(int(112*vis)*0x10101);
+   gltexcoord(u+0,v+0); glvertex(-r,-r,-r);
+   gltexcoord(u+1,v+0); glvertex(-r,+r,-r);
+   gltexcoord(u+1,v+1); glvertex(-r,+r,+r);
+   gltexcoord(u+0,v+1); glvertex(-r,-r,+r);
+   gltexcoord(u+0,v+0); glvertex(+r,+r,-r);
+   gltexcoord(u+1,v+0); glvertex(+r,-r,-r);
+   gltexcoord(u+1,v+1); glvertex(+r,-r,+r);
+   gltexcoord(u+0,v+1); glvertex(+r,+r,+r);
+   
+   glend();
+}
+
+clipit(x,y,z,&dx,&dy,&dz)
+{
+   if (abs(x+dx) > 7) { dx = 0; if (abs(y+dy) >= abs(z+dz)) dy = -sgn(y); else dz = -sgn(z); }
+   if (abs(y+dy) > 7) { dy = 0; if (abs(x+dx) >= abs(z+dz)) dx = -sgn(x); else dz = -sgn(z); }
+   if (abs(z+dz) > 7) { dz = 0; if (abs(x+dx) >= abs(y+dy)) dx = -sgn(x); else dy = -sgn(y); }
+}
+
+orthofit(m[9])
+{
+   static nm[9];
+      //(Cheap & simplified version of the 03/18/2006 algo)
+      //Note: this version assumes input matrix has positive determinant
+   for(c=0;c<4;c++)
+   {
+      for(i=0;i<9;i++) nm[i] = m[i];
+      m[0] += nm[4]*nm[8] - nm[5]*nm[7];
+      m[1] += nm[5]*nm[6] - nm[3]*nm[8];
+      m[2] += nm[3]*nm[7] - nm[4]*nm[6];
+      m[3] += nm[7]*nm[2] - nm[8]*nm[1];
+      m[4] += nm[8]*nm[0] - nm[6]*nm[2];
+      m[5] += nm[6]*nm[1] - nm[7]*nm[0];
+      m[6] += nm[1]*nm[5] - nm[2]*nm[4];
+      m[7] += nm[2]*nm[3] - nm[0]*nm[5];
+      m[8] += nm[0]*nm[4] - nm[1]*nm[3];
+      d = 1/sqrt(m[0]^2+m[1]^2+m[2]^2);
+      for(i=0;i<9;i++) m[i] *= d;
+   }
+}
+
+rotmat2d(m[9],i0,i1,ang)
+{
+   c = cos(ang); s = sin(ang);
+   x = m[i0+0]; y = m[i0+1]; z = m[i0+2];
+   m[i0+0] = c*m[i0+0] - s*m[i1+0];
+   m[i0+1] = c*m[i0+1] - s*m[i1+1];
+   m[i0+2] = c*m[i0+2] - s*m[i1+2];
+   m[i1+0] = c*m[i1+0] + s*x;
+   m[i1+1] = c*m[i1+1] + s*y;
+   m[i1+2] = c*m[i1+2] + s*z;
+}
+
+getrandpos(p[3])
+{
+   p[0] = int(13*rnd)-6;
+   p[1] = int(13*rnd)-6;
+   p[2] = int(13*rnd)-6;
+   i = int(3*rnd);
+   if (i == 0) p[0] = int(2*rnd)*14-7;
+   if (i == 1) p[1] = int(2*rnd)*14-7;
+   if (i == 2) p[2] = int(2*rnd)*14-7;
+}

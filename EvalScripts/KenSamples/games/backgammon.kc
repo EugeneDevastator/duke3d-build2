@@ -1,0 +1,1294 @@
+   //BACKGAMMON.KC by Ken Silverman. Features pretty good computer AI (method 3) .. it beats me
+   //about 1/3 of the time. Algo does brute force search of your moves, then evaluates average of
+   //all rolls of other player, assuming they choose to minimize their pips. As an optimization,
+   //when it turns into a run game, recursion occurs on own player instead of the other.
+   //Click right mouse button for a computer hint.
+   //
+   //TODO:
+   //   Undo move.
+   //   Support multiple moves w/1 drag (if same piece).
+   //   Resigning, doubling (unlikely - clicking roll every turn would slow down game too much)
+   //
+   //History:
+   //   03/27/2012: Start BACKGAMMON.KC.
+   //   03/29/2012: Write dice physics.
+   //   03/31/2012: Write move animation.
+   //   05/03/2012: Improve AI;probably buggy.
+   //   05/04/2012: Write good computer AI.
+   //   05/09/2012: Fix game start dice and improve end game AI.
+   //   06/10/2012: Fix AI&drawcheck().
+   //   06/18/2012: Add checker stacking.
+   //   06/19/2012: When run game&AI recurses on self.
+   //   06/26/2012: Rewrite/optimize computer AI (getvalmoves()&getcompmove()).
+   //   06/27/2012: Fix AI endgame;start net code.
+   //   06/30/2012: Find&integrate Gerry Tesauro's AI.
+   //   07/05/2012: Net code works reliably.
+   //
+   //AI methods:
+   //   0=human
+   //   1=CPU1:Crap (hit if possible else random)
+   //   2=CPU2:Gerry Tesauro's public AI (simple state-based LUT)
+   //   3=CPU3:Ken's AI (game tree/average of dice/judge by pips)
+   //
+   //Stats:
+   //        Ken CPU1 CPU2 CPU3
+   //   Ken ---- 100% ~65% ~65%
+   //  CPU1   0% ----   0%   0%
+   //  CPU2 ~35% 100% ---- ~62%
+   //  CPU3 ~35% 100% ~38% ----
+   //
+   //  Ken beats CPU1 easily
+   //  Ken beats CPU2  31-26
+   //  Ken beats CPU3 ~ 65% of time
+   // CPU2 beats CPU1 ~100% of time
+   // CPU2 beats CPU3 ~ 65% of time :/
+   // CPU3 beats CPU1 ~100% of time
+
+static iscomp[2] = {0,2};
+enum {DEBUGAI=0}; //If 1, use RMB to continue
+
+enum {MOVEMAX=50625,MAXREC=4,HASHSIZ=23};
+static dicep[2][8][3], diceop[2][8][3], diceenab[2], dicerad = 1.5, tim, timroll;
+static ready[2] = {0,0}, gamenum = 0, gusesnd = 1;
+struct { x, y, z; } point3d;
+static point3d ipos, irig, idow, ifor;
+
+()
+{
+   static dice[4], moves[MOVEMAX], score[2] = {0,0};
+
+   turn = 0;
+      // 0:red   jail (drawn at bot-mid)
+      // 1:bot-rig
+      //12:bot-lef
+      //13:top-lef
+      //24:top-rig
+      //25:white jail (drawn at top-mid)
+      //26:white end  (drawn at bot-rig)
+      //27:red   end  (drawn at top-rig)
+   static sboard[28] = {0,-2,0,0,0,0,5,0,3,0,0,0,-5,5,0,0,0,-3,0,-5,0,0,0,0,2,0,0,0}; //start
+ //static sboard[28] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,0,0,0,0,0,0,0,0,-1,1,14,-14}; //test stk
+ //static sboard[28] = {0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,-1,0,0,0,13,-13}; //near end
+ //static sboard[28] = {0,0,0,0,0,0,2,2,0,0,0,0,0,0,0,0,0,0,-2,-2,0,0,0,0,0,0,11,-11}; //hacked pos
+ //static sboard[28] = {0,0,0,-2,-2,-2,-2,-2,2,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,12,-5}; turn = 1;
+ //static sboard[28] = {0,2,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,-2,-2,-2,-2,-2,-2,0,3,-3}; //hacked pos
+ //static sboard[28] = {-3,2,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,-2,-2,-2,-2,-2,-2,3,0,0}; //dice sim :P
+ //static sboard[28] = {-2,2,2,1,2,2,2,0,1,0,0,2,0,0,0,0,0,0,0,0,1,-2,0,-4,-7,0,0,0}; turn = 1; //test MOVEMAX
+ //static sboard[28] = {0,2,2,0,2,2,1,0,0,0,0,0,0,0,0,0,0,0,0,-1,-2,-2,0,-2,-2,0,6,-6}; turn = 1; //bad end
+ //static sboard[28] = {0,4,2,2,3,2,-1,0,0,0,0,0,0,0,-1,0,1,0,-2,-4,-2,0,-3,-2,1,0,0,0}; turn = 1; //bad roll:2-5,2-6
+ //static sboard[28] = {0,-1,0,1,0,1,1,0,1,1,0,1,1,0,1,1,0,1,1,0,1,1,0,1,1,0,0,-14}; turn = 1; //42847 valmoves
+   static board[28];
+   hang = PI/2; vang = 1.2;
+   obstatus = 0; dtimmul = 4;
+
+   rseed = ((klock(-1)*1000)%2^15)*2^16; srand(rseed);
+
+   hdie = gendietex();
+
+   for(i=0;i<28;i++) board[i] = sboard[i];
+   timanim = -1; timroll = -1; grabx = -1; throw = -1; win = 0;
+   tim = klock()*2;
+   rolldice(turn,dice);
+
+   while (1)
+   {
+      otim = tim; tim = klock()*2; dtim = tim-otim;
+
+      if (keystatus[0x1f]) //'S':toggle sound
+      {
+         keystatus[0x1f] = 0;
+         gusesnd = !gusesnd; if (gusesnd) playtext("sound on");
+      }
+
+      speed = dtim;
+      if (keystatus[0x2a]) speed *= 1/16;
+      if (keystatus[0x36]) speed *= 16/1;
+      hang += (keystatus[0x33]-keystatus[0x34])*speed;
+      vang += (keystatus[0xc9]-keystatus[0xd1])*speed;
+
+      if (keystatus[0x14]) { keystatus[0x14] = 0; dtimmul = 5-dtimmul; } //'T':fast time
+      dtim *= dtimmul;
+
+      d = max(xres/yres*30,40);
+      ipos.x = d*cos(vang)*cos(hang);
+      ipos.y = d*cos(vang)*sin(hang);
+      ipos.z =-d*sin(vang);
+      f = -1/sqrt(ipos.x^2+ipos.y^2+ipos.z^2);
+      ifor.x = ipos.x*f; ifor.y = ipos.y*f; ifor.z = ipos.z*f;
+      irig.x = sin(hang); irig.y = -cos(hang); irig.z = 0;
+      idow.x = ifor.y*irig.z - ifor.z*irig.y;
+      idow.y = ifor.z*irig.x - ifor.x*irig.z;
+      idow.z = ifor.x*irig.y - ifor.y*irig.x;
+      ipos.y += 5.5;
+      setcam(ipos.x,ipos.y,ipos.z,irig.x,irig.y,irig.z,idow.x,idow.y,idow.z,ifor.x,ifor.y,ifor.z);
+
+      vx = (mousx-xres/2)/(xres/2);
+      vy = (mousy-yres/2)/(xres/2);
+      vz = 1;
+         //ix = (vx*irig.x + vy*idow.x + vz*ifor.x)*t + ipos.x;
+         //iy = (vx*irig.y + vy*idow.y + vz*ifor.y)*t + ipos.y;
+         //iz = (vx*irig.z + vy*idow.z + vz*ifor.z)*t + ipos.z;
+      t = -ipos.z/(vx*irig.z + vy*idow.z + ifor.z);
+      mx = (vx*irig.x + vy*idow.x + ifor.x)*t + ipos.x;
+      my = (vx*irig.y + vy*idow.y + ifor.y)*t + ipos.y;
+
+         //coordinates for raised piece (in jail)
+      t = (-1-ipos.z)/(vx*irig.z + vy*idow.z + ifor.z);
+      mx2 = (vx*irig.x + vy*idow.x + ifor.x)*t + ipos.x;
+      my2 = (vx*irig.y + vy*idow.y + ifor.y)*t + ipos.y;
+
+      while (net_recv(&from,&val))
+      {
+         if (!val) //other player ready to start next game..
+         {
+            ready[from]++;
+            if (ready[0] == ready[1])
+            {
+               if (net_me >= 2)
+               {
+                  if (win > 0) score[0] += win; else score[1] -= win;
+                  for(i=0;i<28;i++) board[i] = sboard[i];
+                  win = 0;
+               }
+               grabx = -1; turn = 0; rolldice(turn,dice);
+            }
+         }
+         else if (val > 0) //receive move
+         {
+            if (timanim >= 0) //just in case other player moves too quickly..
+            {
+               domove(board,dice,turn,grabx,throw,1); grabx = -1;
+               if ((board[26] == 15) || (board[27] == -15)) win = calcwin(board,dice);
+               if ((!getvalmoves(board,dice,turn,moves)) && (!win))
+                  { turn *= -1; rolldice(turn,dice); }
+            }
+
+            val--;
+            grabx = (val%32); throw = int(val/32); timanim = 1; if (gusesnd) playsound("grab.flac",200,.5);
+         }
+         else if (val < 0) //receive die/dice
+         {
+            val = -1-val;
+            for(i=0;i<2;i++)
+            {
+               v = (int(val/8^i)%8); if (!v) continue;
+               dice[i] = v;
+               for(j=0;j<8;j++)
+               {
+                  static mat[6][9] =
+                  {
+                     +1, 0, 0,  0,+1, 0,  0, 0,+1, //1
+                     +1, 0, 0,  0, 0,-1,  0,+1, 0, //2
+                      0, 0,+1,  0,-1, 0, +1, 0, 0, //3
+                      0, 0,+1,  0,+1, 0, -1, 0, 0, //4
+                     +1, 0, 0,  0, 0,+1,  0,-1, 0, //5
+                     +1, 0, 0,  0,-1, 0,  0, 0,-1, //6
+                  };
+                  x = (int(j/1)%2)*2-1;
+                  y = (int(j/2)%2)*2-1;
+                  z = (int(j/4)%2)*2-1; k = dice[i]-1;
+                  dicep[i][j][0] = (x*mat[k][0] + y*mat[k][1] + z*mat[k][2])*dicerad + (i-.5)*12;
+                  dicep[i][j][1] = (x*mat[k][3] + y*mat[k][4] + z*mat[k][5])*dicerad;
+                  dicep[i][j][2] = (x*mat[k][6] + y*mat[k][7] + z*mat[k][8])*dicerad - dicerad;
+                  for(k=0;k<3;k++) diceop[i][j][k] = dicep[i][j][k];
+               }
+            }
+            if ((dice[0]) && (dice[1]))
+            {
+               timroll = -1;
+               if (dice[0] != dice[1]) { dice[2] = 0; dice[3] = 0; if (!turn) turn = sgn(dice[0]-dice[1]); }
+               else if (turn) { dice[2] = dice[0]; dice[3] = dice[0]; }
+               else { rolldice(turn,dice); if (gusesnd) { playsound("divebord.flac"); } }
+
+               if ((!getvalmoves(board,dice,turn,moves)) && (!win))
+               {
+                  turn *= -1; rolldice(turn,dice);
+                  if (gusesnd) { playsound("divebord.wav"); }
+               }
+            }
+         }
+      }
+
+      if ((win) || ((net_players >= 2) && (min(ready[0],ready[1]) != gamenum)))
+      {
+         if (bstatus > obstatus)
+         {
+            if (net_me < 2)
+            {
+               if (win)
+               {
+                  net_send(NET_ALLELSE,0); ready[net_me]++;
+                  if (win > 0) score[0] += win; else score[1] -= win;
+                  for(i=0;i<28;i++) board[i] = sboard[i];
+                  win = 0;
+               }
+            }
+            if ((net_players < 2) || (ready[0] == ready[1])) { grabx = -1; turn = 0; rolldice(turn,dice); }
+         }
+      }
+      else if (timroll >= 0) //Dice physics..
+      {
+         timroll -= dtim;
+         stillness = 0; for(i=0;i<2;i++) if (diceenab[i]) stillness = max(stillness,fabs(dicephys(i,dtim)));
+         if ((timroll < 0) || (stillness < .02)) //End dice physics..
+         {
+               //Quantize dice
+            for(i=0;i<2;i++)
+            {
+               if ((!diceenab[i]) || (dice[i])) continue;
+               dice[i] = quantdie(i);
+            }
+            if (net_players >= 2) net_send(NET_ALLELSE,-(dice[1]*diceenab[1]*8 + dice[0]*diceenab[0] + 1));
+
+            if ((dice[0]) && (dice[1]))
+            {
+               timroll = -1;
+               if (dice[0] != dice[1]) { dice[2] = 0; dice[3] = 0; if (!turn) turn = sgn(dice[0]-dice[1]); }
+               else if (turn) { dice[2] = dice[0]; dice[3] = dice[0]; }
+               else { rolldice(turn,dice); if (gusesnd) { playsound("divebord.flac"); } }
+
+               if ((!getvalmoves(board,dice,turn,moves)) && (!win))
+               {
+                  turn *= -1; rolldice(turn,dice);
+                  if (gusesnd) { playsound("divebord.flac"); }
+               }
+            }
+         }
+      }
+      else if (timanim >= 0) //animating piece state..
+      {
+         timanim -= dtim;
+         if (timanim < 0) //end animating piece
+         {
+            domove(board,dice,turn,grabx,throw,1); grabx = -1;
+            if ((board[26] == 15) || (board[27] == -15)) win = calcwin(board,dice);
+            if ((!getvalmoves(board,dice,turn,moves)) && (!win))
+               { turn *= -1; rolldice(turn,dice); }
+         }
+      }
+      else if (((iscomp[turn<0]) && (net_players < 2)) || ((bstatus%4) >= 2)) //compmove
+      {
+         //bstatus = 0;
+         tcomp = klock();
+         if (fabs(getcompmove(board,dice,turn,&grabx,&throw,1,iscomp[turn<0])) < 1e31)
+         {
+            tcomp = klock()-tcomp;
+            net_send(NET_ALLELSE,grabx+throw*32+1);
+            timanim = 1; if (gusesnd) playsound("grab.flac",200,1);
+         }
+      }
+      else if (((bstatus%2) > (obstatus%2)) && ((net_players < 2) || (net_me == (turn<0))))
+      {
+         for(ox=0;ox<26;ox++)
+         {
+            if (sgn(board[ox]) != turn) continue;
+            for(oy=fabs(board[ox]);oy>0;oy--)
+            {
+               space2pos(ox,oy,&x,&y,&z);
+               if (z < 0) { if ((x-mx2)^2 + (y-my2)^2 >= 1.5^2) continue; }
+                     else { if ((x-mx )^2 + (y-my )^2 >= 1.5^2) continue; }
+               grabx = ox; graby = oy; if (gusesnd) playsound("grab.flac",200,.5); break;
+            }
+         }
+      }
+      else if (((bstatus%2) < (obstatus%2)) && (grabx >= 0))
+      {
+         throw = -1;
+         for(ox=1;ox<=24;ox++)
+         {
+            space2pos(ox,1,&x,&y,&z);
+            if ((fabs(mx-x) < 1.5) && (my*y >= 0)) throw = ox;
+         }
+         if (mx > 27) throw = ((my<0) != net_me)+26;
+         
+         if (isvalmove(board,dice,grabx,throw))
+         {
+            net_send(NET_ALLELSE,grabx+throw*32+1);
+            domove(board,dice,turn,grabx,throw,1);
+            if ((board[26] == 15) || (board[27] == -15)) win = calcwin(board,dice);
+            if ((!getvalmoves(board,dice,turn,moves)) && (!win))
+               { turn *= -1; rolldice(turn,dice); }
+         }
+         else { if (gusesnd) playsound("divebord.flac"); }
+
+         grabx = -1;
+      }
+      
+      if (timroll < 0) //Flatten dice once numbers are quantized
+      {
+         for(i=0;i<2;i++) if ((diceenab[i]) && (dice[i] > 0)) dicephys(i,-dice[i]);
+      }
+//-------------------------------------------------
+      gldisable(GL_DEPTH_TEST); //no clz necessary - cloud fills screen
+      glsettex("cloud.png"); setcol(0x405060);
+      gltexcoord(tim*.01  ,0); glvertex(   0,   0);
+      gltexcoord(tim*.01+2,0); glvertex(xres,   0);
+      gltexcoord(tim*.01+2,2); glvertex(xres,yres);
+      gltexcoord(tim*.01  ,2); glvertex(   0,yres);
+      drawboard();
+      glenable(GL_DEPTH_TEST);
+
+      for(ox=0;ox<28;ox++)
+         for(oy=fabs(board[ox]);oy>0;oy--)
+         {
+            if (timanim >= 0)  { if ((ox == grabx) && (oy == fabs(board[ox]))) continue; }
+            else if ((grabx >= 0) && (ox == grabx) && (oy == graby)) continue;
+
+            space2pos(ox,oy,&x,&y,&z);
+            if (board[ox] > 0) col = 0x808080;
+                          else col = 0x804040;
+            drawcheck(x,y,z,col);
+         }
+
+      if (timanim >= 0)
+      {
+         if (turn > 0) col = 0x808080;
+                  else col = 0x804040;
+         space2pos(grabx,fabs(board[grabx])                           ,&x0,&y0,&z0);
+         space2pos(throw,fabs(board[throw])+(sgn(board[throw])!=-turn),&x1,&y1,&z1);
+         t = 1-timanim;
+         t = .5-.5*cos(t*PI);
+         drawcheck((x1-x0)*t+x0,(y1-y0)*t+y0,(z1-z0)*t+z0-sin(t*PI)*4,col);
+      }
+      else if (grabx >= 0)
+      {
+         if (turn > 0) col = 0x808080;
+                  else col = 0x804040;
+         drawcheck(mx,my,cos(min(mx^2/16*PI,PI))*-.5-.5,col);
+      }
+
+      glsettex(hdie);
+      for(i=0;i<2;i++)
+      {
+         if ((!diceenab[i]) && (!dice[i])) continue;
+         if (!turn) t = 1-i*2; else t = turn;
+         drawdie((dicep[i][0][0]+dicep[i][7][0])/2,
+                 (dicep[i][0][1]+dicep[i][7][1])/2,
+                 (dicep[i][0][2]+dicep[i][7][2])/2,
+                 (dicep[i][1][0]-dicep[i][0][0])/2,
+                 (dicep[i][1][1]-dicep[i][0][1])/2,
+                 (dicep[i][1][2]-dicep[i][0][2])/2,
+                 (dicep[i][2][0]-dicep[i][0][0])/2,
+                 (dicep[i][2][1]-dicep[i][0][1])/2,
+                 (dicep[i][2][2]-dicep[i][0][2])/2,
+                 (dicep[i][4][0]-dicep[i][0][0])/2,
+                 (dicep[i][4][1]-dicep[i][0][1])/2,
+                 (dicep[i][4][2]-dicep[i][0][2])/2,t);
+      }
+
+      if (timroll < 0)
+      {
+         if ((!iscomp[turn<0]) || ((net_players >= 2) && (!win) && (ready[0] == ready[1])))
+         {
+            n = getvalmoves(board,dice,turn,moves); nk = -1;
+            nn = 0;
+            for(i=0;i<n;i++)
+            {
+#if 0
+               setcol(0xffffff); setfont(6,8);
+               if (i == 0) { moveto(xres-160,192-16); printf("n=%g",n); }
+               for(j=0;j<4;j++)
+               {
+                  k = floor(moves[i]/256^j)%256; //WARNING:can't use int() here! (doesn't handle unsigned int32)
+                  if (!k) break;
+                  moveto(xres-160+j*40,i*8+192); printf("%2g %g",k%32,int(k/32));
+               }
+#endif
+               ok = nk; nk = (moves[i]%256); if (nk == ok) continue;
+               getmove(moves[i],0,turn,&i0,&i1);
+
+               if (turn > 0) setcol(0x808080); else setcol(0xc06060);
+               space2pos(i0,fabs(board[i0])  ,&x0,&y0,&z0);
+               space2pos(i1,fabs(board[i1])+1,&x1,&y1,&z1);
+               dx = x1-x0; dy = y1-y0; dz = z1-z0;
+               for(dt=1/16,t=0;t<1;t=u)
+               {
+                  u = t+dt;
+                  drawcone(dx*t+x0,dy*t+y0,dz*t+z0-sin(t*PI)*4,0.4*(1+dt-t),
+                           dx*u+x0,dy*u+y0,dz*u+z0-sin(u*PI)*4,0.4*(1+dt-u));
+               }
+            }
+         }
+      }
+
+      //moveto(xres/2,0); setfont(8,12);
+      //printf("%g %g %g %g %g",dice[0],dice[1],dice[2],dice[3],stillness);
+
+      getpips(board,&pip0,&pip1); setfont(xres*.020,xres*.036,1);
+      setcol(0xb0b0b0); moveto(xres*.03,yres*.03); printf("Score:%g\nPips:%g",score[0],floor(pip0+.5));
+      setcol(0xc06060); moveto(xres*.82,yres*.03); printf("Score:%g\nPips:%g",score[1],floor(pip1+.5));
+
+      if (win)
+      {
+         siz = 1/16+sin(tim*5)*.001;
+         setfont(xres*siz,xres*siz*1.7,1); moveto(xres/2-xres*siz*((win>0)+4.5),(.5 - siz*1.25)*yres);
+         if (win > 0) { setcol(0xc0c0c0); printf("White += %g!",win); }
+                 else { setcol(0xffa0a0); printf("Red += %g!",-win); }
+
+         if ((net_players >= 2) && (ready[0] != ready[1]))
+         {
+            setfont(xres/32,yres/12,1);
+            if ((ready[0] > ready[1]) && (net_me != 0)) { setcol(0xe0e0e0); moveto(xres/2-xres/32*6.5,0); printf("White's Ready"); }
+            if ((ready[0] < ready[1]) && (net_me != 1)) { setcol(0xffa0a0); moveto(xres/2-xres/32*5.5,0); printf("Red's Ready"); }
+         }
+      }
+      else
+      {
+         setcol(0xa0a0a0); moveto(xres/2-32,0); setfont(6,8); printf("%6.2fms",tcomp*1e3);
+         if (turn > 0) setcol(0xe0e0e0); else setcol(0xffa0a0);
+         if ((net_players >= 2) && (turn) && (ready[0] == ready[1]))
+         {
+            if ((turn<0) == net_me)
+            {
+               siz = 1/16+sin(tim*5)*.001;
+               setfont(xres*siz,yres*siz*2.5,1); moveto(xres/2-xres*siz*5,0);
+               printf("Your Turn!");
+            }
+            else
+            {
+               setfont(xres/32,yres/12,1);
+               if (turn > 0) { moveto(xres/2-xres/32*6,0); printf("White's Turn"); }
+                        else { moveto(xres/2-xres/32*5,0); printf("Red's Turn"); }
+            }
+         }
+      }
+
+      obstatus = bstatus; refresh(); Sleep(1);
+   }
+}
+
+quantdie (i)
+{
+   static facez[7];
+   facez[1] = dicep[i][4][2]+dicep[i][7][2];
+   facez[2] = dicep[i][2][2]+dicep[i][7][2];
+   facez[3] = dicep[i][1][2]+dicep[i][7][2];
+   facez[4] = dicep[i][6][2]+dicep[i][0][2];
+   facez[5] = dicep[i][5][2]+dicep[i][0][2];
+   facez[6] = dicep[i][3][2]+dicep[i][0][2];
+   imax = 1; for(i=6;i>1;i--) { if (facez[i] > facez[imax]) { imax = i; } }
+   return(imax);
+}
+
+rolldice (turn, dice[4])
+{
+   static m[9];
+
+   for(i=0;i<2;i++)
+   {
+      diceenab[i] = ((net_players < 2) || ((!turn) && (i == net_me)) || ((turn) && ((turn<0) == net_me)));
+      if ((diceenab[i]) && ((net_players < 2) || (min(ready[0],ready[1]) == gamenum))) dice[i] = 0;
+
+      matrand(m); nx = nrnd*2; ny = nrnd*2; nz = nrnd*8;
+      for(j=0;j<8;j++)
+      {
+         x = (int(j/1)%2)*2-1;
+         y = (int(j/2)%2)*2-1;
+         z = (int(j/4)%2)*2-1;
+         dicep[i][j][0] = (x*m[0] + y*m[1] + z*m[2])*dicerad + nx + (i-.5)*12;
+         dicep[i][j][1] = (x*m[3] + y*m[4] + z*m[5])*dicerad + ny;
+         dicep[i][j][2] = (x*m[6] + y*m[7] + z*m[8])*dicerad + nz - 40;
+         diceop[i][j][0] = dicep[i][j][0] + nrnd*.25;
+         diceop[i][j][1] = dicep[i][j][1] + nrnd*.25;
+         diceop[i][j][2] = dicep[i][j][2] + nrnd*.25;
+      }
+
+      if (!diceenab[i]) { for(j=0;j<8;j++) dicep[i][j][2] -= 1000; }
+   }
+   if (diceenab[0]+diceenab[1]) timroll = 3;
+}
+
+dicephys (i, dtim)
+{
+   static diceoop[8][3];
+
+   stillness = 0;
+
+   for(j=0;j<8;j++)
+   {
+         //Backup for Verlet
+      diceoop[j][0] = dicep[i][j][0];
+      diceoop[j][1] = dicep[i][j][1];
+      diceoop[j][2] = dicep[i][j][2];
+   }
+   for(j=0;j<8;j++)
+   {
+         //Momentum
+      dicep[i][j][0] = dicep[i][j][0]*2 - diceop[i][j][0];
+      dicep[i][j][1] = dicep[i][j][1]*2 - diceop[i][j][1];
+      dicep[i][j][2] = dicep[i][j][2]*2 - diceop[i][j][2];
+
+         //Gravity
+      dicep[i][j][2] += max(dtim,1e-2)*3;
+
+         //Nothing interesting here.. it's for umm like testing.. ;-P
+      for(k=i*5;k!=6-i*7;k+=1-i*2)
+      {
+         if (dtim >= 0) { if (!keystatus[k+2]) continue; } //Numbers quantized early by user ;-P
+                   else { if (-dtim != k+1) continue; } //Flatten dice once numbers are quantized
+         static chtmsk[6] = {0x0f,0x33,0x55,0xaa,0xcc,0xf0};
+         if (chtmsk[k]%(2^(j+1)) < 2^j) { dicep[i][j][2] += max(dtim,1e-2)*8; }
+         break;
+      }
+      if ((dtim < 0) && (quantdie(i) != -dtim))
+      {
+         static m[9];
+         matrand_axisaligned(&m[0]);
+         nx = (dicep[i][0][0]+dicep[i][7][0])/2;
+         ny = (dicep[i][0][1]+dicep[i][7][1])/2;
+         nz = (dicep[i][0][2]+dicep[i][7][2])/2;
+         for(k=0;k<8;k++)
+         {
+            x = (int(k/1)%2)*2-1; y = (int(k/2)%2)*2-1; z = (int(k/4)%2)*2-1;
+            t = (x*m[0] + y*m[1] + z*m[2])*dicerad + nx; dicep[i][k][0] = t; diceop[i][k][0] = t; diceoop[k][0] = t;
+            t = (x*m[3] + y*m[4] + z*m[5])*dicerad + ny; dicep[i][k][1] = t; diceop[i][k][1] = t; diceoop[k][1] = t;
+            t = (x*m[6] + y*m[7] + z*m[8])*dicerad + nz; dicep[i][k][2] = t; diceop[i][k][2] = t; diceoop[k][2] = t;
+         }
+      }
+      
+         //Border collision
+      if (dicep[i][j][2] > 0)
+      {
+         v = dicep[i][j][2]-diceop[i][j][2];
+         if ((v > .1) && (dtim > 0))
+         {
+            if (gusesnd) playsound("plop.flac",v*64,3.0+(rnd-.5)*1.5); //33762by
+         }
+         dicep[i][j][2] = 0;
+
+            //Contact friction
+         dicep[i][j][0] += (diceop[i][j][0]-dicep[i][j][0])*.5;
+         dicep[i][j][1] += (diceop[i][j][1]-dicep[i][j][1])*.5;
+      }
+
+         //Invisible boundaries
+      if ((i == 0) && (dicep[i][j][0] <-25)) dicep[i][j][0] =-25;
+      if ((i == 0) && (dicep[i][j][0] > -1)) dicep[i][j][0] = -1;
+      if ((i == 1) && (dicep[i][j][0] <  1)) dicep[i][j][0] =  1;
+      if ((i == 1) && (dicep[i][j][0] > 25)) dicep[i][j][0] = 25;
+      if ((dicep[i][j][1] <-8)) dicep[i][j][1] =-8;
+      if ((dicep[i][j][1] > 8)) dicep[i][j][1] = 8;
+   }
+
+      //refresh cube's shape
+   static m[9]; for(j=0;j<9;j++) m[j] = 0;
+   px = 0; py = 0; pz = 0;
+   for(j=0;j<8;j++)
+   {
+      px += dicep[i][j][0];
+      py += dicep[i][j][1];
+      pz += dicep[i][j][2];
+      for(k=0;k<9;k++) m[k] += dicep[i][j][k%3]*((int(j/2^(int(k/3)))%2)*2-1);
+   }
+   px /= 8; py /= 8; pz /= 8;
+   for(j=0;j<9;j++) m[j] /= (dicerad*8);
+   orthofit(&m[0],2);
+
+   for(j=0;j<8;j++)
+   {
+      x = (int(j/1)%2)*2-1;
+      y = (int(j/2)%2)*2-1;
+      z = (int(j/4)%2)*2-1;
+      dicep[i][j][0] = (x*m[0] + y*m[3] + z*m[6])*dicerad + px;
+      dicep[i][j][1] = (x*m[1] + y*m[4] + z*m[7])*dicerad + py;
+      dicep[i][j][2] = (x*m[2] + y*m[5] + z*m[8])*dicerad + pz;
+   
+         //Save for next frame
+      diceop[i][j][0] = diceoop[j][0];
+      diceop[i][j][1] = diceoop[j][1];
+      diceop[i][j][2] = diceoop[j][2];
+      for(k=0;k<3;k++) stillness += (dicep[i][j][k]-diceop[i][j][k])^2;
+   }
+   stillness += ((dicep[i][0][2]+dicep[i][7][2])/2 + dicerad)^2;
+   return(stillness);
+}
+
+drawboard () //Draw in back to front order so GL_DEPTH_TEST can be disabled as long as possible (rendering optimization)
+{
+      //1. draw inner walls of outside border bars first
+   glsettex("wood.png"); glcullface(GL_BACK); //top:1, lef:2, bac:4, bot:8, rig:16, fro:32
+   drawbox(  0, 26,  0,  27,0,0,  0,  1,0,  0,0, 1,  4); //fro bar, bac wal
+   drawbox(  0,-26,  0,  27,0,0,  0,  1,0,  0,0, 1, 32); //bac bar, fro wal
+   drawbox(-26,  0,  0,   1,0,0,  0, 25,0,  0,0, 1, 16); //lef bar, rig wal
+   drawbox( 26,  0,  0,   1,0,0,  0, 25,0,  0,0, 1,  2); //rig bar, lef wal
+   
+   if (ipos.z >= 0) //Hack if under board
+   {
+      drawbox(  0,  0,-.5,   1,0,0,  0, 25,0,  0,0,.5, 2+16); //mid bar, lef&rig walls
+      drawbox(  0,  0,-.5,   1,0,0,  0, 25,0,  0,0,.5, 1    +8      ); //mid bar
+   }
+   
+      //2. Draw board background
+   glsettex("wood.png"); glcullface(GL_BACK);
+   glbegin(GL_COMPLEX); setcol(0x808080); f = .1; g = .1;
+   for(i=0;i<13;i++)  { sx = i*2-25; sy =-25+(i%2)*17; gltexcoord(sx*f,sy*g); glvertex(sx,sy,0); }
+   for(i=12;i>=0;i--) { sx = i*2-25; sy =+25-(i%2)*17; gltexcoord(sx*f,sy*g); glvertex(sx,sy,0); }
+   glnextcontour();
+   for(i=0;i<13;i++)  { sx = i*2+ 1; sy =-25+(i%2)*17; gltexcoord(sx*f,sy*g); glvertex(sx,sy,0); }
+   for(i=12;i>=0;i--) { sx = i*2+ 1; sy =+25-(i%2)*17; gltexcoord(sx*f,sy*g); glvertex(sx,sy,0); }
+   glend();
+
+      //2. Draw board triangles
+   glbegin(GL_TRIANGLES); glcullface(GL_NONE);
+   for(s=-1;s<=1;s+=2)
+      for(i=0;i<12;i++)
+      {
+         if ((i+(s>0))%2) setcol(0x606060); else setcol(0xa0a0a0);
+         sx = i*4+(i>=6)*2-25; sy = s*25     ; gltexcoord(sx*f,sy*g); glvertex(sx,sy,0);
+         sx = i*4+(i>=6)*2-21; sy = s*25     ; gltexcoord(sx*f,sy*g); glvertex(sx,sy,0);
+         sx = i*4+(i>=6)*2-23; sy = s*25-17*s; gltexcoord(sx*f,sy*g); glvertex(sx,sy,0);
+      }
+      
+      //3. Draw mid bar walls
+   glsettex("wood.png"); glcullface(GL_BACK); //top:1, lef:2, bac:4, bot:8, rig:16, fro:32
+   if (ipos.z < 0) drawbox(  0,  0,-.5,   1,0,0,  0, 25,0,  0,0,.5, 2+16); //mid bar, lef&rig walls
+   
+      //4. Draw rest (top/bot/outer walls)
+   if (ipos.z < 0) drawbox(  0,  0,-.5,   1,0,0,  0, 25,0,  0,0,.5, 1    +8      ); //mid bar
+   drawbox(-26,  0,  0,   1,0,0,  0, 25,0,  0,0, 1, 1+2  +8      ); //lef bar
+   drawbox(  0,-26,  0,  27,0,0,  0,  1,0,  0,0, 1, 1+2+4+8+16   ); //bac bar
+   drawbox( 26,  0,  0,   1,0,0,  0, 25,0,  0,0, 1, 1    +8+16   ); //rig bar
+   drawbox(  0, 26,  0,  27,0,0,  0,  1,0,  0,0, 1, 1+2  +8+16+32); //fro bar
+   
+   glcullface(GL_BACK);
+}
+drawbox (cx, cy, cz, rx, ry, rz, dx, dy, dz, fx, fy, fz, vis)
+{
+   static s[6] = {0xe0e0e0,0xd0d0d0,0xffffff,0xc0c0c0,0xd0d0d0,0xb0b0b0};
+   static p[72] =
+   {
+      -1,-1,-1, +1,-1,-1, +1,+1,-1, -1,+1,-1,
+      -1,-1,+1, -1,-1,-1, -1,+1,-1, -1,+1,+1,
+      -1,-1,+1, +1,-1,+1, +1,-1,-1, -1,-1,-1,
+      +1,-1,+1, -1,-1,+1, -1,+1,+1, +1,+1,+1,
+      +1,-1,-1, +1,-1,+1, +1,+1,+1, +1,+1,-1,
+      -1,+1,-1, +1,+1,-1, +1,+1,+1, -1,+1,+1,
+   };
+   glBegin(GL_QUADS); j = 0;
+   for(fac=0;fac<6;fac++)
+   {
+      if (vis%(2^(fac+1)) < 2^fac) { j += 8; continue; }
+      for(i=fac*12,ie=(fac+1)*12;i<ie;i+=3,j+=2)
+      {
+         x = p[i]*rx + p[i+1]*dx + p[i+2]*fx + cx;
+         y = p[i]*ry + p[i+1]*dy + p[i+2]*fy + cy;
+         z = p[i]*rz + p[i+1]*dz + p[i+2]*fz + cz;
+         setcol(s[int(j/8)]); f = .1;
+              if (i < 12) glTexCoord(x*f,y*f);
+         else if (i < 24) glTexCoord(z*f,y*f);
+         else if (i < 36) glTexCoord(x*f,z*f);
+         else if (i < 48) glTexCoord(x*f,y*f);
+         else if (i < 60) glTexCoord(z*f,y*f);
+         else             glTexCoord(x*f,z*f);
+         glVertex(x,y,z);
+      }
+   }
+}
+drawdie (cx, cy, cz, rx, ry, rz, dx, dy, dz, fx, fy, fz, turn)
+{
+   static t[8] = {1e-2,1e-2, 1-1e-2,1e-2, 1-1e-2,1-1e-2, 1e-2,1-1e-2};
+   enum {R=.8};
+   static p[72] =
+   {
+      -R,-R,-1, +R,-R,-1, +R,+R,-1, -R,+R,-1,
+      -1,-R,+R, -1,-R,-R, -1,+R,-R, -1,+R,+R,
+      -R,-1,+R, +R,-1,+R, +R,-1,-R, -R,-1,-R,
+      +R,-R,+1, -R,-R,+1, -R,+R,+1, +R,+R,+1,
+      +1,-R,-R, +1,-R,+R, +1,+R,+R, +1,+R,-R,
+      -R,+1,-R, +R,+1,-R, +R,+1,+R, -R,+1,+R,
+   };
+   glBegin(GL_QUADS); glcullface(GL_BACK);
+   for(i=0,j=0;i<72;i+=3,j+=2)
+   {
+      if ((i%12) == 0)
+      {
+         nx = (p[i]+p[i+6])*rx + (p[i+1]+p[i+7])*dx + (p[i+2]+p[i+8])*fx;
+         ny = (p[i]+p[i+6])*ry + (p[i+1]+p[i+7])*dy + (p[i+2]+p[i+8])*fy;
+         nz = (p[i]+p[i+6])*rz + (p[i+1]+p[i+7])*dz + (p[i+2]+p[i+8])*fz;
+         f = 1/sqrt(nx^2+ny^2+nz^2); nx *= f; ny *= f; nz *= f;
+         f = (nx+ny+nz)*-64+208;
+         if (turn > 0) setcol(f,f,f); else setcol(f,f/2,f/2);
+      }
+      x = p[i]*rx + p[i+1]*dx + p[i+2]*fx + cx;
+      y = p[i]*ry + p[i+1]*dy + p[i+2]*fy + cy;
+      z = p[i]*rz + p[i+1]*dz + p[i+2]*fz + cz;
+      glTexCoord(t[j],t[j+1]/8 + int(i/12)/8);
+      glVertex(x,y,z);
+   }
+
+   rr = sqrt(rx^2 + ry^2 + rz^2)*(1-R);
+   if (turn > 0) setcol(0xa0a0a0); else setcol(0xa05050);
+   for(v=-1;v<=1;v+=2)
+      for(u=-1;u<=1;u+=2)
+      {
+         x0 = u*R*rx + v*R*dx + -R*fx + cx;
+         y0 = u*R*ry + v*R*dy + -R*fy + cy;
+         z0 = u*R*rz + v*R*dz + -R*fz + cz;
+         x1 = u*R*rx + v*R*dx +  R*fx + cx;
+         y1 = u*R*ry + v*R*dy +  R*fy + cy;
+         z1 = u*R*rz + v*R*dz +  R*fz + cz;
+         drawcone(x0,y0,z0,rr,x1,y1,z1,rr,DRAWCONE_NOPHONG);
+         x0 = u*R*rx +  -R*dx + v*R*fx + cx;
+         y0 = u*R*ry +  -R*dy + v*R*fy + cy;
+         z0 = u*R*rz +  -R*dz + v*R*fz + cz;
+         x1 = u*R*rx +   R*dx + v*R*fx + cx;
+         y1 = u*R*ry +   R*dy + v*R*fy + cy;
+         z1 = u*R*rz +   R*dz + v*R*fz + cz;
+         drawcone(x0,y0,z0,rr,x1,y1,z1,rr,DRAWCONE_NOPHONG);
+         x0 = -R*rx + u*R*dx + v*R*fx + cx;
+         y0 = -R*ry + u*R*dy + v*R*fy + cy;
+         z0 = -R*rz + u*R*dz + v*R*fz + cz;
+         x1 =  R*rx + u*R*dx + v*R*fx + cx;
+         y1 =  R*ry + u*R*dy + v*R*fy + cy;
+         z1 =  R*rz + u*R*dz + v*R*fz + cz;
+         drawcone(x0,y0,z0,rr,x1,y1,z1,rr,DRAWCONE_NOPHONG);
+      }
+}
+
+space2pos (ox, oy, &x, &y, &z) 
+{
+   static xlut[15] = {29,29,29,29,29,31.5,31.5,31.5,31.5,34,34,34,36.5,36.5,39};
+   static ylut[15] = {23,20,17,14,11,21.5,18.5,15.5,12.5,20,17,14,18.5,15.5,17};
+   static yylut[15] = {1,2,3,4,5,6,7,1.5,2.5,3.5,4.5,5.5,6.5,2,3};
+   static zylut[15] = {0,0,0,0,0,0,0,-.7,-.7,-.7,-.7,-.7,-.7,-1.4,-1.4};
+        if (ox == 0) { x = 0;                      y = 26-oy*3; z =-1; }
+   else if (ox < 13) { x = 25-(   ox)*4+(ox< 7)*2; y = 26-yylut[oy-1]*3; z = zylut[oy-1]; }
+   else if (ox < 25) { x = 17-(23-ox)*4+(ox>18)*2; y = yylut[oy-1]*3-26; z = zylut[oy-1]; }
+   else if (ox ==25) { x = 0;                      y = oy*3-26; z =-1; }
+   else if (ox ==26) { x = xlut[oy-1];             y = ylut[oy-1]; z = 0; }
+   else if (ox ==27) { x = xlut[oy-1];             y =-ylut[oy-1]; z = 0; }
+   if (net_me) y *= -1;
+}
+drawcheck (x, y, z, col)
+{
+   setcol(col);
+#if 1
+   drawcone(x,y,z-0.10,-1.40,x,y,z-0.65,-1.40,DRAWCONE_CENT+DRAWCONE_NOCAP1);
+   drawcone(x,y,z-0.65,-1.40,x,y,z-0.70,-1.00,DRAWCONE_CENT+DRAWCONE_NOCAP);
+   drawcone(x,y,z-0.70,-1.00,x,y,z-0.50,-0.70,DRAWCONE_CENT+DRAWCONE_NOCAP0+DRAWCONE_CULL_FRONT);
+#else
+   drawspr("c:/kwin/eval/checker.kv6",x,y,z-.4,-1.4,0,PI/2);
+#endif
+}
+
+gendietex ()
+{
+   static buf[8*64][64];
+   r2 = 5.5^2;
+   for(fac=0;fac<8;fac++)
+   {
+      for(y=0;y<64;y++)
+         for(x=0;x<64;x++)
+         {
+            d2 = 1e32;
+            if ((fac == 0) || (fac == 1) || (fac == 7) || (fac == 5)) d2 = min(d2,(x-32)^2 + (y-32)^2);
+            if (fac > 0)
+            {
+               d2 = min(d2,(x-16)^2 + (y-16)^2);
+               d2 = min(d2,(x-48)^2 + (y-48)^2);
+            }
+            if (fac >= 3)
+            {
+               d2 = min(d2,(x-16)^2 + (y-48)^2);
+               d2 = min(d2,(x-48)^2 + (y-16)^2);
+            }
+            if (fac == 3) d2 = min(d2,(x-32)^2 + (fabs(y-32)-16)^2);
+
+            v = 192-exp(-(d2)^2*.002)*256; // + noise(x*.15,y*.15)*16;
+            //i = min(min(x,y),64-max(x,y));
+            //v -= max(8-i,0)*4;
+            //v += max(4-i,0)*20;
+            buf[fac*64+y][x] = rgb(v,v,v);
+         }
+   }
+   return(glsettex(buf,64,64*8));
+}
+
+vecrand (a[3])
+{     //UNIFORM spherical randomization (see spherand.c)
+   a[2] = rnd*2-1;
+   f = rnd*(PI*2); a[0] = cos(f); a[1] = sin(f);
+   f = sqrt(1-a[2]^2); a[0] *= f; a[1] *= f;
+}
+matrand (m[9])
+{
+   vecrand(m[0]);
+   vecrand(m[6]);
+   m[3] = m[1]*m[8] - m[2]*m[7];
+   m[4] = m[2]*m[6] - m[0]*m[8];
+   m[5] = m[0]*m[7] - m[1]*m[6];
+   f = 1 / sqrt(m[3]^2 + m[4]^2 + m[5]^2);
+   m[3] *= f; m[4] *= f; m[5] *= f;
+   m[6] = m[1]*m[5] - m[2]*m[4];
+   m[7] = m[2]*m[3] - m[0]*m[5];
+   m[8] = m[0]*m[4] - m[1]*m[3];
+}
+
+matrand_axisaligned (m[9])
+{
+   for(k=6-1;k>=0;k--) m[k] = 0;
+   k0 = int(3*rnd); m[k0] = int(2*rnd)*2-1;
+   m[((int(2*rnd)+k0+1)%3)+3] = int(2*rnd)*2-1;
+   m[6] = m[1]*m[5] - m[2]*m[4];
+   m[7] = m[2]*m[3] - m[0]*m[5];
+   m[8] = m[0]*m[4] - m[1]*m[3];
+}
+
+orthofit (m[9], c)
+{
+   static nm[9];
+      //(Cheap & simplified version of the 03/18/2006 algo)
+      //Note: this version assumes input matrix has positive determinant
+   for(;c>0;c--)
+   {
+      for(i=0;i<9;i++) nm[i] = m[i];
+      m[0] += nm[4]*nm[8] - nm[5]*nm[7];
+      m[1] += nm[5]*nm[6] - nm[3]*nm[8];
+      m[2] += nm[3]*nm[7] - nm[4]*nm[6];
+      m[3] += nm[7]*nm[2] - nm[8]*nm[1];
+      m[4] += nm[8]*nm[0] - nm[6]*nm[2];
+      m[5] += nm[6]*nm[1] - nm[7]*nm[0];
+      m[6] += nm[1]*nm[5] - nm[2]*nm[4];
+      m[7] += nm[2]*nm[3] - nm[0]*nm[5];
+      m[8] += nm[0]*nm[4] - nm[1]*nm[3];
+      d = 1/sqrt(m[0]^2+m[1]^2+m[2]^2);
+      for(i=0;i<9;i++) m[i] *= d;
+   }
+}
+
+   //06/26/2012: New version, handles all dice in single call
+   //board[]: [0]=RJail, [1-24]=.., [25]=WJail, [26]=WEnd, [27]=REnd, >0=W, <0=R
+   // dice[]: 1..6:die, <=0:N/A
+   //   turn: 1=white, -1=red
+   //moves[]: (board_start_ind + dice_val*32)*2^0 + "*2^8 + "*2^16 + "*2^24
+   //returns: # moves
+getvalmoves (board[28], dice[4], turn, moves[MOVEMAX])
+{
+   static check[32], checkn[5], checki[4], src[4], dest[4], diceval[4], odval[4];
+   auto ndice[4];
+
+   checkn[0] = -1;
+
+      //WARNING:turn's jail must be put on list first!
+   if (turn > 0) { for(i=25;i>0;i--) if (board[i] > 0) { checkn[0]++; check[checkn[0]] = i; } njail = board[25]; }
+            else { for(i=0;i<25;i++) if (board[i] < 0) { checkn[0]++; check[checkn[0]] = i; } njail =-board[ 0]; }
+
+   if ((dice[0] > 0) && (dice[1] > 0) && (dice[0] != dice[1])) //handle non-doubles
+   {
+      mode = 1; diceval[0] = dice[0]; diceval[1] = dice[1]; diceval[2] = 0; diceval[3] = 0; dn = 2;
+   }
+   else
+   {
+      mode = 0; dn = 0;
+      for(i=0;i<4;i++) if (dice[i] > 0) { diceval[dn] = dice[i]; dn++; }
+      if (!dn) return(0);
+   }
+
+   n = 0;
+   for(c=mode;c>=0;c--)
+   {
+      ls = 0; goto in2it;
+      do
+      {
+         checki[ls]--;
+         if (checki[ls] < 0)
+         {
+               //undo depth
+            ls--; if (ls < 0) break;
+
+               //restore board changes
+            board[src[ls]] += turn;
+            if ((dest[ls] >= 1) && (dest[ls] <= 24)) board[dest[ls]] = odval[ls];
+
+            continue;
+         }
+
+         src[ls] = check[checki[ls]];
+         if (!board[src[ls]]) continue; //true in rare cases due to check[] having too many on list in deeper recursion
+         dest[ls] = src[ls] - diceval[ls]*turn; checkn[ls+1] = checkn[ls];
+         if ((dest[ls] >= 1) && (dest[ls] <= 24)) //if dest on board..
+         {
+            v = board[dest[ls]]*turn;
+            if (v <= -2) continue; //blocked by other player
+            if (v <= 0) { checkn[ls+1]++; check[checkn[ls+1]] = dest[ls]; } //new space occupied:add to check list
+         }
+         else if (turn > 0)
+         {
+            for(mini=check[0];mini> 0;mini--) if (board[mini] > 0) break; //check[0] not always mini
+            if ((mini >  6) || ((src[ls] < mini) && (dest[ls] <  0))) continue;
+         }
+         else //if (turn < 0)
+         {
+            for(mini=check[0];mini<25;mini++) if (board[mini] < 0) break; //check[0] not always mini
+            if ((mini < 19) || ((src[ls] > mini) && (dest[ls] > 25))) continue;
+         }
+         if (dn == ls+1)
+         {
+            if (n < MOVEMAX)
+            {
+               moves[n] = 0;
+               for(i=ls;i>=0;i--) moves[n] = moves[n]*256 + src[i]+diceval[i]*32;
+            }
+            n++; continue;
+         }
+
+            //mod board&recurse
+         board[src[ls]] -= turn;
+         if ((dest[ls] >= 1) && (dest[ls] <= 24))
+            { odval[ls] = board[dest[ls]]; board[dest[ls]] += ((odval[ls]==-turn)+1)*turn; }
+
+         ls++;
+in2it:;  checki[ls] = checkn[ls]; if (njail > ls) checki[ls] = 0; //only check first index if in jail
+         checki[ls]++;
+      } while (1);
+
+      if (c) { diceval[0] = dice[1]; diceval[1] = dice[0]; }
+   }
+   if (n) return(n);
+   if (mode)
+   {
+      for(i=1;i<4;i++) ndice[i] = 0;
+      ndice[0] = max(dice[0],dice[1]); n = getvalmoves(board,ndice,turn,moves); if (n) return(n);
+      ndice[0] = min(dice[0],dice[1]); n = getvalmoves(board,ndice,turn,moves);
+   }
+   else
+   {
+      for(i=0;i<dn-1;i++) ndice[i] = diceval[0];
+      for(;i<4;i++) ndice[i] = 0;
+      n = getvalmoves(board,ndice,turn,moves);
+   }
+   return(n);
+}
+isvalmove (board[28], dice[4], m0, m1)
+{
+   static moves[MOVEMAX];
+
+   if ((m1 < 0) || (m0 == m1) || (!board[m0])) return(0);
+   turn = sgn(board[m0]);
+   n = getvalmoves(board,dice,turn,moves);
+   for(i=n-1;i>=0;i--)
+   {
+      getmove(moves[i],0,turn,&i0,&i1);
+      if ((i0 == m0) && (i1 == m1)) return(1);
+   }
+   return(0);
+}
+
+getpips (board[28], &pip0, &pip1)
+{
+   pip0 = 0; pip1 = 0;
+   for(i=0;i<=25;i++)
+   {
+         //NOTE: 1/256 hack makes computer AI favor occupying more spaces when tie.
+           if (board[i] > 0) { pip0 += board[i]*(i   )+(board[i]>+1)/256; }
+      else if (board[i] < 0) { pip1 += board[i]*(i-25)-(board[i]<-1)/256; }
+   }
+   return(pip1-pip0);
+}
+
+calcwin (board[28], dice[2])
+{
+   if (board[26] == 15)
+   {
+      turn = 0; dice[0] = 0; dice[1] = 0; diceenab[0] = 0; diceenab[1] = 0; gamenum++;
+      if (board[27]) { sc = 1; if (gusesnd) playtext("White wins a cube"); }
+      else
+      {
+         sc = 2;
+         for(i=0;i<=6;i++) if (board[i] < 0) sc = 3;
+         if (gusesnd) { if (sc == 2) playtext("White wins a gammon"); else playtext("White wins a backgammon"); }
+      }
+
+   }
+   else if (board[27] ==-15)
+   {
+      turn = 0; dice[0] = 0; dice[1] = 0; diceenab[0] = 0; diceenab[1] = 0; gamenum++;
+      if (board[26]) { sc = -1; if (gusesnd) playtext("Red wins a cube"); }
+      else
+      {
+         sc = -2;
+         for(i=25;i>=19;i--) if (board[i] > 0) sc = -3;
+         if (gusesnd) { if (sc ==-2) playtext("Red wins a gammon"); else playtext("Red wins a backgammon"); }
+      }
+   }
+   return(sc);
+}
+
+domove (board[28], dice[4], turn, grabx, throw, doplay)
+{
+   s = sgn(board[grabx]); board[grabx] -= s;
+   if ((throw < 1) || (throw > 24)) //Move piece into end
+   {
+      board[(turn<0)+26] += turn;
+      for(i=3;i>=0;i--) if (fabs(grabx-(turn<0)*25) == dice[i]) { dice[i] *= -1; break; }
+      if (i < 0) 
+      {
+         bi = 3; for(i=2;i>=0;i--) if (dice[i] > dice[bi]) bi = i;
+         dice[bi] *= -1;
+      }
+      if (doplay) { if (gusesnd) playsound("pickup.wav"); }
+   }
+   else if (board[throw] == -s) //Hit opponent piece
+   {
+      board[throw] *= -1;
+      board[(turn<0)*25] -= turn;
+      for(i=3;i>=0;i--) if (fabs(grabx-throw) == dice[i]) { dice[i] *= -1; break; }
+      if (doplay) { if (gusesnd) playsound("waterpot.flac"); }
+   }
+   else //Regular uneventful move
+   {
+      board[throw] += turn;
+      for(i=3;i>=0;i--) if (fabs(grabx-throw) == dice[i]) { dice[i] *= -1; break; }
+      if (doplay) { if (gusesnd) playsound("put.flac",200,1); }
+   }
+}
+
+board2hash (board[28], hash[3])
+{
+   hash[0] = board[ 0]*32^0 + board[ 1]*32^1 + board[ 2]*32^2 + board[ 3]*32^3 + board[ 4]*32^4
+           + board[ 5]*32^5 + board[ 6]*32^6 + board[ 7]*32^7 + board[ 8]*32^8 + board[ 9]*32^9;
+   hash[1] = board[10]*32^0 + board[11]*32^1 + board[12]*32^2 + board[13]*32^3 + board[14]*32^4
+           + board[15]*32^5 + board[16]*32^6 + board[17]*32^7 + board[18]*32^8 + board[19]*32^9;
+   hash[2] = board[20]*32^0 + board[21]*32^1 + board[22]*32^2 + board[23]*32^3 + board[24]*32^4
+           + board[25]*32^5 + board[26]*32^6 + board[27]*32^7;
+   return((hash[0]+hash[1]-hash[2])%HASHSIZ);
+}
+
+getmove (move, ind, turn, &grabx, &throw)
+{
+   static mulut[4] = {256^0,256^1,256^2,256^3};
+   static rmulut[4] = {1/256^0,1/256^1,1/256^2,1/256^3};
+
+   if (move < mulut[ind]) return(0);
+   i = floor(move*rmulut[ind])%256; //WARNING:can't use int() here because int() truncates #'s >= 2^31
+   j = int(i/32); grabx = i-j*32;
+   throw = grabx - j*turn;
+        if (throw <  1) throw = 26;
+   else if (throw > 24) throw = 27;
+   return(1);
+}
+
+getcompmove_recur (board[28], dice[4], turn, &grabx, &throw, dep, maxdep, rungameswap)
+{
+   static moves[MAXREC][MOVEMAX];
+   static hash0[MAXREC][MOVEMAX], hash1[MAXREC][MOVEMAX], hash2[MAXREC][MOVEMAX];
+   static hashnext[MAXREC][MOVEMAX], hashead[MAXREC][HASHSIZ];
+   static nhash[3]; hashn = 0;
+   auto tboard[28];
+   auto patch[12], patchn;
+   
+#if (DEBUGAI)
+   setfont(8,12); setcol(0xffffff);
+   for(i=0;i<28;i++)
+   {
+      space2pos(i,0,&x,&y,&z);
+      x -= ipos.x; y -= ipos.y; z -= ipos.z;
+      x2 = x*irig.x + y*irig.y + z*irig.z;
+      y2 = x*idow.x + y*idow.y + z*idow.z;
+      z2 = x*ifor.x + y*ifor.y + z*ifor.z;
+      moveto(x2/z2*xres/2+xres/2-(i>=10)*4-4,
+             y2/z2*xres/2+yres/2-6);
+      printf("%g",i);
+   }
+#endif
+
+   bi = -1; bsc = turn*-1e32; bin = 0; num = 0;
+   n = getvalmoves(board,dice,turn,moves[dep][0]); if (n <= 0) return(-1e32);
+   for(j=28-1;j>=0;j--) tboard[j] = board[j];
+   ijail = (turn<0)*25; iend = (turn<0)+26; patchn = 0;
+   
+   for(i=0;i<HASHSIZ;i++) hashead[dep][i] = -1;
+   
+   osc = getpips(board,&p0,&p1);
+
+   for(i=0;i<n;i++)
+   {
+      for(;patchn>0;patchn--) { j = patch[patchn-1]; tboard[j] = board[j]; }
+
+      for(j=0;j<4;j++)
+      {
+         if (!getmove(moves[dep][i],j,turn,&i0,&i1)) break;
+         
+         patch[patchn] = i0; patchn++; tboard[i0] -= turn;
+         if ((i1 < 1) || (i1 > 24)) //Move piece into end
+            { patch[patchn] = iend; patchn++; tboard[iend] += turn; continue; }
+         patch[patchn] = i1; patchn++; 
+         if (tboard[i1] != -turn) { tboard[i1] += turn; continue; } //Regular move
+         tboard[i1] *= -1; tboard[ijail] -= turn; patch[patchn] = ijail; patchn++; //Hit piece
+      }
+   
+#if 1
+      hash = board2hash(tboard,nhash);
+      for(h=hashead[dep][hash];h>=0;h=hashnext[dep][h])
+         if ((hash0[dep][h] == nhash[0]) && (hash1[dep][h] == nhash[1]) && (hash2[dep][h] == nhash[2])) break;
+      if (h >= 0) continue;
+      if (hashn < MOVEMAX)
+      {
+         hash0[dep][hashn] = nhash[0]; hash1[dep][hashn] = nhash[1]; hash2[dep][hashn] = nhash[2];
+         hashnext[dep][hashn] = hashead[dep][hash]; hashead[dep][hash] = hashn; hashn++;
+      }
+#endif
+
+      if (dep < maxdep)
+      {
+         static rolls[21][4] =
+         {
+            1,1,1,1, 2,2,2,2, 3,3,3,3, 4,4,4,4, 5,5,5,5, 6,6,6,6,
+            1,2,0,0,
+            1,3,0,0, 2,3,0,0, 
+            1,4,0,0, 2,4,0,0, 3,4,0,0,
+            1,5,0,0, 2,5,0,0, 3,5,0,0, 4,5,0,0,
+            1,6,0,0, 2,6,0,0, 3,6,0,0, 4,6,0,0, 5,6,0,0,
+         };
+         sc = 0; scn = 0; //calculate expected best score
+         for(r=0;r<21;r++)
+         {
+            s = getcompmove_recur(tboard,rolls[r][0],turn*rungameswap,&ngrabx,&nthrow,dep+1,maxdep,rungameswap);
+            if (fabs(s) < 1e31) { w = (r>=6)+1; sc += s*w; scn += w; }
+         }
+         if (scn) sc /= scn;
+      }
+      else
+      {
+#if 0      
+         sc = getpips(tboard,&p0,&p1);
+#else         
+         sc = osc;
+         for(j=patchn-1;j>=0;j--)
+         {
+            k = patch[j]; if ((k >= 26) || (tboard[k] == -1e32)) continue;
+                 if (tboard[k] > 0) { sc -= tboard[k]*(k   )+(tboard[k]>+1)/256; }
+            else if (tboard[k] < 0) { sc += tboard[k]*(k-25)-(tboard[k]<-1)/256; }
+                 if ( board[k] > 0) { sc +=  board[k]*(k   )+( board[k]>+1)/256; }
+            else if ( board[k] < 0) { sc -=  board[k]*(k-25)-( board[k]<-1)/256; }
+            tboard[k] = -1e32;
+         }
+#endif
+         sc += (tboard[26] - tboard[27])*turn; //an attempt to improve end game
+      }
+      
+#if (DEBUGAI)  
+      if (dep == 0)
+      {
+         setfont(8,12); setcol(0xffffff); num++;
+         for(j=0;j<4;j++)
+         {
+            moveto(xres-448+j*64,num*12);
+            if (moves[dep][i] < 256^j) break;
+            k = floor(moves[dep][i]/256^j)%256; //WARNING:can't use int() here
+            printf("%2g %+2g",k%32,int(k/32));
+         }
+         moveto(xres-200,num*12); printf("%10.6f",sc);
+      }
+#endif
+
+           if (sc*turn > bsc*turn)           { bi = i; bnum = num; bin = 2; bsc = sc; }
+      else if ((sc == bsc) && (rnd*bin < 1)) { bi = i; bnum = num; bin++; }
+   }
+
+#if (DEBUGAI)   
+   if (dep == 0)
+   {
+      drawcone(xres-210,bnum*12+5,4,xres-204,bnum*12+5,4);
+      for(bstatus=0;!bstatus;refresh(),Sleep(15)); bstatus = 0;
+   }
+#endif   
+
+   getmove(moves[dep][bi],0,turn,&grabx,&throw);
+   return(bsc);
+}
+getcompmove (board[28], dice[4], turn, &grabx, &throw, dep, aimeth)
+{
+   dep = min(dep,MAXREC);
+   max0 = -1; min1 = 26;
+   for(i=0;i<=25;i++)
+   {
+      if ((board[i] > 0) && (i > max0)) max0 = i;
+      if ((board[i] < 0) && (i < min1)) min1 = i;
+   }
+   isrungame = (max0<min1);
+
+   if (aimeth < 3)
+   {
+         //super crappy AI
+      static moves[MOVEMAX], tboard[28];
+      n = getvalmoves(board,dice,turn,moves); if (n <= 0) return(-1e32);
+      bsc = -1e32; bi = -1; ijail = (turn<0)*25; iend = (turn<0)+26;
+      for(i=n-1;i>=0;i--)
+      {
+         if (aimeth == 1)
+         {
+               //Hit if possible else random
+            getmove(moves[i],0,turn,&i0,&i1);
+            if (sgn(board[i0]) == -board[i1]) { bi = i; break; }
+         }
+         else
+         {
+               //State based
+            for(j=0;j<28;j++) tboard[j] = board[j];
+            for(j=0;j<4;j++)
+            {
+               if (!getmove(moves[i],j,turn,&i0,&i1)) break;
+               tboard[i0] -= turn;
+               if ((i1 < 1) || (i1 > 24)) { tboard[iend] += turn; continue; } //Move piece into end
+               if (tboard[i1] != -turn) { tboard[i1] += turn; continue; } //Regular move
+               tboard[i1] *= -1; tboard[ijail] -= turn; //Hit piece
+            }
+            sc = pubeval(tboard,turn,isrungame);
+            if (sc > bsc) { bsc = sc; bi = i; }
+         }
+      }
+      if (bi < 0) bi = int(n*rnd);
+      getmove(moves[bi],0,turn,&grabx,&throw);
+      return(0);
+   }
+   return(getcompmove_recur(board,dice,turn,grabx,throw,0,dep,isrungame*2-1));
+}
+
+   //Code based on: ftp://ftp.cs.cmu.edu/afs/cs/project/connect/code/tesauro/
+   // Backgammon move-selection evaluation function for benchmark comparisons.
+   // Makes lots of obvious mistakes, but provides a decent level of play for benchmarking purposes.
+   // Provided as a public service to the backgammon programming community by Gerry Tesauro, IBM Research. (tesauro@watson.ibm.com)
+pubeval (board[28], turn, israce)
+{
+   static wgt[2*122] =
+   {
+          //Contact weights:
+      +0.25696,-0.66937,-1.66135,-2.02487,-2.53398, -0.16092,-1.11725,-1.06654,-0.92830,-1.99558, -1.10388,-0.80802,+0.09856,-0.62086,-1.27999,
+      -0.59220,-0.73667,+0.89032,-0.38933,-1.59847, -1.50197,-0.60966,+1.56166,-0.47389,-1.80390, -0.83425,-0.97741,-1.41371,+0.24500,+0.10970,
+      -1.36476,-1.05572,+1.15420,+0.11069,-0.38319, -0.74816,-0.59244,+0.81116,-0.39511,+0.11424, -0.73169,-0.56074,+1.09792,+0.15977,+0.13786,
+      -1.18435,-0.43363,+1.06169,-0.21329,+0.04798, -0.94373,-0.22982,+1.22737,-0.13099,-0.06295, -0.75882,-0.13658,+1.78389,+0.30416,+0.36797,
+      -0.69851,+0.13003,+1.23070,+0.40868,-0.21081, -0.64073,+0.31061,+1.59554,+0.65718,+0.25429, -0.80789,+0.08240,+1.78964,+0.54304,+0.41174,
+      -1.06161,+0.07851,+2.01451,+0.49786,+0.91936, -0.90750,+0.05941,+1.83120,+0.58722,+1.28777, -0.83711,-0.33248,+2.64983,+0.52698,+0.82132,
+      -0.58897,-1.18223,+3.35809,+0.62017,+0.57353, -0.07276,-0.36214,+4.37655,+0.45481,+0.21746, +0.10504,-0.61977,+3.54001,+0.04612,-0.18108,
+      +0.63211,-0.87046,+2.47673,-0.48016,-1.27157, +0.86505,-1.11342,+1.24612,-0.82385,-2.77082, +1.23606,-1.59529,+0.10438,-1.30206,-4.11520,
+      +5.62596,-2.75800,
+
+         //Race weights:
+      +0.00000,-0.17160,+0.27010,+0.29906,-0.08471, +0.00000,-1.40375,-1.05121,+0.07217,-0.01351, +0.00000,-1.29506,-2.16183,+0.13246,-1.03508,
+      +0.00000,-2.29847,-2.34631,+0.17253,+0.08302, +0.00000,-1.27266,-2.87401,-0.07456,-0.34240, +0.00000,-1.34640,-2.46556,-0.13022,-0.01591,
+      +0.00000,+0.27448,+0.60015,+0.48302,+0.25236, +0.00000,+0.39521,+0.68178,+0.05281,+0.09266, +0.00000,+0.24855,-0.06844,-0.37646,+0.05685,
+      +0.00000,+0.17405,+0.00430,+0.74427,+0.00576, +0.00000,+0.12392,+0.31202,-0.91035,-0.16270, +0.00000,+0.01418,-0.10839,-0.02781,-0.88035,
+      +0.00000,+1.07274,+2.00366,+1.16242,+0.22520, +0.00000,+0.85631,+1.06349,+1.49549,+0.18966, +0.00000,+0.37183,-0.50352,-0.14818,+0.12039,
+      +0.00000,+0.13681,+0.13978,+1.11245,-0.12707, +0.00000,-0.22082,+0.20178,-0.06285,-0.52728, +0.00000,-0.13597,-0.19412,-0.09308,-1.26062,
+      +0.00000,+3.05454,+5.16874,+1.50680,+5.35000, +0.00000,+2.19605,+3.85390,+0.88296,+2.30052, +0.00000,+0.92321,+1.08744,-0.11696,-0.78560,
+      +0.00000,-0.09795,-0.83050,-1.09167,-4.94251, +0.00000,-1.00316,-3.66465,-2.56906,-9.67677, +0.00000,-2.77982,-7.26713,-3.40177,-12.32252,
+      +0.00000,+3.42040,
+   };
+
+   if (board[(turn<0)+26]*turn == 15) return(1e32);
+
+   j = israce*122;
+   sc = wgt[j+120]*turn*board[(turn<0)*25]/-2.0; //OppJail
+      + wgt[j+121]*turn*board[(turn<0)+26]/15.0; //CPUFree
+   for(i=0;i<24;i++,j+=5)
+   {
+      if (turn > 0) v = board[24-i]; else v = -board[i+1];
+      sc += wgt[j+0]*(v ==-1);
+      sc += wgt[j+1]*(v == 1);
+      sc += wgt[j+2]*(v >= 2);
+      sc += wgt[j+3]*(v == 3);
+      sc += wgt[j+4]*max(v-3,0)*.5;
+   }
+   return(sc);
+}

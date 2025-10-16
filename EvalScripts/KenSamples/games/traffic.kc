@@ -1,0 +1,917 @@
+enum {PAKSIZ=3, TICSPERSEC=256};
+enum {MAXSIGNS=28}; static hsign[MAXSIGNS];
+
+static playcol[8] = {0xffffff,0xff8080,0x80ff80,0x8080ff,0xffff80,0xff80ff,0xffffff,0x404040};
+enum {MAXPLAYS=16};
+struct
+{
+   op, p, v, a, wheelang, shand[2], camx, camy, brakeaccel, pedalaccel;
+   tim, goodtim, penaltim, saidshitim, hittim, iscomp, ready;
+} play_t;
+enum {LIGHTMAX=64};   struct { z, t;                          } light_t; //16
+enum {SPRIMAX=32};    struct { x, z, col, texind;             } spri_t;  // 8
+enum {GHOGMAX=64};    struct { oz, dir, phas, flatim, fx, fz; } ghog_t;  // 4
+enum {SMOKEMAX=1024}; struct { x, y, z, xv, yv, zv, te;       } smoke_t;
+   
+   //Level ideas:
+   //   Red light district (lots of traffic lights or more likely red)
+   //   Groundhog day (lots of ghogs)
+   //   Anvil (anvil sits at end of track; must stop before hitting it)
+   //   More Cow Hell (lots of cows)
+   //   The Sticks (few traffic lots - hold gas first!)
+   //   Pit/Land Mine (must jump over hazard by going thru red light or else stuck/game over!)
+   //   Deer Crossing (deer instead of groundhog - 3 second penalty if hit)
+   //Other ideas:
+   //   Falling Asteroid/Rock (?)
+   //   Parking meter: can't stop there too long?
+   //   Rolling Barrel (Donkey Kong?)
+   //   Toss dynamite onto neighboring track (need to be ahead to be useful)
+
+struct
+{
+   play_t play[MAXPLAYS];   double playn;
+   light_t light[LIGHTMAX]; double lightn;
+   spri_t spri[SPRIMAX];    double sprin;
+   ghog_t ghog[GHOGMAX];    double ghogn;
+   smoke_t smoke[SMOKEMAX]; double smoken;
+   double winner[MAXPLAYS], moveseed;
+   double level;
+} gs_t;
+
+()
+{
+   enum {PPAKBUF=1024};
+   static lpak[PAKSIZ], ppak[PPAKBUF][PAKSIZ]; //for client-side prediction
+
+   static gs_t gs, pgs;
+   
+   gensigns();
+     
+   if (net_me == 0) net_send(NET_ALL,((klock(-1)*1000)%2^15)*2^16);
+   while (net_recv(&from,&val) == 0)
+   {
+      cls(0); setfont(9,12);
+      moveto(xres/2,yres/2); printf("Waiting for master..");
+      refresh(); Sleep(1);
+   }
+   
+   gs.level = 0; gs.moveseed = val;
+   game_init(&gs);
+
+   pgs = gs; //Copy sync to pred
+   
+   spakn = 0; ppakn = 0; //sync/pred packet counts of own packets
+   
+   viewp = net_me; ltim = floor(klock()*TICSPERSEC); oha = 0; ova = 0;
+   while (1)
+   {
+      oltim = ltim; ltim = floor(klock()*TICSPERSEC); ldtim = ltim-oltim;
+      if (keystatus[0x2b]) { keystatus[0x2b] = 0; viewp = (viewp+1)%gs.playn; } //Backslash
+      
+      if (((net_me == 0) || (ppakn-spakn < PPAKBUF)) && (ldtim) && (!gs.play[net_me].iscomp))
+      {
+         lpak[0] = net_me +
+                   (((bstatus%2) >= 1) || keystatus[0x1d] || keystatus[0x9d])*16 +
+                   (((bstatus%4) >= 2) || keystatus[0x2a] || keystatus[0x36])*32 +
+                   (((bstatus%8) >= 4) || keystatus[0x39] || keystatus[0x1c] || keystatus[0x9c])*64;
+         lpak[1] = ldtim;
+         h = min(max(near((mousx/xres-.5)*(PI*1.5)   *1024) - oha,-256),255);
+         v = min(max(near(max((mousy/yres-.5)*PI,-.4)*1024) - ova,-256),255);
+         lpak[2] = h + v*512; oha += h; ova += v;
+         net_send(NET_ALL,lpak,PAKSIZ);
+         if (net_me)
+         {
+            for(i=0;i<PAKSIZ;i++) { ppak[ppakn%PPAKBUF][i] = lpak[i]; } ppakn++;
+            execute_pak(&pgs,&lpak,1,viewp);
+         }
+      }
+      
+      if ((!net_me) && (ldtim))
+      {
+         for(p=0;p<gs.playn;p++) //computer AI
+         {
+            if (!gs.play[p].iscomp) continue;
+            if (gs.play[p].p < gs.light[gs.lightn-1].z)
+                 { newacc = docompmove(&gs.play[p],gs.light,gs.lightn,
+                                       (ltim-ldtim)/TICSPERSEC,gs.play[p].iscomp); }
+            else { newacc = gs.play[p].brakeaccel; }
+            lpak[0] = p + (newacc>0)*16 + (newacc<0)*32 + 64;
+            lpak[1] = ldtim;
+            lpak[2] = 0;
+            net_send(NET_ALL,lpak,PAKSIZ);
+         }
+      }
+
+      gototh = 0;
+      while (net_recv(&from,&lpak,PAKSIZ))
+      {
+         if ((lpak[0]%16) == net_me) spakn++; else gototh = 1;
+         execute_pak(&gs,&lpak,(net_me==0)||(net_me!=from),viewp);
+      }
+      if ((gototh) && (net_me))
+      {
+         pgs = gs; //Copy sync to pred
+         for(j=spakn;j<ppakn;j++)
+            execute_pak(&pgs,&ppak[j%PPAKBUF][0],0,0); //recalc: apply predicted paks
+      }
+
+//--------------------------------------------------------------------------------
+      if (!net_me) { render( &gs,viewp); }
+              else { render(&pgs,viewp); }
+
+      refresh(); Sleep(1);
+   }
+}
+
+is_light_safe (pos, vel, acc0, t1, acc1, tim)
+{
+      //z = pos + vel*dt + acc0/2*dt^2
+      //solve for dt: dt^2*(acc0/2) + dt*vel + (pos-z) = 0
+   Za0 = acc0/2; Zb0 = vel; Zc0 = pos;
+   if (Za0 == 0) { dta = -Zc0/Zb0; if (dta < 0) dta = -1e32; }
+   else
+   {
+      insqr = Zb0*Zb0 - Za0*Zc0*4; if (insqr < 0) dta = -1e32;
+      else
+      {
+         a = sqrt(insqr); b = -.5/Za0;
+         dt0 = (Zb0 + a)*b; if (dt0 < 0) dt0 = 1e32;
+         dt1 = (Zb0 - a)*b; if (dt1 < 0) dt1 = 1e32;
+         dta = min(dt0,dt1);
+      }
+   }
+   if ((dta > 0) && (dta < t1) && (((tim+dta-0.05)%8) >= 4.90)) return(0);
+   
+   if (t1 < 1e32)
+   {
+         //z = (pos + vel*t1 + acc0/2*t1^2) + (vel + acc0*t1)*(dt-t1) + acc1/2*(dt-t1)^2
+         //dt1 = dt-t1; solve for dt1: (acc1/2)*dt1^2 + (vel + acc0*t1)*dt1 +
+         //                             (vel*t1 + acc0/2*t1^2 + pos-z) = 0
+      Za1 = acc1/2; Zb1 = vel + acc0*t1; Zc1 = vel*t1 + acc0/2*t1^2 + pos;
+      if (Za1 == 0) { dtb = -Zc1/Zb1; if (dtb < 0) dtb = -1e32; }
+      else
+      {
+         insqr = Zb1*Zb1 - Za1*Zc1*4; if (insqr < 0) dtb = -1e32;
+         else
+         {
+            a = sqrt(insqr); b = -.5/Za1;
+            dt0 = (Zb1 + a)*b; if (dt0 < 0) dt0 = 1e32;
+            dt1 = (Zb1 - a)*b; if (dt1 < 0) dt1 = 1e32;
+            dtb = min(dt0,dt1);
+         }
+      }
+      if ((dtb >= 0) && (((tim+t1+dtb-0.10)%8) >= 4.80)) return(0);
+   }
+   
+   return(1);
+}
+
+docompmovenew (play_t play, light_t light[LIGHTMAX], lightn, tim, complev, i, &got, &newacc)
+{
+   static speed[3]; speed[0] = play.brakeaccel; speed[1] = 0; speed[2] = play.pedalaccel;
+   got = 0; newacc = 0;
+   
+      //two speeds lookahead with loop on time change. Advantage seems to be
+      //ability to look ahead much further than old AI (high n) w/o getting stuck
+   n = 8;
+   dt = .05; bestsc = -1e32;
+   for(j=3-1;j>=0;j--)
+      for(k=3-1;k>=0;k--)
+      {
+         if (k == j) continue;
+         for(t1=dt;t1<=4;t1+=dt) //t1 = time ahead to switch from 1st to 2nd acceleration constant
+         {
+            ie = min(i+n,lightn);
+            for(i2=i;i2<ie;i2++)
+               if (!is_light_safe(play.p-light[i2].z,play.v,speed[j],t1,speed[k],tim-light[i2].t)) break;
+            if (i2 == ie)
+            {
+                  //best pos&vel mix at 'ttest' seconds in future?
+               ttest = 4;
+               if (ttest < t1)
+               {
+                  pos = play.v*ttest + speed[j]/2*ttest^2;
+                  vel = play.v + speed[j]*ttest;
+               }
+               else
+               {
+                  pos = (play.v*t1 + speed[j]/2*t1^2) +
+                        (play.v + speed[j]*t1)*(ttest-t1) +
+                        speed[k]/2*(ttest-t1)^2;
+                  vel = play.v + speed[j]*t1 + speed[k]*(t1-ttest);
+               }
+               sc = pos*1
+                   +vel*0;
+               if ((!got) || (sc > bestsc)) { bestsc = sc; newacc = speed[j]; got = 1; }
+            }
+         }
+      }
+}
+
+docompmove (play_t play, light_t light[LIGHTMAX], lightn, tim, complev)
+{
+   static speed[3]; speed[0] = play.brakeaccel; speed[1] = 0; speed[2] = play.pedalaccel;
+   if (complev == 1) return(speed[2]); //super stupid (Mr. Leadfoot)
+   
+   for(i=0;i<lightn;i++) if (play.p < light[i].z) break;
+   
+   got = 0; newacc = 0;
+   if (complev == 4)
+   {
+      docompmovenew(play,light,lightn,tim,complev,i,&got,&newacc);
+   }
+   else
+   {     //old AI
+         //higher n better and less chance of 'shit', but for n >= ~3-4, AI gets stuck :/
+           if (complev == 2) { n = 1; }
+      else if (complev == 3) { n = 2; }
+      else                   { n = 3; }
+      for(j=0;j<3;j++)
+      {
+         nza = speed[j];
+         ie = min(i+n,lightn);
+         for(i2=i;i2<ie;i2++)
+            if (!is_light_safe(play.p-light[i2].z,play.v,speed[j],1e32,0,tim-light[i2].t)) break;
+         if (i2 == ie) { newacc = speed[j]; got = 1; }
+      }
+   }
+   if (!got)
+   {
+      newacc = speed[0];
+      if (tim >= play.saidshitim) { play.saidshitim = tim+4; playtext("shit"); }
+   }
+   return(newacc);
+}
+
+xform (p[3], rot[9])
+{
+   ox = p[0]; oy = p[1]; oz = p[2];
+   p[0] = ox*rot[0] + oy*rot[1] + oz*rot[2];
+   p[1] = ox*rot[3] + oy*rot[4] + oz*rot[5];
+   p[2] = ox*rot[6] + oy*rot[7] + oz*rot[8];
+}
+
+drawcart (pind, x, y, z, ha, va, ta, cacha, wheelang, tim)
+{
+   static p[3], p2[3], m[9], rot[9];
+   for(i=0;i<9;i++) rot[i] = !(i%4);
+
+   ch = cos(ha); sh = sin(ha); cv = cos(va); sv = sin(va); ct = cos(ta); st = sin(ta);
+   rot[0] =-st*sh*sv + ct*ch; rot[1] =-ct*sh*sv - st*ch; rot[2] = sh*cv;
+   rot[3] = st   *cv        ; rot[4] = ct   *cv        ; rot[5] =    sv;
+   rot[6] =-st*ch*sv - ct*sh; rot[7] =-ct*ch*sv + st*sh; rot[8] = ch*cv;
+
+      //Draw wheels
+   setcol(0x808080);
+   for(xx=-1;xx<=1;xx+=2)
+      for(zz=-1;zz<=1;zz+=2)
+      {
+         a = wheelang+xx+zz;
+         p[0] = xx; p[1] = .5; p[2] = zz; xform(&p[0],rot);
+         m[0] = 0; m[1] = cos(a)*.5; m[2] = sin(a)*.5; xform(&m[0],rot);
+         m[3] = 0; m[4] = sin(a)*-.5; m[5] = cos(a)*.5; xform(&m[3],rot);
+         m[6] = .5; m[7] = 0; m[8] = 0; xform(&m[6],rot);
+         drawspr("bikewheel.kv6",p[0]+x,p[1]+y,p[2]+z,
+            m[0],m[1],m[2],m[3],m[4],m[5],m[6],m[7],m[8]);
+      }
+      
+      //Draw wheel axels
+   setcol(0x202020);
+   for(s=-1;s<=1;s+=2)
+   {
+      p [0] = -1; p [1] = +.5; p [2] = s; xform(&p[0],rot);
+      p2[0] = +1; p2[1] = +.5; p2[2] = s; xform(&p2[0],rot);
+      drawcone(p[0]+x,p[1]+y,p[2]+z,.03,p2[0]+x,p2[1]+y,p2[2]+z,.03);
+   }
+      
+      //Draw caco
+   setcol(playcol[pind%8]);
+   p[0] = 0; p[1] = -.35; p[2] = -.7; xform(&p[0],rot);
+   m[0] = cos(cacha); m[1] = 0; m[2] =-sin(cacha);
+   m[3] = 0; m[4] = 1; m[5] = 0;
+   m[6] =-sin(cacha); m[7] = 0; m[8] =-cos(cacha);
+   xform(&m[0],rot);
+   xform(&m[3],rot);
+   xform(&m[6],rot);
+   drawspr("caco.kv6",p[0]+x,p[1]+y,p[2]+z,
+      m[0],m[1],m[2],m[3],m[4],m[5],m[6],m[7],m[8]);
+   
+      //Draw steering wheel
+   a = noise(tim)*.5;
+   p[0] = 0; p[1] = -.25; p[2] = .5; xform(&p[0],rot);
+   m[0] =.5; m[1] = 0; m[2] = 0; xform(&m[0],rot);
+   m[3] = 0; m[4] = sqrt(.5)*.5; m[5] = sqrt(.5)*-.5; xform(&m[3],rot);
+   m[6] = 0; m[7] = sqrt(.5)*.5; m[8] = sqrt(.5)*.5; xform(&m[6],rot);
+   drawspr("bikewheel.kv6",p[0]+x,p[1]+y,p[2]+z,
+            m[0],m[1],m[2],m[3],m[4],m[5],m[6],m[7],m[8]);
+   
+      //Draw steering wheel axel
+   setcol(0x202020);
+   p [0] = 0; p [1] = -.25; p [2] = .5; xform(&p[0],rot);
+   p2[0] = 0; p2[1] = +.25; p2[2] = 1; xform(&p2[0],rot);
+   drawcone(p[0]+x,p[1]+y,p[2]+z,.05,p2[0]+x,p2[1]+y,p2[2]+z,.05);
+    
+      //Draw cart floor
+   setcol(0xa08060); glsettex("wood.png"); glcullface(GL_NONE);
+   for(i=0;i<4;i++)
+   {
+      u = i>1; v = (3-i)*i*.5; gltexcoord(u,v);
+      p[0] = (v-.5)*1.6; p[1] = .3; p[2] = (u-.5)*-2.8; xform(&p[0],rot);
+      glvertex(p[0]+x,p[1]+y,p[2]+z);
+   }
+}
+
+gensigns ()
+{
+   enum {SIZ=64}; static buf[SIZ][SIZ];
+   
+   for(i=0;i<MAXSIGNS;i++)
+   {
+      setcol(0xffffff); drawcone(0,SIZ/2,-SIZ/2,SIZ,SIZ/2,-SIZ/2);
+
+      moveto(0,0); setcol(0x000000); setfont(8,14);
+      if (i == 0) { printf("\n P ease\n \hd i e\n s owly"); }
+      if (i == 1) { printf("Speeding\n\htickets\n avail-\n  able\n \hahead"); }
+      if (i == 2) { printf("\n Think.\nPlan ahe\nad"); }
+      if (i == 3) { printf("  Slow\nchildren\n1000 pts\n  each"); }
+      if (i == 4) { printf("\n  Slow\n \hadult"); }
+      if (i == 5) { printf("Caution:\n  This\nsign has\n \hsharp\n \hedges"); }
+      if (i == 6) { printf("\tNo\n\htexting\n \hwhile\ncrashing"); }
+      if (i == 7) { printf("\n Beware\n\hfalling\n stocks\n"); }
+      if (i == 8) { printf("\n  \hBad\n  joke\n \hahead"); }
+      if (i == 9) { printf("\hDanger:\n \hI cut\n\hoff you\n \hahead"); }
+      if (i ==10) { printf("\nCaution:\n\hLawyers\n \hahead"); }
+      if (i ==11) { printf("  This\nsign has\n  been\n hacked"); }
+      if (i ==12) { printf("\n Danger\n  flat\n gopher"); }
+      if (i ==13) { printf("Caco w/4\n \hwheel\n \hcan't\npossibly\n \hdrive"); }
+      if (i ==14) { printf("\n\h<- Keep\n \hright"); }
+      if (i ==15) { printf(" \hError\n  404:\n  Road\n  \hnot\n \hfound"); }
+      if (i ==16) { printf(" What's\n taking\n you so\n \hlong?"); }
+      if (i ==17) { printf("That car\n\hmakes u\n  look\n  \hfat"); }
+      if (i ==18) { printf("Thanks 4\nnoticing\n  this\n  sign"); }
+      if (i ==19) { printf("\n\hNothing\n  next\n \hright"); }
+      if (i ==20) { printf("\n \hSpeed\n \hLimit\n \h-23.7"); }
+      if (i ==21) { printf("\n \hYield\n\tto\n nobody"); }
+      if (i ==22) { printf("\n Signal\n \hahead"); }
+      if (i ==23) { printf("Warning:\n unnec-\n essary\n  sign\n \hahead"); }
+      if (i ==24) { printf("\n Beware\n fallen\n  \hcow"); }
+      if (i ==25) { printf("\n Hidden\n hidden\n \hdrive\n  sign"); }
+      if (i ==26) { printf("\hA Fatal\n \hError\n  \hhas\noccurred"); }
+      if (i ==27) { printf("\n \hAbort\n \hRetry\n  Fail"); }
+
+      for(y=0;y<SIZ;y++) gethlin(0,y,&buf[y][0],SIZ);
+      hsign[i] = glsettex(buf,SIZ,SIZ);
+   }
+}
+
+krnd (&kholdrand) //synced rnd (for movement and definitely NOT drawing&AI)!
+{
+   kholdrand = ((kholdrand*214013)+2531011*2)%(2^32);
+   return(kholdrand/2^32);
+}
+
+   //Level ideas:
+   //0. Regular game
+   //1. Groundhog day (lots of ghogs)
+   //2. More Cow Hell (lots of cows)
+   //3. The Sticks (few traffic lots - hold gas first!)
+   //4. Red light district (lots of traffic lights or more likely red)
+   //5? Anvil (anvil sits at end of track; must stop before hitting it)
+   //6? Pit/Land Mine (must jump over hazard by going thru red light or else stuck/game over!)
+   //7? Deer Crossing (deer instead of groundhog - 3 second penalty if hit)
+game_init (gs_t ls)
+{
+   if (ls.level == 0)
+   {
+      ls.playn = max(net_players,2);
+      if (net_players < 2) ls.playn = 3;
+   }
+   for(p=0;p<ls.playn;p++)
+   {
+      if (ls.level == 0)
+      {
+         ls.play[p].shand[0] = playsound("sawtooth.wav",-20);
+         ls.play[p].shand[1] = playsound("square.wav",-20);
+         ls.play[p].iscomp = 0;
+         if ((net_players < 2) && (p)) { ls.play[p].iscomp = ((p+1)%4)+1; }
+         ls.play[p].tim = 0;
+      }
+      ls.play[p].op = 0; ls.play[p].p = 0; ls.play[p].v = 0; ls.play[p].a = 0;
+      ls.play[p].wheelang = 0;
+      ls.play[p].penaltim = -1; ls.play[p].goodtim = -1; ls.play[p].saidshitim = -1;
+      ls.play[p].brakeaccel = -36;
+      ls.play[p].pedalaccel =  12;
+      ls.play[p].ready = 0;
+   }
+   
+   ls.lightn = 16;
+   if (ls.level == 3) ls.lightn = 2;
+   if (ls.level == 4) ls.lightn = 32;
+   for(i=0;i<ls.lightn;i++)
+   {
+      ls.light[i].z = (i+1 + krnd(&ls.moveseed)*.75)*(1024/ls.lightn);
+      ls.light[i].t = krnd(&ls.moveseed)*16;
+   }
+   ls.light[ls.lightn-1].z = 1024;
+
+   ls.sprin = 8;
+   if (ls.level == 2) ls.sprin = 16;
+   for(i=0;i<ls.sprin;i++)
+   {
+      ls.spri[i].texind = int((MAXSIGNS+1)*krnd(&ls.moveseed))-1;
+      if (ls.level == 2) ls.spri[i].texind = -1;
+      ls.spri[i].z = (i+1 + krnd(&ls.moveseed)*.25)*(1024/ls.sprin);
+      if (ls.spri[i].texind < 0)
+      {
+         ls.spri[i].x = (krnd(&ls.moveseed)*20+10)*sgn(krnd(&ls.moveseed)-.5);
+         ls.spri[i].col = krnd(&ls.moveseed)*(PI*2);
+      }
+      else
+      {
+         ls.spri[i].x = (int(krnd(&ls.moveseed)*2)*2-1)*((ls.playn-1)*6+3);
+         ls.spri[i].col = (int(128*krnd(&ls.moveseed))+64)*65536 +
+                          (int(128*krnd(&ls.moveseed))+64)*256 +
+                          (int(128*krnd(&ls.moveseed))+64);
+      }
+   }
+
+   ls.ghogn = 4;
+   if (ls.level == 1) ls.ghogn = 64;
+   for(i=0;i<ls.ghogn;i++)
+   {
+      ls.ghog[i].flatim = -1;
+      ls.ghog[i].oz = krnd(&ls.moveseed)*1024;
+      ls.ghog[i].phas = krnd(&ls.moveseed)*(PI*2);
+      ls.ghog[i].dir = sgn(krnd(&ls.moveseed)-.5);
+   }
+
+   for(p=0;p<ls.playn;p++) ls.winner[p] = -1;
+   
+   ls.level++;
+}
+
+execute_pak (gs_t ls, lpak[PAKSIZ], dosound, viewp)
+{
+   p = (lpak[0]%16);
+   dtim = lpak[1]/TICSPERSEC; ls.play[p].tim += dtim;
+   ls.play[p].camx += (((lpak[2]+256)%512)-256)/1024;
+   ls.play[p].camy += floor((lpak[2]+256)/512)/1024;
+   
+   ls.play[p].a = 0;
+   if (ls.play[p].tim >= ls.play[p].penaltim)
+   {
+      if ((lpak[0]%32) >= 16) { ls.play[p].a = ls.play[p].pedalaccel; }
+      if ((lpak[0]%64) >= 32) { ls.play[p].a = ls.play[p].brakeaccel; }
+   }
+   if (((lpak[0]%128) >= 64) && (ls.winner[ls.playn-1] >= 0) && (ls.play[p].v == 0))
+   {
+      ls.play[p].ready = 1;
+   }
+   
+   vol = 10/(fabs(ls.play[viewp].p-ls.play[p].p)*.02+1);
+   if ((ls.play[p].a < 0) && (ls.play[p].v > 0))
+   {
+      if (dosound) playsound("fminst.flac",vol,noise(ls.play[p].tim*4)*0.25+2.0);
+      
+      for(i=0;i<4;i++)
+      for(z=-1;z<=1;z+=2)
+         for(x=-1;x<=1;x+=2)
+         {
+            ls.smoke[ls.smoken].x = x + (ls.playn-1)*-3 + p*6;
+            ls.smoke[ls.smoken].y = 4;
+            ls.smoke[ls.smoken].z = ls.play[p].p+z;
+            ls.smoke[ls.smoken].xv = 0;
+            ls.smoke[ls.smoken].yv = 0;
+            ls.smoke[ls.smoken].zv = 0;
+            ls.smoke[ls.smoken].te = ls.play[p].tim+4;
+            ls.smoken++;
+         }
+   }
+   
+   if (ls.play[p].a >= 0)
+   {
+      ls.play[p].wheelang -= ls.play[p].v*dtim*2;
+      if (ls.play[p].wheelang < 0) ls.play[p].wheelang += PI*2;
+   }
+   ls.play[p].op = ls.play[p].p;
+   ls.play[p].p += ls.play[p].v*dtim;
+   ls.play[p].v += ls.play[p].a*dtim; if (ls.play[p].v < 0) ls.play[p].v = 0;
+      
+   for(i=0;i<ls.lightn;i++)
+   {
+      z = ls.light[i].z;
+      if ((ls.play[p].op < z) && (ls.play[p].p >= z))
+      {
+         t = (ls.play[p].tim-ls.light[i].t)%8; ls.play[p].hittim = t;
+         if (t < 4) //went through green light
+         {
+            if (dosound) playsound("pickup.wav",vol*5);
+            ls.play[p].goodtim = ls.play[p].tim+1;
+         }
+         else if (t < 5) //went through yellow light
+         {
+            if (dosound) playsound("waterpot.flac",vol*5);
+            ls.play[p].goodtim = ls.play[p].tim+1;
+         }
+         else if (ls.play[p].penaltim < ls.play[p].tim)
+         {
+            if (dosound) playsound("dn3d_squish.flac",vol*5);
+            if (dosound) playsound("blowup2.flac",vol*5);
+            ls.play[p].penaltim = ls.play[p].tim+3;
+               
+               //Accleration bonuses reset upon death.
+            ls.play[p].brakeaccel = -36;
+            ls.play[p].pedalaccel =  12;
+         }
+      }
+   }
+   if ((ls.play[p].p >= ls.light[ls.lightn-1].z) && (ls.play[p].penaltim < ls.play[p].tim))
+   {
+      for(n=0;n<ls.playn;n++) if (ls.winner[n] < 0) break;
+      for(i=n-1;i>=0;i--) if (ls.winner[i] == p) break; //already a winner?
+      if (i < 0)
+      {
+         if ((n == 0) && (dosound))
+         {
+            if (p == net_me) playtext("You win!");
+                        else playtext("Player %g wins!",p+1);
+         }
+         ls.winner[n] = p;
+      }
+   }
+            
+   for(i=ls.sprin-1;i>=0;i--)
+   {
+      if (ls.spri[i].texind >= 0) continue;
+      if ((ls.spri[i].z >= ls.play[p].op) && (ls.spri[i].z < ls.play[p].p))
+      {
+         if (dosound) playsound("rr/moo.flac",50/(fabs(ls.play[viewp].p-ls.spri[i].z)*.02+1),1);
+         ls.play[p].pedalaccel /= 1.5; //moooooove more slowly!
+         ls.play[p].brakeaccel /= 1.5; //
+      }
+   }
+   
+   if (ls.play[p].penaltim >= ls.play[p].tim)
+   {
+      ls.play[p].v *= pow(.125,dtim);
+   }
+   
+   for(i=0;i<ls.ghogn;i++)
+   {
+      if (ls.ghog[i].flatim >= 0) continue; //already flattened :P
+      ghog_getpos(ls,i,p,&gx,&gz,&ha,&vsc);
+      px = (ls.playn-1)*-3 + p*6; pz = ls.play[p].p;
+      if ((fabs(px-gx) < 1) && (fabs(pz-gz) < 2) && (ls.play[p].penaltim < ls.play[p].tim))
+      {
+         ls.play[p].pedalaccel *= 1.5; //flattening groundhogs are good for engines
+         ls.play[p].brakeaccel *= 1.5; //.. and brakes ;-P
+         
+         vol = 100/(fabs(ls.play[viewp].p-ls.play[p].p)*.02+1);
+         if (dosound) playsound("dn3d_squish.flac",vol);
+         ls.ghog[i].flatim = ls.play[p].tim;
+         ls.ghog[i].fx = gx;
+         ls.ghog[i].fz = gz;
+      }
+   }
+
+   if (p) return;
+   
+   for(i=ls.smoken-1;i>=0;i--)
+   {
+      ls.smoke[i].x += ls.smoke[i].xv*dtim;
+      ls.smoke[i].y += ls.smoke[i].yv*dtim;
+      ls.smoke[i].z += ls.smoke[i].zv*dtim;
+      ls.smoke[i].y += dtim;
+      if (ls.smoke[i].y > 4)
+      {
+         ls.smoke[i].y = 4*2-ls.smoke[i].y;
+         ls.smoke[i].yv = fabs(ls.smoke[i].yv)*-.5;
+      }
+      if (ls.play[0].tim >= ls.smoke[i].te)
+         { ls.smoken--; ls.smoke[i] = ls.smoke[ls.smoken]; }
+   }
+   
+   for(i=ls.playn-1;i>=0;i--) if (!ls.play[i].ready) break;
+   if (i < 0) game_init(ls);
+}
+
+ghog_getpos (gs_t ls, i, viewp, &gx, &gz, &ha, &vsc)
+{   
+   if (ls.ghog[i].flatim < 0)
+   {
+      t = ls.play[viewp].tim*2+ls.ghog[i].phas;
+      gx = cos(t)*ls.ghog[i].dir*(ls.playn-1)*3;
+      gz = ls.ghog[i].oz-sin(t)*4;
+      ha = t*ls.ghog[i].dir;
+      vsc = 1;
+   }
+   else
+   {
+      t = ls.ghog[i].flatim*2+ls.ghog[i].phas;
+      gx = ls.ghog[i].fx;
+      gz = ls.ghog[i].fz;
+      ha = t*ls.ghog[i].dir;
+      vsc = .1;
+   }
+}      
+
+render (gs_t ls, viewp)
+{
+   for(p=0;p<ls.playn;p++)
+   {
+      v = ls.play[p].v*.01+.15+noise(ls.play[p].tim*8)*.02;
+      vol = 20/(fabs(ls.play[viewp].p-ls.play[p].p)*.02+1);
+      //f = (ls.play[viewp].v-ls.play[p].v)*1; //doppler?
+      if (ls.play[p].penaltim >= ls.play[p].tim) vol *= (ls.play[p].penaltim-ls.play[p].tim)/3;
+      playsoundupdate(ls.play[p].shand[0],-vol,(cos(ls.play[p].tim*(v*20+15))*.01+1.00)*v);
+      playsoundupdate(ls.play[p].shand[1],-vol,(sin(ls.play[p].tim*(v*20+15))*.01+1.00)*v);
+   }
+   
+   setcam( (ls.playn-1)*-3+viewp*6-sin(ls.play[viewp].camx)*cos(ls.play[viewp].camy)*10,
+         -sin(ls.play[viewp].camy)*10,
+          ls.play[viewp].p-cos(ls.play[viewp].camx)*cos(ls.play[viewp].camy)*10,
+          ls.play[viewp].camx,ls.play[viewp].camy);
+   
+   glcullface(GL_BACK);
+   gldisable(GL_DEPTH_TEST);
+   
+      //Draw low height skybox
+   glbegin(GL_QUADS); d = 8192; h = -64;
+   glsettex("cloud.png"); setcol(0x408040);
+   gltexcoord(  0,  0); glvertex(-d,4, d);
+   gltexcoord(256,  0); glvertex( d,4, d);
+   gltexcoord(256,256); glvertex( d,4,-d);
+   gltexcoord(  0,256); glvertex(-d,4,-d);
+   
+   glsettex("cloud.png"); setcol(0xaa88cc); 
+   gltexcoord(  0,  0); glvertex(-d,h,-d);
+   gltexcoord( 64,  0); glvertex( d,h,-d);
+   gltexcoord( 64, 64); glvertex( d,h, d);
+   gltexcoord(  0, 64); glvertex(-d,h, d);
+   
+   glsettex("cloud.png"); setcol(0x000000); 
+   gltexcoord(  0,  0); glvertex( d,4, d);
+   gltexcoord(256,  0); glvertex(-d,4, d);
+   gltexcoord(256,  4); glvertex(-d,h, d);
+   gltexcoord(  0,  4); glvertex( d,h, d);
+   
+   gltexcoord(  0,  0); glvertex( d,4,-d);
+   gltexcoord(256,  0); glvertex( d,4, d);
+   gltexcoord(256,  4); glvertex( d,h, d);
+   gltexcoord(  0,  4); glvertex( d,h,-d);
+   
+   gltexcoord(  0,  0); glvertex(-d,4,-d);
+   gltexcoord(256,  0); glvertex( d,4,-d);
+   gltexcoord(256,  4); glvertex( d,h,-d);
+   gltexcoord(  0,  4); glvertex(-d,h,-d);
+   
+   gltexcoord(  0,  0); glvertex(-d,4, d);
+   gltexcoord(256,  0); glvertex(-d,4,-d);
+   gltexcoord(256,  4); glvertex(-d,h,-d);
+   gltexcoord(  0,  4); glvertex(-d,h, d);
+   
+      //Draw road
+   glsettex("cloud.png"); setcol(0x404040);
+   w = ls.playn*3;
+   gltexcoord(0, 0); glvertex(-w,+4,+1024);
+   gltexcoord(1, 0); glvertex(+w,+4,+1024);
+   gltexcoord(1,64); glvertex(+w,+4,    0);
+   gltexcoord(0,64); glvertex(-w,+4,    0);
+   setcol(0xc0c0c0); gldisable(GL_DEPTH_TEST);
+      //Draw dotted lines
+   for(x=ls.playn-1;x>0;x--)
+   {
+      o = x*-6+ls.playn*3;
+      for(z=0;z<1024;z+=8)
+      {
+         gltexcoord(0,0); glvertex(o-.2,+4,+z+3);
+         gltexcoord(1,0); glvertex(o+.2,+4,+z+3);
+         gltexcoord(1,4); glvertex(o+.2,+4,   z);
+         gltexcoord(0,4); glvertex(o-.2,+4,   z);
+      }
+   }
+   glenable(GL_DEPTH_TEST);
+
+   for(i=ls.lightn-1;i>=0;i--)
+   {
+      setcol(0xc0c0c0); gldisable(GL_DEPTH_TEST); glcullface(GL_NONE);
+      z = ls.light[i].z+3.5;
+      gltexcoord(0,0); glvertex(-w,+4,+z-3);
+      gltexcoord(4,0); glvertex(+w,+4,+z-3);
+      gltexcoord(4,1); glvertex(+w,+4,+z-4);
+      gltexcoord(0,1); glvertex(-w,+4,+z-4);
+      glenable(GL_DEPTH_TEST);
+      
+      setcol(0x404040);
+      drawcone(-w-1,-5,z,.1,
+               +w+1,-5,z,.1);
+      drawcone(-w-1,-5,z,.1,
+               -w-1,+4,z,-.2);
+      drawcone(+w+1,-5,z,.1,
+               +w+1,+4,z,-.2);
+      
+      v = ls.playn*1;
+      for(x=-v;x<=v;x+=v*2)
+      {
+         setcol(0x404040);
+         drawcone(x,-5,z,.05,
+                  x,-4,z,.05);
+         gltexcoord(0,0); glvertex(x-.3,-4.3,z);
+         gltexcoord(1,0); glvertex(x+.3,-4.3,z);
+         gltexcoord(1,2); glvertex(x+.3,-2.7,z);
+         gltexcoord(0,2); glvertex(x-.3,-2.7,z);
+   
+         setcol(0x202020);
+         for(y=-4.0;y<=-3.0;y+=.5)
+         {
+            drawcone(x,y,z,.25,
+                     x,y,z-.1,-.25);
+         }
+         
+         t = (ls.play[viewp].tim-ls.light[i].t)%8;
+         if (t < 4) setcol(0x00ff00); else setcol(0x202020);
+         drawsph(x,-3.0,z,.2);
+         if ((t >= 4) && (t < 5)) setcol(0xffff00); else setcol(0x202020);
+         drawsph(x,-3.5,z,.2);
+         if (t >= 5) setcol(0xff0000); else setcol(0x202020);
+         drawsph(x,-4.0,z,.2);
+         
+         if (t < 5) { o = t-5; if (t < 4) setcol(0x408040); else setcol(0x808040); }
+               else { o = t-8; setcol(0x804040); }
+         drawcone(-o,-5,z,-.15,
+                  +o,-5,z,-.15);
+      }
+   }
+   
+   for(i=ls.sprin-1;i>=0;i--)
+   {
+      if (ls.spri[i].texind < 0)
+      {
+         setcol(0x808080);
+         drawspr("rr/kow.kv6",ls.spri[i].x,2.1,ls.spri[i].z,3,ls.spri[i].col,0);
+         continue;
+      }
+      glsettex(hsign[ls.spri[i].texind]); setcol(ls.spri[i].col); x = ls.spri[i].x;
+      drawcone(x,-.5,ls.spri[i].z+.10,.09,
+               x,+ 4,ls.spri[i].z+.10,.09);
+      glbegin(GL_QUADS); setcol(ls.spri[i].col);
+      gltexcoord(0,0); glvertex(x-1.5,-1.0,ls.spri[i].z);
+      gltexcoord(1,0); glvertex(x+1.5,-1.0,ls.spri[i].z);
+      gltexcoord(1,1); glvertex(x+1.5,+1.0,ls.spri[i].z);
+      gltexcoord(0,1); glvertex(x-1.5,+1.0,ls.spri[i].z);
+   }
+   
+   setcol(0x202020);
+   for(i=ls.smoken-1;i>=0;i--)
+   {
+      drawsph(ls.smoke[i].x,ls.smoke[i].y,ls.smoke[i].z,(ls.smoke[i].te-ls.play[viewp].tim)*.02);
+   }
+   
+   for(i=0;i<ls.ghogn;i++)
+   {
+      ghog_getpos(ls,i,viewp,&gx,&gz,&ha,&vsc);
+      px = gx; py = 3.9; pz = gz+1-vsc;
+      rx =-cos(ha); ry =   0; rz = sin(ha);
+      dx =       0; dy = vsc; dz =       0;
+      fx = sin(ha); fy =   0; fz = cos(ha);
+      setcol(0x808080);
+      drawspr("groundhog.kv6",px,py,pz, rx,ry,rz, dx,dy,dz, fx,fy,fz);
+      if (vsc < 1)
+      {
+         setcol(0x800000); drawcone(px,py-.03,pz,-.4,px,py+.02,pz,-.4);
+         ls.moveseed = 0;
+         for(j=16;j>0;j--)
+         {
+            nx = px+krnd(&ls.moveseed)-.5;
+            ny = py+.05;
+            nz = pz+krnd(&ls.moveseed)-.5; nr = (krnd(&ls.moveseed)+.5)*-.1;
+            drawcone(nx,ny,nz,nr, nx,ny+.05,nz,nr);
+         }
+      }
+   }
+   
+   for(p=0;p<ls.playn;p++)
+   {
+      x = (ls.playn-1)*-3+p*6; y = 3; z = ls.play[p].p; ha = 0; va = 0; ta = 0; sc = 1;
+      if (ls.play[p].penaltim >= ls.play[p].tim)
+      {
+         a = 1-(ls.play[p].penaltim-ls.play[p].tim)/3;
+         y -= (.25-(a-.5)^2)*32; va = a*PI*-4;
+         ha = sin(sin(a*PI*2)*.5); ta = sin(sin(a*PI*2)*.5);
+      }
+      drawcart(p,x,y,z,ha,va,ta,ls.play[p].camx,ls.play[p].wheelang,ls.play[p].tim);
+   }
+
+   if (ls.play[viewp].tim < 4)
+   {
+      setcol(0xffffff); moveto(xres*.32,yres*.05);
+      setfont(xres*.014,xres*.022,1);
+      printf("  Gas: Ctrl  or L.MouseBut\n"
+             "Brake: Shift or R.MouseBut\n"
+             "\n"
+             "  Goal: Get to end first.\n"
+             "        Bad luck!");
+   }
+   
+   if (viewp != net_me)
+   {
+      if (ls.play[viewp].tim%.5 < .25) setcol(0xffc080);
+                                  else setcol(0xc0ff80);
+      moveto(xres*.32,yres*.35);
+      setfont(xres*.02,xres*.035,1);
+      printf("Viewing player %g\n",viewp+1);
+   }
+           
+   if (ls.play[viewp].tim < ls.play[viewp].penaltim)
+   {
+      setcol(0xff8080); moveto(xres*.32,yres*.05);
+      setfont(xres*.02,xres*.035,1);
+      if (ls.play[viewp].hittim < 6.5) printf("Late by %.3f sec",ls.play[viewp].hittim-5);
+                                  else printf("Early by %.3f sec",8-ls.play[viewp].hittim);
+      t = min(ls.play[viewp].hittim-5,8-ls.play[viewp].hittim);
+           if (t < 0.10) printf("\nMy condolensces.");
+      else if (t < 0.25) printf("\nWhat a shame.");
+      else if (t < 0.50) printf("\nThat's pretty bad.");
+      else if (t < 1.00) printf("\nAre you color blind?");
+      else               printf("\nHave a nice flight!");
+   }
+   else
+   {
+      setcol(0xffffff); setfont(xres*.008,yres*.022,1);
+      moveto(0,0); printf("Power:%.2fx\n",ls.play[viewp].pedalaccel/12);
+      
+      if (ls.play[viewp].tim < ls.play[viewp].goodtim)
+      {
+         setcol(0xffffff); moveto(xres*.40,yres*.05);
+         setfont(xres*.01,xres*.017,1);
+         if (ls.play[viewp].hittim < 2.5) printf("Safe by %.3f sec",ls.play[viewp].hittim);
+                                     else printf("Safe by %.3f sec",5-ls.play[viewp].hittim);
+      }
+   }
+//---------------------------------------------------------------
+      //Draw 2D progress bar at bottom (idea by Matheus Nabao)
+   setcol(0xffffff); xsc = (xres - 10*2)/1024; y0 = ls.playn*-15 + yres;
+   for(i=ls.playn-1;i>0;i--)
+   {
+      y = y0 + i*15-7;
+      for(z=0;z<1024;z+=8) { moveto((z)*xsc+10,y); lineto((z+3)*xsc+10,y); }
+   }
+   setfont(6,8);
+   for(p=ls.playn-1;p>=0;p--)
+   {
+      x = ls.play[p].p*xsc + 10; y = p*15 + y0;
+      setcol(playcol[p]); drawsph(x,y,7);
+      setcol(0x000000); moveto(x-5,y-3);
+      if (p < 9) { printf("P%g",p+1); }
+            else { printf("%g",p+1); }
+      if (ls.play[p].penaltim >= ls.play[p].tim)
+         { setcol(0xff00000); drawsph(x,y,-8); }
+      
+      if (ls.play[p].ready) 
+      {
+         setfont(6,8); setcol(0xffffff); moveto(10,y); printf("Ready");
+      }
+   }
+   for(i=0;i<ls.lightn;i++)
+   {
+      x = ls.light[i].z*xsc + 10;
+      t = (ls.play[viewp].tim-ls.light[i].t)%8;
+           if (t < 4) setcol(0x00ff00);
+      else if (t < 5) setcol(0xffff00);
+      else            setcol(0xff0000);
+      moveto(x,y0); lineto(x,yres-15);
+      if (t < 5) nt = 5-t; else nt = 8-t;
+      moveto(x-8,yres-15); printf("%.1f",nt);
+   }
+   for(i=0;i<ls.ghogn;i++)
+   {
+      ghog_getpos(ls,i,viewp,&gx,&gz,&ha,&vsc);
+      x = gz*xsc + 10; y = gx*2.5 + yres - (ls.playn+1)*(15/2);
+      setcol(0xa08060); drawsph(x,y,2);
+      if (ls.ghog[i].flatim >= 0)
+         { setcol(0xff0000); drawsph(x,y,-3); }
+   }
+//---------------------------------------------------------------
+   setcol(0xffffff); setfont(xres*.018,xres*.032,1);
+   for(i=0;i<ls.playn;i++)
+   {
+      if (ls.winner[i] < 0) break;
+      
+      moveto(xres*.32,yres*(.15+.07*i));
+           if (i == 0) printf("1st");
+      else if (i == 1) printf("2nd");
+      else if (i == 2) printf("3rd");
+      else             printf("%gth",i);
+      printf(" place: ");
+      if (ls.winner[i] == net_me) { printf("You"); }
+                             else { printf("Player %g",ls.winner[i]+1); }
+   }
+   
+   if ((ls.winner[ls.playn-1] >= 0) && (!ls.play[viewp].ready))
+   {
+      moveto(xres*.32,yres*(.15+.07*(ls.playn+1)));
+      if ((ls.play[viewp].tim%.5) < .25) setcol(0xffffff); else setcol(0xc0c0c0);
+      if (ls.play[viewp].v) printf("Stop & Space/Enter to continue");
+                       else printf("Space/Enter to continue");
+   }
+}

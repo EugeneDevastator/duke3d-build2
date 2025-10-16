@@ -1,0 +1,67 @@
+()
+{
+      //Cube vertices
+   static px[8] = {-1,+1,+1,-1,-1,+1,+1,-1};
+   static py[8] = {-1,-1,+1,+1,-1,-1,+1,+1};
+   static pz[8] = {-1,-1,-1,-1,+1,+1,+1,+1};
+   
+   static px2[8], py2[8], pz2[8]; //temp verts
+   
+   static sx[8], sy[8]; //holds projected coords
+   
+   while (1)
+   {
+      cls(0); ang = klock();
+      
+         //Rotate on xy
+      for(i=0;i<8;i++)
+      {
+         ox = px[i]; oy = py[i]; oz = pz[i];
+         px2[i] = cos(ang)*ox - sin(ang)*oy;
+         py2[i] = cos(ang)*oy + sin(ang)*ox;
+         pz2[i] = oz;
+      }
+      
+         //Rotate on xz
+      for(i=0;i<8;i++)
+      {
+         ox = px2[i]; oy = py2[i]; oz = pz2[i];
+         px2[i] = cos(ang)*ox - sin(ang)*oz;
+         py2[i] = oy;
+         pz2[i] = cos(ang)*oz + sin(ang)*ox;
+      }
+       
+         //Rotate on yz
+      for(i=0;i<8;i++)
+      {
+         ox = px2[i]; oy = py2[i]; oz = pz2[i];
+         px2[i] = ox;
+         py2[i] = cos(ang)*oy - sin(ang)*oz;
+         pz2[i] = cos(ang)*oz + sin(ang)*oy;
+      }
+      
+         //Push object in front of camera
+      for(i=0;i<8;i++) pz2[i] += 4;
+      
+         //Project 3D to 2D (90 degree fov)
+      for(i=0;i<8;i++)
+      {
+         sx[i] = px2[i]/pz2[i]*(xres/2) + xres/2;
+         sy[i] = py2[i]/pz2[i]*(xres/2) + yres/2;
+      }
+      
+         //Draw the 12 edges
+      for(i=0;i<=4;i+=4)
+      {
+         moveto(sx[i],sy[i]);
+         for(j=i+3;j>=i;j--) lineto(sx[j],sy[j]);
+      }
+      for(i=0;i<4;i++)
+      {
+         moveto(sx[i],sy[i]);
+         lineto(sx[i+4],sy[i+4]);
+      }
+
+      refresh();
+   }
+}

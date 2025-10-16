@@ -1,0 +1,70 @@
+()
+{
+   static tottim;
+   cls(0x808080); clz(1e32);
+   if (1) setcam(0,0,-64,0,0); else moveloop();
+   t = klock();
+   
+   if (0)
+   {
+      drawkv6("caco.kv6",.4,0,0,0,0,0);
+   }
+   else if (1)
+   {
+      t0 = klock();
+      for(x=-.5;x<=.5;x++)
+         for(y=-.5;y<=.5;y++)
+            for(z=-.5;z<=.5;z++)
+            {
+               setcol(x*256+128,y*256+128,z*256+128);
+               drawkv6("caco.kv6",.4,x*32,y*32,z*32,t+x+y+z,t+x+y+z);
+            }
+      t1 = klock();
+   }
+   else
+   {         
+      t0 = klock(0);
+      for(x=-1;x<=1;x++)
+         for(y=-1;y<=1;y++)
+            for(z=-1;z<=1;z++)
+            {
+               setcol(x*128+128,y*128+128,z*128+128);
+               drawkv6("rpg.kv6",.4,x*32,y*32,z*32,t+x+y+z,t+x+y+z);
+            }
+      t1 = klock(0);
+   }
+   tottim += t1-t0;
+   setfont(9,16); setcol(0xffffff);
+   moveto(0,0); printf("%.2fms",tottim*1000/(numframes+1));
+}
+
+moveloop()
+{
+   static posx, posy, posz, hang, vang, tim;
+   if (numframes == 0) { posz = -64; }
+   otim = tim; tim = klock(); dt = tim-otim;
+   x = 0; y = 0; readmouse(&x,&y);
+   hang += x*.008; vang = min(max(vang-y*.008,-PI/2),PI/2);
+   f = dt*64;
+   if (keystatus[0x2a]) f /= 16;
+   if (keystatus[0x36]) f *= 16;
+   vx = (keystatus[0xcd]-keystatus[0xcb])*f; //Right-Left
+   vy = (keystatus[0xc8]-keystatus[0xd0])*f; //Up-Down
+   vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   static mat[9];
+   ang2mat(hang,vang,mat);
+   posx += mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   posy += mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   posz += mat[2]*vx + mat[5]*vz + mat[8]*vy;
+   setcam(posx,posy,posz,hang,vang);
+}
+
+ang2mat(hang,vang,mat[9])
+{
+   mat[6] = cos(vang)*sin(hang); mat[0] = cos(hang);
+   mat[7] = sin(vang);           mat[1] = 0;
+   mat[8] = cos(vang)*cos(hang); mat[2] =-sin(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}

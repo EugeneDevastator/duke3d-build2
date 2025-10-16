@@ -1,0 +1,155 @@
+()
+{
+   static shand[2], skhand, skid = 0, crashed = 0, obstatus;
+   shand[0] = playsound("sawtooth.wav",-30);
+   shand[1] = playsound("sawtooth.wav",-30);
+   
+   while (1)
+   {
+      /*static px, py, pz, npx, npy, npz, obut;
+      obut = but;
+      if ((readacc3d(&px,&py,&pz,&but) >= 0) && (but == 0))
+         { f = .1; npx += (px-npx)*f; npy += (py-npy)*f; npz += (pz-npz)*f; }
+      mousx = npx*-xres/2+xres/2; mousy = npz*yres+yres*.815; bstatus = but;
+      */
+
+      tim = klock();
+      if (crashed)
+      {
+         for(i=0;i<2;i++) playsoundupdate(shand[i],-1,.001);
+      }
+      else
+      {
+         v = exp(abs(yres*.815-mousy)/256)*.12;
+         playsoundupdate(shand[0],-30,(cos(tim*(v*20+15))*.01+1.00)*v);
+         playsoundupdate(shand[1],-30,(sin(tim*(v*20+15))*.01+1.00)*v);
+      }
+      if (bstatus%2) skid++;
+      if (skid > 0)
+      {
+         skid--;
+         if ((numframes%8) == 0)
+            skhand = playsound("fminst.flac",50,abs(nrnd)*.05+1.8);
+      }
+      if ((bstatus >= 2) > (obstatus >= 2))
+      {
+         crashed = tim;
+         for(i=0;i<16;i++) playsound("rulinst.wav",100,rnd);
+         static insultcnt = 0;
+         i = insultcnt; insultcnt = (insultcnt+1)%4;
+         if (i == 0) playtext("You died in a huge explosion.<rate speed='5'/>3 second penalty.");
+         if (i == 1) playtext("Oh no, that will affect my insurance rate.");
+         if (i == 2) playtext("Hey pal, that really hurt this time.");
+         if (i == 3) playtext("It's ok. The sign was blank anyway.");
+      }
+      if (crashed) { mousy = yres*.815; }
+      
+      hx = xres*.5; hy = yres*.5; rhy = 1/hy; speed = (yres*.815-mousy)*2/hy;
+      t = tim; tics = t-glob[4]; glob[5] += tics*speed; glob[4] = t; t = glob[5];
+      horiz = hy - speed*yres*.08;
+      z = 0; zi = 256/hx;
+      for(sy=horiz;sy>=-1;sy--,z+=zi)
+      {  setcol(z*.3+112,z*.7+128,z*.7+144);
+         moveto(0,sy); lineto(xres,sy);
+      }
+      
+      z = glob[2]; zi = 1024/xres;
+      for(sx=0;sx<xres;sx++,z+=zi)
+      {  setcol(120+cos(z*.01)*15,100+sin(z*.015)*15,50+sin(z*.015)*20);
+         moveto(sx,horiz+1);
+         lineto(sx,horiz-sin(z*.05+sin(z*.04))*xres*.03-xres*.035);
+      }
+      
+      m = 4; w = (yres-1-horiz)*m;
+      
+      x = glob[5]%(PI*8); if (x >= PI*4) { x -= PI*4; v = -1; } else v = 1;
+      x = abs(x-PI*2.5);
+      if (x < PI/2) ; else if (x < PI*1.5) v *= (sin(x)*.5+.5); else v = 0;
+      curve = v*hx;
+      
+      glob[2] += curve*speed*.003;
+         //Draw road
+      curvemul = curve*12;
+      curveadd = xres*.5 - curvemul/(yres-horiz);
+      for(sy=yres-1;sy>horiz;sy--)
+      {  w = (sy-horiz)*m; z = 1/(sy-horiz);
+         x = z*curvemul + curveadd + w*(glob[3]-hx)*rhy*-.4;
+         s = exp(-.02*hy/(sy-horiz))*.8 + (sy-horiz)*rhy*-.5 + 0.3;
+         l = (((z+t*.02)%.004) < .002)*255;
+                                            moveto(0       ,sy);
+         setcol(s*96,s*224,s*96);           lineto(x-w*.500,sy);
+         setcol(s*255,s*(255-l),s*(255-l)); lineto(x-w*.450,sy);
+         if (l)
+         {  setcol(s*128,s*128-l*.01,s*128);lineto(x-w*.015,sy);
+            setcol(s*255,s*255,s*224);      lineto(x+w*.015,sy);
+         }
+         setcol(s*128,s*128-l*.01,s*128);   lineto(x+w*.450,sy);
+         setcol(s*255,s*(255-l),s*(255-l)); lineto(x+w*.500,sy);
+         setcol(s*96,s*224,s*96);           lineto(xres    ,sy);
+      }
+      
+      t *= yres*-.0194; //Draw sign
+      z = t%200; if (z >= 100) { z -= 100; sid = .680; } else sid = -.680;
+      sy = (hy*2-20)/z+horiz; w = (sy-horiz)*m;
+      sx = curvemul*z*.5/hy + curveadd + w*(sid+(glob[3]-hx)*rhy*-.4);
+      rz = hy*.004/z;
+      s = exp(-.02*hy/(sy-horiz))*.8 + (sy-horiz)*rhy*-.4 + 0.3;
+      sye = sy-rz*120; setcol(s*160,s*160,s*192);
+      for(y=sye;y<sy;y++) { moveto(sx-rz* 70,y); lineto(sx-rz* 40,y);
+                            moveto(sx+rz* 40,y); lineto(sx+rz* 70,y); }
+      setcol(s*232,s*232,s*156);
+      for(y=sy-rz*250;y<sye;y++) { moveto(sx-rz*100,y); lineto(sx+rz*100,y); }
+      if (abs(speed) < .1) //Tumbleweed if you're stopped for too long :)
+      {  glob[0] += tics;
+         if (glob[0] > 4)
+         {  x = (glob[0]-4)*xres/4; setcol(225,200,150);
+            y = yres*.7-abs(sin((glob[0]-4)*PI))*yres*.15;
+            for(i=1000;i>0;i--) setpix(x+nrnd*12,y+nrnd*12);
+            if (glob[0] > 8) glob[0] = 0;
+         }
+      } else glob[0] = 0;
+      
+      if (crashed == 0)
+      {
+         glob[3] = mousx - curve*abs(speed)*.2; //Draw car
+         setcol(0,0,0); xoff = (glob[3]-hx)*-.25; l = sin(glob[5]*60)*.0006;
+         for(y=yres*(.77+l);y<yres*(.80+l);y++)
+         {  moveto(glob[3]-xres*.075+xoff,y); lineto(glob[3]-xres*.05+xoff,y);
+            moveto(glob[3]+xres*.05+xoff,y); lineto(glob[3]+xres*.075+xoff,y);
+         }
+         setcol(192,160,128);
+         for(y=yres*.78;y<yres*.88;y++)
+         {  x = ((y-(yres*.88))/(yres*0.75)+.45)*2.5;
+            xoff = (glob[3]-hx)*.25*((y-(yres*.88))/(yres*.10));
+            moveto(xres*(x*-.07)+glob[3]+xoff,y);
+            lineto(xres*(x*+.07)+glob[3]+xoff,y);
+         }
+         setcol(128,112,96);
+         for(y=yres*.88;y<yres*.91;y++)
+            { moveto(xres*-.07+glob[3],y); lineto(xres*.07+glob[3],y); }
+         setcol(128,0,0); xoff = (glob[3]-hx)*-.13;
+         for(y=yres*.80;y<yres*.83;y++)
+         {  w = sqrt((yres*.03)^2-(y-(yres*.83))^2)*rhy*.4;
+            moveto(xres*-w+glob[3]+xoff,y); lineto(xres*w+glob[3]+xoff,y);
+         }
+         setcol(0,0,0);
+         for(y=yres*(.87-l*2);y<yres*(.93-l*2);y++)
+         {  moveto(glob[3]-xres*.11,y); lineto(glob[3]-xres*.07,y);
+            moveto(glob[3]+xres*.07,y); lineto(glob[3]+xres*.11,y);
+         }
+      }
+      else
+      {
+         r = (tim-crashed)*160; srand(0);
+         for(i=0;i<256;i++)
+         {
+            setcol(0xff-rnd,rnd*128,rnd*128);
+            drawsph(glob[3]+nrnd*r,yres*.815+nrnd*r + r^2/100,(r+nrnd)/10);
+         }
+         if (r > 500) crashed = 0;
+      }
+      
+      setcol(255,255,255); setpix(mousx,mousy);
+      obstatus = bstatus; refresh();
+   }
+}
