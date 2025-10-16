@@ -1,0 +1,471 @@
+// Written by Torbjoern 24. november 2009
+enum{MAXMAGNETS = 10}
+struct magnet
+{
+   double x,y;
+   double vx,vy;
+   double fx,fy;
+   polarity;
+};
+
+static magnet magnetList[MAXMAGNETS];
+
+// Tweak these variables:
+static magStrength = 5000;
+static magnetRadi = 22;
+
+// State
+static grabbedPoint = -1; 
+
+
+static time, oldTime, dt, rdt;
+
+()
+{
+   cls(0);
+   
+   cx = xres/2; cy = yres/2;
+   
+   if(numframes==0)
+   {
+      border = magnetRadi*2;
+      xp = border;
+      yp = border;
+      increment = xres*3/MAXMAGNETS;
+      for(i=0; i<MAXMAGNETS; i++)
+      {       
+      
+         mode=1;   
+         
+         if(mode==1) 
+         {            
+            ang = (i/maxmagnets); // Place on a circle. 
+            r = MAXMAGNETS*magnetRadi/3;
+            theta = 2*PI*ang;
+            x = r * cos(theta);
+            y = r * sin(theta);
+            magnetList[i].x = xres/2 + x;
+            magnetList[i].y = yres/2 + y;
+         }     
+         else if(mode==2)
+         {
+            magnetList[i].x = xp;
+            magnetList[i].y = yp;
+            xp += increment;
+            if(xp > xres-border)
+            { 
+               xp = border; 
+               yp += increment;
+            }; 
+         }
+         else if(mode==3)
+         { 
+          magnetList[i].x = border+rnd*(xres-border); // Place randomly
+          magnetList[i].y = border+rnd*(yres-border);
+         }
+       
+
+         // Set the magnets polarity and strength.
+         polarityChooser = i%2; //int(rnd*2);
+         //polarityChooser = i%1;
+         if(polarityChooser < 1)
+         {
+            magnetList[i].polarity = 1;
+         }
+         else
+         {
+            magnetList[i].polarity = -1;
+         }
+
+         
+      }
+   }
+
+   oldTime = time; time = klock(0); dt = time - oldTime; rdt = 1/dt;   
+
+   
+   drawField();
+   field();
+   //potLines();
+   draw();
+   calcPower();
+   mouseDrag();
+     
+   // IM-GUI
+   //slider(0,magStrength,10,20+40*0,200);
+   //slider(1,maxForce,10,20+40*1,200);
+   
+   //setfont(9,16); setcol(0xffffff);
+   //moveto(220,20); printf("magStrength\n\nmaxForce");
+   
+   vx=0; vy=0;
+   force = getFieldStrength(mousx,mousy,vx,vy);
+   moveto(mousx,mousy);
+   printnum( force );
+}
+
+texquad(x,y,width,height)
+{
+   glBegin(GL_COMPLEX);
+   glTexCoord(0,0);glVertex(x,y);
+   glTexCoord(1,0);glVertex(x+width,y);
+   glTexCoord(1,1);glVertex(x+width,y+height);
+   glTexCoord(0,1);glVertex(x,y+height);
+   glEnd();
+}
+
+hsv_to_rgb(h,s,v){ 
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else{
+      hf = h / 60.0; i  = floor( hf ); f  = hf - i;
+      pv  = v * ( 1 - s ); qv  = v * ( 1 - s * f ); tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;}  if(i==1){r=qv; g=v; b=pv;}  if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;}  if(i==4){r=tv; g=pv; b=v;}  if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;} if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   r=int(r*255); g=int(g*255); b=int(b*255);
+   return r*2^16 + g*2^8 + b; 
+}
+
+drawField()
+{
+   enum{S=128};
+   static pixels[S][S]; 
+   if(numframes==0)
+   {
+      glCullFace(GL_BACK); 
+      glDisable(GL_ALPHA_TEST);
+      glDisable(GL_DEPTH_TEST);
+   }
+
+   xRatio =xres/(S);
+   yRatio =yres/(S); 
+
+   for(x=0; x<S; x++)
+   {
+      for(y=0; y<S; y++)
+      {
+         dx=0;dy=0;
+         steep = getFieldStrength(x*xRatio,y*yRatio,dx,dy);
+         // change coloring with a palette gradient from -e to e
+         
+      
+         //c = 60*10.0/log(10*steep);
+         //c = 36*exp(steep*1e5);
+         //c = 36*log(steep*1e5);
+         
+         c = 60*abs(steep)*1e5;
+         c += (steep<0)*60;
+         
+         //c = min(359000, max(-1000,steep));
+         pixels[y][x] = hsv_to_rgb( max(0,min(360,c)) ,1,1);   
+      }
+   }
+   
+   b = glsettex(pixels,S,S);
+   setcol(0xffffff);     
+   texquad(0,0,xres,yres);
+   glremovetex(b);
+}
+
+
+// Calculates the magnetic force
+// working on each magnet
+calcPower()
+{
+   for(i=0; i<MAXMAGNETS; i++)
+   {
+      x = magnetList[i].x;
+      y = magnetList[i].y;
+      f = magnetList[i].polarity * magStrength;
+      magnetList[i].fx = 0;
+      magnetList[i].fy = 0;
+      
+      // Compare this to all others
+      for(j=0; j<MAXMAGNETS; j++)
+      {
+         // Dont check against self
+         if(j==i) continue;
+
+         
+         xOther = magnetList[j].x;
+         yOther = magnetList[j].y;
+         fOther = magnetList[j].polarity * magStrength;
+         
+         // Direction vector:
+         dx = (x-xOther);
+         dy = (y-yOther);
+         
+         // This is what makes them appear magnetic!
+         // Uses Coloumbs law. The force generated between 2 charges:
+         distSq = dx^2 + dy^2;  // Fc = (q1*q2) / r^2    q1 and q1 are charges. r is the distance between.
+         
+         force = (f*fOther) / (distSq);    
+         
+         ang = atan2(dy,dx);
+         magnetList[i].fx += cos(ang)*force;
+         magnetList[i].fy += sin(ang)*force;         
+      }
+
+
+      magnetList[i].fx /= MAXMAGNETS-1;
+      magnetList[i].fy /= MAXMAGNETS-1;  
+   }
+}
+
+// Draw field lines
+field()
+{
+   for(y=0;y<yres;y+=16)
+      for(x=0;x<xres;x+=16)
+      {
+         vx = 0; vy = 0;
+         e = getFieldStrength(x,y,vx,vy);
+         f = 8/sqrt(vx^2+vy^2); // force is inverse of dir vector
+         vx *= f; 
+         vy *= f;         
+         cr = 255+abs(e)*128; cg = 255+abs(e)*128; cb = 255+e*128;
+         setcol(cr,cg,cb); 
+         moveto(x,y);
+         lineto(x+vx,y+vy);
+      }
+}
+
+potLines()
+{
+   static linesegx[1024];
+   static linesegy[1024];
+   
+   xs = xres/2;
+   ys = yres/2;
+   moveto(xs,ys);
+   vx=0; vy=0;
+   sniff = getFieldStrength(xs,ys,vx,vy);
+   oldsniff = sniff;
+   xs += vx;
+   ys += vy;
+   
+   lineto(xs,ys);
+   for(i=0; i<1024; i++)
+   {
+      sniff = getFieldStrength(xs,ys,vx,vy);
+      if( fabs(sniff-oldsniff) < 1e-6 )
+      {
+         xs += 5*vx;
+         ys += 5*vy;   
+         lineto(xs,ys); 
+      }  
+      else
+      {
+         xs = 16;
+         ys = 16;
+      }     
+   }
+   
+}
+
+getFieldStrength(x,y,&vx,&vy) // sets gradient dir in vx,vy, and returns scalar strength
+{
+    vx = 0; vy = 0;
+    // Also, sum up electric field at this point (x,y)
+    e = 0;
+
+    for(i=0; i<MAXMAGNETS; i++)
+    {
+      dx = x-magnetList[i].x;
+      dy = y-magnetList[i].y;
+      distSq = dx^2 + dy^2;
+      distInv = 1/distSq;
+      // direction vector x,y components.
+      vx = dx*distInv - vx;
+      vy = dy*distInv - vy;  
+  
+      e += (magnetList[i].polarity / distSq );
+    }
+    
+    e = max(-1,e);
+    e = min(1,e);
+
+    return e;
+}
+
+// draws and updates motion
+draw()
+{
+   dt = dt / 10;
+   for(steps=0; steps<10; steps++){
+   
+   for(i=0; i<MAXMAGNETS; i++){
+         // add magnetic force vector to position    
+         magnetList[i].vx += magnetList[i].fx * dt;
+         magnetList[i].vy += magnetList[i].fy * dt;
+   }
+   
+   for(i=0; i<MAXMAGNETS; i++)
+   {
+      magnetList[i].x += magnetList[i].vx * dt;
+      magnetList[i].y += magnetList[i].vy * dt;
+     // force magnets inside of screen
+      if(magnetList[i].x - magnetRadi < 0){magnetList[i].x=magnetRadi*2-magnetList[i].x; magnetList[i].vx = abs(magnetList[i].vx);}
+      if(magnetList[i].y - magnetRadi < 0){magnetList[i].y=magnetRadi*2-magnetList[i].y; magnetList[i].vy = abs(magnetList[i].vy);}
+      
+      if(magnetList[i].x + magnetRadi > xres){magnetList[i].x = (xres-magnetRadi)*2-magnetList[i].x; magnetList[i].vx = -abs(magnetList[i].vx);}
+      if(magnetList[i].y + magnetRadi > yres){magnetList[i].y = (yres-magnetRadi)*2-magnetList[i].y; magnetList[i].vy = -abs(magnetList[i].vy);}
+      
+      // Collision detection.
+      for(j=0;j<MAXMAGNETS;j++)
+      {
+         if (i == j) continue;   
+         d = sqrt( (magnetList[i].x-magnetList[j].x)^2 + (magnetList[i].y-magnetList[j].y)^2);
+         d -= (2*magnetRadi);
+         
+         // Magnets/spheres are colliding or penetrating
+         if(d < 0)
+         {
+            // difference in position
+            vx = magnetList[j].x-magnetList[i].x;
+            vy = magnetList[j].y-magnetList[i].y;
+            // force based on collision depth
+            f = 1/(sqrt(vx^2+vy^2)); vx *= f; vy *= f;
+            m = magnetRadi^2*2;
+            magnetList[i].x += vx*d/2; magnetList[i].vx += vx*d*(magnetRadi^2/m)*rdt;
+            magnetList[i].y += vy*d/2; magnetList[i].vy += vy*d*(magnetRadi^2/m)*rdt;
+            magnetList[j].x -= vx*d/2; magnetList[j].vx -= vx*d*(magnetRadi^2/m)*rdt;
+            magnetList[j].y -= vy*d/2; magnetList[j].vy -= vy*d*(magnetRadi^2/m)*rdt;
+            magnetList[i].vx = min(max(magnetList[i].vx,-4096),4096);
+            magnetList[i].vy = min(max(magnetList[i].vy,-4096),4096);
+            magnetList[j].vx = min(max(magnetList[j].vx,-4096),4096);
+            magnetList[j].vy = min(max(magnetList[j].vy,-4096),4096);            
+         }  
+                  
+      } // eof for j collision  
+   
+      // friction
+      k = 2;
+      magnetList[i].vx *= exp(dt*-k); 
+      magnetList[i].vy *= exp(dt*-k);
+
+      x = magnetList[i].x;
+      y = magnetList[i].y;      
+   
+      f =  magnetList[i].polarity;
+      setfont(4,6);
+      if(f > 0)
+      {
+         setcol(0xffffff);
+         drawsph(x,y,magnetRadi);
+         moveto(x-6,y-2); setcol(0xff0000); printf("%g",f);
+      }
+      else
+      {
+         setcol(0xff7777);
+         drawsph(x,y,magnetRadi);
+         moveto(x-6,y-2); setcol(0xffffff); printf("%g",f);
+      }
+
+   } // eof for i
+   }
+}
+
+mouseDrag()
+{
+   if(bstatus == 1)
+   {
+      // move currently grabbed point
+      if(grabbedPoint > -1)
+      {
+         magnetList[grabbedPoint].vx = (mousx-magnetList[grabbedPoint].x)*rdt; 
+         magnetList[grabbedPoint].vy = (mousy-magnetList[grabbedPoint].y)*rdt;
+      }
+      else if(grabbedPoint < 0) // no point grabbed, but mouse is down, check for collision
+      {
+         mindist = 1e32;
+         closest = -1;
+         for(i=0; i < MAXMAGNETS; i++)
+         {
+            dx = mousx-magnetList[i].x;
+            dy = mousy-magnetList[i].y;
+            dist = dx*dx + dy*dy;
+            if( dist < mindist ){
+               closest = i;
+               minDist = dist;
+            }
+         }
+         grabbedPoint = closest;
+      }
+   }
+   else // mouse not down
+   {
+      grabbedPoint = -1;
+   }
+}
+
+slider(sliderNum,&value,x,y,length)
+{
+   enum{numSliders=10};
+   static mouseLock[numSliders];
+
+   // Constructor, set slider to mid position
+   if(numframes==0)
+   {
+      //value = .5 * length; // this is what makes the adv slider work. :S
+      mouseLock[sliderNum] = 0;
+   }  
+   // Draw slider
+   setcol(255,255,255);
+   moveto(x,y);
+   lineto(x+length,y);
+   drawsph(x+value,y,-10);
+   moveto(x+value,y+10);
+   printf("value=%g",value);
+   
+   // mouse input
+   //mouseValue = mousx/(xres/2)-1;
+
+   // Check if anyone else has lock, if so exit.
+   if(mouseLock[sliderNum] == 0)
+   for(i=0; i<numSliders; i++)
+   {
+      if(i==sliderNum) continue; // if we have lock no problem
+      if(mouseLock[i]) return; // someone else has lock
+   }   
+
+   if(bstatus==1)
+   {
+      mx = mousx; my = mousy; 
+      if(mouseLock[sliderNum]) // mouse has lock-on, move slider
+      {
+         setcol(255,0,0);
+         drawsph(x+value, y,-5);
+         if(mx <= (x+length) && mx >= x) // limit movement to slider line
+         {
+            intrinsicRatio = (length-0)/( (length+x)-x);
+            value = ( mx-x)*intrinsicRatio + 0;
+         }
+         else if(mx > (x+length) )
+         {
+            value = length;
+         }
+         else if(mx < x)
+         {
+            value = 0;
+         }
+      }
+      else // check for collision
+      {
+         if( isColliding(mx,my,x+value,y,10) ) mouseLock[sliderNum] = 1; 
+      }
+   }
+   else // mouse released
+   {
+      mouseLock[sliderNum] = 0;
+   }
+
+}
+
+isColliding(x1,y1,x2,y2,radius)
+{
+   if((x1-x2)^2 + (y1-y2)^2 < radius^2 ) return 1;
+   return 0;
+}

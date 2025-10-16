@@ -1,0 +1,146 @@
+enum{MAXPTS = 10}
+static ptx[MAXPTS];
+static pty[MAXPTS];
+static wt[MAXPTS];
+static numpts;
+
+static last;
+static first;
+()
+{
+   if(numframes==0)
+   {
+    ptx[0] = 1;
+    pty[0] = 0;
+    
+   sq22 = sqrt(2) / 2;
+    ptx[1] = sq22;
+    pty[1] = sq22;
+    
+    ptx[2] = 0;
+    pty[2] = 1;
+    
+    ptx[3] = -sq22;
+    pty[3] = sq22;
+    
+    ptx[4] = -1;
+    pty[4] = 0;
+    
+    ptx[5] = -sq22;
+    pty[5] = -sq22;
+    
+    ptx[6] = 0;
+    pty[6] = -1;
+    
+    ptx[7] = sq22;
+    pty[7] = -sq22;
+    
+    ptx[8] = 1;
+    pty[8] = 0;
+    
+   // Glue
+    ptx[9] = ptx[1];
+    pty[9] = pty[1];
+    
+    
+    numpts=MAXPTS;
+    
+    first = 0;
+    last = numpts-1;
+   } 
+
+   setcol(0xffffff);   
+   cls(0);
+   scaler = 250; // Scale points up 
+   
+   mindist = 1e32;
+   minIdx = -1;
+   for(i=0; i<numpts; i++)
+   {
+      drawsph(xres/2+ptx[i]*scaler, yres/2+pty[i]*scaler,-4);
+      dx = mousx - (xres/2 + ptx[i]*scaler);
+      dy = mousy - (yres/2 + pty[i]*scaler);
+      dist = sqrt(dx^2 + dy^2);
+      if(dist < mindist )
+      {
+         mindist = dist;
+         minIdx = i;
+      }
+   }
+   
+   
+   if(bstatus==1)
+   {
+      ptx[minIdx] = (mousx-xres/2)/scaler;
+      pty[minIdx] = (mousy-yres/2)/scaler;
+   }
+
+   
+   x1 = 0; y1 =0;
+   bspline(1,0,x1,y1);
+   moveto( xres/2 + x1*scaler, yres/2 + y1*scaler);
+   
+   for(p=1; p<numpts-1; p++)
+   {      
+      rez = 30;
+      for(i=0; i<rez; i++)
+      {
+         t = i/(rez-1);
+         x = 0; 
+         y = 0;
+         bspline(p,t,x,y);
+         
+         setcol( 0, 255, 0 );
+         //drawsph(x,y,-3);
+         lineto( xres/2 + x*scaler, yres/2 + y*scaler);
+      }
+   }
+
+
+}
+
+bspline(p,t,&x, &y)
+{
+   // X coord
+   prv = ptx[p-1];
+   now = ptx[p];
+   nxt = ptx[p+1];
+   now = 0.5*(t^2 - 2*t + 1)*prv + 0.5*(-2*t^2+2*t+1)*now + (t*t)/2 * nxt;
+
+   
+   if(p==first)   
+   {
+      kstart = 0.5 * (prv + now); 
+      x = kstart + now; 
+   }
+   else if(p==last) //next   
+   {
+      kend = 0.5 * (now + nxt); 
+      x = kend + now; 
+   }
+   else
+   {
+      x = now;
+   }
+     
+   // Y coord
+   prv = pty[p-1];
+   now = pty[p];
+   nxt = pty[p+1];
+   now = 0.5*(t^2 - 2*t + 1)*prv + 0.5*(-2*t^2+2*t+1)*now + (t*t)/2 * nxt;
+
+   if(p==first)   
+   {
+      kstart = 0.5 * (prv + now); 
+      y = kstart + now; 
+   }
+   else if(p==last) //next   
+   {
+      kend = 0.5 * (now + nxt); 
+      y = kend + now; 
+   }
+   else
+   {
+      y = now;
+   } 
+}

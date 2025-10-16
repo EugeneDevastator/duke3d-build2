@@ -1,0 +1,218 @@
+enum{MAX_CIRCLES = 10}
+static circlex[MAX_CIRCLES];
+static circley[MAX_CIRCLES];
+// Displacement / velocity
+static circlevx[MAX_CIRCLES];
+static circlevy[MAX_CIRCLES];
+static circleradius[MAX_CIRCLES];
+
+static numcircles = 0;
+
+enum{INSIDE = -1, NONE = -2}
+
+static dt, time, oldtime;
+
+static running = 1;
+
+// 02 add keyboard control
+()
+{
+   cls(0);
+
+   time = klock(0);
+   if(running)
+   {
+      dt =  time - oldtime;
+   }
+   else
+   {
+      dt = 0;
+   }  
+   oldtime = time; 
+
+   if(numframes == 0)
+   {
+      circlex[numcircles] = xres * 0.5;
+      circley[numcircles] = yres * 0.5;
+      circlevx[numcircles] = nrnd*10;
+      circlevy[numcircles] = nrnd*10;
+      circleradius[numcircles] =35;
+      numcircles++;
+      
+      circlex[numcircles] = xres * 0.25;
+      circley[numcircles] = yres * 0.5;
+      circlevx[numcircles] = 45;
+      circlevy[numcircles] = 0;
+      circleradius[numcircles] = 40;
+      numcircles++;
+   }
+   
+   for(i=0; i<numcircles; i++)
+   {
+      setcol(0xff0000);
+      drawsph( circlex[i], circley[i], circleRadius[i]);
+      setcol(0xffffff);
+      moveto(circlex[i], circley[i]);
+      lineto(circlex[i]+circlevx[i], circley[i]+circlevy[i]);
+   }
+
+   
+   // euler integration of motion
+   for(i=0; i<numcircles; i++)
+   {
+      circlex[i] += circlevx[i] * dt;
+      circley[i] += circlevy[i] * dt;
+      
+   }
+
+   t = circleCircleCollision(0,1);
+   moveto(0,0);
+   printf("COLLISION STATUS: ");
+   if(t==INSIDE) printf("inside");
+   else if(t==NONE) printf("no potential collision");
+   else printf("seconds until collision: %g",t);
+
+
+   t = circleCircleCollision(1,0);
+   moveto(0,30);
+   printf("COLLISION STATUS: ");
+   if(t==INSIDE) printf("inside");
+   else if(t==NONE) printf("no potential collision");
+   else printf("seconds until collision: %g",t);
+
+   
+   if(t > 0 && t < 1)
+   {
+      setcol(0xaa0000);
+      //drawsph( circlex[0] +circlevx[0]*t, circley[0] + circlevy[0]*t, circleRadius[0]);
+      //drawsph( circlex[1] +circlevx[1]*t, circley[1] + circlevy[1]*t, circleRadius[1]);
+      
+      antWheel(circlex[0] +circlevx[0]*t, circley[0] + circlevy[0]*t, circleRadius[0],time);
+      antWheel(circlex[1] +circlevx[1]*t, circley[1] + circlevy[1]*t, circleRadius[1],time);
+   }
+   
+   if(keystatus[203])
+   {
+      rotatePoint(circlevx[1],circlevy[1], -5*pi/180);
+   }
+   if(keystatus[205])
+   {
+      rotatePoint(circlevx[1],circlevy[1], 5*pi/180);
+   }
+   if(keystatus[200])
+   {
+      // 10% faster
+      circlevx[1] *= 1.01;
+      circlevy[1] *= 1.01;
+   }
+   if(keystatus[208])
+   {
+      // 10% faster
+      circlevx[1] *= 0.99;
+      circlevy[1] *= 0.99 ;
+   }
+   
+   if(keystatus[57])
+   {
+      keystatus[57] = 0;
+      if(running) running = 0;
+      else running = 1;
+   }
+   
+   sleep(16);
+   printf("\nctrl+enter to reset");
+}
+
+rotatePoint(&x,&y,ang) // angle in radians
+{
+   newx = x * cos(ang) - y * sin(ang);
+   newy = x * sin(ang) + y * cos(ang);
+   x = newx; y = newy;    
+}
+
+circleCircleCollision(cir1, cir2)
+{
+   wx = circlex[cir1] - circlex[cir2];
+   wy = circley[cir1] - circley[cir2];
+   
+   r = circleRadius[cir1] + circleRadius[cir2];
+   
+   ww = dotProduct(wx,wy,wx,wy);
+   
+   if( ww < r*r ) return INSIDE;
+   
+   vx = circlevx[cir1] - circlevx[cir2];
+   vy = circlevy[cir1] - circlevy[cir2];
+   a = dotProduct(vx,vy,vx,vy);
+   b = dotProduct(wx,wy,vx,vy);
+   c = ww - r*r;
+   root = b*b - a*c;
+   if(root < 0) return NONE;
+   t = (-b - sqrt(root))/a;
+   if(t>1 || t<0) return NONE;
+   return t;
+}
+
+dotProduct(x1,y1,x2,y2)
+{
+   return x1*x2 + y1*y2;
+}
+
+antwheel(tx,ty,r,t)
+{
+      ox = tx + r*sin(0*2*PI/15);
+      oy = ty + r*cos(0*2*PI/15);
+      for(i=1; i<16; i++)
+      {
+         x = tx + r*sin(i*2*PI/15);
+         y = ty + r*cos(i*2*PI/15);
+         ants(ox,oy,x,y,time);
+         ox = x; oy = y;
+      }
+}
+
+ants(x1,y1,x2,y2,t)
+{
+   mv = 0;
+   xdist = x1-x2; ydist=y1-y2;
+   if(xdist < 0) xdist=-xdist;
+   if(ydist < 0) ydist=-ydist;
+   
+   if(ydist > xdist)
+   {
+      mv = ydist;
+   }
+   else
+   {
+      mv = xdist;
+   }
+   
+   x = x1;
+   y = y1;
+   
+   stepx = xdist/mv;
+   if(x1 > x2) stepx = -stepx;
+   stepy = ydist/mv;
+   if(y1 > y2) stepy = -stepy;
+   
+   // makes ants move, start val is det by time
+   // ant speed is time in millis taken for 1 move
+   antspeed = 10;
+   antsize = 10;
+   antcounter = abs( (t*1000/antspeed) % antsize);
+   
+   for(nc=0; nc<floor(mv); nc++)
+   {   
+      if( (abs(antcounter) % antsize) < (antsize/2) ){
+         setcol(0); setpix(x,y);
+      }
+      else{
+         setcol(0xffffff); setpix(x,y);
+      }
+   
+      x+=stepx; y+=stepy;
+      antcounter -= 1;
+   }
+      
+}
+

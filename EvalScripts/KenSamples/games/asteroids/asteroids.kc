@@ -1,0 +1,685 @@
+   //Multiplayer asteroids programmed by Ken Silverman and Jim Grandpre, 12/29/2009-
+   //Additional effects by Mike Murphy.
+   //
+   //Instructions: break down the asteroids before they hit Earth.
+   //Controls:
+   //      Left/right: turn
+   //         Up/down: thrust
+   //           Space: friction (yeah, we know there's no friction in space)
+   //  L.Ctrl/MousBut: fire
+
+enum {MAXPLAYERS=16,PPAKBUF=1024};
+//#define USE6D
+#ifndef USE6D
+enum {PAKSIZ=2};
+#else
+enum {PAKSIZ=5};
+static magx[MAXPLAYERS], magy[MAXPLAYERS], magang[MAXPLAYERS];
+#endif
+static ppak[PPAKBUF][PAKSIZ];
+
+enum {SPRMAX=512};
+enum {SPRPLAY=0,SPRBUL,SPRMET,SPRPART,SPRPOW};
+struct { sprn,level,tim,timcrash,krnd,score[MAXPLAYERS]; } gs_t;
+struct { x,y,ang,vx,vy,siz,tim,typ,own,ext,pow; } ss_t;
+
+static render2d = 0;
+static gxres = 800, gyres = 600, gsc, gxof, gyof;
+
+()
+{
+   static lpak[PAKSIZ];
+   static gs_t gs, pgs;
+   static ss_t spr[SPRMAX], pspr[SPRMAX];
+   
+   glenable(GL_ALPHA_TEST);
+
+   srand(0);
+
+   gs.sprn = net_players;
+   gs.level = 1;
+   gs.tim = 0;
+   gs.timcrash = gs.tim+35/sqrt(net_players);
+   gs.krnd = 50; //2;
+   for(i=0;i<net_players;i++) gs.score[i] = 0;
+   for(i=0;i<net_players;i++)
+   {
+      spr[i].x = (i+.5)*gxres/net_players;
+      spr[i].y = gyres/2;
+      spr[i].vx = 0;
+      spr[i].vy = 0;
+      spr[i].ang = -PI/2;
+      spr[i].tim = 2;
+      spr[i].typ = SPRPLAY;
+      spr[i].own = i;
+      spr[i].siz = 15;
+      spr[i].ext = 0;
+      spr[i].pow = .35;
+#ifdef USE6D
+      magx[i] = 0; magy[i] = 0; magang[i] = 0;
+#endif      
+   }
+
+   for(i=0;i<2;i++) spawnmeteor(spr,gs);
+
+      //Copy sync to pred
+   pgs = gs; for(i=gs.sprn-1;i>=0;i--) pspr[i] = spr[i];
+
+   spakn = 0; ppakn = 0; //sync/pred packet counts of own packets
+
+   ltim = 0; nextfire = 0; from = 0; val = 0;
+
+   lastsent = klock();
+   px=0;py=0;pz=0;rx=0;ry=0;rz=0;dx=0;dy=0;dz=0;fx=0;fy=0;fz=0;but=0;
+   while (1)
+   {
+      if (keystatus[0x1c] || keystatus[0x9c]) //Enter
+      {
+         keystatus[0x1c] = 0; keystatus[0x9c] = 0;
+         render2d = 1-render2d;
+      }
+
+#ifdef USE6D
+      if (USING6DOF > 0)
+      {
+         for(dev=0;dev<min(USING6DOF,1);dev++)
+         {
+            readmag6d(dev,&px,&py,&pz,&rx,&ry,&rz,&dx,&dy,&dz,&fx,&fy,&fz,&but);
+               //px + fx*t = x
+               //py + fy*t = y
+               //pz + fz*t = 0
+            t = -pz/fz;
+            f = (gxres/2)/4;
+            x = px + fx*t; lmagx = x*f+gxres/2;
+            y = py + fy*t; lmagy = y*f+gyres/2;
+            lmagang = atan2(-rx,ry);
+         }
+      }
+      else
+      {
+         lmagang = -17;
+      }
+#endif      
+      
+      tim = klock();
+      if (((net_me == 0) || (ppakn-spakn < PPAKBUF)) && (tim > lastsent+1/60))
+      {
+         lastsent += 1/60;
+
+         oltim = ltim; ltim = tim;
+
+
+            //Everybody sends to master
+         lpak[0] = ltim-oltim;
+
+         lfire = 0;
+         if ((bstatus || (but) || (keystatus[0x1d]) || (keystatus[0x9d])) && (ltim > nextfire))
+            { lfire = 1; nextfire = ltim+spr[net_me].pow; }
+
+         lpak[1] = (keystatus[0xcd]-keystatus[0xcb]+1) +
+                   (keystatus[0xc8]-keystatus[0xd0]+1)*3 +
+                   lfire*9 +
+                   keystatus[0x39]*18
+                   - 16; //Hack to increase chances of sending as 1 byte :P
+#ifdef USE6D         
+         lpak[2] = lmagx; lpak[3] = lmagy; lpak[4] = lmagang;
+#endif         
+
+         net_send(NET_ALL,lpak,PAKSIZ);
+
+         if (net_me)
+         {
+            executepack(net_me,lpak,pspr,pgs,1,1);
+            for(i=0;i<PAKSIZ;i++) { ppak[ppakn%PPAKBUF][i] = lpak[i]; } ppakn++;
+         }
+      }
+
+      gototh = 0;
+      while (net_recv(&from,lpak,PAKSIZ))
+      {
+         if (from == net_me) spakn++; else gototh = 1;
+         executepack(from,lpak,spr,gs,(net_me==0)||(net_me!=from),0);
+      }
+
+      if ((gototh) && (net_me))
+      {
+            //Copy sync to pred
+         pgs = gs; for(i=gs.sprn-1;i>=0;i--) pspr[i] = spr[i];
+
+             //recalculate: apply predicted packs on top of synced state
+         for(j=spakn;j<ppakn;j++)
+         {
+            for(i=0;i<PAKSIZ;i++) lpak[i] = ppak[j%PPAKBUF][i];
+            executepack(net_me,lpak,pspr,pgs,0,1);
+         }
+      }
+
+
+//--------Drawing code goes below-------------
+      if (net_me == 0) drawit( spr, gs);
+                  else drawit(pspr,pgs);
+
+      refresh(); //Sleep(15);
+   }
+}
+
+   //x,y = screen coords
+   //r = maximum size of explosion at t=.5
+   //t = 0 to .5
+explodernd (&kholdrand) //unsynced rnd (for drawing&AI)!
+{
+   kholdrand = ((kholdrand*214013)+2531011*2)%(2^32);
+   return(kholdrand/2^32);
+}
+explode (x,y,rad,t)
+{
+   setcol(0xffffff);
+   ai = (sqrt(5)-1)/2*PI*2; myrnd = 0;
+   for(i=.5;i<rad;i++)
+   {
+      a = i*ai;
+      r = sqrt(i)*t*rad/2;
+      s = explodernd(&myrnd); //(cos(i*)+1);
+      glsettex("meteor.png");
+      drawspr(((cos(a)*r+x)%gxres)*gsc+gxof,((sin(a)*r+y)%gyres)*gsc+gyof,max((s*rad/8)*(0.8-t)*1.3,.5)*gsc,i);
+   }
+}
+
+drawit (ss_t lspr[SPRMAX], gs_t lgs)
+{
+   xsc = xres/gxres;
+   ysc = yres/gyres; if (xsc < ysc) gsc = xsc; else gsc = ysc;
+   gxof = (xres-gxres*gsc)/2;
+   gyof = (yres-gyres*gsc)/2;
+   setcam(0,0,0,0,0);
+
+   static obad = 0, bad;
+   obad = bad; bad = max(255-(lgs.timcrash-lgs.tim)*128,0);
+   if (bad >= 255)
+   {
+      if (obad < 255)
+      {
+         for(i=0;i<4;i++) playsound("blowup2.flac",100,pow(2,i/2));
+         playsound("pickup.wav",100,.05);
+         playsound("pickup.wav",100,.10);
+         playsound("pickup.wav",100,.15);
+      }
+
+      t = (klock()-lgs.timcrash)*2;
+      cls(0,0,max(255-t*4,128));
+      setcol(255-t*4,0,0);
+      setfont(xres/4,yres*0.7,1); moveto(0,yres/4); printf("BSOD");
+      setfont(xres/15,yres*0.15,0);
+      moveto(0,yres*.05); printf("10 billion dead");
+      moveto(0,yres*.80); printf("   LIFE OVER");
+      setcol(255-t*8,255-t*8,0); setfont(xres/4,yres*0.7,0);
+      for(i=-8;i<=8;i++)
+      {
+         moveto(i*t,yres/4+i*t); printf("BSOD");
+         moveto(i*t,yres/4-i*t); printf("BSOD");
+      }
+
+      return;
+   }
+   cls(0,bad,bad);
+   clz(1e32);
+
+      //Draw background stars..
+   enum {STARN=256}; static starx[STARN] = {-1}, stary[STARN], starc[STARN];
+   if (starx[0] < 0)
+   {
+      for(i=0;i<STARN;i++)
+      {
+         starx[i] = gxres*rnd; stary[i] = gyres*rnd;
+         starc[i] = int(64*rnd+48)*0x10101;
+      }
+   }
+   if (bad < 48)
+   {
+      for(i=0;i<STARN;i++)
+      {
+         setcol(starc[i]);
+         xx = ((starx[i]-lspr[net_me].x)%gxres)*gsc+gxof;
+         yy = ((stary[i]-lspr[net_me].y)%gyres)*gsc+gyof;
+         setpix(xx,yy);
+         if (gsc == ysc) { if (xx*2 < xres) xx += gxres*gsc; else xx -= gxres*gsc; }
+                    else { if (yy*2 < yres) yy += gyres*gsc; else yy -= gyres*gsc; }
+         setpix(xx,yy);
+      }
+   }
+
+      //Draw earth
+   setcol(0xc0c0c0);
+   r = 20000; nz = (lgs.timcrash-lgs.tim)*r+r; nha = lgs.tim*-.2;
+   glsettex("earth.jpg");
+   nv = min(max(int(3e6/max(nz,1)),8),20); dv = PI/nv;
+   nu = nv*2; du = PI*2/nu;
+   for(v=PI,iv=0;iv<=nv;iv++,v+=dv)
+   {
+      glBegin(GL_TRIANGLE_STRIP);
+      for(u=0,iu=0;iu<=nu;iu++,u+=du)
+      {
+         glTexCoord((u+nha)*.5/PI,v/PI);
+         glVertex(sin(v)*cos(u)*r,cos(v)*r,sin(v)*sin(u)*r+nz);
+         glTexCoord((u+nha)*.5/PI,(v-dv)/PI);
+         glVertex(sin(v-dv)*cos(u)*r,cos(v-dv)*r,sin(v-dv)*sin(u)*r+nz);
+      }
+   }
+
+   static gotx = -1e32, goty;
+#ifndef USE6D   
+   if (gotx == -1e32)
+   {
+      gotx = lspr[net_me].x;
+      goty = lspr[net_me].y;
+   }
+   gotx += (((lspr[net_me].x-gotx+gxres/2)%gxres)-gxres/2)*.02;
+   goty += (((lspr[net_me].y-goty+gyres/2)%gyres)-gyres/2)*.02;
+#else
+   gotx = gxres/2;
+   goty = gyres/2;
+#endif   
+   
+      //Draw sprites
+   for(i=lgs.sprn-1;i>=0;i--)
+   {
+      sx = (lspr[i].x-gotx+gxres/2)%gxres;
+      sy = (lspr[i].y-goty+gyres/2)%gyres;
+      
+      //sx = (lspr[i].x-lspr[net_me].x+gxres/2)%gxres;
+      //sy = (lspr[i].y-lspr[net_me].y+gyres/2)%gyres;
+      if (lspr[i].typ == SPRPLAY)
+      {
+         glsettex("asteship.png");
+         nsx = sx; c = cos(lspr[i].ang);
+         nsy = sy; s = sin(lspr[i].ang);
+         for(j=0;j<4;j++)
+         {
+            if (j%2) nsx -= sgn(nsx-gxres/2)*gxres; 
+                else nsy -= sgn(nsy-gyres/2)*gyres;
+                
+            v = lgs.tim-lspr[i].tim;
+            if ((v >= -2) && (v < 0))
+            {
+               setcol(int((-v)*96+64)*0x10101);
+               for(r=-23;r<-20;r++) drawsph(sx*gsc+gxof,sy*gsc+gyof,r*gsc);
+            }
+            
+            if (v < -2) continue;
+            if (i == net_me) setcol(0xffffff); else setcol(0xff8080);
+            drawspr(nsx*gsc+gxof,nsy*gsc+gyof,12*gsc,16*gsc,lspr[i].ang+PI/2);
+#ifdef USE6D
+            if (i != net_me)
+            {
+               setcol(0x8080ff); drawspr(((magx[i]-gotx+gxres/2)%gxres)*gsc+gxof,
+                                         ((magy[i]-goty+gyres/2)%gyres)*gsc+gyof,
+                                         12*gsc,16*gsc,magang[i]+PI/2);
+            }
+#endif            
+
+            throttle = int(lspr[i].ext/3)%3-1;
+            if (throttle > 0)
+            {
+               for(u=0;u<2;u++)
+               {
+                  if (u == 0) setcol(0xffa0a0);
+                         else setcol(0xffffa0);
+                  for(t=-1;t<=1;t+=2)
+                     drawcone((nsx-c*16+s*t*4)*gsc+gxof,
+                              (nsy-s*16-c*t*4)*gsc+gyof,(5-u*2)*gsc,
+                              (nsx-c*(32-u*8)+s*t*4)*gsc+gxof,
+                              (nsy-s*(32-u*8)-c*t*4)*gsc+gyof,(1-u)*gsc);
+               }
+            }
+            else if (throttle < 0)
+            {
+               setcol(0xffa0a0);
+               for(t=-1;t<=1;t+=2)
+                  drawcone((nsx-c*8-s*t*9)*gsc+gxof,
+                           (nsy-s*8+c*t*9)*gsc+gyof,2*gsc,
+                           (nsx+c*2-s*t*16)*gsc+gxof,
+                           (nsy+s*2+c*t*16)*gsc+gyof,.5*gsc);
+            }
+         }     
+      }
+      else if (lspr[i].typ == SPRMET)
+      {
+         setcol(255+bad*2,255,255);
+
+         if (bad > 0)
+            for(y=-1;y<=1;y++)
+               for(x=-1;x<=1;x++)
+               {
+                  xx = sx+gxres*x;
+                  yy = sy+gyres*y;
+                  setcol(128+nrnd*32+bad,128+nrnd*32,128+nrnd*32);
+                  drawcone(xx*gsc+gxof,yy*gsc+gyof,lspr[i].siz*gsc*.9,
+                           ((xx-gxres/2)*(bad*.03+1)+gxres/2)*gsc+gxof,
+                           ((yy-gyres/2)*(bad*.03+1)+gyres/2)*gsc+gyof,1);
+               }
+         
+         setcol(255+bad*2,255,255);
+         if (render2d)
+         {
+            glsettex("meteor.png");
+            for(y=-1;y<=1;y++)
+               for(x=-1;x<=1;x++)
+               {
+                  xx = sx+gxres*x;
+                  yy = sy+gyres*y;
+                  drawspr(xx*gsc+gxof,yy*gsc+gyof,lspr[i].siz*gsc,(lgs.tim+i)*.5);
+               }
+         }
+         else
+         {
+            nsx = sx;
+            nsy = sy;
+            for(j=0;j<4;j++)
+            {
+               drawspr("roid.kv6",(nsx*gsc+gxof)-xres/2,(nsy*gsc+gyof)-yres/2,
+                  xres/2,lspr[i].siz*gsc*.8,lgs.tim,lgs.tim,lgs.tim);
+               if (j%2) nsx -= sgn(nsx-gxres/2)*gxres;
+                   else nsy -= sgn(nsy-gyres/2)*gyres;
+            }
+         }
+      }
+      else if (lspr[i].typ == SPRBUL)
+      {
+         if (lspr[i].own == net_me) setcol(0xc0c0c0); else setcol(0xff0000);
+         nsx = sx;
+         nsy = sy;
+         for(j=0;j<4;j++)
+         {
+            drawsph(nsx*gsc+gxof,nsy*gsc+gyof,lspr[i].siz*gsc);
+            if (j%2) nsx -= sgn(nsx-gxres/2)*gxres;
+                else nsy -= sgn(nsy-gyres/2)*gyres;
+         }
+      }
+      else if (lspr[i].typ >= SPRPOW)
+      {
+         nsx = sx;
+         nsy = sy;
+
+         for(j=0;j<4;j++)
+         {
+            setfont(12,26,1);
+            setcol(0x4040c0);
+            for(r=14;r<18;r++) drawsph(nsx*gsc+gxof,nsy*gsc+gyof,-r*gsc);
+            
+            setcol(0x8080c0);
+            a = i + lgs.tim;
+            drawcone((nsx+cos(a)*10)*gsc+gxof,(nsy+sin(a)*10)*gsc+gyof,2*gsc,
+                     (nsx-cos(a)*10)*gsc+gxof,(nsy-sin(a)*10)*gsc+gyof,2*gsc);
+            drawcone((nsx+sin(a)*10)*gsc+gxof,(nsy-cos(a)*10)*gsc+gyof,2*gsc,
+                     (nsx-sin(a)*10)*gsc+gxof,(nsy+cos(a)*10)*gsc+gyof,2*gsc);
+
+            for(k=0;k<3;k++)
+            {
+               setcol(128*256^(2-k));
+               drawsph(((nsx+cos(-lgs.tim+k*PI*2/3)*16)*gsc+gxof-xres/2),
+                       ((nsy+sin(-lgs.tim+k*PI*2/3)*16)*gsc+gyof-yres/2),xres/2,gsc*5);
+            }
+            
+            if (j%2) nsx -= sgn(nsx-gxres/2)*gxres;
+                else nsy -= sgn(nsy-gyres/2)*gyres;
+         }
+      }
+   }
+   for(i=lgs.sprn-1;i>=0;i--)
+   {
+      sx = (lspr[i].x-gotx+gxres/2)%gxres;
+      sy = (lspr[i].y-goty+gyres/2)%gyres;
+      if (lspr[i].typ == SPRPART)
+      {
+         explode(sx,sy,lspr[i].siz,lgs.tim-lspr[i].tim);
+      }
+   }
+
+   setcol(0xffffff);
+   for(i=0;i<net_players;i++)
+   {
+      moveto(xres-64,i*24); setfont(16,24,1);
+      setcol(0x008000); drawcone(xres*.9                     ,i*24+9,xres*.006,
+                                 xres*.9-xres*.01/lspr[i].pow,i*24+9,xres*.006);
+      if (i == net_me) setcol(0xffffff); else setcol(0xff8080);
+      printf("%g",lgs.score[i]);
+   }
+   
+   setcol(0x808080); setfont(12,16);
+   moveto(xres/2-12/2*(7+(lgs.level>=10)),0); printf("Level %g",lgs.level);
+}
+
+spawnmeteor (ss_t lspr[SPRMAX], gs_t lgs)
+{
+   i = lgs.sprn; lgs.sprn++;
+   lspr[i].x = gxres*krnd(&lgs.krnd);
+   lspr[i].y = gyres*krnd(&lgs.krnd);
+   a = PI*2*krnd(&lgs.krnd);
+   lspr[i].vx = cos(a)*128;
+   lspr[i].vy = sin(a)*128;
+   lspr[i].siz = 64;
+   lspr[i].typ = SPRMET;
+   lspr[i].own = int(net_players*krnd(&lgs.krnd));
+}
+
+sprdel (i, ss_t lspr[SPRMAX], gs_t lgs)
+{
+   if (i < net_players) return;
+   lgs.sprn--; lspr[i] = lspr[lgs.sprn];
+}
+
+modist2 (x0,y0,x1,y1)
+{
+   return((((x1-x0+gxres/2)%gxres)-gxres/2)^2 +
+          (((y1-y0+gyres/2)%gyres)-gyres/2)^2);
+}
+
+krnd (&kholdrand) //unsynced rnd (for drawing&AI)!
+{
+   kholdrand = ((kholdrand*214013)+2531011*2)%(2^32);
+   return(kholdrand/2^32);
+}
+
+   //dotimer:hack to keep objects at right time for prediction
+executepack (p, lpak[PAKSIZ], ss_t lspr[SPRMAX], gs_t lgs, dosound, dotimer)
+{
+   dtim     = lpak[0];
+   lpak1 = lpak[1]+16;
+   turn     = (int(lpak1/1)%3)-1;
+   throttle = (int(lpak1/3)%3)-1;
+   fire     = int(lpak1/ 9)%2;
+   friction = int(lpak1/18)%2;
+
+   lspr[p].ext = lpak1;
+
+   if (lgs.timcrash-lgs.tim < 0) return;
+
+   if ((p == 0) || (dotimer))
+   {
+      lgs.tim += dtim;
+   }
+   lspr[p].ang += turn*dtim*4;
+   i = throttle*dtim*256;
+   if (i)
+   {
+      if ((p == net_me) && (dosound)) playsound("woodrub.flac",10,rnd*.2+.5);
+      lspr[p].vx += cos(lspr[p].ang)*i;
+      lspr[p].vy += sin(lspr[p].ang)*i;
+   }
+
+   if (friction)
+   {
+      spd = pow(lspr[p].vx^2 + lspr[p].vy^2,.25);
+      if ((spd > 5) && (dosound)) playsound("fminst.flac",spd/2,rnd*.15+2);
+      lspr[p].vx *= pow(1/64,dtim);
+      lspr[p].vy *= pow(1/64,dtim);
+   }
+
+#ifdef USE6D   
+   magx[p] = lpak[2]; magy[p] = lpak[3]; magang[p] = lpak[4];
+   if (magang[p] != -17) { lspr[p].x = magx[p]; lspr[p].y = magy[p]; lspr[p].ang = magang[p]; }
+#endif   
+
+   if (fire && (lgs.sprn < SPRMAX) && (lgs.tim >= lspr[p].tim))
+   {
+      if (dosound) playsound("blowup2.flac",15,8);
+      lspr[lgs.sprn].x = lspr[p].x;
+      lspr[lgs.sprn].y = lspr[p].y;
+      lspr[lgs.sprn].vx = cos(lspr[p].ang)*256 + lspr[p].vx;
+      lspr[lgs.sprn].vy = sin(lspr[p].ang)*256 + lspr[p].vy;
+      lspr[lgs.sprn].siz = 2;
+      lspr[lgs.sprn].tim = lgs.tim+2;
+      lspr[lgs.sprn].typ = SPRBUL;
+      lspr[lgs.sprn].own = p;
+      lgs.sprn++;
+   }
+
+   for (i=lgs.sprn-1;i>=0;i--)
+   {
+      if ((lspr[i].own == p) || ((lspr[i].own < 0) && (p == 0)) || dotimer)
+      {
+         lspr[i].x += lspr[i].vx*dtim; lspr[i].x %= gxres;
+         lspr[i].y += lspr[i].vy*dtim; lspr[i].y %= gyres;
+      }
+
+      if ((p == 0) || (dotimer))
+         for(j=0;j<net_players;j++)
+         {
+            if (lgs.tim < lspr[j].tim) continue;
+            if ((lspr[i].own == j) && (lspr[i].typ != SPRMET)) continue;
+            if (modist2(lspr[j].x,lspr[j].y,lspr[i].x,lspr[i].y) < (lspr[j].siz+lspr[i].siz)^2)
+            {
+               if (dosound) { playsound("blowup2.flac",100,1); playsound("25dice.flac",100,1); }
+
+               if (lgs.sprn < SPRMAX) //Big explosion when ships crash
+               {
+                  lspr[lgs.sprn].x = (lspr[i].x+lspr[j].x)/2;
+                  lspr[lgs.sprn].y = (lspr[i].y+lspr[j].y)/2;
+                  lspr[lgs.sprn].vx = (lspr[i].vx+lspr[j].vx)/2;
+                  lspr[lgs.sprn].vy = (lspr[i].vy+lspr[j].vy)/2;
+                  lspr[lgs.sprn].siz = 64;
+                  lspr[lgs.sprn].tim = lgs.tim;
+                  lspr[lgs.sprn].typ = SPRPART;
+                  lspr[lgs.sprn].own = p;
+                  lgs.sprn++;
+               }
+
+               lspr[j].tim = lgs.tim+3;
+               lspr[j].x = krnd(&lgs.krnd)*gxres;
+               lspr[j].y = krnd(&lgs.krnd)*gyres;
+               lspr[j].vx = 0;
+               lspr[j].vy = 0;
+               lspr[j].ang = -PI/2;
+               lspr[j].pow = .35;
+
+               if (lspr[i].typ == SPRPLAY)
+               {
+                  lspr[i].tim = lgs.tim+3;
+                  lspr[i].x = krnd(&lgs.krnd)*gxres;
+                  lspr[i].y = krnd(&lgs.krnd)*gyres;
+                  lspr[i].vx = 0;
+                  lspr[i].vy = 0;
+                  lspr[i].ang = -PI/2;
+                  lspr[i].pow = .35;
+               }
+               else if (lspr[i].typ != SPRMET) { sprdel(i,lspr,lgs); goto sprnext; }
+            }
+         }
+
+      if ((lspr[i].typ == SPRBUL) && ((lspr[i].own == p) || (dotimer)))
+      {
+         if (lgs.tim > lspr[i].tim)
+         {
+            sprdel(i,lspr,lgs); goto sprnext;
+         }
+         for(j=lgs.sprn-1;j>=0;j--)
+         {
+            if (lspr[j].typ != SPRMET) continue;
+            if (modist2(lspr[i].x,lspr[i].y,lspr[j].x,lspr[j].y) >= (lspr[i].siz+lspr[j].siz)^2) continue;
+
+            lgs.score[lspr[i].own]++;
+
+            if (dosound) playsound("blowup2.flac",25,2);
+            osiz = lspr[j].siz;
+            if (osiz > 8)
+            {
+               lspr[j].siz = osiz/2;
+               if (lgs.sprn < SPRMAX)
+               {
+                  lspr[lgs.sprn].x = lspr[j].x;
+                  lspr[lgs.sprn].y = lspr[j].y;
+
+                  vx = lspr[j].vx + lspr[i].vx*.1;
+                  vy = lspr[j].vy + lspr[i].vy*.1;
+
+                  lspr[j].vx        = lspr[i].vy*+.1;
+                  lspr[j].vy        = lspr[i].vx*-.1;
+                  lspr[lgs.sprn].vx = vx - lspr[j].vx;
+                  lspr[lgs.sprn].vy = vy - lspr[j].vy;
+
+                  lspr[lgs.sprn].siz = osiz/2;
+                  lspr[lgs.sprn].typ = SPRMET;
+                  lspr[lgs.sprn].own = lspr[j].own;
+                  lgs.sprn++;
+               }
+            }
+
+            lspr[i].typ = SPRPART;
+            lspr[i].siz = osiz;
+            lspr[i].tim = lgs.tim;
+            lspr[i].vx = 0;
+            lspr[i].vy = 0;
+
+               //randomly insert powerup
+            if ((krnd(&lgs.krnd) < .08/lgs.level) && (lgs.sprn < SPRMAX))
+            {
+               k = lgs.sprn; lgs.sprn++;
+               lspr[k] = lspr[i];
+               lspr[k].typ = SPRPOW;
+               lspr[k].tim = lgs.tim+8;
+               lspr[k].siz = 16;
+            }
+            if (osiz <= 8) { sprdel(j,lspr,lgs); goto sprnext; }
+         }
+      }
+
+      if ((lspr[i].typ == SPRPART) && ((lspr[i].own == p) || (dotimer)))
+      {
+         if (lgs.tim > lspr[i].tim+.5)
+         {
+            sprdel(i,lspr,lgs); goto sprnext;
+         }
+      }
+
+      if ((lspr[i].typ == SPRPOW) && ((lspr[i].own == p) || (dotimer)))
+      {
+         if (lgs.tim > lspr[i].tim)
+         {
+            sprdel(i,lspr,lgs); goto sprnext;
+         }
+         for(j=0;j<net_players;j++)
+         {
+            if (modist2(lspr[j].x,lspr[j].y,lspr[i].x,lspr[i].y) < (lspr[j].siz+lspr[i].siz)^2)
+            {
+               if (dosound) playsound("pickup.wav",100,2);
+               lspr[j].pow = max(lspr[j].pow*.8,.1);
+               sprdel(i,lspr,lgs); goto sprnext;
+            }
+         }
+      }
+
+sprnext:;
+   }
+
+   for (i=lgs.sprn-1;i>=0;i--)
+      if (lspr[i].typ == SPRMET) break;
+   if(i < 0)
+   {
+      lgs.level++;
+      if (dosound) playtext("Level %g",lgs.level);
+      lgs.timcrash = lgs.tim+35/sqrt(net_players);
+      for(i=lgs.sprn-1;i>=0;i--) if (lspr[i].typ == SPRBUL) sprdel(i,lspr,lgs);
+      for(i=0;i<=lgs.level;i++) spawnmeteor(lspr,lgs);
+      for(i=0;i<net_players;i++) lspr[i].tim = lgs.tim+2;
+   }
+}

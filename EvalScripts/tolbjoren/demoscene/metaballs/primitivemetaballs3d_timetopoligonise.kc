@@ -1,0 +1,515 @@
+enum{gridSize=40, numBalls=20};
+
+
+// ball position:
+static blobx[numBalls];
+static bloby[numBalls];
+static blobz[numBalls];
+static blobMass[numBalls];
+
+static movementXMul[numBalls];
+static movementYMul[numBalls];
+static movementZMul[numBalls];
+static movementXSin[numBalls];
+static movementYSin[numBalls];
+static movementZSin[numBalls];
+static spd[numBalls];
+static animFrames = 0;
+
+
+
+// Camera position and angle (Y,Z)
+static posx =0;
+static posy =-20;
+static posz = -50;
+static posh = 0;
+static posv = 0.5;
+
+// Mouse speed calc
+static oldMouseX;
+static oldMouseY;
+static mouseSpeedX;
+static mouseSpeedY; 
+
+// FPS calc
+static fps = 0;
+static frames = 0;
+static lastFPSCheck = 0;
+
+static numPointsDrawn = 0;
+
+static pauseMovement = 0;
+
+static numActiveCubes = 0; // was going to use some culling. only check grid near the blobs.
+// could give each blob its own grid... then it could move anywhere in 3d
+
+//static isComputedArr3D[gridSize][gridSize][gridSize];
+//static isComputedArr[gridSize^3];
+
+// Drawing
+static drawscale = 1;
+static drawofs = gridSize/2; // Center metaballs along X-axis
+
+// each cube could have its own?
+static isRendered[gridSize][gridSize][gridSize];
+static fieldStrengthAtPoint[gridSize][gridSize][gridSize];
+
+static bruteForce = -1;
+
+static r = 5; // radius to calc field around ball
+static showCulling = -1;
+static fTargetValue = 48;
+() 
+{
+   if(numframes==0)
+   {      
+      oldMouseX = mousx; oldMouseY = mousy;
+      mouseSpeedX = 0.0; mouseSpeedY = 0.0;
+      
+      lastFPSCheck = klock();
+      setMovement();
+   }
+
+   cls(0); clz(1e32);
+   
+   // Camera control
+   playercontrols(&posx,&posy,&posz,&posh,&posv);
+   if(posv > 1.5) posv = 1.5;
+   if(posv < -1.5) posv = -1.5;
+   setcam(posx,posy,posz,posh,posv); 
+
+   keys();
+   blobs(); // calc and render
+   
+   calcFps();
+}
+keys()
+{
+   if(keystatus[57])
+   {
+      keystatus[57] = 0;
+      if(pauseMovement == 0) pauseMovement = 1;
+      else pauseMovement = 0;
+   }
+   
+   if(keystatus[2])
+   {
+      keystatus[2] = 0;
+      bruteForce *=-1;
+   }
+   
+   if(keystatus[3])
+   {
+      keystatus[3] = 0;
+      if(bruteForce != 1)
+      showCulling *= -1;
+   }
+}
+
+blobs()
+{
+   if(pauseMovement == 0) moveBlobs();
+
+   // Time field strength calc and rendering code:
+   
+   // Calculate field
+   calcFieldPerf = klock();
+   if(bruteForce == 1) calcFieldBruteForce(); else calcFieldCull();
+   calcFieldPerf = klock() - calcFieldPerf;
+      
+   // Draw 
+   renderTime = klock();
+   if(bruteForce == 1) renderBrute(); else renderCull();   
+   renderTime = klock() - renderTime;
+   
+   // boundries of the grid
+   //drawBounds();
+   setcol(0xffffff);
+   wireCube(0,0,0,gridSize*1);
+    
+   setcol(0xffffff); setfont(6,8); moveto(0,0);
+   
+   total = calcFieldPerf + renderTime;
+   printf("\nPercent of frame time used:\nFieldstrength-calc / rendering: %.1f / %.1f", calcFieldPerf/total*100, renderTime/total*100 );
+   printf("\nFPS %g",fps);
+   printf("\nnumPointsDrawn = %g",numPointsDrawn );
+   numPointsDrawn = 0;
+
+   printf("\nactiveCubes = %g of %g total",numActiveCubes,gridsize^3);
+   numActiveCubes = 0;
+   
+   printf("\n\nControls: WASD + shift. Hold right mouse button for mouselook\nSpace to pause/unpause\nPress 1 to toggle bruteforce/culling");
+   printf("\nPress 2 to toggle cull visulisation");
+   if(bruteForce==1) printf("\n\nbrute force metaballs!");
+   
+   if(bruteForce != 1)
+   if(showCulling==1) printf("\n\nCulling visualising on.\nWhite box: Blob position\nRed box: Checked volume");
+}
+
+/*
+isComputed(x,y,z)
+{
+   return isComputedArr[x + y*gridsize + z*gridsize^2];
+}
+
+setIsComputed(x,y,z)
+{
+   isComputedArr[x + y*gridsize + z*gridsize^2] = 1;
+}
+
+clearIsComputed()
+{
+   for(i=0; i<gridSize^3; i++)
+   isComputedArr[i] = 0;
+}
+
+clearIsComputed3D()
+{
+   for(x=0; x<gridSize; x++){
+   for(y=0; y<gridSize; y++){
+   for(z=0; z<gridSize; z++){ 
+      isComputedArr3D[x][y][z] = 0;
+   }}}
+}
+*/
+clearField()
+{
+   for(x=0; x<gridSize; x++){
+   for(y=0; y<gridSize; y++){
+   for(z=0; z<gridSize; z++){ 
+      fieldStrengthAtPoint[z][y][x] = 0;
+   }}}
+}
+
+calcFieldBruteForce()
+{
+   // For each point in space bruteforce:
+   for(z=0; z<gridSize; z++){
+   for(y=0; y<gridSize; y++){
+   for(x=0; x<gridSize; x++){     
+      fieldStrengthAtPoint[z][y][x] = ComputeEnergy2(x,y,z);
+      numActiveCubes++;
+   }}} //end of looping thru xyz space 
+}
+
+ComputeEnergy2(x,y,z)
+{
+   energy = 0;
+   sqDist = 0;   
+
+   for(i=0; i<numBalls; i++){            
+      sqDist = (blobx[i] - x)^2 +
+               (bloby[i] - y)^2 +
+               (blobz[i] - z)^2;
+      if(sqDist < 0.001) sqDist = 0.001;
+      
+      energy += blobMass[i] / sqDist;  
+   }
+   return energy;
+}
+
+calcFieldCull()
+{
+   //clearIsComputed3D(); // costly? YES. Very much so. Memory access is 'spensive.
+   //clearIsComputed();
+   clearField();
+   
+
+   // for each ball   
+   for(i=0; i<numBalls; i++)
+   {
+
+      // check each cube a radius out from the ball
+
+      for(z=int(blobz[i]-r); z < int(blobz[i] + r); z++){     
+      
+      if(z > 0 && z < gridsize)
+      for(y=int(bloby[i]-r); y < int(bloby[i] + r); y++){ 
+      
+      if(y > 0 && y < gridsize)
+      for(x=int(blobx[i]-r); x < int(blobx[i] + r); x++){
+         if(x > 0 && x < gridsize)
+         {
+            // no need to check if it is calced
+            // as we iterate thru all balls and sum up the energi
+            // in thus function
+            //if( isComputedArr3D[x][y][z]==0 )
+            //if( isComputed(x,y,z)==0)
+            {
+               fieldStrengthAtPoint[z][y][x] += ComputeEnergy1(i,x,y,z);
+               
+               //isComputedArr3D[x][y][z] = 1;
+               //setIsComputed(x,y,z);
+               
+               numActiveCubes++;
+               //render(x,y,z);
+               
+            }
+              
+         }
+      }}} // end xyz       
+   } // end for balls
+}
+
+ComputeEnergy1(i,x,y,z)
+{
+   energy = 0;
+   sqDist = 0;   
+
+   //for(i=0; i<numBalls; i++){            
+      sqDist = (blobx[i] - x)^2 +
+               (bloby[i] - y)^2 +
+               (blobz[i] - z)^2;
+      if(sqDist < 0.001) sqDist = 0.001;
+      
+      energy = blobMass[i] / sqDist;  
+   //}
+   return energy;
+}
+
+renderBrute()
+{
+   
+   for(z=0; z<gridSize; z++){
+   for(y=0; y<gridSize; y++){
+   for(x=0; x<gridSize; x++){
+      renderPoint(x,y,z);
+    } // X end of looping thru xyz space 
+    } // Y
+    } // Z
+}
+
+renderCull()
+{
+
+   for(x=0; x<gridSize; x++){
+   for(y=0; y<gridSize; y++){
+   for(z=0; z<gridSize; z++){ 
+      isRendered[x][y][z] = 0;
+   }}}
+  
+   // for each ball   
+   for(i=0; i<numBalls; i++)
+   {
+
+      // check each cube a radius out from the ball
+      for(z=int(blobz[i]-r); z < int(blobz[i] + r); z++){
+      if(z > 0 && z < gridsize)
+      for(y=int(bloby[i]-r); y < int(bloby[i] + r); y++){ 
+      
+      if(y > 0 && y < gridsize)
+      for(x=int(blobx[i]-r); x < int(blobx[i] + r); x++){
+         if(x > 0 && x < gridsize)
+         {
+            if( isRendered[x][y][z]==0 )
+            {
+               isRendered[x][y][z] = 1;
+               renderPoint(x,y,z);
+            }
+              
+         }
+         
+      }}} // end xyz   
+      
+         if(showCulling==1)
+         {
+         setcol(255,255,255);
+         wireCube(blobx[i]-drawofs,bloby[i]-r,blobz[i]-r,r*2); 
+         setcol(255,0,0);
+         wireCube(x-drawofs-r,y-r*2,z-r*2,r*2); 
+         }
+   } // end for balls
+}
+
+fGetOffset(value1, value2, desiredValue)
+{
+   delta = value2-value1;
+   if(delta==0.0){ return 0.5;}
+   val = (desiredValue - value1)/delta;
+   return val;
+}
+
+renderPoint(x,y,z)
+{
+
+   thresMin = 0; thresMax = 0;
+   
+   // tuned for brute   
+   if(bruteForce==1)
+   {
+      thresMin = 0.05;
+      thresMax = 0.4;
+   }
+   else
+   {
+      thresMin = 0.01;
+      thresMax = 0.2;
+   }
+
+
+   field  = 0;
+   
+   // interpolate field strength
+   
+   if(z >= 0 && z < gridSize)
+   {
+      if(z == gridSize-1) // Z < gridsize. Dont go out of bounds.
+      {
+         a = fieldStrengthAtPoint[z][y][x];
+         b = fieldStrengthAtPoint[z][y][x];
+      }
+      else
+      {
+         a = fieldStrengthAtPoint[z][y][x];
+         b = fieldStrengthAtPoint[z+1][y][x];
+      }      
+
+      field = (b-(thresMax-a))/( z-(z+1) )*2;
+   }
+   
+       
+
+   // Takes 90% of render.
+   if(field > thresMin && field < thresMax)
+   {
+      //color = numBalls*field*0.2;
+      //setcol(color*120*x,color*120*y,color*120*z);
+      setcol(x/gridsize*255,y/gridsize*255,z/gridsize*255);         
+
+      // Draw as a grid of lines
+      
+      //moveto(x*drawscale -drawofs,y*drawscale,z*drawscale);
+      //lineto(x*drawscale -drawofs,y*drawscale,z*drawscale+1);
+      //moveto(x*drawscale -drawofs-1,y*drawscale,z*drawscale);
+      //lineto(x*drawscale -drawofs+1,y*drawscale,z*drawscale);
+      
+
+      // or with spheres:
+      drawsph(x*drawscale -drawofs,y*drawscale,z*drawscale,.4);    
+      numPointsDrawn++;
+   }
+}
+
+calcFps()
+{
+   frames++;
+   time = klock();
+   if(time > lastFPSCheck+1.0)
+   {
+      fps = frames;
+      frames = 0;
+      lastFPSCheck = time;
+   }
+}
+
+// set lissajous parameters
+setMovement()
+{
+   a = 2;
+   b = 3; 
+   for(i=0; i < numBalls; i++)
+   {
+      movementXMul[i] = max(rnd*5*a,7); movementXSin[i] = pi*rnd;
+      movementYMul[i] = max(rnd*5*b,7); movementYSin[i] = pi*rnd;
+      movementZMul[i] = max(rnd*5*b,7); movementZSin[i] = pi*rnd;
+      spd[i] = 50+rnd*100;
+      
+      blobMass[i] = 1;
+   }
+}
+
+// Use some predefined lissajous parameters
+moveBlobs()
+{
+   ofs = gridSize/2; // Move center of movement to middle of "electric" field.
+   a = 2;
+   b = 3;
+   for(i=0; i < numBalls; i++)
+   {   
+      blobx[i] = ofs+movementXMul[i]*sin(a* animFrames/spd[i] + movementXSin[i]);
+      bloby[i] = ofs+movementYMul[i]*sin(b* animFrames/spd[i] + movementYSin[i]);
+      blobz[i] = ofs+movementZMul[i]*sin(b* animFrames/spd[i] + movementZSin[i]);
+   }
+   animFrames++;
+}
+
+wireCube(x,y,z,s)
+{
+   h = s/2.0;
+   // Draw top and bottom quads.
+   moveto(x+h,y,z); 
+   lineto(x+h,y,z+s);
+   lineto(x-h,y,z+s);
+   lineto(x-h,y,z);
+   lineto(x+h,y,z);
+
+   moveto(x+h,y+s,z); 
+   lineto(x+h,y+s,z+s);
+   lineto(x-h,y+s,z+s);
+   lineto(x-h,y+s,z);
+   lineto(x+h,y+s,z);
+   
+   // Connectors:
+   moveto(x+h,y+s,z); 
+   lineto(x+h,y,z);
+   moveto(x-h,y+s,z); 
+   lineto(x-h,y,z);
+   moveto(x+h,y+s,z+s); 
+   lineto(x+h,y,z+s);
+   moveto(x-h,y+s,z+s); 
+   lineto(x-h,y,z+s);
+
+}
+
+// Camera and movement code taken from /games/
+//Handle input and player movement
+playercontrols(&posx,&posy,&posz,&posh,&posv)
+{
+   //f *= 100;
+   f = 1;
+   if (keystatus[0x2a]) f *= 4; // left and right shift
+   if (keystatus[0x36]) f *= 4;
+   vx = (keystatus[0xcd]-keystatus[0xcb])*f; //Right-Left
+   vy = (keystatus[0xc8]-keystatus[0xd0])*f; //Up-Down
+   vx2 = (keystatus[32]-keystatus[30])*f; //D-A
+   vy2 = (keystatus[17]-keystatus[31])*f; //W-S
+   if(vx==0) vx=vx2;
+   if(vy==0) vy=vy2;   
+
+   vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   static mat[9]; ang2mat(posh,posv,mat);
+   nvx = mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   nvy = mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   nvz = mat[2]*vx + mat[5]*vz + mat[8]*vy;
+   
+   d = 1/12;
+   
+   x = posx+nvx;
+   y = posy+nvy;
+   z = posz+nvz;
+   posx = x; posy = y; posz = z;
+
+   // mousespeed values are tweaked for 60fps
+   // for instance, sleep(16) if the code hardly does anything :)
+   mouseSpeedX = (mousx - oldMouseX) * 0.01;
+   mouseSpeedY = (mousy - oldMouseY) * 0.01;
+   oldMouseX = mousx;
+   oldMouseY = mousy;
+
+   if(bstatus==2)
+   {
+      //readmouse(&mousx,&mousy); // Dont want exclusive mode.
+      
+      posh += mouseSpeedX;
+      posv += mouseSpeedY;
+   }
+}
+ang2mat(hang,vang,mat[9])
+{
+   mat[6] = cos(vang)*sin(hang); mat[0] = cos(hang);
+   mat[7] = sin(vang);           mat[1] = 0;
+   mat[8] = cos(vang)*cos(hang); mat[2] =-sin(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}

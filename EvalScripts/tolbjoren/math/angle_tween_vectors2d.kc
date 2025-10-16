@@ -1,0 +1,116 @@
+// written by Torbjoern, 1. september 2009
+// Find the angle between 2 vectors
+// can easily be extended to 3D by adding the Z-compontent
+// check out AngleBetweenVectors()
+
+static x1 = 100;
+static y1 = 0;
+
+static x2=0, y2=100;
+
+static mouseDown = 0;
+static grabbedOne = 0;
+
+static dotProduct;
+()
+{
+   cls(0);
+   
+   
+   
+   cx = xres/2; cy = yres/2;
+
+   setcol(0xffffff);
+   drawArrow(cx,cy,cx+x1,cy+y1,8);
+   drawArrow(cx,cy,cx+x2,cy+y2,8);
+   
+   if(isColliding(cx+x1,cy+y1,mousx,mousy,10) )
+   {
+      setcol(0xffff00);
+      drawsph(cx+x1, cy+y1,-10);
+      if(mouseDown && grabbedOne != 2) grabbedOne = 1;
+   }
+   
+   if(grabbedOne==1)
+   {
+      x1 = mousx-cx;
+      y1 = mousy-cy;
+   }
+      
+   if(isColliding(cx+x2,cy+y2,mousx,mousy,10) )
+   {
+      setcol(0xffff00);
+      drawsph(cx+x2, cy+y2,-10);
+      if(mouseDown && grabbedOne != 1) grabbedOne = 2;
+   }
+   
+   if(grabbedOne == 2)
+   {
+      x2 = mousx-cx;
+      y2 = mousy-cy;
+   }
+   
+   
+
+   
+
+   if(bstatus==1)
+   {
+      mouseDown = 1;
+   }
+   else
+   {
+      mouseDown = 0;
+      grabbedOne = 0;
+   }
+   
+   a = AngleBetweenVectors(x1,y1,x2,y2);
+   
+   moveto(mousx,mousy+15);
+   printf("%g radians",a);
+   printf("\n%g degrees", (a*180/PI) );
+   printf("\n dot product: %g",dotProduct);
+   
+   moveto(0,0);
+   printf("Try dragging ends!");
+}
+
+AngleBetweenVectors(vx1, vy1, vx2, vy2)
+{
+   dotProduct = Dot(vx1,vy1,vx2,vy2);
+   vectorsMagnitude = Magnitude(vx1,vy1) * Magnitude(vx2,vy2);
+   angle = acos(dotProduct / vectorsMagnitude); 
+}
+Dot(x1,y1,x2,y2)
+{
+   return (x1*x2 + y1*y2);
+}
+Magnitude(x,y)
+{
+   return sqrt( x^2 + y^2 );
+}
+
+
+drawArrow(sx,sy,ex,ey,len)
+{
+   moveto(sx,sy);
+   lineto(ex,ey);
+   
+   angle = atan2(ey-sy,ex-sx);
+   //if(angle < 0) angle += 2*PI;
+   ofs=PI*1.3;
+   
+   moveto(ex,ey);
+   lineto(ex+cos(angle+ofs)*len, ey+sin(angle+ofs)*len);
+   
+   moveto(ex,ey);
+   lineto(ex+cos(angle-ofs)*len, ey+sin(angle-ofs)*len);
+   
+   moveto(sx,sy);
+   //printf("angle %g",angle*180/PI);
+}
+
+isColliding(x1,y1, x2, y2, radius)
+{
+   if( ((x1-x2)^2 + (y1-y2)^2) < (radius^2) ) return 1;
+}

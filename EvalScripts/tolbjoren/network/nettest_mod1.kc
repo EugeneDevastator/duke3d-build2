@@ -1,0 +1,125 @@
+static mx[16], my[16];
+static msg[16], cnt[16];
+   
+static netCoordinate  = 0;
+static netColorChange = 1;
+   
+static net_X = 1;
+static net_Y = 2;
+
+static color = 0;
+
+
+
+() //Net demo. Instructions:
+{  //1. Connect machines using File..Host/Join
+   //2. Move mouse around, staying inside window.
+   //3. Press '1','2',.. to change player's background color
+   //4. Press 'F' to mess up sync. Press Ctrl+Enter to reset
+
+   while(1)
+   {
+      cls(color);
+   
+      // why is the sending/rec-ing mixed? to get a good "flow"?
+      // dont send everything at one, give the other cpu
+      // some time to process incoming?
+      sendMousePos();
+      recvData();
+      sendColorChange();
+   
+      draw();
+      moveto(0,0);
+      tim = klock();
+      printf("%g %g", int(tim), int(numframes/60));
+      refresh();
+      while (klock()<numframes/60); //Limit fps
+   }
+}
+
+sendMousePos()
+{
+   //sending mousedata to all
+   //tell recv-rs that two coords are on their way
+   net_send(NET_ALL,netCoordinate); 
+   net_send(NET_ALL,mousx);
+   net_send(NET_ALL,mousy);
+}
+
+recvData()
+{
+   from = 0;
+   val = 0;
+   
+   // Parses messages from 16 other players
+   // .. that is. decides what the value
+   // represents and sets the approprate variable.
+   while(net_recv(&from,&val))
+   {
+      // if data val is a coordinate
+      // save it in msg[from]
+      if (cnt[from] == netCoordinate) 
+         msg[from] = val;
+            
+      if (msg[from] == 0)
+      {
+         //set mouse x,y
+         if (cnt[from] == net_x) mx[from] = val;
+         if (cnt[from] == net_y) my[from] = val;
+            
+         // go to next message
+         cnt[from]++; 
+         if (cnt[from] > 2) cnt[from] = 0;
+      }
+      else
+      {
+         // if message is change color then set color to val
+         if (cnt[from] == netColorChange) color = val;
+         cnt[from]++; 
+         if (cnt[from] > 1) cnt[from] = 0;
+      }
+   }
+}
+
+sendColorChange()
+{
+   // send colorchange to appropriate player
+   for(i=0;i<net_players;i++)
+      if (keystatus[i+2])
+      {
+         keystatus[i+2] = 0;
+         net_send(i,netColorChange); //first say that this is a colorChange
+         net_send(i,int(rnd*16777216)); // then insert the data
+      }
+
+   // if F-key then send bogus data to a random player
+   if (keystatus[0x21]) //'F' up sync; tests Ctrl+Enter
+      net_send(int(net_players*rnd),nrnd*1e3);
+}
+
+draw()
+{
+   moveto(xres-224,0); 
+   setfont(12,16);
+   printf("net_me=%g\n",net_me);
+   printf("net_players=%g\n\n",net_players);
+   
+   for(i=0;i<net_players;i++)
+      printf("Player %g:%+4.f %+4.f\n",i,mx[i],my[i]);
+      
+   // first draw all others.
+   for(i=0;i<net_players;i++)
+   {
+      setcol(0xff0000); 
+      drawsph(mx[i],my[i],20);
+      setcol(0xffffff); 
+      moveto(mx[i]-6,my[i]-7); 
+      printf("%g",i);
+   }
+      
+   setcol(0xffffff); 
+   drawsph(mx[net_me],my[net_me],-20);
+   moveto(mx[net_me], my[net_me] );
+   printf("me");
+}
+

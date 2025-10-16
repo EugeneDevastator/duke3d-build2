@@ -1,0 +1,171 @@
+()
+{     //Road texture generator by Ken Silverman. Instructions:
+      //  * Insert point by clicking left mouse button
+      //       (Point is inserted on nearest line to cursor).
+      //  * Drag points the usual way
+      //  * Delete point by dragging it into its neighbor
+      //  * Click right mouse button to toggle road view
+      //  * Copy image to Windows Clipboard using Alt+Printscreen
+
+   enum {PMAX=256}
+   static px[PMAX], py[PMAX], cnt, obstatus, grabpt, showroad;
+   
+   if (bstatus%2 > obstatus%2)
+   {
+      grabpt = -1;
+      for(i=cnt-1;i>=0;i--)
+         if ((px[i]-mousx)^2 + (py[i]-mousy)^2 < 16^2) grabpt = i;
+      if (grabpt < 0)
+      {
+         mind = 1e32; besti = 0;
+         for(i=cnt-1,j=0;j<cnt;i=j,j++)
+         {
+            d = ptlinedist2(mousx,mousy,px[i],py[i],px[j],py[j]);
+            if (d < mind) { mind = d; besti = j; }
+         }
+         for(i=cnt;i>besti;i--)
+         {
+            px[i] = px[i-1];
+            py[i] = py[i-1];
+         }
+         cnt++;
+         px[besti] = mousx; py[besti] = mousy;
+      }
+   }
+   else if ((bstatus%2) && (grabpt >= 0))
+   {
+      px[grabpt] = mousx; py[grabpt] = mousy;
+   }
+   else if ((bstatus%2 < obstatus%2) && (grabpt >= 0))
+   {
+      for(i=cnt-1;i>=0;i--)
+      {
+         if (i == grabpt) continue;
+         if ((px[i]-mousx)^2 + (py[i]-mousy)^2 < 16^2) break;
+      }
+      if (i >= 0)
+      {
+         cnt--;
+         for(i=grabpt;i<cnt;i++)
+            { px[i] = px[i+1]; py[i] = py[i+1]; }
+      }
+   }
+   if ((bstatus >= 2) > (obstatus >= 2)) showroad = 1-showroad;
+   obstatus = bstatus;
+   
+   cls(0);
+   setcol(0x5080c0); 
+   moveto(px[cnt-1],py[cnt-1]);
+   for(i=0;i<cnt;i++) lineto(px[i],py[i]);
+   setcol(0xa0f0f0);
+   for(i=0;i<cnt;i++) drawcirc(px[i],py[i],3);
+   
+   if (cnt > 1)
+   {   
+      setcol(0xf0c0d0);
+      i0 = cnt-2; i1 = cnt-1; dt = 1/64; dt2o2 = dt*dt*.5;
+      sx = (px[i0] + px[i1])*.5;
+      sy = (py[i0] + py[i1])*.5;
+      moveto(sx,sy);
+      for(i2=0;i2<cnt;i0=i1,i1=i2,i2++)
+      {
+if (0)
+{
+            //Original, less optimized code
+         ax = (px[i0] + px[i2])*.5 - px[i1];
+         ay = (py[i0] + py[i2])*.5 - py[i1];
+         bx = px[i1] - px[i0]; cx = (px[i0] + px[i1])*.5;
+         by = py[i1] - py[i0]; cy = (py[i0] + py[i1])*.5;
+         for(t=dt;t<=1;t+=dt)
+         {
+            lineto((ax*t + bx)*t + cx,
+                   (ay*t + by)*t + cy);
+         }
+}
+else
+{
+            //Optimized algo (nice for integers!)
+         sxii = (px[i0] + px[i2] - px[i1]*2)*dt2o2;
+         syii = (py[i0] + py[i2] - py[i1]*2)*dt2o2;
+         sxi = (px[i1] - px[i0])*dt + sxii; sxii += sxii;
+         syi = (py[i1] - py[i0])*dt + syii; syii += syii;
+         //sx = (px[i0] + px[i1])*.5;
+         //sy = (py[i0] + py[i1])*.5;
+         for(t=dt;t<=1;t+=dt)
+         {
+            sx += sxi; sxi += sxii;
+            sy += syi; syi += syii;
+            lineto(sx,sy);
+         }
+}         
+      }
+   }
+   
+   if (showroad)
+   {
+      setcol(0x00ff00);
+      for(y=min(yres,1024)-1;y>=0;y--)
+         { moveto(0,y); lineto(1024,y); }
+      
+      rad = 28;
+      setcol(0x000000);
+      i0 = cnt-2; i1 = cnt-1; dt = 1/64; dt2o2 = dt*dt*.5;
+      sx = (px[i0] + px[i1])*.5;
+      sy = (py[i0] + py[i1])*.5;
+      moveto(sx,sy); leng = 0;
+      for(i2=0;i2<cnt;i0=i1,i1=i2,i2++)
+      {
+         sxii = (px[i0] + px[i2] - px[i1]*2)*dt2o2;
+         syii = (py[i0] + py[i2] - py[i1]*2)*dt2o2;
+         sxi = (px[i1] - px[i0])*dt + sxii; sxii += sxii;
+         syi = (py[i1] - py[i0])*dt + syii; syii += syii;
+         for(t=dt;t<=1;t+=dt)
+         {
+            leng += sqrt(sxi*sxi + syi*syi);
+            sx += sxi; sxi += sxii;
+            sy += syi; syi += syii;
+            drawcirc(sx,sy,rad);
+         }
+      }
+      
+      setcol(0xffffff);
+      i0 = cnt-2; i1 = cnt-1; dt = 1/256; dt2o2 = dt*dt*.5;
+      lmod = leng/int(leng/32);
+      sx = (px[i0] + px[i1])*.5;
+      sy = (py[i0] + py[i1])*.5;
+      moveto(sx,sy); leng = 0;
+      for(i2=0;i2<cnt;i0=i1,i1=i2,i2++)
+      {
+         sxii = (px[i0] + px[i2] - px[i1]*2)*dt2o2;
+         syii = (py[i0] + py[i2] - py[i1]*2)*dt2o2;
+         sxi = (px[i1] - px[i0])*dt + sxii; sxii += sxii;
+         syi = (py[i1] - py[i0])*dt + syii; syii += syii;
+         for(t=dt;t<=1;t+=dt)
+         {
+            leng += sqrt(sxi*sxi + syi*syi);
+            sx += sxi; sxi += sxii;
+            sy += syi; syi += syii;
+            if (leng%lmod < lmod*.4) lineto(sx,sy);
+                                else moveto(sx,sy);
+         }
+      }
+   }
+}
+
+drawcirc(cx,cy,r)
+{
+   y0 = int(cy-r)+1; y1 = int(cy+r)+1; r2 = r*r;
+   for(y=y0;y<y1;y++)
+   {
+      w = sqrt(r2-(y-cy)^2);
+      moveto(cx-w,y); lineto(cx+w,y);
+   }
+}
+
+ptlinedist2(x,y,x0,y0,x1,y1)
+{
+   dx = x1-x0; dy = y1-y0; nx = x-x0; ny = y-y0;
+   f = nx*dx + ny*dy; if (f < 0) return(nx^2 + ny^2);
+   g = dx*dx + dy*dy; if (f > g) return((x-x1)^2 + (y-y1)^2);
+   return((nx*dy-ny*dx)^2/g);
+}

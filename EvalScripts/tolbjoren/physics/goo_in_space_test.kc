@@ -1,0 +1,475 @@
+/*
+ported to evaldraw from C++ code written by Brandon Pelfrey
+*/
+
+struct vec2f
+{
+   x,y;
+}
+
+struct neighbor 
+{ 
+  i, j; 
+  q, q2, lng; 
+};
+
+
+enum{MAX_PARTICLES = 1024*8}
+enum{MAX_NEIGHBORS = 128}
+static particlesCreated = 0;
+
+// The particle structure holding all of the relevant information.
+struct particle 
+{ 
+   vec2f pos;
+   vec2f pos_old;
+   vec2f vel;
+   vec2f force; 
+   mass, rho, rho_near, press, press_near, sigma, beta; 
+   numNeighs;
+   neighbor neighbors[MAX_NEIGHBORS];  
+};
+
+static particle particles[MAX_PARTICLES];
+
+
+
+//////////////////////////////////////////
+static N                   = 256;   // Number of Particles in the simulation
+static double Grav         = 0.01;  // Gravitational Constant for our simulation
+static double spacing      = 4.0;   // Spacing of particles
+static double k;                    // Far pressure weight
+static double k_near;               // Near pressure weight
+static double rest_density  = 20;   // Rest Density
+static double sigma         = 4;    //
+static double beta          = 3;    //
+static double support_radius;       // Radius of Support
+static double rsq;                  // ... squared for performance stuff
+static double SIM_W         = 450;  // The size of the world
+static double bottom        = 0;    // The floor of the world
+
+// Our collection of particles
+
+
+// Mouse attractor
+static vec2f attractor;
+static attracting = 0;
+static repelling  = 0;
+static attr_length_sq;
+
+static err=0;
+
+static oldtime;
+static fps;
+()
+{
+   static frameCount;
+   static oneSec;
+   time = klock(0);
+   dt = time - oldtime;
+   oldtime = time;
+
+   if(numframes==0){
+      k              = spacing / 1000.0;
+      k_near         = k*10;
+      support_radius = spacing*8.25;
+      rsq            = support_radius^2;
+      SIM_W = min(xres-2,yres-2);
+      attr_length_sq = (SIM_W/8)^2;
+      init();
+      attractor.x = -SIM_W;
+      attractor.y = -SIM_W;
+   }
+
+   
+
+    if(bstatus == 1){
+       attracting = 1;
+    }
+    else if( bstatus == 2)
+    {
+       repelling = 1;
+    }
+    else if( bstatus == 0)
+    {
+      attracting = 0;
+      repelling = 0;
+      attractor.x = SIM_W * 99;
+      attractor.y = SIM_W * 99;
+    }
+    
+   // This simply updates the location of the mouse attractor.     
+   double relx = (mousx);
+   double rely = (mousy) ;
+   attractor.x = relx;
+   attractor.y = -rely + SIM_W;
+   
+
+   loop();
+   
+   static time_since_last_render = 0;
+   if (time_since_last_render < time)
+   {
+      time_since_last_render = time + 0.02;
+      render();   
+   }
+
+
+   
+   
+   if (keystatus[57] && particlesCreated < MAX_PARTICLES)
+   {
+      x = attractor.x + randab(-5,5);
+      y = attractor.y + randab(-5,5);
+      particles[particlesCreated].pos.x = x;
+      particles[particlesCreated].pos.y = y;
+      particles[particlesCreated].pos_old.x = x + 0.1 * rnd;
+      particles[particlesCreated].pos_old.y = y + 0.1 * rnd;    
+      particles[particlesCreated].force.x = 0;
+      particles[particlesCreated].force.y = 0;
+      particles[particlesCreated].sigma = sigma;
+      particles[particlesCreated].beta = beta;
+  
+      particlesCreated++;
+   }
+   
+   if (keystatus[211] )
+   {
+      particlesCreated = 0;
+   }
+   
+
+   frameCount++;
+   if( time > oneSec )
+   {
+      fps = frameCount;
+      frameCount = 0;
+      oneSec = time + 1;
+   }
+}
+
+
+// Between [a,b]
+randab(a, b) { return a + (b-a)*rnd(); }
+
+length_2( vec2f a, vec2f b)
+{
+   return (a.x-b.x)^2 + (a.y-b.y)^2;
+}
+
+
+//////////////////////////////////////////
+drawrectfill(x0,y0,x1,y1) { for(y=y0;y<y1;y++) { moveto(x0,y); lineto(x1,y); } }
+drawrectopen(x0,y0,x1,y1) { moveto(x0,y0); lineto(x1,y0); lineto(x1,y1); lineto(x0,y1); lineto(x0,y0); }
+
+render()
+{
+   cls(0);
+
+   xs = 1;
+   ys = SIM_W+1;
+   
+   static maxvel = -1e32;
+   static minvel = 1e32;
+ 
+   for(i=0; i < particlesCreated; ++i)
+   {
+
+      c = particles[i].rho;
+      //v = sqrt(particles[i].vel.x^2 + particles[i].vel.y^2 );
+      //maxvel = max( v, maxvel );
+      //minvel = min( v, minvel );
+      //vnorm = (v) / (maxvel-minvel);
+        
+      setcol( hsv_to_rgb( 360-c*36 ,1,1) );
+      
+      //drawsph(xs+particles[i].pos.x, ys + -particles[i].pos.y, -support_radius*0.125 );
+      
+
+      moveto(  xs+ particles[i].pos_old.x , ys+ -particles[i].pos_old.y );
+      lineto(  xs+ particles[i].pos.x , ys+ -particles[i].pos.y );  
+   }  
+    
+   setcol(255,0,0);
+   drawrectopen(xs - 1,ys-SIM_W - 1,xs+SIM_W, ys);
+
+   //2D
+   setcol(255,255,255);
+   
+   drawsph(1+attractor.x, 1+-attractor.y + 1*SIM_W, -5);
+   if( repelling ){
+      drawsph(1+attractor.x, 1+-attractor.y + 1*SIM_W, -sqrt(attr_length_sq));
+   }
+   
+   moveto(15, 15);
+   printf("FPS = %g\n", fps);
+   
+   printf("#particles = %g\n", particlesCreated);
+   if( err )
+   {
+      printf("errors\n");
+   }else{
+      printf("seems ok\n");
+   }
+
+   if (attracting){
+      printf("attracting\n");
+   }else{
+      printf("not attracting... (Mouse 1)\n");
+   }
+   if (repelling){
+      printf("repelling\n");
+   }else{
+      printf("not repelling... (Mouse 2)\n");
+   }
+}
+
+hsv_to_rgb(h,s,v){ 
+   // expects 360deg and 1,1 hue sat max
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   }
+   return rgb( r*255, g*255, b*255); 
+}
+
+//////////////////////////////////////////
+loop()
+{
+   // UPDATE
+   //
+   // This modified verlet integrator has dt = 1 and calculates the velocity
+   // For later use in the simulation. 
+   
+   // For each particles i ...
+   for(i=0; i < particlesCreated; ++i)
+   {
+      // Apply the currently accumulated forces
+      particles[i].pos.x += particles[i].force.x;
+      particles[i].pos.y += particles[i].force.y;
+    
+      // Restart the forces with gravity only. We'll add the rest later.
+      particles[i].force.x = 0;
+      particles[i].force.y = -Grav;
+    
+      // Calculate the velocity for later.
+      particles[i].vel.x = particles[i].pos.x - particles[i].pos_old.x;
+      particles[i].vel.y = particles[i].pos.y - particles[i].pos_old.y;
+      
+      // (damping has been removed, since there can never be instability issues
+      //  in a verlet based physics simulation, and since it was an ugly hack :-)
+    
+      // Normal verlet stuff
+      particles[i].pos_old.x = particles[i].pos.x;
+      particles[i].pos_old.y = particles[i].pos.y;
+      particles[i].pos.x    += particles[i].vel.x;
+      particles[i].pos.y    += particles[i].vel.y;
+    
+      // If the particle is outside the bounds of the world, then
+      // Make a little spring force to push it back in.
+      if(particles[i].pos.x < 0) particles[i].force.x -= (particles[i].pos.x ) / 2;
+      if(particles[i].pos.x >  SIM_W) particles[i].force.x -= (particles[i].pos.x - SIM_W) / 2;
+      if(particles[i].pos.y < bottom) particles[i].force.y -= (particles[i].pos.y - bottom) / 2;
+      if(particles[i].pos.y > SIM_W)particles[i].force.y -= (particles[i].pos.y - SIM_W) / 2;
+    
+      // Handle mouse interaction. 
+    
+      attr_dist2 = length_2(particles[i].pos,attractor);
+      
+      //  make mouse attract particles
+      if( attracting )
+         if( attr_dist2 < attr_length_sq ){
+            dist = sqrt( attr_dist2 ) ;
+            particles[i].force.x -= (particles[i].pos.x - attractor.x) / (10. * dist);
+            particles[i].force.y -= (particles[i].pos.y - attractor.y) / (10. * dist);
+         }
+      
+
+    //  make mouse repel particles
+      if( repelling )
+         if( attr_dist2 < attr_length_sq ){
+            particles[i].force.x += (particles[i].pos.x - attractor.x) / 128;
+            particles[i].force.y += (particles[i].pos.y - attractor.y) / 128;
+            }
+    
+      // Reset the nessecary items.
+      particles[i].rho = 0;
+      particles[i].rho_near = 0;
+      particles[i].numNeighs = 0; // Clear neighbors
+   }
+  
+   // DENSITY 
+   //
+   // Calculate the density by basically making a weighted sum
+   // of the distances of neighboring particles within the radius of support (r)
+
+   // For each particle ...
+   for(i=0; i < particlesCreated-1; ++i)
+   {
+    
+      // We will sum up the 'near' and 'far' densities.
+      d=0;
+      dn=0;
+    
+      // Now look at every other particle
+      for(j = i+1; j < particlesCreated; ++j)
+      {
+         // The vector seperating the two particles
+         rij_x = particles[j].pos.x - particles[i].pos.x;
+         rij_y = particles[j].pos.y - particles[i].pos.y;         
+         
+         //  OPTIMISATION!! skip pair if either x or y distance
+         //  is bigger than the support radius, r. This seems to 
+         //  boost speed a notch.
+         if(fabs(rij_x) > support_radius) continue;
+         if(fabs(rij_y) > support_radius) continue;
+      
+         // Along with the squared distance between
+         rij_magnitudesquared = rij_x^2 + rij_y^2;            
+      
+         // If they're within the radius of support ...
+         if(rij_magnitudesquared < rsq)
+         {
+            // Get the actual distance from the squared distance.
+            rij_len = sqrt(rij_magnitudesquared);
+        
+            // And calculated the weighted distance values
+            q = 1.0 - rij_len / support_radius;
+            q2 = q*q;
+            q3 = q2*q;
+        
+            d  += q2;
+            dn += q3;
+        
+            // Accumulate on the neighbor
+            particles[j].rho += q2;
+            particles[j].rho_near += q3;
+        
+            // Set up the neighbor list for faster access later.          
+            
+            idx = particles[i].numNeighs;
+                       
+            if( idx < MAX_NEIGHBORS )
+            {
+               particles[i].neighbors[idx].i = i; 
+               particles[i].neighbors[idx].j = j; 
+               particles[i].neighbors[idx].q = q; 
+               particles[i].neighbors[idx].q2 = q2; 
+               //   OPTIMISATION!! save length for later use (saves us some sqrt() calls) 
+               particles[i].neighbors[idx].lng = rij_len; 
+               particles[i].numNeighs++; 
+            }else{
+               err=1; // out of memory for neighs.. increase MAX_NEIGHS
+            }
+  
+         }
+      }
+      particles[i].rho      += d;
+      particles[i].rho_near += dn;
+   }
+
+   // PRESSURE
+   //
+   // Make the simple pressure calculation from the equation of state.
+   for(i=0; i < particlesCreated; ++i)
+   {
+      particles[i].press = k * (particles[i].rho - rest_density);
+      particles[i].press_near = k_near * particles[i].rho_near;
+   }
+
+   // PRESSURE FORCE
+   //
+   // We will force particles in or out from their neighbors
+   // based on their difference from the rest density.
+
+   // For each particle ...
+
+   for(i=0; i < particlesCreated; ++i)
+   {
+      dX_x = 0;
+      dX_y = 0;
+    
+      // For each of the neighbors
+      for(ni=0; ni < particles[i].numNeighs; ++ni)
+      {
+         j = particles[i].neighbors[ni].j;     
+         q = particles[i].neighbors[ni].q;
+         q2 = particles[i].neighbors[ni].q2;       
+      
+         // The vector from particle i to particle j
+         rij_x = particles[j].pos.x - particles[i].pos.x;
+         rij_y = particles[j].pos.y - particles[i].pos.y;
+      
+         // calculate the force from the pressures calculated above
+         dm = (particles[i].press + particles[j].press) * q +
+            (particles[i].press_near + particles[j].press_near) * q2;
+      
+         // Get the direction of the force
+         //vec2f D = rij.normal() * dm;
+         forceMag = 1.0/particles[i].neighbors[ni].lng * dm;
+         D_x = rij_x * forceMag;    //  OPTIMISATION!! here we save a sqrt() call.
+         D_y = rij_y * forceMag;
+         dX_x += D_x; 
+         dX_y += D_y;
+         particles[j].force.x += D_x; 
+         particles[j].force.y += D_y;
+      }
+
+      particles[i].force.x -= dX_x; 
+      particles[i].force.y -= dX_y;
+   }
+
+}
+
+
+
+//////////////////////////////////////////
+init()
+{
+   // create a world with dimensions x:[-SIM_W,SIM_W] and y:[0,SIM_W*2]
+
+   // Initialize particles
+   // We will make a block of particles with a total width of 1/2 of the screen.
+  particlesCreated = 0;
+  
+   x = 0;
+   y = SIM_W/2;
+  for(i=0; i<N; i++)
+  {
+     x += support_radius*0.25;
+     if( x > SIM_W)
+     { 
+        x = 0;
+        y += support_radius*0.25;
+     }
+     
+      if(particlesCreated > N) break;
+ 
+      particles[particlesCreated].pos.x = x;
+      particles[particlesCreated].pos.y = y;
+      particles[particlesCreated].pos_old.x = x;// + 0.1 * nrnd;
+      particles[particlesCreated].pos_old.y = y;// + 0.1 * nrnd;    
+      particles[particlesCreated].force.x = 0;
+      particles[particlesCreated].force.y = 0;
+      particles[particlesCreated].sigma = sigma;
+      particles[particlesCreated].beta = beta;
+  
+      particlesCreated++;
+   }
+}
+

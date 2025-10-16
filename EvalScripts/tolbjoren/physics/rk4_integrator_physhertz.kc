@@ -1,0 +1,394 @@
+// evaldraw version of javascript examples in this article
+// http://codeflow.org/entries/2010/aug/28/integration-by-example-euler-vs-verlet-vs-runge-kutta/#runge-kutta-method
+
+// http://www.gamedev.net/topic/428502-very-basic-overview-of-possible-integrators/
+// how do I calculate the error
+// for each integrator?
+
+struct vec{x,y;}
+
+struct Derivative
+{
+   vec pos;
+   vec vel;
+};
+
+struct body{
+   vec pos;
+   vec vel;
+};
+
+static body one_body;
+static body anchor_body;
+
+static derivative anchor_state;
+
+   
+enum{
+   EULER=1, RK4=2, 
+   INTEGRATOR=2; // <-change this!
+}
+
+enum{MAX_TRAILS = 256}
+struct trail
+{
+   xtrail[MAX_TRAILS];
+   ytrail[MAX_TRAILS];
+}
+
+static trail body_trail;
+
+// Try stiffness = 1, 2, 3, 30 (HIGH!),  0.5
+// 200.000
+
+static spring_stiffness = 100000;
+
+// Try dampening 0, 1e-7, 0.5, 0.9999, 1.0 and higher
+static spring_dampening = 0.9995; 
+
+enum{ updates_pr_sec = 60,
+      dt = 1.0 / updates_pr_sec;
+}
+()
+{
+   setcol(0,255,0);
+
+   
+   if ( numframes == 0 ){
+      // Setup spring graphic & GL state
+         glEnable(GL_ALPHA_TEST);
+         glEnable(GL_DEPTH_TEST);
+         glCullFace(GL_NONE);
+         //glCullFace(GL_BACK);
+         glsettex("demper.png");
+      // end setup spring
+      
+      cx = xres/2;
+      cy = yres/2;
+
+      vecset( one_body.pos, cx, cy+260);
+      
+      startVelX = 50;
+      vecset( one_body.vel, startVelX, 0 );
+      
+      vecset( anchor_state.pos, cx, cy );
+      vecset( anchor_state.vel, 0, 0 );
+      
+      moveto(  one_body.pos.x,  one_body.pos.y );
+      
+      for(i=0; i<MAX_TRAILS; i++){
+         body_trail.xtrail[i] = one_body.pos.x;
+         body_trail.ytrail[i] = one_body.pos.y;
+      }
+   }
+   
+   cls(0); clz(1e32);
+   
+   
+   #if INTEGRATOR==EULER
+      steps = 4;
+      delta = dt/steps;
+      for(i=0; i<steps; i++){
+         vec acc;
+     
+         derivative bodystate;
+         setDerv( bodystate, one_body.pos, one_body.vel );
+       
+         acceleration( acc, anchor_state, bodystate );
+   
+         one_body.vel.x += acc.x * delta;
+         one_body.vel.y += acc.y * delta;   
+   
+         one_body.pos.x += one_body.vel.x * delta;
+         one_body.pos.y += one_body.vel.y * delta;
+      }
+   #endif
+   
+   #if INTEGRATOR==RK4
+      derivative d0;
+      vecset( d0.pos, 0,0);
+      vecset( d0.vel, 0,0);
+      
+      steps = 4;
+      delta = dt/steps;
+      for(i=0; i<steps; i++){
+         derivative d1,d2,d3,d4;
+         compute( d1, anchor_state, one_body, delta*0.0, d0 );
+         compute( d2, anchor_state, one_body, delta*0.5, d1 );
+         compute( d3, anchor_state, one_body, delta*0.5, d2 );
+         compute( d4, anchor_state, one_body, delta*1.0, d3 );
+         
+         dxdt = 1.0 / 6.0 * (d1.pos.x + 2.0*(d2.pos.x + d3.pos.x) + d4.pos.x);
+         dydt = 1.0 / 6.0 * (d1.pos.y + 2.0*(d2.pos.y + d3.pos.y) + d4.pos.y);
+         
+         dvxdt = 1.0 / 6.0 * (d1.vel.x + 2.0*(d2.vel.x + d3.vel.x) + d4.vel.x);
+         dvydt = 1.0 / 6.0 * (d1.vel.y + 2.0*(d2.vel.y + d3.vel.y) + d4.vel.y);
+
+         one_body.pos.x += dxdt * delta;
+         one_body.pos.y += dydt * delta;
+         
+         one_body.vel.x += dvxdt * delta;
+         one_body.vel.y += dvydt * delta;
+
+      }
+   #endif
+   
+   time = klock(0);
+   static time_since_plot = 0;
+   if ( time_since_plot < time )
+   {
+      time_since_plot = time + 0.001;
+      
+      body_trail.xtrail[0] = one_body.pos.x;
+      body_trail.ytrail[0] = one_body.pos.y;
+            
+
+
+      // Update body segments
+      for(j=1; j<MAX_TRAILS; j++)
+      {
+       body_trail.xtrail[MAX_TRAILS-j] = body_trail.xtrail[MAX_TRAILS-j-1];
+       body_trail.ytrail[MAX_TRAILS-j] = body_trail.ytrail[MAX_TRAILS-j-1];
+      } 
+   }
+   
+   
+   drawspring(anchor_state.pos.x, anchor_state.pos.y, one_body.pos.x, one_body.pos.y);
+   
+   setcol(0);
+   moveto(body_trail.xtrail[MAX_TRAILS-1], body_trail.xtrail[MAX_TRAILS-1] );
+   for(j=MAX_TRAILS-1; j!=0; j--)
+   {
+      x = body_trail.xtrail[j];
+      y = body_trail.ytrail[j];
+      
+      c = 255 - j * 255 / MAX_TRAILS;
+      setcol(c,c,c);
+      lineto(x,y);
+   }
+   
+   //lineto(  one_body.pos.x,  one_body.pos.y );
+   setcol(255,255,0);
+   drawsph(  one_body.pos.x,  one_body.pos.y, 4 );
+   
+   setcol(255,0,0);
+   drawsph(  anchor_state.pos.x,  anchor_state.pos.y, 3 );
+   
+   setcol(0,255,0);
+   
+   setfont(18,36,1);
+   moveto(xres/2-100, yres-120);
+   if (INTEGRATOR==EULER) {
+      printf("euler\n");
+   }else{ //INTEGRATOR==RK4
+      printf("rungekutta4\n");
+   }
+   
+   setfont(8,12);
+   moveto(120,120);
+   printf("stiffness = %g\n", spring_stiffness );
+   printf("dampening = %g\n", spring_dampening );
+
+
+   dx = keystatus[205] - keystatus[203];   
+   dy = keystatus[208] - keystatus[200];
+   
+   one_body.vel.x += 10 * dx;
+   one_body.vel.y += 10 * dy;
+
+   if ( keystatus[2] ){
+      //keystatus[57] = 0;
+      dir = sgn(one_body.vel.x);
+      if ( dir == 0 ) dir = 1;
+      one_body.vel.x += 10 * dir ;
+   }
+   if ( keystatus[3] ){
+      //keystatus[57] = 0;
+      dir = sgn(one_body.vel.y);
+      if ( dir == 0 ) dir = 1;
+      one_body.vel.y += 10 * dir ;
+   }
+
+   if ( keystatus[57] ){
+      keystatus[57] = 0;
+      dx = one_body.pos.x - xres/2;
+      dy = one_body.pos.y - yres/2;
+      
+      len = sqrt(dx^2 + dy^2);
+      dx /= len;
+      dy /= len;
+      
+      one_body.vel.x += dx * 5000;
+      one_body.vel.y += dy * 5000;
+   }
+   
+
+   while( numframes/60 > klock() ) {};
+}
+
+acceleration(vec out, derivative d1, derivative d2){
+   vec pos1,pos2;
+   
+   pos1 = d1.pos;
+   pos2 = d2.pos;
+
+   #if 0 // gravity
+   g = 15000000.0;
+   vec dir, vec norm;
+   vecsub( dir, pos1, pos2 );
+   len = length( dir );
+   vecset( norm, dir.x/len, dir.y/len);
+   vecset( out, norm.x * (g/len^2), norm.y * (g/len^2) );
+   
+   #else
+
+      vec vel1,vel2;
+      vel1 = d1.vel;
+      vel2 = d2.vel;
+      
+      xd = pos2.x - pos1.x;
+      yd = pos2.y - pos1.y;
+      
+      vx = vel2.x - vel1.x;
+      vy = vel2.y - vel1.y;
+   
+      b = spring_dampening;
+      
+      k = spring_stiffness;
+      
+      // F = -kx - bv
+      eq = 3;
+      
+      if(eq==1){
+         out.x = - k * xd - b * vx;
+         out.y = - k * yd - b * vy;
+      }else if(eq==2){
+      
+         // maintain distance
+         // F = -k(|x|-d)(x/|x|) - bv
+         dist = sqrt( xd^2 + yd^2 );
+         desired_dist = 150;
+         out.x = -k*( dist - desired_dist ) * (xd/dist) - b*vx;
+         out.y = -k*( dist - desired_dist ) * (yd/dist) - b*vy;
+      }else if(eq==3){
+      
+         // maintain distance
+         // F = -k(|x|-d)(x/|x|) - bv
+         dist = sqrt( xd^2 + yd^2 );
+         desired_dist = 150;
+         
+         vec vel, p1p2;
+         vecset( vel, vx, vy);
+         vecsub( p1p2, pos2, pos1 );
+         
+         v_dot_ext = dot( vel, p1p2 );
+         force_mag = -(k*( dist - desired_dist ) + b * v_dot_ext/dist );
+         out.x = force_mag * (xd/dist);
+         out.y = force_mag * (yd/dist);
+
+      }
+
+   #endif
+   
+
+ 
+
+
+   
+}
+
+compute( derivative calcDerv, derivative anchor, body initial, delta, derivative derv){
+   derivative state;
+   
+   state.pos.x = derv.pos.x * delta + initial.pos.x;
+   state.pos.y = derv.pos.y * delta + initial.pos.y;
+   
+   state.vel.x = derv.vel.x * delta + initial.vel.x;
+   state.vel.y = derv.vel.y * delta + initial.vel.y;
+   
+   vec acc;
+   acceleration( acc, anchor, state );
+
+   calcDerv.pos = state.vel;
+   calcDerv.vel = acc;
+}
+
+setDerv( derivative d, vec p, vec v )
+{
+   vecset( d.pos, p );
+   vecset( d.vel, v );
+}
+
+
+
+vecset(vec v, x,y){ v.x = x; v.y = y; }
+vecset(vec v, vec other){ v.x = other.x; v.y = other.y; }
+
+vecSub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y; 
+}
+
+dot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y;
+}
+
+length( vec v )
+{
+   return sqrt( dot(v,v) );
+}
+
+distance(vec a, vec b){
+   return sqrt( (a.x - b.x)^2 + (a.y - b.y)^2 );
+}
+distanceSq(vec a, vec b){
+   return (a.x - b.x)^2 + (a.y - b.y)^2;
+}
+
+rotate(&x,&y,a){
+   ca = cos(a);
+   sa = sin(a);
+   tmpx = ca * x - sa * y;
+   tmpy = sa * x + ca * y;
+   x = tmpx; y = tmpy; // copy transformed values back
+}
+
+drawspring(x1, y1, x2, y2)
+{
+   dx = x2-x1; dy = y2-y1;
+   a = atan2(dy,dx);
+   
+   w = sqrt( dx^2 + dy^2 );
+   h = 64;
+
+   v1x = 0; v1y = -h/2;
+   v2x = 0; v2y = h/2;
+   v3x = w; v3y = h/2;
+   v4x = w; v4y = -h/2;
+   
+   rotate(v1x, v1y, a);
+   rotate(v2x, v2y, a);
+   rotate(v3x, v3y, a);
+   rotate(v4x, v4y, a);
+   
+   x = x1; y = y1;
+   
+   setcol(255,255,255);
+   glBegin(GL_QUADS);
+      glTexcoord(0,0); glVertex( x+v1x, y+v1y );
+      glTexcoord(0,1); glVertex( x+v2x, y+v2y );
+      glTexcoord(1,1); glVertex( x+v3x, y+v3y );
+      glTexcoord(1,0); glVertex( x+v4x, y+v4y );
+   glEnd();
+   
+   setcol(0,255,05);
+   //glBegin(GL_LINE_LOOP); // why do gl lines bug?
+   moveto( x+v1x, y+v1y );
+   lineto( x+v2x, y+v2y );
+   lineto( x+v3x, y+v3y );
+   lineto( x+v4x, y+v4y );
+   lineto( x+v1x, y+v1y );
+   //glEnd();
+}

@@ -1,0 +1,26 @@
+struct p3d_t{x,y,z;};
+enum{NO_INTERSECTION = 2}
+()
+{
+   p3d_t linePt; linePt.x = 0; linePt.y = 50 - 10*mousy/yres*5; linePt.z = 0; 
+   p3d_t lineVec; lineVec.x = 0; lineVec.y = 150; lineVec.z = 0;
+   p3d_t planePt; planePt.x = 0; planePt.y = 0; planePt.z = 0;
+   p3d_t planeNormal; planeNormal.x = 0; planeNormal.y = 1; planeNormal.z = 0;
+   t = linePlaneIntersection(linePt, lineVec, planePt, planeNormal);
+   cls(0); moveto(0,0); printf("t = %g",t); 
+   
+   scale = 5;
+   tx = xres/2; ty = yres/2;
+   drawsph(tx,ty-linePt.y*scale,5); moveto(tx,ty-linePt.y*scale, ty); lineto(tx,ty-linePt.y*scale+lineVec.y/scale);
+   moveto(tx-50, ty); lineto(tx+50, ty);
+}
+linePlaneIntersection(p3d_t linePt, p3d_t lineVec, p3d_t planePt, p3d_t planeNormal){
+   d = dot(lineVec,planeNormal); // u*n
+   if(d == 0) return NO_INTERSECTION; // early escape. u and v are perpendicular and will never isect.
+   p3d_t v; // p-q
+   v.x = linePt.x - planePt.x; v.y = linePt.y - planePt.y; v.z = linePt.z - planePt.z;
+   return dot(v,planeNormal) / d; // t = ((p-q)*n) / (u*n)
+}
+dot(p3d_t a, p3d_t b){
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}

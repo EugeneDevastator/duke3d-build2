@@ -1,0 +1,189 @@
+/* LatheTool by Ken Silverman 04/02/2006 to 04/03/2006
+
+Instructions:
+1. Move mouse to gray rectangle at bottom.
+2. Holding left mouse button down, drag up into the black rectangle.
+3. Drag back down into the gray rectangle. Your object will solidify.
+4. Rotate object with the right mouse button.
+5. Clear by clicking left mouse button at top, or restart at step 1.
+*/
+
+()
+{
+   static px[1024], py[1024], nump, obstatus;
+   static omousx, omousy, done, minx, maxx;
+   static rr[9], tim, otim;
+   
+      //Generate starting model..
+   model = 0;
+   nump = 64; rad = 128; minx = xres/2-rad; maxx = xres/2+rad;
+   for(i=0;i<nump;i++)
+   {
+      if (model == 0) //torus
+      {
+         px[i] = -cos((i+.3)*PI*2/(nump-1))*.6;
+         py[i] =  sin((i+.3)*PI*2/(nump-1))*.6+1;
+      }
+      else if (model == 1) //sphere, equal angle slices
+      {
+         px[i] =-cos(i*PI/(nump-1));
+         py[i] = sin(i*PI/(nump-1));
+      }
+      else //sphere, equal width slices
+      {
+         px[i] = i*2/(nump-1)-1;
+         py[i] = sqrt(1-px[i]^2);
+      }
+      px[i] = px[i]*rad + xres*.5;
+      py[i] = py[i]*rad + yres*.8;
+   }
+   done = 1; for(i=0;i<9;i++) rr[i] = ((i%4)==0);
+      
+   while (1)
+   {
+      cls(0); clz(1e32); 
+      yof = yres*.8;
+      otim = tim; tim = klock(); dtim = tim-otim;
+      if (bstatus >= 2)
+      {
+         f = (mousx/xres-.5)*dtim*-8; cx = cos(f); sx = sin(f);
+         f = (mousy/yres-.5)*dtim*-8; cy = cos(f); sy = sin(f);
+         for(i=0;i<3;i++)
+         {
+            ox = rr[i*3+0]; oz = rr[i*3+2];
+            rr[i*3+0] = cx*ox + sx*oz;
+            rr[i*3+2] = cx*oz - sx*ox;
+            oy = rr[i*3+1]; oz = rr[i*3+2];
+            rr[i*3+1] = cy*oy + sy*oz;
+            rr[i*3+2] = cy*oz - sy*oy;
+         }
+      }
+      if (bstatus%2)
+      {
+         if ((obstatus%2) == 0)
+         {
+            nump = 0; done = 0; minx = 1e32; maxx = -1e32;
+            omousx = mousx; omousy = mousy;
+            for(i=0;i<9;i++) rr[i] = ((i%4)==0);
+         }
+         while (1)
+         {
+            if (done) break;
+            d = sqrt((mousx-omousx)^2 + (mousy-omousy)^2);
+            if (((d <= 8) || (fabs(mousx-omousx) < .1)) && (nump)) break;
+            if ((mousy > yof) && (omousy > yof)) break;
+            t = 8/d;
+            if ((mousy > yof) || (omousy > yof))
+            {
+               t2 = (omousy-yof)/(mousy-omousy);
+               if (nump) t2 = -t2;
+               omousx += (mousx-omousx)*min(t,t2);
+               omousy += (mousy-omousy)*min(t,t2);
+               if (t2 <= t) omousy = yof; //for safety
+               px[nump] = omousx;
+               py[nump] = omousy; nump++;
+               minx = min(minx,omousx); maxx = max(maxx,omousx);
+               if ((nump > 1) && (omousy >= yof)) done = 1;
+            }
+            else
+            {
+               omousx += (mousx-omousx)*t;
+               omousy += (mousy-omousy)*t;
+               px[nump] = omousx;
+               py[nump] = omousy; nump++;
+               minx = min(minx,omousx); maxx = max(maxx,omousx);
+            }
+         }
+         setcol(0xffffff); drawsph(mousx,mousy,-3);
+      }
+      if (nump == 0) { omousx = mousx; omousy = mousy; }
+      obstatus = bstatus;
+      
+      setcol(0x505050);
+      moveto(0,yof); lineto(xres,yof);
+      setcol(0x404040);
+      for(y=yof+2;y<yres;y+=2) { moveto(0,y); lineto(xres,y); }
+    
+      if (done) setcol(0x606060); else setcol(0xffc080);
+      if (nump)
+      {
+         moveto(px[0],      py[0]);
+         for(i=1;i<nump;i++) lineto(px[i],      py[i]);
+         moveto(px[0],yof*2-py[0]);
+         for(i=1;i<nump;i++) lineto(px[i],yof*2-py[i]);
+      }   
+    
+      setcol(0xc08080);
+      xof = -(minx+maxx)/2; yof = -yof; zof = xres/2;
+      
+if ((done) && (!keystatus[0x2a]))
+{      
+      col = 128; setcol(col,col*.75,col*.5);
+      ox = (px[0]+xof);
+      rx1 = ox*rr[0];
+      ry1 = ox*rr[1];
+      rz1 = ox*rr[2] + zof;
+      rr1 = -(py[0]+yof);
+      for(i=1;i<nump;i++)
+      {
+         ox = (px[i]+xof);
+         rx0 = rx1; rx1 = ox*rr[0];
+         ry0 = ry1; ry1 = ox*rr[1];
+         rz0 = rz1; rz1 = ox*rr[2] + zof;
+         rr0 = rr1; rr1 = -(py[i]+yof);
+         drawcone(rx0,ry0,rz0,-rr0,
+                  rx1,ry1,rz1,-rr1,
+                  (px[i]<px[i-1])*DRAWCONE_CULL_FRONT
+                  +DRAWCONE_NOCAP+DRAWCONE_CENT);
+      }
+}
+else
+{
+      for(i=0;i<nump-1;i++)
+      {
+         da = PI/int(abs(py[i]+yof)*.5+1);
+      
+         dx = px[i+1]-px[i];
+         dy = py[i+1]-py[i]; f = dx*dx + dy*dy;
+         if (f) { f = 1/sqrt(f); dx *= f; dy *= f; }
+               
+         for(a=da*.5;a<PI*2;a+=da)
+         {
+            j = i; c = cos(a+da); s = sin(a+da);
+            for(k=0;k<3;k++)
+            {
+               nx = -dy; ny = c*dx; nz = s*dx;
+               mx = nx*rr[0] + ny*rr[3] + nz*rr[6];
+               my = nx*rr[1] + ny*rr[4] + nz*rr[7];
+               mz = nx*rr[2] + ny*rr[5] + nz*rr[8];
+               l = (mx + my + mz)*.2 + 1;
+            
+               ox = (px[j]+xof);
+               oy = (py[j]+yof)*c;
+               oz = (py[j]+yof)*s;
+               rx = ox*rr[0] + oy*rr[3] + oz*rr[6];
+               ry = ox*rr[1] + oy*rr[4] + oz*rr[7];
+               rz = ox*rr[2] + oy*rr[5] + oz*rr[8] + zof;
+               col = (32768/rz+64)*l;
+               setcol(col,col*.75,col*.5);
+                  
+               if (done) { if (k == 0) drawsph(rx,ry,rz,5); }
+               else
+               {
+                  if (k == 0) moveto(rx,ry,rz);
+                         else lineto(rx,ry,rz);
+               }
+               /*if (k == 0) //show normals
+               {
+                  moveto(rx,ry,rz);
+                  lineto(rx+mx*4,ry+my*4,rz+mz*4);
+               }*/
+      
+               if (k == 0) { c = cos(a); s = sin(a); } else j++;
+            }
+         }
+      }
+}
+      refresh();
+   }
+}

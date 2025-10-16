@@ -1,0 +1,31 @@
+()
+{
+
+   cls(0);
+   
+   static smallest = 1e9;
+   if(numframes==0)
+   for(j=1e8; j<smallest; j++)
+   {
+      for(i=1; i<=20; i++)
+      {
+         if(j % i != 0)
+         {
+         break;
+         }
+         else
+         {
+            if(i==20)
+            {
+               if(j < smallest)
+               {
+                  smallest = j;
+               }
+            }
+         }
+      }
+   }
+   printf("%f,",smallest);
+      
+   
+}

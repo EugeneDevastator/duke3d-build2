@@ -1,0 +1,171 @@
+/*
+   source of inspiration: http://freespace.virgin.net/hugo.elias/models/m_colide.htm
+   
+    
+   -use it for something
+   -this program is fillrate limited because of heavy use of lineto()
+   -todo: add particle radius, a particle may be within multiple cells at once.
+ */
+
+enum{block_Sx = 8, block_Sy = 5, max_particles_inside = 5}
+enum{num_blocks = block_sx * block_sy}
+
+static block_num_particles[num_blocks];
+static block_pointer[num_blocks][max_particles_inside];
+static block_isModified[num_blocks]; // use column
+
+
+enum{MAX_PARTICLES = 15}
+static px[MAX_PARTICLES];
+static py[MAX_PARTICLES];
+()
+{
+   cls(0); setfont(6,8); static buf[1][1];
+   if(numframes==0)
+   {
+      glCullFace(GL_BACK); 
+      glDisable(GL_ALPHA_TEST);
+      glDisable(GL_DEPTH_TEST); 
+      
+      buf[0][0] = rgb(255,255,255);
+      whiteTexture = glsettex(buf,1,1);
+      //glremovetex(whiteTexture);     
+   }
+   
+   // divide space into blocks
+   // 1. at each frame clear data
+   // 2. loop thru ALL particles and add to blocks they cover.
+   // 3. loop thru all modified blocks
+   // if block has more than 1 particle, perform interactions
+   // 4x4 blockmap?
+   
+   if(numframes==0)
+   {
+      xmin = 10; xmax = xres-10;
+      ymin = 10; ymax = yres-10;
+      
+      for(i=0; i<MAX_PARTICLES; i++)
+      {
+         px[i] = xmin+rnd*(xmax-xmin);
+         py[i] = ymin+rnd*(ymax-ymin);
+      }
+   }  
+
+   scan();
+   doInteractions();
+   
+   drawGrid();  
+   drawParticles();
+   
+   px[0] = mousx;
+   py[0] = mousy;
+}
+
+doInteractions()
+{
+   for(i=0; i<block_Sx; i++)
+   {
+      for(j=0; j<block_Sy; j++)
+      {
+         if( block_num_particles[i*block_sy+j] > 1)
+         {
+         // for each particle inside, do collision test against every other
+         }
+      }      
+   }
+}
+
+scan()
+{
+   // 1. at each frame clear data
+   for(i=0; i<num_blocks; i++)
+   {
+      block_isModified[i] = 0;
+      for(j=0; j<max_particles_inside; j++)
+      {
+         block_pointer[i][j] = -1; // empty all pointers
+          block_num_particles[i*block_sy+j] = 0;
+      }
+   }
+   
+   // scan thru all particles and assign to blocks
+   for(i=0; i<MAX_PARTICLES; i++)
+   {
+      xp = int( px[i]/(xres-1)*block_Sx );
+      yp = int( py[i]/(yres-1)*block_Sy );
+      block_isModified[xp*block_sy+yp] = 1; // Set this block to modified
+      for(j=0; j<max_particles_inside; j++)
+      {
+         if(block_pointer[xp*block_sy+yp][j] == -1) // find an empty space in the ptr list
+         {
+            block_pointer[xp*block_sy+yp][j] = i; // set this pos occupied by a particle
+            block_num_particles[xp*block_sy+yp]++; // increment num particles living in this block
+            break; // found a space, exit loop
+         }
+      }
+   }   
+}
+
+drawGrid(){
+   incX = (xres/block_Sx);
+   incY = (yres/block_Sy);
+   
+
+   for(i=0; i<block_Sx; i++)
+   {
+      for(j=0; j<block_Sy; j++)
+      {
+         screenPx = i*(incX);
+         screenPy = j*(incY);
+         
+         setcol(0x333333);
+         if(block_isModified[i*block_sy+j] == 1)
+         {
+            setcol(0x005500);
+         }
+         //texquad(screenPx,screenPy,incX, incY); // expensive!
+         drawrectfill(screenPx,screenPy,screenPx+incX,screenPy+incY); // also expensive.
+         
+         for(k=0; k<max_particles_inside; k++)
+         {   
+            pointer = block_pointer[i*block_sy+j][k];
+            if(pointer > -1)
+            {
+               setcol(0xffffff);
+               moveto(screenPx,screenPy+2+k*9);
+               printf("%.f",pointer);
+            }
+         }
+         setcol(255,2555,255);
+         drawrectopen(screenPx,screenPy,(i+1)*(incX), (j+1)*(incY));
+      }
+   }
+}
+
+drawParticles()
+{
+   setcol(0xffffff);
+   for(i=0; i<MAX_PARTICLES; i++)
+   {
+      drawsph(px[i],py[i],5);
+      
+      xp = int( px[i]/xres*block_Sx );
+      yp = int( py[i]/yres*block_Sy );
+      moveto(px[i]-5,py[i]-15);
+      printf("%.f",i);
+      printf("\n\n\n(%.f,%.f)", xp, yp);   
+   }
+}
+
+texquad(x,y,width,height)
+{
+   glBegin(GL_COMPLEX);
+   glTexCoord(0,0);glVertex(x,y);
+   glTexCoord(1,0);glVertex(x+width,y);
+   glTexCoord(1,1);glVertex(x+width,y+height);
+   glTexCoord(0,1);glVertex(x,y+height);
+   glEnd();
+}
+
+drawrectfill(x0,y0,x1,y1) { for(y=y0;y<y1;y++) { moveto(x0,y); lineto(x1,y); } }
+drawrectopen(x0,y0,x1,y1) { moveto(x0,y0); lineto(x1,y0); lineto(x1,y1); lineto(x0,y1); lineto(x0,y0); }

@@ -1,0 +1,165 @@
+enum {POLN=4};
+static px[POLN] = { 1.00, 1.25, 0.85, 0.85};
+static py[POLN] = {-2.00,-1.00,+0.00,+2.00};
+
+enum {HOLN=2};
+static hx[HOLN] = { 0.900, 0.500};
+static hy[HOLN] = {-1.100,+1.650}; 
+
+enum { casehei =1.000, casethk = .100, casecurverad = .300; }
+enum { holedia = .168, nutdia  = .385; }
+enum { pcbthk  = .065, pcbzoff =-.220; }
+   
+enum { drawsid = 1; } //0=top, 1=bot, 2=both
+
+(x,y,z,&r,&g,&b)
+{
+   if (frameinit) { initpol(); return; }
+   
+   //--------------------------------------
+   casex = 0; for(i=0;i<POLN;i++) casex = max(casex,px[i]*2);
+   casey = py[POLN-1]-py[0];
+   sc = max(max(casex,casey),casehei)*.5; //autoscale to maximize res
+   x *= sc; y *= sc; z *= sc;
+
+   stl_scalefac = sc*25.4; //Select if Evaldraw unit is inch
+   //stl_scalefac = sc;    //Select if Evaldraw unit is mm
+   //--------------------------------------
+   //if (y > hy[1]) return 0; //hack to show screw cross section
+   //if (y > .5) return 0;
+   //--------------------------------------
+      //User custom cutouts go here..
+   //if ((fabs(x) < 0.6/2) && (fabs(y+0.3) < 0.4/2) && (z < 0)) return 0; //top rect
+   //if ((fabs(x) < 0.5/2) && (fabs(z) < 0.2/2) && (y < -casey/2+casethk)) return 0; //front rect
+   //if ((x^2 + (y+.5)^2 < (.15/2)^2) && (z < 0)) return 0; //top circ
+
+      //User custom parts go here..
+   //r = 160; g = 128; b = 112;
+   //if ((fabs(y-.0) < 2.0/2) && ((fabs(x)-.29)^2 + (z-.120)^2 < (.55/2)^2)) return 1; //AA's
+   //if ((fabs(fabs(x)-.40) < .65/2) && (fabs(y+1.70) < .65/2) && (fabs(z-.07) < .5/2)) return 1; //Eth's
+   //if ((fabs(x) < .5/2) && (fabs(y-1.70) < .70/2) && (fabs(z-.07) < .4/2)) return 1; //USB
+   //--------------------------------------
+
+   r = 16*rnd+128;
+ //r += ((int(x+32)+int(y+32))%2)*16; //show inch
+ //r += ((int(x*2.54+32)+int(y*2.54+32))%2)*16; //show cm
+   g = r; b = r;
+   
+      //outer case (early out):
+   if (!inpol(x,y,0,casecurverad)) return 0;
+   if (fabs(z) >= casehei/2) return 0;
+   
+   if (!inpol(x,y,-casethk,casecurverad))
+   {
+      f = .08;
+      if (fabs(z) < f)
+      {
+         f = ((z)/f+.5)*casethk;
+         if ((drawsid == 1) &&  inpol(x,y,-f,casecurverad)) return 0;
+         if ((drawsid == 0) && !inpol(x,y,-f,casecurverad)) return 0;
+         return 1;
+      }
+   }
+   
+   if ((((drawsid != 1) && (z <= pcbzoff)) ||
+        ((drawsid != 0) && (z >= pcbzoff))) && (fabs(z-pcbzoff) >= pcbthk/2))
+   {
+         //holes:
+      d2min = 1e32; bi = 0;
+      for(i=0;i<HOLN;i++)
+      {
+         d2 = (fabs(x)-hx[i])^2 + (y-hy[i])^2;
+         if (d2 < d2min) { d2min = d2; bi = i; }
+      }
+      nx = fabs(x)-hx[bi];
+      ny =      y -hy[bi];
+
+      z0 = casehei/2-casethk*1.5;
+      z1 = casehei/2-casethk;
+      t = (fabs(z)-z0)/(z1-z0);
+      if (d2min < (((nutdia-holedia)*min(max(t  ,0),1) + holedia)/2        )^2) return 0;
+      if (fabs(z) < casehei/2-casethk)
+      if (d2min < (((nutdia-holedia)*    max(t+1,0)    + holedia)/2+casethk)^2) return 1;
+
+         //Hole:strength ridge
+      if (((drawsid != 1) && (max(z,z-pcbzoff) < -pcbthk/2)) ||
+          ((drawsid != 0) && (min(z,z-pcbzoff) >  pcbthk/2)))
+            if ((fabs(nx - ny)/sqrt(2) < casethk/2) ||
+                (fabs(nx + ny)/sqrt(2) < casethk/2))
+               if (fabs(x) > hx[bi])
+                  if (fabs(z) < casehei/2-casethk) return 1;
+   }
+   
+      //inner case:
+   if (((drawsid != 1) && (z <= 0)) ||
+       ((drawsid != 0) && (z >= 0)))
+   {
+      zo = casehei/2 - fabs(z);
+      if (zo < casethk)
+      {
+       //if (inpol(x,y,-fabs(casethk-zo),casecurverad)) return 1; //45deg bevel
+         if (inpol(x,y,sqrt(casethk^2 - (casethk-zo)^2)-casethk,casecurverad)) return 1; //curve
+      }
+      else
+      {
+         if (!inpol(x,y,-casethk,casecurverad)) return 1;
+      }
+   }
+
+   return 0;
+}
+
+static polvx[POLN+1], polvy[POLN+1], polnx[POLN], polny[POLN];
+initpol ()
+{
+   polvx[0] = 1; polvy[0] = 0;
+   for(i=1;i<POLN;i++)
+   {
+      dx = px[i]-px[i-1];
+      dy = py[i]-py[i-1]; f = 1/sqrt(dx*dx + dy*dy);
+      polvx[i] = dx*f;
+      polvy[i] = dy*f;
+   }
+   polvx[i] = -1; polvy[i] = 0;
+   
+   for(i=0;i<POLN;i++)
+   {
+      x0 = polvx[i]; x1 = polvx[i+1]; dx = x1-x0;
+      y0 = polvy[i]; y1 = polvy[i+1]; dy = y1-y0;
+      f = 1/sqrt((x0*x1 + y0*y1 + 1)*(dx^2 + dy^2)*.5);
+      polnx[i] = dx*f;
+      polny[i] = dy*f;
+   }
+}
+inpol (x, y, ofs, rad)
+{
+   if (y <  py[     0]-polny[     0]*ofs) return 0;
+   if (y >= py[POLN-1]-polny[POLN-1]*ofs) return 0;
+
+   x = fabs(x); nrad = rad+ofs; x1 = 0; y1 = 0;
+   for(i=0;i<POLN;i++)
+   {
+      if (polnx[i] >= 0) //line seg between points
+      {
+         cx = px[i]+polnx[i]*ofs;
+         cy = py[i]+polny[i]*ofs;
+         if (y < cy) return ((x-cx)*(y1-cy) >= (y-cy)*(x1-cx));
+         x1 = cx; y1 = cy; continue;
+      }
+      
+      cx = px[i]+polnx[i]*rad;
+      cy = py[i]+polny[i]*rad;
+      
+         //line seg between top of circ & prev point
+      x0 = cx+polvy[i]*nrad; //circ 1st/top contact pt
+      y0 = cy-polvx[i]*nrad;
+      if (y < y0) { return ((x-x0)*(y1-y0) >= (y-y0)*(x1-x0)); }
+      
+         //circ
+      x1 = cx+polvy[i+1]*nrad; //circ 2nd/bot contact pt
+      y1 = cy-polvx[i+1]*nrad;         
+      if (y < y1) { return (max(x-cx,0)^2 + (y-cy)^2 < nrad^2); }
+   }
+    
+   return 0;
+}

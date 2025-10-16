@@ -1,0 +1,43 @@
+()
+{
+   while(1)
+   {
+      cls(0);
+
+      
+      drawArm(5);
+           
+      refresh();
+   }
+}
+
+drawline(x1,y1,x2,y2)
+{
+moveto(x1,y1);
+lineto(x2,y2);
+}
+
+drawArm(n)
+{
+   length = 50;
+   ang1 = mousx*PI/180;    
+  
+   x1=xres/2;
+   y1=yres/2;
+   x2=x1;
+   y2=y1+10;
+   rx=x2+cos(ang1)*length;
+   ry=y2+sin(ang1)*length;         
+   drawline(x2,y2+5,rx,ry);
+      
+   for(i=0; i<n; i++)
+   {
+      x2=rx;
+      y2=ry;    
+      ang = ang1+( (mousy/100-(yres/2)/100)*i*15*PI/180);
+      rx=rx+cos(ang)*length;
+      ry=ry+sin(ang)*length;
+      drawline(x2,y2,rx,ry);
+      drawsph(x2,y2,-5);
+   }
+}

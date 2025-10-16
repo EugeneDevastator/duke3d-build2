@@ -1,0 +1,13 @@
+(x,y,z,&r,&g,&b)
+if ((abs(x) > .99) || (abs(y) > .99) || (abs(z) > .99)) return(0);
+r = x*128+128;
+g = y*128+128;
+b = z*128+128;
+if (x^2+y^2+z^2 < .125) { r = rnd*12+130; g = rnd*12+100; b = rnd*12+80; return(1); }
+if (x^2+y^2 < .25) return(0);
+if (x^2+z^2 < .25) return(0);
+if (y^2+z^2 < .25) return(0);
+if (x^2+y^2 < .5) { r = rnd*12+100; g = rnd*12+150; b = rnd*12+ 80; return(1); }
+if (x^2+z^2 < .5) { r = rnd*12+150; g = rnd*12+130; b = rnd*12+100; return(1); }
+if (y^2+z^2 < .5) { r = rnd*12+130; g = rnd*12+100; b = rnd*12+120; return(1); }
+0

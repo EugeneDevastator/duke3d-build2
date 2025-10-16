@@ -1,0 +1,197 @@
+
+static buf[400];
+
+static width=400;
+// Optimization: calcs metaballs distance^2 from each pixel, then sums up for threshold test
+static x_offset_table[5*400];
+static y_offset_table[5*400];
+static blobx[5];
+static bloby[5];
+() 
+{
+   if(numframes==0)
+   {
+      blobx[0] = 0;
+      bloby[0] = 0;
+      blobx[1] = 390;
+      bloby[1] = 10;
+      blobx[2] = 200;
+      bloby[2] = 200; 
+      blobx[3] = 390;
+      bloby[3] = 390;    
+      
+      blobx[4] = 0;
+      bloby[4] = 0;  
+   }
+   cls(0);
+
+   
+   blobs();
+   
+   blobx[0] = mousx;
+   bloby[0] = mousy;
+   
+   // Move the blobs lissajous style.
+//3:4, 5:4, 5:6, 9:8
+   a = 1;
+   b = 2;
+   s = 70; // scale distance
+   spd = numframes/30;
+   blobx[1] = 200+s*a*sin(a*spd + pi/2);
+   bloby[1] = 200+s*b*sin(b*spd);
+   
+   blobx[3] = 200+-s*a*sin(a*spd +pi/2);
+   bloby[3] = 200+-s*b*sin(b*spd);
+   
+   blobx[4] = 200+-s*a*sin(a*spd +pi/2 + 1.5);
+   bloby[4] = 200+-s*b*sin(b*spd + 1.5);
+   
+   blobx[2] = 200+-s*a*sin(a*spd +pi/2 -1.5);
+   bloby[2] = 200+-s*b*sin(b*spd -1.5);
+   
+}
+
+blobs()
+{
+   start = klock();
+   number_of_blobs = 5;
+   screen_width = 400;
+   screen_height = 400;
+   // First: compute those tables:
+   
+   // Go through every blob
+   for(i=0; i<number_of_blobs; i++)
+   {
+   
+       // Compute the x-offset2 table:
+       for(x=0; x<screen_width; x++)
+       {
+           x_offset_table[i*width+x] = (x - blobx[i] )^2;
+       }
+   
+       // Compute the y-offset2 table:
+       for(y=0; y<screen_width; y++)
+       {
+           y_offset_table[i*width+y] = (y - bloby[i] )^2;
+       }
+   }
+
+
+   // Now we have those tables, we can use them to calculate the
+   // total multiplied distance2 value.
+   for( y=0; y<screen_height; y++)
+   {
+      for(x=0; x<screen_width; x++)
+      {
+         // Calculate the multiplied distance2:   
+         // Set it to one initially.
+         // This is so that the first time we multiply it
+         // by the first value it becomes that value.
+         
+        distance_squared = 1;
+         dist1=1;
+         dist2=1;
+         dist3=1;
+        for(i=0; i<number_of_blobs; i++)
+        {
+            distance_squared=distance_squared*(x_offset_table[i*width+x]+y_offset_table[i*width+y] );
+        }
+        dist1 = (x_offset_table[0*width+x]+y_offset_table[0*width+y]);
+        dist2 = (x_offset_table[1*width+x]+y_offset_table[1*width+y]);
+        dist3 = (x_offset_table[2*width+x]+y_offset_table[2*width+y]);
+        dist4 = (x_offset_table[3*width+x]+y_offset_table[3*width+y]);
+        dist5 = (x_offset_table[4*width+x]+y_offset_table[4*width+y]);
+        product = dist1*dist2*dist3*dist4*dist5;
+
+        /*
+        float dist1 = (x-meta1x)*(x-meta1x)+(y-meta1y)*(y-meta1y);
+                    float dist2 = (x-meta2x)*(x-meta2x)+(y-meta2y)*(y-meta2y);
+                    float dist3 = (x-meta3x)*(x-meta3x)+(y-meta3y)*(y-meta3y);
+        */
+
+        // Turn it into a pixel brightness:
+        //pixel_brightness = 512 - ( product/ 10000000000000000000);
+        // Notice the HUGE division number!
+        
+        
+        
+        m=1000000;
+        r = dist4/(dist2*dist3) *m;
+        g = dist2/(dist4*dist3) *m;
+        b = dist3/(dist2*dist4) *m;
+        
+        // Clip colours in range 0-255
+        /*
+        if(r < 0) 
+            r = 0;
+        if(r > 255)
+            r = 255;
+        if(g <0) 
+            g = 0;
+        if(g > 255)
+            g = 255;
+        if(b < 0) 
+            b = 0;
+        if(b > 255)
+            b = 255; 
+        */
+             
+        
+        
+        // Set the pixel on the screen:
+        buf[x] = r*g*b;
+        //setcol(pixel_brightness, pixel_brightness, pixel_brightness);
+        
+        setcol(r,g,b);
+        setpix(x,y);
+       }
+       //sethlin(0,y,buf,width);
+   }
+   setcol(0xffffff);
+   end = klock() - start;
+   moveto(0,0);
+   setfont(9,16);
+   printf("performance=%g", 1/end);
+   
+   setcol(0xff0000);
+   moveto(70,200);
+   setfont(36,64,0);
+   printf("!");
+}
+
+
+
+
+hsv_to_rgb(h,s,v){
+   if( V == 0 )
+   {
+      R = 0; G = 0; B = 0;
+   }
+   else if( S == 0 )
+   {
+     R = V; G = V; B = V;
+   }
+   else
+   {
+       hf = H / 60;
+          i  = floor( hf );
+       f  = hf - i;
+       pv  = V * ( 1 - S );
+       qv  = V * ( 1 - S * f );
+       tv  = V * ( 1 - S * ( 1 - f ) );
+     /*
+      switch( i )
+      {    
+      case 0: R = V; G = tv; B = pv; break;
+      case 1: R = qv; G = V; B = pv; break;
+      case 2: R = pv; G = V; B = tv; break;
+      case 3: R = pv; G = qv; B = V; break;
+      case 4: R = tv; G = pv; B = V; break;
+      case 5: R = V; G = pv; B = qv; break;
+      case 6: R = V; G = tv; B = pv; break;
+      case -1: R = V; G = pv; B = qv; break;
+      }
+      */
+      }
+      
+}

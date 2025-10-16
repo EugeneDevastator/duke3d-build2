@@ -1,0 +1,136 @@
+struct vec{
+   x,y;
+}
+
+enum{ MAX_PTS=1024*8;}
+struct polygon{
+   vec pts[MAX_PTS];
+   numpts;
+}
+
+()
+{
+   cls(0);
+   static obstatus;
+   
+   static polygon editable_poly;
+
+   if ( numframes == 0 ){
+      numpts = 4;
+      editable_poly.numpts = numpts;
+      for(i=0; i<numpts; i++){
+         a = i * 2*PI / (numpts);
+         vec point;
+         point.x = xres/2 + cos(a)*140;
+         point.y = yres/2 + sin(a)*140;
+         editable_poly.pts[i] = point;
+      }
+   }
+   
+   move_points( editable_poly );
+   
+   if ( bstatus == 2 && obstatus == 0 ){
+      vec mouse_pt; mouse_pt.x = mousx; mouse_pt.y = mousy;
+      editable_poly.pts[editable_poly.numpts] = mouse_pt;
+      editable_poly.numpts++;
+   }
+
+   polygon p;
+   p = editable_poly;
+   
+   
+   subdivs = 4; //mousx/xres*10;
+   for(i=0; i<subdivs; i++){
+      subdivide(p);
+      
+   }
+   
+
+   setcol(0,255,0); drawpoly( editable_poly );
+   setcol(255,255,255);  drawpoly( p );
+   
+   
+   moveto(xres/2-100,yres/2);
+   //printf("write one to throw away");
+   printnum( p.numpts );
+
+   obstatus = bstatus;
+}
+
+lerp( a, b, t ){
+   return (1-t)*a + t*b;
+}
+
+subdivide( polygon poly ){
+
+   polygon newpoly;
+   newpoly.numpts = 0;
+
+   param = 0.2; // try values between [0.0, 0.5], higher num = tighter curve
+
+   vec newp1, newp2;   
+
+   vec pt, nextpt;
+
+   numpts = poly.numpts;
+
+   for(i=0; i<poly.numpts; i++ ){
+      pt = poly.pts[i % numpts];
+      nextpt = poly.pts[ (i+1) % numpts];
+
+      newp1.x = lerp( pt.x, nextpt.x, param );
+      newp1.y = lerp( pt.y, nextpt.y, param );
+
+      newp2.x = lerp( pt.x, nextpt.x, 1-param );
+      newp2.y = lerp( pt.y, nextpt.y, 1-param );
+
+      newpoly.pts[ newpoly.numpts ] = newp1; newpoly.numpts++;
+      newpoly.pts[ newpoly.numpts ] = newp2; newpoly.numpts++;
+      
+   }
+
+   poly = newpoly;
+}
+
+drawpoly( polygon poly )
+{
+   vec pt; pt = poly.pts[0];
+   moveto( pt.x, pt.y );
+   for(i=1; i<poly.numpts; i++){
+      pt = poly.pts[i];
+      lineto( pt.x, pt.y );
+   }
+   pt = poly.pts[0];
+   lineto( pt.x, pt.y );
+}
+
+
+
+move_points( polygon poly ){
+   static isGrab = 0;
+   isGrab = bstatus;
+   
+   mindist = 1e32;
+   minIdx_node = -1;
+   
+   vec node;
+   for(i=0; i<poly.numpts; i++)
+   {
+      node = poly.pts[i];
+      dist = sqrt( (mousx-node.x )^2 +  (mousy-node.y)^2);
+      if (dist < mindist)
+      {
+         mindist = dist;
+         minIdx_node = i;
+      }
+   }
+   
+
+
+   if (isGrab==1 && minIdx_node > -1 )
+   {
+      poly.pts[minIdx_node].x = mousx;
+      poly.pts[minIdx_node].y = mousy;
+   }
+      
+}

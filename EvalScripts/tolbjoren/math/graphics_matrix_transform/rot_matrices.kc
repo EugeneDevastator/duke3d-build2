@@ -1,0 +1,263 @@
+()
+{
+   static x;
+   static y;
+   static z;
+   static speed = 0.01;
+   static rotZ = 0;
+   if( bstatus == 1 )
+   {
+    rotZ = mousx/xres;
+   }
+
+
+   cls(0); clz(1e32);
+   setcam(x,y,z-5,0,0);
+   
+/*
+   drawspr("caco.kv6",x,y,z,rad,hang,vang,tilt);
+   drawspr("caco.kv6",x,y,z,rad,hang,vang);
+   drawspr("caco.kv6",x,y,z,rx,ry,rz,dx,dy,dz,fx,fy,fz);
+*/
+
+   draw_terrain();
+      
+   static m[9];
+
+   static xrot[9];
+   static yrot[9];
+   static zrot[9];
+   #define TAU 3.14*2.0
+   makeX(xrot, mousy/yres * TAU );
+   makeY(yrot, mousx/xres * TAU );
+
+   mult(m,xrot,yrot); // final = XY
+ 
+   setcol(255,255,255);
+   drawspr("cow.kv6", x,y,z,
+   m[0],m[1],m[2],
+   m[3],m[4],m[5],
+   m[6],m[7],m[8]); 
+    
+   /*
+   drawspr("cow.kv6", x,y,z,
+   1,0,0,
+   0,1,0,
+   0,0,1);
+   */
+ 
+   SPACE = 57;  
+   if( keystatus[SPACE] )
+   {
+      x += -m[6] * speed;
+      y += -m[7] * speed;
+      z += -m[8] * speed;
+   }
+
+   moveto(0,0);
+   setfont(12,16);
+   printf("xrot\n");
+   PrintMatrix(xrot);
+   printf("YRot\n");
+   PrintMatrix(yrot);
+   printf("final mtx:\n");
+   PrintMatrix(m);
+
+}
+
+
+tform(m[9], v[3])
+{
+   x = v[0]; y = v[1]; z = v[2];
+   v[0] = m[0] * x + m[1] * y + m[2] * z;
+   v[1] = m[3] * x + m[4] * y + m[5] * z;
+   v[2] = m[6] * x + m[7] * y + m[8] * z;
+}
+
+// C = AB, multiplies A and B, puts result in C
+mult(c[9],a[9],b[9])
+{
+   // mult a row in A with a column in B,
+   // A's row 0 times B's column 0 becomes element [0][0] in C.
+   
+   for(i=0; i<3; i++)
+      for(j=0; j<3; j++)
+      {
+         sum = 0.0;
+         for(k=0; k<3; k++)
+         {
+            sum += A[k*3+i] * B[k*3+j];
+         }
+         C[i*3+j] = sum;
+      }
+     
+   // Alternativt:
+   
+   // 0 1 2
+   // 3 4 5
+   // 6 7 8
+   /*
+   C[0] = A[0]*B[0] + A[1]*B[3] + A[2]*B[6];
+   C[1] = A[0]*B[1] + A[1]*B[4] + A[2]*B[7];
+   C[2] = A[0]*B[2] + A[1]*B[5] + A[2]*B[8];
+   
+   C[3] = A[3]*B[0] + A[4]*B[3] + A[5]*B[6];
+   C[4] = A[3]*B[1] + A[4]*B[4] + A[5]*B[7];
+   C[5] = A[3]*B[2] + A[4]*B[5] + A[5]*B[8];
+   
+   C[6] = A[6]*B[0] + A[7]*B[3] + A[8]*B[6];
+   C[7] = A[6]*B[1] + A[7]*B[4] + A[8]*B[7];
+   C[8] = A[6]*B[2] + A[7]*B[5] + A[8]*B[8];
+   */
+   // koden over er vanskelig aa tyde fordi en 1dim [9]
+   // array brukes for en matrix som egentlig er 2dim [3][3]
+   // mye bedre er definisjonen for matrise multi
+   // c[i][j] = sum k=1 til n a[i][k] * b[k][j]
+   // med ord:
+   // rad i, kolonne j er summen av produktene av
+   // rad i i matrise A, kolonne k
+   // ganger
+   // rad k, kolonne j i matrise B
+   // der k er en teller som indekserer kolonnene i A
+   // og alle radene i B
+   
+   
+   // sagt paa en annen maate
+   // er dette som aa ta dot product med
+   // en rad i A mot en kolonne i B
+   
+   // C[i][j] = dpr( A[i][k], B[k][j] ) 
+
+}
+
+mult(inout[9],other[9])
+{
+   // mult a row in A with a column in B,
+   // A's row 0 times B's column 0 becomes element [0][0] in C.
+   
+   static tmp_mat[9];
+   for(i=0; i<3; i++)
+      for(j=0; j<3; j++)
+      {
+         sum = 0.0;
+         for(k=0; k<3; k++)
+         {
+            sum += inout[k*3+i] * other[k*3+j];
+         }
+         tmp_mat[i*3+j] = sum;
+      }
+   for(i=0; i<9; i++)
+   {
+      inout[i] = tmp_mat[i];
+   }
+}
+
+   // X axis
+   // | 1 0  0 |
+   // | 0 c -s |
+   // | 0 s  c |
+makeX(m[9], r)
+{
+   c = cos(r); s=sin(r);
+   m[0] = 1; m[1] = 0;  m[2] = 0;
+   m[3] = 0; m[4] = c;  m[5] = -s;
+   m[6] = 0; m[7] = s;  m[8] = c;
+}
+   // Y axis
+   // | c 0  s |
+   // | 0 1  0 |
+   // | -s 0 c |
+makeY(m[9], r)
+{
+   c = cos(r); s=sin(r);
+   m[0] = c; m[1] = 0; m[2] = s;
+   m[3] = 0; m[4] = 1;  m[5] = 0;
+   m[6] = -s; m[7] = 0;  m[8] = c;
+}
+   // Z axis
+   // | c -s 0 |
+   // | s c  0 |
+   // | 0 0  1 |
+makeZ(m[9], r)
+{
+   c = cos(r); s=sin(r);
+   m[0] = c; m[1] = -s; m[2] = 0;
+   m[3] = s; m[4] = c;  m[5] = 0;
+   m[6] = 0; m[7] = 0;  m[8] = 1;
+}
+
+InitRotationMatrix(Mtx[9], pAxis[3], r)
+{
+  // The axis vector must be of unit length
+  x=0, y=0, z=0, m=0;
+  m = sqrt(pAxis[0]*pAxis[0] + pAxis[1]*pAxis[1] + pAxis[2]*pAxis[2]);
+  x = pAxis[0]/m;
+  y = pAxis[1]/m;
+  z = pAxis[2]/m;
+
+  // Compute the rotation matrix  
+  c = cos(r);
+  s = sin(r);
+
+  Mtx[0] = (x * x) * (1.0 - c) + c;
+  Mtx[1] = (y * x) * (1.0 - c) + (z * s);
+  Mtx[2] = (z * x) * (1.0 - c) - (y * s);
+
+  Mtx[3] = (x * y) * (1.0 - c) - (z * s);
+  Mtx[4] = (y * y) * (1.0 - c) + c;
+  Mtx[5] = (z * y) * (1.0 - c) + (x * s);
+
+  Mtx[6] = (x * z) * (1.0 - c) + (y * s);
+  Mtx[7] = (y * z) * (1.0 - c) - (x * s);
+  Mtx[8] = (z * z) * (1.0 - c) + c;
+} 
+
+setmtx(m[9], a,b,c,
+             d,e,f,
+             g,h,i)
+{
+   m[0] = a;
+   m[1] = b;
+   m[2] = c;
+   
+   m[3] = d;
+   m[4] = e;
+   m[5] = f;
+   
+   m[6] = g;
+   m[7] = h;
+   m[8] = i;
+}
+
+
+draw_terrain()
+{
+   wid = 16;
+   dep = 16;
+   scale = 3;
+   for(i=0; i<wid*2; i++)
+   {
+      for(j=0; j<dep*2; j++)
+      {
+         f = 3;
+         amp = 10;
+         y = noise(i/32 * f,j/32 * f) * amp;
+         drawsph(i*scale - wid*scale,10-y,j*scale - dep*scale,.6);
+      }
+   }
+}
+
+PrintMatrix(m[9])
+{
+   i=0;
+   j=0;
+   for(i=0; i<3; i++)
+   {
+      for(j=0; j<3; j++)
+      {
+         printf("%4.1f  ",m[i*3+j] );
+      }
+      printf("\n");
+   }
+}
+

@@ -1,0 +1,250 @@
+// Written 6. oktober 2011 by Torbjoern Haugen
+// takes a vector and creates an orthogonal basis
+// for drawing a plane using the two basis vectors that are
+// orthonormal to the input vector
+struct vec{ x,y,z; }
+static mtx[9];
+()
+{
+   cls(0); clz(1e32);
+   
+   //a = klock(0);
+   a = mousx/xres*2*PI;
+   r = -5;
+   ca = cos(a);
+   sa = sin(a);
+   setcam( sa*r, -0.25, ca*r, a, 0 );
+   setview(0,0,xres,yres,xres/2,yres/2,xres/2);
+   
+   glCullface(GL_NONE); // not actual gl
+   glEnable(GL_ALPHA_TEST);
+   
+   vec pos, normal;
+   
+   srand(0);   
+
+   for(i=0; i<15; i++)
+   {
+      random_unit( pos );
+      vecscalar( pos, pos, 2);
+      
+      random_unit( normal );
+      
+      setcol(255,0,0);
+      drawplane(pos, normal);
+   }
+   
+
+   vecset(pos,0,0,0);
+   vecset(normal,0,0,1);
+   drawplane(pos, normal);
+
+}
+
+
+drawplane(vec pos, vec normal )
+{
+   drawplane(pos,normal,1,1);
+}
+
+drawplane(vec pos, vec normal, scale_x, scale_y )
+{   
+   // Create two vectors a and c, perpendicular to normal
+   vec not_normal;
+   not_normal =  normal;
+   
+   vec perp;
+   perp = normal;
+   if (not_normal.x == 0 && not_normal.z == 0){
+      not_normal.x += 1;
+   }else{
+      not_normal.y += 1;
+   }
+   
+   vec a, b;
+   veccross(a,perp,not_normal);
+   normalize(a);
+   veccross(b,perp,a);
+    
+   
+   // scale a and b down to 1/2 as we will use
+   // them in +- dir
+   vecscalar(a,a,0.5*scale_x);
+   vecscalar(b,b,0.5*scale_y);
+   
+   // Create plane vertices from perpendiculars
+   vec neg_a, neg_b;
+   vecscalar(neg_a, a, -1.0);   
+   vecscalar(neg_b, b, -1.0);
+
+   vec ma_mb; // -a - b
+   vec ma_pb; // -a + b
+   vec pa_pb; //  a + b
+   vec pa_mb; //  a - b
+   
+   vecadd( ma_mb, neg_a, neg_b);
+   vecadd( ma_pb, neg_a, b);
+   vecadd( pa_pb, a, b);
+   vecadd( pa_mb, a, neg_b);
+
+   vec u0, u1, u2, u3;
+   u0 = ma_mb;
+   u1 = ma_pb;
+   u2 = pa_pb;
+   u3 = pa_mb;
+
+   // Translate to final position
+   vecadd(u0,pos,u0);
+   vecadd(u1,pos,u1);
+   vecadd(u2,pos,u2);
+   vecadd(u3,pos,u3);
+
+   vec end;
+   vecadd(end, pos, normal);
+   
+   
+//#define SHOW_VECTORS
+#ifdef SHOW_VECTORS
+   setcol(255,0,0);
+   drawArrow(pos, end, 0.03);
+   
+   vecadd(end, pos, a);
+   setcol(0,255,0);
+   drawArrow( pos, end, 0.03);
+   
+   vecadd(end, pos, b);
+   setcol(0,0,255);
+   drawArrow( pos, end, 0.03);
+#endif
+   
+   glBegin(GL_QUADS);
+      glTexcoord(0,1);
+      glVertex( u0 );   
+      glTexcoord(0,0);
+      glVertex( u1 );
+      glTexcoord(1,0);
+      glVertex( u2 );
+      glTexcoord(1,1);
+      glVertex( u3 );
+   glEnd();
+
+   glBegin(GL_LINE_LOOP);
+      glTexcoord(0,0);
+      glVertex( u0 );   
+      glTexcoord(0,1);
+      glVertex( u1 );
+      glTexcoord(1,1);
+      glVertex( u2 );
+      glTexcoord(1,0);
+      glVertex( u3 );
+   glEnd();
+} // end drawplane
+
+
+random_unit( vec v )
+{
+   v.x = nrnd;
+   v.y = nrnd;
+   v.z = nrnd;
+   l = length(v);
+   
+   v.x /= l;
+   v.y /= l;
+   v.z /= l;
+}
+
+glVertex( vec v ){
+   glVertex( v.x, v.y, v.z );
+}
+
+drawArrow(vec s, vec e, scale) // finds direction vector e-s.
+{
+   //moveto(s.x,s.y,s.z);
+   //lineto(e.x,e.y,e.z);
+   vec dir;
+   vecSub(dir, e, s); 
+   
+   arrowlen = length(dir);
+   if(arrowlen < .1) return; // dont draw small arrows.
+   
+   polelen = arrowlen * 0.75;
+   pointerlen = arrowlen - polelen; // not used...
+   normalize(dir);
+   
+   r1=scale;
+   drawcone(s.x,s.y,s.z,r1,
+            s.x+dir.x*polelen,s.y+dir.y*polelen,s.z+dir.z*polelen,r1,DRAWCONE_NOCAP1 );         
+   drawcone(s.x+dir.x*polelen,s.y+dir.y*polelen,s.z+dir.z*polelen, -r1*3, 
+            e.x, e.y, e.z, 0.01,DRAWCONE_CENT);
+   
+}
+
+
+tform(m[9], vec v)
+{
+   x = v.x; y = v.y; z = v.z;
+   v.x= m[0] * x + m[1] * y + m[2] * z;
+   v.y = m[3] * x + m[4] * y + m[5] * z;
+   v.z = m[6] * x + m[7] * y + m[8] * z;
+}
+
+vecScalar( vec out, vec a, s )
+{
+   out.x = a.x * s;
+   out.y = a.y * s;
+   out.z = a.z * s;
+}
+
+vecAdd( vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;   
+}
+vecSub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;   
+}
+
+vecCross( vec out, vec a, vec b)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+
+vecset(vec a, x,y,z){
+   a.x = x; a.y = y; a.z = z;
+}
+
+vecset(vec a, vec other){
+   a.x = other.x; a.y = other.y; a.z = other.z;
+}
+
+vecDot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+length( vec v )
+{
+   return sqrt( vecdot(v,v) );
+}
+
+normalize( vec v )
+{
+   len = length(v);
+   if ( len )
+   {
+      v.x /= len; v.y /= len; v.z /= len;
+   }
+}
+
+buildMatrix( mtx[9], vec side, vec up, vec fwd )
+{
+   mtx[0] = side.x; mtx[1] = side.y; mtx[2] = side.z;
+   mtx[3] = up.x;   mtx[4] = up.y;   mtx[5] = up.z;
+   mtx[6] = fwd.x;  mtx[7] = fwd.y;  mtx[8] = fwd.z;
+}

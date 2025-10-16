@@ -1,0 +1,92 @@
+// Procedural mountains (slow script; beware).
+//
+// BTW: Snow and lava in the same scene! (?)
+//
+//-Robert
+
+(x,y,&r,&g,&b)
+{
+   enum{sq3=1/sqrt(3),STEPINC=.001};
+   
+   c0=mount(x,y);
+   c1=mount(x+STEPINC,y);
+   c2=mount(x,y+STEPINC);
+
+   static ramp[8][4]={0.000, 0.000, 0.000,,
+                      0.930, 0.863, 0.398,,
+                      0.797, 0.664, 0.332,,
+                      0.664, 0.531, 0.133,,
+                      0.797, 0.664, 0.266,,
+                      0.996, 0.797, 0.531,,
+                      2.000, 2.000, 2.000,, // snow is very white :)
+                      3.000, 3.000, 3.000,,};
+
+   nz=STEPINC*3.5; // lower = sharper contrast
+   nx=c0-c2; ny=c1-c0;
+
+   a=1/sqrt(nx^2+ny^2+nz^2); nx*=a; ny*=a; nz*=a;
+
+   a=c0*6.5; i=int(a);
+   r0=ramp[i  ][0]; g0=ramp[i  ][1]; b0=ramp[i  ][2];
+   r1=ramp[i+1][0]; g1=ramp[i+1][1]; b1=ramp[i+1][2];
+   i=a-i; f=sq3*nx+sq3*ny+sq3*nz;
+
+   if (a>.3 && a<3)
+   {
+      fu=1/14; if (a>2) fu*=(3-a)^2^2;
+      f*=1-(noise(x*16,y*16, 9.5)*4+
+            noise(x*32,y*32,10.5)*2+
+            noise(x*48,y*48,11.5)*3)*fu;
+   }
+   if (a<.5)
+   {
+      fu =noise(x* 10,y* 10,12.5)*(1/ 1);
+      fu+=noise(x* 20,y* 20,13.5)*(1/ 2);
+      fu+=noise(x* 40,y* 40,14.5)*(1/ 4);
+      fu+=noise(x* 80,y* 80,15.5)*(1/ 8);
+      fu+=noise(x*160,y*160,16.5)*(1/16);
+      fu+=nrnd*(1/48);
+      if (fu>0) fu=(1-1/(fu+1))*2;
+      
+      fu=min(max(fu*4+3,0),7); u=int(fu);
+      fu-=u; fu=(3-2*fu)*fu*fu;
+      static lavr[8]={0, .25, .5, 1, 1, 1, 1, 1};
+      static lavg[8]={0,.125,.25, 0,.4,.9, 1, 1};
+      static lavb[8]={0,   0,  0, 0, 0,.1,.9, 1};
+      nr=(lavr[u+1]-lavr[u])*fu+lavr[u];
+      ng=(lavg[u+1]-lavg[u])*fu+lavg[u];
+      nb=(lavb[u+1]-lavb[u])*fu+lavb[u];
+      if (a>.3)
+      {
+         z=(a-.3)*5; z=(3-2*z)*z*z; i=(i-.3)*(.5/.2);
+         f =( f- 1)*z+ 1; r0=(r0-nr)*z+nr;
+         g0=(g0-ng)*z+ng; b0=(b0-nb)*z+nb;
+      }
+      else {r=nr*255; g=ng*255; b=nb*255; return;}
+   }
+
+   r=((r1-r0)*i+r0)*f*255;
+   g=((g1-g0)*i+g0)*f*255;
+   b=((b1-b0)*i+b0)*f*255;
+}
+
+mount(x,y)
+{
+   for (a=0,amp=1,frq=1,z=0;z<8;z++)
+   {
+      a+=noise(x*frq,y*frq,z+.5)*amp*(a*1.8+1); // plain mountains...
+      amp*=.5; frq*=1.9;
+   }
+   a=curve((a+1)*.5);
+ 
+   z=fabs(x+noise(x,y)+noise(y*.35,.5)*3); // new: rivers! :)
+   if (z<1) {a*=((1+2^-8)-2^-(8*z^2))^2;}
+   
+   return(a);
+}
+
+curve(x) // curve limiter
+{
+   enum {num=.8}; if (x<num) return(x);
+   return ((1-num)-((1-num)^2)/(x-(num*2-1))+num);
+}

@@ -1,0 +1,275 @@
+// Camera
+static posx = 0;
+static posy = -25;
+static posz = -50;
+static posh = 0;
+static posv = 0.5;
+
+static oldMouseX;
+static oldMouseY;
+static mouseSpeedX;
+static mouseSpeedY; 
+
+
+enum{size =  32}
+static allColors[size][size][3];
+static string[size][size];
+
+
+enum{terrainGridWidth=32, terrainGridLength =32}
+static terrainHeights[terrainGridWidth*terrainGridLength];
+static terrainColors[terrainGridWidth*terrainGridLength];
+static terrainNormals[terrainGridWidth*terrainGridLength];
+static tim,oldtim,dt;
+()
+{
+   dt = tim-oldtim; oldtim = tim; tim = klock();
+   
+      
+   if(numframes==0)
+   {
+      i=0; terrainIdx = 0;
+      for(x=0; x<size; x++)
+      for(y=0; y<size; y++)
+      {      
+         /*
+         for(color=0; color < 3; color++){
+            allColors[x][y][color] = fil("height.raw",i);
+            i++;
+         }
+         */
+         //string[x][y] = fil("height.raw",i);
+         //terrainHeights[terrainIdx] = (255-fil("height.raw",i))/10;
+         
+         r=0; g=0; b=0; 
+         c = pic("heightmap32.png",x,y);
+         hex2rgb(c,r,g,b);
+         terrainHeights[terrainIdx] = -r/25;
+         terrainColors[terrainIdx] = c;
+         
+         
+         i+=3;  
+         terrainIdx++;
+      }
+      calcNormals();
+   }
+
+   t = klock(0);
+
+   glEnable(GL_DEPTH_TEST);
+   glCullFace(GL_NONE);
+   cls(0); clz(1e32);
+   updateCamera();
+   
+   texQuad2(0,-5,0,1);
+   
+   t = klock();
+   tris(); trisP = klock()-t;
+   t = klock();
+   quads(); quadsP = klock()-t;
+
+   
+   setcol(0xffffff);
+   moveto(0,0);
+   printf("mspf: %.5f", dt*1000);
+   
+   printf("\nquads: %.5f", quadsP*1000);
+   printf("\ntri strip: %.5f", trisP*1000);
+   
+   //printf("%g", getfilsiz("height.raw"));
+
+   //sleep(1);
+}
+hex2rgb(hex,&r,&g,&b){
+   r = hex / 2^16 % 256;
+   g = hex / 2^8 % 256;
+   b = hex % 256;
+}
+plots(){
+   setcol(0xffffff);
+   glBegin(GL_POINTS);
+   for(y=0; y<size; y++)
+   for(x=0; x<size; x++)
+   {
+      c = (32+string[x][y]);
+      setcol(c,c,c);
+      c = (255-string[x][y])/10;
+      //setpix(x,y);
+      
+      //drawsph(x,c,y,.1);
+      glVertex(x,  c,  y);
+      //glVertex(x+1,c,  y);
+      //glVertex(x,  c,  y+1);
+      //glVertex(x+1,c,  y+1);
+   }
+   glEnd();
+}
+quads()
+{
+   startW = terrainGridWidth / 2.0 - terrainGridWidth;
+   startL = -terrainGridLength / 2.0 + terrainGridLength;
+   xOffset = 20;
+   yOffset = 0;
+   zOffset = 0;
+     
+   for(i=0; i<terrainGridLength-1; i++)
+   {
+      glBegin(GL_QUADS);
+      
+      for(j=0; j<terrainGridWidth; j++)
+      {
+         //aux = 3*((i+1)*terrainGridWidth + j);
+         //setcol(terrainNormals[aux],terrainNormals[aux+1],terrainNormals[aux+2]);
+         
+         c = 128-50*terrainHeights[(i)*terrainGridWidth + j];
+         setcol(c,c,c);
+         
+         x = startW+(j)+xOffset;
+         y = terrainHeights[(i)*terrainGridWidth + (j)] + yOffset;   
+         z = startL - (i) + zOffset;  
+
+         glVertex(x,y,z);  
+         
+         x = startW+(j+1)+xOffset;
+         y = terrainHeights[(i)*terrainGridWidth + (j+1)] + yOffset;   
+         z = startL - (i) + zOffset;  
+         
+         glVertex(x,y,z); 
+
+         x = startW+(j+1)+xOffset;
+         y = terrainHeights[(i+1)*terrainGridWidth + (j+1)] + yOffset;   
+         z = startL - (i+1) + zOffset;  
+         
+         glVertex(x,y,z); 
+         
+         x = startW+(j)+xOffset;
+         y = terrainHeights[(i+1)*terrainGridWidth + (j)] + yOffset;   
+         z = startL - (i+1) + zOffset;  
+         
+         glVertex(x,y,z); 
+      }
+      glEnd();
+   } 
+}
+tris()
+{
+   startW = terrainGridWidth / 2.0 - terrainGridWidth;
+   startL = -terrainGridLength / 2.0 + terrainGridLength;
+   xOffset = -20;
+   yOffset = 0;
+   zOffset = 0;
+     
+   for(i=0; i<terrainGridLength-1; i++)
+   {
+      glBegin(GL_TRIANGLE_STRIP); // slow as hell.
+      
+      //glBegin(GL_QUADS);
+      for(j=0; j<terrainGridWidth; j++)
+      {
+         //aux = 3*((i+1)*terrainGridWidth + j);
+         //setcol(terrainNormals[aux],terrainNormals[aux+1],terrainNormals[aux+2]);
+         
+         
+         c = 128-50*terrainHeights[(i)*terrainGridWidth + j];
+         setcol(c,c,c);
+         
+      
+         glVertex(
+            startW+j+xOffset,
+            terrainHeights[(i+1)*terrainGridWidth + (j)] + yOffset,
+            startL - (i+1) + zOffset);         
+         glVertex(
+            startW + j + xOffset,
+            terrainHeights[(i)*terrainGridWidth + j] + yOffset,
+            startL - i + zOffset); 
+
+      }
+      glEnd();
+   }
+}
+
+calcNormals(){
+   for(i=0; i<terrainGridWidth*terrainGridLength; i++)
+   {
+      terrainNormals[i] = 255;
+   }   
+
+}
+
+texQuad2(xpos,ypos,z,s){
+   glEnable(GL_ALPHA_TEST);
+   glCullface(GL_NONE);
+   
+   glBegin(GL_QUADS);
+   glTexCoord(0,0); 
+   glVertex(xpos-s,ypos,z-s);  
+   glTexCoord(1,0); 
+   glVertex(xpos+s, ypos,z-s); 
+   glTexCoord(1,1); 
+   glVertex(xpos+s, ypos,z+s); 
+   glTexCoord(0,1); 
+   glVertex(xpos-s,ypos,z+s);  
+   glEnd();
+}
+
+
+updateCamera()
+{
+   playercontrols(&posx,&posy,&posz,&posh,&posv);
+   if(posv > 1.5) posv = 1.5;
+   if(posv < -1.5) posv = -1.5;
+   setcam(posx,posy,posz,posh,posv);
+}
+
+// Camera and movement code taken from /games/
+//Handle input and player movement
+playercontrols(&posx,&posy,&posz,&posh,&posv)
+{
+   //f *= 100;
+   f = 1;
+   if (keystatus[0x2a]) f /= 4;
+   if (keystatus[0x36]) f *= 4;
+   vx = (keystatus[0xcd]-keystatus[0xcb])*f; //Right-Left
+   vy = (keystatus[0xc8]-keystatus[0xd0])*f; //Up-Down
+   vx2 = (keystatus[32]-keystatus[30])*f; //D-A
+   vy2 = (keystatus[17]-keystatus[31])*f; //W-S
+   if(vx==0) vx=vx2;
+   if(vy==0) vy=vy2;   
+
+   vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   static mat[9]; ang2mat(posh,posv,mat);
+   nvx = mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   nvy = mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   nvz = mat[2]*vx + mat[5]*vz + mat[8]*vy;
+   
+   d = 1/12;
+   
+   x = posx+nvx;
+   y = posy+nvy;
+   z = posz+nvz;
+   posx = x; posy = y; posz = z;
+
+   // mousespeed values are tweaked for 60fps
+   // for instance, sleep(16)
+   mouseSpeedX = (mousx - oldMouseX) * 0.01;
+   mouseSpeedY = (mousy - oldMouseY) * 0.01;
+   oldMouseX = mousx;
+   oldMouseY = mousy;
+
+   if(bstatus==2)
+   {
+      //readmouse(&mousx,&mousy);
+      
+      posh += mouseSpeedX;
+      posv += mouseSpeedY;
+   }
+}
+ang2mat(hang,vang,mat[9])
+{
+   mat[6] = cos(vang)*sin(hang); mat[0] = cos(hang);
+   mat[7] = sin(vang);           mat[1] = 0;
+   mat[8] = cos(vang)*cos(hang); mat[2] =-sin(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}

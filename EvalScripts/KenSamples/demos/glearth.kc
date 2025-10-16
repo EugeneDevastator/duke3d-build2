@@ -1,0 +1,18 @@
+() clz(1e32); cls(0); setcol(0xffffff);
+t = klock()*.2; r = 1.8;
+setcam(cos(t)*cos(t)*r,-sin(t)*r,sin(t)*cos(t)*r,-t-PI/2,t);
+glsettex("earth.jpg");
+
+nu = 32; du = PI*2/nu;
+nv = 16; dv = PI/nv;
+for(v=PI,iv=0;iv<=nv;iv++,v+=dv)
+{
+   glBegin(GL_TRIANGLE_STRIP);
+   for(u=0,iu=0;iu<=nu;iu++,u+=du)
+   {
+      glTexCoord(u*.5/PI,v/PI);
+      glVertex(sin(v)*cos(u),cos(v),sin(v)*sin(u));
+      glTexCoord(u*.5/PI,(v-dv)/PI);
+      glVertex(sin(v-dv)*cos(u),cos(v-dv),sin(v-dv)*sin(u));
+   }
+}

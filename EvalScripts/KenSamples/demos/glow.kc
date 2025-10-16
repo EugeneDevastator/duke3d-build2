@@ -1,0 +1,117 @@
+// Example of how to make glowing text.
+//
+// Be sure to experiment with combinations
+// of the MODE and SUBMODE constants!
+//
+// -Robert
+
+()
+{
+   enum{N=6,TEXT=1,MODE=1,SUBMODE=1,ADDNOISE=0} // 0 <= MODE <= 3; 0 <= SUBMODE <= 1
+   static txt[N]={82,79,66,69,82,84};
+   
+   gr=256; gg=512; gb=1024; // nice blue
+  // gr=1024; gg=512; gb=256; // nice orange
+  
+   frq=.15; amp=3; // noise vars (ADDNOISE==1)
+
+   // try high frq / low amp or low frq / high amp
+   // frq=.15; amp=3; frq=.015; amp=30;
+
+   static sbuf[768][1024],fstor[1048576][2];
+   cls(0); setcol(0xffffff); refresh();
+   if (TEXT)
+   {
+      setfont(64,128,1); sp=64+24; cx=(xres-N*sp)*.5;
+      for (i=0;i<N;i++) {moveto(cx,yres/2-64); printchar(txt[i]); cx+=sp;}
+   }
+   else // use picture (select B&W pic)
+   {
+      cx=0;cy=0;getpicsiz(cx,cy); tx=int((xres-cx)/2); ty=int((yres-cy)/2);
+      for (y=0;y<cy;y++) for (x=0;x<cx;x++)
+      {
+         fr=0;fg=0;fb=0; pic(x,y,fr,fg,fb);
+         setcol((max(fr,max(fg,fb))>=64)*0xffffff);
+         setpix(x+tx,y+ty);
+      }
+   }
+   refresh();
+   
+   // algo begins
+   fcnt=0; fcur=0; ix=1/xres;
+   mdist=1e7; // lower number = faster (128^2 works well)
+              // should be +inf for (MODE==0 && SUBMODE==1)
+   for (y=0;y<yres;y++)
+   {
+      for (x=0;x<xres;x++) // set seeds
+      {
+         sbuf[y][x]=mdist; fr=0;fg=0;fb=0; getpix(x,y,fr,fg,fb);
+         if (fr+fg+fb) {fstor[fcnt][0]=y*xres+x; fstor[fcnt][1]=fstor[fcnt][0]; fcnt++;}
+      }
+   }
+   setcol(0xff0000); setfont(32,64,1); moveto(xres/2-2*32,yres/2-32); printf("WAIT");
+   
+   while (fcur<fcnt) // map dist (slow flood-fill voronoi)
+   {
+      cy=int(fstor[fcur][0]*ix); cx=fstor[fcur][0]-cy*xres;
+      if (cx>0 && cy>0 && cx<(xres-1) && cy<(yres-1))
+      {
+         dy=int(fstor[fcur][1]*ix); dx=fstor[fcur][1]-dy*xres;
+         dst=(cx-dx)^2+(cy-dy)^2;
+         if (sbuf[cy][cx]>dst)
+         {
+            sbuf[cy][cx]=dst;
+            fstor[fcnt][1]=fstor[fcur][1]; fstor[fcnt][0]=fstor[fcur][0]+1; fcnt++;
+            fstor[fcnt][1]=fstor[fcur][1]; fstor[fcnt][0]=fstor[fcur][0]-1; fcnt++;
+            fstor[fcnt][1]=fstor[fcur][1]; fstor[fcnt][0]=fstor[fcur][0]+xres; fcnt++;
+            fstor[fcnt][1]=fstor[fcur][1]; fstor[fcnt][0]=fstor[fcur][0]-xres; fcnt++;
+         }
+      }
+      fcur++;
+   }
+   for (v=0,y=0;y<yres;y++) // draw
+   {
+      for (x=0;x<xres;x++,v++)
+      {
+         f=sqrt(sbuf[y][x]);
+
+              if (MODE==0) {g=(32-f)*(1/32);}          // g=1-f
+         else if (MODE==1) {g=exp(f*-.15);}            // g=e^-f
+         else if (MODE==2) {if (f>1) g=1/f; else g=f;} // g=1/f
+         else if (MODE==3) {g=1/max(f,1);}             // g=1/f; f>=1
+
+              if (SUBMODE==0) {a=g;}                   // a=g
+         else if (SUBMODE==1) {a=sin(g*9);}            // a=sin(g)*9
+
+         setcol(gr*a,gg*a,gb*a); setpix(x,y);
+      }
+   }
+   if (ADDNOISE)
+   {
+      for (y=0;y<yres;y++)
+      {
+         for (x=0;x<xres;x++)
+         {
+            sbuf[y][x]=0;
+            fx=x+noise(x*frq,y*frq,1)*amp; if (fx<0 || fx>=(xres-1)) continue;
+            fy=y+noise(x*frq,y*frq,2)*amp; if (fy<0 || fy>=(yres-1)) continue;
+            ix=int(fx); iy=int(fy); fx-=ix; fy-=iy;
+            r0=0;g0=0;b0=0; getpix(ix  ,iy  ,r0,g0,b0);
+            r1=0;g1=0;b1=0; getpix(ix+1,iy  ,r1,g1,b1);
+            r2=0;g2=0;b2=0; getpix(ix  ,iy+1,r2,g2,b2);
+            r3=0;g3=0;b3=0; getpix(ix+1,iy+1,r3,g3,b3);
+            r0=(r1-r0)*fx+r0; g0=(g1-g0)*fx+g0; b0=(b1-b0)*fx+b0;
+            r2=(r3-r2)*fx+r2; g2=(g3-g2)*fx+g2; b2=(b3-b2)*fx+b2;
+            r0=(r2-r0)*fy+r0; g0=(g2-g0)*fy+g0; b0=(b2-b0)*fy+b0;
+            r0=min(max(int(r0),0),255);
+            g0=min(max(int(g0),0),255);
+            b0=min(max(int(b0),0),255);
+            sbuf[y][x]=r0*65536+g0*256+b0;
+         }
+      }
+      for (y=0;y<yres;y++) for (x=0;x<xres;x++) {setcol(sbuf[y][x]); setpix(x,y);}
+   }
+   // algo ends
+   
+   while(1) refresh();
+}

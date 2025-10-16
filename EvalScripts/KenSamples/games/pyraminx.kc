@@ -1,0 +1,436 @@
+static sepoff = 0.10, pixoff = 100, dis = -6, zoom = 1.5; //easier on the eyes for newbies
+//static sepoff = 0.05, pixoff = 80, dis = -12, zoom = 1.5; //real-world values for 1920x1200 28.5" diag LCD
+
+static o0[4][3] = { 0,18, 9,
+                    4,17,27,
+                    8,35,22,
+                   13,26,31};
+static o1[4][9] = { 1, 2, 3,19,20,21,10,11,12,
+                    6, 5, 1,12,16,15,28,29,30,
+                    3, 7, 6,30,34,33,24,23,19,
+                   15,14,10,21,25,24,33,32,28};
+static o2[4][15]= { 4, 5, 6, 7, 8,22,23,24,25,26,13,14,15,16,17,
+                    8, 7, 3, 2, 0, 9,11,10,14,13,31,32,33,34,35,
+                    0, 2, 1, 5, 4,27,29,28,32,31,26,25,21,20,18,
+                   17,16,12,11, 9,18,20,19,23,22,35,34,30,29,27};
+static o3[4][9] = {27,29,30,35,34,33,31,32,28,
+                   18,20,21,26,25,24,22,23,19,
+                    9,11,12,17,16,15,13,14,10,
+                    0, 2, 3, 8, 7, 6, 4, 5, 1};
+static fac[4][3] = {0,2,1, 0,1,3, 0,3,2, 1,2,3};
+struct { x, y, z; } point3d;
+static point3d vt[4] = {-1,-1,-1, 1,1,-1, 1,-1,1, -1,1,1};
+
+//Ken best times:
+//06/28/2015: 28.11
+//07/01/2015: 25.87
+
+()
+{
+      //Project started 06/14/2015, 6:56am
+      //  0 1 2 3 4 5 6
+      //0       * (x0,y0)
+      //1      /0\
+      //2     *---*
+      //3    /1\2/3\
+      //4   *---*---*
+      //5  /4\5/6\7/8\
+      //6 *---*---*---* (x1,y1)
+      // (x2,y2)
+   static point3d pt[3], irig = {1,0,0}, idow = {0,1,0}, ifor = {0,0,1}, ihaf;
+   static stick[36], stickrot[36], rotit[36];
+   static uof[9][3] = {0,1,0, 0,1,0, 0,1,1, 1,2,1, 0,1,0, 0,1,1, 1,2,1, 1,2,2, 2,3,2};
+   static vof[9][3] = {0,0,1, 1,1,2, 1,0,1, 0,0,1, 2,2,3, 2,1,2, 1,1,2, 1,0,1, 0,0,1};
+   static point3d tp, ax;
+   static col[4] = {0xffffff, 0xff0000, 0xffff00, 0x008000};
+   
+   static texmap[128][128];
+   for(y=0;y<128;y++)
+      for(x=0;x<128;x++)
+      {
+         c = int(noise(x*.12,y*.13)*12 + 144)*0x10101;
+         d = min(x,y); d = min(d,(128-(x+y))/sqrt(2));
+         if (d < 16) c -= int(16-d)*0x080808;
+         texmap[y][x] = c;
+      }
+   //for(y=10;y<30;y++) for(x=10;x<30;x++) texmap[x][y] = 0xffffff;
+#if 0   
+   for(y=30;y<40;y++)
+      for(x=30;x<40;x++) { d = 5-sqrt((x-35)^2+(y-35)^2); texmap[x][y] += int(max(d,0))*0x141414; }
+   for(y=30;y<40;y++)
+      for(x=50;x<60;x++) { d = 5-sqrt((x-55)^2+(y-35)^2); texmap[x][y] += int(max(d,0))*0x141414; }
+   for(y=50;y<60;y++)
+      for(x=20;x<55;x++)
+         { d = 5-sqrt((x - min(max(x,25),50))^2+(y-55)^2); texmap[x][y] += int(max(d,0))*0x141414; }
+#endif
+   hpiece = glsettex(texmap,128,128);
+
+   for(j=0;j<4;j++)
+      for(i=0;i<9;i++)
+      {
+         stick[j*9+i] = j;
+         k = ((i==2)||(i==5)||(i==7));
+         if (j == 0) { if (!k) stickrot[j*9+i] = 1; else stickrot[j*9+i] = 0; }
+         if (j == 1) { if (!k) stickrot[j*9+i] = 2; else stickrot[j*9+i] = 1; }
+         if (j == 2) { if (!k) stickrot[j*9+i] = 0; else stickrot[j*9+i] = 2; }
+         if (j == 3) { if (!k) stickrot[j*9+i] = 0; else stickrot[j*9+i] = 2; }
+      }
+      
+   rseed = ((klock(-1)*1000)%2^15)*2^16; srand(rseed);
+   
+#if 1   
+      //Mess up
+   for(i=0;i<4;i++) { rotate(stick,stickrot,i,int(3*rnd)); }
+   for(i=0;i<1024;i++) { rotate(stick,stickrot,int(4*rnd)+4,int(2*rnd)+1); }
+#endif   
+      
+   tim = 0; omousx = mousx; omousy = mousy; obstatus = bstatus; grabi = -1;
+   rotsid = -1; rotn = 0; tanim = -1; animper = 0.25; hiti = -1; timstart = -1; timgot = -1;
+   while (1)
+   {
+      otim = tim; tim = klock(); dtim = tim-otim;
+
+      s = sgn((numframes%2)-.5)*(USINGSTEREO!=0);
+      setcam(sepoff*s,0,0,0,0);
+      setview(0,0,xres,yres,xres/2+pixoff*s,yres/2,xres/2*zoom);
+
+      gldisable(GL_DEPTH_TEST);
+      glsettex("cloud.png");
+      glbegin(GL_QUADS); setcol(0x406080);
+      t = (tim*.1)%1;
+      gltexcoord(t+0,t+0); glvertex(   0,   0);
+      gltexcoord(t+4,t+0); glvertex(xres,   0);
+      gltexcoord(t+4,t+4); glvertex(xres,yres);
+      gltexcoord(t+0,t+4); glvertex(   0,yres);
+      glenable(GL_DEPTH_TEST);
+      
+      if (s >= 0)
+      {
+         if (keystatus[0x32]) //M: Mess up
+         {
+            keystatus[0x32] = 0;
+            for(i=0;i<4;i++) { rotate(stick,stickrot,i,int(3*rnd)); }
+            for(i=0;i<1024;i++) { rotate(stick,stickrot,int(4*rnd)+4,int(2*rnd)+1); }
+            timstart = -1; timgot = -1;
+         }
+         if (keystatus[0x1f]) //S: Solve
+         {
+            keystatus[0x1f] = 0;
+            for(j=0;j<4;j++)
+               for(i=0;i<9;i++)
+               {
+                  stick[j*9+i] = j;
+                  k = ((i==2)||(i==5)||(i==7));
+                  if (j == 0) { if (!k) stickrot[j*9+i] = 1; else stickrot[j*9+i] = 0; }
+                  if (j == 1) { if (!k) stickrot[j*9+i] = 2; else stickrot[j*9+i] = 1; }
+                  if (j == 2) { if (!k) stickrot[j*9+i] = 0; else stickrot[j*9+i] = 2; }
+                  if (j == 3) { if (!k) stickrot[j*9+i] = 0; else stickrot[j*9+i] = 2; }
+               }
+            timstart = -1; timgot = 1e32;
+         }
+         
+         rx = (keystatus[0xcd]-keystatus[0xcb])*dtim*2.0;
+         ry = (keystatus[0xd0]-keystatus[0xc8])*dtim*2.0;
+         rz = (keystatus[0x33]-keystatus[0x34])*dtim*2.0;
+         rotvex(rx,ifor,irig);
+         rotvex(ry,ifor,idow);
+         rotvex(rz,irig,idow);
+      }
+
+      if (tanim >= 0)
+      {
+         for(i=0;i<36;i++) rotit[i] = 0;
+         if (rotsid < 8)
+         {
+            for(i=0;i<3;i++) { rotit[o0[rotsid%4][i]] = 1; }
+            if (rotsid >= 4) { for(i=0;i<9;i++) { rotit[o1[rotsid%4][i]] = 1; } }
+         }
+         else
+         {
+            for(i=0;i<15;i++) { rotit[o2[rotsid%4][i]] = 1; }
+            for(i=0;i<9;i++) { rotit[o3[rotsid%4][i]] = 1; }
+         }
+         
+         if ((rotsid%4) == 0) { x = 1/sqrt(3); y = 1/sqrt(3); z = 1/sqrt(3); }
+         if ((rotsid%4) == 1) { x =-1/sqrt(3); y =-1/sqrt(3); z = 1/sqrt(3); }
+         if ((rotsid%4) == 2) { x =-1/sqrt(3); y = 1/sqrt(3); z =-1/sqrt(3); }
+         if ((rotsid%4) == 3) { x = 1/sqrt(3); y =-1/sqrt(3); z =-1/sqrt(3); }
+         if (rotn == 2) { x = -x; y = -y; z = -z; }
+         ax.x = x*irig.x + y*irig.y + z*irig.z;
+         ax.y = x*idow.x + y*idow.y + z*idow.z;
+         ax.z = x*ifor.x + y*ifor.y + z*ifor.z;
+         
+         ang = (tim-tanim)/animper;
+         ang = min(max(ang,0),1);
+         ang = .5-.5*cos(ang*(PI));
+         ang *= (PI*2/3);
+      }
+      
+      ihaf.x = xres/2; ihaf.y = yres/2; ihaf.z = ihaf.x*zoom;
+      zdep = 4.0;
+      
+      glsettex(hpiece);
+      glbegin(GL_TRIANGLES);
+      for(sid=0;sid<4;sid++)
+      {
+         for(i=0;i<3;i++)
+         {
+            k = fac[sid][i];
+            pt[i].x = vt[k].x*irig.x + vt[k].y*irig.y + vt[k].z*irig.z;
+            pt[i].y = vt[k].x*idow.x + vt[k].y*idow.y + vt[k].z*idow.z;
+            pt[i].z = vt[k].x*ifor.x + vt[k].y*ifor.y + vt[k].z*ifor.z;
+            if (i) { pt[i].x -= pt[0].x; pt[i].y -= pt[0].y; pt[i].z -= pt[0].z; }
+         }
+         for(i=0;i<9;i++)
+         {
+            k = sid*9+i;
+            setcol(col[stick[k]]);
+            for(j=0;j<3;j++)
+            {
+               gltexcoord(j==((stickrot[k]+1)%3),j==((stickrot[k]+2)%3));
+               u = uof[i][j]/3; v = vof[i][j]/3;
+               tp.x = pt[1].x*u + pt[2].x*v + pt[0].x;
+               tp.y = pt[1].y*u + pt[2].y*v + pt[0].y;
+               tp.z = pt[1].z*u + pt[2].z*v + pt[0].z;
+               if ((tanim >= 0) && (rotit[k])) axisrotate(tp,ax,ang);
+               glvertex(tp.x,tp.y,tp.z+zdep);
+            }
+         }
+      }
+      
+      hiti = hittest(irig,idow,ifor,ihaf,zdep,mousx,mousy);
+      //if (hiti >= 0) { setcol(0xffffff); moveto(mousx-10,mousy+8); printf("%g",hiti); }
+      
+      static point3d otouch[10], ntouch[10]; static otouchn, ntouchn = 0;
+      otouchn = ntouchn; ntouchn = 0; for(i=0;i<otouchn;i++) { otouch[i] = ntouch[i]; }
+      for(id=-1;readtouch(&id,&x,&y)>=0;)
+         { ntouch[ntouchn].x = x; ntouch[ntouchn].y = y; ntouch[ntouchn].z = id; ntouchn++; }
+      if ((otouchn == 2) && (otouch[0].z == ntouch[0].z) &&
+          (ntouchn == 2) && (otouch[1].z == ntouch[1].z))
+      {
+         oang = atan2(otouch[1].y-otouch[0].y,otouch[1].x-otouch[0].x);
+         nang = atan2(ntouch[1].y-ntouch[0].y,ntouch[1].x-ntouch[0].x);
+         rotvex(((nang-oang+PI))%(PI*2)-PI,idow,irig);
+      }
+
+      if (tanim < 0)
+      {
+         if ((bstatus%2) && (ntouchn < 2))
+         {
+            if (!(obstatus%2))
+            {
+               grabi = hiti;
+            }
+            if ((grabi >= 0) && (grabi != hiti))
+            {
+               //stick[grabi] = int(4*rnd);
+               rotn = 0;
+               
+                  //Handle corners
+               for(i=0;i<4;i++)
+                  for(j=0;j<3;j++)
+                  {
+                     if ((grabi == o0[i][j]) && (hiti == o0[i][(j-1)%3])) { rotsid = i; rotn = 1; }
+                     if ((grabi == o0[i][j]) && (hiti == o0[i][(j+1)%3])) { rotsid = i; rotn = 2; }
+                  }
+               if (!rotn)
+               {
+                     //Handle middles(&corners)
+                  got = 0;
+                  for(i=0;i<4;i++)
+                     for(j=0;j<9;j++)
+                     {
+                        if ((grabi == o1[i][j]) && (hiti == o1[i][(j-1)%9])) got++;
+                        if ((grabi == o1[i][j]) && (hiti == o1[i][(j+1)%9])) got++;
+                     }
+                  if (got == 1)
+                  {
+                     for(i=0;i<4;i++)
+                        for(j=0;j<9;j++)
+                        {
+                           if ((grabi == o1[i][j]) && (hiti == o1[i][(j-1)%9])) { rotsid = i+4; rotn = 1; }
+                           if ((grabi == o1[i][j]) && (hiti == o1[i][(j+1)%9])) { rotsid = i+4; rotn = 2; }
+                        }
+                  }
+               }
+               if (rotn)
+               {
+                  for(i=0;i<4;i++) playsound("tapfloor.flac",50,i/2+1);
+                  tanim = tim;
+                  if (timstart < 0) timstart = tim;
+               }
+            }
+            grabi = hiti;
+            //grabi = -1;
+         }
+      }
+      else
+      {
+         if (tim >= tanim+animper)
+         {
+            rotate(stick,stickrot,rotsid,rotn);
+            tanim = -1;
+            
+            bad = 0;
+            for(j=0;j<4;j++)
+               for(i=0;i<9;i++)
+                  if (stick[j*9+i] != j) bad = 1;
+            if (!bad) timgot = tim-timstart;
+         }
+      }
+
+      if ((s >= 0) && (((hiti < 0) && (obstatus%2)) || ((bstatus%4) >= 2)))
+      {
+         if (ntouchn < 2)
+         {
+            rx = (mousx-omousx)*8/xres;
+            ry = (mousy-omousy)*8/xres;
+            rotvex(rx,ifor,irig);
+            rotvex(ry,ifor,idow);
+         }
+      }      
+      
+      //moveto(xres-256,0); setcol(0xffffff);
+      //printf(" grabi: %g\n  hiti: %g\nrotsid: %g\n  rotn: %g\n tanim: %g\n",grabi,hiti,rotsid,rotn,tanim);
+      
+      setcol(0xc0c0c0); 
+      if (timgot == 1e32) {}
+      else
+      {      
+         if (timgot < 0)
+         {
+            if (timstart < 0) t = 0; else t = tim-timstart;
+         } else t = timgot;
+         drawdigitime(xres*(1-.18),0,xres,xres*.042,t);
+      }
+      
+      omousx = mousx; omousy = mousy;
+      obstatus = bstatus; refresh(); Sleep(15);
+   }
+}
+
+drawdigitime (x0, y0, x1, y1, t)
+{
+   setfont((x1-x0)/8,y1-y0,1); moveto(x0,y0);
+   t = int(t*100)/100; printf("%2g:%05.2f",int(t/60),t%60);
+}
+
+rotvex (ang, a[3], b[3]) //Rotate vectors a&b around common plane, by ang
+{
+   c = cos(ang); s = sin(ang);
+   for(i=3-1;i>=0;i--) { f = a[i]; a[i] = f*c + b[i]*s; b[i] = b[i]*c - f*s; }
+}
+
+axisrotate (p[3], ax[3], w) //10/26/2011:optimized algo :)
+{
+   //static ax[3];
+
+   c = cos(w); s = sin(w);
+   //t = axis[0]*axis[0] + axis[1]*axis[1] + axis[2]*axis[2]; if (t == 0) return;
+   //t = 1.0 / sqrt(t); ax[0] = axis[0]*t; ax[1] = axis[1]*t; ax[2] = axis[2]*t;
+
+      //P = cross(AX,P)*s + dot(AX,P)*(1-c)*AX + P*c;
+   ox = p[0]; oy = p[1]; oz = p[2];
+   f = (ox*ax[0] + oy*ax[1] + oz*ax[2])*(1.0-c);
+   p[0] = (ax[1]*oz - ax[2]*oy)*s + ax[0]*f + ox*c;
+   p[1] = (ax[2]*ox - ax[0]*oz)*s + ax[1]*f + oy*c;
+   p[2] = (ax[0]*oy - ax[1]*ox)*s + ax[2]*f + oz*c;
+}
+
+rotit (s[36], sr[36], i0, i1, i2)
+{
+   t = s [i0]; s [i0] = s [i1]; s [i1] = s [i2]; s [i2] = t;
+   t = sr[i0]; sr[i0] = sr[i1]; sr[i1] = sr[i2]; sr[i2] = t;
+ 
+   v0 = int(i0/9);
+   v1 = int(i1/9);
+   v2 = int(i2/9);
+   if ((v0 == 0) && (v1 == 1) && (v2 == 2)) { sr[i0] += 0; sr[i1] += 0; sr[i2] += 0; }
+   if ((v0 == 0) && (v1 == 1) && (v2 == 3)) { sr[i0] += 1; sr[i1] += 1; sr[i2] += 1; }
+   if ((v0 == 0) && (v1 == 2) && (v2 == 3)) { sr[i0] += 2; sr[i1] += 1; sr[i2] += 0; }
+   if ((v0 == 1) && (v1 == 2) && (v2 == 3)) { sr[i0] += 1; sr[i1] += 2; sr[i2] += 0; }
+   if ((v0 == 0) && (v1 == 2) && (v2 == 1)) { sr[i0] += 0; sr[i1] += 0; sr[i2] += 0; }
+   if ((v0 == 0) && (v1 == 3) && (v2 == 1)) { sr[i0] += 2; sr[i1] += 2; sr[i2] += 2; }
+   if ((v0 == 0) && (v1 == 3) && (v2 == 2)) { sr[i0] += 0; sr[i1] += 2; sr[i2] += 1; }
+   if ((v0 == 1) && (v1 == 3) && (v2 == 2)) { sr[i0] += 0; sr[i1] += 1; sr[i2] += 2; }
+   sr[i0] %= 3;
+   sr[i1] %= 3;
+   sr[i2] %= 3;
+}
+
+rotate (s[36], sr[36], sid, n)
+{
+   n %= 3; if (!n) return;
+   j = sid%4; o = 3-n;
+   if (sid < 8)
+   {
+      rotit(s,sr,o0[j][0],o0[j][n],o0[j][o]);
+      if (sid >= 4) for(i=3-1;i>=0;i--) rotit(s,sr,o1[j][i],o1[j][i+n*3],o1[j][i+o*3]);
+   }
+   else
+   {
+      for(i=5-1;i>=0;i--) rotit(s,sr,o2[j][i],o2[j][i+n*5],o2[j][i+o*5]);
+      for(i=3-1;i>=0;i--) rotit(s,sr,o3[j][i],o3[j][i+n*3],o3[j][i+o*3]);
+   }
+}
+
+
+hittest (point3d irig, point3d idow, point3d ifor, point3d ihaf, zdep, x, y)
+{
+   point3d pt[3];
+
+   hiti = -1;
+   for(sid=0;sid<4;sid++)
+   {
+      for(i=0;i<3;i++)
+      {
+         k = fac[sid][i];
+         pt[i].x = vt[k].x*irig.x + vt[k].y*irig.y + vt[k].z*irig.z;
+         pt[i].y = vt[k].x*idow.x + vt[k].y*idow.y + vt[k].z*idow.z;
+         pt[i].z = vt[k].x*ifor.x + vt[k].y*ifor.y + vt[k].z*ifor.z;
+         if (i) { pt[i].x -= pt[0].x; pt[i].y -= pt[0].y; pt[i].z -= pt[0].z; }
+      }
+      pt[0].z += zdep;
+         
+      vx = x-ihaf.x; vy = y-ihaf.y; vz = ihaf.z;
+         //(vx)*d + (-pt[1].x)*u + (-pt[2].x)*v = (pt[0].x)
+         //(vy)*d + (-pt[1].y)*u + (-pt[2].y)*v = (pt[0].y)
+         //(vz)*d + (-pt[1].z)*u + (-pt[2].z)*v = (pt[0].z)
+      det = (pt[1].y*pt[2].z - pt[1].z*pt[2].y)*vx +
+            (pt[1].z*pt[2].x - pt[1].x*pt[2].z)*vy +
+            (pt[1].x*pt[2].y - pt[1].y*pt[2].x)*vz;
+      if (det >= 0)
+      {
+         f = 1/det;
+         nx = pt[0].y*vz - pt[0].z*vy;
+         ny = pt[0].z*vx - pt[0].x*vz;
+         nz = pt[0].x*vy - pt[0].y*vx;
+         u = (nx*pt[2].x + ny*pt[2].y + nz*pt[2].z)*f;
+         v =-(nx*pt[1].x + ny*pt[1].y + nz*pt[1].z)*f;
+         if ((u < 0) || (v < 0) || (u+v > 1)) continue;
+         d = ((pt[1].y*pt[2].z - pt[1].z*pt[2].y)*pt[0].x +
+              (pt[1].z*pt[2].x - pt[1].x*pt[2].z)*pt[0].y +
+              (pt[1].x*pt[2].y - pt[1].y*pt[2].x)*pt[0].z)*f;
+         drawsph(vx*d,vy*d,vz*d,.05);
+
+         i0 = int(u*3); i1 = int(v*3); i2 = int((u+v)*3);
+         if (i1 == 0)
+         {
+                 if (i2 == 0) hiti = 0;
+            else if (i0 == 0) hiti = 2;
+            else if (i2 == 1) hiti = 3;
+            else if (i0 == 1) hiti = 7;
+            else              hiti = 8;
+         }
+         else if (i1 == 1)
+         {
+                 if (i2 == 1) hiti = 1;
+            else if (i0 == 0) hiti = 5;
+            else              hiti = 6;
+         }
+         else                 hiti = 4;
+         hiti += sid*9;
+      }
+   }
+   return(hiti);
+}

@@ -1,0 +1,128 @@
+// would be fast in a shader
+
+enum{resx=128, resy=128};
+
+static buf[resy][resx];
+static copy[resy*2][resx*2];
+static time;
+static picx, picy;
+
+static zoom = 0;
+static zoomdir = 1;
+()
+{
+   picx = resx; picy = resy;
+   
+   cls(0);
+   time = klock();
+ 
+   if(numframes==0)
+   {
+      glDisable(GL_DEPTH_TEST); // needed for sprites
+      makeFirstFrame();
+   }
+  
+
+   drawFeedback();
+   warp();
+   mix();
+   scalePic(resx/2,resy/2,256,256,resx+10); // resx*1.01 resx*1.05 SCALE!
+}
+
+// mix drains all the juice
+// this could be sped up by only drawing to a buffer.
+// getpix is slo!
+mix()
+{
+   for(y=0; y<resy; y++)
+   for(x=0; x<resx; x++)
+   {
+      r=0;g=0;b=0;      
+      getpix(x,y,r,g,b);
+      nr = buf[y][x] / 2^16;
+      ng = buf[y][x] / 2^8 % 256;
+      nb = buf[y][x] % 256;
+
+      old = 0.50;
+      new = 0.43;
+      buf[y][x] = rgb(nr * old,ng * old ,nb * old ) + 
+                  rgb(r * new ,g * new ,b * new);
+   }
+}
+
+warp()
+{
+   setcol(0xffffff);
+   drawspr(mousx,mousy,10,0*time);
+   
+   setcol(rnd*255,rnd*255,rnd*255);
+   moveto(resx/4+ 5*cos(5*time), resy/2 + 5*sin(5*time ) );
+   setfont(6,8);
+   printf("numframes %g",numframes);
+   
+}
+
+drawFeedback()
+{
+   // draw
+   static line[resx];
+   for(y=0; y<resy; y++)
+   {
+   for(x=0; x<resx; x++)
+   {
+      line[x] = buf[y][x];
+      //setpix(x,y);
+   }
+   sethlin(0,y,line,resx);
+   }
+}
+
+makeFirstFrame()
+{
+   glsettex("wood.png");
+   setcol(0xffffff);
+   drawspr(100,100,30+sin(klock()*10)*10,klock());   
+   for(y=0; y<resy; y++)
+   for(x=0; x<resx; x++)
+   {
+      r=0; g=0; b=0;
+      getpix(x,y,r,g,b);
+      //buf[x][y] = rgb(r,g,b);
+   }
+}
+
+scalePic(xpos, ypos, xmax, ymax, scale)
+{
+   sx = scale; sy = scale;
+   deltax = picx/sx;
+   deltay = picy/sy;
+   
+   gx = 0;
+   gy = 0;   
+
+   for(y=floor(resx/2); y<floor(resy*2); y++)
+   {
+      for(x=floor(resy/2); x<floor(resx*2); x++)
+      {
+
+         copy[y-scale/2][x-scale/2] = buf[int(gy) ][int(gx)];
+         //copy[y][x] = buf[int(gy) ][int(gx)];
+         
+         gx += deltax;
+         //if(x > xmax) break;
+      }
+      //if(y > ymax) break;
+      gx = 0;
+      gy += deltay;
+   }
+   
+   // Copy back
+   for(y=0; y<resy; y++)
+   {
+      for(x=0; x<resx; x++)
+      {
+         buf[y][x] = copy[y][x];
+      }
+   }
+}
+

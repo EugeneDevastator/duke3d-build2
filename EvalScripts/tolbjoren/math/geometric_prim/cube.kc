@@ -1,0 +1,133 @@
+struct vec{x,y,z;}
+()
+{
+   cls(0); clz(1e32);
+   
+   time = klock(0);
+   cang = mousx/xres*2*PI;
+   //cang = time;
+   dst = -25;
+   setcam(sin(cang)*dst,0,cos(cang)*dst,cang,0);
+   
+   
+   vec p;
+   
+   num = 8;
+   range = 8;
+   for(i=0; i<num; i++)
+   for(j=0; j<num; j++)
+   for(k=0; k<num; k++)
+   {
+      x = i / (num);
+      y = j / (num);
+      z = k / (num);
+      
+      vecset(p, x-.5,y-.5,z-.5);
+      setcolor(p);
+      vecscalar(p,p,2*range);
+      drawcube(p,1);
+   }
+}
+
+setcolor(vec v)
+{
+   setcol( 255+v.x*255, 128+v.y*255, 128+v.z*255);
+}
+
+drawcube(vec pos, size)
+{
+   x = pos.x; y = pos.y; z = pos.z; 
+   glBegin(GL_QUADS);
+   glTexCoord(0,0); glVertex(x-size,y-size,z-size);
+   glTexCoord(1,0); glVertex(x+size,y-size,z-size);
+   glTexCoord(1,1); glVertex(x+size,y+size,z-size);
+   glTexCoord(0,1); glVertex(x-size,y+size,z-size);
+   
+   glTexCoord(0,0); glVertex(x-size,y-size,z+size);
+   glTexCoord(1,0); glVertex(x-size,y-size,z-size);
+   glTexCoord(1,1); glVertex(x-size,y+size,z-size);
+   glTexCoord(0,1); glVertex(x-size,y+size,z+size);
+   
+   glTexCoord(0,0); glVertex(x+size,y-size,z+size);
+   glTexCoord(1,0); glVertex(x-size,y-size,z+size);
+   glTexCoord(1,1); glVertex(x-size,y+size,z+size);
+   glTexCoord(0,1); glVertex(x+size,y+size,z+size);
+   
+   glTexCoord(0,0); glVertex(x+size,y-size,z-size);
+   glTexCoord(1,0); glVertex(x+size,y-size,z+size);
+   glTexCoord(1,1); glVertex(x+size,y+size,z+size);
+   glTexCoord(0,1); glVertex(x+size,y+size,z-size);
+
+   glTexCoord(0,0); glVertex(x-size,y-size,z+size);
+   glTexCoord(1,0); glVertex(x+size,y-size,z+size);
+   glTexCoord(1,1); glVertex(x+size,y-size,z-size);
+   glTexCoord(0,1); glVertex(x-size,y-size,z-size);
+
+   glTexCoord(0,0); glVertex(x-size,y+size,z-size);
+   glTexCoord(1,0); glVertex(x+size,y+size,z-size);
+   glTexCoord(1,1); glVertex(x+size,y+size,z+size);
+   glTexCoord(0,1); glVertex(x-size,y+size,z+size);
+   glEnd(); 
+}
+
+
+vecScalar( vec out, vec a, s )
+{
+   out.x = a.x * s;
+   out.y = a.y * s;
+   out.z = a.z * s;
+}
+
+vecAdd( vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;   
+}
+vecSub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;   
+}
+
+vecCross( vec out, vec a, vec b)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+
+vecset(vec a, x,y,z){
+   a.x = x; a.y = y; a.z = z;
+}
+
+vecset(vec a, vec other){
+   a.x = other.x; a.y = other.y; a.z = other.z;
+}
+
+vecDot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+length( vec v )
+{
+   return sqrt( vecdot(v,v) );
+}
+
+normalize( vec v )
+{
+   len = length(v);
+   if ( len )
+   {
+      v.x /= len; v.y /= len; v.z /= len;
+   }
+}
+
+buildMatrix( mtx[9], vec side, vec up, vec fwd )
+{
+   mtx[0] = side.x; mtx[1] = side.y; mtx[2] = side.z;
+   mtx[3] = up.x;   mtx[4] = up.y;   mtx[5] = up.z;
+   mtx[6] = fwd.x;  mtx[7] = fwd.y;  mtx[8] = fwd.z;
+}

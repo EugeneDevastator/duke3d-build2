@@ -1,0 +1,440 @@
+static iter = 0;
+
+struct vec
+{
+   x,y,z;
+}
+
+struct camera_t
+{
+   vec pos;
+   horiz_angle;
+   verti_angle;
+}
+
+static camera_t camera;
+
+()
+{
+   if (numframes == 0)
+   {
+      vecset( camera.pos, -10,-10,-10 );
+      camera.horiz_angle = pi/4;
+      camera.verti_angle = pi/4;
+   }
+
+
+   cls(0); clz(1e32); glCullface(GL_BACK);
+
+   playercontrols(camera);
+
+   vec pos;
+   vecset(pos, 0.0, 0.0, 0.0);
+   
+   iter = 0;
+   sponge(pos,4.0, 0);
+   
+   moveto(0,0);
+   setcol(255,255,255);
+   printf("%g", iter);
+}
+
+
+point_on_face( vec p, u, v, vec out )
+{
+   if ( abs(p.x) )
+   {
+      vecset(out,p.x,u,v);
+      return;
+   }
+   
+   if ( abs(p.y) )
+   {
+      vecset(out, u, p.y, v);
+      return;
+   }
+   
+   if ( fabs(p.z) )
+   {
+      vecset(out, u, v, p.z);
+      return;
+   }
+
+}
+
+sponge(vec pos, size, levels)
+{
+   if( levels > 1 )
+   {
+      drawcube(pos, size*1.5);
+      //setcol(255,255,255);drawbox(pos, size*1.5*1.02);
+      //drawsph(pos.x,pos.y,pos.z,size*1.5);
+      iter++;
+      return;
+   }
+   
+   vec faces[6];
+   vec face_n, face_s, face_w, face_e, face_u, face_d;
+
+   vecset(face_w, 1.0, 0.0, 0.0);
+   vecset(face_e, -1.0, 0.0, 0.0);
+
+   vecset(face_u, 0.0, 1.0, 0.0);
+   vecset(face_d, 0.0, -1.0, 0.0);   
+
+   vecset(face_n, 0.0, 0.0, 1.0);
+   vecset(face_s, 0.0, 0.0, -1.0);
+   
+   faces[0] = face_w;
+   faces[1] = face_e;
+   faces[2] = face_u;
+   faces[3] = face_d;
+   faces[4] = face_n;
+   faces[5] = face_s;
+
+   
+   for(faceidx = 0; faceidx < 6; faceidx++ )
+   {
+      //sleep(1); 
+      for(i=0; i<3; i++)
+      for(j=0; j<3; j++)
+      {
+         if( i==1 && j==1) continue;
+         
+         u = -1 + i;
+         v = -1 + j;
+         
+         vec pt;
+         point_on_face( faces[faceidx], u, v, pt );
+            
+         pt.x *= size; 
+         pt.y *= size; 
+         pt.z *= size;
+         
+         pt.x += pos.x;
+         pt.y += pos.y;
+         pt.z += pos.z;
+         sponge(pt, size/3, levels+1); 
+         
+      }
+   
+   }
+   
+}
+
+hsv_to_rgb(h,s,v){ 
+   // expects 360deg and 1,1 hue sat max
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   return rgb(r*255, g*255, b*255);
+}
+
+hue_to_rgb(h){ 
+   v=1; s=1;
+   hf = h / 60.0;
+   i  = floor( hf );
+   f  = hf - i;
+   pv  = v * ( 1 - s );
+   qv  = v * ( 1 - s * f );
+   tv  = v * ( 1 - s * ( 1 - f ) );
+   if(i==0){r=v; g=tv; b=pv;} 
+   if(i==1){r=qv; g=v; b=pv;} 
+   if(i==2){r=pv; g=v; b=tv;} 
+   if(i==3){r=pv; g=qv; b=v;} 
+   if(i==4){r=tv; g=pv; b=v;} 
+   if(i==5){r=v; g=pv; b=qv;}
+   if(i==6){r=v; g=tv; b=pv;}
+   if(i==-1){r=v; g=tv; b=qv;}    
+   return rgb(r*255, g*255, b*255);
+}
+
+
+
+vecset( vec out, x,y,z) { out.x = x; out.y = y; out.z = z; }
+
+vecscalar( vec out, vec in, s )
+{
+   out.x = in.x * s;
+   out.y = in.y * s;
+   out.z = in.z * s;
+}
+
+vecadd( vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;
+}
+
+vecsub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;
+}
+
+vecCross( vec out, vec a, vec b)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+
+dot( vec a, vec b )
+{
+   return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+vecset( vec a, vec b )
+{
+   a.x = b.x;
+   a.y = b.y;
+   a.z = b.z;
+}
+
+normalize( vec v )
+{
+   l = length( v );
+   if ( l )
+   {
+      v.x /= l; v.y /= l; v.z /= l;
+   }
+}
+
+length( vec v )
+{
+   return sqrt( dot(v,v) );
+}
+
+
+// Camera and movement code taken from /games/
+//Handle input and player movement
+playercontrols(camera_t cam)
+{
+   static oldMouseX;
+   static oldMouseY;
+   static mouseSpeedX;
+   static mouseSpeedY; 
+
+   f = 0.1;
+   if (keystatus[0x2a]) f /= 4;
+   if (keystatus[0x36]) f *= 4;
+   vx = (keystatus[32]-keystatus[30])*f; //D-A
+   vy = (keystatus[17]-keystatus[31])*f; //W-S  
+   vz = 0;//vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   
+   static mat[9]; 
+   ang2mat(cam.horiz_angle, cam.verti_angle, mat); // Convert angles to rotation matrix
+   
+   // find new position
+   cam.pos.x += mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   cam.pos.y += mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   cam.pos.z += mat[2]*vx + mat[5]*vz + mat[8]*vy; 
+   // mousespeed values are tweaked for 60 fps
+   mouseSpeedX = (mousx - oldMouseX) * 0.01;
+   mouseSpeedY = (mousy - oldMouseY) * 0.01;
+   oldMouseX = mousx;
+   oldMouseY = mousy;
+   if(bstatus==1)
+   {
+      cam.horiz_angle += mouseSpeedX;
+      cam.verti_angle += mouseSpeedY;
+   }
+   // Right,down,forwards unit vectors.
+   setcam(cam.pos.x, cam.pos.y, cam.pos.z,
+          mat[0],mat[1],mat[2],
+          mat[3],mat[4],mat[5],
+          mat[6],mat[7],mat[8]);
+}
+/* converts horizontal and vertical angles to a 3x3 rotation matrix */
+ang2mat(hang,vang,mat[9])
+{
+   mat[0] = cos(hang); mat[1] = 0; mat[2]=-sin(hang);
+   mat[6] = cos(vang)*sin(hang); mat[7] = sin(vang); mat[8]=cos(vang)*cos(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}
+
+
+drawcube(vec pos, size)
+{
+   vec to_cam;
+   vecsub(to_cam, pos, camera.pos);
+   distCam = length(to_cam) * 0.1;
+   normalize( to_cam );
+   vec norm;
+   
+   c = hue_to_rgb( iter%60 );
+   r=0; g=0; b=0;
+   getrgb(c,r,g,b);
+   
+   setcol( r / distCam, g/ distCam, b/ distCam);
+
+//#define DRAW_USING_PLANES 
+#ifdef DRAW_USING_PLANES     
+   size*=2;
+
+   vecset(norm, 0, 0, -1); dpr = dot( to_cam, norm ); if( dpr > 0.0 ); { drawplane(pos, norm, size); }
+   vecset(norm, 0, 0, 1); dpr = dot( to_cam, norm ); if( dpr > 0.0 ); { drawplane(pos, norm, size); }
+   vecset(norm, 0, -1, 0); dpr = dot( to_cam, norm ); if( dpr > 0.0 ); { drawplane(pos, norm, size); }
+   vecset(norm, 0, 1, 0); dpr = dot( to_cam, norm ); if( dpr > 0.0 ); { drawplane(pos, norm, size); }
+   vecset(norm, -1, 0, 0); dpr = dot( to_cam, norm ); if( dpr > 0.0 ); { drawplane(pos, norm, size); }
+   vecset(norm, 1, 0, 0); dpr = dot( to_cam, norm ); if( dpr > 0.0 ); {drawplane(pos, norm, size); }
+
+#else
+   glBegin(GL_QUADS); 
+   x=pos.x; y=pos.y; z=pos.z;
+   
+
+
+   glTexCoord(0,0); glVertex(x-size,y-size,z-size);
+   glTexCoord(1,0); glVertex(x+size,y-size,z-size);
+   glTexCoord(1,1); glVertex(x+size,y+size,z-size);
+   glTexCoord(0,1); glVertex(x-size,y+size,z-size);
+   
+   glTexCoord(0,0); glVertex(x-size,y-size,z+size);
+   glTexCoord(1,0); glVertex(x-size,y-size,z-size);
+   glTexCoord(1,1); glVertex(x-size,y+size,z-size);
+   glTexCoord(0,1); glVertex(x-size,y+size,z+size);
+   
+   glTexCoord(0,0); glVertex(x+size,y-size,z+size);
+   glTexCoord(1,0); glVertex(x-size,y-size,z+size);
+   glTexCoord(1,1); glVertex(x-size,y+size,z+size);
+   glTexCoord(0,1); glVertex(x+size,y+size,z+size);
+   
+   glTexCoord(0,0); glVertex(x+size,y-size,z-size);
+   glTexCoord(1,0); glVertex(x+size,y-size,z+size);
+   glTexCoord(1,1); glVertex(x+size,y+size,z+size);
+   glTexCoord(0,1); glVertex(x+size,y+size,z-size);
+
+   glTexCoord(0,0); glVertex(x-size,y-size,z+size);
+   glTexCoord(1,0); glVertex(x+size,y-size,z+size);
+   glTexCoord(1,1); glVertex(x+size,y-size,z-size);
+   glTexCoord(0,1); glVertex(x-size,y-size,z-size);
+
+   glTexCoord(0,0); glVertex(x-size,y+size,z-size);
+   glTexCoord(1,0); glVertex(x+size,y+size,z-size);
+   glTexCoord(1,1); glVertex(x+size,y+size,z+size);
+   glTexCoord(0,1); glVertex(x-size,y+size,z+size);   
+   
+   glEnd();
+
+#endif
+}
+
+drawbox( vec pos, si )
+{
+   for(u=-1;u<=1;u+=2)
+      for(v=-1;v<=1;v+=2)
+      {
+         uf = u * si;
+         vf = v * si;
+         moveto(pos.x-si,pos.y-uf,pos.z-vf); lineto(pos.x+si,pos.y-uf,pos.z-vf);
+         moveto(pos.x-vf,pos.y-si,pos.z-uf); lineto(pos.x-vf,pos.y+si,pos.z-uf);
+         moveto(pos.x-uf,pos.y-vf,pos.z-si); lineto(pos.x-uf,pos.y-vf,pos.z+si);
+     }
+}
+
+
+drawplane(vec pos, vec normal, radius)
+{   
+   pos.x += normal.x * radius*.5;
+   pos.y += normal.y * radius*.5;
+   pos.z += normal.z * radius*.5;
+   
+   tex_scale = 1;
+   // Create two vectors a and c, perpendicular to normal
+   vec not_normal;
+   vecset(not_normal, normal);
+   
+   vec perp;
+   vecset( perp, normal );
+   if (not_normal.x == 0 && not_normal.z == 0){
+      not_normal.x += 1;
+   }else{
+      not_normal.y += 1;
+   }
+   
+   vec a, b;
+   veccross(a,perp,not_normal);
+   normalize(a);
+   veccross(b,perp,a);
+    
+   // scale a and b down to 1/2 as we will use
+   // them in +- dir
+   vecscalar(a,a,0.5 * radius);
+   vecscalar(b,b,0.5 * radius);
+   
+   // Create plane vertices from perpendiculars
+   vec neg_a, neg_b;
+   vecscalar(neg_a, a, -1.0);   
+   vecscalar(neg_b, b, -1.0);
+
+   vec ma_mb; // -a - b
+   vec ma_pb; // -a + b
+   vec pa_pb; //  a + b
+   vec pa_mb; //  a - b
+   
+   vecadd( ma_mb, neg_a, neg_b);
+   vecadd( ma_pb, neg_a, b);
+   vecadd( pa_pb, a, b);
+   vecadd( pa_mb, a, neg_b);
+
+   vec u0, u1, u2, u3;
+   vecset(u0, ma_mb);
+   vecset(u1, ma_pb);
+   vecset(u2, pa_pb);
+   vecset(u3, pa_mb);
+
+   // Translate to final position
+   vecadd(u0,pos,u0);
+   vecadd(u1,pos,u1);
+   vecadd(u2,pos,u2);
+   vecadd(u3,pos,u3);
+
+   glBegin(GL_QUADS);
+      //glTexcoord(0,1 * tex_scale);
+      glVertex( u0 );   
+      //glTexcoord(0,0);
+      glVertex( u1 );
+      //glTexcoord(1 * tex_scale,0);
+      glVertex( u2 );
+      //glTexcoord(1 * tex_scale,1 * tex_scale);
+      glVertex( u3 );
+   glEnd();
+
+#ifdef SHOW_BOUNDS
+   glBegin(GL_LINE_LOOP);
+      glTexcoord(0,0);
+      glVertex( u0 );   
+      glTexcoord(0,1);
+      glVertex( u1 );
+      glTexcoord(1,1);
+      glVertex( u2 );
+      glTexcoord(1,0);
+      glVertex( u3 );
+   glEnd();
+#endif 
+}
+
+glVertex( vec v ){
+   glVertex( v.x, v.y, v.z );
+}

@@ -1,0 +1,104 @@
+static mtx[9];
+()
+{
+   cls(0); clz(1e32);
+ 
+   static worldup[3];
+   worldup[0] = 0;
+   worldup[1] = -1;
+   worldup[2] = 0;
+
+   static eyeCenter[3];
+   static target[3];
+   setVec( eyeCenter, 0,3,0 );
+     
+   t = klock(0);
+   r = 2;
+   setVec( target, r*cos(t),sin(t*3), r*sin(t) );
+   
+   lookAt( eyeCenter, target, worldUp, mtx );
+   
+   setcam2( eyeCenter, mtx );
+   
+   setcol(0xffffff);
+   
+   for(i=0; i<10; i++)
+   {
+      for(j=0; j<10; j++)
+      {
+         u = -1 + (i / 10) * 2;
+         v = -1 + (j / 10) * 2;
+         drawsph( 3*u, 0, 3*v, .2 );
+      }
+   }
+   
+   setcol(0,0,511);
+   drawsph( target[0], target[1], target[2], 1 );
+}
+
+setcam2( p[3], m[9] )
+{
+   setcam(p[0], p[1], p[2],
+          m[0], m[1], m[2],
+          m[3], m[4], m[5],
+          m[6], m[7], m[8]);
+}
+
+
+lookAt(eye[3], pos[3], worldup[3], mtx[9])
+{
+   static fwd[3];
+   static up[3];
+   static side[3];
+   
+   // find forward dir
+   fwd[0] = pos[0]-eye[0];
+   fwd[1] = pos[1]-eye[1];
+   fwd[2] = pos[2]-eye[2];
+   normalize(fwd);
+   
+   // find up vector as close to world up as possible   
+   dotprod = vecDot(worldUp,fwd);
+   static part2[3];
+   part2[0] = fwd[0]*dotprod;
+   part2[1] = fwd[1]*dotprod;
+   part2[2] = fwd[2]*dotprod;
+   
+   up[0] = worldUp[0] - part2[0];
+   up[1] = worldUp[1] - part2[1];
+   up[2] = worldUp[2] - part2[2];
+   normalize(up);
+
+   static side[3];
+   vecCross(fwd,up,side);
+   normalize(side);
+   
+   mtx[0] = side[0]; mtx[1] = side[1]; mtx[2] = side[2];
+   mtx[3] = up[0];   mtx[4] = up[1]; mtx[5] = up[2];
+   mtx[6] = fwd[0]; mtx[7] = fwd[1]; mtx[8] = fwd[2];
+}
+
+vecdot(v1[3],v2[3]){
+   return v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2];
+}
+
+normalize(v[3]){
+   l = sqrt(v[0]^2 + v[1]^2 + v[2]^2);
+   if(l){
+      v[0] /= l;
+      v[1] /= l;
+      v[2] /= l;
+   }
+}
+
+veccross(v1[3], v2[3], vout[3])
+{
+   vout[0] = v1[1] * v2[2] - v1[2] * v2[1];
+   vout[1] = v1[2] * v2[0] - v1[0] * v2[2];
+   vout[2] = v1[0] * v2[1] - v1[1] * v2[0];
+}
+
+setVec(v[3],x,y,z)
+{
+   v[0] = x; v[1] = y; v[2] = z;
+}

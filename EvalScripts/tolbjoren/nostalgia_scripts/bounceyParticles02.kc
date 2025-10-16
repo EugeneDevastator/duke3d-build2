@@ -1,0 +1,223 @@
+// bouncy particles
+// written by Torbjoern 27 july 2009
+// press MOUSE1 to drop particles
+
+enum{NUMPARTICLES=100, NUMOBSTANCLES=50};
+
+static particlex[NUMPARTICLES];
+static particley[NUMPARTICLES];
+
+static particlevx[NUMPARTICLES];
+static particlevy[NUMPARTICLES];
+
+static particleax[NUMPARTICLES];
+static particleay[NUMPARTICLES];
+
+static liveParticles=0;
+static pRadius = 10;
+
+
+static obstanclex[NUMOBSTANCLES];
+static obstancley[NUMOBSTANCLES];
+static obstancleRadius = 30;
+
+
+// Explosion
+static explodx;
+static explody;
+static explosionLife=0;
+
+
+// TODO: logic tick rate
+// TODO: delta timer
+// TODO: correct collision... integration of motion?
+()
+{
+   cls();
+   if(numframes==0) setup();
+   
+   setcol(0xff0000);
+   DrawObstancles();
+   
+   setcol(0x0000ff);
+   UpdateParticles();
+   drawExplosion();
+   
+   if(bstatus==1)
+   {
+      bstatus = 0;
+      DropParticle();
+   }
+   
+   sleep(8);
+}
+
+setup()
+{
+   for(i=0; i<NUMOBSTANCLES; i++)
+   {
+      skip = 0;
+      x=rnd*xres; y=100+rnd*yres;
+      for(j=0; j<NUMOBSTANCLES; j++)
+      {
+         if(i==j) continue; //dont collide with self
+         if( CirclesCollide2(obstanclex[i],obstancley[i],obstanclex[j],obstancley[j],obstancleRadius,obstancleRadius) )
+         {
+            skip = 1;
+         }
+      }
+      obstanclex[i] = x; obstancley[i] = y;
+      if(skip==0){ obstanclex[i] = -1000; obstancley[i] = -100;}
+   }
+   
+   for(i=0; i<NUMPARTICLES; i++)
+   {
+      resetParticle(i);
+   }
+   
+   
+}
+
+DrawObstancles()
+{
+   for(i=0; i<NUMOBSTANCLES; i++)
+   {
+      drawsph(obstanclex[i],obstancley[i],-obstancleRadius);
+   }
+}
+DropParticle()
+{
+   if(liveParticles < NUMPARTICLES)
+   {
+      particlex[liveParticles] = rnd*xres;
+      particley[liveParticles] = 0;  
+      liveParticles++;
+   }
+}
+
+UpdateParticles()
+{
+   for(i=0; i<liveParticles; i++)
+   {
+      for(o=0; o<NUMOBSTANCLES; o++)
+      {
+         collided = 0;
+         /*
+         dx = particlex[i]-obstanclex[o];
+         dy = particley[i]-obstancley[o]; 
+         l = VectorLength(dx,dy);
+         */
+         // Find normal,
+         // find exit vector
+         // set new vx
+         static c1[2]; c1[0] = obstanclex[o]; c1[1] = obstancley[o];
+         static c2[2]; c2[0] = particlex[i]; c2[1] = particley[i];
+         
+         if( CirclesCollide(c1,c2,obstancleRadius,pRadius) )
+         {
+            collided = 1;
+            wallAngle = CircleNormalAtPoint(particlex[i],particley[i],obstanclex[o],obstancley[o]);
+            //wallAngle = PI;
+            CalcReflection(wallAngle, i);
+            
+            createExplosion(particlex[i],particley[i], 64);
+            playsound("tapfloor.flac");
+         }   
+         if(collided) break;
+      }   
+      particlex[i] += particlevx[i];
+      particley[i] += particlevy[i];  
+
+      particlevx[i] += 10*particleax[i];
+      particlevy[i] += 10*particleay[i];
+      //if(particlevy  > 10) particlevy = 10;    
+
+      drawsph(particlex[i],particley[i],pRadius);
+      if(particley[i] > yres) ResetParticle(i);
+   }
+}
+
+ResetParticle(i)
+{
+   particlex[i] = xres*rnd;
+   particlevx[i] = 0;
+   particleax[i] = 0;
+   
+   particley[i] = -10;
+   particlevy[i] = 0;
+   particleay[i] = .01;
+}
+
+VectorLength(x,y)
+{
+   return sqrt(x^2+y^2);
+}
+
+// Takes: Wall angle, particle number
+// modifies particlevx,vy
+CalcReflection(wallAngle, particle)
+{
+   // Look up velocity for particle
+   vx = particlevx[particle];
+   vy = particlevy[particle];
+
+   // work out the normal
+   nx = cos(wallangle + pi/2);
+   ny = sin(wallangle + pi/2);
+   
+   // p is the projection of V onto the normal
+   dotproduct = vx*nx + vy*ny;
+   px = dotproduct * nx;
+   py = dotproduct * ny;
+   
+   // the velocity after hitting the wall is V-2p
+   //vx = vx - 2*px;
+   //vy = vy - 2*py;   
+   particlevx[particle] = vx - 2*px;
+   particlevy[particle] = vy - 2*py;
+}
+         
+CirclesCollide(c1[2],c2[2],r1,r2)
+{
+   if( Distance2D(c1[0],c1[1],c2[0],c2[1]) < (r1+r2) )
+   {
+      return 1;
+   }
+   return 0;
+}
+CirclesCollide2(x1,y1,x2,y2,r1,r2)
+{
+   if( Distance2D(x1,y1,x2,y2) < (r1+r2) )
+   {
+      return 1;
+   }
+   return 0;
+}
+Distance2D(x1,y1,x2,y2)
+{
+   return sqrt( (x1-x2)^2 + (y1-y2)^2 );
+}
+
+// point (x,y)
+// circle center (cx,cy)
+// points away from circle
+CircleNormalAtPoint(x,y,cx,cy)
+{
+   return (atan2(y-cy, x-cx));        
+}
+
+createExplosion(x,y, life){
+   explodx = x;
+   explody = y;
+   explosionLife = life;
+}
+updateExplosion(){
+   if(explosionLife > 0) explosionLife--;
+}
+drawExplosion(){
+   setcol(0xffa400);
+   for(i=0; i<6.2;i+=0.5){
+      moveto(explodx, explody);
+      lineto( explodx+cos(i)*explosionLife, explody+sin(i)*explosionLife );
+    }
+}

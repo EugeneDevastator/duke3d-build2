@@ -1,0 +1,417 @@
+// Think of it as a heightmap
+// the goal is at the bottom of the hightmap
+// the "AI" agent must always move towards the goal
+// we must be careful not to setup the repulsors
+// in a way that could trap the player in a local minima
+// for now you have to keep a distance between repulsors.
+
+// use repulsors to make walls
+// use attractors to make roads
+
+// things start getting slow at 50 repulsors.
+
+// how does one construct surrounding walls without
+// creating local minima to get stuck in?
+// could traverse the potentialfield with BestFirst?
+
+/* The Lenard Jones potential function is best for
+chasing
+avoidance
+flocking
+
+   not for rigid collisions. You can combine in with rigid collisions to
+   make AI agents appear smarter (dont hug walls, avoid them )
+*/
+
+
+/*
+   TODO: control over forces!
+
+
+*/
+
+struct coord_t
+{
+ x;
+ y;
+ decay;
+ strength;  
+}
+
+
+enum{MAXATTRACTORS = 50}
+static numAttractors = 1;
+static coord_t attractors[MAXATTRACTORS];
+
+enum{MAXREPULSORS = 600}
+static numRepulsors = 0;
+static coord_t repulsors[MAXREPULSORS];
+
+enum{MAXCRITTERS = 150}
+static numCritters = 0;
+static coord_t critters[MAXCRITTERS];
+
+static decayRepulsors = 0;
+static strengthRepulsors = 0; // Repulsor radius of influence
+
+
+enum{e = 2.718281828 };
+
+static t, oldtime, dt;
+()
+{
+   cls(0);
+   t = klock(0);
+   dt = t - oldtime;
+   oldtime = t;
+   
+   nx = xres/100;
+   ny = yres/100;
+
+   if(numframes==0)
+   {
+      radi = 15; // 15
+      decayRepulsors = 1/( (radi/2)^2 );
+      strengthRepulsors = radi; //15
+
+
+
+      attractors[0].x = 50*nx;
+      attractors[0].y = 50*ny;
+      attractors[0].decay = 1.0/100000; // attractor decay rate,  0.0000001; is good
+      attractors[0].strength = 15; // 5 15 100 // attractor radius of influence, keep high for goal. 
+      
+      for(x=strengthRepulsors; x<=xres-strengthRepulsors; x+=20)
+      {
+         repulsors[numRepulsors].x = x;
+         repulsors[numRepulsors].y = yres-decayRepulsors;
+         repulsors[numRepulsors].decay = decayRepulsors;
+         repulsors[numRepulsors].strength = strengthRepulsors;
+         numRepulsors++;
+         
+         repulsors[numRepulsors].x = x;
+         repulsors[numRepulsors].y = decayRepulsors;
+         repulsors[numRepulsors].decay = decayRepulsors;
+         repulsors[numRepulsors].strength = strengthRepulsors;
+         numRepulsors++;
+      } 
+      
+      for(y=strengthRepulsors; y<yres-strengthRepulsors; y+=20)
+      {
+         repulsors[numRepulsors].x = decayRepulsors;
+         repulsors[numRepulsors].y = y;
+         repulsors[numRepulsors].decay = decayRepulsors;
+         repulsors[numRepulsors].strength = strengthRepulsors;
+         numRepulsors++;
+         
+         repulsors[numRepulsors].x = xres-strengthRepulsors;
+         repulsors[numRepulsors].y = y;
+         repulsors[numRepulsors].decay = decayRepulsors;
+         repulsors[numRepulsors].strength = strengthRepulsors;
+         numRepulsors++;
+      }
+      
+      cls(0);
+      moveto(10*nx,35*ny);
+      setfont(18*2.8,36*2.8,1);
+      setcol(255,0,0);printf("HAS POTENTIAL");
+      refresh();
+      for(ix=15; ix<xres-15; ix += 8)
+      for(iy=15; iy<yres-15; iy += 8)
+      {
+         r=0; g=0; b=0;
+         getpix(ix,iy,r,g,b);
+         if(r >= 200)
+         {
+            repulsors[numRepulsors].x = ix;
+            repulsors[numRepulsors].y = iy;
+            repulsors[numRepulsors].decay = decayRepulsors;
+            repulsors[numRepulsors].strength = 5;//strengthRepulsors;
+            numRepulsors++;
+         }
+      }
+   }
+
+   
+   drawFieldLines();
+   
+   input();
+   
+
+   
+
+   setcol(0,0,255); drawsph(attractors[0].x, attractors[0].y, -25);
+   
+
+   setcol(0xffffff);
+   for(i=0; i<numAttractors; i++)
+   {
+      drawsph( attractors[i].x, attractors[i].y, -attractors[i].strength);
+   }
+   setcol(0xff0000);
+   for(i=0; i<numRepulsors; i++)
+   {
+      drawsph( repulsors[i].x, repulsors[i].y, -repulsors[i].strength);
+   }
+   
+   setcol(0xffffff);
+   for(i=0; i<numCritters; i++)
+   {
+      x = critters[i].x;
+      y = critters[i].y;
+      
+      doMove = 1;
+      
+      xgrad = 0; ygrad = 0;
+      derivative(x,y,xgrad,ygrad);
+      
+      xgrad2 = 0; ygrad2 = 0;
+      avoid(x,y,xgrad2,ygrad2);
+      xgrad += xgrad2;
+      ygrad += ygrad2;
+      
+      speed = 1;
+      
+      // Exit if gradient goes to zero
+      //if( fabs(xgrad-0.0) < 1e-6 && fabs(ygrad-0.0) < 1e-6 ) doMove = 0;
+      if( fabs(xgrad-10000) < 1e-6 || fabs(ygrad-10000) < 1e-6 ) doMove = 0;
+      
+      // Exit if we found goal, attractor[0]
+      
+      if( x > attractors[0].x -speed && x < attractors[0].x + speed )
+      {
+         if( y > attractors[0].y -speed && y < attractors[0].y + speed )
+         {
+            //doMove = 0;
+         }
+      }
+      
+      
+      if( doMove )
+      {
+         fact1 = 1.0 / xgrad;
+         fact2 = 1.0 / ygrad;
+         
+         factor = 0;
+         if( abs(fact1) < abs(fact2) )
+            factor = abs(fact1); 
+         else 
+            factor = abs(fact2);
+         
+         
+         // Move towards negative gradient. Down the slope.
+         critters[i].x -= speed * xgrad * factor;
+         critters[i].y -= speed * ygrad * factor;
+      }
+      // Draw
+      x = critters[i].x;
+      y = critters[i].y;
+      drawsph(x,y,-critters[i].strength);
+      setfont(12,18);
+      moveto(x-4,y-4); printf("%1.0f", i);
+   }
+   
+
+   setcol(0x777777);
+   for(y=0; y<15*4; y++)
+   {
+      moveto(0,y); lineto(160,y);
+   } 
+   setcol(0xffffff);
+   setfont(12,18);
+   moveto(0,0);
+   printf("numrepulsors %g\n",numrepulsors); 
+   printf("numAttractors %g\n",numAttractors);
+   printf("numCritters %g\n",numCritters);
+   printf("%g \n",1*10^-7);
+}
+
+input()
+{
+   if(keystatus[2])
+   {
+      attractors[0].x = mousx;
+      attractors[0].y = mousy;
+   }
+   if(bstatus == 1 && numRepulsors < MAXREPULSORS)
+   {
+      //bstatus = 0;
+      
+      if(distance(mousx,mousy, attractors[0].x, attractors[0].y ) > strengthRepulsors*2) // Don't place repulsor on goal
+      {
+         spotFree = 1;      
+
+         // Check if point is sufficiently far away from a repulsor.
+         for(i=0; i<numRepulsors; i++)
+         {
+            if(distance(mousx,mousy, repulsors[i].x, repulsors[i].y ) < strengthRepulsors*1.0)
+            {
+               spotFree = 0;
+               break;
+            }
+         }
+         
+         if( spotFree )
+         {
+            repulsors[numRepulsors].x = mousx;
+            repulsors[numRepulsors].y = mousy;
+            repulsors[numRepulsors].decay = decayRepulsors;
+            repulsors[numRepulsors].strength = strengthRepulsors;
+            numRepulsors++;
+         }
+
+      }
+   }
+   
+   if(bstatus == 2 && numCritters < MAXCRITTERS)
+   {
+      //bstatus = 0;
+      critters[numcritters].x = mousx;
+      critters[numcritters].y = mousy;
+      
+      radi = 8;
+      critters[numcritters].decay = 1/( (radi/2)^2 );
+      critters[numcritters].strength = radi;
+      numCritters++;
+   }
+   
+   
+   /*
+   if(bstatus == 2 && numAttractors < MAXATTRACTORS)   
+   {
+      //bstatus = 0;
+
+      
+      spotFree = 1;      
+
+      // Check if point is sufficiently far away from a repulsor.
+      for(i=0; i<numAttractors; i++)
+      {
+         if(distance(mousx,mousy, attractors[i].x, attractors[i].y ) < beta*1.2)
+         {
+            spotFree = 0;
+            break;
+         }
+      }
+      
+      if( spotFree )
+      {
+         attractors[numAttractors].x = mousx;
+         attractors[numAttractors].y = mousy;
+         attractors[numAttractors].gamma = 0.01;
+         attractors[numAttractors].alpha = 15;
+         numAttractors++;
+      }
+   }
+   */
+}
+
+drawFieldLines()
+{
+   inc = 80;
+   for(y=0; y<yres; y+=inc)
+   {
+      for(x=0; x<xres; x+=inc)
+      {
+         // find field strength at this point (x,y)
+         value = -attract(x,y) + repulse(x,y) ; 
+            
+         // If strength is positive, we have a problem?
+         c = 0;
+         if( value > 0 ) c = rgb( 255, 0, 0);
+         if( value < 0 ) c = rgb( 0, abs(value)*255, 0);
+         setcol(c);
+      
+         // Find direction of field
+         xgrad=0; ygrad=0;
+         derivative(x,y,xgrad,ygrad);
+         
+         // Draw arrow
+         drawsph(x,y,-1.5);
+         moveto(x,y); lineto(x+15*-xgrad, y+15*-ygrad);         
+      }
+   }
+}
+
+distance(x1,y1,x2,y2)
+{
+   return sqrt( (x1-x2)^2 + (y1-y2)^2 )
+}
+
+attract(x,y)
+{
+   value = 0;
+   for(i=0; i<numAttractors; i++)
+   {
+      gamma = attractors[i].decay;
+      alpha = attractors[i].strength;
+      r  = ((x-attractors[i].x)^2 + (y-attractors[i].y)^2) ;
+      value += alpha * pow( e, (-gamma/2 * r ) );
+   }
+   value = abs(value);
+}
+
+repulse(x,y)
+{
+   value = 0;
+   for(i=0; i<numRepulsors; i++)
+   {
+      gamma = repulsors[i].decay;
+       beta = repulsors[i].strength;
+      r = ((x-repulsors[i].x)^2 + (y-repulsors[i].y)^2);
+      value += beta * pow( e, (-gamma/2 * r ) );
+   }
+   value = abs(value);
+}
+
+derivative(x,y, &xval, &yval)
+{
+   xval=0;
+   yval=0;
+   for(i=0; i<numAttractors; i++)
+   {
+      gamma = attractors[i].decay;
+      alpha = attractors[i].strength;
+      r = ((x-attractors[i].x)^2 + (y-attractors[i].y)^2);
+      term = pow( e, (-gamma/2 * r ) );
+      xval += alpha*gamma*(x-attractors[i].x) * term;
+      yval += alpha*gamma*(y-attractors[i].y) * term;
+   }
+   
+   for(i=0; i<numRepulsors; i++)
+   {
+      gamma = repulsors[i].decay;
+      beta = repulsors[i].strength;
+      r =  ((x-repulsors[i].x)^2 + (y-repulsors[i].y)^2);
+      term = pow( e, (-gamma/2 * r ) );
+      xval -= beta*gamma*(x-repulsors[i].x) * term;
+      yval -= beta*gamma*(y-repulsors[i].y) * term;
+   }
+   /*
+   len = sqrt(xval^2 + yval^2);
+   xval /= len;
+   yval /= len;
+   */
+}
+
+// Make critters avoid each other
+avoid(x,y, &xval, &yval)
+{
+   xval=0;
+   yval=0;
+   for(i=0; i<numCritters; i++)
+   {
+      gamma = critters[i].decay;
+      alpha = critters[i].strength;
+      r = ((x-critters[i].x)^2 + (y-critters[i].y)^2);
+      term = pow( e, (-gamma/2 * r ) );
+      xval -= alpha*gamma*(x-critters[i].x) * term;
+      yval -= alpha*gamma*(y-critters[i].y) * term;
+   }
+   
+   /*
+   len = sqrt(xval^2 + yval^2);
+   xval /= len;
+   yval /= len;
+   */  
+}

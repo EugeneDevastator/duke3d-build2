@@ -1,0 +1,238 @@
+// Port of code by Morgan McGuire
+// source can be found here:
+// http://www.flipcode.com/archives/2D_OBB_Intersection.shtml
+
+struct Vector2
+{
+   x,y;
+};
+
+struct OBB{
+    Vector2         corner[4]; // BL, BR, TR, TL
+    Vector2         axis[2];
+    double          origin[2];
+};
+
+//static rot = 0;
+    
+static OBB myBox, mouseBox;
+
+()
+{
+   cls(0); clz(1e32); glDisable(GL_DEPTH_TEST);
+   
+   
+   if( numframes == 0 )
+   {
+      setOBB( myBox, xres/2, yres/2, 40,40,PI/4 );
+      setOBB( mouseBox, 0,0, 40,40, 0 );
+   }
+   
+   Vector2 mousePos;
+   mousePos.x = mousx; mousePos.y = mousy;
+   moveBox( mouseBox, mousePos );
+   
+   if( bstatus == 1 )
+   {
+      //rot += 0.005;
+      rotateBox(mouseBox, -0.005);
+   }
+   if( bstatus == 2 )
+   {
+      //rot -= 0.005;
+      rotateBox(mouseBox, 0.005);
+   }
+   
+   
+   moveto(0,0);
+   
+   if( overlap(myBox, mouseBox)  )
+   {
+      setcol(0xff0000);
+      printf("overlap!");   
+   }else
+   {
+      setcol(0xffffff);
+      printf("no overlap");   
+   }
+
+
+   drawbox(mybox);
+   drawbox(mouseBox);
+}
+
+// CRAP:
+rotateBox(OBB box, angle)
+{
+  Vector2 centroid;
+  centroid.x = (box.corner[0].x + box.corner[1].x + box.corner[2].x + box.corner[3].x) / 4;
+  centroid.y = (box.corner[0].y + box.corner[1].y + box.corner[2].y + box.corner[3].y) / 4;
+
+
+   for(i=0; i<4; i++){
+      box.corner[i].x -= centroid.x;
+      box.corner[i].y -= centroid.y;      
+
+      x = box.corner[i].x;
+      y = box.corner[i].y;
+    
+      rotate2d(x,y,angle);
+      
+      box.corner[i].x = centroid.x + x;
+      box.corner[i].y = centroid.y + y;  
+   }
+}
+
+rotate2d(&x,&y,angle)
+{
+   x1=0,y1=0;
+   sa=0,ca=0;
+   
+   x1 = x;
+   y1 = y;
+   sa = sin(angle);
+   ca = cos(angle);
+   
+   x = x1 * ca - y1 * sa;
+   y = y1 * ca + x1 * sa;
+}
+
+
+computeAxes(OBB box) {
+     box.axis[0].x = box.corner[1].x - box.corner[0].x; 
+     box.axis[0].y = box.corner[1].y - box.corner[0].y; 
+     box.axis[1].x = box.corner[3].x - box.corner[0].x; 
+     box.axis[1].y = box.corner[3].y - box.corner[0].y; 
+
+     // Make the length of each axis 1/edge length so we know any
+     // dot product must be less than 1 to fall within the edge.
+
+     for (a = 0; a < 2; a++) {
+        squaredLength = box.axis[a].x^2 + box.axis[a].y^2;
+        box.axis[a].x /= squaredLength;
+        box.axis[a].y /= squaredLength;
+        box.origin[a] = box.corner[0].x * box.axis[a].x + box.corner[0].y * box.axis[a].y;
+     }
+}
+
+
+setOBB(OBB box, px, py, w, h, angle)
+{
+   Vector2 v1;
+   v1.x = cos(angle);
+   v1.y = sin(angle);
+   Vector2 v2;
+   v2.x = -sin(angle);
+   v2.y = cos(angle);
+   
+   v1.x *= w / 2;
+   v1.y *= w / 2;
+   v2.x *= h / 2;
+   v2.y *= h / 2;
+   
+   box.corner[0].x = px - v1.x - v2.x;
+   box.corner[0].y = py - v1.y - v2.y;
+   
+   box.corner[1].x = px + v1.x - v2.x;
+   box.corner[1].y = py + v1.y - v2.y;
+   
+   box.corner[2].x = px + v1.x + v2.x;
+   box.corner[2].y = py + v1.y + v2.y;
+   
+   box.corner[3].x = px - v1.x + v2.x;
+   box.corner[3].y = py - v1.y + v2.y;
+   
+   computeAxes(box);
+     
+}
+
+overlap( OBB b1, OBB b2 ){
+   if( overlaps1Way(b1,b2) && overlaps1Way(b2,b1) )
+   {   
+      return 1;
+   }
+   return 0;
+}
+ 
+    /** Returns true if other overlaps one dimension of this. */
+overlaps1Way(OBB first, OBB other){
+   for(i=0; i<2; i++)
+   {
+      t = other.corner[0].x * first.axis[i].x + other.corner[0].y * first.axis[i].y;
+      tMin = t;
+      tMax = t;
+      
+      for(c=1; c<4; c++){
+         t = other.corner[c].x * first.axis[i].x + other.corner[c].y * first.axis[i].y; 
+         
+         if( t < tMin ){ tMin = t; }
+         else if(t > tMax){ tMax = t; }
+      }
+   
+   
+      // Subtract off origin
+      // see if [tMin, tMax] intersects [0,1]
+      if( (tMin > (1 + first.origin[i]) ) || (tMax < first.origin[i]) )
+      {
+         // There was no intersection along this dimension: no overlap
+         return 0;
+      }
+   }
+   // There was no dimension along which there is no intersection.
+   // Therefore the boxes overlap.  
+   return 1;
+}
+
+
+moveBox(OBB box, Vector2 center) {
+   Vector2 centroid;
+   centroid.x = (box.corner[0].x + box.corner[1].x + box.corner[2].x + box.corner[3].x) / 4;
+   centroid.y = (box.corner[0].y + box.corner[1].y + box.corner[2].y + box.corner[3].y) / 4;
+
+   Vector2 translation;
+   translation.x = center.x - centroid.x;
+   translation.y = center.y - centroid.y;
+
+   for( c = 0; c < 4; ++c) {
+      box.corner[c].x += translation.x;
+      box.corner[c].y += translation.y;
+   }
+   
+   computeAxes(box);
+}
+
+drawbox(OBB box)
+{
+   setcol(255,255,255);
+   moveto( box.corner[0].x, box.corner[0].y);
+   for (i = 1; i < 4; i++) {
+     lineto( box.corner[i].x, box.corner[i].y);
+   }
+   lineto( box.corner[0].x, box.corner[0].y);
+      
+   for (c = 0; c < 4; c++) {
+   drawsph( box.corner[c].x, box.corner[c].y, 3);
+   }
+   
+
+   Vector2 centroid;
+   centroid.x = (box.corner[0].x + box.corner[1].x + box.corner[2].x + box.corner[3].x) / 4;
+   centroid.y = (box.corner[0].y + box.corner[1].y + box.corner[2].y + box.corner[3].y) / 4;
+
+   for(i=0; i<2; i++){
+   len = sqrt( box.axis[i].x^2 + box.axis[i].y^2 );
+   nx = box.axis[i].x / len; ny = box.axis[i].y / len;
+
+   if(i==0) setcol(255,0,0);
+   if(i==1) setcol(0,255,0);
+   
+   moveto( centroid.x,centroid.y );
+   lineto( centroid.x+nx * 25,centroid.y+ny * 25 );
+  
+   //moveto( centroid.x,centroid.y );
+   //lineto( centroid.x+box.origin[0],centroid.y+box.origin[1] ); 
+
+
+   }
+        
+}

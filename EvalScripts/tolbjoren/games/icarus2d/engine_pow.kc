@@ -1,0 +1,77 @@
+static tim,oldtim,dt;
+static percent = 0;
+static sound = 0;
+()
+{
+   tim = klock(0);
+   dt = tim - oldtim;
+   oldtim = tim;
+
+   static timetoplay = 0;
+   static handle = 0;
+   static totLen;
+   
+   if (sound==0)
+       totLen = .5;
+    else
+       totLen = 1;
+   
+   frq = mousx/xres*5;
+   percent += (frq*dt) / totLen;
+   
+   if (keystatus[57] )
+   {
+      keystatus[57] = 0;
+      sound++;
+      sound %= 2;
+      percent  = 1.0; // force it to play new sound
+      playsoundupdate(handle,0);  // Kill specified sound
+   }   
+
+   if (numframes==0 || percent >= 1.0)
+   {
+      percent = 0;
+      timetoplay = klock(0) + totLen;
+      if ( sound == 0 )
+         handle = playsound("fminst.flac", 100, frq);   
+      else
+         handle = playsound("moo.flac", 100, frq);  
+   }
+   playsoundupdate(handle,100,frq); 
+   
+   cls(0);
+   
+
+   draw_tach_meter(  xres/2, yres/2, 100, frq/5 );
+
+   setcol(255,255,0);
+   moveto(0,0);
+   printf("frq = %g\n", frq*100);
+   printf("percent = %g\n", percent*100);
+   printf("playing sound no = %g\n", sound);
+   
+   while( klock(0) < numframes/60 ) {}
+}
+
+
+draw_tach_meter(x,y,size,angle)
+{
+   setcol(255,255,255);
+   drawsph(x,y, -size);
+
+   for(i=0; i<12; i++)
+   {
+      a = i*2*PI/12;
+      ca = cos(a);
+      sa = sin(a);
+      moveto(x + ca*size, y + sa*size );
+      lineto(x + ca*size*.8, y + sa*size*.8 );
+   }   
+
+   setcol(255,0,0);
+   dx = cos( pi/2+angle * 6.28 );
+   dy = sin( pi/2+angle * 6.28 );
+   drawcone( x, y, 10,
+             x + dx*size, y + dy*size, 1);
+             
+}

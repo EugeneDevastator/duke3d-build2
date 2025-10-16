@@ -1,0 +1,724 @@
+struct vec
+{
+   x,y,z;
+};
+
+struct player_t
+{
+   vec pos; // actual position
+   vec dir // facing direction
+   vec antipos; // Reference point for rotation around sphere
+   dirangle; // steering angle
+   speed; // 0 if still, else speed of movement in dirangle
+   
+   alive;
+   vec cEast;
+   vec cNorth;
+   vec cUp;
+};
+
+static vec planet;
+static planetRadius = 1; // TODO, make clamping relative to this
+static playerRadi = 0.03;
+
+static player_t human_player;
+
+static enemyRadi = 0.02;
+static bulletRadi = 0.01;
+
+enum{MAX_ENEMIES = 64}
+static player_t cpu_players[MAX_ENEMIES];
+
+enum{MAX_BULLETS = 32}
+static player_t bullets[MAX_BULLETS];
+
+
+// Description
+// i want a point to be clamped to a sphere surface, 
+// yet move in any direction... up down left right
+// by rotating its axis
+// clampPoint( player_t player, vec targetPoint )
+static time, oldtime;
+()
+{
+   time = klock(0);
+   dt = time - oldtime;
+   dt = min(dt, 0.01);
+   oldtime = time;
+    
+   if(numframes==0)
+   {   
+      vecset( planet, 0, 0, 0 ); 
+      
+      vec initPos;
+      vecset(initPos, planet.x, planet.y+planetRadius, planet.z);
+      init_player( human_player, initPos );
+      
+      for(i=0; i<MAX_ENEMIES; i++)
+      {
+         x=0; y=0; z=0;
+         pointOnSphereUniform(planetRadius,x,y,z) ;
+         vecset(initPos, planet.x + x, planet.y + y, planet.z + z);
+         init_player( cpu_players[i], initPos );
+         cpu_players[i].alive = 1;
+      }
+   }
+
+   human_player.dirangle = getPlayerDirection(human_player, dt);
+
+
+   cls(0);
+   clz(1e32);
+   glEnable(GL_DEPTH_TEST);
+   //do_controls();
+   
+   clampPoint( human_player, planet, 0 );
+   
+   static m[9];
+   ang = atan2(mousy-yres/2, mousx-xres/2);
+   initRotationMatrix(m,human_player.cUp, ang);
+   
+
+   vec aimdir;
+   vecset( aimdir, human_player.cEast );
+   rotateVector(m,  aimdir);   
+   normalize( aimdir );
+   setcol(0,0,255); drawvec( human_player.pos, aimdir );
+
+   static cooldown  =0;
+   if ( keystatus[57]==1 && cooldown <= 0 )
+   {
+      cooldown = 1/10;
+      createBullet( human_player.pos, aimdir );      
+   }
+   cooldown -= dt;
+
+   applyCamera(); 
+
+   setcol(0xffffff);
+   //drawspr("planet.kv6",planet.x, planet.y, planet.z, 0.95, 0,0);
+   drawuv();
+   
+
+   setcol(255,0,255);
+   //drawvec(human_player.pos, human_player.dir);
+
+   setcol(255,255,255);
+   //drawsph( human_player.antipos, .1);
+   
+   drawsph( human_player.pos, playerRadi);
+   
+// Draw Enemies
+   for(i=0; i<MAX_ENEMIES; i++)
+   {
+      if (cpu_players[i].alive > 0 )
+      {
+         setcol(0,255,0);
+         drawsph( cpu_players[i].pos, enemyRadi);
+         drawvec( cpu_players[i].pos, cpu_players[i].dir );
+      }
+   }  
+   
+   updateEnemies(dt);
+   updateBullets(dt);
+   
+   for(i=0; i<MAX_BULLETS; i++)
+   {
+      if ( bullets[i].alive > 0 )
+      {
+         setcol(255,0,0);
+         bullets[i].speed = 1 * dt;
+         drawsph( bullets[i].pos, bulletRadi);
+         drawvec( bullets[i].pos, bullets[i].dir );
+      }
+   }   
+   
+
+   doCollision();
+   
+   moveto(10,yres-20);
+   setcol(0xff0000); printf("WASD + space + mouse");
+   
+}
+
+doCollision()
+{
+   vec variableScopeFail;
+   for(i=0; i<MAX_BULLETS; i++)
+   {
+      if ( bullets[i].alive > 0 )
+      {
+         for(j=0; j<MAX_ENEMIES; j++)
+         {
+            if ( bullets[i].alive <= 0 ) break;
+            
+            if ( cpu_players[j].alive > 0 )
+            {
+               vecsub( variableScopeFail, bullets[i].pos, cpu_players[j].pos );
+               d = length(variableScopeFail);
+               if ( d < (enemyRadi+bulletRadi) )
+               {
+                  bullets[i].alive = 0;
+                  cpu_players[j].alive = 0;
+                  playsound("ppbaltab.wav");
+               }
+            }
+         }
+      }
+   }
+}
+
+drawsph( vec v, r ){
+   drawsph( v.x, v.y, v.z, r);
+}
+
+// if is ai, then dont set dir to +x vec (EAST)
+clampPoint( player_t player, vec planet, isAi )
+{
+   // relative to planet
+   vec rp;
+   vecsub( rp, player.pos, planet );
+   normalize(rp);
+   
+   vecadd(player.pos, planet, rp );
+   vecsub(rp, player.antipos, planet );
+   normalize(rp);
+   
+   vecadd( player.antipos, planet, rp );
+   
+   // edir = cross(antipos-P, P-O) )
+   vec np; vecsub( np, player.antipos, player.pos );
+   vec po; vecsub( po, player.pos, planet );
+   vec edir; veccross(edir, np, po); normalize(edir);   
+   
+   // ndir = cross(edir, P-O)
+   vec ndir; veccross(ndir, edir, po); normalize(ndir);
+   
+   vec axis;
+   vecsub( axis, player.antipos, planet );
+   normalize(axis);
+   
+   if ( isAi == 0 )
+   {
+      vecset( player.dir, edir );
+   }
+
+   vecset( player.cEast, edir );
+   vecset( player.cNorth, ndir );
+   vecset( player.cUp, po );
+   
+   vec e_cross_n;
+   veccross( e_cross_n, edir, ndir );
+   
+   initRotationMatrix(m,e_cross_n, player.dirangle);
+   rotateVector(m, player.dir);
+   
+   
+   if(player.speed > 0)
+   {
+      // Move player pos and reference point
+      player.pos.x += player.dir.x * player.speed;
+      player.pos.y += player.dir.y * player.speed;
+      player.pos.z += player.dir.z * player.speed;
+      
+      vec top_dir;
+      top_dir.x = -edir.x;
+      top_dir.y = -edir.y;
+      top_dir.z = -edir.z;
+   
+      static m[9];
+      initRotationMatrix(m,axis, player.dirangle );
+      rotateVector(m, top_dir);
+
+      player.antipos.x += top_dir.x * player.speed;
+      player.antipos.y += top_dir.y * player.speed;
+      player.antipos.z += top_dir.z * player.speed;
+   }
+   
+}
+
+// Convert arrow key directions (up, down, left, right) to 
+// a 3D vector with components only in the X,Y plane
+// and freedom in 8 directions
+// using the |u| * |v| * cos(angle) = dotproduct 
+// identity for getting the angle and 
+// the cross-product trick to decide which half-plane
+// our direction vector should point
+
+getPlayerDirection(player_t player, frame_delta)
+{
+   //vx = keystatus[203] - keystatus[205];
+   //vy = keystatus[200] - keystatus[208];
+   
+   vx = keystatus[30] - keystatus[32];
+   vy = keystatus[17] - keystatus[31];
+   
+   vec dirvec;
+   vecset(dirvec, -vx, vy, 0);
+
+   vec sidevec;
+   vecset(sidevec, 1, 0, 0);
+   
+   vec sideXdir;
+   veccross( sideXdir, sidevec, dirvec );
+   moveto(0,0);
+   printf("%g\n%g\n%g", sideXdir.x, sideXdir.y, sideXdir.z);
+   
+   direction = angleBetween( dirvec, sidevec );
+   if ( sideXdir.z <= -1 )
+   {
+      vecset(dirvec, vx, vy, 0);
+      direction = angleBetween( dirvec, sidevec );
+      direction -= PI;
+   }
+
+   f = .85 * frame_delta;
+   player.speed = 0;
+   if (fabs(vx) || fabs(vy) )
+   {
+    player.speed = f;
+   }
+   return direction;
+}
+
+init_player( player_t player, vec pos )
+{
+   vecset( player.pos, pos );
+   vecset( player.antipos, pos.x, pos.z, pos.y ); // swap
+}
+
+copyInto(dst[9], src[9] )
+{
+   for(i=0; i<9; i++){
+      dst[i] = src[i];
+   }
+}
+
+drawvec(vec pos, vec dir)
+{
+   #ifdef STYLE_1
+   drawcone(pos.x, pos.y, pos.z, .01,
+            pos.x + dir.x*.5,
+            pos.y + dir.y*.5,
+            pos.z + dir.z*.5, .01);   
+   #else
+   
+   // TODO cheating with vec length... 
+   moveto(pos.x, pos.y, pos.z);
+   lineto( pos.x + dir.x*.05,
+           pos.y + dir.y*.05,
+           pos.z + dir.z*.05 );   
+   #endif
+}
+
+
+
+InitRotationMatrix(Mtx[9], vec pAxis, r)
+{
+  // The axis vector must be of unit length
+  x=0, y=0, z=0, m=0;
+  m = length(pAxis);
+  x = pAxis.x/m;
+  y = pAxis.y/m;
+  z = pAxis.z/m;
+
+  // Compute the rotation matrix  
+  c = cos(r);
+  s = sin(r);
+
+  Mtx[0] = (x * x) * (1.0 - c) + c;
+  Mtx[1] = (y * x) * (1.0 - c) + (z * s);
+  Mtx[2] = (z * x) * (1.0 - c) - (y * s);
+
+  Mtx[3] = (x * y) * (1.0 - c) - (z * s);
+  Mtx[4] = (y * y) * (1.0 - c) + c;
+  Mtx[5] = (z * y) * (1.0 - c) + (x * s);
+
+  Mtx[6] = (x * z) * (1.0 - c) + (y * s);
+  Mtx[7] = (y * z) * (1.0 - c) - (x * s);
+  Mtx[8] = (z * z) * (1.0 - c) + c;
+} 
+
+// C = AB, multiplies A and B, puts result in C
+mult(c[9],a[9],b[9])
+{
+   C[0] = A[0]*B[0] + A[1]*B[3] + A[2]*B[6];
+   C[1] = A[0]*B[1] + A[1]*B[4] + A[2]*B[7];
+   C[2] = A[0]*B[2] + A[1]*B[5] + A[2]*B[8];
+   
+   C[3] = A[3]*B[0] + A[4]*B[3] + A[5]*B[6];
+   C[4] = A[3]*B[1] + A[4]*B[4] + A[5]*B[7];
+   C[5] = A[3]*B[2] + A[4]*B[5] + A[5]*B[8];
+   
+   C[6] = A[6]*B[0] + A[7]*B[3] + A[8]*B[6];
+   C[7] = A[6]*B[1] + A[7]*B[4] + A[8]*B[7];
+   C[8] = A[6]*B[2] + A[7]*B[5] + A[8]*B[8];
+}
+
+mult(inout[9],other[9])
+{
+   // mult a row in A with a column in B,
+   // A's row 0 times B's column 0 becomes element [0][0] in C.
+   
+   static tmp_mat[9];
+   for(i=0; i<3; i++)
+      for(j=0; j<3; j++)
+      {
+         sum = 0.0;
+         for(k=0; k<3; k++)
+         {
+            sum += inout[k*3+i] * other[k*3+j];
+         }
+         tmp_mat[i*3+j] = sum;
+      }
+   for(i=0; i<9; i++)
+   {
+      inout[i] = tmp_mat[i];
+   }
+}
+
+tform(m[9], v[3])
+{
+   x = v[0]; y = v[1]; z = v[2];
+   v[0] = m[0] * x + m[1] * y + m[2] * z;
+   v[1] = m[3] * x + m[4] * y + m[5] * z;
+   v[2] = m[6] * x + m[7] * y + m[8] * z;
+}
+
+
+rotateVector(m[9], vec v)
+{
+   x = v.x; y = v.y; z = v.z;
+   v.x = m[0] * x + m[1] * y + m[2] * z;
+   v.y = m[3] * x + m[4] * y + m[5] * z;
+   v.z = m[6] * x + m[7] * y + m[8] * z;
+}
+
+   // X axis
+   // | 1 0  0 |
+   // | 0 c -s |
+   // | 0 s  c |
+makeX(m[9], r)
+{
+   c = cos(r); s=sin(r);
+   m[0] = 1; m[1] = 0;  m[2] = 0;
+   m[3] = 0; m[4] = c;  m[5] = -s;
+   m[6] = 0; m[7] = s;  m[8] = c;
+}
+   // Y axis
+   // | c 0  s |
+   // | 0 1  0 |
+   // | -s 0 c |
+makeY(m[9], r)
+{
+   c = cos(r); s=sin(r);
+   m[0] = c; m[1] = 0; m[2] = s;
+   m[3] = 0; m[4] = 1;  m[5] = 0;
+   m[6] = -s; m[7] = 0;  m[8] = c;
+}
+   // Z axis
+   // | c -s 0 |
+   // | s c  0 |
+   // | 0 0  1 |
+makeZ(m[9], r)
+{
+   c = cos(r); s=sin(r);
+   m[0] = c; m[1] = -s; m[2] = 0;
+   m[3] = s; m[4] = c;  m[5] = 0;
+   m[6] = 0; m[7] = 0;  m[8] = 1;
+}
+
+rotate2d(&x, &y, a)
+{
+   ca = cos(a); sa = sin(a);
+   px = x;
+   py = y;
+   x = px * ca - py * sa;
+   y = px * sa + py * ca;
+}
+
+drawuv()
+{
+
+   enum{dim1=16, dim2=16}
+   static px[dim1][dim2];
+   static py[dim1][dim2];
+   static pz[dim1][dim2];
+
+   if(numframes==0)
+   {
+      deltau = 1 / (dim1-1);
+      deltav = 1 / (dim2-1);  
+      startu = 0;
+      startv = 0;  
+
+      for(i=0; i<dim1; i++)
+      for(j=0; j<dim2; j++)
+      {     
+
+         u = startu + i * deltau;
+         v = startv + j * deltav;
+         x=0; y=0; z=0;
+         sphere(u,v, planetRadius, x,y,z);       
+
+         px[i][j] = x; 
+         py[i][j] = y; 
+         pz[i][j] = z;
+      }
+   }
+
+   if (numframes==0)
+   {
+      glsettex("earth2.png");
+   }
+   for(i=0; i<dim1; i++)
+   {
+      sc = 1;
+      for(j=0; j<dim2; j++)  
+      {
+         glBegin(GL_COMPLEX);
+         //glBegin(GL_LINE_STRIP);
+                  
+         glTexCoord( sc*i/dim1, sc*j/dim2);
+         glVertex( px[i][j], py[i][j], pz[i][j] );
+         
+         glTexCoord( sc*(i+1)/dim1, sc*j/dim2);
+         glVertex( px[i+1][j], py[i+1][j], pz[i+1][j] );   
+         
+         glTexCoord( sc*(i+1)/dim1, sc*(j+1)/dim2);
+         glVertex( px[i+1][j+1], py[i+1][j+1], pz[i+1][j+1] );   
+         
+         glTexCoord( sc*i/dim1, sc*(j+1)/dim2);
+         glVertex( px[i][j+1], py[i][j+1], pz[i][j+1] );   
+  
+         glEnd();
+      } 
+   }
+}
+
+sphere(u,v,r,&x,&y,&z)
+{
+   #define SPHERICAL
+   #ifdef SPHERICAL
+      u*=2*PI;
+      v*=PI;
+      x = planet.x + r * cos(u) * sin(v);
+      y = planet.y + r * sin(u) * sin(v);
+      z = planet.z + r * cos(v);
+   #else
+      u = -r + u*2*r;
+      v *= 2*PI;
+      x = planet.x + sqrt(r*r - u*u) * cos(v);
+      y = planet.y + sqrt(r*r - u*u) * sin(v);
+      z = planet.z + u;
+   #endif
+}
+
+normalize(vec p)
+{
+   l = sqrt( p.x^2 + p.y^2 + p.z^2 );
+   if(l != 0.0){
+      p.x/=l;
+      p.y/=l;
+      p.z/=l;
+   }
+}
+
+vecScalar( vec out, vec a, s )
+{
+   out.x = a.x * s;
+   out.y = a.y * s;
+   out.z = a.z * s;
+}
+
+
+length(vec v)
+{
+   return sqrt( vecdot(v,v) );
+}
+
+angleBetween(vec a, vec b)
+{
+   m = length(a)*length(b);
+   return acos( vecdot(a,b) / m );
+}
+
+vecset(vec v, vec o){
+   v.x = o.x; v.y = o.y; v.z = o.z;
+}
+
+vecset(vec v, x,y,z){
+   v.x = x; v.y = y; v.z = z;
+}
+
+vecadd(vec out, vec a, vec b )
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;
+}
+
+vecsub(vec out, vec a, vec b )
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;
+}
+
+vecdot(vec a, vec b )
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+   // c = a x b
+veccross(vec out, vec a, vec b)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+
+setIdentity(m[9])
+{
+   m[0] = 1; m[1] = 0; m[2] = 0;
+   m[3] = 0; m[4] = 1; m[5] = 0;
+   m[6] = 0; m[7] = 0; m[8] = 1;
+}
+
+buildMatrix( mtx[9], vec side, vec up, vec fwd )
+{
+   mtx[0] = side.x; mtx[1] = side.y; mtx[2] = side.z;
+   mtx[3] = up.x;   mtx[4] = up.y;   mtx[5] = up.z;
+   mtx[6] = fwd.x;  mtx[7] = fwd.y;  mtx[8] = fwd.z;
+}
+
+// taken from essential maths for games
+// by verth and bishop p. 532
+pointOnSphereUniform(radi,&x,&y,&z) {
+  eps0 = rnd;
+  eps1 = rnd;
+  z = 1 - 2 * eps0;
+  r = sqrt(1-z*z);
+  phi = 2*PI*eps1;
+  x = r*cos(phi) * radi;
+  y = r*sin(phi) * radi;
+}
+
+updateEnemies(dt)
+{
+   for(i=0; i<MAX_ENEMIES; i++)
+   {
+      if ( cpu_players[i].alive > 0 )
+      {
+         //cpu_players[i].dirangle = getPlayerDirection(cpu_players[i]);
+         vecsub( cpu_players[i].dir, human_player.pos, cpu_players[i].pos);
+         normalize( cpu_players[i].dir );
+         
+         desired_seperation = 2*enemyRadi;
+         vec accum;
+         vec diff;
+         for(j=0; j<MAX_ENEMIES; j++)
+         {
+            if (i!=j && cpu_players[j].alive){
+               vecsub( diff, cpu_players[i].pos, cpu_players[j].pos); // from other to me
+               d = length( diff );
+               if ( d > 0 && d < desired_seperation )
+               {
+                  normalize( diff );
+                  vecscalar(diff, diff, 1/d^2 ); // weight by dist
+                  vecadd( accum, accum, diff );
+               }
+            }
+         }
+
+         // Also human
+         vecsub( diff, cpu_players[i].pos, human_player.pos); // from other to me
+         d = length( diff );
+         if ( d > 0 && d < desired_seperation )
+         {
+            normalize( diff );
+            vecscalar(diff, diff, 1/d^2 ); // weight by dist
+            vecadd( accum, accum, diff );
+         }         
+
+         if ( MAX_ENEMIES > 0 ){
+            vecscalar(accum, accum, 1/(MAX_ENEMIES+1) );
+         }
+         vecadd( cpu_players[i].dir, cpu_players[i].dir, accum );
+         normalize( cpu_players[i].dir );
+         //vecscalar(accum, accum, .5 );
+   
+         cpu_players[i].speed = 0.25 * dt;
+         clampPoint( cpu_players[i], planet, 1);  
+      }
+   }
+   
+   // Respawn
+   static respawnTime = 0;
+   for(i=0; i<MAX_ENEMIES; i++)
+   {
+      if ( cpu_players[i].alive <= 0 && respawnTime < 0 )
+      {
+         respawnTime = 1.75;
+         cpu_players[i].alive = 1;
+         init_player( cpu_players[i], human_player.antipos );
+         //playsound("pickup.wav");
+         break;
+      }
+   }
+   respawnTime -= dt;
+}
+
+createBullet(vec pos, vec dir)
+{
+   for(i=0; i<MAX_BULLETS; i++)
+   {
+      if ( bullets[i].alive <= 0 )
+      {
+         bullets[i].alive = 2;
+         
+         init_player( bullets[i], pos );
+         vecset(bullets[i].dir, dir);
+         playsound("shoot.wav");
+         return;
+      }
+   }
+}
+
+updateBullets(dt)
+{
+   for(i=0; i<MAX_BULLETS; i++)
+   {
+      if ( bullets[i].alive > 0 )
+      {
+         bullets[i].alive -= dt;
+         bullets[i].speed = 1 * dt;
+         clampPoint( bullets[i], planet, 1 );
+         //veccross( bullets[i].dir, bullets[i].cNorth, bullets[i].cUp );
+         
+      }
+   }
+}
+
+applyCamera()
+{
+   // Build a frame of reference matrix with EAST, NORTH, and NORMAL directions
+   // this matrix can now be used to move the point (or satelite)
+   // in any direction relative to the "planet"
+   static frame[9];
+   buildMatrix( frame, human_player.cEast, human_player.cNorth, human_player.cUp );
+
+   zoom = 1.0;
+
+   vec po;
+   vecsub( po, human_player.pos, planet );    
+
+   #define FOLLOW_PLAYER
+   #ifdef FOLLOW_PLAYER
+      setcam( human_player.pos.x + zoom*po.x, human_player.pos.y + zoom*po.y, human_player.pos.z + zoom*po.z,
+              frame[0], frame[1], frame[2], 
+              frame[3], frame[4], frame[5],
+              - frame[6], - frame[7], - frame[8] );
+   #else
+      setcam( 0,0,-5, 0,0);
+   #endif  
+}

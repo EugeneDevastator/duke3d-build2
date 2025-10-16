@@ -1,0 +1,21 @@
+(a[16])
+enum {s,sinc,t,tinc,toff,volsc,midifrq,midivol, out};
+
+/*
+ a[0]: s        0
+ a[1]: sinc     2^((midifrq-57)/12)*220*PI*2/samprate
+ a[2]: t        Time since note on
+ a[3]: tinc     1/samprate
+ a[4]: toff     Time since note off (1e32 if still on)
+ a[5]: volsc    exp(midivol*.03)*512
+ a[6]: midifrq  21-108, 60=middle C
+ a[7]: midivol   1-127, 64=normal
+ a[8-15]: scratch registers (initialized to 0's)
+*/
+
+r = a[s]/PI;
+a[s] += a[sinc]; if (a[s] >= PI) a[s] -= PI*2;
+a[t] += a[tinc]; //increment time
+if (a[t] > a[toff]) a[volsc] *= .99985; //decay
+a[out] += (r*a[volsc]-a[out])*.25; //quick&dirty lpf
+a[out]

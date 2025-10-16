@@ -1,0 +1,55 @@
+()
+{
+   cls(0);
+   w = 300;
+   h = 300;
+   t = 5*klock();
+   c = cos(t);
+   s = sin(t);   
+
+    for(x = 0; x < w; x++) 
+    for(y = 0; y < h; y++) 
+    {    
+         //Uint8 c = x ^ y; 
+         //pset(x, y, ColorRGB(c, c, c));
+         
+         c = noise(10*x/h, y/w) *255;
+         //setcol( rgb(c,c,c) );
+         setcol(hsv_to_rgb( c%360, 1,1) );
+         setpix(x,y); 
+    } 
+    
+   setcol(0xffffff);
+   moveto(0,0);
+   a = unit(199999);
+   printf("unit. neg becomes 0. pos becomes 1. %g", a);
+
+}
+
+hsv_to_rgb(h,s,v)
+{
+   if(v==0){r=0; g=0; b=0;} // no brightness, black
+   else if(s==0){r=v; g=v; b=v;} // grayscale, no saturation
+   else{
+      hf = h / 60.0;
+      i = floor(hf);
+      f = hf - i;
+      pv = v* (1-s);
+      qv = v * (1-s*f);
+      tv = v * (1-s*(1-f));
+      if(i==0){r=v; g=tv; b=pv;}
+      if(i==1){r=qv; g=v; b=pv;}
+      if(i==2){r=pv; g=v; b=pv;}
+      if(i==3){r=pv; g=qv; b=v;}
+      if(i==4){r=tv; g=pv; b=v;}
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}
+   
+   }
+   r = int(r*255);
+   g = int(g*255);
+   b = int(b*255);
+   col =  rgb(r,g,b); // returns last value
+   //return r*2^16 + g*2^8 + b;
+}

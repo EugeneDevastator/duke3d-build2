@@ -1,0 +1,103 @@
+// written by torbjoern haugen
+// 29. march 2010
+
+// A duck that follows a parametric curves tangent :)
+
+()
+{
+   cls(0); clz(1e32); glenable(GL_DEPTH_TEST);
+   
+   //ang=2*PI*mousx/xres;
+   ang = klock(0);
+   r =-30;
+   setcam(r*sin(ang),-10 ,r*cos(ang),ang,0);
+
+
+   // Lissajous curve
+   a = 9;  //<------ Plz mess with lissajous variables! :D
+   b = 3;
+   r = 15;
+
+   drawCurve(a,b,r);  
+
+   t=klock(0) / 3;
+      
+   xt = r*sin(a*t +pi/2);
+   yt = r*sin(b*t );
+
+   dxt = r*-cos(a*t+PI/2)*a;
+   dyt = r*-cos(b*t)*b;
+
+   // normal = p(t) + s('y(t), x'(t) )
+   len = sqrt(dxt^2 + dyt^2);
+   dxt /= len;
+   dyt /= len;
+   nx = xt + -dyt;
+   ny = yt + dxt;  
+   
+   tx = xt+dxt;
+   ty = yt+dyt;
+
+   duckAngle = atan2(dxt,dyt); // convert cartesian to polar
+   
+   setcol(0xffffff);
+   duckSize = 5;
+   drawspr("duck.kv6",xt,-duckSize,yt,
+   duckSize,
+   duckAngle+PI/2,
+   0,
+   sin(25*t)/3 );//sin(15*t)/5) ;
+   
+
+     
+}
+
+drawCurve(a,b,r){
+   t = 0;
+   x = r*sin(a*t +pi/2);
+   y = .1;
+   z = r*sin(b*t );
+   moveto(x,y,z);
+   
+   // 
+   for(i=0; i<1001; i++){
+      t = 2*PI*i/1000;
+      
+      // functionon p(t)
+      xt = r*sin(a*t+PI/2);
+      yt = r*sin(b*t);
+      
+      lineto(xt,y,yt);
+      
+      
+      // derived by t
+      dxt = r*-cos(a*t+PI/2)*a;
+      dyt = r*-cos(b*t)*b;
+      
+      if( i % 2 == 0){
+      len = sqrt(dxt^2 + dyt^2);
+      dxt /= len;
+      dyt /= len;
+      
+      // Normal = p(t) + s( -y'(t), x'(t) )
+      nx = xt + -dyt;
+      ny = yt + dxt;
+      
+      // tangent = p(t) + s * p'(t)
+      tx = xt+2*dxt;
+      ty = yt+2*dyt;
+
+      //moveto(xt,y,yt);
+      //lineto(nx,y,ny);
+      
+      // Show normal
+      //lineto(nx,y,ny);   
+      
+      // Show tangent
+      moveto(xt,y,yt);  lineto(tx,y,ty);     
+
+      moveto(xt,y,yt); 
+      }    
+      
+   }
+}

@@ -1,0 +1,268 @@
+struct vec
+{
+  x,y;
+};
+
+struct line_t{
+   vec v0;
+   vec v1;
+}
+struct ray_t{
+   vec origin;
+   vec dir;
+}
+
+()
+{
+   cls(0);
+   
+   vec p;
+   p.x = mousx;
+   p.y = mousy;
+
+   static line_t line1, line2;
+   if ( numframes == 0 ){
+
+      line1.v0.x = xres/2-100;
+      line1.v0.y = yres/2+150; 
+     
+      line1.v1.x = xres/2-200;
+      line1.v1.y = yres/2-0;
+      
+      line2.v0.x = xres/2+100;
+      line2.v0.y = yres/2-150;
+      
+      line2.v1.x = xres/2+150;
+      line2.v1.y = yres/2+50;
+   }
+   
+   if ( bstatus == 1 ){
+      line2.v0 = p;
+   }
+   if ( bstatus == 2 ){
+      line2.v1 = p;
+   }
+
+   if ( bstatus == 3 ){
+      line1.v0 = p;
+   }
+   if ( bstatus == 4 ){
+      line1.v1 = p;
+   }
+
+   setcol(255,255,255);
+   drawline( line1, 2 );
+   drawline( line2, 2 );
+   
+   vec isect;
+   if ( find_intersection(line1, line2, isect) ){
+      setcol(255,255,0);
+      drawsph(isect, 10);
+   }else
+   {
+      vec closest1, closest2;
+      closestPointsLineLine(closest1, closest2, line1, line2);
+      
+      setcol(0,192,0); drawsph( closest1, 10 );
+      
+      setcol(192,0,0); drawsph( closest2, 10 );
+   }
+
+}
+
+
+
+drawsph( vec v , r ){
+   drawsph(v.x,v.y,r);
+}
+distSq( vec a, vec b ){
+   return (b.x-a.x)^2 + (b.y-a.y)^2;
+}
+length(line_t l){
+   return sqrt( distSq(l.v0, l.v1) );
+}
+
+drawline( line_t l, r ){
+   drawcone(l.v0.x, l.v0.y, r, l.v1.x, l.v1.y, r);
+   len = length( l );
+   dx = (l.v1.x - l.v0.x) / len;
+   dy = (l.v1.y - l.v0.y) / len;
+   moveto(l.v0.x-dx*15, l.v0.y-dy*15); printf("0");
+   moveto(l.v1.x+dx*15, l.v1.y+dy*15); printf("1");
+}
+
+err(){
+   while(1){   
+      cls(32,32,32);
+      setcol(255,0,0);
+      moveto(0,0); printf("err");
+      refresh();
+   }
+}
+
+/*
+a) the lines intersect and closest point on both is isect point
+b) closest point is end point on one, and somewhere on the line of the other
+c) closest points are endpoints of both
+
+case b) requires projection
+*/
+closestPointsLineLine( vec point0, vec point1, line_t line0, line_t line1 ){
+   ray_t segment0, segment1;
+   segment0.origin = line0.v0;
+   vecsub(segment0.dir, line0.v1, line0.v0 );
+   
+   segment1.origin = line1.v0;
+   vecsub(segment1.dir, line1.v1, line1.v0 );
+
+    // compute intermediate parameters
+    vec w0; vecsub(w0, segment0.origin, segment1.origin );
+    double a = vecdot( segment0.dir, segment0.dir );
+    double b = vecdot( segment0.dir, segment1.dir );
+    double c = vecdot( segment1.dir, segment1.dir );
+    double d = vecdot( segment0.dir, w0 );
+    double e = vecdot(segment1.dir, w0 );
+
+    double denom = a*c - b*b;
+    // parameters to compute s_c, t_c
+    double s_c, t_c;
+    double sn, sd, tn, td;
+
+    // if denom is zero, try finding closest point on segment1 to origin0
+    if ( IsZero(denom) )
+    {
+        // clamp s_c to 0
+        sd = td = c;
+        sn = 0.0;
+        tn = e;
+    }
+    else
+    {
+        // clamp s_c within [0,1]
+        sd = td = denom;
+        sn = b*e - c*d;
+        tn = a*e - b*d;
+  
+        // clamp s_c to 0
+        if (sn < 0.0)
+        {
+            sn = 0.0;
+            tn = e;
+            td = c;
+        }
+        // clamp s_c to 1
+        else if (sn > sd)
+        {
+            sn = sd;
+            tn = e + b;
+            td = c;
+        }
+    }
+
+    // clamp t_c within [0,1]
+    // clamp t_c to 0
+    if (tn < 0.0)
+    {
+        t_c = 0.0;
+        // clamp s_c to 0
+        if ( -d < 0.0 )
+        {
+            s_c = 0.0;
+        }
+        // clamp s_c to 1
+        else if ( -d > a )
+        {
+            s_c = 1.0;
+        }
+        else
+        {
+            s_c = -d/a;
+        }
+    }
+    // clamp t_c to 1
+    else if (tn > td)
+    {
+        t_c = 1.0;
+        // clamp s_c to 0
+        if ( (-d+b) < 0.0 )
+        {
+            s_c = 0.0;
+        }
+        // clamp s_c to 1
+        else if ( (-d+b) > a )
+        {
+            s_c = 1.0;
+        }
+        else
+        {
+            s_c = (-d+b)/a;
+        }
+    }
+    else
+    {
+        t_c = tn/td;
+        s_c = sn/sd;
+    }
+
+    // compute closest points
+    ray_point( point0, segment0, s_c );
+    ray_point( point1, segment1, t_c );
+
+}
+
+find_intersection(line_t line1,
+                  line_t line2, vec hitpoint)
+{
+   vec p1, p2, p3, p4;
+   p1 = line1.v0;
+   p2 = line1.v1;
+   p3 = line2.v0;
+   p4 = line2.v1;
+
+   // written by torb. 13. dec 2011
+   e = p1.x - p3.x;
+   f = p1.y - p3.y;
+   
+   dx1 = p2.x - p1.x;
+   dy1 = p2.y - p1.y;
+   
+   dx2 = p4.x - p3.x;
+   dy2 = p4.y - p3.y;
+   
+   a = -dx1; b = dx2;
+   c = -dy1; d = dy2;
+   
+   det = a*d - b*c;
+   // if det == 0, then there is no soln, (dont div by zero!)
+   if ( det == 0 ) return 0;
+   
+   // http://en.wikipedia.org/wiki/Cramer's_rule#Explicit_formulas_for_small_systems
+   s = (e*d - b*f) / det;
+   t = (a*f - e*c) / det;
+   
+   hitpoint.x = p1.x + s * dx1;
+   hitpoint.y = p1.y + s * dy1;
+   
+   within_s = s >= 0 && s <= 1;
+   within_t = t >= 0 && t <= 1;
+   return within_s && within_t;
+}
+
+vecsub(vec out, vec a, vec b){
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+}
+
+vecdot(vec a, vec b){
+   return a.x*b.x + a.y*b.y;
+}
+
+ray_point( vec p, ray_t r, t ){
+   p.x = r.origin.x + t * r.dir.x;
+   p.y = r.origin.y + t * r.dir.y;
+}
+
+isZero( val ) {
+   kEpsilon = 1e-7;
+   return ( fabs(val) <= kEpsilon );
+}

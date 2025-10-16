@@ -1,0 +1,391 @@
+struct RGBA
+{
+   r,g,b,a;
+}
+
+static RGBA globColor;
+
+enum{MAXEMITTERS = 10}
+enum{MAXPARTICLES = 100}
+static pixieDustX[MAXEMITTERS][MAXPARTICLES];
+static pixieDustY[MAXEMITTERS][MAXPARTICLES];
+
+static pixieDustVx[MAXEMITTERS][MAXPARTICLES];
+static pixieDustVy[MAXEMITTERS][MAXPARTICLES];
+static pixieDustLife[MAXEMITTERS][MAXPARTICLES];
+static pixieDustEmitAngle[MAXEMITTERS];
+static pixieDustColor[MAXEMITTERS][MAXPARTICLES];
+
+static emitterX[MAXEMITTERS];
+static emitterY[MAXEMITTERS];
+static emitterDX[MAXEMITTERS];
+static emitterDY[MAXEMITTERS];
+static emitterLife[MAXEMITTERS];
+
+struct Ball
+{
+   x,y;
+   dx,dy;
+   r;
+   life;
+}
+
+enum{MAXBALLS = 50}
+static ball balls[MAXBALLS];
+
+enum{MAX_CIRCLES = 50}
+static circlex[MAX_CIRCLES];
+static circley[MAX_CIRCLES];
+// Displacement / velocity
+static circlevx[MAX_CIRCLES];
+static circlevy[MAX_CIRCLES];
+static circleRadius[MAX_CIRCLES];
+static circleMass[MAX_CIRCLES];
+
+static numcircles = 0;
+
+static collisions = 0;
+
+enum{INSIDE = -1, NONE = -2}
+
+static time,oldtime,dt;
+()
+{
+   time = klock(0); dt = time-oldtime; oldtime=time;
+   cls(0);
+
+   //cls(0);
+   if(numframes==0)
+   {
+      cls(0);
+      for(e=0; e<MAXEMITTERS; e++){
+         angle = 2*PI * rnd;
+         emitterDX[e] = cos(angle);
+         emitterDY[e] = sin(angle);
+         
+         for(j=0; j<MAXPARTICLES; j++){
+            pixieDustLife[e][j] = rnd*255;
+         }
+      }
+      
+      for(i=0; i<50; i++)
+      createCircle();
+      
+
+   }
+   
+   
+   for(i=0; i<numcircles; i++)
+   {
+      setcol(0xff0000);
+      drawsph( circlex[i], circley[i], circleRadius[i]);
+      setcol(0xffffff);
+      moveto(circlex[i], circley[i]);
+      lineto(circlex[i]+circlevx[i], circley[i]+circlevy[i]);
+   }
+
+
+   for(i=0; i<numCircles; i++)
+   {
+      for(j=i+1; j<numCircles; j++)
+      {
+         if(i==j) continue;
+         t = circleCircleCollision(i,j);
+         
+         // TODO. real check
+         if(t <= dt && t >= 0)
+         {
+            clsRed = 255;
+            static normal[2];
+            normal[0] = circlex[i] - circlex[j];
+            normal[1] = circley[i] - circley[j];
+            resolveCollisionFree(i,j,normal);
+            
+            e = getFreeEmitter();
+            x = circlex[i] + normal[0] * 0.5;
+            y = circley[i] + normal[1] * 0.5;
+            emitterLife[e] = time + .5;
+            setEmitter(e, x, y, nrnd, nrnd);
+         }
+      }
+   }
+   
+   // euler integration of motion
+   for(i=0; i<numcircles; i++)
+   {
+      circlex[i] += circlevx[i] * dt;
+      circley[i] += circlevy[i] * dt;
+      
+   }
+   
+   for(i=0; i<numcircles; i++)
+   {
+      if(circlex[i] > xres-circleRadius[i]) circleVx[i]*=-1;
+      if(circlex[i] < circleRadius[i]) circleVx[i]*=-1;
+      if(circley[i] > yres-circleRadius[i]) circleVy[i]*=-1;
+      if(circley[i] < circleRadius[i]) circleVy[i]*=-1;
+      
+   }   
+   
+   updateAndDrawParticles();
+
+   //setColor(mousx/xres*20,1,1,255);
+   //line(0,0,640,480);
+}
+
+setColor(r,g,b,a)
+{
+   globColor.r = r;
+   globColor.g = g;
+   globColor.b = b;
+   globColor.a = a;
+}
+
+setEmitter(e,x,y,dx,dy)
+{
+   emitterX[e] = x; 
+   emitterY[e] = y;
+   emitterDX[e] = dx; 
+   emitterDY[e] = dy;
+   
+   for(p=0; p<MAXPARTICLES; p++)
+   {
+      pixieDustLife[e][p] = time + .01;
+   }
+}
+setSpreadAngle(i,angle)
+{
+   emitterDX[i] = cos(angle); 
+   emitterDY[i] = sin(angle); 
+}
+
+updateAndDrawParticles()
+{
+
+   for(e=0; e<MAXEMITTERS; e++)
+   {
+      for(i=0; i<MAXPARTICLES; i++)
+      {
+         
+         if( emitterLife[e] > time )
+         if(pixieDustLife[e][i] < time)
+         {
+            // NEW it
+            pixieDustLife[e][i] = time + 1*rnd;
+            pixieDustX[e][i] = emitterX[e];
+            pixieDustY[e][i] = emitterY[e];
+            pixieDustColor[e][i] = rnd*255 * 2^16 + rnd*255*2^8 + rnd*255;
+            speed = 50;
+            //pixieDustVx[e][i] = emitterDX[e] * speed * dt;
+            //pixieDustVy[e][i] = emitterDY[e] * speed * dt;
+            pixieDustVx[e][i] = nrnd() * speed * dt;
+            pixieDustVy[e][i] = nrnd() * speed * dt;
+            break;
+         }
+         
+         pixieDustX[e][i] += pixieDustVx[e][i];
+         pixieDustY[e][i] += pixieDustVy[e][i];  
+   
+   
+         setcol( pixieDustColor[e][i] );
+         setpix( pixieDustX[e][i], pixieDustY[e][i] );
+         r = pixieDustColor[e][i]/2^16 % 256;
+         g = pixieDustColor[e][i]/2^8 % 256;
+         b = pixieDustColor[e][i] % 256;
+         a = (time - pixieDustLife[e][i]);
+         //pixelRGBA(pixieDustX[e][i], pixieDustY[e][i],
+         //          r*150, g*150, b*150, 
+         //          a);     
+   
+      }
+   }
+
+}
+
+pixelRGBA(x, y, r, g, b, a)
+{
+  ix=floor(x); iy=floor(y);
+  shx=x-ix;
+  shy=y-iy;
+  displaypixelAntialiased(ix, iy, r, g, b, a*((1-shx)*(1-shy)));
+  displaypixelAntialiased(ix+1, iy, r, g, b, a*(shx*(1-shy)));
+  displaypixelAntialiased(ix, iy+1, r, g, b, a*((1-shx)*shy));
+  displaypixelAntialiased(ix+1, iy+1, r, g, b, a*(shx*shy));
+}
+
+pixelRGBA(x, y)
+{
+  r = globColor.r;
+  g = globColor.g;
+  b = globColor.b;
+  a = globColor.a;
+  ix=floor(x); iy=floor(y);
+  shx=x-ix;
+  shy=y-iy;
+  displaypixelAntialiased(ix, iy, r, g, b, a*((1-shx)*(1-shy)));
+  displaypixelAntialiased(ix+1, iy, r, g, b, a*(shx*(1-shy)));
+  displaypixelAntialiased(ix, iy+1, r, g, b, a*((1-shx)*shy));
+  displaypixelAntialiased(ix+1, iy+1, r, g, b, a*(shx*shy));
+}
+
+
+displaypixelAntialiased(x, y, r, g, b, a)
+{
+  rr=0; rg=0; rb=0;
+  getpix(x,y,rr,rg,rb);
+  r=sqrt(rr*rr+(r*r-rr*rr)*a);
+  g=sqrt(rg*rg+(g*g-rg*rg)*a);
+  b=sqrt(rb*rb+(b*b-rb*rb)*a);
+  setcol(r,g,b);
+  setpix(x,y);
+}
+
+
+line(x0, y0, x1, y1)
+{
+   dx = abs(x1-x0);
+   dy = abs(y1-y0);
+   if( x0 < x1 ) 
+      sx = 1;
+   else 
+      sx = -1;
+   if(y0 < y1)
+      sy = 1;
+   else 
+      sy = -1;
+   
+   err = dx-dy;
+ 
+   while(1)
+   {
+     pixelRGBA(x0,y0);
+     if(x0 == x1 && y0 == y1) break;
+     e2 = 2*err;
+     if(e2 > -dy){
+       err = err - dy;
+       x0 = x0 + sx;
+      }
+     if(e2 < dx){ 
+       err = err + dx;
+       y0 = y0 + sy;
+     }
+    }
+}
+
+
+rotatePoint(&x,&y,ang) // angle in radians
+{
+   newx = x * cos(ang) - y * sin(ang);
+   newy = x * sin(ang) + y * cos(ang);
+   x = newx; y = newy;    
+}
+
+circleCircleCollision(cir1, cir2)
+{
+   wx = circlex[cir1] - circlex[cir2];
+   wy = circley[cir1] - circley[cir2];
+   
+   r = circleRadius[cir1] + circleRadius[cir2];
+   
+   ww = dotProduct(wx,wy,wx,wy);
+   
+   if( ww < r*r ) return INSIDE;
+   
+   vx = circlevx[cir1] - circlevx[cir2];
+   vy = circlevy[cir1] - circlevy[cir2];
+   a = dotProduct(vx,vy,vx,vy);
+   b = dotProduct(wx,wy,vx,vy);
+   c = ww - r*r;
+   root = b*b - a*c;
+   if(root < 0) return NONE;
+   t = (-b - sqrt(root))/a;
+   if(t>1 || t<0) return NONE;
+   return t;
+}
+
+dotProduct(x1,y1,x2,y2)
+{
+   return x1*x2 + y1*y2;
+}
+dotProduct(v1[2],v2[2])
+{
+   return v1[0]*v2[0] + v1[1]*v2[1];
+}
+
+resolveCollisionFree(obj1,obj2,normal[2])
+{
+   r = circleMass[obj1] / circleMass[obj2];  
+   basex = circlevx[obj2]; basey = circlevy[obj2];
+   static u[2]; u[0] = circlevx[obj1] - basex; u[1] = circlevx[obj1] - basey; 
+   static un[2]; componentVector(u,normal,un); // un = componentVec( u, normal )
+   utx = u[0] - un[0]; uty = u[1] - un[1]; // ut = u - n
+   vnx = un[0] * (r-1) / (r+1); vny = un[1] * (r-1) / (r+1);
+   wnx = un[0] * 2 * r / (r+1); wny = un[1] * 2 * r / (r+1);
+   circleVx[obj1] = utx + vnx + basex; circleVy[obj1] = uty + vny + basey;
+   circleVx[obj2] = wnx + basex; circleVy[obj2] = wny + basey;   
+   collisions++;
+}
+
+componentVector(vector[2],directionVector[2], out[2])
+{
+   normalize(directionVector);
+   dpr = dotProduct(vector,directionVector);
+   out[0] = dpr * directionVector[0]; out[1] = dpr * directionVector[1];
+}
+
+normalize(vec[2])
+{
+   len = sqrt(vec[0]^2+vec[1]^2); vec[0]/=len; vec[1]/=len;
+}
+
+createCircle()
+{
+   spawnRadius = 10;// + 10 * rnd;
+   spawnX = spawnRadius + (xres-spawnRadius*2)*rnd;
+   spawnY = spawnRadius + (yres-spawnRadius*2)*rnd;
+   
+   fail = 0;
+   do
+   {
+      fail = 0;
+      
+      
+      for(i=0; i<numcircles; i++)
+      {
+         dx = spawnX - circlex[i];
+         dy = spawnY - circley[i];    
+         rDist = spawnRadius + circleRadius[i];    
+         dist = sqrt(dx*dx+dy*dy);
+         if( dist < rDist )
+         {
+            fail = 1;
+            break;
+         }
+      }
+      
+      if( fail )
+      {
+         spawnRadius = 10;// + 40 * rnd;
+         spawnX = spawnRadius + (xres-spawnRadius*2)*rnd;
+         spawnY = spawnRadius + (yres-spawnRadius*2)*rnd;
+      }
+      
+   }while(fail);
+   
+   circlex[numcircles] = spawnX;
+   circley[numcircles] = spawnY;
+   dir = nrnd * PI;
+   circlevx[numcircles] = cos(dir)*30;
+   circlevy[numcircles] = sin(dir)*30;
+   circleradius[numcircles] = spawnRadius;
+   circleMass[numcircles] = spawnRadius;
+   numcircles++;
+}
+
+getFreeEmitter()
+{
+   for(i=0; i<MAXEMITTERS; i++)
+   {
+      if( emitterLife[i] < time ) return i;
+   }
+}

@@ -1,0 +1,32 @@
+(x,y,&r,&g,&b)
+{
+   c = 255*marbled(x,y,32);
+   r = c;
+   g = c;
+   b = c;
+
+}
+
+turbulence(x,y,size)
+{
+   value = 0.0; initialSize = size;
+   while(size >= 1)
+   {
+      value += noise( x/size, y/size ) * size;
+      size /= 2.0;
+   }
+   return (128*value/initialSize);
+}
+
+stripes(x,f)
+{
+   t = .5 + .5 * sin(f * 2*PI * x);
+   ret = t*t -.5;
+   return ret;
+}
+
+marbled(x,y,z)
+{
+   tex = stripes(x + 2*turbulence(x,y,z), .8);
+   return tex;
+}

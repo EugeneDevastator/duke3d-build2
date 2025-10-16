@@ -1,0 +1,78 @@
+// Strange attractor http://paulbourke.net/fractals/lorenz/
+()
+{
+   cls(0);
+   clz(1e32);
+
+   setcol(0xffffff);
+
+   time = klock(0);
+
+   // Initial pos
+	 //zero_to_one = 0.1 + sin(time)*0.5+0.5;
+   x=.1;
+   y=.0;
+   z=.0;
+
+   // Constants
+   r=28;
+   s=1; // "Prandtl number" fluid viscosity / thermal conductivity, lorenz chose 10
+   b=8.0/3.0;
+   
+   /*r=46.92;
+   s=28;
+   b=4;*/
+
+   imax = 10000;//4*512;
+   //f = imax/(imax/100);
+	 f = imax * 100/imax;
+	 //f = imax/2;//(imax/10);
+	
+   zoom = .5;
+   moveto(x*zoom,y*zoom,z*zoom);
+   for(i=0; i<imax; i++){
+
+       lineto(x*zoom,y*zoom,z*zoom);
+       
+       // New gradient is based on current position
+       dx = s*(y-x);
+       dy = r*x - y - x*z;
+       dz = x*y - b*z;
+       
+       // Update position
+       x+=dx/f;
+       y+=dy/f;
+       z+=dz/f;
+			 
+       //hue = i/imax*200;
+       hue = sqrt(dx^2 + dy^2 + dz^2) * .5;
+       setcol( hsv_to_rgb(hue,1,1) );
+   }
+
+   ang = 2*PI*mousx/xres;
+   camDist = -15;
+   setcam( camDist*sin(ang), 0, 25+camDist*cos(ang), ang, 0);
+}
+
+hsv_to_rgb(h,s,v){ 
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+    return rgb(r*255,g*255,b*255);
+}

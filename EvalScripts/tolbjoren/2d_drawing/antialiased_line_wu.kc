@@ -1,0 +1,124 @@
+()
+{
+   cls(0);
+   t = 5*klock(0);
+   r = 50;
+   //drawline(mousx+cos(t)*r,mousy+sin(t)*r,mousx,mousy);
+   
+   drawline(xres/2, yres/2, mousx, mousy);   
+
+   //moveto(mousx+50,mousy); lineto(mousx,mousy);
+   setcol(0xffffff);
+   //drawsph(mousx,mousy,5);
+
+   //sleep(1);  
+}
+
+plot(x,y,c)
+{
+   i = 196;
+   setcol(c*i,c*i,c*i);
+   setpix(x,y);
+}
+
+drawline(x1,y1,x2,y2)
+{
+   dx = x2-x1;
+   dy = y2-y1;
+   
+   if(abs(dx) > abs(dy)){
+      // handle "horizontal" lines
+      if(x2 < x1)
+      {
+         swap(x1,x2);
+         swap(y1,y2);
+      }
+      
+      gradient = dy / dx;
+      
+      // handle first endpoint
+      xend = int(x1);
+      yend = y1 + gradient * (xend - x1);
+      xgap = rfpart(x1 + 0.5);
+      xpxl1 = xend; // will be used in main loop
+      ypxl1 = int(yend); // integer part?
+      plot(xpxl1, ypxl1, rfpart(xend) * xgap);
+      plot(xpxl1, ypxl1 + 1, fpart(yend) * xgap);
+      intery = yend + gradient; // first y-sect for main loop
+      
+      // handle second endpoint
+      xend = int(x2); // rounded? ipart+0.5;
+      yend = y2 + gradient * (xend - x2);
+      xgap = fpart(x2 + 0.5);
+      xpxl2 = xend; // use
+      ypxl2 = int(yend);
+      plot(xpxl2, ypxl2, rfpart(yend)*xgap);
+      plot(xpxl2, ypxl2 + 1, fpart(yend)*xgap);
+      
+      // main loop
+      for(x=xpxl1+1; x < xpxl2; x++)
+      {
+         plot(x, int(intery), rfpart(intery) );
+         plot(x, int(intery) +1, fpart(intery) );
+         intery += gradient;
+      }
+   }
+   else
+   {
+      /* I have not verifed that this is correct. All i did was: 
+       1. check for y2<y1 instead of x2<x1
+       2. swap the gradient
+       3. interx = xend + gradient;
+       4. and last the main loop.
+      */
+      
+      //handle "vertical" lines  same code as above but X takes the role of Y
+      if(y2 < y1)
+      {
+         swap(x1,x2);
+         swap(y1,y2);
+      }
+      
+      gradient = dx/dy;
+      
+      // handle first endpoint
+      xend = int(x1);
+      yend = y1 + gradient * (xend - x1);
+      xgap = rfpart(x1 + 0.5);
+      xpxl1 = xend; // will be used in main loop
+      ypxl1 = int(yend); // integer part?
+      plot(xpxl1, ypxl1, rfpart(xend) * xgap);
+      plot(xpxl1, ypxl1 + 1, fpart(yend) * xgap);
+      interx = xend + gradient; // first y-sect for main loop
+      
+      // handle second endpoint
+      xend = int(x2); // rounded? ipart+0.5;
+      yend = y2 + gradient * (xend - x2);
+      xgap = fpart(x2 + 0.5);
+      xpxl2 = xend; // use
+      ypxl2 = int(yend);
+      plot(xpxl2, ypxl2, rfpart(yend)*xgap);
+      plot(xpxl2, ypxl2 + 1, fpart(yend)*xgap);
+      
+      // main loop
+      for(y=ypxl1+1; y < ypxl2; y++)
+      {
+         plot(int(interx), y, rfpart(interx) );
+         plot(int(interx) +1,y, fpart(interx) );
+         interx += gradient;
+      }  
+   }
+}
+rfpart(x){
+   return 1 - fpart(x);
+}
+fpart(x){
+   // return fractional part of x.
+   return x-floor(x);
+}
+swap(&a, &b)
+{
+   tmp = a;
+   a = b;
+   b = tmp;
+}

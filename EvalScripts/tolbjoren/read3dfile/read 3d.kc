@@ -1,0 +1,311 @@
+static num = 0;
+
+struct point
+{
+   x,y,z;
+};
+
+enum{MAX_PTS = 1024*14}
+static point Pts[MAX_PTS];
+static numPts = 0;
+
+enum{MAX_NORMALS=MAX_PTS/3}
+static point Normals[MAX_NORMALS];
+static numNormals = 0;
+
+
+// Camera
+static posx = 0;
+static posy = 0;
+static posz = -15;
+static posh = 0; // left right
+static posv = 0.0;
+   
+()
+{
+   static oldtim;
+   tim = klock(0); delta = tim - oldtim; oldtim = tim;
+   
+   cls(0); clz(1e32);
+   //setcam(0,3,-10,0,0);
+
+   if(numframes==0)
+   {
+      glCullface(GL_BACK);
+      glEnable(GL_DEPTH_TEST);
+
+      loadFile();
+      calcNormals();
+   
+      static tex[2][2];
+      c = rgb(200,200,200);
+      tex[0][0] = c;
+      tex[0][1] = c;
+      tex[1][0] = c;
+      tex[1][1] = c;
+      handle=glsettex(tex,2,2);      
+
+   }
+   
+   
+   glBegin(GL_POINTS);
+   for(i=0; i<numPts; i++)
+   {
+      glVertex( pts[i].x, -pts[i].y , pts[i].z);
+   }
+   
+   
+   j=0;
+   for(i=0; i<numPts; i+=3)
+   {
+      #define SHOW_NORMALS
+      #ifdef SHOW_NORMALS
+         setcol(255,255,0);
+         scale = 1;
+         centx = (pts[i].x + pts[i+1].x + pts[i+2].x)/3;
+         centy = (pts[i].y + pts[i+1].y + pts[i+2].y)/3;
+         centz = (pts[i].z + pts[i+1].z + pts[i+2].z)/3;
+         moveto( centx, -centy , centz );
+         lineto( centx + normals[j].x*scale, -centy - normals[j].y*scale, centz + normals[j].z*scale );
+      #endif
+      
+      #define WIREFRAME
+      #ifdef WIREFRAME
+         setcol(128,128,128);
+         moveto( pts[i].x, -pts[i].y , pts[i].z);
+         lineto( pts[i+1].x, -pts[i+1].y , pts[i+1].z);
+         lineto( pts[i+2].x, -pts[i+2].y , pts[i+2].z);
+         lineto( pts[i].x, -pts[i].y , pts[i].z);
+      #endif
+      
+      #define DRAW_FILL
+      #ifdef DRAW_FILL
+            //glBegin(GL_COMPLEX);
+            setcol( 128+128*normals[j].x, 128+128*normals[j].y, 128+128*normals[j].z);
+         glBegin(GL_TRIANGLES);
+         glVertex( pts[i].x, -pts[i].y , pts[i].z);
+         glVertex( pts[i+1].x, -pts[i+1].y , pts[i+1].z);
+         glVertex( pts[i+2].x, -pts[i+2].y , pts[i+2].z);
+         glEnd();
+      #endif
+      
+      
+      j++;
+   }
+   
+   setcol(0xffffff);
+   moveto(0,0);
+   printf("%g", numPts);
+
+   playercontrols(delta);
+}
+
+// Camera and movement code taken from /games/
+//Handle input and player movement
+playercontrols(delta)
+{
+   static oldMouseX;
+   static oldMouseY;
+   static mouseSpeedX;
+   static mouseSpeedY; 
+
+   f = 10*delta;
+   if (keystatus[0x2a]) f /= 4;
+   if (keystatus[0x36]) f *= 4;
+   vx = (keystatus[32]-keystatus[30])*f; //D-A
+   vy = (keystatus[17]-keystatus[31])*f; //W-S  
+   vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   
+   static mat[9]; 
+   ang2mat(posh,posv,mat); // Convert angles to rotation matrix
+   
+   // find new position
+   posx += mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   posy += mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   posz += mat[2]*vx + mat[5]*vz + mat[8]*vy; 
+   // mousespeed values are tweaked for 60 fps
+   mouseSpeedX = (mousx - oldMouseX) * 0.01;
+   mouseSpeedY = (mousy - oldMouseY) * 0.01;
+   oldMouseX = mousx;
+   oldMouseY = mousy;
+   if(bstatus==1)
+   {
+      posh += mouseSpeedX;
+      posv += mouseSpeedY;
+   }
+   // Right,down,forwards unit vectors.
+   setcam(posx,posy,posz,
+          mat[0],mat[1],mat[2],
+          mat[3],mat[4],mat[5],
+          mat[6],mat[7],mat[8]);
+}
+/* converts horizontal and vertical angles to a 3x3 rotation matrix */
+ang2mat(hang,vang,mat[9])
+{
+   mat[0] = cos(hang); mat[1] = 0; mat[2]=-sin(hang);
+   mat[6] = cos(vang)*sin(hang); mat[7] = sin(vang); mat[8]=cos(vang)*cos(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}
+
+calcNormals()
+{
+   for(i=0; i<numPts; i+=3)
+   {
+      dx1 = pts[i+1].x - pts[i].x;
+      dy1 = pts[i+1].y - pts[i].y;
+      dz1 = pts[i+1].z - pts[i].z;
+      
+      dx2 = pts[i+2].x - pts[i].x;
+      dy2 = pts[i+2].y - pts[i].y;
+      dz2 = pts[i+2].z - pts[i].z;
+      
+      normals[numNormals].x = dy1 * dz2 - dz1 * dy2; 
+      normals[numNormals].y = dz1 * dx2 - dx1 * dz2; 
+      normals[numNormals].z = dx1 * dy2 - dy1 * dx2; 
+      
+      len = sqrt(normals[numNormals].x^2 +  normals[numNormals].y^2 + normals[numNormals].z^2);
+      if(len)
+      {
+         normals[numNormals].x /= len;
+         normals[numNormals].y /= len;
+         normals[numNormals].z /= len;
+      }
+      
+
+      numNormals++;
+   }
+}
+
+loadFile()
+{
+   readX = 0;
+   readY = 0;
+   readZ = 0;
+   numPts = 0;   
+
+   i=0;
+   x=0; y=0;
+   for(i=0; i<getfilsiz("triangle.txt"); i++)
+   {
+      if( numPts > MAX_PTS) break;
+      
+      c = fil("triangle.txt",i);
+      if (c != 13) 
+      if( c != '\n' ) 
+      if( c != ';') 
+      {         
+         readSuccess = 0;
+         myNum = readNum(i, readSuccess);
+         
+         space = 0;
+         if( readX ) space = 15;
+         
+         //moveto(xres/2  + x*25 + space, yres/2 + y*10);
+         //printf("%g", myNum);
+         
+         if( readSuccess )
+         {
+            storedNum = 0;
+        
+            if( !readX )
+            {
+               pts[numPts].x = myNum;
+               readX = 1;
+               readY = 0;
+               readZ = 0;
+               storedNum=1;
+            }
+            if( readX && !readY && !storedNum )
+            {
+               pts[numPts].y = myNum;
+               readX = 1;
+               readY = 1;
+               readZ = 0;
+               storedNum=1;
+            } 
+            if( readY && !readZ && !storedNum)
+            {
+               pts[numPts].z = myNum;
+               storedNum = 1;
+               readX = 0;
+               readY = 0;
+               readZ = 0;
+               numPts++;
+            }            
+
+         }
+ 
+
+      }
+      
+
+      x++;   
+   
+      if(c == ';'){
+         x = 0;
+         y++;
+      }
+      
+      if (c == '\n') {
+         x = 0;
+         y++;
+      }
+      
+   }
+}
+
+readNum(&i, &readSuccess)
+{
+   charsRead = 0;
+   static numBuf[10];
+   isNegative = 0;
+
+   
+   c = fil("triangle.txt",i);
+   while( c != 13 && c != '\n' && c != ' ' && c != ';' && i < getfilsiz("triangle.txt") )
+   {    
+      if(c == '-')
+      {
+         isNegative = 1;
+      }
+      else
+      {
+         if(c == '0') numBuf[charsRead] = 0;
+         if(c == '1') numBuf[charsRead] = 1;
+         if(c == '2') numBuf[charsRead] = 2;
+         if(c == '3') numBuf[charsRead] = 3;
+         if(c == '4') numBuf[charsRead] = 4;
+         if(c == '5') numBuf[charsRead] = 5;
+         if(c == '6') numBuf[charsRead] = 6;
+         if(c == '7') numBuf[charsRead] = 7;
+         if(c == '8') numBuf[charsRead] = 8;
+         if(c == '9') numBuf[charsRead] = 9;
+         charsRead++;
+      }
+      
+      i++;
+      c = fil("triangle.txt",i);
+   }
+   
+   if(charsRead <= 0)
+   {
+      readSuccess = 0;
+      return 0;
+   }else{
+      readSuccess = 1;
+   }
+   
+   num = 0;
+   place = charsRead-1;
+   for(j = 0; j < charsRead; j++)
+   {
+      num += numBuf[j] * 10^place;
+      place--;
+   }
+   if( isNegative ) num *= -1;
+   num = num / 1e5;
+   return num;
+}
+

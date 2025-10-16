@@ -1,0 +1,28 @@
+(x,y,z,&r,&g,&b)
+{
+   if (x^2 + y^2 >= thickfunc(z*4)^2) return(0);
+   
+   r = 0; b = 0; g = 0;
+   pic("cloud.png",atan2(y,x)*128/(PI*2),(z+1)*64,&r,&g,&b);
+   r = r*2-224;
+   g = g*2-224; 
+   b = b*2-224;
+   
+   if ((x^2 + y^2 < .02) && (z > .74)) { r = 128; g = 64; b = 0; }
+   if ((abs(z+.19) < .05) || (abs(z+.35) < .05)) { r = 255; g -= 64; b -= 64; }
+   return(1);
+}
+
+thickfunc (x)
+{
+   if (abs(x) > 3) return(0);
+   
+   sc = .15;
+   y = (-sin(x*1.2+3.0)*.5+1.3)*sc;
+   if (x <= -2)
+   {
+      y2 = sqrt(1^2-(x+2)^2)*sc;
+      return((y-y2)*(x+2) + y);
+   }
+   return(y);
+}

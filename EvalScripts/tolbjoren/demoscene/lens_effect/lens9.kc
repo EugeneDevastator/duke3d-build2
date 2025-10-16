@@ -1,0 +1,142 @@
+// Consts:
+static width = 256;
+static height = 256;
+//static diameter=192;
+static magnification=30;
+
+static buf[256*256];
+
+enum{ diameter = 256};
+static tempPixel[diameter][diameter];
+static lightPixel[diameter][diameter];
+static lensPixel[diameter][diameter];
+
+static lightx=128;
+static lighty=128;
+
+()
+{
+   cls(0);
+   if(numframes==0) setup();
+   render();
+   draw(50,50);
+   
+}
+
+movelens(){ lightx = mousx; lighty = mousy; }
+
+setup() //Init Lens Look-up-table
+{
+   //var:
+   radius=0, y=0, x=0, a=0, b=0, c=0; //ints
+   s=0, z=0, v=0; //floats
+   t=0;
+   radius = diameter / 2;
+   s = sqrt(radius^2 - magnification^2);
+   
+   for(y=-radius; y<radius; y++)
+   for(x=-radius; x<radius; x++)
+   {
+      if( (x^2+y^2) >= s^2)
+      {
+         a = x; b = y; c = 0;
+      }
+      else
+      {
+         z = sqrt(radius^2 - x^2 - y^2);
+         v = magnification/z;
+         a = ceil(x*v);
+         b = ceil(y*v);
+         c = ceil(128-sqrt(a^2+b^2)*2);
+         if( c < 0 ) c = 0;
+      }
+      
+      t = (b+radius)*diameter + (a+radius);
+      if(t<0) t=0;
+      if(t>=diameter^2) t = diameter^2-1;
+      
+      //lensPixel[ (y+radius)*diameter + (x+radius) ] = t;
+      //lightPixel[ (y+radius)*diameter + (x+radius) ] = c;
+      lensPixel[x+radius][y+radius] = t;
+      lightPixel[x+radius][y+radius] = c;
+   } 
+}
+
+copyImgToBuf()
+{
+   i=0;
+   for(y=0; y<height; y++)
+   for(x=0; x<width; x++)
+   {
+      r=0; g=0; b=0;
+      pic(x,y,r,g,b);
+      buf[i] = r*2^16 + g*2^8 + b;
+      i++;
+   }
+}
+
+render()
+{
+   x1=0; y1=0; yOff=0; yOff2=0; yOff3=0; i=0; //ints
+   //iRGB, dRGB, x,y, RGB, destPixel
+    
+   moveLens();
+   copyImgToBuf(); //so lens fx isnt cumulative
+   
+   // copy the pixels under the lens to tempPixel
+   yOff2 = 0;
+   for(y1=0; y1<width; y1++)
+   {
+      for(x=0; x<height; x++)
+      {
+         r=0; g=0; b=0;
+         pic(x,y1,r,g,b);
+         tempPixel[x][y1] = r*2^16 + g*2^8 + b;
+         //tempPixel[x][y1+lightY] = r*2^16 + g*2^8 + b;
+         //buf[y1*256+x] = r*2^16 + g*2^8 + b;    
+      }
+      yOff+=diameter;
+   }
+   
+   // Magnify the area under the lens
+   i=0;
+   for(y=0; y<height; y++)
+   for(x=0; x<width; x++)
+   {
+      lensp = lensPixel[lightX-x][lightY-y];
+      iPixel = tempPixel[lensp-x][lensp+y];
+      cPixel = lightPixel[lensp+x][lensp+y];
+      buf[i] = iPixel + cPixel/3;
+      i++;
+   }
+}
+
+draw(xofs, yofs)
+{
+   i=0;
+   for(y=xofs; y<height+xofs; y++)
+   for(x=yofs; x<width+yofs; x++)
+   {
+      setcol( buf[i] );
+      setpix(x,y);
+      i++;
+   }
+   setcol(0xff0000);
+   drawRect(xofs, yofs, width, height);
+}
+      
+drawRect(sx, sy, wx, wy)
+{   
+   moveto(sx, sy);
+   lineto(sx+wx, sy+0);
+   
+   moveto(sx, sy+wy);
+   lineto(sx+wx, sy+wy);
+   
+   moveto(sx, sy);
+   lineto(sx, sy+wy);
+   
+   moveto(sx+wx, sy);
+   lineto(sx+wx, sy+wy);
+}
+      

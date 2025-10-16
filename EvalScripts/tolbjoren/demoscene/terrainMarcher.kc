@@ -1,0 +1,288 @@
+struct vec3{
+  x,y,z;
+}
+
+//struct ray{
+// vec3 origin;
+// vec3 dir;
+//};
+
+static vec3 ro,rd;
+static vec3 p;
+static vec3 normal;
+
+// Camera
+static hang,vang;
+static vec3 pos;
+static vec3 uvw_u;
+static vec3 uvw_v;
+static vec3 uvw_w;
+static vec3 lower_left_corner;
+
+static vec3 sunPos;
+
+static terrain = 1;
+static sun = 2;
+static tree = 3;
+
+enum{XMAX=80*6, YMAX=3*80};
+static tim,oldtim;
+
+
+
+()
+{
+  tim = klock(0); dt = tim - oldtim; oldtim = tim;
+  if(numframes==0)
+  {
+    pos.x = 10;
+    pos.y = -1;
+    pos.z = 30;
+    
+    
+    sunPos.x = 0;
+    sunPos.y = 10;
+    sunPos.z = 10;
+  }
+  f = 15*dt;
+  pos.x += (keystatus[32]-keystatus[30])*f; //D-A
+  pos.y = 2;
+  pos.z += (keystatus[17]-keystatus[31])*f; //W-S;
+
+    
+  initCamera();  
+  render();
+}
+
+render(){
+
+  static hbuf[XMAX];
+  hang = 2*PI*mousx/xres;
+  vang = 0;//2*PI*mousy/yres;
+
+  for(j=0; j<YMAX; j++)
+  {  
+    for(i=0; i<XMAX; i++)
+    {
+      generateRay(i,j);
+      t = 0;
+      vec3 color;
+      rayhit = castRay(t);
+      if( rayhit==TERRAIN )
+      {
+        terrainColor();
+        if(p.y < 1.2)
+        {
+        seaFroth = (2+noise(p.x,p.z));
+        color.x = 1+normal.x + 5*p.y + 40*seaFroth;
+        color.y = 1+normal.y + 5*p.y + 80*seaFroth;
+        color.z = 1+normal.z + 5*p.y + 200*seaFroth;
+        }else
+        {
+
+        grassNoise = (1+noise(10*p.x,p.z));
+        vec3 strand;
+        vec3 gress; gress.x = 64*grassNoise; gress.y = 512*grassNoise; gress.z = 10;
+        vec3 sand; sand.x = 192; sand.y = 192; sand.z = 0;
+
+        lerp(sand,gress,strand,p.y-1.2); // strand = sand -> gress
+
+        color.x = 1+normal.x + strand.x;
+        color.y = 1+normal.y + strand.y;
+        color.z = 1+normal.z + strand.z;
+        }
+        fog(color,t);
+        //cross(p,normal,color);
+        //mult(color, 255);
+        //hbuf[i] = rgb(t*255*(normal.x + p.x) ,t*255*(normal.y+p.y),t*255*(normal.z+p.z) );
+        hbuf[i] = rgb(color.x, color.y, color.z);
+      }
+      else if(rayhit==SUN){
+         hbuf[i] = rgb(255,255,0);
+      } 
+      else { 
+         color.x = j;
+         color.y = 80+j;
+         color.z = 195;
+         hbuf[i] = rgb(color.x, color.y, color.z);
+      }
+    }
+    sethlin(0,j,hbuf,XMAX);
+  }
+
+  moveto(0,0); setfont(4,6);
+  setcol(255,0,0);
+  printf("%.2f %.2f", hang,vang);
+}
+
+initCamera()
+{
+  // Up
+  uvw_v.x = 0;
+  uvw_v.y = -1;
+  uvw_v.z = 0;
+
+  // Gaze/look
+  uvw_w.x = cos(-hang);
+  uvw_w.y = sin(vang);
+  uvw_w.z = cos(vang) * sin(-hang);
+
+  cross(uvw_v, uvw_w, uvw_u); // u = v x w
+  normalize(uvw_u);
+
+  cross(uvw_w, uvw_u, uvw_v); // u = v x w
+  normalize(uvw_v);
+
+  normalize(uvw_w);
+
+  sx = -XMAX/2;
+  sy = -YMAX/2;
+  ex = XMAX/2;
+  ey = YMAX/2;
+
+  vec3 t1, t2;
+  t1.x = uvw_w.x;
+  t1.y = uvw_w.y;
+  t1.z = uvw_w.z;
+  d = XMAX;
+  mult(t1,d);
+
+  t2.x = uvw_v.x;
+  t2.y = uvw_v.y;
+  t2.z = uvw_v.z;
+  mult(t2,sy);
+
+  lower_left_corner.x = uvw_u.x;
+  lower_left_corner.y = uvw_u.y;
+  lower_left_corner.z = uvw_u.z;
+  mult( lower_left_corner, sx);
+  add(lower_left_corner,t1);
+  add(lower_left_corner,t2);
+}
+
+generateRay(x,y)
+{
+  vec3 up;
+  vec3 acc; // accessory? accelerant? 
+
+  rd.x = lower_left_corner.x;
+  rd.y = lower_left_corner.y;
+  rd.z = lower_left_corner.z;
+  
+  up.x = uvw_v.x;
+  up.y = uvw_v.y;
+  up.z = uvw_v.z;
+  mult( up, y );
+
+  acc.x = uvw_u.x;
+  acc.y = uvw_u.y;
+  acc.z = uvw_u.z;
+  mult( acc, x );
+
+  add(rd,up);
+  add(rd,acc);
+  normalize(rd);
+  
+  ro.x = pos.x;
+  ro.y = pos.y;
+  ro.z = pos.z;
+}
+
+
+terrainColor(){
+      // normal found with centeral differences method:
+      eps = 0.04;
+      normal.x = func(p.x-eps,p.z) - func(p.x+eps,p.z);
+      normal.y = 2.0 * eps;
+      normal.z = func(p.x,p.z-eps) - func(p.x,p.z+eps);
+      normalize(normal);     
+}
+
+fog(vec3 color, z){
+  start = 0;
+  end = 30;
+  f = (end-z) / (end-start);
+  vec3 fogColor;
+  fogColor.x = 128;
+  fogColor.y = 128;
+  fogColor.z = 192;
+  color.x = f*color.x + (1-f)*fogColor.x;
+  color.y = f*color.y + (1-f)*fogColor.y;
+  color.z = f*color.z + (1-f)*fogColor.z;
+}
+
+normalize(vec3 v){
+    rlen = 1.0 / sqrt(v.x^2+v.y^2+v.z^2);
+    v.x *= rlen;
+    v.y *= rlen;
+    v.z *= rlen;  
+}
+
+castRay(&resT) // ro=origin, rd=direction
+{
+  rayDeltaRatio = 0.015;// * 4;
+  dt = max(rayDeltaRatio,0.001);
+  mint = 0.01;
+  maxt = 50.0;
+  lh = 0.0;
+  ly = 0.0;
+
+  for(t = mint; t < maxt; t + =dt)
+  {
+    p.x = ro.x + rd.x * t;
+    p.y = ro.y + rd.y * t;
+    p.z = ro.z + rd.z * t;
+    
+    h = func(p.x,p.z);
+    if(p.y < h)
+    {
+      // interpolate the intersection distance
+      resT =  t - dt + dt*(lh-ly)/(p.y-ly-h+lh);
+      return TERRAIN;
+    }    
+
+    // allow the error to be proportonal to the distance
+    dt = rayDeltaRatio*t;
+    lh = h;
+    ly = p.y;
+    
+  }
+  return 0;
+}
+
+cross(vec3 a, vec3 b, vec3 c){
+  c.x = a.y * b.z - a.z * b.y;
+  c.y = a.z * b.x - a.x * b.z;
+  c.z = a.x * b.y - a.y * b.x;
+}
+
+
+add(vec3 a, vec3 b){
+  a.x += b.x;
+  a.y += b.y;
+  a.z += b.z;
+}
+
+mult(vec3 v, s){
+  v.x *= s;
+  v.y *= s;
+  v.z *= s;
+}
+
+lerp( vec3 a, vec3 b, vec3 c, t)
+{
+  c.x =a.x+ (b.x-a.x)*t;
+  c.y =a.y+ (b.y-a.y)*t;
+  c.z =a.z+ (b.z-a.z)*t;
+}
+
+func(x,z)
+{
+   return 1+noise(x*.2,z*.2);
+   //return (10+sin(3*x)+cos(3*z))*.125;
+}
+
+dist(vec3 a, vec3 b){
+  return sqrt( (a.x-b.x)^2 + (a.y-b.y)^2 + (a.z-b.z)^2 );
+}
+

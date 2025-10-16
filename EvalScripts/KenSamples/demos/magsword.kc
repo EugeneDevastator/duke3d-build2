@@ -1,0 +1,450 @@
+static sepoff = 0.10, pixoff = 100, dis = -6, zoom = 1.2; //easier on the eyes for newbies
+//static sepoff = 0.05, pixoff = 80, dis = -12, zoom = 1.2; //real-world values for 1920x1200 28.5" diag LCD
+()
+{
+      //MAGSWORD.KC by Ken Silverman
+      //Note: spring physics code was inspired by "Spring Theory", an old demo by Jason Doucette
+   enum {MAXS=10, BOXSIZ=3};
+   static oobx[MAXS^3], ooby[MAXS^3], oobz[MAXS^3];
+   static obx[MAXS^3], oby[MAXS^3], obz[MAXS^3];
+   static bx[MAXS^3], by[MAXS^3], bz[MAXS^3], bc[MAXS^3], bn;
+   static l0[MAXS^3*12], l1[MAXS^3*12], ld2[MAXS^3*12], ln;
+   
+   enum {MAXDEVS=4, MODEMAX=6};
+   static grabi[MAXDEVS], tim;
+   static mode = 0;
+   
+   for(i=0;i<MAXDEVS;i++) grabi[i] = -1;
+   
+   bn = 0; ln = 0;
+   ldist = 3/MAXS; cent = (MAXS-1)/2;
+   if (1)
+   {
+      for(z=0;z<MAXS;z++)
+         for(y=0;y<MAXS;y++)
+            for(x=0;x<MAXS;x++)
+            {
+               if (mode == 0)
+               {
+                  if ((fabs(y-cent) > .5) || (fabs(x-cent) < cent-1) && (fabs(z-cent) < cent-1)) //quad bridge
+                     if ((y > 0) || ((x > 0) && (x < MAXS-1) && (z > 0) && (z < MAXS-1)))
+                        if ((fabs(x-cent) < cent-1) || (fabs(z-cent) < cent-1)) continue;
+               }
+               else if (mode == 1) { if (fabs(z-4.5) > .5) continue; } //thin box
+               else if (mode == 2) { if ((fabs(x-cent)<cent) && (fabs(y-cent)<cent) && (fabs(z-cent)<cent)) continue; } //open box
+               else if (mode == 3) { ; } //filled 3D box
+               else if (mode == 4) { if ((x-cent)^2+(y-cent)^2+(z-cent)^2 > cent^2) continue; } //ball
+               else if (mode == 5) { p = 4; if (fabs(x-cent)^p+fabs(y-cent)^p+fabs(z-cent)^p < (cent+.2)^p) continue; } //box frame
+             //else if (mode == 6) { if ((x == MAXS/2) || (y == MAXS/2) || (z == MAXS/2)) continue; } //8piece
+             //else if (mode == 7) { if ((x)%2 > 0) continue; } //cloths
+             //else if (mode == 8) { if ((fabs(x-cent) < cent) && (fabs(y-cent) < cent)) continue; } //loop
+             //else if (mode == 9) { if (rnd < .8) continue; } //chain?
+             //else if (mode ==10) { if (x%y%z > 0) continue; } //weird
+               
+               bx[bn] = (x-(cent  ))*ldist;
+               by[bn] = (y-(MAXS-1))*ldist + BOXSIZ;
+               bz[bn] = (z-(cent  ))*ldist; bn++;
+            }
+   }
+   else
+   {     //Ball
+      n = 256; rad = 1.5;
+      sc = (sqrt(5)-1)*PI; hm = (n-1)/2;
+      for(i=0;i<n;i++)
+      {
+         z = (i-hm)/hm; r = sqrt(1-z*z)*rad;
+         bx[bn] = cos(i*sc)*r;
+         by[bn] = sin(i*sc)*r;
+         bz[bn] = z*rad; bn++;
+      }
+   }
+         
+   f = 1e-5;
+   for(i=bn-1;i>=0;i--)
+   {
+      oobx[i] = bx[i]; obx[i] = bx[i]+nrnd*f;
+      ooby[i] = by[i]; oby[i] = by[i]+nrnd*f;
+      oobz[i] = bz[i]; obz[i] = bz[i]+nrnd*f;
+      bc[i] = int(160+noise(i*0.0332)*64)*65536+
+              int(160+noise(i*0.0424)*64)*256+
+              int( 80+noise(i*0.0276)*64);
+   }
+
+   for(i=0;i<bn;i++)
+      for(j=0;j<i;j++)
+      {
+         d2 = (bx[i]-bx[j])^2 +
+              (by[i]-by[j])^2 +
+              (bz[i]-bz[j])^2;
+         if (d2 <= (ldist*1.45)^2)
+            { l0[ln] = i; l1[ln] = j; ld2[ln] = d2; ln++; }
+      }
+   
+      //Randomize link order
+   for(i=ln-1;i>0;i--)
+   {
+      j = int(i*rnd); if (i == j) continue;
+      k = l0 [i]; l0 [i] = l0 [j]; l0 [j] = k;
+      k = l1 [i]; l1 [i] = l1 [j]; l1 [j] = k;
+      k = ld2[i]; ld2[i] = ld2[j]; ld2[j] = k;
+   }
+   
+   while (1)
+   {
+      dtim = tim; tim = klock(); dtim = tim-dtim;
+   
+      if (numframes < 4) cls(0);
+      clz(1e32);
+      s = sgn((numframes%2)-.5)*(USINGSTEREO!=0);
+      static hang, vang;
+      f = dtim;
+      if (keystatus[0x2a]) f /= 4.0;
+      if (keystatus[0x36]) f *= 4.0;
+      hang += (keystatus[0x33]-keystatus[0x34])*f; //, - .
+      vang += (keystatus[0xc9]-keystatus[0xd1])*f; //PGUP-PGDN
+      
+      iforx = sin(hang)*cos(vang); ifory = sin(vang); iforz = cos(hang)*cos(vang);
+      irigx = cos(hang);           irigy = 0;         irigz =-sin(hang);
+      idowx = ifory*irigz - iforz*irigy; iposx = iforx*dis + sin(tim*1.3)*.03;
+      idowy = iforz*irigx - iforx*irigz; iposy = ifory*dis + sin(tim*1.5)*.03;
+      idowz = iforx*irigy - ifory*irigx; iposz = iforz*dis + sin(tim*1.6)*.03;
+      setcam(iposx + sepoff*irigx*s,
+             iposy + sepoff*irigy*s,
+             iposz + sepoff*irigz*s,hang,vang);
+      setview(0,0,xres,yres,xres/2+pixoff*s,yres/2,xres/2*zoom);
+      
+      //drawcone(0,1,+BOXSIZ+3,.1,0,1,-BOXSIZ-3,.1); //test cone for 3D
+         
+      if (0)
+      {
+         for(i=0;i<16;i++)
+         {
+            setcol(0xa09070); r = 2; a = i*PI*2/16+tim;
+            drawsph(-2,cos(a)*r,sin(a)*r,.2);
+         }
+         setcol(0xffffff);
+         drawkv6("caco.kv6",-1.5,-2,0,0,0,tim);
+      }
+      
+      mag6d_smoothfactor = 0.5;
+      
+      static px[MAXDEVS], py[MAXDEVS], pz[MAXDEVS];
+      static rx[MAXDEVS], ry[MAXDEVS], rz[MAXDEVS];
+      static dx[MAXDEVS], dy[MAXDEVS], dz[MAXDEVS];
+      static fx[MAXDEVS], fy[MAXDEVS], fz[MAXDEVS], but[MAXDEVS];
+      static opx[MAXDEVS], opy[MAXDEVS], opz[MAXDEVS];
+      static orx[MAXDEVS], ory[MAXDEVS], orz[MAXDEVS];
+      static odx[MAXDEVS], ody[MAXDEVS], odz[MAXDEVS];
+      static ofx[MAXDEVS], ofy[MAXDEVS], ofz[MAXDEVS], obut[MAXDEVS];
+      for(p=0;p<max(using6dof,1);p++)
+      {
+         obut[p] = but[p]; cnt = readmag6d(p,&px[p],&py[p],&pz[p],&rx[p],&ry[p],&rz[p],
+                                             &dx[p],&dy[p],&dz[p],&fx[p],&fy[p],&fz[p],&but[p]);
+         px[p] *= 2; py[p] *= 2; pz[p] *= 2; pz[p] += 3;
+         orx[p] =  rx[p]; ory[p] =  ry[p]; orz[p] =  rz[p];
+         rx[p]  =  dx[p];  ry[p] =  dy[p];  rz[p] =  dz[p];
+         dx[p]  =-orx[p];  dy[p] =-ory[p];  dz[p] =-orz[p];
+         
+         c = cos(vang); s = sin(vang);
+         opy[p] = py[p]; py[p] = c*py[p] + s*pz[p]; pz[p] = c*pz[p] - s*opy[p];
+         ory[p] = ry[p]; ry[p] = c*ry[p] + s*rz[p]; rz[p] = c*rz[p] - s*ory[p];
+         ody[p] = dy[p]; dy[p] = c*dy[p] + s*dz[p]; dz[p] = c*dz[p] - s*ody[p];
+         ofy[p] = fy[p]; fy[p] = c*fy[p] + s*fz[p]; fz[p] = c*fz[p] - s*ofy[p];
+         c = cos(hang); s = sin(hang);
+         opx[p] = px[p]; px[p] = c*px[p] + s*pz[p]; pz[p] = c*pz[p] - s*opx[p];
+         orx[p] = rx[p]; rx[p] = c*rx[p] + s*rz[p]; rz[p] = c*rz[p] - s*orx[p];
+         odx[p] = dx[p]; dx[p] = c*dx[p] + s*dz[p]; dz[p] = c*dz[p] - s*odx[p];
+         ofx[p] = fx[p]; fx[p] = c*fx[p] + s*fz[p]; fz[p] = c*fz[p] - s*ofx[p];
+         
+         if (((but[p]%2) >= 1) > ((obut[p]%2) >= 1)) { mode--; if (mode <        0) mode = MODEMAX-1; return; } //left  but
+         if (((but[p]%8) >= 4) > ((obut[p]%8) >= 4)) { mode++; if (mode >= MODEMAX) mode =         0; return; } //right but
+         if (but[p] >= 8) //nav (camera rotation)
+         {
+            static xdir[16] = {0,-1,1,0,1,0,1,0,-1,-1};
+            static ydir[16] = {0,-1,-1,-1,1,0,0,0,1,0,0,0,1};
+            hang -= xdir[but[p]/8]*dtim;
+            vang -= ydir[but[p]/8]*dtim;
+         }
+      }
+      
+      
+         //Draw cube
+      glsettex("wood.png"); drawcube(4,BOXSIZ,256*.7,240*.7,280*.7);
+      setcol(0xa08060);
+      for(u=-BOXSIZ;u<=BOXSIZ;u+=BOXSIZ*2)
+         for(v=-BOXSIZ;v<=BOXSIZ;v+=BOXSIZ*2)
+         {
+            //drawcone(-BOXSIZ,-u,-v,.03,+BOXSIZ,-u,-v,.03);
+            //drawcone(-v,-BOXSIZ,-u,.03,-v,+BOXSIZ,-u,.03);
+            //drawcone(-u,-v,-BOXSIZ,.03,-u,-v,+BOXSIZ,.03);
+         }
+      
+      static oax0[MAXDEVS][3], oax1[MAXDEVS][3], ax0[MAXDEVS][3], ax1[MAXDEVS][3];
+      for(p=0;p<max(using6dof,1);p++)
+      {
+         for(i=0;i<3;i++) { oax0[p][i] = ax0[p][i];  oax1[p][i] = ax1[p][i]; }
+         if (0)
+         {
+            f = .7; 
+            setcol(0xffffff); drawkv6("axe.kv6",px[p]+fx[p]*f,py[p]+fy[p]*f,pz[p]+fz[p]*f,rx[p],ry[p],rz[p],dx[p],dy[p],dz[p],fx[p],fy[p],fz[p]);
+          //setcol(0x000000); drawkv6("axe.kv6",px[p]+fx[p]*f,BOXSIZ,pz[p]+fz[p]*f,rx[p],ry[p]*.01,rz[p],dx[p],dy[p]*.01,dz[p],fx[p],fy[p]*.01,fz[p]);
+            f = 1.41; g = .55; nx = px[p]+fx[p]*f+dx[p]*g; ny = py[p]+fy[p]*f+dy[p]*g; nz = pz[p]+fz[p]*f+dz[p]*g;
+            ax0[p][0] = nx-fx[p]*.3; ax0[p][1] = ny-fy[p]*.3; ax0[p][2] = nz-fz[p]*.3;
+            ax1[p][0] = nx+fx[p]*.3; ax1[p][1] = ny+fy[p]*.3; ax1[p][2] = nz+fz[p]*.3;
+         }
+         else
+         {
+            f = .75;
+            setcol(0xffffff); drawkv6("sword.kv6",px[p]+fx[p]*f,py[p]+fy[p]*f,pz[p]+fz[p]*f,rx[p],ry[p],rz[p],dx[p],dy[p],dz[p],fx[p],fy[p],fz[p]);
+          //setcol(0x000000); drawkv6("sword.kv6",px[p]+fx[p]*f,BOXSIZ,pz[p]+fz[p]*f,rx[p],ry[p]*.01,rz[p],dx[p],dy[p]*.01,dz[p],fx[p],fy[p]*.01,fz[p]);
+            nx = px[p]+fx[p]*.85; ny = py[p]+fy[p]*.85; nz = pz[p]+fz[p]*.85;
+            f =-0.383; ax0[p][0] = px[p]+fx[p]*f; ax0[p][1] = py[p]+fy[p]*f; ax0[p][2] = pz[p]+fz[p]*f;
+            f = 1.615; ax1[p][0] = px[p]+fx[p]*f; ax1[p][1] = py[p]+fy[p]*f; ax1[p][2] = pz[p]+fz[p]*f;
+         }
+         //setcol(0xffffff); drawcone(ax0[p][0],ax0[p][1],ax0[p][2],-.01,ax1[p][0],ax1[p][1],ax1[p][2],-.01);
+         
+         if ((but[p]%4) >= 2)
+         {
+            mind2 = 1e32;
+            for(i=bn-1;i>=0;i--)
+            {
+               d2 = (bx[i]-nx)^2 + (by[i]-ny)^2 + (bz[i]-nz)^2;
+               if (d2 < mind2) { mind2 = d2; tgrabi = i; }
+            }
+         
+            if ((obut[p]%4) < 2) grabi[p] = tgrabi;
+            f = dtim*8;
+            bx[grabi] += (nx-bx[grabi[p]])*f;
+            by[grabi] += (ny-by[grabi[p]])*f;
+            bz[grabi] += (nz-bz[grabi[p]])*f;
+            
+            setcol(0xa08040);
+            drawcone(bx[grabi],by[grabi],bz[grabi],.03,nx,ny,nz,.03);
+         }
+      }
+      
+      static otim; iterpersec = 256;
+      n = min(int(tim*iterpersec) - int(otim*iterpersec),iterpersec/5); otim = tim;
+      grav = .000030; fric = .12; //low=ice,high=rubber
+      for(i=bn-1;i>=0;i--) { oobx[i] = bx[i]; ooby[i] = by[i]; oobz[i] = bz[i]; }
+      for(c=n-1;c>=0;c--)
+      {
+         for(i=bn-1;i>=0;i--)
+         {
+            nx = min(max(bx[i]*2 - obx[i]       ,-BOXSIZ),+BOXSIZ);
+            ny = min(max(by[i]*2 - oby[i] + grav,-BOXSIZ),+BOXSIZ);
+            nz = min(max(bz[i]*2 - obz[i]       ,-BOXSIZ),+BOXSIZ);
+            if (fabs(nx) == BOXSIZ) { by[i] += (ny-by[i])*fric; bz[i] += (nz-bz[i])*fric; }
+            if (fabs(ny) == BOXSIZ) { bz[i] += (nz-bz[i])*fric; bx[i] += (nx-bx[i])*fric; }
+            if (fabs(nz) == BOXSIZ) { bx[i] += (nx-bx[i])*fric; by[i] += (ny-by[i])*fric; }
+            obx[i] = bx[i]; bx[i] = nx;
+            oby[i] = by[i]; by[i] = ny;
+            obz[i] = bz[i]; bz[i] = nz;
+         }
+         for(i=ln-1;i>=0;i--)
+         {
+            i0 = l0[i]; i1 = l1[i];
+            dx = bx[i1] - bx[i0];
+            dy = by[i1] - by[i0];
+            dz = bz[i1] - bz[i0];
+            d = dx*dx + dy*dy + dz*dz; f = ld2[i] / (ld2[i]+d)-.5;
+            dx *= f; dy *= f; dz *= f;
+            bx[i0] -= dx; by[i0] -= dy; bz[i0] -= dz;
+            bx[i1] += dx; by[i1] += dy; bz[i1] += dz;
+         }
+      }
+
+      //for(p=0;p<max(using6dof,1);p++)
+      //{
+      //   drawcone(oax0[p][0],oax0[p][1],oax0[p][2],.05,oax1[p][0],oax1[p][1],oax1[p][2],.05);
+      //   drawcone( ax0[p][0], ax0[p][1], ax0[p][2],.05, ax1[p][0], ax1[p][1], ax1[p][2],.05);
+      //   drawcone(oax0[p][0],oax0[p][1],oax0[p][2],.05, ax0[p][0], ax0[p][1], ax0[p][2],.05);
+      //   drawcone(oax1[p][0],oax1[p][1],oax1[p][2],.05, ax1[p][0], ax1[p][1], ax1[p][2],.05);
+      //}
+      
+      if (numframes > 0)
+      {
+         for(i=ln-1;i>=0;i--)
+         {
+            static olin0[3], olin1[3], lin0[3], lin1[3];
+            i0 = l0[i]; olin0[0] = oobx[i0]; olin0[1] = ooby[i0]; olin0[2] = oobz[i0];
+                         lin0[0] =   bx[i0];  lin0[1] =   by[i0];  lin0[2] =   bz[i0];
+            i1 = l1[i]; olin1[0] = oobx[i1]; olin1[1] = ooby[i1]; olin1[2] = oobz[i1];
+                         lin1[0] =   bx[i1];  lin1[1] =   by[i1];  lin1[2] =   bz[i1];
+            for(p=0;p<max(using6dof,1);p++)
+               if (intersecttrap(oax0[p][0],oax1[p][0],ax0[p][0],ax1[p][0],olin0,olin1,lin0,lin1))
+               {
+                  ln--; playsound("woodrub.flac",40,1.5+nrnd*.2);
+                  l0 [i] = l0 [ln];
+                  l1 [i] = l1 [ln];
+                  ld2[i] = ld2[ln];
+               }
+         }
+      }
+      
+      for(i=bn-1;i>=0;i--)
+      {
+         setcol(bc[i]);
+         drawsph(bx[i],by[i],bz[i],.02);
+      }
+      setcol(0xb0b050);
+      for(i=ln-1;i>=0;i--)
+      {
+         i0 = l0[i]; setcol(bc[i0]); moveto(bx[i0],by[i0],bz[i0]);
+         i1 = l1[i];                 lineto(bx[i1],by[i1],bz[i1]);
+      }
+      
+      refresh();
+   }
+}
+
+drawcube (g,f,c0,c1,c2)
+{
+   glbegin(GL_QUADS); 
+   setcol(c0,c0,c0);
+   gltexcoord(0,0); glvertex(-f,+f,+f);
+   gltexcoord(g,0); glvertex(+f,+f,+f);
+   gltexcoord(g,g); glvertex(+f,+f,-f);
+   gltexcoord(0,g); glvertex(-f,+f,-f);
+   gltexcoord(0,0); glvertex(-f,-f,-f);
+   gltexcoord(g,0); glvertex(+f,-f,-f);
+   gltexcoord(g,g); glvertex(+f,-f,+f);
+   gltexcoord(0,g); glvertex(-f,-f,+f);
+   setcol(c1,c1,c1);
+   gltexcoord(0,0); glvertex(+f,-f,+f);
+   gltexcoord(g,0); glvertex(+f,-f,-f);
+   gltexcoord(g,g); glvertex(+f,+f,-f);
+   gltexcoord(0,g); glvertex(+f,+f,+f);
+   gltexcoord(0,0); glvertex(-f,-f,-f);
+   gltexcoord(g,0); glvertex(-f,-f,+f);
+   gltexcoord(g,g); glvertex(-f,+f,+f);
+   gltexcoord(0,g); glvertex(-f,+f,-f);
+   setcol(c2,c2,c2);
+   gltexcoord(0,0); glvertex(-f,-f,+f);
+   gltexcoord(g,0); glvertex(+f,-f,+f);
+   gltexcoord(g,g); glvertex(+f,+f,+f);
+   gltexcoord(0,g); glvertex(-f,+f,+f);
+   gltexcoord(0,0); glvertex(+f,-f,-f);
+   gltexcoord(g,0); glvertex(-f,-f,-f);
+   gltexcoord(g,g); glvertex(-f,+f,-f);
+   gltexcoord(0,g); glvertex(+f,+f,-f);
+}
+
+   //Find shortest path between 2 line segments
+   //Input: 2 line segments: a0-a1, b0-b1
+   //Output: 2 intersection points: ai on segment a0-a1, bi on segment b0-b1
+   //Returns: distance between ai&bi
+roundcylminpath (a0[3],a1[3],b0[3],b1[3]) //,ai[3],bi[3])
+{
+   static ai[3], bi[3];
+   static av[3], bv[3], ab[3];
+   
+   av[0] = a1[0]-a0[0]; bv[0] = b1[0]-b0[0]; ab[0] = b0[0]-a0[0];
+   av[1] = a1[1]-a0[1]; bv[1] = b1[1]-b0[1]; ab[1] = b0[1]-a0[1];
+   av[2] = a1[2]-a0[2]; bv[2] = b1[2]-b0[2]; ab[2] = b0[2]-a0[2];
+   k0 = av[0]*av[0] + av[1]*av[1] + av[2]*av[2];
+   k1 = bv[0]*bv[0] + bv[1]*bv[1] + bv[2]*bv[2];
+   k2 = av[0]*ab[0] + av[1]*ab[1] + av[2]*ab[2];
+   k3 = bv[0]*ab[0] + bv[1]*ab[1] + bv[2]*ab[2];
+   k4 = av[0]*bv[0] + av[1]*bv[1] + av[2]*bv[2];
+      // k0*t - k4*u = k2
+      //-k4*t + k1*u =-k3
+   det = k0*k1 - k4*k4;
+   if (det != 0)
+   {
+      det = 1/det;
+      t = (k1*k2 - k3*k4)*det;
+      u = (k2*k4 - k0*k3)*det;
+   } else { t = 0; u = -k2/k3; }
+   t = min(max(t,0),1);
+   u = min(max(u,0),1);
+   ai[0] = av[0]*t + a0[0]; bi[0] = bv[0]*u + b0[0];
+   ai[1] = av[1]*t + a0[1]; bi[1] = bv[1]*u + b0[1];
+   ai[2] = av[2]*t + a0[2]; bi[2] = bv[2]*u + b0[2];
+   return(sqrt((bi[0]-ai[0])^2+(bi[1]-ai[1])^2+(bi[2]-ai[2])^2));
+}
+
+intersecttrap (a0[3],a1[3],a3[3],a2[3], b0[3],b1[3],b3[3],b2[3])
+{
+      //Early out optimization (Also seems to fix some degenerate case of line vs. triangle (?))
+   for(i=3-1;i>=0;i--)
+   {
+      amin = min(min(a0[i],a1[i]),min(a2[i],a3[i]));
+      bmax = max(max(b0[i],b1[i]),max(b2[i],b3[i])); if (amin >= bmax) return(0);
+      bmin = min(min(b0[i],b1[i]),min(b2[i],b3[i]));
+      amax = max(max(a0[i],a1[i]),max(a2[i],a3[i])); if (bmin >= amax) return(0);
+   }
+   if (intersecttri(a0,a1,a2,b0,b1,b2)) return(1);
+   if (intersecttri(a0,a2,a3,b0,b1,b2)) return(1);
+   if (intersecttri(a0,a1,a2,b0,b2,b3)) return(1);
+   if (intersecttri(a0,a2,a3,b0,b2,b3)) return(1);
+   return(0);
+}
+
+intersecttri (a0[3],a1[3],a2[3], b0[3],b1[3],b2[3])
+{
+   static a[3][3], b[3][3];
+   for(i=3-1;i>=0;i--)
+   {
+      a[0][i] = a0[i]; a[1][i] = a1[i]; a[2][i] = a2[i];
+      b[0][i] = b0[i]; b[1][i] = b1[i]; b[2][i] = b2[i];
+   }
+   
+   static t[3], in[4][3];
+   
+   c = 0;
+   
+   x0 = a[0][0]; y0 = a[0][1]; z0 = a[0][2];
+   nx = (a[1][1]-y0)*(a[2][2]-z0) - (a[1][2]-z0)*(a[2][1]-y0);
+   ny = (a[1][2]-z0)*(a[2][0]-x0) - (a[1][0]-x0)*(a[2][2]-z0);
+   nz = (a[1][0]-x0)*(a[2][1]-y0) - (a[1][1]-y0)*(a[2][0]-x0);
+   for(i=3-1;i>=0;i--)
+      t[i] = (b[i][0]-x0)*nx + (b[i][1]-y0)*ny + (b[i][2]-z0)*nz;
+   for(i=2,j=0;j<3;i=j,j++)
+   {
+      if ((t[i] < 0) == (t[j] < 0)) continue;
+      f = t[i]/(t[i]-t[j]);
+      for(k=3-1;k>=0;k--) in[c][k] = (b[j][k]-b[i][k])*f + b[i][k];
+      c++;
+   }
+   if (c != 2) return(0);
+   
+   x0 = b[0][0]; y0 = b[0][1]; z0 = b[0][2];
+   nx = (b[1][1]-y0)*(b[2][2]-z0) - (b[1][2]-z0)*(b[2][1]-y0);
+   ny = (b[1][2]-z0)*(b[2][0]-x0) - (b[1][0]-x0)*(b[2][2]-z0);
+   nz = (b[1][0]-x0)*(b[2][1]-y0) - (b[1][1]-y0)*(b[2][0]-x0);
+   for(i=3-1;i>=0;i--)
+      t[i] = (a[i][0]-x0)*nx + (a[i][1]-y0)*ny + (a[i][2]-z0)*nz;
+   for(i=2,j=0;j<3;i=j,j++)
+   {
+      if ((t[i] < 0) == (t[j] < 0)) continue;
+      f = t[i]/(t[i]-t[j]);
+      for(k=3-1;k>=0;k--) in[c][k] = (a[j][k]-a[i][k])*f + a[i][k];
+      c++;
+   }
+   if (c != 4) return(0);
+
+   disx = min(min(in[0][0],in[1][0]),min(in[2][0],in[3][0]));
+   disy = min(min(in[0][1],in[1][1]),min(in[2][1],in[3][1]));
+   disz = min(min(in[0][2],in[1][2]),min(in[2][2],in[3][2]));
+   disx = max(max(in[0][0],in[1][0]),max(in[2][0],in[3][0]))-disx;
+   disy = max(max(in[0][1],in[1][1]),max(in[2][1],in[3][1]))-disy;
+   disz = max(max(in[0][2],in[1][2]),max(in[2][2],in[3][2]))-disz;
+   if ((disx > disy) && (disx > disz)) mi = 0;
+   else if (disy > disz) mi = 1; else mi = 2;
+   
+   for(i=0;i<4;i+=2)
+      if (in[i][mi] > in[i+1][mi])
+         for(j=0;j<3;j++)
+            { f = in[i][j]; in[i][j] = in[i+1][j]; in[i+1][j] = f; }
+   if (((in[0][mi] >= in[3][mi]) || (in[2][mi] >= in[1][mi]))) return(0);
+ 
+      //for debug only
+   if (in[0][mi] > in[2][mi]) i0 = 0; else i0 = 2;
+   if (in[1][mi] < in[3][mi]) i1 = 1; else i1 = 3;
+   setcol(0xa0a080);
+   drawcone(in[i0][0],in[i0][1],in[i0][2],.02,
+            in[i1][0],in[i1][1],in[i1][2],.02);
+   
+   return(1);
+}

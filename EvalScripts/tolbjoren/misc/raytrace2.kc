@@ -1,0 +1,182 @@
+struct vec
+{
+   x,y,z;
+}
+
+struct camera_t
+{
+   vec position;
+   vec lookAt;
+   vec lookUp;
+}
+
+struct ray_t
+{
+   vec origin;
+   vec dir;
+}
+
+struct sphere_t
+{
+   vec center;
+   double radius;
+}
+
+
+()
+{
+    width = 480;
+    height = 320;
+ 
+    // Vertical and horizontal field of view
+    hfov = PI/3.5;
+    vfov = hfov * height/width;
+ 
+    // Pixel width and height
+    pw = 2.0 * tan( hfov/2.0 ) / width;
+    ph = 2.0 * tan( vfov/2.0 ) / height;    
+ 
+
+    // sphere
+    sphere_t sphere;
+    set(sphere.center, 1, 1, 1 );
+    sphere.radius = 0.4;
+ 
+    // camera
+    camera_t camera;
+    set( camera.position, 0,0,0 );
+    set( camera.lookAt, 1,1,1 );
+    set( camera.lookUp, 0, 1, 0 );
+ 
+    // scene
+    //let scene = { camera=camera; sphere=sphere }
+ 
+    // set up the coordinate system
+    vec n;
+    vecsub(n, camera.position, camera.lookAt);
+    normalize(n);
+    
+    vec u;
+    veccross(u, camera.lookUp, n);
+    normalize(u);
+    
+    vec v;
+    veccross(v, n, u);
+    normalize(v);
+    
+    vec vpc;
+    vecsub(vpc, camera.position, n);
+ 
+    for (x = 0; x < width; x++ )
+        for (y=0; y<height; y++)
+        {
+            
+            vec uscaled; vecScalar( uscaled, u, (x-width/2.0)*pw );
+            vec vscaled; vecScalar( vscaled, v, (y-height/2.0)*ph );
+            
+            vec rayPoint = {vpc.x+uscaled.x+vscaled.x,
+                            vpc.y+uscaled.y+vscaled.y,
+                            vpc.z+uscaled.z+vscaled.z };
+            
+            vec rayDir;
+            vecsub( rayDir, rayPoint, camera.position );
+            normalize( rayDir );
+            
+            ray_t ray;
+            set( ray.origin, camera.position );
+            set( ray.dir, rayDir ); 
+            
+            if (castRay( ray, sphere ) == 1 )
+            {
+               setcol(255,0,0);
+            }else{
+               setcol(127,127,127);
+            }
+            setpix(x,y);
+         }
+}
+
+castRay( ray_t ray, sphere_t sphere )
+{
+   vec s;
+   vecsub( s, ray.origin, sphere.center );
+   
+   sv = dot(s, ray.dir );
+   ss = dot(s,s);
+   discr = sv*sv - ss + sphere.radius^2;
+   if ( discr < 0.0 ) return 0;
+   return 1;
+/*
+    let s = ray.origin - scene.sphere.center
+    let rayDir = norm ray.direction
+    let sv = Vector3D.DotProduct(s,rayDir)
+    let ss = Vector3D.DotProduct(s,s)
+    let discr = sv*sv - ss + scene.sphere.radius*scene.sphere.radius
+    if discr < 0.0 then false
+    else true
+*/
+
+}
+
+vecscalar( vec out, vec a, s )
+{
+   out.x = a.x * s;
+   out.y = a.y * s;
+   out.z = a.z * s;
+}
+
+vecadd( vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;
+}
+
+vecsub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;
+}
+
+veccross( vec out, vec a, vec b)
+{
+   out.x = a.y * b.z - a.z * b.y;
+   out.y = a.z * b.x - a.x * b.z;
+   out.z = a.x * b.y - a.y * b.x;
+}
+
+
+dot( vec a, vec b )
+{
+   return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+set( vec out, vec a )
+{
+   out.x = a.x;
+   out.y = a.y;
+   out.z = a.z;
+}
+
+set( vec a, x, y, z )
+{
+   a.x = x;
+   a.y = y;
+   a.z = z;
+}
+
+length( vec v )
+{
+   return sqrt( dot(v,v) );
+}
+
+normalize( vec v )
+{
+   l = length(v);
+   if( l ){
+      v.x /= l; 
+      v.y /= l; 
+      v.z /= l;
+   }
+}

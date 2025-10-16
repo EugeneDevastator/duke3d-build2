@@ -1,0 +1,882 @@
+struct p3d_t{x,y,z;};
+
+enum{MAX_SPHERES = 200}
+struct sphere_t{x, y, z, vx, vy, vz, mass, radius, color, isResting, p3d_t f;};
+static sphere_t spheres[MAX_SPHERES];
+static numspheres = 0;
+static p3d_t g;
+
+enum{MAX_PLANES = 10}
+struct plane_t{p3d_t p, p3d_t u, p3d_t v, p3d_t n;};
+static plane_t planes[MAX_PLANES];
+static numplanes = 0;
+
+enum{MAX_POT_COLLS = 4000}
+struct potentialColl_t{x,y,z,collisionTime,r;}
+static potentialColl_t potColls[MAX_POT_COLLS];
+static num_pot_colls;
+
+// resolving collisions correctly
+enum{INSIDE = -1, NONE = -2}
+enum{SPHERESPHERE = -1, SPHEREPLANE = -2}; // Collision types.
+
+
+static running = 0;
+static sphereSphereColls,sphPlaneColls = 0;
+static recursiveCalls, recurseLimit = 500;
+// 03 Time to add plane-sphere
+// 04. it works. problem was m was not being set correctly. instead i was setting mn!
+// 05 wtf? still leaking planeS? my code works and wiki's doesnt? heh.
+
+static scale = 150;
+static slipps = 0;
+
+static time;
+static leaks = 0;
+
+static mat[9]; static p3d_t cam; 
+()
+{
+   static dt, oldtime;
+   cls(0);
+   time = klock(0);
+   if(running){
+      dt =  time - oldtime;
+   }else{
+      dt = 0;
+   }  
+   oldtime = time; 
+
+   if(numframes == 0)
+   {
+      set(g,0,-90.82,0);
+      set(cam,-scale,scale*4,0);
+      poolSetup(); // resting, storBall, pool, square, sine, cradle cube
+      /*
+      createBall(0,150,0,
+                 0,600,-600,100, 10, 0xff );
+
+      createBall(150*2,150,0,
+                 0,600,600,100, 10, 0xffff );
+
+      createBall(-150*2,150,0,
+                 0,600,600,100, 10, 0x00ff00 );
+      */
+      p3d_t u; set(u,-scale*4, 0,0);
+      p3d_t v; set(v,0,0,scale*4);
+      createPlane(0,0,0,u,v); // bottom
+      
+      p3d_t u; set(u,scale*4, 0,0);
+      p3d_t v; set(v,0,0,scale*4);
+      createPlane(0,scale*8,0,u,v); // top
+      
+      set(u,0, -scale*4,0); set(v,scale*4,0,);
+      createPlane(0,scale*4,-scale*4,u,v); // left
+      
+      set(u,0, scale*4,0); set(v,scale*4,0,);
+      createPlane(0,scale*4,scale*4,u,v); // right
+      
+      set(u,0,-scale*4,0); set(v,0,0,scale*4);
+      createPlane(scale*4,scale*4,0,u,v); // back
+
+      set(u,0,scale*4,0); set(v,0,0,scale*4);
+      createPlane(-scale*4,scale*4,0,u,v);   // front 
+   }
+   
+   updateCamera();
+   display();
+   recursiveCalls = 0;
+   if(running)
+   {
+       num_pot_colls = 0; // Reset num potential coll markers.
+      checkCollision(dt);
+   }
+      
+   keys(dt);
+
+   //sleep(16);
+   moveto(0,0);
+   setcol(0xffffff); setfont(8,12);
+   printf("Collision count:");
+   printf(" sphere-sphere: %7.f",sphereSphereColls);
+   printf("\   sphere-plane : %7.f",sphPlaneColls);
+   printf("\nnum_potential_collisions (both ways):   %7.0f",num_pot_colls);
+   static max_potential_collisions;
+   max_potential_collisions = max(max_potential_collisions, num_pot_colls);
+   printf(" maximum so far:   %g",max_potential_collisions); 
+   static maxRecursiveCalls;
+   maxRecursiveCalls = max(maxRecursiveCalls,recursiveCalls);
+   printf("\nnum recursive steps last dt: %3.f",recursiveCalls);
+   printf("   maximum/limit:  %3.f / %g",maxRecursiveCalls, recurseLimit);
+   printf("\nballs  %g / %g",numspheres, MAX_SPHERES);
+   printf("\nplanes  %g / %g",numplanes, MAX_PLANES);
+   
+   printf("\n%3.f slipps,",slipps);
+   printf("%3.f leaks",leaks);
+   
+   //if(running==0){
+   //textscale = xres*0.002;
+   //moveto(xres*0.15, yres/3); setfont(18*textscale,36*textscale,-1);printf("PRESS SPACE TO RESUME");
+   //}
+}
+
+checkCollision(t) // , movable, fixed
+{
+   recursiveCalls++;
+   if( recursiveCalls > recurseLimit) return; // fix calculation of response taking ds innacuracy in account.
+
+   collisionType = NONE;
+   p3d_t collisionNormal;
+   
+   // find first collision
+   mn = 2.0; // time
+   firstColObj1 = 0;
+   firstColObj2 = 0;
+   
+   // Repeat for all moveable objects.
+   for( i=0; i<numSpheres; i++)
+   {
+      obj1 = i;
+      // find the displacement vector
+      
+      // search for collisions with other moveableObjs, dont bother with already checked ones.
+      for( j=i+1; j<numSpheres; j++)
+      {
+         obj2 = j;
+         tm = sphereSphereCollision(obj1, obj2, t); // use a generic detectCollision func that takes any type of obj.
+         //if(tm == NONE) continue;
+         if(tm > 0 && tm <= 1)
+         {
+            m = min(mn, tm);
+            if(m < mn)
+            {
+               mn = m;
+               firstColObj1 = obj1;
+               firstColObj2 = obj2;
+               collisionNormal.x = spheres[obj1].x - spheres[obj2].x;
+               collisionNormal.y = spheres[obj1].y - spheres[obj2].y; 
+               collisionNormal.z = spheres[obj1].z - spheres[obj2].z;  
+               normalize(collisionNormal);      
+               collisionType = SPHERESPHERE;
+               
+               spheres[obj1].isResting = 0;
+               spheres[obj2].isResting = 0;
+            }
+         }
+         
+         t2 = sphereSphereCollision(obj1, obj2, 1);
+         if(t2 > 0 && t2 <= 1)
+         {
+            createPotentialCollision(spheres[obj1].x+spheres[obj1].vx*t2,spheres[obj1].y+spheres[obj1].vy * t2,spheres[obj1].z+spheres[obj1].vz * t2,spheres[obj1].radius+2,tm);
+            createPotentialCollision(spheres[obj2].x+spheres[obj2].vx*t2,spheres[obj2].y+spheres[obj1].vy * t2,spheres[obj2].z+spheres[obj2].vz * t2,spheres[obj2].radius+2,tm);
+         }
+    
+      }
+      
+      //if(spheres[obj1].isResting == 1) continue; // Dont check plane-sphere collision with resting.
+      // Static - dynamic collisions    
+      for(j=0; j<numplanes; j++)
+      {
+         obj2 = j;
+         tm = spherePlaneCollision(obj1,obj2,t);
+         if(tm > 0 && tm <= 1)
+         {           
+            m = min(mn, tm);
+            if(m < mn)
+            {
+               mn = m;
+               mn = tm;
+               firstColObj1 = obj1;
+               firstColObj2 = obj2;
+               collisionNormal.x = planes[obj2].n.x;
+               collisionNormal.y = planes[obj2].n.y;
+               collisionNormal.z = planes[obj2].n.z;
+               collisionType = SPHEREPLANE;
+            }
+         }
+         // todo: show pot sph plane col
+         t2 =  spherePlaneCollision( obj1, obj2, 1);
+         if(t2 > 0 && t2 <= 1) createPotentialCollision(spheres[obj1].x+spheres[obj1].vx*t2,spheres[obj1].y+spheres[obj1].vy * t2,spheres[obj1].z+spheres[obj1].vz * t2,spheres[obj1].radius+2,tm);    
+      }
+   }
+   
+   tmove = 0;
+   if( mn >= 2.0 ) tmove = 1; // go all the way. No collisions.
+   else tmove = mn * t; // time of collision
+   
+   // Move all movable objects.
+   for(i=0; i<numspheres; i++)
+   {
+      simulate(i,tmove *t); 
+   }
+   
+   // if there was no collisions, finish. end recursion.
+   if( mn >= 2.0 ) return;
+   // otherwise resolve collision
+   resolveCollision( firstColObj1, firstColObj2, collisionType, collisionNormal);
+   
+   checkCollision( t * (1.0 - mn) ); // moveableObjects, fixedObjects
+}
+
+getDS(i,dt,p3d_t ds)
+{
+   ds.x = spheres[i].vx * dt + g.x * 0.5 * dt^2;
+   ds.y = spheres[i].vy * dt + g.y * 0.5 * dt^2;
+   ds.z = spheres[i].vz * dt + g.z * 0.5 * dt^2;
+}
+
+simulate(i,delta)
+{
+   p3d_t a;
+   if(spheres[i].isResting) // if balls are resting, set acceleration to zero
+   {
+      a.x = 0; a.y = 0; a.z = 0;
+   }
+   else // else add gravity and impulse forces.
+   {
+      a.x = g.x + spheres[i].f.x; a.y = g.y + spheres[i].f.y; a.z = g.z + spheres[i].f.z; // total forces
+   }
+   spheres[i].x += spheres[i].vx * delta + a.x * 0.5 * delta^2;
+   spheres[i].y += spheres[i].vy * delta + a.y * 0.5 * delta^2;
+   spheres[i].z += spheres[i].vz * delta + a.z * 0.5 * delta^2;
+   spheres[i].vx += a.x*delta; 
+   spheres[i].vy += a.y*delta; 
+   spheres[i].vz += a.z*delta;   
+   if(spheres[i].y < 0) leaks++;
+}
+
+// we know that obj1 always is a circle.
+resolveCollision( obj1, obj2, collisionType, p3d_t normal)
+{
+   if( collisionType == SPHERESPHERE )
+   {
+      // Wake up.
+      spheres[obj1].isResting = 0;
+      spheres[obj2].isResting = 0;
+      resolveCollisionFree(obj1,obj2,normal);   
+      sphereSphereColls++; 
+      
+      
+      playsound("ballwalla.flac",100);
+   }
+   else if(collisionType == SPHEREPLANE )
+   {
+      resolveFixedCollision(obj1,normal);
+      
+      // Put ball to sleep if speedvector 0 or speedvector rel. to plane is 0.
+      p3d_t v; set(v,spheres[obj1].vx,spheres[obj1].vy,spheres[obj1].vz);
+      //p3d_t n; set(n, planes[obj2].n.x, planes[obj2].n.y, planes[obj2].n.z);    
+      //if( dotProduct(n,v) < -1e-8 ) spheres[obj1].isResting = 1;   
+      
+      /*
+      if(spheres[obj1].isResting == 0) 
+      {
+         ballSpeed = length(v);
+         if( ballSpeed < 1e-3 ) spheres[obj1].isResting = 1;
+         
+         spheres[obj1].vx *= 1-1/exp(ballSpeed); 
+         spheres[obj1].vy *= 1-1/exp(ballSpeed); 
+         spheres[obj1].vz *= 1-1/exp(ballSpeed);
+         
+      }
+      */
+      sphPlaneColls++;
+      //playsound("ballwalla.flac",100);
+   }
+}
+// sph-sph response taken from http://www.gamasutra.com/view/feature/3015/pool_hall_lessons_fast_accurate_.php?page=3
+resolveCollisionFree(obj1,obj2,p3d_t normal)
+{
+   p3d_t v1,v2;
+   set(v1,spheres[obj1].vx,spheres[obj1].vy,spheres[obj1].vz);
+   set(v2,spheres[obj2].vx,spheres[obj2].vy,spheres[obj2].vz);
+   a1 = dotProduct(v1,normal);
+   a2 = dotProduct(v2,normal);
+   sumMass = spheres[obj1].mass + spheres[obj2].mass; 
+   optimizedP = (2.0 * (a1 - a2)) / sumMass;
+
+   spheres[obj1].vx = spheres[obj1].vx - optimizedP * spheres[obj2].mass * normal.x; 
+   spheres[obj1].vy = spheres[obj1].vy - optimizedP * spheres[obj2].mass * normal.y;
+   spheres[obj1].vz = spheres[obj1].vz - optimizedP * spheres[obj2].mass * normal.z;
+   
+   spheres[obj2].vx = spheres[obj2].vx + optimizedP * spheres[obj1].mass * normal.x; 
+   spheres[obj2].vy = spheres[obj2].vy + optimizedP * spheres[obj1].mass * normal.y;
+   spheres[obj2].vz = spheres[obj2].vz + optimizedP * spheres[obj1].mass * normal.z;  
+}
+
+resolveFixedCollision(obj,p3d_t normal)
+{
+   dpr = spheres[obj].vx * normal.x +spheres[obj].vy * normal.y + spheres[obj].vz * normal.z;
+   spheres[obj].vx = spheres[obj].vx - 2.0*normal.x*dpr;
+   spheres[obj].vy = spheres[obj].vy - 2.0*normal.y*dpr;
+   spheres[obj].vz = spheres[obj].vz - 2.0*normal.z*dpr;
+}
+
+// Takes handles of to spheres and their displacement vector relative to time; sph1.pos*t - sph2.pos*t
+sphereSphereCollision(cir1, cir2, t)
+{
+   r = spheres[cir1].radius + spheres[cir2].radius;
+   p3d_t a;
+   a.x = spheres[cir1].x - spheres[cir2].x;
+   a.y = spheres[cir1].y - spheres[cir2].y;
+   a.z = spheres[cir1].z - spheres[cir2].z;
+   p3d_t b; // blir som getDS(simtime)
+   p3d_t cir1ds; getDS(cir1, t, cir1ds);
+   p3d_t cir2ds; getDS(cir2, t, cir2ds);
+   // Relative DS
+   b.x = cir1ds.x - cir2ds.x;
+   b.y = cir1ds.y - cir2ds.y;
+   b.z = cir1ds.z - cir2ds.z;
+   
+   aa = dotProduct(a,a);
+   if( aa < r^2 ) return NONE; // Early escape test. Problem?
+   bb = dotProduct(b,b);
+   ab = dotProduct(a,b);
+   sqrFact = (4*ab*ab) - 4*bb*(aa-r^2);
+   if( bb < 1e-7)
+   { 
+      spheres[cir2].vx = spheres[cir1].vx;
+      spheres[cir2].vy = spheres[cir1].vy;
+      spheres[cir2].vz = spheres[cir1].vz;
+      //slipps++; //correctDS();
+      return NONE;
+   }
+   
+   if(sqrFact < 0) return NONE;
+   // Check collision factor
+   x = ( -2 * ab - sqrt(sqrFact) )/(2*bb); 
+   return x;
+}
+
+spherePlaneCollision(s,p,t)
+{
+   // maths and physics for game programmers: 
+   p3d_t d; 
+   p3d_t planeNormal;
+   // n*c-p = n*d
+   d.x = spheres[s].x - planes[p].p.x;
+   d.y = spheres[s].y - planes[p].p.y; 
+   d.z = spheres[s].z - planes[p].p.z;
+   set(planeNormal, planes[p].n.x, planes[p].n.y, planes[p].n.z);
+   side = dotProduct(d,planeNormal);
+   if(side < 0) return NONE; // early escape for 1 sided plane test.
+   r = spheres[s].radius;
+   
+   p3d_t offsetPos;
+   offsetPos.x = planes[p].p.x + planeNormal.x * r;
+   offsetPos.y = planes[p].p.y + planeNormal.y * r; 
+   offsetPos.z = planes[p].p.z + planeNormal.z * r;
+   p3d_t center; set(center, spheres[s].x, spheres[s].y, spheres[s].z);
+   //p3d_t displacement; set(displacement, spheres[s].vx*t, spheres[s].vy*t, spheres[s].vz*t);
+   p3d_t displacement; getDS(s, t, displacement);
+   t = linePlaneIntersection( center, displacement, offsetPos, planeNormal);
+   return -t; // hvorfor minus fortegn her?
+}
+
+linePlaneIntersection(p3d_t linePt, p3d_t lineVec, p3d_t planePt, p3d_t planeNormal){
+   d = dotProduct(lineVec,planeNormal); // u*n
+   tolerance = 1e-7;
+   if( fabs(d) < tolerance) return NONE; // early escape. u and v are perpendicular and will never isect.
+   p3d_t v; // p-q
+   v.x = linePt.x - planePt.x; v.y = linePt.y - planePt.y; v.z = linePt.z - planePt.z;
+   t = dotProduct(v,planeNormal) / d; // t = ((p-q)*n) / (u*n)
+   return t;
+}
+ 
+rotatePoint(&x,&y,ang) // angle in radians
+{
+   newx = x * cos(ang) - y * sin(ang);
+   newy = x * sin(ang) + y * cos(ang);
+   x = newx; y = newy;    
+}
+
+componentVector(p3d_t vector,p3d_t directionVector,p3d_t out) // out gir delen av vec som er i samme retning som dirvec.
+{
+   normalize(directionVector);
+   dpr = dotProduct(vector, directionVector);
+   out.x = dpr * directionVector.x; 
+   out.y = dpr * directionVector.y;
+   out.z = dpr * directionVector.z;
+}
+// 3D Math
+length(p3d_t v){
+   return sqrt(v.x^2 + v.y^2 + v.z^2);
+}
+
+normalize(p3d_t v)
+{
+   len = sqrt(v.x^2 + v.y^2 + v.z^2); 
+   v.x/=len; v.y/=len; v.z/=len;
+}
+dotProduct(p3d_t a, p3d_t b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+cross(p3d_t a, p3d_t b, p3d_t out)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+copy(p3d_t src, p3d_t dst){
+   src.x = dst.x;
+   src.y = dst.y;
+   src.z = dst.z;
+}
+set(p3d_t p,x,y,z){
+   p.x = x;
+   p.y = y;
+   p.z = z;
+}
+
+antwheel(tx,ty,tz,r,t)
+{
+      segs = 8;
+      ox = tx + r*sin(0*2*PI/segs);
+      oz = tz + r*cos(0*2*PI/segs);
+      for(i=1; i<=segs; i++)
+      {
+         x = tx + r*sin(i*2*PI/segs);
+         y = ty;
+         z = tz + r*cos(i*2*PI/segs);
+         setcol(0xff); drawsph(x,y,z,1);
+         ox = x; oy = y;
+      }
+}
+display()
+{
+   clz(1e32); glenable(GL_DEPTH_TEST); 
+   for(i=0; i<numspheres; i++)
+   {
+      //setcol(0xffffff);
+      //moveto(spheres[i].x, spheres[i].y, spheres[i].z);
+      //lineto(spheres[i].x+spheres[i].vx,spheres[i].y+spheres[i].vy,spheres[i].z+spheres[i].vz); 
+      p3d_t start; set(start, spheres[i].x, spheres[i].y, spheres[i].z);
+      p3d_t end; set(end, spheres[i].x+spheres[i].vx,spheres[i].y+spheres[i].vy,spheres[i].z+spheres[i].vz);
+      arrow(start,end);
+   }
+   for(i=0; i<num_pot_colls; i++)
+   {
+      x = potColls[i].x;
+      y = potColls[i].y;
+      z = potColls[i].z;
+      r = potColls[i].r;
+      antwheel(x,y,z,r,time);
+   }
+   
+   static tex[64][64];
+   if(numframes==0) // Generate plane texture
+   {
+      for(i=0; i<64; i++)
+      {
+         for(j=0; j<64; j++)
+         {
+            v = 255 * fabs( noise( time+5*64/(i+64), time+5*64/(j+64) ));
+            tex[i][j] = rgb(v,v,v);
+         }
+      }
+   }
+   for(i=0; i<numplanes;i++){
+
+      handle=glsettex(tex,64,64);
+      // since evaldraw cant yet pass structs inside arrays, need to make new u and v structs.
+      p3d_t u; set(u, planes[i].u.x, planes[i].u.y, planes[i].u.z );
+      p3d_t v; set(v, planes[i].v.x, planes[i].v.y, planes[i].v.z );
+      plane(planes[i].p.x, planes[i].p.y, planes[i].p.z, u, v);
+      glremovetex(handle);
+   }
+   drawballs();
+
+
+   
+
+   for(i=0; i<num_pot_colls; i++)
+   {
+      x = potColls[i].x - cam.x; y = potColls[i].y - cam.y; z = potColls[i].z - cam.z;
+      nx = x* mat[0] + y * mat[1] + z * mat[2];
+      ny = x* mat[3] + y * mat[4] + z * mat[5];
+      nz = x* mat[6] + y * mat[7] + z * mat[8];
+      if(nz <0)continue;
+      f = xres/2/nz;
+      setcol(0xffffff); setfont(8,12);moveto(nx*f+xres/2, ny*f+yres/2); printf("%1.1f",potColls[i].collisionTime);
+   }
+}
+
+drawballs()
+{
+   // 1. Find ball depth relative to camera. 2. Sort by deph. 3. Draw in order, most distant first.
+   static bdep[MAX_SPHERES];
+   static bord[MAX_SPHERES];
+   for(i=0;i<MAX_SPHERES;i++)
+   {
+      bdep[i] = (spheres[i].x-cam.x)*mat[6] +
+                (spheres[i].y-cam.y)*mat[7] +
+                (-spheres[i].radius-cam.z)*mat[8];
+      bord[i] = i;
+   }
+   //Crap sort
+   for(i=1;i<numspheres;i++)
+   for(j=0;j<i;j++)
+      if (bdep[bord[i]] < bdep[bord[j]])
+      { t = bord[i]; bord[i] = bord[j]; bord[j] = t; }
+   
+   for(j=numspheres-1;j>=0;j--)
+   {
+      i = bord[j];
+      //if ((i == 0) && (spheres[0].z)) continue; //?
+      setcol(spheres[i].color);
+      drawsph( spheres[i].x, spheres[i].y, spheres[i].z, spheres[i].radius );
+      
+      x = spheres[i].x - cam.x; y = spheres[i].y - cam.y; z = spheres[i].z - cam.z;
+      nx = x* mat[0] + y * mat[1] + z * mat[2];
+      ny = x* mat[3] + y * mat[4] + z * mat[5];
+      nz = x* mat[6] + y * mat[7] + z * mat[8];
+      if(nz <= spheres[i].radius) continue;
+      f = xres/2/nz;
+      //speedKmt = sqrt(spheres[i].vx^2+spheres[i].vy^2+spheres[i].vz^2)*3.6;
+      //setcol(0xffffff); setfont(8,12);moveto(nx*f+xres/2, ny*f+yres/2); printf("%1.f",speedKmt);
+      if( spheres[i].isResting )
+      {
+         setcol(0xffffff); setfont(8,12);moveto(nx*f+xres/2, ny*f+yres/2); printf("Zzz");
+      }
+   }
+   
+}
+
+arrow(p3d_t s, p3d_t e) // finds direction vector e-s.
+{
+   p3d_t dir;
+   dir.x = e.x - s.x; dir.y = e.y - s.y; dir.z = e.z - s.z; 
+   arrowlen = length(dir);
+   if(arrowlen < .1) return; // dont draw small arrows.
+   polelen = arrowlen * 0.75;
+   pointerlen = arrowlen - polelen;
+   normalize(dir);
+   
+   r1=.8;
+   drawcone(s.x,s.y,s.z,r1,
+            s.x+dir.x*polelen,s.y+dir.y*polelen,s.z+dir.z*polelen,r1,DRAWCONE_NOCAP1 );         
+   drawcone(s.x+dir.x*polelen,s.y+dir.y*polelen,s.z+dir.z*polelen, -r1*3, 
+            e.x, e.y, e.z, 0.01,DRAWCONE_CENT);
+}
+
+plane(x,y,z, p3d_t fu, p3d_t fv)
+{
+   p3d_t p0; set(p0,x,y,z);
+   p3d_t p1; set(p1,p0.x-fu.x-fv.x, p0.y-fu.y-fv.y, p0.z-fu.z-fv.z );
+   p3d_t p2; set(p2,p0.x+fu.x-fv.x, p0.y+fu.y-fv.y, p0.z+fu.z-fv.z );
+   p3d_t p3; set(p3,p0.x+fu.x+fv.x, p0.y+fu.y+fv.y, p0.z+fu.z+fv.z );
+   p3d_t p4; set(p4,p0.x-fu.x+fv.x, p0.y-fu.y+fv.y, p0.z-fu.z+fv.z );
+   
+   // Draw normal
+   p3d_t n; cross(fu,fv,n); normalize(n);
+   p3d_t center; set(center, (p1.x+p3.x)/2, (p1.y+p3.y)/2, (p1.z+p3.z)/2 );
+   //setcol(0xffff00);moveto(center.x,center.y,center.z); lineto(center.x+n.x*10, center.y+n.y*10,center.z+n.z*10);
+   p3d_t end; set(end, center.x+n.x*80, center.y+n.y*80,center.z+n.z*80);
+   setcol(0xffff00); arrow(center,end);
+   setcol(0xffffff );
+   glEnable(GL_ALPHA_TEST); glCullface(GL_NONE);
+   glBegin(GL_QUADS);
+   glTexCoord(0,0); glVertex(p1.x,p1.y,p1.z);  
+   glTexCoord(1,0); glVertex(p2.x,p2.y,p2.z);  
+   glTexCoord(1,1); glVertex(p3.x,p3.y,p3.z);  
+   glTexCoord(0,1); glVertex(p4.x,p4.y,p4.z);   
+   glEnd();
+}
+
+keys(dt)
+{
+   controllball = numspheres-1;
+   if(keystatus[203])
+   {
+      x = spheres[ controllball ].vx; y = spheres[ controllball ].vy;
+      rotatePoint(x,y, -dt*250*pi/180 );
+      spheres[ controllball ].vx = x; spheres[ controllball ].vy = y;
+   }
+   if(keystatus[205])
+   {
+      x = spheres[ controllball ].vx; y = spheres[ controllball ].vy;
+      rotatePoint(x,y, dt*250*pi/180 );
+      spheres[ controllball ].vx = x; spheres[ controllball ].vy = y;
+   }
+   if(keystatus[200])
+   {
+      // 10% faster
+      // jall.
+      spheres[controllball].vx += 100*cos(spheres[controllball].x-xres-spheres[controllball].vx)*dt;
+      spheres[controllball].vy += 100*sin(spheres[controllball].y-yres-spheres[controllball].vy)*dt;
+   }
+   if(keystatus[208])
+   {
+      spheres[controllball].vx *= 0.99;
+      spheres[controllball].vy *= 0.99;
+   }
+   
+   if(keystatus[57])
+   {
+      keystatus[57] = 0;
+      if(running) running = 0;
+      else running = 1;
+   }
+   
+   if(bstatus == 1)
+   {
+      radii = scale/ (3);
+      bstatus = 0;
+      createBall(scale*3,radii*3,0,
+                 -100,0,0,
+                 radii,1,0xff0000);
+   }
+}
+
+createBall(x,y,z,vx,vy,vz,r,m,c)
+{
+   if(numspheres > MAX_SPHERES) return;
+   spheres[numspheres].x = x;
+   spheres[numspheres].y = y;
+   spheres[numspheres].z = z;
+   spheres[numspheres].vx = vx;
+   spheres[numspheres].vy = vy;
+   spheres[numspheres].vz = vz;
+   spheres[numspheres].radius = r;
+   spheres[numspheres].mass = m;
+   spheres[numspheres].color = c;
+   spheres[numspheres].isResting = 0;
+   numspheres++;
+}
+
+createPlane(x,y,z,p3d_t u, p3d_t v)
+{
+   p3d_t n; cross(u,v,n);
+   normalize(n);
+   planes[numplanes].p.x = x; planes[numplanes].p.y = y; planes[numplanes].p.z = z;
+   planes[numplanes].u.x = u.x; planes[numplanes].u.y = u.y; planes[numplanes].u.z = u.z;
+   planes[numplanes].v.x = v.x; planes[numplanes].v.y = v.y; planes[numplanes].v.z = v.z;
+   planes[numplanes].n.x = n.x; planes[numplanes].n.y = n.y; planes[numplanes].n.z = n.z;
+   numplanes++;
+}
+
+createPotentialCollision(x,y,z,r,time)
+{
+   if(num_pot_colls < MAX_POT_COLLS)    
+   {          
+      potColls[num_pot_colls].x = x;
+      potColls[num_pot_colls].y = y;
+      potColls[num_pot_colls].z = z;
+      potColls[num_pot_colls].r = r;
+      potColls[num_pot_colls].collisionTime = time;
+      num_pot_colls++;
+   }  
+}
+
+poolSetup(){       
+      ballTriangleSize=11;
+      numballs = 9+8+7+6+5+4+3+2+1;
+      for(xloop = ballTriangleSize; xloop>1; xloop--)
+      {
+         for(yloop = 1; yloop<xloop; yloop++)
+         {
+         x = scale * 0.45 + (5-xloop)*27;
+         y = scale/10+1e-1;
+         z = scale * 0.5 + yloop*31-(xloop*31)/2.0;
+         color = rgb(255-numspheres*255/numballs, numspheres*255/numballs, yloop*255/6);
+         createBall(x,y,z,0,0,0,scale/10,50,color);
+         }
+      }
+      
+      //  Cue ball 1
+     createBall(scale * 2, y, scale * 0.5, -550, 0, nrnd*5, 10, 50, 0xffffff);
+     //createBall(xres * 0.70, 50, yres * 0.5, 0, -50, 0, 10, 50, 0xffffff);
+}
+
+cubeSetup()
+{
+   y = scale/2;
+   storBallRadii = scale/2;
+//   createBall(0,y+50,0,
+//              0,0,0, storBallRadii, 10, 0xff0000);
+    
+
+   smallRadii = storBallRadii / 8;  
+   xpos = 0; 
+   ypos = 0;
+   zpos = 0;
+
+   sideBySide = 4;
+   total = sideBySide^3;
+   xofs = (sideBySide-1) * smallRadii*2.2 / 2;
+   yofs = xofs;   
+   zofs = yofs;
+   for(i=0; i<total; i++)
+   {
+      createBall(xpos*smallRadii*2.2 -xofs, y+storBallRadii*5+ypos*smallRadii*2.2 -yofs, zpos*smallRadii*2.2 -zofs, 
+                 0,-50,0, smallRadii, 1, rgb(255-i*255/(total-1), i*255/(total-1), xpos*255/(sideBySide-1)) );
+      xpos++;
+      if(xpos > (sideBySide-1))
+      {
+         xpos = 0;
+         ypos++;
+      }
+      if(ypos > (sideBySide-1))
+      {
+         ypos=0;
+         zpos++;
+      }
+   } 
+}
+
+restingSetup() // Place balls on top of plane
+{
+   smallRadii = scale/ (3);  
+   xpos = 0; 
+   ypos = 0;
+
+   sideBySide = 3;
+   total = sideBySide^2;
+   xofs = (sideBySide-1) * smallRadii*2.2 / 2;
+   yofs = (sideBySide-1) * smallRadii*2.2 / 2;   
+
+   for(i=0; i<total; i++)
+   {
+      createBall(xpos*smallRadii*2.2 -xofs, smallRadii+1e-1, ypos*smallRadii*2.2 -yofs, 
+                 0,0,0, smallRadii, 1, rgb(255-i*255/(total-1), i*255/(total-1), 0) );
+      xpos++;
+      if(xpos > (sideBySide-1))
+      {
+         xpos = 0;
+         ypos++;
+      }
+   } 
+}
+
+storBallSetup()
+{
+   y = scale/2;
+   storBallRadii = scale/3;
+   createBall(0,y,0,
+              0,0,0, storBallRadii, 1, 0xff0000);
+    
+
+   smallRadii = storBallRadii / 18;  
+   xpos = 0; 
+   ypos = 0;
+
+   sideBySide = 8;//;14;
+   total = sideBySide^2;
+   xofs = (sideBySide-1) * smallRadii*2.2 / 2;
+   yofs = (sideBySide-1) * smallRadii*2.2 / 2;   
+
+   for(i=0; i<total; i++)
+   {
+      createBall(xpos*smallRadii*2.2 -xofs, y+storBallRadii*2, ypos*smallRadii*2.2 -yofs, 
+                 0,-50,0, smallRadii, 1, rgb(255-i*255/(total-1), i*255/(total-1), 0) );
+      xpos++;
+      if(xpos > (sideBySide-1))
+      {
+         xpos = 0;
+         ypos++;
+      }
+   } 
+}
+
+sineSetup()
+{
+      len = scale*7;
+      circlesToPlace = 12;
+      diam = len / (circlesToPlace-1);
+      for(i=0; i<circlesToPlace; i++)
+      {
+         x = -scale*3.5 + i*len/(circlesToPlace-1);
+         z = scale*0.5 + 70*sin(i*2*PI/(circlesToPlace-1));
+         y = diam*2;
+       createBall(x,y,z,0,0,0,diam/2-0.5, diam/2, rgb(255-i*255/11, i*255/11, 0) );        
+      }  
+      spheres[0].vx = 1000*cos(PI/4); 
+      spheres[0].vz = 1000*sin(PI/4);
+}
+cradleSetup(){
+      // simplified newtons cradle
+      diam = 25;   
+      for(i=0; i<15; i++)
+      {
+      createBall(scale * 0.2 +i*diam,diam*2, scale * 0.5, 0, 0,0, diam/2-0.000001, diam/2, rgb(255-i*255/11, i*255/11, 0) );
+      }      
+      spheres[3].vx = 150;
+}
+squareSetup(){
+      diam = 20;  
+      xpos = 0; 
+      ypos = 0;
+      for(i=0; i<25; i++)
+      {
+         createBall(xres * 0.2 + xpos * diam, yres * 0.5 + ypos * diam,0,0, 0, 0, diam/2-0.01, diam/2, rgb(255-i*255/11, i*255/11, 0) );
+         xpos++;
+         if(xpos > 4)
+         {
+            xpos = 0;
+            ypos++;
+         }
+      }  
+      x = xres * 0.2 + (xpos+5) * diam;
+      y = yres * 0.5 + (ypos) * diam;
+      z = 0;
+      createBall(x,y,z,xres * 0.2 + xpos, yres * 0.2 + ypos,0, 10, 10, rgb(255-i*255/11, i*255/11, 0) );
+}
+
+/* gets the player controls and sets global camera variables. */
+updateCamera()
+{     
+   // horiz and vertical heading (euler angles)  
+   static posh = -PI/2; // left right
+   static posv = -PI/2 - PI/8;
+
+   playercontrols(cam,posh,posv);
+   //if(posv > 1.5) posv = 1.5;
+   //if(posv < -1.5) posv = -1.5;
+   setcam(cam.x,cam.y,cam.z,posh,posv);
+}
+// Camera and movement code taken from /games/
+//Handle input and player movement
+playercontrols(p3d_t campos,&posh,&posv)
+{
+   static oldMouseX;
+   static oldMouseY;
+   static mouseSpeedX;
+   static mouseSpeedY; 
+
+   f = 1;
+   if (keystatus[0x2a]) f *= 4;
+   if (keystatus[0x36]) f *= 8;
+   vx = (keystatus[32]-keystatus[30])*f; //D-A
+   vy = (keystatus[17]-keystatus[31])*f; //W-S  
+   vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   
+   ang2mat(posh,posv,mat);
+   newvx = mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   newvy = mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   newvz = mat[2]*vx + mat[5]*vz + mat[8]*vy; 
+   d = 1/12; 
+   campos.x+=newvx;
+   campos.y+=newvy;
+   campos.z+=newvz;
+   // mousespeed values are tweaked for 60 fps
+   mouseSpeedX = (mousx - oldMouseX) * 0.01;
+   mouseSpeedY = (mousy - oldMouseY) * 0.01;
+   oldMouseX = mousx;
+   oldMouseY = mousy;
+   if(bstatus==2)
+   {
+      posh -= mouseSpeedX;
+      posv += mouseSpeedY;
+   }
+}
+/* converts horizontal and vertical angles to a 3x3 matrix */
+ang2mat(hang,vang,mat[9])
+{
+   mat[6] = cos(vang)*sin(hang); mat[0] = cos(hang);
+   mat[7] = sin(vang);           mat[1] = 0;
+   mat[8] = cos(vang)*cos(hang); mat[2] =-sin(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}

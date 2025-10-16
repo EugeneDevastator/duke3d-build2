@@ -1,0 +1,5 @@
+(x,t,te)
+r = sin(x+abs(sin(x))*4*(exp(t*-4)*.5+.5));
+if (t < .0002) r *= .5-cos(max(t,0)*(PI/.0002))*.5; //Attack
+if (t > te) r *= exp((t-te)*-5);                    //Release
+r

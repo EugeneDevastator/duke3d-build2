@@ -1,0 +1,149 @@
+
+
+enum{width=128, height=128};
+static tex[1];
+static setcount=0;
+
+static pixelSize = 2;
+()
+{   
+   static buf[256][256];
+   static plasmabuffer[width][height];
+   
+
+   clz(1e32); 
+   cls(0);
+   setcol(0xffffff);
+   t = klock()*1; 
+   r = 2.8;
+   setcam(cos(t)*cos(t)*r,-sin(t)*r,sin(t)*cos(t)*r,-t-PI/2,t);
+
+   /*
+   //Generate tex
+   //if(numframes==0)
+   //{
+      for(y=0;y<256;y++)
+         for(x=0;x<256;x++)
+         {
+            //v = noise(x/4,y/4)*100 + 0xffff00;
+            //buf[y][x] = v;
+            g = cos( x+noise(x/16,y/16)*10 );
+            buf[y][x] = g+ (x*y*numframes/10) ;
+         } 
+           
+
+
+      
+   //}
+   */
+   
+   xc = 5;
+   timeDisplacement = klock()*30; //numframes;
+   
+   // no need to do this for every pixel
+   calc1 = sin( rad(timeDisplacement * .5) );
+   calc2 = sin( rad(timeDisplacement * 1) );
+   
+   // plasma algo
+   for(x=0; x<width; xc += pixelSize)
+   {
+      yc = -1000;
+      s1 = 128 + 128 * sin( rad(xc)*calc1);
+      
+      for(y=0; y<height; yc+=pixelSize)
+      {
+         s2 = 128+128*sin( rad(yc)*calc2);
+         s3 = 128+128*sin( rad(xc+yc+timeDisplacement*5/2) );
+         s = (s1+s2+s3)/3;
+         plasmabuffer[x][y] = hsv_to_rgb( s*1.5, 1 , 1);
+          y++;
+      }
+       x++;
+   }
+   
+   tex[0] =glsettex(plasmabuffer,width,height);
+   setcount++;
+
+   
+
+   texu = 1;
+   texv = 1;
+   nu = 32; du = PI*2/nu;
+   nv = 16; dv = PI/nv;
+   
+   //glCullface(GL_FRONT);   
+
+   for(v=PI,iv=0; iv<=nv; iv++, v+=dv)
+   {
+      glBegin(GL_TRIANGLE_STRIP);
+      for(u=0,iu=0;iu<=nu;iu++,u+=du)
+      {
+         glTexCoord(u*.5/PI*texu,v/PI*texv);
+         glVertex(sin(v)*cos(u),cos(v),sin(v)*sin(u));
+         glTexCoord(u*.5/PI*texu,(v-dv)/PI*texv);
+         glVertex(sin(v-dv)*cos(u),cos(v-dv),sin(v-dv)*sin(u));
+      
+         //drawsph(sin(v)*cos(u),cos(v),sin(v)*sin(u),.025);
+      }
+   }
+   setfont(32,64,0);
+   moveto(100,100);
+   printf("Plasma-textured sphere:");
+   setfont(16,32,1);
+   printf("\n\nits only\npossible to\nglsettex\n1024\ntimes\n->%g", setcount);
+   printf("\nNo, just use glRemoveTex and all will be fine.");
+   
+   glremovetex(tex[0]);
+   
+   for(x=0; x<width;x++)
+   for(y=0; y<height;y++)
+   {
+      setcol(plasmabuffer[y][x]);
+      setpix(x+mousx,y+mousy);
+      //fillRect(x,y,pixelSize,pixelSize);
+   }
+   
+}
+
+// Fastest way is to draw horizontals
+fillRect(sx, sy, wx, wy)
+{
+   for(i=0; i<=wx; i++)
+   {   
+      moveto(sx+i, sy);
+      lineto(sx+i, sy+wy);
+   }
+}
+
+
+rad(deg)
+{return deg*pi/180;}
+
+// this function takes Hue (0-360 degrees), Saturation (0.0-1.0) and Value/brightness (0.0-1.0)
+// and returns a RGB int
+hsv_to_rgb(h,s,v){ 
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   r=int(r*255);
+   g=int(g*255);
+   b=int(b*255);
+   return r*2^16 + g*2^8 + b; 
+}
+

@@ -1,0 +1,39 @@
+()
+{
+   cls(0);
+   
+   moveto(0,0);
+   static prim;
+   static numPrimes;
+   if(numframes==0)
+   {
+      for(i=2; i<1e6; i++)
+      {
+         if( isPrime(i) )
+         {
+            prim = i;
+            numPrimes++;
+            if(numPrimes == 10001) break;
+            
+         }
+      }
+   }
+   
+   printf("%g",prim);
+   printf("\n%g primeNumber",numPrimes);
+
+}
+isPrime(n)
+{
+   sqRootN = sqrt(n);
+   for(i=2; i<=sqRootN; i++)
+   {
+      div = n/i;
+      if( isInteger(div) ) return 0;
+   }
+   return 1;
+}
+isInteger(n)
+{
+   n == int(n);
+}

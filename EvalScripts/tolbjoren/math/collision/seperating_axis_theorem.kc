@@ -1,0 +1,232 @@
+enum{MAX_VERTS = 32}
+enum{MAX_AXES = 32}
+
+struct vec{x,y;}
+
+struct axis {
+   vec n;
+   double d; 
+}
+
+
+struct poly {
+   vec verts[MAX_VERTS];
+   axis axes[MAX_AXES];
+   count;
+};
+enum{MAX_POLYS = 8}
+static numPolys = 0;
+static poly polys[MAX_POLYS];
+
+
+()
+{
+   cls(0);
+   numPolys = 0;
+   createBox( xres/2, yres/2, 220, 140 );
+   createPoly( mousx, mousy, 64, 5 );
+   //createPoly( xres/2-100, yres/2-200, 64, 5 );
+   //createBox( mousx, mousy, 90, 90 );
+   
+   setcol(255,255,255);
+   
+   static vec intersections[MAX_VERTS];
+   numIsects = 0;
+   if ( poly_poly( polys[0], polys[1], intersections, numIsects ) )
+   {
+      setcol(255,0,0);
+      
+      for(i=0; i<numIsects; i++) {
+         drawsph( intersections[i].x, intersections[i].y, 3 );
+      }
+   }
+
+   
+   for(i=0; i<numPolys; i++){
+      drawPoly(i);
+   }
+   
+   vec mouse = {mousx, mousy};
+   if ( containsv(polys[0], mouse) ) drawSph(mousx,mousy,10);
+   
+   moveto(0,0); printnum(numPolys);
+}
+
+// Polygons are intersecting if their proj onto any axis is overlapping
+sepAxis( axis axisOut, poly p1, poly p2 ) {
+   
+   static axis lots_of_axes[MAX_AXES];
+   
+   for(i=0; i<p1.count; i++) {
+      axis a = p1.axes[i];
+      
+      smallest = 1e32;
+      for(j=0; j<p2.count; j++) {
+         dpr = dot(a.n, p2.verts[j]);
+         if( dpr < smallest ) {
+            smallest = dpr;
+         }
+      }
+      lots_of_axes[i].n = a.n;
+      lots_of_axes[i].d = smallest - a.d;
+   }
+   
+// Find largest
+   axisOut.d = 0;
+   for(i=0; i<p1.count; i++) {
+      if( lots_of_axes[i].d > axisOut.d ) {
+         axisOut = lots_of_axes[i];
+      }
+   }
+   return axisOut.d <= 0; // some
+}
+
+// Does the poly contain the vert?
+containsv( poly p, vec v ) {
+   axis a;
+   for(i=0; i<p.count; i++){
+      a = p.axes[i];
+      if ( dot(a.n, v) > a.d ) return 0;
+   }
+   return 1;
+}
+
+// Find vertices that intersect axis
+
+findvs( poly p1, poly p2, axis a, vec isects[MAX_VERTS])
+{
+   
+   /*
+   // why take an axis and not do anything with it?
+   vec n;
+   n = a.n;
+   dist = a.d;
+   */
+   numFound = 0;
+   
+   for(i=0; i<p1.count; i++) {
+      if ( containsv(p2, p1.verts[i] ) ) {
+         isects[numFound] = p1.verts[i];
+         numFound++;
+         break;
+      }
+   }
+   for(i=0; i<p2.count; i++) {
+      if ( containsv(p1, p2.verts[i] ) ) {
+         isects[numFound] = p2.verts[i];
+         numFound++;
+         break;
+      }
+   }
+   return numFound;
+}
+
+poly_poly( poly p1, poly p2, vec isects[MAX_VERTS], &numIsects )
+{
+   axis a1, a2;
+   if ( sepAxis( a1, p1, p2) )
+   {   
+      if ( sepAxis( a2, p2, p1) )
+      {
+         // Now, find collision points
+         
+         if ( a1.d > a2.d )
+         {
+            numIsects = findvs( p1, p2, a1, isects);
+         } else {
+            negate(a2.n);
+            numIsects = findvs( p1, p2, a2, isects);
+         }
+         return 1;
+      }
+   }
+   return 0;
+}
+
+calcAxes( poly p )
+{
+   for(i=0; i<p.count; i++) {
+      vec v1 = p.verts[i];
+      vec v2 = p.verts[(i+1)%p.count];
+      vec n;
+      n.x = v2.x - v1.x;
+      n.y = v2.y - v1.y;
+      normalize(n);
+      perp(n);
+      p.axes[i].n = n;
+      p.axes[i].d = dot(n,v1);
+   }
+}
+
+createBox(x,y,w,h)
+{
+   poly p;
+   p.count = 4;
+   
+   // cw
+   p.verts[0].x= -w/2; p.verts[0].y= -h/2;
+   p.verts[1].x= +w/2; p.verts[1].y= -h/2;
+   p.verts[2].x= +w/2; p.verts[2].y= +h/2;
+   p.verts[3].x= -w/2; p.verts[3].y= +h/2;
+   
+   // ccw
+   p.verts[0].x= -w/2; p.verts[0].y= -h/2;
+   p.verts[1].x= -w/2; p.verts[1].y= +h/2;
+   p.verts[2].x= +w/2; p.verts[2].y= +h/2;
+   p.verts[3].x= +w/2; p.verts[3].y= -h/2;
+   
+   for(i=0; i<4; i++) {
+      p.verts[i].x += x;
+      p.verts[i].y += y;
+   }
+   calcAxes(p);
+   polys[numPolys] = p;
+   numPolys++;
+}
+
+createPoly( x,y,radi,cnt ) {
+   polys[numPolys].count = cnt;
+   for(i=0; i<cnt; i++){
+   
+      ang = (i/cnt)*2*PI; // cw
+      ang = 2*PI - (i/cnt)*2*PI; // ccw
+      
+      polys[numPolys].verts[i].x = x + radi*cos(ang);
+      polys[numPolys].verts[i].y = y + radi*sin(ang);
+   }
+   calcAxes( polys[numPolys] );
+   numPolys++;
+}
+
+moveto(vec v) {moveto(v.x, v.y);}
+lineto(vec v) {lineto(v.x, v.y);}
+normalize(vec v) {rlen = sqrt(v.x^2 + v.y^2); v.x*=1/rlen; v.y*=1/rlen; }
+//perp(vec v) { tmp = v.x; v.x = -v.y; v.y = tmp; }
+perp(vec v) { 
+   vec perped = {-v.y, v.x};
+   v = perped;
+}
+dot(vec a, vec b) { return a.x*b.x + a.y*b.y; }
+negate(vec v) { v.x=-v.x; v.y=-v.y; }
+
+drawPoly(p) {
+   cnt = polys[p].count;
+   axis ax;
+   vec p1,p2;
+   for(i=0; i<cnt+1; i++) {
+      if(i==0) moveto( polys[p].verts[i] );
+      else lineto( polys[p].verts[i%cnt] );
+   }
+   
+   for(i=0; i<cnt; i++) {
+      p1 = polys[p].verts[i];
+      p2 = polys[p].verts[(i+1)%cnt];
+      cx = .5 * (p1.x+p2.x);
+      cy = .5 * (p1.y+p2.y);
+
+      
+      ax = polys[p].axes[i];
+      moveto(cx,cy); lineto(cx+ax.n.x*15, cy+ax.n.y*15);
+      
+   }
+}

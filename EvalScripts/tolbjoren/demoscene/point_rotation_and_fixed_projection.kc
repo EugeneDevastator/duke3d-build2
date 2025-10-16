@@ -1,0 +1,129 @@
+//TODO: i want vectorballs! :)
+//draw transparent img onto quad
+//position and rotate
+//sort in visible order
+
+enum{width=3, height=3, depth=3};
+static pointpos[width*height*depth][3];
+static pointcol[width*height];
+
+static point[3];
+()
+{
+   if(numframes==0) setup();
+   cls(0);
+ 
+   t = (-1000*(mousx-xres/2)+1)/xres;  
+
+   // Loop thru all points
+   for(i=0; i<width*height*depth; i++)
+   {
+      render(i); 
+   }
+   
+   setcol(0xffffff);
+   moveto(xres/4, yres-yres/4);
+   setfont(36,72,-1);
+   printf("X Y Z rotation");
+   
+   setcol(0xffffff);
+   moveto(0,5);
+   setfont(18,36);
+   printf("mousx=%g t=%g",mousx,t);
+}
+
+render(pixel)
+{
+   x0 = pointpos[pixel][0];
+   y0 = pointpos[pixel][1];
+   z0 = pointpos[pixel][2];
+   
+   phi = klock()*2;
+   c = cos(phi);
+   s = sin(phi);
+   
+   rotPointX(x0,y0,z0,phi);
+   x=point[0];y=point[1];z=point[2];
+   project(x-150, y, z, 0xff0000);
+   
+   rotPointY(x0,y0,z0,phi);
+   x=point[0];y=point[1];z=point[2];
+   project(x, y, z, 0x00ff00);   
+   
+   rotPointZ(x0,y0,z0,phi);
+   x=point[0];y=point[1];z=point[2];
+   project(x+150, y, z, 0x0000ff);
+}
+
+   // rotasjon x:
+   // | 1 0  0 |
+   // | 0 c -s |
+   // | 0 s  c |
+rotPointX(x,y,z,phi)
+{
+   c = cos(phi);  s = sin(phi);
+   point[0] = x;
+   point[1] = y*c + z*s;
+   point[2] = y*-s + z*c;   
+}
+   // rotasjon y:
+   // | c 0  s |
+   // | 0 1  0 |
+   // | -s 0 c |
+rotPointY(x,y,z,phi)
+{
+   c = cos(phi);  s = sin(phi);
+   point[0] = x*c + z*-s;
+   point[1] = y;
+   point[2] = x*s+ z*c;   
+}
+   // rotasjon z:
+   // | c -s 0 |
+   // | s c  0 |
+   // | 0 0  1 |
+rotPointZ(x,y,z,phi)
+{
+   c = cos(phi);  s = sin(phi);
+   point[0] = x*c + y*s;
+   point[1] = x*-s + y*c;
+   point[2] = z;   
+}
+
+
+project(x,y,z,c)
+{
+   dx = 256*(-x/(z-256) ) +xres/2;
+   dy = 256*(y/(z-256) ) +yres/2;
+   setcol(c);
+   drawsph(dx,dy,4);
+   drawZNum(dx,dy,z);
+   //drawsph(dx,dy,-20-z/6 );       
+}
+
+drawZNum(x,y,z)
+{
+      setcol(190+z);
+      moveto(x,y);
+      printf("%g",floor(z));
+}
+
+setup()
+{
+   cls(0);
+   scale = 30;
+   
+   // Create cube of points
+   i=0;
+   for(z=0; z<depth; z++)
+   for(y=0; y<height; y++)
+   for(x=0; x<width; x++)
+   {
+      pointpos[i][0] = x*scale-scale;
+      pointpos[i][1] = y*scale-scale;
+      pointpos[i][2] = z*scale-scale;      
+      //r=255; g=128; b=0;
+      //getpix(x,y,r,g,b);
+      //pointcol[i] = r*2^16+g*2^8+b;
+      i++; 
+   }
+}

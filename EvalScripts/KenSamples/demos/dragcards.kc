@@ -1,0 +1,539 @@
+enum {MAXCARDS=256};
+static hback, hcard[52];
+static oxs = 0.140, oys = 0.200, xs, ys;
+
+enum {MAXPLAYS=16};
+
+enum {PAKSIZ=5,PPAKBUF=1024};
+static ppak[PPAKBUF][PAKSIZ];
+
+	//Ideas:
+	//* draw/load background?
+	//* generic piece sprites (filled circles)
+	//* change sprite color
+	//* duplicate&delete sprites
+	//* dice
+	//
+	//Ideas from Dennis Radon (02/07/2012):
+	//* selectable # cards in deck
+	//* selectable deck&cover pictures
+	//* net_players > 2
+	//* ability to re-shuffle selected cards
+
+()
+{
+	static   cv[MAXCARDS],   cx[MAXCARDS],   cy[MAXCARDS],   cang[MAXCARDS],  cgrab[MAXCARDS];
+	static  pcv[MAXCARDS],  pcx[MAXCARDS],  pcy[MAXCARDS],  pcang[MAXCARDS], pcgrab[MAXCARDS];
+	static   mx[MAXPLAYS],   my[MAXPLAYS],   mb[MAXPLAYS],     ma[MAXPLAYS];
+	static  pmx[MAXPLAYS],  pmy[MAXPLAYS],  pmb[MAXPLAYS],    pma[MAXPLAYS];
+	static  mox[MAXPLAYS],  moy[MAXPLAYS],  mob[MAXPLAYS];
+	static pmox[MAXPLAYS], pmoy[MAXPLAYS], pmob[MAXPLAYS];
+	ncards = 52;
+	
+	static lpak[PAKSIZ];
+
+	gldisable(GL_DEPTH_TEST); glenable(GL_ALPHA_TEST);
+
+	for(i=0;i<MAXPLAYS;i++)
+		{ mx[i] = 0; my[i] = 0; mb[i] = 0; mox[i] = 0; moy[i] = 0; mob[i] = 0; }
+
+		//Generate card back
+	static buf[128][128];
+	for(y=0;y<128;y++)
+		for(x=0;x<128;x++)
+		{
+			d = (x-64)^2^2^2^2 + (y-64)^2^2^2^2; if (d >= 64^2^2^2^2) { buf[y][x] = -1; continue; }
+			buf[y][x] = pic("cloud.png",x,y);    if (d >= 60^2^2^2^2) { buf[y][x] -= 0x202020; }
+		}
+	hback = glsettex(buf,128,128);
+	mountzip("../wintest");
+
+	from = 0; val = 0;
+	if (net_me == 0) net_send(NET_ALL,((klock(-1)*1000)%2^15)*2^16);
+	while (net_recv(&from,&val) == 0)
+	{
+		cls(0); setfont(9,12);
+		moveto(xres/2,yres/2); printf("Waiting for master..");
+		refresh(); Sleep(1);
+	}
+	srand(val);
+	for(i=0;i<ncards;i++) cv[i] = (i%52);
+	for(i=ncards-1;i>0;i--)
+	{
+		j = int((i+1)*rnd);
+		t = cv[i]; cv[i] = cv[j]; cv[j] = t;
+	}
+
+	for(i=0;i<ncards;i++)
+	{
+		cgrab[i] = -1;
+		if (1)
+		{
+			cx[i] = 1.15 + i*.001;
+			cy[i] = 0;
+			cang[i] = 0;
+		}
+		else if (0)
+		{
+			cx[i] = rnd*2-1;
+			cy[i] = rnd*2-1;
+			cang[i] = PI*2*rnd;
+		}
+		else
+		{
+			cang[i] = (i-25.5)*.07;
+			cx[i] = .0 + sin(cang[i])*.5;
+			cy[i] = .3 - cos(cang[i])*.5;
+		}
+	}
+
+		//pred = sync
+	for(i=0;i<ncards;i++)
+		{ pcv[i] = cv[i]; pcx[i] = cx[i]; pcy[i] = cy[i]; pcang[i] = cang[i]; pcgrab[i] = cgrab[i]; }
+	for(i=0;i<net_players;i++)
+		{ pmx[i] = mx[i]; pmy[i] = my[i]; pmb[i] = mb[i]; pma[i] = ma[i]; pmox[i] = mox[i]; pmoy[i] = moy[i]; pmob[i] = mob[i]; }
+
+	spakn = 0; ppakn = 0; //sync/pred packet counts of own packets
+
+	omousx = 0; omousy = 0; obstatus = 0; tim = 0;
+	while (1)
+	{
+		otim = tim; tim = klock(); dtim = tim-otim;
+
+		if ((net_me == 0) || (ppakn-spakn < PPAKBUF))
+		{
+				//Everybody sends to master
+			lpak[0] = net_me; s = sgn(.5-(net_me%2));
+			nmousx = int((mousx-xres/2)*4096/yres);   lpak[1] = nmousx-omousx; omousx = nmousx;
+			nmousy = int((mousy-yres/2)*4096/yres)*s; lpak[2] = nmousy-omousy; omousy = nmousy;
+			nbstatus = bstatus;
+			if (keystatus[0x2a] || keystatus[0x36]) nbstatus += 16; //Shift
+			if (keystatus[0x1d] || keystatus[0x9d]) nbstatus += 32; //Ctrl
+			lpak[3] = nbstatus-obstatus; obstatus = nbstatus;
+			lpak[4] = int((keystatus[0xcd]-keystatus[0xcb])*dtim*6144*s);
+			net_send(NET_ALL,lpak,PAKSIZ);
+
+			if (net_me)
+			{
+				executepack(lpak,ncards,pcv,pcx,pcy,pcang,pcgrab,pmx,pmy,pmb,pma,pmox,pmoy,pmob);
+				for(i=0;i<PAKSIZ;i++) { ppak[ppakn%PPAKBUF][i] = lpak[i]; } ppakn++;
+			}
+		}
+
+		gototh = 0;
+		while (net_recv(&from,lpak,PAKSIZ))
+		{
+			if (lpak[0] == net_me) spakn++; else gototh = 1;
+			executepack(lpak,ncards,cv,cx,cy,cang,cgrab,mx,my,mb,ma,mox,moy,mob);
+		}
+		if ((gototh) && (net_me))
+		{
+				//pred = sync
+			for(i=0;i<ncards;i++)
+				{ pcv[i] = cv[i]; pcx[i] = cx[i]; pcy[i] = cy[i]; pcang[i] = cang[i]; pcgrab[i] = cgrab[i]; }
+			for(i=0;i<net_players;i++)
+				{ pmx[i] = mx[i]; pmy[i] = my[i]; pmb[i] = mb[i]; pma[i] = ma[i]; pmox[i] = mox[i]; pmoy[i] = moy[i]; pmob[i] = mob[i]; }
+				
+				//recalculate: apply predicted packs on top of synced state
+			for(j=spakn;j<ppakn;j++)
+			{
+				for(i=0;i<PAKSIZ;i++) lpak[i] = ppak[j%PPAKBUF][i];
+				executepack(lpak,ncards,pcv,pcx,pcy,pcang,pcgrab,pmx,pmy,pmb,pma,pmox,pmoy,pmob);
+			}
+		}
+//-------------------------------------------------------------------------------
+		cls(0);
+		
+		xs = oxs*yres/2;
+		ys = oys*yres/2;
+
+		glsettex("wood.png"); setcol(0xc0c0c0);
+		glbegin(GL_QUADS);
+		gltexcoord(0,0); glvertex(yres*-1.0+xres/2,yres*1/3);
+		gltexcoord(8,0); glvertex(yres*+0.3+xres/2,yres*1/3);
+		gltexcoord(8,6); glvertex(yres*+0.3+xres/2,yres*2/3);
+		gltexcoord(0,6); glvertex(yres*-1.0+xres/2,yres*2/3);
+		gltexcoord(0,0); glvertex(yres*+0.5+xres/2,yres*1/3);
+		gltexcoord(8,0); glvertex(yres*+1.0+xres/2,yres*1/3);
+		gltexcoord(8,6); glvertex(yres*+1.0+xres/2,yres*2/3);
+		gltexcoord(0,6); glvertex(yres*+0.5+xres/2,yres*2/3);
+
+		drawcone(yres*-1.0+xres/2,yres*1/3,2,yres*+0.3+xres/2,yres*1/3,2);
+		drawcone(yres*-1.0+xres/2,yres*2/3,2,yres*+0.3+xres/2,yres*2/3,2);
+		drawcone(yres*+0.3+xres/2,yres*1/3,2,yres*+0.3+xres/2,yres*2/3,2);
+		drawcone(yres*+0.5+xres/2,yres*1/3,2,yres*+1.0+xres/2,yres*1/3,2);
+		drawcone(yres*+0.5+xres/2,yres*2/3,2,yres*+1.0+xres/2,yres*2/3,2);
+		drawcone(yres*+0.5+xres/2,yres*1/3,2,yres*+0.5+xres/2,yres*2/3,2);
+		setfont(20,32,1);
+		moveto(5,5); printf("Other:");
+		moveto(5,yres*2/3+5); printf("You:");
+		moveto(5,yres*1/3+5); printf("Public:");
+		moveto(yres*.5+xres/2+5,yres*1/3+5); printf("Deck:");
+
+		if (net_me == 0) drawcards( cv, cx, cy, cang, mx, my,ncards);
+						else drawcards(pcv,pcx,pcy,pcang,pmx,pmy,ncards);
+		
+		refresh(); Sleep(5);
+	}
+}
+
+drawcard (i,x,y,a,isvis)
+{
+	if (isvis == 0)
+	{
+		setcol(0xa09080); glsettex(hback);
+		u0 = 0; v0 = 0;
+		u1 = 1; v1 = 1;
+	}
+	else
+	{
+		if (isvis == 1) setcol(0xd0d0d0); else setcol(0xffffff);
+		if (glsettex("cards256.png") == 0)
+		{
+			drawkard_init();
+			glsettex(hcard[i]);
+			u0 = .17; v0 = 0;
+			u1 = .83; v1 = 1;
+		}
+		else
+		{
+			u = (i%13); v = int(i/13);
+			u0 = (u+0)/13; v0 = (v+0)/4;
+			u1 = (u+1)/13; v1 = (v+1)/4;
+		}
+	}
+	c = cos(a); s = sin(a);
+	gltexcoord(u0,v0); glvertex(x-c*xs+s*ys,y-s*xs-c*ys);
+	gltexcoord(u1,v0); glvertex(x+c*xs+s*ys,y+s*xs-c*ys);
+	gltexcoord(u1,v1); glvertex(x+c*xs-s*ys,y+s*xs+c*ys);
+	gltexcoord(u0,v1); glvertex(x-c*xs-s*ys,y-s*xs+c*ys);
+}
+
+drawcards (cv[MAXCARDS],cx[MAXCARDS],cy[MAXCARDS],cang[MAXCARDS],mx[MAXPLAYS],my[MAXPLAYS],ncards)
+{
+	glbegin(GL_QUADS);
+	for(i=0;i<ncards;i++)
+	{
+		x = cx[i]; y = cy[i]; if (net_me%2) y *= -1;
+
+		if (y < -1/3) vis = 0;
+		else if ((y < 1/3) && (cx[i] > 0.6)) vis = 0;
+		else if (y < 1/3) vis = 2;
+		else vis = 1;
+
+		drawcard(cv[i],x*yres/2+xres/2,y*yres/2+yres/2,cang[i]*sgn(.5-net_me%2),vis);
+	}
+
+	for(j=2;j>=0;j--)
+	{
+		for(i=0;i<net_players;i++)
+		{
+			if (i == net_me)
+			{
+				if (j == 1) continue;
+				v = sin(klock()*10)*.25+1; setcol(v*0x90,v*0x70,v*0x40);
+				x = mousx; y = mousy;
+			}
+			else
+			{
+				if (j == 0) continue;
+				setcol(0x404040);
+				x = mx[i]; y = my[i]; if (net_me%2) y *= -1;
+				x = x*yres/2+xres/2; y = y*yres/2+yres/2;
+			}
+			
+				//Draw hand
+			sz = yres/1024;
+			drawcone(x-sz*20,y+sz*20,sz*8,x-sz*34,y-sz* 4,sz*5);
+			drawcone(x-sz*14,y+sz*20,sz*6,x-sz*18,y-sz*35,sz*5);
+			drawcone(x-sz* 5,y+sz*20,sz*6,x-sz* 4,y-sz*40,sz*5);
+			drawcone(x+sz* 4,y+sz*20,sz*6,x+sz* 8,y-sz*40,sz*5);
+			drawcone(x+sz*12,y+sz*20,sz*6,x+sz*19,y-sz*30,sz*4);
+			drawcone(x-sz*20,y+sz*20,sz*8,x+sz* 9,y+sz*16,sz*8);
+			//setcol(0xffffff); moveto(x-10,y-11); printf("%g",i);
+		}
+	}
+}
+
+insidecard (i,x,y,cx[MAXCARDS],cy[MAXCARDS],cang[MAXCARDS])
+{
+	c = cos(cang[i]); x -= cx[i];
+	s = sin(cang[i]); y -= cy[i];
+	return((fabs(x*c + y*s) < oxs) && (fabs(y*c - x*s) < oys));
+}
+
+intersectcards (i,j,cx[MAXCARDS],cy[MAXCARDS],cang[MAXCARDS])
+{
+	enum {OFFS=0.95};
+	static utst[9] = {-OFFS,+OFFS,+1.00,+1.00,+OFFS,-OFFS,-1.00,-1.00,+0.00};
+	static vtst[9] = {-1.00,-1.00,-OFFS,+OFFS,+1.00,+1.00,+OFFS,-OFFS,+0.00};
+		//Brute force approximation :P
+	ci = cos(cang[i]); si = sin(cang[i]);
+	cj = cos(cang[j]); sj = sin(cang[j]);
+	for(k=0;k<9;k++)
+	{
+		u = utst[k]; v = vtst[k];
+		if (insidecard(j,cx[i] + ci*oxs*u - si*oys*v,
+							  cy[i] + si*oxs*u + ci*oys*v,cx,cy,cang)) return(1);
+		if (insidecard(i,cx[j] + cj*oxs*u - sj*oys*v,
+							  cy[j] + sj*oxs*u + cj*oys*v,cx,cy,cang)) return(1);
+	}
+	return(0);
+}
+
+executepack (lpak[PAKSIZ],ncards,
+				 cv[MAXCARDS],cx[MAXCARDS],cy[MAXCARDS],cang[MAXCARDS],cgrab[MAXCARDS],
+				 mx[MAXPLAYS],my[MAXPLAYS],mb[MAXPLAYS],ma[MAXPLAYS],mox[MAXPLAYS],moy[MAXPLAYS],mob[MAXPLAYS])
+{
+	pind = lpak[0];
+	mx[pind] += lpak[1]/2048;
+	my[pind] += lpak[2]/2048;
+	mb[pind] += lpak[3];
+	ma[pind]  = lpak[4]/2048;
+
+	if (mb[pind]%4)
+	{
+		if ((mob[pind]%4) == 0)
+		{
+			for(i=ncards-1;i>=0;i--)
+			{
+				if (insidecard(i,mx[pind],my[pind],cx,cy,cang) == 0) continue;
+				if ((cgrab[i] >= 0) && (cgrab[i] != pind)) break; //another player already grabbed this card
+
+				v = cv[i]; x = cx[i]; y = cy[i]; a = cang[i]; g = cgrab[i];
+				for(j=i;j<ncards-1;j++)
+					{ cv[j] = cv[j+1]; cx[j] = cx[j+1]; cy[j] = cy[j+1]; cang[j] = cang[j+1]; cgrab[j] = cgrab[j+1]; }
+				cv[j] = v; cx[j] = x; cy[j] = y; cang[j] = a; cgrab[j] = g;
+
+				cgrab[ncards-1] = pind;
+
+				if (((mb[pind]%4) >= 2) || (((mb[pind]%2) >= 1) && ((mb[pind]%32) >= 16))) //RMB or Shift+LMB
+				{
+					static grab[MAXCARDS];
+					grab[0] = ncards-1; grabhit = 1; grabtot = 1;
+					for(i=0;i<ncards-1/*not a typo*/;i++)
+						if (cgrab[i] < 0) { grab[grabtot] = i; grabtot++; }
+					for(i=0;i<grabhit;i++)
+						for(j=grabhit;j<grabtot;j++)
+							if (intersectcards(grab[i],grab[j],cx,cy,cang))
+							{
+								k = grab[j]; grab[j] = grab[grabhit]; grab[grabhit] = k;
+								cgrab[k] = pind; grabhit++;
+							}
+				}
+				else if ((mb[pind]%64) >= 32) //Ctrl+LMB
+				{
+					for(i=0;i<ncards-1/*not a typo*/;i++)
+					{
+						if (cgrab[i] >= 0) continue;
+						if (insidecard(i,mx[pind],my[pind],cx,cy,cang)) cgrab[i] = pind;
+					}
+				}
+
+				break;
+			}
+		}
+		for(i=0;i<ncards;i++)
+		{
+			if (cgrab[i] != pind) continue;
+			cx[i] += mx[pind]-mox[pind];
+			cy[i] += my[pind]-moy[pind];
+			if (ma[pind])
+			{
+				x = cx[i]-mx[pind];
+				y = cy[i]-my[pind];
+				x2 = cos(ma[pind])*x - sin(ma[pind])*y;
+				y2 = cos(ma[pind])*y + sin(ma[pind])*x;
+				cx[i] = x2+mx[pind];
+				cy[i] = y2+my[pind];
+
+				cang[i] += ma[pind];
+			}
+		}
+	}
+	else
+	{
+		for(i=0;i<ncards;i++) if (cgrab[i] == pind) cgrab[i] = -1;
+	}
+
+	mox[pind] = mx[pind]; moy[pind] = my[pind]; mob[pind] = mb[pind];
+}
+
+//------------------------------------------------------------------------------
+drawkard_suit (suit,x,y,sz)
+{
+	setcol((((suit-1)%4)<2)*192,0,0); asz = fabs(sz);
+	if (suit == 0) //Club
+	{
+		drawsph(x,y-sz*6,asz*5);
+		drawsph(x-sz*6,y+sz*3,asz*5);
+		drawsph(x+sz*6,y+sz*3,asz*5);
+		drawcone(x,y-sz*5,asz*2,x,y+sz*8,asz*1);
+		drawcone(x,y+sz*8,asz*1,x,y+sz*14,asz*-4);
+	}
+	if (suit == 1) //Diamond
+	{
+		for(i=int(asz*-12);i<=asz*12;i++)
+		{
+			j = min((1-sqrt(fabs(i)/(asz*12)))*asz*12,asz*9.5);
+			moveto(x-j,y+i); lineto(x+j,y+i);
+		}
+	}
+	if (suit == 2) //Heart
+	{
+		drawcone(x-sz*5,y-sz*5,asz*5,x,y+sz*12,0);
+		drawcone(x+sz*5,y-sz*5,asz*5,x,y+sz*12,0);
+	}
+	if (suit == 3) //Spade
+	{
+		drawcone(x-sz*5,y+sz*3,asz*5,x,y-sz*12,0);
+		drawcone(x+sz*5,y+sz*3,asz*5,x,y-sz*12,0);
+		drawcone(x,y-sz*5,asz*2,x,y+sz*8,asz*1);
+		drawcone(x,y+sz*8,asz*1,x,y+sz*14,asz*-4);
+	}
+}
+drawkard_gen (i,x,y,tim,sz)
+{
+	sz *= .0225;
+	setcol(0xe0e0e0); y0 = sz*-65; y1 = sz*65; d = sz*5;
+	for(yy=y0;yy<y1;yy++) //Draw white background w/curved corners
+	{
+		xx = sz*43; f = fabs(yy) - (sz*65-d); if (f > 0) xx += sqrt(d^2-f^2)-d;
+		moveto(x-xx,y+yy); lineto(x+xx,y+yy);
+	}
+	cval = i%13; suit = int(i/13);
+	
+	for(ss=-1;ss<=1;ss+=2) //Draw card number/letter & suit @ corners
+	{
+		static ch[13] = {'A','2','3','4','5','6','7','8','9',,'J','Q','K'};
+		s = ss*sz;
+		drawkard_suit(suit,x+s*34,y+s*41,s*-.5);
+		setfont(s*14,s*22,1); moveto(x-s*41,y-s*62); printchar(ch[cval]);
+		setfont(s*9,s*22,1); moveto(x-s*43,y-s*62); 
+		if (cval == 9) printf("10");
+	}
+	
+	if (cval < 10) //Draw number card
+	{
+			//y={0 to 12}*3 + x={0 to 2}
+		static ci[10]={2,0,0,3,2,3,3,3,11,12};
+		static cp[22]={1,37,19,0,2,36,38,18,20,10,28,19,0,2,36,38,12,14,24,26,7,31};
+		for(j=cval;j>=0;j--)
+		{
+			k = cp[ci[cval]+j];
+			drawkard_suit(suit,x+sz*((k%3)-1)*18,y+sz*(int(k/3)-6)*7,sz*((k<21)*2-1));
+		}
+		if (i == 13*3) drawkard_suit(suit,x,y,sz*2); //Ace of spades
+	}
+	else //Draw picture card
+	{
+		drawkard_suit(suit,x-sz*18,y-sz*43,sz*+.8);
+		drawkard_suit(suit,x+sz*18,y+sz*43,sz*-.8);
+		if (fabs(suit-1.5) > 1) setcol(0xa0a0a0); else setcol(0xc0a0a0);
+		for(yy=y-sz*54;yy<=y+sz*54;yy++) { moveto(x-sz*28,yy); lineto(x+sz*28,yy); }
+		for(ss=-1;ss<=1;ss+=2) drawkard_suit(suit,x+ss*sz*17,y+ss*sz*42,-sz*ss);
+		setcol(0xd0c0b0); drawsph(x,y,sz*+20); //Body fill
+		setcol(0xc06040);
+		drawcone(x-sz*10,y-sz*16,sz*2,x+sz*16,y+sz*10,sz*2); //Strap
+		drawcone(x-sz*16,y-sz*10,sz*2,x+sz*10,y+sz*16,sz*2); //Strap
+		drawcone(x+sz*10,y-sz*16,sz*2,x-sz*16,y+sz*10,sz*2); //Strap
+		drawcone(x+sz*16,y-sz*10,sz*2,x-sz*10,y+sz*16,sz*2); //Strap
+		setcol(0x000000); drawsph(x,y,sz*-20); //Body outline
+		
+		t = tim+i*7;
+		h = cos(t/8)*.5; j =-sin(t/4); k = min(cos(t*2)*16+16,1);
+		
+		for(ss=-1;ss<=1;ss+=2)
+		{
+			s = ss*sz;
+			setcol(0xffffff); drawsph(x,y-s*30,sz*+14); //Face fill
+			setcol(0x000000); drawsph(x,y-s*30,sz*-14); //Face outline
+			if ((suit == 3) || (i == 10)) dir = 2.5; else dir = -2.5;
+			if ((sqrt(i)%1) == 0) dir = sgn(i-40)*6;
+			drawcone(x-s*3+dir*s,y-s*34,sz*k,x-s*5+dir*s,y-s*34,sz*k); //Eyes
+			drawcone(x+s*3+dir*s,y-s*34,sz*k,x+s*5+dir*s,y-s*34,sz*k);
+			drawcone(x-s*8+dir*s,y-s*(37-h),sz/2,x-s*3+dir*s,y-s*(37+h),sz/2); //Brows
+			drawcone(x+s*3+dir*s,y-s*(37+h),sz/2,x+s*8+dir*s,y-s*(37-h),sz/2);
+			if ((cval != 11) && (i != 10) && (i != 38)) //Stash
+			{
+				drawcone(x-s*6.0+dir*s,y-s*27.5,sz/3,x-s*1.5+dir*s,y-s*26.5,sz/1);
+				drawcone(x+s*1.5+dir*s,y-s*26.5,sz/1,x+s*6.0+dir*s,y-s*27.5,sz/3);
+			}
+			drawcone(x+dir*s,y-s*35,sz/3,x+s*sgn(dir)*1.9+dir*s,y-s*29,sz/2); //Nose
+			drawcone(x+s*sgn(dir)*1.9+dir*s,y-s*29,sz/2,x+dir*s-sgn(dir),y-s*29,sz/3);
+			if (cval == 11) setcol(0xc00000); else setcol(0x000000); //Mouth color
+			drawcone(x-s*6+dir*s,y-s*(23+j),-sz/2,x-s*3+dir*s,y-s*(23-j),sz); //Mouth
+			drawcone(x-s*3+dir*s,y-s*(23-j),-sz,x+s*3+dir*s,y-s*(23-j),sz);
+			drawcone(x+s*3+dir*s,y-s*(23-j),-sz,x+s*6+dir*s,y-s*(23+j),sz/2);
+			if (cval == 10) //Jack
+			{
+				setcol(0xc00000);
+				//drawcone(x+s*3+dir*s,y-s*24,sz*-3,x+s*4+dir*s,y-s*21,sz*3); //Tongue
+				setcol(0xd0d040);
+				drawcone(x-s*12,y-s*42,sz*4,x-s*16,y-s*25,sz*4); //Hair
+				drawcone(x+s*12,y-s*42,sz*4,x+s*16,y-s*25,sz*4);
+				setcol(0xa00000);
+				drawcone(x-s*11,y-s*48,sz*-6,x+s*11,y-s*48,sz*-6); //Hat
+				drawcone(x-s*11,y-s*41,sz*-4,x-s*15,y-s*53,sz*-4);
+				drawcone(x+s*11,y-s*41,sz*-4,x+s*15,y-s*53,sz*-4);
+			}
+			if (cval == 11) //Queen
+			{
+				setcol(0x606060);
+				drawcone(x-s*12,y-s*42,sz*5,x-s*16,y-s*20,sz*4); //Hair
+				drawcone(x+s*12,y-s*42,sz*5,x+s*16,y-s*20,sz*4);
+				setcol(0xffd040);
+				drawcone(x-s*0,y-s*49,sz*4,x-s*4,y-s*43,sz*4); //Crown
+				drawcone(x+s*0,y-s*49,sz*4,x+s*4,y-s*43,sz*4);
+				drawcone(x-s*13,y-s*49,sz*2,x-s*7,y-s*38,sz*-5);
+				drawcone(x+s*13,y-s*49,sz*2,x+s*7,y-s*38,sz*-5);
+				setcol(0x808000); //Flower stem
+				drawcone(x+s*23*sgn((i==37)-.5),y-s*13,sz*1,
+							x+s*23*sgn((i==37)-.5),y-s* 3,sz*1);
+				setcol(0xffd040);
+				drawsph(x+s*20*sgn((i==37)-.5),y-s*13,sz*2); //Flower leaves
+				drawsph(x+s*23*sgn((i==37)-.5),y-s*16,sz*2);
+				drawsph(x+s*26*sgn((i==37)-.5),y-s*13,sz*2);
+				drawsph(x+s*23*sgn((i==37)-.5),y-s*10,sz*2);
+				setcol(0xc06080);
+				drawsph(x-s*3,y-s*45,sz*-3); drawsph(x+s*3,y-s*45,sz*-3); //Bow :P
+			}
+			if (cval == 12) //King
+			{
+				setcol(0xd0d0d0);
+				drawcone(x+s*23,y-s*43,sz*1,x+s*23,y-s* 8,sz*2); //Sword (length)
+				drawcone(x-s*12,y-s*42,sz*3,x-s*16,y-s*28,sz*3); //Hair
+				drawcone(x+s*12,y-s*42,sz*3,x+s*16,y-s*28,sz*3);
+				setcol(0xffd040);
+				drawcone(x+s*20,y-s*12,sz*2,x+s*26,y-s*12,sz*2); //Sword (handle)
+				drawcone(x-s*4,y-s*50,sz*2,x-s*3,y-s*43,sz*4); //Crown
+				drawcone(x+s*4,y-s*50,sz*2,x+s*3,y-s*43,sz*4);
+				drawcone(x-s*11,y-s*49,sz*2,x-s*8,y-s*38,sz*-5);
+				drawcone(x+s*11,y-s*49,sz*2,x+s*8,y-s*38,sz*-5);
+			}
+		}
+	}
+}
+drawkard_init ()
+{
+	static inited = 0; if (inited) return; inited = 1;
+	enum {CARDSIZ=256}; ys = CARDSIZ; xs = CARDSIZ*(2210/13)/(1024/4);
+	static buf[CARDSIZ][CARDSIZ], hlin[CARDSIZ];
+	cls(0xff00ff);
+	for(y=0;y<4;y++)
+		for(x=0;x<13;x++)
+		{
+			drawkard_gen(y*13+x,xs*1.5-CARDSIZ/2,ys/2,.5,xs/2);
+			for(yy=0;yy<CARDSIZ;yy++)
+			{
+				gethlin(0,yy,hlin,CARDSIZ);
+				for(xx=0;xx<CARDSIZ;xx++)
+				{
+					if (hlin[xx] == 0xff00ff) buf[yy][xx] = -1;
+												else buf[yy][xx] = hlin[xx];
+				}
+			}
+			hcard[y*13+x] = glsettex(buf,CARDSIZ,CARDSIZ);
+		}
+}
+//------------------------------------------------------------------------------

@@ -1,0 +1,47 @@
+()cls(0);
+posz = 32; 
+ang = atan2(max(mousy-posz,1e-8),mousx);
+cosang = cos(ang); sinang = sin(ang);
+p = max(-16,ceil(cosang*-16/sinang));
+x = cosang*16 + p*sinang;
+y = sinang*16 - p*cosang;
+v = -x*posz; vi = -sinang*posz; c = 0;
+for(d=0;d<xres;d++)
+{
+      //h = f(d)
+   if (d >= xres-10) h = 0;
+   else if ((d >= 370) && (d < 400)) h = 280;
+   else h = 50*sin(d/40)+40*cos(d/30)+350;
+   
+   setcol(0xff0000); setpix(d,h);
+   if (h < c)
+   {
+      do
+      {
+         v -= x; vi -= sinang;
+         if (v < 0)
+         {
+            setcol(0x808080); moveto(d,c); lineto(0,posz);
+            setcol(0xffffff); setpix(d,c); setpix(x*8,y*8+posz);
+            x += sinang; y -= cosang; v += vi;
+            p++; if (p > 16) return;
+         }
+         c--;
+      } while (h < c);
+   }
+   else
+   {
+      v += x; vi += sinang;
+      c++;
+      while (h >= c) { v += x; vi += sinang; c++; }
+      if (v < 0)
+      {
+         setcol(0x808080); moveto(d,c); lineto(0,posz);
+         setcol(0xffffff); setpix(d,c); setpix(x*8,y*8+posz);
+         x += sinang; y -= cosang; v += vi;
+         p++; if (p > 16) return;
+      }
+   }
+   v -= y; vi += cosang;
+}
+0

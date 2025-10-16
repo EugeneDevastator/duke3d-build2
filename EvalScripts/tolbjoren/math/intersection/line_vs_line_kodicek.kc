@@ -1,0 +1,108 @@
+struct vec2
+{
+   x,y;
+};
+
+()
+{
+   cls(0);
+   
+   static vec2 a,b,c,d;
+   
+   if (numframes==0)
+   {
+      vecset( a, 100, yres/2 );
+      vecset( b, 200, yres/2+100 );
+      vecset(c,xres/2, yres/2-100);
+      vecset( d,xres/2-150, yres/2+100 );   
+   }
+
+   if ( bstatus==1 )
+      vecset( b, mousx,mousy );
+   
+   if ( bstatus==2 )
+      vecset( d, mousx,mousy );
+   
+   drawline( a, b );
+
+
+   drawline(c,d);
+
+
+   setfont(12,18);
+   moveto(a.x+5, a.y-5); printf("A"); 
+   moveto(b.x+5, b.y-5); printf("B"); 
+   moveto(c.x+5, c.y-5); printf("C"); 
+   moveto(d.x+5, d.y-5); printf("D"); 
+
+
+   vec2 v1,v2;
+   v1.x = b.x-a.x;
+   v1.y = b.y-a.y;
+
+   v2.x = d.x-c.x;
+   v2.y = d.y-c.y;
+
+   t1 = isecTime(a,v1,d,v2);
+   t2 = isecTime(c,v2,a,v1);
+  
+
+   moveto(0,0);
+   if(t1 >= 1e32)
+   {
+      printf("never isect. parallell lines");
+   }
+   else
+   {
+      //t = min(1,t);
+      //t = max(0,t);
+      
+      printf("AB vs CD, t = %g\n", t1);
+      drawsph( lerp(a.x,b.x,t1), lerp(a.y,b.y,t1), -8); 
+   }
+   
+   if(t2 >= 1e32)
+   {
+      printf("never isect. parallell lines");
+   }
+   else
+   {
+      printf("CD vs AB, t = %g\n", t2);
+      drawsph( lerp(a.x,b.x,t2), lerp(a.y,b.y,t2), -8); 
+   }
+         
+
+   
+}
+
+vecset( vec2 v, x,y ){
+   v.x = x; v.y = y;
+}
+
+lerp(a,b,t)
+{
+   return a+(b-a)*t;
+}
+
+drawline(vec2 a, vec2 b){
+   moveto(a.x,a.y); lineto(b.x,b.y);
+}
+
+
+// todo: 3D
+// Taken from Mathematics and Physics for Game Programmers by Danny Kodicek
+isecTime(vec2 p1, vec2 v1, vec2 p2, vec2 v2)
+{
+   sc1 = v2.x; tc1 = v1.x; 
+   sc2 = v2.y; tc2 = v1.y; 
+
+   dx = p2.x - p1.x;
+   dy = p2.y - p1.y;
+
+   det = v2.x*v1.y - v1.x * v2.y; // 2x2 determinant of matrix
+   if( fabs(det) < 1e-7 ) return 1e32; // no isec
+   con = sc1*dy - sc2*dx;
+   t = con / det;
+     
+   return t;
+}

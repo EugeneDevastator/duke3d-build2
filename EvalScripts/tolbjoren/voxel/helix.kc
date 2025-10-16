@@ -1,0 +1,30 @@
+(x,y,z,&r,&g,&b)
+
+
+lim = 0.0;
+
+t=0;
+a = 4*t+2*(0.5+y)*PI;
+
+r = 255;
+g = 128 + 128 * a/(2*PI);
+b = 128+128*y;
+
+//tx = x/50;
+//tz = z/50;
+tx = 0.25;
+tz = 0.25;
+
+cx = cos(a) * tx - sin(a) * tz;
+cz = sin(a) * tx + cos(a) * tz;
+
+cx += x;
+cz += z;
+
+d = 0.1;
+
+if ( cx < -lim && cx > -lim-d && 
+     cz < -lim && cz > -lim-d ) return 1;
+
+
+return 0;

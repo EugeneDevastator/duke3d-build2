@@ -1,0 +1,76 @@
+// This perf test compes from the book Game Coding Complete by Mr Mike
+enum{ g_n = 1000};
+static testData[g_n*g_n];
+static testData2[g_n][g_n];
+static columnPerf;
+static rowPerf;
+static benchTime = 0;
+()
+{
+   if(numframes==0) benchmark();
+   cls(0);
+   
+
+   
+   moveto(0,0);
+   printf("\nperformance column ordered: %g s", columnPerf);
+   printf("\nperformance row ordered:    %g s", rowPerf);
+   printf("\nbenchtime: %g",benchTime);
+   
+   if(rowPerf < columnPerf)
+      printf("\n\nlanguage is row order");
+   else
+      printf("\n\nlanguage is column order");
+      
+}
+
+benchmark()
+{
+   columnPerf = 0;
+   rowPerf = 0;
+   runs = 1;
+   startTime = klock();
+   for(run=0; run<runs; run++)
+   {
+      benchStart = klock();
+      //column_ordered();
+      column_major();
+      columnPerf += klock() - benchStart;
+      
+      benchStart = klock();
+      //row_ordered();
+      row_major();
+      rowPerf += klock() - benchStart;
+   }
+   columnPerf = columnPerf/runs;
+   rowPerf = rowPerf/runs;
+   benchTime = klock() - startTime;   
+}
+
+column_ordered()
+{
+   for(j=0; j<g_n; j++) //J
+   for(i=0; i<g_n; i++) //I
+      testData2[i][j] = i*j;
+}
+
+row_ordered()
+{
+   for(i=0; i<g_n; i++)// I
+   for(j=0; j<g_n; j++) // J
+      testData2[i][j] = i*j;
+}
+
+column_major()
+{   
+  for(x=0; x<g_n; x++) //I
+  for(y=0; y<g_n; y++) //J
+     testData[x*g_n+y] = x*y;
+}
+
+row_major()
+{
+  for(x=0; x<g_n; x++) //I
+  for(y=0; y<g_n; y++) //J
+     testData[y*g_n+y] = x*y;
+}

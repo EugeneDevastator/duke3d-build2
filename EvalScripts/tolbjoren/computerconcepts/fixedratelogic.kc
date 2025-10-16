@@ -1,0 +1,55 @@
+// http://www.flipcode.com/archives/Main_Loop_with_Fixed_Time_Steps.shtml
+static t,dt,execution_time;
+static x,oldx;
+static dirx = 1;
+static TICKTIME;
+static UPDATE_TIME = 10;
+()
+{
+   TICKTIME = 1.0/UPDATE_TIME;
+   
+   if(numframes==0)
+   {
+      t = klock(0);
+      x=10;
+   }
+   
+   dt = klock(0) - t;
+   t = klock(0);
+   
+   execution_time += dt;
+   
+   numloops=0;
+   while(execution_time >= TICKTIME)
+   {
+      Update();
+      execution_time -= TICKTIME;
+      numloops++;
+   }
+   
+   tween = execution_time / TICKTIME;
+   
+   render(tween);
+   
+   moveto(0,0);
+   printf("loops:%g\n",numloops);
+   printf("timeused %g\n",execution_time);
+   printf("%.2f\n",tween);
+}
+
+Update()
+{
+   speed = 150 / 1.0 / UPDATE_TIME;
+   oldx=x;
+   x += speed * dirx;
+   
+   if(x < 10 || x > 640) dirx = -dirx;
+}
+
+render(t)
+{
+   cls(0);
+   tx = x*t+oldx*(1.0-t);
+   drawsph(tx,50,-32);
+   drawsph(x,150,-32);
+}

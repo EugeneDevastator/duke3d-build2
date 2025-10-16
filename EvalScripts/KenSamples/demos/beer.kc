@@ -1,0 +1,85 @@
+()
+{
+   clz(1e32);
+   static n = 99, t, sklock;
+   if (bstatus>1) { n = 99; sklock = klock(); t = -1; }
+   tt = (klock()-sklock)/6+1;
+   ot = t; t = floor(tt);
+   if ((bstatus%2) && (n > 1)) { n--; sklock = klock(); t = -1; }
+   if (t != ot)
+   {
+      if (n > 1)
+      {
+         playtext("<rate speed='5'/><pitch middle='+10'/>%g<pitch middle='-10'/>bottles of<pitch middle='+10'/>beer on the wall.",n);
+         playtext(",<rate speed='5'/><pitch middle='+14'/>%g<pitch middle='-10'/>bottles of<pitch middle='+14'/>beer.",n);
+         playtext(",<rate speed='5'/><pitch middle='+8'/>Take one down and pass it around.");
+         if (n > 2)
+              playtext(",<rate speed='5'/><pitch middle='+2'/>%g<pitch middle='+4'/>bottles<pitch middle='+4'/>of<pitch middle='+2'/>beer on the wall.",n-1);
+         else playtext(",<rate speed='5'/><pitch middle='+2'/>1<pitch middle='+4'/>bottle<pitch middle='+4'/>of<pitch middle='+2'/>beer on the wall.");
+      }
+      else if (n > 0)
+      {
+         playtext("<rate speed='5'/><pitch middle='+10'/>1<pitch middle='-10'/>bottle of<pitch middle='+10'/>beer on the wall.");
+         playtext(",<rate speed='5'/><pitch middle='+14'/>1<pitch middle='-10'/>bottle of<pitch middle='+14'/>beer.");
+         playtext(",<rate speed='5'/><pitch middle='+8'/>Take one down and pass it around.");
+         playtext(",<rate speed='5'/><pitch middle='+2'/>No more<pitch middle='+4'/>bottles<pitch middle='+4'/>of<pitch middle='+2'/>beer on the wall.");
+      }
+      else if (n == 0)
+      {
+         playtext("<pitch middle='-10'/>Damn. We're like totally wasted.<pitch middle='+15'/>Very<emph>perceptive,</emph><rate speed='5'/>12 eyes?");
+      }
+      if (n >= 0) n--;
+   }
+   
+   glsettex("brick.png");
+   setcol(0xffffff);
+   glBegin(GL_QUADS);
+   glTexCoord(0,0); glVertex(-4,-2,4);
+   glTexCoord(4,0); glVertex(+4,-2,4);
+   glTexCoord(4,4); glVertex(+4,+2,4);
+   glTexCoord(0,4); glVertex(-4,+2,4);
+   glEnd();
+   glsettex("wood.png");
+   setcol(0xffffff);
+   glBegin(GL_QUADS);
+   glTexCoord(0,0); glVertex(-4,+2,4);
+   glTexCoord(4,0); glVertex(+4,+2,4);
+   glTexCoord(4,2); glVertex(+4,+2,1);
+   glTexCoord(0,2); glVertex(-4,+2,1);
+   glTexCoord(0,0); glVertex(-4,-2,1);
+   glTexCoord(4,0); glVertex(+4,-2,1);
+   glTexCoord(4,2); glVertex(+4,-2,4);
+   glTexCoord(0,2); glVertex(-4,-2,4);
+   glEnd();
+
+   setcol(0xffb080);
+   for(i=0;i<n;i++)
+      drawkv6("rpg.kv6",.01,((i%10)-5)*.2-int(i/10)*.1-1,(int(i/10)-5)*.2,4.05,0,PI/2+.5);
+   x = max(tt-t-.43,0);
+   if (n >= 0)
+   {
+      j = 1-x; setcol(j*0xff,j*0xb0,j*0x80);
+      drawkv6("rpg.kv6",.01,((i%10)-5)*.2-int(i/10)*.1+x*6-1,(int(i/10)-5)*.2,4.05,0,PI/2+.5);
+   }
+   
+   setcol(0xffffff);
+   for(j=0;j<3;j++)
+   {      
+      if (n >= 0)
+      {
+         y = sin(tt*90+j*90)*.01;
+         h = PI/2+x*3;
+         v = -sin(min(max(x*32-5-j*6,0),PI));
+      } else { y = 0; h = sin(tt*16+j*36)*.15; v = sin(tt*19+j*36)*.15; }
+      if (j == 0) { setcol(0xffffff); sc = .014; }
+      if (j == 1) { setcol(0xffd080); sc = .013; }
+      if (j == 2) { setcol(0x80d0ff); sc = .014; }
+      drawkv6("caco.kv6",sc,((i%10)-5)*.2-int(i/10)*.1+.3+j,(int(i/10)-5)*.2+y,3.8,h,v);
+   }
+   
+   setfont(12,16); setcol(0xffc000);
+   moveto(xres*.29,yres*.20);
+   j = int(n+t-tt+1.7);
+   if (j > 1) printf("%g bottles",j);
+   else if (j) printf("%g bottle",j);
+}

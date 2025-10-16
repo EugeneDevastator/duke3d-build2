@@ -1,0 +1,170 @@
+static tim;
+static oldtim;
+()
+{
+   tim = klock(0); dt = tim - oldtim; oldtim = tim;   
+
+   cls(0);
+   clz(1e32);
+   
+
+   setcam(0,0,-3,0,0);
+   
+   
+   //xrot = mousx/xres*2*PI;
+   //yrot = mousy/yres*2*PI;
+   xrot = tim;
+   yrot = tim;
+
+   for(sc = 1; sc > 0.0125; sc -= 0.0125)
+   {
+      setcol( hsv_to_rgb( sc*360, 1,1) );
+      cube(sc,xrot+sc*4, yrot+sc*4) ;
+   }
+   
+   while( klock(0) < numframes/60 ){}
+}
+
+cube(sc, xr, yr)
+{
+   //static v0[3];
+   //set(v0, -1,-1,-1);
+   
+   static v0[3]; set(v0,-sc,-sc,-sc);
+   static v1[3]; set(v1,-sc,-sc,+sc);
+   static v2[3]; set(v2,-sc,+sc,-sc);
+   static v3[3]; set(v3,-sc,+sc,+sc);
+   
+   static v4[3]; set(v4,+sc,-sc,-sc);
+   static v5[3]; set(v5,+sc,-sc,+sc);
+   static v6[3]; set(v6,+sc,+sc,-sc);
+   static v7[3]; set(v7,+sc,+sc,+sc);
+   
+   static mx[9];
+   static my[9];
+   //static mz[9];
+
+   makeX( mx, xr );
+   makeY( my, yr );
+   //makeZ( mz, ang );
+   static m[9];
+   //makeZ( m, mousx/xres);
+   mult(m,mx,my);
+   
+   tform(m,v0);
+   tform(m,v1);
+   tform(m,v2);
+   tform(m,v3);
+   tform(m,v4);
+   tform(m,v5);
+   tform(m,v6);
+   tform(m,v7);
+   
+   // bottom quad
+   drawline(v0,v1);
+   drawline(v0,v4);
+   drawline(v4,v5);
+   drawline(v1,v5);
+   // top quad
+   drawline(v2,v3);
+   drawline(v2,v6);
+   drawline(v6,v7);
+   drawline(v7,v3);
+   
+   // connectors top/bottom quad
+   drawline(v0,v2);
+   drawline(v4,v6);
+   drawline(v1,v3);
+   drawline(v7,v5);
+}
+
+drawline(v1[3], v2[3])
+{
+   moveto( v1[0], v1[1], v1[2] );
+   lineto( v2[0], v2[1], v2[2] );
+}
+
+set(v[3],x,y,z){
+   v[0]=x; v[1]=y; v[2] = z;
+}
+
+makeX(m[9], r)
+{
+   c = cos(r); s=sin(r);
+   m[0] = 1; m[1] = 0;  m[2] = 0;
+   m[3] = 0; m[4] = c;  m[5] = -s;
+   m[6] = 0; m[7] = s;  m[8] = c;
+}
+   // Y axis
+   // | c 0  s |
+   // | 0 1  0 |
+   // | -s 0 c |
+makeY(m[9], r)
+{
+   c = cos(r); s=sin(r);
+   m[0] = c; m[1] = 0; m[2] = s;
+   m[3] = 0; m[4] = 1;  m[5] = 0;
+   m[6] = -s; m[7] = 0;  m[8] = c;
+}
+   // Z axis
+   // | c -s 0 |
+   // | s c  0 |
+   // | 0 0  1 |
+makeZ(m[9], r)
+{
+   c = cos(r); s=sin(r);
+   m[0] = c; m[1] = -s; m[2] = 0;
+   m[3] = s; m[4] = c;  m[5] = 0;
+   m[6] = 0; m[7] = 0;  m[8] = 1;
+}
+
+// C = AB, multiplies A and B, puts result in C
+mult(c[9],a[9],b[9])
+{
+   C[0] = A[0]*B[0] + A[1]*B[3] + A[2]*B[6];
+   C[1] = A[0]*B[1] + A[1]*B[4] + A[2]*B[7];
+   C[2] = A[0]*B[2] + A[1]*B[5] + A[2]*B[8];
+   
+   C[3] = A[3]*B[0] + A[4]*B[3] + A[5]*B[6];
+   C[4] = A[3]*B[1] + A[4]*B[4] + A[5]*B[7];
+   C[5] = A[3]*B[2] + A[4]*B[5] + A[5]*B[8];
+   
+   C[6] = A[6]*B[0] + A[7]*B[3] + A[8]*B[6];
+   C[7] = A[6]*B[1] + A[7]*B[4] + A[8]*B[7];
+   C[8] = A[6]*B[2] + A[7]*B[5] + A[8]*B[8];
+}
+
+tform(m[9], v[3])
+{
+   x = v[0]; y = v[1]; z = v[2];
+   v[0] = m[0] * x + m[1] * y + m[2] * z;
+   v[1] = m[3] * x + m[4] * y + m[5] * z;
+   v[2] = m[6] * x + m[7] * y + m[8] * z;
+}
+
+hsv_to_rgb(h,s,v){ 
+   // expects 360deg and 1,1 hue sat max
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   r=int(r*255);
+   g=int(g*255);
+   b=int(b*255);
+   return rgb(r,g,b); 
+}

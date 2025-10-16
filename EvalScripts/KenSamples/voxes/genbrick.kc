@@ -1,0 +1,21 @@
+(x,y,z,&r,&g,&b)
+ox = abs(x); oy = abs(y); oz = abs(z);
+x += noise(ox*6.2,oy*6.3,3.5)*.03;
+y -= noise(ox*4.7,oy*8.7,7.3)*.04;
+z += noise(ox*6.9,oy*3.4,8.7)*.06;
+hz = (abs( y                %(1/4))<1/24) ||
+     (abs((x-int((y*4)%2)/4)%(1/2))<1/24);
+if (hz*.1+.7 >= z) return(0);
+if (z > .8)
+{
+   r = 180+nrnd*4;
+   g = 180+nrnd*4;
+   b = 180+nrnd*4;
+}
+else
+{
+   r = 255+nrnd*4;
+   g = 128+nrnd*4;
+   b = 128+nrnd*4;
+}
+return(1);

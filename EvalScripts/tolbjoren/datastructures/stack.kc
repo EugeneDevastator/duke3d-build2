@@ -1,0 +1,35 @@
+enum{MAX_STACKS=10, MAX_ELEMENTS=1000}
+static stackarray[MAX_STACKS][MAX_ELEMENTS];
+static stackcount[MAX_STACKS];
+static activestack = 0;
+()
+{
+   //cls(0);
+   
+   if(numframes==0)
+   {
+      cls(0);
+      moveto(0,0);
+      activestack = 0;
+      push(3);
+      push(42);
+      push(64);
+      pop();
+      pop();
+      pop();
+   }
+}
+
+push(x)
+{
+   stackarray[activestack][stackcount[activestack]] = x;
+   stackcount[activestack]++;
+   printf("\npushed <- %g at %g",x,stackcount[activestack]-1);
+}
+
+pop()
+{
+   stackcount[activestack]--;
+   printf("\n-> popped %g at %g", stackarray[activestack][stackcount[activestack]], stackcount[activestack] );
+   return stackarray[activestack][stackcount[activestack]];
+}

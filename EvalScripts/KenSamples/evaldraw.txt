@@ -1,0 +1,1817 @@
+EVALDRAW by Ken Silverman                 Ken's website: http://advsys.net/ken
+RScript by Robert Rodgers                  mail.[Robert's last name]@gmail.com
+------------------------------------------------------------------------------
+Introduction:
+
+I've always wanted to write a compiler inside a compiler. To be more specific,
+I've always wanted to take a string containing some C code, compile it at run
+time, and then start using it like a regular function. Some benefits of
+EVALDRAW are:
+
+   * Instant visual / audio feedback of your changes.
+   * Compiling is done all in memory - no hard drive access.
+   * Compiled code fast enough for realtime 2D & 3D graphing applications.
+   * Full control over DSP effects for designing new musical instruments.
+   * Simple installation - everything is built in to a single executable.
+   * Useful for scripting in games.
+   * The "grad student" algorithm becomes more practical :P
+
+EVALDRAW is short for EVALuate and DRAW. If you wish to talk about this great
+program in your everyday speech (like all the cool people do), the correct
+pronunciation is with the accent on 'eval' (as in evaluate), followed by
+'draw'.
+
+Authors:
+   Ken Silverman: Responsible for everything except for Robert's amazing
+      Rscript compiler.
+   Robert Rodgers: author of Rscript compiler: the default and much better
+      compiler.
+
+Special thanks:
+   Tom Dobrowolski: Provided code for noise() functions and contributed to a
+      few example scripts.
+   Matheus Nabao: Top notch beta tester, especially in rounding up many
+      RScript bugs. He's from Brazil!
+
+------------------------------------------------------------------------------
+History:
+
+02/04/2025:
+   * Add FRAMEINIT variable for graphing functions to use as per-frame init.
+   * Add STL_SCALEFAC variable to allow script to specify the scale factor for
+        saving to STL. (Before you had to edit EVALDRAW.INI which was clunky).
+   * Add some larger fonts (for those with 4K monitors or poor eyesight ;).
+   * Fix crash when doing F2 .. down arrow in a newly spawned text window.
+   * Fix some artifacts in cubes rendering of voxel mode (half voxel off).
+   * Fix bug with 2D graph modes suddenly scrolling downward by half a screen.
+   * Add support for Quite OK Image (QOI) format.
+   * setpix(x,y,z) no longer writes the pixel if z > value in z-buffer,
+        eliminating need for getpix(). This may break some rare scripts that
+        use setpix(x,y,z) in an unusual way.
+   * New scripts:
+      geeky\slide_square.kc: collision detection for square shape.
+      geeky\remez8.kc: does optimal function approx in 8 equal sections.
+      voxes\genboxwiz.kc: quickly generate custom boxes for 3d printing.
+      voxes\pacman.kc: updated to use frameinit.
+      demos\ceilflor.kc: updated to use frameinit.
+      demos\driftbox.kc: updated to use frameinit.
+      demos\usflag.kc: added some interesting stuff..
+      demos\minsurf.kc: physics demo showing what happens with soap bubbles.
+
+01/23/2022:
+   * Fix mouse buttons (and also relative mouse movement - readmouse(&mx,&my))
+        on laptops running Windows 10.
+   * Fix input handling of AltGr+.. from foreign keyboards.
+   * Improve ZIP handling. You can now load the same filename from different
+        DIRs/ZIPs using '|' to separate mounted DIR/ZIP name and filename.
+        For example:
+           mountzip("a.zip"); mountzip("b.zip");
+           buf[i] = fil("foo.txt",i); //load standalone file only
+           buf[i] = fil("|foo.txt",i); //load from 1st dir/zip (nice if 1)
+           buf[i] = fil("a.zip|foo.txt",i); //load file from a.zip
+           buf[i] = fil("b.zip|foo.txt",i); //load file from b.zip
+
+11/20/2021:
+   New/updated scripts:
+      bounce3d.kc: new script showing 3d reflection math
+      span_v2h.kc: new script showing how to convert vert. to horiz. spans
+      lens2.kc: updated script: improve editor; add: Ins, Del, PGUP/PGDN
+      calend.kc: updated script: fix some holidays
+
+05/22/2021:
+   * Add new functions & upgrade others (greetings go out to Matheus Nabao):
+      sethlin(): add new variants supporting mask, blend, and add operations.
+         Add memory bounds protection to prevent crashes.
+      bufset()/bufcpy(): fast buffer (array) clear/copy. They work like
+         C's memset()/memmove(), but with doubles instead of bytes. When
+         porting to C, be sure to multiply 'n' by 8.
+      pic("a.png",x,y,flags): use flags to return col&alpha in desired format.
+      fil(offs): similar to pic() and wav() without a filename. Use
+         Ctrl+Shift+L to select generic file.
+      dmousz: sum this per frame to get mouse wheel position.
+      rgba(r,g,b,a): RGB with alpha.
+      a = getrgb(col,&r,&g,&b); Now returns alpha instead of 0.
+   * Ctrl+Shift+L to select user file for fil() 1-parameter function), and:
+     Ctrl+Shift+S to select save file (alias to F6).
+   * Upgrade to latest KPLIB.C, which adds support for:
+      - Deflate64 and ZIP64 blocks
+      - .GZ, .TAR, .GZ.TAR (but not yet: .TAR.GZ)
+   * Mouse wheel now zooms for graphing modes.
+   * Ctrl+C no longer deselects text; Shift+Del now removes text after copy.
+   * Feature: clicking on error line in title bar jumps text cursor to error.
+   * Bug fix: text coords now update upon LMB click in text in non-'fit' mode.
+   * Bug fix: Evaldraw icon now appears on taskbar.
+   * Bug fix: KV6 models now render in a 4K window (dimensions >= 2048).
+   * Update script: geeky\circtris.kc
+   * New script: geeky\buf_speed_tests.kc (showing all the new sethlin*
+        variants and bufset/bufcpy functions)
+
+11/20/2020:
+   * Robert awakens from a 10 year hiatus and fixes some bugs in RScript:
+      - "(x)xa=abs(x);x*xa" & "(x)xa=abs(x);xa*x" now produce correct result.
+      - "n=2,p=1; n*(pow(100,p))" now gets precomputed properly.
+      - "x=2,asin(x)" now produces the same as "asin(2)", which is "nan(ind)".
+      - "i=0;printf("%.f",i++);" now works the way you would expect.
+      - "(){z=f(mousx,100)&&1;} f(a,b){a>b}" fixed.
+      - "f=0;printnum(2^f);" now gives correct result and not "BUG REPORT".
+      - "(x){printnum(f(x,.5)&&1);}f(a,b){return(a>b);}" no longer crashes.
+      - "(){cls(0);fputc(f(rnd,.5)&&1);} f(a,b){return(a>b);}" also fixed.
+      - "i=1,i%=2;printnum(i);" fixed.
+      - "printf("","");" fixed.
+      - "cls(0);a=0;if(b=a){printnum(b);}" fixed (now prints nothing).
+      - "cls(0);x=3;x*=0;printnum(x);" fixed.
+      - "cls(0);x=3;x/=0;printnum(x);" fixed.
+    ..and adds 2 small new features:
+      - Partial string support (see RSCRIPT.HTM and GEEKY/RSCR_STRINGS.KC)
+      - Improved array initialization syntax supporting braces inside braces.
+   * New script: geeky\rscr_strings.kc (example of feature mentioned above).
+
+10/04/2020:
+   * Fix exception related to Rscript and Data Execution Prevention (DEP).
+   * Fix rounding issues related to noise() functions, and support clean
+     transition of rounding mode when switching between Eval & Rscript
+     compilers.
+   * Fix Ctrl+Alt+Shift+KPEnter process restart when window maximized: window
+     now stays maximized if that was its previous state.
+   * Fix handling of Alt Gr key for international keyboards.
+   * New scripts:
+        demos\steamy.kc: Something fresh for you to enjoy.
+        geeky\hull3d.kc: A port of an old test program from 2001.
+
+05/06/2020:
+   * KV6 voxel sprites now render each cube with perfect boundaries using new
+     code optimized using AVX2 .. in 32-bit mode! Obviously, it is too soon to
+     assume everybody has AVX2, so if AVX2 (or OS support for it) is not
+     detected, the old code for drawing bounded rectangles is used.
+   * Fixed issue when you task switch away from Evaldraw for >= 5 seconds, and
+     upon return to Evaldraw it appears to be hung. It turns out EVALDRAW was
+     never actually hanging, but Windows was incorrectly detecting that it
+     did. A simple call to DisableProcessWindowsGhosting() fixed it ;P
+
+02/23/2020:
+   * Fix mouse handling issues from the most recent release.
+
+02/22/2020:
+   * Fix window flicker on Windows 10 by replacing old page flipping code.
+   * stereomode 2 and 3 (White Line code/Nvidia 3DVision) removed.
+   * alwaysactive / drawoffscreen options removed: no longer have any effect.
+   * Fixed crash that occurred when load/save dialog appeared for 2nd time.
+   * A note on an issue that may or may not still exist:
+      The EVALDRAW environment has been known to intermittently freeze after
+      switching to another app for a while and then returning to the EVALDRAW
+      window. I have been unable to reproduce this in the most recent build.
+      I've only tested a little bit, so I'm not sure if the issue is fully
+      eliminated. Just in case it isn't, here's a little trick to break out of
+      it - without losing your work:
+         * Switch away from EVALDRAW again (Alt+Tab) - yes, seems unintuitive.
+         * Move your mouse a bit - a few circles will do.
+         * Now, quickly return to EVALDRAW with Alt-Tab.
+      After doing the above steps, function should be restored.
+    * Script updates:
+         demos\particles.kc: Simple new demo
+         demos\planpos.kc: Moved kensky.jpg to data path so it is found.
+         games\backgammon.kc: Default play speed increased.
+         games\kpool\kpool.kc: Improve randomization of the break.
+         games\traffic.kc: Now play against 2 different computer AI's, and
+            included forgotten data files: dn3d_squish.flac, groundhog.kv6
+         geeky\calend.kc: Added more holidays.
+         geeky\lens2.kc: Big upgrade from previous version (lens.kc). Supports
+            multiple lenses, rotation (grab with mouse and use left-right
+            arrows). See #if cases near start of script to try other setups.
+         geeky\persp2.kc: Add minor things.
+         voxes\meathead.kc: Now supports animation. To enable, change top
+            line to: (x,y,z,t,&r,&g,&b), comment the "t=..;" near the top, and
+            lower the voxel res.
+
+06/18/2018:
+   * KV6 voxel sprite rendering could be using a better approximation to cubes
+        if Evaldraw were ever ported to 64-bit mode. However, EVALDRAW is
+        currently stuck in 32-bit mode, and I have yet to write equivalent
+        32-bit assembly language code for the new KV6 renderer. If I were to
+        enable it currently, it would run 3x slower so tough luck for now.
+        (NOTE:this rant has been rendererd obsolete - see:05/06/2020 ;)
+
+03/21/2018:
+   * Setting voxel dimensions with F7/Shift+F7 in editor now saves to
+        EVALDRAW.INI correctly, so next load of Evaldraw is correct (typically
+        cubical unless INI is manually edited).
+   * Saving to STL files: fix averaging and quantization of solid colors.
+
+03/02/2016:
+   * printf() now supports \h escape character for half space. It's not
+        standard C, but it shouldn't conflict and it can be very handy for
+        centering text.
+   * multi-touch code was crashing Windows XP. Now works in XP again.
+   * update games\traffic.kc: computer AI, net, multi track, bells&whistles.
+
+02/08/2016:
+   * Fix stray horizontal lines in Bezier (variable size) font.
+   * Fix bottom of window when maximized during a process restart.
+   * .STL file writer now writes a 15-bit RGB color in the 2-byte filler of
+        each triangle (should be compatible with VISCam/SolidView).
+   * Selecting "stereomode=3" in EVALDRAW.INI (Nvidia 3DVision) now ignores
+        and overrides other EVALDRAW.INI settings (fullscreen, xres, yres,
+        stereorefresh). So now, to toggle Nvidia 3DVision, you only need to
+        set "stereomode=3" in EVALDRAW.INI and you're done.
+   * Add readtouch(): Reads multi-touch points, such as for Lenovo laptop.
+   * New scripts:
+        games\kenken.kc: Generator, editor and game. Similar to Sudoku.
+        games\rummiken.kc: Rummikub clone; supports multiplayer.
+        games\pyraminx.kc: Tetrahedron puzzle (like Rubik's Cube) simulator.
+        games\megaminx.kc: Dodecahedron puzzle (like Rubik's Cube) simulator.
+        games\traffic.kc: Traffic light simulation game. Use:Ctrl/Shift.
+
+01/08/2013:
+   * Rewrote drawsph()&drawcone(); now use phong shading by default. Can be
+        disabled using DRAWCONE_NOPHONG flags.
+   * Add DRAWCONE_NOCONE flag to drawcone(). Use it to not draw main part of
+        cone. Can be used to draw a cropped sphere or circle.
+   * Add DRAWCONE_CULL_BACK, DRAWCONE_CULL_FRONT, DRAWCONE_CULL_NONE to
+        control rendering of cone surface on inside or outside.
+   * Add /show:# command line option.
+   * Add /refreshz:# command line option.
+   * New scripts:
+        games\chess\chess.kc: Chess: play against 5-move ahead AI or over net.
+        games\backgammon.kc: Backgammon (no doubling die or resignation).
+        games\bogglegen.kc: 4x4 Boggle game board generator.
+        games\set.kc: Set card game.
+        demos\planpos.kc: Shows planetary positions (subset of GLOBE).
+        geeky\alpher.kc: Compressed line font featuring circular arcs.
+        geeky\morse.kc: Morse code learning toy/game.
+
+11/18/2011:
+   * Add deadlock (freeze) protection: the process automatically restarts
+        after "timeout4deadlock" msec (see EVALDRAW.INI) with no response. I
+        added a new key: Ctrl+Alt+Shift+KPEnter to force a restart of the
+        process manually. Think of it as an extra nasty version of Ctrl+Enter.
+   * Add 2 command line options: /kcsavnam=.. and /wndpos=..
+   * Bug fix: Make Standalone EXE now selects .EXE extension for unnamed file.
+   * Bug fix: Capture sound to WAV (F6) now writes header correctly when end
+        of file is cropped due to silence.
+   * snd() functions now support FLAC format (not just WAV).
+   * New script: games\stratego.kc
+
+05/24/2011:
+   * Rewrote threads to stay open & idled rather than having them restart
+        on every compile. This should be more efficient and also reduce the
+        chances of a deadlock.
+   * KP Enter now works as expected except 1D graphing mode program window.
+   * Add getrgb(col,&r,&g,&b).
+   * New scripts: geeky\ang2vec.kc, geeky\drawall4dof.kc, geeky\wirecube.kc,
+        voxes\column.kc, voxes\barrel.kc (updated)
+
+01/21/2011:
+   * Move playtext() to main thread to fix crash on quit in certain configs.
+   * New scripts: voxes\meathead.kc, geeky\rigidline.kc
+
+08/29/2010:
+   * Fix to RScript: "(x)noise(x)*0" (or similar) no longer crash.
+   * GL_LINES, GL_LINE_LOOP, GL_LINE_STRIP now work correctly with setcam().
+   * Loading files without .KC extension now compile anyway. (Undid change
+        from 01/28/2010).
+   * Starting directory for select/capture file (F6/Ctrl+P) is now directory
+        of .KC script.
+   * Select pic/wav (Ctrl+P) now recompiles script when Compile on Ctrl+Enter
+        is not enabled.
+   * Add 2 command line options: /defpic=[filename] and /defwav=[filename]
+
+07/10/2010:
+   * Added File..Make standalone EXE. With this, you can package your app into
+        a single file - handy for sending to a friend. Data files are
+        automatically stored in the EXE. There is no speed or size advantage
+        to this feature. Since EXE's are large, it is not recommended to use
+        this if you wish to package many script files. In this case, it would
+        be better to use a common ZIP file for the data, and include
+        EVALDRAW.EXE separately.
+   * Add /extract command line option for standalone EXE to extract files.
+
+   * Capture to file (must use F6 hotkey) now works in /runonly mode and now
+        uses .TXT as default file extension.
+   * Add fprintf() and fputc(). These are now the only functions that write to
+        the capture file. printf() and printchar() are no longer captured when
+        the "capture to file" function is activated. This allows text to be
+        displayed without it going to the capture file.
+
+   * Rscript now disabled by default if SSE2 is not detected.
+
+06/06/2010:
+   * Fixes to RScript:
+      - Fixed many problems related to structures.
+      - "#define a(" (a common state while typing) no longer freezes.
+      - log(constant) now evaluated correctly.
+   * Improve debug exception info.
+   * TICTACTOE.KC now features respectable AI; algo by Francisco Godoy (Paco).
+   * KJOUST3D.KC now uses client-side prediction.
+
+05/08/2010:
+   * F1 now closes help window if one is already present.
+   * Fixes to RScript:
+      - Constants with ridiculous exponents (i.e. 1e999999) now evaluate fast.
+      - Fixed some exceptions that have been occurring on valid scripts.
+   * Added "drawprimary" setting to EVALDRAW.INI. This setting only applies to
+        <= WinXP and windowed mode. Setting it to 1 will remove flicker for
+        background apps, but will lower frame rate, especially if you maximize
+        the window.
+   * Removed unnecessary bytes in slave to master packets.
+
+03/21/2010:
+   * Fixed recent bug with netsend(NET_ALLELSE,?) when originating from slave.
+   * Fixed netsend(NET_ALL,?) to guarantee the same order of packets to all
+        machines. Despite my previous claims, this is actually working now.
+   * Fix issue w/quantizing to floats causing sync problems with net code.
+   * Rewrote x86 disassembler from scratch; Debug..Intel asm should now be
+        much more accurate, especially for SSE2 instructions.
+   * Systems without SSE2 should no longer crash on startup, as long as Ken's
+        x87 compiler is selected (you may need to edit EVALDRAW.INI directly).
+   * Put __try & __except blocks around the compiler & ()-mode run-time.
+        This means some crashes are caught in EVALDRAW.EXE, and you don't have
+        to deal with an annoying dialog box and lose your program! It is not
+        foolproof, however. If you see 'exception' in the title bar of your
+        window, you might want to save soon.
+   * A script loaded with the /clip command line option can now be saved.
+   * New scripts: games\snood.kc, geeky\calend.kc
+
+02/10/2010:
+   * Fixes to RScript:
+      - Variable indices for structure element arrays now supported.
+      - Fixed major corruption bug when using a local structure.
+   * Fixed fullscreen mode.
+   * Converted kjoust3d & asteroids code to use structures.
+   * New script: demos\usflag.kc
+
+01/28/2010:
+   * Added support for a brand new script compiler written by my friend,
+        Robert Rodgers. His compiler generates native SSE2 code, so you will
+        need at least a Pentium 4 in order to use it. Robert's compiler is
+        faster than my own EVAL compiler, both in compiling speed, and in
+        execution speed. It already has a lot more features, such as
+        structures, #if..#endif, #define, stack arrays, as well as other
+        things. Please see RScript.htm for more details.
+
+        I have worked with Robert to ensure compatibility with the old EVAL
+        scripts. In some cases, you will need to fix things. Most things are
+        simple, such as putting semicolons where they belong. Another common
+        problem is accessing a multi-dimensional array with fewer than the
+        declared indices, as the behavior of our compilers is different on
+        that.
+
+        I will include my EVAL compiler for the time being. Use it to assist
+        with your porting. I plan to switch completely to Robert's compiler
+        at some point, as he adds more features. Passing this onto him will
+        allow me to concentrate on other parts of EVALDRAW.
+
+   * Added support for UDP networking. Evaldraw does behind the scenes packet
+        correction, so that it behaves like the old TCP mode. The difference
+        is: UDP can be much more responsive than TCP mode. In fact, I made UDP
+        the default network mode.
+   * Added 3-parameter forms of net_send() and net_recv() to speed up and
+        simplify net code.
+   * Help now drawn in a native EVALDRAW window, allowing it to be viewed
+        more easily with code.
+   * Loading files without the .KC extension will now be treated as a regular
+        file, and the compiler will not run on it.
+   * Line of error is now higlighted. (Robert's compiler)
+   * Line number and column are now displayed in the title of each window.
+   * Buttons on window title bar now behave more standard. Added minimizing.
+   * The text cursor's original column is remembered when moving up/down past
+        shorter lines.
+   * Fixed sync problems when restarting in network mode.
+   * Added fadd(a,b) 2-parameter function to EVAL for compatibility with
+        Robert's script compiler. This lets you do addition without the
+        optimizer simplifiying it - useful for some rounding tricks. In other
+        words, to ensure compatibility, "i + 3*2^53 - 3*2^53" should be
+        rewritten as: "fadd(i,3*2^53)-3*2^53".
+   * klock(1) and klock(-1) now scaled properly; decimal point at seconds.
+   * Added gethlin() to speed up loops calling getpix() many times.
+   * Added /clip option: loads script from windows clipboard.
+   * Added stl_scalefac option to EVALDRAW.INI. It affects the scale of units
+        when saving voxel models in (x,y,z,&r,&g,&b) mode to .STL format.
+   * Fixed crash when resizing the window in the graphing modes.
+   * Fixed stuck keys in script after using dialog.
+   * New scripts:
+      games\asteroids\*: Multiplayer asteroids games.
+      demos\dragcards.kc: Generic multiplayer card game. Deck is generated on
+         the fly.
+      geeky\fft.kc: An implementation of a power of 2 size FFT
+      geeky\netsync.kc: A short implementation of a synchronized net protocol.
+
+   * New scripts by Robert Rodgers (since he is now a major contributor!)
+      games\arm.kc, games\box.kc, demos\nasa.kc, demos\timecow.kc,
+      demos\colacow.kc, demos\mount.kc, demos\raymaze_3.kc, demos\glow.kc,
+      voxes\potplant.kc, geeky\space_struct.kc
+     The following models and sounds are also from Robert:
+        coke.kv6, colabus.kv6, cow.kv6, plant.kv6, moo.flac, moo2.flac
+
+   * FYI: roid.kv6, used in asteroids, was generated by Tom Dobrowolski
+
+07/04/2009:
+   * Added new form of 3D drawspr() with tilt parameter.
+   * Fixed mouse not acquiring when using readmouse() & cursor outside window.
+   * Fixed reliability when using Ctrl+Enter during a network session (no more
+        lingering packets from old script).
+   * netsend(0 or NETALL,..) now passes packet to self when not connected.
+   * Added rgb(r,g,b) function to simplify color conversion. Bounds parameters
+        to 0-255.
+   * Added local&universal time options to klock(); klock()/klock(0) work like
+        before. klock(-1 to -9) returns UTC; klock(1 to 9) returns local time.
+        See description below.
+
+05/27/2009:
+   * Fixed several bugs with network code, including crash on quit & timeout.
+   * Enum and static initializers now support constant expressions for initial
+        values. For example: static buf[2]={2+3,1/6};
+   * Added Sleep() function.
+   * CPU usage is now small when script has error.
+   * 'setalwaysactive' in EVALDRAW.INI now defaults to 1.
+   * Now save 'FIT' window state in EVALDRAW.INI (fitmodedef).
+   * Added new controls to the 3D graphing modes, allowing movement similar
+       to a 3D game. See g3dmousemode in EVALDRAW.INI. Note that '1' is the
+       new mode. The 8 lines following it (g3d*) allow you to customize
+       movement keys.
+   * 'rollfix' renamed to 'g3drollfix' in evaldraw.ini
+   * Added /simlag and /simlag:# command line options.
+   * Fixed crash when calling getpicsiz()/pic() with invalid filenames.
+   * glsettex(mybuf,x,y); is no longer restricted to powers of 2. Textures
+        that are not powers of 2 are interpolated to scale appropriately.
+   * Added glremovetex() function, which allows animated textures.
+   * Added glsethei() function, allowing heightmaps in OpenGL style framework.
+        Heightmap data is extracted from the 8-bit alpha channel of the
+        32-bit color. Call glsethei() before glsettex() with a value like 0.1.
+   * New KC complete games:
+        games\kjoust3d\kjoust3d.kc: Based on the classic arcade game, but 3D.
+           It is quite fun playing with friends over a LAN :)
+        games\kpool\kpool.kc: A simple 3D pool simulator.
+        games\bowling\bowling.kc: A simple bowling simulator (with quick&dirty
+           physics), originally intended for a 3D mouse, but also playable with
+           regular mouse.
+
+03/25/2009:
+   * Ctrl+K now selects color or filename. If the cursor is inside quotes, it
+        will spawn a filename dialog. Otherwise, it will spawn a color picker.
+   * Added 5 parameter form of 2D drawspr(), allowing x&y size to be
+        controlled independently: drawspr(x,y,xsiz,ysiz,ang);
+   * Added default voice selection to EVALDRAW.INI:
+        defvoice=name=microsoft sam
+        The default voice is Microsoft Sam because it's the best one ;)
+   * Added FABS(), currently an alias for ABS(). The use of ABS() is now
+        discouraged, since a C compiler will quantize its input to an integer.
+   * Added sethlin() to speed up loops calling setcol()/setpix() many times.
+
+12/03/2008:
+   * Added TCP-based networking. Supports (in theory) up to 16 machines. To
+       start a multi-user session, select File..Host on a machine with a public
+       or open port, and select File..Join on any other machines you wish to
+       join to it. Press Ctrl+Enter from any machine to restart (and hopefully
+       sync) the scripts. A later version of Evaldraw may feature automatic
+       syncing of text as well. Until then, you can use MoonEdit
+       (http://moonedit.com) to edit scripts collaboratively, and have scripts
+       synced at all times. I recommend you add the following line(s) to your
+       ME.CFG (MoonEdit config file), to simplify the process of starting an
+       EVALDRAW session:
+
+   bind f2 format savetxt "\N.kc"; format shell evaldraw /qme /host:2:\P "\F"
+   bind f9 format savetxt "\N.kc"; format shell evaldraw /qme /join:\S:\P "\F"
+
+   * Added TCP-based network functions to script library. See: net_*.
+   * Added new command line options to start a network connection (for
+        spawning a session from MoonEdit)
+   * Added getfilsiz().
+   * "Capture printf to file" now works between refresh() calls.
+   * New KC files:
+        geeky\netsimp.kc: A minimalistic example showing the net functions.
+        geeky\nettest.kc: A more complete net example.
+        demos\clippy.kc: Another must-see machinima demo :)
+        games\tictactoe.kc: Added net mode and selectable grid&win size.
+
+10/08/2008:
+   * Added playnote() for playing MIDI notes immediately on the default MIDI
+        output devices. Think of it as the equivalent of playtext() for music.
+   * 1D graphing modes should now work on systems with no sound card.
+   * Debug windows now update on every script change.
+   * Added 4 tiny WAV files (square.wav,triangle.wav,sine.wav,sawtooth.wav)
+        to data directory for convenience. Useful for various effects.
+   * Added whitepix.png (a single white pixel, 1x1 image) for convenience.
+   * New KC files:
+        demos\playnote_test.kc: Plays through all instruments with silly tune.
+        demos\drumkit.kc: MIDI drum kit; lets you assign custom keys to drums.
+        games\pacman2.kc: Think you're good at pacman? You won't think so
+           after playing my version. These ghosts are good! ;-)
+
+09/17/2008:
+   * Added new forms of drawcone() with another parameter for rendering flags.
+   * New KC files:
+        games\magpong2.kc: Pong/volleyball game with physics.
+        geeky\raycast_101.kc:
+        geeky\drawcone2d.kc: Shows what new drawcone() flags do.
+        geeky\pi.kc: Simple PI calculator (default: 10000 digits)
+
+07/19/2008:
+   * New KC file: games\tictactoe.kc: a complete Tic-Tac-Toe game with good AI
+
+07/06/2008:
+   * refresh() now increments numframes and handles stereo mode properly.
+
+06/28/2008:
+   * Fixed issue with pic("image.png",x,y); and getpicsiz("image.png",&x,&y);
+   * FPU setting now set at the start of threads for improved consistency.
+   * Added screen capture: F12 or under File menu.
+
+06/22/2008:
+   * Fixed flicker/mouse cursor issue that was introduced about 6 months ago.
+   * Added 'select color' to edit menu. Press Ctrl+K with the text cursor over
+        a hex-specifed color (example: 0x0080ff) to replace it.
+   * printnum() now moves text position to next line.
+
+06/18/2008:
+   * Added support for complex polygons (non-convex / multiple contours).
+        See: glBegin(GL_COMPLEX); and glnextcontour();
+        (GL_COMPLEX rasters the entire polygon simultaneously, with similar
+         overhead to drawing a single polygon. It doesn't need to triangulate.
+         Because of this, it is MUCH faster than using GL_TRIANGLE_FAN with >3
+         vertices (or equivalent). Too bad OpenGL lacks support. : )
+   * Added support for VOC files. Like all data formats, the VOC file may
+        located inside a .ZIP, .GRP, etc..
+   * glsettex() now returns a handle (number) which can be passed to future
+        1-parameter glsettex() calls. Why is this useful? Try these reasons:
+           * Multiple user textures now supported.
+           * Access to textures by number. This opens up many possibilities.
+           * Backup/restore currently selected texture. To grab current index
+                without modifying it, use: oldtex = glsettex(-1);
+   * drawcone() now supports 2D form: drawcone(x0,y0,r0,x1,y1,r1)
+   * glvertex() now supports 2D form.
+   * Added GL_DEPTH_TEST flag for use with glenable()&gldisable().
+   * Added drawspr(x,y,r,ang)
+   * Added drawspr(filnam,x,y,z,r,hang,vang); same as drawkv6(), but with
+        parameters reorganized to be consistent with drawsph().
+        The use of drawkv6() is now discouraged. Use drawspr() instead.
+   * Added 13-parameter drawspr() as alias for drawkv6().
+   * New KC files:
+        demos\sprite2d.kc: example of drawspr(). Beware of hypnotism :P
+        geeky\gltest.kc: example with glBegin(GL_COMPLEX) & glnextcontour()
+        geeky\glsettex.kc: example showing new usage of glsettex()
+
+04/13/2008:
+   * Added support for stereo glasses (red-cyan or white line code). Use the
+        view menu to enable red-cyan mode. To enable white line code, you must
+        edit EVALDRAW.INI directly. 3D voxel scripts (x,y,z,...) work
+        automatically, and use the separation settings from EVALDRAW.INI.
+
+        General purpose scripts () require you to do the eye separation
+        explicity. Even numframes are expected to be the left eye's view,
+        while odd numframes are expected to be the right eye's view. Once the
+        right view is finished, the 2 frames are combined and displayed.
+
+        Proper 3D stereo requires adjustments to both setcam() and setview().
+        Use setcam() to move the camera left & right in the 3D world.
+        Use setview() to shift the screen left & right (use the 'hx' param.)
+
+        See STEREO_TEST.KC for an example of how to set up a stereo view for
+        () mode, and also to verify that each eye is getting the correct view.
+   * Added 2 new variables for script: 'using6dof' and 'usingstereo'.
+   * Fixed rounding of graph vs. grid lines in 1d mode
+   * Fixed crash in compiler function block parsing.
+   * Blank pointer parameters now give error instead of script crashing.
+   * Removed invert drag from menus; added drag* options to EVALDRAW.INI.
+   * Added rollfix option to EVALDRAW.INI to select 3D graph rotation style.
+   * New KC files:
+        demos\stereo_test.kc: test program for stereo 3D
+        demos\magsword.kc: demo includes spring physics, stereo support
+        demos\gensword.kc: generates sword model for magsword.kc
+
+03/24/2008:
+   * Added support for global enum and static declarations. If you put your
+        declarations outside the function blocks, they will now be visible to
+        the whole program.
+   * The main function can now have global declarations preceding it.
+   * Arrays can now have expressions in their dimension declarations, as long
+        as they evaluate to a constant at compile time. Ex: static a[(2+3)*5];
+   * Changed camera/mouse controls in the 3D voxel modes - now more intuitive.
+   * KC files are now saved in correct directory after selecting images.
+   * Mouse wheel now allows cursor to scroll out of view.
+   * PGUP/PGDN now scrolls with more standard behavior.
+   * Ctrl+KPEnter now works the same as Ctrl+Enter (recompiles changes).
+   * Text window now captures mouse when highlighting text.
+   * Fixed optimization bug related to pointers writing variables.
+
+03/10/2008:
+   * Improved window dragging behavior.
+   * Added variable size font (parabolic Beziers). To activate, use the new
+        3-parameter form of setfont().
+   * Added animating 1D graphing mode: (x,t)
+   * Added option to invert dragging direction for graphing modes.
+   * Added refresh() function: allows you to update the screen, keyboard, and
+        mouse in the middle of a script.
+   * Added keystatus[256]. The instant of keypress can be detected like this:
+           if (keystatus[0xc8]) { keystatus[0xc8] = 0; playtext("up"); }
+        The use of keystat() is now discouraged because function calls are
+        slower than array accesses.
+   * bstatus can now be used as a flag for detecting the instant of click.
+   * New KC files:
+        demos\stopwatch.kc: nice timer for the Rubik's cube
+        demos\plussing.kc: tutorial for young kids :)
+        geeky\refresh.kc: example using refresh() function
+
+02/16/2008:
+   * Fixed stuck button after task switch.
+   * Added 3-parameter form of playsoundupdate() for volume & frequency.
+   * playsound() now supports loading of FLAC format.
+   * printf() now supports \b,\r,\n,\t and updates the cursor location like
+        a console. This simplifies multi-line text output.
+   * "Capture printf to file" no longer adds carriage returns after each
+        printf() call. Now, you must do it explicitly by adding \n to the
+        printf string. This may require changes to your code.
+   * New KC file:
+        geeky\slide.kc (2D sliding collision detection demo)
+
+10/25/2007:
+   * Fixed mouse acceleration. Cursor movement now uses windows settings.
+   * 2D graphics functions now clip to window according to setview()
+   * Removed SQR(). Please rename it to SQRT().
+   * Added 'voxres': Gives code access to current voxel grid resolution.
+   * Menu now deactivates when using Alt+Tab (doesn't draw if alwaysactive=0).
+   * Ctrl+L (and other hotkeys) now work when menu is open.
+   * Bug fix: selecting right side of line, then pressing backspace now works.
+   * New KC files:
+        geeky\geneps.kc (generate Encapsulated PostScript files)
+        demos\genmaze.kc
+
+09/01/2007:
+   * Bug fix: now saves EVALDRAW.INI when run in Vista.
+   * Fixed horizon artifacts in textured polygon renderer.
+   * New KC file: demos\gltorus.kc
+
+07/13/2007 - 07/18/2007:
+   * Added: GL_ALPHA_TEST, GLDISABLE() and GLENABLE() for masked textures.
+        The threshold for opaque vs. transparent is 50% alpha for now.
+   * Added MAP functions. Sorry, no documentation for now.
+
+07/11/2007:
+   * Now clear the screen when program is blank
+   * Minimize button now does the same thing as F2 (show/hide code).
+   * Printchar() now writes bytes to file when capturing printf in () mode.
+   * GL functions now support textures with now power of 2 dimensions.
+        (When necessary, I scale the textures up to the next power of 2.)
+
+07/08/2007:
+   * Fixed multi-dimensional arrays inside arrays. Example: pal[board[x][y]]
+   * Fixed buffer overrun crash related to filenames and quotes.
+   * Fixed a minor rendering glitch with drawcone().
+   * Fixed crash that occurred when modifying function parameters "(&a)a=0;"
+   * Fixed major thread issue on Windows 98. I didn't realize it was broken.
+   * Fixed crash when unconditional backward branch was last line of script.
+   * Some changes to drawkv6():
+        Angle form only: using a negative radius now scales down the model by
+           its maximum dimension, allowing you to plug in a model of
+           different resolution easily. A spherical KV6 model will now match
+           drawsph(), given a similar radius.
+        Matrix form only: I scaled the rotation matrix up by exactly 2 times
+           to make its size consistent with the angular form.
+   * GL functions and drawkv6() can now brighten RGB components by up to 2x.
+        To brighten, you must call the 3-parameter form of setcol:
+        setcol(r,g,b);  RGB values range from 0-511; use 256 for no scaling.
+   * Added 2D form of drawsph(x,y,r). Use a positive radius to draw a filled
+        circle and a negative radius to draw just the outline of a circle.
+   * Added optimization switch to the menus. Optimizations require more time
+        to compile. You may wish to disable optimizations for certain scripts
+        where the bottleneck is inside Evaldraw's function calls, and not the
+        script itself. I hope to speed up the optimization code someday.
+   * Added some new functions to load,display,etc.. Build maps. The API isn't
+        finished, so I leave it undocumented for now.
+   * KV6 files updated with "suggested palette" feature from the latest SLAB6.
+   * Changed CLOUD.PNG (from the Evaldraw sample data) to be white instead of
+        blue. This makes color remapping a lot easier when using setcol().
+   * New KC file: demos\saltpour.kc
+
+06/14/2007:
+   * Autodetects Vista, reverting to older code that works better with Aero.
+   * Added setview(): use to control viewport and zoom of 3D functions.
+   * Fixed glcullface() which broke in the 02/17/2007 version.
+   * Fixed crash with unusual temporary syntax: "if (xres) m = 0; m +=;"
+   * Fixed freeze when doing ctrl+'=' while code was in infinite-loop state.
+   * getpix() now returns depth under pixel (ignore if not using 3D).
+   * srand() now works for NRND as well.
+   * Fixed false detection of "name conflict" error when comparing enum value.
+   * Fixed drawkv6()'s handling of color: red and blue were swapped. This may
+        require you to fix your scripts. Sorry for the inconvenience.
+   * Significant SSE/SSE2 optimizations for drawsph(): big speed increases
+        for: dsnake3d, goldball2, waves2, poolballs2, sequin, roids, and more.
+   * drawsph()'s shade angle now depends on the orientation from setcam().
+   * Added drawcone() to graphics library.
+   * playsound() can now play stereo .WAV files (converts them to mono first).
+   * Added 'datapath' option to EVALDRAW.INI. Use it if you wish to store your
+        data in a different directory from your KC script, without having to
+        write the full path names in your code. You can also use mountzip() to
+        treat a foreign directory like the current directory.
+   * Loading a KC file now resets view, font, color, and position.
+   * Organized sample programs with sub-directories.
+   * New KC files: setview.kc, conetest.kc
+
+04/02/2007:
+   * New 3-parameter form of setpix(x,y,z) for writing pixel AND Z-buffer.
+   * clz() now clears using the correct Z value. This is useful for tricks.
+   * Now defaults to directory of .KC loaded at command line or "open with".
+   * Made timeoutonkey=1 the default. It's stable, just with some flicker.
+   * Paste now handles multiple carriage returns properly.
+   * Expressions such as "2^(+3)" are now translated properly.
+   * Save as dialog now updates window title with selected filename.
+   * Improved external MIDI support. See new options in EVALDRAW.INI.
+   * New KC files: drawrubix.kc, sawmow3.kc, sawmow4.kc
+
+03/06/2007:
+   * Updated playsound and added playsoundupdate. New features are:
+       Volume, pitch, looping (set repeat with SETLOOP.EXE), and 3D control.
+   * WAV files can now be loaded out of a zip file using mountzip().
+   * Fixed some bugs with string handling.
+   * Static initializers now supported. Example: static a=4, b[4] = {2,3,5,7};
+   * Can now pass and receive multidimensional arrays to sub-funcs. Example:
+        .. static a[3][2]; myfunc(a); } myfunc(a[3][2]) { printnum(a[2][1]); }
+   * "()" at the start of the program is now optional. 0D mode is the default.
+   * Added bells & whistles to dsnake3d.kc :)
+
+02/17/2007:
+   * Replaced TerminateThread with much better and safer solution:
+       Self-modifying code to force code past possible freeze conditions.
+   * Data files now use filename path relative to the .KC file.
+   * (x,y,z,&r,&g,&b) mode now finishes if screen size changed during render.
+   * Curly braces now allowed without requiring a preceding statement.
+   * Thread protection added to sound rendering (piano or play on modify)
+   * Now show compile date in title of help dialog (F1).
+   * Added option to EVALDRAW.INI giving higher priority to text editor:
+       Set this manually: timeoutonkey=1
+     Using this makes the keyboard more responsive, however it can cause
+     flicker. Due to this, I have not enabled by default, although it should
+     be safe to use otherwise.
+   * Menus can be controlled with mouse (once activated by keyboard)
+   * GL functions now take advantage of multithread.
+   * Added hotkey to toggle transparent background for text editor: F11
+   * Added nearest/bilinear option to menu ("PIC") for GL rendering functions.
+   * Added glsettex(arrayname,xsiz,ysiz).
+   * Added getpicsiz(&x,&y) and getpicsiz("a.png",&x,&y).
+   * Added new drawkv6() form with full control of transform/rotation/shear.
+   * noise3d(,,) now supports lower dimensions: noise(), noise(,), noise(,,)
+   * Voxel mode (x,y,z,&r,&g,&b) now supports saving to .STL polygon format.
+   * New EVALDRAW scripts:
+      * bubbles.kc: A funny game based on an idea by Tom Dobrowolski
+      * sorttest.kc: Comparison of 3 sorting algorithms (including quicksort)
+      * genglobe.kc: Generates voxel object using Mercator projection.
+      * polytrap.kc: Quick & dirty polygon triangulator. Draw polygons using
+           space bar/backspace. Finish loop with Enter.
+      * genbrick.kc: I tried making a brick wall.. came out quite cartoonish.
+      * gengerber.kc: I used this to make a printed circuit board - a coil.
+      * circtris.kc: A nice balanced way to triangulate a dome.
+      * sampfilt.kc: Shows how a simple samplerate-changing filter might work.
+      * sawmow2.kc: A cool instrument using sawtooth-like waves.
+
+11/15/2006:
+   * Array indices now round down (for positive indices). WARNING: this may
+      require some changes to your programs. Sorry, this is for the best.
+   * Added 'alwaysactive' option to EVALDRAW.INI.
+   * Fixed typos in dialog boxes and other harmless things.
+   * EVALDRAW.EXE now has its own built-in icon (thanks to Jason Doucette).
+   * New EVALDRAW scripts:
+      * caciobro.kc: An interesting 2D platform game engine.
+      * edroad.kc: Road editor - useful for making "Mario Kart" style games.
+
+10/05/2006:
+   * Did hack for non-English keyboards: ALTGR no longer activates the menu.
+   * Added getpix(x,y,&r,&g,&b) to library.
+
+10/04/2006:
+   * Fixed crash bug when writing invalid code between functions.
+   * Added readmouse(&x,&y,&z) to library.
+
+09/27/2006:
+   * Added support for multi-dimensional arrays, such as "static buf[3][5];".
+       Function parameters do not yet support multidimensional arrays. Also, I
+       plan to change the rounding mode of the least significant dimension to
+       make things consistent.
+   * Fixed freeze problem with playtext() on 1st run of EVALDRAW since reboot.
+   * Added setcam() with 12 parameters, giving full control of orientation.
+   * New EVALDRAW scripts:
+      * 2dperspective.kc: Shows how to set up camera for Gauntlet-style game.
+      * meatball.kc: A simple voxel object using the noise3d() function.
+      * dsnake3d.kc: A 3D snake game on a cube (inspired by Dennis Radon).
+      * fastpong.kc: A fast-paced pong game for those with good reflexes.
+
+08/26/2006:
+   * 3D modes now use freeze protection/time slices for lighting calculation.
+   * Optimized rendering & light calculation for 3D modes.
+        256^3 resolution is now practical : )
+   * Capture to KV6 is now freeze protected - it saves from the voxel cache.
+   * New EVALDRAW script: getnorm2d.kc
+
+08/12/2006:
+   * playtext() now supports printf style parameters; also, to continue
+        speaking (no cut-off) put a comma as first character in the string.
+   * Fixed crash related to speech-to-text uninit (playtext).
+   * New EVALDRAW script: beer.kc
+
+08/08/2006:
+   * Added freeze protection to all modes. Freeze protection prevents infinite
+        loops in the script code from locking up EVALDRAW. The 2D modes are
+        completely done. Here are the cases that are not yet implemented:
+           * 1D modes, during sound rendering (piano or play on modify)
+           * 1D modes, when writing a WAV file (F6)
+           * 3D modes, when writing a KV6 file (F6)  (<- fixed 08/26/2006)
+           * 3D modes, when lighting is enabled (F8) (<- fixed 08/26/2006)
+   * Added "timeoutms" to EVALDRAW.INI for controlling rendering time slice.
+        Decreasing this value makes editing more responsive. Increasing it
+        reduces the chances of tearing or flickering.
+   * New EVALDRAW script: machinima3.kc :)
+
+08/07/2006:
+   * Set stack size of threads to 1MB. Strangely, Windows was only giving 4K!?
+   * Function parameters can now be blank - they are supplied with value of 0.
+   * Drawkv6() is now affected by color from setcol().
+   * KC scripts can now be sent to EVALDRAW using a named pipe (the benefit
+        being no disk access). Named pipes must begin with "\\.\pipe\". For
+        example: "evaldraw \\.\pipe\txt2evaldraw" This feature is mainly
+        intended for use with MoonEdit, allowing pure memory compiling.
+   * Added readmouse(&x,&y) for exclusive mouse reading (hide code window for
+        automatic activation)
+   * Added mountzip("a.zip"). Supports drawkv6(),playsong(),glsettex(),
+        loading of KC files,pic(),fil(),snd(), but not playsound() yet.
+   * Optimized drawkv6() significantly; "()" mode now runs faster in general.
+   * Added new command line option (/runonly) which disables the menu system.
+        Use ESC to quit. This allows scripts to be distributed in a nicer way.
+
+   * New EVALDRAW scripts:
+      * speech.kc: Example speech effects. Try enabling the 2nd&3rd sections!
+      * cubes5.kc: The beginnings of a new game sample?
+      * machinima2.kc: Another silly story by Tom and Ken :)
+
+   * maze3d.kc has updated speech and treemake.kc is much improved.
+
+07/28/2006:
+   * Text buffer input is no longer processed when show code (F2) is off. This
+     allows the use keystat() for all keys (except F1-F12) without worry over
+     modifying the code or the cursor moving around.
+
+   * For safety, only Ctrl+'=' evaluates a highlighted expression.
+
+   * The following lines now compile without error:
+        z = printf("(");
+        printf("%g,%g",i,a[i]);
+
+   * Fixed bad read when return is auto-inserted at end.
+
+   * klock(0) function now resets to 0 at every compile.
+
+   * New EVALDRAW scripts:
+      * machinima.kc: Made using MoonEdit, by Tom Dobrowolski & myself.
+      * polyproto.kc: A quick utility intended to automate the process of
+           picking coordinates for gltexcoord() & glvertex(). To save, use F6.
+
+07/24/2006:
+   * EVALDRAW can now be integrated with MoonEdit! (http://moonedit.com)
+     (MoonEdit is a collaborative text editor which allows remote users to
+     program collaboratively in the same text buffer) To integrate the 2
+     programs, simply copy EVALDRAW.EXE into your MoonEdit directory (or make
+     sure it's accessible from your path), and then add the following line to
+     your ME.CFG file:
+
+        bind f5 format savetxt "\F"; format shell evaldraw /qesc "\F"
+
+     To run the EVALDRAW script, press F5. When run from inside MoonEdit, you
+     can quit EVALDRAW simply by pressing ESC.
+
+   * Fixed "msvcr70.dll not found" errors. (re-compiled with static library).
+
+   * Speech buffer now flushes at each playtext call.
+
+   * Updated breakout.kc and maze3d.kc.
+
+07/23/2006:
+   * New EVAL library features:
+      * Support for sub-functions! Recursion now possible (but dangerous)
+      * User functions now support pointer and string arguments.
+      * RND now uses 31 bits internally (makes generating random color easier)
+      * Fixed some memory leaks.
+      * Fixed bug with: (expression != 0).
+      * Fixed bugs with return; no longer need return (fixed more cases)
+      * Better compatibility with Linux/Mac (the EVAL library, not EVALDRAW)
+
+   * New EVALDRAW library functions:
+
+       Easier file support:
+          snd("a.wav",x);
+          pic(x,y,&r,&g,&b);
+          pic("a.png",x,y);
+          pic("a.png",x,y,&r,&g,&b);
+          fil("a.txt",i);
+
+       OpenGL-like rendering:
+          setcam(x,y,z,hang,vang);
+          glsettex("a.png");
+          glBegin(GL_*);
+          glTexCoord(u,v);
+          glVertex(x,y,z);
+          glEnd(0);
+          glCullFace(GL_*);
+
+       High-level sound support:
+          playsound("a.wav");
+          playsong("a.mid");
+          playtext("hi");
+
+       Misc.:
+          srand(0);
+          setfont(9,16);
+          printf("hi %.2f",x);
+          drawkv6("spring.kv6",scale,x,y,z,hang,vang);
+
+   * EVALDRAW library changes:
+       drawsph() now uses accurate z-buffer & 3D shading.
+       "a.wav"(x) removed. Use snd("a.wav",x) instead.
+       "a.png"(x,y) removed. Use pic("a.png",x,y) instead.
+
+   * New EVALDRAW sample scripts:
+       lens.kc: simulation of light passing through various convex lens shapes
+       flashpic.kc: sample script showing how to use: pic(x,y,&r,&g,&b)
+       poolballs2.kc: poolballs in 3D using drawsph() for 3D shading
+       treemake.kc: demo of recursion
+       subfunc.kc: my test program for sub-functions :)
+       dumpfile.kc: a silly use of the new fil() function
+       glcube.kc: an early test program for the new OpenGL-like functions
+       glwavy.kc: waving carpets
+       glearth.kc: an OpenGL-style texture-mapped sphere
+       gllab3d.kc: same as lab3d.kc, but using the new OpenGL functions
+       breakout.kc: a silly game mainly showing off the new speech function
+       maze3d.kc: a 3D texture-mapped game! (rpg.kv6 made by Mike Derrah)
+
+05/21/2006:
+   * Implemented selectable pixel resolution for faster rendering in 2D modes.
+   * Optimized rendering speed of voxels.
+   * Fixed freeze bug when using more than 2 CPUs.
+   * Fixed crash in script thread when trying to access variables as arrays.
+   * Added a few timeout conditions to prevent bad scripts from freezing.
+        "()" mode is still the only one fully protected from freezes.
+
+   * Added support for multiple windows (try File..New, File..Close)
+   * Added Search..Find, Search..Change. F3 now used for find next.
+   * Added Ctrl+Enter & Ctrl+'=' to evaluate highlighted expressions
+       (useful as a built-in calculator).
+   * Added Tab & Shift+Tab for multi-line indenting.
+
+   * New EVALDRAW library functions:
+       moveto(x,y,z)          move cursor to x,y,z
+       lineto(x,y,z)          draw line from cursor to x,y,z (uses Z-buffer)
+       noise3d(x,y,z)         a procedural noise function by Tom Dobrowolski
+       setgrid(x0,y0,x1,y1)   set your own grid scale&offset in 1D & 2D modes
+       numframes              number of frames drawn since last script compile
+
+   * New KC files:
+      driftbox.kc: optical illusion: remove the grid and stare at the face :)
+      echomap2.kc: a animation showing sound echoes using the image method
+      gravsim.kc: all particles affect each other (perhaps Saturn's rings?)
+      grouray2.kc: converted from QB, shows a piece of Voxlap's 6dof algo
+      lathetool.kc: drag your mouse from the bottom, up, and back down
+      linefit2.kc: uses eigenvalues/eigenvectors to perform 3D line fitting
+      magfield.kc: a cool animation of a magnetic field (although inaccurate)
+      orthofit2.kc: uses a simple iterative method to orthonormalize a matrix
+      poolballs.kc: iterative collision physics for circles
+      rope.kc: updated with some optimizations to reduce # of trig operations
+      rotwheels.kc: a demo I made to show the Z-buffer mixing 3D lines&spheres
+      vecprodtut.kc: a visual demostration of dot and cross products
+
+08/01/2005:
+   * Fixed default directories & filenames in load/save dialogs.
+
+06/26/2005:
+   * Added option to compile on request (Ctrl+Enter) instead of every change.
+   * Fixed cancel button in save prompt while quitting.
+   * Fixed handling of current filename.
+
+06/22/2005:
+   * Typing/pasting in the text window now replaces selected text.
+   * When running in a window (default), the mouse pointer speed now matches
+        the speed & precision settings in the Windows XP control panel.
+   * Mouse position now visible in all modes. 0D & 3D modes now show a cross.
+   * Closing the window by clicking on the 'x' now brings up a save prompt
+        (when changes are made).
+
+06/12/2005:
+   * EVAL compiler changes:
+      * now supports user-defined static arrays (very useful!)
+      * now supports hex constants and ASCII characters in quotes ('a')
+      * added function overloading (ex: cls(c) & cls(r,g,b) coexist happily)
+
+   * Wrote assembler loops to speed up all modes: (), (x), (x,y), etc...
+
+   * Added ASIO support! ASIO offers very low latency playback (2ms on my
+        SB Audigy 2ZS) - perfect for piano mode. For comparison, DirectSound
+        has a latency of 20ms - which is good enough for games, but not for
+        musicians. WARNING: ASIO is not as stable as DirectSound. I've done
+        my best to eliminate crashes, but if one should happen, you can expect
+        one or more of the following to occur:
+        1. Stuck notes which can't be reset until you reboot.
+        2. BSOD at shutdown (parity error). Seems harmless, but annoying.
+
+   * Now supports up to 64 threads (to take advantage of multi-CPU systems).
+        You can edit EVALDRAW.INI to pick how many threads to use.
+
+   * Fixed rounding of texel coordinates when using pic(u,v) or "userpic"(...
+
+   * Implemented bounds check for arrays. If the array is a power of 2 in
+        size, the index wraps around. If the array is not a power of 2, and
+        the index is out of bounds, I set the index to 0 before the operation.
+
+   * Now saves settings in EVALDRAW.INI.
+
+   * Added "playonmodify". When you enable this mode, you no longer need to
+        switch to piano mode to listen to your sound. It plays the sound
+        automatically on every modification to the code.
+
+   * Added mouse highlighting to the editor.
+
+   * New EVALDRAW library functions:
+      keystat(k)    Low-level keyboard support
+      cls(c)        Single parameter version of cls(r,g,b)
+      setcol(c)     Single parameter version of setcol(r,g,b)
+      printchar(v)  Display ASCII character at current position and color.
+
+   * New KC files:
+      roids.kc: shows how to use static arrays
+      lab3d.kc: optimized & added arrow key support
+      metaball.kc
+      meteor.kc: another demo of user static arrays
+      rotozoom4.kc: re-coded to use static arrays instead of glob[]
+      waves2.kc: looks nicer than waves.kc
+
+11/10/2004:
+   * Fixed bug with voxel modes (x,y,z,..) which was making Pentium MMX crash.
+   * Added clz() and drawsph(,,,) for use with "()" mode. Try GOLDBALL2.KC.
+   * Arrays can now use indices with complex expressions, not just constants.
+   * Enum values are no longer limited to use in array indices.
+   * Fixed crash when entering piano mode on systems with no MIDI input device
+   * Fixed a few memory leaks in compiler
+   * New sample files made be me: BARREL.KC, DOOR.KC, PACMAN.KC, MANDEL.KC
+
+07/29/2004:
+   * Added support for "mysnd.wav"(x) and "mypic.png"(x,y) (see DOUBCUBE.KC
+        for an example on how to use this)
+   * Voxel lighting - models look much better with it enabled!
+   * Runs KC code in separate thread. This means endless loops won't freeze
+        the system anymore! In fact, you won't need to restart anything, click
+        on the close button, or send any reports to Microsoft :) Now you just
+        get a harmless black screen. (NOTE: this is only for 0D mode: "()").
+   * Draggable windows, menus, fonts - yes, it's a first for me! This is a
+        sign that I want people other than myself to use this program :)
+   * A new 0D mode (which is called once per frame) which is much less limited
+        than the graphing modes. Use this for general purpose programming. The
+        graphing modes are merely a convenience.
+   * Library functions and variables which allow you to do useful stuff.
+   * A whole lot of new .KC files :)
+
+   * ..&r,&g,&b) modes now range from [0 to 256) instead of [0 to 1).
+   * Fixed bug with windows clipboard (again)
+
+   Compiler changes:
+   * Fixed several optimization-related bugs
+   * Support for external functions
+   * Support for external arrays (indices must be constant though)
+   * Implemented "enum" to allow naming of array indeces.
+   * Implemented "break" and "continue"
+   * x86 disassembler
+
+03/06/2004:
+   * Optimized voxel rendering significantly for "(x,y,z,&r,&g,&b)" mode.
+   * I forgot I was using SSE instructions (supported only on Pentium III and
+      above). There really was no reason for it, so I replaced that code with
+      other instructions. EVALDRAW should now work on anything with MMX.
+
+03/01/2004:
+   * First public release
+
+------------------------------------------------------------------------------
+Command line options:
+
+   >evaldraw [.KC file] [/XDIMxYDIM] [options...]
+
+Available options and examples:
+   /640x480               Select resolution
+   /win                   Run in a window
+   /full                  Run fullscreen
+   /refreshz:120          Select refresh rate for fullscreen mode.
+   /show:3                Initial window state (example: 3 is SW_MAXIMIZED)
+   /qme                   Allows ESC to quit (for MoonEdit integration)
+   /runonly               Disables the menu system and allows ESC to quit
+   /host                  Host 2 user server, waiting for join
+   /host:3                Host 3 user server, waiting for joins
+   /host:2:32123          Host 2 user server on TCP port 32123
+   /join                  Join server on localhost (local machine)
+   /join:localhost:32123  Join named server using TCP port 32123
+   /simlag                Simulate lag on network connect (for local testing)
+   /simlag:250            Simulate lag; specify lag in milliseconds
+   /clip                  Load script from windows clipboard
+   /extract               Extract embedded files from standalone EXE
+   /defpic=caco.png       Specify default picture for pic() functions
+   /defwav=moo.flac       Specify default sound for wav() functions
+   /kcsavnam=bozo.kc      Specify default filename for kc script
+   /wndpos=300,200        Specify top-left corner of initial window
+
+Example: >evaldraw sphere.kc /800x600 /full
+
+------------------------------------------------------------------------------
+EVALDRAW Controls:
+   ESC/ALT  Toggle menus
+   F1       Display help
+   F2       View code window (on/off)
+   F3       Find next. Ctrl+F3 or Shift+F3:Find Previous
+   F4       View grid (on/off)
+   F5       Cycle MultiThread number (1 .. # cores detected)
+   F6       Capture sound to WAV. Uses last note played at the piano (Default
+               is Middle C) and current sample rate (can be changed by
+               editing EVALDRAW.INI).
+            Capture voxel object to KV6 (Voxlap format: 32bit color/any size)
+            Capture printf output of next frame to file. () mode only.
+   F7       Inc./Dec.(Shift+F7) pixel size (2D) or voxel resolution (3D)
+   F8       Toggle voxel lighting (default: on)
+   F9       Select # coefficients for WAV interpolation (4,2,1) if in 1D mode
+            Select filter quality for GL functions (glVertex,etc..)
+   F10      Select font: {4x6,6x8,6x10,7x12,8x12,8x13,8x14,8x15,9x16,12x16}
+               (Shift+F10 to decrement font index)
+   F11      Toggle transparent background
+   F12      Screen capture (EVAL####.PNG)
+
+   Ctrl+N   New program (clear text)
+   Ctrl+L   Load .KC (Ken-C script)
+   Ctrl+S   Save .KC (Ken-C script)
+   Ctrl+P   Load .PNG/.JPG/.TGA/.GIF/.BMP/.PCX for pic(,) or pic(,,&,&,&)
+   Ctrl+=   Evaluate highlighted expression, keeping highlighted text
+   Ctrl+Enter              Restart script
+   Ctrl+Alt+Shift+KPEnter  Restart process (use only when script misbehaves)
+
+   KPEnter  Toggle piano mode (1D modes only). Supports external MIDI keyboard
+   KP+/-    Change octave (for piano mode)
+   L/R.Ctrl Change octave while held (for piano mode)
+
+   NOTE: Search the menus for more shortcuts.
+------------------------------------------------------------------------------
+Currently supported operators, functions, and statements in EVAL:
+(Note: for RScript, please see Rscript.chm.)
+
+   Parenthesis: (), Arrays: [], Blocks: {}, Const strings: "", Literal '"': \"
+          Assignment: = *= /= %= += -= ++ -- (only 1 allowed per statement)
+   1-Param Operators: + - . 0 1 2 3 4 5 6 7 8 9 E PI NRND RND (variable names)
+   2-Param Operators: ^ * / % + - < <= > >= == != && ||
+   1-Param Functions: ABS ACOS ASIN ATAN ATN CEIL COS EXP FABS FACT FLOOR INT
+                      LOG SGN SIN SQRT TAN UNIT
+   2-Param Functions: ATAN2 FADD FMOD LOG MIN MAX POW
+          Statements: IF(expr){codetrue}
+                      IF(expr){codetrue}ELSE{codefalse}
+                      DO{code}WHILE(expr);
+                      WHILE(expr){code}
+                      FOR(precode;expr;postcode){code}
+                      GOTO label;
+                      RETURN expr;
+                      BREAK;
+                      CONTINUE;
+                      ENUM{name(=expr),name(=expr),...};
+                      STATIC name[expr]["...],name["],...;
+                      label:
+            Comments: // text (CR), /* text */
+
+EVAL syntax is similar to C syntax, with the following differences:
+
+Variables & arrays:
+ * Function and variable names are case insensitive
+ * Type declarations are not allowed in the function body. All variables are
+      assumed to be 'double'
+ * Strings cannot be in a variable yet. Only the direct form "" is supported
+ * EVAL uses bounds checking for arrays (to protect EVALDRAW from crashing).
+     The algorithm used depends on overall array size:
+     Power of 2: index is masked using bitwise 'and' causing wrap-around
+           Else: out of bounds indices are changed to 0 before the read/write
+
+Built-in functions:
+ * PI is a built-in constant: 3.14159265358979323...
+ * RND is a parameterless function returning a uniform random number [0..1)
+ * NRND is a parameterless function returning a normal random number
+      (mean = 0, standard deviation = 1)
+ * '^' is a power operator (not an exclusive or). You can also use POW(,)
+ * ATN is an alias for ATAN
+ * MIN&MAX are usually defined in C headers; here they are library functions
+ * LOG supports both 1 and 2 parameter forms. The 2nd parameter is the base
+ * INT rounds towards 0. Use FLOOR&CEIL to round towards -/+inf
+ * SGN returns -1 for negative numbers, 1 for positive numbers, 0 for 0
+ * UNIT returns 0 for negative numbers, 1 for positive numbers, .5 for 0
+ * FACT doesn't exist in C. It calculates factorials using the gamma function
+ * ABS does not quantize input/ouput to integer. For C portability, use FABS.
+
+Misc.:
+ * Switch statements are not yet supported
+
+Function style:
+ * The main function must be at the top of the code and have no name
+ * The last expression is the return value and doesn't need a ;
+ * Return values are optional. If omitted, the function returns 0.0
+ * For a 1-function script, the {} around the function body is optional. For a
+      multi-function script, you must use {} around every function body.
+ * Function parameters can be of type: double, double *, or char *.
+
+   Function parameter syntax:
+      kasm87 syntax: C/C++ syntax:               Description:
+         a           double a                    pass-by-value variable
+         &a          double &a                   pointer to double
+         $a          char *a                     pointer to string
+         a[4]        double a[4]                 pointer to array of doubles
+         a()         double (*a)(double)         function pointer, 1 param
+         a(,)        double (*a)(double,double)  function pointer, 2 params..
+         a(,,)       double (*a)(double,double,double)
+         a(&,)       double (*a)(double*,double)
+         a($,)       double (*a)(char*)
+         a($,.)      double (*a)(char*,...)
+         a(,&,$)     double (*a)(double,double*,char*)
+         a(,&,[8])   double (*a)(double,double*,double*)
+
+   Inside function pointers:
+      kasm87 syntax: C/C++ syntax: Description:
+         (blank)     double        Standard pass-by-value double variable
+         &           double *      Variable pointer; can't be used as array
+         [#]         double *      Array pointer. Number is bounds protection.
+         $           char *        String pointer
+         .           ...           For printf:no type checking. Must be last.
+
+------------------------------------------------------------------------------
+Graphing/programming modes available in EVALDRAW:
+
+0D modes:
+   ()                  Called once per frame. Use this mode for general
+                       purpose programs. Multithread optimization is not
+                       available in this mode. The "()" is optional if the
+                       entire program is stored in a single function.
+
+1D modes:
+   (x)                 Use for simple 1D graphing. 'x' is the x coordinate.
+                          Can be used for instruments that don't need an
+                          amplitude envelope.
+   (x,t)               Use for animating 1D graphs. t is time in seconds.
+
+   (x,t,te)            Use for simple instruments with amplitude envelope.
+                          x: sample counter (default:middle C at 44100hz)
+                          t: time in seconds since note on
+                          te: time in seconds since note off. This value is
+                             set to +1e32 initially while the note is still
+                             playing.
+
+   (a[16])             The recommended mode for creating your own instruments.
+                          Here, 'a' can be thought of as a structure - even
+                          though it's passed to the code like a 16-element
+                          array. In my example code, I use an "enum" to give
+                          useful names to each field of the structure. You
+                          can start with my example from the Help menu.
+
+                          You have much more control in this mode. The
+                          function is still called for every sample, but
+                          unlike (x,t,te) mode, you are responsible for
+                          incrementing the sample and time counters yourself.
+
+                       a[0]: Init:0.0. Sample counter
+                       a[1]: Init:2^((midifrq-57)/12)*220*PI*2/samprate.
+                                This is the sample counter increment per
+                                sample. To generate the default frequency,
+                                put "a[0] += a[1];" in your script.
+                       a[2]: Init:0.0 Time since note on in seconds.
+                       a[3]: Init:1/samprate  To generate proper time in
+                                seconds, put "a[2] += a[3]" in your script.
+                       a[4]: Init:1e32. Time since note off (same as 'te')
+                                This is the only variable which is written
+                                after the first function call. Read this to
+                                detect when the key is released.
+                       a[5]: Init:exp(midivol*.03)*512
+                                This is my favorite equation for converting
+                                MIDI volume to amplitude/volume scale factor.
+                       a[6]: Init:MIDI note # (21-108, 60=middle C)
+                                A nice use for this is split keyboard
+                                (different instrument for each hand).
+                       a[7]: Init:MIDI volume # (1-127)  Use this if you don't
+                                like my equation for a[5].
+                       a[8-15]: Init:0's. Scratch registers. Each note has a
+                                private copy of these scratch registers, so
+                                they are safe to use. Be careful when using
+                                "glob" or static arrays: Since there is only
+                                1 copy of them in memory, you won't be able
+                                to play multiple notes at the same time
+                                without side effects.
+
+2D modes:
+   (x,y)               Simple 2D graphing. Returns:
+                          Default: blue for values <= 0, red for values >= 1
+                          A smooth spectrum of colors for values between 0&1
+                          The spectrum function can be edited in EVALDRAW.INI.
+
+   (x,y,&r,&g,&b)      Same as (x,y) except you specify the color directly.
+                           r,g,b intensities range from 0 to 255.
+
+   (x,y,t)             2D graphing with animation. t is time in seconds.
+
+   (x,y,t,&r,&g,&b)    A combination of the above 2 modes.
+
+3D modes:
+   (x,y,z,&r,&g,&b)    3D graphing. The function is evaluated for a grid of
+                       points inside the unit cube (-1,-1,-1) to (1,1,1).
+                       Voxel resolution can be changed in the menus. Hold
+                       various combinations of mouse buttons to move/rotate
+                       in the 3D environment. Your code returns 2 things:
+                         * the color in r,g,b.
+                         * the return value: specifies whether the voxel is
+                           air or solid: > 0 is solid, <= 0 is air.
+
+   (x,y,z,t,&r,&g,&b)  3D graphing with animation. t is time in seconds.
+
+------------------------------------------------------------------------------
+Global variables and functions:
+
+   snd(samp)           User-selectable 1D read-only array. By default, this is
+   snd("snd.wav",samp)    a sine wave function. You can override this function
+                          by loading a WAV file. To do this, use "Select WAV"
+                          in the File menu. The sound data is loaded and
+                          cached at compile time, so there is not much
+                          overhead.
+
+                          Use the 1-parameter form to test lots of wave files
+                          quickly. Once satisfied, you may insert the filename
+                          as the first parameter to make it permanent.
+                          For example: snd("mywav.wav",x)
+
+                          Note: there is only 1 "snd()" function. You can
+                          have any number of filenames specified in quotes.
+
+   pic(x,y)            Similar to snd() but for 2D arrays (no interpolation)
+   pic(x,y,&r,&g,&b)      Supports these formats: PNG,JPG,GIF,TGA,PCX,BMP,DDS
+   pic("a.png",x,y)       See DOUBCUBE.KC for an example of this syntax.
+   pic("a.png",x,y,flags) 'flags' determines return value. Valid flags are:
+                              PIC_INT24 (default), PIC_INT32, PIC_UINT32,
+                              PIC_BLUE, PIC_GREEN, PIC_RED, PIC_ALPHA
+   pic("a.png",x,y,&r,&g,&b)  <--this variant returns alpha:{0.255}
+   getpicsiz(&x,&y);   Get image dimensions. (shorter form for Ctrl+P image).
+   getpicsiz("a.png",&x,&y);
+
+   fil(offs)           User-selectable general purpose file. Offs range is:
+                          0..fileleng-1. Special hack for Ctrl+Shift+L:
+                          fil(-1) returns 0 if new file has been selected
+                          since last fil(-1) call (or recompile), else -1,
+                          allowing files to be reloaded only when necessary.
+   fil("a.txt",offs)   Similar to snd() and pic(), but for any file. The file
+                          is loaded in binary mode and returns the byte at the
+                          specified offset. No interpolation is performed.
+   getfilsiz("a.txt")  Returns the number of bytes of the specified file.
+
+   xres / yres         Current width and height of the window in pixels. These
+                          are updated when the user resizes the window.
+
+   voxres              Current voxel resolution for (x,y,z(,t),&r,&g,&b) mode.
+
+   keystatus[256]      The status of keys, indexed by their scancode. Array
+                           values are written between frames or during
+                           refresh() when their key state changes (from
+                           pressed to released or vice versa). The instant of
+                           keypress can be detected like this:
+
+                              if (keystatus[0xc8])
+                                 { keystatus[0xc8] = 0; playtext("up"); }
+
+                           Commonly used scancodes:
+                              0xc8:Up       0xd0:Down
+                              0xcb:Left     0xcd:Right
+                              0x2a:L.Shift  0x36:R.Shift
+                              0x1d:L.Ctrl   0x9d:R.Ctrl
+                              0x38:L.Alt    0xb8:R.Alt
+                              0xc9:PageUp   0xd1:PageDn
+                              0xc7:Home     0xcf:End
+                              0x52:'0' on keypad
+
+   keystat(k)          Deprecated! Returns the status of any key. Pass the
+                          keyboard scan code (for example: 0x39 for space bar,
+                          0xc8 for up arrow, etc..) Returns 1 if down, 0 if
+                          up. Note: This function is obsolete and its use is
+                          discouraged. Use keystatus[] instead. It remains
+                          for compatibility with old scripts.
+
+   mousx / mousy       Mouse position relative to top-left corner of window.
+   dmousz              Change in scroll wheel position.
+
+   bstatus             Mouse button status: Bit 0: Left mouse button
+                                            Bit 1: Right mouse button
+                                            Bit 2: Middle mouse button
+                       Bstatus is updated between frames or during refresh().
+                       Bits are updated only when their corresponding up/down
+                       state changes. The instant of click can be detected
+                       like this:
+                          if (bstatus%2) { bstatus--; playtext("LMB hit"); }
+
+   readmouse(&x,&y);   When used, sets mouse to exclusive mode (cursor
+   readmouse(&x,&y,&z);   disappears) and reads the change in mouse
+                          coordinates since the last call to readmouse.
+                          Exclusive mode only takes effect when the code
+                          window is hidden. Use F2 to quickly toggle the code
+                          window. To disable exclusive mode in KC code, call
+                          readmouse with the pointers to x and y set to the
+                          same address. Z (in the 2nd prototype) is for the
+                          scroll wheel.
+   readtouch(&id,&x,&y) Read multi-touch points. Start id as -1, then continue
+                       reading until id is set to -1. Return value is id.
+
+   glob[32]            Deprecated! 32 global scratch variables. These can be
+                          used as general-purpose storage. Note: glob is
+                          obsolete now that EVAL supports user static arrays.
+                          Putting "static glob[32]" at the top of the program
+                          is equivalent.
+
+   using6dof           1 if using a 6 degree of freedom input device, else 0.
+   usingstereo         0 if not using stereo mode, 1 if using red-cyan
+                          glasses, 2 if using white line code (feature is
+                          disabled - sorry), 3 if using NVidia 3DVision
+                          (feature is disabled - sorry)
+
+   frameinit           All graphing functions are now called once initially
+                          with this variable set to 1. Here, you can init
+                          static variables that don't change per frame, such
+                          as general precalculations, or things that depend
+                          only on the time variable. This saves having to
+                          repeat calculations per pixel or voxel. Frameinit
+                          is then set to 0 for the regular multithreaded
+                          rendering. You can safely read static variables here
+                          but should not write them during this stage. If you
+                          need to use small arrays, you can use the 'auto'
+                          keyword. For example, to eliminate calling trig
+                          functions per pixel, you can do:
+
+                       (x,y,t)
+                       if (frameinit) { static c, s; c = cos(t); s = sin(t); }
+                       ..use c, s here..
+
+
+   stl_scalefac        When generating STL files for 3D printing, this scale
+                          factor is applied to the x/y/z coordinates. A good
+                          place to write it is inside a frameinit case, ex:
+                       if (frameinit) { stl_scalefac = 25.4; }
+
+   klock() or klock(0) Returns time in seconds since last script compile.
+   klock(+1 to +9)     Returns local time.
+   klock(-1 to -9)     Same as above (when negated), except returns UTC time.
+                       Description of options:
+                          1:Full date&time, formatted as: YYYYMMDDHHMMSS.sss
+                          2:Year{1601-32767}, 3:Month{1-12}, 4:dayofweek{0-6},
+                          5:Day{1-31}, 6:Hour{0-23}, 7:Min{0-59}, 8:Sec{0-59},
+                          9:millisec{0-999}
+                       If synchronization of fields is important, use klock(1)
+                       or klock(-1) and extract the components yourself. Ex:
+                          t=klock(1); min=int(t/1e4)%100; sec=int(t/1e2)%100;
+
+   srand(seed);        Sets the random seed for RND and NRND.
+
+   cls(c); /           Clear screen to specified color. The single parameter
+   cls(r,g,b);            version can accept colors as hex codes. For example,
+                          this clears the screen to red: cls(0xff0000);
+   setcol(c); /
+   setcol(r,g,b);      Set current drawing color. For certain 3D functions,
+                          this color is used as a scale factor. You can
+                          specify a brightening of colors by using the 3
+                          parameter form which can accept numbers from
+                          0 to 511, 256 being no change.
+
+   rgb(r,g,b);         Convert 3 value color to single value 24-bit color
+                          (0 to 2^24-1). Clips values to {0-255}.
+   rgba(r,g,b,a);      Convert RGB&alpha to signed 32-bit int; clips {0-255}.
+   getrgb(col,&r,&g,&b) Convert 24-bit color to r,g,b values {0-255} and
+                           returns alpha. Col must be signed 32-bit for alpha.
+
+   moveto(x,y);        Set current position for lineto() or print*().
+   moveto(x,y,z);      3D version.
+
+   lineto(x,y);        Draw line from current position and set new position.
+   lineto(x,y,z);      3D version. Uses Z-buffer, current color, and camera.
+                          (see clz,setcol,setcam)
+
+   setpix(x,y);        Plot single pixel.
+   setpix(x,y,z);      Plot single pixel, also writing its Z-buffer value.
+   getpix(x,y,&r,&g,&b); Read color at pixel. Return Z-depth at pixel.
+   gethlin(x0,y,buf,dx); Read horizontal line of pixels (for many getpix).
+   sethlin(x0,y,buf,dx); Write horizontal line of pixels (for many setpix).
+                             (x0,y): left-most pixel of line.
+                             buf: 1D buffer of RGB colors, range: 0-16777215
+                             dx: length of line; number of pixels to write
+                         This version uses SETHLIN_OPAQUE (see below).
+   sethlin(x0,y,buf,dx,flags);
+   sethlin(x0,y,buf,dx,flags,alpha);
+                       Valid flags (not combinable):
+                          SETHLIN_OPAQUE: Write all pixels; ignore bits 24..31
+                                          Alpha parameter supported.
+                          SETHLIN_MASK:   Write pixel if alpha != 0, i.e.:
+                                          if (buf[i] < 0) || (buf[i] >= 2^24)
+                                          Alpha parameter supported.
+                          SETHLIN_BLEND:  Write pixels based on buf[i]'s
+                                          alpha byte: signed int32 bits 24..31
+                                          Alpha parameter not supported.
+                          SETHLIN_ADD:    Add RGB to screen - for splatting
+                                          transparency; basically a 'paddusb'.
+                                          Alpha parameter not supported.
+                       alpha: range:0.0 (transparent) .. 1.0 (opaque)
+
+   bufset(dst,val,n);  Optimized version of: for(i=0;i<n;i++) dst[i] = val;
+   bufcpy(dst,src,n);  Optimized version of: memmove(dst,src,n*8);
+
+
+   setfont(x,y);       Select built-in bitmap font. Example: setfont(9,16);
+   setfont(x,y,dofill); Select size for bezier font. Set dofill to 1 for
+                          solid filled, 0 for outline only.
+
+   printnum(v);        Display number in floating point at current position,
+                          font, and color. (see moveto,setfont,setcol).
+
+   printchar(v);       Like printnum, but displays ASCII character.
+   fputc(v);           Similar to printchar(), except character goes only to
+                          file when "capture (next frame's output) to file
+                          (F6)" is activated. Note that there is no file
+                          handle parameter in EVALDRAW due to the fact that
+                          only 1 file can be saved at a time.
+
+   printf(fmt,..);     Similar to printf in the C library, with restrictions
+                          for safety. Supported types: %e, %E, %f, %g, %G
+                          Support escape sequences: \% \\ \b \h \r \n \t
+                          \h represents a half space - useful for centering,
+                          and is unique feature of EVALDRAW (not part of C).
+   fprintf(fmt,..);    Similar to printf but output also goes to file when
+                          "capture (next frame's output) to file (F6)" is
+                          activated. Note that there is no file handle
+                          parameter in EVALDRAW due to the fact that only 1
+                          file can be saved at a time.
+
+   clz(d);             Clear software Z-buffer to specified value. I usually
+                          use a very high number such as 1e32. Put this at the
+                          top of your script when using any of the built-in 3D
+                          functions.
+
+   setcam(x,y,z,hang,vang); Set camera position&orientation for 3D rendering
+                       routines. hang: horizontal angle in radians
+                                 vang: vertical angle in radians
+   setcam(x,y,z,rx,ry,rz,dx,dy,dz,fx,fy,fz); Set camera position&orientation,
+                          specifying orientation with 3x3 rotation matrix:
+                             rx,ry,rz:   right vector
+                             dx,dy,dz:    down vector
+                             fx,fy,fz: forward vector
+
+   setview(x0,y0,x1,y1); Set viewport for graphics functions.
+   setview(x0,y0,x1,y1,hx,hy,hz); Also specify offset (hx,hy) and fov/zoom (hz)
+                       The 3D functions use this formula for projection:
+                          screen_x = x/z*hz + hx;
+                          screen_y = y/z*hz + hy;
+                       These defaults are written when using the short form:
+                          hx = xres/2;
+                          hy = yres/2;
+                          hz = hx;  //<-90 degree (horiz) field of view (FOV).
+
+   drawsph(x,y,rad);   Draw a 2D circle (uses screen coordinates). Use
+                          positive radius to fill; negative radius for open.
+   drawsph(x,y,z,rad); Draw a shaded sphere with 3D perspective.
+                             X: positive is right
+                             Y: positive is down
+                             Z: positive is forward
+                             R: radius
+                       Uses the Z-buffer, current color, and camera.
+                          (see clz,setcol,setcam).
+                       This example draws a sphere in front of the view:
+                          drawsph(0,0,4,1);
+
+   drawcone(x0,y0,r0,  Draw a 2D thick line. Connects endpoints in same way as
+            x1,y1,r1);    3D version of drawcone().
+   drawcone(x0,y0,z0,r0, Draw a shaded cone or cylinder. The endpoints are
+            x1,y1,z1,r1);   defined like in drawsph(). Drawcone() fills
+                            the region between them. Use a negative radius
+                            to specify a flat end.
+   drawcone(x0,y0,r0,   x1,y1,r1,   flags); Same as above, with flags param.
+   drawcone(x0,y0,z0,r0,x1,y1,z1,r1,flags); Supported flags: (combine w/ '+')
+                            DRAWCONE_NOCAP,DRAWCONE_NOCAP0,DRAWCONE_NOCAP1,
+                            DRAWCONE_FLAT,DRAWCONE_FLAT0,DRAWCONE_FLAT1,
+                            DRAWCONE_CENT,DRAWCONE_NOPHONG,DRAWCONE_NOCONE
+                            DRAWCONE_CULL_BACK,DRAWCONE_CULL_FRONT,
+                            DRAWCONE_CULL_NONE
+                       (DRAWCONE_NOCAP or DRAWCONE_FLAT select both ends.)
+
+   drawspr(x,y,rad,ang); Draw 2D sprite. Uses texture selected in glsettex().
+                       Be sure to handle the Z-buffer properly. For sprite to
+                       appear correctly, you must either call clz(1e32); for
+                       each frame, or call glDisable(GL_DEPTH_TEST) at init.
+                       To render sprites with transparency, be sure to call:
+                          glEnable(GL_ALPHA_TEST) since it is not the default.
+   drawspr(x,y,xsiz,ysiz,ang); Same as above, but with independent control of
+                       x&y aspect ratio. Note: If one of xsiz or ysiz is
+                       negative, the sprite will be invisible unless
+                       glCullFace(GL_NONE) is set.
+   drawspr("caco.kv6",x,y,z,rad,hang,vang,tilt);
+   drawspr("caco.kv6",x,y,z,rad,hang,vang);
+  (drawkv6("caco.kv6",scale,x,y,z,hang,vang); <- deprecated)
+                       Renders 3D model at specified radius and location.
+                       Angles (hang,vang,tilt) are in radians.
+                       Use SLAB6 or POLY2VOX to create or generate your own
+                       KV6 models: http://advsys.net/ken/download.htm#slab6
+   drawspr("caco.kv6",x,y,z,rx,ry,rz,dx,dy,dz,fx,fy,fz);
+  (drawkv6("caco.kv6",x,y,z,rx,ry,rz,dx,dy,dz,fx,fy,fz); <- deprecated)
+                       Render 3D model with full matrix control.
+                       x,y,z:position, r*:right, d*:down, f*:forward vectors
+
+   noise(x)            An interesting procedural texture function written by
+   noise(x,y)             Tom Dobrowolski (http://ged.ax.pl/~tomkh)
+   noise(x,y,z)        (Note: the noise3d() name is being phased out.)
+
+   setgrid(x0,y0,x1,y1); Set your own grid scale&offset in 1D & 2D modes.
+                       Default is: setgrid(-4,3,4,-3)
+                       The y's are negative because I am more familiar with
+                       screen coordinates than proper math coordinates. :P
+
+   numframes           Number of frames drawn since the last script compile.
+
+
+   glsettex("wood.png"); Set current texture by filename.     Returns handle.
+   glsettex(myhand);     Set current texture by handle index. Returns handle.
+   glsettex(mybuf,x,y);  Set current texture by static array. Returns handle.
+                       Notes for static array: x and y are the dimensions of
+                       the texture, x being the inner-most dimension. The
+                       array holds 1 texel per index, 24-bit RGB, 0 to 2^24-1.
+                       Use -1 for transparency. To enable transparency for
+                       rendering, use: glEnable(GL_ALPHA_TEST). To retrieve
+                       the currently selected texture handle without modifying
+                       it, use: hand = glsettex(-1);
+   glremovetex(myhand); Remove texture by handle index. To animate a texture,
+                       you should remove the old texture handle. Otherwise,
+                       you will quickly run out of texture handles.
+
+   glBegin(GL_QUADS);  Start OpenGL-like texture-mapped polygon drawing.
+                       Supported constants:
+                          GL_POINTS,
+                          GL_LINES,GL_LINE_LOOP,GL_LINE_STRIP,
+                          GL_TRIANGLES,GL_TRIANGLE_STRIP,GL_TRIANGLE_FAN,
+                          GL_QUADS,GL_QUAD_STRIP,
+                          GL_POLYGON
+                          GL_COMPLEX <-This flag specific to Evaldraw. Renders
+                             complex polygons. ALWAYS faster than the other
+                             modes due to no triangulation; lower overhead. :)
+
+   glTexCoord(u,v);    Specify uv texture coordinate (must precede glVertex of
+                          the same vertex)
+
+   glVertex(x,y);      Specify vertex 2D/3D coordinate for polygons.
+   glVertex(x,y,z);
+
+   glnextcontour();    For use with glBegin(GL_COMPLEX). Use between contours.
+
+   glEnd();            Optional (except when using glBegin(GL_LINE_LOOP);)
+
+   glCullFace(GL_BACK); Specify culling mode. Supported constants:
+                           GL_NONE : Both sides of polygons visible
+                           GL_FRONT: CCW polygons visible
+                           GL_BACK : CW polygons visible (default)
+
+   glEnable()/glDisable(); Supported flags:
+                             GL_ALPHA_TEST: Use glEnable(GL_ALPHA_TEST); for
+                                masked walls. Default is disabled (opaque).
+                                Threshold is locked at 50% trans. vs. opaque.
+                             GL_DEPTH_TEST: Use glDisable(GL_DEPTH_TEST); to
+                                disable Z-buffer testing (still writes Zbuf).
+                                Default is enabled (uses Zbuf fully).
+
+   playsound("a.wav");    Play WAV/VOC/FLAC. Ex: playsound("a.wav",100,1)
+   playsound("a.wav",vol);           Vol: percentage of full volume: {0-100}
+   playsound("a.wav",vol,frq);       Frq: pitch scaling (1.0 for no scaling)
+   playsound("a.wav",vol,frq,x,y,z); x,y,z: 3D position
+                          All playsound functions return a handle (hsnd) that
+                          can be used in playsoundupdate.
+
+   playsoundupdate(-1,0);       Kill all playing sounds
+   playsoundupdate(hsnd,0);     Kill specified sound (for stopping loops).
+   playsoundupdate(hsnd,vol,frq); Update volume & frequency.
+   playsoundupdate(hsnd,x,y,z); Update 3D position
+
+                       Playsound notes:
+                        * To enable looping, use negative volume.
+                        * Looping sounds must be generated using SETLOOP.EXE
+                          tool (it stores 4 extra bytes in the WAV header).
+                        * Returned handle can be ignored for simple sounds.
+                        * Setcam affects the listener position for 3D sounds.
+
+
+   playsong("a.mid",vol); Plays a .MID file with the specified volume.
+                          Volume: 1-100. To stop playback, call again with
+                          volume set to 0. For looping, set volume negative.
+                          Ex: playsong("a.mid",-75); loops song at 3/4 volume.
+                          Note: playsong() and playnote() do not work
+                             simultaneously.
+   playnote(cmd,dat1,dat2); Sends a MIDI command to the default MIDI output
+                          device. Common MIDI command examples:
+                             playnote(0xc0,80,0); //Set instrument, channel 0
+                             playnote(0x90,60,64); //Play middle C, channel 0
+                             playnote(0x99,36,64); //Play bass drum
+                             playnote(0xb0,0x7b,0); //All notes off, channel 0
+                          Note: playsong() and playnote() do not work
+                             simultaneously.
+
+   playtext("hi");     Uses Window XP's built-in speech synthesizer to speak
+   playtext("%g",PI);     text. Speech XML syntax is supported. (See SPEECH.KC
+                          for an example of controlling pitch, volume, etc..)
+                          Playtext supports printf-style syntax (see printf
+                          restrictions). To continue speech without cutting
+                          off the previous block, place a comma at the
+                          beginning of the string. For example:
+                             playtext("Hello"); playtext(",how are you?");
+
+   net_players         Number of connected users, including own machine:
+                          1 when not connected, 2+ when connected.
+   net_me              Index of current player. Range: {0 .. net_players-1}
+   net_send(to,val);   Send value(s) to another player. 'to' can either be an
+   net_send(to,buf,leng); individual user {0 .. net_players-1}, or one of the
+                          following constants:
+                             NET_ALL       <- Send to everyone, including self
+                             NET_ALLELSE   <- Send to everyone except self
+
+                       Returns the number of values actually transmitted; 0 if
+                       failed. You can assume success unless there is a
+                       serious connection or buffering problem.
+
+   net_recv(&from,&val)      Receive value from another player. Returns the #
+   net_recv(&from,buf,leng)  of values read, or 0 if nothing. 'from' is the
+                       player index of who sent the packet {0..net_players-1}.
+                       'val' or buf[0 .. leng-1] are the value(s) sent.
+
+                       Net function notes:
+                       * Supports up to 16 users (including host)
+                       * The net functions guarantee in-order error free
+                         packet delivery, in either UDP or TCP modes.
+                       * Press Ctrl+Enter to restart scripts on all connected
+                         machines.
+                       * By default, all packets are routed through the
+                         master, guaranteeing that they arrive at each machine
+                         in the same order. This is very handy when writing a
+                         synchronized net protocol.
+                       * Slave-to-slave messages or broadcasts from slaves are
+                         routed through the host machine. (EVALDRAW takes care
+                         of the dirty work of passing it through the host for
+                         you.) Keep this in mind if you care about latency.
+                       * UDP is generally more responsive than TCP, and so it
+                         is typically the better choice.
+                       * Values are double-precision floating point values.
+                         To reduce bandwidth, EVALDRAW compresses values that
+                         fit in a char, short, long, or float. Using small
+                         integer values will lower your bandwidth. For the
+                         curious, here's how it works:
+                                 if (-  16 <= val <    16) 1_byte
+                            else if (-2048 <= val <  2048) 2_bytes
+                            else if (-2^16 <= val <  2^16) 3_bytes
+                            else if (-2^24 <= val <  2^24) 4_bytes
+                            else if (-2^31 <= val <  2^31) 5_bytes
+                            else if (float w/o truncation) 5_bytes
+                            else                           9_bytes
+                       * If you wish to send data on every frame, it is a good
+                         idea to lock your frame rate. For example:
+                            while (klock()<numframes/60); //Limit to 60 fps
+                               or for a cooler CPU (but less smooth):
+                            Sleep((numframes/60-klock())*1000);
+                       * You can send packets to yourself. Sometimes, this
+                         enables simpler code. When sending to yourself, it is
+                         possible to override the routing of packets through
+                         the master, and instead putting the packet
+                         immediately on your receive buffer. To enable this,
+                         add the constant, NET_NOSYNC, to net_send()'s 'to'
+                         parameter. Note that using this flag breaks the
+                         guarantee of packets being in the same order on all
+                         machines.
+                       * The net_recv() function is NOT a blocking function.
+                         Your code should assume that it can return 0.
+                       * It is better to use the 3-parameter net_send() if you
+                         must send multiple values at the same time.
+                       * The 3-parameter net_recv() supports a maximum of 512
+                         values. Higher values of 'leng' will be clipped.
+                       * For testing net code locally, it is helpful to set:
+                            'alwaysactive=1' in EVALDRAW.INI.
+
+   mountzip("a.zip");  Makes all files inside the specified ZIP file or
+                          directory appear as if they are in the local dir.
+                          If there are duplicates, the default behavior is to
+                          have the stand-alone file take precedence like this:
+                             1. Stand-alone file in .KC script's directory
+                             2. Mounted ZIPs
+                             3. Mounted directories
+                          The search order can be overridden by specifying
+                          filenames with a '|' to separate ZIP/DIR and
+                          filename. For example:
+                             buf[i] = fil("a.zip|foo.txt",i);
+
+   sleep(ms);          Calls the Windows Sleep() function. Input parameter is
+                          time in milliseconds. Calling sleep(1); once per
+                          frame is a simple way to save battery life on a
+                          laptop (the downside being not perfectly smooth fps)
+
+   refresh();          This function updates the screen, keyboard, and mouse
+                          in the middle of a script. It gives you the ability
+                          to write interactive logic (such as a yes/no dialog
+                          box) without requiring you design tricks to exit and
+                          re-enter the script.
+
+Note: many functions are only intended to be used in the 0D / () mode. For
+example, you would probably not want to call cls(0) in (x,y,z,&r,&g,&b) mode!
+------------------------------------------------------------------------------
+
+Enjoy!
+
+-Ken S.

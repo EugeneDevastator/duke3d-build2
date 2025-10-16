@@ -1,0 +1,175 @@
+// Original code: warpy
+// http://www.blitzbasic.com/codearcs/codearcs.php?code=2448
+
+// conv to evaldraw by Torbjoern 26 july 2009
+static tmpIntersections[2][2]; // global :(
+
+static lp1[2], lp2[2], cc[2];
+
+static isec2[2];
+static mode = 1;
+()
+{
+   cls(0);
+   setcol(0xffffff);
+   
+   // Set line point 1 and 2
+   lp1[0] = 1.0; lp1[1] = 1.0;
+   lp2[0] = mousx; lp2[1] = mousy;
+   
+   // Set Circle Center
+   cc[0] = xres/2; cc[1] = yres/2;
+   
+   // Circle radius
+   cradi = 50.0;   
+
+   moveto(lp1[0],lp1[1]); lineto(lp2[0],lp2[1]); // Draw line
+   drawsph(cc[0], cc[1], -cRadi); // Collision Circle
+
+   
+   if(mode==1)
+   {
+      if( GetIntersectionLineCircle2(lp1,lp2,cc,cradi) )
+      { 
+         drawsph(isec2[0], isec2[1], -10);
+      }
+      GetIntersectionLineCircleSide(lp1,lp2,cc,cradi);
+   }
+   else
+   {
+      GetIntersectionLineCircle1(lp1,lp2,cc,cradi); 
+      
+      collX = 0; collY = 0;
+      GetClosest(lp2[0],lp2[1],collX, collY);
+      
+      drawsph(collX, collY, -10);
+      
+      drawsph(tmpIntersections[0][0], tmpIntersections[0][1], 2);
+      drawsph(tmpIntersections[1][0], tmpIntersections[1][1], 2); 
+   }
+   
+
+
+   /*
+   moveto(0,yres/2);
+   printf("\n%g",tmpIntersections1x);
+   printf("\n%g",tmpIntersections1y);
+   printf("\n%g",tmpIntersections2x);
+   printf("\n%g",tmpIntersections2y);
+   */
+
+   if(keystatus[2])
+   {
+      keystatus[2] = 0;
+      mode = 1;
+   }
+   if(keystatus[3])
+   {
+      keystatus[3] = 0;
+      mode = 2;
+   }
+}
+
+GetIntersectionLineCircle1(pLinePoint1[2], pLinePoint2[2], pCircleCenter[2], pCircleRadius)
+{ 
+   p = pCircleCenter[0]; q = pCircleCenter[1]; // center of circle coords
+   m = (pLinePoint2[1]-pLinePoint1[1]) / (pLinePoint2[0]-pLinePoint1[0]); // ydiff / xdiff
+   r = pCircleRadius;
+   t = pLinePoint2[1] - (m*pLinePoint2[0]); // y2 - (ydiff/xdiff) * x2
+   s = t-q; //
+   
+   a = m*m + 1; 
+   b = (2*m*s) - (2*p); 
+   c = (s*s) + (p*p) - (r*r);
+   
+   bSqMinFourAc = b*b - 4*a*c;
+   
+   if(bSqMinFourAc > 0)
+   {
+      bSqMinFourAc = sqrt(bSqMinFourAc); 
+      
+      // Find roots
+      x1 = ((-b)+bSqMinFourAc)/(2*a); 
+      x2 = ((-b)-bSqMinFourAc)/(2*a);
+      
+      tmpIntersections[0][0] = x1;
+      tmpIntersections[0][1] = (m*x1)+t; 
+      tmpIntersections[1][0] = x2;
+      tmpIntersections[1][1] = (m*x2)+t;
+   }
+   else if( bSqMinFourAc == 0)
+   {
+      tmpIntersections[0][0] = (-b)/(2*a);
+      tmpIntersections[0][1] = (-b*m)/(2*a)+t;  
+   }  
+   //return tmpIntersections;
+}
+
+// uses isec2
+GetIntersectionLineCircle2(pLineStart[2], pLineEnd[2], pCircCenter[2], pCircRad)
+{
+   GetIntersectionLineCircle1(pLineStart, pLineEnd, pCircCenter, pCircRad);
+   
+   minX = min(pLineStart[0], pLineEnd[0]); maxX = max(pLineStart[0], pLineEnd[0]); 
+   minY = min(pLineStart[1], pLineEnd[1]); maxY = max(pLineStart[1], pLineEnd[1]);
+   
+   for(i=0; i<2; i++) // isec1, isec2
+   {
+      if(tmpIntersections[i][0] < maxX && tmpIntersections[i][0] > minX &&
+         tmpIntersections[i][1] < maxY && tmpIntersections[i][1] > minY
+      )
+      {
+         isec2[0] = tmpIntersections[i][0];
+         isec2[1] = tmpIntersections[i][1];
+         return 1; // got collision point
+      }
+   } 
+
+   return 0; // didnt collide 
+}
+
+GetIntersectionLineCircleSide(pLineStart[2], pLineEnd[2], pCircCenter[2], pCircRad)
+{
+   GetIntersectionLineCircle1(pLineStart, pLineEnd, pCircCenter, pCircRad);
+   
+   minX = min(pLineStart[0], pLineEnd[0]); maxX = max(pLineStart[0], pLineEnd[0]); 
+   minY = min(pLineStart[1], pLineEnd[1]); maxY = max(pLineStart[1], pLineEnd[1]);
+   
+   i = 1; // isec2
+      if(tmpIntersections[i][0] < maxX && tmpIntersections[i][0] > minX &&
+         tmpIntersections[i][1] < maxY && tmpIntersections[i][1] > minY
+      )
+      {
+         isec2[0] = tmpIntersections[i][0];
+         isec2[1] = tmpIntersections[i][1];
+         setcol(i*255,255,0);
+         drawsph(isec2[0], isec2[1], -10);
+         return 1;
+      }
+   return 0; // didnt collide 
+}
+
+
+// Two sqrts :(
+GetClosest(endx, endy, &closestX, &closestY)
+{
+   d1 = distance(endx,endy, tmpIntersections[0][0], tmpIntersections[0][1]);
+   d2 = distance(endx,endy, tmpIntersections[1][0], tmpIntersections[1][1]);
+   if(d1 < d2){
+      closestX = tmpIntersections[0][0]; closestY = tmpIntersections[0][1];
+   }
+   else
+   {
+      closestX = tmpIntersections[1][0]; closestY = tmpIntersections[1][1];   
+   }
+}
+
+distance(x1,y1,x2,y2)
+{
+   return sqrt( (x2-x1)^2 + (y2-y1)^2 );
+}
+
+distanceSquared(x1,y1,x2,y2)
+{
+   return (x2-x1)^2 + (y2-y1)^2;   
+}

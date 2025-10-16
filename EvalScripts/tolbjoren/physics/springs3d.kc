@@ -1,0 +1,333 @@
+// cam is upsidedown
+
+//http://sol.gfxile.net/springs/index.html
+//15/6-2010
+struct masspoint
+{
+   x,y,z,
+   vx,vy,vz;
+};
+
+struct spring
+{
+   p1,p2;
+   desired_d,
+   fx,fy,fz,
+   k;
+};
+
+static masspoint mp[1000];
+static max_mp = 0;
+
+static spring sp[1000];
+static max_spring = 0;
+
+// Camera
+static posx = 0;
+static posy = 65;
+static posz = 60;
+static posh = 0; // left right
+static posv = -140*PI/180.0;
+static mat[9];
+
+// Timestep:
+static t,dt,execution_time;
+static TICKTIME;
+static UPDATE_TIME = 50;
+()
+{
+   TICKTIME = 1.0/UPDATE_TIME;
+   
+   if(numframes==0){   
+     makePrism(nrnd*10,rnd*-100,nrnd*10,6,55,6);    
+     makePrism(nrnd*10,rnd*-100,nrnd*10,5,5,5);
+     makePrism(nrnd*10,rnd*-100,nrnd*10,5,5,5);
+     makePrism(nrnd*10,rnd*-100,nrnd*10,5,5,5);
+   }
+
+   cls(0); clz(1e32);
+   setcol(255,255,255);
+   //setcam(0,0,camz,0,0);
+   setview(0,0,xres,yres,xres/2,yres/2,xres/2);
+   
+   for(i=0; i<max_mp; i++){
+      drawsph(mp[i].x, mp[i].y, mp[i].z, .5);
+   }
+   for(i=0; i<max_spring; i++)
+   {
+      moveto( mp[sp[i].p1].x, mp[sp[i].p1].y, mp[sp[i].p1].z);
+      lineto( mp[sp[i].p2].x, mp[sp[i].p2].y, mp[sp[i].p2].z);
+   }
+   
+   /*glBegin(GL_QUADS);
+   for(i=0; i<4; i++){
+      glVertex( mp[i].x, mp[i].y, mp[i].z );
+   }
+   for(i=4; i<8; i++){
+      glVertex( mp[i].x, mp[i].y, mp[i].z );
+   }*/
+   
+   gridxz(0);
+   
+   //2D
+   setcol(255,0,0);
+   setfont(18/2,36/2,1);
+
+   for(i=0; i<max_mp; i++)
+   {
+      x = mp[i].x - posx; y = mp[i].y - posy; z = mp[i].z - posz;
+      nx = x* mat[0] + y * mat[1] + z * mat[2];
+      ny = x* mat[3] + y * mat[4] + z * mat[5];
+      nz = x* mat[6] + y * mat[7] + z * mat[8];
+      if(nz <0)continue;
+      f = xres/2/nz;
+      moveto(nx*f+xres/2, ny*f+yres/2); 
+      printf("%g",i);
+   }
+
+   dt = klock(0) - t;
+   t = klock(0);
+   
+   execution_time += dt;
+   
+   numloops=0;
+   while(execution_time >= TICKTIME)
+   {
+      physics_tick();
+      execution_time -= TICKTIME;
+      numloops++;
+   }      
+
+   dirx = keystatus[205]-keystatus[203];
+   dirz = keystatus[208]-keystatus[200];
+   diry = keystatus[2]-keystatus[3];
+   if()
+   {
+      for(i=0; i<6; i++){
+         mp[i].vx += 15*dt*dirx;
+         mp[i].vy += 35*dt*diry;
+         mp[i].vz += 15*dt*dirz;
+         
+      }
+   }
+   
+   
+   playercontrols();
+   
+}
+
+makePrism(x,y,z,w,h,d)
+{
+      mass_points_before = max_mp;
+      w2 = w/2; h2 = h/2; d2=d/2;
+      
+      a=define_masspoint(x-w2,y-h2,z+d2);
+      b=define_masspoint(x-w2,y+h2,z+d2);
+      c=define_masspoint(x+w2,y+h2,z+d2);
+      d=define_masspoint(x+w2,y-h2,z+d2);
+      
+      a2=define_masspoint(x-w2,y-h2,z-d2);
+      b2=define_masspoint(x-w2,y+h2,z-d2);
+      c2=define_masspoint(x+w2,y+h2,z-d2);
+      d2=define_masspoint(x+w2,y-h2,z-d2);
+      k_all = 0.2;
+      /*
+      define_spring(a,b,k_all);
+      define_spring(b,c,k_all);
+      define_spring(c,d,k_all);
+      define_spring(d,a,k_all);
+      
+      define_spring(a2,b2,k_all);
+      define_spring(b2,c2,k_all);
+      define_spring(c2,d2,k_all);
+      define_spring(d2,a2,k_all);
+      
+      define_spring(a,a2,k_all);
+      define_spring(b,b2,k_all);
+      define_spring(c,c2,k_all);
+      define_spring(d,d2,k_all);
+
+      define_spring(a,c,k_all);
+      define_spring(b,d,k_all);
+      define_spring(a2,c2,k_all);
+      define_spring(b2,d2,k_all);
+      //top
+      define_spring(a,d2,k_all);
+      define_spring(d,a2,k_all);
+      define_spring(b,c2,k_all);
+      define_spring(c,b2,k_all);
+      //side-x      
+      define_spring(a,b2,k_all);
+      define_spring(b,a2,k_all);
+      define_spring(c,d2,k_all);
+      define_spring(d,c2,k_all); 
+      */
+
+      
+      for(i=mass_points_before; i<max_mp; i++)
+      {
+         for(j=mass_points_before; j<max_mp; j++)
+         {
+            if(i==j) continue;
+            define_spring(i,j,k_all);
+         }
+      }
+}
+
+
+mp_distance(p1, p2)
+{
+   xd = mp[p1].x-mp[p2].x;
+   yd = mp[p1].y-mp[p2].y;
+   zd = mp[p1].z-mp[p2].z;
+   return sqrt(xd^2+yd^2+zd^2);
+}
+
+define_spring(p1, p2, k)
+{
+    sp[max_spring].p1 = p1;
+    sp[max_spring].p2 = p2;
+    sp[max_spring].desired_d = mp_distance( p1, p2);
+    sp[max_spring].fx = sp[max_spring].fy = 0;
+    sp[max_spring].k = k;
+    max_spring++;
+}
+
+define_masspoint(x,y,z)
+{
+    mp[max_mp].x = x;
+    mp[max_mp].y = y;
+    mp[max_mp].z = z;
+    mp[max_mp].vx = mp[max_mp].vy = mp[max_mp].vz = 0;
+    max_mp++;
+    return (max_mp-1);
+}
+
+physics_tick()
+{
+    for (i = 0; i < max_spring; i++)
+    {        
+        dx = mp[sp[i].p1].x - mp[sp[i].p2].x;
+        dy = mp[sp[i].p1].y - mp[sp[i].p2].y;
+        dz = mp[sp[i].p1].z - mp[sp[i].p2].z;
+        d = sqrt(dx*dx+dy*dy+dz*dz);
+        if (d > 0.000001)
+        {
+            // F = -ky
+
+            // how much of the force goes to horizontal and vertical vectors..
+            fx = dx / d;
+            fy = dy / d;
+            fz = dz / d;
+
+            // helper variable, basically this is the force
+            intensity = (d - sp[i].desired_d) * sp[i].k;
+            
+            // apply
+            sp[i].fx = fx * intensity;
+            sp[i].fy = fy * intensity;
+            sp[i].fz = fz * intensity;
+            mp[sp[i].p1].vx -= sp[i].fx;
+            mp[sp[i].p1].vy -= sp[i].fy;
+            mp[sp[i].p1].vz -= sp[i].fz;
+            
+            mp[sp[i].p2].vx += sp[i].fx;
+            mp[sp[i].p2].vy += sp[i].fy;
+            mp[sp[i].p2].vz += sp[i].fz;
+            
+        }
+    }
+
+    for (i = 0; i < max_mp; i++)
+    {
+        mp[i].vy += 0.2;
+        mp[i].x += mp[i].vx;
+        mp[i].y += mp[i].vy;
+        mp[i].z += mp[i].vz;
+        //if (mp[i].y < 0) mp[i].y = 0;
+        if (mp[i].y > 0) mp[i].y = 0;
+        
+        if (mp[i].x < -30) mp[i].x = -30;
+        if (mp[i].x > 30) mp[i].x = 30;
+        
+        if (mp[i].z < -30) mp[i].z = -30;
+        if (mp[i].z > 30) mp[i].z = 30;
+        mp[i].vx *= 0.90;
+        mp[i].vy *= 0.90;
+        mp[i].vz *= 0.90;
+    }
+
+
+}
+
+
+
+gridxz(y)
+{
+   siz = 30;
+   step = 5;
+   ox = -siz;
+   oz = -siz;
+   for(x=-siz; x<=siz; x+=step)
+   {
+   for(z=-siz; z<=siz; z+=step)
+   {
+      moveto(ox,y,oz);
+      lineto(x,y,z);
+
+      moveto(oz,y,ox);
+      lineto(z,y,x);
+            
+      ox = x;
+   } 
+   }
+}
+
+// Camera and movement code taken from /games/
+//Handle input and player movement
+playercontrols()
+{
+   static oldMouseX;
+   static oldMouseY;
+   static mouseSpeedX;
+   static mouseSpeedY; 
+
+   f = .125;
+   if (keystatus[0x2a]) f /= 4;
+   if (keystatus[0x36]) f *= 4;
+   vx = (keystatus[32]-keystatus[30])*f; //D-A
+   vy = (keystatus[17]-keystatus[31])*f; //W-S  
+   vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   
+   //static mat[9]; 
+   ang2mat(posh,posv,mat); // Convert angles to rotation matrix
+   
+   // find new position
+   posx += mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   posy += mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   posz += mat[2]*vx + mat[5]*vz + mat[8]*vy; 
+   // mousespeed values are tweaked for 60 fps
+   mouseSpeedX = (mousx - oldMouseX) * 0.01;
+   mouseSpeedY = (mousy - oldMouseY) * 0.01;
+   oldMouseX = mousx;
+   oldMouseY = mousy;
+   if(bstatus==1)
+   {
+      posh -= mouseSpeedX;
+      posv += mouseSpeedY;
+   }
+   // Right,down,forwards unit vectors.
+   setcam(posx,posy,posz,
+          mat[0],mat[1],mat[2],
+          mat[3],mat[4],mat[5],
+          mat[6],mat[7],mat[8]);
+}
+/* converts horizontal and vertical angles to a 3x3 rotation matrix */
+ang2mat(hang,vang,mat[9])
+{
+   mat[0] = cos(hang); mat[1] = 0; mat[2]=-sin(hang);
+   mat[6] = cos(vang)*sin(hang); mat[7] = sin(vang); mat[8]=cos(vang)*cos(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}

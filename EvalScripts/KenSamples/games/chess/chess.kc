@@ -1,0 +1,867 @@
+   //CHESS.KC by Ken Silverman. AI looks 5 moves ahead (i.e. w-b-w-b-w). Net play supported.
+   //12/18/2012: Proper rules fully implemented.
+   //01/02/2013: Alpha-beta pruning seems to be working.
+   
+static sepoff = 0.05, pixoff = 40;
+   
+#define ANIMTIM 1
+static iscomp[2] = {0,5};
+static rank[16] = {0,1,3,3,5,15,1024,0,0,0,-1024,-15,-5,-3,-3,-1};
+
+struct { x, y, z; } point3d;
+static point3d ipos, irig, idow, ifor;
+static ghx, ghy, ghz;
+static gmove[16384], gmoven = 0;
+static gtcomp, gshowhints = 0;
+
+   //White(4:noprune):10
+   //Black(4:w/prune):12
+   //Tie:11
+   
+()
+{
+   static board[8][8], sboard[8][8] = 
+   {
+       4, 2, 3, 5, 6, 3, 2, 4,
+       1, 1, 1, 1, 1, 1, 1, 1,
+       0, 0, 0, 0, 0, 0, 0, 0,
+       0, 0, 0, 0, 0, 0, 0, 0,
+       0, 0, 0, 0, 0, 0, 0, 0,
+       0, 0, 0, 0, 0, 0, 0, 0,
+      -1,-1,-1,-1,-1,-1,-1,-1,
+      -4,-2,-3,-5,-6,-3,-2,-4,
+   };
+   
+      //if (caststat&1): no white long  castle
+      //if (caststat&2): no white short castle
+      //if (caststat&4): no black long  castle
+      //if (caststat&8): no black short castle
+   static caststat = 0, prevmove = -1;
+   dist = -7.5; ha = (net_me%2)*PI; va = .7;
+   tim = 0; obstatus = 0; lastsendtim = 0; lmx = 0; lmy = 0;
+   
+   mountzip("chessdat.zip");
+   playsound("opendoor.flac");
+   
+   //for(y=0;y<8;y++) for(x=0;x<8;x++) sboard[y][x] = int(11*rnd)-5; //Fun hack :P
+   
+   enum {MAXPLAYS=16};
+   static grabx[MAXPLAYS], graby[MAXPLAYS];
+   static mx[MAXPLAYS], imx[MAXPLAYS];
+   static my[MAXPLAYS], imy[MAXPLAYS];
+   static mb[MAXPLAYS], omb[MAXPLAYS];
+   for(i=0;i<net_players;i++) { grabx[i] = -1; mb[i] = 0; omb[i] = 0; }
+   turn = 0; win = -1; movex0 = 0; movey0 = 0; movex1 = 0; movey1 = 0; movetim = -1;
+   gshowhints = 0;
+   for(y=0;y<8;y++) for(x=0;x<8;x++) board[y][x] = sboard[y][x];
+   
+   while (1)
+   {
+      if ((!USINGSTEREO) || (!(numframes%2)))
+         { otim = tim; tim = klock(); dtim = tim-otim; }
+      else { dtim = 0; }
+
+      f = dtim;
+      if (keystatus[0x2a]) f *= 1/4;
+      if (keystatus[0x36]) f *= 4/1;
+      ha += (keystatus[0x33]-keystatus[0x34])*f;
+      va += (keystatus[0xc9]-keystatus[0xd1])*f;
+      irig.x = cos(ha); irig.y = 0; irig.z = -sin(ha);
+      ifor.x = sin(ha)*cos(va); ifor.y = sin(va); ifor.z = cos(ha)*cos(va);
+      idow.x = ifor.y*irig.z; idow.y = ifor.z*irig.x - ifor.x*irig.z; idow.z =-ifor.y*irig.x;
+      ipos.x = ifor.x*dist; ipos.y = ifor.y*dist; ipos.z = ifor.z*dist;
+
+      hx = mousx-xres/2; hy = mousy-yres/2; hz = xres/2;
+         //ix = (rx*hx + dx*hy + fx*hz)*t + px
+         //iy = (ry*hx + dy*hy + fy*hz)*t + py
+         //iz = (rz*hx + dz*hy + fz*hz)*t + pz
+      t = -ipos.y/(irig.y*hx + idow.y*hy + ifor.y*hz);
+      olmx = lmx; lmx = near(((irig.x*hx + idow.x*hy + ifor.x*hz)*t + ipos.x + 3.5)*64);
+      olmy = lmy; lmy = near(((irig.z*hx + idow.z*hy + ifor.z*hz)*t + ipos.z + 3.5)*64);
+      
+      static lpak[3];
+      if ((fabs(tim-lastsendtim) >= 1/30) && ((bstatus != obstatus) || (lmx != olmx) || (lmy != olmy)))
+      {
+         lastsendtim = tim;
+         lpak[0] = lmx; lpak[1] = lmy; lpak[2] = bstatus;
+         net_send(NET_ALL,lpak,3);
+      }
+      
+      if (win >= 0) { ; }
+      else if (otim < movetim)
+      {
+         if (tim >= movetim)
+         {
+            domove(board,&caststat,&prevmove,movex0,movey0,movex1,movey1,1);
+            turn = 1-turn;
+            movetim = -1;
+         }
+      }
+      else
+      {
+         while (net_recv(&from,lpak,3))
+         {
+            mx[from] = lpak[0]/64; my[from] = lpak[1]/64;
+            omb[from] = mb[from]; mb[from] = lpak[2];
+               
+            imx[from] = floor(mx[from]+.5); imy[from] = floor(my[from]+.5);
+            if ((min(imx[from],imy[from]) >= 0) && (max(imx[from],imy[from]) < 8))
+            {
+               if ((mb[from]%2) > (omb[from]%2))
+               {
+                  for(i=net_players-1;i>=0;i--)
+                  {
+                     if (i == from) continue;
+                     if ((grabx[i] == imx[from]) && (graby[i] == imy[from])) break;
+                  }
+                  if (i < 0) 
+                  {
+                     b = board[imy[from]][imx[from]];
+                     if ((sgn(b) == 1-turn*2) && ((net_players < 2) || (from == turn)))
+                     {
+                        grabx[from] = imx[from];
+                        graby[from] = imy[from];
+                     }
+                  }
+               }
+               if ((!(mb[from]%2)) && (grabx[from] >= 0))
+               {
+                  if (isvalmove(board,caststat,prevmove,grabx[from],graby[from],imx[from],imy[from]))
+                  {
+                     gshowhints = 0;
+                     domove(board,&caststat,&prevmove,grabx[from],graby[from],imx[from],imy[from],1);
+                     o = board[graby[from]][grabx[from]];
+                     //if (fabs(o) == 1) playsound("zipguns.flac");
+                     //if (fabs(o) == 2) playsound("shoot2.flac");
+                     //if (fabs(o) == 3) playsound("shoot2.flac");
+                     //if (fabs(o) == 4) playsound("shoot2.flac");
+                     //if (fabs(o) == 5) playsound("shoot3.flac");
+                     //if (fabs(o) == 6) playsound("warp.flac");
+                     turn = 1-turn;
+                  }
+                  else
+                  {
+                     t = 1-turn*2;
+                     for(ky=0;ky<8;ky++)
+                        for(kx=0;kx<8;kx++)
+                        {
+                           if (board[ky][kx] != t*6) continue;
+                           if (ischeck(board,kx,ky,turn))
+                              { playsound("alarm.flac"); goto break2; }
+                        }
+                     playsound("bouncy.flac");
+break2:;          }
+                  grabx[from] = -1;
+               }
+            }
+            if (!(mb[from]%2)) grabx[from] = -1;
+         }
+         
+         if ((net_players < 2) && (iscomp[turn]))
+         {
+            if (!getcompmove(board,caststat,prevmove,turn,&x0,&y0,&x1,&y1,iscomp[turn])) goto dowin;
+            movex0 = x0; movey0 = y0; movex1 = x1; movey1 = y1; movetim = tim+ANIMTIM;
+            
+            o = board[y0][x0];
+            if (fabs(o) == 1) playsound("zipguns.flac");
+            if (fabs(o) == 2) playsound("shoot2.flac");
+            if (fabs(o) == 3) playsound("shoot2.flac");
+            if (fabs(o) == 4) playsound("shoot2.flac");
+            if (fabs(o) == 5) playsound("shoot3.flac");
+            if (fabs(o) == 6) playsound("warp.flac");
+         }
+      }
+      
+//-------------------------------------------------------------------
+      s = sgn(numframes%2-.5)*(USINGSTEREO!=0);
+      setcam(ipos.x+sepoff*s*irig.x,
+             ipos.y+sepoff*s*irig.y,
+             ipos.z+sepoff*s*irig.z,irig.x,irig.y,irig.z,idow.x,idow.y,idow.z,ifor.x,ifor.y,ifor.z);
+      ghx = xres/2+pixoff*s; ghy = yres/2; ghz = xres/2;
+      setview(0,0,xres,yres,ghx,ghy,ghz);
+      drawsky(tim);
+      drawboard();
+      
+      if ((keystatus[0xe]) && (turn == net_me) && (net_players < 2)) //Backspace (undo move)
+      {
+         keystatus[0xe] = 0;
+         if (gmoven >= 2)
+         {
+            gshowhints = 0;
+            gmoven -= 2; playsound("ouch.wav");
+            
+            for(y=0;y<8;y++) for(x=0;x<8;x++) board[y][x] = sboard[y][x];
+            turn = 0; win = -1; caststat = 0; prevmove = -1;
+            for(i=0;i<gmoven;i++)
+            {
+               move2xys(gmove[i],&x0,&y0,&x1,&y1);
+               domove(board,&caststat,&prevmove,x0,y0,x1,y1,0);
+               turn = 1-turn;
+            }
+         }
+      }
+      
+      setfont(6,8); setcol(0xa08060);
+      for(i=0;i<8;i++)
+      {
+         xyz2sxy(i,-.6,-.2,&sx,&sy); moveto(sx-3,sy-4); printchar(i+'A');
+         xyz2sxy(i,7.6,-.2,&sx,&sy); moveto(sx-3,sy-4); printchar(i+'A');
+         xyz2sxy(-.6,i,-.2,&sx,&sy); moveto(sx-3,sy-4); printchar(i+'1');
+         xyz2sxy(7.6,i,-.2,&sx,&sy); moveto(sx-3,sy-4); printchar(i+'1');
+      }
+      
+      for(i=0;i<net_players;i++)
+      {
+         if ((min(imx[i],imy[i]) < 0) || (max(imx[i],imy[i]) >= 8)) continue;
+         if ((net_players < 2) || (i == turn)) { setcol(0xc0c0c0); r = .03; }
+                                          else { setcol(0x605040); r = .02; }
+         drawsquare(imx[i],imy[i],r);
+      }
+
+      for(y=0;y<8;y++)
+         for(x=0;x<8;x++)
+         {
+            for(i=net_players-1;i>=0;i--)
+               if ((grabx[i] == x) && (graby[i] == y)) break;
+            if (i >= 0) continue;
+            if ((movetim >= 0) && (x == movex0) && (y == movey0)) continue;
+            b = board[y][x]; if (b) drawpiece(b,x,y);
+         }
+      for(i=net_players-1;i>=0;i--)
+      {
+         if (grabx[i] < 0) continue;
+         drawpiece(board[graby[i]][grabx[i]],mx[i],my[i]);
+      }
+      
+      if (movetim >= 0)
+      {
+         x = (movex1-movex0)*(tim-movetim+ANIMTIM)/ANIMTIM+movex0;
+         y = (movey1-movey0)*(tim-movetim+ANIMTIM)/ANIMTIM+movey0;
+         drawpiece(board[movey0][movex0],x,y);
+         setcol(0x504030); showdebugpath(movex0,movey0,x,y);
+      }
+      
+         //show prevmove (debug)
+      if (prevmove >= 0)
+      {
+         setcol(0x504030); 
+         move2xys(prevmove,&x0,&y0,&x1,&y1);
+         showdebugpath(x0,y0,x1,y1);
+      }
+      if ((caststat%2) < 1) setcol(0x408040); else setcol(0x804040); drawsph(-2.0,-.2,-4.1,.05);
+      if ((caststat%4) < 2) setcol(0x408040); else setcol(0x804040); drawsph(+2.0,-.2,-4.1,.05);
+      if ((caststat%8) < 4) setcol(0x408040); else setcol(0x804040); drawsph(-2.0,-.2,+4.1,.05);
+      if ((caststat  ) < 8) setcol(0x408040); else setcol(0x804040); drawsph(+2.0,-.2,+4.1,.05);
+      
+      if (net_players >= 2) i = turn; else i = 0;
+      if ((min(imx[i],imy[i]) >= 0) && (max(imx[i],imy[i]) < 8) &&
+          (sgn(board[imy[i]][imx[i]]) == 1-turn*2))
+      {
+         for(y=0;y<8;y++)
+            for(x=0;x<8;x++)
+               if (isvalmove(board,caststat,prevmove,imx[i],imy[i],x,y))
+                  { setcol(0x00a0a0); drawsquare(x,y,.03); }
+      }
+      
+      n = getvalmoves(board,caststat,prevmove,turn,0);
+      if (n == 0)
+      {
+dowin:;  if (win < 0)
+            for(y=0;y<8;y++)
+               for(x=0;x<8;x++)
+                  if (board[y][x] == (1-turn*2)*6)
+                  {
+                     if (!ischeck(board,x,y,turn)) //stalemate
+                        { win = 2; playsound("shoot4.flac"); }
+                     else { win = 1-turn; playsound("closdoor.flac"); }
+                     goto foundking1;
+                  }
+foundking1:;
+      }
+      
+      if (gshowhints)
+      {
+         setcol(0x808080);
+         for(i=n-1;i>=0;i--)
+         {
+            move2xys(moves[0][i],&x0,&y0,&x1,&y1);
+            showdebugpath(x0,y0,x1,y1);
+         }
+      }
+      
+      setfont(6,8); setcol(0xffffff);
+      for(i=0;i<gmoven;i++)
+      {
+         x = (i%8)*30; y = int(i/8)*8;
+         move2xys(gmove[i],&x0,&y0,&x1,&y1);
+         moveto(x+ 0,y); printchar(x0+'A'); fputc(x0+'A');
+         moveto(x+ 6,y); printchar(y0+'1'); fputc(y0+'1');
+         moveto(x+12,y); printchar(x1+'A'); fputc(x1+'A');
+         moveto(x+18,y); printchar(y1+'1'); fputc(y1+'1'); fputc(32);
+      }
+      
+      if ((bstatus%4) >= 2) { gshowhints = 1-gshowhints; bstatus -= 2; } //RMB
+      for(i=0;i<4;i++)
+         if (keystatus[i+0x10]) //Q,W,.. (hint, no prune)
+         {
+            gshowhints = 1;
+            getcompmove(board,caststat,prevmove,turn,&x0,&y0,&x1,&y1,-(i+1));
+         }
+      for(i=0;i<6;i++)
+         if (keystatus[i+0x2]) //1,2,.. (hint, w/prune)
+         {
+            gshowhints = 1;
+            getcompmove(board,caststat,prevmove,turn,&x0,&y0,&x1,&y1,i+1);
+         }
+
+      if (win < 0)
+      {
+         if (turn == 0) setcol(0xe0e0e0); else setcol(0x000000);
+         if (turn == net_me)
+         {
+            siz = 1/16+sin(tim*5)*.001;
+            setfont(xres*siz,yres*siz*2.5,1); moveto(xres/2-xres*siz*5,0);
+            printf("Your Turn!");
+         }
+         else
+         {
+            setfont(xres/32,yres/12,1); moveto(xres/2-xres/32*5,0);
+            if (turn == 0) printf("White's Turn"); else printf("Black's Turn");
+         }
+      }
+      else
+      {
+         siz = 1/16+sin(tim*5)*.001;
+         setfont(xres*siz,yres*siz*2.5,1); moveto(xres/2-xres*SIZ*5,0);
+         if (win < 2) { setcol(0xffc040); printf("CHECKMATE!\n"); }
+                 else { setcol(0xe000e0); printf("Stalemate!"); }
+         if (win == 0) { setcol(0xe0e0e0); printf("White wins"); }
+         if (win == 1) { setcol(0x000000); printf("Black wins"); }
+      }
+      
+      if (gtcomp) { setfont(6,8); moveto(xres-64,4); setcol(0x808080); printf("%.3f ms",gtcomp*1e3); }
+      
+      obstatus = bstatus; refresh(); Sleep(15);
+   }
+}
+
+drawsky (tim)
+{
+   gldisable(GL_DEPTH_TEST);
+   glbegin(GL_QUADS); glsettex("cloud.png"); setcol(0x206070);
+   tt = (tim*.01)%1;
+   gltexcoord(tt+0,tt+0); glvertex(   0,   0);
+   gltexcoord(tt+1,tt+0); glvertex(xres,   0);
+   gltexcoord(tt+1,tt+1); glvertex(xres,yres);
+   gltexcoord(tt+0,tt+1); glvertex(   0,yres);
+   glenable(GL_DEPTH_TEST);
+}      
+
+drawbox (cx, cy, cz, rx, ry, rz, dx, dy, dz, fx, fy, fz)
+{
+   static s[6] = {0xe0e0e0,0xd0d0d0,0xffffff,0xc0c0c0,0xd0d0d0,0xb0b0b0};
+   static p[72] =
+   {
+      -1,-1,-1, +1,-1,-1, +1,+1,-1, -1,+1,-1,
+      -1,-1,+1, -1,-1,-1, -1,+1,-1, -1,+1,+1,
+      -1,-1,+1, +1,-1,+1, +1,-1,-1, -1,-1,-1,
+      +1,-1,+1, -1,-1,+1, -1,+1,+1, +1,+1,+1,
+      +1,-1,-1, +1,-1,+1, +1,+1,+1, +1,+1,-1,
+      -1,+1,-1, +1,+1,-1, +1,+1,+1, -1,+1,+1,
+   };
+   glBegin(GL_QUADS);
+   for(i=0,j=0;i<72;i+=3,j+=2)
+   {
+      x = p[i]*rx + p[i+1]*dx + p[i+2]*fx + cx;
+      y = p[i]*ry + p[i+1]*dy + p[i+2]*fy + cy;
+      z = p[i]*rz + p[i+1]*dz + p[i+2]*fz + cz;
+      setcol(s[int(j/8)]);
+      if ((j%8) == 0) glTexCoord(0,0);
+      if ((j%8) == 2) glTexCoord(0,.125);
+      if ((j%8) == 4) glTexCoord(6,.125);
+      if ((j%8) == 6) glTexCoord(6,0);
+      glVertex(x,y,z);
+   }
+}
+
+drawboard ()
+{   
+   glbegin(GL_QUADS); glsettex("wood.png"); setcol(0xe0c0a0);
+   for(y=0;y<8;y++)
+      for(x=0;x<8;x++)
+      {
+         setcol(((x+y)%2)*0x303030+0x808080);
+         gltexcoord(0,0); glvertex(x  -4,0,y+1-4);
+         gltexcoord(1,0); glvertex(x+1-4,0,y+1-4);
+         gltexcoord(1,1); glvertex(x+1-4,0,y  -4);
+         gltexcoord(0,1); glvertex(x  -4,0,y  -4);
+      }
+   
+   for(s=-1;s<=1;s+=2)
+   {
+      if (s == -1) glcullface(GL_FRONT); else glcullface(GL_BACK);
+      drawbox(4.1*s,-.1,    0,  .1,0, 0,      0,0,4.0*s,  0,-.1,0);
+      drawbox(  0  ,-.1,4.1*s,   0,0,.1,  s*4.2,0,    0,  0,+.1,0);
+   }
+}
+
+drawpiece (i, x, y)
+{
+   if (i > 0) setcol(0xe8e8e8);
+         else setcol(0x585858);
+   j = fabs(i); x -= 3.5; y -= 3.5;
+   if (j == 1) drawspr("pawn.kv6"  ,x,-.457,y,0.45,0,0);
+   if (j == 2) drawspr("knight.kv6",x,-.610,y,0.60,(i<0)*PI,0);
+   if (j == 3) drawspr("bishop.kv6",x,-.660,y,0.65,0,0);
+   if (j == 4) drawspr("rook.kv6"  ,x,-.570,y,0.55,0,0);
+   if (j == 5) drawspr("queen.kv6" ,x,-.705,y,0.70,0,0);   
+   if (j == 6) drawspr("king.kv6"  ,x,-.805,y,0.80,0,0);
+}
+
+drawsquare (x, y, r)
+{
+   drawcone(x-4,0,y-4,r,x-3,0,y-4,r);
+   drawcone(x-4,0,y-3,r,x-3,0,y-3,r);
+   drawcone(x-4,0,y-4,r,x-4,0,y-3,r);
+   drawcone(x-3,0,y-4,r,x-3,0,y-3,r);
+}
+
+isvalmove (board[8][8], caststat, prevmove, x0, y0, x1, y1)
+{
+   p = board[y0][x0]; if (p == 0) return(0);
+   m = y1*512 + x1*64 + y0*8 + x0;
+   n = getvalmoves(board,caststat,prevmove,p<0,0);
+   for(i=n-1;i>=0;i--) if (moves[0][i] == m) return(1);
+   return(0);
+}
+
+domove (board[8][8], &caststat, &prevmove, x0, y0, x1, y1, doit)
+{
+   sc = 0;
+   o = board[y0][x0]; t = sgn(o);
+   n = board[y1][x1];
+     
+   prevmove = y1*512 + x1*64 + y0*8 + x0;
+   
+   if (fabs(o) == 1) //pawn
+   {
+         //promote to queen
+           if ((o > 0) && (y1 == 7)) { o = 5; sc += rank[5]-rank[1]; }
+      else if ((o < 0) && (y1 == 0)) { o =-5; sc -= rank[5]-rank[1]; }
+      
+         //en passant
+      if ((n == 0) && (x0 != x1))
+      {
+         if (doit) { playsound("getstuff.flac"); }
+         if (board[y0][x1]) sc -= rank[board[y0][x1]];
+         board[y0][x1] = 0;
+      }
+   }
+
+   if (fabs(o) == 6) //castle
+   {
+         //moving king kills castle opportunity
+      if (o > 0) { caststat +=  3-   (caststat%4)  ; }
+            else { caststat += 12-int(caststat/4)*4; }
+      if (fabs(x1-x0) == 2)
+      {
+         board[y1][(x1>4)*2+3] = t*4;
+         board[y1][(x1>4)*7] = 0;
+      }
+   }
+   
+   if (fabs(o) == 4) //rook: moving it kills castle opportunity
+   {
+      if (o > 0)
+      {
+              if (x0 == 0) { if ((caststat%2) < 1) caststat += 1; }
+         else if (x0 == 7) { if ((caststat%4) < 2) caststat += 2; }
+      }
+      else
+      {
+              if (x0 == 0) { if ((caststat%8) < 4) caststat += 4; }
+         else if (x0 == 7) { if ( caststat    < 8) caststat += 8; }
+      }
+   }
+
+   board[y0][x0] = 0;
+   if (board[y1][x1])
+   {
+      if (y1 == 0)
+      {
+              if (x1 == 0) { if ((caststat%2) < 1) caststat += 1; }
+         else if (x1 == 7) { if ((caststat%4) < 2) caststat += 2; }
+      }
+      else
+      {
+              if (x1 == 0) { if ((caststat%8) < 4) caststat += 4; }
+         else if (x1 == 7) { if ( caststat    < 8) caststat += 8; }
+      }
+      sc -= rank[n];
+   }
+   board[y1][x1] = o;
+   
+   if (doit)
+   {
+      gshowhints = 0; gmove[gmoven] = prevmove; gmoven++;
+      if (n)
+      {
+         if (fabs(n) == 1) playsound("getstuff.flac");
+         if (fabs(n) == 2) playsound("blowup.flac");
+         if (fabs(n) == 3) playsound("blowup.flac");
+         if (fabs(n) == 4) playsound("blowup.flac");
+         if (fabs(n) == 5) playsound("death.flac");
+         if (fabs(n) == 6) playsound("closdoor.flac");
+      }
+      
+      for(ky=0;ky<8;ky++)
+         for(kx=0;kx<8;kx++)
+         {
+            if (board[ky][kx] != t*-6) continue;
+            if (ischeck(board,kx,ky,1-(o<0))) playsound("alarm.flac");
+            goto break2;
+         }
+break2:;
+   }
+
+   return(sc*t);
+}
+
+domove_ret_sc_only (board[8][8], x0, y0, x1, y1)
+{
+   sc = 0;
+   o = board[y0][x0];
+   n = board[y1][x1];
+   
+   if (fabs(o) == 1)
+   {
+         //promote to queen
+           if ((o > 0) && (y1 == 7)) { sc = rank[5]-rank[1]; }
+      else if ((o < 0) && (y1 == 0)) { sc = rank[1]-rank[5]; }
+   
+         //en passant
+      if ((n == 0) && (x0 != x1) && (board[y0][x1])) sc = -rank[board[y0][x1]];
+   }
+
+   if (n) sc -= rank[n];
+   return(sgn(o)*sc);
+}
+
+undomove (board[8][8], x0, y0, x1, y1, patch0, patch1)
+{
+   if ((fabs(board[y1][x1]) == 1) && (x0 != x1) && (!patch1)) //undo en passant
+      { board[y0][x1] = -board[y1][x1]; }
+   board[y0][x0] = patch0;
+   board[y1][x1] = patch1;
+   if ((fabs(patch0) == 6) && (fabs(x1-x0) == 2)) //undo castle
+   {
+      board[y1][(x1>4)*2+3] = 0;
+      board[y1][(x1>4)*7] = sgn(patch0)*4;
+   }
+}
+
+xyz2sxy (ox, oy, oz, &sx, &sy)
+{
+   x = ox-3.5; y = oz;
+   z = oy-3.5;
+   x -= ipos.x; y -= ipos.y; z -= ipos.z;
+   nx = x*irig.x + y*irig.y + z*irig.z;
+   ny = x*idow.x + y*idow.y + z*idow.z;
+   nz = x*ifor.x + y*ifor.y + z*ifor.z;
+   f = ghz/nz;
+   sx = nx*f+ghx;
+   sy = ny*f+ghy;
+}
+
+showdebugpath (x0, y0, x1, y1)
+{
+   dx = x1-x0; dy = y1-y0; f = 1/sqrt(dx*dx + dy*dy); dx *= f; dy *= f;
+   drawcone(x0-3.5,0,y0-3.5,.02,x1-3.5,0,y1-3.5,.02);
+   drawcone(x1-dx*.1-3.5,0,y1-dy*.1-3.5,-.06,x1+dx*.1-3.5,0,y1+dy*.1-3.5,.01);
+}
+
+enum {MAXDEP=8;}
+static moves[MAXDEP][320], csc[MAXDEP][320];
+
+move2xys (k, &x0, &y0, &x1, &y1)
+{
+                y1 = int(k/512);
+   k -= y1*512; x1 = int(k/64);
+   k -= x1*64;  y0 = int(k/8);
+   k -= y0*8;   x0 = k;
+}
+
+   //Assumes (kingx,kingy) is turn's king (even if it's not)
+ischeck (board[8][8], kingx, kingy, turn)
+{
+   t = 1-turn*2;
+   
+      //check king
+   x0 = max(kingx-1,0); x1 = min(kingx+1,7);
+   y0 = max(kingy-1,0); y1 = min(kingy+1,7);
+   for(y=y0;y<=y1;y++) for(x=x0;x<=x1;x++) if (board[y][x] == t*-6) return(1);
+      
+      //check pawn
+   if (kingy != (1-turn)*7)
+   {
+      if ((kingx > 0) && (board[kingy+t][kingx-1] == -t)) return(1);
+      if ((kingx < 7) && (board[kingy+t][kingx+1] == -t)) return(1);
+   }
+      
+      //check knight
+   static knix[8] = {+1,+2,+2,+1,-1,-2,-2,-1};
+   static kniy[8] = {+2,+1,-1,-2,-2,-1,+1,+2};
+   for(i=8-1;i>=0;i--)
+   {
+      x = knix[i]+kingx; if ((x < 0) || (x >= 8)) continue;
+      y = kniy[i]+kingy; if ((y < 0) || (y >= 8)) continue;
+      if (board[y][x] == t*-2) return(1);
+   }
+   
+      //check others
+   static dirx[8] = {-1,+1, 0, 0,-1,+1,-1,+1};
+   static diry[8] = { 0, 0,-1,+1,-1,-1,+1,+1};
+   static dirt[8] = {-4,-4,-4,-4,-3,-3,-3,-3};
+   for(i=8-1;i>=0;i--)
+   {
+      x = kingx; y = kingy;
+      do
+      {
+         x += dirx[i]; if ((x < 0) || (x >= 8)) break;
+         y += diry[i]; if ((y < 0) || (y >= 8)) break;
+         b = board[y][x]; if (!b) continue;
+         b *= t; if ((b == -5) || (b == dirt[i])) return(1); //opp: queen=t*-5, bishop=t*-3, rook=t*-4
+         break;
+      } while (1);
+   }
+   
+   return(0);
+}
+
+getvalmoves (board[8][8], caststat, prevmove, turn, dep)
+{
+   n = 0; t = 1-turn*2;
+   for(y0=0;y0<8;y0++)
+      for(x0=0;x0<8;x0++)
+      {
+         p = board[y0][x0]; if (sgn(p) != t) continue;
+         p = fabs(p); m = (y0*8+x0)*65;
+         
+         if (p == 1) //pawn
+         {
+            if (!board[y0+t][x0])
+            {
+               moves[dep][n] = m + t*512; n++;
+               if ((y0 == turn*5+1) && (!board[y0+t*2][x0]))
+                  { moves[dep][n] = m + t*1024; n++; }
+            }
+            for(x=-1;x<=1;x+=2)
+            {
+               if ((x+x0 < 0) || (x+x0 >= 8)) continue;
+               if (sgn(board[y0+t][x+x0]) == -t) { moves[dep][n] = m + t*512 + x*64; n++; }
+            }
+            if (y0 == 4-turn) //capture en passant
+            {
+               move2xys(prevmove,&ox0,&oy0,&ox1,&oy1);
+               if ((board[oy1][ox1] == -t) && (fabs(oy1-oy0) == 2) && (fabs(ox0-x0) == 1))
+                  { moves[dep][n] = m + t*512 + (ox1-x0)*64; n++; }
+            }
+            continue;
+         }
+         if (p == 2) //knight
+         {
+            static knix[8] = {+1,+2,+2,+1,-1,-2,-2,-1};
+            static kniy[8] = {+2,+1,-1,-2,-2,-1,+1,+2};
+            static knia[8] = {1024+64,512+128,-512+128,-1024+64,-1024-64,-512-128,512-128,1024-64};
+            for(i=8-1;i>=0;i--)
+            {
+               x = knix[i]+x0; if ((x < 0) || (x >= 8)) continue;
+               y = kniy[i]+y0; if ((y < 0) || (y >= 8)) continue;
+               if (sgn(board[y][x]) == t) continue;
+               moves[dep][n] = knia[i] + m; n++;
+            }
+            continue;
+         }
+         if (p == 6) //king
+         {
+            static kinx[8] = {-1, 0,+1,-1,+1,-1, 0,+1};
+            static kiny[8] = {-1,-1,-1, 0, 0,+1,+1,+1};
+            static kina[8] = {-9*64,-8*64,-7*64,-1*64,+1*64,+7*64,+8*64,+9*64};
+            for(i=8-1;i>=0;i--)
+            {
+               x = kinx[i]+x0; if ((x < 0) || (x >= 8)) continue;
+               y = kiny[i]+y0; if ((y < 0) || (y >= 8)) continue;
+               if (sgn(board[y][x]) == t) continue;
+               moves[dep][n] = kina[i] + m; n++;
+            }
+            if ((x0 == 4) && (y0 == turn*7)) //castle
+            {
+                  //long castle
+               if ((board[y0][3] == 0) && (board[y0][2] == 0) && (board[y0][1] == 0) &&
+                   (board[y0][0] == t*4) && ((caststat%(turn* 6+2)) < turn*3+1))
+               {
+                  if ((!ischeck(board,4,y0,turn)) && 
+                      (!ischeck(board,3,y0,turn)) && 
+                      (!ischeck(board,2,y0,turn))) { moves[dep][n] = m - 128; n++; }
+               }
+               
+                  //short castle
+               if ((board[y0][5] == 0) && (board[y0][6] == 0) &&
+                   (board[y0][7] == t*4) && ((caststat%(turn*12+4)) < turn*6+2))
+               {
+                  if ((!ischeck(board,4,y0,turn)) && 
+                      (!ischeck(board,5,y0,turn)) && 
+                      (!ischeck(board,6,y0,turn))) { moves[dep][n] = m + 128; n++; }
+               }
+            }
+            continue;
+         }
+         if (p != 3) //horiz/vert (rook&queen)
+         {
+            for(i=1,j=x0;i<=j;i++)
+            {
+               b = board[y0][x0-i]; if (sgn(b) == t) break;
+               moves[dep][n] = i*(-64) + m; n++; if (b) break;
+            }
+            for(i=1,j=7-x0;i<=j;i++)
+            {
+               b = board[y0][x0+i]; if (sgn(b) == t) break;
+               moves[dep][n] = i*(+64) + m; n++; if (b) break;
+            }
+            for(i=1,j=y0;i<=j;i++)
+            {
+               b = board[y0-i][x0]; if (sgn(b) == t) break;
+               moves[dep][n] = i*(-512) + m; n++; if (b) break;
+            }
+            for(i=1,j=7-y0;i<=j;i++)
+            {
+               b = board[y0+i][x0]; if (sgn(b) == t) break;
+               moves[dep][n] = i*(+512) + m; n++; if (b) break;
+            }
+         }
+         if (p != 4) //diag (bishop&queen)
+         {
+            for(i=1,j=min(x0,y0);i<=j;i++)
+            {
+               b = board[y0-i][x0-i]; if (sgn(b) == t) break;
+               moves[dep][n] = i*(-64-512) + m; n++; if (b) break;
+            }
+            for(i=1,j=min(7-x0,7-y0);i<=j;i++)
+            {
+               b = board[y0+i][x0+i]; if (sgn(b) == t) break;
+               moves[dep][n] = i*(+64+512) + m; n++; if (b) break;
+            }
+            for(i=1,j=min(x0,7-y0);i<=j;i++)
+            {
+               b = board[y0+i][x0-i]; if (sgn(b) == t) break;
+               moves[dep][n] = i*(-64+512) + m; n++; if (b) break;
+            }
+            for(i=1,j=min(7-x0,y0);i<=j;i++)
+            {
+               b = board[y0-i][x0+i]; if (sgn(b) == t) break;
+               moves[dep][n] = i*(+64-512) + m; n++; if (b) break;
+            }
+         }
+      }
+   
+   if (dep == 0) //delete moves that would put king in check
+   {
+      for(y=0;y<8;y++)
+         for(x=0;x<8;x++)
+            if (board[y][x] == t*6) { kx = x; ky = y; goto foundking2; }
+foundking2:;
+      for(i=n-1;i>=0;i--)
+      {
+         move2xys(moves[dep][i],&x0,&y0,&x1,&y1);
+
+         ocaststat = caststat; oprevmove = prevmove; patch0 = board[y0][x0]; patch1 = board[y1][x1];
+         domove(board,&caststat,&prevmove,x0,y0,x1,y1,0);
+         
+         for(y=max(ky-1,0);y<=min(ky+1,7);y++)
+            for(x=max(kx-2,0);x<=min(kx+2,7);x++)
+               if (board[y][x] == t*6)
+                  if (ischeck(board,x,y,turn))
+                     { n--; moves[i] = moves[n]; } //delete move - would put king in check
+         
+         undomove(board,x0,y0,x1,y1,patch0,patch1); caststat = ocaststat; prevmove = oprevmove;
+      }
+   }
+   
+   return(n);
+}
+
+static guseprune;
+getcompmove_rec (board[8][8], &caststat, &prevmove, turn, &bx0, &by0, &bx1, &by1, dep, depmax, obestsc)
+{
+   movesn = getvalmoves(board,caststat,prevmove,turn,dep); bsc = -1e32;
+   
+#if 0
+   if ((dep > 0) && (dep < 3)) //attempt at doing best move first (too much overhead)
+   {
+      for(i=movesn-1;i>=0;i--)
+      {
+         move2xys(moves[dep][i],&x0,&y0,&x1,&y1);
+         csc[dep][i] = domove_ret_sc_only(board,x0,y0,x1,y1);
+      }
+      for(gap=1;gap<movesn;gap=gap*3+1);
+      for(gap=int(gap/3);gap>0;gap=int(gap/3))
+         for(i=0;i<movesn-gap;i++)
+            for(j=i;(j >= 0) && (csc[dep][j] < csc[dep][j+gap]);j-=gap)
+            {
+               k = csc  [dep][j]; csc  [dep][j] = csc  [dep][j+gap]; csc  [dep][j+gap] = k;
+               k = moves[dep][j]; moves[dep][j] = moves[dep][j+gap]; moves[dep][j+gap] = k;
+            }
+   }
+#endif
+
+   for(i=movesn-1;i>=0;i--)
+   {
+#if 0
+      if ((dep > 0) && (dep < 3)) //attempt at doing best move first (too much overhead)
+      {
+         k = moves[dep][i]; //No shuffle
+      }
+      else
+#endif      
+      {
+         j = int((i+1)*rnd); k = moves[dep][j]; moves[dep][j] = moves[dep][i]; moves[dep][i] = k; //Shuffle
+      }
+      move2xys(k,&x0,&y0,&x1,&y1);
+
+      ocaststat = caststat; oprevmove = prevmove; patch0 = board[y0][x0]; patch1 = board[y1][x1];
+      sc = domove(board,&caststat,&prevmove,x0,y0,x1,y1,0);
+      if (dep < depmax)
+         sc -= getcompmove_rec(board,caststat,prevmove,1-turn,&nx0,&ny0,&nx1,&ny1,dep+1,depmax,bsc-sc);
+      undomove(board,x0,y0,x1,y1,patch0,patch1); caststat = ocaststat; prevmove = oprevmove;
+      
+      if ((!dep) && (gshowhints) && (!guseprune))
+      {
+         setcol(0xffffff); setfont(8,12); dx = x1-x0; dy = y1-y0; f = 1 - .25/sqrt(dx^2+dy^2);
+         xyz2sxy(dx*f+x0,dy*f+y0,0,&sx,&sy); moveto(sx-4,sy-6); printf("%g",sc);
+      }
+         
+      if (sc > bsc)
+      {
+         bsc = sc; if (!dep) { bx0 = x0; by0 = y0; bx1 = x1; by1 = y1; }
+         if ((guseprune) && (sc >= -obestsc)) break; //alpha-beta prune
+      }
+   }
+   return(bsc);
+}
+
+getcompmove (board[8][8], &caststat, &prevmove,turn, &bx0, &by0, &bx1, &by1, depmax)
+{
+   guseprune = (depmax >= 0); depmax = fabs(depmax);
+   
+   t0 = klock();
+   bsc = getcompmove_rec(board,caststat,prevmove,turn,bx0,by0,bx1,by1,0,depmax-1,-1e32);
+   t1 = klock(); gtcomp = t1-t0;
+   
+   if (gshowhints)
+   {
+      setcol(0xffffff); setfont(8,12); dx = bx1-bx0; dy = by1-by0; f = 1 - .25/sqrt(dx^2+dy^2);
+      xyz2sxy(dx*f+bx0,dy*f+by0,0,&sx,&sy); moveto(sx-4,sy-6); printf("%g",bsc);
+   }
+
+   return(bsc != -1e32);
+}

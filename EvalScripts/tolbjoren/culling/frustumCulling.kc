@@ -1,0 +1,386 @@
+
+// simple frustum culling
+// see here how to do it proper:
+// http://www.lighthouse3d.com/opengl/viewfrustum/index.php?gaplanes
+
+struct vec3
+{
+   x,y,z;
+};
+
+struct plane_t
+{
+   Vec3 normal;
+   Vec3 point;
+   d;
+};
+
+struct camera_t
+{
+   vec3 xaxis,yaxis,zaxis;
+};
+
+static camera_t cam;
+
+static plane_t planes[6];
+enum{NEARP, FARP, TOP, BOTTOM, LEFTP, RIGHTP}
+
+// 4 near corners
+static vec3 ntl ,ntr ,nbl ,nbr ;
+
+// 4 far corners
+static vec3 ftl ,ftr ,fbl ,fbr;
+
+static degToRad = PI/180;
+
+// Distances
+static nearD, farD;
+static Vec3 campos;
+static fov = 0;
+()
+{
+   cls(0); clz(1e32);
+   setcam(0,-12,-12,0,45 * degToRad);
+   //setcam(0,-25,0, 0,90*degToRad);
+   //setcam(0,0,-15,0,0);
+   
+   if(numframes==0)
+   {
+      campos.x = 0;
+      campos.y = 0;
+      campos.z = 0;
+   }
+   dx = (keystatus[203] - keystatus[205]) * 0.05;
+   campos.y += (keystatus[2] - keystatus[3]) * 0.05;
+   dz = (keystatus[200] - keystatus[208]) * 0.05;
+
+   hang = mousx/xres * 2* PI;
+
+   campos.x += cos( hang ) * dz;
+   campos.z += sin( hang ) * dz;
+   
+   campos.x += cos( hang+pi/2 ) * dx;
+   campos.z += sin( hang+pi/2 ) * dx;
+
+   vec3 look_dir;
+   vec3 up_dir;
+   vec3 side_dir;
+
+   look_dir.x = cos(hang);
+   look_dir.y = 0.;
+   look_dir.z = sin(hang);
+   normalize(look_dir);
+      
+   up_dir.x = 0;
+   up_dir.y = 1;
+   up_dir.z = 0;
+   
+   veccross( side_dir, look_dir, up_dir );
+   
+   vec3 look_pos;
+   look_pos.x = campos.x + look_dir.x;
+   look_pos.y = campos.y - look_dir.y;
+   look_pos.z = campos.z + look_dir.z;
+
+   setCamDef(campos, look_pos, up_dir);
+   
+   draw_frustum( );
+   
+
+   
+   // draw look dir
+   moveto(campos.x,campos.y,campos.z); lineto(look_pos.x,look_pos.y,look_pos.z);
+
+   draw_scene();
+}
+
+draw_scene()
+{
+   num = 8;
+   radius = 2;
+   pts_active = 0;
+   max_pts = 0;
+   
+   glbegin(GL_POINTS);
+   for(i=0; i<num; i++)
+   for(j=0; j<num; j++)
+   for(k=0; k<num; k++)
+   {
+      Vec3 pt;
+      pt.x = -radius + i/num * 2*radius;
+      pt.y = -radius + j/num * 2*radius;
+      pt.z = -radius + k/num * 2*radius;
+      
+      /*
+      pt.x = i-(num-1)/2;
+      pt.y = j-(num-1)/2;
+      pt.z = k-(num-1)/2;
+      */
+      
+      /*
+      if( testFrustumSphere(pt,radius) )
+      {
+         ballsActive++;
+         setcol(255,0,0);  
+      }
+      else{
+         setcol(255,255,255);
+      }
+      */
+      
+      if( pointInFrustum(pt) )
+      {
+         pts_active++;
+         setcol(255,0,0);  
+         drawsph(pt.x, pt.y, pt.z, .1);//radius);
+         
+      }
+      else{
+         setcol(255,255,255);
+         glVertex( pt.x, pt.y, pt.z );
+          
+      }
+
+      
+      
+      max_pts++;
+   }
+   
+   setcol(255,255,255);
+   moveto(0,0);
+   printf("%g of %g points active", pts_active, max_pts);
+}
+
+pointInFrustum(vec3 p) {
+ // compute vector from camera position to p
+ vec3 v;
+ v.x = p.x - camPos.x;
+ v.y = p.y - camPos.y;
+ v.z = p.z - camPos.z;
+   
+ vec3 xaxis;
+ vec3 yaxis;
+ vec3 neg_zaxis;
+   
+ xaxis = cam.xaxis;
+ yaxis = cam.yaxis;
+
+ neg_zaxis = cam.zaxis;
+ neg_zaxis.x *= -1;
+ neg_zaxis.y *= -1;
+ neg_zaxis.z *= -1;
+   
+ fov = 25*degtorad;
+ tang = tan( fov );
+ ratio = 1;
+
+ // compute and test the Z coordinate
+ pcz = vecdot(v, neg_zaxis);
+ if (pcz > farD || pcz < nearD) return 0;
+
+ // compute and test the Y coordinate
+ pcy = vecdot(v, yaxis);
+ aux = pcz * tang;
+ if (pcy > aux || pcy < -aux) return 0;
+
+ // compute and test the X coordinate
+ pcx = vecdot(v, xaxis);
+ aux = pcz*tang * ratio;
+ if (pcx > aux || pcx < -aux) return 0;
+
+ return 1;
+}
+
+testFrustumSphere(Vec3 p,ballRadi)
+{
+   dist = 0;
+   for(l=0; l<6; l++) 
+   {
+       dpr = planes[l].normal.x * p.x + planes[l].normal.y * p.y + planes[l].normal.z * p.z;
+
+       dist = planes[l].d + dpr;
+
+       if ( dist < -ballRadi)
+       {
+           return 0;
+       }
+
+   }
+   return 1;
+}
+
+
+setCamDef(Vec3 p, Vec3 l, Vec3 u) 
+{
+   fov = 25 * degToRad;
+   nearD = 1;
+   farD = 8;
+   
+   //ratio = xres/yres;
+   ratio = 1;
+   nearH = 2 * tan( fov * .5 ) * nearD;
+   nearW = nearH * ratio;
+   
+   farH = 2 * tan( fov * .5 ) * farD;
+   farW = farH * ratio;
+   
+   vec3 dir,nc,fc;
+
+   // compute the Z axis of camera
+   // this axis points in the opposite direction from 
+   // the looking direction
+   cam.zaxis.x = p.x - l.x;
+   cam.zaxis.y = p.y - l.y;
+   cam.zaxis.z = p.z - l.z;
+   normalize(cam.zaxis);
+
+   // X axis of camera with given "up" vector and Z axis
+   veccross( cam.xaxis, u, cam.zaxis );
+   normalize(cam.xaxis);
+
+   // the real "up" vector is the cross product of Z and X
+   veccross(cam.yaxis, cam.zaxis, cam.xaxis );
+   
+   vec3 X,Y,Z;
+   X = cam.xaxis;
+   Y = cam.yaxis;
+   Z = cam.zaxis;
+   
+   // compute the centers of the near and far planes
+   nc.x = p.x - Z.x * nearD;
+   nc.y = p.y - Z.y * nearD;
+   nc.z = p.z - Z.z * nearD;  
+
+   fc.x = p.x - Z.x * farD;
+   fc.y = p.y - Z.y * farD;
+   fc.z = p.z - Z.z * farD;
+
+   // compute the 4 corners of the frustum on the near plane
+   ntl.x = nc.x + Y.x * nearH - X.x * nearW;
+   ntl.y = nc.y + Y.y * nearH - X.y * nearW;
+   ntl.z = nc.z + Y.z * nearH - X.z * nearW;
+   
+   ntr.x = nc.x + Y.x * nearH + X.x * nearW;
+   ntr.y = nc.y + Y.y * nearH + X.y * nearW;
+   ntr.z = nc.z + Y.z * nearH + X.z * nearW;   
+
+   nbl.x = nc.x - Y.x * nearH - X.x * nearW;
+   nbl.y = nc.y - Y.y * nearH - X.y * nearW;
+   nbl.z = nc.z - Y.z * nearH - X.z * nearW;
+   
+   nbr.x = nc.x - Y.x * nearH + X.x * nearW;
+   nbr.y = nc.y - Y.y * nearH + X.y * nearW;
+   nbr.z = nc.z - Y.z * nearH + X.z * nearW;
+
+   // compute the 4 corners of the frustum on the far plane
+   ftl.x = fc.x + Y.x * farH - X.x * farW;
+   ftl.y = fc.y + Y.y * farH - X.y * farW;
+   ftl.z = fc.z + Y.z * farH - X.z * farW;
+   
+   ftr.x = fc.x + Y.x * farH + X.x * farW;
+   ftr.y = fc.y + Y.y * farH + X.y * farW;
+   ftr.z = fc.z + Y.z * farH + X.z * farW;
+
+   fbl.x = fc.x - Y.x * farH - X.x * farW;
+   fbl.y = fc.y - Y.y * farH - X.y * farW;
+   fbl.z = fc.z - Y.z * farH - X.z * farW;
+   
+   fbr.x = fc.x - Y.x * farH + X.x * farW;
+   fbr.y = fc.y - Y.y * farH + X.y * farW;
+   fbr.z = fc.z - Y.z * farH + X.z * farW;
+
+   // compute the six planes
+   // the function set3Points assumes that the points
+   // are given in counter clockwise order
+   
+   planeFrom3Points( NEARP, ntl,ntr,nbr);
+   planeFrom3Points( FARP, ftr,ftl,fbl);
+   planeFrom3Points( TOP, ntr, ntl, ftl );
+   planeFrom3Points( BOTTOM, nbl,nbr,fbr);
+   planeFrom3Points( LEFTP, ntl,nbl,fbl);
+   planeFrom3Points( RIGHTP, nbr,ntr,fbr);
+}
+
+
+planeFrom3Points( planeIdx, Vec3 v1, Vec3 v2,  Vec3 v3)
+{
+   Vec3 aux1, aux2, normal;
+
+   aux1.x = v1.x - v2.x;
+   aux1.y = v1.y - v2.y;
+   aux1.z = v1.z - v2.z;
+   
+   aux2.x = v3.x - v2.x;
+   aux2.y = v3.y - v2.y;
+   aux2.z = v3.z - v2.z;
+
+   normal.x = aux2.y * aux1.z - aux2.z * aux1.y;
+   normal.y = aux2.z * aux1.x - aux2.x * aux1.z;
+   normal.z = aux2.x * aux1.y - aux2.y * aux1.x;
+
+   normalize( normal );
+   
+   dpr = normal.x * v2.x + normal.y * v2.y + normal.z * v2.z;
+   d = -dpr;
+   
+   planes[planeIdx].normal.x = normal.x;
+   planes[planeIdx].normal.y = normal.y;
+   planes[planeIdx].normal.z = normal.z;
+  
+   planes[planeIdx].point.x = v2.x;
+   planes[planeIdx].point.y = v2.y;
+   planes[planeIdx].point.z = v2.z; 
+   
+   planes[planeIdx].d = d;
+}
+
+draw_frustum()
+{
+   moveto(ntl.x, ntl.y, ntl.z );
+   lineto(ntr.x, ntr.y, ntr.z );
+   lineto(nbr.x, nbr.y, nbr.z );
+   lineto(nbl.x, nbl.y, nbl.z );
+   lineto(ntl.x, ntl.y, ntl.z );
+   
+
+   moveto(ftl.x, ftl.y, ftl.z );
+   lineto(ftr.x, ftr.y, ftr.z );
+   lineto(fbr.x, fbr.y, fbr.z );
+   lineto(fbl.x, fbl.y, fbl.z );
+   lineto(ftl.x, ftl.y, ftl.z );
+   
+   moveto(ntl.x, ntl.y, ntl.z );
+   lineto(ftl.x, ftl.y, ftl.z );
+
+   moveto(ntr.x, ntr.y, ntr.z );
+   lineto(ftr.x, ftr.y, ftr.z );
+   
+   moveto(nbl.x, nbl.y, nbl.z );
+   lineto(fbl.x, fbl.y, fbl.z );
+   
+   moveto(nbr.x, nbr.y, nbr.z );
+   lineto(fbr.x, fbr.y, fbr.z );
+}
+
+
+normalize(Vec3 n)
+{
+   len = sqrt(n.x^2 + n.y^2 + n.z^2);
+   n.x /= len;
+   n.y /= len;
+   n.z /= len;
+}
+
+vecdot(vec3 a, vec3 b)
+{
+   return a.x*b.x + 
+          a.y*b.y +
+          a.z*b.z;
+}
+
+vecCross( vec3 out, vec3 a, vec3 b)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}

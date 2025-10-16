@@ -1,0 +1,204 @@
+struct sph{
+   x,y;
+   r;
+   tx,ty;
+   customFreq;
+};
+
+enum{MAX_CIRCLES=50}
+static sph sphrs[MAX_CIRCLES];
+static margin;
+static interval;
+static outlineFatness = 1;
+
+static time,dt;
+
+struct lineseg{
+   x1,y1,x2,y2;
+   drawme;
+   belongsTo;
+};
+
+enum{MAX_LINES = 1024*8}
+static lineseg lineList[MAX_LINES];
+static num_lines = 0;
+()
+{
+   newTime = klock();
+   dt = newTime - time;
+   time = newTime;
+
+   cls(0x3545b5);
+   clz(1e32);
+   num_lines = 0;
+
+   //sphrs[0].x = 50;
+   //sphrs[0].y = 50;
+
+   sphrs[1].x = mousx;
+   sphrs[1].y = mousy;
+
+   if(numframes==0)
+   {
+      margin = 100;
+      interval = min(xres,yres) - 2*margin;    
+
+      for(i=0; i<MAX_CIRCLES; i++)
+      {
+         sphrs[i].x = xres/2;
+         sphrs[i].y = yres/2;
+         sphrs[i].r = 30 + 20*rnd;
+
+         sphrs[i].tx = margin+interval * rnd;
+         sphrs[i].ty = margin+interval * rnd;
+
+      }
+   }
+   
+   for(i=0; i<MAX_CIRCLES; i++)
+   {
+         vecx = sphrs[i].tx - sphrs[i].x;
+         vecy = sphrs[i].ty - sphrs[i].y;
+         dist = sqrt(vecx*vecx + vecy*vecy );
+         vecx /= dist;
+         vecy /= dist;
+         sphrs[i].x += vecx * dt * 100;
+         sphrs[i].y += vecy * dt * 100;      
+         
+         if( dist < 3 )
+         {
+            sphrs[i].tx = margin+interval * rnd;
+            sphrs[i].ty = margin+interval * rnd;
+         }
+   }
+   
+
+   for(i=0; i<MAX_CIRCLES; i++)
+   {
+      x1 = sphrs[i].x; y1 = sphrs[i].y;   
+      r1 = sphrs[i].r;
+   
+      setcol(255,255,255);
+      lineList[num_lines].belongsTo = i;
+      drawCirc( x1,y1, -r1 );
+      drawSph( x1, y1, 2 );
+   }
+   
+   for(i=0; i<MAX_CIRCLES; i++)
+   {
+      x1 = sphrs[i].x; y1 = sphrs[i].y;
+      r1 = sphrs[i].r;   
+      setcol(0x4dacdb);
+      //drawSph( x1, y1, r1-outlineFatness+.5 );
+      //setcol(255,255,255);
+      //texCirc(x1,y1,r1-outlineFatness+.5);
+   }
+   
+   for(i=0; i<num_lines; i++)
+   {
+      px1 = lineList[i].x1; py1 = lineList[i].y1;
+      px2 = lineList[i].x2; py2 = lineList[i].y2;
+      lineList[i].drawme = 1;      
+
+      for(j=0; j<MAX_CIRCLES; j++)
+      {
+         if( lineList[i].belongsTo == j ) continue;
+         
+         cx = sphrs[j].x; 
+         cy = sphrs[j].y;
+         r = sphrs[j].r - outlineFatness; 
+         if( insideCirc(px1,py1,cx,cy,r) || insideCirc(px2,py2,cx,cy,r) )
+         {
+            lineList[i].drawme = 0;
+            break;
+         }
+      }
+   }
+   
+   setcol(255,255,255);
+   for(i=0; i<num_lines; i++)
+   {
+      if( lineList[i].drawme == 1) 
+      {
+         px1 = lineList[i].x1; py1 = lineList[i].y1;
+         px2 = lineList[i].x2; py2 = lineList[i].y2;
+         //moveto(px1,py1); lineto(px2,py2);
+         drawcone(px1,py1,outlineFatness, px2,py2, outlineFatness);
+      }
+       
+   }
+   
+   moveto(0,0);
+   printf("%g", num_lines);
+   
+   /*
+   setcol(255,0,0);
+   if( insideCirc(mousx,mousy,xres/2,yres/2,100) ) setcol(255,255,0);
+   drawsph(xres/2,yres/2,-100);
+   */
+
+}
+
+insideCirc(px,py,cx,cy,r)
+{
+   dx = px-cx;
+   dy = py-cy;
+   distSq = dx*dx + dy*dy;
+   if( distSq < r*r ) return 1;
+   return 0;
+}
+
+drawCirc(x,y,r)
+{
+   num = 60;
+   double f = 2.0*PI/(num-1);
+   double a = cos(f);
+   double b = sin(f);
+   double s = 0.0;
+   double c = 1.0;
+   
+   ox = x+r*s;
+   oy = y+r*c;   
+
+   for( n=0; n < num; n++ )
+   {
+       // do something with s and c
+      xp1 = x+r*s;
+      yp1 = y+r*c;
+      lineList[num_lines].x1 = ox;
+      lineList[num_lines].y1 = oy;
+      lineList[num_lines].x2 = xp1;
+      lineList[num_lines].y2 = yp1;  
+      num_lines++; 
+      ox = xp1;
+      oy = yp1;
+
+       double ns = b*c + a*s;
+       double nc = a*c - b*s;
+       c = nc;
+       s = ns;
+   }
+}
+
+drawCircOld(x,y,r)
+{
+   segs = 60;
+   ang_delta = 2*PI / (segs-1);
+   ang = 0;
+   for(i=0; i<segs; i++)
+   {
+      xp1 = x+r*cos(ang_delta * i);
+      yp1 = y+r*sin(ang_delta * i);
+      
+      xp2 = x+r*cos(ang_delta * (i+1));
+      yp2 = y+r*sin(ang_delta * (i+1));
+      
+      lineList[num_lines].x1 = xp1;
+      lineList[num_lines].y1 = yp1;
+      lineList[num_lines].x2 = xp2;
+      lineList[num_lines].y2 = yp2;  
+      num_lines++;    
+      //drawsph(xp,yp,outlineFatness);
+   }
+}
+

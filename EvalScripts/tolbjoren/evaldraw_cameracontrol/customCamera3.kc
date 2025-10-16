@@ -1,0 +1,277 @@
+
+
+
+static angle,angle2 = 0;
+
+
+
+
+
+//vector library for evaldraw by T.
+enum{maxvectors=100};
+static vecX[maxvectors];
+static vecY[maxvectors];
+static vecZ[maxvectors];
+static isDead[maxvectors];
+static aliveVectors;
+
+static eyeX, eyeY, eyeZ;
+
+// TODO cross prod to find right/side vector
+// side = forward x down
+()
+{
+   cls(0); clz(1e32);
+      
+   // Ball movement
+   f = .05;
+   vx2 = (keystatus[32]-keystatus[30])*f; //D-A
+   vy2 = (keystatus[17]-keystatus[31])*f; //W-S
+   
+   angle += vx2;
+   angle2 += vy2;
+   
+   r = 1;
+   x = cos(angle) * r;
+   y = sin(angle) * r;
+   
+   x2 = cos(angle2) * r;
+   y2 = sin(angle2) * r;
+
+   upDown = (keystatus[200]-keystatus[208]) *f;
+   leftRight = (keystatus[203]-keystatus[205]) *f;
+   shiftCtrl = (keystatus[54]-keystatus[157]) *f;
+   
+   
+   eyeX += leftRight;
+   eyeY += shiftCtrl;
+   eyeZ += upDown;   
+
+   obj = vec3( cos(angle) * r, cos(angle2)*r, sin(angle) * r);
+   
+   theta = 0;
+   phi = 0;
+   p = 10;
+   obj2 = vec3( eyeX + p*sin(theta)*cos(phi) , eyeY + p*sin(theta)*sin(phi), eyeZ + p*cos(theta));
+   
+   fwd = 0; up = 0; side = 0;
+   // Look at a obj in 3d space from a eye position
+   // copy the forward, up and side vectors generated for use when drawing and
+   // printing vector values.
+   //lookAt(obj,eyeX,eyeY,eyeZ, fwd, up, side);
+   lookAt(obj,eyeX,eyeY,eyeZ, fwd, up, side);
+
+   
+
+   // Draw 
+   setcol(0,0,255); grid(-1); // ceil grid
+   setcol(255,0,0); grid(1); // floor grid
+   ballOfLines(fwd); // A sphere of lines pointing at the lookAt obj.
+   drawsph( vecX[obj], vecY[obj], vecZ[obj], 1 );
+   //drawsph( vecX[obj2], vecY[obj2], vecZ[obj2], .1 );
+   
+   setcol(0xffffff);
+   moveto(0,0,0);
+   n=0.5;
+   //lineto(vecX[fwd]*n, vecY[fwd]*n, vecZ[fwd]*n);
+
+   
+   //setcol(0xff0000); drawsph(xres/2 - x*100, yres/2 + y*100, -10);
+   
+   //drawsph(50+x2*20,100, -10);   
+   //drawsph(50+y2*20,120, -10); 
+
+   moveto(0,0); printf("forwards  "); vecPrint(fwd);
+   moveto(0,15); printf("up vector "); vecPrint(up);
+   moveto(0,15*2); printf("side      "); vecPrint(side);
+
+   vecDeleteAll();
+}
+
+lookAt(obj,eyeX,eyeY,eyeZ, &fwd, &up, &side)
+{
+   // find forward dir
+   
+   eyePos = vec3(eyeX,eyeY,eyeZ);
+   fwd = vecSub(obj,eyePos);
+   vecNormalize(fwd);   
+   
+   // find up vector as close to world up as possible
+   worldUp = vec3(0,-1,0);
+   dotprod = vecDot(worldUp,fwd);
+   part2 = vec3( vecX[fwd]*dotprod, vecY[fwd]*dotprod, vecZ[fwd]*dotprod);
+   up = vecSub(worldUp,part2);
+   vecNormalize(up);
+
+   side = vecCross(fwd,up);
+   vecNormalize(side);
+   
+   setcam(eyeX,eyeY,eyeZ, 
+          vecX[side], vecY[side], vecZ[side], 
+          vecX[up], vecY[up], vecZ[up],
+          vecX[fwd], vecY[fwd], vecZ[fwd]);
+}
+
+ballOfLines(fwd)
+{
+   n = 2;
+   lx = vecX[fwd]/n; ly = vecY[fwd]/n; lz = vecZ[fwd]/n;
+   max=30;
+   for(i=0; i<max; i++)
+   {
+      theta = i*2*PI / max;
+      
+      for(steps=0; steps<max; steps++)
+      {     
+         phi = steps*2*PI / max;
+         
+         cphi = cos(phi);
+         sphi = sin(phi);
+         ctheta = cos(theta);  
+         stheta = sin(theta);      
+         
+         r = 3;
+         xpos = cphi*stheta*r;
+         zpos = sphi*stheta*r;
+         ypos = ctheta*r;
+
+         moveto(xpos,ypos,zpos);
+         lineto(xpos+lx,ypos+ly,zpos+lz);
+      }
+   }
+}
+
+
+grid(y)
+{
+   step = 1/2;
+   ox = -5;
+   oz = -5;
+   for(x=-5; x<5; x+=step)
+   {
+   for(z=-5; z<5; z+=step)
+   {
+      moveto(ox,y,oz);
+      lineto(x,y,z);
+
+      moveto(oz,y,ox);
+      lineto(z,y,x);
+            
+      ox = x;
+   } 
+   }
+}
+
+//////////////////////////////////////////////
+//  V E C T O R     F U N C T I O N S       //
+//////////////////////////////////////////////
+
+vecDeleteAll(){ 
+aliveVectors = 0;
+for(i=0; i<maxvectors; i++) isDead[i] = 1;
+}
+
+vec3(x,y,z)
+{
+   i=0;
+   for(; i<maxvectors; i++)
+   {
+      if(isDead[i] == 1){
+         isDead[i] = 0;
+         break;
+      }
+   }
+   vecX[i] = x;
+   vecY[i] = y;
+   vecZ[i] = z;
+   handle = i;
+   aliveVectors++;
+   
+   return handle;
+}
+
+vecAdd(a,b)
+{
+   result = vec3(0,0,0);
+   vecX[result] = vecX[a] + vecX[b];
+   vecY[result] = vecY[a] + vecY[b];
+   vecZ[result] = vecZ[a] + vecZ[b];
+   return result;
+}
+
+vecSub(a,b)
+{
+   result = vec3(0,0,0);
+   vecX[result] = vecX[a] - vecX[b];
+   vecY[result] = vecY[a] - vecY[b];
+   vecZ[result] = vecZ[a] - vecZ[b];
+   return result;
+}
+
+vecMultiplyBy(i,scalar)
+{
+   vecX[i] *= scalar;
+   vecY[i] *= scalar;
+   vecZ[i] *= scalar;
+}
+
+vecDot(a,b)
+{
+   result = vecX[a] * vecX[b] + 
+            vecY[a] * vecY[b] +
+            vecZ[a] * vecZ[b];
+   return result;
+}
+
+// Cross product aka Vectorproduct
+vecCross(a,b)
+{
+   result = vec3(0,0,0);
+   vecX[result] = vecY[a]*vecZ[b] - vecZ[a]*vecY[b];
+   vecY[result] = vecZ[a]*vecX[b] - vecX[a]*vecZ[b];
+   vecZ[result] = vecX[a]*vecY[b] - vecY[a]*vecX[b];
+   return result;
+}
+
+vecNormalize(i)
+{
+   l = sqrt(vecX[i]^2+vecY[i]^2+vecZ[i]^2);
+   vecX[i] /= l;
+   vecY[i] /= l;
+   vecZ[i] /= l;
+}
+
+
+
+vecPrint(i)
+{
+   printf("(%g,%g,%g)",vecX[i],vecY[i],vecZ[i]);
+}
+
+vecDelete(i)
+{
+   isDead[i] = 1;
+}
+
+// Drawing
+vecDraw(i)
+{
+   moveto(0,0,0);
+   lineto(vecX[i],vecY[i],vecZ[i]);
+   //drawsph(vectors[i][0],vectors[i][1],vectors[i][2],.05);
+   
+   // indicate direction with an arrow. make sure its unit length
+   //coneDir = vec3(vectors[i][0],vectors[i][1],vectors[i][2]);
+   //coneLen = vec3(vectors[i][0],vectors[i][1],vectors[i][2]);
+   //vecNormalize(coneDir);  
+   //vecNormalize(coneLen); 
+   //vecMultiplyBy(coneLen, 0.25);
+   //vecMultiplyBy(coneDir, 0.25);
+   //length = sqrt(vectors[i][0]^2+vectors[i][1]^2+vectors[i][2]^2); 
+   //s = vecAdd(coneDir,coneLen);
+   length = 1;
+   
+   n=1.2;
+   drawcone(vecX[i]/n,vecY[i]/n,vecZ[i]/n, length/10,
+   vecX[i],vecY[i],vecZ[i], 0);
+}

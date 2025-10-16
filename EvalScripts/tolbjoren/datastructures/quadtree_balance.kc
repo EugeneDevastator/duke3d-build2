@@ -1,0 +1,486 @@
+enum{MAX_PTS = 64}
+
+struct quad
+{
+   isLeaf;
+   parent;
+   NW;
+   NE;
+   SW;
+   SE;
+   xmin, xmax;
+   ymin, ymax;
+   pts[MAX_PTS];
+   numpts;
+};
+
+
+enum{MAX_QUADS=256}
+static quad quads[MAX_QUADS];
+static numquads=0;
+
+struct point{
+   x,y;
+};
+
+static point points[MAX_PTS];
+static numpts = 0;
+static root = -2;
+
+static gotRect = -1;
+
+static balanceList[MAX_QUADS*4];
+static numToBalance=0;
+
+()
+{
+
+   cls(0);
+   
+   if( bstatus == 1 )
+   {
+      bstatus=0;
+      if( numpts < MAX_PTS)
+      {
+         bstatus=0;
+         
+         points[numpts].x = mousx;
+         points[numpts].y = mousy;
+         numpts++;
+      }
+   }   
+
+
+   if( numpts > 2 )
+   {
+   
+   numquads = 0;
+   minx = points[0].x;
+   maxx = points[0].x;
+   miny = points[0].y;
+   maxy = points[0].y;
+   for(i=0; i<numpts; i++)
+   {
+      if( points[i].x < minx ) minx = points[i].x;
+      if( points[i].y < miny ) miny = points[i].y;
+      if( points[i].x > maxx ) maxx = points[i].x;
+      if( points[i].y > maxy ) maxy = points[i].y;
+   }   
+
+   initQuad(0,root,minx,miny,maxx,maxy);
+   for(i=0; i<numpts; i++){
+      quads[0].pts[i] = i;
+   }
+   quads[0].numpts = numpts;
+   numquads = 1;
+   
+   makeTree( 0 );
+   
+   balanceTree();
+   
+   }
+   
+   if( bstatus==2 ) 
+   {
+      bstatus=0;
+      findClickedQuad();
+   }
+
+   if( gotRect != -1 )
+   {
+      i = gotRect;
+      setcol(0xf95404);
+      drawrectfill( floor(quads[i].xmin+2), floor(quads[i].ymin+2), ceil(quads[i].xmax-2), ceil(quads[i].ymax-2) ); 
+                
+      n = getNorthNeighbour( i );
+      if( n != -1 )
+      {
+         setcol(0x4042a2);
+         drawrectfill( floor(quads[n].xmin+2), floor(quads[n].ymin+2), ceil(quads[n].xmax-2), ceil(quads[n].ymax-2) );          
+      }
+
+      n = getSouthNeighbour( i );
+      if( n != -1 )
+      {
+         setcol(0xfb0000);
+         drawrectfill( floor(quads[n].xmin+2), floor(quads[n].ymin+2), ceil(quads[n].xmax-2), ceil(quads[n].ymax-2) );          
+      }
+
+      n = getWestNeighbour( i );
+      if( n != -1 )
+      {
+         setcol(0x27e035);
+         drawrectfill( floor(quads[n].xmin+2), floor(quads[n].ymin+2), ceil(quads[n].xmax-2), ceil(quads[n].ymax-2) );          
+      }
+      
+      n = getEastNeighbour( i );
+      if( n != -1 )
+      {
+         setcol(0xeaef18);
+         drawrectfill( floor(quads[n].xmin+2), floor(quads[n].ymin+2), ceil(quads[n].xmax-2), ceil(quads[n].ymax-2) );          
+      }
+           
+   }
+   
+   setcol(0xff0000);
+   for(i=0; i<numquads; i++)
+   {
+      setcol(0xf95404);
+      drawrectopen( quads[i].xmin, quads[i].ymin, 
+                quads[i].xmax, quads[i].ymax );
+                
+      xmid = (quads[i].xmin + quads[i].xmax)/2; 
+      ymid = (quads[i].ymin + quads[i].ymax)/2;
+                
+      setcol(0x20ec25);
+      for(j=0; j<quads[i].numpts; j++)
+      {
+         idx = quads[i].pts[j];
+         moveto( xmid, ymid );
+         lineto( points[idx].x, points[idx].y );
+      }
+   }
+
+   setcol(0xffffff);
+   for(i=0; i<numpts; i++)
+   {
+      //setpix( points[i].x, points[i].y );
+      drawsph( points[i].x, points[i].y, -2 );
+   }
+
+   moveto(0,0); 
+   printf("%g of max %g quads\n", numquads, MAX_QUADS);
+   printf("%g of max %g points\n", numpts, MAX_PTS);
+   
+   if( numquads > MAX_QUADS-4 )
+   {
+      printf("ERROR: not enough space for quads\n");
+   }
+
+}
+
+makeTree( quadidx )
+{
+   if( quads[quadidx].numpts < 2 ) return;
+   if( numquads > MAX_QUADS-4) return;
+   
+   createInternalNode(quadidx);
+   
+   midx = (quads[quadidx].xmax+quads[quadidx].xmin) / 2.0;
+   midy = (quads[quadidx].ymax+quads[quadidx].ymin) / 2.0;
+   
+   NW = quads[quadidx].NW;
+   NE = quads[quadidx].NE;
+   SW = quads[quadidx].SW;
+   SE = quads[quadidx].SE;
+
+   for(i=0; i<quads[quadidx].numpts; i++)
+   {
+      idx = quads[quadidx].pts[i];
+      if( points[idx].x >  midx && points[idx].y < midy) addPoint(NE,idx);
+      if( points[idx].x <= midx && points[idx].y < midy) addPoint(NW,idx);
+      if( points[idx].x <= midx && points[idx].y >= midy) addPoint(SW,idx);
+      if( points[idx].x >  midx && points[idx].y >= midy) addPoint(SE,idx);
+   }
+   
+   // Want to remove pts from all except leaf nodes?
+   quads[quadidx].numpts = 0;
+   
+   makeTree(NW);
+   makeTree(NE);
+   makeTree(SW);
+   makeTree(SE);
+}
+
+initQuad(quadidx,parentIdx,minx,miny,maxx,maxy)
+{
+   quads[quadidx].numpts = 0;
+   quads[quadidx].isLeaf = 1; // is leaf until it gets children
+   quads[quadidx].parent = parentIdx;
+   quads[quadidx].NW = -1;
+   quads[quadidx].NE = -1;
+   quads[quadidx].SW = -1;
+   quads[quadidx].SE = -1;
+   quads[quadidx].xmin = minx;
+   quads[quadidx].ymin = miny;
+   quads[quadidx].xmax = maxx;
+   quads[quadidx].ymax = maxy;
+}
+
+addPoint(quadidx,pt)
+{
+   if( quads[quadidx].numpts > MAX_PTS) return;
+   quads[quadidx].pts[ quads[quadidx].numpts ] = pt;
+   quads[quadidx].numpts++;
+}
+
+drawrectfill(x0,y0,x1,y1) { for(y=y0;y<y1;y++) { moveto(x0,y); lineto(x1,y); } }
+drawrectopen(x0,y0,x1,y1) { moveto(x0,y0); lineto(x1,y0); lineto(x1,y1); lineto(x0,y1); lineto(x0,y0); }
+
+// Doesnt take negative width/height into account
+PointInRect(testx,testy,rx,ry,w,h)
+{
+   if(testx >= rx && testx <= rx+w)
+   if(testy >= ry && testy <= ry+h)
+      return 1; 
+}
+
+findClickedQuad()
+{
+      for(i=0; i<numquads; i++)
+      {
+         if( quads[i].isLeaf )
+         {
+            w = quads[i].xmax - quads[i].xmin;
+            h = quads[i].ymax - quads[i].ymin;
+            hit = PointInRect(mousx,mousy,quads[i].xmin,quads[i].ymin,w,h);
+            if( hit )
+            {
+               gotRect = i;
+               return;
+            }
+         }
+      }
+}
+
+
+getNorthNeighbour( v )
+{
+   if( v==0 ) return -1;
+   
+   isNE = 0;
+   isNW = 0;
+   isSW = 0;
+   isSE = 0;
+   parent = quads[v].parent;
+   if( quads[parent].NE == v ) isNE = 1;
+   if( quads[parent].NW == v ) isNW = 1;
+   if( quads[parent].SW == v ) isSW = 1;
+   if( quads[parent].SE == v ) isSE = 1;
+   
+   if( isSW ) return quads[parent].NW;
+   if( isSE ) return quads[parent].NE;
+   
+   my = getNorthNeighbour( parent );
+   if( my == -1 || quads[my].isLeaf )
+   {
+      return my;
+   }
+   else if( isNW )
+   {
+      return quads[my].SW;
+   }else{
+      return  quads[my].SE;
+   }
+   return -1;
+}
+
+getSouthNeighbour( v )
+{
+   if( v==0 ) return -1;
+   
+   isNE = 0;
+   isNW = 0;
+   isSW = 0;
+   isSE = 0;
+   parent = quads[v].parent;
+   if( quads[parent].NE == v ) isNE = 1;
+   if( quads[parent].NW == v ) isNW = 1;
+   if( quads[parent].SW == v ) isSW = 1;
+   if( quads[parent].SE == v ) isSE = 1;
+   
+   if( isNW ) return quads[parent].SW;
+   if( isNE ) return quads[parent].SE;
+   
+   my = getSouthNeighbour( parent );
+   if( my == -1 || quads[my].isLeaf )
+   {
+      return my;
+   }
+   else if( isSW )
+   {
+      return quads[my].NW;
+   }else{
+      return  quads[my].NE;
+   }
+   return -1;
+}
+
+getWestNeighbour( v )
+{
+   if( v==0 ) return -1;
+   
+   isNE = 0;
+   isNW = 0;
+   isSW = 0;
+   isSE = 0;
+   parent = quads[v].parent;
+   if( quads[parent].NE == v ) isNE = 1;
+   if( quads[parent].NW == v ) isNW = 1;
+   if( quads[parent].SW == v ) isSW = 1;
+   if( quads[parent].SE == v ) isSE = 1;
+   
+
+   if( isNE ) return quads[parent].NW;
+   if( isSE ) return quads[parent].SW;
+   
+   my = getWestNeighbour( parent );
+   if( my == -1 || quads[my].isLeaf )
+   {
+      return my;
+   }
+   else if( isNW )
+   {
+      return quads[my].NE;
+   }else{
+      return  quads[my].SE;
+   }
+   return -1;
+}
+
+getEastNeighbour( v )
+{
+   if( v==0 ) return -1;
+   
+   isNE = 0;
+   isNW = 0;
+   isSW = 0;
+   isSE = 0;
+   parent = quads[v].parent;
+   if( quads[parent].NE == v ) isNE = 1;
+   if( quads[parent].NW == v ) isNW = 1;
+   if( quads[parent].SW == v ) isSW = 1;
+   if( quads[parent].SE == v ) isSE = 1;
+   
+   if( isNW ) return quads[parent].NE;
+   if( isSW ) return quads[parent].SE;
+   
+   my = getEastNeighbour( parent );
+   if( my == -1 || quads[my].isLeaf )
+   {
+      return my;
+   }
+   else if( isNE )
+   {
+      return quads[my].NW;
+   }else{
+      return quads[my].SW;
+   }
+   return -1;
+}
+
+balanceTree()
+{
+   numToBalance = 0;
+   for(i=0; i<numquads; i++)
+   {
+      if( quads[i].isLeaf ){
+         balanceList[numToBalance] = i;
+         numToBalance++;
+      }
+   }
+   
+   while( numToBalance > 0 )
+   {
+      numToBalance--;
+      my = balanceList[numToBalance];
+      if( hasToSplit(my) )
+      {
+         drawsph(xres/2,yres/2,10);
+         createInternalNode( my );
+         // 5. if my stores a point, then store it in the correct new leaf instead
+         if( quads[my].numpts == 1 )
+         {
+            quads[my].numpts = 0;
+            midx = (quads[my].xmax+quads[my].xmin) / 2.0;
+            midy = (quads[my].ymax+quads[my].ymin) / 2.0;
+            idx = quads[my].pts[0];
+            if( points[idx].x >  midx && points[idx].y < midy) addPoint(quads[my].NE,idx);
+            if( points[idx].x <= midx && points[idx].y < midy) addPoint(quads[my].NW,idx);
+            if( points[idx].x <= midx && points[idx].y >= midy) addPoint(quads[my].SW,idx);
+            if( points[idx].x >  midx && points[idx].y >= midy) addPoint(quads[my].SE,idx);
+         }       
+         // 6. insert the 4 new leaves into list
+         balanceList[numToBalance] = quads[my].NW;
+         balanceList[numToBalance+1] = quads[my].NE;
+         balanceList[numToBalance+2] = quads[my].SE;
+         balanceList[numToBalance+3] = quads[my].SW;
+         numToBalance+=4;
+         
+         // see if neighbors have to split
+         north = getNorthNeighbour(my);
+         south = getSouthNeighbour(my);
+         east = getEastNeighbour(my);
+         west = getWestNeighbour(my);
+         
+         if( hasToSplit(north) ){
+            balanceList[numToBalance] = north; numToBalance++;
+         }
+         if( hasToSplit(south) ){
+            balanceList[numToBalance] = south; numToBalance++;
+         }
+         if( hasToSplit(east) ){
+            balanceList[numToBalance] = east; numToBalance++;
+         }
+         if( hasToSplit(west) ){
+            balanceList[numToBalance] = west; numToBalance++;
+         }         
+
+      }
+   }
+   
+}
+
+hasToSplit(v)
+{
+   halfSize = abs(quads[v].xmax-quads[v].xmin)/2.0;
+   if( isSmaller( getNorthNeighbour( v ), halfSize) ) return 1;
+   if( isSmaller( getSouthNeighbour( v ), halfSize) ) return 1;
+   if( isSmaller( getWestNeighbour( v ), halfSize) ) return 1;
+   if( isSmaller( getEastNeighbour( v ), halfSize) ) return 1;
+   return 0;
+}
+
+isSmaller(node,halfSiz)
+{
+   if( node == -1 ) return 0; // if nil
+   
+   //if( !quads[node].isLeaf ){
+      siz = abs(quads[node].xmax-quads[node].xmin);
+      if( siz < halfSiz ) return 1;
+   //}
+
+   return 0;
+}
+
+createInternalNode(quadidx)
+{
+   if( quads[quadidx].numpts < 2 ) return;
+   if( numquads > MAX_QUADS-4) return;
+   
+   quads[quadidx].isLeaf = 0; // no longer a child
+   
+   midx = (quads[quadidx].xmax+quads[quadidx].xmin) / 2.0;
+   midy = (quads[quadidx].ymax+quads[quadidx].ymin) / 2.0;
+   
+   minx = quads[quadidx].xmin;
+   miny = quads[quadidx].ymin;
+   maxx = quads[quadidx].xmax;
+   maxy = quads[quadidx].ymax;
+   
+   NW = numquads;
+   NE = numquads+1;
+   SW = numquads+2;
+   SE = numquads+3;
+   numquads = numquads + 4;
+
+   quads[quadidx].NW = NW;
+   quads[quadidx].NE = NE;
+   quads[quadidx].SW = SW;
+   quads[quadidx].SE = SE;
+   
+   initQuad(NW,quadidx,minx,miny,midx,midy);
+   initQuad(NE,quadidx,midx,miny,maxx,midy);
+   initQuad(SW,quadidx,minx,midy,midx,maxy);
+   initQuad(SE,quadidx,midx,midy,maxx,maxy);  
+}

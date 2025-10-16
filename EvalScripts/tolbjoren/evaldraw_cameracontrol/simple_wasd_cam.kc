@@ -1,0 +1,64 @@
+static posx = 0;
+static posy = 75;
+static posz = 70;
+static posh = 0; // left right
+static posv = -2.0;
+()
+{
+   cls(0); clz(1e32);
+   for(i=-10; i<10; i++){
+      for(j=-10; j<10; j++)
+      drawsph(i*20,0,j*20,10);
+   }
+   
+   playercontrols();
+}
+
+// Camera and movement code taken from /games/
+//Handle input and player movement
+playercontrols()
+{
+   static oldMouseX;
+   static oldMouseY;
+   static mouseSpeedX;
+   static mouseSpeedY; 
+
+   f = 1;
+   if (keystatus[0x2a]) f /= 4;
+   if (keystatus[0x36]) f *= 4;
+   vx = (keystatus[32]-keystatus[30])*f; //D-A
+   vy = (keystatus[17]-keystatus[31])*f; //W-S  
+   vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   
+   static mat[9]; 
+   ang2mat(posh,posv,mat); // Convert angles to rotation matrix
+   
+   // find new position
+   posx += mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   posy += mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   posz += mat[2]*vx + mat[5]*vz + mat[8]*vy; 
+   // mousespeed values are tweaked for 60 fps
+   mouseSpeedX = (mousx - oldMouseX) * 0.01;
+   mouseSpeedY = (mousy - oldMouseY) * 0.01;
+   oldMouseX = mousx;
+   oldMouseY = mousy;
+   if(bstatus==1)
+   {
+      posh -= mouseSpeedX;
+      posv += mouseSpeedY;
+   }
+   // Right,down,forwards unit vectors.
+   setcam(posx,posy,posz,
+          mat[0],mat[1],mat[2],
+          mat[3],mat[4],mat[5],
+          mat[6],mat[7],mat[8]);
+}
+/* converts horizontal and vertical angles to a 3x3 rotation matrix */
+ang2mat(hang,vang,mat[9])
+{
+   mat[0] = cos(hang); mat[1] = 0; mat[2]=-sin(hang);
+   mat[6] = cos(vang)*sin(hang); mat[7] = sin(vang); mat[8]=cos(vang)*cos(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}

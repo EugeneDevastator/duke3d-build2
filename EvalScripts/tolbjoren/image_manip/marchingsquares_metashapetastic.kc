@@ -1,0 +1,267 @@
+// written by Torbjoern Haugen thursday 19. august 2010
+enum{MAX_POINTS}
+enum{sizx=320, sizy=240}
+enum{width=sizx+2, height=sizy+2}
+static screen[width*height]; // stores pixels for msquares outline
+static vscreen[width*height];
+static tracked[width*height];
+
+struct vec2{
+  x,y;
+}
+
+static vec2 variations_ccw[15];
+enum{MAX_PTS=2*4096}
+static vec2 points[MAX_PTS];
+static numPts = 0;
+
+static oldmousx;
+static oldmousy;
+
+static pixelsAllFilled = 0;
+static pixelsAllEmpty = 0;
+static marchingSquaresStuck = 0;
+static gotOutline = 0;
+
+static tim, oldtim, dt;
+
+()
+{
+  tim = klock(0); dt = tim-oldtim; oldtim = tim;
+
+  if(numframes==0)
+  {
+    setVec(variations_ccw[ 0],  1, 0); // r >
+    setVec(variations_ccw[ 1],  0, 1); // d v
+    setVec(variations_ccw[ 2], -1, 0); // l <
+    setVec(variations_ccw[ 3], -1, 0); // l <
+    setVec(variations_ccw[ 4],  1, 0); // r >
+    setVec(variations_ccw[ 5],  0, 1); // d v
+    setVec(variations_ccw[ 6], -1, 0); // l <
+    setVec(variations_ccw[ 7], -1, 0); // l <
+    setVec(variations_ccw[ 8],  0,-1); // u ^
+    setVec(variations_ccw[ 9],  0,-1); // u ^
+    setVec(variations_ccw[10],  0,-1); // u ^
+    setVec(variations_ccw[11],  0,-1); // u ^
+    setVec(variations_ccw[12],  1, 0); // r >
+    setVec(variations_ccw[13],  0, 1); // d v
+    setVec(variations_ccw[14],  1, 0); // r >
+
+  }
+
+  //if(bstatus==1)
+  if(1)
+  //if(mousx > 1 && mousx < width-1)
+  //if(mousy > 1 && mousy < height-1)
+  {
+    gotOutline = 0;
+    
+    for(y=5; y<height-5; y++)  
+    for(x=5; x<width-5; x++)
+    {
+     if( noise( (8*x/(width)), 8*y/(height), tim) > .3) vscreen[x*height+y] = 1; else vscreen[x*height+y] = 0;
+    }
+    
+    
+    //paintbrush(mousx,mousy,3,1);
+  }
+
+  cls(0);
+
+  painting =0;// bstatus == 1;
+
+  if( !painting )
+  {
+    if( !gotOutline ) getOutline();
+    if( gotOutline) drawOutline();
+  }
+  
+  setcol(255,255,255);
+  
+
+  if(painting) drawScreen();
+
+  moveto(15,height+15);
+  printf("pixelsAllFilled: %f\n", pixelsAllFilled);
+  printf("pixelsAllEmpty: %f\n", pixelsAllEmpty);
+  printf("marchingSquaresStuck: %f\n", marchingSquaresStuck);
+
+  printf("%f\n", 1.0 / dt);
+  printf("%f\n", numPts);
+
+  drawrectopen(0,0,width,height);
+
+  oldmousx=mousx; 
+  oldmousy=mousy;
+}
+
+getOutline()
+{
+  pixelsAllFilled = 0; // reset error status.
+  pixelsAllEmpty = 0;
+  numPts = 0;
+
+  for(i=0; i<height*width; i++)    
+    tracked[i] = 0;  // reset tracked
+
+  for(y=1; y<height-1; y++)  
+  for(x=1; x<width-1; x++)
+  {
+    if(vscreen[x*height+y] > 0 && numPts < MAX_PTS)
+    {
+      if(tracked[x*height+y])
+      {
+        foundExit = 0;
+        while(!foundExit && x < (width-1) )
+        {
+          x++;
+          if( tracked[x*height+y] ) foundExit = 1;
+        }
+        x--;
+      }
+      else
+      {
+        marchingSquares(x,y);
+      }
+      //return;
+    }
+  }
+}
+
+getNextEdgePoint(x,y, &newx, &newy)
+{
+    index = 0;
+    if( vscreen[(x+1)*height+(y+1)] > 0 ) index += 1;
+
+    if( vscreen[(x)*height+(y+1)] > 0 ) index += 2;
+
+    if( vscreen[(x+1)*height+(y)] > 0 ) index += 4;
+
+    if( vscreen[(x)*height+(y)] > 0 ) index += 8;
+    // Error
+    if( index >= 15 ){ pixelsAllFilled+=1; return; }
+    if( index==0){ pixelsAllEmpty +=1; return; }
+
+    newx += variations_ccw[index].x; newy += variations_ccw[index].y;
+}
+
+marchingSquares(x,y)
+{
+  gotOutline = 1;
+  if( numPts >= MAX_PTS) return;
+
+  // reset state:
+  posx = x-1; posy = y-1; // move back and up from pixel
+
+  startx = posx; starty = posy;
+  firstRun = 1;
+  iters = 0;
+  
+  while(iters < MAX_PTS && numPts < MAX_PTS)
+  {
+    if(firstRun)
+    {
+      firstRun = 0;
+      startx = posx; starty = posy;
+    }
+
+    iters++;
+    if( iters >= MAX_PTS ) marchingSquaresStuck++;
+
+    
+
+    tracked[posx*height+posy] = 1;
+    tracked[posx*height+(posy+1)] = 1;
+    tracked[(posx+1)*height+posy] = 1;
+    tracked[(posx+1)*height+(posy+1)] = 1;
+    getNextEdgePoint(posx, posy, posx, posy);    
+
+    //points[numPts].x = posx; points[numPts].y = posy; 
+    screen[posx*height+posy] = 1;
+    numPts++;
+  
+    if(0)
+    {
+      setcol(255,0,0);
+      setpix(posx,posy);   
+      if(iters % 64 == 0)
+      {    
+        refresh();
+        sleep(1);
+      }
+    }
+
+    if( posx==startx && posy== starty) return;  
+  }
+}
+
+drawOutline()
+{
+  for(y=0; y<height; y++)  
+  for(x=0; x<width; x++)
+  {
+    if(screen[x*height+y] > 0)
+    {
+      screen[x*height+y] = 0;
+      setcol(0,255,0);
+      setpix(x,y);
+    }
+  }
+
+  /*for(i=0; i<numPts; i++)
+  {
+    setcol(255*rnd,255*rnd,255*rnd);
+    setpix( points[i].x, points[i].y);
+  }*/
+}
+
+drawScreen()
+{
+  for(y=0; y<height; y++)  
+  for(x=0; x<width; x++)
+  {
+    if(vscreen[x*height+y] > 0)
+    {
+      setcol(255,255,255);
+      setpix(x,y);
+    }
+  }
+}
+
+setVec(vec2 v, x,y)
+{
+  v.x = x; v.y = y;
+}
+
+lerp(x1,x2,t)
+{
+  v = (x2-x1)*t;
+  return v;
+}
+
+lerp2(x1,y1,x2,y2,nx,&ny){
+   ny = y1+(nx-x1)*(y2-y1)/(x2-x1);
+}
+
+// this doesnt work right because of floor round? floor( x + 0.5 ) ?
+paintbrush(x,y,r,c)
+{
+   i=0; j=0;
+   for(i=0; i<2*r; i++)
+   {
+      len = int( sqrt( cos(0.5*PI*(i-r)/r)) * r * 2 );
+      for(j=0; j<len; j++)
+      {
+         xp = int(x+j-len/2);
+         yp = int(y-r+i);
+         if(xp > 1 && xp < (width-1) && yp > 1 && yp < (height-2))
+         {
+            vscreen[xp*height+yp] = c;
+         }
+      }
+   }
+}
+
+
+drawrectfill(x0,y0,x1,y1) { for(y=y0;y<y1;y++) { moveto(x0,y); lineto(x1,y); } }
+drawrectopen(x0,y0,x1,y1) { moveto(x0,y0); lineto(x1,y0); lineto(x1,y1); lineto(x0,y1); lineto(x0,y0); }

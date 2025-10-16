@@ -1,0 +1,162 @@
+// use original eval compiler for text
+()
+{
+   static val1, val2, val3, val4;
+   static toggleType = 1;
+   static hypo = 0, epi = 1; // Initially shows an epitrochid
+
+   cls(0);
+   if(numframes==0)
+   {
+      val1 = 100;
+      val2 = 120;
+      val3 = 50;
+      val4 = 50;
+   }
+   
+   originX = xres/2; originY = yres/2;   
+
+   a = val1;
+   b = val2;
+   h = val3;
+   
+   rounds = val4; //(val4/(200)-1)*3600;
+
+   setcol(0xffffff);
+   
+   t = 0;
+   
+   if(hypo)
+   {
+      x = (a-b)*cos(t)+h*cos( (a-b)/b*t);
+      y = (a-b)*sin(t)-h*sin( (a-b)/b*t);
+   }
+   else if(epi)
+   {
+      x = (a+b)*cos(t)-h*cos( (a+b)/b*t);
+      y = (a+b)*sin(t)-h*sin( (a+b)/b*t);   
+   }
+   ox=originX + x; oy=originY + y;
+   for(t=0; t<2*PI*rounds; t+=1/50)
+   {
+      if(hypo)
+      {
+         x = (a-b)*cos(t)+h*cos( (a-b)/b*t);
+         y = (a-b)*sin(t)-h*sin( (a-b)/b*t);
+      }
+      else if(epi)
+      {
+         x = (a+b)*cos(t)-h*cos( (a+b)/b*t);
+         y = (a+b)*sin(t)-h*sin( (a+b)/b*t);   
+      } 
+      //setpix(originX + x, originY + y);
+      moveto(ox,oy);
+      lineto(originX + x, originY + y);
+      ox = originX + x; oy = originY + y;
+   }
+   
+   
+   
+   if(a == b){moveto(originX, originY); printf("Warning: A == B");}
+   
+   slider(0, val1,20,50,200, "a");
+   slider(1, val2,20,100,200, "b");
+   slider(2, val3,20,150,200, "h");
+   slider(3, val4,20,200,200, "rotations");
+   
+   btn(0,100,300,30,"Hypo/\nEpit", toggleType);
+   
+   if( toggleType < 0)
+   {
+      moveto(xres/2, 50);
+      printf("Hypotrochoid");
+      hypo = 1;
+      epi = 0;
+
+   }
+   if( toggleType > 0)
+   {
+      moveto(xres/2, 50);
+      printf("Epitrochoid");  
+      hypo = 0;
+      epi = 1;       
+   }
+}
+
+// on/off
+// text
+// x,y, w, h,
+btn(num,x,y,radius,$txt, &value)
+{
+   enum{numButtons=49+1};
+   static buttonActive[numButtons];
+   
+   if(numframes==0)
+   {
+      for(i=0; i<numButtons; i++) buttonActive[i] = -1;
+   }
+   setcol(0xff);
+   if(buttonActive[num]==1) drawsph(x,y,radius);
+   else drawsph(x,y,-radius);
+   setcol(0xffffff);
+   moveto(x-radius/1.5,y-radius/4); printf(txt);  
+   
+   if(bstatus==1)
+   if( isColliding(x,y,mousx,mousy,radius) )
+   {
+      buttonActive[num] = -buttonActive[num];
+      value = -value;
+      bStatus = 0; return;
+   }
+}
+
+slider(sliderNum, &value,x,y,length, $description)
+{
+   enum{numSliders=4};
+   static mouseLock[numSliders];
+
+   // Constructor, set slider to mid position
+   if(numframes==0)
+   {
+      //value = .5 * length;
+      mouseLock[sliderNum] = 0;
+   }  
+   // Draw slider
+   moveto(x,y);
+   lineto(x+length,y);
+   drawsph(x+value,y,-10);
+   moveto(x+value,y+10);
+   printf(description);
+   printf(" = %g", value);
+   
+   // mouse input
+   //mouseValue = mousx/(xres/2)-1;
+   if(bstatus==1)
+   {
+      mx = mousx; my = mousy; 
+      if(mouseLock[sliderNum]) // mouse has lock-on, move slider
+      {
+         setcol(255,0,0);
+         drawsph(x+value, y,-5);
+         if(mx <= x+length && mx >= x) // limit movement to slider line
+         value = mx-x;
+      }
+      else // check for collision
+      {
+         if( isColliding(mx,my,x+value,y,10) ) mouseLock[sliderNum] = 1; 
+      }
+   }
+   else // mouse released
+   {
+      mouseLock[sliderNum] = 0;
+   }
+
+}
+
+// Compares distance squared
+isColliding(x1,y1,x2,y2,radius)
+{
+   if((x1-x2)^2 + (y1-y2)^2 < radius^2 ) return 1;
+   return 0;
+}
+

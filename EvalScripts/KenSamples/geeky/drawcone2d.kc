@@ -1,0 +1,25 @@
+()
+{
+   cls(0); setcol(0xffff00); moveto(0,0);
+   printf("Click mouse buttons to test drawcone (2D) flags\n");
+   
+      //Draw filled cone
+   x0 = 150; x1 = mousx; 
+   y0 = 450; y1 = mousy; 
+   r0 = 30;  r1 = 150;
+   flags = 0;
+   if (bstatus%2) { flags += DRAWCONE_FLAT; printf("DRAWCONE_FLAT\n"); }
+   if (bstatus>1) { flags += DRAWCONE_CENT; printf("DRAWCONE_CENT\n"); }   
+   drawcone(x0,y0,r0,x1,y1,r1,flags);
+   
+      //Draw circles
+   setcol(0x808080);
+   drawsph(x0,y0,-r0);
+   drawsph(x1,y1,-r1);
+   
+      //Draw center lines
+   dx = x1-x0; dy = y1-y0;
+   f = 1/sqrt(dx^2+dy^2); dx *= f; dy *= f;
+   moveto(x0-dy*r0,y0+dx*r0); lineto(x0+dy*r0,y0-dx*r0);
+   moveto(x1-dy*r1,y1+dx*r1); lineto(x1+dy*r1,y1-dx*r1);
+}

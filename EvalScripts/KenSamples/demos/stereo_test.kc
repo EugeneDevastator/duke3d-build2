@@ -1,0 +1,78 @@
+() //For stereo effect, select: View .. Stereo glasses .. Colored
+{
+   sepoff = 0.02; pixoff = 20; //eye separation settings
+   isright = (numframes%2);
+   sterdir = sgn(isright-.5)*(USINGSTEREO!=0);
+   
+      //Handle timing for consistent animation
+   static tim; otim = tim;
+      //Only allow animation before rendering of left frame
+   if (isright == 0) tim = klock();
+   dtim = tim-otim; //frame period
+   
+      //Clear screen; set stereo view
+   cls(0xc0c0c0); clz(1e32);
+   setview(0,0,xres,yres,xres/2+pixoff*sterdir,yres/2,xres/2);
+   setcam(sepoff*sterdir,0,-4,0,0);
+   
+      //Draw left&right sign at top
+   moveto(0,yres*.05); setcol(0x404040);
+   setfont(xres/5,yres*.4,1);
+   if (isright == 0) printf("LEFT!"); else printf("RIGHT");
+   
+      //Draw beware sign
+   siz = 40; setfont(siz,siz*1.5,1); setcol(0);
+   setcol(0xffffff); moveto(xres/2-siz*19/2+sterdir*pixoff,yres*.35);
+   printf("Beware of Helicaco!");
+      
+      //Draw caco
+   setcol(256,256,256); drawkv6("caco.kv6",-1,0,.5,0,tim,0);
+      
+      //Bullet vars
+   enum {MAXBUL=16};
+   static bx[MAXBUL], by[MAXBUL], bz[MAXBUL], bs[MAXBUL];
+   static bxv[MAXBUL], byv[MAXBUL], bzv[MAXBUL], bt[MAXBUL], bn = 0;
+ 
+      //Spawn new bullet once per second
+   if (int(tim) != int(otim))
+   {
+      bx[bn] = 0; bxv[bn] = -sin(tim);
+      by[bn] =.5; byv[bn] = 0;
+      bz[bn] = 0; bzv[bn] = -cos(tim);
+      bs[bn] = playsound("shoot.wav",100,1,bx[bn],by[bn],bz[bn]);
+      bt[bn] = tim+4;
+      bn++;
+   }   
+      
+      //Draw & move bullets
+   for(i=bn-1;i>=0;i--)
+   {
+      drawkv6("rpg.kv6",-.5,bx[i],by[i],bz[i],atan2(bxv[i],bzv[i]),0);
+      bx[i] += bxv[i]*dtim*4;
+      by[i] += byv[i]*dtim*4;
+      bz[i] += bzv[i]*dtim*4;
+      playsoundupdate(bs[i],bx[i],by[i],bz[i]);
+      if (tim > bt[i]) //Delete bullets after 4 seconds
+      {
+         bn--;
+         bx[i] = bx[bn]; bxv[i] = bxv[bn];
+         by[i] = by[bn]; byv[i] = byv[bn];
+         bz[i] = bz[bn]; bzv[i] = bzv[bn];
+         bt[i] = bt[bn]; bs[i] = bs[bn];
+      }
+   }
+      
+      //Draw wood floor plane
+   glbegin(GL_QUADS); glsettex("wood.png");
+   gltexcoord(0,0); glvertex(-4,1,4);
+   gltexcoord(4,0); glvertex(+4,1,4);
+   gltexcoord(4,4); glvertex(+4,1,-4);
+   gltexcoord(0,4); glvertex(-4,1,-4);
+   
+      //Draw helicopter blades
+   setcol(144,144,96); t = tim*PI/2;
+   drawcone(cos(t)*+3,-.3,sin(t)*-3,.1,
+            cos(t)*-3,-.3,sin(t)*+3,.1);
+   drawcone(sin(t)*+3,-.3,cos(t)*+3,.1,
+            sin(t)*-3,-.3,cos(t)*-3,.1);
+}

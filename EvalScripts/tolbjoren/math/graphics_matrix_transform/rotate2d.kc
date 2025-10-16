@@ -1,0 +1,37 @@
+()
+{
+   cls(0);
+
+   x=1; y = 0;
+   
+   a = mousx/xres * 2*PI;
+
+   if ( bstatus == 1 ){
+      rotate2d(x,y,a);
+   } else {
+      rotateVec(x,y, cos(a), sin(a) );
+   }
+   
+   moveto(xres/2, yres/2);
+   lineto(xres/2+x*100, yres/2-y*100);
+   printf("\nDegrees:%g", a*180/PI);
+   
+   sleep(1);
+}
+
+// rotate vector by angle
+rotate2d(&x,&y,angle)
+{
+   x1 = x; y1 = y;
+   ca = cos(angle); sa = sin(angle);
+   x = x1 * ca - y1 * sa;
+   y = y1 * ca + x1 * sa;
+}
+
+// rotate vector by vector b
+rotateVec(&x, &y, bx, by)
+{
+   ax = x; ay = y;
+   x = ax * bx - ay * by;
+   y = ay * bx + ax * by;
+}

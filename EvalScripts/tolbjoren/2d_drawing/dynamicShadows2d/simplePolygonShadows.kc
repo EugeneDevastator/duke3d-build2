@@ -1,0 +1,59 @@
+static xpos,ypos;
+static falloff = 1000;
+()
+{
+   clz(1e32); glDisable(GL_DEPTH_TEST);
+   glCullFace(GL_NONE);
+   cls(125,125,125);
+   xpos=mousx, ypos=mousy;
+   
+   setcol(0xffff00);
+   drawsph(xpos,ypos,10);
+   
+   //box
+   DrawShadowCaster(200,200,400,200);
+   DrawShadowCaster(200,200,200,100);
+   DrawShadowCaster(200,100,400,100);
+   DrawShadowCaster(400,100,400,200);
+   
+   // wall
+   DrawShadowCaster(200,400,400,400);
+}
+
+DrawShadowCaster(x1,y1,x2,y2)
+{
+   static shadowCaster[8];
+   lightAngle = atan2(xpos-x2, ypos-y2);
+   
+   setcol(0);
+   
+   shadowCaster[0] = x1;
+   shadowCaster[1] = y1;
+   shadowCaster[2] = x2;
+   shadowCaster[3] = y2;
+   shadowCaster[4] = x2 - sin(lightAngle)*falloff;
+   shadowCaster[5] = y2 - cos(lightAngle)*falloff;
+   lightAngle = atan2(xpos-x1, ypos-y1);
+   shadowCaster[6] = x1 - sin(lightAngle)*falloff;
+   shadowCaster[7] = y1 - cos(lightAngle)*falloff;
+   
+   drawpoly(shadowcaster);
+   setcol(0xffffff);
+   moveto(x1,y1); lineto(x2,y2);
+}
+
+DrawPoly(xy[8])
+{
+   glBegin(GL_COMPLEX);
+   //glBegin(GL_POLYGON);
+   for(i=0; i<8; i+=2)
+   {
+      x = xy[i+0];
+      y = xy[i+1];
+      glVertex(x,y);
+    //glVertex2f(x*ix+y*iy+origin_x,x*jx+y*jy+origin_y);
+      
+      //drawsph(sides[i], sides[i+1], 10);
+   }
+   glEnd();
+}

@@ -1,0 +1,894 @@
+/*
+   -show damage 2d bar
+   -show tower sleeping. zzz.
+   -enemy turning corners
+   -gui
+   
+   -optimization: Render colorpicking with 1 big color-interpolated texture instead
+   of a quad for each tile. glQuads is so expensive!
+   
+   -pop up cow in front of camera when killed
+*/
+
+struct p3d_t{x,y,z;};
+static mat[9]; static p3d_t cam; 
+// horiz and vertical heading (euler angles)  
+static posh = -PI/4; // left right
+static posv = -PI/2 - PI/4;
+
+
+static piover180 = PI/180;
+
+static picked = -1;
+
+static pickQuad = -1;
+
+enum{GRIDW=20,GRIDH=16, GFXSCALE = 3.5}
+static objcolor[GRIDW*GRIDH][3];
+
+enum{MAXTILES=GRIDW*GRIDH}
+enum{PATHTILE, TURRETTILE, EMPTY}
+static tileStatus[MAXTILES]; // occupied? path?
+static tilex[MAXTILES]; // world coordinate of tile.
+static tilez[MAXTILES];
+
+enum{MAXWAYPOINTS = 14}
+static waypoint[MAXWAYPOINTS];
+
+enum{MAXENEMIES=10}
+static enemyx[MAXENEMIES];
+static enemyz[MAXENEMIES];
+static enemyHeading[MAXENEMIES];
+static enemyPointOnLine[MAXENEMIES];
+static enemyTargetWP[MAXENEMIES];
+static enemyAlive[MAXENEMIES];
+static enemyHitpoints[MAXENEMIES];
+static numenemies = 0;
+
+enum{MAXDEAD=10}
+
+   static deadX[MAXDEAD];
+   static deadZ[MAXDEAD];
+   static deadAnim[MAXDEAD];
+   static deadHeading[MAXDEAD];
+
+enum{MAXBULLETS = 1000};
+static bulletpx[MAXBULLETS];
+static bulletpy[MAXBULLETS];
+static bulletdx[MAXBULLETS];
+static bulletdy[MAXBULLETS];
+static bulletLife[MAXBULLETS];
+static numbullets=0;
+
+enum{MAXTURRETS=100}
+static turretx[MAXTURRETS];
+static turrety[MAXTURRETS];
+static turretz[MAXTURRETS];
+static turretHeading[MAXTURRETS];
+static turretType[MAXTURRETS];
+static turretCooldown[MAXTURRETS];
+static numTurrets =0 ;
+enum{GOTTARGET = 1}
+static turretShotRange = 3*gfxScale/2;
+
+static time,oldtime,dt;
+static ticks=0, ticktimer = 0, tickUsed = 0;
+static frames, sec, fps;
+
+static popupTime = 0;
+()
+{
+   oldtime = time:
+   time = klock(0);
+   dt = time - oldtime;
+   
+   // fixed rate game tick
+   if( ticktimer < time ){
+      ticktimer = time + .1; // how often to tick? every 0.1 second?
+      ticks++;
+      tickUsed = 0;
+   }
+   else{
+      tickUsed = 1;
+   }
+
+   sec+=dt;
+   if(sec > 1.0){
+      sec = 0;
+      fps = frames;
+      frames=0;
+   }
+   frames++;
+
+   if(numframes==0){
+      for(i=0; i<MAXTILES; i++){
+      tileStatus[i] = EMPTY;   
+      }
+
+      glenable(GL_DEPTH_TEST);
+      //glcullface(GL_NONE);
+      glcullface(GL_BACK);
+      /*
+       cam.x = GRIDH;
+       cam.y = GRIDW*3;
+       cam.z = GRIDW;  
+       */ 
+       cam.x = 4;
+       cam.y = 26;
+       cam.z = 63;
+       
+       waypoint[0] = 11;
+       waypoint[1] = 75;
+       waypoint[2] = 70;
+       waypoint[3] = 102;
+       waypoint[4] = 99;
+       waypoint[5] = 163;
+       waypoint[6] = 171;
+       waypoint[7] = 219;
+       waypoint[8] = 216;
+       waypoint[9] = 248;
+       waypoint[10] = 241;
+       waypoint[11] = 289;
+       waypoint[12] = 302;
+       waypoint[13] = 318;
+   }
+
+   
+   clz(1e32); cls(255,255,255); // clear screen white, pick colors begin with black
+   renderPickColors(); // render battlefield tiles with unique color
+   getPicked(); // read color and find tile mouse is over
+
+   // Now, draw actual game graphics.
+   //cls(0); 
+   clz(1e32);
+
+   renderBattleField();
+          
+   drawPath(); // also sets path tiles.
+   renderSelection();
+   drawTurrets();
+   drawBullets();
+   
+   updateTurrets();
+   updateEnemies(); // also draw
+   updateDead(); // also draw
+   
+   // make new enemyes every 200 frames
+   if(tickUsed == 0)
+   if(ticks % 10 == 0)
+   {
+      makeEnemy();
+   }
+   
+   //setcam(25,-22,-15,0,45*PIOVER180);   
+   updateCamera();  
+   cowPopUp(); 
+   
+   if( bstatus==1 && tileStatus[pickQuad] == EMPTY && tileStatus[pickQuad] != PATHTILE )// && keystatus[20] )
+   {
+      status=0;
+      turretType[numturrets]==0;
+     
+      // obj insertion code:
+      playsound("tapfloor.flac",100,1);
+      tileStatus[pickQuad] = TURRETTILE;
+      turretx[numturrets] = tilex[ pickQuad ]; //(i+.5)*scale;
+      turrety[numturrets] = 0;
+      turretz[numturrets] = tilez[ pickQuad ]; //(j+.5)*scale;
+      numturrets++;
+   }
+   /*
+   else if(bstatus==1 && keystatus[21])
+   {
+      bstatus=0;
+      //keystatus[21] = 0;
+      doAddObj = 1;
+      turretType[numturrets]=1;
+   }
+   */
+
+   
+   moveto(0,0); setfont(12,16);
+   //setcol(0xffffff);
+   setcol(0);
+   /*
+   printf("\npickr = %g",pickedR);
+   printf("\npickg = %g",pickedG);
+   printf("\npickb = %g",pickedB);
+   
+   printf("\nobjr = %g",objcolor[pickQuad][0]);
+   printf("\nobjg = %g",objcolor[pickQuad][1]);
+   printf("\nobjb = %g",objcolor[pickQuad][2]);
+   */
+   
+   printf("\npickQuad = %g",pickQuad);
+   
+   printf("\nnumturrets = %g",numturrets);
+   printf("\nnumbullets = %g",numbullets);
+   
+   printf("\n ticks %g",ticks);
+   printf("\n fps %g",fps);
+   printf("\n dt %g",dt);
+   
+   printf("\ncamx %g",cam.x);
+   printf("\ncamy %g",cam.y);
+   printf("\ncamz %g",cam.z);
+   /*
+   printf("\n %g",mat[0]); printf(" %g",mat[1]); printf(" %g",mat[2]);
+   printf("\n %g",mat[3]); printf(" %g",mat[4]); printf(" %g",mat[5]);
+   printf("\n %g",mat[6]); printf(" %g",mat[7]); printf(" %g",mat[8]);
+   */
+   //refresh();   
+   //if(fps > 60)
+   //sleep(1);
+}
+
+cowPopUp(){
+   static animating = 0;
+   if( popupTime > 0 )
+   {
+      popupTime--; 
+      //popuptime = 100 -100*mousx/xres;  
+
+      vx = 2.5 - 2* (cos(pi+ (popupTime/100) * 2*PI)/2+.5); //x, normalize to -.5+.5 add .5
+      vy = 1; // z!
+      vz = .3 + sin(time*20)/10; // y!
+      newvx = mat[0]*vx + mat[3]*vz + mat[6]*vy;
+      newvy = mat[1]*vx + mat[4]*vz + mat[7]*vy;
+      newvz = mat[2]*vx + mat[5]*vz + mat[8]*vy; 
+      
+      horiz = posh;
+      verti = posv;
+      tilt = posv;
+      
+      setcol(255,255,255);
+      drawspr("cowdead.kv6", cam.x + newvx, cam.y + newvy, cam.z + newvz,
+      1, 
+      posh - PI/2,
+      -PI,
+      -( (posv+PI/2)%PI - PI/2) );
+   }
+}
+
+makeEnemy(){
+   for(i=0; i<MAXENEMIES; i++)
+   {
+      if(enemyAlive[i] == 0)
+      {
+         enemyTargetWP[i] = 0;
+         enemyPointOnLine[i] = 0;
+         enemyAlive[i]=1;
+         enemyHitpoints[i] = 100;
+         numenemies++;
+         break;
+      }
+   }
+}
+
+renderSelection()
+{
+   i=0; j=0;
+   i = tileX[pickQuad] / gfxscale - .5;
+   j = tileZ[pickQuad] / gfxscale - .5;
+   
+   if( tileStatus[pickQuad] == PATHTILE){
+      setcol(0xff0000);
+   }
+   else if(tileStatus[pickQuad] == EMPTY)
+   {
+      setcol(0x00ff00);
+   }
+   else if(tileStatus[pickQuad] == TURRETTILE ){
+      setcol(0xffff00);
+   }
+   
+   
+   
+   glbegin(gl_quads);
+   moveto(i*gfxscale,.1,j*gfxscale );
+   lineto( (i+1)*gfxscale,.1,j*gfxscale);
+   lineto( (i+1)*gfxscale,.1,(j+1)*gfxscale );
+   lineto(i*gfxscale,.1,(j+1)*gfxscale );
+   lineto(i*gfxscale,.1,j*gfxscale );
+   
+   if(tileStatus[pickQuad] == EMPTY){
+      //setcol(0x777777);
+      setcol(511,511,511);
+      drawspr("hitechcannon.kv6", (i+.5)*gfxscale, .1,(j+.5)*gfxscale, gfxscale/3 + (0.5+sin(time*5))/5, time, -PI);
+      // draw circle to show turret range.
+      circle((i+.5)*gfxscale, .1,(j+.5)*gfxscale,turretShotRange);
+   }
+}
+
+renderBattleField()
+{
+   setcol(0xffffff);
+   tex = glsettex("wood.png"); 
+   glbegin(gl_quads);
+   {
+      gltexcoord(0,0); glvertex( 0, 0, 0 );
+      gltexcoord(10,0); glvertex( gridw*gfxscale, 0, 0 );
+      gltexcoord(10,10); glvertex( gridw*gfxscale, 0, gridh*gfxscale );
+      gltexcoord(0,10); glvertex( 0, 0, gridh*gfxscale );
+   }  
+   glend();
+   glremovetex(tex);   
+}
+
+drawPath(){
+   for(p=0; p<MAXWAYPOINTS-1; p++){
+
+      sx=0; sz=0;
+      ex=0; ez=0;
+      sx = tileX[ waypoint[p] ];
+      sz = tileZ[ waypoint[p] ];
+
+      ex = tileX[ waypoint[p+1] ];
+      ez = tileZ[ waypoint[p+1] ];
+
+      if(waypoint[p] == waypoint[0]){
+         drawspr("cowhouse.kv6", sx+5,-.5,sz ,3, +PI+PI/2, -PI);
+      }
+            
+      if(waypoint[p] == waypoint[MAXWAYPOINTS-2]){
+         drawspr("cowhouse.kv6", sx,-.5,sz ,3, -PI-PI/2, -PI);
+      }
+            
+      //drawsph(sx,1,sz,.5);
+      //moveto( sx,1, sz );
+      //lineto( ex,1, ez );
+      
+      i1=0; j1=0;
+      i1 = sx / gfxscale - .5;
+      j1 = sz / gfxscale - .5;    
+
+      i2 = ex / gfxscale - .5;
+      j2 = ez / gfxscale - .5;
+
+      setcol(0xffffff);
+      tex = glsettex("brick.png"); 
+      
+      diffx = (i2-i1);
+      diffy = (j2-j1);
+      
+
+      if( i1 > i2 ){
+         j=j1;
+         
+         for(i=i2; i < i1+1; i++)
+         {
+         tileStatus[ i*gridH +j ] = PATHTILE;         
+
+         glbegin(gl_quads);
+            gltexcoord(0,0); glvertex(i*gfxscale,.1,j*gfxscale );
+            gltexcoord(1,0); glvertex( (i+1)*gfxscale,.1,j*gfxscale);
+            gltexcoord(1,1); glvertex( (i+1)*gfxscale,.1,(j+1)*gfxscale );
+            gltexcoord(0,1); glvertex(i*gfxscale,.1,(j+1)*gfxscale );    
+         glend();  
+         }
+      }
+      
+      if( i1 < i2 ){
+         j=j1;
+         
+         for(i=i1; i < i2+1; i++)
+         {
+         tileStatus[ i*gridH +j ] = PATHTILE;         
+
+         glbegin(gl_quads);
+            gltexcoord(0,0); glvertex(i*gfxscale,.1,j*gfxscale );
+            gltexcoord(1,0); glvertex( (i+1)*gfxscale,.1,j*gfxscale);
+            gltexcoord(1,1); glvertex( (i+1)*gfxscale,.1,(j+1)*gfxscale );
+            gltexcoord(0,1); glvertex(i*gfxscale,.1,(j+1)*gfxscale );    
+         glend();  
+         }
+      }
+      
+      if( j1 < j2 ){
+         i=i1;
+         
+         for(j=j1; j < j2; j++)
+         {
+         tileStatus[ i*gridH +j ] = PATHTILE;  
+         glbegin(gl_quads);
+            gltexcoord(0,0); glvertex(i*gfxscale,.1,j*gfxscale );
+            gltexcoord(1,0); glvertex( (i+1)*gfxscale,.1,j*gfxscale);
+            gltexcoord(1,1); glvertex( (i+1)*gfxscale,.1,(j+1)*gfxscale );
+            gltexcoord(0,1); glvertex(i*gfxscale,.1,(j+1)*gfxscale );      
+         glend();  
+         }
+      }
+      
+      if( j1 > j2 ){
+         i=i1;
+         
+         for(j=j1; j > j2; j--)
+         {
+         tileStatus[ i*gridH +j ] = PATHTILE;  
+         glbegin(gl_quads);
+            gltexcoord(0,0); glvertex(i*gfxscale,.1,j*gfxscale );
+            gltexcoord(1,0); glvertex( (i+1)*gfxscale,.1,j*gfxscale);
+            gltexcoord(1,1); glvertex( (i+1)*gfxscale,.1,(j+1)*gfxscale );
+            gltexcoord(0,1); glvertex(i*gfxscale,.1,(j+1)*gfxscale );      
+         glend();  
+         }
+      }     
+   }
+}
+
+renderPickColors()
+{
+   static tex[1][1];
+   tex[0][0] = rgb(511,511,511);
+   t = glsettex(tex,1,1);
+   //glbegin(gl_quads);
+   
+   
+   num = 0;
+   setcol(255,255,255);
+   
+   r = 0;
+   g = 0;
+   b = 0;
+   for(i=0; i<GRIDW; i++)
+   for(j=0; j<GRIDH; j++)
+   {
+      scale = gfxscale;
+      // store world coorinate for tile
+      tileX[num] = (i+.5)*scale;
+      tileZ[num] = (j+.5)*scale;      
+
+      setcol(r,g,b); // any difference in color between the 2?
+      //setcol( rgb(red,green,blue) );
+      
+      //glbegin(GL_COMPLEX);
+      gltexcoord(0,0); glvertex(i*scale,0,j*scale ); 
+      gltexcoord(1,0); glvertex( (i+1)*scale,0,j*scale);
+      gltexcoord(1,1); glvertex( (i+1)*scale,0,(j+1)*scale ); 
+      gltexcoord(0,1); glvertex(i*scale,0,(j+1)*scale ); 
+      
+
+      // Store color
+      objcolor[num][0] = r/255;
+      objcolor[num][1] = g/255;
+      objcolor[num][2] = b/255;      
+
+      // Since i dont know how what color evaldraw actually
+      // will draw in 3D i increase r,g,b by a fair amount
+      // to allow for some error in picking one color
+      // you see, getpix doesnt return what i draw here... lighting?
+      r+=10;
+      if(r>255){
+         r=0;
+         g+=10;
+         
+         if(g>255)
+         {
+            g = 0;
+            b+=10;
+         }
+      }       
+      num++;
+   }
+   glend();
+   glremovetex(t);
+}
+
+getPicked(){
+   getpix(mousx,mousy,r,g,b);
+   pickedR = r/255; // guess some precision is lost here...
+   pickedG = g/255;
+   pickedB = b/255;
+
+   num=0;
+   for(i=0; i<GRIDW; i++)
+   for(j=0; j<GRIDH; j++){
+   
+      epsilon=0.01; // can max compare 2 decimals.
+      if( fabs(objcolor[num][0]-pickedR) < epsilon &&
+      fabs(objcolor[num][1]-pickedG) < epsilon &&
+      fabs(objcolor[num][2]-pickedB) < epsilon) 
+      {
+         pickQuad = num;
+         break;
+      }
+      num++;
+   }   
+}
+
+circle(x,y,z,r)
+{
+      j=0;
+      ang = j*2*pi/12;
+      ca = cos(ang);
+      sa = sin(ang); 
+      moveto(x+ca*r, y+1, z+sa*r);
+      for(j=0; j<=12; j++)
+      {
+         ang = j*2*pi/12;
+         ca = cos(ang);
+         sa = sin(ang);
+         lineto(x+ca*r, y+1, z+sa*r);
+      }
+}
+
+drawTurrets(){
+   for(i=0; i<numturrets; i++){         
+         setcol(255,255,255); 
+         x=turretx[i];
+         y=turrety[i];
+         z=turretz[i];
+         if(turrettype[i]==0)
+            //drawspr("rpg.kv6",x,y,z,gfxscale/2,turretHeading[i]+pi/2,-PI); 
+            //drawspr("caco.kv6",x,y,z,gfxscale/3,turretHeading[i]+pi/2,-PI); 
+            //drawspr("kanon.kv6",x,y,z,gfxscale/3,turretHeading[i]-pi,-PI); 
+            drawspr("hitechcannon.kv6",x,y,z,gfxscale/3,turretHeading[i]-pi,-PI); 
+         else
+         {
+            drawspr("tanks.kv6",x,y,z,gfxscale/3,turretHeading[i],-PI); 
+            //drawsph(x,y,z,.25);
+         }
+         
+         // draw circle to show turret range.
+         //circle(x,y,z,turretShotRange);
+   }
+}
+
+distance2d(x1,y1,x2,y2){
+   return sqrt( (x1-x2)^2 + (y1-y2)^2 );
+}
+
+updateTurrets(){
+   for(i=0; i<numturrets; i++){
+      for(j=0; j<maxenemies; j++)
+      {
+         if(enemyAlive[j]==1)
+         {
+            if( distance2d( turretx[i], turretz[i], enemyx[j], enemyz[j] ) <  turretShotRange)
+            //if( doLineOfSight(i,enemy) == GOTTARGET && turretCooldown[i] < 0)
+            
+            
+            if(doLineOfSight(i,j) == GOTTARGET && turretCooldown[i] < time)
+            {
+               turretCooldown[i] = time + 0.2; // sec cooldown
+               ca = cos(-turretHeading[i]);
+               sa = sin(-turretHeading[i]);
+               makeBullet(turretx[i]+ca*gfxscale/3, turretz[i]+sa*gfxscale/3,
+                ca,sa);
+                
+               continue; // dont try to track others
+            }
+         }
+      }
+   } 
+}
+
+
+doLineOfSight(turret,enemy){
+   predx = turretx[turret];
+   predy = turretz[turret];
+   prayx = enemyx[enemy];
+   prayy = enemyz[enemy];
+
+   left = 0;
+   right = 0;
+   
+   angleToPray = atan2(predx-prayx,predy-prayy);
+   angleToPray %= 2*PI;
+   //angleToPray = atan2(predy-prayy,predx-prayx);
+   
+   bound = 30;
+   onTarget = 0;
+   
+   // if predator is dead on, no not correct path.
+   deadOnTarget = angleToPray*180/pi - turretHeading[turret]*180/pi;
+   if(  deadOnTarget < -90+bound &&  deadOnTarget > -90-bound )
+   {
+      onTarget = 1; 
+   } 
+   
+   if(  deadOnTarget > 270-bound &&  deadOnTarget < 270+bound )
+   {
+      onTarget = 1;
+   } 
+   
+
+   PIOVER180 = PI / 180;
+   // koordinatet vi skal rotere til. dit fienden er.
+   vx = cos(angleToPray);
+   vy = sin(angleToPray);
+   
+   ca = -cos( turretHeading[turret] );
+   sa = -sin( turretHeading[turret] );  
+   
+   // hvor mye vi roterer.
+   rotX = vx * ca + vy * sa;
+   rotY = -vx * sa + vy * ca;
+
+
+   //vinkel mellom rot og dit vi skal rotere til
+ 
+   // normaliser
+   //length = sqrt(rotX^2 + rotY^2);
+   //rotX /= length; 
+   //rotY /= length;
+   
+   // rotate max 0.5 degrees per frame
+   
+   maxRot = 400 * PIOVER180 * dt; // degrees
+   
+   tolerance = 0.1; //1*PIOVER180;
+   if(rotx < -tolerance){
+      left = 1;
+      turretHeading[turret] += maxRot;
+      turretHeading[turret] %= 2*PI;
+   }
+   else if(rotx > -tolerance){
+      right = 1;
+      turretHeading[turret] -= maxRot;
+      turretHeading[turret] %= 2*PI;
+   }
+   
+   if( onTarget ) return GOTTARGET;
+}
+
+updateDead(){
+   for(i=0; i<MAXDEAD; i++){
+      if(deadAnim[i] > time)
+      {
+         if(rnd < .5) setcol(0xffff00); else setcol(0xff0000); 
+         animationTime = deadAnim[i] - time;         
+
+         scale = 1+animationTime;
+         drawspr("cowdead.kv6",deadX[i], 1+scale, deadZ[i], scale, deadHeading[i]-animationTime*3, -PI-animationTime*2);
+      }
+   }
+}
+
+
+makeDead(enemy){
+   if(popupTime < 1)
+   popupTime = popupTime = 100;
+
+   for(i=0; i<MAXDEAD; i++){
+      if(deadAnim[i] < time)
+      {
+         snd = rnd;
+         if(snd > 0 && snd < .33) playsound("moo.flac",100,1); 
+         else if(snd > .33 && snd < .66) playsound("moo.flac",100,1.5);
+         else if(snd > .66) playsound("moo.flac",100,2);
+         deadX[i] = enemyx[enemy];
+         deadZ[i] = enemyz[enemy];
+         deadHeading[i] = enemyHeading[enemy];
+         deadAnim[i] = time+1;
+         return;
+      }
+   }
+}
+
+updateEnemies(){
+   for(i=0; i<MAXENEMIES; i++)
+   {
+      if(enemyAlive[i]){ 
+         if(enemyHitpoints[i] < 0){
+            enemyAlive[i] = 0;
+            makeDead(i);
+            continue;
+         }      
+
+         if(enemyTargetWP[i] < MAXWAYPOINTS-1)
+         {
+            tile = waypoint[ enemyTargetWP[i] % MAXWAYPOINTS ];
+            
+            x = tileX[tile];
+            z = tileZ[tile];         
+   
+            nextTile = waypoint[ enemyTargetWP[i]+1 ];
+            dx = tileX[nextTile];
+            dz = tileZ[nextTile];
+            ang = atan2(x-dx,z-dz);
+            
+            lineLen = sqrt( (x-dx)^2 + (z-dz)^2 );
+            
+            t = enemyPointOnLine[i];
+            // lerp
+            px = (dx-x) * t;
+            pz = (dz-z) * t;
+            
+            enemyx[i] = x+px;
+            //enemyy[i] = y;
+            enemyz[i] = z+pz;
+            
+            hit = 384 * enemyHitpoints[i] / 100;
+            setcol(384,hit,hit);
+            drawspr("cow.kv6",x+px, 1 ,z+pz, 1, ang-PI ,-PI+sin(time*10)/2 ); //+sin(time*10)/2
+            enemyHeading[i] = ang-PI +sin(time*10)/2;
+            
+            //drawsph(dx,1,dz,1);
+            
+            // longer dist, slower inc of t.
+            enemyPointOnLine[i] += (5*dt)* 1/linelen;
+            if( enemyPointOnLine[i] > 1.0 ){
+               enemyPointOnLine[i] = 0;
+               newTarget = enemyTargetWP[i]+1 % MAXWAYPOINTS;
+               if( newTarget < MAXWAYPOINTS)
+               enemyTargetWP[i] = newTarget;
+               else enemyTargetWP[i] = 0; 
+            }
+         }
+         else
+         {
+            enemyPointOnLine[i] = 0;
+            enemyTargetWP[i] = 0; 
+         }
+      }
+   }
+
+}
+
+hex2rgb(mrgb,&r,&g,&b)
+{  
+   r = (mrgb / 2^16);
+   g = (mrgb / 2^8) % 256;
+   b = mrgb % 256;   
+}
+
+hsv_to_rgb(h,s,v,&r,&g,&b){ 
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   //r=int(r*255);
+   //g=int(g*255);
+   //b=int(b*255);
+   //return r*2^16 + g*2^8 + b; 
+}
+
+/* gets the player controls and sets global camera variables. */
+updateCamera()
+{     
+   playercontrols(cam,posh,posv);
+   if(posv > -pi/2 - .001) posv = -pi/2 -0.001;
+   if(posv < -3/2*pi) posv = -3/2*pi;
+   setcam(cam.x,cam.y,cam.z,posh,posv);
+
+   setcol(400,400,400);
+   /*
+   drawspr("cow.kv6", cam.x + (mat[0] + mat[3] + mat[6]),
+   cam.y + (mat[1] + mat[4] + mat[7])*0,
+   cam.z + (mat[2] + mat[5] + mat[8]) *-1,
+   gfxScale/3,
+   posh - PI/2,
+   PI ); 
+   */
+       
+   //setcol(0);printf("posv %g",posv);
+
+/*
+   drawspr("cow.kv6",tx,
+   ty,
+   tz,
+   gfxScale/3,
+   posh - PI/2,
+   PI );   
+*/   
+
+}
+// Camera and movement code taken from /games/
+//Handle input and player movement
+playercontrols(p3d_t campos,&posh,&posv)
+{
+   static oldMouseX;
+   static oldMouseY;
+   static mouseSpeedX;
+   static mouseSpeedY; 
+
+   f = 50*dt;
+   if (keystatus[0x2a]) f /= 5;
+   if (keystatus[0x36]) f *= 2;
+   vx = (keystatus[32]-keystatus[30])*f; //D-A
+   vy = (keystatus[17]-keystatus[31])*f; //W-S  
+   vz = 0;//(keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   
+   ang2mat(posh,posv,mat);
+   newvx = mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   newvy = mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   newvz = mat[2]*vx + mat[5]*vz + mat[8]*vy; 
+   d = 1/12; 
+   campos.x+=newvx;
+   campos.y+=newvy;
+   campos.z+=newvz;
+   
+   // mousespeed values are tweaked for 60 fps
+   mouseSpeedX = (mousx - oldMouseX) * 0.01;
+   mouseSpeedY = (mousy - oldMouseY) * 0.01;
+   oldMouseX = mousx;
+   oldMouseY = mousy;
+   if(bstatus==2)
+   {
+      posh -= mouseSpeedX;
+      posv += mouseSpeedY;
+   }
+}
+/* converts horizontal and vertical angles to a 3x3 matrix */
+ang2mat(hang,vang,mat[9])
+{
+   mat[6] = cos(vang)*sin(hang); mat[0] = cos(hang);
+   mat[7] = sin(vang);           mat[1] = 0;
+   mat[8] = cos(vang)*cos(hang); mat[2] =-sin(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}
+
+makeBullet(px,py,dx,dy)
+{
+   for(i=0; i<MAXBULLETS; i++)
+   {
+      if( bulletLife[i] < time )
+      {
+         playsound("swoosh.wav",60,1);
+         bulletLife[i] = time+.5;
+         bulletpx[i] = px;
+         bulletpy[i] = py;
+         bulletdx[i] = dx;
+         bulletdy[i] = dy;
+         return;
+      }
+   }
+}
+
+drawbullets()
+{
+   numbullets = 0;
+   for(i=0; i<MAXBULLETS; i++)
+   {
+      if(bulletLife[i] > time)
+      {
+         numbullets++;      
+
+         bulletpx[i] += bulletdx[i] * 20 * dt;
+         bulletpy[i] += bulletdy[i] * 20 * dt;
+         
+         // check collision
+         for(j=0; j<MAXENEMIES; j++)
+         {
+            if(enemyAlive[j]==1)
+            {
+               dist = (bulletpx[i]-enemyx[j])^2 + (bulletpy[i]-enemyz[j])^2;
+               if( dist < 1 )
+               {
+                  enemyHitpoints[j] -= 10;
+                  bulletLife[i] = -1;
+                  continue;
+               }
+            }
+         }
+
+         
+         if(rnd < .5) setcol(0xffff00); else setcol(0xff0000);         
+
+         drawsph(bulletpx[i], 1, bulletpy[i], .2);
+         
+         if(bulletpx[i] < 0) bulletLife[i] = -1;
+         else if(bulletpy[i] < 0) bulletLife[i] = -1;
+         else if(bulletpx[i] > gfxscale*gridw) bulletLife[i] = -1;
+         else if(bulletpy[i] > gfxscale*gridh) bulletLife[i] = -1;
+      }
+   }
+}

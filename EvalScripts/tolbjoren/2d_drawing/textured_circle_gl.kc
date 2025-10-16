@@ -1,0 +1,49 @@
+static time,dt;
+static tex[2][2];
+()
+{
+
+   tex[0][0] = rgb(255,255,255);
+   tex[0][1] = rgb(255,0,0);
+   tex[1][0] = rgb(0,255,0);
+   tex[1][1] = rgb(0,0,255);
+
+   handle=glsettex(tex,2,2);
+   
+   newTime = klock();
+   dt = newTime - time;
+   time = newTime;
+
+   cls(0);
+   clz(1e32);
+   glEnable(GL_DEPTH_TEST);
+   glEnable(GL_ALPHA_TEST);
+   
+   setcol(255,255,255);
+   texCirc(mousx,mousy,60);
+   
+   glremovetex(handle);
+}
+
+
+texCirc(x,y,r)
+{
+   segs = 18;
+   ang_delta = 2*PI / (segs-1);
+   ang = 0;
+   glBegin(GL_POLYGON);
+   for(i=0; i<segs; i++)
+   {  
+      xp = x+r*cos(ang);
+      yp = y+r*sin(ang);
+
+      u = (cos(ang) +1) * .5;
+      v = (sin(ang) +1) * .5;
+
+      ang += ang_delta;
+   
+      glTexCoord(u,v); 
+      glVertex(xp,yp);       
+   }
+   glEnd();
+}

@@ -1,0 +1,48 @@
+() 
+static buf[256][256];
+{
+clz(1e32); 
+cls(0);
+setcol(0xffffff);
+t = klock()*.2; 
+r = 2.8;
+setcam(cos(t)*cos(t)*r,-sin(t)*r,sin(t)*cos(t)*r,-t-PI/2,t);
+
+   //Generate tex
+   if(numframes==0)
+   {
+      
+      for(y=0;y<256;y++)
+         for(x=0;x<256;x++)
+         {
+            v = noise(x/32,y/32)*100 + 0xffffff;
+            buf[y][x] = v;
+         }
+   }
+
+glsettex(buf,256,256);
+
+
+texSize = 4;
+nu = 32; du = PI*2/nu;
+nv = 16; dv = PI/nv;
+
+for(v=PI,iv=0; iv<=nv; iv++, v+=dv)
+{
+   glBegin(GL_TRIANGLE_STRIP);
+   for(u=0,iu=0;iu<=nu;iu++,u+=du)
+   {
+      glTexCoord(u*.5/PI*texSize,v/PI*texSize);
+      glVertex(sin(v)*cos(u),cos(v),sin(v)*sin(u));
+      glTexCoord(u*.5/PI*texSize,(v-dv)/PI*texSize);
+      glVertex(sin(v-dv)*cos(u),cos(v-dv),sin(v-dv)*sin(u));
+   
+      //drawsph(sin(v)*cos(u),cos(v),sin(v)*sin(u),.025);
+   }
+}
+setfont(32,64,0);
+moveto(100,100);
+printf("moo-sphere:");
+
+
+}

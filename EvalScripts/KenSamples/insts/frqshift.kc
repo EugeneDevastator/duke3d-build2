@@ -1,0 +1,15 @@
+(x,t,te) //Plays sound faster/slower without changing pitch!
+{        //Works best for WAV files containing speech.
+         //1. Use File..Select snd() to select WAV file
+         //2. Press KP Enter to enter piano mode
+   sz = 60; //block size (lower is better for fast talking)
+   //sc = 2.0; //time scale
+   sc = (t*PI*2)*sqrt(sqrt(2))*220/x; //Change only frequency
+   
+   a = x/sz; b = int(a); a -= b; i = (sc-1)*sz; b = b*i+x;
+   r  = snd(b)*(1-a) + snd(b+i)*a;
+   
+   if (t < .001) r *= t/.001;       //Attack
+   if (t > te) r *= exp((t-te)*-5); //Release
+   return(r);
+}

@@ -1,0 +1,303 @@
+// Think of it as a heightmap
+// the goal is at the bottom of the hightmap
+// the "AI" agent must always move towards the goal
+// we must be careful not to setup the repulsors
+// in a way that could trap the player in a local minima
+// for now you have to keep a distance between repulsors.
+
+// use repulsors to make walls
+// use attractors to make roads
+
+// things start getting slow at 50 repulsors.
+
+// how does one construct surrounding walls without
+// creating local minima to get stuck in?
+// could traverse the potentialfield with BestFirst?
+
+struct coord_t
+{
+ x;
+ y;
+ gamma;
+ alpha;  
+}
+
+static startx, starty;
+
+enum{MAXATTRACTORS = 50}
+static numAttractors = 1;
+static coord_t attractors[MAXATTRACTORS];
+
+enum{MAXREPULSORS = 50}
+static numRepulsors = 0;
+static coord_t repulsors[MAXREPULSORS];
+()
+{
+   cls(0);
+   
+   nx = xres/100;
+   ny = yres/100;
+   
+   endx = 50*nx;
+   endy = 50*ny;
+
+   beta = 10; // Repulsor radius of influence
+   gammaAll = 0.01;
+
+   if(numframes==0)
+   {
+      startx = 0;
+      starty = 0;
+      
+      attractors[0].x = endx;
+      attractors[0].y = endy;
+      attractors[0].gamma = 0.0000003; // attractor strength,  0.0000001; is good
+      attractors[0].alpha = 10000; // attractor radius of influence, keep high for goal.  
+   }
+   
+   
+   
+   t = klock(0);
+   //attractors[0].x = 50*nx+cos(t)*50;
+   //attractors[0].y = 50*ny+sin(t)*50;
+   endx = attractors[0].x;
+   endy = attractors[0].y;   
+   
+   //startx = attractors[0].x;
+   //starty = attractors[0].y; 
+   
+
+   //repulsors[0].x = mousx;
+   //repulsors[0].y = mousy;
+   
+
+   inc = 15;
+   for(y=0; y<yres; y+=inc)
+   {
+      for(x=0; x<xres; x+=inc)
+      {
+         // find field strength at this point (x,y)
+         value = -attract(x,y) + repulse(x,y,beta) ; 
+            
+         // If strength is positive, we have a problem?
+         c = 0;
+         if( value > 0 ) c = rgb( 255, 0, 0);
+         if( value < 0 ) c = rgb( 0, abs(value)*255, 0);
+         setcol(c);
+      
+         // Find direction of field
+         xgrad=0; ygrad=0;
+         derivative(x,y,beta,xgrad,ygrad);
+         
+         // Draw arrow
+         drawsph(x,y,-1.5);
+         moveto(x,y); lineto(x+inc*-xgrad, y+inc*-ygrad);         
+      }
+   }
+   
+
+   if(bstatus == 1 && numRepulsors < MAXREPULSORS)
+   {
+      //bstatus = 0;
+      
+      
+      
+      if(distance(mousx,mousy, endx, endy ) > beta*1.5) // Don't place repulsor on goal
+      {
+         spotFree = 1;      
+
+         // Check if point is sufficiently far away from a repulsor.
+         for(i=0; i<numRepulsors; i++)
+         {
+            if(distance(mousx,mousy, repulsors[i].x, repulsors[i].y ) < beta*1.2)
+            {
+               spotFree = 0;
+               break;
+            }
+         }
+         
+         if( spotFree )
+         {
+            repulsors[numRepulsors].x = mousx;
+            repulsors[numRepulsors].y = mousy;
+            repulsors[numRepulsors].gamma = gammaAll;
+            numRepulsors++;
+         }
+
+      }
+   }
+   
+   if(bstatus == 2 && numAttractors < MAXATTRACTORS)   
+   {
+      //bstatus = 0;
+
+      
+      spotFree = 1;      
+
+      // Check if point is sufficiently far away from a repulsor.
+      for(i=0; i<numAttractors; i++)
+      {
+         if(distance(mousx,mousy, attractors[i].x, attractors[i].y ) < beta*1.2)
+         {
+            spotFree = 0;
+            break;
+         }
+      }
+      
+      if( spotFree )
+      {
+         attractors[numAttractors].x = mousx;
+         attractors[numAttractors].y = mousy;
+         attractors[numAttractors].gamma = 0.01;
+         attractors[numAttractors].alpha = 15;
+         numAttractors++;
+      }
+   }
+   
+
+   if(keystatus[57] == 1 )
+   {
+      
+      startx = mousx;
+      starty = mousy;
+   }
+   
+   
+
+   
+   x=startx;
+   y=starty;   
+   waycosts = 0;
+   dtime = 0;
+   
+   inc2 = inc / 2;
+   //for(step=0; step<10000; step++)
+
+   
+   do
+   {
+      time = klock(0);
+      xgrad=0; ygrad=0;
+      derivative(x,y,beta,xgrad,ygrad);
+      
+      // Exit if gradient goes to zero
+      if( fabs(xgrad-0) < 0.0001 && fabs(ygrad-0) < 0.0001 ) break;
+      
+      // Exit if we found goal, attractor[0]
+      if( x > attractors[0].x -inc2 && x < attractors[0].x + inc2 )
+      {
+         if( y > attractors[0].y -inc2 && y < attractors[0].y + inc2 )
+         {
+            break;
+         }
+      }
+      
+      fact1 = 1/xgrad;
+      fact2 = 1/ygrad;
+      
+      factor = 0;
+      if( abs(fact1) < abs(fact2) )
+         factor = abs(fact1); 
+      else 
+         factor = abs(fact2);
+      
+      speed = inc2;
+      // Move towards negative gradient. Down the slope.
+      x -= speed*xgrad * factor;
+      y -= speed*ygrad * factor;
+      
+      dtime = dtime + klock(0) - time;
+      
+
+      setcol( rgb(255-waycosts, waycosts,0) );
+      drawsph(x,y,inc/2);
+      //setpix( x,y);
+      waycosts++;
+      if(waycosts > 1000 ) break; // stuck
+
+   }while(1);
+   
+   
+   
+   
+   
+
+     
+   setcol(0xfa7345);
+   setfont(18,36,1);
+   moveto(0,0);
+   printf("waycosts %g\n",waycosts);
+   printf("millisecs %g\n",dtime*1000);
+   printf("numrepulsors %g",numrepulsors); printf("  numAttractors %g\n",numAttractors);
+
+   
+   
+   setcol(255,255,255);drawsph( startx,starty, 25);
+   setcol(0,0,255); drawsph(attractors[0].x, attractors[0].y, 25);
+   
+
+   setcol(0xffffff);
+   for(i=0; i<numAttractors; i++)
+   {
+      drawsph( attractors[i].x, attractors[i].y, -attractors[i].alpha);
+   }
+   setcol(0xff0000);
+   for(i=0; i<numRepulsors; i++)
+   {
+      drawsph( repulsors[i].x, repulsors[i].y, -beta);
+   }
+
+}
+
+distance(x1,y1,x2,y2)
+{
+   return sqrt( (x1-x2)^2 + (y1-y2)^2 )
+}
+
+attract(x,y)
+{
+   value = 0;
+   for(i=0; i<numAttractors; i++)
+   {
+      gamma = attractors[i].gamma;
+      alpha = attractors[i].alpha;
+      value += alpha * 2.718281828^(-gamma/2 * ((x-attractors[i].x)^2 + (y-attractors[i].y)^2) );
+   }
+   value = abs(value);
+}
+
+repulse(x,y, beta)
+{
+   value = 0;
+   for(i=0; i<numRepulsors; i++)
+   {
+      gamma = repulsors[i].gamma;
+      value += beta * 2.718281828^(-gamma/2 * ((x-repulsors[i].x)^2 + (y-repulsors[i].y)^2) );
+   }
+   value = abs(value);
+}
+
+derivative(x,y,beta, &coordx, &coordy)
+{
+   xval=0;
+   yval=0;
+   for(i=0; i<numAttractors; i++)
+   {
+      gamma = attractors[i].gamma;
+      alpha = attractors[i].alpha;
+      term = 2.718281828^(-gamma/2 * ((x-attractors[i].x)^2 + (y-attractors[i].y)^2) );
+      xval += alpha*gamma*(x-attractors[i].x) * term;
+      yval += alpha*gamma*(y-attractors[i].y) * term;
+   }
+   
+   for(i=0; i<numRepulsors; i++)
+   {
+      gamma = repulsors[i].gamma;
+      term = 2.718281828^(-gamma/2 * ((x-repulsors[i].x)^2 + (y-repulsors[i].y)^2) );
+      xval -= beta*gamma*(x-repulsors[i].x) * term;
+      yval -= beta*gamma*(y-repulsors[i].y) * term;
+   }
+   
+   coordx = xval;
+   coordy = yval;
+}

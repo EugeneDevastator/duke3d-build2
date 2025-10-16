@@ -1,0 +1,21 @@
+(x,y,z,&r,&g,&b) //Tie fighter, originally by Johan Forslof
+//From: http://www.leweyg.com/download/impview.html
+b = x; x = y; y = z; z = b; //Fix coordinates :/
+r = 147; g = 121; b = 200;
+
+xx = x^2; yy = y^2; zz = z^2;
+ax = abs(x); ay = abs(y); az = abs(z);
+
+if (xx+yy+zz < .2)       { r = 100; g = 100; return(1); }
+if ((abs(x-.2) < .2) && (yy+zz < .08))       return(1);
+if (yy*4 + xx < (1-az)*0.12)      { g = 128; return(1); }
+if ((abs(az-.925) < .025) && (ay*.3+ax < 1)) return(1);
+
+if (abs(az-.94) > .05) return(0);
+
+r *= 1.1; g *= 1.1; b *= 1.1;
+if ((ax < .7) && (ay > .9)) return(1);
+if (ay < .035)              return(1);
+if (abs(ax-ay*.7  ) < .05)  return(1);
+if (abs(ax+ay*.3-1) < .05)  return(1);
+0

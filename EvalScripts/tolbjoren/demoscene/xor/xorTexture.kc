@@ -1,0 +1,167 @@
+enum{TEXW=32, TEXH=32};
+
+enum{NUMBITS=8, MAXNUMS=3};
+static binary[MAXNUMS][NUMBITS]; // little endian. LSB at end.
+()
+{
+   // doing things in retarded ways just for fun
+   zoom = max(.5, (mousx*3)/(xres/4) );
+   
+   if(numframes==0)
+   {
+      // setup gl
+      glCullFace(GL_BACK); 
+      glDisable(GL_ALPHA_TEST);
+      glDisable(GL_DEPTH_TEST);
+   }
+   
+   //cls();
+
+   t = klock();  
+   static frame[TEXW][TEXH];  
+
+    for(x = 0; x < TEXW; x++) 
+    for(y = 0; y < TEXH; y++) 
+    {           
+         decToBin(x,0);
+         decToBin(y,1);
+         xor(0,1,2);
+         c = binToDec(2);        
+
+         frame[x][y] = hsv_to_rgb( (c*10*cos(t*0.25))%360,.7,1);
+         //frame[x][y] = 6*rgb(c,c,c);
+         //setcol( rgb(c,c,c) );
+         //setpix(x,y); 
+    } 
+   
+
+   
+   /*   
+   setcol(0xffffff);
+   moveto(0,0);
+   a = unit(199999);
+   printf("unit. neg becomes 0. pos becomes 1. %g", a);
+
+   decToBin(64,0);
+   decToBin(32,1);
+   moveto(mousx+10,mousy);
+   printBin(0);
+   moveto(mousx+10,mousy+15);
+   printBin(1);
+   printf("\n\nXOR:");
+   xor(0,1,2);
+   moveto(mousx+10,mousy+55);
+   printBin(2);
+   
+   numXored = binToDec(2);
+   printf("\nXored = %g",numXored);
+   */
+
+   texHandle = glsettex(frame,TEXW,TEXH);
+   //a = 5; b = 4;
+   a = 9; b = 8;
+   x = xres/2 + a*sin(a*t+PI/2)*50;
+   y = yres/2 + b*sin(b*t)*50;
+   //quad(TEXW/2*zoom,TEXH/2*zoom,TEXW*zoom,TEXH*zoom);
+   drawspr(x,y,texw*zoom,t*2);
+   glremovetex(texhandle);   
+}
+
+binToDec(id)
+{
+   num = 0;
+   for(i=0; i<NUMBITS; i++)
+   {
+      if( binary[id][i] == 1)
+      {
+         num += 2^(NUMBITS-i-1);
+      }
+   }   
+   return num;
+}
+
+decToBin(num,id)
+{
+   for(i=0; i<NUMBITS; i++)
+   {
+      binary[id][i] = 0; // clear.
+   }
+   bitpos = NUMBITS-1;
+   
+   while( num > 0 && bitpos >= 0)
+   {
+      if(num % 2 == 1)
+      {
+         binary[id][bitpos] = 1;
+      }
+      else
+      {
+         binary[id][bitpos] = 0;
+      }
+      bitpos--; // ready for next bit
+      
+      num = int(num/2);
+   }
+}
+
+printBin(id)
+{
+   for(i=0; i<NUMBITS; i++)
+   {
+      printf("%g", binary[id][i] );
+   }   
+}
+
+xor(num1,num2,store)
+{
+   for(i=0; i<NUMBITS; i++)
+   {
+      if(binary[num1][i] == binary[num2][i])
+      {
+         binary[store][i] = 0;
+      }
+      else
+      {
+         binary[store][i] = 1;
+      }
+   }   
+   
+}
+
+quad(x,y,width,height)
+{
+   glBegin(GL_COMPLEX);
+   glTexCoord(0,0);glVertex(x,y);
+   glTexCoord(1,0);glVertex(x+width,y);
+   glTexCoord(1,1);glVertex(x+width,y+height);
+   glTexCoord(0,1);glVertex(x,y+height);
+   glEnd();
+}
+
+hsv_to_rgb(h,s,v)
+{
+   if(v==0){r=0; g=0; b=0;} // no brightness, black
+   else if(s==0){r=v; g=v; b=v;} // grayscale, no saturation
+   else{
+      hf = h / 60.0;
+      i = floor(hf);
+      f = hf - i;
+      pv = v* (1-s);
+      qv = v * (1-s*f);
+      tv = v * (1-s*(1-f));
+      if(i==0){r=v; g=tv; b=pv;}
+      if(i==1){r=qv; g=v; b=pv;}
+      if(i==2){r=pv; g=v; b=pv;}
+      if(i==3){r=pv; g=qv; b=v;}
+      if(i==4){r=tv; g=pv; b=v;}
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}
+   
+   }
+   r = int(r*255);
+   g = int(g*255);
+   b = int(b*255);
+   col =  rgb(r,g,b); // returns last value
+   //return r*2^16 + g*2^8 + b;
+}

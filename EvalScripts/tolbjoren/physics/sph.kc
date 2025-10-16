@@ -1,0 +1,521 @@
+struct vec2f
+{
+   x,y;
+}
+
+struct neighbor 
+{ 
+  i, j; 
+  q, q2, lng; 
+};
+
+
+enum{MAX_PARTICLES = 1024*4}
+enum{MAX_NEIGHBORS = 128}
+static particlesCreated = 0;
+
+// The particle structure holding all of the relevant information.
+struct particle 
+{ 
+   vec2f pos;
+   vec2f pos_old;
+   vec2f vel;
+   vec2f force; 
+   mass, rho, rho_near, press, press_near, sigma, beta; 
+   numNeighs;
+   neighbor neighbors[MAX_NEIGHBORS];  
+};
+
+static particle particles[MAX_PARTICLES];
+
+
+
+//////////////////////////////////////////
+static N             = 512;                     // Number of Particles in the simulation
+static double G             = 0.006;                // Gravitational Constant for our simulation
+static double spacing       = 3.0;                     // Spacing of particles
+static double k; // Far pressure weight
+static double k_near;                     // Near pressure weight
+static double rest_density  = 5;                      // Rest Density
+static double sigma         = 0.1;                //
+static double beta          = 0.1;                //
+static double r;         // Radius of Support
+static double rsq;                     // ... squared for performance stuff
+static double SIM_W         = 350;                        // The size of the world
+static double bottom        = 0;                        // The floor of the world
+
+// Our collection of particles
+
+
+// Mouse attractor
+static vec2f attractor;
+static attracting = 0;
+static repelling  = 0;
+static attractor_radi = 16;
+
+static err=0;
+
+static oldtime;
+()
+{
+   static fps;
+   static frameCount;
+   static oneSec;
+   time = klock(0);
+   dt = time - oldtime;
+   oldtime = time;
+
+   if(numframes==0){
+      k             = spacing / 1000.0;
+      k_near        = k*10;
+      r             = spacing*3.25;
+      rsq           = r*r;
+      init();
+      attractor.x = -SIM_W;
+      attractor.y = -SIM_W;
+   }
+
+   cls(0);
+
+    if(bstatus == 1){
+       attracting = 1;
+    }
+    else if( bstatus == 2)
+    {
+       repelling = 1;
+    }
+    else if( bstatus == 0)
+    {
+      attracting = 0;
+      repelling = 0;
+      attractor.x = SIM_W * 99;
+      attractor.y = SIM_W * 99;
+    }
+    
+   // This simply updates the location of the mouse attractor.     
+   double relx = (mousx);
+   double rely = (mousy) ;
+   attractor.x = relx;
+   attractor.y = -rely + SIM_W;
+   
+
+   advance_particles();
+   calc_density();
+   calc_pressure();
+   calc_viscosity(); // Try without
+   
+   render();
+
+   
+   setcol(255,255,255);
+   
+   drawsph(1+attractor.x, 1+-attractor.y + 1*SIM_W, -5);
+   if( repelling ){
+      drawsph(1+attractor.x, 1+-attractor.y + 1*SIM_W, -attractor_radi);
+   }
+   
+   moveto(SIM_W+15, 15);
+   printf("FPS = %g\n", fps);
+   
+   printf("#particles = %g\n", particlesCreated);
+   if( err )
+   {
+      printf("errors\n");
+   }else{
+      printf("seems ok\n");
+   }
+
+   if (attracting){
+      printf("attracting\n");
+   }else{
+      printf("not attracting... (Mouse 1)\n");
+   }
+   if (repelling){
+      printf("repelling\n");
+   }else{
+      printf("not repelling... (Mouse 2)\n");
+   }
+   
+   
+   if (keystatus[57] && particlesCreated < MAX_PARTICLES)
+   {
+      x = attractor.x + randab(-5,5);
+      y = attractor.y + randab(-5,5);
+      particles[particlesCreated].pos.x = x;
+      particles[particlesCreated].pos.y = y;
+      particles[particlesCreated].pos_old.x = x + 0.1 * rnd;
+      particles[particlesCreated].pos_old.y = y + 0.1 * rnd;    
+      particles[particlesCreated].force.x = 0;
+      particles[particlesCreated].force.y = 0;
+      particles[particlesCreated].sigma = sigma;
+      particles[particlesCreated].beta = beta;
+  
+      particlesCreated++;
+   }
+   
+   if (keystatus[211] )
+   {
+      particlesCreated = 0;
+   }
+   
+
+   frameCount++;
+   if( time > oneSec )
+   {
+      fps = frameCount;
+      frameCount = 0;
+      oneSec = time + 1;
+   }
+}
+
+
+// Between [a,b]
+randab(a, b) { return a + (b-a)*rnd(); }
+
+length_2( vec2f a, vec2f b)
+{
+   return (a.x-b.x)^2 + (a.y-b.y)^2;
+}
+
+
+//////////////////////////////////////////
+drawrectfill(x0,y0,x1,y1) { for(y=y0;y<y1;y++) { moveto(x0,y); lineto(x1,y); } }
+drawrectopen(x0,y0,x1,y1) { moveto(x0,y0); lineto(x1,y0); lineto(x1,y1); lineto(x0,y1); lineto(x0,y0); }
+
+render()
+{
+   xs = 1;
+   ys = SIM_W+1;
+   
+   /*setcol(255,255,255);
+   for(i=0; i < particlesCreated; ++i)
+   {
+      //setcol(255*.2,255*.6,255*.8);
+      drawsph(xs+particles[i].pos.x, ys + -particles[i].pos.y, -r*0.25 );
+   }*/
+   
+   //glBegin(GL_POINTS);
+   for(i=0; i < particlesCreated; ++i)
+   {
+         // We'll let the color be determined by 
+         // ... pressure for the blue component
+         // ... x-velocity for the red component
+         // ... y-velocity for the green-component
+      c = .1 * particles[i].rho;
+      x = 20 * fabs(particles[i].vel.x);
+      y = 20 * fabs(particles[i].vel.y);
+      
+      
+        
+      setcol(255 * (.3+x), 255 * (.3+y), 255 * c);
+      //drawsph(xs+particles[i].pos.x, ys + -particles[i].pos.y, r*0.25 );
+      //drawsph(xs+particles[i].pos.x, ys + -particles[i].pos.y, -r*0.125 );
+      //setpix( xs+ particles[i].pos.x , ys+ -particles[i].pos.y );
+
+      moveto(  xs+ particles[i].pos_old.x , ys+ -particles[i].pos_old.y );
+      lineto(  xs+ particles[i].pos.x , ys+ -particles[i].pos.y );      
+
+      //glVertex( particles[i].pos.x , -particles[i].pos.y, 0 );
+   }  
+    
+   setcol(255,0,0);
+   drawrectopen(xs - 1,ys-SIM_W - 1,xs+SIM_W, ys);
+
+}
+
+
+advance_particles()
+{
+   // UPDATE
+   //
+   // This modified verlet integrator has dt = 1 and calculates the velocity
+   // For later use in the simulation. 
+
+   // For each particles i ...
+   for(i=0; i < particlesCreated; ++i)
+   {
+      // Apply the currently accumulated forces
+      particles[i].pos.x += particles[i].force.x;
+      particles[i].pos.y += particles[i].force.y;
+    
+      // Restart the forces with gravity only. We'll add the rest later.
+      particles[i].force.x = 0;
+      particles[i].force.y = -G;
+    
+      // Calculate the velocity for later.
+      particles[i].vel.x = particles[i].pos.x - particles[i].pos_old.x;
+      particles[i].vel.y = particles[i].pos.y - particles[i].pos_old.y;
+      
+      // (damping has been removed, since there can never be instability issues
+      //  in a verlet based physics simulation, and since it was an ugly hack :-)
+    
+      // Normal verlet stuff
+      particles[i].pos_old.x = particles[i].pos.x;
+      particles[i].pos_old.y = particles[i].pos.y;
+      particles[i].pos.x    += particles[i].vel.x;
+      particles[i].pos.y    += particles[i].vel.y;
+    
+      // If the particle is outside the bounds of the world, then
+      // Make a little spring force to push it back in.
+      if(particles[i].pos.x < 0) particles[i].force.x -= (particles[i].pos.x ) / 2;
+      if(particles[i].pos.x >  SIM_W) particles[i].force.x -= (particles[i].pos.x - SIM_W) / 2;
+      if(particles[i].pos.y < bottom) particles[i].force.y -= (particles[i].pos.y - bottom) / 2;
+      if(particles[i].pos.y > SIM_W)particles[i].force.y -= (particles[i].pos.y - SIM_W) / 2;
+    
+      // Handle mouse interaction. 
+    
+      attr_dist2 = length_2(particles[i].pos,attractor);
+      attr_l = attractor_radi;
+      
+      //  make mouse attract particles
+      if( attracting )
+         if( attr_dist2 < attr_l*attr_l ){
+            particles[i].force.x -= (particles[i].pos.x - attractor.x) / 128;
+            particles[i].force.y -= (particles[i].pos.y - attractor.y) / 128;
+         }
+      
+
+    //  make mouse repel particles
+      if( repelling )
+         if( attr_dist2 < attr_l*attr_l ){
+            particles[i].force.x += (particles[i].pos.x - attractor.x) / 128;
+            particles[i].force.y += (particles[i].pos.y - attractor.y) / 128;
+            }
+    
+      // Reset the nessecary items.
+      particles[i].rho = 0;
+      particles[i].rho_near = 0;
+      particles[i].numNeighs = 0; // Clear neighbors
+   }
+  
+}
+
+calc_density()
+{
+   // DENSITY 
+   //
+   // Calculate the density by basically making a weighted sum
+   // of the distances of neighboring particles within the radius of support (r)
+
+   // For each particle ...
+   for(i=0; i < particlesCreated-1; ++i)
+   {
+    
+      // We will sum up the 'near' and 'far' densities.
+      d=0;
+      dn=0;
+    
+      // Now look at every other particle
+      for(j = i+1; j < particlesCreated; ++j)
+      {
+         
+         //  OPTIMISATION!! skip pair if either x or y distance
+         //  is bigger than the support radius, r. This seems to 
+         //  boost speed a notch.
+         if(fabs(particles[j].pos.x - particles[i].pos.x) > r) continue;
+         if(fabs(particles[j].pos.y - particles[i].pos.y) > r) continue;
+      
+         // The vector seperating the two particles
+         rij_x = particles[j].pos.x - particles[i].pos.x;
+         rij_y = particles[j].pos.y - particles[i].pos.y;
+      
+         // Along with the squared distance between
+         rij_magnitudesquared = rij_x*rij_x + rij_y*rij_y;            
+      
+         // If they're within the radius of support ...
+         if(rij_magnitudesquared < rsq)
+         {
+            // Get the actual distance from the squared distance.
+            rij_len = sqrt(rij_magnitudesquared);
+        
+            // And calculated the weighted distance values
+            q = 1.0 - rij_len / r;
+            q2 = q*q;
+            q3 = q2*q;
+        
+            d  += q2;
+            dn += q3;
+        
+            // Accumulate on the neighbor
+            particles[j].rho += q2;
+            particles[j].rho_near += q3;
+        
+            // Set up the neighbor list for faster access later.          
+            
+            idx = particles[i].numNeighs;
+                       
+            if( idx < MAX_NEIGHBORS )
+            {
+               particles[i].neighbors[idx].i = i; 
+               particles[i].neighbors[idx].j = j; 
+               particles[i].neighbors[idx].q = q; 
+               particles[i].neighbors[idx].q2 = q2; 
+               //   OPTIMISATION!! save length for later use (saves us some sqrt() calls) 
+               particles[i].neighbors[idx].lng = rij_len; 
+               particles[i].numNeighs++; 
+            }else{
+               err=1; // out of memory for neighs.. increase MAX_NEIGHS
+            }
+  
+         }
+      }
+      particles[i].rho      += d;
+      particles[i].rho_near += dn;
+   }
+
+}
+
+calc_pressure()
+{
+   // PRESSURE
+   //
+   // Make the simple pressure calculation from the equation of state.
+   for(i=0; i < particlesCreated; ++i)
+   {
+      particles[i].press = k * (particles[i].rho - rest_density);
+      particles[i].press_near = k_near * particles[i].rho_near;
+   }
+
+   // PRESSURE FORCE
+   //
+   // We will force particles in or out from their neighbors
+   // based on their difference from the rest density.
+
+   // For each particle ...
+
+   for(i=0; i < particlesCreated; ++i)
+   {
+      dX_x = 0;
+      dX_y = 0;
+    
+      // For each of the neighbors
+      for(ni=0; ni < particles[i].numNeighs; ++ni)
+      {
+         j = particles[i].neighbors[ni].j;     
+         q = particles[i].neighbors[ni].q;
+         q2 = particles[i].neighbors[ni].q2;       
+      
+         // The vector from particle i to particle j
+         rij_x = particles[j].pos.x - particles[i].pos.x;
+         rij_y = particles[j].pos.y - particles[i].pos.y;
+      
+         // calculate the force from the pressures calculated above
+         dm = (particles[i].press + particles[j].press) * q +
+            (particles[i].press_near + particles[j].press_near) * q2;
+      
+         // Get the direction of the force
+         //vec2f D = rij.normal() * dm;
+         forceMag = 1.0/particles[i].neighbors[ni].lng * dm;
+         D_x = rij_x * forceMag;    //  OPTIMISATION!! here we save a sqrt() call.
+         D_y = rij_y * forceMag;
+         dX_x += D_x; 
+         dX_y += D_y;
+         particles[j].force.x += D_x; 
+         particles[j].force.y += D_y;
+      }
+
+      particles[i].force.x -= dX_x; 
+      particles[i].force.y -= dX_y;
+   }
+}
+
+
+calc_viscosity()
+{
+   // VISCOSITY
+   //
+   // This simulation actually may look okay if you don't compute 
+   // the viscosity section. The effects of numerical damping and 
+   // surface tension will give a smooth appearance on their own.
+   // Try it.
+
+   // For each particle
+   
+   for(i=0; i < particlesCreated; ++i)
+   {
+      // For each of that particles neighbors
+      for(ni=0; ni < particles[i].numNeighs; ++ni)
+      {
+         ni_idx = particles[i].neighbors[ni].i;
+         nj_idx = particles[i].neighbors[ni].j;
+         
+         rij_x = particles[nj_idx].pos.x - particles[i].pos.x;
+         rij_y = particles[nj_idx].pos.y - particles[i].pos.y;
+         //float l = (rij).len();
+         double l = particles[i].neighbors[ni].lng;      //   OPTIMISATION!! here we save a sqrt() call.
+         double q = l / r;
+     
+         rijn_x = (rij_x / l);
+         rijn_y = (rij_y / l);
+         // Get the projection of the velocities onto the vector between them.
+         double vel_x = (particles[ni_idx].vel.x - particles[nj_idx].vel.x);
+         double vel_y = (particles[ni_idx].vel.y - particles[nj_idx].vel.y);
+         //double u = dpr(rijn, vel);
+         double u = rijn_x * vel_x + rijn_y * vel_y;
+         
+         if(u > 0)
+         {
+            // Calculate the viscosity impulse between the two particles
+            // based on the quadratic function of projected length.
+            magnitude = (1 - q) * (particles[nj_idx].sigma * u + particles[nj_idx].beta * u*u);
+            double I_x = magnitude * rijn_x;
+            double I_y = magnitude * rijn_y;
+       
+            // Apply the impulses on the two particles
+            /*
+            particles[ni_idx].vel.x -= I_x * 0.5;
+            particles[ni_idx].vel.y -= I_y * 0.5;
+            
+            particles[nj_idx].vel.x += I_x * 0.5;
+            particles[nj_idx].vel.y += I_y * 0.5;
+            */
+            
+            // Using verlet, so move positions forward instead with force.
+            particles[ni_idx].force.x -= I_x * 0.5;
+            particles[ni_idx].force.y -= I_y * 0.5;
+            
+            particles[nj_idx].force.x += I_x * 0.5;
+            particles[nj_idx].force.y += I_y * 0.5;            
+
+         }
+      }
+   }
+}
+
+
+
+//////////////////////////////////////////
+init()
+{
+   // create a world with dimensions x:[-SIM_W,SIM_W] and y:[0,SIM_W*2]
+
+   // Initialize particles
+   // We will make a block of particles with a total width of 1/2 of the screen.
+  particlesCreated = 0;
+  
+   x = r;
+   y = SIM_W/2;
+  for(i=0; i<N; i++)
+  {
+     x += r*1;
+     if( x > SIM_W-r)
+     { 
+        x = r;
+        y += r;
+     }
+     
+      if(particlesCreated > N) break;
+ 
+      particles[particlesCreated].pos.x = x;
+      particles[particlesCreated].pos.y = y;
+      particles[particlesCreated].pos_old.x = x;// + 0.1 * nrnd;
+      particles[particlesCreated].pos_old.y = y;// + 0.1 * nrnd;    
+      particles[particlesCreated].force.x = 0;
+      particles[particlesCreated].force.y = 0;
+      particles[particlesCreated].sigma = sigma;
+      particles[particlesCreated].beta = beta;
+  
+      particlesCreated++;
+   }
+}
+

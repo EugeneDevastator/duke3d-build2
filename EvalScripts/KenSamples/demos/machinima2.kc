@@ -1,0 +1,161 @@
+()
+{ //Programmed by Tom Dobrowolski and Ken Silverman in MoonEdit; Dennis Radon watched
+   static cx, cy;
+   cls(0); clz(1e32);
+   setfont(12,16);
+   setcol(0xff00ff);
+   
+   if (numframes == 0) playtext("<pitch middle='-50'/>I hate bugs.<pitch middle='+100'/>This chainsaw should get them!<pitch middle='-100'/>Die!<silence msec='2000'/><pitch middle='+100'/>Excellent! My plan worked.");
+   
+   x = 0; y = 0;
+   readmouse(&x,&y);
+   cx += x*.05; //spin and spin forever (mouse is acquired :) oh (see cubes5.kc)
+   
+   setcol(0x608010);
+   t = klock();
+
+   for(x=10; x<xres; x+=20)
+   for(y=10; y<yres; y+=20)
+   {
+      //ang = sin(x*4*pi/xres + cos(y*4*pi/yres + t*3)*2 + t*3.5);
+      ang = noise3d(x*4/xres, y*4/yres, t);
+      setcol(ang*64+128,128-ang*64,0);
+      for(i=0; i<5; i++)
+      {
+         //ang += y*8/xres;
+         ang2 = ang*4 + i*pi/5 + t;
+         si = sin(ang2); co = cos(ang2);
+         //d = 10/max(abs(si),abs(co)); 
+         d = 10; //-t*.2;
+         si *= d; co *= d;
+         //moveto(x,y); lineto(x+si,y);
+         //moveto(x,y); lineto(x,y+co);
+         moveto(x,y); lineto(x+si,y+co);
+      }
+   }
+   
+   setcol(-1);
+   //drawkv6("caco.kv6",.05,0,0,5,t,0);
+   
+   setcol(0xfff0c0);
+   //d = -.2+t*.1;
+   if (t < 30) {
+   //d = -.5+t*.03;
+   d = -.2+t*.05;
+   if (t > 20) d -= (t-20)*.2;
+   for(i=0; i<10000; i++) { 
+      x = rnd*xres;
+      y = rnd*yres;
+      f = noise3d(x*4/xres, y*4/yres, t);
+      if (f < d) setpix(x,y); // :)
+   }
+   }
+   
+   static px[256], py[256], pinit;
+   if (pinit==0)
+   {
+      for(i=0; i<256; i++)
+      {
+         px[i] = floor(i/16);
+         py[i] = i - px[i]*16;
+         px[i] = (px[i]-8)/16;
+         py[i] = (py[i]-8)/16;
+         //px[i] = rnd-.5;
+         //py[i] = rnd-.5;
+      }
+      pinit = 1;
+   }
+   /*
+   //c = fmod(t,10)*40;
+   //setcol(c,c,c);
+   setcol(-1);
+   for(i=0; i<256; i++)
+   {
+      fx = noise3d(px[i]*2, py[i]*2, t);
+      fy = noise3d(px[i]*2, py[i]*2, t+.5);
+      px[i] += fx*.02;
+      py[i] += fy*.02;
+      //px[i] *= .99;
+      //py[i] *= .99;
+      //setcol(rnd*16777216);//hehe
+      drawsph(px[i],py[i],8-fmod(t,10),.01);
+   }
+   */
+   
+   t = klock()%10;
+   
+   setcol(0xf0f0f0);
+   // there will be saw :))))
+   glBegin(GL_TRIANGLE_FAN); // no no.. I want to make chain-saw :/
+   //glsettex("cloud.png"); setcol(0x00ffff);
+      
+   x = t-4; z = 3.5;
+   co = 0; si = 0; // co = cos(t*2)*.2; si = sin(t*2)*.2;
+   gltexcoord(-1  ,-.2 ); glVertex(-1  +x,-.2 + co,z + si);
+   gltexcoord( 1  ,-.2 ); glVertex( 1  +x,-.2 + co,z + si);
+   gltexcoord( 1.2,-.08); glVertex( 1.2+x,-.08+ co,z + si);
+   gltexcoord( 1.2,+.08); glVertex( 1.2+x,+.08- co,z - si);
+   gltexcoord( 1  , .2 ); glVertex( 1  +x, .2 - co,z - si);
+   gltexcoord(-1  , .2 ); glVertex(-1  +x, .2 - co,z - si);
+   glEnd();
+   
+   if (t > 3.8) tt = t; else tt = 0;
+   drawchains(-1  +x,-.2 +co, 1  +x,-.2 +co,z+si,tt);
+   drawchains( 1  +x,-.2 +co, 1.2+x,-.08+co,z+si,tt);
+   drawchains( 1.2+x,-.08+co, 1.2+x,+.08-co,z+si,tt);
+   drawchains( 1.2+x,+.08-co, 1  +x, .2 -co,z+si,tt);
+   drawchains( 1  +x,+.2 -co,-1  +x, .2 -co,z+si,tt);
+
+   setcol(0xc0c0c0);
+   drawkv6("caco.kv6",.02,-1.8+x,0,z+.5,PI*-.5+sin(t*2)*.25,0);
+   
+      //Blood particles
+   enum {BLN=256}
+   static blx[BLN], bly[BLN], blz[BLN];
+   static blxv[BLN], blyv[BLN], blzv[BLN], blsiz[BLN];
+   for(i=0;i<BLN;i++)
+   {
+      d = sqrt(blxv[i]+blyv[i]+blzv[i]);
+      if (((d <= 0) || (blsiz[i] < .01)) && ((t-3.8)*100 > i+3.8))
+      {
+         f = .01;
+         blx[i] = rnd*2.0-.8; blxv[i] = nrnd*f;
+         bly[i] = .2; blyv[i] = nrnd*f;
+         blz[i] = 0; blzv[i] = nrnd*f;
+         blsiz[i] = .05;
+      }
+      
+      blx[i] += blxv[i]; blxv[i] *= .95;
+      bly[i] += blyv[i]; blyv[i] *= .95; blyv[i] += .005;
+      blz[i] += blzv[i]; blzv[i] *= .95;
+      blsiz[i] *= .95;
+      setcol(0xc04040);
+      drawsph(blx[i]+x,bly[i]+co,blz[i]+z,blsiz[i]);
+   }
+
+   setcol(0xffffff);
+   moveto(x*xres/7+xres*.48,co+yres*.49);
+   printf("STIHL");
+   
+   setcol(0xffffff);
+   moveto(0,0); //sin(t*4)*40+40);
+   printf("Invasion of insects and Caco the grass cutter");
+
+}
+
+drawchains(x0,y0,x1,y1,z,t)
+{
+   vx = x1-x0;
+   vy = y1-y0;
+   dt = 1/(sqrt(vx^2+vy^2)*8);
+   glBegin(GL_TRIANGLES); setcol(0xffffff);
+   for(t=(t*dt*16)%dt;t<1;t+=dt)
+   {
+      x = vx*t+x0;
+      y = vy*t+y0;
+      gltexcoord(0,1); glvertex(x-vx*dt/2,y-vy*dt/2,z);
+      gltexcoord(1,0); glvertex(x+vx*dt/2+vy*dt,y+vy*dt/2-vx*dt,z);
+      gltexcoord(1,1); glvertex(x+vx*dt/2,y+vy*dt/2,z);
+   }
+   glEnd();
+}

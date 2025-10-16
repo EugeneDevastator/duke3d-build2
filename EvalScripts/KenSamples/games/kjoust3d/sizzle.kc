@@ -1,0 +1,4 @@
+(x)
+static smp[2];
+smp[x] = (rnd < exp(x*-.001))*nrnd;
+smp[x]*smp[x-1]

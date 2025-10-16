@@ -1,0 +1,81 @@
+enum{MAX_KNOTS = 20}
+static knot[MAX_KNOTS];
+
+()
+{
+   cls(0,0,0);
+   
+   for(i=0; i<MAX_KNOTS; i++)
+   {
+      knot[i] = i;
+   }
+
+   
+
+   moveto(xres/2,yres/2);
+   
+   steps = 1000;
+   
+   punkter = 5;
+   grad = 3;
+   umax = grad+punkter;
+   for(idx=0; idx < punkter; idx++)
+   {
+   for(it=0; it<steps; it++)
+   {
+      x = it;
+      u = it * umax / (steps-1);
+      //y = N(idx,grad,u);
+     y = Bspline(idx,grad,u);
+        
+      
+      setpix( x/steps* xres/2, 200-y*200 );
+   }
+   }  
+ 
+}
+
+
+N(i,p,u) // i=hvilket punkt, p=grad, u=[0,1]
+{
+   if(p==0)
+   {
+      if( u >= knot[i] && u < knot[i+1] ) // innenfor intervallet. 
+      {
+         return 1;
+      }else{
+         return 0;
+      }
+   }
+   
+   n1 = u-knot[i];
+   d1 = knot[i+p]-knot[i];
+   
+   n2 = knot[i+p+1] - u;
+   d2 = knot[i+p+1] - knot[i+1];
+   
+   //val = n1/d1 * N(i,p-1,u) + n2/d2*N(i+1,p-1,u);
+   val = ( n1/d1 ) * N(i,p-1,u) + ( n2/d2 ) * N(i+1,p-1,u);
+   return val;
+}
+
+bSpline(k,m,t) // k-punkt, m-grad
+{
+   if(m==1)
+   {
+      return (t >= knot[k] && t < knot[k+1] ); // 1 or 0
+   }
+   // recurse
+   sum = 0;
+   den1 = knot[k + m - 1] - knot[k];
+   if( den1 != 0.0 )
+   {
+      sum = (t - knot[k]) * bSpline(k,m-1,t) / den1;
+   }
+   den2 = knot[k+m] - knot[k+1];
+   if( den2 != 0.0 )
+   {
+      sum += (knot[k+m] - t) * bSpline(k+1,m-1,t) / den2;
+   }
+   return sum;
+}

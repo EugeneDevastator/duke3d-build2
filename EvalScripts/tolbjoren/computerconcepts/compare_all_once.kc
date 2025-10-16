@@ -1,0 +1,18 @@
+()
+{
+   cls(0);
+   limit = 5;
+   for(i=0; i<limit; i++)
+   for(j=limit-1; j>i; j--)
+   {
+      printf("\n %g vs %g",i,j);
+   }
+   
+printf("\n\n or \n");
+
+   for(i=0; i<limit-1; i++)
+   for(j=i+1; j<limit; j++)
+   {
+      printf("\n %g vs %g",i,j);
+   }
+}

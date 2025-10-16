@@ -1,0 +1,482 @@
+
+// todo 
+// lighting, oil, fire, methane gas, water wheels
+// clear state of sandSANDs if they are removed or reset. (energy!)
+
+enum{MAX_ELEMENTS = 8}
+enum{OIL=7, GUNPOWDER=6, PLANT=5, FIRE=4, WATER=3, GND=2, SAND=1, EMPTY=0}
+enum{SIZ = 300}
+
+struct t_sand
+{
+  locked; // finished simulating sandstate this iteration
+  state; // burning, exploding
+  type; // water, sandstate, flower, fire, oil
+  energy; // how long it will burn, and how powerfull
+  // how a bout stickyness? sticktion
+  plantyness; // color variation on plant
+  staticwater; // water property
+  x,y; // Integer position on screen (pixels)
+  xp,yp; // Current "real" position 
+  xv, yv; // velocity
+};
+
+static elementMass[MAX_ELEMENTS];
+static elementImmovable[MAX_ELEMENTS];
+static elementGravity[MAX_ELEMENTS];
+static interactionResult[MAX_ELEMENTS][MAX_ELEMENTS];
+static interactionLeftbehind[MAX_ELEMENTS][MAX_ELEMENTS];
+static interactionProbability[MAX_ELEMENTS][MAX_ELEMENTS];
+
+static t_sand sandstate[SIZ+2][SIZ+2];
+static oldmousx, oldmousy;
+static brushSize = 2.5;
+static brushType = SAND;
+static gx,gy; // Pos for swap(dx,dy)
+static SANDCOLOR, WATERCOLOR, GNDCOLOR, GUNPOWDERCOLOR, FIRECOLOR, OILCOLOR;
+
+static delta =  1;
+()
+{
+  cls(0);
+  if(numframes==0){
+    elementMass[EMPTY] = 0;
+    elementMass[SAND] = 2;
+    elementMass[GND] = 0;
+    elementMass[WATER] = 1;
+    elementMass[FIRE] = 0;
+    elementMass[PLANT] = 0;
+    elementMass[GUNPOWDER] = 0;
+    elementMass[OIL] = 1;
+
+    elementImmovable[EMPTY] = 0;
+    elementImmovable[SAND] = 0;
+    elementImmovable[GND] = 1;
+    elementImmovable[WATER] = 0;
+    elementImmovable[FIRE] = 0;
+    elementImmovable[PLANT] = 1;
+    elementImmovable[GUNPOWDER] = 0;
+    elementImmovable[OIL] = 0;
+
+    elementGravity[EMPTY] = 0;
+    elementGravity[SAND] = 1;
+    elementGravity[GND] = 0;
+    elementGravity[WATER] = .1;
+    elementGravity[FIRE] = .1;
+    elementGravity[PLANT] = 0;
+    elementGravity[GUNPOWDER] = .1;
+    elementGravity[OIL] = .1;
+
+    interactionResult[EMPTY][EMPTY] = EMPTY;
+    interactionResult[EMPTY][SAND] = SAND;
+
+
+    SANDCOLOR = 0xffff00;
+    WATERCOLOR = rgb(20,80,200);
+    GNDCOLOR = rgb(127,127,127);
+    GUNPOWDERCOLOR = rgb(210,80,10);
+    FIRECOLOR = rgb(200,10,10);
+    OILCOLOR = 0x724438;
+  }
+
+
+  if(keystatus[2]){ brushSize += 0.5; }
+  if(keystatus[3]){ if(brushSize > 2) brushSize -= 0.5; }
+
+  // MOUSE
+   if(bstatus==1){
+    segs = 10;
+    for(i=0; i<segs; i++)
+    {
+      xp = mousx+lerp(mousx,oldmousx,i/segs);
+      yp = mousy+lerp(mousy,oldmousy,i/segs);
+   
+      paintbrush(xp,yp,brushSize,brushType);
+      
+    }
+   }
+   if(bstatus==4){
+    segs = 10;
+    for(i=0; i<segs; i++)
+    {
+      xp = mousx+lerp(mousx,oldmousx,i/segs);
+      yp = mousy+lerp(mousy,oldmousy,i/segs);
+   
+      paintbrush(xp,yp,brushSize,WATER);
+      
+    }
+   }
+
+   segs = 100;
+    for(i=0; i<segs; i++)
+    {
+      xp = mousx+lerp(mousx,oldmousx,i/segs);
+      yp = mousy+lerp(mousy,oldmousy,i/segs);
+
+      if(bstatus==2){    
+        paintbrush(xp,yp,brushSize,GND);
+      }
+    }
+  
+
+  // Unlock all locked particles.
+  for(x=0; x<SIZ; x++)
+  for(y=0; y<SIZ; y++)
+  {
+    if( sandstate[x][y].locked ) sandstate[x][y].locked = 0; 
+
+  }
+  
+  static lineBuffer[SIZ];
+  for(gy=1; gy<SIZ; gy++)
+  {
+    pressure = 0;
+    pressureStart = 0;
+    for(gx=1; gx<SIZ; gx++)
+    {
+      THIS = sandstate[gx][gy].type;
+      sandInteraction();
+
+      // DRAW
+      if( THIS == EMPTY) lineBuffer[gx] = 0;
+      else if( THIS == SAND ) lineBuffer[gx] = SANDCOLOR;
+      else if( THIS == GND ) lineBuffer[gx] = GNDCOLOR; 
+      else if( THIS == WATER ) lineBuffer[gx] = WATERCOLOR; 
+      else if( THIS == PLANT ) lineBuffer[gx] = rgb(40 + sandstate[gx][gy].plantyness * 10,120+sandstate[gx][gy].energy*10 + sandstate[gx][gy].plantyness*10,30 );
+      else if( THIS == GUNPOWDER) lineBuffer[gx] = GUNPOWDERCOLOR;
+      else if( THIS == OIL) lineBuffer[gx] = OILCOLOR;
+      else if( THIS == FIRE)
+      {
+        // draw on top of pixmap[][]
+        setcol(200,128,0);
+        for(sparks=0; sparks < 3; sparks++){
+          moveto(gx-nrnd,gy-nrnd); lineto(gx+nrnd, gy+nrnd);      
+        }
+       //setcol(FIRECOLOR); 
+      }
+
+    }
+    sethlin(0,gy,lineBuffer,SIZ); // pos(x,y), array, arraySize
+  }
+
+
+  // grow plants
+  iters = 150;
+  for(i=0; i<iters; i++)
+  {
+    choice = int(rnd*4);
+    x=0; y=0;
+    minx = 10;
+    maxx = SIZ-minx;
+    miny = 10;
+    maxy = SIZ-miny;
+    if(choice==0){ x = SIZ*rnd; y = 10+15*rnd; } // top
+    if(choice==1){ x = SIZ*rnd; y = SIZ-10+15*rnd; } // bottom
+    if(choice==2){ x = 5+5*rnd; y = 5+(SIZ-5)*rnd; } // left
+    if(choice==3){ x = 5+5*rnd + SIZ-10; y = 5+(SIZ-5)*rnd; } // right
+
+    particleAlive = 1;
+    vx = (SIZ/2)-x;
+    vy = (SIZ/2)-y;
+    len = sqrt(vx^2+vy^2);
+    vx /= len;
+    vy /= len;
+
+    liff = 0;
+    while(particleAlive)
+    {
+      liff++;
+      if(liff > 210) break;
+      //dx = 1;
+      //if(rnd<.5) dx = -1;
+
+      //dy = 1;
+      //if(rnd<.5) dy = -1;
+      dx = floor(vx * 1+rnd);
+      dy = floor(vy * 1+rnd);
+
+      x+=dx; y+=dy;
+      if(x < 1 || x > (SIZ-1) || y < 1 || y > (SIZ-1) ) particleAlive = 0;
+
+      //setcol(liff,liff,liff); setpix(x,y);
+      
+      if( sandstate[x][y].type == EMPTY ){
+        if( sandstate[x+dx][y+dy].type == PLANT ){ //
+          if(sandstate[x+dx][y+dy].energy > 0){
+          sandstate[x+dx][y+dy].energy -= 1;
+          sandstate[x][y].type = PLANT;
+          sandstate[x+dx][y+dy].plantyness+=5;
+          sandstate[x+dx][y+dy].plantyness % 40;
+          }
+          particleAlive = 0;
+          break;
+        }
+      }
+    }
+  }
+
+  setcol(128,0,0);
+  moveto(0,0); lineto(siz,0); lineto(siz, siz); lineto(0, siz); lineto(0,0);
+
+  setcol(255,255,255);
+  drawsph(mousx,mousy,-brushSize);
+
+  // Gooey
+  static arrowPos=25*1.5;
+  btnnum = 0;
+  setcol(SANDCOLOR);          if( squareBtn(siz+5, 25*btnnum, 25,20 ) ) { brushType = SAND; arrowPos = 25*(btnnum+.5); } btnnum++;
+  setcol(WATERCOLOR);         if( squareBtn(siz+5, 25*btnnum, 25,20 ) ) { brushType = WATER; arrowPos = 25*(btnnum+.5); } btnnum++;
+  setcol(GNDCOLOR);           if( squareBtn(siz+5, 25*btnnum, 25,20 ) ) { brushType = GND; arrowPos = 25*(btnnum+.5); } btnnum++;
+  setcol(0,200,20);           if( squareBtn(siz+5, 25*btnnum, 25,20 ) ) { brushType = PLANT; arrowPos = 25*(btnnum+.5); } btnnum++;
+  setcol(GUNPOWDERCOLOR);     if( squareBtn(siz+5, 25*btnnum, 25,20 ) ) { brushType = GUNPOWDER; arrowPos = 25*(btnnum+.5); } btnnum++;
+  setcol(FIRECOLOR);          if( squareBtn(siz+5, 25*btnnum, 25,20 ) ) { brushType = FIRE; arrowPos = 25*(btnnum+.5); } btnnum++;
+  setcol(OILCOLOR);           if( squareBtn(siz+5, 25*btnnum, 25,20 ) ) { brushType = OIL; arrowPos = 25*(btnnum+.5); } btnnum++;   
+  setcol(255,255,255);        if( squareBtn(siz+5, 25*btnnum, 25,20 ) ) { brushType = EMPTY; arrowPos = 25*(btnnum+.5); } btnnum++;
+  // indicate selected brush with an arrow.
+  setcol(127,127,127);
+  drawcone( siz+5+35, arrowPos, 1, siz+5+60*3, 25*4, 10);
+  moveto(siz+5+60*3.5,25*4); setfont(12,16);  
+  if( brushType == SAND ) printf("sandstate");
+  else if( brushType == WATER ) printf("water");
+  else if( brushType == GND ) printf("solid");
+  else if( brushType == PLANT ) printf("plant");
+  else if( brushType == GUNPOWDER ) printf("gun powder");
+  else if( brushType == FIRE ) printf("fire");
+  else if( brushType == OIL ) printf("oil");
+  else if( brushType == EMPTY ) printf("delete");
+
+  oldmousx = mousx;
+  oldmousy = mousy;
+}
+
+sandInteraction(){
+
+    THIS = sandstate[gx][gy].type;
+/*    
+if(THIS==WATER && pressure == 0)
+    {
+      pressureStart = gy;
+      pressure++;
+    }
+    else if(THIS==WATER && pressure > 0)
+    {
+      pressure++;
+    } 
+    else
+    {
+      pressure = 0;
+    }
+*/
+    // Do not modify locked particles, wait for next iteration! 
+    if( sandstate[gx][gy].locked==0 )
+    {
+      UP = sandstate[gx][gy-1].type;
+      DOWN = sandstate[gx][gy+1].type;
+      L = sandstate[gx-1][gy].type;
+      R = sandstate[gx+1][gy].type;
+      UL = sandstate[gx-1][gy-1].type;
+      UR = sandstate[gx+1][gy-1].type;
+      DL = sandstate[gx-1][gy+1].type;
+      DR = sandstate[gx+1][gy+1].type;
+
+      if( THIS == EMPTY ){
+        sandstate[gx][gy].energy = 0;
+        sandstate[gx][gy].plantyness = 0;
+        sandstate[gx][gy].staticwater = 0;     
+      }
+    /*
+      else
+      {
+        if(sandstate[gx][gy].yv > 0.0)
+        {
+          if(DOWN==EMPTY){
+            airmove();
+          }
+          else{
+            move(sandstate[gx][gy+1]);
+          }
+        }
+        else{
+
+        }
+      }
+     */ 
+      else if( THIS == SAND ){ 
+        if(DOWN == WATER) swap(0,1);
+        else if( DL == WATER ) swap(-1,1);
+        else if( DR == WATER ) swap(1,1);
+        else if( DOWN == EMPTY ) swap(0,1);
+        else if( DR == EMPTY ) swap(+1,1);
+        else if( DL == EMPTY ) swap(-1,1);
+      }
+
+      if( THIS == WATER ){ 
+        if( DOWN == EMPTY || DOWN ==OIL ) swap(0,1);
+        else if( DR == EMPTY || DR == OIL ) swap(+1,1);
+        else if( DL == EMPTY || DL == OIL ) swap(-1,1);                
+        else if( R == EMPTY || R == OIL ) swap(+1,0);
+        else if( L == EMPTY || L == OIL ) swap(-1,0);
+      }
+
+      if( THIS == OIL ){ 
+        if( DOWN == EMPTY ) swap(0,1);
+        else if( DR == EMPTY ) swap(+1,1);
+        else if( DL == EMPTY ) swap(-1,1);                
+        else if( R == EMPTY ) swap(+1,0);
+        else if( L == EMPTY ) swap(-1,0);
+        if( sandstate[gx][gy].energy > 1 ) sandstate[gx][gy].type = FIRE;
+      }
+
+      if( THIS == FIRE ){ 
+        // if combustable
+        if(UP == GUNPOWDER || UP == OIL) burn(0,-1);
+        if(UL == GUNPOWDER || UL == OIL) burn(-1,-1);
+        if(UR == GUNPOWDER || UR == OIL) burn(1,-1);
+        if(R == GUNPOWDER  || R == OIL) burn(1,0);
+        if(L == GUNPOWDER  || L == OIL) burn(-1,0);
+        if(DOWN == GUNPOWDER  || DOWN == OIL) burn(0,1);
+        if(DL == GUNPOWDER || DL == OIL) burn(-1,1);
+        if(DR == GUNPOWDER || DR == OIL) burn(+1,1);        
+
+        sandstate[gx][gy].energy++; // burn, baby!
+        if(sandstate[gx][gy].energy > 6 ) sandstate[gx][gy].type = EMPTY; // finnaly kill self? burn out?
+      }
+
+      if( THIS == PLANT ){ 
+        // suck up water
+        if(DOWN == WATER || L==WATER || R==WATER || DL == WATER || DR == WATER || UP == WATER || UL == WATER || UR == WATER) sandstate[gx][gy].energy += 10; 
+      
+        else if(DOWN == PLANT) exchangeEnergy(0,1);
+        else if(DL == PLANT) exchangeEnergy(-1,1);
+        else if(DR == PLANT) exchangeEnergy(+1,1);        
+        else if(R == PLANT) exchangeEnergy(1,0);
+        else if(L == PLANT) exchangeEnergy(-1,0);
+
+        else if(UP == PLANT) exchangeEnergy(0,-1);
+        else if(UL == PLANT) exchangeEnergy(-1,-1);
+        else if(UR == PLANT) exchangeEnergy(1,-1);
+      }
+
+      if( THIS == GUNPOWDER ){
+        // make sparks. become air+random fire
+        if(UP == GUNPOWDER){ exchangeEnergy(0,-1); }
+        if(UR == GUNPOWDER){ exchangeEnergy(1,-1); }
+        if(R == GUNPOWDER){ exchangeEnergy(1,0); }
+        if(DR == GUNPOWDER){ exchangeEnergy(1,1); }
+        if(DOWN == GUNPOWDER){ exchangeEnergy(0,1); }
+        if(DL == GUNPOWDER){ exchangeEnergy(-1,1); }
+        if(L == GUNPOWDER){ exchangeEnergy(-1,0); }
+        if(UR == GUNPOWDER){ exchangeEnergy(-1,-1); }
+        if( sandstate[gx][gy].energy > 1 ) sandstate[gx][gy].type = FIRE;
+      }
+      
+
+    } // eof sandstate logic
+}
+
+move(newpos)
+{
+}
+
+airmove()
+{
+
+  x = sandstate[gx][gy].x;
+  y = sandstate[gx][gy].y;
+
+  if( sandstate[gx][gy].yv > 1.0 ) sandstate[gx][gy].yv = 1.0;
+  else if( sandstate[gx][gy].yv < 1.0 ) sandstate[gx][gy].yv = -1.0;
+
+  if( sandstate[gx][gy].yv > 1.0 ) sandstate[gx][gy].yp += 1.0; 
+  else if( sandstate[gx][gy].yv < -1.0 ) sandstate[gx][gy].yp -= 1.0; 
+  else sandstate[gx][gy].yp += sandstate[gx][gy].yv;
+
+  if( int(gy) != SIZ )
+  {
+
+    sandstate[gx][gy].y = sandstate[gx][gy].yp;
+    if( sandstate[gx][gy].y > SIZ || sandstate[gx][gy].y < 1 ){ // out of screen
+    }
+    else{
+      //sandstate[x][y].type = sandstate[gx][gy].type; // æsj. evaldrawwwwwwwwwww
+      sandstate[x][y].type = sandstate[gx][gy].type;
+      sandstate[x][y].y = sandstate[gx][gy].y;
+      sandstate[x][y].yp = sandstate[gx][gy].yp;
+      sandstate[x][y].yv = sandstate[gx][gy].yv;
+
+    x = sandstate[gx][gy].x;
+    y = sandstate[gx][gy].y;
+      sandstate[gx][gy].type = EMPTY;
+
+    }
+    
+  }
+
+  // apply gravity
+  sandstate[x][y].yv += (elementMass[sandstate[gx][gy].type]*elementGravity[sandstate[gx][gy].type])*delta;
+}
+
+swap(dx,dy){
+  if( sandstate[gx+dx][gy+dy].type == WATER ) sandstate[gx+dx][gy+dy].staticwater = 1; // water will not move this step
+  sandstate[gx+dx][gy+dy].locked = 1;
+  tmp = sandstate[gx+dx][gy+dy].type;
+  sandstate[gx+dx][gy+dy].type = sandstate[gx][gy].type;
+  sandstate[gx][gy].type = tmp;
+}
+
+exchangeEnergy(dx,dy){
+  if( sandstate[gx][gy].energy < 1 && sandstate[gx+dx][gy+dy].energy > 0 ){ 
+    //sandstate[gx][gy].locked =  1;
+    sandstate[gx][gy].energy += 1; 
+    sandstate[gx+dx][gy+dy].energy -= 1; 
+  } 
+}
+
+burn(dx,dy){
+  //sandstate[gx+dx][gy+dy].locked = 1;
+  sandstate[gx+dx][gy+dy].energy++;
+}
+
+lerp(x1,x2,t){
+   (x2-x1)*t;
+}
+
+paintbrush(x,y,r,c)
+{
+   i=0; j=0;
+   for(i=0; i<2*r; i++)
+   {
+      len = int( sqrt( cos(0.5*PI*(i-r)/r)) * r * 2 );
+      for(j=0; j<len; j++)
+      {
+         xp = x+j-len/2;
+         yp = y-r+i;
+         if(xp > 1 && xp < SIZ && yp > 1 && yp < SIZ)
+         {
+            sandstate[xp][yp].type = c;
+            sandstate[xp][yp].yv = -1;
+         }
+      }
+   }
+}
+
+drawrectfill(x0,y0,x1,y1) { for(y=y0;y<y1;y++) { moveto(x0,y); lineto(x1,y); } }
+drawrectopen(x0,y0,x1,y1) { moveto(x0,y0); lineto(x1,y0); lineto(x1,y1); lineto(x0,y1); lineto(x0,y0); }
+
+squareBtn(x,y,w,h)
+{
+  drawrectopen(x,y,x+w,y+h);
+  if(bstatus==1)
+  if( PointRectCollide(mousx,mousy,x,y,w,h) )
+  return 1;
+
+  drawrectfill(x,y,x+w,y+h);
+}
+
+PointRectCollide(x1,y1,x2,y2,w,h)
+{
+   if(x1 >= x2 && x1 <= x2+w)
+   if(y1 >= y2 && y1 <= y2+h)
+      return 1; 
+}
+

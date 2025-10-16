@@ -1,0 +1,62 @@
+struct vec{x,y,z;}
+()
+{
+   cls(0); clz(1e32);
+   
+   ang = klock(0);
+   ca = cos(ang);
+   sa = sin(ang);
+   radi = -4;
+   setcam(sa*radi,-2,ca*radi,ang,0);
+   
+   y = 0.001;
+   s = 2;
+   glBegin(GL_LINE_LOOP);
+      glVertex( -s, y, -s );
+      glVertex( +s, y, -s );
+      glVertex( +s, y, +s );
+      glVertex( -s, y, +s );
+   glEnd();
+   
+   vec a,b,c;
+   vecset(a, 0,0,1);
+   createPerp( a, b, c );
+   
+   moveto( 0,0,0 );
+   lineto( a );
+   
+   moveto( 0,0,0 );
+   lineto( b );
+   
+   moveto( 0,0,0 );
+   lineto( c );
+   
+}
+
+lineto(vec v){ lineto(v.x,v.y,v.z); }
+
+//Given vector a, returns b&c that makes (a,b,c) orthonormal
+// taken from Ken S' voxlap source
+createPerp (vec a, vec b, vec c)
+{
+   double t;
+
+   if ((a.x == 0) && (a.y == 0) && (a.z == 0)) // zero vec in. zero vec out. can explain that ;)
+      { b.x = 0; b.y = 0; b.z = 0; return; }
+      
+   // x smallest component
+   if ((fabs(a.x) < fabs(a.y)) && (fabs(a.x) < fabs(a.z)))
+      { t = 1.0 / sqrt(a.y*a.y + a.z*a.z); b.x = 0; b.y = a.z*t; b.z = -a.y*t; }
+   // y smallest
+   else if (fabs(a.y) < fabs(a.z))
+      { t = 1.0 / sqrt(a.x*a.x + a.z*a.z); b.x = -a.z*t; b.y = 0; b.z = a.x*t; }
+   // checked all, z must be smallest
+   else
+      { t = 1.0 / sqrt(a.x*a.x + a.y*a.y); b.x = a.y*t; b.y = -a.x*t; b.z = 0; }
+      
+   c.x = a.y*b.z - a.z*b.y;
+   c.y = a.z*b.x - a.x*b.z;
+   c.z = a.x*b.y - a.y*b.x;
+}
+
+vecset(vec v,x,y,z){v.x=x; v.y=y; v.z=z;}

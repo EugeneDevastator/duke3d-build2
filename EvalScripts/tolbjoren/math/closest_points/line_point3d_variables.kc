@@ -1,0 +1,81 @@
+// Closest point on line
+()
+{
+   cls(0); clz(1e32);
+   glEnable(GL_DEPTH_TEST);
+   
+   ax = -1;
+   ay = 1;
+   az = 0;
+   
+   bx = 1;
+   by = -1;
+   bz = 0;
+   
+   px = 4 * (mousx/xres - .5);
+   py = 4 * (mousy/yres - .5);
+   pz = 0;
+   
+   setcol(0xffffff);
+   moveto(ax,ay,az);
+   lineto(bx,by,bz);
+   r = 0.1;
+   rsq = r^2;   
+
+   cpx = px;
+   cpy = py;
+   pcz = pz;
+   closestPtOnLine(px,py,pz,ax,ay,az,bx,by,bz,cpx,cpy,cpz);
+
+   d = sqrt( (px-cpx)^2 + (py-cpy)^2 + (pz-cpz)^2 );   
+
+   if (d < r )
+   {
+      setcol(255,0,0);   
+   }
+   drawsph(px,py,pz,r);
+   
+   setcol(0,0,255); drawsph(cpx,cpy,cpz,r);
+   
+   r = -2;
+   ang = 0;// mousx/xres*2*PI;
+   setcam( sin(ang)*r, 0, cos(ang)*r, ang, 0);
+   
+   
+   moveto(0,0);
+   printnum(d);
+}
+
+
+closestPtOnLine(px,py,pz, ax,ay,az, bx,by,bz, &cx,&cy,&cz)
+{
+   // from A to P
+   apx = px - ax;
+   apy = py - ay;
+   apz = pz - az;
+   // From A to B
+   nx = bx-ax;
+   ny = by-ay;
+   nz = bz-az;
+   // normalize Dir A to B
+   distAB = sqrt( nx^2+ny^2+nz^2);
+   if( distAB > 1e-7 ){
+      nx/=distAB; ny/=distAB; nz/=distAB;
+   }
+   
+   t = nx*apx + ny*apy + nz*apz; // proj v1 onto norm
+   
+   if( t<= 0){ // A is closest
+      cx = ax; cy = ay; cz = az; return;
+   }
+   
+   if( t>= distAB){ // B is closest
+      cx = bx; cy = by; cz = bz; return;
+   }
+   
+   // create new vec, closest pt
+   v3x = ax + nx*t;
+   v3y = ay + ny*t;
+   v3z = az + nz*t;
+   cx = v3x; cy = v3y; cz = v3z;   
+}

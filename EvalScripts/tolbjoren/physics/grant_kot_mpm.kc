@@ -1,0 +1,524 @@
+/*
+ported to evaldraw from javascript
+original version by Grant Kot, found at:
+https://github.com/kotsoft/fluid
+*/
+
+struct Particle
+{
+   x,y; // Position
+   u,v; // Velocity
+   gu,gv; // grid velocity...?
+   
+   cx,cy; // Grid cell position
+   
+   gi; // Grid index?
+   
+   press;
+ 
+   // density, pressure ?
+   px[3];
+   py[3];
+   
+   // Grid position?
+   gx[3];
+   gy[3];
+};
+
+struct Node
+{
+   m; // mass?
+   d; // density?
+   gx, gy; // what physical value is this? its not gridpos?
+   u, v; // velocity
+   ax, ay; // acceleration
+   undefined;
+}
+
+static particleSize = 5;
+static restDensity = 1.6;
+//static stiffness = 1;
+//static bulkViscosity = 1;
+//static elasticity = 0;
+//static shearViscosity = 0;
+//static meltRate = 0;
+static gravity = .0; //.05
+static smoothing = 1; // Dampen velocity
+
+static minX;
+static minY;
+static maxX;
+static maxY;
+static gsizeY; // grid size Y-axis
+static grid_dimx;
+
+enum{MAX_PARTICLES = 1024*4}
+static particle particles[MAX_PARTICLES];
+
+// 2x as many nodes as particles seems to work for 400x400 screen res.
+// will need more for larger screens
+enum{ MAX_NODES = MAX_PARTICLES*8 } 
+static Node grid[MAX_NODES];
+
+
+static accelX, accelY; // accelerometer
+
+static paused = 0;
+()
+{
+   if ( numframes == 0 )
+   {
+
+      /*
+      var gui = new DAT.GUI();
+      gui.add(this, "particleSize", 0, 100);
+      gui.add(this, "restDensity", 0.1, 5.0);
+      gui.add(this, "gravity", 0, 0.2);
+      gui.add(this, "smoothing", 0, 1);
+      */
+   
+      //initialize
+      side = floor( sqrt( MAX_PARTICLES ) +.5 )+1;
+      grid_dimx = side;
+      
+      for (i=0;i<side;i++) {
+         for (j=0;j<side;j++) {
+            Particle p;
+            // Pos (i, j) and start vel
+            setupParticle(p, 15+i*1.2, 0+j*1.2, 0.0, 0.0);
+            particles[i+side*j] = p; // copy back
+         }
+      }
+   
+       
+      minX = particles[0].x;
+      minY = particles[0].y;
+      maxX = minX;
+      maxY = minY;
+   
+      // Set min and max bounds
+      for (i=0; i< MAX_PARTICLES; i++) {
+         Particle p;
+         p = particles[i];
+         if (p.x<minX) {
+            minX = p.x;
+         } else if (p.x>maxX) {
+            maxX = p.x;
+         }
+         if (p.y<minY) {
+            minY = p.y;
+         } else if (p.y>maxY) {
+            maxY = p.y;
+         }
+      }
+   
+      minX = floor(minX-1);
+      minY = floor(minY-1);
+      maxX = floor(maxX+3);
+      maxY = floor(maxY+3);
+   }
+
+
+   if ( bstatus == 1 )
+   {
+      radiusSq = (60/particleSize)^2;
+      
+      for(i=0; i<MAX_PARTICLES; i++) {
+         to_mouse_x = mousx/particleSize - particles[i].x;
+         to_mouse_y = mousy/particleSize - particles[i].y;
+         dsq = to_mouse_x^2 + to_mouse_y^2;
+         if ( dsq < radiusSq ) {
+            dist = sqrt( dsq );
+            particles[i].u += to_mouse_x / (4*dist);
+            particles[i].v += to_mouse_y / (4*dist);
+         }
+      }   
+
+   }
+   
+   if ( bstatus==2 )
+   {
+      accelX = xres/2 - mousx;
+      accelY = yres/2 - mousy;
+      normalize(accelX, accelY);
+      
+      accelX *= 0.05;
+      accelY *= 0.05;
+   }
+
+
+   draw();
+   //sleep(10);  
+}
+normalize(&x,&y)
+{
+   len = sqrt(x^2+y^2);
+   x /= len;
+   y /= len;
+}
+
+
+draw(){
+
+   // Screen borders?
+   double bx = xres/particleSize-1;
+   double by = yres/particleSize-1;
+   
+   gsizeY = floor(maxY-minY);
+   
+   // Reset grid
+   for(i=0; i<MAX_NODES; i++) {
+      grid[i].undefined = 1;
+   }
+
+   activeCount = 0;
+   // Set up grid
+   for (idx=0; idx < MAX_PARTICLES; idx++) {
+      Particle p;
+      p = particles[idx];
+      p.cx = floor(p.x-minX - 0.5);
+      p.cy = floor(p.y-minY - 0.5);
+      p.gi = p.cx*gsizeY+p.cy; // Grid index
+
+      double x = p.cx - (p.x-minX);
+      p.px[0] = (0.5 * x^2 + 1.5 * x + 1.125);
+      p.gx[0] = (x + 1.5);
+      x++;
+      p.px[1] = (-x * x + 0.75);
+      p.gx[1] = (-2.0 * x);
+      x++;
+      p.px[2] = (0.5 * x^2 - 1.5 * x + 1.125);
+      p.gx[2] = (x - 1.5);
+
+      double y = p.cy - (p.y-minY);
+      p.py[0] = (0.5 * y^2 + 1.5 * y + 1.125);
+      p.gy[0] = (y + 1.5);
+      y++;
+      p.py[1] = (-y * y + 0.75);
+      p.gy[1] = (-2.0 * y);
+      y++;
+      p.py[2] = (0.5 * y^2 - 1.5 * y + 1.125);
+      p.gy[2] = (y - 1.5);
+
+      //  integration using 3 previous positions???
+      
+      for (i = 0; i < 3; i++) {
+         double ga = p.gi+i*gsizeY;
+         double pxi = p.px[i];
+         double pgxi = p.gx[i];
+         for (j = 0; j < 3; j++) {
+            double gaj = ga+j;
+            
+            if (grid[gaj].undefined) {
+                     setupNode( grid[gaj] );
+                     activeCount++;
+            }
+            
+            phi = pxi * p.py[j];
+            grid[gaj].m += phi;
+            grid[gaj].gx += pgxi * p.py[j];
+            grid[gaj].gy += pxi * p.gy[j];
+         }
+         
+      }
+      particles[idx] = p; // copy back
+   }
+
+   for (idx=0; idx < MAX_PARTICLES; idx++)
+   {
+      Particle p;
+      p = particles[idx];
+               
+      double density = 0;
+      for (i = 0; i < 3; i++) {
+         double ga = p.gi+i*gsizeY;
+         double pxi = p.px[i];
+         for (j = 0; j < 3; j++) {
+            phi = pxi * p.py[j];
+            density += phi*grid[ga+j].m;
+         }
+      }
+      double pressure = (density-restDensity)/restDensity;
+      if (pressure > 4.0)
+         pressure = 4.0;
+      p.press = pressure;
+
+      double fx = 0;
+      double fy = 0;
+
+      // Keep particle within screen borders
+      if (p.x < 2) {
+         fx += 2-p.x;
+         p.u *= 0.1;
+      } else if (p.x > bx) {
+         fx += bx-p.x;
+         p.u *= 0.1;
+      }
+      if (p.y < 2) {
+         fy += 2-p.y;
+         p.v *= 0.1;
+      } else if (p.y > by) {
+         fy += by-p.y;
+         p.v *= 0.1;
+      }
+
+      // update Grid acceleration
+      for (i = 0; i < 3; i++) {
+         double ga = p.gi+i*gsizeY;
+         double pxi = p.px[i];
+         double gxi = p.gx[i];
+         for (j = 0; j < 3; j++) {
+            phi = pxi * p.py[j];
+            grid[ga+j].ax += -((gxi * p.py[j]) * pressure) + fx * phi;
+            grid[ga+j].ay += -((pxi * p.gy[j]) * pressure) + fy * phi;
+         }
+      }
+      particles[idx] = p;
+   }
+
+   // Grid, Normalizing acceleration based on??
+   // what is m? mass or density?
+   //for (i=0; i<activeCount; i++) {
+   for(i=0; i<MAX_NODES; i++){
+      if (grid[i].undefined) continue;
+      
+      if (grid[i].m > 0.0) {
+         // F=ma
+         grid[i].ax /= grid[i].m;
+         grid[i].ay /= grid[i].m;
+         grid[i].ay += gravity;
+         grid[i].ax += accelX;
+         grid[i].ay += accelY;
+      }
+   }
+
+   /////////// 
+   for (idx=0; idx < MAX_PARTICLES; idx++) {
+      Particle p;
+      p = particles[idx];
+      
+      // Update Particle vel based on grid accel
+      for (i = 0; i < 3; i++) {
+         double ga = p.gi+i*gsizeY;
+         double pxi = p.px[i];
+         for (j = 0; j < 3; j++) {
+            phi = pxi * p.py[j];
+            p.u += phi*grid[ga+j].ax;
+            p.v += phi*grid[ga+j].ay;
+         }
+      }
+      
+      //  Grid Velocities (u,v) based on particle vel (u,v)
+      for (i = 0; i < 3; i++) {
+         double ga = p.gi+i*gsizeY;
+         double pxi = p.px[i];
+         for (j = 0; j < 3; j++) {
+            phi = pxi * p.py[j];
+            grid[ga+j].u += phi*p.u;
+            grid[ga+j].v += phi*p.v;
+         }
+         
+      }
+      particles[idx] = p;
+   }
+   ///////////
+
+   // Normalize grid/node velcity?
+   //for (i=0; i<activeCount; i++) {
+   for(i=0; i<MAX_NODES; i++){
+      if (grid[i].undefined) continue;
+      
+      if (grid[i].m > 0.0) {
+         grid[i].u /= grid[i].m;
+         grid[i].v /= grid[i].m;
+      }
+   }
+
+   minX = particles[0].x;
+   minY = particles[0].y;
+   maxX = minX;
+   maxY = minY;
+   
+   // Sum up grid velocity and apply to each particle
+   // in that grid cell
+   for (idx=0; idx < MAX_PARTICLES; idx++) {
+      Particle p;
+      p = particles[idx];
+      
+      double gu = 0;
+      double gv = 0;
+      for (i = 0; i < 3; i++) {
+         double ga = p.gi+i*gsizeY;
+         double pxi = p.px[i];
+         for (j = 0; j < 3; j++) {
+            Node n;
+            n = grid[ga+j];
+            phi = pxi * p.py[j];
+            gu += phi*n.u;
+            gv += phi*n.v;
+         }
+      }
+      
+      p.x += gu;
+      p.y += gv;
+      p.u += smoothing*(gu-p.u);
+      p.v += smoothing*(gv-p.v);
+      p.gu = gu;
+      p.gv = gv;
+
+      // Update min,max positions of particles
+      if (p.x<minX) {
+         minX = p.x;
+      } else if (p.x>maxX) {
+         maxX = p.x;
+      }
+      if (p.y<minY) {
+         minY = p.y;
+      } else if (p.y>maxY) {
+         maxY = p.y;
+      }
+      particles[idx] = p; // copy back
+   }
+
+   minX = floor(minX-1);
+   minY = floor(minY-1);
+   maxX = floor(maxX+3);
+   maxY = floor(maxY+3);
+
+   cls(0);
+
+   setcol(255,255,255);
+   
+   for (i=0; i<MAX_PARTICLES; i++) {
+      Particle p;
+      p = particles[i];
+      double x1 = p.x*particleSize;
+      double y1 = p.y*particleSize;
+      double x2 = (p.x-p.gu)*particleSize;
+      double y2 = (p.y-p.gv)*particleSize;
+          
+      //vx = p.gu;
+      //vy = p.gv;
+      //c = 100*sqrt(vx^2 + vy^2 );
+      
+      c = abs(p.press) * (360-102);
+      if ( c > (360-102) ) c = (360-102);
+      if ( c < 0 ) c = 0;
+      // R O Y G B I V
+      // 51 102 
+      
+      setcol( hsv_to_rgb( (360-102)-c ,1,1) );
+      
+      //setcol( hsv_to_rgb( 360-c*36 ,1,1) );
+      
+      //setpix( x1, y1);
+      //drawsph(x1,y1,-particleSize/2);
+      moveTo(x1,y1);
+      lineTo(x2,y2);
+   }
+   
+   
+   /*
+   for(i=0; i<MAX_NODES; i++){
+      if (grid[i].undefined) continue;
+      
+      if (grid[i].m > 0.0) {
+         x = xres/2+grid[i].gx*xres/2;
+         y = yres/2+grid[i].gy*yres/2;
+         
+         c = grid[i].m*10;
+         setcol( hsv_to_rgb( 360-c*36 ,1,1) );
+      
+         setpix( x, y);
+         //grid[i].d /= grid[i].m;
+         //grid[i].v /= grid[i].m;
+      }
+   }
+   */
+   
+   /*
+   for(i=0; i<gsizey; i++)
+   {
+      for(j=0; j<gsizey; j++)
+      {
+         if (grid[i].undefined) continue;
+         
+         idx = i + grid_dimx * j;
+         c = grid[idx].u^2 + grid[idx].v^2;
+         setcol( hsv_to_rgb( 360-c*36 ,1,1) );
+         setpix( i*xres/gsizey, j*yres/gsizey );
+      }
+   }
+   */
+
+   setcol(0,255,0);   
+   moveto(xres/2, yres/2); 
+   lineto(xres/2 + accelX*200, yres/2 + accelY*200 );
+
+      
+   setcol(255,255,255);
+   moveto(0,0);
+   printf("%g\n", MAX_PARTICLES);
+   printf("%g nodes of max %g nodes\n", activeCount , MAX_NODES);
+   
+
+
+}
+setupParticle(Particle p, x, y, u, v) {
+   
+   p.x = x;
+   p.y = y;
+   p.u = u;
+   p.v = v;
+   p.gu = u;
+   p.gv = v;
+   
+
+   p.cx = 0;
+   p.cy = 0;
+   p.gi = 0;
+   
+   for(i=0; i<3; i++){
+      p.px[i] = 0;
+      p.py[i] = 0;
+      p.gx[i] = 0;
+      p.gy[i] = 0;
+   }
+
+}
+
+setupNode(Node n) {
+   n.m = 0;
+   n.d = 0;
+   n.gx = 0;
+   n.gy = 0;
+   n.u = 0;
+   n.v = 0;
+   n.ax = 0;
+   n.ay = 0;
+   n.undefined = 0;
+}
+
+hsv_to_rgb(h,s,v){ 
+   // expects 360deg and 1,1 hue sat max
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   }
+   return rgb( r*255, g*255, b*255); 
+}

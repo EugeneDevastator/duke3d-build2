@@ -1,0 +1,94 @@
+//
+static myArray[320*240]; // 76800 pixels
+()
+{
+   cls(0);
+   genLinearArray(); 
+   drawL(0,0);
+
+   genColumnOrderArray();
+   drawCO(0,241);
+   
+   genRowOrder();
+   drawRO(321,0);
+   
+   setcol(0xffffff);
+   moveto(100,100); printf("LINEAR i++");
+   moveto(50,350); printf("COL MAJOR y*width+x");
+   moveto(350,100); printf("ROW MAJOR x*height+y");
+   moveto(350,350);
+   printf("offset = row + col*NUMROWS"); 
+   printf("\noffset = col + row*NUMCOLS");
+}
+
+// same as column order.
+genLinearArray()
+{
+   i=0;
+   // With x,y in this order, the pixels
+   // are stored Row major
+   for(x=0; x<320; x++)
+   for(y=0; y<240; y++)
+   {
+      r = 0.1 + (x+y) * 0.0015;
+      g = 0.5 + (x+y) * 0.001;
+      b = 0.7 + (x+y) * 0.0005;
+      myArray[i] = rgb(r*255,g*255,b*255);
+      i++;
+   }
+}
+genColumnOrderArray()
+{
+   for(y=0; y<240; y++)
+   for(x=0; x<320; x++)
+   {
+      r = 0.1 + (x+y) * 0.0015;
+      g = 0.5 + (x+y) * 0.001;
+      b = 0.7 + (x+y) * 0.0005;
+      myArray[x*240+y] = rgb(r*255,g*255,b*255);
+   }
+}
+genRowOrder()
+{
+   // With x,y in this order, the pixels
+   // are stored Row major
+   
+   for(x=0; x<320; x++)
+   for(y=0; y<240; y++)
+   {
+      r = 0.1 + (x+y) * 0.0015;
+      g = 0.5 + (x+y) * 0.001;
+      b = 0.7 + (x+y) * 0.0005;
+      myArray[y*320+x] = rgb(r*255,g*255,b*255);
+   }
+}
+drawL(xof,yof)
+{
+   i=0;
+   for(x=0; x<320; x++)
+   for(y=0; y<240; y++)
+   {
+      setcol(myArray[i]);
+      setpix(x+xof,y+yof);
+      i++;
+   }
+}
+drawCO(xof,yof)
+{
+   for(x=0; x<320; x++)
+   for(y=0; y<240; y++)
+   {
+      setcol(myArray[x*240+y]); // column major
+      setpix(x+xof,y+yof);
+   }
+}
+drawRO(xof,yof)
+{
+   for(x=0; x<320; x++)
+   for(y=0; y<240; y++)
+   {
+      setcol(myArray[y*320+x]); // row major
+      setpix(x+xof,y+yof);
+   }
+}
+
