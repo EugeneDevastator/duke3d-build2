@@ -6553,9 +6553,10 @@ static void drawgrid (cam_t *cc, int mode)
 			if ((f-d)*g+cc->h.x >= cc->c.x*.32) f -= d;
 			x0 = (f  )*g+cc->h.x;
 			x1 = (f+d)*g+cc->h.x;
-			drawline2d(&cc->c,x0,15,x1,15,0xffc47c58); drawline2d(&cc->c,x0-1,12,x0-1,21,0xffc47c58); drawline2d(&cc->c,x1-1,12,x1-1,21,0xffc47c58);
-			drawline2d(&cc->c,x0,16,x1,16,0xffe49c78); drawline2d(&cc->c,x0  ,12,x0  ,21,0xffe49c78); drawline2d(&cc->c,x1  ,12,x1  ,21,0xffe49c78);
-			drawline2d(&cc->c,x0,17,x1,17,0xffc47c58); drawline2d(&cc->c,x0+1,12,x0+1,21,0xffc47c58); drawline2d(&cc->c,x1+1,12,x1+1,21,0xffc47c58);
+			int lineoff = lineHeight-3;
+			drawline2d(&cc->c,x0,15+lineoff,x1,15+lineoff,0xffc47c58); drawline2d(&cc->c,x0-1,12+lineoff,x0-1,21+lineoff,0xffc47c58); drawline2d(&cc->c,x1-1,12+lineoff,x1-1,21+lineoff,0xffc47c58);
+			drawline2d(&cc->c,x0,16+lineoff,x1,16+lineoff,0xffe49c78); drawline2d(&cc->c,x0  ,12+lineoff,x0  ,21+lineoff,0xffe49c78); drawline2d(&cc->c,x1  ,12+lineoff,x1  ,21+lineoff,0xffe49c78);
+			drawline2d(&cc->c,x0,17+lineoff,x1,17+lineoff,0xffc47c58); drawline2d(&cc->c,x0+1,12+lineoff,x0+1,21+lineoff,0xffc47c58); drawline2d(&cc->c,x1+1,12+lineoff,x1+1,21+lineoff,0xffc47c58);
 			print6x8(&cc->c,(x0+x1)*.5-7*3,yres*.005,0xffe49c78,-1,"%g unit%c",gridsiz*8,((-(gridsiz!=.125))&('s'-32))+32);
 		}
 	}
@@ -12829,25 +12830,25 @@ skipdrawrooms_lab:;
 		else print6x8(&cc->c,8,8+24,0xffffff,0,"(%s is selecting a file)",gst->nick[viewindex]);
 	}
 
-	k = cc->c.y-8;
+	k = cc->c.y-lineHeight;
 		//Always draw your own chat text on bottom
 	i = viewindex;
 	if (gst->p[i].typemode)
 	{
 		col[0] = 0xffffff;
-		k -= 8;
+		k -= lineHeight;
 		if (!gst->nick[i][0]) { print6x8(&cc->c,0,k,col[0],0,"Player %d: %s",i,gst->typemess[i]); j = (i>=100)+(i>=10)+10; }
 							  else { print6x8(&cc->c,0,k,col[0],0,"%s: %s",gst->nick[i],gst->typemess[i]); j = strlen(gst->nick[i])+2; }
 		if ((gst->p[i].typehighlight >= 0) && (gst->p[i].typehighlight != gst->p[i].typecurs))
 		{
 			s0 = min(gst->p[i].typecurs,gst->p[i].typehighlight);
 			s1 = max(gst->p[i].typecurs,gst->p[i].typehighlight);
-			print6x8(&cc->c,(s0+j)*6,k,0,col[0],"%.*s",s1-s0,&gst->typemess[i][s0]);
+			print6x8(&cc->c,(s0+j)*6*fontscale,k,0,col[0],"%.*s",s1-s0,&gst->typemess[i][s0]);
 		}
 		if (fmod(dtotclk,0.2) < 0.12)
 		{
-			if (gst->p[i].typeowritemode) print6x8(&cc->c,(gst->p[i].typecurs+j)*6,k  ,col[0],-1,"%c",219);
-											 else print6x8(&cc->c,(gst->p[i].typecurs+j)*6,k+1,col[0],-1,"_");
+			if (gst->p[i].typeowritemode) print6x8(&cc->c,(gst->p[i].typecurs+j)*6*fontscale,k  ,col[0],-1,"%c",219);
+											 else print6x8(&cc->c,(gst->p[i].typecurs+j)*6*fontscale,k+1,col[0],-1,"_");
 		}
 	}
 
@@ -12856,19 +12857,19 @@ skipdrawrooms_lab:;
 	{
 		if ((i == viewindex) || (!gst->p[i].typemode)) continue;
 		col[0] = 0xff40ff;
-		k -= 8;
+		k -= lineHeight;
 		if (!gst->nick[i][0]) { print6x8(&cc->c,0,k,col[0],0,"Player %d: %s",i,gst->typemess[i]); j = (i>=100)+(i>=10)+10; }
 							  else { print6x8(&cc->c,0,k,col[0],0,"%s: %s",gst->nick[i],gst->typemess[i]); j = strlen(gst->nick[i])+2; }
 		if ((gst->p[i].typehighlight >= 0) && (gst->p[i].typehighlight != gst->p[i].typecurs))
 		{
 			s0 = min(gst->p[i].typecurs,gst->p[i].typehighlight);
 			s1 = max(gst->p[i].typecurs,gst->p[i].typehighlight);
-			print6x8(&cc->c,(s0+j)*6,k,0,col[0],"%.*s",s1-s0,&gst->typemess[i][s0]);
+			print6x8(&cc->c,(s0+j)*6*fontscale,k,0,col[0],"%.*s",s1-s0,&gst->typemess[i][s0]);
 		}
 		if (fmod(dtotclk,0.2) < 0.12)
 		{
-			if (gst->p[i].typeowritemode) print6x8(&cc->c,(gst->p[i].typecurs+j)*6,k,col[0],-1,"%c",219);
-											 else print6x8(&cc->c,(gst->p[i].typecurs+j)*6,k+1,col[0],-1,"_");
+			if (gst->p[i].typeowritemode) print6x8(&cc->c,(gst->p[i].typecurs+j)*6*fontscale,k,col[0],-1,"%c",219);
+											 else print6x8(&cc->c,(gst->p[i].typecurs+j)*6*fontscale,k+1,col[0],-1,"_");
 		}
 	}
 
@@ -14331,7 +14332,7 @@ void doframe (void)
 				print6x8((tiltyp *)&dd,dd.x-helpinfoXOffset,j,0xffffff,0,"n:%d, ns:%d, nw:%d, owner:%d",wal->n,wal->ns,wal->nw,wal->owner); j += lineHeight;
 				if ((unsigned)wal->surf.tilnum < (unsigned)gnumtiles) { print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"file:\"%s\"",gtile[wal->surf.tilnum].filnam); j += lineHeight; }
 				print6x8((tiltyp *)&dd,dd.x-helpinfoXOffset,j,0xffffff,0,"flags:0x%08x",wal->surf.flags); j += lineHeight;
-				print6x8((tiltyp *)&dd,dd.x-helpinfoXOffset,j,0xffffff,0,"tag:%d",wal->surf.tag); j += lineHeight;
+				print6x8((tiltyp *)&dd,dd.x-helpinfoXOffset,j,0xffffff,0,"tags:%d,%d",wal->surf.lotag,wal->surf.hitag); j += lineHeight;
 			}
 		}
 		else //sector
@@ -14342,7 +14343,7 @@ void doframe (void)
 			print6x8((tiltyp *)&dd,dd.x-helpinfoXOffset,j,0xffffff,0,"n:%d, headspri:%d, owner:%d",sec->n,sec->headspri,sec->owner); j += lineHeight;
 			if ((unsigned)sec->surf[i].tilnum < (unsigned)gnumtiles) { print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"file:\"%s\"",gtile[sec->surf[i].tilnum].filnam); j += lineHeight; }
 			print6x8((tiltyp *)&dd,dd.x-helpinfoXOffset,j,0xffffff,0,"flags:0x%08x",sec->surf[i].flags); j += lineHeight;
-			print6x8((tiltyp *)&dd,dd.x-helpinfoXOffset,j,0xffffff,0,"tag:%d",sec->surf[i].tag); j += lineHeight;
+			print6x8((tiltyp *)&dd,dd.x-helpinfoXOffset,j,0xffffff,0,"tags:%d,%d",sec->surf[i].lotag,sec->surf[i].hitag); j += lineHeight;
 		}
 	}
 
