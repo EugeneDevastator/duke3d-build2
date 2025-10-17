@@ -2419,27 +2419,55 @@ static const __int64 font6x8[] = //256 DOS chars, from: DOSAPP.FON (tab blank)
 	0x0030595522004C72,0x1800182418241800,0x2A2A1C0018247E24,0x003C02023C00002A,0x0000002A2A2A2A00,0x4A4A510000242E24,0x00514A4A44000044,0x20000402FC000000,
 	0x2A08080000003F40,0x0012241224000808,0x0000000609090600,0x0008000000001818,0x02023E4030000000,0x0900000E010E0100,0x3C3C3C0000000A0D,0x000000000000003C,
 };
+const int fontscale = 2;
+const int lineHeight = fontscale*8 + 1;
 void print6x8 (tiltyp *dd, long ox, long y, long fcol, long bcol, const char *fmt, ...)
 {
 	va_list arglist;
 	char st[1024], *c, *v;
 	long i, j, ie, x, *lp, *lpx;
+	long sx, sy; // scale coordinates
 
-	if (!fmt) return;
+	if (!fmt || fontscale <= 0) return;
 	va_start(arglist,fmt);
 	if (_vsnprintf((char *)&st,sizeof(st)-1,fmt,arglist)) st[sizeof(st)-1] = 0;
 	va_end(arglist);
 
-	lp = (long *)(y*dd->p+dd->f);
-	for(j=1;j<256;y++,lp=(long *)(((long)lp)+dd->p),j+=j)
-		if ((unsigned)y < (unsigned)dd->y)
-			for(c=st,x=ox;*c;c++,x+=6)
+	for(sy = 0; sy < 8 * fontscale; sy++)
+	{
+		j = 1 << (sy / fontscale); // which bit row we're reading from font
+		long current_y = y + sy;
+		if ((unsigned)current_y >= (unsigned)dd->y) continue;
+
+		lp = (long *)(current_y * dd->p + dd->f);
+
+		for(c = st, x = ox; *c; c++, x += 6 * fontscale)
+		{
+			v = (char *)(((long)*c) * 6 + (long)font6x8);
+			lpx = &lp[x];
+
+			for(i = max(-x, 0), ie = min(dd->x - x, 6 * fontscale); i < ie; i++)
 			{
-				v = (char *)(((long)*c)*6 + (long)font6x8); lpx = &lp[x];
-				for(i=max(-x,0),ie=min(dd->x-x,6);i<ie;i++) { if (v[i]&j) lpx[i] = fcol; else if (bcol >= 0) lpx[i] = bcol; }
-				if ((*c) == 9) { if (bcol >= 0) { for(i=max(-x,6),ie=min(dd->x-x,18);i<ie;i++) lpx[i] = bcol; } x += 2*6; }
+				long font_x = i / fontscale;
+				if (v[font_x] & j)
+					lpx[i] = fcol;
+				else if (bcol >= 0)
+					lpx[i] = bcol;
 			}
+
+			if ((*c) == 9) // tab handling
+			{
+				if (bcol >= 0)
+				{
+					for(i = max(-x, 6 * fontscale), ie = min(dd->x - x, 18 * fontscale); i < ie; i++)
+						lpx[i] = bcol;
+				}
+				x += 2 * 6 * fontscale;
+			}
+		}
+	}
 }
+
 
 static void drawpix (tiltyp *dd, long x, long y, long c)
 {
@@ -6525,9 +6553,10 @@ static void drawgrid (cam_t *cc, int mode)
 			if ((f-d)*g+cc->h.x >= cc->c.x*.32) f -= d;
 			x0 = (f  )*g+cc->h.x;
 			x1 = (f+d)*g+cc->h.x;
-			drawline2d(&cc->c,x0,15,x1,15,0xffc47c58); drawline2d(&cc->c,x0-1,12,x0-1,21,0xffc47c58); drawline2d(&cc->c,x1-1,12,x1-1,21,0xffc47c58);
-			drawline2d(&cc->c,x0,16,x1,16,0xffe49c78); drawline2d(&cc->c,x0  ,12,x0  ,21,0xffe49c78); drawline2d(&cc->c,x1  ,12,x1  ,21,0xffe49c78);
-			drawline2d(&cc->c,x0,17,x1,17,0xffc47c58); drawline2d(&cc->c,x0+1,12,x0+1,21,0xffc47c58); drawline2d(&cc->c,x1+1,12,x1+1,21,0xffc47c58);
+			int lineoff = lineHeight-3;
+			drawline2d(&cc->c,x0,15+lineoff,x1,15+lineoff,0xffc47c58); drawline2d(&cc->c,x0-1,12+lineoff,x0-1,21+lineoff,0xffc47c58); drawline2d(&cc->c,x1-1,12+lineoff,x1-1,21+lineoff,0xffc47c58);
+			drawline2d(&cc->c,x0,16+lineoff,x1,16+lineoff,0xffe49c78); drawline2d(&cc->c,x0  ,12+lineoff,x0  ,21+lineoff,0xffe49c78); drawline2d(&cc->c,x1  ,12+lineoff,x1  ,21+lineoff,0xffe49c78);
+			drawline2d(&cc->c,x0,17+lineoff,x1,17+lineoff,0xffc47c58); drawline2d(&cc->c,x0+1,12+lineoff,x0+1,21+lineoff,0xffc47c58); drawline2d(&cc->c,x1+1,12+lineoff,x1+1,21+lineoff,0xffc47c58);
 			print6x8(&cc->c,(x0+x1)*.5-7*3,yres*.005,0xffe49c78,-1,"%g unit%c",gridsiz*8,((-(gridsiz!=.125))&('s'-32))+32);
 		}
 	}
@@ -12331,7 +12360,7 @@ skipdrawrooms_lab:;
 						fp.z = gdps->ghz/fp.z;
 						fp.x = fp.x*fp.z + gdps->ghx;
 						fp.y = fp.y*fp.z + gdps->ghy;
-						print6x8(&cc->c,fp.x-((pps->circnum>=99)+(pps->circnum>=9)+1)*3,fp.y+8,0xffff00,-1,"%d",pps->circnum+1);
+						print6x8(&cc->c,fp.x-((pps->circnum>=99)+(pps->circnum>=9)+1)*3,fp.y+lineHeight,0xffff00,-1,"%d",pps->circnum+1);
 					}
 				}
 			}
@@ -12801,25 +12830,25 @@ skipdrawrooms_lab:;
 		else print6x8(&cc->c,8,8+24,0xffffff,0,"(%s is selecting a file)",gst->nick[viewindex]);
 	}
 
-	k = cc->c.y-8;
+	k = cc->c.y-lineHeight;
 		//Always draw your own chat text on bottom
 	i = viewindex;
 	if (gst->p[i].typemode)
 	{
 		col[0] = 0xffffff;
-		k -= 8;
+		k -= lineHeight;
 		if (!gst->nick[i][0]) { print6x8(&cc->c,0,k,col[0],0,"Player %d: %s",i,gst->typemess[i]); j = (i>=100)+(i>=10)+10; }
 							  else { print6x8(&cc->c,0,k,col[0],0,"%s: %s",gst->nick[i],gst->typemess[i]); j = strlen(gst->nick[i])+2; }
 		if ((gst->p[i].typehighlight >= 0) && (gst->p[i].typehighlight != gst->p[i].typecurs))
 		{
 			s0 = min(gst->p[i].typecurs,gst->p[i].typehighlight);
 			s1 = max(gst->p[i].typecurs,gst->p[i].typehighlight);
-			print6x8(&cc->c,(s0+j)*6,k,0,col[0],"%.*s",s1-s0,&gst->typemess[i][s0]);
+			print6x8(&cc->c,(s0+j)*6*fontscale,k,0,col[0],"%.*s",s1-s0,&gst->typemess[i][s0]);
 		}
 		if (fmod(dtotclk,0.2) < 0.12)
 		{
-			if (gst->p[i].typeowritemode) print6x8(&cc->c,(gst->p[i].typecurs+j)*6,k  ,col[0],-1,"%c",219);
-											 else print6x8(&cc->c,(gst->p[i].typecurs+j)*6,k+1,col[0],-1,"_");
+			if (gst->p[i].typeowritemode) print6x8(&cc->c,(gst->p[i].typecurs+j)*6*fontscale,k  ,col[0],-1,"%c",219);
+											 else print6x8(&cc->c,(gst->p[i].typecurs+j)*6*fontscale,k+1,col[0],-1,"_");
 		}
 	}
 
@@ -12828,19 +12857,19 @@ skipdrawrooms_lab:;
 	{
 		if ((i == viewindex) || (!gst->p[i].typemode)) continue;
 		col[0] = 0xff40ff;
-		k -= 8;
+		k -= lineHeight;
 		if (!gst->nick[i][0]) { print6x8(&cc->c,0,k,col[0],0,"Player %d: %s",i,gst->typemess[i]); j = (i>=100)+(i>=10)+10; }
 							  else { print6x8(&cc->c,0,k,col[0],0,"%s: %s",gst->nick[i],gst->typemess[i]); j = strlen(gst->nick[i])+2; }
 		if ((gst->p[i].typehighlight >= 0) && (gst->p[i].typehighlight != gst->p[i].typecurs))
 		{
 			s0 = min(gst->p[i].typecurs,gst->p[i].typehighlight);
 			s1 = max(gst->p[i].typecurs,gst->p[i].typehighlight);
-			print6x8(&cc->c,(s0+j)*6,k,0,col[0],"%.*s",s1-s0,&gst->typemess[i][s0]);
+			print6x8(&cc->c,(s0+j)*6*fontscale,k,0,col[0],"%.*s",s1-s0,&gst->typemess[i][s0]);
 		}
 		if (fmod(dtotclk,0.2) < 0.12)
 		{
-			if (gst->p[i].typeowritemode) print6x8(&cc->c,(gst->p[i].typecurs+j)*6,k,col[0],-1,"%c",219);
-											 else print6x8(&cc->c,(gst->p[i].typecurs+j)*6,k+1,col[0],-1,"_");
+			if (gst->p[i].typeowritemode) print6x8(&cc->c,(gst->p[i].typecurs+j)*6*fontscale,k,col[0],-1,"%c",219);
+											 else print6x8(&cc->c,(gst->p[i].typecurs+j)*6*fontscale,k+1,col[0],-1,"_");
 		}
 	}
 
@@ -14147,7 +14176,7 @@ static void drawframe (cam_t *cc)
 		dp.x = (double)gdps->ipos.x;
 		dp.y = (double)gdps->ipos.y;
 		dp.z = (double)gdps->ipos.z;
-		print6x8((tiltyp *)&cam.c,cam.c.x-350,48,0xffffff,-1,"maxcr:%.9f, chn=%d",findmaxcr(&dp,gdps->cursect,1e16,&clos),build2.cliphitnum);
+		print6x8((tiltyp *)&cam.c,cam.c.x-350*fontscale,48,0xffffff,-1,"maxcr:%.9f, chn=%d",findmaxcr(&dp,gdps->cursect,1e16,&clos),build2.cliphitnum);
 		if (build2.cliphitnum < 0) drawsph(&cam,clos.x,clos.y,clos.z,.02+rand()/3276800.0,0x808080);
 	}
 
@@ -14271,49 +14300,50 @@ void doframe (void)
 	if (lps->showdebug)
 	{
 		print6x8((tiltyp *)&dd,dd.x-220,0,0xffffff,-1,"%6d byt sent, %6d byt recv",bytessent,bytesrecv);
-		print6x8((tiltyp *)&dd,dd.x-220,8,0xffffff,-1,"%6.0f bps sent, %6.0f bps recv",((double)bytessent)/dtotclk,((double)bytesrecv)/dtotclk);
+		print6x8((tiltyp *)&dd,dd.x-220,lineHeight,0xffffff,-1,"%6.0f bps sent, %6.0f bps recv",((double)bytessent)/dtotclk,((double)bytesrecv)/dtotclk);
 		if (moveindex) print6x8((tiltyp *)&dd,dd.x-110,16,0xffffff,-1,"lag: %d",ppackfifwn-ppackfifrn);
-		print6x8((tiltyp *)&dd,dd.x-220,16,0xffffff,-1,"cursect:%d",lps->cursect);
+		print6x8((tiltyp *)&dd,dd.x-220,lineHeight*2,0xffffff,-1,"cursect:%d",lps->cursect);
 #if (OOS_CHECK)
 		if (numplayers >= 2) print6x8((tiltyp *)&dd,dd.x-220,24,0xffffff,-1,"gamestate:%d",totcrcbytes);
 #endif
 	}
-
+    int helpinfoXOffset = 320*fontscale;
 	if ((unsigned)lps->grabsect < (unsigned)dast->numsects)
 	{
-		j = 8;
+		j = lineHeight;
 		if (lps->grabwall >= 0)
 		{
 			if ((lps->grabwall&0xc0000000) == 0x40000000) //sprite
 			{
 				i = lps->grabwall&0x3fffffff; spr = &dast->spri[i];
-				print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"spri:%d (sect:%d) (p:%d n:%d)",i,lps->grabsect,spr->sectp,spr->sectn); j += 8;
-				print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"x/y/z:(%g,%g,%g)",spr->p.x,spr->p.y,spr->p.z); j += 8;
-				print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"fat:%g, owner:%d",spr->fat,spr->owner); j += 8;
-				if ((unsigned)spr->tilnum < (unsigned)gnumtiles) { print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"file:\"%s\"",gtile[spr->tilnum].filnam); j += 8; }
-				print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"flags:0x%08x",spr->flags); j += 8;
-				print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"tags:%d,%d",spr->lotag,spr->hitag); j += 8;
+				print6x8((tiltyp *)&dd,dd.x-helpinfoXOffset,j,0xffffff,0,"spri:%d (sect:%d) (p:%d n:%d)",i,lps->grabsect,spr->sectp,spr->sectn); j += lineHeight;
+				print6x8((tiltyp *)&dd,dd.x-helpinfoXOffset,j,0xffffff,0,"x/y/z:(%g,%g,%g)",spr->p.x,spr->p.y,spr->p.z); j += lineHeight;
+				print6x8((tiltyp *)&dd,dd.x-helpinfoXOffset,j,0xffffff,0,"fat:%g, owner:%d",spr->fat,spr->owner); j += lineHeight;
+				if ((unsigned)spr->tilnum < (unsigned)gnumtiles)
+					{ print6x8((tiltyp *)&dd,dd.x-helpinfoXOffset,j,0xffffff,0,"file:\"%s\"",gtile[spr->tilnum].filnam); j += lineHeight; }
+				print6x8((tiltyp *)&dd,dd.x-helpinfoXOffset,j,0xffffff,0,"flags:0x%08x",spr->flags); j += lineHeight;
+				print6x8((tiltyp *)&dd,dd.x-helpinfoXOffset,j,0xffffff,0,"tags:%d,%d",spr->lotag,spr->hitag); j += lineHeight;
 			}
 			else //wall
 			{
 				wal = &dast->sect[lps->grabsect].wall[lps->grabwall];
-				print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"wall:%d (sect:%d)",lps->grabwall,lps->grabsect); j += 8;
-				print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"x/y:(%g,%g)",wal->x,wal->y); j += 8;
-				print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"n:%d, ns:%d, nw:%d, owner:%d",wal->n,wal->ns,wal->nw,wal->owner); j += 8;
-				if ((unsigned)wal->surf.tilnum < (unsigned)gnumtiles) { print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"file:\"%s\"",gtile[wal->surf.tilnum].filnam); j += 8; }
-				print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"flags:0x%08x",wal->surf.flags); j += 8;
-				print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"tag:%d",wal->surf.tag); j += 8;
+				print6x8((tiltyp *)&dd,dd.x-helpinfoXOffset,j,0xffffff,0,"wall:%d (sect:%d)",lps->grabwall,lps->grabsect); j += lineHeight;
+				print6x8((tiltyp *)&dd,dd.x-helpinfoXOffset,j,0xffffff,0,"x/y:(%g,%g)",wal->x,wal->y); j += lineHeight;
+				print6x8((tiltyp *)&dd,dd.x-helpinfoXOffset,j,0xffffff,0,"n:%d, ns:%d, nw:%d, owner:%d",wal->n,wal->ns,wal->nw,wal->owner); j += lineHeight;
+				if ((unsigned)wal->surf.tilnum < (unsigned)gnumtiles) { print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"file:\"%s\"",gtile[wal->surf.tilnum].filnam); j += lineHeight; }
+				print6x8((tiltyp *)&dd,dd.x-helpinfoXOffset,j,0xffffff,0,"flags:0x%08x",wal->surf.flags); j += lineHeight;
+				print6x8((tiltyp *)&dd,dd.x-helpinfoXOffset,j,0xffffff,0,"tags:%d,%d",wal->surf.lotag,wal->surf.hitag); j += lineHeight;
 			}
 		}
 		else //sector
 		{
 			i = (lps->grabcf&1); sec = &dast->sect[lps->grabsect];
-			print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"sect:%d",lps->grabsect); j += 8;
-			print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"z:%g, gradx/y:(%g,%g)",sec->z[i],sec->grad[i].x,sec->grad[i].y); j += 8;
-			print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"n:%d, headspri:%d, owner:%d",sec->n,sec->headspri,sec->owner); j += 8;
-			if ((unsigned)sec->surf[i].tilnum < (unsigned)gnumtiles) { print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"file:\"%s\"",gtile[sec->surf[i].tilnum].filnam); j += 8; }
-			print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"flags:0x%08x",sec->surf[i].flags); j += 8;
-			print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"tag:%d",sec->surf[i].tag); j += 8;
+			print6x8((tiltyp *)&dd,dd.x-helpinfoXOffset,j,0xffffff,0,"sect:%d",lps->grabsect); j += lineHeight;
+			print6x8((tiltyp *)&dd,dd.x-helpinfoXOffset,j,0xffffff,0,"z:%g, gradx/y:(%g,%g)",sec->z[i],sec->grad[i].x,sec->grad[i].y); j += lineHeight;
+			print6x8((tiltyp *)&dd,dd.x-helpinfoXOffset,j,0xffffff,0,"n:%d, headspri:%d, owner:%d",sec->n,sec->headspri,sec->owner); j += lineHeight;
+			if ((unsigned)sec->surf[i].tilnum < (unsigned)gnumtiles) { print6x8((tiltyp *)&dd,dd.x-320,j,0xffffff,0,"file:\"%s\"",gtile[sec->surf[i].tilnum].filnam); j += lineHeight; }
+			print6x8((tiltyp *)&dd,dd.x-helpinfoXOffset,j,0xffffff,0,"flags:0x%08x",sec->surf[i].flags); j += lineHeight;
+			print6x8((tiltyp *)&dd,dd.x-helpinfoXOffset,j,0xffffff,0,"tags:%d,%d",sec->surf[i].lotag,sec->surf[i].hitag); j += lineHeight;
 		}
 	}
 
@@ -14359,7 +14389,7 @@ void doframe (void)
 			for(i=0,k=0;i<showhelpbufleng;i+=j+1,k++)
 			{
 				j = strlen(&showhelpbuf[i]);
-				print6x8((tiltyp *)&dd,dd.x-6*72*showhelppos,dd.y+(k-showhelpbuflines)*8,0x000000+(showhelpbuf[i]!='-')*0x506070,-1,"%s",&showhelpbuf[i]);
+				print6x8((tiltyp *)&dd,dd.x-6*72*showhelppos,dd.y+(k-showhelpbuflines)*lineHeight,0x000000+(showhelpbuf[i]!='-')*0x506070,-1,"%s",&showhelpbuf[i]);
 			}
 		}
 	}
