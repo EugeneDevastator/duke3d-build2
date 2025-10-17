@@ -26,7 +26,7 @@ winmain.obj:     winmain.cpp;   cl /c /TP winmain.cpp   /Ox /G6Fy /MD
 #include <math.h>
 #define PI 3.14159265358979323
 #pragma warning(disable:4731)
-
+static const float one_float = 1.0f;
 #define USESSE2 0
 
 #define USENEWLIGHT 1 //FIXFIXFIX
@@ -1598,7 +1598,8 @@ isyend:
 		}
 
 			//Draw hlines xor style
-		for(i=0;i<pn3;i+=2)
+		// SPAN RENDERING - Draw horizontal spans between edge pairs
+		for(i=0;i<pn3;i+=2)  // Process edge pairs
 		{
 #if (PR_USEFLOAT != 0)
 			sx0 = (int)min(max(rast[i  ].pos,0.f),(float)gcam.c.x); rast[i  ].pos += rast[i  ].inc;
@@ -1631,6 +1632,7 @@ isyend:
 				do { *(int *)(padd+p) = id;/*FIX:USEINTZ only!*/ id += idi; p += 4; } while (p < p2);
 			} while (p < 0);
 #else
+			// Z-BUFFER RENDERING - SSE optimized depth buffer writes
 			_asm
 			{
 				mov eax, ouvmat
@@ -3177,9 +3179,27 @@ void shadowtest2_setcam (cam_t *ncam)
 }
 
 #if (USENEWLIGHT == 0)
-typedef struct { float n2, d2, n1, d1, n0, d0, filler0[2], glk[12], bsc, gsc, rsc, filler1[1]; } hlighterp_t;
+typedef struct
+{
+	float n2, d2, n1, d1, n0, d0, filler0[2], glk[12], bsc, gsc, rsc, filler1[1];
+	float fog_start;     // distance where fog begins
+	float fog_end;       // distance where fog is maximum
+	float fog_density;   // fog intensity
+	float fog_r, fog_g, fog_b; // fog color (blue would be 0,0,1)
+	float fog_factor;    // pre-calculated fog blend factor
+	float fog_color[4];  // fog RGBA (aligned for SIMD)
+} hlighterp_t;
 #else
-typedef struct { float gk[16], gk2[12], bsc, gsc, rsc, filler1[1]; } hlighterp_t;
+typedef struct
+{
+	float gk[16], gk2[12], bsc, gsc, rsc, filler1[1];
+	float fog_start;     // distance where fog begins
+	float fog_end;       // distance where fog is maximum
+	float fog_density;   // fog intensity
+	float fog_r, fog_g, fog_b; // fog color (blue would be 0,0,1)
+	float fog_factor;    // pre-calculated fog blend factor
+	float fog_color[4];  // fog RGBA (aligned for SIMD)
+} hlighterp_t;
 __declspec(align(16)) static const float hligterp_maxzero[4] = {0.f,0.f,0.f,0.f};
 #endif
 static void prepligramp (float *ouvmat, point3d *norm, int lig, hlighterp_t *hl)
@@ -3272,23 +3292,50 @@ static void prepligramp (float *ouvmat, point3d *norm, int lig, hlighterp_t *hl)
 	f = 16384.0; hl->bsc *= f; hl->gsc *= f; hl->rsc *= f;
 #endif
 	hl->filler1[0] = 0.f; //Make sure this is not denormal!
+
+	float cam_dist_factor;
+
+#if (USEINTZ)
+	cam_dist_factor = 1.0/(1048576.0*256.0);
+#else
+	cam_dist_factor = 1.0/gcam.h.z;
+#endif
+
+	// Set fog parameters (you can make these configurable)
+	hl->fog_start = 0.0f;    // start fog at distance 100
+	hl->fog_end = 100.0f;     // full fog at distance 1000
+	hl->fog_density = 3.0f;    // fog strength
+	hl->fog_r = 0.2f;          // blue fog color
+	hl->fog_g = 0.4f;
+	hl->fog_b = 0.8f;
+	hl->fog_color[0] = 0.2f; // blue fog
+	hl->fog_color[1] = 0.4f;
+	hl->fog_color[2] = 0.8f;
+	hl->fog_color[3] = 1.0f;
+	// Calculate fog interpolation factor based on distance
+	float fog_distance = 1.0f / cam_dist_factor; // inverse of distance factor
+	float fog_factor = (fog_distance - hl->fog_start) / (hl->fog_end - hl->fog_start);
+	fog_factor = 1.0f; //fog_factor < 0.0f ? 0.0f : (fog_factor > 1.0f ? 1.0f : fog_factor);
+
+	// Store fog factor for use in pixel shader
+	hl->filler1[0] = fog_factor * hl->fog_density;
 }
 
 void drawpollig (int ei)
 {
-	#define SCISDIST .001
+	#define SCISDIST .001 // Near clipping plane distance
 	__declspec(align(16)) static const float dpqmulval[4] = {0,1,2,3}, dpqfours[4] = {4,4,4,4};
 	__declspec(align(16)) float qamb[4]; //holder for SSE to avoid degenerates
 #define PR0_USEFLOAT 0
 #define PR1_USEFLOAT 1
 #if (PR0_USEFLOAT != 0)
-	typedef struct { int y0, y1; float pos, inc; } rast_t;
+	typedef struct { int y0, y1; float pos, inc; } rast_t; // Main polygon edge raster
 #else
 	typedef struct { int y0, y1, pos, inc; } rast_t;
 #endif
 	rast_t *rast, rtmp;
 #if (PR1_USEFLOAT != 0)
-	typedef struct { int y0, y1; float pos, inc; } lrast_t;
+	typedef struct { int y0, y1; float pos, inc; } lrast_t;// Light polygon edge raster
 #else
 	typedef struct { int y0, y1, pos, inc; } lrast_t;
 #endif
@@ -3624,91 +3671,103 @@ zbuf_in2it: do { *(int *)(padd+p) = id;/*FIX:USEINTZ only!*/ id += idi; p += 4; 
 			vx = (float)x;
 			_asm
 			{
-				mov eax, ouvmat
-				mov ecx, p
-				mov edx, padd
+				mov eax, ouvmat ; Load transformation matrix pointer
+				mov ecx, p ; Load pixel counter (negative offset)
+				mov edx, padd ; Load Z-buffer destination pointer
 
-				movss xmm0, vx
-				movss xmm1, [eax]     ;xmm1: ouvmat[0]
-				movss xmm2, vy
-				mulss xmm0, xmm1
-				mulss xmm2, [eax+3*4]
-				addss xmm0, xmm2
-				addss xmm0, [eax+6*4] ;xmm0: ouvmat[0]*vx + ouvmat[3]*vy + ouvmat[6]
+				movss xmm0, vx ; Load X coordinate (float)
+				movss xmm1, [eax] ; Load ouvmat[0] matrix element
+				movss xmm2, vy ; Load Y coordinate (float)
+				mulss xmm0, xmm1 ; vx * ouvmat[0]
+				mulss xmm2, [eax+3*4] ; vy * ouvmat[3]
+				addss xmm0, xmm2 ; Add X and Y components
+				addss xmm0, [eax+6*4] ; Add ouvmat[6], complete depth calculation
 
-				add edx, ecx
-				test edx, 12
-				jz short zbufskp1
-  zbufbeg1: rcpss xmm2, xmm0
-				addss xmm0, xmm1
+				add edx, ecx ; Adjust destination by pixel offset
+				test edx, 12 ; Test if 16-byte aligned (check bits 2,3)
+				jz short zbufskp1 ; Skip alignment if already aligned
+
+				zbufbeg1:
+				rcpss xmm2, xmm0 ; Calculate reciprocal (1/depth)
+				addss xmm0, xmm1 ; Increment depth by step
 #if (USEINTZ)
-				cvttss2si eax, xmm2
-				mov [edx], eax
+				cvttss2si eax, xmm2; Convert float to integer
+				mov[edx], eax; Store integer Z value
 #else
-				movss [edx], xmm2
+				movss [edx], xmm2 ; Store float Z value directly
 #endif
-				add edx, 4
-				add ecx, 4
-				jge short zbufend
-				test edx, 12
-				jnz short zbufbeg1
-  zbufskp1: sub edx, ecx
+				add edx, 4 ; Move to next pixel
+				add ecx, 4 ; Increment counter
+				jge short zbufend ; Exit if done
+				test edx, 12 ; Check alignment again
+				jnz short zbufbeg1 ; Continue alignment loop
 
-				shufps xmm1, xmm1, 0
-				shufps xmm0, xmm0, 0
-				movaps xmm2, xmm1
-				mulps xmm2, dpqmulval ;{0,1,2,3}
-				mulps xmm1, dpqfours  ;{4,4,4,4}
-				addps xmm0, xmm2
+				zbufskp1:
+				sub edx, ecx ; Restore base pointer
 
-				add ecx, 16
-				jg short zbufend1
+				shufps xmm1, xmm1, 0 ; Broadcast step value {s,s,s,s}
+				shufps xmm0, xmm0, 0 ; Broadcast depth value {d,d,d,d}
+				movaps xmm2, xmm1 ; Copy step value
+				mulps xmm2, dpqmulval ; Multiply by {0,1,2,3}
+				mulps xmm1, dpqfours ; Multiply by {4,4,4,4}
+				addps xmm0, xmm2 ; Create {d+0*s, d+1*s, d+2*s, d+3*s}
 
-  zbufbeg4: rcpps xmm2, xmm0
-				addps xmm0, xmm1
+				add ecx, 16 ; Adjust counter for 4-pixel processing
+				jg short zbufend1 ; Skip main loop if not enough pixels
+
+				zbufbeg4:
+				rcpps xmm2, xmm0 ; Calculate 4 reciprocals simultaneously
+				addps xmm0, xmm1 ; Increment all 4 depth values
 #if ((USESSE2 != 0) || (!USEINTZ))
 #if (USEINTZ)
-				cvttps2dq xmm2, xmm2
+				cvttps2dq xmm2, xmm2; Convert 4 floats to integers(SSE2)
 #endif
-				movaps [edx+ecx-16], xmm2
+				movaps [edx+ecx-16], xmm2 ; Store 4 Z values
 #else
-				cvttps2pi mm0, xmm2
-				movhlps xmm2, xmm2
-				cvttps2pi mm1, xmm2
-				movq [edx+ecx-16], mm0
-				movq [edx+ecx-8], mm1
+				cvttps2pi mm0, xmm2; Convert lower 2 floats to integers
+				movhlps xmm2, xmm2; Move upper 2 floats to lower
+				cvttps2pi mm1, xmm2; Convert upper 2 floats to integers
+				movq[edx + ecx - 16], mm0; Store lower 2 Z values
+				movq[edx + ecx - 8], mm1; Store upper 2 Z values
 #endif
-				add ecx, 16
-				jle short zbufbeg4
+				add ecx, 16 ; Process next 4 pixels
+				jle short zbufbeg4 ; Continue main loop
 
-  zbufend1: sub ecx, 16
-				jz short zbufend
-				rcpps xmm2, xmm0
+				zbufend1:
+				sub ecx, 16 ; Adjust counter back
+				jz short zbufend ; Exit if exactly done
+				rcpps xmm2, xmm0 ; Calculate reciprocals for remaining pixels
 
 #if ((USESSE2 != 0) || (!USEINTZ))
 #if (USEINTZ)
-				cvttps2dq xmm2, xmm2
+				cvttps2dq xmm2, xmm2; Convert remaining floats to integers
 #endif
-  zbufend2: movss [edx+ecx], xmm2
+				zbufend2:
+				movss [edx+ecx], xmm2 ; Store single Z value
 #else
-  zbufend2: cvttss2si eax, xmm2
-				mov [edx+ecx], eax
+			zbufend2:
+				cvttss2si eax, xmm2; Convert single float to integer
+				mov[edx + ecx], eax; Store integer Z value
 #endif
-				shufps xmm2, xmm2, 0x39
-				add ecx, 4
-				jl short zbufend2
-	zbufend:
+				shufps xmm2, xmm2, 0x39 ; Rotate to next element (3,0,1,2)
+				add ecx, 4 ; Move to next pixel
+				jl short zbufend2 ; Continue cleanup loop
+
+				zbufend:
 #if ((USESSE2 == 0) && (USEINTZ))
-				emms
+				emms; Clear MMX state
 #endif
-			}
+				}
 #endif
-
+			// PIXEL RENDERING LOOP
 			while (x < xe)
 			{
 				xe2 = xe;
-
+				// SHADOW CALCULATION - Determine which lights affect current span
 				liglstn = 0;
+
+				// Check if current X position is inside light polygon
+				// Build list of active lights
 				for(l=plnumi-1;l>=0;l--)
 				{
 					while (lpn5[l] < lpn3[l])
@@ -3748,9 +3807,14 @@ zbuf_in2it: do { *(int *)(padd+p) = id;/*FIX:USEINTZ only!*/ id += idi; p += 4; 
 				qs[1] = min((int)(qlig[1]*g_rgbmul[1]),32767);
 				qs[2] = min((int)(qlig[2]*g_rgbmul[2]),32767);
 #else
+				// LIGHTING CALCULATION - SSE optimized lighting computation
+				// For each active light:
+				// - Calculate light attenuation using quadratic formula
+				// - Accumulate RGB contributions
+				// - Apply gamma correction if enabled
 				_asm
 				{
-					movaps xmm7, qamb
+					movaps xmm7, qamb // Start with ambient light
 					mov eax, liglstn
 					sub eax, 1
 					js short endlig0
@@ -3964,11 +4028,18 @@ shline_in2it:;
 						psubw mm7, mm5
 					}
 #if (0)
+					// TEXTURE SAMPLING AND FINAL PIXEL OUTPUT
+					// Two paths: nearest neighbor vs bilinear filtering
 					if (!gps->rendinterp)
 					{
 						do
 						{
 							j = *(int *)(((iw[1]>>ttps)&ymsk) + ((iw[0]>>14)&xmsk) + ttf);
+							// NEAREST NEIGHBOR SAMPLING
+							// - Extract texture coordinates
+							// - Sample single texel
+							// - Apply lighting with MMX
+							// - Write final pixel
 							_asm
 							{
 								punpcklbw mm0, j
@@ -4004,6 +4075,11 @@ shline_in2it:;
 							g0 += (((g1-g0)*j)>>16);
 							r0 += (((r1-r0)*j)>>16);
 							j = (r0<<16)+(g0<<8)+b0;
+							// BILINEAR FILTERING
+							// - Sample 4 neighboring texels
+							// - Interpolate horizontally then vertically
+							// - Apply lighting
+							// - Write final pixel
 							_asm
 							{
 								punpcklbw mm0, j
