@@ -60,7 +60,8 @@ set_target_properties(luajit_lib PROPERTIES
 # Set LuaJIT include directory
 target_include_directories(luajit_lib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/External/LuaJIT/src)
 
-add_executable(game main.cpp)
+add_executable(game main.cpp
+        FileWatcher.h)
 
 add_custom_command(TARGET game POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
