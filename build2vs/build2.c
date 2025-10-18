@@ -144,6 +144,7 @@ print \T
 #include <math.h>
 #include <time.h>
 #include <malloc.h>
+#include "mapcore.h"
 #define PI 3.141592653589793
 
 	//KPLIB.H:
@@ -5708,155 +5709,7 @@ long getcurswall (playerstruct_t *lps, int *hitsect, int *hitwall, point3d *hit)
 
 //--------------------------------------------------------------------------------------------------
 
-typedef struct { double x, y, z; long n, filler; } genpoly_t;
-
-	//Clip wall slopes. Returns loop ordered poly (0, 3, or 4 points)
-	//pol[0]   pol[1]
-	//pol[3]   pol[2]
-static long wallclip (dpoint3d *pol, dpoint3d npol[4])
-{
-	double f, dz0, dz1;
-
-	dz0 = pol[3].z-pol[0].z; dz1 = pol[2].z-pol[1].z;
-	if (dz0 >= 0.0) //Include null case for collision
-	{
-		npol[0] = pol[0];
-		if (dz1 >= 0.0) //Include null case for collision
-		{
-			npol[1] = pol[1];
-			npol[2] = pol[2];
-			npol[3] = pol[3];
-			return(4);
-		}
-		else
-		{
-			f = dz0/(dz0-dz1);
-			npol[1].x = (pol[1].x-pol[0].x)*f + pol[0].x;
-			npol[1].y = (pol[1].y-pol[0].y)*f + pol[0].y;
-			npol[1].z = (pol[1].z-pol[0].z)*f + pol[0].z;
-			npol[2] = pol[3];
-			return(3);
-		}
-	}
-	if (dz1 < 0.0) return(0); //Include null case for collision
-	f = dz0/(dz0-dz1);
-	npol[0].x = (pol[1].x-pol[0].x)*f + pol[0].x;
-	npol[0].y = (pol[1].y-pol[0].y)*f + pol[0].y;
-	npol[0].z = (pol[1].z-pol[0].z)*f + pol[0].z;
-	npol[1] = pol[1];
-	npol[2] = pol[2];
-	return(3);
-}
-
-	//This version also handles u&v. Note: Input should still be simple wall quads
-long wallclip (kgln_t *pol, kgln_t *npol)
-{
-	double f, dz0, dz1;
-
-	dz0 = pol[3].z-pol[0].z; dz1 = pol[2].z-pol[1].z;
-	if (dz0 > 0.0) //do not include null case for rendering
-	{
-		npol[0] = pol[0];
-		if (dz1 > 0.0) //do not include null case for rendering
-		{
-			npol[1] = pol[1];
-			npol[2] = pol[2];
-			npol[3] = pol[3];
-			npol[0].n = npol[1].n = npol[2].n = 1; npol[3].n = -3;
-			return(4);
-		}
-		else
-		{
-			f = dz0/(dz0-dz1);
-			npol[1].x = (pol[1].x-pol[0].x)*f + pol[0].x;
-			npol[1].y = (pol[1].y-pol[0].y)*f + pol[0].y;
-			npol[1].z = (pol[1].z-pol[0].z)*f + pol[0].z;
-			npol[1].u = (pol[1].u-pol[0].u)*f + pol[0].u;
-			npol[1].v = (pol[1].v-pol[0].v)*f + pol[0].v;
-			npol[2] = pol[3];
-			npol[0].n = npol[1].n = 1; npol[2].n = -2;
-			return(3);
-		}
-	}
-	if (dz1 <= 0.0) return(0); //do not include null case for rendering
-	f = dz0/(dz0-dz1);
-	npol[0].x = (pol[1].x-pol[0].x)*f + pol[0].x;
-	npol[0].y = (pol[1].y-pol[0].y)*f + pol[0].y;
-	npol[0].z = (pol[1].z-pol[0].z)*f + pol[0].z;
-	npol[0].u = (pol[1].u-pol[0].u)*f + pol[0].u;
-	npol[0].v = (pol[1].v-pol[0].v)*f + pol[0].v;
-	npol[1] = pol[1];
-	npol[2] = pol[2];
-	npol[0].n = npol[1].n = 1; npol[2].n = -2;
-	return(3);
-}
-
-	//General point-polygon distance function. Single loops only. For multi, use genpoly_t and .n for next
-static double ptpolydist2 (dpoint3d *pt, dpoint3d *pol, int n, dpoint3d *closest)
-{
-	double d, f, g, dmin, dx, dy, dz, nx, ny, nz, x0, y0, x1, y1;
-	int i, j, k, maxnormaxis;
-
-		//test inside poly
-	nx = ny = nz = 0.0;
-	for(i=n-2;i>0;i--) //Find normal
-	{
-		nx += (pol[i].y-pol[0].y)*(pol[i+1].z-pol[0].z) - (pol[i].z-pol[0].z)*(pol[i+1].y-pol[0].y);
-		ny += (pol[i].z-pol[0].z)*(pol[i+1].x-pol[0].x) - (pol[i].x-pol[0].x)*(pol[i+1].z-pol[0].z);
-		nz += (pol[i].x-pol[0].x)*(pol[i+1].y-pol[0].y) - (pol[i].y-pol[0].y)*(pol[i+1].x-pol[0].x);
-	}
-	f = nx*nx + ny*ny + nz*nz;
-	if (f > 0.0) //Plane must have area
-	{
-		d = ((pol[0].x-pt->x)*nx + (pol[0].y-pt->y)*ny + (pol[0].z-pt->z)*nz); g = d/f;
-		dx = nx*g + pt->x;
-		dy = ny*g + pt->y;
-		dz = nz*g + pt->z;
-		if ((fabs(nx) > fabs(ny)) && (fabs(nx) > fabs(nz))) maxnormaxis = 0;
-		else if (fabs(ny) > fabs(nz)) maxnormaxis = 1; else maxnormaxis = 2;
-		for(i=n-1,j=k=0;j<n;i=j,j++)
-		{
-			if (maxnormaxis > 0) { x0 = pol[i].x - dx; x1 = pol[j].x - dx; }
-								 else { x0 = pol[i].y - dy; x1 = pol[j].y - dy; }
-			if (maxnormaxis > 1) { y0 = pol[i].y - dy; y1 = pol[j].y - dy; }
-								 else { y0 = pol[i].z - dz; y1 = pol[j].z - dz; }
-			if (y0*y1 < 0.0)
-			{
-				if (x0*x1 >= 0.0) { if (x0 < 0.0) k++; }
-				else if ((x0*y1 - x1*y0)*y1 < 0.0) k++;
-			}
-		}
-		if (k&1) { closest->x = dx; closest->y = dy; closest->z = dz; return(d*g); }
-	}
-
-	dmin = 1e32;
-	for(i=n-1,j=0;j<n;i=j,j++)
-	{
-		nx = pt->x - pol[i].x; dx = pol[j].x - pol[i].x;
-		ny = pt->y - pol[i].y; dy = pol[j].y - pol[i].y;
-		nz = pt->z - pol[i].z; dz = pol[j].z - pol[i].z;
-
-			//Edge
-		f = nx*dx + ny*dy + nz*dz;
-		if (f <= 0.0)
-		{
-				//Vertex
-			d = nx*nx + ny*ny + nz*nz;
-			if (d < dmin) { dmin = d; closest->x = pol[i].x; closest->y = pol[i].y; closest->z = pol[i].z; }
-			continue;
-		}
-		g = dx*dx + dy*dy + dz*dz; if (f >= g) continue;
-		f /= g;
-		nx = dx*f + pol[i].x;
-		ny = dy*f + pol[i].y;
-		nz = dz*f + pol[i].z;
-		d = (pt->x-nx)*(pt->x-nx) + (pt->y-ny)*(pt->y-ny) + (pt->z-nz)*(pt->z-nz);
-		if (d < dmin) { dmin = d; closest->x = nx; closest->y = ny; closest->z = nz; }
-	}
-	return(dmin);
-}
-
-	//Find maximum clip radius (distance to closest point of any visible polygon)
+//Find maximum clip radius (distance to closest point of any visible polygon)
 double findmaxcr (dpoint3d *p0, int cursect, double mindist, dpoint3d *hit)
 {
 	dpoint3d np, nhit, pol[4], npol[4];
@@ -5979,47 +5832,6 @@ double findmaxcr (dpoint3d *p0, int cursect, double mindist, dpoint3d *hit)
 	}
 	if (!hitit) return(mindist); //Minor optimization; this guarantees same value returned if nothing hit
 	return(sqrt(mindist2));
-}
-
-	//Find shortest path between two 3D line segments
-	//Input: 2 line segments: (a0)-(a1), (b0)-(b1)
-	//Returns: distance^2 between closest points
-double roundcylminpath2 (double a0x, double a0y, double a1x, double a1y,
-								 double b0x, double b0y, double b1x, double b1y)
-{
-	dpoint3d da, db, ab;
-	double k0, k1, k2, k3, k4, d, t, u;
-
-	da.x = a1x-a0x; db.x = b1x-b0x; ab.x = b0x-a0x;
-	da.y = a1y-a0y; db.y = b1y-b0y; ab.y = b0y-a0y;
-	k0 = da.x*da.x + da.y*da.y;
-	k1 = db.x*db.x + db.y*db.y;
-	k2 = da.x*db.x + da.y*db.y;
-	k3 = da.x*ab.x + da.y*ab.y;
-	k4 = db.x*ab.x + db.y*ab.y;
-
-	if (k0 == 0)
-	{
-		if (k1 == 0) { t = u = 0; }
-		else { t = 0; u = -k4/k1; u = min(max(u,0),1); }
-	}
-	else if (k1 == 0) { u = 0; t = k3/k0; t = min(max(t,0),1); }
-	else
-	{
-		d = k0*k1 - k2*k2;
-		t = k1*k3 - k2*k4;
-		u = k2*k3 - k0*k4;
-		d = 1.0/d; t *= d; u *= d;
-		if ((fabs(t-.5) > .5) || (fabs(u-.5) > .5))
-		{
-			u = min(max(u,0),1);
-			t = (k2*u + k3)/k0; t = min(max(t,0),1);
-			u = (k2*t - k4)/k1; u = min(max(u,0),1);
-		}
-	}
-	ab.x += db.x*u - da.x*t;
-	ab.y += db.y*u - da.y*t;
-	return(ab.x*ab.x + ab.y*ab.y);
 }
 
 	//Note: pol doesn't support loops as dpoint3d's!
@@ -6797,7 +6609,7 @@ void saveaskc (char *filnam)
 				pol[3].u = wal[w].surf.uv[2].x*(pol[3].z-pol[0].z) + pol[0].u;
 				pol[3].v = wal[w].surf.uv[2].y*(pol[3].z-pol[0].z) + pol[0].v;
 
-				i = wallclip(pol,npol); if (!i) continue;
+				i = wallclippol(pol,npol); if (!i) continue;
 
 				if (col != ocol) { ocol = col; fprintf(fil,"\tsetcol(%d,%d,%d);\n",((col>>16)&255)<<1,((col>>8)&255)<<1,(col&255)<<1); }
 				if (wal[w].surf.tilnum != otexi) { otexi = wal[w].surf.tilnum; fprintf(fil,"\tglsettex(\"%s\");\n",gtile[otexi].filnam); }
@@ -6912,7 +6724,7 @@ void saveasstl (char *filnam)
 				pol[1].z = getslopez(&sec[s0],cf0,pol[1].x,pol[1].y);
 				pol[2].z = getslopez(&sec[s1],cf1,pol[2].x,pol[2].y);
 				pol[3].z = getslopez(&sec[s1],cf1,pol[3].x,pol[3].y);
-				i = wallclip(pol,npol); if (!i) continue;
+				i = wallclippol(pol,npol); if (!i) continue;
 
 				fp[0].x = npol[0].x; fp[0].y = npol[0].y; fp[0].z = npol[0].z;
 				for(j=2;j<i;j++)
@@ -12096,7 +11908,7 @@ void drawview (cam_t *cc, playerstruct_t *lps, int skipdrawrooms)
 							rpol[0] = pol[3]; rpol[1] = pol[2]; rpol[2] = pol[1]; rpol[3] = pol[0];
 							if ((rpol[0].z < lefz[0]) && (rpol[1].z < rigz[0])) { rpol[0].z = lefz[0]; rpol[1].z = rigz[0]; }
 							if ((rpol[3].z > lefz[1]) && (rpol[2].z > rigz[1])) { rpol[3].z = lefz[1]; rpol[2].z = rigz[1]; }
-							i = wallclip(rpol,npol);
+							i = wallclippol(rpol,npol);
 							if (i)
 							{
 								for(j=0;j<i;j++) xformpos(&npol[j].x,&npol[j].y,&npol[j].z);
@@ -12130,13 +11942,13 @@ void drawview (cam_t *cc, playerstruct_t *lps, int skipdrawrooms)
 						pol[2].v = wal[w].surf.uv[2].y*(pol[2].z-pol[0].z) + pol[0].v + wal[w].surf.uv[1].y*dx;
 						pol[3].u = wal[w].surf.uv[2].x*(pol[3].z-pol[0].z) + pol[0].u;
 						pol[3].v = wal[w].surf.uv[2].y*(pol[3].z-pol[0].z) + pol[0].v;
-						i = wallclip(pol,npol); if (!i) continue;
+						i = wallclippol(pol,npol); if (!i) continue;
 						for(j=0;j<i;j++) xformpos(&npol[j].x,&npol[j].y,&npol[j].z);
 						drawpolfunc(cc,npol,i,&gtile[wal[w].surf.tilnum],col[0],0,&norm,0);
 					}
 					else //parallaxing walls
 					{
-						i = wallclip(pol,npol); if (!i) continue;
+						i = wallclippol(pol,npol); if (!i) continue;
 						for(j=0;j<i;j++) xformpos(&npol[j].x,&npol[j].y,&npol[j].z);
 						drawparallaxpol(cc,npol,i,&gtile[wal[w].surf.tilnum],col[0],&wal[w].surf,&norm,0);
 					}
