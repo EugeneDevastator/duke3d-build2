@@ -1,21 +1,19 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.21)
+cmake_policy(VERSION 3.5)
+
 project(raylib_lua_imgui C CXX)
-# Force x86 architecture
-set(CMAKE_GENERATOR_PLATFORM Win32)
-set(CMAKE_SIZEOF_VOID_P 4)
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
 include(FetchContent)
 
-# Fetch raylib
 FetchContent_Declare(raylib
         URL https://github.com/raysan5/raylib/archive/refs/tags/5.5.tar.gz
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 FetchContent_MakeAvailable(raylib)
 
-# Fetch Dear ImGui
 FetchContent_Declare(imgui
         URL https://github.com/ocornut/imgui/archive/refs/tags/v1.92.1.tar.gz
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
@@ -51,17 +49,14 @@ target_include_directories(rlimgui_lib PUBLIC
 
 target_link_libraries(rlimgui_lib imgui_lib raylib)
 
-# Use prebuilt LuaJIT
 add_library(luajit_lib STATIC IMPORTED)
 set_target_properties(luajit_lib PROPERTIES
         IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/External/LuaJIT/src/lua51.lib
 )
 
-# Set LuaJIT include directory
 target_include_directories(luajit_lib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/External/LuaJIT/src)
 
-add_executable(game main.cpp
-        FileWatcher.h)
+add_executable(game main.cpp FileWatcher.h)
 
 add_custom_command(TARGET game POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
