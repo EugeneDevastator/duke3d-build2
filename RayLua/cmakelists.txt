@@ -8,7 +8,7 @@ include(FetchContent)
 
 # Fetch raylib
 FetchContent_Declare(raylib
-        URL https://github.com/raysan5/raylib/archive/refs/tags/5.0.tar.gz
+        URL https://github.com/raysan5/raylib/archive/refs/tags/5.5.tar.gz
 )
 FetchContent_MakeAvailable(raylib)
 
@@ -18,7 +18,7 @@ FetchContent_Declare(imgui
 )
 FetchContent_MakeAvailable(imgui)
 
-# Fetch rlImGui
+# Fetch rlImGui - use specific commit compatible with raylib 5.0
 FetchContent_Declare(rlimgui
         URL https://github.com/raylib-extras/rlImGui/archive/refs/heads/main.zip
 )
@@ -38,7 +38,6 @@ target_include_directories(imgui_lib PUBLIC ${imgui_SOURCE_DIR})
 # Create rlImGui library
 add_library(rlimgui_lib
         ${rlimgui_SOURCE_DIR}/rlImGui.cpp
-        ${rlimgui_SOURCE_DIR}/imgui_impl_raylib.h
 )
 
 target_include_directories(rlimgui_lib PUBLIC
