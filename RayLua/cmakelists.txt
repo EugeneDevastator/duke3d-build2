@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
-project(raylib_lua_imgui C)
+project(raylib_lua_imgui C CXX)
 
 set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 
 include(FetchContent)
 
@@ -11,11 +12,42 @@ FetchContent_Declare(raylib
 )
 FetchContent_MakeAvailable(raylib)
 
+# Fetch Dear ImGui
+FetchContent_Declare(imgui
+        URL https://github.com/ocornut/imgui/archive/refs/tags/v1.92.1.tar.gz
+)
+FetchContent_MakeAvailable(imgui)
+
 # Fetch rlImGui
 FetchContent_Declare(rlimgui
         URL https://github.com/raylib-extras/rlImGui/archive/refs/heads/main.zip
 )
 FetchContent_MakeAvailable(rlimgui)
+
+# Create ImGui library
+add_library(imgui_lib
+        ${imgui_SOURCE_DIR}/imgui.cpp
+        ${imgui_SOURCE_DIR}/imgui_demo.cpp
+        ${imgui_SOURCE_DIR}/imgui_draw.cpp
+        ${imgui_SOURCE_DIR}/imgui_tables.cpp
+        ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+)
+
+target_include_directories(imgui_lib PUBLIC ${imgui_SOURCE_DIR})
+
+# Create rlImGui library
+add_library(rlimgui_lib
+        ${rlimgui_SOURCE_DIR}/rlImGui.cpp
+        ${rlimgui_SOURCE_DIR}/imgui_impl_raylib.h
+)
+
+target_include_directories(rlimgui_lib PUBLIC
+        ${rlimgui_SOURCE_DIR}
+        ${imgui_SOURCE_DIR}
+        ${raylib_SOURCE_DIR}/src
+)
+
+target_link_libraries(rlimgui_lib imgui_lib raylib)
 
 # Reference precompiled LuaJIT
 set(LUAJIT_ROOT "c:/Eugene/Games/build2-git/RayLua/External/LuaJIT/src")
@@ -29,10 +61,11 @@ add_executable(game main.c)
 
 target_include_directories(game PRIVATE
         ${rlimgui_SOURCE_DIR}
+        ${imgui_SOURCE_DIR}
         ${raylib_SOURCE_DIR}/src
         ${LUAJIT_ROOT}
 )
 
-target_link_libraries(game raylib rlimgui ${LUAJIT_LIBRARY})
+target_link_libraries(game raylib rlimgui_lib imgui_lib ${LUAJIT_LIBRARY})
 
 configure_file(script.lua ${CMAKE_CURRENT_BINARY_DIR}/script.lua COPYONLY)
