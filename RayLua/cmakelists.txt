@@ -22,7 +22,8 @@ FetchContent_MakeAvailable(rlimgui)
 set(LUAJIT_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/luajit)
 set(LUAJIT_INCLUDE_DIR ${LUAJIT_PREFIX}/include/luajit-2.1)
 set(LUAJIT_LIBRARY ${LUAJIT_PREFIX}/lib/lua51.lib)
-
+# Create the include directory early so CMake doesn't complain
+file(MAKE_DIRECTORY ${LUAJIT_INCLUDE_DIR})
 if(WIN32)
         ExternalProject_Add(luajit_build
                 GIT_REPOSITORY https://github.com/LuaJIT/LuaJIT.git
