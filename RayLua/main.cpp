@@ -1,8 +1,12 @@
 #include "raylib.h"
 #include "rlImGui.h"
-#include <luajit-2.1/lua.h>
-#include <luajit-2.1/lualib.h>
-#include <luajit-2.1/lauxlib.h>
+#include "imgui.h"
+
+extern "C" {
+#include <lua.h>
+#include <lualib.h>
+#include <lauxlib.h>
+}
 
 // Expose functions to Lua
 int lua_DrawRectangle(lua_State* L) {
@@ -57,7 +61,22 @@ int main() {
     lua_register(L, "ImGuiEnd", lua_ImGuiEnd);
     lua_register(L, "ImGuiText", lua_ImGuiText);
     
-    luaL_dofile(L, "script.lua");
+    if (luaL_dofile(L, "script.lua") != LUA_OK) {
+        printf("Error loading script.lua: %s\n", lua_tostring(L, -1));
+        // Create default functions
+        luaL_dostring(L, R"(
+        function Render()
+            DrawRectangle(100, 100, 200, 150)
+        end
+
+        function RenderUI()
+            ImGuiBegin("Test Window")
+            ImGuiText("Hello from Lua!")
+            ImGuiText("Mouse: " .. GetMouseX() .. ", " .. GetMouseY())
+            ImGuiEnd()
+        end
+    )");
+    }
     
     while (!WindowShouldClose()) {
         // Reload script on R key
@@ -86,3 +105,4 @@ int main() {
     CloseWindow();
     return 0;
 }
+

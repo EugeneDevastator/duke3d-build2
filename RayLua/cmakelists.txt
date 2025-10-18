@@ -96,6 +96,12 @@ target_include_directories(lua_lib PUBLIC ${lua_SOURCE_DIR}/src)
 
 add_executable(game main.cpp)
 
+add_custom_command(TARGET game POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_SOURCE_DIR}/script.lua
+        $<TARGET_FILE_DIR:game>/script.lua
+)
+
 target_include_directories(game PRIVATE
         ${rlimgui_SOURCE_DIR}
         ${imgui_SOURCE_DIR}
