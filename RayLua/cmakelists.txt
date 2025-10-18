@@ -1,0 +1,25 @@
+cmake_minimum_required(VERSION 4.0)
+project(raylib_lua_imgui C)
+
+set(CMAKE_C_STANDARD 11)
+
+# Fetch raylib
+include(FetchContent)
+FetchContent_Declare(raylib URL https://github.com/raysan5/raylib/archive/refs/tags/5.0.tar.gz)
+FetchContent_MakeAvailable(raylib)
+
+# Fetch rlImGui
+FetchContent_Declare(rlimgui URL https://github.com/raylib-extras/rlImGui/archive/refs/heads/main.zip)
+FetchContent_MakeAvailable(rlimgui)
+
+# Find LuaJIT
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LUAJIT REQUIRED luajit)
+
+add_executable(game main.c)
+target_link_libraries(game raylib rlimgui ${LUAJIT_LIBRARIES})
+target_include_directories(game PRIVATE ${LUAJIT_INCLUDE_DIRS})
+target_compile_options(game PRIVATE ${LUAJIT_CFLAGS_OTHER})
+
+# Copy Lua script to build directory
+configure_file(script.lua ${CMAKE_CURRENT_BINARY_DIR}/script.lua COPYONLY)
