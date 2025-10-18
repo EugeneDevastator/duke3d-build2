@@ -1,0 +1,64 @@
+name: Build and Release Windows x86
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup MSVC
+      uses: microsoft/setup-msbuild@v2
+    
+    - name: Configure CMake
+      working-directory: build2vs
+      run: cmake -B build -A Win32 -T host=x64
+    
+    - name: Build
+      working-directory: build2vs
+      run: cmake --build build --config Release
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: build2-windows-x86
+        path: build2vs/build/Release/build2.exe
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: build2-windows-x86
+        path: ./release
+    
+    - name: Generate tag
+      id: tag
+      run: echo "tag=v$(date +'%Y%m%d-%H%M%S')-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.tag.outputs.tag }}
+        name: Release ${{ steps.tag.outputs.tag }}
+        body: |
+          Auto-generated release from commit ${{ github.sha }}
+          
+          Changes: ${{ github.event.head_commit.message }}
+        files: ./release/build2.exe
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
