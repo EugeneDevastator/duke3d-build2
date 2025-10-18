@@ -89,11 +89,13 @@ double roundcylminpath2 (double a0x, double a0y, double a1x, double a1y,
 	return(ab.x*ab.x + ab.y*ab.y);
 }
 
+// Duplicates a wall in a sector at position w
+// Returns the index of the newly created wall
 int dupwall_imp (sect_t *s, int w)
 {
 	wall_t *wal;
 	int i, j;
-
+	// Check if we need more space for walls
 	if (s->n >= s->nmax)
 	{
 		s->nmax = max(s->n+1,s->nmax<<1); s->nmax = max(s->nmax,8);
@@ -101,6 +103,7 @@ int dupwall_imp (sect_t *s, int w)
 	}
 	wal = s->wall;
 
+	// If this is the first wall, initialize it with default values
 	if (!s->n)
 	{
 		memset(wal,0,sizeof(wall_t));
@@ -108,19 +111,28 @@ int dupwall_imp (sect_t *s, int w)
 		wal[0].ns = wal[0].nw = -1; s->n = 1;
 		return(0);
 	}
+
+	// Shift all walls after position w to make room for the duplicate
 	for(i=s->n;i>w;i--) wal[i] = wal[i-1];
+	// Update wall linking counters based on current state
 	if (!wal[0].n)    { wal[0].n = 1; wal[1].n = -1; }
 	else if (wal[w].n < 0) { wal[w+1].n = wal[w].n-1; wal[w].n = 1; }
 	else { for(i=w+1;wal[i].n>0;i++); wal[i].n--; }
-	s->n++;
-	return(w+1);
+
+	s->n++;  // Increment wall count
+	return(w+1);  // Return index of the new wall
 }
+
+// Calculates the Z height at point (x,y) on a sloped surface
+// Uses the sector's gradient and base Z value
 double getslopez (sect_t *s, int i, double x, double y)
 {
 	wall_t *wal = s->wall;
+	// Calculate Z using plane equation: gradient dot (point - reference) + base_z
 	return((wal[0].x-x)*s->grad[i].x + (wal[0].y-y)*s->grad[i].y + s->z[i]);
 }
-
+// Gets all walls that share the same edge as the given wall
+// Returns list of sectors/walls that connect to this wall edge, sorted by midheight
 int getwalls (int s, int w, vertlist_t *ver, int maxverts)
 {
 	vertlist_t tver;
@@ -132,29 +144,34 @@ int getwalls (int s, int w, vertlist_t *ver, int maxverts)
 	sec = gst->sect; wal = sec[s].wall; bs = wal[w].ns;
 	if ((unsigned)bs >= (unsigned)gst->numsects) return(0);
 
-	vn = 0; nw = wal[w].n+w; bw = wal[w].nw;
+	vn = 0; // vertex count
+	nw = wal[w].n+w; // next wall in current sector
+	bw = wal[w].nw; // wall index in connected sector
 	do
 	{
 		wal2 = sec[bs].wall; i = wal2[bw].n+bw; //Make sure it's an opposite wall
+		// Check if wall coordinates match (same edge)
 		if ((wal[w].x == wal2[i].x) && (wal[nw].x == wal2[bw].x) &&
 			 (wal[w].y == wal2[i].y) && (wal[nw].y == wal2[bw].y))
 		{ if (vn < maxverts) { ver[vn].s = bs; ver[vn].w = bw; vn++; } }
 		bs = wal2[bw].ns;
 		bw = wal2[bw].nw;
-	} while (bs != s);
+	} while (bs != s); // Stop when we loop back to starting sector
 
-	//Sort next sects by order of height in middle of wall (FIX:sort=crap algo)
+	//Sort next sects by order of height in middle of wall (FIX:sort=crap algo) (bubble sort)
 	fx = (wal[w].x+wal[nw].x)*.5;
 	fy = (wal[w].y+wal[nw].y)*.5;
 	for(k=1;k<vn;k++)
 		for(j=0;j<k;j++)
+			// Compare total height (floor + ceiling) at wall middle point
 			if (getslopez(&sec[ver[j].s],0,fx,fy) + getslopez(&sec[ver[j].s],1,fx,fy) >
 				 getslopez(&sec[ver[k].s],0,fx,fy) + getslopez(&sec[ver[k].s],1,fx,fy))
 			{ tver = ver[j]; ver[j] = ver[k]; ver[k] = tver; }
 	return(vn);
 }
 
-
+// Gets all sectors/walls that share the same vertex point
+// Finds all walls that meet at the same corner point
 int getverts (int s, int w, vertlist_t *ver, int maxverts)
 {
 	sect_t *sec;
