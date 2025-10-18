@@ -1,25 +1,84 @@
-cmake_minimum_required(VERSION 4.0)
+cmake_minimum_required(VERSION 3.15)
 project(raylib_lua_imgui C)
 
 set(CMAKE_C_STANDARD 11)
 
-# Fetch raylib
+include(ExternalProject)
 include(FetchContent)
-FetchContent_Declare(raylib URL https://github.com/raysan5/raylib/archive/refs/tags/5.0.tar.gz)
+
+# Fetch raylib
+FetchContent_Declare(raylib
+        URL https://github.com/raysan5/raylib/archive/refs/tags/5.0.tar.gz
+)
 FetchContent_MakeAvailable(raylib)
 
 # Fetch rlImGui
-FetchContent_Declare(rlimgui URL https://github.com/raylib-extras/rlImGui/archive/refs/heads/main.zip)
+FetchContent_Declare(rlimgui
+        URL https://github.com/raylib-extras/rlImGui/archive/refs/heads/main.zip
+)
 FetchContent_MakeAvailable(rlimgui)
 
-# Find LuaJIT
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(LUAJIT REQUIRED luajit)
+# Build LuaJIT from source
+set(LUAJIT_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/luajit)
+set(LUAJIT_INCLUDE_DIR ${LUAJIT_PREFIX}/include/luajit-2.1)
+set(LUAJIT_LIBRARY ${LUAJIT_PREFIX}/lib/lua51.lib)
+
+if(WIN32)
+        ExternalProject_Add(luajit_build
+                GIT_REPOSITORY https://github.com/LuaJIT/LuaJIT.git
+                GIT_TAG v2.1
+                PREFIX ${LUAJIT_PREFIX}
+                CONFIGURE_COMMAND ""
+                BUILD_COMMAND cd <SOURCE_DIR>/src && msvcbuild.bat
+                BUILD_IN_SOURCE 1
+                INSTALL_COMMAND
+                ${CMAKE_COMMAND} -E make_directory ${LUAJIT_PREFIX}/bin &&
+                ${CMAKE_COMMAND} -E make_directory ${LUAJIT_PREFIX}/lib &&
+                ${CMAKE_COMMAND} -E make_directory ${LUAJIT_PREFIX}/include/luajit-2.1 &&
+                ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/src/luajit.exe ${LUAJIT_PREFIX}/bin/ &&
+                ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/src/lua51.dll ${LUAJIT_PREFIX}/bin/ &&
+                ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/src/lua51.lib ${LUAJIT_PREFIX}/lib/ &&
+                ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/src/luajit.h ${LUAJIT_PREFIX}/include/luajit-2.1/ &&
+                ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/src/lauxlib.h ${LUAJIT_PREFIX}/include/luajit-2.1/ &&
+                ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/src/lua.h ${LUAJIT_PREFIX}/include/luajit-2.1/ &&
+                ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/src/lua.hpp ${LUAJIT_PREFIX}/include/luajit-2.1/ &&
+                ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/src/luaconf.h ${LUAJIT_PREFIX}/include/luajit-2.1/ &&
+                ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/src/lualib.h ${LUAJIT_PREFIX}/include/luajit-2.1/
+                BUILD_BYPRODUCTS ${LUAJIT_LIBRARY}
+        )
+else()
+        set(LUAJIT_LIBRARY ${LUAJIT_PREFIX}/lib/libluajit-5.1.a)
+        ExternalProject_Add(luajit_build
+                GIT_REPOSITORY https://github.com/LuaJIT/LuaJIT.git
+                GIT_TAG v2.1
+                PREFIX ${LUAJIT_PREFIX}
+                CONFIGURE_COMMAND ""
+                BUILD_COMMAND make -C <SOURCE_DIR>
+                BUILD_IN_SOURCE 1
+                INSTALL_COMMAND make -C <SOURCE_DIR> install PREFIX=${LUAJIT_PREFIX}
+                BUILD_BYPRODUCTS ${LUAJIT_LIBRARY}
+        )
+endif()
+
+# Create imported target for LuaJIT
+add_library(luajit STATIC IMPORTED)
+set_target_properties(luajit PROPERTIES
+        IMPORTED_LOCATION ${LUAJIT_LIBRARY}
+        INTERFACE_INCLUDE_DIRECTORIES ${LUAJIT_INCLUDE_DIR}
+)
+add_dependencies(luajit luajit_build)
 
 add_executable(game main.c)
-target_link_libraries(game raylib rlimgui ${LUAJIT_LIBRARIES})
-target_include_directories(game PRIVATE ${LUAJIT_INCLUDE_DIRS})
-target_compile_options(game PRIVATE ${LUAJIT_CFLAGS_OTHER})
+target_link_libraries(game raylib rlimgui luajit)
 
 # Copy Lua script to build directory
 configure_file(script.lua ${CMAKE_CURRENT_BINARY_DIR}/script.lua COPYONLY)
+
+# Copy LuaJIT DLL on Windows
+if(WIN32)
+        add_custom_command(TARGET game POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${LUAJIT_PREFIX}/bin/lua51.dll
+                $<TARGET_FILE_DIR:game>
+        )
+endif()
