@@ -120,3 +120,84 @@ double getslopez (sect_t *s, int i, double x, double y)
 	wall_t *wal = s->wall;
 	return((wal[0].x-x)*s->grad[i].x + (wal[0].y-y)*s->grad[i].y + s->z[i]);
 }
+
+int getwalls (int s, int w, vertlist_t *ver, int maxverts)
+{
+	vertlist_t tver;
+	sect_t *sec;
+	wall_t *wal, *wal2;
+	float fx, fy;
+	int i, j, k, bs, bw, nw, vn;
+
+	sec = gst->sect; wal = sec[s].wall; bs = wal[w].ns;
+	if ((unsigned)bs >= (unsigned)gst->numsects) return(0);
+
+	vn = 0; nw = wal[w].n+w; bw = wal[w].nw;
+	do
+	{
+		wal2 = sec[bs].wall; i = wal2[bw].n+bw; //Make sure it's an opposite wall
+		if ((wal[w].x == wal2[i].x) && (wal[nw].x == wal2[bw].x) &&
+			 (wal[w].y == wal2[i].y) && (wal[nw].y == wal2[bw].y))
+		{ if (vn < maxverts) { ver[vn].s = bs; ver[vn].w = bw; vn++; } }
+		bs = wal2[bw].ns;
+		bw = wal2[bw].nw;
+	} while (bs != s);
+
+	//Sort next sects by order of height in middle of wall (FIX:sort=crap algo)
+	fx = (wal[w].x+wal[nw].x)*.5;
+	fy = (wal[w].y+wal[nw].y)*.5;
+	for(k=1;k<vn;k++)
+		for(j=0;j<k;j++)
+			if (getslopez(&sec[ver[j].s],0,fx,fy) + getslopez(&sec[ver[j].s],1,fx,fy) >
+				 getslopez(&sec[ver[k].s],0,fx,fy) + getslopez(&sec[ver[k].s],1,fx,fy))
+			{ tver = ver[j]; ver[j] = ver[k]; ver[k] = tver; }
+	return(vn);
+}
+
+
+int getverts (int s, int w, vertlist_t *ver, int maxverts)
+{
+	sect_t *sec;
+	float x, y;
+	int i, ir, iw, ns, nw;
+
+	if ((maxverts <= 0) || ((unsigned)s >= (unsigned)gst->numsects)) return(0);
+	if ((unsigned)w >= (unsigned)gst->sect[s].n) return(0);
+
+	ver[0].s = s; ver[0].w = w; if (maxverts == 1) return(1);
+	sec = gst->sect;
+	x = sec[s].wall[w].x;
+	y = sec[s].wall[w].y;
+	ir = 0; iw = 1;
+	do
+	{
+		//CCW next sect
+		ns = sec[s].wall[w].ns;
+		if (ns >= 0)
+		{
+			nw = sec[s].wall[w].nw;
+			if ((sec[ns].wall[nw].x != x) || (sec[ns].wall[nw].y != y)) nw += sec[ns].wall[nw].n;
+			for(i=iw-1;i>=0;i--)
+				if ((ver[i].s == ns) && (ver[i].w == nw)) break;
+			if ((i < 0) && (sec[ns].wall[nw].x == x) && (sec[ns].wall[nw].y == y))
+			{ ver[iw].s = ns; ver[iw].w = nw; iw++; if (iw >= maxverts) break; }
+		}
+
+		//CW next sect
+		w = wallprev(&sec[s],w);
+		ns = sec[s].wall[w].ns;
+		if (ns >= 0)
+		{
+			nw = sec[s].wall[w].nw;
+			if ((sec[ns].wall[nw].x != x) || (sec[ns].wall[nw].y != y)) nw += sec[ns].wall[nw].n;
+			for(i=iw-1;i>=0;i--)
+				if ((ver[i].s == ns) && (ver[i].w == nw)) break;
+			if ((i < 0) && (sec[ns].wall[nw].x == x) && (sec[ns].wall[nw].y == y))
+			{ ver[iw].s = ns; ver[iw].w = nw; iw++; if (iw >= maxverts) break; }
+		}
+
+		if (ir >= iw) break;
+		s = ver[ir].s; w = ver[ir].w; ir++;
+	} while (1);
+	return(iw);
+}

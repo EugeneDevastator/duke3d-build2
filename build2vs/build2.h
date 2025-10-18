@@ -95,7 +95,7 @@ typedef struct
 } gamestate_t;
 EXTERN gamestate_t sst, pst, *gst;
 
-typedef struct { int w, s; } vertlist_t;
+
 
 	//Build2 shared global variables:
 EXTERN struct
@@ -125,7 +125,6 @@ extern int build2_loadmap (const char *filnam, int *cursect,
 extern void build2_copygamestate (gamestate_t *dst, gamestate_t *src);
 extern double getslopez (sect_t *s, int i, double x, double y);
 extern int wallprev (sect_t *s, int w);
-extern int getverts (int s, int w, vertlist_t *ver, int maxverts);
 extern void getcentroid (wall_t *wal, int n, float *retcx, float *retcy);
 extern float getarea (wall_t *wal, int n);
 extern void reversewalls (wall_t *wal, int n);
