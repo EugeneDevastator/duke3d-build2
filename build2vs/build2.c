@@ -1803,12 +1803,6 @@ static void xformrot (double *x, double *y, double *z)
 	(*z) = ox*gdps->ifor.x + oy*gdps->ifor.y + oz*gdps->ifor.z;
 }
 
-double getslopez (sect_t *s, int i, double x, double y)
-{
-	wall_t *wal = s->wall;
-	return((wal[0].x-x)*s->grad[i].x + (wal[0].y-y)*s->grad[i].y + s->z[i]);
-}
-
 #ifdef STANDALONE
 static void curs2grid (playerstruct_t *pps, double sx, double sy, point3d *fp)
 {
@@ -3815,39 +3809,20 @@ void delwall (sect_t *s, int w)
 
 int dupwall (sect_t *s, int w)
 {
-	wall_t *wal;
 	int i, j;
-
-	if (s->n >= s->nmax)
-	{
-		s->nmax = max(s->n+1,s->nmax<<1); s->nmax = max(s->nmax,8);
-		s->wall = (wall_t *)realloc(s->wall,s->nmax*sizeof(wall_t));
-	}
-	wal = s->wall;
-
 #ifdef STANDALONE
 	for(i=numplayers-1;i>=0;i--)
 	{
-		if (((unsigned)gst->p[i].grabsect < (unsigned)gst->numsects) && (&gst->sect[gst->p[i].grabsect] == s))
-			if (gst->p[i].grabwall > w) gst->p[i].grabwall++;
-		if (((unsigned)gst->p[i].startsect < (unsigned)gst->numsects) && (&gst->sect[gst->p[i].startsect] == s))
+		if (((unsigned)gst->p[i].grabsect < (unsigned)gst->numsects)
+			&& (&gst->sect[gst->p[i].grabsect] == s))
+			if (gst->p[i].grabwall > w)
+				gst->p[i].grabwall++;
+		if (((unsigned)gst->p[i].startsect < (unsigned)gst->numsects)
+			&& (&gst->sect[gst->p[i].startsect] == s))
 			if (gst->p[i].startwall > w) gst->p[i].startwall++;
 	}
 #endif
-
-	if (!s->n)
-	{
-		memset(wal,0,sizeof(wall_t));
-		wal[0].surf.uv[1].x = wal[0].surf.uv[2].y = 1.f;
-		wal[0].ns = wal[0].nw = -1; s->n = 1;
-		return(0);
-	}
-	for(i=s->n;i>w;i--) wal[i] = wal[i-1];
-		  if (!wal[0].n)    { wal[0].n = 1; wal[1].n = -1; }
-	else if (wal[w].n < 0) { wal[w+1].n = wal[w].n-1; wal[w].n = 1; }
-							else { for(i=w+1;wal[i].n>0;i++); wal[i].n--; }
-	s->n++;
-	return(w+1);
+	return dupwall_imp(s,w);
 }
 
 void delsect (int s)

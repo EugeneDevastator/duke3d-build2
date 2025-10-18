@@ -1,5 +1,7 @@
 //This version also handles u&v. Note: Input should still be simple wall quad
 #include "mapcore.h"
+
+#include "build2.h"
 tile_t *gtile;
 long gnumtiles, gmaltiles, gtilehashead[1024];
 
@@ -85,4 +87,36 @@ double roundcylminpath2 (double a0x, double a0y, double a1x, double a1y,
 	ab.x += db.x*u - da.x*t;
 	ab.y += db.y*u - da.y*t;
 	return(ab.x*ab.x + ab.y*ab.y);
+}
+
+int dupwall_imp (sect_t *s, int w)
+{
+	wall_t *wal;
+	int i, j;
+
+	if (s->n >= s->nmax)
+	{
+		s->nmax = max(s->n+1,s->nmax<<1); s->nmax = max(s->nmax,8);
+		s->wall = (wall_t *)realloc(s->wall,s->nmax*sizeof(wall_t));
+	}
+	wal = s->wall;
+
+	if (!s->n)
+	{
+		memset(wal,0,sizeof(wall_t));
+		wal[0].surf.uv[1].x = wal[0].surf.uv[2].y = 1.f;
+		wal[0].ns = wal[0].nw = -1; s->n = 1;
+		return(0);
+	}
+	for(i=s->n;i>w;i--) wal[i] = wal[i-1];
+	if (!wal[0].n)    { wal[0].n = 1; wal[1].n = -1; }
+	else if (wal[w].n < 0) { wal[w+1].n = wal[w].n-1; wal[w].n = 1; }
+	else { for(i=w+1;wal[i].n>0;i++); wal[i].n--; }
+	s->n++;
+	return(w+1);
+}
+double getslopez (sect_t *s, int i, double x, double y)
+{
+	wall_t *wal = s->wall;
+	return((wal[0].x-x)*s->grad[i].x + (wal[0].y-y)*s->grad[i].y + s->z[i]);
 }

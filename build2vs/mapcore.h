@@ -15,7 +15,7 @@ typedef struct tiltyp {
 	struct tiltyp *lowermip;
 } tiltyp; //shsc=suggested height scale
 typedef struct { float x, y, z; } point3d;
-typedef struct { double x, y, z; } dpoint3d;
+typedef struct { double x, y, z; } dpoint3d; 	//Note: pol doesn't support loops as dpoint3d's!
 
 typedef struct { INT_PTR f; int p, x, y; } tiletype;
 typedef struct { tiltyp c, z; point3d p, r, d, f, h; } cam_t;
@@ -163,7 +163,8 @@ static double ptpolydist2 (dpoint3d *pt, dpoint3d *pol, int n, dpoint3d *closest
 double roundcylminpath2 (double a0x, double a0y, double a1x, double a1y,
 								 double b0x, double b0y, double b1x, double b1y);
 long wallclippol (kgln_t *pol, kgln_t *npol);
-
+int dupwall_imp (sect_t *s, int w);
+double getslopez (sect_t *s, int i, double x, double y);
 //Clip wall slopes. Returns loop ordered poly (0, 3, or 4 points)
 //pol[0]   pol[1]
 //pol[3]   pol[2]
