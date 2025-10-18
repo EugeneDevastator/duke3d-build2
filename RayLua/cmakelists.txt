@@ -22,5 +22,9 @@ add_subdirectory(luajit)
 
 add_executable(game main.c)
 target_link_libraries(game raylib rlimgui luajit_static)
+target_include_directories(game PRIVATE
+        ${rlimgui_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/luajit/src
+)
 
 configure_file(script.lua ${CMAKE_CURRENT_BINARY_DIR}/script.lua COPYONLY)
