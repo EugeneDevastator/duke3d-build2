@@ -1,0 +1,81 @@
+cmake_minimum_required(VERSION 3.16)
+
+include(ExternalProject)
+
+set(LUAJIT_PREFIX ${CMAKE_CURRENT_BINARY_DIR})
+set(LUAJIT_INCLUDE_DIR ${LUAJIT_PREFIX}/include)
+
+if(WIN32)
+    if(MINGW)
+        # Use MinGW make directly without shell
+        set(LUAJIT_LIBRARY ${LUAJIT_PREFIX}/lib/libluajit-5.1.a)
+
+        ExternalProject_Add(luajit_build
+                GIT_REPOSITORY https://github.com/LuaJIT/LuaJIT.git
+                GIT_TAG v2.1
+                PREFIX ${LUAJIT_PREFIX}
+                CONFIGURE_COMMAND ""
+                BUILD_COMMAND mingw32-make -C <SOURCE_DIR> BUILDMODE=static
+                BUILD_IN_SOURCE 1
+                INSTALL_COMMAND
+                ${CMAKE_COMMAND} -E make_directory ${LUAJIT_PREFIX}/lib &&
+                ${CMAKE_COMMAND} -E make_directory ${LUAJIT_INCLUDE_DIR} &&
+                ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/src/libluajit.a ${LUAJIT_PREFIX}/lib/libluajit-5.1.a &&
+                ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/src/luajit.h ${LUAJIT_INCLUDE_DIR}/ &&
+                ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/src/lauxlib.h ${LUAJIT_INCLUDE_DIR}/ &&
+                ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/src/lua.h ${LUAJIT_INCLUDE_DIR}/ &&
+                ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/src/lua.hpp ${LUAJIT_INCLUDE_DIR}/ &&
+                ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/src/luaconf.h ${LUAJIT_INCLUDE_DIR}/ &&
+                ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/src/lualib.h ${LUAJIT_INCLUDE_DIR}/
+                BUILD_BYPRODUCTS ${LUAJIT_LIBRARY}
+        )
+    else()
+        # MSVC
+        set(LUAJIT_LIBRARY ${LUAJIT_PREFIX}/lib/lua51.lib)
+
+        ExternalProject_Add(luajit_build
+                GIT_REPOSITORY https://github.com/LuaJIT/LuaJIT.git
+                GIT_TAG v2.1
+                PREFIX ${LUAJIT_PREFIX}
+                CONFIGURE_COMMAND ""
+                BUILD_COMMAND cmd /c "cd <SOURCE_DIR>/src && msvcbuild.bat static"
+                BUILD_IN_SOURCE 1
+                INSTALL_COMMAND
+                ${CMAKE_COMMAND} -E make_directory ${LUAJIT_PREFIX}/lib &&
+                ${CMAKE_COMMAND} -E make_directory ${LUAJIT_INCLUDE_DIR} &&
+                ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/src/lua51.lib ${LUAJIT_PREFIX}/lib/ &&
+                ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/src/luajit.h ${LUAJIT_INCLUDE_DIR}/ &&
+                ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/src/lauxlib.h ${LUAJIT_INCLUDE_DIR}/ &&
+                ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/src/lua.h ${LUAJIT_INCLUDE_DIR}/ &&
+                ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/src/lua.hpp ${LUAJIT_INCLUDE_DIR}/ &&
+                ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/src/luaconf.h ${LUAJIT_INCLUDE_DIR}/ &&
+                ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/src/lualib.h ${LUAJIT_INCLUDE_DIR}/
+                BUILD_BYPRODUCTS ${LUAJIT_LIBRARY}
+        )
+    endif()
+else()
+    # Unix/Linux
+    set(LUAJIT_LIBRARY ${LUAJIT_PREFIX}/lib/libluajit-5.1.a)
+
+    ExternalProject_Add(luajit_build
+            GIT_REPOSITORY https://github.com/LuaJIT/LuaJIT.git
+            GIT_TAG v2.1
+            PREFIX ${LUAJIT_PREFIX}
+            CONFIGURE_COMMAND ""
+            BUILD_COMMAND make -C <SOURCE_DIR> BUILDMODE=static
+            BUILD_IN_SOURCE 1
+            INSTALL_COMMAND make -C <SOURCE_DIR> install PREFIX=${LUAJIT_PREFIX}
+            BUILD_BYPRODUCTS ${LUAJIT_LIBRARY}
+    )
+endif()
+
+add_library(luajit_static STATIC IMPORTED)
+set_target_properties(luajit_static PROPERTIES
+        IMPORTED_LOCATION ${LUAJIT_LIBRARY}
+        INTERFACE_INCLUDE_DIRECTORIES ${LUAJIT_INCLUDE_DIR}
+)
+add_dependencies(luajit_static luajit_build)
+
+if(WIN32 AND MINGW)
+    target_link_libraries(luajit_static INTERFACE ws2_32)
+endif()

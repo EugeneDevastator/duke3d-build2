@@ -1,4 +1,3 @@
-main.c
 #include "raylib.h"
 #include "rlImGui.h"
 #include <luajit-2.1/lua.h>
