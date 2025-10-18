@@ -22,13 +22,6 @@ FetchContent_Declare(imgui
 )
 FetchContent_MakeAvailable(imgui)
 
-# Fetch Lua
-FetchContent_Declare(lua
-        URL https://www.lua.org/ftp/lua-5.4.7.tar.gz
-        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-)
-FetchContent_MakeAvailable(lua)
-
 add_library(imgui_lib
         ${imgui_SOURCE_DIR}/imgui.cpp
         ${imgui_SOURCE_DIR}/imgui_demo.cpp
@@ -58,43 +51,14 @@ target_include_directories(rlimgui_lib PUBLIC
 
 target_link_libraries(rlimgui_lib imgui_lib raylib)
 
-# Build Lua library
-add_library(lua_lib
-        ${lua_SOURCE_DIR}/src/lapi.c
-        ${lua_SOURCE_DIR}/src/lcode.c
-        ${lua_SOURCE_DIR}/src/lctype.c
-        ${lua_SOURCE_DIR}/src/ldebug.c
-        ${lua_SOURCE_DIR}/src/ldo.c
-        ${lua_SOURCE_DIR}/src/ldump.c
-        ${lua_SOURCE_DIR}/src/lfunc.c
-        ${lua_SOURCE_DIR}/src/lgc.c
-        ${lua_SOURCE_DIR}/src/llex.c
-        ${lua_SOURCE_DIR}/src/lmem.c
-        ${lua_SOURCE_DIR}/src/lobject.c
-        ${lua_SOURCE_DIR}/src/lopcodes.c
-        ${lua_SOURCE_DIR}/src/lparser.c
-        ${lua_SOURCE_DIR}/src/lstate.c
-        ${lua_SOURCE_DIR}/src/lstring.c
-        ${lua_SOURCE_DIR}/src/ltable.c
-        ${lua_SOURCE_DIR}/src/ltm.c
-        ${lua_SOURCE_DIR}/src/lundump.c
-        ${lua_SOURCE_DIR}/src/lvm.c
-        ${lua_SOURCE_DIR}/src/lzio.c
-        ${lua_SOURCE_DIR}/src/lauxlib.c
-        ${lua_SOURCE_DIR}/src/lbaselib.c
-        ${lua_SOURCE_DIR}/src/lcorolib.c
-        ${lua_SOURCE_DIR}/src/ldblib.c
-        ${lua_SOURCE_DIR}/src/liolib.c
-        ${lua_SOURCE_DIR}/src/lmathlib.c
-        ${lua_SOURCE_DIR}/src/loslib.c
-        ${lua_SOURCE_DIR}/src/lstrlib.c
-        ${lua_SOURCE_DIR}/src/ltablib.c
-        ${lua_SOURCE_DIR}/src/lutf8lib.c
-        ${lua_SOURCE_DIR}/src/loadlib.c
-        ${lua_SOURCE_DIR}/src/linit.c
+# Use prebuilt LuaJIT
+add_library(luajit_lib STATIC IMPORTED)
+set_target_properties(luajit_lib PROPERTIES
+        IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/External/LuaJIT/src/lua51.lib
 )
 
-target_include_directories(lua_lib PUBLIC ${lua_SOURCE_DIR}/src)
+# Set LuaJIT include directory
+target_include_directories(luajit_lib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/External/LuaJIT/src)
 
 add_executable(game main.cpp)
 
@@ -108,14 +72,14 @@ target_include_directories(game PRIVATE
         ${rlimgui_SOURCE_DIR}
         ${imgui_SOURCE_DIR}
         ${raylib_SOURCE_DIR}/src
-        ${lua_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/External/LuaJIT/src
 )
 
 target_link_libraries(game
         raylib
         imgui_lib
         rlimgui_lib
-        lua_lib
+        luajit_lib
 )
 
 configure_file(script.lua ${CMAKE_CURRENT_BINARY_DIR}/script.lua COPYONLY)
