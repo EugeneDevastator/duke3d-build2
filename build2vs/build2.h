@@ -67,14 +67,22 @@ typedef struct
 #define MAXPLAYERS 4
 typedef struct
 {
-	point3d startpos, startrig, startdow, startfor;
-	int numsects, malsects; sect_t *sect;
-	int numspris, malspris; spri_t *spri;
-	int blankheadspri;
+	union {
+		// New way: access via map
+		struct {
+			mapstate_t map;
+		};
 
-	#define MAXLIGHTS 256
-	int light_spri[MAXLIGHTS], light_sprinum; //List of active light sprite indices
-
+		// Old way: direct access (maintains binary compatibility)
+		struct {
+			point3d startpos, startrig, startdow, startfor;
+			int numsects, malsects; sect_t *sect;
+			int numspris, malspris; spri_t *spri;
+			int blankheadspri;
+			int light_spri[MAXLIGHTS], light_sprinum;
+		};
+	};
+	// end of map storage
 	playerstruct_t p[MAXPLAYERS];
 
 	int rseed;

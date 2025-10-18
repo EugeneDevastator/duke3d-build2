@@ -84,7 +84,16 @@ typedef struct
 	long owner;      //for dragging while editing, other effects during game
 } sect_t;
 //--------------------------------------------------------------------------------------------------
+typedef struct
+{
+	point3d startpos, startrig, startdow, startfor;
+	int numsects, malsects; sect_t *sect;
+	int numspris, malspris; spri_t *spri;
+	int blankheadspri;
 
+#define MAXLIGHTS 256
+	int light_spri[MAXLIGHTS], light_sprinum;
+} mapstate_t;
 
 
 //General point-polygon distance function. Single loops only. For multi, use genpoly_t and .n for next
