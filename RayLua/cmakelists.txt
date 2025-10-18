@@ -17,14 +17,22 @@ FetchContent_Declare(rlimgui
 )
 FetchContent_MakeAvailable(rlimgui)
 
-# Add LuaJIT subdirectory
-add_subdirectory(luajit)
+# Reference precompiled LuaJIT
+set(LUAJIT_ROOT "c:/Eugene/Games/build2-git/RayLua/External/LuaJIT/src")
+find_library(LUAJIT_LIBRARY
+        NAMES lua51 luajit
+        PATHS ${LUAJIT_ROOT}
+        NO_DEFAULT_PATH
+)
 
 add_executable(game main.c)
-target_link_libraries(game raylib rlimgui luajit_static)
+
 target_include_directories(game PRIVATE
         ${rlimgui_SOURCE_DIR}
-        ${CMAKE_CURRENT_SOURCE_DIR}/luajit/src
+        ${raylib_SOURCE_DIR}/src
+        ${LUAJIT_ROOT}
 )
+
+target_link_libraries(game raylib rlimgui ${LUAJIT_LIBRARY})
 
 configure_file(script.lua ${CMAKE_CURRENT_BINARY_DIR}/script.lua COPYONLY)
