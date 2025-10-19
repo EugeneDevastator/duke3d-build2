@@ -3,6 +3,7 @@
 #include "imgui.h"
 #include "FileWatcher.h"
 #include <vector>
+#include <chrono>
 
 #include "external/miniaudio.h"
 
@@ -18,6 +19,11 @@ struct TransparentRect {
 };
 
 std::vector<TransparentRect> transparentRects;
+
+// Profiling variables
+double luaRenderTime = 0.0;
+double luaUITime = 0.0;
+double drawingTime = 0.0;
 
 int lua_DrawRectangle(lua_State* L) {
     int x = lua_tointeger(L, 1);
@@ -164,27 +170,19 @@ void LoadScript(lua_State* L) {
 
 void SetImguiFonts()
 {
-    // Font configuration
     ImGuiIO& io = ImGui::GetIO();
-    // Clear existing fonts
     io.Fonts->Clear();
-    // Add custom font with larger size
     ImFont* font = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\segoeui.ttf", 28.0f);
     if (font == nullptr) {
-        // Fallback to default font with larger size
         ImFontConfig config;
         config.SizePixels = 18.0f;
         config.PixelSnapH = true;
         io.Fonts->AddFontDefault(&config);
     }
-    // Rebuild font atlas
     io.Fonts->Build();
 }
 
 int main() {
-    // Set config flags BEFORE InitWindow
-    // to hide titlebar:
-    // SetConfigFlags(FLAG_WINDOW_UNDECORATED);
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
     InitWindow(800, 600, "Raylib + Lua + ImGui");
     SetTargetFPS(120);
@@ -223,26 +221,51 @@ int main() {
             LoadScript(L);
         }
 
+        auto frameStart = std::chrono::high_resolution_clock::now();
+
         BeginDrawing();
         ClearBackground(DARKGRAY);
+
+        // Drawing phase timing
+        auto drawStart = std::chrono::high_resolution_clock::now();
 
         for (const auto& rect : transparentRects) {
             DrawRectangle(rect.x, rect.y, rect.width, rect.height, rect.color);
         }
 
+        // Lua Render timing
+        auto luaRenderStart = std::chrono::high_resolution_clock::now();
         lua_getglobal(L, "Render");
         if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
             printf("Render error: %s\n", lua_tostring(L, -1));
             lua_pop(L, 1);
         }
+        auto luaRenderEnd = std::chrono::high_resolution_clock::now();
+        luaRenderTime = std::chrono::duration<double, std::milli>(luaRenderEnd - luaRenderStart).count();
 
+        // UI phase timing
         rlImGuiBegin();
+        auto luaUIStart = std::chrono::high_resolution_clock::now();
         lua_getglobal(L, "RenderUI");
         if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
             printf("RenderUI error: %s\n", lua_tostring(L, -1));
             lua_pop(L, 1);
         }
+        auto luaUIEnd = std::chrono::high_resolution_clock::now();
+        luaUITime = std::chrono::duration<double, std::milli>(luaUIEnd - luaUIStart).count();
+
+        // Profiling window
+        ImGui::Begin("Profiling");
+        ImGui::Text("Lua Render: %.3f ms", luaRenderTime);
+        ImGui::Text("Lua UI: %.3f ms", luaUITime);
+        ImGui::Text("Drawing: %.3f ms", drawingTime);
+        ImGui::Text("Total Lua: %.3f ms", luaRenderTime + luaUITime);
+        ImGui::End();
+
         rlImGuiEnd();
+
+        auto drawEnd = std::chrono::high_resolution_clock::now();
+        drawingTime = std::chrono::duration<double, std::milli>(drawEnd - drawStart).count();
 
         DrawFPS(10, 10);
 
