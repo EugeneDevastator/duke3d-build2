@@ -163,9 +163,15 @@ void LoadScript(lua_State* L) {
 }
 
 int main() {
+    // Set config flags BEFORE InitWindow
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+
     InitWindow(800, 600, "Raylib + Lua + ImGui");
-    SetTargetFPS(60);
+
+    // Force title update after window creation
+    SetWindowTitle("Raylib + Lua + ImGui");
+
+    SetTargetFPS(120);
     rlImGuiSetup(true);
 
     lua_State* L = luaL_newstate();

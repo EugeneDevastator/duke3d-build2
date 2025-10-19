@@ -3,7 +3,7 @@ local rects = {}
 function Render()
     -- Spawn test rectangles on space key
     if GetKeyPressed and GetKeyPressed(32) then -- Space key
-        for i = 1, 100 do
+        for i = 1, 10000 do
             local x = math.random(0, 700)
             local y = math.random(0, 500)
             local w = math.random(120, 480)
