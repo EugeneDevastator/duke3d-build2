@@ -162,17 +162,35 @@ void LoadScript(lua_State* L) {
     }
 }
 
+void SetImguiFonts()
+{
+    // Font configuration
+    ImGuiIO& io = ImGui::GetIO();
+    // Clear existing fonts
+    io.Fonts->Clear();
+    // Add custom font with larger size
+    ImFont* font = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\segoeui.ttf", 28.0f);
+    if (font == nullptr) {
+        // Fallback to default font with larger size
+        ImFontConfig config;
+        config.SizePixels = 18.0f;
+        config.PixelSnapH = true;
+        io.Fonts->AddFontDefault(&config);
+    }
+    // Rebuild font atlas
+    io.Fonts->Build();
+}
+
 int main() {
     // Set config flags BEFORE InitWindow
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
-
+    // to hide titlebar:
+    // SetConfigFlags(FLAG_WINDOW_UNDECORATED);
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
     InitWindow(800, 600, "Raylib + Lua + ImGui");
-
-    // Force title update after window creation
-    SetWindowTitle("Raylib + Lua + ImGui");
-
     SetTargetFPS(120);
     rlImGuiSetup(true);
+
+    SetImguiFonts();
 
     lua_State* L = luaL_newstate();
     luaL_openlibs(L);
