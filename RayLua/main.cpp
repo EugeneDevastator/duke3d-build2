@@ -24,6 +24,7 @@ std::vector<TransparentRect> transparentRects;
 double luaRenderTime = 0.0;
 double luaUITime = 0.0;
 double drawingTime = 0.0;
+bool renderOpaque = false;
 
 int lua_DrawRectangle(lua_State* L) {
     int x = lua_tointeger(L, 1);
@@ -230,8 +231,13 @@ int main() {
         auto drawStart = std::chrono::high_resolution_clock::now();
 
         for (const auto& rect : transparentRects) {
-            DrawRectangle(rect.x, rect.y, rect.width, rect.height, rect.color);
+            Color drawColor = rect.color;
+            if (renderOpaque) {
+                drawColor.a = 255;
+            }
+            DrawRectangle(rect.x, rect.y, rect.width, rect.height, drawColor);
         }
+
 
         // Lua Render timing
         auto luaRenderStart = std::chrono::high_resolution_clock::now();
@@ -260,6 +266,7 @@ int main() {
         ImGui::Text("Lua UI: %.3f ms", luaUITime);
         ImGui::Text("Drawing: %.3f ms", drawingTime);
         ImGui::Text("Total Lua: %.3f ms", luaRenderTime + luaUITime);
+        ImGui::Checkbox("Render Opaque", &renderOpaque);
         ImGui::End();
 
         rlImGuiEnd();
