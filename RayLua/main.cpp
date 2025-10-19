@@ -4,6 +4,8 @@
 #include "FileWatcher.h"
 #include <vector>
 
+#include "external/miniaudio.h"
+
 extern "C" {
 #include <lua.h>
 #include <lualib.h>
@@ -39,7 +41,7 @@ int lua_SpawnTransparentRect(lua_State* L) {
     TransparentRect rect = {x, y, w, h, {(unsigned char)r, (unsigned char)g, (unsigned char)b, (unsigned char)a}};
     transparentRects.push_back(rect);
 
-    lua_pushinteger(L, transparentRects.size() - 1); // Return index
+    lua_pushinteger(L, transparentRects.size() - 1);
     return 1;
 }
 
@@ -111,7 +113,7 @@ int lua_GetMouseY(lua_State* L) {
 
 int lua_ImGuiBegin(lua_State* L) {
     const char* title = lua_tostring(L, 1);
-    ImGui::Begin(title);
+    ImGui::Begin(title,NULL, 0);
     return 0;
 }
 
@@ -124,6 +126,17 @@ int lua_ImGuiText(lua_State* L) {
     const char* text = lua_tostring(L, 1);
     ImGui::Text("%s", text);
     return 0;
+}
+
+int lua_GetKeyPressed(lua_State* L) {
+    int key = lua_tointeger(L, 1);
+    lua_pushboolean(L, IsKeyPressed(key));
+    return 1;
+}
+
+int lua_GetTime(lua_State* L) {
+    lua_pushnumber(L, GetTime());
+    return 1;
 }
 
 void LoadScript(lua_State* L) {
@@ -150,6 +163,7 @@ void LoadScript(lua_State* L) {
 }
 
 int main() {
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(800, 600, "Raylib + Lua + ImGui");
     SetTargetFPS(60);
     rlImGuiSetup(true);
@@ -157,7 +171,6 @@ int main() {
     lua_State* L = luaL_newstate();
     luaL_openlibs(L);
 
-    // Register functions
     lua_register(L, "DrawRectangle", lua_DrawRectangle);
     lua_register(L, "SpawnTransparentRect", lua_SpawnTransparentRect);
     lua_register(L, "SetRectPosition", lua_SetRectPosition);
@@ -171,6 +184,8 @@ int main() {
     lua_register(L, "ImGuiBegin", lua_ImGuiBegin);
     lua_register(L, "ImGuiEnd", lua_ImGuiEnd);
     lua_register(L, "ImGuiText", lua_ImGuiText);
+    lua_register(L, "GetKeyPressed", lua_GetKeyPressed);
+    lua_register(L, "GetTime", lua_GetTime);
 
     FileWatcher watcher("script.lua");
     LoadScript(L);
@@ -187,19 +202,16 @@ int main() {
         BeginDrawing();
         ClearBackground(DARKGRAY);
 
-        // Render transparent rectangles
         for (const auto& rect : transparentRects) {
             DrawRectangle(rect.x, rect.y, rect.width, rect.height, rect.color);
         }
 
-        // Call Lua render
         lua_getglobal(L, "Render");
         if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
             printf("Render error: %s\n", lua_tostring(L, -1));
             lua_pop(L, 1);
         }
 
-        // ImGui
         rlImGuiBegin();
         lua_getglobal(L, "RenderUI");
         if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
@@ -207,6 +219,8 @@ int main() {
             lua_pop(L, 1);
         }
         rlImGuiEnd();
+
+        DrawFPS(10, 10);
 
         EndDrawing();
     }

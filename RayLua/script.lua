@@ -6,12 +6,12 @@ function Render()
         for i = 1, 100 do
             local x = math.random(0, 700)
             local y = math.random(0, 500)
-            local w = math.random(20, 80)
-            local h = math.random(20, 80)
+            local w = math.random(120, 480)
+            local h = math.random(120, 480)
             local r = math.random(0, 255)
             local g = math.random(0, 255)
             local b = math.random(0, 255)
-            local a = math.random(50, 150) -- Semi-transparent
+            local a = math.random(5, 15) -- Semi-transparent
             
             local index = SpawnTransparentRect(x, y, w, h, r, g, b, a)
             table.insert(rects, index)
@@ -21,8 +21,8 @@ function Render()
     -- Move rectangles
     for i, rectIndex in ipairs(rects) do
         local time = GetTime and GetTime() or 0
-        local x = 400 + math.sin(time + i * 0.1) * 200
-        local y = 300 + math.cos(time + i * 0.15) * 150
+        local x = 400 + math.sin(time + i * 0.1) * 1200
+        local y = 300 + math.cos(time + i * 0.15) * 1150
         SetRectPosition(rectIndex, x, y)
     end
     
