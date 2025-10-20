@@ -1,6 +1,6 @@
 //This version also handles u&v. Note: Input should still be simple wall quad
 #include "mapcore.h"
-#include "build2.h"
+
 #define USEHEIMAP 1
 #define NOSOUND 1
 #define STANDALONE 1
@@ -137,7 +137,7 @@ double getslopez (sect_t *s, int i, double x, double y)
 }
 // Gets all walls that share the same edge as the given wall
 // Returns list of sectors/walls that connect to this wall edge, sorted by midheight
-int getwalls (int s, int w, vertlist_t *ver, int maxverts)
+int getwalls_imp (int s, int w, vertlist_t *ver, int maxverts, mapstate_t *map)
 {
 	vertlist_t tver;
 	sect_t *sec;
@@ -145,8 +145,8 @@ int getwalls (int s, int w, vertlist_t *ver, int maxverts)
 	float fx, fy;
 	int i, j, k, bs, bw, nw, vn;
 
-	sec = gst->sect; wal = sec[s].wall; bs = wal[w].ns;
-	if ((unsigned)bs >= (unsigned)gst->numsects) return(0);
+	sec = map->sect; wal = sec[s].wall; bs = wal[w].ns;
+	if ((unsigned)bs >= (unsigned)map->numsects) return(0);
 
 	vn = 0; // vertex count
 	nw = wal[w].n+w; // next wall in current sector
@@ -174,19 +174,36 @@ int getwalls (int s, int w, vertlist_t *ver, int maxverts)
 	return(vn);
 }
 
+int wallprev (sect_t *s, int w)
+{
+	wall_t *wal;
+
+	wal = s->wall;
+	if ((w > 0) && (wal[w-1].n == 1)) return(w-1);
+#if 0
+	while (wal[w].n > 0) w++; //better for few vertices per loop
+	return(w);
+#else
+	{
+		int ww; //better for more vertices per loop
+		for(ww=s->n-1;wal[ww].n+ww>w;ww=wal[ww].n+ww-1);
+		return(ww);
+	}
+#endif
+}
 // Gets all sectors/walls that share the same vertex point
 // Finds all walls that meet at the same corner point
-int getverts (int s, int w, vertlist_t *ver, int maxverts)
+int getverts_imp (int s, int w, vertlist_t *ver, int maxverts, mapstate_t *map)
 {
 	sect_t *sec;
 	float x, y;
 	int i, ir, iw, ns, nw;
 
-	if ((maxverts <= 0) || ((unsigned)s >= (unsigned)gst->numsects)) return(0);
-	if ((unsigned)w >= (unsigned)gst->sect[s].n) return(0);
+	if ((maxverts <= 0) || ((unsigned)s >= (unsigned)map->numsects)) return(0);
+	if ((unsigned)w >= (unsigned)map->sect[s].n) return(0);
 
 	ver[0].s = s; ver[0].w = w; if (maxverts == 1) return(1);
-	sec = gst->sect;
+	sec = map->sect;
 	x = sec[s].wall[w].x;
 	y = sec[s].wall[w].y;
 	ir = 0; iw = 1;
@@ -225,12 +242,12 @@ int getverts (int s, int w, vertlist_t *ver, int maxverts)
 
 // Check if two sectors are neighbors (adjacent to each other)
 // Returns 1 if sectors s0 and s1 are neighbors, 0 otherwise
-long sect_isneighs (int s0, int s1)
+long sect_isneighs_imp (int s0, int s1, mapstate_t *map)
 {
 	sect_t *sec;
 	int i, w, ns, nw;
 
-	sec = gst->sect;
+	sec = map->sect;
 	//if (s0 == s1) return(0); ?
 
 	// Iterate through all walls of sector s0
@@ -241,7 +258,7 @@ long sect_isneighs (int s0, int s1)
 		nw = sec[s0].wall[w].nw;
 
 		// Follow the chain of connected sectors through portals/walls
-		while (((unsigned)ns < (unsigned)gst->numsects) && (ns != s0))
+		while (((unsigned)ns < (unsigned)map->numsects) && (ns != s0))
 		{
 			// Direct neighbor found - sectors are adjacent
 			if (ns == s1) return(1); //s0 and s1 are neighbors

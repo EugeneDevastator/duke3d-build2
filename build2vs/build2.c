@@ -1838,26 +1838,21 @@ double distpoint2line2 (double x, double y, double x0, double y0, double x1, dou
 	f = nx*dy - ny*dx; return(f*f/g); //perpendicular distance to line
 }
 
-int wallprev (sect_t *s, int w)
-{
-	wall_t *wal;
 
-	wal = s->wall;
-	if ((w > 0) && (wal[w-1].n == 1)) return(w-1);
-#if 0
-	while (wal[w].n > 0) w++; //better for few vertices per loop
-	return(w);
-#else
-	{
-	int ww; //better for more vertices per loop
-	for(ww=s->n-1;wal[ww].n+ww>w;ww=wal[ww].n+ww-1);
-	return(ww);
-	}
-#endif
+long sect_isneighs(int s0, int s1)
+{
+	return sect_isneighs_imp(s0, s1, (mapstate_t*)gst);
 }
 
+int getverts(int s, int w, vertlist_t* ver, int maxverts)
+{
+	return getverts_imp(s, w, ver, maxverts, (mapstate_t*)gst);
+}
 
-
+int getwalls(int s, int w, vertlist_t* ver, int maxverts)
+{
+	return getwalls_imp(s, w, ver, maxverts, (mapstate_t*)gst);
+}
 
 #ifdef STANDALONE
 static long gquantstat; //-1=none, 0=vertex, 1=edge (wall)
@@ -3867,7 +3862,7 @@ void updatesect (float x, float y, float z, int *cursect)
 	}
 }
 
-//this
+
 long insspri (int sect, float x, float y, float z)
 {
 	gamestate_t *current_gst = gst;

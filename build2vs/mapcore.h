@@ -166,10 +166,11 @@ double roundcylminpath2 (double a0x, double a0y, double a1x, double a1y,
 								 double b0x, double b0y, double b1x, double b1y);
 long wallclippol (kgln_t *pol, kgln_t *npol);
 int dupwall_imp (sect_t *s, int w);
-long sect_isneighs (int s0, int s1);
+long sect_isneighs_imp (int s0, int s1, mapstate_t* map);
 double getslopez (sect_t *s, int i, double x, double y);
-int getwalls (int s, int w, vertlist_t *ver, int maxverts);
-int getverts (int s, int w, vertlist_t *ver, int maxverts);
+int wallprev (sect_t *s, int w);
+int getwalls_imp (int s, int w, vertlist_t *ver, int maxverts, mapstate_t* map);
+int getverts_imp (int s, int w, vertlist_t *ver, int maxverts, mapstate_t* map);
 long insspri_imp (int sect, float x, float y, float z, mapstate_t *map);
 void delspri_imp (int i, mapstate_t *map);
 void changesprisect_imp (int i, int nsect, mapstate_t *map);
