@@ -1,6 +1,6 @@
 //This version also handles u&v. Note: Input should still be simple wall quad
 #include "mapcore.h"
-
+#include "build2.h"
 #define USEHEIMAP 1
 #define NOSOUND 1
 #define STANDALONE 1
