@@ -170,6 +170,9 @@ long sect_isneighs (int s0, int s1);
 double getslopez (sect_t *s, int i, double x, double y);
 int getwalls (int s, int w, vertlist_t *ver, int maxverts);
 int getverts (int s, int w, vertlist_t *ver, int maxverts);
+long insspri_imp (int sect, float x, float y, float z, mapstate_t *map);
+void delspri_imp (int i, mapstate_t *map);
+void changesprisect_imp (int i, int nsect, mapstate_t *map);
 //Clip wall slopes. Returns loop ordered poly (0, 3, or 4 points)
 //pol[0]   pol[1]
 //pol[3]   pol[2]

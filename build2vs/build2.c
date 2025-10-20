@@ -2387,17 +2387,39 @@ void print6x8 (tiltyp *dd, long ox, long y, long fcol, long bcol, const char *fm
 }
 
 
+/**
+ * Draws a single pixel to a tile/bitmap
+ * @param dd - destination tile structure
+ * @param x,y - pixel coordinates
+ * @param c - color value (32-bit)
+ */
 static void drawpix (tiltyp *dd, long x, long y, long c)
 {
+	// Bounds check - return if coordinates outside tile dimensions
 	if (((unsigned long)x >= dd->x) || ((unsigned long)y >= dd->y)) return;
+
+	// Write pixel: calculate memory address and store color
+	// y*pitch + x*4bytes + frame_offset
 	*(long *)(y*dd->p + (x<<2) + dd->f) = c;
 }
 
+/**
+ * Draws a 3D point by transforming to screen space and drawing pixel
+ * @param cc - camera structure containing projection parameters
+ * @param x,y,z - 3D world coordinates
+ * @param c - color value
+ */
 static void drawpix3d (cam_t *cc, float x, float y, float z, long c)
 {
+	// Transform 3D coordinates (world to camera space)
 	xformpos(&x,&y,&z);
+
+	// Depth culling - skip if too close to camera
 	if (z < SCISDIST) return;
-	z = cc->h.z/z; drawpix(&cc->c,x*z+cc->h.x,y*z+cc->h.y,c);
+
+	// Perspective projection and draw pixel
+	z = cc->h.z/z;
+	drawpix(&cc->c,x*z+cc->h.x,y*z+cc->h.y,c);
 }
 
 static void drawhlin (tiltyp *dd, long x0, long x1, long y, long c)
@@ -3845,148 +3867,23 @@ void updatesect (float x, float y, float z, int *cursect)
 	}
 }
 
-long sect_isneighs (int s0, int s1)
-{
-	sect_t *sec;
-	int i, w, ns, nw;
-
-	sec = gst->sect;
-	//if (s0 == s1) return(0); ?
-	for(w=sec[s0].n-1;w>=0;w--)
-	{
-		ns = sec[s0].wall[w].ns;
-		nw = sec[s0].wall[w].nw;
-		while (((unsigned)ns < (unsigned)gst->numsects) && (ns != s0))
-		{
-			if (ns == s1) return(1); //s0 and s1 are neighbors
-			i = ns;
-			ns = sec[i].wall[nw].ns;
-			nw = sec[i].wall[nw].nw;
-		}
-	}
-	return(0); //bunches not on neighboring sectors are designated as incomparable
-}
-
+//this
 long insspri (int sect, float x, float y, float z)
 {
-	spri_t *spr;
-	long i;
-
-	if ((unsigned)sect >= (unsigned)gst->numsects) return(-1);
-	if (gst->numspris >= gst->malspris)
-	{
-		gst->malspris = max(gst->numspris+1,gst->malspris<<1);
-		gst->spri = (spri_t *)realloc(gst->spri,gst->malspris*sizeof(spri_t));
-#ifndef STANDALONE
-		for(i=gst->numspris;i<gst->malspris;i++)
-		{
-			gst->spri[i].sectn = gst->blankheadspri;
-			gst->spri[i].sectp = -1;
-			gst->spri[i].sect = -1;
-			if (gst->blankheadspri >= 0) gst->spri[gst->blankheadspri].sectp = i;
-			gst->blankheadspri = i;
-		}
-#endif
-	}
-#ifdef STANDALONE
-	i = gst->numspris;
-#else
-	i = gst->blankheadspri;
-	gst->blankheadspri = gst->spri[i].sectn;
-	gst->spri[i].sectp = -1;
-#endif
-	gst->numspris++;
-	spr = &gst->spri[i];
-	memset(spr,0,sizeof(spri_t));
-	spr->p.x = x; spr->p.y = y; spr->p.z = z;
-	spr->r.x = .5; spr->d.z = .5; spr->f.y =-.5;
-	spr->fat = .5; spr->mas = spr->moi = 1.0;
-	spr->tilnum = -1; spr->asc = spr->rsc = spr->gsc = spr->bsc = 4096;
-	spr->owner = -1; spr->flags = 0;
-	spr->sect = sect; spr->sectn = gst->sect[sect].headspri; spr->sectp = -1;
-	if (gst->sect[sect].headspri >= 0) gst->spri[gst->sect[sect].headspri].sectp = i;
-	gst->sect[sect].headspri = i;
-	return(i);
+	gamestate_t *current_gst = gst;
+	return insspri_imp(sect,x,y,z,(mapstate_t*)current_gst);
 }
 
-	//          -1      i
-	//headspri     i      j
-	//               j     -1
 void delspri (int i)
 {
-	spri_t *spr;
-	long j;
-
-#ifdef STANDALONE
-	if ((unsigned)i >= (unsigned)gst->numspris) return;
-#else
-	if (((unsigned)i >= (unsigned)gst->malspris) || (gst->spri[i].sect < 0)) return;
-#endif
-	spr = gst->spri;
-
-		//Delete sprite i
-	if (spr[i].sectp <  0) gst->sect[spr[i].sect].headspri = spr[i].sectn;
-							else spr[spr[i].sectp].sectn = spr[i].sectn;
-	if (spr[i].sectn >= 0) spr[spr[i].sectn].sectp = spr[i].sectp;
-
-	for(j=gst->light_sprinum-1;j>=0;j--)
-		if (gst->light_spri[j] == i) gst->light_spri[j] = gst->light_spri[--gst->light_sprinum];
-
-	gst->numspris--;
-#ifdef STANDALONE
-		//Move sprite numspris to i
-	if (i == gst->numspris) return;
-
-	for(j=gst->light_sprinum-1;j>=0;j--)
-		if (gst->light_spri[j] == gst->numspris) gst->light_spri[j] = i;
-
-	spr[i] = spr[gst->numspris];
-	if (spr[i].sectp <  0) gst->sect[spr[i].sect].headspri = i;
-							else spr[spr[i].sectp].sectn = i;
-	if (spr[i].sectn >= 0) spr[spr[i].sectn].sectp = i;
-#else
-		//Add sprite i to blankheadspri list
-	gst->spri[i].sectn = gst->blankheadspri;
-	gst->spri[i].sectp = -1;
-	gst->spri[i].sect = -1;
-	if (gst->blankheadspri >= 0) gst->spri[gst->blankheadspri].sectp = i;
-	gst->blankheadspri = i;
-#endif
+	gamestate_t *current_gst = gst;
+	delspri_imp(i,(mapstate_t*)current_gst);
 }
 
 void changesprisect (int i, int nsect)
 {
-	spri_t *spr;
-	int osect;
-
-#ifdef STANDALONE
-	if ((unsigned)i >= (unsigned)gst->numspris) return;
-#else
-	if (((unsigned)i >= (unsigned)gst->malspris) || (gst->spri[i].sect < 0)) return;
-#endif
-	if ((unsigned)nsect >= (unsigned)gst->numsects) return;
-
-	spr = &gst->spri[i];
-	osect = spr->sect;
-
-		//Remove from old sector list
-	//if ((unsigned)osect < (unsigned)gst->numsects)
-	//{
-		if (spr->sectp < 0) gst->sect[osect].headspri = spr->sectn;
-					 else gst->spri[spr->sectp].sectn = spr->sectn;
-		if (spr->sectn >= 0) gst->spri[spr->sectn].sectp = spr->sectp;
-	//}
-
-		//Insert on new sector list
-	//if ((unsigned)nsect < (unsigned)gst->numsects)
-	//{
-		spr->sectn = gst->sect[nsect].headspri;
-		spr->sectp = -1;
-		if (gst->sect[nsect].headspri >= 0) gst->spri[gst->sect[nsect].headspri].sectp = i;
-		gst->sect[nsect].headspri = i;
-	//}
-
-	spr->sect = nsect;
+	gamestate_t *current_gst = gst;
+	changesprisect_imp(i,nsect,(mapstate_t*)current_gst);
 }
 
 	//s: sector of sprites to check
@@ -4077,7 +3974,7 @@ static void drawsectfill (cam_t *cc, wall_t *wal, int n, int col)
 	}
 }
 #endif
-
+//here
 	//Returned trapezoid list is guaranteed to be in English text order (MSD:top->bottom, LSD:left->right)
 	//Caller is responsible for freeing memory if ((*retzoids) != 0)
 typedef struct { float x[4], y[2]; int pwal[2]; } zoid_t;
@@ -4193,7 +4090,6 @@ void drawsectfill3d (cam_t *cc, sect_t *sec, int isflor, int col)
 	//ouvmat[2].y = sur->uv[1].y/(sur->uv[1].x*sur->uv[2].y - sur->uv[1].y*sur->uv[2].x) + ouvmat[0].y;
 	//drawcone(cc,ouvmat[0].x,ouvmat[0].y,getslopez(sec,isflor,ouvmat[0].x,ouvmat[0].y),0.02,ouvmat[1].x,ouvmat[1].y,getslopez(sec,isflor,ouvmat[1].x,ouvmat[1].y),0.02,0xffc08080);
 	//drawcone(cc,ouvmat[0].x,ouvmat[0].y,getslopez(sec,isflor,ouvmat[0].x,ouvmat[0].y),0.02,ouvmat[2].x,ouvmat[2].y,getslopez(sec,isflor,ouvmat[2].x,ouvmat[2].y),0.02,0xff80c080);
-
 
 	if (!(sur->flags&4)) //Not relative alignment
 	{

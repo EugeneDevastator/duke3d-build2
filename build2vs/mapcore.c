@@ -1,7 +1,11 @@
 //This version also handles u&v. Note: Input should still be simple wall quad
 #include "mapcore.h"
 
-#include "build2.h"
+#define USEHEIMAP 1
+#define NOSOUND 1
+#define STANDALONE 1
+#define OOS_CHECK 1
+
 tile_t *gtile;
 long gnumtiles, gmaltiles, gtilehashead[1024];
 
@@ -251,4 +255,129 @@ long sect_isneighs (int s0, int s1)
 
 	// No connection found between the sectors
 	return(0); //bunches not on neighboring sectors are designated as incomparable
+}
+
+//this
+long insspri_imp (int sect, float x, float y, float z, mapstate_t *map)
+{
+	spri_t *spr;
+	long i;
+
+	if ((unsigned)sect >= (unsigned)map->numsects) return(-1);
+	if (map->numspris >= map->malspris)
+	{
+		map->malspris = max(map->numspris+1,map->malspris<<1);
+		map->spri = (spri_t *)realloc(map->spri,map->malspris*sizeof(spri_t));
+#ifndef STANDALONE
+		for(i=map->numspris;i<map->malspris;i++)
+		{
+			map->spri[i].sectn = map->blankheadspri;
+			map->spri[i].sectp = -1;
+			map->spri[i].sect = -1;
+			if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
+			map->blankheadspri = i;
+		}
+#endif
+	}
+#ifdef STANDALONE
+	i = map->numspris;
+#else
+	i = map->blankheadspri;
+	map->blankheadspri = map->spri[i].sectn;
+	map->spri[i].sectp = -1;
+#endif
+	map->numspris++;
+	spr = &map->spri[i];
+	memset(spr,0,sizeof(spri_t));
+	spr->p.x = x; spr->p.y = y; spr->p.z = z;
+	spr->r.x = .5; spr->d.z = .5; spr->f.y =-.5;
+	spr->fat = .5; spr->mas = spr->moi = 1.0;
+	spr->tilnum = -1; spr->asc = spr->rsc = spr->gsc = spr->bsc = 4096;
+	spr->owner = -1; spr->flags = 0;
+	spr->sect = sect; spr->sectn = map->sect[sect].headspri; spr->sectp = -1;
+	if (map->sect[sect].headspri >= 0) map->spri[map->sect[sect].headspri].sectp = i;
+	map->sect[sect].headspri = i;
+	return(i);
+}
+
+
+
+//          -1      i
+//headspri     i      j
+//               j     -1
+void delspri_imp (int i, mapstate_t *map)
+{
+	spri_t *spr;
+	long j;
+
+#ifdef STANDALONE
+	if ((unsigned)i >= (unsigned)map->numspris) return;
+#else
+	if (((unsigned)i >= (unsigned)map->malspris) || (map->spri[i].sect < 0)) return;
+#endif
+	spr = map->spri;
+
+	//Delete sprite i
+	if (spr[i].sectp <  0) map->sect[spr[i].sect].headspri = spr[i].sectn;
+	else spr[spr[i].sectp].sectn = spr[i].sectn;
+	if (spr[i].sectn >= 0) spr[spr[i].sectn].sectp = spr[i].sectp;
+
+	for(j=map->light_sprinum-1;j>=0;j--)
+		if (map->light_spri[j] == i) map->light_spri[j] = map->light_spri[--map->light_sprinum];
+
+	map->numspris--;
+#ifdef STANDALONE
+	//Move sprite numspris to i
+	if (i == map->numspris) return;
+
+	for(j=map->light_sprinum-1;j>=0;j--)
+		if (map->light_spri[j] == map->numspris) map->light_spri[j] = i;
+
+	spr[i] = spr[map->numspris];
+	if (spr[i].sectp <  0) map->sect[spr[i].sect].headspri = i;
+	else spr[spr[i].sectp].sectn = i;
+	if (spr[i].sectn >= 0) spr[spr[i].sectn].sectp = i;
+#else
+	//Add sprite i to blankheadspri list
+	map->spri[i].sectn = map->blankheadspri;
+	map->spri[i].sectp = -1;
+	map->spri[i].sect = -1;
+	if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
+	map->blankheadspri = i;
+#endif
+}
+
+void changesprisect_imp (int i, int nsect, mapstate_t *map)
+{
+	spri_t *spr;
+	int osect;
+
+#ifdef STANDALONE
+	if ((unsigned)i >= (unsigned)map->numspris) return;
+#else
+	if (((unsigned)i >= (unsigned)map->malspris) || (map->spri[i].sect < 0)) return;
+#endif
+	if ((unsigned)nsect >= (unsigned)map->numsects) return;
+
+	spr = &map->spri[i];
+	osect = spr->sect;
+
+	//Remove from old sector list
+	//if ((unsigned)osect < (unsigned)gst->numsects)
+	//{
+	if (spr->sectp < 0) map->sect[osect].headspri = spr->sectn;
+	else map->spri[spr->sectp].sectn = spr->sectn;
+	if (spr->sectn >= 0) map->spri[spr->sectn].sectp = spr->sectp;
+	//}
+
+	//Insert on new sector list
+	//if ((unsigned)nsect < (unsigned)gst->numsects)
+	//{
+	spr->sectn = map->sect[nsect].headspri;
+	spr->sectp = -1;
+	if (map->sect[nsect].headspri >= 0) map->spri[map->sect[nsect].headspri].sectp = i;
+	map->sect[nsect].headspri = i;
+	//}
+
+	spr->sect = nsect;
 }
