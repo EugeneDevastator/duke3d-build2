@@ -145,6 +145,7 @@ print \T
 #include <time.h>
 #include <malloc.h>
 #include "mapcore.h"
+#include "loaders.h"
 #define PI 3.141592653589793
 
 	//KPLIB.H:
@@ -595,23 +596,7 @@ static void tcp_close (SOCKET sk) { if (sk != INVALID_SOCKET) closesocket(sk); }
 //----------------------------------------  UDP code begins ----------------------------------------
 
 	//This silly block of code has probably been duplicated about 5 times :P
-static long crctab32[256] = {0};  //SEE CRC32.C
-#define updatecrc32(c,crc) crc=(crctab32[((c)^crc)&255]^(((unsigned)crc)>>8))
-static long crc32_getbuf (char *buf, long leng)
-{
-	long i, crc = -1;
-	for(i=0;i<leng;i++) updatecrc32(buf[i],crc);
-	return(crc);
-}
-static void crc32_init (void)
-{
-	long i, j, k;
-	for(i=255;i>=0;i--)
-	{
-		k = i; for(j=8;j;j--) k = ((unsigned long)k>>1)^((-(k&1))&0xedb88320);
-		crctab32[i] = k;
-	}
-}
+
 
 	//UDP simulating TCP packet format:
 	//   long udp_rbufw;  //32-bit index to last acked byte receiving
@@ -1543,12 +1528,7 @@ static inline unsigned long bswap (unsigned long a)
 static long crctab32[256] = {0};  //SEE CRC32.C
 #endif
 
-#define updatecrc32(c,crc) crc=(crctab32[((c)^crc)&255]^(((unsigned)crc)>>8))
-#define updateadl32(c,crc) \
-{  c += (crc&0xffff); if (c   >= 65521) c   -= 65521; \
-	crc = (crc>>16)+c; if (crc >= 65521) crc -= 65521; \
-	crc = (crc<<16)+c; \
-} \
+
 
 static void fputbytes (unsigned long v, long n)
 	{ for(;n;v>>=8,n--) { fputc(v,pngofil); updatecrc32(v,pngocrc); } }
@@ -3506,7 +3486,6 @@ static void initcrc32 (void)
 		crctab32[i] = k;
 	}
 }
-static long getcrc32z (long crc32, unsigned char *buf) { long i; for(i=0;buf[i];i++) updatecrc32(buf[i],crc32); return(crc32); }
 long gettileind (char *st)
 {
 	long i, crc32, hashind;
@@ -4846,105 +4825,15 @@ void gamestate_save (char *filnam, gamestate_t *gs)
 #endif
 #endif
 
-static void compacttilelist_tilenums (void) //uses gtile[?].namcrc32 as the lut - a complete hack to avoid extra allocs :P
-{
-	sect_t *sec;
-	long s, w;
-
-	sec = gst->sect;
-	for(s=gst->numsects-1;s>=0;s--)
-	{
-		for(w=2-1;w>=0;w--)        { sec[s].surf[w].tilnum      = gtile[sec[s].surf[w].tilnum].namcrc32; }
-		for(w=sec[s].n-1;w>=0;w--) { sec[s].wall[w].surf.tilnum = gtile[sec[s].wall[w].surf.tilnum].namcrc32; }
+static void compacttilelist_tilenums (void){
 #ifndef STANDALONE
-		for(w=sec[s].headspri;w>=0;w=gst->spri[w].sectn)
-			if (gst->spri[w].tilnum >= 0) gst->spri[w].tilnum = gtile[gst->spri[w].tilnum].namcrc32;
-	}
-#else
-	}
-	for(w=gst->numspris-1;w>=0;w--)
-		if ((unsigned)gst->spri[w].tilnum < (unsigned)gnumtiles) gst->spri[w].tilnum = gtile[gst->spri[w].tilnum].namcrc32;
-	for(w=0;w<numplayers;w++)
-	{
-		if ((unsigned)gst->p[w].copysurf[0].tilnum < (unsigned)gnumtiles) gst->p[w].copysurf[0].tilnum = gtile[gst->p[w].copysurf[0].tilnum].namcrc32;
-		if ((unsigned)gst->p[w].copyspri[0].tilnum < (unsigned)gnumtiles) gst->p[w].copyspri[0].tilnum = gtile[gst->p[w].copyspri[0].tilnum].namcrc32;
-	}
-#endif
-}
-static void compacttilelist (long flags)
-{
-	sect_t *sec;
-	long i, j, s, w, nnumtiles;
-
-	sec = gst->sect;
-
-	//gtile[?].namcrc32 used as temp in this function (must be reconstructed before returning)
-
-	if (flags&1) //Remove duplicate filenames (call right after load with alt+sectors copied)
-	{
-		for(i=gnumtiles-1;i>=0;i--) gtile[i].namcrc32 = i;
-		for(s=0;s<sizeof(gtilehashead)/sizeof(gtilehashead[0]);s++)
-			for(i=gtilehashead[s];i>=0;i=gtile[i].hashnext) //n^2 compare on linked list
-			{
-				if (!gtile[i].filnam[0]) continue;
-				for(j=gtile[i].hashnext;j>=0;j=gtile[j].hashnext)
-					if (!stricmp(gtile[i].filnam,gtile[j].filnam))
-					{
-						if (gtile[j].tt.f) { free((void *)gtile[j].tt.f); gtile[j].tt.f = 0; }
-						gtile[j].filnam[0] = 0;
-						gtile[j].namcrc32 = i;
-					}
-			}
-		compacttilelist_tilenums();
-
-		nnumtiles = 0;
-		for(i=0;i<gnumtiles;i++)
-		{
-			if (!gtile[i].filnam[0]) continue;
-			j = gtile[nnumtiles].namcrc32; gtile[nnumtiles] = gtile[i]; gtile[nnumtiles].namcrc32 = j; //copy all except namcrc32
-			gtile[i].namcrc32 = nnumtiles; nnumtiles++;
-		}
-		if (nnumtiles != gnumtiles) { compacttilelist_tilenums(); gnumtiles = nnumtiles; }
-	}
-
-	if (flags&2) //Remove unused tiles (call just before save)
-	{
-		for(i=0;i<gnumtiles;i++) gtile[i].namcrc32 = 0;
-		gtile[0].namcrc32 = 1; //Keep default tile (cloud.png)
-		for(s=gst->numsects-1;s>=0;s--)
-		{
-			for(w=2-1;w>=0;w--) gtile[sec[s].surf[w].tilnum].namcrc32 = 1;
-			for(w=sec[s].n-1;w>=0;w--) gtile[sec[s].wall[w].surf.tilnum].namcrc32 = 1;
-#ifndef STANDALONE
-			for(w=sec[s].headspri;w>=0;w=gst->spri[w].sectn)
-				if (gst->spri[w].tilnum >= 0) gtile[gst->spri[w].tilnum].namcrc32 = 1;
-		}
-#else
-		}
-		for(w=gst->numspris-1;w>=0;w--)
-			if ((unsigned)gst->spri[w].tilnum < (unsigned)gnumtiles)
-				gtile[gst->spri[w].tilnum].namcrc32 = 1;
-#endif
-		nnumtiles = 0;
-		for(i=0;i<gnumtiles;i++)
-		{
-			if (!gtile[i].namcrc32) continue;
-			j = gtile[nnumtiles].namcrc32; gtile[nnumtiles] = gtile[i]; gtile[nnumtiles].namcrc32 = j; //copy all except namcrc32
-			gtile[i].namcrc32 = nnumtiles; nnumtiles++;
-		}
-		if (nnumtiles != gnumtiles) { compacttilelist_tilenums(); gnumtiles = nnumtiles; }
-	}
-
-	if (flags&3) //Reconstruct namcrc32's and hash table from scratch
-	{
-		memset(gtilehashead,-1,sizeof(gtilehashead));
-		for(i=0;i<gnumtiles;i++)
-		{
-			gtile[i].namcrc32 = getcrc32z(0,(unsigned char *)gtile[i].filnam);
-			j = (gtile[i].namcrc32&(sizeof(gtilehashead)/sizeof(gtilehashead[0])-1));
-			gtile[i].hashnext = gtilehashead[j]; gtilehashead[j] = i;
-		}
-	}
+compacttilelist_tilenums_imp((mapstate_t*)gst)
+   for(w=0;w<numplayers;w++)
+   {
+       if ((unsigned)map->p[w].copysurf[0].tilnum < (unsigned)gnumtiles) map->p[w].copysurf[0].tilnum = gtile[map->p[w].copysurf[0].tilnum].namcrc32;
+       if ((unsigned)map->p[w].copyspri[0].tilnum < (unsigned)gnumtiles) map->p[w].copyspri[0].tilnum = gtile[map->p[w].copyspri[0].tilnum].namcrc32;
+   }
+ #endif
 }
 
 static int arewallstouching (int s0, int w0, int s1, int w1)
@@ -6552,7 +6441,7 @@ void savemap (char *filnam)
 
 	checknextwalls();
 	checksprisect(-1);
-	compacttilelist(3);
+	compacttilelist_imp(3, (mapstate_t*)gst);
 
 	fil = fopen(filnam,"wb"); if (!fil) return;
 
@@ -6830,7 +6719,7 @@ static int loadmap (char *filnam)
 			gtile[i].hashnext = gtilehashead[j]; gtilehashead[j] = i;
 		}
 #else
-		compacttilelist(1);
+		compacttilelist_imp(1, (mapstate_t*)gst);
 #endif
 
 		kzclose();
