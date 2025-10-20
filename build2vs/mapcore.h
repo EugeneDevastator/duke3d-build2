@@ -17,11 +17,11 @@ typedef struct tiltyp {
 typedef struct { float x, y, z; } point3d;
 typedef struct { double x, y, z; } dpoint3d; 	//Note: pol doesn't support loops as dpoint3d's!
 
-
 typedef struct { INT_PTR f; int p, x, y; } tiletype;
 typedef struct { tiltyp c, z; point3d p, r, d, f, h; } cam_t;
 
 #endif
+
 typedef struct { int w, s; } vertlist_t;
 typedef struct { float x, y, z, u, v; int n; } kgln_t;
 typedef struct { double x, y, z; long n, filler; } genpoly_t;
@@ -166,6 +166,7 @@ double roundcylminpath2 (double a0x, double a0y, double a1x, double a1y,
 								 double b0x, double b0y, double b1x, double b1y);
 long wallclippol (kgln_t *pol, kgln_t *npol);
 int dupwall_imp (sect_t *s, int w);
+long sect_isneighs (int s0, int s1);
 double getslopez (sect_t *s, int i, double x, double y);
 int getwalls (int s, int w, vertlist_t *ver, int maxverts);
 int getverts (int s, int w, vertlist_t *ver, int maxverts);

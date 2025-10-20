@@ -218,3 +218,37 @@ int getverts (int s, int w, vertlist_t *ver, int maxverts)
 	} while (1);
 	return(iw);
 }
+
+// Check if two sectors are neighbors (adjacent to each other)
+// Returns 1 if sectors s0 and s1 are neighbors, 0 otherwise
+long sect_isneighs (int s0, int s1)
+{
+	sect_t *sec;
+	int i, w, ns, nw;
+
+	sec = gst->sect;
+	//if (s0 == s1) return(0); ?
+
+	// Iterate through all walls of sector s0
+	for(w=sec[s0].n-1;w>=0;w--)
+	{
+		// Get the neighboring sector and wall indices for current wall
+		ns = sec[s0].wall[w].ns;
+		nw = sec[s0].wall[w].nw;
+
+		// Follow the chain of connected sectors through portals/walls
+		while (((unsigned)ns < (unsigned)gst->numsects) && (ns != s0))
+		{
+			// Direct neighbor found - sectors are adjacent
+			if (ns == s1) return(1); //s0 and s1 are neighbors
+
+			// Move to next sector in the chain
+			i = ns;
+			ns = sec[i].wall[nw].ns;
+			nw = sec[i].wall[nw].nw;
+		}
+	}
+
+	// No connection found between the sectors
+	return(0); //bunches not on neighboring sectors are designated as incomparable
+}
