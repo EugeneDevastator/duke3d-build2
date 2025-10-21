@@ -21,7 +21,7 @@
 #define TYPEMESSNUM 8
 #define TYPEMESSLENG 256
 #endif
-#include "mapcore.h"
+#include "Core/mapcore.h"
 typedef struct
 {
 		//screen/camera state
@@ -131,10 +131,10 @@ extern void reversewalls (wall_t *wal, int n);
 extern void rotatewallsurfsleft1 (wall_t *wal, int n);
 extern void dragpoint (gamestate_t *lst, int s, int w, float x, float y);
 extern void delwall (sect_t *s, int w);
-extern int dupwall (sect_t *s, int w);
-extern void delsect (int s);
+//extern int dupwall (sect_t *s, int w);
+//extern void delsect (int s);
 extern int insidesect (double x, double y, wall_t *wal, int w);
-extern void updatesect (float x, float y, float z, int *cursect);
+//extern void updatesect (float x, float y, float z, int *cursect);
 extern int polybool (wall_t *wal0, int n0, wall_t *wal1, int n1, wall_t **wal2, int *n2, int op);
 extern void checknextwalls ();
 extern long gettileind (char *filnam);

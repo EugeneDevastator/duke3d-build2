@@ -51,7 +51,6 @@ long wallclippol (kgln_t *pol, kgln_t *npol)
 	return(3);
 }
 
-
 //Find shortest path between two 3D line segments
 //Input: 2 line segments: (a0)-(a1), (b0)-(b1)
 //Returns: distance^2 between closest points

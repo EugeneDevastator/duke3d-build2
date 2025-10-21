@@ -144,32 +144,10 @@ print \T
 #include <math.h>
 #include <time.h>
 #include <malloc.h>
-#include "mapcore.h"
-#include "loaders.h"
+#include "Core/mapcore.h"
+#include "Core/loaders.h"
+#include "Core/kplib.h"
 #define PI 3.141592653589793
-
-	//KPLIB.H:
-	//High-level (easy) picture loading function:
-extern void kpzload (const char *, int *, int *, int *z, int *);
-	//Low-level PNG/JPG functions:
-extern int kpgetdim (const char *, int, int *, int *);
-extern int kprender (const char *, int, INT_PTR, int, int, int, int, int);
-	//Ken's ZIP functions:
-extern int kzaddstack (const char *);
-extern void kzuninit (void);
-extern void kzsetfil (FILE *);
-extern int kzopen (const char *);
-extern void kzfindfilestart (const char *);
-extern int kzfindfile (char *);
-extern int kzread (void *, int);
-extern int kzfilelength (void);
-extern int kzseek (int, int);
-extern int kztell (void);
-extern int kzgetc (void);
-extern int kzeof (void);
-extern void kzclose (void);
-extern void kzfindfilestart (const char *); //pass wildcard string
-extern int kzfindfile (char *); //you alloc buf, returns 1:found,0:~found
 
 	//DRAWCONE.H:
 extern void drawcone_setup (int, int, tiletype *, INT_PTR,  point3d *,  point3d *,  point3d *,  point3d *, double, double, double);
@@ -260,7 +238,7 @@ extern void morph_uninit (void);
 #endif
 
 static int cputype = 0;
-static char curmappath[MAX_PATH+1] = "";
+
 
 void (*drawpolfunc)(cam_t *cc, kgln_t *vert, long num, tile_t *tpic, long curcol, float *ouvmat, point3d *norm, long flags);
 
@@ -290,7 +268,7 @@ static long fpsometer[2][FPSSIZ], fpsind[2][FPSSIZ], numframes[2] = {0,0}, micro
 static long folder  [64+1][64]; //Icon for selecting files in 'v' mode
 static long upfolder[64+1][64]; //Icon for selecting files in 'v' mode
 #endif
-static long nullpic [64+1][64]; //Null set icon (image not found)
+//static long nullpic [64+1][64]; //Null set icon (image not found)
 
 //App state variables: -----------------------------------------------------------------------------
 
@@ -820,7 +798,7 @@ static SOCKET udp_open (char *joinip)
 		if (ws.wVersion != 0x101) { sprintf(net_err,"WinSock version not supported. Error: %d",WSAGetLastError()); return(INVALID_SOCKET); }
 		atexit(udp_wsaclean);
 		udp_inited = 1;
-		crc32_init();
+		initcrc32();
 
 		for(i=0;i<MAXPLAYERS;i++)
 		{
@@ -1809,16 +1787,6 @@ static void curs2grid (playerstruct_t *pps, double sx, double sy, point3d *fp)
 }
 #endif
 
-double distpoint2line2 (double x, double y, double x0, double y0, double x1, double y1)
-{
-	double f, g, dx, dy, nx, ny;
-	dx = x1-x0; dy = y1-y0; nx = x-x0; ny = y-y0;
-	f = nx*dx + ny*dy; if (f <=0.f) return(nx*nx + ny*ny); //behind point 0?
-	g = dx*dx + dy*dy; if (f >=  g) return((x-x1)*(x-x1) + (y-y1)*(y-y1)); //behind point 1?
-	f = nx*dy - ny*dx; return(f*f/g); //perpendicular distance to line
-}
-
-
 long sect_isneighs(int s0, int s1)
 {
 	return sect_isneighs_imp(s0, s1, (mapstate_t*)gst);
@@ -2070,8 +2038,8 @@ static _inline int argb_scale (int c0, int mul12)
 }
 #endif
 
-static __forceinline unsigned int bsf (unsigned int a) { _asm bsf eax, a }
-static __forceinline unsigned int bsr (unsigned int a) { _asm bsr eax, a }
+//static __forceinline unsigned int bsf (unsigned int a) { _asm bsf eax, a }
+//static __forceinline unsigned int bsr (unsigned int a) { _asm bsr eax, a }
 static __forceinline int uptil1 (unsigned int *lptr, int z)
 {
 	//   //This line does the same thing (but slow & brute force)
@@ -2097,18 +2065,7 @@ static __forceinline void dtol (double f, long *a)
 	}
 }
 
-static _inline void dcossin (double a, double *c, double *s)
-{
-	_asm
-	{
-		fld a
-		fsincos
-		mov eax, c
-		fstp qword ptr [eax]
-		mov eax, s
-		fstp qword ptr [eax]
-	}
-}
+
 
 void orthofit3x3 (point3d *v0, point3d *v1, point3d *v2)
 {
@@ -2660,7 +2617,7 @@ static void drawkv6 (cam_t *cc, char *filnam, double px, double py, double pz,
 	drawkv6(&drawkv6_frame,kv6, px,py,pz, rx,ry,rz, dx,dy,dz, fx,fy,fz, col, shadefac);
 }
 
-static unsigned char gammlut[256], gotpal = 0;
+//static unsigned char gammlut[256], gotpal = 0;
 void setgammlut (double gammval)
 {
 	long i;
@@ -3476,16 +3433,6 @@ static HCURSOR gencrosscursor (void)
 
 //--------------------------------------------------------------------------------------------------
 
-static void initcrc32 (void)
-{
-	long i, j, k;
-	for(i=255;i>=0;i--)
-	{
-		k = i;
-		for(j=8;j;j--) k = ((unsigned long)k>>1)^((-(k&1))&0xedb88320);
-		crctab32[i] = k;
-	}
-}
 long gettileind (char *st)
 {
 	long i, crc32, hashind;
@@ -3590,41 +3537,6 @@ long settilefilename (long hitsect, long hitwall, char *filnam)
 	return(i);
 }
 
-	//Find centroid of polygon (algo copied from TAGPNT2.BAS 09/14/2006)
-void getcentroid (wall_t *wal, int n, float *retcx, float *retcy)
-{
-	float r, cx, cy, x0, y0, x1, y1, area;
-	int w0, w1;
-
-		//Find centroid of polygon (works for all polygons! 06/21/1999)
-	cx = cy = 0.f; area = 0.f;
-	for(w0=0;w0<n;w0++)
-	{
-		x0 = wal[w0].x; y0 = wal[w0].y; w1 = wal[w0].n+w0;
-		x1 = wal[w1].x; y1 = wal[w1].y;
-		cx += ((x0+x1)*x0 + x1*x1)*(y1-y0);
-		cy += ((y0+y1)*y0 + y1*y1)*(x0-x1);
-		area += (x0+x1)*(y1-y0);
-	}
-	r = 1.0/(area*3.0); (*retcx) = cx*r; (*retcy) = cy*r; //area *= .5;
-}
-
-float getarea (wall_t *wal, int n)
-{
-	float area;
-	int w0, w1, w2;
-
-		//Get area of polygon using pieces of pie (triangles)
-		//(0,0),(x1,y1),(x2,y1) using z of cross product, multiply-optimized
-	area = 0.f;
-	for(w0=n-1;w0>=0;w0--)
-	{
-		w1 = wal[w0].n+w0; w2 = wal[w1].n+w1;
-		area += (wal[w0].x-wal[w2].x)*wal[w1].y;
-	}
-	return(area*.5);
-}
-
 void reversewalls (wall_t *wal, int n)
 {
 	wall_t twal;
@@ -3677,26 +3589,10 @@ void dragpoint (gamestate_t *lst, int s, int w, float x, float y)
 	}
 	gst = ost;
 }
-
 void delwall (sect_t *s, int w)
 {
-	wall_t *wal;
 	int i;
-
-#if 0
-	{ //debug only
-		char snotbuf[1024];
-		sprintf(snotbuf,"before delwall(wall %d) %d walls\n",w,s->n);
-		for(i=0;i<s->n;i++) sprintf(&snotbuf[strlen(snotbuf)],"Wall %d: %f %f %d\n",i,wal[i].x,wal[i].y,wal[i].n);
-		MessageBox(ghwnd,snotbuf,prognam,MB_OK);
-	}
-#endif
-
-	if (!s->n) return;
-	wal = s->wall;
-	if (wal[w].n < 0) { wal[w-1].n = wal[w].n+1; }
-					 else { for(i=w;wal[i].n>0;i++); wal[i].n++; }
-
+	delwall_imp(s,w,(mapstate_t*)gst);
 #ifdef STANDALONE
 	for(i=numplayers-1;i>=0;i--)
 	{
@@ -3710,18 +3606,6 @@ void delwall (sect_t *s, int w)
 			if (gst->p[i].startwall == w) { gst->p[i].startsect = -1; continue; }
 			if (gst->p[i].startwall > w) gst->p[i].startwall--;
 		}
-	}
-#endif
-
-	s->n--;
-	for(i=w;i<s->n;i++) wal[i] = wal[i+1];
-
-#if 0
-	{ //debug only
-		char snotbuf[1024];
-		sprintf(snotbuf,"after delwall(wall %d) %d walls\n",w,s->n);
-		for(i=0;i<s->n;i++) sprintf(&snotbuf[strlen(snotbuf)],"Wall %d: %f %f %d\n",i,wal[i].x,wal[i].y,wal[i].n);
-		MessageBox(ghwnd,snotbuf,prognam,MB_OK);
 	}
 #endif
 }
@@ -3744,110 +3628,29 @@ int dupwall (sect_t *s, int w)
 	return dupwall_imp(s,w);
 }
 
-void delsect (int s)
+void delsect(int s)
 {
-	sect_t *sec;
-	int i;
-
-	sec = gst->sect;
-
+	delsect_imp(s, (mapstate_t*)gst);
+int i;
 #ifdef STANDALONE
-	for(i=numplayers-1;i>=0;i--)
+	for (i = numplayers - 1; i >= 0; i--)
 	{
-			  if (gst->p[i].grabsect  ==               s) gst->p[i].grabsect  = -1;
-		else if (gst->p[i].grabsect  == gst->numsects-1) gst->p[i].grabsect  =  s;
-			  if (gst->p[i].startsect  ==               s) gst->p[i].startsect  = -1;
-		else if (gst->p[i].startsect  == gst->numsects-1) gst->p[i].startsect  =  s;
+		if (gst->p[i].grabsect == s) gst->p[i].grabsect = -1;
+		else if (gst->p[i].grabsect == gst->numsects - 1) gst->p[i].grabsect = s;
+		if (gst->p[i].startsect == s) gst->p[i].startsect = -1;
+		else if (gst->p[i].startsect == gst->numsects - 1) gst->p[i].startsect = s;
 	}
 #endif
-
-	if (sec[s].wall) free(sec[s].wall);
-	gst->numsects--; sec[s] = sec[gst->numsects];
-	memset(&sec[gst->numsects],0,sizeof(sect_t));
 }
-
-int insidesect (double x, double y, wall_t *wal, int w)
-{
-	int v, c;
-
-	c = 0;
-	for(w--;w>=0;w--)
-	{
-		v = wal[w].n+w; if ((wal[w].y < y) != (y <= wal[v].y)) continue;
-		if ((((double)wal[v].x-(double)wal[w].x)*(y-(double)wal[w].y) <
-			  ((double)wal[v].y-(double)wal[w].y)*(x-(double)wal[w].x)) != (wal[v].y < wal[w].y)) c++;
-	}
-	return(c&1);
-}
-
-	//Pass z as >1e30 to make updatesect ignore height return first sector containing (x,y)
 void updatesect (float x, float y, float z, int *cursect)
 {
-	sect_t *sec;
-	long *gotsect;
-	int i, s, w, ns, nw, allsec, cnt, *secfif, secfifw, secfifr;
-
-	sec = gst->sect;
-	s = (*cursect);
-	if ((unsigned)s >= (unsigned)gst->numsects) //reference invalid; brute force search
-	{
-		for(s=gst->numsects-1;s>=0;s--)
-			if (insidesect(x,y,sec[s].wall,sec[s].n))
-				if ((z > 1e30) || ((z >= getslopez(&sec[s],0,x,y)) && (z <= getslopez(&sec[s],1,x,y)))) break;
-		(*cursect) = s; return;
-	}
-
-	if (insidesect(x,y,sec[s].wall,sec[s].n))
-		if ((z > 1e30) || ((z >= getslopez(&sec[s],0,x,y)) && (z <= getslopez(&sec[s],1,x,y)))) return;
-
-	w = (((gst->numsects+31)>>5)<<2);
-	gotsect = (long *)_alloca(w);
-	memset(gotsect,0,w); gotsect[s>>5] |= (1<<s);
-	secfif = (int *)_alloca(gst->numsects*sizeof(secfif[0]));
-	secfifw = secfifr = 0;
-
-	(*cursect) = -1; allsec = gst->numsects-1;
-	for(cnt=gst->numsects-1;cnt>0;cnt--)
-	{
-		for(w=sec[s].n-1;w>=0;w--)
-		{
-			ns = sec[s].wall[w].ns;
-			nw = sec[s].wall[w].nw;
-			while (((unsigned)ns < (unsigned)gst->numsects) && (ns != s))
-			{
-				if (!(gotsect[ns>>5]&(1<<ns)))
-				{
-					gotsect[ns>>5] |= (1<<ns);
-					secfif[secfifw] = ns; secfifw++;
-				}
-				i = ns;
-				ns = sec[i].wall[nw].ns;
-				nw = sec[i].wall[nw].nw;
-			}
-		}
-
-		if (secfifr < secfifw)
-			{ s = secfif[secfifr]; secfifr++; } //breadth-first
-		else
-		{     //fifo was empty.. must be some disjoint sectors
-			while ((allsec >= 0) && (gotsect[allsec>>5]&(1<<allsec))) allsec--;
-			s = allsec; if (s < 0) break;
-			gotsect[s>>5] |= (1<<s);
-		}
-
-		if (insidesect(x,y,sec[s].wall,sec[s].n))
-			if ((z > 1e30) || ((z >= getslopez(&sec[s],0,x,y)) && (z <= getslopez(&sec[s],1,x,y))))
-				{ (*cursect) = s; return; }
-	}
+	updatesect_imp(x, y, z, cursect, (mapstate_t*)gst);
 }
-
-
 long insspri (int sect, float x, float y, float z)
 {
 	gamestate_t *current_gst = gst;
 	return insspri_imp(sect,x,y,z,(mapstate_t*)current_gst);
 }
-
 void delspri (int i)
 {
 	gamestate_t *current_gst = gst;
@@ -3864,51 +3667,7 @@ void changesprisect (int i, int nsect)
 	//Pass -1 to check and compact all valid sprites
 void checksprisect (int s)
 {
-	sect_t *sec;
-	spri_t *spr;
-	int w, ns, nw, s0, s1;
-
-	sec = gst->sect;
-	spr = gst->spri;
-#if 0
-	//FIXFIX:Warning: this block has not been tested!
-	if ((unsigned)s < (unsigned)gst->numsects)
-	{
-		for(w=sec[s].headspri;w>=0;w=nw)
-		{
-			nw = spr[w].sectn;
-			ns = spr[w].sect; updatesect(spr[w].p.x,spr[w].p.y,spr[w].p.z,&ns);
-			if (ns != spr[w].sect) changesprisect(w,ns);
-		}
-		return;
-	}
-#endif
-	for(s=gst->numsects-1;s>=0;s--) sec[s].headspri = -1;
-	for(w=nw=0;w<gst->numspris;w++)
-	{
-		ns = spr[w].sect; if (ns < 0) continue;
-		updatesect(spr[w].p.x,spr[w].p.y,spr[w].p.z,&ns);
-		if ((unsigned)ns >= (unsigned)gst->numsects) ns = spr[w].sect;
-
-		spr[nw] = spr[w];
-		spr[nw].sect = ns;
-		spr[nw].sectn = sec[ns].headspri;
-		spr[nw].sectp = -1;
-		if (sec[ns].headspri >= 0) spr[sec[ns].headspri].sectp = nw;
-		sec[ns].headspri = nw;
-		nw++;
-	}
-#ifndef STANDALONE
-	gst->blankheadspri = -1;
-	for(;nw<gst->malspris;nw++)
-	{
-		gst->spri[nw].sectn = gst->blankheadspri;
-		gst->spri[nw].sectp = -1;
-		gst->spri[nw].sect = -1;
-		if (gst->blankheadspri >= 0) gst->spri[gst->blankheadspri].sectp = nw;
-		gst->blankheadspri = nw;
-	}
-#endif
+	checksprisect_imp(s, (mapstate_t*) gst);
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -4190,317 +3949,12 @@ void drawsectfill3d (cam_t *cc, sect_t *sec, int isflor, int col)
 #endif
 
 //---------------------------------------------------------------------------------------------
-enum { POLYBOOL_AND,POLYBOOL_SUB,POLYBOOL_SUBR,POLYBOOL_OR,/*POLYBOOL_XOR,*/POLYBOOL_END };
-typedef struct { double x0, y0, x1, y1; int i; } polbool_lin_t; //FIXFIX:try float?
 
-	//returns 1 if (x,y) is on border; else 0
-static int onpoly (double x, double y, wall_t *wal, int n)
+int polyspli2(wall_t* owal, int on, wall_t** retwal, long sec0, long isflor0,
+              long sec1, long isflor1, long dir)
 {
-	int i, j;
-
-	for(i=n-1;i>=0;i--) //FIX:visit bbox(x,y,x,y){wal,n}
-	{
-		if ((x == wal[i].x) && (y == wal[i].y)) return(1);
-		j = wal[i].n+i;
-		if ((wal[i].x < x) != (x < wal[j].x)) continue;
-		if ((wal[i].y < y) != (y < wal[j].y)) continue;
-		if ((wal[j].x-x)*(wal[i].y-y) == (wal[i].x-x)*(wal[j].y-y)) return(1);
-	}
-	return(0);
+	return polyspli2_imp(owal, on, retwal, sec0, isflor0, sec1, isflor1, dir, (mapstate_t*)gst);
 }
-
-	//returns 1 if (x,y) is inside (undefined on border); else 0
-static int inpoly (double x, double y, wall_t *wal, int n)
-{
-	int i, j, c;
-
-	c = 0;
-	for(i=n-1;i>=0;i--) //FIX:visit bbox(x,y,x,y){wal,n}
-	{
-		j = wal[i].n+i; if ((wal[i].y < y) != (y <= wal[j].y)) continue;
-		if (((wal[j].x-wal[i].x)*(y-wal[i].y) <
-			  (wal[j].y-wal[i].y)*(x-wal[i].x)) != (wal[j].y < wal[i].y)) c ^= 1;
-	}
-	return(c);
-}
-
-static int polbool_splitlinepoint (polbool_lin_t **lin, int *linmal, wall_t *wal, int n, wall_t *owal, int on)
-{
-	double x0, y0, x1, y1, ix, iy;
-	int i, j;
-
-	if ((*linmal) < n) { (*linmal) = max(n,256); (*lin) = (polbool_lin_t *)realloc(*lin,(*linmal)*sizeof(polbool_lin_t)); }
-
-	for(i=0;i<n;i++)
-	{
-		(*lin)[i].x0 = wal[i].x; (*lin)[i].y0 = wal[i].y; j = wal[i].n+i;
-		(*lin)[i].x1 = wal[j].x; (*lin)[i].y1 = wal[j].y; (*lin)[i].i = i;
-	}
-	for(i=0;i<n;i++)
-	{
-		x0 = (*lin)[i].x0; y0 = (*lin)[i].y0; x1 = (*lin)[i].x1; y1 = (*lin)[i].y1;
-		for(j=0;j<on;j++) //FIX:visit bbox(x0,y0,x1,y1){owal,on}
-		{
-			ix = owal[j].x; iy = owal[j].y;
-
-				//if in middle of line segment..
-			if ((x0 < ix) != (ix < x1)) continue;
-			if ((y0 < iy) != (iy < y1)) continue;
-			if ((x1-ix)*(y0-iy) != (x0-ix)*(y1-iy)) continue;
-			if ((ix == x0) && (iy == y0)) continue;
-			if ((ix == x1) && (iy == y1)) continue;
-
-			if (n >= (*linmal)) { (*linmal) = max((*linmal)*2,n+1); (*lin) = (polbool_lin_t *)realloc(*lin,(*linmal)*sizeof(polbool_lin_t)); }
-
-			(*lin)[i].x1 = ix; (*lin)[i].y1 = iy;
-			(*lin)[n].x0 = ix; (*lin)[n].y0 = iy;
-			(*lin)[n].x1 = x1; (*lin)[n].y1 = y1; (*lin)[n].i = (*lin)[i].i; n++;
-			x1 = ix; y1 = iy;
-		}
-	}
-	return(n);
-}
-
-	// ��Ŀ
-	// �A��Ŀ
-	// ����B�
-	//   ����
-	//   Collinear line priority:
-	//1st sector (wal0): POLYBOOL_AND, POLYBOOL_SUB, POLYBOOL_OR
-	//2nd sector (wal1): POLYBOOL_SUB2
-	//if retwal is null, returns # walls without generating wall list
-int polybool (wall_t *wal0, int on0, wall_t *wal1, int on1, wall_t **retwal, int *retn, int op)
-{
-	static polbool_lin_t *lin0 = 0, *lin1 = 0;
-	static int lin0mal = 0, lin1mal = 0;
-	wall_t *twal;
-	double d, t, u, ax, ay, x0, y0, x1, y1, x2, y2, x3, y3, x10, y10, x23, y23, x20, y20, ix, iy;
-	int i, j, n, n0, n1, oldn0, oi, on;
-
-	if (retwal) { (*retwal) = 0; (*retn) = 0; }
-	if ((unsigned)op >= POLYBOOL_END) return(0);
-
-	if (op == POLYBOOL_SUBR)
-	{
-		twal = wal0; wal0 = wal1; wal1 = twal;
-		n = on0; on0 = on1; on1 = n;
-	}
-
-		//Line vs. Point
-	n0 = polbool_splitlinepoint(&lin0,&lin0mal,wal0,on0,wal1,on1);
-	n1 = polbool_splitlinepoint(&lin1,&lin1mal,wal1,on1,wal0,on0);
-
-		//Line vs. Line..
-	for(i=0;i<n0;i++)
-	{
-		x0 = lin0[i].x0; y0 = lin0[i].y0; x1 = lin0[i].x1; y1 = lin0[i].y1;
-		for(j=n1-1;j>=0;j--) //FIX:visit hash&bbox(x0,y0,x1,y1){lin1,n1}
-		{
-			x2 = lin1[j].x0; y2 = lin1[j].y0; x3 = lin1[j].x1; y3 = lin1[j].y1;
-			if ((x2 == x0) && (y2 == y0)) continue; //This extra check is necessary
-			if ((x2 == x1) && (y2 == y1)) continue; //because intersect() calculates
-			if ((x3 == x0) && (y3 == y0)) continue; //d/t/u temp products differently
-			if ((x3 == x1) && (y3 == y1)) continue; //giving inconsistent results :/
-
-				//intersect() inline
-				//(x1-x0)*t + (x2-x3)*u = (x2-x0)
-				//(y1-y0)*t + (y2-y3)*u = (y2-y0)
-			x10 = x1-x0; x23 = x2-x3; x20 = x2-x0;
-			y10 = y1-y0; y23 = y2-y3; y20 = y2-y0;
-			d =  x10*y23 - y10*x23;    if (d == 0.0) continue; d = 1.0/d;
-			t = (x20*y23 - y20*x23)*d; if ((t <= 0.0) || (t >= 1.0)) continue;
-			u = (x10*y20 - y10*x20)*d; if ((u <= 0.0) || (u >= 1.0)) continue;
-			ix = x10*t + x0; iy = y10*t + y0;
-
-			if (n0 >= lin0mal) { lin0mal = max(lin0mal*2,n0+1); lin0 = (polbool_lin_t *)realloc(lin0,lin0mal*sizeof(polbool_lin_t)); }
-			if (n1 >= lin1mal) { lin1mal = max(lin1mal*2,n1+1); lin1 = (polbool_lin_t *)realloc(lin1,lin1mal*sizeof(polbool_lin_t)); }
-
-			lin0[n0].x0 = ix; lin0[n0].x1 = lin0[i].x1; lin0[i].x1 = ix;
-			lin0[n0].y0 = iy; lin0[n0].y1 = lin0[i].y1; lin0[i].y1 = iy;
-			lin0[n0].i = lin0[i].i; n0++;
-
-			lin1[n1].x0 = ix; lin1[n1].x1 = lin1[j].x1; lin1[j].x1 = ix;
-			lin1[n1].y0 = iy; lin1[n1].y1 = lin1[j].y1; lin1[j].y1 = iy;
-			lin1[n1].i = lin1[j].i; n1++;
-
-			x1 = ix; y1 = iy;
-		}
-	}
-
-	if ((op == POLYBOOL_SUB) || (op == POLYBOOL_SUBR))
-	{
-		for(i=n1-1;i>=0;i--)
-		{
-			d = lin1[i].x0; lin1[i].x0 = lin1[i].x1; lin1[i].x1 = d;
-			d = lin1[i].y0; lin1[i].y0 = lin1[i].y1; lin1[i].y1 = d;
-		}
-	}
-
-		//Delete non-output lines from lin0 soup..
-	for(i=n0-1;i>=0;i--)
-	{
-		x0 = lin0[i].x0; x1 = lin0[i].x1; ax = (x0+x1)*.5;
-		y0 = lin0[i].y0; y1 = lin0[i].y1; ay = (y0+y1)*.5;
-		if (onpoly(ax,ay,wal1,on1)) //Make sure no exact matches on other loop
-		{
-			for(j=n1-1;j>=0;j--) //FIX:visit hash|bbox(x0,y0,x1,y1){lin1,n1}
-				if ((x0 == lin1[j].x1) && (y0 == lin1[j].y1) &&
-					 (x1 == lin1[j].x0) && (y1 == lin1[j].y0)) { n0--; lin0[i] = lin0[n0]; break; }
-		}
-		else if (inpoly(ax,ay,wal1,on1) == (op != POLYBOOL_AND)) { n0--; lin0[i] = lin0[n0]; }
-	}
-
-	if (n0+n1 >= lin0mal) { lin0mal = max(lin0mal*2,n0+n1); lin0 = (polbool_lin_t *)realloc(lin0,lin0mal*sizeof(polbool_lin_t)); }
-
-		//Copy output lines from lin1 soup to lin0.. (delete unnecessary)
-	oldn0 = n0;
-	for(i=n1-1;i>=0;i--)
-	{
-		ax = (lin1[i].x0+lin1[i].x1)*.5;
-		ay = (lin1[i].y0+lin1[i].y1)*.5;
-		if (onpoly(ax,ay,wal0,on0)) continue;
-		if (inpoly(ax,ay,wal0,on0) != (op != POLYBOOL_OR)) continue;
-		lin0[n0] = lin1[i]; n0++; //copy to lin0/n0
-	}
-	if (n0 < 3) return(0);
-	if (!retwal) return(n0); //Hack to return # walls only
-
-	if (op == POLYBOOL_SUBR) { for(i= 0;i<oldn0;i++) lin0[i].i += 0x80000000; }
-							  else { for(i=oldn0;i<n0;i++) lin0[i].i += 0x80000000; }
-
-	(*retwal) = (wall_t *)malloc(n0*sizeof(wall_t)); if (!(*retwal)) return(0);
-
-		//Convert soup to sector.. (re-loop)
-	oi = 0; on = 0; n = 0;
-	while (1)
-	{
-		j = oi; x1 = lin0[j].x0; y1 = lin0[j].y0;
-		do
-		{
-			i = j;
-			x0 = x1; x1 = lin0[i].x1;
-			y0 = y1; y1 = lin0[i].y1;
-
-			(*retwal)[n].x = x0; (*retwal)[n].y = y0; (*retwal)[n].n = 1;
-			(*retwal)[n].ns = -1; (*retwal)[n].nw = -1;
-			if (!(lin0[i].i&0x80000000)) twal = &wal0[lin0[i].i&0x7fffffff];
-											else twal = &wal1[lin0[i].i&0x7fffffff];
-			(*retwal)[n].owner = twal->owner;
-			(*retwal)[n].surf  = twal->surf; (*retwal)[n].surf.flags &= ~0x20;/*annoying hack to disable 1-way walls*/
-			(*retwal)[n].surfn = twal->surfn;
-			(*retwal)[n].xsurf = twal->xsurf;
-			lin0[i].i = -1; n++;
-
-			for(j=n0-1;j>=0;j--) //FIX:visit hash|bbox(x1,y1,x1,y1){lin0,n0}
-				if ((lin0[j].i != -1) && (lin0[j].x0 == x1) && (lin0[j].y0 == y1)) break;
-		} while (j >= 0);
-		if (n-on >= 3) { (*retwal)[n-1].n = on-n+1; on = n; } else { n = on; }
-		do { oi++; if (oi >= n0) { (*retn) = n; return(1); } } while (lin0[oi].i == -1);
-	}
-}
-
-	//Split complex polygon by line. Returns complex polygon.
-	// owal[],on: input wall list
-	//    retwal: output wall list (malloced inside polyspli if not null)
-	//(kx,ky,ka): valid half-space test (x*kx + y*ky + ka > 0)
-	//   returns: # output walls
-int polyspli (wall_t *owal, int on, wall_t **retwal, double kx, double ky, double ka)
-{
-	typedef struct { float x, y; long n, i; } polspli_t;
-	polspli_t *tpal;
-	wall_t *twal;
-	double t, ti, tj;
-	int i, j, k, n, oi, n2, on2, startn, *spi[2], spin[2];
-	char *got;
-
-	tpal = (polspli_t *)_alloca(on*2*sizeof(polspli_t)); if (!tpal) return(0);
-	spi[0] = (int *)_alloca(((on+1)>>1)*sizeof(wall_t)); if (!spi[0]) return(0);
-	spi[1] = (int *)_alloca(((on+1)>>1)*sizeof(wall_t)); if (!spi[1]) return(0);
-
-		//Clip poly to line, noting intersections to spi[]
-	n = 0; startn = 0; spin[0] = 0; spin[1] = 0;
-	for(i=0;i<on;i++)
-	{
-		j = owal[i].n+i;
-		ti = owal[i].x*kx + owal[i].y*ky + ka;
-		tj = owal[j].x*kx + owal[j].y*ky + ka;
-		if (ti > 0.0)
-		{
-			tpal[n].x = owal[i].x; tpal[n].y = owal[i].y;
-			tpal[n].n = 1; tpal[n].i = i; n++;
-		}
-		if ((ti > 0.0) != (tj > 0.0))
-		{
-			t = ti/(ti-tj); k = (!(ti > 0)); spi[k][spin[k]] = n; spin[k]++;
-			tpal[n].x = (owal[j].x-owal[i].x)*t + owal[i].x;
-			tpal[n].y = (owal[j].y-owal[i].y)*t + owal[i].y;
-			tpal[n].n = 1; tpal[n].i = i; n++;
-		}
-		if ((j < i) && (n-startn >= 3)) { tpal[n-1].n = startn-n+1; startn = n; }
-	}
-	if (n < 3) return(0);
-	if (!retwal) return(n); //Hack to return # walls only
-
-		//Sort intersections..
-	for(k=2-1;k>=0;k--)
-		for(j=1;j<spin[k];j++)
-			for(i=0;i<j;i++)
-				if ((tpal[spi[k][i]].x-tpal[spi[k][j]].x)*ky >
-					 (tpal[spi[k][i]].y-tpal[spi[k][j]].y)*kx)
-					{ t = spi[k][i]; spi[k][i] = spi[k][j]; spi[k][j] = t; }
-
-		//Re-map intersections..
-	for(i=0;i<spin[0];i++) tpal[spi[0][i]].n = spi[1][i]-spi[0][i];
-
-	got = (char *)_alloca(n*sizeof(got[0])); if (!got) return(0);
-	(*retwal) = (wall_t *)malloc(n*sizeof(wall_t)); if (!(*retwal)) return(0);
-
-		//De-spaghettify loops (put in sequential order)
-	for(i=0;i<n;i++) got[i] = 0;
-	n2 = 0; i = 0;
-	while (1)
-	{
-		on2 = n2; oi = i;
-		do
-		{
-			(*retwal)[n2].x = tpal[i].x; (*retwal)[n2].y = tpal[i].y; (*retwal)[n2].n = 1;
-			(*retwal)[n2].ns = -1; (*retwal)[n2].nw = -1;
-			twal = &owal[tpal[i].i];
-			(*retwal)[n2].owner = twal->owner;
-			(*retwal)[n2].surf  = twal->surf; (*retwal)[n].surf.flags &= ~0x20;/*annoying hack to disable 1-way walls*/
-			(*retwal)[n2].surfn = twal->surfn;
-			(*retwal)[n2].xsurf = twal->xsurf;
-			n2++;
-
-			got[i] = 1; i += tpal[i].n;
-		} while (i != oi);
-		(*retwal)[n2-1].n = on2-(n2-1);
-		while (got[i]) { i++; if (i >= n) return(n2); }
-	}
-}
-
-	//Split wall list, slope vs. slope (helper function)
-int polyspli2 (wall_t *owal, int on, wall_t **retwal, long sec0, long isflor0,
-																		long sec1, long isflor1, long dir)
-{
-	double nx0, ny0, ox0, oy0, oz0, nx1, ny1, ox1, oy1, oz1;
-	sect_t *sec = gst->sect;
-
-		//(x-sec[i].wal[0].x)*sec[i].grad[0].x + (y-sec[i].wal[0].y)*sec[i].grad[0].y + (z-sec[i].z[0])*1 > 0 //ceil i
-		//(x-sec[i].wal[0].x)*sec[i].grad[1].x + (y-sec[i].wal[0].y)*sec[i].grad[1].y + (z-sec[i].z[1])*1 < 0 //flor i
-		//(x-sec[j].wal[0].x)*sec[j].grad[0].x + (y-sec[j].wal[0].y)*sec[j].grad[0].y + (z-sec[j].z[0])*1 > 0 //ceil j
-		//(x-sec[j].wal[0].x)*sec[j].grad[1].x + (y-sec[j].wal[0].y)*sec[j].grad[1].y + (z-sec[j].z[1])*1 < 0 //flor j
-		//
-		//(x-ox0)*nx0 + (y-oy0)*ny0 + (z-oz0) > 0
-		//(x-ox1)*nx1 + (y-oy1)*ny1 + (z-oz1) < 0
-		//
-		//x*(nx0-nx1) + y*(ny0-ny1) + ox1*nx1 + oy1*ny1 + oz1 - ox0*nx0 - oy0*ny0 - oz0 = 0
-	nx0 = sec[sec0].grad[isflor0].x; ny0 = sec[sec0].grad[isflor0].y; ox0 = sec[sec0].wall[0].x; oy0 = sec[sec0].wall[0].y; oz0 = sec[sec0].z[isflor0];
-	nx1 = sec[sec1].grad[isflor1].x; ny1 = sec[sec1].grad[isflor1].y; ox1 = sec[sec1].wall[0].x; oy1 = sec[sec1].wall[0].y; oz1 = sec[sec1].z[isflor1];
-	if (!dir) return(polyspli(owal,on,retwal,nx0-nx1,ny0-ny1,ox1*nx1 + oy1*ny1 + oz1 - ox0*nx0 - oy0*ny0 - oz0));
-		  else return(polyspli(owal,on,retwal,nx1-nx0,ny1-ny0,ox0*nx0 + oy0*ny0 + oz0 - ox1*nx1 - oy1*ny1 - oz1));
-}
-
 //---------------------------------------------------------------------------------------------
 
 static void freegamestate (gamestate_t *dst)
@@ -6477,750 +5931,7 @@ void savemap (char *filnam)
 typedef struct { long tilnum, flags, tag; point2d uv[3]; int dummy[6]; short asc, rsc, gsc, bsc; } osurf1_t;
 typedef struct { float x, y; long n, ns, nw; surf_t surf; } owall1_t;
 typedef struct { float z[2]; point2d grad[2]; surf_t surf[2]; long foglev; wall_t *wall; int n, nmax; } osect1_t;
-
-static int loadmap (char *filnam)
-{
-	surf_t *sur;
-	sect_t *sec;
-	wall_t *wal;
-	spri_t *spr;
-	float f, fx, fy;
-	int i, j, k, l;
-	long x, y, z, fileid, hitile, warned = 0, altsects, nnumtiles, nnumspris;
-	short s, cursect;
-	char och, tbuf[256];
-
-	if (!kzopen(filnam))
-	{     //Try without full pathname - see if it's in ZIP/GRP/Mounted_Dir
-		for(i=j=0;filnam[i];i++) if ((filnam[i] == '/') || (filnam[i] == '\\')) j = i+1;
-		if (!j) return(0);
-		filnam = &filnam[j];
-		if (!kzopen(filnam)) return(0);
-	}
-	kzread(&fileid,4);
-	if ((fileid == 0x04034b50) || (fileid == 0x536e654b)) //'PK\3\4' is ZIP file id, 'KenS' is GRP file id
-		{ kzclose(); kzaddstack(filnam); return(1); }
-	sec = gst->sect; gst->light_sprinum = 0;
-	if (fileid == 0x3142534b) //KSB1
-	{
-		typedef struct { long tilnum, flags, tag; point2d uv[3]; int dummy[6]; short asc, rsc, gsc, bsc; } surf1_t;
-		typedef struct { float x, y; long n, ns, nw; surf1_t surf; } wall1_t;
-		typedef struct { float z[2]; point2d grad[2]; surf1_t surf[2]; long foglev; wall1_t *wall; int n, nmax; } sect1_t;
-		surf1_t surf1;
-		wall1_t wall1;
-		sect1_t sect1;
-
-		for(i=gst->numsects-1;i>=0;i--)
-			if (gst->sect[i].wall) { free(gst->sect[i].wall); gst->sect[i].wall = 0; }
-		kzread(&gst->numsects,4);
-		if (gst->numsects > gst->malsects)
-		{
-			i = gst->malsects; gst->malsects = max(gst->numsects+1,gst->malsects<<1);
-			sec = gst->sect = (sect_t *)realloc(sec,gst->malsects*sizeof(sect_t));
-			memset(&sec[i],0,(gst->malsects-i)*sizeof(sect_t));
-		}
-		memset(sec,0,sizeof(sect_t)*gst->numsects);
-		for(i=0;i<gst->numsects;i++)
-		{
-			kzread(&sect1,sizeof(sect1_t));
-			for(j=0;j<2;j++)
-			{
-				sec[i].z[j] = sect1.z[j];
-				sec[i].grad[j] = sect1.grad[j];
-				//for(k=0;k<3;k++) sec[i].surf[j].uv[k] = sect1.surf[j].uv[k];
-				sec[i].surf[j].uv[1].x = sec[i].surf[j].uv[2].y = 1.f;
-				sec[i].surf[j].asc = sect1.surf[j].asc;
-				sec[i].surf[j].rsc = sect1.surf[j].rsc;
-				sec[i].surf[j].gsc = sect1.surf[j].gsc;
-				sec[i].surf[j].bsc = sect1.surf[j].bsc;
-				sec[i].headspri = -1;
-				sec[i].owner = -1;
-			}
-			sec[i].n = sect1.n;
-			sec[i].nmax = sect1.nmax;
-		}
-		for(i=0;i<gst->numsects;i++)
-		{
-			sec[i].wall = (wall_t *)malloc(sec[i].nmax*sizeof(wall_t));
-			memset(sec[i].wall,0,sec[i].nmax*sizeof(wall_t));
-			for(j=0;j<sec[i].n;j++)
-			{
-				kzread(&wall1,sizeof(wall1_t));
-				wal = sec[i].wall;
-				wal[j].x = wall1.x;
-				wal[j].y = wall1.y;
-				wal[j].n = wall1.n;
-				wal[j].ns = wall1.ns;
-				wal[j].nw = wall1.nw;
-				if (!stricmp(&filnam[max(strlen(filnam)-13,0)],"sos_test3.map"))
-					  { for(k=0;k<3;k++) wal[j].surf.uv[k] = wall1.surf.uv[k]; }
-				else { wal[j].surf.uv[1].x = wal[j].surf.uv[2].y = 1.f; }
-				wal[j].surf.asc = wall1.surf.asc;
-				wal[j].surf.rsc = wall1.surf.rsc;
-				wal[j].surf.gsc = wall1.surf.gsc;
-				wal[j].surf.bsc = wall1.surf.bsc;
-				wal[j].surfn = 1;
-				wal[j].owner = -1;
-			}
-		}
-
-		gst->numspris = 0;
-
 #ifdef STANDALONE
-		for(i=numplayers-1;i>=0;i--) gst->p[i].sec.n = 0;
-#endif
-		checknextwalls();
-		checksprisect(-1);
-		kzclose();
-		return(1);
-	}
-	else if (fileid == 0x3242534b) //KSB2 (current BUILD2 map format)
-	{
-		kzread(&gst->startpos,sizeof(gst->startpos));
-		kzread(&gst->startrig,sizeof(gst->startrig));
-		kzread(&gst->startdow,sizeof(gst->startdow));
-		kzread(&gst->startfor,sizeof(gst->startfor));
-		for(i=numplayers-1;i>=0;i--)
-		{
-			gst->p[i].ipos = gst->startpos;
-			gst->p[i].ifor = gst->startfor;
-			gst->p[i].irig = gst->startrig;
-			gst->p[i].idow = gst->startdow;
-			gst->p[i].cursect = -1;
-		}
-
-			//Load sectors
-		altsects = 0;
-		for(i=0;i<gst->numsects;i++)
-		{
-			if (sec[i].owner < 0)
-			{
-				while (sec[i].headspri >= 0) delspri(sec[i].headspri);
-				if (gst->sect[i].wall) { free(gst->sect[i].wall); gst->sect[i].wall = 0; }
-				continue;
-			}
-			for(j=sec[i].headspri;j>=0;j=gst->spri[j].sectn) gst->spri[j].sect = altsects;
-			memcpy(&sec[altsects],&sec[i],sizeof(sect_t)); altsects++;
-		}
-		kzread(&i,4); gst->numsects = i+altsects;
-		if (gst->numsects > gst->malsects)
-		{
-			i = gst->malsects; gst->malsects = max(gst->numsects+1,gst->malsects<<1);
-			sec = gst->sect = (sect_t *)realloc(sec,gst->malsects*sizeof(sect_t));
-			memset(&sec[i],0,(gst->malsects-i)*sizeof(sect_t));
-		}
-		kzread(&sec[altsects],(gst->numsects-altsects)*sizeof(sect_t));
-
-			//Load walls
-		for(i=altsects;i<gst->numsects;i++)
-		{
-			sec[i].wall = (wall_t *)malloc(sec[i].nmax*sizeof(wall_t));
-			sec[i].owner = -1;
-			for(j=0;j<sec[i].n;j++)
-			{
-				kzread(&sec[i].wall[j],sizeof(wall_t));
-
-				if (!sec[i].wall[j].n)
-				{
-					if (!warned)
-					{
-						warned = 1;
-						if (MessageBox(ghwnd,"Your map appears to be corrupt. Load anyway?",prognam,MB_YESNO) == IDNO)
-						{
-							for(;i>=0;i--) free(sec[i].wall);
-							gst->numsects = 0;
-							return(-1);
-						}
-					}
-				}
-
-				sec[i].wall[j].owner = -1;
-				if (sec[i].wall[j].surfn > 1)
-				{
-					sec[i].wall[j].xsurf = (surf_t *)malloc((sec[i].wall[j].surfn-1)*sizeof(surf_t));
-					kzread(sec[i].wall[j].xsurf,(sec[i].wall[j].surfn-1)*sizeof(surf_t));
-				}
-			}
-		}
-
-			//Load tiles
-		kzread(&nnumtiles,4); gnumtiles += nnumtiles;
-		if (gnumtiles > gmaltiles)
-		{
-			gmaltiles = max(gnumtiles+1,gmaltiles<<1);
-			gtile = (tile_t *)realloc(gtile,gmaltiles*sizeof(tile_t));
-		}
-		for(i=gnumtiles-nnumtiles;i<gnumtiles;i++)
-		{
-			kzread(&s,2); kzread(gtile[i].filnam,s); gtile[i].filnam[s] = 0; //FIX:possible buffer overflow here
-			gtile[i].tt.f = 0;
-			gtile[i].namcrc32 = getcrc32z(0,(unsigned char *)gtile[i].filnam);
-		}
-
-			//Load sprites
-		kzread(&nnumspris,4); gst->numspris += nnumspris;
-		if (!nnumspris) for(i=0;i<gst->numsects;i++) { sec[i].headspri = -1; sec[i].owner = -1; } //Hack for loading old format
-		if (gst->numspris > gst->malspris)
-		{
-			i = gst->malspris;
-			gst->malspris = max(gst->numspris+1,gst->malspris<<1);
-			gst->spri = (spri_t *)realloc(gst->spri,gst->malspris*sizeof(spri_t));
-#ifndef STANDALONE
-			for(;i<gst->malspris;i++) gst->spri[i].sect = -1;
-#endif
-		}
-		kzread(&gst->spri[gst->numspris-nnumspris],nnumspris*sizeof(spri_t));
-		for(i=gst->numspris-nnumspris;i<gst->numspris;i++) gst->spri[i].sect += altsects;
-
-
-			// | 0 ..       altsects ..  gst->numsects   |
-			// |   ^old_sects^    |     ^new_sects^      |
-			//
-			// |0..gst->numspris-nnumspris..gst->numspris|
-			// |  ^old_sprites^   |    ^new_sprites^     |
-			//
-			// | 0 ..  gnumtiles-nnumtiles .. gnumtiles  |
-			// |   ^old_tiles^    |     ^new_tiles^      |
-
-			//Adjust tile indices for new sectors(/walls) & sprites
-		for(i=altsects;i<gst->numsects;i++)
-		{
-			for(j=0;j<2       ;j++) sec[i].surf[j].tilnum      += gnumtiles-nnumtiles;
-			for(j=0;j<sec[i].n;j++) sec[i].wall[j].surf.tilnum += gnumtiles-nnumtiles;
-		}
-		for(i=gst->numspris-nnumspris;i<gst->numspris;i++) if (gst->spri[i].tilnum >= 0) gst->spri[i].tilnum += gnumtiles-nnumtiles;
-
-		//-------------------------------------------------------------------
-
-			//Sprite hacks
-		for(i=0;i<gst->numspris;i++)
-		{
-			gst->spri[i].owner = -1;
-
-				//Insert lights
-			if (gst->spri[i].flags&(1<<16))
-			{
-				if (gst->light_sprinum < MAXLIGHTS) gst->light_spri[gst->light_sprinum++] = i;
-			}
-		}
-
-#ifdef STANDALONE
-		for(i=numplayers-1;i>=0;i--) gst->p[i].sec.n = 0;
-#endif
-		checknextwalls();
-		checksprisect(-1);
-
-#if 0
-			//Rebuild hash table from scratch
-		memset(gtilehashead,-1,sizeof(gtilehashead));
-		for(i=0;i<gnumtiles;i++)
-		{
-			j = (gtile[i].namcrc32&(sizeof(gtilehashead)/sizeof(gtilehashead[0])-1));
-			gtile[i].hashnext = gtilehashead[j]; gtilehashead[j] = i;
-		}
-#else
-		compacttilelist_imp(1, (mapstate_t*)gst);
-#endif
-
-		kzclose();
-		return(1);
-	}
-	else if ((fileid == 0x00000007) || //Build1 .MAP format 7
-				(fileid == 0x00000cbe))   //Cubes5 .CUB format
-	{
-			//Build1 format variables:
-		typedef struct { short picnum, heinum; signed char shade; char pal, xpanning, ypanning; } build7surf_t;
-		typedef struct
-		{
-			short wallptr, wallnum;
-			long z[2]; short stat[2]; build7surf_t surf[2];
-			char visibility, filler;
-			short lotag, hitag, extra;
-		} build7sect_t;
-		typedef struct
-		{
-			long x, y;
-			short point2, nextwall, nextsect, cstat, picnum, overpicnum;
-			signed char shade;
-			char pal, xrepeat, yrepeat, xpanning, ypanning;
-			short lotag, hitag, extra;
-		} build7wall_t;
-		typedef struct
-		{
-			long x, y, z; short cstat, picnum;
-			signed char shade; char pal, clipdist, filler;
-			unsigned char xrepeat, yrepeat; signed char xoffset, yoffset;
-			short sectnum, statnum, ang, owner, xvel, yvel, zvel, lotag, hitag, extra;
-		} build7spri_t;
-		build7sect_t b7sec;
-		build7wall_t b7wal;
-		build7spri_t b7spr;
-
-			//Cubes5 format variables:
-		#define BSIZ 16
-		double c1, c2, c3, s1, s2, s3, c1c3, c1s3, s1c3, s1s3;
-		signed short board[6][BSIZ][BSIZ][BSIZ]; //Board layout
-		long posx, posy, posz, a1, a2, a3, oy, yy;
-
-		//------------------------------------------------------------------------
-		long filnum, arttiles, loctile0, loctile1, iskenbuild = 0;
-		short *tilesizx = 0, *tilesizy = 0, *tilefile = 0;
-		char tbuf[MAX_PATH*2];
-
-		kzclose();
-
-		strcpy(curmappath,filnam);
-		for(i=j=0;curmappath[i];i++) if ((curmappath[i] == '/') || (curmappath[i] == '\\')) j = i+1;
-		curmappath[j] = 0;
-
-		arttiles = 0; //Scan .ART files, incrementing number until tile is in range
-		for(filnum=0;1;filnum++)
-		{
-			sprintf(tbuf,"TILES%03d.ART",filnum);
-			if (!kzopen(tbuf))
-			{
-				sprintf(tbuf,"%sTILES%03d.ART",curmappath,filnum);
-				if (!kzopen(tbuf)) break;
-			}
-			kzread(tbuf,16); if (*(long *)&tbuf[0] != 1) break;
-			loctile0 = *(long *)&tbuf[8];
-			loctile1 = (*(long *)&tbuf[12])+1;
-			if ((loctile0 < 0) || (loctile1 <= arttiles) || (loctile0 >= loctile1)) continue;
-			i = arttiles; arttiles = loctile1;
-			tilesizx = (short *)realloc(tilesizx,arttiles*sizeof(tilesizx[0]));
-			tilesizy = (short *)realloc(tilesizy,arttiles*sizeof(tilesizy[0]));
-			tilefile = (short *)realloc(tilefile,arttiles*sizeof(tilefile[0]));
-			for(;i<arttiles;i++) { tilesizx[i] = 0; tilesizy[i] = 0; tilefile[i] = 0; }
-			kzread(&tilesizx[loctile0],(loctile1-loctile0)*sizeof(short));
-			kzread(&tilesizy[loctile0],(loctile1-loctile0)*sizeof(short));
-			for(i=loctile0;i<loctile1;i++) tilefile[i] = filnum;
-		}
-		if (!arttiles)
-		{
-			tilesizx = (short *)malloc(sizeof(tilesizx[0]));
-			tilesizy = (short *)malloc(sizeof(tilesizy[0]));
-			tilefile = (short *)malloc(sizeof(tilefile[0]));
-			tilesizx[0] = tilesizy[0] = 2; tilefile[0] = 0; arttiles = 1;
-		}
-		else if (arttiles >= 20) //Autodetect KenBuild data
-		{
-			for(i=24-1;i>=0;i--) //If the sizes of the 1st 24 tiles match that of Kenbuild, then that's what it is
-			{
-				x = 32; if (i == 4)               x = 16; if (i >= 20) x = 64;
-				y = 32; if ((i == 3) || (i == 4)) y = 16; if (i >= 18) y = 64;
-				if ((tilesizx[i] != x) || (tilesizy[i] != y)) break;
-			}
-			if (i < 0) iskenbuild = 1;
-		}
-
-		kzclose();
-		kzopen(filnam);
-		kzread(&i,4);
-		//------------------------------------------------------------------------
-
-		hitile = 0;
-
-		if (fileid == 0x00000007) //Build1 .MAP format 7
-		{
-			kzread(&x,4); //posx
-			kzread(&y,4); //posy
-			kzread(&z,4); //posz
-			kzread(&s,2); //ang
-			kzread(&cursect,2); //cursectnum
-			gst->startpos.x = ((float)x)*(1.f/512.f);
-			gst->startpos.y = ((float)y)*(1.f/512.f);
-			gst->startpos.z = ((float)z)*(1.f/(512.f*16.f));
-			gst->startfor.x = cos(((float)s)*PI/1024.0);
-			gst->startfor.y = sin(((float)s)*PI/1024.0);
-			gst->startfor.z = 0.f;
-			gst->startrig.x =-gst->startfor.y;
-			gst->startrig.y = gst->startfor.x;
-			gst->startrig.z = 0.f;
-			gst->startdow.x = 0.f;
-			gst->startdow.y = 0.f;
-			gst->startdow.z = 1.f;
-			for(i=numplayers-1;i>=0;i--)
-			{
-				gst->p[i].ipos = gst->startpos;
-				gst->p[i].ifor = gst->startfor;
-				gst->p[i].irig = gst->startrig;
-				gst->p[i].idow = gst->startdow;
-				gst->p[i].cursect = cursect;
-			}
-
-			kzread(&s,2);
-			gst->numsects = (int)s; //numsectors
-			if (gst->numsects > gst->malsects)
-			{
-				i = gst->malsects; gst->malsects = max(gst->numsects+1,gst->malsects<<1);
-				sec = gst->sect = (sect_t *)realloc(sec,gst->malsects*sizeof(sect_t));
-				memset(&sec[i],0,(gst->malsects-i)*sizeof(sect_t));
-			}
-			for(i=0;i<gst->numsects;i++)
-			{
-				kzread(&b7sec,sizeof(b7sec));
-				sec[i].n = sec[i].nmax = b7sec.wallnum;
-				sec[i].wall = (wall_t *)realloc(sec[i].wall,sec[i].nmax*sizeof(wall_t));
-				memset(sec[i].wall,0,sec[i].nmax*sizeof(wall_t));
-				for(j=0;j<2;j++)
-				{
-					sec[i].z[j] = ((float)b7sec.z[j])*(1.f/(512.f*16.f));
-					sec[i].grad[j].x = sec[i].grad[j].y = 0;
-					if (b7sec.stat[j]&2) //Enable slopes flag
-						sec[i].grad[j].y = ((float)b7sec.surf[j].heinum)*(1.f/4096.f);
-					sur = &sec[i].surf[j];
-					sur->flags = 0;
-					if (b7sec.stat[j]&1) sur->flags |= (1<<16);
-					sur->asc = 4096;
-					sur->rsc = (32-b7sec.surf[j].shade)*128;
-					sur->gsc = (32-b7sec.surf[j].shade)*128;
-					sur->bsc = (32-b7sec.surf[j].shade)*128;
-					l = b7sec.surf[j].picnum;
-					if ((unsigned)l >= (unsigned)arttiles) l = 0;
-					sur->tilnum = l; hitile = max(hitile,l);
-
-					// Convert lotag/hitag to single tag field
-					// j=0 is ceiling, j=1 is floor - assign to floor surface only
-					if (j == 1) // Floor surface
-					{
-						// Merge lotag (lower 16 bits) and hitag (upper 16 bits) into single long
-						sur->lotag = b7sec.lotag;
-						sur->hitag = b7sec.hitag;
-					}
-
-					sur->pal = b7sec.surf[j].pal;
-
-					sur->uv[0].x = ((float)b7sec.surf[j].xpanning)/256.0;
-					sur->uv[0].y = ((float)b7sec.surf[j].ypanning)/256.0;
-					sur->uv[1].y = sur->uv[2].x = 0;
-					if (!(b7sec.stat[j]&4))
-					{
-						sur->uv[1].x = 32.0/((float)tilesizx[l]);
-						sur->uv[2].y = 32.0/((float)tilesizy[l]);
-					}
-					else
-					{
-						sur->uv[1].x = 32.0/((float)tilesizy[l]);
-						sur->uv[2].y = 32.0/((float)tilesizx[l]);
-					}
-					if (b7sec.stat[j]&8) { sur->uv[1].x *= 2; sur->uv[2].y *= 2; } //double smooshiness
-					if (b7sec.stat[j]&16) sur->uv[1].x *= -1; //x-flip
-					if (!(b7sec.stat[j]&32)) sur->uv[2].y *= -1; //y-flip
-					if (b7sec.stat[j]&64) //relative alignment
-					{
-						f = ((float)b7sec.surf[j].heinum)*(1.f/4096.f);
-						sur->uv[2].y *= -sqrt(f*f + 1.f);
-						sur->flags |= 4;
-					}
-					if (b7sec.stat[j]&4) //swap x&y
-					{
-						if (((b7sec.stat[j]&16) != 0) != ((b7sec.stat[j]&32) != 0))
-							{ sur->uv[1].x *= -1; sur->uv[2].y *= -1; }
-						sur->uv[1].y = sur->uv[1].x; sur->uv[1].x = 0;
-						sur->uv[2].x = sur->uv[2].y; sur->uv[2].y = 0;
-					}
-
-					//FIX:This hack corrects an LHS vs. RHS bug in a later stage of texture mapping (drawsectfill?)
-					if (sur->uv[1].x*sur->uv[2].y < sur->uv[1].y*sur->uv[2].x)
-						{ sur->uv[2].x *= -1; sur->uv[2].y *= -1; }
-				}
-
-				sec[i].headspri = -1;
-				sec[i].owner = -1;
-				//sec[i].foglev = ?;
-			}
-			kzread(&s,2); //numwalls
-			for(i=k=0;i<gst->numsects;i++)
-			{
-				for(j=0;j<sec[i].n;j++,k++)
-				{
-					kzread(&b7wal,sizeof(b7wal));
-					sec[i].wall[j].x = ((float)b7wal.x)*(1.f/512.f);
-					sec[i].wall[j].y = ((float)b7wal.y)*(1.f/512.f);
-					sec[i].wall[j].n = b7wal.point2-k;
-					sur = &sec[i].wall[j].surf;
-					sur->flags = 0;
-					if (b7wal.cstat&1) sur->flags |= 1;
-
-					// flag at byte 1 : double split  = 1, one tile = 0
-					// bottom tile is taken from overtile of nextwall(meaning opposite side of the wall)
-					// mask tile is undertile field
-
-					sur->lotag = b7wal.lotag;
-					sur->hitag = b7wal.hitag;
-					sur->pal = b7wal.pal;
-
-					sur->uv[0].x = b7wal.xpanning;
-					sur->uv[0].y = b7wal.ypanning;
-					sur->uv[1].x = b7wal.xrepeat; if (b7wal.cstat&  8) sur->uv[1].x *= -1;
-					sur->uv[1].y = sur->uv[2].x = 0;
-					sur->uv[2].y = b7wal.yrepeat; if (b7wal.cstat&256) sur->uv[2].y *= -1;
-					if ((b7wal.nextsect < 0) ^ (!(b7wal.cstat&4))) sur->flags ^= 4; //align bot/nextsec
-					if (b7wal.cstat&(16+32)) sur->flags |= 32; //bit4:masking, bit5:1-way
-					sur->asc = 4096;
-					sur->rsc = (32-b7wal.shade)*128;
-					sur->gsc = (32-b7wal.shade)*128;
-					sur->bsc = (32-b7wal.shade)*128;
-					l = b7wal.picnum; if ((unsigned)l >= (unsigned)arttiles) l = 0;
-					sur->tilnum = l; hitile = max(hitile,l);
-					sec[i].wall[j].surfn = 1;
-					sec[i].wall[j].owner = -1;
-				}
-				// tile adjust?
-				for(j=0;j<sec[i].n;j++)
-				{
-					l = j+sec[i].wall[j].n;
-					fx = sec[i].wall[l].x - sec[i].wall[j].x;
-					fy = sec[i].wall[l].y - sec[i].wall[j].y;
-					f = sqrt(fx*fx + fy*fy);
-					sur = &sec[i].wall[j].surf;
-					l = sur->tilnum;
-					sur->uv[1].x = ((float)sur->uv[1].x*8.0)/(f*((float)tilesizx[l]));
-					sur->uv[2].y = ((float)sur->uv[2].y*4.0)/((float)tilesizy[l]);
-					sur->uv[0].x = ((float)sur->uv[0].x)/((float)tilesizx[l]);
-					sur->uv[0].y = ((float)sur->uv[0].y)/256.f * (1-2*(sur->uv[2].y < 0));
-				}
-
-				fx = sec[i].wall[1].y-sec[i].wall[0].y;
-				fy = sec[i].wall[0].x-sec[i].wall[1].x;
-				f = fx*fx + fy*fy; if (f > 0) f = 1.0/sqrt(f); fx *= f; fy *= f;
-				for(j=0;j<2;j++)
-				{
-					sec[i].grad[j].x = fx*sec[i].grad[j].y;
-					sec[i].grad[j].y = fy*sec[i].grad[j].y;
-				}
-			}
-
-			kzread(&s,2); gst->numspris = (int)s;
-			if (gst->numspris > gst->malspris)
-			{
-				i = gst->malspris;
-				gst->malspris = max(gst->numspris+1,gst->malspris<<1);
-				gst->spri = (spri_t *)realloc(gst->spri,gst->malspris*sizeof(spri_t));
-#ifndef STANDALONE
-				for(;i<gst->malspris;i++) gst->spri[i].sect = -1;
-#endif
-			}
-			for(i=0;i<gst->numspris;i++)
-			{
-				kzread(&b7spr,sizeof(b7spr));
-				spr = &gst->spri[i];
-				memset(spr,0,sizeof(spri_t));
-
-				l = b7spr.picnum; if ((unsigned)l >= (unsigned)arttiles) l = 0;
-				spr->p.x = ((float)b7spr.x)*(1.f/512.f);
-				spr->p.y = ((float)b7spr.y)*(1.f/512.f);
-				spr->p.z = ((float)b7spr.z)*(1.f/(512.f*16.f));
-				spr->flags = 0;
-				switch(b7spr.cstat&48)  // https://wiki.eduke32.com/wiki/Cstat_(sprite)
-										// 48  =32  +16 wall or  floor only check
-					{
-					case 0: //Face sprite
-						spr->flags |= 16;
-						//no break intentional
-					case 48: //Voxel sprite
-						//no break intentional
-					case 16: //Wall sprite
-						spr->p.z -= (b7spr.yrepeat/4096.0*(float)tilesizy[l]);
-						spr->r.x = sin((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
-						spr->r.y =-cos((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
-						spr->d.z = (b7spr.yrepeat/4096.0*(float)tilesizy[l]);
-						break;
-					case 32: //Floor sprite
-						spr->r.x = sin((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
-						spr->r.y =-cos((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
-						spr->d.x = cos((float)b7spr.ang*PI/1024.0)*(b7spr.yrepeat/4096.0*(float)tilesizy[l]);
-						spr->d.y = sin((float)b7spr.ang*PI/1024.0)*(b7spr.yrepeat/4096.0*(float)tilesizy[l]);
-						if (b7spr.cstat&8) { spr->d.x *= -1; spr->d.y *= -1; }
-						break;
-				}
-				if (b7spr.cstat&1) spr->flags |= 1; // blocking
-				if (b7spr.cstat&64) spr->flags |= 64; // 1 sided
-				if (b7spr.cstat&4) { spr->r.x *= -1; spr->r.y *= -1; spr->r.z *= -1; spr->flags ^= 4; } //&4: x-flipped
-				if (b7spr.cstat&8) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; spr->flags ^= 4; } //&8: y-flipped?
-				if (b7spr.cstat&128) { spr->p.z += (b7spr.yrepeat/4096.0*(float)tilesizy[l]); } //&128: real-centered centering (center at center) - originally half submerged sprite
-
-				if ((unsigned)b7spr.sectnum < (unsigned)gst->numsects) //Make shade relative to sector
-				{
-					j = b7spr.sectnum; j = 32 - gst->sect[j].surf[gst->sect[j].surf[0].flags&1^1].rsc/128;
-					if (iskenbuild) b7spr.shade += j+6;
-				}
-
-				spr->f.z=3; // sus
-				spr->f.x=cos((float)b7spr.ang*PI/1024.0);
-				spr->f.y=sin((float)b7spr.ang*PI/1024.0);
-				spr->fat = 0.f;
-				spr->asc = 4096;
-				spr->rsc = (32-b7spr.shade)*128;
-				spr->gsc = (32-b7spr.shade)*128;
-				spr->bsc = (32-b7spr.shade)*128;
-
-				spr->mas = spr->moi = 1.0;
-				spr->owner = -1;
-
-				spr->tilnum = l; hitile = max(hitile,l);
-				spr->sect = b7spr.sectnum;
-				spr->sectn = spr->sectp = -1;
-				spr->lotag = b7spr.lotag;
-				spr->hitag = b7spr.hitag;
-				spr->pal = b7spr.pal;
-			}
-		}
-		else //CUBES5 map format (.CUB extension)
-		{
-			kzread(&x,4); //posx
-			kzread(&y,4); //posy
-			kzread(&z,4); //posz
-			kzread(&a1,4); //angle range: 0-2047
-			kzread(&a2,4);
-			kzread(&a3,4);
-			gst->startpos.x =      ((float)x)*(1.f/1024.f);
-			gst->startpos.y = 16.f-((float)z)*(1.f/1024.f);
-			gst->startpos.z =      ((float)y)*(1.f/1024.f);
-			dcossin((double)a3*PI/1024.0,&c1,&s1);
-			dcossin((double)a2*PI/1024.0,&c2,&s2);
-			dcossin((double)a1*PI/1024.0,&c3,&s3);
-			c1c3 = c1*c3; c1s3 = c1*s3; s1c3 = s1*c3; s1s3 = s1*s3;
-			gst->startrig.x = c1c3 + s1s3*s2;
-			gst->startrig.y = s1c3 - c1s3*s2;
-			gst->startrig.z = -s3*c2;
-			gst->startdow.x = c1s3 - s1c3*s2;
-			gst->startdow.y = s1s3 + c1c3*s2;
-			gst->startdow.z = c3*c2;
-			gst->startfor.x = s1*c2;
-			gst->startfor.y = -c1*c2;
-			gst->startfor.z = s2;
-			for(i=numplayers-1;i>=0;i--)
-			{
-				gst->p[i].ipos = gst->startpos;
-				gst->p[i].irig = gst->startrig;
-				gst->p[i].idow = gst->startdow;
-				gst->p[i].ifor = gst->startfor;
-				gst->p[i].cursect = -1;
-			}
-
-				//6 faces * BSIZ^3 board map * 2 bytes for picnum
-				//if face 0 is -1, the cube is air
-			kzread(board,6*BSIZ*BSIZ*BSIZ*sizeof(short));
-			gst->numsects = 0;
-			for(x=0;x<BSIZ;x++)
-				for(z=0;z<BSIZ;z++)
-				{
-					oy = BSIZ;
-					for(y=0;y<BSIZ;y++)
-					{
-						if (board[0][x][y][z] >= 0) continue;
-
-						if (oy > y) oy = y;
-						if ((y < BSIZ-1) && (board[0][x][y+1][z] < 0)) continue;
-
-						if (gst->numsects >= gst->malsects)
-						{
-							i = gst->malsects; gst->malsects = max(gst->numsects+1,gst->malsects<<1);
-							sec = gst->sect = (sect_t *)realloc(sec,gst->malsects*sizeof(sect_t));
-							memset(&sec[i],0,(gst->malsects-i)*sizeof(sect_t));
-						}
-
-						i = gst->numsects;
-						sec[i].n = sec[i].nmax = 4;
-						sec[i].wall = (wall_t *)realloc(sec[i].wall,sec[i].nmax*sizeof(wall_t));
-						memset(sec[i].wall,0,sec[i].nmax*sizeof(wall_t));
-						sec[i].z[0] = (float) oy  ;
-						sec[i].z[1] = (float)(y+1);
-						for(j=0;j<2;j++)
-						{
-							sec[i].grad[j].x = sec[i].grad[j].y = 0;
-							sur = &sec[i].surf[j];
-							sur->uv[1].x = sur->uv[2].y = 1.f;
-							sur->asc = 4096;
-							sur->rsc = 4096-768+1536*j;
-							sur->gsc = 4096-768+1536*j;
-							sur->bsc = 4096-768+1536*j;
-
-							if (!j) l = board[4][x][oy-1][z];
-								else l = board[1][x][ y+1][z];
-							if ((unsigned)l >= (unsigned)arttiles) l = 0;
-							sur->tilnum = l; hitile = max(hitile,l);
-							sur->uv[1].x = max(64.f/((float)tilesizx[l]),1.f);
-							sur->uv[2].y = max(64.f/((float)tilesizy[l]),1.f);
-						}
-						//sec[i].foglev = ?;
-						sec[i].headspri = -1;
-						sec[i].owner = -1;
-
-						for(j=0;j<4;j++)
-						{
-							sec[i].wall[j].x = ((float)(       x+(((j+1)>>1)&1)))*(1.f);
-							sec[i].wall[j].y = ((float)(BSIZ-1-z+(( j  )>>1)   ))*(1.f);
-							if (j < 3) sec[i].wall[j].n = 1; else sec[i].wall[j].n = -3;
-							sec[i].wall[j].surf.uv[1].x = sec[i].wall[j].surf.uv[2].y = 1;
-							sec[i].wall[j].surf.asc = 4096;
-							sec[i].wall[j].surf.rsc = 4096+(labs(j-1)-1)*512;
-							sec[i].wall[j].surf.gsc = 4096+(labs(j-1)-1)*512;
-							sec[i].wall[j].surf.bsc = 4096+(labs(j-1)-1)*512;
-							sec[i].wall[j].surfn = 1;
-							sec[i].wall[j].owner = -1;
-
-							l = -1;
-							for(yy=oy;yy<=y;yy++)
-							{
-								switch (j)
-								{
-									case 0: if (board[0][x  ][yy][z+1] < 0) break; l = board[2][x  ][yy][z+1]; break;
-									case 1: if (board[0][x+1][yy][z  ] < 0) break; l = board[0][x+1][yy][z  ]; break;
-									case 2: if (board[0][x  ][yy][z-1] < 0) break; l = board[5][x  ][yy][z-1]; break;
-									case 3: if (board[0][x-1][yy][z  ] < 0) break; l = board[3][x-1][yy][z  ]; break;
-								}
-								if ((unsigned)l < (unsigned)arttiles) break;
-							}
-							if ((unsigned)l >= (unsigned)arttiles) l = 0;
-							sec[i].wall[j].surf.tilnum = l; hitile = max(hitile,l);
-							sec[i].wall[j].surf.uv[1].x = max(64.f/((float)tilesizx[l]),1.f);
-							sec[i].wall[j].surf.uv[2].y = max(64.f/((float)tilesizy[l]),1.f);
-						}
-						gst->numsects++;
-
-						oy = BSIZ;
-					}
-				}
-
-			gst->numspris = 0;
-		}
-
-			//Set texture names..
-		for(i=gnumtiles-1;i>=0;i--)
-			if (gtile[i].tt.f) { free((void *)gtile[i].tt.f); gtile[i].tt.f = 0; }
-		gnumtiles = 0; memset(gtilehashead,-1,sizeof(gtilehashead));
-
-		hitile++;
-		if (hitile > gmaltiles)
-		{
-			gmaltiles = hitile;
-			gtile = (tile_t *)realloc(gtile,gmaltiles*sizeof(tile_t));
-		}
-		for(i=0;i<hitile;i++)
-		{
-			sprintf(tbuf,"tiles%03d.art|%d",tilefile[i],i);
-			gettileind(tbuf);
-		}
-
-		if (tilesizx) free(tilesizx);
-		if (tilesizy) free(tilesizy);
-		if (tilefile) free(tilefile);
-
-#ifdef STANDALONE
-		for(i=numplayers-1;i>=0;i--) gst->p[i].sec.n = 0;
-#endif
-		checknextwalls();
-		checksprisect(-1);
-		kzclose();
-		return(1);
-	}
-	else { return(0); } //MessageBox(ghwnd,"Invalid MAP format",prognam,MB_OK);
-}
-
-#ifdef STANDALONE
-
 static void releasegrabdrag (long curindex, long doplaysound)
 {
 	#define MAXVERTS 256 //FIX:timebomb: assumes there are never > 256 sectors connected at same vertex
