@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="VcsDirectoryMappings">
+    <mapping directory="$PROJECT_DIR$/.." vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/External/LuaJIT" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/build/_deps/rlimgui-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/cmake-build-relwithdebinfo-visual-studio/_deps/rlimgui-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/luajit/cmake-build-debug-mingw/src/luajit_build" vcs="Git" />
+  </component>
+</project>
