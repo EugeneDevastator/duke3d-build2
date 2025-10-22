@@ -4,7 +4,9 @@
 #include <math.h>
 #include <windows.h>
 #include <malloc.h>
+#ifndef PI
 #define PI 3.141592653589793
+#endif
 #ifndef BUILD2_MAPCORE_H
 #define BUILD2_MAPCORE_H
 typedef struct { float x, y; } point2d;

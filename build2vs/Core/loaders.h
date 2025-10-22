@@ -142,8 +142,25 @@ static void compacttilelist_imp (long flags, mapstate_t* map)
 		}
 	}
 }
+static long gettileind (char *st)
+{
+	long i, crc32, hashind;
 
-void loadpic_imp (tile_t *tpic)
+	crc32 = getcrc32z(0,(unsigned char *)st); hashind = (crc32&(sizeof(gtilehashead)/sizeof(gtilehashead[0])-1));
+	for(i=gtilehashead[hashind];i>=0;i=gtile[i].hashnext)
+	{
+		if (gtile[i].namcrc32 != crc32) continue;
+		if (!stricmp(gtile[i].filnam,st)) return(i);
+	}
+	if (gnumtiles >= gmaltiles) { gmaltiles = max(gnumtiles+1,gmaltiles<<1); gtile = (tile_t *)realloc(gtile,gmaltiles*sizeof(tile_t)); }
+	strcpy(gtile[gnumtiles].filnam,st);
+	gtile[gnumtiles].namcrc32 = crc32;
+	gtile[gnumtiles].hashnext = gtilehashead[hashind]; gtilehashead[hashind] = gnumtiles;
+	gtile[gnumtiles].tt.f = 0;
+	gnumtiles++;
+	return(gnumtiles-1);
+}
+void loadpic_imp (tile_t *tpic, mapstate_t* gst)
 {
 	static unsigned char lastpal[256][4], uch;
 	tiltyp *pic;
@@ -264,13 +281,13 @@ void loadpic_imp (tile_t *tpic)
 #endif
 	if (!pic->f) { pic->f = (long)nullpic; pic->x = 64; pic->y = 64; pic->p = (pic->x<<2); pic->lowermip = 0; }
 }
-static int arewallstouching (int s0, int w0, int s1, int w1)
+static int arewallstouching (int s0, int w0, int s1, int w1, mapstate_t* map)
 {
 	sect_t *sec;
 	float x[4], y[4];
 	int i;
 
-	sec = gst->sect;
+	sec = map->sect;
 
 	x[0] = sec[s0].wall[w0].x; y[0] = sec[s0].wall[w0].y; i = sec[s0].wall[w0].n+w0;
 	x[1] = sec[s0].wall[i ].x; y[1] = sec[s0].wall[i ].y;
@@ -466,7 +483,7 @@ cnw_break2:;
 						s1 = subhashlist[j].s; if (s0 == s1) continue; //Don't allow 2-vertex loops to become red lines
 						w1 = subhashlist[j].w;
 						//printf("//   cmp: j=%2d,w=%2d,r=%2d, %3d,%3d, %3d,%3d, ",j,w,r,s0,w0,s1,w1); //FIX
-						if (!arewallstouching(s0,w0,s1,w1)) { /*printf("no\n");FIX*/ continue; }
+						if (!arewallstouching(s0,w0,s1,w1,map)) { /*printf("no\n");FIX*/ continue; }
 						//printf("yes\n"); //FIX
 
 						s2 = sec[s0].wall[w0].ns;
@@ -614,7 +631,7 @@ static int loadmap_imp (char *filnam, mapstate_t* map)
 		{
 			if (sec[i].owner < 0)
 			{
-				while (sec[i].headspri >= 0) delspri(sec[i].headspri);
+				while (sec[i].headspri >= 0) delspri_imp(sec[i].headspri,map);
 				if (map->sect[i].wall) { free(map->sect[i].wall); map->sect[i].wall = 0; }
 				continue;
 			}
@@ -644,7 +661,7 @@ static int loadmap_imp (char *filnam, mapstate_t* map)
 					if (!warned)
 					{
 						warned = 1;
-						if (MessageBox(ghwnd,"Your map appears to be corrupt. Load anyway?",prognam,MB_YESNO) == IDNO)
+						if (true)//(MessageBox(ghwnd,"Your map appears to be corrupt. Load anyway?",prognam,MB_YESNO) == IDNO)
 						{
 							for(;i>=0;i--) free(sec[i].wall);
 							map->numsects = 0;

@@ -3435,24 +3435,6 @@ static HCURSOR gencrosscursor (void)
 
 //--------------------------------------------------------------------------------------------------
 
-long gettileind (char *st)
-{
-	long i, crc32, hashind;
-
-	crc32 = getcrc32z(0,(unsigned char *)st); hashind = (crc32&(sizeof(gtilehashead)/sizeof(gtilehashead[0])-1));
-	for(i=gtilehashead[hashind];i>=0;i=gtile[i].hashnext)
-	{
-		if (gtile[i].namcrc32 != crc32) continue;
-		if (!stricmp(gtile[i].filnam,st)) return(i);
-	}
-	if (gnumtiles >= gmaltiles) { gmaltiles = max(gnumtiles+1,gmaltiles<<1); gtile = (tile_t *)realloc(gtile,gmaltiles*sizeof(tile_t)); }
-	strcpy(gtile[gnumtiles].filnam,st);
-	gtile[gnumtiles].namcrc32 = crc32;
-	gtile[gnumtiles].hashnext = gtilehashead[hashind]; gtilehashead[hashind] = gnumtiles;
-	gtile[gnumtiles].tt.f = 0;
-	gnumtiles++;
-	return(gnumtiles-1);
-}
 
 long settilefilename (long hitsect, long hitwall, char *filnam)
 {
