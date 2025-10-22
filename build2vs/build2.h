@@ -5,92 +5,23 @@
 #include <windows.h>
 #include <malloc.h>
 
+
 #pragma pack(push,1)
 
-typedef struct { float x, y; } point2d;
+
 #ifdef BUILD2
  //^ FIXFIXFIXFIX: hack to avoid redefinition error!
 #define EXTERN
 #else
 #define EXTERN extern
 #endif
-typedef struct { float x, y, z, u, v; int n; } kgln_t;
-#ifndef KEN_DRAWPOLY_H
-typedef struct tiltyp { long f, p, x, y, z; float shsc; tiltyp *lowermip; } tiltyp; //shsc=suggested height scale
-typedef struct { float x, y, z; } point3d;
-typedef struct { double x, y, z; } dpoint3d;
-typedef struct { INT_PTR f; int p, x, y; } tiletype;
-typedef struct { tiltyp c, z; point3d p, r, d, f, h; } cam_t;
-#endif
-
-typedef struct
-{
-	char filnam[240]; //Must fit packet header, sector&wall index, null terminator in 256 byte packet
-	tiltyp tt; //union! if (!tt.p), it's a 3D model, tt.f points to raw model data, tt.x is type
-	long namcrc32, hashnext;
-} tile_t;
-EXTERN tile_t *gtile;
-EXTERN long gnumtiles, gmaltiles, gtilehashead[1024];
-
-//--------------------------------------------------------------------------------------------------
-	//Map format:
-typedef struct
-{
-	long tilnum, tilanm/*???*/;
-
-	//Bit0:Blocking, Bit2:RelativeAlignment, Bit5:1Way, Bit16:IsParallax, Bit17:IsSkybox
-	union { long flags; struct { char _f1, _f2, _f3, pal; }; }; // temporary pal storage
-	union { long tag; struct { short lotag, hitag; }; };
-
-	point2d uv[3];
-	unsigned short asc, rsc, gsc, bsc; //4096 is no change
-} surf_t;
-
-typedef struct
-{
-	float x, y;
-	long n, ns, nw; //n:rel. wall ind.; ns & nw : nextsect & nextwall_of_sect
-	long owner; //for dragging while editing, other effects during game
-	long surfn;
-	surf_t surf, *xsurf; //additional malloced surfs when (surfn > 1)
-} wall_t;
-
-typedef struct
-{
-	point3d p, r, d, f;      //Position, orientation (right, down, forward)
-	point3d v, av;           //Position velocity, Angular velocity (direction=axis, magnitude=vel)
-	float fat, mas, moi;     //Physics (moi=moment of inertia)
-	long tilnum;             //Model file. Ex:"TILES000.ART|64","CARDBOARD.PNG","CACO.KV6","HAND.KCM","IMP.MD3"
-	unsigned short asc, rsc, gsc, bsc; //Color scales. 4096 is no change
-	long owner;
-	union { long tag; struct { short lotag, hitag; }; };
-	long tim, otim;          //Time (in milliseconds) for animation
-
-	//Bit0:Blocking, Bit2:1WayOtherSide, Bit5,Bit4:Face/Wall/Floor/.., Bit6:1side, Bit16:IsLight, Bit17-19:SpotAx(1-6), Bit20-29:SpotWid, Bit31:Invisible
-	union { long flags; struct { char _f1, _f2, _f3, pal; }; }; // temporary pal storage
-
-	long sect, sectn, sectp; //Current sector / doubly-linked list of indices
-} spri_t;
-
-typedef struct
-{
-	float minx, miny, maxx, maxy; //bounding box
-	float z[2];      //ceil&flor height
-	point2d grad[2]; //ceil&flor grad. grad.x = norm.x/norm.z, grad.y = norm.y/norm.z
-	surf_t surf[2];  //ceil&flor texture info
-	wall_t *wall;
-	long n, nmax;    //n:numwalls, nmax:walls malloced (nmax >= n)
-	long headspri;   //head sprite index (-1 if none)
-	long foglev;
-	long owner;      //for dragging while editing, other effects during game
-} sect_t;
 //--------------------------------------------------------------------------------------------------
 
 #ifdef STANDALONE
 #define TYPEMESSNUM 8
 #define TYPEMESSLENG 256
 #endif
-
+#include "Core/mapcore.h"
 typedef struct
 {
 		//screen/camera state
@@ -136,14 +67,22 @@ typedef struct
 #define MAXPLAYERS 4
 typedef struct
 {
-	point3d startpos, startrig, startdow, startfor;
-	int numsects, malsects; sect_t *sect;
-	int numspris, malspris; spri_t *spri;
-	int blankheadspri;
+	union {
+		// New way: access via map
+		struct {
+			mapstate_t map;
+		};
 
-	#define MAXLIGHTS 256
-	int light_spri[MAXLIGHTS], light_sprinum; //List of active light sprite indices
-
+		// Old way: direct access (maintains binary compatibility)
+		struct {
+			point3d startpos, startrig, startdow, startfor;
+			int numsects, malsects; sect_t *sect;
+			int numspris, malspris; spri_t *spri;
+			int blankheadspri;
+			int light_spri[MAXLIGHTS], light_sprinum;
+		};
+	};
+	// end of map storage
 	playerstruct_t p[MAXPLAYERS];
 
 	int rseed;
@@ -156,7 +95,7 @@ typedef struct
 } gamestate_t;
 EXTERN gamestate_t sst, pst, *gst;
 
-typedef struct { int w, s; } vertlist_t;
+
 
 	//Build2 shared global variables:
 EXTERN struct
@@ -186,17 +125,16 @@ extern int build2_loadmap (const char *filnam, int *cursect,
 extern void build2_copygamestate (gamestate_t *dst, gamestate_t *src);
 extern double getslopez (sect_t *s, int i, double x, double y);
 extern int wallprev (sect_t *s, int w);
-extern int getverts (int s, int w, vertlist_t *ver, int maxverts);
 extern void getcentroid (wall_t *wal, int n, float *retcx, float *retcy);
 extern float getarea (wall_t *wal, int n);
 extern void reversewalls (wall_t *wal, int n);
 extern void rotatewallsurfsleft1 (wall_t *wal, int n);
 extern void dragpoint (gamestate_t *lst, int s, int w, float x, float y);
 extern void delwall (sect_t *s, int w);
-extern int dupwall (sect_t *s, int w);
-extern void delsect (int s);
+//extern int dupwall (sect_t *s, int w);
+//extern void delsect (int s);
 extern int insidesect (double x, double y, wall_t *wal, int w);
-extern void updatesect (float x, float y, float z, int *cursect);
+//extern void updatesect (float x, float y, float z, int *cursect);
 extern int polybool (wall_t *wal0, int n0, wall_t *wal1, int n1, wall_t **wal2, int *n2, int op);
 extern void checknextwalls ();
 extern long gettileind (char *filnam);

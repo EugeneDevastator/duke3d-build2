@@ -16,15 +16,20 @@ set(SOURCES
     drawcone.c
     drawkv6.c
     morph.c
-    kplib.c
+        Core/kplib.c
+        Core/mapcore.c
     winmain.cpp
 )
 
 # Headers
 set(HEADERS
+        Core/mapcore.h
     build2.h
     drawpoly.h
     sysmain.h
+        Core/loaders.h
+        Core/kplib.h
+
 )
 
 # Create Windows executable (not console)
