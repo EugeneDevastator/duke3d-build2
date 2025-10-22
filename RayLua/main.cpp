@@ -25,6 +25,25 @@ struct TransparentRect {
 };
 void MapTest()
 {
+    map = static_cast<mapstate_t*>(malloc(sizeof(mapstate_t)));
+    initcrc32();
+
+    gnumtiles = 0; memset(gtilehashead,-1,sizeof(gtilehashead));
+    gmaltiles = 256;
+    gtile = (tile_t *)malloc(gmaltiles*sizeof(tile_t)); if (!gtile) return;
+    //memset(gtile,0,gmaltiles*sizeof(tile_t)); //FIX
+
+    map->numsects = 0;
+    map->malsects = 256;
+    map->sect = (sect_t *)malloc(map->malsects*sizeof(sect_t)); if (!map->sect) return;
+    memset(map->sect,0,map->malsects*sizeof(sect_t));
+
+    map->numspris = 0;
+    map->malspris = 256;
+    map->spri = (spri_t *)malloc(map->malspris*sizeof(spri_t)); if (!map->spri) return;
+    memset(map->spri,0,map->malspris*sizeof(spri_t));
+    map->blankheadspri = -1;
+    memset(map,0,sizeof(mapstate_t));
    loadmap_imp((char*)"c:/Eugene/Games/build2/E2L5.MAP",map);
 int a =1;
 }

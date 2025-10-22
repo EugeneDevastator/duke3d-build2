@@ -50,10 +50,9 @@ signed char kplib_coltype, kplib_bitdepth;
 char *kplib_filterlist = 0;
 int kplib_filterlistmal = 0;
 static long kz_get_file_length(FILE* file) {
-	long current = ftell(file);
-	fseek(file, 0, SEEK_END);
+	fseek(file, 0L, SEEK_END);
 	long length = ftell(file);
-	fseek(file, current, SEEK_SET);
+	rewind(file);
 	return length;
 }
 //============================ KPNGILIB begins ===============================
@@ -2825,19 +2824,19 @@ int kzopen (const char *filnam)
 	FILE *fil;
 	int i, j, fileoffs, fileleng;
 	char tempbuf[46+260], *zipnam, iscomp;
-
+	errno_t err;
 	//kzfs.fil = 0;
 	if (filnam[0] != '|') //Search standalone file first
 	{
-		kzfs.fil = fopen(filnam,"rb");
+		err = fopen_s(&kzfs.fil, filnam,"r");
 		if (kzfs.fil)
 		{
 			kzfs.comptyp = 0;
 			kzfs.seek0 = 0;
-			kzfs.leng = kz_get_file_length(_fileno(kzfs.fil));
+			kzfs.leng = kz_get_file_length(kzfs.fil);
 			kzfs.pos = 0;
 			kzfs.i = 0;
-			return((long*)kzfs.fil);
+			return(err);
 		}
 	}
 	if (kzcheckhash(filnam,&zipnam,&fileoffs,&fileleng,&iscomp)) //Then check mounted ZIP/GRP files
@@ -2900,7 +2899,7 @@ int kzopen (const char *filnam)
 		{
 			kzfs.comptyp = 0;
 			kzfs.seek0 = 0;
-			kzfs.leng = kz_get_file_length(_fileno(kzfs.fil));
+			kzfs.leng = kz_get_file_length(kzfs.fil);
 			kzfs.pos = 0;
 			kzfs.i = 0;
 			return((long*)kzfs.fil);
