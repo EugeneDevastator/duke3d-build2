@@ -29,133 +29,7 @@ credits.
 -Ken S.
 **************************************************************************************************/
 
-#include <string.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <stdio.h>
-#include <stdlib.h>
 
-enum //kpgetdim() return values:
-{
-	KPLIB_NONE=0,
-	KPLIB_PNG, KPLIB_JPG, KPLIB_GIF, KPLIB_CEL,
-	KPLIB_BMP, KPLIB_PCX, KPLIB_DDS, KPLIB_TGA,
-};
-
-#if defined(__POWERPC__)
-#define BIGENDIAN 1
-#endif
-
-#ifdef BIGENDIAN
-static unsigned int LSWAPIB (unsigned int a) { return(((a>>8)&0xff00)+((a&0xff00)<<8)+(a<<24)+(a>>24)); }
-static unsigned short SSWAPIB (unsigned short a) { return((a>>8)+(a<<8)); }
-#define LSWAPIL(a) (a)
-#define SSWAPIL(a) (a)
-#else
-#define LSWAPIB(a) (a)
-#define SSWAPIB(a) (a)
-static unsigned int LSWAPIL (unsigned int a) { return(((a>>8)&0xff00)+((a&0xff00)<<8)+(a<<24)+(a>>24)); }
-static unsigned short SSWAPIL (unsigned short a) { return((a>>8)+(a<<8)); }
-#endif
-
-#ifdef __GNUC__
-#include <stdint.h>
-#define INT_PTR intptr_t
-#define UINT_PTR uintptr_t
-#endif
-
-#if !defined(_WIN32) && !defined(__DOS__)
-#include <unistd.h>
-#include <dirent.h>
-typedef long long __int64;
-static __inline int _lrotl (int i, int sh)
-	{ return((i>>(-sh))|(i<<sh)); }
-static __inline int filelength (int h)
-{
-	struct stat st;
-	if (fstat(h,&st) < 0) return(-1);
-	return(st.st_size);
-}
-#define _fileno fileno
-#else
-#include <io.h>
-#endif
-
-#if defined(__DOS__)
-#include <dos.h>
-#elif defined(_WIN32)
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#endif
-
-#ifndef O_BINARY
-#define O_BINARY 0
-#endif
-#if !defined(max)
-#define max(a,b) (((a) > (b)) ? (a) : (b))
-#endif
-#if !defined(min)
-#define min(a,b) (((a) < (b)) ? (a) : (b))
-#endif
-
-#if defined(__GNUC__)
-#define _inline inline
-#endif
-
-	//use GCC-specific extension to force symbol name to be something in particular to override underscoring.
-#if defined(__GNUC__) && defined(__i386__) && !defined(NOASM)
-#define ASMNAME(x) asm(x)
-#else
-#define ASMNAME(x)
-#endif
-
-static int bytesperline, xres, yres, globxoffs, globyoffs;
-static INT_PTR frameplace;
-
-static const int pow2mask[32] =
-{
-	0x00000000,0x00000001,0x00000003,0x00000007,
-	0x0000000f,0x0000001f,0x0000003f,0x0000007f,
-	0x000000ff,0x000001ff,0x000003ff,0x000007ff,
-	0x00000fff,0x00001fff,0x00003fff,0x00007fff,
-	0x0000ffff,0x0001ffff,0x0003ffff,0x0007ffff,
-	0x000fffff,0x001fffff,0x003fffff,0x007fffff,
-	0x00ffffff,0x01ffffff,0x03ffffff,0x07ffffff,
-	0x0fffffff,0x1fffffff,0x3fffffff,0x7fffffff,
-};
-static const int pow2long[32] =
-{
-	0x00000001,0x00000002,0x00000004,0x00000008,
-	0x00000010,0x00000020,0x00000040,0x00000080,
-	0x00000100,0x00000200,0x00000400,0x00000800,
-	0x00001000,0x00002000,0x00004000,0x00008000,
-	0x00010000,0x00020000,0x00040000,0x00080000,
-	0x00100000,0x00200000,0x00400000,0x00800000,
-	0x01000000,0x02000000,0x04000000,0x08000000,
-	0x10000000,0x20000000,0x40000000,0x80000000,
-};
-
-	//Hack for peekbits,getbits,suckbits (to prevent lots of duplicate code)
-	//   0: PNG: do 12-byte chunk_header removal hack
-	// !=0: ZIP: use 64K buffer (olinbuf)
-static int zipfilmode;
-typedef struct
-{
-	FILE *fil;   //0:no file open, !=0:open file (either stand-alone or zip)
-	int comptyp; //0:raw data (can be ZIP or stand-alone), 8:PKZIP LZ77 *flate
-	int seek0;   //0:stand-alone file, !=0: start of zip compressed stream data
-	int compleng;//Global variable for compression FIFO
-	int comptell;//Global variable for compression FIFO
-	int leng;    //Uncompressed file size (bytes)
-	int pos;     //Current uncompressed relative file position (0<=pos<=leng)
-	int endpos;  //Temp global variable for kzread
-	int jmpplc;  //Store place where decompression paused
-	int i;       //For stand-alone/ZIP comptyp#0, this is like "uncomptell"
-					  //For ZIP comptyp#8&btype==0 "<64K store", this saves i state
-	int bfinal;  //LZ77 decompression state (for later calls)
-} kzfilestate;
-static kzfilestate kzfs;
 
 //Initialized tables (can't be in union)
 //jpg:                png:
@@ -169,6 +43,8 @@ static kzfilestate kzfs;
 //   pow2mask     128*
 //   dcflagor      64
 
+#include "kplib.h"
+static int bytesperline, xres, yres, globxoffs, globyoffs;
 int kplib_palcol[256] ASMNAME("kplib_palcol"), kplib_paleng, kplib_bakcol, kplib_numhufblocks, kplib_zlibcompflags;
 signed char kplib_coltype, kplib_bitdepth;
 char *kplib_filterlist = 0;
@@ -2192,23 +2068,23 @@ static int ktgarend (const char *header, int fleng,
 //==============================  TARGA ends =================================
 //==============================  BMP begins =================================
 	//TODO: handle BI_RLE8 and BI_RLE4 (compression types 1&2 respectively)
-	//                        ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
-	//                        ³  0(2): "BM"   ³
-	// ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿³ 10(4): rastoff³ ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
-	// ³headsiz=12 (OS/2 1.x)³³ 14(4): headsiz³ ³ All new formats: ³
-	//ÚÁÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÁÁÄÄÄÄÄÄÄÄÄÄÄÄÄÂÄÁÄÁÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÁÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
-	//³ 18(2): xsiz                         ³ 18(4): xsiz                                  ³
-	//³ 20(2): ysiz                         ³ 22(4): ysiz                                  ³
-	//³ 22(2): planes (always 1)            ³ 26(2): planes (always 1)                     ³
-	//³ 24(2): cdim (1,4,8,24)              ³ 28(2): cdim (1,4,8,16,24,32)                 ³
-	//³ if (cdim < 16)                      ³ 30(4): compression (0,1,2,3!?,4)             ³
-	//³    26(rastoff-14-headsiz): pal(bgr) ³ 34(4): (bitmap data size+3)&3                ³
-	//³                                     ³ 46(4): N colors (0=2^cdim)                   ³
-	//³                                     ³ if (cdim < 16)                               ³
-	//³                                     ³    14+headsiz(rastoff-14-headsiz): pal(bgr0) ³
-	//ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÂÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÁÄÄÄÄÄÄÄÄÄÂÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
-	//                      ³ rastoff(?): bitmap data ³
-	//                      ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+	//                        ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¿
+	//                        ï¿½  0(2): "BM"   ï¿½
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¿ï¿½ 10(4): rastoffï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¿
+	// ï¿½headsiz=12 (OS/2 1.x)ï¿½ï¿½ 14(4): headsizï¿½ ï¿½ All new formats: ï¿½
+	//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¿
+	//ï¿½ 18(2): xsiz                         ï¿½ 18(4): xsiz                                  ï¿½
+	//ï¿½ 20(2): ysiz                         ï¿½ 22(4): ysiz                                  ï¿½
+	//ï¿½ 22(2): planes (always 1)            ï¿½ 26(2): planes (always 1)                     ï¿½
+	//ï¿½ 24(2): cdim (1,4,8,24)              ï¿½ 28(2): cdim (1,4,8,16,24,32)                 ï¿½
+	//ï¿½ if (cdim < 16)                      ï¿½ 30(4): compression (0,1,2,3!?,4)             ï¿½
+	//ï¿½    26(rastoff-14-headsiz): pal(bgr) ï¿½ 34(4): (bitmap data size+3)&3                ï¿½
+	//ï¿½                                     ï¿½ 46(4): N colors (0=2^cdim)                   ï¿½
+	//ï¿½                                     ï¿½ if (cdim < 16)                               ï¿½
+	//ï¿½                                     ï¿½    14+headsiz(rastoff-14-headsiz): pal(bgr0) ï¿½
+	//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	//                      ï¿½ rastoff(?): bitmap data ï¿½
+	//                      ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 static int kbmprend (const char *buf, int fleng,
 	INT_PTR daframeplace, int dabytesperline, int daxres, int dayres,
 	int daglobxoffs, int daglobyoffs)
