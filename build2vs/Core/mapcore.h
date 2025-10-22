@@ -10,6 +10,16 @@
 #ifndef BUILD2_MAPCORE_H
 #define BUILD2_MAPCORE_H
 typedef struct { float x, y; } point2d;
+
+#ifndef max
+#define max(a,b)            (((a) > (b)) ? (a) : (b))
+#endif
+
+#ifndef min
+#define min(a,b)            (((a) < (b)) ? (a) : (b))
+#endif
+
+
 #ifndef KEN_DRAWPOLY_H
 typedef struct tiltyp {
 	long f, p, x, y, z;

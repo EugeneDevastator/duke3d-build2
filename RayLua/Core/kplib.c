@@ -49,7 +49,13 @@ int kplib_palcol[256] ASMNAME("kplib_palcol"), kplib_paleng, kplib_bakcol, kplib
 signed char kplib_coltype, kplib_bitdepth;
 char *kplib_filterlist = 0;
 int kplib_filterlistmal = 0;
-
+static long kz_get_file_length(FILE* file) {
+	long current = ftell(file);
+	fseek(file, 0, SEEK_END);
+	long length = ftell(file);
+	fseek(file, current, SEEK_SET);
+	return length;
+}
 //============================ KPNGILIB begins ===============================
 
 //07/31/2000: KPNG.C first ported to C from READPNG.BAS
@@ -63,7 +69,7 @@ int kplib_filterlistmal = 0;
 	//.PNG specific variables:
 static int bakr = 0x80, bakg = 0x80, bakb = 0x80; //this used to be public...
 static int gslidew = 0, gslider = 0, xm, xmn[4], xr0, xr1, xplc, yplc;
-static INT_PTR nfplace;
+static long* nfplace;
 static int clen[320], cclen[19], bitpos, filt, xsiz, ysiz;
 static int xsizbpl, ixsiz, ixoff, iyoff, ixstp, iystp, intlac, nbpl, trnsrgb ASMNAME("trnsrgb");
 static int ccind[19] = {16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15};
@@ -492,7 +498,7 @@ static int Paeth686 (int, int, int);
 	value [ecx]
 
 	//Note: "cmove eax,?" may be faster than "jne ?:and eax,?" but who cares
-static void rgbhlineasm (int, int, INT_PTR, int);
+static void rgbhlineasm (int, int, long*, int);
 #pragma aux rgbhlineasm =\
 	"sub ecx, edx"\
 	"jle short endit"\
@@ -520,7 +526,7 @@ static void rgbhlineasm (int, int, INT_PTR, int);
 	modify exact [eax ecx edi]\
 	value
 
-static void pal8hlineasm (int, int, INT_PTR, int);
+static void pal8hlineasm (int, int, long*, int);
 #pragma aux pal8hlineasm =\
 	"sub ecx, edx"\
 	"jle short endit"\
@@ -565,7 +571,7 @@ static _inline int Paeth686 (int a, int b, int c)
 	}
 }
 
-static _inline void rgbhlineasm (int c, int d, INT_PTR t, int b)
+static _inline void rgbhlineasm (int c, int d, long* t, int b)
 {
 	_asm
 	{
@@ -606,7 +612,7 @@ endit:
 	}
 }
 
-static _inline void pal8hlineasm (int c, int d, INT_PTR t, int b)
+static _inline void pal8hlineasm (int c, int d, long* t, int b)
 {
 	_asm
 	{
@@ -654,7 +660,7 @@ static inline int Paeth686 (int a, int b, int c)
 }
 
 	//Note: "cmove eax,?" may be faster than "jne ?:and eax,?" but who cares
-static inline void rgbhlineasm (int c, int d, INT_PTR t, int b)
+static inline void rgbhlineasm (int c, int d, long* t, int b)
 {
 	__asm__ __volatile__ (
 		"subl %%edx, %%ecx \n"
@@ -683,7 +689,7 @@ static inline void rgbhlineasm (int c, int d, INT_PTR t, int b)
 		);
 }
 
-static inline void pal8hlineasm (int c, int d, INT_PTR t, int b)
+static inline void pal8hlineasm (int c, int d, long* t, int b)
 {
 	__asm__ __volatile__ (
 		"subl %%edx, %%ecx \n"
@@ -707,7 +713,7 @@ static inline int Paeth686 (int a, int b, int c)
 	return(Paeth(a,b,c));
 }
 
-static inline void rgbhlineasm (int x, int xr1, INT_PTR p, int ixstp)
+static inline void rgbhlineasm (int x, int xr1, long* p, int ixstp)
 {
 	int i;
 	if (!trnsrgb)
@@ -723,7 +729,7 @@ static inline void rgbhlineasm (int x, int xr1, INT_PTR p, int ixstp)
 	}
 }
 
-static inline void pal8hlineasm (int x, int xr1, INT_PTR p, int ixstp)
+static inline void pal8hlineasm (int x, int xr1, long* p, int ixstp)
 {
 	for(;x>xr1;p+=ixstp,x--) *(int *)p = kplib_palcol[olinbuf[x]];
 }
@@ -741,7 +747,7 @@ static inline void pal8hlineasm (int x, int xr1, INT_PTR p, int ixstp)
 static void putbuf (const unsigned char *buf, int leng)
 {
 	int i, x;
-	INT_PTR p;
+	long* p;
 
 	if (filt < 0)
 	{
@@ -875,7 +881,7 @@ static void initpngtables()
 }
 
 static int kpngrend (const char *kfilebuf, int kfilength,
-	INT_PTR daframeplace, int dabytesperline, int daxres, int dayres,
+	long* daframeplace, int dabytesperline, int daxres, int dayres,
 	int daglobxoffs, int daglobyoffs)
 {
 	int i, j, k, bfinal, btype, hlit, hdist, leng;
@@ -1320,7 +1326,7 @@ static void invdct8x8 (int *dc, unsigned char dcflag)
 static void yrbrend (int x, int y, int *ldct)
 {
 	int i, j, ox, oy, xx, yy, xxx, yyy, xxxend, yyyend, yv, cr, cb, *odc, *dc, *dc2;
-	INT_PTR p, pp;
+	long* p, pp;
 
 	odc = ldct; dc2 = &ldct[10<<6];
 	for(yy=0;yy<(lcompvsamp[0]<<3);yy+=8)
@@ -1409,7 +1415,7 @@ static void yrbrend (int x, int y, int *ldct)
 void (*kplib_yrbrend_func)(int,int,int *) = yrbrend;
 
 static int kpegrend (const char *kfilebuf, int kfilength,
-	INT_PTR daframeplace, int dabytesperline, int daxres, int dayres,
+	long* daframeplace, int dabytesperline, int daxres, int dayres,
 	int daglobxoffs, int daglobyoffs)
 {
 	int i, j, v, leng, xdim, ydim, index, prec, restartcnt, restartinterval;
@@ -1813,12 +1819,12 @@ static unsigned char suffix[4100], filbuffer[768], tempstack[4096];
 static int prefix[4100];
 
 static int kgifrend (const char *kfilebuf, int kfilelength,
-	INT_PTR daframeplace, int dabytesperline, int daxres, int dayres,
+	long* daframeplace, int dabytesperline, int daxres, int dayres,
 	int daglobxoffs, int daglobyoffs)
 {
 	int i, x, y, xsiz, ysiz, yinc, xend, xspan, yspan, currstr, numbitgoal;
 	int lzcols, dat, blocklen, bitcnt, xoff, yoff, transcol, backcol, *lptr;
-	INT_PTR p;
+	long* p;
 	char numbits, startnumbits, chunkind, ilacefirst;
 	const unsigned char *ptr, *cptr;
 
@@ -1869,13 +1875,13 @@ static int kgifrend (const char *kfilebuf, int kfilelength,
 		xx[3] = min(daglobxoffs+xsiz      ,daxres); yy[3] = min(daglobyoffs+ysiz      ,dayres);
 
 		lptr = (int *)(yy[0]*dabytesperline+daframeplace);
-		for(y=yy[0];y<yy[1];y++,lptr=(int *)(((INT_PTR)lptr)+dabytesperline))
+		for(y=yy[0];y<yy[1];y++,lptr=(int *)(((long*)lptr)+dabytesperline))
 			for(x=xx[0];x<xx[3];x++) lptr[x] = backcol;
-		for(;y<yy[2];y++,lptr=(int *)(((INT_PTR)lptr)+dabytesperline))
+		for(;y<yy[2];y++,lptr=(int *)(((long*)lptr)+dabytesperline))
 		{  for(x=xx[0];x<xx[1];x++) lptr[x] = backcol;
 			for(x=xx[2];x<xx[3];x++) lptr[x] = backcol;
 		}
-		for(;y<yy[3];y++,lptr=(int *)(((INT_PTR)lptr)+dabytesperline))
+		for(;y<yy[3];y++,lptr=(int *)(((long*)lptr)+dabytesperline))
 			for(x=xx[0];x<xx[3];x++) lptr[x] = backcol;
 
 		daglobxoffs += xoff; //Offset bitmap image by extra amount
@@ -1955,7 +1961,7 @@ static int kgifrend (const char *kfilebuf, int kfilelength,
 	//int imagebytes, filler[4];
 	//char pal6bit[256][3], image[ydim][xdim];
 static int kcelrend (const char *buf, int fleng,
-	INT_PTR daframeplace, int dabytesperline, int daxres, int dayres,
+	long* daframeplace, int dabytesperline, int daxres, int dayres,
 	int daglobxoffs, int daglobyoffs)
 {
 	int i, x, y, x0, x1, y0, y1, xsiz, ysiz;
@@ -1991,11 +1997,11 @@ static int kcelrend (const char *buf, int fleng,
 //=============================  TARGA begins ================================
 
 static int ktgarend (const char *header, int fleng,
-	INT_PTR daframeplace, int dabytesperline, int daxres, int dayres,
+	long* daframeplace, int dabytesperline, int daxres, int dayres,
 	int daglobxoffs, int daglobyoffs)
 {
 	int i, x, y, pi, xi, yi, x0, x1, y0, y1, xsiz, ysiz, rlestat, colbyte, pixbyte;
-	INT_PTR p;
+	long* p;
 	const unsigned char *fptr, *cptr, *nptr;
 
 		//Ugly and unreliable identification for .TGA!
@@ -2086,7 +2092,7 @@ static int ktgarend (const char *header, int fleng,
 	//                      � rastoff(?): bitmap data �
 	//                      ���������������������������
 static int kbmprend (const char *buf, int fleng,
-	INT_PTR daframeplace, int dabytesperline, int daxres, int dayres,
+	long* daframeplace, int dabytesperline, int daxres, int dayres,
 	int daglobxoffs, int daglobyoffs)
 {
 	int i, j, x, y, x0, x1, y0, y1, rastoff, headsiz, xsiz, ysiz, cdim, comp, cptrinc, *lptr;
@@ -2198,11 +2204,11 @@ static int kbmprend (const char *buf, int fleng,
 //==============================  PCX begins =================================
 	//Note: currently only supports 8 and 24 bit PCX
 static int kpcxrend (const char *buf, int fleng,
-	INT_PTR daframeplace, int dabytesperline, int daxres, int dayres,
+	long* daframeplace, int dabytesperline, int daxres, int dayres,
 	int daglobxoffs, int daglobyoffs)
 {
 	int i, j, x, y, nplanes, x0, x1, y0, y1, bpl, xsiz, ysiz;
-	INT_PTR p;
+	long* p;
 	unsigned char c, *cptr;
 
 	if (*(int *)buf != LSWAPIB(0x0801050a)) return(-1);
@@ -2280,10 +2286,10 @@ static int kpcxrend (const char *buf, int fleng,
 
 	//Note:currently supports: DXT1,DXT2,DXT3,DXT4,DXT5,A8R8G8B8
 static int kddsrend (const char *buf, int leng,
-	INT_PTR frameptr, int bpl, int xdim, int ydim, int xoff, int yoff)
+	long* frameptr, int bpl, int xdim, int ydim, int xoff, int yoff)
 {
 	int x, y, z, xx, yy, xsiz, ysiz, dxt, al[2], ai, j, k, v, c0, c1, stride;
-	INT_PTR p;
+	long* p;
 	unsigned int lut[256], r[4], g[4], b[4], a[8], rr, gg, bb;
 	unsigned char *uptr, *wptr;
 
@@ -2323,8 +2329,8 @@ static int kddsrend (const char *buf, int leng,
 	for(y=0;y<ysiz;y+=4,buf+=stride)
 		for(x=0;x<xsiz;x+=4)
 		{
-			if (dxt == 1) uptr = (unsigned char *)(((INT_PTR)buf)+(x<<1));
-						else uptr = (unsigned char *)(((INT_PTR)buf)+(x<<2)+8);
+			if (dxt == 1) uptr = (unsigned char *)(((long*)buf)+(x<<1));
+						else uptr = (unsigned char *)(((long*)buf)+(x<<2)+8);
 			c0 = SSWAPIB(*(unsigned short *)&uptr[0]);
 			r[0] = ((c0>>8)&0xf8); g[0] = ((c0>>3)&0xfc); b[0] = ((c0<<3)&0xfc); a[0] = 255;
 			c1 = SSWAPIB(*(unsigned short *)&uptr[2]);
@@ -2411,18 +2417,18 @@ int kpgetdim (const char *buf, int leng, int *xsiz, int *ysiz)
 		lptr = (int *)buf;
 		if ((lptr[0] != LSWAPIB(0x474e5089)) || (lptr[1] != LSWAPIB(0x0a1a0a0d))) return(KPLIB_NONE);
 		lptr = &lptr[2];
-		while (((UINT_PTR)lptr-(UINT_PTR)buf) < (UINT_PTR)(leng-16))
+		while (((Ulong*)lptr-(Ulong*)buf) < (Ulong*)(leng-16))
 		{
 			if (lptr[1] == LSWAPIB(0x52444849)) //IHDR
 				{ (*xsiz) = LSWAPIL(lptr[2]); (*ysiz) = LSWAPIL(lptr[3]); return(KPLIB_PNG); }
-			lptr = (int *)((INT_PTR)lptr + LSWAPIL(lptr[0]) + 12);
+			lptr = (int *)((long*)lptr + LSWAPIL(lptr[0]) + 12);
 		}
 		return(KPLIB_NONE);
 	}
 	else if ((ubuf[0] == 0xff) && (ubuf[1] == 0xd8)) //.JPG
 	{
 		cptr = (unsigned char *)&buf[2];
-		while (((UINT_PTR)cptr-(UINT_PTR)buf) < (UINT_PTR)(leng-8))
+		while (((Ulong*)cptr-(Ulong*)buf) < (Ulong*)(leng-8))
 		{
 			if ((cptr[0] != 0xff) || (cptr[1] == 0xff)) { cptr++; continue; }
 			if ((unsigned int)(cptr[1]-0xc0) < 3)
@@ -2490,7 +2496,7 @@ int kpgetdim (const char *buf, int leng, int *xsiz, int *ysiz)
 	return(KPLIB_NONE);
 }
 
-int kprender (const char *buf, int leng, INT_PTR frameptr, int bpl,
+int kprender (const char *buf, int leng, long* frameptr, int bpl,
 					int xdim, int ydim, int xoff, int yoff)
 {
 	unsigned char *ubuf = (unsigned char *)buf;
@@ -2807,12 +2813,14 @@ void kzsetfil (FILE *fil)
 	kzfs.fil = fil;
 	kzfs.comptyp = 0;
 	kzfs.seek0 = 0;
-	kzfs.leng = filelength(_fileno(kzfs.fil));
+	fseek(kzfs.fil, 0, SEEK_END);
+	kzfs.leng = ftell(kzfs.fil);
+	fseek(kzfs.fil, 0, SEEK_SET);
 	kzfs.pos = 0;
 	kzfs.i = 0;
 }
 
-INT_PTR kzopen (const char *filnam)
+int kzopen (const char *filnam)
 {
 	FILE *fil;
 	int i, j, fileoffs, fileleng;
@@ -2826,10 +2834,10 @@ INT_PTR kzopen (const char *filnam)
 		{
 			kzfs.comptyp = 0;
 			kzfs.seek0 = 0;
-			kzfs.leng = filelength(_fileno(kzfs.fil));
+			kzfs.leng = kz_get_file_length(_fileno(kzfs.fil));
 			kzfs.pos = 0;
 			kzfs.i = 0;
-			return((INT_PTR)kzfs.fil);
+			return((long*)kzfs.fil);
 		}
 	}
 	if (kzcheckhash(filnam,&zipnam,&fileoffs,&fileleng,&iscomp)) //Then check mounted ZIP/GRP files
@@ -2844,7 +2852,7 @@ INT_PTR kzopen (const char *filnam)
 			kzfs.leng = fileleng;
 			kzfs.pos = 0;
 			kzfs.i = 0;
-			return((INT_PTR)kzfs.fil);
+			return((long*)kzfs.fil);
 		}
 		else
 		{
@@ -2859,7 +2867,7 @@ INT_PTR kzopen (const char *filnam)
 			kzfs.pos = 0;
 			switch(kzfs.comptyp) //Compression method
 			{
-				case 0: kzfs.i = 0; return((INT_PTR)kzfs.fil);
+				case 0: kzfs.i = 0; return((long*)kzfs.fil);
 				case 8:
 					if (!pnginited) { pnginited = 1; initpngtables(); }
 					kzfs.comptell = 0;
@@ -2868,7 +2876,7 @@ INT_PTR kzopen (const char *filnam)
 						//WARNING: No file in ZIP can be > 2GB-32K bytes
 					gslidew = 0x7fffffff; //Force reload at beginning
 
-					return((INT_PTR)kzfs.fil);
+					return((long*)kzfs.fil);
 				default: fclose(kzfs.fil); kzfs.fil = 0; return(0);
 			}
 		}
@@ -2892,10 +2900,10 @@ INT_PTR kzopen (const char *filnam)
 		{
 			kzfs.comptyp = 0;
 			kzfs.seek0 = 0;
-			kzfs.leng = filelength(_fileno(kzfs.fil));
+			kzfs.leng = kz_get_file_length(_fileno(kzfs.fil));
 			kzfs.pos = 0;
 			kzfs.i = 0;
-			return((INT_PTR)kzfs.fil);
+			return((long*)kzfs.fil);
 		}
 	}
 
@@ -2908,8 +2916,10 @@ INT_PTR kzopen (const char *filnam)
 #define MAX_PATH 260
 static struct find_t findata;
 #elif defined(_WIN32)
-static HANDLE hfind = INVALID_HANDLE_VALUE;
+static FILE hfind;
+#ifdef KEN_BUILD_2
 static WIN32_FIND_DATA findata;
+#endif
 #else
 #define MAX_PATH 260
 static DIR *hfind = NULL;
@@ -2926,6 +2936,8 @@ static struct dirent *findata = NULL;
 static int srchstat = -1, srchzoff = 0, srchdoff = -1, wildstpathleng;
 static char wildst[MAX_PATH] = "", newildst[MAX_PATH] = "";
 
+//C:/Eugene/Games/build2-git/RayLua/Core/kplib.c(2930): warning C4142: 'kz_get_file_length': benign redefinition of type
+#ifdef KEN_BUILD_2
 void kzfindfilestart (const char *st)
 {
 #if defined(__DOS__)
@@ -3072,7 +3084,7 @@ kzfindfile_beg:;
 // * Files inside zip begin with '|'
 
 // --------------------------------------------------------------------------
-
+#endif
 static char *gzbufptr;
 static void putbuf4zip (const unsigned char *buf, int uncomp0, int uncomp1)
 {
@@ -3347,7 +3359,7 @@ void kpzload (const char *filnam, long *pic, long *bpl, int *xsiz, int *ysiz)
 
 	kpgetdim(buf,leng,xsiz,ysiz);
 	(*bpl) = ((*xsiz)<<2);
-	(*pic) = (INT_PTR)malloc((*ysiz)*(*bpl)); if (!(*pic)) { free(buf); return; }
+	(*pic) = (long*)malloc((*ysiz)*(*bpl)); if (!(*pic)) { free(buf); return; }
 	if (kprender(buf,leng,*pic,*bpl,*xsiz,*ysiz,0,0) < 0) { free(buf); free((void *)*pic); (*pic) = 0; return; }
 	free(buf);
 }

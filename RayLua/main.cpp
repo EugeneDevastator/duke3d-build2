@@ -1,6 +1,11 @@
+//#include "kplib.h"
+//#include "Core/loaders.h"
+
 #include "raylib.h"
 #include "rlImGui.h"
 #include "imgui.h"
+
+
 #include "FileWatcher.h"
 #include <vector>
 #include <chrono>
@@ -13,10 +18,16 @@ extern "C" {
 #include <lauxlib.h>
 }
 
+//static mapstate_t *map;
 struct TransparentRect {
     float x, y, width, height;
     Color color;
 };
+void MapTest()
+{
+  // loadmap_imp((char*)"c:/Eugene/Games/build2/E2L5.MAP",map);
+
+}
 
 std::vector<TransparentRect> transparentRects;
 
@@ -213,6 +224,9 @@ int main() {
     FileWatcher watcher("script.lua");
     LoadScript(L);
 
+MapTest();
+
+
     while (!WindowShouldClose()) {
         if (watcher.HasChanged()) {
             LoadScript(L);
@@ -284,3 +298,4 @@ int main() {
     CloseWindow();
     return 0;
 }
+

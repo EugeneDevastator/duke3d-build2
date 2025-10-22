@@ -11,44 +11,48 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
 
-# Raylib
-FetchContent_Declare(raylib
-        URL https://github.com/raysan5/raylib/archive/refs/tags/5.5.tar.gz
-        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-)
-FetchContent_MakeAvailable(raylib)
+# Try to find raylib first, fallback to FetchContent
+find_package(raylib QUIET)
+if(NOT raylib_FOUND)
+    message(STATUS "raylib not found, fetching...")
+    FetchContent_Declare(
+            raylib
+            GIT_REPOSITORY https://github.com/raysan5/raylib.git
+            GIT_TAG 5.5
+    )
+    FetchContent_MakeAvailable(raylib)
+endif()
 
-# ImGui
-FetchContent_Declare(imgui
-        URL https://github.com/ocornut/imgui/archive/refs/tags/v1.92.1.tar.gz
-        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+# ImGui - always use FetchContent since it doesn't have find_package support
+FetchContent_Declare(
+        imgui
+        GIT_REPOSITORY https://github.com/ocornut/imgui.git
+        GIT_TAG v1.92.1
 )
 FetchContent_MakeAvailable(imgui)
 
-add_library(imgui_lib
+# Create imgui target
+add_library(imgui STATIC
         ${imgui_SOURCE_DIR}/imgui.cpp
         ${imgui_SOURCE_DIR}/imgui_demo.cpp
         ${imgui_SOURCE_DIR}/imgui_draw.cpp
         ${imgui_SOURCE_DIR}/imgui_tables.cpp
         ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+        ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
 )
-target_include_directories(imgui_lib PUBLIC ${imgui_SOURCE_DIR})
+target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
 
 # RlImGui
-FetchContent_Declare(rlimgui
+FetchContent_Declare(
+        rlimgui
         GIT_REPOSITORY https://github.com/raylib-extras/rlImGui.git
         GIT_TAG 4d8a618
-        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 FetchContent_MakeAvailable(rlimgui)
 
-add_library(rlimgui_lib ${rlimgui_SOURCE_DIR}/rlImGui.cpp)
-target_include_directories(rlimgui_lib PUBLIC
-        ${rlimgui_SOURCE_DIR}
-        ${imgui_SOURCE_DIR}
-        ${raylib_SOURCE_DIR}/src
-)
-target_link_libraries(rlimgui_lib imgui_lib raylib)
+add_library(rlimgui STATIC ${rlimgui_SOURCE_DIR}/rlImGui.cpp)
+target_link_libraries(rlimgui PUBLIC raylib imgui)
+target_include_directories(rlimgui PUBLIC ${rlimgui_SOURCE_DIR})
 
 # LuaJIT
 add_library(luajit_lib STATIC IMPORTED)
@@ -57,18 +61,16 @@ set_target_properties(luajit_lib PROPERTIES
 )
 target_include_directories(luajit_lib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/External/LuaJIT/src)
 
-# Core files - explicit list
+# Core files
 set(CORE_SOURCES
         core/mapcore.c
         core/kplib.c
-        # Add other .c files here
 )
 
 set(CORE_HEADERS
         core/mapcore.h
         core/loaders.h
         core/kplib.h
-        # Add other .h files here
 )
 
 # Main executable
@@ -83,25 +85,24 @@ target_compile_definitions(game PRIVATE
         USEHEIMAP=0
         NOSOUND=0
         OOS_CHECK=0
-        WIN32
+        _WIN32
         _WINDOWS
         _X86_
 )
 
 target_include_directories(game PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/core
-        ${rlimgui_SOURCE_DIR}
-        ${imgui_SOURCE_DIR}
-        ${raylib_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/External/LuaJIT/src
 )
 
 target_link_libraries(game
         raylib
-        imgui_lib
-        rlimgui_lib
+        imgui
+        rlimgui
         luajit_lib
 )
 
-# Copy script
-configure_file(script.lua ${CMAKE_CURRENT_BINARY_DIR}/script.lua COPYONLY)
+add_custom_command(TARGET game POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_SOURCE_DIR}/script.lua
+        $<TARGET_FILE_DIR:game>/script.lua)

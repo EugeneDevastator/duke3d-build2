@@ -1,15 +1,25 @@
 //
 // Created by omnis on 10/18/2025.
 //
+#ifndef BUILD2_MAPCORE_H
+#define BUILD2_MAPCORE_H
 #include <math.h>
 #include <malloc.h>
-#include <minwindef.h>
+#include <stdlib.h>
+#include <string.h>
 
 #ifndef PI
 #define PI 3.141592653589793
 #endif
-#ifndef BUILD2_MAPCORE_H
-#define BUILD2_MAPCORE_H
+#ifndef max
+#define max(a,b)            (((a) > (b)) ? (a) : (b))
+#endif
+
+#ifndef min
+#define min(a,b)            (((a) < (b)) ? (a) : (b))
+#endif
+
+
 typedef struct { float x, y; } point2d;
 #ifndef KEN_DRAWPOLY_H
 typedef struct tiltyp {
@@ -36,7 +46,7 @@ typedef struct
 } tile_t;
 
 extern tile_t *gtile;
-extern long gnumtiles, gmaltiles, gtilehashead[1024];
+long gnumtiles, gmaltiles, gtilehashead[1024];
 	//Map format:
 typedef struct
 {
@@ -379,7 +389,7 @@ static int polbool_splitlinepoint (polbool_lin_t **lin, int *linmal, wall_t *wal
 	double x0, y0, x1, y1, ix, iy;
 	int i, j;
 
-	if ((*linmal) < n) { (*linmal) = max(n,256); (*lin) = (polbool_lin_t *)realloc(*lin,(*linmal)*sizeof(polbool_lin_t)); }
+	if ((*linmal) < n) { (*linmal) = fmax(n,256); (*lin) = (polbool_lin_t *)realloc(*lin,(*linmal)*sizeof(polbool_lin_t)); }
 
 	for(i=0;i<n;i++)
 	{
