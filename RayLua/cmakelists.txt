@@ -1,11 +1,12 @@
 cmake_minimum_required(VERSION 3.21)
 cmake_policy(VERSION 3.5)
-
+#set(CMAKE_GENERATOR_PLATFORM Win32)
+set(CMAKE_VERBOSE_MAKEFILE ON)
 project(raylib_lua_imgui C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
-
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(FetchContent)
 
 FetchContent_Declare(raylib
@@ -34,6 +35,8 @@ FetchContent_Declare(rlimgui
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 FetchContent_MakeAvailable(rlimgui)
+#file(GLOB CORE_SOURCES "./core/*.cpp" "./core/*.c")
+#file(GLOB CORE_HEADERS "./core/*.h" "./core/*.hpp")
 
 target_include_directories(imgui_lib PUBLIC ${imgui_SOURCE_DIR})
 
@@ -45,6 +48,9 @@ target_include_directories(rlimgui_lib PUBLIC
         ${rlimgui_SOURCE_DIR}
         ${imgui_SOURCE_DIR}
         ${raylib_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/External/LuaJIT/src/
+      #  ${CMAKE_CURRENT_SOURCE_DIR}/core
+      #  ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 target_link_libraries(rlimgui_lib imgui_lib raylib)

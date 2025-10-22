@@ -5,12 +5,16 @@
       "name": "win32-default",
       "displayName": "RayLua Win32 Build",
       "generator": "Visual Studio 17 2022",
-      "toolset": "v143",
       "architecture": "Win32",
       "cacheVariables": {
         "CMAKE_POLICY_VERSION_MINIMUM": "3.5"
       },
-      "binaryDir": "${sourceDir}/build"
+      "vendor": {
+        "jetbrains.com/clion": {
+          "toolchain": "Visual Studio"
+        }
+      },
+      "binaryDir": "${sourceDir}/bin"
     }
   ],
   "buildPresets": [
