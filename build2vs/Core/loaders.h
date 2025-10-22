@@ -1005,5 +1005,175 @@ void loadpic_imp (tile_t *tpic)
 #endif
 	if (!pic->f) { pic->f = (long)nullpic; pic->x = 64; pic->y = 64; pic->p = (pic->x<<2); pic->lowermip = 0; }
 }
+void saveaskc (char *filnam)
+{
+	#define MAXVERTS 256 //FIX:timebomb: assumes there are never > 256 sectors connected at same vertex
+	vertlist_t verts[MAXVERTS], tvert;
+	kgln_t pol[4], npol[4], tpol;
+	point2d *grad;
+	sect_t *sec;
+	wall_t *wal, *wal2;
+	zoid_t *zoids;
+	FILE *fil;
+	float dx, fx, fy, fz;
+	int i, j, k, n, w, s, nw, wn, bs, bw, vn, s0, cf0, s1, cf1, isflor, otexi, ocol = -1, col, nzoids;
 
+	fil = fopen(filnam,"wb"); if (!fil) return;
+
+	sec = gst->sect;
+
+	fprintf(fil,"()\n{\n\tcls(0); clz(1e32);\n");
+	fprintf(fil,"\tsetcam(%+f,%+f,%+f,\n\t\t\t %+f,%+f,%+f,\n\t\t\t %+f,%+f,%+f,\n\t\t\t %+f,%+f,%+f);\n",
+		gst->startpos.x,gst->startpos.y,gst->startpos.z,
+		gst->startrig.x,gst->startrig.y,gst->startrig.z,
+		gst->startdow.x,gst->startdow.y,gst->startdow.z,
+		gst->startfor.x,gst->startfor.y,gst->startfor.z);
+	fprintf(fil,"\tdrawmap();\n}\n\ndrawmap ()\n{\n");
+
+	otexi = -1;
+	for(s=0;s<gst->numsects;s++)
+	{
+		sec = &gst->sect[s];
+
+			//draw sector filled
+		for(isflor=0;isflor<2;isflor++)
+		{
+			col = (min(sec->surf[isflor].asc>>8,255)<<24) +
+					(min(sec->surf[isflor].rsc>>5,255)<<16) +
+					(min(sec->surf[isflor].gsc>>5,255)<< 8) +
+					(min(sec->surf[isflor].bsc>>5,255)    );
+
+			wal = sec->wall; fz = sec->z[isflor]; grad = &sec->grad[isflor]; n = sec->n;
+
+			if (!sect2trap(wal,n,&zoids,&nzoids)) continue;
+
+			if (col != ocol) { ocol = col; fprintf(fil,"\tsetcol(%d,%d,%d);\n",((col>>16)&255)<<1,((col>>8)&255)<<1,(col&255)<<1); }
+			if (sec->surf[isflor].tilnum != otexi) { otexi = sec->surf[isflor].tilnum; fprintf(fil,"\tglsettex(\"%s\");\n",gtile[otexi].filnam); }
+
+			for(i=0;i<nzoids;i++)
+			{
+				for(j=0,n=0;j<4;j++)
+				{
+					pol[n].x = zoids[i].x[j];
+					pol[n].y = zoids[i].y[j>>1];
+					if ((!n) || (pol[n].x != pol[n-1].x) || (pol[n].y != pol[n-1].y))
+					{
+						pol[n].u = pol[n].x*sec->surf[isflor].uv[1].x + pol[n].y*sec->surf[isflor].uv[2].x + sec->surf[isflor].uv[0].x;
+						pol[n].v = pol[n].x*sec->surf[isflor].uv[1].y + pol[n].y*sec->surf[isflor].uv[2].y + sec->surf[isflor].uv[0].y;
+						pol[n].z = (wal[0].x-pol[n].x)*grad->x + (wal[0].y-pol[n].y)*grad->y + fz;
+						pol[n].n = 1; n++;
+					}
+				}
+				if (n < 3) continue;
+				pol[n-1].n = 1-n;
+
+				fprintf(fil,"\tglBegin(GL_TRIANGLE_FAN);\n");
+				for(j=0;j<n;j++)
+				{
+					if (isflor) k = j; else k = n-1-j;
+					fprintf(fil,"\tglTexCoord(%g,%g); ",pol[k].u,pol[k].v);
+					fprintf(fil,"glVertex(%g,%g,%g);\n",pol[k].x,pol[k].y,pol[k].z);
+				}
+			}
+			free(zoids);
+		}
+
+		sec = gst->sect;
+
+		wal = sec[s].wall; wn = sec[s].n;
+		for(w=0;w<wn;w++)
+		{
+			nw = wal[w].n+w;
+			col = (min(wal[w].surf.asc>>8,255)<<24) +
+					(min(wal[w].surf.rsc>>5,255)<<16) +
+					(min(wal[w].surf.gsc>>5,255)<< 8) +
+					(min(wal[w].surf.bsc>>5,255)    );
+			dx = sqrt((wal[nw].x-wal[w].x)*(wal[nw].x-wal[w].x) + (wal[nw].y-wal[w].y)*(wal[nw].y-wal[w].y));
+
+			vn = getwalls_imp(s,w,verts,MAXVERTS);
+			pol[0].x = wal[ w].x; pol[0].y = wal[ w].y; pol[0].n = 1;
+			pol[1].x = wal[nw].x; pol[1].y = wal[nw].y; pol[1].n = 1;
+			pol[2].x = wal[nw].x; pol[2].y = wal[nw].y; pol[2].n = 1;
+			pol[3].x = wal[ w].x; pol[3].y = wal[ w].y; pol[3].n =-3;
+			for(k=0;k<=vn;k++) //Warning: do not reverse for loop!
+			{
+				if (k >  0) { s0 = verts[k-1].s; cf0 = 1; } else { s0 = s; cf0 = 0; }
+				if (k < vn) { s1 = verts[k  ].s; cf1 = 0; } else { s1 = s; cf1 = 1; }
+
+				pol[0].z = getslopez(&sec[s0],cf0,pol[0].x,pol[0].y);
+				pol[1].z = getslopez(&sec[s0],cf0,pol[1].x,pol[1].y);
+				pol[2].z = getslopez(&sec[s1],cf1,pol[2].x,pol[2].y);
+				pol[3].z = getslopez(&sec[s1],cf1,pol[3].x,pol[3].y);
+
+				pol[0].u = wal[w].surf.uv[0].x; //FIXFIX
+				pol[0].v = wal[w].surf.uv[0].y + wal[w].surf.uv[2].y*(pol[0].z-sec[s].z[0]);
+				pol[1].u = wal[w].surf.uv[2].x*(pol[1].z-pol[0].z) + pol[0].u + wal[w].surf.uv[1].x*dx;
+				pol[1].v = wal[w].surf.uv[2].y*(pol[1].z-pol[0].z) + pol[0].v + wal[w].surf.uv[1].y*dx;
+				pol[2].u = wal[w].surf.uv[2].x*(pol[2].z-pol[0].z) + pol[0].u + wal[w].surf.uv[1].x*dx;
+				pol[2].v = wal[w].surf.uv[2].y*(pol[2].z-pol[0].z) + pol[0].v + wal[w].surf.uv[1].y*dx;
+				pol[3].u = wal[w].surf.uv[2].x*(pol[3].z-pol[0].z) + pol[0].u;
+				pol[3].v = wal[w].surf.uv[2].y*(pol[3].z-pol[0].z) + pol[0].v;
+
+				i = wallclippol(pol,npol); if (!i) continue;
+
+				if (col != ocol) { ocol = col; fprintf(fil,"\tsetcol(%d,%d,%d);\n",((col>>16)&255)<<1,((col>>8)&255)<<1,(col&255)<<1); }
+				if (wal[w].surf.tilnum != otexi) { otexi = wal[w].surf.tilnum; fprintf(fil,"\tglsettex(\"%s\");\n",gtile[otexi].filnam); }
+				fprintf(fil,"\tglBegin(GL_TRIANGLE_FAN);\n");
+				for(j=0;j<i;j++)
+				{
+					fprintf(fil,"\tglTexCoord(%g,%g); ",npol[j].u,npol[j].v);
+					fprintf(fil,"glVertex(%g,%g,%g);\n",npol[j].x,npol[j].y,npol[j].z);
+				}
+				fprintf(fil,"\tglEnd();\n");
+			}
+		}
+	}
+	fprintf(fil,"}");
+	fclose(fil);
+}
+void savemap (char *filnam)
+{
+	FILE *fil;
+	sect_t *sec;
+	int i, j;
+	short s;
+
+	i = strlen(filnam);
+	if ((i >= 3) && (!stricmp(&filnam[i-3],".kc"))) { saveaskc(filnam); return; }
+	if ((i >= 4) && (!stricmp(&filnam[i-4],".stl"))) { saveasstl(filnam); return; }
+
+	checknextwalls();
+	checksprisect(-1);
+	compacttilelist_imp(3, (mapstate_t*)gst);
+
+	fil = fopen(filnam,"wb"); if (!fil) return;
+
+	sec = gst->sect;
+	i = 0x3242534b; fwrite(&i,4,1,fil); //KSB2
+	fwrite(&gst->startpos,sizeof(gst->startpos),1,fil);
+	fwrite(&gst->startrig,sizeof(gst->startrig),1,fil);
+	fwrite(&gst->startdow,sizeof(gst->startdow),1,fil);
+	fwrite(&gst->startfor,sizeof(gst->startfor),1,fil);
+	fwrite(&gst->numsects,4,1,fil);
+	fwrite(sec,sizeof(sect_t)*gst->numsects,1,fil);
+	for(i=0;i<gst->numsects;i++)
+	{
+		if (!sec[i].wall) continue;
+		for(j=0;j<sec[i].n;j++)
+		{
+			fwrite(&sec[i].wall[j],sizeof(wall_t),1,fil);
+			if (sec[i].wall[j].surfn > 1) fwrite(sec[i].wall[j].xsurf,(sec[i].wall[j].surfn-1)*sizeof(surf_t),1,fil);
+		}
+	}
+	fwrite(&gnumtiles,4,1,fil);
+	for(i=0;i<gnumtiles;i++)
+	{
+		s = strlen(gtile[i].filnam); fwrite(&s,2,1,fil);
+		fwrite(gtile[i].filnam,s,1,fil);
+	}
+	fwrite(&gst->numspris,4,1,fil);
+	fwrite(gst->spri,gst->numspris*sizeof(spri_t),1,fil);
+
+	fclose(fil);
+}
 #endif //BUILD2_LOADERS_H

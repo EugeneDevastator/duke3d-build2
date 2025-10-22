@@ -419,8 +419,9 @@ static long getcputype (void)
 	if (i&(1<<25)) i |= (1<<22); //SSE implies MMX+ support
 	return(i);
 }
+
 //--------------------------------------------------------------------------------------------------
-#ifdef STANDALONE
+#ifdef STANDALONE // NETWORKING
 static long netproto = 0; //0=udp, 1=tcp
 //------------------------------------- SIMPLE TCP code begins -------------------------------------
 #include <winsock2.h>
@@ -942,6 +943,7 @@ static char *savefileselect (char *mess, char *spec, char *defext)
 	if (!GetSaveFileName(&ofn)) return(0); else return(fileselectnam);
 }
 #endif
+
 //---------------------------------- Ken file select code begins  ----------------------------------
 static char curpicpath[MAX_PATH+1] = "", curmodpath[MAX_PATH+1] = "";
 #define MAXHIGHLIGHTDEP 16 //Number of directories to remember highlight position
@@ -2214,7 +2216,7 @@ memset8beg:
 	}
 }
 
-#ifdef STANDALONE
+#ifdef STANDALONE // Scanline drawing misc.
 
 static const char hinge_png[] =
 {
@@ -2633,7 +2635,7 @@ void setgammlut (double gammval)
 	gotpal = 0; //Force palette to reload
 }
 
-void loadpic (tile_t *tpic)
+void loadpic (tile_t *tpic) // was copied
 {
 	static unsigned char lastpal[256][4], uch;
 	tiltyp *pic;
@@ -3353,7 +3355,7 @@ void drawparallaxpol (cam_t *cc, kgln_t *vert, long num, tile_t *tpic, long curc
 }
 
 
-#ifdef STANDALONE
+#ifdef STANDALONE // UI BEGINS
 static void drawmouse (tiltyp *dd, int x, int y, int col)
 {
 	int i, darkcol;
@@ -5882,7 +5884,7 @@ void saveasstl (char *filnam)
 	fclose(fil);
 }
 
-void savemap (char *filnam)
+void savemap (char *filnam) // TODO MOVE THIS
 {
 	FILE *fil;
 	sect_t *sec;
@@ -5931,7 +5933,7 @@ void savemap (char *filnam)
 typedef struct { long tilnum, flags, tag; point2d uv[3]; int dummy[6]; short asc, rsc, gsc, bsc; } osurf1_t;
 typedef struct { float x, y; long n, ns, nw; surf_t surf; } owall1_t;
 typedef struct { float z[2]; point2d grad[2]; surf_t surf[2]; long foglev; wall_t *wall; int n, nmax; } osect1_t;
-#ifdef STANDALONE
+#ifdef STANDALONE // UI HANDLERS
 static void releasegrabdrag (long curindex, long doplaysound)
 {
 	#define MAXVERTS 256 //FIX:timebomb: assumes there are never > 256 sectors connected at same vertex
@@ -9690,7 +9692,9 @@ grabskip2end:;
 		updatesect(gps->ipos.x,gps->ipos.y,gps->ipos.z,&gps->cursect);
 	}
 }
-
+#endif
+//------------------------
+#ifdef STANDALONE // UI VIEWS
 	//avatar sign cache
 #define AVATARSIGNX 128
 #define AVATARSIGNY 16
@@ -11445,7 +11449,7 @@ void build2_uninit (void)
 	if (zbuffermem) { free(zbuffermem); zbuffermem = 0; zbuffersiz = 0; }
 }
 
-#ifndef STANDALONE
+#ifndef STANDALONE // update loop + frames
 
 long build2_init (void)
 {
