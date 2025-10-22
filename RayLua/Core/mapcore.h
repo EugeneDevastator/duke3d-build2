@@ -3,6 +3,7 @@
 //
 #ifndef BUILD2_MAPCORE_H
 #define BUILD2_MAPCORE_H
+#pragma once
 #include <math.h>
 #include <malloc.h>
 #include <stdlib.h>
@@ -45,7 +46,7 @@ typedef struct
     long namcrc32, hashnext;
 } tile_t;
 
-extern tile_t *gtile;
+tile_t *gtile;
 long gnumtiles, gmaltiles, gtilehashead[1024];
 	//Map format:
 typedef struct

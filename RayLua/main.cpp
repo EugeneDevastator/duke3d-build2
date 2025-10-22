@@ -1,5 +1,4 @@
 //#include "kplib.h"
-//#include "Core/loaders.h"
 
 #include "raylib.h"
 #include "rlImGui.h"
@@ -13,20 +12,21 @@
 #include "external/miniaudio.h"
 
 extern "C" {
+#include "Core/loaders.h"
 #include <lua.h>
 #include <lualib.h>
 #include <lauxlib.h>
 }
 
-//static mapstate_t *map;
+static mapstate_t *map;
 struct TransparentRect {
     float x, y, width, height;
     Color color;
 };
 void MapTest()
 {
-  // loadmap_imp((char*)"c:/Eugene/Games/build2/E2L5.MAP",map);
-
+   loadmap_imp((char*)"c:/Eugene/Games/build2/E2L5.MAP",map);
+int a =1;
 }
 
 std::vector<TransparentRect> transparentRects;
