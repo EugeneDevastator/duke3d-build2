@@ -3,8 +3,6 @@ name: Build and Release Windows x86
 on:
   push:
     branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
 
 jobs:
   build:
