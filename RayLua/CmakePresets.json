@@ -3,8 +3,9 @@
   "configurePresets": [
     {
       "name": "win32-default",
-      "displayName": "Win32 Build",
+      "displayName": "RayLua Win32 Build",
       "generator": "Visual Studio 17 2022",
+      "toolset": "v143",
       "architecture": "Win32",
       "cacheVariables": {
         "CMAKE_POLICY_VERSION_MINIMUM": "3.5"
@@ -15,6 +16,7 @@
   "buildPresets": [
     {
       "name": "win32-release",
+      "displayName": "RayLua Win32 Buildpres",
       "configurePreset": "win32-default",
       "configuration": "RelWithDebInfo"
     }
