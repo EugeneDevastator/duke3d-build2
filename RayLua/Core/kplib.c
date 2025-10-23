@@ -2830,7 +2830,7 @@ errno_t err;
 	//kzfs.fil = 0;
 	if (filnam[0] != '|') //Search standalone file first
 	{
-		err = fopen_s(&kzfs.fil, filnam,"r");
+		err = fopen_s(&kzfs.fil, filnam,"rb");
 		if (kzfs.fil)
 		{
 			kzfs.comptyp = 0;
@@ -3106,7 +3106,7 @@ int kzread (void *buffer, int leng)
 
 	if (kzfs.comptyp == 0)
 	{
-		//if (kzfs.pos != kzfs.i) //Seek only when position changes
+		if (kzfs.pos != kzfs.i) //Seek only when position changes
 		{
 			fseek(kzfs.fil,kzfs.seek0+kzfs.pos,SEEK_SET);
 			printf("kzseek,%d",kzfs.seek0+kzfs.pos);

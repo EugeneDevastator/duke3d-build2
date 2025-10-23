@@ -26,6 +26,7 @@ struct TransparentRect {
 void MapTest()
 {
     map = static_cast<mapstate_t*>(malloc(sizeof(mapstate_t)));
+    memset(map,0,sizeof(mapstate_t));
     initcrc32();
 
     gnumtiles = 0; memset(gtilehashead,-1,sizeof(gtilehashead));
@@ -35,16 +36,28 @@ void MapTest()
 
     map->numsects = 0;
     map->malsects = 256;
-    map->sect = (sect_t *)malloc(map->malsects*sizeof(sect_t)); if (!map->sect) return;
+    map->sect = static_cast<sect_t*>(malloc(map->malsects * sizeof(sect_t))); if (!map->sect) return;
     memset(map->sect,0,map->malsects*sizeof(sect_t));
 
     map->numspris = 0;
     map->malspris = 256;
-    map->spri = (spri_t *)malloc(map->malspris*sizeof(spri_t)); if (!map->spri) return;
+    map->spri = static_cast<spri_t*>(malloc(map->malspris * sizeof(spri_t))); if (!map->spri) return;
     memset(map->spri,0,map->malspris*sizeof(spri_t));
     map->blankheadspri = -1;
-    memset(map,0,sizeof(mapstate_t));
-   loadmap_imp((char*)"c:/Eugene/Games/build2/E2L5.MAP",map);
+
+    map->blankheadspri = -1;
+    for(int i=0;i<map->malspris;i++)
+    {
+        map->spri[i].sectn = map->blankheadspri;
+        map->spri[i].sectp = -1;
+        map->spri[i].sect = -1;
+        if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
+        map->blankheadspri = i;
+    }
+
+
+   loadmap_imp((char*)"c:/Eugene/Games/build2/E2L7.MAP",map);
+
 int a =1;
 }
 

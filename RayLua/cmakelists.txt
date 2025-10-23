@@ -88,7 +88,6 @@ target_compile_definitions(game PRIVATE
         OOS_CHECK=0
         _WIN32
         _WINDOWS
-        _X86_
 )
 
 target_include_directories(game PRIVATE
