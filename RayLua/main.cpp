@@ -6,9 +6,10 @@
 
 
 #include "FileWatcher.h"
-#include <vector>
+#include <math.h>
 #include <chrono>
 
+#include "raymath.h"
 #include "external/miniaudio.h"
 
 extern "C" {
@@ -226,6 +227,130 @@ void SetImguiFonts()
     io.Fonts->Build();
 }
 
+
+typedef struct {
+    Vector3 position;
+    Vector3 target;
+    Vector3 up;
+    float speed;
+} FreeCamera;
+
+void DrawMapstate(mapstate_t* map) {
+    // Draw sectors
+    for (int s = 0; s < map->numsects; s++) {
+        sect_t* sect = &map->sect[s];
+
+        // Draw walls as lines
+        for (int w = 0; w < sect->n; w++) {
+            wall_t* wall = &sect->wall[w];
+            wall_t* nextwall = &sect->wall[(w + 1) % sect->n];
+
+            Vector3 start = {wall->x, sect->z[0], wall->y};
+            Vector3 end = {nextwall->x, sect->z[0], nextwall->y};
+
+            // Floor outline
+            DrawLine3D(start, end, WHITE);
+
+            // Ceiling outline
+            start.y = sect->z[1];
+            end.y = sect->z[1];
+            DrawLine3D(start, end, GRAY);
+
+            // Vertical wall lines
+            Vector3 bottom = {wall->x, sect->z[0], wall->y};
+            Vector3 top = {wall->x, sect->z[1], wall->y};
+            DrawLine3D(bottom, top, LIGHTGRAY);
+        }
+    }
+
+    // Draw sprites as simple cubes
+    for (int i = 0; i < map->numspris; i++) {
+        spri_t* spr = &map->spri[i];
+        Vector3 pos = {spr->p.x, spr->p.y, spr->p.z};
+        DrawCubeWires(pos, 1.0f, 1.0f, 1.0f, RED);
+    }
+}
+
+void UpdateFreeCamera(FreeCamera* cam, float deltaTime) {
+    float speed = cam->speed * deltaTime;
+
+    Vector3 forward = Vector3Normalize(Vector3Subtract(cam->target, cam->position));
+    Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, cam->up));
+
+    // WASD movement
+    if (IsKeyDown(KEY_W)) {
+        cam->position = Vector3Add(cam->position, Vector3Scale(forward, speed));
+        cam->target = Vector3Add(cam->target, Vector3Scale(forward, speed));
+    }
+    if (IsKeyDown(KEY_S)) {
+        cam->position = Vector3Subtract(cam->position, Vector3Scale(forward, speed));
+        cam->target = Vector3Subtract(cam->target, Vector3Scale(forward, speed));
+    }
+    if (IsKeyDown(KEY_A)) {
+        cam->position = Vector3Subtract(cam->position, Vector3Scale(right, speed));
+        cam->target = Vector3Subtract(cam->target, Vector3Scale(right, speed));
+    }
+    if (IsKeyDown(KEY_D)) {
+        cam->position = Vector3Add(cam->position, Vector3Scale(right, speed));
+        cam->target = Vector3Add(cam->target, Vector3Scale(right, speed));
+    }
+
+    // Mouse look
+    Vector2 mouseDelta = GetMouseDelta();
+    if (mouseDelta.x != 0 || mouseDelta.y != 0) {
+        float sensitivity = 0.003f;
+
+        // Horizontal rotation
+        Vector3 targetOffset = Vector3Subtract(cam->target, cam->position);
+        targetOffset = Vector3RotateByAxisAngle(targetOffset, cam->up, -mouseDelta.x * sensitivity);
+
+        // Vertical rotation
+        targetOffset = Vector3RotateByAxisAngle(targetOffset, right, -mouseDelta.y * sensitivity);
+
+        cam->target = Vector3Add(cam->position, targetOffset);
+    }
+}
+
+void VisualizeMapstate(mapstate_t* map) {
+    InitWindow(1024, 768, "Mapstate Visualizer");
+    SetTargetFPS(60);
+    DisableCursor();
+
+    FreeCamera cam = {0};
+    cam.position = {map->startpos.x, map->startpos.y, map->startpos.z};
+    cam.target = Vector3Add(cam.position, {map->startfor.x, map->startfor.y, map->startfor.z});
+    cam.up ={0, 1, 0};
+    cam.speed = 50.0f;
+
+    Camera3D camera = {0};
+
+    while (!WindowShouldClose()) {
+        float deltaTime = GetFrameTime();
+        UpdateFreeCamera(&cam, deltaTime);
+
+        camera.position = cam.position;
+        camera.target = cam.target;
+        camera.up = cam.up;
+        camera.fovy = 60.0f;
+        camera.projection = CAMERA_PERSPECTIVE;
+
+        BeginDrawing();
+        ClearBackground(BLACK);
+
+        BeginMode3D(camera);
+        DrawMapstate(map);
+        EndMode3D();
+
+        DrawText("WASD: Move, Mouse: Look", 10, 10, 20, WHITE);
+        DrawFPS(10, 40);
+
+        EndDrawing();
+    }
+
+    CloseWindow();
+}
+
+
 int main() {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
     InitWindow(800, 600, "Raylib + Lua + ImGui");
@@ -256,8 +381,7 @@ int main() {
     FileWatcher watcher("script.lua");
     LoadScript(L);
 
-MapTest();
-
+    MapTest();
 
     while (!WindowShouldClose()) {
         if (watcher.HasChanged()) {
@@ -272,7 +396,7 @@ MapTest();
 
         BeginDrawing();
         ClearBackground(DARKGRAY);
-
+        VisualizeMapstate(map);
         // Drawing phase timing
         auto drawStart = std::chrono::high_resolution_clock::now();
 
@@ -283,8 +407,6 @@ MapTest();
             }
             DrawRectangle(rect.x, rect.y, rect.width, rect.height, drawColor);
         }
-
-
         // Lua Render timing
         auto luaRenderStart = std::chrono::high_resolution_clock::now();
         lua_getglobal(L, "Render");
@@ -330,4 +452,3 @@ MapTest();
     CloseWindow();
     return 0;
 }
-
