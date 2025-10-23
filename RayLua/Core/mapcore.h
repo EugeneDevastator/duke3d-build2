@@ -1,16 +1,17 @@
 //
 // Created by omnis on 10/18/2025.
 //
+#ifndef BUILD2_MAPCORE_H
+#define BUILD2_MAPCORE_H
+#pragma once
 #include <math.h>
-#include <windows.h>
 #include <malloc.h>
+#include <stdlib.h>
+#include <string.h>
+
 #ifndef PI
 #define PI 3.141592653589793
 #endif
-#ifndef BUILD2_MAPCORE_H
-#define BUILD2_MAPCORE_H
-typedef struct { float x, y; } point2d;
-
 #ifndef max
 #define max(a,b)            (((a) > (b)) ? (a) : (b))
 #endif
@@ -20,6 +21,7 @@ typedef struct { float x, y; } point2d;
 #endif
 
 
+typedef struct { float x, y; } point2d;
 #ifndef KEN_DRAWPOLY_H
 typedef struct tiltyp {
 	long f, p, x, y, z;
@@ -29,7 +31,7 @@ typedef struct tiltyp {
 typedef struct { float x, y, z; } point3d;
 typedef struct { double x, y, z; } dpoint3d; 	//Note: pol doesn't support loops as dpoint3d's!
 
-typedef struct { INT_PTR f; int p, x, y; } tiletype;
+typedef struct { long* f; int p, x, y; } tiletype;
 typedef struct { tiltyp c, z; point3d p, r, d, f, h; } cam_t;
 
 #endif
@@ -44,8 +46,8 @@ typedef struct
     long namcrc32, hashnext;
 } tile_t;
 
-extern tile_t *gtile;
-extern long gnumtiles, gmaltiles, gtilehashead[1024];
+tile_t *gtile;
+long gnumtiles, gmaltiles, gtilehashead[1024];
 	//Map format:
 typedef struct
 {
@@ -388,7 +390,7 @@ static int polbool_splitlinepoint (polbool_lin_t **lin, int *linmal, wall_t *wal
 	double x0, y0, x1, y1, ix, iy;
 	int i, j;
 
-	if ((*linmal) < n) { (*linmal) = max(n,256); (*lin) = (polbool_lin_t *)realloc(*lin,(*linmal)*sizeof(polbool_lin_t)); }
+	if ((*linmal) < n) { (*linmal) = fmax(n,256); (*lin) = (polbool_lin_t *)realloc(*lin,(*linmal)*sizeof(polbool_lin_t)); }
 
 	for(i=0;i<n;i++)
 	{

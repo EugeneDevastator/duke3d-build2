@@ -1,0 +1,28 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "win32-default",
+      "displayName": "RayLua Win32 Build",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "Win32",
+      "cacheVariables": {
+        "CMAKE_POLICY_VERSION_MINIMUM": "3.5"
+      },
+      "vendor": {
+        "jetbrains.com/clion": {
+          "toolchain": "Visual Studio"
+        }
+      },
+      "binaryDir": "${sourceDir}/bin"
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "win32-release",
+      "displayName": "RayLua Win32 Buildpres",
+      "configurePreset": "win32-default",
+      "configuration": "RelWithDebInfo"
+    }
+  ]
+}
