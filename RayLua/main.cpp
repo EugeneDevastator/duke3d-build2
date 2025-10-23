@@ -266,11 +266,19 @@ void DrawMapstate(mapstate_t* map) {
     // Draw sprites as simple cubes
     for (int i = 0; i < map->numspris; i++) {
         spri_t* spr = &map->spri[i];
-        Vector3 pos = {spr->p.x, spr->p.y, spr->p.z};
-        DrawCubeWires(pos, 1.0f, 1.0f, 1.0f, RED);
+        Vector3 pos = {spr->p.x, spr->p.z, spr->p.y};
+        float s = 0.1f;
+        DrawCubeWires(pos, s, s, s, DARKBLUE);
     }
 }
-
+void DrawImgui()
+{
+    rlImGuiBegin();
+    ImGui::Begin("Profiling");
+    ImGui::Text("Lets f..n go!");
+    ImGui::End();
+    rlImGuiEnd();
+}
 void UpdateFreeCamera(FreeCamera* cam, float deltaTime) {
     float speed = cam->speed * deltaTime;
 
@@ -314,7 +322,7 @@ void UpdateFreeCamera(FreeCamera* cam, float deltaTime) {
 void VisualizeMapstate(mapstate_t* map) {
     InitWindow(1024, 768, "Mapstate Visualizer");
     SetTargetFPS(60);
-    DisableCursor();
+
 
     FreeCamera cam = {0};
     cam.position = {map->startpos.x, map->startpos.y, map->startpos.z};
@@ -340,7 +348,8 @@ void VisualizeMapstate(mapstate_t* map) {
         BeginMode3D(camera);
         DrawMapstate(map);
         EndMode3D();
-
+        DrawImgui();
+        DisableCursor();
         DrawText("WASD: Move, Mouse: Look", 10, 10, 20, WHITE);
         DrawFPS(10, 40);
 
@@ -419,6 +428,7 @@ int main() {
 
         // UI phase timing
         rlImGuiBegin();
+
         auto luaUIStart = std::chrono::high_resolution_clock::now();
         lua_getglobal(L, "RenderUI");
         if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
