@@ -134,7 +134,7 @@ typedef struct
 static kzfilestate kzfs;
 //KPLIB.H:
 //High-level (easy) picture loading function:
-void kpzload (const char *filnam, long *pic, long *bpl, int *xsiz, int *ysiz);
+void kpzload (const char *filnam, INT_PTR *pic, long *bpl, int *xsiz, int *ysiz);
 //Low-level PNG/JPG functions:
 int kpgetdim (const char *, int, int *, int *);
 int kprender (const char *, int, INT_PTR, int, int, int, int, int);
