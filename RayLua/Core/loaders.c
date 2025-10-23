@@ -135,7 +135,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 	short s, cursect;
 	char och, tbuf[256];
 
-	if (!(kzopen(filnam)==0))
+	if (!kzopen(filnam))
 	{     //Try without full pathname - see if it's in ZIP/GRP/Mounted_Dir
 		for(i=j=0;filnam[i];i++) if ((filnam[i] == '/') || (filnam[i] == '\\')) j = i+1;
 		if (!j) return(0);
@@ -576,6 +576,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				//sec[i].foglev = ?;
 			}
 			kzread(&s,2); //numwalls
+			printf("walls:%d",s);
 			for(i=k=0;i<map->numsects;i++)
 			{
 				for(j=0;j<sec[i].n;j++,k++)

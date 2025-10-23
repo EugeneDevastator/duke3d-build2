@@ -4,13 +4,12 @@
 
 #ifndef BUILD2_KPLIB_H
 #define BUILD2_KPLIB_H
-#include <string.h>
-//#include <fcntl.h>
-//#include <sys/types.h>
+#include <stdint.h>
+#include <fcntl.h>
+#include <sys/types.h>
 #include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
-typedef unsigned long Ulong;
 #define MAX_PATH 260
 enum //kpgetdim() return values:
 {
@@ -37,8 +36,6 @@ static unsigned short SSWAPIL (unsigned short a) { return((a>>8)+(a<<8)); }
 
 #ifdef __GNUC__
 #include <stdint.h>
-#define long* intptr_t
-#define Ulong* uintptr_t
 #endif
 
 #if !defined(_WIN32) && !defined(__DOS__)
@@ -87,7 +84,7 @@ static __inline int filelength (int h)
 #endif
 
 
-static long* frameplace;
+static intptr_t frameplace;
 
 static const int pow2mask[32] =
 {
@@ -137,7 +134,7 @@ static kzfilestate kzfs;
 void kpzload (const char *filnam, long *pic, long *bpl, int *xsiz, int *ysiz);
 //Low-level PNG/JPG functions:
 int kpgetdim (const char *, int, int *, int *);
-int kprender (const char *, int, long*, int, int, int, int, int);
+int kprender (const char *, int, intptr_t, int, int, int, int, int);
 //Ken's ZIP functions:
 int kzaddstack (const char *);
 void kzuninit (void);
@@ -150,8 +147,7 @@ int kztell (void);
 int kzgetc (void);
 int kzeof (void);
 void kzclose (void);
-#ifdef KEN_BUILD_2
 void kzfindfilestart (const char *); //pass wildcard string
 int kzfindfile (char *); //you alloc buf, returns 1:found,0:~found
-#endif
+
 #endif //BUILD2_KPLIB_H
