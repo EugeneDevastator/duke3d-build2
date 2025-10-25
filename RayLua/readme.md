@@ -42,6 +42,7 @@ those go for physics and other stuff like, blocking, hit receiving, physics laye
 add Alpha to Ken's field
 ### Pal and fogpal (1 and 1 byte)
 we can combine pal lookup with fog.
-
+### render-tags Rtag1-8, 2 bytes each
+- fog density, fog start, transparency, diter, shine, etc. 
 # Ai behaviors.
 main plan is to make behavior trees, and expose construction of them in lua.
