@@ -64,12 +64,14 @@ target_include_directories(luajit_lib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/Exte
 # Core files
 set(CORE_SOURCES
         core/mapcore.c
+        core/artloader.c
         core/kplib.c
         Core/loaders.c
 )
 
 set(CORE_HEADERS
         core/mapcore.h
+        core/artloader.h
         core/loaders.h
         core/kplib.h
 )

@@ -9,11 +9,6 @@
 #include "mapcore.h"
 #include "kplib.h"
 
-static char curmappath[MAX_PATH+1] = "";
-static unsigned char gammlut[256], gotpal = 0;
-static long nullpic [64+1][64]; //Null set icon (image not found)
-//static __forceinline unsigned int bsf (unsigned int a) { _asm bsf eax, a }
-//static __forceinline unsigned int bsr (unsigned int a) { _asm bsr eax, a }
 
 static long crctab32[256] = {0};  //SEE CRC32.C
 #define updatecrc32(c,crc) crc=(crctab32[((c)^crc)&255]^(((unsigned)crc)>>8))
@@ -160,7 +155,6 @@ static long gettileind (char *st)
 	gnumtiles++;
 	return(gnumtiles-1);
 }
-void loadpic_imp (tile_t *tpic, mapstate_t* gst);
 static int arewallstouching (int s0, int w0, int s1, int w1, mapstate_t* map)
 {
 	sect_t *sec;
