@@ -19,7 +19,7 @@ However in new basis we would tag sprite because there can be more stuff in the 
 Seems like sprite as behavior taggin is main thing for everything.
 
 ## New fields - behavior
-### classId - 2 bytes.
+### classId - 2 bytes. (prob. replace tag)
 in future we can merge all behaviors from different games, by this class id.
 ### RX,TX - 2 bytes each
 blood system to emit receive.
@@ -31,11 +31,12 @@ can be used for whatever - delays, randomization, etc.
 ### additional polymorphic choice: opt1-opt15 
 4 bits each (16 options, hopefully enough, like transmitted command, fadng curve, etc.
 ## new fields - common and map state
-### Layer (2bytes)
+### Layer (2 bytes)
 will be used for chunking purposes or editor selection isolation, for ex. mark entire second floor like layer 2 and then toggle show only layer 2 in editor.
-### Renderflags (2bytes)
+### Renderflags (16 bits)
 I want to split flags into maybe just 2 fields, one for visualisation, like, is it flipped, is it wall sprite, etc.
-### CoreFlags (2bytes)
+color apply mechanics. (regular or radial-vector based)
+### CoreFlags (16 bits)
 those go for physics and other stuff like, blocking, hit receiving, physics layer (last 4 bytes)
 ### Color (4 bytes rgba)
 add Alpha to Ken's field
