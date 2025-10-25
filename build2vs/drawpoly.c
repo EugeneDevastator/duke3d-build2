@@ -191,8 +191,8 @@ void htfinish (void)
 	/*FlushInstructionCache(GetCurrentProcess(),_daddr,sizeof(daval));*/ \
 }
 
-static __forceinline long bsf (long a) { _asm bsf eax, a }
-static __forceinline long bsr (long a) { _asm bsr eax, a }
+//static __forceinline long bsf (long a) { _asm bsf eax, a }
+//static __forceinline long bsr (long a) { _asm bsr eax, a }
 
 static __forceinline long mulshr16 (long a, long d)
 {
@@ -3133,11 +3133,11 @@ static long divconst (long *twolongstate, long numer) { return(numer/twolongstat
 
 	//Scale texture to next higher pow2. Uses box_sum_mip (no bilinear)
 	//Integrate area of double box. Assumes read area is smaller than write area
-	//едддеддде
-	//Ё  иьм╩ Ё
-	//еддведвде
-	//Ё  хьм╪ Ё
-	//едддеддде
+	//О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫
+	//О©╫  О©╫О©╫м╩ О©╫
+	//О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫
+	//О©╫  О©╫О©╫м╪ О©╫
+	//О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫
 void scaletex_boxsum (tiltyp *rt, tiltyp *wt)
 {
 	long i, rx, ry, rxf, ryf, nxm1, nym1, col0[4], col1[4], col2, ds, divstate[4][2];

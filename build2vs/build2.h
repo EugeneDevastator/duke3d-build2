@@ -22,6 +22,7 @@
 #define TYPEMESSLENG 256
 #endif
 #include "Core/mapcore.h"
+#include "Core/artloader.h"
 typedef struct
 {
 		//screen/camera state

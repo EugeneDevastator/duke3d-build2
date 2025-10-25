@@ -19,6 +19,7 @@ set(SOURCES
         Core/kplib.c
         Core/mapcore.c
     winmain.cpp
+        Core/artloader.c
 )
 
 # Headers
@@ -29,6 +30,7 @@ set(HEADERS
     sysmain.h
         Core/loaders.h
         Core/kplib.h
+        Core/artloader.h
 
 )
 
