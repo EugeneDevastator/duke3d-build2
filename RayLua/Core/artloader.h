@@ -19,6 +19,7 @@ static __forceinline unsigned int bsf (unsigned int a) { _asm bsf eax, a }
 static __forceinline unsigned int bsr (unsigned int a) { _asm bsr eax, a }
 typedef struct
 {
+	// could be 'tiles014|4323'
 	char filnam[240]; //Must fit packet header, sector&wall index, null terminator in 256 byte packet
 	tiltyp tt; //union! if (!tt.p), it's a 3D model, tt.f points to raw model data, tt.x is type
 	long namcrc32, hashnext;
@@ -26,6 +27,6 @@ typedef struct
 static unsigned char gammlut[256], gotpal = 0;
 static tile_t *gtile;
 
-void loadpic (tile_t *tpic);
+void loadpic (tile_t *tpic, char* rootpath);
 
 #endif //BUILD2_ARTLOADER_H
