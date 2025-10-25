@@ -268,7 +268,7 @@ static long fpsometer[2][FPSSIZ], fpsind[2][FPSSIZ], numframes[2] = {0,0}, micro
 static long folder  [64+1][64]; //Icon for selecting files in 'v' mode
 static long upfolder[64+1][64]; //Icon for selecting files in 'v' mode
 #endif
-//static long nullpic [64+1][64]; //Null set icon (image not found)
+static long nullpic [64+1][64]; //Null set icon (image not found)
 
 //App state variables: -----------------------------------------------------------------------------
 
@@ -2040,8 +2040,8 @@ static _inline int argb_scale (int c0, int mul12)
 }
 #endif
 
-//static __forceinline unsigned int bsf (unsigned int a) { _asm bsf eax, a }
-//static __forceinline unsigned int bsr (unsigned int a) { _asm bsr eax, a }
+static __forceinline unsigned int bsf (unsigned int a) { _asm bsf eax, a }
+static __forceinline unsigned int bsr (unsigned int a) { _asm bsr eax, a }
 static __forceinline int uptil1 (unsigned int *lptr, int z)
 {
 	//   //This line does the same thing (but slow & brute force)
@@ -2619,7 +2619,7 @@ static void drawkv6 (cam_t *cc, char *filnam, double px, double py, double pz,
 	drawkv6(&drawkv6_frame,kv6, px,py,pz, rx,ry,rz, dx,dy,dz, fx,fy,fz, col, shadefac);
 }
 
-//static unsigned char gammlut[256], gotpal = 0;
+static unsigned char gammlut[256], gotpal = 0;
 void setgammlut (double gammval)
 {
 	long i;
@@ -2635,6 +2635,127 @@ void setgammlut (double gammval)
 	gotpal = 0; //Force palette to reload
 }
 
+void loadpic (tile_t *tpic) // was copied
+{
+	static unsigned char lastpal[256][4], uch;
+	tiltyp *pic;
+	long i, j, x, y, filnum, tilenum, loctile0, loctile1, lnx, lny, nx, ny;
+	short *sxsiz, *sysiz;
+	unsigned char *uptr;
+	char tbuf[MAX_PATH*2], tbuf2[MAX_PATH*2];
+
+	pic = &tpic->tt; if (pic->f) return;
+
+	strcpy(tbuf,tpic->filnam);
+#if USEGROU
+
+		//.ART loader
+	for(i=j=0;tbuf[i];i++) if (tbuf[i] == '|') j = i;
+	if (!j) { tilenum = 0; } else { tilenum = atol(&tbuf[j+1]); tbuf[j] = 0; i = j; }
+	if ((i >= 5) && (!stricmp(&tbuf[i-4],".ART")))
+	{
+		if (!gotpal)
+		{
+			gotpal = 1;
+			for(i=j=0;tbuf[i];i++) if ((tbuf[i] == '/') || (tbuf[i] == '\\')) j = i+1;
+			strcpy(tbuf2,tbuf);
+			strcpy(&tbuf2[j],"palette.dat");
+			i = kzopen(tbuf2);
+			if (!i)
+			{
+				strcpy(tbuf2,curmappath); j += strlen(curmappath);
+				strcat(tbuf2,tbuf);
+				strcpy(&tbuf2[j],"palette.dat");
+				i = kzopen(tbuf2);
+			}
+			if (i)
+			{
+				kzread(lastpal,768);
+				*(long *)&lastpal[255][0] = 0^0xff000000;
+				for(i=255-1;i>=0;i--)
+				{
+					lastpal[i][3] = 255^0xff;
+					lastpal[i][2] = gammlut[lastpal[0][i*3+2]<<2];
+					lastpal[i][1] = gammlut[lastpal[0][i*3+1]<<2];
+					lastpal[i][0] = gammlut[lastpal[0][i*3  ]<<2];
+					uch = lastpal[i][0]; lastpal[i][0] = lastpal[i][2]; lastpal[i][2] = uch;
+				}
+				kzclose();
+			}
+		}
+
+		filnum = 0; //Scan .ART files, incrementing number until tile is in range
+		do
+		{
+			if (!kzopen(tbuf))
+			{
+				sprintf(tbuf2,"%s%s",curmappath,tbuf);
+				if (!kzopen(tbuf2)) { filnum = -1; break; }
+			}
+			kzread(tbuf,16); if (*(long *)&tbuf[0] != 1) { filnum = -1; break; }
+			loctile0 = *(long *)&tbuf[8];
+			loctile1 = (*(long *)&tbuf[12])-loctile0+1;
+			i = tilenum-loctile0; if ((unsigned)i < (unsigned)loctile1) { tilenum = i; break; }
+			filnum++; sprintf(&tbuf[strlen(tbuf)-7],"%03d.ART",filnum);
+		} while (1);
+		if (filnum >= 0)
+		{
+			sxsiz = (short *)_alloca(loctile1<<2); sysiz = &sxsiz[loctile1];
+			kzread(sxsiz,loctile1<<2);
+			for(i=0,j=16+(loctile1<<3);i<tilenum;i++) j += ((long)sxsiz[i])*((long)sysiz[i]);
+
+			pic->x = (long)sxsiz[tilenum];
+			pic->y = (long)sysiz[tilenum];
+
+				//Grab the picanm of the current tile (not currently implemented)
+			//kzseek(16+(loctile1<<2)+(tilenum<<2),SEEK_SET);
+			//kzread(&i,4);
+			//pic->xoffs = ((i<<16)>>24);
+			//pic->yoffs = ((i<< 8)>>24);
+
+				//Allocate texture to next higher pow2
+			if (pic->x <= 1) lnx = 0; else lnx = bsr(pic->x-1)+1;
+			if (pic->y <= 1) lny = 0; else lny = bsr(pic->y-1)+1;
+			nx = (1<<lnx); ny = (1<<lny);
+
+			kzseek(j,SEEK_SET);
+			uptr = (unsigned char *)_alloca(pic->y);
+			pic->p = (nx<<2);
+			pic->f = (long)malloc((ny+1)*pic->p+4);
+
+			for(x=0;x<pic->x;x++)
+			{
+				kzread(uptr,pic->y); i = (x<<2)+pic->f;
+				for(y=0;y<pic->y;y++,i+=pic->p) *(long *)i = *(long *)&lastpal[(long)uptr[y]][0];
+			}
+			kzclose();
+
+				//Scale texture to next higher pow2. Uses box_sum_mip (no bilinear)
+			if ((pic->x != nx) || (pic->y != ny))
+			{
+				tiltyp pow2t;
+				pow2t.f = pic->f; pow2t.p = pic->p; pow2t.x = nx; pow2t.y = ny;
+				scaletex_boxsum((tiltyp *)pic,&pow2t);
+				pic->x = nx; pic->y = ny;
+			}
+
+			fixtex4grou((tiltyp *)pic);
+			pic->lowermip = 0;
+		}
+	}
+	else
+	{
+		tiltyp gtt; //FIXFIX
+		kpzload4grou(tbuf,&gtt,1.0,2);
+		//applyshade(&gtt,1<<14,1<<14); fixtex4grou(&gtt);
+		pic->f = gtt.f; pic->p = gtt.p; pic->x = gtt.x; pic->y = gtt.y; pic->lowermip = gtt.lowermip;
+	}
+#else
+	kpzload(tbuf,&pic->f,&pic->p,&pic->x,&pic->y);
+	//kpzload(tpic->filnam,&pic->f,&pic->p,&pic->x,&pic->y); //FIX:why don't relative filenames work?
+#endif
+	if (!pic->f) { pic->f = (long)nullpic; pic->x = 64; pic->y = 64; pic->p = (pic->x<<2); pic->lowermip = 0; }
+}
 
 	//copied from evaldraw.c (renamed from drawpol_sse, then modified more) (09/12/2006)
 long kglcullmode = 0x405;
@@ -5695,7 +5816,6 @@ static long isintersect_sect_rect (long s, float x0, float y0, float x1, float y
 static int loadmap(char* fname)
 {
 	return loadmap_imp(fname,(mapstate_t*)gst);
-	int a =1;
 }
 static void executepack (unsigned char *recvbuf, int doplaysound)
 {

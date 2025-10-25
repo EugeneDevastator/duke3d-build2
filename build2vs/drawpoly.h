@@ -1,6 +1,6 @@
 #ifndef KEN_DRAWPOLY_H
 #define KEN_DRAWPOLY_H
-#include "core\artloader.h"
+
 #define RENDFLAGS_INTERP      (1<< 0) //nearest vs. bilinear interpolation
 #define RENDFLAGS_HEIGHT      (1<< 1) //flat vs. height mapped
 #define RENDFLAGS_COVSID      (1<< 2) //for heightmapped: cover sides
@@ -19,6 +19,12 @@ typedef struct { float x, y, z; } point3d;
 typedef struct { double x, y, z; } dpoint3d;
 typedef struct { INT_PTR f, p, x, y; } tiletype;
 // Structure definition for tile/bitmap data
+typedef struct tiltyp {
+	INT_PTR f, p;           // f=frame buffer pointer, p=pitch/stride
+	int x, y, z;            // x,y=dimensions, z=depth/format info
+	float shsc;             // shsc=suggested height scale
+	tiltyp *lowermip;       // pointer to lower mipmap level
+} tiltyp;
 
 typedef struct { tiltyp c, z; point3d p, r, d, f, h; } cam_t;
 typedef struct { float x, y, z, u, v; int n; } vertyp;

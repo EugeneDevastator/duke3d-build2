@@ -191,8 +191,8 @@ void htfinish (void)
 	/*FlushInstructionCache(GetCurrentProcess(),_daddr,sizeof(daval));*/ \
 }
 
-//static __forceinline long bsf (long a) { _asm bsf eax, a }
-//static __forceinline long bsr (long a) { _asm bsr eax, a }
+static __forceinline long bsf (long a) { _asm bsf eax, a }
+static __forceinline long bsr (long a) { _asm bsr eax, a }
 
 static __forceinline long mulshr16 (long a, long d)
 {
