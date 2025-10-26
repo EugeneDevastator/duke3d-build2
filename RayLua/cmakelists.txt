@@ -74,6 +74,7 @@ set(CORE_HEADERS
         core/artloader.h
         core/loaders.h
         core/kplib.h
+        luabinder.hpp
 )
 
 # Main executable
