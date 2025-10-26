@@ -7,7 +7,6 @@
 #define OOS_CHECK 1
 
 tile_t *gtile;
-long gnumtiles, gmaltiles, gtilehashead[1024];
 
 long wallclippol (kgln_t *pol, kgln_t *npol)
 {

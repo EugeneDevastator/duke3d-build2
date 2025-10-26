@@ -9,9 +9,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "kplib.h"
+#include "artloader.h"
 #ifndef PI
 #define PI 3.141592653589793
 #endif
+typedef struct { float x, y; } point2d;
+static long gnumtiles, gmaltiles, gtilehashead[1024];
+static char curmappath[MAX_PATH+1] = "";
+
 #ifndef max
 #define max(a,b)            (((a) > (b)) ? (a) : (b))
 #endif
@@ -21,17 +27,16 @@
 #endif
 
 
-typedef struct { float x, y; } point2d;
 #ifndef KEN_DRAWPOLY_H
-typedef struct tiltyp {
-	long f, p, x, y, z;
-	float shsc;
-	struct tiltyp *lowermip;
-} tiltyp; //shsc=suggested height scale
+//typedef struct tiltyp {
+//	long f, p, x, y, z;
+//	float shsc;
+//	struct tiltyp *lowermip;
+//} tiltyp; //shsc=suggested height scale
 typedef struct { float x, y, z; } point3d;
 typedef struct { double x, y, z; } dpoint3d; 	//Note: pol doesn't support loops as dpoint3d's!
 
-typedef struct { long* f; int p, x, y; } tiletype;
+typedef struct { intptr_t f; int p, x, y; } tiletype;
 typedef struct { tiltyp c, z; point3d p, r, d, f, h; } cam_t;
 
 #endif
@@ -39,15 +44,8 @@ typedef struct { tiltyp c, z; point3d p, r, d, f, h; } cam_t;
 typedef struct { int w, s; } vertlist_t;
 typedef struct { float x, y, z, u, v; int n; } kgln_t;
 typedef struct { double x, y, z; long n, filler; } genpoly_t;
-typedef struct
-{
-    char filnam[240]; //Must fit packet header, sector&wall index, null terminator in 256 byte packet
-    tiltyp tt; //union! if (!tt.p), it's a 3D model, tt.f points to raw model data, tt.x is type
-    long namcrc32, hashnext;
-} tile_t;
 
-tile_t *gtile;
-long gnumtiles, gmaltiles, gtilehashead[1024];
+
 	//Map format:
 typedef struct
 {

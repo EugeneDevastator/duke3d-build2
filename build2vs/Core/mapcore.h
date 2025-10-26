@@ -10,6 +10,8 @@
 #ifndef BUILD2_MAPCORE_H
 #define BUILD2_MAPCORE_H
 typedef struct { float x, y; } point2d;
+static long gnumtiles, gmaltiles, gtilehashead[1024];
+static char curmappath[MAX_PATH+1] = "";
 
 #ifndef max
 #define max(a,b)            (((a) > (b)) ? (a) : (b))

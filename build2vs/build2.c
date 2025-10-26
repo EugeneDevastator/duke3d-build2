@@ -268,7 +268,7 @@ static long fpsometer[2][FPSSIZ], fpsind[2][FPSSIZ], numframes[2] = {0,0}, micro
 static long folder  [64+1][64]; //Icon for selecting files in 'v' mode
 static long upfolder[64+1][64]; //Icon for selecting files in 'v' mode
 #endif
-//static long nullpic [64+1][64]; //Null set icon (image not found)
+static long nullpic [64+1][64]; //Null set icon (image not found)
 
 //App state variables: -----------------------------------------------------------------------------
 
@@ -2040,8 +2040,8 @@ static _inline int argb_scale (int c0, int mul12)
 }
 #endif
 
-//static __forceinline unsigned int bsf (unsigned int a) { _asm bsf eax, a }
-//static __forceinline unsigned int bsr (unsigned int a) { _asm bsr eax, a }
+static __forceinline unsigned int bsf (unsigned int a) { _asm bsf eax, a }
+static __forceinline unsigned int bsr (unsigned int a) { _asm bsr eax, a }
 static __forceinline int uptil1 (unsigned int *lptr, int z)
 {
 	//   //This line does the same thing (but slow & brute force)
@@ -2619,7 +2619,7 @@ static void drawkv6 (cam_t *cc, char *filnam, double px, double py, double pz,
 	drawkv6(&drawkv6_frame,kv6, px,py,pz, rx,ry,rz, dx,dy,dz, fx,fy,fz, col, shadefac);
 }
 
-//static unsigned char gammlut[256], gotpal = 0;
+static unsigned char gammlut[256], gotpal = 0;
 void setgammlut (double gammval)
 {
 	long i;

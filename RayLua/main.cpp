@@ -9,21 +9,18 @@
 #include <math.h>
 #include <chrono>
 
+#include "luabinder.hpp"
 #include "raymath.h"
-#include "external/miniaudio.h"
+
 
 extern "C" {
 #include "Core/loaders.h"
-#include <lua.h>
-#include <lualib.h>
-#include <lauxlib.h>
+#include "Core/artloader.h"
+
 }
 
 static mapstate_t *map;
-struct TransparentRect {
-    float x, y, width, height;
-    Color color;
-};
+
 void MapTest()
 {
     map = static_cast<mapstate_t*>(malloc(sizeof(mapstate_t)));
@@ -62,7 +59,7 @@ void MapTest()
 int a =1;
 }
 
-std::vector<TransparentRect> transparentRects;
+
 
 // Profiling variables
 double luaRenderTime = 0.0;
@@ -70,148 +67,6 @@ double luaUITime = 0.0;
 double drawingTime = 0.0;
 bool renderOpaque = false;
 
-int lua_DrawRectangle(lua_State* L) {
-    int x = lua_tointeger(L, 1);
-    int y = lua_tointeger(L, 2);
-    int w = lua_tointeger(L, 3);
-    int h = lua_tointeger(L, 4);
-    DrawRectangle(x, y, w, h, RED);
-    return 0;
-}
-
-int lua_SpawnTransparentRect(lua_State* L) {
-    float x = lua_tonumber(L, 1);
-    float y = lua_tonumber(L, 2);
-    float w = lua_tonumber(L, 3);
-    float h = lua_tonumber(L, 4);
-    int r = lua_tointeger(L, 5);
-    int g = lua_tointeger(L, 6);
-    int b = lua_tointeger(L, 7);
-    int a = lua_tointeger(L, 8);
-
-    TransparentRect rect = {x, y, w, h, {(unsigned char)r, (unsigned char)g, (unsigned char)b, (unsigned char)a}};
-    transparentRects.push_back(rect);
-
-    lua_pushinteger(L, transparentRects.size() - 1);
-    return 1;
-}
-
-int lua_SetRectPosition(lua_State* L) {
-    int index = lua_tointeger(L, 1);
-    float x = lua_tonumber(L, 2);
-    float y = lua_tonumber(L, 3);
-
-    if (index >= 0 && index < transparentRects.size()) {
-        transparentRects[index].x = x;
-        transparentRects[index].y = y;
-    }
-    return 0;
-}
-
-int lua_SetRectSize(lua_State* L) {
-    int index = lua_tointeger(L, 1);
-    float w = lua_tonumber(L, 2);
-    float h = lua_tonumber(L, 3);
-
-    if (index >= 0 && index < transparentRects.size()) {
-        transparentRects[index].width = w;
-        transparentRects[index].height = h;
-    }
-    return 0;
-}
-
-int lua_SetRectColor(lua_State* L) {
-    int index = lua_tointeger(L, 1);
-    int r = lua_tointeger(L, 2);
-    int g = lua_tointeger(L, 3);
-    int b = lua_tointeger(L, 4);
-    int a = lua_tointeger(L, 5);
-
-    if (index >= 0 && index < transparentRects.size()) {
-        transparentRects[index].color = {(unsigned char)r, (unsigned char)g, (unsigned char)b, (unsigned char)a};
-    }
-    return 0;
-}
-
-int lua_DeleteRect(lua_State* L) {
-    int index = lua_tointeger(L, 1);
-
-    if (index >= 0 && index < transparentRects.size()) {
-        transparentRects.erase(transparentRects.begin() + index);
-    }
-    return 0;
-}
-
-int lua_ClearAllRects(lua_State* L) {
-    transparentRects.clear();
-    return 0;
-}
-
-int lua_GetRectCount(lua_State* L) {
-    lua_pushinteger(L, transparentRects.size());
-    return 1;
-}
-
-int lua_GetMouseX(lua_State* L) {
-    lua_pushinteger(L, GetMouseX());
-    return 1;
-}
-
-int lua_GetMouseY(lua_State* L) {
-    lua_pushinteger(L, GetMouseY());
-    return 1;
-}
-
-int lua_ImGuiBegin(lua_State* L) {
-    const char* title = lua_tostring(L, 1);
-    ImGui::Begin(title,NULL, 0);
-    return 0;
-}
-
-int lua_ImGuiEnd(lua_State* L) {
-    ImGui::End();
-    return 0;
-}
-
-int lua_ImGuiText(lua_State* L) {
-    const char* text = lua_tostring(L, 1);
-    ImGui::Text("%s", text);
-    return 0;
-}
-
-int lua_GetKeyPressed(lua_State* L) {
-    int key = lua_tointeger(L, 1);
-    lua_pushboolean(L, IsKeyPressed(key));
-    return 1;
-}
-
-int lua_GetTime(lua_State* L) {
-    lua_pushnumber(L, GetTime());
-    return 1;
-}
-
-void LoadScript(lua_State* L) {
-    if (luaL_dofile(L, "script.lua") != LUA_OK) {
-        printf("Error loading script.lua: %s\n", lua_tostring(L, -1));
-        lua_pop(L, 1);
-
-        luaL_dostring(L, R"(
-        function Render()
-            DrawRectangle(100, 100, 200, 150)
-        end
-
-        function RenderUI()
-            ImGuiBegin("Test Window")
-            ImGuiText("Hello from Lua!")
-            ImGuiText("Mouse: " .. GetMouseX() .. ", " .. GetMouseY())
-            ImGuiText("Rects: " .. GetRectCount())
-            ImGuiEnd()
-        end
-        )");
-    } else {
-        printf("Script reloaded successfully\n");
-    }
-}
 
 void SetImguiFonts()
 {
@@ -359,53 +214,162 @@ void VisualizeMapstate(mapstate_t* map) {
     CloseWindow();
 }
 
+Texture2D ConvertPalToTexture() {
+    Image palImage = {0};
+    palImage.width = 16;
+    palImage.height = 16;
+    palImage.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+    palImage.mipmaps = 1;
+    palImage.data = malloc(16 * 16 * 4);
+
+    auto *pixels = static_cast<unsigned char*>(palImage.data);
+
+    // Debug the actual memory
+
+    int i = 6;
+    printf("Direct memory read: %d %d %d %d\n",
+           getColor(i+0), getColor(i+1),getColor(i+2),getColor(i+3));
+
+    for (int y = 0; y < 16; y++) {
+        for (int x = 0; x < 16; x++) {
+            int colorIndex = y * 16 + x;
+            int pixelIndex = (y * 16 + x) * 4;
+
+            // Direct memory access instead of array indexing
+            pixels[pixelIndex + 0] = getColor(colorIndex)[2]; // R
+            pixels[pixelIndex + 1] = getColor(colorIndex)[1]; // G
+            pixels[pixelIndex + 2] = getColor(colorIndex)[0]; // B
+            pixels[pixelIndex + 3] = 255;        // A
+        }
+    }
+
+    Texture2D texture = LoadTextureFromImage(palImage);
+    UnloadImage(palImage);
+    return texture;
+}
+
+// converts INDEXED pics only!
+Texture2D ConvertPicToTexture(tile_t *tpic) {
+    if (!tpic || !tpic->tt.f) return {0};
+
+    tiltyp *pic = &tpic->tt;
+
+    Image picImage = {0};
+    picImage.width = pic->x;
+    picImage.height = pic->y;
+    picImage.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+    picImage.mipmaps = 1;
+
+    picImage.data = malloc(pic->x * pic->y * 4);
+    unsigned char *pixels = (unsigned char*)picImage.data;
+
+    // pic->f points to RGBA data, pic->p is stride in bytes
+    for (int y = 0; y < pic->y; y++) {
+        unsigned char *srcRow = (unsigned char*)(pic->f + y * pic->p);
+        for (int x = 0; x < pic->x; x++) {
+            int srcIndex = x * 4;  // 4 bytes per pixel in source, even tho we need only byte 1 as index.
+            // i guess Ken used it for rgba textures too, since build2 can do them.
+            int dstIndex = (y * pic->x + x) * 4;
+
+            // Source is already RGBA, just copy and potentially reorder
+            pixels[dstIndex + 0] = srcRow[srcIndex + 2]; // R (from B)
+            pixels[dstIndex + 1] = srcRow[srcIndex + 1]; // G
+            pixels[dstIndex + 2] = srcRow[srcIndex + 0]; // B (from R)
+            pixels[dstIndex + 3] = 255; // A
+        }
+    }
+
+    Texture2D texture = LoadTextureFromImage(picImage);
+    UnloadImage(picImage);
+    return texture;
+}
+
+
+// Draw palette and texture preview on screen
+void DrawPaletteAndTexture(Texture2D palTexture, Texture2D picTexture, int screenWidth, int screenHeight) {
+  //  BeginDrawing();
+  //  ClearBackground(DARKGRAY);
+
+    // Draw palette in top-left corner
+    if (palTexture.id > 0) {
+        DrawTextureEx(palTexture, {10, 10}, 0.0f, 8.0f, WHITE);
+        DrawText("PALETTE", 10, 150, 20, WHITE);
+    }
+
+    // Draw texture in center-right area
+    if (picTexture.id > 0) {
+        float scale = 2.0f;
+        int maxSize = 400;
+
+        // Scale texture to fit preview area
+        if (picTexture.width > maxSize || picTexture.height > maxSize) {
+            float scaleX = (float)maxSize / picTexture.width;
+            float scaleY = (float)maxSize / picTexture.height;
+            scale = (scaleX < scaleY) ? scaleX : scaleY;
+        }
+
+        Vector2 pos = {
+            screenWidth - picTexture.width * scale - 20,
+            (screenHeight - picTexture.height * scale) / 2
+        };
+
+        DrawTextureEx(picTexture, pos, 0.0f, scale, WHITE);
+
+        // Draw texture info
+        char info[256];
+        sprintf(info, "SIZE: %dx%d", picTexture.width, picTexture.height);
+        DrawText(info, (int)pos.x, (int)pos.y - 25, 20, WHITE);
+    }
+
+  //  EndDrawing();
+}
+
+
+
 
 int main() {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
     InitWindow(800, 600, "Raylib + Lua + ImGui");
     SetTargetFPS(120);
     rlImGuiSetup(true);
-
+    LuaBinder::Init();
     SetImguiFonts();
 
-    lua_State* L = luaL_newstate();
-    luaL_openlibs(L);
-
-    lua_register(L, "DrawRectangle", lua_DrawRectangle);
-    lua_register(L, "SpawnTransparentRect", lua_SpawnTransparentRect);
-    lua_register(L, "SetRectPosition", lua_SetRectPosition);
-    lua_register(L, "SetRectSize", lua_SetRectSize);
-    lua_register(L, "SetRectColor", lua_SetRectColor);
-    lua_register(L, "DeleteRect", lua_DeleteRect);
-    lua_register(L, "ClearAllRects", lua_ClearAllRects);
-    lua_register(L, "GetRectCount", lua_GetRectCount);
-    lua_register(L, "GetMouseX", lua_GetMouseX);
-    lua_register(L, "GetMouseY", lua_GetMouseY);
-    lua_register(L, "ImGuiBegin", lua_ImGuiBegin);
-    lua_register(L, "ImGuiEnd", lua_ImGuiEnd);
-    lua_register(L, "ImGuiText", lua_ImGuiText);
-    lua_register(L, "GetKeyPressed", lua_GetKeyPressed);
-    lua_register(L, "GetTime", lua_GetTime);
-
     FileWatcher watcher("script.lua");
-    LoadScript(L);
+    LuaBinder::LoadScript();
+    char rootpath[256];
+    strcpy_s(rootpath, "c:/Eugene/Games/build2/");
+    LoadPal(rootpath);
+    auto paltex = ConvertPalToTexture();
+    tile_t* pic = static_cast<tile_t*>(malloc(sizeof(tile_t)));
+    strcpy_s(pic->filnam, "TILES000.art|1");
+    loadpic(pic,rootpath);
 
-    MapTest();
+
+    auto tex = ConvertPicToTexture(pic);
+
+    //MapTest();
 
     while (!WindowShouldClose()) {
         if (watcher.HasChanged()) {
-            LoadScript(L);
+            LuaBinder::LoadScript();
         }
 
         if (IsKeyPressed(KEY_R)) {
-            LoadScript(L);
+            LuaBinder::LoadScript();
+        }
+        // Add the E key check here
+        if (IsKeyPressed(KEY_E)) {
+            system("notepad script.lua");
         }
 
         auto frameStart = std::chrono::high_resolution_clock::now();
 
         BeginDrawing();
         ClearBackground(DARKGRAY);
-        VisualizeMapstate(map);
+
+
+        //VisualizeMapstate(map);
         // Drawing phase timing
         auto drawStart = std::chrono::high_resolution_clock::now();
 
@@ -416,13 +380,10 @@ int main() {
             }
             DrawRectangle(rect.x, rect.y, rect.width, rect.height, drawColor);
         }
+
         // Lua Render timing
         auto luaRenderStart = std::chrono::high_resolution_clock::now();
-        lua_getglobal(L, "Render");
-        if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
-            printf("Render error: %s\n", lua_tostring(L, -1));
-            lua_pop(L, 1);
-        }
+        LuaBinder::DoSceneUpdate();
         auto luaRenderEnd = std::chrono::high_resolution_clock::now();
         luaRenderTime = std::chrono::duration<double, std::milli>(luaRenderEnd - luaRenderStart).count();
 
@@ -430,11 +391,7 @@ int main() {
         rlImGuiBegin();
 
         auto luaUIStart = std::chrono::high_resolution_clock::now();
-        lua_getglobal(L, "RenderUI");
-        if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
-            printf("RenderUI error: %s\n", lua_tostring(L, -1));
-            lua_pop(L, 1);
-        }
+        LuaBinder::DoUpdate();
         auto luaUIEnd = std::chrono::high_resolution_clock::now();
         luaUITime = std::chrono::duration<double, std::milli>(luaUIEnd - luaUIStart).count();
 
@@ -453,7 +410,7 @@ int main() {
         drawingTime = std::chrono::duration<double, std::milli>(drawEnd - drawStart).count();
 
         DrawFPS(10, 10);
-
+        DrawPaletteAndTexture(paltex,tex,600,600);
         EndDrawing();
     }
 
