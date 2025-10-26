@@ -153,22 +153,8 @@ void kpzload4grou_intr (const char *filnam, tiltyp *tt, float shsc, int flags)
 	//for(ntt=tt;ntt=genmiptiltyp(ntt););
 }
 
-static unsigned char globalpal[256][4];
+
 ////1.0=no change, useful range={0.0..~4.0)
-void setgammlut (double gammval)
-{
-	long i;
-
-	gammval = 1.0/gammval;
-	for(i=0;i<256;i++) gammlut[i] = pow(((double)i)*(1.0/256.0),gammval)*256.0;
-
-		//Remove all loaded tiles from memory
-	//if (gtile)
-	//	for(i=gnumtiles-1;i>=0;i--)
-	//		if (gtile[i].tt.f) { free((void *)gtile[i].tt.f); gtile[i].tt.f = 0; }
-    //
-	//gotpal = 0; //Force palette to reload
-}
 
 void CleanTiles(){
 	//if (gtile)
@@ -176,45 +162,6 @@ void CleanTiles(){
 	//		if (gtile[i].tt.f) { free((void *)gtile[i].tt.f); gtile[i].tt.f = 0; }
     //
 	//gotpal = 0; //Force palette to reload
-}
-
-void LoadPal(const char *basepath) {
-    char tbuf[MAX_PATH*2];
-    int i, j;
-    unsigned char uch;
-
-    if (gotpal) return;
-	//build2.gammaval = 1.0; //1.0=no change, useful range={0.0..~4.0)
-	setgammlut(1.0);
-
-    // Try palette.dat in same directory as basepath
-    for(i=j=0;basepath[i];i++) if ((basepath[i] == '/') || (basepath[i] == '\\')) j = i+1;
-    strcpy(tbuf, basepath);
-    strcpy(&tbuf[j], "palette.dat");
-
-    //i = kzopen(tbuf);
-    //if (!i) {
-    //    // Try in rootpath
-    //    strcpy(tbuf, basepath);
-    //    j += strlen(basepath);
-    //    strcat(tbuf, basepath);
-    //    strcpy(&tbuf[j], "palette.dat");
-    //    i = kzopen(tbuf);
-    //}
-
-    if (i) {
-        kzread(globalpal, 768);
-        *(long *)&globalpal[255][0] = 0^0xff000000;
-        for(i=255-1;i>=0;i--) {
-            globalpal[i][3] = 255^0xff;
-            globalpal[i][2] = gammlut[globalpal[0][i*3+2]<<2];
-            globalpal[i][1] = gammlut[globalpal[0][i*3+1]<<2];
-            globalpal[i][0] = gammlut[globalpal[0][i*3  ]<<2];
-            uch = globalpal[i][0]; globalpal[i][0] = globalpal[i][2]; globalpal[i][2] = uch;
-        }
-        kzclose();
-        gotpal = 1;
-    }
 }
 
 void loadpic(tile_t *tpic, char* rootpath) {
@@ -225,7 +172,8 @@ void loadpic(tile_t *tpic, char* rootpath) {
     char tbuf[MAX_PATH*2], tbuf2[MAX_PATH*2];
 
     pic = &tpic->tt;
-    if (pic->f) return;
+   // if (pic->f) // clear
+//		{ free((void *)pic->f); pic->f = 0; }
 
     strcpy(tbuf, tpic->filnam);
 #if USEGROU
@@ -297,5 +245,60 @@ void loadpic(tile_t *tpic, char* rootpath) {
     kpzload(tbuf,&pic->f,&pic->p,&pic->x,&pic->y);
 #endif
     if (!pic->f) { pic->f = (long)nullpic; pic->x = 64; pic->y = 64; pic->p = (pic->x<<2); pic->lowermip = 0; }
+}
+
+void setgammlut(double gammval)
+{
+	long i;
+
+	gammval = 1.0/gammval;
+	for(i=0;i<256;i++) gammlut[i] = pow(((double)i)*(1.0/256.0),gammval)*256.0;
+
+	//Remove all loaded tiles from memory
+	//if (gtile)
+	//	for(i=gnumtiles-1;i>=0;i--)
+	//		if (gtile[i].tt.f) { free((void *)gtile[i].tt.f); gtile[i].tt.f = 0; }
+	//
+	//gotpal = 0; //Force palette to reload
+}
+
+void LoadPal(const char* basepath)
+{
+	char tbuf[MAX_PATH*2];
+	int i, j;
+	unsigned char uch;
+
+	if (gotpal) return;
+	//build2.gammaval = 1.0; //1.0=no change, useful range={0.0..~4.0)
+	setgammlut(1.0);
+
+	// Try palette.dat in same directory as basepath
+	for(i=j=0;basepath[i];i++) if ((basepath[i] == '/') || (basepath[i] == '\\')) j = i+1;
+	strcpy(tbuf, basepath);
+	strcpy(&tbuf[j], "palette.dat");
+
+	i = kzopen(tbuf);
+	if (!i) {
+	    // Try in rootpath
+	    strcpy(tbuf, basepath);
+	    j += strlen(basepath);
+	    strcat(tbuf, basepath);
+	    strcpy(&tbuf[j], "palette.dat");
+	    i = kzopen(tbuf);
+	}
+
+	if (i) {
+		kzread(globalpal, 768);
+		*(long *)&globalpal[255][0] = 0^0xff000000;
+		for(i=255-1;i>=0;i--) {
+			globalpal[i][3] = 0xff ^ 255;
+			globalpal[i][2] = gammlut[globalpal[0][i*3+2]<<2];
+			globalpal[i][1] = gammlut[globalpal[0][i*3+1]<<2];
+			globalpal[i][0] = gammlut[globalpal[0][i*3  ]<<2];
+			uch = globalpal[i][0]; globalpal[i][0] = globalpal[i][2]; globalpal[i][2] = uch;
+		}
+		kzclose();
+		gotpal = 1;
+	}
 }
 
