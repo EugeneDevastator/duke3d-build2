@@ -5,7 +5,7 @@
 #ifndef BUILD2_ARTLOADER_H
 #define BUILD2_ARTLOADER_H
 #include "kplib.h"
-static unsigned char globalpal[256][4];
+#include "stdint.h"
 #define USEGROU 1
 typedef struct tiltyp {
 	intptr_t f, p;           // f=frame buffer pointer, p=pitch/stride
@@ -26,10 +26,7 @@ typedef struct
 } tile_t;
 static unsigned char gammlut[256], gotpal = 0;
 static tile_t *gtile;
-static char* getColor(int idx)
-{
-	return (char*)globalpal[idx];
-}
+unsigned char* getColor(int idx);
 
 void loadpic (tile_t *tpic, char* rootpath);
 void setgammlut (double gammval);

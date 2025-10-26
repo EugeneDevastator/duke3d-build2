@@ -11,10 +11,10 @@
 
 #include "raymath.h"
 #include "external/miniaudio.h"
-
 extern "C" {
 #include "Core/loaders.h"
 #include "Core/artloader.h"
+
 #include <lua.h>
 #include <lualib.h>
 #include <lauxlib.h>
@@ -366,25 +366,26 @@ Texture2D ConvertPalToTexture() {
     palImage.height = 16;
     palImage.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
     palImage.mipmaps = 1;
-
-    // Allocate memory for 16x16 palette preview
     palImage.data = malloc(16 * 16 * 4);
+
     auto *pixels = static_cast<unsigned char*>(palImage.data);
-    for (int i = 0; i < 4; i++) {
-        printf("Palette[%d]: R=%d G=%d B=%d A=%d\n", i,
-               globalpal[i][0], globalpal[i][1], globalpal[i][2], globalpal[i][3]);
-        // in debug values are there, but it still prints zeros
-    }
-    // Fill palette preview (16x16 grid showing all 256 colors)
+
+    // Debug the actual memory
+
+    int i = 6;
+    printf("Direct memory read: %d %d %d %d\n",
+           getColor(i+0), getColor(i+1),getColor(i+2),getColor(i+3));
+
     for (int y = 0; y < 16; y++) {
         for (int x = 0; x < 16; x++) {
             int colorIndex = y * 16 + x;
             int pixelIndex = (y * 16 + x) * 4;
-            const auto b = getColor(colorIndex);
-            pixels[pixelIndex + 0] = globalpal[colorIndex][3]; // R
-            pixels[pixelIndex + 1] = b[1]; // G
-            pixels[pixelIndex + 2] = (int)globalpal[colorIndex][1]; // B
-            pixels[pixelIndex + 3] = 255;//globalpal[colorIndex][3]; // A
+
+            // Direct memory access instead of array indexing
+            pixels[pixelIndex + 0] = getColor(colorIndex)[2]; // R
+            pixels[pixelIndex + 1] = getColor(colorIndex)[1]; // G
+            pixels[pixelIndex + 2] = getColor(colorIndex)[0]; // B
+            pixels[pixelIndex + 3] = 255;        // A
         }
     }
 
@@ -392,7 +393,6 @@ Texture2D ConvertPalToTexture() {
     UnloadImage(palImage);
     return texture;
 }
-
 // Convert PIC/ART tile to Raylib texture
 Texture2D ConvertPicToTexture(tile_t *tpic) {
     if (!tpic || !tpic->tt.f) return {0};
@@ -415,11 +415,11 @@ Texture2D ConvertPicToTexture(tile_t *tpic) {
             int srcIndex = y * pic->p + (x << 2);
             int dstIndex = (y * pic->x + x) * 4;
 
-            unsigned char *srcPixel = (unsigned char*)(pic->f + srcIndex);
-auto col = globalpal[*srcPixel];
-            pixels[dstIndex + 0] = col[0]; // R
+            unsigned char *srcPixel = (unsigned char*)(pic->f+srcIndex);
+            auto col = getColor(*srcPixel);
+            pixels[dstIndex + 0] = col[2]; // R
             pixels[dstIndex + 1] = col[1]; // G
-            pixels[dstIndex + 2] = col[2]; // B
+            pixels[dstIndex + 2] = col[0]; // B
             pixels[dstIndex + 3] = 255; // A
         }
     }
@@ -504,7 +504,7 @@ int main() {
     LoadPal(rootpath);
     auto paltex = ConvertPalToTexture();
     tile_t* pic = static_cast<tile_t*>(malloc(sizeof(tile_t)));
-    strcpy_s(pic->filnam, "tiles000|5");
+    strcpy_s(pic->filnam, "TILES000.art|1");
     loadpic(pic,rootpath);
 
 

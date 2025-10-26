@@ -5,7 +5,7 @@
 
 #include <string.h>
 #include "mapcore.h"
-
+unsigned char globalpal[256][4];
 #if defined(_MSC_VER)
 void divconst_setdenom_intr (long *twolongstate, long denom)
 {
@@ -162,6 +162,11 @@ void CleanTiles(){
 	//		if (gtile[i].tt.f) { free((void *)gtile[i].tt.f); gtile[i].tt.f = 0; }
     //
 	//gotpal = 0; //Force palette to reload
+}
+
+unsigned char* getColor(int idx)
+{
+	return (unsigned char*)globalpal[idx];
 }
 
 void loadpic(tile_t *tpic, char* rootpath) {
