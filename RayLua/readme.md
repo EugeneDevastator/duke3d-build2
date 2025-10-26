@@ -4,6 +4,12 @@
 
 Should be run from here: `.\RayLua\External\LuaJIT\src\msvcbuild.bat`
 
+# Lua scripting limitations
+1. no threading, - means we do only occasional modifications or event reactions, C side does updating based on state.
+for ex lua will do `projectile.xvel = 100`; C will animate all projectiles each frame.
+
+
+
 # New map format iteration
 this doc is work in progress. I would like to stick to original tag system as much as possible and introduce as less new fields as possible.
 ## Tags
