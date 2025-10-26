@@ -394,6 +394,7 @@ Texture2D ConvertPalToTexture() {
     return texture;
 }
 
+// converts INDEXED pics only!
 Texture2D ConvertPicToTexture(tile_t *tpic) {
     if (!tpic || !tpic->tt.f) return {0};
 
@@ -412,7 +413,8 @@ Texture2D ConvertPicToTexture(tile_t *tpic) {
     for (int y = 0; y < pic->y; y++) {
         unsigned char *srcRow = (unsigned char*)(pic->f + y * pic->p);
         for (int x = 0; x < pic->x; x++) {
-            int srcIndex = x * 4;  // 4 bytes per pixel in source
+            int srcIndex = x * 4;  // 4 bytes per pixel in source, even tho we need only byte 1 as index.
+            // i guess Ken used it for rgba textures too, since build2 can do them.
             int dstIndex = (y * pic->x + x) * 4;
 
             // Source is already RGBA, just copy and potentially reorder
