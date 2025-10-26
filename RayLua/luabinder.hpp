@@ -9,7 +9,7 @@ extern "C" {
 #include <lauxlib.h>
 }
 
-static lua_State* L;
+static inline lua_State* L;
 
 struct TransparentRect
 {
@@ -17,11 +17,47 @@ struct TransparentRect
     Color color;
 };
 
-std::vector<TransparentRect> transparentRects;
-
+inline std::vector<TransparentRect> transparentRects;
+static inline std::vector<int> persistentRectIndices;
 class LuaBinder
 {
 public:
+// persistence
+
+
+    // Add these functions to LuaBinder class:
+    static void RegisterPersistence(lua_State* L)
+    {
+        lua_register(L, "GetPersistentRects", lua_GetPersistentRects);
+        lua_register(L, "AddPersistentRect", lua_AddPersistentRect);
+        lua_register(L, "ClearPersistentRects", lua_ClearPersistentRects);
+    }
+
+    static int lua_GetPersistentRects(lua_State* L)
+    {
+        lua_newtable(L);
+        for (size_t i = 0; i < persistentRectIndices.size(); i++) {
+            lua_pushinteger(L, persistentRectIndices[i]);
+            lua_rawseti(L, -2, i + 1);
+        }
+        return 1;
+    }
+
+    static int lua_AddPersistentRect(lua_State* L)
+    {
+        int index = lua_tointeger(L, 1);
+        persistentRectIndices.push_back(index);
+        return 0;
+    }
+
+    static int lua_ClearPersistentRects(lua_State* L)
+    {
+        persistentRectIndices.clear();
+        return 0;
+    }
+
+    // main
+
     static void Init()
     {
         L = luaL_newstate();
@@ -29,6 +65,7 @@ public:
         RegisterRaylib(L);
         RegisterImGui(L);
         RegisterInput(L);
+        RegisterPersistence(L);  // Add this line
     }
     static void DoSceneUpdate()
     {

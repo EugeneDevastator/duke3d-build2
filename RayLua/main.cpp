@@ -358,6 +358,10 @@ int main() {
         if (IsKeyPressed(KEY_R)) {
             LuaBinder::LoadScript();
         }
+        // Add the E key check here
+        if (IsKeyPressed(KEY_E)) {
+            system("notepad script.lua");
+        }
 
         auto frameStart = std::chrono::high_resolution_clock::now();
 
