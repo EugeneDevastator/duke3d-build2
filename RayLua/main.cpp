@@ -393,7 +393,7 @@ Texture2D ConvertPalToTexture() {
     UnloadImage(palImage);
     return texture;
 }
-// Convert PIC/ART tile to Raylib texture
+
 Texture2D ConvertPicToTexture(tile_t *tpic) {
     if (!tpic || !tpic->tt.f) return {0};
 
@@ -405,21 +405,20 @@ Texture2D ConvertPicToTexture(tile_t *tpic) {
     picImage.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
     picImage.mipmaps = 1;
 
-    // Allocate memory for image data
     picImage.data = malloc(pic->x * pic->y * 4);
     unsigned char *pixels = (unsigned char*)picImage.data;
 
-    // Copy pixel data from pic format to RGBA
+    // pic->f points to RGBA data, pic->p is stride in bytes
     for (int y = 0; y < pic->y; y++) {
+        unsigned char *srcRow = (unsigned char*)(pic->f + y * pic->p);
         for (int x = 0; x < pic->x; x++) {
-            int srcIndex = y * pic->p + (x << 2);
+            int srcIndex = x * 4;  // 4 bytes per pixel in source
             int dstIndex = (y * pic->x + x) * 4;
 
-            unsigned char *srcPixel = (unsigned char*)(pic->f+srcIndex);
-            auto col = getColor(*srcPixel);
-            pixels[dstIndex + 0] = col[2]; // R
-            pixels[dstIndex + 1] = col[1]; // G
-            pixels[dstIndex + 2] = col[0]; // B
+            // Source is already RGBA, just copy and potentially reorder
+            pixels[dstIndex + 0] = srcRow[srcIndex + 2]; // R (from B)
+            pixels[dstIndex + 1] = srcRow[srcIndex + 1]; // G
+            pixels[dstIndex + 2] = srcRow[srcIndex + 0]; // B (from R)
             pixels[dstIndex + 3] = 255; // A
         }
     }
@@ -428,6 +427,7 @@ Texture2D ConvertPicToTexture(tile_t *tpic) {
     UnloadImage(picImage);
     return texture;
 }
+
 
 // Draw palette and texture preview on screen
 void DrawPaletteAndTexture(Texture2D palTexture, Texture2D picTexture, int screenWidth, int screenHeight) {
@@ -442,7 +442,7 @@ void DrawPaletteAndTexture(Texture2D palTexture, Texture2D picTexture, int scree
 
     // Draw texture in center-right area
     if (picTexture.id > 0) {
-        float scale = 1.0f;
+        float scale = 2.0f;
         int maxSize = 400;
 
         // Scale texture to fit preview area
@@ -575,7 +575,7 @@ int main() {
         drawingTime = std::chrono::duration<double, std::milli>(drawEnd - drawStart).count();
 
         DrawFPS(10, 10);
-        DrawPaletteAndTexture(paltex,tex,1000,1000);
+        DrawPaletteAndTexture(paltex,tex,600,600);
         EndDrawing();
     }
 
