@@ -973,52 +973,74 @@ static void rast_sub (rast_t *d0, rast_t *d1, rast_t *s0, rast_t *s1)
 	d1->ymin = d0->ymin; d1->ymax = d0->ymax;
 }
 
+/** ai comments:
+ * Renders a scanline with depth buffering and color interpolation.
+ * Processes pixels in chunks using SIMD shader functions, then interpolates between
+ * computed points to fill the complete scanline.
+ *
+ * @param iy - Y coordinate (scanline number) to render
+ * @param _ - Pointer to int array containing [x_start, x_end] bounds
+ */
 static void draw_dohlin (int iy, void *_)
-{
+{  // Depth values from shader
 	ALIGN(16) float fdeps[(MAXXDIM>>LNPIX)+4];
-	ALIGN(16) int icols[(MAXXDIM>>LNPIX)+4], ixs[(MAXXDIM>>LNPIX)+4];
+	ALIGN(16) int icols[(MAXXDIM>>LNPIX)+4], ixs[(MAXXDIM>>LNPIX)+4];  // Colors and X positions
 	float *zptr;
 	int i, ix0, ix1, ix, ixe, ixsn, *cptr;
 
+	// Extract and validate X bounds from parameter
 	ix0 = max(((int *)_)[0],    0);
 	ix1 = min(((int *)_)[1],gdd.x); if (ix0 >= ix1) return;
 
+	// Setup pointers to color buffer and Z-buffer for current scanline
 	cptr = (int *)(gdd.p*iy + gdd.f);
 	zptr = (float *)(((INT_PTR)cptr) + zbufoff);
 
 #if 1
+	// Build array of X positions for shader evaluation (simple linear spacing)
 	ixsn = 0; for(ix=ix0,ixe=ix1-1;ix<ixe;ix+=NPIX) { ixs[ixsn] = ix; ixsn++; }
 	ixs[ixsn] = ixe; ixsn++;
 #else
-		//make most of shader4 by rounding ixsn up to next multiple of 4: BUGGY!
+	    //make most of shader4 by rounding ixsn up to next multiple of 4: BUGGY!
+	// Alternative: shader4-optimized spacing (marked as BUGGY)
 	ixsn = ((ix1-ix0+(NPIX*2-2))>>LNPIX); ixsn = (ixsn+(NPIX-1))&(-NPIX);
 	int k, m; k = (ix0<<16); m = ((ix1-1-ix0)<<16)/(ixsn-1);
 	for(i=0;i<ixsn-1;i++,k+=m) { ixs[i] = (k>>16); }
 	ixs[ixsn-1] = ix1-1;
 #endif
+
+	// Execute SIMD shader function in groups of 4 to compute depth/color at key points
 	for(i=0;i<ixsn;i+=4) glsl_shader4_func(&ixs[i],iy,&fdeps[i],&icols[i]);
 	ixs[ixsn] = ix1; //hack to force end
 
 #ifndef _MSC_VER
+	// C implementation: Linear interpolation between shader-computed points
 	float fdep, fdepi;
 	int icol, icoli;
 
 	icol = icols[0]; fdep = fdeps[0]; ixsn = 1;
 	for(ix=ix0;ix<ix1;ix=ixe)
 	{
+		// Calculate interpolation deltas for current segment
 		ixe = ixs[ixsn]; i = ixe-ix;
 		icoli = ((icols[ixsn]-icol)*ireciplo[i])>>12;
 		fdepi = (fdeps[ixsn]-fdep)*freciplo[i];
 		ixsn++;
+
+		// Interpolate and render pixels in current segment
 		for(i=ix;i<ixe;i++,icol+=icoli,fdep+=fdepi)
 		{
+			// Depth test - skip if behind existing pixel
 			if (fdep >= zptr[i]) continue;
 			//if (i != ix) continue;
+
+			// Update Z-buffer and render pixel with RGB color conversion
 			zptr[i] = fdep;
 			cptr[i] = (min((rr*icol)>>14,255)<<16) + (min((gg*icol)>>14,255)<<8) + min((bb*icol)>>14,255);
 		}
 	}
 #else
+	// MSVC inline assembly implementation: Same logic as C version but optimized with SSE
 	_asm
 	{
 		push esi
@@ -1032,6 +1054,9 @@ static void draw_dohlin (int iy, void *_)
 			;edi:ixsn   xmm5:
 			;ebp:       xmm6:
 			;esp:       xmm7:temp
+		// Register allocation comments:
+		// eax:cptr   xmm0:fdep    esi:ix     edi:ixsn
+		// ecx:zptr   xmm1:icol    xmm2:fdepi xmm3:icoli
 
 		mov esi, ix0
 		mov edi, 1
@@ -1039,9 +1064,13 @@ static void draw_dohlin (int iy, void *_)
 		movss xmm1, icols[0]
 		mov eax, cptr
 		mov ecx, zptr
+
+		 // Main segment loop
 topit:   mov edx, ixs[edi*4]
 			sub edx, esi
 			jle short endit
+
+		// Calculate interpolation deltas using SSE
 				movss xmm3, icols[edi*4]
 				psubd xmm3, xmm1
 				movss xmm7, ireciplo[edx*4]
@@ -1051,13 +1080,19 @@ topit:   mov edx, ixs[edi*4]
 				movss xmm2, fdeps[edi*4]
 				subss xmm2, xmm0
 				mulss xmm2, freciplo[edx*4]
+
+		// Inner pixel loop with depth test and color conversion
 begit:         ucomiss xmm0, [ecx+esi*4]
 					ja short skpit
+
+		// Update Z-buffer and convert/store color
 						movss [ecx+esi*4], xmm0
 						pshuflw xmm7, xmm1, 0x00
 						pmulhuw xmm7, dqcolmul
 						packuswb xmm7, xmm7
 						movss [eax+esi*4], xmm7
+
+		// Advance interpolation values
 skpit:         addss xmm0, xmm2
 					paddd xmm1, xmm3
 					add esi, 1

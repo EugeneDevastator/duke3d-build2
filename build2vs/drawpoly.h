@@ -18,7 +18,14 @@
 typedef struct { float x, y, z; } point3d;
 typedef struct { double x, y, z; } dpoint3d;
 typedef struct { INT_PTR f, p, x, y; } tiletype;
-typedef struct tiltyp { INT_PTR f, p; int x, y, z; float shsc; tiltyp *lowermip; } tiltyp; //shsc=suggested height scale
+// Structure definition for tile/bitmap data
+typedef struct tiltyp {
+	INT_PTR f, p;           // f=frame buffer pointer, p=pitch/stride
+	int x, y, z;            // x,y=dimensions, z=depth/format info
+	float shsc;             // shsc=suggested height scale
+	tiltyp *lowermip;       // pointer to lower mipmap level
+} tiltyp;
+
 typedef struct { tiltyp c, z; point3d p, r, d, f, h; } cam_t;
 typedef struct { float x, y, z, u, v; int n; } vertyp;
 
