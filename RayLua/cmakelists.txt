@@ -73,10 +73,11 @@ if(NOT EXISTS ${LUAJIT_LIB_PATH})
         )
 
         if(VS_INSTALL_PATH)
-            set(VCVARS_PATH "${VS_INSTALL_PATH}/VC/Auxiliary/Build/vcvars32.bat")
+            # Convert to native path and escape properly
+            file(TO_NATIVE_PATH "${VS_INSTALL_PATH}/VC/Auxiliary/Build/vcvars32.bat" VCVARS_PATH)
 
             execute_process(
-                    COMMAND cmd /c "\"${VCVARS_PATH}\" && msvcbuild.bat static"
+                    COMMAND cmd /c call "${VCVARS_PATH}" && "msvcbuild.bat static"
                     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/External/LuaJIT/src
                     RESULT_VARIABLE LUAJIT_BUILD_RESULT
             )
@@ -93,11 +94,13 @@ if(NOT EXISTS ${LUAJIT_LIB_PATH})
         )
 
         set(VCVARS_FOUND FALSE)
-        foreach(VCVARS_PATH ${COMMON_VS_PATHS})
-            if(EXISTS "${VCVARS_PATH}")
+        foreach(VCVARS_PATH_RAW ${COMMON_VS_PATHS})
+            if(EXISTS "${VCVARS_PATH_RAW}")
+                # Convert to native path
+                file(TO_NATIVE_PATH "${VCVARS_PATH_RAW}" VCVARS_PATH)
+
                 execute_process(
-                        # '\"C:\Program Files\Microsoft Visual Studio\2022\Community/VC/Auxiliary/Build/vcvars32.bat\"' getting slahses issue here
-                        COMMAND cmd /c "\"${VCVARS_PATH}\" && msvcbuild.bat static"
+                        COMMAND cmd /c "call /"${VCVARS_PATH}/" && msvcbuild.bat static"
                         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/External/LuaJIT/src
                         RESULT_VARIABLE LUAJIT_BUILD_RESULT
                 )
@@ -123,6 +126,13 @@ if(NOT EXISTS ${LUAJIT_LIB_PATH})
 else()
     message(STATUS "LuaJIT library found, skipping compilation")
 endif()
+# link luajit
+add_library(luajit_lib STATIC IMPORTED)
+set_target_properties(luajit_lib PROPERTIES
+        IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/External/LuaJIT/src/lua51.lib
+)
+target_include_directories(luajit_lib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/External/LuaJIT/src)
+
 
 # Core files
 set(CORE_SOURCES
