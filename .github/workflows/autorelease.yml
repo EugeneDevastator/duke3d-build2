@@ -1,9 +1,5 @@
 name: Build and Release Windows x86
 
-on:
-  push:
-    branches: [ main, master ]
-
 jobs:
   build:
     runs-on: windows-latest
