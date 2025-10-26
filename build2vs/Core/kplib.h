@@ -4,7 +4,8 @@
 
 #ifndef BUILD2_KPLIB_H
 #define BUILD2_KPLIB_H
-#include <stdint.h>
+
+#include <string.h>
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -36,6 +37,8 @@ static unsigned short SSWAPIL (unsigned short a) { return((a>>8)+(a<<8)); }
 
 #ifdef __GNUC__
 #include <stdint.h>
+#define INT_PTR intptr_t
+#define UINT_PTR uintptr_t
 #endif
 
 #if !defined(_WIN32) && !defined(__DOS__)
@@ -59,7 +62,7 @@ static __inline int filelength (int h)
 #include <dos.h>
 #elif defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
-//#include <windows.h>
+#include <windows.h>
 #endif
 
 #ifndef O_BINARY
@@ -84,7 +87,7 @@ static __inline int filelength (int h)
 #endif
 
 
-static intptr_t frameplace;
+static INT_PTR frameplace;
 
 static const int pow2mask[32] =
 {
@@ -131,10 +134,10 @@ typedef struct
 static kzfilestate kzfs;
 //KPLIB.H:
 //High-level (easy) picture loading function:
-void kpzload (const char *filnam, long *pic, long *bpl, int *xsiz, int *ysiz);
+void kpzload (const char *filnam, INT_PTR *pic, long *bpl, int *xsiz, int *ysiz);
 //Low-level PNG/JPG functions:
 int kpgetdim (const char *, int, int *, int *);
-int kprender (const char *, int, intptr_t, int, int, int, int, int);
+int kprender (const char *, int, INT_PTR, int, int, int, int, int);
 //Ken's ZIP functions:
 int kzaddstack (const char *);
 void kzuninit (void);

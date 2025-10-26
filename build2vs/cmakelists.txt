@@ -41,6 +41,7 @@ target_compile_definitions(build2 PRIVATE
     USEHEIMAP=0
     NOSOUND=0
     OOS_CHECK=0
+    KEN_BUILD_2=1
     WIN32
     _WINDOWS
 )
