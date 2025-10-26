@@ -1,6 +1,10 @@
 # Port of duke3d onto Build2
 Build 2 by Ken Silverman: https://www.advsys.net/ken/build.htm
 
+Im transitioning engine into raylib environment, 
+
+info below is old but still usable.
+
 ## To see maps in engine you'll need:
 - all .art files in folder with map
 - palette.dat in same folder
