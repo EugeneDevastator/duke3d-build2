@@ -2,6 +2,15 @@
 // Created by omnis on 10/22/2025.
 //
 #include "loaders.h"
+void initTiles()
+{
+	gnumtiles = 0;
+	memset(gtilehashead, -1, sizeof(gtilehashead));
+	gmaltiles = 256;
+	gtile = (tile_t*)malloc(gmaltiles * sizeof(tile_t));
+	//if (!gtile)
+	//	memset(gtile,0,gmaltiles*sizeof(tile_t)); //FIX
+}
 int loadmap_imp (char *filnam, mapstate_t* map)
 {
 	surf_t *sur;
@@ -13,6 +22,8 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 	long x, y, z, fileid, hitile, warned = 0, altsects, nnumtiles, nnumspris;
 	short s, cursect;
 	char och, tbuf[256];
+
+	initTiles();
 
 	if (!kzopen(filnam))
 	{     //Try without full pathname - see if it's in ZIP/GRP/Mounted_Dir
@@ -174,11 +185,14 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			gmaltiles = max(gnumtiles+1,gmaltiles<<1);
 			gtile = (tile_t *)realloc(gtile,gmaltiles*sizeof(tile_t));
 		}
+		tile_t* gtpic;
 		for(i=gnumtiles-nnumtiles;i<gnumtiles;i++)
 		{
 			kzread(&s,2); kzread(gtile[i].filnam,s); gtile[i].filnam[s] = 0; //FIX:possible buffer overflow here
 			gtile[i].tt.f = 0;
 			gtile[i].namcrc32 = getcrc32z(0,(unsigned char *)gtile[i].filnam);
+			gtpic = &gtile[sur->tilnum];
+			if (!gtpic->tt.f) loadpic(gtpic,curmappath);
 		}
 
 			//Load sprites
@@ -728,8 +742,15 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 		}
 		for(i=0;i<hitile;i++)
 		{
-			sprintf(tbuf,"tiles%03d.art|%d",tilefile[i],i);
+			sprintf(tbuf,"tiles%03d.art|%d\n",tilefile[i],i);
 			gettileind(tbuf);
+		}
+		tile_t* gtpic;
+		for(i=0;i<gmaltiles;i++)
+		{
+			gtpic = &gtile[i];
+			if (!gtpic->tt.f)
+				loadpic(gtpic,curmappath);
 		}
 
 		if (tilesizx) free(tilesizx);

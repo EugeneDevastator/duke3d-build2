@@ -5,6 +5,9 @@
 
 #include <string.h>
 #include "mapcore.h"
+
+tile_t* gtile;
+tile_t* getGtile(int i){return &gtile[i];}
 unsigned char globalpal[256][4];
 #if defined(_MSC_VER)
 void divconst_setdenom_intr (long *twolongstate, long denom)
@@ -192,7 +195,6 @@ void loadpic(tile_t *tpic, char* rootpath) {
         filnum = 0;
         do {
             if (!kzopen(tbuf)) {
-                sprintf(tbuf2,"%s%s",rootpath,tbuf);
                 if (!kzopen(tbuf2)) { filnum = -1; break; }
             }
             kzread(tbuf,16);

@@ -10,15 +10,17 @@ extern "C" {
 #include "mapcore.h"
 }
 
+
 #include "raylib.h"
 #include "raymath.h"
 #include "rlgl.h"
 
 static Texture2D* runtimeTextures;
 static mapstate_t* map;
-
+static long gnumtiles_i, gmaltiles_i, gtilehashead_i[1024];
 class DumbRender
 {
+
 public:
     static mapstate_t* GetMap()
     {
@@ -27,11 +29,13 @@ public:
 
     static void Init()
     {
-        LoadMapAndTiles();
 
         char rootpath[256];
         strcpy_s(rootpath, "c:/Eugene/Games/build2/");
         LoadPal(rootpath);
+        LoadMapAndTiles();
+
+
 
         GenerateTextures();
         // auto paltex = ConvertPalToTexture();
@@ -40,130 +44,101 @@ public:
         // auto tex = ConvertPicToTexture(pic);
     }
 
-    static void DrawMapstateTex(Camera3D cam)
+static void DrawMapstateTex(Camera3D cam)
+{
+    // Draw sectors
+    for (int s = 0; s < map->numsects; s++)
     {
-        // Draw sectors
-        for (int s = 0; s < map->numsects; s++)
+        sect_t* sect = &map->sect[s];
+
+        if (sect->n >= 3)
         {
-            sect_t* sect = &map->sect[s];
-
-            // Draw floor and ceiling as textured polygons
-            if (sect->n >= 3) // Need at least 3 vertices for a polygon
+            // Create floor mesh
+            if (sect->surf[0].tilnum >= 0 && sect->surf[0].tilnum < get_gnumtiles())
             {
-                // Prepare vertices for floor and ceiling
-                auto* floorVerts = static_cast<Vector3*>(malloc(sect->n * sizeof(Vector3)));
-                auto ceilVerts = static_cast<Vector3*>(malloc(sect->n * sizeof(Vector3)));
-                auto uvs = static_cast<Vector2*>(malloc(sect->n * sizeof(Vector2)));
+                Mesh floorMesh = {0};
+                floorMesh.vertexCount = sect->n;
+                floorMesh.triangleCount = sect->n - 2; // Fan triangulation
 
+                floorMesh.vertices = (float*)malloc(floorMesh.vertexCount * 3 * sizeof(float));
+                floorMesh.texcoords = (float*)malloc(floorMesh.vertexCount * 2 * sizeof(float));
+                floorMesh.indices = (unsigned short*)malloc(floorMesh.triangleCount * 3 * sizeof(unsigned short));
+
+                // Fill vertices and UVs
                 for (int w = 0; w < sect->n; w++)
                 {
                     wall_t* wall = &sect->wall[w];
-                    floorVerts[w] = {wall->x, sect->z[0], wall->y};
-                    ceilVerts[w] = {wall->x, sect->z[1], wall->y};
+                    floorMesh.vertices[w*3] = wall->x;
+                    floorMesh.vertices[w*3+1] = sect->z[0];
+                    floorMesh.vertices[w*3+2] = wall->y;
 
-                    // Use UV coordinates from surf if available, otherwise generate
-                    if (sect->surf[0].uv)
-                    {
-                        uvs[w] = {sect->surf[0].uv[w % 3].x, sect->surf[0].uv[w % 3].y};
-                    }
-                    else
-                    {
-                        uvs[w] = {wall->x * 0.1f, wall->y * 0.1f};
-                    }
+                    floorMesh.texcoords[w*2] = wall->x * 0.1f;
+                    floorMesh.texcoords[w*2+1] = wall->y * 0.1f;
                 }
 
-                // Draw floor
-                if (sect->surf[0].tilnum >= 0 && sect->surf[0].tilnum < gnumtiles)
+                // Fan triangulation
+                for (int t = 0; t < floorMesh.triangleCount; t++)
                 {
-                    Texture2D floorTex = runtimeTextures[sect->surf[0].tilnum];
-                    auto matrixIdentity=MatrixIdentity();
-                    DrawMeshInstanced(GenMeshPoly(sect->n, 1.0f), {0},
-                                      &matrixIdentity, 1);
-                    // Note: Raylib doesn't have direct textured polygon drawing
-                    // You'll need to create a mesh and draw it with texture
+                    floorMesh.indices[t*3] = 0;
+                    floorMesh.indices[t*3+1] = t + 1;
+                    floorMesh.indices[t*3+2] = t + 2;
                 }
 
-                // Draw ceiling
-                if (sect->surf[1].tilnum >= 0 && sect->surf[1].tilnum < gnumtiles)
-                {
-                    Texture2D ceilTex = runtimeTextures[sect->surf[1].tilnum];
-                    // Similar approach for ceiling
-                }
+                UploadMesh(&floorMesh, false);
 
-                free(floorVerts);
-                free(ceilVerts);
-                free(uvs);
-            }
+                Texture2D floorTex = runtimeTextures[sect->surf[0].tilnum];
+                DrawMesh(floorMesh, LoadMaterialDefault(), MatrixIdentity());
 
-            // Draw walls as textured quads
-            for (int w = 0; w < sect->n; w++)
-            {
-                wall_t* wall = &sect->wall[w];
-                wall_t* nextwall = &sect->wall[(w + 1) % sect->n];
-
-                // Wall vertices
-                Vector3 bottomLeft = {wall->x, sect->z[0], wall->y};
-                Vector3 bottomRight = {nextwall->x, sect->z[0], nextwall->y};
-                Vector3 topLeft = {wall->x, sect->z[1], wall->y};
-                Vector3 topRight = {nextwall->x, sect->z[1], nextwall->y};
-
-                // Get wall texture
-                int texIndex = wall->surf.tilnum;
-                if (wall->xsurf && wall->surfn > 1)
-                    texIndex = wall->xsurf[0].tilnum;
-
-                if (texIndex >= 0 && texIndex < gnumtiles)
-                {
-                    Texture2D wallTex = runtimeTextures[texIndex];
-
-                    // Draw textured quad
-                    rlSetTexture(wallTex.id);
-                    rlBegin(RL_QUADS);
-
-                    // UV coordinates
-                    Vector2 uv0 = {0.0f, 1.0f};
-                    Vector2 uv1 = {1.0f, 1.0f};
-                    Vector2 uv2 = {1.0f, 0.0f};
-                    Vector2 uv3 = {0.0f, 0.0f};
-
-                    // Use custom UV if available
-                    if (wall->surf.uv)
-                    {
-                        uv0 = {wall->surf.uv[0].x, wall->surf.uv[0].y};
-                        uv1 = {wall->surf.uv[1].x, wall->surf.uv[1].y};
-                        uv2 = {wall->surf.uv[2].x, wall->surf.uv[2].y};
-                    }
-
-                    rlTexCoord2f(uv0.x, uv0.y);
-                    rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
-                    rlTexCoord2f(uv1.x, uv1.y);
-                    rlVertex3f(bottomRight.x, bottomRight.y, bottomRight.z);
-                    rlTexCoord2f(uv2.x, uv2.y);
-                    rlVertex3f(topRight.x, topRight.y, topRight.z);
-                    rlTexCoord2f(uv3.x, uv3.y);
-                    rlVertex3f(topLeft.x, topLeft.y, topLeft.z);
-
-                    rlEnd();
-                    rlSetTexture(0);
-                }
+                UnloadMesh(floorMesh);
             }
         }
 
-        // Draw sprites as textured billboards
+        // Wall rendering (this part looks correct)
+        for (int w = 0; w < sect->n; w++)
+        {
+            wall_t* wall = &sect->wall[w];
+            wall_t* nextwall = &sect->wall[(w + 1) % sect->n];
+
+            Vector3 bottomLeft = {wall->x, sect->z[0], wall->y};
+            Vector3 bottomRight = {nextwall->x, sect->z[0], nextwall->y};
+            Vector3 topLeft = {wall->x, sect->z[1], wall->y};
+            Vector3 topRight = {nextwall->x, sect->z[1], nextwall->y};
+
+            int texIndex = wall->surf.tilnum;
+            if (wall->xsurf && wall->surfn > 1)
+                texIndex = wall->xsurf[0].tilnum;
+
+            if (texIndex >= 0 && texIndex < get_gnumtiles())
+            {
+                Texture2D wallTex = runtimeTextures[texIndex];
+
+                rlSetTexture(wallTex.id);
+                rlBegin(RL_QUADS);
+
+                rlTexCoord2f(0.0f, 1.0f); rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
+                rlTexCoord2f(1.0f, 1.0f); rlVertex3f(bottomRight.x, bottomRight.y, bottomRight.z);
+                rlTexCoord2f(1.0f, 0.0f); rlVertex3f(topRight.x, topRight.y, topRight.z);
+                rlTexCoord2f(0.0f, 0.0f); rlVertex3f(topLeft.x, topLeft.y, topLeft.z);
+
+                rlEnd();
+                rlSetTexture(0);
+            }
+        }
+
+        // Sprites (this part looks correct)
         for (int i = 0; i < map->numspris; i++)
         {
             spri_t* spr = &map->spri[i];
-
-            if (spr->tilnum >= 0 && spr->tilnum < gnumtiles)
+            if (spr->tilnum >= 0 && spr->tilnum < gnumtiles_i)
             {
                 Texture2D spriteTex = runtimeTextures[spr->tilnum];
                 Vector3 pos = {spr->p.x, spr->p.z, spr->p.y};
-
-                // Draw as billboard (always facing camera)
                 DrawBillboard(cam, spriteTex, pos, 1.0f, WHITE);
             }
         }
     }
+}
+
 
 
     static void DrawMapstateLines()
@@ -286,7 +261,10 @@ public:
         UnloadImage(picImage);
         return texture;
     }
-
+    static void DrawPaletteAndTexture()
+    {
+        DrawPaletteAndTexture(runtimeTextures[1],runtimeTextures[0],660,660);
+    }
     static void DrawPaletteAndTexture(Texture2D palTexture, Texture2D picTexture, int screenWidth, int screenHeight)
     {
         //  BeginDrawing();
@@ -332,11 +310,20 @@ public:
 private:
     static void GenerateTextures()
     {
-        runtimeTextures = static_cast<Texture2D*>(malloc(sizeof(Texture2D) * gnumtiles));
-        for (int i = 0; i < gnumtiles; ++i)
+        gnumtiles_i = get_gnumtiles();
+        gmaltiles_i = get_gmaltiles();
+        // static long gnumtiles, gmaltiles, gtilehashead[1024];
+        // static *long get_gtilehashead() { return gtilehashead; } // in outer file
+        long* source = get_gtilehashead();
+        memcpy(gtilehashead_i, source, sizeof(long) * 1024);
+
+        runtimeTextures = static_cast<Texture2D*>(malloc(sizeof(Texture2D) * gnumtiles_i));
+        int end = gnumtiles_i;
+        for (int i = 0; i < end; ++i)
         {
-            runtimeTextures[i] = ConvertPicToTexture(&gtile[i]);
+            runtimeTextures[i] = ConvertPicToTexture(getGtile(i));
         }
+        int a = 1;
     }
 
     static void LoadMapAndTiles()
@@ -344,13 +331,6 @@ private:
         map = static_cast<mapstate_t*>(malloc(sizeof(mapstate_t)));
         memset(map, 0, sizeof(mapstate_t));
         initcrc32();
-
-        gnumtiles = 0;
-        memset(gtilehashead, -1, sizeof(gtilehashead));
-        gmaltiles = 256;
-        gtile = (tile_t*)malloc(gmaltiles * sizeof(tile_t));
-        if (!gtile) return;
-        //memset(gtile,0,gmaltiles*sizeof(tile_t)); //FIX
 
         map->numsects = 0;
         map->malsects = 256;

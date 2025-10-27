@@ -105,6 +105,8 @@ void UpdateFreeCamera(FreeCamera* cam, float deltaTime) {
 }
 
 void VisualizeMapstate() {
+    DumbRender::Init();
+
     auto map = DumbRender::GetMap();
     InitWindow(1024, 768, "Mapstate Visualizer");
     SetTargetFPS(60);
@@ -132,9 +134,12 @@ void VisualizeMapstate() {
         ClearBackground(BLACK);
 
         BeginMode3D(camera);
-        DumbRender::DrawMapstateLines();
+
+        DumbRender::DrawMapstateTex(camera);
+
 
         EndMode3D();
+        DumbRender::DrawPaletteAndTexture();
         DrawImgui();
         DisableCursor();
         DrawText("WASD: Move, Mouse: Look", 10, 10, 20, WHITE);
@@ -159,7 +164,7 @@ int main() {
 
     FileWatcher watcher("script.lua");
     LuaBinder::LoadScript();
-    DumbRender::Init();
+
     VisualizeMapstate();
     //MapTest();
 
