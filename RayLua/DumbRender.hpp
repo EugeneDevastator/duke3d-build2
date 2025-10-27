@@ -14,19 +14,22 @@ extern "C" {
 #include "raylib.h"
 #include "raymath.h"
 #include "rlgl.h"
-typedef struct {
+
+typedef struct
+{
     Mesh mesh;
     int textureIndex;
     bool isValid;
 } FloorMeshData;
+
 static FloorMeshData* floorMeshes = NULL;
 static int numFloorMeshes = 0;
 static Texture2D* runtimeTextures;
 static mapstate_t* map;
 static long gnumtiles_i, gmaltiles_i, gtilehashead_i[1024];
+
 class DumbRender
 {
-
 public:
     static mapstate_t* GetMap()
     {
@@ -35,7 +38,6 @@ public:
 
     static void Init()
     {
-
         char rootpath[256];
         strcpy_s(rootpath, "c:/Eugene/Games/build2/");
         LoadPal(rootpath);
@@ -49,142 +51,178 @@ public:
     }
 
 
-
-
-
-// Call once when map loads
-static void InitMapstateTex(void)
-{
-    if (floorMeshes) {
-        // Cleanup existing meshes
-        for (int i = 0; i < numFloorMeshes; i++) {
-            if (floorMeshes[i].isValid) {
-                UnloadMesh(floorMeshes[i].mesh);
+    // Call once when map loads
+    static void InitMapstateTex(void)
+    {
+        if (floorMeshes)
+        {
+            // Cleanup existing meshes
+            for (int i = 0; i < numFloorMeshes; i++)
+            {
+                if (floorMeshes[i].isValid)
+                {
+                    UnloadMesh(floorMeshes[i].mesh);
+                }
             }
+            free(floorMeshes);
         }
-        free(floorMeshes);
-    }
 
-    numFloorMeshes = map->numsects;
-    floorMeshes = (FloorMeshData*)calloc(numFloorMeshes, sizeof(FloorMeshData));
+        numFloorMeshes = map->numsects;
+        floorMeshes = (FloorMeshData*)calloc(numFloorMeshes, sizeof(FloorMeshData));
 
-    // Pre-build all floor meshes
-    for (int s = 0; s < map->numsects; s++) {
-        sect_t* sect = &map->sect[s];
-        FloorMeshData* floorData = &floorMeshes[s];
+        // Pre-build all floor meshes
+        for (int s = 0; s < map->numsects; s++)
+        {
+            sect_t* sect = &map->sect[s];
+            FloorMeshData* floorData = &floorMeshes[s];
 
-        floorData->isValid = false;
+            floorData->isValid = false;
 
-        if (sect->n >= 3 && sect->surf[0].tilnum >= 0 && sect->surf[0].tilnum < get_gnumtiles()) {
-            Mesh floorMesh = {0};
-            floorMesh.vertexCount = sect->n;
-            floorMesh.triangleCount = sect->n - 2;
+            if (sect->n >= 3 && sect->surf[0].tilnum >= 0 && sect->surf[0].tilnum < get_gnumtiles())
+            {
+                Mesh floorMesh = {0};
+                floorMesh.vertexCount = sect->n;
+                floorMesh.triangleCount = sect->n - 2;
 
-            floorMesh.vertices = (float*)malloc(floorMesh.vertexCount * 3 * sizeof(float));
-            floorMesh.texcoords = (float*)malloc(floorMesh.vertexCount * 2 * sizeof(float));
-            floorMesh.indices = (unsigned short*)malloc(floorMesh.triangleCount * 3 * sizeof(unsigned short));
+                floorMesh.vertices = (float*)malloc(floorMesh.vertexCount * 3 * sizeof(float));
+                floorMesh.texcoords = (float*)malloc(floorMesh.vertexCount * 2 * sizeof(float));
+                floorMesh.indices = (unsigned short*)malloc(floorMesh.triangleCount * 3 * sizeof(unsigned short));
 
-            // Fill vertices and UVs
-            for (int w = 0; w < sect->n; w++) {
-                wall_t* wall = &sect->wall[w];
-                floorMesh.vertices[w*3] = wall->x;
-                floorMesh.vertices[w*3+1] = sect->z[0];
-                floorMesh.vertices[w*3+2] = wall->y;
+                // Fill vertices and UVs
+                for (int w = 0; w < sect->n; w++)
+                {
+                    wall_t* wall = &sect->wall[w];
+                    floorMesh.vertices[w * 3] = wall->x;
+                    floorMesh.vertices[w * 3 + 1] = sect->z[0];
+                    floorMesh.vertices[w * 3 + 2] = wall->y;
 
-                floorMesh.texcoords[w*2] = wall->x * 0.1f;
-                floorMesh.texcoords[w*2+1] = wall->y * 0.1f;
+                    floorMesh.texcoords[w * 2] = wall->x * 0.1f;
+                    floorMesh.texcoords[w * 2 + 1] = wall->y * 0.1f;
+                }
+
+                // Fan triangulation
+                for (int t = 0; t < floorMesh.triangleCount; t++)
+                {
+                    floorMesh.indices[t * 3] = 0;
+                    floorMesh.indices[t * 3 + 1] = t + 1;
+                    floorMesh.indices[t * 3 + 2] = t + 2;
+                }
+
+                UploadMesh(&floorMesh, false);
+
+                floorData->mesh = floorMesh;
+                floorData->textureIndex = sect->surf[0].tilnum;
+                floorData->isValid = true;
             }
-
-            // Fan triangulation
-            for (int t = 0; t < floorMesh.triangleCount; t++) {
-                floorMesh.indices[t*3] = 0;
-                floorMesh.indices[t*3+1] = t + 1;
-                floorMesh.indices[t*3+2] = t + 2;
-            }
-
-            UploadMesh(&floorMesh, false);
-
-            floorData->mesh = floorMesh;
-            floorData->textureIndex = sect->surf[0].tilnum;
-            floorData->isValid = true;
-        }
-    }
-}
-
-// Call every frame
-static void DrawMapstateTex(Camera3D cam)
-{
-    Material defaultMat = LoadMaterialDefault();
-
-    // Draw pre-built floor meshes
-    for (int s = 0; s < numFloorMeshes; s++) {
-        FloorMeshData* floorData = &floorMeshes[s];
-        if (floorData->isValid) {
-            Texture2D floorTex = runtimeTextures[floorData->textureIndex];
-            SetMaterialTexture(&defaultMat, MATERIAL_MAP_DIFFUSE, floorTex);
-            DrawMesh(floorData->mesh, defaultMat, MatrixIdentity());
         }
     }
 
-    // Draw walls (unchanged - already efficient)
-    for (int s = 0; s < map->numsects; s++) {
-        sect_t* sect = &map->sect[s];
+    // Call every frame
+    static void DrawMapstateTex(Camera3D cam)
+    {
+        // Draw pre-built floor meshes (UNLIT)
+        for (int s = 0; s < numFloorMeshes; s++)
+        {
+            FloorMeshData* floorData = &floorMeshes[s];
+            if (floorData->isValid)
+            {
+                Texture2D floorTex = runtimeTextures[floorData->textureIndex];
 
-        for (int w = 0; w < sect->n; w++) {
-            wall_t* wall = &sect->wall[w];
-            wall_t* nextwall = &sect->wall[(w + 1) % sect->n];
+                rlSetTexture(floorTex.id);
+                rlBegin(RL_TRIANGLES);
 
-            Vector3 bottomLeft = {wall->x, sect->z[0], wall->y};
-            Vector3 bottomRight = {nextwall->x, sect->z[0], nextwall->y};
-            Vector3 topLeft = {wall->x, sect->z[1], wall->y};
-            Vector3 topRight = {nextwall->x, sect->z[1], nextwall->y};
+                // Draw triangles from mesh data
+                for (int t = 0; t < floorData->mesh.triangleCount; t++)
+                {
+                    for (int v = 0; v < 3; v++)
+                    {
+                        int idx = floorData->mesh.indices[t * 3 + v];
+                        rlTexCoord2f(
+                            floorData->mesh.texcoords[idx * 2],
+                            floorData->mesh.texcoords[idx * 2 + 1]
+                        );
+                        rlVertex3f(
+                            floorData->mesh.vertices[idx * 3],
+                            floorData->mesh.vertices[idx * 3 + 1],
+                            floorData->mesh.vertices[idx * 3 + 2]
+                        );
+                    }
+                }
 
-            int texIndex = wall->surf.tilnum;
-            if (wall->xsurf && wall->surfn > 1)
-                texIndex = wall->xsurf[0].tilnum;
-
-            if (texIndex >= 0 && texIndex < get_gnumtiles()) {
-                Texture2D wallTex = runtimeTextures[texIndex];
-
-                rlSetTexture(wallTex.id);
-                rlBegin(RL_QUADS);
-                rlTexCoord2f(0.0f, 1.0f); rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
-                rlTexCoord2f(1.0f, 1.0f); rlVertex3f(bottomRight.x, bottomRight.y, bottomRight.z);
-                rlTexCoord2f(1.0f, 0.0f); rlVertex3f(topRight.x, topRight.y, topRight.z);
-                rlTexCoord2f(0.0f, 0.0f); rlVertex3f(topLeft.x, topLeft.y, topLeft.z);
                 rlEnd();
                 rlSetTexture(0);
             }
         }
-    }
 
-    // Draw sprites (unchanged - already efficient)
-    for (int i = 0; i < map->numspris; i++) {
-        spri_t* spr = &map->spri[i];
-        if (spr->tilnum >= 0 && spr->tilnum < gnumtiles_i) {
-            Texture2D spriteTex = runtimeTextures[spr->tilnum];
-            Vector3 pos = {spr->p.x, spr->p.z, spr->p.y};
-            DrawBillboard(cam, spriteTex, pos, 1.0f, WHITE);
-        }
-    }
+        // Draw walls (unchanged - already efficient)
+        for (int s = 0; s < map->numsects; s++)
+        {
+            sect_t* sect = &map->sect[s];
 
-    UnloadMaterial(defaultMat);
-}
+            for (int w = 0; w < sect->n; w++)
+            {
+                wall_t* wall = &sect->wall[w];
+                wall_t* nextwall = &sect->wall[(w + 1) % sect->n];
 
-// Call when map unloads
-static void CleanupMapstateTex(void)
-{
-    if (floorMeshes) {
-        for (int i = 0; i < numFloorMeshes; i++) {
-            if (floorMeshes[i].isValid) {
-                UnloadMesh(floorMeshes[i].mesh);
+                Vector3 bottomLeft = {wall->x, sect->z[0], wall->y};
+                Vector3 bottomRight = {nextwall->x, sect->z[0], nextwall->y};
+                Vector3 topLeft = {wall->x, sect->z[1], wall->y};
+                Vector3 topRight = {nextwall->x, sect->z[1], nextwall->y};
+
+                int texIndex = wall->surf.tilnum;
+                if (wall->xsurf && wall->surfn > 1)
+                    texIndex = wall->xsurf[0].tilnum;
+
+                if (texIndex >= 0 && texIndex < get_gnumtiles())
+                {
+                    Texture2D wallTex = runtimeTextures[texIndex];
+
+                    rlSetTexture(wallTex.id);
+                    rlBegin(RL_QUADS);
+                    rlTexCoord2f(0.0f, 1.0f);
+                    rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
+                    rlTexCoord2f(1.0f, 1.0f);
+                    rlVertex3f(bottomRight.x, bottomRight.y, bottomRight.z);
+                    rlTexCoord2f(1.0f, 0.0f);
+                    rlVertex3f(topRight.x, topRight.y, topRight.z);
+                    rlTexCoord2f(0.0f, 0.0f);
+                    rlVertex3f(topLeft.x, topLeft.y, topLeft.z);
+                    rlEnd();
+                    rlSetTexture(0);
+                }
             }
         }
-        free(floorMeshes);
-        floorMeshes = NULL;
-        numFloorMeshes = 0;
+
+        // Draw sprites (unchanged - already efficient)
+        for (int i = 0; i < map->numspris; i++)
+        {
+            spri_t* spr = &map->spri[i];
+            if (spr->tilnum >= 0 && spr->tilnum < gnumtiles_i)
+            {
+                Texture2D spriteTex = runtimeTextures[spr->tilnum];
+                Vector3 pos = {spr->p.x, spr->p.z, spr->p.y};
+                DrawBillboard(cam, spriteTex, pos, 1.0f, WHITE);
+            }
+        }
     }
-}
+
+    // Call when map unloads
+    static void CleanupMapstateTex(void)
+    {
+        if (floorMeshes)
+        {
+            for (int i = 0; i < numFloorMeshes; i++)
+            {
+                if (floorMeshes[i].isValid)
+                {
+                    UnloadMesh(floorMeshes[i].mesh);
+                }
+            }
+            free(floorMeshes);
+            floorMeshes = NULL;
+            numFloorMeshes = 0;
+        }
+    }
 
 
     static void DrawMapstateLines()
@@ -230,6 +268,35 @@ static void CleanupMapstateTex(void)
             float s = 0.1f;
             DrawCubeWires(pos, s, s, s, DARKBLUE);
         }
+    }
+    static void TestRenderTextures() // all end up gobbled data
+    {
+        // Clear background
+      //  BeginDrawing();
+      //  ClearBackground(BLACK);
+
+        // Test texture indices 1, 2, 3
+        for (int i = 1; i <= 3; i++)
+        {
+            Texture2D tex = runtimeTextures[i];
+
+            // Skip invalid textures
+            if (tex.id == 0) continue;
+
+            // Position quads side by side
+            float x = 100.0f + (i - 1) * 150.0f;
+            float y = 100.0f;
+            float size = 100.0f;
+
+            // Draw textured quad
+            DrawTexture(tex, (int)x, (int)y, WHITE);
+
+            // Draw texture info
+            DrawText(TextFormat("Tex %d: %dx%d ID:%d", i, tex.width, tex.height, tex.id),
+                     (int)x, (int)y + tex.height + 5, 10, WHITE);
+        }
+
+     //   EndDrawing();
     }
 
     static Texture2D ConvertPalToTexture()
@@ -277,13 +344,15 @@ static void CleanupMapstateTex(void)
         tiltyp* pic = &tpic->tt;
 
         Image picImage = {0};
-        picImage.width = pic->x;
-        picImage.height = pic->y;
+        int x = max(4,pic->x);
+        int y = max(4,pic->y);
+        picImage.width = x;
+        picImage.height = y;
         picImage.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
         picImage.mipmaps = 1;
 
-        picImage.data = malloc(pic->x * pic->y * 4);
-        unsigned char* pixels = (unsigned char*)picImage.data;
+        picImage.data = malloc(x * y * 4);
+        auto* pixels = static_cast<unsigned char*>(picImage.data);
 
         // pic->f points to RGBA data, pic->p is stride in bytes
         for (int y = 0; y < pic->y; y++)
@@ -296,6 +365,11 @@ static void CleanupMapstateTex(void)
                 int dstIndex = (y * pic->x + x) * 4;
 
                 // Source is already RGBA, just copy and potentially reorder
+                // tried replacing with those, and for a split second it is orange, but then falls back to green and still debugs everywhere
+            //    pixels[dstIndex + 0] = 255;
+            //    pixels[dstIndex + 1] = 122;
+            //    pixels[dstIndex + 2] = 44;
+
                 pixels[dstIndex + 0] = srcRow[srcIndex + 2]; // R (from B)
                 pixels[dstIndex + 1] = srcRow[srcIndex + 1]; // G
                 pixels[dstIndex + 2] = srcRow[srcIndex + 0]; // B (from R)
@@ -307,10 +381,12 @@ static void CleanupMapstateTex(void)
         UnloadImage(picImage);
         return texture;
     }
+
     static void DrawPaletteAndTexture()
     {
-        DrawPaletteAndTexture(runtimeTextures[1],runtimeTextures[0],660,660);
+        DrawPaletteAndTexture(runtimeTextures[6], runtimeTextures[10], 660, 660);
     }
+
     static void DrawPaletteAndTexture(Texture2D palTexture, Texture2D picTexture, int screenWidth, int screenHeight)
     {
         //  BeginDrawing();

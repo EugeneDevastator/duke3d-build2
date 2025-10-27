@@ -108,7 +108,7 @@ void VisualizeMapstate() {
     DumbRender::Init();
 
     auto map = DumbRender::GetMap();
-    InitWindow(1024, 768, "Mapstate Visualizer");
+    //InitWindow(1024, 768, "Mapstate Visualizer");
     SetTargetFPS(60);
 
 
@@ -136,11 +136,12 @@ void VisualizeMapstate() {
         BeginMode3D(camera);
 
         DumbRender::DrawMapstateTex(camera);
-        DumbRender::DrawMapstateLines();
-
-
+     //   DumbRender::DrawMapstateLines();
         EndMode3D();
-        DumbRender::DrawPaletteAndTexture();
+       // DumbRender::DrawPaletteAndTexture();
+
+//DumbRender::TestRenderTextures();
+
         DrawImgui();
         DisableCursor();
         DrawText("WASD: Move, Mouse: Look", 10, 10, 20, WHITE);
@@ -160,11 +161,11 @@ int main() {
     InitWindow(800, 600, "Raylib + Lua + ImGui");
     SetTargetFPS(120);
     rlImGuiSetup(true);
-    LuaBinder::Init();
+   // LuaBinder::Init();
     SetImguiFonts();
 
-    FileWatcher watcher("script.lua");
-    LuaBinder::LoadScript();
+   // FileWatcher watcher("script.lua");
+    //LuaBinder::LoadScript();
 
     VisualizeMapstate();
     DumbRender::CleanupMapstateTex();
@@ -172,9 +173,9 @@ int main() {
     //MapTest();
 
     while (!WindowShouldClose()) {
-        if (watcher.HasChanged()) {
+       // if (watcher.HasChanged()) {
             LuaBinder::LoadScript();
-        }
+       // }
 
         if (IsKeyPressed(KEY_R)) {
             LuaBinder::LoadScript();
