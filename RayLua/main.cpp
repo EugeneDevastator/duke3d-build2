@@ -136,6 +136,7 @@ void VisualizeMapstate() {
         BeginMode3D(camera);
 
         DumbRender::DrawMapstateTex(camera);
+        DumbRender::DrawMapstateLines();
 
 
         EndMode3D();
@@ -166,6 +167,8 @@ int main() {
     LuaBinder::LoadScript();
 
     VisualizeMapstate();
+    DumbRender::CleanupMapstateTex();
+    return 0;
     //MapTest();
 
     while (!WindowShouldClose()) {

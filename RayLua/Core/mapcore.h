@@ -16,7 +16,7 @@
 #endif
 typedef struct { float x, y; } point2d;
 extern long gnumtiles, gmaltiles, gtilehashead[1024];
-static char curmappath[MAX_PATH+1] = "";
+extern char curmappath[MAX_PATH+1];
 long get_gnumtiles(void);
 long get_gmaltiles(void);
 long* get_gtilehashead(void);

@@ -742,7 +742,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 		}
 		for(i=0;i<hitile;i++)
 		{
-			sprintf(tbuf,"tiles%03d.art|%d\n",tilefile[i],i);
+			sprintf(tbuf,"tiles%03d.art|%d",tilefile[i],i);
 			gettileind(tbuf);
 		}
 		tile_t* gtpic;

@@ -14,7 +14,13 @@ extern "C" {
 #include "raylib.h"
 #include "raymath.h"
 #include "rlgl.h"
-
+typedef struct {
+    Mesh mesh;
+    int textureIndex;
+    bool isValid;
+} FloorMeshData;
+static FloorMeshData* floorMeshes = NULL;
+static int numFloorMeshes = 0;
 static Texture2D* runtimeTextures;
 static mapstate_t* map;
 static long gnumtiles_i, gmaltiles_i, gtilehashead_i[1024];
@@ -34,68 +40,97 @@ public:
         strcpy_s(rootpath, "c:/Eugene/Games/build2/");
         LoadPal(rootpath);
         LoadMapAndTiles();
-
-
-
         GenerateTextures();
+        InitMapstateTex();
         // auto paltex = ConvertPalToTexture();
         // tile_t* pic = static_cast<tile_t*>(malloc(sizeof(tile_t)));
         // strcpy_s(pic->filnam, "TILES000.art|1");
         // auto tex = ConvertPicToTexture(pic);
     }
 
-static void DrawMapstateTex(Camera3D cam)
+
+
+
+
+// Call once when map loads
+static void InitMapstateTex(void)
 {
-    // Draw sectors
-    for (int s = 0; s < map->numsects; s++)
-    {
-        sect_t* sect = &map->sect[s];
-
-        if (sect->n >= 3)
-        {
-            // Create floor mesh
-            if (sect->surf[0].tilnum >= 0 && sect->surf[0].tilnum < get_gnumtiles())
-            {
-                Mesh floorMesh = {0};
-                floorMesh.vertexCount = sect->n;
-                floorMesh.triangleCount = sect->n - 2; // Fan triangulation
-
-                floorMesh.vertices = (float*)malloc(floorMesh.vertexCount * 3 * sizeof(float));
-                floorMesh.texcoords = (float*)malloc(floorMesh.vertexCount * 2 * sizeof(float));
-                floorMesh.indices = (unsigned short*)malloc(floorMesh.triangleCount * 3 * sizeof(unsigned short));
-
-                // Fill vertices and UVs
-                for (int w = 0; w < sect->n; w++)
-                {
-                    wall_t* wall = &sect->wall[w];
-                    floorMesh.vertices[w*3] = wall->x;
-                    floorMesh.vertices[w*3+1] = sect->z[0];
-                    floorMesh.vertices[w*3+2] = wall->y;
-
-                    floorMesh.texcoords[w*2] = wall->x * 0.1f;
-                    floorMesh.texcoords[w*2+1] = wall->y * 0.1f;
-                }
-
-                // Fan triangulation
-                for (int t = 0; t < floorMesh.triangleCount; t++)
-                {
-                    floorMesh.indices[t*3] = 0;
-                    floorMesh.indices[t*3+1] = t + 1;
-                    floorMesh.indices[t*3+2] = t + 2;
-                }
-
-                UploadMesh(&floorMesh, false);
-
-                Texture2D floorTex = runtimeTextures[sect->surf[0].tilnum];
-                DrawMesh(floorMesh, LoadMaterialDefault(), MatrixIdentity());
-
-                UnloadMesh(floorMesh);
+    if (floorMeshes) {
+        // Cleanup existing meshes
+        for (int i = 0; i < numFloorMeshes; i++) {
+            if (floorMeshes[i].isValid) {
+                UnloadMesh(floorMeshes[i].mesh);
             }
         }
+        free(floorMeshes);
+    }
 
-        // Wall rendering (this part looks correct)
-        for (int w = 0; w < sect->n; w++)
-        {
+    numFloorMeshes = map->numsects;
+    floorMeshes = (FloorMeshData*)calloc(numFloorMeshes, sizeof(FloorMeshData));
+
+    // Pre-build all floor meshes
+    for (int s = 0; s < map->numsects; s++) {
+        sect_t* sect = &map->sect[s];
+        FloorMeshData* floorData = &floorMeshes[s];
+
+        floorData->isValid = false;
+
+        if (sect->n >= 3 && sect->surf[0].tilnum >= 0 && sect->surf[0].tilnum < get_gnumtiles()) {
+            Mesh floorMesh = {0};
+            floorMesh.vertexCount = sect->n;
+            floorMesh.triangleCount = sect->n - 2;
+
+            floorMesh.vertices = (float*)malloc(floorMesh.vertexCount * 3 * sizeof(float));
+            floorMesh.texcoords = (float*)malloc(floorMesh.vertexCount * 2 * sizeof(float));
+            floorMesh.indices = (unsigned short*)malloc(floorMesh.triangleCount * 3 * sizeof(unsigned short));
+
+            // Fill vertices and UVs
+            for (int w = 0; w < sect->n; w++) {
+                wall_t* wall = &sect->wall[w];
+                floorMesh.vertices[w*3] = wall->x;
+                floorMesh.vertices[w*3+1] = sect->z[0];
+                floorMesh.vertices[w*3+2] = wall->y;
+
+                floorMesh.texcoords[w*2] = wall->x * 0.1f;
+                floorMesh.texcoords[w*2+1] = wall->y * 0.1f;
+            }
+
+            // Fan triangulation
+            for (int t = 0; t < floorMesh.triangleCount; t++) {
+                floorMesh.indices[t*3] = 0;
+                floorMesh.indices[t*3+1] = t + 1;
+                floorMesh.indices[t*3+2] = t + 2;
+            }
+
+            UploadMesh(&floorMesh, false);
+
+            floorData->mesh = floorMesh;
+            floorData->textureIndex = sect->surf[0].tilnum;
+            floorData->isValid = true;
+        }
+    }
+}
+
+// Call every frame
+static void DrawMapstateTex(Camera3D cam)
+{
+    Material defaultMat = LoadMaterialDefault();
+
+    // Draw pre-built floor meshes
+    for (int s = 0; s < numFloorMeshes; s++) {
+        FloorMeshData* floorData = &floorMeshes[s];
+        if (floorData->isValid) {
+            Texture2D floorTex = runtimeTextures[floorData->textureIndex];
+            SetMaterialTexture(&defaultMat, MATERIAL_MAP_DIFFUSE, floorTex);
+            DrawMesh(floorData->mesh, defaultMat, MatrixIdentity());
+        }
+    }
+
+    // Draw walls (unchanged - already efficient)
+    for (int s = 0; s < map->numsects; s++) {
+        sect_t* sect = &map->sect[s];
+
+        for (int w = 0; w < sect->n; w++) {
             wall_t* wall = &sect->wall[w];
             wall_t* nextwall = &sect->wall[(w + 1) % sect->n];
 
@@ -108,37 +143,48 @@ static void DrawMapstateTex(Camera3D cam)
             if (wall->xsurf && wall->surfn > 1)
                 texIndex = wall->xsurf[0].tilnum;
 
-            if (texIndex >= 0 && texIndex < get_gnumtiles())
-            {
+            if (texIndex >= 0 && texIndex < get_gnumtiles()) {
                 Texture2D wallTex = runtimeTextures[texIndex];
 
                 rlSetTexture(wallTex.id);
                 rlBegin(RL_QUADS);
-
                 rlTexCoord2f(0.0f, 1.0f); rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
                 rlTexCoord2f(1.0f, 1.0f); rlVertex3f(bottomRight.x, bottomRight.y, bottomRight.z);
                 rlTexCoord2f(1.0f, 0.0f); rlVertex3f(topRight.x, topRight.y, topRight.z);
                 rlTexCoord2f(0.0f, 0.0f); rlVertex3f(topLeft.x, topLeft.y, topLeft.z);
-
                 rlEnd();
                 rlSetTexture(0);
             }
         }
+    }
 
-        // Sprites (this part looks correct)
-        for (int i = 0; i < map->numspris; i++)
-        {
-            spri_t* spr = &map->spri[i];
-            if (spr->tilnum >= 0 && spr->tilnum < gnumtiles_i)
-            {
-                Texture2D spriteTex = runtimeTextures[spr->tilnum];
-                Vector3 pos = {spr->p.x, spr->p.z, spr->p.y};
-                DrawBillboard(cam, spriteTex, pos, 1.0f, WHITE);
-            }
+    // Draw sprites (unchanged - already efficient)
+    for (int i = 0; i < map->numspris; i++) {
+        spri_t* spr = &map->spri[i];
+        if (spr->tilnum >= 0 && spr->tilnum < gnumtiles_i) {
+            Texture2D spriteTex = runtimeTextures[spr->tilnum];
+            Vector3 pos = {spr->p.x, spr->p.z, spr->p.y};
+            DrawBillboard(cam, spriteTex, pos, 1.0f, WHITE);
         }
     }
+
+    UnloadMaterial(defaultMat);
 }
 
+// Call when map unloads
+static void CleanupMapstateTex(void)
+{
+    if (floorMeshes) {
+        for (int i = 0; i < numFloorMeshes; i++) {
+            if (floorMeshes[i].isValid) {
+                UnloadMesh(floorMeshes[i].mesh);
+            }
+        }
+        free(floorMeshes);
+        floorMeshes = NULL;
+        numFloorMeshes = 0;
+    }
+}
 
 
     static void DrawMapstateLines()

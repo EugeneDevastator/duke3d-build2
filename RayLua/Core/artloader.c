@@ -195,7 +195,10 @@ void loadpic(tile_t *tpic, char* rootpath) {
         filnum = 0;
         do {
             if (!kzopen(tbuf)) {
-                if (!kzopen(tbuf2)) { filnum = -1; break; }
+            	strcpy_s(tbuf2, sizeof(tbuf2), curmappath);
+            	strcat_s(tbuf2, sizeof(tbuf2), tbuf);
+            if (!kzopen(tbuf2))
+            	{ filnum = -1; break; }
             }
             kzread(tbuf,16);
             if (*(long *)&tbuf[0] != 1) { filnum = -1; break; }

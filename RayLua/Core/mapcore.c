@@ -8,7 +8,7 @@
 
 
 long gnumtiles, gmaltiles, gtilehashead[1024];
-
+char curmappath[MAX_PATH+1]="";
 long get_gnumtiles(void) { return gnumtiles; }
 long get_gmaltiles(void) { return gmaltiles; }
 long* get_gtilehashead(void) { return gtilehashead; }

@@ -3109,11 +3109,11 @@ int kzread (void *buffer, int leng)
 		if (kzfs.pos != kzfs.i) //Seek only when position changes
 		{
 			fseek(kzfs.fil,kzfs.seek0+kzfs.pos,SEEK_SET);
-			printf("kzseek,%d",kzfs.seek0+kzfs.pos);
+			//printf("kzseek,%d",kzfs.seek0+kzfs.pos);
 		}
 		i = min(kzfs.leng-kzfs.pos,leng);
 		fread(buffer,i,1,kzfs.fil);
-		printf("reading size:%d",i);
+		//printf("reading size:%d",i);
 		kzfs.i += i; //kzfs.i is a local copy of ftell(kzfs.fil);
 	}
 	else if (kzfs.comptyp == 8)
