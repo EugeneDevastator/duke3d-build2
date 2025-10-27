@@ -212,7 +212,9 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			for(j=0;j<2       ;j++) sec[i].surf[j].tilnum      += gnumtiles-nnumtiles;
 			for(j=0;j<sec[i].n;j++) sec[i].wall[j].surf.tilnum += gnumtiles-nnumtiles;
 		}
-		for(i=map->numspris-nnumspris;i<map->numspris;i++) if (map->spri[i].tilnum >= 0) map->spri[i].tilnum += gnumtiles-nnumtiles;
+		for(i=map->numspris-nnumspris;i<map->numspris;i++)
+			if (map->spri[i].tilnum >= 0)
+				map->spri[i].tilnum += gnumtiles-nnumtiles;
 
 		//-------------------------------------------------------------------
 

@@ -9,6 +9,7 @@
 #include <math.h>
 #include <chrono>
 
+#include "DumbRender.hpp"
 #include "luabinder.hpp"
 #include "raymath.h"
 
@@ -19,45 +20,9 @@ extern "C" {
 
 }
 
-static mapstate_t *map;
-
-void MapTest()
-{
-    map = static_cast<mapstate_t*>(malloc(sizeof(mapstate_t)));
-    memset(map,0,sizeof(mapstate_t));
-    initcrc32();
-
-    gnumtiles = 0; memset(gtilehashead,-1,sizeof(gtilehashead));
-    gmaltiles = 256;
-    gtile = (tile_t *)malloc(gmaltiles*sizeof(tile_t)); if (!gtile) return;
-    //memset(gtile,0,gmaltiles*sizeof(tile_t)); //FIX
-
-    map->numsects = 0;
-    map->malsects = 256;
-    map->sect = static_cast<sect_t*>(malloc(map->malsects * sizeof(sect_t))); if (!map->sect) return;
-    memset(map->sect,0,map->malsects*sizeof(sect_t));
-
-    map->numspris = 0;
-    map->malspris = 256;
-    map->spri = static_cast<spri_t*>(malloc(map->malspris * sizeof(spri_t))); if (!map->spri) return;
-    memset(map->spri,0,map->malspris*sizeof(spri_t));
-    map->blankheadspri = -1;
-
-    map->blankheadspri = -1;
-    for(int i=0;i<map->malspris;i++)
-    {
-        map->spri[i].sectn = map->blankheadspri;
-        map->spri[i].sectp = -1;
-        map->spri[i].sect = -1;
-        if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
-        map->blankheadspri = i;
-    }
 
 
-   loadmap_imp((char*)"c:/Eugene/Games/build2/E2L7.MAP",map);
 
-int a =1;
-}
 
 
 
@@ -89,43 +54,6 @@ typedef struct {
     Vector3 up;
     float speed;
 } FreeCamera;
-
-void DrawMapstate(mapstate_t* map) {
-    // Draw sectors
-    for (int s = 0; s < map->numsects; s++) {
-        sect_t* sect = &map->sect[s];
-
-        // Draw walls as lines
-        for (int w = 0; w < sect->n; w++) {
-            wall_t* wall = &sect->wall[w];
-            wall_t* nextwall = &sect->wall[(w + 1) % sect->n];
-
-            Vector3 start = {wall->x, sect->z[0], wall->y};
-            Vector3 end = {nextwall->x, sect->z[0], nextwall->y};
-
-            // Floor outline
-            DrawLine3D(start, end, WHITE);
-
-            // Ceiling outline
-            start.y = sect->z[1];
-            end.y = sect->z[1];
-            DrawLine3D(start, end, GRAY);
-
-            // Vertical wall lines
-            Vector3 bottom = {wall->x, sect->z[0], wall->y};
-            Vector3 top = {wall->x, sect->z[1], wall->y};
-            DrawLine3D(bottom, top, LIGHTGRAY);
-        }
-    }
-
-    // Draw sprites as simple cubes
-    for (int i = 0; i < map->numspris; i++) {
-        spri_t* spr = &map->spri[i];
-        Vector3 pos = {spr->p.x, spr->p.z, spr->p.y};
-        float s = 0.1f;
-        DrawCubeWires(pos, s, s, s, DARKBLUE);
-    }
-}
 void DrawImgui()
 {
     rlImGuiBegin();
@@ -134,6 +62,8 @@ void DrawImgui()
     ImGui::End();
     rlImGuiEnd();
 }
+
+
 void UpdateFreeCamera(FreeCamera* cam, float deltaTime) {
     float speed = cam->speed * deltaTime;
 
@@ -174,7 +104,8 @@ void UpdateFreeCamera(FreeCamera* cam, float deltaTime) {
     }
 }
 
-void VisualizeMapstate(mapstate_t* map) {
+void VisualizeMapstate() {
+    auto map = DumbRender::GetMap();
     InitWindow(1024, 768, "Mapstate Visualizer");
     SetTargetFPS(60);
 
@@ -201,7 +132,8 @@ void VisualizeMapstate(mapstate_t* map) {
         ClearBackground(BLACK);
 
         BeginMode3D(camera);
-        DrawMapstate(map);
+        DumbRender::DrawMapstateLines();
+
         EndMode3D();
         DrawImgui();
         DisableCursor();
@@ -214,117 +146,7 @@ void VisualizeMapstate(mapstate_t* map) {
     CloseWindow();
 }
 
-Texture2D ConvertPalToTexture() {
-    Image palImage = {0};
-    palImage.width = 16;
-    palImage.height = 16;
-    palImage.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
-    palImage.mipmaps = 1;
-    palImage.data = malloc(16 * 16 * 4);
-
-    auto *pixels = static_cast<unsigned char*>(palImage.data);
-
-    // Debug the actual memory
-
-    int i = 6;
-    printf("Direct memory read: %d %d %d %d\n",
-           getColor(i+0), getColor(i+1),getColor(i+2),getColor(i+3));
-
-    for (int y = 0; y < 16; y++) {
-        for (int x = 0; x < 16; x++) {
-            int colorIndex = y * 16 + x;
-            int pixelIndex = (y * 16 + x) * 4;
-
-            // Direct memory access instead of array indexing
-            pixels[pixelIndex + 0] = getColor(colorIndex)[2]; // R
-            pixels[pixelIndex + 1] = getColor(colorIndex)[1]; // G
-            pixels[pixelIndex + 2] = getColor(colorIndex)[0]; // B
-            pixels[pixelIndex + 3] = 255;        // A
-        }
-    }
-
-    Texture2D texture = LoadTextureFromImage(palImage);
-    UnloadImage(palImage);
-    return texture;
-}
-
-// converts INDEXED pics only!
-Texture2D ConvertPicToTexture(tile_t *tpic) {
-    if (!tpic || !tpic->tt.f) return {0};
-
-    tiltyp *pic = &tpic->tt;
-
-    Image picImage = {0};
-    picImage.width = pic->x;
-    picImage.height = pic->y;
-    picImage.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
-    picImage.mipmaps = 1;
-
-    picImage.data = malloc(pic->x * pic->y * 4);
-    unsigned char *pixels = (unsigned char*)picImage.data;
-
-    // pic->f points to RGBA data, pic->p is stride in bytes
-    for (int y = 0; y < pic->y; y++) {
-        unsigned char *srcRow = (unsigned char*)(pic->f + y * pic->p);
-        for (int x = 0; x < pic->x; x++) {
-            int srcIndex = x * 4;  // 4 bytes per pixel in source, even tho we need only byte 1 as index.
-            // i guess Ken used it for rgba textures too, since build2 can do them.
-            int dstIndex = (y * pic->x + x) * 4;
-
-            // Source is already RGBA, just copy and potentially reorder
-            pixels[dstIndex + 0] = srcRow[srcIndex + 2]; // R (from B)
-            pixels[dstIndex + 1] = srcRow[srcIndex + 1]; // G
-            pixels[dstIndex + 2] = srcRow[srcIndex + 0]; // B (from R)
-            pixels[dstIndex + 3] = 255; // A
-        }
-    }
-
-    Texture2D texture = LoadTextureFromImage(picImage);
-    UnloadImage(picImage);
-    return texture;
-}
-
-
 // Draw palette and texture preview on screen
-void DrawPaletteAndTexture(Texture2D palTexture, Texture2D picTexture, int screenWidth, int screenHeight) {
-  //  BeginDrawing();
-  //  ClearBackground(DARKGRAY);
-
-    // Draw palette in top-left corner
-    if (palTexture.id > 0) {
-        DrawTextureEx(palTexture, {10, 10}, 0.0f, 8.0f, WHITE);
-        DrawText("PALETTE", 10, 150, 20, WHITE);
-    }
-
-    // Draw texture in center-right area
-    if (picTexture.id > 0) {
-        float scale = 2.0f;
-        int maxSize = 400;
-
-        // Scale texture to fit preview area
-        if (picTexture.width > maxSize || picTexture.height > maxSize) {
-            float scaleX = (float)maxSize / picTexture.width;
-            float scaleY = (float)maxSize / picTexture.height;
-            scale = (scaleX < scaleY) ? scaleX : scaleY;
-        }
-
-        Vector2 pos = {
-            screenWidth - picTexture.width * scale - 20,
-            (screenHeight - picTexture.height * scale) / 2
-        };
-
-        DrawTextureEx(picTexture, pos, 0.0f, scale, WHITE);
-
-        // Draw texture info
-        char info[256];
-        sprintf(info, "SIZE: %dx%d", picTexture.width, picTexture.height);
-        DrawText(info, (int)pos.x, (int)pos.y - 25, 20, WHITE);
-    }
-
-  //  EndDrawing();
-}
-
-
 
 
 int main() {
@@ -337,17 +159,8 @@ int main() {
 
     FileWatcher watcher("script.lua");
     LuaBinder::LoadScript();
-    char rootpath[256];
-    strcpy_s(rootpath, "c:/Eugene/Games/build2/");
-    LoadPal(rootpath);
-    auto paltex = ConvertPalToTexture();
-    tile_t* pic = static_cast<tile_t*>(malloc(sizeof(tile_t)));
-    strcpy_s(pic->filnam, "TILES000.art|1");
-    loadpic(pic,rootpath);
-
-
-    auto tex = ConvertPicToTexture(pic);
-
+    DumbRender::Init();
+    VisualizeMapstate();
     //MapTest();
 
     while (!WindowShouldClose()) {
@@ -369,7 +182,7 @@ int main() {
         ClearBackground(DARKGRAY);
 
 
-        //VisualizeMapstate(map);
+
         // Drawing phase timing
         auto drawStart = std::chrono::high_resolution_clock::now();
 
@@ -386,6 +199,7 @@ int main() {
         LuaBinder::DoSceneUpdate();
         auto luaRenderEnd = std::chrono::high_resolution_clock::now();
         luaRenderTime = std::chrono::duration<double, std::milli>(luaRenderEnd - luaRenderStart).count();
+
 
         // UI phase timing
         rlImGuiBegin();
@@ -410,7 +224,7 @@ int main() {
         drawingTime = std::chrono::duration<double, std::milli>(drawEnd - drawStart).count();
 
         DrawFPS(10, 10);
-        DrawPaletteAndTexture(paltex,tex,600,600);
+      //  DrawPaletteAndTexture(paltex,tex,600,600);
         EndDrawing();
     }
 
