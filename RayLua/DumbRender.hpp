@@ -231,8 +231,17 @@ public:
             if (spr->tilnum >= 0 && spr->tilnum < gnumtiles_i)
             {
                 Texture2D spriteTex = runtimeTextures[spr->tilnum];
-                Vector3 pos = {spr->p.x, spr->p.z, spr->p.y};
-                DrawBillboard(cam, spriteTex, pos, 1.0f, WHITE);
+                Vector3 rg=  {spr->r.x,spr->r.y,spr->r.z};
+                Vector3 dw=  {spr->d.x,spr->d.y,spr->d.z};
+                auto xs = Vector3Length(rg);
+                auto ys = Vector3Length(dw);
+                Vector3 pos = {spr->p.x-xs, spr->p.z-ys, spr->p.y};
+                Rectangle source = { 0.0f, 0.0f, (float)spriteTex.width, (float)spriteTex.height };
+                xs*=2;
+                ys*=2;
+
+                DrawBillboardRec(cam, spriteTex, source, pos, { xs, ys }, WHITE);
+
             }
         }
     }
@@ -406,7 +415,7 @@ public:
                 pixels[dstIndex + 0] = srcRow[srcIndex + 2]; // R (from B)
                 pixels[dstIndex + 1] = srcRow[srcIndex + 1]; // G
                 pixels[dstIndex + 2] = srcRow[srcIndex + 0]; // B (from R)
-                pixels[dstIndex + 3] = 255; // A
+                pixels[dstIndex + 3] = srcRow[srcIndex + 3]; // A
             }
         }
 

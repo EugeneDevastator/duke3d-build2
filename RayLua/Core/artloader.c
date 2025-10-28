@@ -299,14 +299,15 @@ void LoadPal(const char* basepath)
 
 	if (i) {
 		kzread(globalpal, 768);
-		*(long *)&globalpal[255][0] = 0^0xff000000;
+		*(long *)&globalpal[256][0] = 0^0xff000000;
 		for(i=255-1;i>=0;i--) {
-			globalpal[i][3] = 0xff ^ 255;
+			globalpal[i][3] = 255;
 			globalpal[i][2] = gammlut[globalpal[0][i*3+2]<<2];
 			globalpal[i][1] = gammlut[globalpal[0][i*3+1]<<2];
 			globalpal[i][0] = gammlut[globalpal[0][i*3  ]<<2];
 			uch = globalpal[i][0]; globalpal[i][0] = globalpal[i][2]; globalpal[i][2] = uch;
 		}
+		globalpal[255][3] = 0;
 		kzclose();
 		gotpal = 1;
 	}
