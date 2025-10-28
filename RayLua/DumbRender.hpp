@@ -78,26 +78,40 @@ public:
 
             floorData->isValid = false;
 
-            if (sect->n >= 3 && sect->surf[0].tilnum >= 0 && sect->surf[0].tilnum < get_gnumtiles())
+            if (sect->n >= 3 && sect->surf[1].tilnum >= 0 && sect->surf[1].tilnum < get_gnumtiles())
             {
                 Mesh floorMesh = {0};
                 floorMesh.vertexCount = sect->n;
                 floorMesh.triangleCount = sect->n - 2;
 
-                floorMesh.vertices = (float*)malloc(floorMesh.vertexCount * 3 * sizeof(float));
-                floorMesh.texcoords = (float*)malloc(floorMesh.vertexCount * 2 * sizeof(float));
-                floorMesh.indices = (unsigned short*)malloc(floorMesh.triangleCount * 3 * sizeof(unsigned short));
+                floorMesh.vertices = static_cast<float*>(malloc(floorMesh.vertexCount * 3 * sizeof(float)));
+                floorMesh.texcoords = static_cast<float*>(malloc(floorMesh.vertexCount * 2 * sizeof(float)));
+                floorMesh.indices = static_cast<unsigned short*>(malloc(floorMesh.triangleCount * 3 * sizeof(unsigned short)));
+                float minX = FLT_MAX, maxX = -FLT_MAX;
+                float minY = FLT_MAX, maxY = -FLT_MAX;
 
+                for (int w = 0; w < sect->n; w++)
+                {
+                    wall_t* wall = &sect->wall[w];
+                    if (wall->x < minX) minX = wall->x;
+                    if (wall->x > maxX) maxX = wall->x;
+                    if (wall->y < minY) minY = wall->y;
+                    if (wall->y > maxY) maxY = wall->y;
+                }
+
+                float rangeX = maxX - minX;
+                float rangeY = maxY - minY;
                 // Fill vertices and UVs
                 for (int w = 0; w < sect->n; w++)
                 {
                     wall_t* wall = &sect->wall[w];
                     floorMesh.vertices[w * 3] = wall->x;
-                    floorMesh.vertices[w * 3 + 1] = sect->z[0];
+                    floorMesh.vertices[w * 3 + 1] = (float) sect->z[1];
                     floorMesh.vertices[w * 3 + 2] = wall->y;
-
-                    floorMesh.texcoords[w * 2] = wall->x * 0.1f;
-                    floorMesh.texcoords[w * 2 + 1] = wall->y * 0.1f;
+                    floorMesh.texcoords[w * 2] = 0.2f * wall->x;
+                    floorMesh.texcoords[w * 2 + 1] = 0.2f * wall->y;
+                   // floorMesh.texcoords[w * 2] = ((int)wall->x % 100)/100.0f;
+                   // floorMesh.texcoords[w * 2 + 1] = ((int)wall->y % 100)/100.0f;
                 }
 
                 // Fan triangulation
@@ -111,7 +125,7 @@ public:
                 UploadMesh(&floorMesh, false);
 
                 floorData->mesh = floorMesh;
-                floorData->textureIndex = sect->surf[0].tilnum;
+                floorData->textureIndex = sect->surf[1].tilnum;
                 floorData->isValid = true;
             }
         }
@@ -128,29 +142,48 @@ public:
             {
                 Texture2D floorTex = runtimeTextures[floorData->textureIndex];
 
-                rlSetTexture(floorTex.id);
-                rlBegin(RL_TRIANGLES);
-
                 // Draw triangles from mesh data
-                for (int t = 0; t < floorData->mesh.triangleCount; t++)
+                if (false)
                 {
-                    for (int v = 0; v < 3; v++)
-                    {
-                        int idx = floorData->mesh.indices[t * 3 + v];
-                        rlTexCoord2f(
-                            floorData->mesh.texcoords[idx * 2],
-                            floorData->mesh.texcoords[idx * 2 + 1]
-                        );
-                        rlVertex3f(
-                            floorData->mesh.vertices[idx * 3],
-                            floorData->mesh.vertices[idx * 3 + 1],
-                            floorData->mesh.vertices[idx * 3 + 2]
-                        );
-                    }
-                }
+                    // Create material with unlit shader
+                    Material mat = LoadMaterialDefault();
 
-                rlEnd();
-                rlSetTexture(0);
+                    // Load basic unlit shader (or use default basic shader)
+                    Shader unlitShader = LoadShader(0, 0); // Uses default vertex/fragment shaders
+                    mat.shader = unlitShader;
+
+                    SetMaterialTexture(&mat, MATERIAL_MAP_DIFFUSE, floorTex);
+
+                    DrawMesh(floorData->mesh, mat, MatrixTranslate(0, 0, 0));
+
+                    UnloadShader(unlitShader);
+                    UnloadMaterial(mat);
+                }
+                else
+                {
+                    rlBegin(RL_TRIANGLES); // in triangels it resets texture hence reorder
+                    rlSetTexture(floorTex.id);
+                    rlColor4ub(255, 255, 255, 255);
+                    for (int t = 0; t < floorData->mesh.triangleCount; t++)
+                    {
+                        for (int v = 0; v < 3; v++)
+                        {
+                            int idx = floorData->mesh.indices[t * 3 + v];
+                            rlTexCoord2f(
+                                floorData->mesh.texcoords[idx * 2],
+                                floorData->mesh.texcoords[idx * 2 + 1]
+                            );
+                            rlVertex3f(
+                                floorData->mesh.vertices[idx * 3],
+                                floorData->mesh.vertices[idx * 3 + 1],
+                                floorData->mesh.vertices[idx * 3 + 2]
+                            );
+                        }
+                    }
+
+                    rlEnd();
+                    rlSetTexture(0);
+                }
             }
         }
 
@@ -179,6 +212,7 @@ public:
 
                     rlSetTexture(wallTex.id);
                     rlBegin(RL_QUADS);
+                    rlColor4ub(255, 255, 255, 255);
                     rlTexCoord2f(0.0f, 1.0f);
                     rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
                     rlTexCoord2f(1.0f, 1.0f);
@@ -269,11 +303,12 @@ public:
             DrawCubeWires(pos, s, s, s, DARKBLUE);
         }
     }
+
     static void TestRenderTextures() // all end up gobbled data
     {
         // Clear background
-      //  BeginDrawing();
-      //  ClearBackground(BLACK);
+        //  BeginDrawing();
+        //  ClearBackground(BLACK);
 
         // Test texture indices 1, 2, 3
         for (int i = 1; i <= 3; i++)
@@ -296,7 +331,7 @@ public:
                      (int)x, (int)y + tex.height + 5, 10, WHITE);
         }
 
-     //   EndDrawing();
+        //   EndDrawing();
     }
 
     static Texture2D ConvertPalToTexture()
@@ -339,13 +374,14 @@ public:
     // converts INDEXED pics only!
     static Texture2D ConvertPicToTexture(tile_t* tpic)
     {
-        if (!tpic || !tpic->tt.f) return {0};
+        if (!tpic || !tpic->tt.f)
+            return {0};
 
         tiltyp* pic = &tpic->tt;
 
         Image picImage = {0};
-        int x = max(4,pic->x);
-        int y = max(4,pic->y);
+        int x = max(4, pic->x);
+        int y = max(4, pic->y);
         picImage.width = x;
         picImage.height = y;
         picImage.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
@@ -366,9 +402,9 @@ public:
 
                 // Source is already RGBA, just copy and potentially reorder
                 // tried replacing with those, and for a split second it is orange, but then falls back to green and still debugs everywhere
-            //    pixels[dstIndex + 0] = 255;
-            //    pixels[dstIndex + 1] = 122;
-            //    pixels[dstIndex + 2] = 44;
+                //    pixels[dstIndex + 0] = 255;
+                //    pixels[dstIndex + 1] = 122;
+                //    pixels[dstIndex + 2] = 44;
 
                 pixels[dstIndex + 0] = srcRow[srcIndex + 2]; // R (from B)
                 pixels[dstIndex + 1] = srcRow[srcIndex + 1]; // G
