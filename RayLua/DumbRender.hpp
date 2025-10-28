@@ -203,7 +203,8 @@ public:
                     texIndex = wall->xsurf[0].tilnum;
                 auto dx = sqrt((nextwall->x-wall->x)*(nextwall->x-wall->x) + (nextwall->y-wall->y)*(nextwall->y-wall->y));
                 auto dy = sect->z[0]-sect->z[1];
-                if (!wall->ns>0)
+
+                if (wall->ns == -1) //dont draw red walls for now.
                 if (texIndex >= 0 && texIndex < get_gnumtiles())
                 {
                     Texture2D wallTex = runtimeTextures[texIndex];
