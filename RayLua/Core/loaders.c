@@ -495,7 +495,8 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					sur->uv[0].x = b7wal.xpanning;
 					sur->uv[0].y = b7wal.ypanning;
 					sur->uv[1].x = b7wal.xrepeat; if (b7wal.cstat&  8) sur->uv[1].x *= -1;
-					sur->uv[1].y = sur->uv[2].x = 0;
+					sur->uv[1].y = 0;
+					sur->uv[2].x = 0;
 					sur->uv[2].y = b7wal.yrepeat; if (b7wal.cstat&256) sur->uv[2].y *= -1;
 					if ((b7wal.nextsect < 0) ^ (!(b7wal.cstat&4))) sur->flags ^= 4; //align bot/nextsec
 					if (b7wal.cstat&(16+32)) sur->flags |= 32; //bit4:masking, bit5:1-way
