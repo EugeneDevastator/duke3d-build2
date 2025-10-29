@@ -2634,6 +2634,7 @@ static void gentex_wall (kgln_t *npol2, surf_t *sur)
 
 static void drawalls (int b)
 {
+	// === VARIABLE DECLARATIONS ===
 	extern void loadpic (tile_t *);
 	#define MAXVERTS 256 //FIX:timebomb: assumes there are never > 256 sectors connected at same vertex
 	vertlist_t verts[MAXVERTS];
@@ -2650,6 +2651,7 @@ static void drawalls (int b)
 	int i, j, k, l, m, n, s, ns, isflor, plothead[2], wn, w, ww, nw, vn, ws, wi, we, kval[4], imin, imax;
 	int ks[2], ke[2], col, n0, n1;
 
+    // === SETUP SECTOR AND WALL DATA ===
 	s = bunch[b].sec;
 	sec = gst->sect;
 
@@ -2672,28 +2674,28 @@ static void drawalls (int b)
 	twaln = prepbunch(b,twal);
 	gligsect = s; gligslab = 0;
 
-
-		//delete bunch (fill hole).. must do this after b is last read and before bunch indices get changed inside scansector()
-		//Example: bunchn=6,closest=2 (before op)
-		//     0 1 2 3 4
-		//0
-		//1  0:x
-		//2  1:. . ? ? ?
-		//3  3:x x .
-		//4  6:x x . x
-		//5 10:x x . x x
+	// === BUNCH MANAGEMENT: DELETE CURRENT BUNCH FROM GRID ===
+	// Removes processed bunch and compacts the bunch grid structure
+	// Example: bunchn=6,closest=2 (before op)
+	//	 0 1 2 3 4
+	//0
+	//1  0:x
+	//2  1:. . ? ? ?
+	//3  3:x x .
+	//4  6:x x . x
+	//5 10:x x . x x
 	bunchn--; bunch[b] = bunch[bunchn];
 	j = (((bunchn-1)*bunchn)>>1);
 	memcpy(&bunchgrid[((b-1)*b)>>1],&bunchgrid[j],b*sizeof(bunchgrid[0]));
 	for(i=b+1;i<bunchn;i++) bunchgrid[(((i-1)*i)>>1)+b] = ((bunchgrid[j+i]&1)<<1) + (bunchgrid[j+i]>>1);
 
-
-		//Draw ceilings&floors
+	// === DRAW CEILINGS & FLOORS ===
 	for(isflor=0;isflor<2;isflor++)
 	{
-			//3D back-face cull
+		// Back-face culling: skip if camera is on wrong side of surface
 		if ((gcam.p.z >= getslopez(&sec[s],isflor,gcam.p.x,gcam.p.y)) == isflor) continue;
 
+		// Setup surface properties (height, gradient, color)
 		fz = sec[s].z[isflor]; grad = &sec[s].grad[isflor];
 		gcurcol = (min(sec[s].surf[isflor].asc>>8,255)<<24) +
 					 (min(sec[s].surf[isflor].rsc>>5,255)<<16) +
@@ -2701,6 +2703,7 @@ static void drawalls (int b)
 					 (min(sec[s].surf[isflor].bsc>>5,255)    );
 		gcurcol = argb_interp(gcurcol,(gcurcol&0xff000000)+((gcurcol&0xfcfcfc)>>2),(int)(gps->compact2d*24576.0));
 
+		// Calculate surface normal vector
 		gnorm.x = grad->x;
 		gnorm.y = grad->y;
 		gnorm.z = 1.f; if (isflor) { gnorm.x = -gnorm.x; gnorm.y = -gnorm.y; gnorm.z = -gnorm.z; }
@@ -2712,12 +2715,14 @@ static void drawalls (int b)
 			//   (wal[i].x-wal[0].x)*grad->x +
 			//   (wal[i].y-wal[0].y)*grad->y +
 			//   (?       -      fz)*      1 = 0
+		// Build polygon for ceiling/floor using plane equation:
 		plothead[0] = -1; plothead[1] = -1;
 		for(ww=twaln;ww>=0;ww-=twaln) plothead[isflor] = mono_ins(plothead[isflor],twal[ww].x,twal[ww].y,gnorm.z*-1e32); //do not replace w/single zenith point - ruins precision
 		i = isflor^1;
 		for(ww=0;ww<=twaln;ww++) plothead[i] = mono_ins(plothead[i],twal[ww].x,twal[ww].y,(wal[0].x-twal[ww].x)*grad->x + (wal[0].y-twal[ww].y)*grad->y + fz);
 		plothead[i] = mp[plothead[i]].n;
 
+		// Setup texture and rendering flags
 		sur = &sec[s].surf[isflor]; gtpic = &gtile[sur->tilnum]; if (!gtpic->tt.f) loadpic(gtpic);
 			  if (sec[s].surf[isflor].flags&(1<<17)) { gflags = 2;                  } //skybox ceil/flor
 		else if (sec[s].surf[isflor].flags&(1<<16)) { gflags = 1; gentex_sky(sur); } //parallaxing ceil/flor
@@ -2729,13 +2734,15 @@ static void drawalls (int b)
 #endif
 	}
 
-		//Draw walls
+	// === DRAW WALLS ===
 	for(ww=0;ww<twaln;ww++)
 	{
+		// Get wall vertices and setup wall segment
 		vn = getwalls(s,twal[ww].i,verts,MAXVERTS);
 		w = twal[ww].i; nw = wal[w].n+w;
 		sur = &wal[w].surf;
 
+		// Calculate wall length and setup color/normal
 		dx = sqrt((wal[nw].x-wal[w].x)*(wal[nw].x-wal[w].x) + (wal[nw].y-wal[w].y)*(wal[nw].y-wal[w].y));
 		gcurcol = (min(sur->asc>>8,255)<<24) +
 					 (min(sur->rsc>>5,255)<<16) +
@@ -2745,15 +2752,17 @@ static void drawalls (int b)
 		gnorm.y = wal[nw].x-wal[w].x;
 		gnorm.z = 0;
 		f = 1.0/sqrt(gnorm.x*gnorm.x + gnorm.y*gnorm.y); gnorm.x *= f; gnorm.y *= f;
-
+		// Setup base wall quad (floor to ceiling)
 		pol[0].x = twal[ww  ].x; pol[0].y = twal[ww  ].y; pol[0].z = getslopez(&sec[s],0,pol[0].x,pol[0].y); //pol[0].n = 1;
 		pol[1].x = twal[ww+1].x; pol[1].y = twal[ww+1].y; pol[1].z = getslopez(&sec[s],0,pol[1].x,pol[1].y); //pol[1].n = 1;
 		pol[2].x = twal[ww+1].x; pol[2].y = twal[ww+1].y; pol[2].z = getslopez(&sec[s],1,pol[2].x,pol[2].y); //pol[2].n = 1;
 		pol[3].x = twal[ww  ].x; pol[3].y = twal[ww  ].y; pol[3].z = getslopez(&sec[s],1,pol[3].x,pol[3].y); //pol[3].n =-3;
 
+		// === WALL SEGMENT SUBDIVISION LOOP =		   // Process wall in segments, clipping against adjacent sectors
 		opolz[3] = pol[0].z; opolz[2] = pol[1].z;
 		for(m=0;m<=(vn<<1);m++) //Warning: do not reverse for loop!
 		{
+			// Update Z-coordinates for current segment
 			opolz[0] = opolz[3]; opolz[1] = opolz[2];
 			if (m == (vn<<1)) { opolz[2] = pol[2].z; opolz[3] = pol[3].z; }
 			else
@@ -2762,13 +2771,17 @@ static void drawalls (int b)
 				opolz[3] = getslopez(&sec[verts[m>>1].s],m&1,pol[3].x,pol[3].y);
 			}
 			//if ((opolz[0] >= opolz[3]) && (opolz[1] >= opolz[2])) continue; //Early-out optimization: skip walls with 0 height
+
+			// Skip zero-height wall segments (optimization)
 			if ((max(pol[0].z,opolz[0]) >= min(pol[3].z,opolz[3])-1e-4) &&
 				 (max(pol[1].z,opolz[1]) >= min(pol[2].z,opolz[2])-1e-4)) continue; //Early-out optimization: skip walls with 0 height FIXFIXFIXFIX
 
 			//if (!intersect_traps_mono(pol[0].x,pol[0].y, pol[1].x,pol[1].y, pol[0].z,pol[1].z,pol[2].z,pol[3].z, opolz[0],opolz[1],opolz[2],opolz[3], &plothead[0],&plothead[1])) continue;
+			// Calculate intersection of wall segment with clipping trapezoids
 			f = 1e-7; //FIXFIXFIXFIX:use ^ ?
 			if (!intersect_traps_mono(pol[0].x,pol[0].y, pol[1].x,pol[1].y, pol[0].z-f,pol[1].z-f,pol[2].z+f,pol[3].z+f, opolz[0]-f,opolz[1]-f,opolz[2]+f,opolz[3]+f, &plothead[0],&plothead[1])) continue;
 
+			// Render wall segment if visible
 			if ((!(m&1)) || (wal[w].surf.flags&(1<<5))) //Draw wall here //(1<<5): 1-way
 			{
 				gtpic = &gtile[sur->tilnum]; if (!gtpic->tt.f) loadpic(gtpic);
@@ -2776,24 +2789,28 @@ static void drawalls (int b)
 				else if (sur->flags&(1<<16)) { gflags = 1; gentex_sky(sur); } //parallaxing ceil/flor
 				else
 				{
+					// Calculate UV mapping for wall texture
 					npol2[0].x = wal[ w].x; npol2[0].y = wal[ w].y; npol2[0].z = getslopez(&sec[s],0,wal[w].x,wal[w].y);
 					npol2[1].x = wal[nw].x; npol2[1].y = wal[nw].y; npol2[1].z = npol2[0].z;
 					npol2[2].x = wal[ w].x; npol2[2].y = wal[ w].y; npol2[2].z = npol2[0].z + 1.f;
+					// Determine reference Z-level texture alignment
 						  if (!(sur->flags&4)) f = sec[                s].z[0];
 					else if (!vn)             f = sec[                s].z[1]; //White walls don't have verts[]!
 					else if (!m)              f = sec[verts[       0].s].z[0];
 					else                      f = sec[verts[(m-1)>>1].s].z[0];
+					// Apply UV coordinates with proper scaling
 					npol2[0].u = sur->uv[0].x;                 npol2[0].v = sur->uv[2].y*(npol2[0].z-f) + sur->uv[0].y;
 					npol2[1].u = sur->uv[1].x*dx + npol2[0].u; npol2[1].v = sur->uv[1].y*dx             + npol2[0].v;
 					npol2[2].u = sur->uv[2].x    + npol2[0].u; npol2[2].v = sur->uv[2].y                + npol2[0].v;
 					gflags = 0; gentex_wall(npol2,sur);
 				}
 				gligwall = w; gligslab = m; ns = -1;
-			} else ns = verts[m>>1].s;
+			} else ns = verts[m>>1].s; // Portal to adjacent sector
 
+			// Render the wall polygon
 			drawpol_befclip(s,ns,plothead[0],plothead[1],((m>vn)<<2)+3);
 #ifdef STANDALONE
-			gcnt--; if (gcnt <= 0) return;
+			gcnt--; if (gcnt <= 0) return; // Debug: limit polygon count
 #endif
 		}
 	}
