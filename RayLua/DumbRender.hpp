@@ -239,7 +239,9 @@ public:
                 }
             }
         }
-        // draw walls dummy, draws entire wall anyway.
+
+        // draw walls
+
         for (int s = 0; s < map->numsects; s++)
         {
             sect_t* sect = &map->sect[s];
@@ -249,26 +251,38 @@ public:
                 wall_t* wall = &sect->wall[w];
                 wall_t* nextwall = &sect->wall[(w + 1) % sect->n];
 
-                Vector3 bottomLeft = {wall->x, -sect->z[0], wall->y};
-                Vector3 bottomRight = {nextwall->x, -sect->z[0], nextwall->y};
-                Vector3 topLeft = {wall->x, -sect->z[1], wall->y};
-                Vector3 topRight = {nextwall->x, -sect->z[1], nextwall->y};
+                // Get wall heights with slope support
+                float bottomLeftZ = GetSlopeZ(sect, 0, wall->x, wall->y); // floor at wall start
+                float bottomRightZ = GetSlopeZ(sect, 0, nextwall->x, nextwall->y); // floor at wall end
+                float topLeftZ = GetSlopeZ(sect, 1, wall->x, wall->y); // ceiling at wall start
+                float topRightZ = GetSlopeZ(sect, 1, nextwall->x, nextwall->y); // ceiling at wall end
+
+                // raylib friendly coords
+                Vector3 bottomLeft = {wall->x, bottomLeftZ, wall->y};
+                Vector3 bottomRight = {nextwall->x, bottomRightZ, nextwall->y};
+                Vector3 topLeft = {wall->x, topLeftZ, wall->y};
+                Vector3 topRight = {nextwall->x, topRightZ, nextwall->y};
 
                 int texIndex = wall->surf.tilnum;
                 if (wall->xsurf && wall->surfn > 1)
                     texIndex = wall->xsurf[0].tilnum;
-                auto dx = sqrt(
-                    (nextwall->x - wall->x) * (nextwall->x - wall->x) + (nextwall->y - wall->y) * (nextwall->y - wall->
-                        y));
-                auto dy = sect->z[0] - sect->z[1];
 
-                if (wall->ns == -1) //dont draw adjacent walls for now.
+                float dx = sqrt((nextwall->x - wall->x) * (nextwall->x - wall->x) +
+                    (nextwall->y - wall->y) * (nextwall->y - wall->y));
+                float dy = sect->z[0] - sect->z[1];
+
+                if (wall->ns == -1)
+                {
+                    // Solid wall - draw full wall
                     if (texIndex >= 0 && texIndex < get_gnumtiles())
                     {
+                        float dy = topLeftZ - bottomLeftZ; // Use actual height difference
+
                         Texture2D wallTex = runtimeTextures[texIndex];
                         rlSetTexture(wallTex.id);
                         rlBegin(RL_QUADS);
                         rlColor4ub(255, 255, 255, 255);
+
                         rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y * dy);
                         rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
                         rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 1.0f * wall->surf.uv[2].y * dy);
@@ -277,9 +291,117 @@ public:
                         rlVertex3f(topRight.x, topRight.y, topRight.z);
                         rlTexCoord2f(0.0f, 0.0f);
                         rlVertex3f(topLeft.x, topLeft.y, topLeft.z);
+
                         rlEnd();
                         rlSetTexture(0);
                     }
+                }
+                else
+                {
+                    // Portal wall - draw upper and lower parts
+                    sect_t* nextSect = &map->sect[wall->ns];
+int lowtile,masktile,hitile = wall->surf.tilnum;
+                    if (wall->surfn==3)
+                    {
+                        lowtile = wall->xsurf[0].tilnum;
+                        masktile = wall->xsurf[1].tilnum;
+                    }
+
+                    // Get heights of adjacent sector with slopes
+                    float nextBottomLeftZ = GetSlopeZ(nextSect, 0, wall->x, wall->y);
+                    float nextBottomRightZ = GetSlopeZ(nextSect, 0, nextwall->x, nextwall->y);
+                    float nextTopLeftZ = GetSlopeZ(nextSect, 1, wall->x, wall->y);
+                    float nextTopRightZ = GetSlopeZ(nextSect, 1, nextwall->x, nextwall->y);
+
+                    // Draw upper wall (between current ceiling and next ceiling)
+                    if (topLeftZ > nextTopLeftZ || topRightZ > nextTopRightZ)
+                    {
+                        Vector3 upperBottomLeft = {wall->x, nextTopLeftZ, wall->y};
+                        Vector3 upperBottomRight = {nextwall->x, nextTopRightZ, nextwall->y};
+
+                        if (hitile >= 0 && hitile < get_gnumtiles())
+                        {
+                            float upperDy = topLeftZ - nextTopLeftZ;
+
+                            Texture2D upperTex = runtimeTextures[hitile];
+                            rlSetTexture(upperTex.id);
+                            rlBegin(RL_QUADS);
+                            rlColor4ub(255, 255, 255, 255);
+
+                            rlTexCoord2f(0.0f, 1.0f * upperDy);
+                            rlVertex3f(upperBottomLeft.x, upperBottomLeft.y, upperBottomLeft.z);
+                            rlTexCoord2f(1.0f * dx, 1.0f * upperDy);
+                            rlVertex3f(upperBottomRight.x, upperBottomRight.y, upperBottomRight.z);
+                            rlTexCoord2f(1.0f * dx, 0.0f);
+                            rlVertex3f(topRight.x, topRight.y, topRight.z);
+                            rlTexCoord2f(0.0f, 0.0f);
+                            rlVertex3f(topLeft.x, topLeft.y, topLeft.z);
+
+                            rlEnd();
+                            rlSetTexture(0);
+                        }
+                    }
+
+                    // Draw lower wall (between current floor and next floor)
+                    if (bottomLeftZ < nextBottomLeftZ || bottomRightZ < nextBottomRightZ)
+                    {
+                        Vector3 lowerTopLeft = {wall->x, nextBottomLeftZ, wall->y};
+                        Vector3 lowerTopRight = {nextwall->x, nextBottomRightZ, nextwall->y};
+
+                        if (lowtile >= 0 && lowtile < get_gnumtiles())
+                        {
+                            float lowerDy = nextBottomLeftZ - bottomLeftZ;
+
+                            Texture2D lowerTex = runtimeTextures[lowtile];
+                            rlSetTexture(lowerTex.id);
+                            rlBegin(RL_QUADS);
+                            rlColor4ub(255, 255, 255, 255);
+
+                            rlTexCoord2f(0.0f, 1.0f * lowerDy);
+                            rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
+                            rlTexCoord2f(1.0f * dx, 1.0f * lowerDy);
+                            rlVertex3f(bottomRight.x, bottomRight.y, bottomRight.z);
+                            rlTexCoord2f(1.0f * dx, 0.0f);
+                            rlVertex3f(lowerTopRight.x, lowerTopRight.y, lowerTopRight.z);
+                            rlTexCoord2f(0.0f, 0.0f);
+                            rlVertex3f(lowerTopLeft.x, lowerTopLeft.y, lowerTopLeft.z);
+
+                            rlEnd();
+                            rlSetTexture(0);
+                        }
+                    }
+
+                    // Draw middle wall (masked/transparent texture between sectors)
+                    if (false)//wall->xsurf && wall->surfn > 2 && wall->xsurf[2].tilnum >= 0)
+                    {
+                        if (masktile < get_gnumtiles())
+                        {
+                            Vector3 midBottomLeft = {wall->x, max(bottomLeftZ, nextBottomLeftZ), wall->y};
+                            Vector3 midBottomRight = {nextwall->x, max(bottomRightZ, nextBottomRightZ), nextwall->y};
+                            Vector3 midTopLeft = {wall->x, min(topLeftZ, nextTopLeftZ), wall->y};
+                            Vector3 midTopRight = {nextwall->x, min(topRightZ, nextTopRightZ), nextwall->y};
+
+                            float midDy = min(topLeftZ, nextTopLeftZ) - max(bottomLeftZ, nextBottomLeftZ);
+
+                            Texture2D midTex = runtimeTextures[masktile];
+                            rlSetTexture(midTex.id);
+                            rlBegin(RL_QUADS);
+                            rlColor4ub(255, 255, 255, 128); // todo update transp.
+
+                            rlTexCoord2f(0.0f, 1.0f * midDy);
+                            rlVertex3f(midBottomLeft.x, midBottomLeft.y, midBottomLeft.z);
+                            rlTexCoord2f(1.0f * dx, 1.0f * midDy);
+                            rlVertex3f(midBottomRight.x, midBottomRight.y, midBottomRight.z);
+                            rlTexCoord2f(1.0f * dx, 0.0f);
+                            rlVertex3f(midTopRight.x, midTopRight.y, midTopRight.z);
+                            rlTexCoord2f(0.0f, 0.0f);
+                            rlVertex3f(midTopLeft.x, midTopLeft.y, midTopLeft.z);
+
+                            rlEnd();
+                            rlSetTexture(0);
+                        }
+                    }
+                }
             }
         }
         // Draw sprites (unchanged)
@@ -293,7 +415,7 @@ public:
                 Vector3 dw = {spr->d.x, spr->d.y, spr->d.z};
                 auto xs = Vector3Length(rg);
                 auto ys = Vector3Length(dw);
-                Vector3 pos = {spr->p.x - xs, -spr->p.z + ys, spr->p.y};
+                Vector3 pos = {spr->p.x - xs, -spr->p.z - ys, spr->p.y};
                 Rectangle source = {0.0f, 0.0f, (float)spriteTex.width, (float)spriteTex.height};
                 xs *= 2;
                 ys *= 2;
