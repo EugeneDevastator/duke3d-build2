@@ -508,6 +508,14 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					sur->tilnum = l; hitile = max(hitile,l);
 					sec[i].wall[j].surfn = 1;
 					sec[i].wall[j].owner = -1;
+					if (sec[i].wall[j].ns != -1) // handle split wall
+					{
+						sec[i].wall[j].surfn =3;
+						sec[i].wall[j].xsurf = malloc(sizeof(surf_t)*3);
+						sec[i].wall[j].xsurf[0].tilnum = b7wal.picnum;
+						sec[i].wall[j].xsurf[1].tilnum = b7wal.overpicnum;
+						sec[i].wall[j].xsurf[1].asc = 127;
+					}
 				}
 				// tile adjust?
 				for(j=0;j<sec[i].n;j++)
@@ -531,6 +539,19 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				{
 					sec[i].grad[j].x = fx*sec[i].grad[j].y;
 					sec[i].grad[j].y = fy*sec[i].grad[j].y;
+				}
+			}
+			//second pass for walls
+			for(i=k=0;i<map->numsects;i++)
+			{
+				for(j=0;j<sec[i].n;j++,k++)
+				{
+					wall_t wal = sec[i].wall[j];
+					if ( wal.surfn==3)
+					{
+						int nextpic = sec[wal.ns].wall[wal.nw].surf.tilnum;
+						wal.xsurf[2].tilnum = nextpic;
+					}
 				}
 			}
 
