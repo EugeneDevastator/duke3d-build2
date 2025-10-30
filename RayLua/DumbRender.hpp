@@ -85,23 +85,26 @@ public:
     }
 
     // Calculate Z-coordinate at point using sector slope
+    // Calculate Z-coordinate at point using sector slope
     static float GetSlopeZ(sect_t* sect, int isFloor, float x, float y)
     {
-        //   float baseZ = sect->z[isFloor];
-        //   point2d* grad = &sect->grad[isFloor];
-
-        //   // Use first wall as reference point
-        //   if (sect->n > 0) {
-        //       wall_t* refWall = &sect->wall[0];
-        //       float dx = x - refWall->x;
-        //       float dy = y - refWall->y;
-        //       return baseZ + dx * grad->x + dy * grad->y;
-        //   }
-        //   return baseZ;
         wall_t* wal = sect->wall;
-        // Calculate Z using plane equation: gradient dot (point - reference) + base_z
-        return ((wal[0].x - x) * sect->grad[isFloor].x + (wal[0].y - y) * sect->grad[isFloor].y + sect->z[isFloor]);
+        float gradX = sect->grad[isFloor].x;
+        float gradY = sect->grad[isFloor].y;
+
+        // Use the correct base Z for this surface
+        float baseZ = sect->z[isFloor];
+        float gradZ = 1.0f;
+        // For floors, negate the gradient (matching old code logic)
+        if (isFloor) {
+            gradX = -gradX;
+            gradY = -gradY;
+            gradZ = -gradZ;
+        }
+       return -sect->z[isFloor]; // oh boy, it is flipped?!
+        return -((wal[0].x - x) * gradX + (wal[0].y - y) * gradY + baseZ);
     }
+
 
     // Updated floor mesh generation with slopes
     static void InitMapstateTex(void)
