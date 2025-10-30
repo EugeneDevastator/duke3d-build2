@@ -252,10 +252,10 @@ public:
                 wall_t* nextwall = &sect->wall[(w + 1) % sect->n];
 
                 // Get wall heights with slope support
-                float bottomLeftZ = GetSlopeZ(sect, 0, wall->x, wall->y); // floor at wall start
-                float bottomRightZ = GetSlopeZ(sect, 0, nextwall->x, nextwall->y); // floor at wall end
-                float topLeftZ = GetSlopeZ(sect, 1, wall->x, wall->y); // ceiling at wall start
-                float topRightZ = GetSlopeZ(sect, 1, nextwall->x, nextwall->y); // ceiling at wall end
+                float bottomLeftZ = GetSlopeZ(sect, 1, wall->x, wall->y); // floor at wall start
+                float bottomRightZ = GetSlopeZ(sect, 1, nextwall->x, nextwall->y); // floor at wall end
+                float topLeftZ = GetSlopeZ(sect, 0, wall->x, wall->y); // ceiling at wall start
+                float topRightZ = GetSlopeZ(sect, 0, nextwall->x, nextwall->y); // ceiling at wall end
 
                 // raylib friendly coords
                 Vector3 bottomLeft = {wall->x, bottomLeftZ, wall->y};
@@ -308,10 +308,10 @@ int lowtile,masktile,hitile = wall->surf.tilnum;
                     }
 
                     // Get heights of adjacent sector with slopes
-                    float nextBottomLeftZ = GetSlopeZ(nextSect, 0, wall->x, wall->y);
-                    float nextBottomRightZ = GetSlopeZ(nextSect, 0, nextwall->x, nextwall->y);
-                    float nextTopLeftZ = GetSlopeZ(nextSect, 1, wall->x, wall->y);
-                    float nextTopRightZ = GetSlopeZ(nextSect, 1, nextwall->x, nextwall->y);
+                    float nextBottomLeftZ = GetSlopeZ(nextSect, 1, wall->x, wall->y);
+                    float nextBottomRightZ = GetSlopeZ(nextSect, 1, nextwall->x, nextwall->y);
+                    float nextTopLeftZ = GetSlopeZ(nextSect, 0, wall->x, wall->y);
+                    float nextTopRightZ = GetSlopeZ(nextSect, 0, nextwall->x, nextwall->y);
 
                     // Draw upper wall (between current ceiling and next ceiling)
                     if (topLeftZ > nextTopLeftZ || topRightZ > nextTopRightZ)
@@ -328,13 +328,13 @@ int lowtile,masktile,hitile = wall->surf.tilnum;
                             rlBegin(RL_QUADS);
                             rlColor4ub(255, 255, 255, 255);
 
-                            rlTexCoord2f(0.0f, 1.0f * upperDy);
+                            rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y *upperDy);
                             rlVertex3f(upperBottomLeft.x, upperBottomLeft.y, upperBottomLeft.z);
-                            rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 1.0f * upperDy);
+                            rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 1.0f * wall->surf.uv[2].y *upperDy);
                             rlVertex3f(upperBottomRight.x, upperBottomRight.y, upperBottomRight.z);
                             rlTexCoord2f(1.0f  * wall->surf.uv[1].x * dx, 0.0f);
                             rlVertex3f(topRight.x, topRight.y, topRight.z);
-                            rlTexCoord2f(0.0f, 0.0f);
+                            rlTexCoord2f(0.0f, 0);
                             rlVertex3f(topLeft.x, topLeft.y, topLeft.z);
 
                             rlEnd();
