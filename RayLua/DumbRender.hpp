@@ -316,25 +316,28 @@ int lowtile,masktile,hitile = wall->surf.tilnum;
                     // Draw upper wall (between current ceiling and next ceiling)
                     if (topLeftZ > nextTopLeftZ || topRightZ > nextTopRightZ)
                     {
-                        Vector3 upperBottomLeft = {wall->x, nextTopLeftZ, wall->y};
-                        Vector3 upperBottomRight = {nextwall->x, nextTopRightZ, nextwall->y};
+                        Vector3 bottom_left = {wall->x, nextTopLeftZ, wall->y};
+                        Vector3 bottom_right = {nextwall->x, nextTopRightZ, nextwall->y};
 
                         if (hitile >= 0 && hitile < get_gnumtiles())
                         {
                             float upperDy = topLeftZ - nextTopLeftZ;
-
+                            float dh = nextTopLeftZ -nextTopRightZ;
                             Texture2D upperTex = runtimeTextures[hitile];
                             rlSetTexture(upperTex.id);
                             rlBegin(RL_QUADS);
                             rlColor4ub(255, 255, 255, 255);
 
                             rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y *upperDy);
-                            rlVertex3f(upperBottomLeft.x, upperBottomLeft.y, upperBottomLeft.z);
-                            rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 1.0f * wall->surf.uv[2].y *upperDy);
-                            rlVertex3f(upperBottomRight.x, upperBottomRight.y, upperBottomRight.z);
+                            rlVertex3f(bottom_left.x, bottom_left.y, bottom_left.z);
+
+                            rlTexCoord2f(wall->surf.uv[1].x * dx, wall->surf.uv[2].y*(upperDy + dh));
+                            rlVertex3f(bottom_right.x, bottom_right.y, bottom_right.z);
+
                             rlTexCoord2f(1.0f  * wall->surf.uv[1].x * dx, 0.0f);
                             rlVertex3f(topRight.x, topRight.y, topRight.z);
-                            rlTexCoord2f(0.0f, 0);
+
+                            rlTexCoord2f(0.0f, 0.0);
                             rlVertex3f(topLeft.x, topLeft.y, topLeft.z);
 
                             rlEnd();
@@ -415,7 +418,7 @@ int lowtile,masktile,hitile = wall->surf.tilnum;
                 Vector3 dw = {spr->d.x, spr->d.y, spr->d.z};
                 auto xs = Vector3Length(rg);
                 auto ys = Vector3Length(dw);
-                Vector3 pos = {spr->p.x - xs, -spr->p.z - ys, spr->p.y};
+                Vector3 pos = {spr->p.x - xs, -spr->p.z , spr->p.y};
                 Rectangle source = {0.0f, 0.0f, (float)spriteTex.width, (float)spriteTex.height};
                 xs *= 2;
                 ys *= 2;
