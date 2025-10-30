@@ -15,9 +15,33 @@ extern "C" {
 #include "raymath.h"
 #include "rlgl.h"
 
+struct WallSegment
+{
+    float z[4]; // bottom-left, bottom-right, top-right, top-left
+    bool isVisible;
+    int adjacentSector;
+};
+
 typedef struct
 {
-    Mesh mesh;
+    int s;
+    float z;
+} vert;
+
+typedef struct
+{
+    float* vertices;
+    float* texcoords;
+    unsigned short* indices;
+    int vertexCount;
+    int triangleCount;
+    bool isValid;
+    Mesh rendermesh;
+} TriangulatedMesh;
+
+typedef struct
+{
+    TriangulatedMesh mesh;
     int textureIndex;
     bool isValid;
 } FloorMeshData;
@@ -50,27 +74,304 @@ public:
         // auto tex = ConvertPicToTexture(pic);
     }
 
+    // Calculates the Z height at point (x,y) on a sloped surface
+    // Uses the sector's gradient and base Z value
+    // original, correct code
+    double getslopez(sect_t* s, int i, double x, double y)
+    {
+        wall_t* wal = s->wall;
+        // Calculate Z using plane equation: gradient dot (point - reference) + base_z
+        return ((wal[0].x - x) * s->grad[i].x + (wal[0].y - y) * s->grad[i].y + s->z[i]);
+    }
 
-    // Call once when map loads
+    // Calculate Z-coordinate at point using sector slope
+    static float GetSlopeZ(sect_t* sect, int isFloor, float x, float y)
+    {
+        //   float baseZ = sect->z[isFloor];
+        //   point2d* grad = &sect->grad[isFloor];
+
+        //   // Use first wall as reference point
+        //   if (sect->n > 0) {
+        //       wall_t* refWall = &sect->wall[0];
+        //       float dx = x - refWall->x;
+        //       float dy = y - refWall->y;
+        //       return baseZ + dx * grad->x + dy * grad->y;
+        //   }
+        //   return baseZ;
+        wall_t* wal = sect->wall;
+        // Calculate Z using plane equation: gradient dot (point - reference) + base_z
+        return ((wal[0].x - x) * sect->grad[isFloor].x + (wal[0].y - y) * sect->grad[isFloor].y + sect->z[isFloor]);
+    }
+
+    // Updated floor mesh generation with slopes
     static void InitMapstateTex(void)
     {
         if (floorMeshes)
         {
-            // Cleanup existing meshes
             for (int i = 0; i < numFloorMeshes; i++)
             {
                 if (floorMeshes[i].isValid)
                 {
-                    UnloadMesh(floorMeshes[i].mesh);
+                    UnloadMesh(floorMeshes[i].mesh.rendermesh);
+                    free(floorMeshes[i].mesh.vertices);
+                    free(floorMeshes[i].mesh.texcoords);
+                    free(floorMeshes[i].mesh.indices);
+                }
+            }
+            free(floorMeshes);
+        }
+
+        numFloorMeshes = map->numsects * 2; // floor + ceiling
+        floorMeshes = (FloorMeshData*)calloc(numFloorMeshes, sizeof(FloorMeshData));
+
+        for (int s = 0; s < map->numsects; s++)
+        {
+            sect_t* sect = &map->sect[s];
+
+            // Generate floor and ceiling meshes
+            for (int isFloor = 0; isFloor < 2; isFloor++)
+            {
+                int meshIdx = s * 2 + isFloor;
+                FloorMeshData* meshData = &floorMeshes[meshIdx];
+
+                meshData->isValid = false;
+
+                if (sect->n >= 3 && sect->surf[isFloor].tilnum >= 0 && sect->surf[isFloor].tilnum < get_gnumtiles())
+                {
+                    TriangulatedMesh triMesh = {0};
+                    triMesh.vertexCount = sect->n;
+                    triMesh.triangleCount = sect->n - 2;
+
+                    triMesh.vertices = (float*)malloc(triMesh.vertexCount * 3 * sizeof(float));
+                    triMesh.texcoords = (float*)malloc(triMesh.vertexCount * 2 * sizeof(float));
+                    triMesh.indices = (unsigned short*)malloc(triMesh.triangleCount * 3 * sizeof(unsigned short));
+
+                    // Fill vertices with slope calculations
+                    for (int w = 0; w < sect->n; w++)
+                    {
+                        const wall_t* wall = &sect->wall[w];
+                        float z = GetSlopeZ(sect, isFloor, wall->x, wall->y);
+
+                        triMesh.vertices[w * 3] = wall->x;
+                        triMesh.vertices[w * 3 + 1] = z;
+                        triMesh.vertices[w * 3 + 2] = wall->y;
+
+                        triMesh.texcoords[w * 2] = 0.2f * wall->x;
+                        triMesh.texcoords[w * 2 + 1] = 0.2f * wall->y;
+                    }
+
+                    // Triangulate
+                    float* polyVertices = (float*)malloc(sect->n * 2 * sizeof(float));
+                    for (int w = 0; w < sect->n; w++)
+                    {
+                        polyVertices[w * 2] = sect->wall[w].x;
+                        polyVertices[w * 2 + 1] = sect->wall[w].y;
+                    }
+
+                    triMesh.triangleCount = TriangulatePolygon(polyVertices, sect->n, triMesh.indices);
+                    triMesh.isValid = true;
+
+                    // Create Raylib mesh
+                    Mesh mesh = {0};
+                    mesh.vertexCount = triMesh.vertexCount;
+                    mesh.triangleCount = triMesh.triangleCount;
+                    mesh.vertices = triMesh.vertices;
+                    mesh.texcoords = triMesh.texcoords;
+                    mesh.indices = triMesh.indices;
+
+                    UploadMesh(&mesh, false);
+
+                    meshData->mesh.rendermesh = mesh;
+                    meshData->mesh = triMesh;
+                    meshData->textureIndex = sect->surf[isFloor].tilnum;
+                    meshData->isValid = true;
+
+                    free(polyVertices);
+                }
+            }
+        }
+    }
+
+
+    // Updated wall rendering with segments
+    static void DrawMapstateTex(Camera3D cam)
+    {
+        rlDrawRenderBatchActive();
+        rlDisableBackfaceCulling();
+
+        // Draw floors and ceilings with slopes
+        for (int s = 0; s < map->numsects; s++)
+        {
+            for (int isFloor = 0; isFloor < 2; isFloor++)
+            {
+                int meshIdx = s * 2 + isFloor;
+                FloorMeshData* meshData = &floorMeshes[meshIdx];
+
+                if (meshData->isValid)
+                {
+                    const Texture2D tex = runtimeTextures[meshData->textureIndex];
+
+                    rlBegin(RL_TRIANGLES);
+                    rlSetTexture(tex.id);
+                    rlDisableBackfaceCulling();
+
+                    for (int tri = 0; tri < meshData->mesh.triangleCount; tri++)
+                    {
+                        for (int vert = 0; vert < 3; vert++)
+                        {
+                            int idx = meshData->mesh.indices[tri * 3 + vert];
+                            rlColor4ub(255, 255, 255, 255);
+                            rlTexCoord2f(
+                                meshData->mesh.texcoords[idx * 2],
+                                meshData->mesh.texcoords[idx * 2 + 1]
+                            );
+                            rlVertex3f(
+                                meshData->mesh.vertices[idx * 3],
+                                meshData->mesh.vertices[idx * 3 + 1],
+                                meshData->mesh.vertices[idx * 3 + 2]
+                            );
+                        }
+                    }
+
+                    rlDrawRenderBatchActive();
+                    rlSetTexture(0);
+                    rlEnd();
+                }
+            }
+        }
+        // draw walls dummy, draws entire wall anyway.
+        for (int s = 0; s < map->numsects; s++)
+        {
+            sect_t* sect = &map->sect[s];
+
+            for (int w = 0; w < sect->n; w++)
+            {
+                wall_t* wall = &sect->wall[w];
+                wall_t* nextwall = &sect->wall[(w + 1) % sect->n];
+
+                Vector3 bottomLeft = {wall->x, sect->z[0], wall->y};
+                Vector3 bottomRight = {nextwall->x, sect->z[0], nextwall->y};
+                Vector3 topLeft = {wall->x, sect->z[1], wall->y};
+                Vector3 topRight = {nextwall->x, sect->z[1], nextwall->y};
+
+                int texIndex = wall->surf.tilnum;
+                if (wall->xsurf && wall->surfn > 1)
+                    texIndex = wall->xsurf[0].tilnum;
+                auto dx = sqrt(
+                    (nextwall->x - wall->x) * (nextwall->x - wall->x) + (nextwall->y - wall->y) * (nextwall->y - wall->
+                        y));
+                auto dy = sect->z[0] - sect->z[1];
+
+                if (wall->ns == -1) //dont draw adjacent walls for now.
+                    if (texIndex >= 0 && texIndex < get_gnumtiles())
+                    {
+                        Texture2D wallTex = runtimeTextures[texIndex];
+                        rlSetTexture(wallTex.id);
+                        rlBegin(RL_QUADS);
+                        rlColor4ub(255, 255, 255, 255);
+                        rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y * dy);
+                        rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
+                        rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 1.0f * wall->surf.uv[2].y * dy);
+                        rlVertex3f(bottomRight.x, bottomRight.y, bottomRight.z);
+                        rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 0.0f);
+                        rlVertex3f(topRight.x, topRight.y, topRight.z);
+                        rlTexCoord2f(0.0f, 0.0f);
+                        rlVertex3f(topLeft.x, topLeft.y, topLeft.z);
+                        rlEnd();
+                        rlSetTexture(0);
+                    }
+            }
+        }
+        // Draw sprites (unchanged)
+        for (int i = 0; i < map->numspris; i++)
+        {
+            spri_t* spr = &map->spri[i];
+            if (spr->tilnum >= 0 && spr->tilnum < gnumtiles_i)
+            {
+                Texture2D spriteTex = runtimeTextures[spr->tilnum];
+                Vector3 rg = {spr->r.x, spr->r.y, spr->r.z};
+                Vector3 dw = {spr->d.x, spr->d.y, spr->d.z};
+                auto xs = Vector3Length(rg);
+                auto ys = Vector3Length(dw);
+                Vector3 pos = {spr->p.x - xs, spr->p.z - ys, spr->p.y};
+                Rectangle source = {0.0f, 0.0f, (float)spriteTex.width, (float)spriteTex.height};
+                xs *= 2;
+                ys *= 2;
+
+                DrawBillboardRec(cam, spriteTex, source, pos, {xs, ys}, WHITE);
+            }
+        }
+    }
+
+    static int TriangulatePolygon(float* vertices, int vertexCount, unsigned short* indices)
+    {
+        if (vertexCount < 3) return 0;
+
+        int triangleCount = 0;
+        int* vertexList = (int*)malloc(vertexCount * sizeof(int));
+
+        // Initialize vertex list
+        for (int i = 0; i < vertexCount; i++)
+        {
+            vertexList[i] = i;
+        }
+
+        int remainingVertices = vertexCount;
+        int currentVertex = 0;
+
+        // Simple fan triangulation for now (can be improved with proper ear clipping)
+        while (remainingVertices > 2)
+        {
+            int v0 = vertexList[0];
+            int v1 = vertexList[currentVertex + 1];
+            int v2 = vertexList[currentVertex + 2];
+
+            // Add triangle
+            indices[triangleCount * 3] = v0;
+            indices[triangleCount * 3 + 1] = v1;
+            indices[triangleCount * 3 + 2] = v2;
+
+            triangleCount++;
+
+            // Remove middle vertex
+            for (int i = currentVertex + 1; i < remainingVertices - 1; i++)
+            {
+                vertexList[i] = vertexList[i + 1];
+            }
+            remainingVertices--;
+
+            if (currentVertex >= remainingVertices - 2)
+            {
+                currentVertex = 0;
+            }
+        }
+
+        free(vertexList);
+        return triangleCount;
+    }
+
+
+    // Call once when map loads
+    static void InitMapstateTexOld(void)
+    {
+        if (floorMeshes)
+        {
+            for (int i = 0; i < numFloorMeshes; i++)
+            {
+                if (floorMeshes[i].isValid)
+                {
+                    UnloadMesh(floorMeshes[i].mesh.rendermesh);
+                    free(floorMeshes[i].mesh.vertices);
+                    free(floorMeshes[i].mesh.texcoords);
+                    free(floorMeshes[i].mesh.indices);
                 }
             }
             free(floorMeshes);
         }
 
         numFloorMeshes = map->numsects;
-        floorMeshes = static_cast<FloorMeshData*>(calloc(numFloorMeshes, sizeof(FloorMeshData)));
+        floorMeshes = (FloorMeshData*)calloc(numFloorMeshes, sizeof(FloorMeshData));
 
-        // Pre-build all floor meshes
         for (int s = 0; s < map->numsects; s++)
         {
             sect_t* sect = &map->sect[s];
@@ -80,47 +381,64 @@ public:
 
             if (sect->n >= 3 && sect->surf[1].tilnum >= 0 && sect->surf[1].tilnum < get_gnumtiles())
             {
-                Mesh floorMesh = {};
-                floorMesh.vertexCount = sect->n;
-                floorMesh.triangleCount = floorMesh.vertexCount - 2;
+                // Prepare vertices for triangulation
+                float* polyVertices = (float*)malloc(sect->n * 2 * sizeof(float));
 
-                floorMesh.vertices = static_cast<float*>(malloc(floorMesh.vertexCount * 3 * sizeof(float)));
-                floorMesh.texcoords = static_cast<float*>(malloc(floorMesh.vertexCount * 2 * sizeof(float)));
-                floorMesh.indices = static_cast<unsigned short*>(malloc(
-                    (floorMesh.triangleCount) * 3 * sizeof(unsigned short)));
+                for (int w = 0; w < sect->n; w++)
+                {
+                    polyVertices[w * 2] = sect->wall[w].x;
+                    polyVertices[w * 2 + 1] = sect->wall[w].y;
+                }
+
+                // Create triangulated mesh
+                TriangulatedMesh triMesh = {0};
+                triMesh.vertexCount = sect->n;
+                triMesh.triangleCount = sect->n - 2;
+
+                triMesh.vertices = (float*)malloc(triMesh.vertexCount * 3 * sizeof(float));
+                triMesh.texcoords = (float*)malloc(triMesh.vertexCount * 2 * sizeof(float));
+                triMesh.indices = (unsigned short*)malloc(triMesh.triangleCount * 3 * sizeof(unsigned short));
+
                 float z = sect->z[0];
-                // Fill vertices and UVs
+
+                // Fill 3D vertices and UVs
                 for (int w = 0; w < sect->n; w++)
                 {
                     const wall_t* wall = &sect->wall[w];
-                    floorMesh.vertices[w * 3] = wall->x;
-                    floorMesh.vertices[w * 3 + 1] = z;
-                    floorMesh.vertices[w * 3 + 2] = wall->y;
+                    triMesh.vertices[w * 3] = wall->x;
+                    triMesh.vertices[w * 3 + 1] = z;
+                    triMesh.vertices[w * 3 + 2] = wall->y;
 
-                    floorMesh.texcoords[w * 2] = 0.2f * wall->x;
-                    floorMesh.texcoords[w * 2 + 1] = 0.2f * wall->y;
+                    triMesh.texcoords[w * 2] = 0.2f * wall->x;
+                    triMesh.texcoords[w * 2 + 1] = 0.2f * wall->y;
                 }
 
-                // Fixed fan triangulation for closed loop
-                for (int t = 0; t < floorMesh.triangleCount; t++)
-                {
-                    floorMesh.indices[t * 3] = 0;
-                    floorMesh.indices[t * 3 + 2] = t + 1;
-                    floorMesh.indices[t * 3 + 1] = (t + 2) % (sect->n + 1); // Wrap around for last triangle
-                }
+                // Triangulate polygon
+                triMesh.triangleCount = TriangulatePolygon(polyVertices, sect->n, triMesh.indices);
+                triMesh.isValid = true;
+
+                // Convert to Raylib mesh
+                Mesh floorMesh = {0};
+                floorMesh.vertexCount = triMesh.vertexCount;
+                floorMesh.triangleCount = triMesh.triangleCount;
+                floorMesh.vertices = triMesh.vertices;
+                floorMesh.texcoords = triMesh.texcoords;
+                floorMesh.indices = triMesh.indices;
 
                 UploadMesh(&floorMesh, false);
 
-                floorData->mesh = floorMesh;
+                floorData->mesh.rendermesh = floorMesh;
+                floorData->mesh = triMesh;
                 floorData->textureIndex = sect->surf[1].tilnum;
                 floorData->isValid = true;
+
+                free(polyVertices);
             }
         }
     }
 
-
     // Call every frame
-    static void DrawMapstateTex(Camera3D cam)
+    static void DrawMapstateTexOld(Camera3D cam)
     {
         rlDrawRenderBatchActive();
         rlDisableBackfaceCulling();
@@ -144,21 +462,21 @@ public:
 
                     SetMaterialTexture(&mat, MATERIAL_MAP_DIFFUSE, floorTex);
 
-                    DrawMesh(floorData->mesh, mat, MatrixTranslate(0, 0, 0));
+                    DrawMesh(floorData->mesh.rendermesh, mat, MatrixTranslate(0, 0, 0));
 
                     UnloadShader(unlitShader);
                     UnloadMaterial(mat);
                 }
                 else
                 {
-                   // rlCheckRenderBatchLimit(floorData->mesh.vertexCount * 12);
+                    // rlCheckRenderBatchLimit(floorData->mesh.vertexCount * 12);
                     rlBegin(RL_TRIANGLES); // in triangels it resets texture hence reorder
                     rlSetTexture(floorTex.id);
                     rlDisableBackfaceCulling();
                     for (int tri = 0; tri < floorData->mesh.triangleCount; tri++)
                     {
-                       // rlBegin(RL_TRIANGLES);  // without those 2 lines last vertex ofr each floor pinches at 0,0,0 with black color
-                       // rlSetTexture(floorTex.id);    //
+                        // rlBegin(RL_TRIANGLES);  // without those 2 lines last vertex ofr each floor pinches at 0,0,0 with black color
+                        // rlSetTexture(floorTex.id);    //
                         for (int vert = 0; vert < 3; vert++)
                         {
                             int idxa = floorData->mesh.indices[tri * 3 + vert];
@@ -174,7 +492,6 @@ public:
                                 floorData->mesh.vertices[idxa * 3 + 2] //zpos
                             );
                         }
-
                     }
                     rlDrawRenderBatchActive();
                     rlSetTexture(0);
@@ -201,27 +518,29 @@ public:
                 int texIndex = wall->surf.tilnum;
                 if (wall->xsurf && wall->surfn > 1)
                     texIndex = wall->xsurf[0].tilnum;
-                auto dx = sqrt((nextwall->x-wall->x)*(nextwall->x-wall->x) + (nextwall->y-wall->y)*(nextwall->y-wall->y));
-                auto dy = sect->z[0]-sect->z[1];
+                auto dx = sqrt(
+                    (nextwall->x - wall->x) * (nextwall->x - wall->x) + (nextwall->y - wall->y) * (nextwall->y - wall->
+                        y));
+                auto dy = sect->z[0] - sect->z[1];
 
                 if (wall->ns == -1) //dont draw red walls for now.
-                if (texIndex >= 0 && texIndex < get_gnumtiles())
-                {
-                    Texture2D wallTex = runtimeTextures[texIndex];
-                    rlSetTexture(wallTex.id);
-                    rlBegin(RL_QUADS);
-                    rlColor4ub(255, 255, 255, 255);
-                    rlTexCoord2f(0.0f, 1.0f*wall->surf.uv[2].y*dy);
-                    rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
-                    rlTexCoord2f(1.0f*wall->surf.uv[1].x*dx, 1.0f*wall->surf.uv[2].y*dy);
-                    rlVertex3f(bottomRight.x, bottomRight.y, bottomRight.z);
-                    rlTexCoord2f(1.0f*wall->surf.uv[1].x*dx, 0.0f);
-                    rlVertex3f(topRight.x, topRight.y, topRight.z);
-                    rlTexCoord2f(0.0f, 0.0f);
-                    rlVertex3f(topLeft.x, topLeft.y, topLeft.z);
-                    rlEnd();
-                    rlSetTexture(0);
-                }
+                    if (texIndex >= 0 && texIndex < get_gnumtiles())
+                    {
+                        Texture2D wallTex = runtimeTextures[texIndex];
+                        rlSetTexture(wallTex.id);
+                        rlBegin(RL_QUADS);
+                        rlColor4ub(255, 255, 255, 255);
+                        rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y * dy);
+                        rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
+                        rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 1.0f * wall->surf.uv[2].y * dy);
+                        rlVertex3f(bottomRight.x, bottomRight.y, bottomRight.z);
+                        rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 0.0f);
+                        rlVertex3f(topRight.x, topRight.y, topRight.z);
+                        rlTexCoord2f(0.0f, 0.0f);
+                        rlVertex3f(topLeft.x, topLeft.y, topLeft.z);
+                        rlEnd();
+                        rlSetTexture(0);
+                    }
             }
         }
 
@@ -232,17 +551,16 @@ public:
             if (spr->tilnum >= 0 && spr->tilnum < gnumtiles_i)
             {
                 Texture2D spriteTex = runtimeTextures[spr->tilnum];
-                Vector3 rg=  {spr->r.x,spr->r.y,spr->r.z};
-                Vector3 dw=  {spr->d.x,spr->d.y,spr->d.z};
+                Vector3 rg = {spr->r.x, spr->r.y, spr->r.z};
+                Vector3 dw = {spr->d.x, spr->d.y, spr->d.z};
                 auto xs = Vector3Length(rg);
                 auto ys = Vector3Length(dw);
-                Vector3 pos = {spr->p.x-xs, spr->p.z-ys, spr->p.y};
-                Rectangle source = { 0.0f, 0.0f, (float)spriteTex.width, (float)spriteTex.height };
-                xs*=2;
-                ys*=2;
+                Vector3 pos = {spr->p.x - xs, spr->p.z - ys, spr->p.y};
+                Rectangle source = {0.0f, 0.0f, (float)spriteTex.width, (float)spriteTex.height};
+                xs *= 2;
+                ys *= 2;
 
-                DrawBillboardRec(cam, spriteTex, source, pos, { xs, ys }, WHITE);
-
+                DrawBillboardRec(cam, spriteTex, source, pos, {xs, ys}, WHITE);
             }
         }
     }
@@ -256,7 +574,7 @@ public:
             {
                 if (floorMeshes[i].isValid)
                 {
-                    UnloadMesh(floorMeshes[i].mesh);
+                    UnloadMesh(floorMeshes[i].mesh.rendermesh);
                 }
             }
             free(floorMeshes);
@@ -486,7 +804,7 @@ private:
         int end = gnumtiles_i;
         for (int i = 0; i < end; ++i)
         {
-            runtimeTextures[i] = ConvertPicToTexture(getGtile(i));
+            runtimeTextures[i] = ConvertPicToTexture(getGtile(i)); // returns Texture2D
         }
         int a = 1;
     }
@@ -519,7 +837,7 @@ private:
             if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
             map->blankheadspri = i;
         }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/E2L7.MAP", map);
+        loadmap_imp((char*)"c:/Eugene/Games/build2/E2L4.MAP", map);
     }
 };
 
