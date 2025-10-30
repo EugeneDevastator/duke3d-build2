@@ -330,9 +330,9 @@ int lowtile,masktile,hitile = wall->surf.tilnum;
 
                             rlTexCoord2f(0.0f, 1.0f * upperDy);
                             rlVertex3f(upperBottomLeft.x, upperBottomLeft.y, upperBottomLeft.z);
-                            rlTexCoord2f(1.0f * dx, 1.0f * upperDy);
+                            rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 1.0f * upperDy);
                             rlVertex3f(upperBottomRight.x, upperBottomRight.y, upperBottomRight.z);
-                            rlTexCoord2f(1.0f * dx, 0.0f);
+                            rlTexCoord2f(1.0f  * wall->surf.uv[1].x * dx, 0.0f);
                             rlVertex3f(topRight.x, topRight.y, topRight.z);
                             rlTexCoord2f(0.0f, 0.0f);
                             rlVertex3f(topLeft.x, topLeft.y, topLeft.z);
@@ -359,9 +359,9 @@ int lowtile,masktile,hitile = wall->surf.tilnum;
 
                             rlTexCoord2f(0.0f, 1.0f * lowerDy);
                             rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
-                            rlTexCoord2f(1.0f * dx, 1.0f * lowerDy);
+                            rlTexCoord2f(1.0f * wall->surf.uv[1].x  * dx, 1.0f * lowerDy);
                             rlVertex3f(bottomRight.x, bottomRight.y, bottomRight.z);
-                            rlTexCoord2f(1.0f * dx, 0.0f);
+                            rlTexCoord2f(1.0f  * wall->surf.uv[1].x * dx, 0.0f);
                             rlVertex3f(lowerTopRight.x, lowerTopRight.y, lowerTopRight.z);
                             rlTexCoord2f(0.0f, 0.0f);
                             rlVertex3f(lowerTopLeft.x, lowerTopLeft.y, lowerTopLeft.z);
