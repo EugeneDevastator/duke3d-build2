@@ -244,7 +244,7 @@ public:
         }
 
         // draw walls
-
+        rlDisableBackfaceCulling();
         for (int s = 0; s < map->numsects; s++)
         {
             sect_t* sect = &map->sect[s];
@@ -273,7 +273,8 @@ public:
                 float dx = sqrt((nextwall->x - wall->x) * (nextwall->x - wall->x) +
                     (nextwall->y - wall->y) * (nextwall->y - wall->y));
                 float dy = sect->z[0] - sect->z[1];
-
+                rlEnableDepthMask();
+                rlDisableBackfaceCulling();
                 if (wall->ns == -1)
                 {
                     // Solid wall - draw full wall
@@ -344,7 +345,6 @@ public:
 
                             rlTexCoord2f(0.0f, 0.0);
                             rlVertex3f(topLeft.x, topLeft.y, topLeft.z);
-
                             rlEnd();
                             rlSetTexture(0);
                         }
@@ -354,6 +354,7 @@ public:
 
                     if (bottomLeftZ < nextBottomLeftZ || bottomRightZ < nextBottomRightZ)
                     {
+
                         Vector3 thisTopLeft = {wall->x, nextBottomLeftZ, wall->y};
                         Vector3 thisTopRight = {nextwall->x, nextBottomRightZ, nextwall->y};
 
@@ -366,6 +367,7 @@ public:
 
                             rlSetTexture(lowerTex.id);
                             rlBegin(RL_QUADS);
+
                             rlColor4ub(255, 255, 255, 255);
 // CW starting from upper left
                             rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y *(largeDy+selfDy));
@@ -379,7 +381,6 @@ public:
 
                             rlTexCoord2f(0.0f, 0.0);
                             rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
-
                             rlEnd();
                             rlSetTexture(0);
                         }
@@ -390,7 +391,7 @@ public:
                     if (wall->xsurf[1].asc > 0 && masktile < get_gnumtiles())
                     {
                             rlEnableBackfaceCulling();
-                             rlDisableDepthMask();
+                            rlDisableDepthMask();
                             Vector3 midBottomLeft = {wall->x, max(bottomLeftZ, nextBottomLeftZ), wall->y};
                             Vector3 midBottomRight = {nextwall->x, max(bottomRightZ, nextBottomRightZ), nextwall->y};
                             Vector3 midTopLeft = {wall->x, min(topLeftZ, nextTopLeftZ), wall->y};
@@ -414,17 +415,19 @@ public:
 
                             rlEnd();
                             rlSetTexture(0);
+                            rlEnableDepthMask();
 
                     }
                 }
             }
         }
         rlEnableDepthMask();
+        rlDisableBackfaceCulling();
         // Draw sprites (unchanged)
         for (int i = 0; i < map->numspris; i++)
         {
             spri_t* spr = &map->spri[i];
-            if (spr->tilnum >= 0 && spr->tilnum < gnumtiles_i)
+            if (spr->tilnum >= 0 && spr->tilnum < gnumtiles_i) // sprites
             {
                 Texture2D spriteTex = runtimeTextures[spr->tilnum];
                 Vector3 rg = {spr->r.x, spr->r.y, spr->r.z};
@@ -443,52 +446,132 @@ public:
         }
     }
 
-    static int TriangulatePolygon(float* vertices, int vertexCount, unsigned short* indices)
+ static bool IsPointInTriangle(float px, float py, float ax, float ay, float bx, float by, float cx, float cy)
+{
+    float denom = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy);
+    if (fabs(denom) < 1e-10f) return false;
+
+    float a = ((by - cy) * (px - cx) + (cx - bx) * (py - cy)) / denom;
+    float b = ((cy - ay) * (px - cx) + (ax - cx) * (py - cy)) / denom;
+    float c = 1.0f - a - b;
+
+    return a >= 0 && b >= 0 && c >= 0;
+}
+
+static float CrossProduct2D(float ax, float ay, float bx, float by, float cx, float cy)
+{
+    return (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+}
+
+static bool IsEar(float* vertices, int* vertexList, int remainingVertices, int earIndex)
+{
+    if (remainingVertices < 3) return false;
+
+    int prev = (earIndex - 1 + remainingVertices) % remainingVertices;
+    int curr = earIndex;
+    int next = (earIndex + 1) % remainingVertices;
+
+    int v0 = vertexList[prev];
+    int v1 = vertexList[curr];
+    int v2 = vertexList[next];
+
+    float ax = vertices[v0 * 2];
+    float ay = vertices[v0 * 2 + 1];
+    float bx = vertices[v1 * 2];
+    float by = vertices[v1 * 2 + 1];
+    float cx = vertices[v2 * 2];
+    float cy = vertices[v2 * 2 + 1];
+
+    // Check if triangle is convex (counter-clockwise)
+    if (CrossProduct2D(ax, ay, bx, by, cx, cy) <= 0)
+        return false;
+
+    // Check if any other vertex is inside this triangle
+    for (int i = 0; i < remainingVertices; i++)
     {
-        if (vertexCount < 3) return 0;
+        if (i == prev || i == curr || i == next) continue;
 
-        int triangleCount = 0;
-        int* vertexList = (int*)malloc(vertexCount * sizeof(int));
+        int vi = vertexList[i];
+        float px = vertices[vi * 2];
+        float py = vertices[vi * 2 + 1];
 
-        // Initialize vertex list
-        for (int i = 0; i < vertexCount; i++)
-        {
-            vertexList[i] = i;
-        }
-
-        int remainingVertices = vertexCount;
-        int currentVertex = 0;
-
-        // Simple fan triangulation for now (can be improved with proper ear clipping)
-        while (remainingVertices > 2)
-        {
-            int v0 = vertexList[0];
-            int v1 = vertexList[currentVertex + 1];
-            int v2 = vertexList[currentVertex + 2];
-
-            // Add triangle
-            indices[triangleCount * 3] = v0;
-            indices[triangleCount * 3 + 1] = v1;
-            indices[triangleCount * 3 + 2] = v2;
-
-            triangleCount++;
-
-            // Remove middle vertex
-            for (int i = currentVertex + 1; i < remainingVertices - 1; i++)
-            {
-                vertexList[i] = vertexList[i + 1];
-            }
-            remainingVertices--;
-
-            if (currentVertex >= remainingVertices - 2)
-            {
-                currentVertex = 0;
-            }
-        }
-
-        free(vertexList);
-        return triangleCount;
+        if (IsPointInTriangle(px, py, ax, ay, bx, by, cx, cy))
+            return false;
     }
+
+    return true;
+}
+
+static int TriangulatePolygon(float* vertices, int vertexCount, unsigned short* indices)
+{
+    if (vertexCount < 3) return 0;
+
+    int triangleCount = 0;
+    int* vertexList = (int*)malloc(vertexCount * sizeof(int));
+
+    // Initialize vertex list
+    for (int i = 0; i < vertexCount; i++)
+    {
+        vertexList[i] = i;
+    }
+
+    int remainingVertices = vertexCount;
+    int attempts = 0;
+    int maxAttempts = remainingVertices * 2;
+
+    while (remainingVertices > 2 && attempts < maxAttempts)
+    {
+        bool foundEar = false;
+
+        for (int i = 0; i < remainingVertices; i++)
+        {
+            if (IsEar(vertices, vertexList, remainingVertices, i))
+            {
+                // Found an ear, create triangle
+                int prev = (i - 1 + remainingVertices) % remainingVertices;
+                int curr = i;
+                int next = (i + 1) % remainingVertices;
+
+                indices[triangleCount * 3] = vertexList[prev];
+                indices[triangleCount * 3 + 1] = vertexList[curr];
+                indices[triangleCount * 3 + 2] = vertexList[next];
+
+                triangleCount++;
+
+                // Remove the ear vertex
+                for (int j = i; j < remainingVertices - 1; j++)
+                {
+                    vertexList[j] = vertexList[j + 1];
+                }
+                remainingVertices--;
+
+                foundEar = true;
+                attempts = 0;
+                break;
+            }
+        }
+
+        if (!foundEar)
+        {
+            attempts++;
+            // If no ear found, try fallback fan triangulation
+            if (attempts >= maxAttempts && remainingVertices > 2)
+            {
+                for (int i = 1; i < remainingVertices - 1; i++)
+                {
+                    indices[triangleCount * 3] = vertexList[0];
+                    indices[triangleCount * 3 + 1] = vertexList[i];
+                    indices[triangleCount * 3 + 2] = vertexList[i + 1];
+                    triangleCount++;
+                }
+                break;
+            }
+        }
+    }
+
+    free(vertexList);
+    return triangleCount;
+}
 
 
     // Call once when map loads
