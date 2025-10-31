@@ -296,7 +296,7 @@ public:
                         rlSetTexture(0);
                     }
                 }
-                else
+                else // rendering red wall of this sector.
                 {
                     // Portal wall - draw upper and lower parts
                     sect_t* nextSect = &map->sect[wall->ns];
@@ -321,14 +321,15 @@ int lowtile,masktile,hitile = wall->surf.tilnum;
 
                         if (hitile >= 0 && hitile < get_gnumtiles())
                         {
-                            float upperDy = topLeftZ - nextTopLeftZ;
+                            float upperDy = topLeftZ - nextTopLeftZ; // affects other paart
+                            float selfDy = topLeftZ - topRightZ; // affects upper part
                             float dh = nextTopLeftZ -nextTopRightZ;
                             Texture2D upperTex = runtimeTextures[hitile];
                             rlSetTexture(upperTex.id);
                             rlBegin(RL_QUADS);
                             rlColor4ub(255, 255, 255, 255);
 
-                            rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y *upperDy);
+                            rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y *(upperDy+selfDy));
                             rlVertex3f(bottom_left.x, bottom_left.y, bottom_left.z);
 
                             rlTexCoord2f(wall->surf.uv[1].x * dx, wall->surf.uv[2].y*(upperDy + dh));
@@ -348,26 +349,31 @@ int lowtile,masktile,hitile = wall->surf.tilnum;
                     // Draw lower wall (between current floor and next floor)
                     if (bottomLeftZ < nextBottomLeftZ || bottomRightZ < nextBottomRightZ)
                     {
-                        Vector3 lowerTopLeft = {wall->x, nextBottomLeftZ, wall->y};
-                        Vector3 lowerTopRight = {nextwall->x, nextBottomRightZ, nextwall->y};
+                        Vector3 thisTopLeft = {wall->x, nextBottomLeftZ, wall->y};
+                        Vector3 thisTopRight = {nextwall->x, nextBottomRightZ, nextwall->y};
 
                         if (lowtile >= 0 && lowtile < get_gnumtiles())
                         {
-                            float lowerDy = nextBottomLeftZ - bottomLeftZ;
-
+                            float largeDy = bottomLeftZ - nextBottomLeftZ; // affects other paart
+                            float selfDy = bottomLeftZ - bottomRightZ; // affects upper part
+                            float dh = nextBottomLeftZ -nextBottomRightZ;
                             Texture2D lowerTex = runtimeTextures[lowtile];
+
                             rlSetTexture(lowerTex.id);
                             rlBegin(RL_QUADS);
                             rlColor4ub(255, 255, 255, 255);
+// CW starting from upper left
+                            rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y *(largeDy+selfDy));
+                            rlVertex3f(thisTopLeft.x, thisTopLeft.y, thisTopLeft.z);
 
-                            rlTexCoord2f(0.0f, 1.0f * lowerDy);
-                            rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
-                            rlTexCoord2f(1.0f * wall->surf.uv[1].x  * dx, 1.0f * lowerDy);
-                            rlVertex3f(bottomRight.x, bottomRight.y, bottomRight.z);
+                            rlTexCoord2f(wall->surf.uv[1].x * dx, wall->surf.uv[2].y*(largeDy + dh));
+                            rlVertex3f(thisTopRight.x, thisTopRight.y, thisTopRight.z);
+
                             rlTexCoord2f(1.0f  * wall->surf.uv[1].x * dx, 0.0f);
-                            rlVertex3f(lowerTopRight.x, lowerTopRight.y, lowerTopRight.z);
-                            rlTexCoord2f(0.0f, 0.0f);
-                            rlVertex3f(lowerTopLeft.x, lowerTopLeft.y, lowerTopLeft.z);
+                            rlVertex3f(bottomRight.x, bottomRight.y, bottomRight.z);
+
+                            rlTexCoord2f(0.0f, 0.0);
+                            rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
 
                             rlEnd();
                             rlSetTexture(0);

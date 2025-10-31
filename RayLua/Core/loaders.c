@@ -2,6 +2,19 @@
 // Created by omnis on 10/22/2025.
 //
 #include "loaders.h"
+
+// TODO : new mapstate should have raylib friendly coords by default. period.
+point3d buildToRaylib(point3d buildcoord)
+{
+	return (point3d){buildcoord.x, -buildcoord.z, buildcoord.y};
+}
+// In-place conversion - modifies original
+void toRaylibInPlace(point3d *buildcoord)
+{
+	float temp_y = buildcoord->y;
+	buildcoord->y = -buildcoord->z;
+	buildcoord->z = temp_y;
+}
 void initTiles()
 {
 	gnumtiles = 0;
@@ -371,6 +384,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			map->startpos.x = ((float)x)*(1.f/512.f);
 			map->startpos.y = ((float)y)*(1.f/512.f);
 			map->startpos.z = ((float)z)*(1.f/(512.f*16.f));
+
 			map->startfor.x = cos(((float)s)*PI/1024.0);
 			map->startfor.y = sin(((float)s)*PI/1024.0);
 			map->startfor.z = 0.f;
@@ -629,6 +643,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				spr->hitag = b7spr.hitag;
 				spr->pal = b7spr.pal;
 			}
+			toRaylibInPlace(&map->startpos);
 		}
 		else //CUBES5 map format (.CUB extension)
 		{
@@ -662,6 +677,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 		//		gst->p[i].ifor = gst->startfor;
 		//		gst->p[i].cursect = -1;
 		//	}
+
 
 				//6 faces * BSIZ^3 board map * 2 bytes for picnum
 				//if face 0 is -1, the cube is air
