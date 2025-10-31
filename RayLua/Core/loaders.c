@@ -541,9 +541,9 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			}
 			kzread(&s,2); //numwalls
 			printf("walls:%d",s);
-			for(i=k=0;i<map->numsects;i++)
+			for(i=k=0;i<map->numsects;i++) //wall
 			{
-				for(j=0;j<sec[i].n;j++,k++)
+				for(j=0;j<sec[i].n;j++,k++) // walls
 				{
 					kzread(&b7wal,sizeof(b7wal));
 					sec[i].wall[j].x = ((float)b7wal.x)*(1.f/512.f);
@@ -610,25 +610,30 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					sur->uv[0].y = ((float)sur->uv[0].y)/256.f * (1-2*(sur->uv[2].y < 0));
 				}
 
-				fx = sec[i].wall[1].y-sec[i].wall[0].y;
-				fy = sec[i].wall[0].x-sec[i].wall[1].x;
-				f = fx*fx + fy*fy; if (f > 0) f = 1.0/sqrt(f); fx *= f; fy *= f;
-				for(j=0;j<2;j++)
-				{
-					sec[i].grad[j].x = fx*sec[i].grad[j].y;
-					sec[i].grad[j].y = fy*sec[i].grad[j].y;
+				{ // setting sector slope gradient
+					fx = sec[i].wall[1].y-sec[i].wall[0].y;
+					fy = sec[i].wall[0].x-sec[i].wall[1].x;
+					f = fx*fx + fy*fy; if (f > 0) f = 1.0/sqrt(f); fx *= f; fy *= f;
+					for(j=0;j<2;j++)
+					{
+						sec[i].grad[j].x = fx*sec[i].grad[j].y;
+						sec[i].grad[j].y = fy*sec[i].grad[j].y;
+					}
 				}
 			}
 			//second pass for walls
-			for(i=k=0;i<map->numsects;i++)
+			for(i=k=0;i<map->numsects;i++) // second pass for double wall tex.
 			{
 				for(j=0;j<sec[i].n;j++,k++)
 				{
-					wall_t wal = sec[i].wall[j];
-					if ( wal.surfn==3)
+					wall_t *walp = &sec[i].wall[j];
+					if (walp->surfn == 3)
 					{
-						int nextpic = sec[wal.ns].wall[wal.nw].surf.tilnum;
-						wal.xsurf[2].tilnum = nextpic;
+						memcpy(walp->xsurf[0].uv,walp->surf.uv,sizeof(point2d)*3);
+						memcpy(walp->xsurf[1].uv,walp->surf.uv,sizeof(point2d)*3);
+						memcpy(walp->xsurf[2].uv,walp->surf.uv,sizeof(point2d)*3);
+						int nextpic = sec[walp->ns].wall[walp->nw].surf.tilnum;
+						walp->xsurf[2].tilnum = nextpic;
 					}
 				}
 			}
