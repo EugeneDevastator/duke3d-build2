@@ -347,6 +347,7 @@ int lowtile,masktile,hitile = wall->surf.tilnum;
                     }
 
                     // Draw lower wall (between current floor and next floor)
+
                     if (bottomLeftZ < nextBottomLeftZ || bottomRightZ < nextBottomRightZ)
                     {
                         Vector3 thisTopLeft = {wall->x, nextBottomLeftZ, wall->y};
@@ -379,12 +380,13 @@ int lowtile,masktile,hitile = wall->surf.tilnum;
                             rlSetTexture(0);
                         }
                     }
-
+                    // need separate transparent pass for it.
                     // Draw middle wall (masked/transparent texture between sectors)
-                    if (false)//wall->xsurf && wall->surfn > 2 && wall->xsurf[2].tilnum >= 0)
+                    // todo - make transparent queue
+                    if (wall->xsurf[1].asc > 0 && masktile < get_gnumtiles())
                     {
-                        if (masktile < get_gnumtiles())
-                        {
+                            rlEnableBackfaceCulling();
+                             rlDisableDepthMask();
                             Vector3 midBottomLeft = {wall->x, max(bottomLeftZ, nextBottomLeftZ), wall->y};
                             Vector3 midBottomRight = {nextwall->x, max(bottomRightZ, nextBottomRightZ), nextwall->y};
                             Vector3 midTopLeft = {wall->x, min(topLeftZ, nextTopLeftZ), wall->y};
@@ -408,11 +410,12 @@ int lowtile,masktile,hitile = wall->surf.tilnum;
 
                             rlEnd();
                             rlSetTexture(0);
-                        }
+
                     }
                 }
             }
         }
+        rlEnableDepthMask();
         // Draw sprites (unchanged)
         for (int i = 0; i < map->numspris; i++)
         {
@@ -424,12 +427,14 @@ int lowtile,masktile,hitile = wall->surf.tilnum;
                 Vector3 dw = {spr->d.x, spr->d.y, spr->d.z};
                 auto xs = Vector3Length(rg);
                 auto ys = Vector3Length(dw);
+                int xflip = spr->flags & 4 ? -1 : 1;
+                int yflip = spr->flags & 8 ? -1 : 1;
                 Vector3 pos = {spr->p.x - xs, -spr->p.z , spr->p.y};
                 Rectangle source = {0.0f, 0.0f, (float)spriteTex.width, (float)spriteTex.height};
                 xs *= 2;
                 ys *= 2;
 
-                DrawBillboardRec(cam, spriteTex, source, pos, {xs, ys}, WHITE);
+                DrawBillboardRec(cam, spriteTex, source, pos, {xs*xflip, ys*yflip}, WHITE);
             }
         }
     }
@@ -968,7 +973,7 @@ private:
             if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
             map->blankheadspri = i;
         }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/E2L4.MAP", map);
+        loadmap_imp((char*)"c:/Eugene/Games/build2/E2l7.MAP", map);
     }
 };
 

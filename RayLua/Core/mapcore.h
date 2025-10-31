@@ -58,9 +58,10 @@ typedef struct
 	//Bit0:Blocking, Bit2:RelativeAlignment, Bit5:1Way, Bit16:IsParallax, Bit17:IsSkybox
 	union { long flags; struct { char _f1, _f2, _f3, pal; }; }; // temporary pal storage
 	union { long tag; struct { short lotag, hitag; }; };
-
 	point2d uv[3];
 	unsigned short asc, rsc, gsc, bsc; //4096 is no change
+	short renderflags; // new flags;
+	short uvVertexAnchor; // 0= lower left, CW order
 } surf_t;
 
 typedef struct
@@ -69,6 +70,7 @@ typedef struct
 	long n, ns, nw; //n:rel. wall ind.; ns & nw : nextsect & nextwall_of_sect
 	long owner; //for dragging while editing, other effects during game
 	long surfn;
+
 	surf_t surf, *xsurf; //additional malloced surfs when (surfn > 1)
 } wall_t;
 

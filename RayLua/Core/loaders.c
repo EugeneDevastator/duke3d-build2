@@ -15,6 +15,61 @@ void toRaylibInPlace(point3d *buildcoord)
 	buildcoord->y = -buildcoord->z;
 	buildcoord->z = temp_y;
 }
+// build format 7 flags.
+#define SPRITE_BLOCKING         (1 << 0)   // 1
+#define SPRITE_SEMI_TRANSPARENT (1 << 1)   // 2
+#define SPRITE_FLIP_X           (1 << 2)   // 4
+#define SPRITE_FLIP_Y           (1 << 3)   // 8
+#define SPRITE_WALL_ALIGNED     (1 << 4)   // 16
+#define SPRITE_FLOOR_ALIGNED    (1 << 5)   // 32
+#define SPRITE_ONE_SIDED        (1 << 6)   // 64
+#define SPRITE_TRUE_CENTERED    (1 << 7)   // 128
+#define SPRITE_HITSCAN          (1 << 8)   // 256
+#define SPRITE_TRANSPARENT      (1 << 9)   // 512
+#define SPRITE_IGNORE_SHADE     (1 << 11)  // 2048
+#define SPRITE_INVISIBLE        (1 << 15)  // 32768
+
+#define WALL_BLOCKING           (1 << 0)   // 1
+#define WALL_BOTTOM_SWAP        (1 << 1)   // 2
+#define WALL_ALIGN_FLOOR        (1 << 2)   // 4
+#define WALL_FLIP_X             (1 << 3)   // 8
+#define WALL_MASKED             (1 << 4)   // 16
+#define WALL_SOLID_MASKED       (1 << 5)   // 32
+#define WALL_HITSCAN            (1 << 6)   // 64
+#define WALL_SEMI_TRANSPARENT   (1 << 7)   // 128
+#define WALL_FLIP_Y             (1 << 8)   // 256
+#define WALL_TRANSPARENT        (1 << 9)   // 512  // usualy always combines with semitransp.
+
+#define SECTOR_PARALLAX         (1 << 0)   // 1
+#define SECTOR_SLOPED           (1 << 1)   // 2
+#define SECTOR_SWAP_XY          (1 << 2)   // 4
+#define SECTOR_EXPAND_TEXTURE   (1 << 3)   // 8
+#define SECTOR_FLIP_X           (1 << 4)   // 16
+#define SECTOR_FLIP_Y           (1 << 5)   // 32
+#define SECTOR_RELATIVE_ALIGN   (1 << 6)   // 64
+#define SECTOR_MASKED           (1 << 7)   // 128
+#define SECTOR_TRANSLUCENT      (1 << 8)   // 256
+#define SECTOR_REVERSE_TRANS    (SECTOR_MASKED | SECTOR_TRANSLUCENT) // 384
+
+// Convenience macros for flag operations
+#define HAS_FLAG(flags, flag)    ((flags) & (flag))
+#define SET_FLAG(flags, flag)    ((flags) |= (flag))
+#define CLEAR_FLAG(flags, flag)  ((flags) &= ~(flag))
+#define TOGGLE_FLAG(flags, flag) ((flags) ^= (flag))
+
+/* WALL FLAGS
+*0 	1 	Enable blocking flag. 	[B]
+1 	2 	Enable "bottom texture swap". This makes the top and bottom half of a wall separately editable. However, they will still share repeat values. 	[2]
+2 	4 	Align texture to floor (bottom orientation). 	[O]
+3 	8 	Flip texture around x-axis. 	[F]
+4 	16 	Set as masked wall. Two-sided masked walls must be manually set on each side (the keypress does this automatically). Use it in conjunction with Shift for a one-sided masked wall. 	[M]
+5 	32 	Set as 'solid' one-sided masked wall. This differs from Shift + M in that the wall will not be compatible with transparency settings or invisible (pink) pixels. This type of masked wall must be used to make mirrors. 	[1]
+6 	64 	Enable hitscan flag. 	[H]
+7 	128 	Set as semi-transparent. The keypress applies itself to both sides. 	[T]
+8 	256 	Flip texture around y-axis. 	[F]
+9 	512 	Set as transparent (must be combined with cstat value 128). The keypress applies itself to both sides. 	[T]
+10-15 	1024-32768 	*RESERVED* 	N/A
+ */
 void initTiles()
 {
 	gnumtiles = 0;
@@ -522,13 +577,23 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					sur->tilnum = l; hitile = max(hitile,l);
 					sec[i].wall[j].surfn = 1;
 					sec[i].wall[j].owner = -1;
+					wall_t *thiswal = &sec[i].wall[j];
 					if (sec[i].wall[j].ns != -1) // handle split wall
 					{
-						sec[i].wall[j].surfn =3;
-						sec[i].wall[j].xsurf = malloc(sizeof(surf_t)*3);
-						sec[i].wall[j].xsurf[0].tilnum = b7wal.picnum;
-						sec[i].wall[j].xsurf[1].tilnum = b7wal.overpicnum;
-						sec[i].wall[j].xsurf[1].asc = 127;
+						thiswal->surfn =3;
+						thiswal->xsurf = malloc(sizeof(surf_t)*3);
+						thiswal->xsurf[0].tilnum = b7wal.picnum;
+						thiswal->xsurf[1].tilnum = b7wal.overpicnum;
+						int opacity = 0;
+							if (HAS_FLAG(b7wal.cstat, WALL_MASKED))
+						{
+							if (HAS_FLAG(b7wal.cstat, WALL_SEMI_TRANSPARENT))
+								opacity = 128;
+								if (HAS_FLAG(b7wal.cstat, WALL_TRANSPARENT))
+									opacity = 32;
+						}
+
+						thiswal->xsurf[1].asc = opacity;
 					}
 				}
 				// tile adjust?
@@ -612,10 +677,11 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						if (b7spr.cstat&8) { spr->d.x *= -1; spr->d.y *= -1; }
 						break;
 				}
+
 				if (b7spr.cstat&1) spr->flags |= 1; // blocking
-				if (b7spr.cstat&64) spr->flags |= 64; // 1 sided
+				if (HAS_FLAG(b7spr.cstat, SPRITE_ONE_SIDED)) spr->flags |= 64; // 1 sided
 				if (b7spr.cstat&4) { spr->r.x *= -1; spr->r.y *= -1; spr->r.z *= -1; spr->flags ^= 4; } //&4: x-flipped
-				if (b7spr.cstat&8) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; spr->flags ^= 4; } //&8: y-flipped?
+				if (b7spr.cstat&8) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; spr->flags ^= 8; } //&8: y-flipped?
 				if (b7spr.cstat&128) { spr->p.z += (b7spr.yrepeat/4096.0*(float)tilesizy[l]); } //&128: real-centered centering (center at center) - originally half submerged sprite
 
 				if ((unsigned)b7spr.sectnum < (unsigned)map->numsects) //Make shade relative to sector
@@ -643,6 +709,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				spr->hitag = b7spr.hitag;
 				spr->pal = b7spr.pal;
 			}
+
 			toRaylibInPlace(&map->startpos);
 		}
 		else //CUBES5 map format (.CUB extension)
