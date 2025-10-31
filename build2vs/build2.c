@@ -1,3 +1,4 @@
+// stat reference https://infosuite.duke4.net/index.php?page=references
 #if 0 //To compile, type: nmake build2.c
 
 !if "$(_NMAKE_VER)" == "6.00.8168.0"

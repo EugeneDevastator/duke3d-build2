@@ -155,9 +155,12 @@ public:
                         triMesh.vertices[w * 3] = wall->x;
                         triMesh.vertices[w * 3 + 1] = z;
                         triMesh.vertices[w * 3 + 2] = wall->y;
-
-                        triMesh.texcoords[w * 2] = 0.2f * wall->x;
-                        triMesh.texcoords[w * 2 + 1] = 0.2f * wall->y;
+                        // uvs are matrix transform.. converting pos to uv.
+                        // [u]   [uv[1].x  uv[2].x  uv[0].x] [wall->x]
+                        // [v] = [uv[1].y  uv[2].y  uv[0].y] [wall->y]
+                        // [1]   [   0        0        1   ] [   1   ]
+                        triMesh.texcoords[w * 2] =  wall->x * sect->surf[isFloor].uv[1].x + wall->y * sect->surf[isFloor].uv[2].x+ sect->surf[isFloor].uv[0].x;
+                        triMesh.texcoords[w * 2 + 1] =  wall->x * sect->surf[isFloor].uv[1].y + wall->y * sect->surf[isFloor].uv[2].y+ sect->surf[isFloor].uv[0].y;
                     }
 
                     // Triangulate
@@ -300,10 +303,11 @@ public:
                 {
                     // Portal wall - draw upper and lower parts
                     sect_t* nextSect = &map->sect[wall->ns];
-int lowtile,masktile,hitile = wall->surf.tilnum;
+                    int lowtile,masktile,hitile = wall->surf.tilnum;
                     if (wall->surfn==3)
                     {
-                        lowtile = wall->xsurf[0].tilnum;
+                        int lowtileind = wall->surf.flags & 2 ? 2 : 0;
+                        lowtile = wall->xsurf[lowtileind].tilnum;
                         masktile = wall->xsurf[1].tilnum;
                     }
 
@@ -545,8 +549,8 @@ int lowtile,masktile,hitile = wall->surf.tilnum;
                     triMesh.vertices[w * 3 + 1] = z;
                     triMesh.vertices[w * 3 + 2] = wall->y;
 
-                    triMesh.texcoords[w * 2] = 0.2f * wall->x;
-                    triMesh.texcoords[w * 2 + 1] = 0.2f * wall->y;
+                    triMesh.texcoords[w * 2] = 0.2f * wall->x * sect->surf->uv[1].x;
+                    triMesh.texcoords[w * 2 + 1] = 0.2f * wall->y * sect->surf->uv[2].y;
                 }
 
                 // Triangulate polygon
