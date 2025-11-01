@@ -2,17 +2,6 @@
 // Created by omnis on 10/22/2025.
 //
 #include "loaders.h"
-
-// TODO : new mapstate should have raylib friendly coords by default. period.
-point3d buildToRaylib(point3d buildcoord)
-{
-	return {buildcoord.x, -buildcoord.z, buildcoord.y};
-}
-point3d buildToRaylib(float x, float y, float z)
-{
-	return {x, -z, y};
-}
-
 int loadmap_imp (char *filnam, mapstate_t* map)
 {
 	surf_t *sur;
