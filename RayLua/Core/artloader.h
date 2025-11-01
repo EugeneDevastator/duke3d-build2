@@ -25,7 +25,9 @@ typedef struct
 	long namcrc32, hashnext;
 } tile_t;
 static unsigned char gammlut[256], gotpal = 0;
-static tile_t *gtile;
+extern tile_t *gtile;
+extern unsigned char globalpal[256][4];
+tile_t* getGtile(int i);
 unsigned char* getColor(int idx);
 
 void loadpic (tile_t *tpic, char* rootpath);

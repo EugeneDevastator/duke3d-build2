@@ -148,6 +148,7 @@ set(CORE_HEADERS
         core/loaders.h
         core/kplib.h
         luabinder.hpp
+        dumbrender.hpp
 )
 
 # Main executable

@@ -2,6 +2,93 @@
 // Created by omnis on 10/22/2025.
 //
 #include "loaders.h"
+// TODO : Replace types with stdint like uint8_t
+// TODO : new mapstate should have raylib friendly coords by default. period.
+point3d buildToRaylib(point3d buildcoord)
+{
+	return (point3d){buildcoord.x, -buildcoord.z, buildcoord.y};
+}
+// In-place conversion - modifies original
+void toRaylibInPlace(point3d *buildcoord)
+{
+	float temp_y = buildcoord->y;
+	buildcoord->y = -buildcoord->z;
+	buildcoord->z = temp_y;
+}
+// build format 7 flags.
+#define SPRITE_BLOCKING         (1 << 0)   // 1
+#define SPRITE_SEMI_TRANSPARENT (1 << 1)   // 2
+#define SPRITE_FLIP_X           (1 << 2)   // 4
+#define SPRITE_FLIP_Y           (1 << 3)   // 8
+#define SPRITE_WALL_ALIGNED     (1 << 4)   // 16
+#define SPRITE_FLOOR_ALIGNED    (1 << 5)   // 32
+#define SPRITE_ONE_SIDED        (1 << 6)   // 64
+#define SPRITE_TRUE_CENTERED    (1 << 7)   // 128
+#define SPRITE_HITSCAN          (1 << 8)   // 256
+#define SPRITE_TRANSPARENT      (1 << 9)   // 512
+#define SPRITE_IGNORE_SHADE     (1 << 11)  // 2048
+#define SPRITE_INVISIBLE        (1 << 15)  // 32768
+
+#define WALL_BLOCKING           (1 << 0)   // 1
+#define WALL_BOTTOM_SWAP        (1 << 1)   // 2
+#define WALL_ALIGN_FLOOR        (1 << 2)   // 4
+#define WALL_FLIP_X             (1 << 3)   // 8
+#define WALL_MASKED             (1 << 4)   // 16
+#define WALL_SOLID_MASKED       (1 << 5)   // 32
+#define WALL_HITSCAN            (1 << 6)   // 64
+#define WALL_SEMI_TRANSPARENT   (1 << 7)   // 128
+#define WALL_FLIP_Y             (1 << 8)   // 256
+#define WALL_TRANSPARENT        (1 << 9)   // 512  // usualy always combines with semitransp.
+
+#define SECTOR_PARALLAX         (1 << 0)   // 1
+#define SECTOR_SLOPED           (1 << 1)   // 2
+#define SECTOR_SWAP_XY          (1 << 2)   // 4
+#define SECTOR_EXPAND_TEXTURE   (1 << 3)   // 8
+#define SECTOR_FLIP_X           (1 << 4)   // 16
+#define SECTOR_FLIP_Y           (1 << 5)   // 32
+#define SECTOR_RELATIVE_ALIGN   (1 << 6)   // 64
+#define SECTOR_MASKED           (1 << 7)   // 128
+#define SECTOR_TRANSLUCENT      (1 << 8)   // 256
+#define SECTOR_REVERSE_TRANS    (SECTOR_MASKED | SECTOR_TRANSLUCENT) // 384
+
+
+#define SPRITE_B2_BLOCKING         (1 << 0)   // 1
+#define SPRITE_B2_1         (1 << 1)   // 1
+#define SPRITE_B2_FLIP_X           (1 << 2)   // 4
+#define SPRITE_B2_FLIP_Y           (1 << 3)   // 8
+#define SPRITE_B2_FACING        (1 << 4)   // 16
+#define SPRITE_B2_FLAT_POLY    (1 << 5)   // 32
+#define SPRITE_B2_ONE_SIDED        (1 << 6)   // 64
+
+
+// Convenience macros for flag operations
+#define HAS_FLAG(flags, flag)    ((flags) & (flag))
+#define SET_FLAG(flags, flag)    ((flags) |= (flag))
+#define CLEAR_FLAG(flags, flag)  ((flags) &= ~(flag))
+#define TOGGLE_FLAG(flags, flag) ((flags) ^= (flag))
+
+/* WALL FLAGS
+*0 	1 	Enable blocking flag. 	[B]
+1 	2 	Enable "bottom texture swap". This makes the top and bottom half of a wall separately editable. However, they will still share repeat values. 	[2]
+2 	4 	Align texture to floor (bottom orientation). 	[O]
+3 	8 	Flip texture around x-axis. 	[F]
+4 	16 	Set as masked wall. Two-sided masked walls must be manually set on each side (the keypress does this automatically). Use it in conjunction with Shift for a one-sided masked wall. 	[M]
+5 	32 	Set as 'solid' one-sided masked wall. This differs from Shift + M in that the wall will not be compatible with transparency settings or invisible (pink) pixels. This type of masked wall must be used to make mirrors. 	[1]
+6 	64 	Enable hitscan flag. 	[H]
+7 	128 	Set as semi-transparent. The keypress applies itself to both sides. 	[T]
+8 	256 	Flip texture around y-axis. 	[F]
+9 	512 	Set as transparent (must be combined with cstat value 128). The keypress applies itself to both sides. 	[T]
+10-15 	1024-32768 	*RESERVED* 	N/A
+ */
+void initTiles()
+{
+	gnumtiles = 0;
+	memset(gtilehashead, -1, sizeof(gtilehashead));
+	gmaltiles = 256;
+	gtile = (tile_t*)malloc(gmaltiles * sizeof(tile_t));
+	//if (!gtile)
+	//	memset(gtile,0,gmaltiles*sizeof(tile_t)); //FIX
+}
 int loadmap_imp (char *filnam, mapstate_t* map)
 {
 	surf_t *sur;
@@ -13,6 +100,8 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 	long x, y, z, fileid, hitile, warned = 0, altsects, nnumtiles, nnumspris;
 	short s, cursect;
 	char och, tbuf[256];
+
+	initTiles();
 
 	if (!kzopen(filnam))
 	{     //Try without full pathname - see if it's in ZIP/GRP/Mounted_Dir
@@ -174,11 +263,14 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			gmaltiles = max(gnumtiles+1,gmaltiles<<1);
 			gtile = (tile_t *)realloc(gtile,gmaltiles*sizeof(tile_t));
 		}
+		tile_t* gtpic;
 		for(i=gnumtiles-nnumtiles;i<gnumtiles;i++)
 		{
 			kzread(&s,2); kzread(gtile[i].filnam,s); gtile[i].filnam[s] = 0; //FIX:possible buffer overflow here
 			gtile[i].tt.f = 0;
 			gtile[i].namcrc32 = getcrc32z(0,(unsigned char *)gtile[i].filnam);
+			gtpic = &gtile[sur->tilnum];
+			if (!gtpic->tt.f) loadpic(gtpic,curmappath);
 		}
 
 			//Load sprites
@@ -212,7 +304,9 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			for(j=0;j<2       ;j++) sec[i].surf[j].tilnum      += gnumtiles-nnumtiles;
 			for(j=0;j<sec[i].n;j++) sec[i].wall[j].surf.tilnum += gnumtiles-nnumtiles;
 		}
-		for(i=map->numspris-nnumspris;i<map->numspris;i++) if (map->spri[i].tilnum >= 0) map->spri[i].tilnum += gnumtiles-nnumtiles;
+		for(i=map->numspris-nnumspris;i<map->numspris;i++)
+			if (map->spri[i].tilnum >= 0)
+				map->spri[i].tilnum += gnumtiles-nnumtiles;
 
 		//-------------------------------------------------------------------
 
@@ -355,6 +449,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			map->startpos.x = ((float)x)*(1.f/512.f);
 			map->startpos.y = ((float)y)*(1.f/512.f);
 			map->startpos.z = ((float)z)*(1.f/(512.f*16.f));
+
 			map->startfor.x = cos(((float)s)*PI/1024.0);
 			map->startfor.y = sin(((float)s)*PI/1024.0);
 			map->startfor.z = 0.f;
@@ -381,7 +476,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				sec = map->sect = (sect_t *)realloc(sec,map->malsects*sizeof(sect_t));
 				memset(&sec[i],0,(map->malsects-i)*sizeof(sect_t));
 			}
-			for(i=0;i<map->numsects;i++)
+			for(i=0;i<map->numsects;i++) // parse sectors
 			{
 				kzread(&b7sec,sizeof(b7sec));
 				sec[i].n = sec[i].nmax = b7sec.wallnum;
@@ -456,9 +551,9 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			}
 			kzread(&s,2); //numwalls
 			printf("walls:%d",s);
-			for(i=k=0;i<map->numsects;i++)
+			for(i=k=0;i<map->numsects;i++) //wall
 			{
-				for(j=0;j<sec[i].n;j++,k++)
+				for(j=0;j<sec[i].n;j++,k++) // walls
 				{
 					kzread(&b7wal,sizeof(b7wal));
 					sec[i].wall[j].x = ((float)b7wal.x)*(1.f/512.f);
@@ -469,8 +564,6 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					if (b7wal.cstat&1) sur->flags |= 1;
 
 					// flag at byte 1 : double split  = 1, one tile = 0
-					// bottom tile is taken from overtile of nextwall(meaning opposite side of the wall)
-					// mask tile is undertile field
 
 					sur->lotag = b7wal.lotag;
 					sur->hitag = b7wal.hitag;
@@ -479,9 +572,11 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					sur->uv[0].x = b7wal.xpanning;
 					sur->uv[0].y = b7wal.ypanning;
 					sur->uv[1].x = b7wal.xrepeat; if (b7wal.cstat&  8) sur->uv[1].x *= -1;
-					sur->uv[1].y = sur->uv[2].x = 0;
+					sur->uv[1].y = 0;
+					sur->uv[2].x = 0;
 					sur->uv[2].y = b7wal.yrepeat; if (b7wal.cstat&256) sur->uv[2].y *= -1;
-					if ((b7wal.nextsect < 0) ^ (!(b7wal.cstat&4))) sur->flags ^= 4; //align bot/nextsec
+					if ((b7wal.nextsect < 0) ^ (!(b7wal.cstat&4))) sur->flags ^= 4;
+					if (HAS_FLAG(b7wal.cstat,WALL_BOTTOM_SWAP)) sur->flags ^= 2; //align bot/nextsec
 					if (b7wal.cstat&(16+32)) sur->flags |= 32; //bit4:masking, bit5:1-way
 					sur->asc = 4096;
 					sur->rsc = (32-b7wal.shade)*128;
@@ -491,6 +586,24 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					sur->tilnum = l; hitile = max(hitile,l);
 					sec[i].wall[j].surfn = 1;
 					sec[i].wall[j].owner = -1;
+					wall_t *thiswal = &sec[i].wall[j];
+					if (sec[i].wall[j].ns != -1) // handle split wall
+					{
+						thiswal->surfn =3;
+						thiswal->xsurf = malloc(sizeof(surf_t)*3);
+						thiswal->xsurf[0].tilnum = b7wal.picnum;
+						thiswal->xsurf[1].tilnum = b7wal.overpicnum;
+						int opacity = 0;
+							if (HAS_FLAG(b7wal.cstat, WALL_MASKED))
+						{
+							if (HAS_FLAG(b7wal.cstat, WALL_SEMI_TRANSPARENT))
+								opacity = 128;
+								if (HAS_FLAG(b7wal.cstat, WALL_TRANSPARENT))
+									opacity = 32;
+						}
+
+						thiswal->xsurf[1].asc = opacity;
+					}
 				}
 				// tile adjust?
 				for(j=0;j<sec[i].n;j++)
@@ -507,13 +620,31 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					sur->uv[0].y = ((float)sur->uv[0].y)/256.f * (1-2*(sur->uv[2].y < 0));
 				}
 
-				fx = sec[i].wall[1].y-sec[i].wall[0].y;
-				fy = sec[i].wall[0].x-sec[i].wall[1].x;
-				f = fx*fx + fy*fy; if (f > 0) f = 1.0/sqrt(f); fx *= f; fy *= f;
-				for(j=0;j<2;j++)
+				{ // setting sector slope gradient
+					fx = sec[i].wall[1].y-sec[i].wall[0].y;
+					fy = sec[i].wall[0].x-sec[i].wall[1].x;
+					f = fx*fx + fy*fy; if (f > 0) f = 1.0/sqrt(f); fx *= f; fy *= f;
+					for(j=0;j<2;j++)
+					{
+						sec[i].grad[j].x = fx*sec[i].grad[j].y;
+						sec[i].grad[j].y = fy*sec[i].grad[j].y;
+					}
+				}
+			}
+			//second pass for walls
+			for(i=k=0;i<map->numsects;i++) // second pass for double wall tex.
+			{
+				for(j=0;j<sec[i].n;j++,k++)
 				{
-					sec[i].grad[j].x = fx*sec[i].grad[j].y;
-					sec[i].grad[j].y = fy*sec[i].grad[j].y;
+					wall_t *walp = &sec[i].wall[j];
+					if (walp->surfn == 3)
+					{
+						memcpy(walp->xsurf[0].uv,walp->surf.uv,sizeof(point2d)*3);
+						memcpy(walp->xsurf[1].uv,walp->surf.uv,sizeof(point2d)*3);
+						memcpy(walp->xsurf[2].uv,walp->surf.uv,sizeof(point2d)*3);
+						int nextpic = sec[walp->ns].wall[walp->nw].surf.tilnum;
+						walp->xsurf[2].tilnum = nextpic;
+					}
 				}
 			}
 
@@ -538,32 +669,43 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				spr->p.y = ((float)b7spr.y)*(1.f/512.f);
 				spr->p.z = ((float)b7spr.z)*(1.f/(512.f*16.f));
 				spr->flags = 0;
-				switch(b7spr.cstat&48)  // https://wiki.eduke32.com/wiki/Cstat_(sprite)
-										// 48  =32  +16 wall or  floor only check
+
+				int flagsw=b7spr.cstat & (SPRITE_WALL_ALIGNED | SPRITE_FLOOR_ALIGNED);
+				if  (flagsw ==0) //Face sprite
+					spr->flags |= SPRITE_B2_FACING;
+				if  (flagsw & SPRITE_WALL_ALIGNED)
+					spr->flags |= SPRITE_B2_FLAT_POLY;
+				if  (flagsw & SPRITE_FLOOR_ALIGNED)
+					spr->flags |= SPRITE_B2_FLAT_POLY;
+
+				point3d buildFW = (point3d){cos((float)b7spr.ang*PI/1024.0),sin((float)b7spr.ang*PI/1024.0),0};
+				switch(flagsw)  // https://wiki.eduke32.com/wiki/Cstat_(sprite)
 					{
-					case 0: //Face sprite
-						spr->flags |= 16;
-						//no break intentional
+					case 0: //facing
 					case 48: //Voxel sprite
 						//no break intentional
-					case 16: //Wall sprite
+					case SPRITE_WALL_ALIGNED: //Wall sprite
 						spr->p.z -= (b7spr.yrepeat/4096.0*(float)tilesizy[l]);
-						spr->r.x = sin((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
-						spr->r.y =-cos((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
-						spr->d.z = (b7spr.yrepeat/4096.0*(float)tilesizy[l]);
+						spr->r.x = -sin((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
+						spr->r.y = cos((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
+						spr->d.z = -(b7spr.yrepeat/4096.0*(float)tilesizy[l]);
+						spr->f = buildFW;
 						break;
-					case 32: //Floor sprite
+					case SPRITE_FLOOR_ALIGNED: //Floor sprite
+					// forward faces up, right faces right, down faces along build's forward;
 						spr->r.x = sin((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
 						spr->r.y =-cos((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
 						spr->d.x = cos((float)b7spr.ang*PI/1024.0)*(b7spr.yrepeat/4096.0*(float)tilesizy[l]);
 						spr->d.y = sin((float)b7spr.ang*PI/1024.0)*(b7spr.yrepeat/4096.0*(float)tilesizy[l]);
-						if (b7spr.cstat&8) { spr->d.x *= -1; spr->d.y *= -1; }
+						spr->f = (point3d){0,0,-1}; // facing up
+					if (b7spr.cstat&8) { spr->d.x *= -1; spr->d.y *= -1; }
 						break;
 				}
+
 				if (b7spr.cstat&1) spr->flags |= 1; // blocking
-				if (b7spr.cstat&64) spr->flags |= 64; // 1 sided
+				if (HAS_FLAG(b7spr.cstat, SPRITE_ONE_SIDED)) spr->flags |= SPRITE_B2_ONE_SIDED; // 1 sided
 				if (b7spr.cstat&4) { spr->r.x *= -1; spr->r.y *= -1; spr->r.z *= -1; spr->flags ^= 4; } //&4: x-flipped
-				if (b7spr.cstat&8) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; spr->flags ^= 4; } //&8: y-flipped?
+				if (b7spr.cstat&8) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; spr->flags ^= 8; } //&8: y-flipped?
 				if (b7spr.cstat&128) { spr->p.z += (b7spr.yrepeat/4096.0*(float)tilesizy[l]); } //&128: real-centered centering (center at center) - originally half submerged sprite
 
 				if ((unsigned)b7spr.sectnum < (unsigned)map->numsects) //Make shade relative to sector
@@ -572,9 +714,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					if (iskenbuild) b7spr.shade += j+6;
 				}
 
-				spr->f.z=3; // sus
-				spr->f.x=cos((float)b7spr.ang*PI/1024.0);
-				spr->f.y=sin((float)b7spr.ang*PI/1024.0);
+
 				spr->fat = 0.f;
 				spr->asc = 4096;
 				spr->rsc = (32-b7spr.shade)*128;
@@ -590,7 +730,14 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				spr->lotag = b7spr.lotag;
 				spr->hitag = b7spr.hitag;
 				spr->pal = b7spr.pal;
+
+				toRaylibInPlace(&spr->p);
+				toRaylibInPlace(&spr->r);
+				toRaylibInPlace(&spr->d);
+				toRaylibInPlace(&spr->f);
 			}
+
+			toRaylibInPlace(&map->startpos);
 		}
 		else //CUBES5 map format (.CUB extension)
 		{
@@ -624,6 +771,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 		//		gst->p[i].ifor = gst->startfor;
 		//		gst->p[i].cursect = -1;
 		//	}
+
 
 				//6 faces * BSIZ^3 board map * 2 bytes for picnum
 				//if face 0 is -1, the cube is air
@@ -728,6 +876,13 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 		{
 			sprintf(tbuf,"tiles%03d.art|%d",tilefile[i],i);
 			gettileind(tbuf);
+		}
+		tile_t* gtpic;
+		for(i=0;i<gmaltiles;i++)
+		{
+			gtpic = &gtile[i];
+			if (!gtpic->tt.f)
+				loadpic(gtpic,curmappath);
 		}
 
 		if (tilesizx) free(tilesizx);

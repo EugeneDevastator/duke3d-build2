@@ -5,6 +5,9 @@
 
 #include <string.h>
 #include "mapcore.h"
+
+tile_t* gtile;
+tile_t* getGtile(int i){return &gtile[i];}
 unsigned char globalpal[256][4];
 #if defined(_MSC_VER)
 void divconst_setdenom_intr (long *twolongstate, long denom)
@@ -192,8 +195,10 @@ void loadpic(tile_t *tpic, char* rootpath) {
         filnum = 0;
         do {
             if (!kzopen(tbuf)) {
-                sprintf(tbuf2,"%s%s",rootpath,tbuf);
-                if (!kzopen(tbuf2)) { filnum = -1; break; }
+            	strcpy_s(tbuf2, sizeof(tbuf2), curmappath);
+            	strcat_s(tbuf2, sizeof(tbuf2), tbuf);
+            if (!kzopen(tbuf2))
+            	{ filnum = -1; break; }
             }
             kzread(tbuf,16);
             if (*(long *)&tbuf[0] != 1) { filnum = -1; break; }
@@ -294,14 +299,15 @@ void LoadPal(const char* basepath)
 
 	if (i) {
 		kzread(globalpal, 768);
-		*(long *)&globalpal[255][0] = 0^0xff000000;
+		*(long *)&globalpal[256][0] = 0^0xff000000;
 		for(i=255-1;i>=0;i--) {
-			globalpal[i][3] = 0xff ^ 255;
+			globalpal[i][3] = 255;
 			globalpal[i][2] = gammlut[globalpal[0][i*3+2]<<2];
 			globalpal[i][1] = gammlut[globalpal[0][i*3+1]<<2];
 			globalpal[i][0] = gammlut[globalpal[0][i*3  ]<<2];
 			uch = globalpal[i][0]; globalpal[i][0] = globalpal[i][2]; globalpal[i][2] = uch;
 		}
+		globalpal[255][3] = 0;
 		kzclose();
 		gotpal = 1;
 	}
