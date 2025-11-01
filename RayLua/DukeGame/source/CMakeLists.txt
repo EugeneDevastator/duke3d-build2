@@ -7,7 +7,11 @@ set(CMAKE_C_STANDARD 99)
 set(SOURCES
         gamedef.c
         ENGINE.C;
-        game.c
+        build.C;
+        #game.c
+        KDMENG.C
+        BUILD.C
+        GAME_NOSYS.C;
 
         # Add more .c files here
 )
@@ -19,7 +23,9 @@ set(HEADERS
         gamedefs.h;
         names.h;
 engine.h
-        KDMENG.C;
+        GAME_NOSYS.C
+        PREMAP.C
+
         # Add more .h files here
 )
 

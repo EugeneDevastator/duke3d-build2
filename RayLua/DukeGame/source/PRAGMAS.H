@@ -32,209 +32,50 @@ static long dmval;
 	modify exact [eax]\
    value [eax]
 
-#pragma aux scale =\
-	"imul edx",\
-	"idiv ecx",\
-	parm nomemory [eax][edx][ecx]\
-	modify exact [eax edx]\
+#include <stdint.h>
 
-#pragma aux mulscale =\
-	"imul edx",\
-	"shrd eax, edx, cl",\
-	parm nomemory [eax][edx][ecx]\
-	modify exact [eax edx]\
+static inline int32_t scale(int32_t a, int32_t b, int32_t c) {
+	return (int32_t)(((int64_t)a * b) / c);
+}
 
-#pragma aux mulscale1 =\
-	"imul edx",\
-	"shrd eax, edx, 1",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
+static inline int32_t mulscale(int32_t a, int32_t b, int shift) {
+	return (int32_t)(((int64_t)a * b) >> shift);
+}
 
-#pragma aux mulscale2 =\
-	"imul edx",\
-	"shrd eax, edx, 2",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
+// Use the generic version for all cases
+#define mulscale1(a,b)  mulscale(a,b,1)
+#define mulscale2(a,b)  mulscale(a,b,2)
+#define mulscale3(a,b)  mulscale(a,b,3)
+#define mulscale4(a,b)  mulscale(a,b,4)
+#define mulscale5(a,b)  mulscale(a,b,5)
+#define mulscale6(a,b)  mulscale(a,b,6)
+#define mulscale7(a,b)  mulscale(a,b,7)
+#define mulscale8(a,b)  mulscale(a,b,8)
+#define mulscale9(a,b)  mulscale(a,b,9)
+#define mulscale10(a,b) mulscale(a,b,10)
+#define mulscale11(a,b) mulscale(a,b,11)
+#define mulscale12(a,b) mulscale(a,b,12)
+#define mulscale13(a,b) mulscale(a,b,13)
+#define mulscale14(a,b) mulscale(a,b,14)
+#define mulscale15(a,b) mulscale(a,b,15)
+#define mulscale16(a,b) mulscale(a,b,16)
+#define mulscale17(a,b) mulscale(a,b,17)
+#define mulscale18(a,b) mulscale(a,b,18)
+#define mulscale19(a,b) mulscale(a,b,19)
+#define mulscale20(a,b) mulscale(a,b,20)
+#define mulscale21(a,b) mulscale(a,b,21)
+#define mulscale22(a,b) mulscale(a,b,22)
+#define mulscale23(a,b) mulscale(a,b,23)
+#define mulscale24(a,b) mulscale(a,b,24)
+#define mulscale25(a,b) mulscale(a,b,25)
+#define mulscale26(a,b) mulscale(a,b,26)
+#define mulscale27(a,b) mulscale(a,b,27)
+#define mulscale28(a,b) mulscale(a,b,28)
+#define mulscale29(a,b) mulscale(a,b,29)
+#define mulscale30(a,b) mulscale(a,b,30)
+#define mulscale31(a,b) mulscale(a,b,31)
+#define mulscale32(a,b) mulscale(a,b,32)
 
-#pragma aux mulscale3 =\
-	"imul edx",\
-	"shrd eax, edx, 3",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale4 =\
-	"imul edx",\
-	"shrd eax, edx, 4",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale5 =\
-	"imul edx",\
-	"shrd eax, edx, 5",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale6 =\
-	"imul edx",\
-	"shrd eax, edx, 6",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale7 =\
-	"imul edx",\
-	"shrd eax, edx, 7",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale8 =\
-	"imul edx",\
-	"shrd eax, edx, 8",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale9 =\
-	"imul edx",\
-	"shrd eax, edx, 9",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale10 =\
-	"imul edx",\
-	"shrd eax, edx, 10",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale11 =\
-	"imul edx",\
-	"shrd eax, edx, 11",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale12 =\
-	"imul edx",\
-	"shrd eax, edx, 12",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale13 =\
-	"imul edx",\
-	"shrd eax, edx, 13",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale14 =\
-	"imul edx",\
-	"shrd eax, edx, 14",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale15 =\
-	"imul edx",\
-	"shrd eax, edx, 15",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale16 =\
-	"imul edx",\
-	"shrd eax, edx, 16",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale17 =\
-	"imul edx",\
-	"shrd eax, edx, 17",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale18 =\
-	"imul edx",\
-	"shrd eax, edx, 18",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale19 =\
-	"imul edx",\
-	"shrd eax, edx, 19",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale20 =\
-	"imul edx",\
-	"shrd eax, edx, 20",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale21 =\
-	"imul edx",\
-	"shrd eax, edx, 21",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale22 =\
-	"imul edx",\
-	"shrd eax, edx, 22",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale23 =\
-	"imul edx",\
-	"shrd eax, edx, 23",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale24 =\
-	"imul edx",\
-	"shrd eax, edx, 24",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale25 =\
-	"imul edx",\
-	"shrd eax, edx, 25",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale26 =\
-	"imul edx",\
-	"shrd eax, edx, 26",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale27 =\
-	"imul edx",\
-	"shrd eax, edx, 27",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale28 =\
-	"imul edx",\
-	"shrd eax, edx, 28",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale29 =\
-	"imul edx",\
-	"shrd eax, edx, 29",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale30 =\
-	"imul edx",\
-	"shrd eax, edx, 30",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale31 =\
-	"imul edx",\
-	"shrd eax, edx, 31",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-
-#pragma aux mulscale32 =\
-	"imul edx",\
-	parm nomemory [eax][edx]\
-	modify exact [eax edx]\
-	value [edx]\
 
 #pragma aux dmulscale =\
 	"imul edx",\

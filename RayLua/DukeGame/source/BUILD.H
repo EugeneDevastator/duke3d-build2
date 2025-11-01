@@ -23,6 +23,8 @@ Original Source: 1996 - Todd Replogle
 Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
+#ifndef BUILD_HEADER_H
+#define BUILD_HEADER_H
 
 #define MAXSECTORS 1024
 #define MAXWALLS 8192
@@ -39,7 +41,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #define CLIPMASK0 (((1L)<<16)+1L)
 #define CLIPMASK1 (((256L)<<16)+64L)
-#undef ENGINE
+
 	//Make all variables in BUILD.H defined in the ENGINE,
 	//and externed in GAME
 //#ifdef ENGINE
@@ -126,10 +128,13 @@ typedef struct
 	short ang, owner, xvel, yvel, zvel;
 	short lotag, hitag, extra;
 } spritetype;
-
-EXTERN sectortype sector[MAXSECTORS];
+#ifdef sector
+#undef sector
+#warning "sector macro was defined, undefined it"
+#endif
+extern sectortype sector[MAXSECTORS];
 EXTERN walltype wall[MAXWALLS];
-EXTERN spritetype sprite[MAXSPRITES];
+spritetype sprite[MAXSPRITES];
 
 EXTERN long spritesortcnt;
 EXTERN spritetype tsprite[MAXSPRITESONSCREEN];
@@ -285,3 +290,4 @@ OTHER VARIABLES:
 		NUMSECTORS - the total number of existing sectors.  Modified every time
 			you call the loadboard function.
 ***************************************************************************/
+#endif

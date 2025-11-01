@@ -23,7 +23,8 @@ Original Source: 1996 - Todd Replogle
 Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
-
+#ifndef DUKE3D_H
+#define DUKE3D_H
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -76,16 +77,16 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "function.h"
 #include "fx_man.h"
 #include "config.h"
-#include "sounds.h"
+//#include "sounds.h"
 #include "control.h"
-#include "_rts.h"
-#include "rts.h"
+//#include "_rts.h"
+//#include "rts.h"
 #include "soundefs.h"
 
 
 #include "task_man.h"
-#include "music.h"
-#include "sndcards.h"
+//#include "music.h"
+//#include "sndcards.h"
 
 #include "names.h"
 #include "funct.h"
@@ -546,3 +547,4 @@ extern long stereomode, stereowidth, stereopixelwidth;
 
 extern long myaimmode, myaimstat, omyaimstat;
 
+#endif
