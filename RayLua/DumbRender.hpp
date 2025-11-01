@@ -445,14 +445,19 @@ public:
             {
                 Texture2D spriteTex = runtimeTextures[spr->tilnum];
                 Vector3 rg = {spr->r.x, spr->r.y, spr->r.z};
-                Vector3 rg9 = {spr->r.y, spr->r.x, spr->r.z};
                 Vector3 dw = {spr->d.x, spr->d.y, spr->d.z};
                 Vector3 frw = {spr->f.x, spr->f.y, spr->f.z};
                 Vector3 pos = {spr->p.x, spr->p.y, spr->p.z};
-                Vector3 a = pos+rg+frw;
-                Vector3 b = pos+rg-frw;
-                Vector3 c = pos-rg-frw;
-                Vector3 d = pos-rg+frw;
+                pos += frw*0.1; // bias agains fighting
+                Vector3 a = pos+rg+dw;
+                Vector3 b = pos+rg-dw;
+                Vector3 c = pos-rg-dw;
+                Vector3 d = pos-rg+dw;
+                // Debug vectors
+                DrawLine3D(pos, Vector3Add(pos, frw), BLUE);    // Forward vector
+                DrawLine3D(pos, Vector3Add(pos, rg), RED);   // Right vector
+                DrawLine3D(pos, Vector3Add(pos, dw), GREEN);    // Down vector
+
                 if (spr->flags & 32) // spr->flags |= SPRITE_B2_FLAT_POLY;
                 {
                     rlDisableDepthMask();
@@ -460,14 +465,10 @@ public:
                     rlBegin(RL_QUADS);
                     rlColor4ub(255, 255, 255, 255); // todo update transp.
 
-                    rlTexCoord2f(0.0f, 1.0f);
-                    rlVertex3V(a);
-                    rlTexCoord2f(1.0f , 1.0f);
-                    rlVertex3V(b);
-                    rlTexCoord2f(1.0f , 0.0f);
-                    rlVertex3V(c);
-                    rlTexCoord2f(0.0f, 0.0f);
-                    rlVertex3V(d);
+                    rlTexCoord2f(0.0f, 1.0f);       rlVertex3V(b);
+                    rlTexCoord2f(1.0f , 1.0f);      rlVertex3V(c);
+                    rlTexCoord2f(1.0f , 0.0f);      rlVertex3V(d);
+                    rlTexCoord2f(0.0f, 0.0f);       rlVertex3V(a);
 
                     rlEnd();
                     rlSetTexture(0);
@@ -1108,7 +1109,7 @@ private:
             if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
             map->blankheadspri = i;
         }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/E2l4.MAP", map);
+        loadmap_imp((char*)"c:/Eugene/Games/build2/E4l5.MAP", map);
     }
 };
 

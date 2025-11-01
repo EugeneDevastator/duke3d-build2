@@ -677,6 +677,8 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					spr->flags |= SPRITE_B2_FLAT_POLY;
 				if  (flagsw & SPRITE_FLOOR_ALIGNED)
 					spr->flags |= SPRITE_B2_FLAT_POLY;
+
+				point3d buildFW = (point3d){cos((float)b7spr.ang*PI/1024.0),sin((float)b7spr.ang*PI/1024.0),0};
 				switch(flagsw)  // https://wiki.eduke32.com/wiki/Cstat_(sprite)
 					{
 					case 0: //facing
@@ -684,12 +686,10 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						//no break intentional
 					case SPRITE_WALL_ALIGNED: //Wall sprite
 						spr->p.z -= (b7spr.yrepeat/4096.0*(float)tilesizy[l]);
-						spr->r.x = sin((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
-						spr->r.y =-cos((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
-						spr->d.z = (b7spr.yrepeat/4096.0*(float)tilesizy[l]);
-						spr->f.z=0; // forward remains unit.
-						spr->f.x=cos((float)b7spr.ang*PI/1024.0);
-						spr->f.y=sin((float)b7spr.ang*PI/1024.0);
+						spr->r.x = -sin((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
+						spr->r.y = cos((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
+						spr->d.z = -(b7spr.yrepeat/4096.0*(float)tilesizy[l]);
+						spr->f = buildFW;
 						break;
 					case SPRITE_FLOOR_ALIGNED: //Floor sprite
 					// forward faces up, right faces right, down faces along build's forward;
@@ -697,9 +697,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						spr->r.y =-cos((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
 						spr->d.x = cos((float)b7spr.ang*PI/1024.0)*(b7spr.yrepeat/4096.0*(float)tilesizy[l]);
 						spr->d.y = sin((float)b7spr.ang*PI/1024.0)*(b7spr.yrepeat/4096.0*(float)tilesizy[l]);
-						spr->f.z=0; // sus
-						spr->f.x=cos((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l];
-						spr->f.y=sin((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l];
+						spr->f = (point3d){0,0,-1}; // facing up
 					if (b7spr.cstat&8) { spr->d.x *= -1; spr->d.y *= -1; }
 						break;
 				}
