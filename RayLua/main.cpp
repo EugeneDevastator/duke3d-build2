@@ -1,4 +1,14 @@
 //#include "kplib.h"
+// notes for porting:
+// raylib bridge.h : has drawDukeSprite(..) and doUpdate(dt)
+// raylib bridge .cpp
+// dukewrapper.h
+// call duke.init
+// duke init calls bridge
+// call bridge.update or smth to update.
+// duke is built behind initializer wrapper
+// bridge is also build behind call forwarding.
+
 
 #include "raylib.h"
 #include "rlImGui.h"
