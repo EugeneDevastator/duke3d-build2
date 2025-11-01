@@ -173,8 +173,10 @@ public:
                         // [u]   [uv[1].x  uv[2].x  uv[0].x] [wall->x]
                         // [v] = [uv[1].y  uv[2].y  uv[0].y] [wall->y]
                         // [1]   [   0        0        1   ] [   1   ]
-                        triMesh.texcoords[w * 2] =  wall->x * sect->surf[isFloor].uv[1].x + wall->y * sect->surf[isFloor].uv[2].x+ sect->surf[isFloor].uv[0].x;
-                        triMesh.texcoords[w * 2 + 1] =  wall->x * sect->surf[isFloor].uv[1].y + wall->y * sect->surf[isFloor].uv[2].y+ sect->surf[isFloor].uv[0].y;
+                        triMesh.texcoords[w * 2] = wall->x * sect->surf[isFloor].uv[1].x + wall->y * sect->surf[isFloor]
+                            .uv[2].x + sect->surf[isFloor].uv[0].x;
+                        triMesh.texcoords[w * 2 + 1] = wall->x * sect->surf[isFloor].uv[1].y + wall->y * sect->surf[
+                            isFloor].uv[2].y + sect->surf[isFloor].uv[0].y;
                     }
 
                     // Triangulate
@@ -318,8 +320,8 @@ public:
                 {
                     // Portal wall - draw upper and lower parts
                     sect_t* nextSect = &map->sect[wall->ns];
-                    int lowtile,masktile,hitile = wall->surf.tilnum;
-                    if (wall->surfn==3)
+                    int lowtile, masktile, hitile = wall->surf.tilnum;
+                    if (wall->surfn == 3)
                     {
                         int lowtileind = wall->surf.flags & 2 ? 2 : 0;
                         lowtile = wall->xsurf[lowtileind].tilnum;
@@ -342,19 +344,19 @@ public:
                         {
                             float upperDy = topLeftZ - nextTopLeftZ; // affects other paart
                             float selfDy = topLeftZ - topRightZ; // affects upper part
-                            float dh = nextTopLeftZ -nextTopRightZ;
+                            float dh = nextTopLeftZ - nextTopRightZ;
                             Texture2D upperTex = runtimeTextures[hitile];
                             rlSetTexture(upperTex.id);
                             rlBegin(RL_QUADS);
                             rlColor4ub(255, 255, 255, 255);
 
-                            rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y *(upperDy+selfDy));
+                            rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y * (upperDy + selfDy));
                             rlVertex3f(bottom_left.x, bottom_left.y, bottom_left.z);
 
-                            rlTexCoord2f(wall->surf.uv[1].x * dx, wall->surf.uv[2].y*(upperDy + dh));
+                            rlTexCoord2f(wall->surf.uv[1].x * dx, wall->surf.uv[2].y * (upperDy + dh));
                             rlVertex3f(bottom_right.x, bottom_right.y, bottom_right.z);
 
-                            rlTexCoord2f(1.0f  * wall->surf.uv[1].x * dx, 0.0f);
+                            rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 0.0f);
                             rlVertex3f(topRight.x, topRight.y, topRight.z);
 
                             rlTexCoord2f(0.0f, 0.0);
@@ -368,7 +370,6 @@ public:
 
                     if (bottomLeftZ < nextBottomLeftZ || bottomRightZ < nextBottomRightZ)
                     {
-
                         Vector3 thisTopLeft = {wall->x, nextBottomLeftZ, wall->y};
                         Vector3 thisTopRight = {nextwall->x, nextBottomRightZ, nextwall->y};
 
@@ -376,21 +377,21 @@ public:
                         {
                             float largeDy = bottomLeftZ - nextBottomLeftZ; // affects other paart
                             float selfDy = bottomLeftZ - bottomRightZ; // affects upper part
-                            float dh = nextBottomLeftZ -nextBottomRightZ;
+                            float dh = nextBottomLeftZ - nextBottomRightZ;
                             Texture2D lowerTex = runtimeTextures[lowtile];
 
                             rlSetTexture(lowerTex.id);
                             rlBegin(RL_QUADS);
 
                             rlColor4ub(255, 255, 255, 255);
-// CW starting from upper left
-                            rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y *(largeDy+selfDy));
+                            // CW starting from upper left
+                            rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y * (largeDy + selfDy));
                             rlVertex3f(thisTopLeft.x, thisTopLeft.y, thisTopLeft.z);
 
-                            rlTexCoord2f(wall->surf.uv[1].x * dx, wall->surf.uv[2].y*(largeDy + dh));
+                            rlTexCoord2f(wall->surf.uv[1].x * dx, wall->surf.uv[2].y * (largeDy + dh));
                             rlVertex3f(thisTopRight.x, thisTopRight.y, thisTopRight.z);
 
-                            rlTexCoord2f(1.0f  * wall->surf.uv[1].x * dx, 0.0f);
+                            rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 0.0f);
                             rlVertex3f(bottomRight.x, bottomRight.y, bottomRight.z);
 
                             rlTexCoord2f(0.0f, 0.0);
@@ -404,33 +405,32 @@ public:
                     // todo - make transparent queue
                     if (wall->xsurf[1].asc > 0 && masktile < get_gnumtiles())
                     {
-                            rlEnableBackfaceCulling();
-                            rlDisableDepthMask();
-                            Vector3 midBottomLeft = {wall->x, max(bottomLeftZ, nextBottomLeftZ), wall->y};
-                            Vector3 midBottomRight = {nextwall->x, max(bottomRightZ, nextBottomRightZ), nextwall->y};
-                            Vector3 midTopLeft = {wall->x, min(topLeftZ, nextTopLeftZ), wall->y};
-                            Vector3 midTopRight = {nextwall->x, min(topRightZ, nextTopRightZ), nextwall->y};
+                        rlEnableBackfaceCulling();
+                        rlDisableDepthMask();
+                        Vector3 midBottomLeft = {wall->x, max(bottomLeftZ, nextBottomLeftZ), wall->y};
+                        Vector3 midBottomRight = {nextwall->x, max(bottomRightZ, nextBottomRightZ), nextwall->y};
+                        Vector3 midTopLeft = {wall->x, min(topLeftZ, nextTopLeftZ), wall->y};
+                        Vector3 midTopRight = {nextwall->x, min(topRightZ, nextTopRightZ), nextwall->y};
 
-                            float midDy = min(topLeftZ, nextTopLeftZ) - max(bottomLeftZ, nextBottomLeftZ);
+                        float midDy = min(topLeftZ, nextTopLeftZ) - max(bottomLeftZ, nextBottomLeftZ);
 
-                            Texture2D midTex = runtimeTextures[masktile];
-                            rlSetTexture(midTex.id);
-                            rlBegin(RL_QUADS);
-                            rlColor4ub(255, 255, 255, 128); // todo update transp.
+                        Texture2D midTex = runtimeTextures[masktile];
+                        rlSetTexture(midTex.id);
+                        rlBegin(RL_QUADS);
+                        rlColor4ub(255, 255, 255, 128); // todo update transp.
 
-                            rlTexCoord2f(0.0f, 1.0f * midDy);
-                            rlVertex3f(midBottomLeft.x, midBottomLeft.y, midBottomLeft.z);
-                            rlTexCoord2f(1.0f * dx, 1.0f * midDy);
-                            rlVertex3f(midBottomRight.x, midBottomRight.y, midBottomRight.z);
-                            rlTexCoord2f(1.0f * dx, 0.0f);
-                            rlVertex3f(midTopRight.x, midTopRight.y, midTopRight.z);
-                            rlTexCoord2f(0.0f, 0.0f);
-                            rlVertex3f(midTopLeft.x, midTopLeft.y, midTopLeft.z);
+                        rlTexCoord2f(0.0f, 1.0f * midDy);
+                        rlVertex3f(midBottomLeft.x, midBottomLeft.y, midBottomLeft.z);
+                        rlTexCoord2f(1.0f * dx, 1.0f * midDy);
+                        rlVertex3f(midBottomRight.x, midBottomRight.y, midBottomRight.z);
+                        rlTexCoord2f(1.0f * dx, 0.0f);
+                        rlVertex3f(midTopRight.x, midTopRight.y, midTopRight.z);
+                        rlTexCoord2f(0.0f, 0.0f);
+                        rlVertex3f(midTopLeft.x, midTopLeft.y, midTopLeft.z);
 
-                            rlEnd();
-                            rlSetTexture(0);
-                            rlEnableDepthMask();
-
+                        rlEnd();
+                        rlSetTexture(0);
+                        rlEnableDepthMask();
                     }
                 }
             }
@@ -448,15 +448,15 @@ public:
                 Vector3 dw = {spr->d.x, spr->d.y, spr->d.z};
                 Vector3 frw = {spr->f.x, spr->f.y, spr->f.z};
                 Vector3 pos = {spr->p.x, spr->p.y, spr->p.z};
-                pos += frw*0.1; // bias agains fighting
-                Vector3 a = pos+rg+dw;
-                Vector3 b = pos+rg-dw;
-                Vector3 c = pos-rg-dw;
-                Vector3 d = pos-rg+dw;
+                pos += frw * 0.1; // bias agains fighting
+                Vector3 a = pos + rg + dw;
+                Vector3 b = pos + rg - dw;
+                Vector3 c = pos - rg - dw;
+                Vector3 d = pos - rg + dw;
                 // Debug vectors
-                DrawLine3D(pos, Vector3Add(pos, frw), BLUE);    // Forward vector
-                DrawLine3D(pos, Vector3Add(pos, rg), RED);   // Right vector
-                DrawLine3D(pos, Vector3Add(pos, dw), GREEN);    // Down vector
+                DrawLine3D(pos, Vector3Add(pos, frw), BLUE); // Forward vector
+                DrawLine3D(pos, Vector3Add(pos, rg), RED); // Right vector
+                DrawLine3D(pos, Vector3Add(pos, dw), GREEN); // Down vector
 
                 if (spr->flags & 32) // spr->flags |= SPRITE_B2_FLAT_POLY;
                 {
@@ -465,10 +465,14 @@ public:
                     rlBegin(RL_QUADS);
                     rlColor4ub(255, 255, 255, 255); // todo update transp.
 
-                    rlTexCoord2f(0.0f, 1.0f);       rlVertex3V(b);
-                    rlTexCoord2f(1.0f , 1.0f);      rlVertex3V(c);
-                    rlTexCoord2f(1.0f , 0.0f);      rlVertex3V(d);
-                    rlTexCoord2f(0.0f, 0.0f);       rlVertex3V(a);
+                    rlTexCoord2f(0.0f, 1.0f);
+                    rlVertex3V(b);
+                    rlTexCoord2f(1.0f, 1.0f);
+                    rlVertex3V(c);
+                    rlTexCoord2f(1.0f, 0.0f);
+                    rlVertex3V(d);
+                    rlTexCoord2f(0.0f, 0.0f);
+                    rlVertex3V(a);
 
                     rlEnd();
                     rlSetTexture(0);
@@ -476,151 +480,152 @@ public:
                 }
                 else
                 {
-
                     auto xs = Vector3Length(rg);
                     auto ys = Vector3Length(dw);
                     int xflip = spr->flags & 4 ? -1 : 1;
                     int yflip = spr->flags & 8 ? -1 : 1;
-                    Vector3 pos = {spr->p.x - xs, spr->p.y , spr->p.z};
+                    Vector3 pos = {spr->p.x, spr->p.y, spr->p.z};
                     Rectangle source = {0.0f, 0.0f, (float)spriteTex.width, (float)spriteTex.height};
                     xs *= 2;
                     ys *= 2;
 
-                    DrawBillboardRec(cam, spriteTex, source, pos, {xs*xflip, ys*yflip}, WHITE);
+                    DrawBillboardRec(cam, spriteTex, source, pos, {xs * xflip, ys * yflip}, WHITE);
                 }
             }
         }
     }
-static void rlVertex3V(Vector3 v)
+
+    static void rlVertex3V(Vector3 v)
     {
         rlVertex3f(v.x, v.y, v.z);
     }
- static bool IsPointInTriangle(float px, float py, float ax, float ay, float bx, float by, float cx, float cy)
-{
-    float denom = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy);
-    if (fabs(denom) < 1e-10f) return false;
 
-    float a = ((by - cy) * (px - cx) + (cx - bx) * (py - cy)) / denom;
-    float b = ((cy - ay) * (px - cx) + (ax - cx) * (py - cy)) / denom;
-    float c = 1.0f - a - b;
-
-    return a >= 0 && b >= 0 && c >= 0;
-}
-
-static float CrossProduct2D(float ax, float ay, float bx, float by, float cx, float cy)
-{
-    return (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
-}
-
-static bool IsEar(float* vertices, int* vertexList, int remainingVertices, int earIndex)
-{
-    if (remainingVertices < 3) return false;
-
-    int prev = (earIndex - 1 + remainingVertices) % remainingVertices;
-    int curr = earIndex;
-    int next = (earIndex + 1) % remainingVertices;
-
-    int v0 = vertexList[prev];
-    int v1 = vertexList[curr];
-    int v2 = vertexList[next];
-
-    float ax = vertices[v0 * 2];
-    float ay = vertices[v0 * 2 + 1];
-    float bx = vertices[v1 * 2];
-    float by = vertices[v1 * 2 + 1];
-    float cx = vertices[v2 * 2];
-    float cy = vertices[v2 * 2 + 1];
-
-    // Check if triangle is convex (counter-clockwise)
-    if (CrossProduct2D(ax, ay, bx, by, cx, cy) <= 0)
-        return false;
-
-    // Check if any other vertex is inside this triangle
-    for (int i = 0; i < remainingVertices; i++)
+    static bool IsPointInTriangle(float px, float py, float ax, float ay, float bx, float by, float cx, float cy)
     {
-        if (i == prev || i == curr || i == next) continue;
+        float denom = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy);
+        if (fabs(denom) < 1e-10f) return false;
 
-        int vi = vertexList[i];
-        float px = vertices[vi * 2];
-        float py = vertices[vi * 2 + 1];
+        float a = ((by - cy) * (px - cx) + (cx - bx) * (py - cy)) / denom;
+        float b = ((cy - ay) * (px - cx) + (ax - cx) * (py - cy)) / denom;
+        float c = 1.0f - a - b;
 
-        if (IsPointInTriangle(px, py, ax, ay, bx, by, cx, cy))
+        return a >= 0 && b >= 0 && c >= 0;
+    }
+
+    static float CrossProduct2D(float ax, float ay, float bx, float by, float cx, float cy)
+    {
+        return (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+    }
+
+    static bool IsEar(float* vertices, int* vertexList, int remainingVertices, int earIndex)
+    {
+        if (remainingVertices < 3) return false;
+
+        int prev = (earIndex - 1 + remainingVertices) % remainingVertices;
+        int curr = earIndex;
+        int next = (earIndex + 1) % remainingVertices;
+
+        int v0 = vertexList[prev];
+        int v1 = vertexList[curr];
+        int v2 = vertexList[next];
+
+        float ax = vertices[v0 * 2];
+        float ay = vertices[v0 * 2 + 1];
+        float bx = vertices[v1 * 2];
+        float by = vertices[v1 * 2 + 1];
+        float cx = vertices[v2 * 2];
+        float cy = vertices[v2 * 2 + 1];
+
+        // Check if triangle is convex (counter-clockwise)
+        if (CrossProduct2D(ax, ay, bx, by, cx, cy) <= 0)
             return false;
-    }
 
-    return true;
-}
-
-static int TriangulatePolygon(float* vertices, int vertexCount, unsigned short* indices)
-{
-    if (vertexCount < 3) return 0;
-
-    int triangleCount = 0;
-    int* vertexList = (int*)malloc(vertexCount * sizeof(int));
-
-    // Initialize vertex list
-    for (int i = 0; i < vertexCount; i++)
-    {
-        vertexList[i] = i;
-    }
-
-    int remainingVertices = vertexCount;
-    int attempts = 0;
-    int maxAttempts = remainingVertices * 2;
-
-    while (remainingVertices > 2 && attempts < maxAttempts)
-    {
-        bool foundEar = false;
-
+        // Check if any other vertex is inside this triangle
         for (int i = 0; i < remainingVertices; i++)
         {
-            if (IsEar(vertices, vertexList, remainingVertices, i))
-            {
-                // Found an ear, create triangle
-                int prev = (i - 1 + remainingVertices) % remainingVertices;
-                int curr = i;
-                int next = (i + 1) % remainingVertices;
+            if (i == prev || i == curr || i == next) continue;
 
-                indices[triangleCount * 3] = vertexList[prev];
-                indices[triangleCount * 3 + 1] = vertexList[curr];
-                indices[triangleCount * 3 + 2] = vertexList[next];
+            int vi = vertexList[i];
+            float px = vertices[vi * 2];
+            float py = vertices[vi * 2 + 1];
 
-                triangleCount++;
-
-                // Remove the ear vertex
-                for (int j = i; j < remainingVertices - 1; j++)
-                {
-                    vertexList[j] = vertexList[j + 1];
-                }
-                remainingVertices--;
-
-                foundEar = true;
-                attempts = 0;
-                break;
-            }
+            if (IsPointInTriangle(px, py, ax, ay, bx, by, cx, cy))
+                return false;
         }
 
-        if (!foundEar)
-        {
-            attempts++;
-            // If no ear found, try fallback fan triangulation
-            if (attempts >= maxAttempts && remainingVertices > 2)
-            {
-                for (int i = 1; i < remainingVertices - 1; i++)
-                {
-                    indices[triangleCount * 3] = vertexList[0];
-                    indices[triangleCount * 3 + 1] = vertexList[i];
-                    indices[triangleCount * 3 + 2] = vertexList[i + 1];
-                    triangleCount++;
-                }
-                break;
-            }
-        }
+        return true;
     }
 
-    free(vertexList);
-    return triangleCount;
-}
+    static int TriangulatePolygon(float* vertices, int vertexCount, unsigned short* indices)
+    {
+        if (vertexCount < 3) return 0;
+
+        int triangleCount = 0;
+        int* vertexList = (int*)malloc(vertexCount * sizeof(int));
+
+        // Initialize vertex list
+        for (int i = 0; i < vertexCount; i++)
+        {
+            vertexList[i] = i;
+        }
+
+        int remainingVertices = vertexCount;
+        int attempts = 0;
+        int maxAttempts = remainingVertices * 2;
+
+        while (remainingVertices > 2 && attempts < maxAttempts)
+        {
+            bool foundEar = false;
+
+            for (int i = 0; i < remainingVertices; i++)
+            {
+                if (IsEar(vertices, vertexList, remainingVertices, i))
+                {
+                    // Found an ear, create triangle
+                    int prev = (i - 1 + remainingVertices) % remainingVertices;
+                    int curr = i;
+                    int next = (i + 1) % remainingVertices;
+
+                    indices[triangleCount * 3] = vertexList[prev];
+                    indices[triangleCount * 3 + 1] = vertexList[curr];
+                    indices[triangleCount * 3 + 2] = vertexList[next];
+
+                    triangleCount++;
+
+                    // Remove the ear vertex
+                    for (int j = i; j < remainingVertices - 1; j++)
+                    {
+                        vertexList[j] = vertexList[j + 1];
+                    }
+                    remainingVertices--;
+
+                    foundEar = true;
+                    attempts = 0;
+                    break;
+                }
+            }
+
+            if (!foundEar)
+            {
+                attempts++;
+                // If no ear found, try fallback fan triangulation
+                if (attempts >= maxAttempts && remainingVertices > 2)
+                {
+                    for (int i = 1; i < remainingVertices - 1; i++)
+                    {
+                        indices[triangleCount * 3] = vertexList[0];
+                        indices[triangleCount * 3 + 1] = vertexList[i];
+                        indices[triangleCount * 3 + 2] = vertexList[i + 1];
+                        triangleCount++;
+                    }
+                    break;
+                }
+            }
+        }
+
+        free(vertexList);
+        return triangleCount;
+    }
 
 
     // Call once when map loads
