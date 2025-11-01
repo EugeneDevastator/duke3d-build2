@@ -5301,6 +5301,205 @@ int drawline16(long x1, long y1, long x2, long y2, char col)
     }
 }
 
+int krand()
+{
+    randomseed = (randomseed*27584621)+1;
+    return(((unsigned long)randomseed)>>16);
+}
+
+int getzrange(long x, long y, long z, short sectnum, long* ceilz, long* ceilhit, long* florz, long* florhit,
+              long walldist, unsigned long cliptype)
+{
+    sectortype *sec;
+    walltype *wal, *wal2;
+    spritetype *spr;
+    long clipsectcnt, startwall, endwall, tilenum, xoff, yoff, dax, day;
+    long xmin, ymin, xmax, ymax, i, j, k, l, daz, daz2, dx, dy;
+    long x1, y1, x2, y2, x3, y3, x4, y4, ang, cosang, sinang;
+    long xspan, yspan, xrepeat, yrepeat, dasprclipmask, dawalclipmask;
+    short cstat;
+    char bad, clipyou;
+
+    if (sectnum < 0)
+    {
+        *ceilz = 0x80000000; *ceilhit = -1;
+        *florz = 0x7fffffff; *florhit = -1;
+        return;
+    }
+
+    //Extra walldist for sprites on sector lines
+    i = walldist+MAXCLIPDIST+1;
+    xmin = x-i; ymin = y-i;
+    xmax = x+i; ymax = y+i;
+
+    getzsofslope(sectnum,x,y,ceilz,florz);
+    *ceilhit = sectnum+16384; *florhit = sectnum+16384;
+
+    dawalclipmask = (cliptype&65535);
+    dasprclipmask = (cliptype>>16);
+
+    clipsectorlist[0] = sectnum;
+    clipsectcnt = 0; clipsectnum = 1;
+
+    do  //Collect sectors inside your square first
+    {
+        sec = &sector[clipsectorlist[clipsectcnt]];
+        startwall = sec->wallptr; endwall = startwall + sec->wallnum;
+        for(j=startwall,wal=&wall[startwall];j<endwall;j++,wal++)
+        {
+            k = wal->nextsector;
+            if (k >= 0)
+            {
+                wal2 = &wall[wal->point2];
+                x1 = wal->x; x2 = wal2->x;
+                if ((x1 < xmin) && (x2 < xmin)) continue;
+                if ((x1 > xmax) && (x2 > xmax)) continue;
+                y1 = wal->y; y2 = wal2->y;
+                if ((y1 < ymin) && (y2 < ymin)) continue;
+                if ((y1 > ymax) && (y2 > ymax)) continue;
+
+                dx = x2-x1; dy = y2-y1;
+                if (dx*(y-y1) < (x-x1)*dy) continue; //back
+                if (dx > 0) dax = dx*(ymin-y1); else dax = dx*(ymax-y1);
+                if (dy > 0) day = dy*(xmax-x1); else day = dy*(xmin-x1);
+                if (dax >= day) continue;
+
+                if (wal->cstat&dawalclipmask) continue;
+                sec = &sector[k];
+                if (editstatus == 0)
+                {
+                    if (((sec->ceilingstat&1) == 0) && (z <= sec->ceilingz+(3<<8))) continue;
+                    if (((sec->floorstat&1) == 0) && (z >= sec->floorz-(3<<8))) continue;
+                }
+
+                for(i=clipsectnum-1;i>=0;i--) if (clipsectorlist[i] == k) break;
+                if (i < 0) clipsectorlist[clipsectnum++] = k;
+
+                if ((x1 < xmin+MAXCLIPDIST) && (x2 < xmin+MAXCLIPDIST)) continue;
+                if ((x1 > xmax-MAXCLIPDIST) && (x2 > xmax-MAXCLIPDIST)) continue;
+                if ((y1 < ymin+MAXCLIPDIST) && (y2 < ymin+MAXCLIPDIST)) continue;
+                if ((y1 > ymax-MAXCLIPDIST) && (y2 > ymax-MAXCLIPDIST)) continue;
+                if (dx > 0) dax += dx*MAXCLIPDIST; else dax -= dx*MAXCLIPDIST;
+                if (dy > 0) day -= dy*MAXCLIPDIST; else day += dy*MAXCLIPDIST;
+                if (dax >= day) continue;
+
+                //It actually got here, through all the continue's!!!
+                getzsofslope((short)k,x,y,&daz,&daz2);
+                if (daz > *ceilz) { *ceilz = daz; *ceilhit = k+16384; }
+                if (daz2 < *florz) { *florz = daz2; *florhit = k+16384; }
+            }
+        }
+        clipsectcnt++;
+    } while (clipsectcnt < clipsectnum);
+
+    for(i=0;i<clipsectnum;i++)
+    {
+        for(j=headspritesect[clipsectorlist[i]];j>=0;j=nextspritesect[j])
+        {
+            spr = &sprite[j];
+            cstat = spr->cstat;
+            if (cstat&dasprclipmask)
+            {
+                x1 = spr->x; y1 = spr->y;
+
+                clipyou = 0;
+                switch(cstat&48)
+                {
+                case 0:
+                    k = walldist+(spr->clipdist<<2)+1;
+                    if ((klabs(x1-x) <= k) && (klabs(y1-y) <= k))
+                    {
+                        daz = spr->z;
+                        k = ((tilesizy[spr->picnum]*spr->yrepeat)<<1);
+                        if (cstat&128) daz += k;
+                        if (picanm[spr->picnum]&0x00ff0000) daz -= ((long)((signed char)((picanm[spr->picnum]>>16)&255))*spr->yrepeat<<2);
+                        daz2 = daz - (k<<1);
+                        clipyou = 1;
+                    }
+                    break;
+                case 16:
+                    tilenum = spr->picnum;
+                    xoff = (long)((signed char)((picanm[tilenum]>>8)&255))+((long)spr->xoffset);
+                    if ((cstat&4) > 0) xoff = -xoff;
+                    k = spr->ang; l = spr->xrepeat;
+                    dax = sintable[k&2047]*l; day = sintable[(k+1536)&2047]*l;
+                    l = tilesizx[tilenum]; k = (l>>1)+xoff;
+                    x1 -= mulscale16(dax,k); x2 = x1+mulscale16(dax,l);
+                    y1 -= mulscale16(day,k); y2 = y1+mulscale16(day,l);
+                    if (clipinsideboxline(x,y,x1,y1,x2,y2,walldist+1) != 0)
+                    {
+                        daz = spr->z; k = ((tilesizy[spr->picnum]*spr->yrepeat)<<1);
+                        if (cstat&128) daz += k;
+                        if (picanm[spr->picnum]&0x00ff0000) daz -= ((long)((signed char)((picanm[spr->picnum]>>16)&255))*spr->yrepeat<<2);
+                        daz2 = daz-(k<<1);
+                        clipyou = 1;
+                    }
+                    break;
+                case 32:
+                    daz = spr->z; daz2 = daz;
+
+                    if ((cstat&64) != 0)
+                        if ((z > daz) == ((cstat&8)==0)) continue;
+
+                    tilenum = spr->picnum;
+                    xoff = (long)((signed char)((picanm[tilenum]>>8)&255))+((long)spr->xoffset);
+                    yoff = (long)((signed char)((picanm[tilenum]>>16)&255))+((long)spr->yoffset);
+                    if ((cstat&4) > 0) xoff = -xoff;
+                    if ((cstat&8) > 0) yoff = -yoff;
+
+                    ang = spr->ang;
+                    cosang = sintable[(ang+512)&2047]; sinang = sintable[ang];
+                    xspan = tilesizx[tilenum]; xrepeat = spr->xrepeat;
+                    yspan = tilesizy[tilenum]; yrepeat = spr->yrepeat;
+
+                    dax = ((xspan>>1)+xoff)*xrepeat; day = ((yspan>>1)+yoff)*yrepeat;
+                    x1 += dmulscale16(sinang,dax,cosang,day)-x;
+                    y1 += dmulscale16(sinang,day,-cosang,dax)-y;
+                    l = xspan*xrepeat;
+                    x2 = x1 - mulscale16(sinang,l);
+                    y2 = y1 + mulscale16(cosang,l);
+                    l = yspan*yrepeat;
+                    k = -mulscale16(cosang,l); x3 = x2+k; x4 = x1+k;
+                    k = -mulscale16(sinang,l); y3 = y2+k; y4 = y1+k;
+
+                    dax = mulscale14(sintable[(spr->ang-256+512)&2047],walldist+4);
+                    day = mulscale14(sintable[(spr->ang-256)&2047],walldist+4);
+                    x1 += dax; x2 -= day; x3 -= dax; x4 += day;
+                    y1 += day; y2 += dax; y3 -= day; y4 -= dax;
+
+                    if ((y1^y2) < 0)
+                    {
+                        if ((x1^x2) < 0) clipyou ^= (x1*y2<x2*y1)^(y1<y2);
+                        else if (x1 >= 0) clipyou ^= 1;
+                    }
+                    if ((y2^y3) < 0)
+                    {
+                        if ((x2^x3) < 0) clipyou ^= (x2*y3<x3*y2)^(y2<y3);
+                        else if (x2 >= 0) clipyou ^= 1;
+                    }
+                    if ((y3^y4) < 0)
+                    {
+                        if ((x3^x4) < 0) clipyou ^= (x3*y4<x4*y3)^(y3<y4);
+                        else if (x3 >= 0) clipyou ^= 1;
+                    }
+                    if ((y4^y1) < 0)
+                    {
+                        if ((x4^x1) < 0) clipyou ^= (x4*y1<x1*y4)^(y4<y1);
+                        else if (x4 >= 0) clipyou ^= 1;
+                    }
+                    break;
+                }
+
+                if (clipyou != 0)
+                {
+                    if ((z > daz) && (daz > *ceilz)) { *ceilz = daz; *ceilhit = j+49152; }
+                    if ((z < daz2) && (daz2 < *florz)) { *florz = daz2; *florhit = j+49152; }
+                }
+            }
+        }
+    }
+}
+
 int sectorofwall(short theline)
 {
     long i, j, gap;
