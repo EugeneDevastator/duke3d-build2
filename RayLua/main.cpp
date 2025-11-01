@@ -20,7 +20,7 @@
 #include <chrono>
 
 #include "DumbRender.hpp"
-#include "luabinder.hpp"
+//#include "luabinder.hpp"
 #include "raymath.h"
 
 
@@ -29,12 +29,6 @@ extern "C" {
 #include "Core/artloader.h"
 
 }
-
-
-
-
-
-
 
 // Profiling variables
 double luaRenderTime = 0.0;
@@ -184,11 +178,11 @@ int main() {
 
     while (!WindowShouldClose()) {
        // if (watcher.HasChanged()) {
-            LuaBinder::LoadScript();
+          //  LuaBinder::LoadScript();
        // }
 
         if (IsKeyPressed(KEY_R)) {
-            LuaBinder::LoadScript();
+          //  LuaBinder::LoadScript();
         }
         // Add the E key check here
         if (IsKeyPressed(KEY_E)) {
@@ -205,17 +199,17 @@ int main() {
         // Drawing phase timing
         auto drawStart = std::chrono::high_resolution_clock::now();
 
-        for (const auto& rect : transparentRects) {
-            Color drawColor = rect.color;
-            if (renderOpaque) {
-                drawColor.a = 255;
-            }
-            DrawRectangle(rect.x, rect.y, rect.width, rect.height, drawColor);
-        }
+     //   for (const auto& rect : transparentRects) {
+     //       Color drawColor = rect.color;
+     //       if (renderOpaque) {
+     //           drawColor.a = 255;
+     //       }
+     //       DrawRectangle(rect.x, rect.y, rect.width, rect.height, drawColor);
+     //   }
 
         // Lua Render timing
         auto luaRenderStart = std::chrono::high_resolution_clock::now();
-        LuaBinder::DoSceneUpdate();
+      //  LuaBinder::DoSceneUpdate();
         auto luaRenderEnd = std::chrono::high_resolution_clock::now();
         luaRenderTime = std::chrono::duration<double, std::milli>(luaRenderEnd - luaRenderStart).count();
 
@@ -224,7 +218,7 @@ int main() {
         rlImGuiBegin();
 
         auto luaUIStart = std::chrono::high_resolution_clock::now();
-        LuaBinder::DoUpdate();
+     //   LuaBinder::DoUpdate();
         auto luaUIEnd = std::chrono::high_resolution_clock::now();
         luaUITime = std::chrono::duration<double, std::milli>(luaUIEnd - luaUIStart).count();
 
@@ -248,7 +242,7 @@ int main() {
     }
 
     rlImGuiShutdown();
-    lua_close(L);
+ //!  lua_close(L);
     CloseWindow();
     return 0;
 }
