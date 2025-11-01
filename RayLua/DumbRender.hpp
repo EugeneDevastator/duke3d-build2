@@ -1,6 +1,20 @@
 //
 // Created by omnis on 10/27/2025.
 //
+/*
+*
+The X-axis runs horizontally, with positive values extending to the right.
+The Y-axis runs vertically, with positive values extending upwards.
+In 3D, the Z-axis extends out of the screen, with positive values going forward.
+
+Forward Direction in raylib
+
+In raylib, the forward direction is typically defined as the positive Z-axis in 3D space. This means:
+
+Moving forward increases the Z-coordinate.
+The forward direction can be visualized as moving away from the camera or viewer.
+
+*/
 
 #ifndef RAYLIB_LUA_IMGUI_DUMBRENDER_H
 #define RAYLIB_LUA_IMGUI_DUMBRENDER_H
@@ -431,21 +445,55 @@ public:
             {
                 Texture2D spriteTex = runtimeTextures[spr->tilnum];
                 Vector3 rg = {spr->r.x, spr->r.y, spr->r.z};
+                Vector3 rg9 = {spr->r.y, spr->r.x, spr->r.z};
                 Vector3 dw = {spr->d.x, spr->d.y, spr->d.z};
-                auto xs = Vector3Length(rg);
-                auto ys = Vector3Length(dw);
-                int xflip = spr->flags & 4 ? -1 : 1;
-                int yflip = spr->flags & 8 ? -1 : 1;
-                Vector3 pos = {spr->p.x - xs, -spr->p.z , spr->p.y};
-                Rectangle source = {0.0f, 0.0f, (float)spriteTex.width, (float)spriteTex.height};
-                xs *= 2;
-                ys *= 2;
+                Vector3 frw = {spr->f.x, spr->f.y, spr->f.z};
+                Vector3 pos = {spr->p.x, spr->p.y, spr->p.z};
+                Vector3 a = pos+rg+frw;
+                Vector3 b = pos+rg-frw;
+                Vector3 c = pos-rg-frw;
+                Vector3 d = pos-rg+frw;
+                if (spr->flags & 32) // spr->flags |= SPRITE_B2_FLAT_POLY;
+                {
+                    rlDisableDepthMask();
+                    rlSetTexture(spriteTex.id);
+                    rlBegin(RL_QUADS);
+                    rlColor4ub(255, 255, 255, 255); // todo update transp.
 
-                DrawBillboardRec(cam, spriteTex, source, pos, {xs*xflip, ys*yflip}, WHITE);
+                    rlTexCoord2f(0.0f, 1.0f);
+                    rlVertex3V(a);
+                    rlTexCoord2f(1.0f , 1.0f);
+                    rlVertex3V(b);
+                    rlTexCoord2f(1.0f , 0.0f);
+                    rlVertex3V(c);
+                    rlTexCoord2f(0.0f, 0.0f);
+                    rlVertex3V(d);
+
+                    rlEnd();
+                    rlSetTexture(0);
+                    rlEnableDepthMask();
+                }
+                else
+                {
+
+                    auto xs = Vector3Length(rg);
+                    auto ys = Vector3Length(dw);
+                    int xflip = spr->flags & 4 ? -1 : 1;
+                    int yflip = spr->flags & 8 ? -1 : 1;
+                    Vector3 pos = {spr->p.x - xs, spr->p.y , spr->p.z};
+                    Rectangle source = {0.0f, 0.0f, (float)spriteTex.width, (float)spriteTex.height};
+                    xs *= 2;
+                    ys *= 2;
+
+                    DrawBillboardRec(cam, spriteTex, source, pos, {xs*xflip, ys*yflip}, WHITE);
+                }
             }
         }
     }
-
+static void rlVertex3V(Vector3 v)
+    {
+        rlVertex3f(v.x, v.y, v.z);
+    }
  static bool IsPointInTriangle(float px, float py, float ax, float ay, float bx, float by, float cx, float cy)
 {
     float denom = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy);
@@ -1060,7 +1108,7 @@ private:
             if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
             map->blankheadspri = i;
         }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/E2l7.MAP", map);
+        loadmap_imp((char*)"c:/Eugene/Games/build2/E2l4.MAP", map);
     }
 };
 

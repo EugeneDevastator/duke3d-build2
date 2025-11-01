@@ -2,7 +2,7 @@
 // Created by omnis on 10/22/2025.
 //
 #include "loaders.h"
-
+// TODO : Replace types with stdint like uint8_t
 // TODO : new mapstate should have raylib friendly coords by default. period.
 point3d buildToRaylib(point3d buildcoord)
 {
@@ -50,6 +50,16 @@ void toRaylibInPlace(point3d *buildcoord)
 #define SECTOR_MASKED           (1 << 7)   // 128
 #define SECTOR_TRANSLUCENT      (1 << 8)   // 256
 #define SECTOR_REVERSE_TRANS    (SECTOR_MASKED | SECTOR_TRANSLUCENT) // 384
+
+
+#define SPRITE_B2_BLOCKING         (1 << 0)   // 1
+#define SPRITE_B2_1         (1 << 1)   // 1
+#define SPRITE_B2_FLIP_X           (1 << 2)   // 4
+#define SPRITE_B2_FLIP_Y           (1 << 3)   // 8
+#define SPRITE_B2_FACING        (1 << 4)   // 16
+#define SPRITE_B2_FLAT_POLY    (1 << 5)   // 32
+#define SPRITE_B2_ONE_SIDED        (1 << 6)   // 64
+
 
 // Convenience macros for flag operations
 #define HAS_FLAG(flags, flag)    ((flags) & (flag))
@@ -659,31 +669,43 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				spr->p.y = ((float)b7spr.y)*(1.f/512.f);
 				spr->p.z = ((float)b7spr.z)*(1.f/(512.f*16.f));
 				spr->flags = 0;
-				switch(b7spr.cstat&48)  // https://wiki.eduke32.com/wiki/Cstat_(sprite)
-										// 48  =32  +16 wall or  floor only check
+
+				int flagsw=b7spr.cstat & (SPRITE_WALL_ALIGNED | SPRITE_FLOOR_ALIGNED);
+				if  (flagsw ==0) //Face sprite
+					spr->flags |= SPRITE_B2_FACING;
+				if  (flagsw & SPRITE_WALL_ALIGNED)
+					spr->flags |= SPRITE_B2_FLAT_POLY;
+				if  (flagsw & SPRITE_FLOOR_ALIGNED)
+					spr->flags |= SPRITE_B2_FLAT_POLY;
+				switch(flagsw)  // https://wiki.eduke32.com/wiki/Cstat_(sprite)
 					{
-					case 0: //Face sprite
-						spr->flags |= 16;
-						//no break intentional
+					case 0: //facing
 					case 48: //Voxel sprite
 						//no break intentional
-					case 16: //Wall sprite
+					case SPRITE_WALL_ALIGNED: //Wall sprite
 						spr->p.z -= (b7spr.yrepeat/4096.0*(float)tilesizy[l]);
 						spr->r.x = sin((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
 						spr->r.y =-cos((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
 						spr->d.z = (b7spr.yrepeat/4096.0*(float)tilesizy[l]);
+						spr->f.z=0; // forward remains unit.
+						spr->f.x=cos((float)b7spr.ang*PI/1024.0);
+						spr->f.y=sin((float)b7spr.ang*PI/1024.0);
 						break;
-					case 32: //Floor sprite
+					case SPRITE_FLOOR_ALIGNED: //Floor sprite
+					// forward faces up, right faces right, down faces along build's forward;
 						spr->r.x = sin((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
 						spr->r.y =-cos((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
 						spr->d.x = cos((float)b7spr.ang*PI/1024.0)*(b7spr.yrepeat/4096.0*(float)tilesizy[l]);
 						spr->d.y = sin((float)b7spr.ang*PI/1024.0)*(b7spr.yrepeat/4096.0*(float)tilesizy[l]);
-						if (b7spr.cstat&8) { spr->d.x *= -1; spr->d.y *= -1; }
+						spr->f.z=0; // sus
+						spr->f.x=cos((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l];
+						spr->f.y=sin((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l];
+					if (b7spr.cstat&8) { spr->d.x *= -1; spr->d.y *= -1; }
 						break;
 				}
 
 				if (b7spr.cstat&1) spr->flags |= 1; // blocking
-				if (HAS_FLAG(b7spr.cstat, SPRITE_ONE_SIDED)) spr->flags |= 64; // 1 sided
+				if (HAS_FLAG(b7spr.cstat, SPRITE_ONE_SIDED)) spr->flags |= SPRITE_B2_ONE_SIDED; // 1 sided
 				if (b7spr.cstat&4) { spr->r.x *= -1; spr->r.y *= -1; spr->r.z *= -1; spr->flags ^= 4; } //&4: x-flipped
 				if (b7spr.cstat&8) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; spr->flags ^= 8; } //&8: y-flipped?
 				if (b7spr.cstat&128) { spr->p.z += (b7spr.yrepeat/4096.0*(float)tilesizy[l]); } //&128: real-centered centering (center at center) - originally half submerged sprite
@@ -694,9 +716,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					if (iskenbuild) b7spr.shade += j+6;
 				}
 
-				spr->f.z=3; // sus
-				spr->f.x=cos((float)b7spr.ang*PI/1024.0);
-				spr->f.y=sin((float)b7spr.ang*PI/1024.0);
+
 				spr->fat = 0.f;
 				spr->asc = 4096;
 				spr->rsc = (32-b7spr.shade)*128;
@@ -712,6 +732,11 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				spr->lotag = b7spr.lotag;
 				spr->hitag = b7spr.hitag;
 				spr->pal = b7spr.pal;
+
+				toRaylibInPlace(&spr->p);
+				toRaylibInPlace(&spr->r);
+				toRaylibInPlace(&spr->d);
+				toRaylibInPlace(&spr->f);
 			}
 
 			toRaylibInPlace(&map->startpos);
