@@ -24,23 +24,28 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
 
-#include "types.h"
-#include "develop.h"
-#include "scriplib.h"
+//#include "types.h"
+//#include "develop.h"
+//#include "scriplib.h"
 #include "file_lib.h"
 #include "gamedefs.h"
 #include "keyboard.h"
-#include "util_lib.h"
+//#include "util_lib.h"
 #include "function.h"
 #include "control.h"
 #include "fx_man.h"
 #include "music.h"
 #include "sounds.h"
-#include "config.h"
+//#include "config.h"
+#include "mmulti.h"
+#include "player.c"
+#include "mathutil.h"
 //#include "sndcards.h"
 
+#include "CACHE1D.H"
 #include "duke3d.h"
 #include "engine.h"
+//#include "cache1d.c"
 
 
 #ifdef VOLUMEONE
@@ -85,7 +90,7 @@ char firstdemofile[80] = { '\0' };
         scale(x2,xdim,320)-1,scale(y2,ydim,200)-1);                        \
 }
 
-void __interrupt __far newint24( int errval, int ax, int bp, int si );
+//void __interrupt __far newint24( int errval, int ax, int bp, int si );
 
 int recfilep,totalreccnt;
 char debug_on = 0,actor_tog = 0,*rtsptr,memorycheckoveride=0;
@@ -105,14 +110,15 @@ task *TimerPtr=NULL;
 
 extern long lastvisinc;
 
-void timerhandler()
+void timerhandler(task *t)
 {
+    (void)t; // Suppress unused parameter warning
     totalclock++;
 }
 
 void inittimer()
 {
-    TimerPtr = TS_ScheduleTask( timerhandler,TICRATE, 1, NULL );
+    TimerPtr = TS_ScheduleTask(timerhandler, TICRATE, 1, NULL);
     TS_Dispatch();
 }
 
@@ -348,7 +354,7 @@ short user_quote_time[MAXUSERQUOTES];
 char user_quote[MAXUSERQUOTES][128];
 // char typebuflen,typebuf[41];
 
-adduserquote(char *daquote)
+void adduserquote(char *daquote)
 {
     long i;
 
@@ -537,7 +543,7 @@ void getpackets(void)
 
                 if(numlumps == 0) break;
 
-                if (SoundToggle == 0 || ud.lockout == 1 || FXDevice == NumSoundCards)
+                if (SoundToggle == 0 || ud.lockout == 1 )//|| FXDevice == NumSoundCards)
                     break;
                 rtsptr = (char *)RTS_GetSound(packbuf[1]-1);
                 if (*rtsptr == 'C')
@@ -922,8 +928,8 @@ void faketimerhandler()
 }
 
 extern long cacnum;
-typedef struct { long *hand, leng; char *lock; } cactype;
-extern cactype cac[];
+// typedef struct { long *hand, leng; char *lock; } cactype;
+cactype cac[];
 
 void caches(void)
 {
@@ -1295,7 +1301,7 @@ void weaponnum999(char ind,long x,long y,long num1, long num2,char ha)
 
 
     //REPLACE FULLY
-void weapon_amounts(struct player_struct *p,long x,long y,long u)
+void weapon_amounts(player_struct *p,long x,long y,long u)
 {
      int cw;
 
@@ -1453,7 +1459,7 @@ void scratchmarks(long x,long y,long n,char s,char p)
     if(ni) overwritesprite(x,y,SCRATCH+ni-1,s,p,0);
 }
   */
-void displayinventory(struct player_struct *p)
+void displayinventory(player_struct *p)
 {
     short n, j, xoff, y;
 
@@ -1884,7 +1890,7 @@ void operatefta(void)
          gametext(320>>1,k,fta_quotes[ps[screenpeek].ftq],0,2+8+16+1+32);
 }
 
-void FTA(short q,struct player_struct *p)
+void FTA(short q, player_struct *p)
 {
     if( ud.fta_on == 1)
     {
@@ -1912,13 +1918,13 @@ void showtwoscreens(void)
     flushperms();
     ps[myconnectindex].palette = palette;
     for(i=0;i<64;i+=7) palto(0,0,0,i);
-    KB_FlushKeyboardQueue();
+    KB_FlushKeyBoardQueue();
     rotatesprite(0,0,65536L,0,3291,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
     nextpage(); for(i=63;i>0;i-=7) palto(0,0,0,i);
     while( !KB_KeyWaiting() ) getpackets();
 
     for(i=0;i<64;i+=7) palto(0,0,0,i);
-    KB_FlushKeyboardQueue();
+    KB_FlushKeyBoardQueue();
     rotatesprite(0,0,65536L,0,3290,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
     nextpage(); for(i=63;i>0;i-=7) palto(0,0,0,i);
     while( !KB_KeyWaiting() ) getpackets();
@@ -2469,7 +2475,7 @@ void updatesectorz(long x, long y, long z, short *sectnum)
     *sectnum = -1;
 }
 
-void view(struct player_struct *pp, long *vx, long *vy,long *vz,short *vsectnum, short ang, short horiz)
+void view(player_struct *pp, long *vx, long *vy,long *vz,short *vsectnum, short ang, short horiz)
 {
      spritetype *sp;
      long i, nx, ny, nz, hx, hy, hz, hitx, hity, hitz;
@@ -2612,7 +2618,8 @@ long tempsectorz[MAXSECTORS];
 long tempsectorpicnum[MAXSECTORS];
 //short tempcursectnum;
 
-SE40_Draw(int spnum,long x,long y,long z,short a,short h,long smoothratio)
+// "Floor Over Floor" (FOF) rendering effect
+void SE40_Draw(int spnum,long x,long y,long z,short a,short h,long smoothratio)
 {
  int i=0,j=0,k=0;
  int floor1=0,floor2=0,ok=0,fofmode=0;
@@ -6113,7 +6120,7 @@ void cheats(void)
 //                    FTA(25,&ps[myconnectindex]);
                     cheatbuflen = 0;
                 }
-                KB_FlushKeyboardQueue();
+                KB_FlushKeyBoardQueue();
             }
             else if(ps[myconnectindex].cheat_phase != 0)
             {
@@ -6290,7 +6297,7 @@ void nonsharedkeys(void)
 
         if( ud.multimode > 1 && BUTTON(gamefunc_SendMessage) )
         {
-            KB_FlushKeyboardQueue();
+            KB_FlushKeyBoardQueue();
             CONTROL_ClearButton( gamefunc_SendMessage );
             ps[myconnectindex].gm |= MODE_TYPE;
             typebuf[0] = 0;
@@ -6378,7 +6385,7 @@ void nonsharedkeys(void)
             }
         }
 
-        if(KB_KeyPressed( sc_F4 ) && FXDevice != NumSoundCards )
+        if(KB_KeyPressed( sc_F4 ) )//&& FXDevice != NumSoundCards )
         {
             KB_ClearKeyDown( sc_F4 );
             FX_StopAllSounds();
@@ -6403,7 +6410,7 @@ void nonsharedkeys(void)
 
             if(lastsavedpos == -1) goto FAKE_F2;
 
-            KB_FlushKeyboardQueue();
+            KB_FlushKeyBoardQueue();
 
             if(sprite[ps[myconnectindex].i].extra <= 0)
             {
@@ -6446,15 +6453,15 @@ void nonsharedkeys(void)
             FTA(109+ps[myconnectindex].over_shoulder_on,&ps[myconnectindex]);
         }
 
-        if( KB_KeyPressed( sc_F5 ) && MusicDevice != NumSoundCards )
-        {
-            KB_ClearKeyDown( sc_F5 );
-            strcpy(&tempbuf[0],&music_fn[0][music_select][0]);
-            strcat(&tempbuf[0],".  USE SHIFT-F5 TO CHANGE.");
-            strcpy(&fta_quotes[26][0],&tempbuf[0]);
-            FTA(26,&ps[myconnectindex]);
+      // if( KB_KeyPressed( sc_F5 ) && MusicDevice != NumSoundCards )
+      // {
+      //     KB_ClearKeyDown( sc_F5 );
+      //     strcpy(&tempbuf[0],&music_fn[0][music_select][0]);
+      //     strcat(&tempbuf[0],".  USE SHIFT-F5 TO CHANGE.");
+      //     strcpy(&fta_quotes[26][0],&tempbuf[0]);
+      //     FTA(26,&ps[myconnectindex]);
 
-        }
+      // }
 
         if(KB_KeyPressed( sc_F8 ))
         {
@@ -6936,7 +6943,7 @@ void Logo(void)
 
     ready2send = 0;
 
-    KB_FlushKeyboardQueue();
+    KB_FlushKeyBoardQueue();
 
     setview(0,0,xdim-1,ydim-1);
     clearview(0L);
@@ -6954,7 +6961,7 @@ void Logo(void)
         getpackets();
         playanm("logo.anm",5);
         palto(0,0,0,63);
-        KB_FlushKeyboardQueue();
+        KB_FlushKeyBoardQueue();
     }
 
     clearview(0L);
@@ -6978,7 +6985,7 @@ void Logo(void)
     ps[myconnectindex].palette = titlepal;
     flushperms();
     rotatesprite(0,0,65536L,0,BETASCREEN,0,0,2+8+16+64,0,0,xdim-1,ydim-1);
-    KB_FlushKeyboardQueue();
+    KB_FlushKeyBoardQueue();
     nextpage();
     for(i=63;i>0;i-=7) palto(0,0,0,i);
     totalclock = 0;
@@ -7148,7 +7155,7 @@ void Startup(void)
 
 #endif
 
-   CONTROL_Startup( ControllerType, &GetTime, TICRATE );
+   //CONTROL_Startup( ControllerType, &GetTime, TICRATE );
 
 // CTW - MODIFICATION
 // initengine(ScreenMode,ScreenWidth,ScreenHeight);
@@ -7382,14 +7389,15 @@ void main(int argc,char **argv)
         vidoption = 2;
         setgamemode(vidoption,320,200);
     }*/
-    if( setgamemode(ScreenMode,ScreenWidth,ScreenHeight) < 0 )
-    {
-        printf("\nVESA driver for ( %i * %i ) not found/supported!\n",xdim,ydim);
-        ScreenMode = 2;
-        ScreenWidth = 320;
-        ScreenHeight = 200;
-        setgamemode(ScreenMode,ScreenWidth,ScreenHeight);
-    }
+    // used dos code
+  //  if( setgamemode(ScreenMode,ScreenWidth,ScreenHeight) < 0 )
+  //  {
+  //      printf("\nVESA driver for ( %i * %i ) not found/supported!\n",xdim,ydim);
+  //      ScreenMode = 2;
+  //      ScreenWidth = 320;
+  //      ScreenHeight = 200;
+  //      setgamemode(ScreenMode,ScreenWidth,ScreenHeight);
+  //  }
 // CTW END - MODIFICATION
 
     genspriteremaps();
@@ -7597,7 +7605,7 @@ long playback(void)
     ready2send = 0;
     i = 0;
 
-    KB_FlushKeyboardQueue();
+    KB_FlushKeyBoardQueue();
 
     k = 0;
 
@@ -7664,7 +7672,7 @@ long playback(void)
                // CONTROL_GetInput( &noshareinfo );
                 if( BUTTON(gamefunc_SendMessage) )
                 {
-                    KB_FlushKeyboardQueue();
+                    KB_FlushKeyBoardQueue();
                     CONTROL_ClearButton( gamefunc_SendMessage );
                     ps[myconnectindex].gm = MODE_TYPE;
                     typebuf[0] = 0;
@@ -8390,28 +8398,28 @@ void doorders(void)
     for(i=0;i<63;i+=7) palto(0,0,0,i);
     ps[myconnectindex].palette = palette;
     totalclock = 0;
-    KB_FlushKeyboardQueue();
+    KB_FlushKeyBoardQueue();
     rotatesprite(0,0,65536L,0,ORDERING,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
     nextpage(); for(i=63;i>0;i-=7) palto(0,0,0,i);
     totalclock = 0;while( !KB_KeyWaiting() ) getpackets();
 
     for(i=0;i<63;i+=7) palto(0,0,0,i);
     totalclock = 0;
-    KB_FlushKeyboardQueue();
+    KB_FlushKeyBoardQueue();
     rotatesprite(0,0,65536L,0,ORDERING+1,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
     nextpage(); for(i=63;i>0;i-=7) palto(0,0,0,i);
     totalclock = 0;while( !KB_KeyWaiting() ) getpackets();
 
     for(i=0;i<63;i+=7) palto(0,0,0,i);
     totalclock = 0;
-    KB_FlushKeyboardQueue();
+    KB_FlushKeyBoardQueue();
     rotatesprite(0,0,65536L,0,ORDERING+2,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
     nextpage(); for(i=63;i>0;i-=7) palto(0,0,0,i);
     totalclock = 0;while( !KB_KeyWaiting() ) getpackets();
 
     for(i=0;i<63;i+=7) palto(0,0,0,i);
     totalclock = 0;
-    KB_FlushKeyboardQueue();
+    KB_FlushKeyBoardQueue();
     rotatesprite(0,0,65536L,0,ORDERING+3,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
     nextpage(); for(i=63;i>0;i-=7) palto(0,0,0,i);
     totalclock = 0;while( !KB_KeyWaiting() ) getpackets();
@@ -8467,7 +8475,7 @@ void dobonus(char bonusonly)
                 ps[myconnectindex].palette = endingpal;
                 for(t=63;t>=0;t--) palto(0,0,0,t);
 
-                KB_FlushKeyboardQueue();
+                KB_FlushKeyBoardQueue();
                 totalclock = 0; tinc = 0;
                 while( 1 )
                 {
@@ -8510,7 +8518,7 @@ void dobonus(char bonusonly)
 
             for(t=0;t<64;t++) palto(0,0,0,t);
 
-            KB_FlushKeyboardQueue();
+            KB_FlushKeyBoardQueue();
             ps[myconnectindex].palette = palette;
 
             rotatesprite(0,0,65536L,0,3292,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
@@ -8538,7 +8546,7 @@ void dobonus(char bonusonly)
 
             for(t=0;t<64;t++) palto(0,0,0,t);
             setview(0,0,xdim-1,ydim-1);
-            KB_FlushKeyboardQueue();
+            KB_FlushKeyBoardQueue();
             ps[myconnectindex].palette = palette;
             rotatesprite(0,0,65536L,0,3293,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
             nextpage(); for(t=63;t>0;t--) palto(0,0,0,t);
@@ -8557,7 +8565,7 @@ void dobonus(char bonusonly)
 
             if(ud.lockout == 0)
             {
-                KB_FlushKeyboardQueue();
+                KB_FlushKeyBoardQueue();
                 playanm("vol4e1.anm",8);
                 clearview(0L);
                 nextpage();
@@ -8585,7 +8593,7 @@ void dobonus(char bonusonly)
             nextpage();
 
             for(t=63;t>0;t-=3) palto(0,0,0,t);
-            KB_FlushKeyboardQueue();
+            KB_FlushKeyBoardQueue();
             while(!KB_KeyWaiting()) getpackets();
             for(t=0;t<64;t+=3) palto(0,0,0,t);
 
@@ -8665,7 +8673,7 @@ void dobonus(char bonusonly)
     FRAGBONUS:
 
     ps[myconnectindex].palette = palette;
-    KB_FlushKeyboardQueue();
+    KB_FlushKeyBoardQueue();
     totalclock = 0; tinc = 0;
     bonuscnt = 0;
 
@@ -8675,7 +8683,7 @@ void dobonus(char bonusonly)
 
     if(playerswhenstarted > 1 && ud.coop != 1 )
     {
-        if(!(MusicToggle == 0 || MusicDevice == NumSoundCards))
+        if(!(MusicToggle == 0 ))// || MusicDevice == NumSoundCards))
             sound(BONUSMUSIC);
 
         rotatesprite(0,0,65536L,0,MENUSCREEN,16,0,2+8+16+64,0,0,xdim-1,ydim-1);
@@ -8750,7 +8758,7 @@ void dobonus(char bonusonly)
         for(t=0;t<64;t+=7)
             palto(0,0,0,63-t);
 
-        KB_FlushKeyboardQueue();
+        KB_FlushKeyBoardQueue();
         while(KB_KeyWaiting()==0) getpackets();
 
         if( KB_KeyPressed( sc_F12 ) )
@@ -8783,11 +8791,11 @@ void dobonus(char bonusonly)
 
     gametext(160,192,"PRESS ANY KEY TO CONTINUE",16,2+8+16);
 
-    if(!(MusicToggle == 0 || MusicDevice == NumSoundCards))
+    if(!(MusicToggle == 0 ))//|| MusicDevice == NumSoundCards))
         sound(BONUSMUSIC);
 
     nextpage();
-    KB_FlushKeyboardQueue();
+    KB_FlushKeyBoardQueue();
     for(t=0;t<64;t++) palto(0,0,0,63-t);
     bonuscnt = 0;
     totalclock = 0; tinc = 0;
@@ -8955,7 +8963,7 @@ void dobonus(char bonusonly)
 
                 if( totalclock < (60*13) )
                 {
-                    KB_FlushKeyboardQueue();
+                    KB_FlushKeyBoardQueue();
                     totalclock = (60*13);
                 }
                 else if( totalclock < (1000000000L))

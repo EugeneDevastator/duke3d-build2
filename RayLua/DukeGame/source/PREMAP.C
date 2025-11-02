@@ -1291,7 +1291,7 @@ void dofrontscreens(void)
 
         for(j=63;j>0;j-=7) palto(0,0,0,j);
 
-        KB_FlushKeyboardQueue();
+        KB_FlushKeyBoardQueue();
         ud.screen_size = i;
     }
     else

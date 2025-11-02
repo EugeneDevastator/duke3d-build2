@@ -26,6 +26,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
 
+
 extern void sendscore(char *s);
 //#line "sounds.c" 25
 extern void SoundStartup(void );
@@ -58,7 +59,7 @@ extern void stopenvsound(short num,short i);
 //#line "sounds.c" 494
 extern void pan3dsound(void );
 //#line "sounds.c" 571
-extern void TestCallBack(long num);
+//extern void TestCallBack(long num);
 //#line "sector.c" 9
 extern short callsound(short sn,short whatsprite);
 //#line "sector.c" 56
@@ -108,7 +109,7 @@ extern void activatebysector(short sect,short j);
 //#line "sector.c" 1532
 extern void checkhitwall(short spr,short dawallnum,long x,long y,long z,short atwith);
 //#line "sector.c" 1746
-extern void checkplayerhurt(struct player_struct *p,short j);
+extern void checkplayerhurt(player_struct *p,short j);
 //#line "sector.c" 1816
 extern char checkhitceiling(short sn);
 //#line "sector.c" 1891
@@ -178,13 +179,13 @@ extern void dofrontscreens(void );
 //#line "premap.c" 1285
 extern void enterlevel(char g);
 //#line "player.c" 10
-extern void setpal(struct player_struct *p);
+extern void setpal(player_struct *p);
 //#line "player.c" 28
-extern void incur_damage(struct player_struct *p);
+extern void incur_damage(player_struct *p);
 //#line "player.c" 59
-extern void quickkill(struct player_struct *p);
+extern void quickkill(player_struct *p);
 //#line "player.c" 73
-extern void forceplayerangle(struct player_struct *p);
+extern void forceplayerangle(player_struct *p);
 //#line "player.c" 85
 extern void tracers(long x1,long y1,long z1,long x2,long y2,long z2,long n);
 //#line "player.c" 114
@@ -192,7 +193,7 @@ extern long hits(short i);
 //#line "player.c" 131
 extern long hitasprite(short i,short *hitsp);
 //#line "player.c" 152
-extern long hitawall(struct player_struct *p,short *hitw);
+extern long hitawall(player_struct *p,short *hitw);
 //#line "player.c" 163
 extern short aim(spritetype *s,short aang);
 //#line "player.c" 234
@@ -216,9 +217,9 @@ extern void displayweapon(short snum);
 //#line "player.c" 1501
 extern void getinput(short snum);
 //#line "player.c" 1742
-extern char doincrements(struct player_struct *p);
+extern char doincrements(player_struct *p);
 //#line "player.c" 1935
-extern void checkweapons(struct player_struct *p);
+extern void checkweapons(player_struct *p);
 //#line "player.c" 1951
 extern void processinput(short snum);
 //#line "menues.c" 18
@@ -300,7 +301,7 @@ extern void execute(short i,short p,long x);
 //#line "game.c" 63
 extern void overwritesprite(long thex,long they,short tilenum,signed char shade,char stat,char dapalnum);
 //#line "game.c" 70
-extern void timerhandler(void);
+extern void timerhandler(task *);
 //#line "game.c" 75
 extern void inittimer(void);
 //#line "game.c" 81
@@ -342,13 +343,13 @@ extern void weaponnum(short ind,long x,long y,long num1,long num2,char ha);
 //#line "game.c" 1049
 extern void weaponnum999(char ind,long x,long y,long num1,long num2,char ha);
 //#line "game.c" 1088
-extern void weapon_amounts(struct player_struct *p,long x,long y,long u);
+extern void weapon_amounts(player_struct *p,long x,long y,long u);
 //#line "game.c" 1197
 extern void digitalnumber(long x,long y,long n,char s,char cs);
 //#line "game.c" 1223
 extern void scratchmarks(long x,long y,long n,char s,char p);
 //#line "game.c" 1238
-extern void displayinventory(struct player_struct *p);
+extern void displayinventory(player_struct *p);
 //#line "game.c" 1296
 extern void displayfragbar(void );
 //#line "game.c" 1318
@@ -362,7 +363,7 @@ extern void coords(short snum);
 //#line "game.c" 1607
 extern void operatefta(void);
 //#line "game.c" 1654
-extern void FTA(short q,struct player_struct *p);
+extern void FTA(short q,player_struct *p);
 //#line "game.c" 1668
 extern void showtwoscreens(void );
 //#line "game.c" 1691
@@ -376,7 +377,7 @@ extern void displayrest(long smoothratio);
 //#line "game.c" 2047
 extern void updatesectorz(long x,long y,long z,short *sectnum);
 //#line "game.c" 2085
-extern void view(struct player_struct *pp,long *vx,long *vy,long *vz,short *vsectnum,short ang,short horiz);
+extern void view(player_struct *pp,long *vx,long *vy,long *vz,short *vsectnum,short ang,short horiz);
 //#line "game.c" 2137
 extern void drawbackground(void );
 //#line "game.c" 2200
@@ -490,15 +491,15 @@ extern void CONFIG_WriteSetup(void );
 //#line "animlib.c" 34
 extern void CheckAnimStarted(char *funcname);
 //#line "animlib.c" 46
-extern uint16 findpage(uint16 framenumber);
+extern uint16_t findpage(uint16_t framenumber);
 //#line "animlib.c" 71
-extern void loadpage(uint16 pagenumber,uint16 *pagepointer);
+extern void loadpage(uint16_t pagenumber,uint16_t *pagepointer);
 //#line "animlib.c" 97
 extern void CPlayRunSkipDump(char *srcP,char *dstP);
 //#line "animlib.c" 177
-extern void renderframe(uint16 framenumber,uint16 *pagepointer);
+extern void renderframe(uint16_t framenumber,uint16_t *pagepointer);
 //#line "animlib.c" 214
-extern void drawframe(uint16 framenumber);
+extern void drawframe(uint16_t framenumber);
 //#line "animlib.c" 228
 extern void ANIM_LoadAnim(char *buffer);
 //#line "animlib.c" 260
@@ -506,9 +507,9 @@ extern void ANIM_FreeAnim(void );
 //#line "animlib.c" 275
 extern int32_t ANIM_NumFrames(void );
 //#line "animlib.c" 287
-extern byte *ANIM_DrawFrame(int32_t framenumber);
+extern uint8_t *ANIM_DrawFrame(int32_t framenumber);
 //#line "animlib.c" 312
-extern byte *ANIM_GetPalette(void );
+extern uint8_t *ANIM_GetPalette(void );
 //#line "actors.c" 7
 extern void updateinterpolations(void);
 //#line "actors.c" 15
@@ -526,11 +527,11 @@ extern long floorspace(short sectnum);
 //#line "actors.c" 91
 extern void addammo(short weapon,struct player_struct *p,short amount);
 //#line "actors.c" 99
-extern void addweapon(struct player_struct *p,short weapon);
+extern void addweapon(player_struct *p,short weapon);
 //#line "actors.c" 132
-extern void checkavailinven(struct player_struct *p);
+extern void checkavailinven(player_struct *p);
 //#line "actors.c" 152
-extern void checkavailweapon(struct player_struct *p);
+extern void checkavailweapon(player_struct *p);
 //#line "actors.c" 301
 extern long ifsquished(short i,short p);
 //#line "actors.c" 326

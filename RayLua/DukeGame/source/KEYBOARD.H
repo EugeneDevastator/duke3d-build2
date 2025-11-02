@@ -208,18 +208,18 @@ extern volatile kb_scancode KB_LastScan;
 */
 
 void KB_KeyEvent( int scancode, bool keypressed );  // Interprets scancodes
-bool KB_KeyWaiting( void );         // Checks if a character is waiting in the keyboard queue
-char    KB_Getch( void );              // Gets the next keypress
+bool KB_KeyWaiting(  );         // Checks if a character is waiting in the keyboard queue
+char    KB_Getch(  );              // Gets the next keypress
 void    KB_Addch( char ch );           // Adds key to end of queue
-void    KB_FlushKeyboardQueue( void ); // Empties the keyboard queue of all waiting characters.
-void    KB_ClearKeysDown( void );      // Clears all keys down flags.
+void    KB_FlushKeyBoardQueue(  ); // Empties the keyboard queue of all waiting characters.
+void    KB_ClearKeysDown(  );      // Clears all keys down flags.
 char *  KB_ScanCodeToString( kb_scancode scancode ); // convert scancode into a string
 kb_scancode KB_StringToScanCode( char * string );  // convert a string into a scancode
-void    KB_TurnKeypadOn( void );       // turn the keypad on
-void    KB_TurnKeypadOff( void );      // turn the keypad off
-bool KB_KeypadActive( void );       // check whether keypad is active
-void    KB_Startup( void );
-void    KB_Shutdown( void );
+void    KB_TurnKeypadOn(  );       // turn the keypad on
+void    KB_TurnKeypadOff(  );      // turn the keypad off
+bool KB_KeypadActive(  );       // check whether keypad is active
+void    KB_Startup(  );
+void    KB_Shutdown(  );
 
 #ifdef __cplusplus
 };

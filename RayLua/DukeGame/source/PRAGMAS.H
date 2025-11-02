@@ -25,7 +25,13 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 //-------------------------------------------------------------------------
 
 static long dmval;
+static inline int min(int a, int b) {
+	return (a < b) ? a : b;
+}
 
+static inline int max(int a, int b) {
+	return (a > b) ? a : b;
+}
 #pragma aux sqr =\
 	"imul eax, eax",\
    parm nomemory [eax]\

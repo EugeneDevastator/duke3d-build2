@@ -26,36 +26,12 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
 
-#ifndef __TASK_MAN_H
-#define __TASK_MAN_H
+include <stdint.h>;
 
-enum TASK_ERRORS
-   {
-   TASK_Warning = -2,
-   TASK_Error = -1,
-   TASK_Ok = 0
-   };
+extern int32_t FindDistance2D(int32_t dx, int32_t dy);
+extern int32_t FindDistance3D(int32_t dx, int32_t dy, int32_t dz);
+//extern int32_t FindDistance3D_HP(int32_t dx, int32_t dy, int32_t dz);
+extern int32_t ArcTangentAppx(int32_t dx, int32_t dy);
 
-typedef struct task
-{
-    struct task *next;
-    struct task *prev;
-    void (*TaskService)(struct task *);
-    void *data;
-    int32_t rate;
-    volatile int32_t count;
-    int priority;
-    int active;
-} task;
 
-extern volatile int TS_InInterrupt;
 
-void TS_Shutdown(void);
-task *TS_ScheduleTask(void (*Function)(task *), int rate, int priority, void *data);
-int TS_Terminate(task *ptr);
-void TS_Dispatch(void);
-void TS_SetTaskRate(task *Task, int rate);
-void TS_UnlockMemory(void);
-int TS_LockMemory(void);
-
-#endif

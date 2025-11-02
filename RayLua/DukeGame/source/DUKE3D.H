@@ -89,7 +89,6 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 //#include "sndcards.h"
 
 #include "names.h"
-#include "funct.h"
 
 
 #define TICRATE (120)

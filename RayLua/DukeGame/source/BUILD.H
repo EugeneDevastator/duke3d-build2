@@ -144,7 +144,7 @@ EXTERN long xdim, ydim, ylookup[MAXYDIM+1], numpages;
 EXTERN long yxaspect, viewingrange;
 
 EXTERN short numsectors, numwalls;
-EXTERN volatile long totalclock;
+EXTERN long totalclock;
 EXTERN long numframes, randomseed;
 EXTERN short sintable[2048];
 EXTERN char palette[768];

@@ -13,7 +13,8 @@ set(SOURCES
         #game.c
         KDMENG.C
         BUILD.C
-        GAME_NOSYS.C;
+        GAME_NOSYS.C
+        keyboard.c;
 
         # Add more .c files here
 )
@@ -30,6 +31,14 @@ set(HEADERS
         keyboard.h
         MMULTI.H
         MUSIC.H
+        funct.h
+        control.h
+        MMULTI.H
+        PLAYER.C
+        MATHUTIL.H
+        MATHUTIL.H
+        CACHE1D.H
+        Cache1d.c
 
         # Add more .h files here
 )

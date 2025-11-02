@@ -5302,6 +5302,35 @@ int drawline16(long x1, long y1, long x2, long y2, char col)
     }
 }
 
+int printext256(long xpos, long ypos, short col, short backcol, char name[82], char fontsize)
+{
+    long stx, i, x, y, charxsiz;
+    char *fontptr, *letptr, *ptr;
+
+    stx = xpos;
+
+    if (fontsize) { fontptr = smalltextfont; charxsiz = 4; }
+    else { fontptr = textfont; charxsiz = 8; }
+
+    for(i=0;name[i];i++)
+    {
+        letptr = &fontptr[name[i]<<3];
+        ptr = (char *)(ylookup[ypos+7]+(stx-fontsize)+frameplace);
+        for(y=7;y>=0;y--)
+        {
+            for(x=charxsiz-1;x>=0;x--)
+            {
+                if (letptr[y]&pow2char[7-fontsize-x])
+                    ptr[x] = (char)col;
+                else if (backcol >= 0)
+                    ptr[x] = (char)backcol;
+            }
+            ptr -= ylookup[1];
+        }
+        stx += charxsiz;
+    }
+}
+
 int krand()
 {
     randomseed = (randomseed*27584621)+1;
@@ -6097,6 +6126,108 @@ int clearallviews(long dacol)
         break;
     }
     faketimerhandler();
+}
+
+int setviewtotile(short tilenume, long xsiz, long ysiz)
+{
+    long i, j;
+
+    //DRAWROOMS TO TILE BACKUP&SET CODE
+    tilesizx[tilenume] = xsiz; tilesizy[tilenume] = ysiz;
+    bakxsiz[setviewcnt] = xsiz; bakysiz[setviewcnt] = ysiz;
+    bakvidoption[setviewcnt] = vidoption; vidoption = 2;
+    bakframeplace[setviewcnt] = frameplace; frameplace = waloff[tilenume];
+    bakwindowx1[setviewcnt] = windowx1; bakwindowy1[setviewcnt] = windowy1;
+    bakwindowx2[setviewcnt] = windowx2; bakwindowy2[setviewcnt] = windowy2;
+    copybufbyte(&startumost[windowx1],&bakumost[windowx1],(windowx2-windowx1+1)*sizeof(bakumost[0]));
+    copybufbyte(&startdmost[windowx1],&bakdmost[windowx1],(windowx2-windowx1+1)*sizeof(bakdmost[0]));
+    setview(0,0,ysiz-1,xsiz-1);
+    setaspect(65536,65536);
+    j = 0; for(i=0;i<=xsiz;i++) { ylookup[i] = j, j += ysiz; }
+    setvlinebpl(ysiz);
+    setviewcnt++;
+}
+
+int setviewback()
+{
+    long i, j, k, xsiz, ysiz;
+
+    if (setviewcnt <= 0) return;
+    setviewcnt--;
+
+    setview(bakwindowx1[setviewcnt],bakwindowy1[setviewcnt],
+            bakwindowx2[setviewcnt],bakwindowy2[setviewcnt]);
+    copybufbyte(&bakumost[windowx1],&startumost[windowx1],(windowx2-windowx1+1)*sizeof(startumost[0]));
+    copybufbyte(&bakdmost[windowx1],&startdmost[windowx1],(windowx2-windowx1+1)*sizeof(startdmost[0]));
+    vidoption = bakvidoption[setviewcnt];
+    frameplace = bakframeplace[setviewcnt];
+    if (setviewcnt == 0)
+        k = bakxsiz[0];
+    else
+        k = max(bakxsiz[setviewcnt-1],bakxsiz[setviewcnt]);
+    j = 0; for(i=0;i<=k;i++) ylookup[i] = j, j += bytesperline;
+    setvlinebpl(bytesperline);
+}
+
+int squarerotatetile(short tilenume)
+{
+    long i, j, k, xsiz, ysiz;
+    char *ptr1, *ptr2;
+
+    xsiz = tilesizx[tilenume]; ysiz = tilesizy[tilenume];
+
+    //supports square tiles only for rotation part
+    if (xsiz == ysiz)
+    {
+        k = (xsiz<<1);
+        for(i=xsiz-1;i>=0;i--)
+        {
+            ptr1 = (char *)(waloff[tilenume]+i*(xsiz+1)); ptr2 = ptr1;
+            if ((i&1) != 0) { ptr1--; ptr2 -= xsiz; swapchar(ptr1,ptr2); }
+            for(j=(i>>1)-1;j>=0;j--)
+            { ptr1 -= 2; ptr2 -= k; swapchar2(ptr1,ptr2,xsiz); }
+        }
+    }
+}
+
+int preparemirror(long dax, long day, long daz, short daang, long dahoriz, short dawall, short dasector, long* tposx,
+    long* tposy, short* tang)
+{
+    long i, j, x, y, dx, dy;
+
+    x = wall[dawall].x; dx = wall[wall[dawall].point2].x-x;
+    y = wall[dawall].y; dy = wall[wall[dawall].point2].y-y;
+    j = dx*dx + dy*dy; if (j == 0) return;
+    i = (((dax-x)*dx + (day-y)*dy)<<1);
+    *tposx = (x<<1) + scale(dx,i,j) - dax;
+    *tposy = (y<<1) + scale(dy,i,j) - day;
+    *tang = (((getangle(dx,dy)<<1)-daang)&2047);
+
+    inpreparemirror = 1;
+}
+
+int completemirror()
+{
+    long i, dy, p;
+
+    //Can't reverse with uninitialized data
+    if (inpreparemirror) { inpreparemirror = 0; return; }
+    if (mirrorsx1 > 0) mirrorsx1--;
+    if (mirrorsx2 < windowx2-windowx1-1) mirrorsx2++;
+    if (mirrorsx2 < mirrorsx1) return;
+
+    transarea += (mirrorsx2-mirrorsx1)*(windowy2-windowy1);
+
+    p = frameplace+ylookup[windowy1+mirrorsy1]+windowx1+mirrorsx1;
+    i = windowx2-windowx1-mirrorsx2-mirrorsx1; mirrorsx2 -= mirrorsx1;
+    for(dy=mirrorsy2-mirrorsy1;dy>=0;dy--)
+    {
+        copybufbyte(p+1,tempbuf,mirrorsx2+1);
+        tempbuf[mirrorsx2] = tempbuf[mirrorsx2-1];
+        copybufreverse(&tempbuf[mirrorsx2],p+i,mirrorsx2+1);
+        p += ylookup[1];
+        faketimerhandler();
+    }
 }
 
 int sectorofwall(short theline)

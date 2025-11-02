@@ -1270,7 +1270,7 @@ kdmconvalloc32 (long size)
 installbikdmhandlers()
 {
 	union REGS r;
-	struct SREGS sr;
+	SREGS sr;
 	long lowp;
 	void far *fh;
 
@@ -1316,7 +1316,7 @@ installbikdmhandlers()
 uninstallbikdmhandlers()
 {
 	union REGS r;
-	struct SREGS sr;
+	SREGS sr;
 
 		//restore old protected mode handler
 	r.x.eax = 0x2500+kdmvect;   /* DOS set vector (INT 0Ch) */
