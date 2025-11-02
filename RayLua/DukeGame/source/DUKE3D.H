@@ -281,7 +281,7 @@ extern long msx[2048],msy[2048];
 extern short cyclers[MAXCYCLERS][6],numcyclers;
 extern char myname[32];
 
-typedef struct user_defs
+typedef struct
 {
     char god,warp_on,cashman,eog,showallmap;
     char show_help,scrollmode,clipping;
@@ -308,13 +308,13 @@ typedef struct user_defs
     int32_t m_ffire,ffire,m_player_skill,m_level_number,m_volume_number,multimode;
     int32_t player_skill,level_number,volume_number,m_marker,marker,mouseflip;
 
-};
+} user_defs;
 
-typedef struct player_orig
+typedef struct
 {
     long ox,oy,oz;
     short oa,os;
-};
+} player_orig;
 
 
 extern char numplayersprites;
@@ -388,8 +388,8 @@ extern long impact_damage,respawnactortime,respawnitemtime;
 
 extern short spriteq[1024],spriteqloc,spriteqamount;
 extern player_struct ps[MAXPLAYERS];
-extern struct player_orig po[MAXPLAYERS];
-extern struct user_defs ud;
+extern player_orig po[MAXPLAYERS];
+extern user_defs ud;
 extern short int moustat;
 extern short int global_random;
 extern long scaredfallz;
@@ -423,7 +423,7 @@ extern short camsprite;
 extern char inspace(short sectnum);
 
 
-typedef struct weaponhit
+typedef struct
 {
     char cgg;
     short picnum,ang,extra,owner,movflag;
@@ -431,9 +431,9 @@ typedef struct weaponhit
     short timetosleep;
     long floorz,ceilingz,lastvx,lastvy,bposx,bposy,bposz;
     long temp_data[6];
-};
+} weaponhit;
 
-extern struct weaponhit hittype[MAXSPRITES];
+extern weaponhit hittype[MAXSPRITES];
 
 extern input loc;
 extern input recsync[RECSYNCBUFSIZ];

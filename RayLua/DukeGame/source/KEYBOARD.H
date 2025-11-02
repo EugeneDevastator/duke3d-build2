@@ -220,7 +220,7 @@ void    KB_TurnKeypadOff(  );      // turn the keypad off
 bool KB_KeypadActive(  );       // check whether keypad is active
 void    KB_Startup(  );
 void    KB_Shutdown(  );
-
+    char KB_Getch(  );
 #ifdef __cplusplus
 };
 #endif

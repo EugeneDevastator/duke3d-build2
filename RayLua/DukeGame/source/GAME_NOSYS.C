@@ -45,6 +45,8 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "CACHE1D.H"
 #include "duke3d.h"
 #include "engine.h"
+#include "gamedefs.h"
+#include "global.c"
 //#include "cache1d.c"
 
 
@@ -1981,7 +1983,7 @@ void gameexit(char *t)
         dobonus(1);
 // CTW - MODIFICATION
 //      setgamemode();
-        setgamemode(ScreenMode,ScreenWidth,ScreenHeight);
+   //     setgamemode(ScreenMode,ScreenWidth,ScreenHeight);//removd
 // CTW END - MODIFICATION
     }
 #ifdef ONELEVELDEMO
@@ -2002,7 +2004,7 @@ void gameexit(char *t)
 
     if(*t != 0)
     {
-        setvmode(0x3);
+      //  setvmode(0x3); //removd
         binscreen();
 // CTW - MODIFICATION
 /*      if(playonten == 0)
@@ -2168,7 +2170,7 @@ void typemode(void)
 
                 if( KB_KeyWaiting() )
                 {
-                     i = KB_GetCh();
+                     i = KB_Getch();
 
                      if(i == 'A' || i == 'a' || i == 13)
                           sendmessagecommand = ud.multimode;
@@ -7089,7 +7091,7 @@ void loadtmb(void)
 ===================
 */
 
-void ShutDown( void )
+void ShutDown()
 {
     SoundShutdown();
     MusicShutdown();
@@ -8076,8 +8078,8 @@ void fakedomovethings(void)
             tempang = syn->avel<<1;
 
             if(psectlotag == 2)
-                myang += (tempang-(tempang>>3))*sgn(doubvel);
-            else myang += (tempang)*sgn(doubvel);
+                myang += (tempang-(tempang>>3))*ksgn(doubvel);
+            else myang += (tempang)*ksgn(doubvel);
             myang &= 2047;
         }
 

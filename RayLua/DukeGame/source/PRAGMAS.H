@@ -977,268 +977,98 @@ static inline int32_t mulscale(int32_t a, int32_t b, int shift) {
 	"skipboundit:",\
 	parm nomemory [eax][ebx][ecx]\
 	modify exact [eax ebx edx]\
+#include <stdint.h>
 
-#pragma aux divscale =\
-	"mov edx, eax",\
-	"shl eax, cl",\
-	"neg cl",\
-	"sar edx, cl",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx][ecx]\
-	modify exact [eax ecx edx]\
+// Generic divscale implementation using 64-bit arithmetic
+static inline int32_t divscale_generic(int32_t a, int32_t b, int scale) {
+    return (int32_t)(((int64_t)a << scale) / b);
+}
 
-#pragma aux divscale1 =\
-	"add eax, eax",\
-	"sbb edx, edx",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
+// Optimized implementations for common cases
+static inline int32_t divscale1_impl(int32_t a, int32_t b) {
+    return (int32_t)(((int64_t)a << 1) / b);
+}
 
-#pragma aux divscale2 =\
-	"mov edx, eax",\
-	"sar edx, 30",\
-	"lea eax, [eax*4]",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
+static inline int32_t divscale16_impl(int32_t a, int32_t b) {
+    return (int32_t)(((int64_t)a << 16) / b);
+}
 
-#pragma aux divscale3 =\
-	"mov edx, eax",\
-	"sar edx, 29",\
-	"lea eax, [eax*8]",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
+static inline int32_t divscale32_impl(int32_t a, int32_t b) {
+    return (int32_t)((int64_t)a / b);
+}
 
-#pragma aux divscale4 =\
-	"mov edx, eax",\
-	"sar edx, 28",\
-	"shl eax, 4",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
+// Macro generator for all divscale functions
+#define DIVSCALE_FUNC(n) \
+    static inline int32_t divscale##n(int32_t a, int32_t b) { \
+        return divscale_generic(a, b, n); \
+    }
 
-#pragma aux divscale5 =\
-	"mov edx, eax",\
-	"sar edx, 27",\
-	"shl eax, 5",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
+// Generate all functions 1-31
+DIVSCALE_FUNC(1)
+DIVSCALE_FUNC(2)
+DIVSCALE_FUNC(3)
+DIVSCALE_FUNC(4)
+DIVSCALE_FUNC(5)
+DIVSCALE_FUNC(6)
+DIVSCALE_FUNC(7)
+DIVSCALE_FUNC(8)
+DIVSCALE_FUNC(9)
+DIVSCALE_FUNC(10)
+DIVSCALE_FUNC(11)
+DIVSCALE_FUNC(12)
+DIVSCALE_FUNC(13)
+DIVSCALE_FUNC(14)
+DIVSCALE_FUNC(15)
+DIVSCALE_FUNC(16)
+DIVSCALE_FUNC(17)
+DIVSCALE_FUNC(18)
+DIVSCALE_FUNC(19)
+DIVSCALE_FUNC(20)
+DIVSCALE_FUNC(21)
+DIVSCALE_FUNC(22)
+DIVSCALE_FUNC(23)
+DIVSCALE_FUNC(24)
+DIVSCALE_FUNC(25)
+DIVSCALE_FUNC(26)
+DIVSCALE_FUNC(27)
+DIVSCALE_FUNC(28)
+DIVSCALE_FUNC(29)
+DIVSCALE_FUNC(30)
+DIVSCALE_FUNC(31)
 
-#pragma aux divscale6 =\
-	"mov edx, eax",\
-	"sar edx, 26",\
-	"shl eax, 6",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
+// Special case for divscale32
+static inline int32_t divscale32(int32_t a, int32_t b) {
+    return a / b;
+}
 
-#pragma aux divscale7 =\
-	"mov edx, eax",\
-	"sar edx, 25",\
-	"shl eax, 7",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
+// Generic divscale with runtime scale parameter
+static inline int32_t divscale(int32_t a, int32_t b, int scale) {
+    if (scale == 0) return a / b;
+    if (scale > 31) scale = 31;
+    return divscale_generic(a, b, scale);
+}
 
-#pragma aux divscale8 =\
-	"mov edx, eax",\
-	"sar edx, 24",\
-	"shl eax, 8",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
+// Function pointer array for runtime dispatch (optional)
+typedef int32_t (*divscale_func_t)(int32_t, int32_t);
 
-#pragma aux divscale9 =\
-	"mov edx, eax",\
-	"sar edx, 23",\
-	"shl eax, 9",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
+static const divscale_func_t divscale_funcs[33] = {
+    [0] = divscale32,
+    [1] = divscale1, [2] = divscale2, [3] = divscale3, [4] = divscale4,
+    [5] = divscale5, [6] = divscale6, [7] = divscale7, [8] = divscale8,
+    [9] = divscale9, [10] = divscale10, [11] = divscale11, [12] = divscale12,
+    [13] = divscale13, [14] = divscale14, [15] = divscale15, [16] = divscale16,
+    [17] = divscale17, [18] = divscale18, [19] = divscale19, [20] = divscale20,
+    [21] = divscale21, [22] = divscale22, [23] = divscale23, [24] = divscale24,
+    [25] = divscale25, [26] = divscale26, [27] = divscale27, [28] = divscale28,
+    [29] = divscale29, [30] = divscale30, [31] = divscale31, [32] = divscale32
+};
 
-#pragma aux divscale10 =\
-	"mov edx, eax",\
-	"sar edx, 22",\
-	"shl eax, 10",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
+// Runtime dispatch function
+static inline int32_t divscale_dispatch(int32_t a, int32_t b, int scale) {
+    if (scale < 0 || scale > 32) return divscale_generic(a, b, scale);
+    return divscale_funcs[scale](a, b);
+}
 
-#pragma aux divscale11 =\
-	"mov edx, eax",\
-	"sar edx, 21",\
-	"shl eax, 11",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
-
-#pragma aux divscale12 =\
-	"mov edx, eax",\
-	"sar edx, 20",\
-	"shl eax, 12",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
-
-#pragma aux divscale13 =\
-	"mov edx, eax",\
-	"sar edx, 19",\
-	"shl eax, 13",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
-
-#pragma aux divscale14 =\
-	"mov edx, eax",\
-	"sar edx, 18",\
-	"shl eax, 14",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
-
-#pragma aux divscale15 =\
-	"mov edx, eax",\
-	"sar edx, 17",\
-	"shl eax, 15",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
-
-#pragma aux divscale16 =\
-	"mov edx, eax",\
-	"sar edx, 16",\
-	"shl eax, 16",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
-
-#pragma aux divscale17 =\
-	"mov edx, eax",\
-	"sar edx, 15",\
-	"shl eax, 17",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
-
-#pragma aux divscale18 =\
-	"mov edx, eax",\
-	"sar edx, 14",\
-	"shl eax, 18",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
-
-#pragma aux divscale19 =\
-	"mov edx, eax",\
-	"sar edx, 13",\
-	"shl eax, 19",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
-
-#pragma aux divscale20 =\
-	"mov edx, eax",\
-	"sar edx, 12",\
-	"shl eax, 20",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
-
-#pragma aux divscale21 =\
-	"mov edx, eax",\
-	"sar edx, 11",\
-	"shl eax, 21",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
-
-#pragma aux divscale22 =\
-	"mov edx, eax",\
-	"sar edx, 10",\
-	"shl eax, 22",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
-
-#pragma aux divscale23 =\
-	"mov edx, eax",\
-	"sar edx, 9",\
-	"shl eax, 23",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
-
-#pragma aux divscale24 =\
-	"mov edx, eax",\
-	"sar edx, 8",\
-	"shl eax, 24",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
-
-#pragma aux divscale25 =\
-	"mov edx, eax",\
-	"sar edx, 7",\
-	"shl eax, 25",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
-
-#pragma aux divscale26 =\
-	"mov edx, eax",\
-	"sar edx, 6",\
-	"shl eax, 26",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
-
-#pragma aux divscale27 =\
-	"mov edx, eax",\
-	"sar edx, 5",\
-	"shl eax, 27",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
-
-#pragma aux divscale28 =\
-	"mov edx, eax",\
-	"sar edx, 4",\
-	"shl eax, 28",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
-
-#pragma aux divscale29 =\
-	"mov edx, eax",\
-	"sar edx, 3",\
-	"shl eax, 29",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
-
-#pragma aux divscale30 =\
-	"mov edx, eax",\
-	"sar edx, 2",\
-	"shl eax, 30",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
-
-#pragma aux divscale31 =\
-	"mov edx, eax",\
-	"sar edx, 1",\
-	"shl eax, 31",\
-	"idiv ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax edx]\
-
-#pragma aux divscale32 =\
-	"xor eax, eax",\
-	"idiv ebx",\
-	parm nomemory [edx][ebx]\
-	modify exact [eax edx]\
 
 #pragma aux int5 =\
 	"int 0x5",\
@@ -1842,3 +1672,22 @@ static long timeroffs1mhz;
 #pragma aux printchrasm =\
         "rep stosw",\
         parm [edi][ecx][eax]\
+
+// Convert deltatime1mhz from assembly to C
+uint32_t deltatime1mhz(uint32_t start_time, uint32_t current_time) {
+	uint32_t delta = current_time - start_time;
+
+	// Handle timer overflow (equivalent to jnc skipit + add)
+	if (current_time < start_time) {
+		delta += 0x0fff0000;
+	}
+
+	return delta;
+}
+
+// Convert printchrasm from assembly to C
+void printchrasm(uint16_t* dest, uint32_t count, uint16_t value) {
+	for (uint32_t i = 0; i < count; i++) {
+		dest[i] = value;
+	}
+}

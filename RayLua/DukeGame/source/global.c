@@ -946,7 +946,7 @@ void RegisterShutdownFunction( void (* shutdown) (void) )
     shutdown_func = shutdown;
 }
 
-void Shutdown(void)
+void Shutdown()
 {
     if (shutdown_func != NULL)
     {
