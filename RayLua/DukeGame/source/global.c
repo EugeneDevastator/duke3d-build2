@@ -45,7 +45,7 @@ short neartagsector, neartagwall, neartagsprite;
 long gc,neartaghitdist,lockclock,max_player_health,max_armour_amount,max_ammo_amount[MAX_WEAPONS];
 
 // long temp_data[MAXSPRITES][6];
-struct weaponhit hittype[MAXSPRITES];
+weaponhit hittype[MAXSPRITES];
 short spriteq[1024],spriteqloc,spriteqamount=64;
 
 // ported build engine has this, too.  --ryan.
@@ -53,7 +53,7 @@ short spriteq[1024],spriteqloc,spriteqamount=64;
 short moustat = 0;
 #endif
 
-struct animwalltype animwall[MAXANIMWALLS];
+animwalltype animwall[MAXANIMWALLS];
 short numanimwalls;
 long *animateptr[MAXANIMATES], animategoal[MAXANIMATES], animatevel[MAXANIMATES], animatecnt;
 // long oanimateval[MAXANIMATES];
@@ -96,9 +96,9 @@ SOUNDOWNER SoundOwner[NUM_SOUNDS][4];
 char numplayersprites,loadfromgrouponly,earthquaketime;
 
 long fricxv,fricyv;
-struct player_orig po[MAXPLAYERS];
-struct player_struct ps[MAXPLAYERS];
-struct user_defs ud;
+player_orig po[MAXPLAYERS];
+player_struct ps[MAXPLAYERS];
+user_defs ud;
 
 char pus, pub;
 char syncstat, syncval[MAXPLAYERS][MOVEFIFOSIZ];
@@ -213,7 +213,7 @@ void FixFilePath(char *filename)
         if ((*ptr == PATH_SEP_CHAR) || (*ptr == '\0'))
         {
             char pch = *ptr;
-            struct dirent *dent = NULL;
+            dirent *dent = NULL;
             DIR *dir;
 
             if ((pch == PATH_SEP_CHAR) && (*(ptr + 1) == '\0'))
@@ -372,7 +372,7 @@ static int check_pattern_nocase(const char *x, const char *y)
 
 int _dos_findnext(struct find_t *f)
 {
-    struct dirent *dent;
+    dirent *dent;
 
     if (f->dir == NULL)
         return(1);  /* no such dir or we're just done searching. */
@@ -402,7 +402,7 @@ int _dos_findnext(struct find_t *f)
 void _dos_getdate(struct dosdate_t *date)
 {
 	time_t curtime = time(NULL);
-	struct tm *tm;
+	tm *tm;
 	
 	if (date == NULL) {
 		return;

@@ -2410,7 +2410,7 @@ void cheatkeys(short snum)
     char dainv;
     unsigned long sb_snum;
     long j;
-    struct player_struct *p;
+    player_struct *p;
 
     sb_snum = sync[snum].bits;
     p = &ps[snum];
@@ -2885,7 +2885,7 @@ void cheatkeys(short snum)
 void checksectors(short snum)
 {
     long i = -1,oldz;
-    struct player_struct *p;
+    player_struct *p;
     short j,hitscanwall;
 
     p = &ps[snum];

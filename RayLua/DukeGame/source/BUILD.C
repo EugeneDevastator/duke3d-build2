@@ -5686,7 +5686,7 @@ initmenupaths(char *filename)
 getfilenames(char kind[6])
 {
 	short type;
-	struct find_t fileinfo;
+	find_t fileinfo;
 
 	if (strcmp(kind,"SUBD") == 0)
 	{

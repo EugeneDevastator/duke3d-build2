@@ -390,7 +390,7 @@ void vscrn(void)
 
 void pickrandomspot(short snum)
 {
-    struct player_struct *p;
+    player_struct *p;
     short i;
 
     p = &ps[snum];
@@ -408,7 +408,7 @@ void pickrandomspot(short snum)
 
 void resetplayerstats(short snum)
 {
-    struct player_struct *p;
+    player_struct *p;
     short i;
 
     p = &ps[snum];
@@ -514,7 +514,7 @@ void resetplayerstats(short snum)
 void resetweapons(short snum)
 {
     short  weapon;
-    struct player_struct *p;
+    player_struct *p;
 
     p = &ps[snum];
 
@@ -539,7 +539,7 @@ void resetweapons(short snum)
 
 void resetinventory(short snum)
 {
-    struct player_struct *p;
+    player_struct *p;
     short i;
 
     p = &ps[snum];
@@ -560,7 +560,7 @@ void resetinventory(short snum)
 
 void resetprestat(short snum,char g)
 {
-    struct player_struct *p;
+    player_struct *p;
     short i;
 
     p = &ps[snum];
@@ -972,7 +972,7 @@ void prelevel(char g)
 
 void newgame(char vn,char ln,char sk)
 {
-    struct player_struct *p = &ps[0];
+    player_struct *p = &ps[0];
     short i;
 
     if(globalskillsound >= 0)

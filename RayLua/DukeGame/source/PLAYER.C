@@ -1292,7 +1292,7 @@ void displayweapon(short snum)
     long weapon_xoffset, i, j, x1, y1, x2;
     char o,pal;
     signed char gs;
-    struct player_struct *p;
+    player_struct *p;
     short *kb;
 
     p = &ps[snum];
@@ -1787,7 +1787,7 @@ void getinput(short snum)
     int32 turnamount;
     int32 keymove;
     int32 momx,momy;
-    struct player_struct *p;
+    player_struct *p;
 
     momx = momy = 0;
     p = &ps[snum];
@@ -2235,7 +2235,7 @@ void processinput(short snum)
     char shrunk;
     unsigned long sb_snum;
     short psect, psectlotag,*kb, tempsect, pi;
-    struct player_struct *p;
+    player_struct *p;
     spritetype *s;
 
     p = &ps[snum];
@@ -3972,7 +3972,7 @@ void computergetinput(long snum, input *syn)
     long dist, daang, zang, fightdist, damyang, damysect;
     long startsect, endsect, splc, send, startwall, endwall;
     short dasect, dawall, daspr;
-    struct player_struct *p;
+    player_struct *p;
     walltype *wal;
 
     p = &ps[snum];

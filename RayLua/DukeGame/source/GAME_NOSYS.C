@@ -1540,7 +1540,7 @@ void displayfragbar(void)
 
 void coolgaugetext(short snum)
 {
-    struct player_struct *p;
+    player_struct *p;
     long i, j, o, ss, u;
     char c, permbit;
 
@@ -2234,7 +2234,7 @@ void displayrest(long smoothratio)
 {
     long a, i, j;
 
-    struct player_struct *pp;
+    player_struct *pp;
     walltype *wal;
     long cposx,cposy,cang;
 
@@ -7723,7 +7723,7 @@ char moveloop()
 void fakedomovethingscorrect(void)
 {
      long i;
-     struct player_struct *p;
+     player_struct *p;
 
      if (numplayers < 2) return;
 
@@ -7755,7 +7755,7 @@ void fakedomovethingscorrect(void)
 void fakedomovethings(void)
 {
         input *syn;
-        struct player_struct *p;
+        player_struct *p;
         long i, j, k, doubvel, fz, cz, hz, lz, x, y;
         unsigned long sb_snum;
         short psect, psectlotag, tempsect, backcstat;

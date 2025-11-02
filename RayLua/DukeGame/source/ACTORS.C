@@ -1163,7 +1163,7 @@ void moveplayers(void) //Players
     short i , nexti;
     long otherx;
     spritetype *s;
-    struct player_struct *p;
+    player_struct *p;
 
     i = headspritestat[10];
     while(i >= 0)
