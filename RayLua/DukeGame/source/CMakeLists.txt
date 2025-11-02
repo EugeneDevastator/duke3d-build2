@@ -12,7 +12,6 @@ set(SOURCES
         build.C
         #game.c
         KDMENG.C
-        BUILD.C
         GAME.C
         keyboard.c
         global.c
@@ -42,6 +41,8 @@ set(HEADERS
         PLAYER.C
         MATHUTIL.H
         CACHE1D.H
+        GAME_TEXT.c
+        GAME_TEXT.c
 
         # Add more .h files here
 )

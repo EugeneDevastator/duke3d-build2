@@ -1824,8 +1824,10 @@ int uninitengine()
         if (palookup[i] != NULL) { kkfree(palookup[i]); palookup[i] = NULL; }
 }
 
-int nextpage()
+void nextpage()
 {
+    // Drawing code.
+/*
     long totbytes, i, j, k;
     permfifotype *per;
 
@@ -1918,6 +1920,7 @@ int nextpage()
 
     beforedrawrooms = 1;
     numframes++;
+    */
 }
 
 int loadtile(short tilenume)

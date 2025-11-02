@@ -483,7 +483,7 @@ initengine();
 
 uninitengine();
 
-nextpage();
+void nextpage();
 
 char cachedebug = 0;
 loadtile (short tilenume);
