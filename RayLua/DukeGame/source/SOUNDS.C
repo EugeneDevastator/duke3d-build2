@@ -46,7 +46,10 @@ long backflag,numenvsnds;
 =
 ===================
 */
-
+void testcallback(unsigned long num)
+{
+    TestCallBack(num);
+}
 void SoundStartup( void )
    {
    int32 status;
@@ -539,7 +542,7 @@ void stopenvsound(short num,short i)
     }
 }
 
-void pan3dsound(void)
+void pan3dsound()
 {
     long sndist, sx, sy, sz, cx, cy, cz;
     short sndang,ca,j,k,i,cs;
@@ -657,7 +660,7 @@ void TestCallBack(long num)
         Sound[num].lock--;
 }
 
-void clearsoundlocks(void)
+void clearsoundlocks()
 {
     long i;
 

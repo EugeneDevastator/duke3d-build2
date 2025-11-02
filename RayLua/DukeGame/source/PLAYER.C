@@ -27,11 +27,17 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 // Savage Baggage Masters
 
 #include "duke3d.h"
+#include "engine.h"
+#include "mathutil.h"
+#include "pragmas.h"
+#include "global.h"
+#include "control.h"
+#include "sounds.h"
+#include <stdlib.h>
+int32_t turnheldtime; //MED
+int32_t lastcontroltime; //MED
 
-int32 turnheldtime; //MED
-int32 lastcontroltime; //MED
-
-void setpal(struct player_struct *p)
+void setpal(player_struct *p)
 {
     if(p->heat_on) p->palette = slimepal;
     else switch(sector[p->cursectnum].ceilingpicnum)
@@ -49,7 +55,7 @@ void setpal(struct player_struct *p)
     restorepalette = 1;
 }
 
-void incur_damage( struct player_struct *p )
+void incur_damage(player_struct *p )
 {
     long  damage = 0L, shield_damage = 0L;
     short i, damage_source;
@@ -80,7 +86,7 @@ void incur_damage( struct player_struct *p )
     }
 }
 
-void quickkill(struct player_struct *p)
+void quickkill( player_struct *p)
 {
     p->pals[0] = 48;
     p->pals[1] = 48;
@@ -93,7 +99,7 @@ void quickkill(struct player_struct *p)
     return;
 }
 
-void forceplayerangle(struct player_struct *p)
+void forceplayerangle( player_struct *p)
 {
     short n;
 
@@ -188,7 +194,7 @@ long hitaspriteandwall(short i,short *hitsp,short *hitw,short *x, short *y)
 */
 
 
-long hitawall(struct player_struct *p,short *hitw)
+long hitawall( player_struct *p,short *hitw)
 {
     long sx,sy,sz;
     short sect,hs;
@@ -1656,7 +1662,7 @@ void displayweapon(short snum)
             {
                 char cycloidy[] = {0,4,12,24,12,4,0};
 
-                i = sgn((*kb)>>2);
+                i = ksgn((*kb)>>2);
 
                 if(p->hbomb_hold_delay)
                 {
@@ -1782,11 +1788,11 @@ void getinput(short snum)
     short j, daang;
 // MED
     ControlInfo info;
-    int32 tics;
-    boolean running;
-    int32 turnamount;
-    int32 keymove;
-    int32 momx,momy;
+    int32_t tics;
+    bool running;
+    int32_t turnamount;
+    int32_t keymove;
+    int32_t momx,momy;
     player_struct *p;
 
     momx = momy = 0;
@@ -2017,7 +2023,7 @@ void getinput(short snum)
 }
 
 
-char doincrements(struct player_struct *p)
+char doincrements( player_struct *p)
 {
     long /*j,*/i,snum;
 
@@ -2207,7 +2213,7 @@ short weapon_sprites[MAX_WEAPONS] = { KNEE, FIRSTGUNSPRITE, SHOTGUNSPRITE,
         CHAINGUNSPRITE, RPGSPRITE, HEAVYHBOMB, SHRINKERSPRITE, DEVISTATORSPRITE,
         TRIPBOMBSPRITE, FREEZESPRITE, HEAVYHBOMB, SHRINKERSPRITE};
 
-void checkweapons(struct player_struct *p)
+void checkweapons( player_struct *p)
 {
     short j,cw;
 
@@ -3018,8 +3024,8 @@ void processinput(short snum)
 
         tempang = sync[snum].avel<<1;
 
-        if( psectlotag == 2 ) p->angvel =(tempang-(tempang>>3))*sgn(doubvel);
-        else p->angvel = tempang*sgn(doubvel);
+        if( psectlotag == 2 ) p->angvel =(tempang-(tempang>>3))*ksgn(doubvel);
+        else p->angvel = tempang*ksgn(doubvel);
 
         p->ang += p->angvel;
         p->ang &= 2047;
@@ -3902,10 +3908,8 @@ void processinput(short snum)
     }
 }
 
-
-
 //UPDATE THIS FILE OVER THE OLD GETSPRITESCORE/COMPUTERGETINPUT FUNCTIONS
-getspritescore(long snum, long dapicnum)
+int getspritescore(long snum, long dapicnum)
 {
     switch(dapicnum)
     {

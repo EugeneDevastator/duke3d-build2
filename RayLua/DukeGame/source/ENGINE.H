@@ -1,7 +1,8 @@
 // "Build Engine & Tools" Copyright (c) 1993-1997 Ken Silverman
 // Ken Silverman's official web site: "http://www.advsys.net/ken"
 // See the included license file "BUILDLIC.TXT" for license info.
-
+#ifndef KEN_ENGINE_H
+#define KEN_ENGINE_H
 #define SUPERBUILD
 
 #define ENGINE
@@ -1017,7 +1018,7 @@ printext16(long xpos, long ypos, short col, short backcol, char name[82], char f
 
 printext256(long xpos, long ypos, short col, short backcol, char name[82], char fontsize);
 
-krand();
+int krand();
 
 getzrange(long x, long y, long z, short sectnum,
 		  long *ceilz, long *ceilhit, long *florz, long *florhit,
@@ -2019,7 +2020,7 @@ installbistereohandlers(void far *stereohan)
 	int c;
 
 		//Get old protected mode handler
-	r.x.eax = 0x3500+0x70;   /* DOS get vector (INT 0Ch) */
+	r.x.eax = 0x3500+0x70;   // DOS get vector (INT 0Ch)
 	sr.ds = sr.es = 0;
 	int386x(0x21,&r,&r,&sr);
 	rtcopmsel = (unsigned short)sr.es;
@@ -2150,3 +2151,4 @@ setfirstwall(short sectnum, short newfirstwall)
 }
 
 */
+#endif

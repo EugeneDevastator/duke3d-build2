@@ -6,39 +6,41 @@ set(CMAKE_C_STANDARD 99)
 # Source files
 set(SOURCES
         gamedef.c
-        ENGINE.C;
-        actors.C;
-        players.C;
-        build.C;
+        ENGINE.C
+        actors.C
+        player.C
+        build.C
         #game.c
         KDMENG.C
         BUILD.C
-        GAME_NOSYS.C
-        keyboard.c;
+        GAME.C
+        keyboard.c
+        global.c
+        Cache1d.c
+        PREMAP.C
+        SOUNDS.C
+        Config.c
 
         # Add more .c files here
 )
 
 # Header files (optional, for IDE support)
 set(HEADERS
-        build.h;
-        duke3d.h;
-        gamedefs.h;
-        names.h;
+        build.h
+        duke3d.h
+        gamedefs.h
+        config.h
+        names.h
         engine.h
-        PREMAP.C
-        SOUNDS.C
+        sounds.h
         keyboard.h
-        MMULTI.H
         MUSIC.H
         funct.h
         control.h
         MMULTI.H
         PLAYER.C
         MATHUTIL.H
-        MATHUTIL.H
         CACHE1D.H
-        Cache1d.c
 
         # Add more .h files here
 )

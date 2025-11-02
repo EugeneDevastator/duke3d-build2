@@ -111,14 +111,14 @@ typedef struct
 
    typedef int32_t fixed; // see fixed.h but claude says int32 ok
 typedef struct
-   {
-   fixed     dx;
-   fixed     dy;
-   fixed     dz;
-   fixed     dyaw;
-   fixed     dpitch;
-   fixed     droll;
-   } ControlInfo;
+{
+   int32_t dx;
+   int32_t dy;
+   int32_t dz;
+   int32_t dyaw;
+   int32_t dpitch;
+   int32_t droll;
+} ControlInfo;
 
 typedef enum
    {

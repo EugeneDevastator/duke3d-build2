@@ -74,7 +74,7 @@ static long kdminprep = 0, kdmintinprep = 0;
 static long dmacheckport, dmachecksiz;
 
 void (__interrupt __far *oldsbhandler)();
-void __interrupt __far sbhandler(void);
+void __interrupt __far sbhandler()
 
 long samplediv, oldtimerfreq, chainbackcnt, chainbackstart;
 char *pcsndptr, pcsndlookup[256], bufferside;

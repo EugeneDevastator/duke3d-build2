@@ -33,11 +33,11 @@ extern void ExtEditWallData(short wallnum);
 extern void ExtEditSpriteData(short spritenum);
 
 void (__interrupt __far *oldtimerhandler)();
-void __interrupt __far timerhandler(void);
+void __interrupt __far timerhandler()
 
 #define KEYFIFOSIZ 64
 void (__interrupt __far *oldkeyhandler)();
-void __interrupt __far keyhandler(void);
+void __interrupt __far keyhandler()
 volatile char keystatus[256], keyfifo[KEYFIFOSIZ], keyfifoplc, keyfifoend;
 volatile char readch, oldreadch, extended, keytemp;
 

@@ -83,881 +83,129 @@ static inline int32_t mulscale(int32_t a, int32_t b, int shift) {
 #define mulscale32(a,b) mulscale(a,b,32)
 
 
-#pragma aux dmulscale =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, cl",\
-	parm nomemory [eax][edx][esi][edi][ecx]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale1 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 1",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale2 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 2",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale3 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 3",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale4 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 4",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale5 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 5",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale6 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 6",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale7 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 7",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale8 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 8",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale9 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 9",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale10 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 10",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale11 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 11",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale12 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 12",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale13 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 13",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale14 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 14",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale15 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 15",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale16 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 16",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale17 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 17",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale18 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 18",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale19 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 19",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale20 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 20",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale21 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 21",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale22 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 22",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale23 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 23",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale24 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 24",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale25 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 25",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale26 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 26",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale27 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 27",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale28 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 28",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale29 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 29",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale30 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 30",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale31 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	"shrd eax, edx, 31",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-
-#pragma aux dmulscale32 =\
-	"imul edx",\
-	"mov ebx, eax",\
-	"mov eax, esi",\
-	"mov esi, edx",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, esi",\
-	parm nomemory [eax][edx][esi][edi]\
-	modify exact [eax ebx edx esi]\
-	value [edx]\
-
-#pragma aux tmulscale1 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 1",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale2 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 2",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale3 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 3",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale4 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 4",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale5 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 5",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale6 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 6",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale7 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 7",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale8 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 8",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale9 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 9",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale10 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 10",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale11 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 11",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale12 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 12",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale13 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 13",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale14 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 14",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale15 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 15",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale16 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 16",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale17 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 17",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale18 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 18",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale19 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 19",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale20 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 20",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale21 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 21",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale22 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 22",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale23 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 23",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale24 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 24",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale25 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 25",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale26 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 26",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale27 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 27",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale28 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 28",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale29 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 29",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale30 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 30",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale31 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	"shrd eax, edx, 31",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux tmulscale32 =\
-	"imul edx",\
-	"xchg eax, ebx",\
-	"xchg edx, ecx",\
-	"imul edx",\
-	"add ebx, eax",\
-	"adc ecx, edx",\
-	"mov eax, esi",\
-	"imul edi",\
-	"add eax, ebx",\
-	"adc edx, ecx",\
-	parm nomemory [eax][edx][ebx][ecx][esi][edi]\
-	modify exact [eax ebx ecx edx]\
-	value [edx]\
+// Base function for dmulscale operations
+static inline int32_t dmulscale_base(int32_t a, int32_t b, int32_t c, int32_t d, int shift) {
+	int64_t result1 = (int64_t)a * b;
+	int64_t result2 = (int64_t)c * d;
+	int64_t sum = result1 + result2;
+	return (int32_t)(sum >> shift);
+}
+
+// Special case for dmulscale32 (returns high 32 bits)
+static inline int32_t dmulscale32_base(int32_t a, int32_t b, int32_t c, int32_t d) {
+	int64_t result1 = (int64_t)a * b;
+	int64_t result2 = (int64_t)c * d;
+	int64_t sum = result1 + result2;
+	return (int32_t)(sum >> 32);
+}
+
+// Macro for generating dmulscale functions
+#define DMULSCALE_FUNC(n) \
+static inline int32_t dmulscale##n(int32_t a, int32_t b, int32_t c, int32_t d) { \
+return dmulscale_base(a, b, c, d, n); \
+}
+
+// Variable shift version
+static inline int32_t dmulscale(int32_t a, int32_t b, int32_t c, int32_t d, int shift) {
+	return dmulscale_base(a, b, c, d, shift);
+}
+
+// Generate all fixed-shift versions
+DMULSCALE_FUNC(1)
+DMULSCALE_FUNC(2)
+DMULSCALE_FUNC(3)
+DMULSCALE_FUNC(4)
+DMULSCALE_FUNC(5)
+DMULSCALE_FUNC(6)
+DMULSCALE_FUNC(7)
+DMULSCALE_FUNC(8)
+DMULSCALE_FUNC(9)
+DMULSCALE_FUNC(10)
+DMULSCALE_FUNC(11)
+DMULSCALE_FUNC(12)
+DMULSCALE_FUNC(13)
+DMULSCALE_FUNC(14)
+DMULSCALE_FUNC(15)
+DMULSCALE_FUNC(16)
+DMULSCALE_FUNC(17)
+DMULSCALE_FUNC(18)
+DMULSCALE_FUNC(19)
+DMULSCALE_FUNC(20)
+DMULSCALE_FUNC(21)
+DMULSCALE_FUNC(22)
+DMULSCALE_FUNC(23)
+DMULSCALE_FUNC(24)
+DMULSCALE_FUNC(25)
+DMULSCALE_FUNC(26)
+DMULSCALE_FUNC(27)
+DMULSCALE_FUNC(28)
+DMULSCALE_FUNC(29)
+DMULSCALE_FUNC(30)
+DMULSCALE_FUNC(31)
+
+// Special case for dmulscale32
+static inline int32_t dmulscale32(int32_t a, int32_t b, int32_t c, int32_t d) {
+	return dmulscale32_base(a, b, c, d);
+}
+
+// Base function for triple multiply and scale
+static inline int32_t tmulscale_base(int32_t a, int32_t b, int32_t c, int32_t d, int32_t e, int32_t f, int shift) {
+	int64_t result1 = (int64_t)a * b;
+	int64_t result2 = (int64_t)c * d;
+	int64_t result3 = (int64_t)e * f;
+
+	int64_t sum = result1 + result2 + result3;
+
+	if (shift == 32) {
+		return (int32_t)(sum >> 32);
+	} else {
+		return (int32_t)(sum >> shift);
+	}
+}
+
+// Macro to generate all tmulscale functions
+#define TMULSCALE_FUNC(n) \
+static inline int32_t tmulscale##n(int32_t a, int32_t b, int32_t c, int32_t d, int32_t e, int32_t f) { \
+return tmulscale_base(a, b, c, d, e, f, n); \
+}
+
+// Generate all functions from 1 to 32
+TMULSCALE_FUNC(1)
+TMULSCALE_FUNC(2)
+TMULSCALE_FUNC(3)
+TMULSCALE_FUNC(4)
+TMULSCALE_FUNC(5)
+TMULSCALE_FUNC(6)
+TMULSCALE_FUNC(7)
+TMULSCALE_FUNC(8)
+TMULSCALE_FUNC(9)
+TMULSCALE_FUNC(10)
+TMULSCALE_FUNC(11)
+TMULSCALE_FUNC(12)
+TMULSCALE_FUNC(13)
+TMULSCALE_FUNC(14)
+TMULSCALE_FUNC(15)
+TMULSCALE_FUNC(16)
+TMULSCALE_FUNC(17)
+TMULSCALE_FUNC(18)
+TMULSCALE_FUNC(19)
+TMULSCALE_FUNC(20)
+TMULSCALE_FUNC(21)
+TMULSCALE_FUNC(22)
+TMULSCALE_FUNC(23)
+TMULSCALE_FUNC(24)
+TMULSCALE_FUNC(25)
+TMULSCALE_FUNC(26)
+TMULSCALE_FUNC(27)
+TMULSCALE_FUNC(28)
+TMULSCALE_FUNC(29)
+TMULSCALE_FUNC(30)
+TMULSCALE_FUNC(31)
+
+// Special case for tmulscale32 - returns high 32 bits
+static inline int32_t tmulscale32(int32_t a, int32_t b, int32_t c, int32_t d, int32_t e, int32_t f) {
+	return tmulscale_base(a, b, c, d, e, f, 32);
+}
 
 #pragma aux boundmulscale =\
 	"imul ebx",\
@@ -1435,7 +683,7 @@ static inline void copybufreverse(const void* src, void* dest, size_t count) {
 	value [edx]
 
 // Absolute value
-static inline int32_t klabs(int32_t x) {
+static inline int32_t klabs(long x) {
 	return (x < 0) ? -x : x;
 }
 

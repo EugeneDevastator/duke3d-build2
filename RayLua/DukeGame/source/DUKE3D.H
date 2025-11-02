@@ -40,6 +40,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "pragmas.h"
 #include "function.h"
 #include "build.h"
+#include "engine.h"
 
 #define VOLUMEALL
 #define PLUTOPAK
@@ -266,12 +267,12 @@ typedef struct
     int  length, num;
 } SAMPLE;
 
-static struct animwalltype
+typedef struct
 {
         short wallnum;
         long tag;
-};
-extern struct animwalltype animwall[MAXANIMWALLS];
+}animwalltype;
+extern animwalltype animwall[MAXANIMWALLS];
 extern short numanimwalls,probey,lastprobey;
 
 extern char *mymembuf;

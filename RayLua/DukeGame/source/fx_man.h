@@ -131,6 +131,6 @@ void PlayMusic(char *_filename);
 // API addition: Call this when you reload/ditch a pile of sound effects.
 //  (mapchange? Dunno if duke3d blindly loads all sounds at startup).
 //  Implicitly stops all playing sounds and music. --ryan.
-void FX_CleanCache(void);
+void FX_CleanCache()
 
 #endif
