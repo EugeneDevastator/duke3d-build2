@@ -38,6 +38,8 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 // we load this in to get default button and key assignments
 // as well as setting up function mappings
 
+#include "CACHE1D.H"
+#include "global.h"
 #include "_functio.h"
 
 //
@@ -145,7 +147,7 @@ void CONFIG_GetSetupFilename( void )
          }
       printf("\n");
       printf("(%s will be used if no selection is made within 10 seconds.)\n\n",SETUPFILENAME);
-      KB_FlushKeyboardQueue();
+      KB_FlushKeyBoardQueue();
       KB_ClearKeysDown();
       count = 9;
       oldtime = clock();
@@ -326,11 +328,11 @@ void CONFIG_ReadKeys( void )
          key2 = 0;
          if (keyname1[0])
             {
-            key1 = (byte) KB_StringToScanCode( keyname1 );
+            key1 = (int8_t) KB_StringToScanCode( keyname1 );
             }
          if (keyname2[0])
             {
-            key2 = (byte) KB_StringToScanCode( keyname2 );
+            key2 = (int8_t) KB_StringToScanCode( keyname2 );
             }
          CONTROL_MapKey( function, key1, key2 );
          }
