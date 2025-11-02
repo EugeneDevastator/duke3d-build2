@@ -1281,102 +1281,159 @@ static inline int32_t mulscale(int32_t a, int32_t b, int shift) {
 	"mov dword ptr [edi], eax",\
 	parm [edi][eax]\
 	modify exact \
+// Clear buffer with 32-bit value
+static inline void clearbuf(void* dest, size_t count, uint32_t value) {
+    uint32_t* ptr = (uint32_t*)dest;
+    for (size_t i = 0; i < count; i++) {
+        ptr[i] = value;
+    }
+}
 
-#pragma aux clearbuf =\
-	"rep stosd",\
-	parm [edi][ecx][eax]\
-	modify exact [edi ecx]\
+// Clear buffer byte-wise with optimized alignment
+static inline void clearbufbyte(void* dest, size_t count, uint8_t value) {
+    uint8_t* ptr = (uint8_t*)dest;
 
-#pragma aux clearbufbyte =\
-	"cmp ecx, 4",\
-	"jae longcopy",\
-	"test cl, 1",\
-	"jz preskip",\
-	"stosb",\
-	"preskip: shr ecx, 1",\
-	"rep stosw",\
-	"jmp endit",\
-	"longcopy: test edi, 1",\
-	"jz skip1",\
-	"stosb",\
-	"dec ecx",\
-	"skip1: test edi, 2",\
-	"jz skip2",\
-	"stosw",\
-	"sub ecx, 2",\
-	"skip2: mov ebx, ecx",\
-	"shr ecx, 2",\
-	"rep stosd",\
-	"test bl, 2",\
-	"jz skip3",\
-	"stosw",\
-	"skip3: test bl, 1",\
-	"jz endit",\
-	"stosb",\
-	"endit:",\
-	parm [edi][ecx][eax]\
-	modify [ebx]\
+    if (count < 4) {
+        // Handle small buffers
+        if (count & 1) {
+            *ptr++ = value;
+            count--;
+        }
+        uint16_t value16 = value | (value << 8);
+        while (count >= 2) {
+            *(uint16_t*)ptr = value16;
+            ptr += 2;
+            count -= 2;
+        }
+        return;
+    }
 
-#pragma aux copybuf =\
-	"rep movsd",\
-	parm [esi][edi][ecx]\
-	modify exact [ecx esi edi]\
+    // Align to 4-byte boundary
+    uint32_t value32 = value | (value << 8) | (value << 16) | (value << 24);
 
-#pragma aux copybufbyte =\
-	"cmp ecx, 4",\
-	"jae longcopy",\
-	"test cl, 1",\
-	"jz preskip",\
-	"movsb",\
-	"preskip: shr ecx, 1",\
-	"rep movsw",\
-	"jmp endit",\
-	"longcopy: test edi, 1",\
-	"jz skip1",\
-	"movsb",\
-	"dec ecx",\
-	"skip1: test edi, 2",\
-	"jz skip2",\
-	"movsw",\
-	"sub ecx, 2",\
-	"skip2: mov ebx, ecx",\
-	"shr ecx, 2",\
-	"rep movsd",\
-	"test bl, 2",\
-	"jz skip3",\
-	"movsw",\
-	"skip3: test bl, 1",\
-	"jz endit",\
-	"movsb",\
-	"endit:",\
-	parm [esi][edi][ecx]\
-	modify [ebx]\
+    while ((uintptr_t)ptr & 1) {
+        *ptr++ = value;
+        count--;
+    }
 
-#pragma aux copybufreverse =\
-	"shr ecx, 1",\
-	"jnc skipit1",\
-	"mov al, byte ptr [esi]",\
-	"dec esi",\
-	"mov byte ptr [edi], al",\
-	"inc edi",\
-	"skipit1: shr ecx, 1",\
-	"jnc skipit2",\
-	"mov ax, word ptr [esi-1]",\
-	"sub esi, 2",\
-	"ror ax, 8",\
-	"mov word ptr [edi], ax",\
-	"add edi, 2",\
-	"skipit2: test ecx, ecx",\
-	"jz endloop",\
-	"begloop: mov eax, dword ptr [esi-3]",\
-	"sub esi, 4",\
-	"bswap eax",\
-	"mov dword ptr [edi], eax",\
-	"add edi, 4",\
-	"dec ecx",\
-	"jnz begloop",\
-	"endloop:",\
-	parm [esi][edi][ecx]\
+    while ((uintptr_t)ptr & 2) {
+        *(uint16_t*)ptr = value32;
+        ptr += 2;
+        count -= 2;
+    }
+
+    // Fill 4-byte chunks
+    while (count >= 4) {
+        *(uint32_t*)ptr = value32;
+        ptr += 4;
+        count -= 4;
+    }
+
+    // Handle remaining bytes
+    if (count & 2) {
+        *(uint16_t*)ptr = value32;
+        ptr += 2;
+    }
+    if (count & 1) {
+        *ptr = value;
+    }
+}
+
+// Copy buffer 32-bit aligned
+static inline void copybuf(const void* src, void* dest, size_t count) {
+    const uint32_t* src32 = (const uint32_t*)src;
+    uint32_t* dest32 = (uint32_t*)dest;
+    for (size_t i = 0; i < count; i++) {
+        dest32[i] = src32[i];
+    }
+}
+
+// Copy buffer byte-wise with alignment optimization
+static inline void copybufbyte(const void* src, void* dest, size_t count) {
+    const uint8_t* src_ptr = (const uint8_t*)src;
+    uint8_t* dest_ptr = (uint8_t*)dest;
+
+    if (count < 4) {
+        // Handle small buffers
+        if (count & 1) {
+            *dest_ptr++ = *src_ptr++;
+            count--;
+        }
+        while (count >= 2) {
+            *(uint16_t*)dest_ptr = *(const uint16_t*)src_ptr;
+            dest_ptr += 2;
+            src_ptr += 2;
+            count -= 2;
+        }
+        return;
+    }
+
+    // Align destination to boundaries
+    while ((uintptr_t)dest_ptr & 1) {
+        *dest_ptr++ = *src_ptr++;
+        count--;
+    }
+
+    while ((uintptr_t)dest_ptr & 2) {
+        *(uint16_t*)dest_ptr = *(const uint16_t*)src_ptr;
+        dest_ptr += 2;
+        src_ptr += 2;
+        count -= 2;
+    }
+
+    // Copy 4-byte chunks
+    while (count >= 4) {
+        *(uint32_t*)dest_ptr = *(const uint32_t*)src_ptr;
+        dest_ptr += 4;
+        src_ptr += 4;
+        count -= 4;
+    }
+
+    // Handle remaining bytes
+    if (count & 2) {
+        *(uint16_t*)dest_ptr = *(const uint16_t*)src_ptr;
+        dest_ptr += 2;
+        src_ptr += 2;
+    }
+    if (count & 1) {
+        *dest_ptr = *src_ptr;
+    }
+}
+
+// Copy buffer in reverse with byte swapping
+static inline void copybufreverse(const void* src, void* dest, size_t count) {
+    const uint8_t* src_ptr = (const uint8_t*)src;
+    uint8_t* dest_ptr = (uint8_t*)dest;
+
+    // Handle odd byte
+    if (count & 1) {
+        *dest_ptr++ = *src_ptr--;
+        count--;
+    }
+
+    // Handle 2-byte chunks with byte swap
+    if (count & 2) {
+        uint16_t val = *(const uint16_t*)(src_ptr - 1);
+        *(uint16_t*)dest_ptr = ((val & 0xFF) << 8) | ((val >> 8) & 0xFF);
+        dest_ptr += 2;
+        src_ptr -= 2;
+        count -= 2;
+    }
+
+    // Handle 4-byte chunks with full reversal
+    while (count >= 4) {
+        uint32_t val = *(const uint32_t*)(src_ptr - 3);
+        // Byte swap 32-bit value
+        val = ((val & 0xFF000000) >> 24) |
+              ((val & 0x00FF0000) >> 8)  |
+              ((val & 0x0000FF00) << 8)  |
+              ((val & 0x000000FF) << 24);
+        *(uint32_t*)dest_ptr = val;
+        dest_ptr += 4;
+        src_ptr -= 4;
+        count -= 4;
+    }
+}
 
 #pragma aux qinterpolatedown16 =\
 	"mov ebx, ecx",\
@@ -1541,55 +1598,35 @@ static inline int32_t mulscale(int32_t a, int32_t b, int shift) {
 	modify exact [eax edx]\
 	value [edx]
 
-#pragma klabs =\
-	"test eax, eax",\
-	"jns skipnegate",\
-	"neg eax",\
-	"skipnegate:",\
-	parm nomemory [eax]\
+// Absolute value
+static inline int32_t klabs(int32_t x) {
+	return (x < 0) ? -x : x;
+}
 
-#pragma aux ksgn =\
-	"add ebx, ebx",\
-	"sbb eax, eax",\
-	"cmp eax, ebx",\
-	"adc al, 0",\
-	parm nomemory [ebx]\
-	modify exact [eax ebx]\
+// Sign function: returns -1, 0, or 1
+static inline int32_t ksgn(int32_t x) {
+	return (x > 0) - (x < 0);
+}
 
-	//eax = (unsigned min)umin(eax,ebx)
-#pragma aux umin =\
-	"sub eax, ebx",\
-	"sbb ecx, ecx",\
-	"and eax, ecx",\
-	"add eax, ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax ecx]\
+// Unsigned minimum
+static inline uint32_t umin(uint32_t a, uint32_t b) {
+	return (a < b) ? a : b;
+}
 
-	//eax = (unsigned max)umax(eax,ebx)
-#pragma aux umax =\
-	"sub eax, ebx",\
-	"sbb ecx, ecx",\
-	"xor ecx, 0xffffffff",\
-	"and eax, ecx",\
-	"add eax, ebx",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax ecx]\
+// Unsigned maximum
+static inline uint32_t umax(uint32_t a, uint32_t b) {
+	return (a > b) ? a : b;
+}
 
-#pragma aux kmin =\
-	"cmp eax, ebx",\
-	"jl skipit",\
-	"mov eax, ebx",\
-	"skipit:",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax]\
+// Signed minimum
+static inline int32_t kmin(int32_t a, int32_t b) {
+	return (a < b) ? a : b;
+}
 
-#pragma aux kmax =\
-	"cmp eax, ebx",\
-	"jg skipit",\
-	"mov eax, ebx",\
-	"skipit:",\
-	parm nomemory [eax][ebx]\
-	modify exact [eax]\
+// Signed maximum
+static inline int32_t kmax(int32_t a, int32_t b) {
+	return (a > b) ? a : b;
+}
 
 #pragma aux limitrate =\
 	"mov dx, 0x3da",\

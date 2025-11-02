@@ -70,7 +70,7 @@ static long lowrecip[1024], nytooclose, nytoofar;
 static unsigned long distrecip[16384];
 #endif
 
-static char moustat = 0;
+//static char moustat = 0;
 
 long transarea = 0, totalarea = 0, beforedrawrooms = 1;
 
@@ -553,7 +553,7 @@ insertspritesect(short sectnum);
 
 insertspritestat(short statnum);
 
-deletesprite(short spritenum);
+int deletesprite(short spritenum);
 
 deletespritesect(short deleteme);
 

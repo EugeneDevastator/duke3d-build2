@@ -163,9 +163,7 @@ char *keyw[NUMKEYWORDS] =
 };
 
 // bits and pieces
- int klabs(int x) {
-    return x < 0 ? -x : x;
-}
+
 // main code
 short getincangle(short a,short na)
 {
@@ -1477,15 +1475,15 @@ void loadefs(char *filenam,char *mptr)
         puts("Missing external con file(s).");
         puts("COPY INTERNAL DEFAULTS TO DIRECTORY(Y/n)?");
 
-        KB_FlushKeyboardQueue();
-        while( KB_KeyWaiting() );
+     //  KB_FlushKeyboardQueue();
+     //  while( KB_KeyWaiting() );
 
-        i = KB_Getch();
-        if(i == 'y' || i == 'Y' )
-        {
-            puts(" Yes");
-            copydefaultcons();
-        }
+     //  i = KB_Getch();
+     //  if(i == 'y' || i == 'Y' )
+     //  {
+           puts(" Yes");
+           copydefaultcons();
+     //  }
     }
 
     fp = kopen4load(filenam,loadfromgrouponly);
@@ -1536,15 +1534,15 @@ void loadefs(char *filenam,char *mptr)
             puts("before attempting to modify them.  Do you want to use the");
             puts("INTERNAL DEFAULTS (y/N)?");
 
-            KB_FlushKeyboardQueue();
-            while( KB_KeyWaiting() );
-            i = KB_Getch();
-            if(i == 'y' || i == 'Y' )
-            {
+          // KB_FlushKeyboardQueue();
+          // while( KB_KeyWaiting() );
+          // i = KB_Getch();
+          // if(i == 'y' || i == 'Y' )
+          // {
                 loadfromgrouponly = 1;
                 puts(" Yes");
-                return;
-            }
+          //     return;
+          // }
         }
     }
 
@@ -1563,17 +1561,17 @@ void loadefs(char *filenam,char *mptr)
                 puts("before attempting to modify them.  Do you want to use the");
                 puts("internal defaults (Y/N)?");
 
-                KB_FlushKeyboardQueue();
-                while( !KB_KeyWaiting() );
+             //  KB_FlushKeyboardQueue();
+             //  while( !KB_KeyWaiting() );
 
-                i = KB_Getch();
-                if( i == 'y' || i == 'Y' )
-                {
-                    puts(" Yes");
+             //  i = KB_Getch();
+             //  if( i == 'y' || i == 'Y' )
+             //  {
+             //      puts(" Yes");
                     loadfromgrouponly = 1;
                     return;
-                }
-                else gameexit("");
+             //  }
+             //  else gameexit("");
             }
         }
     }
@@ -2588,7 +2586,7 @@ char parse(void)
             insptr++;
             parseifelse(g_t[1] == *insptr);
             break;
-        case 42:
+        case 42: // resetplayer
             insptr++;
 
             if(ud.multimode < 2)
@@ -2596,7 +2594,7 @@ char parse(void)
                 if( lastsavedpos >= 0 && ud.recstat != 2 )
                 {
                     ps[g_p].gm = MODE_MENU;
-                    KB_ClearKeyDown(sc_Space);
+                    //KB_ClearKeyDown(sc_Space);
                     cmenu(15000);
                 }
                 else ps[g_p].gm = MODE_RESTART;

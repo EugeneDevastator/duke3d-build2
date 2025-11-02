@@ -33,10 +33,10 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "util_lib.h"
 #include "function.h"
 #include "control.h"
-#include "fx_man.h"
+//#include "fx_man.h"
 #include "sounds.h"
 #include "config.h"
-#include "sndcards.h"
+//#include "sndcards.h"
 
 #include "duke3d.h"
 #include "engine.h"
@@ -7333,30 +7333,7 @@ char testcd( char *fn )
 
 void copyprotect(void)
 {
-    FILE *fp;
-    char idfile[256];
 
-    return;
-
-    cp = 0;
-
-    fp = (FILE *)fopen("cdrom.ini","rt");
-    if(fp == (FILE *) NULL)
-    {
-        cp = 1;
-        return;
-    }
-
-    fscanf(fp,"%s",idfile);
-    fclose(fp);
-
-    strcat(idfile,IDFILENAME);
-
-    if( testcd(idfile) )
-    {
-        cp = 1;
-        return;
-    }
 }
 
 void main(int argc,char **argv)

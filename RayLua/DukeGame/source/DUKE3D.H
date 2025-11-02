@@ -377,7 +377,9 @@ typedef struct
     char max_actors_killed,actors_killed,return_to_center;
 }  player_struct;
 
-extern unsigned char tempbuf[2048], packbuf[576];
+//same type, is in engine.h
+//extern unsigned char tempbuf[2048];
+extern unsigned char packbuf[576];
 
 extern long gc,max_player_health,max_armour_amount,max_ammo_amount[MAX_WEAPONS];
 
@@ -386,7 +388,7 @@ extern long impact_damage,respawnactortime,respawnitemtime;
 #define MOVFIFOSIZ 256
 
 extern short spriteq[1024],spriteqloc,spriteqamount;
-extern struct player_struct ps[MAXPLAYERS];
+extern player_struct ps[MAXPLAYERS];
 extern struct player_orig po[MAXPLAYERS];
 extern struct user_defs ud;
 extern short int moustat;
@@ -398,7 +400,7 @@ extern char fta_quotes[NUMOFFIRSTTIMEACTIVE][64];
 extern char scantoasc[128],ready2send;
 extern char scantoascwithshift[128];
 
-extern fx_device device;
+//extern fx_device device;
 extern SAMPLE Sound[ NUM_SOUNDS ];
 extern int32_t VoiceToggle,AmbienceToggle;
 extern SOUNDOWNER SoundOwner[NUM_SOUNDS][4];
@@ -543,7 +545,7 @@ extern long *curipos[MAXINTERPOLATIONS];
 extern short numclouds,clouds[128],cloudx[128],cloudy[128];
 extern long cloudtotalclock,totalmemory;
 
-extern long stereomode, stereowidth, stereopixelwidth;
+//extern long stereomode, stereowidth, stereopixelwidth;
 
 extern long myaimmode, myaimstat, omyaimstat;
 

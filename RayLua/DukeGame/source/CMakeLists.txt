@@ -7,6 +7,8 @@ set(CMAKE_C_STANDARD 99)
 set(SOURCES
         gamedef.c
         ENGINE.C;
+        actors.C;
+        players.C;
         build.C;
         #game.c
         KDMENG.C
