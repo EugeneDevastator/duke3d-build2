@@ -29,13 +29,16 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include <string.h>
 #include <stdarg.h>
 #include <errno.h>
+#include <time.h>
 
+#include "mmulti.h"
+#define MAX_PATH 256
 #ifdef __BEOS__
 #include <endian.h>
 #endif
 
 #include "duke3d.h"
-
+#define STUBBED(x) printf("STUB: %s in %s:%d\n", x, __FILE__, __LINE__)
 char *mymembuf;
 char MusicPtr[72000];
 
@@ -63,7 +66,7 @@ short cyclers[MAXCYCLERS][6],numcyclers;
 
 char fta_quotes[NUMOFFIRSTTIMEACTIVE][64];
 
-unsigned char tempbuf[2048], packbuf[576];
+unsigned char  packbuf[576]; // tempbuf[2048], in engine,
 
 char buf[80];
 
@@ -393,21 +396,28 @@ int _dos_findnext(struct find_t *f)
     return(1);  /* no match in whole directory. */
 }
 #else
-#error please define for your platform.
+//#error please define for your platform.
+#define PATH_SEP_STR "/"
 #endif
-
+typedef struct
+{
+	unsigned char day;
+	unsigned char month;
+	unsigned int year;
+	unsigned char dayofweek;
+} dosdate_t;
 
 #if !PLATFORM_DOS
-void _dos_getdate(struct dosdate_t *date)
+void _dos_getdate(dosdate_t *date)
 {
 	time_t curtime = time(NULL);
-	tm *tm;
+	struct tm *tm;
 	
 	if (date == NULL) {
 		return;
 	}
 	
-	memset(date, 0, sizeof(struct dosdate_t));
+	memset(date, 0, sizeof(dosdate_t));
 	
 	if ((tm = localtime(&curtime)) != NULL) {
 		date->day = tm->tm_mday;
@@ -541,7 +551,7 @@ void SafeRead (int32_t handle, void *buffer, int32_t count)
 		iocount = count > 0x8000 ? 0x8000 : count;
 		if (read (handle,buffer,iocount) != (int)iocount)
 			Error ("File read failure reading %ld bytes",count);
-		buffer = (void *)( (byte *)buffer + iocount );
+		buffer = (void *)( (int8_t *)buffer + iocount );
 		count -= iocount;
 	}
 }
@@ -556,7 +566,7 @@ void SafeWrite (int32_t handle, void *buffer, int32_t count)
 		iocount = count > 0x8000 ? 0x8000 : count;
 		if (write (handle,buffer,iocount) != (int)iocount)
 			Error ("File write failure writing %ld bytes",count);
-		buffer = (void *)( (byte *)buffer + iocount );
+		buffer = (void *)( (int8_t *)buffer + iocount );
 		count -= iocount;
 	}
 }
@@ -668,7 +678,9 @@ void SafeFree (void * ptr)
 #endif
 
 #ifndef BYTE_ORDER
+
 #error Please define your platform.
+
 #endif
 
 #if (BYTE_ORDER == LITTLE_ENDIAN)
@@ -685,7 +697,7 @@ void SafeFree (void * ptr)
 
 short	SwapShort (short l)
 {
-	byte	b1,b2;
+	int8_t	b1,b2;
 
 	b1 = l&255;
 	b2 = (l>>8)&255;
@@ -701,7 +713,7 @@ short	KeepShort (short l)
 
 long	SwapLong (long l)
 {
-	byte	b1,b2,b3,b4;
+	int8_t	b1,b2,b3,b4;
 
 	b1 = l&255;
 	b2 = (l>>8)&255;
@@ -898,7 +910,7 @@ int dukescreencapture(char *str, char inverseit)
     char *path = alloca(slen);
     strcpy(path, ApogeePath);
     strcat(path, SCREENSHOTDIR);
-	mkdir(path, S_IRWXU);
+	mkdir(path);//, S_IRWXU);
     strcat(path, PATH_SEP_STR);
     strcat(path, str);
     str = path;
@@ -908,7 +920,7 @@ int dukescreencapture(char *str, char inverseit)
 }
 
 
-char   CheckParm (char *check)
+char CheckParm (char *check)
 {
     int i;
     for (i = 1; i < _argc; i++)
@@ -944,5 +956,5 @@ void Shutdown()
  *  BUILD_CACHEDEBUG 0 at the top of the source. Flip it to 1 if you ever
  *  need to tinker in the cache code.
  */
-char cachedebug = 0;
+//char cachedebug = 0;
 

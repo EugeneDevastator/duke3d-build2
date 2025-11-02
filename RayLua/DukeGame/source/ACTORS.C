@@ -26,6 +26,9 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #include "duke3d.h"
 #include "sector.c"
+#include "global.h"
+#include "sounds.h"
+#include "engine.h"
 
 extern char numenvsnds,actor_tog;
 
@@ -112,7 +115,7 @@ long floorspace(short sectnum)
     return 0;
 }
 
-void addammo( short weapon,struct player_struct *p,short amount)
+void addammo( short weapon, player_struct *p,short amount)
 {
    p->ammo_amount[weapon] += amount;
 
@@ -120,7 +123,7 @@ void addammo( short weapon,struct player_struct *p,short amount)
         p->ammo_amount[weapon] = max_ammo_amount[weapon];
 }
 
-void addweapon( struct player_struct *p,short weapon)
+void addweapon(player_struct *p,short weapon)
 {
     if ( p->gotweapon[weapon] == 0 )
     {
@@ -158,7 +161,7 @@ void addweapon( struct player_struct *p,short weapon)
     }
 }
 
-void checkavailinven( struct player_struct *p )
+void checkavailinven(player_struct *p )
 {
 
     if(p->firstaid_amount > 0)
@@ -178,7 +181,7 @@ void checkavailinven( struct player_struct *p )
     else p->inven_icon = 0;
 }
 
-void checkavailweapon( struct player_struct *p )
+void checkavailweapon(player_struct *p )
 {
     short i,snum;
     int32_t weap;
@@ -233,7 +236,7 @@ void checkavailweapon( struct player_struct *p )
 }
 
  /*
-void checkavailweapon( struct player_struct *p )
+void checkavailweapon(player_struct *p )
 {
     short i,okay,check_shoot,check_bombs;
 
@@ -605,7 +608,7 @@ void hitradius( short i, long  r, long  hp1, long  hp2, long  hp3, long  hp4 )
 }
 
 
-movesprite(short spritenum, long xchange, long ychange, long zchange, unsigned long cliptype)
+int movesprite(short spritenum, long xchange, long ychange, long zchange, unsigned long cliptype)
 {
     long daz,h, oldx, oldy;
     short retval, dasectnum, a, cd;
@@ -3468,7 +3471,7 @@ void moveactors(void)
                     {
                         l = ps[p].posz-s->z;
                         if( klabs(l) < (48<<8) ) t[0] = 3;
-                        else s->z += sgn(ps[p].posz-s->z)<<10;
+                        else s->z += ksgn(ps[p].posz-s->z)<<10;
                     }
                     else
                     {
@@ -5136,7 +5139,7 @@ void moveeffectors(void)   //STATNUM 3
                         {
                             if(hittype[j].temp_data[5] == 0)
                                 hittype[j].temp_data[5] = dist(&sprite[j],s);
-                            x = sgn( dist(&sprite[j],s)-hittype[j].temp_data[5] );
+                            x = ksgn( dist(&sprite[j],s)-hittype[j].temp_data[5] );
                             if(sprite[j].extra)
                                 x = -x;
                             s->xvel += x;
@@ -5535,7 +5538,7 @@ void moveeffectors(void)   //STATNUM 3
 
                         if( klabs( sc->floorheinum-t[5] ) < 8 )
                             sc->floorheinum = t[5];
-                        else sc->floorheinum += ( sgn(t[5]-sc->floorheinum)<<4 );
+                        else sc->floorheinum += ( ksgn(t[5]-sc->floorheinum)<<4 );
                     }
 
                     m = (s->xvel*sintable[(s->ang+512)&2047])>>14;
@@ -5990,23 +5993,23 @@ void moveeffectors(void)   //STATNUM 3
                         if( s->owner )
                         {
                             if( klabs(t[0]-sc->ceilingz) >= j )
-                                sc->ceilingz += sgn(t[0]-sc->ceilingz)*j;
+                                sc->ceilingz += ksgn(t[0]-sc->ceilingz)*j;
                             else sc->ceilingz = t[0];
                         }
                         else
                         {
                             if( klabs(t[1]-sc->floorz) >= j )
-                                sc->floorz += sgn(t[1]-sc->floorz)*j;
+                                sc->floorz += ksgn(t[1]-sc->floorz)*j;
                             else sc->floorz = t[1];
                         }
                     }
                     else
                     {
                         if( klabs(t[1]-sc->floorz) >= j )
-                            sc->floorz += sgn(t[1]-sc->floorz)*j;
+                            sc->floorz += ksgn(t[1]-sc->floorz)*j;
                         else sc->floorz = t[1];
                         if( klabs(t[0]-sc->ceilingz) >= j )
-                            sc->ceilingz += sgn(t[0]-sc->ceilingz)*j;
+                            sc->ceilingz += ksgn(t[0]-sc->ceilingz)*j;
                         sc->ceilingz = t[0];
                     }
 
@@ -6866,7 +6869,7 @@ void moveeffectors(void)   //STATNUM 3
                             }
                             else
                             {
-                                l = sgn(s->z-sc->floorz)*SP;
+                                l = ksgn(s->z-sc->floorz)*SP;
                                 sc->floorz += l;
 
                                 j = headspritesect[s->sectnum];
@@ -6896,7 +6899,7 @@ void moveeffectors(void)   //STATNUM 3
                             }
                             else
                             {
-                                l = sgn(t[1]-sc->floorz)*SP;
+                                l = ksgn(t[1]-sc->floorz)*SP;
                                 sc->floorz += l;
 
                                 j = headspritesect[s->sectnum];
@@ -6928,7 +6931,7 @@ void moveeffectors(void)   //STATNUM 3
                         }
                         else
                         {
-                            l = sgn(s->z-sc->floorz)*SP;
+                            l = ksgn(s->z-sc->floorz)*SP;
                             sc->floorz += l;
 
                             j = headspritesect[s->sectnum];
@@ -6957,7 +6960,7 @@ void moveeffectors(void)   //STATNUM 3
                         }
                         else
                         {
-                            l = sgn(s->z-t[1])*SP;
+                            l = ksgn(s->z-t[1])*SP;
                             sc->floorz -= l;
 
                             j = headspritesect[s->sectnum];
@@ -6996,7 +6999,7 @@ void moveeffectors(void)   //STATNUM 3
                                 t[0] = 0;
                             }
                             else sc->ceilingz +=
-                                sgn(s->z-sc->ceilingz)*SP;
+                                ksgn(s->z-sc->ceilingz)*SP;
                         }
                         else
                         {
@@ -7009,7 +7012,7 @@ void moveeffectors(void)   //STATNUM 3
                                 t[0] = 0;
                             }
                             else sc->ceilingz +=
-                                sgn(t[1]-sc->ceilingz)*SP;
+                                ksgn(t[1]-sc->ceilingz)*SP;
                         }
                         break;
                     }
@@ -7025,7 +7028,7 @@ void moveeffectors(void)   //STATNUM 3
                             sc->ceilingz = s->z;
                         }
                         else sc->ceilingz +=
-                            sgn(s->z-sc->ceilingz)*SP;
+                            ksgn(s->z-sc->ceilingz)*SP;
                     }
                     else
                     {
@@ -7035,7 +7038,7 @@ void moveeffectors(void)   //STATNUM 3
                             t[2] = !t[2];
                             callsound(s->sectnum,i);
                         }
-                        else sc->ceilingz -= sgn(s->z-t[1])*SP;
+                        else sc->ceilingz -= ksgn(s->z-t[1])*SP;
                     }
                 }
                 break;

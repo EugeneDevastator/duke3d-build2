@@ -29,23 +29,23 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #define SETUPNAMEPARM "SETUPFILE"
 
-extern int32 FXDevice;
-extern int32 MusicDevice;
-extern int32 FXVolume;
-extern int32 MusicVolume;
+extern int32_t FXDevice;
+extern int32_t MusicDevice;
+extern int32_t FXVolume;
+extern int32_t MusicVolume;
 extern fx_blaster_config BlasterConfig;
-extern int32 NumVoices;
-extern int32 NumChannels;
-extern int32 NumBits;
-extern int32 MixRate;
-extern int32 MidiPort;
-extern int32 ReverseStereo;
+extern int32_t NumVoices;
+extern int32_t NumChannels;
+extern int32_t NumBits;
+extern int32_t MixRate;
+extern int32_t MidiPort;
+extern int32_t ReverseStereo;
 
-extern int32 ControllerType;
-extern int32 MouseAiming;
-extern int32 ScreenMode;
-extern int32 ScreenWidth;
-extern int32 ScreenHeight;
+extern int32_t ControllerType;
+extern int32_t MouseAiming;
+extern int32_t ScreenMode;
+extern int32_t ScreenWidth;
+extern int32_t ScreenHeight;
 
 void CONFIG_ReadSetup( void );
 void CONFIG_GetSetupFilename( void );

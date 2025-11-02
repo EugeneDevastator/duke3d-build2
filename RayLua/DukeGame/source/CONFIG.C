@@ -28,6 +28,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <ctype.h>
 #include <time.h>
 #include <dos.h>
@@ -42,36 +43,36 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 //
 // Sound variables
 //
-int32 FXDevice;
-int32 MusicDevice;
-int32 FXVolume;
-int32 MusicVolume;
-int32 SoundToggle;
-int32 MusicToggle;
-int32 VoiceToggle;
-int32 AmbienceToggle;
+// int32_t FXDevice;
+// int32_t MusicDevice;
+// int32_t FXVolume;
+// int32_t MusicVolume;
+int32_t SoundToggle;
+int32_t MusicToggle;
+int32_t VoiceToggle;
+int32_t AmbienceToggle;
 fx_blaster_config BlasterConfig;
-int32 NumVoices;
-int32 NumChannels;
-int32 NumBits;
-int32 MixRate;
-int32 MidiPort;
-int32 ReverseStereo;
+// int32_t NumVoices;
+// int32_t NumChannels;
+// int32_t NumBits;
+// int32_t MixRate;
+// int32_t MidiPort;
+// int32_t ReverseStereo;
 
-int32 ControllerType;
-int32 MouseAiming;
+// int32_t ControllerType;
+// int32_t MouseAiming;
 
 //
 // Screen variables
 //
 
-int32 ScreenMode;
-int32 ScreenWidth;
-int32 ScreenHeight;
+// int32_t ScreenMode;
+// int32_t ScreenWidth;
+// int32_t ScreenHeight;
 
 static char setupfilename[128]={SETUPFILENAME};
-static int32 scripthandle;
-static int32 setupread=0;
+static int32_t scripthandle;
+static int32_t setupread=0;
 /*
 ===================
 =
@@ -86,8 +87,8 @@ void CONFIG_GetSetupFilename( void )
    char extension[10];
    char * src;
    char * filenames[MAXSETUPFILES];
-   int32 numfiles;
-   int32 i;
+   int32_t numfiles;
+   int32_t i;
 
    strcpy(setupfilename,SETUPFILENAME);
 
@@ -123,9 +124,9 @@ void CONFIG_GetSetupFilename( void )
       }
    if (numfiles>1)
       {
-      int32 time;
-      int32 oldtime;
-      int32 count;
+      int32_t time;
+      int32_t oldtime;
+      int32_t count;
 
       printf("\nMultiple Configuration Files Encountered\n");
       printf("========================================\n");
@@ -160,7 +161,7 @@ void CONFIG_GetSetupFilename( void )
             }
          if (KB_KeyWaiting())
             {
-            int32 ch = KB_Getch();
+            int32_t ch = KB_Getch();
             ch -='a';
             if (ch>=0 && ch<numfiles)
                {
@@ -193,9 +194,9 @@ void CONFIG_GetSetupFilename( void )
 ===================
 */
 
-int32 CONFIG_FunctionNameToNum( char * func )
+int32_t CONFIG_FunctionNameToNum( char * func )
    {
-   int32 i;
+   int32_t i;
 
    for (i=0;i<NUMGAMEFUNCTIONS;i++)
       {
@@ -215,7 +216,7 @@ int32 CONFIG_FunctionNameToNum( char * func )
 ===================
 */
 
-char * CONFIG_FunctionNumToName( int32 func )
+char * CONFIG_FunctionNumToName( int32_t func )
    {
    if (func < NUMGAMEFUNCTIONS)
       {
@@ -236,7 +237,7 @@ char * CONFIG_FunctionNumToName( int32 func )
 */
 
 
-int32 CONFIG_AnalogNameToNum( char * func )
+int32_t CONFIG_AnalogNameToNum( char * func )
    {
 
    if (!stricmp(func,"analog_turning"))
@@ -297,9 +298,9 @@ void CONFIG_SetDefaults( void )
 
 void CONFIG_ReadKeys( void )
    {
-   int32 i;
-   int32 numkeyentries;
-   int32 function;
+   int32_t i;
+   int32_t numkeyentries;
+   int32_t function;
    char keyname1[80];
    char keyname2[80];
    kb_scancode key1,key2;
@@ -345,12 +346,12 @@ void CONFIG_ReadKeys( void )
 ===================
 */
 
-void CONFIG_SetupMouse( int32 scripthandle )
+void CONFIG_SetupMouse( int32_t scripthandle )
    {
-   int32 i;
+   int32_t i;
    char str[80];
    char temp[80];
-   int32 function, scale;
+   int32_t function, scale;
 
    for (i=0;i<MAXMOUSEBUTTONS;i++)
       {
@@ -407,12 +408,12 @@ void CONFIG_SetupMouse( int32 scripthandle )
 ===================
 */
 
-void CONFIG_SetupGamePad( int32 scripthandle )
+void CONFIG_SetupGamePad( int32_t scripthandle )
    {
-   int32 i;
+   int32_t i;
    char str[80];
    char temp[80];
-   int32 function;
+   int32_t function;
 
 
    for (i=0;i<MAXJOYBUTTONS;i++)
@@ -458,12 +459,12 @@ void CONFIG_SetupGamePad( int32 scripthandle )
 ===================
 */
 
-void CONFIG_SetupJoystick( int32 scripthandle )
+void CONFIG_SetupJoystick( int32_t scripthandle )
    {
-   int32 i;
+   int32_t i;
    char str[80];
    char temp[80];
-   int32 function, scale;
+   int32_t function, scale;
 
    for (i=0;i<MAXJOYBUTTONS;i++)
       {
@@ -544,7 +545,7 @@ void readsavenames(void)
 
 void CONFIG_ReadSetup( void )
 {
-   int32 dummy;
+   int32_t dummy;
    char commmacro[] = "CommbatMacro# ";
 
    if (!SafeFileExists(setupfilename))
@@ -651,8 +652,8 @@ void CONFIG_ReadSetup( void )
    SCRIPT_GetNumber( scripthandle, "Controls","ControllerType",&ControllerType);
    SCRIPT_GetNumber( scripthandle, "Controls","MouseAimingFlipped",&ud.mouseflip);
    SCRIPT_GetNumber( scripthandle, "Controls","MouseAiming",&MouseAiming);
-   SCRIPT_GetNumber( scripthandle, "Controls","GameMouseAiming",(int32 *)&ps[0].aim_mode);
-   SCRIPT_GetNumber( scripthandle, "Controls","AimingFlag",(int32 *)&myaimmode);
+   SCRIPT_GetNumber( scripthandle, "Controls","GameMouseAiming",(int32_t *)&ps[0].aim_mode);
+   SCRIPT_GetNumber( scripthandle, "Controls","AimingFlag",(int32_t *)&myaimmode);
 
    CONTROL_ClearAssignments();
 
@@ -688,7 +689,7 @@ void CONFIG_ReadSetup( void )
 
 void CONFIG_WriteSetup( void )
    {
-   int32 dummy;
+   int32_t dummy;
 
    if (!setupread) return;
 
@@ -712,7 +713,7 @@ void CONFIG_WriteSetup( void )
    SCRIPT_PutNumber( scripthandle, "Misc", "Crosshairs",ud.crosshair,false,false);
    SCRIPT_PutNumber( scripthandle, "Controls", "MouseAimingFlipped",ud.mouseflip,false,false);
    SCRIPT_PutNumber( scripthandle, "Controls","MouseAiming",MouseAiming,false,false);
-   SCRIPT_PutNumber( scripthandle, "Controls","GameMouseAiming",(int32) ps[myconnectindex].aim_mode,false,false);
+   SCRIPT_PutNumber( scripthandle, "Controls","GameMouseAiming",(int32_t) ps[myconnectindex].aim_mode,false,false);
    SCRIPT_PutNumber( scripthandle, "Controls","AimingFlag",(long) myaimmode,false,false);
 
    for(dummy=0;dummy<10;dummy++)

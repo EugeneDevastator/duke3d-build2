@@ -69,12 +69,12 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #define FOURSLEIGHT (1<<8)
 
-#include "types.h"
+//#include "types.h"
 #include "file_lib.h"
-#include "develop.h"
+//#include "develop.h"
 #include "gamedefs.h"
 #include "keyboard.h"
-#include "util_lib.h"
+//#include "util_lib.h"
 #include "function.h"
 #include "fx_man.h"
 #include "config.h"

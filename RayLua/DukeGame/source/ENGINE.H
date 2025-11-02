@@ -420,7 +420,7 @@ extern long drawslab(long,long,long,long,long,long);
 void drawrooms(long daposx, long daposy, long daposz,
 			 short daang, long dahoriz, short dacursectnum);
 
-scansector (short sectnum);
+void scansector (short sectnum);
 
 wallfront (long l1, long l2);
 
@@ -1288,24 +1288,9 @@ alignceilslope(short dasect, long x, long y, long z)
 	if (sector[dasect].ceilingheinum == 0) sector[dasect].ceilingstat &= ~2;
 												 else sector[dasect].ceilingstat |= 2;
 }
-
-alignflorslope(short dasect, long x, long y, long z)
-{
-	long i, dax, day;
-	walltype *wal;
-
-	wal = &wall[sector[dasect].wallptr];
-	dax = wall[wal->point2].x-wal->x;
-	day = wall[wal->point2].y-wal->y;
-
-	i = (y-wal->y)*dax - (x-wal->x)*day; if (i == 0) return;
-	sector[dasect].floorheinum = scale((z-sector[dasect].floorz)<<8,
-												  nsqrtasm(dax*dax+day*day),i);
-
-	if (sector[dasect].floorheinum == 0) sector[dasect].floorstat &= ~2;
-											  else sector[dasect].floorstat |= 2;
-}
-
+*/
+alignflorslope(short dasect, long x, long y, long z);
+/*
 owallmost(short *mostbuf, long w, long z)
 {
 	long bad, x, intx, inty, xcross, y, yy, yinc;

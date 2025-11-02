@@ -169,7 +169,7 @@ void drawrooms(long daposx, long daposy, long daposz, short daang, long dahoriz,
 }
 
 
-int scansector(short sectnum)
+void scansector(short sectnum)
 {
     walltype *wal, *wal2;
     spritetype *spr;
@@ -6884,4 +6884,21 @@ int getzsofslope(short sectnum, long dax, long day, long* ceilz, long* florz)
         if (sec->ceilingstat&2) *ceilz = (*ceilz)+scale(sec->ceilingheinum,j,i);
         if (sec->floorstat&2) *florz = (*florz)+scale(sec->floorheinum,j,i);
     }
+}
+
+int alignflorslope(short dasect, long x, long y, long z)
+{
+    long i, dax, day;
+    walltype *wal;
+
+    wal = &wall[sector[dasect].wallptr];
+    dax = wall[wal->point2].x-wal->x;
+    day = wall[wal->point2].y-wal->y;
+
+    i = (y-wal->y)*dax - (x-wal->x)*day; if (i == 0) return;
+    sector[dasect].floorheinum = scale((z-sector[dasect].floorz)<<8,
+                                       nsqrtasm(dax*dax+day*day),i);
+
+    if (sector[dasect].floorheinum == 0) sector[dasect].floorstat &= ~2;
+    else sector[dasect].floorstat |= 2;
 }

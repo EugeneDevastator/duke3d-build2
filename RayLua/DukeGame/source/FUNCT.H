@@ -165,7 +165,7 @@ extern void resettimevars(void );
 //#line "premap.c" 1043
 extern void genspriteremaps(void );
 //#line "premap.c" 1077
-extern void waitforeverybody()
+extern void waitforeverybody();
 //#line "premap.c" 1131
 extern char checksum(long sum);
 //#line "premap.c" 1163
@@ -249,7 +249,7 @@ extern void dispnames(void );
 //#line "menues.c" 832
 extern int getfilenames(char kind[]);
 //#line "menues.c" 865
-extern void sortfilenames()
+extern void sortfilenames();
 //#line "menues.c" 886
 extern void menus(void );
 //#line "menues.c" 2414
@@ -291,7 +291,7 @@ extern short furthestcanseepoint(short i,spritetype *ts,long *dax,long *day);
 //#line "gamedef.c" 1444
 extern void alterang(short a);
 //#line "gamedef.c" 1512
-extern void move()
+extern void move();
 //#line "gamedef.c" 1711
 extern void parseifelse(long condition);
 //#line "gamedef.c" 1729
@@ -303,7 +303,7 @@ extern void overwritesprite(long thex,long they,short tilenum,signed char shade,
 //#line "game.c" 70
 extern void timerhandler(task *);
 //#line "game.c" 75
-extern void inittimer()
+extern void inittimer();
 //#line "game.c" 81
 extern void uninittimer(void );
 //#line "game.c" 89
@@ -321,7 +321,7 @@ extern void allowtimetocorrecterrorswhenquitting(void );
 //#line "game.c" 280
 extern void getpackets(void );
 //#line "game.c" 502
-extern void faketimerhandler()
+extern void faketimerhandler();
 //#line "game.c" 788
 extern void checksync(void );
 //#line "game.c" 815
@@ -361,7 +361,7 @@ extern void clocks(void );
 //#line "game.c" 1582
 extern void coords(short snum);
 //#line "game.c" 1607
-extern void operatefta()
+extern void operatefta();
 //#line "game.c" 1654
 extern void FTA(short q,player_struct *p);
 //#line "game.c" 1668
@@ -413,7 +413,7 @@ extern void Startup(void );
 //#line "game.c" 6284
 extern void getnames(void );
 //#line "game.c" 6309
-extern void main(int argc,char **argv);
+extern int main(int argc,char **argv);
 //#line "game.c" 6563
 extern char opendemoread(char which_demo);
 //#line "game.c" 6589
@@ -425,9 +425,9 @@ extern void closedemowrite(void );
 //#line "game.c" 6642
 extern long playback(void );
 //#line "game.c" 6777
-extern char moveloop()
+extern char moveloop();
 //#line "game.c" 6796
-extern void fakedomovethingscorrect()
+extern void fakedomovethingscorrect();
 //#line "game.c" 6829
 extern void fakedomovethings(void );
 //#line "game.c" 7247
@@ -511,7 +511,7 @@ extern uint8_t *ANIM_DrawFrame(int32_t framenumber);
 //#line "animlib.c" 312
 extern uint8_t *ANIM_GetPalette(void );
 //#line "actors.c" 7
-extern void updateinterpolations()
+extern void updateinterpolations();
 //#line "actors.c" 15
 extern void setinterpolation(long *posptr);
 //#line "actors.c" 27
@@ -519,13 +519,13 @@ extern void stopinterpolation(long *posptr);
 //#line "actors.c" 41
 extern void dointerpolations(long smoothratio);
 //#line "actors.c" 55
-extern void restoreinterpolations()
+extern void restoreinterpolations();
 //#line "actors.c" 63
 extern long ceilingspace(short sectnum);
 //#line "actors.c" 77
 extern long floorspace(short sectnum);
 //#line "actors.c" 91
-extern void addammo(short weapon,struct player_struct *p,short amount);
+extern void addammo(short weapon, player_struct *p,short amount);
 //#line "actors.c" 99
 extern void addweapon(player_struct *p,short weapon);
 //#line "actors.c" 132

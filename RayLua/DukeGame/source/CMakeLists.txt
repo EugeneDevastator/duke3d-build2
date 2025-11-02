@@ -20,6 +20,7 @@ set(SOURCES
         PREMAP.C
         SOUNDS.C
         Config.c
+        scriplib.c
 
         # Add more .c files here
 )

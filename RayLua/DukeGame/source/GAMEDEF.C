@@ -1945,7 +1945,7 @@ void move()
    }
 }
 
-char parse()
+char parse();
 
 void parseifelse(long condition)
 {
