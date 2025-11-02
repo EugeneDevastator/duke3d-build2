@@ -33,7 +33,8 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "util_lib.h"
 #include "function.h"
 #include "control.h"
-//#include "fx_man.h"
+#include "fx_man.h"
+#include "music.h"
 #include "sounds.h"
 #include "config.h"
 //#include "sndcards.h"
@@ -2756,7 +2757,7 @@ void displayrooms(short snum,long smoothratio)
 {
     long cposx,cposy,cposz,dst,j,fz,cz,hz,lz;
     short sect, cang, k, choriz,tsect;
-    struct player_struct *p;
+    player_struct *p;
     long tposx,tposy,tposz,dx,dy,thoriz,i;
     short tang;
 
@@ -7270,66 +7271,6 @@ void writestring(long a1,long a2,long a3,short a4,long vx,long vy,long vz)
     fclose(fp);
 
 }
-
-
-char testcd( char *fn )
-{
-
- short drive_count, drive;
- long dalen = 0;
- struct find_t dafilet;
- int fil;
-
- union _REGS ir;
- union _REGS or;
- struct _SREGS sr;
-
- if( IDFSIZE != 9961476 )
- {
-     drive = toupper(*fn)-'A';
-
-     ir.w.ax = 0x1500;
-     ir.w.bx = 0;                             /* check that MSCDEX is installed */
-     int386(0x2f, &ir, &or);
-     drive_count = or.w.bx;
-
-     if( drive_count == 0 )
-         return 1;
-
-     ir.w.ax = 0x150b;
-     ir.w.bx = 0;
-     ir.w.cx = drive;
-     int386(0x2f, &ir, &or);
-
-     if (or.w.ax == 0 || or.w.bx != 0xadad)
-         return 1;
-
-     ir.w.ax = 0x1502;
-     ir.w.bx = FP_OFF(buf);
-     sr.es = FP_SEG(buf);
-     ir.w.cx = drive;
-     int386x(0x2f, &ir, &or, &sr);
-
-     if( or.h.al == 0 || or.h.al == 30)
-         return 1;
-
-  }
-
-  fil = open(fn,O_RDONLY,S_IREAD);
-
-  if ( fil < 0 ) return 1;
-
-  // ( DO A SEE/Byte check here.) (Not coded in this version)
-
-
-  dalen = filelength(fil);
-
-  close(fil);
-
-  return( dalen != IDFSIZE );
-
-}
-
 
 void copyprotect(void)
 {

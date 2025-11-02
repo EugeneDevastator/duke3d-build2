@@ -124,15 +124,15 @@ extern void RTS_AddFile(char *filename);
 //#line "rts.c" 93
 extern void RTS_Init(char *filename);
 //#line "rts.c" 126
-extern int32 RTS_NumSounds(void );
+extern int32_t RTS_NumSounds(void );
 //#line "rts.c" 141
-extern int32 RTS_SoundLength(int32 lump);
+extern int32_t RTS_SoundLength(int32_t lump);
 //#line "rts.c" 157
-extern char *RTS_GetSoundName(int32 i);
+extern char *RTS_GetSoundName(int32_t i);
 //#line "rts.c" 174
-extern void RTS_ReadLump(int32 lump,void *dest);
+extern void RTS_ReadLump(int32_t lump,void *dest);
 //#line "rts.c" 194
-extern void *RTS_GetSound(int32 lump);
+extern void *RTS_GetSound(int32_t lump);
 //#line "premap.c" 7
 extern void xyzmirror(short i,short wn);
 //#line "premap.c" 20
@@ -228,7 +228,7 @@ extern void savetemp(char *fn,long daptr,long dasiz);
 //#line "menues.c" 49
 extern void getangplayers(short snum);
 //#line "menues.c" 67
-extern int loadpheader(char spot,int32 *vn,int32 *ln,int32 *psk,int32 *numplr);
+extern int loadpheader(char spot,int32_t *vn,int32_t *ln,int32_t *psk,int32_t *numplr);
 //#line "menues.c" 105
 extern int loadplayer(signed char spot);
 //#line "menues.c" 276
@@ -466,21 +466,21 @@ extern void CenterRudder(void );
 //#line "config.c" 57
 extern void CONFIG_GetSetupFilename(void );
 //#line "config.c" 170
-extern int32 CONFIG_FunctionNameToNum(char *func);
+extern int32_t CONFIG_FunctionNameToNum(char *func);
 //#line "config.c" 192
-extern char *CONFIG_FunctionNumToName(int32 func);
+extern char *CONFIG_FunctionNumToName(int32_t func);
 //#line "config.c" 211
-extern int32 CONFIG_AnalogNameToNum(char *func);
+extern int32_t CONFIG_AnalogNameToNum(char *func);
 //#line "config.c" 240
 extern void CONFIG_SetDefaults(void );
 //#line "config.c" 264
 extern void CONFIG_ReadKeys(void );
 //#line "config.c" 314
-extern void CONFIG_SetupMouse(int32 scripthandle);
+extern void CONFIG_SetupMouse(int32_t scripthandle);
 //#line "config.c" 376
-extern void CONFIG_SetupGamePad(int32 scripthandle);
+extern void CONFIG_SetupGamePad(int32_t scripthandle);
 //#line "config.c" 427
-extern void CONFIG_SetupJoystick(int32 scripthandle);
+extern void CONFIG_SetupJoystick(int32_t scripthandle);
 //#line "config.c" 485
 extern void readsavenames(void );
 //#line "config.c" 512
@@ -504,9 +504,9 @@ extern void ANIM_LoadAnim(char *buffer);
 //#line "animlib.c" 260
 extern void ANIM_FreeAnim(void );
 //#line "animlib.c" 275
-extern int32 ANIM_NumFrames(void );
+extern int32_t ANIM_NumFrames(void );
 //#line "animlib.c" 287
-extern byte *ANIM_DrawFrame(int32 framenumber);
+extern byte *ANIM_DrawFrame(int32_t framenumber);
 //#line "animlib.c" 312
 extern byte *ANIM_GetPalette(void );
 //#line "actors.c" 7

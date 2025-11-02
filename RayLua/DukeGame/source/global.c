@@ -488,7 +488,7 @@ void Error (char *error, ...)
 }
 
 
-int32 SafeOpenAppend (const char *_filename, int32 filetype)
+int32_t SafeOpenAppend (const char *_filename, int32_t filetype)
 {
 	int	handle;
     char filename[MAX_PATH];
@@ -505,7 +505,7 @@ int32 SafeOpenAppend (const char *_filename, int32 filetype)
 	return handle;
 }
 
-boolean SafeFileExists ( const char * _filename )
+bool SafeFileExists ( const char * _filename )
 {
     char filename[MAX_PATH];
     strncpy(filename, _filename, sizeof (filename));
@@ -516,7 +516,7 @@ boolean SafeFileExists ( const char * _filename )
 }
 
 
-int32 SafeOpenWrite (const char *_filename, int32 filetype)
+int32_t SafeOpenWrite (const char *_filename, int32_t filetype)
 {
 	int	handle;
     char filename[MAX_PATH];
@@ -533,7 +533,7 @@ int32 SafeOpenWrite (const char *_filename, int32 filetype)
 	return handle;
 }
 
-int32 SafeOpenRead (const char *_filename, int32 filetype)
+int32_t SafeOpenRead (const char *_filename, int32_t filetype)
 {
 	int	handle;
     char filename[MAX_PATH];
@@ -550,7 +550,7 @@ int32 SafeOpenRead (const char *_filename, int32 filetype)
 }
 
 
-void SafeRead (int32 handle, void *buffer, int32 count)
+void SafeRead (int32_t handle, void *buffer, int32_t count)
 {
 	unsigned	iocount;
 
@@ -565,7 +565,7 @@ void SafeRead (int32 handle, void *buffer, int32 count)
 }
 
 
-void SafeWrite (int32 handle, void *buffer, int32 count)
+void SafeWrite (int32_t handle, void *buffer, int32_t count)
 {
 	unsigned	iocount;
 
@@ -580,7 +580,7 @@ void SafeWrite (int32 handle, void *buffer, int32 count)
 }
 
 
-void GetPathFromEnvironment( char *fullname, int32 length, const char *filename )
+void GetPathFromEnvironment( char *fullname, int32_t length, const char *filename )
 {
 	snprintf(fullname, length-1, "%s%s", ApogeePath, filename);
 }
@@ -612,7 +612,7 @@ void *SafeMalloc (long size)
 	return ptr;
 }
 
-void SafeRealloc (void **x, int32 size)
+void SafeRealloc (void **x, int32_t size)
 {
 	void *ptr;
 

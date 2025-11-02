@@ -1047,90 +1047,15 @@ krand();
 getzrange(long x, long y, long z, short sectnum,
 		  long *ceilz, long *ceilhit, long *florz, long *florhit,
 		  long walldist, unsigned long cliptype);
-/*
-setview(long x1, long y1, long x2, long y2)
-{
-	long i, j;
 
-	windowx1 = x1; wx1 = (x1<<12);
-	windowy1 = y1; wy1 = (y1<<12);
-	windowx2 = x2; wx2 = ((x2+1)<<12);
-	windowy2 = y2; wy2 = ((y2+1)<<12);
+setview(long x1, long y1, long x2, long y2);
 
-	xdimen = (x2-x1)+1; halfxdimen = (xdimen>>1);
-	xdimenrecip = divscale32(1L,xdimen);
-	ydimen = (y2-y1)+1;
+setaspect(long daxrange, long daaspect);
 
-	setaspect(65536L,(long)divscale16(ydim*320L,xdim*200L));
+dosetaspect();
 
-	for(i=0;i<windowx1;i++) { startumost[i] = 1, startdmost[i] = 0; }
-	for(i=windowx1;i<=windowx2;i++)
-		{ startumost[i] = windowy1, startdmost[i] = windowy2+1; }
-	for(i=windowx2+1;i<xdim;i++) { startumost[i] = 1, startdmost[i] = 0; }
+flushperms();
 
-	viewoffset = windowy1*bytesperline + windowx1;
-
-	if ((stereomode) || (vidoption == 6))
-	{
-		ostereopixelwidth = stereopixelwidth;
-		xdimen = (windowx2-windowx1+1)+(stereopixelwidth<<1); halfxdimen = (xdimen>>1);
-		xdimenrecip = divscale32(1L,xdimen);
-		setaspect((long)divscale16(xdimen,windowx2-windowx1+1),yxaspect);
-	}
-}
-
-setaspect(long daxrange, long daaspect)
-{
-	viewingrange = daxrange;
-	viewingrangerecip = divscale32(1L,daxrange);
-
-	yxaspect = daaspect;
-	xyaspect = divscale32(1,yxaspect);
-	xdimenscale = scale(xdimen,yxaspect,320);
-	xdimscale = scale(320,xyaspect,xdimen);
-}
-
-dosetaspect()
-{
-	long i, j, k, x, y, xinc;
-
-	if (xyaspect != oxyaspect)
-	{
-		oxyaspect = xyaspect;
-		j = xyaspect*320;
-		horizlookup2[horizycent-1] = divscale26(131072,j);
-		for(i=ydim*4-1;i>=0;i--)
-			if (i != (horizycent-1))
-			{
-				horizlookup[i] = divscale28(1,i-(horizycent-1));
-				horizlookup2[i] = divscale14(klabs(horizlookup[i]),j);
-			}
-	}
-	if ((xdimen != oxdimen) || (viewingrange != oviewingrange))
-	{
-		oxdimen = xdimen;
-		oviewingrange = viewingrange;
-		xinc = mulscale32(viewingrange*320,xdimenrecip);
-		x = (640<<16)-mulscale1(xinc,xdimen);
-		for(i=0;i<xdimen;i++)
-		{
-			j = (x&65535); k = (x>>16); x += xinc;
-			if (j != 0) j = mulscale16((long)radarang[k+1]-(long)radarang[k],j);
-			radarang2[i] = (short)(((long)radarang[k]+j)>>6);
-		}
-#ifdef SUPERBUILD
-		for(i=1;i<16384;i++) distrecip[i] = divscale20(xdimen,i);
-		nytooclose = xdimen*2100;
-		nytoofar = 16384*16384-1048576;
-#endif
-	}
-}
-
-flushperms()
-{
-	permhead = permtail = 0;
-}
-*/
 rotatesprite (long sx, long sy, long z, short a, short picnum, signed char dashade, char dapalnum, char dastat, long cx1, long cy1, long cx2, long cy2);
 
 dorotatesprite (long sx, long sy, long z, short a, short picnum, signed char dashade, char dapalnum, char dastat, long cx1, long cy1, long cx2, long cy2);
@@ -1916,60 +1841,12 @@ fillpolygon(long npoints)
 	}
 	faketimerhandler();
 }
+*/
 
-clearview(long dacol)
-{
-	long i, p, y, x1, x2, dx;
-	char *ptr;
+clearview(long dacol);
 
-	if (qsetmode != 200) return;
-
-	dx = windowx2-windowx1+1;
-	dacol += (dacol<<8); dacol += (dacol<<16);
-	if (vidoption == 6)
-	{
-		p = FP_OFF(screen)+ylookup[windowy1]+windowx1;
-		for(y=windowy1;y<=windowy2;y++)
-		{
-			clearbufbyte(p,dx,dacol);
-			clearbufbyte(p+65536,dx,dacol);
-			p += ylookup[1];
-		}
-		faketimerhandler();
-		return;
-	}
-	p = frameplace+ylookup[windowy1]+windowx1;
-	for(y=windowy1;y<=windowy2;y++)
-		{ clearbufbyte(p,dx,dacol); p += ylookup[1]; }
-	faketimerhandler();
-}
-
-clearallviews(long dacol)
-{
-	long i;
-
-	if (qsetmode != 200) return;
-	dacol += (dacol<<8); dacol += (dacol<<16);
-
-	switch(vidoption)
-	{
-		case 1:
-			for(i=0;i<numpages;i++)
-			{
-				setactivepage(i);
-				clearbufbyte(frameplace,imageSize,0L);
-			}
-			setactivepage(activepage);
-		case 2:
-			clearbuf(frameplace,(xdim*ydim)>>2,0L);
-			break;
-		case 6:
-			clearbuf(screen,128000L>>2,dacol);
-			break;
-	}
-	faketimerhandler();
-}
-
+clearallviews(long dacol);
+/*
 plotpixel(long x, long y, char col)
 {
 	drawpixel(ylookup[y]+x+frameplace,(long)col);

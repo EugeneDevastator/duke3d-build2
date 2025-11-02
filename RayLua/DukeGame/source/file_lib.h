@@ -26,6 +26,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #ifndef _file_lib_public
 #define _file_lib_public
+#include <stdbool.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -48,42 +49,42 @@ enum
 // SafeOpenWrite - Opens a file for writing, returns handle
 //
 //==========================================================================
-int32 SafeOpenWrite ( const char * filename, int32 filetype );
+int32_t SafeOpenWrite ( const char * filename, int32_t filetype );
 
 //==========================================================================
 //
 // SafeOpenRead - Opens a file for reading, returns handle
 //
 //==========================================================================
-int32 SafeOpenRead ( const char * filename, int32 filetype );
+int32_t SafeOpenRead ( const char * filename, int32_t filetype );
 
 //==========================================================================
 //
 // SafeOpenAppend - Opens a file for appending, returns handle
 //
 //==========================================================================
-int32 SafeOpenAppend ( const char * filename, int32 filetype );
+int32_t SafeOpenAppend ( const char * filename, int32_t filetype );
 
 //==========================================================================
 //
 // SafeClose - Close a file denoted by the file handle
 //
 //==========================================================================
-void SafeClose ( int32 handle );
+void SafeClose ( int32_t handle );
 
 //==========================================================================
 //
 // SafeFileExists - Checks for existence of file
 //
 //==========================================================================
-boolean SafeFileExists ( const char * filename );
+bool SafeFileExists ( const char * filename );
 
 //==========================================================================
 //
 // SafeFileLength - Get length of a file pointed to by handle
 //
 //==========================================================================
-int32 SafeFileLength ( int32 handle );
+int32_t SafeFileLength ( int32_t handle );
 
 //==========================================================================
 //
@@ -96,7 +97,7 @@ int32 SafeFileLength ( int32 handle );
 //            count  - number of bytes to read
 //
 //==========================================================================
-void SafeRead (int32 handle, void *buffer, int32 count);
+void SafeRead (int32_t handle, void *buffer, int32_t count);
 
 //==========================================================================
 //
@@ -109,7 +110,7 @@ void SafeRead (int32 handle, void *buffer, int32 count);
 //             count  - number of bytes to write
 //
 //==========================================================================
-void SafeWrite (int32 handle, void *buffer, int32 count);
+void SafeWrite (int32_t handle, void *buffer, int32_t count);
 
 //==========================================================================
 //
@@ -122,7 +123,7 @@ void SafeWrite (int32 handle, void *buffer, int32 count);
 //            returns number of bytes read
 //
 //==========================================================================
-int32 LoadFile ( const char * filename, void ** bufferptr );
+int32_t LoadFile ( const char * filename, void ** bufferptr );
 
 //==========================================================================
 //
@@ -135,7 +136,7 @@ int32 LoadFile ( const char * filename, void ** bufferptr );
 //            count - number of bytes to write
 //
 //==========================================================================
-void SaveFile ( const char * filename, void * bufferptr, int32 count );
+void SaveFile ( const char * filename, void * bufferptr, int32_t count );
 
 //==========================================================================
 //
@@ -149,7 +150,7 @@ void SaveFile ( const char * filename, void * bufferptr, int32 count );
 //                          filename - standard filename
 //
 //==========================================================================
-void GetPathFromEnvironment( char *fullname, int32 length, const char *filename );
+void GetPathFromEnvironment( char *fullname, int32_t length, const char *filename );
 
 //==========================================================================
 //

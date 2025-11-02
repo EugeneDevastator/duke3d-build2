@@ -24,9 +24,12 @@ set(HEADERS
         duke3d.h;
         gamedefs.h;
         names.h;
-engine.h
-        GAME_NOSYS.C
+        engine.h
         PREMAP.C
+        SOUNDS.C
+        keyboard.h
+        MMULTI.H
+        MUSIC.H
 
         # Add more .h files here
 )
