@@ -65,7 +65,7 @@ extern long startposx, startposy, startposz;
 extern short startang, startsectnum;
 extern long frameplace, pageoffset, ydim16;
 
-extern long cachesize, artsize;
+static long cachesize, artsize;
 
 static short oldmousebstatus = 0, brightness = 0;
 long zlock = 0x7fffffff, zmode = 0, whitecol, kensplayerheight = 32;

@@ -18,6 +18,7 @@
 #include <conio.h>
 //#include <i86.h>
 #include "build.h"
+#include "CACHE1D.H"
 #include "duke3d.h"
 #include "pragmas.h"
 
@@ -39,18 +40,15 @@ volatile char oa1, o3c2, ortca, ortcb, overtbits, laststereoint;
 #define MAXCLIPDIST 1024
 
 	//MUST CALL MALLOC THIS WAY TO FORCE CALLS TO KMALLOC!
-void *kmalloc(size_t size) { return(malloc(size)); }
+
 void *kkmalloc(size_t size);
 #pragma aux kkmalloc =\
 	"call kmalloc",\
 	parm [eax]\
 
 	//MUST CALL FREE THIS WAY TO FORCE CALLS TO KFREE!
-void kfree(void *buffer) { free(buffer); }
-void kkfree(void *buffer);
-#pragma aux kkfree =\
-	"call kfree",\
-	parm [eax]\
+
+
 
 #ifdef SUPERBUILD
 	//MUST CALL LOADVOXEL THIS WAY BECAUSE WATCOM STINKS!
@@ -96,7 +94,7 @@ char picsiz[MAXTILES], tilefilenum[MAXTILES];
 long lastageclock;
 long tilefileoffs[MAXTILES];
 
-long artsize = 0, cachesize = 0;
+static long artsize = 0, cachesize = 0;
 
 static short radarang[1280], radarang2[MAXXDIM];
 static unsigned short sqrtable[4096], shlookup[4096+256];
@@ -424,15 +422,7 @@ void scansector (short sectnum);
 
 wallfront (long l1, long l2);
 
-spritewallfront (spritetype *s, long w)
-{
-	walltype *wal;
-	long x1, y1;
-
-	wal = &wall[w]; x1 = wal->x; y1 = wal->y;
-	wal = &wall[wal->point2];
-	return (dmulscale32(wal->x-x1,s->y-y1,-(s->x-x1),wal->y-y1) >= 0);
-}
+int32_t spritewallfront (spritetype *s, long w);
 
 bunchfront (long b1, long b2)
 {
@@ -2012,7 +2002,7 @@ installbistereohandlers(void far *stereohan)
 	rtcopmoff = r.x.ebx;
 
 		//Get old real mode handler
-	r.x.eax = 0x0200;   /* DPMI get real mode vector */
+	r.x.eax = 0x0200;   // DPMI get real mode vector
 	r.h.bl = 0x70;
 	int386(0x31,&r,&r);
 	rtcormseg = (unsigned short)r.x.ecx;
@@ -2061,7 +2051,7 @@ uninstallbistereohandlers()
 	r.x.edx = (unsigned long)rtcormoff;
 	int386(0x31,&r,&r);
 }
-
+*/
 loopnumofsector(short sectnum, short wallnum)
 {
 	long i, numloops, startwall, endwall;
@@ -2135,5 +2125,5 @@ setfirstwall(short sectnum, short newfirstwall)
 		if (wall[i].nextwall >= 0) wall[wall[i].nextwall].nextwall = i;
 }
 
-*/
+
 #endif

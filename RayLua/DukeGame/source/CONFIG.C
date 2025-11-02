@@ -83,8 +83,11 @@ static int32_t setupread=0;
 ===================
 */
 #define MAXSETUPFILES 20
-void CONFIG_GetSetupFilename( void )
+void CONFIG_GetSetupFilename( void ){}
+/*
+void CONFIG_GetSetupFilename( void ) // original
    {
+   return; // we can skip internal config hopefully.
    struct find_t fblock;
    char extension[10];
    char * src;
@@ -187,7 +190,7 @@ void CONFIG_GetSetupFilename( void )
       SafeFree(filenames[i]);
       }
    }
-
+*/
 /*
 ===================
 =

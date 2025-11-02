@@ -1,4 +1,5 @@
 #include "engine.h"
+#include "cache1d.h"
 // many will be unused so need to pass by header.
 void drawrooms(long daposx, long daposy, long daposz, short daang, long dahoriz, short dacursectnum)
 {
@@ -336,6 +337,16 @@ int wallfront(long l1, long l2)
         return((t2^t1) < 0);
     }
     return(-2);
+}
+
+int32_t spritewallfront(spritetype* s, long w)
+{
+    walltype *wal;
+    long x1, y1;
+
+    wal = &wall[w]; x1 = wal->x; y1 = wal->y;
+    wal = &wall[wal->point2];
+    return (dmulscale32(wal->x-x1,s->y-y1,-(s->x-x1),wal->y-y1) >= 0);
 }
 
 int drawalls(long bunch)

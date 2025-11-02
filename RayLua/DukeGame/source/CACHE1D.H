@@ -1,13 +1,19 @@
 // "Build Engine & Tools" Copyright (c) 1993-1997 Ken Silverman
 // Ken Silverman's official web site: "http://www.advsys.net/ken"
 // See the included license file "BUILDLIC.TXT" for license info.
-
+#ifndef CACHED_H
+#define CACHED_H
 //#include <dos.h>
 #include <stdio.h>
 #include "pragmas.h"
 #include <fcntl.h>
+#include <stdint.h>
 #include <io.h>
-
+#define FP_OFF(x) ((long) (x)) //toggle off floatng point
+#define FPP_OFF(x) ((long) ((void*)(x)))
+void *kmalloc(size_t size) { return(malloc(size)); }
+void kfree(void *buffer) { free(buffer); }
+void kkfree(void *buffer) { free(buffer); }
 //   This module keeps track of a standard linear cacheing system.
 //   To use this module, here's all you need to do:
 //
@@ -38,23 +44,29 @@
 
 #define MAXCACHEOBJECTS 9216
 
-static long cachesize = 0;
+
 long cachecount = 0;
 char zerochar = 0;
 long cachestart = 0, cacnum = 0, agecount = 0;
-typedef struct { long *hand, leng; char *lock; } cactype;
-extern cactype cac[MAXCACHEOBJECTS];
+
+typedef struct
+{
+	long *hand, leng;
+	char* lock;
+} cactype;
+
+cactype cac[MAXCACHEOBJECTS];
 static long lockrecip[200];
 
-initcache(long dacachestart, long dacachesize);
+void initcache(long dacachestart, long dacachesize);
 
-allocache (long *newhandle, long newbytes, char *newlockptr);
+void allocache (long *newhandle, long newbytes, char *newlockptr);
 
-suckcache (long *suckptr);
+void suckcache (long *suckptr);
 
-agecache();
+void agecache();
 
-reportandexit(char *errormessage);
+void reportandexit(char *errormessage);
 
 
 //#include <io.h>
@@ -64,7 +76,7 @@ reportandexit(char *errormessage);
 #define MAXGROUPFILES 4     //Warning: Fix groupfil if this is changed
 #define MAXOPENFILES 64     //Warning: Fix filehan if this is changed
 
-static unit8_t toupperlookup[256] =
+static uint8_t toupperlookup[256] =
 {
 	0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f,
 	0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17,0x18,0x19,0x1a,0x1b,0x1c,0x1d,0x1e,0x1f,
@@ -101,19 +113,19 @@ static long filehan[MAXOPENFILES] =
 	-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
 };
 
-initgroupfile(char *filename);
+int initgroupfile(char *filename);
 
-uninitgroupfile();
+void uninitgroupfile();
 
-kopen4load(char *filename, char searchfirst);
+long kopen4load(char *filename, char searchfirst);
 
-kread(long handle, void *buffer, long leng);
+int kread(long handle, void *buffer, long leng);
 
-klseek(long handle, long offset, long whence);
+long klseek(long handle, long offset, long whence);
 
-kfilelength(long handle);
+long kfilelength(long handle);
 
-kclose(long handle);
+void kclose(long handle);
 
 
 //Internal LZW variables
@@ -121,219 +133,13 @@ kclose(long handle);
 static char *lzwbuf1, *lzwbuf4, *lzwbuf5, lzwbuflock[5];
 static short *lzwbuf2, *lzwbuf3;
 
-kdfread(void *buffer, size_t dasizeof, size_t count, long fil)
-{
-	long i, j, k, kgoal;
-	short leng;
-	char *ptr;
+void kdfread(void *buffer, size_t dasizeof, size_t count, long fil);
 
-	lzwbuflock[0] = lzwbuflock[1] = lzwbuflock[2] = lzwbuflock[3] = lzwbuflock[4] = 200;
-	if (lzwbuf1 == NULL) allocache((long *)&lzwbuf1,LZWSIZE+(LZWSIZE>>4),&lzwbuflock[0]);
-	if (lzwbuf2 == NULL) allocache((long *)&lzwbuf2,(LZWSIZE+(LZWSIZE>>4))*2,&lzwbuflock[1]);
-	if (lzwbuf3 == NULL) allocache((long *)&lzwbuf3,(LZWSIZE+(LZWSIZE>>4))*2,&lzwbuflock[2]);
-	if (lzwbuf4 == NULL) allocache((long *)&lzwbuf4,LZWSIZE,&lzwbuflock[3]);
-	if (lzwbuf5 == NULL) allocache((long *)&lzwbuf5,LZWSIZE+(LZWSIZE>>4),&lzwbuflock[4]);
+//void dfread(void *buffer, size_t dasizeof, size_t count, FILE *fil);
 
-	if (dasizeof > LZWSIZE) { count *= dasizeof; dasizeof = 1; }
-	ptr = (char *)buffer;
+//void dfwrite(void *buffer, size_t dasizeof, size_t count, FILE *fil);
 
-	kread(fil,&leng,2); kread(fil,lzwbuf5,(long)leng);
-	k = 0; kgoal = uncompress(lzwbuf5,(long)leng,lzwbuf4);
+long compress(char *lzwinbuf, long uncompleng, char *lzwoutbuf);
 
-	copybufbyte(lzwbuf4,ptr,(long)dasizeof);
-	k += (long)dasizeof;
-
-	for(i=1;i<count;i++)
-	{
-		if (k >= kgoal)
-		{
-			kread(fil,&leng,2); kread(fil,lzwbuf5,(long)leng);
-			k = 0; kgoal = uncompress(lzwbuf5,(long)leng,lzwbuf4);
-		}
-		for(j=0;j<dasizeof;j++) ptr[j+dasizeof] = ((ptr[j]+lzwbuf4[j+k])&255);
-		k += dasizeof;
-		ptr += dasizeof;
-	}
-	lzwbuflock[0] = lzwbuflock[1] = lzwbuflock[2] = lzwbuflock[3] = lzwbuflock[4] = 1;
-}
-
-dfread(void *buffer, size_t dasizeof, size_t count, FILE *fil)
-{
-	long i, j, k, kgoal;
-	short leng;
-	char *ptr;
-
-	lzwbuflock[0] = lzwbuflock[1] = lzwbuflock[2] = lzwbuflock[3] = lzwbuflock[4] = 200;
-	if (lzwbuf1 == NULL) allocache((long *)&lzwbuf1,LZWSIZE+(LZWSIZE>>4),&lzwbuflock[0]);
-	if (lzwbuf2 == NULL) allocache((long *)&lzwbuf2,(LZWSIZE+(LZWSIZE>>4))*2,&lzwbuflock[1]);
-	if (lzwbuf3 == NULL) allocache((long *)&lzwbuf3,(LZWSIZE+(LZWSIZE>>4))*2,&lzwbuflock[2]);
-	if (lzwbuf4 == NULL) allocache((long *)&lzwbuf4,LZWSIZE,&lzwbuflock[3]);
-	if (lzwbuf5 == NULL) allocache((long *)&lzwbuf5,LZWSIZE+(LZWSIZE>>4),&lzwbuflock[4]);
-
-	if (dasizeof > LZWSIZE) { count *= dasizeof; dasizeof = 1; }
-	ptr = (char *)buffer;
-
-	fread(&leng,2,1,fil); fread(lzwbuf5,(long)leng,1,fil);
-	k = 0; kgoal = uncompress(lzwbuf5,(long)leng,lzwbuf4);
-
-	copybufbyte(lzwbuf4,ptr,(long)dasizeof);
-	k += (long)dasizeof;
-
-	for(i=1;i<count;i++)
-	{
-		if (k >= kgoal)
-		{
-			fread(&leng,2,1,fil); fread(lzwbuf5,(long)leng,1,fil);
-			k = 0; kgoal = uncompress(lzwbuf5,(long)leng,lzwbuf4);
-		}
-		for(j=0;j<dasizeof;j++) ptr[j+dasizeof] = ((ptr[j]+lzwbuf4[j+k])&255);
-		k += dasizeof;
-		ptr += dasizeof;
-	}
-	lzwbuflock[0] = lzwbuflock[1] = lzwbuflock[2] = lzwbuflock[3] = lzwbuflock[4] = 1;
-}
-
-dfwrite(void *buffer, size_t dasizeof, size_t count, FILE *fil)
-{
-	long i, j, k;
-	short leng;
-	char *ptr;
-
-	lzwbuflock[0] = lzwbuflock[1] = lzwbuflock[2] = lzwbuflock[3] = lzwbuflock[4] = 200;
-	if (lzwbuf1 == NULL) allocache((long *)&lzwbuf1,LZWSIZE+(LZWSIZE>>4),&lzwbuflock);
-	if (lzwbuf2 == NULL) allocache((long *)&lzwbuf2,(LZWSIZE+(LZWSIZE>>4))*2,&lzwbuflock);
-	if (lzwbuf3 == NULL) allocache((long *)&lzwbuf3,(LZWSIZE+(LZWSIZE>>4))*2,&lzwbuflock);
-	if (lzwbuf4 == NULL) allocache((long *)&lzwbuf4,LZWSIZE,&lzwbuflock);
-	if (lzwbuf5 == NULL) allocache((long *)&lzwbuf5,LZWSIZE+(LZWSIZE>>4),&lzwbuflock);
-
-	if (dasizeof > LZWSIZE) { count *= dasizeof; dasizeof = 1; }
-	ptr = (char *)buffer;
-
-	copybufbyte(ptr,lzwbuf4,(long)dasizeof);
-	k = dasizeof;
-
-	if (k > LZWSIZE-dasizeof)
-	{
-		leng = (short)compress(lzwbuf4,k,lzwbuf5); k = 0;
-		fwrite(&leng,2,1,fil); fwrite(lzwbuf5,(long)leng,1,fil);
-	}
-
-	for(i=1;i<count;i++)
-	{
-		for(j=0;j<dasizeof;j++) lzwbuf4[j+k] = ((ptr[j+dasizeof]-ptr[j])&255);
-		k += dasizeof;
-		if (k > LZWSIZE-dasizeof)
-		{
-			leng = (short)compress(lzwbuf4,k,lzwbuf5); k = 0;
-			fwrite(&leng,2,1,fil); fwrite(lzwbuf5,(long)leng,1,fil);
-		}
-		ptr += dasizeof;
-	}
-	if (k > 0)
-	{
-		leng = (short)compress(lzwbuf4,k,lzwbuf5);
-		fwrite(&leng,2,1,fil); fwrite(lzwbuf5,(long)leng,1,fil);
-	}
-	lzwbuflock[0] = lzwbuflock[1] = lzwbuflock[2] = lzwbuflock[3] = lzwbuflock[4] = 1;
-}
-
-compress(char *lzwinbuf, long uncompleng, char *lzwoutbuf)
-{
-	long i, addr, newaddr, addrcnt, zx, *longptr;
-	long bytecnt1, bitcnt, numbits, oneupnumbits;
-	short *shortptr;
-
-	for(i=255;i>=0;i--) { lzwbuf1[i] = i; lzwbuf3[i] = (i+1)&255; }
-	clearbuf(FP_OFF(lzwbuf2),256>>1,0xffffffff);
-	clearbuf(FP_OFF(lzwoutbuf),((uncompleng+15)+3)>>2,0L);
-
-	addrcnt = 256; bytecnt1 = 0; bitcnt = (4<<3);
-	numbits = 8; oneupnumbits = (1<<8);
-	do
-	{
-		addr = lzwinbuf[bytecnt1];
-		do
-		{
-			bytecnt1++;
-			if (bytecnt1 == uncompleng) break;
-			if (lzwbuf2[addr] < 0) {lzwbuf2[addr] = addrcnt; break;}
-			newaddr = lzwbuf2[addr];
-			while (lzwbuf1[newaddr] != lzwinbuf[bytecnt1])
-			{
-				zx = lzwbuf3[newaddr];
-				if (zx < 0) {lzwbuf3[newaddr] = addrcnt; break;}
-				newaddr = zx;
-			}
-			if (lzwbuf3[newaddr] == addrcnt) break;
-			addr = newaddr;
-		} while (addr >= 0);
-		lzwbuf1[addrcnt] = lzwinbuf[bytecnt1];
-		lzwbuf2[addrcnt] = -1;
-		lzwbuf3[addrcnt] = -1;
-
-		longptr = (long *)&lzwoutbuf[bitcnt>>3];
-		longptr[0] |= (addr<<(bitcnt&7));
-		bitcnt += numbits;
-		if ((addr&((oneupnumbits>>1)-1)) > ((addrcnt-1)&((oneupnumbits>>1)-1)))
-			bitcnt--;
-
-		addrcnt++;
-		if (addrcnt > oneupnumbits) { numbits++; oneupnumbits <<= 1; }
-	} while ((bytecnt1 < uncompleng) && (bitcnt < (uncompleng<<3)));
-
-	longptr = (long *)&lzwoutbuf[bitcnt>>3];
-	longptr[0] |= (addr<<(bitcnt&7));
-	bitcnt += numbits;
-	if ((addr&((oneupnumbits>>1)-1)) > ((addrcnt-1)&((oneupnumbits>>1)-1)))
-		bitcnt--;
-
-	shortptr = (short *)lzwoutbuf;
-	shortptr[0] = (short)uncompleng;
-	if (((bitcnt+7)>>3) < uncompleng)
-	{
-		shortptr[1] = (short)addrcnt;
-		return((bitcnt+7)>>3);
-	}
-	shortptr[1] = (short)0;
-	for(i=0;i<uncompleng;i++) lzwoutbuf[i+4] = lzwinbuf[i];
-	return(uncompleng+4);
-}
-
-uncompress(char *lzwinbuf, long compleng, char *lzwoutbuf)
-{
-	long strtot, currstr, numbits, oneupnumbits;
-	long i, dat, leng, bitcnt, outbytecnt, *longptr;
-	short *shortptr;
-
-	shortptr = (short *)lzwinbuf;
-	strtot = (long)shortptr[1];
-	if (strtot == 0)
-	{
-		copybuf(FP_OFF(lzwinbuf)+4,FP_OFF(lzwoutbuf),((compleng-4)+3)>>2);
-		return((long)shortptr[0]); //uncompleng
-	}
-	for(i=255;i>=0;i--) { lzwbuf2[i] = i; lzwbuf3[i] = i; }
-	currstr = 256; bitcnt = (4<<3); outbytecnt = 0;
-	numbits = 8; oneupnumbits = (1<<8);
-	do
-	{
-		longptr = (long *)&lzwinbuf[bitcnt>>3];
-		dat = ((longptr[0]>>(bitcnt&7)) & (oneupnumbits-1));
-		bitcnt += numbits;
-		if ((dat&((oneupnumbits>>1)-1)) > ((currstr-1)&((oneupnumbits>>1)-1)))
-			{ dat &= ((oneupnumbits>>1)-1); bitcnt--; }
-
-		lzwbuf3[currstr] = dat;
-
-		for(leng=0;dat>=256;leng++,dat=lzwbuf3[dat])
-			lzwbuf1[leng] = lzwbuf2[dat];
-
-		lzwoutbuf[outbytecnt++] = dat;
-		for(i=leng-1;i>=0;i--) lzwoutbuf[outbytecnt++] = lzwbuf1[i];
-
-		lzwbuf2[currstr-1] = dat; lzwbuf2[currstr] = dat;
-		currstr++;
-		if (currstr > oneupnumbits) { numbits++; oneupnumbits <<= 1; }
-	} while (currstr < strtot);
-	return((long)shortptr[0]); //uncompleng
-}
+long uncompress(char *lzwinbuf, long compleng, char *lzwoutbuf);
+#endif

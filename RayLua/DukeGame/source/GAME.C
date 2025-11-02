@@ -931,7 +931,7 @@ void faketimerhandler()
 
 extern long cacnum;
 // typedef struct { long *hand, leng; char *lock; } cactype;
-cactype cac[];
+
 
 void caches(void)
 {
