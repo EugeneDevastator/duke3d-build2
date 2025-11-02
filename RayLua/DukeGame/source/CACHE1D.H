@@ -135,9 +135,9 @@ static short *lzwbuf2, *lzwbuf3;
 
 void kdfread(void *buffer, size_t dasizeof, size_t count, long fil);
 
-//void dfread(void *buffer, size_t dasizeof, size_t count, FILE *fil);
+void dfread(void *buffer, size_t dasizeof, size_t count, FILE *fil);
 
-//void dfwrite(void *buffer, size_t dasizeof, size_t count, FILE *fil);
+void dfwrite(void *buffer, size_t dasizeof, size_t count, FILE *fil);
 
 long compress(char *lzwinbuf, long uncompleng, char *lzwoutbuf);
 
