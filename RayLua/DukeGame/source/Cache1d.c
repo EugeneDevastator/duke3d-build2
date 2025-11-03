@@ -1,5 +1,5 @@
 #include "cache1d.h"
-
+#include "fcntl.h"
 long cachesize = 0;
 void  initcache(long dacachestart, long dacachesize)
 {
@@ -162,7 +162,7 @@ int initgroupfile(char* filename)
 
     if (numgroupfiles >= MAXGROUPFILES) return(-1);
 
-    groupfil[numgroupfiles] = open(filename,O_BINARY|O_RDWR);
+    groupfil[numgroupfiles] = open(filename,0x8000|0x0002); // r bind
     if (groupfil[numgroupfiles] != -1)
     {
         groupfilpos[numgroupfiles] = 0;

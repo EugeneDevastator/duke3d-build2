@@ -25,7 +25,8 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 //-------------------------------------------------------------------------
 
 // Savage Baggage Masters
-
+#ifndef PLAYER_C
+#define PLAYER_C
 #include "duke3d.h"
 #include "engine.h"
 #include "mathutil.h"
@@ -37,6 +38,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 int32_t turnheldtime; //MED
 int32_t lastcontroltime; //MED
 
+short fistsign;
 static long fdmatrix[12][12] ={
     //KNEE PIST SHOT CHAIN RPG PIPE SHRI DEVI WALL FREE HAND EXPA
     128,  -1,  -1,  -1, 128,  -1,  -1,  -1, 128,  -1, 128,  -1,   //KNEE
@@ -102,7 +104,7 @@ void incur_damage(player_struct *p )
     }
 }
 
-void quickkill( player_struct *p)
+void quickkill(player_struct *p)
 {
     p->pals[0] = 48;
     p->pals[1] = 48;
@@ -115,7 +117,7 @@ void quickkill( player_struct *p)
     return;
 }
 
-void forceplayerangle( player_struct *p)
+void forceplayerangle(player_struct *p)
 {
     short n;
 
@@ -1297,7 +1299,6 @@ char animateaccess(short gs,short snum)
     return 1;
 }
 
-short fistsign;
 
 void displayweapon(short snum)
 {
@@ -4332,3 +4333,4 @@ void computergetinput(long snum, input *syn)
     }
 }
 
+#endif

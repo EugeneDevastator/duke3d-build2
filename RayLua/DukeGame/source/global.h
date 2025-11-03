@@ -23,7 +23,7 @@ Original Source: 1996 - Todd Replogle
 Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
-#infdef GLOBAL_H
+#ifndef GLOBAL_H
 #define GLOBAL_H
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,6 +31,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include <stdarg.h>
 #include <errno.h>
 #include <time.h>
+#include <io.h>
 
 #include "mmulti.h"
 #define MAX_PATH 256
@@ -505,7 +506,7 @@ bool SafeFileExists ( const char * _filename )
     filename[sizeof (filename) - 1] = '\0';
     FixFilePath(filename);
 
-    return(access(filename, F_OK) == 0);
+    return(_access(filename, 0) == 0);
 }
 
 

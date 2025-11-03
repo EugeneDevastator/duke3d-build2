@@ -95,7 +95,7 @@ char picsiz[MAXTILES], tilefilenum[MAXTILES];
 long lastageclock;
 long tilefileoffs[MAXTILES];
 
-static long artsize = 0, cachesize = 0;
+static long artsize = 0;
 
 static short radarang[1280], radarang2[MAXXDIM];
 static unsigned short sqrtable[4096], shlookup[4096+256];

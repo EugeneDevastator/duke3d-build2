@@ -38,7 +38,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include <io.h>
 #include <stdint.h>
 #include <time.h>
-
+#include "mmulti.h"
 #include "build.h"
 #include "engine.h"
 #include "function.h"
@@ -348,7 +348,7 @@ typedef struct
     short somethingonplayer,on_crane;
 // index of playe's sprite in all sprites on map
     short i;
-    short one_parallax_sectnum;;
+    short one_parallax_sectnum;
     short over_shoulder_on,random_club_frame,fist_incs;
     short one_eighty_count,cheat_phase;
     short dummyplayersprite,extra_extra8,quick_kick;

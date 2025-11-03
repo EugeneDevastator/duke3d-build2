@@ -23,15 +23,11 @@ Original Source: 1996 - Todd Replogle, Ken Silverman
 Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
+#ifndef PRAGMAS_H
+#define PRAGMAS_H
 #include <stdint.h>
 static long dmval;
-static inline int min(int a, int b) {
-	return (a < b) ? a : b;
-}
 
-static inline int max(int a, int b) {
-	return (a > b) ? a : b;
-}
 /*
 #pragma aux sqr =\
 	"imul eax, eax",\
@@ -937,3 +933,4 @@ void printchrasm(uint16_t* dest, uint32_t count, uint16_t value) {
 		dest[i] = value;
 	}
 }
+#endif

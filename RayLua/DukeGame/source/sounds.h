@@ -33,7 +33,6 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #ifndef _sounds_public_
 #define _sounds_public_
-include <config.h>;
 
 // extern int32_t FXDevice;
 // extern int32_t MusicDevice;

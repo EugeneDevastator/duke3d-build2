@@ -40,6 +40,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #include "CACHE1D.H"
 #include "global.h"
+#include "sounds.h"
 #include "_functio.h"
 
 //
