@@ -9,7 +9,8 @@
 #include <process.h>
 #include <stdarg.h>
 #include "pragmas.h"
-
+#ifndef MMULTI_H
+#define MMULTI_H
 #define MAXPLAYERS 16
 #define BAKSIZ 16384
 #define SIMULATEERRORS 0
@@ -63,11 +64,11 @@ typedef struct
 static gcomtype *gcom;
 
 // static union REGS regs;
-
+/*
 #pragma aux longcall =\
 	"call eax",\
 	parm [eax]\
-
+*/
 void callcommit();
 
 void initmultiplayers(char damultioption, char dacomrateoption, char dapriority);
@@ -239,3 +240,4 @@ short getpacket (short *other, char *bufptr)
 void flushpackets();
 
 void genericmultifunction(long other, char *bufptr, long messleng, long command);
+#endif

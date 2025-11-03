@@ -37,6 +37,22 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 int32_t turnheldtime; //MED
 int32_t lastcontroltime; //MED
 
+static long fdmatrix[12][12] ={
+    //KNEE PIST SHOT CHAIN RPG PIPE SHRI DEVI WALL FREE HAND EXPA
+    128,  -1,  -1,  -1, 128,  -1,  -1,  -1, 128,  -1, 128,  -1,   //KNEE
+   1024,1024,1024,1024,2560, 128,2560,2560,1024,2560,2560,2560,   //PIST
+    512, 512, 512, 512,2560, 128,2560,2560,1024,2560,2560,2560,   //SHOT
+    512, 512, 512, 512,2560, 128,2560,2560,1024,2560,2560,2560,   //CHAIN
+   2560,2560,2560,2560,2560,2560,2560,2560,2560,2560,2560,2560,   //RPG
+    512, 512, 512, 512,2048, 512,2560,2560, 512,2560,2560,2560,   //PIPE
+    128, 128, 128, 128,2560, 128,2560,2560, 128, 128, 128, 128,   //SHRI
+   1536,1536,1536,1536,2560,1536,1536,1536,1536,1536,1536,1536,   //DEVI
+     -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,   //WALL
+    128, 128, 128, 128,2560, 128,2560,2560, 128, 128, 128, 128,   //FREE
+   2560,2560,2560,2560,2560,2560,2560,2560,2560,2560,2560,2560,   //HAND
+    128, 128, 128, 128,2560, 128,2560,2560, 128, 128, 128, 128,   //EXPA
+};
+
 void setpal(player_struct *p)
 {
     if(p->heat_on) p->palette = slimepal;
@@ -178,7 +194,6 @@ long hitasprite(short i,short *hitsp)
     return ( FindDistance2D(sx-SX,sy-SY) );
 }
 
-/*
 long hitaspriteandwall(short i,short *hitsp,short *hitw,short *x, short *y)
 {
     long sz;
@@ -191,8 +206,6 @@ long hitaspriteandwall(short i,short *hitsp,short *hitw,short *x, short *y)
 
     return ( FindDistance2D(*x-SX,*y-SY) );
 }
-*/
-
 
 long hitawall( player_struct *p,short *hitw)
 {
@@ -302,9 +315,6 @@ short aim(spritetype *s,short aang)
 
     return j;
 }
-
-
-
 
 void shoot(short i,short atwith)
 {
@@ -1113,8 +1123,6 @@ void shoot(short i,short atwith)
     return;
 }
 
-
-
 void displayloogie(short snum)
 {
     long i, a, x, y, z;
@@ -1210,8 +1218,6 @@ char animateknuckles(short gs,short snum)
 
     return 1;
 }
-
-
 
 long lastvisinc;
 
@@ -3157,8 +3163,11 @@ void processinput(short snum)
                 }
             }
         }
-        else if(p->walking_snd_toggle > 0)
-            p->walking_snd_toggle --;
+        else
+        {
+            if(p->walking_snd_toggle > 0)
+                p->walking_snd_toggle --;
+        }
 
         if(p->jetpack_on == 0 && p->steroids_amount > 0 && p->steroids_amount < 400)
             doubvel <<= 1;
@@ -3949,22 +3958,6 @@ int getspritescore(long snum, long dapicnum)
     return(0);
 }
 
-static long fdmatrix[12][12] =
-{
- //KNEE PIST SHOT CHAIN RPG PIPE SHRI DEVI WALL FREE HAND EXPA
-     128,  -1,  -1,  -1, 128,  -1,  -1,  -1, 128,  -1, 128,  -1,   //KNEE
-    1024,1024,1024,1024,2560, 128,2560,2560,1024,2560,2560,2560,   //PIST
-     512, 512, 512, 512,2560, 128,2560,2560,1024,2560,2560,2560,   //SHOT
-     512, 512, 512, 512,2560, 128,2560,2560,1024,2560,2560,2560,   //CHAIN
-    2560,2560,2560,2560,2560,2560,2560,2560,2560,2560,2560,2560,   //RPG
-     512, 512, 512, 512,2048, 512,2560,2560, 512,2560,2560,2560,   //PIPE
-     128, 128, 128, 128,2560, 128,2560,2560, 128, 128, 128, 128,   //SHRI
-    1536,1536,1536,1536,2560,1536,1536,1536,1536,1536,1536,1536,   //DEVI
-      -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,   //WALL
-     128, 128, 128, 128,2560, 128,2560,2560, 128, 128, 128, 128,   //FREE
-    2560,2560,2560,2560,2560,2560,2560,2560,2560,2560,2560,2560,   //HAND
-     128, 128, 128, 128,2560, 128,2560,2560, 128, 128, 128, 128,   //EXPA
-};
 
 static long goalx[MAXPLAYERS], goaly[MAXPLAYERS], goalz[MAXPLAYERS];
 static long goalsect[MAXPLAYERS], goalwall[MAXPLAYERS], goalsprite[MAXPLAYERS];

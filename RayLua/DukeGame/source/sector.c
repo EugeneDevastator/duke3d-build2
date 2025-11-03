@@ -1475,7 +1475,7 @@ char checkhitswitch(short snum,long w,char switchtype)
                 x = headspritestat[3];
                 while(x >= 0)
                 {
-                   if( ((sprite[x].hitag) == lotag) )
+                   if( (sprite[x].hitag) == lotag )
                    {
                        switch(sprite[x].lotag)
                        {

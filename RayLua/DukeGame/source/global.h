@@ -23,7 +23,8 @@ Original Source: 1996 - Todd Replogle
 Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
-
+#infdef GLOBAL_H
+#define GLOBAL_H
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -958,3 +959,4 @@ void Shutdown()
  */
 //char cachedebug = 0;
 
+#endif

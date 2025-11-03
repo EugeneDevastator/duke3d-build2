@@ -23,7 +23,7 @@ Original Source: 1996 - Todd Replogle, Ken Silverman
 Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
-
+#include <stdint.h>
 static long dmval;
 static inline int min(int a, int b) {
 	return (a < b) ? a : b;
@@ -32,13 +32,14 @@ static inline int min(int a, int b) {
 static inline int max(int a, int b) {
 	return (a > b) ? a : b;
 }
+/*
 #pragma aux sqr =\
 	"imul eax, eax",\
    parm nomemory [eax]\
 	modify exact [eax]\
    value [eax]
+*/
 
-#include <stdint.h>
 
 static inline int32_t scale(int32_t a, int32_t b, int32_t c) {
 	return (int32_t)(((int64_t)a * b) / c);
@@ -100,10 +101,7 @@ static inline int32_t dmulscale32_base(int32_t a, int32_t b, int32_t c, int32_t 
 }
 
 // Macro for generating dmulscale functions
-#define DMULSCALE_FUNC(n) \
-static inline int32_t dmulscale##n(int32_t a, int32_t b, int32_t c, int32_t d) { \
-return dmulscale_base(a, b, c, d, n); \
-}
+#define DMULSCALE_FUNC(n) static inline int32_t dmulscale##n(int32_t a, int32_t b, int32_t c, int32_t d) { return dmulscale_base(a, b, c, d, n); }
 
 // Variable shift version
 static inline int32_t dmulscale(int32_t a, int32_t b, int32_t c, int32_t d, int shift) {
@@ -165,9 +163,7 @@ static inline int32_t tmulscale_base(int32_t a, int32_t b, int32_t c, int32_t d,
 
 // Macro to generate all tmulscale functions
 #define TMULSCALE_FUNC(n) \
-static inline int32_t tmulscale##n(int32_t a, int32_t b, int32_t c, int32_t d, int32_t e, int32_t f) { \
-return tmulscale_base(a, b, c, d, e, f, n); \
-}
+static inline int32_t tmulscale##n(int32_t a, int32_t b, int32_t c, int32_t d, int32_t e, int32_t f) { return tmulscale_base(a, b, c, d, e, f, n); }
 
 // Generate all functions from 1 to 32
 TMULSCALE_FUNC(1)
@@ -206,7 +202,7 @@ TMULSCALE_FUNC(31)
 static inline int32_t tmulscale32(int32_t a, int32_t b, int32_t c, int32_t d, int32_t e, int32_t f) {
 	return tmulscale_base(a, b, c, d, e, f, 32);
 }
-
+/*
 #pragma aux boundmulscale =\
 	"imul ebx",\
 	"mov ebx, edx",\
@@ -225,11 +221,11 @@ static inline int32_t tmulscale32(int32_t a, int32_t b, int32_t c, int32_t d, in
 	"skipboundit:",\
 	parm nomemory [eax][ebx][ecx]\
 	modify exact [eax ebx edx]\
-#include <stdint.h>
+*/
 
 // Generic divscale implementation using 64-bit arithmetic
 static inline int32_t divscale_generic(int32_t a, int32_t b, int scale) {
-    return (int32_t)(((int64_t)a << scale) / b);
+	return (int32_t)(((int64_t)a << scale) / b);
 }
 
 // Optimized implementations for common cases
@@ -246,10 +242,8 @@ static inline int32_t divscale32_impl(int32_t a, int32_t b) {
 }
 
 // Macro generator for all divscale functions
-#define DIVSCALE_FUNC(n) \
-    static inline int32_t divscale##n(int32_t a, int32_t b) { \
-        return divscale_generic(a, b, n); \
-    }
+// Macro generator for all divscale functions
+#define DIVSCALE_FUNC(n) static inline int32_t divscale##n(int32_t a, int32_t b) { 	return divscale_generic(a, b, n); }
 
 // Generate all functions 1-31
 DIVSCALE_FUNC(1)
@@ -316,8 +310,7 @@ static inline int32_t divscale_dispatch(int32_t a, int32_t b, int scale) {
     if (scale < 0 || scale > 32) return divscale_generic(a, b, scale);
     return divscale_funcs[scale](a, b);
 }
-
-
+/*
 #pragma aux int5 =\
 	"int 0x5",\
 
@@ -365,6 +358,8 @@ static inline int32_t divscale_dispatch(int32_t a, int32_t b, int scale) {
 	"mov dword ptr [edi], eax",\
 	parm [edi][eax]\
 	modify exact \
+
+*/
 // Clear buffer with 32-bit value
 static inline void clearbuf(void* dest, size_t count, uint32_t value) {
     uint32_t* ptr = (uint32_t*)dest;
@@ -518,7 +513,7 @@ static inline void copybufreverse(const void* src, void* dest, size_t count) {
         count -= 4;
     }
 }
-
+/*
 #pragma aux qinterpolatedown16 =\
 	"mov ebx, ecx",\
 	"shr ecx, 1",\
@@ -681,7 +676,7 @@ static inline void copybufreverse(const void* src, void* dest, size_t count) {
 	parm [eax][ebx]\
 	modify exact [eax edx]\
 	value [edx]
-
+*/
 // Absolute value
 static inline int32_t klabs(long x) {
 	return (x < 0) ? -x : x;
@@ -711,7 +706,7 @@ static inline int32_t kmin(int32_t a, int32_t b) {
 static inline int32_t kmax(int32_t a, int32_t b) {
 	return (a > b) ? a : b;
 }
-
+/*
 #pragma aux limitrate =\
 	"mov dx, 0x3da",\
 	"wait1: in al, dx",\
@@ -837,8 +832,10 @@ static inline int32_t kmax(int32_t a, int32_t b) {
 	"mov [eax], dx",\
 	parm [eax][ebx][esi]\
 	modify exact [ecx edx esi]\
+*/
+//static long timeroffs1mhz;
 
-static long timeroffs1mhz;
+/*
 	//accutimeroffs = -8-(t1-t0);
 #pragma aux inittimer1mhz =\
 	"xor ebx, ebx",\
@@ -921,6 +918,7 @@ static long timeroffs1mhz;
         "rep stosw",\
         parm [edi][ecx][eax]\
 
+*/
 // Convert deltatime1mhz from assembly to C
 uint32_t deltatime1mhz(uint32_t start_time, uint32_t current_time) {
 	uint32_t delta = current_time - start_time;

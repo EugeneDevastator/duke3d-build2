@@ -129,7 +129,7 @@ static char scantoascwithshift[128] =
 	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 };
-
+/*
 #pragma aux fillscreen16 =\
 	"mov dx, 0x3ce",\
 	"shl ax, 8",\
@@ -141,6 +141,7 @@ static char scantoascwithshift[128] =
 	"rep stosd",\
 	parm [edi][eax][ecx]\
 	modify [edx]\
+	*/
 /*
 main(short int argc,char **argv)
 {

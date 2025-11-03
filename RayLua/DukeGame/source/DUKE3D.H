@@ -101,12 +101,9 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #define NUM_SOUNDS 450
 
-#pragma aux sgn =\
-        "add ebx, ebx",\
-        "sbb eax, eax",\
-        "cmp eax, ebx",\
-        "adc eax, 0",\
-        parm [ebx]\
+int sgn(int value) {
+    return (value > 0) - (value < 0);
+}
 
 #define    ALT_IS_PRESSED ( KB_KeyPressed( sc_RightAlt ) || KB_KeyPressed( sc_LeftAlt ) )
 #define    SHIFTS_IS_PRESSED ( KB_KeyPressed( sc_RightShift ) || KB_KeyPressed( sc_LeftShift ) )
@@ -511,9 +508,6 @@ extern short myangbak[MOVEFIFOSIZ];
 extern short weaponsandammosprites[15];
 
 
-
-
-//DUKE3D.H:
 typedef struct
 {
         short frag[MAXPLAYERS], got_access, last_extra, shield_amount, curr_weapon;

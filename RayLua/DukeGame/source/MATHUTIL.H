@@ -26,7 +26,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
 
-
+#include <stdint.h>
 extern long FindDistance2D(int32_t dx, int32_t dy);
 extern int32_t FindDistance3D(int32_t dx, int32_t dy, int32_t dz);
 //extern int32_t FindDistance3D_HP(int32_t dx, int32_t dy, int32_t dz);

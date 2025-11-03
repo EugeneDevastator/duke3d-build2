@@ -73,8 +73,8 @@ static long mixerval = 0;
 static long kdminprep = 0, kdmintinprep = 0;
 static long dmacheckport, dmachecksiz;
 
-void (__interrupt __far *oldsbhandler)();
-void __interrupt __far sbhandler()
+//void (__interrupt __far *oldsbhandler)();
+//void __interrupt __far sbhandler()
 
 long samplediv, oldtimerfreq, chainbackcnt, chainbackstart;
 char *pcsndptr, pcsndlookup[256], bufferside;
@@ -83,7 +83,7 @@ static short kdmvect = 0x8;
 static unsigned short kdmpsel, kdmrseg, kdmroff;
 static unsigned long kdmpoff;
 
-void (__interrupt __far *oldpctimerhandler)();
+//void (__interrupt __far *oldpctimerhandler)();
 #define KDMCODEBYTES 256
 static char pcrealbuffer[KDMCODEBYTES] =        //See pckdm.asm
 {
@@ -105,25 +105,26 @@ long ramplookup[64];
 unsigned short sndseg = 0;
 
 extern long monolocomb(long,long,long,long,long,long);
-#pragma aux monolocomb parm [eax][ebx][ecx][edx][esi][edi];
+// #pragma aux monolocomb parm [eax][ebx][ecx][edx][esi][edi];
 extern long monohicomb(long,long,long,long,long,long);
-#pragma aux monohicomb parm [eax][ebx][ecx][edx][esi][edi];
+// #pragma aux monohicomb parm [eax][ebx][ecx][edx][esi][edi];
 extern long stereolocomb(long,long,long,long,long,long);
-#pragma aux stereolocomb parm [eax][ebx][ecx][edx][esi][edi];
+// #pragma aux stereolocomb parm [eax][ebx][ecx][edx][esi][edi];
 extern long stereohicomb(long,long,long,long,long,long);
-#pragma aux stereohicomb parm [eax][ebx][ecx][edx][esi][edi];
+// #pragma aux stereohicomb parm [eax][ebx][ecx][edx][esi][edi];
 extern long setuppctimerhandler(long,long,long,long,long,long);
-#pragma aux setuppctimerhandler parm [eax][ebx][ecx][edx][esi][edi];
-extern void interrupt pctimerhandler();
+// #pragma aux setuppctimerhandler parm [eax][ebx][ecx][edx][esi][edi];
+//extern void interrupt pctimerhandler();
 extern long pcbound2char(long,long,long);
-#pragma aux pcbound2char parm [ecx][esi][edi];
+// #pragma aux pcbound2char parm [ecx][esi][edi];
 extern long bound2char(long,long,long);
-#pragma aux bound2char parm [ecx][esi][edi];
+// #pragma aux bound2char parm [ecx][esi][edi];
 extern long bound2short(long,long,long);
-#pragma aux bound2short parm [ecx][esi][edi];
+// #pragma aux bound2short parm [ecx][esi][edi];
 
 static long oneshr10 = 0x3a800000, oneshl14 = 0x46800000;
-#pragma aux fsin =\
+/*
+// #pragma aux fsin =\
 	"fldpi",\
 	"fimul dword ptr [eax]",\
 	"fmul dword ptr [oneshr10]",\
@@ -132,7 +133,7 @@ static long oneshr10 = 0x3a800000, oneshl14 = 0x46800000;
 	"fistp dword ptr [eax]",\
 	parm [eax]\
 
-#pragma aux convallocate =\
+// #pragma aux convallocate =\
 	"mov ax, 0x100",\
 	"int 0x31",\
 	"jnc nocarry",\
@@ -141,14 +142,14 @@ static long oneshr10 = 0x3a800000, oneshl14 = 0x46800000;
 	parm [bx]\
 	modify [eax edx]\
 
-#pragma aux convdeallocate =\
+// #pragma aux convdeallocate =\
 	"mov ax, 0x101",\
 	"mov dx, sndselector",\
 	"int 0x31",\
 	parm [dx]\
 	modify [eax edx]\
 
-#pragma aux resetsb =\
+// #pragma aux resetsb =\
 	"mov edx, sbport",\
 	"add edx, 0x6",\
 	"mov al, 1",\
@@ -175,7 +176,7 @@ static long oneshr10 = 0x3a800000, oneshl14 = 0x46800000;
 	"resetend:",\
 	modify [ebx ecx edx]\
 
-#pragma aux sbin =\
+// #pragma aux sbin =\
 	"xor eax, eax",\
 	"mov dx, word ptr sbport[0]",\
 	"add dl, 0xe",\
@@ -186,7 +187,7 @@ static long oneshr10 = 0x3a800000, oneshl14 = 0x46800000;
 	"in al, dx",\
 	modify [edx]\
 
-#pragma aux sbout =\
+// #pragma aux sbout =\
 	"mov dx, word ptr sbport[0]",\
 	"add dl, 0xc",\
 	"mov ah, al",\
@@ -198,7 +199,7 @@ static long oneshr10 = 0x3a800000, oneshl14 = 0x46800000;
 	parm [eax]\
 	modify [edx]\
 
-#pragma aux sbmixin =\
+// #pragma aux sbmixin =\
 	"mov dx, word ptr sbport[0]",\
 	"add dl, 0x4",\
 	"out dx, al",\
@@ -208,7 +209,7 @@ static long oneshr10 = 0x3a800000, oneshl14 = 0x46800000;
 	parm [eax]\
 	modify [edx]\
 
-#pragma aux sbmixout =\
+// #pragma aux sbmixout =\
 	"mov dx, word ptr sbport[0]",\
 	"add dl, 0x4",\
 	"out dx, al",\
@@ -218,7 +219,7 @@ static long oneshr10 = 0x3a800000, oneshl14 = 0x46800000;
 	parm [eax][ebx]\
 	modify [edx]\
 
-#pragma aux findpas =\
+// #pragma aux findpas =\
 	"mov eax, 0x0000bc00",\
 	"mov ebx, 0x00003f3f",\
 	"int 0x2f",\
@@ -239,7 +240,7 @@ static long oneshr10 = 0x3a800000, oneshl14 = 0x46800000;
 	"sbb eax, eax",\
 	modify [eax ebx ecx edx]\
 
-#pragma aux calcvolookupmono =\
+// #pragma aux calcvolookupmono =\
 	"mov ecx, 64",\
 	"lea edx, [eax+ebx]",\
 	"add ebx, ebx",\
@@ -257,7 +258,7 @@ static long oneshr10 = 0x3a800000, oneshl14 = 0x46800000;
 	parm [edi][eax][ebx]\
 	modify [ecx edx]\
 
-#pragma aux calcvolookupstereo =\
+// #pragma aux calcvolookupstereo =\
 	"mov esi, 128",\
 	"begit: mov dword ptr [edi], eax",\
 	"mov dword ptr [edi+4], ecx",\
@@ -273,7 +274,7 @@ static long oneshr10 = 0x3a800000, oneshl14 = 0x46800000;
 	parm [edi][eax][ebx][ecx][edx]\
 	modify [esi]\
 
-#pragma aux gettimerval =\
+// #pragma aux gettimerval =\
 	"xor eax, eax",\
 	"xor ebx, ebx",\
 	"mov ecx, 65536",\
@@ -293,32 +294,32 @@ static long oneshr10 = 0x3a800000, oneshl14 = 0x46800000;
 	"endit: mov eax, ebx",\
 	modify [eax ebx ecx edx]\
 
-#pragma aux klabs =\
+// #pragma aux klabs =\
 	"test eax, eax",\
 	"jns skipnegate",\
 	"neg eax",\
 	"skipnegate:",\
 	parm [eax]\
 
-#pragma aux mulscale16 =\
+// #pragma aux mulscale16 =\
 	"imul ebx",\
 	"shrd eax, edx, 16",\
 	parm nomemory [eax][ebx]\
 	modify exact [eax edx]\
 
-#pragma aux mulscale24 =\
+// #pragma aux mulscale24 =\
 	"imul ebx",\
 	"shrd eax, edx, 24",\
 	parm nomemory [eax][ebx]\
 	modify exact [eax edx]\
 
-#pragma aux mulscale30 =\
+// #pragma aux mulscale30 =\
 	"imul ebx",\
 	"shrd eax, edx, 30",\
 	parm nomemory [eax][ebx]\
 	modify exact [eax edx]\
 
-#pragma aux dmulscale28 =\
+// #pragma aux dmulscale28 =\
 	"imul edx",\
 	"mov ebx, eax",\
 	"mov eax, esi",\
@@ -330,13 +331,13 @@ static long oneshr10 = 0x3a800000, oneshl14 = 0x46800000;
 	parm nomemory [eax][edx][esi][edi]\
 	modify exact [eax ebx edx esi]\
 
-#pragma aux clearbuf =\
+// #pragma aux clearbuf =\
 	"snot: mov dword ptr [edi], eax",\
 	"add edi, 4",\
 	"loop snot",\
 	parm [edi][ecx][eax]\
 
-#pragma aux copybuf =\
+// #pragma aux copybuf =\
 	"snot: mov eax, dword ptr [esi]",\
 	"mov dword ptr [edi], eax",\
 	"add esi, 4",\
@@ -345,20 +346,20 @@ static long oneshr10 = 0x3a800000, oneshl14 = 0x46800000;
 	parm [esi][edi][ecx]\
 	modify [eax]\
 
-#pragma aux koutp =\
+// #pragma aux koutp =\
 	"out dx, al",\
 	parm [edx][eax]\
 
-#pragma aux koutpw =\
+// #pragma aux koutpw =\
 	"out dx, ax",\
 	parm [edx][eax]\
 
-#pragma aux kinp =\
+// #pragma aux kinp =\
 	"xor eax, eax",\
 	"in al, dx",\
 	parm [edx]\
 
-#pragma aux msqrtasm =\
+// #pragma aux msqrtasm =\
 	"mov eax, 0x40000000",\
 	"mov ebx, 0x20000000",\
 	"begit: cmp ecx, eax",\
@@ -374,7 +375,8 @@ static long oneshr10 = 0x3a800000, oneshl14 = 0x46800000;
 	"shr eax, 1",\
 	parm nomemory [ecx]\
 	modify exact [eax ebx ecx]\
-
+	*/
+/*
 initsb(char dadigistat, char damusistat, long dasamplerate, char danumspeakers, char dabytespersample, char daintspersec, char daquality)
 {
 	long i, j, k;
@@ -1275,14 +1277,14 @@ installbikdmhandlers()
 	void far *fh;
 
 		//Get old protected mode handler
-	r.x.eax = 0x3500+kdmvect;   /* DOS get vector (INT 0Ch) */
+	r.x.eax = 0x3500+kdmvect;   //DOS get vector (INT 0Ch)
 	sr.ds = sr.es = 0;
 	int386x(0x21,&r,&r,&sr);
 	kdmpsel = (unsigned short)sr.es;
 	kdmpoff = r.x.ebx;
 
 		//Get old real mode handler
-	r.x.eax = 0x0200;   /* DPMI get real mode vector */
+	r.x.eax = 0x0200;  //DPMI get real mode vector
 	r.h.bl = kdmvect;
 	int386(0x31,&r,&r);
 	kdmrseg = (unsigned short)r.x.ecx;
@@ -1298,7 +1300,7 @@ installbikdmhandlers()
 	memcpy((void *)lowp,(void *)pcrealbuffer,KDMCODEBYTES);
 
 		//Set new protected mode handler
-	r.x.eax = 0x2500+kdmvect;   /* DOS set vector (INT 0Ch) */
+	r.x.eax = 0x2500+kdmvect;   // DOS set vector (INT 0Ch)
 	fh = (void far *)pctimerhandler;
 	r.x.edx = FP_OFF(fh);
 	sr.ds = FP_SEG(fh);      //DS:EDX == &handler
@@ -1319,16 +1321,17 @@ uninstallbikdmhandlers()
 	SREGS sr;
 
 		//restore old protected mode handler
-	r.x.eax = 0x2500+kdmvect;   /* DOS set vector (INT 0Ch) */
+	r.x.eax = 0x2500+kdmvect;   // DOS set vector (INT 0Ch)
 	r.x.edx = kdmpoff;
-	sr.ds = kdmpsel;    /* DS:EDX == &handler */
+	sr.ds = kdmpsel;     //DS:EDX == &handler
 	sr.es = 0;
 	int386x(0x21,&r,&r,&sr);
 
 		//restore old real mode handler
-	r.x.eax = 0x0201;   /* DPMI set real mode vector */
+	r.x.eax = 0x0201;   // DPMI set real mode vector
 	r.h.bl = kdmvect;
 	r.x.ecx = (unsigned long)kdmrseg;     //CX:DX == real mode &handler
 	r.x.edx = (unsigned long)kdmroff;
 	int386(0x31,&r,&r);
 }
+*/
