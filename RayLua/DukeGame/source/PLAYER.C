@@ -1217,6 +1217,7 @@ long lastvisinc;
 
 void displaymasks(short snum)
 {
+    return;// scuba
     short i, p;
 
     if(sprite[ps[snum].i].pal == 1)

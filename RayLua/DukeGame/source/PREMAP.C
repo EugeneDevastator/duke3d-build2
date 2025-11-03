@@ -27,6 +27,9 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "duke3d.h"
 #include "ENGINE.H"
 #include "music.h"
+#include "sounds.h"
+#include "game_text.c"
+#include "mmulti.h"
 
 extern char everyothertime;
 short which_palookup = 9;
@@ -353,6 +356,7 @@ void xyzmirror(short i,short wn)
 
 void vscrn(void)
 {
+    return;//
      long i, j, ss, x1, x2, y1, y2;
 
 	 if(ud.screen_size < 0) ud.screen_size = 0;
@@ -1371,11 +1375,11 @@ void enterlevel(char g)
 
     i = ud.screen_size;
     ud.screen_size = 0;
-    dofrontscreens();
-    vscrn();
+    dofrontscreens(); // loading screen
+   // vscrn();
     ud.screen_size = i;
 
-#ifndef VOLUMEONE
+//#ifndef VOLUMEONE // full version if nopt def
 
     if( boardfilename[0] != 0 && ud.m_level_number == 7 && ud.m_volume_number == 0 )
     {
@@ -1391,26 +1395,26 @@ void enterlevel(char g)
         gameexit(tempbuf);
     }
 
-#else
-
-    l = strlen(level_file_names[ (ud.volume_number*11)+ud.level_number]);
-    copybufbyte( level_file_names[ (ud.volume_number*11)+ud.level_number],&levname[0],l);
-    levname[l] = 255;
-    levname[l+1] = 0;
-
-    if ( loadboard( levname,&ps[0].posx, &ps[0].posy, &ps[0].posz, &ps[0].ang,&ps[0].cursectnum ) == -1)
-    {
-        sprintf(tempbuf,"Map %s not found!",level_file_names[(ud.volume_number*11)+ud.level_number]);
-        gameexit(tempbuf);
-    }
-#endif
+//#else
+//
+//    l = strlen(level_file_names[ (ud.volume_number*11)+ud.level_number]);
+//    copybufbyte( level_file_names[ (ud.volume_number*11)+ud.level_number],&levname[0],l);
+//    levname[l] = 255;
+//    levname[l+1] = 0;
+//
+//    if ( loadboard( levname,&ps[0].posx, &ps[0].posy, &ps[0].posz, &ps[0].ang,&ps[0].cursectnum ) == -1)
+//    {
+//        sprintf(tempbuf,"Map %s not found!",level_file_names[(ud.volume_number*11)+ud.level_number]);
+//        gameexit(tempbuf);
+//    }
+//#endif
 
     clearbufbyte(gotpic,sizeof(gotpic),0L);
 
     prelevel(g);
 
     allignwarpelevators();
-    resetpspritevars(g);
+    resetpspritevars(g); // player init
 
     cachedebug = 0;
     automapping = 0;
@@ -1438,9 +1442,9 @@ void enterlevel(char g)
     if( (ud.recstat == 1) && (g&MODE_RESTART) != MODE_RESTART )
         opendemowrite();
 
-#ifdef VOLUMEONE
-    if(ud.level_number == 0 && ud.recstat != 2) FTA(40,&ps[myconnectindex]);
-#endif
+//#ifdef VOLUMEONE
+//    if(ud.level_number == 0 && ud.recstat != 2) FTA(40,&ps[myconnectindex]);
+//#endif
 
     for(i=connecthead;i>=0;i=connectpoint2[i])
         switch(sector[sprite[ps[i].i].sectnum].floorpicnum)
@@ -1462,7 +1466,7 @@ void enterlevel(char g)
      resetmys();
 
      ps[myconnectindex].palette = palette;
-     palto(0,0,0,0);
+     // palto(0,0,0,0); //some menu func.
 
      setpal(&ps[myconnectindex]);
      flushperms();
@@ -1492,8 +1496,6 @@ void enterlevel(char g)
      clearfrags();
 
      resettimevars();  // Here we go
-
-
 }
 
 /*

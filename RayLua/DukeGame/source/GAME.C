@@ -1036,6 +1036,7 @@ void invennum(long x,long y,char num1,char ha,char sbits)
 #ifdef VOLUMEONE
 void orderweaponnum(short ind,long x,long y,long num1, long num2,char ha)
 {
+    return;//
     rotatesprite((x-7)<<16,y<<16,65536L,0,THREEBYFIVE+ind+1,ha-10,7,10+128,0,0,xdim-1,ydim-1);
     rotatesprite((x-3)<<16,y<<16,65536L,0,THREEBYFIVE+10,ha,0,10+128,0,0,xdim-1,ydim-1);
 
@@ -1144,8 +1145,17 @@ void coords(short snum)
     printext256(250L,y+64L+7,31,-1,tempbuf,1);
 }
 
+/*
+fta = countdown timer for message visibility
+ftq = quote index to display
+Messages 115/116 have priority and special positioning
+Message 26 can repeat even if same as current
+Fade effect uses different text rendering flags
+ */
+// Renders and manages on-screen text messages with fade effects:
 void operatefta(void)
 {
+    return;//
      long i, j, k;
 
      if(ud.screen_size > 0) j = 200-45; else j = 200-8;
@@ -1197,9 +1207,10 @@ void operatefta(void)
      else
          gametext(320>>1,k,fta_quotes[ps[screenpeek].ftq],0,2+8+16+1+32);
 }
-
+// Triggers a system message display:
 void FTA(short q, player_struct *p)
 {
+    return;//
     if( ud.fta_on == 1)
     {
         if( p->fta > 0 && q != 115 && q != 116 )
@@ -1542,8 +1553,14 @@ void moveclouds(void)
         }
     }
 }
-
-
+void palto(char r,char g,char b,long e)
+{
+    // in menus.c
+};
+void drawoverheadmap(long cposx,long cposy,long czoom,short cang)
+{
+    // in menus.c
+}
 void displayrest(long smoothratio)
 {
     long a, i, j;
@@ -1569,7 +1586,7 @@ void displayrest(long smoothratio)
         restorepalette = 0;
     }
     else if(pp->loogcnt > 0) palto(0,64,0,(pp->loogcnt>>1)+128);
-
+/*
     if(ud.show_help)
     {
         switch(ud.show_help)
@@ -1596,6 +1613,7 @@ void displayrest(long smoothratio)
         return;
     }
 
+*/
     i = pp->cursectnum;
 
     show2dsector[i>>3] |= (1<<(i&7));
@@ -1625,7 +1643,7 @@ void displayrest(long smoothratio)
             }
             moveclouds();
         }
-
+// map likely
         if( ud.overhead_on > 0 )
         {
                 smoothratio = min(max(smoothratio,0),65536);
@@ -1783,6 +1801,7 @@ void updatesectorz(long x, long y, long z, short *sectnum)
     *sectnum = -1;
 }
 
+// third person camera setup, likely for network death screen
 void view(player_struct *pp, long *vx, long *vy,long *vz,short *vsectnum, short ang, short horiz)
 {
      spritetype *sp;
@@ -2040,7 +2059,7 @@ void SE40_Draw(int spnum,long x,long y,long z,short a,short h,long smoothratio)
 
 
 
-
+// probably ROR
 void se40code(long x,long y,long z,long a,long h, long smoothratio)
 {
     int i;
@@ -2099,9 +2118,10 @@ void displayrooms(short snum,long smoothratio)
     sect = p->cursectnum;
     if(sect < 0 || sect >= MAXSECTORS) return;
 
-    dointerpolations(smoothratio);
+    dointerpolations(smoothratio); // positional interp.
 
-    animatecamsprite();
+    if (false)
+        animatecamsprite(); // render code for cam screen
 
     if(ud.camerasprite >= 0)
     {
@@ -2288,24 +2308,6 @@ void displayrooms(short snum,long smoothratio)
             p->visibility += (ud.const_visibility-p->visibility)>>2;
     }
     else p->visibility = ud.const_visibility;
-}
-
-
-
-
-
-short LocateTheLocator(short n,short sn)
-{
-    short i;
-
-    i = headspritestat[7];
-    while(i >= 0)
-    {
-        if( (sn == -1 || sn == SECT) && n == SLT )
-            return i;
-        i = nextspritestat[i];
-    }
-    return -1;
 }
 
 // This function spawns/creates a new sprite entity
@@ -4996,10 +4998,6 @@ void cheats(void)
     if( (ps[myconnectindex].gm&MODE_TYPE) || (ps[myconnectindex].gm&MODE_MENU))
         return;
 
-#ifdef BETA
-    return;
-#endif
-
     if ( ps[myconnectindex].cheat_phase == 1)
     {
        while (KB_KeyWaiting())
@@ -5044,11 +5042,7 @@ void cheats(void)
                 switch(k)
                 {
                     case 21:
-#ifdef VOLUMEONE
-                        j = 6;
-#else
                         j = 0;
-#endif
 
                         for ( weapon = PISTOL_WEAPON;weapon < MAX_WEAPONS-j;weapon++ )
                         {
@@ -6378,6 +6372,7 @@ void Logo(void)
 
 void loadtmb(void)
 {
+    return;// music code
     char tmb[8000];
     long fil, l;
 
@@ -6446,28 +6441,12 @@ void Startup(void)
 
    compilecons();
 
-   CONFIG_GetSetupFilename();
-   CONFIG_ReadSetup();
-
-#ifdef AUSTRALIA
-  ud.lockout = 1;
-#endif
-
-   if(CommandSoundToggleOff) SoundToggle = 0;
-   if(CommandMusicToggleOff) MusicToggle = 0;
-
-#ifdef VOLUMEONE
-
-   printf("\n*** You have run Duke Nukem 3D %ld times. ***\n\n",ud.executions);
-   if(ud.executions >= 50) puts("IT IS NOW TIME TO UPGRADE TO THE COMPLETE VERSION!!!\n");
-
-#endif
 
    //CONTROL_Startup( ControllerType, &GetTime, TICRATE );
 
 // CTW - MODIFICATION
 // initengine(ScreenMode,ScreenWidth,ScreenHeight);
-   initengine();
+ //  initengine();
 // CTW END - MODIFICATION
    inittimer();
 
@@ -6475,7 +6454,7 @@ void Startup(void)
    puts("Loading art header.");
    loadpics("tiles000.art");
 
-   readsavenames();
+   //readsavenames();
 
    tilesizx[MIRROR] = tilesizy[MIRROR] = 0;
 
@@ -6491,11 +6470,11 @@ void Startup(void)
    if(networkmode == 255)
        networkmode = 1;
 
-   puts("Checking music inits.");
+ //  puts("Checking music inits.");
  //  MusicStartup();
-   puts("Checking sound inits.");
+ //  puts("Checking sound inits.");
   // SoundStartup();
-   loadtmb();
+ //  loadtmb();
 }
 
 
@@ -6591,12 +6570,179 @@ void copyprotect(void)
 {
 
 }
+void closedemowrite(){};
 
-void RunDukeMap() // New Entry point
+void RunDukeMap() // New Entry point copy of main
 {
 // probably expose this api with something like
     // mapfilepath, *engineapi
+
+{
+    long i, j, k, l;
+    int32_t tempautorun;
+
+    todd[0] = 'T';
+    sixteen[0] = 'D';
+    trees[0] = 'I';
+
+    totalmemory = 999999999999;
+
+    Startup();
+
+    if(numplayers > 1)
+    {
+        ud.multimode = numplayers;
+        sendlogon();
+    }
+    else if(boardfilename[0] != 0)
+    {
+        ud.m_level_number = 7;
+        ud.m_volume_number = 0;
+        ud.warp_on = 1;
+    }
+
+    getnames();
+
+    // try getting game later right away.
+    ud.volume_number = ud.m_volume_number = 1;
+    ud.level_number = ud.m_level_number = 2;
+    ud.player_skill = ud.m_player_skill = 2;
+
+
+    if(ud.multimode > 1)
+    {
+        playerswhenstarted = ud.multimode;
+
+        if(ud.warp_on == 0)
+        {
+            ud.m_monsters_off = 1;
+            ud.m_player_skill = 0;
+        }
+    }
+
+    ud.last_level = -1;
+
+    puts("Loading palette/lookups.");
+
+    genspriteremaps();
+
+    if(ud.warp_on > 1 && ud.multimode < 2)
+    {
+        clearview(0L);
+        ps[myconnectindex].palette = palette;
+        palto(0,0,0,0);
+        rotatesprite(320<<15,200<<15,65536L,0,LOADSCREEN,0,0,2+8+64,0,0,xdim-1,ydim-1);
+        menutext(160,105,0,0,"LOADING SAVED GAME...");
+        nextpage();
+
+        j = loadplayer(ud.warp_on-2);
+        if(j)
+            ud.warp_on = 0;
+    }
+
+    MAIN_LOOP_RESTART:
+
+    if(ud.warp_on == 0)
+        Logo();
+    else if(ud.warp_on == 1)
+    {
+        newgame(ud.m_volume_number,ud.m_level_number,ud.m_player_skill);
+        enterlevel(MODE_GAME);
+    }
+    else vscrn();
+
+    tempautorun = ud.auto_run;
+
+    if( ud.warp_on == 0 && playback() )
+    {
+     //  FX_StopAllSounds();
+     //   clearsoundlocks();
+        nomorelogohack = 1;
+        goto MAIN_LOOP_RESTART;
+    }
+
+    ud.auto_run = tempautorun;
+
+    ud.warp_on = 0;
+
+    while ( !(ps[myconnectindex].gm&MODE_END) ) //The whole loop!!!!!!!!!!!!!!!!!!
+    {
+        if( ud.recstat == 2 || ud.multimode > 1 || ( ud.show_help == 0 && (ps[myconnectindex].gm&MODE_MENU) != MODE_MENU ) )
+            if( ps[myconnectindex].gm&MODE_GAME )
+                if( moveloop() ) continue;
+/*
+        if( ps[myconnectindex].gm&MODE_EOL || ps[myconnectindex].gm&MODE_RESTART )
+        {
+            if( ps[myconnectindex].gm&MODE_EOL )
+            {
+                closedemowrite();
+
+                ready2send = 0;
+
+                i = ud.screen_size;
+                ud.screen_size = 0;
+                vscrn();
+                ud.screen_size = i;
+                dobonus(0);
+
+                if(ud.eog)
+                {
+                    ud.eog = 0;
+                    if(ud.multimode < 2)
+                    {
+                        ps[myconnectindex].gm = MODE_MENU;
+                        cmenu(0);
+                        probey = 0;
+                        goto MAIN_LOOP_RESTART;
+                    }
+                    else
+                    {
+                        ud.m_level_number = 0;
+                        ud.level_number = 0;
+                    }
+                }
+            }
+
+            ready2send = 0;
+            if(numplayers > 1) ps[myconnectindex].gm = MODE_GAME;
+            enterlevel(ps[myconnectindex].gm);
+            continue;
+        }
+*/
+        cheats();
+        nonsharedkeys();
+
+        if( (ud.show_help == 0
+            && ud.multimode < 2
+            && !(ps[myconnectindex].gm&MODE_MENU) )
+            || ud.multimode > 1
+            || ud.recstat == 2)
+            i = min(max((totalclock-ototalclock)*(65536L/TICSPERFRAME),0),65536);
+        else
+            i = 65536;
+
+        displayrooms(screenpeek,i);
+        displayrest(i);
+
+      //  if(ps[myconnectindex].gm&MODE_DEMO)
+      //      goto MAIN_LOOP_RESTART;
+
+        if(debug_on) caches();
+
+        //checksync(); //net
+
+#ifdef VOLUMEONE
+        if(ud.show_help == 0 && show_shareware > 0 && (ps[myconnectindex].gm&MODE_MENU) == 0 )
+            rotatesprite((320-50)<<16,9<<16,65536L,0,BETAVERSION,0,0,2+8+16+128,0,0,xdim-1,ydim-1);
+#endif
+        nextpage();
+    }
+
+    gameexit(" ");
 }
+}
+
+
 
 int main(int argc,char **argv)
 {

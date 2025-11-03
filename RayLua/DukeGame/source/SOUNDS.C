@@ -27,11 +27,11 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include <conio.h>
 #include <stdio.h>
 #include <string.h>
-#include "types.h"
-#include "sndcards.h"
+//#include "types.h"
+//#include "sndcards.h"
 #include "fx_man.h"
 #include "music.h"
-#include "util_lib.h"
+//#include "util_lib.h"
 #include "duke3d.h"
 
 
@@ -318,7 +318,6 @@ int xyzsound(short num,short i,long x,long y,long z)
 //    if(num != 358) return 0;
 
     if( num >= NUM_SOUNDS ||
-        FXDevice == NumSoundCards ||
         ( (soundm[num]&8) && ud.lockout ) ||
         SoundToggle == 0 ||
         Sound[num].num > 3 ||

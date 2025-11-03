@@ -192,7 +192,7 @@ void ExtractFileBase (char *path, char *dest);
 //                returns false otherwise
 //
 //==========================================================================
-boolean GetExtension( char *filename, char *extension );
+bool GetExtension( char *filename, char *extension );
 
 //==========================================================================
 //

@@ -25,22 +25,23 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 //-------------------------------------------------------------------------
 #ifndef DUKE3D_H
 #define DUKE3D_H
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <malloc.h>
-#include <dos.h>
-//#include <bios.h>
-#include <io.h>
-#include <fcntl.H>
-#include <time.h>
-#include <ctype.h>
-#include <stdint.h>
 
-#include "pragmas.h"
-#include "function.h"
+#include <dos.h>
+#include <malloc.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+//#include <bios.h>
+#include <ctype.h>
+#include <fcntl.H>
+#include <io.h>
+#include <stdint.h>
+#include <time.h>
+
 #include "build.h"
 #include "engine.h"
+#include "function.h"
+#include "pragmas.h"
 
 #define VOLUMEALL
 #define PLUTOPAK
@@ -75,9 +76,9 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "gamedefs.h"
 #include "keyboard.h"
 //#include "util_lib.h"
+#include "config.h"
 #include "function.h"
 #include "fx_man.h"
-#include "config.h"
 //#include "sounds.h"
 #include "control.h"
 //#include "_rts.h"
@@ -346,7 +347,10 @@ typedef struct
     short jumping_counter,airleft,knee_incs,access_incs;
     short fta,ftq,access_wallnum,access_spritenum;
     short kickback_pic,got_access,weapon_ang,firstaid_amount;
-    short somethingonplayer,on_crane,i,one_parallax_sectnum;
+    short somethingonplayer,on_crane;
+// index of playe's sprite in all sprites on map
+    short i;
+    short one_parallax_sectnum;;
     short over_shoulder_on,random_club_frame,fist_incs;
     short one_eighty_count,cheat_phase;
     short dummyplayersprite,extra_extra8,quick_kick;

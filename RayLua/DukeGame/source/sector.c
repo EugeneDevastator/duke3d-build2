@@ -25,6 +25,9 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 //-------------------------------------------------------------------------
 
 #include "duke3d.h"
+#include "global.h"
+#include "music.h"
+#include "sounds.h"
 // code for sector interaction in game
 // PRIMITIVE
 
@@ -346,7 +349,8 @@ long getanimationgoal(long *animptr)
 	return(j);
 }
 
-static long setanimation(short animsect,long *animptr, long thegoal, long thevel)
+// was static
+long setanimation(short animsect,long *animptr, long thegoal, long thevel)
 {
 	long i, j;
 
@@ -1797,7 +1801,7 @@ void checkhitwall(short spr,short dawallnum,long x,long y,long z,short atwith)
 }
 
 
-void checkplayerhurt(struct player_struct *p,short j)
+void checkplayerhurt(player_struct *p,short j)
 {
     if( (j&49152) == 49152 )
     {

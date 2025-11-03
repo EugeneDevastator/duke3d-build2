@@ -83,9 +83,9 @@ extern short findotherplayer(short p,long *d);
 //#line "sector.c" 240
 extern void doanimations(void );
 //#line "sector.c" 301
-extern int getanimationgoal(long *animptr);
+extern long getanimationgoal(long *animptr);
 //#line "sector.c" 315
-extern int setanimation(short animsect,long *animptr,long thegoal,long thevel);
+extern long setanimation(short animsect,long *animptr, long thegoal, long thevel);
 //#line "sector.c" 348
 extern void animatecamsprite(void );
 //#line "sector.c" 369
@@ -255,7 +255,7 @@ extern void menus(void );
 //#line "menues.c" 2414
 extern void palto(char r,char g,char b,long e);
 //#line "menues.c" 2436
-extern void drawoverheadmap(long cposx,long cposy,long czoom,short cang);
+//extern void drawoverheadmap(long cposx,long cposy,long czoom,short cang);
 //#line "menues.c" 2685
 extern void playanm(char *fn,char);
 //#line "gamedef.c" 122

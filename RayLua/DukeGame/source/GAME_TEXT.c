@@ -464,6 +464,7 @@ void weapon_amounts(player_struct *p,long x,long y,long u)
 
 void coolgaugetext(short snum)
 {
+    return;//draws main menu
     player_struct *p;
     long i, j, o, ss, u;
     char c, permbit;

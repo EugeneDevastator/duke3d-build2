@@ -1,8 +1,14 @@
 #include "engine.h"
 #include "cache1d.h"
 // many will be unused so need to pass by header.
+//we can use this to forward camera pos, ezpz
 void drawrooms(long daposx, long daposy, long daposz, short daang, long dahoriz, short dacursectnum)
 {
+    //do the actual render at position.
+}
+/*
+{
+
     long i, j, z, cz, fz, closest;
     short *shortptr1, *shortptr2;
 
@@ -40,23 +46,23 @@ void drawrooms(long daposx, long daposy, long daposz, short daang, long dahoriz,
             setaspect((long)divscale16(xdimen,windowx2-windowx1+1),yxaspect);
         }
 
-        if ((!(activepage&1)) ^ inpreparemirror)
-        {
-            for(i=windowx1;i<windowx1+(stereopixelwidth<<1);i++) { startumost[i] = 1, startdmost[i] = 0; }
-            for(;i<windowx2+1+(stereopixelwidth<<1);i++) { startumost[i] = windowy1, startdmost[i] = windowy2+1; }
-            viewoffset = windowy1*bytesperline+windowx1-(stereopixelwidth<<1);
-            i = stereowidth;
-        }
-        else
-        {
-            for(i=windowx1;i<windowx2+1;i++) { startumost[i] = windowy1, startdmost[i] = windowy2+1; }
-            for(;i<windowx2+1+(stereopixelwidth<<1);i++) { startumost[i] = 1, startdmost[i] = 0; }
-            viewoffset = windowy1*bytesperline+windowx1;
-            i = -stereowidth;
-        }
-        globalposx += mulscale24(singlobalang,i);
-        globalposy -= mulscale24(cosglobalang,i);
-        if (vidoption == 6) frameplace = FP_OFF(screen)+(activepage&1)*65536;
+      //  if ((!(activepage&1)) ^ inpreparemirror)
+      //  {
+      //      for(i=windowx1;i<windowx1+(stereopixelwidth<<1);i++) { startumost[i] = 1, startdmost[i] = 0; }
+      //      for(;i<windowx2+1+(stereopixelwidth<<1);i++) { startumost[i] = windowy1, startdmost[i] = windowy2+1; }
+      //      viewoffset = windowy1*bytesperline+windowx1-(stereopixelwidth<<1);
+      //      i = stereowidth;
+      //  }
+      //  else
+      //  {
+      //      for(i=windowx1;i<windowx2+1;i++) { startumost[i] = windowy1, startdmost[i] = windowy2+1; }
+      //      for(;i<windowx2+1+(stereopixelwidth<<1);i++) { startumost[i] = 1, startdmost[i] = 0; }
+      //      viewoffset = windowy1*bytesperline+windowx1;
+      //      i = -stereowidth;
+      //  }
+      // globalposx += mulscale24(singlobalang,i);
+      // globalposy -= mulscale24(cosglobalang,i);
+      // if (vidoption == 6) frameplace = FP_OFF(screen)+(activepage&1)*65536;
     }
 
     if ((xyaspect != oxyaspect) || (xdimen != oxdimen) || (viewingrange != oviewingrange))
@@ -78,9 +84,9 @@ void drawrooms(long daposx, long daposy, long daposz, short daang, long dahoriz,
     umost[0] = shortptr1[0]-windowy1;
     dmost[0] = shortptr2[0]-windowy1;
 
-    if (smostwallcnt < 0)
-        if (getkensmessagecrc(FP_OFF(kensmessage)) != 0x56c764d4)
-        { setvmode(0x3); printf("Nice try.\n"); exit(0); }
+    //if (smostwallcnt < 0)
+    //    if (getkensmessagecrc(FP_OFF(kensmessage)) != 0x56c764d4)
+    //    { setvmode(0x3); printf("Nice try.\n"); exit(0); }
 
     numhits = xdimen; numscans = 0; numbunches = 0;
     maskwallcnt = 0; smostwallcnt = 0; smostcnt = 0; spritesortcnt = 0;
@@ -167,7 +173,7 @@ void drawrooms(long daposx, long daposy, long daposz, short daang, long dahoriz,
         bunchfirst[closest] = bunchfirst[numbunches];
         bunchlast[closest] = bunchlast[numbunches];
     }
-}
+}*/
 
 
 void scansector(short sectnum)
@@ -349,8 +355,9 @@ int32_t spritewallfront(spritetype* s, long w)
     return (dmulscale32(wal->x-x1,s->y-y1,-(s->x-x1),wal->y-y1) >= 0);
 }
 
-int drawalls(long bunch)
+void drawalls(long bunch)
 {
+    return;//
     sectortype *sec, *nextsec;
     walltype *wal;
     long i, j, k, l, m, n, x, y, x1, x2, cz[5], fz[5];
@@ -362,30 +369,30 @@ int drawalls(long bunch)
     sectnum = thesector[z]; sec = &sector[sectnum];
 
     andwstat1 = 0xff; andwstat2 = 0xff;
-    for(;z>=0;z=p2[z])  //uplc/dplc calculation
-    {
-        andwstat1 &= wallmost(uplc,z,sectnum,(char)0);
-        andwstat2 &= wallmost(dplc,z,sectnum,(char)1);
-    }
-
-    if ((andwstat1&3) != 3)     //draw ceilings
-    {
-        if ((sec->ceilingstat&3) == 2)
-            grouscan(xb1[bunchfirst[bunch]],xb2[bunchlast[bunch]],sectnum,0);
-        else if ((sec->ceilingstat&1) == 0)
-            ceilscan(xb1[bunchfirst[bunch]],xb2[bunchlast[bunch]],sectnum);
-        else
-            parascan(xb1[bunchfirst[bunch]],xb2[bunchlast[bunch]],sectnum,0,bunch);
-    }
-    if ((andwstat2&12) != 12)   //draw floors
-    {
-        if ((sec->floorstat&3) == 2)
-            grouscan(xb1[bunchfirst[bunch]],xb2[bunchlast[bunch]],sectnum,1);
-        else if ((sec->floorstat&1) == 0)
-            florscan(xb1[bunchfirst[bunch]],xb2[bunchlast[bunch]],sectnum);
-        else
-            parascan(xb1[bunchfirst[bunch]],xb2[bunchlast[bunch]],sectnum,1,bunch);
-    }
+   // for(;z>=0;z=p2[z])  //uplc/dplc calculation
+   // {
+   //     andwstat1 &= wallmost(uplc,z,sectnum,(char)0);
+   //     andwstat2 &= wallmost(dplc,z,sectnum,(char)1);
+   // }
+//
+   // if ((andwstat1&3) != 3)     //draw ceilings
+   // {
+   //     if ((sec->ceilingstat&3) == 2)
+   //         grouscan(xb1[bunchfirst[bunch]],xb2[bunchlast[bunch]],sectnum,0);
+   //     else if ((sec->ceilingstat&1) == 0)
+   //         ceilscan(xb1[bunchfirst[bunch]],xb2[bunchlast[bunch]],sectnum);
+   //     else
+   //         parascan(xb1[bunchfirst[bunch]],xb2[bunchlast[bunch]],sectnum,0,bunch);
+   // }
+   // if ((andwstat2&12) != 12)   //draw floors
+   // {
+   //     if ((sec->floorstat&3) == 2)
+   //         grouscan(xb1[bunchfirst[bunch]],xb2[bunchlast[bunch]],sectnum,1);
+   //     else if ((sec->floorstat&1) == 0)
+   //         florscan(xb1[bunchfirst[bunch]],xb2[bunchlast[bunch]],sectnum);
+   //     else
+   //         parascan(xb1[bunchfirst[bunch]],xb2[bunchlast[bunch]],sectnum,1,bunch);
+   // }
 
     //DRAW WALLS SECTION!
     for(z=bunchfirst[bunch];z>=0;z=p2[z])
@@ -451,7 +458,7 @@ int drawalls(long bunch)
                 }
                 else
                 {
-                    wallmost(dwall,z,nextsectnum,(char)0);
+              //      wallmost(dwall,z,nextsectnum,(char)0);
                     if ((cz[2] > fz[0]) || (cz[3] > fz[1]))
                         for(i=x1;i<=x2;i++) if (dwall[i] > dplc[i]) dwall[i] = dplc[i];
 
@@ -539,7 +546,7 @@ int drawalls(long bunch)
                 }
                 else
                 {
-                    wallmost(uwall,z,nextsectnum,(char)1);
+                   // wallmost(uwall,z,nextsectnum,(char)1);
                     if ((fz[2] < cz[0]) || (fz[3] < cz[1]))
                         for(i=x1;i<=x2;i++) if (uwall[i] < uplc[i]) uwall[i] = uplc[i];
 
@@ -779,7 +786,7 @@ void prepwall(long z, walltype* wal)
     }
 }
 
-int ceilscan(long x1, long x2, long sectnum)
+void ceilscan(long x1, long x2, long sectnum)
 {
     long i, j, ox, oy, x, y1, y2, twall, bwall;
     sectortype *sec;
@@ -945,7 +952,7 @@ int ceilscan(long x1, long x2, long sectnum)
     faketimerhandler();
 }
 
-int florscan(long x1, long x2, long sectnum)
+void florscan(long x1, long x2, long sectnum)
 {
     long i, j, ox, oy, x, y1, y2, twall, bwall;
     sectortype *sec;
@@ -1111,7 +1118,7 @@ int florscan(long x1, long x2, long sectnum)
     faketimerhandler();
 }
 
-int wallscan(long x1, long x2, short* uwal, short* dwal, long* swal, long* lwal)
+void wallscan(long x1, long x2, short* uwal, short* dwal, long* swal, long* lwal)
 {
     long i, x, xnice, ynice, fpalookup, shade;
     long y1ve[4], y2ve[4], u4, d4, dax, z, tsizx, tsizy;
@@ -1233,7 +1240,7 @@ int wallscan(long x1, long x2, short* uwal, short* dwal, long* swal, long* lwal)
     faketimerhandler();
 }
 
-int maskwallscan(long x1, long x2, short* uwal, short* dwal, long* swal, long* lwal)
+void maskwallscan(long x1, long x2, short* uwal, short* dwal, long* swal, long* lwal)
 {
     long i, x, startx, xnice, ynice, fpalookup, shade;
     long y1ve[4], y2ve[4], u4, d4, dax, z, p, tsizx, tsizy;
@@ -1359,7 +1366,7 @@ int maskwallscan(long x1, long x2, short* uwal, short* dwal, long* swal, long* l
     faketimerhandler();
 }
 
-int transmaskvline(long x)
+void transmaskvline(long x)
 {
     long vplc, vinc, p, i, palookupoffs, shade, bufplc;
     short y1v, y2v;
@@ -1387,7 +1394,7 @@ int transmaskvline(long x)
     transarea += y2v-y1v;
 }
 
-int transmaskvline2(long x)
+void transmaskvline2(long x)
 {
     long i, y1, y2, x2;
     short y1ve[2], y2ve[2];
@@ -1456,7 +1463,7 @@ int transmaskvline2(long x)
     faketimerhandler();
 }
 
-int transmaskwallscan(long x1, long x2)
+void transmaskwallscan(long x1, long x2)
 {
     long x, startx;
 
@@ -1588,7 +1595,7 @@ int loadtables()
     }
 }
 
-int loadpalette()
+void loadpalette()
 {
     long i, j, k, dist, fil;
     char *ptr;
@@ -1640,6 +1647,7 @@ int loadpalette()
 
 int setgamemode(char davidoption, long daxdim, long daydim)
 {
+    /*
     long i, j, k, ostereomode;
 
     if ((qsetmode == 200) && (vidoption == davidoption) && (xdim == daxdim) && (ydim == daydim))
@@ -1714,10 +1722,12 @@ int setgamemode(char davidoption, long daxdim, long daydim)
     if (ostereomode) setstereo(ostereomode);
 
     qsetmode = 200;
+
+    */
     return(0);
 }
 
-int hline(long xr, long yp)
+void hline(long xr, long yp)
 {
     long xl, r, s;
 
@@ -1731,7 +1741,7 @@ int hline(long xr, long yp)
               ylookup[yp]+xr+frameoffset);
 }
 
-int slowhline(long xr, long yp)
+void slowhline(long xr, long yp)
 {
     long xl, x, y, ox, oy, r, p, shade;
 
@@ -1790,7 +1800,7 @@ int initengine()
     clearbuf((long)(&show2dwall[0]),(long)((MAXWALLS+3)>>5),0L);
     automapping = 0;
 
-    validmodecnt = 0;
+    //validmodecnt = 0;
 
     pointhighlight = -1;
     linehighlight = -1;
@@ -1807,19 +1817,19 @@ int uninitengine()
 {
     long i;
 
-    if (vidoption == 1) uninitvesa();
+ //   if (vidoption == 1) uninitvesa();
     if (artfil != -1) kclose(artfil);
 
-    if (stereomode) setstereo(0L);
+  //  if (stereomode) setstereo(0L);
 
     if (transluc != NULL) { kkfree(transluc); transluc = NULL; }
     if (pic != NULL) { kkfree(pic); pic = NULL; }
-    if (screen != NULL)
-    {
-        if (screenalloctype == 0) kkfree((void *)screen);
-        //if (screenalloctype == 1) suckcache(screen);  //Cache already gone
-        screen = NULL;
-    }
+   //if (screen != NULL)
+   //{
+   //    if (screenalloctype == 0) kkfree((void *)screen);
+   //    //if (screenalloctype == 1) suckcache(screen);  //Cache already gone
+   //    screen = NULL;
+   //}
     for(i=0;i<MAXPALOOKUPS;i++)
         if (palookup[i] != NULL) { kkfree(palookup[i]); palookup[i] = NULL; }
 }
@@ -1923,7 +1933,7 @@ void nextpage()
     */
 }
 
-int loadtile(short tilenume)
+void loadtile(short tilenume)
 {
     char *ptr;
     long i, dasiz;
@@ -2069,7 +2079,7 @@ int loadpics(char* filename)
     return(0);
 }
 
-int qloadkvx(long voxindex, char* filename)
+void qloadkvx(long voxindex, char* filename)
 {
     long i, fil, dasiz, lengcnt, lengtot;
     char *ptr;
@@ -2148,26 +2158,27 @@ int clipinsideboxline(long x, long y, long x1, long y1, long x2, long y2, long w
 
 int readpixel16(long p)
 {
-    long mask, dat;
+ // long mask, dat;
 
-    mask = pow2long[p&7^7];
+ // mask = pow2long[p&7^7];
 
-    if ((qsetmode == 480) && (ydim16 <= 336) && (p >= 640*336))
-        p -= 640*336;
-    else
-        p += pageoffset;
+ // if ((qsetmode == 480) && (ydim16 <= 336) && (p >= 640*336))
+ //     p -= 640*336;
+ // else
+ //     p += pageoffset;
 
-    p >>= 3;
+ // p >>= 3;
 
-    koutp(0x3ce,0x4);
-    koutp(0x3cf,0); dat = ((readpixel(p+0xa0000)&mask)>0);
-    koutp(0x3cf,1); dat += (((readpixel(p+0xa0000)&mask)>0)<<1);
-    koutp(0x3cf,2); dat += (((readpixel(p+0xa0000)&mask)>0)<<2);
-    koutp(0x3cf,3); dat += (((readpixel(p+0xa0000)&mask)>0)<<3);
-    return(dat);
+ // koutp(0x3ce,0x4);
+ // koutp(0x3cf,0); dat = ((readpixel(p+0xa0000)&mask)>0);
+ // koutp(0x3cf,1); dat += (((readpixel(p+0xa0000)&mask)>0)<<1);
+ // koutp(0x3cf,2); dat += (((readpixel(p+0xa0000)&mask)>0)<<2);
+ // koutp(0x3cf,3); dat += (((readpixel(p+0xa0000)&mask)>0)<<3);
+ // return(dat);
 }
 
-int screencapture(char* filename, char inverseit)
+int screencapture(char* filename, char inverseit) { return 0; };
+/*
 {
     char *ptr;
     long fil, i, bufplc, p, col, ncol, leng, numbytes, xres;
@@ -2292,7 +2303,7 @@ int screencapture(char* filename, char inverseit)
     capturecount++;
     return(0);
 }
-
+*/
 int inside(long x, long y, short sectnum)
 {
     walltype *wal;
@@ -2334,7 +2345,7 @@ int ksqrt(long num)
     return(nsqrtasm(num));
 }
 
-int krecip(long num)
+long krecip(long num)
 {
     return(krecipasm(num));
 }
@@ -2391,6 +2402,8 @@ int copytilepiece(long tilenume1, long sx1, long sy1, long xsiz, long ysiz, long
 
 int drawmasks()
 {
+    // scuba and stuff
+    /*
     long i, j, k, l, gap, xs, ys, zs, xp, yp, zp, z1, z2, yoff, yspan;
 
     for(i=spritesortcnt-1;i>=0;i--) tspriteptr[i] = &tsprite[i];
@@ -2486,7 +2499,7 @@ int drawmasks()
 
 		drawline256(xs-65536,ys-65536,xs+65536,ys+65536,31);
 		drawline256(xs+65536,ys-65536,xs-65536,ys+65536,31);
-	}*/
+	}
 
     while ((spritesortcnt > 0) && (maskwallcnt > 0))  //While BOTH > 0
     {
@@ -2529,9 +2542,11 @@ int drawmasks()
     }
     while (spritesortcnt > 0) drawsprite(--spritesortcnt);
     while (maskwallcnt > 0) drawmaskwall(--maskwallcnt);
+    */
+    return 0;
 }
 
-int drawmaskwall(short damaskwallcnt)
+void drawmaskwall(short damaskwallcnt){};/*
 {
     long i, j, k, x, z, sectnum, z1, z2, lx, rx;
     sectortype *sec, *nsec;
@@ -2621,10 +2636,12 @@ int drawmaskwall(short damaskwallcnt)
         }
         transmaskwallscan(xb1[z],xb2[z]);
     }
-}
+}*/
 
-int drawsprite(long snum)
+void drawsprite(long snum) {};
+/*
 {
+
     spritetype *tspr;
     sectortype *sec;
     long startum, startdm, sectnum, xb, yp, cstat;
@@ -3501,9 +3518,12 @@ int drawsprite(long snum)
 #endif
     if (automapping == 1) show2dsprite[spritenum>>3] |= pow2char[spritenum&7];
 }
-
-int drawvox(long dasprx, long daspry, long dasprz, long dasprang, long daxscale, long dayscale, char daindex,
-    signed char dashade, char dapal, long* daumost, long* dadmost)
+*/
+void drawvox(long dasprx, long daspry, long dasprz, long dasprang, long daxscale, long dayscale, char daindex,
+             signed char dashade, char dapal, long* daumost, long* dadmost)
+{
+    // use kv6; or use this.
+}/*
 {
     long i, j, k, x, y, z, syoff, ggxstart, ggystart, nxoff;
     long cosang, sinang, sprcosang, sprsinang, backx, backy, gxinc, gyinc;
@@ -3708,7 +3728,7 @@ int drawvox(long dasprx, long daspry, long dasprz, long dasprang, long daxscale,
             }
         }
     }
-}
+}*/
 
 int ceilspritescan(long x1, long x2)
 {
@@ -3744,7 +3764,7 @@ int ceilspritescan(long x1, long x2)
     faketimerhandler();
 }
 
-int ceilspritehline(long x2, long y)
+void ceilspritehline(long x2, long y)
 {
     long x1, v, bx, by;
 
@@ -3789,7 +3809,7 @@ int setsprite(short spritenum, long newx, long newy, long newz)
     return(0);
 }
 
-int animateoffs(short tilenum, short fakevar)
+long animateoffs(short tilenum, short fakevar)
 {
     long i, k, offs;
 
@@ -3816,7 +3836,7 @@ int animateoffs(short tilenum, short fakevar)
     return(offs);
 }
 
-int initspritelists()
+void initspritelists()
 {
     long i;
 
@@ -3966,7 +3986,7 @@ int changespritestat(short spritenum, short newstatnum)
     return(0);
 }
 
-int nextsectorneighborz(short sectnum, long thez, short topbottom, short direction)
+short nextsectorneighborz(short sectnum, long thez, short topbottom, short direction)
 {
     walltype *wal;
     long i, testz, nextz;
@@ -4518,7 +4538,7 @@ int rintersect(long x1, long y1, long z1, long vx, long vy, long vz, long x3, lo
     return(1);
 }
 
-int dragpoint(short pointhighlight, long dax, long day)
+void dragpoint(short pointhighlight, long dax, long day)
 {
     short cnt, tempshort;
 
@@ -4560,7 +4580,7 @@ int dragpoint(short pointhighlight, long dax, long day)
     while ((tempshort != pointhighlight) && (cnt > 0));
 }
 
-int lastwall(short point)
+short lastwall(short point)
 {
     long i, j, cnt;
 
@@ -4895,7 +4915,7 @@ int clipmove(long* x, long* y, long* z, short* sectnum, long xvect, long yvect, 
     return(retval);
 }
 
-int keepaway(long* x, long* y, long w)
+void keepaway(long* x, long* y, long w)
 {
     long dx, dy, ox, oy, x1, y1;
     char first;
@@ -5078,7 +5098,7 @@ int pushmove(long* x, long* y, long* z, short* sectnum, long walldist, long ceil
     return(bad);
 }
 
-int updatesector(long x, long y, short* sectnum)
+void updatesector(long x, long y, short* sectnum)
 {
     walltype *wal;
     long i, j;
@@ -5125,24 +5145,28 @@ int rotatepoint(long xpivot, long ypivot, long x, long y, short daang, long* x2,
     *y2 = dmulscale14(y,dacos,x,dasin) + ypivot;
 }
 
-int initmouse()
+void initmouse()
 {
-    return(moustat = setupmouse());
+  //  return(moustat = setupmouse());
 }
 
-int getmousevalues(short* mousx, short* mousy, short* bstatus)
+void getmousevalues(short* mousx, short* mousy, short* bstatus)
 {
-    if (moustat == 0) { *mousx = 0; *mousy = 0; *bstatus = 0; return; }
-    readmousexy(mousx,mousy);
-    readmousebstatus(bstatus);
+    // Get from RL.
+  // if (moustat == 0) { *mousx = 0; *mousy = 0; *bstatus = 0; return; }
+  // readmousexy(mousx,mousy);
+  // readmousebstatus(bstatus);
 }
 
-int printscreeninterrupt()
+void printscreeninterrupt()
 {
-    int5();
+  //  int5();
 }
 
-int drawline256(long x1, long y1, long x2, long y2, char col)
+void drawline256(long x1, long y1, long x2, long y2, char col)
+{
+    // reimpl.
+}/*
 {
     long dx, dy, i, j, p, inc, plc, daend;
 
@@ -5214,9 +5238,13 @@ int drawline256(long x1, long y1, long x2, long y2, char col)
             plc += inc; p += ylookup[1];
         }
     }
-}
+}*/
 
-int drawline16(long x1, long y1, long x2, long y2, char col)
+void drawline16(long x1, long y1, long x2, long y2, char col)
+{
+  // DO IMP.
+}
+/*
 {
     long i, dx, dy, p, pinc, d;
     char lmask, rmask;
@@ -5314,7 +5342,7 @@ int drawline16(long x1, long y1, long x2, long y2, char col)
         if (d >= dy) { d -= dy; p += pinc; }
         p += 640;
     }
-}
+}*/
 
 int printext256(long xpos, long ypos, short col, short backcol, char name[82], char fontsize)
 {
@@ -5351,8 +5379,8 @@ int krand()
     return(((unsigned long)randomseed)>>16);
 }
 
-int getzrange(long x, long y, long z, short sectnum, long* ceilz, long* ceilhit, long* florz, long* florhit,
-              long walldist, unsigned long cliptype)
+void getzrange(long x, long y, long z, short sectnum, long* ceilz, long* ceilhit, long* florz, long* florhit,
+               long walldist, unsigned long cliptype)
 {
     sectortype *sec;
     walltype *wal, *wal2;
@@ -5546,6 +5574,7 @@ int getzrange(long x, long y, long z, short sectnum, long* ceilz, long* ceilhit,
 
 int setview(long x1, long y1, long x2, long y2)
 {
+    return 0; // old gfx
     long i, j;
 
     windowx1 = x1; wx1 = (x1<<12);
@@ -5564,7 +5593,7 @@ int setview(long x1, long y1, long x2, long y2)
     { startumost[i] = windowy1, startdmost[i] = windowy2+1; }
     for(i=windowx2+1;i<xdim;i++) { startumost[i] = 1, startdmost[i] = 0; }
 
-    viewoffset = windowy1*bytesperline + windowx1;
+  //  viewoffset = windowy1*bytesperline + windowx1;
 
     if ((stereomode) || (vidoption == 6))
     {
@@ -5627,8 +5656,24 @@ int flushperms()
     permhead = permtail = 0;
 }
 
-int rotatesprite(long sx, long sy, long z, short a, short picnum, signed char dashade, char dapalnum, char dastat,
-                 long cx1, long cy1, long cx2, long cy2)
+void rotatesprite(long sx, long sy, long z, short a, short picnum, signed char dashade, char dapalnum, char dastat,
+                  long cx1, long cy1, long cx2, long cy2)
+{}
+    /*
+    //With a modern renderer, this becomes:
+    {
+  create sprite quad with 4 vertices
+  set vertex positions (with rotation matrix)
+  set UV coordinates for texture sampling
+
+  bind texture
+  set shader uniforms:
+    - transformation matrix
+    - tint color
+    - transparency mode
+
+  submit draw call
+}
 {
     long i;
     permfifotype *per, *per2;
@@ -5697,10 +5742,11 @@ int rotatesprite(long sx, long sy, long z, short a, short picnum, signed char da
         permhead = ((permhead+1)&(MAXPERMS-1));
     }
 }
-
-int dorotatesprite(long sx, long sy, long z, short a, short picnum, signed char dashade, char dapalnum, char dastat,
-    long cx1, long cy1, long cx2, long cy2)
+    */
+void dorotatesprite(long sx, long sy, long z, short a, short picnum, signed char dashade, char dapalnum, char dastat,
+                    long cx1, long cy1, long cx2, long cy2){}/*
 {
+
     long cosang, sinang, v, nextv, dax1, dax2, oy, bx, by, ny1, ny2;
     long i, x, y, x1, y1, x2, y2, gx1, gy1, p, bufplc, palookupoffs;
     long xsiz, ysiz, xoff, yoff, npoints, yplc, yinc, lx, rx, xx, xend;
@@ -6088,6 +6134,61 @@ int dorotatesprite(long sx, long sy, long z, short a, short picnum, signed char 
         setactivepage(activepage);
     }
 }
+*/
+int makepalookup(long palnum, char* remapbuf, signed char r, signed char g, signed char b, char dastat)
+{
+    long i, j, dist, palscale;
+    char *ptr, *ptr2;
+
+    if (paletteloaded == 0) return;
+
+    if (palookup[palnum] == NULL)
+    {
+        //Allocate palookup buffer
+        if ((palookup[palnum] = (char *)kkmalloc(numpalookups<<8)) == NULL)
+            allocache(&palookup[palnum],numpalookups<<8,&permanentlock);
+    }
+
+    if (dastat == 0) return;
+    if ((r|g|b|63) != 63) return;
+
+    if ((r|g|b) == 0)
+    {
+        for(i=0;i<256;i++)
+        {
+            ptr = (char *)(FP_OFF(palookup[0])+remapbuf[i]);
+            ptr2 = (char *)(FP_OFF(palookup[palnum])+i);
+            for(j=0;j<numpalookups;j++)
+            { *ptr2 = *ptr; ptr += 256; ptr2 += 256; }
+        }
+    }
+    else
+    {
+        ptr2 = (char *)FP_OFF(palookup[palnum]);
+        for(i=0;i<numpalookups;i++)
+        {
+            palscale = divscale16(i,numpalookups);
+            for(j=0;j<256;j++)
+            {
+                ptr = (char *)&palette[remapbuf[j]*3];
+                *ptr2++ = getclosestcol((long)ptr[0]+mulscale16(r-ptr[0],palscale),
+                                        (long)ptr[1]+mulscale16(g-ptr[1],palscale),
+                                        (long)ptr[2]+mulscale16(b-ptr[2],palscale));
+            }
+        }
+    }
+
+    if ((vidoption == 6) && (qsetmode == 200))
+    {
+        for(i=0;i<256;i++)
+        {
+            dist = palette[i*3]*3+palette[i*3+1]*5+palette[i*3+2]*2;
+            ptr = (char *)(FP_OFF(palookup[palnum])+i);
+            for(j=0;j<32;j++)
+                ptr[j<<8] = (char)min(max(mulscale10(dist,32-j),0),15);
+        }
+    }
+}
 
 void setbrightness(char dabrightness, char* dapal)
 {
@@ -6119,10 +6220,13 @@ void setbrightness(char dabrightness, char* dapal)
         }
     }
 
-    VBE_setPalette(0,256,tempbuf);
+  //  VBE_setPalette(0,256,tempbuf);
 }
 
-int drawmapview(long dax, long day, long zoome, short ang)
+void drawmapview(long dax, long day, long zoome, short ang)
+{
+    // IMPL.
+}/*
 {
     walltype *wal;
     sectortype *sec;
@@ -6376,7 +6480,7 @@ int drawmapview(long dax, long day, long zoome, short ang)
             fillpolygon(npoints);
         }
     }
-}
+}*/
 
 int clippoly(long npoints, long clipstat)
 {
@@ -6682,61 +6786,63 @@ int fillpolygon(long npoints)
     faketimerhandler();
 }
 
-int clearview(long dacol)
+void clearview(long dacol)
 {
-    long i, p, y, x1, x2, dx;
-    char *ptr;
-
-    if (qsetmode != 200) return;
-
-    dx = windowx2-windowx1+1;
-    dacol += (dacol<<8); dacol += (dacol<<16);
-    if (vidoption == 6)
-    {
-        p = FP_OFF(screen)+ylookup[windowy1]+windowx1;
-        for(y=windowy1;y<=windowy2;y++)
-        {
-            clearbufbyte(p,dx,dacol);
-            clearbufbyte(p+65536,dx,dacol);
-            p += ylookup[1];
-        }
-        faketimerhandler();
-        return;
-    }
-    p = frameplace+ylookup[windowy1]+windowx1;
-    for(y=windowy1;y<=windowy2;y++)
-    { clearbufbyte(p,dx,dacol); p += ylookup[1]; }
-    faketimerhandler();
+ //   long i, p, y, x1, x2, dx;
+ //   char *ptr;
+//
+ //   if (qsetmode != 200) return;
+//
+ //   dx = windowx2-windowx1+1;
+ //   dacol += (dacol<<8); dacol += (dacol<<16);
+ //   if (vidoption == 6)
+ //   {
+ //       p = FP_OFF(screen)+ylookup[windowy1]+windowx1;
+ //       for(y=windowy1;y<=windowy2;y++)
+ //       {
+ //           clearbufbyte(p,dx,dacol);
+ //           clearbufbyte(p+65536,dx,dacol);
+ //           p += ylookup[1];
+ //       }
+ //       faketimerhandler();
+ //       return;
+ //   }
+ //   p = frameplace+ylookup[windowy1]+windowx1;
+ //   for(y=windowy1;y<=windowy2;y++)
+ //   { clearbufbyte(p,dx,dacol); p += ylookup[1]; }
+ //   faketimerhandler();
 }
 
-int clearallviews(long dacol)
+void clearallviews(long dacol)
 {
     long i;
 
     if (qsetmode != 200) return;
     dacol += (dacol<<8); dacol += (dacol<<16);
 
-    switch(vidoption)
-    {
-    case 1:
-        for(i=0;i<numpages;i++)
-        {
-            setactivepage(i);
-            clearbufbyte(frameplace,imageSize,0L);
-        }
-        setactivepage(activepage);
-    case 2:
-        clearbuf(frameplace,(xdim*ydim)>>2,0L);
-        break;
-    case 6:
-        clearbuf(screen,128000L>>2,dacol);
-        break;
-    }
+  // switch(vidoption)
+  // {
+  // case 1:
+  //     for(i=0;i<numpages;i++)
+  //     {
+  //         setactivepage(i);
+  //         clearbufbyte(frameplace,imageSize,0L);
+  //     }
+  //     setactivepage(activepage);
+  // case 2:
+  //     clearbuf(frameplace,(xdim*ydim)>>2,0L);
+  //     break;
+  // case 6:
+  //     clearbuf(screen,128000L>>2,dacol);
+  //     break;
+  // }
     faketimerhandler();
 }
 
-int setviewtotile(short tilenume, long xsiz, long ysiz)
+void setviewtotile(short tilenume, long xsiz, long ysiz)
 {
+    return;//
+    // replace with rendertextures somehow.
     long i, j;
 
     //DRAWROOMS TO TILE BACKUP&SET CODE
@@ -6754,9 +6860,10 @@ int setviewtotile(short tilenume, long xsiz, long ysiz)
     setvlinebpl(ysiz);
     setviewcnt++;
 }
-
-int setviewback()
+static int bytesperline;
+void setviewback()
 {
+
     long i, j, k, xsiz, ysiz;
 
     if (setviewcnt <= 0) return;
@@ -6766,6 +6873,8 @@ int setviewback()
             bakwindowx2[setviewcnt],bakwindowy2[setviewcnt]);
     copybufbyte(&bakumost[windowx1],&startumost[windowx1],(windowx2-windowx1+1)*sizeof(startumost[0]));
     copybufbyte(&bakdmost[windowx1],&startdmost[windowx1],(windowx2-windowx1+1)*sizeof(startdmost[0]));
+
+    return;//
     vidoption = bakvidoption[setviewcnt];
     frameplace = bakframeplace[setviewcnt];
     if (setviewcnt == 0)
@@ -6776,29 +6885,29 @@ int setviewback()
     setvlinebpl(bytesperline);
 }
 
-int squarerotatetile(short tilenume)
+void squarerotatetile(short tilenume)
 {
-    long i, j, k, xsiz, ysiz;
-    char *ptr1, *ptr2;
-
-    xsiz = tilesizx[tilenume]; ysiz = tilesizy[tilenume];
-
-    //supports square tiles only for rotation part
-    if (xsiz == ysiz)
-    {
-        k = (xsiz<<1);
-        for(i=xsiz-1;i>=0;i--)
-        {
-            ptr1 = (char *)(waloff[tilenume]+i*(xsiz+1)); ptr2 = ptr1;
-            if ((i&1) != 0) { ptr1--; ptr2 -= xsiz; swapchar(ptr1,ptr2); }
-            for(j=(i>>1)-1;j>=0;j--)
-            { ptr1 -= 2; ptr2 -= k; swapchar2(ptr1,ptr2,xsiz); }
-        }
-    }
+  //  long i, j, k, xsiz, ysiz;
+  //  char *ptr1, *ptr2;
+//
+  //  xsiz = tilesizx[tilenume]; ysiz = tilesizy[tilenume];
+//
+  //  //supports square tiles only for rotation part
+  //  if (xsiz == ysiz)
+  //  {
+  //      k = (xsiz<<1);
+  //      for(i=xsiz-1;i>=0;i--)
+  //      {
+  //          ptr1 = (char *)(waloff[tilenume]+i*(xsiz+1)); ptr2 = ptr1;
+  //          if ((i&1) != 0) { ptr1--; ptr2 -= xsiz;  swapchar(ptr1,ptr2); }
+  //          for(j=(i>>1)-1;j>=0;j--)
+  //          { ptr1 -= 2; ptr2 -= k; swapchar2(ptr1,ptr2,xsiz); }
+  //      }
+  //  }
 }
 
-int preparemirror(long dax, long day, long daz, short daang, long dahoriz, short dawall, short dasector, long* tposx,
-    long* tposy, short* tang)
+void preparemirror(long dax, long day, long daz, short daang, long dahoriz, short dawall, short dasector, long* tposx,
+                   long* tposy, short* tang)
 {
     long i, j, x, y, dx, dy;
 
@@ -6813,8 +6922,9 @@ int preparemirror(long dax, long day, long daz, short daang, long dahoriz, short
     inpreparemirror = 1;
 }
 
-int completemirror()
+void completemirror()
 {
+    return;// do mirror external.
     long i, dy, p;
 
     //Can't reverse with uninitialized data
@@ -6837,7 +6947,7 @@ int completemirror()
     }
 }
 
-int sectorofwall(short theline)
+long sectorofwall(short theline)
 {
     long i, j, gap;
 
@@ -6855,7 +6965,7 @@ int sectorofwall(short theline)
     return(i);
 }
 
-int getceilzofslope(short sectnum, long dax, long day)
+long getceilzofslope(short sectnum, long dax, long day)
 {
     long dx, dy, i, j;
     walltype *wal;
@@ -6868,7 +6978,7 @@ int getceilzofslope(short sectnum, long dax, long day)
     return(sector[sectnum].ceilingz+scale(sector[sectnum].ceilingheinum,j,i));
 }
 
-int getflorzofslope(short sectnum, long dax, long day)
+long getflorzofslope(short sectnum, long dax, long day)
 {
     long dx, dy, i, j;
     walltype *wal;
@@ -6881,7 +6991,7 @@ int getflorzofslope(short sectnum, long dax, long day)
     return(sector[sectnum].floorz+scale(sector[sectnum].floorheinum,j,i));
 }
 
-int getzsofslope(short sectnum, long dax, long day, long* ceilz, long* florz)
+void getzsofslope(short sectnum, long dax, long day, long* ceilz, long* florz)
 {
     long dx, dy, i, j;
     walltype *wal, *wal2;
@@ -6900,7 +7010,7 @@ int getzsofslope(short sectnum, long dax, long day, long* ceilz, long* florz)
     }
 }
 
-int alignflorslope(short dasect, long x, long y, long z)
+void alignflorslope(short dasect, long x, long y, long z)
 {
     long i, dax, day;
     walltype *wal;
@@ -6915,4 +7025,9 @@ int alignflorslope(short dasect, long x, long y, long z)
 
     if (sector[dasect].floorheinum == 0) sector[dasect].floorstat &= ~2;
     else sector[dasect].floorstat |= 2;
+}
+
+long getpalookup(long davis, long dashade)
+{
+    return(min(max(dashade+(davis>>8),0),numpalookups-1));
 }

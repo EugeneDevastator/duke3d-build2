@@ -3119,7 +3119,19 @@ void movetransports(void)
     }
 }
 
+short LocateTheLocator(short n,short sn)
+{
+    short i;
 
+    i = headspritestat[7];
+    while(i >= 0)
+    {
+        if( (sn == -1 || sn == SECT) && n == SLT )
+            return i;
+        i = nextspritestat[i];
+    }
+    return -1;
+}
 
 void moveactors(void)
 {
