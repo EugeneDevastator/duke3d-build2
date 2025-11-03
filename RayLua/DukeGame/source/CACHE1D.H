@@ -4,11 +4,11 @@
 #ifndef CACHED_H
 #define CACHED_H
 //#include <dos.h>
-#include <stdio.h>
-#include "pragmas.h"
-#include <fcntl.h>
-#include <stdint.h>
 #include <io.h>
+#include <stdint.h>
+#include <stdio.h>
+//#include "fcntl.h"
+#include "pragmas.h"
 #define FP_OFF(x) ((long) (x)) //toggle off floatng point
 #define FPP_OFF(x) ((long) ((void*)(x)))
 void *kmalloc(size_t size) { return(malloc(size)); }

@@ -449,27 +449,11 @@ void drawrooms(long daposx, long daposy, long daposz,
 
 void scansector (short sectnum);
 
-wallfront (long l1, long l2);
+int wallfront (long l1, long l2);
 
 int32_t spritewallfront (spritetype *s, long w);
 
-bunchfront (long b1, long b2)
-{
-	long x1b1, x2b1, x1b2, x2b2, b1f, b2f, i;
-
-	b1f = bunchfirst[b1]; x1b1 = xb1[b1f]; x2b2 = xb2[bunchlast[b2]]+1;
-	if (x1b1 >= x2b2) return(-1);
-	b2f = bunchfirst[b2]; x1b2 = xb1[b2f]; x2b1 = xb2[bunchlast[b1]]+1;
-	if (x1b2 >= x2b1) return(-1);
-
-	if (x1b1 >= x1b2)
-	{
-		for(i=b2f;xb2[i]<x1b1;i=p2[i]);
-		return(wallfront(b1f,i));
-	}
-	for(i=b1f;xb2[i]<x1b2;i=p2[i]);
-	return(wallfront(i,b2f));
-}
+int bunchfront (long b1, long b2);
 
 void drawalls (long bunch);
 
@@ -489,18 +473,18 @@ void transmaskvline2(long x);
 
 void transmaskwallscan(long x1, long x2);
 
-loadboard(char *filename, long *daposx, long *daposy, long *daposz,
+int loadboard(char *filename, long *daposx, long *daposy, long *daposz,
 		  short *daang, short *dacursectnum);
 
-saveboard(char *filename, long *daposx, long *daposy, long *daposz,
+int saveboard(char *filename, long *daposx, long *daposy, long *daposz,
 		  short *daang, short *dacursectnum);
 
-loadtables();
+void loadtables();
 
 void loadpalette();
 
 static char screenalloctype = 255;
-void setgamemode(char davidoption, long daxdim, long daydim);
+int setgamemode(char davidoption, long daxdim, long daydim);
 
 
 void hline(long xr, long yp);
@@ -517,23 +501,23 @@ void nextpage();
 char cachedebug = 0;
 void loadtile(short tilenume);
 
-void allocatepermanenttile(short tilenume, long xsiz, long ysiz);
+long allocatepermanenttile(short tilenume, long xsiz, long ysiz);
 
-void loadpics(char *filename);
+int loadpics(char* filename);
 
 #ifdef SUPERBUILD
 void qloadkvx(long voxindex, char* filename);
 #endif
 
-void clipinsidebox(long x, long y, short wallnum, long walldist);
+int clipinsidebox(long x, long y, short wallnum, long walldist);
 
-void clipinsideboxline(long x, long y, long x1, long y1, long x2, long y2, long walldist);
+int clipinsideboxline(long x, long y, long x1, long y1, long x2, long y2, long walldist);
 
 long readpixel16(long p);
 
-void screencapture(char *filename, char inverseit);
+int screencapture(char *filename, char inverseit);
 
-bool inside (long x, long y, short sectnum);
+int inside (long x, long y, short sectnum);
 
 long getangle(long xvect, long yvect);
 
@@ -546,7 +530,7 @@ void initksqrt();
 void copytilepiece(long tilenume1, long sx1, long sy1, long xsiz, long ysiz,
 			  long tilenume2, long sx2, long sy2);
 
-void drawmasks();
+int drawmasks();
 
 void drawmaskwall(short damaskwallcnt);
 
@@ -572,11 +556,11 @@ int insertsprite(short sectnum, short statnum);
 
 int insertspritesect(short sectnum);
 
-void insertspritestat(short statnum);
+int insertspritestat(short statnum);
 
 int deletesprite(short spritenum);
 
-void deletespritesect(short deleteme);
+int deletespritesect(short deleteme);
 
 int deletespritestat (short deleteme);
 
@@ -587,6 +571,9 @@ int changespritestat(short spritenum, short newstatnum);
 short nextsectorneighborz(short sectnum, long thez, short topbottom, short direction);
 
 int cansee(long x1, long y1, long z1, short sect1, long x2, long y2, long z2, short sect2);
+
+int hitscan(long xs, long ys, long zs, short sectnum, long vx, long vy, long vz, short* hitsect, short* hitwall,
+	short* hitsprite, long* hitx, long* hity, long* hitz, unsigned long cliptype);
 
 int inthitscan(long xs, long ys, long zs, short sectnum, long vx, long vy, long vz,
 		short *hitsect, short *hitwall, short *hitsprite,
@@ -613,20 +600,20 @@ short lastwall(short point);
 }                                                        \
 
 long clipmoveboxtracenum = 3;
-clipmove (long *x, long *y, long *z, short *sectnum,
-			 long xvect, long yvect,
-			 long walldist, long ceildist, long flordist, unsigned long cliptype);
+long clipmove(long* x, long* y, long* z, short* sectnum,
+			  long xvect, long yvect,
+			  long walldist, long ceildist, long flordist, unsigned long cliptype);
 
 void keepaway(long* x, long* y, long w);
 
-raytrace (long x3, long y3, long *x4, long *y4);
+long raytrace(long x3, long y3, long* x4, long* y4);
 
-pushmove (long *x, long *y, long *z, short *sectnum,
-		  long walldist, long ceildist, long flordist, unsigned long cliptype);
+long pushmove(long* x, long* y, long* z, short* sectnum,
+			  long walldist, long ceildist, long flordist, unsigned long cliptype);
 
 void updatesector(long x, long y, short* sectnum);
 
-rotatepoint(long xpivot, long ypivot, long x, long y, short daang, long *x2, long *y2);
+void rotatepoint(long xpivot, long ypivot, long x, long y, short daang, long* x2, long* y2);
 
 void initmouse();
 
@@ -1035,7 +1022,7 @@ printext16(long xpos, long ypos, short col, short backcol, char name[82], char f
 }
 */
 
-printext256(long xpos, long ypos, short col, short backcol, char name[82], char fontsize);
+void printext256(long xpos, long ypos, short col, short backcol, char name[82], char fontsize);
 
 int krand();
 
@@ -1043,13 +1030,13 @@ void getzrange(long x, long y, long z, short sectnum,
 			   long* ceilz, long* ceilhit, long* florz, long* florhit,
 			   long walldist, unsigned long cliptype);
 
-setview(long x1, long y1, long x2, long y2);
+int setview(long x1, long y1, long x2, long y2);
 
-setaspect(long daxrange, long daaspect);
+void setaspect(long daxrange, long daaspect);
 
-dosetaspect();
+void dosetaspect();
 
-flushperms();
+void flushperms();
 
 void rotatesprite(long sx, long sy, long z, short a, short picnum, signed char dashade, char dapalnum, char dastat,
 				  long cx1, long cy1, long cx2, long cy2);
@@ -1058,148 +1045,21 @@ void dorotatesprite(long sx, long sy, long z, short a, short picnum, signed char
 					long cx1, long cy1, long cx2, long cy2);
 
 //Assume npoints=4 with polygon on &rx1,&ry1
-clippoly4(long cx1, long cy1, long cx2, long cy2)
-{
-	long n, nn, z, zz, x, x1, x2, y, y1, y2, t;
+long clippoly4(long cx1, long cy1, long cx2, long cy2);
 
-	nn = 0; z = 0;
-	do
-	{
-		zz = ((z+1)&3);
-		x1 = rx1[z]; x2 = rx1[zz]-x1;
+void makepalookup(long palnum, char* remapbuf, signed char r, signed char g, signed char b, char dastat);
 
-		if ((cx1 <= x1) && (x1 <= cx2))
-			rx2[nn] = x1, ry2[nn] = ry1[z], nn++;
+void initfastcolorlookup(long rscale, long gscale, long bscale);
 
-		if (x2 <= 0) x = cx2; else x = cx1;
-		t = x-x1;
-		if (((t-x2)^t) < 0)
-			rx2[nn] = x, ry2[nn] = ry1[z]+scale(t,ry1[zz]-ry1[z],x2), nn++;
-
-		if (x2 <= 0) x = cx1; else x = cx2;
-		t = x-x1;
-		if (((t-x2)^t) < 0)
-			rx2[nn] = x, ry2[nn] = ry1[z]+scale(t,ry1[zz]-ry1[z],x2), nn++;
-
-		z = zz;
-	} while (z != 0);
-	if (nn < 3) return(0);
-
-	n = 0; z = 0;
-	do
-	{
-		zz = z+1; if (zz == nn) zz = 0;
-		y1 = ry2[z]; y2 = ry2[zz]-y1;
-
-		if ((cy1 <= y1) && (y1 <= cy2))
-			ry1[n] = y1, rx1[n] = rx2[z], n++;
-
-		if (y2 <= 0) y = cy2; else y = cy1;
-		t = y-y1;
-		if (((t-y2)^t) < 0)
-			ry1[n] = y, rx1[n] = rx2[z]+scale(t,rx2[zz]-rx2[z],y2), n++;
-
-		if (y2 <= 0) y = cy1; else y = cy2;
-		t = y-y1;
-		if (((t-y2)^t) < 0)
-			ry1[n] = y, rx1[n] = rx2[z]+scale(t,rx2[zz]-rx2[z],y2), n++;
-
-		z = zz;
-	} while (z != 0);
-	return(n);
-}
-
-void makepalookup(long palnum, char *remapbuf, signed char r, signed char g, signed char b, char dastat);
-
-initfastcolorlookup(long rscale, long gscale, long bscale)
-{
-	long i, j, x, y, z;
-	char *pal1;
-
-	j = 0;
-	for(i=64;i>=0;i--)
-	{
-		//j = (i-64)*(i-64);
-		rdist[i] = rdist[128-i] = j*rscale;
-		gdist[i] = gdist[128-i] = j*gscale;
-		bdist[i] = bdist[128-i] = j*bscale;
-		j += 129-(i<<1);
-	}
-
-	clearbufbyte(FP_OFF(colhere),sizeof(colhere),0L);
-	clearbufbyte(FP_OFF(colhead),sizeof(colhead),0L);
-
-	pal1 = (char *)&palette[768-3];
-	for(i=255;i>=0;i--,pal1-=3)
-	{
-		j = (pal1[0]>>3)*FASTPALGRIDSIZ*FASTPALGRIDSIZ+(pal1[1]>>3)*FASTPALGRIDSIZ+(pal1[2]>>3)+FASTPALGRIDSIZ*FASTPALGRIDSIZ+FASTPALGRIDSIZ+1;
-		if (colhere[j>>3]&pow2char[j&7]) colnext[i] = colhead[j]; else colnext[i] = -1;
-		colhead[j] = i;
-		colhere[j>>3] |= pow2char[j&7];
-	}
-
-	i = 0;
-	for(x=-FASTPALGRIDSIZ*FASTPALGRIDSIZ;x<=FASTPALGRIDSIZ*FASTPALGRIDSIZ;x+=FASTPALGRIDSIZ*FASTPALGRIDSIZ)
-		for(y=-FASTPALGRIDSIZ;y<=FASTPALGRIDSIZ;y+=FASTPALGRIDSIZ)
-			for(z=-1;z<=1;z++)
-				colscan[i++] = x+y+z;
-	i = colscan[13]; colscan[13] = colscan[26]; colscan[26] = i;
-}
-
-getclosestcol(long r, long g, long b)
-{
-	long x, y, z, i, j, k, dist, mindist, retcol;
-	char *pal1;
-
-	j = (r>>3)*FASTPALGRIDSIZ*FASTPALGRIDSIZ+(g>>3)*FASTPALGRIDSIZ+(b>>3)+FASTPALGRIDSIZ*FASTPALGRIDSIZ+FASTPALGRIDSIZ+1;
-	mindist = min(rdist[coldist[r&7]+64+8],gdist[coldist[g&7]+64+8]);
-	mindist = min(mindist,bdist[coldist[b&7]+64+8]);
-	mindist++;
-
-	r = 64-r; g = 64-g; b = 64-b;
-
-	retcol = -1;
-	for(k=26;k>=0;k--)
-	{
-		i = colscan[k]+j; if ((colhere[i>>3]&pow2char[i&7]) == 0) continue;
-		i = colhead[i];
-		do
-		{
-			pal1 = (char *)&palette[i*3];
-			dist = gdist[pal1[1]+g];
-			if (dist < mindist)
-			{
-				dist += rdist[pal1[0]+r];
-				if (dist < mindist)
-				{
-					dist += bdist[pal1[2]+b];
-					if (dist < mindist) { mindist = dist; retcol = i; }
-				}
-			}
-			i = colnext[i];
-		} while (i >= 0);
-	}
-	if (retcol >= 0) return(retcol);
-
-	mindist = 0x7fffffff;
-	pal1 = (char *)&palette[768-3];
-	for(i=255;i>=0;i--,pal1-=3)
-	{
-		dist = gdist[pal1[1]+g]; if (dist >= mindist) continue;
-		dist += rdist[pal1[0]+r]; if (dist >= mindist) continue;
-		dist += bdist[pal1[2]+b]; if (dist >= mindist) continue;
-		mindist = dist; retcol = i;
-	}
-	return(retcol);
-}
+long getclosestcol(long r, long g, long b);
 
 void setbrightness(char dabrightness, char *dapal);
 
 void drawmapview(long dax, long day, long zoome, short ang);
 
-clippoly (long npoints, long clipstat);
+long clippoly (long npoints, long clipstat);
 
-fillpolygon(long npoints);
+void fillpolygon(long npoints);
 
 void clearview(long dacol);
 
@@ -2028,20 +1888,7 @@ uninstallbistereohandlers()
 	int386(0x31,&r,&r);
 }
 */
-loopnumofsector(short sectnum, short wallnum)
-{
-	long i, numloops, startwall, endwall;
-
-	numloops = 0;
-	startwall = sector[sectnum].wallptr;
-	endwall = startwall + sector[sectnum].wallnum;
-	for(i=startwall;i<endwall;i++)
-	{
-		if (i == wallnum) return(numloops);
-		if (wall[i].point2 < i) numloops++;
-	}
-	return(-1);
-}
+long loopnumofsector(short sectnum, short wallnum);
 
 setfirstwall(short sectnum, short newfirstwall)
 {

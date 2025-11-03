@@ -27,6 +27,8 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "duke3d.h"
 #include "keyboard.h"
 
+#include "global.h"
+
 /* this should be a proper prototype included from a header file */
 extern int stricmp(const char *x, const char *y);
 
@@ -38,10 +40,10 @@ extern int stricmp(const char *x, const char *y);
 =============================================================================
 */
 
-volatile byte  KB_KeyDown[ MAXKEYBOARDSCAN ];   // Keyboard state array
+volatile uint8_t KB_KeyDown[ MAXKEYBOARDSCAN ];   // Keyboard state array
 volatile kb_scancode KB_LastScan;
 
-static volatile boolean keyIsWaiting = 0;
+static volatile bool keyIsWaiting = 0;
 
 static char scancodeToASCII[ MAXKEYBOARDSCAN ];
 static char shiftedScancodeToASCII[ MAXKEYBOARDSCAN ];
@@ -52,10 +54,14 @@ static char extscanToSC[ MAXKEYBOARDSCAN ];
 FUNCTIONS
 =============================================================================
 */
-
+int _readlastkeyhit()
+{
+	// TO IMPL.
+	return 0;
+}
 void keyhandler()
 {
-    static boolean gotextended = false;
+    static bool gotextended = false;
     
     int rawkey = _readlastkeyhit();
     int lastkey = rawkey & 0x7f;
@@ -102,14 +108,14 @@ void keyhandler()
     CONTROL_UpdateKeyboardState(lastkey, pressed);
 }
 
-void KB_KeyEvent( int scancode, boolean keypressed )
+void KB_KeyEvent( int scancode, bool keypressed )
 {
 	STUBBED("KB_KeyEvent");
 }
 
-boolean KB_KeyWaiting(  )
+bool KB_KeyWaiting(  )
 {
-    _handle_events();
+   // _handle_events();
     return keyIsWaiting;
 }
 
@@ -117,7 +123,7 @@ char KB_Getch(  )
 {
     int shifted;
 
-    while (!keyIsWaiting) { _idle(); /* pull the pud. */ }
+    while (!keyIsWaiting) { /*  _idle();pull the pud. */ }
 	keyIsWaiting = false;
     if (KB_LastScan >= MAXKEYBOARDSCAN)
         return(0xFF);
@@ -135,7 +141,7 @@ void KB_Addch( char ch )
 
 void KB_FlushKeyBoardQueue(  )
 {
-    _handle_events();
+  // _handle_events();
 	keyIsWaiting = false;
 }
 
@@ -253,21 +259,21 @@ static struct {
 	{ "PrtScn",	sc_PrintScreen	},
 
     // AZERTY hacks...
-	{ "INTL1",	sc_INTL1	},
-	{ "INTL2",	sc_INTL2	},
-	{ "INTL3",	sc_INTL3	},
-	{ "INTL4",	sc_INTL4	},
-	{ "INTL5",	sc_INTL5	},
-	{ "INTL6",	sc_INTL6	},
-	{ "INTL7",	sc_INTL7	},
-	{ "INTL8",	sc_INTL8	},
-	{ "INTL9",	sc_INTL9	},
-	{ "INTL10",	sc_INTL10	},
-	{ "INTL11",	sc_INTL11	},
-	{ "INTL12",	sc_INTL12	},
-	{ "INTL13",	sc_INTL13	},
-	{ "INTL14",	sc_INTL14	},
-	{ "INTL15",	sc_INTL15	},
+//	{ "INTL1",	sc_INTL1	},
+//	{ "INTL2",	sc_INTL2	},
+//	{ "INTL3",	sc_INTL3	},
+//	{ "INTL4",	sc_INTL4	},
+//	{ "INTL5",	sc_INTL5	},
+//	{ "INTL6",	sc_INTL6	},
+//	{ "INTL7",	sc_INTL7	},
+//	{ "INTL8",	sc_INTL8	},
+//	{ "INTL9",	sc_INTL9	},
+//	{ "INTL10",	sc_INTL10	},
+//	{ "INTL11",	sc_INTL11	},
+//	{ "INTL12",	sc_INTL12	},
+//	{ "INTL13",	sc_INTL13	},
+//	{ "INTL14",	sc_INTL14	},
+//	{ "INTL15",	sc_INTL15	},
 
 	{ NULL,		0		}
 };
@@ -308,7 +314,7 @@ void KB_TurnKeypadOff( void )
 	STUBBED("KB_TurnKeypadOff");
 }
 
-boolean KB_KeypadActive( void )
+bool KB_KeypadActive( void )
 {
 	STUBBED("KB_KeypadActive");
 	return false;

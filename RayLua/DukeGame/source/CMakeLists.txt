@@ -20,6 +20,7 @@ set(SOURCES
         SOUNDS.C
         Config.c
         scriplib.c
+        mmulti.c
 
         # Add more .c files here
 )

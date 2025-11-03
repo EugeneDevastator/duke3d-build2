@@ -53,7 +53,7 @@ int32_t SoundToggle;
 int32_t MusicToggle;
 int32_t VoiceToggle;
 int32_t AmbienceToggle;
-fx_blaster_config BlasterConfig;
+//fx_blaster_config BlasterConfig;
 // int32_t NumVoices;
 // int32_t NumChannels;
 // int32_t NumBits;

@@ -1649,7 +1649,7 @@ void movestandables(void)
                 if( s->xvel < 192 )
                     s->xvel += 8;
                 s->ang = getangle(msx[t[4]]-s->x,msy[t[4]]-s->y);
-                IFMOVING;
+                IFMOVING;  //wat?
                 if( ((s->x-msx[t[4]])*(s->x-msx[t[4]])+(s->y-msy[t[4]])*(s->y-msy[t[4]]) ) < (128*128) )
                     t[0]++;
             }
@@ -5889,7 +5889,9 @@ void moveeffectors(void)   //STATNUM 3
                         k = headspritestat[1];
                         while(k >= 0)
                         {
-                            if( sprite[k].extra > 0 && badguy(&sprite[k]) && clipinsidebox(sprite[k].x,sprite[k].y,j,256L) == 1 )
+                            if( sprite[k].extra > 0
+                                && badguy(&sprite[k])
+                                && clipinsidebox(sprite[k].x,sprite[k].y,j,256L) == 1 )
                                 goto BOLT;
                             k = nextspritestat[k];
                         }

@@ -23,8 +23,9 @@ Original Source: 1996 - Todd Replogle
 Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
-#ifndef DUKE3D_H
-#define DUKE3D_H
+
+#ifndef DUKE3DMAIN_H
+#define DUKE3DMAIN_H
 
 #include <dos.h>
 #include <malloc.h>

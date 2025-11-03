@@ -679,7 +679,7 @@ void SafeFree (void * ptr)
 
 #ifndef BYTE_ORDER
 
-#error Please define your platform.
+//#error Please define your platform.
 
 #endif
 

@@ -35,7 +35,7 @@ extern char everyothertime;
 short which_palookup = 9;
 
 
-tloadtile(short tilenume)
+void tloadtile(short tilenume)
 {
     gotpic[tilenume>>3] |= (1<<(tilenume&7));
 }
@@ -240,7 +240,7 @@ char getsound(unsigned short num)
     long   l;
 
     if(num >= NUM_SOUNDS || SoundToggle == 0) return 0;
-    if (FXDevice == NumSoundCards) return 0;
+   // if (FXDevice == NumSoundCards) return 0;
 
     fp = kopen4load(sounds[num],loadfromgrouponly);
     if(fp == -1) return 0;
@@ -264,7 +264,7 @@ void precachenecessarysounds(void)
 {
     short i, j;
 
-    if (FXDevice == NumSoundCards) return;
+  //  if (FXDevice == NumSoundCards) return;
     j = 0;
 
     for(i=0;i<NUM_SOUNDS;i++)

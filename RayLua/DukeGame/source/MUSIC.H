@@ -27,7 +27,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #ifndef __MUSIC_H
 #define __MUSIC_H
 
-#include "sndcards.h"
+//#include "sndcards.h"
 
 extern int MUSIC_ErrorCode;
 
@@ -60,29 +60,29 @@ typedef struct
 
 char *MUSIC_ErrorString( int ErrorNumber );
 int   MUSIC_Init( int SoundCard, int Address );
-int   MUSIC_Shutdown( void );
+int   MUSIC_Shutdown();
 void  MUSIC_SetMaxFMMidiChannel( int channel );
 void  MUSIC_SetVolume( int volume );
 void  MUSIC_SetMidiChannelVolume( int channel, int volume );
-void  MUSIC_ResetMidiChannelVolumes( void );
-int   MUSIC_GetVolume( void );
+void  MUSIC_ResetMidiChannelVolumes();
+int   MUSIC_GetVolume();
 void  MUSIC_SetLoopFlag( int loopflag );
-int   MUSIC_SongPlaying( void );
-void  MUSIC_Continue( void );
-void  MUSIC_Pause( void );
-int   MUSIC_StopSong( void );
+int   MUSIC_SongPlaying();
+void  MUSIC_Continue();
+void  MUSIC_Pause();
+int   MUSIC_StopSong();
 int   MUSIC_PlaySong( unsigned char *song, int loopflag );
 void  MUSIC_SetContext( int context );
-int   MUSIC_GetContext( void );
+int   MUSIC_GetContext();
 void  MUSIC_SetSongTick( unsigned long PositionInTicks );
 void  MUSIC_SetSongTime( unsigned long milliseconds );
 void  MUSIC_SetSongPosition( int measure, int beat, int tick );
 void  MUSIC_GetSongPosition( songposition *pos );
 void  MUSIC_GetSongLength( songposition *pos );
 int   MUSIC_FadeVolume( int tovolume, int milliseconds );
-int   MUSIC_FadeActive( void );
-void  MUSIC_StopFade( void );
-void  MUSIC_RerouteMidiChannel( int channel, int cdecl ( *function )( int event, int c1, int c2 ) );
+int   MUSIC_FadeActive();
+void  MUSIC_StopFade();
+void MUSIC_RerouteMidiChannel(int channel, int (*function)(int event, int c1, int c2));
 void  MUSIC_RegisterTimbreBank( unsigned char *timbres );
 
 #endif

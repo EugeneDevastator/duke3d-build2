@@ -32,12 +32,12 @@ extern void ExtEditSectorData(short sectnum);
 extern void ExtEditWallData(short wallnum);
 extern void ExtEditSpriteData(short spritenum);
 
-void (__interrupt __far *oldtimerhandler)();
-void __interrupt __far timerhandler()
+// void (__interrupt __far *oldtimerhandler)();
+// void __interrupt __far timerhandler()
 
 #define KEYFIFOSIZ 64
-void (__interrupt __far *oldkeyhandler)();
-void __interrupt __far keyhandler()
+//void (__interrupt __far *oldkeyhandler)();
+// void __interrupt __far keyhandler()
 volatile char keystatus[256], keyfifo[KEYFIFOSIZ], keyfifoplc, keyfifoend;
 volatile char readch, oldreadch, extended, keytemp;
 
@@ -141,7 +141,7 @@ static char scantoascwithshift[128] =
 	"rep stosd",\
 	parm [edi][eax][ecx]\
 	modify [edx]\
-
+/*
 main(short int argc,char **argv)
 {
 	char ch, quitflag;
@@ -6587,3 +6587,4 @@ AutoAlignWalls(long nWall0, long ply)
 		nWall1 = wall[wall[nWall1].nextwall].point2;
 	}
 }
+*/
