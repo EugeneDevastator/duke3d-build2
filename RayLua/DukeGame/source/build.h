@@ -25,7 +25,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 //-------------------------------------------------------------------------
 #ifndef BUILD_HEADER_H
 #define BUILD_HEADER_H
-
+#pragma once
 #define MAXSECTORS 1024
 #define MAXWALLS 8192
 #define MAXSPRITES 4096
@@ -47,7 +47,8 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 //#ifdef ENGINE
 //	#define EXTERN
 //#else
-	#define EXTERN extern
+	#define EXTERN
+#include "types.h"
 //#endif
 
 //ceilingstat/floorstat:
@@ -116,18 +117,8 @@ typedef struct
 //   bit 15: 1 = Invisible sprite, 0 = not invisible
 
 	//44 bytes
-typedef struct
-{
-	long x, y, z;
-	short cstat, picnum;
-	signed char shade;
-	char pal, clipdist, filler;
-	unsigned char xrepeat, yrepeat;
-	signed char xoffset, yoffset;
-	short sectnum, statnum;
-	short ang, owner, xvel, yvel, zvel;
-	short lotag, hitag, extra;
-} spritetype;
+
+
 #ifdef sector
 #undef sector
 #warning "sector macro was defined, undefined it"

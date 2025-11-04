@@ -28,10 +28,9 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #ifndef _keyboard_public
 #define _keyboard_public
+#include <stdbool.h>
 #include <stdint.h>
-#ifdef __cplusplus
-extern "C" {
-#endif
+
 
 /*
 =============================================================================

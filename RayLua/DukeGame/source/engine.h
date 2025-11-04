@@ -3,33 +3,19 @@
 // See the included license file "BUILDLIC.TXT" for license info.
 #ifndef KEN_ENGINE_H
 #define KEN_ENGINE_H
+#pragma once
 #define SUPERBUILD
 
 #define ENGINE
-#include <string.h>
-#include <malloc.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <dos.h>
-#include <fcntl.h>
-#include <io.h>
-#include <sys\types.h>
-#include <sys\stat.h>
-#include <conio.h>
 //#include <i86.h>
 #include "build.h"
-#include "CACHE1D.H"
+#include "cache1d.h"
 #include "duke3d.h"
 #include "pragmas.h"
-
-long stereowidth = 23040, stereopixelwidth = 28, ostereopixelwidth = -1;
-volatile long stereomode = 0, visualpage, activepage, whiteband, blackband;
-volatile char oa1, o3c2, ortca, ortcb, overtbits, laststereoint;
+#include "funct.h"
+extern sectortype sector[MAXSECTORS];
 
 //#include "ves2.h"
-
-#pragma intrinsic(min);
-#pragma intrinsic(max);
 
 #define MAXCLIPNUM 512
 #define MAXPERMS 512
@@ -41,11 +27,8 @@ volatile char oa1, o3c2, ortca, ortcb, overtbits, laststereoint;
 
 	//MUST CALL MALLOC THIS WAY TO FORCE CALLS TO KMALLOC!
 
-void *kkmalloc(size_t size);
 /*
-// #pragma aux kkmalloc =\
-	"call kmalloc",\
-	parm [eax]\
+
 */
 	//MUST CALL FREE THIS WAY TO FORCE CALLS TO KFREE!
 
@@ -53,11 +36,9 @@ void *kkmalloc(size_t size);
 
 #ifdef SUPERBUILD
 	//MUST CALL LOADVOXEL THIS WAY BECAUSE WATCOM STINKS!
-void loadvoxel(long voxindex) { }
+void loadvoxel(long voxindex);
 void kloadvoxel(long voxindex);
-// #pragma aux kloadvoxel =\
-	"call loadvoxel",\
-	parm [eax]\
+
 
 	//These variables need to be copied into BUILD
 #define MAXXSIZ 128
@@ -65,143 +46,22 @@ void kloadvoxel(long voxindex);
 #define MAXZSIZ 200
 #define MAXVOXELS 512
 #define MAXVOXMIPS 5
-long voxoff[MAXVOXELS][MAXVOXMIPS], voxlock[MAXVOXELS][MAXVOXMIPS];
-static long ggxinc[MAXXSIZ+1], ggyinc[MAXXSIZ+1];
-static long lowrecip[1024], nytooclose, nytoofar;
-static unsigned long distrecip[16384];
+
 #endif
 
 //static char moustat = 0;
 
-long transarea = 0, totalarea = 0, beforedrawrooms = 1;
-
-static long oxdimen = -1, oviewingrange = -1, oxyaspect = -1;
-
-static long curbrightness = 0;
 
 	//Textured Map variables
-static char globalpolytype;
-static short *dotp1[MAXYDIM], *dotp2[MAXYDIM];
 
-static unsigned char tempbuf[MAXWALLS];
 
-long ebpbak, espbak;
-long slopalookup[2048];
-
-static char permanentlock = 255;
-long artversion, mapversion;
-char *pic = NULL;
-char picsiz[MAXTILES], tilefilenum[MAXTILES];
-long lastageclock;
-long tilefileoffs[MAXTILES];
-
-static long artsize = 0;
-
-static short radarang[1280], radarang2[MAXXDIM];
-static unsigned short sqrtable[4096], shlookup[4096+256];
-char pow2char[8] = {1,2,4,8,16,32,64,128};
-long pow2long[32] =
-{
-	1L,2L,4L,8L,
-	16L,32L,64L,128L,
-	256L,512L,1024L,2048L,
-	4096L,8192L,16384L,32768L,
-	65536L,131072L,262144L,524288L,
-	1048576L,2097152L,4194304L,8388608L,
-	16777216L,33554432L,67108864L,134217728L,
-	268435456L,536870912L,1073741824L,2147483647L,
-};
-long reciptable[2048], fpuasm;
-
-char britable[16][64];
-char textfont[1024], smalltextfont[1024];
 
 static char kensmessage[128];
-// #pragma aux getkensmessagecrc =\
-	"xor eax, eax",\
-	"mov ecx, 32",\
-	"beg: mov edx, dword ptr [ebx+ecx*4-4]",\
-	"ror edx, cl",\
-	"adc eax, edx",\
-	"bswap eax",\
-	"loop short beg",\
-	parm [ebx]\
-	modify exact [eax ebx ecx edx]\
 
-static long xb1[MAXWALLSB], yb1[MAXWALLSB], xb2[MAXWALLSB], yb2[MAXWALLSB];
-static long rx1[MAXWALLSB], ry1[MAXWALLSB], rx2[MAXWALLSB], ry2[MAXWALLSB];
-static short p2[MAXWALLSB], thesector[MAXWALLSB], thewall[MAXWALLSB];
-
-static short bunchfirst[MAXWALLSB], bunchlast[MAXWALLSB];
-
-static short smost[MAXYSAVES], smostcnt;
-static short smoststart[MAXWALLSB];
-static char smostwalltype[MAXWALLSB];
-static long smostwall[MAXWALLSB], smostwallcnt = -1L;
-
-static short maskwall[MAXWALLSB], maskwallcnt;
-static long spritesx[MAXSPRITESONSCREEN];
-static long spritesy[MAXSPRITESONSCREEN+1];
-static long spritesz[MAXSPRITESONSCREEN];
-static spritetype *tspriteptr[MAXSPRITESONSCREEN];
-
-short umost[MAXXDIM], dmost[MAXXDIM];
-static short bakumost[MAXXDIM], bakdmost[MAXXDIM];
-short uplc[MAXXDIM], dplc[MAXXDIM];
-static short uwall[MAXXDIM], dwall[MAXXDIM];
-static long swplc[MAXXDIM], lplc[MAXXDIM];
-static long swall[MAXXDIM], lwall[MAXXDIM+4];
-long xdimen = -1, xdimenrecip, halfxdimen, xdimenscale, xdimscale;
-long wx1, wy1, wx2, wy2, ydimen;
-long viewoffset, frameoffset;
-
-static long rxi[8], ryi[8], rzi[8], rxi2[8], ryi2[8], rzi2[8];
-static long xsi[8], ysi[8], *horizlookup, *horizlookup2, horizycent;
-
-long globalposx, globalposy, globalposz, globalhoriz;
-short globalang, globalcursectnum;
-long globalpal, cosglobalang, singlobalang;
-long cosviewingrangeglobalang, sinviewingrangeglobalang;
-char *globalpalwritten;
-long globaluclip, globaldclip, globvis;
-long globalvisibility, globalhisibility, globalpisibility, globalcisibility;
-char globparaceilclip, globparaflorclip;
-
-long xyaspect, viewingrangerecip;
-
-long asm1, asm2, asm3, asm4;
-long vplce[4], vince[4], palookupoffse[4], bufplce[4];
-char globalxshift, globalyshift;
-long globalxpanning, globalypanning, globalshade;
-short globalpicnum, globalshiftval;
-long globalzd, globalbufplc, globalyscale, globalorientation;
-long globalx1, globaly1, globalx2, globaly2, globalx3, globaly3, globalzx;
-long globalx, globaly, globalz;
-
-static short sectorborder[256], sectorbordercnt;
-static char tablesloaded = 0;
-long pageoffset, ydim16, qsetmode = 0;
-long startposx, startposy, startposz;
-short startang, startsectnum;
-short pointhighlight, linehighlight, highlightcnt;
-static long lastx[MAXYDIM];
-char *transluc = NULL, paletteloaded = 0;
 
 #define FASTPALGRIDSIZ 8
-static long rdist[129], gdist[129], bdist[129];
-static char colhere[((FASTPALGRIDSIZ+2)*(FASTPALGRIDSIZ+2)*(FASTPALGRIDSIZ+2))>>3];
-static char colhead[(FASTPALGRIDSIZ+2)*(FASTPALGRIDSIZ+2)*(FASTPALGRIDSIZ+2)];
-static long colnext[256];
-static char coldist[8] = {0,1,2,3,4,3,2,1};
-static long colscan[27];
-
-static short clipnum, hitwalls[4];
-long hitscangoalx = (1<<29)-1, hitscangoaly = (1<<29)-1;
 
 typedef struct { long x1, y1, x2, y2; } linetype;
-static linetype clipit[MAXCLIPNUM];
-static short clipsectorlist[MAXCLIPNUM], clipsectnum;
-static short clipobjectval[MAXCLIPNUM];
 
 typedef struct
 {
@@ -211,45 +71,7 @@ typedef struct
 	char dapalnum, dastat, pagesleft;
 	long cx1, cy1, cx2, cy2;
 } permfifotype;
-static permfifotype permfifo[MAXPERMS];
-static long permhead = 0, permtail = 0;
-
-short numscans, numhits, numbunches;
-static short posfil, capturecount = 0, hitcnt;
-
-static char pcxheader[128] =
-{
-	0xa,0x5,0x1,0x8,0x0,0x0,0x0,0x0,0x3f,0x1,0xc7,0x0,
-	0x40,0x1,0xc8,0x0,0x0,0x0,0x0,0x8,0x8,0x8,0x10,0x10,
-	0x10,0x18,0x18,0x18,0x20,0x20,0x20,0x28,0x28,0x28,0x30,0x30,
-	0x30,0x38,0x38,0x38,0x40,0x40,0x40,0x48,0x48,0x48,0x50,0x50,
-	0x50,0x58,0x58,0x58,0x60,0x60,0x60,0x68,0x68,0x68,0x70,0x70,
-	0x70,0x78,0x78,0x78,0x0,0x1,0x40,0x1,0x0,0x0,0x0,0x0,
-	0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-	0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-	0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-	0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-	0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-};
-static char vgapal16[48] =
-{
-	00,00,00,00,00,42,00,42,00,00,42,42,42,00,00,42,00,42,42,21,00,42,42,42,
-	21,21,21,21,21,63,21,63,21,21,63,63,63,21,21,63,21,63,63,63,21,63,63,63,
-};
-
-short editstatus = 0;
-short searchit;
-long searchx = -1, searchy;                          //search input
-short searchsector, searchwall, searchstat;     //search output
-
-static char artfilename[20];
-static long numtilefiles, artfil = -1, artfilnum, artfilplc;
-
-static char inpreparemirror = 0;
-static long mirrorsx1, mirrorsy1, mirrorsx2, mirrorsy2;
-
-long totalclocklock;
-
+/*
 extern long mmxoverlay();
 // #pragma aux mmxoverlay modify [eax ebx ecx edx];
 extern long sethlinesizes(long,long,long);
@@ -334,116 +156,21 @@ extern long setupdrawslab(long,long);
 // #pragma aux setupdrawslab parm [eax][ebx];
 extern long drawslab(long,long,long,long,long,long);
 // #pragma aux drawslab parm [eax][ebx][ecx][edx][esi][edi];
-
+*/
 // Pure C version of nsqrtasm (requires lookup tables)
-uint32_t nsqrtasm(uint32_t value) {
-	uint32_t temp = value;
-	uint16_t shift_info;
-
-	if (value & 0xff000000) {
-		temp >>= 24;
-		shift_info = shlookup[temp + 4096]; // +4096 for offset 8192/2
-	} else {
-		temp >>= 12;
-		shift_info = shlookup[temp];
-	}
-
-	value >>= (shift_info & 0xff);
-	value = sqrtable[value];
-	value >>= (shift_info >> 8);
-
-	return value;
-}
+uint32_t nsqrtasm(uint32_t value);
 
 // Pure C version of msqrtasm
-uint32_t msqrtasm(uint32_t value) {
-	uint32_t result = 0x40000000;
-	uint32_t bit = 0x20000000;
-
-	while (bit != 0) {
-		if (value >= result) {
-			value -= result;
-			result += bit << 2;
-		}
-		result -= bit;
-		result >>= 1;
-		bit >>= 2;
-	}
-
-	if (value >= result) {
-		result++;
-	}
-
-	return result >> 1;
-}
+uint32_t msqrtasm(uint32_t value);
 
 // Assuming reciptable is defined elsewhere as:
 // extern int32_t reciptable[2048];
 
-int32_t krecipasm(int32_t input) {
-	union {
-		float f;
-		int32_t i;
-	} fpuasm;
+int32_t krecipasm(int32_t input);
 
-	// Convert integer to float and back to get IEEE 754 representation
-	fpuasm.f = (float)input;
+void setgotpic(uint32_t index);
 
-	// Extract the original input for further processing
-	int32_t eax = fpuasm.i;
-	int32_t ebx, ecx;
 
-	// add eax, eax + sbb ebx, ebx (sets ebx to -1 if carry, 0 otherwise)
-	uint64_t temp = (uint64_t)eax + (uint64_t)eax;
-	ebx = (temp > 0xFFFFFFFF) ? -1 : 0;
-	eax = (int32_t)temp;
-
-	// mov ecx, eax
-	ecx = eax;
-
-	// and eax, 0x007ff000 + shr eax, 10
-	eax = (eax & 0x007ff000) >> 10;
-
-	// sub ecx, 0x3f800000 + shr ecx, 23
-	ecx = (ecx - 0x3f800000) >> 23;
-
-	// mov eax, dword ptr reciptable[eax]
-	eax = reciptable[eax];
-
-	// sar eax, cl (arithmetic right shift)
-	eax = eax >> ecx;
-
-	// xor eax, ebx
-	eax = eax ^ ebx;
-
-	return eax;
-}
-
-void setgotpic(uint32_t index) {
-	if (walock[index] < 200) {
-		walock[index] = 199;
-	}
-
-	uint32_t byte_index = index >> 3;
-	uint32_t bit_mask = 1 << (index & 7);
-
-	gotpic[byte_index] |= bit_mask;
-}
-
-// #pragma aux getclipmask =\
-	"sar eax, 31",\
-	"add ebx, ebx",\
-	"adc eax, eax",\
-	"add ecx, ecx",\
-	"adc eax, eax",\
-	"add edx, edx",\
-	"adc eax, eax",\
-	"mov ebx, eax",\
-	"shl ebx, 4",\
-	"or al, 0xf0",\
-	"xor eax, ebx",\
-	parm [eax][ebx][ecx][edx]\
-	modify exact [eax ebx ecx edx]\
 
 void drawrooms(long daposx, long daposy, long daposz,
 			 short daang, long dahoriz, short dacursectnum);
@@ -492,14 +219,13 @@ void hline(long xr, long yp);
 
 void slowhline(long xr, long yp);
 
-long dommxoverlay = 1;
 void initengine();
 
 void uninitengine();
 
 void nextpage();
 
-char cachedebug = 0;
+
 void loadtile(short tilenume);
 
 long allocatepermanenttile(short tilenume, long xsiz, long ysiz);
@@ -524,7 +250,7 @@ long getangle(long xvect, long yvect);
 
 long ksqrt(long num);
 
-long krecip(long num);
+//long krecip(long num);
 
 void initksqrt();
 
@@ -600,7 +326,7 @@ short lastwall(short point);
 	clipnum++;                                            \
 }                                                        \
 
-long clipmoveboxtracenum = 3;
+
 long clipmove(long* x, long* y, long* z, short* sectnum,
 			  long xvect, long yvect,
 			  long walldist, long ceildist, long flordist, unsigned long cliptype);
@@ -1889,65 +1615,9 @@ uninstallbistereohandlers()
 	int386(0x31,&r,&r);
 }
 */
-long loopnumofsector(short sectnum, short wallnum);
+extern long loopnumofsector(short sectnum, short wallnum);
 
-setfirstwall(short sectnum, short newfirstwall)
-{
-	long i, j, k, numwallsofloop;
-	long startwall, endwall, danumwalls, dagoalloop;
-
-	startwall = sector[sectnum].wallptr;
-	danumwalls = sector[sectnum].wallnum;
-	endwall = startwall+danumwalls;
-	if ((newfirstwall < startwall) || (newfirstwall >= startwall+danumwalls)) return;
-	for(i=0;i<danumwalls;i++)
-		memcpy(&wall[i+numwalls],&wall[i+startwall],sizeof(walltype));
-
-	numwallsofloop = 0;
-	i = newfirstwall;
-	do
-	{
-		numwallsofloop++;
-		i = wall[i].point2;
-	} while (i != newfirstwall);
-
-		//Put correct loop at beginning
-	dagoalloop = loopnumofsector(sectnum,newfirstwall);
-	if (dagoalloop > 0)
-	{
-		j = 0;
-		while (loopnumofsector(sectnum,j+startwall) != dagoalloop) j++;
-		for(i=0;i<danumwalls;i++)
-		{
-			k = i+j; if (k >= danumwalls) k -= danumwalls;
-			memcpy(&wall[startwall+i],&wall[numwalls+k],sizeof(walltype));
-
-			wall[startwall+i].point2 += danumwalls-startwall-j;
-			if (wall[startwall+i].point2 >= danumwalls)
-				wall[startwall+i].point2 -= danumwalls;
-			wall[startwall+i].point2 += startwall;
-		}
-		newfirstwall += danumwalls-j;
-		if (newfirstwall >= startwall+danumwalls) newfirstwall -= danumwalls;
-	}
-
-	for(i=0;i<numwallsofloop;i++)
-		memcpy(&wall[i+numwalls],&wall[i+startwall],sizeof(walltype));
-	for(i=0;i<numwallsofloop;i++)
-	{
-		k = i+newfirstwall-startwall;
-		if (k >= numwallsofloop) k -= numwallsofloop;
-		memcpy(&wall[startwall+i],&wall[numwalls+k],sizeof(walltype));
-
-		wall[startwall+i].point2 += numwallsofloop-newfirstwall;
-		if (wall[startwall+i].point2 >= numwallsofloop)
-			wall[startwall+i].point2 -= numwallsofloop;
-		wall[startwall+i].point2 += startwall;
-	}
-
-	for(i=startwall;i<endwall;i++)
-		if (wall[i].nextwall >= 0) wall[wall[i].nextwall].nextwall = i;
-}
+void setfirstwall(short sectnum, short newfirstwall);
 
 
 #endif

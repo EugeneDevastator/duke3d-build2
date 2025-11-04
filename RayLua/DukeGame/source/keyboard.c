@@ -24,14 +24,12 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
 
-#include "duke3d.h"
+//#include "duke3d.h"
 #include "keyboard.h"
 
 #include "global.h"
 
 /* this should be a proper prototype included from a header file */
-extern int stricmp(const char *x, const char *y);
-
 /*
 =============================================================================
 
@@ -121,7 +119,7 @@ bool KB_KeyWaiting(  )
 
 char KB_Getch(  )
 {
-    int shifted;
+    //int shifted;
 
     while (!keyIsWaiting) { /*  _idle();pull the pud. */ }
 	keyIsWaiting = false;
@@ -297,30 +295,30 @@ kb_scancode KB_StringToScanCode( char * string )
 	name = keyname2scancode[i].name;
 	for(;name;++i, name=keyname2scancode[i].name)
 	{
-		if(!stricmp(name,string))
+		if(!strcmp(name,string))
 			break;
 	}
-	
+
 	return keyname2scancode[i].code;
 }
 
-void KB_TurnKeypadOn( void )
+void KB_TurnKeypadOn()
 {
 	STUBBED("KB_TurnKeypadOn");
 }
 
-void KB_TurnKeypadOff( void )
+void KB_TurnKeypadOff()
 {
 	STUBBED("KB_TurnKeypadOff");
 }
 
-bool KB_KeypadActive( void )
+bool KB_KeypadActive()
 {
 	STUBBED("KB_KeypadActive");
 	return false;
 }
 
-void KB_Startup( void )
+void KB_Startup()
 {
     memset(scancodeToASCII, 0xFF, sizeof (scancodeToASCII));
 
@@ -460,7 +458,7 @@ void KB_Startup( void )
 	KB_ClearKeysDown();
 }
 
-void KB_Shutdown( void )
+void KB_Shutdown()
 {
 	KB_ClearKeysDown();
 }

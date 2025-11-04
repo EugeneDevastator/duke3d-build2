@@ -23,7 +23,8 @@ Original Source: 1996 - Todd Replogle
 Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
-
+#ifndef NAMES_H
+#define NAMES_H
 #define SECTOREFFECTOR 1
 #define ACTIVATOR 2
 #define TOUCHPLATE 3
@@ -750,3 +751,4 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #define SIGN2 4912
 #define JURYGUY 4943
 
+#endif

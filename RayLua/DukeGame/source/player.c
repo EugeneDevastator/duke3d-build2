@@ -1,3 +1,12 @@
+#include <stdint.h>
+
+#include "build.h"
+#include "duke3d.h"
+
+#include "global.h"
+#include "soundefs.h"
+#include "sounds.h"
+#include "funct.h"
 //-------------------------------------------------------------------------
 /*
 Copyright (C) 1996, 2003 - 3D Realms Entertainment
@@ -25,19 +34,9 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 //-------------------------------------------------------------------------
 
 // Savage Baggage Masters
-#ifndef PLAYER_C
-#define PLAYER_C
-#include "duke3d.h"
-#include "engine.h"
-#include "mathutil.h"
-#include "pragmas.h"
-#include "global.h"
-#include "control.h"
-#include "sounds.h"
-#include <stdlib.h>
+char tempbuf[4096];
 int32_t turnheldtime; //MED
 int32_t lastcontroltime; //MED
-
 short fistsign;
 static long fdmatrix[12][12] ={
     //KNEE PIST SHOT CHAIN RPG PIPE SHRI DEVI WALL FREE HAND EXPA
@@ -4332,5 +4331,3 @@ void computergetinput(long snum, input *syn)
         syn->avel = min(max((((daang+1024-damyang)&2047)-1024)>>3,-127),127);
     }
 }
-
-#endif

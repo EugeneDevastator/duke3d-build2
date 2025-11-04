@@ -1,3 +1,6 @@
+#ifndef PRAGMAS_H
+#define PRAGMAS_H
+
 //-------------------------------------------------------------------------
 /*
 Copyright (C) 1996, 2003 - 3D Realms Entertainment
@@ -23,18 +26,10 @@ Original Source: 1996 - Todd Replogle, Ken Silverman
 Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
-#ifndef PRAGMAS_H
-#define PRAGMAS_H
+
 #include <stdint.h>
 static long dmval;
 
-/*
-#pragma aux sqr =\
-	"imul eax, eax",\
-   parm nomemory [eax]\
-	modify exact [eax]\
-   value [eax]
-*/
 
 
 static inline int32_t scale(int32_t a, int32_t b, int32_t c) {
@@ -198,26 +193,6 @@ TMULSCALE_FUNC(31)
 static inline int32_t tmulscale32(int32_t a, int32_t b, int32_t c, int32_t d, int32_t e, int32_t f) {
 	return tmulscale_base(a, b, c, d, e, f, 32);
 }
-/*
-#pragma aux boundmulscale =\
-	"imul ebx",\
-	"mov ebx, edx",\
-	"shrd eax, edx, cl",\
-	"sar edx, cl",\
-	"xor edx, eax",\
-	"js checkit",\
-	"xor edx, eax",\
-	"jz skipboundit",\
-	"cmp edx, 0xffffffff",\
-	"je skipboundit",\
-	"checkit:",\
-	"mov eax, ebx",\
-	"sar eax, 31",\
-	"xor eax, 0x7fffffff",\
-	"skipboundit:",\
-	parm nomemory [eax][ebx][ecx]\
-	modify exact [eax ebx edx]\
-*/
 
 // Generic divscale implementation using 64-bit arithmetic
 static inline int32_t divscale_generic(int32_t a, int32_t b, int scale) {
@@ -306,56 +281,7 @@ static inline int32_t divscale_dispatch(int32_t a, int32_t b, int scale) {
     if (scale < 0 || scale > 32) return divscale_generic(a, b, scale);
     return divscale_funcs[scale](a, b);
 }
-/*
-#pragma aux int5 =\
-	"int 0x5",\
 
-#pragma aux setvmode =\
-	"int 0x10",\
-	parm [eax]\
-
-#pragma aux setupmouse =\
-	"mov ax, 0",\
-	"int 33h",\
-	"and eax, 0x0000ffff",\
-	modify exact [eax]\
-
-#pragma aux readmousexy =\
-	"mov ax, 11d",\
-	"int 33h",\
-	"mov [esi], cx",\
-	"mov [edi], dx",\
-	parm [esi][edi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux readmousebstatus =\
-	"mov ax, 5d",\
-	"int 33h",\
-	"mov [esi], ax",\
-	parm [esi]\
-	modify exact [eax ebx ecx edx]\
-
-#pragma aux readpixel =\
-	"mov al, byte ptr [edi]",\
-	parm nomemory [edi]\
-	modify exact [eax]\
-
-#pragma aux drawpixel =\
-	"mov byte ptr [edi], al",\
-	parm [edi][eax]\
-	modify exact \
-
-#pragma aux drawpixels =\
-	"mov word ptr [edi], ax",\
-	parm [edi][eax]\
-	modify exact \
-
-#pragma aux drawpixelses =\
-	"mov dword ptr [edi], eax",\
-	parm [edi][eax]\
-	modify exact \
-
-*/
 // Clear buffer with 32-bit value
 static inline void clearbuf(void* dest, size_t count, uint32_t value) {
     uint32_t* ptr = (uint32_t*)dest;
@@ -364,7 +290,7 @@ static inline void clearbuf(void* dest, size_t count, uint32_t value) {
     }
 }
 
-// Clear buffer byte-wise with optimized alignment
+// Clear buffer int8_t-wise with optimized alignment
 static inline void clearbufbyte(void* dest, size_t count, uint8_t value) {
     uint8_t* ptr = (uint8_t*)dest;
 
@@ -383,7 +309,7 @@ static inline void clearbufbyte(void* dest, size_t count, uint8_t value) {
         return;
     }
 
-    // Align to 4-byte boundary
+    // Align to 4-int8_t boundary
     uint32_t value32 = value | (value << 8) | (value << 16) | (value << 24);
 
     while ((uintptr_t)ptr & 1) {
@@ -397,7 +323,7 @@ static inline void clearbufbyte(void* dest, size_t count, uint8_t value) {
         count -= 2;
     }
 
-    // Fill 4-byte chunks
+    // Fill 4-int8_t chunks
     while (count >= 4) {
         *(uint32_t*)ptr = value32;
         ptr += 4;
@@ -423,7 +349,7 @@ static inline void copybuf(const void* src, void* dest, size_t count) {
     }
 }
 
-// Copy buffer byte-wise with alignment optimization
+// Copy buffer int8_t-wise with alignment optimization
 static inline void copybufbyte(const void* src, void* dest, size_t count) {
     const uint8_t* src_ptr = (const uint8_t*)src;
     uint8_t* dest_ptr = (uint8_t*)dest;
@@ -456,7 +382,7 @@ static inline void copybufbyte(const void* src, void* dest, size_t count) {
         count -= 2;
     }
 
-    // Copy 4-byte chunks
+    // Copy 4-int8_t chunks
     while (count >= 4) {
         *(uint32_t*)dest_ptr = *(const uint32_t*)src_ptr;
         dest_ptr += 4;
@@ -475,18 +401,18 @@ static inline void copybufbyte(const void* src, void* dest, size_t count) {
     }
 }
 
-// Copy buffer in reverse with byte swapping
+// Copy buffer in reverse with int8_t swapping
 static inline void copybufreverse(const void* src, void* dest, size_t count) {
     const uint8_t* src_ptr = (const uint8_t*)src;
     uint8_t* dest_ptr = (uint8_t*)dest;
 
-    // Handle odd byte
+    // Handle odd int8_t
     if (count & 1) {
         *dest_ptr++ = *src_ptr--;
         count--;
     }
 
-    // Handle 2-byte chunks with byte swap
+    // Handle 2-int8_t chunks with int8_t swap
     if (count & 2) {
         uint16_t val = *(const uint16_t*)(src_ptr - 1);
         *(uint16_t*)dest_ptr = ((val & 0xFF) << 8) | ((val >> 8) & 0xFF);
@@ -495,7 +421,7 @@ static inline void copybufreverse(const void* src, void* dest, size_t count) {
         count -= 2;
     }
 
-    // Handle 4-byte chunks with full reversal
+    // Handle 4-int8_t chunks with full reversal
     while (count >= 4) {
         uint32_t val = *(const uint32_t*)(src_ptr - 3);
         // Byte swap 32-bit value
@@ -509,170 +435,7 @@ static inline void copybufreverse(const void* src, void* dest, size_t count) {
         count -= 4;
     }
 }
-/*
-#pragma aux qinterpolatedown16 =\
-	"mov ebx, ecx",\
-	"shr ecx, 1",\
-	"jz skipbegcalc",\
-	"begqcalc: lea edi, [edx+esi]",\
-	"sar edx, 16",\
-	"mov dword ptr [eax], edx",\
-	"lea edx, [edi+esi]",\
-	"sar edi, 16",\
-	"mov dword ptr [eax+4], edi",\
-	"add eax, 8",\
-	"dec ecx",\
-	"jnz begqcalc",\
-	"test ebx, 1",\
-	"jz skipbegqcalc2",\
-	"skipbegcalc: sar edx, 16",\
-	"mov dword ptr [eax], edx",\
-	"skipbegqcalc2:",\
-	parm [eax][ecx][edx][esi]\
-	modify exact [eax ebx ecx edx edi]\
 
-#pragma aux qinterpolatedown16short =\
-	"test ecx, ecx",\
-	"jz endit",\
-	"test al, 2",\
-	"jz skipalignit",\
-	"mov ebx, edx",\
-	"sar ebx, 16",\
-	"mov word ptr [eax], bx",\
-	"add edx, esi",\
-	"add eax, 2",\
-	"dec ecx",\
-	"jz endit",\
-	"skipalignit: sub ecx, 2",\
-	"jc finishit",\
-	"begqcalc: mov ebx, edx",\
-	"add edx, esi",\
-	"sar ebx, 16",\
-	"mov edi, edx",\
-	"and edi, 0ffff0000h",\
-	"add edx, esi",\
-	"add ebx, edi",\
-	"mov dword ptr [eax], ebx",\
-	"add eax, 4",\
-	"sub ecx, 2",\
-	"jnc begqcalc",\
-	"test cl, 1",\
-	"jz endit",\
-	"finishit: mov ebx, edx",\
-	"sar ebx, 16",\
-	"mov word ptr [eax], bx",\
-	"endit:",\
-	parm [eax][ecx][edx][esi]\
-	modify exact [eax ebx ecx edx edi]\
-
-#pragma aux setcolor16 =\
-	"mov dx, 0x3ce",\
-	"shl ax, 8",\
-	"out dx, ax",\
-	parm [eax]\
-	modify exact [eax edx]\
-
-#pragma aux vlin16first =\
-	"mov al, byte ptr [edi]",\
-	"mov eax, ecx",\
-	"shr ecx, 2",\
-	"begvlin16firsta: mov byte ptr [edi], al",\
-	"mov byte ptr [edi+80], al",\
-	"mov byte ptr [edi+160], al",\
-	"mov byte ptr [edi+240], al",\
-	"add edi, 320",\
-	"dec ecx",\
-	"jnz begvlin16firsta",\
-	"mov ecx, eax",\
-	"and ecx, 3",\
-	"jz skipfirst",\
-	"begvlin16firstb: mov byte ptr [edi], al",\
-	"add edi, 80",\
-	"dec ecx",\
-	"jnz begvlin16firstb",\
-	"skipfirst:",\
-	parm [edi][ecx]\
-	modify exact [eax ecx edi]\
-
-#pragma aux vlin16 =\
-	"mov esi, edi",\
-	"begvlin16: movsb",\
-	"add edi, 79",\
-	"add esi, 79",\
-	"dec ecx",\
-	"jnz begvlin16",\
-	parm [edi][ecx]\
-	modify exact [ecx esi edi]\
-
-#pragma aux drawpixel16 =\
-	"mov ecx, edi",\
-	"mov eax, 0x00008008",\
-	"mov dx, 0x3ce",\
-	"ror ah, cl",\
-	"shr edi, 3",\
-	"out dx, ax",\
-	"mov cl, byte ptr [edi+0xa0000]",\
-	"mov byte ptr [edi+0xa0000], al",\
-	parm [edi]\
-	modify exact [eax ecx edx edi]\
-
-#pragma aux fillscreen16 =\
-	"mov dx, 0x3ce",\
-	"shl ax, 8",\
-	"out dx, ax",\
-	"mov ax, 0xff08",\
-	"out dx, ax",\
-	"shr ecx, 5",\
-	"add edi, 0xa0000",\
-	"rep stosd",\
-	parm [edi][eax][ecx]\
-	modify exact [eax ecx edx edi]\
-
-#pragma aux koutp =\
-	"out dx, al",\
-	parm [edx][eax]\
-	modify exact \
-
-#pragma aux koutpw =\
-	"out dx, ax",\
-	parm [edx][eax]\
-	modify exact \
-
-#pragma aux kinp =\
-	"in al, dx",\
-	parm nomemory [edx]\
-	modify exact [eax]\
-
-#pragma aux mul3 =\
-	"lea eax, [eax+eax*2]",\
-	parm nomemory [eax]\
-
-#pragma aux mul5 =\
-	"lea eax, [eax+eax*4]",\
-	parm nomemory [eax]\
-
-#pragma aux mul9 =\
-	"lea eax, [eax+eax*8]",\
-	parm nomemory [eax]\
-
-	//returns eax/ebx, dmval = eax%edx;
-#pragma aux divmod =\
-	"xor edx, edx",\
-	"div ebx",\
-	"mov dmval, edx",\
-	parm [eax][ebx]\
-	modify exact [eax edx]\
-	value [eax]
-
-	//returns eax%ebx, dmval = eax/edx;
-#pragma aux moddiv =\
-	"xor edx, edx",\
-	"div ebx",\
-	"mov dmval, eax",\
-	parm [eax][ebx]\
-	modify exact [eax edx]\
-	value [edx]
-*/
 // Absolute value
 static inline int32_t klabs(long x) {
 	return (x < 0) ? -x : x;
@@ -702,221 +465,12 @@ static inline int32_t kmin(int32_t a, int32_t b) {
 static inline int32_t kmax(int32_t a, int32_t b) {
 	return (a > b) ? a : b;
 }
-/*
-#pragma aux limitrate =\
-	"mov dx, 0x3da",\
-	"wait1: in al, dx",\
-	"test al, 8",\
-	"jnz wait1",\
-	"wait2: in al, dx",\
-	"test al, 8",\
-	"jz wait2",\
-	modify exact [eax edx]\
 
-#pragma aux readtimer =\
-	"mov al, 0xd2",\
-	"out 0x43, al",\
-	"in al, 0x40",\
-	"shl eax, 24",\
-	"in al, 0x40",\
-	"rol eax, 8",\
-	modify [eax]\
-
-#pragma aux redblueblit = \
-	"xor ecx, ecx",\
-	"begblit: mov eax, dword ptr [edx+ecx]",\
-	"shl eax, 4",\
-	"add eax, dword ptr [ebx+ecx]",\
-	"mov dword ptr [ecx+0xa0000], eax",\
-	"add ecx, 4",\
-	"cmp ecx, esi",\
-	"jb begblit",\
-	parm [ebx][edx][esi]\
-	modify exact [eax ecx]\
-
-#pragma aux chainblit =\
-	"shr ecx, 1",\
-	"jnc prebeg",\
-	"mov al, byte ptr [esi+8]",\
-	"mov ah, byte ptr [esi+12]",\
-	"shl eax, 16",\
-	"mov al, byte ptr [esi]",\
-	"mov ah, byte ptr [esi+4]",\
-	"mov dword ptr [edi], eax",\
-	"add esi, 16",\
-	"add edi, 4",\
-	"test ecx, ecx",\
-	"prebeg: jz endit",\
-	"beg: mov al, byte ptr [esi+8]",\
-	"mov bl, byte ptr [esi+24]",\
-	"mov ah, byte ptr [esi+12]",\
-	"mov bh, byte ptr [esi+28]",\
-	"shl eax, 16",\
-	"add edi, 8",\
-	"shl ebx, 16",\
-	"mov al, byte ptr [esi]",\
-	"mov bl, byte ptr [esi+16]",\
-	"mov ah, byte ptr [esi+4]",\
-	"mov bh, byte ptr [esi+20]",\
-	"add esi, 32",\
-	"mov dword ptr [edi-8], eax",\
-	"dec ecx",\
-	"mov dword ptr [edi-4], ebx",\
-	"jnz beg",\
-	"endit:",\
-	parm [esi][edi][ecx]\
-	modify exact [eax ebx ecx esi edi]\
-
-#pragma aux swapchar =\
-	"mov cl, [eax]",\
-	"mov ch, [ebx]",\
-	"mov [ebx], cl",\
-	"mov [eax], ch",\
-	parm [eax][ebx]\
-	modify exact [ecx]\
-
-#pragma aux swapshort =\
-	"mov cx, [eax]",\
-	"mov dx, [ebx]",\
-	"mov [ebx], cx",\
-	"mov [eax], dx",\
-	parm [eax][ebx]\
-	modify exact [ecx edx]\
-
-#pragma aux swaplong =\
-	"mov ecx, [eax]",\
-	"mov edx, [ebx]",\
-	"mov [ebx], ecx",\
-	"mov [eax], edx",\
-	parm [eax][ebx]\
-	modify exact [ecx edx]\
-
-#pragma aux swapbuf4 =\
-	"begswap:",\
-	"mov esi, [eax]",\
-	"mov edi, [ebx]",\
-	"mov [ebx], esi",\
-	"mov [eax], edi",\
-	"add eax, 4",\
-	"add ebx, 4",\
-	"dec ecx",\
-	"jnz short begswap",\
-	parm [eax][ebx][ecx]\
-	modify exact [eax ebx ecx esi edi]\
-
-#pragma aux swap64bit =\
-	"mov ecx, [eax]",\
-	"mov edx, [ebx]",\
-	"mov [ebx], ecx",\
-	"mov ecx, [eax+4]",\
-	"mov [eax], edx",\
-	"mov edx, [ebx+4]",\
-	"mov [ebx+4], ecx",\
-	"mov [eax+4], edx",\
-	parm [eax][ebx]\
-	modify exact [ecx edx]\
-
-	//swapchar2(ptr1,ptr2,xsiz); is the same as:
-	//swapchar(ptr1,ptr2); swapchar(ptr1+1,ptr2+xsiz);
-#pragma aux swapchar2 =\
-	"add esi, ebx",\
-	"mov cx, [eax]",\
-	"mov dl, [ebx]",\
-	"mov [ebx], cl",\
-	"mov dh, [esi]",\
-	"mov [esi], ch",\
-	"mov [eax], dx",\
-	parm [eax][ebx][esi]\
-	modify exact [ecx edx esi]\
-*/
 //static long timeroffs1mhz;
 
-/*
-	//accutimeroffs = -8-(t1-t0);
-#pragma aux inittimer1mhz =\
-	"xor ebx, ebx",\
-	"xor ecx, ecx",\
-	"in al, 0x61",\
-	"or al, 1",\
-	"out 0x61, al",\
-	"mov al, 0x34",\
-	"out 0x43, al",\
-	"xor al, al",\
-	"out 0x40, al",\
-	"mov al, 0xb4",\
-	"out 0x43, al",\
-	"mov al, 240",\
-	"out 0x42, al",\
-	"xor al, al",\
-	"cli",\
-	"out 0x40, al",\
-	"dec al",\
-	"out 0x42, al",\
-	"mov al, 0x04",\
-	"out 0x43, al",\
-	"in al, 0x40",\
-	"mov bl, al",\
-	"in al, 0x40",\
-	"mov bh, al",\
-	"mov al, 0x84",\
-	"out 0x43, al",\
-	"in al, 0x42",\
-	"mov cl, al",\
-	"in al, 0x42",\
-	"sti",\
-	"mov ch, al",\
-	"sub ebx, ecx",\
-	"sub ebx, 8",\
-	"mov timeroffs1mhz, ebx",\
-	modify exact [eax ebx ecx]\
 
-#pragma aux uninittimer1mhz =\
-	"in al, 0x61",\
-	"and al, 252",\
-	"out 0x61, al",\
-	modify exact [eax]\
-
-	//t = ((ecx-ebx+timeroffs1mhz)&0xfff0)*4095 + ecx;
-#pragma aux gettime1mhz =\
-	"mov ebx, timeroffs1mhz",\
-	"xor ecx, ecx",\
-	"mov al, 0x04",\
-	"cli",\
-	"out 0x43, al",\
-	"in al, 0x40",\
-	"sub bl, al",\
-	"in al, 0x40",\
-	"sbb bh, al",\
-	"mov al, 0x84",\
-	"out 0x43, al",\
-	"in al, 0x42",\
-	"mov cl, al",\
-	"in al, 0x42",\
-	"sti",\
-	"mov ch, al",\
-	"add ebx, ecx",\
-	"and ebx, 0x0000fff0",\
-	"sub ecx, ebx",\
-	"shl ebx, 12",\
-	"add ebx, ecx",\
-	modify exact [eax ebx ecx]\
-	value [ebx]\
-
-	//eax = eax-ebx; if (eax < 0) eax += (1<<28) - (1<<16);
-#pragma aux deltatime1mhz =\
-	"sub eax, ebx",\
-	"jnc skipit",\
-	"add eax, 0x0fff0000",\
-	"skipit:",\
-	parm [ebx][eax]\
-
-#pragma aux printchrasm =\
-        "rep stosw",\
-        parm [edi][ecx][eax]\
-
-*/
 // Convert deltatime1mhz from assembly to C
-uint32_t deltatime1mhz(uint32_t start_time, uint32_t current_time) {
+inline uint32_t deltatime1mhz(uint32_t start_time, uint32_t current_time) {
 	uint32_t delta = current_time - start_time;
 
 	// Handle timer overflow (equivalent to jnc skipit + add)
@@ -928,7 +482,7 @@ uint32_t deltatime1mhz(uint32_t start_time, uint32_t current_time) {
 }
 
 // Convert printchrasm from assembly to C
-void printchrasm(uint16_t* dest, uint32_t count, uint16_t value) {
+inline void printchrasm(uint16_t* dest, uint32_t count, uint16_t value) {
 	for (uint32_t i = 0; i < count; i++) {
 		dest[i] = value;
 	}

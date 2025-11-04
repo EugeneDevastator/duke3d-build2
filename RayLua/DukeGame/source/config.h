@@ -2,10 +2,7 @@
 /*
 Copyright (C) 1996, 2003 - 3D Realms Entertainment
 
-This file is NOT part of Duke Nukem 3D version 1.5 - Atomic Edition
-However, it is either an older version of a file that is, or is
-some test code written during the development of Duke Nukem 3D.
-This file is provided purely for educational interest.
+This file is part of Duke Nukem 3D version 1.5 - Atomic Edition
 
 Duke Nukem 3D is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -22,15 +19,36 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
+Original Source: 1996 - Todd Replogle
 Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
 
-#include <stdint.h>
-extern long FindDistance2D(int32_t dx, int32_t dy);
-extern int32_t FindDistance3D(int32_t dx, int32_t dy, int32_t dz);
-//extern int32_t FindDistance3D_HP(int32_t dx, int32_t dy, int32_t dz);
-extern int32_t ArcTangentAppx(int32_t dx, int32_t dy);
+#ifndef _config_public
+#define _config_public
+#define SETUPNAMEPARM "SETUPFILE"
+#include "control.h"
+
+extern int32_t FXDevice;
+extern int32_t MusicDevice;
+extern int32_t FXVolume;
+extern int32_t MusicVolume;
+//extern fx_blaster_config BlasterConfig;
+extern int32_t NumVoices;
+extern int32_t NumChannels;
+extern int32_t NumBits;
+extern int32_t MixRate;
+extern int32_t MidiPort;
+extern int32_t ReverseStereo;
 
 
+extern int32_t MouseAiming;
+extern int32_t ScreenMode;
+extern int32_t ScreenWidth;
+extern int32_t ScreenHeight;
 
+void CONFIG_ReadSetup();
+void CONFIG_GetSetupFilename();
+void CONFIG_WriteSetup();
+
+#endif

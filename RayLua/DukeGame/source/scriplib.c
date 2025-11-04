@@ -67,7 +67,7 @@ static int script_numscriptsopen = 0;
 static scriptnode_t *script_headnode[MAX_SCRIPTS];
 
 /* Utility functions */
-static scriptnode_t *SCRIPT_constructnode (void)
+static scriptnode_t *SCRIPT_constructnode ()
 {
 	scriptnode_t *s;
 

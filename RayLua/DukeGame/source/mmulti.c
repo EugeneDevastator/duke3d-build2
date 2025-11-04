@@ -1,8 +1,23 @@
+
 //
 // Created by omnis on 11/3/2025.
 //
 #include "mmulti.h"
 
+#include "global.h"
+char syncstate = 0;
+
+static long incnt[MAXPLAYERS], outcntplc[MAXPLAYERS], outcntend[MAXPLAYERS];
+static char errorgotnum[MAXPLAYERS];
+static char errorfixnum[MAXPLAYERS];
+static char errorresendnum[MAXPLAYERS];
+static long timeoutcount = 60, resendagaincount = 4, lastsendtime[MAXPLAYERS];
+static char lastpacket[576], inlastpacket = 0;
+static short lastpacketfrom, lastpacketleng;
+long crctable[256];
+static short bakpacketptr[MAXPLAYERS][256], bakpacketlen[MAXPLAYERS][256];
+static char bakpacketbuf[BAKSIZ];
+static long bakpacketplc = 0;
 void  callcommit()
 {
     //if (gcom->intnum&0xff00)
@@ -104,6 +119,7 @@ int getoutputcirclesize()
 
 int setsocket(short newsocket)
 {
+    return 0;
 }
 
 void sendpacket(long other, char* bufptr, long messleng)
@@ -210,6 +226,147 @@ void dosendpackets(long other)
     if (rand()&SIMULATEERRORS)
 #endif
     { gcom->command = 1; callcommit(); }
+}
+
+short getpacket(short* other, char* bufptr)
+{
+    long i, j, messleng;
+    unsigned short dacrc;
+
+    if (numplayers < 2) return(0);
+
+    for(i=connecthead;i>=0;i=connectpoint2[i])
+        if (i != myconnectindex)
+        {
+            if (totalclock < lastsendtime[i]) lastsendtime[i] = totalclock;
+            if (totalclock > lastsendtime[i]+timeoutcount)
+            {
+#if (PRINTERRORS)
+                printf(" TimeOut!");
+#endif
+                errorgotnum[i] = errorfixnum[i]+1;
+
+                if ((outcntplc[i] == outcntend[i]) && (outcntplc[i] > 0))
+                { outcntplc[i]--; lastsendtime[i] = totalclock; }
+                else
+                    lastsendtime[i] += resendagaincount;
+                dosendpackets(i);
+                //}
+            }
+        }
+
+    if (inlastpacket != 0)
+    {
+        //2ND half of good double-packet
+        inlastpacket = 0;
+        *other = lastpacketfrom;
+        memcpy(bufptr,lastpacket,lastpacketleng);
+        return(lastpacketleng);
+    }
+
+    gcom->command = 2;
+    callcommit();
+
+#if (SHOWGETPACKETS)
+    if (gcom->other != -1)
+    {
+        printf(" Get(%ld): ",gcom->other);
+        for(i=0;i<gcom->numbytes;i++) printf("%2x ",gcom->buffer[i]);
+        printf("\n");
+    }
+#endif
+
+    if (gcom->other < 0) return(0);
+    *other = gcom->other-1;
+
+    messleng = gcom->numbytes;
+
+    dacrc = ((unsigned short)gcom->buffer[messleng-2]);
+    dacrc += (((unsigned short)gcom->buffer[messleng-1])<<8);
+    if (dacrc != getcrc(gcom->buffer,messleng-2))        //CRC check
+    {
+#if (PRINTERRORS)
+        printf("\n%ld CRC",gcom->buffer[0]);
+#endif
+        errorgotnum[*other] = errorfixnum[*other]+1;
+        return(0);
+    }
+
+    while ((errorfixnum[*other]&7) != ((gcom->buffer[1]>>3)&7))
+        errorfixnum[*other]++;
+
+    if ((gcom->buffer[1]&7) != (errorresendnum[*other]&7))
+    {
+        errorresendnum[*other]++;
+        outcntplc[*other] = (outcntend[*other]&0xffffff00)+gcom->buffer[2];
+        if (outcntplc[*other] > outcntend[*other]) outcntplc[*other] -= 256;
+    }
+
+    if (gcom->buffer[0] != (incnt[*other]&255))   //CNT check
+    {
+        if (((incnt[*other]-gcom->buffer[0])&255) > 32)
+        {
+            errorgotnum[*other] = errorfixnum[*other]+1;
+#if (PRINTERRORS)
+            printf("\n%ld CNT",gcom->buffer[0]);
+#endif
+        }
+#if (PRINTERRORS)
+		else
+        {
+            if (!(gcom->buffer[1]&128))           //single else double packet
+                printf("\n%ld cnt",gcom->buffer[0]);
+            else
+            {
+                if (((gcom->buffer[0]+1)&255) == (incnt[*other]&255))
+                {
+        //GOOD! Take second half of double packet
+#if (PRINTERRORS)
+        printf("\n%ld-%ld .� ",gcom->buffer[0],(gcom->buffer[0]+1)&255);
+#endif
+        messleng = ((long)gcom->buffer[3]) + (((long)gcom->buffer[4])<<8);
+        lastpacketleng = gcom->numbytes-7-messleng;
+        memcpy(bufptr,&gcom->buffer[messleng+5],lastpacketleng);
+        incnt[*other]++;
+        return(lastpacketleng);
+				}
+				else
+        printf("\n%ld-%ld cnt ",gcom->buffer[0],(gcom->buffer[0]+1)&255);
+			}
+		}
+#endif
+        return(0);
+    }
+
+    //PACKET WAS GOOD!
+    if ((gcom->buffer[1]&128) == 0)           //Single packet
+    {
+#if (PRINTERRORS)
+        printf("\n%ld �  ",gcom->buffer[0]);
+#endif
+
+        messleng = gcom->numbytes-5;
+
+        memcpy(bufptr,&gcom->buffer[3],messleng);
+
+        incnt[*other]++;
+        return(messleng);
+    }
+
+    //Double packet
+#if (PRINTERRORS)
+    printf("\n%ld-%ld �� ",gcom->buffer[0],(gcom->buffer[0]+1)&255);
+#endif
+
+    messleng = ((long)gcom->buffer[3]) + (((long)gcom->buffer[4])<<8);
+    lastpacketleng = gcom->numbytes-7-messleng;
+    inlastpacket = 1; lastpacketfrom = *other;
+
+    memcpy(bufptr,&gcom->buffer[5],messleng);
+    memcpy(lastpacket,&gcom->buffer[messleng+5],lastpacketleng);
+
+    incnt[*other] += 2;
+    return(messleng);
 }
 
 void flushpackets()

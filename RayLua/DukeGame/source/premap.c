@@ -23,17 +23,15 @@ Original Source: 1996 - Todd Replogle
 Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
-
+#include "build.h"
 #include "duke3d.h"
-#include "ENGINE.H"
+#include "funct.h"
 #include "music.h"
 #include "sounds.h"
-#include "game_text.c"
-#include "mmulti.h"
 
 extern char everyothertime;
 short which_palookup = 9;
-
+char tempbuf[4096];
 
 void tloadtile(short tilenume)
 {
@@ -161,7 +159,7 @@ void cachespritenum(short i)
             tloadtile(j);
 }
 
-void cachegoodsprites(void)
+void cachegoodsprites()
 {
     short i;
 
@@ -260,7 +258,7 @@ char getsound(unsigned short num)
     return 1;
 }
 
-void precachenecessarysounds(void)
+void precachenecessarysounds()
 {
     short i, j;
 
@@ -278,7 +276,7 @@ void precachenecessarysounds(void)
 }
 
 
-void cacheit(void)
+void cacheit()
 {
     short i,j;
 
@@ -321,7 +319,7 @@ void cacheit(void)
 
 }
 
-void docacheit(void)
+void docacheit()
 {
     long i,j;
 
@@ -340,7 +338,6 @@ void docacheit(void)
 }
 
 
-
 void xyzmirror(short i,short wn)
 {
     if (waloff[wn] == 0) loadtile(wn);
@@ -354,7 +351,7 @@ void xyzmirror(short i,short wn)
 	squarerotatetile(wn);
 }
 
-void vscrn(void)
+void vscrn()
 {
     return;//
      long i, j, ss, x1, x2, y1, y2;
@@ -1193,7 +1190,7 @@ void resetpspritevars(char g)
     }
 }
 
-void clearfrags(void)
+void clearfrags()
 {
     short i;
 
@@ -1202,7 +1199,7 @@ void clearfrags(void)
      clearbufbyte(&frags[0][0],(MAXPLAYERS*MAXPLAYERS)<<1,0L);
 }
 
-void resettimevars(void)
+void resettimevars()
 {
     vel = svel = angvel = horiz = 0;
 
@@ -1214,7 +1211,7 @@ void resettimevars(void)
 }
 
 
-void genspriteremaps(void)
+void genspriteremaps()
 {
     long j,fp;
     signed char look_pos;
@@ -1266,7 +1263,7 @@ void waitforeverybody()
     } while (i >= 0);
 }
 
-void dofrontscreens(void)
+void dofrontscreens()
 {
     long tincs,i,j;
 
@@ -1310,7 +1307,7 @@ void dofrontscreens(void)
     }
 }
 
-void clearfifo(void)
+void clearfifo()
 {
     syncvaltail = 0L;
     syncvaltottail = 0L;
@@ -1334,7 +1331,7 @@ void clearfifo(void)
 //    clearbufbyte(playerquitflag,MAXPLAYERS,0x01);
 }
 
-void resetmys(void)
+void resetmys()
 {
       myx = omyx = ps[myconnectindex].posx;
       myy = omyy = ps[myconnectindex].posy;

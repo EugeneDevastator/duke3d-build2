@@ -12,8 +12,6 @@
 #include "build.h"
 #include "pragmas.h"
 
-#pragma intrinsic(min);
-#pragma intrinsic(max);
 
 #define MAXMENUFILES 256
 #define updatecrc16(crc,dat) (crc = (((crc<<8)&65535)^crctable[((((unsigned short)crc)>>8)&65535)^dat]))
@@ -98,7 +96,7 @@ static char pskysearch[MAXSECTORS];
 short temppicnum, tempcstat, templotag, temphitag, tempextra;
 char tempshade, temppal, tempvis, tempxrepeat, tempyrepeat;
 char somethingintab = 255;
-static char boardfilename[13], oboardfilename[13];
+//static char boardfilename[13], oboardfilename[13];
 
 static long repeatcountx, repeatcounty;
 
@@ -129,19 +127,7 @@ static char scantoascwithshift[128] =
 	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 };
-/*
-#pragma aux fillscreen16 =\
-	"mov dx, 0x3ce",\
-	"shl ax, 8",\
-	"out dx, ax",\
-	"mov ax, 0xff08",\
-	"out dx, ax",\
-	"shr ecx, 5",\
-	"add edi, 0xa0000",\
-	"rep stosd",\
-	parm [edi][eax][ecx]\
-	modify [edx]\
-	*/
+
 /*
 main(short int argc,char **argv)
 {
@@ -1509,7 +1495,7 @@ editinput()
 				}
 				while ((wall[wallfind[0]].picnum == wall[searchwall].picnum) && (wallfind[0] != searchwall) && (cnt > 0));
 				*/
-
+/*
 				keystatus[0x34] = 0;
 			}
 			if (searchstat == 3)
@@ -1674,6 +1660,7 @@ editinput()
 				}
 				asksave = 1;
 			}*/
+/*
 			if (searchstat == 3)
 			{
 				if ((sprite[searchwall].cstat&2) == 0)
@@ -6159,7 +6146,7 @@ showsectordata(short sectnum)
 	printext16(200,48,11,-1,snotbuf,0);
 	sprintf(snotbuf,"(X,Y)pan: %d, %d",sector[sectnum].ceilingxpanning,sector[sectnum].ceilingypanning);
 	printext16(200,56,11,-1,snotbuf,0);
-	sprintf(snotbuf,"Shade byte: %d",sector[sectnum].ceilingshade);
+	sprintf(snotbuf,"Shade int8_t: %d",sector[sectnum].ceilingshade);
 	printext16(200,64,11,-1,snotbuf,0);
 	sprintf(snotbuf,"Z-coordinate: %ld",sector[sectnum].ceilingz);
 	printext16(200,72,11,-1,snotbuf,0);
@@ -6175,7 +6162,7 @@ showsectordata(short sectnum)
 	printext16(400,48,11,-1,snotbuf,0);
 	sprintf(snotbuf,"(X,Y)pan: %d, %d",sector[sectnum].floorxpanning,sector[sectnum].floorypanning);
 	printext16(400,56,11,-1,snotbuf,0);
-	sprintf(snotbuf,"Shade byte: %d",sector[sectnum].floorshade);
+	sprintf(snotbuf,"Shade int8_t: %d",sector[sectnum].floorshade);
 	printext16(400,64,11,-1,snotbuf,0);
 	sprintf(snotbuf,"Z-coordinate: %ld",sector[sectnum].floorz);
 	printext16(400,72,11,-1,snotbuf,0);

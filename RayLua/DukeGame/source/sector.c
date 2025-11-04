@@ -24,16 +24,21 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
 
+#include "sector.h"
+
+#include "build.h"
 #include "duke3d.h"
-#include "global.h"
+#include "funct.h"
 #include "music.h"
 #include "sounds.h"
+
+
 // code for sector interaction in game
 // PRIMITIVE
 
 
 char haltsoundhack;
-short callsound(short sn,short whatsprite)
+short callsound(short sn,short whatsprite){}/*
 {
     short i;
 
@@ -77,7 +82,7 @@ short callsound(short sn,short whatsprite)
         i = nextspritesect[i];
     }
     return -1;
-}
+}*/
 
 
 short check_activator_motion( short lotag )
@@ -154,7 +159,6 @@ char isadoorwall(short dapic)
     }
     return 0;
 }
-
 
 char isanunderoperator(short lotag)
 {
@@ -273,7 +277,7 @@ short findotherplayer(short p,long *d)
 
 
 
-void doanimations(void)
+void doanimations()
 {
 	long i, j, a, p, v, dasect;
 
@@ -383,7 +387,7 @@ long setanimation(short animsect,long *animptr, long thegoal, long thevel)
 
 
 
-void animatecamsprite(void)
+void animatecamsprite()
 {
     short i;
 
@@ -404,7 +408,7 @@ void animatecamsprite(void)
     else T1++;
 }
 
-void animatewalls(void)
+void animatewalls()
 {
     long i, j, p, t;
 
@@ -2377,7 +2381,7 @@ void checkhitsprite(short i,short sn)
 }
 
 
-void allignwarpelevators(void)
+void allignwarpelevators()
 {
     short i, j;
 
@@ -2404,7 +2408,6 @@ void allignwarpelevators(void)
         i = nextspritestat[i];
     }
 }
-
 
 
 
@@ -3223,6 +3226,3 @@ void checksectors(short snum)
         }
     }
 }
-
-
-

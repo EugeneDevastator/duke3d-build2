@@ -23,7 +23,8 @@ Original Source: 1996 - Todd Replogle
 Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
-
+#ifndef SOUNDEFS_H
+#define SOUNDEFS_H
 #define SECTOREFFECTOR 1
 #define ACTIVATOR 2
 #define TOUCHPLATE 3
@@ -1229,3 +1230,4 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #define SMACKIT                        394
 #define BELLSND                        395
 // MAXIMUM NUMBER OF SOUNDS: 450 ( 0-449 )
+#endif

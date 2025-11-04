@@ -1,16 +1,35 @@
 //
 // Created by omnis on 11/2/2025.
 //
-#include "engine.h"
 
-#define patchstatusbar(x1,y1,x2,y2)                                        \
-{                                                                          \
-rotatesprite(0,(200-34)<<16,65536L,0,BOTTOMSTATUSBAR,4,0,10+16+64+128, \
-scale(x1,xdim,320),scale(y1,ydim,200),                             \
-scale(x2,xdim,320)-1,scale(y2,ydim,200)-1);                        \
-}
+#include <ctype.h>
 
-void displayinventory(player_struct *p)
+#include "game_text.h"
+
+
+char tempbuf[4096];
+void displayfragbar(){}/*
+{
+    short i, j;
+
+    j = 0;
+
+    for(i=connecthead;i>=0;i=connectpoint2[i])
+        if(i > j) j = i;
+
+    rotatesprite(0,0,65600L,0,FRAGBAR,0,0,2+8+16+64+128,0,0,xdim-1,ydim-1);
+    if(j >= 4) rotatesprite(319,(8)<<16,65600L,0,FRAGBAR,0,0,10+16+64+128,0,0,xdim-1,ydim-1);
+    if(j >= 8) rotatesprite(319,(16)<<16,65600L,0,FRAGBAR,0,0,10+16+64+128,0,0,xdim-1,ydim-1);
+    if(j >= 12) rotatesprite(319,(24)<<16,65600L,0,FRAGBAR,0,0,10+16+64+128,0,0,xdim-1,ydim-1);
+
+    for(i=connecthead;i>=0;i=connectpoint2[i])
+    {
+        minitext(21+(73*(i&3)),2+((i&28)<<1),&ud.user_name[i][0],sprite[ps[i].i].pal,2+8+16+128);
+        sprintf(tempbuf,"%d",ps[i].frag-ps[i].fraggedself);
+        minitext(17+50+(73*(i&3)),2+((i&28)<<1),tempbuf,sprite[ps[i].i].pal,2+8+16+128);
+    }
+}*/
+void displayinventory(player_struct* p){}/*
 {
     short n, j, xoff, y;
 
@@ -45,19 +64,19 @@ void displayinventory(player_struct *p)
         {
             switch( n&(1<<j) )
             {
-                case   1:
+            case   1:
                 rotatesprite(xoff<<16,y<<16,65536L,0,FIRSTAID_ICON,0,0,2+16,windowx1,windowy1,windowx2,windowy2);break;
-                case   2:
+            case   2:
                 rotatesprite((xoff+1)<<16,y<<16,65536L,0,STEROIDS_ICON,0,0,2+16,windowx1,windowy1,windowx2,windowy2);break;
-                case   4:
+            case   4:
                 rotatesprite((xoff+2)<<16,y<<16,65536L,0,HOLODUKE_ICON,0,0,2+16,windowx1,windowy1,windowx2,windowy2);break;
-                case   8:
+            case   8:
                 rotatesprite(xoff<<16,y<<16,65536L,0,JETPACK_ICON,0,0,2+16,windowx1,windowy1,windowx2,windowy2);break;
-                case  16:
+            case  16:
                 rotatesprite(xoff<<16,y<<16,65536L,0,HEAT_ICON,0,0,2+16,windowx1,windowy1,windowx2,windowy2);break;
-                case  32:
+            case  32:
                 rotatesprite(xoff<<16,y<<16,65536L,0,AIRTANK_ICON,0,0,2+16,windowx1,windowy1,windowx2,windowy2);break;
-                case 64:
+            case 64:
                 rotatesprite(xoff<<16,(y-1)<<16,65536L,0,BOOT_ICON,0,0,2+16,windowx1,windowy1,windowx2,windowy2);break;
             }
 
@@ -69,33 +88,11 @@ void displayinventory(player_struct *p)
 
         j++;
     }
-}
+}*/
 
 
 
-void displayfragbar(void)
-{
-    short i, j;
-
-    j = 0;
-
-    for(i=connecthead;i>=0;i=connectpoint2[i])
-        if(i > j) j = i;
-
-    rotatesprite(0,0,65600L,0,FRAGBAR,0,0,2+8+16+64+128,0,0,xdim-1,ydim-1);
-    if(j >= 4) rotatesprite(319,(8)<<16,65600L,0,FRAGBAR,0,0,10+16+64+128,0,0,xdim-1,ydim-1);
-    if(j >= 8) rotatesprite(319,(16)<<16,65600L,0,FRAGBAR,0,0,10+16+64+128,0,0,xdim-1,ydim-1);
-    if(j >= 12) rotatesprite(319,(24)<<16,65600L,0,FRAGBAR,0,0,10+16+64+128,0,0,xdim-1,ydim-1);
-
-    for(i=connecthead;i>=0;i=connectpoint2[i])
-    {
-        minitext(21+(73*(i&3)),2+((i&28)<<1),&ud.user_name[i][0],sprite[ps[i].i].pal,2+8+16+128);
-        sprintf(tempbuf,"%d",ps[i].frag-ps[i].fraggedself);
-        minitext(17+50+(73*(i&3)),2+((i&28)<<1),tempbuf,sprite[ps[i].i].pal,2+8+16+128);
-    }
-}
-
-int gametext(int x,int y,char *t,char s,short dabits)
+int gametext(int x, int y, char* t, char s, short dabits)
 {
     short ac,newx;
     char centre, *oldt;
@@ -143,7 +140,7 @@ int gametext(int x,int y,char *t,char s,short dabits)
     return (x);
 }
 
-int gametextpal(int x,int y,char *t,char s,char p)
+int gametextpal(int x, int y, char* t, char s, char p)
 {
     short ac,newx;
     char centre, *oldt;
@@ -190,7 +187,7 @@ int gametextpal(int x,int y,char *t,char s,char p)
     return (x);
 }
 
-int gametextpart(int x,int y,char *t,char s,short p)
+int gametextpart(int x, int y, char* t, char s, short p)
 {
     short ac,newx, cnt;
     char centre, *oldt;
@@ -246,7 +243,7 @@ int gametextpart(int x,int y,char *t,char s,short p)
     return (x);
 }
 
-int minitext(int x,int y,char *t,char p,char sb)
+int minitext(int x, int y, char* t, char p, char sb)
 {
     short ac;
 
@@ -264,7 +261,7 @@ int minitext(int x,int y,char *t,char p,char sb)
     return (x);
 }
 
-int minitextshade(int x,int y,char *t,char s,char p,char sb)
+int minitextshade(int x, int y, char* t, char s, char p, char sb)
 {
     short ac;
 
@@ -281,7 +278,8 @@ int minitextshade(int x,int y,char *t,char s,char p,char sb)
     }
     return (x);
 }
-void weaponnum(short ind,long x,long y,long num1, long num2,char ha)
+
+void weaponnum(short ind, long x, long y, long num1, long num2, char ha)
 {
     char dabuf[80] = {0};
 
@@ -309,7 +307,7 @@ void weaponnum(short ind,long x,long y,long num1, long num2,char ha)
     else rotatesprite((x+13)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
 }
 
-void weaponnum999(char ind,long x,long y,long num1, long num2,char ha)
+void weaponnum999(char ind, long x, long y, long num1, long num2, char ha)
 {
     char dabuf[80] = {0};
 
@@ -345,124 +343,124 @@ void weaponnum999(char ind,long x,long y,long num1, long num2,char ha)
     }
     else rotatesprite((x+25)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
 }
-void weapon_amounts(player_struct *p,long x,long y,long u)
+
+void weapon_amounts(player_struct* p, long x, long y, long u){}/*
 {
-     int cw;
+    int cw;
 
-     cw = p->curr_weapon;
+    cw = p->curr_weapon;
 
-     if (u&4)
-     {
-         if (u != 0xffffffff) patchstatusbar(96,178,96+12,178+6);
-         weaponnum999(PISTOL_WEAPON,x,y,
+    if (u&4)
+    {
+        if (u != 0xffffffff) patchstatusbar(96,178,96+12,178+6);
+        weaponnum999(PISTOL_WEAPON,x,y,
                      p->ammo_amount[PISTOL_WEAPON],max_ammo_amount[PISTOL_WEAPON],
                      12-20*(cw == PISTOL_WEAPON) );
-     }
-     if (u&8)
-     {
-         if (u != 0xffffffff) patchstatusbar(96,184,96+12,184+6);
-         weaponnum999(SHOTGUN_WEAPON,x,y+6,
+    }
+    if (u&8)
+    {
+        if (u != 0xffffffff) patchstatusbar(96,184,96+12,184+6);
+        weaponnum999(SHOTGUN_WEAPON,x,y+6,
                      p->ammo_amount[SHOTGUN_WEAPON],max_ammo_amount[SHOTGUN_WEAPON],
                      (!p->gotweapon[SHOTGUN_WEAPON]*9)+12-18*
                      (cw == SHOTGUN_WEAPON) );
-     }
-     if (u&16)
-     {
-         if (u != 0xffffffff) patchstatusbar(96,190,96+12,190+6);
-         weaponnum999(CHAINGUN_WEAPON,x,y+12,
-                      p->ammo_amount[CHAINGUN_WEAPON],max_ammo_amount[CHAINGUN_WEAPON],
-                      (!p->gotweapon[CHAINGUN_WEAPON]*9)+12-18*
-                      (cw == CHAINGUN_WEAPON) );
-     }
-     if (u&32)
-     {
-         if (u != 0xffffffff) patchstatusbar(135,178,135+8,178+6);
-         weaponnum(RPG_WEAPON,x+39,y,
+    }
+    if (u&16)
+    {
+        if (u != 0xffffffff) patchstatusbar(96,190,96+12,190+6);
+        weaponnum999(CHAINGUN_WEAPON,x,y+12,
+                     p->ammo_amount[CHAINGUN_WEAPON],max_ammo_amount[CHAINGUN_WEAPON],
+                     (!p->gotweapon[CHAINGUN_WEAPON]*9)+12-18*
+                     (cw == CHAINGUN_WEAPON) );
+    }
+    if (u&32)
+    {
+        if (u != 0xffffffff) patchstatusbar(135,178,135+8,178+6);
+        weaponnum(RPG_WEAPON,x+39,y,
                   p->ammo_amount[RPG_WEAPON],max_ammo_amount[RPG_WEAPON],
                   (!p->gotweapon[RPG_WEAPON]*9)+12-19*
                   (cw == RPG_WEAPON) );
-     }
-     if (u&64)
-     {
-         if (u != 0xffffffff) patchstatusbar(135,184,135+8,184+6);
-         weaponnum(HANDBOMB_WEAPON,x+39,y+6,
-                     p->ammo_amount[HANDBOMB_WEAPON],max_ammo_amount[HANDBOMB_WEAPON],
-                     (((!p->ammo_amount[HANDBOMB_WEAPON])|(!p->gotweapon[HANDBOMB_WEAPON]))*9)+12-19*
-                     ((cw == HANDBOMB_WEAPON) || (cw == HANDREMOTE_WEAPON)));
-     }
-     if (u&128)
-     {
-         if (u != 0xffffffff) patchstatusbar(135,190,135+8,190+6);
+    }
+    if (u&64)
+    {
+        if (u != 0xffffffff) patchstatusbar(135,184,135+8,184+6);
+        weaponnum(HANDBOMB_WEAPON,x+39,y+6,
+                  p->ammo_amount[HANDBOMB_WEAPON],max_ammo_amount[HANDBOMB_WEAPON],
+                  (((!p->ammo_amount[HANDBOMB_WEAPON])|(!p->gotweapon[HANDBOMB_WEAPON]))*9)+12-19*
+                  ((cw == HANDBOMB_WEAPON) || (cw == HANDREMOTE_WEAPON)));
+    }
+    if (u&128)
+    {
+        if (u != 0xffffffff) patchstatusbar(135,190,135+8,190+6);
 
 #ifdef VOLUMEONE
-         orderweaponnum(SHRINKER_WEAPON,x+39,y+12,
-                     p->ammo_amount[SHRINKER_WEAPON],max_ammo_amount[SHRINKER_WEAPON],
-                     (!p->gotweapon[SHRINKER_WEAPON]*9)+12-18*
-                     (cw == SHRINKER_WEAPON) );
+        orderweaponnum(SHRINKER_WEAPON,x+39,y+12,
+                       p->ammo_amount[SHRINKER_WEAPON],max_ammo_amount[SHRINKER_WEAPON],
+                       (!p->gotweapon[SHRINKER_WEAPON]*9)+12-18*
+                       (cw == SHRINKER_WEAPON) );
 #else
-         if(p->subweapon&(1<<GROW_WEAPON))
-             weaponnum(SHRINKER_WEAPON,x+39,y+12,
-                 p->ammo_amount[GROW_WEAPON],max_ammo_amount[GROW_WEAPON],
-                 (!p->gotweapon[GROW_WEAPON]*9)+12-18*
-                 (cw == GROW_WEAPON) );
-         else
-             weaponnum(SHRINKER_WEAPON,x+39,y+12,
-                 p->ammo_amount[SHRINKER_WEAPON],max_ammo_amount[SHRINKER_WEAPON],
-                 (!p->gotweapon[SHRINKER_WEAPON]*9)+12-18*
-                 (cw == SHRINKER_WEAPON) );
+        if(p->subweapon&(1<<GROW_WEAPON))
+            weaponnum(SHRINKER_WEAPON,x+39,y+12,
+                      p->ammo_amount[GROW_WEAPON],max_ammo_amount[GROW_WEAPON],
+                      (!p->gotweapon[GROW_WEAPON]*9)+12-18*
+                      (cw == GROW_WEAPON) );
+        else
+            weaponnum(SHRINKER_WEAPON,x+39,y+12,
+                      p->ammo_amount[SHRINKER_WEAPON],max_ammo_amount[SHRINKER_WEAPON],
+                      (!p->gotweapon[SHRINKER_WEAPON]*9)+12-18*
+                      (cw == SHRINKER_WEAPON) );
 #endif
-     }
-     if (u&256)
-     {
-         if (u != 0xffffffff) patchstatusbar(166,178,166+8,178+6);
+    }
+    if (u&256)
+    {
+        if (u != 0xffffffff) patchstatusbar(166,178,166+8,178+6);
 
 #ifdef VOLUMEONE
         orderweaponnum(DEVISTATOR_WEAPON,x+70,y,
-                     p->ammo_amount[DEVISTATOR_WEAPON],max_ammo_amount[DEVISTATOR_WEAPON],
-                     (!p->gotweapon[DEVISTATOR_WEAPON]*9)+12-18*
-                     (cw == DEVISTATOR_WEAPON) );
+                       p->ammo_amount[DEVISTATOR_WEAPON],max_ammo_amount[DEVISTATOR_WEAPON],
+                       (!p->gotweapon[DEVISTATOR_WEAPON]*9)+12-18*
+                       (cw == DEVISTATOR_WEAPON) );
 #else
-         weaponnum(DEVISTATOR_WEAPON,x+70,y,
-                     p->ammo_amount[DEVISTATOR_WEAPON],max_ammo_amount[DEVISTATOR_WEAPON],
-                     (!p->gotweapon[DEVISTATOR_WEAPON]*9)+12-18*
-                     (cw == DEVISTATOR_WEAPON) );
+        weaponnum(DEVISTATOR_WEAPON,x+70,y,
+                  p->ammo_amount[DEVISTATOR_WEAPON],max_ammo_amount[DEVISTATOR_WEAPON],
+                  (!p->gotweapon[DEVISTATOR_WEAPON]*9)+12-18*
+                  (cw == DEVISTATOR_WEAPON) );
 #endif
-     }
-     if (u&512)
-     {
-         if (u != 0xffffffff) patchstatusbar(166,184,166+8,184+6);
+    }
+    if (u&512)
+    {
+        if (u != 0xffffffff) patchstatusbar(166,184,166+8,184+6);
 #ifdef VOLUMEONE
-         orderweaponnum(TRIPBOMB_WEAPON,x+70,y+6,
-                     p->ammo_amount[TRIPBOMB_WEAPON],max_ammo_amount[TRIPBOMB_WEAPON],
-                     (!p->gotweapon[TRIPBOMB_WEAPON]*9)+12-18*
-                     (cw == TRIPBOMB_WEAPON) );
+        orderweaponnum(TRIPBOMB_WEAPON,x+70,y+6,
+                       p->ammo_amount[TRIPBOMB_WEAPON],max_ammo_amount[TRIPBOMB_WEAPON],
+                       (!p->gotweapon[TRIPBOMB_WEAPON]*9)+12-18*
+                       (cw == TRIPBOMB_WEAPON) );
 #else
-         weaponnum(TRIPBOMB_WEAPON,x+70,y+6,
-                     p->ammo_amount[TRIPBOMB_WEAPON],max_ammo_amount[TRIPBOMB_WEAPON],
-                     (!p->gotweapon[TRIPBOMB_WEAPON]*9)+12-18*
-                     (cw == TRIPBOMB_WEAPON) );
+        weaponnum(TRIPBOMB_WEAPON,x+70,y+6,
+                  p->ammo_amount[TRIPBOMB_WEAPON],max_ammo_amount[TRIPBOMB_WEAPON],
+                  (!p->gotweapon[TRIPBOMB_WEAPON]*9)+12-18*
+                  (cw == TRIPBOMB_WEAPON) );
 #endif
-     }
+    }
 
-     if (u&65536L)
-     {
-         if (u != 0xffffffff) patchstatusbar(166,190,166+8,190+6);
+    if (u&65536L)
+    {
+        if (u != 0xffffffff) patchstatusbar(166,190,166+8,190+6);
 #ifdef VOLUMEONE
         orderweaponnum(-1,x+70,y+12,
-                     p->ammo_amount[FREEZE_WEAPON],max_ammo_amount[FREEZE_WEAPON],
-                     (!p->gotweapon[FREEZE_WEAPON]*9)+12-18*
-                     (cw == FREEZE_WEAPON) );
+                       p->ammo_amount[FREEZE_WEAPON],max_ammo_amount[FREEZE_WEAPON],
+                       (!p->gotweapon[FREEZE_WEAPON]*9)+12-18*
+                       (cw == FREEZE_WEAPON) );
 #else
-         weaponnum(-1,x+70,y+12,
-                     p->ammo_amount[FREEZE_WEAPON],max_ammo_amount[FREEZE_WEAPON],
-                     (!p->gotweapon[FREEZE_WEAPON]*9)+12-18*
-                     (cw == FREEZE_WEAPON) );
+        weaponnum(-1,x+70,y+12,
+                  p->ammo_amount[FREEZE_WEAPON],max_ammo_amount[FREEZE_WEAPON],
+                  (!p->gotweapon[FREEZE_WEAPON]*9)+12-18*
+                  (cw == FREEZE_WEAPON) );
 #endif
-     }
-}
+    }
+}*/
 
-
-void coolgaugetext(short snum)
+void coolgaugetext(short snum){}/*
 {
     return;//draws main menu
     player_struct *p;
@@ -483,7 +481,7 @@ void coolgaugetext(short snum)
     if ( ud.multimode > 1 && ud.coop != 1 )
     {
         if (pus)
-            { displayfragbar(); }
+        { displayfragbar(); }
         else
         {
             for(i=connecthead;i>=0;i=connectpoint2[i])
@@ -514,14 +512,14 @@ void coolgaugetext(short snum)
         {
             switch(p->inven_icon)
             {
-                case 1: i = FIRSTAID_ICON; break;
-                case 2: i = STEROIDS_ICON; break;
-                case 3: i = HOLODUKE_ICON; break;
-                case 4: i = JETPACK_ICON; break;
-                case 5: i = HEAT_ICON; break;
-                case 6: i = AIRTANK_ICON; break;
-                case 7: i = BOOT_ICON; break;
-                default: i = -1;
+            case 1: i = FIRSTAID_ICON; break;
+            case 2: i = STEROIDS_ICON; break;
+            case 3: i = HOLODUKE_ICON; break;
+            case 4: i = JETPACK_ICON; break;
+            case 5: i = HEAT_ICON; break;
+            case 6: i = AIRTANK_ICON; break;
+            case 7: i = BOOT_ICON; break;
+            default: i = -1;
             }
             if (i >= 0) rotatesprite((231-o)<<16,(200-21)<<16,65536L,0,i,0,0,10+16+permbit,0,0,xdim-1,ydim-1);
 
@@ -530,13 +528,13 @@ void coolgaugetext(short snum)
             j = 0x80000000;
             switch(p->inven_icon)
             {
-                case 1: i = p->firstaid_amount; break;
-                case 2: i = ((p->steroids_amount+3)>>2); break;
-                case 3: i = ((p->holoduke_amount+15)/24); j = p->holoduke_on; break;
-                case 4: i = ((p->jetpack_amount+15)>>4); j = p->jetpack_on; break;
-                case 5: i = p->heat_amount/12; j = p->heat_on; break;
-                case 6: i = ((p->scuba_amount+63)>>6); break;
-                case 7: i = (p->boot_amount>>1); break;
+            case 1: i = p->firstaid_amount; break;
+            case 2: i = ((p->steroids_amount+3)>>2); break;
+            case 3: i = ((p->holoduke_amount+15)/24); j = p->holoduke_on; break;
+            case 4: i = ((p->jetpack_amount+15)>>4); j = p->jetpack_on; break;
+            case 5: i = p->heat_amount/12; j = p->heat_on; break;
+            case 6: i = ((p->scuba_amount+63)>>6); break;
+            case 7: i = (p->boot_amount>>1); break;
             }
             invennum(284-30-o,200-6,(char)i,0,10+permbit);
             if (j > 0) minitext(288-30-o,180,"ON",0,10+16+permbit);
@@ -546,7 +544,7 @@ void coolgaugetext(short snum)
         return;
     }
 
-        //DRAW/UPDATE FULL STATUS BAR:
+    //DRAW/UPDATE FULL STATUS BAR:
 
     if (pus) { pus = 0; u = 0xffffffff; } else u = 0;
 
@@ -558,9 +556,9 @@ void coolgaugetext(short snum)
     for(i=1;i < 10;i++)
     {
         if (sbar.ammo_amount[i] != p->ammo_amount[i]) {
-        sbar.ammo_amount[i] = p->ammo_amount[i]; if(i < 9) u |= ((2<<i)+1024); else u |= 65536L+1024; }
+            sbar.ammo_amount[i] = p->ammo_amount[i]; if(i < 9) u |= ((2<<i)+1024); else u |= 65536L+1024; }
         if (sbar.gotweapon[i] != p->gotweapon[i]) { sbar.gotweapon[i] =
-        p->gotweapon[i]; if(i < 9 ) u |= ((2<<i)+1024); else u |= 65536L+1024; }
+            p->gotweapon[i]; if(i < 9 ) u |= ((2<<i)+1024); else u |= 65536L+1024; }
     }
     if (sbar.inven_icon != p->inven_icon) { sbar.inven_icon = p->inven_icon; u |= (2048+4096+8192); }
     if (sbar.holoduke_on != p->holoduke_on) { sbar.holoduke_on = p->holoduke_on; u |= (4096+8192); }
@@ -647,7 +645,7 @@ void coolgaugetext(short snum)
         if (u != 0xffffffff)
         {
             if (u&(2048+4096)) { patchstatusbar(231,179,265,197); }
-                              else { patchstatusbar(250,190,261,195); }
+            else { patchstatusbar(250,190,261,195); }
         }
         if (p->inven_icon)
         {
@@ -657,13 +655,13 @@ void coolgaugetext(short snum)
             {
                 switch(p->inven_icon)
                 {
-                    case 1: i = FIRSTAID_ICON; break;
-                    case 2: i = STEROIDS_ICON; break;
-                    case 3: i = HOLODUKE_ICON; break;
-                    case 4: i = JETPACK_ICON; break;
-                    case 5: i = HEAT_ICON; break;
-                    case 6: i = AIRTANK_ICON; break;
-                    case 7: i = BOOT_ICON; break;
+                case 1: i = FIRSTAID_ICON; break;
+                case 2: i = STEROIDS_ICON; break;
+                case 3: i = HOLODUKE_ICON; break;
+                case 4: i = JETPACK_ICON; break;
+                case 5: i = HEAT_ICON; break;
+                case 6: i = AIRTANK_ICON; break;
+                case 7: i = BOOT_ICON; break;
                 }
                 rotatesprite((231-o)<<16,(200-21)<<16,65536L,0,i,0,0,10+16+permbit,0,0,xdim-1,ydim-1);
                 minitext(292-30-o,190,"%",6,10+16+permbit);
@@ -673,10 +671,10 @@ void coolgaugetext(short snum)
             {
                 switch(p->inven_icon)
                 {
-                    case 3: j = p->holoduke_on; break;
-                    case 4: j = p->jetpack_on; break;
-                    case 5: j = p->heat_on; break;
-                    default: j = 0x80000000;
+                case 3: j = p->holoduke_on; break;
+                case 4: j = p->jetpack_on; break;
+                case 5: j = p->heat_on; break;
+                default: j = 0x80000000;
                 }
                 if (j > 0) minitext(288-30-o,180,"ON",0,10+16+permbit);
                 else if (j != 0x80000000) minitext(284-30-o,180,"OFF",2,10+16+permbit);
@@ -685,17 +683,16 @@ void coolgaugetext(short snum)
             {
                 switch(p->inven_icon)
                 {
-                    case 1: i = p->firstaid_amount; break;
-                    case 2: i = ((p->steroids_amount+3)>>2); break;
-                    case 3: i = ((p->holoduke_amount+15)/24); break;
-                    case 4: i = ((p->jetpack_amount+15)>>4); break;
-                    case 5: i = p->heat_amount/12; break;
-                    case 6: i = ((p->scuba_amount+63)>>6); break;
-                    case 7: i = (p->boot_amount>>1); break;
+                case 1: i = p->firstaid_amount; break;
+                case 2: i = ((p->steroids_amount+3)>>2); break;
+                case 3: i = ((p->holoduke_amount+15)/24); break;
+                case 4: i = ((p->jetpack_amount+15)>>4); break;
+                case 5: i = p->heat_amount/12; break;
+                case 6: i = ((p->scuba_amount+63)>>6); break;
+                case 7: i = (p->boot_amount>>1); break;
                 }
                 invennum(284-30-o,200-6,(char)i,0,10+permbit);
             }
         }
     }
-}
-
+}*/

@@ -23,17 +23,77 @@ Original Source: 1996 - Todd Replogle
 Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
-#include "engine.h"
-#include "duke3d.h"
+
+#include <ctype.h>
+
 #include "build.h"
-#include "game.c"    //spritettype
-#include "actors.c"  //SSp function
-#include "cache1d.c"  // kloading
+#include "cache1d.h"  // kloading
+#include "duke3d.h"
+#include "engine.h"
+#include "funct.h"
+#include "fx_man.h"    //spritettype
+#include "gamedefs.h"
+#include "global.h"
+#include "_functio.h"
 
-
-
+char * gamefunctions[] =
+{
+    "Move_Forward",
+    "Move_Backward",
+    "Turn_Left",
+    "Turn_Right",
+    "Strafe",
+    "Fire",
+    "Open",
+    "Run",
+    "AutoRun",
+    "Jump",
+    "Crouch",
+    "Look_Up",
+    "Look_Down",
+    "Look_Left",
+    "Look_Right",
+    "Strafe_Left",
+    "Strafe_Right",
+    "Aim_Up",
+    "Aim_Down",
+    "Weapon_1",
+    "Weapon_2",
+    "Weapon_3",
+    "Weapon_4",
+    "Weapon_5",
+    "Weapon_6",
+    "Weapon_7",
+    "Weapon_8",
+    "Weapon_9",
+    "Weapon_10",
+    "Inventory",
+    "Inventory_Left",
+    "Inventory_Right",
+    "Holo_Duke",
+    "Jetpack",
+    "NightVision",
+    "MedKit",
+    "TurnAround",
+    "SendMessage",
+    "Map",
+    "Shrink_Screen",
+    "Enlarge_Screen",
+    "Center_View",
+    "Holster_Weapon",
+    "Show_Opponents_Weapon",
+    "Map_Follow_Mode",
+    "See_Coop_View",
+    "Mouse_Aiming",
+    "Toggle_Crosshair",
+    "Steroids",
+    "Quick_Kick",
+    "Next_Weapon",
+    "Previous_Weapon",
+    };
+long numfreezebounces=3;
 extern short otherp;
-
+long dukefriction = 0xcc00;
 static short total_lines,line_number;
 static char checking_ifelse,parsing_state,*last_used_text;
 static short num_squigilly_brackets;
@@ -45,7 +105,7 @@ static long *g_t;
 static spritetype *g_sp;
 
 #define NUMKEYWORDS     112
-
+char tempbuf[4096];
 char *keyw[NUMKEYWORDS] =
 {
     "definelevelname",  // 0
@@ -289,7 +349,7 @@ void makeitfall(short i)
 }
 
 
-void getlabel(void)
+void getlabel()
 {
     long i;
 
@@ -308,7 +368,7 @@ void getlabel(void)
     label[(labelcnt<<6)+i] = 0;
 }
 
-long keyword(void)
+long keyword()
 {
     long i;
     char *temptextptr;
@@ -337,7 +397,7 @@ long keyword(void)
     return -1;
 }
 
-long transword(void) //Returns its code #
+long transword() //Returns its code #
 {
     long i, l;
 
@@ -386,7 +446,7 @@ long transword(void) //Returns its code #
     return -1;
 }
 
-void transnum(void)
+void transnum()
 {
     long i, l;
 
@@ -442,7 +502,7 @@ void transnum(void)
 }
 
 
-char parsecommand(void)
+char parsecommand()
 {
     long i, j, k, *tempscrptr;
     char done, *origtptr, temp_ifelse_check, tw;
@@ -1411,7 +1471,7 @@ char parsecommand(void)
 }
 
 
-void passone(void)
+void passone()
 {
 
     while( parsecommand() == 0 );
@@ -1428,7 +1488,7 @@ char *defaultcons[3] =
      {"DEFS.CON"}
 };
 
-void copydefaultcons(void)
+void copydefaultcons()
 {
     long i, fs, fpi;
     FILE *fpo;
@@ -1465,7 +1525,7 @@ void copydefaultcons(void)
     }
 }
 
-void loadefs(char *filenam,char *mptr)
+void loadefs(char *filenam, char *mptr)
 {
     int i;
     long fs,fp;
@@ -1967,7 +2027,7 @@ void parseifelse(long condition)
 
 // long *it = 0x00589a04;
 
-char parse(void)
+char parse()
 {
     long j, l, s;
 
@@ -2595,7 +2655,7 @@ char parse(void)
                 {
                     ps[g_p].gm = MODE_MENU;
                     //KB_ClearKeyDown(sc_Space);
-                    cmenu(15000);
+                    //cmenu(15000);
                 }
                 else ps[g_p].gm = MODE_RESTART;
                 killit_flag = 2;
@@ -3164,7 +3224,7 @@ void execute(short i,short p,long x)
 // Byte: Left, Left, Left, Left, Right.
 // ( Duke, loozing consc, trips on broken pipe, )
 // ( hits temple on edge of step. )
-// ( Rats everywhere, byte pushing them away with weapon,
+// ( Rats everywhere, int8_t pushing them away with weapon,
 // ( eventually covered, show usual groosums, Duke appears dead
 // ( Duke wakes up, in hospital, vision less blurry
 // ( Hospital doing brain scan, 1/3 cran. mass MISSING!

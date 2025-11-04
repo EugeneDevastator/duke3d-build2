@@ -78,17 +78,17 @@ int   FX_SetupCard( int SoundCard, fx_device *device );
 int   FX_GetBlasterSettings( fx_blaster_config *blaster );
 int   FX_SetupSoundBlaster( fx_blaster_config blaster, int *MaxVoices, int *MaxSampleBits, int *MaxChannels );
 int   FX_Init( int SoundCard, int numvoices, int numchannels, int samplebits, unsigned mixrate );
-int   FX_Shutdown( void );
+int   FX_Shutdown();
 int   FX_SetCallBack( void ( *function )( unsigned long ) );
 void  FX_SetVolume( int volume );
-int   FX_GetVolume( void );
+int   FX_GetVolume();
 
 void  FX_SetReverseStereo( int setting );
-int   FX_GetReverseStereo( void );
+int   FX_GetReverseStereo();
 void  FX_SetReverb( int reverb );
 void  FX_SetFastReverb( int reverb );
-int   FX_GetMaxReverbDelay( void );
-int   FX_GetReverbDelay( void );
+int   FX_GetMaxReverbDelay();
+int   FX_GetReverbDelay();
 void  FX_SetReverbDelay( int delay );
 
 int FX_VoiceAvailable( int priority );
@@ -118,14 +118,14 @@ int FX_PlayLoopedRaw( char *ptr, unsigned long length, char *loopstart,
        int right, int priority, unsigned long callbackval );
 int FX_Pan3D( int handle, int angle, int distance );
 int FX_SoundActive( int handle );
-int FX_SoundsPlaying( void );
-int FX_StopSound( int handle );
-int FX_StopAllSounds( void );
+int FX_SoundsPlaying();
+extern int FX_StopSound( int handle );
+int FX_StopAllSounds();
 int FX_StartDemandFeedPlayback( void ( *function )( char **ptr, unsigned long *length ),
        int rate, int pitchoffset, int vol, int left, int right,
        int priority, unsigned long callbackval );
 int  FX_StartRecording( int MixRate, void ( *function )( char *ptr, int length ) );
-void FX_StopRecord( void );
+void FX_StopRecord();
 void PlayMusic(char *_filename);
 
 // API addition: Call this when you reload/ditch a pile of sound effects.

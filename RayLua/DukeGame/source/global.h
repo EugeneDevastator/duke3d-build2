@@ -25,6 +25,8 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 //-------------------------------------------------------------------------
 #ifndef GLOBAL_H
 #define GLOBAL_H
+#pragma once
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,14 +34,15 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include <errno.h>
 #include <time.h>
 #include <io.h>
-
+#include "duke3d.h"
 #include "mmulti.h"
+
 #define MAX_PATH 256
 #ifdef __BEOS__
 #include <endian.h>
 #endif
 
-#include "duke3d.h"
+
 #define STUBBED(x) printf("STUB: %s in %s:%d\n", x, __FILE__, __LINE__)
 char *mymembuf;
 char MusicPtr[72000];
@@ -51,7 +54,7 @@ long gc,neartaghitdist,lockclock,max_player_health,max_armour_amount,max_ammo_am
 
 // long temp_data[MAXSPRITES][6];
 weaponhit hittype[MAXSPRITES];
-short spriteq[1024],spriteqloc,spriteqamount=64;
+short spriteq[1024],spriteqloc,spriteqamount;
 
 // ported build engine has this, too.  --ryan.
 #if PLATFORM_DOS
@@ -60,7 +63,7 @@ short moustat = 0;
 
 animwalltype animwall[MAXANIMWALLS];
 short numanimwalls;
-long *animateptr[MAXANIMATES], animategoal[MAXANIMATES], animatevel[MAXANIMATES], animatecnt;
+long *animateptr[MAXANIMATES], animategoal[MAXANIMATES], animatevel[MAXANIMATES];
 // long oanimateval[MAXANIMATES];
 short animatesect[MAXANIMATES];
 long msx[2048],msy[2048];
@@ -128,7 +131,7 @@ long movefifoend[MAXPLAYERS];
 
 char playerreadyflag[MAXPLAYERS],ready2send;
 char playerquitflag[MAXPLAYERS];
-long vel, svel, angvel, horiz, ototalclock, respawnactortime=768, respawnitemtime=768, groupfile;
+long vel, svel, angvel, horiz, ototalclock, respawnactortime, respawnitemtime, groupfile;
 
 long script[MAXSCRIPTSIZE],*scriptptr,*insptr,*labelcode,labelcnt;
 long *actorscrptr[MAXTILES],*parsing_actor;
@@ -144,23 +147,7 @@ char env_music_fn[4][13];
 char rtsplaying;
 
 
-short weaponsandammosprites[15] = {
-        RPGSPRITE,
-        CHAINGUNSPRITE,
-        DEVISTATORAMMO,
-        RPGAMMO,
-        RPGAMMO,
-        JETPACK,
-        SHIELD,
-        FIRSTAID,
-        STEROIDS,
-        RPGAMMO,
-        RPGAMMO,
-        RPGSPRITE,
-        RPGAMMO,
-        FREEZESPRITE,
-        FREEZEAMMO
-    };
+short weaponsandammosprites[15];
 
 long impact_damage;
 
@@ -174,104 +161,26 @@ signed char multiwho, multipos, multiwhat, multiflag;
 
 long fakemovefifoplc,movefifoplc;
 long myxbak[MOVEFIFOSIZ], myybak[MOVEFIFOSIZ], myzbak[MOVEFIFOSIZ];
-long myhorizbak[MOVEFIFOSIZ],dukefriction = 0xcc00, show_shareware;
+long myhorizbak[MOVEFIFOSIZ],dukefriction, show_shareware;
 
 short myangbak[MOVEFIFOSIZ];
-char myname[32],camerashitable,freezerhurtowner=0,lasermode;
+char myname[32],camerashitable,freezerhurtowner,lasermode;
 // CTW - MODIFICATION
 // char networkmode = 255, movesperpacket = 1,gamequit = 0,playonten = 0,everyothertime;
-char networkmode = 255, movesperpacket = 1,gamequit = 0,everyothertime;
+char networkmode, movesperpacket,gamequit,everyothertime;
 // CTW END - MODIFICATION
-long numfreezebounces=3,rpgblastradius,pipebombblastradius,tripbombblastradius,shrinkerblastradius,morterblastradius,bouncemineblastradius,seenineblastradius;
+long rpgblastradius,pipebombblastradius,tripbombblastradius,shrinkerblastradius,morterblastradius,bouncemineblastradius,seenineblastradius;
 STATUSBARTYPE sbar;
 
-long myminlag[MAXPLAYERS], mymaxlag, otherminlag, bufferjitter = 1;
-short numclouds,clouds[128],cloudx[128],cloudy[128];
-long cloudtotalclock = 0,totalmemory = 0;
-long numinterpolations = 0, startofdynamicinterpolations = 0;
-long oldipos[MAXINTERPOLATIONS];
-long bakipos[MAXINTERPOLATIONS];
-long *curipos[MAXINTERPOLATIONS];
 
+extern int _argc;
+extern char **_argv;
 static char ApogeePath[256];
 
 // portability stuff.  --ryan.
 // A good portion of this was ripped from GPL'd Rise of the Triad.  --ryan.
-
-void FixFilePath(char *filename)
-{
-#if defined(PLATFORM_UNIX) && !defined(DC)
-    char *ptr;
-    char *lastsep = filename;
-
-    if ((!filename) || (*filename == '\0'))
-        return;
-
-    if (access(filename, F_OK) == 0)  /* File exists; we're good to go. */
-        return;
-
-    for (ptr = filename; 1; ptr++)
-    {
-        if (*ptr == '\\')
-            *ptr = PATH_SEP_CHAR;
-
-        if ((*ptr == PATH_SEP_CHAR) || (*ptr == '\0'))
-        {
-            char pch = *ptr;
-            dirent *dent = NULL;
-            DIR *dir;
-
-            if ((pch == PATH_SEP_CHAR) && (*(ptr + 1) == '\0'))
-                return; /* eos is pathsep; we're done. */
-
-            if (lastsep == ptr)
-                continue;  /* absolute path; skip to next one. */
-
-            *ptr = '\0';
-            if (lastsep == filename) {
-                dir = opendir((*lastsep == PATH_SEP_CHAR) ? ROOTDIR : CURDIR);
-                
-                if (*lastsep == PATH_SEP_CHAR) {
-                    lastsep++;
-                }
-            } 
-            else
-            {
-                *lastsep = '\0';
-                dir = opendir(filename);
-                *lastsep = PATH_SEP_CHAR;
-                lastsep++;
-            }
-
-            if (dir == NULL)
-            {
-                *ptr = PATH_SEP_CHAR;
-                return;  /* maybe dir doesn't exist? give up. */
-            }
-
-            while ((dent = readdir(dir)) != NULL)
-            {
-                if (strcasecmp(dent->d_name, lastsep) == 0)
-                {
-                    /* found match; replace it. */
-                    strcpy(lastsep, dent->d_name);
-                    break;
-                }
-            }
-
-            closedir(dir);
-            *ptr = pch;
-            lastsep = ptr;
-
-            if (dent == NULL)
-                return;  /* no match. oh well. */
-
-            if (pch == '\0')  /* eos? */
-                return;
-        }
-    }
-#endif
-}
+void Error (char *error, ...);
+void FixFilePath(char *filename);
 
 
 #if PLATFORM_DOS
@@ -410,249 +319,13 @@ typedef struct
 } dosdate_t;
 
 #if !PLATFORM_DOS
-void _dos_getdate(dosdate_t *date)
-{
-	time_t curtime = time(NULL);
-	struct tm *tm;
-	
-	if (date == NULL) {
-		return;
-	}
-	
-	memset(date, 0, sizeof(dosdate_t));
-	
-	if ((tm = localtime(&curtime)) != NULL) {
-		date->day = tm->tm_mday;
-		date->month = tm->tm_mon + 1;
-		date->year = tm->tm_year + 1900;
-		date->dayofweek = tm->tm_wday + 1;
-	}
-}
+void _dos_getdate(dosdate_t *date);
 #endif
 
 
 long FindDistance2D(int ix, int iy);
 
-int FindDistance3D(int ix, int iy, int iz)
-{
-   int   t;
-
-   ix= abs(ix);           /* absolute values */
-   iy= abs(iy);
-   iz= abs(iz);
-
-   if (ix<iy)
-   {
-     int tmp = ix;
-     ix = iy;
-     iy = tmp;
-   }
-
-   if (ix<iz)
-   {
-     int tmp = ix;
-     ix = iz;
-     iz = tmp;
-   }
-
-   t = iy + iz;
-
-   return (ix - (ix>>4) + (t>>2) + (t>>3));
-}
-
-void Error (char *error, ...)
-{
-   char msgbuf[300];
-   va_list argptr;
-   static int inerror = 0;
-
-   inerror++;
-   if (inerror > 1)
-      return;
-
-   #if USE_SDL
-   SDL_Quit();
-   #endif
-
-   va_start (argptr, error);
-   vfprintf(stderr, error, argptr);
-   va_end (argptr);
-
-   exit (1);
-}
-
-
-int32_t SafeOpenAppend (const char *_filename, int32_t filetype)
-{
-	int	handle;
-    char filename[MAX_PATH];
-    strncpy(filename, _filename, sizeof (filename));
-    filename[sizeof (filename) - 1] = '\0';
-    FixFilePath(filename);
-
-	handle = open(filename,O_RDWR | O_BINARY | O_CREAT | O_APPEND
-	, S_IREAD | S_IWRITE);
-
-	if (handle == -1)
-		Error ("Error opening for append %s: %s",filename,strerror(errno));
-
-	return handle;
-}
-
-bool SafeFileExists ( const char * _filename )
-{
-    char filename[MAX_PATH];
-    strncpy(filename, _filename, sizeof (filename));
-    filename[sizeof (filename) - 1] = '\0';
-    FixFilePath(filename);
-
-    return(_access(filename, 0) == 0);
-}
-
-
-int32_t SafeOpenWrite (const char *_filename, int32_t filetype)
-{
-	int	handle;
-    char filename[MAX_PATH];
-    strncpy(filename, _filename, sizeof (filename));
-    filename[sizeof (filename) - 1] = '\0';
-    FixFilePath(filename);
-
-	handle = open(filename,O_RDWR | O_BINARY | O_CREAT | O_TRUNC
-	, S_IREAD | S_IWRITE);
-
-	if (handle == -1)
-		Error ("Error opening %s: %s",filename,strerror(errno));
-
-	return handle;
-}
-
-int32_t SafeOpenRead (const char *_filename, int32_t filetype)
-{
-	int	handle;
-    char filename[MAX_PATH];
-    strncpy(filename, _filename, sizeof (filename));
-    filename[sizeof (filename) - 1] = '\0';
-    FixFilePath(filename);
-
-	handle = open(filename,O_RDONLY | O_BINARY);
-
-	if (handle == -1)
-		Error ("Error opening %s: %s",filename,strerror(errno));
-
-	return handle;
-}
-
-
-void SafeRead (int32_t handle, void *buffer, int32_t count)
-{
-	unsigned	iocount;
-
-	while (count)
-	{
-		iocount = count > 0x8000 ? 0x8000 : count;
-		if (read (handle,buffer,iocount) != (int)iocount)
-			Error ("File read failure reading %ld bytes",count);
-		buffer = (void *)( (int8_t *)buffer + iocount );
-		count -= iocount;
-	}
-}
-
-
-void SafeWrite (int32_t handle, void *buffer, int32_t count)
-{
-	unsigned	iocount;
-
-	while (count)
-	{
-		iocount = count > 0x8000 ? 0x8000 : count;
-		if (write (handle,buffer,iocount) != (int)iocount)
-			Error ("File write failure writing %ld bytes",count);
-		buffer = (void *)( (int8_t *)buffer + iocount );
-		count -= iocount;
-	}
-}
-
-
-void GetPathFromEnvironment( char *fullname, int32_t length, const char *filename )
-{
-	snprintf(fullname, length-1, "%s%s", ApogeePath, filename);
-}
-
-void SafeWriteString (int handle, char * buffer)
-{
-	unsigned	iocount;
-
-   iocount=strlen(buffer);
-	if (write (handle,buffer,iocount) != (int)iocount)
-			Error ("File write string failure writing %s\n",buffer);
-}
-
-void *SafeMalloc (long size)
-{
-	void *ptr;
-
-#if 0
-   if (zonememorystarted==false)
-      Error("Called SafeMalloc without starting zone memory\n");
-	ptr = Z_Malloc (size,PU_STATIC,NULL);
-#else
-    ptr = malloc(size);
-#endif
-
-	if (!ptr)
-      Error ("SafeMalloc failure for %lu bytes",size);
-
-	return ptr;
-}
-
-void SafeRealloc (void **x, int32_t size)
-{
-	void *ptr;
-
-#if 0
-   if (zonememorystarted==false)
-      Error("Called SafeMalloc without starting zone memory\n");
-	ptr = Z_Malloc (size,PU_STATIC,NULL);
-#else
-    ptr = realloc(*x, size);
-#endif
-
-	if (!ptr)
-      Error ("SafeRealloc failure for %lu bytes",size);
-
-    *x = ptr;
-}
-
-void *SafeLevelMalloc (long size)
-{
-	void *ptr;
-
-#if 0
-   if (zonememorystarted==false)
-      Error("Called SafeLevelMalloc without starting zone memory\n");
-   ptr = Z_LevelMalloc (size,PU_STATIC,NULL);
-#else
-    ptr = malloc(size);
-#endif
-
-	if (!ptr)
-      Error ("SafeLevelMalloc failure for %lu bytes",size);
-
-	return ptr;
-}
-
-void SafeFree (void * ptr)
-{
-   if ( ptr == NULL )
-      Error ("SafeFree : Tried to free a freed pointer\n");
-
-#if 0
-	Z_Free (ptr);
-#else
-    free(ptr);
-#endif
-}
+int32_t FindDistance3D(int ix, int iy, int iz);
 
 
 #ifndef LITTLE_ENDIAN
@@ -685,50 +358,15 @@ void SafeFree (void * ptr)
 
 #endif
 
-#if (BYTE_ORDER == LITTLE_ENDIAN)
-#define KeepShort IntelShort
-#define SwapShort MotoShort
-#define KeepLong IntelLong
-#define SwapLong MotoLong
-#else
-#define KeepShort MotoShort
-#define SwapShort IntelShort
-#define KeepLong MotoLong
-#define SwapLong IntelLong
-#endif
 
-short	SwapShort (short l)
-{
-	int8_t	b1,b2;
+short SwapShort (short l);
 
-	b1 = l&255;
-	b2 = (l>>8)&255;
-
-	return (b1<<8) + b2;
-}
-
-short	KeepShort (short l)
-{
-	return l;
-}
+short	KeepShort (short l);
 
 
-long	SwapLong (long l)
-{
-	int8_t	b1,b2,b3,b4;
+long	SwapLong (long l);
 
-	b1 = l&255;
-	b2 = (l>>8)&255;
-	b3 = (l>>16)&255;
-	b4 = (l>>24)&255;
-
-	return ((long)b1<<24) + ((long)b2<<16) + ((long)b3<<8) + b4;
-}
-
-long	KeepLong (long l)
-{
-	return l;
-}
+long	KeepLong (long l);
 
 
 #undef KeepShort
@@ -736,31 +374,13 @@ long	KeepLong (long l)
 #undef SwapShort
 #undef SwapLong
 
-void SwapIntelLong(long *l)
-{
-    *l = IntelLong(*l);
-}
+void SwapIntelLong(long *l);
 
-void SwapIntelShort(short *s)
-{
-    *s = IntelShort(*s);
-}
+void SwapIntelShort(short *s);
 
-void SwapIntelLongArray(long *l, int num)
-{
-    while (num--) {
-        SwapIntelLong(l);
-        l++;
-    }
-}
+void SwapIntelLongArray(long *l, int num);
 
-void SwapIntelShortArray(short *s, int num)
-{
-    while (num--) {
-        SwapIntelShort(s);
-        s++;
-    }
-}
+void SwapIntelShortArray(short *s, int num);
 
 
 /* 
@@ -769,187 +389,20 @@ void SwapIntelShortArray(short *s, int num)
   Stolen for Duke3D, too.
  */
  
-#if PLATFORM_UNIX
-char *strlwr(char *s)
-{
-	char *p = s;
-	
-	while (*p) {
-		*p = tolower(*p);
-		p++;
-	}
-	
-	return s;
-}
-
-char *strupr(char *s)
-{
-	char *p = s;
-	
-	while (*p) {
-		*p = toupper(*p);
-		p++;
-	}
-	
-	return s;
-}
-	
-char *itoa(int value, char *string, int radix)
-{
-	switch (radix) {
-		case 10:
-			sprintf(string, "%d", value);
-			break;
-		case 16:
-			sprintf(string, "%x", value);
-			break;
-		default:
-			STUBBED("unknown radix");
-			break;
-	}
-	
-	return string;
-}
-
-char *ltoa(long value, char *string, int radix)
-{
-	switch (radix) {
-		case 10:
-			sprintf(string, "%ld", value);
-			break;
-		case 16:
-			sprintf(string, "%lx", value);
-			break;
-		default:
-			STUBBED("unknown radix");
-			break;
-	}
-	
-	return string;
-}
-
-char *ultoa(unsigned long value, char *string, int radix)
-{
-	switch (radix) {
-		case 10:
-			sprintf(string, "%lu", value);
-			break;
-		case 16:
-			sprintf(string, "%lux", value);
-			break;
-		default:
-			STUBBED("unknown radix");
-			break;
-	}
-	
-	return string;
-}
-#endif
 
 
-int setup_homedir (void)
-{
-#ifdef DC
-	strcpy (ApogeePath, "/ram/");
-#elif PLATFORM_UNIX
-    char *cfgpath;
-	int err;
-
-#if PLATFORM_MACOSX
-	snprintf (ApogeePath, sizeof (ApogeePath), "%s/Library/", getenv ("HOME"));
-	mkdir (ApogeePath, S_IRWXU);
-	snprintf (ApogeePath, sizeof (ApogeePath), "%s/Library/Application Support/", getenv ("HOME"));
-	mkdir (ApogeePath, S_IRWXU);
-	snprintf (ApogeePath, sizeof (ApogeePath), "%s/Library/Application Support/Duke Nukem 3D/", getenv ("HOME"));
-#else
-	snprintf (ApogeePath, sizeof (ApogeePath), "%s/.duke3d/", getenv ("HOME"));
-#endif
-
-	err = mkdir (ApogeePath, S_IRWXU);
-	if (err == -1 && errno != EEXIST)
-	{
-		fprintf (stderr, "Couldn't create preferences directory: %s\n", 
-				strerror (errno));
-		return -1;
-	}
-
-    /* copy duke3d.cfg to prefpath if it doesn't exist... */
-    cfgpath = alloca(strlen(ApogeePath) + strlen(SETUPFILENAME) + 1);
-    strcpy(cfgpath, ApogeePath);
-    strcat(cfgpath, SETUPFILENAME);
-    if (access(cfgpath, F_OK) == -1)
-    {
-        FILE *in = fopen(SETUPFILENAME, "rb");
-        if (in)
-        {
-            FILE *out = fopen(cfgpath, "wb");
-            if (out)
-            {
-                int ch;
-                while ((ch = fgetc(in)) != EOF)
-                    fputc(ch, out);
-                fclose(out);
-            }
-            fclose(in);
-        }
-    }
-#else
-    sprintf(ApogeePath, ".%s", PATH_SEP_STR);
-#endif
-
-	return 0;
-}
+int setup_homedir ();
 
 
-int dukescreencapture(char *str, char inverseit)
-{
-// dos screencapture wants string to be in NAME0000.pcx format.
-#ifndef PLATFORM_DOS
-    // respect prefpath...
-    const char *SCREENSHOTDIR = "Screenshots";
-    size_t slen = strlen(ApogeePath) + strlen(str) +
-                  strlen(PATH_SEP_STR) + strlen(SCREENSHOTDIR) + 1;
-    char *path = alloca(slen);
-    strcpy(path, ApogeePath);
-    strcat(path, SCREENSHOTDIR);
-	mkdir(path);//, S_IRWXU);
-    strcat(path, PATH_SEP_STR);
-    strcat(path, str);
-    str = path;
-#endif
-
-    return(screencapture(str, inverseit));
-}
+int dukescreencapture(char *str, char inverseit);
 
 
-char CheckParm (char *check)
-{
-    int i;
-    for (i = 1; i < _argc; i++)
-    {
-        if ((*(_argv[i]) == '-') && (strcmpi(_argv[i] + 1, check) == 0))
-            return(i);
-    }
-
-    return(0);
-}
+char CheckParm (char *check);
 
 
-static void (*shutdown_func)(void) = NULL;
+void RegisterShutdownFunction( void (* shutdown) () );
 
-void RegisterShutdownFunction( void (* shutdown) (void) )
-{
-    shutdown_func = shutdown;
-}
-
-void Shutdown()
-{
-    if (shutdown_func != NULL)
-    {
-        shutdown_func();
-        shutdown_func = NULL;
-    }
-}
+void Shutdown();
 
 
 /*

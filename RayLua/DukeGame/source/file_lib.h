@@ -27,9 +27,8 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #ifndef _file_lib_public
 #define _file_lib_public
 #include <stdbool.h>
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <stdint.h>
+
 
 enum
    {
@@ -49,42 +48,42 @@ enum
 // SafeOpenWrite - Opens a file for writing, returns handle
 //
 //==========================================================================
-int32_t SafeOpenWrite ( const char * filename, int32_t filetype );
+extern int32_t SafeOpenWrite ( const char * filename, int32_t filetype );
 
 //==========================================================================
 //
 // SafeOpenRead - Opens a file for reading, returns handle
 //
 //==========================================================================
-int32_t SafeOpenRead ( const char * filename, int32_t filetype );
+extern int32_t SafeOpenRead ( const char * filename, int32_t filetype );
 
 //==========================================================================
 //
 // SafeOpenAppend - Opens a file for appending, returns handle
 //
 //==========================================================================
-int32_t SafeOpenAppend ( const char * filename, int32_t filetype );
+extern int32_t SafeOpenAppend ( const char * filename, int32_t filetype );
 
 //==========================================================================
 //
 // SafeClose - Close a file denoted by the file handle
 //
 //==========================================================================
-void SafeClose ( int32_t handle );
+extern void SafeClose ( int32_t handle );
 
 //==========================================================================
 //
 // SafeFileExists - Checks for existence of file
 //
 //==========================================================================
-bool SafeFileExists ( const char * filename );
+extern bool SafeFileExists ( const char * filename );
 
 //==========================================================================
 //
 // SafeFileLength - Get length of a file pointed to by handle
 //
 //==========================================================================
-int32_t SafeFileLength ( int32_t handle );
+extern int32_t SafeFileLength ( int32_t handle );
 
 //==========================================================================
 //
@@ -97,7 +96,7 @@ int32_t SafeFileLength ( int32_t handle );
 //            count  - number of bytes to read
 //
 //==========================================================================
-void SafeRead (int32_t handle, void *buffer, int32_t count);
+extern void SafeRead (int32_t handle, void *buffer, int32_t count);
 
 //==========================================================================
 //
@@ -110,7 +109,7 @@ void SafeRead (int32_t handle, void *buffer, int32_t count);
 //             count  - number of bytes to write
 //
 //==========================================================================
-void SafeWrite (int32_t handle, void *buffer, int32_t count);
+extern void SafeWrite (int32_t handle, void *buffer, int32_t count);
 
 //==========================================================================
 //
@@ -123,7 +122,7 @@ void SafeWrite (int32_t handle, void *buffer, int32_t count);
 //            returns number of bytes read
 //
 //==========================================================================
-int32_t LoadFile ( const char * filename, void ** bufferptr );
+extern int32_t LoadFile ( const char * filename, void ** bufferptr );
 
 //==========================================================================
 //
@@ -136,7 +135,7 @@ int32_t LoadFile ( const char * filename, void ** bufferptr );
 //            count - number of bytes to write
 //
 //==========================================================================
-void SaveFile ( const char * filename, void * bufferptr, int32_t count );
+extern void SaveFile ( const char * filename, void * bufferptr, int32_t count );
 
 //==========================================================================
 //
@@ -150,7 +149,7 @@ void SaveFile ( const char * filename, void * bufferptr, int32_t count );
 //                          filename - standard filename
 //
 //==========================================================================
-void GetPathFromEnvironment( char *fullname, int32_t length, const char *filename );
+extern void GetPathFromEnvironment( char *fullname, int32_t length, const char *filename );
 
 //==========================================================================
 //
@@ -161,7 +160,7 @@ void GetPathFromEnvironment( char *fullname, int32_t length, const char *filenam
 //                    extension - default extension should include '.'
 //
 //==========================================================================
-void DefaultExtension (char *path, const char *extension);
+extern void DefaultExtension (char *path, const char *extension);
 
 //==========================================================================
 //
@@ -172,7 +171,7 @@ void DefaultExtension (char *path, const char *extension);
 //               extension - default path
 //
 //==========================================================================
-void DefaultPath (char *path, const char *basepath);
+extern void DefaultPath (char *path, const char *basepath);
 
 //==========================================================================
 //
@@ -183,7 +182,7 @@ void DefaultPath (char *path, const char *basepath);
 //                   dest - where the file base name will be placed
 //
 //==========================================================================
-void ExtractFileBase (char *path, char *dest);
+extern void ExtractFileBase (char *path, char *dest);
 
 //==========================================================================
 //
@@ -192,7 +191,7 @@ void ExtractFileBase (char *path, char *dest);
 //                returns false otherwise
 //
 //==========================================================================
-bool GetExtension( char *filename, char *extension );
+extern bool GetExtension( char *filename, char *extension );
 
 //==========================================================================
 //
@@ -200,7 +199,7 @@ bool GetExtension( char *filename, char *extension );
 // 					space is left at the end of the string to hold an extension.
 //
 //==========================================================================
-void SetExtension( char *filename, const char *extension );
+extern void SetExtension( char *filename, const char *extension );
 
 #ifdef __MSDOS__
 //******************************************************************************
@@ -234,7 +233,7 @@ char * GetPath (char * path, char *dir);
 //    FALSE - If unsuccessful.
 //
 //******************************************************************************
-boolean ChangeDirectory (char * path);
+bool ChangeDirectory (char * path);
 
 //******************************************************************************
 //
@@ -251,7 +250,7 @@ boolean ChangeDirectory (char * path);
 //    FALSE - If drive change unsuccessful.
 //
 //******************************************************************************
-boolean ChangeDrive (char *drive);
+bool ChangeDrive (char *drive);
 
 #endif
 

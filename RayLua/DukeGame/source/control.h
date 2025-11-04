@@ -32,10 +32,6 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #ifndef _control_public
 #define _control_public
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 
 //***************************************************************************
 //
@@ -64,6 +60,10 @@ extern "C" {
     ( !BUTTON( x ) && BUTTONHELD( x ) )
 #define BUTTONSTATECHANGED(x) \
     ( BUTTON( x ) != BUTTONHELD( x ) )
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "keyboard.h"
 
 //***************************************************************************
 //
@@ -78,16 +78,7 @@ typedef enum
    axis_right
    } axisdirection;
 
-typedef enum
-   {
-   analog_turning=0,
-   analog_strafing=1,
-   analog_lookingupanddown=2,
-   analog_elevation=3,
-   analog_rolling=4,
-   analog_moving=5,
-   analog_maxtype
-   } analogcontrol;
+
 
 typedef enum
    {
@@ -168,30 +159,30 @@ void CONTROL_MapJoyButton(int32_t whichfunction, int32_t whichbutton, bool doubl
 void CONTROL_MapJoyHat(int32_t whichfunction, int32_t whichhat, int32_t whichvalue); 
 void CONTROL_DefineFlag( int32_t which, bool toggle );
 bool CONTROL_FlagActive( int32_t which );
-void CONTROL_ClearAssignments( void );
+void CONTROL_ClearAssignments();
 void CONTROL_GetUserInput( UserInput *info );
 void CONTROL_GetInput( ControlInfo *info );
 void CONTROL_ClearButton( int32_t whichbutton );
 void CONTROL_ClearUserInput( UserInput *info );
-void CONTROL_WaitRelease( void );
-void CONTROL_Ack( void );
+void CONTROL_WaitRelease();
+void CONTROL_Ack();
 void CONTROL_CenterJoystick
    (
-   void ( *CenterCenter )( void ),
-   void ( *UpperLeft )( void ),
-   void ( *LowerRight )( void ),
-   void ( *CenterThrottle )( void ),
-   void ( *CenterRudder )( void )
+   void ( *CenterCenter )(),
+   void ( *UpperLeft )(),
+   void ( *LowerRight )(),
+   void ( *CenterThrottle )(),
+   void ( *CenterRudder )()
    );
-int32_t CONTROL_GetMouseSensitivity( void );
+int32_t CONTROL_GetMouseSensitivity();
 void CONTROL_SetMouseSensitivity( int32_t newsensitivity );
 void CONTROL_Startup
    (
    controltype which,
-   int32_t ( *TimeFunction )( void ),
+   int32_t ( *TimeFunction )(),
    int32_t ticspersecond
    );
-void CONTROL_Shutdown( void );
+void CONTROL_Shutdown();
 
 void CONTROL_MapAnalogAxis
    (
@@ -221,13 +212,12 @@ int32_t CONTROL_FilterDeadzone
    int32_t axisdeadzone
    );
 int32_t CONTROL_GetFilteredAxisValue(int32_t axis);
-void CONTROL_PrintAxes( void );
-
+void CONTROL_PrintAxes();
+   void    MOUSE_GetDelta( int32_t* x, int32_t* y  );
 void CONTROL_UpdateKeyboardState(int key, int pressed);
-
+void    JOYSTICK_UpdateHats();
 const char *CONTROL_GetMappingName(int32_t which);
 
-#ifdef __cplusplus
-};
+extern controltype ControllerType;
 #endif
-#endif
+

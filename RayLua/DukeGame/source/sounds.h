@@ -33,28 +33,50 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #ifndef _sounds_public_
 #define _sounds_public_
+#include "funct.h"
 
-// extern int32_t FXDevice;
-// extern int32_t MusicDevice;
-// extern int32_t FXVolume;
-// extern int32_t MusicVolume;
-extern fx_blaster_config BlasterConfig;
-// extern int32_t NumVoices;
-// extern int32_t NumChannels;
-// extern int32_t NumBits;
-// extern int32_t MixRate;
-// extern int32_t MidiPort;
-// extern int32_t ReverseStereo;
 
-void SoundStartup( void );
-void SoundShutdown( void );
-void MusicStartup( void );
-void MusicShutdown( void );
+//#line "sounds.c" 25
+extern void SoundStartup();
+//#line "sounds.c" 95
+extern void SoundShutdown();
+//#line "sounds.c" 118
+extern void MusicStartup();
+//#line "sounds.c" 166
+extern void MusicShutdown();
+//#line "sounds.c" 181
+extern int USRHOOKS_GetMem(char **ptr,unsigned long size);
+//#line "sounds.c" 192
+extern int USRHOOKS_FreeMem(char *ptr);
+//#line "sounds.c" 200
+extern void intomenusounds();
+//#line "sounds.c" 227
+extern void playmusic(char *fn);
+//#line "sounds.c" 251
+extern char loadsound(unsigned short num);
+//#line "sounds.c" 277
+extern int xyzsound(short num,short i,long x,long y,long z);
+//#line "sounds.c" 407
+extern void sound(short num);
+//#line "sounds.c" 463
+extern int spritesound(unsigned short num,short i);
+//#line "sounds.c" 469
+extern void stopsound(short num);
+//#line "sounds.c" 478
+extern void stopenvsound(short num,short i);
+//#line "sounds.c" 494
+extern void pan3dsound();
+//#line "sounds.c" 571
+
+
+
+
 
 /* sounds.c */
 void clearsoundlocks();
 
 /* dunno where this came from; I added it. --ryan. */
 void testcallback(unsigned long num);
+
 
 #endif

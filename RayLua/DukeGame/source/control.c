@@ -31,13 +31,14 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include <stdint.h>
 
 #include "gamedefs.h"
-#include "control.h"
 
 #include <string.h>
 
 #include "config.h"
 #include "global.h"
 #include "keyboard.h"
+
+controltype ControllerType = controltype_keyboardandmouse;
 //***************************************************************************
 // FIXME  These will need to be removed once the buildengine directory
 //        structure is figured out and we move to unified SDL codebase
@@ -260,7 +261,7 @@ void CONTROL_GetInput( ControlInfo *info )
        default:
                {
             // If mouse aim is active
-                       if( myaimmode )
+                       if( 0 )//)myaimmode )
                        {  
                                info->dpitch = my * sens*2;
             }

@@ -27,23 +27,15 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #ifndef DUKE3DMAIN_H
 #define DUKE3DMAIN_H
 
-#include <dos.h>
-#include <malloc.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+
 //#include <bios.h>
-#include <ctype.h>
-#include <fcntl.H>
-#include <io.h>
-#include <stdint.h>
-#include <time.h>
-#include "mmulti.h"
+
 #include "build.h"
 #include "engine.h"
 #include "function.h"
+#include "mmulti.h"
 #include "pragmas.h"
-
+#include "funct.h"
 #define VOLUMEALL
 #define PLUTOPAK
 // #define VOLUMEONE
@@ -101,9 +93,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #define NUM_SOUNDS 450
 
-int sgn(int value) {
-    return (value > 0) - (value < 0);
-}
+int sgn(int value);
 
 #define    ALT_IS_PRESSED ( KB_KeyPressed( sc_RightAlt ) || KB_KeyPressed( sc_LeftAlt ) )
 #define    SHIFTS_IS_PRESSED ( KB_KeyPressed( sc_RightShift ) || KB_KeyPressed( sc_LeftShift ) )
@@ -190,7 +180,7 @@ int sgn(int value) {
 #define TRAND krand()
 
 
-#define MAX_WEAPONS  12
+
 
 #define KNEE_WEAPON          0
 #define PISTOL_WEAPON        1
@@ -247,12 +237,7 @@ enum USRHOOKS_Errors
    USRHOOKS_Ok      = 0
    };
 
-typedef struct
-{
-    signed char avel, horz;
-    short fvel, svel;
-    unsigned long bits;
-} input;
+
 
 extern input inputfifo[MOVEFIFOSIZ][MAXPLAYERS], sync[MAXPLAYERS];
 extern input recsync[RECSYNCBUFSIZ];
@@ -325,59 +310,7 @@ void add_ammo( short, short, short, short );
 
 extern long fricxv,fricyv;
 
-typedef struct
-{
-    long zoom,exitx,exity,loogiex[64],loogiey[64],numloogs,loogcnt;
-    long posx, posy, posz, horiz, ohoriz, ohorizoff, invdisptime;
-    long bobposx,bobposy,oposx,oposy,oposz,pyoff,opyoff;
-    long posxv,posyv,poszv,last_pissed_time,truefz,truecz;
-    long player_par,visibility;
-    long bobcounter,weapon_sway;
-    long pals_time,randomflamex,crack_time;
 
-    int32_t aim_mode;
-
-    short ang,oang,angvel,cursectnum,look_ang,last_extra,subweapon;
-    short ammo_amount[MAX_WEAPONS],wackedbyactor,frag,fraggedself;
-
-    short curr_weapon, last_weapon, tipincs, horizoff, wantweaponfire;
-    short holoduke_amount,newowner,hurt_delay,hbomb_hold_delay;
-    short jumping_counter,airleft,knee_incs,access_incs;
-    short fta,ftq,access_wallnum,access_spritenum;
-    short kickback_pic,got_access,weapon_ang,firstaid_amount;
-    short somethingonplayer,on_crane;
-// index of playe's sprite in all sprites on map
-    short i;
-    short one_parallax_sectnum;
-    short over_shoulder_on,random_club_frame,fist_incs;
-    short one_eighty_count,cheat_phase;
-    short dummyplayersprite,extra_extra8,quick_kick;
-    short heat_amount,actorsqu,timebeforeexit,customexitsound;
-
-    short weaprecs[16],weapreccnt,interface_toggle_flag;
-
-    short rotscrnang,dead_flag,show_empty_weapon;
-    short scuba_amount,jetpack_amount,steroids_amount,shield_amount;
-    short holoduke_on,pycount,weapon_pos,frag_ps;
-    short transporter_hold,last_full_weapon,footprintshade,boot_amount;
-
-    int scream_voice;
-
-    char gm,on_warping_sector,footprintcount;
-    char hbomb_on,jumping_toggle,rapid_fire_hold,on_ground;
-    char name[32],inven_icon,buttonpalette;
-
-    char jetpack_on,spritebridge,lastrandomspot;
-    char scuba_on,footprintpal,heat_on;
-
-    char  holster_weapon,falling_counter;
-    char  gotweapon[MAX_WEAPONS],refresh_inventory,*palette;
-
-    char toggle_key_flag,knuckle_incs; // ,select_dir;
-    char walking_snd_toggle, palookup, hard_landing;
-    char max_secret_rooms,secret_rooms,/*fire_flag,*/pals[3];
-    char max_actors_killed,actors_killed,return_to_center;
-}  player_struct;
 
 //same type, is in engine.h
 //extern unsigned char tempbuf[2048];
@@ -385,7 +318,7 @@ extern unsigned char packbuf[576];
 
 extern long gc,max_player_health,max_armour_amount,max_ammo_amount[MAX_WEAPONS];
 
-extern long impact_damage,respawnactortime,respawnitemtime;
+extern long impact_damage;
 
 #define MOVFIFOSIZ 256
 
@@ -471,8 +404,6 @@ extern void TestCallBack(unsigned long);
 extern long frameplace, chainplace, chainnumpages;
 extern volatile long checksume;
 
-#include "funct.h"
-
 extern char screencapt;
 extern short soundps[NUM_SOUNDS],soundpe[NUM_SOUNDS],soundvo[NUM_SOUNDS];
 extern char soundpr[NUM_SOUNDS],soundm[NUM_SOUNDS];
@@ -488,7 +419,7 @@ extern short last_threehundred,lastsavedpos;
 extern char restorepalette;
 
 extern short buttonstat;
-extern long cachecount;
+
 extern char boardfilename[128],waterpal[768],slimepal[768],titlepal[768],drealms[768],endingpal[768];
 extern char betaname[80];
 extern char cachedebug,earthquaketime;

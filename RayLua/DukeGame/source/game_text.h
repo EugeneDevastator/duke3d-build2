@@ -12,7 +12,6 @@ scale(x2,xdim,320)-1,scale(y2,ydim,200)-1);                        \
 }
 #include "duke3d.h"
 
-void displayinventory(player_struct *p);
 
 void displayfragbar();
 
@@ -30,8 +29,4 @@ void weaponnum(short ind,long x,long y,long num1, long num2,char ha);
 
 void weaponnum999(char ind,long x,long y,long num1, long num2,char ha);
 
-void weapon_amounts(player_struct *p,long x,long y,long u);
-
-
-void coolgaugetext(short snum);
 #endif //GAME_GAME_TEXT_H

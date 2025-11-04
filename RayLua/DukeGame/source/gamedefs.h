@@ -34,9 +34,6 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #ifndef _gamedefs_public_
 #define _gamedefs_public_
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 //****************************************************************************
 //

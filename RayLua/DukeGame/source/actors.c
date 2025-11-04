@@ -25,13 +25,13 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 //-------------------------------------------------------------------------
 
 #include "duke3d.h"
-#include "sector.c"
 #include "global.h"
 #include "sounds.h"
 #include "engine.h"
+#include "funct.h"
 
 extern char numenvsnds,actor_tog;
-
+char tempbuf[4096];
 void updateinterpolations()  //Stick at beginning of domovethings
 {
 	long i;
@@ -890,7 +890,7 @@ void ms(short i)
     }
 }
 
-void movefta(void)
+void movefta()
 {
     long x, px, py, sx, sy;
     short i, j, p, psect, ssect, nexti;
@@ -1078,7 +1078,7 @@ short ifhitbyweapon(short sn)
     return -1;
 }
 
-void movecyclers(void)
+void movecyclers()
 {
     short q, j, x, t, s, *c;
     walltype *wal;
@@ -1115,7 +1115,7 @@ void movecyclers(void)
     }
 }
 
-void movedummyplayers(void)
+void movedummyplayers()
 {
     short i, p, nexti;
 
@@ -1161,7 +1161,7 @@ void movedummyplayers(void)
 
 
 short otherp;
-void moveplayers(void) //Players
+void moveplayers() //Players
 {
     short i , nexti;
     long otherx;
@@ -1298,7 +1298,7 @@ void moveplayers(void) //Players
 }
 
 
-void movefx(void)
+void movefx()
 {
     short i, j, nexti, p;
     long x, ht;
@@ -1400,7 +1400,7 @@ void movefx(void)
 
 
 
-void movefallers(void)
+void movefallers()
 {
     short i, nexti, sect, j;
     spritetype *s;
@@ -1498,7 +1498,7 @@ void movefallers(void)
     }
 }
 
-void movestandables(void)
+void movestandables()
 {
     short i, j, k, m, nexti, nextj, nextk, p, q, sect;
     long l, x, *t, x1, y1;
@@ -2434,7 +2434,7 @@ void bounce(short i)
     s->ang = getangle(xvect,yvect);
 }
      
-void moveweapons(void)
+void moveweapons()
 {
     short i, j, k, nexti, p, q, tempsect;
     long dax,day,daz, x, l, ll, x1, y1;
@@ -2779,7 +2779,7 @@ void moveweapons(void)
 }
 
 
-void movetransports(void)
+void movetransports()
 {
     char warpspriteto;
     short i, j, k, l, p, sect, sectlotag, nexti, nextj, nextk;
@@ -3133,7 +3133,7 @@ short LocateTheLocator(short n,short sn)
     return -1;
 }
 
-void moveactors(void)
+void moveactors()
 {
     long x, m, l, *t;
     short a, i, j, nexti, nextj, sect, p;
@@ -4390,7 +4390,7 @@ void moveactors(void)
 }
 
 
-void moveexplosions(void)  // STATNUM 5
+void moveexplosions()  // STATNUM 5
 {
     short i, j, k, nexti, sect, p;
     long l, x, *t;
@@ -4923,7 +4923,7 @@ void moveexplosions(void)  // STATNUM 5
     }
 }
 
-void moveeffectors(void)   //STATNUM 3
+void moveeffectors()   //STATNUM 3
 {
     long q, l, m, x, st, j, *t;
     short i, k, nexti, nextk, p, sh, nextj;
@@ -7151,4 +7151,3 @@ void moveeffectors(void)   //STATNUM 3
           alignflorslope(s->sectnum,wal->x,wal->y,sector[wal->nextsector].floorz);
      }
 }
-

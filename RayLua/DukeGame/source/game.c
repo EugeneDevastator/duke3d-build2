@@ -11,7 +11,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -24,32 +24,14 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
 
-//#include "types.h"
-//#include "develop.h"
-//#include "scriplib.h"
-#include "file_lib.h"
-#include "gamedefs.h"
-#include "keyboard.h"
-//#include "util_lib.h"
-#include "function.h"
-#include "control.h"
-#include "fx_man.h"
+#include <ctype.h>
+#include <stdint.h>
+#include "funct.h"
+#include "duke3d.h"
+#include "global.h"
 #include "music.h"
 #include "sounds.h"
-//#include "config.h"
-#include "mmulti.h"
-#include "player.c"
-#include "mathutil.h"
-//#include "sndcards.h"
-
-#include "CACHE1D.H"
-#include "duke3d.h"
-#include "engine.h"
-#include "gamedefs.h"
-#include "global.h"
-//#include "cache1d.c"
-#include "game_text.c"
-
+char tempbuf[4096];
 #ifdef VOLUMEONE
     #define VERSION "1.4"
 #else
@@ -91,14 +73,14 @@ char firstdemofile[80] = { '\0' };
 
 int recfilep,totalreccnt;
 char debug_on = 0,actor_tog = 0,*rtsptr,memorycheckoveride=0;
-
+user_defs ud = {};
 
 
 extern char syncstate;
 extern int32_t numlumps;
 
 FILE *frecfilep = (FILE *)NULL;
-void pitch_test( void );
+void pitch_test();
 
 char restorepalette,screencapt,nomorelogohack;
 int sendmessagecommand = -1;
@@ -109,7 +91,7 @@ extern long lastvisinc;
 
 void timerhandler(task *t)
 {
-    (void)t; // Suppress unused parameter warning
+   // ()t; // Suppress unused parameter warning
     totalclock++;
 }
 
@@ -119,7 +101,7 @@ void inittimer()
     TS_Dispatch();
 }
 
-void uninittimer(void)
+void uninittimer()
 {
    if (TimerPtr)
       TS_Terminate( TimerPtr );
@@ -136,7 +118,7 @@ void gamenumber(long x,long y,long n,char s)
 
 
 char recbuf[80];
-void allowtimetocorrecterrorswhenquitting(void)
+void allowtimetocorrecterrorswhenquitting()
 {
      long i, j, oldtotalclock;
 
@@ -179,7 +161,7 @@ void adduserquote(char *daquote)
 }
 
 
-void getpackets(void)
+void getpackets()
 {
     long i, j, k, l;
     FILE *fp;
@@ -206,7 +188,7 @@ void getpackets(void)
                 multiwhat = 0;
                 multiwho = other;
                 multipos = packbuf[1];
-                loadplayer( multipos );
+              //  loadplayer( multipos );
                 multiflag = 0;
                 break;
             case 0:  //[0] (receive master sync buffer)
@@ -355,11 +337,11 @@ void getpackets(void)
 
                 if (SoundToggle == 0 || ud.lockout == 1 )//|| FXDevice == NumSoundCards)
                     break;
-                rtsptr = (char *)RTS_GetSound(packbuf[1]-1);
-                if (*rtsptr == 'C')
-                    FX_PlayVOC3D(rtsptr,0,0,0,255,-packbuf[1]);
-                else
-                    FX_PlayWAV3D(rtsptr,0,0,0,255,-packbuf[1]);
+               //rtsptr = (char *)RTS_GetSound(packbuf[1]-1);
+               //if (*rtsptr == 'C')
+               //    FX_PlayVOC3D(rtsptr,0,0,0,255,-packbuf[1]);
+               //else
+               //    FX_PlayWAV3D(rtsptr,0,0,0,255,-packbuf[1]);
                 rtsplaying = 7;
                 break;
             case 8:
@@ -741,7 +723,7 @@ extern long cacnum;
 // typedef struct { long *hand, leng; char *lock; } cactype;
 
 
-void caches(void)
+void caches()
 {
      short i,k;
 
@@ -767,7 +749,7 @@ void caches(void)
 
 
 
-void checksync(void)
+void checksync()
 {
       long i, k;
 
@@ -1044,8 +1026,6 @@ void orderweaponnum(short ind,long x,long y,long num1, long num2,char ha)
 }
 #endif
 
-
-
 void digitalnumber(long x,long y,long n,char s,char cs)
 {
     short i, j, k, p, c;
@@ -1093,7 +1073,7 @@ void scratchmarks(long x,long y,long n,char s,char p)
 #define AVERAGEFRAMES 16
 static long frameval[AVERAGEFRAMES], framecnt = 0;
 
-void tics(void)
+void tics()
 {
     long i;
     char b[10];
@@ -1153,7 +1133,7 @@ Message 26 can repeat even if same as current
 Fade effect uses different text rendering flags
  */
 // Renders and manages on-screen text messages with fade effects:
-void operatefta(void)
+void operatefta()
 {
     return;//
      long i, j, k;
@@ -1228,26 +1208,10 @@ void FTA(short q, player_struct *p)
     }
 }
 
-void showtwoscreens(void)
+void showtwoscreens()
 {
     short i;
 
-#ifndef VOLUMEALL
-    setview(0,0,xdim-1,ydim-1);
-    flushperms();
-    ps[myconnectindex].palette = palette;
-    for(i=0;i<64;i+=7) palto(0,0,0,i);
-    KB_FlushKeyBoardQueue();
-    rotatesprite(0,0,65536L,0,3291,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
-    nextpage(); for(i=63;i>0;i-=7) palto(0,0,0,i);
-    while( !KB_KeyWaiting() ) getpackets();
-
-    for(i=0;i<64;i+=7) palto(0,0,0,i);
-    KB_FlushKeyBoardQueue();
-    rotatesprite(0,0,65536L,0,3290,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
-    nextpage(); for(i=63;i>0;i-=7) palto(0,0,0,i);
-    while( !KB_KeyWaiting() ) getpackets();
-#else
 // CTW - REMOVED
 /*  setview(0,0,xdim-1,ydim-1);
     flushperms();
@@ -1260,10 +1224,10 @@ void showtwoscreens(void)
     totalclock = 0;
     while( !KB_KeyWaiting() && totalclock < 2400) getpackets();*/
 // CTW END - REMOVED
-#endif
+
 }
 
-void binscreen(void)
+void binscreen()
 {
     long fil;
 #ifdef VOLUMEONE
@@ -1417,7 +1381,7 @@ short strget(short x,short y,char *t,short dalen,short c)
     return (0);
 }
 
-void typemode(void)
+void typemode()
 {
      short ch, hitstate, i, j;
 
@@ -1535,7 +1499,7 @@ void typemode(void)
      }
 }
 
-void moveclouds(void)
+void moveclouds()
 {
     if( totalclock > cloudtotalclock || totalclock < (cloudtotalclock-7))
     {
@@ -1739,8 +1703,8 @@ void displayrest(long smoothratio)
 
             if(ud.multimode < 2 && ud.recstat != 2) ready2send = 0;
 
-            if(ps[myconnectindex].gm&MODE_GAME) cmenu(50);
-            else cmenu(0);
+          // if(ps[myconnectindex].gm&MODE_GAME) cmenu(50);
+          // else cmenu(0);
             screenpeek = myconnectindex;
         }
     }
@@ -1748,13 +1712,13 @@ void displayrest(long smoothratio)
     if(ps[myconnectindex].newowner == -1 && ud.overhead_on == 0 && ud.crosshair && ud.camerasprite == -1)
         rotatesprite((160L-(ps[myconnectindex].look_ang>>1))<<16,100L<<16,65536L,0,CROSSHAIR,0,0,2+1,windowx1,windowy1,windowx2,windowy2);
 
-    if(ps[myconnectindex].gm&MODE_TYPE)
-        typemode();
-    else
-        menus();
-    
-    if( ud.pause_on==1 && (ps[myconnectindex].gm&MODE_MENU) == 0 )
-        menutext(160,100,0,0,"GAME PAUSED");
+  // if(ps[myconnectindex].gm&MODE_TYPE)
+  //     typemode();
+  // else
+  //     menus();
+  //
+  // if( ud.pause_on==1 && (ps[myconnectindex].gm&MODE_MENU) == 0 )
+  //     menutext(160,100,0,0,"GAME PAUSED");
 
     if(ud.coords)
         coords(screenpeek);
@@ -1861,7 +1825,7 @@ void view(player_struct *pp, long *vx, long *vy,long *vz,short *vsectnum, short 
 }
      
     //REPLACE FULLY
-void drawbackground(void)
+void drawbackground()
 {
      short dapicnum;
      long x,y,x1,y1,x2,y2,topy;
@@ -4991,7 +4955,7 @@ char cheatquotes[NUMCHEATCODES][14] = {
 
 
 char cheatbuf[10],cheatbuflen;
-void cheats(void)
+void cheats()
 {
     short ch, i, j, k, keystate, weapon;
 
@@ -5436,7 +5400,7 @@ void cheats(void)
 
 
 long nonsharedtimer;
-void nonsharedkeys(void)
+void nonsharedkeys()
 {
     short i,ch, weapon;
     long j;
@@ -5567,12 +5531,12 @@ void nonsharedkeys(void)
             }
 
             if(ud.lockout == 0)
-                if(SoundToggle && ALT_IS_PRESSED && ( RTS_NumSounds() > 0 ) && rtsplaying == 0 && VoiceToggle )
+                if(SoundToggle && ALT_IS_PRESSED && rtsplaying == 0 && VoiceToggle )
             {
-                rtsptr = (char *)RTS_GetSound (i-1);
-                if(*rtsptr == 'C')
-                    FX_PlayVOC3D( rtsptr,0,0,0,255,-i);
-                else FX_PlayWAV3D( rtsptr,0,0,0,255,-i);
+              // rtsptr = (char *)RTS_GetSound (i-1);
+              // if(*rtsptr == 'C')
+              //     FX_PlayVOC3D( rtsptr,0,0,0,255,-i);
+              // else FX_PlayWAV3D( rtsptr,0,0,0,255,-i);
 
                 rtsplaying = 7;
 
@@ -5646,10 +5610,10 @@ void nonsharedkeys(void)
                     FTA(118,&ps[myconnectindex]);
                     return;
                 }
-                cmenu(350);
+                //cmenu(350);
                 screencapt = 1;
                 displayrooms(myconnectindex,65536);
-                savetemp("duke3d.tmp",waloff[MAXTILES-1],160*100);
+               // savetemp("duke3d.tmp",waloff[MAXTILES-1],160*100);
                 screencapt = 0;
                 FX_StopAllSounds();
                 clearsoundlocks();
@@ -5672,7 +5636,7 @@ void nonsharedkeys(void)
                 if(movesperpacket == 4 && connecthead != myconnectindex)
                     return;
 
-                cmenu(300);
+                //cmenu(300);
                 FX_StopAllSounds();
                 clearsoundlocks();
 
@@ -5699,7 +5663,7 @@ void nonsharedkeys(void)
                 ready2send = 0;
                 totalclock = ototalclock;
             }
-            cmenu(700);
+            //cmenu(700);
 
         }
 
@@ -5721,7 +5685,7 @@ void nonsharedkeys(void)
             }
             screencapt = 1;
             displayrooms(myconnectindex,65536);
-            savetemp("duke3d.tmp",waloff[MAXTILES-1],160*100);
+            //savetemp("duke3d.tmp",waloff[MAXTILES-1],160*100);
             screencapt = 0;
             if( lastsavedpos >= 0 )
             {
@@ -6219,14 +6183,14 @@ void printstr(short x, short y, char string[81], char attribute)
         while (string[i] != 0)
         {
                 character = string[i];
-                printchrasm(0xb8000+(long)pos,1L,((long)attribute<<8)+(long)character);
+               // printchrasm(0xb8000+&pos,1L,((long)attribute<<8)+(long)character);
                 i++;
                 pos+=2;
         }
 }
 
 /*
-void cacheicon(void)
+void cacheicon()
 {
     if(cachecount > 0)
     {
@@ -6237,7 +6201,7 @@ void cacheicon(void)
 }
        */
 
-void Logo(void)
+void Logo()
 {
     short i,j,soundanm;
 
@@ -6370,7 +6334,7 @@ void Logo(void)
     clearview(0L);
 }
 
-void loadtmb(void)
+void loadtmb()
 {
     return;// music code
     char tmb[8000];
@@ -6415,7 +6379,7 @@ static char sixteen[] = "16 Possible Dukes";
 ===================
 */
 
-void compilecons(void)
+void compilecons()
 {
    mymembuf = (char *)&hittype[0];
    labelcode = (long *)&sector[0];
@@ -6433,7 +6397,7 @@ void compilecons(void)
 }
 
 
-void Startup(void)
+void Startup()
 {
    int i;
 
@@ -6485,7 +6449,7 @@ void sendscore(char *s)
 }
 
 
-void getnames(void)
+void getnames()
 {
     short i,l;
 
@@ -6566,7 +6530,7 @@ void writestring(long a1,long a2,long a3,short a4,long vx,long vy,long vz)
 
 }
 
-void copyprotect(void)
+void copyprotect()
 {
 
 }
@@ -6741,8 +6705,6 @@ void RunDukeMap() // New Entry point copy of main
     gameexit(" ");
 }
 }
-
-
 
 int main(int argc,char **argv)
 {
@@ -7011,7 +6973,7 @@ char which_demo = 0;
 char in_menu = 0;
 
 // extern long syncs[];
-long playback(void)
+long playback()
 {
     long i,j,k,l,t;
     short p;
@@ -7188,7 +7150,7 @@ char moveloop()
     return 0;
 }
 
-void fakedomovethingscorrect(void)
+void fakedomovethingscorrect()
 {
      long i;
      player_struct *p;
@@ -7220,7 +7182,7 @@ void fakedomovethingscorrect(void)
 
 }
 
-void fakedomovethings(void)
+void fakedomovethings()
 {
         input *syn;
         player_struct *p;
@@ -7659,7 +7621,7 @@ ENDFAKEPROCESSINPUT:
 }
 
 
-char domovethings(void)
+char domovethings()
 {
     short i, j;
     char ch;
@@ -7849,7 +7811,7 @@ char domovethings(void)
 }
 
 
-void doorders(void)
+void doorders()
 {
     short i;
 
@@ -8600,7 +8562,7 @@ void lotsofcolourglass(short i,short wallnum,short n)
          }
 }
 
-void SetupGameButtons( void )
+void SetupGameButtons()
 {
 }
 
@@ -8612,10 +8574,7 @@ void SetupGameButtons( void )
 ===================
 */
 
-long GetTime(void)
+long GetTime()
    {
    return totalclock;
    }
-
-
-
