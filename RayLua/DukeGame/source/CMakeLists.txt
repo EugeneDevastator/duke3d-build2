@@ -26,6 +26,7 @@ set(SOURCES
         scriplib.c
         sector.c
         sounds.c
+        menues.c
 )
 
 # Header files (optional, for IDE support)

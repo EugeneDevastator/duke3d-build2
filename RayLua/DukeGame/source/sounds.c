@@ -84,17 +84,22 @@ void MusicStartup()
 
 void MusicShutdown()
 {}
-
+void  FX_SetReverbDelay( int delay ){};
 int USRHOOKS_GetMem(char **ptr, unsigned long size )
 {
 return 0;
 }
-
+int FX_VoiceAvailable( int priority ){return 0;};
 int USRHOOKS_FreeMem(char *ptr)
 {return 0; }
-
+int FX_StopAllSounds()
+{
+    return 0;
+}
+int FX_StopSound( int handle ){return 0;}
+void  FX_SetReverb( int reverb ){};
 char menunum=0;
-
+void PlayMusic(char *_filename){};
 void intomenusounds()
 {}
 

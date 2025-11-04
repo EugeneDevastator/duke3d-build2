@@ -445,7 +445,7 @@ extern void getnames();
 //#line "game.c" 6309
 //extern int main(int argc,char **argv);
 //#line "game.c" 6563
-extern char opendemoread(char which_demo);
+//extern char opendemoread(char which_demo);
 //#line "game.c" 6589
 extern void opendemowrite();
 //#line "game.c" 6608

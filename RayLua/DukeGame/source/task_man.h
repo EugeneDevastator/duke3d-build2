@@ -51,7 +51,7 @@ typedef struct task
 extern volatile int TS_InInterrupt;
 
 void TS_Shutdown();
-task *TS_ScheduleTask(void (*Function)(task *), int rate, int priority, void *data);
+//task *TS_ScheduleTask(void (*Function)(task *), int rate, int priority, void *data);
 int TS_Terminate(task *ptr);
 void TS_Dispatch();
 void TS_SetTaskRate(task *Task, int rate);

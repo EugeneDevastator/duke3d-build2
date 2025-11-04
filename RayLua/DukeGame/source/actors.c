@@ -23,12 +23,12 @@ Original Source: 1996 - Todd Replogle
 Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
-
+#include "funct.h"
 #include "duke3d.h"
 #include "global.h"
 #include "sounds.h"
 #include "engine.h"
-#include "funct.h"
+
 
 extern char numenvsnds,actor_tog;
 char tempbuf[4096];

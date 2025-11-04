@@ -119,7 +119,7 @@ int FX_PlayLoopedRaw( char *ptr, unsigned long length, char *loopstart,
 int FX_Pan3D( int handle, int angle, int distance );
 int FX_SoundActive( int handle );
 int FX_SoundsPlaying();
-extern int FX_StopSound( int handle );
+int FX_StopSound( int handle );
 int FX_StopAllSounds();
 int FX_StartDemandFeedPlayback( void ( *function )( char **ptr, unsigned long *length ),
        int rate, int pitchoffset, int vol, int left, int right,

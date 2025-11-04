@@ -100,6 +100,12 @@ int getcrc(char* buffer, short bufleng)
     return(j&65535);
 }
 
+void uninitmultiplayers()
+{}
+
+void sendlogon()
+{}
+
 void sendlogoff()
 {
     long i;

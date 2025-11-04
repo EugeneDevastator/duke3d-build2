@@ -62,9 +62,9 @@ void setpackettimeout(long datimeoutcount, long daresendagaincount);
 
 int getcrc(char *buffer, short bufleng);
 
-void uninitmultiplayers();
+void uninitmultiplayers();;
 
-void sendlogon();
+void sendlogon();;
 
 void sendlogoff();
 int getoutputcirclesize();

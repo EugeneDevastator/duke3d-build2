@@ -31,6 +31,15 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "global.h"
 #include "music.h"
 #include "sounds.h"
+#include "task_man.h"
+void TS_Shutdown(){};
+//task *TS_ScheduleTask(void (*Function)(task *), int rate, int priority, void *data);
+int TS_Terminate(task *ptr){};
+void TS_Dispatch(){};
+void TS_SetTaskRate(task *Task, int rate){};
+void TS_UnlockMemory(){};
+int TS_LockMemory(){};
+
 char tempbuf[4096];
 #ifdef VOLUMEONE
     #define VERSION "1.4"
@@ -76,8 +85,8 @@ char debug_on = 0,actor_tog = 0,*rtsptr,memorycheckoveride=0;
 user_defs ud = {};
 
 
-extern char syncstate;
-extern int32_t numlumps;
+char syncstate;
+int32_t numlumps;
 
 FILE *frecfilep = (FILE *)NULL;
 void pitch_test();
@@ -97,7 +106,7 @@ void timerhandler(task *t)
 
 void inittimer()
 {
-    TimerPtr = TS_ScheduleTask(timerhandler, TICRATE, 1, NULL);
+   // TimerPtr = TS_ScheduleTask(timerhandler, TICRATE, 1, NULL);
     TS_Dispatch();
 }
 
@@ -1380,7 +1389,7 @@ short strget(short x,short y,char *t,short dalen,short c)
 
     return (0);
 }
-
+long animatecnt =0;
 void typemode()
 {
      short ch, hitstate, i, j;
@@ -1498,7 +1507,7 @@ void typemode()
           else pub = NUMPAGES;
      }
 }
-
+void opendemowrite(){};
 void moveclouds()
 {
     if( totalclock > cloudtotalclock || totalclock < (cloudtotalclock-7))
@@ -6992,7 +7001,7 @@ long playback()
 
     flushperms();
 
-    if(numplayers < 2) foundemo = opendemoread(which_demo);
+  //  if(numplayers < 2) foundemo = opendemoread(which_demo);
 
     if(foundemo == 0)
     {
@@ -7620,7 +7629,7 @@ ENDFAKEPROCESSINPUT:
         sprite[p->i].cstat = backcstat;
 }
 
-
+void record(){};
 char domovethings()
 {
     short i, j;
