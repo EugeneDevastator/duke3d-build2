@@ -5660,6 +5660,7 @@ int setview(long x1, long y1, long x2, long y2)
 
 void setaspect(long daxrange, long daaspect)
 {
+    return;//
     viewingrange = daxrange;
     viewingrangerecip = divscale32(1L, daxrange);
 
@@ -6256,8 +6257,7 @@ long clippoly4(long cx1, long cy1, long cx2, long cy2)
     return (n);
 }
 
-void makepalookup(long palnum, char* remapbuf, signed char r, signed char g, signed char b, char dastat)
-{
+void makepalookup(long palnum, char* remapbuf, signed char r, signed char g, signed char b, char dastat){
   //  long i, j, dist, palscale;
   //  char *ptr, *ptr2;
 //

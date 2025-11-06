@@ -2147,6 +2147,7 @@ static long oyrepeat = -1;
 
 void displayrooms(short snum, long smoothratio)
 {
+    return;//
     long cposx, cposy, cposz, dst, j, fz, cz, hz, lz;
     short sect, cang, k, choriz, tsect;
     player_struct* p;
@@ -6406,6 +6407,7 @@ void cacheicon()
 
 void Logo()
 {
+    return;//
     short i, j, soundanm;
 
     soundanm = 0;
@@ -6792,7 +6794,7 @@ void RunDukeMap() // New Entry point copy of main
         }
 
         ud.last_level = -1;
-
+        ud.warp_on = 1;
         puts("Loading palette/lookups.");
 
         genspriteremaps();
@@ -6824,7 +6826,7 @@ void RunDukeMap() // New Entry point copy of main
 
         tempautorun = ud.auto_run;
 
-        if (ud.warp_on == 0 && playback())
+        if (ud.warp_on == 0 )//&& playback())
         {
             //  FX_StopAllSounds();
             //   clearsoundlocks();
@@ -7190,6 +7192,7 @@ char in_menu = 0;
 // extern long syncs[];
 long playback()
 {
+    return;
     long i, j, k, l, t;
     short p;
     char foundemo;
