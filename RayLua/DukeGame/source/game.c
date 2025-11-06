@@ -6837,7 +6837,7 @@ void RunDukeMap() // New Entry point copy of main
         ud.auto_run = tempautorun;
 
         ud.warp_on = 0;
-
+        puts("Entering Main loop, yay!");
         while (!(ps[myconnectindex].gm & MODE_END)) //The whole loop!!!!!!!!!!!!!!!!!!
         {
             if (ud.recstat == 2 || ud.multimode > 1 || (ud.show_help == 0 && (ps[myconnectindex].gm & MODE_MENU) !=

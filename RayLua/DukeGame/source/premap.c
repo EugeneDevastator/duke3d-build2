@@ -1373,7 +1373,7 @@ void enterlevel(char g)
 
   //  i = ud.screen_size;
   //  ud.screen_size = 0;
-  //  dofrontscreens(); // loading screen
+      dofrontscreens(); // loading screen
   //   // vscrn();
   //  ud.screen_size = i;
 
