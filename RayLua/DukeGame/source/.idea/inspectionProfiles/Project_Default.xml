@@ -2,10 +2,10 @@
   <profile version="1.0">
     <option name="myName" value="Project Default" />
     <inspection_tool class="Annotator" enabled="false" level="ERROR" enabled_by_default="false" />
-    <inspection_tool class="ArgumentSelectionDefects" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CDeclarationWithImplicitIntType" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CMakeDeprecatedCommands" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CMakeMismatchedCommandArguments" enabled="false" level="WARNING" enabled_by_default="false" />
+    <inspection_tool class="ArgumentSelectionDefects" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CDeclarationWithImplicitIntType" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CMakeDeprecatedCommands" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CMakeMismatchedCommandArguments" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
     <inspection_tool class="CheckDtdRefs" enabled="false" level="ERROR" enabled_by_default="false" />
     <inspection_tool class="CheckEmptyScriptTag" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="CheckImageSize" enabled="false" level="WARNING" enabled_by_default="false" />
@@ -13,238 +13,251 @@
     <inspection_tool class="CheckTagEmptyBody" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="CheckValidXmlInScriptTagBody" enabled="false" level="ERROR" enabled_by_default="false" />
     <inspection_tool class="CheckXmlFileWithXercesValidator" enabled="false" level="ERROR" enabled_by_default="false" />
-    <inspection_tool class="ClangTidy" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="Clazy" enabled="false" level="WARNING" enabled_by_default="false" />
+    <inspection_tool class="ClangTidy" enabled="true" level="ERROR" enabled_by_default="true" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="Clazy" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
     <inspection_tool class="CommandLineInspection" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="ComposeErroneousRelation" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="ComposeMissingKeys" enabled="false" level="ERROR" enabled_by_default="false" />
     <inspection_tool class="ComposeUnknownKeys" enabled="false" level="ERROR" enabled_by_default="false" />
     <inspection_tool class="ComposeUnknownValues" enabled="false" level="ERROR" enabled_by_default="false" />
     <inspection_tool class="ComposeUnquotedPorts" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="ConstevalIfIsAlwaysConstant" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppAbstractClassWithoutSpecifier" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppAbstractFinalClass" enabled="false" level="WARNING" enabled_by_default="false" />
+    <inspection_tool class="ConstevalIfIsAlwaysConstant" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppAbstractClassWithoutSpecifier" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppAbstractFinalClass" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
     <inspection_tool class="CppAbstractVirtualFunctionCallInCtor" enabled="false" level="ERROR" enabled_by_default="false" />
-    <inspection_tool class="CppAccessSpecifierWithNoDeclarations" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppAwaiterTypeIsNotClass" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppBooleanIncrementExpression" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppBoostFormatBadCode" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppBoostFormatLegacyCode" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
+    <inspection_tool class="CppAccessSpecifierWithNoDeclarations" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppAwaiterTypeIsNotClass" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppBooleanIncrementExpression" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppBoostFormatBadCode" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppBoostFormatLegacyCode" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
     <inspection_tool class="CppBoostFormatMixedArgs" enabled="false" level="ERROR" enabled_by_default="false" />
     <inspection_tool class="CppBoostFormatTooFewArgs" enabled="false" level="ERROR" enabled_by_default="false" />
-    <inspection_tool class="CppBoostFormatTooManyArgs" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppCStyleCast" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppCVQualifierCanNotBeAppliedToReference" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppClassCanBeFinal" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppClassIsIncomplete" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppClassNeedsConstructorBecauseOfUninitializedMember" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppClassNeverUsed" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppCompileTimeConstantCanBeReplacedWithBooleanConstant" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppConceptNeverUsed" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppConditionalExpressionCanBeSimplified" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppConstParameterInDeclaration" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppConstValueFunctionReturnType" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppCoroutineCallResolveError" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDFAArrayIndexOutOfBounds" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDFAConstantConditions" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDFAConstantFunctionResult" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDFAConstantParameter" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDFADeletedPointer" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDFAEndlessLoop" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDFAInfiniteRecursion" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDFAInvalidatedMemory" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDFALocalValueEscapesFunction" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDFALocalValueEscapesScope" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDFALoopConditionNotUpdated" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDFAMemoryLeak" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDFANotInitializedField" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDFANullDereference" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDFATimeOver" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppDFAUnreachableCode" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDFAUnreachableFunctionCall" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDFAUnreadVariable" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDFAUnusedValue" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDeclarationHidesLocal" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDeclarationHidesUncapturedLocal" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppDeclarationSpecifierWithoutDeclarators" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDeclaratorDisambiguatedAsFunction" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDeclaratorNeverUsed" enabled="false" level="WARNING" enabled_by_default="false" />
+    <inspection_tool class="CppBoostFormatTooManyArgs" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppCStyleCast" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppCVQualifierCanNotBeAppliedToReference" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppClassCanBeFinal" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppClassIsIncomplete" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppClassNeedsConstructorBecauseOfUninitializedMember" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppClassNeverUsed" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppCompileTimeConstantCanBeReplacedWithBooleanConstant" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppConceptNeverUsed" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppConditionalExpressionCanBeSimplified" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppConstParameterInDeclaration" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppConstValueFunctionReturnType" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppCoroutineCallResolveError" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDFAArrayIndexOutOfBounds" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDFAConstantConditions" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDFAConstantFunctionResult" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDFAConstantParameter" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDFADeletedPointer" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDFAEndlessLoop" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDFAInfiniteRecursion" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDFAInvalidatedMemory" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDFALocalValueEscapesFunction" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDFALocalValueEscapesScope" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDFALoopConditionNotUpdated" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDFAMemoryLeak" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDFANotInitializedField" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDFANullDereference" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDFATimeOver" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDFAUnreachableCode" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDFAUnreachableFunctionCall" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDFAUnreadVariable" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDFAUnusedValue" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDeclarationHidesLocal" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDeclarationHidesUncapturedLocal" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDeclarationSpecifierWithoutDeclarators" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDeclaratorDisambiguatedAsFunction" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDeclaratorNeverUsed" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
     <inspection_tool class="CppDeclaratorUsedBeforeInitialization" enabled="false" level="ERROR" enabled_by_default="false" />
-    <inspection_tool class="CppDefaultCaseNotHandledInSwitchStatement" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDefaultInitializationWithNoUserConstructor" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDefaultIsUsedAsIdentifier" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDefaultedSpecialMemberFunctionIsImplicitlyDeleted" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDeletingVoidPointer" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDependentTemplateWithoutTemplateKeyword" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDependentTypeWithoutTypenameKeyword" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDeprecatedEntity" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDeprecatedOverridenMethod" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDeprecatedRegisterStorageClassSpecifier" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDereferenceOperatorLimitExceeded" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDiscardedPostfixOperatorResult" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDoxygenSyntaxError" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDoxygenUndocumentedParameter" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppDoxygenUnresolvedReference" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppEmptyDeclaration" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppEnforceCVQualifiersOrder" enabled="true" level="WARNING" enabled_by_default="true" />
-    <inspection_tool class="CppEnforceCVQualifiersPlacement" enabled="true" level="WARNING" enabled_by_default="true" />
-    <inspection_tool class="CppEnforceDoStatementBraces" enabled="true" level="WARNING" enabled_by_default="true" />
-    <inspection_tool class="CppEnforceForStatementBraces" enabled="true" level="WARNING" enabled_by_default="true" />
-    <inspection_tool class="CppEnforceFunctionDeclarationStyle" enabled="true" level="WARNING" enabled_by_default="true" />
-    <inspection_tool class="CppEnforceIfStatementBraces" enabled="true" level="WARNING" enabled_by_default="true" />
-    <inspection_tool class="CppEnforceTypeAliasCodeStyle" enabled="true" level="WARNING" enabled_by_default="true" />
-    <inspection_tool class="CppEnforceWhileStatementBraces" enabled="true" level="WARNING" enabled_by_default="true" />
-    <inspection_tool class="CppEntityAssignedButNoRead" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppEntityUsedOnlyInUnevaluatedContext" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppEnumeratorNeverUsed" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppEqualOperandsInBinaryExpression" enabled="false" level="WARNING" enabled_by_default="false" />
+    <inspection_tool class="CppDefaultCaseNotHandledInSwitchStatement" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDefaultInitializationWithNoUserConstructor" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDefaultIsUsedAsIdentifier" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDefaultedSpecialMemberFunctionIsImplicitlyDeleted" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDeletingVoidPointer" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDependentTemplateWithoutTemplateKeyword" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDependentTypeWithoutTypenameKeyword" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDeprecatedEntity" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDeprecatedOverridenMethod" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDeprecatedRegisterStorageClassSpecifier" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDereferenceOperatorLimitExceeded" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDiscardedPostfixOperatorResult" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDoxygenSyntaxError" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDoxygenUndocumentedParameter" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppDoxygenUnresolvedReference" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppEmptyDeclaration" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppEnforceCVQualifiersOrder" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppEnforceCVQualifiersPlacement" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppEnforceDoStatementBraces" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppEnforceForStatementBraces" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppEnforceFunctionDeclarationStyle" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppEnforceIfStatementBraces" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppEnforceNestedNamespacesStyle" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppEnforceOverridingDestructorStyle" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppEnforceOverridingFunctionStyle" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppEnforceTypeAliasCodeStyle" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppEnforceWhileStatementBraces" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppEntityAssignedButNoRead" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppEntityUsedOnlyInUnevaluatedContext" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppEnumeratorNeverUsed" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppEqualOperandsInBinaryExpression" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
     <inspection_tool class="CppEvaluationFailure" enabled="false" level="ERROR" enabled_by_default="false" />
-    <inspection_tool class="CppExplicitSpecializationInNonNamespaceScope" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppExpressionWithoutSideEffects" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppFinalFunctionInFinalClass" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppFinalNonOverridingVirtualFunction" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppForLoopCanBeReplacedWithWhile" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppForwardEnumDeclarationWithoutUnderlyingType" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppFunctionDoesntReturnValue" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppFunctionIsNotImplemented" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppFunctionResultShouldBeUsed" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppFunctionalStyleCast" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppHeaderHasBeenAlreadyIncluded" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppHiddenFunction" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppHidingFunction" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppIdenticalOperandsInBinaryExpression" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppIfCanBeReplacedByConstexprIf" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppImplicitDefaultConstructorNotAvailable" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppIncompatiblePointerConversion" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppIncompleteSwitchStatement" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppIntegralToPointerConversion" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppInvalidLineContinuation" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppJoinDeclarationAndAssignment" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppLambdaCaptureNeverUsed" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppLocalVariableMayBeConst" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppLocalVariableMightNotBeInitialized" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppLongFloat" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppMemberFunctionMayBeConst" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppMemberFunctionMayBeStatic" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppMismatchedClassTags" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppMissingIncludeGuard" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppMissingKeywordThrow" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppModulePartitionWithSeveralPartitionUnits" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppMsExtAddressOfClassRValue" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppMsExtBindingRValueToLvalueReference" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppMsExtCopyElisionInCopyInitDeclarator" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppMsExtDoubleUserConversionInCopyInit" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppMsExtNotInitializedStaticConstLocalVar" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppMsExtReinterpretCastFromNullptr" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppMultiCharacterLiteral" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppMultiCharacterWideLiteral" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppMustBePublicVirtualToImplementInterface" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppMutableSpecifierOnReferenceMember" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppNoDiscardExpression" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppNodiscardFunctionWithoutReturnValue" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppNonExceptionSafeResourceAcquisition" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppNonExplicitConversionOperator" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppNonExplicitConvertingConstructor" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppNonInlineFunctionDefinitionInHeaderFile" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppNonInlineVariableDefinitionInHeaderFile" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppNotAllPathsReturnValue" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppObjectMemberMightNotBeInitialized" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppOutParameterMustBeWritten" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppParameterMayBeConst" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppParameterMayBeConstPtrOrRef" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppParameterNamesMismatch" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppParameterNeverUsed" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppPassValueParameterByConstReference" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppPointerConversionDropsQualifiers" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppPointerToIntegralConversion" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppPolymorphicClassWithNonVirtualPublicDestructor" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppPossiblyErroneousEmptyStatements" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppPossiblyUninitializedMember" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppPossiblyUnintendedObjectSlicing" enabled="false" level="WARNING" enabled_by_default="false" />
+    <inspection_tool class="CppExplicitSpecializationInNonNamespaceScope" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppExpressionWithoutSideEffects" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppFinalFunctionInFinalClass" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppFinalNonOverridingVirtualFunction" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppForLoopCanBeReplacedWithWhile" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppForwardEnumDeclarationWithoutUnderlyingType" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppFunctionDoesntReturnValue" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppFunctionIsNotImplemented" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppFunctionResultShouldBeUsed" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppFunctionalStyleCast" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppHeaderHasBeenAlreadyIncluded" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppHiddenFunction" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppHidingFunction" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppIdenticalOperandsInBinaryExpression" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppIfCanBeReplacedByConstexprIf" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppImplicitDefaultConstructorNotAvailable" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppIncompatiblePointerConversion" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppIncompleteSwitchStatement" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppInconsistentNaming" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppIntegralToPointerConversion" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppInvalidLineContinuation" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppJoinDeclarationAndAssignment" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppLambdaCaptureNeverUsed" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppLocalVariableMayBeConst" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppLocalVariableMightNotBeInitialized" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppLocalVariableWithNonTrivialDtorIsNeverUsed" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppLongFloat" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppMemberFunctionMayBeConst" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppMemberFunctionMayBeStatic" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppMemberInitializersOrder" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppMismatchedClassTags" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppMissingIncludeGuard" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppMissingKeywordThrow" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppModulePartitionWithSeveralPartitionUnits" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppMsExtAddressOfClassRValue" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppMsExtBindingRValueToLvalueReference" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppMsExtCopyElisionInCopyInitDeclarator" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppMsExtDoubleUserConversionInCopyInit" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppMsExtNotInitializedStaticConstLocalVar" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppMsExtReinterpretCastFromNullptr" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppMultiCharacterLiteral" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppMultiCharacterWideLiteral" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppMustBePublicVirtualToImplementInterface" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppMutableSpecifierOnReferenceMember" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppNoDiscardExpression" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppNodiscardFunctionWithoutReturnValue" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppNonExceptionSafeResourceAcquisition" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppNonExplicitConversionOperator" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppNonExplicitConvertingConstructor" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppNonInlineFunctionDefinitionInHeaderFile" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppNonInlineVariableDefinitionInHeaderFile" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppNotAllPathsReturnValue" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppObjectMemberMightNotBeInitialized" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppOutParameterMustBeWritten" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppParameterMayBeConst" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppParameterMayBeConstPtrOrRef" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppParameterNamesMismatch" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppParameterNeverUsed" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppPassValueParameterByConstReference" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppPointerConversionDropsQualifiers" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppPointerToIntegralConversion" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppPolymorphicClassWithNonVirtualPublicDestructor" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppPossiblyErroneousEmptyStatements" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppPossiblyUninitializedMember" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppPossiblyUnintendedObjectSlicing" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
     <inspection_tool class="CppPrecompiledHeaderIsNotIncluded" enabled="false" level="ERROR" enabled_by_default="false" />
     <inspection_tool class="CppPrecompiledHeaderNotFound" enabled="false" level="ERROR" enabled_by_default="false" />
-    <inspection_tool class="CppPrintfBadFormat" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppPrintfExtraArg" enabled="false" level="WARNING" enabled_by_default="false" />
+    <inspection_tool class="CppPrintfBadFormat" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppPrintfExtraArg" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
     <inspection_tool class="CppPrintfMissedArg" enabled="false" level="ERROR" enabled_by_default="false" />
-    <inspection_tool class="CppPrintfRiskyFormat" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppPrivateSpecialMemberFunctionIsNotImplemented" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppRangeBasedForIncompatibleReference" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppRedefinitionOfDefaultArgumentInOverrideFunction" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantAccessSpecifier" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantBaseClassAccessSpecifier" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantBaseClassInitializer" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantBooleanExpressionArgument" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantCastExpression" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantComplexityInComparison" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantConditionalExpression" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantConstSpecifier" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantControlFlowJump" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantDereferencingAndTakingAddress" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantElaboratedTypeSpecifier" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantElseKeyword" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantElseKeywordInsideCompoundStatement" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantEmptyDeclaration" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantEmptyStatement" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantExportKeyword" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantFwdClassOrEnumSpecifier" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantInlineSpecifier" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantLambdaParameterList" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantMemberInitializer" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantNamespaceDefinition" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantParentheses" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantQualifier" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantStaticSpecifierOnMemberAllocationFunction" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantStaticSpecifierOnThreadLocalLocalVariable" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantTemplateArguments" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantTemplateKeyword" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantTypenameKeyword" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantVoidArgumentList" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppRedundantZeroInitializerInAggregateInitialization" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppReinterpretCastFromVoidPtr" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppRemoveRedundantBraces" enabled="true" level="WARNING" enabled_by_default="true" />
-    <inspection_tool class="CppReplaceMemsetWithZeroInitialization" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppReplaceTieWithStructuredBinding" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppReturnNoValueInNonVoidFunction" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppSmartPointerVsMakeFunction" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppSomeObjectMembersMightNotBeInitialized" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppSpecialFunctionWithoutNoexceptSpecification" enabled="false" level="WARNING" enabled_by_default="false" />
+    <inspection_tool class="CppPrintfRiskyFormat" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppPrivateSpecialMemberFunctionIsNotImplemented" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRangeBasedForIncompatibleReference" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedefinitionOfDefaultArgumentInOverrideFunction" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantAccessSpecifier" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantBaseClassAccessSpecifier" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantBaseClassInitializer" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantBooleanExpressionArgument" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantCastExpression" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantComplexityInComparison" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantConditionalExpression" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantConstSpecifier" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantControlFlowJump" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantDereferencingAndTakingAddress" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantElaboratedTypeSpecifier" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantElseKeyword" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantElseKeywordInsideCompoundStatement" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantEmptyDeclaration" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantEmptyStatement" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantExportKeyword" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantFwdClassOrEnumSpecifier" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantInlineSpecifier" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantLambdaParameterList" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantMemberInitializer" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantNamespaceDefinition" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantParentheses" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantQualifier" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantQualifierADL" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantStaticSpecifierOnMemberAllocationFunction" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantStaticSpecifierOnThreadLocalLocalVariable" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantTemplateArguments" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantTemplateKeyword" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantTypenameKeyword" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantVoidArgumentList" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRedundantZeroInitializerInAggregateInitialization" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppReinterpretCastFromVoidPtr" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppRemoveRedundantBraces" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppReplaceMemsetWithZeroInitialization" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppReplaceTieWithStructuredBinding" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppReturnNoValueInNonVoidFunction" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppSmartPointerVsMakeFunction" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppSomeObjectMembersMightNotBeInitialized" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppSpecialFunctionWithoutNoexceptSpecification" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
     <inspection_tool class="CppStaticAssertFailure" enabled="false" level="ERROR" enabled_by_default="false" />
-    <inspection_tool class="CppStaticDataMemberInUnnamedStruct" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppStaticSpecifierOnAnonymousNamespaceMember" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppStringLiteralToCharPointerConversion" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppTemplateArgumentsCanBeDeduced" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppTemplateParameterNeverUsed" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppTemplateParameterShadowing" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppThrowExpressionCanBeReplacedWithRethrow" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppTooWideScope" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppTooWideScopeInitStatement" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppTypeAliasNeverUsed" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppUninitializedDependentBaseClass" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppUninitializedNonStaticDataMember" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppUnionMemberOfReferenceType" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppUnmatchedPragmaEndRegionDirective" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppUnmatchedPragmaRegionDirective" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppUnnamedNamespaceInHeaderFile" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppUnsignedZeroComparison" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppUnusedIncludeDirective" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppUseAlgorithmWithCount" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppUseAssociativeContains" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppUseElementsView" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppUseEraseAlgorithm" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppUseFamiliarTemplateSyntaxForGenericLambdas" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppUseRangeAlgorithm" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppUseStdSize" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppUseStructuredBinding" enabled="false" level="HINT" enabled_by_default="false" />
-    <inspection_tool class="CppUseTypeTraitAlias" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppUserDefinedLiteralSuffixDoesNotStartWithUnderscore" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppUsingResultOfAssignmentAsCondition" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppVariableCanBeMadeConstexpr" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppVirtualFunctionCallInsideCtor" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppVirtualFunctionInFinalClass" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppVolatileParameterInDeclaration" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppWarningDirective" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppZeroConstantCanBeReplacedWithNullptr" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="CppZeroValuedExpressionUsedAsNullPointer" enabled="false" level="WARNING" enabled_by_default="false" />
+    <inspection_tool class="CppStaticDataMemberInUnnamedStruct" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppStaticSpecifierOnAnonymousNamespaceMember" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppStringLiteralToCharPointerConversion" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppTabsAreDisallowed" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppTemplateArgumentsCanBeDeduced" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppTemplateParameterNeverUsed" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppTemplateParameterShadowing" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppThrowExpressionCanBeReplacedWithRethrow" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppTooWideScope" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppTooWideScopeInitStatement" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppTypeAliasNeverUsed" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppUninitializedDependentBaseClass" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppUninitializedNonStaticDataMember" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppUnionMemberOfReferenceType" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppUnmatchedPragmaEndRegionDirective" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppUnmatchedPragmaRegionDirective" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppUnnamedNamespaceInHeaderFile" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppUnnecessaryWhitespace" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppUnsignedZeroComparison" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppUnusedIncludeDirective" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppUseAlgorithmWithCount" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppUseAssociativeContains" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppUseAuto" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppUseAutoForNumeric" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppUseElementsView" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppUseEraseAlgorithm" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppUseFamiliarTemplateSyntaxForGenericLambdas" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppUseRangeAlgorithm" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppUseStdSize" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppUseStructuredBinding" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppUseTypeTraitAlias" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppUserDefinedLiteralSuffixDoesNotStartWithUnderscore" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppUsingResultOfAssignmentAsCondition" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppVariableCanBeMadeConstexpr" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppVirtualFunctionCallInsideCtor" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppVirtualFunctionInFinalClass" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppVolatileParameterInDeclaration" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppWarningDirective" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppWrongIncludesOrder" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppWrongSlashesInIncludeDirective" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppZeroConstantCanBeReplacedWithNullptr" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="CppZeroValuedExpressionUsedAsNullPointer" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
     <inspection_tool class="CssDeprecatedValue" enabled="false" level="ERROR" enabled_by_default="false" />
     <inspection_tool class="CssInvalidAtRule" enabled="false" level="ERROR" enabled_by_default="false" />
     <inspection_tool class="CssInvalidCharsetRule" enabled="false" level="WARNING" enabled_by_default="false" />
@@ -305,8 +318,9 @@
     <inspection_tool class="DtsUndeclaredProperty" enabled="false" level="ERROR" enabled_by_default="false" />
     <inspection_tool class="DuplicateKeyInSection" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="DuplicateSectionInFile" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="DuplicatedCode" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
+    <inspection_tool class="DuplicatedCode" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
     <inspection_tool class="DuplicatedJobUsage" enabled="false" level="ERROR" enabled_by_default="false" />
+    <inspection_tool class="EmptyDirectory" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
     <inspection_tool class="GithubFunctionSignatureValidation" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="GrazieInspection" enabled="false" level="GRAMMAR_ERROR" enabled_by_default="false" />
     <inspection_tool class="HardwiredNamespacePrefix" enabled="false" level="WARNING" enabled_by_default="false" />
@@ -361,7 +375,7 @@
     <inspection_tool class="HttpRequestRequestSeparatorYamlBodyInspection" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
     <inspection_tool class="HttpRequestWhitespaceInsideRequestTargetPath" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
     <inspection_tool class="HttpUrlsUsage" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="IfStdIsConstantEvaluatedCanBeReplaced" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
+    <inspection_tool class="IfStdIsConstantEvaluatedCanBeReplaced" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
     <inspection_tool class="IgnoreFileDuplicateEntry" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="IllegalJobDependency" enabled="false" level="ERROR" enabled_by_default="false" />
     <inspection_tool class="ImplicitTypeConversion" enabled="false" level="WARNING" enabled_by_default="false">
@@ -369,6 +383,8 @@
       <option name="FLAG_EXPLICIT_CONVERSION" value="true" />
       <option name="IGNORE_NODESET_TO_BOOLEAN_VIA_STRING" value="true" />
     </inspection_tool>
+    <inspection_tool class="InconsistentLineSeparators" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="IncorrectFormatting" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
     <inspection_tool class="IncorrectHttpHeaderInspection" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="IndexZeroUsage" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="InjectedReferences" enabled="false" level="ERROR" enabled_by_default="false" />
@@ -385,6 +401,7 @@
     <inspection_tool class="LessResolvedByNameOnly" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
     <inspection_tool class="LessUnresolvedMixin" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="LessUnresolvedVariable" enabled="false" level="WARNING" enabled_by_default="false" />
+    <inspection_tool class="LongLine" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
     <inspection_tool class="LossyEncoding" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="MakefileUnresolvedPrerequisite" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
     <inspection_tool class="MandatoryParamsAbsent" enabled="false" level="ERROR" enabled_by_default="false" />
@@ -396,6 +413,7 @@
     <inspection_tool class="MarkdownUnresolvedFileReference" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="MarkdownUnresolvedHeaderReference" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="MarkdownUnresolvedLinkLabel" enabled="false" level="WARNING" enabled_by_default="false" />
+    <inspection_tool class="Misra" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
     <inspection_tool class="MongoJSDeprecationInspection" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="MongoJSResolveInspection" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="MongoJSSideEffectsInspection" enabled="false" level="WARNING" enabled_by_default="false" />
@@ -416,7 +434,8 @@
     <inspection_tool class="PostCssMediaRange" enabled="false" level="ERROR" enabled_by_default="false" />
     <inspection_tool class="PostCssUnresolvedModuleValueReference" enabled="false" level="ERROR" enabled_by_default="false" />
     <inspection_tool class="PpParserError" enabled="false" level="ERROR" enabled_by_default="false" />
-    <inspection_tool class="PreprocessorComment" enabled="false" level="WARNING" enabled_by_default="false" />
+    <inspection_tool class="PreprocessorComment" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="ProblematicWhitespace" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
     <inspection_tool class="PyAbstractClassInspection" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
     <inspection_tool class="PyArgumentListInspection" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="PyAssertTypeInspection" enabled="false" level="WARNING" enabled_by_default="false" />
@@ -502,9 +521,9 @@
     <inspection_tool class="PyUnresolvedReferencesInspection" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="PyUnusedImportsInspection" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="PyUnusedLocalInspection" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="RadGlobal" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="ReassignedToPlainText" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="RedundantSuppression" enabled="false" level="WARNING" enabled_by_default="false" />
+    <inspection_tool class="RadGlobal" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="ReassignedToPlainText" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="RedundantSuppression" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
     <inspection_tool class="RedundantTypeConversion" enabled="false" level="WARNING" enabled_by_default="false">
       <option name="CHECK_ANY" value="false" />
     </inspection_tool>
@@ -525,7 +544,6 @@
     <inspection_tool class="RequiredAttributes" enabled="false" level="WARNING" enabled_by_default="false">
       <option name="myAdditionalRequiredHtmlAttributes" value="" />
     </inspection_tool>
-    <inspection_tool class="SSBasedInspection" enabled="true" level="WARNING" enabled_by_default="true" />
     <inspection_tool class="SassScssResolvedByNameOnly" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
     <inspection_tool class="SassScssUnresolvedMixin" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="SassScssUnresolvedPlaceholderSelector" enabled="false" level="WARNING" enabled_by_default="false" />
@@ -584,7 +602,8 @@
     <inspection_tool class="SqlUnusedSubqueryItemInspection" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="SqlUnusedVariableInspection" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="SqlWithoutWhereInspection" enabled="false" level="WARNING" enabled_by_default="false" />
-    <inspection_tool class="StdIsConstantEvaluatedWillAlwaysEvaluateToConstant" enabled="false" level="WARNING" enabled_by_default="false" />
+    <inspection_tool class="StdIsConstantEvaluatedWillAlwaysEvaluateToConstant" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
+    <inspection_tool class="TodoComment" enabled="false" level="ERROR" enabled_by_default="false" editorAttributes="ERRORS_ATTRIBUTES" />
     <inspection_tool class="TomlUnresolvedReference" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="UndefinedAction" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="UndefinedJob" enabled="false" level="ERROR" enabled_by_default="false" />
