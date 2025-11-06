@@ -173,7 +173,7 @@ void ceilspritescan (long x1, long x2);
 
 void ceilspritehline(long x2, long y);
 
-int setsprite(short spritenum, long newx, long newy, long newz);
+//int setsprite(short spritenum, long newx, long newy, long newz);
 
 long animateoffs(short tilenum, short fakevar);
 

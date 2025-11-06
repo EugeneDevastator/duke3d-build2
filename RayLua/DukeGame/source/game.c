@@ -2565,7 +2565,7 @@ short spawn( short j, short pn )
             case WATERSPLASH2:
                 if(j >= 0)
                 {
-                    setsprite(i,sprite[j].x,sprite[j].y,sprite[j].z);
+                    bbeng.SetSprPos(i,sprite[j].x,sprite[j].y,sprite[j].z);
                     sp->xrepeat = sp->yrepeat = 8+(TRAND&7);
                 }
                 else sp->xrepeat = sp->yrepeat = 16+(TRAND&15);
@@ -2659,7 +2659,7 @@ short spawn( short j, short pn )
                 sp->xvel = 128;
                 changespritestat(i,5);
                 ssp(i,CLIPMASK0);
-                setsprite(i,sp->x,sp->y,sp->z);
+                bbeng.SetSprPos(i,sp->x,sp->y,sp->z);
                 break;
 
             case FRAMEEFFECT1:
@@ -3220,7 +3220,7 @@ short spawn( short j, short pn )
                         bbeng.SetSprPos(s, sp->x, sp->y, sp->z);
                         sprite[s].shade = sp->shade;
 
-                        setsprite(s,sprite[s].x,sprite[s].y,sprite[s].z);
+                        bbeng.SetSprPos(s,sprite[s].x,sprite[s].y,sprite[s].z);
                         break;
                     }
                     s = nextspritestat[s];

@@ -434,7 +434,7 @@ void shoot(short i,short atwith)
                         bbeng.SetSprPos(k,hitx,hity,hitz);
                         sprite[k].cstat |= (TRAND&4);
                         ssp(k,CLIPMASK0);
-                        setsprite(k,sprite[k].x,sprite[k].y,sprite[k].z);
+                        bbeng.SetSprPos(k,sprite[k].x,sprite[k].y,sprite[k].z);
                         if( PN == OOZFILTER || PN == NEWBEAST )
                             sprite[k].pal = 6;
                     }
@@ -3249,7 +3249,7 @@ void processinput(short snum)
         }
 
         // RBG***
-        setsprite(pi,p->posx,p->posy,p->posz+PHEIGHT);
+        bbeng.SetSprPos(pi,p->posx,p->posy,p->posz+PHEIGHT);
 
         if( psectlotag < 3 )
         {

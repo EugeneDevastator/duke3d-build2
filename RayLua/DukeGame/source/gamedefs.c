@@ -35,6 +35,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "gamedefs.h"
 #include "global.h"
 #include "_functio.h"
+#include "dukewrap.h"
 
 char * gamefunctions[] =
 {
@@ -1872,7 +1873,7 @@ void move()
         {
             hittype[g_i].bposx = g_sp->x;
             hittype[g_i].bposy = g_sp->y;
-            setsprite(g_i,g_sp->x,g_sp->y,g_sp->z);
+            bbeng.SetSprPos(g_i,g_sp->x,g_sp->y,g_sp->z);
         }
         return;
     }
@@ -2667,7 +2668,7 @@ char parse()
                 g_sp->y = hittype[g_i].bposy = ps[g_p].bobposy = ps[g_p].oposy =ps[g_p].posy;
                 g_sp->z = hittype[g_i].bposy = ps[g_p].oposz =ps[g_p].posz;
                 updatesector(ps[g_p].posx,ps[g_p].posy,&ps[g_p].cursectnum);
-                setsprite(ps[g_p].i,ps[g_p].posx,ps[g_p].posy,ps[g_p].posz+PHEIGHT);
+                bbeng.SetSprPos(ps[g_p].i,ps[g_p].posx,ps[g_p].posy,ps[g_p].posz+PHEIGHT);
                 g_sp->cstat = 257;
 
                 g_sp->shade = -12;

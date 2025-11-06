@@ -622,7 +622,7 @@ int movesprite(short spritenum, long xchange, long ychange, long zchange, unsign
         sprite[spritenum].y += (ychange*TICSPERFRAME)>>2;
         sprite[spritenum].z += (zchange*TICSPERFRAME)>>2;
         if(bg)
-            setsprite(spritenum,sprite[spritenum].x,sprite[spritenum].y,sprite[spritenum].z);
+            bbeng.SetSprPos(spritenum,sprite[spritenum].x,sprite[spritenum].y,sprite[spritenum].z);
         return 0;
     }
 
@@ -664,7 +664,7 @@ int movesprite(short spritenum, long xchange, long ychange, long zchange, unsign
                     sprite[spritenum].ang = (TRAND&2047);
                 else if( (hittype[spritenum].temp_data[0]&3) == 1 && sprite[spritenum].picnum != COMMANDER )
                     sprite[spritenum].ang = (TRAND&2047);
-                setsprite(spritenum,oldx,oldy,sprite[spritenum].z);
+                bbeng.SetSprPos(spritenum,oldx,oldy,sprite[spritenum].z);
                 if(dasectnum < 0) dasectnum = 0;
                 return (16384+dasectnum);
         }
@@ -1150,7 +1150,7 @@ void movedummyplayers()
 
         SX += (ps[p].posx-ps[p].oposx);
         SY += (ps[p].posy-ps[p].oposy);
-        setsprite(i,SX,SY,SZ);
+        bbeng.SetSprPos(i,SX,SY,SZ);
 
         BOLT:
 
@@ -1182,7 +1182,7 @@ void moveplayers() //Players
                 s->y = p->oposy;
                 hittype[i].bposz = s->z = p->oposz+PHEIGHT;
                 s->ang = p->oang;
-                setsprite(i,s->x,s->y,s->z);
+                bbeng.SetSprPos(i,s->x,s->y,s->z);
             }
             else
             {
@@ -1282,7 +1282,7 @@ void moveplayers() //Players
             else
             {
                 s->ang = 2047-p->ang;
-                setsprite(i,s->x,s->y,s->z);
+                bbeng.SetSprPos(i,s->x,s->y,s->z);
             }
         }
 
@@ -1538,7 +1538,7 @@ void movestandables()
                         case 6:
                         case 10:
                             s->ang = getangle(msx[t[4]+1]-s->x,msy[t[4]+1]-s->y);
-                            setsprite(j,msx[t[4]+1],msy[t[4]+1],sprite[j].z);
+                            bbeng.SetSprPos(j,msx[t[4]+1],msy[t[4]+1],sprite[j].z);
                             t[0]++;
                             goto BOLT;
                     }
@@ -1656,7 +1656,7 @@ void movestandables()
             else if(t[0]==9)
                 t[0] = 0;
 
-            setsprite(msy[t[4]+2],s->x,s->y,s->z-(34<<8));
+            bbeng.SetSprPos(msy[t[4]+2],s->x,s->y,s->z-(34<<8));
 
             if(s->owner != -1)
             {
@@ -1674,7 +1674,7 @@ void movestandables()
 
                 if(s->owner >= 0)
                 {
-                    setsprite(s->owner,s->x,s->y,s->z);
+                    bbeng.SetSprPos(s->owner,s->x,s->y,s->z);
 
                     hittype[s->owner].bposx = s->x;
                     hittype[s->owner].bposy = s->y;
@@ -1687,7 +1687,7 @@ void movestandables()
                     ps[p].oposx = ps[p].posx = s->x-(sintable[(ps[p].ang+512)&2047]>>6);
                     ps[p].oposy = ps[p].posy = s->y-(sintable[ps[p].ang&2047]>>6);
                     ps[p].oposz = ps[p].posz = s->z+(2<<8);
-                    setsprite(ps[p].i,ps[p].posx,ps[p].posy,ps[p].posz);
+                    bbeng.SetSprPos(ps[p].i,ps[p].posx,ps[p].posy,ps[p].posz);
                     ps[p].cursectnum = sprite[ps[p].i].sectnum;
                 }
             }
@@ -1815,7 +1815,7 @@ void movestandables()
                 s->x += sintable[(T6+512)&2047]>>9;
                 s->y += sintable[(T6)&2047]>>9;
                 s->z -= (3<<8);
-                setsprite(i,s->x,s->y,s->z);
+                bbeng.SetSprPos(i,s->x,s->y,s->z);
 
                 x = hitasprite(i,&m);
 
@@ -1828,7 +1828,7 @@ void movestandables()
                 while(x > 0)
                 {
                     j = spawn(i,LASERLINE);
-                    setsprite(j,sprite[j].x,sprite[j].y,sprite[j].z);
+                    bbeng.SetSprPos(j,sprite[j].x,sprite[j].y,sprite[j].z);
                     sprite[j].hitag = s->hitag;
                     hittype[j].temp_data[1] = sprite[j].z;
 
@@ -1846,7 +1846,7 @@ void movestandables()
                 T1++;
                 s->x = T4;s->y = T5;
                 s->z += (3<<8);
-                setsprite(i,s->x,s->y,s->z);
+                bbeng.SetSprPos(i,s->x,s->y,s->z);
                 T4 = 0;
                 if( m >= 0 )
                 {
@@ -1864,13 +1864,13 @@ void movestandables()
                 s->x += sintable[(T6+512)&2047]>>9;
                 s->y += sintable[(T6)&2047]>>9;
                 s->z -= (3<<8);
-                setsprite(i,s->x,s->y,s->z);
+                bbeng.SetSprPos(i,s->x,s->y,s->z);
 
                 x = hitasprite(i,&m);
 
                 s->x = T4;s->y = T5;
                 s->z += (3<<8);
-                setsprite(i,s->x,s->y,s->z);
+                bbeng.SetSprPos(i,s->x,s->y,s->z);
 
                 if( hittype[i].lastvx != x )
                 {
@@ -2655,7 +2655,7 @@ void moveweapons()
                         }
                         else
                         {
-                            setsprite(i,dax,day,daz);
+                            bbeng.SetSprPos(i,dax,day,daz);
                             checkhitwall(i,j,s->x,s->y,s->z,s->picnum);
 
                             if(s->picnum == FREEZEBLAST)
@@ -2676,7 +2676,7 @@ void moveweapons()
                     }
                     else if( (j&49152) == 16384)
                     {
-                        setsprite(i,dax,day,daz);
+                        bbeng.SetSprPos(i,dax,day,daz);
 
                         if(s->zvel < 0)
                         {
@@ -2931,7 +2931,7 @@ void movetransports()
                             ps[p].cursectnum = sprite[OW].sectnum;
 
                             changespritesect(j,sprite[OW].sectnum);
-                            setsprite(ps[p].i,ps[p].posx,ps[p].posy,ps[p].posz+PHEIGHT);
+                            bbeng.SetSprPos(ps[p].i,ps[p].posx,ps[p].posy,ps[p].posz+PHEIGHT);
 
                             setpal(&ps[p]);
 
@@ -3670,7 +3670,7 @@ void moveactors()
                         goto BOLT;
                     }
 
-                    setsprite(i,s->x,s->y,s->z);
+                    bbeng.SetSprPos(i,s->x,s->y,s->z);
 
                     s->ang = ps[p].ang;
 
@@ -4580,7 +4580,7 @@ void moveexplosions()  // STATNUM 5
                 ssp(i,CLIPMASK0);
 
                 if( (TRAND&3) == 0 )
-                    setsprite(i,s->x,s->y,s->z);
+                    bbeng.SetSprPos(i,s->x,s->y,s->z);
 
                 if(s->sectnum == -1) KILLIT(i);
                 l = getflorzofslope(s->sectnum,s->x,s->y);
@@ -4633,7 +4633,7 @@ void moveexplosions()  // STATNUM 5
 
                 if(s->zvel > 1024 && s->zvel < 1280)
                 {
-                    setsprite(i,s->x,s->y,s->z);
+                    bbeng.SetSprPos(i,s->x,s->y,s->z);
                     sect = s->sectnum;
                 }
 
@@ -4847,7 +4847,7 @@ void moveexplosions()  // STATNUM 5
                     s->xrepeat >>= 1;
                     s->yrepeat >>= 1;
                     if( rnd(96) )
-                      setsprite(i,s->x,s->y,s->z);
+                      bbeng.SetSprPos(i,s->x,s->y,s->z);
                     t[0]++;//Number of bounces
                 }
                 else if( t[0] == 3 ) KILLIT(i);
@@ -4872,7 +4872,7 @@ void moveexplosions()  // STATNUM 5
 
                 if(s->zvel > 1024 && s->zvel < 1280)
                 {
-                    setsprite(i,s->x,s->y,s->z);
+                    bbeng.SetSprPos(i,s->x,s->y,s->z);
                     sect = s->sectnum;
                 }
 
@@ -4906,7 +4906,7 @@ void moveexplosions()  // STATNUM 5
                     if(s->picnum == SCRAP1 && s->yvel > 0)
                     {
                         j = spawn(i,s->yvel);
-                        setsprite(j,s->x,s->y,s->z);
+                        bbeng.SetSprPos(j,s->x,s->y,s->z);
                         getglobalz(j);
                         sprite[j].hitag = sprite[j].lotag = 0;
                     }
@@ -5230,7 +5230,7 @@ void moveeffectors()   //STATNUM 3
                                 ps[p].posy = s->y;
                                 ps[p].cursectnum = s->sectnum;
 
-                                setsprite(ps[p].i,s->x,s->y,s->z);
+                                bbeng.SetSprPos(ps[p].i,s->x,s->y,s->z);
                                 quickkill(&ps[p]);
                             }
                         }
@@ -5295,7 +5295,7 @@ void moveeffectors()   //STATNUM 3
                     }
 
                     ms(i);
-                    setsprite(i,s->x,s->y,s->z);
+                    bbeng.SetSprPos(i,s->x,s->y,s->z);
 
                     if( (sc->floorz-sc->ceilingz) < (108<<8) )
                     {
@@ -5311,7 +5311,7 @@ void moveeffectors()   //STATNUM 3
                                 ps[p].oposy = ps[p].posy = s->y;
                                 ps[p].cursectnum = s->sectnum;
 
-                                setsprite(ps[p].i,s->x,s->y,s->z);
+                                bbeng.SetSprPos(ps[p].i,s->x,s->y,s->z);
                                 quickkill(&ps[p]);
                             }
                         }
@@ -5410,7 +5410,7 @@ void moveeffectors()   //STATNUM 3
                             ps[p].posy = s->y;
                             ps[p].cursectnum = s->sectnum;
 
-                            setsprite(ps[p].i,s->x,s->y,s->z);
+                            bbeng.SetSprPos(ps[p].i,s->x,s->y,s->z);
                             quickkill(&ps[p]);
                         }
                     }
@@ -5463,7 +5463,7 @@ void moveeffectors()   //STATNUM 3
                     }
 
                     ms(i);
-                    setsprite(i,s->x,s->y,s->z);
+                    bbeng.SetSprPos(i,s->x,s->y,s->z);
 
                     if( (sc->floorz-sc->ceilingz) < (108<<8) )
                     {
@@ -5483,7 +5483,7 @@ void moveeffectors()   //STATNUM 3
 
                                 ps[p].cursectnum = s->sectnum;
 
-                                setsprite(ps[p].i,s->x,s->y,s->z);
+                                bbeng.SetSprPos(ps[p].i,s->x,s->y,s->z);
                                 quickkill(&ps[p]);
                             }
                         }
@@ -5571,12 +5571,12 @@ void moveeffectors()   //STATNUM 3
                         {
                             sprite[j].x+=m;
                             sprite[j].y+=x;
-                            setsprite(j,sprite[j].x,sprite[j].y,sprite[j].z);
+                            bbeng.SetSprPos(j,sprite[j].x,sprite[j].y,sprite[j].z);
                         }
                         j = nextj;
                     }
                     ms(i);
-                    setsprite(i,s->x,s->y,s->z);
+                    bbeng.SetSprPos(i,s->x,s->y,s->z);
                 }
                 break;
 
@@ -5756,7 +5756,7 @@ void moveeffectors()   //STATNUM 3
                 sc->ceilingz += s->zvel;
                 sector[t[0]].ceilingz += s->zvel;
                 ms(i);
-                setsprite(i,s->x,s->y,s->z);
+                bbeng.SetSprPos(i,s->x,s->y,s->z);
                 break;
 
             
@@ -5901,7 +5901,7 @@ void moveeffectors()   //STATNUM 3
                                 t[2]-=k;
                                 t[4]-=k;
                                 ms(i);
-                                setsprite(i,s->x,s->y,s->z);
+                                bbeng.SetSprPos(i,s->x,s->y,s->z);
                                 goto BOLT;
                             }
                             k = nextspritestat[k];
@@ -5912,14 +5912,14 @@ void moveeffectors()   //STATNUM 3
                     t[2]+=k;
                     t[4]+=k;
                     ms(i);
-                    setsprite(i,s->x,s->y,s->z);
+                    bbeng.SetSprPos(i,s->x,s->y,s->z);
 
                     if(t[4] <= -511 || t[4] >= 512)
                     {
                         t[4] = 0;
                         t[2] &= 0xffffff00;
                         ms(i);
-                        setsprite(i,s->x,s->y,s->z);
+                        bbeng.SetSprPos(i,s->x,s->y,s->z);
                         break;
                     }
                 }
@@ -6085,7 +6085,7 @@ void moveeffectors()   //STATNUM 3
                     }
 
                     ms(i);
-                    setsprite(i,s->x,s->y,s->z);
+                    bbeng.SetSprPos(i,s->x,s->y,s->z);
                 }
                 break;
 
@@ -6117,7 +6117,7 @@ void moveeffectors()   //STATNUM 3
                 else sc->ceilingz-=512;
 
                 ms(i);
-                setsprite(i,s->x,s->y,s->z);
+                bbeng.SetSprPos(i,s->x,s->y,s->z);
 
                 break;
 
@@ -6226,7 +6226,7 @@ void moveeffectors()   //STATNUM 3
                             hittype[k].bposz = sprite[k].z;
 
                             changespritesect(k,sprite[j].sectnum);
-                            setsprite(k,sprite[k].x,sprite[k].y,sprite[k].z);
+                            bbeng.SetSprPos(k,sprite[k].x,sprite[k].y,sprite[k].z);
 
                             hittype[k].floorz = sector[sprite[j].sectnum].floorz;
                             hittype[k].ceilingz = sector[sprite[j].sectnum].ceilingz;
@@ -6444,7 +6444,7 @@ void moveeffectors()   //STATNUM 3
                         {
                             sprite[j].x += x;
                             sprite[j].y += l;
-                            setsprite(j,sprite[j].x,sprite[j].y,sprite[j].z);
+                            bbeng.SetSprPos(j,sprite[j].x,sprite[j].y,sprite[j].z);
                             if( sector[sprite[j].sectnum].floorstat&2 )
                                 if(sprite[j].statnum == 2)
                                     makeitfall(j);
@@ -6464,7 +6464,7 @@ void moveeffectors()   //STATNUM 3
                             ps[p].oposx = ps[p].posx;
                             ps[p].oposy = ps[p].posy;
 
-                            setsprite(ps[p].i,ps[p].posx,ps[p].posy,ps[p].posz+PHEIGHT);
+                            bbeng.SetSprPos(ps[p].i,ps[p].posx,ps[p].posy,ps[p].posz+PHEIGHT);
                         }
 
                     sc->floorxpanning-=x>>3;
@@ -6579,7 +6579,7 @@ void moveeffectors()   //STATNUM 3
                                     sprite[j].x += x>>2;
                                     sprite[j].y += l>>2;
 
-                                    setsprite(j,sprite[j].x,sprite[j].y,sprite[j].z);
+                                    bbeng.SetSprPos(j,sprite[j].x,sprite[j].y,sprite[j].z);
 
                                     if( sector[sprite[j].sectnum].floorstat&2 )
                                         if(sprite[j].statnum == 2)
@@ -6611,7 +6611,7 @@ void moveeffectors()   //STATNUM 3
                     k = spawn(i,SMALLSMOKE);
                     sprite[k].xvel = 96+(TRAND&127);
                     ssp(k,CLIPMASK0);
-                    setsprite(k,sprite[k].x,sprite[k].y,sprite[k].z);
+                    bbeng.SetSprPos(k,sprite[k].x,sprite[k].y,sprite[k].z);
                     if( rnd(16) )
                         spawn(i,EXPLOSION2);
                 }
@@ -6690,7 +6690,7 @@ void moveeffectors()   //STATNUM 3
                         sprite[j].y += x;
 
                         sprite[j].z += s->zvel;
-                        setsprite(j,sprite[j].x,sprite[j].y,sprite[j].z);
+                        bbeng.SetSprPos(j,sprite[j].x,sprite[j].y,sprite[j].z);
                     }
                     j = nextj;
                 }
@@ -6707,7 +6707,7 @@ void moveeffectors()   //STATNUM 3
                         ps[p].posz += s->zvel;
 
                 ms(i);
-                setsprite(i,s->x,s->y,s->z);
+                bbeng.SetSprPos(i,s->x,s->y,s->z);
 
                 break;
 
