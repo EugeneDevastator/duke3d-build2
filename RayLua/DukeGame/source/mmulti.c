@@ -28,6 +28,7 @@ void  callcommit()
 
 void initmultiplayers(char damultioption, char dacomrateoption, char dapriority)
 {
+
     long i;
     char *parm, delims[4] = {'\\','-','/','\0'};
 
@@ -49,6 +50,7 @@ void initmultiplayers(char damultioption, char dacomrateoption, char dapriority)
         connecthead = 0; connectpoint2[0] = -1;
         return;
     }
+/*
     gcom = (gcomtype *)atol(_argv[i+1]);
 
     numplayers = gcom->numplayers;
@@ -59,7 +61,7 @@ void initmultiplayers(char damultioption, char dacomrateoption, char dapriority)
     connecthead = 0;
     for(i=0;i<numplayers-1;i++) connectpoint2[i] = i+1;
     connectpoint2[numplayers-1] = -1;
-
+*/
     for(i=0;i<numplayers;i++) lastsendtime[i] = totalclock;
 }
 

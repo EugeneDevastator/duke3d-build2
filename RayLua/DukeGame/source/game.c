@@ -6757,8 +6757,6 @@ void RunDukeMap() // New Entry point copy of main
         trees[0] = 'I';
         initgroupfile("duke3d.grp");
 
-
-
         totalmemory = 999999999999;
         Startup();
 

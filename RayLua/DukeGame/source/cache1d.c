@@ -49,7 +49,7 @@ static long groupfilpos[MAXGROUPFILES];
 static char *gfilelist[MAXGROUPFILES];
 static long *gfileoffs[MAXGROUPFILES];
 
-static char filegrp[MAXOPENFILES];
+static uint8_t filegrp[MAXOPENFILES];
 static long filepos[MAXOPENFILES];
 static long filehan[MAXOPENFILES] =
 {
@@ -135,7 +135,7 @@ void  allocache(long* newhandle, long newbytes, char* newlockptr)
 
     //Remove all blocks except 1
     suckz -= (bestz+1); cacnum -= suckz;
-    copybufbyte(&cac[bestz+suckz],&cac[bestz],(cacnum-bestz)*sizeof(cactype));
+    memcpy(&cac[bestz+suckz],&cac[bestz],(cacnum-bestz)*sizeof(cactype));
     cac[bestz].hand = newhandle; *newhandle = cachestart+besto;
     cac[bestz].leng = newbytes;
     cac[bestz].lock = newlockptr;
@@ -177,12 +177,12 @@ void  suckcache(long* suckptr)
             if ((i > 0) && (*cac[i-1].lock == 0))
             {
                 cac[i-1].leng += cac[i].leng;
-                cacnum--; copybuf(&cac[i+1],&cac[i],(cacnum-i)*sizeof(cactype));
+                cacnum--; memcpy(&cac[i+1],&cac[i],(cacnum-i)*sizeof(cactype));
             }
             else if ((i < cacnum-1) && (*cac[i+1].lock == 0))
             {
                 cac[i+1].leng += cac[i].leng;
-                cacnum--; copybuf(&cac[i+1],&cac[i],(cacnum-i)*sizeof(cactype));
+                cacnum--; memcpy(&cac[i+1],&cac[i],(cacnum-i)*sizeof(cactype));
             }
         }
 }
@@ -317,10 +317,11 @@ long kopen4load(const char* filename, char searchfirst)
     }
 
     if (searchfirst == 0) {
-        FILE* file = fopen(filename, "rb");
+        FILE* file;
+        fopen_s(&file, filename, "rb");
         if (file) {
             filegrp[newhandle] = 255;
-            filehan[newhandle] = fileno(file);
+            filehan[newhandle] = _fileno(file);
             filepos[newhandle] = 0;
             return newhandle;
         }
@@ -409,7 +410,7 @@ long klseek(long handle, long offset, int whence)
 
 long kfilelength(long handle)
 {
-    long groupnum = filegrp[handle];
+    unsigned char groupnum = filegrp[handle];
 
     if (groupnum == 255) {
         struct stat st;
@@ -452,7 +453,7 @@ void kdfread(void* buffer, size_t dasizeof, size_t count, long fil)
     kread(fil,&leng,2); kread(fil,lzwbuf5,(long)leng);
     k = 0; kgoal = uncompress(lzwbuf5,(long)leng,lzwbuf4);
 
-    copybufbyte(lzwbuf4,ptr,(long)dasizeof);
+    memcpy(lzwbuf4,ptr,(long)dasizeof);
     k += (long)dasizeof;
 
     for(i=1;i<count;i++)
@@ -488,7 +489,7 @@ void dfread(void* buffer, size_t dasizeof, size_t count, FILE* fil)
     fread(&leng,2,1,fil); fread(lzwbuf5,(long)leng,1,fil);
     k = 0; kgoal = uncompress(lzwbuf5,(long)leng,lzwbuf4);
 
-    copybufbyte(lzwbuf4,ptr,(long)dasizeof);
+    memcpy(lzwbuf4,ptr,(long)dasizeof);
     k += (long)dasizeof;
 
     for(i=1;i<count;i++)
@@ -521,7 +522,7 @@ void dfwrite(void* buffer, size_t dasizeof, size_t count, FILE* fil)
     if (dasizeof > LZWSIZE) { count *= dasizeof; dasizeof = 1; }
     ptr = (char *)buffer;
 
-    copybufbyte(ptr,lzwbuf4,(long)dasizeof);
+    memcpy(ptr,lzwbuf4,(long)dasizeof);
     k = dasizeof;
 
     if (k > LZWSIZE-dasizeof)
@@ -558,8 +559,8 @@ long compress(char* lzwinbuf, long uncompleng, char* lzwoutbuf)
     short *shortptr;
 
     for(i=255;i>=0;i--) { lzwbuf1[i] = i; lzwbuf3[i] = (i+1)&255; }
-    clearbuf((void*)(lzwbuf2),256>>1,0xffffffff);
-    clearbuf((void*)(lzwoutbuf),((uncompleng+15)+3)>>2,0L);
+    memset((void*)(lzwbuf2),256>>1,0xffffffff);
+    memset((void*)(lzwoutbuf),((uncompleng+15)+3)>>2,0L);
 
     addrcnt = 256; bytecnt1 = 0; bitcnt = (4<<3);
     numbits = 8; oneupnumbits = (1<<8);
@@ -623,7 +624,7 @@ long uncompress(char* lzwinbuf, long compleng, char* lzwoutbuf)
     strtot = (long)shortptr[1];
     if (strtot == 0)
     {
-        copybuf((char*)(lzwinbuf)+4, (char*)(lzwoutbuf), ((compleng-4)+3)>>2);
+        memcpy((char*)(lzwinbuf)+4, (char*)(lzwoutbuf), ((compleng-4)+3)>>2);
         return((long)shortptr[0]); //uncompleng
     }
     for(i=255;i>=0;i--) { lzwbuf2[i] = i; lzwbuf3[i] = i; }

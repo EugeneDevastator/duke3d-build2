@@ -1213,6 +1213,7 @@ void resettimevars()
 
 void genspriteremaps()
 {
+
     long j,fp;
     signed char look_pos;
     char *lookfn = "lookup.dat";
