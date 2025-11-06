@@ -1,11 +1,18 @@
 #include <stdlib.h>
 
 #include "cache1d.h"
+
+#include <ctype.h>
+#include <sys/stat.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <errno.h>
 #include "fcntl.h"
+
 long cachesize = 0;
-
-
-
 long cachecount = 0;
 char zerochar = 0;
 long cachestart = 0, cacnum = 0, agecount = 0;
@@ -216,179 +223,213 @@ void reportandexit(char* errormessage)
     printf("ERROR: %s",errormessage);
    //exit(0);
 }
-
-int initgroupfile(char* filename)
+int initgroupfile(const char* filename)
 {
     char buf[16];
-    long i, j, k;
+    FILE* file;
 
-    if (numgroupfiles >= MAXGROUPFILES) return(-1);
+    if (numgroupfiles >= MAXGROUPFILES) return -1;
 
-    groupfil[numgroupfiles] = open(filename,0x8000|0x0002); // r bind
-    if (groupfil[numgroupfiles] != -1)
-    {
-        groupfilpos[numgroupfiles] = 0;
-        read(groupfil[numgroupfiles],buf,16);
-        if ((buf[0] != 'K') || (buf[1] != 'e') || (buf[2] != 'n') ||
-            (buf[3] != 'S') || (buf[4] != 'i') || (buf[5] != 'l') ||
-            (buf[6] != 'v') || (buf[7] != 'e') || (buf[8] != 'r') ||
-            (buf[9] != 'm') || (buf[10] != 'a') || (buf[11] != 'n'))
-        {
-            close(groupfil[numgroupfiles]);
-            groupfil[numgroupfiles] = -1;
-            return(-1);
-        }
-        gnumfiles[numgroupfiles] = *((long *)&buf[12]);
-
-        if ((gfilelist[numgroupfiles] = (char *)kmalloc(gnumfiles[numgroupfiles]<<4)) == 0)
-        { printf("Not enough memory for file grouping system\n"); }//exit(0); }
-        if ((gfileoffs[numgroupfiles] = (long *)kmalloc((gnumfiles[numgroupfiles]+1)<<2)) == 0)
-        { printf("Not enough memory for file grouping system\n"); }//exit(0); }
-
-        read(groupfil[numgroupfiles],gfilelist[numgroupfiles],gnumfiles[numgroupfiles]<<4);
-
-        j = 0;
-        for(i=0;i<gnumfiles[numgroupfiles];i++)
-        {
-            k = *((long *)&gfilelist[numgroupfiles][(i<<4)+12]);
-            gfilelist[numgroupfiles][(i<<4)+12] = 0;
-            gfileoffs[numgroupfiles][i] = j;
-            j += k;
-        }
-        gfileoffs[numgroupfiles][gnumfiles[numgroupfiles]] = j;
+    file = fopen(filename, "rb");
+    if (!file) {
+        groupfil[numgroupfiles] = -1;
+        return -1;
     }
+
+    groupfil[numgroupfiles] = fileno(file);
+    groupfilpos[numgroupfiles] = 0;
+
+    if (fread(buf, 1, 16, file) != 16) {
+        fclose(file);
+        groupfil[numgroupfiles] = -1;
+        return -1;
+    }
+
+    if (memcmp(buf, "KenSilverman", 12) != 0) {
+        fclose(file);
+        groupfil[numgroupfiles] = -1;
+        return -1;
+    }
+
+    memcpy(&gnumfiles[numgroupfiles], &buf[12], sizeof(long));
+
+    gfilelist[numgroupfiles] = malloc(gnumfiles[numgroupfiles] * 16);
+    if (!gfilelist[numgroupfiles]) {
+        printf("Not enough memory for file grouping system\n");
+        fclose(file);
+        groupfil[numgroupfiles] = -1;
+        return -1;
+    }
+
+    gfileoffs[numgroupfiles] = malloc((gnumfiles[numgroupfiles] + 1) * sizeof(long));
+    if (!gfileoffs[numgroupfiles]) {
+        printf("Not enough memory for file grouping system\n");
+        free(gfilelist[numgroupfiles]);
+        fclose(file);
+        groupfil[numgroupfiles] = -1;
+        return -1;
+    }
+
+    if (fread(gfilelist[numgroupfiles], 16, gnumfiles[numgroupfiles], file) != gnumfiles[numgroupfiles]) {
+        free(gfilelist[numgroupfiles]);
+        free(gfileoffs[numgroupfiles]);
+        fclose(file);
+        groupfil[numgroupfiles] = -1;
+        return -1;
+    }
+
+    long j = 0;
+    for (long i = 0; i < gnumfiles[numgroupfiles]; i++) {
+        long k;
+        memcpy(&k, &gfilelist[numgroupfiles][(i * 16) + 12], sizeof(long));
+        gfilelist[numgroupfiles][(i * 16) + 12] = 0;
+        gfileoffs[numgroupfiles][i] = j;
+        j += k;
+    }
+    gfileoffs[numgroupfiles][gnumfiles[numgroupfiles]] = j;
+
     numgroupfiles++;
-    return(groupfil[numgroupfiles-1]);
+    return groupfil[numgroupfiles - 1];
 }
 
-void uninitgroupfile()
+void uninitgroupfile(void)
 {
-    long i;
-
-    for(i=numgroupfiles-1;i>=0;i--)
-        if (groupfil[i] != -1)
-        {
-            kfree(gfilelist[i]);
-            kfree(gfileoffs[i]);
+    for (long i = numgroupfiles - 1; i >= 0; i--) {
+        if (groupfil[i] != -1) {
+            free(gfilelist[i]);
+            free(gfileoffs[i]);
             close(groupfil[i]);
             groupfil[i] = -1;
         }
+    }
 }
 
-long kopen4load(char* filename, char searchfirst)
+long kopen4load(const char* filename, char searchfirst)
 {
-    long i, j, k, fil, newhandle;
-    char bad, *gfileptr;
+    long newhandle = MAXOPENFILES - 1;
 
-    newhandle = MAXOPENFILES-1;
-    while (filehan[newhandle] != -1)
-    {
+    while (filehan[newhandle] != -1) {
         newhandle--;
-        if (newhandle < 0)
-        {
+        if (newhandle < 0) {
             printf("TOO MANY FILES OPEN IN FILE GROUPING SYSTEM!");
-            //exit(0);
+            return -1;
         }
     }
 
-    if (searchfirst == 0)
-        if ((fil = open(filename,O_BINARY|O_RDONLY)) != -1)
-        {
+    if (searchfirst == 0) {
+        FILE* file = fopen(filename, "rb");
+        if (file) {
             filegrp[newhandle] = 255;
-            filehan[newhandle] = fil;
+            filehan[newhandle] = fileno(file);
             filepos[newhandle] = 0;
-            return(newhandle);
+            return newhandle;
         }
-    for(k=numgroupfiles-1;k>=0;k--)
-    {
-        if (searchfirst != 0) k = 0;
-        if (groupfil[k] != -1)
-        {
-            for(i=gnumfiles[k]-1;i>=0;i--)
-            {
-                gfileptr = (char *)&gfilelist[k][i<<4];
+    }
 
-                bad = 0;
-                for(j=0;j<13;j++)
-                {
+    for (long k = numgroupfiles - 1; k >= 0; k--) {
+        if (searchfirst != 0) k = 0;
+        if (groupfil[k] != -1) {
+            for (long i = gnumfiles[k] - 1; i >= 0; i--) {
+                char* gfileptr = &gfilelist[k][i * 16];
+
+                int bad = 0;
+                for (int j = 0; j < 13; j++) {
                     if (!filename[j]) break;
-                    if (toupperlookup[filename[j]] != toupperlookup[gfileptr[j]])
-                    { bad = 1; break; }
+                    if (toupper(filename[j]) != toupper(gfileptr[j])) {
+                        bad = 1;
+                        break;
+                    }
                 }
                 if (bad) continue;
 
                 filegrp[newhandle] = k;
                 filehan[newhandle] = i;
                 filepos[newhandle] = 0;
-                return(newhandle);
+                return newhandle;
             }
         }
     }
-    return(-1);
+    return -1;
 }
 
 int kread(long handle, void* buffer, long leng)
 {
-    long i, j, filenum, groupnum;
+    long filenum = filehan[handle];
+    long groupnum = filegrp[handle];
 
-    filenum = filehan[handle];
-    groupnum = filegrp[handle];
-    if (groupnum == 255) return(read(filenum,buffer,leng));
+    if (groupnum == 255) {
+        return read(filenum, buffer, leng);
+    }
 
-    if (groupfil[groupnum] != -1)
-    {
-        i = gfileoffs[groupnum][filenum]+filepos[handle];
-        if (i != groupfilpos[groupnum])
-        {
-            lseek(groupfil[groupnum],i+((gnumfiles[groupnum]+1)<<4),SEEK_SET);
+    if (groupfil[groupnum] != -1) {
+        long i = gfileoffs[groupnum][filenum] + filepos[handle];
+        if (i != groupfilpos[groupnum]) {
+            lseek(groupfil[groupnum], i + ((gnumfiles[groupnum] + 1) * 16), SEEK_SET);
             groupfilpos[groupnum] = i;
         }
-        leng = min(leng,(gfileoffs[groupnum][filenum+1]-gfileoffs[groupnum][filenum])-filepos[handle]);
-        leng = read(groupfil[groupnum],buffer,leng);
+
+        long maxread = (gfileoffs[groupnum][filenum + 1] - gfileoffs[groupnum][filenum]) - filepos[handle];
+        leng = (leng < maxread) ? leng : maxread;
+
+        leng = read(groupfil[groupnum], buffer, leng);
         filepos[handle] += leng;
         groupfilpos[groupnum] += leng;
-        return(leng);
+        return leng;
     }
 
-    return(0);
+    return 0;
 }
 
-long klseek(long handle, long offset, long whence)
+long klseek(long handle, long offset, int whence)
 {
-    long i, groupnum;
+    long groupnum = filegrp[handle];
 
-    groupnum = filegrp[handle];
-
-    if (groupnum == 255) return(lseek(filehan[handle],offset,whence));
-    if (groupfil[groupnum] != -1)
-    {
-        switch(whence)
-        {
-        case SEEK_SET: filepos[handle] = offset; break;
-        case SEEK_END: i = filehan[handle];
-            filepos[handle] = (gfileoffs[groupnum][i+1]-gfileoffs[groupnum][i])+offset;
-            break;
-        case SEEK_CUR: filepos[handle] += offset; break;
-        }
-        return(filepos[handle]);
+    if (groupnum == 255) {
+        return lseek(filehan[handle], offset, whence);
     }
-    return(-1);
+
+    if (groupfil[groupnum] != -1) {
+        switch (whence) {
+            case SEEK_SET:
+                filepos[handle] = offset;
+                break;
+            case SEEK_END: {
+                long i = filehan[handle];
+                filepos[handle] = (gfileoffs[groupnum][i + 1] - gfileoffs[groupnum][i]) + offset;
+                break;
+            }
+            case SEEK_CUR:
+                filepos[handle] += offset;
+                break;
+        }
+        return filepos[handle];
+    }
+    return -1;
 }
 
 long kfilelength(long handle)
 {
-    long i, groupnum;
+    long groupnum = filegrp[handle];
 
-    groupnum = filegrp[handle];
-    if (groupnum == 255) return(filelength(filehan[handle]));
-    i = filehan[handle];
-    return(gfileoffs[groupnum][i+1]-gfileoffs[groupnum][i]);
+    if (groupnum == 255) {
+        struct stat st;
+        if (fstat(filehan[handle], &st) == 0) {
+            return st.st_size;
+        }
+        return -1;
+    }
+
+    long i = filehan[handle];  // groupnum is -1 here somehow.
+    return gfileoffs[groupnum][i + 1] - gfileoffs[groupnum][i];
 }
 
 void kclose(long handle)
 {
     if (handle < 0) return;
-    if (filegrp[handle] == 255) close(filehan[handle]);
+
+    if (filegrp[handle] == 255) {
+        close(filehan[handle]);
+    }
     filehan[handle] = -1;
 }
 

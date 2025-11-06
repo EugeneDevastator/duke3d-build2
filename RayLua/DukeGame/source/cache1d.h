@@ -76,11 +76,11 @@ void reportandexit(char *errormessage);
 #define MAXOPENFILES 64     //Warning: Fix filehan if this is changed
 
 
-int initgroupfile(char *filename);
+int initgroupfile(const char* filename);
 
 void uninitgroupfile();
 
-long kopen4load(char *filename, char searchfirst);
+long kopen4load(const char* filename, char searchfirst);
 
 int kread(long handle, void *buffer, long leng);
 
