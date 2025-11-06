@@ -747,12 +747,12 @@ void caches()
 
      k += 6;
 
-     for(i=1;i<11;i++)
-          if (lumplockbyte[i] >= 200)
-          {
-                sprintf(tempbuf,"RTS Locked %ld:",i);
-                printext256(0L,k,31,-1,tempbuf,1); k += 6;
-          }
+   //  for(i=1;i<11;i++)
+   //       if (lumplockbyte[i] >= 200)
+   //       {
+   //             sprintf(tempbuf,"RTS Locked %ld:",i);
+   //             printext256(0L,k,31,-1,tempbuf,1); k += 6;
+   //       }
 
 
 }
@@ -6716,6 +6716,9 @@ void RunDukeMap() // New Entry point copy of main
 
 int main(int argc,char **argv)
 {
+    RunDukeMap();
+    return;
+
     long i, j, k, l;
     int32_t tempautorun;
 
@@ -7821,6 +7824,7 @@ char domovethings()
 
 void doorders()
 {
+
     short i;
 
     setview(0,0,xdim-1,ydim-1);

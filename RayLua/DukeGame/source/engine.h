@@ -104,6 +104,7 @@ static void dorotatesprite(long sx, long sy, long z, short a, short picnum, sign
 static long sectorofwall(short theline);
 void alignflorslope(short dasect, long x, long y, long z);
 static long getpalookup(long davis, long dashade);
+static long loopnumofsector(short sectnum, short wallnum);
 
 // ----------------- public to remove --------------
 void initengine();
@@ -111,12 +112,14 @@ void uninitengine();
 void nextpage();
 void loadpalette();
 int screencapture(char* filename, char inverseit);
+
 // ---------------- public to retain --------
 long getangle(long xvect, long yvect);
 long ksqrt(long num);
 void initksqrt();
 void initmouse();
 void getmousevalues(short* mousx, short* mousy, short* bstatus);
+
 // ------------------ old render funcs
 void drawrooms(long daposx, long daposy, long daposz, short daang, long dahoriz, short dacursectnum);
 static void scansector(short sectnum);
@@ -170,13 +173,12 @@ static long clippoly(long npoints, long clipstat);
 
 
 // ------------ funcs to port ---------------
-
+// load map and output starting pos. should be good.
 int loadboard(char* filename, long* daposx, long* daposy, long* daposz, short* daang, short* dacursectnum);
 int saveboard(char* filename, long* daposx, long* daposy, long* daposz, short* daang, short* dacursectnum);
 int setgamemode(char davidoption, long daxdim, long daydim);
 void loadtile(short tilenume);
 int loadpics(char* filename);
-
 int clipinsidebox(long x, long y, short wallnum, long walldist);
 int inside(long x, long y, short sectnum);
 int insertsprite(short sectnum, short statnum);
@@ -197,7 +199,6 @@ long clipmove(long* x, long* y, long* z, short* sectnum,
 void keepaway(long* x, long* y, long w);
 
 long raytrace(long x3, long y3, long* x4, long* y4);
-
 long pushmove(long* x, long* y, long* z, short* sectnum,
 			  long walldist, long ceildist, long flordist, unsigned long cliptype);
 // gets valid sector at position. assumes that most of the time it is already in sectnum, otherwise - scan nearby, and then scan all
@@ -206,10 +207,8 @@ void rotatepoint(long xpivot, long ypivot, long x, long y, short daang, long* x2
 void getzrange(long x, long y, long z, short sectnum,
 			   long* ceilz, long* ceilhit, long* florz, long* florhit,
 			   long walldist, unsigned long cliptype);
-
 void rotatesprite(long sx, long sy, long z, short a, short picnum, signed char dashade, char dapalnum, char dastat,
 				  long cx1, long cy1, long cx2, long cy2);
-
 void makepalookup(long palnum, char* remapbuf, signed char r, signed char g, signed char b, char dastat);
 long getceilzofslope(short sectnum, long dax, long day);
 long getflorzofslope(short sectnum, long dax, long day);
@@ -227,7 +226,7 @@ void getzsofslope(short sectnum, long dax, long day, long* ceilz, long* florz);
 //Assume npoints=4 with polygon on &rx1,&ry1
 
 
-static long loopnumofsector(short sectnum, short wallnum);
+
 
 
 #endif

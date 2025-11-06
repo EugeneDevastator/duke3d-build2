@@ -3,6 +3,7 @@
 #include "engine.h"
 #include "cache1d.h"
 #include "funct.h"
+#include "pragmas.h"
 static void faketimerhandler (){};
 sectortype sector[MAXSECTORS];
 volatile long stereomode = 0, visualpage, activepage, whiteband, blackband;

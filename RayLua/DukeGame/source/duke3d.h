@@ -424,7 +424,7 @@ extern char boardfilename[128],waterpal[768],slimepal[768],titlepal[768],drealms
 extern char betaname[80];
 extern char cachedebug,earthquaketime;
 extern char networkmode;
-extern char lumplockbyte[11];
+//extern char lumplockbyte[11];
 
     //DUKE3D.H - replace the end "my's" with this
 extern long myx, omyx, myxvel, myy, omyy, myyvel, myz, omyz, myzvel;

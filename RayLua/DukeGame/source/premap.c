@@ -1370,11 +1370,11 @@ void enterlevel(char g)
     clearsoundlocks();
     FX_SetReverb(0);
 
-    i = ud.screen_size;
-    ud.screen_size = 0;
-    dofrontscreens(); // loading screen
-   // vscrn();
-    ud.screen_size = i;
+  //  i = ud.screen_size;
+  //  ud.screen_size = 0;
+  //  dofrontscreens(); // loading screen
+  //   // vscrn();
+  //  ud.screen_size = i;
 
 //#ifndef VOLUMEONE // full version if nopt def
 
