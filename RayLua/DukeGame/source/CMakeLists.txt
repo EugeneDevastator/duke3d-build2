@@ -27,6 +27,7 @@ set(SOURCES
         sector.c
         sounds.c
         menues.c
+        dukewrap.c
 )
 
 # Header files (optional, for IDE support)
@@ -37,6 +38,7 @@ set(HEADERS
         config.h
         control.h
         duke3d.h
+        dukewrap.h
         engine.h
         file_lib.h
         funct.h

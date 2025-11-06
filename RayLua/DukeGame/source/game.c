@@ -32,6 +32,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "music.h"
 #include "sounds.h"
 #include "task_man.h"
+#include "dukewrap.h"
 void TS_Shutdown(){};
 //task *TS_ScheduleTask(void (*Function)(task *), int rate, int priority, void *data);
 int TS_Terminate(task *ptr){};
@@ -3216,9 +3217,7 @@ short spawn( short j, short pn )
                         msx[tempwallptr+1] = sprite[s].x;
                         msy[tempwallptr+1] = sprite[s].y;
 
-                        sprite[s].x = sp->x;
-                        sprite[s].y = sp->y;
-                        sprite[s].z = sp->z;
+                        bbeng.SetSprPos(s, sp->x, sp->y, sp->z);
                         sprite[s].shade = sp->shade;
 
                         setsprite(s,sprite[s].x,sprite[s].y,sprite[s].z);

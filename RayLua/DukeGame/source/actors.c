@@ -28,7 +28,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "global.h"
 #include "sounds.h"
 #include "engine.h"
-
+#include "dukewrap.h"
 
 extern char numenvsnds,actor_tog;
 char tempbuf[4096];
@@ -659,8 +659,7 @@ int movesprite(short spritenum, long xchange, long ychange, long zchange, unsign
             ) )
           )
         {
-                sprite[spritenum].x = oldx;
-                sprite[spritenum].y = oldy;
+            bbeng.SetSprPosXY(spritenum,oldx,oldy);
                 if(sector[dasectnum].lotag == 1 && sprite[spritenum].picnum == LIZMAN)
                     sprite[spritenum].ang = (TRAND&2047);
                 else if( (hittype[spritenum].temp_data[0]&3) == 1 && sprite[spritenum].picnum != COMMANDER )
@@ -2707,9 +2706,7 @@ void moveweapons()
                         if(s->picnum == RPG)
                         {
                             k = spawn(i,EXPLOSION2);
-                            sprite[k].x = dax;
-                            sprite[k].y = day;
-                            sprite[k].z = daz;
+                            bbeng.SetSprPos(k,dax,day,daz);
 
                             if(s->xrepeat < 10)
                             {
@@ -5066,8 +5063,7 @@ void moveeffectors()   //STATNUM 3
 
                             if(sprite[ps[p].i].extra <= 0)
                             {
-                                sprite[ps[p].i].x = m;
-                                sprite[ps[p].i].y = x;
+                                bbeng.SetSprPosXY(ps[p].i,m,x);
                             }
                         }
                     }
@@ -5271,8 +5267,7 @@ void moveeffectors()   //STATNUM 3
                             }
                             if( sprite[ps[p].i].extra <= 0 )
                             {
-                                sprite[ps[p].i].x = ps[p].posx;
-                                sprite[ps[p].i].y = ps[p].posy;
+                                bbeng.SetSprPosXY(ps[p].i, ps[p].posx, ps[p].posy);
                             }
                         }
                     }

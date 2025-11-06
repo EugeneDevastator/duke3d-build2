@@ -120,174 +120,7 @@ static char vgapal16[48] =
 };
 
 static long cachesize;
-/*
-{
 
-    long i, j, z, cz, fz, closest;
-    short *shortptr1, *shortptr2;
-
-    beforedrawrooms = 0;
-    totalarea += (windowx2+1-windowx1)*(windowy2+1-windowy1);
-
-    globalposx = daposx; globalposy = daposy; globalposz = daposz;
-    globalang = (daang&2047);
-
-    globalhoriz = mulscale16(dahoriz-100,xdimenscale)+(ydimen>>1);
-    globaluclip = (0-globalhoriz)*xdimscale;
-    globaldclip = (ydimen-globalhoriz)*xdimscale;
-
-    i = mulscale16(xdimenscale,viewingrangerecip);
-    globalpisibility = mulscale16(parallaxvisibility,i);
-    globalvisibility = mulscale16(visibility,i);
-    globalhisibility = mulscale16(globalvisibility,xyaspect);
-    globalcisibility = mulscale8(globalhisibility,320);
-
-    globalcursectnum = dacursectnum;
-    totalclocklock = totalclock;
-
-    cosglobalang = sintable[(globalang+512)&2047];
-    singlobalang = sintable[globalang&2047];
-    cosviewingrangeglobalang = mulscale16(cosglobalang,viewingrange);
-    sinviewingrangeglobalang = mulscale16(singlobalang,viewingrange);
-
-    if ((stereomode != 0) || (vidoption == 6))
-    {
-        if (stereopixelwidth != ostereopixelwidth)
-        {
-            ostereopixelwidth = stereopixelwidth;
-            xdimen = (windowx2-windowx1+1)+(stereopixelwidth<<1); halfxdimen = (xdimen>>1);
-            xdimenrecip = divscale32(1L,xdimen);
-            setaspect((long)divscale16(xdimen,windowx2-windowx1+1),yxaspect);
-        }
-
-      //  if ((!(activepage&1)) ^ inpreparemirror)
-      //  {
-      //      for(i=windowx1;i<windowx1+(stereopixelwidth<<1);i++) { startumost[i] = 1, startdmost[i] = 0; }
-      //      for(;i<windowx2+1+(stereopixelwidth<<1);i++) { startumost[i] = windowy1, startdmost[i] = windowy2+1; }
-      //      viewoffset = windowy1*bytesperline+windowx1-(stereopixelwidth<<1);
-      //      i = stereowidth;
-      //  }
-      //  else
-      //  {
-      //      for(i=windowx1;i<windowx2+1;i++) { startumost[i] = windowy1, startdmost[i] = windowy2+1; }
-      //      for(;i<windowx2+1+(stereopixelwidth<<1);i++) { startumost[i] = 1, startdmost[i] = 0; }
-      //      viewoffset = windowy1*bytesperline+windowx1;
-      //      i = -stereowidth;
-      //  }
-      // globalposx += mulscale24(singlobalang,i);
-      // globalposy -= mulscale24(cosglobalang,i);
-      // if (vidoption == 6) frameplace = FP_OFF(screen)+(activepage&1)*65536;
-    }
-
-    if ((xyaspect != oxyaspect) || (xdimen != oxdimen) || (viewingrange != oviewingrange))
-        dosetaspect();
-
-    frameoffset = frameplace+viewoffset;
-
-    clearbufbyte((long)(&gotsector[0]),(long)((numsectors+7)>>3),0L);
-
-    shortptr1 = (short *)&startumost[windowx1];
-    shortptr2 = (short *)&startdmost[windowx1];
-    i = xdimen-1;
-    do
-    {
-        umost[i] = shortptr1[i]-windowy1;
-        dmost[i] = shortptr2[i]-windowy1;
-        i--;
-    } while (i != 0);
-    umost[0] = shortptr1[0]-windowy1;
-    dmost[0] = shortptr2[0]-windowy1;
-
-    //if (smostwallcnt < 0)
-    //    if (getkensmessagecrc(FP_OFF(kensmessage)) != 0x56c764d4)
-    //    { setvmode(0x3); printf("Nice try.\n"); exit(0); }
-
-    numhits = xdimen; numscans = 0; numbunches = 0;
-    maskwallcnt = 0; smostwallcnt = 0; smostcnt = 0; spritesortcnt = 0;
-
-    if (globalcursectnum >= MAXSECTORS)
-        globalcursectnum -= MAXSECTORS;
-    else
-    {
-        i = globalcursectnum;
-        updatesector(globalposx,globalposy,&globalcursectnum);
-        if (globalcursectnum < 0) globalcursectnum = i;
-    }
-
-    globparaceilclip = 1;
-    globparaflorclip = 1;
-    getzsofslope(globalcursectnum,globalposx,globalposy,&cz,&fz);
-    if (globalposz < cz) globparaceilclip = 0;
-    if (globalposz > fz) globparaflorclip = 0;
-
-    scansector(globalcursectnum);
-
-    if (inpreparemirror)
-    {
-        inpreparemirror = 0;
-        mirrorsx1 = xdimen-1; mirrorsx2 = 0;
-        for(i=numscans-1;i>=0;i--)
-        {
-            if (wall[thewall[i]].nextsector < 0) continue;
-            if (xb1[i] < mirrorsx1) mirrorsx1 = xb1[i];
-            if (xb2[i] > mirrorsx2) mirrorsx2 = xb2[i];
-        }
-
-        if (stereomode)
-        {
-            mirrorsx1 += (stereopixelwidth<<1);
-            mirrorsx2 += (stereopixelwidth<<1);
-        }
-
-        for(i=0;i<mirrorsx1;i++)
-            if (umost[i] <= dmost[i])
-            { umost[i] = 1; dmost[i] = 0; numhits--; }
-        for(i=mirrorsx2+1;i<xdimen;i++)
-            if (umost[i] <= dmost[i])
-            { umost[i] = 1; dmost[i] = 0; numhits--; }
-
-        drawalls(0L);
-        numbunches--;
-        bunchfirst[0] = bunchfirst[numbunches];
-        bunchlast[0] = bunchlast[numbunches];
-
-        mirrorsy1 = min(umost[mirrorsx1],umost[mirrorsx2]);
-        mirrorsy2 = max(dmost[mirrorsx1],dmost[mirrorsx2]);
-    }
-
-    while ((numbunches > 0) && (numhits > 0))
-    {
-        clearbuf((long)(&tempbuf[0]),(long)((numbunches+3)>>2),0L);
-        tempbuf[0] = 1;
-
-        closest = 0;              //Almost works, but not quite :(
-        for(i=1;i<numbunches;i++)
-        {
-            if ((j = bunchfront(i,closest)) < 0) continue;
-            tempbuf[i] = 1;
-            if (j == 0) tempbuf[closest] = 1, closest = i;
-        }
-        for(i=0;i<numbunches;i++) //Double-check
-        {
-            if (tempbuf[i]) continue;
-            if ((j = bunchfront(i,closest)) < 0) continue;
-            tempbuf[i] = 1;
-            if (j == 0) tempbuf[closest] = 1, closest = i, i = 0;
-        }
-
-        drawalls(closest);
-
-        if (automapping)
-        {
-            for(z=bunchfirst[closest];z>=0;z=p2[z])
-                show2dwall[thewall[z]>>3] |= pow2char[thewall[z]&7];
-        }
-
-        numbunches--;
-        bunchfirst[closest] = bunchfirst[numbunches];
-        bunchlast[closest] = bunchlast[numbunches];
-    }
-}*/
 static char globalpolytype;
 static short *dotp1[MAXYDIM], *dotp2[MAXYDIM];
 long voxoff[MAXVOXELS][MAXVOXMIPS], voxlock[MAXVOXELS][MAXVOXMIPS];
@@ -1141,8 +974,8 @@ void prepwall(long z, walltype* wal)
     }
 }
 
-void ceilscan(long x1, long x2, long sectnum){}/*
-{
+void ceilscan(long x1, long x2, long sectnum){}
+/*{
     long i, j, ox, oy, x, y1, y2, twall, bwall;
     sectortype* sec;
 
@@ -1906,7 +1739,8 @@ long allocatepermanenttile(short tilenume, long xsiz, long ysiz)
     return (waloff[tilenume]);
 }
 
-int loadpics(char* filename){return 0;}/*
+int loadpics(char* filename){return 0;}
+/*
 {
     long offscount, siz, localtilestart, localtileend, dasiz;
     short fil, i, j, k;
@@ -2484,9 +2318,8 @@ int drawmasks()
     return 0;
 }
 
-void drawmaskwall(short damaskwallcnt)
-{
-}; /*
+void drawmaskwall(short damaskwallcnt){};
+/*
 {
     long i, j, k, x, z, sectnum, z1, z2, lx, rx;
     sectortype *sec, *nsec;
@@ -3465,7 +3298,8 @@ void drawvox(long dasprx, long daspry, long dasprz, long dasprang, long daxscale
              signed char dashade, char dapal, long* daumost, long* dadmost)
 {
     // use kv6; or use this.
-} /*
+}
+/*
 {
     long i, j, k, x, y, z, syoff, ggxstart, ggystart, nxoff;
     long cosang, sinang, sprcosang, sprsinang, backx, backy, gxinc, gyinc;
@@ -3739,6 +3573,7 @@ void ceilspritehline(long x2, long y){}/*
 
 int setsprite(short spritenum, long newx, long newy, long newz)
 {
+    // move entirely into new engine
     short bad, j, tempsectnum;
 
     sprite[spritenum].x = newx;
@@ -5276,6 +5111,7 @@ void updatesector(long x, long y, short* sectnum)
     *sectnum = -1;
 }
 
+// internal usage
 void rotatepoint(long xpivot, long ypivot, long x, long y, short daang, long* x2, long* y2)
 {
     long dacos, dasin;
@@ -5309,7 +5145,8 @@ void printscreeninterrupt()
 void drawline256(long x1, long y1, long x2, long y2, char col)
 {
     // reimpl.
-} /*
+}
+/*
 {
     long dx, dy, i, j, p, inc, plc, daend;
 
@@ -5963,9 +5800,8 @@ if (numpages >= 2)
 }
 */
 void dorotatesprite(long sx, long sy, long z, short a, short picnum, signed char dashade, char dapalnum, char dastat,
-                    long cx1, long cy1, long cx2, long cy2)
-{
-} /*
+                    long cx1, long cy1, long cx2, long cy2){}
+/*
 {
 
     long cosang, sinang, v, nextv, dax1, dax2, oy, bx, by, ny1, ny2;
@@ -6613,7 +6449,8 @@ void setbrightness(char dabrightness, char* dapal)
 void drawmapview(long dax, long day, long zoome, short ang)
 {
     // IMPL.
-} /*
+}
+/*
 {
     walltype *wal;
     sectortype *sec;
@@ -7140,127 +6977,7 @@ long clippoly(long npoints, long clipstat)
     return (npoints);
 }
 
-void fillpolygon(long npoints){};/*
-{
-    long z, zz, zzz, x1, y1, x2, y2, miny, maxy, x, y, xinc, cnt;
-    long ox, oy, bx, by, bxinc, byinc, xend, p, r, day1, day2;
-    short *ptr, *ptr2;
-
-    miny = 0x7fffffff;
-    maxy = 0x80000000;
-    for (z = npoints - 1; z >= 0; z--)
-    {
-        y = ry1[z];
-        miny = min(miny, y);
-        maxy = max(maxy, y);
-    }
-    miny = (miny >> 12);
-    maxy = (maxy >> 12);
-    if (miny < 0) miny = 0;
-    if (maxy >= ydim) maxy = ydim - 1;
-    ptr = smost; //They're pointers! - watch how you optimize this thing
-    for (y = miny; y <= maxy; y++)
-    {
-        dotp1[y] = ptr;
-        dotp2[y] = ptr + (MAXNODESPERLINE >> 1);
-        ptr += MAXNODESPERLINE;
-    }
-
-    for (z = npoints - 1; z >= 0; z--)
-    {
-        zz = xb1[z];
-        y1 = ry1[z];
-        day1 = (y1 >> 12);
-        y2 = ry1[zz];
-        day2 = (y2 >> 12);
-        if (day1 != day2)
-        {
-            x1 = rx1[z];
-            x2 = rx1[zz];
-            xinc = divscale12(x2 - x1, y2 - y1);
-            if (day2 > day1)
-            {
-                x1 += mulscale12((day1<<12)+4095-y1, xinc);
-                for (y = day1; y < day2; y++)
-                {
-                    *dotp2[y]++ = (x1 >> 12);
-                    x1 += xinc;
-                }
-            }
-            else
-            {
-                x2 += mulscale12((day2<<12)+4095-y2, xinc);
-                for (y = day2; y < day1; y++)
-                {
-                    *dotp1[y]++ = (x2 >> 12);
-                    x2 += xinc;
-                }
-            }
-        }
-    }
-
-    globalx1 = mulscale16(globalx1, xyaspect);
-    globaly2 = mulscale16(globaly2, xyaspect);
-
-    oy = miny + 1 - (ydim >> 1);
-    globalposx += oy * globalx1;
-    globalposy += oy * globaly2;
-
-    setuphlineasm4(asm1, asm2);
-
-    ptr = smost;
-    for (y = miny; y <= maxy; y++)
-    {
-        cnt = dotp1[y] - ptr;
-        ptr2 = ptr + (MAXNODESPERLINE >> 1);
-        for (z = cnt - 1; z >= 0; z--)
-        {
-            day1 = 0;
-            day2 = 0;
-            for (zz = z; zz > 0; zz--)
-            {
-                if (ptr[zz] < ptr[day1]) day1 = zz;
-                if (ptr2[zz] < ptr2[day2]) day2 = zz;
-            }
-            x1 = ptr[day1];
-            ptr[day1] = ptr[z];
-            x2 = ptr2[day2] - 1;
-            ptr2[day2] = ptr2[z];
-            if (x1 > x2) continue;
-
-            if (globalpolytype < 1)
-            {
-                //maphline
-                ox = x2 + 1 - (xdim >> 1);
-                bx = ox * asm1 + globalposx;
-                by = ox * asm2 - globalposy;
-
-                p = ylookup[y] + x2 + frameplace;
-                hlineasm4(x2 - x1, -1L, globalshade << 8, by, bx, p);
-            }
-            else
-            {
-                //maphline
-                ox = x1 + 1 - (xdim >> 1);
-                bx = ox * asm1 + globalposx;
-                by = ox * asm2 - globalposy;
-
-                p = ylookup[y] + x1 + frameplace;
-                if (globalpolytype == 1)
-                    mhline(globalbufplc, bx, (x2 - x1) << 16, 0L, by, p);
-                else
-                {
-                    thline(globalbufplc, bx, (x2 - x1) << 16, 0L, by, p);
-                    transarea += (x2 - x1);
-                }
-            }
-        }
-        globalposx += globalx1;
-        globalposy += globaly2;
-        ptr += MAXNODESPERLINE;
-    }
-    faketimerhandler();
-}*/
+void fillpolygon(long npoints){};
 
 void clearview(long dacol)
 {

@@ -7,6 +7,7 @@
 #include "soundefs.h"
 #include "sounds.h"
 #include "funct.h"
+#include "dukewrap.h"
 //-------------------------------------------------------------------------
 /*
 Copyright (C) 1996, 2003 - 3D Realms Entertainment
@@ -428,10 +429,9 @@ void shoot(short i,short atwith)
                         k = spawn(i,atwith);
                         sprite[k].xvel = -12;
                         sprite[k].ang = getangle(wall[hitwall].x-wall[wall[hitwall].point2].x,
-                            wall[hitwall].y-wall[wall[hitwall].point2].y)+512;
-                        sprite[k].x = hitx;
-                        sprite[k].y = hity;
-                        sprite[k].z = hitz;
+                        wall[hitwall].y-wall[wall[hitwall].point2].y)+512;
+
+                        bbeng.SetSprPos(k,hitx,hity,hitz);
                         sprite[k].cstat |= (TRAND&4);
                         ssp(k,CLIPMASK0);
                         setsprite(k,sprite[k].x,sprite[k].y,sprite[k].z);
@@ -483,8 +483,7 @@ void shoot(short i,short atwith)
                 else if(p >= 0 && zvel > 0 && sector[hitsect].lotag == 1)
                 {
                     j = spawn(ps[p].i,WATERSPLASH2);
-                    sprite[j].x = hitx;
-                    sprite[j].y = hity;
+                    bbeng.SetSprPosXY(j,hitx, hity);
                     sprite[j].ang = ps[p].ang; // Total tweek
                     sprite[j].xvel = 32;
                     ssp(i,CLIPMASK0);

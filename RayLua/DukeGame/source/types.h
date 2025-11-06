@@ -37,6 +37,20 @@ typedef struct
 typedef struct
 {
     long zoom,exitx,exity,loogiex[64],loogiey[64],numloogs,loogcnt;
+
+    /*Position Variables:
+
+    oposx, oposy, oposz - Old/Previous position coordinates (x, y, z from last frame)
+    posx, posy, posz - Current position coordinates
+    posxv, posyv, poszv - Position velocity (movement speed in each axis)
+    Bob Variables:
+
+    bobposx, bobposy - Head bobbing position offsets (weapon/view sway when walking)
+    bobcounter - Counter for bobbing animation timing
+    Vertical Offset Variables:
+
+    pyoff, opyoff - Player Y offset and old player Y offset (likely for crouching/jumping)*/
+
     long posx, posy, posz, horiz, ohoriz, ohorizoff, invdisptime;
     long bobposx,bobposy,oposx,oposy,oposz,pyoff,opyoff;
     long posxv,posyv,poszv,last_pissed_time,truefz,truecz;
