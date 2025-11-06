@@ -11,7 +11,6 @@
 #include "build.h"
 #include "cache1d.h"
 #include "duke3d.h"
-#include "pragmas.h"
 #include "funct.h"
 extern sectortype sector[MAXSECTORS];
 
@@ -26,6 +25,13 @@ extern sectortype sector[MAXSECTORS];
 #define MAXCLIPDIST 1024
 
 
+#define addclipline(dax1, day1, dax2, day2, daoval)      \
+{                                                        \
+clipit[clipnum].x1 = dax1; clipit[clipnum].y1 = day1; \
+clipit[clipnum].x2 = dax2; clipit[clipnum].y2 = day2; \
+clipobjectval[clipnum] = daoval;                      \
+clipnum++;                                            \
+}
 #ifdef SUPERBUILD
 //MUST CALL LOADVOXEL THIS WAY BECAUSE WATCOM STINKS!
 void loadvoxel(long voxindex);
@@ -42,8 +48,6 @@ void kloadvoxel(long voxindex);
 #endif
 
 static char kensmessage[128];
-
-
 
 
 static char screenalloctype = 255;
@@ -85,16 +89,34 @@ static int32_t spritewallfront(spritetype* s, long w);
 static void loadtables();
 static void initspritelists();
 static int clipinsideboxline(long x, long y, long x1, long y1, long x2, long y2, long walldist);
+static int insertspritesect(short sectnum);
+static int insertspritestat(short statnum);
+static int deletespritesect(short deleteme);
+static int deletespritestat(short deleteme);
+static int lintersect(long x1, long y1, long z1, long x2, long y2, long z2, long x3,
+			   long y3, long x4, long y4, long* intx, long* inty, long* intz);
+static short lastwall(short point);
+static int rintersect(long x1, long y1, long z1, long vx, long vy, long vz, long x3,
+			   long y3, long x4, long y4, long* intx, long* inty, long* intz);
+int krand();
+static void dorotatesprite(long sx, long sy, long z, short a, short picnum, signed char dashade, char dapalnum, char dastat,
+					long cx1, long cy1, long cx2, long cy2);
+static long sectorofwall(short theline);
+void alignflorslope(short dasect, long x, long y, long z);
+static long getpalookup(long davis, long dashade);
 
-// public but irrelevant
+// ----------------- public to remove --------------
 void initengine();
 void uninitengine();
 void nextpage();
 void loadpalette();
 int screencapture(char* filename, char inverseit);
+// ---------------- public to retain --------
 long getangle(long xvect, long yvect);
 long ksqrt(long num);
 void initksqrt();
+void initmouse();
+void getmousevalues(short* mousx, short* mousy, short* bstatus);
 // ------------------ old render funcs
 void drawrooms(long daposx, long daposy, long daposz, short daang, long dahoriz, short dacursectnum);
 static void scansector(short sectnum);
@@ -115,178 +137,97 @@ static long readpixel16(long p);
 int drawmasks();
 static void drawmaskwall(short damaskwallcnt);
 static void drawsprite(long snum);
-void drawvox(long dasprx, long daspry, long dasprz, long dasprang, long daxscale, long dayscale, char daindex, signed char dashade, char dapal, long* daumost, long* dadmost);
+void drawvox(long dasprx, long daspry, long dasprz, long dasprang, long daxscale, long dayscale, char daindex,
+			 signed char dashade, char dapal, long* daumost, long* dadmost);
 static void ceilspritescan(long x1, long x2);
 static void copytilepiece(long tilenume1, long sx1, long sy1, long xsiz, long ysiz, long tilenume2, long sx2, long sy2);
 static void ceilspritehline(long x2, long y);
 static long animateoffs(short tilenum, short fakevar);
-// ------------ funcs to port
+static void printscreeninterrupt();
+void drawline256(long x1, long y1, long x2, long y2, char col);
+void drawline16(long x1, long y1, long x2, long y2, char col);
+void printext256(long xpos, long ypos, short col, short backcol, char name[82], char fontsize);
+int setview(long x1, long y1, long x2, long y2);
+void setaspect(long daxrange, long daaspect);
+static void dosetaspect();
+void flushperms();
+void qloadkvx(long voxindex, char* filename);
+static void initfastcolorlookup(long rscale, long gscale, long bscale);
+static long getclosestcol(long r, long g, long b);
+void setbrightness(char dabrightness, char* dapal);
+void drawmapview(long dax, long day, long zoome, short ang);
+static void fillpolygon(long npoints);
+void clearview(long dacol);
+void clearallviews(long dacol);
+void setviewtotile(short tilenume, long xsiz, long ysiz);
+void setviewback();
+void squarerotatetile(short tilenume);
+void preparemirror(long dax, long day, long daz, short daang, long dahoriz, short dawall, short dasector, long* tposx,
+				   long* tposy, short* tang);
+void completemirror();
+static long clippoly4(long cx1, long cy1, long cx2, long cy2);
+static long clippoly(long npoints, long clipstat);
+
+
+// ------------ funcs to port ---------------
+
 int loadboard(char* filename, long* daposx, long* daposy, long* daposz, short* daang, short* dacursectnum);
 int saveboard(char* filename, long* daposx, long* daposy, long* daposz, short* daang, short* dacursectnum);
 int setgamemode(char davidoption, long daxdim, long daydim);
 void loadtile(short tilenume);
 int loadpics(char* filename);
-void qloadkvx(long voxindex, char* filename);
+
 int clipinsidebox(long x, long y, short wallnum, long walldist);
 int inside(long x, long y, short sectnum);
-// ported
-//int setsprite(short spritenum, long newx, long newy, long newz);
-
-
-
-
 int insertsprite(short sectnum, short statnum);
-
-static int insertspritesect(short sectnum);
-
-static int insertspritestat(short statnum);
-
 int deletesprite(short spritenum);
-
-static int deletespritesect(short deleteme);
-
-static int deletespritestat(short deleteme);
-
 int changespritesect(short spritenum, short newsectnum);
-
 int changespritestat(short spritenum, short newstatnum);
-
 short nextsectorneighborz(short sectnum, long thez, short topbottom, short direction);
-
 int cansee(long x1, long y1, long z1, short sect1, long x2, long y2, long z2, short sect2);
-
-int hitscan(long xs, long ys, long zs, short sectnum, long vx, long vy, long vz, short* hitsect, short* hitwall,
-			short* hitsprite, long* hitx, long* hity, long* hitz, unsigned long cliptype);
-
-int inthitscan(long xs, long ys, long zs, short sectnum, long vx, long vy, long vz,
-			   short* hitsect, short* hitwall, short* hitsprite,
-			   long* hitx, long* hity, long* hitz, unsigned long cliptype);
-
+int hitscan(long xs, long ys, long zs, short sectnum, long vx, long vy, long vz, short* hitsect, short* hitwall,short* hitsprite, long* hitx, long* hity, long* hitz, unsigned long cliptype);
+int inthitscan(long xs, long ys, long zs, short sectnum, long vx, long vy, long vz, short* hitsect, short* hitwall, short* hitsprite, long* hitx, long* hity, long* hitz, unsigned long cliptype);
 int neartag(long xs, long ys, long zs, short sectnum, short ange, short* neartagsector, short* neartagwall,
 			short* neartagsprite, long* neartaghitdist, long neartagrange, char tagsearch);
-
-int lintersect(long x1, long y1, long z1, long x2, long y2, long z2, long x3,
-			   long y3, long x4, long y4, long* intx, long* inty, long* intz);
-
-int rintersect(long x1, long y1, long z1, long vx, long vy, long vz, long x3,
-			   long y3, long x4, long y4, long* intx, long* inty, long* intz);
-
 void dragpoint(short pointhighlight, long dax, long day);
-
-short lastwall(short point);
-
-#define addclipline(dax1, day1, dax2, day2, daoval)      \
-{                                                        \
-	clipit[clipnum].x1 = dax1; clipit[clipnum].y1 = day1; \
-	clipit[clipnum].x2 = dax2; clipit[clipnum].y2 = day2; \
-	clipobjectval[clipnum] = daoval;                      \
-	clipnum++;                                            \
-}
-
 long clipmove(long* x, long* y, long* z, short* sectnum,
 			  long xvect, long yvect,
 			  long walldist, long ceildist, long flordist, unsigned long cliptype);
-
+// check
 void keepaway(long* x, long* y, long w);
 
 long raytrace(long x3, long y3, long* x4, long* y4);
 
 long pushmove(long* x, long* y, long* z, short* sectnum,
 			  long walldist, long ceildist, long flordist, unsigned long cliptype);
-
+// gets valid sector at position. assumes that most of the time it is already in sectnum, otherwise - scan nearby, and then scan all
 void updatesector(long x, long y, short* sectnum);
-
 void rotatepoint(long xpivot, long ypivot, long x, long y, short daang, long* x2, long* y2);
-
-void initmouse();
-
-void getmousevalues(short* mousx, short* mousy, short* bstatus);
-
-static void printscreeninterrupt();
-
-void drawline256(long x1, long y1, long x2, long y2, char col);
-
-void drawline16(long x1, long y1, long x2, long y2, char col);
-
-void printext256(long xpos, long ypos, short col, short backcol, char name[82], char fontsize);
-
-int krand();
-
 void getzrange(long x, long y, long z, short sectnum,
 			   long* ceilz, long* ceilhit, long* florz, long* florhit,
 			   long walldist, unsigned long cliptype);
 
-int setview(long x1, long y1, long x2, long y2);
-
-void setaspect(long daxrange, long daaspect);
-
-static void dosetaspect();
-
-void flushperms();
-
 void rotatesprite(long sx, long sy, long z, short a, short picnum, signed char dashade, char dapalnum, char dastat,
 				  long cx1, long cy1, long cx2, long cy2);
 
-void dorotatesprite(long sx, long sy, long z, short a, short picnum, signed char dashade, char dapalnum, char dastat,
-					long cx1, long cy1, long cx2, long cy2);
-
-//Assume npoints=4 with polygon on &rx1,&ry1
-long clippoly4(long cx1, long cy1, long cx2, long cy2);
-
 void makepalookup(long palnum, char* remapbuf, signed char r, signed char g, signed char b, char dastat);
-
-void initfastcolorlookup(long rscale, long gscale, long bscale);
-
-long getclosestcol(long r, long g, long b);
-
-void setbrightness(char dabrightness, char* dapal);
-
-void drawmapview(long dax, long day, long zoome, short ang);
-
-long clippoly(long npoints, long clipstat);
-
-void fillpolygon(long npoints);
-
-void clearview(long dacol);
-
-void clearallviews(long dacol);
-/*
-plotpixel(long x, long y, char col)
-{
-	drawpixel(ylookup[y]+x+frameplace,(long)col);
-}
-
-char getpixel(long x, long y)
-{
-	return(readpixel(ylookup[y]+x+frameplace));
-}
-*/
-//MUST USE RESTOREFORDRAWROOMS AFTER DRAWING
-
-
-void setviewtotile(short tilenume, long xsiz, long ysiz);
-
-void setviewback();
-
-void squarerotatetile(short tilenume);
-
-void preparemirror(long dax, long day, long daz, short daang, long dahoriz, short dawall, short dasector, long* tposx,long* tposy, short* tang);
-
-void completemirror();
-
-long sectorofwall(short theline);
-
 long getceilzofslope(short sectnum, long dax, long day);
-
 long getflorzofslope(short sectnum, long dax, long day);
-
 void getzsofslope(short sectnum, long dax, long day, long* ceilz, long* florz);
 
-void alignflorslope(short dasect, long x, long y, long z);
 
-long getpalookup(long davis, long dashade);
 
-extern long loopnumofsector(short sectnum, short wallnum);
+//---------------- ported
+
+//int setsprite(short spritenum, long newx, long newy, long newz);
+
+//----------------------
+
+
+//Assume npoints=4 with polygon on &rx1,&ry1
+
+
+static long loopnumofsector(short sectnum, short wallnum);
 
 
 #endif

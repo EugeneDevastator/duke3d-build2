@@ -3590,7 +3590,7 @@ int setsprite(short spritenum, long newx, long newy, long newz)
     return (0);
 }
 
-♥long animateoffs(short tilenum, short fakevar)
+long animateoffs(short tilenum, short fakevar)
 {
     long i, k, offs;
 
@@ -5075,6 +5075,7 @@ long pushmove(long* x, long* y, long* z, short* sectnum, long walldist, long cei
     return (bad);
 }
 
+// gets valid sector at position. assumes that most of the time it is already in sectnum, otherwise - scan nearby, and then scan all
 void updatesector(long x, long y, short* sectnum)
 {
     walltype* wal;
@@ -6978,7 +6979,6 @@ long clippoly(long npoints, long clipstat)
 }
 
 void fillpolygon(long npoints){};
-
 void clearview(long dacol)
 {
     //   long i, p, y, x1, x2, dx;
