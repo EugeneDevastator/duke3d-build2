@@ -6418,7 +6418,7 @@ void Startup()
 
 // CTW - MODIFICATION
 // initengine(ScreenMode,ScreenWidth,ScreenHeight);
- //  initengine();
+ initengine();
 // CTW END - MODIFICATION
    inittimer();
 

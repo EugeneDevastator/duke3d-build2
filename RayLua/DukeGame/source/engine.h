@@ -27,12 +27,12 @@ extern sectortype sector[MAXSECTORS];
 
 
 #ifdef SUPERBUILD
-	//MUST CALL LOADVOXEL THIS WAY BECAUSE WATCOM STINKS!
+//MUST CALL LOADVOXEL THIS WAY BECAUSE WATCOM STINKS!
 void loadvoxel(long voxindex);
 void kloadvoxel(long voxindex);
 
 
-	//These variables need to be copied into BUILD
+//These variables need to be copied into BUILD
 #define MAXXSIZ 128
 #define MAXYSIZ 128
 #define MAXZSIZ 200
@@ -44,9 +44,16 @@ void kloadvoxel(long voxindex);
 static char kensmessage[128];
 
 
+
+
+static char screenalloctype = 255;
+
 #define FASTPALGRIDSIZ 8
 
-typedef struct { long x1, y1, x2, y2; } linetype;
+typedef struct
+{
+	long x1, y1, x2, y2;
+} linetype;
 
 typedef struct
 {
@@ -57,6 +64,11 @@ typedef struct
 	long cx1, cy1, cx2, cy2;
 } permfifotype;
 
+static long setviewcnt = 0;
+static long bakvidoption[4];
+static long bakframeplace[4], bakxsiz[4], bakysiz[4];
+static long bakwindowx1[4], bakwindowy1[4];
+static long bakwindowx2[4], bakwindowy2[4];
 // Pure C version of nsqrtasm (requires lookup tables)
 uint32_t nsqrtasm(uint32_t value);
 
@@ -65,131 +77,75 @@ uint32_t msqrtasm(uint32_t value);
 
 // Assuming reciptable is defined elsewhere as:
 // extern int32_t reciptable[2048];
+// ----------------- internal init and helpers
+static int32_t krecipasm(int32_t input);
+static void setgotpic(uint32_t index);
+static int wallfront(long l1, long l2);
+static int32_t spritewallfront(spritetype* s, long w);
+static void loadtables();
+static void initspritelists();
+static int clipinsideboxline(long x, long y, long x1, long y1, long x2, long y2, long walldist);
 
-int32_t krecipasm(int32_t input);
-
-void setgotpic(uint32_t index);
-
-
-
-void drawrooms(long daposx, long daposy, long daposz,
-			 short daang, long dahoriz, short dacursectnum);
-
-void scansector (short sectnum);
-
-int wallfront (long l1, long l2);
-
-int32_t spritewallfront (spritetype *s, long w);
-
-int bunchfront (long b1, long b2);
-
-void drawalls (long bunch);
-
-void prepwall(long z, walltype *wal);
-
-void ceilscan(long x1, long x2, long sectnum);
-
-void florscan(long x1, long x2, long sectnum);
-
-void wallscan(long x1, long x2, short* uwal, short* dwal, long* swal, long* lwal);
-
-void maskwallscan(long x1, long x2, short *uwal, short *dwal, long *swal, long *lwal);
-
-void transmaskvline(long x);
-
-void transmaskvline2(long x);
-
-void transmaskwallscan(long x1, long x2);
-
-int loadboard(char *filename, long *daposx, long *daposy, long *daposz,
-		  short *daang, short *dacursectnum);
-
-int saveboard(char *filename, long *daposx, long *daposy, long *daposz,
-		  short *daang, short *dacursectnum);
-
-void loadtables();
-
-void loadpalette();
-
-static char screenalloctype = 255;
-int setgamemode(char davidoption, long daxdim, long daydim);
-
-
-void hline(long xr, long yp);
-
-void slowhline(long xr, long yp);
-
+// public but irrelevant
 void initengine();
-
 void uninitengine();
-
 void nextpage();
-
-
-void loadtile(short tilenume);
-
-long allocatepermanenttile(short tilenume, long xsiz, long ysiz);
-
-int loadpics(char* filename);
-
-#ifdef SUPERBUILD
-void qloadkvx(long voxindex, char* filename);
-#endif
-
-int clipinsidebox(long x, long y, short wallnum, long walldist);
-
-int clipinsideboxline(long x, long y, long x1, long y1, long x2, long y2, long walldist);
-
-long readpixel16(long p);
-
-int screencapture(char *filename, char inverseit);
-
-int inside (long x, long y, short sectnum);
-
+void loadpalette();
+int screencapture(char* filename, char inverseit);
 long getangle(long xvect, long yvect);
-
 long ksqrt(long num);
-
-//long krecip(long num);
-
 void initksqrt();
-
-void copytilepiece(long tilenume1, long sx1, long sy1, long xsiz, long ysiz,
-			  long tilenume2, long sx2, long sy2);
-
+// ------------------ old render funcs
+void drawrooms(long daposx, long daposy, long daposz, short daang, long dahoriz, short dacursectnum);
+static void scansector(short sectnum);
+static int bunchfront(long b1, long b2);
+static void drawalls(long bunch);
+static void prepwall(long z, walltype* wal);
+static void ceilscan(long x1, long x2, long sectnum);
+static void florscan(long x1, long x2, long sectnum);
+static void wallscan(long x1, long x2, short* uwal, short* dwal, long* swal, long* lwal);
+static void maskwallscan(long x1, long x2, short* uwal, short* dwal, long* swal, long* lwal);
+static void transmaskvline(long x);
+static void transmaskvline2(long x);
+static void transmaskwallscan(long x1, long x2);
+static void hline(long xr, long yp);
+static void slowhline(long xr, long yp);
+static long allocatepermanenttile(short tilenume, long xsiz, long ysiz);
+static long readpixel16(long p);
 int drawmasks();
-
-void drawmaskwall(short damaskwallcnt);
-
-void drawsprite(long snum);
-
-#ifdef SUPERBUILD
-void drawvox(long dasprx, long daspry, long dasprz, long dasprang,
-			 long daxscale, long dayscale, char daindex,
-			 signed char dashade, char dapal, long* daumost, long* dadmost);
-#endif
-
-void ceilspritescan (long x1, long x2);
-
-void ceilspritehline(long x2, long y);
-
+static void drawmaskwall(short damaskwallcnt);
+static void drawsprite(long snum);
+void drawvox(long dasprx, long daspry, long dasprz, long dasprang, long daxscale, long dayscale, char daindex, signed char dashade, char dapal, long* daumost, long* dadmost);
+static void ceilspritescan(long x1, long x2);
+static void copytilepiece(long tilenume1, long sx1, long sy1, long xsiz, long ysiz, long tilenume2, long sx2, long sy2);
+static void ceilspritehline(long x2, long y);
+static long animateoffs(short tilenum, short fakevar);
+// ------------ funcs to port
+int loadboard(char* filename, long* daposx, long* daposy, long* daposz, short* daang, short* dacursectnum);
+int saveboard(char* filename, long* daposx, long* daposy, long* daposz, short* daang, short* dacursectnum);
+int setgamemode(char davidoption, long daxdim, long daydim);
+void loadtile(short tilenume);
+int loadpics(char* filename);
+void qloadkvx(long voxindex, char* filename);
+int clipinsidebox(long x, long y, short wallnum, long walldist);
+int inside(long x, long y, short sectnum);
+// ported
 //int setsprite(short spritenum, long newx, long newy, long newz);
 
-long animateoffs(short tilenum, short fakevar);
 
-void initspritelists();
+
 
 int insertsprite(short sectnum, short statnum);
 
-int insertspritesect(short sectnum);
+static int insertspritesect(short sectnum);
 
-int insertspritestat(short statnum);
+static int insertspritestat(short statnum);
 
 int deletesprite(short spritenum);
 
-int deletespritesect(short deleteme);
+static int deletespritesect(short deleteme);
 
-int deletespritestat (short deleteme);
+static int deletespritestat(short deleteme);
 
 int changespritesect(short spritenum, short newsectnum);
 
@@ -200,19 +156,20 @@ short nextsectorneighborz(short sectnum, long thez, short topbottom, short direc
 int cansee(long x1, long y1, long z1, short sect1, long x2, long y2, long z2, short sect2);
 
 int hitscan(long xs, long ys, long zs, short sectnum, long vx, long vy, long vz, short* hitsect, short* hitwall,
-	short* hitsprite, long* hitx, long* hity, long* hitz, unsigned long cliptype);
+			short* hitsprite, long* hitx, long* hity, long* hitz, unsigned long cliptype);
 
 int inthitscan(long xs, long ys, long zs, short sectnum, long vx, long vy, long vz,
-		short *hitsect, short *hitwall, short *hitsprite,
-		long *hitx, long *hity, long *hitz, unsigned long cliptype);
+			   short* hitsect, short* hitwall, short* hitsprite,
+			   long* hitx, long* hity, long* hitz, unsigned long cliptype);
 
-int neartag (long xs, long ys, long zs, short sectnum, short ange, short *neartagsector, short *neartagwall, short *neartagsprite, long *neartaghitdist, long neartagrange, char tagsearch);
+int neartag(long xs, long ys, long zs, short sectnum, short ange, short* neartagsector, short* neartagwall,
+			short* neartagsprite, long* neartaghitdist, long neartagrange, char tagsearch);
 
 int lintersect(long x1, long y1, long z1, long x2, long y2, long z2, long x3,
-		   long y3, long x4, long y4, long *intx, long *inty, long *intz);
+			   long y3, long x4, long y4, long* intx, long* inty, long* intz);
 
 int rintersect(long x1, long y1, long z1, long vx, long vy, long vz, long x3,
-		   long y3, long x4, long y4, long *intx, long *inty, long *intz);
+			   long y3, long x4, long y4, long* intx, long* inty, long* intz);
 
 void dragpoint(short pointhighlight, long dax, long day);
 
@@ -224,8 +181,7 @@ short lastwall(short point);
 	clipit[clipnum].x2 = dax2; clipit[clipnum].y2 = day2; \
 	clipobjectval[clipnum] = daoval;                      \
 	clipnum++;                                            \
-}                                                        \
-
+}
 
 long clipmove(long* x, long* y, long* z, short* sectnum,
 			  long xvect, long yvect,
@@ -246,7 +202,7 @@ void initmouse();
 
 void getmousevalues(short* mousx, short* mousy, short* bstatus);
 
-void printscreeninterrupt();
+static void printscreeninterrupt();
 
 void drawline256(long x1, long y1, long x2, long y2, char col);
 
@@ -264,7 +220,7 @@ int setview(long x1, long y1, long x2, long y2);
 
 void setaspect(long daxrange, long daaspect);
 
-void dosetaspect();
+static void dosetaspect();
 
 void flushperms();
 
@@ -283,11 +239,11 @@ void initfastcolorlookup(long rscale, long gscale, long bscale);
 
 long getclosestcol(long r, long g, long b);
 
-void setbrightness(char dabrightness, char *dapal);
+void setbrightness(char dabrightness, char* dapal);
 
 void drawmapview(long dax, long day, long zoome, short ang);
 
-long clippoly (long npoints, long clipstat);
+long clippoly(long npoints, long clipstat);
 
 void fillpolygon(long npoints);
 
@@ -305,12 +261,8 @@ char getpixel(long x, long y)
 	return(readpixel(ylookup[y]+x+frameplace));
 }
 */
-	//MUST USE RESTOREFORDRAWROOMS AFTER DRAWING
-static long setviewcnt = 0;
-static long bakvidoption[4];
-static long bakframeplace[4], bakxsiz[4], bakysiz[4];
-static long bakwindowx1[4], bakwindowy1[4];
-static long bakwindowx2[4], bakwindowy2[4];
+//MUST USE RESTOREFORDRAWROOMS AFTER DRAWING
+
 
 void setviewtotile(short tilenume, long xsiz, long ysiz);
 
@@ -318,8 +270,7 @@ void setviewback();
 
 void squarerotatetile(short tilenume);
 
-void preparemirror(long dax, long day, long daz, short daang, long dahoriz, short dawall, short dasector, long* tposx,
-				   long* tposy, short* tang);
+void preparemirror(long dax, long day, long daz, short daang, long dahoriz, short dawall, short dasector, long* tposx,long* tposy, short* tang);
 
 void completemirror();
 

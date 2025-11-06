@@ -3590,7 +3590,7 @@ int setsprite(short spritenum, long newx, long newy, long newz)
     return (0);
 }
 
-long animateoffs(short tilenum, short fakevar)
+♥long animateoffs(short tilenum, short fakevar)
 {
     long i, k, offs;
 
