@@ -37,7 +37,10 @@ void SetSprPosXY(long i,long x, long y) // not in .h file
     // redirect to main api.
     // main api. set pos (i, x-z,y) for ex.
 }
-
+spritetype ReadSprite(long i){
+ spritetype a = {};
+    return a;
+}
 // is it ok to store internal function in pointer?
 void InitWrapper() // pass in real api
 {

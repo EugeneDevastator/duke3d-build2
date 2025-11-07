@@ -4,10 +4,16 @@
 
 #ifndef GAME_DUKEWRAP_H
 #define GAME_DUKEWRAP_H
+#include "types.h"
+
 typedef struct
 {
      void (*SetSprPos)(long i,long x, long y, long z);
      void (*SetSprPosXY)(long i, long x, long y);
+     spritetype (*ReadSprite)(long i);
+     sectortype (*ReadSect)(long i);
+     void (*SetCeilHeight)(long sid, long height);
+     void (*SetFloorHeight)(long sid, long height);
      int (*arrpt)[10];
 } dukewrapper;
 
