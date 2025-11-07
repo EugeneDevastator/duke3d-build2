@@ -163,7 +163,7 @@ long hits(short i)
     long sx,sy,sz;
     short sect,hw,hs;
     long zoff;
-
+    READSPR
     if(PN == APLAYER) zoff = (40<<8);
     else zoff = 0;
 
@@ -179,7 +179,7 @@ long hitasprite(short i,short *hitsp)
 {
     long sx,sy,sz,zoff;
     short sect,hw;
-
+    READSPR
     if(badguy(&sprite[i]) )
         zoff = (42<<8);
     else if(PN == APLAYER) zoff = (39<<8);
@@ -200,7 +200,7 @@ long hitaspriteandwall(short i,short *hitsp,short *hitw,short *x, short *y)
 {
     long sz;
     short sect;
-
+    READSPR
     hitscan(SX,SY,SZ,SECT,
         sintable[(SA+512)&2047],
         sintable[SA&2047],
@@ -256,6 +256,7 @@ short aim(spritetype *s,short aang)
             if( sprite[i].xrepeat > 0 && sprite[i].extra >= 0 && (sprite[i].cstat&(257+32768)) == 257)
                 if( badguy(&sprite[i]) || k < 2 )
             {
+                    READSPR
                 if(badguy(&sprite[i]) || PN == APLAYER || PN == SHARK)
                 {
                     if( PN == APLAYER &&
@@ -348,6 +349,7 @@ void shoot(short i,short atwith)
         sx = s->x;
         sy = s->y;
         sz = s->z-((s->yrepeat*tilesizy[s->picnum])<<1)+(4<<8);
+        READSPR
         if(s->picnum != ROTATEGUN)
         {
             sz -= (7<<8);
@@ -430,7 +432,7 @@ void shoot(short i,short atwith)
                         sprite[k].xvel = -12;
                         sprite[k].ang = getangle(wall[hitwall].x-wall[wall[hitwall].point2].x,
                         wall[hitwall].y-wall[wall[hitwall].point2].y)+512;
-
+                        READSPR
                         bbeng.SetSprPos(k,hitx,hity,hitz);
                         sprite[k].cstat |= (TRAND&4);
                         ssp(k,CLIPMASK0);
@@ -782,7 +784,7 @@ void shoot(short i,short atwith)
             {
                 j = EGS(sect,sx,sy,sz,atwith,-127,sizx,sizy,sa,vel,zvel,i,4);
                 sprite[j].extra += (TRAND&7);
-
+                READSPR
                 if(atwith == COOLEXPLOSION1)
                 {
                     sprite[j].shade = 0;
@@ -835,6 +837,7 @@ void shoot(short i,short atwith)
             }
             else
             {
+                READSPR
                 j = findplayer(s,&x);
                 sa = getangle(ps[j].oposx-sx,ps[j].oposy-sy);
                 if(PN == BOSS3)
@@ -874,6 +877,7 @@ void shoot(short i,short atwith)
 
             if(p == -1)
             {
+                READSPR
                 if(PN == BOSS3)
                 {
                     if(TRAND&1)
@@ -2597,6 +2601,7 @@ void processinput(short snum)
     if(p->newowner >= 0)
     {
         i = p->newowner;
+        READSPR
         p->posx = SX;
         p->posy = SY;
         p->posz = SZ;

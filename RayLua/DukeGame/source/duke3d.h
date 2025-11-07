@@ -142,27 +142,29 @@ int sgn(int value);
 #define MAXSCRIPTSIZE 20460
 #define MAXANIMATES 64
 
-#define SP  sprite[i].yvel
-#define SX  sprite[i].x
-#define SY  sprite[i].y
-#define SZ  sprite[i].z
-#define SS  sprite[i].shade
-#define PN  sprite[i].picnum
-#define SA  sprite[i].ang
-#define SV  sprite[i].xvel
-#define ZV  sprite[i].zvel
-#define RX  sprite[i].xrepeat
-#define RY  sprite[i].yrepeat
-#define OW  sprite[i].owner
-#define CS  sprite[i].cstat
-#define SH  sprite[i].extra
-#define CX  sprite[i].xoffset
-#define CY  sprite[i].yoffset
-#define CD  sprite[i].clipdist
-#define PL  sprite[i].pal
-#define SLT  sprite[i].lotag
-#define SHT  sprite[i].hitag
-#define SECT sprite[i].sectnum
+#define SP  sprt.yvel
+#define SX  sprt.x
+#define SY  sprt.y
+#define SZ  sprt.z
+#define SS  sprt.shade
+#define PN  sprt.picnum
+#define SA  sprt.ang
+#define SV  sprt.xvel
+#define ZV  sprt.zvel
+#define RX  sprt.xrepeat
+#define RY  sprt.yrepeat
+#define OW  sprt.owner
+#define CS  sprt.cstat
+#define SH  sprt.extra
+#define CX  sprt.xoffset
+#define CY  sprt.yoffset
+#define CD  sprt.clipdist
+#define PL  sprt.pal
+#define SLT  sprt.lotag
+#define SHT  sprt.hitag
+#define SECT sprt.sectnum
+#define READSPR spritetype sprt = bbeng.ReadSprite(i);
+
 
 #define face_player 1
 #define geth 2

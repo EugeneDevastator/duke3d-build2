@@ -828,6 +828,7 @@ void checksync()
 
 void check_fta_sounds(short i)
 {
+    READSPR
     if (sprite[i].extra > 0)
         switch (PN)
         {
@@ -2450,7 +2451,7 @@ short EGS(short whatsect, long s_x, long s_y, long s_z, short s_pn, signed char 
         s->extra = 0;
         s->hitag = 0;
     }
-
+    READSPR
     if (show2dsector[SECT >> 3] & (1 << (SECT & 7))) show2dsprite[i >> 3] |= (1 << (i & 7));
     else show2dsprite[i >> 3] &= ~(1 << (i & 7));
     /*
@@ -2464,7 +2465,7 @@ short EGS(short whatsect, long s_x, long s_y, long s_z, short s_pn, signed char 
 }
 
 char wallswitchcheck(short i)
-{
+{READSPR
     switch (PN)
     {
     case HANDPRINTSWITCH:
@@ -2530,7 +2531,7 @@ short spawn(short j, short pn)
     else
     {
         i = pn;
-
+        READSPR
         hittype[i].picnum = PN;
         hittype[i].timetosleep = 0;
         hittype[i].extra = -1;
@@ -2672,6 +2673,7 @@ short spawn(short j, short pn)
 
         sp->shade = -16;
         sp->cstat |= 128;
+        READSPR
         if (j >= 0)
         {
             if (sector[sprite[j].sectnum].lotag == 2)
@@ -4621,6 +4623,7 @@ void animatesprites(long x, long y, short a, long smoothratio)
             continue;
         case VIEWSCREEN:
         case VIEWSCREEN2:
+            READSPR
             if (camsprite >= 0 && hittype[OW].temp_data[0] == 1)
             {
                 t->picnum = STATIC;
@@ -8718,7 +8721,7 @@ void lotsofglass(short i, short wallnum, short n)
     short sect, a;
 
     sect = -1;
-
+    READSPR
     if (wallnum < 0)
     {
         for (j = n - 1; j >= 0; j--)
@@ -8763,7 +8766,7 @@ void lotsofglass(short i, short wallnum, short n)
 void spriteglass(short i, short n)
 {
     long j, k, a, z;
-
+    READSPR
     for (j = n; j > 0; j--)
     {
         a = TRAND & 2047;
@@ -8806,7 +8809,7 @@ void lotsofcolourglass(short i, short wallnum, short n)
 {
     long j, xv, yv, z, x1, y1;
     short sect = -1, a, k;
-
+    READSPR
     if (wallnum < 0)
     {
         for (j = n - 1; j >= 0; j--)

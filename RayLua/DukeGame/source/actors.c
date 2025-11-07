@@ -393,7 +393,7 @@ long ifsquished(short i, short p)
     sectortype *sc;
     char squishme;
     long floorceildist;
-
+    READSPR
     if(PN == APLAYER && ud.clipping)
         return 0;
 
@@ -781,6 +781,7 @@ void guts(spritetype *s,short gtype, short n, short p)
     {
         a = TRAND&2047;
         i = EGS(s->sectnum,s->x+(TRAND&255)-128,s->y+(TRAND&255)-128,gutz-(TRAND&8191),gtype,-32,sx,sy,a,48+(TRAND&31),-512-(TRAND&2047),ps[p].i,5);
+        READSPR
         if(PN == JIBS2)
         {
             sprite[i].xrepeat >>= 2;
@@ -820,7 +821,7 @@ void gutsdir(spritetype *s,short gtype, short n, short p)
 void setsectinterpolate(short i)
 {
     long j, k, startwall,endwall;
-
+    READSPR
     startwall = sector[SECT].wallptr;
     endwall = startwall+sector[SECT].wallnum;
 
@@ -843,7 +844,7 @@ void setsectinterpolate(short i)
 void clearsectinterpolate(short i)
 {
     short j,startwall,endwall;
-
+    READSPR
     startwall = sector[SECT].wallptr;
     endwall = startwall+sector[SECT].wallnum;
     for(j=startwall;j<endwall;j++)
@@ -987,6 +988,7 @@ short ifhitsectors(short sectnum)
     i = headspritestat[5];
     while(i >= 0)
     {
+        READSPR
         if( PN == EXPLOSION2 && sectnum == SECT )
             return i;
         i = nextspritestat[i];
@@ -1122,7 +1124,7 @@ void movedummyplayers()
     while(i >= 0)
     {
         nexti = nextspritestat[i];
-
+        READSPR
         p = sprite[OW].yvel;
 
         if( ps[p].on_crane >= 0 || sector[ps[p].cursectnum].lotag != 1 || sprite[ps[p].i].extra <= 0 )
@@ -1307,7 +1309,7 @@ void movefx()
     while(i >= 0)
     {
         s = &sprite[i];
-
+        READSPR
         nexti = nextspritestat[i];
 
         switch(s->picnum)
@@ -1410,7 +1412,7 @@ void movefallers()
     {
         nexti = nextspritestat[i];
         s = &sprite[i];
-
+        READSPR
         sect = s->sectnum;
 
         if( T1 == 0 )
@@ -1517,7 +1519,7 @@ void movestandables()
         hittype[i].bposx = s->x;
         hittype[i].bposy = s->y;
         hittype[i].bposz = s->z;
-
+        READSPR
         IFWITHIN(CRANE,CRANE+3)
         {
             //t[0] = state
@@ -2786,6 +2788,7 @@ void movetransports()
 
     while(i >= 0)
     {
+        READSPR
         sect = SECT;
         sectlotag = sector[sect].lotag;
 
@@ -3123,6 +3126,7 @@ short LocateTheLocator(short n,short sn)
     i = headspritestat[7];
     while(i >= 0)
     {
+        READSPR
         if( (sn == -1 || sn == SECT) && n == SLT )
             return i;
         i = nextspritestat[i];
@@ -3214,6 +3218,7 @@ void moveactors()
                 {
                     KILLIT(i);
                 }
+            READSPR
                 if( T1 >= (respawnitemtime>>1) && T1 < ((respawnitemtime>>1)+(respawnitemtime>>2)) )
                     PN = RESPAWNMARKERYELLOW;
                 else if( T1 > ((respawnitemtime>>1)+(respawnitemtime>>2)) )
@@ -4590,6 +4595,7 @@ void moveexplosions()  // STATNUM 5
                     s->z = l;
 
                     insertspriteq(i);
+                    READSPR
                     PN ++;
 
                     j = headspritestat[5];
@@ -4863,7 +4869,7 @@ void moveexplosions()  // STATNUM 5
 
                 goto BOLT;
         }
-
+READSPR
         IFWITHIN(SCRAP6,SCRAP5+3)
         {
                 if(s->xvel > 0)
@@ -5315,7 +5321,7 @@ void moveeffectors()   //STATNUM 3
                                 quickkill(&ps[p]);
                             }
                         }
-
+                        READSPR
                         j = headspritesect[sprite[OW].sectnum];
                         while(j >= 0)
                         {
@@ -5487,7 +5493,7 @@ void moveeffectors()   //STATNUM 3
                                 quickkill(&ps[p]);
                             }
                         }
-
+                        READSPR
                         j = headspritesect[sprite[OW].sectnum];
                         while(j >= 0)
                         {
@@ -5661,7 +5667,7 @@ void moveeffectors()   //STATNUM 3
                             wall[wal->nextwall].shade = wal->shade;
                     }
                 }
-
+            READSPR
                 j = headspritesect[SECT];
                 while(j >= 0)
                 {

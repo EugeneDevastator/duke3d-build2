@@ -1654,6 +1654,7 @@ char dodge(spritetype *s)
 
     for(i=headspritestat[4];i>=0;i=nextspritestat[i]) //weapons list
     {
+        READSPR
         if( OW == i || SECT != s->sectnum)
             continue;
 

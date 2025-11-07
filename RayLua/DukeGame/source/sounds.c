@@ -30,6 +30,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "fx_man.h"
 #include "global.h"
 #include "funct.h"
+#include "dukewrap.h"
 long backflag,numenvsnds;
 
 /*
@@ -279,7 +280,7 @@ void sound(short num)
 {}
 
 int spritesound(unsigned short num, short i)
-{
+{READSPR
     return xyzsound(num,i,SX,SY,SZ);
 }
 

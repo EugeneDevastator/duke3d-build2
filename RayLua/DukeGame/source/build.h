@@ -62,20 +62,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 //   bits 7-15: reserved
 
 	//40 bytes
-typedef struct
-{
-	short wallptr, wallnum;
-	long ceilingz, floorz;
-	short ceilingstat, floorstat;
-	short ceilingpicnum, ceilingheinum;
-	signed char ceilingshade;
-	char ceilingpal, ceilingxpanning, ceilingypanning;
-	short floorpicnum, floorheinum;
-	signed char floorshade;
-	char floorpal, floorxpanning, floorypanning;
-	char visibility, filler;
-	short lotag, hitag, extra;
-} sectortype;
+
 
 //cstat:
 //   bit 0: 1 = Blocking wall (use with clipmove, getzrange)         "B"

@@ -1226,7 +1226,7 @@ int loadboard(char* filename, long* daposx, long* daposy, long* daposz, short* d
     kread(fil, daang, 2);
     kread(fil, dacursectnum, 2);
 
-    kread(fil, &numsectors, 2);
+    kread(fil, &numsectors, 2);  // reading actual map data here, numsectors is num in the map;
     kread(fil, &sector[0], sizeof(sectortype) * numsectors);
 
     kread(fil, &numwalls, 2);

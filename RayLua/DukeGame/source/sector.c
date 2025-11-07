@@ -28,6 +28,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #include "build.h"
 #include "duke3d.h"
+#include "dukewrap.h"
 #include "funct.h"
 #include "music.h"
 #include "sounds.h"
@@ -398,7 +399,7 @@ void animatecamsprite()
     if(T1 >= 11)
     {
         T1 = 0;
-
+        READSPR
         if(ps[screenpeek].newowner >= 0)
             OW = ps[screenpeek].newowner;
 
@@ -513,7 +514,7 @@ char activatewarpelevators(short s,short d) //Parm = sectoreffectornum
 
     i = headspritestat[3];
     while(i >= 0)
-    {
+    {READSPR
         if( SLT == 17 )
             if( SHT == sprite[s].hitag )
                 if( (klabs(sector[sn].floorz-hittype[s].temp_data[2]) > SP) ||
@@ -537,7 +538,7 @@ char activatewarpelevators(short s,short d) //Parm = sectoreffectornum
 
     i = headspritestat[3];
     while(i >= 0)
-    {
+    {READSPR
         if( SLT == 17 )
             if( SHT == sprite[s].hitag )
             {
@@ -691,7 +692,7 @@ void operatesectors(short sn,short ii)
 
             i = headspritesect[sn];
             while(i >= 0)
-            {
+            {READSPR
                 if(PN==SECTOREFFECTOR && SLT == 17 ) break;
                 i = nextspritesect[i];
             }
@@ -705,7 +706,7 @@ void operatesectors(short sn,short ii)
                 return;
             }
             else
-            {
+            {READSPR
                 if(sptr->floorz > SZ)
                     activatewarpelevators(i,-1);
                 else
@@ -767,7 +768,7 @@ void operatesectors(short sn,short ii)
 
             i = headspritestat[3]; //Effectors
             while(i >= 0)
-            {
+            {READSPR
                 if( (SLT == 22) &&
                     (SHT == sptr->hitag) )
                 {
@@ -795,7 +796,7 @@ void operatesectors(short sn,short ii)
             {
                 i = headspritesect[sn];
                 while(i >= 0)
-                {
+                {READSPR
                     if(sprite[i].statnum == 3 && SLT==9)
                     {
                         j = SZ;
@@ -878,7 +879,7 @@ void operatesectors(short sn,short ii)
 
             i = headspritestat[3];
             while(i >= 0)
-            {
+            {READSPR
                 if( SLT == 11 && SECT == sn && !T5)
                 {
                     j = i;
@@ -886,7 +887,7 @@ void operatesectors(short sn,short ii)
                 }
                 i = nextspritestat[i];
             }
-
+        READSPR
             l = sector[SECT].lotag&0x8000;
 
             if(j >= 0)
@@ -1000,6 +1001,7 @@ void operaterespawns(short low)
     while(i >= 0)
     {
         nexti = nextspritestat[i];
+        READSPR
         if(SLT == low) switch(PN)
         {
             case RESPAWN:
@@ -1042,7 +1044,7 @@ void operateactivators(short low,short snum)
         if(sprite[i].lotag == low)
         {
             if( sprite[i].picnum == ACTIVATORLOCKED )
-            {
+            {READSPR
                 if(sector[SECT].lotag&16384)
                     sector[SECT].lotag &= 65535-16384;
                 else
@@ -1056,7 +1058,7 @@ void operateactivators(short low,short snum)
                 }
             }
             else
-            {
+            {READSPR
                 switch(SHT)
                 {
                     case 0:
@@ -1114,7 +1116,7 @@ void operatemasterswitches(short low)
 
     i = headspritestat[6];
     while(i >= 0)
-    {
+    {READSPR
         if( PN == MASTERSWITCH && SLT == low && SP == 0 )
             SP = 1;
         i = nextspritestat[i];
@@ -1269,7 +1271,7 @@ char checkhitswitch(short snum,long w,char switchtype)
 
     i = headspritestat[0];
     while(i >= 0)
-    {
+    {READSPR
         if( lotag == SLT ) switch(PN)
         {
             case DIPSWITCH:
@@ -1541,7 +1543,7 @@ void activatebysector(short sect,short j)
 
     i = headspritesect[sect];
     while(i >= 0)
-    {
+    {READSPR
         if(PN == ACTIVATOR)
         {
             operateactivators(SLT,-1);
@@ -1613,7 +1615,7 @@ void checkhitwall(short spr,short dawallnum,long x,long y,long z,short atwith)
                     i = EGS(sn,x,y,z,FORCERIPPLE,-127,16+sprite[spr].xrepeat,16+sprite[spr].yrepeat,0,0,0,spr,5);
                 else i = EGS(sn,x,y,z,FORCERIPPLE,-127,32,32,0,0,0,spr,5);
             }
-
+                   READSPR
             CS |= 18+128;
             SA = getangle(wal->x-wall[wal->point2].x,
                 wal->y-wall[wal->point2].y)-512;
@@ -1791,7 +1793,7 @@ void checkhitwall(short spr,short dawallnum,long x,long y,long z,short atwith)
                 j = TRAND&1;
                 i= headspritestat[3];
                 while(i >= 0)
-                {
+                {READSPR
                     if(SHT == wall[dawallnum].lotag && SLT == 3 )
                     {
                         T3 = j;
@@ -1911,7 +1913,7 @@ char checkhitceiling(short sn)
                 {
                     i = headspritesect[sn];
                     while(i >= 0)
-                    {
+                    {READSPR
                         if( PN == SECTOREFFECTOR && SLT == 12 )
                         {
                             j = headspritestat[3];
@@ -1930,7 +1932,7 @@ char checkhitceiling(short sn)
                 i = headspritestat[3];
                 j = TRAND&1;
                 while(i >= 0)
-                {
+                {READSPR
                     if(SHT == (sector[sn].hitag) && SLT == 3 )
                     {
                         T3 = j;
@@ -1951,7 +1953,7 @@ void checkhitsprite(short i,short sn)
     spritetype *s;
 
     i &= (MAXSPRITES-1);
-
+    READSPR
     switch(PN)
     {
         case OCEANSPRITE1:
@@ -2385,21 +2387,27 @@ void allignwarpelevators()
 {
     short i, j;
 
+
     i = headspritestat[3];
     while(i >= 0)
     {
+        READSPR
+        spritetype s = bbeng.ReadSprite(i);
         if( SLT == 17 && SS > 16)
         {
             j = headspritestat[3];
             while(j >= 0)
             {
-                if( (sprite[j].lotag) == 17 && i != j &&
-                    (SHT) == (sprite[j].hitag) )
+                spritetype jspr = bbeng.ReadSprite(j);
+                if( (jspr.lotag) == 17 && i != j &&
+                    (SHT) == (jspr.hitag) )
                 {
-                    sector[sprite[j].sectnum].floorz =
-                        sector[SECT].floorz;
-                    sector[sprite[j].sectnum].ceilingz =
-                        sector[SECT].ceilingz;
+                    sectortype jsec = bbeng.ReadSect(jspr.sectnum);
+                    sectortype isec = bbeng.ReadSect(SECT);
+                    bbeng.SetFloorHeight(jspr.sectnum, isec.floorz);
+                    bbeng.SetCeilHeight(jspr.sectnum, isec.ceilingz);
+                   // sector[jspr.sectnum].floorz =  sector[SECT].floorz;
+                   // sector[jspr.sectnum].ceilingz =  sector[SECT].ceilingz;
                 }
 
                 j = nextspritestat[j];
@@ -2805,7 +2813,7 @@ void cheatkeys(short snum)
             {
 
                 if( p->holoduke_amount > 0 )
-                {
+                {READSPR
                     p->inven_icon = 3;
 
                     p->holoduke_on = i =
@@ -3118,7 +3126,7 @@ void checksectors(short snum)
                         i = headspritestat[1];
 
                         while(i >= 0)
-                        {
+                        {READSPR
                             if( PN == CAMERA1 && SP == 0 && sprite[neartagsprite].hitag == SLT )
                             {
                                 SP = 1; //Using this camera
@@ -3157,7 +3165,7 @@ void checksectors(short snum)
 
                         i = headspritestat[1];
                         while(i >= 0)
-                        {
+                        {READSPR
                             if(PN==CAMERA1) SP = 0;
                             i = nextspritestat[i];
                         }
@@ -3203,7 +3211,7 @@ void checksectors(short snum)
         {
             i = headspritesect[neartagsector];
             while(i >= 0)
-            {
+            {READSPR
                 if( PN == ACTIVATOR || PN == MASTERSWITCH )
                     return;
                 i = nextspritesect[i];
@@ -3216,7 +3224,7 @@ void checksectors(short snum)
             {
                 i = headspritesect[sprite[p->i].sectnum];
                 while(i >= 0)
-                {
+                {READSPR
                     if(PN == ACTIVATOR || PN == MASTERSWITCH) return;
                     i = nextspritesect[i];
                 }
