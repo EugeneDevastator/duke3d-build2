@@ -3,6 +3,10 @@
 
 #include "raylib.h"
 #include "raymath.h"
+extern "C" {
+    #include "mapcore.h"
+}
+
 
 class DumbCore {
 private:
@@ -18,10 +22,12 @@ private:
     static bool initialized;
 
 public:
-    static void Init() {
+    static mapstate_t *map;
+    static void Init(mapstate_t* loadedMap) {
         if (initialized) return;
-        
-        cam.position = {0.0f, 5.0f, 10.0f};
+        map = loadedMap;
+
+        cam.position = {map->startpos.x, -map->startpos.y, map->startpos.z};
         cam.target = {0.0f, 0.0f, 0.0f};
         cam.up = {0.0f, 1.0f, 0.0f};
         cam.speed = 50.0f;
@@ -109,5 +115,5 @@ private:
 DumbCore::FreeCamera DumbCore::cam = {};
 Camera3D DumbCore::camera = {};
 bool DumbCore::initialized = false;
-
+mapstate_t* DumbCore::map = nullptr;
 #endif // DUMBCORE_HPP

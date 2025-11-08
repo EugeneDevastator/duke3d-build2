@@ -1118,5 +1118,4 @@ private:
     }
 };
 
-
 #endif //RAYLIB_LUA_IMGUI_DUMBRENDER_H

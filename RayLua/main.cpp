@@ -161,10 +161,9 @@ void VisualizeMapstate() {
 // Draw palette and texture preview on screen
 void MainLoop()
 {
-    DumbCore::Init();
     DumbRender::Init();
-
     auto map = DumbRender::GetMap();
+    DumbCore::Init(map);
     //InitWindow(1024, 768, "Mapstate Visualizer");
     SetTargetFPS(60);
 
