@@ -4,7 +4,7 @@
 #include "physics.h"
 
 #include "mapcore.h"
-
+clipdata build2;
 void collmove (dpoint3d *p, int *cursect, dpoint3d *v, double cr, long doslide, mapstate_t* map)
 {
 	dpoint3d nv, n0, n1, n2;
@@ -12,7 +12,7 @@ void collmove (dpoint3d *p, int *cursect, dpoint3d *v, double cr, long doslide, 
 	long i;
 
 	f = sqrt(v->x*v->x + v->y*v->y + v->z*v->z) + cr;
-	build2.clipmaxcr = findmaxcr(p,*cursect,f,&nv);
+	build2.clipmaxcr = findmaxcr(p,*cursect,f,&nv, map);
 	if (build2.clipmaxcr >= f) { p->x += v->x; p->y += v->y; p->z += v->z; build2.cliphitnum = -1; return; }
 	cr = min(cr,build2.clipmaxcr);
 
@@ -56,7 +56,7 @@ void collmove (point3d *p, int *cursect, point3d *v, double cr, long doslide, ma
 	np.x = (double)p->x; nv.x = v->x;
 	np.y = (double)p->y; nv.y = v->y;
 	np.z = (double)p->z; nv.z = v->z;
-	collmove(&np,cursect,&nv,cr,doslide);
+	collmove(&np,cursect,&nv,cr,doslide, map);
 	p->x = (float)np.x;
 	p->y = (float)np.y;
 	p->z = (float)np.z;

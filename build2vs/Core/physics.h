@@ -5,7 +5,7 @@
 #ifndef BUILD2_PHYSICS_H
 #define BUILD2_PHYSICS_H
 #include "mapcore.h"
-extern struct
+typedef struct
 {
     double gammaval; //1.0=no change, useful range={0.0..~4.0)
     //----------------------- DATA coming from BUILD2.C -----------------------
@@ -18,12 +18,13 @@ extern struct
     //----------------------- DATA provided to BUILD2.C -----------------------
 
     double fattestsprite; //For sprite collision: when to cross sectors
-} build2; // rename to clipper.
+} clipdata; // rename to clipper.
+extern clipdata build2;
 
-void collmove (dpoint3d *p, int *cursect, dpoint3d *v, double cr, long doslide);
+void collmove (dpoint3d *p, int *cursect, dpoint3d *v, double cr, long doslide, mapstate_t* map);
 
-void collmove (point3d *p, int *cursect, point3d *v, double cr, long doslide);
-double findmaxcr (dpoint3d *p0, int cursect, double mindist, dpoint3d *hit);
+void collmove (point3d *p, int *cursect, point3d *v, double cr, long doslide, mapstate_t* map);
+double findmaxcr (dpoint3d *p0, int cursect, double mindist, dpoint3d *hit, mapstate_t* map);
 
 
 //Find maximum clip radius (distance to closest point of any visible polygon)
