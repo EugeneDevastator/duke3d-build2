@@ -41,12 +41,12 @@ public:
 
         cam.target = {0.0f, 0.0f, 0.0f};
         cam.up = {0.0f, 1.0f, 0.0f};
-        cam.speed = 50.0f;
+        cam.speed = 10.0f;
 
         camera.position = cam.position;
         camera.target = cam.target;
         camera.up = cam.up;
-        camera.fovy = 60.0f;
+        camera.fovy = 90.0f;
         camera.projection = CAMERA_PERSPECTIVE;
 
         initialized = true;
