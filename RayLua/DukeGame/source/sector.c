@@ -94,9 +94,10 @@ short check_activator_motion( short lotag )
     i = headspritestat[8];
     while ( i >= 0 )
     {
-        if ( sprite[i].lotag == lotag )
+        READSPR
+        if ( sprt.lotag == lotag )
         {
-            s = &sprite[i];
+            s = &sprt;
 
             for ( j = animatecnt-1; j >= 0; j-- )
                 if ( s->sectnum == animatesect[j] )
@@ -157,6 +158,8 @@ char isadoorwall(short dapic)
         case DOORTILE22:
         case DOORTILE23:
             return 1;
+        default:
+            return 0;
     }
     return 0;
 }
@@ -285,7 +288,7 @@ void doanimations()
 	for(i=animatecnt-1;i>=0;i--)
 	{
 		a = *animateptr[i];
-		v = animatevel[i]*TICSPERFRAME;
+		v = animatevel[i]*TICSPERFRAME;  // anim here
 		dasect = animatesect[i];
 
         if (a == animategoal[i])
@@ -297,11 +300,11 @@ void doanimations()
             animategoal[i] = animategoal[animatecnt];
             animatevel[i] = animatevel[animatecnt];
             animatesect[i] = animatesect[animatecnt];
-            if( sector[animatesect[i]].lotag == 18 || sector[animatesect[i]].lotag == 19 )
+            if( sector[animatesect[i]].lotag == 18 || sector[animatesect[i]].lotag == 19 ) // 19 Elevator Up
                 if(animateptr[i] == &sector[animatesect[i]].ceilingz)
                     continue;
 
-           if( (sector[dasect].lotag&0xff) != 22 )
+           if( (sector[dasect].lotag&0xff) != 22 ) //splitdoor
                 callsound(dasect,-1);
 
             continue;
@@ -560,12 +563,13 @@ void operatesectors(short sn,short ii)
     sectortype *sptr;
 
     sect_error = 0;
-    sptr = &sector[sn];
+    sectortype stt = bbeng.ReadSect(sn);
+    sptr = &stt;
 
     switch(sptr->lotag&(0xffff-49152))
     {
 
-        case 30:
+        case 30:  // rotate and rise bridge
             j = sector[sn].hitag;
             if( hittype[j].tempang == 0 ||
                 hittype[j].tempang == 256)
@@ -575,7 +579,7 @@ void operatesectors(short sn,short ii)
             else sprite[j].extra = 1;
             break;
 
-        case 31:
+        case 31: // 2way train
 
             j = sector[sn].hitag;
             if(hittype[j].temp_data[4] == 0)
@@ -600,7 +604,7 @@ void operatesectors(short sn,short ii)
             }
             return;
 
-        case 9:
+        case 9: // star trk door slide h
         {
             long dax,day,dax2,day2,sp;
             long wallfind[2];
@@ -716,7 +720,7 @@ void operatesectors(short sn,short ii)
             return;
 
         case 16:
-        case 17:
+        case 17:  // elev platform up
 
             i = getanimationgoal(&sptr->floorz);
 
@@ -826,7 +830,7 @@ void operatesectors(short sn,short ii)
 
             return;
 
-        case 21:
+        case 21: //floor door
             i = getanimationgoal(&sptr->floorz);
             if (i >= 0)
             {
@@ -2962,7 +2966,7 @@ void checksectors(short snum)
             goto CLEARCAMERAS;
         }
     }
-
+// 29 = use-open, 31 = esc
     if( !(sync[snum].bits&(1<<29)) && !(sync[snum].bits&(1<<31)))
         p->toggle_key_flag = 0;
 

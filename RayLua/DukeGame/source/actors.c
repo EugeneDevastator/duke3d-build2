@@ -638,7 +638,7 @@ int movesprite(short spritenum, long xchange, long ychange, long zchange, unsign
         oldy = sprite[spritenum].y;
 
         if( sprite[spritenum].xrepeat > 60 )
-            retval = clipmove(&sprite[spritenum].x,&sprite[spritenum].y,&daz,&dasectnum,((xchange*TICSPERFRAME)<<11),((ychange*TICSPERFRAME)<<11),1024L,(4<<8),(4<<8),cliptype);
+            retval = clipmove(&sprite[spritenum].x,&sprite[spritenum].y,&daz,&dasectnum,((xchange*TICSPERFRAME)<<11),((ychange*TICSPERFRAME)<<11),1024L,(4<<8),(4<<8),cliptype); //4<<8 = 1024
         else
         {
             if(sprite[spritenum].picnum == LIZMAN)
@@ -661,7 +661,7 @@ int movesprite(short spritenum, long xchange, long ychange, long zchange, unsign
         {
             bbeng.SetSprPosXY(spritenum,oldx,oldy);
                 if(sector[dasectnum].lotag == 1 && sprite[spritenum].picnum == LIZMAN)
-                    sprite[spritenum].ang = (TRAND&2047);
+                    sprite[spritenum].ang = (TRAND&2047); // 0b11111111111 looks like its angle clip.
                 else if( (hittype[spritenum].temp_data[0]&3) == 1 && sprite[spritenum].picnum != COMMANDER )
                     sprite[spritenum].ang = (TRAND&2047);
                 bbeng.SetSprPos(spritenum,oldx,oldy,sprite[spritenum].z);

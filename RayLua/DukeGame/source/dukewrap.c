@@ -49,4 +49,42 @@ void InitWrapper() // pass in real api
     // save main api
 }
 
+typedef struct {
+    float deltaTime;        // Time since last frame in seconds
+    float fixedDeltaTime;   // Fixed timestep (1/120.0f for Duke3D compatibility)
+    float accumulator;      // For fixed timestep accumulation
+    long totalTicks;        // Equivalent to old totalclock
+} GameTimer;
 
+GameTimer gameTimer = {0};
+// Convert old units to seconds
+#define TICS_TO_SECONDS(tics) ((float)(tics) / 120.0f)
+#define SECONDS_TO_TICS(seconds) ((long)((seconds) * 120.0f))
+
+// Convert TICSPERFRAME movements to per-second
+#define MOVEMENT_TO_UNITS_PER_SEC(movement) ((float)(movement) * 26.0f)
+/*
+void UpdateGameTimer() {
+    static uint64_t lastTime = {0};
+    static uint64_t frequency = {0};
+
+   // if (frequency.QuadPart == 0) {
+   //     QueryPerformanceFrequency(&frequency);
+   //     QueryPerformanceCounter(&lastTime);
+   //     return;
+   // }
+
+    uint64_t currentTime;
+    QueryPerformanceCounter(&currentTime);
+
+    gameTimer.deltaTime = (float)(currentTime.QuadPart - lastTime.QuadPart) / frequency.QuadPart;
+    gameTimer.accumulator += gameTimer.deltaTime;
+    gameTimer.fixedDeltaTime = 1.0f / 120.0f; // Match TICRATE
+
+    // Update tick counter for compatibility
+    gameTimer.totalTicks += (long)(gameTimer.deltaTime * 120.0f);
+
+    lastTime = currentTime;
+}
+
+*/

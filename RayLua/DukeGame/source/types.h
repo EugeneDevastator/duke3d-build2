@@ -29,7 +29,15 @@ No 	99 	TSPR_TEMP 	A tspr will have this when it is a shadow cast by an actor.
 No 	100 	STAT_MIRROREDACTOR 	A tspr will have this when it is part of a mirror reflection.
 Yes 	1024 	MAXSTATUS 	A sprite id with this statnum is invalid, meaning that it has been deleted or just never existed in the map. Do NOT try to destroy a sprite by setting this value on it, instead use the killit command or else try setting the sprite's xrepeat to zero.
  */
-
+typedef struct
+{
+    long x, y;
+    short point2, nextwall, nextsector, cstat;
+    short picnum, overpicnum;
+    signed char shade;
+    char pal, xrepeat, yrepeat, xpanning, ypanning;
+    short lotag, hitag, extra;
+} walltype;
 
 typedef struct
 {

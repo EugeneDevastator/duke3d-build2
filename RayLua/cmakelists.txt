@@ -144,6 +144,7 @@ set(CORE_SOURCES
         core/artloader.c
         core/kplib.c
         Core/loaders.c
+        Core/physics.c
 )
 
 set(CORE_HEADERS
@@ -151,6 +152,7 @@ set(CORE_HEADERS
         core/artloader.h
         core/loaders.h
         core/kplib.h
+        core/physics.h
         dumbrender.hpp
          DumbCore.hpp
 

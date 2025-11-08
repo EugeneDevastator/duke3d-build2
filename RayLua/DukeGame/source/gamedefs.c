@@ -262,7 +262,7 @@ char isaltok(char c)
 {
     return ( isalnum(c) || c == '{' || c == '}' || c == '/' || c == '*' || c == '-' || c == '_' || c == '.');
 }
-
+// vertical collision parsing, handling ceil floor and sprite on sprite collisions, as if jumping on someone.
 void getglobalz(short i)
 {
     long hz,lz,zr;

@@ -2,9 +2,10 @@
 
 #include "engine.h"
 #include "cache1d.h"
+#include "dukewrap.h"
 #include "funct.h"
 #include "pragmas.h"
-static void faketimerhandler (){};
+//static void faketimerhandler (){};
 sectortype sector[MAXSECTORS];
 volatile long stereomode = 0, visualpage, activepage, whiteband, blackband;
 volatile char oa1, o3c2, ortca, ortcb, overtbits, laststereoint;
@@ -1239,7 +1240,7 @@ int loadboard(char* filename, long* daposx, long* daposy, long* daposz, short* d
         insertsprite(sprite[i].sectnum, sprite[i].statnum);
 
     //Must be after loading sectors, etc!
-    updatesector(*daposx, *daposy, dacursectnum);
+    bbeng.FindSectorOfPoint(*daposx, *daposy, dacursectnum);
 
     kclose(fil);
     return (0);
@@ -3582,7 +3583,7 @@ int setsprite(short spritenum, long newx, long newy, long newz)
     sprite[spritenum].z = newz;
 
     tempsectnum = sprite[spritenum].sectnum;
-    updatesector(newx, newy, &tempsectnum);
+    bbeng.FindSectorOfPoint(newx, newy, &tempsectnum);
     if (tempsectnum < 0)
         return (-1);
     if (tempsectnum != sprite[spritenum].sectnum)
@@ -3911,6 +3912,10 @@ int hitscan(long xs, long ys, long zs, short sectnum, long vx, long vy, long vz,
 
     *hitx = hitscangoalx;
     *hity = hitscangoaly;
+    //dawalclipmask = (cliptype & 65535); for clip0 = 1; for clip1 = 64
+    //dasprclipmask = (cliptype >> 16); for clip0 = 1; for clip1 = 256
+// 256 for sprite is hitscan
+    // and 64 is for wall.
 
     dawalclipmask = (cliptype & 65535);
     dasprclipmask = (cliptype >> 16);
@@ -4519,7 +4524,7 @@ long clipmove(long* x, long* y, long* z, short* sectnum, long xvect, long yvect,
     goaly = (*y) + (yvect >> 14);
 
 
-    clipnum = 0;
+    clipnum = 0; // reset clipper
 
     cx = (((*x) + goalx) >> 1);
     cy = (((*y) + goaly) >> 1);
@@ -4541,12 +4546,16 @@ long clipmove(long* x, long* y, long* z, short* sectnum, long xvect, long yvect,
     do
     {
         dasect = clipsectorlist[clipsectcnt++];
-        sec = &sector[dasect];
-        startwall = sec->wallptr;
-        endwall = startwall + sec->wallnum;
-        for (j = startwall, wal = &wall[startwall]; j < endwall; j++, wal++)
+        sectortype tempsec = bbeng.ReadSect(dasect);
+        startwall = tempsec.wallptr;
+        endwall = startwall + tempsec.wallnum;
+        //for (j = startwall, wal = &wall[startwall]; j < endwall; j++, wal++)
+        for (j = startwall; j < endwall; j++)
         {
-            wal2 = &wall[wal->point2];
+            walltype w = bbeng.ReadWall(j);
+            wal = &w;
+            walltype w2 = bbeng.ReadWall(wal->point2);
+            wal2 = &w2;
             if ((wal->x < xmin) && (wal2->x < xmin)) continue;
             if ((wal->x > xmax) && (wal2->x > xmax)) continue;
             if ((wal->y < ymin) && (wal2->y < ymin)) continue;
@@ -4573,17 +4582,19 @@ long clipmove(long* x, long* y, long* z, short* sectnum, long xvect, long yvect,
             {
                 if (rintersect(*x, *y, 0, gx, gy, 0, x1, y1, x2, y2, &dax, &day, &daz) == 0)
                     dax = *x, day = *y;
-                daz = getflorzofslope((short)dasect, dax, day);
-                daz2 = getflorzofslope(wal->nextsector, dax, day);
+                daz = bbeng.GetFloorZSloped((short)dasect, dax, day);
+                daz2 = bbeng.GetFloorZSloped(wal->nextsector, dax, day);
 
-                sec2 = &sector[wal->nextsector];
+                sectortype s2 = bbeng.ReadSect(wal->nextsector);
+                sec2 = &s2;
+                
                 if (daz2 < daz - (1 << 8))
                     if ((sec2->floorstat & 1) == 0)
                         if ((*z) >= daz2 - (flordist - 1)) clipyou = 1;
                 if (clipyou == 0)
                 {
-                    daz = getceilzofslope((short)dasect, dax, day);
-                    daz2 = getceilzofslope(wal->nextsector, dax, day);
+                    daz = bbeng.GetFloorZSloped((short)dasect, dax, day);
+                    daz2 = bbeng.GetFloorZSloped(wal->nextsector, dax, day);
                     if (daz2 > daz + (1 << 8))
                         if ((sec2->ceilingstat & 1) == 0)
                             if ((*z) <= daz2 + (ceildist - 1)) clipyou = 1;
@@ -4618,7 +4629,8 @@ long clipmove(long* x, long* y, long* z, short* sectnum, long xvect, long yvect,
 
         for (j = headspritesect[dasect]; j >= 0; j = nextspritesect[j])
         {
-            spr = &sprite[j];
+            spritetype s = bbeng.ReadSprite(j);
+            spr = &s;
             cstat = spr->cstat;
             if ((cstat & dasprclipmask) == 0) continue;
             x1 = spr->x;
@@ -4796,7 +4808,7 @@ long clipmove(long* x, long* y, long* z, short* sectnum, long xvect, long yvect,
                 templong2 = dmulscale6(clipit[j].x2 - clipit[j].x1, oxvect, clipit[j].y2 - clipit[j].y1, oyvect);
                 if ((templong1 ^ templong2) < 0)
                 {
-                    updatesector(*x, *y, sectnum);
+                    bbeng.FindSectorOfPoint(*x, *y, sectnum);
                     return (retval);
                 }
             }
@@ -4828,7 +4840,7 @@ long clipmove(long* x, long* y, long* z, short* sectnum, long xvect, long yvect,
         if (inside(*x, *y, j) == 1)
         {
             if (sector[j].ceilingstat & 2)
-                templong2 = (getceilzofslope((short)j, *x, *y) - (*z));
+                templong2 = (bbeng.GetFloorZSloped((short)j, *x, *y) - (*z));
             else
                 templong2 = (sector[j].ceilingz - (*z));
 
@@ -4991,7 +5003,7 @@ long pushmove(long* x, long* y, long* z, short* sectnum, long walldist, long cei
 						} while ((klabs((*x)-spr->x) < t) && (klabs((*y)-spr->y) < t));
 						bad = -1;
 						k--; if (k <= 0) return(bad);
-						updatesector(*x,*y,sectnum);
+						bbeng.FindSectorOfPoint(*x,*y,sectnum);
 					}
 				}
 			}*/
@@ -5034,8 +5046,8 @@ long pushmove(long* x, long* y, long* z, short* sectnum, long walldist, long cei
                         if ((daz2 < daz - (1 << 8)) && ((sec2->floorstat & 1) == 0))
                             if (*z >= daz2 - (flordist - 1)) j = 1;
 
-                        daz = getceilzofslope(clipsectorlist[clipsectcnt], dax, day);
-                        daz2 = getceilzofslope(wal->nextsector, dax, day);
+                        daz = bbeng.GetFloorZSloped(clipsectorlist[clipsectcnt], dax, day);
+                        daz2 = bbeng.GetFloorZSloped(wal->nextsector, dax, day);
                         if ((daz2 > daz + (1 << 8)) && ((sec2->ceilingstat & 1) == 0))
                             if (*z <= daz2 + (ceildist - 1)) j = 1;
                     }
@@ -5056,7 +5068,7 @@ long pushmove(long* x, long* y, long* z, short* sectnum, long walldist, long cei
                         bad = -1;
                         k--;
                         if (k <= 0) return (bad);
-                        updatesector(*x, *y, sectnum);
+                        bbeng.FindSectorOfPoint(*x, *y, sectnum);
                     }
                     else
                     {
@@ -5077,7 +5089,7 @@ long pushmove(long* x, long* y, long* z, short* sectnum, long walldist, long cei
 }
 
 // gets valid sector at position. assumes that most of the time it is already in sectnum, otherwise - scan nearby, and then scan all
-void updatesector(long x, long y, short* sectnum)
+void bbeng.FindSectorOfPoint(long x, long y, short* sectnum)
 {
     walltype* wal;
     long i, j;
@@ -7180,7 +7192,7 @@ long sectorofwall(short theline)
     return (i);
 }
 
-long getceilzofslope(short sectnum, long dax, long day)
+long bbeng.GetFloorZSloped(short sectnum, long dax, long day)
 {
     long dx, dy, i, j;
     walltype* wal;

@@ -12,8 +12,21 @@ typedef struct
      void (*SetSprPosXY)(long i, long x, long y);
      spritetype (*ReadSprite)(long i);
      sectortype (*ReadSect)(long i);
+     sectortype (*ReadSectP)(long i, sectortype *target);
+     walltype (*ReadWall)(long i);
+     void (*FindSectorOfPoint)(long x, long y, int *inoutSecNum); // for api use: int func(x,y,sectn)
+     void (*WriteSectInfo)(long i, sectortype *s);
      void (*SetCeilHeight)(long sid, long height);
      void (*SetFloorHeight)(long sid, long height);
+     long (*GetFloorZSloped)(long sid, long x, long y);
+     void (*KeepAway)(long* x, long* y, long w); // see engine.c
+     int (*HitScan)(long xs, long ys, long zs,
+         short sectnum,
+         long vx, long vy, long vz,
+         short* hitsect, short* hitwall, short* hitsprite,
+         long* hitx, long* hity, long* hitz,
+         unsigned long cliptype);
+
      int (*arrpt)[10];
 } dukewrapper;
 

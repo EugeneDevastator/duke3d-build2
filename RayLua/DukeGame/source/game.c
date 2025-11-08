@@ -147,7 +147,7 @@ char recbuf[80];
 
 void allowtimetocorrecterrorswhenquitting()
 {
-    long i, j, oldtotalclock;
+   /* long i, j, oldtotalclock;
 
     ready2send = 0;
 
@@ -164,7 +164,7 @@ void allowtimetocorrecterrorswhenquitting()
         for (i = connecthead; i >= 0; i = connectpoint2[i])
             if (i != myconnectindex)
                 sendpacket(i, packbuf, 1);
-    }
+    }*/
 }
 
 #define MAXUSERQUOTES 4
@@ -2148,7 +2148,7 @@ static long oyrepeat = -1;
 
 void displayrooms(short snum, long smoothratio)
 {
-    return;//
+
     long cposx, cposy, cposz, dst, j, fz, cz, hz, lz;
     short sect, cang, k, choriz, tsect;
     player_struct* p;
@@ -2179,7 +2179,10 @@ void displayrooms(short snum, long smoothratio)
     if (sect < 0 || sect >= MAXSECTORS) return;
 
     dointerpolations(smoothratio); // positional interp.
+// render
+    //    restoreinterpolations();
 
+    return;//
     if (false)
         animatecamsprite(); // render code for cam screen
 
