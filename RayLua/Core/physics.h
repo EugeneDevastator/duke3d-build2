@@ -12,8 +12,9 @@ typedef struct
 
     //Clipmove hit point info (use this after calling clipmove):
     double clipmaxcr; //clipmove always calls findmaxcr even with no movement
-    dpoint3d cliphit[3];
+    dpoint3d cliphit[3]; //	cliphit[] contains hit points for each collision stage
     long cliphitnum, clipsect[3], clipwall[3];
+//	cliphitnum indicates number of surfaces hit (0-3)
 
     //----------------------- DATA provided to BUILD2.C -----------------------
 

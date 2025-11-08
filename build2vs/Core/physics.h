@@ -18,7 +18,8 @@ typedef struct
     //----------------------- DATA provided to BUILD2.C -----------------------
 
     double fattestsprite; //For sprite collision: when to cross sectors
-} clipdata; // rename to clipper.
+} clipdata;
+
 extern clipdata build2;
 
 void collmove (dpoint3d *p, int *cursect, dpoint3d *v, double cr, long doslide, mapstate_t* map);
