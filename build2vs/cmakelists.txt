@@ -20,6 +20,7 @@ set(SOURCES
         Core/mapcore.c
         Core/loaders.c
     winmain.cpp
+        Core/physics.c
 )
 
 # Headers
@@ -30,6 +31,7 @@ set(HEADERS
     sysmain.h
         Core/loaders.h
         Core/kplib.h
+        Core/physics.h
 
 )
 
