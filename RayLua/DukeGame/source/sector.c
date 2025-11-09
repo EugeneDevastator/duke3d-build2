@@ -2987,6 +2987,12 @@ void cheatkeys(short snum)
     }
 }
 
+/*
+This method handles player interaction with the game world
+- it's essentially Duke3D's "use/activate" system.
+The name checksectors is misleading; it should be something like
+handlePlayerInteraction or processUseAction.
+*/
 void checksectors(short snum)
 {
     long i = -1,oldz;
@@ -2994,19 +3000,22 @@ void checksectors(short snum)
     short j,hitscanwall;
 
     p = &ps[snum];
-
-    switch(sector[p->cursectnum].lotag)
+    READSECTN(psect,p->cursectnum)
+    switch(psect.lotag)
     {
 
         case 32767:
-            sector[p->cursectnum].lotag = 0;
+            psect.lotag = 0;
             FTA(9,p);
             p->secret_rooms++;
+            bbeng.WriteSect(p->cursectnum, psect);
             return;
         case -1:
             for(i=connecthead;i>=0;i=connectpoint2[i])
                 ps[i].gm = MODE_EOL;
-            sector[p->cursectnum].lotag = 0;
+            psect.lotag = 0;
+            bbeng.WriteSect(p->cursectnum, psect);
+
             if(ud.from_bonus)
             {
                 ud.level_number = ud.from_bonus;
@@ -3022,16 +3031,18 @@ void checksectors(short snum)
             }
             return;
         case -2:
-            sector[p->cursectnum].lotag = 0;
+            psect.lotag = 0;
             p->timebeforeexit = 26*8;
-            p->customexitsound = sector[p->cursectnum].hitag;
+            p->customexitsound = psect.hitag;
+            bbeng.WriteSect(p->cursectnum, psect);
             return;
         default:
-            if(sector[p->cursectnum].lotag >= 10000 && sector[p->cursectnum].lotag < 16383)
+            if(psect.lotag >= 10000 && psect.lotag < 16383)
             {
                 if(snum == screenpeek || ud.coop == 1 )
-                    spritesound(sector[p->cursectnum].lotag-10000,p->i);
-                sector[p->cursectnum].lotag = 0;
+                    spritesound(psect.lotag-10000,p->i);
+                psect.lotag = 0;
+                bbeng.WriteSect(p->cursectnum, psect);
             }
             break;
 
@@ -3138,7 +3149,7 @@ void checksectors(short snum)
             return;
 
         if( neartagsprite == -1 && neartagwall == -1)
-            if(sector[p->cursectnum].lotag == 2 )
+            if(psect.lotag == 2 )
             {
                 oldz = hitasprite(p->i,&neartagsprite);
                 if(oldz > 1280) neartagsprite = -1;
