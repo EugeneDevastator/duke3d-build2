@@ -11,7 +11,8 @@ typedef struct
      void (*SetSprPos)(long i,long x, long y, long z);
      void (*SetSprPosXY)(long i, long x, long y);
      spritetype (*ReadSprite)(long i);
-
+     void (*WriteSprite)(long i, spritetype s);
+    int (*FindClosestSectorIdByHeigh)(int sectnum, long baseZ, short isOtherFloor, short isDirectionUpward);
      sectortype (*ReadSect)(long i);
      void (*WriteSect)(long i, sectortype sect);
 

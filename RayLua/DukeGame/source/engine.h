@@ -185,7 +185,8 @@ int insertsprite(short sectnum, short statnum);
 int deletesprite(short spritenum);
 int changespritesect(short spritenum, short newsectnum);
 int changespritestat(short spritenum, short newstatnum);
-short nextsectorneighborz(short sectnum, long thez, short topbottom, short direction);
+// will be internalized
+//short nextsectorneighborz(short sectnum, long thez, short topbottom, short direction);
 int cansee(long x1, long y1, long z1, short sect1, long x2, long y2, long z2, short sect2);
 int hitscan(long xs, long ys, long zs, short sectnum, long vx, long vy, long vz, short* hitsect, short* hitwall,short* hitsprite, long* hitx, long* hity, long* hitz, unsigned long cliptype);
 int inthitscan(long xs, long ys, long zs, short sectnum, long vx, long vy, long vz, short* hitsect, short* hitwall, short* hitsprite, long* hitx, long* hity, long* hitz, unsigned long cliptype);

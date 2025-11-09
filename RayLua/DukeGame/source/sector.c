@@ -342,7 +342,7 @@ void doanimations()
 		*animateptr[i] = a;
 	}
 }
-
+// bool IsAnimating(target, property) this is always used to check if animation is there.
 long getanimationgoal(long *animptr)
 {
 	long i, j;
@@ -387,9 +387,6 @@ long setanimation(short animsect,long *animptr, long thegoal, long thevel)
 
     return(j);
 }
-
-
-
 
 void animatecamsprite()
 {
@@ -571,65 +568,73 @@ void operatesectors(short sn,short ii)
     long j=0l, l=0l, q=0l, startwall=0l, endwall=0l;
     short i=0;
     char sect_error;
-    sectortype *sptr;
+    sectortype *secSNp;
 
     sect_error = 0;
-    sectortype stt = bbeng.ReadSect(sn);
-    sptr = &stt;
+    sectortype secSN = bbeng.ReadSect(sn);
+    secSNp = &secSN;
 
     // Bit mask to clear upper 2 bits (49152 = 0xC000 = 11000000 00000000)
     // This removes flags from lotag, keeping only the base sector type (0-16383)
-    switch(sptr->lotag&(0xffff-49152))
+    switch(secSNp->lotag&(0xffff-49152))
     {
 
         case 30:  // rotate and rise bridge
-            j = sector[sn].hitag;
+            j = secSN.hitag;
+            spritetype sj = bbeng.ReadSprite(j);
             if( hittype[j].tempang == 0 ||
                 hittype[j].tempang == 256)
                     callsound(sn,ii);
-            if(sprite[j].extra == 1)
-                sprite[j].extra = 3;
-            else sprite[j].extra = 1;
+            if(sj.extra == 1)
+                sj.extra = 3;
+            else sj.extra = 1;
+            bbeng.WriteSprite(j,sj);
             break;
 
         case 31: // 2way train
 
-            j = sector[sn].hitag;
+            j = secSN.hitag;
             if(hittype[j].temp_data[4] == 0)
                 hittype[j].temp_data[4] = 1;
 
             callsound(sn,ii);
             break;
 
-        case 26: //The split doors
-            i = getanimationgoal(&sptr->ceilingz);
+        case 26: //The star trek doors Horiz + vertical.
+            i = getanimationgoal(&secSNp->ceilingz);
             if(i == -1) //if the door has stopped
             {
                 haltsoundhack = 1;
                 // Bit manipulation to change sector type while preserving upper bits
                 // 0xff00 = 11111111 00000000 - keeps upper byte, clears lower
-                sptr->lotag &= 0xff00;  // Clear lower 8 bits
-                sptr->lotag |= 22;      // Set to type 22 (splitting door)
+                secSNp->lotag &= 0xff00;  // Clear lower 8 bits
+                secSNp->lotag |= 22;      // Set to type 22 (splitting door)
+                bbeng.WriteSectInfo(sn,secSNp);
                 operatesectors(sn,ii);  // Recursive call with new type
-                sptr->lotag &= 0xff00;  // Clear again
-                sptr->lotag |= 9;       // Set to type 9 (star trek door)
+
+                secSNp->lotag &= 0xff00;  // Clear again
+                secSNp->lotag |= 9;       // Set to type 9 (star trek door)
+                bbeng.WriteSectInfo(sn,secSNp);
                 operatesectors(sn,ii);  // Another recursive call
-                sptr->lotag &= 0xff00;  // Restore
-                sptr->lotag |= 26;      // Back to original type 26
+
+                secSNp->lotag &= 0xff00;  // Restore
+                secSNp->lotag |= 26;      // Back to original type 26
+                bbeng.WriteSectInfo(sn,secSNp);
             }
             return;
 
-        case 9: // star trk door slide h
+        case 9: // star trk door slide h, ones that squish texture.
         {
+            return; // skip this for now.
             long dax,day,dax2,day2,sp;
             long wallfind[2];
 
-            startwall = sptr->wallptr;
-            endwall = startwall+sptr->wallnum-1;
+            startwall = secSNp->wallptr;
+            endwall = startwall+secSNp->wallnum-1;
 
             // Extract speed from upper 4 bits of extra field
             // >>4 is equivalent to /16, gets upper nibble
-            sp = sptr->extra>>4;
+            sp = secSNp->extra>>4;
 
             //first find center point by averaging all points
             dax = 0L, day = 0L;
@@ -710,18 +715,19 @@ void operatesectors(short sn,short ii)
         return;
 
         case 15://Warping elevators
-
-            if(sprite[ii].picnum != APLAYER) return;
+            spritetype SPRii = bbeng.ReadSprite(ii);
+            if(SPRii.picnum != APLAYER) return;
 //            if(ps[sprite[ii].yvel].select_dir == 1) return;
 
             i = headspritesect[sn];
             while(i >= 0)
-            {READSPR  // Macro that likely sets up sprite reading context
+            {
+                READSPR  // Macro that likely sets up sprite reading context
                 if(PN==SECTOREFFECTOR && SLT == 17 ) break;
                 i = nextspritesect[i];
             }
 
-            if(sprite[ii].sectnum == sn)
+            if(SPRii.sectnum == sn)
             {
                 if( activatewarpelevators(i,-1) )
                     activatewarpelevators(i,1);
@@ -730,8 +736,9 @@ void operatesectors(short sn,short ii)
                 return;
             }
             else
-            {READSPR
-                if(sptr->floorz > SZ)
+            {
+                READSPR
+                if(secSNp->floorz > SZ)
                     activatewarpelevators(i,-1);
                 else
                     activatewarpelevators(i,1);
@@ -742,22 +749,22 @@ void operatesectors(short sn,short ii)
         case 16:
         case 17:  // elev platform up
 
-            i = getanimationgoal(&sptr->floorz);
+            i = getanimationgoal(&secSNp->floorz);
 
             if(i == -1)
             {
-                i = nextsectorneighborz(sn,sptr->floorz,1,1);
+                i = bbeng.FindClosestSectorIdByHeigh(sn,secSNp->floorz,1,1);
                 if( i == -1 )
                 {
-                    i = nextsectorneighborz(sn,sptr->floorz,1,-1);
+                    i = bbeng.FindClosestSectorIdByHeigh(sn,secSNp->floorz,1,-1);
                     if( i == -1 ) return;
                     j = sector[i].floorz;
-                    setanimation(sn,&sptr->floorz,j,sptr->extra);
+                    setanimation(sn,&secSNp->floorz,j,secSNp->extra);
                 }
                 else
                 {
                     j = sector[i].floorz;
-                    setanimation(sn,&sptr->floorz,j,sptr->extra);
+                    setanimation(sn,&secSNp->floorz,j,secSNp->extra);
                 }
                 callsound(sn,ii);
             }
@@ -767,18 +774,19 @@ void operatesectors(short sn,short ii)
         case 18:
         case 19:
 
-            i = getanimationgoal(&sptr->floorz);
+            i = getanimationgoal(&secSNp->floorz);
 
             if(i==-1)
             {
-                i = nextsectorneighborz(sn,sptr->floorz,1,-1);
-                if(i==-1) i = nextsectorneighborz(sn,sptr->floorz,1,1);
+                sectortype sectori = bbeng.ReadSect(i);
+                i = (short)bbeng.FindClosestSectorIdByHeigh(sn,secSNp->floorz,1,-1);
+                if(i==-1) i = (short)bbeng.FindClosestSectorIdByHeigh(sn,secSNp->floorz,1,1);
                 if(i==-1) return;
-                j = sector[i].floorz;
-                q = sptr->extra;
-                l = sptr->ceilingz-sptr->floorz;
-                setanimation(sn,&sptr->floorz,j,q);
-                setanimation(sn,&sptr->ceilingz,j+l,q);
+                j = sectori.floorz;
+                q = secSNp->extra;
+                l = secSNp->ceilingz-secSNp->floorz;
+                setanimation(sn,&secSNp->floorz,j,q);
+                setanimation(sn,&secSNp->ceilingz,j+l,q);
                 callsound(sn,ii);
             }
             return;
@@ -787,30 +795,40 @@ void operatesectors(short sn,short ii)
 
             // Check bit 15 (0x8000 = 32768) to determine door state
             // This is a common pattern - using high bit as state flag
-            if(sptr->lotag&0x8000)
-                j = sector[nextsectorneighborz(sn,sptr->ceilingz,1,1)].floorz;
+            int tempid;
+            if (secSNp->lotag & 0x8000)
+            {
+                tempid = bbeng.FindClosestSectorIdByHeigh(sn, secSNp->ceilingz, 1, 1);
+                j = sector[tempid].floorz;
+            }
             else
-                j = sector[nextsectorneighborz(sn,sptr->ceilingz,-1,-1)].ceilingz;
+            {
+                tempid = bbeng.FindClosestSectorIdByHeigh(sn, secSNp->ceilingz, -1, -1);
+                j = sector[tempid].ceilingz;
+            }
 
             i = headspritestat[3]; //Effectors
             while(i >= 0)
-            {READSPR
+            {
+                READSPR
+                READSECT
                 if( (SLT == 22) &&
-                    (SHT == sptr->hitag) )
+                    (SHT == secSNp->hitag) )
                 {
-                    sector[SECT].extra = -sector[SECT].extra;
+                    sectr.extra = -sectr.extra;
 
                     T1 = sn;
                     T2 = 1;
+                    WRITESECT
                 }
                 i = nextspritestat[i];
             }
 
             // XOR toggle of bit 15 - flips the state flag
-            sptr->lotag ^= 0x8000;
+            secSNp->lotag ^= 0x8000;
+            bbeng.WriteSectInfo(sn,secSNp);
 
-            setanimation(sn,&sptr->ceilingz,j,sptr->extra);
-
+            setanimation(sn,&secSNp->ceilingz,j,secSNp->extra);
             callsound(sn,ii);
 
             return;
@@ -820,7 +838,7 @@ void operatesectors(short sn,short ii)
             REDODOOR:
 
             // Check state bit again (0x8000 = bit 15)
-            if(sptr->lotag&0x8000)
+            if(secSNp->lotag&0x8000)
             {
                 i = headspritesect[sn];
                 while(i >= 0)
@@ -833,48 +851,48 @@ void operatesectors(short sn,short ii)
                     i = nextspritesect[i];
                 }
                 if(i==-1)
-                    j = sptr->floorz;
+                    j = secSNp->floorz;
             }
             else
             {
-                j = nextsectorneighborz(sn,sptr->ceilingz,-1,-1);
+                j = bbeng.FindClosestSectorIdByHeigh(sn,secSNp->ceilingz,-1,-1);
 
                 if(j >= 0) j = sector[j].ceilingz;
                 else
                 {
                     // Set bit 15 (32768) and retry - fallback mechanism
-                    sptr->lotag |= 32768;
+                    secSNp->lotag |= 32768;
                     goto REDODOOR;
                 }
             }
 
             // Toggle state bit
-            sptr->lotag ^= 0x8000;
+            secSNp->lotag ^= 0x8000;
 
-            setanimation(sn,&sptr->ceilingz,j,sptr->extra);
+            setanimation(sn,&secSNp->ceilingz,j,secSNp->extra);
             callsound(sn,ii);
 
             return;
 
         case 21: //floor door
-            i = getanimationgoal(&sptr->floorz);
+            i = getanimationgoal(&secSNp->floorz);
             if (i >= 0)
             {
-                if (animategoal[sn] == sptr->ceilingz)
-                    animategoal[i] = sector[nextsectorneighborz(sn,sptr->ceilingz,1,1)].floorz;
-                else animategoal[i] = sptr->ceilingz;
+                if (animategoal[sn] == secSNp->ceilingz)
+                    animategoal[i] = sector[bbeng.FindClosestSectorIdByHeigh(sn,secSNp->ceilingz,1,1)].floorz;
+                else animategoal[i] = secSNp->ceilingz;
                 j = animategoal[i];
             }
             else
             {
-                if (sptr->ceilingz == sptr->floorz)
-                    j = sector[nextsectorneighborz(sn,sptr->ceilingz,1,1)].floorz;
-                else j = sptr->ceilingz;
+                if (secSNp->ceilingz == secSNp->floorz)
+                    j = sector[FindClosestSectorIdByHeigh(sn,secSNp->ceilingz,1,1)].floorz;
+                else j = secSNp->ceilingz;
 
                 // Toggle state bit
-                sptr->lotag ^= 0x8000;
+                secSNp->lotag ^= 0x8000;
 
-                if(setanimation(sn,&sptr->floorz,j,sptr->extra) >= 0)
+                if(setanimation(sn,&secSNp->floorz,j,secSNp->extra) >= 0)
                     callsound(sn,ii);
             }
             return;
@@ -884,23 +902,23 @@ void operatesectors(short sn,short ii)
             // REDODOOR22:
 
             // Check state bit to determine split door behavior
-            if ( (sptr->lotag&0x8000) )
+            if ( (secSNp->lotag&0x8000) )
             {
                 // >>1 is divide by 2 - finds midpoint between floor and ceiling
-                q = (sptr->ceilingz+sptr->floorz)>>1;
-                j = setanimation(sn,&sptr->floorz,q,sptr->extra);
-                j = setanimation(sn,&sptr->ceilingz,q,sptr->extra);
+                q = (secSNp->ceilingz+secSNp->floorz)>>1;
+                j = setanimation(sn,&secSNp->floorz,q,secSNp->extra);
+                j = setanimation(sn,&secSNp->ceilingz,q,secSNp->extra);
             }
             else
             {
-                q = sector[nextsectorneighborz(sn,sptr->floorz,1,1)].floorz;
-                j = setanimation(sn,&sptr->floorz,q,sptr->extra);
-                q = sector[nextsectorneighborz(sn,sptr->ceilingz,-1,-1)].ceilingz;
-                j = setanimation(sn,&sptr->ceilingz,q,sptr->extra);
+                q = sector[FindClosestSectorIdByHeigh(sn,secSNp->floorz,1,1)].floorz;
+                j = setanimation(sn,&secSNp->floorz,q,secSNp->extra);
+                q = sector[FindClosestSectorIdByHeigh(sn,secSNp->ceilingz,-1,-1)].ceilingz;
+                j = setanimation(sn,&secSNp->ceilingz,q,secSNp->extra);
             }
 
             // Toggle state
-            sptr->lotag ^= 0x8000;
+            secSNp->lotag ^= 0x8000;
 
             callsound(sn,ii);
 

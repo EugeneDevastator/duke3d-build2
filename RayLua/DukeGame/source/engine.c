@@ -3769,6 +3769,7 @@ int changespritestat(short spritenum, short newstatnum)
     return (0);
 }
 
+// returns sector id.
 short nextsectorneighborz(short sectnum, long thez, short topbottom, short direction)
 {
     walltype* wal;

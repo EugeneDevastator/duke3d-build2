@@ -48,6 +48,75 @@ void InitWrapper() // pass in real api
     bbeng.SetSprPosXY = SetSprPosXY;
     // save main api
 }
+/*
+*short nextsectorneighborz(short sectnum, long thez, short topbottom, short direction)
+{
+    walltype* wal;
+    long i, testz, nextz;
+    short sectortouse;
+
+    if (direction == 1) nextz = 0x7fffffff;
+    else nextz = 0x80000000;
+
+    sectortouse = -1;
+
+    wal = &wall[sector[sectnum].wallptr];
+    i = sector[sectnum].wallnum;
+    do
+    {
+        if (wal->nextsector >= 0)
+        {
+            if (topbottom == 1)
+            {
+                testz = sector[wal->nextsector].floorz;
+                if (direction == 1)
+                {
+                    if ((testz > thez) && (testz < nextz))
+                    {
+                        nextz = testz;
+                        sectortouse = wal->nextsector;
+                    }
+                }
+                else
+                {
+                    if ((testz < thez) && (testz > nextz))
+                    {
+                        nextz = testz;
+                        sectortouse = wal->nextsector;
+                    }
+                }
+            }
+            else
+            {
+                testz = sector[wal->nextsector].ceilingz;
+                if (direction == 1)
+                {
+                    if ((testz > thez) && (testz < nextz))
+                    {
+                        nextz = testz;
+                        sectortouse = wal->nextsector;
+                    }
+                }
+                else
+                {
+                    if ((testz < thez) && (testz > nextz))
+                    {
+                        nextz = testz;
+                        sectortouse = wal->nextsector;
+                    }
+                }
+            }
+        }
+        wal++;
+        i--;
+    }
+    while (i != 0);
+
+    return (sectortouse);
+}*/
+int FindClosestSectorIdByHeigh(int sectnum, long baseZ, short isOtherFloor, short isDirectionUpward){
+    return 0; // look above for impl.
+}
 
 typedef struct {
     float deltaTime;        // Time since last frame in seconds

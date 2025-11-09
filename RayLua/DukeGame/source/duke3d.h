@@ -88,6 +88,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #define TICRATE (120)
 #define TICSPERFRAME (TICRATE/26)
+// so we assume that there are 120 tics per second? and 26 fps is default fps
 
 // #define GC (TICSPERFRAME*44)
 
@@ -163,10 +164,12 @@ int sgn(int value);
 #define SLT  sprt.lotag
 #define SHT  sprt.hitag
 #define SECT sprt.sectnum
+#define SECTR sectr
 #define READSPR spritetype sprt = bbeng.ReadSprite(i);
 #define READSECT sectortype sectr = bbeng.ReadSect(SECT);
-#define WRITESECT bbeng.WriteSect(SECT, sectr);
 
+#define WRITESECT bbeng.WriteSect(SECT, sectr);
+#define READSECTN(name,id) sectortype name = bbeng.ReadSect(id);
 
 #define face_player 1
 #define geth 2

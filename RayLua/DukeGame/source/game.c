@@ -3947,10 +3947,10 @@ short spawn(short j, short pn)
 
             T3 = sector[sect].floorz; //Stopping loc
 
-            j = nextsectorneighborz(sect, sector[sect].floorz, -1, -1);
+            j = bbeng.FindClosestSectorIdByHeigh(sect, sector[sect].floorz, -1, -1);
             T4 = sector[j].ceilingz;
 
-            j = nextsectorneighborz(sect, sector[sect].ceilingz, 1, 1);
+            j = bbeng.FindClosestSectorIdByHeigh(sect, sector[sect].ceilingz, 1, 1);
             T5 = sector[j].floorz;
 
             if (numplayers < 2)
