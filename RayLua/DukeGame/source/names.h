@@ -37,7 +37,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #define STAT_STANDABLE 6        // Standable objects (BOLT1+, VIEWSCREEN, CRANE, TRASH, WATERDRIP, destructible barrels, etc)
 #define STAT_LOCATOR 7          // Locator sprites
 #define STAT_ACTIVATOR 8        // Activator sprites
-#define STAT_TRANSPORT 9        //
+#define STAT_TRANSPORT 9        // the TELE-PORTERS
 #define STAT_PLAYER 10          // Player sprite and Holoduke
 #define STAT_FX 11              // Effects sprites (RESPAWN, MUSICANDSFX)
 #define STAT_FALLER 12          // Destructible decorative sprites with nonzero hitag

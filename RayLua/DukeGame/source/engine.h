@@ -203,6 +203,7 @@ long pushmove(long* x, long* y, long* z, short* sectnum,
 			  long walldist, long ceildist, long flordist, unsigned long cliptype);
 // gets valid sector at position. assumes that most of the time it is already in sectnum, otherwise - scan nearby, and then scan all
 void updatesector(long x, long y, short* sectnum);
+void updatesectorz(long x, long y, long z, short* sectnum);
 void rotatepoint(long xpivot, long ypivot, long x, long y, short daang, long* x2, long* y2);
 void getzrange(long x, long y, long z, short sectnum,
 			   long* ceilz, long* ceilhit, long* florz, long* florhit,

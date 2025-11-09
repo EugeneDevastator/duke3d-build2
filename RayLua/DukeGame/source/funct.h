@@ -405,7 +405,7 @@ extern short strget(short x,short y,char *t,short dalen,short c);
 //#line "game.c" 1819
 extern void displayrest(long smoothratio);
 //#line "game.c" 2047
-extern void updatesectorz(long x,long y,long z,short *sectnum);
+//extern void updatesectorz(long x,long y,long z,short *sectnum);
 //#line "game.c" 2085
 extern void view(player_struct *pp,long *vx,long *vy,long *vz,short *vsectnum,short ang,short horiz);
 //#line "game.c" 2137
