@@ -1021,11 +1021,11 @@ void operaterespawns(short low)
     }
 }
 
-void operateactivators(short low,short snum)
+void operateactivators(short low,short snum) // snum usually used for MP, otherwise -1
 {
     short i, j, k, *p, nexti;
     walltype *wal;
-
+    // parse cyclers
     for(i=numcyclers-1;i>=0;i--)
     {
         p = &cyclers[i][0];
@@ -1045,12 +1045,13 @@ void operateactivators(short low,short snum)
     k = -1;
     while(i >= 0)
     {
-        if(sprite[i].lotag == low)
+        READSPR
+        if(SLT == low)
         {
-            if( sprite[i].picnum == ACTIVATORLOCKED )
-            {READSPR
-                if(sector[SECT].lotag&16384)
-                    sector[SECT].lotag &= 65535-16384;
+            if( PN == ACTIVATORLOCKED )
+            {
+                if(sector[SECT].lotag&16384) // cut off lower tags?
+                    sector[SECT].lotag &= 65535-16384; // unset b_0___
                 else
                     sector[SECT].lotag |= 16384;
 
@@ -1062,7 +1063,7 @@ void operateactivators(short low,short snum)
                 }
             }
             else
-            {READSPR
+            {
                 switch(SHT)
                 {
                     case 0:
@@ -1547,7 +1548,8 @@ void activatebysector(short sect,short j)
 
     i = headspritesect[sect];
     while(i >= 0)
-    {READSPR
+    {
+        READSPR
         if(PN == ACTIVATOR)
         {
             operateactivators(SLT,-1);

@@ -164,6 +164,7 @@ int sgn(int value);
 #define SHT  sprt.hitag
 #define SECT sprt.sectnum
 #define READSPR spritetype sprt = bbeng.ReadSprite(i);
+#define READSECT spritetype sectr = bbeng.ReadSect(SECT);
 
 
 #define face_player 1

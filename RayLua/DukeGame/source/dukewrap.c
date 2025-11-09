@@ -63,6 +63,7 @@ GameTimer gameTimer = {0};
 
 // Convert TICSPERFRAME movements to per-second
 #define MOVEMENT_TO_UNITS_PER_SEC(movement) ((float)(movement) * 26.0f)
+// essentially 26 ticks per frame. so mps = vel/26
 /*
 void UpdateGameTimer() {
     static uint64_t lastTime = {0};
