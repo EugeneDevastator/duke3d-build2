@@ -5090,7 +5090,7 @@ long pushmove(long* x, long* y, long* z, short* sectnum, long walldist, long cei
 }
 
 // gets valid sector at position. assumes that most of the time it is already in sectnum, otherwise - scan nearby, and then scan all
-void bbeng.FindSectorOfPoint(long x, long y, short* sectnum)
+void updatesector(long x, long y, short* sectnum)
 {
     walltype* wal;
     long i, j;
@@ -7193,7 +7193,7 @@ long sectorofwall(short theline)
     return (i);
 }
 
-long bbeng.GetFloorZSloped(short sectnum, long dax, long day)
+long getceilzofslope(short sectnum, long dax, long day)
 {
     long dx, dy, i, j;
     walltype* wal;
