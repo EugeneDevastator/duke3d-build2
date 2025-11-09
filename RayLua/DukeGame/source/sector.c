@@ -553,7 +553,18 @@ char activatewarpelevators(short s,short d) //Parm = sectoreffectornum
     return 0;
 }
 
+/*
+*0x8000 (32768): Used as state flag in bit 15 throughout the code
+0xff00: Masks upper 8 bits, clears lower 8 bits
+0xff: Masks lower 8 bits only
+>>1: Fast divide by 2 for midpoint calculations
+>>4: Extract upper nibble (divide by 16) for speed values
+^= 0x8000: XOR toggle of state bit
+&= 0x7fff: Clear bit 15 (0x7fff = 0111111111111111)
+|= 0x8000: Set bit 15
+The code uses bit 15 as a universal "state" flag across different door/sector types, allowing for open/closed states to be tracked efficiently.
 
+ */
 
 void operatesectors(short sn,short ii)
 {
@@ -566,6 +577,8 @@ void operatesectors(short sn,short ii)
     sectortype stt = bbeng.ReadSect(sn);
     sptr = &stt;
 
+    // Bit mask to clear upper 2 bits (49152 = 0xC000 = 11000000 00000000)
+    // This removes flags from lotag, keeping only the base sector type (0-16383)
     switch(sptr->lotag&(0xffff-49152))
     {
 
@@ -584,7 +597,7 @@ void operatesectors(short sn,short ii)
             j = sector[sn].hitag;
             if(hittype[j].temp_data[4] == 0)
                 hittype[j].temp_data[4] = 1;
-            
+
             callsound(sn,ii);
             break;
 
@@ -593,14 +606,16 @@ void operatesectors(short sn,short ii)
             if(i == -1) //if the door has stopped
             {
                 haltsoundhack = 1;
-                sptr->lotag &= 0xff00;
-                sptr->lotag |= 22;
-                operatesectors(sn,ii);
-                sptr->lotag &= 0xff00;
-                sptr->lotag |= 9;
-                operatesectors(sn,ii);
-                sptr->lotag &= 0xff00;
-                sptr->lotag |= 26;
+                // Bit manipulation to change sector type while preserving upper bits
+                // 0xff00 = 11111111 00000000 - keeps upper byte, clears lower
+                sptr->lotag &= 0xff00;  // Clear lower 8 bits
+                sptr->lotag |= 22;      // Set to type 22 (splitting door)
+                operatesectors(sn,ii);  // Recursive call with new type
+                sptr->lotag &= 0xff00;  // Clear again
+                sptr->lotag |= 9;       // Set to type 9 (star trek door)
+                operatesectors(sn,ii);  // Another recursive call
+                sptr->lotag &= 0xff00;  // Restore
+                sptr->lotag |= 26;      // Back to original type 26
             }
             return;
 
@@ -612,6 +627,8 @@ void operatesectors(short sn,short ii)
             startwall = sptr->wallptr;
             endwall = startwall+sptr->wallnum-1;
 
+            // Extract speed from upper 4 bits of extra field
+            // >>4 is equivalent to /16, gets upper nibble
             sp = sptr->extra>>4;
 
             //first find center point by averaging all points
@@ -626,6 +643,7 @@ void operatesectors(short sn,short ii)
 
             //find any points with either same x or same y coordinate
             //  as center (dax, day) - should be 2 points found.
+            // This finds the "hinge" points of the door
             wallfind[0] = -1;
             wallfind[1] = -1;
             for(i=startwall;i<=endwall;i++)
@@ -643,10 +661,12 @@ void operatesectors(short sn,short ii)
                     //find what direction door should open by averaging the
                     //  2 neighboring points of wallfind[0] & wallfind[1].
                     i = wallfind[j]-1; if (i < startwall) i = endwall;
+                    // >>1 is divide by 2 for averaging
                     dax2 = ((wall[i].x+wall[wall[wallfind[j]].point2].x)>>1)-wall[wallfind[j]].x;
                     day2 = ((wall[i].y+wall[wall[wallfind[j]].point2].y)>>1)-wall[wallfind[j]].y;
                     if (dax2 != 0)
                     {
+                        // Complex wall chain traversal: wall->point2->point2 gets the wall 2 steps ahead
                         dax2 = wall[wall[wall[wallfind[j]].point2].point2].x;
                         dax2 -= wall[wall[wallfind[j]].point2].x;
                         setanimation(sn,&wall[wallfind[j]].x,wall[wallfind[j]].x+dax2,sp);
@@ -696,7 +716,7 @@ void operatesectors(short sn,short ii)
 
             i = headspritesect[sn];
             while(i >= 0)
-            {READSPR
+            {READSPR  // Macro that likely sets up sprite reading context
                 if(PN==SECTOREFFECTOR && SLT == 17 ) break;
                 i = nextspritesect[i];
             }
@@ -765,6 +785,8 @@ void operatesectors(short sn,short ii)
 
         case 29:
 
+            // Check bit 15 (0x8000 = 32768) to determine door state
+            // This is a common pattern - using high bit as state flag
             if(sptr->lotag&0x8000)
                 j = sector[nextsectorneighborz(sn,sptr->ceilingz,1,1)].floorz;
             else
@@ -784,6 +806,7 @@ void operatesectors(short sn,short ii)
                 i = nextspritestat[i];
             }
 
+            // XOR toggle of bit 15 - flips the state flag
             sptr->lotag ^= 0x8000;
 
             setanimation(sn,&sptr->ceilingz,j,sptr->extra);
@@ -796,6 +819,7 @@ void operatesectors(short sn,short ii)
 
             REDODOOR:
 
+            // Check state bit again (0x8000 = bit 15)
             if(sptr->lotag&0x8000)
             {
                 i = headspritesect[sn];
@@ -818,11 +842,13 @@ void operatesectors(short sn,short ii)
                 if(j >= 0) j = sector[j].ceilingz;
                 else
                 {
+                    // Set bit 15 (32768) and retry - fallback mechanism
                     sptr->lotag |= 32768;
                     goto REDODOOR;
                 }
             }
 
+            // Toggle state bit
             sptr->lotag ^= 0x8000;
 
             setanimation(sn,&sptr->ceilingz,j,sptr->extra);
@@ -845,6 +871,7 @@ void operatesectors(short sn,short ii)
                     j = sector[nextsectorneighborz(sn,sptr->ceilingz,1,1)].floorz;
                 else j = sptr->ceilingz;
 
+                // Toggle state bit
                 sptr->lotag ^= 0x8000;
 
                 if(setanimation(sn,&sptr->floorz,j,sptr->extra) >= 0)
@@ -856,8 +883,10 @@ void operatesectors(short sn,short ii)
 
             // REDODOOR22:
 
+            // Check state bit to determine split door behavior
             if ( (sptr->lotag&0x8000) )
             {
+                // >>1 is divide by 2 - finds midpoint between floor and ceiling
                 q = (sptr->ceilingz+sptr->floorz)>>1;
                 j = setanimation(sn,&sptr->floorz,q,sptr->extra);
                 j = setanimation(sn,&sptr->ceilingz,q,sptr->extra);
@@ -870,6 +899,7 @@ void operatesectors(short sn,short ii)
                 j = setanimation(sn,&sptr->ceilingz,q,sptr->extra);
             }
 
+            // Toggle state
             sptr->lotag ^= 0x8000;
 
             callsound(sn,ii);
@@ -892,6 +922,7 @@ void operatesectors(short sn,short ii)
                 i = nextspritestat[i];
             }
         READSPR
+            // Extract state bit from sector lotag
             l = sector[SECT].lotag&0x8000;
 
             if(j >= 0)
@@ -901,10 +932,11 @@ void operatesectors(short sn,short ii)
                 {
                     if( l == (sector[SECT].lotag&0x8000) && SLT == 11 && sprite[j].hitag == SHT && !T5 )
                     {
-                        if(sector[SECT].lotag&0x8000) sector[SECT].lotag &= 0x7fff;
-                        else sector[SECT].lotag |= 0x8000;
+                        // Toggle state bit for all matching doors
+                        if(sector[SECT].lotag&0x8000) sector[SECT].lotag &= 0x7fff;  // Clear bit 15
+                        else sector[SECT].lotag |= 0x8000;  // Set bit 15
                         T5 = 1;
-                        T4 = -T4;
+                        T4 = -T4;  // Reverse direction
                         if(q == 0)
                         {
                             callsound(sn,i);
@@ -936,8 +968,9 @@ void operatesectors(short sn,short ii)
                 {
                     if( SLT == 15 )
                     {
+                        // Toggle door state
                         sector[SECT].lotag ^= 0x8000; // Toggle the open or close
-                        SA += 1024;
+                        SA += 1024;  // Rotate sprite angle (1024 = 90 degrees in Build engine)
                         if(T5) callsound(SECT,i);
                         callsound(SECT,i);
                         if(sector[SECT].lotag&0x8000) T5 = 1;
@@ -953,9 +986,11 @@ void operatesectors(short sn,short ii)
             j = headspritestat[3];
             while(j >= 0)
             {
+                // Mask with 0xff to get lower 8 bits only
                 if( (sprite[j].lotag&0xff)==20 && sprite[j].sectnum == sn) //Bridge
                 {
 
+                    // Toggle bridge state
                     sector[sn].lotag ^= 0x8000;
                     if(sector[sn].lotag&0x8000) //OPENING
                         hittype[j].temp_data[0] = 1;
@@ -974,6 +1009,7 @@ void operatesectors(short sn,short ii)
             j = headspritesect[sn];
             while(j >= 0)
             {
+                // Check lower 8 bits only with mask
                 if(sprite[j].statnum==3 && (sprite[j].lotag&0xff)==21)
                     break; //Found it
                 j = nextspritesect[j];
@@ -984,6 +1020,7 @@ void operatesectors(short sn,short ii)
             l = headspritestat[3];
             while(l >= 0)
             {
+                // Activate all matching sector effectors
                 if( (sprite[l].lotag&0xff)==21 && !hittype[l].temp_data[0] &&
                     (sprite[l].hitag) == j )
                     hittype[l].temp_data[0] = 1;
@@ -994,6 +1031,7 @@ void operatesectors(short sn,short ii)
             return;
     }
 }
+
 
 
 
