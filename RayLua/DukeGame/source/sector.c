@@ -2287,7 +2287,7 @@ void checkhitsprite(short i,short sn)
 
             if( ( sprite[sn].picnum == FREEZEBLAST || sprite[sn].owner != i ) && sprite[i].statnum != 4)
             {
-                if( badguy(&sprite[i]) == 1)
+                if( isBadGuy(&sprite[i]) == 1)
                 {
                     if(sprite[sn].picnum == RPG) sprite[sn].extra <<= 1;
 

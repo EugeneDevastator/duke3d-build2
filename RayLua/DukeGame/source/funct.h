@@ -358,7 +358,7 @@ extern void check_fta_sounds(short i);
 //#line "game.c" 869
 extern short inventory(spritetype *s);
 //#line "game.c" 886
-extern short badguy(spritetype *s);
+extern short isBadGuy(spritetype *s);
 //#line "game.c" 924
 extern short badguypic(short pn);
 //#line "game.c" 963

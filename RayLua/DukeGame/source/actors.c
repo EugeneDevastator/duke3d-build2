@@ -413,7 +413,7 @@ long ifsquished(short i, short p)
     {
         FTA(10,&ps[p]);
 
-        if(badguy(&sprite[i])) sprite[i].xvel = 0;
+        if(isBadGuy(&sprite[i])) sprite[i].xvel = 0;
 
         if(sprite[i].pal == 1)
         {
@@ -502,12 +502,12 @@ void hitradius( short i, long  r, long  hp1, long  hp2, long  hp3, long  hp4 )
                 if( s->picnum != SHRINKSPARK || (sj->cstat&257) )
                     if( dist( s, sj ) < r )
                     {
-                        if( badguy(sj) && !cansee( sj->x, sj->y,sj->z+q, sj->sectnum, s->x, s->y, s->z+q, s->sectnum) )
+                        if( isBadGuy(sj) && !cansee( sj->x, sj->y,sj->z+q, sj->sectnum, s->x, s->y, s->z+q, s->sectnum) )
                             goto BOLT;
                         checkhitsprite( j, i );
                     }
             }
-            else if( sj->extra >= 0 && sj != s && ( sj->picnum == TRIPBOMB || badguy(sj) || sj->picnum == QUEBALL || sj->picnum == STRIPEBALL || (sj->cstat&257) || sj->picnum == DUKELYINGDEAD ) )
+            else if( sj->extra >= 0 && sj != s && ( sj->picnum == TRIPBOMB || isBadGuy(sj) || sj->picnum == QUEBALL || sj->picnum == STRIPEBALL || (sj->cstat&257) || sj->picnum == DUKELYINGDEAD ) )
             {
                 if( s->picnum == SHRINKSPARK && sj->picnum != SHARK && ( j == s->owner || sj->xrepeat < 24 ) )
                 {
@@ -614,7 +614,7 @@ int movesprite(short spritenum, long xchange, long ychange, long zchange, unsign
     short retval, dasectnum, a, cd;
     char bg;
 
-    bg = badguy(&sprite[spritenum]);
+    bg = isBadGuy(&sprite[spritenum]);
 
     if(sprite[spritenum].statnum == 5 || (bg && sprite[spritenum].xrepeat < 4 ) )
     {
@@ -761,7 +761,7 @@ void guts(spritetype *s,short gtype, short n, short p)
     char sx,sy;
     signed char pal;
 
-    if(badguy(s) && s->xrepeat < 16)
+    if(isBadGuy(s) && s->xrepeat < 16)
         sx = sy = 8;
     else sx = sy = 32;
 
@@ -774,7 +774,7 @@ void guts(spritetype *s,short gtype, short n, short p)
     if(s->picnum == COMMANDER)
         gutz -= (24<<8);
 
-    if( badguy(s) && s->pal == 6)
+    if( isBadGuy(s) && s->pal == 6)
         pal = 6;
     else pal = 0;
 
@@ -798,7 +798,7 @@ void gutsdir(spritetype *s,short gtype, short n, short p)
     short i,a,j;
     char sx,sy;
 
-    if(badguy(s) && s->xrepeat < 16)
+    if(isBadGuy(s) && s->xrepeat < 16)
         sx = sy = 8;
     else sx = sy = 32;
 
@@ -913,7 +913,7 @@ void movefta()
                 hittype[i].timetosleep++;
                 if( hittype[i].timetosleep >= (x>>8) )
                 {
-                    if(badguy(s))
+                    if(isBadGuy(s))
                     {
                         px = ps[p].oposx+64-(TRAND&127);
                         py = ps[p].oposy+64-(TRAND&127);
@@ -970,7 +970,7 @@ void movefta()
                     else hittype[i].timetosleep = 0;
                 }
             }
-            if( badguy( s ) )
+            if( isBadGuy( s ) )
             {
                 if (sector[s->sectnum].ceilingstat&1)
                     s->shade = sector[s->sectnum].ceilingshade;
@@ -2464,7 +2464,7 @@ void moveweapons()
                 if(T2 > 2047) KILLIT(i);
 
                 if(sprite[s->owner].statnum == MAXSTATUS)
-                    if(badguy(&sprite[s->owner]) == 0)
+                    if(isBadGuy(&sprite[s->owner]) == 0)
                         KILLIT(i);
 
                 s->ang = sprite[s->owner].ang;
@@ -2601,7 +2601,7 @@ void moveweapons()
                         j &= (MAXSPRITES-1);
 
                         if(s->picnum == FREEZEBLAST && sprite[j].pal == 1 )
-                            if( badguy(&sprite[j]) || sprite[j].picnum == APLAYER )
+                            if( isBadGuy(&sprite[j]) || sprite[j].picnum == APLAYER )
                         {
                             j = spawn(i,TRANSPORTERSTAR);
                             sprite[j].pal = 1;
@@ -4367,7 +4367,7 @@ void moveactors()
 
 
 // #ifndef VOLOMEONE
-        if( ud.multimode < 2 && badguy(s) )
+        if( ud.multimode < 2 && isBadGuy(s) )
         {
             if( actor_tog == 1)
             {
@@ -5325,7 +5325,7 @@ void moveeffectors()   //STATNUM 3
                         while(j >= 0)
                         {
                             l = nextspritesect[j];
-                            if (sprite[j].statnum == 1 && badguy(&sprite[j]) && sprite[j].picnum != SECTOREFFECTOR && sprite[j].picnum != LOCATORS )
+                            if (sprite[j].statnum == 1 && isBadGuy(&sprite[j]) && sprite[j].picnum != SECTOREFFECTOR && sprite[j].picnum != LOCATORS )
                             {
                                 k = sprite[j].sectnum;
                                 updatesector(sprite[j].x,sprite[j].y,&k);
@@ -5497,7 +5497,7 @@ void moveeffectors()   //STATNUM 3
                         while(j >= 0)
                         {
                             l = nextspritesect[j];
-                            if (sprite[j].statnum == 1 && badguy(&sprite[j]) && sprite[j].picnum != SECTOREFFECTOR && sprite[j].picnum != LOCATORS )
+                            if (sprite[j].statnum == 1 && isBadGuy(&sprite[j]) && sprite[j].picnum != SECTOREFFECTOR && sprite[j].picnum != LOCATORS )
                             {
             //                    if(sprite[j].sectnum != s->sectnum)
                                 {
@@ -5890,7 +5890,7 @@ void moveeffectors()   //STATNUM 3
                         while(k >= 0)
                         {
                             if( sprite[k].extra > 0
-                                && badguy(&sprite[k])
+                                && isBadGuy(&sprite[k])
                                 && clipinsidebox(sprite[k].x,sprite[k].y,j,256L) == 1 )
                                 goto BOLT;
                             k = nextspritestat[k];

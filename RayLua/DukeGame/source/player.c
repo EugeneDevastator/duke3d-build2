@@ -179,7 +179,7 @@ long hitasprite(short i,short *hitsp)
     long sx,sy,sz,zoff;
     short sect,hw;
 
-    if(badguy(&sprite[i]) )
+    if(isBadGuy(&sprite[i]) )
         zoff = (42<<8);
     else if(PN == APLAYER) zoff = (39<<8);
     else zoff = 0;
@@ -189,7 +189,7 @@ long hitasprite(short i,short *hitsp)
         sintable[SA&2047],
         0,&sect,&hw,hitsp,&sx,&sy,&sz,CLIPMASK1);
 
-    if(hw >= 0 && (wall[hw].cstat&16) && badguy(&sprite[i]) )
+    if(hw >= 0 && (wall[hw].cstat&16) && isBadGuy(&sprite[i]) )
         return((1<<30));
 
     return ( FindDistance2D(sx-SX,sy-SY) );
@@ -253,9 +253,9 @@ short aim(spritetype *s,short aang)
             break;
         for(i=headspritestat[aimstats[k]];i >= 0;i=nextspritestat[i])
             if( sprite[i].xrepeat > 0 && sprite[i].extra >= 0 && (sprite[i].cstat&(257+32768)) == 257)
-                if( badguy(&sprite[i]) || k < 2 )
+                if( isBadGuy(&sprite[i]) || k < 2 )
             {
-                if(badguy(&sprite[i]) || PN == APLAYER || PN == SHARK)
+                if(isBadGuy(&sprite[i]) || PN == APLAYER || PN == SHARK)
                 {
                     if( PN == APLAYER &&
 //                        ud.ffire == 0 &&
@@ -350,7 +350,7 @@ void shoot(short i,short atwith)
         if(s->picnum != ROTATEGUN)
         {
             sz -= (7<<8);
-            if(badguy(s) && PN != COMMANDER)
+            if(isBadGuy(s) && PN != COMMANDER)
             {
                 sx += (sintable[(sa+1024+96)&2047]>>7);
                 sy += (sintable[(sa+512+96)&2047]>>7);
@@ -849,7 +849,7 @@ void shoot(short i,short atwith)
                 l = ldist(&sprite[ps[j].i],s);
                 zvel = ( (ps[j].oposz-sz)*vel) / l;
 
-                if( badguy(s) && (s->hitag&face_player_smart) )
+                if( isBadGuy(s) && (s->hitag&face_player_smart) )
                     sa = s->ang+(TRAND&31)-16;
             }
 
@@ -2331,7 +2331,7 @@ void processinput(short snum)
             p->footprintcount = 0;
             p->spritebridge = 1;
         }
-        else if(badguy(&sprite[j]) && sprite[j].xrepeat > 24 && klabs(s->z-sprite[j].z) < (84<<8) )
+        else if(isBadGuy(&sprite[j]) && sprite[j].xrepeat > 24 && klabs(s->z-sprite[j].z) < (84<<8) )
         {
             j = getangle(sprite[j].x-p->posx,sprite[j].y-p->posy);
             p->posxv -= sintable[(j+512)&2047]<<4;
@@ -3402,7 +3402,7 @@ void processinput(short snum)
                     quickkill(&ps[sprite[p->actorsqu].yvel]);
                     ps[sprite[p->actorsqu].yvel].frag_ps = snum;
                 }
-                else if(badguy(&sprite[p->actorsqu]))
+                else if(isBadGuy(&sprite[p->actorsqu]))
                 {
                     deletesprite(p->actorsqu);
                     p->actors_killed++;

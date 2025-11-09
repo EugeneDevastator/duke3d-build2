@@ -875,7 +875,7 @@ short inventory(spritetype *s)
 }
 
 
-short badguy(spritetype *s)
+short isBadGuy(spritetype *s)
 {
 
     switch(s->picnum)
@@ -2646,7 +2646,7 @@ short spawn( short j, short pn )
                     {
                         sp->xrepeat = 48;
                         sp->yrepeat = 64;
-                        if(sprite[j].statnum == 10 || badguy(&sprite[j]) )
+                        if(sprite[j].statnum == 10 || isBadGuy(&sprite[j]) )
                             sp->z -= (32<<8);
                     }
                 }
@@ -4285,7 +4285,7 @@ void animatesprites(long x,long y,short a,long smoothratio)
             case GREENSLIME+7:
                 break;
             default:
-                if( ( (t->cstat&16) ) || ( badguy(t) && t->extra > 0) || t->statnum == 10)
+                if( ( (t->cstat&16) ) || ( isBadGuy(t) && t->extra > 0) || t->statnum == 10)
                     continue;
         }
 
@@ -4762,7 +4762,7 @@ void animatesprites(long x,long y,short a,long smoothratio)
                 t->cstat |= 4;
         }
 
-        if( s->statnum == 13 || badguy(s) || (s->picnum == APLAYER && s->owner >= 0) )
+        if( s->statnum == 13 || isBadGuy(s) || (s->picnum == APLAYER && s->owner >= 0) )
             if(t->statnum != 99 && s->picnum != EXPLOSION2 && s->picnum != HANGLIGHT && s->picnum != DOMELITE)
                 if(s->picnum != HOTMEAT)
         {
@@ -7274,7 +7274,7 @@ void fakedomovethings()
                         psectlotag = 0;
                         spritebridge = 1;
                  }
-                 if(badguy(&sprite[j]) && sprite[j].xrepeat > 24 && klabs(sprite[p->i].z-sprite[j].z) < (84<<8) )
+                 if(isBadGuy(&sprite[j]) && sprite[j].xrepeat > 24 && klabs(sprite[p->i].z-sprite[j].z) < (84<<8) )
                  {
                     j = getangle( sprite[j].x-myx,sprite[j].y-myy);
                     myxvel -= sintable[(j+512)&2047]<<4;
