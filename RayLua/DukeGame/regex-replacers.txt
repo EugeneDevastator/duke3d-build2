@@ -1,0 +1,19 @@
+﻿// this one is good as we need force setter.
+(\bwall\[)(.*)(\]\.)(.*) = (.*);
+bbeng.SetWall_$4($2,$5);
+
+for getter we can enforce read wall each time, eh..
+
+(\bwall\[)(.*?)(\]\.)([a-z]*)\b
+bbeng.ReadWall_$4($2)
+
+// idea is: 1. replace all equals first
+// then replace all innermost usages of wall sector and sprite
+// problem with sprites is that they can be changed implicitly by macros, so need to check all macroses first
+(\bwall\[)([^\[\]]*)(\]\.)([a-z,0-9]*)
+RWALL($2).$4
+#define RWALL bbeng.ReadWall
+
+(\bsector\[)([^\[\]]*)(\]\.)([a-z,0-9]*)
+RSECT($2).$4
+#define RSECT bbeng.ReadSect
