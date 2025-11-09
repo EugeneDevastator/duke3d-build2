@@ -1025,95 +1025,119 @@ void operateactivators(short low,short snum) // snum usually used for MP, otherw
 {
     short i, j, k, *p, nexti;
     walltype *wal;
-    // parse cyclers
+
+    // === CYCLER PROCESSING SECTION ===
+    // Handle light pulsation effects - iterate backwards through cycler array
     for(i=numcyclers-1;i>=0;i--)
     {
-        p = &cyclers[i][0];
+        p = &cyclers[i][0]; // Get pointer to cycler data array
 
-        if(p[4] == low)
+        if(p[4] == low) // Check if cycler's lotag matches activation tag
         {
-            p[5] = !p[5];
+            p[5] = !p[5]; // Toggle cycler state (on/off)
 
+            // Apply cycler shade to sector floor and ceiling
             sector[p[0]].floorshade = sector[p[0]].ceilingshade = p[3];
+
+            // Apply same shade to all walls in the sector
             wal = &wall[sector[p[0]].wallptr];
             for(j=sector[p[0]].wallnum;j > 0;j--,wal++)
                 wal->shade = p[3];
         }
     }
 
+    // === ACTIVATOR SPRITE PROCESSING SECTION ===
+    // Process all sprites in statnum 8 (activator sprites)
     i = headspritestat[8];
-    k = -1;
+    k = -1; // Sound handle tracker
     while(i >= 0)
     {
-        READSPR
-        if(SLT == low)
+        READSPR // Macro to read sprite data into local vars (PN, SLT, SHT, SECT, etc.)
+
+        if(SLT == low) // If sprite's lotag matches activation tag
         {
+            // === LOCKED ACTIVATOR HANDLING ===
             if( PN == ACTIVATORLOCKED )
             {
-                if(sector[SECT].lotag&16384) // cut off lower tags?
-                    sector[SECT].lotag &= 65535-16384; // unset b_0___
+                // Toggle sector lock state using bit 14 (16384 = 0x4000)
+                if(sector[SECT].lotag&16384) // If currently locked
+                    sector[SECT].lotag &= 65535-16384; // Unlock (clear bit 14)
                 else
-                    sector[SECT].lotag |= 16384;
+                    sector[SECT].lotag |= 16384; // Lock (set bit 14)
 
+                // Display message to player if valid player number
                 if(snum >= 0)
                 {
                     if(sector[SECT].lotag&16384)
-                        FTA(4,&ps[snum]);
-                    else FTA(8,&ps[snum]);
+                        FTA(4,&ps[snum]); // "Locked" message
+                    else FTA(8,&ps[snum]); // "Unlocked" message
                 }
             }
+            // === REGULAR ACTIVATOR HANDLING ===
             else
             {
+                // Check activator conditions based on hitag
                 switch(SHT)
                 {
-                    case 0:
+                    case 0: // No condition - always activate
                         break;
-                    case 1:
+                    case 1: // Only activate if sector is closed (floor == ceiling)
                         if(sector[SECT].floorz != sector[SECT].ceilingz)
                         {
                             i = nextspritestat[i];
-                            continue;
+                            continue; // Skip this activator
                         }
                         break;
-                    case 2:
+                    case 2: // Only activate if sector is open (floor != ceiling)
                         if(sector[SECT].floorz == sector[SECT].ceilingz)
                         {
                             i = nextspritestat[i];
-                            continue;
+                            continue; // Skip this activator
                         }
                         break;
                 }
 
+                // === SECTOR EFFECTOR ACTIVATION ===
+                // If sector lotag < 3, look for sector effectors to toggle
                 if( sector[sprite[i].sectnum].lotag < 3 )
                 {
-                    j = headspritesect[sprite[i].sectnum];
+                    j = headspritesect[sprite[i].sectnum]; // Get first sprite in sector
                     while(j >= 0)
                     {
+                        // Toggle specific sector effectors (statnum 3)
                         if( sprite[j].statnum == 3 ) switch(sprite[j].lotag)
                         {
-                            case 36:
-                            case 31:
-                            case 32:
-                            case 18:
+                            case 36: // Subway car
+                            case 31: // Two-way train
+                            case 32: // (undocumented effector)
+                            case 18: // Incremental sector rise/fall
+                                // Toggle effector state and play sound
                                 hittype[j].temp_data[0] = 1-hittype[j].temp_data[0];
                                 callsound(SECT,j);
                                 break;
                         }
-                        j = nextspritesect[j];
+                        j = nextspritesect[j]; // Next sprite in sector
                     }
                 }
 
+                // === SPLITTING DOOR SOUND ===
+                // Play sound for splitting doors (lotag 22) - only once per activation
                 if( k == -1 && (sector[SECT].lotag&0xff) == 22 )
                     k = callsound(SECT,i);
 
+                // === MAIN SECTOR OPERATION ===
+                // Activate the sector's main function (doors, elevators, etc.)
                 operatesectors(SECT,i);
             }
         }
-        i = nextspritestat[i];
+        i = nextspritestat[i]; // Move to next activator sprite
      }
 
+    // === RESPAWN HANDLING ===
+    // Handle any respawn effects associated with this activation tag
     operaterespawns(low);
 }
+
 
 void operatemasterswitches(short low)
 {
