@@ -1791,53 +1791,6 @@ void displayrest(long smoothratio)
         tics();
 }
 
-
-void updatesectorz(long x, long y, long z, short* sectnum)
-{
-    walltype* wal;
-    long i, j, cz, fz;
-
-    getzsofslope(*sectnum, x, y, &cz, &fz);
-    if ((z >= cz) && (z <= fz))
-        if (inside(x, y, *sectnum) != 0) return;
-
-    if ((*sectnum >= 0) && (*sectnum < numsectors))
-    {
-        wal = &wall[sector[*sectnum].wallptr];
-        j = sector[*sectnum].wallnum;
-        do
-        {
-            i = wal->nextsector;
-            if (i >= 0)
-            {
-                getzsofslope(i, x, y, &cz, &fz);
-                if ((z >= cz) && (z <= fz))
-                    if (inside(x, y, (short)i) == 1)
-                    {
-                        *sectnum = i;
-                        return;
-                    }
-            }
-            wal++;
-            j--;
-        }
-        while (j != 0);
-    }
-
-    for (i = numsectors - 1; i >= 0; i--)
-    {
-        getzsofslope(i, x, y, &cz, &fz);
-        if ((z >= cz) && (z <= fz))
-            if (inside(x, y, (short)i) == 1)
-            {
-                *sectnum = i;
-                return;
-            }
-    }
-
-    *sectnum = -1;
-}
-
 // third person camera setup, likely for network death screen
 void view(player_struct* pp, long* vx, long* vy, long* vz, short* vsectnum, short ang, short horiz)
 {
