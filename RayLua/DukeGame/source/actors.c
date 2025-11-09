@@ -782,7 +782,7 @@ void guts(spritetype *s,short gtype, short n, short p)
     {
         a = TRAND&2047;
         i = EGS(s->sectnum,s->x+(TRAND&255)-128,s->y+(TRAND&255)-128,gutz-(TRAND&8191),gtype,-32,sx,sy,a,48+(TRAND&31),-512-(TRAND&2047),ps[p].i,STAT_MISC);
-        READSPR
+
         if(PN == JIBS2)
         {
             sprite[i].xrepeat >>= 2;

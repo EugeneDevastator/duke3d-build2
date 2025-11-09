@@ -780,13 +780,13 @@ void caches()
 
     k += 6;
 
-    for (i = 1; i < 11; i++)
-        if (lumplockbyte[i] >= 200)
-        {
-            sprintf(tempbuf, "RTS Locked %ld:", i);
-            printext256(0L, k, 31, -1, tempbuf, 1);
-            k += 6;
-        }
+  // for (i = 1; i < 11; i++)
+  //     if (lumplockbyte[i] >= 200)
+  //     {
+  //         sprintf(tempbuf, "RTS Locked %ld:", i);
+  //         printext256(0L, k, 31, -1, tempbuf, 1);
+  //         k += 6;
+  //     }
 }
 
 
