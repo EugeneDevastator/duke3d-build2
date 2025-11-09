@@ -8730,7 +8730,7 @@ void lotsofglass(short i, short wallnum, short n)
         for (j = n - 1; j >= 0; j--)
         {
             a = SA - 256 + (TRAND & 511) + 1024;
-            EGS(SECT,SX,SY,SZ,GLASSPIECES + (j % 3), -32, 36, 36, a, 32 + (TRAND & 63), 1024 - (TRAND & 1023), i, 5);
+            EGS(SECT,SX,SY,SZ,GLASSPIECES + (j % 3), -32, 36, 36, a, 32 + (TRAND & 63), 1024 - (TRAND & 1023), i, STAT_MISC);
         }
         return;
     }
@@ -8761,7 +8761,7 @@ void lotsofglass(short i, short wallnum, short n)
             if (z < -(32 << 8) || z > (32 << 8))
                 z = SZ - (32 << 8) + (TRAND & ((64 << 8) - 1));
             a = SA - 1024;
-            EGS(SECT, x1, y1, z,GLASSPIECES + (j % 3), -32, 36, 36, a, 32 + (TRAND & 63), -(TRAND & 1023), i, 5);
+            EGS(SECT, x1, y1, z,GLASSPIECES + (j % 3), -32, 36, 36, a, 32 + (TRAND & 63), -(TRAND & 1023), i, STAT_MISC);
         }
     }
 }
@@ -8802,7 +8802,7 @@ void ceilingglass(short i, short sectnum, short n)
             y1 += yv;
             a = TRAND & 2047;
             z = sector[sectnum].ceilingz + ((TRAND & 15) << 8);
-            EGS(sectnum, x1, y1, z,GLASSPIECES + (j % 3), -32, 36, 36, a, (TRAND & 31), 0, i, 5);
+            EGS(sectnum, x1, y1, z,GLASSPIECES + (j % 3), -32, 36, 36, a, (TRAND & 31), 0, i, STAT_MISC);
         }
     }
 }
@@ -8842,7 +8842,7 @@ void lotsofcolourglass(short i, short wallnum, short n)
         if (z < -(32 << 8) || z > (32 << 8))
             z = SZ - (32 << 8) + (TRAND & ((64 << 8) - 1));
         a = SA - 1024;
-        k = EGS(SECT, x1, y1, z,GLASSPIECES + (j % 3), -32, 36, 36, a, 32 + (TRAND & 63), -(TRAND & 2047), i, 5);
+        k = EGS(SECT, x1, y1, z,GLASSPIECES + (j % 3), -32, 36, 36, a, 32 + (TRAND & 63), -(TRAND & 2047), i, STAT_MISC);
         sprite[k].pal = TRAND & 7;
     }
 }

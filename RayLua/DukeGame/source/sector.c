@@ -1698,12 +1698,12 @@ void checkhitwall(short spr,short dawallnum,long x,long y,long z,short atwith)
             if( sn < 0 ) return;
 
             if(atwith == -1)
-                i = EGS(sn,x,y,z,FORCERIPPLE,-127,8,8,0,0,0,spr,5);
+                i = EGS(sn,x,y,z,FORCERIPPLE,-127,8,8,0,0,0,spr,STAT_MISC);
             else
             {
                 if(atwith == CHAINGUN)
-                    i = EGS(sn,x,y,z,FORCERIPPLE,-127,16+sprite[spr].xrepeat,16+sprite[spr].yrepeat,0,0,0,spr,5);
-                else i = EGS(sn,x,y,z,FORCERIPPLE,-127,32,32,0,0,0,spr,5);
+                    i = EGS(sn,x,y,z,FORCERIPPLE,-127,16+sprite[spr].xrepeat,16+sprite[spr].yrepeat,0,0,0,spr,STAT_MISC);
+                else i = EGS(sn,x,y,z,FORCERIPPLE,-127,32,32,0,0,0,spr,STAT_MISC);
             }
                    READSPR
             CS |= 18+128;
@@ -2110,7 +2110,7 @@ void checkhitsprite(short i,short sn)
                 case HEAVYHBOMB:
                     for(k=0;k<64;k++)
                     {
-                        j = EGS(SECT,SX,SY,SZ-(TRAND%(48<<8)),SCRAP3+(TRAND&3),-8,48,48,TRAND&2047,(TRAND&63)+64,-(TRAND&4095)-(sprite[i].zvel>>2),i,5);
+                        j = EGS(SECT,SX,SY,SZ-(TRAND%(48<<8)),SCRAP3+(TRAND&3),-8,48,48,TRAND&2047,(TRAND&63)+64,-(TRAND&4095)-(sprite[i].zvel>>2),i,STAT_MISC);
                         sprite[j].pal = 8;
                     }
 
@@ -2125,7 +2125,7 @@ void checkhitsprite(short i,short sn)
         case HANGLIGHT:
         case GENERICPOLE2:
             for(k=0;k<6;k++)
-                EGS(SECT,SX,SY,SZ-(8<<8),SCRAP1+(TRAND&15),-8,48,48,TRAND&2047,(TRAND&63)+64,-(TRAND&4095)-(sprite[i].zvel>>2),i,5);
+                EGS(SECT,SX,SY,SZ-(8<<8),SCRAP1+(TRAND&15),-8,48,48,TRAND&2047,(TRAND&63)+64,-(TRAND&4095)-(sprite[i].zvel>>2),i,STAT_MISC);
             spritesound(GLASS_HEAVYBREAK,i);
             deletesprite(i);
             break;
@@ -2269,7 +2269,7 @@ void checkhitsprite(short i,short sn)
 
 //            for(k=0;k<5;k++)
   //          {
-    //            j = EGS(SECT,SX,SY,SZ-(TRAND%(48<<8)),SCRAP3+(TRAND&3),-8,48,48,TRAND&2047,(TRAND&63)+64,-(TRAND&4095)-(sprite[i].zvel>>2),i,5);
+    //            j = EGS(SECT,SX,SY,SZ-(TRAND%(48<<8)),SCRAP3+(TRAND&3),-8,48,48,TRAND&2047,(TRAND&63)+64,-(TRAND&4095)-(sprite[i].zvel>>2),i,STAT_MISC);
       //          sprite[j].pal = 2;
         //    }
             spritesound(GLASS_HEAVYBREAK,i);
