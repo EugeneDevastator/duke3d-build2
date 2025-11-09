@@ -170,7 +170,7 @@ int sgn(int value);
 #define READSECT sectortype sectr = bbeng.ReadSect(i);
 #define WRITESECT bbeng.WriteSect(i, sectr);
 
-#define READSECTBYOFSPR sectortype sectr = bbeng.ReadSect(SECT);
+#define READSECTOFSPR sectortype sectr = bbeng.ReadSect(SECT);
 #define WRITESECTOFSPR bbeng.WriteSect(SECT, sectr);
 
 #define WRITESPR bbeng.WriteSprite(i, sprt);

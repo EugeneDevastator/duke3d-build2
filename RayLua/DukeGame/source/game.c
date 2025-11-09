@@ -3795,7 +3795,7 @@ short spawn(short j, short pn)
 
             T5 = sector[sect].floorz == SZ;
             sp->cstat = 0;
-            changespritestat(i, STAT_TRANSPORT);
+            changespritestat(                i, STAT_TRANSPORT);
             return i;
         case 1:
             sp->owner = -1;

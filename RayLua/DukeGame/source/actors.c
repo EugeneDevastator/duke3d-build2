@@ -398,7 +398,7 @@ long ifsquished(short i, short p)
     READSPR
     if(PN == APLAYER && ud.clipping)
         return 0;
-    READSECTBYOFSPR
+    READSECTOFSPR
     sc = &sectr;
     floorceildist = sc->floorz - sc->ceilingz;
 
@@ -2794,8 +2794,9 @@ void movetransports()
     while(i >= 0)
     {
         READSPR
+        READSECTOFSPR
         sect = SECT;
-        sectlotag = sector[sect].lotag;
+        sectlotag = sectr.lotag;
 
         nexti = nextspritestat[i];
 

@@ -767,7 +767,7 @@ void prelevel(char g)
 
     for (i = 0; i < MAXSPRITES; i++)
     {READSPR
-        if (sprite[i].statnum < MAXSTATUS)
+        if (sprt.statnum < MAXSTATUS)
         {
             if (PN == SECTOREFFECTOR && SLT == 14)
                 continue;
@@ -776,12 +776,14 @@ void prelevel(char g)
     }
 
     for (i = 0; i < MAXSPRITES; i++)
-        if (sprite[i].statnum < MAXSTATUS)
-        {
-            READSPR
-            if (PN == SECTOREFFECTOR && SLT == 14)
-                spawn(-1, i);
-        }
+    {
+        READSPR
+       if (sprt.statnum < MAXSTATUS)
+       {
+           if (PN == SECTOREFFECTOR && SLT == 14)
+               spawn(-1, i);
+       }
+    }
 
     lotaglist = 0;
 

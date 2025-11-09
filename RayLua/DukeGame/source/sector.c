@@ -813,7 +813,7 @@ void operatesectors(short sn,short ii)
             while(i >= 0)
             {
                 READSPR
-                READSECTBYOFSPR
+                READSECTOFSPR
                 if( (SLT == 22) &&
                     (SHT == secSNp->hitag) )
                 {
@@ -1114,7 +1114,7 @@ void operateactivators(short low,short snum) // snum usually used for MP, otherw
 
         if(SLT == low) // If sprite's lotag matches activation tag
         {
-            READSECTBYOFSPR
+            READSECTOFSPR
             // === LOCKED ACTIVATOR HANDLING ===
             if( PN == ACTIVATORLOCKED )
             {
