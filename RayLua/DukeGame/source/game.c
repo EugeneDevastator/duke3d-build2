@@ -2617,7 +2617,7 @@ short spawn(short j, short pn)
             if (j == -1 && sp->lotag > ud.player_skill)
             {
                 sp->xrepeat = sp->yrepeat = 0;
-                changespritestat(i, 5);
+                changespritestat(i, STAT_MISC);
                 break;
             }
 
@@ -2630,7 +2630,7 @@ short spawn(short j, short pn)
                 if (ud.monsters_off == 1)
                 {
                     sp->xrepeat = sp->yrepeat = 0;
-                    changespritestat(i, 5);
+                    changespritestat(i, STAT_MISC);
                     break;
                 }
 
@@ -2645,7 +2645,7 @@ short spawn(short j, short pn)
                 {
                     if (sprite[j].picnum == RESPAWN)
                         hittype[i].tempang = sprite[i].pal = sprite[j].pal;
-                    changespritestat(i, 1);
+                    changespritestat(i, STAT_ACTOR);
                 }
                 else changespritestat(i, 2);
             }
@@ -2653,7 +2653,7 @@ short spawn(short j, short pn)
             {
                 sp->clipdist = 40;
                 sp->owner = i;
-                changespritestat(i, 1);
+                changespritestat(i, STAT_ACTOR);
             }
 
             hittype[i].timetosleep = 0;
@@ -2664,7 +2664,7 @@ short spawn(short j, short pn)
         break;
     case FOF:
         sp->xrepeat = sp->yrepeat = 0;
-        changespritestat(i, 5);
+        changespritestat(i, STAT_MISC);
         break;
     case WATERSPLASH2:
         if (j >= 0)
@@ -2718,7 +2718,7 @@ short spawn(short j, short pn)
     case DUKETORSO:
     case DUKEGUN:
     case DUKELEG:
-        changespritestat(i, 5);
+        changespritestat(i, STAT_MISC);
         break;
     case TONGUE:
         if (j >= 0)
@@ -2762,7 +2762,7 @@ short spawn(short j, short pn)
         sp->ang = sprite[j].ang;
 
         sp->xvel = 128;
-        changespritestat(i, 5);
+        changespritestat(i, STAT_MISC);
         ssp(i,CLIPMASK0);
         bbeng.SetSprPos(i, sp->x, sp->y, sp->z);
         break;
@@ -2776,7 +2776,7 @@ short spawn(short j, short pn)
         }
         else sp->xrepeat = sp->yrepeat = 0;
 
-        changespritestat(i, 5);
+        changespritestat(i, STAT_MISC);
 
         break;
 
@@ -2795,7 +2795,7 @@ short spawn(short j, short pn)
         }
 
         if (j >= 0) sp->ang = hittype[j].temp_data[5] + 512;
-        changespritestat(i, 5);
+        changespritestat(i, STAT_MISC);
         break;
 
     case FORCESPHERE:
@@ -2807,7 +2807,7 @@ short spawn(short j, short pn)
         else
         {
             sp->xrepeat = sp->yrepeat = 1;
-            changespritestat(i, 5);
+            changespritestat(i, STAT_MISC);
         }
         break;
 
@@ -2816,7 +2816,7 @@ short spawn(short j, short pn)
         sp->z -= (26 << 8);
         if (j >= 0 && sprite[j].pal == 6)
             sp->pal = 6;
-        changespritestat(i, 5);
+        changespritestat(i, STAT_MISC);
         break;
     case BLOODPOOL:
     case PUKE:
@@ -2837,35 +2837,35 @@ short spawn(short j, short pn)
                         if (s1 >= 0 && sector[s1].floorz != sector[sp->sectnum].floorz)
                         {
                             sp->xrepeat = sp->yrepeat = 0;
-                            changespritestat(i, 5);
+                            changespritestat(i, STAT_MISC);
                             break;
                         }
                     }
                     else
                     {
                         sp->xrepeat = sp->yrepeat = 0;
-                        changespritestat(i, 5);
+                        changespritestat(i, STAT_MISC);
                         break;
                     }
                 }
                 else
                 {
                     sp->xrepeat = sp->yrepeat = 0;
-                    changespritestat(i, 5);
+                    changespritestat(i, STAT_MISC);
                     break;
                 }
             }
             else
             {
                 sp->xrepeat = sp->yrepeat = 0;
-                changespritestat(i, 5);
+                changespritestat(i, STAT_MISC);
                 break;
             }
         }
 
         if (sector[SECT].lotag == 1)
         {
-            changespritestat(i, 5);
+            changespritestat(i, STAT_MISC);
             break;
         }
 
@@ -2888,7 +2888,7 @@ short spawn(short j, short pn)
     case FECES:
         if (j >= 0)
             sp->xrepeat = sp->yrepeat = 1;
-        changespritestat(i, 5);
+        changespritestat(i, STAT_MISC);
         break;
 
     case BLOODSPLAT1:
@@ -2902,14 +2902,14 @@ short spawn(short j, short pn)
         if (j >= 0 && sprite[j].pal == 6)
             sp->pal = 6;
         insertspriteq(i);
-        changespritestat(i, 5);
+        changespritestat(i, STAT_MISC);
         break;
 
     case TRIPBOMB:
         if (sp->lotag > ud.player_skill)
         {
             sp->xrepeat = sp->yrepeat = 0;
-            changespritestat(i, 5);
+            changespritestat(i, STAT_MISC);
             break;
         }
 
@@ -3015,7 +3015,7 @@ short spawn(short j, short pn)
         if (ud.multimode < 2 && sp->pal)
         {
             sp->xrepeat = sp->yrepeat = 0;
-            changespritestat(i, 5);
+            changespritestat(i, STAT_MISC);
         }
         else sp->pal = 0;
         break;
@@ -3060,7 +3060,7 @@ short spawn(short j, short pn)
                         if (s1 >= 0 && sector[s1].floorz != sector[sp->sectnum].floorz)
                         {
                             sp->xrepeat = sp->yrepeat = 0;
-                            changespritestat(i, 5);
+                            changespritestat(i, STAT_MISC);
                             break;
                         }
                     }
@@ -3091,7 +3091,7 @@ short spawn(short j, short pn)
             sp->xrepeat = sp->yrepeat = 32;
 
         insertspriteq(i);
-        changespritestat(i, 5);
+        changespritestat(i, STAT_MISC);
         break;
 
     case FEM1:
@@ -3162,7 +3162,7 @@ short spawn(short j, short pn)
         if (sp->picnum == MIKE)
             sp->yvel = sp->hitag;
     case WEATHERWARN:
-        changespritestat(i, 1);
+        changespritestat(i, STAT_ACTOR);
         break;
 
     case SPOTLITE:
@@ -3183,7 +3183,7 @@ short spawn(short j, short pn)
             sp->xrepeat = sp->yrepeat = 8;
             sp->ang = TRAND & 2047;
         }
-        changespritestat(i, 5);
+        changespritestat(i, STAT_MISC);
         break;
 
     case VIEWSCREEN:
@@ -3191,7 +3191,7 @@ short spawn(short j, short pn)
         sp->owner = i;
         sp->lotag = 1;
         sp->extra = 1;
-        changespritestat(i, 6);
+        changespritestat(i, STAT_STANDABLE);
         break;
 
     case SHELL: //From the player
@@ -3229,7 +3229,7 @@ short spawn(short j, short pn)
 
             sp->xrepeat = sp->yrepeat = 4;
 
-            changespritestat(i, 5);
+            changespritestat(i, STAT_MISC);
         }
         break;
 
@@ -3239,7 +3239,7 @@ short spawn(short j, short pn)
         if (ud.multimode < 2 && sp->pal == 1)
         {
             sp->xrepeat = sp->yrepeat = 0;
-            changespritestat(i, 5);
+            changespritestat(i, STAT_MISC);
             break;
         }
         sp->cstat = (short)32768;
@@ -3292,7 +3292,7 @@ short spawn(short j, short pn)
                 sp->z = x - (12 << 8);
         }
 
-        changespritestat(i, 5);
+        changespritestat(i, STAT_MISC);
 
         break;
 
@@ -3314,7 +3314,7 @@ short spawn(short j, short pn)
         if (j == 2) j = 0;
 
         if (ud.multimode < 2 || (ud.multimode > 1 && j != sp->lotag))
-            changespritestat(i, 5);
+            changespritestat(i, STAT_MISC);
         else
             changespritestat(i, 10);
         break;
@@ -3329,7 +3329,7 @@ short spawn(short j, short pn)
         }
         else sp->xrepeat = sp->yrepeat = 32;
 
-        changespritestat(i, 5);
+        changespritestat(i, STAT_MISC);
         break;
 
     case CRANE:
@@ -3371,7 +3371,7 @@ short spawn(short j, short pn)
         tempwallptr += 3;
         sp->owner = -1;
         sp->extra = 8;
-        changespritestat(i, 6);
+        changespritestat(i, STAT_STANDABLE);
         break;
 
     case WATERDRIP:
@@ -3405,12 +3405,12 @@ short spawn(short j, short pn)
         sp->yrepeat = 24;
 
 
-        changespritestat(i, 6);
+        changespritestat(i, STAT_STANDABLE);
         break;
 
     case PLUG:
         sp->lotag = 9999;
-        changespritestat(i, 6);
+        changespritestat(i, STAT_STANDABLE);
         break;
     case TOUCHPLATE:
         T3 = sector[sect].floorz;
@@ -3419,12 +3419,12 @@ short spawn(short j, short pn)
         if (sp->pal && ud.multimode > 1)
         {
             sp->xrepeat = sp->yrepeat = 0;
-            changespritestat(i, 5);
+            changespritestat(i, STAT_MISC);
             break;
         }
     case WATERBUBBLEMAKER:
         sp->cstat |= 32768;
-        changespritestat(i, 6);
+        changespritestat(i, STAT_STANDABLE);
         break;
     case BOLT1:
     case BOLT1 + 1:
@@ -3440,14 +3440,14 @@ short spawn(short j, short pn)
         if (sp->picnum == MASTERSWITCH)
             sp->cstat |= 32768;
         sp->yvel = 0;
-        changespritestat(i, 6);
+        changespritestat(i, STAT_STANDABLE);
         break;
     case TARGET:
     case DUCK:
     case LETTER:
         sp->extra = 1;
         sp->cstat |= 257;
-        changespritestat(i, 1);
+        changespritestat(i, STAT_ACTOR);
         break;
     case OCTABRAINSTAYPUT:
     case LIZTROOPSTAYPUT:
@@ -3541,7 +3541,7 @@ short spawn(short j, short pn)
         if ((sp->lotag > ud.player_skill) || ud.monsters_off == 1)
         {
             sp->xrepeat = sp->yrepeat = 0;
-            changespritestat(i, 5);
+            changespritestat(i, STAT_MISC);
             break;
         }
         else
@@ -3568,7 +3568,7 @@ short spawn(short j, short pn)
             {
                 hittype[i].timetosleep = 0;
                 check_fta_sounds(i);
-                changespritestat(i, 1);
+                changespritestat(i, STAT_ACTOR);
             }
             else changespritestat(i, 2);
         }
@@ -3594,7 +3594,7 @@ short spawn(short j, short pn)
     case DOORSHOCK:
         sp->cstat |= 1 + 256;
         sp->shade = -12;
-        changespritestat(i, 6);
+        changespritestat(i, STAT_STANDABLE);
         break;
 
     case OOZ:
@@ -3608,7 +3608,7 @@ short spawn(short j, short pn)
             insertspriteq(i);
         }
 
-        changespritestat(i, 1);
+        changespritestat(i, STAT_ACTOR);
 
         getglobalz(i);
 
@@ -3635,7 +3635,7 @@ short spawn(short j, short pn)
             if (sp->lotag > ud.player_skill)
             {
                 sp->xrepeat = sp->yrepeat = 0;
-                changespritestat(i, 5);
+                changespritestat(i, STAT_MISC);
                 return i;
             }
             ps[myconnectindex].max_actors_killed++;
@@ -3643,7 +3643,7 @@ short spawn(short j, short pn)
             if (ud.monsters_off == 1)
             {
                 sp->xrepeat = sp->yrepeat = 0;
-                changespritestat(i, 5);
+                changespritestat(i, STAT_MISC);
                 break;
             }
             sp->extra = 130;
@@ -3657,7 +3657,7 @@ short spawn(short j, short pn)
         if (ud.multimode < 2 && sp->pal != 0)
         {
             sp->xrepeat = sp->yrepeat = 0;
-            changespritestat(i, 5);
+            changespritestat(i, STAT_MISC);
             break;
         }
         sp->pal = 0;
@@ -3714,7 +3714,7 @@ short spawn(short j, short pn)
         if ((ud.multimode < 2 && sp->pal != 0) || (sp->lotag > ud.player_skill))
         {
             sp->xrepeat = sp->yrepeat = 0;
-            changespritestat(i, 5);
+            changespritestat(i, STAT_MISC);
             break;
         }
 
@@ -3728,7 +3728,7 @@ short spawn(short j, short pn)
         if (ud.multimode > 1 && ud.coop != 1 && sp->picnum == ACCESSCARD)
         {
             sp->xrepeat = sp->yrepeat = 0;
-            changespritestat(i, 5);
+            changespritestat(i, STAT_MISC);
             break;
         }
         else
@@ -3740,7 +3740,7 @@ short spawn(short j, short pn)
 
         sp->shade = -17;
 
-        if (j >= 0) changespritestat(i, 1);
+        if (j >= 0) changespritestat(i, STAT_ACTOR);
         else
         {
             changespritestat(i, 2);
@@ -3758,12 +3758,12 @@ short spawn(short j, short pn)
     case BOX:
         CS = 257; // Make it hitable
         sprite[i].extra = 1;
-        changespritestat(i, 6);
+        changespritestat(i, STAT_STANDABLE);
         break;
 
     case FLOORFLAME:
         sp->shade = -127;
-        changespritestat(i, 6);
+        changespritestat(i, STAT_STANDABLE);
         break;
 
     case BOUNCEMINE:
@@ -3791,13 +3791,13 @@ short spawn(short j, short pn)
         if (ud.multimode < 2 && sp->pal != 0)
         {
             sp->xrepeat = sp->yrepeat = 0;
-            changespritestat(i, 5);
+            changespritestat(i, STAT_MISC);
             break;
         }
         else sp->pal = 0;
         if (sp->picnum == CAMERAPOLE || sp->picnum == GENERICPOLE) break;
         sp->picnum = CAMERA1;
-        changespritestat(i, 1);
+        changespritestat(i, STAT_ACTOR);
         break;
     case STEAM:
         if (j >= 0)
@@ -3809,7 +3809,7 @@ short spawn(short j, short pn)
             ssp(i,CLIPMASK0);
         }
     case CEILINGSTEAM:
-        changespritestat(i, 6);
+        changespritestat(i, STAT_STANDABLE);
         break;
 
     case SECTOREFFECTOR:
@@ -3839,7 +3839,7 @@ short spawn(short j, short pn)
 
             T5 = sector[sect].floorz == SZ;
             sp->cstat = 0;
-            changespritestat(i, 9);
+            changespritestat(i, STAT_TRANSPORT);
             return i;
         case 1:
             sp->owner = -1;
@@ -4273,7 +4273,7 @@ short spawn(short j, short pn)
         sp->extra = impact_damage << 2;
         sp->owner = i;
 
-        changespritestat(i, 6);
+        changespritestat(i, STAT_STANDABLE);
         break;
 
     case CRACK1:
@@ -4295,13 +4295,13 @@ short spawn(short j, short pn)
         if (ud.multimode < 2 && sp->pal != 0)
         {
             sp->xrepeat = sp->yrepeat = 0;
-            changespritestat(i, 5);
+            changespritestat(i, STAT_MISC);
             break;
         }
 
         sp->pal = 0;
         sp->owner = i;
-        changespritestat(i, 6);
+        changespritestat(i, STAT_STANDABLE);
         sp->xvel = 8;
         ssp(i,CLIPMASK0);
         break;
@@ -4339,7 +4339,7 @@ short spawn(short j, short pn)
         if (ud.monsters_off == 1 && sp->picnum == EGG)
         {
             sp->xrepeat = sp->yrepeat = 0;
-            changespritestat(i, 5);
+            changespritestat(i, STAT_MISC);
         }
         else
         {
@@ -4351,7 +4351,7 @@ short spawn(short j, short pn)
         break;
     case TOILETWATER:
         sp->shade = -16;
-        changespritestat(i, 6);
+        changespritestat(i, STAT_STANDABLE);
         break;
     }
     return i;
