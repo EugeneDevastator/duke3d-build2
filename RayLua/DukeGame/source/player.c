@@ -662,7 +662,7 @@ void shoot(short i,short atwith)
                             }
                         }
 
-                        l = headspritestat[5];
+                        l = headspritestat[STAT_MISC];
                         while(l >= 0)
                         {
                             if(sprite[l].picnum == BULLETHOLE)

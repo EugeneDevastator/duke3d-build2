@@ -985,7 +985,7 @@ short ifhitsectors(short sectnum)
 {
     short i;
 
-    i = headspritestat[5];
+    i = headspritestat[STAT_MISC];
     while(i >= 0)
     {
         READSPR
@@ -1781,7 +1781,7 @@ void movestandables()
                     sprite[j].xvel = 348;
                     ssp(j,CLIPMASK0);
 
-                    j = headspritestat[5];
+                    j = headspritestat[STAT_MISC];
                     while(j >= 0)
                     {
                         if(sprite[j].picnum == LASERLINE && s->hitag == sprite[j].hitag)
@@ -2784,7 +2784,7 @@ void movetransports()
     short i, j, k, l, p, sect, sectlotag, nexti, nextj, nextk;
     long ll,onfloorz,q;
 
-    i = headspritestat[9]; //Transporters
+    i = headspritestat[STAT_TRANSPORT]; //Transporters
 
     while(i >= 0)
     {
@@ -3382,7 +3382,7 @@ void moveactors()
                 }
                 else if(t[2] > 10)
                 {
-                    j = headspritestat[5];
+                    j = headspritestat[STAT_MISC];
                     while(j >= 0)
                     {
                         if(sprite[j].owner == i && sprite[j].picnum == FORCESPHERE)
@@ -4398,7 +4398,7 @@ void moveexplosions()  // STATNUM 5
     long l, x, *t;
     spritetype *s;
 
-    i = headspritestat[5];
+    i = headspritestat[STAT_MISC];
     while(i >= 0)
     {
         nexti = nextspritestat[i];
@@ -4598,7 +4598,7 @@ void moveexplosions()  // STATNUM 5
                     READSPR
                     PN ++;
 
-                    j = headspritestat[5];
+                    j = headspritestat[STAT_MISC];
                     while(j >= 0)
                     {
                         if(sprite[j].picnum == BLOODPOOL)

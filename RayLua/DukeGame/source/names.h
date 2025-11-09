@@ -33,7 +33,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #define STAT_ZOMBIEACTOR 2      // Sleepers - actors taking break from code execution (Pig Cop reverting when alone)
 #define STAT_EFFECTOR 3         // Sector effectors and related sprites
 #define STAT_PROJECTILE 4       // Projectiles (RPG, FREEZEBLAST, SHRINKSPARK, custom projectiles - not hitscan bullets)
-#define STAT_MISC 5             //
+#define STAT_MISC 5             // used for actors. blood, gibs, laser line. some non-common behavior marker
 #define STAT_STANDABLE 6        // Standable objects (BOLT1+, VIEWSCREEN, CRANE, TRASH, WATERDRIP, destructible barrels, etc)
 #define STAT_LOCATOR 7          // Locator sprites
 #define STAT_ACTIVATOR 8        // Activator sprites
@@ -42,7 +42,8 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #define STAT_FX 11              // Effects sprites (RESPAWN, MUSICANDSFX)
 #define STAT_FALLER 12          // Destructible decorative sprites with nonzero hitag
 #define STAT_DUMMYPLAYER 13     // Dummy player sprites for multiplayer
-#define STAT_LIGHT 14           //
+#define STAT_LIGHT 14           // unused?
+#define STAT_SE40 15            // only in new code and for ROR effects. probably useless.
 
 // Temporary sprite status (tspr only - not actual sprites)
 #define TSPR_TEMP 99            // Shadow cast by actor (tspr only)
