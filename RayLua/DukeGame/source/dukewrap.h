@@ -11,8 +11,12 @@ typedef struct
      void (*SetSprPos)(long i,long x, long y, long z);
      void (*SetSprPosXY)(long i, long x, long y);
      spritetype (*ReadSprite)(long i);
+
      sectortype (*ReadSect)(long i);
+     void (*WriteSect)(long i, sectortype sect);
+
      sectortype (*ReadSectP)(long i, sectortype *target);
+
      walltype (*ReadWall)(long i);
      void (*FindSectorOfPoint)(long x, long y, int *inoutSecNum); // for api use: int func(x,y,sectn)
      void (*WriteSectInfo)(long i, sectortype *s);

@@ -1056,22 +1056,24 @@ void operateactivators(short low,short snum) // snum usually used for MP, otherw
 
         if(SLT == low) // If sprite's lotag matches activation tag
         {
+            READSECT
             // === LOCKED ACTIVATOR HANDLING ===
             if( PN == ACTIVATORLOCKED )
             {
                 // Toggle sector lock state using bit 14 (16384 = 0x4000)
-                if(sector[SECT].lotag&16384) // If currently locked
-                    sector[SECT].lotag &= 65535-16384; // Unlock (clear bit 14)
+                if(sectr.lotag&16384) // If currently locked
+                    sectr.lotag &= 65535-16384; // Unlock (clear bit 14)
                 else
-                    sector[SECT].lotag |= 16384; // Lock (set bit 14)
+                    sectr.lotag |= 16384; // Lock (set bit 14)
 
                 // Display message to player if valid player number
                 if(snum >= 0)
                 {
-                    if(sector[SECT].lotag&16384)
+                    if(sectr.lotag&16384)
                         FTA(4,&ps[snum]); // "Locked" message
                     else FTA(8,&ps[snum]); // "Unlocked" message
                 }
+                WRITESECT
             }
             // === REGULAR ACTIVATOR HANDLING ===
             else
@@ -1082,14 +1084,14 @@ void operateactivators(short low,short snum) // snum usually used for MP, otherw
                     case 0: // No condition - always activate
                         break;
                     case 1: // Only activate if sector is closed (floor == ceiling)
-                        if(sector[SECT].floorz != sector[SECT].ceilingz)
+                        if(sectr.floorz != sectr.ceilingz)
                         {
                             i = nextspritestat[i];
                             continue; // Skip this activator
                         }
                         break;
                     case 2: // Only activate if sector is open (floor != ceiling)
-                        if(sector[SECT].floorz == sector[SECT].ceilingz)
+                        if(sectr.floorz == sectr.ceilingz)
                         {
                             i = nextspritestat[i];
                             continue; // Skip this activator
@@ -1099,13 +1101,14 @@ void operateactivators(short low,short snum) // snum usually used for MP, otherw
 
                 // === SECTOR EFFECTOR ACTIVATION ===
                 // If sector lotag < 3, look for sector effectors to toggle
-                if( sector[sprite[i].sectnum].lotag < 3 )
+                if( sectr.lotag < 3 )
                 {
-                    j = headspritesect[sprite[i].sectnum]; // Get first sprite in sector
+                    j = headspritesect[sprt.sectnum]; // Get first sprite in sector
                     while(j >= 0)
                     {
                         // Toggle specific sector effectors (statnum 3)
-                        if( sprite[j].statnum == 3 ) switch(sprite[j].lotag)
+                        spritetype sj = bbeng.ReadSprite(j);
+                        if( sj.statnum == 3 ) switch(sj.lotag)
                         {
                             case 36: // Subway car
                             case 31: // Two-way train
@@ -1122,11 +1125,12 @@ void operateactivators(short low,short snum) // snum usually used for MP, otherw
 
                 // === SPLITTING DOOR SOUND ===
                 // Play sound for splitting doors (lotag 22) - only once per activation
-                if( k == -1 && (sector[SECT].lotag&0xff) == 22 )
+                if( k == -1 && (sectr.lotag&0xff) == 22 )
                     k = callsound(SECT,i);
 
                 // === MAIN SECTOR OPERATION ===
                 // Activate the sector's main function (doors, elevators, etc.)
+                WRITESECT
                 operatesectors(SECT,i);
             }
         }

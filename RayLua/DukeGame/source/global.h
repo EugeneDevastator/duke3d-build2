@@ -53,7 +53,7 @@ short neartagsector, neartagwall, neartagsprite;
 long gc,neartaghitdist,lockclock,max_player_health,max_armour_amount,max_ammo_amount[MAX_WEAPONS];
 
 // long temp_data[MAXSPRITES][6];
-weaponhit hittype[MAXSPRITES];
+weaponhit hittype[MAXSPRITES]; // can remain as is.
 short spriteq[1024],spriteqloc,spriteqamount;
 
 // ported build engine has this, too.  --ryan.
