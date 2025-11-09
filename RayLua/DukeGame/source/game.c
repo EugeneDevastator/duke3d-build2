@@ -910,7 +910,7 @@ short inventory(spritetype* s)
 }
 
 
-short badguy(spritetype* s)
+short isBadGuy(spritetype* s)
 {
     switch (s->picnum)
     {
@@ -1243,6 +1243,7 @@ void operatefta()
 // Triggers a system message display:
 void FTA(short q, player_struct* p)
 {
+    printf("emitting quote %d",q);
     return; //
     if (ud.fta_on == 1)
     {
@@ -1647,15 +1648,16 @@ void displayrest(long smoothratio)
     i = pp->cursectnum;
 
     show2dsector[i >> 3] |= (1 << (i & 7));
-    wal = &wall[sector[i].wallptr];
-    for (j = sector[i].wallnum; j > 0; j--, wal++)
+    READSECT
+    wal = &wall[sectr.wallptr];
+    for (j = sectr.wallnum; j > 0; j--, wal++)
     {
         i = wal->nextsector;
         if (i < 0) continue;
         if (wal->cstat & 0x0071) continue;
         if (wall[wal->nextwall].cstat & 0x0071) continue;
-        if (sector[i].lotag == 32767) continue;
-        if (sector[i].ceilingz >= sector[i].floorz) continue;
+        if (sectr.lotag == 32767) continue;
+        if (sectr.ceilingz >= sectr.floorz) continue;
         show2dsector[i >> 3] |= (1 << (i & 7));
     }
 
@@ -2330,7 +2332,7 @@ void displayrooms(short snum, long smoothratio)
 
             if (wall[mirrorwall[i]].overpicnum == MIRROR)
             {
-                preparemirror(cposx, cposy, cposz, cang, choriz, mirrorwall[i], mirrorsector[i], &tposx, &tposy, &tang);
+                //preparemirror(cposx, cposy, cposz, cang, choriz, mirrorwall[i], mirrorsector[i], &tposx, &tposy, &tang);
 
                 j = visibility;
                 visibility = (j >> 1) + (j >> 2);
@@ -2342,7 +2344,7 @@ void displayrooms(short snum, long smoothratio)
                 display_mirror = 0;
 
                 drawmasks();
-                completemirror(); //Reverse screen x-wise in this function
+                //completemirror(); //Reverse screen x-wise in this function
                 visibility = j;
             }
             gotpic[MIRROR >> 3] &= ~(1 << (MIRROR & 7));
@@ -2752,7 +2754,7 @@ short spawn(short j, short pn)
             {
                 sp->xrepeat = 48;
                 sp->yrepeat = 64;
-                if (sprite[j].statnum == 10 || badguy(&sprite[j]))
+                if (sprite[j].statnum == 10 || isBadGuy(&sprite[j]))
                     sp->z -= (32 << 8);
             }
         }
@@ -4430,7 +4432,7 @@ void animatesprites(long x, long y, short a, long smoothratio)
         case GREENSLIME + 7:
             break;
         default:
-            if (((t->cstat & 16)) || (badguy(t) && t->extra > 0) || t->statnum == 10)
+            if (((t->cstat & 16)) || (isBadGuy(t) && t->extra > 0) || t->statnum == 10)
                 continue;
         }
 
@@ -4925,7 +4927,7 @@ void animatesprites(long x, long y, short a, long smoothratio)
                 t->cstat |= 4;
         }
 
-        if (s->statnum == 13 || badguy(s) || (s->picnum == APLAYER && s->owner >= 0))
+        if (s->statnum == 13 || isBadGuy(s) || (s->picnum == APLAYER && s->owner >= 0))
             if (t->statnum != 99 && s->picnum != EXPLOSION2 && s->picnum != HANGLIGHT && s->picnum != DOMELITE)
                 if (s->picnum != HOTMEAT)
                 {
@@ -5129,8 +5131,9 @@ char cheatquotes[NUMCHEATCODES][14] = {
 
 char cheatbuf[10], cheatbuflen;
 
-void cheats()
+void cheats(){}/*
 {
+    return;// ignore for now
     short ch, i, j, k, keystate, weapon;
 
     if ((ps[myconnectindex].gm & MODE_TYPE) || (ps[myconnectindex].gm & MODE_MENU))
@@ -5570,7 +5573,7 @@ void cheats()
             }
         }
     }
-}
+}*/
 
 
 long nonsharedtimer;
@@ -7500,7 +7503,7 @@ void fakedomovethings()
             psectlotag = 0;
             spritebridge = 1;
         }
-        if (badguy(&sprite[j]) && sprite[j].xrepeat > 24 && klabs(sprite[p->i].z - sprite[j].z) < (84 << 8))
+        if (isBadGuy(&sprite[j]) && sprite[j].xrepeat > 24 && klabs(sprite[p->i].z - sprite[j].z) < (84 << 8))
         {
             j = getangle(sprite[j].x - myx, sprite[j].y - myy);
             myxvel -= sintable[(j + 512) & 2047] << 4;

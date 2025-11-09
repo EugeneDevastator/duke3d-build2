@@ -165,9 +165,8 @@ void clearallviews(long dacol);
 void setviewtotile(short tilenume, long xsiz, long ysiz);
 void setviewback();
 void squarerotatetile(short tilenume);
-void preparemirror(long dax, long day, long daz, short daang, long dahoriz, short dawall, short dasector, long* tposx,
-				   long* tposy, short* tang);
-void completemirror();
+//void preparemirror(long dax, long day, long daz, short daang, long dahoriz, short dawall, short dasector, long* tposx,long* tposy, short* tang);
+//void completemirror();
 static long clippoly4(long cx1, long cy1, long cx2, long cy2);
 static long clippoly(long npoints, long clipstat);
 
@@ -219,7 +218,7 @@ void getzsofslope(short sectnum, long dax, long day, long* ceilz, long* florz);
 
 //---------------- ported
 
-//int setsprite(short spritenum, long newx, long newy, long newz);
+int setsprite(short spritenum, long newx, long newy, long newz);
 
 //----------------------
 

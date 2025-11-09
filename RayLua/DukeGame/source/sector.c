@@ -91,7 +91,7 @@ short check_activator_motion( short lotag )
     short i, j;
     spritetype *s;
 
-    i = headspritestat[8];
+    i = headspritestat[STAT_ACTIVATOR];
     while ( i >= 0 )
     {
         READSPR
@@ -758,12 +758,14 @@ void operatesectors(short sn,short ii)
                 {
                     i = bbeng.FindClosestSectorIdByHeigh(sn,secSNp->floorz,1,-1);
                     if( i == -1 ) return;
-                    j = sector[i].floorz;
+                    READSECT
+                    j = sectr.floorz;
                     setanimation(sn,&secSNp->floorz,j,secSNp->extra);
                 }
                 else
                 {
-                    j = sector[i].floorz;
+                    READSECT
+                    j = sectr.floorz;
                     setanimation(sn,&secSNp->floorz,j,secSNp->extra);
                 }
                 callsound(sn,ii);
@@ -811,7 +813,7 @@ void operatesectors(short sn,short ii)
             while(i >= 0)
             {
                 READSPR
-                READSECT
+                READSECTBYOFSPR
                 if( (SLT == 22) &&
                     (SHT == secSNp->hitag) )
                 {
@@ -819,7 +821,7 @@ void operatesectors(short sn,short ii)
 
                     T1 = sn;
                     T2 = 1;
-                    WRITESECT
+                    WRITESECTOFSPR
                 }
                 i = nextspritestat[i];
             }
@@ -857,7 +859,7 @@ void operatesectors(short sn,short ii)
             {
                 j = bbeng.FindClosestSectorIdByHeigh(sn,secSNp->ceilingz,-1,-1);
 
-                if(j >= 0) j = sector[j].ceilingz;
+                if(j >= 0) j = bbeng.ReadSect(j).ceilingz;
                 else
                 {
                     // Set bit 15 (32768) and retry - fallback mechanism
@@ -1112,7 +1114,7 @@ void operateactivators(short low,short snum) // snum usually used for MP, otherw
 
         if(SLT == low) // If sprite's lotag matches activation tag
         {
-            READSECT
+            READSECTBYOFSPR
             // === LOCKED ACTIVATOR HANDLING ===
             if( PN == ACTIVATORLOCKED )
             {
@@ -1129,7 +1131,7 @@ void operateactivators(short low,short snum) // snum usually used for MP, otherw
                         FTA(4,&ps[snum]); // "Locked" message
                     else FTA(8,&ps[snum]); // "Unlocked" message
                 }
-                WRITESECT
+                WRITESECTOFSPR
             }
             // === REGULAR ACTIVATOR HANDLING ===
             else
@@ -1186,7 +1188,7 @@ void operateactivators(short low,short snum) // snum usually used for MP, otherw
 
                 // === MAIN SECTOR OPERATION ===
                 // Activate the sector's main function (doors, elevators, etc.)
-                WRITESECT
+                WRITESECTOFSPR
                 operatesectors(SECT,i);
             }
         }
@@ -1381,9 +1383,9 @@ char checkhitswitch(short snum,long w,char switchtype)
             case MULTISWITCH+1:
             case MULTISWITCH+2:
             case MULTISWITCH+3:
-                sprite[i].picnum++;
-                if( sprite[i].picnum > (MULTISWITCH+3) )
-                    sprite[i].picnum = MULTISWITCH;
+                sprt.picnum++;
+                if( sprt.picnum > (MULTISWITCH+3) )
+                    sprt.picnum = MULTISWITCH;
                 break;
             case ACCESSSWITCH:
             case ACCESSSWITCH2:
@@ -1400,7 +1402,7 @@ char checkhitswitch(short snum,long w,char switchtype)
             case PULLSWITCH:
             case DIPSWITCH2:
             case DIPSWITCH3:
-                sprite[i].picnum++;
+                sprt.picnum++;
                 break;
             case PULLSWITCH+1:
             case HANDSWITCH+1:
@@ -1415,8 +1417,9 @@ char checkhitswitch(short snum,long w,char switchtype)
             case FRANKENSTINESWITCH+1:
             case DIPSWITCH2+1:
             case DIPSWITCH3+1:
-                sprite[i].picnum--;
+                sprt.picnum--;
                 break;
+            WRITESPR
         }
         i = nextspritestat[i];
     }
@@ -1567,7 +1570,7 @@ char checkhitswitch(short snum,long w,char switchtype)
                     picnum == (MULTISWITCH+2) || picnum == (MULTISWITCH+3) )
                         lotag += picnum-MULTISWITCH;
 
-                x = headspritestat[3];
+                x = headspritestat[STAT_EFFECTOR];
                 while(x >= 0)
                 {
                    if( (sprite[x].hitag) == lotag )
@@ -2379,7 +2382,7 @@ void checkhitsprite(short i,short sn)
 
             if( ( sprite[sn].picnum == FREEZEBLAST || sprite[sn].owner != i ) && sprite[i].statnum != 4)
             {
-                if( badguy(&sprite[i]) == 1)
+                if( isBadGuy(&sprite[i]) == 1)
                 {
                     if(sprite[sn].picnum == RPG) sprite[sn].extra <<= 1;
 
@@ -3004,7 +3007,7 @@ void checksectors(short snum)
     switch(psect.lotag)
     {
 
-        case 32767:
+        case 32767:  //secret area
             psect.lotag = 0;
             FTA(9,p);
             p->secret_rooms++;
@@ -3036,7 +3039,7 @@ void checksectors(short snum)
             p->customexitsound = psect.hitag;
             bbeng.WriteSect(p->cursectnum, psect);
             return;
-        default:
+        default:  //one time sound
             if(psect.lotag >= 10000 && psect.lotag < 16383)
             {
                 if(snum == screenpeek || ud.coop == 1 )

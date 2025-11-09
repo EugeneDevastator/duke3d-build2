@@ -44,7 +44,7 @@ void cachespritenum(short i)
     char maxc;
     short j;
 
-    if (ud.monsters_off && badguy(&sprite[i])) return;
+    if (ud.monsters_off && isBadGuy(&sprite[i])) return;
 
     maxc = 1;
     READSPR
@@ -297,12 +297,13 @@ void cacheit()
 
     for (i = 0; i < numsectors; i++)
     {
-        if (waloff[sector[i].floorpicnum] == 0)
-            tloadtile(sector[i].floorpicnum);
-        if (waloff[sector[i].ceilingpicnum] == 0)
+        READSECT
+        if (waloff[sectr.floorpicnum] == 0)
+            tloadtile(sectr.floorpicnum);
+        if (waloff[sectr.ceilingpicnum] == 0)
         {
-            tloadtile(sector[i].ceilingpicnum);
-            if (waloff[sector[i].ceilingpicnum] == LA)
+            tloadtile(sectr.ceilingpicnum);
+            if (waloff[sectr.ceilingpicnum] == LA)
             {
                 tloadtile(LA + 1);
                 tloadtile(LA + 2);
@@ -683,45 +684,49 @@ void prelevel(char g)
 
     for (i = 0; i < numsectors; i++)
     {
-        sector[i].extra = 256;
+        READSECT
+        sectr.extra = 256;
 
-        switch (sector[i].lotag)
+        switch (sectr.lotag)
         {
         case 20:
         case 22:
-            if (sector[i].floorz > sector[i].ceilingz)
-                sector[i].lotag |= 32768;
+            if (sectr.floorz > sectr.ceilingz)
+            {
+                sectr.lotag |= 32768;
+                WRITESECT
+            }
             continue;
         }
 
-        if (sector[i].ceilingstat & 1)
+        if (sectr.ceilingstat & 1)
         {
-            if (waloff[sector[i].ceilingpicnum] == 0)
+            if (waloff[sectr.ceilingpicnum] == 0)
             {
-                if (sector[i].ceilingpicnum == LA)
+                if (sectr.ceilingpicnum == LA)
                     for (j = 0; j < 5; j++)
-                        if (waloff[sector[i].ceilingpicnum + j] == 0)
-                            tloadtile(sector[i].ceilingpicnum + j);
+                        if (waloff[sectr.ceilingpicnum + j] == 0)
+                            tloadtile(sectr.ceilingpicnum + j);
             }
-            setupbackdrop(sector[i].ceilingpicnum);
+            setupbackdrop(sectr.ceilingpicnum);
 
-            if (sector[i].ceilingpicnum == CLOUDYSKIES && numclouds < 127)
+            if (sectr.ceilingpicnum == CLOUDYSKIES && numclouds < 127)
                 clouds[numclouds++] = i;
 
             if (ps[0].one_parallax_sectnum == -1)
                 ps[0].one_parallax_sectnum = i;
         }
 
-        if (sector[i].lotag == 32767) //Found a secret room
+        if (sectr.lotag == 32767) //Found a secret room
         {
             ps[0].max_secret_rooms++;
             continue;
         }
 
-        if (sector[i].lotag == -1)
+        if (sectr.lotag == -1)
         {
-            ps[0].exitx = wall[sector[i].wallptr].x;
-            ps[0].exity = wall[sector[i].wallptr].y;
+            ps[0].exitx = wall[sectr.wallptr].x;
+            ps[0].exity = wall[sectr.wallptr].y;
             continue;
         }
     }
@@ -839,11 +844,12 @@ void prelevel(char g)
 
     mirrorcnt = 0;
 
+// mirror calculatons
     for (i = 0; i < numwalls; i++)
     {
         walltype* wal;
         wal = &wall[i];
-
+/*
         if (wal->overpicnum == MIRROR && (wal->cstat & 32) != 0)
         {
             j = wal->nextsector;
@@ -860,9 +866,9 @@ void prelevel(char g)
                 continue;
             }
         }
-
-        if (numanimwalls >= MAXANIMWALLS)
-            gameexit("\nToo many 'anim' walls (max 512.)");
+*/
+    //   if (numanimwalls >= MAXANIMWALLS)
+    //        gameexit("\nToo many 'anim' walls (max 512.)");
 
         animwall[numanimwalls].tag = 0;
         animwall[numanimwalls].wallnum = 0;
@@ -883,8 +889,8 @@ void prelevel(char g)
         case W_FORCEFIELD + 1:
         case W_FORCEFIELD + 2:
             if (wal->shade > 31)
-                wal->cstat = 0;
-            else wal->cstat |= 85 + 256;
+                wal->cstat = 0; // no block no nothing
+            else wal->cstat |= 85 + 256; // block, align bottom, mask, hitscan, yflip. wtf...
 
 
             if (wal->lotag && wal->nextwall >= 0)

@@ -89,9 +89,10 @@ void restoreinterpolations()  //Stick at end of drawscreen
 
 long ceilingspace(short sectnum)
 {
-    if( (sector[sectnum].ceilingstat&1) && sector[sectnum].ceilingpal == 0 )
+    sectortype sect = bbeng.ReadSect(sectnum);
+    if( (sect.ceilingstat&1) && sect.ceilingpal == 0 )
     {
-        switch(sector[sectnum].ceilingpicnum)
+        switch(sect.ceilingpicnum)
         {
             case MOONSKY1:
             case BIGORBIT1:
@@ -103,9 +104,10 @@ long ceilingspace(short sectnum)
 
 long floorspace(short sectnum)
 {
-    if( (sector[sectnum].floorstat&1) && sector[sectnum].ceilingpal == 0 )
+    sectortype sect = bbeng.ReadSect(sectnum);
+    if( (sect.floorstat&1) && sect.ceilingpal == 0 )
     {
-        switch(sector[sectnum].floorpicnum)
+        switch(sect.floorpicnum)
         {
             case MOONSKY1:
             case BIGORBIT1:
@@ -396,13 +398,13 @@ long ifsquished(short i, short p)
     READSPR
     if(PN == APLAYER && ud.clipping)
         return 0;
-
-    sc = &sector[SECT];
+    READSECTBYOFSPR
+    sc = &sectr;
     floorceildist = sc->floorz - sc->ceilingz;
 
     if(sc->lotag != 23)
     {
-        if(sprite[i].pal == 1)
+        if(sprt.pal == 1)
             squishme = floorceildist < (32<<8) && (sc->lotag&32768) == 0;
         else
             squishme = floorceildist < (12<<8); // && (sc->lotag&32768) == 0;
@@ -413,9 +415,9 @@ long ifsquished(short i, short p)
     {
         FTA(10,&ps[p]);
 
-        if(badguy(&sprite[i])) sprite[i].xvel = 0;
+        if(isBadGuy(&sprt)) sprt.xvel = 0;
 
-        if(sprite[i].pal == 1)
+        if(sprt.pal == 1)
         {
             hittype[i].picnum = SHOTSPARK1;
             hittype[i].extra = 1;
@@ -450,21 +452,22 @@ void hitradius( short i, long  r, long  hp1, long  hp2, long  hp3, long  hp4 )
         do
         {
             dasect = tempshort[sectcnt++];
-            if(((sector[dasect].ceilingz-s->z)>>8) < r)
+            sectortype dsec = bbeng.ReadSect(dasect);
+            if(((dsec.ceilingz-s->z)>>8) < r)
             {
-               d = klabs(wall[sector[dasect].wallptr].x-s->x)+klabs(wall[sector[dasect].wallptr].y-s->y);
+               d = klabs(wall[dsec.wallptr].x-s->x)+klabs(wall[dsec.wallptr].y-s->y);
                if(d < r)
                     checkhitceiling(dasect);
                else
                {
-                    d = klabs(wall[wall[wall[sector[dasect].wallptr].point2].point2].x-s->x)+klabs(wall[wall[wall[sector[dasect].wallptr].point2].point2].y-s->y);
+                    d = klabs(wall[wall[wall[dsec.wallptr].point2].point2].x-s->x)+klabs(wall[wall[wall[dsec.wallptr].point2].point2].y-s->y);
                     if(d < r)
                         checkhitceiling(dasect);
                }
            }
 
-           startwall = sector[dasect].wallptr;
-           endwall = startwall+sector[dasect].wallnum;
+           startwall = dsec.wallptr;
+           endwall = startwall+dsec.wallnum;
            for(x=startwall,wal=&wall[startwall];x<endwall;x++,wal++)
                if( ( klabs(wal->x-s->x)+klabs(wal->y-s->y) ) < r)
            {
@@ -502,12 +505,12 @@ void hitradius( short i, long  r, long  hp1, long  hp2, long  hp3, long  hp4 )
                 if( s->picnum != SHRINKSPARK || (sj->cstat&257) )
                     if( dist( s, sj ) < r )
                     {
-                        if( badguy(sj) && !cansee( sj->x, sj->y,sj->z+q, sj->sectnum, s->x, s->y, s->z+q, s->sectnum) )
+                        if( isBadGuy(sj) && !cansee( sj->x, sj->y,sj->z+q, sj->sectnum, s->x, s->y, s->z+q, s->sectnum) )
                             goto BOLT;
                         checkhitsprite( j, i );
                     }
             }
-            else if( sj->extra >= 0 && sj != s && ( sj->picnum == TRIPBOMB || badguy(sj) || sj->picnum == QUEBALL || sj->picnum == STRIPEBALL || (sj->cstat&257) || sj->picnum == DUKELYINGDEAD ) )
+            else if( sj->extra >= 0 && sj != s && ( sj->picnum == TRIPBOMB || isBadGuy(sj) || sj->picnum == QUEBALL || sj->picnum == STRIPEBALL || (sj->cstat&257) || sj->picnum == DUKELYINGDEAD ) )
             {
                 if( s->picnum == SHRINKSPARK && sj->picnum != SHARK && ( j == s->owner || sj->xrepeat < 24 ) )
                 {
@@ -613,83 +616,84 @@ int movesprite(short spritenum, long xchange, long ychange, long zchange, unsign
     long daz,h, oldx, oldy;
     short retval, dasectnum, a, cd;
     char bg;
+    spritetype spri = bbeng.ReadSprite(spritenum);
+    bg = isBadGuy(&spri);
 
-    bg = badguy(&sprite[spritenum]);
-
-    if(sprite[spritenum].statnum == 5 || (bg && sprite[spritenum].xrepeat < 4 ) )
+    if(spri.statnum == STAT_MISC || (bg && spri.xrepeat < 4 ) )
     {
-        sprite[spritenum].x += (xchange*TICSPERFRAME)>>2;
-        sprite[spritenum].y += (ychange*TICSPERFRAME)>>2;
-        sprite[spritenum].z += (zchange*TICSPERFRAME)>>2;
+        spri.x += (xchange*TICSPERFRAME)>>2;
+        spri.y += (ychange*TICSPERFRAME)>>2;
+        spri.z += (zchange*TICSPERFRAME)>>2;
         if(bg)
-            bbeng.SetSprPos(spritenum,sprite[spritenum].x,sprite[spritenum].y,sprite[spritenum].z);
+            bbeng.SetSprPos(spritenum,spri.x,spri.y,spri.z);
         return 0;
     }
 
-    dasectnum = sprite[spritenum].sectnum;
+    dasectnum = spri.sectnum;
 
-	daz = sprite[spritenum].z;
-    h = ((tilesizy[sprite[spritenum].picnum]*sprite[spritenum].yrepeat)<<1);
+	daz = spri.z;
+    h = ((tilesizy[spri.picnum]*spri.yrepeat)<<1);
     daz -= h;
 
     if( bg )
     {
-        oldx = sprite[spritenum].x;
-        oldy = sprite[spritenum].y;
+        oldx = spri.x;
+        oldy = spri.y;
 
-        if( sprite[spritenum].xrepeat > 60 )
-            retval = clipmove(&sprite[spritenum].x,&sprite[spritenum].y,&daz,&dasectnum,((xchange*TICSPERFRAME)<<11),((ychange*TICSPERFRAME)<<11),1024L,(4<<8),(4<<8),cliptype); //4<<8 = 1024
+        if( spri.xrepeat > 60 )
+            retval = clipmove(&spri.x,&spri.y,&daz,&dasectnum,((xchange*TICSPERFRAME)<<11),((ychange*TICSPERFRAME)<<11),1024L,(4<<8),(4<<8),cliptype); //4<<8 = 1024
         else
         {
-            if(sprite[spritenum].picnum == LIZMAN)
+            if(spri.picnum == LIZMAN)
                 cd = 292L;
-            else if( (actortype[sprite[spritenum].picnum]&3) )
-                cd = sprite[spritenum].clipdist<<2;
+            else if( (actortype[spri.picnum]&3) )
+                cd = spri.clipdist<<2;
             else
                 cd = 192L;
 
-            retval = clipmove(&sprite[spritenum].x,&sprite[spritenum].y,&daz,&dasectnum,((xchange*TICSPERFRAME)<<11),((ychange*TICSPERFRAME)<<11),cd,(4<<8),(4<<8),cliptype);
+            retval = clipmove(&spri.x,&spri.y,&daz,&dasectnum,((xchange*TICSPERFRAME)<<11),((ychange*TICSPERFRAME)<<11),cd,(4<<8),(4<<8),cliptype);
         }
-
+        sectortype dasectr = bbeng.ReadSect(dasectnum);
         if( dasectnum < 0 || ( dasectnum >= 0 &&
             ( ( hittype[spritenum].actorstayput >= 0 && hittype[spritenum].actorstayput != dasectnum ) ||
-              ( ( sprite[spritenum].picnum == BOSS2 ) && sprite[spritenum].pal == 0 && sector[dasectnum].lotag != 3 ) ||
-              ( ( sprite[spritenum].picnum == BOSS1 || sprite[spritenum].picnum == BOSS2 ) && sector[dasectnum].lotag == 1 ) ||
-              ( sector[dasectnum].lotag == 1 && ( sprite[spritenum].picnum == LIZMAN || ( sprite[spritenum].picnum == LIZTROOP && sprite[spritenum].zvel == 0 ) ) )
+              ( ( spri.picnum == BOSS2 ) && spri.pal == 0 && dasectr.lotag != 3 ) ||
+              ( ( spri.picnum == BOSS1 || spri.picnum == BOSS2 ) && dasectr.lotag == 1 ) ||
+              ( dasectr.lotag == 1 && ( spri.picnum == LIZMAN || ( spri.picnum == LIZTROOP && spri.zvel == 0 ) ) )
             ) )
           )
         {
-            bbeng.SetSprPosXY(spritenum,oldx,oldy);
-                if(sector[dasectnum].lotag == 1 && sprite[spritenum].picnum == LIZMAN)
-                    sprite[spritenum].ang = (TRAND&2047); // 0b11111111111 looks like its angle clip.
-                else if( (hittype[spritenum].temp_data[0]&3) == 1 && sprite[spritenum].picnum != COMMANDER )
-                    sprite[spritenum].ang = (TRAND&2047);
-                bbeng.SetSprPos(spritenum,oldx,oldy,sprite[spritenum].z);
+            spri.x=oldx;
+            spri.y=oldy;
+                if(dasectr.lotag == 1 && spri.picnum == LIZMAN)
+                    spri.ang = (TRAND&2047); // 0b11111111111 looks like its angle clip.
+                else if( (hittype[spritenum].temp_data[0]&3) == 1 && spri.picnum != COMMANDER )
+                    spri.ang = (TRAND&2047);
+                bbeng.SetSprPos(spritenum,oldx,oldy,spri.z);
                 if(dasectnum < 0) dasectnum = 0;
                 return (16384+dasectnum);
         }
-        if( (retval&49152) >= 32768 && (hittype[spritenum].cgg==0) ) sprite[spritenum].ang += 768;
+        if( (retval&49152) >= 32768 && (hittype[spritenum].cgg==0) ) spri.ang += 768;
     }
     else
     {
-        if(sprite[spritenum].statnum == 4)
+        if(spri.statnum == 4)
             retval =
-                clipmove(&sprite[spritenum].x,&sprite[spritenum].y,&daz,&dasectnum,((xchange*TICSPERFRAME)<<11),((ychange*TICSPERFRAME)<<11),8L,(4<<8),(4<<8),cliptype);
+                clipmove(&spri.x,&spri.y,&daz,&dasectnum,((xchange*TICSPERFRAME)<<11),((ychange*TICSPERFRAME)<<11),8L,(4<<8),(4<<8),cliptype);
         else
             retval =
-                clipmove(&sprite[spritenum].x,&sprite[spritenum].y,&daz,&dasectnum,((xchange*TICSPERFRAME)<<11),((ychange*TICSPERFRAME)<<11),(long)(sprite[spritenum].clipdist<<2),(4<<8),(4<<8),cliptype);
+                clipmove(&spri.x,&spri.y,&daz,&dasectnum,((xchange*TICSPERFRAME)<<11),((ychange*TICSPERFRAME)<<11),(long)(spri.clipdist<<2),(4<<8),(4<<8),cliptype);
     }
 
     if( dasectnum >= 0)
-        if ( (dasectnum != sprite[spritenum].sectnum) )
+        if ( (dasectnum != spri.sectnum) )
             changespritesect(spritenum,dasectnum);
-    daz = sprite[spritenum].z + ((zchange*TICSPERFRAME)>>3);
+    daz = spri.z + ((zchange*TICSPERFRAME)>>3);
     if ((daz > hittype[spritenum].ceilingz) && (daz <= hittype[spritenum].floorz))
-        sprite[spritenum].z = daz;
+        spri.z = daz;
     else
         if (retval == 0)
-            return(16384+dasectnum);
-
+            retval=(16384+dasectnum);
+    bbeng.WriteSprite(spritenum,spri);
 	return(retval);
 }
 
@@ -760,7 +764,7 @@ void guts(spritetype *s,short gtype, short n, short p)
     char sx,sy;
     signed char pal;
 
-    if(badguy(s) && s->xrepeat < 16)
+    if(isBadGuy(s) && s->xrepeat < 16)
         sx = sy = 8;
     else sx = sy = 32;
 
@@ -773,7 +777,7 @@ void guts(spritetype *s,short gtype, short n, short p)
     if(s->picnum == COMMANDER)
         gutz -= (24<<8);
 
-    if( badguy(s) && s->pal == 6)
+    if( isBadGuy(s) && s->pal == 6)
         pal = 6;
     else pal = 0;
 
@@ -798,7 +802,7 @@ void gutsdir(spritetype *s,short gtype, short n, short p)
     short i,a,j;
     char sx,sy;
 
-    if(badguy(s) && s->xrepeat < 16)
+    if(isBadGuy(s) && s->xrepeat < 16)
         sx = sy = 8;
     else sx = sy = 32;
 
@@ -913,7 +917,7 @@ void movefta()
                 hittype[i].timetosleep++;
                 if( hittype[i].timetosleep >= (x>>8) )
                 {
-                    if(badguy(s))
+                    if(isBadGuy(s))
                     {
                         px = ps[p].oposx+64-(TRAND&127);
                         py = ps[p].oposy+64-(TRAND&127);
@@ -970,7 +974,7 @@ void movefta()
                     else hittype[i].timetosleep = 0;
                 }
             }
-            if( badguy( s ) )
+            if( isBadGuy( s ) )
             {
                 if (sector[s->sectnum].ceilingstat&1)
                     s->shade = sector[s->sectnum].ceilingshade;
@@ -1097,12 +1101,12 @@ void movecyclers()
 
         if( j < cshade ) j = cshade;
         else if( j > t )  j = t;
-
-        c[1] += sector[s].extra;
+        sectortype Ssect = bbeng.ReadSect(s);
+        c[1] += Ssect.extra;
         if(c[5])
         {
-            wal = &wall[sector[s].wallptr];
-            for(x = sector[s].wallnum;x>0;x--,wal++)
+            wal = &wall[Ssect.wallptr];
+            for(x = Ssect.wallnum;x>0;x--,wal++)
                 if( wal->hitag != 1 )
             {
                 wal->shade = j;
@@ -1111,7 +1115,8 @@ void movecyclers()
                     wall[wal->nextwall].shade = j;
 
             }
-            sector[s].floorshade = sector[s].ceilingshade = j;
+            Ssect.floorshade = Ssect.ceilingshade = j;
+            bbeng.WriteSect(s,Ssect);
         }
     }
 }
@@ -2465,7 +2470,7 @@ void moveweapons()
                 if(T2 > 2047) KILLIT(i);
 
                 if(sprite[s->owner].statnum == MAXSTATUS)
-                    if(badguy(&sprite[s->owner]) == 0)
+                    if(isBadGuy(&sprite[s->owner]) == 0)
                         KILLIT(i);
 
                 s->ang = sprite[s->owner].ang;
@@ -2602,7 +2607,7 @@ void moveweapons()
                         j &= (MAXSPRITES-1);
 
                         if(s->picnum == FREEZEBLAST && sprite[j].pal == 1 )
-                            if( badguy(&sprite[j]) || sprite[j].picnum == APLAYER )
+                            if( isBadGuy(&sprite[j]) || sprite[j].picnum == APLAYER )
                         {
                             j = spawn(i,TRANSPORTERSTAR);
                             sprite[j].pal = 1;
@@ -4369,7 +4374,7 @@ void moveactors()
 
 
 // #ifndef VOLOMEONE
-        if( ud.multimode < 2 && badguy(s) )
+        if( ud.multimode < 2 && isBadGuy(s) )
         {
             if( actor_tog == 1)
             {
@@ -5326,7 +5331,7 @@ void moveeffectors()   //STATNUM 3
                         while(j >= 0)
                         {
                             l = nextspritesect[j];
-                            if (sprite[j].statnum == 1 && badguy(&sprite[j]) && sprite[j].picnum != SECTOREFFECTOR && sprite[j].picnum != LOCATORS )
+                            if (sprite[j].statnum == 1 && isBadGuy(&sprite[j]) && sprite[j].picnum != SECTOREFFECTOR && sprite[j].picnum != LOCATORS )
                             {
                                 k = sprite[j].sectnum;
                                 updatesector(sprite[j].x,sprite[j].y,&k);
@@ -5498,7 +5503,7 @@ void moveeffectors()   //STATNUM 3
                         while(j >= 0)
                         {
                             l = nextspritesect[j];
-                            if (sprite[j].statnum == 1 && badguy(&sprite[j]) && sprite[j].picnum != SECTOREFFECTOR && sprite[j].picnum != LOCATORS )
+                            if (sprite[j].statnum == 1 && isBadGuy(&sprite[j]) && sprite[j].picnum != SECTOREFFECTOR && sprite[j].picnum != LOCATORS )
                             {
             //                    if(sprite[j].sectnum != s->sectnum)
                                 {
@@ -5891,7 +5896,7 @@ void moveeffectors()   //STATNUM 3
                         while(k >= 0)
                         {
                             if( sprite[k].extra > 0
-                                && badguy(&sprite[k])
+                                && isBadGuy(&sprite[k])
                                 && clipinsidebox(sprite[k].x,sprite[k].y,j,256L) == 1 )
                                 goto BOLT;
                             k = nextspritestat[k];

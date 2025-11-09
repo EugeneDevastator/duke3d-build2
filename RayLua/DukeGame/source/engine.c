@@ -4231,7 +4231,27 @@ int hitscan(long xs, long ys, long zs, short sectnum, long vx, long vy, long vz,
     while (tempshortcnt < tempshortnum);
     return (0);
 }
+/*Function Overview
+neartag performs a raycast from a given position
+to find the nearest tagged game object (sector, wall, or sprite)
+within a specified range and angle.
 
+Inputs
+xs, ys, zs - Starting position coordinates (x, y, z)
+sectnum - Starting sector number
+ange - Ray direction angle (Build engine angle format)
+neartagrange - Maximum search distance
+tagsearch - Bitmask for tag types to search:
+1 = search lotag
+2 = search hitag
+3 = search both
+
+Outputs (via pointers)
+neartagsector - Index of nearest tagged sector (-1 if none)
+neartagwall - Index of nearest tagged wall (-1 if none)
+neartagsprite - Index of nearest tagged sprite (-1 if none)
+neartaghitdist - Distance to the nearest tagged object
+*/
 int neartag(long xs, long ys, long zs, short sectnum, short ange, short* neartagsector, short* neartagwall,
             short* neartagsprite, long* neartaghitdist, long neartagrange, char tagsearch)
 {
