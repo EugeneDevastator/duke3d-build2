@@ -150,9 +150,9 @@ void tracers(long x1,long y1,long z1,long x2,long y2,long z2,long n)
           if(sect >= 0)
           {
               if(sector[sect].lotag == 2)
-                  EGS(sect,x1,y1,z1,WATERBUBBLE,-32,4+(TRAND&3),4+(TRAND&3),TRAND&2047,0,0,ps[0].i,5);
+                  EGS(sect,x1,y1,z1,WATERBUBBLE,-32,4+(TRAND&3),4+(TRAND&3),TRAND&2047,0,0,ps[0].i,STAT_MISC);
               else
-                  EGS(sect,x1,y1,z1,SMALLSMOKE,-32,14,14,0,0,0,ps[0].i,5);
+                  EGS(sect,x1,y1,z1,SMALLSMOKE,-32,14,14,0,0,0,ps[0].i,STAT_MISC);
           }
 	 }
 }
