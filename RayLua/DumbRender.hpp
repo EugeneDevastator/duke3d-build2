@@ -221,7 +221,7 @@ public:
         // Draw floors and ceilings with slopes
         for (int s = 0; s < map->numsects; s++)
         {
-            for (int isFloor = 0; isFloor < 2; isFloor++)
+            for (int isFloor = 1; isFloor < 2; isFloor++)
             {
                 int meshIdx = s * 2 + isFloor;
                 FloorMeshData* meshData = &floorMeshes[meshIdx];
@@ -1114,9 +1114,8 @@ private:
             if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
             map->blankheadspri = i;
         }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/E4l5.MAP", map);
+        loadmap_imp((char*)"c:/Eugene/Games/build2/E2l7.MAP", map);
     }
 };
-
 
 #endif //RAYLIB_LUA_IMGUI_DUMBRENDER_H
