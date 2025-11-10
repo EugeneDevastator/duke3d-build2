@@ -1654,12 +1654,12 @@ char dodge(spritetype *s)
 
     for(i=headspritestat[4];i>=0;i=nextspritestat[i]) //weapons list
     {
-        if( OW == i || SECT != s->sectnum)
+        if( sprite[i].owner == i || sprite[i].sectnum != s->sectnum)
             continue;
 
-        bx = SX-mx;
-        by = SY-my;
-        bxvect = sintable[(SA+512)&2047]; byvect = sintable[SA&2047];
+        bx = sprite[i].x-mx;
+        by = sprite[i].y-my;
+        bxvect = sintable[(sprite[i].ang+512)&2047]; byvect = sintable[sprite[i].ang&2047];
 
         if (mxvect*bx + myvect*by >= 0)
             if (bxvect*bx + byvect*by < 0)

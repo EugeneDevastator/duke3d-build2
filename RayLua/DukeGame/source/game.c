@@ -828,7 +828,7 @@ void checksync()
 void check_fta_sounds(short i)
 {
     if (sprite[i].extra > 0)
-        switch (PN)
+        switch (sprite[i].picnum)
         {
         case LIZTROOPONTOILET:
         case LIZTROOPJUSTSIT:
@@ -2406,7 +2406,7 @@ short EGS(short whatsect, long s_x, long s_y, long s_z, short s_pn, signed char 
         s->hitag = 0;
     }
 
-    if (show2dsector[SECT >> 3] & (1 << (SECT & 7))) show2dsprite[i >> 3] |= (1 << (i & 7));
+    if (show2dsector[sprite[i].sectnum >> 3] & (1 << (sprite[i].sectnum & 7))) show2dsprite[i >> 3] |= (1 << (i & 7));
     else show2dsprite[i >> 3] &= ~(1 << (i & 7));
     /*
         if(s->sectnum < 0)
@@ -2420,7 +2420,7 @@ short EGS(short whatsect, long s_x, long s_y, long s_z, short s_pn, signed char 
 
 char wallswitchcheck(short i)
 {
-    switch (PN)
+    switch (sprite[i].picnum)
     {
     case HANDPRINTSWITCH:
     case HANDPRINTSWITCH + 1:
@@ -2486,21 +2486,21 @@ short spawn(short j, short pn)
     {
         i = pn;
 
-        hittype[i].picnum = PN;
+        hittype[i].picnum = sprite[i].picnum;
         hittype[i].timetosleep = 0;
         hittype[i].extra = -1;
 
-        hittype[i].bposx = SX;
-        hittype[i].bposy = SY;
-        hittype[i].bposz = SZ;
+        hittype[i].bposx = sprite[i].x;
+        hittype[i].bposy = sprite[i].y;
+        hittype[i].bposz = sprite[i].z;
 
-        OW = hittype[i].owner = i;
+        sprite[i].owner = hittype[i].owner = i;
         hittype[i].cgg = 0;
         hittype[i].movflag = 0;
         hittype[i].tempang = 0;
         hittype[i].dispicnum = 0;
-        hittype[i].floorz = sector[SECT].floorz;
-        hittype[i].ceilingz = sector[SECT].ceilingz;
+        hittype[i].floorz = sector[sprite[i].sectnum].floorz;
+        hittype[i].ceilingz = sector[sprite[i].sectnum].ceilingz;
 
         hittype[i].lastvx = 0;
         hittype[i].lastvy = 0;
@@ -2508,49 +2508,50 @@ short spawn(short j, short pn)
 
         T1 = T2 = T3 = T4 = T5 = T6 = 0;
 
-        if (PN != SPEAKER && PN != LETTER && PN != DUCK && PN != TARGET && PN != TRIPBOMB && PN != VIEWSCREEN && PN !=
-            VIEWSCREEN2 && (CS & 48))
-            if (!(PN >= CRACK1 && PN <= CRACK4))
+        if (sprite[i].picnum != SPEAKER && sprite[i].picnum != LETTER && sprite[i].picnum != DUCK && sprite[i].picnum != TARGET && sprite
+            [i].picnum != TRIPBOMB && sprite[i].picnum != VIEWSCREEN && sprite[i].picnum !=
+            VIEWSCREEN2 && (sprite[i].cstat & 48))
+            if (!(sprite[i].picnum >= CRACK1 && sprite[i].picnum <= CRACK4))
             {
-                if (SS == 127) return i;
-                if (wallswitchcheck(i) == 1 && (CS & 16))
+                if (sprite[i].shade == 127) return i;
+                if (wallswitchcheck(i) == 1 && (sprite[i].cstat & 16))
                 {
-                    if (PN != ACCESSSWITCH && PN != ACCESSSWITCH2 && sprite[i].pal)
+                    if (sprite[i].picnum != ACCESSSWITCH && sprite[i].picnum != ACCESSSWITCH2 && sprite[i].pal)
                     {
                         if ((ud.multimode < 2) || (ud.multimode > 1 && ud.coop == 1))
                         {
                             sprite[i].xrepeat = sprite[i].yrepeat = 0;
-                            sprite[i].cstat = SLT = SHT = 0;
+                            sprite[i].cstat = sprite[i].lotag = sprite[i].hitag = 0;
                             return i;
                         }
                     }
-                    CS |= 257;
-                    if (sprite[i].pal && PN != ACCESSSWITCH && PN != ACCESSSWITCH2)
+                    sprite[i].cstat |= 257;
+                    if (sprite[i].pal && sprite[i].picnum != ACCESSSWITCH && sprite[i].picnum != ACCESSSWITCH2)
                         sprite[i].pal = 0;
                     return i;
                 }
 
-                if (SHT)
+                if (sprite[i].hitag)
                 {
                     changespritestat(i, 12);
-                    CS |= 257;
-                    SH = impact_damage;
+                    sprite[i].cstat |= 257;
+                    sprite[i].extra = impact_damage;
                     return i;
                 }
             }
 
-        s = PN;
+        s = sprite[i].picnum;
 
-        if (CS & 1)
-            CS |= 256;
+        if (sprite[i].cstat & 1)
+            sprite[i].cstat |= 256;
 
         if (actorscrptr[s])
         {
-            SH = *(actorscrptr[s]);
+            sprite[i].extra = *(actorscrptr[s]);
             T5 = *(actorscrptr[s] + 1);
             T2 = *(actorscrptr[s] + 2);
-            if (*(actorscrptr[s] + 3) && SHT == 0)
-                SHT = *(actorscrptr[s] + 3);
+            if (*(actorscrptr[s] + 3) && sprite[i].hitag == 0)
+                sprite[i].hitag = *(actorscrptr[s] + 3);
         }
         else
             T2 = T5 = 0;
@@ -2631,11 +2632,11 @@ short spawn(short j, short pn)
         {
             if (sector[sprite[j].sectnum].lotag == 2)
             {
-                sp->z = getceilzofslope(SECT,SX,SY) + (16 << 8);
+                sp->z = getceilzofslope(sprite[i].sectnum,sprite[i].x,sprite[i].y) + (16 << 8);
                 sp->cstat |= 8;
             }
             else if (sector[sprite[j].sectnum].lotag == 1)
-                sp->z = getflorzofslope(SECT,SX,SY);
+                sp->z = getflorzofslope(sprite[i].sectnum,sprite[i].x,sprite[i].y);
         }
 
         if (sector[sect].floorpicnum == FLOORSLIME ||
@@ -2813,7 +2814,7 @@ short spawn(short j, short pn)
             }
         }
 
-        if (sector[SECT].lotag == 1)
+        if (sector[sprite[i].sectnum].lotag == 1)
         {
             changespritestat(i, STAT_MISC);
             break;
@@ -3297,7 +3298,7 @@ short spawn(short j, short pn)
         s = headspritestat[0];
         while (s >= 0)
         {
-            if (sprite[s].picnum == CRANEPOLE && SHT == (sprite[s].hitag))
+            if (sprite[s].picnum == CRANEPOLE && sprite[i].hitag == (sprite[s].hitag))
             {
                 msy[tempwallptr + 2] = s;
 
@@ -3604,7 +3605,7 @@ short spawn(short j, short pn)
         if (sp->picnum == REACTOR || sp->picnum == REACTOR2)
             sp->extra = impact_damage;
 
-        CS |= 257; // Make it hitable
+        sprite[i].cstat |= 257; // Make it hitable
 
         if (ud.multimode < 2 && sp->pal != 0)
         {
@@ -3613,7 +3614,7 @@ short spawn(short j, short pn)
             break;
         }
         sp->pal = 0;
-        SS = -17;
+        sprite[i].shade = -17;
 
         changespritestat(i, 2);
         break;
@@ -3701,14 +3702,14 @@ short spawn(short j, short pn)
         break;
 
     case WATERFOUNTAIN:
-        SLT = 1;
+        sprite[i].lotag = 1;
 
     case TREE1:
     case TREE2:
     case TIRE:
     case CONE:
     case BOX:
-        CS = 257; // Make it hitable
+        sprite[i].cstat = 257; // Make it hitable
         sprite[i].extra = 1;
         changespritestat(i, STAT_STANDABLE);
         break;
@@ -3780,16 +3781,16 @@ short spawn(short j, short pn)
             {
                 for (j = 0; j < MAXSPRITES; j++)
                     if (sprite[j].statnum < MAXSTATUS && sprite[j].picnum == SECTOREFFECTOR && (sprite[j].lotag == 7 ||
-                        sprite[j].lotag == 23) && i != j && sprite[j].hitag == SHT)
+                        sprite[j].lotag == 23) && i != j && sprite[j].hitag == sprite[i].hitag)
                     {
-                        OW = j;
+                        sprite[i].owner = j;
                         break;
                     }
             }
             else
-                OW = i;
+                sprite[i].owner = i;
 
-            T5 = sector[sect].floorz == SZ;
+            T5 = sector[sect].floorz == sprite[i].z;
             sp->cstat = 0;
             changespritestat(i, STAT_TRANSPORT);
             return i;
@@ -4578,7 +4579,7 @@ void animatesprites(long x, long y, short a, long smoothratio)
             continue;
         case VIEWSCREEN:
         case VIEWSCREEN2:
-            if (camsprite >= 0 && hittype[OW].temp_data[0] == 1)
+            if (camsprite >= 0 && hittype[sprite[i].owner].temp_data[0] == 1)
             {
                 t->picnum = STATIC;
                 t->cstat |= (rand() & 12);
@@ -8680,8 +8681,8 @@ void lotsofglass(short i, short wallnum, short n)
     {
         for (j = n - 1; j >= 0; j--)
         {
-            a = SA - 256 + (TRAND & 511) + 1024;
-            EGS(SECT,SX,SY,SZ,GLASSPIECES + (j % 3), -32, 36, 36, a, 32 + (TRAND & 63), 1024 - (TRAND & 1023), i, STAT_MISC);
+            a = sprite[i].ang - 256 + (TRAND & 511) + 1024;
+            EGS(sprite[i].sectnum,sprite[i].x,sprite[i].y,sprite[i].z,GLASSPIECES + (j % 3), -32, 36, 36, a, 32 + (TRAND & 63), 1024 - (TRAND & 1023), i, STAT_MISC);
         }
         return;
     }
@@ -8710,9 +8711,9 @@ void lotsofglass(short i, short wallnum, short n)
         {
             z = sector[sect].floorz - (TRAND & (klabs(sector[sect].ceilingz - sector[sect].floorz)));
             if (z < -(32 << 8) || z > (32 << 8))
-                z = SZ - (32 << 8) + (TRAND & ((64 << 8) - 1));
-            a = SA - 1024;
-            EGS(SECT, x1, y1, z,GLASSPIECES + (j % 3), -32, 36, 36, a, 32 + (TRAND & 63), -(TRAND & 1023), i, STAT_MISC);
+                z = sprite[i].z - (32 << 8) + (TRAND & ((64 << 8) - 1));
+            a = sprite[i].ang - 1024;
+            EGS(sprite[i].sectnum, x1, y1, z,GLASSPIECES + (j % 3), -32, 36, 36, a, 32 + (TRAND & 63), -(TRAND & 1023), i, STAT_MISC);
         }
     }
 }
@@ -8724,8 +8725,8 @@ void spriteglass(short i, short n)
     for (j = n; j > 0; j--)
     {
         a = TRAND & 2047;
-        z = SZ - ((TRAND & 16) << 8);
-        k = EGS(SECT,SX,SY, z,GLASSPIECES + (j % 3),TRAND & 15, 36, 36, a, 32 + (TRAND & 63), -512 - (TRAND & 2047), i,
+        z = sprite[i].z - ((TRAND & 16) << 8);
+        k = EGS(sprite[i].sectnum,sprite[i].x,sprite[i].y, z,GLASSPIECES + (j % 3),TRAND & 15, 36, 36, a, 32 + (TRAND & 63), -512 - (TRAND & 2047), i,
                 5);
         sprite[k].pal = sprite[i].pal;
     }
@@ -8769,7 +8770,7 @@ void lotsofcolourglass(short i, short wallnum, short n)
         for (j = n - 1; j >= 0; j--)
         {
             a = TRAND & 2047;
-            k = EGS(SECT,SX,SY,SZ - (TRAND & (63 << 8)),GLASSPIECES + (j % 3), -32, 36, 36, a, 32 + (TRAND & 63),
+            k = EGS(sprite[i].sectnum,sprite[i].x,sprite[i].y,sprite[i].z - (TRAND & (63 << 8)),GLASSPIECES + (j % 3), -32, 36, 36, a, 32 + (TRAND & 63),
                     1024 - (TRAND & 2047), i, 5);
             sprite[k].pal = TRAND & 15;
         }
@@ -8791,9 +8792,9 @@ void lotsofcolourglass(short i, short wallnum, short n)
         updatesector(x1, y1, &sect);
         z = sector[sect].floorz - (TRAND & (klabs(sector[sect].ceilingz - sector[sect].floorz)));
         if (z < -(32 << 8) || z > (32 << 8))
-            z = SZ - (32 << 8) + (TRAND & ((64 << 8) - 1));
-        a = SA - 1024;
-        k = EGS(SECT, x1, y1, z,GLASSPIECES + (j % 3), -32, 36, 36, a, 32 + (TRAND & 63), -(TRAND & 2047), i, STAT_MISC);
+            z = sprite[i].z - (32 << 8) + (TRAND & ((64 << 8) - 1));
+        a = sprite[i].ang - 1024;
+        k = EGS(sprite[i].sectnum, x1, y1, z,GLASSPIECES + (j % 3), -32, 36, 36, a, 32 + (TRAND & 63), -(TRAND & 2047), i, STAT_MISC);
         sprite[k].pal = TRAND & 7;
     }
 }
