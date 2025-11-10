@@ -59,6 +59,8 @@ int probe(int x, int y, int i, int n)
 
 int menutext(int x, int y, short s, short p, char* t)
 {
+    puts(t);
+    return;//
     short i, ac, centre;
 
     y -= 12;

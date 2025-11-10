@@ -43,7 +43,7 @@ void cachespritenum(short i)
     char maxc;
     short j;
 
-    if(ud.monsters_off && badguy(&sprite[i])) return;
+    if(ud.monsters_off && isBadGuy(&sprite[i])) return;
 
     maxc = 1;
 

@@ -35,6 +35,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "gamedefs.h"
 #include "global.h"
 #include "_functio.h"
+#include "dukewrap.h"
 
 char * gamefunctions[] =
 {
@@ -261,7 +262,7 @@ char isaltok(char c)
 {
     return ( isalnum(c) || c == '{' || c == '}' || c == '/' || c == '*' || c == '-' || c == '_' || c == '.');
 }
-
+// vertical collision parsing, handling ceil floor and sprite on sprite collisions, as if jumping on someone.
 void getglobalz(short i)
 {
     long hz,lz,zr;
@@ -279,7 +280,7 @@ void getglobalz(short i)
         if( (lz&49152) == 49152 && (sprite[lz&(MAXSPRITES-1)].cstat&48) == 0 )
         {
             lz &= (MAXSPRITES-1);
-            if( badguy(&sprite[lz]) && sprite[lz].pal != 1)
+            if( isBadGuy(&sprite[lz]) && sprite[lz].pal != 1)
             {
                 if( s->statnum != 4 )
                 {
@@ -288,7 +289,7 @@ void getglobalz(short i)
                     ssp(i,CLIPMASK0);
                 }
             }
-            else if(sprite[lz].picnum == APLAYER && badguy(s) )
+            else if(sprite[lz].picnum == APLAYER && isBadGuy(s) )
             {
                 hittype[i].dispicnum = -4; // No shadows on actors
                 s->xvel = -256;
@@ -1868,7 +1869,7 @@ void move()
 
     if( g_t[1] == 0 || a == 0 )
     {
-        if( ( badguy(g_sp) && g_sp->extra <= 0 ) || (hittype[g_i].bposx != g_sp->x) || (hittype[g_i].bposy != g_sp->y) )
+        if( ( isBadGuy(g_sp) && g_sp->extra <= 0 ) || (hittype[g_i].bposx != g_sp->x) || (hittype[g_i].bposy != g_sp->y) )
         {
             hittype[g_i].bposx = g_sp->x;
             hittype[g_i].bposy = g_sp->y;
@@ -1890,7 +1891,7 @@ void move()
 
     if(g_sp->xvel > -6 && g_sp->xvel < 6 ) g_sp->xvel = 0;
 
-    a = badguy(g_sp);
+    a = isBadGuy(g_sp);
 
     if(g_sp->xvel || g_sp->zvel)
     {
@@ -2047,7 +2048,7 @@ char parse()
             {
                 short temphit, sclip, angdif;
 
-                if( badguy(g_sp) && g_sp->xrepeat > 56 )
+                if( isBadGuy(g_sp) && g_sp->xrepeat > 56 )
                 {
                     sclip = 3084;
                     angdif = 48;
@@ -2350,7 +2351,7 @@ char parse()
                 {
                     g_sp->z = hittype[g_i].floorz - FOURSLEIGHT;
 
-                    if( badguy(g_sp) || ( g_sp->picnum == APLAYER && g_sp->owner >= 0) )
+                    if( isBadGuy(g_sp) || ( g_sp->picnum == APLAYER && g_sp->owner >= 0) )
                     {
 
                         if( g_sp->zvel > 3084 && g_sp->extra <= 1)
@@ -2923,7 +2924,7 @@ char parse()
             parseifelse( dodge(g_sp) == 1);
             break;
         case 71:
-            if( badguy(g_sp) )
+            if( isBadGuy(g_sp) )
                 parseifelse( ud.respawn_monsters );
             else if( inventory(g_sp) )
                 parseifelse( ud.respawn_inventory );
@@ -3113,7 +3114,7 @@ void execute(short i,short p,long x)
 
     if(g_sp->sectnum < 0 || g_sp->sectnum >= MAXSECTORS)
     {
-        if(badguy(g_sp))
+        if(isBadGuy(g_sp))
             ps[g_p].actors_killed++;
         deletesprite(g_i);
         return;
@@ -3148,7 +3149,7 @@ void execute(short i,short p,long x)
 
         if( g_sp->statnum == 1)
         {
-            if( badguy(g_sp) )
+            if( isBadGuy(g_sp) )
             {
                 if( g_sp->xrepeat > 60 ) return;
                 if( ud.respawn_monsters == 1 && g_sp->extra <= 0 ) return;

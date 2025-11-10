@@ -38,9 +38,11 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #define MAXPALOOKUPS 256
 #define MAXPSKYTILES 256
 #define MAXSPRITESONSCREEN 1024
+//dawalclipmask = (cliptype & 65535); for clip0 = 1; for clip1 = 64
+//dasprclipmask = (cliptype >> 16); for clip0 = 1; for clip1 = 256
 
-#define CLIPMASK0 (((1L)<<16)+1L)
-#define CLIPMASK1 (((256L)<<16)+64L)
+#define CLIPMASK0 (((1L)<<16)+1L) // 65537
+#define CLIPMASK1 (((256L)<<16)+64L) // 0b1000000000000000001000000 // 16777280
 
 	//Make all variables in BUILD.H defined in the ENGINE,
 	//and externed in GAME
@@ -62,20 +64,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 //   bits 7-15: reserved
 
 	//40 bytes
-typedef struct
-{
-	short wallptr, wallnum;
-	long ceilingz, floorz;
-	short ceilingstat, floorstat;
-	short ceilingpicnum, ceilingheinum;
-	signed char ceilingshade;
-	char ceilingpal, ceilingxpanning, ceilingypanning;
-	short floorpicnum, floorheinum;
-	signed char floorshade;
-	char floorpal, floorxpanning, floorypanning;
-	char visibility, filler;
-	short lotag, hitag, extra;
-} sectortype;
+
 
 //cstat:
 //   bit 0: 1 = Blocking wall (use with clipmove, getzrange)         "B"
@@ -91,15 +80,7 @@ typedef struct
 //   bits 10-15: reserved
 
 	//32 bytes
-typedef struct
-{
-	long x, y;
-	short point2, nextwall, nextsector, cstat;
-	short picnum, overpicnum;
-	signed char shade;
-	char pal, xrepeat, yrepeat, xpanning, ypanning;
-	short lotag, hitag, extra;
-} walltype;
+
 
 //cstat:
 //   bit 0: 1 = Blocking sprite (use with clipmove, getzrange)       "B"

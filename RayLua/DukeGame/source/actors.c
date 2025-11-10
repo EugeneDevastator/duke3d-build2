@@ -413,7 +413,7 @@ long ifsquished(short i, short p)
     {
         FTA(10,&ps[p]);
 
-        if(badguy(&sprite[i])) sprite[i].xvel = 0;
+        if(isBadGuy(&sprite[i])) sprite[i].xvel = 0;
 
         if(sprite[i].pal == 1)
         {
@@ -502,12 +502,12 @@ void hitradius( short i, long  r, long  hp1, long  hp2, long  hp3, long  hp4 )
                 if( s->picnum != SHRINKSPARK || (sj->cstat&257) )
                     if( dist( s, sj ) < r )
                     {
-                        if( badguy(sj) && !cansee( sj->x, sj->y,sj->z+q, sj->sectnum, s->x, s->y, s->z+q, s->sectnum) )
+                        if( isBadGuy(sj) && !cansee( sj->x, sj->y,sj->z+q, sj->sectnum, s->x, s->y, s->z+q, s->sectnum) )
                             goto BOLT;
                         checkhitsprite( j, i );
                     }
             }
-            else if( sj->extra >= 0 && sj != s && ( sj->picnum == TRIPBOMB || badguy(sj) || sj->picnum == QUEBALL || sj->picnum == STRIPEBALL || (sj->cstat&257) || sj->picnum == DUKELYINGDEAD ) )
+            else if( sj->extra >= 0 && sj != s && ( sj->picnum == TRIPBOMB || isBadGuy(sj) || sj->picnum == QUEBALL || sj->picnum == STRIPEBALL || (sj->cstat&257) || sj->picnum == DUKELYINGDEAD ) )
             {
                 if( s->picnum == SHRINKSPARK && sj->picnum != SHARK && ( j == s->owner || sj->xrepeat < 24 ) )
                 {
@@ -614,7 +614,7 @@ int movesprite(short spritenum, long xchange, long ychange, long zchange, unsign
     short retval, dasectnum, a, cd;
     char bg;
 
-    bg = badguy(&sprite[spritenum]);
+    bg = isBadGuy(&sprite[spritenum]);
 
     if(sprite[spritenum].statnum == 5 || (bg && sprite[spritenum].xrepeat < 4 ) )
     {
@@ -727,7 +727,7 @@ void lotsofmoney(spritetype *s, short n)
     short i ,j;
     for(i=n;i>0;i--)
     {
-        j = EGS(s->sectnum,s->x,s->y,s->z-(TRAND%(47<<8)),MONEY,-32,8,8,TRAND&2047,0,0,0,5);
+        j = EGS(s->sectnum,s->x,s->y,s->z-(TRAND%(47<<8)),MONEY,-32,8,8,TRAND&2047,0,0,0,STAT_MISC);
         sprite[j].cstat = TRAND&12;
     }
 }
@@ -737,7 +737,7 @@ void lotsofmail(spritetype *s, short n)
     short i ,j;
     for(i=n;i>0;i--)
     {
-        j = EGS(s->sectnum,s->x,s->y,s->z-(TRAND%(47<<8)),MAIL,-32,8,8,TRAND&2047,0,0,0,5);
+        j = EGS(s->sectnum,s->x,s->y,s->z-(TRAND%(47<<8)),MAIL,-32,8,8,TRAND&2047,0,0,0,STAT_MISC);
         sprite[j].cstat = TRAND&12;
     }
 }
@@ -747,7 +747,7 @@ void lotsofpaper(spritetype *s, short n)
     short i ,j;
     for(i=n;i>0;i--)
     {
-        j = EGS(s->sectnum,s->x,s->y,s->z-(TRAND%(47<<8)),PAPER,-32,8,8,TRAND&2047,0,0,0,5);
+        j = EGS(s->sectnum,s->x,s->y,s->z-(TRAND%(47<<8)),PAPER,-32,8,8,TRAND&2047,0,0,0,STAT_MISC);
         sprite[j].cstat = TRAND&12;
     }
 }
@@ -761,7 +761,7 @@ void guts(spritetype *s,short gtype, short n, short p)
     char sx,sy;
     signed char pal;
 
-    if(badguy(s) && s->xrepeat < 16)
+    if(isBadGuy(s) && s->xrepeat < 16)
         sx = sy = 8;
     else sx = sy = 32;
 
@@ -774,14 +774,15 @@ void guts(spritetype *s,short gtype, short n, short p)
     if(s->picnum == COMMANDER)
         gutz -= (24<<8);
 
-    if( badguy(s) && s->pal == 6)
+    if( isBadGuy(s) && s->pal == 6)
         pal = 6;
     else pal = 0;
 
     for(j=0;j<n;j++)
     {
         a = TRAND&2047;
-        i = EGS(s->sectnum,s->x+(TRAND&255)-128,s->y+(TRAND&255)-128,gutz-(TRAND&8191),gtype,-32,sx,sy,a,48+(TRAND&31),-512-(TRAND&2047),ps[p].i,5);
+        i = EGS(s->sectnum,s->x+(TRAND&255)-128,s->y+(TRAND&255)-128,gutz-(TRAND&8191),gtype,-32,sx,sy,a,48+(TRAND&31),-512-(TRAND&2047),ps[p].i,STAT_MISC);
+
         if(PN == JIBS2)
         {
             sprite[i].xrepeat >>= 2;
@@ -798,7 +799,7 @@ void gutsdir(spritetype *s,short gtype, short n, short p)
     short i,a,j;
     char sx,sy;
 
-    if(badguy(s) && s->xrepeat < 16)
+    if(isBadGuy(s) && s->xrepeat < 16)
         sx = sy = 8;
     else sx = sy = 32;
 
@@ -814,7 +815,7 @@ void gutsdir(spritetype *s,short gtype, short n, short p)
     for(j=0;j<n;j++)
     {
         a = TRAND&2047;
-        i = EGS(s->sectnum,s->x,s->y,gutz,gtype,-32,sx,sy,a,256+(TRAND&127),-512-(TRAND&2047),ps[p].i,5);
+        i = EGS(s->sectnum,s->x,s->y,gutz,gtype,-32,sx,sy,a,256+(TRAND&127),-512-(TRAND&2047),ps[p].i,STAT_MISC);
     }
 }
 
@@ -913,7 +914,7 @@ void movefta()
                 hittype[i].timetosleep++;
                 if( hittype[i].timetosleep >= (x>>8) )
                 {
-                    if(badguy(s))
+                    if(isBadGuy(s))
                     {
                         px = ps[p].oposx+64-(TRAND&127);
                         py = ps[p].oposy+64-(TRAND&127);
@@ -970,7 +971,7 @@ void movefta()
                     else hittype[i].timetosleep = 0;
                 }
             }
-            if( badguy( s ) )
+            if( isBadGuy( s ) )
             {
                 if (sector[s->sectnum].ceilingstat&1)
                     s->shade = sector[s->sectnum].ceilingshade;
@@ -985,7 +986,7 @@ short ifhitsectors(short sectnum)
 {
     short i;
 
-    i = headspritestat[5];
+    i = headspritestat[STAT_MISC];
     while(i >= 0)
     {
         if( PN == EXPLOSION2 && sectnum == SECT )
@@ -1780,7 +1781,7 @@ void movestandables()
                     sprite[j].xvel = 348;
                     ssp(j,CLIPMASK0);
 
-                    j = headspritestat[5];
+                    j = headspritestat[STAT_MISC];
                     while(j >= 0)
                     {
                         if(sprite[j].picnum == LASERLINE && s->hitag == sprite[j].hitag)
@@ -1920,7 +1921,7 @@ void movestandables()
 
             for(k=0;k<16;k++)
             {
-                j = EGS(SECT,SX,SY,SZ-(TRAND%(48<<8)),SCRAP3+(TRAND&3),-8,48,48,TRAND&2047,(TRAND&63)+64,-(TRAND&4095)-(sprite[i].zvel>>2),i,5);
+                j = EGS(SECT,SX,SY,SZ-(TRAND%(48<<8)),SCRAP3+(TRAND&3),-8,48,48,TRAND&2047,(TRAND&63)+64,-(TRAND&4095)-(sprite[i].zvel>>2),i,STAT_MISC);
                 sprite[j].pal = 2;
             }
 
@@ -2464,7 +2465,7 @@ void moveweapons()
                 if(T2 > 2047) KILLIT(i);
 
                 if(sprite[s->owner].statnum == MAXSTATUS)
-                    if(badguy(&sprite[s->owner]) == 0)
+                    if(isBadGuy(&sprite[s->owner]) == 0)
                         KILLIT(i);
 
                 s->ang = sprite[s->owner].ang;
@@ -2601,7 +2602,7 @@ void moveweapons()
                         j &= (MAXSPRITES-1);
 
                         if(s->picnum == FREEZEBLAST && sprite[j].pal == 1 )
-                            if( badguy(&sprite[j]) || sprite[j].picnum == APLAYER )
+                            if( isBadGuy(&sprite[j]) || sprite[j].picnum == APLAYER )
                         {
                             j = spawn(i,TRANSPORTERSTAR);
                             sprite[j].pal = 1;
@@ -2785,7 +2786,7 @@ void movetransports()
     short i, j, k, l, p, sect, sectlotag, nexti, nextj, nextk;
     long ll,onfloorz,q;
 
-    i = headspritestat[9]; //Transporters
+    i = headspritestat[STAT_TRANSPORT]; //Transporters
 
     while(i >= 0)
     {
@@ -3380,7 +3381,7 @@ void moveactors()
                 }
                 else if(t[2] > 10)
                 {
-                    j = headspritestat[5];
+                    j = headspritestat[STAT_MISC];
                     while(j >= 0)
                     {
                         if(sprite[j].owner == i && sprite[j].picnum == FORCESPHERE)
@@ -3645,7 +3646,7 @@ void moveactors()
                         if(j == FREEZEBLAST) goto BOLT;
                         for(j=16; j >= 0 ;j--)
                         {
-                            k = EGS(SECT,SX,SY,SZ,GLASSPIECES+(j%3),-32,36,36,TRAND&2047,32+(TRAND&63),1024-(TRAND&1023),i,5);
+                            k = EGS(SECT,SX,SY,SZ,GLASSPIECES+(j%3),-32,36,36,TRAND&2047,32+(TRAND&63),1024-(TRAND&1023),i,STAT_MISC);
                             sprite[k].pal = 1;
                         }
                         spritesound(GLASS_BREAKING,i);
@@ -3682,7 +3683,7 @@ void moveactors()
                     {
                         for(x=0;x<8;x++)
                         {
-                            j = EGS(sect,s->x,s->y,s->z-(8<<8),SCRAP3+(TRAND&3),-8,48,48,TRAND&2047,(TRAND&63)+64,-(TRAND&4095)-(s->zvel>>2),i,5);
+                            j = EGS(sect,s->x,s->y,s->z-(8<<8),SCRAP3+(TRAND&3),-8,48,48,TRAND&2047,(TRAND&63)+64,-(TRAND&4095)-(s->zvel>>2),i,STAT_MISC);
                             sprite[j].pal = 6;
                         }
 
@@ -3795,7 +3796,7 @@ void moveactors()
 
                         for(x=0;x<8;x++)
                         {
-                            j = EGS(sect,s->x,s->y,s->z-(8<<8),SCRAP3+(TRAND&3),-8,48,48,TRAND&2047,(TRAND&63)+64,-(TRAND&4095)-(s->zvel>>2),i,5);
+                            j = EGS(sect,s->x,s->y,s->z-(8<<8),SCRAP3+(TRAND&3),-8,48,48,TRAND&2047,(TRAND&63)+64,-(TRAND&4095)-(s->zvel>>2),i,STAT_MISC);
                             sprite[j].pal = 6;
                         }
                         t[0] = -3;
@@ -4367,7 +4368,7 @@ void moveactors()
 
 
 // #ifndef VOLOMEONE
-        if( ud.multimode < 2 && badguy(s) )
+        if( ud.multimode < 2 && isBadGuy(s) )
         {
             if( actor_tog == 1)
             {
@@ -4396,7 +4397,7 @@ void moveexplosions()  // STATNUM 5
     long l, x, *t;
     spritetype *s;
 
-    i = headspritestat[5];
+    i = headspritestat[STAT_MISC];
     while(i >= 0)
     {
         nexti = nextspritestat[i];
@@ -4595,7 +4596,7 @@ void moveexplosions()  // STATNUM 5
                     insertspriteq(i);
                     PN ++;
 
-                    j = headspritestat[5];
+                    j = headspritestat[STAT_MISC];
                     while(j >= 0)
                     {
                         if(sprite[j].picnum == BLOODPOOL)
@@ -5325,7 +5326,7 @@ void moveeffectors()   //STATNUM 3
                         while(j >= 0)
                         {
                             l = nextspritesect[j];
-                            if (sprite[j].statnum == 1 && badguy(&sprite[j]) && sprite[j].picnum != SECTOREFFECTOR && sprite[j].picnum != LOCATORS )
+                            if (sprite[j].statnum == 1 && isBadGuy(&sprite[j]) && sprite[j].picnum != SECTOREFFECTOR && sprite[j].picnum != LOCATORS )
                             {
                                 k = sprite[j].sectnum;
                                 updatesector(sprite[j].x,sprite[j].y,&k);
@@ -5497,7 +5498,7 @@ void moveeffectors()   //STATNUM 3
                         while(j >= 0)
                         {
                             l = nextspritesect[j];
-                            if (sprite[j].statnum == 1 && badguy(&sprite[j]) && sprite[j].picnum != SECTOREFFECTOR && sprite[j].picnum != LOCATORS )
+                            if (sprite[j].statnum == 1 && isBadGuy(&sprite[j]) && sprite[j].picnum != SECTOREFFECTOR && sprite[j].picnum != LOCATORS )
                             {
             //                    if(sprite[j].sectnum != s->sectnum)
                                 {
@@ -5890,7 +5891,7 @@ void moveeffectors()   //STATNUM 3
                         while(k >= 0)
                         {
                             if( sprite[k].extra > 0
-                                && badguy(&sprite[k])
+                                && isBadGuy(&sprite[k])
                                 && clipinsidebox(sprite[k].x,sprite[k].y,j,256L) == 1 )
                                 goto BOLT;
                             k = nextspritestat[k];
