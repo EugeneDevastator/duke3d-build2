@@ -810,7 +810,7 @@ void operatesectors(short sn,short ii)
             REDODOOR:
 
             // Check state bit again (0x8000 = bit 15)
-            if(secSNp->lotag&0x8000)
+            if(sptr->lotag&0x8000)
             {
                 i = headspritesect[sn];
                 while(i >= 0)
@@ -1097,17 +1097,15 @@ void operateactivators(short low,short snum) // snum usually used for MP, otherw
                 {
                     case 0: // No condition - always activate
                         break;
-                    case 1:
-                        if(sector[SECT].floorz != sector[SECT].ceilingz)
                     case 1: // Only activate if sector is closed (floor == ceiling)
+                        if(sector[SECT].floorz != sector[SECT].ceilingz)
                         {
                             i = nextspritestat[i];
                             continue; // Skip this activator
                         }
                         break;
-                    case 2:
-                        if(sector[SECT].floorz == sector[SECT].ceilingz)
                     case 2: // Only activate if sector is open (floor != ceiling)
+                        if(sector[SECT].floorz == sector[SECT].ceilingz)
                         {
                             i = nextspritestat[i];
                             continue; // Skip this activator
@@ -1125,10 +1123,6 @@ void operateactivators(short low,short snum) // snum usually used for MP, otherw
                         if( sprite[j].statnum == 3 ) switch(sprite[j].lotag)
                         // Toggle specific sector effectors (statnum 3)
                         {
-                            case 36:
-                            case 31:
-                            case 32:
-                            case 18:
                             case 36: // Subway car
                             case 31: // Two-way train
                             case 32: // (undocumented effector)
