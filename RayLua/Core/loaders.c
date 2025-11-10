@@ -348,7 +348,11 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				(fileid == 0x00000cbe))   //Cubes5 .CUB format
 	{
 			//Build1 format variables:
-		typedef struct { short picnum, heinum; signed char shade; char pal, xpanning, ypanning; } build7surf_t;
+			typedef struct {
+				short picnum, heinum;
+				signed char shade;
+				char pal, xpanning, ypanning;
+			} build7surf_t;
 		typedef struct
 		{
 			short wallptr, wallnum;
@@ -482,6 +486,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				sec[i].n = sec[i].nmax = b7sec.wallnum;
 				sec[i].wall = (wall_t *)realloc(sec[i].wall,sec[i].nmax*sizeof(wall_t));
 				memset(sec[i].wall,0,sec[i].nmax*sizeof(wall_t));
+
 				for(j=0;j<2;j++)
 				{
 					sec[i].z[j] = ((float)b7sec.z[j])*(1.f/(512.f*16.f));

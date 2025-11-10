@@ -4,6 +4,7 @@
 
 #ifndef RAYLIB_LUA_IMGUI_SHARED_TYPES_H
 #define RAYLIB_LUA_IMGUI_SHARED_TYPES_H
+#include <stdint.h>
 
 typedef struct { float x, y, z; } point3d;
 typedef struct { double x, y, z; } dpoint3d; 	//Note: pol doesn't support loops as dpoint3d's!
@@ -30,6 +31,7 @@ typedef struct
 	long surfn;
 
 	surf_t surf, *xsurf; //additional malloced surfs when (surfn > 1)
+	uint16_t tags[16];
 } wall_t;
 
 typedef struct
@@ -47,6 +49,7 @@ typedef struct
 	union { long flags; struct { char _f1, _f2, _f3, pal; }; }; // temporary pal storage
 
 	long sect, sectn, sectp; //Current sector / doubly-linked list of indices
+	uint16_t tags[16];
 } spri_t;
 
 typedef struct
@@ -60,6 +63,7 @@ typedef struct
 	long headspri;   //head sprite index (-1 if none)
 	long foglev;
 	long owner;      //for dragging while editing, other effects during game
+	uint16_t tags[16];
 } sect_t;
 //--------------------------------------------------------------------------------------------------
 typedef struct
