@@ -737,7 +737,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				toRaylibInPlace(&spr->f);
 			}
 
-			toRaylibInPlace(&map->startpos);
+			//toRaylibInPlace(&map->startpos);
 		}
 		else //CUBES5 map format (.CUB extension)
 		{

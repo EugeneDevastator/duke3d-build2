@@ -21,6 +21,7 @@
 
 #include "DumbRender.hpp"
 //#include "luabinder.hpp"
+#include "DumbCore.hpp"
 #include "raymath.h"
 
 
@@ -158,7 +159,39 @@ void VisualizeMapstate() {
 }
 
 // Draw palette and texture preview on screen
+void MainLoop()
+{
+    DumbRender::Init();
+    auto map = DumbRender::GetMap();
+    DumbCore::Init(map);
+    //InitWindow(1024, 768, "Mapstate Visualizer");
+    SetTargetFPS(60);
 
+    while (!WindowShouldClose()) {
+        float deltaTime = GetFrameTime();
+        DumbCore::Update(deltaTime);
+
+        BeginDrawing();
+        ClearBackground(BLACK);
+
+        BeginMode3D(DumbCore::GetCamera());
+
+
+        DumbRender::DrawMapstateTex(DumbCore::GetCamera());
+        //   DumbRender::DrawMapstateLines();
+        EndMode3D();
+        // DumbRender::DrawPaletteAndTexture();
+
+        //DumbRender::TestRenderTextures();
+
+        DrawImgui();
+        DisableCursor();
+        DrawText("WASD: Move, Mouse: Look", 10, 10, 20, WHITE);
+        DrawFPS(10, 40);
+
+        EndDrawing();
+    }
+}
 
 int main() {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
@@ -171,7 +204,8 @@ int main() {
    // FileWatcher watcher("script.lua");
     //LuaBinder::LoadScript();
 
-    VisualizeMapstate();
+    //VisualizeMapstate();
+    MainLoop();
     DumbRender::CleanupMapstateTex();
     return 0;
     //MapTest();
