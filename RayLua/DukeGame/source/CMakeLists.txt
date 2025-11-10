@@ -28,6 +28,7 @@ set(SOURCES
         sounds.c
         menues.c
         dukewrap.c
+        ../../interfaces/engineapi.c
 )
 
 # Header files (optional, for IDE support)
@@ -60,7 +61,8 @@ set(HEADERS
         task_man.h
         types.h
         _functio.h
-
+        ../../interfaces/engineapi.h
+        ../../interfaces/shared_types.h
         # Add more .h files here
 )
 

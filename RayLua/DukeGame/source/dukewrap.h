@@ -5,7 +5,7 @@
 #ifndef GAME_DUKEWRAP_H
 #define GAME_DUKEWRAP_H
 #include "types.h"
-
+#include "../../interfaces/engineapi.h"
 typedef struct
 {
     //set sprite position with sector correction
@@ -41,6 +41,6 @@ typedef struct
 
 extern dukewrapper bbeng; // bb= build 2
 
-void InitWrapper();
+void InitWrapper(engineapi_t* api);
 
 #endif //GAME_DUKEWRAP_H

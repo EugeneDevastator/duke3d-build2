@@ -2,6 +2,7 @@
 // Created by omnis on 11/6/2025.
 //
 #include "dukewrap.h"
+#include "../../interfaces/engineapi.h"
 
 #include <stdlib.h>
 dukewrapper bbeng;
@@ -42,7 +43,7 @@ spritetype ReadSprite(long i){
     return a;
 }
 // is it ok to store internal function in pointer?
-void InitWrapper() // pass in real api
+void InitWrapper(engineapi_t* api) // pass in real api
 {
     bbeng.SetSprPos = SetSprPos;
     bbeng.SetSprPosXY = SetSprPosXY;

@@ -145,6 +145,7 @@ set(CORE_SOURCES
         core/kplib.c
         Core/loaders.c
         Core/physics.c
+        interfaces/engineapi.c
 )
 
 set(CORE_HEADERS
@@ -155,6 +156,8 @@ set(CORE_HEADERS
         core/physics.h
         dumbrender.hpp
          DumbCore.hpp
+        interfaces/engineapi.h
+        interfaces/shared_types.h
 
 )
 if (NOT DISABLE_LUA)
