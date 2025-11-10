@@ -1,6 +1,7 @@
 #ifndef KEN_DRAWPOLY_H
 #define KEN_DRAWPOLY_H
-
+#include "Core/artloader.h"
+#include "Core/mapcore.h"
 #define RENDFLAGS_INTERP      (1<< 0) //nearest vs. bilinear interpolation
 #define RENDFLAGS_HEIGHT      (1<< 1) //flat vs. height mapped
 #define RENDFLAGS_COVSID      (1<< 2) //for heightmapped: cover sides
@@ -14,7 +15,7 @@
 #define RENDFLAGS_GMAT        (1<< 9) //!= : ouvmat acts as g_mat (overrides RENDFLAGS_OUVMAT)
 #define RENDFLAGS_NOTRCP      (1<<10) //!= : no translation, rotation, clip, and project
 #define RENDFLAGS_FLIPHEIGHT  (1<<11)
-
+/*
 typedef struct { float x, y, z; } point3d;
 typedef struct { double x, y, z; } dpoint3d;
 typedef struct { INT_PTR f, p, x, y; } tiletype;
@@ -25,8 +26,8 @@ typedef struct tiltyp {
 	float shsc;             // shsc=suggested height scale
 	tiltyp *lowermip;       // pointer to lower mipmap level
 } tiltyp;
-
-typedef struct { tiltyp c, z; point3d p, r, d, f, h; } cam_t;
+*/
+//typedef struct { tiltyp c, z; point3d p, r, d, f, h; } cam_t;
 typedef struct { float x, y, z, u, v; int n; } vertyp;
 
 extern double drawpoly_anginc; //Raycast resolution. Default: 2.0

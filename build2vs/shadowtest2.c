@@ -199,8 +199,8 @@ static _inline int lbound0 (int a, int b) //b MUST be >= 0
 	return((~(a>>31))&b);
 }
 
-static __forceinline unsigned int bsf (unsigned int a) { _asm bsf eax, a }
-static __forceinline unsigned int bsr (unsigned int a) { _asm bsr eax, a }
+// static __forceinline unsigned int bsf (unsigned int a) { _asm bsf eax, a }
+// static __forceinline unsigned int bsr (unsigned int a) { _asm bsr eax, a }
 static __forceinline int uptil1 (unsigned int *lptr, int z)
 {
 	//   //This line does the same thing (but slow & brute force)

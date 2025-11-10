@@ -98,20 +98,7 @@ EXTERN gamestate_t sst, pst, *gst;
 
 
 	//Build2 shared global variables:
-EXTERN struct
-{
-	double gammaval; //1.0=no change, useful range={0.0..~4.0)
-	//----------------------- DATA coming from BUILD2.C -----------------------
 
-		//Clipmove hit point info (use this after calling clipmove):
-	double clipmaxcr; //clipmove always calls findmaxcr even with no movement
-	dpoint3d cliphit[3];
-	long cliphitnum, clipsect[3], clipwall[3];
-
-	//----------------------- DATA provided to BUILD2.C -----------------------
-
-	double fattestsprite; //For sprite collision: when to cross sectors
-} build2;
 
 #pragma pack(pop)
 
@@ -157,7 +144,7 @@ extern void drawsprite (cam_t *cc, spri_t *spr);
 	//Physics functions:
 extern int build2_hitmove (int *cursect, dpoint3d *p, dpoint3d *v, double cr, int isslide, int *hitsect, int *hitwall);
 extern int hitscan (point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, int *hitwall, point3d *hit);
-extern double findmaxcr (dpoint3d *p0, int cursect, double mindist, dpoint3d *hit);
+//extern double findmaxcr (dpoint3d *p0, int cursect, double mindist, dpoint3d *hit);
 
 	//Math functions:
 extern void orthofit3x3 (point3d *v0, point3d *v1, point3d *v2);

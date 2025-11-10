@@ -41,7 +41,7 @@ void divconst_setdenom_intr (long *twolongstate, long denom)
 { twolongstate[0] = divconst_denom; divconst_denom = denom; }
 long divconst (long *twolongstate, long numer) { return(numer/twolongstate[0]); }
 #endif
-
+long nullpic [64+1][64];
 
 void scaletex_boxsum_intr (tiltyp *rt, tiltyp *wt)  // copy from drawpoly
 {
