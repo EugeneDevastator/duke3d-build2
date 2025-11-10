@@ -146,7 +146,7 @@ char recbuf[80];
 
 void allowtimetocorrecterrorswhenquitting()
 {
-    long i, j, oldtotalclock;
+   /* long i, j, oldtotalclock;
 
     ready2send = 0;
 
@@ -163,7 +163,7 @@ void allowtimetocorrecterrorswhenquitting()
         for (i = connecthead; i >= 0; i = connectpoint2[i])
             if (i != myconnectindex)
                 sendpacket(i, packbuf, 1);
-    }
+    }*/
 }
 
 #define MAXUSERQUOTES 4
@@ -780,13 +780,12 @@ void caches()
 
     k += 6;
 
-  // for (i = 1; i < 11; i++)
-  //     if (lumplockbyte[i] >= 200)
-  //     {
-  //         sprintf(tempbuf, "RTS Locked %ld:", i);
-  //         printext256(0L, k, 31, -1, tempbuf, 1);
-  //         k += 6;
-  //     }
+    //  for(i=1;i<11;i++)
+    //       if (lumplockbyte[i] >= 200)
+    //       {
+    //             sprintf(tempbuf,"RTS Locked %ld:",i);
+    //             printext256(0L,k,31,-1,tempbuf,1); k += 6;
+    //       }
 }
 
 
@@ -1242,6 +1241,7 @@ void operatefta()
 // Triggers a system message display:
 void FTA(short q, player_struct* p)
 {
+    printf("emitting quote %d",q);
     return; //
     if (ud.fta_on == 1)
     {
@@ -2130,7 +2130,10 @@ void displayrooms(short snum, long smoothratio)
     if (sect < 0 || sect >= MAXSECTORS) return;
 
     dointerpolations(smoothratio); // positional interp.
+// render
+    //    restoreinterpolations();
 
+    return;//
     if (false)
         animatecamsprite(); // render code for cam screen
 
@@ -2278,7 +2281,7 @@ void displayrooms(short snum, long smoothratio)
 
             if (wall[mirrorwall[i]].overpicnum == MIRROR)
             {
-                preparemirror(cposx, cposy, cposz, cang, choriz, mirrorwall[i], mirrorsector[i], &tposx, &tposy, &tang);
+                //preparemirror(cposx, cposy, cposz, cang, choriz, mirrorwall[i], mirrorsector[i], &tposx, &tposy, &tang);
 
                 j = visibility;
                 visibility = (j >> 1) + (j >> 2);
@@ -2290,7 +2293,7 @@ void displayrooms(short snum, long smoothratio)
                 display_mirror = 0;
 
                 drawmasks();
-                completemirror(); //Reverse screen x-wise in this function
+                //completemirror(); //Reverse screen x-wise in this function
                 visibility = j;
             }
             gotpic[MIRROR >> 3] &= ~(1 << (MIRROR & 7));
@@ -2565,7 +2568,7 @@ short spawn(short j, short pn)
             if (j == -1 && sp->lotag > ud.player_skill)
             {
                 sp->xrepeat = sp->yrepeat = 0;
-                changespritestat(i, 5);
+                changespritestat(i, STAT_MISC);
                 break;
             }
 
@@ -2578,7 +2581,7 @@ short spawn(short j, short pn)
                 if (ud.monsters_off == 1)
                 {
                     sp->xrepeat = sp->yrepeat = 0;
-                    changespritestat(i, 5);
+                    changespritestat(i, STAT_MISC);
                     break;
                 }
 
@@ -2593,7 +2596,7 @@ short spawn(short j, short pn)
                 {
                     if (sprite[j].picnum == RESPAWN)
                         hittype[i].tempang = sprite[i].pal = sprite[j].pal;
-                    changespritestat(i, 1);
+                    changespritestat(i, STAT_ACTOR);
                 }
                 else changespritestat(i, 2);
             }
@@ -2601,7 +2604,7 @@ short spawn(short j, short pn)
             {
                 sp->clipdist = 40;
                 sp->owner = i;
-                changespritestat(i, 1);
+                changespritestat(i, STAT_ACTOR);
             }
 
             hittype[i].timetosleep = 0;
@@ -5077,8 +5080,9 @@ char cheatquotes[NUMCHEATCODES][14] = {
 
 char cheatbuf[10], cheatbuflen;
 
-void cheats()
+void cheats(){}/*
 {
+    return;// ignore for now
     short ch, i, j, k, keystate, weapon;
 
     if ((ps[myconnectindex].gm & MODE_TYPE) || (ps[myconnectindex].gm & MODE_MENU))
@@ -5518,7 +5522,7 @@ void cheats()
             }
         }
     }
-}
+}*/
 
 
 long nonsharedtimer;
@@ -6361,6 +6365,7 @@ void cacheicon()
 
 void Logo()
 {
+    return;//
     short i, j, soundanm;
 
     soundanm = 0;
@@ -6572,7 +6577,7 @@ void Startup()
 
     // CTW - MODIFICATION
     // initengine(ScreenMode,ScreenWidth,ScreenHeight);
-    //  initengine();
+    initengine();
     // CTW END - MODIFICATION
     inittimer();
 
@@ -6710,9 +6715,9 @@ void RunDukeMap() // New Entry point copy of main
         todd[0] = 'T';
         sixteen[0] = 'D';
         trees[0] = 'I';
+        initgroupfile("duke3d.grp");
 
         totalmemory = 999999999999;
-
         Startup();
 
         if (numplayers > 1)
@@ -6747,7 +6752,7 @@ void RunDukeMap() // New Entry point copy of main
         }
 
         ud.last_level = -1;
-
+        ud.warp_on = 1;
         puts("Loading palette/lookups.");
 
         genspriteremaps();
@@ -6779,7 +6784,7 @@ void RunDukeMap() // New Entry point copy of main
 
         tempautorun = ud.auto_run;
 
-        if (ud.warp_on == 0 && playback())
+        if (ud.warp_on == 0 )//&& playback())
         {
             //  FX_StopAllSounds();
             //   clearsoundlocks();
@@ -6872,6 +6877,9 @@ void RunDukeMap() // New Entry point copy of main
 
 int main(int argc, char** argv)
 {
+    checkcommandline(argc, argv);
+    RunDukeMap();
+    return  0;
     long i, j, k, l;
     int32_t tempautorun;
 
