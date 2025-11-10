@@ -549,7 +549,18 @@ char activatewarpelevators(short s,short d) //Parm = sectoreffectornum
     return 0;
 }
 
+/*
+*0x8000 (32768): Used as state flag in bit 15 throughout the code
+0xff00: Masks upper 8 bits, clears lower 8 bits
+0xff: Masks lower 8 bits only
+>>1: Fast divide by 2 for midpoint calculations
+>>4: Extract upper nibble (divide by 16) for speed values
+^= 0x8000: XOR toggle of state bit
+&= 0x7fff: Clear bit 15 (0x7fff = 0111111111111111)
+|= 0x8000: Set bit 15
+The code uses bit 15 as a universal "state" flag across different door/sector types, allowing for open/closed states to be tracked efficiently.
 
+ */
 
 void operatesectors(short sn,short ii)
 {
@@ -608,6 +619,8 @@ void operatesectors(short sn,short ii)
             endwall = startwall+sptr->wallnum-1;
 
             sp = sptr->extra>>4;
+            // Extract speed from upper 4 bits of extra field
+            // >>4 is equivalent to /16, gets upper nibble
 
             //first find center point by averaging all points
             dax = 0L, day = 0L;
@@ -621,6 +634,7 @@ void operatesectors(short sn,short ii)
 
             //find any points with either same x or same y coordinate
             //  as center (dax, day) - should be 2 points found.
+            // This finds the "hinge" points of the door
             wallfind[0] = -1;
             wallfind[1] = -1;
             for(i=startwall;i<=endwall;i++)
@@ -638,10 +652,12 @@ void operatesectors(short sn,short ii)
                     //find what direction door should open by averaging the
                     //  2 neighboring points of wallfind[0] & wallfind[1].
                     i = wallfind[j]-1; if (i < startwall) i = endwall;
+                    // >>1 is divide by 2 for averaging
                     dax2 = ((wall[i].x+wall[wall[wallfind[j]].point2].x)>>1)-wall[wallfind[j]].x;
                     day2 = ((wall[i].y+wall[wall[wallfind[j]].point2].y)>>1)-wall[wallfind[j]].y;
                     if (dax2 != 0)
                     {
+                        // Complex wall chain traversal: wall->point2->point2 gets the wall 2 steps ahead
                         dax2 = wall[wall[wall[wallfind[j]].point2].point2].x;
                         dax2 -= wall[wall[wallfind[j]].point2].x;
                         setanimation(sn,&wall[wallfind[j]].x,wall[wallfind[j]].x+dax2,sp);
@@ -715,7 +731,7 @@ void operatesectors(short sn,short ii)
             return;
 
         case 16:
-        case 17:
+        case 17:  // elev platform up
 
             i = getanimationgoal(&sptr->floorz);
 
@@ -762,6 +778,8 @@ void operatesectors(short sn,short ii)
 
             if(sptr->lotag&0x8000)
                 j = sector[nextsectorneighborz(sn,sptr->ceilingz,1,1)].floorz;
+            // Check bit 15 (0x8000 = 32768) to determine door state
+            // This is a common pattern - using high bit as state flag
             else
                 j = sector[nextsectorneighborz(sn,sptr->ceilingz,-1,-1)].ceilingz;
 
@@ -791,7 +809,8 @@ void operatesectors(short sn,short ii)
 
             REDODOOR:
 
-            if(sptr->lotag&0x8000)
+            // Check state bit again (0x8000 = bit 15)
+            if(secSNp->lotag&0x8000)
             {
                 i = headspritesect[sn];
                 while(i >= 0)
@@ -931,8 +950,9 @@ void operatesectors(short sn,short ii)
                 {
                     if( SLT == 15 )
                     {
+                        // Toggle door state
                         sector[SECT].lotag ^= 0x8000; // Toggle the open or close
-                        SA += 1024;
+                        SA += 1024;  // Rotate sprite angle (1024 = 90 degrees in Build engine)
                         if(T5) callsound(SECT,i);
                         callsound(SECT,i);
                         if(sector[SECT].lotag&0x8000) T5 = 1;
@@ -948,9 +968,11 @@ void operatesectors(short sn,short ii)
             j = headspritestat[3];
             while(j >= 0)
             {
+                // Mask with 0xff to get lower 8 bits only
                 if( (sprite[j].lotag&0xff)==20 && sprite[j].sectnum == sn) //Bridge
                 {
 
+                    // Toggle bridge state
                     sector[sn].lotag ^= 0x8000;
                     if(sector[sn].lotag&0x8000) //OPENING
                         hittype[j].temp_data[0] = 1;
@@ -969,6 +991,7 @@ void operatesectors(short sn,short ii)
             j = headspritesect[sn];
             while(j >= 0)
             {
+                // Check lower 8 bits only with mask
                 if(sprite[j].statnum==3 && (sprite[j].lotag&0xff)==21)
                     break; //Found it
                 j = nextspritesect[j];
@@ -979,6 +1002,7 @@ void operatesectors(short sn,short ii)
             l = headspritestat[3];
             while(l >= 0)
             {
+                // Activate all matching sector effectors
                 if( (sprite[l].lotag&0xff)==21 && !hittype[l].temp_data[0] &&
                     (sprite[l].hitag) == j )
                     hittype[l].temp_data[0] = 1;
@@ -1015,39 +1039,49 @@ void operaterespawns(short low)
     }
 }
 
-void operateactivators(short low,short snum)
+void operateactivators(short low,short snum) // snum usually used for MP, otherwise -1
 {
     short i, j, k, *p, nexti;
     walltype *wal;
 
+    // === CYCLER PROCESSING SECTION ===
+    // Handle light pulsation effects - iterate backwards through cycler array
     for(i=numcyclers-1;i>=0;i--)
     {
-        p = &cyclers[i][0];
+        p = &cyclers[i][0]; // Get pointer to cycler data array
 
-        if(p[4] == low)
+        if(p[4] == low) // Check if cycler's lotag matches activation tag
         {
-            p[5] = !p[5];
+            p[5] = !p[5]; // Toggle cycler state (on/off)
 
+            // Apply cycler shade to sector floor and ceiling
             sector[p[0]].floorshade = sector[p[0]].ceilingshade = p[3];
+
+            // Apply same shade to all walls in the sector
             wal = &wall[sector[p[0]].wallptr];
             for(j=sector[p[0]].wallnum;j > 0;j--,wal++)
                 wal->shade = p[3];
         }
     }
 
+    // === ACTIVATOR SPRITE PROCESSING SECTION ===
+    // Process all sprites in statnum 8 (activator sprites)
     i = headspritestat[8];
-    k = -1;
+    k = -1; // Sound handle tracker
     while(i >= 0)
     {
         if(sprite[i].lotag == low)
         {
             if( sprite[i].picnum == ACTIVATORLOCKED )
+            // === LOCKED ACTIVATOR HANDLING ===
             {
                 if(sector[SECT].lotag&16384)
                     sector[SECT].lotag &= 65535-16384;
+                // Toggle sector lock state using bit 14 (16384 = 0x4000)
                 else
                     sector[SECT].lotag |= 16384;
 
+                // Display message to player if valid player number
                 if(snum >= 0)
                 {
                     if(sector[SECT].lotag&16384)
@@ -1055,39 +1089,51 @@ void operateactivators(short low,short snum)
                     else FTA(8,&ps[snum]);
                 }
             }
+            // === REGULAR ACTIVATOR HANDLING ===
             else
             {
+                // Check activator conditions based on hitag
                 switch(SHT)
                 {
-                    case 0:
+                    case 0: // No condition - always activate
                         break;
                     case 1:
                         if(sector[SECT].floorz != sector[SECT].ceilingz)
+                    case 1: // Only activate if sector is closed (floor == ceiling)
                         {
                             i = nextspritestat[i];
-                            continue;
+                            continue; // Skip this activator
                         }
                         break;
                     case 2:
                         if(sector[SECT].floorz == sector[SECT].ceilingz)
+                    case 2: // Only activate if sector is open (floor != ceiling)
                         {
                             i = nextspritestat[i];
-                            continue;
+                            continue; // Skip this activator
                         }
                         break;
                 }
 
                 if( sector[sprite[i].sectnum].lotag < 3 )
+                // === SECTOR EFFECTOR ACTIVATION ===
+                // If sector lotag < 3, look for sector effectors to toggle
                 {
                     j = headspritesect[sprite[i].sectnum];
                     while(j >= 0)
                     {
                         if( sprite[j].statnum == 3 ) switch(sprite[j].lotag)
+                        // Toggle specific sector effectors (statnum 3)
                         {
                             case 36:
                             case 31:
                             case 32:
                             case 18:
+                            case 36: // Subway car
+                            case 31: // Two-way train
+                            case 32: // (undocumented effector)
+                            case 18: // Incremental sector rise/fall
+                                // Toggle effector state and play sound
                                 hittype[j].temp_data[0] = 1-hittype[j].temp_data[0];
                                 callsound(SECT,j);
                                 break;
@@ -1097,14 +1143,19 @@ void operateactivators(short low,short snum)
                 }
 
                 if( k == -1 && (sector[SECT].lotag&0xff) == 22 )
+                // === SPLITTING DOOR SOUND ===
+                // Play sound for splitting doors (lotag 22) - only once per activation
                     k = callsound(SECT,i);
 
+                // Activate the sector's main function (doors, elevators, etc.)
                 operatesectors(SECT,i);
             }
         }
         i = nextspritestat[i];
      }
 
+    // === RESPAWN HANDLING ===
+    // Handle any respawn effects associated with this activation tag
     operaterespawns(low);
 }
 
@@ -2889,6 +2940,12 @@ void cheatkeys(short snum)
     }
 }
 
+/*
+This method handles player interaction with the game world
+- it's essentially Duke3D's "use/activate" system.
+The name checksectors is misleading; it should be something like
+handlePlayerInteraction or processUseAction.
+*/
 void checksectors(short snum)
 {
     long i = -1,oldz;
@@ -2954,7 +3011,7 @@ void checksectors(short snum)
             goto CLEARCAMERAS;
         }
     }
-
+// 29 = use-open, 31 = esc
     if( !(sync[snum].bits&(1<<29)) && !(sync[snum].bits&(1<<31)))
         p->toggle_key_flag = 0;
 
