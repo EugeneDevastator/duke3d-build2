@@ -11,5 +11,6 @@ typedef struct{
     void (*GetKeysThisFrame)(char *writearr);
     void (*SetPlayerPos)(float x, float y, float z);
     mapstate_t* (*GetLoadedMap)();
+    void (*RegisterUpdate)(float (*UpdateFunc));
 }engineapi_t;
     #endif

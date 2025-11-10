@@ -2,6 +2,7 @@
 
 #include "build.h"
 #include "duke3d.h"
+#include "dukewrap.h"
 
 #include "global.h"
 #include "soundefs.h"
@@ -33,6 +34,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
 
+#include "dukewrap.h"
 // Savage Baggage Masters
 char tempbuf[4096];
 int32_t turnheldtime; //MED
@@ -1842,9 +1844,9 @@ void getinput(short snum)
         return;
     }
 
-    loc.bits =   BUTTON(gamefunc_Jump);
-    loc.bits |=   BUTTON(gamefunc_Crouch)<<1;
-    loc.bits |=   BUTTON(gamefunc_Fire)<<2;
+    loc.bits |=   bbeng.FrameInputs[SPC_JUMP];
+    loc.bits |=   bbeng.FrameInputs[CROUCH]<<1;
+    loc.bits |=   bbeng.FrameInputs[MB_SHOOT]<<2;
     loc.bits |=   BUTTON(gamefunc_Aim_Up)<<3;
     loc.bits |=   BUTTON(gamefunc_Aim_Down)<<4;
     loc.bits |=   BUTTON(gamefunc_Run)<<5;
@@ -1898,7 +1900,7 @@ void getinput(short snum)
     loc.bits |=   (((long)gamequit)<<26);
     loc.bits |=   BUTTON(gamefunc_Inventory_Right)<<27;
     loc.bits |=   BUTTON(gamefunc_TurnAround)<<28;
-    loc.bits |=   BUTTON(gamefunc_Open)<<29;
+    loc.bits |=   bbeng.FrameInputs[E_USE]<<29;
     loc.bits |=   BUTTON(gamefunc_Inventory)<<30;
     loc.bits |=   KB_KeyPressed(sc_Escape)<<31;
 
@@ -1978,17 +1980,26 @@ void getinput(short snum)
            }
     }
 
-    if ( BUTTON( gamefunc_Strafe_Left ) )
+    if (bbeng.FrameInputs[A_LEFT])
         svel += keymove;
+    if (bbeng.FrameInputs[D_RIGHT])
+        svel -= keymove;
 
-    if ( BUTTON( gamefunc_Strafe_Right ) )
-        svel += -keymove;
-
-    if ( BUTTON(gamefunc_Move_Forward) )
+    if (bbeng.FrameInputs[W_FRW])
         vel += keymove;
+    if (bbeng.FrameInputs[S_BACK])
+        vel -= keymove;
+  // if ( BUTTON( gamefunc_Strafe_Left ) )
+  //     svel += keymove;
 
-    if ( BUTTON(gamefunc_Move_Backward) )
-        vel += -keymove;
+  // if ( BUTTON( gamefunc_Strafe_Right ) )
+  //     svel += -keymove;
+
+  // if ( BUTTON(gamefunc_Move_Forward) )
+  //     vel += keymove;
+
+  // if ( BUTTON(gamefunc_Move_Backward) )
+  //     vel += -keymove;
 
     if(vel < -MAXVEL) vel = -MAXVEL;
     if(vel > MAXVEL) vel = MAXVEL;

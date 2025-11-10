@@ -1366,6 +1366,126 @@ void resetmys()
     myreturntocenter = ps[myconnectindex].return_to_center;
 }
 
+void enterlevel_rl() {
+     short i, j;
+    long l;
+    char levname[256];
+
+    //if ((g & MODE_DEMO) != MODE_DEMO) ud.recstat = ud.m_recstat;
+    ud.respawn_monsters = ud.m_respawn_monsters;
+    ud.respawn_items = ud.m_respawn_items;
+    ud.respawn_inventory = ud.m_respawn_inventory;
+    ud.monsters_off = ud.m_monsters_off;
+    ud.coop = ud.m_coop;
+    ud.marker = ud.m_marker;
+    ud.ffire = ud.m_ffire;
+
+  //  if ((g & MODE_DEMO) == 0 && ud.recstat == 2)
+  //      ud.recstat = 0;
+
+    FX_StopAllSounds();
+    clearsoundlocks();
+    FX_SetReverb(0);
+
+    i = ud.screen_size;
+    ud.screen_size = 0;
+    dofrontscreens(); // loading screen
+    // vscrn();
+    ud.screen_size = i;
+
+    //#ifndef VOLUMEONE // full version if nopt def
+// board loading is external.
+
+    clearbufbyte(gotpic, sizeof(gotpic), 0L);
+
+    prelevel(MODE_GAME);
+
+    allignwarpelevators();
+    resetpspritevars(MODE_GAME); // player init
+
+    cachedebug = 0;
+    automapping = 0;
+
+    if (ud.recstat != 2) MUSIC_StopSong();
+
+    cacheit();
+    docacheit();
+
+    if (ud.recstat != 2)
+    {
+        music_select = (ud.volume_number * 11) + ud.level_number;
+        playmusic(&music_fn[0][music_select][0]);
+    }
+
+    if ((MODE_GAME & MODE_GAME) || (g & MODE_EOL))
+        ps[myconnectindex].gm = MODE_GAME;
+    else if (MODE_GAME & MODE_RESTART)
+    {
+        if (ud.recstat == 2)
+            ps[myconnectindex].gm = MODE_DEMO;
+        else ps[myconnectindex].gm = MODE_GAME;
+    }
+
+    if ((ud.recstat == 1) && (g & MODE_RESTART) != MODE_RESTART)
+        opendemowrite();
+
+    //#ifdef VOLUMEONE
+    //    if(ud.level_number == 0 && ud.recstat != 2) FTA(40,&ps[myconnectindex]);
+    //#endif
+
+    for (i = connecthead; i >= 0; i = connectpoint2[i])
+        switch (sector[sprite[ps[i].i].sectnum].floorpicnum)
+        {
+        case HURTRAIL:
+        case FLOORSLIME:
+        case FLOORPLASMA:
+            resetweapons(i);
+            resetinventory(i);
+            ps[i].gotweapon[PISTOL_WEAPON] = 0;
+            ps[i].ammo_amount[PISTOL_WEAPON] = 0;
+            ps[i].curr_weapon = KNEE_WEAPON;
+            ps[i].kickback_pic = 0;
+            break;
+        }
+
+    //PREMAP.C - replace near the my's at the end of the file
+
+    resetmys();
+
+    ps[myconnectindex].palette = palette;
+    // palto(0,0,0,0); //some menu func.
+
+    setpal(&ps[myconnectindex]);
+    flushperms();
+
+    everyothertime = 0;
+    global_random = 0;
+
+    ud.last_level = ud.level_number + 1;
+
+    clearfifo();
+
+    for (i = numinterpolations - 1; i >= 0; i--) bakipos[i] = *curipos[i];
+
+    restorepalette = 1;
+
+    flushpackets();
+    waitforeverybody();
+
+    palto(0, 0, 0, 0);
+    vscrn();
+    clearview(0L);
+    drawbackground();
+
+    clearbufbyte(playerquitflag,MAXPLAYERS, 0x01010101);
+    ps[myconnectindex].over_shoulder_on = 0;
+
+    clearfrags();
+
+    resettimevars(); // Here we go
+}
+
+
 void enterlevel(char g)
 {
     short i, j;

@@ -5,14 +5,20 @@
 #include "../../interfaces/engineapi.h"
 
 #include <stdlib.h>
-dukewrapper bbeng;
 
-void SetSprPos(long i,long x, long y, long z) // not in .h file
+#include "engine.h"
+#include "keyboard.h"
+dukewrapper bbeng;
+engineapi_t *rayl;
+char *inputs;
+mapstate_t* map;
+
+void SetSprPos(long i, long x, long y, long z) // not in .h file
 {
     // redirect to main api.
-// main api. set pos (i, x-z,y) for ex.
+    // main api. set pos (i, x-z,y) for ex.
 
-     // see int setsprite(short spritenum, long newx, long newy, long newz) in engine .c
+    // see int setsprite(short spritenum, long newx, long newy, long newz) in engine .c
 
     // need to update sprite sector as well.
     /*
@@ -33,22 +39,91 @@ void SetSprPos(long i,long x, long y, long z) // not in .h file
     return (0);
      **/
 }
-void SetSprPosXY(long i,long x, long y) // not in .h file
+
+void SetSprPosXY(long i, long x, long y) // not in .h file
 {
     // redirect to main api.
     // main api. set pos (i, x-z,y) for ex.
 }
-spritetype ReadSprite(long i){
- spritetype a = {};
+
+spritetype ReadSprite(long i) {
+    spritetype a = {};
     return a;
 }
+
 // is it ok to store internal function in pointer?
-void InitWrapper(engineapi_t* api) // pass in real api
+void InitWrapper(engineapi_t *api) // pass in real api
 {
     bbeng.SetSprPos = SetSprPos;
     bbeng.SetSprPosXY = SetSprPosXY;
-    // save main api
+    rayl = api;
+    inputs = malloc(20 * sizeof(char));
+    bbeng.FrameInputs = inputs;
+    map = rayl->GetLoadedMap();
 }
+
+short forwardToAng(point3d forw) {
+    return 0;
+   //       map->startfor.x = cos(((float)s)*PI/1024.0);
+    //      map->startfor.y = sin(((float)s)*PI/1024.0);
+}
+void ConvertSector(int i,sectortype* sect) {
+
+}
+void ConvertSprite(int i,spritetype* spr) {
+
+spr->lotag = map->spri[i].lotag;
+spr->hitag = map->spri[i].hitag;
+
+}
+void ConvertWall(int i,walltype* w) {
+// also store map ow n - b2wall
+}
+void ParseMapToDukeFormat() {
+    initspritelists();
+
+    clearbuf((&show2dsector[0]), (long)((MAXSECTORS + 3) >> 5), 0L);
+    clearbuf((&show2dsprite[0]), (long)((MAXSPRITES + 3) >> 5), 0L);
+    clearbuf((&show2dwall[0]), (long)((MAXWALLS + 3) >> 5), 0L);
+    ps[0].posx = map->startpos.x;
+    ps[0].posy = map->startpos.y;
+    ps[0].posz = map->startpos.z;
+    ps[0].ang = forwardToAng(map->startfor);
+    ps[0].cursectnum = -1; // do update at th end
+
+    numsectors = (short)map->numsects;
+    for (int i = 0; i < numsectors; ++i) {
+        ConvertSector(i,&sector[i]);
+    }
+    // --- walls ---
+    int walln = 0;
+    for (int i = 0; i < numsectors; ++i) {
+        for (int k = 0; k < map->sect[i].n; ++k) {
+            ConvertWall(walln, &wall[walln]);
+            walln++;
+        }
+        walln+=map->sect[i].n;
+    }
+    numwalls = (short)walln;
+
+    // sprites
+    numsprites = (short)map->numspris;
+    for (int i = 0; i < numsprites; ++i) {
+        ConvertSprite(i,&sprite[i]);
+    }
+
+    for (int i = 0; i < numsprites; i++)
+        insertsprite(sprite[i].sectnum, sprite[i].statnum);
+
+    //Must be after loading sectors, etc!
+    bbeng.FindSectorOfPoint(ps[0].posx, ps[0].posy, &ps[0].cursectnum);
+}
+
+void GetInput() {
+    rayl->GetKeysThisFrame(inputs);
+}
+
+
 /*
 *short nextsectorneighborz(short sectnum, long thez, short topbottom, short direction)
 {
@@ -115,15 +190,15 @@ void InitWrapper(engineapi_t* api) // pass in real api
 
     return (sectortouse);
 }*/
-int FindClosestSectorIdByHeigh(int sectnum, long baseZ, short isOtherFloor, short isDirectionUpward){
+int FindClosestSectorIdByHeigh(int sectnum, long baseZ, short isOtherFloor, short isDirectionUpward) {
     return 0; // look above for impl.
 }
 
 typedef struct {
-    float deltaTime;        // Time since last frame in seconds
-    float fixedDeltaTime;   // Fixed timestep (1/120.0f for Duke3D compatibility)
-    float accumulator;      // For fixed timestep accumulation
-    long totalTicks;        // Equivalent to old totalclock
+    float deltaTime; // Time since last frame in seconds
+    float fixedDeltaTime; // Fixed timestep (1/120.0f for Duke3D compatibility)
+    float accumulator; // For fixed timestep accumulation
+    long totalTicks; // Equivalent to old totalclock
 } GameTimer;
 
 GameTimer gameTimer = {0};

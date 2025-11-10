@@ -6,6 +6,16 @@
 #define GAME_DUKEWRAP_H
 #include "types.h"
 #include "../../interfaces/engineapi.h"
+#define W_FRW 0
+#define S_BACK 1
+#define A_LEFT 2
+#define D_RIGHT 3
+#define E_USE 4
+#define SPC_JUMP 5
+#define CROUCH 6
+#define MB_SHOOT 7
+
+
 typedef struct
 {
     //set sprite position with sector correction
@@ -23,7 +33,7 @@ typedef struct
      sectortype (*ReadSectP)(long i, sectortype *target);
 
      walltype (*ReadWall)(long i);
-     void (*FindSectorOfPoint)(long x, long y, int *inoutSecNum); // for api use: int func(x,y,sectn)
+     void (*FindSectorOfPoint)(long x, long y, short *inoutSecNum); // for api use: int func(x,y,sectn)
      void (*WriteSectInfo)(long i, sectortype *s);
      void (*SetCeilHeight)(long sid, long height);
      void (*SetFloorHeight)(long sid, long height);
@@ -35,8 +45,7 @@ typedef struct
          short* hitsect, short* hitwall, short* hitsprite,
          long* hitx, long* hity, long* hitz,
          unsigned long cliptype);
-
-     int (*arrpt)[10];
+     char* FrameInputs;
 } dukewrapper;
 
 extern dukewrapper bbeng; // bb= build 2
