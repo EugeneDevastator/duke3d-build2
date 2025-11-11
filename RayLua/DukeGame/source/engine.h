@@ -87,7 +87,7 @@ static void setgotpic(uint32_t index);
 static int wallfront(long l1, long l2);
 static int32_t spritewallfront(spritetype* s, long w);
 static void loadtables();
-static void initspritelists();
+void initspritelists();
 static int clipinsideboxline(long x, long y, long x1, long y1, long x2, long y2, long walldist);
 static int insertspritesect(short sectnum);
 static int insertspritestat(short statnum);

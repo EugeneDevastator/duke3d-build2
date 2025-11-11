@@ -115,7 +115,7 @@ EXTERN char vidoption;
 EXTERN long xdim, ydim, ylookup[MAXYDIM+1], numpages;
 EXTERN long yxaspect, viewingrange;
 
-EXTERN short numsectors, numwalls, numsprites;
+EXTERN short numsectors, numwalls;
 EXTERN long totalclock;
 EXTERN long numframes, randomseed;
 EXTERN short sintable[2048];

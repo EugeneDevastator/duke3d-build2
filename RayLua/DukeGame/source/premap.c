@@ -1417,7 +1417,7 @@ void enterlevel_rl() {
         playmusic(&music_fn[0][music_select][0]);
     }
 
-    if ((MODE_GAME & MODE_GAME) || (g & MODE_EOL))
+    if ((MODE_GAME & MODE_GAME) || (MODE_GAME & MODE_EOL))
         ps[myconnectindex].gm = MODE_GAME;
     else if (MODE_GAME & MODE_RESTART)
     {
@@ -1426,7 +1426,7 @@ void enterlevel_rl() {
         else ps[myconnectindex].gm = MODE_GAME;
     }
 
-    if ((ud.recstat == 1) && (g & MODE_RESTART) != MODE_RESTART)
+    if ((ud.recstat == 1) && (MODE_GAME & MODE_RESTART) != MODE_RESTART)
         opendemowrite();
 
     //#ifdef VOLUMEONE
