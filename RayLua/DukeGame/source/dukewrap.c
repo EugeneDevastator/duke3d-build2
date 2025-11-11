@@ -79,10 +79,9 @@ void InitWrapper(engineapi_t *api) // pass in real api
     map = rayl->GetLoadedMap();
 }
 
+
 short forwardToAng(point3d forw) {
-    return 0;
-   //       map->startfor.x = cos(((float)s)*PI/1024.0);
-    //      map->startfor.y = sin(((float)s)*PI/1024.0);
+    return (int)(atan2(forw.y, forw.x) * 1024.0 / PI);
 }
 void ConvertSector(int i,sectortype* sect) {
     sect_t b2sec = map->sect[i];
@@ -126,7 +125,7 @@ void ConvertSprite(int i,spritetype* spr) {
     spr->yoffset=0;
     spr->sectnum = b2spr.sectn,
     spr->statnum = b2spr.tags[MT_STATNUM];
-    spr->ang = acos(b2spr.f.x)*(1024.0/3.1491),
+    spr->ang = forwardToAng(b2spr.f),
     spr->owner =0 ,
     spr->xvel=0,
     spr->yvel=0,
@@ -137,8 +136,8 @@ void ConvertSprite(int i,spritetype* spr) {
 }
 void ConvertWall(int i,walltype* w, wall_t b2wall) {
 
-        /* long */           w->x = b2wall.x;
-        /* long */           w->y = b2wall.y;
+        /* long */           w->x = b2wall.x * 512;
+        /* long */           w->y = b2wall.y * 512;
         /* short */          w->point2 = b2wall.nw, // we can abolish it by extracting api.
         /* short */          w->nextwall = b2wall.nw,
         /* short */          w->nextsector = b2wall.ns,
@@ -175,6 +174,7 @@ void ParseMapToDukeFormat() {
     for (int i = 0; i < numsectors; ++i) {
         ConvertSector(i,&sector[i]);
     }
+
     // --- walls ---
     int walln = 0;
     for (int i = 0; i < numsectors; ++i) {
@@ -193,11 +193,12 @@ void ParseMapToDukeFormat() {
         ConvertSprite(i,&sprite[i]);
     }
 
+    // should account for findsectorofpoint
     for (int i = 0; i < numsprites; i++)
         insertsprite(sprite[i].sectnum, sprite[i].statnum);
 
     //Must be after loading sectors, etc!
-    bbeng.FindSectorOfPoint(ps[0].posx, ps[0].posy, &ps[0].cursectnum);
+    //bbeng.FindSectorOfPoint(ps[0].posx, ps[0].posy, &ps[0].cursectnum);
 }
 
 void GetInput() {
