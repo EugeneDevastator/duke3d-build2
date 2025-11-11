@@ -142,28 +142,6 @@ int sgn(int value);
 #define MAXSCRIPTSIZE 20460
 #define MAXANIMATES 64
 
-#define SP  sprite[i].yvel
-#define SX  sprite[i].x
-#define SY  sprite[i].y
-#define SZ  sprite[i].z
-#define SS  sprite[i].shade
-#define PN  sprite[i].picnum
-#define SA  sprite[i].ang
-#define SV  sprite[i].xvel
-#define ZV  sprite[i].zvel
-#define RX  sprite[i].xrepeat
-#define RY  sprite[i].yrepeat
-#define OW  sprite[i].owner
-#define CS  sprite[i].cstat
-#define SH  sprite[i].extra
-#define CX  sprite[i].xoffset
-#define CY  sprite[i].yoffset
-#define CD  sprite[i].clipdist
-#define PL  sprite[i].pal
-#define SLT  sprite[i].lotag
-#define SHT  sprite[i].hitag
-#define SECT sprite[i].sectnum
-
 #define face_player 1
 #define geth 2
 #define getv 4
@@ -204,7 +182,7 @@ int sgn(int value);
 
 #define ESCESCAPE if(KB_KeyPressed( sc_Escape ) ) gameexit(" ");
 
-#define IFWITHIN(B,E) if((PN)>=(B) && (PN)<=(E))
+#define IFWITHIN(B,E) if((sprite[i].picnum)>=(B) && (sprite[i].picnum)<=(E))
 #define KILLIT(KX) {deletesprite(KX);goto BOLT;}
 
 

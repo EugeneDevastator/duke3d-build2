@@ -394,10 +394,10 @@ long ifsquished(short i, short p)
     char squishme;
     long floorceildist;
 
-    if(PN == APLAYER && ud.clipping)
+    if(sprite[i].picnum == APLAYER && ud.clipping)
         return 0;
 
-    sc = &sector[SECT];
+    sc = &sector[sprite[i].sectnum];
     floorceildist = sc->floorz - sc->ceilingz;
 
     if(sc->lotag != 23)
@@ -783,7 +783,7 @@ void guts(spritetype *s,short gtype, short n, short p)
         a = TRAND&2047;
         i = EGS(s->sectnum,s->x+(TRAND&255)-128,s->y+(TRAND&255)-128,gutz-(TRAND&8191),gtype,-32,sx,sy,a,48+(TRAND&31),-512-(TRAND&2047),ps[p].i,STAT_MISC);
 
-        if(PN == JIBS2)
+        if(sprite[i].picnum == JIBS2)
         {
             sprite[i].xrepeat >>= 2;
             sprite[i].yrepeat >>= 2;
@@ -823,8 +823,8 @@ void setsectinterpolate(short i)
 {
     long j, k, startwall,endwall;
 
-    startwall = sector[SECT].wallptr;
-    endwall = startwall+sector[SECT].wallnum;
+    startwall = sector[sprite[i].sectnum].wallptr;
+    endwall = startwall+sector[sprite[i].sectnum].wallnum;
 
     for(j=startwall;j<endwall;j++)
     {
@@ -846,8 +846,8 @@ void clearsectinterpolate(short i)
 {
     short j,startwall,endwall;
 
-    startwall = sector[SECT].wallptr;
-    endwall = startwall+sector[SECT].wallnum;
+    startwall = sector[sprite[i].sectnum].wallptr;
+    endwall = startwall+sector[sprite[i].sectnum].wallnum;
     for(j=startwall;j<endwall;j++)
     {
         stopinterpolation(&wall[j].x);
@@ -989,7 +989,7 @@ short ifhitsectors(short sectnum)
     i = headspritestat[STAT_MISC];
     while(i >= 0)
     {
-        if( PN == EXPLOSION2 && sectnum == SECT )
+        if( sprite[i].picnum == EXPLOSION2 && sectnum == sprite[i].sectnum )
             return i;
         i = nextspritestat[i];
     }
@@ -1125,7 +1125,7 @@ void movedummyplayers()
     {
         nexti = nextspritestat[i];
 
-        p = sprite[OW].yvel;
+        p = sprite[sprite[i].owner].yvel;
 
         if( ps[p].on_crane >= 0 || sector[ps[p].cursectnum].lotag != 1 || sprite[ps[p].i].extra <= 0 )
         {
@@ -1136,23 +1136,23 @@ void movedummyplayers()
         {
             if(ps[p].on_ground && ps[p].on_warping_sector == 1 && sector[ps[p].cursectnum].lotag == 1 )
             {
-                CS = 257;
-                SZ = sector[SECT].ceilingz+(27<<8);
-                SA = ps[p].ang;
+                sprite[i].cstat = 257;
+                sprite[i].z = sector[sprite[i].sectnum].ceilingz+(27<<8);
+                sprite[i].ang = ps[p].ang;
                 if(T1 == 8)
                     T1 = 0;
                 else T1++;
             }
             else
             {
-                if(sector[SECT].lotag != 2) SZ = sector[SECT].floorz;
-                CS = (short) 32768;
+                if(sector[sprite[i].sectnum].lotag != 2) sprite[i].z = sector[sprite[i].sectnum].floorz;
+                sprite[i].cstat = (short) 32768;
             }
         }
 
-        SX += (ps[p].posx-ps[p].oposx);
-        SY += (ps[p].posy-ps[p].oposy);
-        setsprite(i,SX,SY,SZ);
+        sprite[i].x += (ps[p].posx-ps[p].oposx);
+        sprite[i].y += (ps[p].posy-ps[p].oposy);
+        setsprite(i,sprite[i].x,sprite[i].y,sprite[i].z);
 
         BOLT:
 
@@ -1229,7 +1229,7 @@ void moveplayers() //Players
                 }
                 else
                 {
-                    
+
                     p->posx = s->x;
                     p->posy = s->y;
                     p->posz = s->z-(20<<8);
@@ -1317,7 +1317,7 @@ void movefx()
             case RESPAWN:
                 if(sprite[i].extra == 66)
                 {
-                    j = spawn(i,SHT);
+                    j = spawn(i,sprite[i].hitag);
 //                    sprite[j].pal = sprite[i].pal;
                     KILLIT(i);
                 }
@@ -1350,7 +1350,9 @@ void movefx()
                         T1 = 0;
                     }
                 }
-                else if(s->lotag < 999 && (unsigned)sector[s->sectnum].lotag < 9 && AmbienceToggle && sector[SECT].floorz != sector[SECT].ceilingz)
+                else if(s->lotag < 999 && (unsigned)sector[s->sectnum].lotag < 9 && AmbienceToggle && sector[sprite[i].
+                            sectnum].floorz != sector[sprite
+                            [i].sectnum].ceilingz)
                 {
                     if( (soundm[s->lotag]&2) )
                     {
@@ -1362,7 +1364,7 @@ void movefx()
                                 j = headspritestat[11];
                                 while(j >= 0)
                                 {
-                                    if( PN == MUSICANDSFX && j != i && sprite[j].lotag < 999 && hittype[j].temp_data[0] == 1 && dist(&sprite[j],&sprite[ps[screenpeek].i]) > x )
+                                    if( sprite[i].picnum == MUSICANDSFX && j != i && sprite[j].lotag < 999 && hittype[j].temp_data[0] == 1 && dist(&sprite[j],&sprite[ps[screenpeek].i]) > x )
                                     {
                                         stopenvsound(sprite[j].lotag,j);
                                         break;
@@ -1430,7 +1432,7 @@ void movefallers()
                         j = headspritestat[12];
                         while(j >= 0)
                         {
-                            if(sprite[j].hitag == SHT)
+                            if(sprite[j].hitag == sprite[i].hitag)
                             {
                                 hittype[j].temp_data[0] = 1;
                                 sprite[j].cstat &= (65535-64);
@@ -1921,7 +1923,7 @@ void movestandables()
 
             for(k=0;k<16;k++)
             {
-                j = EGS(SECT,SX,SY,SZ-(TRAND%(48<<8)),SCRAP3+(TRAND&3),-8,48,48,TRAND&2047,(TRAND&63)+64,-(TRAND&4095)-(sprite[i].zvel>>2),i,STAT_MISC);
+                j = EGS(sprite[i].sectnum,sprite[i].x,sprite[i].y,sprite[i].z-(TRAND%(48<<8)),SCRAP3+(TRAND&3),-8,48,48,TRAND&2047,(TRAND&63)+64,-(TRAND&4095)-(sprite[i].zvel>>2),i,STAT_MISC);
                 sprite[j].pal = 2;
             }
 
@@ -2119,7 +2121,7 @@ void movestandables()
 
                 if( x < 2048 )
                 {
-                    if( SP == 1 )
+                    if( sprite[i].yvel == 1 )
                         camsprite = i;
                 }
                 else if( camsprite != -1 && T1 == 1)
@@ -2235,7 +2237,7 @@ void movestandables()
                     sector[sect].ceilingshade = 20;
                 }
                 goto BOLT;
-                
+
             case WATERDRIP:
 
                 if( t[1] )
@@ -2434,7 +2436,7 @@ void bounce(short i)
     s->xvel = ksqrt(dmulscale8(xvect,xvect,yvect,yvect));
     s->ang = getangle(xvect,yvect);
 }
-     
+
 void moveweapons()
 {
     short i, j, k, nexti, p, q, tempsect;
@@ -2790,12 +2792,12 @@ void movetransports()
 
     while(i >= 0)
     {
-        sect = SECT;
+        sect = sprite[i].sectnum;
         sectlotag = sector[sect].lotag;
 
         nexti = nextspritestat[i];
 
-        if(OW == i)
+        if(sprite[i].owner == i)
         {
             i = nexti;
             continue;
@@ -2831,31 +2833,31 @@ void movetransports()
                                 }
 
                                 for(k=connecthead;k>=0;k=connectpoint2[k])
-                                    if(ps[k].cursectnum == sprite[OW].sectnum)
+                                    if(ps[k].cursectnum == sprite[sprite[i].owner].sectnum)
                                 {
                                     ps[k].frag_ps = p;
                                     sprite[ps[k].i].extra = 0;
                                 }
 
-                                ps[p].ang = sprite[OW].ang;
+                                ps[p].ang = sprite[sprite[i].owner].ang;
 
-                                if(sprite[OW].owner != OW)
+                                if(sprite[sprite[i].owner].owner != sprite[i].owner)
                                 {
                                     T1 = 13;
-                                    hittype[OW].temp_data[0] = 13;
+                                    hittype[sprite[i].owner].temp_data[0] = 13;
                                     ps[p].transporter_hold = 13;
                                 }
 
-                                ps[p].bobposx = ps[p].oposx = ps[p].posx = sprite[OW].x;
-                                ps[p].bobposy = ps[p].oposy = ps[p].posy = sprite[OW].y;
-                                ps[p].oposz = ps[p].posz = sprite[OW].z-PHEIGHT;
+                                ps[p].bobposx = ps[p].oposx = ps[p].posx = sprite[sprite[i].owner].x;
+                                ps[p].bobposy = ps[p].oposy = ps[p].posy = sprite[sprite[i].owner].y;
+                                ps[p].oposz = ps[p].posz = sprite[sprite[i].owner].z-PHEIGHT;
 
-                                changespritesect(j,sprite[OW].sectnum);
+                                changespritesect(j,sprite[sprite[i].owner].sectnum);
                                 ps[p].cursectnum = sprite[j].sectnum;
 
                                 if(sprite[i].pal == 0)
                                 {
-                                    k = spawn(OW,TRANSPORTERBEAM);
+                                    k = spawn(sprite[i].owner,TRANSPORTERBEAM);
                                     spritesound(TELEPORTER,k);
                                 }
 
@@ -2864,24 +2866,24 @@ void movetransports()
                         }
                         else if( !(sectlotag == 1 && ps[p].on_ground == 1)  ) break;
 
-                        if(onfloorz == 0 && klabs(SZ-ps[p].posz) < 6144 )
+                        if(onfloorz == 0 && klabs(sprite[i].z-ps[p].posz) < 6144 )
                             if( (ps[p].jetpack_on == 0 ) || (ps[p].jetpack_on && (sync[p].bits&1) ) ||
                                 (ps[p].jetpack_on && (sync[p].bits&2) ) )
                         {
-                            ps[p].oposx = ps[p].posx += sprite[OW].x-SX;
-                            ps[p].oposy = ps[p].posy += sprite[OW].y-SY;
+                            ps[p].oposx = ps[p].posx += sprite[sprite[i].owner].x-sprite[i].x;
+                            ps[p].oposy = ps[p].posy += sprite[sprite[i].owner].y-sprite[i].y;
 
                             if( ps[p].jetpack_on && ( (sync[p].bits&1) || ps[p].jetpack_on < 11 ) )
-                                ps[p].posz = sprite[OW].z-6144;
-                            else ps[p].posz = sprite[OW].z+6144;
+                                ps[p].posz = sprite[sprite[i].owner].z-6144;
+                            else ps[p].posz = sprite[sprite[i].owner].z+6144;
                             ps[p].oposz = ps[p].posz;
 
                             hittype[ps[p].i].bposx = ps[p].posx;
                             hittype[ps[p].i].bposy = ps[p].posy;
                             hittype[ps[p].i].bposz = ps[p].posz;
 
-                            changespritesect(j,sprite[OW].sectnum);
-                            ps[p].cursectnum = sprite[OW].sectnum;
+                            changespritesect(j,sprite[sprite[i].owner].sectnum);
+                            ps[p].cursectnum = sprite[sprite[i].owner].sectnum;
 
                             break;
                         }
@@ -2900,7 +2902,7 @@ void movetransports()
                             if(sprite[ps[p].i].extra > 0)
                                 spritesound(DUKE_UNDERWATER,j);
                             ps[p].oposz = ps[p].posz =
-                                sector[sprite[OW].sectnum].ceilingz+(7<<8);
+                                sector[sprite[sprite[i].owner].sectnum].ceilingz+(7<<8);
 
                             ps[p].posxv = 4096-(TRAND&8192);
                             ps[p].posyv = 4096-(TRAND&8192);
@@ -2919,7 +2921,7 @@ void movetransports()
                             spritesound(DUKE_GASP,j);
 
                             ps[p].oposz = ps[p].posz =
-                                sector[sprite[OW].sectnum].floorz-(7<<8);
+                                sector[sprite[sprite[i].owner].sectnum].floorz-(7<<8);
 
                             ps[p].jumping_toggle = 1;
                             ps[p].jumping_counter = 0;
@@ -2927,14 +2929,14 @@ void movetransports()
 
                         if(k == 1)
                         {
-                            ps[p].oposx = ps[p].posx += sprite[OW].x-SX;
-                            ps[p].oposy = ps[p].posy += sprite[OW].y-SY;
+                            ps[p].oposx = ps[p].posx += sprite[sprite[i].owner].x-sprite[i].x;
+                            ps[p].oposy = ps[p].posy += sprite[sprite[i].owner].y-sprite[i].y;
 
-                            if(sprite[OW].owner != OW)
+                            if(sprite[sprite[i].owner].owner != sprite[i].owner)
                                 ps[p].transporter_hold = -2;
-                            ps[p].cursectnum = sprite[OW].sectnum;
+                            ps[p].cursectnum = sprite[sprite[i].owner].sectnum;
 
-                            changespritesect(j,sprite[OW].sectnum);
+                            changespritesect(j,sprite[sprite[i].owner].sectnum);
                             setsprite(ps[p].i,ps[p].posx,ps[p].posy,ps[p].posz+PHEIGHT);
 
                             setpal(&ps[p]);
@@ -2984,9 +2986,9 @@ void movetransports()
                         if( ll && sectlotag == 1 && sprite[j].z > (sector[sect].floorz-ll) )
                             warpspriteto = 1;
 
-                        if( sectlotag == 0 && ( onfloorz || klabs(sprite[j].z-SZ) < 4096) )
+                        if( sectlotag == 0 && ( onfloorz || klabs(sprite[j].z-sprite[i].z) < 4096) )
                         {
-                            if( sprite[OW].owner != OW && onfloorz && T1 > 0 && sprite[j].statnum != 5 )
+                            if( sprite[sprite[i].owner].owner != sprite[i].owner && onfloorz && T1 > 0 && sprite[j].statnum != 5 )
                             {
                                 T1++;
                                 goto BOLT;
@@ -3038,12 +3040,13 @@ void movetransports()
                                     case 0:
                                         if(onfloorz)
                                         {
-                                            if( sprite[j].statnum == 4 || ( checkcursectnums(sect) == -1 && checkcursectnums(sprite[OW].sectnum)  == -1 ) )
+                                            if( sprite[j].statnum == 4 || ( checkcursectnums(sect) == -1 && checkcursectnums(sprite[sprite
+                                                                                [i].owner].sectnum)  == -1 ) )
                                             {
-                                                sprite[j].x += (sprite[OW].x-SX);
-                                                sprite[j].y += (sprite[OW].y-SY);
-                                                sprite[j].z -= SZ - sector[sprite[OW].sectnum].floorz;
-                                                sprite[j].ang = sprite[OW].ang;
+                                                sprite[j].x += (sprite[sprite[i].owner].x-sprite[i].x);
+                                                sprite[j].y += (sprite[sprite[i].owner].y-sprite[i].y);
+                                                sprite[j].z -= sprite[i].z - sector[sprite[sprite[i].owner].sectnum].floorz;
+                                                sprite[j].ang = sprite[sprite[i].owner].ang;
 
                                                 hittype[j].bposx = sprite[j].x;
                                                 hittype[j].bposy = sprite[j].y;
@@ -3054,54 +3057,54 @@ void movetransports()
                                                     k = spawn(i,TRANSPORTERBEAM);
                                                     spritesound(TELEPORTER,k);
 
-                                                    k = spawn(OW,TRANSPORTERBEAM);
+                                                    k = spawn(sprite[i].owner,TRANSPORTERBEAM);
                                                     spritesound(TELEPORTER,k);
                                                 }
 
-                                                if( sprite[OW].owner != OW )
+                                                if( sprite[sprite[i].owner].owner != sprite[i].owner )
                                                 {
                                                     T1 = 13;
-                                                    hittype[OW].temp_data[0] = 13;
+                                                    hittype[sprite[i].owner].temp_data[0] = 13;
                                                 }
 
-                                                changespritesect(j,sprite[OW].sectnum);
+                                                changespritesect(j,sprite[sprite[i].owner].sectnum);
                                             }
                                         }
                                         else
                                         {
-                                            sprite[j].x += (sprite[OW].x-SX);
-                                            sprite[j].y += (sprite[OW].y-SY);
-                                            sprite[j].z = sprite[OW].z+4096;
+                                            sprite[j].x += (sprite[sprite[i].owner].x-sprite[i].x);
+                                            sprite[j].y += (sprite[sprite[i].owner].y-sprite[i].y);
+                                            sprite[j].z = sprite[sprite[i].owner].z+4096;
 
                                             hittype[j].bposx = sprite[j].x;
                                             hittype[j].bposy = sprite[j].y;
                                             hittype[j].bposz = sprite[j].z;
 
-                                            changespritesect(j,sprite[OW].sectnum);
+                                            changespritesect(j,sprite[sprite[i].owner].sectnum);
                                         }
                                         break;
                                     case 1:
-                                        sprite[j].x += (sprite[OW].x-SX);
-                                        sprite[j].y += (sprite[OW].y-SY);
-                                        sprite[j].z = sector[sprite[OW].sectnum].ceilingz+ll;
+                                        sprite[j].x += (sprite[sprite[i].owner].x-sprite[i].x);
+                                        sprite[j].y += (sprite[sprite[i].owner].y-sprite[i].y);
+                                        sprite[j].z = sector[sprite[sprite[i].owner].sectnum].ceilingz+ll;
 
                                         hittype[j].bposx = sprite[j].x;
                                         hittype[j].bposy = sprite[j].y;
                                         hittype[j].bposz = sprite[j].z;
 
-                                        changespritesect(j,sprite[OW].sectnum);
+                                        changespritesect(j,sprite[sprite[i].owner].sectnum);
 
                                         break;
                                     case 2:
-                                        sprite[j].x += (sprite[OW].x-SX);
-                                        sprite[j].y += (sprite[OW].y-SY);
-                                        sprite[j].z = sector[sprite[OW].sectnum].floorz-ll;
+                                        sprite[j].x += (sprite[sprite[i].owner].x-sprite[i].x);
+                                        sprite[j].y += (sprite[sprite[i].owner].y-sprite[i].y);
+                                        sprite[j].z = sector[sprite[sprite[i].owner].sectnum].floorz-ll;
 
                                         hittype[j].bposx = sprite[j].x;
                                         hittype[j].bposy = sprite[j].y;
                                         hittype[j].bposz = sprite[j].z;
 
-                                        changespritesect(j,sprite[OW].sectnum);
+                                        changespritesect(j,sprite[sprite[i].owner].sectnum);
 
                                         break;
                                 }
@@ -3127,7 +3130,7 @@ short LocateTheLocator(short n,short sn)
     i = headspritestat[7];
     while(i >= 0)
     {
-        if( (sn == -1 || sn == SECT) && n == SLT )
+        if( (sn == -1 || sn == sprite[i].sectnum) && n == sprite[i].lotag )
             return i;
         i = nextspritestat[i];
     }
@@ -3219,9 +3222,9 @@ void moveactors()
                     KILLIT(i);
                 }
                 if( T1 >= (respawnitemtime>>1) && T1 < ((respawnitemtime>>1)+(respawnitemtime>>2)) )
-                    PN = RESPAWNMARKERYELLOW;
+                    sprite[i].picnum = RESPAWNMARKERYELLOW;
                 else if( T1 > ((respawnitemtime>>1)+(respawnitemtime>>2)) )
-                    PN = RESPAWNMARKERGREEN;
+                    sprite[i].picnum = RESPAWNMARKERGREEN;
                 makeitfall(i);
                 break;
 
@@ -3646,7 +3649,7 @@ void moveactors()
                         if(j == FREEZEBLAST) goto BOLT;
                         for(j=16; j >= 0 ;j--)
                         {
-                            k = EGS(SECT,SX,SY,SZ,GLASSPIECES+(j%3),-32,36,36,TRAND&2047,32+(TRAND&63),1024-(TRAND&1023),i,STAT_MISC);
+                            k = EGS(sprite[i].sectnum,sprite[i].x,sprite[i].y,sprite[i].z,GLASSPIECES+(j%3),-32,36,36,TRAND&2047,32+(TRAND&63),1024-(TRAND&1023),i,STAT_MISC);
                             sprite[k].pal = 1;
                         }
                         spritesound(GLASS_BREAKING,i);
@@ -3654,7 +3657,7 @@ void moveactors()
                     }
                     else if(x < 1024 && ps[p].quick_kick == 0)
                     {
-                        j = getincangle(ps[p].ang,getangle(SX-ps[p].posx,SY-ps[p].posy));
+                        j = getincangle(ps[p].ang,getangle(sprite[i].x-ps[p].posx,sprite[i].y-ps[p].posy));
                         if( j > -128 && j < 128 )
                             ps[p].quick_kick = 14;
                     }
@@ -4041,7 +4044,7 @@ void moveactors()
                     (s->xvel*(sintable[s->ang&2047]))>>14,
                     s->zvel,CLIPMASK0);
 
-                if(sector[SECT].lotag == 1 && s->zvel == 0)
+                if(sector[sprite[i].sectnum].lotag == 1 && s->zvel == 0)
                 {
                     s->z += (32<<8);
                     if(t[5] == 0)
@@ -4594,7 +4597,7 @@ void moveexplosions()  // STATNUM 5
                     s->z = l;
 
                     insertspriteq(i);
-                    PN ++;
+                    sprite[i].picnum ++;
 
                     j = headspritestat[STAT_MISC];
                     while(j >= 0)
@@ -5322,7 +5325,7 @@ void moveeffectors()   //STATNUM 3
                             }
                         }
 
-                        j = headspritesect[sprite[OW].sectnum];
+                        j = headspritesect[sprite[sprite[i].owner].sectnum];
                         while(j >= 0)
                         {
                             l = nextspritesect[j];
@@ -5494,7 +5497,7 @@ void moveeffectors()   //STATNUM 3
                             }
                         }
 
-                        j = headspritesect[sprite[OW].sectnum];
+                        j = headspritesect[sprite[sprite[i].owner].sectnum];
                         while(j >= 0)
                         {
                             l = nextspritesect[j];
@@ -5668,7 +5671,7 @@ void moveeffectors()   //STATNUM 3
                     }
                 }
 
-                j = headspritesect[SECT];
+                j = headspritesect[sprite[i].sectnum];
                 while(j >= 0)
                 {
                     if(sprite[j].cstat&16)
@@ -5903,7 +5906,7 @@ void moveeffectors()   //STATNUM 3
                             if( sprite[k].owner >= 0 && clipinsidebox(sprite[k].x,sprite[k].y,j,144L) == 1 )
                             {
                                 t[5] = 8; // Delay
-                                k = (SP>>3)*t[3];
+                                k = (sprite[i].yvel>>3)*t[3];
                                 t[2]-=k;
                                 t[4]-=k;
                                 ms(i);
@@ -5914,7 +5917,7 @@ void moveeffectors()   //STATNUM 3
                         }
                     }
 
-                    k = (SP>>3)*t[3];
+                    k = (sprite[i].yvel>>3)*t[3];
                     t[2]+=k;
                     t[4]+=k;
                     ms(i);
@@ -5948,7 +5951,7 @@ void moveeffectors()   //STATNUM 3
                     sc->ceilingshade = t[2];
                     t[0]=0;
 
-                    j = headspritesect[SECT];
+                    j = headspritesect[sprite[i].sectnum];
                     while(j >= 0)
                     {
                         if(sprite[j].cstat&16)
@@ -5983,7 +5986,7 @@ void moveeffectors()   //STATNUM 3
                     }
                     else t[0] = 2;
 
-                    j = headspritesect[SECT];
+                    j = headspritesect[sprite[i].sectnum];
                     while(j >= 0)
                     {
                         if(sprite[j].cstat&16)
@@ -6001,7 +6004,7 @@ void moveeffectors()   //STATNUM 3
             case 13:
                 if( t[2] )
                 {
-                    j = (SP<<5)|1;
+                    j = (sprite[i].yvel<<5)|1;
 
                     if( s->ang == 512 )
                     {
@@ -6071,7 +6074,7 @@ void moveeffectors()   //STATNUM 3
 
                     if(t[4] == 1) //Opening
                     {
-                        if( t[3] >= (SP>>3) )
+                        if( t[3] >= (sprite[i].yvel>>3) )
                         {
                             t[4] = 0; //Turn off the sliders
                             callsound(s->sectnum,i);
@@ -6129,7 +6132,7 @@ void moveeffectors()   //STATNUM 3
 
             case 17:
 
-                q = t[0]*(SP<<2);
+                q = t[0]*(sprite[i].yvel<<2);
 
                 sc->ceilingz += q;
                 sc->floorz += q;
@@ -6162,7 +6165,7 @@ void moveeffectors()   //STATNUM 3
 
                 if( t[0] )                if(t[0]) //If in motion
                 {
-                    if( klabs(sc->floorz-t[2]) <= SP)
+                    if( klabs(sc->floorz-t[2]) <= sprite[i].yvel)
                     {
                         activatewarpelevators(i,0);
                         break;
@@ -6347,7 +6350,7 @@ void moveeffectors()   //STATNUM 3
                     }
 
                     if(sc->ceilingz < sc->floorz)
-                        sc->ceilingz += SP;
+                        sc->ceilingz += sprite[i].yvel;
                     else
                     {
                         sc->ceilingz = sc->floorz;
@@ -6432,7 +6435,7 @@ void moveeffectors()   //STATNUM 3
                     s->x += x;
                     s->y += l;
 
-                    if( t[3] <= 0 || (t[3]>>6) >= (SP>>6) )
+                    if( t[3] <= 0 || (t[3]>>6) >= (sprite[i].yvel>>6) )
                     {
                         s->x -= x;
                         s->y -= l;
@@ -6493,7 +6496,7 @@ void moveeffectors()   //STATNUM 3
 
                 if( t[0] == 1 ) //Decide if the s->sectnum should go up or down
                 {
-                    s->zvel = ksgn(s->z-*(long *)l) * (SP<<4);
+                    s->zvel = ksgn(s->z-*(long *)l) * (sprite[i].yvel<<4);
                     t[0]++;
                 }
 
@@ -6525,8 +6528,8 @@ void moveeffectors()   //STATNUM 3
 
                 if(t[4]) break;
 
-                x = (SP*sintable[(s->ang+512)&2047])>>18;
-                l = (SP*sintable[s->ang&2047])>>18;
+                x = (sprite[i].yvel*sintable[(s->ang+512)&2047])>>18;
+                l = (sprite[i].yvel*sintable[s->ang&2047])>>18;
 
                 k = 0;
 
@@ -6605,7 +6608,7 @@ void moveeffectors()   //STATNUM 3
                     fricyv += l<<3;
                 }
 
-                sc->floorxpanning += SP>>7;
+                sc->floorxpanning += sprite[i].yvel>>7;
 
             break;
 
@@ -6653,13 +6656,13 @@ void moveeffectors()   //STATNUM 3
 
                 if(s->shade)
                 {
-                    sc->ceilingz += SP<<4;
+                    sc->ceilingz += sprite[i].yvel<<4;
                     if(sc->ceilingz > sc->floorz)
                         sc->ceilingz = sc->floorz;
                 }
                 else
                 {
-                    sc->ceilingz   -= SP<<4;
+                    sc->ceilingz   -= sprite[i].yvel<<4;
                     if(sc->ceilingz < t[3])
                         sc->ceilingz = t[3];
                 }
@@ -6734,14 +6737,14 @@ void moveeffectors()   //STATNUM 3
                     }
                     else if(ud.recstat == 2 && ps[p].newowner == -1)
                     {
-                        if(cansee(s->x,s->y,s->z,SECT,ps[p].posx,ps[p].posy,ps[p].posz,ps[p].cursectnum))
+                        if(cansee(s->x,s->y,s->z,sprite[i].sectnum,ps[p].posx,ps[p].posy,ps[p].posz,ps[p].cursectnum))
                         {
                             if(x < (unsigned)sh)
                             {
                                 ud.camerasprite = i;
                                 t[0] = 999;
                                 s->ang += getincangle(s->ang,getangle(ps[p].posx-s->x,ps[p].posy-s->y))>>3;
-                                SP = 100+((s->z-ps[p].posz)/257);
+                                sprite[i].yvel = 100+((s->z-ps[p].posz)/257);
 
                             }
                             else if(t[0] == 999)
@@ -6872,9 +6875,9 @@ void moveeffectors()   //STATNUM 3
 
                     if(t[2] == 1) // Retract
                     {
-                        if(SA != 1536)
+                        if(sprite[i].ang != 1536)
                         {
-                            if( klabs( sc->floorz - s->z ) < SP )
+                            if( klabs( sc->floorz - s->z ) < sprite[i].yvel )
                             {
                                 sc->floorz = s->z;
                                 t[2] = 0;
@@ -6884,7 +6887,7 @@ void moveeffectors()   //STATNUM 3
                             }
                             else
                             {
-                                l = ksgn(s->z-sc->floorz)*SP;
+                                l = ksgn(s->z-sc->floorz)*sprite[i].yvel;
                                 sc->floorz += l;
 
                                 j = headspritesect[s->sectnum];
@@ -6904,7 +6907,7 @@ void moveeffectors()   //STATNUM 3
                         }
                         else
                         {
-                            if( klabs( sc->floorz - t[1] ) < SP )
+                            if( klabs( sc->floorz - t[1] ) < sprite[i].yvel )
                             {
                                 sc->floorz = t[1];
                                 callsound(s->sectnum,i);
@@ -6914,7 +6917,7 @@ void moveeffectors()   //STATNUM 3
                             }
                             else
                             {
-                                l = ksgn(t[1]-sc->floorz)*SP;
+                                l = ksgn(t[1]-sc->floorz)*sprite[i].yvel;
                                 sc->floorz += l;
 
                                 j = headspritesect[s->sectnum];
@@ -6937,7 +6940,7 @@ void moveeffectors()   //STATNUM 3
 
                     if( (s->ang&2047) == 1536)
                     {
-                        if( klabs( s->z-sc->floorz ) < SP )
+                        if( klabs( s->z-sc->floorz ) < sprite[i].yvel )
                         {
                             callsound(s->sectnum,i);
                             t[0] = 0;
@@ -6946,7 +6949,7 @@ void moveeffectors()   //STATNUM 3
                         }
                         else
                         {
-                            l = ksgn(s->z-sc->floorz)*SP;
+                            l = ksgn(s->z-sc->floorz)*sprite[i].yvel;
                             sc->floorz += l;
 
                             j = headspritesect[s->sectnum];
@@ -6966,7 +6969,7 @@ void moveeffectors()   //STATNUM 3
                     }
                     else
                     {
-                        if( klabs( sc->floorz-t[1] ) < SP )
+                        if( klabs( sc->floorz-t[1] ) < sprite[i].yvel )
                         {
                             t[0] = 0;
                             callsound(s->sectnum,i);
@@ -6975,7 +6978,7 @@ void moveeffectors()   //STATNUM 3
                         }
                         else
                         {
-                            l = ksgn(s->z-t[1])*SP;
+                            l = ksgn(s->z-t[1])*sprite[i].yvel;
                             sc->floorz -= l;
 
                             j = headspritesect[s->sectnum];
@@ -7003,10 +7006,10 @@ void moveeffectors()   //STATNUM 3
 
                     if(t[2] == 1) // Retract
                     {
-                        if(SA != 1536)
+                        if(sprite[i].ang != 1536)
                         {
                             if( klabs( sc->ceilingz - s->z ) <
-                                (SP<<1) )
+                                (sprite[i].yvel<<1) )
                             {
                                 sc->ceilingz = s->z;
                                 callsound(s->sectnum,i);
@@ -7014,12 +7017,12 @@ void moveeffectors()   //STATNUM 3
                                 t[0] = 0;
                             }
                             else sc->ceilingz +=
-                                ksgn(s->z-sc->ceilingz)*SP;
+                                ksgn(s->z-sc->ceilingz)*sprite[i].yvel;
                         }
                         else
                         {
                             if( klabs( sc->ceilingz - t[1] ) <
-                                (SP<<1) )
+                                (sprite[i].yvel<<1) )
                             {
                                 sc->ceilingz = t[1];
                                 callsound(s->sectnum,i);
@@ -7027,7 +7030,7 @@ void moveeffectors()   //STATNUM 3
                                 t[0] = 0;
                             }
                             else sc->ceilingz +=
-                                ksgn(t[1]-sc->ceilingz)*SP;
+                                ksgn(t[1]-sc->ceilingz)*sprite[i].yvel;
                         }
                         break;
                     }
@@ -7035,7 +7038,7 @@ void moveeffectors()   //STATNUM 3
                     if( (s->ang&2047) == 1536)
                     {
                         if( klabs(sc->ceilingz-s->z ) <
-                            (SP<<1) )
+                            (sprite[i].yvel<<1) )
                         {
                             t[0] = 0;
                             t[2] = !t[2];
@@ -7043,17 +7046,17 @@ void moveeffectors()   //STATNUM 3
                             sc->ceilingz = s->z;
                         }
                         else sc->ceilingz +=
-                            ksgn(s->z-sc->ceilingz)*SP;
+                            ksgn(s->z-sc->ceilingz)*sprite[i].yvel;
                     }
                     else
                     {
-                        if( klabs(sc->ceilingz-t[1] ) < (SP<<1) )
+                        if( klabs(sc->ceilingz-t[1] ) < (sprite[i].yvel<<1) )
                         {
                             t[0] = 0;
                             t[2] = !t[2];
                             callsound(s->sectnum,i);
                         }
-                        else sc->ceilingz -= ksgn(s->z-t[1])*SP;
+                        else sc->ceilingz -= ksgn(s->z-t[1])*sprite[i].yvel;
                     }
                 }
                 break;
