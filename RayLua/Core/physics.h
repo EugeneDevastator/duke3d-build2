@@ -12,9 +12,8 @@ typedef struct
 
     //Clipmove hit point info (use this after calling clipmove):
     double clipmaxcr; //clipmove always calls findmaxcr even with no movement
-    dpoint3d cliphit[3]; //	cliphit[] contains hit points for each collision stage
+    dpoint3d cliphit[3];
     long cliphitnum, clipsect[3], clipwall[3];
-//	cliphitnum indicates number of surfaces hit (0-3)
 
     //----------------------- DATA provided to BUILD2.C -----------------------
 
@@ -25,7 +24,7 @@ extern clipdata build2;
 
 void collmove (dpoint3d *p, int *cursect, dpoint3d *v, double cr, long doslide, mapstate_t* map);
 
-void collmove_p (point3d *p, int *cursect, point3d *v, double cr, long doslide, mapstate_t* map);
+void collmove (point3d *p, int *cursect, point3d *v, double cr, long doslide, mapstate_t* map);
 double findmaxcr (dpoint3d *p0, int cursect, double mindist, dpoint3d *hit, mapstate_t* map);
 
 
@@ -46,5 +45,6 @@ long sphtrace (dpoint3d *p0,  //start pt
 							 int *cursect,
 							 double cr, mapstate_t* gst);
 
+int hitscan (point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, int *hitwall, point3d *hit, mapstate_t* map);
 
 #endif //BUILD2_PHYSICS_H

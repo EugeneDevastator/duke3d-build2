@@ -14,6 +14,8 @@ char *inputs;
 mapstate_t* map;
 // mt = map transfer
 // populating tags from the end.
+#define PI 3.14159265358979323846
+
 #define MT_LAST 15 // index, not count
 #define MT_STATNUM (MT_LAST - 2)
 #define MT_PICLOW (MT_LAST - 3)
