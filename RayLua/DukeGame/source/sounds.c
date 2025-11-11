@@ -280,7 +280,7 @@ void sound(short num)
 
 int spritesound(unsigned short num, short i)
 {
-    return xyzsound(num,i,SX,SY,SZ);
+    return xyzsound(num,i,sprite[i].x,sprite[i].y,sprite[i].z);
 }
 
 void stopsound(short num)

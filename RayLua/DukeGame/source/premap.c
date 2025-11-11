@@ -47,7 +47,7 @@ void cachespritenum(short i)
 
     maxc = 1;
 
-    switch (PN)
+    switch (sprite[i].picnum)
     {
     case HYDRENT:
         tloadtile(BROKEFIREHYDRENT);
@@ -154,7 +154,7 @@ void cachespritenum(short i)
         break;
     }
 
-    for (j = PN; j < (PN + maxc); j++)
+    for (j = sprite[i].picnum; j < (sprite[i].picnum + maxc); j++)
         if (waloff[j] == 0)
             tloadtile(j);
 }
@@ -342,9 +342,9 @@ void xyzmirror(short i, short wn)
     if (waloff[wn] == 0) loadtile(wn);
     setviewtotile(wn, tilesizy[wn], tilesizx[wn]);
 
-    drawrooms(SX,SY,SZ,SA, 100 + sprite[i].shade,SECT);
+    drawrooms(sprite[i].x,sprite[i].y,sprite[i].z,sprite[i].ang, 100 + sprite[i].shade,sprite[i].sectnum);
     display_mirror = 1;
-    animatesprites(SX,SY,SA, 65536L);
+    animatesprites(sprite[i].x,sprite[i].y,sprite[i].ang, 65536L);
     display_mirror = 0;
     drawmasks();
 
@@ -732,26 +732,26 @@ void prelevel(char g)
 
         if (sprite[i].lotag == -1 && (sprite[i].cstat & 16))
         {
-            ps[0].exitx = SX;
-            ps[0].exity = SY;
+            ps[0].exitx = sprite[i].x;
+            ps[0].exity = sprite[i].y;
         }
         else
-            switch (PN)
+            switch (sprite[i].picnum)
             {
             case GPSPEED:
-                sector[SECT].extra = SLT;
+                sector[sprite[i].sectnum].extra = sprite[i].lotag;
                 deletesprite(i);
                 break;
 
             case CYCLER:
                 if (numcyclers >= MAXCYCLERS)
                     gameexit("\nToo many cycling sectors.");
-                cyclers[numcyclers][0] = SECT;
-                cyclers[numcyclers][1] = SLT;
-                cyclers[numcyclers][2] = SS;
-                cyclers[numcyclers][3] = sector[SECT].floorshade;
-                cyclers[numcyclers][4] = SHT;
-                cyclers[numcyclers][5] = (SA == 1536);
+                cyclers[numcyclers][0] = sprite[i].sectnum;
+                cyclers[numcyclers][1] = sprite[i].lotag;
+                cyclers[numcyclers][2] = sprite[i].shade;
+                cyclers[numcyclers][3] = sector[sprite[i].sectnum].floorshade;
+                cyclers[numcyclers][4] = sprite[i].hitag;
+                cyclers[numcyclers][5] = (sprite[i].ang == 1536);
                 numcyclers++;
                 deletesprite(i);
                 break;
@@ -763,7 +763,7 @@ void prelevel(char g)
     {
         if (sprite[i].statnum < MAXSTATUS)
         {
-            if (PN == SECTOREFFECTOR && SLT == 14)
+            if (sprite[i].picnum == SECTOREFFECTOR && sprite[i].lotag == 14)
                 continue;
             spawn(-1, i);
         }
@@ -772,7 +772,7 @@ void prelevel(char g)
     for (i = 0; i < MAXSPRITES; i++)
         if (sprite[i].statnum < MAXSTATUS)
         {
-            if (PN == SECTOREFFECTOR && SLT == 14)
+            if (sprite[i].picnum == SECTOREFFECTOR && sprite[i].lotag == 14)
                 spawn(-1, i);
         }
 
@@ -781,7 +781,7 @@ void prelevel(char g)
     i = headspritestat[0];
     while (i >= 0)
     {
-        switch (PN)
+        switch (sprite[i].picnum)
         {
         case DIPSWITCH:
         case DIPSWITCH2:
@@ -812,12 +812,12 @@ void prelevel(char g)
         case LOCKSWITCH1 + 1:
         case POWERSWITCH2 + 1:
             for (j = 0; j < lotaglist; j++)
-                if (SLT == lotags[j])
+                if (sprite[i].lotag == lotags[j])
                     break;
 
             if (j == lotaglist)
             {
-                lotags[lotaglist] = SLT;
+                lotags[lotaglist] = sprite[i].lotag;
                 lotaglist++;
                 if (lotaglist > 64)
                     gameexit("\nToo many switches (64 max).");
@@ -825,7 +825,7 @@ void prelevel(char g)
                 j = headspritestat[3];
                 while (j >= 0)
                 {
-                    if (sprite[j].lotag == 12 && sprite[j].hitag == SLT)
+                    if (sprite[j].lotag == 12 && sprite[j].hitag == sprite[i].lotag)
                         hittype[j].temp_data[0] = 1;
                     j = nextspritestat[j];
                 }

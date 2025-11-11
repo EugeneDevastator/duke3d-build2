@@ -165,15 +165,15 @@ long hits(short i)
     short sect,hw,hs;
     long zoff;
 
-    if(PN == APLAYER) zoff = (40<<8);
+    if(sprite[i].picnum == APLAYER) zoff = (40<<8);
     else zoff = 0;
 
-    hitscan(SX,SY,SZ-zoff,SECT,
-        sintable[(SA+512)&2047],
-        sintable[SA&2047],
+    hitscan(sprite[i].x,sprite[i].y,sprite[i].z-zoff,sprite[i].sectnum,
+        sintable[(sprite[i].ang+512)&2047],
+        sintable[sprite[i].ang&2047],
         0,&sect,&hw,&hs,&sx,&sy,&sz,CLIPMASK1);
 
-    return ( FindDistance2D( sx-SX,sy-SY ) );
+    return ( FindDistance2D( sx-sprite[i].x,sy-sprite[i].y ) );
 }
 
 long hitasprite(short i,short *hitsp)
@@ -183,18 +183,18 @@ long hitasprite(short i,short *hitsp)
 
     if(isBadGuy(&sprite[i]) )
         zoff = (42<<8);
-    else if(PN == APLAYER) zoff = (39<<8);
+    else if(sprite[i].picnum == APLAYER) zoff = (39<<8);
     else zoff = 0;
 
-    hitscan(SX,SY,SZ-zoff,SECT,
-        sintable[(SA+512)&2047],
-        sintable[SA&2047],
+    hitscan(sprite[i].x,sprite[i].y,sprite[i].z-zoff,sprite[i].sectnum,
+        sintable[(sprite[i].ang+512)&2047],
+        sintable[sprite[i].ang&2047],
         0,&sect,&hw,hitsp,&sx,&sy,&sz,CLIPMASK1);
 
     if(hw >= 0 && (wall[hw].cstat&16) && isBadGuy(&sprite[i]) )
         return((1<<30));
 
-    return ( FindDistance2D(sx-SX,sy-SY) );
+    return ( FindDistance2D(sx-sprite[i].x,sy-sprite[i].y) );
 }
 
 long hitaspriteandwall(short i,short *hitsp,short *hitw,short *x, short *y)
@@ -202,12 +202,12 @@ long hitaspriteandwall(short i,short *hitsp,short *hitw,short *x, short *y)
     long sz;
     short sect;
 
-    hitscan(SX,SY,SZ,SECT,
-        sintable[(SA+512)&2047],
-        sintable[SA&2047],
+    hitscan(sprite[i].x,sprite[i].y,sprite[i].z,sprite[i].sectnum,
+        sintable[(sprite[i].ang+512)&2047],
+        sintable[sprite[i].ang&2047],
         0,&sect,hitw,hitsp,x,y,&sz,CLIPMASK1);
 
-    return ( FindDistance2D(*x-SX,*y-SY) );
+    return ( FindDistance2D(*x-sprite[i].x,*y-sprite[i].y) );
 }
 
 long hitawall( player_struct *p,short *hitw)
@@ -257,9 +257,9 @@ short aim(spritetype *s,short aang)
             if( sprite[i].xrepeat > 0 && sprite[i].extra >= 0 && (sprite[i].cstat&(257+32768)) == 257)
                 if( isBadGuy(&sprite[i]) || k < 2 )
             {
-                if(isBadGuy(&sprite[i]) || PN == APLAYER || PN == SHARK)
+                if(isBadGuy(&sprite[i]) || sprite[i].picnum == APLAYER || sprite[i].picnum == SHARK)
                 {
-                    if( PN == APLAYER &&
+                    if( sprite[i].picnum == APLAYER &&
 //                        ud.ffire == 0 &&
                         ud.coop == 1 &&
                         s->picnum == APLAYER &&
@@ -268,7 +268,7 @@ short aim(spritetype *s,short aang)
 
                     if(gotshrinker && sprite[i].xrepeat < 30 )
                     {
-                        switch(PN)
+                        switch(sprite[i].picnum)
                         {
                             case SHARK:
                                 if(sprite[i].xrepeat < 20) continue;
@@ -289,8 +289,8 @@ short aim(spritetype *s,short aang)
                     if(gotfreezer && sprite[i].pal == 1) continue;
                 }
 
-                xv = (SX-s->x);
-                yv = (SY-s->y);
+                xv = (sprite[i].x-s->x);
+                yv = (sprite[i].y-s->y);
 
                 if( (dy1*xv) <= (dx1*yv) )
                     if( ( dy2*xv ) >= (dx2*yv) )
@@ -299,12 +299,12 @@ short aim(spritetype *s,short aang)
                     if( sdist > 512 && sdist < smax )
                     {
                         if(s->picnum == APLAYER)
-                            a = (klabs(scale(SZ-s->z,10,sdist)-(ps[s->yvel].horiz+ps[s->yvel].horizoff-100)) < 100);
+                            a = (klabs(scale(sprite[i].z-s->z,10,sdist)-(ps[s->yvel].horiz+ps[s->yvel].horizoff-100)) < 100);
                         else a = 1;
 
-                        if(PN == ORGANTIC || PN == ROTATEGUN )
-                            cans = cansee(SX,SY,SZ,SECT,s->x,s->y,s->z-(32<<8),s->sectnum);
-                        else cans = cansee(SX,SY,SZ-(32<<8),SECT,s->x,s->y,s->z-(32<<8),s->sectnum);
+                        if(sprite[i].picnum == ORGANTIC || sprite[i].picnum == ROTATEGUN )
+                            cans = cansee(sprite[i].x,sprite[i].y,sprite[i].z,sprite[i].sectnum,s->x,s->y,s->z-(32<<8),s->sectnum);
+                        else cans = cansee(sprite[i].x,sprite[i].y,sprite[i].z-(32<<8),sprite[i].sectnum,s->x,s->y,s->z-(32<<8),s->sectnum);
 
                         if( a && cans )
                         {
@@ -352,7 +352,7 @@ void shoot(short i,short atwith)
         if(s->picnum != ROTATEGUN)
         {
             sz -= (7<<8);
-            if(isBadGuy(s) && PN != COMMANDER)
+            if(isBadGuy(s) && sprite[i].picnum != COMMANDER)
             {
                 sx += (sintable[(sa+1024+96)&2047]>>7);
                 sy += (sintable[(sa+512+96)&2047]>>7);
@@ -437,7 +437,7 @@ void shoot(short i,short atwith)
                         sprite[k].cstat |= (TRAND&4);
                         ssp(k,CLIPMASK0);
                         setsprite(k,sprite[k].x,sprite[k].y,sprite[k].z);
-                        if( PN == OOZFILTER || PN == NEWBEAST )
+                        if( sprite[i].picnum == OOZFILTER || sprite[i].picnum == NEWBEAST )
                             sprite[k].pal = 6;
                     }
                 }
@@ -789,7 +789,7 @@ void shoot(short i,short atwith)
                 if(atwith == COOLEXPLOSION1)
                 {
                     sprite[j].shade = 0;
-                    if(PN == BOSS2)
+                    if(sprite[i].picnum == BOSS2)
                     {
                         l = sprite[j].xvel;
                         sprite[j].xvel = 1024;
@@ -840,9 +840,9 @@ void shoot(short i,short atwith)
             {
                 j = findplayer(s,&x);
                 sa = getangle(ps[j].oposx-sx,ps[j].oposy-sy);
-                if(PN == BOSS3)
+                if(sprite[i].picnum == BOSS3)
                     sz -= (32<<8);
-                else if(PN == BOSS2)
+                else if(sprite[i].picnum == BOSS2)
                 {
                     vel += 128;
                     sz += 24<<8;
@@ -877,7 +877,7 @@ void shoot(short i,short atwith)
 
             if(p == -1)
             {
-                if(PN == BOSS3)
+                if(sprite[i].picnum == BOSS3)
                 {
                     if(TRAND&1)
                     {
@@ -894,7 +894,7 @@ void shoot(short i,short atwith)
                     sprite[j].xrepeat = 42;
                     sprite[j].yrepeat = 42;
                 }
-                else if(PN == BOSS2)
+                else if(sprite[i].picnum == BOSS2)
                 {
                     sprite[j].x -= sintable[sa&2047]/56;
                     sprite[j].y -= sintable[(sa+1024+512)&2047]/56;
@@ -2609,10 +2609,10 @@ void processinput(short snum)
     if(p->newowner >= 0)
     {
         i = p->newowner;
-        p->posx = SX;
-        p->posy = SY;
-        p->posz = SZ;
-        p->ang =  SA;
+        p->posx = sprite[i].x;
+        p->posy = sprite[i].y;
+        p->posz = sprite[i].z;
+        p->ang =  sprite[i].ang;
         p->posxv = p->posyv = s->xvel = 0;
         p->look_ang = 0;
         p->rotscrnang = 0;

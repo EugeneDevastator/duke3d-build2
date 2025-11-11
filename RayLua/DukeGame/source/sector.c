@@ -400,10 +400,10 @@ void animatecamsprite()
         T1 = 0;
 
         if(ps[screenpeek].newowner >= 0)
-            OW = ps[screenpeek].newowner;
+            sprite[i].owner = ps[screenpeek].newowner;
 
-        else if(OW >= 0 && dist(&sprite[ps[screenpeek].i],&sprite[i]) < 2048)
-            xyzmirror(OW,PN);
+        else if(sprite[i].owner >= 0 && dist(&sprite[ps[screenpeek].i],&sprite[i]) < 2048)
+            xyzmirror(sprite[i].owner,sprite[i].picnum);
     }
     else T1++;
 }
@@ -514,10 +514,10 @@ char activatewarpelevators(short s,short d) //Parm = sectoreffectornum
     i = headspritestat[3];
     while(i >= 0)
     {
-        if( SLT == 17 )
-            if( SHT == sprite[s].hitag )
-                if( (klabs(sector[sn].floorz-hittype[s].temp_data[2]) > SP) ||
-                    (sector[SECT].hitag == (sector[sn].hitag-d) ) )
+        if( sprite[i].lotag == 17 )
+            if( sprite[i].hitag == sprite[s].hitag )
+                if( (klabs(sector[sn].floorz-hittype[s].temp_data[2]) > sprite[i].yvel) ||
+                    (sector[sprite[i].sectnum].hitag == (sector[sn].hitag-d) ) )
                         break;
         i = nextspritestat[i];
     }
@@ -538,8 +538,8 @@ char activatewarpelevators(short s,short d) //Parm = sectoreffectornum
     i = headspritestat[3];
     while(i >= 0)
     {
-        if( SLT == 17 )
-            if( SHT == sprite[s].hitag )
+        if( sprite[i].lotag == 17 )
+            if( sprite[i].hitag == sprite[s].hitag )
             {
                 T1 = d;
                 T2 = d; //Make all check warp
@@ -708,7 +708,7 @@ void operatesectors(short sn,short ii)
             i = headspritesect[sn];
             while(i >= 0)
             {
-                if(PN==SECTOREFFECTOR && SLT == 17 ) break;
+                if(sprite[i].picnum==SECTOREFFECTOR && sprite[i].lotag == 17 ) break;
                 i = nextspritesect[i];
             }
 
@@ -722,7 +722,7 @@ void operatesectors(short sn,short ii)
             }
             else
             {
-                if(sptr->floorz > SZ)
+                if(sptr->floorz > sprite[i].z)
                     activatewarpelevators(i,-1);
                 else
                     activatewarpelevators(i,1);
@@ -786,10 +786,10 @@ void operatesectors(short sn,short ii)
             i = headspritestat[3]; //Effectors
             while(i >= 0)
             {
-                if( (SLT == 22) &&
-                    (SHT == sptr->hitag) )
+                if( (sprite[i].lotag == 22) &&
+                    (sprite[i].hitag == sptr->hitag) )
                 {
-                    sector[SECT].extra = -sector[SECT].extra;
+                    sector[sprite[i].sectnum].extra = -sector[sprite[i].sectnum].extra;
 
                     T1 = sn;
                     T2 = 1;
@@ -815,9 +815,9 @@ void operatesectors(short sn,short ii)
                 i = headspritesect[sn];
                 while(i >= 0)
                 {
-                    if(sprite[i].statnum == 3 && SLT==9)
+                    if(sprite[i].statnum == 3 && sprite[i].lotag==9)
                     {
-                        j = SZ;
+                        j = sprite[i].z;
                         break;
                     }
                     i = nextspritesect[i];
@@ -898,7 +898,7 @@ void operatesectors(short sn,short ii)
             i = headspritestat[3];
             while(i >= 0)
             {
-                if( SLT == 11 && SECT == sn && !T5)
+                if( sprite[i].lotag == 11 && sprite[i].sectnum == sn && !T5)
                 {
                     j = i;
                     break;
@@ -906,17 +906,17 @@ void operatesectors(short sn,short ii)
                 i = nextspritestat[i];
             }
 
-            l = sector[SECT].lotag&0x8000;
+            l = sector[sprite[i].sectnum].lotag&0x8000;
 
             if(j >= 0)
             {
                 i = headspritestat[3];
                 while(i >= 0)
                 {
-                    if( l == (sector[SECT].lotag&0x8000) && SLT == 11 && sprite[j].hitag == SHT && !T5 )
+                    if( l == (sector[sprite[i].sectnum].lotag&0x8000) && sprite[i].lotag == 11 && sprite[j].hitag == sprite[i].hitag && !T5 )
                     {
-                        if(sector[SECT].lotag&0x8000) sector[SECT].lotag &= 0x7fff;
-                        else sector[SECT].lotag |= 0x8000;
+                        if(sector[sprite[i].sectnum].lotag&0x8000) sector[sprite[i].sectnum].lotag &= 0x7fff;
+                        else sector[sprite[i].sectnum].lotag |= 0x8000;
                         T5 = 1;
                         T4 = -T4;
                         if(q == 0)
@@ -946,16 +946,16 @@ void operatesectors(short sn,short ii)
             i = headspritestat[3];
             while(i >= 0)
             {
-                if( SHT==sprite[j].hitag )
+                if( sprite[i].hitag==sprite[j].hitag )
                 {
-                    if( SLT == 15 )
+                    if( sprite[i].lotag == 15 )
                     {
                         // Toggle door state
-                        sector[SECT].lotag ^= 0x8000; // Toggle the open or close
-                        SA += 1024;  // Rotate sprite angle (1024 = 90 degrees in Build engine)
-                        if(T5) callsound(SECT,i);
-                        callsound(SECT,i);
-                        if(sector[SECT].lotag&0x8000) T5 = 1;
+                        sector[sprite[i].sectnum].lotag ^= 0x8000; // Toggle the open or close
+                        sprite[i].ang += 1024;  // Rotate sprite angle (1024 = 90 degrees in Build engine)
+                        if(T5) callsound(sprite[i].sectnum,i);
+                        callsound(sprite[i].sectnum,i);
+                        if(sector[sprite[i].sectnum].lotag&0x8000) T5 = 1;
                         else T5 = 2;
                     }
                 }
@@ -1024,10 +1024,10 @@ void operaterespawns(short low)
     while(i >= 0)
     {
         nexti = nextspritestat[i];
-        if(SLT == low) switch(PN)
+        if(sprite[i].lotag == low) switch(sprite[i].picnum)
         {
             case RESPAWN:
-                if( badguypic(SHT) && ud.monsters_off ) break;
+                if( badguypic(sprite[i].hitag) && ud.monsters_off ) break;
 
                 j = spawn(i,TRANSPORTERSTAR);
                 sprite[j].z -= (32<<8);
@@ -1075,16 +1075,16 @@ void operateactivators(short low,short snum) // snum usually used for MP, otherw
             if( sprite[i].picnum == ACTIVATORLOCKED )
             // === LOCKED ACTIVATOR HANDLING ===
             {
-                if(sector[SECT].lotag&16384)
-                    sector[SECT].lotag &= 65535-16384;
+                if(sector[sprite[i].sectnum].lotag&16384)
+                    sector[sprite[i].sectnum].lotag &= 65535-16384;
                 // Toggle sector lock state using bit 14 (16384 = 0x4000)
                 else
-                    sector[SECT].lotag |= 16384;
+                    sector[sprite[i].sectnum].lotag |= 16384;
 
                 // Display message to player if valid player number
                 if(snum >= 0)
                 {
-                    if(sector[SECT].lotag&16384)
+                    if(sector[sprite[i].sectnum].lotag&16384)
                         FTA(4,&ps[snum]);
                     else FTA(8,&ps[snum]);
                 }
@@ -1093,19 +1093,19 @@ void operateactivators(short low,short snum) // snum usually used for MP, otherw
             else
             {
                 // Check activator conditions based on hitag
-                switch(SHT)
+                switch(sprite[i].hitag)
                 {
                     case 0: // No condition - always activate
                         break;
                     case 1: // Only activate if sector is closed (floor == ceiling)
-                        if(sector[SECT].floorz != sector[SECT].ceilingz)
+                        if(sector[sprite[i].sectnum].floorz != sector[sprite[i].sectnum].ceilingz)
                         {
                             i = nextspritestat[i];
                             continue; // Skip this activator
                         }
                         break;
                     case 2: // Only activate if sector is open (floor != ceiling)
-                        if(sector[SECT].floorz == sector[SECT].ceilingz)
+                        if(sector[sprite[i].sectnum].floorz == sector[sprite[i].sectnum].ceilingz)
                         {
                             i = nextspritestat[i];
                             continue; // Skip this activator
@@ -1129,20 +1129,20 @@ void operateactivators(short low,short snum) // snum usually used for MP, otherw
                             case 18: // Incremental sector rise/fall
                                 // Toggle effector state and play sound
                                 hittype[j].temp_data[0] = 1-hittype[j].temp_data[0];
-                                callsound(SECT,j);
+                                callsound(sprite[i].sectnum,j);
                                 break;
                         }
                         j = nextspritesect[j];
                     }
                 }
 
-                if( k == -1 && (sector[SECT].lotag&0xff) == 22 )
+                if( k == -1 && (sector[sprite[i].sectnum].lotag&0xff) == 22 )
                 // === SPLITTING DOOR SOUND ===
                 // Play sound for splitting doors (lotag 22) - only once per activation
-                    k = callsound(SECT,i);
+                    k = callsound(sprite[i].sectnum,i);
 
                 // Activate the sector's main function (doors, elevators, etc.)
-                operatesectors(SECT,i);
+                operatesectors(sprite[i].sectnum,i);
             }
         }
         i = nextspritestat[i];
@@ -1160,8 +1160,8 @@ void operatemasterswitches(short low)
     i = headspritestat[6];
     while(i >= 0)
     {
-        if( PN == MASTERSWITCH && SLT == low && SP == 0 )
-            SP = 1;
+        if( sprite[i].picnum == MASTERSWITCH && sprite[i].lotag == low && sprite[i].yvel == 0 )
+            sprite[i].yvel = 1;
         i = nextspritestat[i];
     }
 }
@@ -1315,20 +1315,20 @@ char checkhitswitch(short snum,long w,char switchtype)
     i = headspritestat[0];
     while(i >= 0)
     {
-        if( lotag == SLT ) switch(PN)
+        if( lotag == sprite[i].lotag ) switch(sprite[i].picnum)
         {
             case DIPSWITCH:
             case TECHSWITCH:
             case ALIENSWITCH:
-                if( switchtype == 1 && w == i ) PN++;
-                else if( SHT == 0 ) correctdips++;
+                if( switchtype == 1 && w == i ) sprite[i].picnum++;
+                else if( sprite[i].hitag == 0 ) correctdips++;
                 numdips++;
                 break;
             case TECHSWITCH+1:
             case DIPSWITCH+1:
             case ALIENSWITCH+1:
-                if( switchtype == 1 && w == i ) PN--;
-                else if( SHT == 1 ) correctdips++;
+                if( switchtype == 1 && w == i ) sprite[i].picnum--;
+                else if( sprite[i].hitag == 1 ) correctdips++;
                 numdips++;
                 break;
             case MULTISWITCH:
@@ -1587,9 +1587,9 @@ void activatebysector(short sect,short j)
     i = headspritesect[sect];
     while(i >= 0)
     {
-        if(PN == ACTIVATOR)
+        if(sprite[i].picnum == ACTIVATOR)
         {
-            operateactivators(SLT,-1);
+            operateactivators(sprite[i].lotag,-1);
             didit = 1;
 //            return;
         }
@@ -1659,9 +1659,9 @@ void checkhitwall(short spr,short dawallnum,long x,long y,long z,short atwith)
                 else i = EGS(sn,x,y,z,FORCERIPPLE,-127,32,32,0,0,0,spr,STAT_MISC);
             }
 
-            CS |= 18+128;
-            SA = getangle(wal->x-wall[wal->point2].x,
-                wal->y-wall[wal->point2].y)-512;
+            sprite[i].cstat |= 18+128;
+            sprite[i].ang = getangle(wal->x-wall[wal->point2].x,
+                                     wal->y-wall[wal->point2].y)-512;
 
             spritesound(SOMETHINGHITFORCE,i);
 
@@ -1689,7 +1689,7 @@ void checkhitwall(short spr,short dawallnum,long x,long y,long z,short atwith)
                 wall[wal->nextwall].cstat = 0;
 
             i = EGS(sn,x,y,z,SECTOREFFECTOR,0,0,0,ps[0].ang,0,0,spr,3);
-            SLT = 128; T2 = 5; T3 = dawallnum;
+            sprite[i].lotag = 128; T2 = 5; T3 = dawallnum;
             spritesound(GLASS_BREAKING,i);
             return;
         case STAINGLASS1:
@@ -1837,7 +1837,7 @@ void checkhitwall(short spr,short dawallnum,long x,long y,long z,short atwith)
                 i= headspritestat[3];
                 while(i >= 0)
                 {
-                    if(SHT == wall[dawallnum].lotag && SLT == 3 )
+                    if(sprite[i].hitag == wall[dawallnum].lotag && sprite[i].lotag == 3 )
                     {
                         T3 = j;
                         T4 = darkestwall;
@@ -1957,12 +1957,12 @@ char checkhitceiling(short sn)
                     i = headspritesect[sn];
                     while(i >= 0)
                     {
-                        if( PN == SECTOREFFECTOR && SLT == 12 )
+                        if( sprite[i].picnum == SECTOREFFECTOR && sprite[i].lotag == 12 )
                         {
                             j = headspritestat[3];
                             while(j >= 0)
                             {
-                                if( sprite[j].hitag == SHT )
+                                if( sprite[j].hitag == sprite[i].hitag )
                                     hittype[j].temp_data[3] = 1;
                                 j = nextspritestat[j];
                             }
@@ -1976,7 +1976,7 @@ char checkhitceiling(short sn)
                 j = TRAND&1;
                 while(i >= 0)
                 {
-                    if(SHT == (sector[sn].hitag) && SLT == 3 )
+                    if(sprite[i].hitag == (sector[sn].hitag) && sprite[i].lotag == 3 )
                     {
                         T3 = j;
                         T5 = 1;
@@ -1997,7 +1997,7 @@ void checkhitsprite(short i,short sn)
 
     i &= (MAXSPRITES-1);
 
-    switch(PN)
+    switch(sprite[i].picnum)
     {
         case OCEANSPRITE1:
         case OCEANSPRITE2:
@@ -2012,8 +2012,8 @@ void checkhitsprite(short i,short sn)
             if(sprite[sn].picnum == QUEBALL || sprite[sn].picnum == STRIPEBALL)
             {
                 sprite[sn].xvel = (sprite[i].xvel>>1)+(sprite[i].xvel>>2);
-                sprite[sn].ang -= (SA<<1)+1024;
-                SA = getangle(SX-sprite[sn].x,SY-sprite[sn].y)-512;
+                sprite[sn].ang -= (sprite[i].ang<<1)+1024;
+                sprite[i].ang = getangle(sprite[i].x-sprite[sn].x,sprite[i].y-sprite[sn].y)-512;
                 if(Sound[POOLBALLHIT].num < 2)
                     spritesound(POOLBALLHIT,i);
             }
@@ -2045,7 +2045,7 @@ void checkhitsprite(short i,short sn)
                 case HEAVYHBOMB:
                     if(T1 == 0)
                     {
-                        CS &= ~257;
+                        sprite[i].cstat &= ~257;
                         T1 = 1;
                         spawn(i,BURNING);
                     }
@@ -2063,13 +2063,13 @@ void checkhitsprite(short i,short sn)
                 case HEAVYHBOMB:
                     for(k=0;k<64;k++)
                     {
-                        j = EGS(SECT,SX,SY,SZ-(TRAND%(48<<8)),SCRAP3+(TRAND&3),-8,48,48,TRAND&2047,(TRAND&63)+64,-(TRAND&4095)-(sprite[i].zvel>>2),i,STAT_MISC);
+                        j = EGS(sprite[i].sectnum,sprite[i].x,sprite[i].y,sprite[i].z-(TRAND%(48<<8)),SCRAP3+(TRAND&3),-8,48,48,TRAND&2047,(TRAND&63)+64,-(TRAND&4095)-(sprite[i].zvel>>2),i,STAT_MISC);
                         sprite[j].pal = 8;
                     }
 
-                    if(PN == CACTUS)
-                        PN = CACTUSBROKE;
-                    CS &= ~257;
+                    if(sprite[i].picnum == CACTUS)
+                        sprite[i].picnum = CACTUSBROKE;
+                    sprite[i].cstat &= ~257;
              //       else deletesprite(i);
                     break;
             }
@@ -2078,17 +2078,17 @@ void checkhitsprite(short i,short sn)
         case HANGLIGHT:
         case GENERICPOLE2:
             for(k=0;k<6;k++)
-                EGS(SECT,SX,SY,SZ-(8<<8),SCRAP1+(TRAND&15),-8,48,48,TRAND&2047,(TRAND&63)+64,-(TRAND&4095)-(sprite[i].zvel>>2),i,STAT_MISC);
+                EGS(sprite[i].sectnum,sprite[i].x,sprite[i].y,sprite[i].z-(8<<8),SCRAP1+(TRAND&15),-8,48,48,TRAND&2047,(TRAND&63)+64,-(TRAND&4095)-(sprite[i].zvel>>2),i,STAT_MISC);
             spritesound(GLASS_HEAVYBREAK,i);
             deletesprite(i);
             break;
 
 
         case FANSPRITE:
-            PN = FANSPRITEBROKE;
-            CS &= (65535-257);
-            if( sector[SECT].floorpicnum == FANSHADOW )
-                sector[SECT].floorpicnum = FANSHADOWBROKE;
+            sprite[i].picnum = FANSPRITEBROKE;
+            sprite[i].cstat &= (65535-257);
+            if( sector[sprite[i].sectnum].floorpicnum == FANSHADOW )
+                sector[sprite[i].sectnum].floorpicnum = FANSHADOWBROKE;
 
             spritesound(GLASS_HEAVYBREAK,i);
             s = &sprite[i];
@@ -2099,7 +2099,7 @@ void checkhitsprite(short i,short sn)
         case WATERFOUNTAIN+1:
         case WATERFOUNTAIN+2:
         case WATERFOUNTAIN+3:
-            PN = WATERFOUNTAINBROKE;
+            sprite[i].picnum = WATERFOUNTAINBROKE;
             spawn(i,TOILETWATER);
             break;
         case SATELITE:
@@ -2109,7 +2109,7 @@ void checkhitsprite(short i,short sn)
             if(sprite[sn].extra != *actorscrptr[SHOTSPARK1] )
             {
                 for(j=0;j<15;j++)
-                    EGS(SECT,SX,SY,sector[SECT].floorz-(12<<8)-(j<<9),SCRAP1+(TRAND&15),-8,64,64,
+                    EGS(sprite[i].sectnum,sprite[i].x,sprite[i].y,sector[sprite[i].sectnum].floorz-(12<<8)-(j<<9),SCRAP1+(TRAND&15),-8,64,64,
                         TRAND&2047,(TRAND&127)+64,-(TRAND&511)-256,i,5);
                 spawn(i,EXPLOSION2);
                 deletesprite(i);
@@ -2143,23 +2143,23 @@ void checkhitsprite(short i,short sn)
         case VASE:
         case STATUEFLASH:
         case STATUE:
-            if(PN == BOTTLE10)
+            if(sprite[i].picnum == BOTTLE10)
                 lotsofmoney(&sprite[i],4+(TRAND&3));
-            else if(PN == STATUE || PN == STATUEFLASH)
+            else if(sprite[i].picnum == STATUE || sprite[i].picnum == STATUEFLASH)
             {
                 lotsofcolourglass(i,-1,40);
                 spritesound(GLASS_HEAVYBREAK,i);
             }
-            else if(PN == VASE)
+            else if(sprite[i].picnum == VASE)
                 lotsofglass(i,-1,40);
 
             spritesound(GLASS_BREAKING,i);
-            SA = TRAND&2047;
+            sprite[i].ang = TRAND&2047;
             lotsofglass(i,-1,8);
             deletesprite(i);
             break;
         case FETUS:
-            PN = FETUSBROKE;
+            sprite[i].picnum = FETUSBROKE;
             spritesound(GLASS_BREAKING,i);
             lotsofglass(i,-1,10);
             break;
@@ -2167,7 +2167,7 @@ void checkhitsprite(short i,short sn)
             for(j=0;j<48;j++)
             {
                 shoot(i,BLOODSPLAT1);
-                SA += 333;
+                sprite[i].ang += 333;
             }
             spritesound(GLASS_HEAVYBREAK,i);
             spritesound(SQUISHED,i);
@@ -2177,47 +2177,47 @@ void checkhitsprite(short i,short sn)
             deletesprite(i);
             break;
         case HYDROPLANT:
-            PN = BROKEHYDROPLANT;
+            sprite[i].picnum = BROKEHYDROPLANT;
             spritesound(GLASS_BREAKING,i);
             lotsofglass(i,-1,10);
             break;
 
         case FORCESPHERE:
             sprite[i].xrepeat = 0;
-            hittype[OW].temp_data[0] = 32;
-            hittype[OW].temp_data[1] = !hittype[OW].temp_data[1];
-            hittype[OW].temp_data[2] ++;
+            hittype[sprite[i].owner].temp_data[0] = 32;
+            hittype[sprite[i].owner].temp_data[1] = !hittype[sprite[i].owner].temp_data[1];
+            hittype[sprite[i].owner].temp_data[2] ++;
             spawn(i,EXPLOSION2);
             break;
 
         case BROKEHYDROPLANT:
-            if(CS&1)
+            if(sprite[i].cstat&1)
             {
                 spritesound(GLASS_BREAKING,i);
-                SZ += 16<<8;
-                CS = 0;
+                sprite[i].z += 16<<8;
+                sprite[i].cstat = 0;
                 lotsofglass(i,-1,5);
             }
             break;
 
         case TOILET:
-            PN = TOILETBROKE;
-            CS |= (TRAND&1)<<2;
-            CS &= ~257;
+            sprite[i].picnum = TOILETBROKE;
+            sprite[i].cstat |= (TRAND&1)<<2;
+            sprite[i].cstat &= ~257;
             spawn(i,TOILETWATER);
             spritesound(GLASS_BREAKING,i);
             break;
 
         case STALL:
-            PN = STALLBROKE;
-            CS |= (TRAND&1)<<2;
-            CS &= ~257;
+            sprite[i].picnum = STALLBROKE;
+            sprite[i].cstat |= (TRAND&1)<<2;
+            sprite[i].cstat &= ~257;
             spawn(i,TOILETWATER);
             spritesound(GLASS_HEAVYBREAK,i);
             break;
 
         case HYDRENT:
-            PN = BROKEFIREHYDRENT;
+            sprite[i].picnum = BROKEFIREHYDRENT;
             spawn(i,TOILETWATER);
 
 //            for(k=0;k<5;k++)
@@ -2229,25 +2229,25 @@ void checkhitsprite(short i,short sn)
             break;
 
         case GRATE1:
-            PN = BGRATE1;
-            CS &= (65535-256-1);
+            sprite[i].picnum = BGRATE1;
+            sprite[i].cstat &= (65535-256-1);
             spritesound(VENT_BUST,i);
             break;
 
         case CIRCLEPANNEL:
-            PN = CIRCLEPANNELBROKE;
-            CS &= (65535-256-1);
+            sprite[i].picnum = CIRCLEPANNELBROKE;
+            sprite[i].cstat &= (65535-256-1);
             spritesound(VENT_BUST,i);
             break;
         case PANNEL1:
         case PANNEL2:
-            PN = BPANNEL1;
-            CS &= (65535-256-1);
+            sprite[i].picnum = BPANNEL1;
+            sprite[i].cstat &= (65535-256-1);
             spritesound(VENT_BUST,i);
             break;
         case PANNEL3:
-            PN = BPANNEL3;
-            CS &= (65535-256-1);
+            sprite[i].picnum = BPANNEL3;
+            sprite[i].cstat &= (65535-256-1);
             spritesound(VENT_BUST,i);
             break;
         case PIPE1:
@@ -2256,44 +2256,44 @@ void checkhitsprite(short i,short sn)
         case PIPE4:
         case PIPE5:
         case PIPE6:
-            switch(PN)
+            switch(sprite[i].picnum)
             {
-                case PIPE1:PN=PIPE1B;break;
-                case PIPE2:PN=PIPE2B;break;
-                case PIPE3:PN=PIPE3B;break;
-                case PIPE4:PN=PIPE4B;break;
-                case PIPE5:PN=PIPE5B;break;
-                case PIPE6:PN=PIPE6B;break;
+                case PIPE1:sprite[i].picnum=PIPE1B;break;
+                case PIPE2:sprite[i].picnum=PIPE2B;break;
+                case PIPE3:sprite[i].picnum=PIPE3B;break;
+                case PIPE4:sprite[i].picnum=PIPE4B;break;
+                case PIPE5:sprite[i].picnum=PIPE5B;break;
+                case PIPE6:sprite[i].picnum=PIPE6B;break;
             }
 
             j = spawn(i,STEAM);
-            sprite[j].z = sector[SECT].floorz-(32<<8);
+            sprite[j].z = sector[sprite[i].sectnum].floorz-(32<<8);
             break;
 
         case MONK:
         case LUKE:
         case INDY:
         case JURYGUY:
-            spritesound(SLT,i);
-            spawn(i,SHT);
+            spritesound(sprite[i].lotag,i);
+            spawn(i,sprite[i].hitag);
         case SPACEMARINE:
             sprite[i].extra -= sprite[sn].extra;
             if(sprite[i].extra > 0) break;
-            SA = TRAND&2047;
+            sprite[i].ang = TRAND&2047;
             shoot(i,BLOODSPLAT1);
-            SA = TRAND&2047;
+            sprite[i].ang = TRAND&2047;
             shoot(i,BLOODSPLAT2);
-            SA = TRAND&2047;
+            sprite[i].ang = TRAND&2047;
             shoot(i,BLOODSPLAT3);
-            SA = TRAND&2047;
+            sprite[i].ang = TRAND&2047;
             shoot(i,BLOODSPLAT4);
-            SA = TRAND&2047;
+            sprite[i].ang = TRAND&2047;
             shoot(i,BLOODSPLAT1);
-            SA = TRAND&2047;
+            sprite[i].ang = TRAND&2047;
             shoot(i,BLOODSPLAT2);
-            SA = TRAND&2047;
+            sprite[i].ang = TRAND&2047;
             shoot(i,BLOODSPLAT3);
-            SA = TRAND&2047;
+            sprite[i].ang = TRAND&2047;
             shoot(i,BLOODSPLAT4);
             guts(&sprite[i],JIBS1,1,myconnectindex);
             guts(&sprite[i],JIBS2,2,myconnectindex);
@@ -2306,8 +2306,8 @@ void checkhitsprite(short i,short sn)
             break;
         case CHAIR1:
         case CHAIR2:
-            PN = BROKENCHAIR;
-            CS = 0;
+            sprite[i].picnum = BROKENCHAIR;
+            sprite[i].cstat = 0;
             break;
         case CHAIR3:
         case MOVIECAMERA:
@@ -2325,9 +2325,9 @@ void checkhitsprite(short i,short sn)
             deletesprite(i);
             break;
         case PLAYERONWATER:
-            i = OW;
+            i = sprite[i].owner;
         default:
-            if( (sprite[i].cstat&16) && SHT == 0 && SLT == 0 && sprite[i].statnum == 0)
+            if( (sprite[i].cstat&16) && sprite[i].hitag == 0 && sprite[i].lotag == 0 && sprite[i].statnum == 0)
                 break;
 
             if( ( sprite[sn].picnum == FREEZEBLAST || sprite[sn].owner != i ) && sprite[i].statnum != 4)
@@ -2336,9 +2336,11 @@ void checkhitsprite(short i,short sn)
                 {
                     if(sprite[sn].picnum == RPG) sprite[sn].extra <<= 1;
 
-                    if( (PN != DRONE) && (PN != ROTATEGUN) && (PN != COMMANDER) && (PN < GREENSLIME || PN > GREENSLIME+7) )
+                    if( (sprite[i].picnum != DRONE) && (sprite[i].picnum != ROTATEGUN) && (sprite[i].picnum != COMMANDER) && (sprite
+                            [i].picnum < GREENSLIME || sprite
+                            [i].picnum > GREENSLIME+7) )
                         if(sprite[sn].picnum != FREEZEBLAST )
-                            if( actortype[PN] == 0 )
+                            if( actortype[sprite[i].picnum] == 0 )
                     {
                         j = spawn(sn,JIBS6);
                         if(sprite[sn].pal == 6)
@@ -2351,7 +2353,7 @@ void checkhitsprite(short i,short sn)
 
                     j = sprite[sn].owner;
 
-                    if( j >= 0 && sprite[j].picnum == APLAYER && PN != ROTATEGUN && PN != DRONE )
+                    if( j >= 0 && sprite[j].picnum == APLAYER && sprite[i].picnum != ROTATEGUN && sprite[i].picnum != DRONE )
                         if( ps[sprite[j].yvel].curr_weapon == SHOTGUN_WEAPON )
                     {
                         shoot(i,BLOODSPLAT3);
@@ -2360,14 +2362,15 @@ void checkhitsprite(short i,short sn)
                         shoot(i,BLOODSPLAT4);
                     }
 
-                    if( PN != TANK && PN != BOSS1 && PN != BOSS4 && PN != BOSS2 && PN != BOSS3 && PN != RECON && PN != ROTATEGUN )
+                    if( sprite[i].picnum != TANK && sprite[i].picnum != BOSS1 && sprite[i].picnum != BOSS4 && sprite[i].picnum != BOSS2 && sprite
+                        [i].picnum != BOSS3 && sprite[i].picnum != RECON && sprite[i].picnum != ROTATEGUN )
                     {
                         if( (sprite[i].cstat&48) == 0 )
-                            SA = (sprite[sn].ang+1024)&2047;
+                            sprite[i].ang = (sprite[sn].ang+1024)&2047;
                         sprite[i].xvel = -(sprite[sn].extra<<2);
-                        j = SECT;
-                        pushmove(&SX,&SY,&SZ,&j,128L,(4L<<8),(4L<<8),CLIPMASK0);
-                        if(j != SECT && j >= 0 && j < MAXSECTORS)
+                        j = sprite[i].sectnum;
+                        pushmove(&sprite[i].x,&sprite[i].y,&sprite[i].z,&j,128L,(4L<<8),(4L<<8),CLIPMASK0);
+                        if(j != sprite[i].sectnum && j >= 0 && j < MAXSECTORS)
                             changespritesect(i,j);
                     }
 
@@ -2376,12 +2379,12 @@ void checkhitsprite(short i,short sn)
                         changespritestat(i,1);
                         hittype[i].timetosleep = SLEEPTIME;
                     }
-                    if( ( RX < 24 || PN == SHARK) && sprite[sn].picnum == SHRINKSPARK) return;
+                    if( ( sprite[i].xrepeat < 24 || sprite[i].picnum == SHARK) && sprite[sn].picnum == SHRINKSPARK) return;
                 }
 
                 if( sprite[i].statnum != 2 )
                 {
-                    if( sprite[sn].picnum == FREEZEBLAST && ( (PN == APLAYER && sprite[i].pal == 1 ) || ( freezerhurtowner == 0 && sprite[sn].owner == i ) ) )
+                    if( sprite[sn].picnum == FREEZEBLAST && ( (sprite[i].picnum == APLAYER && sprite[i].pal == 1 ) || ( freezerhurtowner == 0 && sprite[sn].owner == i ) ) )
                         return;
 
                     hittype[i].picnum = sprite[sn].picnum;
@@ -2412,7 +2415,7 @@ void checkhitsprite(short i,short sn)
                         }
                     }
 
-                    if( RX < 24 && sprite[sn].picnum == SHRINKSPARK)
+                    if( sprite[i].xrepeat < 24 && sprite[sn].picnum == SHRINKSPARK)
                         return;
 
                     if( sprite[hittype[i].owner].picnum != APLAYER)
@@ -2433,18 +2436,18 @@ void allignwarpelevators()
     i = headspritestat[3];
     while(i >= 0)
     {
-        if( SLT == 17 && SS > 16)
+        if( sprite[i].lotag == 17 && sprite[i].shade > 16)
         {
             j = headspritestat[3];
             while(j >= 0)
             {
                 if( (sprite[j].lotag) == 17 && i != j &&
-                    (SHT) == (sprite[j].hitag) )
+                    (sprite[i].hitag) == (sprite[j].hitag) )
                 {
                     sector[sprite[j].sectnum].floorz =
-                        sector[SECT].floorz;
+                        sector[sprite[i].sectnum].floorz;
                     sector[sprite[j].sectnum].ceilingz =
-                        sector[SECT].ceilingz;
+                        sector[sprite[i].sectnum].ceilingz;
                 }
 
                 j = nextspritestat[j];
@@ -2859,7 +2862,7 @@ void cheatkeys(short snum)
                         p->posy,
                         p->posz+(30<<8),APLAYER,-64,0,0,p->ang,0,0,-1,10);
                     T4 = T5 = 0;
-                    SP = snum;
+                    sprite[i].yvel = snum;
                     sprite[i].extra = 0;
                     FTA(47,p);
                 }
@@ -3170,9 +3173,10 @@ void checksectors(short snum)
 
                         while(i >= 0)
                         {
-                            if( PN == CAMERA1 && SP == 0 && sprite[neartagsprite].hitag == SLT )
+                            if( sprite[i].picnum == CAMERA1 && sprite[i].yvel == 0 && sprite[neartagsprite].hitag == sprite
+                                [i].lotag )
                             {
-                                SP = 1; //Using this camera
+                                sprite[i].yvel = 1; //Using this camera
                                 spritesound(MONITOR_ACTIVE,neartagsprite);
 
                                 sprite[neartagsprite].owner = i;
@@ -3180,7 +3184,7 @@ void checksectors(short snum)
 
 
                                 j = p->cursectnum;
-                                p->cursectnum = SECT;
+                                p->cursectnum = sprite[i].sectnum;
                                 setpal(p);
                                 p->cursectnum = j;
 
@@ -3209,7 +3213,7 @@ void checksectors(short snum)
                         i = headspritestat[1];
                         while(i >= 0)
                         {
-                            if(PN==CAMERA1) SP = 0;
+                            if(sprite[i].picnum==CAMERA1) sprite[i].yvel = 0;
                             i = nextspritestat[i];
                         }
                     }
@@ -3255,7 +3259,7 @@ void checksectors(short snum)
             i = headspritesect[neartagsector];
             while(i >= 0)
             {
-                if( PN == ACTIVATOR || PN == MASTERSWITCH )
+                if( sprite[i].picnum == ACTIVATOR || sprite[i].picnum == MASTERSWITCH )
                     return;
                 i = nextspritesect[i];
             }
@@ -3268,7 +3272,7 @@ void checksectors(short snum)
                 i = headspritesect[sprite[p->i].sectnum];
                 while(i >= 0)
                 {
-                    if(PN == ACTIVATOR || PN == MASTERSWITCH) return;
+                    if(sprite[i].picnum == ACTIVATOR || sprite[i].picnum == MASTERSWITCH) return;
                     i = nextspritesect[i];
                 }
                 operatesectors(sprite[p->i].sectnum,p->i);
