@@ -43,6 +43,6 @@ typedef struct
 
 extern dukewrapper bbeng; // bb= build 2
 
-void InitWrapper(engineapi_t* api);
+void InitDukeWrapper(engineapi_t* api);
 
 #endif //GAME_DUKEWRAP_H

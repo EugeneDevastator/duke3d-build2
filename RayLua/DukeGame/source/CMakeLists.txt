@@ -63,6 +63,7 @@ set(HEADERS
         _functio.h
         ../../interfaces/engineapi.h
         ../../interfaces/shared_types.h
+        game.h
         # Add more .h files here
 )
 

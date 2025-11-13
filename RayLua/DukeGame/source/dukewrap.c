@@ -71,7 +71,7 @@ spritetype ReadSprite(long i) {
 }
 
 // is it ok to store internal function in pointer?
-void InitWrapper(engineapi_t *api) // pass in real api
+void InitDukeWrapper(engineapi_t *api) // pass in real api
 {
     bbeng.SetSprPos = SetSprPos;
     bbeng.SetSprPosXY = SetSprPosXY;
@@ -207,7 +207,6 @@ void ParseMapToDukeFormat() {
 }
 
 void GetInput() {
-    rayl->GetKeysThisFrame(inputs);
 }
 
 

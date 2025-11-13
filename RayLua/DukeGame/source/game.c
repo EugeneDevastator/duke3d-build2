@@ -32,6 +32,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "music.h"
 #include "sounds.h"
 #include "task_man.h"
+#include "game.h"
 
 void TS_Shutdown()
 {
@@ -6797,51 +6798,15 @@ void RunDukeMap() // New Entry point copy of main
 
         ud.warp_on = 0;
 
-        while (!(ps[myconnectindex].gm & MODE_END)) //The whole loop!!!!!!!!!!!!!!!!!!
-        {
+        gameexit(" ");
+    }
+}
+void DoDukeLoop() {
+
             if (ud.recstat == 2 || ud.multimode > 1 || (ud.show_help == 0 && (ps[myconnectindex].gm & MODE_MENU) !=
                 MODE_MENU))
                 if (ps[myconnectindex].gm & MODE_GAME)
-                    if (moveloop()) continue;
-            /*
-                    if( ps[myconnectindex].gm&MODE_EOL || ps[myconnectindex].gm&MODE_RESTART )
-                    {
-                        if( ps[myconnectindex].gm&MODE_EOL )
-                        {
-                            closedemowrite();
-
-                            ready2send = 0;
-
-                            i = ud.screen_size;
-                            ud.screen_size = 0;
-                            vscrn();
-                            ud.screen_size = i;
-                            dobonus(0);
-
-                            if(ud.eog)
-                            {
-                                ud.eog = 0;
-                                if(ud.multimode < 2)
-                                {
-                                    ps[myconnectindex].gm = MODE_MENU;
-                                    cmenu(0);
-                                    probey = 0;
-                                    goto MAIN_LOOP_RESTART;
-                                }
-                                else
-                                {
-                                    ud.m_level_number = 0;
-                                    ud.level_number = 0;
-                                }
-                            }
-                        }
-
-                        ready2send = 0;
-                        if(numplayers > 1) ps[myconnectindex].gm = MODE_GAME;
-                        enterlevel(ps[myconnectindex].gm);
-                        continue;
-                    }
-            */
+                    if (moveloop()) return;
             cheats();
             nonsharedkeys();
 
@@ -6864,16 +6829,6 @@ void RunDukeMap() // New Entry point copy of main
 
             //checksync(); //net
 
-#ifdef VOLUMEONE
-            if (ud.show_help == 0 && show_shareware > 0 && (ps[myconnectindex].gm & MODE_MENU) == 0)
-                rotatesprite((320 - 50) << 16, 9 << 16, 65536L, 0, BETAVERSION, 0, 0, 2 + 8 + 16 + 128, 0, 0, xdim - 1,
-                             ydim - 1);
-#endif
-            nextpage();
-        }
-
-        gameexit(" ");
-    }
 }
 
 int main(int argc, char** argv)

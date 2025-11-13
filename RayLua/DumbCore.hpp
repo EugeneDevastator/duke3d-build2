@@ -3,6 +3,8 @@
 
 #include "raylib.h"
 #include "raymath.h"
+#include "source/dukewrap.h"
+#include "source/game.h"
 
 
 extern "C" {
@@ -13,11 +15,9 @@ extern "C" {
 }
 
 
-class DumbCore
-{
+class DumbCore {
 private:
-    struct FreeCamera
-    {
+    struct FreeCamera {
         Vector3 position;
         Vector3 target;
         Vector3 up;
@@ -29,17 +29,17 @@ private:
     static bool initialized;
     static int cursec;
     static point3d b2pos;
-public:
-    static mapstate_t* map;
 
-    static void Init(mapstate_t* loadedMap)
-    {
+public:
+    static mapstate_t *map;
+
+    static void Init(mapstate_t *loadedMap) {
         if (initialized) return;
         map = loadedMap;
         b2pos = map->startpos;
         point3d pos = buildToRaylib(b2pos);
         cam.position = {pos.x, pos.y, pos.z};
-        updatesect_imp(cam.position.x,-cam.position.z,cam.position.y,&cursec, map);
+        updatesect_imp(cam.position.x, -cam.position.z, cam.position.y, &cursec, map);
 
         cam.target = {0.0f, 0.0f, 0.0f};
         cam.up = {0.0f, 1.0f, 0.0f};
@@ -53,10 +53,14 @@ public:
 
         initialized = true;
         InitEngineApi(map);
+#if IS_DUKE_INCLUDED
+        InitDukeWrapper(&engine);
+        RunDukeMap();
+
+#endif
     }
 
-    static void Update(float deltaTime)
-    {
+    static void Update(float deltaTime) {
         if (!initialized) return;
 
         UpdateFreeCamera(deltaTime);
@@ -67,24 +71,21 @@ public:
         camera.up = cam.up;
     }
 
-    static Camera3D GetCamera()
-    {
+    static Camera3D GetCamera() {
         return camera;
     }
 
-    static void SetCameraPosition(Vector3 pos)
-    {
+    static void SetCameraPosition(Vector3 pos) {
         cam.position = pos;
         cam.target = Vector3Add(pos, {0, 0, -1});
     }
 
 private:
-    static point3d RaylibToBuild(Vector3 vec)
-    {
-        return {vec.x, vec.z,-vec.y};
+    static point3d RaylibToBuild(Vector3 vec) {
+        return {vec.x, vec.z, -vec.y};
     }
-    static void UpdateFreeCamera(float deltaTime)
-    {
+
+    static void UpdateFreeCamera(float deltaTime) {
         point3d camposb2 = {b2pos.x, b2pos.y, b2pos.z};
         Vector3 startpos = cam.position;
         float speed = cam.speed * deltaTime;
@@ -96,42 +97,37 @@ private:
 
 
         // WASD movement
-        if (IsKeyDown(KEY_W))
-        {
+        if (IsKeyDown(KEY_W)) {
             cam.position = Vector3Add(cam.position, Vector3Scale(forward, speed));
             cam.target = Vector3Add(cam.target, Vector3Scale(forward, speed));
         }
-        if (IsKeyDown(KEY_S))
-        {
+        if (IsKeyDown(KEY_S)) {
             cam.position = Vector3Subtract(cam.position, Vector3Scale(forward, speed));
             cam.target = Vector3Subtract(cam.target, Vector3Scale(forward, speed));
         }
-        if (IsKeyDown(KEY_A))
-        {
+        if (IsKeyDown(KEY_A)) {
             cam.position = Vector3Subtract(cam.position, Vector3Scale(right, speed));
             cam.target = Vector3Subtract(cam.target, Vector3Scale(right, speed));
         }
-        if (IsKeyDown(KEY_D))
-        {
+        if (IsKeyDown(KEY_D)) {
             cam.position = Vector3Add(cam.position, Vector3Scale(right, speed));
             cam.target = Vector3Add(cam.target, Vector3Scale(right, speed));
         }
 
         //those funcs still use internal build coords.
-        point3d movevec = RaylibToBuild(cam.position-startpos);
+        point3d movevec = RaylibToBuild(cam.position - startpos);
         point3d mv = {movevec.x, movevec.y, movevec.z};
-        collmove_p(&camposb2, &cursec, &mv, 0.25,1, map);
-        updatesect_imp(camposb2.x,camposb2.y,camposb2.z,&cursec, map);
+        collmove_p(&camposb2, &cursec, &mv, 0.25, 1, map);
+        updatesect_imp(camposb2.x, camposb2.y, camposb2.z, &cursec, map);
 
-        b2pos = {camposb2.x,camposb2.y,camposb2.z};
+        b2pos = {camposb2.x, camposb2.y, camposb2.z};
 
         cam.position.x = b2pos.x;
         cam.position.y = -b2pos.z;
         cam.position.z = b2pos.y;
         // Mouse look
         Vector2 mouseDelta = GetMouseDelta();
-        if (mouseDelta.x != 0 || mouseDelta.y != 0)
-        {
+        if (mouseDelta.x != 0 || mouseDelta.y != 0) {
             float sensitivity = 0.003f;
 
             Vector3 targetOffset = Vector3Subtract(cam.target, cam.position);
@@ -141,8 +137,8 @@ private:
             cam.target = Vector3Add(cam.position, targetOffset);
         }
     }
-    static void UpdateViaDuke(float deltaTime)
-    {
+
+    static void UpdateViaDuke(float deltaTime) {
         ForwardEngineUpdate(deltaTime);
         // WASD movement
         engine.Inputs[W_FRW] = IsKeyDown(KEY_W) ? 1 : 0;
@@ -157,19 +153,16 @@ private:
         cam.position.x = px;
         cam.position.y = -pz;
         cam.position.z = py;
-        cam.target = Vector3Add(cam.position, {0,0,1});
-
+        cam.target = Vector3Add(cam.position, {0, 0, 1});
     }
-    static void HandleInteraction()
-    {
-        if (IsKeyPressed(KEY_E))
-        {
+
+    static void HandleInteraction() {
+        if (IsKeyPressed(KEY_E)) {
             OnInteract();
         }
     }
 
-    static void OnInteract()
-    {
+    static void OnInteract() {
         // Stub for interaction - override this for actual functionality
         // For now, just print to console or do nothing
     }
@@ -180,6 +173,6 @@ DumbCore::FreeCamera DumbCore::cam = {};
 Camera3D DumbCore::camera = {};
 bool DumbCore::initialized = false;
 int DumbCore::cursec = false;
-point3d DumbCore::b2pos = {0,0,0};
-mapstate_t* DumbCore::map = nullptr;
+point3d DumbCore::b2pos = {0, 0, 0};
+mapstate_t *DumbCore::map = nullptr;
 #endif // DUMBCORE_HPP
