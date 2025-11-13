@@ -5,12 +5,35 @@
 #ifndef R_ENGINEAPI_H
 #define R_ENGINEAPI_H
 #include "shared_types.h"
-
+#define W_FRW 0
+#define S_BACK 1
+#define A_LEFT 2
+#define D_RIGHT 3
+#define E_USE 4
+#define SPC_JUMP 5
+#define CROUCH 6
+#define MB_SHOOT 7
+float px,py,pz;
 // wsad use-E jump-Space crouch-letfctrl
-typedef struct{
-    void (*GetKeysThisFrame)(char *writearr);
+typedef struct {
+    // void (*GetKeysThisFrame)(char *writearr);
     void (*SetPlayerPos)(float x, float y, float z);
-    mapstate_t* (*GetLoadedMap)();
-    void (*RegisterUpdate)(float (*UpdateFunc));
-}engineapi_t;
-    #endif
+
+    void (*SetSpritePos)(int i, float x, float y, float z);
+
+    void (*SetFloorZ)(int i, float z);
+
+    void (*SetCeilZ)(int i, float z);
+
+    mapstate_t * (*GetLoadedMap)();
+
+    void (*RegisterUpdate)(void (*UpdateFunc)(float t));
+
+    char *Inputs;
+} engineapi_t;
+
+engineapi_t engine;
+
+void InitEngineApi(mapstate_t *map);
+void ForwardEngineUpdate(float dt);
+#endif

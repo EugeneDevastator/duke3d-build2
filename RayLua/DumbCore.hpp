@@ -4,10 +4,12 @@
 #include "raylib.h"
 #include "raymath.h"
 
+
 extern "C" {
 #include "mapcore.h"
 #include "physics.h"
 #include "loaders.h"
+#include "interfaces/engineapi.h"
 }
 
 
@@ -50,6 +52,7 @@ public:
         camera.projection = CAMERA_PERSPECTIVE;
 
         initialized = true;
+        InitEngineApi(map);
     }
 
     static void Update(float deltaTime)
@@ -138,7 +141,25 @@ private:
             cam.target = Vector3Add(cam.position, targetOffset);
         }
     }
+    static void UpdateViaDuke(float deltaTime)
+    {
+        ForwardEngineUpdate(deltaTime);
+        // WASD movement
+        engine.Inputs[W_FRW] = IsKeyDown(KEY_W) ? 1 : 0;
+        engine.Inputs[S_BACK] = IsKeyDown(KEY_S) ? 1 : 0;
+        engine.Inputs[A_LEFT] = IsKeyDown(KEY_A) ? 1 : 0;
+        engine.Inputs[D_RIGHT] = IsKeyDown(KEY_D) ? 1 : 0;
+        engine.Inputs[SPC_JUMP] = IsKeyDown(KEY_SPACE) ? 1 : 0;
+        engine.Inputs[E_USE] = IsKeyDown(KEY_E) ? 1 : 0;
+        engine.Inputs[CROUCH] = IsKeyDown(KEY_LEFT_CONTROL) ? 1 : 0;
+        engine.Inputs[MB_SHOOT] = IsMouseButtonDown(MOUSE_BUTTON_LEFT) ? 1 : 0;
 
+        cam.position.x = px;
+        cam.position.y = -pz;
+        cam.position.z = py;
+        cam.target = Vector3Add(cam.position, {0,0,1});
+
+    }
     static void HandleInteraction()
     {
         if (IsKeyPressed(KEY_E))

@@ -6,14 +6,7 @@
 #define GAME_DUKEWRAP_H
 #include "types.h"
 #include "../../interfaces/engineapi.h"
-#define W_FRW 0
-#define S_BACK 1
-#define A_LEFT 2
-#define D_RIGHT 3
-#define E_USE 4
-#define SPC_JUMP 5
-#define CROUCH 6
-#define MB_SHOOT 7
+
 
 
 typedef struct
