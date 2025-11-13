@@ -76,7 +76,7 @@ void InitWrapper(engineapi_t *api) // pass in real api
     bbeng.SetSprPos = SetSprPos;
     bbeng.SetSprPosXY = SetSprPosXY;
     rayl = api;
-    inputs = malloc(20 * sizeof(char));
+    inputs = (char*)calloc(20 , sizeof(char));
     bbeng.FrameInputs = inputs;
     map = rayl->GetLoadedMap();
 }
@@ -159,6 +159,9 @@ void ConvertWall(int i,walltype* w, wall_t b2wall) {
         /* short */          w->hitag = b2wall.surf.hitag;
         /* short */          w->extra = b2wall.tags[MT_EXTRA];
 }
+
+// todo sync sprita xy and floorpos at the frame end.
+// and do keys.
 void ParseMapToDukeFormat() {
     int numsprites;
     initspritelists();
