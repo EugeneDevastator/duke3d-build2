@@ -49,7 +49,7 @@ void collmove (dpoint3d *p, int *cursect, dpoint3d *v, double cr, long doslide, 
 	}
 }
 
-void collmove (point3d *p, int *cursect, point3d *v, double cr, long doslide, mapstate_t* map)
+void collmove_p(point3d *p, int *cursect, point3d *v, double cr, long doslide, mapstate_t* map)
 {
 	dpoint3d np, nv;
 
@@ -545,6 +545,12 @@ long sphtrace (dpoint3d *p0,  //start pt
 	dp.z = v0->z*mint; p0->z += dp.z; v0->z -= dp.z;
 	return(mint == 1.0);
 }
+
+/*
+ *point3d *viewright,point3d *viewdown
+those were previously player view vectors for facing sprites.
+*/
+
 
 int hitscan (point3d *p0, point3d *pv, point3d *viewright,point3d *viewdown, float vscale, int cursect, int *hitsect, int *hitwall, point3d *hit, mapstate_t* map)
 {

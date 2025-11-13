@@ -24,7 +24,7 @@ extern clipdata build2;
 
 void collmove (dpoint3d *p, int *cursect, dpoint3d *v, double cr, long doslide, mapstate_t* map);
 
-void collmove (point3d *p, int *cursect, point3d *v, double cr, long doslide, mapstate_t* map);
+void collmove_p (point3d *p, int *cursect, point3d *v, double cr, long doslide, mapstate_t* map);
 double findmaxcr (dpoint3d *p0, int cursect, double mindist, dpoint3d *hit, mapstate_t* map);
 
 

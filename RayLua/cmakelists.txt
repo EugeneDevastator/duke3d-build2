@@ -139,26 +139,32 @@ if (NOT DEFINED DISABLE_LUA)
 endif ()
 
 # Core files
-set(CORE_SOURCES
+set(C_SOURCES
+        interfaces/engineapi.c
         core/mapcore.c
         core/artloader.c
         core/kplib.c
         Core/loaders.c
         Core/physics.c
-        interfaces/engineapi.c
+        interfaces/eventstore.c
 )
-
-set(CORE_HEADERS
+set(C_HEADERS
         core/mapcore.h
         core/artloader.h
         core/loaders.h
         core/kplib.h
         core/physics.h
-        dumbrender.hpp
-         DumbCore.hpp
         interfaces/engineapi.h
         interfaces/shared_types.h
-
+        interfaces/eventstore.h
+        interfaces/ev_projection.h
+        interfaces/event_types.h
+)
+set(CORE_HEADERS
+        dumbrender.hpp
+         DumbCore.hpp
+)
+set(CORE_SOURCES
 )
 if (NOT DISABLE_LUA)
     list(APPEND CORE_HEADERS luabinder.hpp)
@@ -170,6 +176,8 @@ add_executable(game
         FileWatcher.h
         ${CORE_SOURCES}
         ${CORE_HEADERS}
+        ${C_HEADERS}
+        ${C_SOURCES}
 )
 
 target_compile_definitions(game PRIVATE
@@ -179,7 +187,12 @@ target_compile_definitions(game PRIVATE
         _WIN32
         _WINDOWS
 )
-
+set_source_files_properties(${C_SOURCES} PROPERTIES
+        LANGUAGE C
+        C_STANDARD 99
+        C_STANDARD_REQUIRED ON
+)
+# Fix target_include_directories syntax:
 target_include_directories(game PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/core
         if (!DISABLE_LUA)
