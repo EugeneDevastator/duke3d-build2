@@ -58,11 +58,29 @@ void SetSprPos(long i, long x, long y, long z) // not in .h file
     return (0);
      **/
 }
+void SetSectorFloorZ(int i, long z) {
+    sector[i].floorz = z;
+    rayl->SetFloorZ(i, z / 512.0f / 16.0f);
+}
+void SetSectorCeilZ(int i, long z) {
+    sector[i].floorz = z;
+    rayl->SetFloorZ(i, z / 512.0f / 16.0f);
+}
 
+void SetSprPosXYZ(long i, long x, long y, long z) // not in .h file
+{
+    // convert to projection laters.
+    sprite[i].x = x;
+    sprite[i].y = y;
+    sprite[i].z = z;
+    rayl->SetSpritePos(i, x / 512.0f, y / 512.0f, z / 512.0f / 16.0f);
+}
 void SetSprPosXY(long i, long x, long y) // not in .h file
 {
-    // redirect to main api.
-    // main api. set pos (i, x-z,y) for ex.
+    // convert to projection laters.
+    sprite[i].x = x;
+    sprite[i].y = y;
+    rayl->SetSpritePos(i, x / 512.0f, y / 512.0f, sprite[i].z / 512.0f / 16.0f);
 }
 
 spritetype ReadSprite(long i) {

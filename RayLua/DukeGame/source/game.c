@@ -2132,7 +2132,8 @@ void displayrooms(short snum, long smoothratio)
 
     dointerpolations(smoothratio); // positional interp.
 // render
-    //    restoreinterpolations();
+//
+   restoreinterpolations();
 
     return;//
     if (false)

@@ -42,7 +42,11 @@ typedef struct
 } dukewrapper;
 
 extern dukewrapper bbeng; // bb= build 2
+void SetSprPosXY(long i, long x, long y);
+void SetSprPosXYZ(long i, long x, long y, long z);
 
+void SetSectorFloorZ(int i, long z);
+void SetSectorCeilZ(int i, long z);
 void InitDukeWrapper(engineapi_t* api);
 
 #endif //GAME_DUKEWRAP_H

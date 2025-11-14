@@ -29,6 +29,7 @@ typedef struct
 	long n, ns, nw; //n:rel. wall ind.; ns & nw : nextsect & nextwall_of_sect
 	long owner; //for dragging while editing, other effects during game
 	long surfn;
+	// maybe make portal innate?
 
 	surf_t surf, *xsurf; //additional malloced surfs when (surfn > 1)
 	uint16_t tags[16];
@@ -64,7 +65,25 @@ typedef struct
 	long foglev;
 	long owner;      //for dragging while editing, other effects during game
 	uint16_t tags[16];
+
+	// int nwperim - perimeter walls, would be first in sequence
+	// int nwnested - nested walls for fully inner sectors
+	// could be purely runtime info.
+	// but also inverted sector should be much easier to do.
+
+
 } sect_t;
+
+typedef struct {
+	long nsect;
+	sect_t* sects;
+	long spriorig; // sprite that denotes origin
+	point3d transform[3]; // pos, rot, scale or fdr
+	uint8_t kind; // 0 - normal. 1 - inverted. 2- procedural subtract, 3- overlay.
+	// rotation and position transforms.
+	// use some wall as origin, or even sprite.
+} chunk_t;
+
 //--------------------------------------------------------------------------------------------------
 typedef struct
 {
