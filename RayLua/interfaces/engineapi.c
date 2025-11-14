@@ -45,18 +45,17 @@ void RegisterUpdate(void (*UpdateFunc)(float t)) {
 }
 
 void ForwardEngineUpdate(float dt) {
-
-//    targetupdate(dt);
-    DoDukeLoop();
+    targetupdate(dt);
 }
 
 void InitEngineApi(mapstate_t *map) {
     mapref = map;
-    inputs = (char *) calloc(10, sizeof(char));
+    inputs = (char *) calloc(20, sizeof(char));
     engine.Inputs = inputs;
     engine.SetSpritePos = SetSpritePos;
     engine.SetFloorZ = SetFloorZ;
     engine.SetCeilZ = SetCeilZ;
     engine.SetPlayerPos = SetPlayerPos;
     engine.GetLoadedMap = GetLoadedMap;
+    engine.RegisterUpdate = RegisterUpdate;
 }

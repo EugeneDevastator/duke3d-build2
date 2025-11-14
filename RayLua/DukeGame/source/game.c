@@ -468,11 +468,11 @@ void faketimerhandler()
     //    short who;
     input *osyn, *nsyn;
 
-    if (qe == 0 && KB_KeyPressed(sc_LeftControl) && KB_KeyPressed(sc_LeftAlt) && KB_KeyPressed(sc_Delete))
-    {
-        qe = 1;
-        gameexit("Quick Exit.");
-    }
+   // if (qe == 0 && KB_KeyPressed(sc_LeftControl) && KB_KeyPressed(sc_LeftAlt) && KB_KeyPressed(sc_Delete))
+   // {
+   //     qe = 1;
+   //     gameexit("Quick Exit.");
+   // }
 
     if ((totalclock < ototalclock + TICSPERFRAME) || (ready2send == 0)) return;
     ototalclock += TICSPERFRAME;
@@ -2476,7 +2476,7 @@ long tempwallptr;
 // spawns sometihng and configures for game.
 short spawn(short j, short pn)
 {
-    short i, s, startwall, endwall, sect, clostest;
+    short i, s, startwall, endwall, sect, clostest =0;
     long x, y, d;
     spritetype* sp;
 
@@ -6805,8 +6805,17 @@ void InitDuke() // New Entry point copy of main
    //     gameexit(" ");
     }
 }
+void timerUp() {
+    totalclock++;
+    if ((totalclock < ototalclock + TICSPERFRAME)) return;
+    ototalclock += TICSPERFRAME;
+
+}
+
 void DoDukeLoop() {
     long i;
+    if ((totalclock < ototalclock + TICSPERFRAME)) return;
+    ototalclock += TICSPERFRAME;
             if (ud.recstat == 2 || ud.multimode > 1 || (ud.show_help == 0 && (ps[myconnectindex].gm & MODE_MENU) !=
                 MODE_MENU))
                 if (ps[myconnectindex].gm & MODE_GAME)

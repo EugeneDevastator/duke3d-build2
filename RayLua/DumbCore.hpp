@@ -144,9 +144,11 @@ private:
     }
 #if IS_DUKE_INCLUDED
     static void UpdateViaDuke(float deltaTime) {
-        ForwardEngineUpdate(deltaTime);
+
         // WASD movement
-        engine.Inputs[W_FRW] = IsKeyDown(KEY_W) ? 1 : 0;
+        engine.Inputs[W_FRW] = IsKeyDown(KEY_W) ?
+        1
+        : 0;
         engine.Inputs[S_BACK] = IsKeyDown(KEY_S) ? 1 : 0;
         engine.Inputs[A_LEFT] = IsKeyDown(KEY_A) ? 1 : 0;
         engine.Inputs[D_RIGHT] = IsKeyDown(KEY_D) ? 1 : 0;
@@ -154,7 +156,7 @@ private:
         engine.Inputs[E_USE] = IsKeyDown(KEY_E) ? 1 : 0;
         engine.Inputs[CROUCH] = IsKeyDown(KEY_LEFT_CONTROL) ? 1 : 0;
         engine.Inputs[MB_SHOOT] = IsMouseButtonDown(MOUSE_BUTTON_LEFT) ? 1 : 0;
-
+        ForwardEngineUpdate(deltaTime);
         cam.position.x = px;
         cam.position.y = -pz;
         cam.position.z = py;

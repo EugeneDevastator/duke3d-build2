@@ -7,6 +7,7 @@
 #include <stdlib.h>
 
 #include "engine.h"
+#include "game.h"
 #include "keyboard.h"
 dukewrapper bbeng;
 engineapi_t *rayl;
@@ -45,11 +46,11 @@ void SetSprPos(long i, long x, long y, long z) // not in .h file
 }
 void SetSectorFloorZ(int i, long z) {
     sector[i].floorz = z;
-    rayl->SetFloorZ(i, z / 512.0f / 16.0f);
+    rayl->SetFloorZ(i, z / (512.f*16.f));
 }
 void SetSectorCeilZ(int i, long z) {
     sector[i].ceilingz = z;
-    rayl->SetFloorZ(i, z / 512.0f / 16.0f);
+    rayl->SetFloorZ(i, z / (512.f*16.f));
 }
 
 void SetSprPosXYZ(long i, long x, long y, long z) // not in .h file
@@ -58,21 +59,25 @@ void SetSprPosXYZ(long i, long x, long y, long z) // not in .h file
     sprite[i].x = x;
     sprite[i].y = y;
     sprite[i].z = z;
-    rayl->SetSpritePos(i, x / 512.0f, y / 512.0f, z / 512.0f / 16.0f);
+    rayl->SetSpritePos(i, x / 512.0f, y / 512.0f, z / (512.f*16.f));
 }
 void SetSprPosXY(long i, long x, long y) // not in .h file
 {
     // convert to projection laters.
     sprite[i].x = x;
     sprite[i].y = y;
-    rayl->SetSpritePos(i, x / 512.0f, y / 512.0f, sprite[i].z / 512.0f / 16.0f);
+    rayl->SetSpritePos(i, x / 512.0f, y / 512.0f, sprite[i].z / (512.f*16.f));
 }
 
 spritetype ReadSprite(long i) {
     spritetype a = {};
     return a;
 }
+void DoDukeUpdate(float dt) {
+    DoDukeLoop();
+    rayl->SetPlayerPos(ps[0].posx/ 512.0f,ps[0].posy/ 512.0f,ps[0].posz/ (512.f*16.f));
 
+}
 // is it ok to store internal function in pointer?
 void InitDukeWrapper(engineapi_t *api) // pass in real api
 {
@@ -80,10 +85,11 @@ void InitDukeWrapper(engineapi_t *api) // pass in real api
     bbeng.SetSprPosXY = SetSprPosXY;
     bbeng.GetFloorZSloped = getceilzofslope;
     rayl = api;
-    inputs = (char*)calloc(20 , sizeof(char));
-    bbeng.FrameInputs = inputs;
+    bbeng.FrameInputs = api->Inputs;
     map = rayl->GetLoadedMap();
+    rayl->RegisterUpdate(DoDukeUpdate);
 }
+
 
 
 short forwardToAng(point3d forw) {
