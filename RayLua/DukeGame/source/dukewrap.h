@@ -52,5 +52,6 @@ void SetSprPosXYZ(long i, long x, long y, long z);
 void SetSectorFloorZ(int i, long z);
 void SetSectorCeilZ(int i, long z);
 void InitDukeWrapper(engineapi_t* api);
+void ParseMapToDukeFormat();
 
 #endif //GAME_DUKEWRAP_H

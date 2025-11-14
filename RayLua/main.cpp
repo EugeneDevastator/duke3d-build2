@@ -166,7 +166,7 @@ void MainLoop()
     DumbCore::Init(map);
     //InitWindow(1024, 768, "Mapstate Visualizer");
     SetTargetFPS(60);
-
+    DumbRender::LoadTexturesToGPU();
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
         DumbCore::Update(deltaTime);

@@ -3,16 +3,17 @@
 
 #include "raylib.h"
 #include "raymath.h"
-#if IS_DUKE_INCLUDED
-#include "DukeGame/source/dukewrap.h"
-#include "DukeGame/source/game.h"
-#endif
+
 
 extern "C" {
 #include "mapcore.h"
 #include "physics.h"
 #include "loaders.h"
 #include "interfaces/engineapi.h"
+#if IS_DUKE_INCLUDED
+#include "DukeGame/source/dukewrap.h"
+#include "DukeGame/source/game.h"
+#endif
 }
 
 
@@ -56,15 +57,18 @@ public:
         InitEngineApi(map);
 #if IS_DUKE_INCLUDED
         InitDukeWrapper(&engine);
-        RunDukeMap();
-
+        InitDuke();
 #endif
     }
 
     static void Update(float deltaTime) {
         if (!initialized) return;
 
+#if IS_DUKE_INCLUDED
+        UpdateViaDuke(deltaTime);
+#else
         UpdateFreeCamera(deltaTime);
+#endif
         HandleInteraction();
 
         camera.position = cam.position;

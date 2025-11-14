@@ -6709,7 +6709,7 @@ void closedemowrite()
 {
 };
 
-void RunDukeMap() // New Entry point copy of main
+void InitDuke() // New Entry point copy of main
 {
     // probably expose this api with something like
     // mapfilepath, *engineapi
@@ -6777,14 +6777,14 @@ void RunDukeMap() // New Entry point copy of main
                 ud.warp_on = 0;
         }
 
-    MAIN_LOOP_RESTART:
+    //MAIN_LOOP_RESTART:
 
         if (ud.warp_on == 0)
             Logo();
         else if (ud.warp_on == 1)
         {
             newgame(ud.m_volume_number, ud.m_level_number, ud.m_player_skill);
-            enterlevel(MODE_GAME);
+            enterlevel_rl();
         }
         else vscrn();
 
@@ -6795,14 +6795,14 @@ void RunDukeMap() // New Entry point copy of main
             //  FX_StopAllSounds();
             //   clearsoundlocks();
             nomorelogohack = 1;
-            goto MAIN_LOOP_RESTART;
+      //      goto MAIN_LOOP_RESTART;
         }
 
-        ud.auto_run = tempautorun;
+      //  ud.auto_run = tempautorun;
 
-        ud.warp_on = 0;
+     //   ud.warp_on = 0;
 
-        gameexit(" ");
+   //     gameexit(" ");
     }
 }
 void DoDukeLoop() {
@@ -6834,11 +6834,11 @@ void DoDukeLoop() {
             //checksync(); //net
 
 }
-
+#if !IS_DUKE_INCLUDED
 int main(int argc, char** argv)
 {
     checkcommandline(argc, argv);
-    RunDukeMap();
+    InitDuke();
     return  0;
     long i, j, k, l;
     int32_t tempautorun;
@@ -7095,7 +7095,7 @@ MAIN_LOOP_RESTART:
 
     gameexit(" ");
 }
-
+#endif
 // CTW - MODIFICATION
 // On my XP machine, demo playback causes the game to crash shortly in.
 // Only bug found so far, not sure if it's OS dependent or compiler or what.
@@ -8770,7 +8770,7 @@ void SetupGameButtons()
 ===================
 */
 
-long GetTime()
-{
-    return totalclock;
-}
+//long GetTime()
+//{
+//    return totalclock;
+//}

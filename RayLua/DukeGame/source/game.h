@@ -4,5 +4,6 @@
 
 #ifndef DUKE_GAME_H
 #define DUKE_GAME_H
-void RunDukeMap();
+void InitDuke();
+void DoDukeLoop();
 #endif

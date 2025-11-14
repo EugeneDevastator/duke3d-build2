@@ -45,6 +45,6 @@ long sphtrace (dpoint3d *p0,  //start pt
 							 int *cursect,
 							 double cr, mapstate_t* gst);
 
-int hitscan (point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, int *hitwall, point3d *hit, mapstate_t* map);
+//int hitscan (point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, int *hitwall, point3d *hit, mapstate_t* map);
 
 #endif //BUILD2_PHYSICS_H

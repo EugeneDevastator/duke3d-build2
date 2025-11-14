@@ -80,12 +80,15 @@ public:
         strcpy_s(rootpath, "c:/Eugene/Games/build2/");
         LoadPal(rootpath);
         LoadMapAndTiles();
-        GenerateTextures();
-        InitMapstateTex();
+
         // auto paltex = ConvertPalToTexture();
         // tile_t* pic = static_cast<tile_t*>(malloc(sizeof(tile_t)));
         // strcpy_s(pic->filnam, "TILES000.art|1");
         // auto tex = ConvertPicToTexture(pic);
+    }
+    static void LoadTexturesToGPU() {
+        GenerateTextures();
+        InitMapstateTex();
     }
 
     // Calculates the Z height at point (x,y) on a sloped surface

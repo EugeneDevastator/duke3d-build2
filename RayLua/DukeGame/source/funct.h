@@ -199,6 +199,7 @@ extern void cacheit();
 extern void dofrontscreens();
 //#line "premap.c" 1285
 extern void enterlevel(char g);
+extern void enterlevel_rl();
 //#line "player.c" 10
 extern void setpal(player_struct *p);
 //#line "player.c" 28
@@ -483,7 +484,7 @@ extern void lotsofcolourglass(short i,short wallnum,short n);
 //#line "game.c" 8004
 extern void SetupGameButtons();
 //#line "game.c" 8068
-extern long GetTime();
+//extern long GetTime();
 //#line "game.c" 8082
 extern void CenterCenter();
 //#line "game.c" 8095

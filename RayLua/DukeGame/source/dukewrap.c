@@ -143,7 +143,7 @@ void ConvertWall(int i,walltype* w, wall_t b2wall) {
 
         /* long */           w->x = b2wall.x * 512;
         /* long */           w->y = b2wall.y * 512;
-        /* short */          w->point2 = b2wall.nw, // we can abolish it by extracting api.
+        /* short */          w->point2 = b2wall.tags[MT_WALLPT2]; // we can abolish it by extracting api.
         /* short */          w->nextwall = b2wall.nw,
         /* short */          w->nextsector = b2wall.ns,
         /* short */          w->cstat = b2wall.tags[MT_CSTAT];

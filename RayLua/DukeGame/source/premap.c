@@ -25,6 +25,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 //-------------------------------------------------------------------------
 #include "build.h"
 #include "duke3d.h"
+#include "dukewrap.h"
 #include "funct.h"
 #include "music.h"
 #include "sounds.h"
@@ -1395,7 +1396,7 @@ void enterlevel_rl() {
 
     //#ifndef VOLUMEONE // full version if nopt def
 // board loading is external.
-
+    ParseMapToDukeFormat();
     clearbufbyte(gotpic, sizeof(gotpic), 0L);
 
     prelevel(MODE_GAME);

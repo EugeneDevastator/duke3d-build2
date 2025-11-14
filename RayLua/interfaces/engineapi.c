@@ -4,6 +4,8 @@
 #include "engineapi.h"
 
 #include <stdlib.h>
+
+#include "source/game.h"
 static mapstate_t *mapref;
 char *inputs;
 
@@ -43,7 +45,9 @@ void RegisterUpdate(void (*UpdateFunc)(float t)) {
 }
 
 void ForwardEngineUpdate(float dt) {
-    targetupdate(dt);
+
+//    targetupdate(dt);
+    DoDukeLoop();
 }
 
 void InitEngineApi(mapstate_t *map) {
@@ -54,4 +58,5 @@ void InitEngineApi(mapstate_t *map) {
     engine.SetFloorZ = SetFloorZ;
     engine.SetCeilZ = SetCeilZ;
     engine.SetPlayerPos = SetPlayerPos;
+    engine.GetLoadedMap = GetLoadedMap;
 }

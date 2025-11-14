@@ -11,7 +11,10 @@
 #define MT_PICLOW (MT_LAST - 3)
 #define MT_CSTAT (MT_LAST - 4)
 #define MT_PICOVER (MT_LAST - 5)
+
 #define MT_HNUMLOW (MT_LAST - 6)
+#define MT_WALLPT2 (MT_LAST - 6)
+
 #define MT_HNUMHI (MT_LAST - 7)
 #define MT_SHADELOW (MT_LAST - 8)
 #define MT_SHADEHI (MT_LAST - 9)

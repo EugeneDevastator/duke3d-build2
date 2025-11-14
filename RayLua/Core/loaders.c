@@ -564,7 +564,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			}
 			kzread(&s,2); //numwalls
 			printf("walls:%d",s);
-			for(i=k=0;i<map->numsects;i++) //wall
+			for(i=k=0;i<map->numsects;i++) // Parse walls
 			{
 				for(j=0;j<sec[i].n;j++,k++) // walls
 				{
@@ -572,6 +572,8 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					sec[i].wall[j].x = ((float)b7wal.x)*(1.f/512.f);
 					sec[i].wall[j].y = ((float)b7wal.y)*(1.f/512.f);
 					sec[i].wall[j].n = b7wal.point2-k;
+					sec[i].wall[j].tags[MT_WALLPT2] = b7wal.point2;
+
 					sur = &sec[i].wall[j].surf;
 					sur->flags = 0;
 					if (b7wal.cstat&1) sur->flags |= 1;
