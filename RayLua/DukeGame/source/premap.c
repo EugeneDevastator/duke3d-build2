@@ -1137,7 +1137,7 @@ void resetpspritevars(char g)
         }
 
     numplayersprites = 0;
-    circ = 2048 / ud.multimode;
+    circ = 2048 ;/// ud.multimode;
 
     which_palookup = 9;
     j = connecthead;

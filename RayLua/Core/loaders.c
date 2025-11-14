@@ -450,6 +450,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			kzread(&z,4); //posz
 			kzread(&s,2); //ang
 			kzread(&cursect,2); //cursectnum
+			map->startsectn = cursect;
 			map->startpos.x = ((float)x)*(1.f/512.f);
 			map->startpos.y = ((float)y)*(1.f/512.f);
 			map->startpos.z = ((float)z)*(1.f/(512.f*16.f));
@@ -561,6 +562,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				sec[i].tags[MT_HNUMLOW]=b7sec.surf[FLOOR].heinum;
 				sec[i].tags[MT_SHADELOW]=b7sec.surf[FLOOR].shade;
 				sec[i].tags[MT_EXTRA] = b7sec.extra;
+				sec[i].tags[MT_FIRST_WALL] = b7sec.wallptr;
 			}
 			kzread(&s,2); //numwalls
 			printf("walls:%d",s);
@@ -573,6 +575,9 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					sec[i].wall[j].y = ((float)b7wal.y)*(1.f/512.f);
 					sec[i].wall[j].n = b7wal.point2-k;
 					sec[i].wall[j].tags[MT_WALLPT2] = b7wal.point2;
+					sec[i].wall[j].tags[MT_WALLIDX] = j;
+					sec[i].wall[j].tags[MT_NEXTSEC] = b7wal.nextsect;
+					sec[i].wall[j].tags[MT_NEXTWALL] = b7wal.nextwall;
 
 					sur = &sec[i].wall[j].surf;
 					sur->flags = 0;

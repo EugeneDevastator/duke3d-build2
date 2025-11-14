@@ -10,17 +10,26 @@
 #define MT_STATNUM (MT_LAST - 2)
 #define MT_PICLOW (MT_LAST - 3)
 #define MT_CSTAT (MT_LAST - 4)
+
 #define MT_PICOVER (MT_LAST - 5)
 
 #define MT_HNUMLOW (MT_LAST - 6)
 #define MT_WALLPT2 (MT_LAST - 6)
 
 #define MT_HNUMHI (MT_LAST - 7)
+#define MT_NEXTWALL (MT_LAST - 7)
+
 #define MT_SHADELOW (MT_LAST - 8)
+
 #define MT_SHADEHI (MT_LAST - 9)
+
 #define MT_VIS (MT_LAST - 10)
 #define MT_EXTRA (MT_LAST - 11)
+
 #define MT_FIRST_WALL (MT_LAST - 12)
+#define MT_WALLIDX (MT_LAST - 12)
+
+#define MT_NEXTSEC (MT_LAST - 13)
 
 #define FLOOR 1
 #define CEIL 0
@@ -108,6 +117,7 @@ typedef struct {
 typedef struct
 {
 	point3d startpos, startrig, startdow, startfor;
+	long startsectn;
 	int numsects, malsects; sect_t *sect;
 	int numspris, malspris; spri_t *spri;
 	int blankheadspri;

@@ -211,7 +211,7 @@ void getzrange(long x, long y, long z, short sectnum,
 void rotatesprite(long sx, long sy, long z, short a, short picnum, signed char dashade, char dapalnum, char dastat,
 				  long cx1, long cy1, long cx2, long cy2);
 void makepalookup(long palnum, char* remapbuf, signed char r, signed char g, signed char b, char dastat);
-long getceilzofslope(short sectnum, long dax, long day);
+long getceilzofslope(long sectnum, long dax, long day);
 long getflorzofslope(short sectnum, long dax, long day);
 void getzsofslope(short sectnum, long dax, long day, long* ceilz, long* florz);
 

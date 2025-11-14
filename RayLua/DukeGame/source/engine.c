@@ -7250,7 +7250,7 @@ long sectorofwall(short theline)
     return (i);
 }
 
-long getceilzofslope(short sectnum, long dax, long day)
+long getceilzofslope(long sectnum, long dax, long day)
 {
     long dx, dy, i, j;
     walltype* wal;

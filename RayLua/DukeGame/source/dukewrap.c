@@ -78,6 +78,7 @@ void InitDukeWrapper(engineapi_t *api) // pass in real api
 {
     bbeng.SetSprPos = SetSprPos;
     bbeng.SetSprPosXY = SetSprPosXY;
+    bbeng.GetFloorZSloped = getceilzofslope;
     rayl = api;
     inputs = (char*)calloc(20 , sizeof(char));
     bbeng.FrameInputs = inputs;
@@ -91,6 +92,7 @@ short forwardToAng(point3d forw) {
 void ConvertSector(int i,sectortype* sect) {
     sect_t b2sec = map->sect[i];
     /* short */      sect->wallptr = b2sec.tags[MT_FIRST_WALL];// and this is count of walls, like idx = wallptr + i for i in (0..n)
+    /* short */      sect->wallnum = b2sec.n;// and this is count of walls, like idx = wallptr + i for i in (0..n)
     /* long */       sect->ceilingz = b2sec.z[CEIL];
     /* long */       sect->floorz = b2sec.z[FLOOR];
     /* short */      sect->ceilingstat = b2sec.tags[MT_STATNUM];
@@ -139,7 +141,9 @@ void ConvertSprite(int i,spritetype* spr) {
     spr->hitag = b2spr.hitag;
     spr->extra = b2spr.tags[MT_EXTRA];
 }
-void ConvertWall(int i,walltype* w, wall_t b2wall) {
+void ConvertWall(wall_t b2wall) {
+                            long idx = b2wall.tags[MT_WALLIDX];
+                            walltype *w = &wall[idx];
 
         /* long */           w->x = b2wall.x * 512;
         /* long */           w->y = b2wall.y * 512;
@@ -161,6 +165,8 @@ void ConvertWall(int i,walltype* w, wall_t b2wall) {
         /* short */          w->lotag = b2wall.surf.lotag;
         /* short */          w->hitag = b2wall.surf.hitag;
         /* short */          w->extra = b2wall.tags[MT_EXTRA];
+                             w->nextwall = b2wall.tags[MT_NEXTWALL];
+                             w->nextsector = b2wall.tags[MT_NEXTSEC];
 }
 
 // todo sync sprita xy and floorpos at the frame end.
@@ -172,11 +178,11 @@ void ParseMapToDukeFormat() {
     clearbuf((&show2dsector[0]), (long)((MAXSECTORS + 3) >> 5), 0L);
     clearbuf((&show2dsprite[0]), (long)((MAXSPRITES + 3) >> 5), 0L);
     clearbuf((&show2dwall[0]), (long)((MAXWALLS + 3) >> 5), 0L);
-    ps[0].posx = map->startpos.x;
-    ps[0].posy = map->startpos.y;
-    ps[0].posz = map->startpos.z;
+    ps[0].posx = map->startpos.x * 512;
+    ps[0].posy = map->startpos.y* 512;
+    ps[0].posz = map->startpos.z* 512*16;
     ps[0].ang = forwardToAng(map->startfor);
-    ps[0].cursectnum = -1; // do update at th end
+    ps[0].cursectnum = map->startsectn; // do update at th end
 
     numsectors = (short)map->numsects;
     for (int i = 0; i < numsectors; ++i) {
@@ -185,13 +191,12 @@ void ParseMapToDukeFormat() {
 
     // --- walls ---
     int walln = 0;
-    for (int i = 0; i < numsectors; ++i) {
-        sector[i].wallptr = walln;
-        for (int k = 0; k < map->sect[i].n; ++k) {
-            ConvertWall(walln, &wall[walln],map->sect[i].wall[k]);
+    for (int i = 0; i < numsectors;i++) {
+       //sector[i].wallptr = walln;
+        for (int k = 0; k < map->sect[i].n; k++) {
+            ConvertWall(map->sect[i].wall[k]);
             walln++;
         }
-        walln+=map->sect[i].n;
     }
     numwalls = (short)walln;
 
@@ -206,7 +211,7 @@ void ParseMapToDukeFormat() {
         insertsprite(sprite[i].sectnum, sprite[i].statnum);
 
     //Must be after loading sectors, etc!
-    //bbeng.FindSectorOfPoint(ps[0].posx, ps[0].posy, &ps[0].cursectnum);
+    //updatesector(ps[0].posx, ps[0].posy, &ps[0].cursectnum);
 }
 
 void GetInput() {

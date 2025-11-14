@@ -6713,7 +6713,7 @@ void InitDuke() // New Entry point copy of main
 {
     // probably expose this api with something like
     // mapfilepath, *engineapi
-
+    numplayers=1;
     {
         long i, j, k, l;
         int32_t tempautorun;
