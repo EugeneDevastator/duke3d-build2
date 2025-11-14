@@ -3,9 +3,10 @@
 
 #include "raylib.h"
 #include "raymath.h"
-#include "source/dukewrap.h"
-#include "source/game.h"
-
+#if IS_DUKE_INCLUDED
+#include "DukeGame/source/dukewrap.h"
+#include "DukeGame/source/game.h"
+#endif
 
 extern "C" {
 #include "mapcore.h"
@@ -137,7 +138,7 @@ private:
             cam.target = Vector3Add(cam.position, targetOffset);
         }
     }
-
+#if IS_DUKE_INCLUDED
     static void UpdateViaDuke(float deltaTime) {
         ForwardEngineUpdate(deltaTime);
         // WASD movement
@@ -155,7 +156,7 @@ private:
         cam.position.z = py;
         cam.target = Vector3Add(cam.position, {0, 0, 1});
     }
-
+#endif
     static void HandleInteraction() {
         if (IsKeyPressed(KEY_E)) {
             OnInteract();

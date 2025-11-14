@@ -1,7 +1,7 @@
 
 # Collect Duke game source files
-file(GLOB DUKE_C "DukeGame/*.c")
-file(GLOB DUKE_H "DukeGame/*.h")
+file(GLOB DUKE_C "DukeGame/source/*.c")
+file(GLOB DUKE_H "DukeGame/source/*.h")
 
 add_executable(DukeGame
         main.cpp

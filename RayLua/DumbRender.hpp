@@ -444,10 +444,10 @@ public:
             if (spr->tilnum >= 0 && spr->tilnum < gnumtiles_i) // sprites
             {
                 Texture2D spriteTex = runtimeTextures[spr->tilnum];
-                Vector3 rg = {spr->r.x, spr->r.y, spr->r.z};
-                Vector3 dw = {spr->d.x, spr->d.y, spr->d.z};
-                Vector3 frw = {spr->f.x, spr->f.y, spr->f.z};
-                Vector3 pos = {spr->p.x, spr->p.y, spr->p.z};
+                Vector3 rg = {spr->r.x, -spr->r.z, spr->r.y};
+                Vector3 dw = {spr->d.x, -spr->d.z, spr->d.y};
+                Vector3 frw = {spr->f.x, -spr->f.z, spr->f.y};
+                Vector3 pos = {spr->p.x, -spr->p.z, spr->p.y};
                 pos += frw * 0.1; // bias agains fighting
                 Vector3 a = pos + rg + dw;
                 Vector3 b = pos + rg - dw;
@@ -484,7 +484,7 @@ public:
                     auto ys = Vector3Length(dw);
                     int xflip = spr->flags & 4 ? -1 : 1;
                     int yflip = spr->flags & 8 ? -1 : 1;
-                    Vector3 pos = {spr->p.x, spr->p.y, spr->p.z};
+                    Vector3 pos = {spr->p.x, -spr->p.z, spr->p.y};
                     Rectangle source = {0.0f, 0.0f, (float)spriteTex.width, (float)spriteTex.height};
                     xs *= 2;
                     ys *= 2;

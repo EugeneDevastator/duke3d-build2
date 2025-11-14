@@ -6806,7 +6806,7 @@ void RunDukeMap() // New Entry point copy of main
     }
 }
 void DoDukeLoop() {
-
+    long i;
             if (ud.recstat == 2 || ud.multimode > 1 || (ud.show_help == 0 && (ps[myconnectindex].gm & MODE_MENU) !=
                 MODE_MENU))
                 if (ps[myconnectindex].gm & MODE_GAME)
@@ -6829,7 +6829,7 @@ void DoDukeLoop() {
             //  if(ps[myconnectindex].gm&MODE_DEMO)
             //      goto MAIN_LOOP_RESTART;
 
-            if (debug_on) caches();
+          //  if (debug_on) caches();
 
             //checksync(); //net
 

@@ -553,6 +553,14 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				sec[i].headspri = -1;
 				sec[i].owner = -1;
 				//sec[i].foglev = ?;
+
+				sec[i].tags[MT_STATNUM]=b7sec.stat[CEIL];
+				sec[i].tags[MT_STATNUM+1]=b7sec.stat[FLOOR];
+				sec[i].tags[MT_HNUMHI]=b7sec.surf[CEIL].heinum;
+				sec[i].tags[MT_SHADEHI]=b7sec.surf[CEIL].shade;
+				sec[i].tags[MT_HNUMLOW]=b7sec.surf[FLOOR].heinum;
+				sec[i].tags[MT_SHADELOW]=b7sec.surf[FLOOR].shade;
+				sec[i].tags[MT_EXTRA] = b7sec.extra;
 			}
 			kzread(&s,2); //numwalls
 			printf("walls:%d",s);
@@ -663,7 +671,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				for(;i<map->malspris;i++) map->spri[i].sect = -1;
 #endif
 			}
-			for(i=0;i<map->numspris;i++)
+			for(i=0;i<map->numspris;i++) // PARSE SPRITES
 			{
 				kzread(&b7spr,sizeof(b7spr));
 				spr = &map->spri[i];
@@ -736,13 +744,11 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				spr->hitag = b7spr.hitag;
 				spr->pal = b7spr.pal;
 
-				toRaylibInPlace(&spr->p);
-				toRaylibInPlace(&spr->r);
-				toRaylibInPlace(&spr->d);
-				toRaylibInPlace(&spr->f);
+				spr->tags[MT_CSTAT] = b7spr.cstat;
+				spr->tags[MT_SHADELOW] = b7spr.shade;
+				spr->tags[MT_STATNUM] = b7spr.statnum;
+				spr->tags[MT_EXTRA] = b7spr.extra;
 			}
-
-			//toRaylibInPlace(&map->startpos);
 		}
 		else //CUBES5 map format (.CUB extension)
 		{

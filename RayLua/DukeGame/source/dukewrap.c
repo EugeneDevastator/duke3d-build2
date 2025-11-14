@@ -16,21 +16,6 @@ mapstate_t* map;
 // populating tags from the end.
 #define PI 3.14159265358979323846
 
-#define MT_LAST 15 // index, not count
-#define MT_STATNUM (MT_LAST - 2)
-#define MT_PICLOW (MT_LAST - 3)
-#define MT_CSTAT (MT_LAST - 4)
-#define MT_PICOVER (MT_LAST - 5)
-#define MT_HNUMLOW (MT_LAST - 6)
-#define MT_HNUMHI (MT_LAST - 7)
-#define MT_SHADELOW (MT_LAST - 8)
-#define MT_SHADEHI (MT_LAST - 9)
-#define MT_VIS (MT_LAST - 10)
-#define MT_EXTRA (MT_LAST - 11)
-#define MT_FIRST_WALL (MT_LAST - 12)
-
-#define FLOOR 1
-#define CEIL 0
 
 void SetSprPos(long i, long x, long y, long z) // not in .h file
 {
