@@ -7,6 +7,10 @@
 #include "types.h"
 #include "../../interfaces/engineapi.h"
 
+#define SET_SPRITE_XY(a, b, c) (SetSprPosXY(a,b,c))
+#define SET_SPRITE_XYZ(a, b, c,d) (SetSprPosXYZ(a,b,c,d))
+#define SET_SECTOR_FLORZ(a, b) (SetSectorFloorZ(a,b))
+#define SET_SECTOR_CEILZ(a, b) (SetSectorCeilZ(a,b))
 
 
 typedef struct

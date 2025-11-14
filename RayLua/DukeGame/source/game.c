@@ -34,6 +34,8 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "task_man.h"
 #include "game.h"
 
+#include "dukewrap.h"
+
 void TS_Shutdown()
 {
 };
@@ -2058,12 +2060,12 @@ void SE40_Draw(int spnum, long x, long y, long z, short a, short h, long smoothr
         {
             if (k == 40)
             {
-                sector[sprite[j].sectnum].floorz = tempsectorz[sprite[j].sectnum];
+                SET_SECTOR_FLORZ(sprite[j].sectnum,tempsectorz[sprite[j].sectnum]);
                 sector[sprite[j].sectnum].floorpicnum = tempsectorpicnum[sprite[j].sectnum];
             }
             if (k == 41)
             {
-                sector[sprite[j].sectnum].ceilingz = tempsectorz[sprite[j].sectnum];
+                SET_SECTOR_CEILZ(sprite[j].sectnum,tempsectorz[sprite[j].sectnum]);
                 sector[sprite[j].sectnum].ceilingpicnum = tempsectorpicnum[sprite[j].sectnum];
             }
         } // end if
@@ -3312,9 +3314,7 @@ short spawn(short j, short pn)
                 msx[tempwallptr + 1] = sprite[s].x;
                 msy[tempwallptr + 1] = sprite[s].y;
 
-                sprite[s].x = sp->x;
-                sprite[s].y = sp->y;
-                sprite[s].z = sp->z;
+                SET_SPRITE_XYZ(s,sp->x,sp->y,sp->z);
                 sprite[s].shade = sp->shade;
 
                 setsprite(s, sprite[s].x, sprite[s].y, sprite[s].z);
@@ -3812,7 +3812,7 @@ short spawn(short j, short pn)
             {
                 T2 = sector[sect].floorz;
                 if (sp->pal)
-                    sector[sect].floorz = sp->z;
+                    SET_SECTOR_FLORZ(sect,sp->z);
             }
 
             sp->hitag <<= 2;
@@ -3824,11 +3824,11 @@ short spawn(short j, short pn)
         case 25: // Pistons
             T4 = sector[sect].ceilingz;
             T5 = 1;
-            sector[sect].ceilingz = sp->z;
+                SET_SECTOR_CEILZ(sect,sp->z);
             setinterpolation(&sector[sect].ceilingz);
             break;
         case 35:
-            sector[sect].ceilingz = sp->z;
+                SET_SECTOR_CEILZ(sect,sp->z);
             break;
         case 27:
             if (ud.recstat == 1)
@@ -3858,9 +3858,10 @@ short spawn(short j, short pn)
                     sector[sect].ceilingz = sp->z;
                 else
                     sector[sect].floorz = sp->z;
+            } else {
+                SET_SECTOR_FLORZ(sect, sp->z);
+                SET_SECTOR_CEILZ(sect, sp->z);
             }
-            else
-                sector[sect].ceilingz = sector[sect].floorz = sp->z;
 
             if (sector[sect].ceilingstat & 1)
             {
@@ -3993,7 +3994,8 @@ short spawn(short j, short pn)
         case 31:
             T2 = sector[sect].floorz;
             //    T3 = sp->hitag;
-            if (sp->ang != 1536) sector[sect].floorz = sp->z;
+            if (sp->ang != 1536)
+                SET_SECTOR_FLORZ(sect,sp->z);
 
             startwall = sector[sect].wallptr;
             endwall = startwall + sector[sect].wallnum;
@@ -4007,7 +4009,8 @@ short spawn(short j, short pn)
         case 32:
             T2 = sector[sect].ceilingz;
             T3 = sp->hitag;
-            if (sp->ang != 1536) sector[sect].ceilingz = sp->z;
+            if (sp->ang != 1536)
+                SET_SECTOR_CEILZ(sect,sp->z);
 
             startwall = sector[sect].wallptr;
             endwall = startwall + sector[sect].wallnum;

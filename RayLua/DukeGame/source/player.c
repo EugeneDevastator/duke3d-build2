@@ -431,9 +431,7 @@ void shoot(short i,short atwith)
                         sprite[k].xvel = -12;
                         sprite[k].ang = getangle(wall[hitwall].x-wall[wall[hitwall].point2].x,
                             wall[hitwall].y-wall[wall[hitwall].point2].y)+512;
-                        sprite[k].x = hitx;
-                        sprite[k].y = hity;
-                        sprite[k].z = hitz;
+                        SET_SPRITE_XYZ(k,hitx,hity,hitz);
                         sprite[k].cstat |= (TRAND&4);
                         ssp(k,CLIPMASK0);
                         setsprite(k,sprite[k].x,sprite[k].y,sprite[k].z);

@@ -3578,9 +3578,7 @@ int setsprite(short spritenum, long newx, long newy, long newz)
     // move entirely into new engine
     short bad, j, tempsectnum;
 
-    sprite[spritenum].x = newx;
-    sprite[spritenum].y = newy;
-    sprite[spritenum].z = newz;
+    SET_SPRITE_XYZ(spritenum,newx,newy,newz);
 
     tempsectnum = sprite[spritenum].sectnum;
     bbeng.FindSectorOfPoint(newx, newy, &tempsectnum);

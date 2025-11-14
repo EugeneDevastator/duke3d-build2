@@ -63,7 +63,7 @@ void SetSectorFloorZ(int i, long z) {
     rayl->SetFloorZ(i, z / 512.0f / 16.0f);
 }
 void SetSectorCeilZ(int i, long z) {
-    sector[i].floorz = z;
+    sector[i].ceilingz = z;
     rayl->SetFloorZ(i, z / 512.0f / 16.0f);
 }
 
