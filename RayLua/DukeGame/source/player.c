@@ -1948,7 +1948,7 @@ void getinput(short snum)
     }
     else
     {
-        if ( BUTTON(gamefunc_Turn_Left))
+        if (bbeng.FrameInputs[Q_TLEFT])
            {
            turnheldtime += tics;
            if (turnheldtime>=TURBOTURNTIME)
@@ -1960,7 +1960,7 @@ void getinput(short snum)
               angvel -= PREAMBLETURN;
               }
            }
-        else if ( BUTTON(gamefunc_Turn_Right))
+        else if (bbeng.FrameInputs[R_TRIGHT])
            {
            turnheldtime += tics;
            if (turnheldtime>=TURBOTURNTIME)

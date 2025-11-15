@@ -1221,7 +1221,7 @@ void resettimevars()
 {
     vel = svel = angvel = horiz = 0;
 
-    totalclock = 0L;
+    // totalclock = 0L;
     cloudtotalclock = 0L;
     ototalclock = 0L;
     lockclock = 0L;

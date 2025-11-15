@@ -461,6 +461,7 @@ extern char moveloop();
 extern void fakedomovethingscorrect();
 //#line "game.c" 6829
 extern void fakedomovethings();
+extern void fakedomovethings_rlp0();
 //#line "game.c" 7247
 extern char domovethings();
 //#line "game.c" 7373

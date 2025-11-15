@@ -170,7 +170,7 @@ void MainLoop()
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
         DumbCore::Update(deltaTime);
-
+        printf("detaT:%f",deltaTime);
         BeginDrawing();
         ClearBackground(BLACK);
 

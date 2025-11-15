@@ -158,6 +158,8 @@ private:
         engine.Inputs[E_USE] = IsKeyDown(KEY_E) ? 1 : 0;
         engine.Inputs[CROUCH] = IsKeyDown(KEY_LEFT_CONTROL) ? 1 : 0;
         engine.Inputs[MB_SHOOT] = IsMouseButtonDown(MOUSE_BUTTON_LEFT) ? 1 : 0;
+        engine.Inputs[Q_TLEFT] = IsMouseButtonDown(KEY_Q) ? 1 : 0;
+        engine.Inputs[R_TRIGHT] = IsMouseButtonDown(KEY_R) ? 1 : 0;
         ForwardEngineUpdate(deltaTime);
         cam.position.x = px;
         cam.position.y = -pz;

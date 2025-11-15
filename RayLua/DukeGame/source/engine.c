@@ -1534,7 +1534,7 @@ void initengine()
     linehighlight = -1;
     highlightcnt = 0;
 
-    totalclock = 0;
+    // totalclock = 0;
     visibility = 512;
     parallaxvisibility = 512;
 
@@ -3644,6 +3644,9 @@ void initspritelists()
 
 int insertsprite(short sectnum, short statnum)
 {
+    if (statnum==12) {
+        int a=1;
+    }
     insertspritestat(statnum);
     return (insertspritesect(sectnum));
 }

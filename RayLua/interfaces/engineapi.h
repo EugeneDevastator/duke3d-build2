@@ -13,6 +13,8 @@
 #define SPC_JUMP 5
 #define CROUCH 6
 #define MB_SHOOT 7
+#define Q_TLEFT 7
+#define R_TRIGHT 7
 float px,py,pz;
 // wsad use-E jump-Space crouch-letfctrl
 typedef struct {
