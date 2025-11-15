@@ -2376,8 +2376,11 @@ void displayrooms(short snum, long smoothratio)
     if (sect < 0 || sect >= MAXSECTORS) return;
 
     dointerpolations(smoothratio); // positional interp.
-// render
-//
+    // needed as we dont have built in interpolations.
+    for (int k = 0;k<numsectors;k++){
+        SET_SECTOR_CEILZ(k,sector[k].ceilingz);
+        SET_SECTOR_FLORZ(k,sector[k].floorz);
+    }
    restoreinterpolations();
 
     return;//

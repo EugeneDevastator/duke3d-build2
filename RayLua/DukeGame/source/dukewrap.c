@@ -50,7 +50,7 @@ void SetSectorFloorZ(int i, long z) {
 }
 void SetSectorCeilZ(int i, long z) {
     sector[i].ceilingz = z;
-    rayl->SetFloorZ(i, z / (512.f*16.f));
+    rayl->SetCeilZ(i, z / (512.f*16.f));
 }
 
 void SetSprPosXYZ(long i, long x, long y, long z) // not in .h file

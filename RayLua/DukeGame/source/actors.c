@@ -1416,7 +1416,7 @@ void movefallers()
         s = &sprite[i];
 
         sect = s->sectnum;
-
+        SET_SPRITE_XYZ(i,s->x,s->y,s->z);
         if( T1 == 0 )
         {
             s->z -= (16<<8);
@@ -1515,7 +1515,7 @@ void movestandables()
         t = &hittype[i].temp_data[0];
         s = &sprite[i];
         sect = s->sectnum;
-
+        SET_SPRITE_XYZ(i,s->x,s->y,s->z);
         if( sect < 0 ) KILLIT(i);
 
         hittype[i].bposx = s->x;
@@ -3150,7 +3150,7 @@ void moveactors()
         nexti = nextspritestat[i];
 
         s = &sprite[i];
-
+SET_SPRITE_XYZ(i,s->x,s->y,s->z);
         sect = s->sectnum;
 
         if( s->xrepeat == 0 || sect < 0 || sect >= MAXSECTORS)
