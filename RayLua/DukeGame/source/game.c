@@ -7051,11 +7051,15 @@ void InitDuke() // New Entry point copy of main
     }
 }
 void timerUp() {
-    totalclock++;
-    if ((totalclock < ototalclock + TICSPERFRAME)) return;
+  //  totalclock++;
+   // if ((totalclock < ototalclock + TICSPERFRAME)) return;
     //ototalclock += TICSPERFRAME;
 
 }
+
+void pitch_test() {
+}
+
 static float accumulatedTime = 0;
 const float TICK_DURATION = 1.0f / TICRATE;
 
@@ -7274,6 +7278,8 @@ void UpdateClocks(float dt)
 void DoDukeLoop(float dt) {
     long i;
     // Accumulate delta time and convert to ticks
+  //  lockclock += TICSPERFRAME;
+
     accumulatedTime += dt;
         ototalclock = totalclock;
     // Convert dt to game ticks (TICRATE is usually 120, TICSPERFRAME is ~26)
@@ -7286,7 +7292,7 @@ void DoDukeLoop(float dt) {
     }
 
 
-    getinput(myconnectindex);
+    getinput(0);
     updateplayer0();
             if (ud.recstat == 2 || ud.multimode > 1 || (ud.show_help == 0 && (ps[myconnectindex].gm & MODE_MENU) !=
                 MODE_MENU))
@@ -7757,7 +7763,8 @@ char moveloop()
     if (numplayers > 1)
         while (fakemovefifoplc < movefifoend[myconnectindex]) fakedomovethings();
 
-    getpackets();
+    //getpackets();
+    sync[0].bits=loc.bits;
 
     if (numplayers < 2) bufferjitter = 0;
     if (domovethings()) return 1;
@@ -7775,7 +7782,7 @@ void fakedomovethingscorrect()
 {
     long i;
     player_struct* p;
-
+    myconnectindex=0;
     if (numplayers < 2) return;
 
     i = ((movefifoplc - 1) & (MOVEFIFOSIZ - 1));
@@ -8697,7 +8704,7 @@ char domovethings()
 {
     short i, j;
     char ch;
-
+/*
     for (i = connecthead; i >= 0; i = connectpoint2[i])
         if (sync[i].bits & (1 << 17))
         {
@@ -8749,13 +8756,13 @@ char domovethings()
                 }
             }
         }
-
+*/
     ud.camerasprite = -1;
-    lockclock += TICSPERFRAME;
+ //   lockclock += TICSPERFRAME;
 
     if (earthquaketime > 0) earthquaketime--;
     if (rtsplaying > 0) rtsplaying--;
-
+/*
     for (i = 0; i < MAXUSERQUOTES; i++)
         if (user_quote_time[i])
         {
@@ -8776,16 +8783,16 @@ char domovethings()
             pub = NUMPAGES;
         }
     }
-
+*/
     everyothertime++;
-
+/*
     for (i = connecthead; i >= 0; i = connectpoint2[i])
         copybufbyte(&inputfifo[movefifoplc & (MOVEFIFOSIZ - 1)][i], &sync[i], sizeof(input));
     movefifoplc++;
-
+*/
     updateinterpolations();
 
-    j = -1;
+    j = -1;/*
     for (i = connecthead; i >= 0; i = connectpoint2[i])
     {
         if ((sync[i].bits & (1 << 26)) == 0)
@@ -8827,7 +8834,7 @@ char domovethings()
             gameexit(
                 " \nThe 'MASTER/First player' just quit the game.  All\nplayers are returned from the game. This only happens in 5-8\nplayer mode as a different network scheme is used.");
     }
-
+*//*
     if ((numplayers >= 2) && ((movefifoplc & 7) == 7))
     {
         ch = (char)(randomseed & 255);
@@ -8836,7 +8843,7 @@ char domovethings()
         syncval[myconnectindex][syncvalhead[myconnectindex] & (MOVEFIFOSIZ - 1)] = ch;
         syncvalhead[myconnectindex]++;
     }
-
+*/
     if (ud.recstat == 1) record();
 
     if (ud.pause_on == 0)
@@ -8844,8 +8851,8 @@ char domovethings()
         global_random = TRAND;
         movedummyplayers(); //ST 13
     }
-
-    for (i = connecthead; i >= 0; i = connectpoint2[i])
+i=0;
+   // for (i = connecthead; i >= 0; i = connectpoint2[i])
     {
         cheatkeys(i);
 
