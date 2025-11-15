@@ -3705,6 +3705,7 @@ int deletesprite(short spritenum)
 {
     deletespritestat(spritenum);
     return (deletespritesect(spritenum));
+
 }
 
 int deletespritesect(short deleteme)
@@ -3724,6 +3725,7 @@ int deletespritesect(short deleteme)
     headspritesect[MAXSECTORS] = deleteme;
 
     sprite[deleteme].sectnum = MAXSECTORS;
+    DEL_SPRITE(deleteme);
     return (0);
 }
 

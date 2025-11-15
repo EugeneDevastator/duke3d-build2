@@ -11,6 +11,7 @@
 #define SET_SPRITE_XYZ(a, b, c,d) (SetSprPosXYZ(a,b,c,d))
 #define SET_SECTOR_FLORZ(a, b) (SetSectorFloorZ(a,b))
 #define SET_SECTOR_CEILZ(a, b) (SetSectorCeilZ(a,b))
+#define DEL_SPRITE(a) (DeleteSprite(a))
 
 
 typedef struct

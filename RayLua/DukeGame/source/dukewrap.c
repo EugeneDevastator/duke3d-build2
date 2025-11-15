@@ -20,6 +20,7 @@ mapstate_t* map;
 
 void SetSprPos(long i, long x, long y, long z) // not in .h file
 {
+    SetSprPosXYZ(i,x,y,z);
     // redirect to main api.
     // main api. set pos (i, x-z,y) for ex.
 
@@ -51,7 +52,7 @@ void InsertSprite(int sect, float x, float y, float z) {
 }
 
 
-void DelSprite(int sid) {
+void DeleteSprite(int sid) {
     rayl->DeleteSprite(sid);
 }
 

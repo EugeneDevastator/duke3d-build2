@@ -624,6 +624,7 @@ int movesprite(short spritenum, long xchange, long ychange, long zchange, unsign
         sprite[spritenum].z += (zchange*TICSPERFRAME)>>2;
         if(bg)
             setsprite(spritenum,sprite[spritenum].x,sprite[spritenum].y,sprite[spritenum].z);
+        SET_SPRITE_XYZ(spritenum, sprite[spritenum].x,sprite[spritenum].y,sprite[spritenum].z);
         return 0;
     }
 
@@ -689,8 +690,9 @@ int movesprite(short spritenum, long xchange, long ychange, long zchange, unsign
         sprite[spritenum].z = daz;
     else
         if (retval == 0)
-            return(16384+dasectnum);
+            retval=(16384+dasectnum);
 
+    SET_SPRITE_XYZ(spritenum, sprite[spritenum].x,sprite[spritenum].y,sprite[spritenum].z);
 	return(retval);
 }
 

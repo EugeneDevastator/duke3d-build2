@@ -2601,7 +2601,7 @@ short EGS(short whatsect, long s_x, long s_y, long s_z, short s_pn, signed char 
     hittype[i].bposx = s_x;
     hittype[i].bposy = s_y;
     hittype[i].bposz = s_z;
-
+    InsertSprite(whatsect,s_x,s_y,s_z);
     s = &sprite[i];
 
     s->x = s_x;
@@ -7286,12 +7286,13 @@ void DoDukeLoop(float dt) {
     accumulatedTime += dt;
         ototalclock = totalclock;
     // Convert dt to game ticks (TICRATE is usually 120, TICSPERFRAME is ~26)
-    float ticks_to_add = dt * TICRATE;
+    // looks like there us need to convert tihs correctly, - read more on usage of averate fps
+    float ticks_to_add = dt * 90.0f;
     totalclock += (int)ticks_to_add;
 
-    while(accumulatedTime >= (1.0f / TICRATE))
+    while(accumulatedTime >= (1.0f / 90.0f))
     {
-        accumulatedTime -= (1.0f / TICRATE);
+        accumulatedTime -= (1.0f / 90.0f);
     }
 
 
