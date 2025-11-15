@@ -2066,31 +2066,26 @@ int screencapture(char* filename, char inverseit) { return 0; };
 */
 int inside(long x, long y, short sectnum)
 {
-    walltype* wal;
+    walltype *wal;
     long i, x1, y1, x2, y2;
     unsigned long cnt;
 
-    if ((sectnum < 0) || (sectnum >= numsectors)) return (-1);
+    if ((sectnum < 0) || (sectnum >= numsectors)) return(-1);
 
     cnt = 0;
     wal = &wall[sector[sectnum].wallptr];
     i = sector[sectnum].wallnum;
     do
     {
-        y1 = wal->y - y;
-        y2 = wall[wal->point2].y - y;
-        if ((y1 ^ y2) < 0)
+        y1 = wal->y-y; y2 = wall[wal->point2].y-y;
+        if ((y1^y2) < 0)
         {
-            x1 = wal->x - x;
-            x2 = wall[wal->point2].x - x;
-            if ((x1 ^ x2) >= 0) cnt ^= x1;
-            else cnt ^= (x1 * y2 - x2 * y1) ^ y2;
+            x1 = wal->x-x; x2 = wall[wal->point2].x-x;
+            if ((x1^x2) >= 0) cnt ^= x1; else cnt ^= (x1*y2-x2*y1)^y2;
         }
-        wal++;
-        i--;
-    }
-    while (i);
-    return (cnt >> 31);
+        wal++; i--;
+    } while (i);
+    return(cnt>>31);
 }
 
 long getangle(long xvect, long yvect)
@@ -5147,12 +5142,12 @@ void updatesectorz(long x, long y, long z, short* sectnum)
 }
 
 // gets valid sector at position. assumes that most of the time it is already in sectnum, otherwise - scan nearby, and then scan all
-void updatesector(long x, long y, short* sectnum)
+void updatesector(long x, long y, short *sectnum)
 {
-    walltype* wal;
+    walltype *wal;
     long i, j;
 
-    if (inside(x, y, *sectnum) == 1) return;
+    if (inside(x,y,*sectnum) == 1) return;
 
     if ((*sectnum >= 0) && (*sectnum < numsectors))
     {
@@ -5162,19 +5157,18 @@ void updatesector(long x, long y, short* sectnum)
         {
             i = wal->nextsector;
             if (i >= 0)
-                if (inside(x, y, (short)i) == 1)
+                if (inside(x,y,(short)i) == 1)
                 {
                     *sectnum = i;
                     return;
                 }
             wal++;
             j--;
-        }
-        while (j != 0);
+        } while (j != 0);
     }
 
-    for (i = numsectors - 1; i >= 0; i--)
-        if (inside(x, y, (short)i) == 1)
+    for(i=numsectors-1;i>=0;i--)
+        if (inside(x,y,(short)i) == 1)
         {
             *sectnum = i;
             return;

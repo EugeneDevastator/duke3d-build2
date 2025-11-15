@@ -763,7 +763,248 @@ void faketimerhandler()
         movefifosendplc += movesperpacket;
     }
 }
+void faketimerhandler_rl()
+{
+    long i, j, k, l;
+    //    short who;
+    input *osyn, *nsyn;
+    numplayers = 1;
 
+    getinput(myconnectindex);
+
+    avgfvel += loc.fvel;
+    avgsvel += loc.svel;
+    avgavel += loc.avel;
+    avghorz += loc.horz;
+    avgbits |= loc.bits;
+
+    nsyn[0].fvel = avgfvel / movesperpacket;
+    nsyn[0].svel = avgsvel / movesperpacket;
+    nsyn[0].avel = avgavel / movesperpacket;
+    nsyn[0].horz = avghorz / movesperpacket;
+    nsyn[0].bits = avgbits;
+    avgfvel = avgsvel = avgavel = avghorz = avgbits = 0;
+    movefifoend[myconnectindex]++;
+
+
+    if (false && networkmode == 1)
+    {
+        packbuf[0] = 17;
+        if ((movefifoend[myconnectindex] - 1) == 0) packbuf[0] = 16;
+        j = 1;
+
+        //Fix timers and buffer/jitter value
+        if (((movefifoend[myconnectindex] - 1) & (TIMERUPDATESIZ - 1)) == 0)
+        {
+            if (myconnectindex != connecthead)
+            {
+                i = myminlag[connecthead] - otherminlag;
+                if (klabs(i) > 8) i >>= 1;
+                else if (klabs(i) > 2) i = ksgn(i);
+                else i = 0;
+
+                totalclock -= TICSPERFRAME * i;
+                myminlag[connecthead] -= i;
+                otherminlag += i;
+            }
+
+            if (myconnectindex == connecthead)
+                for (i = connectpoint2[connecthead]; i >= 0; i = connectpoint2[i])
+                    packbuf[j++] = min(max(myminlag[i],-128), 127);
+
+            for (i = connecthead; i >= 0; i = connectpoint2[i])
+                myminlag[i] = 0x7fffffff;
+        }
+
+        osyn = (input*)&inputfifo[(movefifoend[myconnectindex] - 2) & (MOVEFIFOSIZ - 1)][myconnectindex];
+        nsyn = (input*)&inputfifo[(movefifoend[myconnectindex] - 1) & (MOVEFIFOSIZ - 1)][myconnectindex];
+
+        k = j;
+        packbuf[j++] = 0;
+
+        if (nsyn[0].fvel != osyn[0].fvel)
+        {
+            packbuf[j++] = (char)nsyn[0].fvel;
+            packbuf[j++] = (char)(nsyn[0].fvel >> 8);
+            packbuf[k] |= 1;
+        }
+        if (nsyn[0].svel != osyn[0].svel)
+        {
+            packbuf[j++] = (char)nsyn[0].svel;
+            packbuf[j++] = (char)(nsyn[0].svel >> 8);
+            packbuf[k] |= 2;
+        }
+        if (nsyn[0].avel != osyn[0].avel)
+        {
+            packbuf[j++] = (signed char)nsyn[0].avel;
+            packbuf[k] |= 4;
+        }
+        if ((nsyn[0].bits ^ osyn[0].bits) & 0x000000ff) packbuf[j++] = (nsyn[0].bits & 255), packbuf[k] |= 8;
+        if ((nsyn[0].bits ^ osyn[0].bits) & 0x0000ff00) packbuf[j++] = ((nsyn[0].bits >> 8) & 255), packbuf[k] |= 16;
+        if ((nsyn[0].bits ^ osyn[0].bits) & 0x00ff0000) packbuf[j++] = ((nsyn[0].bits >> 16) & 255), packbuf[k] |= 32;
+        if ((nsyn[0].bits ^ osyn[0].bits) & 0xff000000) packbuf[j++] = ((nsyn[0].bits >> 24) & 255), packbuf[k] |= 64;
+        if (nsyn[0].horz != osyn[0].horz)
+        {
+            packbuf[j++] = (char)nsyn[0].horz;
+            packbuf[k] |= 128;
+        }
+
+        while (syncvalhead[myconnectindex] != syncvaltail)
+        {
+            packbuf[j++] = syncval[myconnectindex][syncvaltail & (MOVEFIFOSIZ - 1)];
+            syncvaltail++;
+        }
+
+        for (i = connecthead; i >= 0; i = connectpoint2[i])
+            if (i != myconnectindex)
+                sendpacket(i, packbuf, j);
+
+        return;
+    }
+    if (false && myconnectindex != connecthead) //Slave
+    {
+        //Fix timers and buffer/jitter value
+        if (((movefifoend[myconnectindex] - 1) & (TIMERUPDATESIZ - 1)) == 0)
+        {
+            i = myminlag[connecthead] - otherminlag;
+            if (klabs(i) > 8) i >>= 1;
+            else if (klabs(i) > 2) i = ksgn(i);
+            else i = 0;
+
+            totalclock -= TICSPERFRAME * i;
+            myminlag[connecthead] -= i;
+            otherminlag += i;
+
+            for (i = connecthead; i >= 0; i = connectpoint2[i])
+                myminlag[i] = 0x7fffffff;
+        }
+
+        packbuf[0] = 1;
+        packbuf[1] = 0;
+        j = 2;
+
+        osyn = (input*)&inputfifo[(movefifoend[myconnectindex] - 2) & (MOVEFIFOSIZ - 1)][myconnectindex];
+        nsyn = (input*)&inputfifo[(movefifoend[myconnectindex] - 1) & (MOVEFIFOSIZ - 1)][myconnectindex];
+
+        if (nsyn[0].fvel != osyn[0].fvel)
+        {
+            packbuf[j++] = (char)nsyn[0].fvel;
+            packbuf[j++] = (char)(nsyn[0].fvel >> 8);
+            packbuf[1] |= 1;
+        }
+        if (nsyn[0].svel != osyn[0].svel)
+        {
+            packbuf[j++] = (char)nsyn[0].svel;
+            packbuf[j++] = (char)(nsyn[0].svel >> 8);
+            packbuf[1] |= 2;
+        }
+        if (nsyn[0].avel != osyn[0].avel)
+        {
+            packbuf[j++] = (signed char)nsyn[0].avel;
+            packbuf[1] |= 4;
+        }
+        if ((nsyn[0].bits ^ osyn[0].bits) & 0x000000ff) packbuf[j++] = (nsyn[0].bits & 255), packbuf[1] |= 8;
+        if ((nsyn[0].bits ^ osyn[0].bits) & 0x0000ff00) packbuf[j++] = ((nsyn[0].bits >> 8) & 255), packbuf[1] |= 16;
+        if ((nsyn[0].bits ^ osyn[0].bits) & 0x00ff0000) packbuf[j++] = ((nsyn[0].bits >> 16) & 255), packbuf[1] |= 32;
+        if ((nsyn[0].bits ^ osyn[0].bits) & 0xff000000) packbuf[j++] = ((nsyn[0].bits >> 24) & 255), packbuf[1] |= 64;
+        if (nsyn[0].horz != osyn[0].horz)
+        {
+            packbuf[j++] = (char)nsyn[0].horz;
+            packbuf[1] |= 128;
+        }
+
+        while (syncvalhead[myconnectindex] != syncvaltail)
+        {
+            packbuf[j++] = syncval[myconnectindex][syncvaltail & (MOVEFIFOSIZ - 1)];
+            syncvaltail++;
+        }
+
+        sendpacket(connecthead, packbuf, j);
+        return;
+    }
+
+    //This allows allow packet-resends
+
+    while (1) //Master
+    {
+        for (i = connecthead; i >= 0; i = connectpoint2[i])
+            if (playerquitflag[i] && (movefifoend[i] <= movefifosendplc)) return;
+
+        osyn = (input*)&inputfifo[(movefifosendplc - 1) & (MOVEFIFOSIZ - 1)][0];
+        nsyn = (input*)&inputfifo[(movefifosendplc) & (MOVEFIFOSIZ - 1)][0];
+
+        //MASTER -> SLAVE packet
+        packbuf[0] = 0;
+        j = 1;
+
+        //Fix timers and buffer/jitter value
+        if ((movefifosendplc & (TIMERUPDATESIZ - 1)) == 0)
+        {
+            for (i = connectpoint2[connecthead]; i >= 0; i = connectpoint2[i])
+                if (playerquitflag[i])
+                    packbuf[j++] = min(max(myminlag[i],-128), 127);
+
+            for (i = connecthead; i >= 0; i = connectpoint2[i])
+                myminlag[i] = 0x7fffffff;
+        }
+
+        k = j;
+        for (i = connecthead; i >= 0; i = connectpoint2[i])
+            j += playerquitflag[i];
+        for (i = connecthead; i >= 0; i = connectpoint2[i])
+        {
+            if (playerquitflag[i] == 0) continue;
+
+            packbuf[k] = 0;
+            if (nsyn[i].fvel != osyn[i].fvel)
+            {
+                packbuf[j++] = (char)nsyn[i].fvel;
+                packbuf[j++] = (char)(nsyn[i].fvel >> 8);
+                packbuf[k] |= 1;
+            }
+            if (nsyn[i].svel != osyn[i].svel)
+            {
+                packbuf[j++] = (char)nsyn[i].svel;
+                packbuf[j++] = (char)(nsyn[i].svel >> 8);
+                packbuf[k] |= 2;
+            }
+            if (nsyn[i].avel != osyn[i].avel)
+            {
+                packbuf[j++] = (signed char)nsyn[i].avel;
+                packbuf[k] |= 4;
+            }
+            if ((nsyn[i].bits ^ osyn[i].bits) & 0x000000ff) packbuf[j++] = (nsyn[i].bits & 255), packbuf[k] |= 8;
+            if ((nsyn[i].bits ^ osyn[i].bits) & 0x0000ff00) packbuf[j++] = ((nsyn[i].bits >> 8) & 255), packbuf[k] |=
+                16;
+            if ((nsyn[i].bits ^ osyn[i].bits) & 0x00ff0000) packbuf[j++] = ((nsyn[i].bits >> 16) & 255), packbuf[k] |=
+                32;
+            if ((nsyn[i].bits ^ osyn[i].bits) & 0xff000000) packbuf[j++] = ((nsyn[i].bits >> 24) & 255), packbuf[k] |=
+                64;
+            if (nsyn[i].horz != osyn[i].horz)
+            {
+                packbuf[j++] = (char)nsyn[i].horz;
+                packbuf[k] |= 128;
+            }
+            k++;
+        }
+
+        while (syncvalhead[myconnectindex] != syncvaltail)
+        {
+            packbuf[j++] = syncval[myconnectindex][syncvaltail & (MOVEFIFOSIZ - 1)];
+            syncvaltail++;
+        }
+
+        for (i = connectpoint2[connecthead]; i >= 0; i = connectpoint2[i])
+            if (playerquitflag[i])
+            {
+                sendpacket(i, packbuf, j);
+                if (nsyn[i].bits & (1 << 26))
+                    playerquitflag[i] = 0;
+            }
+
+        movefifosendplc += movesperpacket;
+    }
+}
 extern long cacnum;
 // typedef struct { long *hand, leng; char *lock; } cactype;
 
@@ -6811,11 +7052,26 @@ void timerUp() {
     ototalclock += TICSPERFRAME;
 
 }
-
-void DoDukeLoop() {
+static float accumulatedTime;
+void DoDukeLoop(float dt) {
     long i;
-    if ((totalclock < ototalclock + TICSPERFRAME)) return;
-    ototalclock += TICSPERFRAME;
+    // Accumulate delta time and convert to ticks
+    accumulatedTime += dt;
+
+    // Duke runs at TICRATE (120 Hz), so each tick = 1/120 second
+    const float TICK_DURATION = 1.0f / TICRATE;
+
+    while (accumulatedTime >= TICK_DURATION) {
+        totalclock++;
+        accumulatedTime -= TICK_DURATION;
+    }
+
+    // Update ototalclock for frame timing
+    ototalclock = totalclock;
+
+
+    getinput(myconnectindex);
+
             if (ud.recstat == 2 || ud.multimode > 1 || (ud.show_help == 0 && (ps[myconnectindex].gm & MODE_MENU) !=
                 MODE_MENU))
                 if (ps[myconnectindex].gm & MODE_GAME)
@@ -7286,13 +7542,14 @@ char moveloop()
     getpackets();
 
     if (numplayers < 2) bufferjitter = 0;
-    while (movefifoend[myconnectindex] - movefifoplc > bufferjitter)
-    {
-        for (i = connecthead; i >= 0; i = connectpoint2[i])
-            if (movefifoplc == movefifoend[i]) break;
-        if (i >= 0) break;
-        if (domovethings()) return 1;
-    }
+    if (domovethings()) return 1;
+   // while (movefifoend[myconnectindex] - movefifoplc > bufferjitter)
+   // {
+   //     for (i = connecthead; i >= 0; i = connectpoint2[i])
+   //         if (movefifoplc == movefifoend[i]) break;
+   //     if (i >= 0) break;
+   //     if (domovethings()) return 1;
+   // }
     return 0;
 }
 

@@ -13,10 +13,10 @@
 
 #define MT_PICOVER (MT_LAST - 5)
 
-#define MT_HNUMLOW (MT_LAST - 6)
+#define MT_SEC_HNLOW (MT_LAST - 6)
 #define MT_WALLPT2 (MT_LAST - 6)
 
-#define MT_HNUMHI (MT_LAST - 7)
+#define MT_SEC_HNHI (MT_LAST - 7)
 #define MT_NEXTWALL (MT_LAST - 7)
 
 #define MT_SHADELOW (MT_LAST - 8)
@@ -26,10 +26,11 @@
 #define MT_VIS (MT_LAST - 10)
 #define MT_EXTRA (MT_LAST - 11)
 
-#define MT_FIRST_WALL (MT_LAST - 12)
-#define MT_WALLIDX (MT_LAST - 12)
+#define MT_SEC_FWALL (MT_LAST - 12)
+#define MT_WAL_WALLIDX (MT_LAST - 12)
 
-#define MT_NEXTSEC (MT_LAST - 13)
+#define MT_SEC_WALLNUM (MT_LAST - 13)
+#define MT_WAL_NEXTSEC (MT_LAST - 13)
 
 #define FLOOR 1
 #define CEIL 0

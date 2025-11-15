@@ -28,6 +28,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #include "build.h"
 #include "duke3d.h"
+#include "dukewrap.h"
 #include "funct.h"
 #include "music.h"
 #include "sounds.h"
@@ -3184,9 +3185,11 @@ void checksectors(short snum)
 
 
                                 j = p->cursectnum;
-                                p->cursectnum = sprite[i].sectnum;
+                                setPcursectnum(snum,sprite[i].sectnum);
+
                                 setpal(p);
-                                p->cursectnum = j;
+                                setPcursectnum(snum,j);
+
 
                                 // parallaxtype = 2;
                                 p->newowner = i;

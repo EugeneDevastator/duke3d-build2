@@ -74,8 +74,9 @@ spritetype ReadSprite(long i) {
     return a;
 }
 void DoDukeUpdate(float dt) {
-    DoDukeLoop();
+    DoDukeLoop(dt);
     rayl->SetPlayerPos(ps[0].posx/ 512.0f,ps[0].posy/ 512.0f,ps[0].posz/ (512.f*16.f));
+   // rayl->SetPlayerPos(ps[0].posx/ 512.0f,ps[0].posy/ 512.0f,ps[0].posz/ (512.f*16.f));
 
 }
 // is it ok to store internal function in pointer?
@@ -84,6 +85,7 @@ void InitDukeWrapper(engineapi_t *api) // pass in real api
     bbeng.SetSprPos = SetSprPos;
     bbeng.SetSprPosXY = SetSprPosXY;
     bbeng.GetFloorZSloped = getceilzofslope;
+    bbeng.FindSectorOfPoint = updatesector;
     rayl = api;
     bbeng.FrameInputs = api->Inputs;
     map = rayl->GetLoadedMap();
@@ -97,20 +99,20 @@ short forwardToAng(point3d forw) {
 }
 void ConvertSector(int i,sectortype* sect) {
     sect_t b2sec = map->sect[i];
-    /* short */      sect->wallptr = b2sec.tags[MT_FIRST_WALL];// and this is count of walls, like idx = wallptr + i for i in (0..n)
+    /* short */      sect->wallptr = b2sec.tags[MT_SEC_FWALL];// and this is count of walls, like idx = wallptr + i for i in (0..n)
     /* short */      sect->wallnum = b2sec.n;// and this is count of walls, like idx = wallptr + i for i in (0..n)
-    /* long */       sect->ceilingz = b2sec.z[CEIL];
-    /* long */       sect->floorz = b2sec.z[FLOOR];
+    /* long */       sect->ceilingz = b2sec.z[CEIL] * (512*16);
+    /* long */       sect->floorz = b2sec.z[FLOOR] * (512*16);
     /* short */      sect->ceilingstat = b2sec.tags[MT_STATNUM];
     /* short */      sect->floorstat = b2sec.tags[MT_STATNUM+1];
     /* short */      sect->ceilingpicnum = b2sec.surf[CEIL].tilnum;
-    /* short */      sect->ceilingheinum = b2sec.tags[MT_HNUMHI];
+    /* short */      sect->ceilingheinum = b2sec.tags[MT_SEC_HNHI];
     /* signed char*/ sect->ceilingshade = b2sec.tags[MT_SHADEHI];
     /* char */       sect->ceilingpal = b2sec.surf[CEIL].pal;
     /* char */       sect->ceilingxpanning=1;
     /* char */       sect->ceilingypanning=1;
     /* short */      sect->floorpicnum = b2sec.surf[FLOOR].tilnum;
-    /* short */      sect->floorheinum = b2sec.tags[MT_HNUMLOW];
+    /* short */      sect->floorheinum = b2sec.tags[MT_SEC_HNLOW];
     /* signed char*/ sect->floorshade = b2sec.tags[MT_SHADELOW];
     /* char */       sect->floorpal = b2sec.surf[FLOOR].pal;
     /* char */       sect->floorxpanning = 1 ;
@@ -127,6 +129,7 @@ void ConvertSprite(int i,spritetype* spr) {
     spr->y = b2spr.p.y * 512;
     spr->z = b2spr.p.z * (512*16);
     spr->cstat = b2spr.tags[MT_CSTAT],
+    spr->sectnum = b2spr.sect,
     spr->picnum = b2spr.tilnum;
     spr->shade = b2spr.tags[MT_SHADELOW];
     spr->pal = b2spr.pal,
@@ -136,7 +139,6 @@ void ConvertSprite(int i,spritetype* spr) {
     spr->yrepeat=1;
     spr->xoffset=0,
     spr->yoffset=0;
-    spr->sectnum = b2spr.sectn,
     spr->statnum = b2spr.tags[MT_STATNUM];
     spr->ang = forwardToAng(b2spr.f),
     spr->owner =0 ,
@@ -147,34 +149,41 @@ void ConvertSprite(int i,spritetype* spr) {
     spr->hitag = b2spr.hitag;
     spr->extra = b2spr.tags[MT_EXTRA];
 }
+
 void ConvertWall(wall_t b2wall) {
-                            long idx = b2wall.tags[MT_WALLIDX];
-                            walltype *w = &wall[idx];
+    long idx = b2wall.tags[MT_WAL_WALLIDX];
+    walltype *w = &wall[idx];
 
-        /* long */           w->x = b2wall.x * 512;
-        /* long */           w->y = b2wall.y * 512;
-        /* short */          w->point2 = b2wall.tags[MT_WALLPT2]; // we can abolish it by extracting api.
-        /* short */          w->nextwall = b2wall.nw,
-        /* short */          w->nextsector = b2wall.ns,
-        /* short */          w->cstat = b2wall.tags[MT_CSTAT];
-        /* short */          w->picnum = b2wall.surf.tilnum;
-                            if (b2wall.surfn>2)
-        /* short */              w->overpicnum = b2wall.xsurf[1].tilnum;
-                             else
-                                 w->overpicnum = w->picnum;
-        /* signedchar */     w->shade = b2wall.tags[MT_SHADELOW];
-        /* char */           w->pal = b2wall.surf.pal;
-        /* char */           w->xrepeat = 1;
-        /* char */           w->yrepeat = 1;
-        /* char */           w->xpanning = 1;
-        /* char */           w->ypanning = 1;
-        /* short */          w->lotag = b2wall.surf.lotag;
-        /* short */          w->hitag = b2wall.surf.hitag;
-        /* short */          w->extra = b2wall.tags[MT_EXTRA];
-                             w->nextwall = b2wall.tags[MT_NEXTWALL];
-                             w->nextsector = b2wall.tags[MT_NEXTSEC];
+    w->x = b2wall.x * 512;
+    w->y = b2wall.y * 512;
+    w->point2 = b2wall.tags[MT_WALLPT2]; // we can abolish it by extracting api.
+    w->nextwall = b2wall.tags[MT_NEXTWALL],
+    w->nextsector = b2wall.ns,
+    w->cstat = b2wall.tags[MT_CSTAT];
+    w->picnum = b2wall.surf.tilnum;
+    if (b2wall.surfn > 2)
+        w->overpicnum = b2wall.xsurf[1].tilnum;
+    else
+        w->overpicnum = w->picnum;
+    /* signedchar */
+    w->shade = b2wall.tags[MT_SHADELOW];
+    w->pal = b2wall.surf.pal;
+    w->xrepeat = 1;
+    w->yrepeat = 1;
+    w->xpanning = 1;
+    w->ypanning = 1;
+    w->lotag = b2wall.surf.lotag;
+    w->hitag = b2wall.surf.hitag;
+    w->extra = b2wall.tags[MT_EXTRA];
+    w->nextwall = b2wall.tags[MT_NEXTWALL];
+    w->nextsector = b2wall.tags[MT_WAL_NEXTSEC];
 }
-
+void setPcursectnum(int pid, int sectn) {
+    ps[pid].cursectnum = sectn;
+    if (sectn < 0) {
+        int a = 1; // breakp.
+    }
+}
 // todo sync sprita xy and floorpos at the frame end.
 // and do keys.
 void ParseMapToDukeFormat() {
@@ -217,7 +226,8 @@ void ParseMapToDukeFormat() {
         insertsprite(sprite[i].sectnum, sprite[i].statnum);
 
     //Must be after loading sectors, etc!
-    //updatesector(ps[0].posx, ps[0].posy, &ps[0].cursectnum);
+    updatesector(ps[0].posx, ps[0].posy, &ps[0].cursectnum);
+    int a =1;
 }
 
 void GetInput() {

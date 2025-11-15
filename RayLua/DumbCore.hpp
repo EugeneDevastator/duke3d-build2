@@ -146,9 +146,11 @@ private:
     static void UpdateViaDuke(float deltaTime) {
 
         // WASD movement
-        engine.Inputs[W_FRW] = IsKeyDown(KEY_W) ?
-        1
-        : 0;
+        if (IsKeyDown(KEY_W))
+            engine.Inputs[W_FRW] = 1;
+        else
+            engine.Inputs[W_FRW] = 0;
+
         engine.Inputs[S_BACK] = IsKeyDown(KEY_S) ? 1 : 0;
         engine.Inputs[A_LEFT] = IsKeyDown(KEY_A) ? 1 : 0;
         engine.Inputs[D_RIGHT] = IsKeyDown(KEY_D) ? 1 : 0;

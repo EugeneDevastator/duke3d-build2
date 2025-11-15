@@ -1692,7 +1692,7 @@ void movestandables()
                     ps[p].oposy = ps[p].posy = s->y-(sintable[ps[p].ang&2047]>>6);
                     ps[p].oposz = ps[p].posz = s->z+(2<<8);
                     setsprite(ps[p].i,ps[p].posx,ps[p].posy,ps[p].posz);
-                    ps[p].cursectnum = sprite[ps[p].i].sectnum;
+                    setPcursectnum(s,sprite[ps[p].i].sectnum);
                 }
             }
 
@@ -2853,7 +2853,7 @@ void movetransports()
                                 ps[p].oposz = ps[p].posz = sprite[sprite[i].owner].z-PHEIGHT;
 
                                 changespritesect(j,sprite[sprite[i].owner].sectnum);
-                                ps[p].cursectnum = sprite[j].sectnum;
+                                setPcursectnum(p, sprite[j].sectnum);
 
                                 if(sprite[i].pal == 0)
                                 {
@@ -2883,7 +2883,7 @@ void movetransports()
                             hittype[ps[p].i].bposz = ps[p].posz;
 
                             changespritesect(j,sprite[sprite[i].owner].sectnum);
-                            ps[p].cursectnum = sprite[sprite[i].owner].sectnum;
+                            setPcursectnum(p, sprite[sprite[i].owner].sectnum);
 
                             break;
                         }
@@ -2934,7 +2934,7 @@ void movetransports()
 
                             if(sprite[sprite[i].owner].owner != sprite[i].owner)
                                 ps[p].transporter_hold = -2;
-                            ps[p].cursectnum = sprite[sprite[i].owner].sectnum;
+                            setPcursectnum(p, sprite[sprite[i].owner].sectnum);
 
                             changespritesect(j,sprite[sprite[i].owner].sectnum);
                             setsprite(ps[p].i,ps[p].posx,ps[p].posy,ps[p].posz+PHEIGHT);
@@ -5235,7 +5235,7 @@ void moveeffectors()   //STATNUM 3
                             {
                                 ps[p].posx = s->x;
                                 ps[p].posy = s->y;
-                                ps[p].cursectnum = s->sectnum;
+                                setPcursectnum(p,s->sectnum);
 
                                 setsprite(ps[p].i,s->x,s->y,s->z);
                                 quickkill(&ps[p]);
@@ -5317,7 +5317,7 @@ void moveeffectors()   //STATNUM 3
                             {
                                 ps[p].oposx = ps[p].posx = s->x;
                                 ps[p].oposy = ps[p].posy = s->y;
-                                ps[p].cursectnum = s->sectnum;
+                                setPcursectnum(p,s->sectnum);
 
                                 setsprite(ps[p].i,s->x,s->y,s->z);
                                 quickkill(&ps[p]);
@@ -5416,7 +5416,7 @@ void moveeffectors()   //STATNUM 3
                         {
                             ps[p].posx = s->x;
                             ps[p].posy = s->y;
-                            ps[p].cursectnum = s->sectnum;
+                            setPcursectnum(p,s->sectnum);
 
                             setsprite(ps[p].i,s->x,s->y,s->z);
                             quickkill(&ps[p]);
@@ -5489,7 +5489,7 @@ void moveeffectors()   //STATNUM 3
                                 ps[p].oposx = ps[p].posx;
                                 ps[p].oposy = ps[p].posy;
 
-                                ps[p].cursectnum = s->sectnum;
+                                setPcursectnum(p,s->sectnum);
 
                                 setsprite(ps[p].i,s->x,s->y,s->z);
                                 quickkill(&ps[p]);

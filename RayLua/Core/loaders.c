@@ -557,15 +557,17 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 
 				sec[i].tags[MT_STATNUM]=b7sec.stat[CEIL];
 				sec[i].tags[MT_STATNUM+1]=b7sec.stat[FLOOR];
-				sec[i].tags[MT_HNUMHI]=b7sec.surf[CEIL].heinum;
+				sec[i].tags[MT_SEC_HNHI]=b7sec.surf[CEIL].heinum;
 				sec[i].tags[MT_SHADEHI]=b7sec.surf[CEIL].shade;
-				sec[i].tags[MT_HNUMLOW]=b7sec.surf[FLOOR].heinum;
+				sec[i].tags[MT_SEC_HNLOW]=b7sec.surf[FLOOR].heinum;
 				sec[i].tags[MT_SHADELOW]=b7sec.surf[FLOOR].shade;
 				sec[i].tags[MT_EXTRA] = b7sec.extra;
-				sec[i].tags[MT_FIRST_WALL] = b7sec.wallptr;
+				sec[i].tags[MT_SEC_FWALL] = b7sec.wallptr;
+				sec[i].tags[MT_SEC_WALLNUM] = b7sec.wallnum;
 			}
 			kzread(&s,2); //numwalls
 			printf("walls:%d",s);
+			int wallidx =0;
 			for(i=k=0;i<map->numsects;i++) // Parse walls
 			{
 				for(j=0;j<sec[i].n;j++,k++) // walls
@@ -575,9 +577,11 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					sec[i].wall[j].y = ((float)b7wal.y)*(1.f/512.f);
 					sec[i].wall[j].n = b7wal.point2-k;
 					sec[i].wall[j].tags[MT_WALLPT2] = b7wal.point2;
-					sec[i].wall[j].tags[MT_WALLIDX] = j;
-					sec[i].wall[j].tags[MT_NEXTSEC] = b7wal.nextsect;
+					sec[i].wall[j].tags[MT_WAL_WALLIDX] = j;
+					sec[i].wall[j].tags[MT_WAL_NEXTSEC] = b7wal.nextsect;
 					sec[i].wall[j].tags[MT_NEXTWALL] = b7wal.nextwall;
+					sec[i].wall[j].tags[MT_WAL_WALLIDX] = wallidx;
+					wallidx++;
 
 					sur = &sec[i].wall[j].surf;
 					sur->flags = 0;
