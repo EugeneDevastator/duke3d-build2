@@ -30,6 +30,8 @@ typedef struct {
     mapstate_t * (*GetLoadedMap)();
 
     void (*RegisterUpdate)(void (*UpdateFunc)(float t));
+    void (*InsertSprite)(int sect, float x,float y,float z);
+    void (*DeleteSprite)(int sid);
 
     char *Inputs;
 } engineapi_t;

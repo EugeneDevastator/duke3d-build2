@@ -54,4 +54,6 @@ void SetSectorCeilZ(int i, long z);
 void InitDukeWrapper(engineapi_t* api);
 void ParseMapToDukeFormat();
 void setPcursectnum(int pid, int sectn);
+void InsertSprite(int sect, float x, float y, float z);
+void DeleteSprite(int sid);
 #endif //GAME_DUKEWRAP_H

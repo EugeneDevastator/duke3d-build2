@@ -44,6 +44,18 @@ void SetSprPos(long i, long x, long y, long z) // not in .h file
     return (0);
      **/
 }
+
+void InsertSprite(int sect, float x, float y, float z) {
+    rayl->InsertSprite(sect, x / 512.0f, y / 512.0f, z / (512.f*16.f));
+// need to handle b2 id somehow.
+}
+
+
+void DelSprite(int sid) {
+    rayl->DeleteSprite(sid);
+}
+
+
 void SetSectorFloorZ(int i, long z) {
     sector[i].floorz = z;
     rayl->SetFloorZ(i, z / (512.f*16.f));

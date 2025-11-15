@@ -444,8 +444,11 @@ public:
         for (int i = 0; i < map->numspris; i++)
         {
             spri_t* spr = &map->spri[i];
-            if (spr->tilnum >= 0 && spr->tilnum < gnumtiles_i) // sprites
+            if (spr->tilnum >= 0 ) // sprites
             {
+                if (spr->tilnum >= gnumtiles_i)
+                    spr->tilnum = gnumtiles_i - 10;
+
                 Texture2D spriteTex = runtimeTextures[spr->tilnum];
                 Vector3 rg = {spr->r.x, -spr->r.z, spr->r.y};
                 Vector3 dw = {spr->d.x, -spr->d.z, spr->d.y};

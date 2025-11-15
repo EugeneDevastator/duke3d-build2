@@ -49,11 +49,12 @@ void ForwardEngineUpdate(float dt) {
     targetupdate(dt);
 }
 
-void InsertSprite(int sectid, float x, float y, float z) {
-    insspri_imp(sectid,x,y,z,mapref);
+static void InsertSprite(int sectid, float x, float y, float z) {
+    long i = insspri_imp(sectid,x,y,z,mapref);
+    mapref->spri[i].tilnum=1;
 }
 
-void DelSprite(int id) {
+static void DelSprite(int id) {
     delspri_imp(id,mapref);
 }
 
