@@ -5,6 +5,7 @@
 
 #include <stdlib.h>
 
+#include "mapcore.h"
 #include "source/game.h"
 static mapstate_t *mapref;
 char *inputs;
@@ -48,6 +49,19 @@ void ForwardEngineUpdate(float dt) {
     targetupdate(dt);
 }
 
+void InsertSprite(int sectid, float x, float y, float z) {
+    insspri_imp(sectid,x,y,z,mapref);
+}
+
+void DelSprite(int id) {
+    delspri_imp(id,mapref);
+}
+
+void SetSpritePicNum(int id, int picnum) {
+    mapref->spri[id].tilnum;
+}
+
+
 void InitEngineApi(mapstate_t *map) {
     mapref = map;
     inputs = (char *) calloc(20, sizeof(char));
@@ -58,4 +72,6 @@ void InitEngineApi(mapstate_t *map) {
     engine.SetPlayerPos = SetPlayerPos;
     engine.GetLoadedMap = GetLoadedMap;
     engine.RegisterUpdate = RegisterUpdate;
+    engine.InsertSprite = InsertSprite;
+    engine.DeleteSprite = DelSprite;
 }

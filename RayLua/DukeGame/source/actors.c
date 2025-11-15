@@ -589,7 +589,7 @@ void hitradius( short i, long  r, long  hp1, long  hp2, long  hp3, long  hp4 )
                                 updatesector(ps[p].posx,ps[p].posy,&ps[p].cursectnum);
                                 setpal(&ps[p]);
 
-                                k = headspritestat[1];
+                                k = headspritestat[STAT_ACTOR];
                                 while(k >= 0)
                                 {
                                     if(sprite[k].picnum==CAMERA1)
@@ -3144,7 +3144,7 @@ void moveactors()
     spritetype *s;
     unsigned short k;
 
-    i = headspritestat[1];
+    i = headspritestat[STAT_ACTOR];
     while(i >= 0)
     {
         nexti = nextspritestat[i];
@@ -3185,7 +3185,7 @@ SET_SPRITE_XYZ(i,s->x,s->y,s->z);
                         s->cstat = 32+128;
                         k = 1;
 
-                        j = headspritestat[1];
+                        j = headspritestat[STAT_ACTOR];
                         while(j >= 0)
                         {
                             if( sprite[j].lotag == s->lotag &&
@@ -3319,7 +3319,7 @@ SET_SPRITE_XYZ(i,s->x,s->y,s->z);
                             if( j > -64 && j < 64 && (sync[p].bits&(1<<29)) )
                                 if(ps[p].toggle_key_flag == 1)
                             {
-                                a = headspritestat[1];
+                                a = headspritestat[STAT_ACTOR];
                                 while(a >= 0)
                                 {
                                     if(sprite[a].picnum == QUEBALL || sprite[a].picnum == STRIPEBALL)
@@ -3725,7 +3725,7 @@ SET_SPRITE_XYZ(i,s->x,s->y,s->z);
                         updatesector(ps[p].posx,ps[p].posy,&ps[p].cursectnum);
                         setpal(&ps[p]);
 
-                        j = headspritestat[1];
+                        j = headspritestat[STAT_ACTOR];
                         while(j >= 0)
                         {
                             if(sprite[j].picnum==CAMERA1) sprite[j].yvel = 0;
@@ -5889,7 +5889,7 @@ void moveeffectors()   //STATNUM 3
 
                     for(j=startwall;j<endwall;j++)
                     {
-                        k = headspritestat[1];
+                        k = headspritestat[STAT_ACTOR];
                         while(k >= 0)
                         {
                             if( sprite[k].extra > 0
