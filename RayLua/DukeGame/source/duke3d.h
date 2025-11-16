@@ -409,7 +409,6 @@ extern char networkmode;
 //extern char lumplockbyte[11];
 
     //DUKE3D.H - replace the end "my's" with this
-extern long myx, omyx, myxvel, myy, omyy, myyvel, myz, omyz, myzvel;
 extern short myhoriz, omyhoriz, myhorizoff, omyhorizoff, globalskillsound;
 extern short myang, omyang, mycursectnum, myjumpingcounter;
 extern char myjumpingtoggle, myonground, myhardlanding,myreturntocenter;

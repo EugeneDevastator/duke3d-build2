@@ -27,6 +27,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "duke3d.h"
 #include "dukewrap.h"
 #include "funct.h"
+#include "global.h"
 #include "music.h"
 #include "sounds.h"
 
@@ -1352,9 +1353,6 @@ void clearfifo()
 
 void resetmys()
 {
-    myx = omyx = ps[myconnectindex].posx;
-    myy = omyy = ps[myconnectindex].posy;
-    myz = omyz = ps[myconnectindex].posz;
     myxvel = myyvel = myzvel = 0;
     myang = omyang = ps[myconnectindex].ang;
     myhoriz = omyhoriz = ps[myconnectindex].horiz;

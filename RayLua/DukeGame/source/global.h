@@ -151,8 +151,22 @@ short weaponsandammosprites[15];
 long impact_damage;
 
         //GLOBAL.C - replace the end "my's" with this
-long myx, omyx, myxvel, myy, omyy, myyvel, myz, omyz, myzvel;
-short myhoriz, omyhoriz, myhorizoff, omyhorizoff;
+#define myxvel ps[0].posxv
+#define myyvel ps[0].posyv
+#define myzvel ps[0].poszv
+
+#define myx ps[0].posx
+#define myy ps[0].posy
+#define myz ps[0].posz
+
+#define omyz ps[0].oposz
+#define omyy ps[0].oposy
+#define omyx ps[0].oposx
+#define myhoriz ps[myconnectindex].horiz
+#define omyhoriz ps[myconnectindex].ohoriz
+#define myhorizoff ps[myconnectindex].horizoff
+#define omyhorizoff ps[myconnectindex].ohorizoff
+
 short myang, omyang, mycursectnum, myjumpingcounter,frags[MAXPLAYERS][MAXPLAYERS];
 
 //GAME.C sync state variables

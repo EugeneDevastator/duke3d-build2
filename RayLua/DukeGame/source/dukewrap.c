@@ -211,6 +211,7 @@ void ParseMapToDukeFormat() {
     ps[0].posx = map->startpos.x * 512;
     ps[0].posy = map->startpos.y* 512;
     ps[0].posz = map->startpos.z* 512*16;
+    ps[0].poszv = 0;
     ps[0].ang = forwardToAng(map->startfor);
     ps[0].cursectnum = map->startsectn; // do update at th end
 
