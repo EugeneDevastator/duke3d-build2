@@ -2292,7 +2292,7 @@ void processinput(short snum)
     p->truefz = j;
     p->truecz = getceilzofslope(psect,p->posx,p->posy);
 
-    truefdist = klabs(p->posz-j);
+    truefdist = labs(p->posz-j);
     if( (lz&49152) == 16384 && psectlotag == 1 && truefdist > PHEIGHT+(16<<8) )
         psectlotag = 0;
 
@@ -2940,9 +2940,9 @@ void processinput(short snum)
             if( i==40 )
             {
                 //Smooth on the ground
-
                 k = ((fz-(i<<8))-p->posz)>>1;
-                if( klabs(k) < 256 ) k = 0;
+                if( labs(k) < 256 ) k = 0;
+                else if( labs(k) == 256 ) k = k > 0 ? 128 : -128; // Reduce the 256 case to half
                 p->posz += k;
                 p->poszv -= 768;
                 if(p->poszv < 0) p->poszv = 0;
@@ -3041,7 +3041,8 @@ void processinput(short snum)
 
         tempang = sync[snum].avel<<1;
 
-        if( psectlotag == 2 ) p->angvel =(tempang-(tempang>>3))*sgn(doubvel);
+        if( psectlotag == 2 )
+            p->angvel =(tempang-(tempang>>3))*sgn(doubvel);
         else p->angvel = tempang*sgn(doubvel);
 
         p->ang += p->angvel;
@@ -3256,8 +3257,8 @@ void processinput(short snum)
                 p->pyoff = 0;
         }
 
-        // RBG***
-        setsprite(pi,p->posx,p->posy,p->posz+PHEIGHT);
+        // RBG*** // this is original code but it breaks stuff now..
+        //setsprite(pi,p->posx,p->posy,p->posz+PHEIGHT);
 
         if( psectlotag < 3 )
         {

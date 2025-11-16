@@ -555,8 +555,8 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				sec[i].owner = -1;
 				//sec[i].foglev = ?;
 
-				sec[i].tags[MT_STATNUM]=b7sec.stat[CEIL];
-				sec[i].tags[MT_STATNUM+1]=b7sec.stat[FLOOR];
+				sec[i].tags[MT_STATCEIL]=b7sec.stat[CEIL];
+				sec[i].tags[MT_STATFLOOR]=b7sec.stat[FLOOR];
 				sec[i].tags[MT_SEC_HNHI]=b7sec.surf[CEIL].heinum;
 				sec[i].tags[MT_SHADEHI]=b7sec.surf[CEIL].shade;
 				sec[i].tags[MT_SEC_HNLOW]=b7sec.surf[FLOOR].heinum;
@@ -762,6 +762,8 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				spr->tags[MT_SPR_CLIPDIST] = b7spr.clipdist;
 				spr->tags[MT_SPR_XREP] = b7spr.xrepeat;
 				spr->tags[MT_SPR_YREP] = b7spr.yrepeat;
+				spr->tags[MT_SPR_XOFF] = b7spr.xoffset;
+				spr->tags[MT_SPR_YOFF] = b7spr.yoffset;
 			}
 		}
 		else //CUBES5 map format (.CUB extension)

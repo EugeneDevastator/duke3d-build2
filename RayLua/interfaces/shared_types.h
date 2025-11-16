@@ -7,8 +7,15 @@
 #include <stdint.h>
 // duke tags defs.
 #define MT_LAST 15 // index, not count
+
+#define MT_STATCEIL (MT_LAST - 1)
+
 #define MT_STATNUM (MT_LAST - 2)
+#define MT_STATFLOOR (MT_LAST - 2)
+
+
 #define MT_PICLOW (MT_LAST - 3)
+
 #define MT_CSTAT (MT_LAST - 4)
 
 #define MT_PICOVER (MT_LAST - 5)
@@ -31,9 +38,11 @@
 
 #define MT_SEC_FWALL (MT_LAST - 12)
 #define MT_WAL_WALLIDX (MT_LAST - 12)
+#define MT_SPR_XOFF (MT_LAST - 12)
 
 #define MT_SEC_WALLNUM (MT_LAST - 13)
 #define MT_WAL_NEXTSEC (MT_LAST - 13)
+#define MT_SPR_YOFF (MT_LAST - 12)
 
 #define FLOOR 1
 #define CEIL 0
