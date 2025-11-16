@@ -5968,7 +5968,7 @@ void InitDuke() // New Entry point copy of main
             nomorelogohack = 1;
       //      goto MAIN_LOOP_RESTART;
         }
-
+        ud.clipping = 0;
       //  ud.auto_run = tempautorun;
 
      //   ud.warp_on = 0;
@@ -6051,38 +6051,36 @@ void init2() {
 int accumulatedTicks = 0;
 void DoDukeLoop(float dt) {
     long i;
-    // Accumulate delta time and convert to ticks
-    //  lockclock += TICSPERFRAME;
 
-
-    // 120 *0.111 = 12.111
-    // int = 12
-    // 12 / 120 = 0.1
-    // lockclock is not needed
+    // Accumulate delta time
     accumulatedTime += dt;
-    int ready_ticks = (int)(accumulatedTime * TICKS_PER_SECF); // 26 ticks per frame. 16 avg fps.
-    accumulatedTicks += ready_ticks;
-    lockclock += ready_ticks;
 
-    accumulatedTime -= ready_ticks/TICKS_PER_SECF;
+    // Calculate how many ticks should have passed
+    int ticks_to_process = (int)(accumulatedTime * TICKS_PER_SECF);
 
+    // Remove processed time
+    accumulatedTime -= ticks_to_process / TICKS_PER_SECF;
 
-    if (accumulatedTicks > 1) {
-        accumulatedTicks--;
+    // Process each tick
+    for (int tick = 0; tick < ticks_to_process; tick++) {
         totalclock++;
-    }
-    faketimerhandler();
-    domovethings();
-    cheats();
-    nonsharedkeys();
+        lockclock++;
 
-    smoothratio = min(max((totalclock-lockclock)*(65536L/TICSPERFRAME),0), 65536);
+        faketimerhandler();
+        domovethings();
+        cheats();
+        nonsharedkeys();
+    }
+
+    // Calculate interpolation ratio for smooth rendering
+    smoothratio = min(max((int)((accumulatedTime * TICKS_PER_SECF) * (65536L/TICSPERFRAME)), 0), 65536);
+
     displayrooms(screenpeek, smoothratio);
     displayrest(smoothratio);
 
     checksync();
-
 }
+
 #if !IS_DUKE_INCLUDED
 int main(int argc, char** argv)
 {
@@ -6422,12 +6420,12 @@ char domovethings(void)
 
     i=0;
     {
-        cheatkeys(i);
+        cheatkeys(0);
 
         if( ud.pause_on == 0 )
         {
-            processinput(i);
-            checksectors(i);
+            processinput(0);
+            checksectors(0);
         }
     }
 
