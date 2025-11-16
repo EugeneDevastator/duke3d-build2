@@ -148,10 +148,10 @@ void ConvertSprite(int i,spritetype* spr) {
     spr->picnum = b2spr.tilnum;
     spr->shade = b2spr.tags[MT_SHADELOW];
     spr->pal = b2spr.pal,
-    spr->clipdist = b2spr.fat,
+    spr->clipdist = b2spr.tags[MT_SPR_CLIPDIST],
     spr->filler = 0;
-    spr->xrepeat =1,
-    spr->yrepeat=1;
+    spr->xrepeat = b2spr.tags[MT_SPR_XREP],
+    spr->yrepeat = b2spr.tags[MT_SPR_YREP];
     spr->xoffset=0,
     spr->yoffset=0;
     spr->statnum = b2spr.tags[MT_STATNUM];

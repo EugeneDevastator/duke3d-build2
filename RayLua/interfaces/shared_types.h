@@ -15,11 +15,14 @@
 
 #define MT_SEC_HNLOW (MT_LAST - 6)
 #define MT_WALLPT2 (MT_LAST - 6)
+#define MT_SPR_XREP (MT_LAST - 6)
 
 #define MT_SEC_HNHI (MT_LAST - 7)
 #define MT_NEXTWALL (MT_LAST - 7)
+#define MT_SPR_YREP (MT_LAST - 7)
 
 #define MT_SHADELOW (MT_LAST - 8)
+#define MT_SPR_CLIPDIST (MT_LAST - 8)
 
 #define MT_SHADEHI (MT_LAST - 9)
 

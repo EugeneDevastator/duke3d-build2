@@ -759,6 +759,9 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				spr->tags[MT_SHADELOW] = b7spr.shade;
 				spr->tags[MT_STATNUM] = b7spr.statnum;
 				spr->tags[MT_EXTRA] = b7spr.extra;
+				spr->tags[MT_SPR_CLIPDIST] = b7spr.clipdist;
+				spr->tags[MT_SPR_XREP] = b7spr.xrepeat;
+				spr->tags[MT_SPR_YREP] = b7spr.yrepeat;
 			}
 		}
 		else //CUBES5 map format (.CUB extension)
