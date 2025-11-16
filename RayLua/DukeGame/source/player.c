@@ -1842,7 +1842,7 @@ void getinput(short snum)
         return;
     }
 
-    loc.bits |=   bbeng.FrameInputs[SPC_JUMP];
+    loc.bits =   bbeng.FrameInputs[SPC_JUMP];
     loc.bits |=   bbeng.FrameInputs[CROUCH]<<1;
     loc.bits |=   bbeng.FrameInputs[MB_SHOOT]<<2;
     loc.bits |=   BUTTON(gamefunc_Aim_Up)<<3;
@@ -2872,8 +2872,8 @@ void processinput(short snum)
                 }
             }
         }
-
-        if(p->posz < (fz-(i<<8)) ) //falling
+        int fcorr = fz-(i<<8);
+        if(p->posz < (fcorr) ) //falling
         {
             if( (sb_snum&3) == 0 && p->on_ground && (sector[psect].floorstat&2) && p->posz >= (fz-(i<<8)-(16<<8) ) )
                 p->posz = fz-(i<<8);
@@ -3040,8 +3040,8 @@ void processinput(short snum)
 
         tempang = sync[snum].avel<<1;
 
-        if( psectlotag == 2 ) p->angvel =(tempang-(tempang>>3))*ksgn(doubvel);
-        else p->angvel = tempang*ksgn(doubvel);
+        if( psectlotag == 2 ) p->angvel =(tempang-(tempang>>3))*sgn(doubvel);
+        else p->angvel = tempang*sgn(doubvel);
 
         p->ang += p->angvel;
         p->ang &= 2047;
@@ -3172,11 +3172,8 @@ void processinput(short snum)
                 }
             }
         }
-        else
-        {
-            if(p->walking_snd_toggle > 0)
-                p->walking_snd_toggle --;
-        }
+        else if(p->walking_snd_toggle > 0)
+            p->walking_snd_toggle --;
 
         if(p->jetpack_on == 0 && p->steroids_amount > 0 && p->steroids_amount < 400)
             doubvel <<= 1;
@@ -3926,6 +3923,7 @@ void processinput(short snum)
         }
     }
 }
+
 
 //UPDATE THIS FILE OVER THE OLD GETSPRITESCORE/COMPUTERGETINPUT FUNCTIONS
 int getspritescore(long snum, long dapicnum)

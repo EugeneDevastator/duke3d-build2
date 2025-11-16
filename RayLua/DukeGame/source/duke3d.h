@@ -88,7 +88,10 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #define TICRATE (120)
 #define TICSPERFRAME (TICRATE/26)
-
+// we assume that previously avg of 16 fps was used to print out fps.
+// or we can assume 120 ticks per second is tickrate.
+#define TICKS_PER_SECF (73.84615384615384615392f)
+#define TICKS_TO_SEC(t) (t/TICKS_PER_SECF)
 // #define GC (TICSPERFRAME*44)
 
 #define NUM_SOUNDS 450

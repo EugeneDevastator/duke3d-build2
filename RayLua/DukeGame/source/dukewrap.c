@@ -88,8 +88,13 @@ spritetype ReadSprite(long i) {
 }
 void DoDukeUpdate(float dt) {
     DoDukeLoop(dt);
-    rayl->SetPlayerPos(ps[0].posx/ 512.0f,ps[0].posy/ 512.0f,ps[0].posz/ (512.f*16.f));
-   // rayl->SetPlayerPos(ps[0].posx/ 512.0f,ps[0].posy/ 512.0f,ps[0].posz/ (512.f*16.f));
+    rayl->SetPlayerPos(
+        ps[0].posx / 512.0f,
+        ps[0].posy/ 512.0f,
+        ps[0].posz/ (512.f*16.f)
+        );
+
+
 
 }
 // is it ok to store internal function in pointer?

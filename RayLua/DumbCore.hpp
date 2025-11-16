@@ -161,9 +161,10 @@ private:
         engine.Inputs[Q_TLEFT] = IsMouseButtonDown(KEY_Q) ? 1 : 0;
         engine.Inputs[R_TRIGHT] = IsMouseButtonDown(KEY_R) ? 1 : 0;
         ForwardEngineUpdate(deltaTime);
-        cam.position.x = px;
-        cam.position.y = -pz;
-        cam.position.z = py;
+        point3d ppos = GetPlayerPos();
+        cam.position.x = ppos.x;
+        cam.position.y = -ppos.z;
+        cam.position.z = ppos.y;
         cam.target = Vector3Add(cam.position, {0, 0, 1});
     }
 #endif

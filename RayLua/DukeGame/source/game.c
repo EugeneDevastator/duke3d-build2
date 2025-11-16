@@ -36,7 +36,9 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #include "dukewrap.h"
 
-static char detailmode = 0, ready2send = 0;
+static char detailmode = 0;// ready2send = 0;
+char syncstat, othersyncval[MOVEFIFOSIZ];
+char syncstat, syncval[MAXPLAYERS][MOVEFIFOSIZ];
 static long gotlastpacketclock = 0, smoothratio;
 static long oposx[MAXPLAYERS], oposy[MAXPLAYERS], oposz[MAXPLAYERS];
 static long ohoriz[MAXPLAYERS], ozoom[MAXPLAYERS];
@@ -237,17 +239,23 @@ void faketimerhandler()
     //    if (i != myconnectindex)
     //        if (movefifoend[i] < movefifoend[myconnectindex]-200) return;
 
-     getinput(myconnectindex);
-
-   // movefifoend[myconnectindex]++;
-
+     getinput(0);
+    for(i=connecthead;i>=0;i=connectpoint2[i])
+        if (i != myconnectindex)
+            if (movefifoend[i] < movefifoend[myconnectindex]-200) return;
      avgfvel += loc.fvel;
      avgsvel += loc.svel;
      avgavel += loc.avel;
      avghorz += loc.horz;
      avgbits |= loc.bits;
-
-     inputfifo[movefifoend[myconnectindex]&(MOVEFIFOSIZ-1)][myconnectindex] = loc;
+    if (movefifoend[myconnectindex]&(movesperpacket-1))
+    {
+        copybufbyte(&inputfifo[(movefifoend[myconnectindex]-1)&(MOVEFIFOSIZ-1)][myconnectindex],
+                        &inputfifo[movefifoend[myconnectindex]&(MOVEFIFOSIZ-1)][myconnectindex],sizeof(input));
+        movefifoend[myconnectindex]++;
+        return;
+    }
+     //inputfifo[movefifoend[myconnectindex]&(MOVEFIFOSIZ-1)][myconnectindex] = loc;
      nsyn = &inputfifo[movefifoend[myconnectindex]&(MOVEFIFOSIZ-1)][myconnectindex];
      nsyn[0].fvel = avgfvel;
      nsyn[0].svel = avgsvel;
@@ -257,263 +265,19 @@ void faketimerhandler()
      avgfvel = avgsvel = avgavel = avghorz = avgbits = 0;
      movefifoend[myconnectindex]++;
 
-   /*  if (numplayers < 2)
+     if (numplayers < 2)
      {
           if (ud.multimode > 1)
               for(i=connecthead;i>=0;i=connectpoint2[i])
               if(i != myconnectindex)
               {
-                  //clearbufbyte(&inputfifo[movefifoend[i]&(MOVEFIFOSIZ-1)][i],sizeof(input),0L);
+                  clearbufbyte(&inputfifo[movefifoend[i]&(MOVEFIFOSIZ-1)][i],sizeof(input),0L);
                   if(ud.playerai)
                       computergetinput(i,&inputfifo[movefifoend[i]&(MOVEFIFOSIZ-1)][i]);
                   movefifoend[i]++;
               }
           return;
-     }*/
-}
-void faketimerhandler_rl()
-{
-    long i, j, k, l;
-    //    short who;
-    input *osyn, *nsyn;
-    numplayers = 1;
-
- //  getinput(myconnectindex);
-
-    avgfvel += loc.fvel;
-    avgsvel += loc.svel;
-    avgavel += loc.avel;
-    avghorz += loc.horz;
-    avgbits |= loc.bits;
-
-    nsyn[0].fvel = avgfvel / movesperpacket;
-    nsyn[0].svel = avgsvel / movesperpacket;
-    nsyn[0].avel = avgavel / movesperpacket;
-    nsyn[0].horz = avghorz / movesperpacket;
-    nsyn[0].bits = avgbits;
-
-    avgfvel = avgsvel = avgavel = avghorz = avgbits = 0;
-
-    movefifoend[myconnectindex]++;
-
-
-    if (false && networkmode == 1)
-    {
-        packbuf[0] = 17;
-        if ((movefifoend[myconnectindex] - 1) == 0) packbuf[0] = 16;
-        j = 1;
-
-        //Fix timers and buffer/jitter value
-        if (((movefifoend[myconnectindex] - 1) & (TIMERUPDATESIZ - 1)) == 0)
-        {
-            if (myconnectindex != connecthead)
-            {
-                i = myminlag[connecthead] - otherminlag;
-                if (klabs(i) > 8) i >>= 1;
-                else if (klabs(i) > 2) i = ksgn(i);
-                else i = 0;
-
-              //  totalclock -= TICSPERFRAME * i;
-                myminlag[connecthead] -= i;
-                otherminlag += i;
-            }
-
-            if (myconnectindex == connecthead)
-                for (i = connectpoint2[connecthead]; i >= 0; i = connectpoint2[i])
-                    packbuf[j++] = min(max(myminlag[i],-128), 127);
-
-            for (i = connecthead; i >= 0; i = connectpoint2[i])
-                myminlag[i] = 0x7fffffff;
-        }
-
-        osyn = (input*)&inputfifo[(movefifoend[myconnectindex] - 2) & (MOVEFIFOSIZ - 1)][myconnectindex];
-        nsyn = (input*)&inputfifo[(movefifoend[myconnectindex] - 1) & (MOVEFIFOSIZ - 1)][myconnectindex];
-
-        k = j;
-        packbuf[j++] = 0;
-
-        if (nsyn[0].fvel != osyn[0].fvel)
-        {
-            packbuf[j++] = (char)nsyn[0].fvel;
-            packbuf[j++] = (char)(nsyn[0].fvel >> 8);
-            packbuf[k] |= 1;
-        }
-        if (nsyn[0].svel != osyn[0].svel)
-        {
-            packbuf[j++] = (char)nsyn[0].svel;
-            packbuf[j++] = (char)(nsyn[0].svel >> 8);
-            packbuf[k] |= 2;
-        }
-        if (nsyn[0].avel != osyn[0].avel)
-        {
-            packbuf[j++] = (signed char)nsyn[0].avel;
-            packbuf[k] |= 4;
-        }
-        if ((nsyn[0].bits ^ osyn[0].bits) & 0x000000ff) packbuf[j++] = (nsyn[0].bits & 255), packbuf[k] |= 8;
-        if ((nsyn[0].bits ^ osyn[0].bits) & 0x0000ff00) packbuf[j++] = ((nsyn[0].bits >> 8) & 255), packbuf[k] |= 16;
-        if ((nsyn[0].bits ^ osyn[0].bits) & 0x00ff0000) packbuf[j++] = ((nsyn[0].bits >> 16) & 255), packbuf[k] |= 32;
-        if ((nsyn[0].bits ^ osyn[0].bits) & 0xff000000) packbuf[j++] = ((nsyn[0].bits >> 24) & 255), packbuf[k] |= 64;
-        if (nsyn[0].horz != osyn[0].horz)
-        {
-            packbuf[j++] = (char)nsyn[0].horz;
-            packbuf[k] |= 128;
-        }
-
-        while (syncvalhead[myconnectindex] != syncvaltail)
-        {
-            packbuf[j++] = syncval[myconnectindex][syncvaltail & (MOVEFIFOSIZ - 1)];
-            syncvaltail++;
-        }
-
-        for (i = connecthead; i >= 0; i = connectpoint2[i])
-            if (i != myconnectindex)
-                sendpacket(i, packbuf, j);
-
-        return;
-    }
-    if (false && myconnectindex != connecthead) //Slave
-    {
-        //Fix timers and buffer/jitter value
-        if (((movefifoend[myconnectindex] - 1) & (TIMERUPDATESIZ - 1)) == 0)
-        {
-            i = myminlag[connecthead] - otherminlag;
-            if (klabs(i) > 8) i >>= 1;
-            else if (klabs(i) > 2) i = ksgn(i);
-            else i = 0;
-
-            // totalclock -= TICSPERFRAME * i;
-            myminlag[connecthead] -= i;
-            otherminlag += i;
-
-            for (i = connecthead; i >= 0; i = connectpoint2[i])
-                myminlag[i] = 0x7fffffff;
-        }
-
-        packbuf[0] = 1;
-        packbuf[1] = 0;
-        j = 2;
-
-        osyn = (input*)&inputfifo[(movefifoend[myconnectindex] - 2) & (MOVEFIFOSIZ - 1)][myconnectindex];
-        nsyn = (input*)&inputfifo[(movefifoend[myconnectindex] - 1) & (MOVEFIFOSIZ - 1)][myconnectindex];
-
-        if (nsyn[0].fvel != osyn[0].fvel)
-        {
-            packbuf[j++] = (char)nsyn[0].fvel;
-            packbuf[j++] = (char)(nsyn[0].fvel >> 8);
-            packbuf[1] |= 1;
-        }
-        if (nsyn[0].svel != osyn[0].svel)
-        {
-            packbuf[j++] = (char)nsyn[0].svel;
-            packbuf[j++] = (char)(nsyn[0].svel >> 8);
-            packbuf[1] |= 2;
-        }
-        if (nsyn[0].avel != osyn[0].avel)
-        {
-            packbuf[j++] = (signed char)nsyn[0].avel;
-            packbuf[1] |= 4;
-        }
-        if ((nsyn[0].bits ^ osyn[0].bits) & 0x000000ff) packbuf[j++] = (nsyn[0].bits & 255), packbuf[1] |= 8;
-        if ((nsyn[0].bits ^ osyn[0].bits) & 0x0000ff00) packbuf[j++] = ((nsyn[0].bits >> 8) & 255), packbuf[1] |= 16;
-        if ((nsyn[0].bits ^ osyn[0].bits) & 0x00ff0000) packbuf[j++] = ((nsyn[0].bits >> 16) & 255), packbuf[1] |= 32;
-        if ((nsyn[0].bits ^ osyn[0].bits) & 0xff000000) packbuf[j++] = ((nsyn[0].bits >> 24) & 255), packbuf[1] |= 64;
-        if (nsyn[0].horz != osyn[0].horz)
-        {
-            packbuf[j++] = (char)nsyn[0].horz;
-            packbuf[1] |= 128;
-        }
-
-        while (syncvalhead[myconnectindex] != syncvaltail)
-        {
-            packbuf[j++] = syncval[myconnectindex][syncvaltail & (MOVEFIFOSIZ - 1)];
-            syncvaltail++;
-        }
-
-        sendpacket(connecthead, packbuf, j);
-        return;
-    }
-
-    //This allows allow packet-resends
-/*
-    while (1) //Master
-    {
-        for (i = connecthead; i >= 0; i = connectpoint2[i])
-            if (playerquitflag[i] && (movefifoend[i] <= movefifosendplc)) return;
-
-        osyn = (input*)&inputfifo[(movefifosendplc - 1) & (MOVEFIFOSIZ - 1)][0];
-        nsyn = (input*)&inputfifo[(movefifosendplc) & (MOVEFIFOSIZ - 1)][0];
-
-        //MASTER -> SLAVE packet
-        packbuf[0] = 0;
-        j = 1;
-
-        //Fix timers and buffer/jitter value
-        if ((movefifosendplc & (TIMERUPDATESIZ - 1)) == 0)
-        {
-            for (i = connectpoint2[connecthead]; i >= 0; i = connectpoint2[i])
-                if (playerquitflag[i])
-                    packbuf[j++] = min(max(myminlag[i],-128), 127);
-
-            for (i = connecthead; i >= 0; i = connectpoint2[i])
-                myminlag[i] = 0x7fffffff;
-        }
-
-        k = j;
-        for (i = connecthead; i >= 0; i = connectpoint2[i])
-            j += playerquitflag[i];
-        for (i = connecthead; i >= 0; i = connectpoint2[i])
-        {
-            if (playerquitflag[i] == 0) continue;
-
-            packbuf[k] = 0;
-            if (nsyn[i].fvel != osyn[i].fvel)
-            {
-                packbuf[j++] = (char)nsyn[i].fvel;
-                packbuf[j++] = (char)(nsyn[i].fvel >> 8);
-                packbuf[k] |= 1;
-            }
-            if (nsyn[i].svel != osyn[i].svel)
-            {
-                packbuf[j++] = (char)nsyn[i].svel;
-                packbuf[j++] = (char)(nsyn[i].svel >> 8);
-                packbuf[k] |= 2;
-            }
-            if (nsyn[i].avel != osyn[i].avel)
-            {
-                packbuf[j++] = (signed char)nsyn[i].avel;
-                packbuf[k] |= 4;
-            }
-            if ((nsyn[i].bits ^ osyn[i].bits) & 0x000000ff) packbuf[j++] = (nsyn[i].bits & 255), packbuf[k] |= 8;
-            if ((nsyn[i].bits ^ osyn[i].bits) & 0x0000ff00) packbuf[j++] = ((nsyn[i].bits >> 8) & 255), packbuf[k] |=
-                16;
-            if ((nsyn[i].bits ^ osyn[i].bits) & 0x00ff0000) packbuf[j++] = ((nsyn[i].bits >> 16) & 255), packbuf[k] |=
-                32;
-            if ((nsyn[i].bits ^ osyn[i].bits) & 0xff000000) packbuf[j++] = ((nsyn[i].bits >> 24) & 255), packbuf[k] |=
-                64;
-            if (nsyn[i].horz != osyn[i].horz)
-            {
-                packbuf[j++] = (char)nsyn[i].horz;
-                packbuf[k] |= 128;
-            }
-            k++;
-        }
-
-        while (syncvalhead[myconnectindex] != syncvaltail)
-        {
-            packbuf[j++] = syncval[myconnectindex][syncvaltail & (MOVEFIFOSIZ - 1)];
-            syncvaltail++;
-        }
-
-        for (i = connectpoint2[connecthead]; i >= 0; i = connectpoint2[i])
-            if (playerquitflag[i])
-            {
-                sendpacket(i, packbuf, j);
-                if (nsyn[i].bits & (1 << 26))
-                    playerquitflag[i] = 0;
-            }
-
-        movefifosendplc += movesperpacket;
-    }*/
+     }
 }
 extern long cacnum;
 // typedef struct { long *hand, leng; char *lock; } cactype;
@@ -1847,11 +1611,10 @@ void displayrooms(short snum, long smoothratio)
     }
    restoreinterpolations();
 
-    return;//
     if (false)
         animatecamsprite(); // render code for cam screen
 
-    if (ud.camerasprite >= 0)
+    if (false && ud.camerasprite >= 0)
     {
         spritetype* s;
 
@@ -1872,13 +1635,14 @@ void displayrooms(short snum, long smoothratio)
     else
     {
         i = divscale22(1, sprite[p->i].yrepeat + 28);
-        if (i != oyrepeat)
+/*
+        if (false && i != oyrepeat)
         {
             oyrepeat = i;
             setaspect(oyrepeat, yxaspect);
         }
 
-        if (screencapt)
+        if (false && screencapt)
         {
             walock[MAXTILES - 1] = 254;
             if (waloff[MAXTILES - 1] == 0)
@@ -1915,17 +1679,7 @@ void displayrooms(short snum, long smoothratio)
             i = sintable[i + 512] * 8 + sintable[i] * 5L;
             setaspect(i >> 1, yxaspect);
         }
-
-        if ((snum == myconnectindex) && (numplayers > 1))
-        {
-            cposx = omyx + mulscale16((long)(myx-omyx), smoothratio);
-            cposy = omyy + mulscale16((long)(myy-omyy), smoothratio);
-            cposz = omyz + mulscale16((long)(myz-omyz), smoothratio);
-            cang = omyang + mulscale16((long)(((myang+1024-omyang)&2047)-1024), smoothratio);
-            choriz = omyhoriz + omyhorizoff + mulscale16((long)(myhoriz+myhorizoff-omyhoriz-omyhorizoff), smoothratio);
-            sect = mycursectnum;
-        }
-        else
+*/
         {
             cposx = p->oposx + mulscale16((long)(p->posx-p->oposx), smoothratio);
             cposy = p->oposy + mulscale16((long)(p->posy-p->oposy), smoothratio);
@@ -1981,7 +1735,7 @@ void displayrooms(short snum, long smoothratio)
         else if (choriz < -99) choriz = -99;
 
         se40code(cposx, cposy, cposz, cang, choriz, smoothratio);
-
+/*
         if ((gotpic[MIRROR >> 3] & (1 << (MIRROR & 7))) > 0)
         {
             dst = 0x7fffffff;
@@ -2012,31 +1766,31 @@ void displayrooms(short snum, long smoothratio)
             }
             gotpic[MIRROR >> 3] &= ~(1 << (MIRROR & 7));
         }
-
+*/
         drawrooms(cposx, cposy, cposz, cang, choriz, sect);
         animatesprites(cposx, cposy, cang, smoothratio);
         drawmasks();
 
-        if (screencapt == 1)
-        {
-            setviewback();
-            walock[MAXTILES - 1] = 1;
-            screencapt = 0;
-        }
-        else if ((ud.screen_tilting && p->rotscrnang) || ud.detail == 0)
-        {
-            if (ud.screen_tilting) tang = p->rotscrnang;
-            else tang = 0;
-            setviewback();
-            picanm[MAXTILES - 2] &= 0xff0000ff;
-            i = (tang & 511);
-            if (i > 256) i = 512 - i;
-            i = sintable[i + 512] * 8 + sintable[i] * 5L;
-            if ((1 - ud.detail) == 0) i >>= 1;
-            rotatesprite(160 << 16, 100 << 16, i, tang + 512,MAXTILES - 2, 0, 0, 4 + 2 + 64, windowx1, windowy1,
-                         windowx2, windowy2);
-            walock[MAXTILES - 2] = 199;
-        }
+     // if (false && screencapt == 1)
+     // {
+     //     setviewback();
+     //     walock[MAXTILES - 1] = 1;
+     //     screencapt = 0;
+     // }
+     // else if ((ud.screen_tilting && p->rotscrnang) || ud.detail == 0)
+     // {
+     //     if (ud.screen_tilting) tang = p->rotscrnang;
+     //     else tang = 0;
+     //     setviewback();
+     //     picanm[MAXTILES - 2] &= 0xff0000ff;
+     //     i = (tang & 511);
+     //     if (i > 256) i = 512 - i;
+     //     i = sintable[i + 512] * 8 + sintable[i] * 5L;
+     //     if ((1 - ud.detail) == 0) i >>= 1;
+     //     rotatesprite(160 << 16, 100 << 16, i, tang + 512,MAXTILES - 2, 0, 0, 4 + 2 + 64, windowx1, windowy1,
+     //                  windowx2, windowy2);
+     //     walock[MAXTILES - 2] = 199;
+     // }
     }
 
     restoreinterpolations();
@@ -5494,7 +5248,7 @@ void nonsharedkeys()
                 }
                 //cmenu(350);
                 screencapt = 1;
-                long smoothratio = min(max((totalclock-lockclock)*(65536L/TICSPERFRAME),0),65536);
+                smoothratio = 65536; //min(max((totalclock-lockclock)*(65536L/TICSPERFRAME),0),65536);
 
                 displayrooms(myconnectindex, smoothratio);
                 // savetemp("duke3d.tmp",waloff[MAXTILES-1],160*100);
@@ -6163,7 +5917,7 @@ void Startup()
 
     for (i = 0; i < MAXPLAYERS; i++) playerreadyflag[i] = 0;
     initmultiplayers_singleplayer();
-
+   // playerreadyflag[0] = 1;
 
     ps[myconnectindex].palette = (char*)&palette[0];
     SetupGameButtons();
@@ -6289,19 +6043,6 @@ void InitDuke() // New Entry point copy of main
 
         totalmemory = 999999999999;
         Startup();
-
-        if (numplayers > 1)
-        {
-            ud.multimode = numplayers;
-            sendlogon();
-        }
-        else if (boardfilename[0] != 0)
-        {
-            ud.m_level_number = 7;
-            ud.m_volume_number = 0;
-            ud.warp_on = 1;
-        }
-
         getnames();
 
         // try getting game later right away.
@@ -6309,17 +6050,6 @@ void InitDuke() // New Entry point copy of main
         ud.level_number = ud.m_level_number = 2;
         ud.player_skill = ud.m_player_skill = 2;
 
-
-        if (ud.multimode > 1)
-        {
-            playerswhenstarted = ud.multimode;
-
-            if (ud.warp_on == 0)
-            {
-                ud.m_monsters_off = 1;
-                ud.m_player_skill = 0;
-            }
-        }
 
         ud.last_level = -1;
         ud.warp_on = 1;
@@ -6382,184 +6112,6 @@ void pitch_test() {
 static float accumulatedTime = 0;
 const float TICK_DURATION = 1.0f / TICRATE;
 
-void updateplayer0(void)
-{
-
-    player_struct *p = &ps[0];
-    long doubvel, myxvel, myyvel, psect, i;
-    char spritebridge = 0;
-    i = 34;
-    // Get current sector and basic setup
-    psect = p->cursectnum;
-    if(psect < 0 || psect >= MAXSECTORS) return;
-
-    doubvel = TICSPERFRAME;
-    myxvel = p->posxv;
-    myyvel = p->posyv;
-    long cz = hittype[p->i].ceilingz;
-    long fz = hittype[p->i].floorz;
-    // Apply steroids speed boost
-    if(p->steroids_amount > 0 && p->steroids_amount < 400)
-        doubvel <<= 1;
-
-    // Get input from global loc structure (already parsed)
-    myxvel += ((loc.fvel * doubvel) << 6);
-    myyvel += ((loc.svel * doubvel) << 6);
-    long k = getflorzofslope(psect, p->posx, p->posy);
-
-    // Apply friction based on conditions
-    if((p->curr_weapon == KNEE_WEAPON && p->kickback_pic > 10 && p->on_ground) ||
-       (p->on_ground && (loc.bits & 2))) {
-        // Crouching or knee attack friction
-        myxvel = mulscale16(myxvel, dukefriction - 0x2000);
-        myyvel = mulscale16(myyvel, dukefriction - 0x2000);
-    } else {
-        if(sector[psect].lotag == 2) {
-            // Underwater friction
-            myxvel = mulscale16(myxvel, dukefriction - 0x1400);
-            myyvel = mulscale16(myyvel, dukefriction - 0x1400);
-        } else {
-            // Normal friction
-            myxvel = mulscale16(myxvel, dukefriction);
-            myyvel = mulscale16(myyvel, dukefriction);
-        }
-    }
-
-    // Stop very small movements
-    if(abs(myxvel) < 2048 && abs(myyvel) < 2048)
-        myxvel = myyvel = 0;
-
-    // Shrunk player moves slower
-    if(sprite[p->i].yrepeat < 32) {
-        myxvel = mulscale16(myxvel, (dukefriction) - (dukefriction>>1) + (dukefriction>>2));
-        myyvel = mulscale16(myyvel, (dukefriction) - (dukefriction>>1) + (dukefriction>>2));
-    }
-    int psectlotag = sector[psect].lotag;
-    unsigned long sb_snum = loc.bits;
-    if (psectlotag != 2)
-    {
-        if (myz < (fz - (i << 8)) && (floorspace(psect) | ceilingspace(psect)) == 0) //falling
-        {
-            if ((sb_snum & 3) == 0 && myonground && (sector[psect].floorstat & 2) && myz >= (fz - (i << 8) - (16 << 8)))
-                myz = fz - (i << 8);
-            else
-            {
-                myonground = 0;
-
-                myzvel += (gc + 80);
-
-                if (myzvel >= (4096 + 2048)) myzvel = (4096 + 2048);
-            }
-        }
-
-        else
-        {
-            if (psectlotag != 1 && psectlotag != 2 && myonground == 0 && myzvel > (6144 >> 1))
-                myhardlanding = myzvel >> 10;
-            myonground = 1;
-
-            if (i == 40)
-            {
-                //Smooth on the ground
-
-                k = ((fz - (i << 8)) - myz) >> 1;
-                if (klabs(k) < 256) k = 0;
-                myz += k; // ((fz-(i<<8))-myz)>>1;
-                myzvel -= 768; // 412;
-                if (myzvel < 0) myzvel = 0;
-            }
-            else if (myjumpingcounter == 0)
-            {
-                myz += ((fz - (i << 7)) - myz) >> 1; //Smooth on the water
-                if (p->on_warping_sector == 0 && myz > fz - (16 << 8))
-                {
-                    myz = fz - (16 << 8);
-                    myzvel >>= 1;
-                }
-            }
-
-            if (sb_snum & 2)
-                myz += (2048 + 768);
-
-            if ((sb_snum & 1) == 0 && myjumpingtoggle == 1)
-                myjumpingtoggle = 0;
-
-            else if ((sb_snum & 1) && myjumpingtoggle == 0)
-            {
-                if (myjumpingcounter == 0)
-                    if ((fz - cz) > (56 << 8))
-                    {
-                        myjumpingcounter = 1;
-                        myjumpingtoggle = 1;
-                    }
-            }
-            if (myjumpingcounter && (sb_snum & 1) == 0)
-                myjumpingcounter = 0;
-        }
-
-        if (myjumpingcounter)
-        {
-            if ((sb_snum & 1) == 0 && myjumpingtoggle == 1)
-                myjumpingtoggle = 0;
-
-            if (myjumpingcounter < (1024 + 256))
-            {
-                if (psectlotag == 1 && myjumpingcounter > 768)
-                {
-                    myjumpingcounter = 0;
-                    myzvel = -512;
-                }
-                else
-                {
-                    myzvel -= (sintable[(2048 - 128 + myjumpingcounter) & 2047]) / 12;
-                    myjumpingcounter += 180;
-
-                    myonground = 0;
-                }
-            }
-            else
-            {
-                myjumpingcounter = 0;
-                myzvel = 0;
-            }
-        }
-
-        myz += myzvel;
-
-        if (myz < (cz + (4 << 8)))
-        {
-            myjumpingcounter = 0;
-            if (myzvel < 0) myxvel = myyvel = 0;
-            myzvel = 128;
-            myz = cz + (4 << 8);
-        }
-    }
-
-    // Determine clipping height
-    if(sector[psect].lotag == 1 || spritebridge == 1)
-        i = (4L << 8);
-    else
-        i = (20L << 8);
-    p->posz = myz;
-    // Apply movement with collision detection - THIS IS WHERE POSITION UPDATES
-    clipmove(&p->posx, &p->posy, &p->posz, &p->cursectnum,
-             myxvel, myyvel, 164L, 4L << 8, i, CLIPMASK0);
-
-    // Push player out of walls if stuck
-    pushmove(&p->posx, &p->posy, &p->posz, &p->cursectnum,
-             164L, 4L << 8, 4L << 8, CLIPMASK0);
-
-    // Store velocity back to player
-    p->posxv = myxvel;
-    p->posyv = myyvel;
-    p->poszv = myzvel;
-
-    // Adjust height for shrunk player
-    if(p->jetpack_on == 0 && sector[psect].lotag != 1 &&
-       sector[psect].lotag != 2 && sprite[p->i].yrepeat < 32)
-        p->posz += 30 << 8;
-}
-
 void UpdateClocks(float dt)
 {
     static float accumulator = 0.0f;
@@ -6619,7 +6171,28 @@ void init2() {
     tempautorun = ud.auto_run;
 
 }
-void DoDukeLoopv2(int argc, char **argv) {
+void DoDukeLoop(float dt) {
+    long i;
+    // Accumulate delta time and convert to ticks
+    //  lockclock += TICSPERFRAME;
+
+    accumulatedTime += dt;
+
+
+    float ticks_to_add_f = accumulatedTime * 120.0; // 26 ticks per frame. 16 avg fps.
+    int ticks_added = (int)ticks_to_add_f;
+    if (ticks_added < 2)
+    accumulatedTime -= ticks_added/120.0;
+    totalclock += ticks_added;
+    ototalclock = totalclock;
+
+
+if (ticks_added < 2)
+    return;
+    // 120 *0.111 = 12.111
+    // int = 12
+    // 12 / 120 = 0.1
+// lockclock is not needed
 
     //The whole loop!!!!!!!!!!!!!!!!!!
 
@@ -6627,48 +6200,21 @@ void DoDukeLoopv2(int argc, char **argv) {
     cheats();
     nonsharedkeys();
 
-    smoothratio = min(max((totalclock-lockclock)*(65536L/TICSPERFRAME),0), 65536);
+    smoothratio = 65536 ;//min(max((totalclock-lockclock)*(65536L/TICSPERFRAME),0), 65536);
     displayrooms(screenpeek, smoothratio);
     displayrest(smoothratio);
     faketimerhandler();
     checksync();
+
+    lockclock = totalclock;
+    cameraclock = totalclock;
 }
 
-void DoDukeLoop(float dt) {
-    long i;
-    // Accumulate delta time and convert to ticks
-  //  lockclock += TICSPERFRAME;
-
-    accumulatedTime += dt;
-        ototalclock = totalclock;
-    // Convert dt to game ticks (TICRATE is usually 120, TICSPERFRAME is ~26)
-    // looks like there us need to convert tihs correctly, - read more on usage of averate fps
-    float ticks_to_add = dt * 90.0f;
-    totalclock += (int)ticks_to_add;
-
-    while(accumulatedTime >= (1.0f / 90.0f))
-    {
-        accumulatedTime -= (1.0f / 90.0f);
-    }
-
-
-    getinput(0);
-
-    moveloop();
-    cheats();
-    nonsharedkeys();
-
-    smoothratio = min(max((totalclock-lockclock)*(65536L/TICSPERFRAME),0),65536);
-    displayrooms(screenpeek, smoothratio);
-    displayrest(smoothratio);
-    checksync();
-
-}
 #if !IS_DUKE_INCLUDED
 int main(int argc, char** argv)
 {
     checkcommandline(argc, argv);
-    InitDuke();
+    InitDuske();
     return  0;
     long i, j, k, l;
     int32_t tempautorun;
@@ -7106,45 +6652,8 @@ char moveloop()
     return domovethings();
 }
 
-void fakedomovethingscorrect()
-{
-    long i;
-    player_struct* p;
-    myconnectindex=0;
-    if (numplayers < 2) return;
-
-    i = ((movefifoplc - 1) & (MOVEFIFOSIZ - 1));
-    p = &ps[myconnectindex];
-
-    if (p->posx == myxbak[i] && p->posy == myybak[i] && p->posz == myzbak[i]
-        && p->horiz == myhorizbak[i] && p->ang == myangbak[i])
-        return;
-
-    myx = p->posx;
-    omyx = p->oposx;
-    myxvel = p->posxv;
-    myy = p->posy;
-    omyy = p->oposy;
-    myyvel = p->posyv;
-    myz = p->posz;
-    omyz = p->oposz;
-    myzvel = p->poszv;
-    myang = p->ang;
-    omyang = p->oang;
-    mycursectnum = p->cursectnum;
-    myhoriz = p->horiz;
-    omyhoriz = p->ohoriz;
-    myhorizoff = p->horizoff;
-    omyhorizoff = p->ohorizoff;
-    myjumpingcounter = p->jumping_counter;
-    myjumpingtoggle = p->jumping_toggle;
-    myonground = p->on_ground;
-    myhardlanding = p->hard_landing;
-    myreturntocenter = p->return_to_center;
-
-    fakemovefifoplc = movefifoplc;
-    while (fakemovefifoplc < movefifoend[myconnectindex])
-        fakedomovethings();
+void fakedomovethingscorrect() {
+    //mp only
 }
 void fakedomovethings()
 {

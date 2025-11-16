@@ -998,33 +998,33 @@ void newgame(char vn, char ln, char sk)
         while (Sound[globalskillsound].lock >= 200);
     globalskillsound = -1;
 
-    waitforeverybody();
+   // waitforeverybody();
     ready2send = 0;
 
-    if (ud.m_recstat != 2 && ud.last_level >= 0 && ud.multimode > 1 && ud.coop != 1)
-        dobonus(1);
+  //  if (ud.m_recstat != 2 && ud.last_level >= 0 && ud.multimode > 1 && ud.coop != 1)
+   //     dobonus(1);
 
-    if (ln == 0 && vn == 3 && ud.multimode < 2 && ud.lockout == 0)
-    {
-        playmusic(&env_music_fn[1][0]);
+//  if (ln == 0 && vn == 3 && ud.multimode < 2 && ud.lockout == 0)
+//  {
+//      playmusic(&env_music_fn[1][0]);
 
-        flushperms();
-        setview(0, 0, xdim - 1, ydim - 1);
-        clearview(0L);
-        nextpage();
+//      flushperms();
+//      setview(0, 0, xdim - 1, ydim - 1);
+//      clearview(0L);
+//      nextpage();
 
-        playanm("vol41a.anm", 6);
-        clearview(0L);
-        nextpage();
-        playanm("vol42a.anm", 7);
-        //        clearview(0L);
-        //      nextpage();
-        playanm("vol43a.anm", 9);
-        clearview(0L);
-        nextpage();
+//      playanm("vol41a.anm", 6);
+//      clearview(0L);
+//      nextpage();
+//      playanm("vol42a.anm", 7);
+//      //        clearview(0L);
+//      //      nextpage();
+//      playanm("vol43a.anm", 9);
+//      clearview(0L);
+//      nextpage();
 
-        FX_StopAllSounds();
-    }
+//      FX_StopAllSounds();
+//  }
 
     show_shareware = 26 * 34;
 

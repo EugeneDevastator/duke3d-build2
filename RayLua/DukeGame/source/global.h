@@ -128,7 +128,7 @@ long movefifoend[MAXPLAYERS];
 
     //Game recording variables
 
-//char playerreadyflag[MAXPLAYERS],ready2send;
+char playerreadyflag[MAXPLAYERS],ready2send;
 char playerquitflag[MAXPLAYERS];
 long vel, svel, angvel, ototalclock, respawnactortime, respawnitemtime, groupfile;
 
@@ -156,7 +156,7 @@ short myhoriz, omyhoriz, myhorizoff, omyhorizoff;
 short myang, omyang, mycursectnum, myjumpingcounter,frags[MAXPLAYERS][MAXPLAYERS];
 
 //GAME.C sync state variables
-static char syncstat, othersyncval[MOVEFIFOSIZ];
+
 //static long syncvaltottail, othersyncvalhead, syncvaltail;
 
 

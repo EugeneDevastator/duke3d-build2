@@ -15,7 +15,7 @@
 #define MB_SHOOT 7
 #define Q_TLEFT 7
 #define R_TRIGHT 7
-float px,py,pz;
+extern float px,py,pz;
 // wsad use-E jump-Space crouch-letfctrl
 typedef struct {
     // void (*GetKeysThisFrame)(char *writearr);
@@ -37,7 +37,7 @@ typedef struct {
 } engineapi_t;
 
 engineapi_t engine;
-
+point3d GetPlayerPos();
 void InitEngineApi(mapstate_t *map);
 void ForwardEngineUpdate(float dt);
 #endif

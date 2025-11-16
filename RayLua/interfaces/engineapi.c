@@ -9,7 +9,7 @@
 #include "source/game.h"
 static mapstate_t *mapref;
 char *inputs;
-
+float px,py,pz = 0;
 void (*targetupdate)(float t);
 
 
@@ -62,7 +62,9 @@ void SetSpritePicNum(int id, int picnum) {
     mapref->spri[id].tilnum;
 }
 
-
+point3d GetPlayerPos() {
+    return (point3d){px,py,pz};
+}
 void InitEngineApi(mapstate_t *map) {
     mapref = map;
     inputs = (char *) calloc(20, sizeof(char));
