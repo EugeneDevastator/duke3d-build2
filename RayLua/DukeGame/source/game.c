@@ -6115,26 +6115,41 @@ void init2() {
     tempautorun = ud.auto_run;
 
 }
-static float accumulator = 0.0f;
-const float FIXED_TIMESTEP = (1.0f / TICKS_PER_SECF); // 120 Hz
 int accumulatedTicks = 0;
 void DoDukeLoop(float dt) {
+    long i;
+    // Accumulate delta time and convert to ticks
+    //  lockclock += TICSPERFRAME;
 
-    accumulator += dt;
 
-    while (accumulator >= FIXED_TIMESTEP) {
+    // 120 *0.111 = 12.111
+    // int = 12
+    // 12 / 120 = 0.1
+    // lockclock is not needed
+    accumulatedTime += dt;
+    int ready_ticks = (int)(accumulatedTime * TICKS_PER_SECF); // 26 ticks per frame. 16 avg fps.
+    accumulatedTicks += ready_ticks;
+    lockclock += ready_ticks;
+
+    accumulatedTime -= ready_ticks/TICKS_PER_SECF;
+
+
+    if (accumulatedTicks > 1) {
+        accumulatedTicks--;
         totalclock++;
-        faketimerhandler();
-        moveloop();
-        cheats();
-        nonsharedkeys();
-        accumulator -= FIXED_TIMESTEP;
     }
 
-    smoothratio = (long)(accumulator / FIXED_TIMESTEP * 65536.0f);
+    //printf("accum ticks:%n",accumulatedTicks);
+    moveloop();
+    cheats();
+    nonsharedkeys();
+
+    smoothratio = min(max((totalclock-lockclock)*(65536L/TICSPERFRAME),0), 65536);
     displayrooms(screenpeek, smoothratio);
     displayrest(smoothratio);
-   // checksync();
+    faketimerhandler();
+    checksync();
+
 }
 #if !IS_DUKE_INCLUDED
 int main(int argc, char** argv)
