@@ -93,9 +93,6 @@ void DoDukeUpdate(float dt) {
         ps[0].posy/ 512.0f,
         ps[0].posz/ (512.f*16.f)
         );
-
-
-
 }
 // is it ok to store internal function in pointer?
 void InitDukeWrapper(engineapi_t *api) // pass in real api

@@ -353,6 +353,7 @@ typedef struct
 extern weaponhit hittype[MAXSPRITES];
 
 extern input loc;
+extern input current_input;
 extern input recsync[RECSYNCBUFSIZ];
 extern long avgfvel, avgsvel, avgavel, avghorz, avgbits;
 

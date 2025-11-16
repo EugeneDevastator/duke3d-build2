@@ -110,7 +110,7 @@ player_struct ps[MAXPLAYERS];
 
 char pus, pub;
 long syncvalhead[MAXPLAYERS], syncvaltail, syncvaltottail;
-
+input current_input;
 input sync[MAXPLAYERS], loc;
 input recsync[RECSYNCBUFSIZ];
 long avgfvel, avgsvel, avgavel, avghorz, avgbits;
