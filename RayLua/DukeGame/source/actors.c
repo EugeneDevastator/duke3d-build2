@@ -75,8 +75,10 @@ void dointerpolations(long smoothratio)       //Stick at beginning of drawscreen
 	for(i=numinterpolations-1;i>=0;i--)
 	{
 		bakipos[i] = *curipos[i];
-		odelta = ndelta; ndelta = (*curipos[i])-oldipos[i];
-		if (odelta != ndelta) j = mulscale16(ndelta,smoothratio);
+		odelta = ndelta;
+	    ndelta = (*curipos[i])-oldipos[i];
+		if (odelta != ndelta)
+		    j = mulscale16(ndelta,smoothratio);
 		*curipos[i] = oldipos[i]+j;
 	}
 }

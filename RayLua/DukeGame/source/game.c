@@ -1064,7 +1064,7 @@ void drawoverheadmap(long cposx, long cposy, long czoom, short cang)
     // in menus.c
 }
 
-void displayrest(long smoothratio)
+void displayrest(long smratio)
 {
     long a, i, j;
 
@@ -1149,23 +1149,23 @@ void displayrest(long smoothratio)
         // map likely
         if (ud.overhead_on > 0)
         {
-            smoothratio = min(max(smoothratio,0), 65536);
-            dointerpolations(smoothratio);
+            smratio = min(max(smratio,0), 65536);
+            dointerpolations(smratio);
             if (ud.scrollmode == 0)
             {
                 if (pp->newowner == -1)
                 {
                     if (screenpeek == myconnectindex && numplayers > 1)
                     {
-                        cposx = omyx + mulscale16((long)(myx-omyx), smoothratio);
-                        cposy = omyy + mulscale16((long)(myy-omyy), smoothratio);
-                        cang = omyang + mulscale16((long)(((myang+1024-omyang)&2047)-1024), smoothratio);
+                        cposx = omyx + mulscale16((long)(myx-omyx), smratio);
+                        cposy = omyy + mulscale16((long)(myy-omyy), smratio);
+                        cang = omyang + mulscale16((long)(((myang+1024-omyang)&2047)-1024), smratio);
                     }
                     else
                     {
-                        cposx = pp->oposx + mulscale16((long)(pp->posx-pp->oposx), smoothratio);
-                        cposy = pp->oposy + mulscale16((long)(pp->posy-pp->oposy), smoothratio);
-                        cang = pp->oang + mulscale16((long)(((pp->ang+1024-pp->oang)&2047)-1024), smoothratio);
+                        cposx = pp->oposx + mulscale16((long)(pp->posx-pp->oposx), smratio);
+                        cposy = pp->oposy + mulscale16((long)(pp->posy-pp->oposy), smratio);
+                        cang = pp->oang + mulscale16((long)(((pp->ang+1024-pp->oang)&2047)-1024), smratio);
                     }
                 }
                 else
@@ -5248,7 +5248,7 @@ void nonsharedkeys()
                 }
                 //cmenu(350);
                 screencapt = 1;
-                smoothratio = 65536; //min(max((totalclock-lockclock)*(65536L/TICSPERFRAME),0),65536);
+                smoothratio = min(max((totalclock-lockclock)*(65536L/TICSPERFRAME),0),65536);
 
                 displayrooms(myconnectindex, smoothratio);
                 // savetemp("duke3d.tmp",waloff[MAXTILES-1],160*100);
@@ -6171,43 +6171,41 @@ void init2() {
     tempautorun = ud.auto_run;
 
 }
+int accumulatedTicks = 0;
 void DoDukeLoop(float dt) {
     long i;
     // Accumulate delta time and convert to ticks
     //  lockclock += TICSPERFRAME;
 
-    accumulatedTime += dt;
 
-
-    float ticks_to_add_f = accumulatedTime * 120.0; // 26 ticks per frame. 16 avg fps.
-    int ticks_added = (int)ticks_to_add_f;
-    if (ticks_added < 2)
-    accumulatedTime -= ticks_added/120.0;
-    totalclock += ticks_added;
-    ototalclock = totalclock;
-
-
-if (ticks_added < 2)
-    return;
     // 120 *0.111 = 12.111
     // int = 12
     // 12 / 120 = 0.1
-// lockclock is not needed
+    // lockclock is not needed
+    accumulatedTime += dt;
+    int ready_ticks = (int)(accumulatedTime * TICKS_PER_SECF); // 26 ticks per frame. 16 avg fps.
+    accumulatedTicks += ready_ticks;
+    lockclock += ready_ticks;
 
-    //The whole loop!!!!!!!!!!!!!!!!!!
+    accumulatedTime -= ready_ticks/TICKS_PER_SECF;
 
+
+    if (accumulatedTicks > 1) {
+        accumulatedTicks--;
+        totalclock++;
+    }
+
+    //printf("accum ticks:%n",accumulatedTicks);
     moveloop();
     cheats();
     nonsharedkeys();
 
-    smoothratio = 65536 ;//min(max((totalclock-lockclock)*(65536L/TICSPERFRAME),0), 65536);
+    smoothratio = min(max((totalclock-lockclock)*(65536L/TICSPERFRAME),0), 65536);
     displayrooms(screenpeek, smoothratio);
     displayrest(smoothratio);
     faketimerhandler();
     checksync();
 
-    lockclock = totalclock;
-    cameraclock = totalclock;
 }
 
 #if !IS_DUKE_INCLUDED

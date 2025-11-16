@@ -404,7 +404,7 @@ extern void gameexit(char *t);
 //#line "game.c" 1752
 extern short strget(short x,short y,char *t,short dalen,short c);
 //#line "game.c" 1819
-extern void displayrest(long smoothratio);
+extern void displayrest(long smratio);
 //#line "game.c" 2047
 extern void updatesectorz(long x,long y,long z,short *sectnum);
 //#line "game.c" 2085
