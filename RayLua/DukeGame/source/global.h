@@ -109,7 +109,6 @@ player_struct ps[MAXPLAYERS];
 //extern user_defs ud;
 
 char pus, pub;
-char syncstat, syncval[MAXPLAYERS][MOVEFIFOSIZ];
 long syncvalhead[MAXPLAYERS], syncvaltail, syncvaltottail;
 
 input sync[MAXPLAYERS], loc;
@@ -129,9 +128,9 @@ long movefifoend[MAXPLAYERS];
 
     //Game recording variables
 
-char playerreadyflag[MAXPLAYERS],ready2send;
+//char playerreadyflag[MAXPLAYERS],ready2send;
 char playerquitflag[MAXPLAYERS];
-long vel, svel, angvel, horiz, ototalclock, respawnactortime, respawnitemtime, groupfile;
+long vel, svel, angvel, ototalclock, respawnactortime, respawnitemtime, groupfile;
 
 long script[MAXSCRIPTSIZE],*scriptptr,*insptr,*labelcode,labelcnt;
 long *actorscrptr[MAXTILES],*parsing_actor;
@@ -155,6 +154,12 @@ long impact_damage;
 long myx, omyx, myxvel, myy, omyy, myyvel, myz, omyz, myzvel;
 short myhoriz, omyhoriz, myhorizoff, omyhorizoff;
 short myang, omyang, mycursectnum, myjumpingcounter,frags[MAXPLAYERS][MAXPLAYERS];
+
+//GAME.C sync state variables
+static char syncstat, othersyncval[MOVEFIFOSIZ];
+//static long syncvaltottail, othersyncvalhead, syncvaltail;
+
+
 
 char myjumpingtoggle, myonground, myhardlanding, myreturntocenter;
 signed char multiwho, multipos, multiwhat, multiflag;

@@ -1219,7 +1219,7 @@ void clearfrags()
 
 void resettimevars()
 {
-    vel = svel = angvel = horiz = 0;
+    vel = svel = angvel = horiz_ = 0;
 
     // totalclock = 0L;
     cloudtotalclock = 0L;

@@ -1812,7 +1812,7 @@ void getinput(short snum)
          loc.fvel = vel = 0;
          loc.svel = svel = 0;
          loc.avel = angvel = 0;
-         loc.horz = horiz = 0;
+         loc.horz = horiz_ = 0;
          loc.bits = (((long)gamequit)<<26);
          info.dz = info.dyaw = 0;
          return;
@@ -1903,7 +1903,7 @@ void getinput(short snum)
     loc.bits |=   KB_KeyPressed(sc_Escape)<<31;
 
     running = BUTTON(gamefunc_Run)|ud.auto_run;
-    svel = vel = angvel = horiz = 0;
+    svel = vel = angvel = horiz_ = 0;
 
     if( CONTROL_JoystickEnabled )
         if ( running ) info.dz *= 2;
@@ -1915,8 +1915,8 @@ void getinput(short snum)
     if( myaimmode )
     {
         if(ud.mouseflip)
-            horiz -= info.dz/(314-128);
-        else horiz += info.dz/(314-128);
+            horiz_ -= info.dz/(314-128);
+        else horiz_ += info.dz/(314-128);
 
         info.dz = 0;
     }
@@ -2005,8 +2005,8 @@ void getinput(short snum)
     if(svel > MAXSVEL) svel = MAXSVEL;
     if(angvel < -MAXANGVEL) angvel = -MAXANGVEL;
     if(angvel > MAXANGVEL) angvel = MAXANGVEL;
-    if(horiz < -MAXHORIZ) horiz = -MAXHORIZ;
-    if(horiz > MAXHORIZ) horiz = MAXHORIZ;
+    if(horiz_ < -MAXHORIZ) horiz_ = -MAXHORIZ;
+    if(horiz_ > MAXHORIZ) horiz_ = MAXHORIZ;
 
     if(ud.scrollmode && ud.overhead_on)
     {
@@ -2035,7 +2035,7 @@ void getinput(short snum)
     loc.fvel = momx;
     loc.svel = momy;
     loc.avel = angvel;
-    loc.horz = horiz;
+    loc.horz = horiz_;
 }
 
 

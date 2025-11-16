@@ -25,7 +25,15 @@ void  callcommit()
     //else
     //	int386(gcom->intnum,&regs,&regs);
 }
-
+void initmultiplayers_singleplayer(void)
+{
+    numplayers = 1;
+    ud.multimode = 1;
+    myconnectindex = 0;
+    connecthead = 0;
+    connectpoint2[0] = -1;
+    ready2send = 1;
+}
 void initmultiplayers(char damultioption, char dacomrateoption, char dapriority)
 {
 

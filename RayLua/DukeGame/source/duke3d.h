@@ -371,7 +371,7 @@ extern long animatevel[MAXANIMATES];
 extern short neartagsector, neartagwall, neartagsprite;
 extern long neartaghitdist;
 extern short animatesect[MAXANIMATES];
-extern long movefifoplc, vel,svel,angvel,horiz;
+extern long movefifoplc, vel,svel,angvel,horiz_;
 
 extern short mirrorwall[64], mirrorsector[64], mirrorcnt;
 
