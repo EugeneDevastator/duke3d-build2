@@ -2266,7 +2266,8 @@ void processinput(short snum)
 
     kb = &p->kickback_pic;
 
-    if(p->cheat_phase <= 0) sb_snum = sync[snum].bits;
+    if(p->cheat_phase <= 0)
+        sb_snum = current_input.bits;
     else sb_snum = 0;
 
     psect = p->cursectnum;

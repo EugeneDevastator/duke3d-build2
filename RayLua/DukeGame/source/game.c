@@ -220,64 +220,8 @@ return;
 
 void faketimerhandler()
 {
-    long i, j, k, l;
-//    short who;
-    input *osyn, *nsyn;
-
-    //if(qe == 0 && KB_KeyPressed(sc_LeftControl) && KB_KeyPressed(sc_LeftAlt) && KB_KeyPressed(sc_Delete))
-    //{
-    //    qe = 1;
-    //    gameexit("Quick Exit.");
-    //}
-
-   // if ((totalclock < ototalclock+TICSPERFRAME) || (ready2send == 0)) return;
-   // ototalclock += TICSPERFRAME;
-
-    getpackets();
-
-    //for(i=connecthead;i>=0;i=connectpoint2[i])
-    //    if (i != myconnectindex)
-    //        if (movefifoend[i] < movefifoend[myconnectindex]-200) return;
-
-     getinput(0);
-    for(i=connecthead;i>=0;i=connectpoint2[i])
-        if (i != myconnectindex)
-            if (movefifoend[i] < movefifoend[myconnectindex]-200) return;
-     avgfvel += loc.fvel;
-     avgsvel += loc.svel;
-     avgavel += loc.avel;
-     avghorz += loc.horz;
-     avgbits |= loc.bits;
-    if (movefifoend[myconnectindex]&(movesperpacket-1))
-    {
-        copybufbyte(&inputfifo[(movefifoend[myconnectindex]-1)&(MOVEFIFOSIZ-1)][myconnectindex],
-                        &inputfifo[movefifoend[myconnectindex]&(MOVEFIFOSIZ-1)][myconnectindex],sizeof(input));
-        movefifoend[myconnectindex]++;
-        return;
-    }
-     //inputfifo[movefifoend[myconnectindex]&(MOVEFIFOSIZ-1)][myconnectindex] = loc;
-     nsyn = &inputfifo[movefifoend[myconnectindex]&(MOVEFIFOSIZ-1)][myconnectindex];
-     nsyn[0].fvel = avgfvel;
-     nsyn[0].svel = avgsvel;
-     nsyn[0].avel = avgavel;
-     nsyn[0].horz = avghorz;
-     nsyn[0].bits = avgbits;
-     avgfvel = avgsvel = avgavel = avghorz = avgbits = 0;
-     movefifoend[myconnectindex]++;
-
-     if (numplayers < 2)
-     {
-          if (ud.multimode > 1)
-              for(i=connecthead;i>=0;i=connectpoint2[i])
-              if(i != myconnectindex)
-              {
-                  clearbufbyte(&inputfifo[movefifoend[i]&(MOVEFIFOSIZ-1)][i],sizeof(input),0L);
-                  if(ud.playerai)
-                      computergetinput(i,&inputfifo[movefifoend[i]&(MOVEFIFOSIZ-1)][i]);
-                  movefifoend[i]++;
-              }
-          return;
-     }
+    getinput(0);
+    current_input = loc; // Store directly
 }
 extern long cacnum;
 // typedef struct { long *hand, leng; char *lock; } cactype;
@@ -310,7 +254,7 @@ void caches()
 void checksync()
 {
     long i, k;
-
+return;
     for (i = connecthead; i >= 0; i = connectpoint2[i])
         if (syncvalhead[i] == syncvaltottail) break;
     if (i < 0)
@@ -6662,7 +6606,7 @@ void fakedomovethings()
     short psect, psectlotag, tempsect, backcstat;
     char shrunk, spritebridge;
 
-    syn = (input*)&inputfifo[fakemovefifoplc & (MOVEFIFOSIZ - 1)][myconnectindex];
+    syn = &loc;
 
     p = &ps[myconnectindex];
 
@@ -7569,7 +7513,7 @@ char domovethings(void)
     everyothertime++;
 
     i=0;
-    copybufbyte(&inputfifo[movefifoplc&(MOVEFIFOSIZ-1)][i],&sync[i],sizeof(input));
+    copybufbyte(&loc,&sync[i],sizeof(input));
     movefifoplc++;
 
     updateinterpolations();
