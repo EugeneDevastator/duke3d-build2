@@ -13,8 +13,8 @@
 #define SPC_JUMP 5
 #define CROUCH 6
 #define MB_SHOOT 7
-#define Q_TLEFT 7
-#define R_TRIGHT 7
+#define Q_TLEFT 9
+#define R_TRIGHT 17
 extern float px,py,pz;
 // wsad use-E jump-Space crouch-letfctrl
 typedef struct {
@@ -32,12 +32,14 @@ typedef struct {
     void (*RegisterUpdate)(void (*UpdateFunc)(float t));
     void (*InsertSprite)(int sect, float x,float y,float z);
     void (*DeleteSprite)(int sid);
+    void (*SetPlayerForward)(float x, float y, float z);
 
     char *Inputs;
 } engineapi_t;
 
 engineapi_t engine;
 point3d GetPlayerPos();
+point3d GetPlayerFrw();
 void InitEngineApi(mapstate_t *map);
 void ForwardEngineUpdate(float dt);
 #endif

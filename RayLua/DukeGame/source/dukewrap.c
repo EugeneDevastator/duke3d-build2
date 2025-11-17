@@ -93,6 +93,14 @@ void DoDukeUpdate(float dt) {
         ps[0].posy/ 512.0f,
         ps[0].posz/ (512.f*16.f)
         );
+
+ //   map->startfor.x = cos(((float)s)*PI/1024.0);
+ //   map->startfor.y = sin(((float)s)*PI/1024.0);
+ //   map->startfor.z = 0.f;
+float x1 = cos(((float)ps[0].ang)*PI/1024.0);
+float y1 = sin(((float)ps[0].ang)*PI/1024.0);
+    float z1 =1;
+    rayl->SetPlayerForward(x1,y1,0);
 }
 // is it ok to store internal function in pointer?
 void InitDukeWrapper(engineapi_t *api) // pass in real api
@@ -152,8 +160,8 @@ void ConvertSprite(int i,spritetype* spr) {
     spr->filler = 0;
     spr->xrepeat = b2spr.tags[MT_SPR_XREP];
     spr->yrepeat = b2spr.tags[MT_SPR_YREP];
-    spr->xoffset=b2spr.tags[MT_SPR_XOFF];
-    spr->yoffset=b2spr.tags[MT_SPR_YOFF];
+    spr->xoffset = b2spr.tags[MT_SPR_XOFF];
+    spr->yoffset = b2spr.tags[MT_SPR_YOFF];
     spr->statnum = b2spr.tags[MT_STATNUM];
     spr->ang = forwardToAng(b2spr.f);
     spr->owner = b2spr.sect;

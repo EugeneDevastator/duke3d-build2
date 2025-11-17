@@ -10,6 +10,7 @@
 static mapstate_t *mapref;
 char *inputs;
 float px,py,pz = 0;
+float pfx,pfy,pfz = 0;
 void (*targetupdate)(float t);
 
 
@@ -65,6 +66,14 @@ void SetSpritePicNum(int id, int picnum) {
 point3d GetPlayerPos() {
     return (point3d){px,py,pz};
 }
+point3d GetPlayerFrw() {
+    return (point3d){pfx,pfy,pfz};
+}
+void SetPlayerForward(float x, float y, float z) {
+    pfx = x;
+    pfy = y;
+    pfz = z;
+}
 void InitEngineApi(mapstate_t *map) {
     mapref = map;
     inputs = (char *) calloc(20, sizeof(char));
@@ -77,4 +86,5 @@ void InitEngineApi(mapstate_t *map) {
     engine.RegisterUpdate = RegisterUpdate;
     engine.InsertSprite = InsertSprite;
     engine.DeleteSprite = DelSprite;
+    engine.SetPlayerForward = SetPlayerForward;
 }

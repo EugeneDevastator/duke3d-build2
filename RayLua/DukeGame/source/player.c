@@ -1849,7 +1849,7 @@ void getinput(short snum)
     loc.bits |=   BUTTON(gamefunc_Aim_Down)<<4;
     loc.bits |=   BUTTON(gamefunc_Run)<<5;
     loc.bits |=   BUTTON(gamefunc_Look_Left)<<6;
-    loc.bits |=   BUTTON(gamefunc_Look_Right)<<7;
+    loc.bits |=   BUTTON(gamefunc_Look_Right)<<7; // quick looks
 
     j=0;
     if (BUTTON(gamefunc_Weapon_1))

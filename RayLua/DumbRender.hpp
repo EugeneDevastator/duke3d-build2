@@ -438,8 +438,8 @@ public:
                 }
             }
         }
-        //rlEnableDepthMask();
-        rlEnableBackfaceCulling();
+        rlEnableDepthMask();
+        //rlEnableBackfaceCulling();
         // Draw sprites (unchanged)
         for (int i = 0; i < map->numspris; i++)
         {

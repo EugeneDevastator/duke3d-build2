@@ -107,6 +107,7 @@ typedef struct
 
     int32_t aim_mode;
 
+    // look ang = yaw horiz = pitch
     short ang,oang,angvel,cursectnum,look_ang,last_extra,subweapon;
     short ammo_amount[MAX_WEAPONS],wackedbyactor,frag,fraggedself;
 

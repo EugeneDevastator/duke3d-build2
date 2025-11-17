@@ -158,14 +158,15 @@ private:
         engine.Inputs[E_USE] = IsKeyDown(KEY_E) ? 1 : 0;
         engine.Inputs[CROUCH] = IsKeyDown(KEY_LEFT_CONTROL) ? 1 : 0;
         engine.Inputs[MB_SHOOT] = IsMouseButtonDown(MOUSE_BUTTON_LEFT) ? 1 : 0;
-        engine.Inputs[Q_TLEFT] = IsMouseButtonDown(KEY_Q) ? 1 : 0;
-        engine.Inputs[R_TRIGHT] = IsMouseButtonDown(KEY_R) ? 1 : 0;
+        engine.Inputs[Q_TLEFT] = IsKeyDown(KEY_Q) ? 1 : 0;
+        engine.Inputs[R_TRIGHT] = IsKeyDown(KEY_R) ? 1 : 0;
         ForwardEngineUpdate(deltaTime);
         point3d ppos = GetPlayerPos();
+        point3d frw = GetPlayerFrw();
         cam.position.x = ppos.x;
         cam.position.y = -ppos.z;
         cam.position.z = ppos.y;
-        cam.target = Vector3Add(cam.position, {0, 0, 1});
+        cam.target = Vector3Add(cam.position, {frw.x, -frw.z, frw.y});
     }
 #endif
     static void HandleInteraction() {
