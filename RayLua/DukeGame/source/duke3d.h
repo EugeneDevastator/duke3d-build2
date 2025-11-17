@@ -88,11 +88,13 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 extern float globalDT;
 extern int globalTR;
 #define TICRATE (120)
-#define TIC_RESOLUTION = 5
-#define DT_RATEF 4.2f
-extern const float FIXED_TICK_TIME_SEC;
+// additional timer resolution - we can do more than 120hz for better fidelity
+#define TIC_RES 4
+static const float FIXED_TICK_TIME_SEC = 1.0/(120.0f*TIC_RES);
 #define TIC_RATE_MUL 1
-#define TICSPERFRAME globalTR * TIC_RATE_MUL // 4.26...  // this is used as speed multiplier, meaning fixed DT.
+// global TR is whole ticks for this frame.
+// ticksperframe is actually accumulated ticks, and is used as dt everywhere: pos = pos + v * TICKSPERFRAME
+#define TICSPERFRAME globalTR * TIC_RATE_MUL / TIC_RES // 4.26...  // this is used as speed multiplier, meaning fixed DT.
 // we assume that previously avg of 16 fps was used to print out fps.
 // or we can assume 120 ticks per second is tickrate.
 #define TICKS_PER_SECF (33.84615384615384615392f)

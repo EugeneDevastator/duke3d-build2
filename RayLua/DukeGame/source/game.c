@@ -42,7 +42,7 @@ char syncstat, syncval[MAXPLAYERS][MOVEFIFOSIZ];
 static long gotlastpacketclock = 0, smoothratio;
 float globalDT = 0;
 int globalTR = 0;
-const float FIXED_TICK_TIME_SEC = 1.0/120.0f;
+
 static long horiz_;
 static long nummoves;
 static short ang[MAXPLAYERS], cursectnum[MAXPLAYERS], ocursectnum[MAXPLAYERS];
