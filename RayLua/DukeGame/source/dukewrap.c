@@ -96,9 +96,9 @@ void DoDukeUpdate(float dt) {
         ps[0].posy/ 512.0f,
         ps[0].posz/ (512.f*16.f)
         );
-long h = ps[0].horiz;
+long h = ps[0].horiz+ps[0].horizoff;
     float yaw = ((float)ps[0].ang) * PI / 1024.0f;
-    float pitch = ((float)(h - 100)) * PI / 1024.0f;  // 100 is center
+    float pitch = -((float)(h - 100)) * PI / 1024.0f;  // 100 is center
 
     // Forward vector combining yaw and pitch
     float x1 = cos(pitch) * cos(yaw);

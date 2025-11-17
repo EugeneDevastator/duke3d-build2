@@ -1845,8 +1845,8 @@ void getinput(short snum)
     loc.bits =   bbeng.FrameInputs[SPC_JUMP];
     loc.bits |=   bbeng.FrameInputs[CROUCH]<<1;
     loc.bits |=   bbeng.FrameInputs[MB_SHOOT]<<2;
-    loc.bits |=   BUTTON(gamefunc_Aim_Up)<<3;
-    loc.bits |=   BUTTON(gamefunc_Aim_Down)<<4;
+    loc.bits |=   bbeng.FrameInputs[ACT_AIM_UP]<<3;
+    loc.bits |=   bbeng.FrameInputs[ACT_AIM_DOWN]<<4;
     loc.bits |=   BUTTON(gamefunc_Run)<<5;
     loc.bits |=   BUTTON(gamefunc_Look_Left)<<6;
     loc.bits |=   BUTTON(gamefunc_Look_Right)<<7; // quick looks
@@ -1883,8 +1883,8 @@ void getinput(short snum)
 
     loc.bits |=   j<<8;
     loc.bits |=   BUTTON(gamefunc_Steroids)<<12;
-    loc.bits |=   bbeng.FrameInputs[ACT_AIM_UP]<<13;
-    loc.bits |=   bbeng.FrameInputs[ACT_AIM_DOWN]<<14;
+    loc.bits |=   BUTTON(gamefunc_Look_Up)<<13;
+    loc.bits |=   BUTTON(gamefunc_Look_Down)<<14;
     loc.bits |=   BUTTON(gamefunc_NightVision)<<15;
     loc.bits |=   BUTTON(gamefunc_MedKit)<<16;
     loc.bits |=   BUTTON(gamefunc_Center_View)<<18;
