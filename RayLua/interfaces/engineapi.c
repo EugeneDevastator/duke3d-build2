@@ -76,7 +76,7 @@ void SetPlayerForward(float x, float y, float z) {
 }
 void InitEngineApi(mapstate_t *map) {
     mapref = map;
-    inputs = (char *) calloc(20, sizeof(char));
+    inputs = (char *) calloc(30, sizeof(char));
     engine.Inputs = inputs;
     engine.SetSpritePos = SetSpritePos;
     engine.SetFloorZ = SetFloorZ;

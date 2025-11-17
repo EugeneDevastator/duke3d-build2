@@ -162,10 +162,10 @@ long impact_damage;
 #define omyz ps[0].oposz
 #define omyy ps[0].oposy
 #define omyx ps[0].oposx
-#define myhoriz ps[myconnectindex].horiz
-#define omyhoriz ps[myconnectindex].ohoriz
-#define myhorizoff ps[myconnectindex].horizoff
-#define omyhorizoff ps[myconnectindex].ohorizoff
+#define myhoriz ps[0].horiz
+#define omyhoriz ps[0].ohoriz
+#define myhorizoff ps[0].horizoff
+#define omyhorizoff ps[0].ohorizoff
 
 short myang, omyang, mycursectnum, myjumpingcounter,frags[MAXPLAYERS][MAXPLAYERS];
 

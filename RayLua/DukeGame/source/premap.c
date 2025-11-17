@@ -1354,15 +1354,15 @@ void clearfifo()
 void resetmys()
 {
     myxvel = myyvel = myzvel = 0;
-    myang = omyang = ps[myconnectindex].ang;
-    myhoriz = omyhoriz = ps[myconnectindex].horiz;
-    myhorizoff = omyhorizoff = ps[myconnectindex].horizoff;
-    mycursectnum = ps[myconnectindex].cursectnum;
-    myjumpingcounter = ps[myconnectindex].jumping_counter;
-    myjumpingtoggle = ps[myconnectindex].jumping_toggle;
-    myonground = ps[myconnectindex].on_ground;
-    myhardlanding = ps[myconnectindex].hard_landing;
-    myreturntocenter = ps[myconnectindex].return_to_center;
+    myang = omyang = ps[0].ang;
+    myhoriz = omyhoriz = ps[0].horiz;
+    myhorizoff = omyhorizoff = ps[0].horizoff;
+    mycursectnum = ps[0].cursectnum;
+    myjumpingcounter = ps[0].jumping_counter;
+    myjumpingtoggle = ps[0].jumping_toggle;
+    myonground = ps[0].on_ground;
+    myhardlanding = ps[0].hard_landing;
+    myreturntocenter = ps[0].return_to_center;
 }
 
 void enterlevel_rl() {

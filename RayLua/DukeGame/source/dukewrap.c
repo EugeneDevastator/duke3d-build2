@@ -88,19 +88,24 @@ spritetype ReadSprite(long i) {
 }
 void DoDukeUpdate(float dt) {
     DoDukeLoop(dt);
+    sprite[ps[0].i].x = ps[0].posx;
+    sprite[ps[0].i].y = ps[0].posy;
+    sprite[ps[0].i].z = ps[0].posz;
     rayl->SetPlayerPos(
         ps[0].posx / 512.0f,
         ps[0].posy/ 512.0f,
         ps[0].posz/ (512.f*16.f)
         );
+long h = ps[0].horiz;
+    float yaw = ((float)ps[0].ang) * PI / 1024.0f;
+    float pitch = ((float)(h - 100)) * PI / 1024.0f;  // 100 is center
 
- //   map->startfor.x = cos(((float)s)*PI/1024.0);
- //   map->startfor.y = sin(((float)s)*PI/1024.0);
- //   map->startfor.z = 0.f;
-float x1 = cos(((float)ps[0].ang)*PI/1024.0);
-float y1 = sin(((float)ps[0].ang)*PI/1024.0);
-    float z1 =1;
-    rayl->SetPlayerForward(x1,y1,0);
+    // Forward vector combining yaw and pitch
+    float x1 = cos(pitch) * cos(yaw);
+    float y1 = cos(pitch) * sin(yaw);
+    float z1 = sin(pitch);
+
+    rayl->SetPlayerForward(x1,y1,z1);
 }
 // is it ok to store internal function in pointer?
 void InitDukeWrapper(engineapi_t *api) // pass in real api
@@ -257,73 +262,6 @@ void ParseMapToDukeFormat() {
 void GetInput() {
 }
 
-
-/*
-*short nextsectorneighborz(short sectnum, long thez, short topbottom, short direction)
-{
-    walltype* wal;
-    long i, testz, nextz;
-    short sectortouse;
-
-    if (direction == 1) nextz = 0x7fffffff;
-    else nextz = 0x80000000;
-
-    sectortouse = -1;
-
-    wal = &wall[sector[sectnum].wallptr];
-    i = sector[sectnum].wallnum;
-    do
-    {
-        if (wal->nextsector >= 0)
-        {
-            if (topbottom == 1)
-            {
-                testz = sector[wal->nextsector].floorz;
-                if (direction == 1)
-                {
-                    if ((testz > thez) && (testz < nextz))
-                    {
-                        nextz = testz;
-                        sectortouse = wal->nextsector;
-                    }
-                }
-                else
-                {
-                    if ((testz < thez) && (testz > nextz))
-                    {
-                        nextz = testz;
-                        sectortouse = wal->nextsector;
-                    }
-                }
-            }
-            else
-            {
-                testz = sector[wal->nextsector].ceilingz;
-                if (direction == 1)
-                {
-                    if ((testz > thez) && (testz < nextz))
-                    {
-                        nextz = testz;
-                        sectortouse = wal->nextsector;
-                    }
-                }
-                else
-                {
-                    if ((testz < thez) && (testz > nextz))
-                    {
-                        nextz = testz;
-                        sectortouse = wal->nextsector;
-                    }
-                }
-            }
-        }
-        wal++;
-        i--;
-    }
-    while (i != 0);
-
-    return (sectortouse);
-}*/
 int FindClosestSectorIdByHeigh(int sectnum, long baseZ, short isOtherFloor, short isDirectionUpward) {
     return 0; // look above for impl.
 }
