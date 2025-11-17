@@ -40,7 +40,9 @@ static char detailmode = 0;// ready2send = 0;
 char syncstat, othersyncval[MOVEFIFOSIZ];
 char syncstat, syncval[MAXPLAYERS][MOVEFIFOSIZ];
 static long gotlastpacketclock = 0, smoothratio;
-
+float globalDT = 0;
+int globalTR = 0;
+const float FIXED_TICK_TIME_SEC = 1.0/120.0f;
 static long horiz_;
 static long nummoves;
 static short ang[MAXPLAYERS], cursectnum[MAXPLAYERS], ocursectnum[MAXPLAYERS];
@@ -6050,36 +6052,22 @@ void init2() {
 }
 int accumulatedTicks = 0;
 void DoDukeLoop(float dt) {
-    long i;
+    globalDT += dt;
+    int fulltics = globalDT/FIXED_TICK_TIME_SEC;
+    globalTR = fulltics;
+    globalDT -= FIXED_TICK_TIME_SEC * fulltics;
 
-    // Accumulate delta time
-    accumulatedTime += dt;
-
-    // Calculate how many ticks should have passed
-    int ticks_to_process = (int)(accumulatedTime * TICKS_PER_SECF);
-
-    // Remove processed time
-    accumulatedTime -= ticks_to_process / TICKS_PER_SECF;
-
-    // Process each tick
-    for (int tick = 0; tick < ticks_to_process; tick++) {
-        totalclock++;
-        lockclock++;
-
-        faketimerhandler();
-        domovethings();
-        cheats();
-        nonsharedkeys();
-    }
-
-    // Calculate interpolation ratio for smooth rendering
-    smoothratio = min(max((int)((accumulatedTime * TICKS_PER_SECF) * (65536L/TICSPERFRAME)), 0), 65536);
+    faketimerhandler();
+    domovethings();
+    cheats();
+    nonsharedkeys();
 
     displayrooms(screenpeek, smoothratio);
     displayrest(smoothratio);
-
     checksync();
 }
+
+
 
 #if !IS_DUKE_INCLUDED
 int main(int argc, char** argv)

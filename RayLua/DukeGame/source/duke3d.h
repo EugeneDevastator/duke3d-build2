@@ -85,12 +85,17 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #include "names.h"
 
-
+extern float globalDT;
+extern int globalTR;
 #define TICRATE (120)
-#define TICSPERFRAME (TICRATE/26) //
+#define TIC_RESOLUTION = 5
+#define DT_RATEF 4.2f
+extern const float FIXED_TICK_TIME_SEC;
+#define TIC_RATE_MUL 1
+#define TICSPERFRAME globalTR * TIC_RATE_MUL // 4.26...  // this is used as speed multiplier, meaning fixed DT.
 // we assume that previously avg of 16 fps was used to print out fps.
 // or we can assume 120 ticks per second is tickrate.
-#define TICKS_PER_SECF (73.84615384615384615392f)
+#define TICKS_PER_SECF (33.84615384615384615392f)
 #define TICKS_TO_SEC(t) (t/TICKS_PER_SECF)
 // #define GC (TICSPERFRAME*44)
 
@@ -99,7 +104,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 int sgn(int value);
 
 #define    ALT_IS_PRESSED ( KB_KeyPressed( sc_RightAlt ) || KB_KeyPressed( sc_LeftAlt ) )
-#define    SHIFTS_IS_PRESSED ( KB_KeyPressed( sc_RightShift ) || KB_KeyPressed( sc_LeftShift ) )
+#define    SHIFTS_IS_PRESSED ( KB_KeyPressed(      sc_RightShift ) || KB_KeyPressed( sc_LeftShift ) )
 #define    RANDOMSCRAP EGS(s->sectnum,s->x+(TRAND&255)-128,s->y+(TRAND&255)-128,s->z-(8<<8)-(TRAND&8191),SCRAP6+(TRAND&15),-8,48,48,TRAND&2047,(TRAND&63)+64,-512-(TRAND&2047),i,5)
 
 #define    BLACK 0

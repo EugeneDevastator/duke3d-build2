@@ -43,6 +43,7 @@ void updateinterpolations()  //Stick at beginning of domovethings
 
 void setinterpolation(long *posptr)
 {
+    return;
 	long i;
 
 	if (numinterpolations >= MAXINTERPOLATIONS) return;
@@ -55,6 +56,7 @@ void setinterpolation(long *posptr)
 
 void stopinterpolation(long *posptr)
 {
+    return;
 	long i;
 
 	for(i=numinterpolations-1;i>=startofdynamicinterpolations;i--)
@@ -69,6 +71,7 @@ void stopinterpolation(long *posptr)
 
 void dointerpolations(long smoothratio)       //Stick at beginning of drawscreen
 {
+    return;
 	long i, j, odelta, ndelta;
 
 	ndelta = 0; j = 0;
@@ -85,6 +88,7 @@ void dointerpolations(long smoothratio)       //Stick at beginning of drawscreen
 
 void restoreinterpolations()  //Stick at end of drawscreen
 {
+    return;
 	long i;
 
 	for(i=numinterpolations-1;i>=0;i--) *curipos[i] = bakipos[i];

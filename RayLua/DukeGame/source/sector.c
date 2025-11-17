@@ -30,6 +30,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "duke3d.h"
 #include "dukewrap.h"
 #include "funct.h"
+#include "global.h"
 #include "music.h"
 #include "sounds.h"
 
@@ -3284,3 +3285,4 @@ void checksectors(short snum)
         }
     }
 }
+
