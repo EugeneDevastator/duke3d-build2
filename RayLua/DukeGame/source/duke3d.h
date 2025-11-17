@@ -89,16 +89,16 @@ extern float globalDT;
 extern int globalTR;
 #define TICRATE (120)
 // additional timer resolution - we can do more than 120hz for better fidelity
-#define TIC_RES 4
-static const float FIXED_TICK_TIME_SEC = 1.0/(120.0f*TIC_RES);
-#define TIC_RATE_MUL 1
+#define TIC_RES 1
+#define TIC_RATE_BIAS 24
+static const float FIXED_TICK_TIME_SEC = 1.0 / ((120.0f + TIC_RATE_BIAS) * TIC_RES);
+
 // global TR is whole ticks for this frame.
 // ticksperframe is actually accumulated ticks, and is used as dt everywhere: pos = pos + v * TICKSPERFRAME
-#define TICSPERFRAME globalTR * TIC_RATE_MUL / TIC_RES // 4.26...  // this is used as speed multiplier, meaning fixed DT.
+#define TICSPERFRAME globalTR / TIC_RES
+// 4.26...= TICSPERFRAME = 26/120; // but since we are frame independent we can ditch this.
 // we assume that previously avg of 16 fps was used to print out fps.
-// or we can assume 120 ticks per second is tickrate.
-#define TICKS_PER_SECF (33.84615384615384615392f)
-#define TICKS_TO_SEC(t) (t/TICKS_PER_SECF)
+// maybe use gravity with proper ticks
 // #define GC (TICSPERFRAME*44)
 
 #define NUM_SOUNDS 450
