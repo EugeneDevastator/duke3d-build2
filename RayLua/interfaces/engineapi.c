@@ -53,8 +53,8 @@ void ForwardEngineUpdate(float dt) {
 
 static void InsertSprite(int sectid, float x, float y, float z) {
     long i = insspri_imp(sectid,x,y,z,mapref);
-    if (mapref->spri[i].tilnum > gmaltiles || mapref->spri[i].tilnum < 0)
-        mapref->spri[i].tilnum = 1;
+   // if (mapref->spri[i].tilnum > gmaltiles || mapref->spri[i].tilnum < 0)
+   //     mapref->spri[i].tilnum = 1;
 }
 
 static void DelSprite(int id) {
@@ -62,7 +62,7 @@ static void DelSprite(int id) {
 }
 
 void SetSpritePicNum(int id, int picnum) {
-    if (id <0) return;
+    if (id < 0) return;
     mapref->spri[id].tilnum = picnum;
 }
 
@@ -95,7 +95,7 @@ void InitEngineApi(mapstate_t *map) {
     int i;
     for (i=0;i<gmaltiles;i++) {
         engine.tilesizex[i] = gtile[i].tt.x;
-        engine.tilesizex[i] = gtile[i].tt.y;
+        engine.tilesizey[i] = gtile[i].tt.y;
     }
 
 

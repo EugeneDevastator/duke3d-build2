@@ -2842,12 +2842,12 @@ int cansee(long x1, long y1, long z1, short sect1, long x2, long y2, long z2, sh
     return (0);
 }
 
-int hitscan(long xs, long ys, long zs, short sectnum, long vx, long vy, long vz, short* hitsect, short* hitwall,
-            short* hitsprite, long* hitx, long* hity, long* hitz, unsigned long cliptype)
-{
-    sectortype* sec;
+int hitscan(long xs, long ys, long zs, short sectnum, long vx, long vy, long vz,
+            short *hitsect, short *hitwall, short *hitsprite,
+            long *hitx, long *hity, long *hitz, unsigned long cliptype) {
+    sectortype *sec;
     walltype *wal, *wal2;
-    spritetype* spr;
+    spritetype *spr;
     long z, zz, x1, y1, z1, x2, y2, z2, x3, y3, x4, y4, intx, inty, intz;
     long topt, topu, bot, dist, offx, offy, cstat;
     long i, j, k, l, tilenum, xoff, yoff, dax, day, daz, daz2;
@@ -2875,14 +2875,12 @@ int hitscan(long xs, long ys, long zs, short sectnum, long vx, long vy, long vz,
     clipsectorlist[0] = sectnum;
     tempshortcnt = 0;
     tempshortnum = 1;
-    do
-    {
+    do {
         dasector = clipsectorlist[tempshortcnt];
         sec = &sector[dasector];
 
         x1 = 0x7fffffff;
-        if (sec->ceilingstat & 2)
-        {
+        if (sec->ceilingstat & 2) {
             wal = &wall[sec->wallptr];
             wal2 = &wall[wal->point2];
             dax = wal2->x - wal->x;
@@ -2894,32 +2892,26 @@ int hitscan(long xs, long ys, long zs, short sectnum, long vx, long vy, long vz,
             day *= i;
 
             j = (vz << 8) - dmulscale15(dax, vy, -day, vx);
-            if (j != 0)
-            {
+            if (j != 0) {
                 i = ((sec->ceilingz - zs) << 8) + dmulscale15(dax, ys - wal->y, -day, xs - wal->x);
-                if (((i ^ j) >= 0) && ((klabs(i) >> 1) < klabs(j)))
-                {
+                if (((i ^ j) >= 0) && ((klabs(i) >> 1) < klabs(j))) {
                     i = divscale30(i, j);
                     x1 = xs + mulscale30(vx, i);
                     y1 = ys + mulscale30(vy, i);
                     z1 = zs + mulscale30(vz, i);
                 }
             }
-        }
-        else if ((vz < 0) && (zs >= sec->ceilingz))
-        {
+        } else if ((vz < 0) && (zs >= sec->ceilingz)) {
             z1 = sec->ceilingz;
             i = z1 - zs;
-            if ((klabs(i) >> 1) < -vz)
-            {
+            if ((klabs(i) >> 1) < -vz) {
                 i = divscale30(i, vz);
                 x1 = xs + mulscale30(vx, i);
                 y1 = ys + mulscale30(vy, i);
             }
         }
         if ((x1 != 0x7fffffff) && (klabs(x1 - xs) + klabs(y1 - ys) < klabs((*hitx) - xs) + klabs((*hity) - ys)))
-            if (inside(x1, y1, dasector) != 0)
-            {
+            if (inside(x1, y1, dasector) != 0) {
                 *hitsect = dasector;
                 *hitwall = -1;
                 *hitsprite = -1;
@@ -2929,8 +2921,7 @@ int hitscan(long xs, long ys, long zs, short sectnum, long vx, long vy, long vz,
             }
 
         x1 = 0x7fffffff;
-        if (sec->floorstat & 2)
-        {
+        if (sec->floorstat & 2) {
             wal = &wall[sec->wallptr];
             wal2 = &wall[wal->point2];
             dax = wal2->x - wal->x;
@@ -2942,32 +2933,26 @@ int hitscan(long xs, long ys, long zs, short sectnum, long vx, long vy, long vz,
             day *= i;
 
             j = (vz << 8) - dmulscale15(dax, vy, -day, vx);
-            if (j != 0)
-            {
+            if (j != 0) {
                 i = ((sec->floorz - zs) << 8) + dmulscale15(dax, ys - wal->y, -day, xs - wal->x);
-                if (((i ^ j) >= 0) && ((klabs(i) >> 1) < klabs(j)))
-                {
+                if (((i ^ j) >= 0) && ((klabs(i) >> 1) < klabs(j))) {
                     i = divscale30(i, j);
                     x1 = xs + mulscale30(vx, i);
                     y1 = ys + mulscale30(vy, i);
                     z1 = zs + mulscale30(vz, i);
                 }
             }
-        }
-        else if ((vz > 0) && (zs <= sec->floorz))
-        {
+        } else if ((vz > 0) && (zs <= sec->floorz)) {
             z1 = sec->floorz;
             i = z1 - zs;
-            if ((klabs(i) >> 1) < vz)
-            {
+            if ((klabs(i) >> 1) < vz) {
                 i = divscale30(i, vz);
                 x1 = xs + mulscale30(vx, i);
                 y1 = ys + mulscale30(vy, i);
             }
         }
         if ((x1 != 0x7fffffff) && (klabs(x1 - xs) + klabs(y1 - ys) < klabs((*hitx) - xs) + klabs((*hity) - ys)))
-            if (inside(x1, y1, dasector) != 0)
-            {
+            if (inside(x1, y1, dasector) != 0) {
                 *hitsect = dasector;
                 *hitwall = -1;
                 *hitsprite = -1;
@@ -2978,9 +2963,7 @@ int hitscan(long xs, long ys, long zs, short sectnum, long vx, long vy, long vz,
 
         startwall = sec->wallptr;
         endwall = startwall + sec->wallnum;
-        for (z = startwall, wal = &wall[startwall]; z < endwall; z++, wal++)
-        {
-
+        for (z = startwall, wal = &wall[startwall]; z < endwall; z++, wal++) {
             wal2 = &wall[wal->point2];
             x1 = wal->x;
             y1 = wal->y;
@@ -2993,8 +2976,7 @@ int hitscan(long xs, long ys, long zs, short sectnum, long vx, long vy, long vz,
             if (klabs(intx - xs) + klabs(inty - ys) >= klabs((*hitx) - xs) + klabs((*hity) - ys)) continue;
 
             nextsector = wal->nextsector;
-            if ((nextsector < 0) || (wal->cstat & dawalclipmask))
-            {
+            if ((nextsector < 0) || (wal->cstat & dawalclipmask)) {
                 *hitsect = dasector;
                 *hitwall = z;
                 *hitsprite = -1;
@@ -3004,8 +2986,7 @@ int hitscan(long xs, long ys, long zs, short sectnum, long vx, long vy, long vz,
                 continue;
             }
             getzsofslope(nextsector, intx, inty, &daz, &daz2);
-            if ((intz <= daz) || (intz >= daz2))
-            {
+            if ((intz <= daz) || (intz >= daz2)) {
                 *hitsect = dasector;
                 *hitwall = z;
                 *hitsprite = -1;
@@ -3020,8 +3001,7 @@ int hitscan(long xs, long ys, long zs, short sectnum, long vx, long vy, long vz,
             if (zz < 0) clipsectorlist[tempshortnum++] = nextsector;
         }
 
-        for (z = headspritesect[dasector]; z >= 0; z = nextspritesect[z])
-        {
+        for (z = headspritesect[dasector]; z >= 0; z = nextspritesect[z]) {
             spr = &sprite[z];
             cstat = spr->cstat;
             if ((cstat & dasprclipmask) == 0) continue;
@@ -3029,160 +3009,153 @@ int hitscan(long xs, long ys, long zs, short sectnum, long vx, long vy, long vz,
             x1 = spr->x;
             y1 = spr->y;
             z1 = spr->z;
-            switch (cstat & 48)
-            {
-            case 0:
-                topt = vx * (x1 - xs) + vy * (y1 - ys);
-                if (topt <= 0) continue;
-                bot = vx * vx + vy * vy;
-                if (bot == 0) continue;
+            switch (cstat & 48) {
+                case 0:
+                    topt = vx * (x1 - xs) + vy * (y1 - ys);
+                    if (topt <= 0) continue;
+                    bot = vx * vx + vy * vy;
+                    if (bot == 0) continue;
 
-                intz = zs + scale(vz, topt, bot);
+                    intz = zs + scale(vz, topt, bot);
 
-                i = (tilesizy[spr->picnum] * spr->yrepeat << 2);
-                if (cstat & 128) z1 += (i >> 1);
-                if (picanm[spr->picnum] & 0x00ff0000) z1 -= ((long)((signed char)((picanm[spr->picnum] >> 16) & 255)) *
-                    spr->yrepeat << 2);
-                if ((intz > z1) || (intz < z1 - i)) continue;
-                topu = vx * (y1 - ys) - vy * (x1 - xs);
+                    i = (tilesizy[spr->picnum] * spr->yrepeat << 2);
+                    if (cstat & 128) z1 += (i >> 1);
+                    if (picanm[spr->picnum] & 0x00ff0000)
+                        z1 -= ((long) ((signed char) ((picanm[spr->picnum] >> 16) & 255)) * spr->yrepeat << 2);
+                    if ((intz > z1) || (intz < z1 - i)) continue;
+                    topu = vx * (y1 - ys) - vy * (x1 - xs);
 
-                offx = scale(vx, topu, bot);
-                offy = scale(vy, topu, bot);
-                dist = offx * offx + offy * offy;
-                i = tilesizx[spr->picnum] * spr->xrepeat;
-                i *= i;
-                if (dist > (i >> 7)) continue;
-                intx = xs + scale(vx, topt, bot);
-                inty = ys + scale(vy, topt, bot);
+                    offx = scale(vx, topu, bot);
+                    offy = scale(vy, topu, bot);
+                    dist = offx * offx + offy * offy;
+                    i = tilesizx[spr->picnum] * spr->xrepeat;
+                    i *= i;
+                    if (dist > (i >> 7)) continue;
+                    intx = xs + scale(vx, topt, bot);
+                    inty = ys + scale(vy, topt, bot);
 
-                if (klabs(intx - xs) + klabs(inty - ys) > klabs((*hitx) - xs) + klabs((*hity) - ys)) continue;
+                    if (klabs(intx - xs) + klabs(inty - ys) > klabs((*hitx) - xs) + klabs((*hity) - ys)) continue;
 
-                *hitsect = dasector;
-                *hitwall = -1;
-                *hitsprite = z;
-                *hitx = intx;
-                *hity = inty;
-                *hitz = intz;
-                break;
-            case 16:
-                //These lines get the 2 points of the rotated sprite
-                //Given: (x1, y1) starts out as the center point
-                tilenum = spr->picnum;
-                xoff = (long)((signed char)((picanm[tilenum] >> 8) & 255)) + ((long)spr->xoffset);
-                if ((cstat & 4) > 0) xoff = -xoff;
-                k = spr->ang;
-                l = spr->xrepeat;
-                dax = sintable[k & 2047] * l;
-                day = sintable[(k + 1536) & 2047] * l;
-                l = tilesizx[tilenum];
-                k = (l >> 1) + xoff;
-                x1 -= mulscale16(dax, k);
-                x2 = x1 + mulscale16(dax, l);
-                y1 -= mulscale16(day, k);
-                y2 = y1 + mulscale16(day, l);
-
-                if ((cstat & 64) != 0) //back side of 1-way sprite
-                    if ((x1 - xs) * (y2 - ys) < (x2 - xs) * (y1 - ys)) continue;
-
-                if (rintersect(xs, ys, zs, vx, vy, vz, x1, y1, x2, y2, &intx, &inty, &intz) == 0) continue;
-
-                if (klabs(intx - xs) + klabs(inty - ys) > klabs((*hitx) - xs) + klabs((*hity) - ys)) continue;
-
-                k = ((tilesizy[spr->picnum] * spr->yrepeat) << 2);
-                if (cstat & 128) daz = spr->z + (k >> 1);
-                else daz = spr->z;
-                if (picanm[spr->picnum] & 0x00ff0000) daz -= ((long)((signed char)((picanm[spr->picnum] >> 16) & 255)) *
-                    spr->yrepeat << 2);
-                if ((intz < daz) && (intz > daz - k))
-                {
                     *hitsect = dasector;
                     *hitwall = -1;
                     *hitsprite = z;
                     *hitx = intx;
                     *hity = inty;
                     *hitz = intz;
-                }
-                break;
-            case 32:
-                if (vz == 0) continue;
-                intz = z1;
-                if (((intz - zs) ^ vz) < 0) continue;
-                if ((cstat & 64) != 0)
-                    if ((zs > intz) == ((cstat & 8) == 0)) continue;
+                    break;
+                case 16:
+                    //These lines get the 2 points of the rotated sprite
+                    //Given: (x1, y1) starts out as the center point
+                    tilenum = spr->picnum;
+                    xoff = (long) ((signed char) ((picanm[tilenum] >> 8) & 255)) + ((long) spr->xoffset);
+                    if ((cstat & 4) > 0) xoff = -xoff;
+                    k = spr->ang;
+                    l = spr->xrepeat;
+                    dax = sintable[k & 2047] * l;
+                    day = sintable[(k + 1536) & 2047] * l;
+                    l = tilesizx[tilenum];
+                    k = (l >> 1) + xoff;
+                    x1 -= mulscale16(dax, k);
+                    x2 = x1 + mulscale16(dax, l);
+                    y1 -= mulscale16(day, k);
+                    y2 = y1 + mulscale16(day, l);
 
-                intx = xs + scale(intz - zs, vx, vz);
-                inty = ys + scale(intz - zs, vy, vz);
+                    if ((cstat & 64) != 0) //back side of 1-way sprite
+                        if ((x1 - xs) * (y2 - ys) < (x2 - xs) * (y1 - ys)) continue;
 
-                if (klabs(intx - xs) + klabs(inty - ys) > klabs((*hitx) - xs) + klabs((*hity) - ys)) continue;
+                    if (rintersect(xs, ys, zs, vx, vy, vz, x1, y1, x2, y2, &intx, &inty, &intz) == 0) continue;
 
-                tilenum = spr->picnum;
-                xoff = (long)((signed char)((picanm[tilenum] >> 8) & 255)) + ((long)spr->xoffset);
-                yoff = (long)((signed char)((picanm[tilenum] >> 16) & 255)) + ((long)spr->yoffset);
-                if ((cstat & 4) > 0) xoff = -xoff;
-                if ((cstat & 8) > 0) yoff = -yoff;
+                    if (klabs(intx - xs) + klabs(inty - ys) > klabs((*hitx) - xs) + klabs((*hity) - ys)) continue;
 
-                ang = spr->ang;
-                cosang = sintable[(ang + 512) & 2047];
-                sinang = sintable[ang];
-                xspan = tilesizx[tilenum];
-                xrepeat = spr->xrepeat;
-                yspan = tilesizy[tilenum];
-                yrepeat = spr->yrepeat;
+                    k = ((tilesizy[spr->picnum] * spr->yrepeat) << 2);
+                    if (cstat & 128) daz = spr->z + (k >> 1);
+                    else daz = spr->z;
+                    if (picanm[spr->picnum] & 0x00ff0000)
+                        daz -= ((long) ((signed char) ((picanm[spr->picnum] >> 16) & 255)) * spr->yrepeat << 2);
+                    if ((intz < daz) && (intz > daz - k)) {
+                        *hitsect = dasector;
+                        *hitwall = -1;
+                        *hitsprite = z;
+                        *hitx = intx;
+                        *hity = inty;
+                        *hitz = intz;
+                    }
+                    break;
+                case 32:
+                    if (vz == 0) continue;
+                    intz = z1;
+                    if (((intz - zs) ^ vz) < 0) continue;
+                    if ((cstat & 64) != 0)
+                        if ((zs > intz) == ((cstat & 8) == 0)) continue;
 
-                dax = ((xspan >> 1) + xoff) * xrepeat;
-                day = ((yspan >> 1) + yoff) * yrepeat;
-                x1 += dmulscale16(sinang, dax, cosang, day) - intx;
-                y1 += dmulscale16(sinang, day, -cosang, dax) - inty;
-                l = xspan * xrepeat;
-                x2 = x1 - mulscale16(sinang, l);
-                y2 = y1 + mulscale16(cosang, l);
-                l = yspan * yrepeat;
-                k = -mulscale16(cosang, l);
-                x3 = x2 + k;
-                x4 = x1 + k;
-                k = -mulscale16(sinang, l);
-                y3 = y2 + k;
-                y4 = y1 + k;
+                    intx = xs + scale(intz - zs, vx, vz);
+                    inty = ys + scale(intz - zs, vy, vz);
 
-                clipyou = 0;
-                if ((y1 ^ y2) < 0)
-                {
-                    if ((x1 ^ x2) < 0) clipyou ^= (x1 * y2 < x2 * y1) ^ (y1 < y2);
-                    else if (x1 >= 0) clipyou ^= 1;
-                }
-                if ((y2 ^ y3) < 0)
-                {
-                    if ((x2 ^ x3) < 0) clipyou ^= (x2 * y3 < x3 * y2) ^ (y2 < y3);
-                    else if (x2 >= 0) clipyou ^= 1;
-                }
-                if ((y3 ^ y4) < 0)
-                {
-                    if ((x3 ^ x4) < 0) clipyou ^= (x3 * y4 < x4 * y3) ^ (y3 < y4);
-                    else if (x3 >= 0) clipyou ^= 1;
-                }
-                if ((y4 ^ y1) < 0)
-                {
-                    if ((x4 ^ x1) < 0) clipyou ^= (x4 * y1 < x1 * y4) ^ (y4 < y1);
-                    else if (x4 >= 0) clipyou ^= 1;
-                }
+                    if (klabs(intx - xs) + klabs(inty - ys) > klabs((*hitx) - xs) + klabs((*hity) - ys)) continue;
 
-                if (clipyou != 0)
-                {
-                    *hitsect = dasector;
-                    *hitwall = -1;
-                    *hitsprite = z;
-                    *hitx = intx;
-                    *hity = inty;
-                    *hitz = intz;
-                }
-                break;
+                    tilenum = spr->picnum;
+                    xoff = (long) ((signed char) ((picanm[tilenum] >> 8) & 255)) + ((long) spr->xoffset);
+                    yoff = (long) ((signed char) ((picanm[tilenum] >> 16) & 255)) + ((long) spr->yoffset);
+                    if ((cstat & 4) > 0) xoff = -xoff;
+                    if ((cstat & 8) > 0) yoff = -yoff;
+
+                    ang = spr->ang;
+                    cosang = sintable[(ang + 512) & 2047];
+                    sinang = sintable[ang];
+                    xspan = tilesizx[tilenum];
+                    xrepeat = spr->xrepeat;
+                    yspan = tilesizy[tilenum];
+                    yrepeat = spr->yrepeat;
+
+                    dax = ((xspan >> 1) + xoff) * xrepeat;
+                    day = ((yspan >> 1) + yoff) * yrepeat;
+                    x1 += dmulscale16(sinang, dax, cosang, day) - intx;
+                    y1 += dmulscale16(sinang, day, -cosang, dax) - inty;
+                    l = xspan * xrepeat;
+                    x2 = x1 - mulscale16(sinang, l);
+                    y2 = y1 + mulscale16(cosang, l);
+                    l = yspan * yrepeat;
+                    k = -mulscale16(cosang, l);
+                    x3 = x2 + k;
+                    x4 = x1 + k;
+                    k = -mulscale16(sinang, l);
+                    y3 = y2 + k;
+                    y4 = y1 + k;
+
+                    clipyou = 0;
+                    if ((y1 ^ y2) < 0) {
+                        if ((x1 ^ x2) < 0) clipyou ^= (x1 * y2 < x2 * y1) ^ (y1 < y2);
+                        else if (x1 >= 0) clipyou ^= 1;
+                    }
+                    if ((y2 ^ y3) < 0) {
+                        if ((x2 ^ x3) < 0) clipyou ^= (x2 * y3 < x3 * y2) ^ (y2 < y3);
+                        else if (x2 >= 0) clipyou ^= 1;
+                    }
+                    if ((y3 ^ y4) < 0) {
+                        if ((x3 ^ x4) < 0) clipyou ^= (x3 * y4 < x4 * y3) ^ (y3 < y4);
+                        else if (x3 >= 0) clipyou ^= 1;
+                    }
+                    if ((y4 ^ y1) < 0) {
+                        if ((x4 ^ x1) < 0) clipyou ^= (x4 * y1 < x1 * y4) ^ (y4 < y1);
+                        else if (x4 >= 0) clipyou ^= 1;
+                    }
+
+                    if (clipyou != 0) {
+                        *hitsect = dasector;
+                        *hitwall = -1;
+                        *hitsprite = z;
+                        *hitx = intx;
+                        *hity = inty;
+                        *hitz = intz;
+                    }
+                    break;
             }
         }
         tempshortcnt++;
-    }
-    while (tempshortcnt < tempshortnum);
+    } while (tempshortcnt < tempshortnum);
     return (0);
 }
+
 /*Function Overview
 neartag performs a raycast from a given position
 to find the nearest tagged game object (sector, wall, or sprite)
@@ -3204,141 +3177,122 @@ neartagwall - Index of nearest tagged wall (-1 if none)
 neartagsprite - Index of nearest tagged sprite (-1 if none)
 neartaghitdist - Distance to the nearest tagged object
 */
-int neartag(long xs, long ys, long zs, short sectnum, short ange, short* neartagsector, short* neartagwall,
-            short* neartagsprite, long* neartaghitdist, long neartagrange, char tagsearch)
+neartag (long xs, long ys, long zs, short sectnum, short ange, short *neartagsector, short *neartagwall, short *neartagsprite, long *neartaghitdist, long neartagrange, char tagsearch)
 {
-    walltype *wal, *wal2;
-    spritetype* spr;
-    long i, z, zz, xe, ye, ze, x1, y1, z1, x2, y2, z2, intx, inty, intz;
-    long topt, topu, bot, dist, offx, offy, vx, vy, vz;
-    short tempshortcnt, tempshortnum, dasector, startwall, endwall;
-    short nextsector, good;
+	walltype *wal, *wal2;
+	spritetype *spr;
+	long i, z, zz, xe, ye, ze, x1, y1, z1, x2, y2, z2, intx, inty, intz;
+	long topt, topu, bot, dist, offx, offy, vx, vy, vz;
+	short tempshortcnt, tempshortnum, dasector, startwall, endwall;
+	short nextsector, good;
 
-    *neartagsector = -1;
-    *neartagwall = -1;
-    *neartagsprite = -1;
-    *neartaghitdist = 0;
+	*neartagsector = -1; *neartagwall = -1; *neartagsprite = -1;
+	*neartaghitdist = 0;
 
-    if (sectnum < 0) return (0);
-    if ((tagsearch < 1) || (tagsearch > 3)) return (0);
+	if (sectnum < 0) return(0);
+	if ((tagsearch < 1) || (tagsearch > 3)) return(0);
 
-    vx = mulscale14(sintable[(ange+2560)&2047], neartagrange);
-    xe = xs + vx;
-    vy = mulscale14(sintable[(ange+2048)&2047], neartagrange);
-    ye = ys + vy;
-    vz = 0;
-    ze = 0;
+	vx = mulscale14(sintable[(ange+2560)&2047],neartagrange); xe = xs+vx;
+	vy = mulscale14(sintable[(ange+2048)&2047],neartagrange); ye = ys+vy;
+	vz = 0; ze = 0;
 
-    clipsectorlist[0] = sectnum;
-    tempshortcnt = 0;
-    tempshortnum = 1;
+	clipsectorlist[0] = sectnum;
+	tempshortcnt = 0; tempshortnum = 1;
 
-    do
-    {
-        dasector = clipsectorlist[tempshortcnt];
+	do
+	{
+		dasector = clipsectorlist[tempshortcnt];
 
-        startwall = sector[dasector].wallptr;
-        endwall = startwall + sector[dasector].wallnum - 1;
-        for (z = startwall, wal = &wall[startwall]; z <= endwall; z++, wal++)
-        {
-            wal2 = &wall[wal->point2];
-            x1 = wal->x;
-            y1 = wal->y;
-            x2 = wal2->x;
-            y2 = wal2->y;
+		startwall = sector[dasector].wallptr;
+		endwall = startwall + sector[dasector].wallnum - 1;
+		for(z=startwall,wal=&wall[startwall];z<=endwall;z++,wal++)
+		{
+			wal2 = &wall[wal->point2];
+			x1 = wal->x; y1 = wal->y; x2 = wal2->x; y2 = wal2->y;
 
-            nextsector = wal->nextsector;
+			nextsector = wal->nextsector;
 
-            good = 0;
-            if (nextsector >= 0)
-            {
-                if ((tagsearch & 1) && sector[nextsector].lotag) good |= 1;
-                if ((tagsearch & 2) && sector[nextsector].hitag) good |= 1;
-            }
-            if ((tagsearch & 1) && wal->lotag) good |= 2;
-            if ((tagsearch & 2) && wal->hitag) good |= 2;
+			good = 0;
+			if (nextsector >= 0)
+			{
+				if ((tagsearch&1) && sector[nextsector].lotag) good |= 1;
+				if ((tagsearch&2) && sector[nextsector].hitag) good |= 1;
+			}
+			if ((tagsearch&1) && wal->lotag) good |= 2;
+			if ((tagsearch&2) && wal->hitag) good |= 2;
 
-            if ((good == 0) && (nextsector < 0)) continue;
-            if ((x1 - xs) * (y2 - ys) < (x2 - xs) * (y1 - ys)) continue;
+			if ((good == 0) && (nextsector < 0)) continue;
+			if ((x1-xs)*(y2-ys) < (x2-xs)*(y1-ys)) continue;
 
-            if (lintersect(xs, ys, zs, xe, ye, ze, x1, y1, x2, y2, &intx, &inty, &intz) == 1)
-            {
-                if (good != 0)
-                {
-                    if (good & 1) *neartagsector = nextsector;
-                    if (good & 2) *neartagwall = z;
-                    *neartaghitdist = dmulscale14(intx - xs, sintable[(ange + 2560) & 2047], inty - ys,
-                                                  sintable[(ange + 2048) & 2047]);
-                    xe = intx;
-                    ye = inty;
-                    ze = intz;
-                }
-                if (nextsector >= 0)
-                {
-                    for (zz = tempshortnum - 1; zz >= 0; zz--)
-                        if (clipsectorlist[zz] == nextsector) break;
-                    if (zz < 0) clipsectorlist[tempshortnum++] = nextsector;
-                }
-            }
-        }
+			if (lintersect(xs,ys,zs,xe,ye,ze,x1,y1,x2,y2,&intx,&inty,&intz) == 1)
+			{
+				if (good != 0)
+				{
+					if (good&1) *neartagsector = nextsector;
+					if (good&2) *neartagwall = z;
+					*neartaghitdist = dmulscale14(intx-xs,sintable[(ange+2560)&2047],inty-ys,sintable[(ange+2048)&2047]);
+					xe = intx; ye = inty; ze = intz;
+				}
+				if (nextsector >= 0)
+				{
+					for(zz=tempshortnum-1;zz>=0;zz--)
+						if (clipsectorlist[zz] == nextsector) break;
+					if (zz < 0) clipsectorlist[tempshortnum++] = nextsector;
+				}
+			}
+		}
 
-        for (z = headspritesect[dasector]; z >= 0; z = nextspritesect[z])
-        {
-            spr = &sprite[z];
+		for(z=headspritesect[dasector];z>=0;z=nextspritesect[z])
+		{
+			spr = &sprite[z];
 
-            good = 0;
-            if ((tagsearch & 1) && spr->lotag) good |= 1;
-            if ((tagsearch & 2) && spr->hitag) good |= 1;
-            if (good != 0)
-            {
-                x1 = spr->x;
-                y1 = spr->y;
-                z1 = spr->z;
+			good = 0;
+			if ((tagsearch&1) && spr->lotag) good |= 1;
+			if ((tagsearch&2) && spr->hitag) good |= 1;
+			if (good != 0)
+			{
+				x1 = spr->x; y1 = spr->y; z1 = spr->z;
 
-                topt = vx * (x1 - xs) + vy * (y1 - ys);
-                if (topt > 0)
-                {
-                    bot = vx * vx + vy * vy;
-                    if (bot != 0)
-                    {
-                        intz = zs + scale(vz, topt, bot);
-                        i = tilesizy[spr->picnum] * spr->yrepeat;
-                        if (spr->cstat & 128) z1 += (i << 1);
-                        if (picanm[spr->picnum] & 0x00ff0000) z1 -= ((long)((signed char)((picanm[spr->picnum] >> 16) &
-                            255)) * spr->yrepeat << 2);
-                        if ((intz <= z1) && (intz >= z1 - (i << 2)))
-                        {
-                            topu = vx * (y1 - ys) - vy * (x1 - xs);
+				topt = vx*(x1-xs) + vy*(y1-ys);
+				if (topt > 0)
+				{
+					bot = vx*vx + vy*vy;
+					if (bot != 0)
+					{
+						intz = zs+scale(vz,topt,bot);
+						i = tilesizy[spr->picnum]*spr->yrepeat;
+						if (spr->cstat&128) z1 += (i<<1);
+						if (picanm[spr->picnum]&0x00ff0000) z1 -= ((long)((signed char)((picanm[spr->picnum]>>16)&255))*spr->yrepeat<<2);
+						if ((intz <= z1) && (intz >= z1-(i<<2)))
+						{
+							topu = vx*(y1-ys) - vy*(x1-xs);
 
-                            offx = scale(vx, topu, bot);
-                            offy = scale(vy, topu, bot);
-                            dist = offx * offx + offy * offy;
-                            i = (tilesizx[spr->picnum] * spr->xrepeat);
-                            i *= i;
-                            if (dist <= (i >> 7))
-                            {
-                                intx = xs + scale(vx, topt, bot);
-                                inty = ys + scale(vy, topt, bot);
-                                if (klabs(intx - xs) + klabs(inty - ys) < klabs(xe - xs) + klabs(ye - ys))
-                                {
-                                    *neartagsprite = z;
-                                    *neartaghitdist = dmulscale14(intx - xs, sintable[(ange + 2560) & 2047], inty - ys,
-                                                                  sintable[(ange + 2048) & 2047]);
-                                    xe = intx;
-                                    ye = inty;
-                                    ze = intz;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+							offx = scale(vx,topu,bot);
+							offy = scale(vy,topu,bot);
+							dist = offx*offx + offy*offy;
+							i = (tilesizx[spr->picnum]*spr->xrepeat); i *= i;
+							if (dist <= (i>>7))
+							{
+								intx = xs + scale(vx,topt,bot);
+								inty = ys + scale(vy,topt,bot);
+								if (klabs(intx-xs)+klabs(inty-ys) < klabs(xe-xs)+klabs(ye-ys))
+								{
+									*neartagsprite = z;
+									*neartaghitdist = dmulscale14(intx-xs,sintable[(ange+2560)&2047],inty-ys,sintable[(ange+2048)&2047]);
+									xe = intx;
+									ye = inty;
+									ze = intz;
+								}
+							}
+						}
+					}
+				}
+			}
+		}
 
-        tempshortcnt++;
-    }
-    while (tempshortcnt < tempshortnum);
-    return (0);
+		tempshortcnt++;
+	} while (tempshortcnt < tempshortnum);
+	return(0);
 }
 
 int lintersect(long x1, long y1, long z1, long x2, long y2, long z2, long x3, long y3, long x4, long y4, long* intx,
@@ -3378,40 +3332,33 @@ int lintersect(long x1, long y1, long z1, long x2, long y2, long z2, long x3, lo
     return (1);
 }
 
-int rintersect(long x1, long y1, long z1, long vx, long vy, long vz, long x3, long y3, long x4, long y4, long* intx,
-               long* inty, long* intz)
-{
-    //p1 towards p2 is a ray
+rintersect(long x1, long y1, long z1, long vx, long vy, long vz, long x3,
+              long y3, long x4, long y4, long *intx, long *inty, long *intz)
+{     //p1 towards p2 is a ray
     long x34, y34, x31, y31, bot, topt, topu, t;
 
-    x34 = x3 - x4;
-    y34 = y3 - y4;
-    bot = vx * y34 - vy * x34;
+    x34 = x3-x4; y34 = y3-y4;
+    bot = vx*y34 - vy*x34;
     if (bot >= 0)
     {
-        if (bot == 0) return (0);
-        x31 = x3 - x1;
-        y31 = y3 - y1;
-        topt = x31 * y34 - y31 * x34;
-        if (topt < 0) return (0);
-        topu = vx * y31 - vy * x31;
-        if ((topu < 0) || (topu >= bot)) return (0);
+        if (bot == 0) return(0);
+        x31 = x3-x1; y31 = y3-y1;
+        topt = x31*y34 - y31*x34; if (topt < 0) return(0);
+        topu = vx*y31 - vy*x31; if ((topu < 0) || (topu >= bot)) return(0);
     }
     else
     {
-        x31 = x3 - x1;
-        y31 = y3 - y1;
-        topt = x31 * y34 - y31 * x34;
-        if (topt > 0) return (0);
-        topu = vx * y31 - vy * x31;
-        if ((topu > 0) || (topu <= bot)) return (0);
+        x31 = x3-x1; y31 = y3-y1;
+        topt = x31*y34 - y31*x34; if (topt > 0) return(0);
+        topu = vx*y31 - vy*x31; if ((topu > 0) || (topu <= bot)) return(0);
     }
-    t = divscale16(topt, bot);
-    *intx = x1 + mulscale16(vx, t);
-    *inty = y1 + mulscale16(vy, t);
-    *intz = z1 + mulscale16(vz, t);
-    return (1);
+    t = divscale16(topt,bot);
+    *intx = x1 + mulscale16(vx,t);
+    *inty = y1 + mulscale16(vy,t);
+    *intz = z1 + mulscale16(vz,t);
+    return(1);
 }
+
 
 void dragpoint(short pointhighlight, long dax, long day)
 {
