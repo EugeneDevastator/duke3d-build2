@@ -36,8 +36,11 @@ typedef struct {
     void (*DeleteSprite)(int sid);
     void (*SetPlayerForward)(float x, float y, float z);
     void (*SetSpritePicNum)(int i, int picnum);
-
     char *Inputs;
+// temp info
+    int tilesizex[7000];
+    int tilesizey[7000];
+
 } engineapi_t;
 
 engineapi_t engine;

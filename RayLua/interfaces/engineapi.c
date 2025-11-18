@@ -6,6 +6,7 @@
 #include <stdlib.h>
 
 #include "mapcore.h"
+#include "source/build.h"
 #include "source/game.h"
 static mapstate_t *mapref;
 char *inputs;
@@ -61,6 +62,7 @@ static void DelSprite(int id) {
 }
 
 void SetSpritePicNum(int id, int picnum) {
+    if (id <0) return;
     mapref->spri[id].tilnum = picnum;
 }
 
@@ -89,4 +91,12 @@ void InitEngineApi(mapstate_t *map) {
     engine.DeleteSprite = DelSprite;
     engine.SetPlayerForward = SetPlayerForward;
     engine.SetSpritePicNum = SetSpritePicNum;
+// this is absolutely strange, but looks like duke needs tile sizes to calculate hits?
+    int i;
+    for (i=0;i<gmaltiles;i++) {
+        engine.tilesizex[i] = gtile[i].tt.x;
+        engine.tilesizex[i] = gtile[i].tt.y;
+    }
+
+
 }

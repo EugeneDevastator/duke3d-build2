@@ -1374,6 +1374,7 @@ char checkhitswitch(short snum,long w,char switchtype)
                 sprite[i].picnum--;
                 break;
         }
+        SET_SPR_PIC(i,sprite[i].picnum);
         i = nextspritestat[i];
     }
 

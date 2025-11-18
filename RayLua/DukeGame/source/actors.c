@@ -35,6 +35,7 @@ extern char numenvsnds,actor_tog;
 char tempbuf[4096];
 void updateinterpolations()  //Stick at beginning of domovethings
 {
+    return;
 	long i;
 
 	for(i=numinterpolations-1;i>=0;i--) oldipos[i] = *curipos[i];
@@ -630,6 +631,7 @@ int movesprite(short spritenum, long xchange, long ychange, long zchange, unsign
         sprite[spritenum].z += (zchange*TICSPERFRAME)>>2;
         if(bg)
             setsprite(spritenum,sprite[spritenum].x,sprite[spritenum].y,sprite[spritenum].z);
+
         SET_SPRITE_XYZ(spritenum, sprite[spritenum].x,sprite[spritenum].y,sprite[spritenum].z);
         return 0;
     }
@@ -673,7 +675,8 @@ int movesprite(short spritenum, long xchange, long ychange, long zchange, unsign
                 else if( (hittype[spritenum].temp_data[0]&3) == 1 && sprite[spritenum].picnum != COMMANDER )
                     sprite[spritenum].ang = (TRAND&2047);
                 setsprite(spritenum,oldx,oldy,sprite[spritenum].z);
-                if(dasectnum < 0) dasectnum = 0;
+            SET_SPRITE_I(spritenum);
+                 if(dasectnum < 0) dasectnum = 0;
                 return (16384+dasectnum);
         }
         if( (retval&49152) >= 32768 && (hittype[spritenum].cgg==0) ) sprite[spritenum].ang += 768;
@@ -687,7 +690,7 @@ int movesprite(short spritenum, long xchange, long ychange, long zchange, unsign
             retval =
                 clipmove(&sprite[spritenum].x,&sprite[spritenum].y,&daz,&dasectnum,((xchange*TICSPERFRAME)<<11),((ychange*TICSPERFRAME)<<11),(long)(sprite[spritenum].clipdist<<2),(4<<8),(4<<8),cliptype);
     }
-
+    SET_SPRITE_I(spritenum);
     if( dasectnum >= 0)
         if ( (dasectnum != sprite[spritenum].sectnum) )
             changespritesect(spritenum,dasectnum);
@@ -698,8 +701,8 @@ int movesprite(short spritenum, long xchange, long ychange, long zchange, unsign
         if (retval == 0)
             retval=(16384+dasectnum);
 
-    SET_SPRITE_XYZ(spritenum, sprite[spritenum].x,sprite[spritenum].y,sprite[spritenum].z);
-	return(retval);
+    SET_SPRITE_I(spritenum);
+    return(retval);
 }
 
 
@@ -1134,7 +1137,7 @@ void movedummyplayers()
         nexti = nextspritestat[i];
 
         p = sprite[sprite[i].owner].yvel;
-
+        SET_SPRITE_I(i);
         if( ps[p].on_crane >= 0 || sector[ps[p].cursectnum].lotag != 1 || sprite[ps[p].i].extra <= 0 )
         {
             ps[p].dummyplayersprite = -1;
@@ -1181,7 +1184,7 @@ void moveplayers() //Players
     while(i >= 0)
     {
         nexti = nextspritestat[i];
-
+        SET_SPRITE_I(i);
         s = &sprite[i];
         p = &ps[s->yvel];
         if(s->owner >= 0)
@@ -1270,7 +1273,7 @@ void moveplayers() //Players
                 s->xrepeat += 4;
                 s->cstat |= 2;
             }
-            else s->xrepeat = 42;
+            else s-> xrepeat = 42;
             if(s->yrepeat < 36)
                 s->yrepeat += 4;
             else
@@ -1317,7 +1320,7 @@ void movefx()
     while(i >= 0)
     {
         s = &sprite[i];
-
+        SET_SPRITE_I(i);
         nexti = nextspritestat[i];
 
         switch(s->picnum)
@@ -1422,7 +1425,7 @@ void movefallers()
     {
         nexti = nextspritestat[i];
         s = &sprite[i];
-
+        SET_SPRITE_I(i);
         sect = s->sectnum;
 
         if( T1 == 0 )
@@ -1524,7 +1527,7 @@ void movestandables()
         t = &hittype[i].temp_data[0];
         s = &sprite[i];
         sect = s->sectnum;
-        SET_SPRITE_XYZ(i,s->x,s->y,s->z);
+        SET_SPRITE_I(i);
         if( sect < 0 ) KILLIT(i);
 
         hittype[i].bposx = s->x;
@@ -2401,7 +2404,7 @@ void movestandables()
                 execute(i,p,x);
                 goto BOLT;
         }
-
+        SET_SPRITE_XYZ(i,s->x,s->y,s->z);
         BOLT:
         SET_SPRITE_XYZ(i,s->x,s->y,s->z);
         i = nexti;
@@ -2445,6 +2448,7 @@ void bounce(short i)
     s->zvel = zvect;
     s->xvel = ksqrt(dmulscale8(xvect,xvect,yvect,yvect));
     s->ang = getangle(xvect,yvect);
+    SET_SPRITE_I(i);
 }
 
 void moveweapons()
@@ -2459,7 +2463,7 @@ void moveweapons()
     {
         nexti = nextspritestat[i];
         s = &sprite[i];
-
+        SET_SPRITE_I(i);
         if(s->sectnum < 0) KILLIT(i);
 
         hittype[i].bposx = s->x;
@@ -2788,6 +2792,7 @@ void moveweapons()
         }
         SET_SPRITE_XYZ(i,s->x,s->y,s->z);
         BOLT:
+        SET_SPRITE_XYZ(i,s->x,s->y,s->z);
         i = nexti;
     }
 }
@@ -3161,7 +3166,7 @@ void moveactors()
         nexti = nextspritestat[i];
 
         s = &sprite[i];
-
+        SET_SPRITE_I(i);
         sect = s->sectnum;
 
         if( s->xrepeat == 0 || sect < 0 || sect >= MAXSECTORS)
@@ -4396,9 +4401,9 @@ void moveactors()
         p = findplayer(s,&x);
 
         execute(i,p,x);
-
-        BOLT:
         SET_SPRITE_XYZ(i,s->x,s->y,s->z);
+        BOLT:
+        SET_SPRITE_XYZ(i,sprite[i].x,sprite[i].y,sprite[i].z);
         i = nexti;
     }
 
@@ -4932,8 +4937,9 @@ void moveexplosions()  // STATNUM 5
                 }
                 goto BOLT;
         }
-
+        SET_SPRITE_XYZ(i,s->x,s->y,s->z);
         BOLT:
+        SET_SPRITE_XYZ(i,s->x,s->y,s->z);
         i = nexti;
     }
 }
@@ -4953,7 +4959,7 @@ void moveeffectors()   //STATNUM 3
     {
         nexti = nextspritestat[i];
         s = &sprite[i];
-
+        SET_SPRITE_I(i);
         sc = &sector[s->sectnum];
         st = s->lotag;
         sh = s->hitag;
@@ -6585,8 +6591,12 @@ void moveeffectors()   //STATNUM 3
                                 sprite[j].picnum == SIDEBOLT1+2 ||
                                 sprite[j].picnum == SIDEBOLT1+3 ||
                                 wallswitchcheck(j)
+
                               )
-                              break;
+                             {
+                                SET_SPR_PIC(j,sprite[j].picnum);
+                             break;
+                             }
 
                             if( !(sprite[j].picnum >= CRANE && sprite[j].picnum <= (CRANE+3)))
                             {
@@ -7150,7 +7160,9 @@ void moveeffectors()   //STATNUM 3
                 }
                 break;
         }
+
         BOLT:
+        SET_SPR_PIC(i,sprite[i].picnum);
         i = nexti;
     }
 

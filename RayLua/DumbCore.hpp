@@ -161,8 +161,8 @@ private:
         Vector2 mdelta = GetMouseDelta();
         engine.Inputs[Q_TLEFT] = mdelta.x<0 ? 1 : 0;
         engine.Inputs[R_TRIGHT] = mdelta.x>0 ? 1 : 0;
-        engine.Inputs[ACT_AIM_DOWN] = mdelta.y < 0 ? 1 : 0;
-        engine.Inputs[ACT_AIM_UP] = mdelta.y > 0 ? 1 : 0;
+        engine.Inputs[ACT_AIM_DOWN] = mdelta.y > 0 ? 1 : 0; // inverted
+        engine.Inputs[ACT_AIM_UP] = mdelta.y < 0 ? 1 : 0;
         ForwardEngineUpdate(deltaTime);
         point3d ppos = GetPlayerPos();
         point3d frw = GetPlayerFrw();

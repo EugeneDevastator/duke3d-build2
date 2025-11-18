@@ -17,7 +17,7 @@ mapstate_t* map;
 // populating tags from the end.
 #define PI 3.14159265358979323846
 long mapToEngine[MAXSPRITES];
-long mapToDuke[MAXSPRITES];
+long mapToDuke[MAXSPRITES*100];
 
 void SetSprPos(long i, long x, long y, long z) // not in .h file
 {
@@ -83,20 +83,20 @@ spritetype ReadSprite(long i) {
 }
 void DoDukeUpdate(float dt) {
     DoDukeLoop(dt);
- //  sprite[ps[0].i].x = ps[0].posx;
- //  sprite[ps[0].i].y = ps[0].posy;
- //  sprite[ps[0].i].z = ps[0].posz;
+  // sprite[ps[0].i].x = ps[0].posx;
+  // sprite[ps[0].i].y = ps[0].posy;
+  // sprite[ps[0].i].z = ps[0].posz;
     rayl->SetPlayerPos(
-        ps[0].posx / 512.0f,
-        ps[0].posy/ 512.0f,
-        ps[0].posz/ (512.f*16.f)
+        sprite[ps[0].i].x / 512.0f,
+        sprite[ps[0].i].y/ 512.0f,
+        sprite[ps[0].i].z/ (512.f*16.f)
         );
 
-SET_SPRITE_XYZ(ps[0].i, ps[0].posx, ps[0].posy,ps[0].posz);
-    sprite[ps[0].i].ang=ps[0].ang;
+ //   SET_SPRITE_XYZ(ps[0].i, ps[0].posx, ps[0].posy,ps[0].posz);
+ //   sprite[ps[0].i].ang=ps[0].ang;
 
     long h = ps[0].horiz+ps[0].horizoff;
-    float yaw = ((float)ps[0].ang) * PI / 1024.0f;
+    float yaw = ((float)sprite[ps[0].i].ang) * PI / 1024.0f;
     float pitch = -((float)(h - 100)) * PI / 1024.0f;  // 100 is center
 
     // Forward vector combining yaw and pitch
@@ -229,6 +229,25 @@ void ParseMapToDukeFormat() {
     ps[0].ang = forwardToAng(map->startfor);
     ps[0].cursectnum = map->startsectn; // do update at th end
 
+// tile params
+    for (int i = 0; i < MAXTILES; ++i) {
+        tilesizx[i] = rayl->tilesizex[i];
+        tilesizy[i] = rayl->tilesizey[i];
+    }
+
+    for (int i = 0; i < MAXTILES; i++) {
+        // Set default values: no animation, no offsets
+       // picanm[i] = 0x00000000;
+
+        // If you need centered sprites, you can set offsets like this:
+        // picanm[i] = 0x00000000; // Keep as zero for no offset
+
+        // Or if you want to center sprites based on their size:
+         int xoff = -(tilesizx[i] >> 1); // Center X
+         int yoff = -(tilesizy[i] >> 1); // Center Y
+         picanm[i] = ((yoff & 0xFF) << 16) | ((xoff & 0xFF) << 8);
+    }
+    // map structure
     numsectors = (short)map->numsects;
     for (int i = 0; i < numsectors; ++i) {
         ConvertSector(i,&sector[i]);
@@ -266,44 +285,3 @@ void GetInput() {
 int FindClosestSectorIdByHeigh(int sectnum, long baseZ, short isOtherFloor, short isDirectionUpward) {
     return 0; // look above for impl.
 }
-
-typedef struct {
-    float deltaTime; // Time since last frame in seconds
-    float fixedDeltaTime; // Fixed timestep (1/120.0f for Duke3D compatibility)
-    float accumulator; // For fixed timestep accumulation
-    long totalTicks; // Equivalent to old totalclock
-} GameTimer;
-
-GameTimer gameTimer = {0};
-// Convert old units to seconds
-#define TICS_TO_SECONDS(tics) ((float)(tics) / 120.0f)
-#define SECONDS_TO_TICS(seconds) ((long)((seconds) * 120.0f))
-
-// Convert TICSPERFRAME movements to per-second
-#define MOVEMENT_TO_UNITS_PER_SEC(movement) ((float)(movement) * 26.0f)
-// essentially 26 ticks per frame. so mps = vel/26
-/*
-void UpdateGameTimer() {
-    static uint64_t lastTime = {0};
-    static uint64_t frequency = {0};
-
-   // if (frequency.QuadPart == 0) {
-   //     QueryPerformanceFrequency(&frequency);
-   //     QueryPerformanceCounter(&lastTime);
-   //     return;
-   // }
-
-    uint64_t currentTime;
-    QueryPerformanceCounter(&currentTime);
-
-    gameTimer.deltaTime = (float)(currentTime.QuadPart - lastTime.QuadPart) / frequency.QuadPart;
-    gameTimer.accumulator += gameTimer.deltaTime;
-    gameTimer.fixedDeltaTime = 1.0f / 120.0f; // Match TICRATE
-
-    // Update tick counter for compatibility
-    gameTimer.totalTicks += (long)(gameTimer.deltaTime * 120.0f);
-
-    lastTime = currentTime;
-}
-
-*/

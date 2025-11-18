@@ -180,8 +180,8 @@ void loadpic(tile_t *tpic, char* rootpath) {
     char tbuf[MAX_PATH*2], tbuf2[MAX_PATH*2];
 
     pic = &tpic->tt;
-    if (pic->f) // clear
-		{ free((void *)pic->f); pic->f = 0; }
+   // if (pic->f) // clear
+	//	{ free((void *)pic->f); pic->f = 0; }
 
     strcpy(tbuf, tpic->filnam);
 #if USEGROU

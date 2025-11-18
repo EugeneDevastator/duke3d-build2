@@ -3258,7 +3258,7 @@ void processinput(short snum)
         }
 
         // RBG*** // this is original code but it breaks stuff now..
-        //setsprite(pi,p->posx,p->posy,p->posz+PHEIGHT);
+        setsprite(pi,p->posx,p->posy,p->posz+PHEIGHT);
 
         if( psectlotag < 3 )
         {

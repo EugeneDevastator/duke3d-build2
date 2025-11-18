@@ -10,10 +10,12 @@
 
 #define SET_SPRITE_XY(a, b, c) (SetSprPosXY(a,b,c))
 #define SET_SPRITE_XYZ(a, b, c,d) (SetSprPosXYZ(a,b,c,d))
+#define SET_SPRITE_I(a) (SetSprPosXYZ(a,sprite[a].x,sprite[a].y,sprite[a].z))
 #define SET_SECTOR_FLORZ(a, b) (SetSectorFloorZ(a,b))
 #define SET_SECTOR_CEILZ(a, b) (SetSectorCeilZ(a,b))
 #define DEL_SPRITE(a) (DeleteSprite(a))
 #define SET_SPR_PIC(sid,pid) (rayl->SetSpritePicNum(mapToEngine[sid],pid))
+#define SET_SPR_PIC_I(sid) (rayl->SetSpritePicNum(mapToEngine[sid],sprite[mapToEngine[sid]].picnum))
 extern long mapToEngine[MAXSPRITES];
 extern engineapi_t *rayl;
 typedef struct

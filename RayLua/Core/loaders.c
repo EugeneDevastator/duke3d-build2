@@ -894,7 +894,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 		gnumtiles = 0; memset(gtilehashead,-1,sizeof(gtilehashead));
 
 		hitile++;
-		hitile = 4000;
+		hitile = 5000;
 		if (hitile > gmaltiles)
 		{
 			gmaltiles = hitile;
