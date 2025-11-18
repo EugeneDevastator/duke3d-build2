@@ -894,11 +894,13 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 		gnumtiles = 0; memset(gtilehashead,-1,sizeof(gtilehashead));
 
 		hitile++;
+		hitile = 4000;
 		if (hitile > gmaltiles)
 		{
 			gmaltiles = hitile;
 			gtile = (tile_t *)realloc(gtile,gmaltiles*sizeof(tile_t));
 		}
+
 		for(i=0;i<hitile;i++)
 		{
 			sprintf(tbuf,"tiles%03d.art|%d",tilefile[i],i);

@@ -289,22 +289,22 @@ long insspri_imp (int sect, float x, float y, float z, mapstate_t *map)
 		map->malspris = max(map->numspris+1,map->malspris<<1);
 		map->spri = (spri_t *)realloc(map->spri,map->malspris*sizeof(spri_t));
 #ifndef STANDALONE
-		for(i=map->numspris;i<map->malspris;i++)
-		{
-			map->spri[i].sectn = map->blankheadspri;
-			map->spri[i].sectp = -1;
-			map->spri[i].sect = -1;
-			if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
-			map->blankheadspri = i;
-		}
+	//	for(i=map->numspris;i<map->malspris;i++)
+	//	{
+	//		map->spri[i].sectn = map->blankheadspri;
+	//		map->spri[i].sectp = -1;
+	//		map->spri[i].sect = -1;
+	//		if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
+	//		map->blankheadspri = i;
+	//	}
 #endif
 	}
 #ifdef STANDALONE
 	i = map->numspris;
 #else
-	i = map->blankheadspri;
-	map->blankheadspri = map->spri[i].sectn;
-	map->spri[i].sectp = -1;
+	//i = map->blankheadspri;
+	//map->blankheadspri = map->spri[i].sectn;
+	//map->spri[i].sectp = -1;
 #endif
 	map->numspris++;
 	spr = &map->spri[i];
@@ -333,7 +333,7 @@ void delspri_imp (int i, mapstate_t *map)
 #ifdef STANDALONE
 	if ((unsigned)i >= (unsigned)map->numspris) return;
 #else
-	if (((unsigned)i >= (unsigned)map->malspris) || (map->spri[i].sect < 0)) return;
+	//if (((unsigned)i >= (unsigned)map->malspris) || (map->spri[i].sect < 0)) return;
 #endif
 	spr = map->spri;
 
@@ -358,12 +358,12 @@ void delspri_imp (int i, mapstate_t *map)
 	else spr[spr[i].sectp].sectn = i;
 	if (spr[i].sectn >= 0) spr[spr[i].sectn].sectp = i;
 #else
-	//Add sprite i to blankheadspri list
-	map->spri[i].sectn = map->blankheadspri;
-	map->spri[i].sectp = -1;
-	map->spri[i].sect = -1;
-	if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
-	map->blankheadspri = i;
+//	//Add sprite i to blankheadspri list
+//	map->spri[i].sectn = map->blankheadspri;
+//	map->spri[i].sectp = -1;
+//	map->spri[i].sect = -1;
+//	if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
+//	map->blankheadspri = i;
 #endif
 }
 
