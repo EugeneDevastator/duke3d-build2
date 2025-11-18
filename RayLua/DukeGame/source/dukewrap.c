@@ -16,44 +16,37 @@ mapstate_t* map;
 // mt = map transfer
 // populating tags from the end.
 #define PI 3.14159265358979323846
-
+long mapToEngine[MAXSPRITES];
+long mapToDuke[MAXSPRITES];
 
 void SetSprPos(long i, long x, long y, long z) // not in .h file
 {
     SetSprPosXYZ(i,x,y,z);
-    // redirect to main api.
-    // main api. set pos (i, x-z,y) for ex.
-
-    // see int setsprite(short spritenum, long newx, long newy, long newz) in engine .c
-
-    // need to update sprite sector as well.
-    /*
-    *    // move entirely into new engine
-    short bad, j, tempsectnum;
-
-    sprite[spritenum].x = newx;
-    sprite[spritenum].y = newy;
-    sprite[spritenum].z = newz;
-
-    tempsectnum = sprite[spritenum].sectnum;
-    updatesector(newx, newy, &tempsectnum);
-    if (tempsectnum < 0)
-        return (-1);
-    if (tempsectnum != sprite[spritenum].sectnum)
-        changespritesect(spritenum, tempsectnum);
-
-    return (0);
-     **/
 }
 
 void InsertSprite(int sect, float x, float y, float z) {
     rayl->InsertSprite(sect, x / 512.0f, y / 512.0f, z / (512.f*16.f));
 // need to handle b2 id somehow.
 }
+void InsertSpriteTMP(int sect, float x, float y, float z, int dukeid) {
+    rayl->InsertSprite(sect, x / 512.0f, y / 512.0f, z / (512.f*16.f));
+    mapToEngine[dukeid] = map->numspris-1;
+    mapToDuke[map->numspris-1] = dukeid;
+// need to handle b2 id somehow.
+}
 
 
-void DeleteSprite(int sid) {
-    rayl->DeleteSprite(sid);
+void DeleteSprite(int dukeid) {
+    int movedplace = mapToEngine[dukeid];
+
+    rayl->DeleteSprite(movedplace);
+    int movedid = map->numspris;
+    int dukelink = mapToDuke[movedid];
+    mapToEngine[dukelink]= movedplace;
+    mapToDuke[movedplace]=dukelink;
+    mapToDuke[movedid]=-1;
+    mapToEngine[dukeid]=-1;
+
 }
 
 
@@ -68,18 +61,20 @@ void SetSectorCeilZ(int i, long z) {
 
 void SetSprPosXYZ(long i, long x, long y, long z) // not in .h file
 {
+    int engineid = mapToEngine[i];
     // convert to projection laters.
     sprite[i].x = x;
     sprite[i].y = y;
     sprite[i].z = z;
-    rayl->SetSpritePos(i, x / 512.0f, y / 512.0f, z / (512.f*16.f));
+    rayl->SetSpritePos(engineid, x / 512.0f, y / 512.0f, z / (512.f*16.f));
 }
 void SetSprPosXY(long i, long x, long y) // not in .h file
 {
+    int engineid = mapToEngine[i];
     // convert to projection laters.
     sprite[i].x = x;
     sprite[i].y = y;
-    rayl->SetSpritePos(i, x / 512.0f, y / 512.0f, sprite[i].z / (512.f*16.f));
+    rayl->SetSpritePos(engineid, x / 512.0f, y / 512.0f, sprite[engineid].z / (512.f*16.f));
 }
 
 spritetype ReadSprite(long i) {
@@ -88,15 +83,19 @@ spritetype ReadSprite(long i) {
 }
 void DoDukeUpdate(float dt) {
     DoDukeLoop(dt);
-    sprite[ps[0].i].x = ps[0].posx;
-    sprite[ps[0].i].y = ps[0].posy;
-    sprite[ps[0].i].z = ps[0].posz;
+ //  sprite[ps[0].i].x = ps[0].posx;
+ //  sprite[ps[0].i].y = ps[0].posy;
+ //  sprite[ps[0].i].z = ps[0].posz;
     rayl->SetPlayerPos(
         ps[0].posx / 512.0f,
         ps[0].posy/ 512.0f,
         ps[0].posz/ (512.f*16.f)
         );
-long h = ps[0].horiz+ps[0].horizoff;
+
+SET_SPRITE_XYZ(ps[0].i, ps[0].posx, ps[0].posy,ps[0].posz);
+    sprite[ps[0].i].ang=ps[0].ang;
+
+    long h = ps[0].horiz+ps[0].horizoff;
     float yaw = ((float)ps[0].ang) * PI / 1024.0f;
     float pitch = -((float)(h - 100)) * PI / 1024.0f;  // 100 is center
 
@@ -152,6 +151,8 @@ void ConvertSector(int i,sectortype* sect) {
     /* short */      sect->extra = b2sec.tags[MT_EXTRA];
 }
 void ConvertSprite(int i,spritetype* spr) {
+    mapToEngine[i]=i;
+    mapToDuke[i]=i;
     spri_t b2spr = map->spri[i];
     spr->x = b2spr.p.x * 512;
     spr->y = b2spr.p.y * 512;
@@ -169,7 +170,7 @@ void ConvertSprite(int i,spritetype* spr) {
     spr->yoffset = b2spr.tags[MT_SPR_YOFF];
     spr->statnum = b2spr.tags[MT_STATNUM];
     spr->ang = forwardToAng(b2spr.f);
-    spr->owner = b2spr.sect;
+    spr->owner = -1;//b2spr.sect;
     spr->xvel=0;
     spr->yvel=0;
     spr->zvel=0;

@@ -35,6 +35,7 @@ typedef struct {
     void (*InsertSprite)(int sect, float x,float y,float z);
     void (*DeleteSprite)(int sid);
     void (*SetPlayerForward)(float x, float y, float z);
+    void (*SetSpritePicNum)(int i, int picnum);
 
     char *Inputs;
 } engineapi_t;

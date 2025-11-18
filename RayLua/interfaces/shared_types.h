@@ -74,7 +74,7 @@ typedef struct
 	// maybe make portal innate?
 
 	surf_t surf, *xsurf; //additional malloced surfs when (surfn > 1)
-	uint16_t tags[16];
+	int32_t tags[16];
 } wall_t;
 
 typedef struct
@@ -92,7 +92,7 @@ typedef struct
 	union { long flags; struct { char _f1, _f2, _f3, pal; }; }; // temporary pal storage
 
 	long sect, sectn, sectp; //Current sector / doubly-linked list of indices
-	uint16_t tags[16];
+	int32_t tags[16];
 } spri_t;
 
 typedef struct
@@ -106,7 +106,7 @@ typedef struct
 	long headspri;   //head sprite index (-1 if none)
 	long foglev;
 	long owner;      //for dragging while editing, other effects during game
-	uint16_t tags[16];
+	int32_t tags[16];
 
 	// int nwperim - perimeter walls, would be first in sequence
 	// int nwnested - nested walls for fully inner sectors

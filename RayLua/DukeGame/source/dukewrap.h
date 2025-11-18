@@ -4,6 +4,7 @@
 
 #ifndef GAME_DUKEWRAP_H
 #define GAME_DUKEWRAP_H
+#include "build.h"
 #include "types.h"
 #include "../../interfaces/engineapi.h"
 
@@ -12,8 +13,9 @@
 #define SET_SECTOR_FLORZ(a, b) (SetSectorFloorZ(a,b))
 #define SET_SECTOR_CEILZ(a, b) (SetSectorCeilZ(a,b))
 #define DEL_SPRITE(a) (DeleteSprite(a))
-
-
+#define SET_SPR_PIC(sid,pid) (rayl->SetSpritePicNum(mapToEngine[sid],pid))
+extern long mapToEngine[MAXSPRITES];
+extern engineapi_t *rayl;
 typedef struct
 {
     //set sprite position with sector correction
@@ -56,5 +58,6 @@ void InitDukeWrapper(engineapi_t* api);
 void ParseMapToDukeFormat();
 void setPcursectnum(int pid, int sectn);
 void InsertSprite(int sect, float x, float y, float z);
-void DeleteSprite(int sid);
+void InsertSpriteTMP(int sect, float x, float y, float z, int dukeid);
+void DeleteSprite(int dukeid);
 #endif //GAME_DUKEWRAP_H

@@ -3573,8 +3573,6 @@ int setsprite(short spritenum, long newx, long newy, long newz)
     // move entirely into new engine
     short bad, j, tempsectnum;
 
-
-
     tempsectnum = sprite[spritenum].sectnum;
     bbeng.FindSectorOfPoint(newx, newy, &tempsectnum);
     if (tempsectnum < 0)
@@ -3646,9 +3644,6 @@ void initspritelists()
 
 int insertsprite(short sectnum, short statnum)
 {
-    if (statnum==12) {
-        int a=1;
-    }
     insertspritestat(statnum);
     return (insertspritesect(sectnum));
 }
@@ -3659,7 +3654,6 @@ int insertspritesect(short sectnum)
 
     if ((sectnum >= MAXSECTORS) || (headspritesect[MAXSECTORS] == -1))
         return (-1); //list full
-
     blanktouse = headspritesect[MAXSECTORS];
 
     headspritesect[MAXSECTORS] = nextspritesect[blanktouse];
@@ -3710,9 +3704,11 @@ int deletesprite(short spritenum)
 
 int deletespritesect(short deleteme)
 {
+
     if (sprite[deleteme].sectnum == MAXSECTORS)
         return (-1);
-
+    DEL_SPRITE(deleteme);
+    //shift head
     if (headspritesect[sprite[deleteme].sectnum] == deleteme)
         headspritesect[sprite[deleteme].sectnum] = nextspritesect[deleteme];
 
@@ -3725,7 +3721,7 @@ int deletespritesect(short deleteme)
     headspritesect[MAXSECTORS] = deleteme;
 
     sprite[deleteme].sectnum = MAXSECTORS;
-    DEL_SPRITE(deleteme);
+
     return (0);
 }
 
@@ -3755,7 +3751,10 @@ int changespritesect(short spritenum, short newsectnum)
     if (sprite[spritenum].sectnum == newsectnum) return (0);
     if (sprite[spritenum].sectnum == MAXSECTORS) return (-1);
     if (deletespritesect(spritenum) < 0) return (-1);
-    insertspritesect(newsectnum);
+    int newi = insertspritesect(newsectnum);
+    DEL_SPRITE(spritenum);
+    InsertSpriteTMP(newsectnum, sprite[spritenum].x,sprite[spritenum].y,sprite[spritenum].z, newi);
+
     return (0);
 }
 

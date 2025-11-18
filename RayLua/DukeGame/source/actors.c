@@ -1424,7 +1424,7 @@ void movefallers()
         s = &sprite[i];
 
         sect = s->sectnum;
-        SET_SPRITE_XYZ(i,s->x,s->y,s->z);
+
         if( T1 == 0 )
         {
             s->z -= (16<<8);
@@ -1505,6 +1505,7 @@ void movefallers()
         }
 
         BOLT:
+        SET_SPRITE_XYZ(i,s->x,s->y,s->z);
         i = nexti;
     }
 }
@@ -2402,6 +2403,7 @@ void movestandables()
         }
 
         BOLT:
+        SET_SPRITE_XYZ(i,s->x,s->y,s->z);
         i = nexti;
     }
 }
@@ -2784,6 +2786,7 @@ void moveweapons()
                 execute(i,p,x);
                 goto BOLT;
         }
+        SET_SPRITE_XYZ(i,s->x,s->y,s->z);
         BOLT:
         i = nexti;
     }
@@ -3158,7 +3161,7 @@ void moveactors()
         nexti = nextspritestat[i];
 
         s = &sprite[i];
-SET_SPRITE_XYZ(i,s->x,s->y,s->z);
+
         sect = s->sectnum;
 
         if( s->xrepeat == 0 || sect < 0 || sect >= MAXSECTORS)
@@ -4395,7 +4398,7 @@ SET_SPRITE_XYZ(i,s->x,s->y,s->z);
         execute(i,p,x);
 
         BOLT:
-
+        SET_SPRITE_XYZ(i,s->x,s->y,s->z);
         i = nexti;
     }
 

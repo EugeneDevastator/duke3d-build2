@@ -1698,7 +1698,7 @@ short EGS(short whatsect, long s_x, long s_y, long s_z, short s_pn, signed char 
     hittype[i].bposx = s_x;
     hittype[i].bposy = s_y;
     hittype[i].bposz = s_z;
-    InsertSprite(whatsect,s_x,s_y,s_z);
+    InsertSpriteTMP(whatsect,s_x,s_y,s_z,i);
     s = &sprite[i];
 
     s->x = s_x;
@@ -1706,6 +1706,7 @@ short EGS(short whatsect, long s_x, long s_y, long s_z, short s_pn, signed char 
     s->z = s_z;
     s->cstat = 0;
     s->picnum = s_pn;
+    SET_SPR_PIC(i,s_pn);
     s->shade = s_s;
     s->xrepeat = s_xr;
     s->yrepeat = s_yr;
@@ -6065,6 +6066,7 @@ void DoDukeLoop(float dt) {
     displayrooms(screenpeek, smoothratio);
     displayrest(smoothratio);
     checksync();
+
 }
 
 
