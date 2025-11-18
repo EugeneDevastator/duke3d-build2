@@ -17,6 +17,7 @@
 #define SET_SPR_PIC(sid,pid) (rayl->SetSpritePicNum(mapToEngine[sid],pid))
 #define SET_SPR_PIC_I(sid) (rayl->SetSpritePicNum(mapToEngine[sid],sprite[mapToEngine[sid]].picnum))
 extern long mapToEngine[MAXSPRITES];
+extern long mapToDuke[MAXSPRITES*100];
 extern engineapi_t *rayl;
 typedef struct
 {

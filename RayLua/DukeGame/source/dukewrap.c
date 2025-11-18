@@ -83,20 +83,20 @@ spritetype ReadSprite(long i) {
 }
 void DoDukeUpdate(float dt) {
     DoDukeLoop(dt);
-  // sprite[ps[0].i].x = ps[0].posx;
-  // sprite[ps[0].i].y = ps[0].posy;
-  // sprite[ps[0].i].z = ps[0].posz;
+   sprite[ps[0].i].x = ps[0].posx;
+   sprite[ps[0].i].y = ps[0].posy;
+   sprite[ps[0].i].z = ps[0].posz;
     rayl->SetPlayerPos(
-        sprite[ps[0].i].x / 512.0f,
-        sprite[ps[0].i].y/ 512.0f,
-        sprite[ps[0].i].z/ (512.f*16.f)
+        ps[0].posx / 512.0f,
+        ps[0].posy/ 512.0f,
+        ps[0].posz/ (512.f*16.f)
         );
 
  //   SET_SPRITE_XYZ(ps[0].i, ps[0].posx, ps[0].posy,ps[0].posz);
- //   sprite[ps[0].i].ang=ps[0].ang;
-
+    sprite[ps[0].i].ang=ps[0].ang;
+    rayl->SetSpritePos(mapToEngine[ps[0].i],0,0,0); // just hide player
     long h = ps[0].horiz+ps[0].horizoff;
-    float yaw = ((float)sprite[ps[0].i].ang) * PI / 1024.0f;
+    float yaw = ((float)ps[0].ang) * PI / 1024.0f;
     float pitch = -((float)(h - 100)) * PI / 1024.0f;  // 100 is center
 
     // Forward vector combining yaw and pitch
@@ -237,15 +237,15 @@ void ParseMapToDukeFormat() {
 
     for (int i = 0; i < MAXTILES; i++) {
         // Set default values: no animation, no offsets
-       // picanm[i] = 0x00000000;
+        picanm[i] = 0x00000000;
 
         // If you need centered sprites, you can set offsets like this:
         // picanm[i] = 0x00000000; // Keep as zero for no offset
 
         // Or if you want to center sprites based on their size:
-         int xoff = -(tilesizx[i] >> 1); // Center X
-         int yoff = -(tilesizy[i] >> 1); // Center Y
-         picanm[i] = ((yoff & 0xFF) << 16) | ((xoff & 0xFF) << 8);
+      //   int xoff = -(tilesizx[i] >> 1); // Center X
+      //   int yoff = -(tilesizy[i] >> 1); // Center Y
+       //  picanm[i] = ((yoff & 0xFF) << 16) | ((xoff & 0xFF) << 8);
     }
     // map structure
     numsectors = (short)map->numsects;

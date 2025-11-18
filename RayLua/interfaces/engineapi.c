@@ -53,8 +53,8 @@ void ForwardEngineUpdate(float dt) {
 
 static void InsertSprite(int sectid, float x, float y, float z) {
     long i = insspri_imp(sectid,x,y,z,mapref);
-   // if (mapref->spri[i].tilnum > gmaltiles || mapref->spri[i].tilnum < 0)
-   //     mapref->spri[i].tilnum = 1;
+    if (mapref->spri[i].tilnum > gmaltiles || mapref->spri[i].tilnum < 0)
+        mapref->spri[i].tilnum = 1;
 }
 
 static void DelSprite(int id) {

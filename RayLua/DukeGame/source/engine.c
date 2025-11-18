@@ -2704,9 +2704,9 @@ int changespritesect(short spritenum, short newsectnum)
     if (sprite[spritenum].sectnum == MAXSECTORS) return (-1);
     if (deletespritesect(spritenum) < 0) return (-1);
     int newi = insertspritesect(newsectnum);
-    DEL_SPRITE(spritenum);
+    int target = mapToEngine[spritenum];
     InsertSpriteTMP(newsectnum, sprite[spritenum].x,sprite[spritenum].y,sprite[spritenum].z, newi);
-
+    SET_SPR_PIC(newi,sprite[newi].picnum);
     return (0);
 }
 
