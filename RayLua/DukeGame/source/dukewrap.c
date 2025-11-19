@@ -66,34 +66,40 @@ void SetSprPosXYZ(long i, long x, long y, long z) // not in .h file
     sprite[i].x = x;
     sprite[i].y = y;
     sprite[i].z = z;
-    rayl->SetSpritePos(engineid, x / 512.0f, y / 512.0f, z / (512.f*16.f));
+    float xr = x / 512.0f;
+    float yr=  y / 512.0f;
+    float zr = z / (512.f*16.f);
+
+    spritetype *s = &sprite[i];
+    // if (s->cstat&1) spr->flags |= 1; // blocking
+  //  if (HAS_FLAG(s->cstat, SPRITE_ONE_SIDED)) spr->flags |= SPRITE_B2_ONE_SIDED; // 1 sided
+   // if (s->cstat&4) { spr->r.x *= -1; spr->r.y *= -1; spr->r.z *= -1; spr->flags ^= 4; } //&4: x-flipped
+   // if (s->cstat&8) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; spr->flags ^= 8; } //&8: y-flipped?
+    if (s->cstat&128)
+        { zr += (s->yrepeat/4096.0*(float)tilesizy[s->picnum]); } //&128: real-centered centering (center at center) - originally half submerged sprite
+    rayl->SetSpritePos(engineid, xr,yr,zr);
+
 }
 void SetSprPosXY(long i, long x, long y) // not in .h file
 {
-    int engineid = mapToEngine[i];
-    // convert to projection laters.
-    sprite[i].x = x;
-    sprite[i].y = y;
-    rayl->SetSpritePos(engineid, x / 512.0f, y / 512.0f, sprite[engineid].z / (512.f*16.f));
+    SetSprPosXYZ(i,x,y,sprite[i].z);
 }
-
+void UpdateSpr(long i) // not in .h file
+{
+    SetSprPosXYZ(i,sprite[i].x,sprite[i].y,sprite[i].z);
+}
 spritetype ReadSprite(long i) {
     spritetype a = {};
     return a;
 }
 void DoDukeUpdate(float dt) {
     DoDukeLoop(dt);
-   sprite[ps[0].i].x = ps[0].posx;
-   sprite[ps[0].i].y = ps[0].posy;
-   sprite[ps[0].i].z = ps[0].posz;
     rayl->SetPlayerPos(
         ps[0].posx / 512.0f,
         ps[0].posy/ 512.0f,
         ps[0].posz/ (512.f*16.f)
         );
 
- //   SET_SPRITE_XYZ(ps[0].i, ps[0].posx, ps[0].posy,ps[0].posz);
-    sprite[ps[0].i].ang=ps[0].ang;
     rayl->SetSpritePos(mapToEngine[ps[0].i],0,0,0); // just hide player
     long h = ps[0].horiz+ps[0].horizoff;
     float yaw = ((float)ps[0].ang) * PI / 1024.0f;
@@ -227,26 +233,8 @@ void ParseMapToDukeFormat() {
     ps[0].posz = map->startpos.z* 512*16;
     ps[0].poszv = 0;
     ps[0].ang = forwardToAng(map->startfor);
-    ps[0].cursectnum = map->startsectn; // do update at th end
+    ps[0].cursectnum = map->startsectn;
 
-// tile params
-    for (int i = 0; i < MAXTILES; ++i) {
-        tilesizx[i] = rayl->tilesizex[i];
-        tilesizy[i] = rayl->tilesizey[i];
-    }
-
-    for (int i = 0; i < MAXTILES; i++) {
-        // Set default values: no animation, no offsets
-        picanm[i] = 0x00000000;
-
-        // If you need centered sprites, you can set offsets like this:
-        // picanm[i] = 0x00000000; // Keep as zero for no offset
-
-        // Or if you want to center sprites based on their size:
-      //   int xoff = -(tilesizx[i] >> 1); // Center X
-      //   int yoff = -(tilesizy[i] >> 1); // Center Y
-       //  picanm[i] = ((yoff & 0xFF) << 16) | ((xoff & 0xFF) << 8);
-    }
     // map structure
     numsectors = (short)map->numsects;
     for (int i = 0; i < numsectors; ++i) {
@@ -275,8 +263,15 @@ void ParseMapToDukeFormat() {
         insertsprite(sprite[i].sectnum, sprite[i].statnum);
 
     //Must be after loading sectors, etc!
-    updatesector(ps[0].posx, ps[0].posy, &ps[0].cursectnum);
+    updatesectorz(ps[0].posx, ps[0].posy, ps[0].posz, &ps[0].cursectnum);
     int a =1;
+
+    // tile params
+    for (int i = 0; i < MAXTILES; ++i) {
+        tilesizx[i] = rayl->tilesizex[i];
+        tilesizy[i] = rayl->tilesizey[i];
+        picanm[i] = rayl->picanms[i];
+    }
 }
 
 void GetInput() {

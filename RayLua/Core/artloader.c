@@ -8,6 +8,7 @@
 
 tile_t* gtile;
 tile_t* getGtile(int i){return &gtile[i];}
+
 unsigned char globalpal[256][4];
 #if defined(_MSC_VER)
 void divconst_setdenom_intr (long *twolongstate, long denom)
@@ -177,11 +178,21 @@ void loadpic(tile_t *tpic, char* rootpath) {
     long i, j, x, y, filnum, tilenum, loctile0, loctile1, lnx, lny, nx, ny;
     short *sxsiz, *sysiz;
     unsigned char *uptr;
-    char tbuf[MAX_PATH*2], tbuf2[MAX_PATH*2];
+    char tbuf[MAX_PATH*2], tbuf2[	MAX_PATH*2];
 
     pic = &tpic->tt;
-   // if (pic->f) // clear
-	//	{ free((void *)pic->f); pic->f = 0; }
+    if (pic->f) // clear
+		{ free((void *)pic->f); pic->f = 0; }
+
+
+//	kread(fil, &numtiles, 4);
+//	kread(fil, &localtilestart, 4); [8]
+//	kread(fil, &localtileend, 4); [12]
+//	kread(fil, &tilesizx[localtilestart], (localtileend - localtilestart + 1) << 1); 16
+//	kread(fil, &tilesizy[localtilestart], (localtileend - localtilestart + 1) << 1);
+//	kread(fil, &picanm[localtilestart], (localtileend - localtilestart + 1) << 2);
+// EXTERN long numtiles, picanm[MAXTILES],
+
 
     strcpy(tbuf, tpic->filnam);
 #if USEGROU
@@ -201,7 +212,7 @@ void loadpic(tile_t *tpic, char* rootpath) {
             	{ filnum = -1; break; }
             }
             kzread(tbuf,16);
-            if (*(long *)&tbuf[0] != 1) { filnum = -1; break; }
+            if (*(long *)&tbuf[0] != 1) { filnum = -1; break; } //	if (artversion != 1) return (-1);
             loctile0 = *(long *)&tbuf[8];
             loctile1 = (*(long *)&tbuf[12])-loctile0+1;
             i = tilenum-loctile0;
@@ -218,6 +229,10 @@ void loadpic(tile_t *tpic, char* rootpath) {
 
             pic->x = (long)sxsiz[tilenum];
             pic->y = (long)sysiz[tilenum];
+        	// Read picanm data - use _alloca, don't free it
+        	uint32_t *picanm_data = (uint32_t *)_alloca(loctile1<<2);
+        	kzread(picanm_data, loctile1<<2);
+        	pic->anmdata = picanm_data[tilenum];  // Get specific tile's picanm
 
             if (pic->x <= 1) lnx = 0; else lnx = bsr(pic->x-1)+1;
             if (pic->y <= 1) lny = 0; else lny = bsr(pic->y-1)+1;

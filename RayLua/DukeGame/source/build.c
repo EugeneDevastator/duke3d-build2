@@ -90,7 +90,7 @@ long numsprites;
 short highlight[MAXWALLS];
 short highlightsector[MAXSECTORS], highlightsectorcnt = -1;
 extern char textfont[128][8];
-
+uint32_t picanm[MAXTILES];
 static char pskysearch[MAXSECTORS];
 
 short temppicnum, tempcstat, templotag, temphitag, tempextra;

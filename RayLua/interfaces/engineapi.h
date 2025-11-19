@@ -40,7 +40,7 @@ typedef struct {
 // temp info
     int tilesizex[7000];
     int tilesizey[7000];
-
+    uint32_t picanms[7000];
 } engineapi_t;
 
 engineapi_t engine;

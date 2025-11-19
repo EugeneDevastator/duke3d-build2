@@ -6,8 +6,6 @@
 #include <stdlib.h>
 
 #include "mapcore.h"
-#include "source/build.h"
-#include "source/game.h"
 static mapstate_t *mapref;
 char *inputs;
 float px,py,pz = 0;
@@ -96,6 +94,7 @@ void InitEngineApi(mapstate_t *map) {
     for (i=0;i<gmaltiles;i++) {
         engine.tilesizex[i] = gtile[i].tt.x;
         engine.tilesizey[i] = gtile[i].tt.y;
+        engine.picanms[i] = gtile[i].tt.anmdata;
     }
 
 

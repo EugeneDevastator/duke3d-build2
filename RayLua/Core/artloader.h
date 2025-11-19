@@ -12,6 +12,7 @@ typedef struct tiltyp {
 	int x, y, z;            // x,y=dimensions, z=depth/format info
 	float shsc;             // shsc=suggested height scale
 	struct tiltyp *lowermip; // pointer to lower mipmap level
+	uint32_t anmdata;
 } tiltyp;
 
 static long nullpic [64+1][64]; //Null set icon (image not found)

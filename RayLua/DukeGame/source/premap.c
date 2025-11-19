@@ -1396,7 +1396,7 @@ void enterlevel_rl() {
 // board loading is external.
     ParseMapToDukeFormat();
     clearbufbyte(gotpic, sizeof(gotpic), 0L);
-
+    myconnectindex=0;
     prelevel(MODE_GAME);
 
     allignwarpelevators();

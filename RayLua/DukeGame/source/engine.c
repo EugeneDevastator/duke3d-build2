@@ -672,7 +672,7 @@ void loadtile(short tilenume)
 long allocatepermanenttile(short tilenume, long xsiz, long ysiz)
 {
     long i, j, x, y, dasiz;
-return;
+return 1;
     if ((xsiz <= 0) || (ysiz <= 0) || ((unsigned)tilenume >= (unsigned)MAXTILES))
         return (0);
 
@@ -2525,6 +2525,9 @@ int setsprite(short spritenum, long newx, long newy, long newz)
     // move entirely into new engine
     short bad, j, tempsectnum;
 
+    sprite[spritenum].x = newx;
+    sprite[spritenum].y = newy;
+    sprite[spritenum].z = newz;
     tempsectnum = sprite[spritenum].sectnum;
     bbeng.FindSectorOfPoint(newx, newy, &tempsectnum);
     if (tempsectnum < 0)
