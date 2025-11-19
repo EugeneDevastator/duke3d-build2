@@ -75,8 +75,13 @@ void SetSprPosXYZ(long i, long x, long y, long z) // not in .h file
   //  if (HAS_FLAG(s->cstat, SPRITE_ONE_SIDED)) spr->flags |= SPRITE_B2_ONE_SIDED; // 1 sided
    // if (s->cstat&4) { spr->r.x *= -1; spr->r.y *= -1; spr->r.z *= -1; spr->flags ^= 4; } //&4: x-flipped
    // if (s->cstat&8) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; spr->flags ^= 8; } //&8: y-flipped?
-    if (s->cstat&128)
-        { zr += (s->yrepeat/4096.0*(float)tilesizy[s->picnum]); } //&128: real-centered centering (center at center) - originally half submerged sprite
+   if (!(s->cstat&128)) // inverting it wtf..
+   {
+        // somehow this crashes it, but eh, need another wy to set up sprite views anyway.
+     // long zoff= ((long)((signed char)((picanm[s->picnum] >> 16) &
+     //                  255)));
+       zr -= ((s->yrepeat/4096.0)*(float)tilesizy[s->picnum]*0.5f); // 0.5f is exp hack.
+    } //&128: real-centered centering (center at center) - originally half submerged sprite
     rayl->SetSpritePos(engineid, xr,yr,zr);
 
 }
@@ -117,7 +122,7 @@ void InitDukeWrapper(engineapi_t *api) // pass in real api
 {
     bbeng.SetSprPos = SetSprPos;
     bbeng.SetSprPosXY = SetSprPosXY;
-    bbeng.GetFloorZSloped = getceilzofslope;
+    bbeng.GetFloorZSloped = getceilzofslope;  // fuck. seems correct need to rename to CeilZSLoped
     bbeng.FindSectorOfPoint = updatesector;
     rayl = api;
     bbeng.FrameInputs = api->Inputs;

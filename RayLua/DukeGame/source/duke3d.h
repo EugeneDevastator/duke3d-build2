@@ -90,7 +90,7 @@ extern int globalTR;
 #define TICRATE (120)
 // additional timer resolution - we can do more than 120hz for better fidelity
 #define TIC_RES 1
-#define TIC_RATE_BIAS 24
+#define TIC_RATE_BIAS 0
 static const float FIXED_TICK_TIME_SEC = 1.0 / ((120.0f + TIC_RATE_BIAS) * TIC_RES);
 
 // global TR is whole ticks for this frame.
