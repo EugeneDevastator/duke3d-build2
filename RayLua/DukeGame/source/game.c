@@ -3664,6 +3664,30 @@ void animatesprites(long x, long y, short a, long smoothratio)
     short i, j, k, p, sect;
     long l, t1, t3, t4;
     spritetype *s, *t;
+    k=0;
+    int hs = headspritestat[STAT_ACTOR];
+    while (hs >= 0) {
+        tsprite[k].owner = hs;
+        tsprite[k].picnum =  sprite[hs].picnum;
+        hs = nextspritestat[hs];
+        k++;
+    }
+    hs = headspritestat[STAT_MISC];
+    while (hs >= 0) {
+        tsprite[k].owner = hs;
+        tsprite[k].picnum =  sprite[hs].picnum;
+        hs = nextspritestat[hs];
+        k++;
+    }
+    hs = headspritestat[STAT_PROJECTILE];
+    while (hs >= 0) {
+        tsprite[k].owner = hs;
+        tsprite[k].picnum =  sprite[hs].picnum;
+        hs = nextspritestat[hs];
+        k++;
+    }
+    spritesortcnt = k-1;
+
 
     for (j = 0; j < spritesortcnt; j++)
     {
@@ -4381,6 +4405,17 @@ void animatesprites(long x, long y, short a, long smoothratio)
         if (sector[t->sectnum].floorpicnum == MIRROR)
             t->xrepeat = t->yrepeat = 0;
     }
+
+    // do the offsets on parsed sprites - after animate loop.
+    // originally was done in draw sprite
+    for (j = 0; j < spritesortcnt; j++) {
+        int tilenum = tsprite[j].picnum;
+        if (picanm[tilenum]&192) {
+            tilenum += animateoffs(tilenum,0);
+        }
+        SET_SPR_PIC(tsprite[j].owner,tilenum);
+    }
+
 }
 
 
@@ -6056,15 +6091,18 @@ void DoDukeLoop(float dt) {
     globalDT += dt;
     int fulltics = globalDT/FIXED_TICK_TIME_SEC;
     globalTR = fulltics;
+
     globalDT -= FIXED_TICK_TIME_SEC * fulltics;
+    totalclocklock += fulltics;
 
     faketimerhandler();
     domovethings();
     cheats();
     nonsharedkeys();
 
-    displayrooms(screenpeek, smoothratio);
-    displayrest(smoothratio);
+   // displayrooms(screenpeek, smoothratio);
+   // displayrest(smoothratio);
+    animatesprites(ps[0].posx,ps[0].posy, ps[0].ang, 65535);
     checksync();
 
 }

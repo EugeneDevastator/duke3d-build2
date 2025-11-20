@@ -67,7 +67,7 @@ typedef struct
 	char dapalnum, dastat, pagesleft;
 	long cx1, cy1, cx2, cy2;
 } permfifotype;
-
+extern long totalclocklock;
 static long setviewcnt = 0;
 static long bakvidoption[4];
 static long bakframeplace[4], bakxsiz[4], bakysiz[4];
@@ -145,7 +145,7 @@ void drawvox(long dasprx, long daspry, long dasprz, long dasprang, long daxscale
 static void ceilspritescan(long x1, long x2);
 static void copytilepiece(long tilenume1, long sx1, long sy1, long xsiz, long ysiz, long tilenume2, long sx2, long sy2);
 static void ceilspritehline(long x2, long y);
-static long animateoffs(short tilenum, short fakevar);
+long animateoffs(short tilenum, short fakevar);
 static void printscreeninterrupt();
 void drawline256(long x1, long y1, long x2, long y2, char col);
 void drawline16(long x1, long y1, long x2, long y2, char col);
