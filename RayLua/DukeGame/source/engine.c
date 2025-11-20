@@ -1360,6 +1360,7 @@ void drawmaskwall(short damaskwallcnt){};
     }
 }*/
 
+//snum is number from stsprtes
 void drawsprite(long snum)
 {
 };
@@ -2540,7 +2541,6 @@ int setsprite(short spritenum, long newx, long newy, long newz)
 
 long animateoffs(short tilenum, short fakevar)
 {
-    return 0;//
     // oh likely this is animator.
     long i, k, offs;
 
