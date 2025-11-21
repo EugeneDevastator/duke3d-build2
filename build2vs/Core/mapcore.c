@@ -6,8 +6,6 @@
 #define STANDALONE 1
 #define OOS_CHECK 1
 
-tile_t *gtile;
-
 long wallclippol (kgln_t *pol, kgln_t *npol)
 {
 	double f, dz0, dz1;

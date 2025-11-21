@@ -4,6 +4,7 @@
 #ifndef BUILD2_MAPCORE_H
 #define BUILD2_MAPCORE_H
 
+#include <cstring>
 #include <math.h>
 #include <malloc.h>
 
@@ -31,13 +32,13 @@ typedef struct { double x, y, z; } dpoint3d; 	//Note: pol doesn't support loops 
 
 typedef struct tiltyp tiltyp;
 typedef struct tiltyp{
-	long f, p, x, y, z;
+	uint32_t f, p, x, y, z;
 	float shsc;
 	tiltyp *lowermip;
 } tiltyp;
 
 
-typedef struct { INT_PTR f; int p, x, y; } tiletype;
+typedef struct { intptr_t f; int p, x, y; } tiletype;
 typedef struct { tiltyp c, z; point3d p, r, d, f, h; } cam_t;
 
 

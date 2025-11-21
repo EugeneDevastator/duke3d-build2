@@ -15,6 +15,7 @@ winmain.obj: winmain.cpp sysmain.h; cl /c /J /TP winmain.cpp /Ox /Ob2 /G6Fy /Gs 
 #include <math.h>
 #include <malloc.h>
 #include "drawpoly.h"
+#include "Core/kplib.h"
 
 #define MAXXDIM 4096
 #define MAXYDIM 2160
@@ -28,31 +29,7 @@ winmain.obj: winmain.cpp sysmain.h; cl /c /J /TP winmain.cpp /Ox /Ob2 /G6Fy /Gs 
 #define ZSCALE (1<<23) //1<<(20..26)
 
 //--------------------------------------------------------------------------------------------------
-	//KPLIB.H
-	//High-level (easy) picture loading function:
-extern void kpzload (const char *, int *, int *, int *z, int *);
 
-	//Low-level PNG/JPG functions:
-extern int kpgetdim (const char *, int, int *, int *);
-extern int kprender (const char *, int, INT_PTR, int, int, int, int, int);
-
-	//Ken's ZIP functions:
-extern int kzaddstack (const char *);
-extern void kzuninit ();
-extern void kzsetfil (FILE *);
-extern int kzopen (const char *);
-extern void kzfindfilestart (const char *);
-extern int kzfindfile (char *);
-extern int kzread (void *, int);
-extern int kzfilelength ();
-extern int kzseek (int, int);
-extern int kztell ();
-extern int kzgetc ();
-extern int kzeof ();
-extern void kzclose ();
-
-extern void kzfindfilestart (const char *); //pass wildcard string
-extern int kzfindfile (char *); //you alloc buf, returns 1:found,0:~found
 //--------------------------------------------------------------------------------------------------
 
 double drawpoly_anginc = 2.0;
@@ -3010,7 +2987,7 @@ void drawpoly (tiltyp *tt, vertyp *pt, int n, int rgbmul, float hsc, float *ouvm
 #endif
 }
 
-void drawpoly_setup (tiletype *dd, INT_PTR lzbufoff, point3d *lpos, point3d *lrig, point3d *ldow, point3d *lfor, float hx, float hy, float hz)
+void drawpoly_setup (tiletype *dd, intptr_t lzbufoff, point3d *lpos, point3d *lrig, point3d *ldow, point3d *lfor, float hx, float hy, float hz)
 {
 	gcc.c.f = dd->f;          gcc.c.p = dd->p; gcc.c.x = dd->x; gcc.c.y = dd->y;
 	gcc.z.f = dd->f+lzbufoff; gcc.z.p = dd->p; gcc.z.x = dd->x; gcc.z.y = dd->y;
@@ -3022,7 +2999,7 @@ void drawpoly_setup (tiletype *dd, INT_PTR lzbufoff, point3d *lpos, point3d *lri
 	htflatbilin(-2);
 }
 
-void drawpoly_setup (tiletype *dd, INT_PTR lzbufoff, dpoint3d *lpos, dpoint3d *lrig, dpoint3d *ldow, dpoint3d *lfor, float hx, float hy, float hz)
+void drawpoly_setup (tiletype *dd, intptr_t lzbufoff, dpoint3d *lpos, dpoint3d *lrig, dpoint3d *ldow, dpoint3d *lfor, float hx, float hy, float hz)
 {
 	point3d fpos, frig, fdow, ffor;
 	fpos.x = lpos->x; fpos.y = lpos->y; fpos.z = lpos->z;

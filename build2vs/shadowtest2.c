@@ -174,15 +174,15 @@ typedef struct
 	float hx[8], hy[8], hz[8], rhzup20[8];
 	short wmin[8], wmax[8];
 	short ighyxyx[4], igyxyx[4]; //32-bit only!
-	INT_PTR ddp, ddf, ddx, ddy, zbufoff;
+	intptr_t ddp, ddf, ddx, ddy, zbufoff;
 	point3d p, r, d, f;
 } drawkv6_frame_t;
-extern void drawkv6_setup (drawkv6_frame_t *frame, tiletype *dd, INT_PTR lzbufoff, dpoint3d *lipos, dpoint3d *lirig, dpoint3d *lidow, dpoint3d *lifor, float hx, float hy, float hz);
+extern void drawkv6_setup (drawkv6_frame_t *frame, tiletype *dd, intptr_t lzbufoff, dpoint3d *lipos, dpoint3d *lirig, dpoint3d *lidow, dpoint3d *lifor, float hx, float hy, float hz);
 drawkv6_frame_t drawkv6_frame;
 
 	//DRAWCONE.H:
-extern void drawcone_setup (int, int, tiletype *, INT_PTR,  point3d *,  point3d *,  point3d *,  point3d *, double, double, double);
-extern void drawcone_setup (int, int, tiletype *, INT_PTR, dpoint3d *, dpoint3d *, dpoint3d *, dpoint3d *, double, double, double);
+extern void drawcone_setup (int, int, tiletype *, intptr_t,  point3d *,  point3d *,  point3d *,  point3d *, double, double, double);
+extern void drawcone_setup (int, int, tiletype *, intptr_t, dpoint3d *, dpoint3d *, dpoint3d *, dpoint3d *, double, double, double);
 extern void drawsph (double, double, double, double, int, double);
 extern void drawcone (double, double, double, double, double, double, double, double, int, double, int);
 #define DRAWCONE_NOCAP0 1
@@ -256,11 +256,11 @@ static void print6x8 (tiltyp *ldd, int ox, int y, int fcol, int bcol, const char
 	va_end(arglist);
 
 	lp = (int *)(y*ldd->p+ldd->f);
-	for(j=1;j<256;y++,lp=(int *)(((INT_PTR)lp)+ldd->p),j+=j)
+	for(j=1;j<256;y++,lp=(int *)(((intptr_t)lp)+ldd->p),j+=j)
 		if ((unsigned)y < (unsigned)ldd->y)
 			for(c=st,x=ox;*c;c++,x+=6)
 			{
-				v = (char *)(((int)*c)*6 + (INT_PTR)font6x8); lpx = &lp[x];
+				v = (char *)(((int)*c)*6 + (intptr_t)font6x8); lpx = &lp[x];
 				for(i=max(-x,0),ie=min(ldd->x-x,6);i<ie;i++) { if (v[i]&j) lpx[i] = fcol; else if (bcol >= 0) lpx[i] = bcol; }
 				if ((*c) == 9) { if (bcol >= 0) { for(i=max(-x,6),ie=min(ldd->x-x,18);i<ie;i++) lpx[i] = bcol; } x += 2*6; }
 			}
@@ -1451,7 +1451,7 @@ static void drawpoly_flat_threadsafe (tiltyp *tt, vertyp *pt, int pn, int rgbmul
 	float f, d, u, v, vx, vy, di8, ui8, vi8, od;
 	int i, j, k, iy0, iy1, pn2, pn3, pn4;
 	__declspec(align(8)) int iw[2], iwi[2];
-	INT_PTR p, p2, padd, ttf, ttp;
+	intptr_t p, p2, padd, ttf, ttp;
 	int id, idi, sx0, sx1, sy;
 	int ttps, ymsk, xmsk, *isy;
 	__int64 qddmul, qmask;
@@ -1474,7 +1474,7 @@ static void drawpoly_flat_threadsafe (tiltyp *tt, vertyp *pt, int pn, int rgbmul
 	isy = (int *)_alloca(pn*sizeof(isy[0]));
 	for(i=pn-1;i>=0;i--) isy[i] = (int)min(max(ceil(pt[i].y),0.f),(float)gcam.c.y);
 #else
-	isy = (int *)((((INT_PTR)_alloca(pn*sizeof(isy[0])+32))+15)&~15);
+	isy = (int *)((((intptr_t)_alloca(pn*sizeof(isy[0])+32))+15)&~15);
 	_asm
 	{
 		mov eax, 0x5f80 ;round +inf
@@ -2855,14 +2855,14 @@ void draw_hsr_polymost (cam_t *cc, gamestate_t *lgs, playerstruct_t *lps, int cu
 		if (sectgotmal) free((void *)sectgotmal);
 		sectgotn = ((lgs->numsects+127)&~127);
 		sectgotmal = (unsigned int *)malloc((sectgotn>>3)+16); //NOTE:malloc doesn't guarantee 16-byte alignment!
-		sectgot = (unsigned int *)((((INT_PTR)sectgotmal)+15)&~15);
+		sectgot = (unsigned int *)((((intptr_t)sectgotmal)+15)&~15);
 	}
 	if ((shadowtest2_rendmode != 4) && (lgs->numsects > shadowtest2_sectgotn))
 	{
 		if (shadowtest2_sectgotmal) free((void *)shadowtest2_sectgotmal);
 		shadowtest2_sectgotn = ((lgs->numsects+127)&~127);
 		shadowtest2_sectgotmal = (unsigned int *)malloc((shadowtest2_sectgotn>>3)+16); //NOTE:malloc doesn't guarantee 16-byte alignment!
-		shadowtest2_sectgot = (unsigned int *)((((INT_PTR)shadowtest2_sectgotmal)+15)&~15);
+		shadowtest2_sectgot = (unsigned int *)((((intptr_t)shadowtest2_sectgotmal)+15)&~15);
 	}
 	if (!mphmal) mono_initonce();
 
@@ -2943,7 +2943,7 @@ void draw_hsr_polymost (cam_t *cc, gamestate_t *lgs, playerstruct_t *lps, int cu
 			if (glp->sectgotmal) free((void *)glp->sectgotmal);
 			glp->sectgotn = ((lgs->numsects+127)&~127);
 			glp->sectgotmal = (unsigned int *)malloc((glp->sectgotn>>3)+16); //NOTE:malloc doesn't guarantee 16-byte alignment!
-			glp->sectgot = (unsigned int *)((((INT_PTR)glp->sectgotmal)+15)&~15);
+			glp->sectgot = (unsigned int *)((((intptr_t)glp->sectgotmal)+15)&~15);
 		}
 		if (glp->lighasheadn <= 0)
 		{
@@ -3330,7 +3330,7 @@ void drawpollig (int ei)
 	lightpos_t *lp;
 	float f, g, ox, oy, oz, d, u, v, vx, vy, di8, ui8, vi8, od, *ouvmat;
 	__declspec(align(8)) int iw[2], iwi[2];
-	INT_PTR l, padd;
+	intptr_t l, padd;
 	int id, idi, oid, oidi, p, p2, sy, *zptr, *lptr, xalign;
 	int ttps, ymsk, xmsk, xshift, ttf, ttp, rgbmul; //, nrgbmul;
 	int i, j, k, x, xe, xe2, xe3, iy0, iy1, pn, pn2, pn3, pn4, ymin, ymax, lnum, lpn, olpn2, lpn2, col;
@@ -3340,7 +3340,7 @@ void drawpollig (int ei)
 	i =            pn  *sizeof(rast_t );
 	j = ligpolmaxvert*2*sizeof(point2d);
 	k = ligpolmaxvert  *sizeof(point3d);
-	l = (INT_PTR)_alloca(i+j+k);
+	l = (intptr_t)_alloca(i+j+k);
 	rast = (rast_t  *)(l);
 	lpt  = (point2d *)(l+i);
 	lvt2 = (point3d *)(l+i+j);
@@ -3625,7 +3625,7 @@ void drawpollig (int ei)
 			}
 
 				//Render Z's
-			padd = (INT_PTR)&zptr[xe]; p = ((x-xe)<<2);
+			padd = (intptr_t)&zptr[xe]; p = ((x-xe)<<2);
 #if 0
 			od = d; oid = id; oidi = idi;
 			p2 = min(p+((FLATSTEPSIZ-j)<<2),0); goto zbuf_in2it;
@@ -4488,7 +4488,7 @@ void doframe ()
 	static int bstatus, obstatus, ischanged = 3, movelights = 0;
 	lightpos_t *lp;
 	float f, g, fx, fy, fmousx, fmousy;
-	INT_PTR p, zbufoff;
+	intptr_t p, zbufoff;
 	int i, j, i0, i1, lig, x, y;
 
 	readkeyboard(); if (ext_keystatus[1]) { quitloop(); return; }
@@ -4773,8 +4773,8 @@ void doframe ()
 		}
 			//zbuffer aligns its memory to the same pixel boundaries as the screen!
 			//WARNING: Pentium 4's L2 cache has severe slowdowns when 65536-64 <= (zbufoff&65535) < 64
-		zbufoff = (INT_PTR)zbuffermem-gdd.f;
-		//zbufoff = (((((INT_PTR)zbuffermem)-gdd.f-128)+255)&~255)+128;
+		zbufoff = (intptr_t)zbuffermem-gdd.f;
+		//zbufoff = (((((intptr_t)zbuffermem)-gdd.f-128)+255)&~255)+128;
 
 		if ((!shadowtest2_rendmode) || (shadowtest2_rendmode == 3))
 		{
@@ -4782,7 +4782,7 @@ void doframe ()
 		}
 
 		cam.c.f = gdd.f; cam.c.p = gdd.p; cam.c.x = gdd.x; cam.c.y = gdd.y;
-		cam.z = cam.c; cam.z.f = (INT_PTR)gdd.f+zbufoff;
+		cam.z = cam.c; cam.z.f = (intptr_t)gdd.f+zbufoff;
 		dcamp.x = (double)cam.p.x; dcamp.y = (double)cam.p.y; dcamp.z = (double)cam.p.z;
 		dcamr.x = (double)cam.r.x; dcamr.y = (double)cam.r.y; dcamr.z = (double)cam.r.z;
 		dcamd.x = (double)cam.d.x; dcamd.y = (double)cam.d.y; dcamd.z = (double)cam.d.z;

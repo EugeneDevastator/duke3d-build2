@@ -42,7 +42,9 @@ void divconst_setdenom_intr (long *twolongstate, long denom)
 long divconst (long *twolongstate, long numer) { return(numer/twolongstate[0]); }
 #endif
 long nullpic [64+1][64];
-
+unsigned char gammlut[256];
+unsigned char gotpal = 0;
+tile_t *gtile;
 void scaletex_boxsum_intr (tiltyp *rt, tiltyp *wt)  // copy from drawpoly
 {
 	long i, rx, ry, rxf, ryf, nxm1, nym1, col0[4], col1[4], col2, ds, divstate[4][2];
@@ -150,7 +152,7 @@ void kpzload4grou_intr (const char *filnam, tiltyp *tt, float shsc, int flags)
 	//for(ntt=tt;ntt=genmiptiltyp(ntt););
 }
 
-void loadpic (tile_t *tpic) // was copied
+static void loadpic (tile_t *tpic) // was copied
 {
 	static unsigned char lastpal[256][4], uch;
 	tiltyp *pic;

@@ -44,12 +44,15 @@ credits.
 //   dcflagor      64
 
 #include "kplib.h"
-static int bytesperline, xres, yres, globxoffs, globyoffs;
+
+#include <cstring>
+#include <sys/stat.h>
+int bytesperline, xres, yres, globxoffs, globyoffs;
 int kplib_palcol[256] ASMNAME("kplib_palcol"), kplib_paleng, kplib_bakcol, kplib_numhufblocks, kplib_zlibcompflags;
 signed char kplib_coltype, kplib_bitdepth;
 char *kplib_filterlist = 0;
 int kplib_filterlistmal = 0;
-
+int zipfilmode;
 //============================ KPNGILIB begins ===============================
 
 //07/31/2000: KPNG.C first ported to C from READPNG.BAS
@@ -63,7 +66,7 @@ int kplib_filterlistmal = 0;
 	//.PNG specific variables:
 static int bakr = 0x80, bakg = 0x80, bakb = 0x80; //this used to be public...
 static int gslidew = 0, gslider = 0, xm, xmn[4], xr0, xr1, xplc, yplc;
-static INT_PTR nfplace;
+static intptr_t nfplace;
 static int clen[320], cclen[19], bitpos, filt, xsiz, ysiz;
 static int xsizbpl, ixsiz, ixoff, iyoff, ixstp, iystp, intlac, nbpl, trnsrgb ASMNAME("trnsrgb");
 static int ccind[19] = {16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15};
@@ -195,6 +198,31 @@ static _inline void cpuid (int a, int *s)
 	}
 }
 
+static intptr_t frameplace;
+
+static const int pow2mask[32] =
+{
+	0x00000000,0x00000001,0x00000003,0x00000007,
+	0x0000000f,0x0000001f,0x0000003f,0x0000007f,
+	0x000000ff,0x000001ff,0x000003ff,0x000007ff,
+	0x00000fff,0x00001fff,0x00003fff,0x00007fff,
+	0x0000ffff,0x0001ffff,0x0003ffff,0x0007ffff,
+	0x000fffff,0x001fffff,0x003fffff,0x007fffff,
+	0x00ffffff,0x01ffffff,0x03ffffff,0x07ffffff,
+	0x0fffffff,0x1fffffff,0x3fffffff,0x7fffffff,
+};
+static const uint32_t pow2long[32] =
+{
+	0x00000001,0x00000002,0x00000004,0x00000008,
+	0x00000010,0x00000020,0x00000040,0x00000080,
+	0x00000100,0x00000200,0x00000400,0x00000800,
+	0x00001000,0x00002000,0x00004000,0x00008000,
+	0x00010000,0x00020000,0x00040000,0x00080000,
+	0x00100000,0x00200000,0x00400000,0x00800000,
+	0x01000000,0x02000000,0x04000000,0x08000000,
+	0x10000000,0x20000000,0x40000000,0x80000000,
+};
+kzfilestate kzfs;
 #elif defined(__GNUC__) && defined(__i386__) && !defined(NOASM)
 
 static inline unsigned int bswap (unsigned int a)
@@ -492,7 +520,7 @@ static int Paeth686 (int, int, int);
 	value [ecx]
 
 	//Note: "cmove eax,?" may be faster than "jne ?:and eax,?" but who cares
-static void rgbhlineasm (int, int, INT_PTR, int);
+static void rgbhlineasm (int, int, intptr_t, int);
 #pragma aux rgbhlineasm =\
 	"sub ecx, edx"\
 	"jle short endit"\
@@ -520,7 +548,7 @@ static void rgbhlineasm (int, int, INT_PTR, int);
 	modify exact [eax ecx edi]\
 	value
 
-static void pal8hlineasm (int, int, INT_PTR, int);
+static void pal8hlineasm (int, int, intptr_t, int);
 #pragma aux pal8hlineasm =\
 	"sub ecx, edx"\
 	"jle short endit"\
@@ -565,7 +593,7 @@ static _inline int Paeth686 (int a, int b, int c)
 	}
 }
 
-static _inline void rgbhlineasm (int c, int d, INT_PTR t, int b)
+static _inline void rgbhlineasm (int c, int d, intptr_t t, int b)
 {
 	_asm
 	{
@@ -606,7 +634,7 @@ endit:
 	}
 }
 
-static _inline void pal8hlineasm (int c, int d, INT_PTR t, int b)
+static _inline void pal8hlineasm (int c, int d, intptr_t t, int b)
 {
 	_asm
 	{
@@ -654,7 +682,7 @@ static inline int Paeth686 (int a, int b, int c)
 }
 
 	//Note: "cmove eax,?" may be faster than "jne ?:and eax,?" but who cares
-static inline void rgbhlineasm (int c, int d, INT_PTR t, int b)
+static inline void rgbhlineasm (int c, int d, intptr_t t, int b)
 {
 	__asm__ __volatile__ (
 		"subl %%edx, %%ecx \n"
@@ -683,7 +711,7 @@ static inline void rgbhlineasm (int c, int d, INT_PTR t, int b)
 		);
 }
 
-static inline void pal8hlineasm (int c, int d, INT_PTR t, int b)
+static inline void pal8hlineasm (int c, int d, intptr_t t, int b)
 {
 	__asm__ __volatile__ (
 		"subl %%edx, %%ecx \n"
@@ -707,7 +735,7 @@ static inline int Paeth686 (int a, int b, int c)
 	return(Paeth(a,b,c));
 }
 
-static inline void rgbhlineasm (int x, int xr1, INT_PTR p, int ixstp)
+static inline void rgbhlineasm (int x, int xr1, intptr_t p, int ixstp)
 {
 	int i;
 	if (!trnsrgb)
@@ -723,7 +751,7 @@ static inline void rgbhlineasm (int x, int xr1, INT_PTR p, int ixstp)
 	}
 }
 
-static inline void pal8hlineasm (int x, int xr1, INT_PTR p, int ixstp)
+static inline void pal8hlineasm (int x, int xr1, intptr_t p, int ixstp)
 {
 	for(;x>xr1;p+=ixstp,x--) *(int *)p = kplib_palcol[olinbuf[x]];
 }
@@ -741,7 +769,7 @@ static inline void pal8hlineasm (int x, int xr1, INT_PTR p, int ixstp)
 static void putbuf (const unsigned char *buf, int leng)
 {
 	int i, x;
-	INT_PTR p;
+	intptr_t p;
 
 	if (filt < 0)
 	{
@@ -875,7 +903,7 @@ static void initpngtables()
 }
 
 static int kpngrend (const char *kfilebuf, int kfilength,
-	INT_PTR daframeplace, int dabytesperline, int daxres, int dayres,
+	intptr_t daframeplace, int dabytesperline, int daxres, int dayres,
 	int daglobxoffs, int daglobyoffs)
 {
 	int i, j, k, bfinal, btype, hlit, hdist, leng;
@@ -1320,7 +1348,7 @@ static void invdct8x8 (int *dc, unsigned char dcflag)
 static void yrbrend (int x, int y, int *ldct)
 {
 	int i, j, ox, oy, xx, yy, xxx, yyy, xxxend, yyyend, yv, cr, cb, *odc, *dc, *dc2;
-	INT_PTR p, pp;
+	intptr_t p, pp;
 
 	odc = ldct; dc2 = &ldct[10<<6];
 	for(yy=0;yy<(lcompvsamp[0]<<3);yy+=8)
@@ -1409,7 +1437,7 @@ static void yrbrend (int x, int y, int *ldct)
 void (*kplib_yrbrend_func)(int,int,int *) = yrbrend;
 
 static int kpegrend (const char *kfilebuf, int kfilength,
-	INT_PTR daframeplace, int dabytesperline, int daxres, int dayres,
+	intptr_t daframeplace, int dabytesperline, int daxres, int dayres,
 	int daglobxoffs, int daglobyoffs)
 {
 	int i, j, v, leng, xdim, ydim, index, prec, restartcnt, restartinterval;
@@ -1813,12 +1841,12 @@ static unsigned char suffix[4100], filbuffer[768], tempstack[4096];
 static int prefix[4100];
 
 static int kgifrend (const char *kfilebuf, int kfilelength,
-	INT_PTR daframeplace, int dabytesperline, int daxres, int dayres,
+	intptr_t daframeplace, int dabytesperline, int daxres, int dayres,
 	int daglobxoffs, int daglobyoffs)
 {
 	int i, x, y, xsiz, ysiz, yinc, xend, xspan, yspan, currstr, numbitgoal;
 	int lzcols, dat, blocklen, bitcnt, xoff, yoff, transcol, backcol, *lptr;
-	INT_PTR p;
+	intptr_t p;
 	char numbits, startnumbits, chunkind, ilacefirst;
 	const unsigned char *ptr, *cptr;
 
@@ -1869,13 +1897,13 @@ static int kgifrend (const char *kfilebuf, int kfilelength,
 		xx[3] = min(daglobxoffs+xsiz      ,daxres); yy[3] = min(daglobyoffs+ysiz      ,dayres);
 
 		lptr = (int *)(yy[0]*dabytesperline+daframeplace);
-		for(y=yy[0];y<yy[1];y++,lptr=(int *)(((INT_PTR)lptr)+dabytesperline))
+		for(y=yy[0];y<yy[1];y++,lptr=(int *)(((intptr_t)lptr)+dabytesperline))
 			for(x=xx[0];x<xx[3];x++) lptr[x] = backcol;
-		for(;y<yy[2];y++,lptr=(int *)(((INT_PTR)lptr)+dabytesperline))
+		for(;y<yy[2];y++,lptr=(int *)(((intptr_t)lptr)+dabytesperline))
 		{  for(x=xx[0];x<xx[1];x++) lptr[x] = backcol;
 			for(x=xx[2];x<xx[3];x++) lptr[x] = backcol;
 		}
-		for(;y<yy[3];y++,lptr=(int *)(((INT_PTR)lptr)+dabytesperline))
+		for(;y<yy[3];y++,lptr=(int *)(((intptr_t)lptr)+dabytesperline))
 			for(x=xx[0];x<xx[3];x++) lptr[x] = backcol;
 
 		daglobxoffs += xoff; //Offset bitmap image by extra amount
@@ -1955,7 +1983,7 @@ static int kgifrend (const char *kfilebuf, int kfilelength,
 	//int imagebytes, filler[4];
 	//char pal6bit[256][3], image[ydim][xdim];
 static int kcelrend (const char *buf, int fleng,
-	INT_PTR daframeplace, int dabytesperline, int daxres, int dayres,
+	intptr_t daframeplace, int dabytesperline, int daxres, int dayres,
 	int daglobxoffs, int daglobyoffs)
 {
 	int i, x, y, x0, x1, y0, y1, xsiz, ysiz;
@@ -1991,11 +2019,11 @@ static int kcelrend (const char *buf, int fleng,
 //=============================  TARGA begins ================================
 
 static int ktgarend (const char *header, int fleng,
-	INT_PTR daframeplace, int dabytesperline, int daxres, int dayres,
+	intptr_t daframeplace, int dabytesperline, int daxres, int dayres,
 	int daglobxoffs, int daglobyoffs)
 {
 	int i, x, y, pi, xi, yi, x0, x1, y0, y1, xsiz, ysiz, rlestat, colbyte, pixbyte;
-	INT_PTR p;
+	intptr_t p;
 	const unsigned char *fptr, *cptr, *nptr;
 
 		//Ugly and unreliable identification for .TGA!
@@ -2086,7 +2114,7 @@ static int ktgarend (const char *header, int fleng,
 	//                      � rastoff(?): bitmap data �
 	//                      ���������������������������
 static int kbmprend (const char *buf, int fleng,
-	INT_PTR daframeplace, int dabytesperline, int daxres, int dayres,
+	intptr_t daframeplace, int dabytesperline, int daxres, int dayres,
 	int daglobxoffs, int daglobyoffs)
 {
 	int i, j, x, y, x0, x1, y0, y1, rastoff, headsiz, xsiz, ysiz, cdim, comp, cptrinc, *lptr;
@@ -2198,11 +2226,11 @@ static int kbmprend (const char *buf, int fleng,
 //==============================  PCX begins =================================
 	//Note: currently only supports 8 and 24 bit PCX
 static int kpcxrend (const char *buf, int fleng,
-	INT_PTR daframeplace, int dabytesperline, int daxres, int dayres,
+	intptr_t daframeplace, int dabytesperline, int daxres, int dayres,
 	int daglobxoffs, int daglobyoffs)
 {
 	int i, j, x, y, nplanes, x0, x1, y0, y1, bpl, xsiz, ysiz;
-	INT_PTR p;
+	intptr_t p;
 	unsigned char c, *cptr;
 
 	if (*(int *)buf != LSWAPIB(0x0801050a)) return(-1);
@@ -2280,10 +2308,10 @@ static int kpcxrend (const char *buf, int fleng,
 
 	//Note:currently supports: DXT1,DXT2,DXT3,DXT4,DXT5,A8R8G8B8
 static int kddsrend (const char *buf, int leng,
-	INT_PTR frameptr, int bpl, int xdim, int ydim, int xoff, int yoff)
+	intptr_t frameptr, int bpl, int xdim, int ydim, int xoff, int yoff)
 {
 	int x, y, z, xx, yy, xsiz, ysiz, dxt, al[2], ai, j, k, v, c0, c1, stride;
-	INT_PTR p;
+	intptr_t p;
 	unsigned int lut[256], r[4], g[4], b[4], a[8], rr, gg, bb;
 	unsigned char *uptr, *wptr;
 
@@ -2323,8 +2351,8 @@ static int kddsrend (const char *buf, int leng,
 	for(y=0;y<ysiz;y+=4,buf+=stride)
 		for(x=0;x<xsiz;x+=4)
 		{
-			if (dxt == 1) uptr = (unsigned char *)(((INT_PTR)buf)+(x<<1));
-						else uptr = (unsigned char *)(((INT_PTR)buf)+(x<<2)+8);
+			if (dxt == 1) uptr = (unsigned char *)(((intptr_t)buf)+(x<<1));
+						else uptr = (unsigned char *)(((intptr_t)buf)+(x<<2)+8);
 			c0 = SSWAPIB(*(unsigned short *)&uptr[0]);
 			r[0] = ((c0>>8)&0xf8); g[0] = ((c0>>3)&0xfc); b[0] = ((c0<<3)&0xfc); a[0] = 255;
 			c1 = SSWAPIB(*(unsigned short *)&uptr[2]);
@@ -2411,18 +2439,18 @@ int kpgetdim (const char *buf, int leng, int *xsiz, int *ysiz)
 		lptr = (int *)buf;
 		if ((lptr[0] != LSWAPIB(0x474e5089)) || (lptr[1] != LSWAPIB(0x0a1a0a0d))) return(KPLIB_NONE);
 		lptr = &lptr[2];
-		while (((UINT_PTR)lptr-(UINT_PTR)buf) < (UINT_PTR)(leng-16))
+		while (((uintptr_t)lptr-(uintptr_t)buf) < (uintptr_t)(leng-16))
 		{
 			if (lptr[1] == LSWAPIB(0x52444849)) //IHDR
 				{ (*xsiz) = LSWAPIL(lptr[2]); (*ysiz) = LSWAPIL(lptr[3]); return(KPLIB_PNG); }
-			lptr = (int *)((INT_PTR)lptr + LSWAPIL(lptr[0]) + 12);
+			lptr = (int *)((intptr_t)lptr + LSWAPIL(lptr[0]) + 12);
 		}
 		return(KPLIB_NONE);
 	}
 	else if ((ubuf[0] == 0xff) && (ubuf[1] == 0xd8)) //.JPG
 	{
 		cptr = (unsigned char *)&buf[2];
-		while (((UINT_PTR)cptr-(UINT_PTR)buf) < (UINT_PTR)(leng-8))
+		while (((uintptr_t)cptr-(uintptr_t)buf) < (uintptr_t)(leng-8))
 		{
 			if ((cptr[0] != 0xff) || (cptr[1] == 0xff)) { cptr++; continue; }
 			if ((unsigned int)(cptr[1]-0xc0) < 3)
@@ -2490,7 +2518,7 @@ int kpgetdim (const char *buf, int leng, int *xsiz, int *ysiz)
 	return(KPLIB_NONE);
 }
 
-int kprender (const char *buf, int leng, INT_PTR frameptr, int bpl,
+int kprender (const char *buf, int leng, intptr_t frameptr, int bpl,
 					int xdim, int ydim, int xoff, int yoff)
 {
 	unsigned char *ubuf = (unsigned char *)buf;
@@ -2802,119 +2830,123 @@ int kzaddstack (const char *filnam)
 }
 
   //this allows the use of kplib.c with a file that is already open
-void kzsetfil (FILE *fil)
-{
-	kzfs.fil = fil;
-	kzfs.comptyp = 0;
-	kzfs.seek0 = 0;
-	kzfs.leng = filelength(_fileno(kzfs.fil));
-	kzfs.pos = 0;
-	kzfs.i = 0;
+void kzsetfil(FILE *fil) {
+    kzfs.fil = fil;
+    kzfs.comptyp = 0;
+    kzfs.seek0 = 0;
+
+    // Get file size using fseek/ftell
+    long current_pos = ftell(fil);
+    fseek(fil, 0, SEEK_END);
+    kzfs.leng = (int)ftell(fil);
+    fseek(fil, current_pos, SEEK_SET);
+
+    kzfs.pos = 0;
+    kzfs.i = 0;
 }
 
-INT_PTR kzopen (const char *filnam)
-{
-	FILE *fil;
-	int i, j, fileoffs, fileleng;
-	char tempbuf[46+260], *zipnam, iscomp;
+intptr_t kzopen(const char *filnam) {
+    FILE *fil;
+    int i, j, fileoffs, fileleng;
+    char tempbuf[46+260], *zipnam, iscomp;
 
-	//kzfs.fil = 0;
-	if (filnam[0] != '|') //Search standalone file first
-	{
-		kzfs.fil = fopen(filnam,"rb");
-		if (kzfs.fil)
-		{
-			kzfs.comptyp = 0;
-			kzfs.seek0 = 0;
-			kzfs.leng = filelength(_fileno(kzfs.fil));
-			kzfs.pos = 0;
-			kzfs.i = 0;
-			return((INT_PTR)kzfs.fil);
-		}
-	}
-	if (kzcheckhash(filnam,&zipnam,&fileoffs,&fileleng,&iscomp)) //Then check mounted ZIP/GRP files
-	{
-		fil = fopen(zipnam,"rb"); if (!fil) return(0);
-		fseek(fil,fileoffs,SEEK_SET);
-		if (!iscomp) //Must be from GRP file
-		{
-			kzfs.fil = fil;
-			kzfs.comptyp = 0;
-			kzfs.seek0 = fileoffs;
-			kzfs.leng = fileleng;
-			kzfs.pos = 0;
-			kzfs.i = 0;
-			return((INT_PTR)kzfs.fil);
-		}
-		else
-		{
-			fread(tempbuf,30,1,fil);
-			if (*(int *)&tempbuf[0] != LSWAPIB(0x04034b50)) { fclose(fil); return(0); }
-			fseek(fil,SSWAPIB(*(short *)&tempbuf[26])+SSWAPIB(*(short *)&tempbuf[28]),SEEK_CUR);
+    if (filnam[0] != '|') {
+        kzfs.fil = fopen(filnam, "rb");
+        if (kzfs.fil) {
+            kzfs.comptyp = 0;
+            kzfs.seek0 = 0;
 
-			kzfs.fil = fil;
-			kzfs.comptyp = SSWAPIB(*(short *)&tempbuf[8]);
-			kzfs.seek0 = ftell(fil);
-			kzfs.leng = LSWAPIB(*(int *)&tempbuf[22]);
-			kzfs.pos = 0;
-			switch(kzfs.comptyp) //Compression method
-			{
-				case 0: kzfs.i = 0; return((INT_PTR)kzfs.fil);
-				case 8:
-					if (!pnginited) { pnginited = 1; initpngtables(); }
-					kzfs.comptell = 0;
-					kzfs.compleng = LSWAPIB(*(int *)&tempbuf[18]);
+            // Get file size
+            fseek(kzfs.fil, 0, SEEK_END);
+            kzfs.leng = (int)ftell(kzfs.fil);
+            fseek(kzfs.fil, 0, SEEK_SET);
 
-						//WARNING: No file in ZIP can be > 2GB-32K bytes
-					gslidew = 0x7fffffff; //Force reload at beginning
+            kzfs.pos = 0;
+            kzfs.i = 0;
+            return((intptr_t)kzfs.fil);
+        }
+    }
 
-					return((INT_PTR)kzfs.fil);
-				default: fclose(kzfs.fil); kzfs.fil = 0; return(0);
-			}
-		}
-	}
+    if (kzcheckhash(filnam, &zipnam, &fileoffs, &fileleng, &iscomp)) {
+        fil = fopen(zipnam, "rb");
+        if (!fil) return(0);
+        fseek(fil, fileoffs, SEEK_SET);
 
-		//Finally, check mounted dirs
-	for(i=kzdirnamhead;i>=0;i=*(int *)&kzhashbuf[i])
-	{
-		strcpy(tempbuf,&kzhashbuf[i+4]);
-		j = strlen(tempbuf);
-		if (strlen(filnam)+1+j >= sizeof(tempbuf)) continue; //don't allow long filenames to buffer overrun
-		if ((j) && (tempbuf[j-1] != '/') && (tempbuf[j-1] != '\\') && (filnam[0] != '/') && (filnam[0] != '\\'))
-#if (defined(__DOS__) || defined(_WIN32))
-			strcat(tempbuf,"\\");
-#else
-			strcat(tempbuf,"/");
-#endif
-		strcat(tempbuf,filnam);
-		kzfs.fil = fopen(tempbuf,"rb");
-		if (kzfs.fil)
-		{
-			kzfs.comptyp = 0;
-			kzfs.seek0 = 0;
-			kzfs.leng = filelength(_fileno(kzfs.fil));
-			kzfs.pos = 0;
-			kzfs.i = 0;
-			return((INT_PTR)kzfs.fil);
-		}
-	}
+        if (!iscomp) {
+            kzfs.fil = fil;
+            kzfs.comptyp = 0;
+            kzfs.seek0 = fileoffs;
+            kzfs.leng = fileleng;
+            kzfs.pos = 0;
+            kzfs.i = 0;
+            return((intptr_t)kzfs.fil);
+        } else {
+            fread(tempbuf, 30, 1, fil);
+            if (*(int *)&tempbuf[0] != LSWAPIB(0x04034b50)) {
+                fclose(fil);
+                return(0);
+            }
+            fseek(fil, SSWAPIB(*(short *)&tempbuf[26]) + SSWAPIB(*(short *)&tempbuf[28]), SEEK_CUR);
 
-	return(0);
+            kzfs.fil = fil;
+            kzfs.comptyp = SSWAPIB(*(short *)&tempbuf[8]);
+            kzfs.seek0 = ftell(fil);
+            kzfs.leng = LSWAPIB(*(int *)&tempbuf[22]);
+            kzfs.pos = 0;
+
+            switch(kzfs.comptyp) {
+                case 0: kzfs.i = 0; return((intptr_t)kzfs.fil);
+                case 8:
+                    if (!pnginited) { pnginited = 1; initpngtables(); }
+                    kzfs.comptell = 0;
+                    kzfs.compleng = LSWAPIB(*(int *)&tempbuf[18]);
+                    gslidew = 0x7fffffff;
+                    return((intptr_t)kzfs.fil);
+                default:
+                    fclose(kzfs.fil);
+                    kzfs.fil = 0;
+                    return(0);
+            }
+        }
+    }
+
+    // Check mounted directories
+    for(i = kzdirnamhead; i >= 0; i = *(int *)&kzhashbuf[i]) {
+        strcpy(tempbuf, &kzhashbuf[i+4]);
+        j = strlen(tempbuf);
+        if (strlen(filnam) + 1 + j >= sizeof(tempbuf)) continue;
+
+        if ((j) && (tempbuf[j-1] != '/') && (tempbuf[j-1] != '\\') &&
+            (filnam[0] != '/') && (filnam[0] != '\\')) {
+            strcat(tempbuf, "/");
+        }
+        strcat(tempbuf, filnam);
+
+        kzfs.fil = fopen(tempbuf, "rb");
+        if (kzfs.fil) {
+            kzfs.comptyp = 0;
+            kzfs.seek0 = 0;
+
+            fseek(kzfs.fil, 0, SEEK_END);
+            kzfs.leng = (int)ftell(kzfs.fil);
+            fseek(kzfs.fil, 0, SEEK_SET);
+
+            kzfs.pos = 0;
+            kzfs.i = 0;
+            return((intptr_t)kzfs.fil);
+        }
+    }
+
+    return(0);
 }
+
 
 // --------------------------------------------------------------------------
 
-#if defined(__DOS__)
 #define MAX_PATH 260
-static struct find_t findata;
-#elif defined(_WIN32)
-static HANDLE hfind = INVALID_HANDLE_VALUE;
-static WIN32_FIND_DATA findata;
-#else
-#define MAX_PATH 260
-static DIR *hfind = NULL;
-static struct dirent *findata = NULL;
-#endif
+static int wildstpathleng;
+static char wildst[MAX_PATH] = "", newildst[MAX_PATH] = "";
+static int srchstat = -1, srchzoff = 0, srchdoff = -1;
 
 	//File find state variables. Example sequence (read top->bot, left->right):
 	//   srchstat   srchzoff    srchdoff
@@ -2923,145 +2955,72 @@ static struct dirent *findata = NULL;
 	//           4              300
 	//   0,1,2,3,4              100
 	//   0,1,2,3,4              -1
-static int srchstat = -1, srchzoff = 0, srchdoff = -1, wildstpathleng;
-static char wildst[MAX_PATH] = "", newildst[MAX_PATH] = "";
 
-void kzfindfilestart (const char *st)
-{
-#if defined(__DOS__)
-#elif defined(_WIN32)
-	if (hfind != INVALID_HANDLE_VALUE)
-		{ FindClose(hfind); hfind = INVALID_HANDLE_VALUE; }
-#else
-	if (hfind) { closedir(hfind); hfind = NULL; }
-#endif
-	strcpy(wildst,st); strcpy(newildst,st);
-	srchstat = 0; srchzoff = kzlastfnam; srchdoff = kzdirnamhead;
+void kzfindfilestart(const char *st) {
+	strcpy(wildst, st);
+	strcpy(newildst, st);
+	srchstat = 0;
+	srchzoff = kzlastfnam;
+	srchdoff = kzdirnamhead;
 }
 
-int kzfindfile (char *filnam)
-{
+
+
+int kzfindfile(char *filnam) {
 	int i;
 
-kzfindfile_beg:;
-	filnam[0] = 0;
-	if (srchstat == 0)
-	{
-		if (!newildst[0]) { srchstat = -1; return(0); }
-		do
-		{
-			srchstat = 1;
-
-				//Extract directory from wildcard string for pre-pending
-			wildstpathleng = 0;
-			for(i=0;newildst[i];i++)
-				if ((newildst[i] == '/') || (newildst[i] == '\\'))
-					wildstpathleng = i+1;
-
-			memcpy(filnam,newildst,wildstpathleng);
-
-#if defined(__DOS__)
-			if (_dos_findfirst(newildst,_A_SUBDIR,&findata))
-				{ if (!kzhashbuf) return(0); srchstat = 2; continue; }
-			i = wildstpathleng;
-			if (findata.attrib&16)
-				if ((findata.name[0] == '.') && (!findata.name[1])) continue;
-			strcpy(&filnam[i],findata.name);
-			if (findata.attrib&16) strcat(&filnam[i],"\\");
-#elif defined(_WIN32)
-			hfind = FindFirstFile(newildst,&findata);
-			if (hfind == INVALID_HANDLE_VALUE)
-				{ if (!kzhashbuf) return(0); srchstat = 2; continue; }
-			if (findata.dwFileAttributes&FILE_ATTRIBUTE_HIDDEN) continue;
-			i = wildstpathleng;
-			if (findata.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY)
-				if ((findata.cFileName[0] == '.') && (!findata.cFileName[1])) continue;
-			strcpy(&filnam[i],findata.cFileName);
-			if (findata.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY) strcat(&filnam[i],"\\");
-#else
-			if (!hfind)
-			{
-				char *s = (char *)".";
-				if (wildstpathleng > 0) {
-					filnam[wildstpathleng] = 0;
-					s = filnam;
-				}
-				hfind = opendir(s);
-				if (!hfind) { if (!kzhashbuf) return 0; srchstat = 2; continue; }
-			}
-			break;   // process srchstat == 1
-#endif
-			return(1);
-		} while (0);
-	}
-	if (srchstat == 1)
-	{
-		while (1)
-		{
-			memcpy(filnam,newildst,wildstpathleng);
-#if defined(__DOS__)
-			if (_dos_findnext(&findata))
-				{ if (!kzhashbuf) return(0); srchstat = 2; break; }
-			i = wildstpathleng;
-			if (findata.attrib&16)
-				if ((findata.name[0] == '.') && (!findata.name[1])) continue;
-			strcpy(&filnam[i],findata.name);
-			if (findata.attrib&16) strcat(&filnam[i],"\\");
-#elif defined(_WIN32)
-			if (!FindNextFile(hfind,&findata))
-				{ FindClose(hfind); hfind = INVALID_HANDLE_VALUE; if (!kzhashbuf) return(0); srchstat = 2; break; }
-			if (findata.dwFileAttributes&FILE_ATTRIBUTE_HIDDEN) continue;
-			i = wildstpathleng;
-			if (findata.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY)
-				if ((findata.cFileName[0] == '.') && (!findata.cFileName[1])) continue;
-			strcpy(&filnam[i],findata.cFileName);
-			if (findata.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY) strcat(&filnam[i],"\\");
-#else
-			if ((findata = readdir(hfind)) == NULL)
-				{ closedir(hfind); hfind = NULL; if (!kzhashbuf) return 0; srchstat = 2; break; }
-			i = wildstpathleng;
-			if (findata->d_type == DT_DIR)
-				{ if (findata->d_name[0] == '.' && !findata->d_name[1]) continue; } //skip .
-			else if ((findata->d_type == DT_REG) || (findata->d_type == DT_LNK))
-				{ if (findata->d_name[0] == '.') continue; } //skip hidden (dot) files
-			else continue; //skip devices and fifos and such
-			if (!wildmatch(findata->d_name,&newildst[wildstpathleng])) continue;
-			strcpy(&filnam[i],findata->d_name);
-			if (findata->d_type == DT_DIR) strcat(&filnam[i],"/");
-#endif
-			return(1);
+	kzfindfile_beg:
+		filnam[0] = 0;
+	if (srchstat == 0) {
+		if (!newildst[0]) {
+			srchstat = -1;
+			return(0);
 		}
+
+		wildstpathleng = 0;
+		for(i = 0; newildst[i]; i++) {
+			if ((newildst[i] == '/') || (newildst[i] == '\\'))
+				wildstpathleng = i + 1;
+		}
+
+		memcpy(filnam, newildst, wildstpathleng);
+		srchstat = 2; // Skip directory enumeration, go directly to ZIP files
 	}
-	while (srchstat == 2)
-	{
-		if (srchzoff < 0) { srchstat = 3; break; }
-		if (wildmatch(&kzhashbuf[srchzoff+21],newildst))
-		{
-			//strcpy(filnam,&kzhashbuf[srchzoff+21]);
-			filnam[0] = '|'; strcpy(&filnam[1],&kzhashbuf[srchzoff+21]);
+
+	// Handle ZIP files and directories
+	while (srchstat == 2) {
+		if (srchzoff < 0) {
+			srchstat = 3;
+			break;
+		}
+		if (wildmatch(&kzhashbuf[srchzoff+21], newildst)) {
+			filnam[0] = '|';
+			strcpy(&filnam[1], &kzhashbuf[srchzoff+21]);
 			srchzoff = *(int *)&kzhashbuf[srchzoff+4];
 			return(1);
 		}
 		srchzoff = *(int *)&kzhashbuf[srchzoff+4];
 	}
-	while (srchstat == 3)
-	{
-		if (srchdoff < 0) { srchstat = -1; break; }
-		strcpy(newildst,&kzhashbuf[srchdoff+4]);
+
+	while (srchstat == 3) {
+		if (srchdoff < 0) {
+			srchstat = -1;
+			break;
+		}
+		strcpy(newildst, &kzhashbuf[srchdoff+4]);
 		i = strlen(newildst);
-		if ((i) && (newildst[i-1] != '/') && (newildst[i-1] != '\\') && (filnam[0] != '/') && (filnam[0] != '\\'))
-#if (defined(__DOS__) || defined(_WIN32))
-			strcat(newildst,"\\");
-#else
-			strcat(newildst,"/");
-#endif
-		strcat(newildst,wildst);
+		if ((i) && (newildst[i-1] != '/') && (newildst[i-1] != '\\') &&
+			(filnam[0] != '/') && (filnam[0] != '\\'))
+			strcat(newildst, "/");
+		strcat(newildst, wildst);
 		srchdoff = *(int *)&kzhashbuf[srchdoff];
-		srchstat = 0; goto kzfindfile_beg;
+		srchstat = 0;
+		goto kzfindfile_beg;
 	}
 
 	return(0);
 }
+
 
 //File searching code (supports inside ZIP files!) How to use this code:
 //   char filnam[MAX_PATH];
@@ -3284,10 +3243,13 @@ retkzread:;
 	return(kzfs.pos-i);
 }
 
-int kzfilelength ()
-{
-	if (!kzfs.fil) return(0);
-	return(kzfs.leng);
+static long filelength(FILE* fp) {
+	if (!fp) return 0;
+	long current = ftell(fp);
+	fseek(fp, 0, SEEK_END);
+	long length = ftell(fp);
+	fseek(fp, current, SEEK_SET);
+	return length;
 }
 
 	//WARNING: kzseek(<-32768,SEEK_CUR); or:
@@ -3329,11 +3291,14 @@ void kzclose ()
 {
 	if (kzfs.fil) { fclose(kzfs.fil); kzfs.fil = 0; }
 }
-
+int kzfilelength() {
+	if (!kzfs.fil) return 0;
+	return kzfs.leng;
+}
 //====================== ZIP decompression code ends =========================
 //===================== HANDY PICTURE function begins ========================
 
-void kpzload (const char *filnam, INT_PTR *pic, long *bpl, int *xsiz, int *ysiz)
+void kpzload (const char *filnam, intptr_t *pic, long *bpl, int *xsiz, int *ysiz)
 {
 	char *buf;
 	int leng;
@@ -3347,7 +3312,7 @@ void kpzload (const char *filnam, INT_PTR *pic, long *bpl, int *xsiz, int *ysiz)
 
 	kpgetdim(buf,leng,xsiz,ysiz);
 	(*bpl) = ((*xsiz)<<2);
-	(*pic) = (INT_PTR)malloc((*ysiz)*(*bpl)); if (!(*pic)) { free(buf); return; }
+	(*pic) = (intptr_t)malloc((*ysiz)*(*bpl)); if (!(*pic)) { free(buf); return; }
 	if (kprender(buf,leng,*pic,*bpl,*xsiz,*ysiz,0,0) < 0) { free(buf); free((void *)*pic); (*pic) = 0; return; }
 	free(buf);
 }

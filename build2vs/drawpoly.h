@@ -18,10 +18,10 @@
 /*
 typedef struct { float x, y, z; } point3d;
 typedef struct { double x, y, z; } dpoint3d;
-typedef struct { INT_PTR f, p, x, y; } tiletype;
+typedef struct { intptr_t f, p, x, y; } tiletype;
 // Structure definition for tile/bitmap data
 typedef struct tiltyp {
-	INT_PTR f, p;           // f=frame buffer pointer, p=pitch/stride
+	intptr_t f, p;           // f=frame buffer pointer, p=pitch/stride
 	int x, y, z;            // x,y=dimensions, z=depth/format info
 	float shsc;             // shsc=suggested height scale
 	tiltyp *lowermip;       // pointer to lower mipmap level
@@ -37,8 +37,8 @@ extern int drawpoly_numcpu;
 extern void drawpoly_init (void);
 
 	//Must call once per frame (or cbuf/zbuf/camera change)
-extern void drawpoly_setup (tiletype *dd, INT_PTR lzbufoff,  point3d *lpos,  point3d *lrig,  point3d *ldow,  point3d *lfor, float hx, float hy, float hz);
-extern void drawpoly_setup (tiletype *dd, INT_PTR lzbufoff, dpoint3d *lpos, dpoint3d *lrig, dpoint3d *ldow, dpoint3d *lfor, float hx, float hy, float hz);
+extern void drawpoly_setup (tiletype *dd, intptr_t lzbufoff,  point3d *lpos,  point3d *lrig,  point3d *ldow,  point3d *lfor, float hx, float hy, float hz);
+extern void drawpoly_setup (tiletype *dd, intptr_t lzbufoff, dpoint3d *lpos, dpoint3d *lrig, dpoint3d *ldow, dpoint3d *lfor, float hx, float hy, float hz);
 
 	//Draw polygon!
 extern void drawpoly (tiltyp *tt, vertyp *pt, int n, int rgbmul, float hsc, float *ouvmat, int rendflags);

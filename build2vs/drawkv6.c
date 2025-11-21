@@ -1,3 +1,4 @@
+ #include "Core/mapcore.h"
 #if 0
 objs=drawkv6.obj cwinmain.obj
 opts=/c /TP /Ox /GFy /MT /nologo
@@ -62,10 +63,7 @@ extern void kzclose ();
 #include <stdio.h>
 #endif
 
-typedef struct { double x, y, z; } dpoint3d;
-typedef struct { float x, y, z; } point3d;
 #if (STANDALONE == 0)
-typedef struct { INT_PTR f, p, x, y; } tiletype;
 #else
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -87,7 +85,7 @@ typedef struct
 	float hx[8], hy[8], hz[8], rhzup20[8];
 	short wmin[8], wmax[8];
 	short ighyxyx[4], igyxyx[4]; //32-bit only!
-	INT_PTR ddp, ddf, ddx, ddy, zbufoff;
+	intptr_t ddp, ddf, ddx, ddy, zbufoff;
 	point3d p, r, d, f;
 } drawkv6_frame_t;
 
@@ -190,7 +188,7 @@ ALIGN(8) static short ig0000[4] = {0,0,0,0};
 
 static void boundcubefillz_c (drawkv6_frame_t *frame, int n, int col)
 {
-	INT_PTR p;
+	intptr_t p;
 	float f;
 	int i, x, y, z, x0, y0, x1, y1;
 
@@ -844,8 +842,8 @@ dk6_endit2:    pop edi
 					wptr = (int *)(yy*frame->ddp + frame->ddf); wptre = &wptr[nx1]; wptr += nx0;
 					for(;wptr<wptre;wptr++)
 					{
-						if (zz >= *(int *)((INT_PTR)wptr+frame->zbufoff)) continue;
-						*(int *)((INT_PTR)wptr+frame->zbufoff) = zz;
+						if (zz >= *(int *)((intptr_t)wptr+frame->zbufoff)) continue;
+						*(int *)((intptr_t)wptr+frame->zbufoff) = zz;
 						wptr[0] = col;
 					}
 				}
@@ -883,7 +881,7 @@ void drawkv6_init (void)
 	memset(kv6hashead,-1,sizeof(kv6hashead));
 }
 
-void drawkv6_setup (drawkv6_frame_t *frame, tiletype *dd, INT_PTR lzbufoff,
+void drawkv6_setup (drawkv6_frame_t *frame, tiletype *dd, intptr_t lzbufoff,
 						  point3d *lipos, point3d *lirig, point3d *lidow, point3d *lifor,
 						  float hx, float hy, float hz)
 {
@@ -915,7 +913,7 @@ void drawkv6_setup (drawkv6_frame_t *frame, tiletype *dd, INT_PTR lzbufoff,
 	frame->igyxyx[0] = dd->x; frame->igyxyx[2] = dd->x; frame->igyxyx[1] = dd->y; frame->igyxyx[3] = dd->y;
 }
 
-void drawkv6_setup (drawkv6_frame_t *frame, tiletype *dd, INT_PTR lzbufoff,
+void drawkv6_setup (drawkv6_frame_t *frame, tiletype *dd, intptr_t lzbufoff,
 						  dpoint3d *lipos, dpoint3d *lirig, dpoint3d *lidow, dpoint3d *lifor,
 						  float hx, float hy, float hz)
 {
@@ -954,9 +952,9 @@ static kv6data_t *genmipkv6 (kv6data_t *kv6)
 	nkv6->zpiv = kv6->zpiv*.5;
 	nkv6->lowermip = 0;
 
-	xptr = (int *)(((INT_PTR)nkv6) + sizeof(kv6data_t));
-	xyptr = (unsigned short *)(((INT_PTR)xptr) + (xs<<2));
-	voxptr = (kv6voxtype *)(((INT_PTR)xyptr) + xysiz);
+	xptr = (int *)(((intptr_t)nkv6) + sizeof(kv6data_t));
+	xyptr = (unsigned short *)(((intptr_t)xptr) + (xs<<2));
+	voxptr = (kv6voxtype *)(((intptr_t)xyptr) + xysiz);
 	n = 0;
 
 	v0[0] = kv6->vox; sxyi2 = kv6->ylen; sxyi2i = (kv6->ysiz<<1);
@@ -1030,9 +1028,9 @@ static kv6data_t *genmipkv6 (kv6data_t *kv6)
 
 	nkv6->leng = sizeof(kv6data_t) + (xs<<2) + xysiz + n*sizeof(kv6voxtype);
 	nkv6 = (kv6data_t *)realloc(nkv6,nkv6->leng); if (!nkv6) return(0);
-	nkv6->xlen = (unsigned int *)(((INT_PTR)nkv6) + sizeof(kv6data_t));
-	nkv6->ylen = (unsigned short *)(((INT_PTR)nkv6->xlen) + (xs<<2));
-	nkv6->vox = (kv6voxtype *)(((INT_PTR)nkv6->ylen) + xysiz);
+	nkv6->xlen = (unsigned int *)(((intptr_t)nkv6) + sizeof(kv6data_t));
+	nkv6->ylen = (unsigned short *)(((intptr_t)nkv6->xlen) + (xs<<2));
+	nkv6->vox = (kv6voxtype *)(((intptr_t)nkv6->ylen) + xysiz);
 	nkv6->datmalptr = 0; //mips are all in 1 block - no need to free separate data block
 	nkv6->numvoxs = n;
 	kv6->lowermip = nkv6;
@@ -1079,8 +1077,8 @@ kv6data_t *drawkv6_get (char *filnam)
 	kv6->lowermip = 0;
 	kv6->vox = (kv6voxtype *)malloc(l0+l1+l2); if (!kv6->vox) { fclose(fil); free(kv6); kv6nam2ptr[kv6nam2ptr_num-1].ptr = 0; return(0); }
 	kv6->datmalptr = kv6->vox;
-	kv6->xlen = (unsigned int *)(((INT_PTR)kv6->vox) + l0);
-	kv6->ylen = (unsigned short *)(((INT_PTR)kv6->xlen) + l1);
+	kv6->xlen = (unsigned int *)(((intptr_t)kv6->vox) + l0);
+	kv6->ylen = (unsigned short *)(((intptr_t)kv6->xlen) + l1);
 	fread(kv6->vox,l0+l1+l2,1,fil);
 	fclose(fil);
 
@@ -1172,7 +1170,7 @@ int WINAPI WinMain (HINSTANCE hinst, HINSTANCE hpinst, LPSTR cmdline, int ncmdsh
 	ALIGN(32) drawkv6_frame_t kv6frame;
 	kv6data_t *caco;
 	point3d ipos, irig, idow, ifor;
-	INT_PTR zbufoff;
+	intptr_t zbufoff;
 	double tim = 0.0, otim, dtim, t0, t1, tottim = 0.0, avgdtim = 0.0;
 	float f, g, px, py, pz, rx, ry, rz, dx, dy, dz, fx, fy, fz;
 	int i, x, y, z, obstatus = 0, *zbuf = 0, zbufmal = 0, numframes = 0;
@@ -1204,7 +1202,7 @@ int WINAPI WinMain (HINSTANCE hinst, HINSTANCE hpinst, LPSTR cmdline, int ncmdsh
 			if (i > zbufmal) { zbufmal = i; zbuf = (int *)realloc(zbuf,zbufmal+256); }
 				//zbuffer aligns its memory to the same pixel boundaries as the screen!
 				//WARNING: Pentium 4's L2 cache has severe slowdowns when 65536-64 <= (zbufoff&65535) < 64
-			zbufoff = (((((INT_PTR)zbuf)-dd.f-128)+255)&~255)+128;
+			zbufoff = (((((intptr_t)zbuf)-dd.f-128)+255)&~255)+128;
 			memset(zbuf,0x7f,i);
 
 #if 0
