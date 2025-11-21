@@ -1,4 +1,4 @@
-// stat reference https://infosuite.duke4.net/index.php?page=references
+#include "Core/physics.h"
 #if 0 //To compile, type: nmake build2.c
 
 !if "$(_NMAKE_VER)" == "6.00.8168.0"
@@ -134,7 +134,6 @@ print \T
 #define USEGROU 1    //if (0) { must remove /DUSEINTZ from drawcone.c compile line! }
 
 #include <basetsd.h>
-#include "Core/physics.h"
 #ifdef USEGROU
 #include "drawpoly.h"
 #endif
@@ -146,15 +145,11 @@ print \T
 #include <math.h>
 #include <time.h>
 #include <malloc.h>
-#include "Core/mapcore.h"
-#include "Core/loaders.h"
-#include "Core/artloader.h"
-#include "Core/kplib.h"
 #define PI 3.141592653589793
 
 	//DRAWCONE.H:
-extern void drawcone_setup (int, int, tiletype *, INT_PTR,  point3d *,  point3d *,  point3d *,  point3d *, double, double, double);
-extern void drawcone_setup (int, int, tiletype *, INT_PTR, dpoint3d *, dpoint3d *, dpoint3d *, dpoint3d *, double, double, double);
+extern void drawcone_setup (int, int, tiletype *, intptr_t,  point3d *,  point3d *,  point3d *,  point3d *, double, double, double);
+extern void drawcone_setup (int, int, tiletype *, intptr_t, dpoint3d *, dpoint3d *, dpoint3d *, dpoint3d *, double, double, double);
 extern void drawsph (double, double, double, double, int, double);
 extern void drawcone (double, double, double, double, double, double, double, double, int, double, int);
 #define DRAWCONE_NOCAP0 1
@@ -205,7 +200,7 @@ typedef struct
 	float hx[8], hy[8], hz[8], rhzup20[8];
 	short wmin[8], wmax[8];
 	short ighyxyx[4], igyxyx[4]; //32-bit only!
-	INT_PTR ddp, ddf, ddx, ddy, zbufoff;
+	intptr_t ddp, ddf, ddx, ddy, zbufoff;
 	point3d p, r, d, f;
 } drawkv6_frame_t;
 typedef struct { int col; unsigned short z; char vis, dir; } kv6voxtype;
@@ -221,8 +216,8 @@ typedef struct kv6data_t
 	void *datmalptr;
 } kv6data_t;
 extern void drawkv6_init (void);
-extern void drawkv6_setup (drawkv6_frame_t *frame, tiletype *, INT_PTR,  point3d *,  point3d *,  point3d *,  point3d *, float, float, float);
-extern void drawkv6_setup (drawkv6_frame_t *frame, tiletype *, INT_PTR, dpoint3d *, dpoint3d *, dpoint3d *, dpoint3d *, float, float, float);
+extern void drawkv6_setup (drawkv6_frame_t *frame, tiletype *, intptr_t,  point3d *,  point3d *,  point3d *,  point3d *, float, float, float);
+extern void drawkv6_setup (drawkv6_frame_t *frame, tiletype *, intptr_t, dpoint3d *, dpoint3d *, dpoint3d *, dpoint3d *, float, float, float);
 extern kv6data_t *drawkv6_get (char *);
 extern void drawkv6 (drawkv6_frame_t *frame, kv6data_t *, float, float, float, float, float, float, float, float, float, float, float, float, int, float);
 extern void drawkv6_freeall (void);
@@ -271,7 +266,7 @@ static long fpsometer[2][FPSSIZ], fpsind[2][FPSSIZ], numframes[2] = {0,0}, micro
 static long folder  [64+1][64]; //Icon for selecting files in 'v' mode
 static long upfolder[64+1][64]; //Icon for selecting files in 'v' mode
 #endif
-
+static long nullpic [64+1][64]; //Null set icon (image not found)
 
 //App state variables: -----------------------------------------------------------------------------
 
@@ -422,9 +417,8 @@ static long getcputype (void)
 	if (i&(1<<25)) i |= (1<<22); //SSE implies MMX+ support
 	return(i);
 }
-
 //--------------------------------------------------------------------------------------------------
-#ifdef STANDALONE // NETWORKING
+#ifdef STANDALONE
 static long netproto = 0; //0=udp, 1=tcp
 //------------------------------------- SIMPLE TCP code begins -------------------------------------
 #include <winsock2.h>
@@ -578,7 +572,23 @@ static void tcp_close (SOCKET sk) { if (sk != INVALID_SOCKET) closesocket(sk); }
 //----------------------------------------  UDP code begins ----------------------------------------
 
 	//This silly block of code has probably been duplicated about 5 times :P
-
+static long crctab32[256] = {0};  //SEE CRC32.C
+#define updatecrc32(c,crc) crc=(crctab32[((c)^crc)&255]^(((unsigned)crc)>>8))
+static long crc32_getbuf (char *buf, long leng)
+{
+	long i, crc = -1;
+	for(i=0;i<leng;i++) updatecrc32(buf[i],crc);
+	return(crc);
+}
+static void crc32_init (void)
+{
+	long i, j, k;
+	for(i=255;i>=0;i--)
+	{
+		k = i; for(j=8;j;j--) k = ((unsigned long)k>>1)^((-(k&1))&0xedb88320);
+		crctab32[i] = k;
+	}
+}
 
 	//UDP simulating TCP packet format:
 	//   long udp_rbufw;  //32-bit index to last acked byte receiving
@@ -802,7 +812,7 @@ static SOCKET udp_open (char *joinip)
 		if (ws.wVersion != 0x101) { sprintf(net_err,"WinSock version not supported. Error: %d",WSAGetLastError()); return(INVALID_SOCKET); }
 		atexit(udp_wsaclean);
 		udp_inited = 1;
-		initcrc32();
+		crc32_init();
 
 		for(i=0;i<MAXPLAYERS;i++)
 		{
@@ -946,7 +956,6 @@ static char *savefileselect (char *mess, char *spec, char *defext)
 	if (!GetSaveFileName(&ofn)) return(0); else return(fileselectnam);
 }
 #endif
-
 //---------------------------------- Ken file select code begins  ----------------------------------
 static char curpicpath[MAX_PATH+1] = "", curmodpath[MAX_PATH+1] = "";
 #define MAXHIGHLIGHTDEP 16 //Number of directories to remember highlight position
@@ -1511,7 +1520,12 @@ static inline unsigned long bswap (unsigned long a)
 static long crctab32[256] = {0};  //SEE CRC32.C
 #endif
 
-
+#define updatecrc32(c,crc) crc=(crctab32[((c)^crc)&255]^(((unsigned)crc)>>8))
+#define updateadl32(c,crc) \
+{  c += (crc&0xffff); if (c   >= 65521) c   -= 65521; \
+	crc = (crc>>16)+c; if (crc >= 65521) crc -= 65521; \
+	crc = (crc<<16)+c; \
+} \
 
 static void fputbytes (unsigned long v, long n)
 	{ for(;n;v>>=8,n--) { fputc(v,pngofil); updatecrc32(v,pngocrc); } }
@@ -1792,19 +1806,84 @@ static void curs2grid (playerstruct_t *pps, double sx, double sy, point3d *fp)
 }
 #endif
 
-long sect_isneighs(int s0, int s1)
+int getverts (int s, int w, vertlist_t *ver, int maxverts)
 {
-	return sect_isneighs_imp(s0, s1, (mapstate_t*)gst);
+	sect_t *sec;
+	float x, y;
+	int i, ir, iw, ns, nw;
+
+	if ((maxverts <= 0) || ((unsigned)s >= (unsigned)gst->numsects)) return(0);
+	if ((unsigned)w >= (unsigned)gst->sect[s].n) return(0);
+
+	ver[0].s = s; ver[0].w = w; if (maxverts == 1) return(1);
+	sec = gst->sect;
+	x = sec[s].wall[w].x;
+	y = sec[s].wall[w].y;
+	ir = 0; iw = 1;
+	do
+	{
+			//CCW next sect
+		ns = sec[s].wall[w].ns;
+		if (ns >= 0)
+		{
+			nw = sec[s].wall[w].nw;
+			if ((sec[ns].wall[nw].x != x) || (sec[ns].wall[nw].y != y)) nw += sec[ns].wall[nw].n;
+			for(i=iw-1;i>=0;i--)
+				if ((ver[i].s == ns) && (ver[i].w == nw)) break;
+			if ((i < 0) && (sec[ns].wall[nw].x == x) && (sec[ns].wall[nw].y == y))
+				{ ver[iw].s = ns; ver[iw].w = nw; iw++; if (iw >= maxverts) break; }
+		}
+
+			//CW next sect
+		w = wallprev(&sec[s],w);
+		ns = sec[s].wall[w].ns;
+		if (ns >= 0)
+		{
+			nw = sec[s].wall[w].nw;
+			if ((sec[ns].wall[nw].x != x) || (sec[ns].wall[nw].y != y)) nw += sec[ns].wall[nw].n;
+			for(i=iw-1;i>=0;i--)
+				if ((ver[i].s == ns) && (ver[i].w == nw)) break;
+			if ((i < 0) && (sec[ns].wall[nw].x == x) && (sec[ns].wall[nw].y == y))
+				{ ver[iw].s = ns; ver[iw].w = nw; iw++; if (iw >= maxverts) break; }
+		}
+
+		if (ir >= iw) break;
+		s = ver[ir].s; w = ver[ir].w; ir++;
+	} while (1);
+	return(iw);
 }
 
-int getverts(int s, int w, vertlist_t* ver, int maxverts)
+int getwalls (int s, int w, vertlist_t *ver, int maxverts)
 {
-	return getverts_imp(s, w, ver, maxverts, (mapstate_t*)gst);
-}
+	vertlist_t tver;
+	sect_t *sec;
+	wall_t *wal, *wal2;
+	float fx, fy;
+	int i, j, k, bs, bw, nw, vn;
 
-int getwalls(int s, int w, vertlist_t* ver, int maxverts)
-{
-	return getwalls_imp(s, w, ver, maxverts, (mapstate_t*)gst);
+	sec = gst->sect; wal = sec[s].wall; bs = wal[w].ns;
+	if ((unsigned)bs >= (unsigned)gst->numsects) return(0);
+
+	vn = 0; nw = wal[w].n+w; bw = wal[w].nw;
+	do
+	{
+		wal2 = sec[bs].wall; i = wal2[bw].n+bw; //Make sure it's an opposite wall
+		if ((wal[w].x == wal2[i].x) && (wal[nw].x == wal2[bw].x) &&
+			 (wal[w].y == wal2[i].y) && (wal[nw].y == wal2[bw].y))
+			{ if (vn < maxverts) { ver[vn].s = bs; ver[vn].w = bw; vn++; } }
+		bs = wal2[bw].ns;
+		bw = wal2[bw].nw;
+	} while (bs != s);
+
+		//Sort next sects by order of height in middle of wall (FIX:sort=crap algo)
+	fx = (wal[w].x+wal[nw].x)*.5;
+	fy = (wal[w].y+wal[nw].y)*.5;
+	for(k=1;k<vn;k++)
+		for(j=0;j<k;j++)
+			if (getslopez(&sec[ver[j].s],0,fx,fy) + getslopez(&sec[ver[j].s],1,fx,fy) >
+				 getslopez(&sec[ver[k].s],0,fx,fy) + getslopez(&sec[ver[k].s],1,fx,fy))
+				{ tver = ver[j]; ver[j] = ver[k]; ver[k] = tver; }
+	return(vn);
 }
 
 #ifdef STANDALONE
@@ -2042,9 +2121,6 @@ static _inline int argb_scale (int c0, int mul12)
 	}
 }
 #endif
-
-//static __forceinline unsigned int bsf (unsigned int a) { _asm bsf eax, a }
-//static __forceinline unsigned int bsr (unsigned int a) { _asm bsr eax, a }
 static __forceinline int uptil1 (unsigned int *lptr, int z)
 {
 	//   //This line does the same thing (but slow & brute force)
@@ -2060,7 +2136,7 @@ static __forceinline int uptil1 (unsigned int *lptr, int z)
 	return(bsr(i)+z+1);
 }
 
-static __forceinline void dtol (double f, long *a)
+static void dtol (double f, long *a)
 {
 	_asm
 	{
@@ -2069,8 +2145,6 @@ static __forceinline void dtol (double f, long *a)
 		fistp dword ptr [eax]
 	}
 }
-
-
 
 void orthofit3x3 (point3d *v0, point3d *v1, point3d *v2)
 {
@@ -2219,7 +2293,7 @@ memset8beg:
 	}
 }
 
-#ifdef STANDALONE // Scanline drawing misc.
+#ifdef STANDALONE
 
 static const char hinge_png[] =
 {
@@ -2324,39 +2398,17 @@ void print6x8 (tiltyp *dd, long ox, long y, long fcol, long bcol, const char *fm
 }
 
 
-/**
- * Draws a single pixel to a tile/bitmap
- * @param dd - destination tile structure
- * @param x,y - pixel coordinates
- * @param c - color value (32-bit)
- */
 static void drawpix (tiltyp *dd, long x, long y, long c)
 {
-	// Bounds check - return if coordinates outside tile dimensions
 	if (((unsigned long)x >= dd->x) || ((unsigned long)y >= dd->y)) return;
-
-	// Write pixel: calculate memory address and store color
-	// y*pitch + x*4bytes + frame_offset
 	*(long *)(y*dd->p + (x<<2) + dd->f) = c;
 }
 
-/**
- * Draws a 3D point by transforming to screen space and drawing pixel
- * @param cc - camera structure containing projection parameters
- * @param x,y,z - 3D world coordinates
- * @param c - color value
- */
 static void drawpix3d (cam_t *cc, float x, float y, float z, long c)
 {
-	// Transform 3D coordinates (world to camera space)
 	xformpos(&x,&y,&z);
-
-	// Depth culling - skip if too close to camera
 	if (z < SCISDIST) return;
-
-	// Perspective projection and draw pixel
-	z = cc->h.z/z;
-	drawpix(&cc->c,x*z+cc->h.x,y*z+cc->h.y,c);
+	z = cc->h.z/z; drawpix(&cc->c,x*z+cc->h.x,y*z+cc->h.y,c);
 }
 
 static void drawhlin (tiltyp *dd, long x0, long x1, long y, long c)
@@ -2622,7 +2674,6 @@ static void drawkv6 (cam_t *cc, char *filnam, double px, double py, double pz,
 	drawkv6(&drawkv6_frame,kv6, px,py,pz, rx,ry,rz, dx,dy,dz, fx,fy,fz, col, shadefac);
 }
 
-//static unsigned char gammlut[256];
 void setgammlut (double gammval)
 {
 	long i;
@@ -2637,8 +2688,8 @@ void setgammlut (double gammval)
 
 	gotpal = 0; //Force palette to reload
 }
-/*
-void loadpic (tile_t *tpic) // was copied
+
+void loadpic (tile_t *tpic)
 {
 	static unsigned char lastpal[256][4], uch;
 	tiltyp *pic;
@@ -2759,7 +2810,7 @@ void loadpic (tile_t *tpic) // was copied
 #endif
 	if (!pic->f) { pic->f = (long)nullpic; pic->x = 64; pic->y = 64; pic->p = (pic->x<<2); pic->lowermip = 0; }
 }
-*/
+
 	//copied from evaldraw.c (renamed from drawpol_sse, then modified more) (09/12/2006)
 long kglcullmode = 0x405;
 __declspec(align(16)) static float dpqmulval[4] = {0,1,2,3}, dpqfours[4] = {4,4,4,4}, dpqones[4] = {1,1,1,1};
@@ -3358,7 +3409,7 @@ void drawparallaxpol (cam_t *cc, kgln_t *vert, long num, tile_t *tpic, long curc
 }
 
 
-#ifdef STANDALONE // UI BEGINS
+#ifdef STANDALONE
 static void drawmouse (tiltyp *dd, int x, int y, int col)
 {
 	int i, darkcol;
@@ -3438,6 +3489,35 @@ static HCURSOR gencrosscursor (void)
 
 //--------------------------------------------------------------------------------------------------
 
+static void initcrc32 (void)
+{
+	long i, j, k;
+	for(i=255;i>=0;i--)
+	{
+		k = i;
+		for(j=8;j;j--) k = ((unsigned long)k>>1)^((-(k&1))&0xedb88320);
+		crctab32[i] = k;
+	}
+}
+static long getcrc32z (long crc32, unsigned char *buf) { long i; for(i=0;buf[i];i++) updatecrc32(buf[i],crc32); return(crc32); }
+long gettileind (char *st)
+{
+	long i, crc32, hashind;
+
+	crc32 = getcrc32z(0,(unsigned char *)st); hashind = (crc32&(sizeof(gtilehashead)/sizeof(gtilehashead[0])-1));
+	for(i=gtilehashead[hashind];i>=0;i=gtile[i].hashnext)
+	{
+		if (gtile[i].namcrc32 != crc32) continue;
+		if (!stricmp(gtile[i].filnam,st)) return(i);
+	}
+	if (gnumtiles >= gmaltiles) { gmaltiles = max(gnumtiles+1,gmaltiles<<1); gtile = (tile_t *)realloc(gtile,gmaltiles*sizeof(tile_t)); }
+	strcpy(gtile[gnumtiles].filnam,st);
+	gtile[gnumtiles].namcrc32 = crc32;
+	gtile[gnumtiles].hashnext = gtilehashead[hashind]; gtilehashead[hashind] = gnumtiles;
+	gtile[gnumtiles].tt.f = 0;
+	gnumtiles++;
+	return(gnumtiles-1);
+}
 
 long settilefilename (long hitsect, long hitwall, char *filnam)
 {
@@ -3524,6 +3604,9 @@ long settilefilename (long hitsect, long hitwall, char *filnam)
 	return(i);
 }
 
+	//Find centroid of polygon (algo copied from TAGPNT2.BAS 09/14/2006)
+
+
 void reversewalls (wall_t *wal, int n)
 {
 	wall_t twal;
@@ -3576,10 +3659,26 @@ void dragpoint (gamestate_t *lst, int s, int w, float x, float y)
 	}
 	gst = ost;
 }
+
 void delwall (sect_t *s, int w)
 {
+	wall_t *wal;
 	int i;
-	delwall_imp(s,w,(mapstate_t*)gst);
+
+#if 0
+	{ //debug only
+		char snotbuf[1024];
+		sprintf(snotbuf,"before delwall(wall %d) %d walls\n",w,s->n);
+		for(i=0;i<s->n;i++) sprintf(&snotbuf[strlen(snotbuf)],"Wall %d: %f %f %d\n",i,wal[i].x,wal[i].y,wal[i].n);
+		MessageBox(ghwnd,snotbuf,prognam,MB_OK);
+	}
+#endif
+
+	if (!s->n) return;
+	wal = s->wall;
+	if (wal[w].n < 0) { wal[w-1].n = wal[w].n+1; }
+					 else { for(i=w;wal[i].n>0;i++); wal[i].n++; }
+
 #ifdef STANDALONE
 	for(i=numplayers-1;i>=0;i--)
 	{
@@ -3595,66 +3694,333 @@ void delwall (sect_t *s, int w)
 		}
 	}
 #endif
+
+	s->n--;
+	for(i=w;i<s->n;i++) wal[i] = wal[i+1];
+
+#if 0
+	{ //debug only
+		char snotbuf[1024];
+		sprintf(snotbuf,"after delwall(wall %d) %d walls\n",w,s->n);
+		for(i=0;i<s->n;i++) sprintf(&snotbuf[strlen(snotbuf)],"Wall %d: %f %f %d\n",i,wal[i].x,wal[i].y,wal[i].n);
+		MessageBox(ghwnd,snotbuf,prognam,MB_OK);
+	}
+#endif
 }
 
 int dupwall (sect_t *s, int w)
 {
+	wall_t *wal;
 	int i, j;
+
+	if (s->n >= s->nmax)
+	{
+		s->nmax = max(s->n+1,s->nmax<<1); s->nmax = max(s->nmax,8);
+		s->wall = (wall_t *)realloc(s->wall,s->nmax*sizeof(wall_t));
+	}
+	wal = s->wall;
+
 #ifdef STANDALONE
 	for(i=numplayers-1;i>=0;i--)
 	{
-		if (((unsigned)gst->p[i].grabsect < (unsigned)gst->numsects)
-			&& (&gst->sect[gst->p[i].grabsect] == s))
-			if (gst->p[i].grabwall > w)
-				gst->p[i].grabwall++;
-		if (((unsigned)gst->p[i].startsect < (unsigned)gst->numsects)
-			&& (&gst->sect[gst->p[i].startsect] == s))
+		if (((unsigned)gst->p[i].grabsect < (unsigned)gst->numsects) && (&gst->sect[gst->p[i].grabsect] == s))
+			if (gst->p[i].grabwall > w) gst->p[i].grabwall++;
+		if (((unsigned)gst->p[i].startsect < (unsigned)gst->numsects) && (&gst->sect[gst->p[i].startsect] == s))
 			if (gst->p[i].startwall > w) gst->p[i].startwall++;
 	}
 #endif
-	return dupwall_imp(s,w);
+
+	if (!s->n)
+	{
+		memset(wal,0,sizeof(wall_t));
+		wal[0].surf.uv[1].x = wal[0].surf.uv[2].y = 1.f;
+		wal[0].ns = wal[0].nw = -1; s->n = 1;
+		return(0);
+	}
+	for(i=s->n;i>w;i--) wal[i] = wal[i-1];
+		  if (!wal[0].n)    { wal[0].n = 1; wal[1].n = -1; }
+	else if (wal[w].n < 0) { wal[w+1].n = wal[w].n-1; wal[w].n = 1; }
+							else { for(i=w+1;wal[i].n>0;i++); wal[i].n--; }
+	s->n++;
+	return(w+1);
 }
 
-void delsect(int s)
+void delsect (int s)
 {
-	delsect_imp(s, (mapstate_t*)gst);
-int i;
+	sect_t *sec;
+	int i;
+
+	sec = gst->sect;
+
 #ifdef STANDALONE
-	for (i = numplayers - 1; i >= 0; i--)
+	for(i=numplayers-1;i>=0;i--)
 	{
-		if (gst->p[i].grabsect == s) gst->p[i].grabsect = -1;
-		else if (gst->p[i].grabsect == gst->numsects - 1) gst->p[i].grabsect = s;
-		if (gst->p[i].startsect == s) gst->p[i].startsect = -1;
-		else if (gst->p[i].startsect == gst->numsects - 1) gst->p[i].startsect = s;
+			  if (gst->p[i].grabsect  ==               s) gst->p[i].grabsect  = -1;
+		else if (gst->p[i].grabsect  == gst->numsects-1) gst->p[i].grabsect  =  s;
+			  if (gst->p[i].startsect  ==               s) gst->p[i].startsect  = -1;
+		else if (gst->p[i].startsect  == gst->numsects-1) gst->p[i].startsect  =  s;
 	}
 #endif
+
+	if (sec[s].wall) free(sec[s].wall);
+	gst->numsects--; sec[s] = sec[gst->numsects];
+	memset(&sec[gst->numsects],0,sizeof(sect_t));
 }
+
+	//Pass z as >1e30 to make updatesect ignore height return first sector containing (x,y)
 void updatesect (float x, float y, float z, int *cursect)
 {
-	updatesect_imp(x, y, z, cursect, (mapstate_t*)gst);
+	sect_t *sec;
+	long *gotsect;
+	int i, s, w, ns, nw, allsec, cnt, *secfif, secfifw, secfifr;
+
+	sec = gst->sect;
+	s = (*cursect);
+	if ((unsigned)s >= (unsigned)gst->numsects) //reference invalid; brute force search
+	{
+		for(s=gst->numsects-1;s>=0;s--)
+			if (insidesect(x,y,sec[s].wall,sec[s].n))
+				if ((z > 1e30) || ((z >= getslopez(&sec[s],0,x,y)) && (z <= getslopez(&sec[s],1,x,y)))) break;
+		(*cursect) = s; return;
+	}
+
+	if (insidesect(x,y,sec[s].wall,sec[s].n))
+		if ((z > 1e30) || ((z >= getslopez(&sec[s],0,x,y)) && (z <= getslopez(&sec[s],1,x,y)))) return;
+
+	w = (((gst->numsects+31)>>5)<<2);
+	gotsect = (long *)_alloca(w);
+	memset(gotsect,0,w); gotsect[s>>5] |= (1<<s);
+	secfif = (int *)_alloca(gst->numsects*sizeof(secfif[0]));
+	secfifw = secfifr = 0;
+
+	(*cursect) = -1; allsec = gst->numsects-1;
+	for(cnt=gst->numsects-1;cnt>0;cnt--)
+	{
+		for(w=sec[s].n-1;w>=0;w--)
+		{
+			ns = sec[s].wall[w].ns;
+			nw = sec[s].wall[w].nw;
+			while (((unsigned)ns < (unsigned)gst->numsects) && (ns != s))
+			{
+				if (!(gotsect[ns>>5]&(1<<ns)))
+				{
+					gotsect[ns>>5] |= (1<<ns);
+					secfif[secfifw] = ns; secfifw++;
+				}
+				i = ns;
+				ns = sec[i].wall[nw].ns;
+				nw = sec[i].wall[nw].nw;
+			}
+		}
+
+		if (secfifr < secfifw)
+			{ s = secfif[secfifr]; secfifr++; } //breadth-first
+		else
+		{     //fifo was empty.. must be some disjoint sectors
+			while ((allsec >= 0) && (gotsect[allsec>>5]&(1<<allsec))) allsec--;
+			s = allsec; if (s < 0) break;
+			gotsect[s>>5] |= (1<<s);
+		}
+
+		if (insidesect(x,y,sec[s].wall,sec[s].n))
+			if ((z > 1e30) || ((z >= getslopez(&sec[s],0,x,y)) && (z <= getslopez(&sec[s],1,x,y))))
+				{ (*cursect) = s; return; }
+	}
 }
+
+long sect_isneighs (int s0, int s1)
+{
+	sect_t *sec;
+	int i, w, ns, nw;
+
+	sec = gst->sect;
+	//if (s0 == s1) return(0); ?
+	for(w=sec[s0].n-1;w>=0;w--)
+	{
+		ns = sec[s0].wall[w].ns;
+		nw = sec[s0].wall[w].nw;
+		while (((unsigned)ns < (unsigned)gst->numsects) && (ns != s0))
+		{
+			if (ns == s1) return(1); //s0 and s1 are neighbors
+			i = ns;
+			ns = sec[i].wall[nw].ns;
+			nw = sec[i].wall[nw].nw;
+		}
+	}
+	return(0); //bunches not on neighboring sectors are designated as incomparable
+}
+
 long insspri (int sect, float x, float y, float z)
 {
-	gamestate_t *current_gst = gst;
-	return insspri_imp(sect,x,y,z,(mapstate_t*)current_gst);
+	spri_t *spr;
+	long i;
+
+	if ((unsigned)sect >= (unsigned)gst->numsects) return(-1);
+	if (gst->numspris >= gst->malspris)
+	{
+		gst->malspris = max(gst->numspris+1,gst->malspris<<1);
+		gst->spri = (spri_t *)realloc(gst->spri,gst->malspris*sizeof(spri_t));
+#ifndef STANDALONE
+		for(i=gst->numspris;i<gst->malspris;i++)
+		{
+			gst->spri[i].sectn = gst->blankheadspri;
+			gst->spri[i].sectp = -1;
+			gst->spri[i].sect = -1;
+			if (gst->blankheadspri >= 0) gst->spri[gst->blankheadspri].sectp = i;
+			gst->blankheadspri = i;
+		}
+#endif
+	}
+#ifdef STANDALONE
+	i = gst->numspris;
+#else
+	i = gst->blankheadspri;
+	gst->blankheadspri = gst->spri[i].sectn;
+	gst->spri[i].sectp = -1;
+#endif
+	gst->numspris++;
+	spr = &gst->spri[i];
+	memset(spr,0,sizeof(spri_t));
+	spr->p.x = x; spr->p.y = y; spr->p.z = z;
+	spr->r.x = .5; spr->d.z = .5; spr->f.y =-.5;
+	spr->fat = .5; spr->mas = spr->moi = 1.0;
+	spr->tilnum = -1; spr->asc = spr->rsc = spr->gsc = spr->bsc = 4096;
+	spr->owner = -1; spr->flags = 0;
+	spr->sect = sect; spr->sectn = gst->sect[sect].headspri; spr->sectp = -1;
+	if (gst->sect[sect].headspri >= 0) gst->spri[gst->sect[sect].headspri].sectp = i;
+	gst->sect[sect].headspri = i;
+	return(i);
 }
+
+	//          -1      i
+	//headspri     i      j
+	//               j     -1
 void delspri (int i)
 {
-	gamestate_t *current_gst = gst;
-	delspri_imp(i,(mapstate_t*)current_gst);
+	spri_t *spr;
+	long j;
+
+#ifdef STANDALONE
+	if ((unsigned)i >= (unsigned)gst->numspris) return;
+#else
+	if (((unsigned)i >= (unsigned)gst->malspris) || (gst->spri[i].sect < 0)) return;
+#endif
+	spr = gst->spri;
+
+		//Delete sprite i
+	if (spr[i].sectp <  0) gst->sect[spr[i].sect].headspri = spr[i].sectn;
+							else spr[spr[i].sectp].sectn = spr[i].sectn;
+	if (spr[i].sectn >= 0) spr[spr[i].sectn].sectp = spr[i].sectp;
+
+	for(j=gst->light_sprinum-1;j>=0;j--)
+		if (gst->light_spri[j] == i) gst->light_spri[j] = gst->light_spri[--gst->light_sprinum];
+
+	gst->numspris--;
+#ifdef STANDALONE
+		//Move sprite numspris to i
+	if (i == gst->numspris) return;
+
+	for(j=gst->light_sprinum-1;j>=0;j--)
+		if (gst->light_spri[j] == gst->numspris) gst->light_spri[j] = i;
+
+	spr[i] = spr[gst->numspris];
+	if (spr[i].sectp <  0) gst->sect[spr[i].sect].headspri = i;
+							else spr[spr[i].sectp].sectn = i;
+	if (spr[i].sectn >= 0) spr[spr[i].sectn].sectp = i;
+#else
+		//Add sprite i to blankheadspri list
+	gst->spri[i].sectn = gst->blankheadspri;
+	gst->spri[i].sectp = -1;
+	gst->spri[i].sect = -1;
+	if (gst->blankheadspri >= 0) gst->spri[gst->blankheadspri].sectp = i;
+	gst->blankheadspri = i;
+#endif
 }
 
 void changesprisect (int i, int nsect)
 {
-	gamestate_t *current_gst = gst;
-	changesprisect_imp(i,nsect,(mapstate_t*)current_gst);
+	spri_t *spr;
+	int osect;
+
+#ifdef STANDALONE
+	if ((unsigned)i >= (unsigned)gst->numspris) return;
+#else
+	if (((unsigned)i >= (unsigned)gst->malspris) || (gst->spri[i].sect < 0)) return;
+#endif
+	if ((unsigned)nsect >= (unsigned)gst->numsects) return;
+
+	spr = &gst->spri[i];
+	osect = spr->sect;
+
+		//Remove from old sector list
+	//if ((unsigned)osect < (unsigned)gst->numsects)
+	//{
+		if (spr->sectp < 0) gst->sect[osect].headspri = spr->sectn;
+					 else gst->spri[spr->sectp].sectn = spr->sectn;
+		if (spr->sectn >= 0) gst->spri[spr->sectn].sectp = spr->sectp;
+	//}
+
+		//Insert on new sector list
+	//if ((unsigned)nsect < (unsigned)gst->numsects)
+	//{
+		spr->sectn = gst->sect[nsect].headspri;
+		spr->sectp = -1;
+		if (gst->sect[nsect].headspri >= 0) gst->spri[gst->sect[nsect].headspri].sectp = i;
+		gst->sect[nsect].headspri = i;
+	//}
+
+	spr->sect = nsect;
 }
 
 	//s: sector of sprites to check
 	//Pass -1 to check and compact all valid sprites
 void checksprisect (int s)
 {
-	checksprisect_imp(s, (mapstate_t*) gst);
+	sect_t *sec;
+	spri_t *spr;
+	int w, ns, nw, s0, s1;
+
+	sec = gst->sect;
+	spr = gst->spri;
+#if 0
+	//FIXFIX:Warning: this block has not been tested!
+	if ((unsigned)s < (unsigned)gst->numsects)
+	{
+		for(w=sec[s].headspri;w>=0;w=nw)
+		{
+			nw = spr[w].sectn;
+			ns = spr[w].sect; updatesect(spr[w].p.x,spr[w].p.y,spr[w].p.z,&ns);
+			if (ns != spr[w].sect) changesprisect(w,ns);
+		}
+		return;
+	}
+#endif
+	for(s=gst->numsects-1;s>=0;s--) sec[s].headspri = -1;
+	for(w=nw=0;w<gst->numspris;w++)
+	{
+		ns = spr[w].sect; if (ns < 0) continue;
+		updatesect(spr[w].p.x,spr[w].p.y,spr[w].p.z,&ns);
+		if ((unsigned)ns >= (unsigned)gst->numsects) ns = spr[w].sect;
+
+		spr[nw] = spr[w];
+		spr[nw].sect = ns;
+		spr[nw].sectn = sec[ns].headspri;
+		spr[nw].sectp = -1;
+		if (sec[ns].headspri >= 0) spr[sec[ns].headspri].sectp = nw;
+		sec[ns].headspri = nw;
+		nw++;
+	}
+#ifndef STANDALONE
+	gst->blankheadspri = -1;
+	for(;nw<gst->malspris;nw++)
+	{
+		gst->spri[nw].sectn = gst->blankheadspri;
+		gst->spri[nw].sectp = -1;
+		gst->spri[nw].sect = -1;
+		if (gst->blankheadspri >= 0) gst->spri[gst->blankheadspri].sectp = nw;
+		gst->blankheadspri = nw;
+	}
+#endif
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -3694,7 +4060,7 @@ static void drawsectfill (cam_t *cc, wall_t *wal, int n, int col)
 	}
 }
 #endif
-//here
+
 	//Returned trapezoid list is guaranteed to be in English text order (MSD:top->bottom, LSD:left->right)
 	//Caller is responsible for freeing memory if ((*retzoids) != 0)
 typedef struct { float x[4], y[2]; int pwal[2]; } zoid_t;
@@ -3810,6 +4176,7 @@ void drawsectfill3d (cam_t *cc, sect_t *sec, int isflor, int col)
 	//ouvmat[2].y = sur->uv[1].y/(sur->uv[1].x*sur->uv[2].y - sur->uv[1].y*sur->uv[2].x) + ouvmat[0].y;
 	//drawcone(cc,ouvmat[0].x,ouvmat[0].y,getslopez(sec,isflor,ouvmat[0].x,ouvmat[0].y),0.02,ouvmat[1].x,ouvmat[1].y,getslopez(sec,isflor,ouvmat[1].x,ouvmat[1].y),0.02,0xffc08080);
 	//drawcone(cc,ouvmat[0].x,ouvmat[0].y,getslopez(sec,isflor,ouvmat[0].x,ouvmat[0].y),0.02,ouvmat[2].x,ouvmat[2].y,getslopez(sec,isflor,ouvmat[2].x,ouvmat[2].y),0.02,0xff80c080);
+
 
 	if (!(sur->flags&4)) //Not relative alignment
 	{
@@ -3937,11 +4304,43 @@ void drawsectfill3d (cam_t *cc, sect_t *sec, int isflor, int col)
 
 //---------------------------------------------------------------------------------------------
 
-int polyspli2(wall_t* owal, int on, wall_t** retwal, long sec0, long isflor0,
-              long sec1, long isflor1, long dir)
+	// ��Ŀ
+	// �A��Ŀ
+	// ����B�
+	//   ����
+	//   Collinear line priority:
+	//1st sector (wal0): POLYBOOL_AND, POLYBOOL_SUB, POLYBOOL_OR
+	//2nd sector (wal1): POLYBOOL_SUB2
+	//if retwal is null, returns # walls without generating wall list
+
+	//Split complex polygon by line. Returns complex polygon.
+	// owal[],on: input wall list
+	//    retwal: output wall list (malloced inside polyspli if not null)
+	//(kx,ky,ka): valid half-space test (x*kx + y*ky + ka > 0)
+	//   returns: # output walls
+
+	//Split wall list, slope vs. slope (helper function)
+int polyspli2 (wall_t *owal, int on, wall_t **retwal, long sec0, long isflor0,
+																		long sec1, long isflor1, long dir)
 {
-	return polyspli2_imp(owal, on, retwal, sec0, isflor0, sec1, isflor1, dir, (mapstate_t*)gst);
+	double nx0, ny0, ox0, oy0, oz0, nx1, ny1, ox1, oy1, oz1;
+	sect_t *sec = gst->sect;
+
+		//(x-sec[i].wal[0].x)*sec[i].grad[0].x + (y-sec[i].wal[0].y)*sec[i].grad[0].y + (z-sec[i].z[0])*1 > 0 //ceil i
+		//(x-sec[i].wal[0].x)*sec[i].grad[1].x + (y-sec[i].wal[0].y)*sec[i].grad[1].y + (z-sec[i].z[1])*1 < 0 //flor i
+		//(x-sec[j].wal[0].x)*sec[j].grad[0].x + (y-sec[j].wal[0].y)*sec[j].grad[0].y + (z-sec[j].z[0])*1 > 0 //ceil j
+		//(x-sec[j].wal[0].x)*sec[j].grad[1].x + (y-sec[j].wal[0].y)*sec[j].grad[1].y + (z-sec[j].z[1])*1 < 0 //flor j
+		//
+		//(x-ox0)*nx0 + (y-oy0)*ny0 + (z-oz0) > 0
+		//(x-ox1)*nx1 + (y-oy1)*ny1 + (z-oz1) < 0
+		//
+		//x*(nx0-nx1) + y*(ny0-ny1) + ox1*nx1 + oy1*ny1 + oz1 - ox0*nx0 - oy0*ny0 - oz0 = 0
+	nx0 = sec[sec0].grad[isflor0].x; ny0 = sec[sec0].grad[isflor0].y; ox0 = sec[sec0].wall[0].x; oy0 = sec[sec0].wall[0].y; oz0 = sec[sec0].z[isflor0];
+	nx1 = sec[sec1].grad[isflor1].x; ny1 = sec[sec1].grad[isflor1].y; ox1 = sec[sec1].wall[0].x; oy1 = sec[sec1].wall[0].y; oz1 = sec[sec1].z[isflor1];
+	if (!dir) return(polyspli(owal,on,retwal,nx0-nx1,ny0-ny1,ox1*nx1 + oy1*ny1 + oz1 - ox0*nx0 - oy0*ny0 - oz0));
+		  else return(polyspli(owal,on,retwal,nx1-nx0,ny1-ny0,ox0*nx0 + oy0*ny0 + oz0 - ox1*nx1 - oy1*ny1 - oz1));
 }
+
 //---------------------------------------------------------------------------------------------
 
 static void freegamestate (gamestate_t *dst)
@@ -4266,21 +4665,336 @@ void gamestate_save (char *filnam, gamestate_t *gs)
 #endif
 #endif
 
-static void compacttilelist_tilenums (void){
+static void compacttilelist_tilenums (void) //uses gtile[?].namcrc32 as the lut - a complete hack to avoid extra allocs :P
+{
+	sect_t *sec;
+	long s, w;
+
+	sec = gst->sect;
+	for(s=gst->numsects-1;s>=0;s--)
+	{
+		for(w=2-1;w>=0;w--)        { sec[s].surf[w].tilnum      = gtile[sec[s].surf[w].tilnum].namcrc32; }
+		for(w=sec[s].n-1;w>=0;w--) { sec[s].wall[w].surf.tilnum = gtile[sec[s].wall[w].surf.tilnum].namcrc32; }
 #ifndef STANDALONE
-compacttilelist_tilenums_imp((mapstate_t*)gst)
-   for(w=0;w<numplayers;w++)
-   {
-       if ((unsigned)map->p[w].copysurf[0].tilnum < (unsigned)gnumtiles) map->p[w].copysurf[0].tilnum = gtile[map->p[w].copysurf[0].tilnum].namcrc32;
-       if ((unsigned)map->p[w].copyspri[0].tilnum < (unsigned)gnumtiles) map->p[w].copyspri[0].tilnum = gtile[map->p[w].copyspri[0].tilnum].namcrc32;
-   }
- #endif
+		for(w=sec[s].headspri;w>=0;w=gst->spri[w].sectn)
+			if (gst->spri[w].tilnum >= 0) gst->spri[w].tilnum = gtile[gst->spri[w].tilnum].namcrc32;
+	}
+#else
+	}
+	for(w=gst->numspris-1;w>=0;w--)
+		if ((unsigned)gst->spri[w].tilnum < (unsigned)gnumtiles) gst->spri[w].tilnum = gtile[gst->spri[w].tilnum].namcrc32;
+	for(w=0;w<numplayers;w++)
+	{
+		if ((unsigned)gst->p[w].copysurf[0].tilnum < (unsigned)gnumtiles) gst->p[w].copysurf[0].tilnum = gtile[gst->p[w].copysurf[0].tilnum].namcrc32;
+		if ((unsigned)gst->p[w].copyspri[0].tilnum < (unsigned)gnumtiles) gst->p[w].copyspri[0].tilnum = gtile[gst->p[w].copyspri[0].tilnum].namcrc32;
+	}
+#endif
+}
+static void compacttilelist (long flags)
+{
+	sect_t *sec;
+	long i, j, s, w, nnumtiles;
+
+	sec = gst->sect;
+
+	//gtile[?].namcrc32 used as temp in this function (must be reconstructed before returning)
+
+	if (flags&1) //Remove duplicate filenames (call right after load with alt+sectors copied)
+	{
+		for(i=gnumtiles-1;i>=0;i--) gtile[i].namcrc32 = i;
+		for(s=0;s<sizeof(gtilehashead)/sizeof(gtilehashead[0]);s++)
+			for(i=gtilehashead[s];i>=0;i=gtile[i].hashnext) //n^2 compare on linked list
+			{
+				if (!gtile[i].filnam[0]) continue;
+				for(j=gtile[i].hashnext;j>=0;j=gtile[j].hashnext)
+					if (!stricmp(gtile[i].filnam,gtile[j].filnam))
+					{
+						if (gtile[j].tt.f) { free((void *)gtile[j].tt.f); gtile[j].tt.f = 0; }
+						gtile[j].filnam[0] = 0;
+						gtile[j].namcrc32 = i;
+					}
+			}
+		compacttilelist_tilenums();
+
+		nnumtiles = 0;
+		for(i=0;i<gnumtiles;i++)
+		{
+			if (!gtile[i].filnam[0]) continue;
+			j = gtile[nnumtiles].namcrc32; gtile[nnumtiles] = gtile[i]; gtile[nnumtiles].namcrc32 = j; //copy all except namcrc32
+			gtile[i].namcrc32 = nnumtiles; nnumtiles++;
+		}
+		if (nnumtiles != gnumtiles) { compacttilelist_tilenums(); gnumtiles = nnumtiles; }
+	}
+
+	if (flags&2) //Remove unused tiles (call just before save)
+	{
+		for(i=0;i<gnumtiles;i++) gtile[i].namcrc32 = 0;
+		gtile[0].namcrc32 = 1; //Keep default tile (cloud.png)
+		for(s=gst->numsects-1;s>=0;s--)
+		{
+			for(w=2-1;w>=0;w--) gtile[sec[s].surf[w].tilnum].namcrc32 = 1;
+			for(w=sec[s].n-1;w>=0;w--) gtile[sec[s].wall[w].surf.tilnum].namcrc32 = 1;
+#ifndef STANDALONE
+			for(w=sec[s].headspri;w>=0;w=gst->spri[w].sectn)
+				if (gst->spri[w].tilnum >= 0) gtile[gst->spri[w].tilnum].namcrc32 = 1;
+		}
+#else
+		}
+		for(w=gst->numspris-1;w>=0;w--)
+			if ((unsigned)gst->spri[w].tilnum < (unsigned)gnumtiles)
+				gtile[gst->spri[w].tilnum].namcrc32 = 1;
+#endif
+		nnumtiles = 0;
+		for(i=0;i<gnumtiles;i++)
+		{
+			if (!gtile[i].namcrc32) continue;
+			j = gtile[nnumtiles].namcrc32; gtile[nnumtiles] = gtile[i]; gtile[nnumtiles].namcrc32 = j; //copy all except namcrc32
+			gtile[i].namcrc32 = nnumtiles; nnumtiles++;
+		}
+		if (nnumtiles != gnumtiles) { compacttilelist_tilenums(); gnumtiles = nnumtiles; }
+	}
+
+	if (flags&3) //Reconstruct namcrc32's and hash table from scratch
+	{
+		memset(gtilehashead,-1,sizeof(gtilehashead));
+		for(i=0;i<gnumtiles;i++)
+		{
+			gtile[i].namcrc32 = getcrc32z(0,(unsigned char *)gtile[i].filnam);
+			j = (gtile[i].namcrc32&(sizeof(gtilehashead)/sizeof(gtilehashead[0])-1));
+			gtile[i].hashnext = gtilehashead[j]; gtilehashead[j] = i;
+		}
+	}
 }
 
+static int arewallstouching (int s0, int w0, int s1, int w1)
+{
+	sect_t *sec;
+	float x[4], y[4];
+	int i;
+
+	sec = gst->sect;
+
+	x[0] = sec[s0].wall[w0].x; y[0] = sec[s0].wall[w0].y; i = sec[s0].wall[w0].n+w0;
+	x[1] = sec[s0].wall[i ].x; y[1] = sec[s0].wall[i ].y;
+	x[2] = sec[s1].wall[w1].x; y[2] = sec[s1].wall[w1].y; i = sec[s1].wall[w1].n+w1;
+	x[3] = sec[s1].wall[i ].x; y[3] = sec[s1].wall[i ].y;
+
+		//Make sure x's & y's match (front or back)
+	if ((x[0] == x[2]) && (y[0] == y[2])) { if ((x[1] != x[3]) || (y[1] != y[3])) return(0); }
+	else { if ((x[0] != x[3]) || (y[0] != y[3]) || (x[1] != x[2]) || (y[1] != y[2])) return(0); }
+
+		//Connect walls only if their z's cross
+	for(i=1;i>=0;i--)
+		if (max(getslopez(&sec[s0],0,x[i],y[i]),getslopez(&sec[s1],0,x[i],y[i])) <=
+			 min(getslopez(&sec[s0],1,x[i],y[i]),getslopez(&sec[s1],1,x[i],y[i]))) return(1);
+
+	return(0);
+}
 
 void checknextwalls (void)
 {
-    checknextwalls_imp((mapstate_t*)gst);
+#if 0
+	sect_t *sec;
+	float f, x0, y0, x1, y1;
+	int s0, w0, w0n, s1, w1, w1n;
+
+	sec = gst->sect;
+
+		//Clear all nextsect/nextwalls
+	for(s0=0;s0<gst->numsects;s0++)
+		for(w0=0;w0<sec[s0].n;w0++) sec[s0].wall[w0].ns = sec[s0].wall[w0].nw = -1;
+
+	for(s1=1;s1<gst->numsects;s1++)
+		for(w1=0;w1<sec[s1].n;w1++)
+		{
+			x0 = sec[s1].wall[w1].x;  y0 = sec[s1].wall[w1].y; w1n = sec[s1].wall[w1].n+w1;
+			x1 = sec[s1].wall[w1n].x; y1 = sec[s1].wall[w1n].y;
+			for(s0=0;s0<s1;s0++)
+				for(w0=0;w0<sec[s0].n;w0++)
+					if ((sec[s0].wall[w0].x == x1) && (sec[s0].wall[w0].y == y1))
+					{
+						w0n = sec[s0].wall[w0].n+w0;
+						if ((sec[s0].wall[w0n].x == x0) && (sec[s0].wall[w0n].y == y0))
+						{
+							sec[s1].wall[w1].ns = s0; //FIX: obsolete: doesn't support SOS
+							sec[s1].wall[w1].nw = w0;
+							sec[s0].wall[w0].ns = s1;
+							sec[s0].wall[w0].nw = w1;
+							goto cnw_break2;
+						}
+					}
+cnw_break2:;
+		}
+#else
+	typedef struct { int w, s; float minpt; } cvertlist_t;
+	cvertlist_t *hashead, *hashlist, *subhashlist, vertemp;
+	int *hashsiz;
+	sect_t *sec;
+	float f; //WARNING: keep f float for hash trick!
+	float x0, y0, x1, y1, fz[8];
+	int i, j, k, m, n, r, w, s0, w0, w0n, s1, w1, w1n, s2, w2, lhsiz, hsiz, numwalls, maxchainleng;
+	int gap, z, zz, subn;
+
+	sec = gst->sect;
+
+	for(s0=0,numwalls=0;s0<gst->numsects;s0++) numwalls += sec[s0].n;
+
+	for(lhsiz=4,hsiz=(1<<lhsiz);(hsiz<<1)<numwalls;lhsiz++,hsiz<<=1); //hsiz = 0.5x to 1.0x of numwalls
+	hashead = (cvertlist_t *)_alloca(hsiz*sizeof(hashead[0])); memset(hashead,-1,hsiz*sizeof(hashead[0]));
+	hashsiz = (int         *)_alloca(hsiz*sizeof(hashsiz[0])); memset(hashsiz, 0,hsiz*sizeof(hashsiz[0]));
+
+	maxchainleng = 0;
+	for(s0=0;s0<gst->numsects;s0++)
+		for(w0=0;w0<sec[s0].n;w0++)
+		{
+			i = 0; w0n = sec[s0].wall[w0].n+w0;
+				//Hash must give same values if w0 and w0n are swapped (commutativity)
+			f = sec[s0].wall[w0].x*sec[s0].wall[w0n].x + sec[s0].wall[w0].y*sec[s0].wall[w0n].y;
+			k = *(long *)&f;
+			//k ^= (*(long *)&sec[s0].wall[w0].x) ^ (*(long *)&sec[s0].wall[w0n].x);
+			//k ^= (*(long *)&sec[s0].wall[w0].y) ^ (*(long *)&sec[s0].wall[w0n].y);
+			for(j=lhsiz;j<32;j+=lhsiz) i -= (k>>j);
+			i &= (hsiz-1);
+
+			sec[s0].wall[w0].ns = hashead[i].s; hashead[i].s = s0;
+			sec[s0].wall[w0].nw = hashead[i].w; hashead[i].w = w0;
+			hashsiz[i]++; if (hashsiz[i] > maxchainleng) maxchainleng = hashsiz[i];
+		}
+
+	//hashhead -> s0w0 -> s1w1 -> s2w2 -> s3w3 -> s4w4 -> -1
+	//              A       B       A               B
+
+	hashlist = (cvertlist_t *)_alloca(maxchainleng*sizeof(hashlist[0]));
+
+	//printf("maxchainleng=%d\n",maxchainleng); //FIX
+
+	for(i=0;i<hsiz;i++)
+	{
+		n = 0;
+		s0 = hashead[i].s;
+		w0 = hashead[i].w;
+		while (s0 >= 0)
+		{
+			hashlist[n].s = s0;
+			hashlist[n].w = w0;
+
+				//for 2nd-level hash!
+			w0n = sec[s0].wall[w0].n+w0; x0 = sec[s0].wall[w0].x; x1 = sec[s0].wall[w0n].x;
+			if (x0 != x1) hashlist[n].minpt = min(x0,x1);
+						else hashlist[n].minpt = min(sec[s0].wall[w0].y,sec[s0].wall[w0n].y);
+			n++;
+
+				//Easier to join chains if inited as pointing to self rather than -1
+			s1 = sec[s0].wall[w0].ns; sec[s0].wall[w0].ns = s0;
+			w1 = sec[s0].wall[w0].nw; sec[s0].wall[w0].nw = w0;
+			s0 = s1; w0 = w1;
+		}
+
+		if (n >= 2)
+		{
+				//Sort points by y's
+			for(gap=(n>>1);gap;gap>>=1)
+				for(z=0;z<n-gap;z++)
+					for(zz=z;zz>=0;zz-=gap)
+					{
+						if (hashlist[zz].minpt <= hashlist[zz+gap].minpt) break;
+						vertemp = hashlist[zz]; hashlist[zz] = hashlist[zz+gap]; hashlist[zz+gap] = vertemp;
+					}
+
+			//printf("//n=%d\n",n); //FIX
+
+			for(zz=n,z=n-1;z>=0;z--)
+			{
+				if ((z) && (hashlist[z-1].minpt == hashlist[z].minpt)) continue;
+				subhashlist = &hashlist[z]; subn = zz-z; zz = z;
+
+					//Example: (sector walls overlapping, drawn sideways)
+					//   AAA EEE DDD
+					//     BBB CCC
+					//                                  0    1    2    3    4
+					//j=?,w=4,r=5,n=5, s0:?, s1:?, {A->A,B->B,C->C,D->D,E->E}
+					//j=?,w=4,r=4,n=5, s0:E, s1:?, {A->A,B->B,C->C,D->D,E->E}
+					//j=3,w=4,r=4,n=5, s0:E, s1:D, {A->A,B->B,C->C,D->D,E->E}
+					//j=2,w=3,r=4,n=5, s0:E, s1:C, {A->A,B->B,D->D|C->E,E->C}
+					//j=1,w=2,r=4,n=5, s0:E, s1:B, {A->A,D->D|B->C,C->E,E->B}
+					//j=0,w=2,r=4,n=5, s0:E, s1:A, {A->A,D->D|B->C,C->E,E->B}
+					//j=1,w=1,r=3,n=5, s0:C, s1:D, {A->A|D->E,B->C,C->D,E->B}
+					//j=0,w=1,r=3,n=5, s0:C, s1:A, {A->A|D->E,B->C,C->D,E->B}
+					//j=0,w=0,r=2,n=5, s0:B, s1:A, {A->C,D->E,B->A,C->D,E->B}
+
+					//     s0    s1  s3  s2
+					//  +-------+---+---+---+
+					//  |   1   | 7 | D | 8 |
+					//  |0     2|6 4|C E|B 9|
+					//  |   3   | 5 | F | A |
+					//  +-------+---+---+---+
+					//                           s0,w0  s1,w1
+					//cmp: i=5 ,j=1,w=2,r=2,n=3   0,1,   2,3  no
+					//cmp: i=5 ,j=0,w=2,r=2,n=3   0,1,   3,2  no
+					//cmp: i=5 ,j=0,w=1,r=1,n=3   2,3,   3,2  yes
+
+					//cmp: i=6 ,j=0,w=1,r=1,n=2   0,0,   3,1  no
+
+					//cmp: i=8 ,j=1,w=2,r=2,n=3   0,2,   1,2  yes
+					//cmp: i=8 ,j=0,w=1,r=2,n=3   0,2,   2,2  no
+					//cmp: i=8 ,j=0,w=1,r=1,n=3   1,2,   2,2  no
+
+					//cmp: i=10,j=0,w=1,r=1,n=2   1,0,   3,0  yes
+
+					//Graph search and connect: fifo is hashlist itself
+					//      (write) (read) (total)
+					//  0      w      r      n
+					//   (left) (fifo) (done)
+				//printf("//i=%d:n=%d\n",i,subn); //FIX
+					//FIX
+				//for(j=0;j<subn;j++)
+				//{
+				//   s0 = subhashlist[j].s;
+				//   w0 = subhashlist[j].w;
+				//   x0 = sec[s0].wall[w0].x; x1 = sec[s0].wall[w0n].x; w0n = sec[s0].wall[w0].n+w0;
+				//   y0 = sec[s0].wall[w0].y; y1 = sec[s0].wall[w0n].y;
+				//   printf("   %2d: %6.1f %6.1f %6.1f %6.1f | %6.1f\n",j,x0,y0,x1,y1,subhashlist[j].minpt);
+				//}
+
+				w = subn-1; r = subn;
+				while (w > 0)
+				{
+					r--;
+					s0 = subhashlist[r].s;
+					w0 = subhashlist[r].w;
+					for(j=w-1;j>=0;j--)
+					{
+						s1 = subhashlist[j].s; if (s0 == s1) continue; //Don't allow 2-vertex loops to become red lines
+						w1 = subhashlist[j].w;
+						//printf("//   cmp: j=%2d,w=%2d,r=%2d, %3d,%3d, %3d,%3d, ",j,w,r,s0,w0,s1,w1); //FIX
+						if (!arewallstouching(s0,w0,s1,w1)) { /*printf("no\n");FIX*/ continue; }
+						//printf("yes\n"); //FIX
+
+						s2 = sec[s0].wall[w0].ns;
+						w2 = sec[s0].wall[w0].nw;
+							  sec[s0].wall[w0].ns = sec[s1].wall[w1].ns;
+							  sec[s0].wall[w0].nw = sec[s1].wall[w1].nw;
+															sec[s1].wall[w1].ns = s2;
+															sec[s1].wall[w1].nw = w2;
+						w--; if (w == j) continue;
+						vertemp = subhashlist[w];
+									 subhashlist[w] = subhashlist[j];
+															subhashlist[j] = vertemp;
+					}
+					if (r == w) w--;
+				}
+			}
+		}
+
+			//convert disjoint walls (self-linked) back to -1's
+		for(j=n-1;j>=0;j--)
+		{
+			s0 = hashlist[j].s; w0 = hashlist[j].w;
+			if ((sec[s0].wall[w0].ns == s0) && (sec[s0].wall[w0].nw == w0))
+				{ sec[s0].wall[w0].ns = sec[s0].wall[w0].nw = -1; }
+		}
+	}
+#endif
 	shadowtest2_updatelighting = 1;
 }
 
@@ -4602,6 +5316,592 @@ long getcurswall (playerstruct_t *lps, int *hitsect, int *hitwall, point3d *hit)
 #endif
 
 //--------------------------------------------------------------------------------------------------
+
+	//Clip wall slopes. Returns loop ordered poly (0, 3, or 4 points)
+	//pol[0]   pol[1]
+	//pol[3]   pol[2]
+
+	//This version also handles u&v. Note: Input should still be simple wall quads
+long wallclip (kgln_t *pol, kgln_t *npol)
+{
+	double f, dz0, dz1;
+
+	dz0 = pol[3].z-pol[0].z; dz1 = pol[2].z-pol[1].z;
+	if (dz0 > 0.0) //do not include null case for rendering
+	{
+		npol[0] = pol[0];
+		if (dz1 > 0.0) //do not include null case for rendering
+		{
+			npol[1] = pol[1];
+			npol[2] = pol[2];
+			npol[3] = pol[3];
+			npol[0].n = npol[1].n = npol[2].n = 1; npol[3].n = -3;
+			return(4);
+		}
+		else
+		{
+			f = dz0/(dz0-dz1);
+			npol[1].x = (pol[1].x-pol[0].x)*f + pol[0].x;
+			npol[1].y = (pol[1].y-pol[0].y)*f + pol[0].y;
+			npol[1].z = (pol[1].z-pol[0].z)*f + pol[0].z;
+			npol[1].u = (pol[1].u-pol[0].u)*f + pol[0].u;
+			npol[1].v = (pol[1].v-pol[0].v)*f + pol[0].v;
+			npol[2] = pol[3];
+			npol[0].n = npol[1].n = 1; npol[2].n = -2;
+			return(3);
+		}
+	}
+	if (dz1 <= 0.0) return(0); //do not include null case for rendering
+	f = dz0/(dz0-dz1);
+	npol[0].x = (pol[1].x-pol[0].x)*f + pol[0].x;
+	npol[0].y = (pol[1].y-pol[0].y)*f + pol[0].y;
+	npol[0].z = (pol[1].z-pol[0].z)*f + pol[0].z;
+	npol[0].u = (pol[1].u-pol[0].u)*f + pol[0].u;
+	npol[0].v = (pol[1].v-pol[0].v)*f + pol[0].v;
+	npol[1] = pol[1];
+	npol[2] = pol[2];
+	npol[0].n = npol[1].n = 1; npol[2].n = -2;
+	return(3);
+}
+
+	//Find maximum clip radius (distance to closest point of any visible polygon)
+double findmaxcr (dpoint3d *p0, int cursect, double mindist, dpoint3d *hit)
+{
+	dpoint3d np, nhit, pol[4], npol[4];
+	#define MAXVERTS 256 //FIX:timebomb: assumes there are never > 256 sectors connected at same vertex
+	vertlist_t verts[MAXVERTS], tvert;
+	sect_t *sec;
+	wall_t *wal, *wal2;
+	spri_t *spr;
+	double d, f, g, dist2, mindist2, mindist2andmaxfat;
+	long *gotsect;
+	int i, j, k, s, w, nw, bs, bw, vn, s0, s1, cf0, cf1, *secfif, secfifw, secfifr, hitit;
+
+	if ((unsigned)cursect >= (unsigned)gst->numsects) return(mindist);
+
+	i = (((gst->numsects+31)>>5)<<2);
+	gotsect = (long *)_alloca(i);
+	memset(gotsect,0,i);
+	gotsect[cursect>>5] |= (1<<cursect);
+
+	secfif = (int *)_alloca(gst->numsects*sizeof(secfif[0]));
+	secfif[0] = cursect; secfifr = 0; secfifw = 1;
+
+	hitit = 0;
+	mindist2 = mindist*mindist;
+	mindist2andmaxfat = (mindist+build2.fattestsprite)*(mindist+build2.fattestsprite);
+	hit->x = hit->y = hit->z = -17.0;
+	sec = gst->sect;
+	//for(s=gst->numsects-1;s>=0;s--) //Brute force for now.. portals later :/
+	while (secfifr < secfifw)
+	{
+		s = secfif[secfifr]; secfifr++;
+
+		//dist2 = 0.0; //FIX: bounded box not implemented yet!
+		//d = max(max((sec[s].minx) - p0->x,p0->x - (sec[s].maxx)),0.0); dist2 += d*d;
+		//d = max(max((sec[s].miny) - p0->y,p0->y - (sec[s].maxy)),0.0); dist2 += d*d;
+		//if (dist2 >= mindist2) continue;
+
+		wal = sec[s].wall; j = 0;
+		for(i=2-1;i>=0;i--)
+		{
+			if ((p0->z > getslopez(&sec[s],i,p0->x,p0->y)) == i) { j |= (i+1); continue; }
+
+				// point: <wal[0].x,wal[0].y,sec[s].z[i]>
+				//normal: <sec[s].grad[i].x,sec[s].grad[i].y,1>
+			f = (p0->x-wal[0].x)*sec[s].grad[i].x + (p0->y-wal[0].y)*sec[s].grad[i].y + (p0->z-sec[s].z[i])*1.0;
+			g = ((double)sec[s].grad[i].x)*sec[s].grad[i].x + ((double)sec[s].grad[i].y)*sec[s].grad[i].y + 1.0*1.0;
+			f /= g;
+			np.x = p0->x - sec[s].grad[i].x*f;
+			np.y = p0->y - sec[s].grad[i].y*f;
+			np.z = p0->z -              1.0*f;
+			if (!insidesect(np.x,np.y,sec[s].wall,sec[s].n)) continue;
+			f *= f*g; if (f < mindist2) { mindist2 = f; (*hit) = np; hitit = 1; }
+		}
+		if (j == 3) continue; //Behind ceiling or floor
+		for(w=0;w<sec[s].n;w++)
+		{
+			nw = wal[w].n+w;
+			vn = getwalls(s,w,verts,MAXVERTS);
+			if (wal[w].surf.flags&1) vn = 0; //Blocking wall
+			pol[0].x = wal[ w].x; pol[0].y = wal[ w].y;
+			pol[1].x = wal[nw].x; pol[1].y = wal[nw].y;
+			pol[2].x = wal[nw].x; pol[2].y = wal[nw].y;
+			pol[3].x = wal[ w].x; pol[3].y = wal[ w].y;
+			for(k=0;k<=vn;k++) //Warning: do not reverse for loop!
+			{
+				if (k >  0) { s0 = verts[k-1].s; cf0 = 1; } else { s0 = s; cf0 = 0; }
+				if (k < vn) { s1 = verts[k  ].s; cf1 = 0; } else { s1 = s; cf1 = 1; }
+
+				pol[0].z = getslopez(&sec[s0],cf0,wal[ w].x,wal[ w].y);
+				pol[1].z = getslopez(&sec[s0],cf0,wal[nw].x,wal[nw].y);
+
+				if ((k) && (!(gotsect[s0>>5]&(1<<s0))))
+				{
+						//FIX:Should only test sectors > mindist2 for sprites...
+					if (ptpolydist2(p0,pol,4,&nhit) < mindist2andmaxfat)
+						{ secfif[secfifw] = s0; secfifw++; gotsect[s0>>5] |= (1<<s0); }
+				}
+
+				pol[2].z = getslopez(&sec[s1],cf1,wal[nw].x,wal[nw].y);
+				pol[3].z = getslopez(&sec[s1],cf1,wal[ w].x,wal[ w].y);
+
+				i = wallclip(pol,npol);
+				if (i) { d = ptpolydist2(p0,npol,i,&nhit); if (d < mindist2) { mindist2 = d; (*hit) = nhit; hitit = 1; } }
+			}
+		}
+
+		spr = gst->spri;
+		for(w=sec[s].headspri;w>=0;w=spr[w].sectn)
+		{
+			//if (spr[w].owner >= 0) continue;
+			if (!(spr[w].flags&1)) continue;
+			if (spr[w].fat > 0)
+			{
+				np.x = p0->x-spr[w].p.x;
+				np.y = p0->y-spr[w].p.y;
+				np.z = p0->z-spr[w].p.z;
+				d = sqrt(np.x*np.x + np.y*np.y + np.z*np.z);
+				f = d-spr[w].fat;
+				if ((f <= 0.0) || (f*f >= mindist2)) continue;
+				mindist2 = f*f;
+				d = spr[w].fat/d;
+				hit->x = spr[w].p.x + np.x*d;
+				hit->y = spr[w].p.y + np.y*d;
+				hit->z = spr[w].p.z + np.z*d;
+				hitit = 1;
+			}
+			else //Flat polygon (wall/floor sprite)
+			{
+				for(i=4-1;i>=0;i--)
+				{
+					if ((i+1)&2) f = 1; else f = -1;
+					if ((i  )&2) g = 1; else g = -1;
+					pol[i].x = spr[w].p.x + spr[w].r.x*f + spr[w].d.x*g;
+					pol[i].y = spr[w].p.y + spr[w].r.y*f + spr[w].d.y*g;
+					pol[i].z = spr[w].p.z + spr[w].r.z*f + spr[w].d.z*g;
+				}
+				d = ptpolydist2(p0,pol,4,&nhit); if (d < mindist2) { mindist2 = d; (*hit) = nhit; hitit = 1; }
+			}
+		}
+	}
+	if (!hitit) return(mindist); //Minor optimization; this guarantees same value returned if nothing hit
+	return(sqrt(mindist2));
+}
+
+	//Note: pol doesn't support loops as dpoint3d's!
+	//(flags&1): collide both sides of plane
+static double sphpolydist (dpoint3d *p0, dpoint3d *v0, double cr, dpoint3d *pol, int n, int flags, dpoint3d *hit)
+{
+	dpoint3d np, fd, e, ff, fg;
+	double f, g, t, u, v, nx, ny, nz, mint, Za, Zb, Zc, x0, y0, x1, y1;
+	int i, j, k, maxnormaxis;
+
+	mint = 1.0;
+
+#if 0
+		//Saving this block in case I choose to optimize wall planes by processing all segments simultaneously
+	dpoint3d pol[4], npol[4];
+	double wx, wy, wz;
+	sect_t *sec;
+	wall_t *wal;
+	int nw;
+	sec = gst->sect; wal = sec[s].wall; nw = wal[w].n+w;
+
+	pol[0].x = wal[ w].x; pol[0].y = wal[ w].y; pol[0].z = getslopez(&sec[s0],cf0,pol[0].x,pol[0].y);
+	pol[1].x = wal[nw].x; pol[1].y = wal[nw].y; pol[1].z = getslopez(&sec[s0],cf0,pol[1].x,pol[1].y);
+	pol[2].x = wal[nw].x; pol[2].y = wal[nw].y; pol[2].z = getslopez(&sec[s1],cf1,pol[2].x,pol[2].y);
+	pol[3].x = wal[ w].x; pol[3].y = wal[ w].y; pol[3].z = getslopez(&sec[s1],cf1,pol[3].x,pol[3].y);
+	n = wallclip(pol,npol); if (!n) return(1.0);
+
+		//Raytrace to planes
+	nx = wal[w].y-wal[nw].y; ny = wal[nw].x-wal[w].x; //plane's normal (nz = 0)
+	t = v0->x*nx + v0->y*ny;
+	if (t < 0.0)
+	{
+		f = 1.0/sqrt(nx*nx + ny*ny); nx *= f; ny *= f; t *= f; //FIX:optimize
+		wx = wal[w].x; wy = wal[w].y; wz = 0.0; //point on plane
+		t = (cr - ((p0->x-wx)*nx + (p0->y-wy)*ny)) / t;
+		np.x = v0->x*t + p0->x - nx*cr;
+		np.y = v0->y*t + p0->y - ny*cr;
+		np.z = v0->z*t + p0->z;
+		if (fabs(wal[nw].x-wal[w].x) >= fabs(wal[nw].y-wal[w].y))
+			  { f = np.x-wal[w].x; g = wal[nw].x-wal[w].x; }
+		else { f = np.y-wal[w].y; g = wal[nw].y-wal[w].y; }
+		if (g < 0) { f = -f; g = -g; }
+		if ((t >= 0) && (t < mint) &&
+			 (f >= 0.0) && (f <= g) &&
+			 (np.z >= getslopez(&sec[s0],cf0,np.x,np.y)) &&
+			 (np.z <= getslopez(&sec[s1],cf1,np.x,np.y)))
+			{ mint = t; (*hit) = np; }
+	}
+#else
+	nx = ny = nz = 0.0;
+	for(i=n-2;i>0;i--)
+	{
+		nx += (pol[i].y-pol[0].y)*(pol[i+1].z-pol[0].z) - (pol[i].z-pol[0].z)*(pol[i+1].y-pol[0].y);
+		ny += (pol[i].z-pol[0].z)*(pol[i+1].x-pol[0].x) - (pol[i].x-pol[0].x)*(pol[i+1].z-pol[0].z);
+		nz += (pol[i].x-pol[0].x)*(pol[i+1].y-pol[0].y) - (pol[i].y-pol[0].y)*(pol[i+1].x-pol[0].x);
+	}
+	f = nx*nx + ny*ny + nz*nz;
+	if (f > 0.0) //Plane must have area
+	{
+		f = -cr/sqrt(f); nx *= f; ny *= f; nz *= f;
+
+		t = v0->x*nx + v0->y*ny + v0->z*nz;
+		if ((flags&1) && (t > 0.0)) { t = -t; nx = -nx; ny = -ny; nz = -nz; }
+		if (t < 0.0) //Vector must be towards plane
+		{
+				//(v0->x*t + p0->x - (pol[0].x + nx))*nx
+				//(v0->y*t + p0->y - (pol[0].y + ny))*ny
+				//(v0->z*t + p0->z - (pol[0].z + nz))*nz = 0
+			t = ((pol[0].x+nx-p0->x)*nx +
+				  (pol[0].y+ny-p0->y)*ny +
+				  (pol[0].z+nz-p0->z)*nz) / t;
+			np.x = v0->x*t + p0->x - nx;
+			np.y = v0->y*t + p0->y - ny;
+			np.z = v0->z*t + p0->z - nz;
+
+			if ((fabs(nx) > fabs(ny)) && (fabs(nx) > fabs(nz))) maxnormaxis = 0;
+			else if (fabs(ny) > fabs(nz)) maxnormaxis = 1; else maxnormaxis = 2;
+
+			for(i=n-1,j=k=0;j<n;i=j,j++)
+			{
+				if (maxnormaxis > 0) { x0 = pol[i].x - np.x; x1 = pol[j].x - np.x; }
+									 else { x0 = pol[i].y - np.y; x1 = pol[j].y - np.y; }
+				if (maxnormaxis > 1) { y0 = pol[i].y - np.y; y1 = pol[j].y - np.y; }
+									 else { y0 = pol[i].z - np.z; y1 = pol[j].z - np.z; }
+				if (y0*y1 < 0.0)
+				{
+					if (x0*x1 >= 0.0) { if (x0 < 0.0) k++; }
+					else if ((x0*y1 - x1*y0)*y1 < 0.0) k++;
+				}
+			}
+			if ((k&1) && (t > 0) && (t < mint)) { mint = t; (*hit) = np; }
+		}
+	}
+#endif
+
+	for(i=0;i<n;i++)
+	{
+		j = i+1; if (j >= n) j = 0;
+			//Raytrace to edges (cylinders)
+			//ix = t*v0->x+p0->x  (ix,iy,iz)
+			//iy = t*v0->y+p0->y     /�
+			//iz = t*v0->z+p0->z   c` cr
+			//                   /`   �
+			//           p->v[i]���a���������p->v[j]
+			//
+			//a = ((ix-p->v[i].x)*d.x + (iy-p->v[i].y)*dy + (iz-p->v[i].z)*dz) / sqrt(d.x*d.x + dy*dy + dz*dz)
+			//c = sqrt((ix-p->v[i].x)^2 + (iy-p->v[i].y)^2 + (iz-p->v[i].z)^2)
+			//a*a + cr*cr = c*c
+			//0 <= t < mint
+			//
+			//((t*v0->x+ex)*d.x+(t*v0->y+e.y)*d.y+(t*v0->z+e.z)*d.z)^2-((t*v0->x+e.x)^2+(t*v0->y+e.y)^2+(t*v0->z+e.z)^2-cr^2)*v
+		fd.x = pol[j].x-pol[i].x; e.x = p0->x-pol[i].x;
+		fd.y = pol[j].y-pol[i].y; e.y = p0->y-pol[i].y;
+		fd.z = pol[j].z-pol[i].z; e.z = p0->z-pol[i].z;
+		ff.x = fd.x*fd.x; ff.y = fd.y*fd.y; ff.z = fd.z*fd.z; v = ff.x+ff.y+ff.z;
+		ff.x -= v; fg.z = fd.x*fd.y;
+		ff.y -= v; fg.y = fd.x*fd.z;
+		ff.z -= v; fg.x = fd.y*fd.z;
+		Za = ff.x*v0->x*v0->x + ff.y*v0->y*v0->y + ff.z*v0->z*v0->z + (fg.z* v0->x*v0->y          + fg.y* v0->x*v0->z          + fg.x* v0->y*v0->z         )*2;
+		Zb = ff.x*e.x*v0->x   + ff.y*e.y*v0->y   + ff.z*e.z*v0->z   + (fg.z*(e.x*v0->y+e.y*v0->x) + fg.y*(e.x*v0->z+e.z*v0->x) + fg.x*(e.y*v0->z+e.z*v0->y))  ;
+		Zc = ff.x*e.x*e.x     + ff.y*e.y*e.y     + ff.z*e.z*e.z     + (fg.z* e.x*e.y              + fg.y* e.x*e.z              + fg.x* e.y*e.z             )*2;
+		Zc += cr*cr*v;
+		u = Zb*Zb - Za*Zc; if ((u < 0.0) || (Za == 0.0)) continue;
+	 //t = (sqrt(u)-Zb) / Za;  //Classic quadratic equation (Zb premultiplied by .5)
+		t = -Zc / (sqrt(u)+Zb); //Alternate quadratic equation (Zb premultiplied by .5)
+		if ((t < 0.0) || (t >= mint)) continue;
+		u = (t*v0->x+e.x)*fd.x + (t*v0->y+e.y)*fd.y + (t*v0->z+e.z)*fd.z; if ((u < 0) || (u >= v)) continue;
+		mint = t; u /= v;
+		hit->x = fd.x*u + pol[i].x;
+		hit->y = fd.y*u + pol[i].y;
+		hit->z = fd.z*u + pol[i].z;
+	}
+
+		//Raytrace to vertices (sphere)
+		//ix = t*v0->x + p0->x
+		//iy = t*v0->y + p0->y
+		//iz = t*v0->z + p0->z
+		//(px-ix)^2 + (py-iy)^2 + (pz-iz)^2 = cr*cr
+		//0 <= t < mint
+		//
+		//ex = p0->x-px;
+		//ey = p0->y-py;
+		//ez = p0->z-pz;
+		//(t*v0->x + ex)^2 +
+		//(t*v0->y + ey)^2 +
+		//(t*v0->z + ez)^2 = cr*cr
+		//
+		//t*t*v0->x^2 + t*v0->x*ex*2 + ex*ex
+		//t*t*v0->y^2 + t*v0->y*ey*2 + ey*ey
+		//t*t*v0->z^2 + t*v0->z*ez*2 + ez*ez - cr*cr = 0
+	for(i=0;i<n;i++)
+	{
+		e.x = p0->x-pol[i].x; e.y = p0->y-pol[i].y; e.z = p0->z-pol[i].z;
+		Za = v0->x*v0->x + v0->y*v0->y + v0->z*v0->z; //FIX:optimize
+		Zb = v0->x*e.x + v0->y*e.y + v0->z*e.z;
+		Zc = e.x*e.x + e.y*e.y + e.z*e.z - cr*cr;
+		u = Zb*Zb - Za*Zc; if ((u < 0.0) || (Za == 0.0)) continue;
+	 //t = -(sqrt(u)+Zb) / Za; //Classic quadratic equation (Zb premultiplied by .5)
+		t = Zc / (sqrt(u)-Zb); //Alternate quadratic equation (Zb premultiplied by .5)
+		if ((t < 0.0) || (t >= mint)) continue;
+		mint = t; (*hit) = pol[i];
+	}
+
+	return(mint);
+}
+
+static double sphtracewall (dpoint3d *p0, dpoint3d *v0, double cr, int s, int w, int s0, int cf0, int s1, int cf1, dpoint3d *hit)
+{
+	sect_t *sec;
+	wall_t *wal;
+	dpoint3d pol[4], npol[8];
+	int n, nw;
+
+	sec = gst->sect; wal = sec[s].wall; nw = wal[w].n+w;
+	pol[0].x = wal[ w].x; pol[0].y = wal[ w].y; pol[0].z = getslopez(&sec[s0],cf0,wal[ w].x,wal[ w].y);
+	pol[1].x = wal[nw].x; pol[1].y = wal[nw].y; pol[1].z = getslopez(&sec[s0],cf0,wal[nw].x,wal[nw].y);
+	pol[2].x = wal[nw].x; pol[2].y = wal[nw].y; pol[2].z = getslopez(&sec[s1],cf1,wal[nw].x,wal[nw].y);
+	pol[3].x = wal[ w].x; pol[3].y = wal[ w].y; pol[3].z = getslopez(&sec[s1],cf1,wal[ w].x,wal[ w].y);
+	n = wallclip(pol,npol); if (!n) return(1.0);
+	return(sphpolydist(p0,v0,cr,npol,n,0,hit));
+}
+
+static double sphtracerec (dpoint3d *p0, dpoint3d *v0, dpoint3d *hit, int *cursect, double cr)
+{
+	dpoint3d np, nhit, pol[4];
+	#define MAXVERTS 256 //FIX:timebomb: assumes there are never > 256 sectors connected at same vertex
+	vertlist_t verts[MAXVERTS], tvert;
+	sect_t *sec;
+	wall_t *wal, *wal2;
+	spri_t *spr;
+	double d, f, g, t, u, v, wx, wy, wz, nx, ny, nz, mint, Za, Zb, Zc;
+	long *gotsect;
+	int i, j, k, s, w, nw, bs, bw, vn, s0, s1, cf0, cf1, *secfif, secfifw, secfifr;
+
+	if ((unsigned)(*cursect) >= (unsigned)gst->numsects) return(1.0);
+
+	i = (((gst->numsects+31)>>5)<<2);
+	gotsect = (long *)_alloca(i);
+	memset(gotsect,0,i);
+	gotsect[(*cursect)>>5] |= (1<<(*cursect));
+
+	secfif = (int *)_alloca(gst->numsects*sizeof(secfif[0]));
+	secfif[0] = (*cursect); secfifr = 0; secfifw = 1;
+
+	mint = 1.0; hit->x = hit->y = hit->z = -17.0;
+
+	sec = gst->sect;
+	while (secfifr < secfifw)
+	{
+		s = secfif[secfifr]; secfifr++;
+
+			//Raytrace to planes
+			//ix = t*v0->x + p0->x
+			//iy = t*v0->y + p0->y
+			//iz = t*v0->z + p0->z
+			//(ix-wx)*nx + (iy-wy)*ny + (iz-wz)*nz = cr
+			//
+			//t = (cr - ((p0->x-wx)*nx + (p0->y-wy)*ny + (p0->z-wz)*nz)) / (v0->x*nx + v0->y*ny + v0->z*nz)
+		wal = sec[s].wall;
+		for(i=2-1;i>=0;i--) //Collide ceilings/floors
+		{
+			nx = sec[s].grad[i].x; ny = sec[s].grad[i].y; nz = 1.0; //plane's normal
+			if (i) { nx = -nx; ny = -ny; nz = -nz; }
+			t = v0->x*nx + v0->y*ny + v0->z*nz; if (t >= 0.0) continue;
+			f = 1.0/sqrt(nx*nx + ny*ny + 1.0); nx *= f; ny *= f; nz *= f; t *= f; //FIX:optimize
+			wx = wal[0].x; wy = wal[0].y; wz = sec[s].z[i]; //point on plane
+			f = (p0->x-wx)*nx + (p0->y-wy)*ny + (p0->z-wz)*nz; if (f < 0) continue;
+			t = (cr-f)/t;
+			np.x = v0->x*t + p0->x - nx*cr;
+			np.y = v0->y*t + p0->y - ny*cr;
+			np.z = v0->z*t + p0->z - nz*cr;
+			if (!insidesect(np.x,np.y,sec[s].wall,sec[s].n)) continue;
+			if ((t >= 0) && (t < mint))
+			{
+				mint = t; (*hit) = np;
+				build2.clipsect[build2.cliphitnum] = s;
+				build2.clipwall[build2.cliphitnum] = i-2;
+			}
+		}
+
+		for(w=0;w<sec[s].n;w++)
+		{
+			nw = wal[w].n+w;
+			vn = getwalls(s,w,verts,MAXVERTS);
+			if (wal[w].surf.flags&1) vn = 0; //Blocking wall
+
+			s0 = s; cf0 = 0;
+			for(k=0;k<=vn;k++) //Warning: do not reverse for loop direction!
+			{
+				if (k)
+				{
+					s0 = s1; cf0 = 1;
+					if (!(gotsect[s0>>5]&(1<<s0)))
+					{
+						d = distpoint2line2(p0->x,p0->y,wal[w].x,wal[w].y,wal[nw].x,wal[nw].y);
+						if ((d < cr*cr) || (sphtracewall(p0,v0,cr,s,w,s1,cf1,s0,cf0,&nhit) < mint))
+							{ secfif[secfifw] = s0; secfifw++; gotsect[s0>>5] |= (1<<s0); }
+						else
+						{
+								//FIX:Should only test these sectors for sprites...
+							d = roundcylminpath2(p0->x,p0->y,p0->x+v0->x,p0->y+v0->y,wal[w].x,wal[w].y,wal[nw].x,wal[nw].y);
+							if (d < (build2.fattestsprite+cr)*(build2.fattestsprite+cr))
+								{ secfif[secfifw] = s0; secfifw++; gotsect[s0>>5] |= (1<<s0); }
+						}
+					}
+				}
+				if (k < vn) { s1 = verts[k].s; cf1 = 0; } else { s1 = s; cf1 = 1; }
+				d = sphtracewall(p0,v0,cr,s,w,s0,cf0,s1,cf1,&nhit);
+				if (d < mint)
+				{
+					mint = d; (*hit) = nhit;
+					build2.clipsect[build2.cliphitnum] = s;
+					build2.clipwall[build2.cliphitnum] = w;
+				}
+			}
+		}
+
+		spr = gst->spri;
+		for(w=sec[s].headspri;w>=0;w=spr[w].sectn)
+		{
+			//if (spr[w].owner >= 0) continue;
+			if (!(spr[w].flags&1)) continue;
+
+			if (spr[w].fat > 0.f)
+			{
+					//Raytrace to sphere
+				np.x = p0->x-spr[w].p.x;
+				np.y = p0->y-spr[w].p.y;
+				np.z = p0->z-spr[w].p.z;
+				Za = v0->x*v0->x + v0->y*v0->y + v0->z*v0->z; //FIX:optimize
+				Zb = v0->x*np.x + v0->y*np.y + v0->z*np.z;
+				d = np.x*np.x + np.y*np.y + np.z*np.z;
+				Zc = d - (spr[w].fat+cr)*(spr[w].fat+cr);
+				u = Zb*Zb - Za*Zc; if ((u < 0.0) || (Za == 0.0)) continue;
+			 //t = -(sqrt(u)+Zb) / Za; //Classic quadratic equation (Zb premultiplied by .5)
+				t = Zc / (sqrt(u)-Zb); //Alternate quadratic equation (Zb premultiplied by .5)
+				if ((t < 0.0) || (t >= mint)) continue;
+				mint = t;
+				if (d != 0) d = spr[w].fat/sqrt(d);
+				hit->x = spr[w].p.x + np.x*d;
+				hit->y = spr[w].p.y + np.y*d;
+				hit->z = spr[w].p.z + np.z*d;
+				build2.clipsect[build2.cliphitnum] = s;
+				build2.clipwall[build2.cliphitnum] = w+0x40000000;
+			}
+			else //Flat polygon (wall/floor sprite)
+			{
+				for(i=4-1;i>=0;i--)
+				{
+					if ((i+1)&2) f = 1; else f = -1;
+					if ((i  )&2) g = 1; else g = -1;
+					pol[i].x = spr[w].p.x + spr[w].r.x*f + spr[w].d.x*g;
+					pol[i].y = spr[w].p.y + spr[w].r.y*f + spr[w].d.y*g;
+					pol[i].z = spr[w].p.z + spr[w].r.z*f + spr[w].d.z*g;
+				}
+				j = 0;
+				if (!(spr[w].flags&64)) j |= 1; //select 1/2-sided collision
+				else if (spr[w].flags&4) { np = pol[0]; pol[0] = pol[2]; pol[2] = np; } //Mirrored: use other side
+				t = sphpolydist(p0,v0,cr,pol,4,j,&nhit);
+				if ((t < 0.0) || (t >= mint)) continue;
+				mint = t;
+				(*hit) = nhit;
+				build2.clipsect[build2.cliphitnum] = s;
+				build2.clipwall[build2.cliphitnum] = w+0x40000000;
+			}
+		}
+	}
+	return(mint);
+}
+
+	//Returns: 1 if no obstacles, 0 if hit something
+static long sphtrace (dpoint3d *p0,  //start pt
+							 dpoint3d *v0,  //move vector
+							 dpoint3d *hit, //pt causing collision
+							 int *cursect,
+							 double cr)
+{
+	dpoint3d dp;
+	double mint;
+
+	if ((v0->x == 0.0) && (v0->y == 0.0) && (v0->z == 0.0)) return(1);
+
+	mint = sphtracerec(p0,v0,hit,cursect,cr);
+	dp.x = v0->x*mint; p0->x += dp.x; v0->x -= dp.x;
+	dp.y = v0->y*mint; p0->y += dp.y; v0->y -= dp.y;
+	dp.z = v0->z*mint; p0->z += dp.z; v0->z -= dp.z;
+	return(mint == 1.0);
+}
+
+static void collmove (dpoint3d *p, int *cursect, dpoint3d *v, double cr, long doslide)
+{
+	dpoint3d nv, n0, n1, n2;
+	double f;
+	long i;
+
+	f = sqrt(v->x*v->x + v->y*v->y + v->z*v->z) + cr;
+	build2.clipmaxcr = findmaxcr(p,*cursect,f,&nv);
+	if (build2.clipmaxcr >= f) { p->x += v->x; p->y += v->y; p->z += v->z; build2.cliphitnum = -1; return; }
+	cr = min(cr,build2.clipmaxcr);
+
+	nv = (*v);
+
+	build2.cliphitnum = 0; cr -= 1e-7;
+	if (!sphtrace(p,&nv,&build2.cliphit[0],cursect,cr))
+	{
+		build2.cliphitnum = 1;
+		if (doslide)
+		{
+				//Make slide vector (nv) parallel to surface hit (normal: build2.cliphit[0]-p)
+			n0.x = build2.cliphit[0].x-p->x; n0.y = build2.cliphit[0].y-p->y; n0.z = build2.cliphit[0].z-p->z;
+			f = (nv.x*n0.x + nv.y*n0.y + nv.z*n0.z) / (cr*cr);
+			nv.x -= n0.x*f; nv.y -= n0.y*f; nv.z -= n0.z*f;
+
+			cr -= 1e-7;
+			if (!sphtrace(p,&nv,&build2.cliphit[1],cursect,cr))
+			{
+				build2.cliphitnum = 2;
+
+					//Make slide vector (nv) parallel to both surfaces hit (normals: build2.cliphit[0]-p, build2.cliphit[1]-p)
+				n1.x = build2.cliphit[1].x-p->x; n1.y = build2.cliphit[1].y-p->y; n1.z = build2.cliphit[1].z-p->z;
+				n2.x = n0.z*n1.y - n0.y*n1.z;
+				n2.y = n0.x*n1.z - n0.z*n1.x;
+				n2.z = n0.y*n1.x - n0.x*n1.y;
+				f = (nv.x*n2.x + nv.y*n2.y + nv.z*n2.z) / (n2.x*n2.x + n2.y*n2.y + n2.z*n2.z);
+				nv.x = n2.x*f; nv.y = n2.y*f; nv.z = n2.z*f;
+
+				cr -= 1e-7;
+				if (!sphtrace(p,&nv,&build2.cliphit[2],cursect,cr)) build2.cliphitnum = 3;
+			}
+		}
+	}
+}
+
+static void collmove (point3d *p, int *cursect, point3d *v, double cr, long doslide)
+{
+	dpoint3d np, nv;
+
+	np.x = (double)p->x; nv.x = v->x;
+	np.y = (double)p->y; nv.y = v->y;
+	np.z = (double)p->z; nv.z = v->z;
+	collmove(&np,cursect,&nv,cr,doslide);
+	p->x = (float)np.x;
+	p->y = (float)np.y;
+	p->z = (float)np.z;
+	if (build2.cliphitnum < 2) return;
+
+		//FIX:This evil hack makes sure double->float quantization does not mess
+		//    w/3rd stage of sliding collision
+	if ((nv.x < 0.0) && ((double)p->x > np.x)) (*(long *)&p->x)--;
+	if ((nv.x > 0.0) && ((double)p->x < np.x)) (*(long *)&p->x)++;
+	if ((nv.y < 0.0) && ((double)p->y > np.y)) (*(long *)&p->y)--;
+	if ((nv.y > 0.0) && ((double)p->y < np.y)) (*(long *)&p->y)++;
+	if ((nv.z < 0.0) && ((double)p->z > np.z)) (*(long *)&p->z)--;
+	if ((nv.z > 0.0) && ((double)p->z < np.z)) (*(long *)&p->z)++;
+}
 
 //--------------------------------------------------------------------------------------------------
 
@@ -4964,7 +6264,7 @@ void saveaskc (char *filnam)
 				pol[3].u = wal[w].surf.uv[2].x*(pol[3].z-pol[0].z) + pol[0].u;
 				pol[3].v = wal[w].surf.uv[2].y*(pol[3].z-pol[0].z) + pol[0].v;
 
-				i = wallclippol(pol,npol); if (!i) continue;
+				i = wallclip(pol,npol); if (!i) continue;
 
 				if (col != ocol) { ocol = col; fprintf(fil,"\tsetcol(%d,%d,%d);\n",((col>>16)&255)<<1,((col>>8)&255)<<1,(col&255)<<1); }
 				if (wal[w].surf.tilnum != otexi) { otexi = wal[w].surf.tilnum; fprintf(fil,"\tglsettex(\"%s\");\n",gtile[otexi].filnam); }
@@ -5079,7 +6379,7 @@ void saveasstl (char *filnam)
 				pol[1].z = getslopez(&sec[s0],cf0,pol[1].x,pol[1].y);
 				pol[2].z = getslopez(&sec[s1],cf1,pol[2].x,pol[2].y);
 				pol[3].z = getslopez(&sec[s1],cf1,pol[3].x,pol[3].y);
-				i = wallclippol(pol,npol); if (!i) continue;
+				i = wallclip(pol,npol); if (!i) continue;
 
 				fp[0].x = npol[0].x; fp[0].y = npol[0].y; fp[0].z = npol[0].z;
 				for(j=2;j<i;j++)
@@ -5105,7 +6405,7 @@ void saveasstl (char *filnam)
 	fclose(fil);
 }
 
-void savemap (char *filnam) // TODO MOVE THIS
+void savemap (char *filnam)
 {
 	FILE *fil;
 	sect_t *sec;
@@ -5118,7 +6418,7 @@ void savemap (char *filnam) // TODO MOVE THIS
 
 	checknextwalls();
 	checksprisect(-1);
-	compacttilelist_imp(3, (mapstate_t*)gst);
+	compacttilelist(3);
 
 	fil = fopen(filnam,"wb"); if (!fil) return;
 
@@ -5154,7 +6454,750 @@ void savemap (char *filnam) // TODO MOVE THIS
 typedef struct { long tilnum, flags, tag; point2d uv[3]; int dummy[6]; short asc, rsc, gsc, bsc; } osurf1_t;
 typedef struct { float x, y; long n, ns, nw; surf_t surf; } owall1_t;
 typedef struct { float z[2]; point2d grad[2]; surf_t surf[2]; long foglev; wall_t *wall; int n, nmax; } osect1_t;
-#ifdef STANDALONE // UI HANDLERS
+
+static int loadmap (char *filnam)
+{
+	surf_t *sur;
+	sect_t *sec;
+	wall_t *wal;
+	spri_t *spr;
+	float f, fx, fy;
+	int i, j, k, l;
+	long x, y, z, fileid, hitile, warned = 0, altsects, nnumtiles, nnumspris;
+	short s, cursect;
+	char och, tbuf[256];
+
+	if (!kzopen(filnam))
+	{     //Try without full pathname - see if it's in ZIP/GRP/Mounted_Dir
+		for(i=j=0;filnam[i];i++) if ((filnam[i] == '/') || (filnam[i] == '\\')) j = i+1;
+		if (!j) return(0);
+		filnam = &filnam[j];
+		if (!kzopen(filnam)) return(0);
+	}
+	kzread(&fileid,4);
+	if ((fileid == 0x04034b50) || (fileid == 0x536e654b)) //'PK\3\4' is ZIP file id, 'KenS' is GRP file id
+		{ kzclose(); kzaddstack(filnam); return(1); }
+	sec = gst->sect; gst->light_sprinum = 0;
+	if (fileid == 0x3142534b) //KSB1
+	{
+		typedef struct { long tilnum, flags, tag; point2d uv[3]; int dummy[6]; short asc, rsc, gsc, bsc; } surf1_t;
+		typedef struct { float x, y; long n, ns, nw; surf1_t surf; } wall1_t;
+		typedef struct { float z[2]; point2d grad[2]; surf1_t surf[2]; long foglev; wall1_t *wall; int n, nmax; } sect1_t;
+		surf1_t surf1;
+		wall1_t wall1;
+		sect1_t sect1;
+
+		for(i=gst->numsects-1;i>=0;i--)
+			if (gst->sect[i].wall) { free(gst->sect[i].wall); gst->sect[i].wall = 0; }
+		kzread(&gst->numsects,4);
+		if (gst->numsects > gst->malsects)
+		{
+			i = gst->malsects; gst->malsects = max(gst->numsects+1,gst->malsects<<1);
+			sec = gst->sect = (sect_t *)realloc(sec,gst->malsects*sizeof(sect_t));
+			memset(&sec[i],0,(gst->malsects-i)*sizeof(sect_t));
+		}
+		memset(sec,0,sizeof(sect_t)*gst->numsects);
+		for(i=0;i<gst->numsects;i++)
+		{
+			kzread(&sect1,sizeof(sect1_t));
+			for(j=0;j<2;j++)
+			{
+				sec[i].z[j] = sect1.z[j];
+				sec[i].grad[j] = sect1.grad[j];
+				//for(k=0;k<3;k++) sec[i].surf[j].uv[k] = sect1.surf[j].uv[k];
+				sec[i].surf[j].uv[1].x = sec[i].surf[j].uv[2].y = 1.f;
+				sec[i].surf[j].asc = sect1.surf[j].asc;
+				sec[i].surf[j].rsc = sect1.surf[j].rsc;
+				sec[i].surf[j].gsc = sect1.surf[j].gsc;
+				sec[i].surf[j].bsc = sect1.surf[j].bsc;
+				sec[i].headspri = -1;
+				sec[i].owner = -1;
+			}
+			sec[i].n = sect1.n;
+			sec[i].nmax = sect1.nmax;
+		}
+		for(i=0;i<gst->numsects;i++)
+		{
+			sec[i].wall = (wall_t *)malloc(sec[i].nmax*sizeof(wall_t));
+			memset(sec[i].wall,0,sec[i].nmax*sizeof(wall_t));
+			for(j=0;j<sec[i].n;j++)
+			{
+				kzread(&wall1,sizeof(wall1_t));
+				wal = sec[i].wall;
+				wal[j].x = wall1.x;
+				wal[j].y = wall1.y;
+				wal[j].n = wall1.n;
+				wal[j].ns = wall1.ns;
+				wal[j].nw = wall1.nw;
+				if (!stricmp(&filnam[max(strlen(filnam)-13,0)],"sos_test3.map"))
+					  { for(k=0;k<3;k++) wal[j].surf.uv[k] = wall1.surf.uv[k]; }
+				else { wal[j].surf.uv[1].x = wal[j].surf.uv[2].y = 1.f; }
+				wal[j].surf.asc = wall1.surf.asc;
+				wal[j].surf.rsc = wall1.surf.rsc;
+				wal[j].surf.gsc = wall1.surf.gsc;
+				wal[j].surf.bsc = wall1.surf.bsc;
+				wal[j].surfn = 1;
+				wal[j].owner = -1;
+			}
+		}
+
+		gst->numspris = 0;
+
+#ifdef STANDALONE
+		for(i=numplayers-1;i>=0;i--) gst->p[i].sec.n = 0;
+#endif
+		checknextwalls();
+		checksprisect(-1);
+		kzclose();
+		return(1);
+	}
+	else if (fileid == 0x3242534b) //KSB2 (current BUILD2 map format)
+	{
+		kzread(&gst->startpos,sizeof(gst->startpos));
+		kzread(&gst->startrig,sizeof(gst->startrig));
+		kzread(&gst->startdow,sizeof(gst->startdow));
+		kzread(&gst->startfor,sizeof(gst->startfor));
+		for(i=numplayers-1;i>=0;i--)
+		{
+			gst->p[i].ipos = gst->startpos;
+			gst->p[i].ifor = gst->startfor;
+			gst->p[i].irig = gst->startrig;
+			gst->p[i].idow = gst->startdow;
+			gst->p[i].cursect = -1;
+		}
+
+			//Load sectors
+		altsects = 0;
+		for(i=0;i<gst->numsects;i++)
+		{
+			if (sec[i].owner < 0)
+			{
+				while (sec[i].headspri >= 0) delspri(sec[i].headspri);
+				if (gst->sect[i].wall) { free(gst->sect[i].wall); gst->sect[i].wall = 0; }
+				continue;
+			}
+			for(j=sec[i].headspri;j>=0;j=gst->spri[j].sectn) gst->spri[j].sect = altsects;
+			memcpy(&sec[altsects],&sec[i],sizeof(sect_t)); altsects++;
+		}
+		kzread(&i,4); gst->numsects = i+altsects;
+		if (gst->numsects > gst->malsects)
+		{
+			i = gst->malsects; gst->malsects = max(gst->numsects+1,gst->malsects<<1);
+			sec = gst->sect = (sect_t *)realloc(sec,gst->malsects*sizeof(sect_t));
+			memset(&sec[i],0,(gst->malsects-i)*sizeof(sect_t));
+		}
+		kzread(&sec[altsects],(gst->numsects-altsects)*sizeof(sect_t));
+
+			//Load walls
+		for(i=altsects;i<gst->numsects;i++)
+		{
+			sec[i].wall = (wall_t *)malloc(sec[i].nmax*sizeof(wall_t));
+			sec[i].owner = -1;
+			for(j=0;j<sec[i].n;j++)
+			{
+				kzread(&sec[i].wall[j],sizeof(wall_t));
+
+				if (!sec[i].wall[j].n)
+				{
+					if (!warned)
+					{
+						warned = 1;
+						if (MessageBox(ghwnd,"Your map appears to be corrupt. Load anyway?",prognam,MB_YESNO) == IDNO)
+						{
+							for(;i>=0;i--) free(sec[i].wall);
+							gst->numsects = 0;
+							return(-1);
+						}
+					}
+				}
+
+				sec[i].wall[j].owner = -1;
+				if (sec[i].wall[j].surfn > 1)
+				{
+					sec[i].wall[j].xsurf = (surf_t *)malloc((sec[i].wall[j].surfn-1)*sizeof(surf_t));
+					kzread(sec[i].wall[j].xsurf,(sec[i].wall[j].surfn-1)*sizeof(surf_t));
+				}
+			}
+		}
+
+			//Load tiles
+		kzread(&nnumtiles,4); gnumtiles += nnumtiles;
+		if (gnumtiles > gmaltiles)
+		{
+			gmaltiles = max(gnumtiles+1,gmaltiles<<1);
+			gtile = (tile_t *)realloc(gtile,gmaltiles*sizeof(tile_t));
+		}
+		for(i=gnumtiles-nnumtiles;i<gnumtiles;i++)
+		{
+			kzread(&s,2); kzread(gtile[i].filnam,s); gtile[i].filnam[s] = 0; //FIX:possible buffer overflow here
+			gtile[i].tt.f = 0;
+			gtile[i].namcrc32 = getcrc32z(0,(unsigned char *)gtile[i].filnam);
+		}
+
+			//Load sprites
+		kzread(&nnumspris,4); gst->numspris += nnumspris;
+		if (!nnumspris) for(i=0;i<gst->numsects;i++) { sec[i].headspri = -1; sec[i].owner = -1; } //Hack for loading old format
+		if (gst->numspris > gst->malspris)
+		{
+			i = gst->malspris;
+			gst->malspris = max(gst->numspris+1,gst->malspris<<1);
+			gst->spri = (spri_t *)realloc(gst->spri,gst->malspris*sizeof(spri_t));
+#ifndef STANDALONE
+			for(;i<gst->malspris;i++) gst->spri[i].sect = -1;
+#endif
+		}
+		kzread(&gst->spri[gst->numspris-nnumspris],nnumspris*sizeof(spri_t));
+		for(i=gst->numspris-nnumspris;i<gst->numspris;i++) gst->spri[i].sect += altsects;
+
+
+			// | 0 ..       altsects ..  gst->numsects   |
+			// |   ^old_sects^    |     ^new_sects^      |
+			//
+			// |0..gst->numspris-nnumspris..gst->numspris|
+			// |  ^old_sprites^   |    ^new_sprites^     |
+			//
+			// | 0 ..  gnumtiles-nnumtiles .. gnumtiles  |
+			// |   ^old_tiles^    |     ^new_tiles^      |
+
+			//Adjust tile indices for new sectors(/walls) & sprites
+		for(i=altsects;i<gst->numsects;i++)
+		{
+			for(j=0;j<2       ;j++) sec[i].surf[j].tilnum      += gnumtiles-nnumtiles;
+			for(j=0;j<sec[i].n;j++) sec[i].wall[j].surf.tilnum += gnumtiles-nnumtiles;
+		}
+		for(i=gst->numspris-nnumspris;i<gst->numspris;i++) if (gst->spri[i].tilnum >= 0) gst->spri[i].tilnum += gnumtiles-nnumtiles;
+
+		//-------------------------------------------------------------------
+
+			//Sprite hacks
+		for(i=0;i<gst->numspris;i++)
+		{
+			gst->spri[i].owner = -1;
+
+				//Insert lights
+			if (gst->spri[i].flags&(1<<16))
+			{
+				if (gst->light_sprinum < MAXLIGHTS) gst->light_spri[gst->light_sprinum++] = i;
+			}
+		}
+
+#ifdef STANDALONE
+		for(i=numplayers-1;i>=0;i--) gst->p[i].sec.n = 0;
+#endif
+		checknextwalls();
+		checksprisect(-1);
+
+#if 0
+			//Rebuild hash table from scratch
+		memset(gtilehashead,-1,sizeof(gtilehashead));
+		for(i=0;i<gnumtiles;i++)
+		{
+			j = (gtile[i].namcrc32&(sizeof(gtilehashead)/sizeof(gtilehashead[0])-1));
+			gtile[i].hashnext = gtilehashead[j]; gtilehashead[j] = i;
+		}
+#else
+		compacttilelist(1);
+#endif
+
+		kzclose();
+		return(1);
+	}
+	else if ((fileid == 0x00000007) || //Build1 .MAP format 7
+				(fileid == 0x00000cbe))   //Cubes5 .CUB format
+	{
+			//Build1 format variables:
+		typedef struct { short picnum, heinum; signed char shade; char pal, xpanning, ypanning; } build7surf_t;
+		typedef struct
+		{
+			short wallptr, wallnum;
+			long z[2]; short stat[2]; build7surf_t surf[2];
+			char visibility, filler;
+			short lotag, hitag, extra;
+		} build7sect_t;
+		typedef struct
+		{
+			long x, y;
+			short point2, nextwall, nextsect, cstat, picnum, overpicnum;
+			signed char shade;
+			char pal, xrepeat, yrepeat, xpanning, ypanning;
+			short lotag, hitag, extra;
+		} build7wall_t;
+		typedef struct
+		{
+			long x, y, z; short cstat, picnum;
+			signed char shade; char pal, clipdist, filler;
+			unsigned char xrepeat, yrepeat; signed char xoffset, yoffset;
+			short sectnum, statnum, ang, owner, xvel, yvel, zvel, lotag, hitag, extra;
+		} build7spri_t;
+		build7sect_t b7sec;
+		build7wall_t b7wal;
+		build7spri_t b7spr;
+
+			//Cubes5 format variables:
+		#define BSIZ 16
+		double c1, c2, c3, s1, s2, s3, c1c3, c1s3, s1c3, s1s3;
+		signed short board[6][BSIZ][BSIZ][BSIZ]; //Board layout
+		long posx, posy, posz, a1, a2, a3, oy, yy;
+
+		//------------------------------------------------------------------------
+		long filnum, arttiles, loctile0, loctile1, iskenbuild = 0;
+		short *tilesizx = 0, *tilesizy = 0, *tilefile = 0;
+		char tbuf[MAX_PATH*2];
+
+		kzclose();
+
+		strcpy(curmappath,filnam);
+		for(i=j=0;curmappath[i];i++) if ((curmappath[i] == '/') || (curmappath[i] == '\\')) j = i+1;
+		curmappath[j] = 0;
+
+		arttiles = 0; //Scan .ART files, incrementing number until tile is in range
+		for(filnum=0;1;filnum++)
+		{
+			sprintf(tbuf,"TILES%03d.ART",filnum);
+			if (!kzopen(tbuf))
+			{
+				sprintf(tbuf,"%sTILES%03d.ART",curmappath,filnum);
+				if (!kzopen(tbuf)) break;
+			}
+			kzread(tbuf,16); if (*(long *)&tbuf[0] != 1) break;
+			loctile0 = *(long *)&tbuf[8];
+			loctile1 = (*(long *)&tbuf[12])+1;
+			if ((loctile0 < 0) || (loctile1 <= arttiles) || (loctile0 >= loctile1)) continue;
+			i = arttiles; arttiles = loctile1;
+			tilesizx = (short *)realloc(tilesizx,arttiles*sizeof(tilesizx[0]));
+			tilesizy = (short *)realloc(tilesizy,arttiles*sizeof(tilesizy[0]));
+			tilefile = (short *)realloc(tilefile,arttiles*sizeof(tilefile[0]));
+			for(;i<arttiles;i++) { tilesizx[i] = 0; tilesizy[i] = 0; tilefile[i] = 0; }
+			kzread(&tilesizx[loctile0],(loctile1-loctile0)*sizeof(short));
+			kzread(&tilesizy[loctile0],(loctile1-loctile0)*sizeof(short));
+			for(i=loctile0;i<loctile1;i++) tilefile[i] = filnum;
+		}
+		if (!arttiles)
+		{
+			tilesizx = (short *)malloc(sizeof(tilesizx[0]));
+			tilesizy = (short *)malloc(sizeof(tilesizy[0]));
+			tilefile = (short *)malloc(sizeof(tilefile[0]));
+			tilesizx[0] = tilesizy[0] = 2; tilefile[0] = 0; arttiles = 1;
+		}
+		else if (arttiles >= 20) //Autodetect KenBuild data
+		{
+			for(i=24-1;i>=0;i--) //If the sizes of the 1st 24 tiles match that of Kenbuild, then that's what it is
+			{
+				x = 32; if (i == 4)               x = 16; if (i >= 20) x = 64;
+				y = 32; if ((i == 3) || (i == 4)) y = 16; if (i >= 18) y = 64;
+				if ((tilesizx[i] != x) || (tilesizy[i] != y)) break;
+			}
+			if (i < 0) iskenbuild = 1;
+		}
+
+		kzclose();
+		kzopen(filnam);
+		kzread(&i,4);
+		//------------------------------------------------------------------------
+
+		hitile = 0;
+
+		if (fileid == 0x00000007) //Build1 .MAP format 7
+		{
+			kzread(&x,4); //posx
+			kzread(&y,4); //posy
+			kzread(&z,4); //posz
+			kzread(&s,2); //ang
+			kzread(&cursect,2); //cursectnum
+			gst->startpos.x = ((float)x)*(1.f/512.f);
+			gst->startpos.y = ((float)y)*(1.f/512.f);
+			gst->startpos.z = ((float)z)*(1.f/(512.f*16.f));
+			gst->startfor.x = cos(((float)s)*PI/1024.0);
+			gst->startfor.y = sin(((float)s)*PI/1024.0);
+			gst->startfor.z = 0.f;
+			gst->startrig.x =-gst->startfor.y;
+			gst->startrig.y = gst->startfor.x;
+			gst->startrig.z = 0.f;
+			gst->startdow.x = 0.f;
+			gst->startdow.y = 0.f;
+			gst->startdow.z = 1.f;
+			for(i=numplayers-1;i>=0;i--)
+			{
+				gst->p[i].ipos = gst->startpos;
+				gst->p[i].ifor = gst->startfor;
+				gst->p[i].irig = gst->startrig;
+				gst->p[i].idow = gst->startdow;
+				gst->p[i].cursect = cursect;
+			}
+
+			kzread(&s,2);
+			gst->numsects = (int)s; //numsectors
+			if (gst->numsects > gst->malsects)
+			{
+				i = gst->malsects; gst->malsects = max(gst->numsects+1,gst->malsects<<1);
+				sec = gst->sect = (sect_t *)realloc(sec,gst->malsects*sizeof(sect_t));
+				memset(&sec[i],0,(gst->malsects-i)*sizeof(sect_t));
+			}
+			for(i=0;i<gst->numsects;i++)
+			{
+				kzread(&b7sec,sizeof(b7sec));
+				sec[i].n = sec[i].nmax = b7sec.wallnum;
+				sec[i].wall = (wall_t *)realloc(sec[i].wall,sec[i].nmax*sizeof(wall_t));
+				memset(sec[i].wall,0,sec[i].nmax*sizeof(wall_t));
+				for(j=0;j<2;j++)
+				{
+					sec[i].z[j] = ((float)b7sec.z[j])*(1.f/(512.f*16.f));
+					sec[i].grad[j].x = sec[i].grad[j].y = 0;
+					if (b7sec.stat[j]&2) //Enable slopes flag
+						sec[i].grad[j].y = ((float)b7sec.surf[j].heinum)*(1.f/4096.f);
+					sur = &sec[i].surf[j];
+					sur->flags = 0;
+					if (b7sec.stat[j]&1) sur->flags |= (1<<16);
+					sur->asc = 4096;
+					sur->rsc = (32-b7sec.surf[j].shade)*128;
+					sur->gsc = (32-b7sec.surf[j].shade)*128;
+					sur->bsc = (32-b7sec.surf[j].shade)*128;
+					l = b7sec.surf[j].picnum;
+					if ((unsigned)l >= (unsigned)arttiles) l = 0;
+					sur->tilnum = l; hitile = max(hitile,l);
+
+					// Convert lotag/hitag to single tag field
+					// j=0 is ceiling, j=1 is floor - assign to floor surface only
+					if (j == 1) // Floor surface
+					{
+						// Merge lotag (lower 16 bits) and hitag (upper 16 bits) into single long
+						sur->lotag = b7sec.lotag;
+						sur->hitag = b7sec.hitag;
+					}
+
+					sur->pal = b7sec.surf[j].pal;
+
+					sur->uv[0].x = ((float)b7sec.surf[j].xpanning)/256.0;
+					sur->uv[0].y = ((float)b7sec.surf[j].ypanning)/256.0;
+					sur->uv[1].y = sur->uv[2].x = 0;
+					if (!(b7sec.stat[j]&4))
+					{
+						sur->uv[1].x = 32.0/((float)tilesizx[l]);
+						sur->uv[2].y = 32.0/((float)tilesizy[l]);
+					}
+					else
+					{
+						sur->uv[1].x = 32.0/((float)tilesizy[l]);
+						sur->uv[2].y = 32.0/((float)tilesizx[l]);
+					}
+					if (b7sec.stat[j]&8) { sur->uv[1].x *= 2; sur->uv[2].y *= 2; } //double smooshiness
+					if (b7sec.stat[j]&16) sur->uv[1].x *= -1; //x-flip
+					if (!(b7sec.stat[j]&32)) sur->uv[2].y *= -1; //y-flip
+					if (b7sec.stat[j]&64) //relative alignment
+					{
+						f = ((float)b7sec.surf[j].heinum)*(1.f/4096.f);
+						sur->uv[2].y *= -sqrt(f*f + 1.f);
+						sur->flags |= 4;
+					}
+					if (b7sec.stat[j]&4) //swap x&y
+					{
+						if (((b7sec.stat[j]&16) != 0) != ((b7sec.stat[j]&32) != 0))
+							{ sur->uv[1].x *= -1; sur->uv[2].y *= -1; }
+						sur->uv[1].y = sur->uv[1].x; sur->uv[1].x = 0;
+						sur->uv[2].x = sur->uv[2].y; sur->uv[2].y = 0;
+					}
+
+					//FIX:This hack corrects an LHS vs. RHS bug in a later stage of texture mapping (drawsectfill?)
+					if (sur->uv[1].x*sur->uv[2].y < sur->uv[1].y*sur->uv[2].x)
+						{ sur->uv[2].x *= -1; sur->uv[2].y *= -1; }
+				}
+
+				sec[i].headspri = -1;
+				sec[i].owner = -1;
+				//sec[i].foglev = ?;
+			}
+			kzread(&s,2); //numwalls
+			for(i=k=0;i<gst->numsects;i++)
+			{
+				for(j=0;j<sec[i].n;j++,k++)
+				{
+					kzread(&b7wal,sizeof(b7wal));
+					sec[i].wall[j].x = ((float)b7wal.x)*(1.f/512.f);
+					sec[i].wall[j].y = ((float)b7wal.y)*(1.f/512.f);
+					sec[i].wall[j].n = b7wal.point2-k;
+					sur = &sec[i].wall[j].surf;
+					sur->flags = 0;
+					if (b7wal.cstat&1) sur->flags |= 1;
+
+					// flag at byte 1 : double split  = 1, one tile = 0
+					// bottom tile is taken from overtile of nextwall(meaning opposite side of the wall)
+					// mask tile is undertile field
+
+					sur->lotag = b7wal.lotag;
+					sur->hitag = b7wal.hitag;
+					sur->pal = b7wal.pal;
+
+					sur->uv[0].x = b7wal.xpanning;
+					sur->uv[0].y = b7wal.ypanning;
+					sur->uv[1].x = b7wal.xrepeat; if (b7wal.cstat&  8) sur->uv[1].x *= -1;
+					sur->uv[1].y = sur->uv[2].x = 0;
+					sur->uv[2].y = b7wal.yrepeat; if (b7wal.cstat&256) sur->uv[2].y *= -1;
+					if ((b7wal.nextsect < 0) ^ (!(b7wal.cstat&4))) sur->flags ^= 4; //align bot/nextsec
+					if (b7wal.cstat&(16+32)) sur->flags |= 32; //bit4:masking, bit5:1-way
+					sur->asc = 4096;
+					sur->rsc = (32-b7wal.shade)*128;
+					sur->gsc = (32-b7wal.shade)*128;
+					sur->bsc = (32-b7wal.shade)*128;
+					l = b7wal.picnum; if ((unsigned)l >= (unsigned)arttiles) l = 0;
+					sur->tilnum = l; hitile = max(hitile,l);
+					sec[i].wall[j].surfn = 1;
+					sec[i].wall[j].owner = -1;
+				}
+				// tile adjust?
+				for(j=0;j<sec[i].n;j++)
+				{
+					l = j+sec[i].wall[j].n;
+					fx = sec[i].wall[l].x - sec[i].wall[j].x;
+					fy = sec[i].wall[l].y - sec[i].wall[j].y;
+					f = sqrt(fx*fx + fy*fy);
+					sur = &sec[i].wall[j].surf;
+					l = sur->tilnum;
+					sur->uv[1].x = ((float)sur->uv[1].x*8.0)/(f*((float)tilesizx[l]));
+					sur->uv[2].y = ((float)sur->uv[2].y*4.0)/((float)tilesizy[l]);
+					sur->uv[0].x = ((float)sur->uv[0].x)/((float)tilesizx[l]);
+					sur->uv[0].y = ((float)sur->uv[0].y)/256.f * (1-2*(sur->uv[2].y < 0));
+				}
+
+				fx = sec[i].wall[1].y-sec[i].wall[0].y;
+				fy = sec[i].wall[0].x-sec[i].wall[1].x;
+				f = fx*fx + fy*fy; if (f > 0) f = 1.0/sqrt(f); fx *= f; fy *= f;
+				for(j=0;j<2;j++)
+				{
+					sec[i].grad[j].x = fx*sec[i].grad[j].y;
+					sec[i].grad[j].y = fy*sec[i].grad[j].y;
+				}
+			}
+
+			kzread(&s,2); gst->numspris = (int)s;
+			if (gst->numspris > gst->malspris)
+			{
+				i = gst->malspris;
+				gst->malspris = max(gst->numspris+1,gst->malspris<<1);
+				gst->spri = (spri_t *)realloc(gst->spri,gst->malspris*sizeof(spri_t));
+#ifndef STANDALONE
+				for(;i<gst->malspris;i++) gst->spri[i].sect = -1;
+#endif
+			}
+			for(i=0;i<gst->numspris;i++)
+			{
+				kzread(&b7spr,sizeof(b7spr));
+				spr = &gst->spri[i];
+				memset(spr,0,sizeof(spri_t));
+
+				l = b7spr.picnum; if ((unsigned)l >= (unsigned)arttiles) l = 0;
+				spr->p.x = ((float)b7spr.x)*(1.f/512.f);
+				spr->p.y = ((float)b7spr.y)*(1.f/512.f);
+				spr->p.z = ((float)b7spr.z)*(1.f/(512.f*16.f));
+				spr->flags = 0;
+				switch(b7spr.cstat&48)  // https://wiki.eduke32.com/wiki/Cstat_(sprite)
+										// 48  =32  +16 wall or  floor only check
+					{
+					case 0: //Face sprite
+						spr->flags |= 16;
+						//no break intentional
+					case 48: //Voxel sprite
+						//no break intentional
+					case 16: //Wall sprite
+						spr->p.z -= (b7spr.yrepeat/4096.0*(float)tilesizy[l]);
+						spr->r.x = sin((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
+						spr->r.y =-cos((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
+						spr->d.z = (b7spr.yrepeat/4096.0*(float)tilesizy[l]);
+						break;
+					case 32: //Floor sprite
+						spr->r.x = sin((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
+						spr->r.y =-cos((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
+						spr->d.x = cos((float)b7spr.ang*PI/1024.0)*(b7spr.yrepeat/4096.0*(float)tilesizy[l]);
+						spr->d.y = sin((float)b7spr.ang*PI/1024.0)*(b7spr.yrepeat/4096.0*(float)tilesizy[l]);
+						if (b7spr.cstat&8) { spr->d.x *= -1; spr->d.y *= -1; }
+						break;
+				}
+				if (b7spr.cstat&1) spr->flags |= 1; // blocking
+				if (b7spr.cstat&64) spr->flags |= 64; // 1 sided
+				if (b7spr.cstat&4) { spr->r.x *= -1; spr->r.y *= -1; spr->r.z *= -1; spr->flags ^= 4; } //&4: x-flipped
+				if (b7spr.cstat&8) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; spr->flags ^= 4; } //&8: y-flipped?
+				if (b7spr.cstat&128) { spr->p.z += (b7spr.yrepeat/4096.0*(float)tilesizy[l]); } //&128: real-centered centering (center at center) - originally half submerged sprite
+
+				if ((unsigned)b7spr.sectnum < (unsigned)gst->numsects) //Make shade relative to sector
+				{
+					j = b7spr.sectnum; j = 32 - gst->sect[j].surf[gst->sect[j].surf[0].flags&1^1].rsc/128;
+					if (iskenbuild) b7spr.shade += j+6;
+				}
+
+				spr->f.z=3; // sus
+				spr->f.x=cos((float)b7spr.ang*PI/1024.0);
+				spr->f.y=sin((float)b7spr.ang*PI/1024.0);
+				spr->fat = 0.f;
+				spr->asc = 4096;
+				spr->rsc = (32-b7spr.shade)*128;
+				spr->gsc = (32-b7spr.shade)*128;
+				spr->bsc = (32-b7spr.shade)*128;
+
+				spr->mas = spr->moi = 1.0;
+				spr->owner = -1;
+
+				spr->tilnum = l; hitile = max(hitile,l);
+				spr->sect = b7spr.sectnum;
+				spr->sectn = spr->sectp = -1;
+				spr->lotag = b7spr.lotag;
+				spr->hitag = b7spr.hitag;
+				spr->pal = b7spr.pal;
+			}
+		}
+		else //CUBES5 map format (.CUB extension)
+		{
+			kzread(&x,4); //posx
+			kzread(&y,4); //posy
+			kzread(&z,4); //posz
+			kzread(&a1,4); //angle range: 0-2047
+			kzread(&a2,4);
+			kzread(&a3,4);
+			gst->startpos.x =      ((float)x)*(1.f/1024.f);
+			gst->startpos.y = 16.f-((float)z)*(1.f/1024.f);
+			gst->startpos.z =      ((float)y)*(1.f/1024.f);
+			dcossin((double)a3*PI/1024.0,&c1,&s1);
+			dcossin((double)a2*PI/1024.0,&c2,&s2);
+			dcossin((double)a1*PI/1024.0,&c3,&s3);
+			c1c3 = c1*c3; c1s3 = c1*s3; s1c3 = s1*c3; s1s3 = s1*s3;
+			gst->startrig.x = c1c3 + s1s3*s2;
+			gst->startrig.y = s1c3 - c1s3*s2;
+			gst->startrig.z = -s3*c2;
+			gst->startdow.x = c1s3 - s1c3*s2;
+			gst->startdow.y = s1s3 + c1c3*s2;
+			gst->startdow.z = c3*c2;
+			gst->startfor.x = s1*c2;
+			gst->startfor.y = -c1*c2;
+			gst->startfor.z = s2;
+			for(i=numplayers-1;i>=0;i--)
+			{
+				gst->p[i].ipos = gst->startpos;
+				gst->p[i].irig = gst->startrig;
+				gst->p[i].idow = gst->startdow;
+				gst->p[i].ifor = gst->startfor;
+				gst->p[i].cursect = -1;
+			}
+
+				//6 faces * BSIZ^3 board map * 2 bytes for picnum
+				//if face 0 is -1, the cube is air
+			kzread(board,6*BSIZ*BSIZ*BSIZ*sizeof(short));
+			gst->numsects = 0;
+			for(x=0;x<BSIZ;x++)
+				for(z=0;z<BSIZ;z++)
+				{
+					oy = BSIZ;
+					for(y=0;y<BSIZ;y++)
+					{
+						if (board[0][x][y][z] >= 0) continue;
+
+						if (oy > y) oy = y;
+						if ((y < BSIZ-1) && (board[0][x][y+1][z] < 0)) continue;
+
+						if (gst->numsects >= gst->malsects)
+						{
+							i = gst->malsects; gst->malsects = max(gst->numsects+1,gst->malsects<<1);
+							sec = gst->sect = (sect_t *)realloc(sec,gst->malsects*sizeof(sect_t));
+							memset(&sec[i],0,(gst->malsects-i)*sizeof(sect_t));
+						}
+
+						i = gst->numsects;
+						sec[i].n = sec[i].nmax = 4;
+						sec[i].wall = (wall_t *)realloc(sec[i].wall,sec[i].nmax*sizeof(wall_t));
+						memset(sec[i].wall,0,sec[i].nmax*sizeof(wall_t));
+						sec[i].z[0] = (float) oy  ;
+						sec[i].z[1] = (float)(y+1);
+						for(j=0;j<2;j++)
+						{
+							sec[i].grad[j].x = sec[i].grad[j].y = 0;
+							sur = &sec[i].surf[j];
+							sur->uv[1].x = sur->uv[2].y = 1.f;
+							sur->asc = 4096;
+							sur->rsc = 4096-768+1536*j;
+							sur->gsc = 4096-768+1536*j;
+							sur->bsc = 4096-768+1536*j;
+
+							if (!j) l = board[4][x][oy-1][z];
+								else l = board[1][x][ y+1][z];
+							if ((unsigned)l >= (unsigned)arttiles) l = 0;
+							sur->tilnum = l; hitile = max(hitile,l);
+							sur->uv[1].x = max(64.f/((float)tilesizx[l]),1.f);
+							sur->uv[2].y = max(64.f/((float)tilesizy[l]),1.f);
+						}
+						//sec[i].foglev = ?;
+						sec[i].headspri = -1;
+						sec[i].owner = -1;
+
+						for(j=0;j<4;j++)
+						{
+							sec[i].wall[j].x = ((float)(       x+(((j+1)>>1)&1)))*(1.f);
+							sec[i].wall[j].y = ((float)(BSIZ-1-z+(( j  )>>1)   ))*(1.f);
+							if (j < 3) sec[i].wall[j].n = 1; else sec[i].wall[j].n = -3;
+							sec[i].wall[j].surf.uv[1].x = sec[i].wall[j].surf.uv[2].y = 1;
+							sec[i].wall[j].surf.asc = 4096;
+							sec[i].wall[j].surf.rsc = 4096+(labs(j-1)-1)*512;
+							sec[i].wall[j].surf.gsc = 4096+(labs(j-1)-1)*512;
+							sec[i].wall[j].surf.bsc = 4096+(labs(j-1)-1)*512;
+							sec[i].wall[j].surfn = 1;
+							sec[i].wall[j].owner = -1;
+
+							l = -1;
+							for(yy=oy;yy<=y;yy++)
+							{
+								switch (j)
+								{
+									case 0: if (board[0][x  ][yy][z+1] < 0) break; l = board[2][x  ][yy][z+1]; break;
+									case 1: if (board[0][x+1][yy][z  ] < 0) break; l = board[0][x+1][yy][z  ]; break;
+									case 2: if (board[0][x  ][yy][z-1] < 0) break; l = board[5][x  ][yy][z-1]; break;
+									case 3: if (board[0][x-1][yy][z  ] < 0) break; l = board[3][x-1][yy][z  ]; break;
+								}
+								if ((unsigned)l < (unsigned)arttiles) break;
+							}
+							if ((unsigned)l >= (unsigned)arttiles) l = 0;
+							sec[i].wall[j].surf.tilnum = l; hitile = max(hitile,l);
+							sec[i].wall[j].surf.uv[1].x = max(64.f/((float)tilesizx[l]),1.f);
+							sec[i].wall[j].surf.uv[2].y = max(64.f/((float)tilesizy[l]),1.f);
+						}
+						gst->numsects++;
+
+						oy = BSIZ;
+					}
+				}
+
+			gst->numspris = 0;
+		}
+
+			//Set texture names..
+		for(i=gnumtiles-1;i>=0;i--)
+			if (gtile[i].tt.f) { free((void *)gtile[i].tt.f); gtile[i].tt.f = 0; }
+		gnumtiles = 0; memset(gtilehashead,-1,sizeof(gtilehashead));
+
+		hitile++;
+		if (hitile > gmaltiles)
+		{
+			gmaltiles = hitile;
+			gtile = (tile_t *)realloc(gtile,gmaltiles*sizeof(tile_t));
+		}
+		for(i=0;i<hitile;i++)
+		{
+			sprintf(tbuf,"tiles%03d.art|%d",tilefile[i],i);
+			gettileind(tbuf);
+		}
+
+		if (tilesizx) free(tilesizx);
+		if (tilesizy) free(tilesizy);
+		if (tilefile) free(tilefile);
+
+#ifdef STANDALONE
+		for(i=numplayers-1;i>=0;i--) gst->p[i].sec.n = 0;
+#endif
+		checknextwalls();
+		checksprisect(-1);
+		kzclose();
+		return(1);
+	}
+	else { return(0); } //MessageBox(ghwnd,"Invalid MAP format",prognam,MB_OK);
+}
+
+#ifdef STANDALONE
+
 static void releasegrabdrag (long curindex, long doplaysound)
 {
 	#define MAXVERTS 256 //FIX:timebomb: assumes there are never > 256 sectors connected at same vertex
@@ -5277,10 +7320,7 @@ static long isintersect_sect_rect (long s, float x0, float y0, float x1, float y
 	}
 	free(zoids); return(0);
 }
-static int loadmap(char* fname)
-{
-	return loadmap_imp(fname,(mapstate_t*)gst);
-}
+
 static void executepack (unsigned char *recvbuf, int doplaysound)
 {
 	FILE *fil;
@@ -5529,7 +7569,7 @@ static void executepack (unsigned char *recvbuf, int doplaysound)
 
 				//Sliding collision (Note: floating point seems to be enough precision)
 			if (!gps->docollide) { gps->ipos.x += fp.x; gps->ipos.y += fp.y; gps->ipos.z += fp.z; }
-			else collmove(&gps->ipos,&gps->cursect,&fp,0.25,1, (mapstate_t*)gst);
+			else collmove(&gps->ipos,&gps->cursect,&fp,0.25,1);
 			updatesect(gps->ipos.x,gps->ipos.y,gps->ipos.z,&gps->cursect);
 
 			if (gps->grabmode != GRABFILE)
@@ -7853,8 +9893,7 @@ splitsecthack:;                  //Copy split backwards
 					{
 						ddflip2gdi(); if (mouseacquired) { mouseacquired = 0; setacquire(0,1); }
 						cptr = (char *)loadfileselect("Load MAP..","MAP\0*.map\0All files (*.*)\0*.*\0\0","MAP");
-						if (cptr) { loadmap
-							(cptr); sec = gst->sect; }
+						if (cptr) { loadmap(cptr); sec = gst->sect; }
 						keystatus[0x1d] = keystatus[0x9d] = 0;
 					}
 				}
@@ -8917,9 +10956,7 @@ grabskip2end:;
 		updatesect(gps->ipos.x,gps->ipos.y,gps->ipos.z,&gps->cursect);
 	}
 }
-#endif
-//------------------------
-#ifdef STANDALONE // UI VIEWS
+
 	//avatar sign cache
 #define AVATARSIGNX 128
 #define AVATARSIGNY 16
@@ -9526,7 +11563,7 @@ void drawview (cam_t *cc, playerstruct_t *lps, int skipdrawrooms)
 							rpol[0] = pol[3]; rpol[1] = pol[2]; rpol[2] = pol[1]; rpol[3] = pol[0];
 							if ((rpol[0].z < lefz[0]) && (rpol[1].z < rigz[0])) { rpol[0].z = lefz[0]; rpol[1].z = rigz[0]; }
 							if ((rpol[3].z > lefz[1]) && (rpol[2].z > rigz[1])) { rpol[3].z = lefz[1]; rpol[2].z = rigz[1]; }
-							i = wallclippol(rpol,npol);
+							i = wallclip(rpol,npol);
 							if (i)
 							{
 								for(j=0;j<i;j++) xformpos(&npol[j].x,&npol[j].y,&npol[j].z);
@@ -9560,13 +11597,13 @@ void drawview (cam_t *cc, playerstruct_t *lps, int skipdrawrooms)
 						pol[2].v = wal[w].surf.uv[2].y*(pol[2].z-pol[0].z) + pol[0].v + wal[w].surf.uv[1].y*dx;
 						pol[3].u = wal[w].surf.uv[2].x*(pol[3].z-pol[0].z) + pol[0].u;
 						pol[3].v = wal[w].surf.uv[2].y*(pol[3].z-pol[0].z) + pol[0].v;
-						i = wallclippol(pol,npol); if (!i) continue;
+						i = wallclip(pol,npol); if (!i) continue;
 						for(j=0;j<i;j++) xformpos(&npol[j].x,&npol[j].y,&npol[j].z);
 						drawpolfunc(cc,npol,i,&gtile[wal[w].surf.tilnum],col[0],0,&norm,0);
 					}
 					else //parallaxing walls
 					{
-						i = wallclippol(pol,npol); if (!i) continue;
+						i = wallclip(pol,npol); if (!i) continue;
 						for(j=0;j<i;j++) xformpos(&npol[j].x,&npol[j].y,&npol[j].z);
 						drawparallaxpol(cc,npol,i,&gtile[wal[w].surf.tilnum],col[0],&wal[w].surf,&norm,0);
 					}
@@ -10193,7 +12230,7 @@ skipdrawrooms_lab:;
 			}
 
 				//Draw avatar sign (name)
-			til.tt.f = (INT_PTR)(&avatarsign[i][0][0]);
+			til.tt.f = (intptr_t)(&avatarsign[i][0][0]);
 			til.tt.x = AVATARSIGNX; til.tt.y = AVATARSIGNY; til.tt.p = (til.tt.x<<2);
 			if (gst->nick[i][0]) cptr = gst->nick[i]; else { sprintf(tbuf,"Player %d",i); cptr = tbuf; }
 			if (strcmp(avatarname[i],cptr))
@@ -10674,7 +12711,7 @@ void build2_uninit (void)
 	if (zbuffermem) { free(zbuffermem); zbuffermem = 0; zbuffersiz = 0; }
 }
 
-#ifndef STANDALONE // update loop + frames
+#ifndef STANDALONE
 
 long build2_init (void)
 {
@@ -11606,7 +13643,7 @@ static void drawframe (cam_t *cc)
 		dp.x = (double)gdps->ipos.x;
 		dp.y = (double)gdps->ipos.y;
 		dp.z = (double)gdps->ipos.z;
-		print6x8((tiltyp *)&cam.c,cam.c.x-350*fontscale,48,0xffffff,-1,"maxcr:%.9f, chn=%d",findmaxcr(&dp,gdps->cursect,1e16,&clos,(mapstate_t*)gst),build2.cliphitnum);
+		print6x8((tiltyp *)&cam.c,cam.c.x-350*fontscale,48,0xffffff,-1,"maxcr:%.9f, chn=%d",findmaxcr(&dp,gdps->cursect,1e16,&clos),build2.cliphitnum);
 		if (build2.cliphitnum < 0) drawsph(&cam,clos.x,clos.y,clos.z,.02+rand()/3276800.0,0x808080);
 	}
 

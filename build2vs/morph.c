@@ -1,9 +1,10 @@
+#include "Core/mapcore.h"
 #if 0 //--------------------------------------------------------------------------------------------
 Example library usage:
 
 #define USEMORPH
 #if USEMORPH
-extern void morph_init (long, long, long, void (*)(cam_t *));
+extern void morph_init (long, long, long, void (*)(mcam_t *));
 extern void morph_sleepuntilretrace ();
 extern void morph_drawframe (tiltyp *, long, point3d *, point3d *, point3d *, point3d *, float, float, float);
 extern void morph_uninit ();
@@ -11,7 +12,7 @@ extern void morph_uninit ();
 
 	//User function must draw to surface: cc->c,cc->z
 	//User function must write: cc->p,r,d,f,hx,hy,hz
-void drawframe (cam_t *cc)
+void drawframe (mcam_t *cc)
 {
 	*(long *)(cc->c.f) = 0xffffff; //draw your frame here!
 
@@ -54,9 +55,9 @@ extern LPDIRECTDRAW7 lpdd;         //For refresh locking
 #define MORPHBOXSIZ (1<<LMORPHBOXSIZ)
 #define NUMPAGES 3
 
-typedef struct tiltyp { long f, p, x, y, z; float shsc; tiltyp *lowermip; } tiltyp; //shsc=suggested height scale //Note: morph has no use for z,shsc
-typedef struct { float x, y, z; } point3d;
-typedef struct { tiltyp c, z; point3d p, r, d, f; float hx, hy, hz; } cam_t;
+//typedef struct tiltyp { long f, p, x, y, z; float shsc; tiltyp *lowermip; } tiltyp; //shsc=suggested height scale //Note: morph has no use for z,shsc
+//typedef struct { float x, y, z; } point3d;
+typedef struct { tiltyp c, z; point3d p, r, d, f; float hx, hy, hz; } mcam_t;
 
 static volatile long numslowframes = 0, gotaframe = 0;
 static tiltyp ocbuf[NUMPAGES], ozbuf[NUMPAGES];
@@ -73,10 +74,9 @@ static _inline long lbound0 (long a, long b) //b MUST be >= 0
 	return((~(a>>31))&b);
 }
 
-static void (*morph_userframe)(cam_t *);
+static void (*morph_userframe)(mcam_t *);
 
 #if USEREVMAP
-typedef struct { float x, y; } point2d;
 typedef struct { long x, y; } lpoint2d;
 static point2d boxf[(MAXXDIM/MORPHBOXSIZ+1)*(MAXYDIM/MORPHBOXSIZ+1)];
 static lpoint2d boxr[(MAXXDIM/MORPHBOXSIZ+1)*(MAXYDIM/MORPHBOXSIZ+1)];
@@ -321,7 +321,7 @@ static HANDLE drawslowhand;
 static volatile long drawslowstate = -1;
 static void __cdecl drawslowfunc (void *_)
 {
-	cam_t cm;
+	mcam_t cm;
 	long i;
 
 	while (drawslowstate <= 0)
@@ -359,7 +359,7 @@ void morph_uninit ()
 	}
 }
 
-void morph_init (long xsiz, long ysiz, long dafullsc, void (*userframe)(cam_t *))
+void morph_init (long xsiz, long ysiz, long dafullsc, void (*userframe)(mcam_t *))
 {
 	long i;
 

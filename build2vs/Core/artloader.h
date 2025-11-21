@@ -20,10 +20,9 @@ typedef struct tiltyp {
 //static long nullpic [64+1][64]; //Null set icon (image not found)
 static __forceinline unsigned int bsf (unsigned int a) { _asm bsf eax, a }
 static __forceinline unsigned int bsr (unsigned int a) { _asm bsr eax, a }
-extern long nullpic [64+1][64]; //Null set icon (image not found)
-static unsigned char gammlut[256], gotpal = 0;
-static tile_t *gtile;
+extern unsigned char gammlut[256], gotpal;
+extern tile_t *gtile;
 
-void loadpic (tile_t *tpic);
+//void loadpic (tile_t *tpic);
 
 #endif //BUILD2_ARTLOADER_H

@@ -1,3 +1,4 @@
+#include "Core/mapcore.h"
 #if 0 //To compile, type "nmake drawcone.c"
 
 !if 1
@@ -44,8 +45,6 @@ kdisasm.o:  kdisasm.c            ; \Dev-Cpp\bin\gcc -c -x c++ kdisasm.c  -o kdis
 	//Compiler define: Add this to the compile line to use an integer-based Z-buffer (*1048576.0/hz)
 	//Note: the integer-based Z-buffer is slower (but fewer artifacts) than default floating point.
 
-typedef struct { double x, y, z; } dpoint3d;
-typedef struct { INT_PTR f, p; int x, y; } tiletype;
 
 #define DRAWCONE_NOCAP0 1
 #define DRAWCONE_NOCAP1 2
@@ -63,9 +62,9 @@ typedef struct { INT_PTR f, p; int x, y; } tiletype;
 	//zbufoff: z_buffer_ptr - color_buffer_ptr (pitch MUST be the same)
 	//ipos,irig,idow,ifor: pos.&ori. of camera. For convenience and calculation of shade angle.
 	//hx,hy,hz: horizon offset, field of view. For 90 degree L-R fov, use: hx=hz=dd.x/2; hy=dd.y/2;
-extern void drawcone_setup (int cputype, int numcpu, tiletype *dd, INT_PTR zbufoff,
+extern void drawcone_setup (int cputype, int numcpu, tiletype *dd, intptr_t zbufoff,
 	point3d *ipos, point3d *irig, point3d *idow, point3d *ifor, double hx, double hy, double hz);
-extern void drawcone_setup (int cputype, int numcpu, tiletype *dd, INT_PTR zbufoff,
+extern void drawcone_setup (int cputype, int numcpu, tiletype *dd, intptr_t zbufoff,
 	dpoint3d *ipos, dpoint3d *irig, dpoint3d *idow, dpoint3d *ifor, double hx, double hy, double hz);
 
 	//shade: controls contrast of shading. I like to use 38.4.
@@ -90,7 +89,6 @@ extern void drawcone (double x0, double y0, double z0, double r0,
 #ifdef STANDALONE
 #include "cwinmain.h"
 #else
-typedef struct { INT_PTR f, p, x, y; } tiletype;
 #endif
 
 #ifndef _MSC_VER
@@ -143,15 +141,12 @@ typedef int v2si __attribute__((mode(V2SI)));
 #define DRAWCONE_CULL_FRONT 128
 #define DRAWCONE_CULL_NONE 256
 
-typedef struct { float x, y; } point2d;
-typedef struct { float x, y, z; } point3d;
 typedef struct { float x, y, z, w; } point4d;
 typedef struct { double x, y; } dpoint2d;
-typedef struct { double x, y, z; } dpoint3d;
 typedef struct { int x0, y0, x1, y1; float hx, hy, hz, rhzup20, gds, sphclip[4]; } view_t;
 
 static tiletype gdd;
-static INT_PTR zbufoff;
+static intptr_t zbufoff;
 static int cputype, gnumcpu;
 static dpoint3d ipos, irig, idow, ifor;
 static view_t gview;
@@ -251,7 +246,7 @@ static void htrun (void (*lcallfunc)(int, void *), void *luserdata, int v0, int 
 
 //--------------------------------------------------------------------------------------------------
 
-void drawcone_setup (int lcputype, int lnumcpu, tiletype *ndd, INT_PTR lzbufoff,
+void drawcone_setup (int lcputype, int lnumcpu, tiletype *ndd, intptr_t lzbufoff,
 	dpoint3d *npos, dpoint3d *nrig, dpoint3d *ndow, dpoint3d *nfor,
 	double hx, double hy, double hz)
 {
@@ -288,7 +283,7 @@ void drawcone_setup (int lcputype, int lnumcpu, tiletype *ndd, INT_PTR lzbufoff,
 	for(i=4-1;i>=0;i--) { dqhx[i] = gview.hx; dqhz[i] = gview.hz; }
 }
 
-void drawcone_setup (int lcputype, int lnumcpu, tiletype *ndd, INT_PTR lzbufoff,
+void drawcone_setup (int lcputype, int lnumcpu, tiletype *ndd, intptr_t lzbufoff,
 	point3d *npos, point3d *nrig, point3d *ndow, point3d *nfor,
 	double hx, double hy, double hz)
 {
@@ -994,7 +989,7 @@ static void draw_dohlin (int iy, void *_)
 
 	// Setup pointers to color buffer and Z-buffer for current scanline
 	cptr = (int *)(gdd.p*iy + gdd.f);
-	zptr = (float *)(((INT_PTR)cptr) + zbufoff);
+	zptr = (float *)(((intptr_t)cptr) + zbufoff);
 
 #if 1
 	// Build array of X positions for shader evaluation (simple linear spacing)
@@ -2282,7 +2277,7 @@ static void showzbuffunc (int sy, void *_)
 	float *zptr;
 	int i, sx, *iptr;
 
-	iptr = (int *)(gdd.p*sy + gdd.f); zptr = (float *)(((INT_PTR)iptr)+zbufoff);
+	iptr = (int *)(gdd.p*sy + gdd.f); zptr = (float *)(((intptr_t)iptr)+zbufoff);
 	for(sx=0;sx<gdd.x;sx++)
 	{
 #if (USEINTZ == 0)
@@ -2426,7 +2421,7 @@ int WINAPI WinMain (HINSTANCE hinst, HINSTANCE hpinst, LPSTR cmdline, int ncmdsh
 
 			//zbuffer aligns its memory to the same pixel boundaries as the screen!
 			//WARNING: Pentium 4's L2 cache has severe slowdowns when 65536-64 <= (zbufoff&65535) < 64
-		zbufoff = (((((INT_PTR)zbuffermem)-gdd.f-128)+255)&~255)+128;
+		zbufoff = (((((intptr_t)zbuffermem)-gdd.f-128)+255)&~255)+128;
 
 		if (cputype&(1<<25)) //Got SSE
 			  { for(j=0,i=gdd.f+zbufoff;j<gdd.y;j++,i+=gdd.p) memset8((void *)i,0x7f7f7f7f,gdd.x<<2); }

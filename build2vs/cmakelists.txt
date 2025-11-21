@@ -19,26 +19,31 @@ set(SOURCES
         Core/kplib.c
         Core/mapcore.c
         Core/loaders.c
-    winmain.cpp
         Core/physics.c
         Core/artloader.c
 )
-
+set(SOURCES_CPP
+        winmain.cpp
+)
 # Headers
 set(HEADERS
         Core/mapcore.h
-    build2.h
-    drawpoly.h
-    sysmain.h
+        build2.h
+        drawpoly.h
+        sysmain.h
         Core/loaders.h
         Core/kplib.h
         Core/physics.h
 
 
 )
-
+set_source_files_properties(${SOURCES} PROPERTIES
+        LANGUAGE C
+        C_STANDARD 99
+        C_STANDARD_REQUIRED ON
+)
 # Create Windows executable (not console)
-add_executable(build2 WIN32 ${SOURCES} ${HEADERS})
+add_executable(build2 WIN32 ${SOURCES} ${SOURCES_CPP} ${HEADERS})
 
 # Preprocessor definitions
 target_compile_definitions(build2 PRIVATE 
