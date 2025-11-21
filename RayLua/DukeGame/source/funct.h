@@ -199,6 +199,7 @@ extern void cacheit();
 extern void dofrontscreens();
 //#line "premap.c" 1285
 extern void enterlevel(char g);
+extern void enterlevel_rl();
 //#line "player.c" 10
 extern void setpal(player_struct *p);
 //#line "player.c" 28
@@ -403,7 +404,7 @@ extern void gameexit(char *t);
 //#line "game.c" 1752
 extern short strget(short x,short y,char *t,short dalen,short c);
 //#line "game.c" 1819
-extern void displayrest(long smoothratio);
+extern void displayrest(long smratio);
 //#line "game.c" 2047
 extern void updatesectorz(long x,long y,long z,short *sectnum);
 //#line "game.c" 2085
@@ -460,6 +461,7 @@ extern char moveloop();
 extern void fakedomovethingscorrect();
 //#line "game.c" 6829
 extern void fakedomovethings();
+extern void fakedomovethings_rlp0();
 //#line "game.c" 7247
 extern char domovethings();
 //#line "game.c" 7373
@@ -483,7 +485,7 @@ extern void lotsofcolourglass(short i,short wallnum,short n);
 //#line "game.c" 8004
 extern void SetupGameButtons();
 //#line "game.c" 8068
-extern long GetTime();
+//extern long GetTime();
 //#line "game.c" 8082
 extern void CenterCenter();
 //#line "game.c" 8095

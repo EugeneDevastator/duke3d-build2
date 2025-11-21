@@ -2,6 +2,7 @@
 
 #include "build.h"
 #include "duke3d.h"
+#include "dukewrap.h"
 
 #include "global.h"
 #include "soundefs.h"
@@ -33,6 +34,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
 
+#include "dukewrap.h"
 // Savage Baggage Masters
 char tempbuf[4096];
 int32_t turnheldtime; //MED
@@ -429,9 +431,7 @@ void shoot(short i,short atwith)
                         sprite[k].xvel = -12;
                         sprite[k].ang = getangle(wall[hitwall].x-wall[wall[hitwall].point2].x,
                             wall[hitwall].y-wall[wall[hitwall].point2].y)+512;
-                        sprite[k].x = hitx;
-                        sprite[k].y = hity;
-                        sprite[k].z = hitz;
+                        SET_SPRITE_XYZ(k,hitx,hity,hitz);
                         sprite[k].cstat |= (TRAND&4);
                         ssp(k,CLIPMASK0);
                         setsprite(k,sprite[k].x,sprite[k].y,sprite[k].z);
@@ -1812,7 +1812,7 @@ void getinput(short snum)
          loc.fvel = vel = 0;
          loc.svel = svel = 0;
          loc.avel = angvel = 0;
-         loc.horz = horiz = 0;
+         loc.horz = horiz_ = 0;
          loc.bits = (((long)gamequit)<<26);
          info.dz = info.dyaw = 0;
          return;
@@ -1842,14 +1842,14 @@ void getinput(short snum)
         return;
     }
 
-    loc.bits =   BUTTON(gamefunc_Jump);
-    loc.bits |=   BUTTON(gamefunc_Crouch)<<1;
-    loc.bits |=   BUTTON(gamefunc_Fire)<<2;
-    loc.bits |=   BUTTON(gamefunc_Aim_Up)<<3;
-    loc.bits |=   BUTTON(gamefunc_Aim_Down)<<4;
+    loc.bits =   bbeng.FrameInputs[SPC_JUMP];
+    loc.bits |=   bbeng.FrameInputs[CROUCH]<<1;
+    loc.bits |=   bbeng.FrameInputs[MB_SHOOT]<<2;
+    loc.bits |=   bbeng.FrameInputs[ACT_AIM_UP]<<3;
+    loc.bits |=   bbeng.FrameInputs[ACT_AIM_DOWN]<<4;
     loc.bits |=   BUTTON(gamefunc_Run)<<5;
     loc.bits |=   BUTTON(gamefunc_Look_Left)<<6;
-    loc.bits |=   BUTTON(gamefunc_Look_Right)<<7;
+    loc.bits |=   BUTTON(gamefunc_Look_Right)<<7; // quick looks
 
     j=0;
     if (BUTTON(gamefunc_Weapon_1))
@@ -1898,12 +1898,12 @@ void getinput(short snum)
     loc.bits |=   (((long)gamequit)<<26);
     loc.bits |=   BUTTON(gamefunc_Inventory_Right)<<27;
     loc.bits |=   BUTTON(gamefunc_TurnAround)<<28;
-    loc.bits |=   BUTTON(gamefunc_Open)<<29;
+    loc.bits |=   bbeng.FrameInputs[E_USE]<<29;
     loc.bits |=   BUTTON(gamefunc_Inventory)<<30;
     loc.bits |=   KB_KeyPressed(sc_Escape)<<31;
 
     running = BUTTON(gamefunc_Run)|ud.auto_run;
-    svel = vel = angvel = horiz = 0;
+    svel = vel = angvel = horiz_ = 0;
 
     if( CONTROL_JoystickEnabled )
         if ( running ) info.dz *= 2;
@@ -1915,8 +1915,8 @@ void getinput(short snum)
     if( myaimmode )
     {
         if(ud.mouseflip)
-            horiz -= info.dz/(314-128);
-        else horiz += info.dz/(314-128);
+            horiz_ -= info.dz/(314-128);
+        else horiz_ += info.dz/(314-128);
 
         info.dz = 0;
     }
@@ -1948,7 +1948,7 @@ void getinput(short snum)
     }
     else
     {
-        if ( BUTTON(gamefunc_Turn_Left))
+        if (bbeng.FrameInputs[Q_TLEFT])
            {
            turnheldtime += tics;
            if (turnheldtime>=TURBOTURNTIME)
@@ -1960,7 +1960,7 @@ void getinput(short snum)
               angvel -= PREAMBLETURN;
               }
            }
-        else if ( BUTTON(gamefunc_Turn_Right))
+        else if (bbeng.FrameInputs[R_TRIGHT])
            {
            turnheldtime += tics;
            if (turnheldtime>=TURBOTURNTIME)
@@ -1978,17 +1978,26 @@ void getinput(short snum)
            }
     }
 
-    if ( BUTTON( gamefunc_Strafe_Left ) )
+    if (bbeng.FrameInputs[A_LEFT])
         svel += keymove;
+    if (bbeng.FrameInputs[D_RIGHT])
+        svel -= keymove;
 
-    if ( BUTTON( gamefunc_Strafe_Right ) )
-        svel += -keymove;
-
-    if ( BUTTON(gamefunc_Move_Forward) )
+    if (bbeng.FrameInputs[W_FRW])
         vel += keymove;
+    if (bbeng.FrameInputs[S_BACK])
+        vel -= keymove;
+  // if ( BUTTON( gamefunc_Strafe_Left ) )
+  //     svel += keymove;
 
-    if ( BUTTON(gamefunc_Move_Backward) )
-        vel += -keymove;
+  // if ( BUTTON( gamefunc_Strafe_Right ) )
+  //     svel += -keymove;
+
+  // if ( BUTTON(gamefunc_Move_Forward) )
+  //     vel += keymove;
+
+  // if ( BUTTON(gamefunc_Move_Backward) )
+  //     vel += -keymove;
 
     if(vel < -MAXVEL) vel = -MAXVEL;
     if(vel > MAXVEL) vel = MAXVEL;
@@ -1996,8 +2005,8 @@ void getinput(short snum)
     if(svel > MAXSVEL) svel = MAXSVEL;
     if(angvel < -MAXANGVEL) angvel = -MAXANGVEL;
     if(angvel > MAXANGVEL) angvel = MAXANGVEL;
-    if(horiz < -MAXHORIZ) horiz = -MAXHORIZ;
-    if(horiz > MAXHORIZ) horiz = MAXHORIZ;
+    if(horiz_ < -MAXHORIZ) horiz_ = -MAXHORIZ;
+    if(horiz_ > MAXHORIZ) horiz_ = MAXHORIZ;
 
     if(ud.scrollmode && ud.overhead_on)
     {
@@ -2026,7 +2035,7 @@ void getinput(short snum)
     loc.fvel = momx;
     loc.svel = momy;
     loc.avel = angvel;
-    loc.horz = horiz;
+    loc.horz = horiz_;
 }
 
 
@@ -2257,7 +2266,8 @@ void processinput(short snum)
 
     kb = &p->kickback_pic;
 
-    if(p->cheat_phase <= 0) sb_snum = sync[snum].bits;
+    if(p->cheat_phase <= 0)
+        sb_snum = current_input.bits;
     else sb_snum = 0;
 
     psect = p->cursectnum;
@@ -2282,7 +2292,7 @@ void processinput(short snum)
     p->truefz = j;
     p->truecz = getceilzofslope(psect,p->posx,p->posy);
 
-    truefdist = klabs(p->posz-j);
+    truefdist = labs(p->posz-j);
     if( (lz&49152) == 16384 && psectlotag == 1 && truefdist > PHEIGHT+(16<<8) )
         psectlotag = 0;
 
@@ -2863,8 +2873,8 @@ void processinput(short snum)
                 }
             }
         }
-
-        if(p->posz < (fz-(i<<8)) ) //falling
+        int fcorr = fz-(i<<8);
+        if(p->posz < (fcorr) ) //falling
         {
             if( (sb_snum&3) == 0 && p->on_ground && (sector[psect].floorstat&2) && p->posz >= (fz-(i<<8)-(16<<8) ) )
                 p->posz = fz-(i<<8);
@@ -2930,9 +2940,9 @@ void processinput(short snum)
             if( i==40 )
             {
                 //Smooth on the ground
-
                 k = ((fz-(i<<8))-p->posz)>>1;
-                if( klabs(k) < 256 ) k = 0;
+                if( labs(k) < 256 ) k = 0;
+                else if( labs(k) == 256 ) k = k > 0 ? 128 : -128; // Reduce the 256 case to half
                 p->posz += k;
                 p->poszv -= 768;
                 if(p->poszv < 0) p->poszv = 0;
@@ -3031,8 +3041,9 @@ void processinput(short snum)
 
         tempang = sync[snum].avel<<1;
 
-        if( psectlotag == 2 ) p->angvel =(tempang-(tempang>>3))*ksgn(doubvel);
-        else p->angvel = tempang*ksgn(doubvel);
+        if( psectlotag == 2 )
+            p->angvel =(tempang-(tempang>>3))*sgn(doubvel);
+        else p->angvel = tempang*sgn(doubvel);
 
         p->ang += p->angvel;
         p->ang &= 2047;
@@ -3163,11 +3174,8 @@ void processinput(short snum)
                 }
             }
         }
-        else
-        {
-            if(p->walking_snd_toggle > 0)
-                p->walking_snd_toggle --;
-        }
+        else if(p->walking_snd_toggle > 0)
+            p->walking_snd_toggle --;
 
         if(p->jetpack_on == 0 && p->steroids_amount > 0 && p->steroids_amount < 400)
             doubvel <<= 1;
@@ -3249,7 +3257,7 @@ void processinput(short snum)
                 p->pyoff = 0;
         }
 
-        // RBG***
+        // RBG*** // this is original code but it breaks stuff now..
         setsprite(pi,p->posx,p->posy,p->posz+PHEIGHT);
 
         if( psectlotag < 3 )
@@ -3917,6 +3925,7 @@ void processinput(short snum)
         }
     }
 }
+
 
 //UPDATE THIS FILE OVER THE OLD GETSPRITESCORE/COMPUTERGETINPUT FUNCTIONS
 int getspritescore(long snum, long dapicnum)

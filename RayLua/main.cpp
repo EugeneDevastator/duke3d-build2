@@ -62,8 +62,23 @@ typedef struct {
 void DrawImgui()
 {
     rlImGuiBegin();
-    ImGui::Begin("Profiling");
-    ImGui::Text("Lets f..n go!");
+    ImGuiIO& io = ImGui::GetIO();
+    ImVec2 display_size = io.DisplaySize;
+
+    // Create invisible window at bottom
+    ImGui::SetNextWindowPos(ImVec2(10, display_size.y - 50), ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.0f); // Transparent background
+
+    ImGui::Begin("##overlay", nullptr,
+        ImGuiWindowFlags_NoTitleBar |
+        ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoScrollbar |
+        ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_NoInputs |
+        ImGuiWindowFlags_AlwaysAutoResize);
+
+    ImGui::Text("Its time to write text and print spritenum!");
     ImGui::End();
     rlImGuiEnd();
 }
@@ -166,11 +181,11 @@ void MainLoop()
     DumbCore::Init(map);
     //InitWindow(1024, 768, "Mapstate Visualizer");
     SetTargetFPS(60);
-
+    DumbRender::LoadTexturesToGPU();
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
         DumbCore::Update(deltaTime);
-
+       // printf("detaT:%f",deltaTime);
         BeginDrawing();
         ClearBackground(BLACK);
 

@@ -438,7 +438,7 @@ static inline void copybufreverse(const void* src, void* dest, size_t count) {
 
 // Absolute value
 static inline int32_t klabs(long x) {
-	return (x < 0) ? -x : x;
+	return labs(x);
 }
 
 // Sign function: returns -1, 0, or 1

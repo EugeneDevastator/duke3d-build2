@@ -137,7 +137,8 @@ EXTERN short nextspritesect[MAXSPRITES], nextspritestat[MAXSPRITES];
 
 EXTERN short tilesizx[MAXTILES], tilesizy[MAXTILES];
 EXTERN char walock[MAXTILES];
-EXTERN long numtiles, picanm[MAXTILES], waloff[MAXTILES];
+EXTERN long numtiles,  waloff[MAXTILES];
+EXTERN uint32_t picanm[MAXTILES];
 
 	//These variables are for auto-mapping with the draw2dscreen function.
 	//When you load a new board, these bits are all set to 0 - since

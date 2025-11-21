@@ -49,7 +49,7 @@ char buildkeys[NUMKEYS] =
 	0x9c,0x1c,0xd,0xc,0xf,
 };
 
-long posx, posy, posz, horiz = 100;
+long posx, posy, posz, horiz_ = 100;
 short ang, cursectnum;
 long hvel;
 
@@ -90,7 +90,7 @@ long numsprites;
 short highlight[MAXWALLS];
 short highlightsector[MAXSECTORS], highlightsectorcnt = -1;
 extern char textfont[128][8];
-
+uint32_t picanm[MAXTILES];
 static char pskysearch[MAXSECTORS];
 
 short temppicnum, tempcstat, templotag, temphitag, tempextra;

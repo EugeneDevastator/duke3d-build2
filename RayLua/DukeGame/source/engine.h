@@ -67,7 +67,7 @@ typedef struct
 	char dapalnum, dastat, pagesleft;
 	long cx1, cy1, cx2, cy2;
 } permfifotype;
-
+extern long totalclocklock;
 static long setviewcnt = 0;
 static long bakvidoption[4];
 static long bakframeplace[4], bakxsiz[4], bakysiz[4];
@@ -87,7 +87,7 @@ static void setgotpic(uint32_t index);
 static int wallfront(long l1, long l2);
 static int32_t spritewallfront(spritetype* s, long w);
 static void loadtables();
-static void initspritelists();
+void initspritelists();
 static int clipinsideboxline(long x, long y, long x1, long y1, long x2, long y2, long walldist);
 static int insertspritesect(short sectnum);
 static int insertspritestat(short statnum);
@@ -145,7 +145,7 @@ void drawvox(long dasprx, long daspry, long dasprz, long dasprang, long daxscale
 static void ceilspritescan(long x1, long x2);
 static void copytilepiece(long tilenume1, long sx1, long sy1, long xsiz, long ysiz, long tilenume2, long sx2, long sy2);
 static void ceilspritehline(long x2, long y);
-static long animateoffs(short tilenum, short fakevar);
+long animateoffs(short tilenum, short fakevar);
 static void printscreeninterrupt();
 void drawline256(long x1, long y1, long x2, long y2, char col);
 void drawline16(long x1, long y1, long x2, long y2, char col);
@@ -185,7 +185,7 @@ int deletesprite(short spritenum);
 int changespritesect(short spritenum, short newsectnum);
 int changespritestat(short spritenum, short newstatnum);
 // will be internalized
-//short nextsectorneighborz(short sectnum, long thez, short topbottom, short direction);
+short nextsectorneighborz(short sectnum, long thez, short topbottom, short direction);
 int cansee(long x1, long y1, long z1, short sect1, long x2, long y2, long z2, short sect2);
 int hitscan(long xs, long ys, long zs, short sectnum, long vx, long vy, long vz, short* hitsect, short* hitwall,short* hitsprite, long* hitx, long* hity, long* hitz, unsigned long cliptype);
 int inthitscan(long xs, long ys, long zs, short sectnum, long vx, long vy, long vz, short* hitsect, short* hitwall, short* hitsprite, long* hitx, long* hity, long* hitz, unsigned long cliptype);
@@ -211,7 +211,7 @@ void getzrange(long x, long y, long z, short sectnum,
 void rotatesprite(long sx, long sy, long z, short a, short picnum, signed char dashade, char dapalnum, char dastat,
 				  long cx1, long cy1, long cx2, long cy2);
 void makepalookup(long palnum, char* remapbuf, signed char r, signed char g, signed char b, char dastat);
-long getceilzofslope(short sectnum, long dax, long day);
+long getceilzofslope(long sectnum, long dax, long day);
 long getflorzofslope(short sectnum, long dax, long day);
 void getzsofslope(short sectnum, long dax, long day, long* ceilz, long* florz);
 

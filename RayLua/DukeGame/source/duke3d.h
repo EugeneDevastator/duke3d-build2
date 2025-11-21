@@ -85,10 +85,20 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #include "names.h"
 
-
+extern float globalDT;
+extern int globalTR;
 #define TICRATE (120)
-#define TICSPERFRAME (TICRATE/26)
+// additional timer resolution - we can do more than 120hz for better fidelity
+#define TIC_RES 1
+#define TIC_RATE_BIAS 0
+static const float FIXED_TICK_TIME_SEC = 1.0 / ((120.0f + TIC_RATE_BIAS) * TIC_RES);
 
+// global TR is whole ticks for this frame.
+// ticksperframe is actually accumulated ticks, and is used as dt everywhere: pos = pos + v * TICKSPERFRAME
+#define TICSPERFRAME globalTR / TIC_RES
+// 4.26...= TICSPERFRAME = 26/120; // but since we are frame independent we can ditch this.
+// we assume that previously avg of 16 fps was used to print out fps.
+// maybe use gravity with proper ticks
 // #define GC (TICSPERFRAME*44)
 
 #define NUM_SOUNDS 450
@@ -96,7 +106,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 int sgn(int value);
 
 #define    ALT_IS_PRESSED ( KB_KeyPressed( sc_RightAlt ) || KB_KeyPressed( sc_LeftAlt ) )
-#define    SHIFTS_IS_PRESSED ( KB_KeyPressed( sc_RightShift ) || KB_KeyPressed( sc_LeftShift ) )
+#define    SHIFTS_IS_PRESSED ( KB_KeyPressed(      sc_RightShift ) || KB_KeyPressed( sc_LeftShift ) )
 #define    RANDOMSCRAP EGS(s->sectnum,s->x+(TRAND&255)-128,s->y+(TRAND&255)-128,s->z-(8<<8)-(TRAND&8191),SCRAP6+(TRAND&15),-8,48,48,TRAND&2047,(TRAND&63)+64,-512-(TRAND&2047),i,5)
 
 #define    BLACK 0
@@ -350,6 +360,7 @@ typedef struct
 extern weaponhit hittype[MAXSPRITES];
 
 extern input loc;
+extern input current_input;
 extern input recsync[RECSYNCBUFSIZ];
 extern long avgfvel, avgsvel, avgavel, avghorz, avgbits;
 
@@ -371,7 +382,7 @@ extern long animatevel[MAXANIMATES];
 extern short neartagsector, neartagwall, neartagsprite;
 extern long neartaghitdist;
 extern short animatesect[MAXANIMATES];
-extern long movefifoplc, vel,svel,angvel,horiz;
+extern long movefifoplc, vel,svel,angvel,horiz_;
 
 extern short mirrorwall[64], mirrorsector[64], mirrorcnt;
 
@@ -405,7 +416,6 @@ extern char networkmode;
 //extern char lumplockbyte[11];
 
     //DUKE3D.H - replace the end "my's" with this
-extern long myx, omyx, myxvel, myy, omyy, myyvel, myz, omyz, myzvel;
 extern short myhoriz, omyhoriz, myhorizoff, omyhorizoff, globalskillsound;
 extern short myang, omyang, mycursectnum, myjumpingcounter;
 extern char myjumpingtoggle, myonground, myhardlanding,myreturntocenter;

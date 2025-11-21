@@ -25,6 +25,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 //-------------------------------------------------------------------------
 #include "funct.h"
 #include "duke3d.h"
+#include "dukewrap.h"
 #include "global.h"
 #include "sounds.h"
 #include "engine.h"
@@ -34,6 +35,7 @@ extern char numenvsnds,actor_tog;
 char tempbuf[4096];
 void updateinterpolations()  //Stick at beginning of domovethings
 {
+    return;
 	long i;
 
 	for(i=numinterpolations-1;i>=0;i--) oldipos[i] = *curipos[i];
@@ -42,6 +44,7 @@ void updateinterpolations()  //Stick at beginning of domovethings
 
 void setinterpolation(long *posptr)
 {
+    return;
 	long i;
 
 	if (numinterpolations >= MAXINTERPOLATIONS) return;
@@ -54,6 +57,7 @@ void setinterpolation(long *posptr)
 
 void stopinterpolation(long *posptr)
 {
+    return;
 	long i;
 
 	for(i=numinterpolations-1;i>=startofdynamicinterpolations;i--)
@@ -68,20 +72,24 @@ void stopinterpolation(long *posptr)
 
 void dointerpolations(long smoothratio)       //Stick at beginning of drawscreen
 {
+    return;
 	long i, j, odelta, ndelta;
 
 	ndelta = 0; j = 0;
 	for(i=numinterpolations-1;i>=0;i--)
 	{
 		bakipos[i] = *curipos[i];
-		odelta = ndelta; ndelta = (*curipos[i])-oldipos[i];
-		if (odelta != ndelta) j = mulscale16(ndelta,smoothratio);
+		odelta = ndelta;
+	    ndelta = (*curipos[i])-oldipos[i];
+		if (odelta != ndelta)
+		    j = mulscale16(ndelta,smoothratio);
 		*curipos[i] = oldipos[i]+j;
 	}
 }
 
 void restoreinterpolations()  //Stick at end of drawscreen
 {
+    return;
 	long i;
 
 	for(i=numinterpolations-1;i>=0;i--) *curipos[i] = bakipos[i];
@@ -588,7 +596,7 @@ void hitradius( short i, long  r, long  hp1, long  hp2, long  hp3, long  hp4 )
                                 updatesector(ps[p].posx,ps[p].posy,&ps[p].cursectnum);
                                 setpal(&ps[p]);
 
-                                k = headspritestat[1];
+                                k = headspritestat[STAT_ACTOR];
                                 while(k >= 0)
                                 {
                                     if(sprite[k].picnum==CAMERA1)
@@ -623,6 +631,8 @@ int movesprite(short spritenum, long xchange, long ychange, long zchange, unsign
         sprite[spritenum].z += (zchange*TICSPERFRAME)>>2;
         if(bg)
             setsprite(spritenum,sprite[spritenum].x,sprite[spritenum].y,sprite[spritenum].z);
+
+        SET_SPRITE_XYZ(spritenum, sprite[spritenum].x,sprite[spritenum].y,sprite[spritenum].z);
         return 0;
     }
 
@@ -659,14 +669,14 @@ int movesprite(short spritenum, long xchange, long ychange, long zchange, unsign
             ) )
           )
         {
-                sprite[spritenum].x = oldx;
-                sprite[spritenum].y = oldy;
+                SET_SPRITE_XY(spritenum,oldx,oldy);
                 if(sector[dasectnum].lotag == 1 && sprite[spritenum].picnum == LIZMAN)
                     sprite[spritenum].ang = (TRAND&2047);
                 else if( (hittype[spritenum].temp_data[0]&3) == 1 && sprite[spritenum].picnum != COMMANDER )
                     sprite[spritenum].ang = (TRAND&2047);
                 setsprite(spritenum,oldx,oldy,sprite[spritenum].z);
-                if(dasectnum < 0) dasectnum = 0;
+            SET_SPRITE_I(spritenum);
+                 if(dasectnum < 0) dasectnum = 0;
                 return (16384+dasectnum);
         }
         if( (retval&49152) >= 32768 && (hittype[spritenum].cgg==0) ) sprite[spritenum].ang += 768;
@@ -680,7 +690,7 @@ int movesprite(short spritenum, long xchange, long ychange, long zchange, unsign
             retval =
                 clipmove(&sprite[spritenum].x,&sprite[spritenum].y,&daz,&dasectnum,((xchange*TICSPERFRAME)<<11),((ychange*TICSPERFRAME)<<11),(long)(sprite[spritenum].clipdist<<2),(4<<8),(4<<8),cliptype);
     }
-
+    SET_SPRITE_I(spritenum);
     if( dasectnum >= 0)
         if ( (dasectnum != sprite[spritenum].sectnum) )
             changespritesect(spritenum,dasectnum);
@@ -689,9 +699,10 @@ int movesprite(short spritenum, long xchange, long ychange, long zchange, unsign
         sprite[spritenum].z = daz;
     else
         if (retval == 0)
-            return(16384+dasectnum);
+            retval=(16384+dasectnum);
 
-	return(retval);
+    SET_SPRITE_I(spritenum);
+    return(retval);
 }
 
 
@@ -1126,7 +1137,7 @@ void movedummyplayers()
         nexti = nextspritestat[i];
 
         p = sprite[sprite[i].owner].yvel;
-
+        SET_SPRITE_I(i);
         if( ps[p].on_crane >= 0 || sector[ps[p].cursectnum].lotag != 1 || sprite[ps[p].i].extra <= 0 )
         {
             ps[p].dummyplayersprite = -1;
@@ -1173,7 +1184,7 @@ void moveplayers() //Players
     while(i >= 0)
     {
         nexti = nextspritestat[i];
-
+        SET_SPRITE_I(i);
         s = &sprite[i];
         p = &ps[s->yvel];
         if(s->owner >= 0)
@@ -1262,7 +1273,7 @@ void moveplayers() //Players
                 s->xrepeat += 4;
                 s->cstat |= 2;
             }
-            else s->xrepeat = 42;
+            else s-> xrepeat = 42;
             if(s->yrepeat < 36)
                 s->yrepeat += 4;
             else
@@ -1309,7 +1320,7 @@ void movefx()
     while(i >= 0)
     {
         s = &sprite[i];
-
+        SET_SPRITE_I(i);
         nexti = nextspritestat[i];
 
         switch(s->picnum)
@@ -1414,7 +1425,7 @@ void movefallers()
     {
         nexti = nextspritestat[i];
         s = &sprite[i];
-
+        SET_SPRITE_I(i);
         sect = s->sectnum;
 
         if( T1 == 0 )
@@ -1497,6 +1508,7 @@ void movefallers()
         }
 
         BOLT:
+        SET_SPRITE_XYZ(i,s->x,s->y,s->z);
         i = nexti;
     }
 }
@@ -1515,7 +1527,7 @@ void movestandables()
         t = &hittype[i].temp_data[0];
         s = &sprite[i];
         sect = s->sectnum;
-
+        SET_SPRITE_I(i);
         if( sect < 0 ) KILLIT(i);
 
         hittype[i].bposx = s->x;
@@ -1692,7 +1704,7 @@ void movestandables()
                     ps[p].oposy = ps[p].posy = s->y-(sintable[ps[p].ang&2047]>>6);
                     ps[p].oposz = ps[p].posz = s->z+(2<<8);
                     setsprite(ps[p].i,ps[p].posx,ps[p].posy,ps[p].posz);
-                    ps[p].cursectnum = sprite[ps[p].i].sectnum;
+                    setPcursectnum(s,sprite[ps[p].i].sectnum);
                 }
             }
 
@@ -2290,7 +2302,7 @@ void movestandables()
                     {
                         if(x >= t[2])
                         {
-                            sector[sect].floorz = x;
+                            SET_SECTOR_FLORZ(sect,x);
                             t[1] = 0;
                         }
                         else
@@ -2392,8 +2404,9 @@ void movestandables()
                 execute(i,p,x);
                 goto BOLT;
         }
-
+        SET_SPRITE_XYZ(i,s->x,s->y,s->z);
         BOLT:
+        SET_SPRITE_XYZ(i,s->x,s->y,s->z);
         i = nexti;
     }
 }
@@ -2435,6 +2448,7 @@ void bounce(short i)
     s->zvel = zvect;
     s->xvel = ksqrt(dmulscale8(xvect,xvect,yvect,yvect));
     s->ang = getangle(xvect,yvect);
+    SET_SPRITE_I(i);
 }
 
 void moveweapons()
@@ -2449,7 +2463,7 @@ void moveweapons()
     {
         nexti = nextspritestat[i];
         s = &sprite[i];
-
+        SET_SPRITE_I(i);
         if(s->sectnum < 0) KILLIT(i);
 
         hittype[i].bposx = s->x;
@@ -2776,7 +2790,9 @@ void moveweapons()
                 execute(i,p,x);
                 goto BOLT;
         }
+        SET_SPRITE_XYZ(i,s->x,s->y,s->z);
         BOLT:
+        SET_SPRITE_XYZ(i,s->x,s->y,s->z);
         i = nexti;
     }
 }
@@ -2853,7 +2869,7 @@ void movetransports()
                                 ps[p].oposz = ps[p].posz = sprite[sprite[i].owner].z-PHEIGHT;
 
                                 changespritesect(j,sprite[sprite[i].owner].sectnum);
-                                ps[p].cursectnum = sprite[j].sectnum;
+                                setPcursectnum(p, sprite[j].sectnum);
 
                                 if(sprite[i].pal == 0)
                                 {
@@ -2883,7 +2899,7 @@ void movetransports()
                             hittype[ps[p].i].bposz = ps[p].posz;
 
                             changespritesect(j,sprite[sprite[i].owner].sectnum);
-                            ps[p].cursectnum = sprite[sprite[i].owner].sectnum;
+                            setPcursectnum(p, sprite[sprite[i].owner].sectnum);
 
                             break;
                         }
@@ -2934,7 +2950,7 @@ void movetransports()
 
                             if(sprite[sprite[i].owner].owner != sprite[i].owner)
                                 ps[p].transporter_hold = -2;
-                            ps[p].cursectnum = sprite[sprite[i].owner].sectnum;
+                            setPcursectnum(p, sprite[sprite[i].owner].sectnum);
 
                             changespritesect(j,sprite[sprite[i].owner].sectnum);
                             setsprite(ps[p].i,ps[p].posx,ps[p].posy,ps[p].posz+PHEIGHT);
@@ -3144,13 +3160,13 @@ void moveactors()
     spritetype *s;
     unsigned short k;
 
-    i = headspritestat[1];
+    i = headspritestat[STAT_ACTOR];
     while(i >= 0)
     {
         nexti = nextspritestat[i];
 
         s = &sprite[i];
-
+        SET_SPRITE_I(i);
         sect = s->sectnum;
 
         if( s->xrepeat == 0 || sect < 0 || sect >= MAXSECTORS)
@@ -3185,7 +3201,7 @@ void moveactors()
                         s->cstat = 32+128;
                         k = 1;
 
-                        j = headspritestat[1];
+                        j = headspritestat[STAT_ACTOR];
                         while(j >= 0)
                         {
                             if( sprite[j].lotag == s->lotag &&
@@ -3319,7 +3335,7 @@ void moveactors()
                             if( j > -64 && j < 64 && (sync[p].bits&(1<<29)) )
                                 if(ps[p].toggle_key_flag == 1)
                             {
-                                a = headspritestat[1];
+                                a = headspritestat[STAT_ACTOR];
                                 while(a >= 0)
                                 {
                                     if(sprite[a].picnum == QUEBALL || sprite[a].picnum == STRIPEBALL)
@@ -3725,7 +3741,7 @@ void moveactors()
                         updatesector(ps[p].posx,ps[p].posy,&ps[p].cursectnum);
                         setpal(&ps[p]);
 
-                        j = headspritestat[1];
+                        j = headspritestat[STAT_ACTOR];
                         while(j >= 0)
                         {
                             if(sprite[j].picnum==CAMERA1) sprite[j].yvel = 0;
@@ -4385,9 +4401,9 @@ void moveactors()
         p = findplayer(s,&x);
 
         execute(i,p,x);
-
+        SET_SPRITE_XYZ(i,s->x,s->y,s->z);
         BOLT:
-
+        SET_SPRITE_XYZ(i,sprite[i].x,sprite[i].y,sprite[i].z);
         i = nexti;
     }
 
@@ -4921,8 +4937,9 @@ void moveexplosions()  // STATNUM 5
                 }
                 goto BOLT;
         }
-
+        SET_SPRITE_XYZ(i,s->x,s->y,s->z);
         BOLT:
+        SET_SPRITE_XYZ(i,s->x,s->y,s->z);
         i = nexti;
     }
 }
@@ -4942,7 +4959,7 @@ void moveeffectors()   //STATNUM 3
     {
         nexti = nextspritestat[i];
         s = &sprite[i];
-
+        SET_SPRITE_I(i);
         sc = &sector[s->sectnum];
         st = s->lotag;
         sh = s->hitag;
@@ -5070,8 +5087,7 @@ void moveeffectors()   //STATNUM 3
 
                             if(sprite[ps[p].i].extra <= 0)
                             {
-                                sprite[ps[p].i].x = m;
-                                sprite[ps[p].i].y = x;
+                                SET_SPRITE_XY(ps[p].i,m,x);
                             }
                         }
                     }
@@ -5236,7 +5252,7 @@ void moveeffectors()   //STATNUM 3
                             {
                                 ps[p].posx = s->x;
                                 ps[p].posy = s->y;
-                                ps[p].cursectnum = s->sectnum;
+                                setPcursectnum(p,s->sectnum);
 
                                 setsprite(ps[p].i,s->x,s->y,s->z);
                                 quickkill(&ps[p]);
@@ -5318,7 +5334,7 @@ void moveeffectors()   //STATNUM 3
                             {
                                 ps[p].oposx = ps[p].posx = s->x;
                                 ps[p].oposy = ps[p].posy = s->y;
-                                ps[p].cursectnum = s->sectnum;
+                                setPcursectnum(p,s->sectnum);
 
                                 setsprite(ps[p].i,s->x,s->y,s->z);
                                 quickkill(&ps[p]);
@@ -5417,7 +5433,7 @@ void moveeffectors()   //STATNUM 3
                         {
                             ps[p].posx = s->x;
                             ps[p].posy = s->y;
-                            ps[p].cursectnum = s->sectnum;
+                            setPcursectnum(p,s->sectnum);
 
                             setsprite(ps[p].i,s->x,s->y,s->z);
                             quickkill(&ps[p]);
@@ -5490,7 +5506,7 @@ void moveeffectors()   //STATNUM 3
                                 ps[p].oposx = ps[p].posx;
                                 ps[p].oposy = ps[p].posy;
 
-                                ps[p].cursectnum = s->sectnum;
+                                setPcursectnum(p,s->sectnum);
 
                                 setsprite(ps[p].i,s->x,s->y,s->z);
                                 quickkill(&ps[p]);
@@ -5890,7 +5906,7 @@ void moveeffectors()   //STATNUM 3
 
                     for(j=startwall;j<endwall;j++)
                     {
-                        k = headspritestat[1];
+                        k = headspritestat[STAT_ACTOR];
                         while(k >= 0)
                         {
                             if( sprite[k].extra > 0
@@ -6575,8 +6591,12 @@ void moveeffectors()   //STATNUM 3
                                 sprite[j].picnum == SIDEBOLT1+2 ||
                                 sprite[j].picnum == SIDEBOLT1+3 ||
                                 wallswitchcheck(j)
+
                               )
-                              break;
+                             {
+                                SET_SPR_PIC(j,sprite[j].picnum);
+                             break;
+                             }
 
                             if( !(sprite[j].picnum >= CRANE && sprite[j].picnum <= (CRANE+3)))
                             {
@@ -7140,7 +7160,9 @@ void moveeffectors()   //STATNUM 3
                 }
                 break;
         }
+
         BOLT:
+        SET_SPR_PIC(i,sprite[i].picnum);
         i = nexti;
     }
 

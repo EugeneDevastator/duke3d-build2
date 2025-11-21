@@ -28,7 +28,9 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #include "build.h"
 #include "duke3d.h"
+#include "dukewrap.h"
 #include "funct.h"
+#include "global.h"
 #include "music.h"
 #include "sounds.h"
 
@@ -1372,6 +1374,7 @@ char checkhitswitch(short snum,long w,char switchtype)
                 sprite[i].picnum--;
                 break;
         }
+        SET_SPR_PIC(i,sprite[i].picnum);
         i = nextspritestat[i];
     }
 
@@ -2407,7 +2410,7 @@ void checkhitsprite(short i,short sn)
                         updatesector(ps[p].posx,ps[p].posy,&ps[p].cursectnum);
                         setpal(&ps[p]);
 
-                        j = headspritestat[1];
+                        j = headspritestat[STAT_ACTOR];
                         while(j >= 0)
                         {
                             if(sprite[j].picnum==CAMERA1) sprite[j].yvel = 0;
@@ -2696,7 +2699,7 @@ void cheatkeys(short snum)
 
                 if( j == HANDBOMB_WEAPON && p->ammo_amount[HANDBOMB_WEAPON] == 0 )
                 {
-                    k = headspritestat[1];
+                    k = headspritestat[STAT_ACTOR];
                     while(k >= 0)
                     {
                         if( sprite[k].picnum == HEAVYHBOMB && sprite[k].owner == p->i )
@@ -3169,7 +3172,7 @@ void checksectors(short snum)
                 case VIEWSCREEN:
                 case VIEWSCREEN2:
                     {
-                        i = headspritestat[1];
+                        i = headspritestat[STAT_ACTOR];
 
                         while(i >= 0)
                         {
@@ -3184,9 +3187,11 @@ void checksectors(short snum)
 
 
                                 j = p->cursectnum;
-                                p->cursectnum = sprite[i].sectnum;
+                                setPcursectnum(snum,sprite[i].sectnum);
+
                                 setpal(p);
-                                p->cursectnum = j;
+                                setPcursectnum(snum,j);
+
 
                                 // parallaxtype = 2;
                                 p->newowner = i;
@@ -3210,7 +3215,7 @@ void checksectors(short snum)
                         setpal(p);
 
 
-                        i = headspritestat[1];
+                        i = headspritestat[STAT_ACTOR];
                         while(i >= 0)
                         {
                             if(sprite[i].picnum==CAMERA1) sprite[i].yvel = 0;
@@ -3281,3 +3286,4 @@ void checksectors(short snum)
         }
     }
 }
+

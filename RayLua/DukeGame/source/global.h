@@ -109,9 +109,8 @@ player_struct ps[MAXPLAYERS];
 //extern user_defs ud;
 
 char pus, pub;
-char syncstat, syncval[MAXPLAYERS][MOVEFIFOSIZ];
 long syncvalhead[MAXPLAYERS], syncvaltail, syncvaltottail;
-
+input current_input;
 input sync[MAXPLAYERS], loc;
 input recsync[RECSYNCBUFSIZ];
 long avgfvel, avgsvel, avgavel, avghorz, avgbits;
@@ -131,7 +130,7 @@ long movefifoend[MAXPLAYERS];
 
 char playerreadyflag[MAXPLAYERS],ready2send;
 char playerquitflag[MAXPLAYERS];
-long vel, svel, angvel, horiz, ototalclock, respawnactortime, respawnitemtime, groupfile;
+long vel, svel, angvel, ototalclock, respawnactortime, respawnitemtime, groupfile;
 
 long script[MAXSCRIPTSIZE],*scriptptr,*insptr,*labelcode,labelcnt;
 long *actorscrptr[MAXTILES],*parsing_actor;
@@ -152,9 +151,29 @@ short weaponsandammosprites[15];
 long impact_damage;
 
         //GLOBAL.C - replace the end "my's" with this
-long myx, omyx, myxvel, myy, omyy, myyvel, myz, omyz, myzvel;
-short myhoriz, omyhoriz, myhorizoff, omyhorizoff;
+#define myxvel ps[0].posxv
+#define myyvel ps[0].posyv
+#define myzvel ps[0].poszv
+
+#define myx ps[0].posx
+#define myy ps[0].posy
+#define myz ps[0].posz
+
+#define omyz ps[0].oposz
+#define omyy ps[0].oposy
+#define omyx ps[0].oposx
+#define myhoriz ps[0].horiz
+#define omyhoriz ps[0].ohoriz
+#define myhorizoff ps[0].horizoff
+#define omyhorizoff ps[0].ohorizoff
+
 short myang, omyang, mycursectnum, myjumpingcounter,frags[MAXPLAYERS][MAXPLAYERS];
+
+//GAME.C sync state variables
+
+//static long syncvaltottail, othersyncvalhead, syncvaltail;
+
+
 
 char myjumpingtoggle, myonground, myhardlanding, myreturntocenter;
 signed char multiwho, multipos, multiwhat, multiflag;

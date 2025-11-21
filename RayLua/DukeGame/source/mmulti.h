@@ -54,8 +54,8 @@ static gcomtype *gcom;
 
 void callcommit();
 
-void initmultiplayers(char damultioption, char dacomrateoption, char dapriority);
-
+//void initmultiplayers(char damultioption, char dacomrateoption, char dapriority);
+void initmultiplayers_singleplayer();
 void initcrc();
 
 void setpackettimeout(long datimeoutcount, long daresendagaincount);

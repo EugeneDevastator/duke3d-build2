@@ -25,7 +25,9 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 //-------------------------------------------------------------------------
 #include "build.h"
 #include "duke3d.h"
+#include "dukewrap.h"
 #include "funct.h"
+#include "global.h"
 #include "music.h"
 #include "sounds.h"
 
@@ -997,33 +999,33 @@ void newgame(char vn, char ln, char sk)
         while (Sound[globalskillsound].lock >= 200);
     globalskillsound = -1;
 
-    waitforeverybody();
+   // waitforeverybody();
     ready2send = 0;
 
-    if (ud.m_recstat != 2 && ud.last_level >= 0 && ud.multimode > 1 && ud.coop != 1)
-        dobonus(1);
+  //  if (ud.m_recstat != 2 && ud.last_level >= 0 && ud.multimode > 1 && ud.coop != 1)
+   //     dobonus(1);
 
-    if (ln == 0 && vn == 3 && ud.multimode < 2 && ud.lockout == 0)
-    {
-        playmusic(&env_music_fn[1][0]);
+//  if (ln == 0 && vn == 3 && ud.multimode < 2 && ud.lockout == 0)
+//  {
+//      playmusic(&env_music_fn[1][0]);
 
-        flushperms();
-        setview(0, 0, xdim - 1, ydim - 1);
-        clearview(0L);
-        nextpage();
+//      flushperms();
+//      setview(0, 0, xdim - 1, ydim - 1);
+//      clearview(0L);
+//      nextpage();
 
-        playanm("vol41a.anm", 6);
-        clearview(0L);
-        nextpage();
-        playanm("vol42a.anm", 7);
-        //        clearview(0L);
-        //      nextpage();
-        playanm("vol43a.anm", 9);
-        clearview(0L);
-        nextpage();
+//      playanm("vol41a.anm", 6);
+//      clearview(0L);
+//      nextpage();
+//      playanm("vol42a.anm", 7);
+//      //        clearview(0L);
+//      //      nextpage();
+//      playanm("vol43a.anm", 9);
+//      clearview(0L);
+//      nextpage();
 
-        FX_StopAllSounds();
-    }
+//      FX_StopAllSounds();
+//  }
 
     show_shareware = 26 * 34;
 
@@ -1136,7 +1138,7 @@ void resetpspritevars(char g)
         }
 
     numplayersprites = 0;
-    circ = 2048 / ud.multimode;
+    circ = 2048 ;/// ud.multimode;
 
     which_palookup = 9;
     j = connecthead;
@@ -1218,9 +1220,9 @@ void clearfrags()
 
 void resettimevars()
 {
-    vel = svel = angvel = horiz = 0;
+    vel = svel = angvel = horiz_ = 0;
 
-    totalclock = 0L;
+    // totalclock = 0L;
     cloudtotalclock = 0L;
     ototalclock = 0L;
     lockclock = 0L;
@@ -1351,20 +1353,137 @@ void clearfifo()
 
 void resetmys()
 {
-    myx = omyx = ps[myconnectindex].posx;
-    myy = omyy = ps[myconnectindex].posy;
-    myz = omyz = ps[myconnectindex].posz;
     myxvel = myyvel = myzvel = 0;
-    myang = omyang = ps[myconnectindex].ang;
-    myhoriz = omyhoriz = ps[myconnectindex].horiz;
-    myhorizoff = omyhorizoff = ps[myconnectindex].horizoff;
-    mycursectnum = ps[myconnectindex].cursectnum;
-    myjumpingcounter = ps[myconnectindex].jumping_counter;
-    myjumpingtoggle = ps[myconnectindex].jumping_toggle;
-    myonground = ps[myconnectindex].on_ground;
-    myhardlanding = ps[myconnectindex].hard_landing;
-    myreturntocenter = ps[myconnectindex].return_to_center;
+    myang = omyang = ps[0].ang;
+    myhoriz = omyhoriz = ps[0].horiz;
+    myhorizoff = omyhorizoff = ps[0].horizoff;
+    mycursectnum = ps[0].cursectnum;
+    myjumpingcounter = ps[0].jumping_counter;
+    myjumpingtoggle = ps[0].jumping_toggle;
+    myonground = ps[0].on_ground;
+    myhardlanding = ps[0].hard_landing;
+    myreturntocenter = ps[0].return_to_center;
 }
+
+void enterlevel_rl() {
+     short i, j;
+    long l;
+    char levname[256];
+
+    //if ((g & MODE_DEMO) != MODE_DEMO) ud.recstat = ud.m_recstat;
+    ud.respawn_monsters = ud.m_respawn_monsters;
+    ud.respawn_items = ud.m_respawn_items;
+    ud.respawn_inventory = ud.m_respawn_inventory;
+    ud.monsters_off = ud.m_monsters_off;
+    ud.coop = ud.m_coop;
+    ud.marker = ud.m_marker;
+    ud.ffire = ud.m_ffire;
+
+  //  if ((g & MODE_DEMO) == 0 && ud.recstat == 2)
+  //      ud.recstat = 0;
+
+    FX_StopAllSounds();
+    clearsoundlocks();
+    FX_SetReverb(0);
+
+    i = ud.screen_size;
+    ud.screen_size = 0;
+    dofrontscreens(); // loading screen
+    // vscrn();
+    ud.screen_size = i;
+
+    //#ifndef VOLUMEONE // full version if nopt def
+// board loading is external.
+    ParseMapToDukeFormat();
+    clearbufbyte(gotpic, sizeof(gotpic), 0L);
+    myconnectindex=0;
+    prelevel(MODE_GAME);
+
+    allignwarpelevators();
+    resetpspritevars(MODE_GAME); // player init
+
+    cachedebug = 0;
+    automapping = 0;
+
+    if (ud.recstat != 2) MUSIC_StopSong();
+
+    cacheit();
+    docacheit();
+
+    if (ud.recstat != 2)
+    {
+        music_select = (ud.volume_number * 11) + ud.level_number;
+        playmusic(&music_fn[0][music_select][0]);
+    }
+
+    if ((MODE_GAME & MODE_GAME) || (MODE_GAME & MODE_EOL))
+        ps[myconnectindex].gm = MODE_GAME;
+    else if (MODE_GAME & MODE_RESTART)
+    {
+        if (ud.recstat == 2)
+            ps[myconnectindex].gm = MODE_DEMO;
+        else ps[myconnectindex].gm = MODE_GAME;
+    }
+
+    if ((ud.recstat == 1) && (MODE_GAME & MODE_RESTART) != MODE_RESTART)
+        opendemowrite();
+
+    //#ifdef VOLUMEONE
+    //    if(ud.level_number == 0 && ud.recstat != 2) FTA(40,&ps[myconnectindex]);
+    //#endif
+
+    for (i = connecthead; i >= 0; i = connectpoint2[i])
+        switch (sector[sprite[ps[i].i].sectnum].floorpicnum)
+        {
+        case HURTRAIL:
+        case FLOORSLIME:
+        case FLOORPLASMA:
+            resetweapons(i);
+            resetinventory(i);
+            ps[i].gotweapon[PISTOL_WEAPON] = 0;
+            ps[i].ammo_amount[PISTOL_WEAPON] = 0;
+            ps[i].curr_weapon = KNEE_WEAPON;
+            ps[i].kickback_pic = 0;
+            break;
+        }
+
+    //PREMAP.C - replace near the my's at the end of the file
+
+    resetmys();
+
+    ps[myconnectindex].palette = palette;
+    // palto(0,0,0,0); //some menu func.
+
+    setpal(&ps[myconnectindex]);
+    flushperms();
+
+    everyothertime = 0;
+    global_random = 0;
+
+    ud.last_level = ud.level_number + 1;
+
+    clearfifo();
+
+    for (i = numinterpolations - 1; i >= 0; i--) bakipos[i] = *curipos[i];
+
+    restorepalette = 1;
+
+    flushpackets();
+    waitforeverybody();
+
+    palto(0, 0, 0, 0);
+    vscrn();
+    clearview(0L);
+    drawbackground();
+
+    clearbufbyte(playerquitflag,MAXPLAYERS, 0x01010101);
+    ps[myconnectindex].over_shoulder_on = 0;
+
+    clearfrags();
+
+    resettimevars(); // Here we go
+}
+
 
 void enterlevel(char g)
 {

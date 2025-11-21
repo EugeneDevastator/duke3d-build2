@@ -1,4 +1,4 @@
-//
+ //
 // Created by omnis on 10/27/2025.
 //
 /*
@@ -80,12 +80,15 @@ public:
         strcpy_s(rootpath, "c:/Eugene/Games/build2/");
         LoadPal(rootpath);
         LoadMapAndTiles();
-        GenerateTextures();
-        InitMapstateTex();
+
         // auto paltex = ConvertPalToTexture();
         // tile_t* pic = static_cast<tile_t*>(malloc(sizeof(tile_t)));
         // strcpy_s(pic->filnam, "TILES000.art|1");
         // auto tex = ConvertPicToTexture(pic);
+    }
+    static void LoadTexturesToGPU() {
+        GenerateTextures();
+        InitMapstateTex();
     }
 
     // Calculates the Z height at point (x,y) on a sloped surface
@@ -291,7 +294,7 @@ public:
                 float dy = sect->z[0] - sect->z[1];
                 rlEnableDepthMask();
                 rlDisableBackfaceCulling();
-                if (wall->ns == -1)
+                if (wall->ns == -1 || wall->ns >= map->malsects)
                 {
                     // Solid wall - draw full wall
                     if (texIndex >= 0 && texIndex < get_gnumtiles())
@@ -436,18 +439,21 @@ public:
             }
         }
         rlEnableDepthMask();
-        rlDisableBackfaceCulling();
+        //rlEnableBackfaceCulling();
         // Draw sprites (unchanged)
         for (int i = 0; i < map->numspris; i++)
         {
             spri_t* spr = &map->spri[i];
-            if (spr->tilnum >= 0 && spr->tilnum < gnumtiles_i) // sprites
+            if (spr->tilnum >= 0 ) // sprites
             {
+                if (spr->tilnum >= gnumtiles_i)
+                    spr->tilnum = gnumtiles_i - 10;
+
                 Texture2D spriteTex = runtimeTextures[spr->tilnum];
-                Vector3 rg = {spr->r.x, spr->r.y, spr->r.z};
-                Vector3 dw = {spr->d.x, spr->d.y, spr->d.z};
-                Vector3 frw = {spr->f.x, spr->f.y, spr->f.z};
-                Vector3 pos = {spr->p.x, spr->p.y, spr->p.z};
+                Vector3 rg = {spr->r.x, -spr->r.z, spr->r.y};
+                Vector3 dw = {spr->d.x, -spr->d.z, spr->d.y};
+                Vector3 frw = {spr->f.x, -spr->f.z, spr->f.y};
+                Vector3 pos = {spr->p.x, -spr->p.z, spr->p.y};
                 pos += frw * 0.1; // bias agains fighting
                 Vector3 a = pos + rg + dw;
                 Vector3 b = pos + rg - dw;
@@ -484,7 +490,7 @@ public:
                     auto ys = Vector3Length(dw);
                     int xflip = spr->flags & 4 ? -1 : 1;
                     int yflip = spr->flags & 8 ? -1 : 1;
-                    Vector3 pos = {spr->p.x, spr->p.y, spr->p.z};
+                    Vector3 pos = {spr->p.x, -spr->p.z, spr->p.y};
                     Rectangle source = {0.0f, 0.0f, (float)spriteTex.width, (float)spriteTex.height};
                     xs *= 2;
                     ys *= 2;
@@ -1114,7 +1120,7 @@ private:
             if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
             map->blankheadspri = i;
         }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/E2l7.MAP", map);
+        loadmap_imp((char*)"c:/Eugene/Games/build2/e3l1.MAP", map);
     }
 };
 

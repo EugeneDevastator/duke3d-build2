@@ -36,6 +36,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "global.h"
 #include "_functio.h"
 #include "dukewrap.h"
+#include "sounds.h"
 
 char * gamefunctions[] =
 {
@@ -2492,7 +2493,7 @@ char parse()
                 updatesector(ps[g_p].posx,ps[g_p].posy,&ps[g_p].cursectnum);
                 setpal(&ps[g_p]);
 
-                j = headspritestat[1];
+                j = headspritestat[STAT_ACTOR];
                 while(j >= 0)
                 {
                     if(sprite[j].picnum==CAMERA1)
