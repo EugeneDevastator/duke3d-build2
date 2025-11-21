@@ -1,6 +1,7 @@
 #include "build2.h"
 #include "softrender.h"
 #include "Core/monoclip.h"
+#include "shadowtest2.h"
 #if 0
 shadowtest2.exe: shadowtest2.obj winmain.obj build2.obj drawpoly.obj drawcone.obj drawkv6.obj kplib.obj;
 				link shadowtest2.obj winmain.obj build2.obj drawpoly.obj drawcone.obj drawkv6.obj kplib.obj\
@@ -108,8 +109,6 @@ unsigned int *shadowtest2_sectgot = 0; //WARNING:code uses x86-32 bit shift tric
 static unsigned int *sectgotmal = 0, *shadowtest2_sectgotmal = 0;
 static int sectgotn = 0, shadowtest2_sectgotn = 0;
 
-	//Bunches
-typedef struct { int sec, wal0, wal1; double fra0, fra1; } bunch_t;
 static bunch_t *bunch = 0;
 static unsigned int *bunchgot = 0;
 static unsigned char *bunchgrid = 0;
@@ -128,22 +127,8 @@ static float gouvmat[9];
 static int gcurcol;
 
 #define LIGHTMAX 256 //FIX:make dynamic!
-typedef struct
-{
-	int vert0, b2sect, b2wall, b2slab, b2hashn;
-} ligpol_t;
-typedef struct
-{
-	point3d p, f;
-	int sect, sprilink;
-	float rgb[3], spotwid;
-	int flags; //&(1<<0):useshadow, &(1<<31):moved
 
-	unsigned int *sectgot, *sectgotmal; int sectgotn;             //Bit array of sectors hit by this light
-	int *lighashead;                    int lighasheadn;          //Hash heads into this light's polygon match info
-	ligpol_t *ligpol;                   int ligpoln, ligpolmal;   //Light polygon match info / next hash
-	point3d *ligpolv;                   int ligpolvn, ligpolvmal; //Vertices for light polygon info
-} lightpos_t;
+
 lightpos_t shadowtest2_light[LIGHTMAX];
 static lightpos_t *glp;
 int shadowtest2_numlights = 0, shadowtest2_useshadows = 1, shadowtest2_numcpu = 0;
@@ -187,8 +172,6 @@ extern void drawcone (double, double, double, double, double, double, double, do
 
 //--------------------------------------------------------------------------------------------------
 
-	//for twal, it is always safe to allocate sector's number of walls + 1 indices
-typedef struct { int i; double x, y; } bunchverts_t; //temp structure holding verts of bunch - easier to work with
 static int prepbunch (int b, bunchverts_t *twal)
 {
 	wall_t *wal;
@@ -231,7 +214,6 @@ static int prepbunch (int b, bunchverts_t *twal)
 	//   sid: which way bunch intersects 1:/, 2:backslash
 	//   wal: wall index on b0's sector {0..sec[s1].n-1}
 	//   fra: intersection point ratio (wal to wal_next) {0.0..1.0}
-typedef struct { int bun, sid; int wal; double fra; } bfint_t;
 #define BFINTMAX 256
 static bfint_t bfint[BFINTMAX];
 static int bfintn, bfintlut[BFINTMAX+1];
@@ -712,15 +694,6 @@ static void drawpol_aftclip (int plothead0, int plothead1) //this function for d
 }
 #endif
 
-
-
-typedef struct
-{
-	int vert0, b2sect, b2wall, b2slab, b2hashn;
-	int curcol, flags;
-	tile_t *tpic; float ouvmat[9];
-	point3d norm;
-} eyepol_t;
 static eyepol_t *eyepol = 0; // 4096 eyepol_t's = 192KB
 static point2d *eyepolv = 0; //16384 point2d's  = 128KB
 int eyepoln = 0, glignum = 0;

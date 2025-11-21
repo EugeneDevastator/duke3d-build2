@@ -70,4 +70,5 @@ void drawpolsol (cam_t *lcam, point3d *vt, int num, int lignum);
 #endif
 
 
+
 #endif //BUILD2_SOFTRENDER_H
