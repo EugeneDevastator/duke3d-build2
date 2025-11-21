@@ -93,7 +93,7 @@ typedef struct
 	int chatmessn;
 #endif
 } gamestate_t;
-EXTERN gamestate_t sst, pst, *gst;
+extern gamestate_t sst, pst, *gst;
 
 
 
@@ -103,60 +103,60 @@ EXTERN gamestate_t sst, pst, *gst;
 #pragma pack(pop)
 
 	//General functions:
-extern long build2_init ();
-extern void build2_uninit ();
+long build2_init ();
+void build2_uninit ();
 
 	//Map functions:
-extern int build2_loadmap (const char *filnam, int *cursect,
+int build2_loadmap (const char *filnam, int *cursect,
 									dpoint3d *npos, dpoint3d *nrig, dpoint3d *ndow, dpoint3d *nfor);
-extern void build2_copygamestate (gamestate_t *dst, gamestate_t *src);
-extern double getslopez (sect_t *s, int i, double x, double y);
-extern int wallprev (sect_t *s, int w);
-extern void getcentroid (wall_t *wal, int n, float *retcx, float *retcy);
-extern float getarea (wall_t *wal, int n);
-extern void reversewalls (wall_t *wal, int n);
-extern void rotatewallsurfsleft1 (wall_t *wal, int n);
-extern void dragpoint (gamestate_t *lst, int s, int w, float x, float y);
-extern void delwall (sect_t *s, int w);
+void build2_copygamestate (gamestate_t *dst, gamestate_t *src);
+double getslopez (sect_t *s, int i, double x, double y);
+int wallprev (sect_t *s, int w);
+void getcentroid (wall_t *wal, int n, float *retcx, float *retcy);
+float getarea (wall_t *wal, int n);
+void reversewalls (wall_t *wal, int n);
+void rotatewallsurfsleft1 (wall_t *wal, int n);
+void dragpoint (gamestate_t *lst, int s, int w, float x, float y);
+void delwall (sect_t *s, int w);
 //extern int dupwall (sect_t *s, int w);
 //extern void delsect (int s);
-extern int insidesect (double x, double y, wall_t *wal, int w);
+int insidesect (double x, double y, wall_t *wal, int w);
 //extern void updatesect (float x, float y, float z, int *cursect);
-extern int polybool (wall_t *wal0, int n0, wall_t *wal1, int n1, wall_t **wal2, int *n2, int op);
-extern void checknextwalls ();
-extern long gettileind (char *filnam);
-extern long settilefilename (long hitsect, long hitwall, char *filnam);
-extern void delspri (int i);
-extern long insspri (int sect, float x, float y, float z);
-extern void changesprisect (int i, int nsect);
-extern void checksprisect (int s); //s: sector of sprites to check; -1 to check all sprites
+int polybool (wall_t *wal0, int n0, wall_t *wal1, int n1, wall_t **wal2, int *n2, int op);
+void checknextwalls ();
+long gettileind (char *filnam);
+long settilefilename (long hitsect, long hitwall, char *filnam);
+void delspri (int i);
+long insspri (int sect, float x, float y, float z);
+void changesprisect (int i, int nsect);
+void checksprisect (int s); //s: sector of sprites to check; -1 to check all sprites
 
 	 //Render functions:
-extern void build2_render (tiletype *dd, long lzbufoff, long cursect,
+void build2_render (tiletype *dd, long lzbufoff, long cursect,
 									dpoint3d *npos, dpoint3d *nrig, dpoint3d *ndow, dpoint3d *nfor,
 									double hx, double hy, double hz);
-extern void drawpol (cam_t *cc, kgln_t *vert, long num, tile_t *tpic, long curcol);
-extern int isvispol (cam_t *cc, kgln_t *vert, long num);
-extern void memset8 (void *d, long v, long n);
-extern void drawsectfill3d (cam_t *cc, sect_t *sec, int isflor, int col);
-extern void drawsprite (cam_t *cc, spri_t *spr);
+void drawpol (cam_t *cc, kgln_t *vert, long num, tile_t *tpic, long curcol);
+int isvispol (cam_t *cc, kgln_t *vert, long num);
+void memset8 (void *d, long v, long n);
+void drawsectfill3d (cam_t *cc, sect_t *sec, int isflor, int col);
+void drawsprite (cam_t *cc, spri_t *spr);
 
 	//Physics functions:
-extern int build2_hitmove (int *cursect, dpoint3d *p, dpoint3d *v, double cr, int isslide, int *hitsect, int *hitwall);
-extern int hitscan (point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, int *hitwall, point3d *hit);
+int build2_hitmove (int *cursect, dpoint3d *p, dpoint3d *v, double cr, int isslide, int *hitsect, int *hitwall);
+int hitscan (point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, int *hitwall, point3d *hit);
 //extern double findmaxcr (dpoint3d *p0, int cursect, double mindist, dpoint3d *hit);
 
 	//Math functions:
-extern void orthofit3x3 (point3d *v0, point3d *v1, point3d *v2);
-extern void orthorotate (double ox, double oy, double oz,  point3d *iri,  point3d *ido,  point3d *ifo);
-extern void orthorotate (double ox, double oy, double oz, dpoint3d *iri, dpoint3d *ido, dpoint3d *ifo);
-extern void slerp (point3d *irig,  point3d *idow,  point3d *ifor,
+void orthofit3x3 (point3d *v0, point3d *v1, point3d *v2);
+void orthorotate (double ox, double oy, double oz,  point3d *iri,  point3d *ido,  point3d *ifo);
+void orthorotate (double ox, double oy, double oz, dpoint3d *iri, dpoint3d *ido, dpoint3d *ifo);
+void slerp (point3d *irig,  point3d *idow,  point3d *ifor,
 						 point3d *irig2, point3d *idow2, point3d *ifor2,
 						 point3d *iri,   point3d *ido,   point3d *ifo,   float rat);
 
-	//Disk functions:
-extern void savemap (char *filnam);
-extern void savekc (char *filnam);
-extern void screencapture (tiletype *tt);
+//Disk functions:
+void savemap (char *filnam);
+void savekc (char *filnam);
+void screencapture (tiletype *tt);
 
 #endif

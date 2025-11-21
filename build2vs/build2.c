@@ -176,6 +176,9 @@ typedef struct
 	ligpol_t *ligpol;                   int ligpoln, ligpolmal;   //Light polygon match info / next hash
 	point3d *ligpolv;                   int ligpolvn, ligpolvmal; //Vertices for light polygon info
 } lightpos_t;
+
+gamestate_t sst, pst, *gst;
+
 extern lightpos_t shadowtest2_light[LIGHTMAX];
 extern int shadowtest2_numlights, shadowtest2_useshadows, shadowtest2_numcpu;
 extern int shadowtest2_rendmode, eyepoln, glignum;
@@ -12713,7 +12716,7 @@ void build2_uninit (void)
 
 #ifndef STANDALONE
 
-long build2_init (void)
+long build2_init ()
 {
 	long i;
 
@@ -13013,7 +13016,7 @@ int build2_hitmove (int *cursect, dpoint3d *p, dpoint3d *v, double cr, int issli
 #endif
 #ifdef STANDALONE
 
-void uninitapp (void)
+void uninitapp ()
 {
 	int i;
 
@@ -13420,7 +13423,7 @@ long initapp (long argc, char **argv)
 
 	//User function must draw to surface: cc->c,cc->z
 	//User function must write: cc->p,r,d,f,hx,hy,hz
-static void drawframe (cam_t *cc)
+void drawframe (cam_t *cc)
 {
 	playerstruct_t cps;
 	cam_t cam;

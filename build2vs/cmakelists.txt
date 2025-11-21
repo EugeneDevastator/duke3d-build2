@@ -21,6 +21,8 @@ set(SOURCES
         Core/loaders.c
         Core/physics.c
         Core/artloader.c
+        Core/monoclip.c
+        Core/monoclip.h
 )
 set(SOURCES_CPP
         winmain.cpp
@@ -34,6 +36,8 @@ set(HEADERS
         Core/loaders.h
         Core/kplib.h
         Core/physics.h
+        Core/monoclip.c
+        Core/monoclip.h
 
 
 )
