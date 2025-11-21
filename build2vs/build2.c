@@ -13674,7 +13674,7 @@ void drawframe (cam_t *cc)
 	cc->h.x = gdps->ghx; cc->h.y = gdps->ghy; cc->h.z = gdps->ghz;
 }
 
-void doframe (void)
+void doframe ()
 {
 	gamestate_t *dast;
 	playerstruct_t *lps;

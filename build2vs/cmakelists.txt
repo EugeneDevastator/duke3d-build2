@@ -23,6 +23,8 @@ set(SOURCES
         Core/artloader.c
         Core/monoclip.c
         Core/monoclip.h
+        softrender.c
+        softrender.h
 )
 set(SOURCES_CPP
         winmain.cpp
@@ -38,6 +40,8 @@ set(HEADERS
         Core/physics.h
         Core/monoclip.c
         Core/monoclip.h
+        softrender.c
+        softrender.h
 
 
 )
