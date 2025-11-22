@@ -2236,12 +2236,12 @@ static void resetfps (void)
 	for(i=0;i<FPSSIZ;i++) { fpsdtim[i] = 1e32; fpsind[i] = i; } numframes = 0;
 }
 
-void uninitapp (void)
+static void uninitapp (void)
 {
 	if (zbuffermem) { free(zbuffermem); zbuffermem = 0; } zbuffersiz = 0;
 }
 
-long initapp (long argc, char **argv)
+static long initapp (long argc, char **argv)
 {
 	int i, j, k, l, argnoslash[8], argnoslashcnt = 0, numcpu = 0;
 	char *filnam;
@@ -2312,7 +2312,7 @@ long initapp (long argc, char **argv)
 	return(0);
 }
 
-void doframe ()
+static void doframe ()
 {
 	static dpoint3d dp, dcamr, dcamd, dcamf;
 	static int bstatus, obstatus, ischanged = 3, movelights = 0;
@@ -3323,6 +3323,7 @@ void drawpollig(int ei) {
                 qs[1] = min((int)(qlig[1]*g_rgbmul[1]),32767);
                 qs[2] = min((int)(qlig[2]*g_rgbmul[2]),32767);
 #else
+            	// Vectorized per-pixel lighting with quadratic falloff
                 _asm
                         {
                         movaps xmm7, qamb
@@ -3594,7 +3595,10 @@ void drawpollig(int ei) {
                         } while (x < xe3);
                     }
 #else
-                    if (!gps->rendinterp)
+                	// === SCANLINE RASTERIZATION LOOP ===
+                	// High-performance texture mapping with lighting
+                	// Uses fixed-point arithmetic for speed
+                    if (!gps->rendinterp) // Nearest neighbor sampling
                     {
                         _asm
                                 {

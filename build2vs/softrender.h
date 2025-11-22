@@ -36,6 +36,24 @@ static _inline int rgb_scale (int c0, int c1)
 #define SCISDIST .001
 #include "drawpoly.h"
 #include "Core/mapcore.h"
+constexpr int fontscale = 2;
+constexpr int lineHeight = fontscale*8 + 1;
+
+_inline void memset8(void *d, long v, long n) {
+	_asm
+			{
+				mov edx, d
+				mov ecx, n
+				movd mm0, v
+				punpckldq mm0, mm0
+				memset8beg:
+				movntq qword ptr [edx], mm0
+				add edx, 8
+				sub ecx, 8
+				jg short memset8beg
+				emms
+				}
+}
 
 int argb_interp (int c0, int c1, int mul15);
 
@@ -53,13 +71,18 @@ int uptil1 (unsigned int *lptr, int z);
 
 //NOTE: font is stored vertically first! (like .ART files)
 extern const uint64_t font6x8[];
-void print6x8 (tiltyp *ldd, int ox, int y, int fcol, int bcol, const char *fmt, ...);
 
-void drawpix (tiltyp *ldd, int x, int y, int col);
+void drawpix (tiltyp *dd, long x, long y, long c);
 
-void drawline2d (tiltyp *ldd, float x0, float y0, float x1, float y1, int col);
+void drawline2d (tiltyp *dd, float x0, float y0, float x1, float y1, long col);
 
-void drawline3d (cam_t *lcam, float x0, float y0, float z0, float x1, float y1, float z1, int col);
+void print6x8 (tiltyp *dd, long ox, long y, long fcol, long bcol, const char *fmt, ...);
+
+void drawhlin (tiltyp *dd, long x0, long x1, long y, long c);
+
+void shellsrt (float *a, int n);
+
+void shellsrt (int *a, int n);
 
 #ifdef STANDALONE
 	//For debug only!

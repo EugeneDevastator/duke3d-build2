@@ -2,9 +2,10 @@
 #define KEN_BUILD2_H
 
 #define WIN32_LEAN_AND_MEAN
+
 #include <windows.h>
 #include <malloc.h>
-
+#define STANDALONE
 
 #pragma pack(push,1)
 
@@ -137,10 +138,9 @@ void build2_render (tiletype *dd, long lzbufoff, long cursect,
 									double hx, double hy, double hz);
 void drawpol (cam_t *cc, kgln_t *vert, long num, tile_t *tpic, long curcol);
 int isvispol (cam_t *cc, kgln_t *vert, long num);
-void memset8 (void *d, long v, long n);
 void drawsectfill3d (cam_t *cc, sect_t *sec, int isflor, int col);
 void drawsprite (cam_t *cc, spri_t *spr);
-
+void drawline3d (cam_t *cc, float x0, float y0, float z0, float x1, float y1, float z1, long col);
 	//Physics functions:
 int build2_hitmove (int *cursect, dpoint3d *p, dpoint3d *v, double cr, int isslide, int *hitsect, int *hitwall);
 int hitscan (point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, int *hitwall, point3d *hit);

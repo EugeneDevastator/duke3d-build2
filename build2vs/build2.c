@@ -1,3 +1,4 @@
+#include "shadowtest2.h"
 #include "Core/physics.h"
 #if 0 //To compile, type: nmake build2.c
 
@@ -160,37 +161,11 @@ extern void drawcone (double, double, double, double, double, double, double, do
 
 	//SHADOWTEST2.H:
 #define LIGHTMAX 256 //FIX:make dynamic!
-typedef struct
-{
-	int vert0, b2sect, b2wall, b2slab, b2hashn;
-} ligpol_t;
-typedef struct
-{
-	point3d p, f;
-	int sect, sprilink;
-	float rgb[3], spotwid;
-	int flags; //&(1<<0):useshadow, &(1<<31):moved
-
-	unsigned int *sectgot, *sectgotmal; int sectgotn;             //Bit array of sectors hit by this light
-	int *lighashead;                    int lighasheadn;          //Hash heads into this light's polygon match info
-	ligpol_t *ligpol;                   int ligpoln, ligpolmal;   //Light polygon match info / next hash
-	point3d *ligpolv;                   int ligpolvn, ligpolvmal; //Vertices for light polygon info
-} lightpos_t;
-
 gamestate_t sst, pst, *gst;
-
-extern lightpos_t shadowtest2_light[LIGHTMAX];
 extern int shadowtest2_numlights, shadowtest2_useshadows, shadowtest2_numcpu;
 extern int shadowtest2_rendmode, eyepoln, glignum;
 extern unsigned int *shadowtest2_sectgot;
 extern float shadowtest2_ambrgb[3];
-extern void shadowtest2_ligpolreset(int);
-extern void shadowtest2_init (void);
-extern void shadowtest2_uninit (void);
-extern void draw_hsr_polymost (cam_t *cc, gamestate_t *lgs, playerstruct_t *lps, int cursect);
-extern void shadowtest2_setcam (cam_t *ncam);
-extern void eyepol_drawfunc (int ind);
-extern void drawpollig (int ei);
 extern void drawsprites (void);
 extern void htrun (void (*dacallfunc)(int), int v0, int v1, int danumcpu);
 #define MAXCPU 64
@@ -1067,8 +1042,6 @@ static void myfileselect_start (void)
 	myfileselectmode = 1;
 }
 
-static void drawhlin (tiltyp *dd, long x0, long x1, long y, long c);
-static void drawpix (tiltyp *dd, long x, long y, long c);
 static void drawsph (cam_t *cc, double x, double y, double z, double r, long col);
 static void drawkv6 (cam_t *cc, char *filnam, double px, double py, double pz,
 															 double rx, double ry, double rz,
@@ -1712,27 +1685,6 @@ static void playtext (char *st)
 }
 #endif
 
-static void shellsrt (float *a, int n)
-{
-	float t;
-	int i, j, g;
-
-	for(g=(n>>1);g;g>>=1)
-		for(i=0;i<n-g;i++)
-			for(j=i;(j>=0)&&(a[j]>a[j+g]);j-=g)
-				{ t = a[j]; a[j] = a[j+g]; a[j+g] = t; }
-}
-
-static void shellsrt (int *a, int n)
-{
-	int i, j, g, t;
-
-	for(g=(n>>1);g;g>>=1)
-		for(i=0;i<n-g;i++)
-			for(j=i;(j>=0)&&(a[j]>a[j+g]);j-=g)
-				{ t = a[j]; a[j] = a[j+g]; a[j+g] = t; }
-}
-
 static void xformpos (float *x, float *y, float *z)
 {
 	float t, ox, oy, oz;
@@ -1782,7 +1734,6 @@ static void xformrot (double *x, double *y, double *z)
 	(*y) = ox*gdps->idow.x + oy*gdps->idow.y + oz*gdps->idow.z;
 	(*z) = ox*gdps->ifor.x + oy*gdps->ifor.y + oz*gdps->ifor.z;
 }
-
 #ifdef STANDALONE
 static void curs2grid (playerstruct_t *pps, double sx, double sy, point3d *fp)
 {
@@ -2279,22 +2230,6 @@ void slerp (point3d *irig,  point3d *idow,  point3d *ifor,
 	//   1. All 32 bits of v are used and expected to be filled
 	//   2. Writes max((n+7)&~7,8) bytes
 	//   3. Assumes d is aligned on 8 byte boundary
-_inline void memset8 (void *d, long v, long n)
-{
-	_asm
-	{
-		mov edx, d
-		mov ecx, n
-		movd mm0, v
-		punpckldq mm0, mm0
-memset8beg:
-		movntq qword ptr [edx], mm0
-		add edx, 8
-		sub ecx, 8
-		jg short memset8beg
-		emms
-	}
-}
 
 #ifdef STANDALONE
 
@@ -2324,113 +2259,14 @@ static tilelist_t tilelist[] =
 };
 
 	//NOTE: font is stored vertically first! (like .ART files)
-static const __int64 font6x8[] = //256 DOS chars, from: DOSAPP.FON (tab blank)
-{
-	0x3E00000000000000,0x6F6B3E003E455145,0x1C3E7C3E1C003E6B,0x3000183C7E3C1800,0x7E5C180030367F36,0x000018180000185C,0x0000FFFFE7E7FFFF,0xDBDBC3FF00000000,
-	0x0E364A483000FFC3,0x6000062979290600,0x0A7E600004023F70,0x2A1C361C2A003F35,0x0800081C3E7F0000,0x7F361400007F3E1C,0x005F005F00001436,0x22007F017F090600,
-	0x606060002259554D,0x14B6FFB614000060,0x100004067F060400,0x3E08080010307F30,0x08083E1C0800081C,0x0800404040407800,0x3F3C3000083E083E,0x030F3F0F0300303C,
-	0x0000000000000000,0x0003070000065F06,0x247E247E24000307,0x630000126A2B2400,0x5649360063640813,0x0000030700005020,0x00000000413E0000,0x1C3E080000003E41,
-	0x08083E080800083E,0x0800000060E00000,0x6060000008080808,0x0204081020000000,0x00003E4549513E00,0x4951620000407F42,0x3649494922004649,0x2F00107F12141800,
-	0x494A3C0031494949,0x0305097101003049,0x0600364949493600,0x6C6C00001E294949,0x00006CEC00000000,0x2400004122140800,0x2241000024242424,0x0609590102000814,
-	0x7E001E555D413E00,0x49497F007E111111,0x224141413E003649,0x7F003E4141417F00,0x09097F0041494949,0x7A4949413E000109,0x00007F0808087F00,0x4040300000417F41,
-	0x412214087F003F40,0x7F00404040407F00,0x04027F007F020402,0x3E4141413E007F08,0x3E00060909097F00,0x09097F005E215141,0x3249494926006619,0x3F0001017F010100,
-	0x40201F003F404040,0x3F403C403F001F20,0x0700631408146300,0x4549710007087008,0x0041417F00000043,0x0000201008040200,0x01020400007F4141,0x8080808080800402,
-	0x2000000007030000,0x44447F0078545454,0x2844444438003844,0x38007F4444443800,0x097E080008545454,0x7CA4A4A418000009,0x0000007804047F00,0x8480400000407D00,
-	0x004428107F00007D,0x7C0000407F000000,0x04047C0078041804,0x3844444438000078,0x380038444444FC00,0x44784400FC444444,0x2054545408000804,0x3C000024443E0400,
-	0x40201C00007C2040,0x3C6030603C001C20,0x9C00006C10106C00,0x54546400003C60A0,0x0041413E0800004C,0x0000000077000000,0x02010200083E4141,0x3C2623263C000001,
-	0x3D001221E1A11E00,0x54543800007D2040,0x7855555520000955,0x2000785554552000,0x5557200078545555,0x1422E2A21C007857,0x3800085555553800,0x5555380008555455,
-	0x00417C0100000854,0x0000004279020000,0x2429700000407C01,0x782F252F78007029,0x3400455554547C00,0x7F097E0058547C54,0x0039454538004949,0x3900003944453800,
-	0x21413C0000384445,0x007C20413D00007D,0x3D00003D60A19C00,0x40413C00003D4242,0x002466241800003D,0x29006249493E4800,0x16097F00292A7C2A,0x02097E8840001078,
-	0x0000785555542000,0x4544380000417D00,0x007D21403C000039,0x7A0000710A097A00,0x5555080000792211,0x004E51514E005E55,0x3C0020404D483000,0x0404040404040404,
-	0x506A4C0817001C04,0x0000782A34081700,0x0014080000307D30,0x0814000814001408,0x55AA114411441144,0xEEBBEEBB55AA55AA,0x0000FF000000EEBB,0x0A0A0000FF080808,
-	0xFF00FF080000FF0A,0x0000F808F8080000,0xFB0A0000FE0A0A0A,0xFF00FF000000FF00,0x0000FE02FA0A0000,0x0F0800000F080B0A,0x0F0A0A0A00000F08,0x0000F80808080000,
-	0x080808080F000000,0xF808080808080F08,0x0808FF0000000808,0x0808080808080808,0xFF0000000808FF08,0x0808FF00FF000A0A,0xFE000A0A0B080F00,0x0B080B0A0A0AFA02,
-	0x0A0AFA02FA0A0A0A,0x0A0A0A0AFB00FF00,0xFB00FB0A0A0A0A0A,0x0A0A0B0A0A0A0A0A,0x0A0A08080F080F08,0xF808F8080A0AFA0A,0x08080F080F000808,0x00000A0A0F000000,
-	0xF808F8000A0AFE00,0x0808FF00FF080808,0x08080A0AFB0A0A0A,0xF800000000000F08,0xFFFFFFFFFFFF0808,0xFFFFF0F0F0F0F0F0,0xFF000000000000FF,0x0F0F0F0F0F0FFFFF,
-	0xFE00241824241800,0x01017F0000344A4A,0x027E027E02000003,0x1800006349556300,0x2020FC00041C2424,0x000478040800001C,0x3E00085577550800,0x02724C00003E4949,
-	0x0030595522004C72,0x1800182418241800,0x2A2A1C0018247E24,0x003C02023C00002A,0x0000002A2A2A2A00,0x4A4A510000242E24,0x00514A4A44000044,0x20000402FC000000,
-	0x2A08080000003F40,0x0012241224000808,0x0000000609090600,0x0008000000001818,0x02023E4030000000,0x0900000E010E0100,0x3C3C3C0000000A0D,0x000000000000003C,
-};
-const int fontscale = 2;
-const int lineHeight = fontscale*8 + 1;
-void print6x8 (tiltyp *dd, long ox, long y, long fcol, long bcol, const char *fmt, ...)
-{
-	va_list arglist;
-	char st[1024], *c, *v;
-	long i, j, ie, x, *lp, *lpx;
-	long sx, sy; // scale coordinates
 
-	if (!fmt || fontscale <= 0) return;
-	va_start(arglist,fmt);
-	if (_vsnprintf((char *)&st,sizeof(st)-1,fmt,arglist)) st[sizeof(st)-1] = 0;
-	va_end(arglist);
 
-	for(sy = 0; sy < 8 * fontscale; sy++)
-	{
-		j = 1 << (sy / fontscale); // which bit row we're reading from font
-		long current_y = y + sy;
-		if ((unsigned)current_y >= (unsigned)dd->y) continue;
 
-		lp = (long *)(current_y * dd->p + dd->f);
-
-		for(c = st, x = ox; *c; c++, x += 6 * fontscale)
-		{
-			v = (char *)(((long)*c) * 6 + (long)font6x8);
-			lpx = &lp[x];
-
-			for(i = max(-x, 0), ie = min(dd->x - x, 6 * fontscale); i < ie; i++)
-			{
-				long font_x = i / fontscale;
-				if (v[font_x] & j)
-					lpx[i] = fcol;
-				else if (bcol >= 0)
-					lpx[i] = bcol;
-			}
-
-			if ((*c) == 9) // tab handling
-			{
-				if (bcol >= 0)
-				{
-					for(i = max(-x, 6 * fontscale), ie = min(dd->x - x, 18 * fontscale); i < ie; i++)
-						lpx[i] = bcol;
-				}
-				x += 2 * 6 * fontscale;
-			}
-		}
-	}
+void drawpix3d(cam_t *cc, float x, float y, float z, long c) {
+    xformpos(&x,&y,&z);
+    if (z < SCISDIST) return;
+    z = cc->h.z/z; drawpix(&cc->c,x*z+cc->h.x,y*z+cc->h.y,c);
 }
-
-
-static void drawpix (tiltyp *dd, long x, long y, long c)
-{
-	if (((unsigned long)x >= dd->x) || ((unsigned long)y >= dd->y)) return;
-	*(long *)(y*dd->p + (x<<2) + dd->f) = c;
-}
-
-static void drawpix3d (cam_t *cc, float x, float y, float z, long c)
-{
-	xformpos(&x,&y,&z);
-	if (z < SCISDIST) return;
-	z = cc->h.z/z; drawpix(&cc->c,x*z+cc->h.x,y*z+cc->h.y,c);
-}
-
-static void drawhlin (tiltyp *dd, long x0, long x1, long y, long c)
-{
-	long x;
-	if (x0 > x1) { x = x0; x0 = x1; x1 = x; }
-	if ((x0 >= dd->x) || (x1 <= 0) || ((unsigned)y >= (unsigned)dd->y)) return;
-	if (x0 < 0) x0 = 0;
-	if (x1 > dd->x) x1 = dd->x;
-	y = y*dd->p + dd->f;
-#if 0
-	for(x=x0;x<x1;x++) *(long *)((x<<2) + y) = c;
-#else
-	x0 = (x0<<2)+y; x1 = (x1<<2)+y;
-	if (x1-x0 >= 8) memset8((void *)x0,c,(x1-x0)&~7);
-	if ((x1-x0)&4) *(long *)(x1-4) = c;
-#endif
-}
-
 #if 0
 static void drawcirc (tiltyp *dd, long xc, long yc, long r, long c)
 {
@@ -2487,32 +2323,6 @@ static void drawcirc (tiltyp *dd, double fx, double fy, double rad, long curcol)
 	}
 }
 #endif
-
-static void drawline2d (tiltyp *dd, float x0, float y0, float x1, float y1, long col)
-{
-	float f;
-	int i, dx, dy, ipx[2], ipy[2];
-
-		  if (x0 <     0) { if (x1 <     0) return; y0 = (    0-x0)*(y1-y0)/(x1-x0)+y0; x0 =     0; }
-	else if (x0 > dd->x) { if (x1 > dd->x) return; y0 = (dd->x-x0)*(y1-y0)/(x1-x0)+y0; x0 = dd->x; }
-		  if (y0 <     0) { if (y1 <     0) return; x0 = (    0-y0)*(x1-x0)/(y1-y0)+x0; y0 =     0; }
-	else if (y0 > dd->y) { if (y1 > dd->y) return; x0 = (dd->y-y0)*(x1-x0)/(y1-y0)+x0; y0 = dd->y; }
-		  if (x1 <     0) {                         y1 = (    0-x1)*(y1-y0)/(x1-x0)+y1; x1 =     0; }
-	else if (x1 > dd->x) {                         y1 = (dd->x-x1)*(y1-y0)/(x1-x0)+y1; x1 = dd->x; }
-		  if (y1 <     0) {                         x1 = (    0-y1)*(x1-x0)/(y1-y0)+x1; y1 =     0; }
-	else if (y1 > dd->y) {                         x1 = (dd->y-y1)*(x1-x0)/(y1-y0)+x1; y1 = dd->y; }
-
-	x1 -= x0; y1 -= y0;
-	i = ceil(max(fabs(x1),fabs(y1))); if (!(i&0x7fffffff)) return;
-	f = 65536.0/(float)i;
-	ipx[0] = (int)(x0*65536.0); ipx[1] = (int)(x1*f);
-	ipy[0] = (int)(y0*65536.0); ipy[1] = (int)(y1*f);
-	for(;i>0;i--)
-	{
-		drawpix(dd,ipx[0]>>16,ipy[0]>>16,col);
-		ipx[0] += ipx[1]; ipy[0] += ipy[1];
-	}
-}
 
 static void drawlinez (cam_t *cc, double x1, double y1, double x2, double y2,
 							  double rx0, double ry0, double rz0, double rx1, double ry1, double rz1, long col)
@@ -2592,7 +2402,7 @@ static void drawlinez (cam_t *cc, double x1, double y1, double x2, double y2,
 	}
 }
 
-static void drawline3d (cam_t *cc, float x0, float y0, float z0, float x1, float y1, float z1, long col)
+void drawline3d (cam_t *cc, float x0, float y0, float z0, float x1, float y1, float z1, long col)
 {
 	double ox, oy, oz, r;
 
