@@ -750,6 +750,13 @@ void eyepol_drawfunc (int ind)
 }
 
 static void gentex_xform(float *f);
+/*
+	Purpose: Renders visible geometry polygons to screen
+	Converts 3D polygon vertices to 2D screen coordinates
+	Handles texture mapping setup (UV coordinates, skybox mapping)
+	Stores polygons in eyepol[] array for later rendering
+	Manages different rendering modes (walls, skybox, parallax sky)
+ */
 static void drawtagfunc (int rethead0, int rethead1)
 {
 	float f, g, *fptr;
@@ -849,7 +856,14 @@ static void drawtagfunc (int rethead0, int rethead1)
 	eyepoln++;
 	eyepol[eyepoln].vert0 = eyepolvn;
 }
-
+/*
+	Purpose: Renders skybox faces as background
+	Generates 6 cube faces for skybox rendering
+	Clips each face against view frustum
+	Projects cube vertices to screen space
+	Calls drawtagfunc for each visible skybox face
+	Uses special texture mapping flags (gflags = 10-15 for different cube faces)
+*/
 static void skytagfunc (int rethead0, int rethead1)
 {
 	#define SSCISDIST 0.000001 //Reduces probability of glitch further
@@ -921,6 +935,13 @@ skiprest:;
 #define LIGHASHSIZ 1024
 static int ligpolmaxvert = 0;
 #define lighash(sect,wall,slab) ((((slab)<<6)+((sect)<<4)+(wall))&(LIGHASHSIZ-1))
+/*
+	Purpose: Generates shadow polygon lists for lighting
+	Converts screen-space polygons back to 3D world coordinates
+	Stores shadow-casting geometry in ligpol[] arrays per light source
+	Used during shadow map generation phase (mode 4)
+	Creates hash table for fast polygon lookup by sector/wall/slab
+ */
 static void ligpoltagfunc (int rethead0, int rethead1)
 {
 	float f, fx, fy, fz;
@@ -982,6 +1003,14 @@ static void ligpoltagfunc (int rethead0, int rethead1)
 }
 
 static int gnewtag, gdoscansector;
+/*
+	Purpose: Portal traversal and sector visibility
+	Manages sector-to-sector transitions through portals
+	Updates visibility lists when moving between connected areas
+	Handles clipping of view regions as camera moves through world
+	Maintains mph[] (mono polygon hierarchy) for spatial partitioning
+	"tag" refers to sector IDs
+*/
 static void changetagfunc (int rethead0, int rethead1)
 {
 	if ((rethead0|rethead1) < 0) return;
@@ -3149,7 +3178,7 @@ void drawpollig(int ei) {
 
         if (pn3)
         {
-            //prep sy:
+            //prep sy: some lightmap calc.
             i = sy*sy;
             for(lig=plnumi-1;lig>=0;lig--)
             {
