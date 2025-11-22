@@ -1160,7 +1160,7 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 		}
 		else
 		{
-				  if (shadowtest2_rendmode == 4) mono_output = ligpoltagfunc; //add to light list
+				  if (shadowtest2_rendmode == 4) mono_output = ligpoltagfunc; //add to light list // this will process point lights. otherwize will only use plr light.
 			else if (gflags < 2)                mono_output =   drawtagfunc; //draw wall
 			else                                mono_output =    skytagfunc; //calls drawtagfunc inside
 			for(i=mphnum-1;i>=0;i--) if (mph[i].tag == tag) mono_bool(mph[i].head[0],mph[i].head[1],plothead[0],plothead[1],MONO_BOOL_AND,mono_output);
@@ -1567,6 +1567,19 @@ static void drawalls (int b)
 		}
 	}
 }
+/*
+ *The function operates in different modes based on shadowtest2_rendmode:
+	Mode 2 (Standard Rendering):
+
+	Renders visible geometry from camera viewpoint
+	Populates eyepol[] array with screen-space polygons
+	Each polygon contains texture mapping data and surface normals
+	Mode 4 (Shadow Map Generation):
+
+	Renders from light source positions
+	Generates shadow polygon lists (ligpol[]) for each light
+	Creates visibility data for shadow casting
+*/
 
 void draw_hsr_polymost (cam_t *cc, gamestate_t *lgs, playerstruct_t *lps, int cursect)
 {
@@ -3032,6 +3045,7 @@ void drawpollig(int ei) {
         if (plnumi > 0) plnum[plnumi-1] = lpn2-olpn2;
         for(i=4-1;i>=0;i--) qamb[i] = g_qamb[i];
     }
+	// If use this only - all will be brighht.
     else //parallaxing sky does not use shadows
     {
 #if (USEGAMMAHACK == 0)
@@ -3039,7 +3053,7 @@ void drawpollig(int ei) {
 #else
         f = 256.f*16384.f;
 #endif
-        qamb[0] = f; qamb[1] = f; qamb[2] = f; qamb[3] = 0.f;
+        qamb[0] = f; qamb[1] = f; qamb[2] = f; qamb[3] = 0.f;  // ambient parallax..
     }
 
     //Shell sort top y's
@@ -3120,7 +3134,7 @@ void drawpollig(int ei) {
                     prast[l][j-1] = lrtmp;
                 }
             }
-            //Insert line segments
+            //Insert line segments // no lights without it.
             while ((lpn4[l] < plnum[l]) && (sy >= prast[l][lpn4[l]].y0))
             {
                 lrtmp = prast[l][lpn4[l]];

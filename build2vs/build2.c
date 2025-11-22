@@ -13351,7 +13351,7 @@ void drawframe (cam_t *cc)
 
 
 		if (gdps->compact2d == 0.0)
-		{
+		{   // Main render scope
 			shadowtest2_useshadows = b2opts.shadows; shadowtest2_numlights = 0;
 			for(i=gst->light_sprinum-1;i>=0;i--)
 			{
@@ -13439,7 +13439,7 @@ void drawframe (cam_t *cc)
 			shadowtest2_setcam(&cam);
 			htrun(drawpollig,0,eyepoln,shadowtest2_numcpu);
 			//drawsprites();
-			drawview(&cam,gdps,1);
+			drawview(&cam,gdps,1); // draws sprites, huh
 
 			drawkv6_numlights = -1;
 		}
