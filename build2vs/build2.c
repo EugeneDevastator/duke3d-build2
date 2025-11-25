@@ -6376,6 +6376,7 @@ static int loadmap (char *filnam)
 			gst->p[i].irig = gst->startrig;
 			gst->p[i].idow = gst->startdow;
 			gst->p[i].cursect = -1;
+
 		}
 
 			//Load sectors

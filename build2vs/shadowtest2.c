@@ -1,8 +1,6 @@
-#include "build2.h"
 #include "softrender.h"
 #include "Core/monoclip.h"
 #include "shadowtest2.h"
-
 #include "scenerender.h"
 #if 0
 shadowtest2.exe: shadowtest2.obj winmain.obj build2.obj drawpoly.obj drawcone.obj drawkv6.obj kplib.obj;

@@ -11,7 +11,7 @@ int mphmal = 0;
 
 
 mp_t *mp = 0;
-static int mpempty, mpmal = 0;
+int mpempty, mpmal = 0;
 
 void mph_check(int mphnum) {
     if (mphnum >= mphmal) {

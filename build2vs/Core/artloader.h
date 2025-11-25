@@ -18,7 +18,9 @@ typedef struct tiltyp {
 } tiltyp;
 */
 //static long nullpic [64+1][64]; //Null set icon (image not found)
+// (Bit Scan Forward) Finds the index of the first set bit (least significant bit) in the input
 static __forceinline unsigned int bsf (unsigned int a) { _asm bsf eax, a }
+//(Bit Scan Reverse) Finds the index of the last set bit (most significant bit)
 static __forceinline unsigned int bsr (unsigned int a) { _asm bsr eax, a }
 extern unsigned char gammlut[256], gotpal;
 extern tile_t *gtile;

@@ -34,7 +34,7 @@ typedef struct {
 extern mp_t *mp;
 extern mph_t *mph;
 extern int mphnum, mphmal;
-
+extern int mpempty, mpmal;
 // Memory management - ensures mph array has sufficient capacity
 void mph_check (int mphnum);
 

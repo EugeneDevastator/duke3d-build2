@@ -1,7 +1,6 @@
 #ifndef SHADOWTEST2_H
 #define SHADOWTEST2_H
 
-#include "build2.h"
 #include "scenerender.h"
 #include "softrender.h"
 

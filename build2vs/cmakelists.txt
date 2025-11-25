@@ -24,6 +24,7 @@ set(SOURCES
         Core/monoclip.c
         softrender.c
         shadowtest2.c
+        scenerender.c
 )
 set(SOURCES_CPP
         winmain.cpp
@@ -41,7 +42,7 @@ set(HEADERS
         softrender.h
         shadowtest2.h
 
-
+        scenerender.h
 )
 set_source_files_properties(${SOURCES} PROPERTIES
         LANGUAGE C
