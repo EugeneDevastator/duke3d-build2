@@ -1,5 +1,8 @@
 #include "monoclip.h"
 #include "shadowtest2.h"
+
+#include <stdbool.h>
+
 #include "scenerender.h"
 #if 0
 shadowtest2.exe: shadowtest2.obj winmain.obj build2.obj drawpoly.obj drawcone.obj drawkv6.obj kplib.obj;
@@ -20,8 +23,6 @@ winmain.obj:     winmain.cpp;   cl /c /TP winmain.cpp   /Ox /G6Fy /MD
 !if 0
 #endif
 
-#include "sysmain.h"
-#include "drawpoly.h"
 #include <malloc.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -30,7 +31,7 @@ winmain.obj:     winmain.cpp;   cl /c /TP winmain.cpp   /Ox /G6Fy /MD
 #pragma warning(disable:4731)
 
 #define USESSE2 0
-
+#define SCISDIST 0.0001
 #define USENEWLIGHT 1 //FIXFIXFIX
 #define USEGAMMAHACK 1 //FIXFIXFIX
 int renderinterp = 1;
@@ -97,7 +98,7 @@ drawscreen (..)
 static tiletype gdd;
 int shadowtest2_rendmode = 1;
 extern int drawpoly_numcpu;
-
+int shadowtest2_updatelighting = 1;
 #ifdef STANDALONE
 	//For debug only!
 static int gcnt, curgcnt = 0x7fffffff, fixposx, fixposy;
@@ -137,9 +138,7 @@ static float spotwid[LIGHTMAX];
 
 //--------------------------------------------------------------------------------------------------
 extern void htrun (void (*dacallfunc)(int), int v0, int v1, int danumcpu);
-extern int getwalls (int s, int w, vertlist_t *ver, int maxverts);
 extern double distpoint2line2 (double x, double y, double x0, double y0, double x1, double y1);
-extern int cputype;
 
 	//KPLIB.H (excerpt):
 extern int kzaddstack (const char *);
@@ -153,14 +152,9 @@ typedef struct
 	intptr_t ddp, ddf, ddx, ddy, zbufoff;
 	point3d p, r, d, f;
 } drawkv6_frame_t;
-extern void drawkv6_setup (drawkv6_frame_t *frame, tiletype *dd, intptr_t lzbufoff, dpoint3d *lipos, dpoint3d *lirig, dpoint3d *lidow, dpoint3d *lifor, float hx, float hy, float hz);
 drawkv6_frame_t drawkv6_frame;
 
 	//DRAWCONE.H:
-extern void drawcone_setup (int, int, tiletype *, intptr_t,  point3d *,  point3d *,  point3d *,  point3d *, double, double, double);
-extern void drawcone_setup (int, int, tiletype *, intptr_t, dpoint3d *, dpoint3d *, dpoint3d *, dpoint3d *, double, double, double);
-extern void drawsph (double, double, double, double, int, double);
-extern void drawcone (double, double, double, double, double, double, double, double, int, double, int);
 #define DRAWCONE_NOCAP0 1
 #define DRAWCONE_NOCAP1 2
 #define DRAWCONE_FLAT0 4
@@ -169,6 +163,38 @@ extern void drawcone (double, double, double, double, double, double, double, do
 //--------------------------------------------------------------------------------------------------
 
 //--------------------------------------------------------------------------------------------------
+inline void memset8(void *d, long v, long n) {
+	_asm
+			{
+				mov edx, d
+				mov ecx, n
+				movd mm0, v
+				punpckldq mm0, mm0
+				memset8beg:
+				movntq qword ptr [edx], mm0
+				add edx, 8
+				sub ecx, 8
+				jg short memset8beg
+				emms
+				}
+}
+int argb_interp(int c0, int c1, int mul15) {
+	_asm
+			{
+				punpcklbw mm0, c0
+				punpcklbw mm1, c1
+				psrlw mm0, 8
+				psrlw mm1, 8
+				psubw mm1, mm0
+				paddw mm1, mm1
+				pshufw mm2, mul15, 0
+				pmulhw mm1, mm2
+				paddw mm1, mm0
+				packuswb mm1, mm1
+				movd eax, mm1
+				emms
+				}
+}
 
 static int prepbunch (int b, bunchverts_t *twal)
 {
@@ -692,10 +718,10 @@ static void drawpol_aftclip (int plothead0, int plothead1) //this function for d
 }
 #endif
 
-static eyepol_t *eyepol = 0; // 4096 eyepol_t's = 192KB
-static point2d *eyepolv = 0; //16384 point2d's  = 128KB
+eyepol_t *eyepol = 0; // 4096 eyepol_t's = 192KB
+point2d *eyepolv = 0; //16384 point2d's  = 128KB
 int eyepoln = 0, glignum = 0;
-static int eyepolmal = 0, eyepolvn = 0, eyepolvmal = 0;
+int eyepolmal = 0, eyepolvn = 0, eyepolvmal = 0;
 static int gligsect, gligwall, gligslab, gflags;
 static point3d gnorm;
 void eyepol_drawfunc (int ind)
@@ -715,13 +741,13 @@ void eyepol_drawfunc (int ind)
 	}
 	vert[n-1].n = 0;
 
-	i = RENDFLAGS_OUVMAT|RENDFLAGS_NODEPTHTEST|RENDFLAGS_NOTRCP|RENDFLAGS_GMAT;
-	if (renderinterp) i |= RENDFLAGS_INTERP;
-	drawpoly_flat_threadsafe(&eyepol[ind].tpic->tt,(vertyp *)vert,n,eyepol[ind].curcol,(((unsigned)eyepol[ind].curcol)>>24)/16.0,eyepol[ind].ouvmat,i,gcam);
+	//i = RENDFLAGS_OUVMAT|RENDFLAGS_NODEPTHTEST|RENDFLAGS_NOTRCP|RENDFLAGS_GMAT;
+	//if (renderinterp) i |= RENDFLAGS_INTERP;
+	//drawpoly_flat_threadsafe(&eyepol[ind].tpic->tt,(vertyp *)vert,n,eyepol[ind].curcol,(((unsigned)eyepol[ind].curcol)>>24)/16.0,eyepol[ind].ouvmat,i,gcam);
 
 	if (shadowtest2_rendmode == 1)
 	{
-		for(i=n-1,j=0;i>=0;j=i,i--) drawline2d(&gcam.c,vert[i].x,vert[i].y,vert[j].x,vert[j].y,0xa0a0a0); //WARNING:fusing this with centroid algo below fails.. compiler bug?
+	//	for(i=n-1,j=0;i>=0;j=i,i--) drawline2d(&gcam.c,vert[i].x,vert[i].y,vert[j].x,vert[j].y,0xa0a0a0); //WARNING:fusing this with centroid algo below fails.. compiler bug?
 #if 0
 		fx = 0.f; fy = 0.f;
 		for(i=n-1,j=0;i>=0;j=i,i--) { fx += vert[i].x; fy += vert[i].y; }
@@ -740,10 +766,10 @@ void eyepol_drawfunc (int ind)
 		}
 		f = 1.f/(f*3.f); i = (int)(fx*f); j = (int)(fy*f);
 #endif
-													  drawpix(&gcam.c,i+0,j-1,0xffffff); drawpix(&gcam.c,i+1,j-1,0xffffff);
-		drawpix(&gcam.c,i-1,j+0,0xffffff); drawpix(&gcam.c,i+0,j+0,0x000000); drawpix(&gcam.c,i+1,j+0,0x000000); drawpix(&gcam.c,i+2,j+0,0xffffff);
-		drawpix(&gcam.c,i-1,j+1,0xffffff); drawpix(&gcam.c,i+0,j+1,0x000000); drawpix(&gcam.c,i+1,j+1,0x000000); drawpix(&gcam.c,i+2,j+1,0xffffff);
-													  drawpix(&gcam.c,i+0,j+2,0xffffff); drawpix(&gcam.c,i+1,j+2,0xffffff);
+	//												  drawpix(&gcam.c,i+0,j-1,0xffffff); drawpix(&gcam.c,i+1,j-1,0xffffff);
+	//	drawpix(&gcam.c,i-1,j+0,0xffffff); drawpix(&gcam.c,i+0,j+0,0x000000); drawpix(&gcam.c,i+1,j+0,0x000000); drawpix(&gcam.c,i+2,j+0,0xffffff);
+	//	drawpix(&gcam.c,i-1,j+1,0xffffff); drawpix(&gcam.c,i+0,j+1,0x000000); drawpix(&gcam.c,i+1,j+1,0x000000); drawpix(&gcam.c,i+2,j+1,0xffffff);
+	//												  drawpix(&gcam.c,i+0,j+2,0xffffff); drawpix(&gcam.c,i+1,j+2,0xffffff);
 	}
 }
 
@@ -1189,7 +1215,7 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 		}
 		else
 		{
-				  if (shadowtest2_rendmode == 4) mono_output = ligpoltagfunc; //add to light list // this will process point lights. otherwize will only use plr light.
+				  if (shadowtest2_rendmode == 4) mono_output = drawtagfunc; //add to light list // this will process point lights. otherwize will only use plr light.
 			else if (gflags < 2)                mono_output =   drawtagfunc; //draw wall
 			else                                mono_output =    skytagfunc; //calls drawtagfunc inside
 			for(i=mphnum-1;i>=0;i--) if (mph[i].tag == tag) mono_bool(mph[i].head[0],mph[i].head[1],plothead[0],plothead[1],MONO_BOOL_AND,mono_output);
@@ -1419,7 +1445,7 @@ the final visible geometry ready for 2D projection.
 The b parameter is a bunch index - this function processes one "bunch" (visible sector group) at a time. The traversal logic is in the caller that:
 */
 
-static void drawalls (int b)
+static void drawalls (int b, mapstate_t* map)
 {
 	// === VARIABLE DECLARATIONS ===
 	extern void loadpic (tile_t *);
@@ -1525,7 +1551,7 @@ static void drawalls (int b)
 	for(ww=0;ww<twaln;ww++)
 	{
 		// Get wall vertices and setup wall segment
-		vn = getwalls(s,twal[ww].i,verts,MAXVERTS);
+		vn = getwalls_imp(s,twal[ww].i,verts,MAXVERTS,map);
 		w = twal[ww].i; nw = wal[w].n+w;
 		sur = &wal[w].surf;
 
@@ -1639,7 +1665,7 @@ void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, player_transform *lps, int c
 	if (shadowtest2_rendmode == 4)
 	{
 		glp = &shadowtest2_light[glignum];
-		if ((!(glp->flags&1)) || (!shadowtest2_useshadows)) return;
+	//	if ((!(glp->flags&1)) || (!shadowtest2_useshadows)) return;
 	}
 	gcam = (*cc); gst = lgs; gps = lps;
 
@@ -1674,7 +1700,8 @@ void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, player_transform *lps, int c
 		shadowtest2_sectgotmal = (unsigned int *)malloc((shadowtest2_sectgotn>>3)+16); //NOTE:malloc doesn't guarantee 16-byte alignment!
 		shadowtest2_sectgot = (unsigned int *)((((intptr_t)shadowtest2_sectgotmal)+15)&~15);
 	}
-	if (!mphmal) mono_initonce();
+	if (!mphmal)
+		mono_initonce();
 
 #ifdef STANDALONE
 	fixposx = 0; fixposy = 32;
@@ -1702,9 +1729,9 @@ void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, player_transform *lps, int c
 		drig.x = 1.0; drig.y = 0.0; drig.z = 0.0;
 		ddow.x = 0.0; ddow.y = 1.0; ddow.z = 0.0;
 		dfor.x = 0.0; dfor.y = 0.0; dfor.z = 1.0;
-		drawpoly_setup(                           (tiletype *)&gcam.c,gcam.z.f-gcam.c.f,&dpos,&drig,&ddow,&dfor,gcam.h.x,gcam.h.y,gcam.h.z);
-		drawcone_setup(cputype,shadowtest2_numcpu,(tiletype *)&gcam.c,gcam.z.f-gcam.c.f,&dpos,&drig,&ddow,&dfor,gcam.h.x,gcam.h.y,gcam.h.z);
-		 drawkv6_setup(&drawkv6_frame,            (tiletype *)&gcam.c,gcam.z.f-gcam.c.f,&dpos,&drig,&ddow,&dfor,gcam.h.x,gcam.h.y,gcam.h.z);
+	//	drawpoly_setup(                           (tiletype *)&gcam.c,gcam.z.f-gcam.c.f,&dpos,&drig,&ddow,&dfor,gcam.h.x,gcam.h.y,gcam.h.z);
+		//drawcone_setup(cputype,shadowtest2_numcpu,(tiletype *)&gcam.c,gcam.z.f-gcam.c.f,&dpos,&drig,&ddow,&dfor,gcam.h.x,gcam.h.y,gcam.h.z);
+		// drawkv6_setup(&drawkv6_frame,            (tiletype *)&gcam.c,gcam.z.f-gcam.c.f,&dpos,&drig,&ddow,&dfor,gcam.h.x,gcam.h.y,gcam.h.z);
 
 		for(i=shadowtest2_numlights-1;i>=0;i--)
 		{
@@ -1859,7 +1886,7 @@ nogood:; }
 			closest = i;
 #endif
 
-			drawalls(closest);
+			drawalls(closest,lgs);
 #ifdef STANDALONE
 			if (gcnt <= 0) break; //FIX
 #endif
@@ -1923,7 +1950,7 @@ nogood:; }
 		}
 		else
 		{
-			if (!(cputype&(1<<25))) //Got SSE
+			if (false)// && !(cputype&(1<<25))) //Got SSE
 				{ for(i=((lgs->numsects+31)>>5)-1;i>=0;i--) uptr[i] |= sectgot[i]; }
 			else
 			{
@@ -1947,55 +1974,8 @@ nogood:; }
 }
 
 typedef struct { int sect; point3d p; float rgb[3]; int useshadow; } drawkv6_lightpos_t;
-extern drawkv6_lightpos_t drawkv6_light[MAXLIGHTS];
-extern int drawkv6_numlights;
-extern float drawkv6_ambrgb[3];
-void drawsprites (void)
+void drawsprites ()
 {
-	spri_t *spr;
-	int i, s, w;
-
-	if (!shadowtest2_sectgot) return;
-
-	if (shadowtest2_numlights)
-	{
-		drawkv6_numlights = shadowtest2_numlights;
-		for(i=shadowtest2_numlights-1;i>=0;i--)
-		{
-			float ox, oy, oz;
-
-			drawkv6_light[i].sect      = shadowtest2_light[i].sect;
-			drawkv6_light[i].p         = shadowtest2_light[i].p;
-			drawkv6_light[i].rgb[0]    = shadowtest2_light[i].rgb[0];
-			drawkv6_light[i].rgb[1]    = shadowtest2_light[i].rgb[1];
-			drawkv6_light[i].rgb[2]    = shadowtest2_light[i].rgb[2];
-			drawkv6_light[i].useshadow = (shadowtest2_light[i].flags&1);
-			//xformpos(&drawkv6_light[i].p.x,&drawkv6_light[i].p.y,&drawkv6_light[i].p.z);
-
-			ox = drawkv6_light[i].p.x-gps->ipos.x;
-			oy = drawkv6_light[i].p.y-gps->ipos.y;
-			oz = drawkv6_light[i].p.z-gps->ipos.z;
-			drawkv6_light[i].p.x = ox*gps->irig.x + oy*gps->irig.y + oz*gps->irig.z;
-			drawkv6_light[i].p.y = ox*gps->idow.x + oy*gps->idow.y + oz*gps->idow.z;
-			drawkv6_light[i].p.z = ox*gps->ifor.x + oy*gps->ifor.y + oz*gps->ifor.z;
-		}
-		drawkv6_ambrgb[0] = shadowtest2_ambrgb[0];
-		drawkv6_ambrgb[1] = shadowtest2_ambrgb[1];
-		drawkv6_ambrgb[2] = shadowtest2_ambrgb[2];
-	} else drawkv6_numlights = -1;
-
-	gcam.p.x = 0; gcam.p.y = 0; gcam.p.z = 0;
-	gcam.r.x = 1; gcam.r.y = 0; gcam.r.z = 0;
-	gcam.d.x = 0; gcam.d.y = 1; gcam.d.z = 0;
-	gcam.f.x = 0; gcam.f.y = 0; gcam.f.z = 1;
-	for(s=uptil1(shadowtest2_sectgot,gst->numsects);s>0;s=uptil1(shadowtest2_sectgot,s-1))
-		for(w=gst->sect[s-1].headspri;w>=0;w=gst->spri[w].sectn)
-		{
-			spr = &gst->spri[w];
-			if (!(spr->flags&0x80000000)) drawsprite(&gcam,spr); //Draw non-invisible sprites
-		}
-
-	drawkv6_numlights = -1;
 }
 
 void shadowtest2_setcam (cam_t *ncam)
@@ -2183,732 +2163,7 @@ void shadowtest2_init ()
 }
 
 //--------------------------------------------------------------------------------------------------
-#ifdef STANDALONE
 
-#pragma comment(lib,"comdlg32.lib")
-#include <commdlg.h>
-
-static int numframes = 0;
-
-static double dtotclk, odtotclk, dtim;
-
-	//FPS counter
-#define FPSSIZ 64
-static int fpsind[FPSSIZ];
-static float fpsdtim[FPSSIZ];
-
-static cam_t cam;
-static dpoint3d startpos, startrig, startdow, startfor, dcamp;
-static int *zbuffermem = 0, zbuffersiz = 0, cursect;
-static int shadowtest_numcpu;
-
-static dpoint3d ligvel[LIGHTMAX];
-
-
-	//For debug only!
-static int setclipboardtext (char *st)
-{
-	HANDLE hbuf;
-	int i, j;
-	char *cptr;
-
-	for(i=0,j=0;st[i];i++) if (st[i] == 13) j++;
-	if (!OpenClipboard(ghwnd)) return(0);
-	EmptyClipboard();
-	hbuf = GlobalAlloc(GMEM_MOVEABLE,i+j+1); if (!hbuf) { CloseClipboard(); return(0); }
-
-	cptr = (char *)GlobalLock(hbuf);
-	for(i=0;st[i];i++) { *cptr++ = st[i]; if (st[i] == 13) *cptr++ = 10; }
-	*cptr++ = 0;
-	GlobalUnlock(hbuf);
-
-	SetClipboardData(CF_TEXT,hbuf);
-	CloseClipboard();
-
-	//NOTE: Clipboard owns hbuf - don't do "GlobalFree(hbuf);"!
-	return(1);
-}
-
-static void resetview (void)
-{
-		//EVILNESS: doubles can become denormal when converted to single precision; killing fps!
-	if (fabs(startrig.x) <= 1.4013e-45) startrig.x = 0.0;
-	if (fabs(startrig.y) <= 1.4013e-45) startrig.y = 0.0;
-	if (fabs(startrig.z) <= 1.4013e-45) startrig.z = 0.0;
-	if (fabs(startdow.x) <= 1.4013e-45) startdow.x = 0.0;
-	if (fabs(startdow.y) <= 1.4013e-45) startdow.y = 0.0;
-	if (fabs(startdow.z) <= 1.4013e-45) startdow.z = 0.0;
-	if (fabs(startfor.x) <= 1.4013e-45) startfor.x = 0.0;
-	if (fabs(startfor.y) <= 1.4013e-45) startfor.y = 0.0;
-	if (fabs(startfor.z) <= 1.4013e-45) startfor.z = 0.0;
-
-	cam.p.x = startpos.x; cam.p.y = startpos.y; cam.p.z = startpos.z;
-	cam.r.x = startrig.x; cam.r.y = startrig.y; cam.r.z = startrig.z;
-	cam.d.x = startdow.x; cam.d.y = startdow.y; cam.d.z = startdow.z;
-	cam.f.x = startfor.x; cam.f.y = startfor.y; cam.f.z = startfor.z;
-	cam.h.x = xres/2; cam.h.y = yres/2; cam.h.z = cam.h.x;
-	dcamp = startpos;
-}
-
-static void grablightsfrommap (void)
-{
-	lightpos_t *lp;
-	int i;
-	mapstate_t sst = *gst;
-
-	shadowtest2_numlights = 0;
-	for(i=0;i<sst.numspris;i++)
-	{
-		if (!(sst.spri[i].flags&(1<<16))) continue;
-
-		lp = &shadowtest2_light[shadowtest2_numlights];
-		lp->sect   = sst.spri[i].sect;
-		lp->sprilink = i;
-		lp->p      = sst.spri[i].p;
-		lp->rgb[0] = sst.spri[i].bsc/8192.0;
-		lp->rgb[1] = sst.spri[i].gsc/8192.0;
-		lp->rgb[2] = sst.spri[i].rsc/8192.0;
-		lp->flags  = 1;
-		lp->sectgot      = 0;
-		lp->sectgotmal   = 0;
-		lp->sectgotn     = 0;
-		lp->lighashead   = 0;
-		lp->lighasheadn  = 0;
-		lp->ligpol       = 0;
-		lp->ligpoln      = 0;
-		lp->ligpolmal    = 0;
-		lp->ligpolv      = 0;
-		lp->ligpolvn     = 0;
-		lp->ligpolvmal   = 0;
-
-		ligvel[shadowtest2_numlights].x = 0.0;
-		ligvel[shadowtest2_numlights].y = 0.0;
-		ligvel[shadowtest2_numlights].z = 0.0;
-		shadowtest2_numlights++;
-	}
-	if (shadowtest2_numlights) shadowtest2_rendmode = 0;
-}
-
-static void resetfps (void)
-{
-	int i;
-	for(i=0;i<FPSSIZ;i++) { fpsdtim[i] = 1e32; fpsind[i] = i; } numframes = 0;
-}
-
-static void uninitapp (void)
-{
-	if (zbuffermem) { free(zbuffermem); zbuffermem = 0; } zbuffersiz = 0;
-}
-
-static long initapp (long argc, char **argv)
-{
-	int i, j, k, l, argnoslash[8], argnoslashcnt = 0, numcpu = 0;
-	char *filnam;
-
-	xres = 800; yres = 600; colbits = 32; fullscreen = 0; prognam = "ShadowTest2";
-	for(i=1;i<argc;i++)
-	{
-		if ((argv[i][0] != '/') && (argv[i][0] != '-'))
-		{
-			if (argnoslashcnt < sizeof(argnoslash)/sizeof(argnoslash[0])) argnoslash[argnoslashcnt++] = i;
-			continue;
-		}
-		if (argv[i][1] == '?') { MessageBox(0,"shadowtest2 [.MAP] [/#x#(x)] [/?]",prognam,MB_OK); return(-1); }
-		if (!memicmp(&argv[i][1],"cpu=",4)) { numcpu = min(max(atol(&argv[i][5]),1),64/*MAXCPU*/); continue; }
-		if ((argv[i][1] >= '0') && (argv[i][1] <= '9'))
-		{
-			k = 0; l = 0;
-			for(j=1;;j++)
-			{
-				if ((argv[i][j] >= '0') && (argv[i][j] <= '9')) { k = (k*10+argv[i][j]-48); continue; }
-				switch (l)
-				{
-					case 0: xres = k; break;
-					case 1: yres = k; break;
-					case 2: fullscreen = 1; break;
-				}
-				if (!argv[i][j]) break;
-				l++; if (l > 2) break;
-				k = 0;
-			}
-		}
-	}
-
-	drawpoly_init();
-	if (build2_init() < 0) { MessageBox(ghwnd,"Build2_init failed",prognam,MB_OK); return(-1); }
-
-	if (!argnoslashcnt)
-	{
-		filnam = "doortest.map";
-
-		 //FIXFIXFIXFIX: former bunchfront() splitting problems.. remove!
-	 ////filnam = "fukl.map";    //used 2 crashes at start.. bug fixed.. remove!
-	 ////filnam = "balcony.map"; //used 2 crashes instantly due to some light.. bug fixed.. remove!
-	 ////filnam = "motel.map";   //used 2 crashes near start.. bug fixed.. remove!
-
-		if (!build2_loadmap(filnam,&cursect,&startpos,&startrig,&startdow,&startfor)) { MessageBox(ghwnd,".MAP not found",prognam,MB_OK); return(-1); }
-	}
-	else
-	{
-		for(j=0;j<argnoslashcnt;j++)
-			if (!build2_loadmap(argv[argnoslash[j]],&cursect,&startpos,&startrig,&startdow,&startfor))
-			{
-				char tbuf[MAX_PATH];
-				sprintf(tbuf,"%s.map",argv[argnoslash[j]]);
-				build2_loadmap(tbuf,&cursect,&startpos,&startrig,&startdow,&startfor);
-			}
-	}
-
-	//startpos.x = 0.4589626193; startpos.y = -11.1178150177; startpos.z = 0.3460207283; //FIX! for fuk9.map only!
-
-	resetview();
-	grablightsfrommap();
-	resetfps();
-
-	if (numcpu) drawpoly_numcpu = numcpu;
-	shadowtest2_numcpu = drawpoly_numcpu;
-
-	return(0);
-}
-/*
-static void doframe ()
-{
-	static dpoint3d dp, dcamr, dcamd, dcamf;
-	static int bstatus, obstatus, ischanged = 3, movelights = 0;
-	lightpos_t *lp;
-	float f, g, fx, fy, fmousx, fmousy;
-	intptr_t p, zbufoff;
-	int i, j, i0, i1, lig, x, y;
-
-	readkeyboard(); if (ext_keystatus[1]) { quitloop(); return; }
-	odtotclk = dtotclk; readklock(&dtotclk); dtim = dtotclk-odtotclk;
-	obstatus = bstatus; readmouse(&fmousx,&fmousy,(long *)&bstatus);
-
-	f = dtim*4;
-	if (keystatus[0x36]) f *= 4;
-	if (keystatus[0x2a]) f *= .25;
-	dp.x = dp.y = dp.z = 0.f;
-	if (keystatus[0xcb]) { dp.x -= cam.r.x*f; dp.y -= cam.r.y*f; dp.z -= cam.r.z*f; } //left
-	if (keystatus[0xcd]) { dp.x += cam.r.x*f; dp.y += cam.r.y*f; dp.z += cam.r.z*f; } //right
-	if (keystatus[0xc8]) { dp.x += cam.f.x*f; dp.y += cam.f.y*f; dp.z += cam.f.z*f; } //forward
-	if (keystatus[0xd0]) { dp.x -= cam.f.x*f; dp.y -= cam.f.y*f; dp.z -= cam.f.z*f; } //back
-	if (keystatus[0x9d]) { dp.x -= cam.d.x*f; dp.y -= cam.d.y*f; dp.z -= cam.d.z*f; } //Rctrl
-	if (keystatus[0x52]) { dp.x += cam.d.x*f; dp.y += cam.d.y*f; dp.z += cam.d.z*f; } //KP0
-	if (keystatus[0xb8]) { dcamp.x += dp.x; dcamp.y += dp.y; dcamp.z += dp.z; } else build2_hitmove(&cursect,&dcamp,&dp,0.25,1,0,0);
-	cam.p.x = (float)dcamp.x; cam.p.y = (float)dcamp.y; cam.p.z = (float)dcamp.z;
-	if (keystatus[0x4b]) { cam.h.x += f*64.0; } //KP4
-	if (keystatus[0x4d]) { cam.h.x -= f*64.0; } //KP6
-	if (keystatus[0x48]) { cam.h.y += f*64.0; } //KP8
-	if (keystatus[0x50]) { cam.h.y -= f*64.0; } //KP2
-	if (keystatus[0x35]) { keystatus[0x35] = 0; resetview(); } // /
-	if (keystatus[0x4c]) { cam.h.x = xres/2; cam.h.y = yres/2; cam.h.z = cam.h.x; } //KP5
-	if (keystatus[0xb5]) { g = cam.h.z; cam.h.z *= pow(1.25,-f); if ((g > cam.h.x) && (cam.h.z <= cam.h.x)) { cam.h.z = cam.h.x; keystatus[0xb5] = 0; } } //KP/
-	if (keystatus[0x37]) { g = cam.h.z; cam.h.z *= pow(1.25,+f); if ((g < cam.h.x) && (cam.h.z >= cam.h.x)) { cam.h.z = cam.h.x; keystatus[0x37] = 0; } } //KP*
-	if (!(bstatus&2)) orthorotate(cam.r.z*.05,fmousy*.01,fmousx*.01,&cam.r,&cam.d,&cam.f);
-					 else orthorotate(fmousx*-.01,fmousy*.01,       0.0,&cam.r,&cam.d,&cam.f);
-	if (fabs(cam.r.x) <= 1e-32) cam.r.x = 0.0;
-	if (fabs(cam.r.y) <= 1e-32) cam.r.y = 0.0;
-	if (fabs(cam.r.z) <= 1e-32) cam.r.z = 0.0;
-	if (fabs(cam.d.x) <= 1e-32) cam.d.x = 0.0;
-	if (fabs(cam.d.y) <= 1e-32) cam.d.y = 0.0;
-	if (fabs(cam.d.z) <= 1e-32) cam.d.z = 0.0;
-	if (fabs(cam.f.x) <= 1e-32) cam.f.x = 0.0;
-	if (fabs(cam.f.y) <= 1e-32) cam.f.y = 0.0;
-	if (fabs(cam.f.z) <= 1e-32) cam.f.z = 0.0;
-
-	for(i=0;i<8;i++)
-		if (keystatus[i+0x3b]) //F1-F8
-		{
-			drawpoly_numcpu = i+1; shadowtest_numcpu = drawpoly_numcpu; shadowtest2_numcpu = drawpoly_numcpu;
-			resetfps();
-			break;
-		}
-	for(i=0;i<5;i++) //'1'-'5'
-	{
-		if (keystatus[i+0x02])
-		{
-			keystatus[i+0x02] = 0;
-			shadowtest2_rendmode = i;
-			if ((!shadowtest2_numlights) && (!shadowtest2_rendmode)) shadowtest2_rendmode = 2;
-			clearscreen(0); if (zbuffermem) memset8((void *)zbuffermem,0,zbuffersiz);
-			resetfps();
-		}
-	}
-	if (keystatus[0x17]) { keystatus[0x17] = 0; sst.p[0].rendinterp ^= 1; resetfps(); } //I
-	if (keystatus[0x26]) //L
-	{
-		keystatus[0x26] = 0;
-		if (keystatus[0x1d]|keystatus[0x9d]) //Ctrl+L: load map
-		{
-			static char fileselectnam[MAX_PATH+1];
-			ddflip2gdi();
-			OPENFILENAME ofn = { sizeof(OPENFILENAME),ghwnd,0,"MAP\0*.map\0GRP\0*.grp\0All Files\0*.*\0\0",0,0,1,fileselectnam,MAX_PATH,0,0,0,"Select .MAP to Load",OFN_HIDEREADONLY|OFN_NOCHANGEDIR,0,0,".MAP",0,0,0};
-			if (GetOpenFileName(&ofn))
-			{
-				if (!build2_loadmap(fileselectnam,&cursect,&startpos,&startrig,&startdow,&startfor))
-					{ MessageBox(ghwnd,".MAP not found",prognam,MB_OK); }
-				else
-				{
-					i = strlen(fileselectnam);
-					if ((i >= 4) && (!stricmp(&fileselectnam[i-4],".grp")))
-						kzaddstack(fileselectnam);
-					else
-					{
-						resetview();
-						for(i=shadowtest2_numlights-1;i>=0;i--) shadowtest2_dellight(i);
-						grablightsfrommap();
-						ischanged = 3;
-						resetfps();
-					}
-				}
-			}
-			keystatus[0x1d] = keystatus[0x9d] = 0;
-		}
-		else
-		{
-			sst.light_sprinum ^= -1; //List of active light sprite indices
-		}
-	}
-
-
-	if (keystatus[0x1f]) { keystatus[0x1f] = 0; shadowtest2_useshadows ^= 1; resetfps(); } //S
-	if (keystatus[0xd2]) //Ins (insert light at pos)
-	{
-		keystatus[0xd2] = 0;
-
-		if (shadowtest2_numlights < LIGHTMAX)
-		{
-			static const float ligdefrgb[8][3] = {1,1,1, 0,0,1, 0,1,0, 1,0,0, 0,1,1, 1,0,1, 1,1,0, .5,.5,.5};
-			lp = &shadowtest2_light[shadowtest2_numlights];
-
-			lp->sect = cursect;
-			lp->sprilink = -1;
-			lp->p.x = dcamp.x;
-			lp->p.y = dcamp.y;
-			lp->p.z = dcamp.z;
-			lp->f.x = cam.f.x;
-			lp->f.y = cam.f.y;
-			lp->f.z = cam.f.z;
-			lp->spotwid = -1.0;
-			lp->rgb[0] = ligdefrgb[shadowtest2_numlights&7][0];
-			lp->rgb[1] = ligdefrgb[shadowtest2_numlights&7][1];
-			lp->rgb[2] = ligdefrgb[shadowtest2_numlights&7][2];
-			lp->flags = 1;
-			lp->sectgot      = 0;
-			lp->sectgotmal   = 0;
-			lp->sectgotn     = 0;
-			lp->lighashead   = 0;
-			lp->lighasheadn  = 0;
-			lp->ligpol       = 0;
-			lp->ligpoln      = 0;
-			lp->ligpolmal    = 0;
-			lp->ligpolv      = 0;
-			lp->ligpolvn     = 0;
-			lp->ligpolvmal   = 0;
-
-			if (!(keystatus[0x1d]|keystatus[0x9d]))
-			{
-				ligvel[shadowtest2_numlights].x = cam.f.x;
-				ligvel[shadowtest2_numlights].y = cam.f.y;
-				ligvel[shadowtest2_numlights].z = cam.f.z;
-				lp->spotwid = 0.25;
-			}
-			else
-			{
-				ligvel[shadowtest2_numlights].x = 0.0;
-				ligvel[shadowtest2_numlights].y = 0.0;
-				ligvel[shadowtest2_numlights].z = 0.0;
-				lp->spotwid = 0.5;
-			}
-			shadowtest2_numlights++;
-			ischanged = 3; shadowtest2_rendmode = 4; resetfps();
-		}
-	}
-
-	if (keystatus[0xd3]) //Del (delete nearest light)
-	{
-		keystatus[0xd3] = 0;
-		if (shadowtest2_numlights > 0)
-		{
-			g = 1e32; j = 0;
-			for(i=shadowtest2_numlights-1;i>=0;i--)
-			{
-				dp.x = shadowtest2_light[i].p.x - dcamp.x;
-				dp.y = shadowtest2_light[i].p.y - dcamp.y;
-				dp.z = shadowtest2_light[i].p.z - dcamp.z;
-				f = dp.x*dp.x + dp.y*dp.y + dp.z*dp.z; if (f < g) { g = f; j = i; }
-			}
-			shadowtest2_dellight(j);
-			ligvel[j] = ligvel[shadowtest2_numlights];
-			if (!shadowtest2_numlights) shadowtest2_rendmode = 2;
-			resetfps();
-			ischanged = 3;
-		}
-	}
-	if (keystatus[0xcf]) { ischanged = 3; } //End
-	if (keystatus[0x32]) //M (toggle moving lights)
-	{
-		keystatus[0x32] = 0;
-		if ((shadowtest2_numlights > 0) && (ligvel[0].x == 0.0) && (ligvel[0].y == 0.0) && (ligvel[0].z == 0.0))
-		{
-			for(i=0;i<shadowtest2_numlights;i++)
-			{
-				//if (shadowtest2_light[i].sprilink < 0) continue;
-					//UNIFORM spherical randomization (see spherand.c)
-				ligvel[i].z = (((double)rand())/32768.0)*2.0-1.0;
-				f = (((double)rand())/32768.0)*(PI*2.0); ligvel[i].x = cos(f); ligvel[i].y = sin(f);
-				f = sqrt(1.0-ligvel[i].z*ligvel[i].z); ligvel[i].x *= f; ligvel[i].y *= f;
-				f = 0.5f; ligvel[i].x *= f; ligvel[i].y *= f; ligvel[i].z *= f; //scale vector
-
-				lp = &shadowtest2_light[i]; lp->f.x = ligvel[i].x; lp->f.y = ligvel[i].y; lp->f.z = ligvel[i].z;
-			}
-		}
-		else
-		{
-			for(i=0;i<shadowtest2_numlights;i++)
-			{
-				//if (shadowtest2_light[i].sprilink < 0) continue;
-				ligvel[i].x = 0.f; ligvel[i].y = 0.f; ligvel[i].z = 0.f;
-			}
-		}
-	}
-	if (keystatus[0x58]) //F12: capture startpos to clipbaord
-	{
-		char tbuf[1024];
-		keystatus[0x58] = 0;
-		sprintf(tbuf,"   startpos.x=%20.16f;startpos.y=%20.16f;startpos.z=%20.16f;\r"
-						 "   startrig.x=%20.16f;startrig.y=%20.16f;startrig.z=%20.16f;\r"
-						 "   startdow.x=%20.16f;startdow.y=%20.16f;startdow.z=%20.16f;\r"
-						 "   startfor.x=%20.16f;startfor.y=%20.16f;startfor.z=%20.16f;\r",
-						 cam.p.x,cam.p.y,cam.p.z,
-						 cam.r.x,cam.r.y,cam.r.z,
-						 cam.d.x,cam.d.y,cam.d.z,
-						 cam.f.x,cam.f.y,cam.f.z);
-		setclipboardtext(tbuf);
-		MessageBox(ghwnd,"pos&ori copied to clipboard",prognam,MB_OK);
-	}
-
-	for(i=0;i<shadowtest2_numlights;i++)
-	{
-		dpoint3d dp2, norm;
-		int hitsect, hitwall;
-
-		if ((ligvel[i].x == 0.0) && (ligvel[i].y == 0.0) && (ligvel[i].z == 0.0)) continue;
-		ischanged |= 1;
-
-		dp.x = shadowtest2_light[i].p.x;
-		dp.y = shadowtest2_light[i].p.y;
-		dp.z = shadowtest2_light[i].p.z;
-		f = dtim*4.0;
-		dp2.x = ligvel[i].x*f;
-		dp2.y = ligvel[i].y*f;
-		dp2.z = ligvel[i].z*f;
-		if (build2_hitmove(&shadowtest2_light[i].sect,&dp,&dp2,0.05,1,&hitsect,&hitwall))
-		{
-			if (hitwall < 0)
-			{
-				sect_t *sec = &sst.sect[hitsect];
-				norm.x = sec->grad[hitwall&1].x;
-				norm.y = sec->grad[hitwall&1].y;
-				norm.z = 1.f; if (hitwall == -1) { gnorm.x = -gnorm.x; gnorm.y = -gnorm.y; gnorm.z = -gnorm.z; }
-				f = 1.0/sqrt(norm.x*norm.x + norm.y*norm.y + 1.0); norm.x *= f; norm.y *= f; norm.z *= f;
-			}
-			else if (!(hitwall&0x40000000))
-			{
-				wall_t *wal = sst.sect[hitsect].wall;
-				norm.x = wal[hitwall].y - wal[wal[hitwall].n+hitwall].y;
-				norm.y = wal[wal[hitwall].n+hitwall].x - wal[hitwall].x;
-				norm.z = 0;
-				f = 1.0/sqrt(norm.x*norm.x + norm.y*norm.y); norm.x *= f; norm.y *= f;
-			}
-			else
-			{
-				spri_t *spr = &sst.spri[hitwall&0x3fffffff];
-				norm.x = spr->p.x-dp.x;
-				norm.y = spr->p.y-dp.y;
-				norm.z = spr->p.z-dp.z;
-				f = 1.0/sqrt(norm.x*norm.x + norm.y*norm.y + norm.z*norm.z); norm.x *= f; norm.y *= f; norm.z *= f;
-			}
-
-			f = (ligvel[i].x*norm.x + ligvel[i].y*norm.y + ligvel[i].z*norm.z)*-2;
-			ligvel[i].x += norm.x*f;
-			ligvel[i].y += norm.y*f;
-			ligvel[i].z += norm.z*f;
-
-			lp = &shadowtest2_light[i];
-			lp->f.x = ligvel[i].x; lp->f.y = ligvel[i].y; lp->f.z = ligvel[i].z;
-		}
-		shadowtest2_light[i].p.x = dp.x;
-		shadowtest2_light[i].p.y = dp.y;
-		shadowtest2_light[i].p.z = dp.z;
-
-		j = shadowtest2_light[i].sprilink;
-		if ((unsigned)j < (unsigned)sst.numspris)
-		{
-			sst.spri[j].p = shadowtest2_light[i].p;
-			changesprisect(j,shadowtest2_light[i].sect);
-		}
-	}
-
-
-	if (startdirectdraw((long *)&gdd.f,(long *)&gdd.p,(long *)&gdd.x,(long *)&gdd.y))
-	{
-		i = gdd.p*gdd.y+256;
-		if ((i > zbuffersiz) || (!zbuffermem)) //Increase Z buffer size if too small
-		{
-			if (zbuffermem) free(zbuffermem);
-			zbuffersiz = i;
-			zbuffermem = (int *)malloc(zbuffersiz);
-		}
-			//zbuffer aligns its memory to the same pixel boundaries as the screen!
-			//WARNING: Pentium 4's L2 cache has severe slowdowns when 65536-64 <= (zbufoff&65535) < 64
-		zbufoff = (intptr_t)zbuffermem-gdd.f;
-		//zbufoff = (((((intptr_t)zbuffermem)-gdd.f-128)+255)&~255)+128;
-
-		if ((!shadowtest2_rendmode) || (shadowtest2_rendmode == 3))
-		{
-			for(i=0,p=gdd.f+zbufoff;i<gdd.y;i++,p+=gdd.p) memset8((void *)p,0x7f7f7f7f,gdd.x<<2);
-		}
-
-		cam.c.f = gdd.f; cam.c.p = gdd.p; cam.c.x = gdd.x; cam.c.y = gdd.y;
-		cam.z = cam.c; cam.z.f = (intptr_t)gdd.f+zbufoff;
-		dcamp.x = (double)cam.p.x; dcamp.y = (double)cam.p.y; dcamp.z = (double)cam.p.z;
-		dcamr.x = (double)cam.r.x; dcamr.y = (double)cam.r.y; dcamr.z = (double)cam.r.z;
-		dcamd.x = (double)cam.d.x; dcamd.y = (double)cam.d.y; dcamd.z = (double)cam.d.z;
-		dcamf.x = (double)cam.f.x; dcamf.y = (double)cam.f.y; dcamf.z = (double)cam.f.z;
-
-			//Hacks to link with Build2
-		extern playerstruct_t *gdps; gdps = &sst.p[0];
-		sst.p[0].ipos.x = cam.p.x; sst.p[0].ipos.y = cam.p.y; sst.p[0].ipos.z = cam.p.z;
-		sst.p[0].irig.x = cam.r.x; sst.p[0].irig.y = cam.r.y; sst.p[0].irig.z = cam.r.z;
-		sst.p[0].idow.x = cam.d.x; sst.p[0].idow.y = cam.d.y; sst.p[0].idow.z = cam.d.z;
-		sst.p[0].ifor.x = cam.f.x; sst.p[0].ifor.y = cam.f.y; sst.p[0].ifor.z = cam.f.z;
-		sst.p[0].cursect = cursect;
-		sst.p[0].ghx = cam.h.x; sst.p[0].ghy = cam.h.y; sst.p[0].ghz = cam.h.z;
-		sst.p[0].editmode = 3.0; sst.p[0].compact2d = 0.0;
-
-		switch (shadowtest2_rendmode)
-		{
-			case 0: build2_render((tiletype *)&cam.c,cam.z.f-cam.c.f,cursect,&dcamp,&dcamr,&dcamd,&dcamf,cam.h.x,cam.h.y,cam.h.z); break;
-			case 1: case 2:
-				if (curgcnt != 0x7fffffff) clearscreen(0);
-				draw_hsr_polymost(&cam,&sst,&sst.p[0],cursect);
-				if ((eyepoln) && (!keystatus[0x38])) htrun(eyepol_drawfunc,0,eyepoln,shadowtest2_numcpu); //Empty FIFO
-				drawsprites();
-
-				if (shadowtest2_rendmode == 1)
-				{
-					print6x8(&gcam.c,(gdd.x>>1)-60+7*8, 0,0xffffff,0,"cnt:%10d",curgcnt);
-				 //print6x8(&gcam.c,(gdd.x>>1)-60+0*8, 8,0xffffff,0,"sectgotn:%10d",sectgotn);
-				 //print6x8(&gcam.c,(gdd.x>>1)-60+2*8,16,0xffffff,0,"bunchmal:%10d",bunchmal);
-				 //print6x8(&gcam.c,(gdd.x>>1)-60+5*8,24,0xffffff,0,"mpmal:%10d",mpmal);
-				 //print6x8(&gcam.c,(gdd.x>>1)-60+4*8,32,0xffffff,0,"mphmal:%10d",mphmal);
-
-						//debug bunches
-					bunchverts_t twal[1024];
-					double d, dx0, dy0, dx1, dy1;
-					int twaln;
-					for(i=bunchn-1;i>=0;i--)
-					{
-						twaln = prepbunch(i,twal);
-						for(j=0;j<=twaln;j++)
-						{
-							d = 64.0;
-							dx0 = -((twal[j+0].x-cam.p.x)*xformmats - (twal[j+0].y-cam.p.y)*xformmatc)*d + gdd.x*.50;
-							dy0 = -((twal[j+0].x-cam.p.x)*xformmatc + (twal[j+0].y-cam.p.y)*xformmats)*d + gdd.y*.95;
-							if (j < twaln)
-							{
-								dx1 = -((twal[j+1].x-cam.p.x)*xformmats - (twal[j+1].y-cam.p.y)*xformmatc)*d + gdd.x*.50;
-								dy1 = -((twal[j+1].x-cam.p.x)*xformmatc + (twal[j+1].y-cam.p.y)*xformmats)*d + gdd.y*.95;
-								drawline2d(&cam.c,dx0,dy0,dx1,dy1,0xc0ffff);
-
-								d = ((GetTickCount()+i*1266)&2047)*(1.0/2048.0);
-								print6x8(&cam.c,(dx1-dx0)*d+dx0-3,(dy1-dy0)*d+dy0-4,0xc0ffff,-1,"%d",i);
-							}
-						}
-					}
-					drawline2d(&cam.c,gdd.x*.50,gdd.y*.95,gdd.x*.50,gdd.y*.95 - 16,0xffffff);
-					print6x8(&gcam.c,gdd.x*.50-3,gdd.y*.95-4,0xffffff,-1,"o");
-					for(j=0;j<bunchn;j++)
-					{
-						print6x8(&gcam.c,15-12,50+j*8,0xffffff,-1,"%d",j);
-						print6x8(&gcam.c,15+j*8,50-12,0xffffff,-1,"%d",j);
-						for(i=0;i<j;i++) print6x8(&gcam.c,15+i*8,50+j*8,0xffff80,-1,"%d",bunchgrid[(((j-1)*j)>>1)+i]);
-					}
-				}
-
-				break;
-			case 3:
-				{
-				float x0, y0, z0, x1, y1, z1, z2, z3;
-				int s, w, w2, col;
-				gcam = cam;
-				clearscreen(0);
-				for(s=0;s<sst.numsects;s++)
-					for(w=0;w<sst.sect[s].n;w++)
-					{
-						w2 = sst.sect[s].wall[w].n+w;
-
-						x0 = sst.sect[s].wall[w].x;
-						y0 = sst.sect[s].wall[w].y;
-						z0 = getslopez(&sst.sect[s],0,x0,y0);
-						z1 = getslopez(&sst.sect[s],1,x0,y0);
-
-						x1 = sst.sect[s].wall[w2].x;
-						y1 = sst.sect[s].wall[w2].y;
-						z2 = getslopez(&sst.sect[s],0,x1,y1);
-						z3 = getslopez(&sst.sect[s],1,x1,y1);
-
-						if (sst.sect[s].wall[w].ns < 0) col = 0xffffff; else col = 0xff0000;
-						drawline3d(&cam,x0,y0,z0,x1,y1,z2,col);
-						drawline3d(&cam,x0,y0,z1,x1,y1,z3,col);
-						drawline3d(&cam,x0,y0,z0,x0,y0,z1,col);
-						drawline3d(&cam,x1,y1,z2,x1,y1,z3,col);
-					}
-				}
-				break;
-			case 4:
-				shadowtest2_rendmode = 2; draw_hsr_polymost(&cam,&sst,&sst.p[0],cursect); shadowtest2_rendmode = 4;
-
-				if (ischanged == 3)
-				{
-					cam_t ncam; ncam = cam;
-					ischanged = 0;
-					shadowtest2_ligpolreset(-1);
-					for(glignum=0;glignum<shadowtest2_numlights;glignum++)
-					{
-						ncam.p = shadowtest2_light[glignum].p;
-						draw_hsr_polymost(&ncam,&sst,&sst.p[0],shadowtest2_light[glignum].sect);
-					}
-				}
-				else if (ischanged == 1)
-				{
-					cam_t ncam; ncam = cam;
-					ischanged = 0;
-					for(glignum=0;glignum<shadowtest2_numlights;glignum++)
-					{
-						if ((ligvel[glignum].x == 0.0) && (ligvel[glignum].y == 0.0) && (ligvel[glignum].z == 0.0)) continue;
-
-						if (!shadowtest2_isgotsectintersect(glignum))
-						{
-								//Current view doesn't intersect sector list of previously rendered light polygon list of this light source
-								//Even so, a check should still occur occasionally
-							if ((rand()&255) > 10) continue;
-						}
-
-						shadowtest2_ligpolreset(glignum);
-						ncam.p = shadowtest2_light[glignum].p;
-						draw_hsr_polymost(&ncam,&sst,&sst.p[0],shadowtest2_light[glignum].sect);
-					}
-				}
-
-				shadowtest2_setcam(&cam);
-				htrun(drawpollig,0,eyepoln,shadowtest2_numcpu);
-
-#if 0
-				for(i=eyepoln-1;i>=0;i--)
-				{
-					int v, v0, v1, v2;
-					v0 = eyepol[i].vert0; v1 = eyepol[i+1].vert0;
-					//drawpolsol(&cam,&eyepolv[v0],v1-v0,3);
-
-#if 0
-					x = 0; y = 0; j = 0;
-					for(v=v0;v<v1;v++) { x += eyepolv[v].x; y += eyepolv[v].y; j++; }
-					if (j) { x /= j; y /= j; }
-#else
-						//Find centroid of polygon
-					fx = 0; fy = 0; f = 0;
-					for(i0=v1-1,i1=v0;i1<v1;i0=i1,i1++)
-					{
-						float fx0, fy0, fx1, fy1;
-						fx0 = eyepolv[i0].x; fy0 = eyepolv[i0].y;
-						fx1 = eyepolv[i1].x; fy1 = eyepolv[i1].y;
-						fx += ((fx0+fx1)*fx0 + fx1*fx1)*(fy1-fy0);
-						fy += ((fy0+fy1)*fy0 + fy1*fy1)*(fx0-fx1);
-						f += (fx0+fx1)*(fy1-fy0);
-					}
-					f = 1.0/(f*3.0); x = (int)(fx*f); y = (int)(fy*f);
-#endif
-
-					for(lig=0;lig<shadowtest2_numlights;lig++)
-					{
-						lp = &shadowtest2_light[lig];
-						for(j=lp->lighashead[lighash(eyepol[i].b2sect,eyepol[i].b2wall,eyepol[i].b2slab)];j>=0;j=lp->ligpol[j].b2hashn)
-						{
-							if ((lp->ligpol[j].b2sect != eyepol[i].b2sect) || (lp->ligpol[j].b2wall != eyepol[i].b2wall) || (lp->ligpol[j].b2slab != eyepol[i].b2slab))
-								{ print6x8(&gcam.c,x,y,0xffffff,0,"xx"); y += 8; continue; }
-							print6x8(&gcam.c,x,y,0xffffff,0,"%d",lig); y += 8;
-						}
-					}
-
-					for(v=v1-1,v2=v0;v2<v1;v=v2,v2++) { drawline2d(&cam.c,eyepolv[v].x,eyepolv[v].y,eyepolv[v2].x,eyepolv[v2].y,0xffffff); }
-				}
-#endif
-#if 0
-				for(lig=0;lig<shadowtest2_numlights;lig++)
-				{
-					lp = &shadowtest2_light[lig];
-					for(i=lp->ligpoln-1;i>=0;i--)
-					{
-						int v, v0, v1, v2;
-						v0 = lp->ligpol[i].vert0; v1 = lp->ligpol[i+1].vert0;
-						drawpolsol(&cam,&lp->ligpolv[v0],v1-v0,lig);
-						for(v=v1-1,v2=v0;v2<v1;v=v2,v2++) drawline3d(&cam,lp->ligpolv[v].x,lp->ligpolv[v].y,lp->ligpolv[v].z,lp->ligpolv[v2].x,lp->ligpolv[v2].y,lp->ligpolv[v2].z,0xffffff);
-					}
-				}
-#endif
-
-				drawsprites();
-				break;
-		}
-
-		print6x8(&gcam.c,gdd.x-192,16,0xffffff,-1,"%10.6f%10.6f%10.6f",cam.p.x,cam.p.y,cam.p.z);
-		print6x8(&gcam.c,gdd.x-192,26,0xffffff,-1,"%10.6f%10.6f%10.6f",cam.r.x,cam.r.y,cam.r.z);
-		print6x8(&gcam.c,gdd.x-192,36,0xffffff,-1,"%10.6f%10.6f%10.6f",cam.d.x,cam.d.y,cam.d.z);
-		print6x8(&gcam.c,gdd.x-192,46,0xffffff,-1,"%10.6f%10.6f%10.6f",cam.f.x,cam.f.y,cam.f.z);
-
-		f = 1.f;
-		dpoint3d ncamp; ncamp.x = (double)cam.p.x*f; ncamp.y = (double)cam.p.y*f; ncamp.z = (double)cam.p.z*f;
-		drawpoly_setup(                           (tiletype *)&cam.c.f,cam.z.f-cam.c.f,&ncamp,&dcamr,&dcamd,&dcamf,cam.h.x,cam.h.y,cam.h.z);
-		drawcone_setup(cputype,shadowtest2_numcpu,(tiletype *)&cam.c.f,cam.z.f-cam.c.f,&ncamp,&dcamr,&dcamd,&dcamf,cam.h.x,cam.h.y,cam.h.z);
-		 drawkv6_setup(&drawkv6_frame,            (tiletype *)&cam.c.f,cam.z.f-cam.c.f,&ncamp,&dcamr,&dcamd,&dcamf,cam.h.x,cam.h.y,cam.h.z);
-		for(i=0;i<shadowtest2_numlights;i++)
-		{
-			if (shadowtest2_light[i].sprilink >= 0) continue;
-			drawsph(shadowtest2_light[i].p.x*f,shadowtest2_light[i].p.y*f,shadowtest2_light[i].p.z*f,f*.05,
-				(min(max((int)(shadowtest2_light[i].rgb[0]*256),0),255)    ) +
-				(min(max((int)(shadowtest2_light[i].rgb[1]*256),0),255)<< 8) +
-				(min(max((int)(shadowtest2_light[i].rgb[2]*256),0),255)<<16),38.4);
-		}
-
-			//FPS counter
-		fpsdtim[numframes&(FPSSIZ-1)] = dtim; numframes++;
-
-			//Fast sort when already sorted... otherwise slow!
-		i = min(numframes,FPSSIZ)-1;
-		for(j=0;j<i;j++)
-			if (fpsdtim[fpsind[j]] > fpsdtim[fpsind[j+1]])
-			{
-				y = fpsind[j+1];
-				for(x=j;x>=0;x--) { fpsind[x+1] = fpsind[x]; if (fpsdtim[fpsind[x]] <= fpsdtim[y]) break; }
-				fpsind[x+1] = y;
-			}
-		f = (fpsdtim[fpsind[i>>1]] + fpsdtim[fpsind[(i+1)>>1]])*.5; //Median
-		print6x8(&gcam.c,0,0,0xffffff,0,"%6.2f fps",1.0/f);
-		print6x8(&gcam.c,0,8,0xffffff,0,"%6.2f ms/f",f*1000.0);
-		for(i=0;i<FPSSIZ;i++)
-		{
-			drawpix(&gcam.c,i,f*10000.0,0xe06060);
-			drawpix(&gcam.c,i,min(fpsdtim[(numframes+i)&(FPSSIZ-1)]*10000.0,gdd.y-1),0xc0c0c0);
-		}
-		print6x8(&gcam.c,0,16,0xffffff,0,"rendmode:%d,MT:%d",shadowtest2_rendmode+1,shadowtest2_numcpu);
-
-		stopdirectdraw();
-		nextpage();
-	}
-}*/
-#endif
 void drawpollig(int ei) {
 
     __declspec(align(16)) static const float dpqmulval[4] = {0,1,2,3}, dpqfours[4] = {4,4,4,4};

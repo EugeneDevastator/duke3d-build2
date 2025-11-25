@@ -37,7 +37,7 @@ void mono_initonce() {
     mp[0].p = mpmal - 1;
 }
 
-int mono_ins(int i, double nx, double ny) {
+int mono_ins2d(int i, double nx, double ny) {
     int j, p, n, got;
 
     got = mpempty;
@@ -76,7 +76,7 @@ int mono_ins(int i, double nx, double ny) {
 }
 
 int mono_ins(int i, double nx, double ny, double nz) {
-    i = mono_ins(i, nx, ny);
+    i = mono_ins2d(i, nx, ny);
     mp[i].z = nz;
     return (i);
 }
@@ -284,7 +284,7 @@ int mono_max(int hd0, int hd1, int maxsid, int mode) {
         i = hd0;
         ho = -1;
         do {
-            ho = mono_ins(ho, mp[i].x, mp[i].y);
+            ho = mono_ins2d(ho, mp[i].x, mp[i].y);
             i = mp[i].n;
         } while (i != hd0);
         return (mp[ho].n);
@@ -306,7 +306,7 @@ int mono_max(int hd0, int hd1, int maxsid, int mode) {
     i = (x0[1] < x0[0]);
     j = (i ^ 1);
     while (x1[i] <= x0[j]) {
-        if (j & mode) { ho = mono_ins(ho, x0[0], y0[0]); }
+        if (j & mode) { ho = mono_ins2d(ho, x0[0], y0[0]); }
         ind[i] = mp[ind[i]].n;
         if (ind[i] == hd[i]) {
             ind[0] = hd[0];
@@ -321,9 +321,9 @@ int mono_max(int hd0, int hd1, int maxsid, int mode) {
     f = (y1[i] - y0[i]) * (x0[j] - x0[i]);
     dx = x1[i] - x0[i];
     good = ((f - (y0[j] - y0[i]) * dx) * ((double) maxsid) > 0.0);
-    if (j & mode) { ho = mono_ins(ho, x0[i], y0[i]); }
-    if ((j & mode) != good) { ho = mono_ins(ho, x0[j], f / dx + y0[i]); }
-    if (!good) { ho = mono_ins(ho, x0[j], y0[j]); }
+    if (j & mode) { ho = mono_ins2d(ho, x0[i], y0[i]); }
+    if ((j & mode) != good) { ho = mono_ins2d(ho, x0[j], f / dx + y0[i]); }
+    if (!good) { ho = mono_ins2d(ho, x0[j], y0[j]); }
     while (1) {
         ogot = (good == i);
         i = (x1[1] < x1[0]);
@@ -339,10 +339,10 @@ int mono_max(int hd0, int hd1, int maxsid, int mode) {
             g = dx * dy2 - dy * dx2;
             if (g) {
                 f /= g;
-                if ((f >= 0.0) && (f <= 1.0)) ho = mono_ins(ho, dx * f + x1[i], dy * f + y1[i]);
+                if ((f >= 0.0) && (f <= 1.0)) ho = mono_ins2d(ho, dx * f + x1[i], dy * f + y1[i]);
             }
         }
-        if (good) { ho = mono_ins(ho, x1[i], y1[i]); }
+        if (good) { ho = mono_ins2d(ho, x1[i], y1[i]); }
         ind[i] = mp[ind[i]].n;
         if (ind[i] == hd[i]) break;
         x0[i] = x1[i];
@@ -351,12 +351,12 @@ int mono_max(int hd0, int hd1, int maxsid, int mode) {
         y1[i] = mp[ind[i]].y;
     }
 
-    if ((i & mode) == good) { ho = mono_ins(ho, x1[i], (x1[i] - x0[j]) * dy2 / dx2 + y0[j]); }
+    if ((i & mode) == good) { ho = mono_ins2d(ho, x1[i], (x1[i] - x0[j]) * dy2 / dx2 + y0[j]); }
     if (i & mode) //Write rest of red verts
     {
     bad:;
         do {
-            ho = mono_ins(ho, mp[ind[0]].x, mp[ind[0]].y);
+            ho = mono_ins2d(ho, mp[ind[0]].x, mp[ind[0]].y);
             ind[0] = mp[ind[0]].n;
         } while (ind[0] != hd[0]);
     }
@@ -396,12 +396,12 @@ int mono_clipself(int hd0, int hd1, void (*mono_output)(int h0, int h1)) {
         dx = x1[i] - x0[i];
         good = ((f - dx * (y0[j] - y0[i])) * ((double) (i * 2 - 1)) > 0.0);
         if (good) {
-            ho[i] = mono_ins(ho[i], x0[j], f / dx + y0[i]);
-            ho[j] = mono_ins(ho[j], x0[j], y0[j]);
+            ho[i] = mono_ins2d(ho[i], x0[j], f / dx + y0[i]);
+            ho[j] = mono_ins2d(ho[j], x0[j], y0[j]);
         }
     } else {
         good = (y0[0] < y0[1]);
-        if (good) { for (k = 2 - 1; k >= 0; k--) { ho[k] = mono_ins(ho[k], x0[k], y0[k]); } }
+        if (good) { for (k = 2 - 1; k >= 0; k--) { ho[k] = mono_ins2d(ho[k], x0[k], y0[k]); } }
     }
     while (1) {
         i = (x1[1] < x1[0]);
@@ -420,7 +420,7 @@ int mono_clipself(int hd0, int hd1, void (*mono_output)(int h0, int h1)) {
                 f /= g;
                 ix = dx * f + x1[i];
                 iy = dy * f + y1[i];
-                for (k = 2 - 1; k >= 0; k--) { ho[k] = mono_ins(ho[k], ix, iy); }
+                for (k = 2 - 1; k >= 0; k--) { ho[k] = mono_ins2d(ho[k], ix, iy); }
             }
             if (!good) {
                 mono_output(mp[ho[0]].n, mp[ho[1]].n);
@@ -432,15 +432,15 @@ int mono_clipself(int hd0, int hd1, void (*mono_output)(int h0, int h1)) {
 
         ind[i] = mp[ind[i]].n;
         if (ind[i] == hd[i]) break;
-        if (good) { ho[i] = mono_ins(ho[i], x1[i], y1[i]); }
+        if (good) { ho[i] = mono_ins2d(ho[i], x1[i], y1[i]); }
         x0[i] = x1[i];
         x1[i] = mp[ind[i]].x;
         y0[i] = y1[i];
         y1[i] = mp[ind[i]].y;
     }
     if (good) {
-        ho[i] = mono_ins(ho[i], x1[i], y1[i]);
-        ho[j] = mono_ins(ho[j], x1[i], (x1[i] - x0[j]) * dy2 / dx2 + y0[j]);
+        ho[i] = mono_ins2d(ho[i], x1[i], y1[i]);
+        ho[j] = mono_ins2d(ho[j], x1[i], (x1[i] - x0[j]) * dy2 / dx2 + y0[j]);
     }
 
     for (k = 2 - 1; k >= 0; k--) if (ho[k] >= 0) { ho[k] = mp[ho[k]].n; }
@@ -507,12 +507,12 @@ int mono_join(int hd0, int hd1, int hd2, int hd3, int *ho0, int *ho1) {
     for (j = 2 - 1; j >= 0; j--) {
         ho[j] = -1;
         for (i = hd[j + 0]; 1;) {
-            ho[j] = mono_ins(ho[j], mp[i].x, mp[i].y);
+            ho[j] = mono_ins2d(ho[j], mp[i].x, mp[i].y);
             if (i == iy[j + 0]) break;
             i = mp[i].n;
         }
         for (i = iy[j + 2]; 1;) {
-            ho[j] = mono_ins(ho[j], mp[i].x, mp[i].y);
+            ho[j] = mono_ins2d(ho[j], mp[i].x, mp[i].y);
             i = mp[i].n;
             if (i == hd[j + 2]) break;
         }

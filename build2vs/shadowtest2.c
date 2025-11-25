@@ -1,6 +1,8 @@
 #include "softrender.h"
 #include "Core/monoclip.h"
 #include "shadowtest2.h"
+
+#include "build2.h"
 #include "scenerender.h"
 #if 0
 shadowtest2.exe: shadowtest2.obj winmain.obj build2.obj drawpoly.obj drawcone.obj drawkv6.obj kplib.obj;
@@ -1642,7 +1644,7 @@ void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, player_transform *lps, int c
 		glp = &shadowtest2_light[glignum];
 		if ((!(glp->flags&1)) || (!shadowtest2_useshadows)) return;
 	}
-	gcam = (*cc); gst = lgs; gps = lps;
+ 	gcam = (*cc); gst = lgs; gps = lps;
 
 	if ((lgs->numsects <= 0) || ((unsigned)cursect >= (unsigned)lgs->numsects))
 	{

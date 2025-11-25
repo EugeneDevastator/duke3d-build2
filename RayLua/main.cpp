@@ -23,6 +23,7 @@
 //#include "luabinder.hpp"
 #include "DumbCore.hpp"
 #include "raymath.h"
+#include "DukeGame/source/dukewrap.h"
 
 
 extern "C" {
@@ -124,7 +125,7 @@ void UpdateFreeCamera(FreeCamera* cam, float deltaTime) {
     }
 }
 
-void VisualizeMapstate() {
+void VisualizeMapstate() {  //unused
     DumbRender::Init();
 
     auto map = DumbRender::GetMap();
@@ -139,7 +140,11 @@ void VisualizeMapstate() {
     cam.speed = 50.0f;
 
     Camera3D camera = {0};
-
+    Camera2D camera2D = {0};
+    camera2D.target = {0.0f, 0.0f};        // What the camera is looking at
+    camera2D.offset = {512.0f, 384.0f};    // Camera offset (screen center)
+    camera2D.rotation = 0.0f;              // Camera rotation
+    camera2D.zoom = 1.0f;                  // Camera zoom
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
         UpdateFreeCamera(&cam, deltaTime);
@@ -158,6 +163,7 @@ void VisualizeMapstate() {
         DumbRender::DrawMapstateTex(camera);
      //   DumbRender::DrawMapstateLines();
         EndMode3D();
+
        // DumbRender::DrawPaletteAndTexture();
 
 //DumbRender::TestRenderTextures();
@@ -175,11 +181,10 @@ void VisualizeMapstate() {
 
 // Draw palette and texture preview on screen
 void MainLoop()
-{
+{        DisableCursor();
     DumbRender::Init();
     auto map = DumbRender::GetMap();
     DumbCore::Init(map);
-    //InitWindow(1024, 768, "Mapstate Visualizer");
     SetTargetFPS(60);
     DumbRender::LoadTexturesToGPU();
     while (!WindowShouldClose()) {
@@ -190,17 +195,17 @@ void MainLoop()
         ClearBackground(BLACK);
 
         BeginMode3D(DumbCore::GetCamera());
-
-
         DumbRender::DrawMapstateTex(DumbCore::GetCamera());
         //   DumbRender::DrawMapstateLines();
         EndMode3D();
+
         // DumbRender::DrawPaletteAndTexture();
 
+        DumbRender::DrawPost3d(GetScreenWidth(),GetScreenHeight(),DumbCore::GetCamera());
         //DumbRender::TestRenderTextures();
 
         DrawImgui();
-        DisableCursor();
+
         DrawText("WASD: Move, Mouse: Look", 10, 10, 20, WHITE);
         DrawFPS(10, 40);
 

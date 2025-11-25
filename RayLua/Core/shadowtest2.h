@@ -12,7 +12,9 @@
 #define BFINTMAX 256                    // Maximum bunch front intersections
 #define MAXVERTS 256                    // Maximum vertices per sector connection
 #define LRASTMAX 8192                   // Maximum light raster entries
-
+#define LFLATSTEPSIZ 3
+#define FLATSTEPSIZ (1<<LFLATSTEPSIZ)
+#define SCISDIST .001
 extern int shadowtest2_numlights, shadowtest2_useshadows, shadowtest2_numcpu;
 extern int shadowtest2_rendmode, eyepoln, glignum;
 extern unsigned int *shadowtest2_sectgot;
@@ -90,7 +92,7 @@ typedef struct {
 // ================================================================================================
 // GLOBAL VARIABLES
 // ================================================================================================
-
+extern int shadowtest2_updatelighting;
 // Light system
 extern lightpos_t shadowtest2_light[LIGHTMAX];  // Light source array
 extern int shadowtest2_numlights;               // Current number of active lights
@@ -104,7 +106,10 @@ extern int shadowtest2_sectgotn;                // Size of global sector bit arr
 
 // Rendering mode control
 extern int shadowtest2_rendmode;                // Current rendering mode (0-4)
-
+extern eyepol_t *eyepol; // 4096 eyepol_t's = 192KB
+extern point2d *eyepolv; //16384 point2d's  = 128KB
+extern int eyepoln, glignum;
+extern int eyepolmal, eyepolvn, eyepolvmal;
 // ================================================================================================
 // POLYGONAL SCENE CLIPPING FUNCTIONS
 // ================================================================================================
@@ -202,9 +207,9 @@ void drawtagfunc(int rethead0, int rethead1);
 void skytagfunc(int rethead0, int rethead1);
 
 // Texture coordinate generation functions
-void gentex_wall(void *npol2, void *sur);       // Wall texture mapping
-void gentex_ceilflor(void *sec, void *wal, void *sur, int isflor); // Ceiling/floor texture mapping
-void gentex_sky(void *sur);                     // Sky texture mapping
+//void gentex_wall(void *npol2, void *sur);       // Wall texture mapping
+//void gentex_ceilflor(void *sec, void *wal, void *sur, int isflor); // Ceiling/floor texture mapping
+//void gentex_sky(void *sur);                     // Sky texture mapping
 
 // ================================================================================================
 // UTILITY AND MANAGEMENT FUNCTIONS
@@ -219,7 +224,7 @@ void changetagfunc(int rethead0, int rethead1);
 /** Processes wall segments, handles both clipping and rendering setup
  * @param b Bunch index to process
  */
-void drawalls(int b);
+void drawalls(int b, mapstate_t* map);
 
 /** Renders sprites with lighting if available */
 void drawsprites();

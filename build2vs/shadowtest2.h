@@ -7,7 +7,9 @@
 // ================================================================================================
 // CONSTANTS AND CONFIGURATION
 // ================================================================================================
-
+#define LFLATSTEPSIZ 3
+#define FLATSTEPSIZ (1<<LFLATSTEPSIZ)
+#define SCISDIST .001
 #define LIGHTMAX 256                    // Maximum number of light sources
 #define LIGHASHSIZ 1024                 // Hash table size for light polygon matching
 #define BFINTMAX 256                    // Maximum bunch front intersections

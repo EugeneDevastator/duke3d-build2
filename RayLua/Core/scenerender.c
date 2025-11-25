@@ -4,10 +4,12 @@
 
 #include "scenerender.h"
 
+#include <stdbool.h>
+
 #include "shadowtest2.h"
 #include "mapcore.h"
 static bool useLights = false;
-static int shadowtest2_updatelighting = 1;
+
 void setLightOption(bool isenabled) {
 	useLights=isenabled;
 }

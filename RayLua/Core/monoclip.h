@@ -42,7 +42,7 @@ void mph_check (int mphnum);
 void mono_initonce ();
 
 // Insert vertex into polygon chain - if i<0 starts new loop, else inserts after vertex i
-int  mono_ins (int i, double nx, double ny);
+int  mono_ins2d (int i, double nx, double ny);
 int  mono_ins (int i, double nx, double ny, double nz);  // 3D version
 
 // Remove vertex from polygon chain and return to free pool

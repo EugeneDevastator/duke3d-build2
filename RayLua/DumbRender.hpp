@@ -18,11 +18,13 @@ The forward direction can be visualized as moving away from the camera or viewer
 
 #ifndef RAYLIB_LUA_IMGUI_DUMBRENDER_H
 #define RAYLIB_LUA_IMGUI_DUMBRENDER_H
-#include "shadowtest2.h"
+#include "DumbCore.hpp"
+
 
  extern "C" {
 #include "loaders.h"
 #include "mapcore.h"
+#include "shadowtest2.h"
 }
 
 
@@ -133,7 +135,7 @@ public:
         plr.ifor = map->startfor;
         plr.irig = map->startrig;
         plr.idow = map->startdow;
-        plr.cursect = -1;
+        plr.cursect = map->startsectn;
 
         plr.grdc.x = 0; plr.grdc.y = 0; plr.grdc.z = 0; //center
         plr.grdu.x = 1; plr.grdu.y = 0; plr.grdu.z = 0;
@@ -144,6 +146,7 @@ public:
         plr.ghy = 600/2;
         plr.ghz = plr.ghx;
         plr.zoom = plr.ozoom = 1.f;
+        shadowtest2_init();
 
         if (floorMeshes)
         {
@@ -238,14 +241,90 @@ public:
         }
     }
 
+    static void DrawEyePoly(float sw, float sh, player_transform *playr, cam_t *cam) {
+        dpoint3d dp, dr, dd, df;
+        long i, j, k, l, m, flashlight1st;
+        dp.x = 0.0;
+        dp.y = 0.0;
+        dp.z = 0.0;
+        dr.x = 1.0;
+        dr.y = 0.0;
+        dr.z = 0.0;
+        dd.x = 0.0;
+        dd.y = 1.0;
+        dd.z = 0.0;
+        df.x = 0.0;
+        df.y = 0.0;
+        df.z = 1.0;
+        cam->h.x = playr->ghx;
+        cam->h.y = playr->ghy;
+        cam->h.z = playr->ghz;
 
-    // Updated wall rendering with segments
-    static void DrawMapstateTex(Camera3D cam)
-    {
 
+        // cam.c = cc->c; cam.z = cc->z;
 
+        cam->c.x = sw;
+        cam->c.y = sh;
+        cam->z.x = sw;
+        cam->z.y = sh;
+        shadowtest2_ligpolreset(-1);
+        shadowtest2_setcam(cam);
+        //---
         shadowtest2_rendmode = 2;
-        draw_hsr_polymost(&cam,map,&plr,plr.cursect);
+        draw_hsr_polymost(cam, map, playr, playr->cursect);
+        shadowtest2_rendmode = 4;
+        if (shadowtest2_updatelighting) //FIXFIX
+        {
+            cam_t ncam;
+            ncam = *cam;
+            shadowtest2_updatelighting = 0; //FIXFIX
+            shadowtest2_ligpolreset(-1);
+            //for(glignum=0;glignum<shadowtest2_numlights;glignum++)
+            //{
+            //    ncam.p = shadowtest2_light[glignum].p;
+            //    draw_hsr_polymost(&ncam,map,plr,shadowtest2_light[glignum].sect);
+            //}
+        }
+    }
+
+    static void DrawPost3d(float sw, float sh, Camera3D camsrc) {
+        Vector2 v1 = {0, 0};
+        Vector2 v2 = {sw, sh};
+        Vector2 v3 = {sw / 2, sh};
+        Color transparentWhite = {255, 255, 255, 128};
+        //   DrawTriangle(v1, v2, v3, transparentWhite);
+        cam_t b2cam;
+        plr.ipos = {camsrc.position.x, camsrc.position.z, -camsrc.position.y};
+        b2cam.p = plr.ipos;
+        b2cam.f = plr.ifor;
+        b2cam.r = plr.irig;
+        b2cam.d = plr.idow;
+
+        DrawEyePoly(sw, sh, &plr, &b2cam);
+        if (!eyepol || !eyepolv || eyepoln <= 0) return;
+
+        // Set blend mode for semitransparency
+        //    BeginBlendMode(BLEND_ALPHA);
+        for (int i = 0; i < eyepoln; i++) {
+            int v0 = eyepol[i].vert0;
+            int v1 = eyepol[i + 1].vert0;
+            int vertCount = v1 - v0;
+
+            if (vertCount < 3) continue; // Skip invalid polygons
+
+            // Use fan triangulation from first vertex
+            Vector2 center = {eyepolv[v0].x, eyepolv[v0].y};
+
+            for (int j = 1; j < vertCount - 1; j++) {
+                Vector2 p1 = {eyepolv[v0 + j].x, eyepolv[v0 + j].y};
+                Vector2 p2 = {eyepolv[v0 + j + 1].x, eyepolv[v0 + j + 1].y};
+                DrawTriangleLines(center, p1, p2, transparentWhite);
+            }
+        }
+    }
+    // Updated wall rendering with segments
+    static void DrawMapstateTex(Camera3D rlcam)
+    {
         rlDrawRenderBatchActive();
         rlDisableBackfaceCulling();
 
@@ -524,7 +603,7 @@ public:
                     xs *= 2;
                     ys *= 2;
 
-                    DrawBillboardRec(cam, spriteTex, source, pos, {xs * xflip, ys * yflip}, WHITE);
+                    DrawBillboardRec(rlcam, spriteTex, source, pos, {xs * xflip, ys * yflip}, WHITE);
                 }
             }
         }

@@ -40,7 +40,10 @@ long* get_gtilehashead(void);
 //} tiltyp; //shsc=suggested height scale
 
 typedef struct { intptr_t f; int p, x, y; } tiletype;
-typedef struct { tiltyp c, z; point3d p, r, d, f, h; } cam_t;
+typedef struct {
+	// color, zbuf
+	tiltyp c, z;
+	point3d p, r, d, f, h; } cam_t;
 
 #endif
 

@@ -35,7 +35,7 @@ typedef struct
 		//screen/camera state
 		struct {
 			int xres, yres, fullscreen;
-			float ghx, ghy, ghz, zoom, ozoom;
+			float ghx, ghy, ghz, zoom, ozoom; // halfx y z of screen in px.
 			point3d ipos, irig, idow, ifor;
 			point3d npos, nrig, ndow, nfor; //for 2d/3d swap animation
 			point3d grdc, grdu, grdv, grdn; //center,u,v,normal
