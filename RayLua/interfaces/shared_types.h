@@ -103,6 +103,16 @@ typedef struct { float x, y, z; } point3d;
 typedef struct { double x, y, z; } dpoint3d; 	//Note: pol doesn't support loops as dpoint3d's!
 typedef struct { float x, y; } point2d;
 	//Map format:
+typedef struct {
+// view.xpos += xsize*scale * normal_offset * global_ppi.
+	point3d scaling;
+
+	// 0,0,0 = sprite is to the right and above pivot
+	// y for flat sprites is disregarded, as we scale in world along x - right, and z - up.
+	// 1,0,1 - will align upper right corner to pivot.
+	point3d noffset;
+} viewanchor; // maybe for billboards or do uvs union. it looks like this shouldbe full 3d transform matrix
+
 typedef struct
 {
 	long tilnum, tilanm/*???*/;
@@ -112,8 +122,10 @@ typedef struct
 	union { long tag; struct { short lotag, hitag; }; };
 	point2d uv[3];
 	unsigned short asc, rsc, gsc, bsc; //4096 is no change
+
+
 	short renderflags; // new flags;
-	short uvVertexAnchor; // 0= lower left, CW order
+	viewanchor view;
 } surf_t;
 
 typedef struct
@@ -144,6 +156,22 @@ typedef struct
 
 	long sect, sectn, sectp; //Current sector / doubly-linked list of indices
 	int32_t tags[16];
+	///
+	uint8_t modid; // mod id - for game processors, like duke, doom, etc. 0 is reserved for core entities.
+	uint16_t classid; // instead of implicit class recognition by spritenum or pal - use explicit. so for ex. we can just make 3d rpg rocket as prop.
+	uint8_t clipmask; // block, hitscan, trigger, - for physics engine
+	uint8_t linkmask; // damage, signal, use, - everything for linking with other communicators
+
+	uint8_t renderflags; // isinvisible, one-way,
+	uint8_t renderclass; // billboard, flat, flat-box, flat-box-bupe, pipe-down-aligned, voxel, mesh, sdf, etc.
+
+		struct {
+			unsigned int pal	: 6;    // 64 pals
+			unsigned int filt   : 3; // |9, for ex find edges, invert, mask etc.
+			unsigned int blend	: 4; // |13, additive, multiply, etc.
+			unsigned int _		: 3; // 16
+		} fx;
+
 } spri_t;
 
 typedef struct
