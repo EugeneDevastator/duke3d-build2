@@ -5,6 +5,8 @@
 
 #include <windows.h>
 #include <malloc.h>
+
+#include "scenerender.h"
 #define STANDALONE
 
 #pragma pack(push,1)
@@ -25,14 +27,24 @@
 #include "Core/mapcore.h"
 typedef struct
 {
+	union {
+		struct {
+			player_transform tr;
+		};
+
 		//screen/camera state
-	int xres, yres, fullscreen;
-	float ghx, ghy, ghz, zoom, ozoom;
-	point3d ipos, irig, idow, ifor;
-	point3d npos, nrig, ndow, nfor; //for 2d/3d swap animation
-	point3d grdc, grdu, grdv, grdn; //center,u,v,normal
+		struct {
+			int xres, yres, fullscreen;
+			float ghx, ghy, ghz, zoom, ozoom;
+			point3d ipos, irig, idow, ifor;
+			point3d npos, nrig, ndow, nfor; //for 2d/3d swap animation
+			point3d grdc, grdu, grdv, grdn; //center,u,v,normal
+			int cursect;
+		};
+	};
+
 	float dgridlock, dgridlock3d, compact2d, goalheight2d, height2d;
-	int cursect, rendheight, rendinterp, editmode;
+	int rendheight, rendinterp, editmode;
 
 #ifdef STANDALONE
 		//input state
@@ -65,6 +77,9 @@ typedef struct
 #endif
 } playerstruct_t;
 
+
+
+
 #define MAXPLAYERS 4
 typedef struct
 {
@@ -94,7 +109,7 @@ typedef struct
 	int chatmessn;
 #endif
 } gamestate_t;
-extern gamestate_t sst, pst, *gst;
+
 
 
 

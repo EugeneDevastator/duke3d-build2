@@ -161,10 +161,9 @@ extern void drawcone (double, double, double, double, double, double, double, do
 
 	//SHADOWTEST2.H:
 #define LIGHTMAX 256 //FIX:make dynamic!
-gamestate_t sst, pst, *gst;
-extern int shadowtest2_numlights, shadowtest2_useshadows, shadowtest2_numcpu;
-extern int shadowtest2_rendmode, eyepoln, glignum;
-extern unsigned int *shadowtest2_sectgot;
+static gamestate_t sst, pst, *gst;
+
+
 extern float shadowtest2_ambrgb[3];
 extern void drawsprites (void);
 extern void htrun (void (*dacallfunc)(int), int v0, int v1, int danumcpu);
@@ -1629,7 +1628,7 @@ void surroundcapture (cam_t *cam, gamestate_t *dast, playerstruct_t *lps, int n)
 		ncam.h.x = n/2; ncam.h.y = n/2; ncam.h.z = n/2;
 		ncam.c.f = (long)colbuf; ncam.c.p = n*4; ncam.c.x = n; ncam.c.y = n;
 		ncam.z.f = (long)depbuf; ncam.z.p = n*4; ncam.z.x = n; ncam.z.y = n;
-		shadowtest2_rendmode = 2; draw_hsr_polymost(&ncam,dast,lps,lps->cursect); shadowtest2_rendmode = 4;
+		shadowtest2_rendmode = 2; draw_hsr_polymost(&ncam,(mapstate_t*)dast,(player_transform*)lps,lps->cursect); shadowtest2_rendmode = 4;
 		htrun(drawpollig,0,eyepoln,shadowtest2_numcpu);
 
 		for(j=0;j<n*n;j++) pngoutputpixel(colbuf[j]);
@@ -13413,7 +13412,7 @@ void drawframe (cam_t *cc)
 			drawkv6_ambrgb[1] = shadowtest2_ambrgb[1];
 			drawkv6_ambrgb[2] = shadowtest2_ambrgb[2];
 
-			shadowtest2_rendmode = 2; draw_hsr_polymost(&cam,gst,gdps,gdps->cursect); shadowtest2_rendmode = 4;
+			shadowtest2_rendmode = 2; draw_hsr_polymost(&cam,(mapstate_t*)gst,(player_transform*)gdps,gdps->cursect); shadowtest2_rendmode = 4;
 			if (shadowtest2_updatelighting) //FIXFIX
 			{
 				cam_t ncam; ncam = cam;
@@ -13422,7 +13421,7 @@ void drawframe (cam_t *cc)
 				for(glignum=0;glignum<shadowtest2_numlights;glignum++)
 				{
 					ncam.p = shadowtest2_light[glignum].p;
-					draw_hsr_polymost(&ncam,gst,gdps,shadowtest2_light[glignum].sect);
+					draw_hsr_polymost(&ncam,(mapstate_t*)gst,(player_transform*)gdps,shadowtest2_light[glignum].sect);
 				}
 			}
 			else
@@ -13432,7 +13431,7 @@ void drawframe (cam_t *cc)
 				{
 					shadowtest2_ligpolreset(glignum);
 					ncam.p = shadowtest2_light[glignum].p;
-					draw_hsr_polymost(&ncam,gst,gdps,shadowtest2_light[glignum].sect);
+					draw_hsr_polymost(&ncam,(mapstate_t*)(&gst),(player_transform*)(&gdps),shadowtest2_light[glignum].sect);
 				}
 			}
 

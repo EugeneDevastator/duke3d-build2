@@ -2,6 +2,8 @@
 #include "softrender.h"
 #include "Core/monoclip.h"
 #include "shadowtest2.h"
+
+#include "scenerender.h"
 #if 0
 shadowtest2.exe: shadowtest2.obj winmain.obj build2.obj drawpoly.obj drawcone.obj drawkv6.obj kplib.obj;
 				link shadowtest2.obj winmain.obj build2.obj drawpoly.obj drawcone.obj drawkv6.obj kplib.obj\
@@ -34,7 +36,8 @@ winmain.obj:     winmain.cpp;   cl /c /TP winmain.cpp   /Ox /G6Fy /MD
 
 #define USENEWLIGHT 1 //FIXFIXFIX
 #define USEGAMMAHACK 1 //FIXFIXFIX
-
+int renderinterp = 1;
+int compact2d = 0;
 #if 0
 
 typedef struct { char filnam[232]; float u0, v0, ux, uy, vx, vy; } sky_t;
@@ -115,8 +118,8 @@ static unsigned char *bunchgrid = 0;
 static int bunchn, bunchmal = 0;
 
 	//Translation & rotation
-static gamestate_t *gst;
-static playerstruct_t *gps;
+static mapstate_t *gst;
+static player_transform *gps;
 static cam_t gcam;
 static point3d gnadd;
 static double xformmat[9], xformmatc, xformmats;
@@ -127,8 +130,6 @@ static float gouvmat[9];
 static int gcurcol;
 
 #define LIGHTMAX 256 //FIX:make dynamic!
-
-
 lightpos_t shadowtest2_light[LIGHTMAX];
 static lightpos_t *glp;
 int shadowtest2_numlights = 0, shadowtest2_useshadows = 1, shadowtest2_numcpu = 0;
@@ -666,7 +667,7 @@ static void drawpol_aftclip (int plothead0, int plothead1) //this function for d
 	gtt.f = pic->f; gtt.p = pic->p; gtt.x = pic->x; gtt.y = pic->y; gtt.z = 1.0; gtt.shsc = 2.0; gtt.lowermip = pic->lowermip;
 
 	i = RENDFLAGS_OUVMAT|RENDFLAGS_NODEPTHTEST|RENDFLAGS_NOTRCP|RENDFLAGS_GMAT;
-	if (gps->rendinterp) i |= RENDFLAGS_INTERP;
+	if (renderinterp) i |= RENDFLAGS_INTERP;
 	drawpoly(&gtt,(vertyp *)vert,n,gcurcol,(((unsigned)gcurcol)>>24)/16.0,gouvmat,i);
 
 	if (shadowtest2_rendmode != 2)
@@ -718,7 +719,7 @@ void eyepol_drawfunc (int ind)
 	vert[n-1].n = 0;
 
 	i = RENDFLAGS_OUVMAT|RENDFLAGS_NODEPTHTEST|RENDFLAGS_NOTRCP|RENDFLAGS_GMAT;
-	if (gps->rendinterp) i |= RENDFLAGS_INTERP;
+	if (renderinterp) i |= RENDFLAGS_INTERP;
 	drawpoly_flat_threadsafe(&eyepol[ind].tpic->tt,(vertyp *)vert,n,eyepol[ind].curcol,(((unsigned)eyepol[ind].curcol)>>24)/16.0,eyepol[ind].ouvmat,i,gcam);
 
 	if (shadowtest2_rendmode == 1)
@@ -896,6 +897,7 @@ static void skytagfunc (int rethead0, int rethead1)
 		n = 0;
 		for(i=4-1,j=0;j<4;i=j,j++)
 		{
+			//Near-Plane Clipping (Sutherland-Hodgman)
 			if (otp[i].z >= SSCISDIST) { tp[n] = otp[i]; n++; }
 			if ((otp[i].z >= SSCISDIST) != (otp[j].z >= SSCISDIST))
 			{
@@ -907,7 +909,8 @@ static void skytagfunc (int rethead0, int rethead1)
 		}
 		if (n < 3) goto skiprest;
 
-			//project & find x extents
+			//project & find x extents, persp proj.
+			//Formula: screen_x = (world_x * focal_length) / depth + center_x
 		for(i=0;i<n;i++)
 		{
 			f = gcam.h.z/tp[i].z;
@@ -1270,7 +1273,7 @@ static void gentex_xform (float *ouvmat)
 	ouvmat[7] = ouvmat[7]*gcam.h.z - ouvmat[1]*gcam.h.x - ouvmat[4]*gcam.h.y;
 	ouvmat[8] = ouvmat[8]*gcam.h.z - ouvmat[2]*gcam.h.x - ouvmat[5]*gcam.h.y;
 
-	if (gps->rendinterp)
+	if (renderinterp)
 	{
 		ouvmat[1] -= ouvmat[0]*32768.0; ouvmat[2] -= ouvmat[0]*32768.0;
 		ouvmat[4] -= ouvmat[3]*32768.0; ouvmat[5] -= ouvmat[3]*32768.0;
@@ -1405,13 +1408,19 @@ static void gentex_wall (kgln_t *npol2, surf_t *sur)
 	f = (float)gtpic->tt.x*g;            gouvmat[1] *= f; gouvmat[4] *= f; gouvmat[7] *= f;
 	f = (float)gtpic->tt.y*g;            gouvmat[2] *= f; gouvmat[5] *= f; gouvmat[8] *= f;
 
-	if (gps->rendinterp)
+	if (renderinterp)
 	{
 		gouvmat[1] -= gouvmat[0]*32768.0; gouvmat[2] -= gouvmat[0]*32768.0;
 		gouvmat[4] -= gouvmat[3]*32768.0; gouvmat[5] -= gouvmat[3]*32768.0;
 		gouvmat[7] -= gouvmat[6]*32768.0; gouvmat[8] -= gouvmat[6]*32768.0;
 	}
 }
+/*
+the mono engine produces camera-space polygons that are clipped to not overlap.
+The plothead[0] and plothead[1] contain monotone polygon pairs representing
+the final visible geometry ready for 2D projection.
+The b parameter is a bunch index - this function processes one "bunch" (visible sector group) at a time. The traversal logic is in the caller that:
+*/
 
 static void drawalls (int b)
 {
@@ -1482,7 +1491,7 @@ static void drawalls (int b)
 					 (min(sec[s].surf[isflor].rsc>>5,255)<<16) +
 					 (min(sec[s].surf[isflor].gsc>>5,255)<< 8) +
 					 (min(sec[s].surf[isflor].bsc>>5,255)    );
-		gcurcol = argb_interp(gcurcol,(gcurcol&0xff000000)+((gcurcol&0xfcfcfc)>>2),(int)(gps->compact2d*24576.0));
+		gcurcol = argb_interp(gcurcol,(gcurcol&0xff000000)+((gcurcol&0xfcfcfc)>>2),(int)(compact2d*24576.0));
 
 		// Calculate surface normal vector
 		gnorm.x = grad->x;
@@ -1557,6 +1566,11 @@ static void drawalls (int b)
 			if ((max(pol[0].z,opolz[0]) >= min(pol[3].z,opolz[3])-1e-4) &&
 				 (max(pol[1].z,opolz[1]) >= min(pol[2].z,opolz[2])-1e-4)) continue; //Early-out optimization: skip walls with 0 height FIXFIXFIXFIX
 
+			/*Most critical usage - determines visible wall segments
+			Intersects current wall trapezoid with adjacent sector geometry
+			Returns monotone polygon pair representing visible portion
+			If no intersection, wall segment is completely occluded*/
+
 			//if (!intersect_traps_mono(pol[0].x,pol[0].y, pol[1].x,pol[1].y, pol[0].z,pol[1].z,pol[2].z,pol[3].z, opolz[0],opolz[1],opolz[2],opolz[3], &plothead[0],&plothead[1])) continue;
 			// Calculate intersection of wall segment with clipping trapezoids
 			f = 1e-7; //FIXFIXFIXFIX:use ^ ?
@@ -1586,6 +1600,11 @@ static void drawalls (int b)
 					gflags = 0; gentex_wall(npol2,sur);
 				}
 				gligwall = w; gligslab = m; ns = -1;
+				/* notes:
+				 *	gligsect = s;        // Current sector
+					gligwall = w;        // Wall index
+					gligslab = m;        // Segment/slab number (0,1,2... for each vertical division)*/
+
 			} else ns = verts[m>>1].s; // Portal to adjacent sector
 
 			// Render the wall polygon
@@ -1610,7 +1629,7 @@ static void drawalls (int b)
 	Creates visibility data for shadow casting
 */
 
-void draw_hsr_polymost (cam_t *cc, gamestate_t *lgs, playerstruct_t *lps, int cursect)
+void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, player_transform *lps, int cursect)
 {
 	wall_t *wal;
 	spri_t *spr;
@@ -2238,6 +2257,7 @@ static void grablightsfrommap (void)
 {
 	lightpos_t *lp;
 	int i;
+	mapstate_t sst = *gst;
 
 	shadowtest2_numlights = 0;
 	for(i=0;i<sst.numspris;i++)
@@ -2353,7 +2373,7 @@ static long initapp (long argc, char **argv)
 
 	return(0);
 }
-
+/*
 static void doframe ()
 {
 	static dpoint3d dp, dcamr, dcamd, dcamf;
@@ -2890,7 +2910,7 @@ static void doframe ()
 		stopdirectdraw();
 		nextpage();
 	}
-}
+}*/
 #endif
 void drawpollig(int ei) {
 
@@ -3641,7 +3661,7 @@ void drawpollig(int ei) {
                 	// === SCANLINE RASTERIZATION LOOP ===
                 	// High-performance texture mapping with lighting
                 	// Uses fixed-point arithmetic for speed
-                    if (!gps->rendinterp) // Nearest neighbor sampling
+                    if (renderinterp) // Nearest neighbor sampling
                     {
                         _asm
                                 {

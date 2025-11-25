@@ -2,6 +2,7 @@
 #define SHADOWTEST2_H
 
 #include "build2.h"
+#include "scenerender.h"
 #include "softrender.h"
 
 // ================================================================================================
@@ -14,6 +15,9 @@
 #define MAXVERTS 256                    // Maximum vertices per sector connection
 #define LRASTMAX 8192                   // Maximum light raster entries
 
+extern int shadowtest2_numlights, shadowtest2_useshadows, shadowtest2_numcpu;
+extern int shadowtest2_rendmode, eyepoln, glignum;
+extern unsigned int *shadowtest2_sectgot;
 // ================================================================================================
 // LIGHT SYSTEM DATA STRUCTURES
 // ================================================================================================
@@ -142,7 +146,7 @@ void drawpol_befclip(int tag, int newtag, int plothead0, int plothead1, int flag
  * @param lps Player state with rendering settings
  * @param cursect Current sector index
  */
-void draw_hsr_polymost(cam_t *cc, gamestate_t *lgs, playerstruct_t *lps, int cursect);
+void draw_hsr_polymost(cam_t *cc, mapstate_t *lgs, player_transform *lps, int cursect);
 
 // ================================================================================================
 // POLYGONAL SHADOW CREATION FUNCTIONS
