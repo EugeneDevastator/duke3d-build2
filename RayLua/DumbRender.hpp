@@ -18,8 +18,9 @@ The forward direction can be visualized as moving away from the camera or viewer
 
 #ifndef RAYLIB_LUA_IMGUI_DUMBRENDER_H
 #define RAYLIB_LUA_IMGUI_DUMBRENDER_H
+#include "shadowtest2.h"
 
-extern "C" {
+ extern "C" {
 #include "loaders.h"
 #include "mapcore.h"
 }
@@ -65,9 +66,14 @@ static int numFloorMeshes = 0;
 static Texture2D* runtimeTextures;
 static mapstate_t* map;
 static long gnumtiles_i, gmaltiles_i, gtilehashead_i[1024];
-
+static bool drawWalls = false;
+static bool drawSpris = false;
+static bool drawCeils = false;
+static player_transform plr;
 class DumbRender
 {
+
+
 public:
     static mapstate_t* GetMap()
     {
@@ -123,6 +129,22 @@ public:
     // Updated floor mesh generation with slopes
     static void InitMapstateTex(void)
     {
+        plr.ipos = map->startpos;
+        plr.ifor = map->startfor;
+        plr.irig = map->startrig;
+        plr.idow = map->startdow;
+        plr.cursect = -1;
+
+        plr.grdc.x = 0; plr.grdc.y = 0; plr.grdc.z = 0; //center
+        plr.grdu.x = 1; plr.grdu.y = 0; plr.grdu.z = 0;
+        plr.grdv.x = 0; plr.grdv.y = 1; plr.grdv.z = 0;
+        plr.grdn.x = 0; plr.grdn.y = 0; plr.grdn.z = 1; //normal
+
+        plr.ghx = 800/2; //NOTE: Do not replace with variables - static init needed for sync
+        plr.ghy = 600/2;
+        plr.ghz = plr.ghx;
+        plr.zoom = plr.ozoom = 1.f;
+
         if (floorMeshes)
         {
             for (int i = 0; i < numFloorMeshes; i++)
@@ -148,6 +170,8 @@ public:
             // Generate floor and ceiling meshes
             for (int isFloor = 0; isFloor < 2; isFloor++)
             {
+                if (!drawCeils && (isFloor == 0))
+                    continue;
                 int meshIdx = s * 2 + isFloor;
                 FloorMeshData* meshData = &floorMeshes[meshIdx];
 
@@ -218,6 +242,10 @@ public:
     // Updated wall rendering with segments
     static void DrawMapstateTex(Camera3D cam)
     {
+
+
+        shadowtest2_rendmode = 2;
+        draw_hsr_polymost(&cam,map,&plr,plr.cursect);
         rlDrawRenderBatchActive();
         rlDisableBackfaceCulling();
 
@@ -264,6 +292,7 @@ public:
 
         // draw walls
         rlDisableBackfaceCulling();
+        if (drawWalls)
         for (int s = 0; s < map->numsects; s++)
         {
             sect_t* sect = &map->sect[s];
