@@ -85,7 +85,7 @@ typedef struct {
     int b2hashn;                        // Hash chain for polygon matching
     int curcol, flags;                  // Color and rendering flags
     tile_t *tpic;                       // Texture tile pointer
-    float ouvmat[9];                    // UV mapping transformation matrix
+    float ouvmat[9];                    // inverse perspective transformation
     point3d norm;                       // Surface normal vector
 } eyepol_t;
 

@@ -63,5 +63,36 @@ include(shared.cmake)
 
 include(raygame.cmake)
 include(duke_target.cmake)
+# Debug file copying
+message(STATUS "Source directory: ${CMAKE_CURRENT_SOURCE_DIR}")
+message(STATUS "Binary directory: ${PROJECT_BINARY_DIR}")
 
+# Check if source files exist
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/uv_vis_shader.vs")
+    message(STATUS "Found vertex shader source")
+else()
+    message(FATAL_ERROR "Vertex shader source NOT FOUND: ${CMAKE_CURRENT_SOURCE_DIR}/uv_vis_shader.vs")
+endif()
 
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/uv_vis_shader.fs")
+    message(STATUS "Found fragment shader source")
+else()
+    message(FATAL_ERROR "Fragment shader source NOT FOUND: ${CMAKE_CURRENT_SOURCE_DIR}/uv_vis_shader.fs")
+endif()
+
+# Copy with verbose output
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/uv_vis_shader.vs ${PROJECT_BINARY_DIR}/uv_vis_shader.vs COPYONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/uv_vis_shader.fs ${PROJECT_BINARY_DIR}/uv_vis_shader.fs COPYONLY)
+
+# Verify copy worked
+if(EXISTS "${PROJECT_BINARY_DIR}/uv_vis_shader.vs")
+    message(STATUS "Successfully copied vertex shader to: ${PROJECT_BINARY_DIR}/uv_vis_shader.vs")
+else()
+    message(FATAL_ERROR "Failed to copy vertex shader")
+endif()
+
+if(EXISTS "${PROJECT_BINARY_DIR}/uv_vis_shader.fs")
+    message(STATUS "Successfully copied fragment shader to: ${PROJECT_BINARY_DIR}/uv_vis_shader.fs")
+else()
+    message(FATAL_ERROR "Failed to copy fragment shader")
+endif()

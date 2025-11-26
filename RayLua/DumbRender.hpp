@@ -72,6 +72,7 @@ static bool drawWalls = false;
 static bool drawSpris = false;
 static bool drawCeils = false;
 static player_transform plr;
+static Shader uvShader ;
 class DumbRender
 {
 
@@ -85,6 +86,8 @@ public:
     static void Init()
     {
         char rootpath[256];
+        uvShader = LoadShader("uv_vis_shader.vs", "uv_vis_shader.fs");
+
         strcpy_s(rootpath, "c:/Eugene/Games/build2/");
         LoadPal(rootpath);
         LoadMapAndTiles();
@@ -288,11 +291,11 @@ public:
     }
 
     static void DrawPost3d(float sw, float sh, Camera3D camsrc) {
-        Vector2 v1 = {0, 0};
-        Vector2 v2 = {sw, sh};
-        Vector2 v3 = {sw / 2, sh};
+        // Vector2 v1 = {0, 0};
+        // Vector2 v2 = {sw, sh};
+        // Vector2 v3 = {sw / 2, sh};
         Color transparentWhite = {255, 255, 255, 128};
-        //   DrawTriangle(v1, v2, v3, transparentWhite);
+
         cam_t b2cam;
         plr.ipos = {camsrc.position.x, camsrc.position.z, -camsrc.position.y};
         b2cam.p = plr.ipos;
@@ -300,40 +303,82 @@ public:
         b2cam.r = plr.irig;
         b2cam.d = plr.idow;
 
-        DrawEyePoly(sw, sh, &plr, &b2cam);
+        DrawEyePoly(sw, sh, &plr, &b2cam); // ken render
         if (!eyepol || !eyepolv || eyepoln <= 0) return;
-
-        // Set blend mode for semitransparency
-        //    BeginBlendMode(BLEND_ALPHA);
+        //     rlDisableBackfaceCulling();
         for (int i = 0; i < eyepoln; i++) {
             int v0 = eyepol[i].vert0;
             int v1 = eyepol[i + 1].vert0;
             int vertCount = v1 - v0;
 
-            if (vertCount < 3) continue; // Skip invalid polygons
+            if (vertCount < 3) continue;
 
-            rlBegin(RL_TRIANGLES);
-            rlDisableBackfaceCulling();
+            // In your render loop
+            //  BeginShaderMode(uvShader);
 
+
+            float red = 0.3f; //i *30;
             // Use fan triangulation from first vertex
             Vector2 center = {eyepolv[v0].x, eyepolv[v0].y};
-
+            float z0 = eyepolv[v0].z / 500.0f;
+            rlBegin(RL_TRIANGLES);
             for (int j = 1; j < vertCount - 1; j++) {
                 Vector2 p1 = {eyepolv[v0 + j].x, eyepolv[v0 + j].y};
                 Vector2 p2 = {eyepolv[v0 + j + 1].x, eyepolv[v0 + j + 1].y};
+                float z1 = eyepolv[v0 + j].z / 500.0f;
+                float z2 = eyepolv[v0 + j + 1].z / 500.0f;
 
-              //  int idx = meshData->mesh.indices[tri * 3 + vert];
-                rlColor4ub(255, 255, 255, 122);
+                // Calculate UV coordinates for each vertex using the transformation matrix
+                float *ouvmat = eyepol[i].ouvmat;
+                float d1 = ouvmat[0]*center.x + ouvmat[3]*center.y + ouvmat[6];
+                float d2 = ouvmat[0]*p1.x + ouvmat[3]*p1.y + ouvmat[6];
+                float d3 = ouvmat[0]*p2.x + ouvmat[3]*p2.y + ouvmat[6];
+                // Center vertex UV
+              //  float u_center = ouvmat[0] * center.x + ouvmat[3] * center.y + ouvmat[6];
+                float u_center = ouvmat[1] * center.x + ouvmat[4] * center.y + ouvmat[7];
+                float v_center = ouvmat[2] * center.x + ouvmat[5] * center.y + ouvmat[8];
 
-                rlVertex2f(center.x,center.y);
-                rlColor4ub(0, 255, 255, 122);
-                rlVertex2f(p1.x,p1.y);
-                rlColor4ub(255, 0, 255, 122);
-                rlVertex2f(p2.x,p2.y);
+                /// f = 1.0/d;
+                /// final_u = u * f;  // Corrected texture coordinate
+                // final_v = v * f;
+                // Perspective correct UV (divide by w)
+               // if (w_center != 0) {
+               //     u_center /= w_center;
+               //     v_center /= w_center;
+               // }
 
+
+                // Normalize UV to [0,1] range and convert to color
+                // Use fractional part to handle tiling
+                u_center = u_center - floorf(u_center);
+                v_center = v_center - floorf(v_center);
+
+
+                // Convert UV to RGB (U->Red, V->Green, Blue=0.5 for visibility)
+                rlColor4f(red, fabs(-d1), 0, 1);
+              //  rlTexCoord2f(u_center, eyepolv[v0].z);
+                rlNormal3f(0,1,0);
+                rlVertex2f(center.x, center.y);
+
+                rlNormal3f(0,1,0);
+                rlColor4f(red, fabs(-d2 ), 0, 1);
+            //    rlTexCoord2f(u_p1, z1);
+                rlVertex2f(p1.x, p1.y);
+
+                rlNormal3f(0,1,0);
+                rlColor4f(red, fabs(-d3 ), 0, 1);
+             //   rlTexCoord2f(u_p2, z2);
+                rlVertex2f(p2.x, p2.y);
+
+                //
             }
+            rlDrawRenderBatchActive();
+            rlEnd();
+
+            //  EndShaderMode();
         }
     }
+
 
     // Updated wall rendering with segments
     static void DrawMapstateTex(Camera3D rlcam)
@@ -352,6 +397,7 @@ public:
                 if (meshData->isValid)
                 {
                     const Texture2D tex = runtimeTextures[meshData->textureIndex];
+
 
                     rlBegin(RL_TRIANGLES);
                     rlSetTexture(tex.id);
