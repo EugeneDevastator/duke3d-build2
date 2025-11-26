@@ -312,16 +312,29 @@ public:
 
             if (vertCount < 3) continue; // Skip invalid polygons
 
+            rlBegin(RL_TRIANGLES);
+            rlDisableBackfaceCulling();
+
             // Use fan triangulation from first vertex
             Vector2 center = {eyepolv[v0].x, eyepolv[v0].y};
 
             for (int j = 1; j < vertCount - 1; j++) {
                 Vector2 p1 = {eyepolv[v0 + j].x, eyepolv[v0 + j].y};
                 Vector2 p2 = {eyepolv[v0 + j + 1].x, eyepolv[v0 + j + 1].y};
-                DrawTriangleLines(center, p1, p2, transparentWhite);
+
+              //  int idx = meshData->mesh.indices[tri * 3 + vert];
+                rlColor4ub(255, 255, 255, 122);
+
+                rlVertex2f(center.x,center.y);
+                rlColor4ub(0, 255, 255, 122);
+                rlVertex2f(p1.x,p1.y);
+                rlColor4ub(255, 0, 255, 122);
+                rlVertex2f(p2.x,p2.y);
+
             }
         }
     }
+
     // Updated wall rendering with segments
     static void DrawMapstateTex(Camera3D rlcam)
     {
