@@ -289,7 +289,58 @@ public:
             //}
         }
     }
+static void recalculateOuvmat(point2d* clippedVerts, int vertCount, float* originalOuvmat, float* newOuvmat) {
+    if (vertCount < 3) return;
 
+    // Use first 3 vertices to rebuild the matrix
+    point2d p0 = clippedVerts[0];
+    point2d p1 = clippedVerts[1];
+    point2d p2 = clippedVerts[2];
+
+    // Calculate original depths for these points using old matrix
+    float d0 = originalOuvmat[0]*p0.x + originalOuvmat[3]*p0.y + originalOuvmat[6];
+    float d1 = originalOuvmat[0]*p1.x + originalOuvmat[3]*p1.y + originalOuvmat[6];
+    float d2 = originalOuvmat[0]*p2.x + originalOuvmat[3]*p2.y + originalOuvmat[6];
+
+    // Calculate original UV coordinates
+    float u0 = (originalOuvmat[1]*p0.x + originalOuvmat[4]*p0.y + originalOuvmat[7]) / d0;
+    float v0 = (originalOuvmat[2]*p0.x + originalOuvmat[5]*p0.y + originalOuvmat[8]) / d0;
+    float u1 = (originalOuvmat[1]*p1.x + originalOuvmat[4]*p1.y + originalOuvmat[7]) / d1;
+    float v1 = (originalOuvmat[2]*p1.x + originalOuvmat[5]*p1.y + originalOuvmat[8]) / d1;
+    float u2 = (originalOuvmat[1]*p2.x + originalOuvmat[4]*p2.y + originalOuvmat[7]) / d2;
+    float v2 = (originalOuvmat[2]*p2.x + originalOuvmat[5]*p2.y + originalOuvmat[8]) / d2;
+
+    // Solve for new matrix coefficients
+    // d = ax + by + c, u*d = dx + ey + f, v*d = gx + hy + i
+    float det = (p1.x - p0.x) * (p2.y - p0.y) - (p2.x - p0.x) * (p1.y - p0.y);
+    if (fabs(det) < 1e-6) return; // Degenerate
+
+    // Solve 3x3 system for depth coefficients
+    newOuvmat[0] = ((d1-d0)*(p2.y-p0.y) - (d2-d0)*(p1.y-p0.y)) / det;
+    newOuvmat[3] = ((d2-d0)*(p1.x-p0.x) - (d1-d0)*(p2.x-p0.x)) / det;
+    newOuvmat[6] = d0 - newOuvmat[0]*p0.x - newOuvmat[3]*p0.y;
+
+    // Solve for U coefficients
+    float ud0 = u0*d0, ud1 = u1*d1, ud2 = u2*d2;
+    newOuvmat[1] = ((ud1-ud0)*(p2.y-p0.y) - (ud2-ud0)*(p1.y-p0.y)) / det;
+    newOuvmat[4] = ((ud2-ud0)*(p1.x-p0.x) - (ud1-ud0)*(p2.x-p0.x)) / det;
+    newOuvmat[7] = ud0 - newOuvmat[1]*p0.x - newOuvmat[4]*p0.y;
+
+    // Solve for V coefficients
+    float vd0 = v0*d0, vd1 = v1*d1, vd2 = v2*d2;
+    newOuvmat[2] = ((vd1-vd0)*(p2.y-p0.y) - (vd2-vd0)*(p1.y-p0.y)) / det;
+    newOuvmat[5] = ((vd2-vd0)*(p1.x-p0.x) - (vd1-vd0)*(p2.x-p0.x)) / det;
+    newOuvmat[8] = vd0 - newOuvmat[2]*p0.x - newOuvmat[5]*p0.y;
+}
+    static bool isPolygonClipped(point2d* verts, int vertCount, Rectangle screenBounds) {
+        for (int i = 0; i < vertCount; i++) {
+            if (verts[i].x < screenBounds.x || verts[i].x > screenBounds.x + screenBounds.width ||
+                verts[i].y < screenBounds.y || verts[i].y > screenBounds.y + screenBounds.height) {
+                return true;
+                }
+        }
+        return false;
+    }
     static void DrawPost3d(float sw, float sh, Camera3D camsrc) {
         // Vector2 v1 = {0, 0};
         // Vector2 v2 = {sw, sh};
@@ -304,78 +355,50 @@ public:
         b2cam.d = plr.idow;
 
         DrawEyePoly(sw, sh, &plr, &b2cam); // ken render
+
         if (!eyepol || !eyepolv || eyepoln <= 0) return;
-        //     rlDisableBackfaceCulling();
+        rlDisableBackfaceCulling();
         for (int i = 0; i < eyepoln; i++) {
             int v0 = eyepol[i].vert0;
             int v1 = eyepol[i + 1].vert0;
             int vertCount = v1 - v0;
-
             if (vertCount < 3) continue;
+            // Check if polygon is clipped
+            Rectangle screenBounds = {0, 0, sw, sh};
+            point2d* polyVerts = &eyepolv[v0];
 
-            // In your render loop
-            //  BeginShaderMode(uvShader);
+            float* ouvmat = eyepol[i].ouvmat;
+            float newOuvmat[9];
 
+            if (isPolygonClipped(polyVerts, vertCount, screenBounds)) {
+                // Recalculate matrix for clipped polygon
+                recalculateOuvmat(polyVerts, vertCount, ouvmat, newOuvmat);
+                ouvmat = newOuvmat;
+            }
+            BeginShaderMode(uvShader);
 
-            float red = 0.3f; //i *30;
-            // Use fan triangulation from first vertex
-            Vector2 center = {eyepolv[v0].x, eyepolv[v0].y};
-            float z0 = eyepolv[v0].z / 500.0f;
             rlBegin(RL_TRIANGLES);
             for (int j = 1; j < vertCount - 1; j++) {
-                Vector2 p1 = {eyepolv[v0 + j].x, eyepolv[v0 + j].y};
-                Vector2 p2 = {eyepolv[v0 + j + 1].x, eyepolv[v0 + j + 1].y};
-                float z1 = eyepolv[v0 + j].z / 500.0f;
-                float z2 = eyepolv[v0 + j + 1].z / 500.0f;
-
-                // Calculate UV coordinates for each vertex using the transformation matrix
-                float *ouvmat = eyepol[i].ouvmat;
-                float d1 = ouvmat[0]*center.x + ouvmat[3]*center.y + ouvmat[6];
-                float d2 = ouvmat[0]*p1.x + ouvmat[3]*p1.y + ouvmat[6];
-                float d3 = ouvmat[0]*p2.x + ouvmat[3]*p2.y + ouvmat[6];
-                // Center vertex UV
-              //  float u_center = ouvmat[0] * center.x + ouvmat[3] * center.y + ouvmat[6];
-                float u_center = ouvmat[1] * center.x + ouvmat[4] * center.y + ouvmat[7];
-                float v_center = ouvmat[2] * center.x + ouvmat[5] * center.y + ouvmat[8];
-
-                /// f = 1.0/d;
-                /// final_u = u * f;  // Corrected texture coordinate
-                // final_v = v * f;
-                // Perspective correct UV (divide by w)
-               // if (w_center != 0) {
-               //     u_center /= w_center;
-               //     v_center /= w_center;
-               // }
-
-
-                // Normalize UV to [0,1] range and convert to color
-                // Use fractional part to handle tiling
-                u_center = u_center - floorf(u_center);
-                v_center = v_center - floorf(v_center);
-
-
-                // Convert UV to RGB (U->Red, V->Green, Blue=0.5 for visibility)
-                rlColor4f(red, fabs(-d1), 0, 1);
-              //  rlTexCoord2f(u_center, eyepolv[v0].z);
-                rlNormal3f(0,1,0);
-                rlVertex2f(center.x, center.y);
-
-                rlNormal3f(0,1,0);
-                rlColor4f(red, fabs(-d2 ), 0, 1);
-            //    rlTexCoord2f(u_p1, z1);
-                rlVertex2f(p1.x, p1.y);
-
-                rlNormal3f(0,1,0);
-                rlColor4f(red, fabs(-d3 ), 0, 1);
-             //   rlTexCoord2f(u_p2, z2);
-                rlVertex2f(p2.x, p2.y);
-
-                //
+                int idx[] = {v0, v0+j, v0+j+1};
+                for (int k = 0;k<3;k++) {
+                    Vector2 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y};
+                    float *ouvmat = eyepol[i].ouvmat;
+                    float depth = ouvmat[0]*pt.x + ouvmat[3]*pt.y + ouvmat[6];
+                    float u = ouvmat[1] * pt.x + ouvmat[4] * pt.y + ouvmat[7];
+                    float v = ouvmat[2] * pt.x + ouvmat[5] * pt.y + ouvmat[8];
+                    float f = 1.0/depth;
+                    float final_u = u * f  / (65536.0f *64);  // Corrected texture coordinate
+                    float final_v = v * f  / (65536.0f * 64);
+                    rlColor4f(1, 1, fabs(depth), 1);
+                    rlTexCoord2f(final_u, final_v);
+                  //  rlNormal3f(0,1,0);
+                    rlVertex2f(pt.x, pt.y);
+                }
             }
             rlDrawRenderBatchActive();
             rlEnd();
 
-            //  EndShaderMode();
+             EndShaderMode();
         }
     }
 
