@@ -19,6 +19,7 @@ The forward direction can be visualized as moving away from the camera or viewer
 #ifndef RAYLIB_LUA_IMGUI_DUMBRENDER_H
 #define RAYLIB_LUA_IMGUI_DUMBRENDER_H
 #include "DumbCore.hpp"
+#include "cmake-build-custom/_deps/raylib-src/src/external/glad.h"
 
 
  extern "C" {
@@ -70,7 +71,7 @@ static mapstate_t* map;
 static long gnumtiles_i, gmaltiles_i, gtilehashead_i[1024];
 static bool drawWalls = true;
 static bool drawSpris = false;
-static bool drawCeils = false;
+static bool drawCeils = true;
 static player_transform plr;
 static Shader uvShader ;
 class DumbRender
@@ -297,6 +298,7 @@ public:
 				{
 					shadowtest2_light[shadowtest2_numlights].sect   = map->spri[map->light_spri[i]].sect;
 					shadowtest2_light[shadowtest2_numlights].p      = map->spri[map->light_spri[i]].p;
+				    shadowtest2_light[shadowtest2_numlights].p.x += sin(GetTime()+shadowtest2_light[shadowtest2_numlights].p.y)*3;
 					k = ((map->spri[map->light_spri[i]].flags>>17)&7);
 					if (!k) { shadowtest2_light[shadowtest2_numlights].spotwid = -1.0; }
 					else
@@ -397,6 +399,7 @@ static void recalculateOuvmat(point2d* clippedVerts, int vertCount, float* origi
         // Vector2 v2 = {sw, sh};
         // Vector2 v3 = {sw / 2, sh};
         Color transparentWhite = {255, 255, 255, 128};
+        ClearBackground({50,50,60,255});  // Set your desired color
 
         cam_t b2cam;
         plr.ipos = {camsrc.position.x, camsrc.position.z, -camsrc.position.y};
@@ -471,7 +474,7 @@ static void recalculateOuvmat(point2d* clippedVerts, int vertCount, float* origi
             BeginMode3D(camsrc);
             rlDisableBackfaceCulling();
             rlDisableDepthMask();
-            BeginBlendMode(RL_BLEND_ADDITIVE);
+            BeginBlendMode(BLEND_ADDITIVE);
             for(int lightIndex = 0; lightIndex < shadowtest2_numlights; lightIndex++) {
                 lightpos_t* lght = &shadowtest2_light[lightIndex];
                 for (int i = 0; i < lght->ligpoln; i++) {
@@ -484,22 +487,23 @@ static void recalculateOuvmat(point2d* clippedVerts, int vertCount, float* origi
                     point3d *polyVerts = &lght->ligpolv[v0];
                     //   BeginShaderMode(uvShader);
                     rlBegin(RL_TRIANGLES);
-
+                    glEnable(GL_POLYGON_OFFSET_FILL);
+                    glPolygonOffset(-1.0f, 1.0f);
                     rlSetTexture(0);
                     for (int j = 1; j < vertCount - 1; j++) {
                         int idx[] = {v0, v0 + j, v0 + j + 1};
                         for (int k = 0; k < 3; k++) {
                             Vector3 pt = {lght->ligpolv[idx[k]].x, lght->ligpolv[idx[k]].y, lght->ligpolv[idx[k]].z};
-Vector3 camad = {0};//(camsrc.target-camsrc.position);
+                            Vector3 cambias = {0};//(pt-camsrc.position);
 
-                            rlColor4f(lightIndex, 1-lightIndex, 0, 0.8);
+                            rlColor4f(lightIndex*0.4f, (1-lightIndex)*0.4f, 0, 1);
                             rlNormal3f(0,1,0);
                             rlTexCoord2f(0,0.5);
-                            rlVertex3f(pt.x+camad.x, -pt.z+0.02+camad.y, pt.y+camad.z);
+                            rlVertex3f(pt.x+cambias.x, -pt.z+cambias.y, pt.y+cambias.z);
                         }
                     }
                    rlDrawRenderBatchActive();
-
+                    glDisable(GL_POLYGON_OFFSET_FILL);
                     rlEnd();
 
                 }

@@ -294,7 +294,7 @@ void MainLoop()
                           {0, 0, 800, -600}, {0, 0}, WHITE);
 
             // Multiply blend lights
-            BeginBlendMode(BLEND_MULTIPLIED);
+            BeginBlendMode(RL_BLEND_MULTIPLIED);
             DrawTextureRec({lightTarget.colorTexture, 800, 600, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
                           {0, 0, 800, -600}, {0, 0}, WHITE);
             EndBlendMode();
