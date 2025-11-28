@@ -70,10 +70,13 @@ static Texture2D* runtimeTextures;
 static mapstate_t* map;
 static long gnumtiles_i, gmaltiles_i, gtilehashead_i[1024];
 static bool drawWalls = true;
-static bool drawSpris = false;
+static bool drawSpris = true;
 static bool drawCeils = true;
 static player_transform plr;
 static Shader uvShader ;
+static Shader lightShader ;
+static int lightPosLoc;
+static int lightRangeLoc;
 class DumbRender
 {
 
@@ -88,6 +91,12 @@ public:
     {
         char rootpath[256];
         uvShader = LoadShader("uv_vis_shader.vs", "uv_vis_shader.fs");
+
+        lightShader = LoadShader("light.vs", "light.fs");
+
+        lightPosLoc = GetShaderLocation(lightShader, "lightPosition");
+        lightRangeLoc = GetShaderLocation(lightShader, "lightRange");
+
 
         strcpy_s(rootpath, "c:/Eugene/Games/build2/");
         LoadPal(rootpath);
@@ -183,6 +192,7 @@ public:
         numFloorMeshes = map->numsects * 2; // floor + ceiling
         floorMeshes = (FloorMeshData*)calloc(numFloorMeshes, sizeof(FloorMeshData));
 
+
         for (int s = 0; s < map->numsects; s++)
         {
             sect_t* sect = &map->sect[s];
@@ -190,8 +200,8 @@ public:
             // Generate floor and ceiling meshes
             for (int isFloor = 0; isFloor < 2; isFloor++)
             {
-                if (!drawCeils && (isFloor == 0))
-                    continue;
+               // if (!drawCeils && (isFloor == 0))
+               //     continue;
                 int meshIdx = s * 2 + isFloor;
                 FloorMeshData* meshData = &floorMeshes[meshIdx];
 
@@ -475,39 +485,48 @@ static void recalculateOuvmat(point2d* clippedVerts, int vertCount, float* origi
             rlDisableBackfaceCulling();
             rlDisableDepthMask();
             BeginBlendMode(BLEND_ADDITIVE);
+
+            BeginShaderMode(lightShader);
+
+            int lightRange = 10;
+
             for(int lightIndex = 0; lightIndex < shadowtest2_numlights; lightIndex++) {
                 lightpos_t* lght = &shadowtest2_light[lightIndex];
+                Vector3 lightpos = {lght->p.x,-lght->p.z,lght->p.y};
+                SetShaderValue(lightShader, lightPosLoc, &lightpos, SHADER_UNIFORM_VEC3);
+                SetShaderValue(lightShader, lightRangeLoc, &lightRange, SHADER_UNIFORM_FLOAT);
+
                 for (int i = 0; i < lght->ligpoln; i++) {
                     int v0 = lght->ligpol[i].vert0;
                     int v1 = lght->ligpol[i + 1].vert0;
                     int vertCount = v1 - v0;
                     if (vertCount < 3) continue;
-                    // Check if polygon is clipped
-                    Rectangle screenBounds = {0, 0, sw, sh};
-                    point3d *polyVerts = &lght->ligpolv[v0];
+
                     //   BeginShaderMode(uvShader);
                     rlBegin(RL_TRIANGLES);
                     glEnable(GL_POLYGON_OFFSET_FILL);
                     glPolygonOffset(-1.0f, 1.0f);
-                    rlSetTexture(0);
+                    //rlSetTexture(0);
                     for (int j = 1; j < vertCount - 1; j++) {
                         int idx[] = {v0, v0 + j, v0 + j + 1};
                         for (int k = 0; k < 3; k++) {
-                            Vector3 pt = {lght->ligpolv[idx[k]].x, lght->ligpolv[idx[k]].y, lght->ligpolv[idx[k]].z};
-                            Vector3 cambias = {0};//(pt-camsrc.position);
+                            Vector3 ptb2 = {lght->ligpolv[idx[k]].x, lght->ligpolv[idx[k]].y, lght->ligpolv[idx[k]].z};
+                            Vector3 pt = {ptb2.x,-ptb2.z, ptb2.y};
 
-                            rlColor4f(lightIndex*0.4f, (1-lightIndex)*0.4f, 0, 1);
+                            rlColor4f(lightIndex, (1-lightIndex), 0, 1);
                             rlNormal3f(0,1,0);
                             rlTexCoord2f(0,0.5);
-                            rlVertex3f(pt.x+cambias.x, -pt.z+cambias.y, pt.y+cambias.z);
+                            rlVertex3f(pt.x, pt.y, pt.z);
                         }
                     }
                    rlDrawRenderBatchActive();
                     glDisable(GL_POLYGON_OFFSET_FILL);
+
                     rlEnd();
 
                 }
             }
+            EndShaderMode();
             EndBlendMode();
             rlEnableDepthMask();
             EndMode3D();
@@ -525,7 +544,7 @@ static void recalculateOuvmat(point2d* clippedVerts, int vertCount, float* origi
         // Draw floors and ceilings with slopes
         for (int s = 0; s < map->numsects; s++)
         {
-            for (int isFloor = 1; isFloor < 2; isFloor++)
+            for (int isFloor = 0; isFloor < 2; isFloor++)
             {
                 int meshIdx = s * 2 + isFloor;
                 FloorMeshData* meshData = &floorMeshes[meshIdx];
