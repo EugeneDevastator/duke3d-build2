@@ -110,6 +110,7 @@ extern eyepol_t *eyepol; // 4096 eyepol_t's = 192KB
 extern point2d *eyepolv; //16384 point2d's  = 128KB
 extern int eyepoln, glignum;
 extern int eyepolmal, eyepolvn, eyepolvmal;
+ extern lightpos_t *glp;
 // ================================================================================================
 // POLYGONAL SCENE CLIPPING FUNCTIONS
 // ================================================================================================

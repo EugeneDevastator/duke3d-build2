@@ -91,7 +91,20 @@ public:
         strcpy_s(rootpath, "c:/Eugene/Games/build2/");
         LoadPal(rootpath);
         LoadMapAndTiles();
+        shadowtest2_numlights=0;
+        //Sprite hacks
+        for(int i=0;i<map->numspris;i++)
+        {
+            map->spri[i].owner = -1;
 
+            //Insert lights
+            if (map->spri[i].tilnum == 126)
+            {
+                map->spri[i].flags |= SPRITE_B2_IS_LIGHT;
+                if (map->light_sprinum < MAXLIGHTS)
+                    map->light_spri[map->light_sprinum++] = i;
+            }
+        }
         // auto paltex = ConvertPalToTexture();
         // tile_t* pic = static_cast<tile_t*>(malloc(sizeof(tile_t)));
         // strcpy_s(pic->filnam, "TILES000.art|1");
@@ -270,24 +283,61 @@ public:
         cam->c.y = sh;
         cam->z.x = sw;
         cam->z.y = sh;
-        shadowtest2_ligpolreset(-1);
-        shadowtest2_setcam(cam);
+
+
+
+ // Main render scope
+			shadowtest2_useshadows = 1;//b2opts.shadows;
+			shadowtest2_numlights = 0;
+			for(i=map->light_sprinum-1;i>=0;i--)
+			{
+				if (((unsigned)map->light_spri[i] < (unsigned)map->malspris)
+				    && (map->spri[map->light_spri[i]].sect >= 0)
+				    && (shadowtest2_numlights < MAXLIGHTS))
+				{
+					shadowtest2_light[shadowtest2_numlights].sect   = map->spri[map->light_spri[i]].sect;
+					shadowtest2_light[shadowtest2_numlights].p      = map->spri[map->light_spri[i]].p;
+					k = ((map->spri[map->light_spri[i]].flags>>17)&7);
+					if (!k) { shadowtest2_light[shadowtest2_numlights].spotwid = -1.0; }
+					else
+					{
+						m = ((map->spri[map->light_spri[i]].flags>>20)&1023); if (!m) continue;
+						shadowtest2_light[shadowtest2_numlights].spotwid = cos(m*PI/1024.0); //FIX:use lut
+						switch(k)
+						{
+							case 1: case 2: shadowtest2_light[shadowtest2_numlights].f = map->spri[map->light_spri[i]].d; break;
+							case 3: case 4: shadowtest2_light[shadowtest2_numlights].f = map->spri[map->light_spri[i]].f; break;
+							case 5: case 6: shadowtest2_light[shadowtest2_numlights].f = map->spri[map->light_spri[i]].r; break;
+						}
+						if (!(k&1)) { shadowtest2_light[shadowtest2_numlights].f.x *= -1; shadowtest2_light[shadowtest2_numlights].f.y *= -1; shadowtest2_light[shadowtest2_numlights].f.z *= -1; }
+					}
+					shadowtest2_light[shadowtest2_numlights].rgb[0] = map->spri[map->light_spri[i]].bsc/8192.f; //gsc/8192   map->spri[map->light_spri[i]].fat;
+					shadowtest2_light[shadowtest2_numlights].rgb[1] = map->spri[map->light_spri[i]].gsc/8192.f;
+					shadowtest2_light[shadowtest2_numlights].rgb[2] = map->spri[map->light_spri[i]].rsc/8192.f;
+					shadowtest2_light[shadowtest2_numlights].flags  = 1;
+					shadowtest2_numlights++;
+				}
+			}
+
         //---
         shadowtest2_rendmode = 2;
         draw_hsr_polymost(cam, map, playr, playr->cursect);
         shadowtest2_rendmode = 4;
-        if (shadowtest2_updatelighting) //FIXFIX
+
+        shadowtest2_numlights =1;
+       // if (shadowtest2_updatelighting) //FIXFIX
         {
             cam_t ncam;
             ncam = *cam;
-            shadowtest2_updatelighting = 0; //FIXFIX
+           // shadowtest2_updatelighting = 0; //FIXFIX
             shadowtest2_ligpolreset(-1);
-            //for(glignum=0;glignum<shadowtest2_numlights;glignum++)
-            //{
-            //    ncam.p = shadowtest2_light[glignum].p;
-            //    draw_hsr_polymost(&ncam,map,plr,shadowtest2_light[glignum].sect);
-            //}
+            for(glignum=0;glignum<shadowtest2_numlights;glignum++)
+            {
+                ncam.p = shadowtest2_light[glignum].p;
+                draw_hsr_polymost(&ncam,map,&plr,shadowtest2_light[glignum].sect);
+            }
         }
+        shadowtest2_setcam(cam);
     }
 static void recalculateOuvmat(point2d* clippedVerts, int vertCount, float* originalOuvmat, float* newOuvmat) {
     if (vertCount < 3) return;
@@ -341,6 +391,7 @@ static void recalculateOuvmat(point2d* clippedVerts, int vertCount, float* origi
         }
         return false;
     }
+
     static void DrawPost3d(float sw, float sh, Camera3D camsrc) {
         // Vector2 v1 = {0, 0};
         // Vector2 v2 = {sw, sh};
@@ -356,51 +407,100 @@ static void recalculateOuvmat(point2d* clippedVerts, int vertCount, float* origi
 
         DrawEyePoly(sw, sh, &plr, &b2cam); // ken render
 
-        if (!eyepol || !eyepolv || eyepoln <= 0) return;
+        // Eyepol polys
+
         rlDisableBackfaceCulling();
-        for (int i = 0; i < eyepoln; i++) {
-            int v0 = eyepol[i].vert0;
-            int v1 = eyepol[i + 1].vert0;
-            int vertCount = v1 - v0;
-            if (vertCount < 3) continue;
-            // Check if polygon is clipped
-            Rectangle screenBounds = {0, 0, sw, sh};
-            point2d* polyVerts = &eyepolv[v0];
+       // if (!eyepol || !eyepolv || eyepoln <= 0) return;
+        if (false) {
+            for (int i = 0; i < eyepoln; i++) { // eypolis
+                int v0 = eyepol[i].vert0;
+                int v1 = eyepol[i + 1].vert0;
+                int vertCount = v1 - v0;
+                if (vertCount < 3) continue;
+                // Check if polygon is clipped
+                Rectangle screenBounds = {0, 0, sw, sh};
+                point2d *polyVerts = &eyepolv[v0];
 
-            float* ouvmat = eyepol[i].ouvmat;
-            float newOuvmat[9];
+                float *ouvmat = eyepol[i].ouvmat;
+                float di8 = ouvmat[0] * FLATSTEPSIZ;
+                // float j;
+                // if (di8 < 0) j = ((x-xe+1)&(FLATSTEPSIZ-1)); else j = 0;
 
-            if (isPolygonClipped(polyVerts, vertCount, screenBounds)) {
-                // Recalculate matrix for clipped polygon
-                recalculateOuvmat(polyVerts, vertCount, ouvmat, newOuvmat);
-                ouvmat = newOuvmat;
+                {
+                    //   BeginShaderMode(uvShader);
+                    rlBegin(RL_TRIANGLES);
+                    for (int j = 1; j < vertCount - 1; j++) {
+                        int idx[] = {v0, v0 + j, v0 + j + 1};
+                        for (int k = 0; k < 3; k++) {
+                            Vector2 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y};
+                            //float *ouvmat = eyepol[i].ouvmat;
+                            float depth = ouvmat[0] * pt.x + ouvmat[3] * pt.y + ouvmat[6];
+                            float u = ouvmat[1] * pt.x + ouvmat[4] * pt.y + ouvmat[7];
+                            float v = ouvmat[2] * pt.x + ouvmat[5] * pt.y + ouvmat[8];
+                            float f = 1.0 / depth;
+                            float final_u = u * f / (65536.0f * 64); // Corrected texture coordinate
+                            float final_v = v * f / (65536.0f * 64);
+                            rlColor4f(1, 1, fabs(depth), 0.2);
+                            rlTexCoord2f(final_u, final_v);
+                            //  rlNormal3f(0,1,0);
+                            rlVertex2f(pt.x, pt.y);
+                        }
+                    }
+                    rlEnd();
+                    // EndShaderMode();
+                    rlDrawRenderBatchActive();
+                } // eypol polys
+                {
+                    rlBegin(RL_LINES);
+                    for (int j = 1; j < vertCount - 1; j++) {
+                        int idx[] = {v0, v0 + j, v0 + j + 1};
+                        for (int k = 0; k < 3; k++) {
+                            Vector2 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y};
+                            rlColor4f(0, 1, 1, 1);
+                            rlVertex2f(pt.x, pt.y);
+                        }
+                    }
+                    rlEnd();
+                } // eyepol lines for each poly
             }
-            BeginShaderMode(uvShader);
+        }
+        //if (!lightpos_t || !eyepolv || eyepoln <= 0) return;}
 
-            rlBegin(RL_TRIANGLES);
-            for (int j = 1; j < vertCount - 1; j++) {
-                int idx[] = {v0, v0+j, v0+j+1};
-                for (int k = 0;k<3;k++) {
-                    Vector2 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y};
-                    float *ouvmat = eyepol[i].ouvmat;
-                    float depth = ouvmat[0]*pt.x + ouvmat[3]*pt.y + ouvmat[6];
-                    float u = ouvmat[1] * pt.x + ouvmat[4] * pt.y + ouvmat[7];
-                    float v = ouvmat[2] * pt.x + ouvmat[5] * pt.y + ouvmat[8];
-                    float f = 1.0/depth;
-                    float final_u = u * f  / (65536.0f *64);  // Corrected texture coordinate
-                    float final_v = v * f  / (65536.0f * 64);
-                    rlColor4f(1, 1, fabs(depth), 1);
-                    rlTexCoord2f(final_u, final_v);
-                  //  rlNormal3f(0,1,0);
-                    rlVertex2f(pt.x, pt.y);
+        { // Light polys
+
+            BeginMode3D(camsrc);
+            rlDisableBackfaceCulling();
+
+        //    rlDisableDepthMask();
+       //    rlDisableDepthTest();
+            for (int i = 0; i < glp->ligpoln; i++) {
+                int v0 = glp->ligpol[i].vert0;
+                int v1 = glp->ligpol[i + 1].vert0;
+                int vertCount = v1 - v0;
+                if (vertCount < 3) continue;
+                // Check if polygon is clipped
+                Rectangle screenBounds = {0, 0, sw, sh};
+                point3d *polyVerts = &glp->ligpolv[v0];
+                //   BeginShaderMode(uvShader);
+                rlBegin(RL_TRIANGLES);
+                rlSetTexture(0);
+                for (int j = 1; j < vertCount - 1; j++) {
+                    int idx[] = {v0, v0 + j, v0 + j + 1};
+                    for (int k = 0; k < 3; k++) {
+                        Vector3 pt = {glp->ligpolv[idx[k]].x, glp->ligpolv[idx[k]].y, glp->ligpolv[idx[k]].z};
+                        rlColor4f(1, 0.4, 1, 0.3);
+                        rlNormal3f(0,1,0);
+                        rlTexCoord2f(0,0.5);
+                        rlVertex3f(pt.x, -pt.z+0.2, pt.y);
+                    }
                 }
+                rlEnd();
+                rlDrawRenderBatchActive();
             }
-            rlDrawRenderBatchActive();
-            rlEnd();
-
-             EndShaderMode();
+            EndMode3D();
         }
     }
+
 
 
     // Updated wall rendering with segments
@@ -1310,7 +1410,7 @@ private:
             if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
             map->blankheadspri = i;
         }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/e3l1.MAP", map);
+        loadmap_imp((char*)"c:/Eugene/Games/build2/LIG.MAP", map);
     }
 };
 

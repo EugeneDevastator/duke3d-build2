@@ -97,6 +97,8 @@
 #define SPRITE_B2_FACING        (1 << 4)   // 16
 #define SPRITE_B2_FLAT_POLY    (1 << 5)   // 32
 #define SPRITE_B2_ONE_SIDED        (1 << 6)   // 64
+#define SPRITE_B2_IS_LIGHT     (1 << 16)   // 64
+//Bit0:Blocking, Bit2:1WayOtherSide, Bit5,Bit4:Face/Wall/Floor/.., Bit6:1side, Bit16:IsLight, Bit17-19:SpotAx(1-6), Bit20-29:SpotWid, Bit31:Invisible
 
 
 typedef struct { float x, y, z; } point3d;

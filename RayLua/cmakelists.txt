@@ -86,7 +86,7 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/uv_vis_shader.fs ${PROJECT_BINARY_DIR
 
 # Verify copy worked
 if(EXISTS "${PROJECT_BINARY_DIR}/uv_vis_shader.vs")
-    message(STATUS "Successfully copied vertex shader to: ${PROJECT_BINARY_DIR}/uv_vis_shader.vs")
+    message(STATUS "Successfully copied vertex shader to: ${CMAKE_CURRENT_BINARY_DIR}/uv_vis_shader.vs")
 else()
     message(FATAL_ERROR "Failed to copy vertex shader")
 endif()

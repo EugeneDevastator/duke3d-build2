@@ -31,7 +31,6 @@ winmain.obj:     winmain.cpp;   cl /c /TP winmain.cpp   /Ox /G6Fy /MD
 #pragma warning(disable:4731)
 
 #define USESSE2 0
-#define SCISDIST 0.0001
 #define USENEWLIGHT 1 //FIXFIXFIX
 #define USEGAMMAHACK 1 //FIXFIXFIX
 int renderinterp = 1;
@@ -129,7 +128,7 @@ static int gcurcol;
 
 #define LIGHTMAX 256 //FIX:make dynamic!
 lightpos_t shadowtest2_light[LIGHTMAX];
-static lightpos_t *glp;
+lightpos_t *glp;
 int shadowtest2_numlights = 0, shadowtest2_useshadows = 1, shadowtest2_numcpu = 0;
 float shadowtest2_ambrgb[3] = {32.0,32.0,32.0};
 __declspec(align(16)) static float g_qamb[4]; //holder for SSE to avoid degenerates
@@ -790,26 +789,41 @@ static void drawtagfunc (int rethead0, int rethead1)
 	rethead[0] = rethead0; rethead[1] = rethead1;
 
 #if 0
-		//Old code to draw polygon immediately:
-	for(i=2-1;i>=0;i--) { k = rethead[i]; do { print6x8(&gcam.c,mp[k].x-3,mp[k].y-5,0xffffff,-1,"x"); k = mp[k].n; } while (k != rethead[i]); }
-	drawpol_aftclip(rethead0,rethead1); for(i=2-1;i>=0;i--) mono_deloop(rethead[i]); return;
+	//Old code to draw polygon immediately:
+	for (i = 2 - 1; i >= 0; i--) {
+		k = rethead[i];
+		do {
+			print6x8(&gcam.c, mp[k].x - 3, mp[k].y - 5, 0xffffff, -1, "x");
+			k = mp[k].n;
+		} while (k != rethead[i]);
+	}
+	drawpol_aftclip(rethead0, rethead1); for (i = 2 - 1; i >= 0; i--) mono_deloop(rethead[i]); return;
 #endif
 
-		//Put on FIFO:
+	// Put on FIFO:
 	for(h=0;h<2;h++)
 	{
-		i = rethead[h]; //k = eyepolvn;
+		i = rethead[h];
 		do
 		{
-			if (h) i = mp[i].p;
+			if (h)
+				i = mp[i].p;
 
 			if (eyepolvn >= eyepolvmal)
 			{
-				eyepolvmal = max(eyepolvmal<<1,16384); //den_01.map room of death uses ~15000 max
+				eyepolvmal = max(eyepolvmal<<1,16384);
 				eyepolv = (point2d *)realloc(eyepolv,eyepolvmal*sizeof(point2d));
 			}
 
-			f =          gcam.h.z/(/*mp[i].x*xformmat[6]*/ + mp[i].y*xformmat[7] + gnadd.z);
+			// ORIGINAL CODE - REMOVE CLIPPING:
+			/*
+			f = gcam.h.z/(mp[i].x*xformmat[6] + mp[i].y*xformmat[7] + gnadd.z);
+			eyepolv[eyepolvn].x = (mp[i].x*xformmat[0] + mp[i].y*xformmat[1] + gnadd.x)*f + gcam.h.x;
+			eyepolv[eyepolvn].y = (mp[i].x*xformmat[3] + mp[i].y*xformmat[4] + gnadd.y)*f + gcam.h.y;
+			*/
+
+			// NEW CODE - No screen edge clamping:
+			f = gcam.h.z/(mp[i].x*xformmat[6] + mp[i].y*xformmat[7] + gnadd.z);
 			eyepolv[eyepolvn].x = (mp[i].x*xformmat[0] + mp[i].y*xformmat[1] + gnadd.x)*f + gcam.h.x;
 			eyepolv[eyepolvn].y = (mp[i].x*xformmat[3] + mp[i].y*xformmat[4] + gnadd.y)*f + gcam.h.y;
 
@@ -819,6 +833,7 @@ static void drawtagfunc (int rethead0, int rethead1)
 		} while (i != rethead[h]);
 		mono_deloop(rethead[h]);
 	}
+
 
 	if (eyepoln+1 >= eyepolmal)
 	{
@@ -831,7 +846,8 @@ static void drawtagfunc (int rethead0, int rethead1)
 		memcpy((void *)eyepol[eyepoln].ouvmat,(void *)gouvmat,sizeof(gouvmat[0])*9);
 	else
 	{
-		f = (((float)gtpic->tt.x)+1.15f)/((float)gtpic->tt.x); fptr = eyepol[eyepoln].ouvmat;
+		//f = (((float)gtpic->tt.x)+1.15f)/((float)gtpic->tt.x); fptr = eyepol[eyepoln].ouvmat;
+		f = (((float)64)+1.15f)/((float)64); fptr = eyepol[eyepoln].ouvmat;
 		switch(gflags)
 		{
 			case 14: fptr[0] = +f                 ; fptr[3] = f*+2.f; fptr[6] =     0.f; //Front
@@ -1141,6 +1157,7 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 		f = gcam.h.z/tp[i].z;
 		tp[i].x = tp[i].x*f + gcam.h.x;
 		tp[i].y = tp[i].y*f + gcam.h.y;
+		//tp[i].z_linear = tp[i].z;  // Store linear depth BEFORE projection
 	}
 
 		//generate vmono
@@ -1215,7 +1232,7 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 		}
 		else
 		{
-				  if (shadowtest2_rendmode == 4) mono_output = drawtagfunc; //add to light list // this will process point lights. otherwize will only use plr light.
+				  if (shadowtest2_rendmode == 4) mono_output = ligpoltagfunc; //add to light list // this will process point lights. otherwize will only use plr light.
 			else if (gflags < 2)                mono_output =   drawtagfunc; //draw wall
 			else                                mono_output =    skytagfunc; //calls drawtagfunc inside
 			for(i=mphnum-1;i>=0;i--) if (mph[i].tag == tag) mono_bool(mph[i].head[0],mph[i].head[1],plothead[0],plothead[1],MONO_BOOL_AND,mono_output);
@@ -1248,10 +1265,16 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 				for(j=omph0-1;j>=0;j--) //Join monos
 				{
 					if (mph[j].tag != gnewtag) continue;
-					if (!mono_join(mph[j].head[0],mph[j].head[1],mph[k].head[0],mph[k].head[1],&i0,&i1)) continue;
-					for(i=2-1;i>=0;i--) { mono_deloop(mph[k].head[i]); mono_deloop(mph[j].head[i]); }
-					omph0--; mph[k] = mph[omph0];
-					mph[j].head[0] = i0; mph[j].head[1] = i1; k = j;
+					if (!mono_join(mph[j].head[0], mph[j].head[1], mph[k].head[0], mph[k].head[1], &i0, &i1)) continue;
+					for (i = 2 - 1; i >= 0; i--) {
+						mono_deloop(mph[k].head[i]);
+						mono_deloop(mph[j].head[i]);
+					}
+					omph0--;
+					mph[k] = mph[omph0];
+					mph[j].head[0] = i0;
+					mph[j].head[1] = i1;
+					k = j;
 				}
 			}
 #ifdef STANDALONE
@@ -1287,8 +1310,8 @@ static void gentex_xform (float *ouvmat)
 	f = 1048576.0*16.0 / (f*gcam.h.z);
 #endif
 	ax = (1.0/65536.0 )*f;
-	ay = ((float)gtpic->tt.x)*f;
-	az = ((float)gtpic->tt.y)*f;
+	ay = ((float)64)*f;
+	az = ((float)64)*f;
 	ouvmat[0] = p2x*ax; ouvmat[1] = p0x*ay; ouvmat[2] = p1x*az;
 	ouvmat[3] = p2y*ax; ouvmat[4] = p0y*ay; ouvmat[5] = p1y*az;
 	ouvmat[6] = p2z*ax; ouvmat[7] = p0z*ay; ouvmat[8] = p1z*az;
@@ -1428,8 +1451,8 @@ static void gentex_wall (kgln_t *npol2, surf_t *sur)
 	g = rdet;
 #endif
 													 gouvmat[0] *= g; gouvmat[3] *= g; gouvmat[6] *= g; g *= rdet*65536.0;
-	f = (float)gtpic->tt.x*g;            gouvmat[1] *= f; gouvmat[4] *= f; gouvmat[7] *= f;
-	f = (float)gtpic->tt.y*g;            gouvmat[2] *= f; gouvmat[5] *= f; gouvmat[8] *= f;
+	f = (float)64*g;            gouvmat[1] *= f; gouvmat[4] *= f; gouvmat[7] *= f;
+	f = (float)64*g;            gouvmat[2] *= f; gouvmat[5] *= f; gouvmat[8] *= f;
 
 	if (renderinterp)
 	{
@@ -1448,7 +1471,7 @@ The b parameter is a bunch index - this function processes one "bunch" (visible 
 static void drawalls (int b, mapstate_t* map)
 {
 	// === VARIABLE DECLARATIONS ===
-	extern void loadpic (tile_t *);
+	//extern void loadpic (tile_t *);
 	#define MAXVERTS 256 //FIX:timebomb: assumes there are never > 256 sectors connected at same vertex
 	vertlist_t verts[MAXVERTS];
 	bunchverts_t *twal;
@@ -1536,11 +1559,19 @@ static void drawalls (int b, mapstate_t* map)
 		plothead[i] = mp[plothead[i]].n;
 
 		// Setup texture and rendering flags
-		sur = &sec[s].surf[isflor]; gtpic = &gtile[sur->tilnum]; if (!gtpic->tt.f) loadpic(gtpic);
-			  if (sec[s].surf[isflor].flags&(1<<17)) { gflags = 2;                  } //skybox ceil/flor
-		else if (sec[s].surf[isflor].flags&(1<<16)) { gflags = 1; gentex_sky(sur); } //parallaxing ceil/flor
-															else { gflags = 0; gentex_ceilflor(&sec[s],wal,sur,isflor); }
-		gligwall = isflor-2;
+		sur = &sec[s].surf[isflor];
+		gtpic = &gtile[sur->tilnum];
+		//if (!gtpic->tt.f) loadpic(gtpic);
+		if (sec[s].surf[isflor].flags & (1 << 17)) { gflags = 2; } //skybox ceil/flor
+		else if (sec[s].surf[isflor].flags & (1 << 16)) {  //parallaxing ceil/flor
+			gflags = 1;
+			gentex_sky(sur);
+		}
+		else {
+			gflags = 0;
+			gentex_ceilflor(&sec[s], wal, sur, isflor);
+		}
+		gligwall = isflor - 2;
 		drawpol_befclip(s,-1,plothead[0],plothead[1],(isflor<<2)+3);
 #ifdef STANDALONE
 		gcnt--; if (gcnt <= 0) return;
@@ -1602,7 +1633,7 @@ static void drawalls (int b, mapstate_t* map)
 			// Render wall segment if visible
 			if ((!(m&1)) || (wal[w].surf.flags&(1<<5))) //Draw wall here //(1<<5): 1-way
 			{
-				gtpic = &gtile[sur->tilnum]; if (!gtpic->tt.f) loadpic(gtpic);
+			//	gtpic = &gtile[sur->tilnum]; if (!gtpic->tt.f) loadpic(gtpic);
 					  if (sur->flags&(1<<17)) { gflags = 2;                  } //skybox ceil/flor
 				else if (sur->flags&(1<<16)) { gflags = 1; gentex_sky(sur); } //parallaxing ceil/flor
 				else
@@ -1632,9 +1663,6 @@ static void drawalls (int b, mapstate_t* map)
 
 			// Render the wall polygon
 			drawpol_befclip(s,ns,plothead[0],plothead[1],((m>vn)<<2)+3);
-#ifdef STANDALONE
-			gcnt--; if (gcnt <= 0) return; // Debug: limit polygon count
-#endif
 		}
 	}
 }
@@ -1813,11 +1841,21 @@ void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, player_transform *lps, int c
 		{
 			xformprep(((double)halfplane)*PI);
 
+			// ORIGINAL CODE - REMOVE THIS BLOCK:
+			/*
 			i = 0; //i = 16;
 			xformbac(         i-gcam.h.x,         i-gcam.h.y,gcam.h.z,&bord[0]);
 			xformbac(gcam.c.x-i-gcam.h.x,         i-gcam.h.y,gcam.h.z,&bord[1]);
 			xformbac(gcam.c.x-i-gcam.h.x,gcam.c.y-i-gcam.h.y,gcam.h.z,&bord[2]);
 			xformbac(         i-gcam.h.x,gcam.c.y-i-gcam.h.y,gcam.h.z,&bord[3]);
+			*/
+
+			// NEW CODE - Use much larger bounds:
+			float large_bound = 1e6f;
+			xformbac(-large_bound, -large_bound, gcam.h.z, &bord[0]);
+			xformbac(+large_bound, -large_bound, gcam.h.z, &bord[1]);
+			xformbac(+large_bound, +large_bound, gcam.h.z, &bord[2]);
+			xformbac(-large_bound, +large_bound, gcam.h.z, &bord[3]);
 
 				//Clip screen to front plane
 			n = 0; didcut = 0;

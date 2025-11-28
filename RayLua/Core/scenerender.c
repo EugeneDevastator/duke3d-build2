@@ -125,7 +125,7 @@ void drawframe (cam_t *cc, player_transform *gdps, mapstate_t *gst) // draws sce
 			shadowtest2_rendmode = 2;
 			draw_hsr_polymost(&cam,gst,gdps,gdps->cursect);
 // and here we probably can stop and see eyepoln.
-			return;
+
 			shadowtest2_rendmode = 4;
 			if (shadowtest2_updatelighting) //FIXFIX
 			{

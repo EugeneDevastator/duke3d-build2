@@ -197,13 +197,12 @@ void MainLoop()
         BeginMode3D(DumbCore::GetCamera());
         DumbRender::DrawMapstateTex(DumbCore::GetCamera());
         //   DumbRender::DrawMapstateLines();
-        EndMode3D();
 
-        // DumbRender::DrawPaletteAndTexture();
-
+         EndMode3D();
         DumbRender::DrawPost3d(GetScreenWidth(),GetScreenHeight(),DumbCore::GetCamera());
-        //DumbRender::TestRenderTextures();
 
+        //DumbRender::TestRenderTextures();
+        // DumbRender::DrawPaletteAndTexture();
         DrawImgui();
 
         DrawText("WASD: Move, Mouse: Look", 10, 10, 20, WHITE);
