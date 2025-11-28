@@ -490,9 +490,9 @@ static void recalculateOuvmat(point2d* clippedVerts, int vertCount, float* origi
                         int idx[] = {v0, v0 + j, v0 + j + 1};
                         for (int k = 0; k < 3; k++) {
                             Vector3 pt = {lght->ligpolv[idx[k]].x, lght->ligpolv[idx[k]].y, lght->ligpolv[idx[k]].z};
-Vector3 camad = (camsrc.target-camsrc.position);
+Vector3 camad = {0};//(camsrc.target-camsrc.position);
 
-                            rlColor4f(lightIndex, 1-lightIndex, 0, 0.2);
+                            rlColor4f(lightIndex, 1-lightIndex, 0, 0.8);
                             rlNormal3f(0,1,0);
                             rlTexCoord2f(0,0.5);
                             rlVertex3f(pt.x+camad.x, -pt.z+0.02+camad.y, pt.y+camad.z);
