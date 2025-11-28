@@ -128,7 +128,7 @@ static int gcurcol;
 
 #define LIGHTMAX 256 //FIX:make dynamic!
 lightpos_t shadowtest2_light[LIGHTMAX];
-lightpos_t *glp;
+static lightpos_t *glp;
 int shadowtest2_numlights = 0, shadowtest2_useshadows = 1, shadowtest2_numcpu = 0;
 float shadowtest2_ambrgb[3] = {32.0,32.0,32.0};
 __declspec(align(16)) static float g_qamb[4]; //holder for SSE to avoid degenerates

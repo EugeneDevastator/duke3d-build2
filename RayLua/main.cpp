@@ -187,14 +187,20 @@ void MainLoop()
     DumbCore::Init(map);
     SetTargetFPS(60);
     DumbRender::LoadTexturesToGPU();
+
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
         DumbCore::Update(deltaTime);
        // printf("detaT:%f",deltaTime);
         BeginDrawing();
+
         ClearBackground(BLACK);
 
+
+
+
         BeginMode3D(DumbCore::GetCamera());
+
         DumbRender::DrawMapstateTex(DumbCore::GetCamera());
         //   DumbRender::DrawMapstateLines();
 

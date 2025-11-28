@@ -68,7 +68,7 @@ static int numFloorMeshes = 0;
 static Texture2D* runtimeTextures;
 static mapstate_t* map;
 static long gnumtiles_i, gmaltiles_i, gtilehashead_i[1024];
-static bool drawWalls = false;
+static bool drawWalls = true;
 static bool drawSpris = false;
 static bool drawCeils = false;
 static player_transform plr;
@@ -324,7 +324,7 @@ public:
         draw_hsr_polymost(cam, map, playr, playr->cursect);
         shadowtest2_rendmode = 4;
 
-        shadowtest2_numlights =1;
+       // shadowtest2_numlights =1;
        // if (shadowtest2_updatelighting) //FIXFIX
         {
             cam_t ncam;
@@ -470,33 +470,42 @@ static void recalculateOuvmat(point2d* clippedVerts, int vertCount, float* origi
 
             BeginMode3D(camsrc);
             rlDisableBackfaceCulling();
+            rlDisableDepthMask();
+            BeginBlendMode(RL_BLEND_ADDITIVE);
+            for(int lightIndex = 0; lightIndex < shadowtest2_numlights; lightIndex++) {
+                lightpos_t* lght = &shadowtest2_light[lightIndex];
+                for (int i = 0; i < lght->ligpoln; i++) {
+                    int v0 = lght->ligpol[i].vert0;
+                    int v1 = lght->ligpol[i + 1].vert0;
+                    int vertCount = v1 - v0;
+                    if (vertCount < 3) continue;
+                    // Check if polygon is clipped
+                    Rectangle screenBounds = {0, 0, sw, sh};
+                    point3d *polyVerts = &lght->ligpolv[v0];
+                    //   BeginShaderMode(uvShader);
+                    rlBegin(RL_TRIANGLES);
 
-        //    rlDisableDepthMask();
-       //    rlDisableDepthTest();
-            for (int i = 0; i < glp->ligpoln; i++) {
-                int v0 = glp->ligpol[i].vert0;
-                int v1 = glp->ligpol[i + 1].vert0;
-                int vertCount = v1 - v0;
-                if (vertCount < 3) continue;
-                // Check if polygon is clipped
-                Rectangle screenBounds = {0, 0, sw, sh};
-                point3d *polyVerts = &glp->ligpolv[v0];
-                //   BeginShaderMode(uvShader);
-                rlBegin(RL_TRIANGLES);
-                rlSetTexture(0);
-                for (int j = 1; j < vertCount - 1; j++) {
-                    int idx[] = {v0, v0 + j, v0 + j + 1};
-                    for (int k = 0; k < 3; k++) {
-                        Vector3 pt = {glp->ligpolv[idx[k]].x, glp->ligpolv[idx[k]].y, glp->ligpolv[idx[k]].z};
-                        rlColor4f(1, 0.4, 1, 0.3);
-                        rlNormal3f(0,1,0);
-                        rlTexCoord2f(0,0.5);
-                        rlVertex3f(pt.x, -pt.z+0.2, pt.y);
+                    rlSetTexture(0);
+                    for (int j = 1; j < vertCount - 1; j++) {
+                        int idx[] = {v0, v0 + j, v0 + j + 1};
+                        for (int k = 0; k < 3; k++) {
+                            Vector3 pt = {lght->ligpolv[idx[k]].x, lght->ligpolv[idx[k]].y, lght->ligpolv[idx[k]].z};
+Vector3 camad = (camsrc.target-camsrc.position);
+
+                            rlColor4f(lightIndex, 1-lightIndex, 0, 0.2);
+                            rlNormal3f(0,1,0);
+                            rlTexCoord2f(0,0.5);
+                            rlVertex3f(pt.x+camad.x, -pt.z+0.02+camad.y, pt.y+camad.z);
+                        }
                     }
+                   rlDrawRenderBatchActive();
+
+                    rlEnd();
+
                 }
-                rlEnd();
-                rlDrawRenderBatchActive();
             }
+            EndBlendMode();
+            rlEnableDepthMask();
             EndMode3D();
         }
     }
