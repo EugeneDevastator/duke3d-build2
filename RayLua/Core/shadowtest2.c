@@ -885,6 +885,8 @@ static void drawtagfunc_ws(int rethead0, int rethead1)
 	eyepol[eyepoln].vert0 = eyepolvn;
 }
 
+
+
 /*
 	Purpose: Renders visible geometry polygons to screen
 	Converts 3D polygon vertices to 2D screen coordinates

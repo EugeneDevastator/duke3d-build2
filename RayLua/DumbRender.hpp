@@ -69,7 +69,7 @@ static int numFloorMeshes = 0;
 static Texture2D* runtimeTextures;
 static mapstate_t* map;
 static long gnumtiles_i, gmaltiles_i, gtilehashead_i[1024];
-static bool drawWalls = true;
+static bool drawWalls = false;
 static bool drawSpris = true;
 static bool drawCeils = false;
 static player_transform plr;
@@ -267,7 +267,39 @@ public:
             }
         }
     }
-
+    static bool draw_eyepol_scrspace(float sw, float sh, int i, int &v0dumm, int &vertCountdd) {
+        int v0 = eyepol[i].vert0;
+        int v1 = eyepol[i + 1].vert0;
+        int vertCount = v1 - v0;
+        if (vertCount < 3) return true;
+        // Check if polygon is clipped
+        float *ouvmat = eyepol[i].ouvmat;
+        {
+            //   BeginShaderMode(uvShader);
+            rlBegin(RL_TRIANGLES);
+            for (int j = 1; j < vertCount - 1; j++) {
+                int idx[] = {v0, v0 + j, v0 + j + 1};
+                for (int k = 0; k < 3; k++) {
+                    Vector2 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y};
+                    //float *ouvmat = eyepol[i].ouvmat;
+                    float depth = ouvmat[0] * pt.x + ouvmat[3] * pt.y + ouvmat[6];
+                    float u = ouvmat[1] * pt.x + ouvmat[4] * pt.y + ouvmat[7];
+                    float v = ouvmat[2] * pt.x + ouvmat[5] * pt.y + ouvmat[8];
+                    float f = 1.0 / depth;
+                    float final_u = u * f / (65536.0f * 64); // Corrected texture coordinate
+                    float final_v = v * f / (65536.0f * 64);
+                    rlColor4f(1, 1, fabs(depth), 0.2);
+                    rlTexCoord2f(final_u, final_v);
+                    //  rlNormal3f(0,1,0);
+                    rlVertex2f(pt.x, pt.y);
+                }
+            }
+            rlEnd();
+            // EndShaderMode();
+            rlDrawRenderBatchActive();
+        } // eypol polys
+        return false;
+    }
     static void DrawEyePoly(float sw, float sh, player_transform *playr, cam_t *cam) {
         dpoint3d dp, dr, dd, df;
         long i, j, k, l, m, flashlight1st;
@@ -295,8 +327,21 @@ public:
         cam->z.x = sw;
         cam->z.y = sh;
 
-
-
+        if (false)//((!useLights) || (gdps->cursect < 0))
+        {
+            cam->r.x = 1.f; cam->r.y = 0.f; cam->r.z = 0.f;
+            cam->d.x = 0.f; cam->d.y = 1.f; cam->d.z = 0.f;
+            cam->f.x = 0.f; cam->f.y = 0.f; cam->f.z = 1.f;
+            cam->p.x = 0.f; cam->p.y = 0.f; cam->p.z = 0.f;
+            //	drawkv6_numlights = -1;
+            //	drawview(&cam,gdps,0);
+        }
+        else {
+            cam->r.x = playr->irig.x; cam->r.y = playr->irig.y; cam->r.z = playr->irig.z;
+            cam->d.x = playr->idow.x; cam->d.y = playr->idow.y; cam->d.z = playr->idow.z;
+            cam->f.x = playr->ifor.x; cam->f.y = playr->ifor.y; cam->f.z = playr->ifor.z;
+            cam->p.x = playr->ipos.x; cam->p.y = playr->ipos.y; cam->p.z = playr->ipos.z;
+        }
  // Main render scope
 			shadowtest2_useshadows = 1;//b2opts.shadows;
 			shadowtest2_numlights = 0;
@@ -350,86 +395,47 @@ public:
             }
         }
         shadowtest2_setcam(cam);
+        cam->p = playr->ipos; cam->r = playr->irig; cam->d = playr->idow; cam->f = playr->ifor;
+        cam->h.x = playr->ghx; cam->h.y = playr->ghy; cam->h.z = playr->ghz;
     }
 
-    static bool draw_eyepol_scrspace(float sw, float sh, int i, int &v0, int &vertCount) {
-        v0 = eyepol[i].vert0;
-        int v1 = eyepol[i + 1].vert0;
-        vertCount = v1 - v0;
-        if (vertCount < 3) return true;
-        // Check if polygon is clipped
-        Rectangle screenBounds = {0, 0, sw, sh};
-        float *ouvmat = eyepol[i].ouvmat;
-        float di8 = ouvmat[0] * FLATSTEPSIZ;
-        // float j;
-        // if (di8 < 0) j = ((x-xe+1)&(FLATSTEPSIZ-1)); else j = 0;
-
-        {
-            //   BeginShaderMode(uvShader);
-            rlBegin(RL_TRIANGLES);
-            for (int j = 1; j < vertCount - 1; j++) {
-                int idx[] = {v0, v0 + j, v0 + j + 1};
-                for (int k = 0; k < 3; k++) {
-                    Vector2 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y};
-                    //float *ouvmat = eyepol[i].ouvmat;
-                    float depth = ouvmat[0] * pt.x + ouvmat[3] * pt.y + ouvmat[6];
-                    float u = ouvmat[1] * pt.x + ouvmat[4] * pt.y + ouvmat[7];
-                    float v = ouvmat[2] * pt.x + ouvmat[5] * pt.y + ouvmat[8];
-                    float f = 1.0 / depth;
-                    float final_u = u * f / (65536.0f * 64); // Corrected texture coordinate
-                    float final_v = v * f / (65536.0f * 64);
-                    rlColor4f(1, 1, fabs(depth), 0.2);
-                    rlTexCoord2f(final_u, final_v);
-                    //  rlNormal3f(0,1,0);
-                    rlVertex2f(pt.x, pt.y);
-                }
-            }
-            rlEnd();
-            // EndShaderMode();
-            rlDrawRenderBatchActive();
-        } // eypol polys
-        return false;
-    }
     static bool draw_eyepol_wspace(float sw, float sh, int i, int &v0, int &vertCount) {
-        v0 = eyepol[i].vert0;
-        int v1 = eyepol[i + 1].vert0;
-        vertCount = v1 - v0;
-        if (vertCount < 3) return true;
-        // Check if polygon is clipped
-        float *ouvmat = eyepol[i].ouvmat;
-        float di8 = ouvmat[0] * FLATSTEPSIZ;
+            v0 = eyepol[i].vert0;
+            int v1 = eyepol[i + 1].vert0;
+            vertCount = v1 - v0;
+            if (vertCount < 3) return true;
 
-        // float j;
-        // if (di8 < 0) j = ((x-xe+1)&(FLATSTEPSIZ-1)); else j = 0;
-        {
-            BeginShaderMode(uvShader);
+            float *ouvmat = eyepol[i].ouvmat;
+
+           // BeginShaderMode(uvShader);
             rlBegin(RL_TRIANGLES);
             glEnable(GL_POLYGON_OFFSET_FILL);
-            glPolygonOffset(-1.0f, 1.0f);
-            for (int j = 1; j < vertCount - 1; j++) {
-                int idx[] = {v0, v0 + j, v0 + j + 1};
-                for (int k = 0; k < 3; k++) {
-                    Vector3 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y, eyepolv[idx[k]].z};
-                    //float *ouvmat = eyepol[i].ouvmat;
-                    float depth = ouvmat[0] * pt.x + ouvmat[3] * pt.y + ouvmat[6];
-                    float u = ouvmat[1] * pt.x + ouvmat[4] * pt.y + ouvmat[7];
-                    float v = ouvmat[2] * pt.x + ouvmat[5] * pt.y + ouvmat[8];
-                    float f = 1.0 / depth;
-                    float final_u = u * f / (65536.0f * 64); // Corrected texture coordinate
-                    float final_v = v * f / (65536.0f * 64);
+            glPolygonOffset(1.0f, 1.0f);
 
-                    rlColor4f(1, 1, fabs(depth), 1);
-                    rlTexCoord2f(final_u, final_v);
-                    //  rlNormal3f(0,1,0);
-                    rlVertex3f(pt.x, -pt.z, pt.y);
-                }
+        for (int j = 1; j < vertCount - 1; j++) {
+            int idx[] = {v0, v0 + j, v0 + j + 1};
+            for (int k = 0; k < 3; k++) {
+                Vector3 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y, eyepolv[idx[k]].z};
+
+                // CORRECTED UV transformation
+                float u = ouvmat[1] * pt.x + ouvmat[4] * pt.y + ouvmat[7] * pt.z;
+                float v = ouvmat[2] * pt.x + ouvmat[5] * pt.y + ouvmat[8] * pt.z;
+
+                float final_u = u ;/// (65536.0f);
+                float final_v = v;// / (65536.0f);
+
+                rlColor4f(i*5, 1, 0.3f, 1);
+                rlTexCoord2f(final_u, final_v);
+                rlVertex3f(pt.x, -pt.z, pt.y);
             }
+        }
+        glDisable(GL_POLYGON_OFFSET_FILL);
             rlEnd();
-            EndShaderMode();
+       //     EndShaderMode();
             rlDrawRenderBatchActive();
-        } // eypol polys
-        return false;
-    }
+            return false;
+        }
+
     static void DrawPost3d(float sw, float sh, Camera3D camsrc) {
         // Vector2 v1 = {0, 0};
         // Vector2 v2 = {sw, sh};
@@ -438,7 +444,19 @@ public:
         ClearBackground({50,50,60,255});  // Set your desired color
 
         cam_t b2cam;
-      //  plr.ipos = {camsrc.position.x, camsrc.position.z, -camsrc.position.y};
+        plr.ipos = {camsrc.position.x, camsrc.position.z, -camsrc.position.y};
+        updatesect_imp(plr.ipos.x,plr.ipos.y,plr.ipos.z, &plr.cursect, map);
+
+        Vector3 forward = Vector3Normalize(Vector3Subtract(camsrc.target, camsrc.position));
+        Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camsrc.up));
+         Vector3 up = Vector3CrossProduct(right, forward); // Recalculate orthogonal up
+
+        // Convert to Build2 coordinate system (x->x, y->z, z->-y)
+        plr.ifor.x = forward.x;  plr.ifor.y = forward.z;  plr.ifor.z = -forward.y;
+        plr.irig.x = right.x;    plr.irig.y = right.z;    plr.irig.z = -right.y;
+        plr.idow.x = -up.x;       plr.idow.y = -up.z;       plr.idow.z = up.y;
+
+
         b2cam.p = plr.ipos;
         b2cam.f = plr.ifor;
         b2cam.r = plr.irig;
@@ -463,7 +481,6 @@ public:
                 int vertCount;
 
                 if (draw_eyepol_wspace(sw, sh, i, v0, vertCount)) continue;
-
 
                 if (drawlines)
                 {

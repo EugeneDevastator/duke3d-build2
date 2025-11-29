@@ -6,6 +6,7 @@
 #pragma once
 #include <math.h>
 #include <malloc.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -50,8 +51,18 @@ typedef struct {
 typedef struct { int w, s; } vertlist_t;
 typedef struct { float x, y, z, u, v; int n; } kgln_t;
 typedef struct { double x, y, z; long n, filler; } genpoly_t;
+typedef struct {
+	// calculate only diff between sprites. ideally forward facing along normal.
+	int entry_sprite;
+	int exit_sprite;
+	int entry_id;
+	int exit_id;
+	bool entryIsWall;
+	bool exitIsWall;
+} portal;
 
-
+extern int portaln;
+extern portal portals[100];
 
 
 static _inline void dcossin (double a, double *c, double *s)
