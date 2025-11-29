@@ -783,7 +783,7 @@ static void gentex_xform(float *f);
  */
 static void drawtagfunc_ws(int rethead0, int rethead1)
 {
-	float f, g, *fptr;
+	float f,fx,fy, g, *fptr;
 	int i, j, k, h, rethead[2];
 
 	if ((rethead0|rethead1) < 0) { mono_deloop(rethead1); mono_deloop(rethead0); return; }
@@ -803,12 +803,18 @@ static void drawtagfunc_ws(int rethead0, int rethead1)
 				eyepolvmal = max(eyepolvmal<<1,16384);
 				eyepolv = (point3d *)realloc(eyepolv,eyepolvmal*sizeof(point3d));
 			}
+			f = gcam.h.z/(/*mp[i].x*xformmat[6]*/ + mp[i].y*xformmat[7] + gnadd.z);
+			fx        =  (mp[i].x*xformmat[0] + mp[i].y*xformmat[1] + gnadd.x)*f + gcam.h.x;
+			fy        =  (mp[i].x*xformmat[3] + mp[i].y*xformmat[4] + gnadd.y)*f + gcam.h.y;
 
-			// WORLD SPACE COORDINATES - No projection, just transform back to world
-			// Convert from camera space back to world space
-			eyepolv[eyepolvn].x = mp[i].x*xformmat[0] + mp[i].y*xformmat[1] + gcam.p.x;
-			eyepolv[eyepolvn].y = mp[i].x*xformmat[3] + mp[i].y*xformmat[4] + gcam.p.y;
-			eyepolv[eyepolvn].z = mp[i].x*xformmat[2] + mp[i].y*xformmat[4] + gcam.p.z;
+#if (USEINTZ)
+			f = 1.0/((gouvmat[0]*fx + gouvmat[3]*fy + gouvmat[6])*1048576.0*256.0);
+#else
+			f = 1.0/((gouvmat[0]*fx + gouvmat[3]*fy + gouvmat[6])*gcam.h.z);
+#endif
+			eyepolv[eyepolvn].x = ((fx-gcam.h.x)*gcam.r.x + (fy-gcam.h.y)*gcam.d.x + (gcam.h.z)*gcam.f.x)*f + gcam.p.x;
+			eyepolv[eyepolvn].y = ((fx-gcam.h.x)*gcam.r.y + (fy-gcam.h.y)*gcam.d.y + (gcam.h.z)*gcam.f.y)*f + gcam.p.y;
+			eyepolv[eyepolvn].z = ((fx-gcam.h.x)*gcam.r.z + (fy-gcam.h.y)*gcam.d.z + (gcam.h.z)*gcam.f.z)*f + gcam.p.z;
 
 			eyepolvn++;
 
@@ -878,6 +884,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1)
 	eyepoln++;
 	eyepol[eyepoln].vert0 = eyepolvn;
 }
+
 /*
 	Purpose: Renders visible geometry polygons to screen
 	Converts 3D polygon vertices to 2D screen coordinates
