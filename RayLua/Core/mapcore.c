@@ -7,6 +7,7 @@
 #define OOS_CHECK 1
 
 int portaln=0;
+portal portals[100] ={};
 long gnumtiles, gmaltiles, gtilehashead[1024];
 char curmappath[MAX_PATH+1]="";
 long get_gnumtiles(void) { return gnumtiles; }

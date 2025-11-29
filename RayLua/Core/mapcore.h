@@ -44,7 +44,10 @@ typedef struct { intptr_t f; int p, x, y; } tiletype;
 typedef struct {
 	// color, zbuf
 	tiltyp c, z;
-	point3d p, r, d, f, h; } cam_t;
+	point3d p, r, d, f, h;
+	int cursect;
+} cam_t;
+
 
 #endif
 
@@ -53,13 +56,22 @@ typedef struct { float x, y, z, u, v; int n; } kgln_t;
 typedef struct { double x, y, z; long n, filler; } genpoly_t;
 typedef struct {
 	// calculate only diff between sprites. ideally forward facing along normal.
-	int entry_sprite;
-	int exit_sprite;
-	int entry_id;
-	int exit_id;
-	bool entryIsWall;
-	bool exitIsWall;
+	int entry_sprite; // sprite in sector that defines portal transform - use position and forward vector for now.
+	int entry_surfid;
+	int entry_sect;
+	bool iswall;
+	int target_portal;
 } portal;
+typedef struct {
+	point3d position_offset;
+	point3d rotation_axis;
+	float rotation_angle;
+	float transform_matrix[16];  // 4x4 transformation matrix
+	bool is_active;
+	int entry_sprite_id;
+	int target_sprite_id;
+} portal_transform_t;
+
 
 extern int portaln;
 extern portal portals[100];

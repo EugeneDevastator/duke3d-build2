@@ -2,6 +2,7 @@
 #define SHADOWTEST2_H
 
 #include "scenerender.h"
+#include "monoclip.h"
 
 // ================================================================================================
 // CONSTANTS AND CONFIGURATION
@@ -47,32 +48,6 @@ typedef struct {
     int ligpolvn, ligpolvmal;           // Count and allocated size of ligpolv array
 } lightpos_t;
 
-// ================================================================================================
-// POLYGONAL SCENE CLIPPING DATA STRUCTURES
-// ================================================================================================
-
-/** Wall segment bunch for front-to-back sorting */
-typedef struct {
-    int sec, wal0, wal1;                // Sector index and wall range
-    double fra0, fra1;                  // Parametric fractions for wall clipping
-} bunch_t;
-
-/** Bunch intersection data for polygon splitting */
-typedef struct {
-    int bun, sid;                       // Bunch index and intersection side (1:/, 2:\)
-    int wal;                            // Wall index on sector
-    double fra;                         // Intersection point ratio [0.0..1.0]
-} bfint_t;
-
-/** Temporary vertex structure for bunch processing
-* 	//for twal, it is always safe to allocate sector's number of walls + 1 indices
-typedef struct { int i; double x, y; } bunchverts_t; //temp structure holding verts of bunch - easier to work with
-
- */
-typedef struct {
-    int i;                              // Original wall index
-    double x, y;                        // Clipped coordinates
-} bunchverts_t;
 
 // ================================================================================================
 // SOFTWARE RENDERING DATA STRUCTURES
@@ -118,7 +93,7 @@ extern int eyepolmal, eyepolvn, eyepolvmal;
 /** Main sector scanning with near-plane clipping
  * @param sectnum Sector index to scan and add to bunch list
  */
-void scansector(int sectnum);
+void scansector(int sectnum, bunchgrp *b);
 
 /** Polygon front-to-back sorting and intersection testing
  * @param b0 First bunch index for comparison
@@ -126,7 +101,7 @@ void scansector(int sectnum);
  * @param fixsplitnow Whether to generate split data for intersections
  * @return 0=no overlap, 1=b0 front, 2=b1 front, 3=unsortable
  */
-int bunchfront(int b0, int b1, int fixsplitnow);
+int bunchfront(int b0, int b1, int fixsplitnow, bunchgrp *b);
 
 /** Prepares wall segments for bunch processing
  * @param b Bunch index to process
@@ -142,7 +117,7 @@ int prepbunch(int b, bunchverts_t *twal);
  * @param plothead1 Second polygon loop head
  * @param flags Clipping flags: &1=do and, &2=do sub, &4=reverse cut for sub
  */
-void drawpol_befclip(int tag, int newtag, int plothead0, int plothead1, int flags);
+void drawpol_befclip(int tag, int newtag, int plothead0, int plothead1, int flags,bunchgrp *b);
 
 /** Main HSR (Hidden Surface Removal) function handling both clipping and rendering
  * @param cc Camera parameters
@@ -150,7 +125,8 @@ void drawpol_befclip(int tag, int newtag, int plothead0, int plothead1, int flag
  * @param lps Player state with rendering settings
  * @param cursect Current sector index
  */
-void draw_hsr_polymost(cam_t *cc, mapstate_t *lgs, player_transform *lps, int cursect);
+void reset_context();
+void draw_hsr_polymost(cam_t *cc, mapstate_t *lgs);
 
 // ================================================================================================
 // POLYGONAL SHADOW CREATION FUNCTIONS
@@ -220,12 +196,12 @@ void skytagfunc(int rethead0, int rethead1);
  * @param rethead0 First polygon loop head
  * @param rethead1 Second polygon loop head
  */
-void changetagfunc(int rethead0, int rethead1);
+void changetagfunc(int rethead0, int rethead1, bunchgrp* b);
 
 /** Processes wall segments, handles both clipping and rendering setup
- * @param b Bunch index to process
+ * @param bid Bunch index to process
  */
-void drawalls(int b, mapstate_t* map);
+void drawalls(int bid, mapstate_t* map, bunchgrp *b);
 
 /** Renders sprites with lighting if available */
 void drawsprites();

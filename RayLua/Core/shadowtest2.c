@@ -109,13 +109,11 @@ unsigned int *shadowtest2_sectgot = 0; //WARNING:code uses x86-32 bit shift tric
 static unsigned int *sectgotmal = 0, *shadowtest2_sectgotmal = 0;
 static int sectgotn = 0, shadowtest2_sectgotn = 0;
 
-static bunch_t *bunch = 0;
-static unsigned int *bunchgot = 0;
-static unsigned char *bunchgrid = 0;
-static int bunchn, bunchmal = 0;
-
-	//Translation & rotation
-static mapstate_t *gst;
+#define MAX_PORTAL_DEPTH 10
+static cam_t camstack[MAX_PORTAL_DEPTH +1];
+static int camcursor = -1;
+//Translation & rotation
+static mapstate_t *curMap;
 static player_transform *gps;
 static cam_t gcam;
 static point3d gnadd;
@@ -195,36 +193,36 @@ int argb_interp(int c0, int c1, int mul15) {
 				}
 }
 
-static int prepbunch (int b, bunchverts_t *twal)
+static int prepbunch (int id, bunchverts_t *twal, bunchgrp *b)
 {
 	wall_t *wal;
 	double f, x, y, x0, y0, x1, y1;
 	int i, n;
 
-	wal = gst->sect[bunch[b].sec].wall;
-	i = bunch[b].wal0; twal[0].i = i;
+	wal = curMap->sect[b->bunch[id].sec].wall;
+	i = b->bunch[id].wal0; twal[0].i = i;
 	x0 = wal[i].x; y0 = wal[i].y; i += wal[i].n;
-	x1 = wal[i].x; y1 = wal[i].y; f = bunch[b].fra0;
+	x1 = wal[i].x; y1 = wal[i].y; f = b->bunch[id].fra0;
 	twal[0].x = (x1-x0)*f + x0;
 	twal[0].y = (y1-y0)*f + y0;
-	if ((bunch[b].wal0 == bunch[b].wal1) && (bunch[b].fra0 < bunch[b].fra1))
+	if ((b->bunch[id].wal0 == b->bunch[id].wal1) && (b->bunch[id].fra0 < b->bunch[id].fra1))
 	{     //Hack for left side clip
-		f = bunch[b].fra1;
+		f = b->bunch[id].fra1;
 		twal[1].x = (x1-x0)*f + x0;
 		twal[1].y = (y1-y0)*f + y0;
 		return(1);
 	}
 	twal[1].x = x1;
 	twal[1].y = y1; n = 1;
-	while (i != bunch[b].wal1)
+	while (i != b->bunch[id].wal1)
 	{
 		twal[n].i = i; n++; i += wal[i].n;
 		twal[n].x = wal[i].x;
 		twal[n].y = wal[i].y;
 	}
-	if (bunch[b].fra1 > 0.0)
+	if (b->bunch[id].fra1 > 0.0)
 	{
-		x = wal[i].x; y = wal[i].y; f = bunch[b].fra1;
+		x = wal[i].x; y = wal[i].y; f = b->bunch[id].fra1;
 		twal[n].i = i; n++; i += wal[i].n;
 		twal[n].x = (wal[i].x-x)*f + x;
 		twal[n].y = (wal[i].y-y)*f + y;
@@ -237,9 +235,8 @@ static int prepbunch (int b, bunchverts_t *twal)
 	//   sid: which way bunch intersects 1:/, 2:backslash
 	//   wal: wall index on b0's sector {0..sec[s1].n-1}
 	//   fra: intersection point ratio (wal to wal_next) {0.0..1.0}
-#define BFINTMAX 256
-static bfint_t bfint[BFINTMAX];
-static int bfintn, bfintlut[BFINTMAX+1];
+
+
 
 	//See BUNCHFRONT2.KC for derivation.
 	//Returns:
@@ -247,7 +244,7 @@ static int bfintn, bfintlut[BFINTMAX+1];
 	//   1: FRONT:RED(b0)
 	//   2: FRONT:GREEN(b1)
 	//   3: UNSORTABLE!
-static int bunchfront (int b0, int b1, int fixsplitnow)
+static int bunchfront (int b0, int b1, int fixsplitnow, bunchgrp *b)
 {
 	bunchverts_t *twal[2];
 	wall_t *wal;
@@ -261,7 +258,7 @@ static int bunchfront (int b0, int b1, int fixsplitnow)
 #if 0 //This doen't work if 'B' of {A<B<C} is hidden from view :/
 	sect_t *sec;
 	int s0, s1, w, ns, nw;
-	sec = gst->sect;
+	sec = curMap->sect;
 	s0 = bunch[b0].sec;
 	s1 = bunch[b1].sec;
 	if (s0 != s1)
@@ -270,7 +267,7 @@ static int bunchfront (int b0, int b1, int fixsplitnow)
 		{
 			ns = sec[s0].wall[w].ns;
 			nw = sec[s0].wall[w].nw;
-			while (((unsigned)ns < (unsigned)gst->numsects) && (ns != s0))
+			while (((unsigned)ns < (unsigned)curMap->numsects) && (ns != s0))
 			{
 				if (ns == s1) goto good; //s0 and s1 are neighbors
 				i = ns;
@@ -292,9 +289,9 @@ good:;
 	//   ExitProcess(0);
 	//}
 
-	twal[0] = (bunchverts_t *)_alloca((gst->sect[bunch[b0].sec].n+gst->sect[bunch[b1].sec].n+2)*sizeof(bunchverts_t));
-	twaln[0] = prepbunch(b0,twal[0]); twal[1] = &twal[0][twaln[0]+1];
-	twaln[1] = prepbunch(b1,twal[1]);
+	twal[0] = (bunchverts_t *)_alloca((curMap->sect[b->bunch[b0].sec].n+curMap->sect[b->bunch[b1].sec].n+2)*sizeof(bunchverts_t));
+	twaln[0] = prepbunch(b0,twal[0],b); twal[1] = &twal[0][twaln[0]+1];
+	twaln[1] = prepbunch(b1,twal[1],b);
 
 		//Offset vertices (BUNCHNEAR of scansector() already puts them safely in front)
 	for(j=2-1;j>=0;j--) for(i=twaln[j];i>=0;i--) { twal[j][i].x -= gcam.p.x; twal[j][i].y -= gcam.p.y; }
@@ -339,7 +336,7 @@ good:;
 #else
 		//Calculate the areas between the 2 bunches (superset of above algo - can determine if unsortable)
 	ind[0] = 0; ind[1] = 0; cnt = 0; otx0 = 0; oty0 = 0; otx1 = 0; oty1 = 0;
-	j = 0; gotsid = 0; startsid = -1; obfintn = bfintn;
+	j = 0; gotsid = 0; startsid = -1; obfintn = b->bfintn;
 	while (1)
 	{
 		sid = (twal[0][ind[0]].x*twal[1][ind[1]].y < twal[0][ind[0]].y*twal[1][ind[1]].x);
@@ -372,10 +369,10 @@ good:;
 				else
 				{
 						//NOTE:must use original wall vertices to get correct value of t!
-					wal = gst->sect[bunch[b0].sec].wall; i = twal[0][ind[0]-1].i;
+					wal = curMap->sect[b->bunch[b0].sec].wall; i = twal[0][ind[0]-1].i;
 					x0 = wal[i].x-gcam.p.x; y0 = wal[i].y-gcam.p.y; i += wal[i].n;
 					x1 = wal[i].x-gcam.p.x; y1 = wal[i].y-gcam.p.y;
-					wal = gst->sect[bunch[b1].sec].wall; i = twal[1][ind[1]-1].i;
+					wal = curMap->sect[b->bunch[b1].sec].wall; i = twal[1][ind[1]-1].i;
 					x2 = wal[i].x-gcam.p.x; y2 = wal[i].y-gcam.p.y; i += wal[i].n;
 					x3 = wal[i].x-gcam.p.x; y3 = wal[i].y-gcam.p.y;
 
@@ -390,13 +387,13 @@ good:;
 					d0 = (oty0-oty1)*tix + (otx1-otx0)*tiy; a[oj] += d0;
 					d1 = ( ty1- ty0)*tix + ( tx0- tx1)*tiy; a[ j] += d1;
 
-					if ((fixsplitnow) && (bfintn < BFINTMAX))
+					if ((fixsplitnow) && (b->bfintn < BFINTMAX))
 					{
-						bfint[bfintn].bun = b1;
-						bfint[bfintn].sid = startsid+1; startsid ^= 1;
-						bfint[bfintn].wal = twal[0][ind[0]-1].i;
-						bfint[bfintn].fra = t;
-						bfintn++;
+						b->bfint[b->bfintn].bun = b1;
+						b->bfint[b->bfintn].sid = startsid+1; startsid ^= 1;
+						b->bfint[b->bfintn].wal = twal[0][ind[0]-1].i;
+						b->bfint[b->bfintn].fra = t;
+						b->bfintn++;
 					}
 				}
 			}
@@ -413,7 +410,7 @@ overflow:otx0 = tx0; oty0 = ty0; otx1 = tx1; oty1 = ty1;
 #endif
 }
 
-static void scansector (int sectnum)
+static void scansector (int sectnum, bunchgrp* b)
 {
 	#define BUNCHNEAR 1e-7
 	sect_t *sec;
@@ -425,9 +422,9 @@ static void scansector (int sectnum)
 	if (sectnum < 0) return;
 	sectgot[sectnum>>5] |= (1<<sectnum);
 
-	sec = &gst->sect[sectnum]; wal = sec->wall;
+	sec = &curMap->sect[sectnum]; wal = sec->wall;
 
-	obunchn = bunchn; realobunchn = bunchn;
+	obunchn = b->bunchn; realobunchn = b->bunchn;
 	for(i=0,ie=sec->n;i<ie;i++)
 	{
 		j = wal[i].n+i;
@@ -442,41 +439,41 @@ static void scansector (int sectnum)
 		else if (f1 <= BUNCHNEAR) { f1 = (BUNCHNEAR-f0)/(f1-f0); f0 = 0.0; if (f0 >= f1) goto docont; }
 		else                      { f0 = 0.0;                    f1 = 1.0; }
 
-		k = bunch[bunchn-1].wal1;
-		if ((bunchn > obunchn) && (wal[k].n+k == i) && (bunch[bunchn-1].fra1 == 1.0))
+		k = b->bunch[b->bunchn-1].wal1;
+		if ((b->bunchn > obunchn) && (wal[k].n+k == i) && (b->bunch[b->bunchn-1].fra1 == 1.0))
 		{
-			bunch[bunchn-1].wal1 = i; //continue from previous wall (typical case)
-			bunch[bunchn-1].fra1 = f1;
-			if ((bunchn-1 > obunchn) && (bunch[obunchn].wal0 == j) && (bunch[obunchn].fra0 == 0.0))
+			b->bunch[b->bunchn-1].wal1 = i; //continue from previous wall (typical case)
+			b->bunch[b->bunchn-1].fra1 = f1;
+			if ((b->bunchn-1 > obunchn) && (b->bunch[obunchn].wal0 == j) && (b->bunch[obunchn].fra0 == 0.0))
 			{
-				bunchn--; //attach to left side of 1st bunch on loop
-				bunch[obunchn].wal0 = bunch[bunchn].wal0;
-				bunch[obunchn].fra0 = bunch[bunchn].fra0;
+				b->bunchn--; //attach to left side of 1st bunch on loop
+				b->bunch[obunchn].wal0 = b->bunch[b->bunchn].wal0;
+				b->bunch[obunchn].fra0 = b->bunch[b->bunchn].fra0;
 			}
 		}
-		else if ((bunchn > obunchn) && (bunch[obunchn].wal0 == j) && (bunch[obunchn].fra0 == 0.0))
+		else if ((b->bunchn > obunchn) && (b->bunch[obunchn].wal0 == j) && (b->bunch[obunchn].fra0 == 0.0))
 		{
-			bunch[obunchn].wal0 = i; //update left side of 1st bunch on loop
-			bunch[obunchn].fra0 = f0;
+			b->bunch[obunchn].wal0 = i; //update left side of 1st bunch on loop
+			b->bunch[obunchn].fra0 = f0;
 		}
 		else
 		{
-			if (bunchn >= bunchmal)
+			if (b->bunchn >= b->bunchmal)
 			{
-				bunchmal <<= 1;
-				bunch     = (bunch_t       *)realloc(bunch    ,bunchmal*sizeof(bunch[0]));
-				bunchgot  = (unsigned int  *)realloc(bunchgot ,((bunchmal+31)&~31)>>3);
-				bunchgrid = (unsigned char *)realloc(bunchgrid,((bunchmal-1)*bunchmal)>>1);
+				b->bunchmal <<= 1;
+				b->bunch     = (bunch_t       *)realloc(b->bunch    ,b->bunchmal*sizeof(b->bunch[0]));
+				b->bunchgot  = (unsigned int  *)realloc(b->bunchgot ,((b->bunchmal+31)&~31)>>3);
+				b->bunchgrid = (unsigned char *)realloc(b->bunchgrid,((b->bunchmal-1)*b->bunchmal)>>1);
 			}
-			bunch[bunchn].wal0 = i; bunch[bunchn].fra0 = f0; //start new bunch
-			bunch[bunchn].wal1 = i; bunch[bunchn].fra1 = f1;
-			bunch[bunchn].sec = sectnum; bunchn++;
+			b->bunch[b->bunchn].wal0 = i; b->bunch[b->bunchn].fra0 = f0; //start new b->bunch
+			b->bunch[b->bunchn].wal1 = i; b->bunch[b->bunchn].fra1 = f1;
+			b->bunch[b->bunchn].sec = sectnum; b->bunchn++;
 		}
 docont:;
-		if (j < i) obunchn = bunchn;
+		if (j < i) obunchn = b->bunchn;
 	}
 
-	for(obunchn=realobunchn;obunchn<bunchn;obunchn++)
+	for(obunchn=realobunchn;obunchn<b->bunchn;obunchn++)
 	{
 			//insert bunch
 			//  0 1 2 3 4
@@ -487,42 +484,42 @@ docont:;
 			//4 x x x x
 			//5 ? ? ? ? ?
 			//0,1,3,6,10,15,21,28,36,45,55,..
-		j = (((obunchn-1)*obunchn)>>1); bfintn = 0;
-		for(i=0;i<obunchn;i++) bunchgrid[j+i] = bunchfront(obunchn,i,1);
+		j = (((obunchn-1)*obunchn)>>1); b->bfintn = 0;
+		for(i=0;i<obunchn;i++) b->bunchgrid[j+i] = bunchfront(obunchn,i,1,b);
 
-		if (!bfintn) continue;
+		if (!b->bfintn) continue;
 
 			//sort bfint's
-		for(j=1;j<bfintn;j++)
+		for(j=1;j<b->bfintn;j++)
 			for(i=0;i<j;i++)
 			{
 					//              bfint[i].wal vs. bfint[j].wal ?
 					//0    bunch[obunchn].wal0........bunch[obunchn].wal1       sec->n
 					//0....bunch[obunchn].wal1        bunch[obunchn].wal0.......sec->n
-				m = bfint[i].wal; o = bfint[j].wal;
-				if (bunch[obunchn].wal0 > bunch[obunchn].wal1) //handle wall index wrap-around
+				m = b->bfint[i].wal; o = b->bfint[j].wal;
+				if (b->bunch[obunchn].wal0 > b->bunch[obunchn].wal1) //handle wall index wrap-around
 				{
-					if (m <= bunch[obunchn].wal1) m += sec->n;
-					if (o <= bunch[obunchn].wal1) o += sec->n;
+					if (m <= b->bunch[obunchn].wal1) m += sec->n;
+					if (o <= b->bunch[obunchn].wal1) o += sec->n;
 				}
 				if (m < o) continue;
-				if ((bfint[i].wal == bfint[j].wal) && (bfint[i].fra <= bfint[j].fra)) continue;
+				if ((b->bfint[i].wal == b->bfint[j].wal) && (b->bfint[i].fra <= b->bfint[j].fra)) continue;
 
-				tbf = bfint[i]; bfint[i] = bfint[j]; bfint[j] = tbf;
+				tbf = b->bfint[i]; b->bfint[i] = b->bfint[j]; b->bfint[j] = tbf;
 			}
 
 			//combine null or tiny bunches
-		obfintn = bfintn; bfintlut[0] = 0; bfintn = 1;
+		obfintn = b->bfintn; b->bfintlut[0] = 0; b->bfintn = 1;
 		for(i=1;i<obfintn;i++)
-			if ((bfint[i-1].wal != bfint[i].wal) || (bfint[i].fra-bfint[i-1].fra >= 2e-7))
-				{ bfintlut[bfintn] = i; bfintn++; }
-		bfintlut[bfintn] = obfintn;
+			if ((b->bfint[i-1].wal != b->bfint[i].wal) || (b->bfint[i].fra-b->bfint[i-1].fra >= 2e-7))
+				{ b->bfintlut[b->bfintn] = i; b->bfintn++; }
+		b->bfintlut[b->bfintn] = obfintn;
 
 #if 0
 		if (sectnum == 0)
 		{
 			char tbuf[2048];
-			sprintf(tbuf,"bef (bunchn=%d obunchn=%d bfintn=%d)\n",bunchn,obunchn,bfintn);
+			sprintf(tbuf,"bef (bunchn=%d obunchn=%d b->bfintn=%d)\n",bunchn,obunchn,b->bfintn);
 			for(m=0;m<bunchn;m++)
 			{
 				sprintf(&tbuf[strlen(tbuf)],"%d (%2d: %2d %15.12f %2d %15.12f) : ",m,bunch[m].sec,bunch[m].wal0,bunch[m].fra0,bunch[m].wal1,bunch[m].fra1);
@@ -533,24 +530,24 @@ docont:;
 		}
 #endif
 
-			//obunchn gets its ass split 'bfintn' times into a total of 'bfintn+1' pieces
-		if (bunchn+bfintn > bunchmal)
+			//obunchn gets its ass split 'b->bfintn' times into a total of 'b->bfintn+1' pieces
+		if (b->bunchn+b->bfintn > b->bunchmal)
 		{
-			bunchmal = max(bunchmal<<1,bunchn+bfintn);
-			bunch     = (bunch_t       *)realloc(bunch    ,bunchmal*sizeof(bunch[0]));
-			bunchgot  = (unsigned int  *)realloc(bunchgot ,((bunchmal+31)&~31)>>3);
-			bunchgrid = (unsigned char *)realloc(bunchgrid,((bunchmal-1)*bunchmal)>>1);
+			b->bunchmal = max(b->bunchmal<<1,b->bunchn+b->bfintn);
+			b->bunch     = (bunch_t       *)realloc(b->bunch    ,b->bunchmal*sizeof(b->bunch[0]));
+			b->bunchgot  = (unsigned int  *)realloc(b->bunchgot ,((b->bunchmal+31)&~31)>>3);
+			b->bunchgrid = (unsigned char *)realloc(b->bunchgrid,((b->bunchmal-1)*b->bunchmal)>>1);
 		}
 
 			//Shove not-yet-processed neighbors to end of list. WARNING:be careful with indices/for loop order!
-		for(k=0;k<bfintn;k++) bunch[bunchn+bfintn-1-k] = bunch[obunchn+k+1];
-		for(k=bfintn-1;k>=0;k--) bunch[obunchn+k+1] = bunch[obunchn];
-		for(k=bfintn-1;k>=0;k--)
+		for(k=0;k<b->bfintn;k++) b->bunch[b->bunchn+b->bfintn-1-k] = b->bunch[obunchn+k+1];
+		for(k=b->bfintn-1;k>=0;k--) b->bunch[obunchn+k+1] = b->bunch[obunchn];
+		for(k=b->bfintn-1;k>=0;k--)
 		{
-			bunch[obunchn+k  ].wal1 = bfint[bfintlut[k  ]  ].wal; bunch[obunchn+k  ].fra1 = max(bfint[bfintlut[k  ]  ].fra-1e-7,0.0);
-			bunch[obunchn+k+1].wal0 = bfint[bfintlut[k+1]-1].wal; bunch[obunchn+k+1].fra0 = min(bfint[bfintlut[k+1]-1].fra+1e-7,1.0);
+			b->bunch[obunchn+k  ].wal1 = b->bfint[b->bfintlut[k  ]  ].wal; b->bunch[obunchn+k  ].fra1 = max(b->bfint[b->bfintlut[k  ]  ].fra-1e-7,0.0);
+			b->bunch[obunchn+k+1].wal0 = b->bfint[b->bfintlut[k+1]-1].wal; b->bunch[obunchn+k+1].fra0 = min(b->bfint[b->bfintlut[k+1]-1].fra+1e-7,1.0);
 		}
-		bunchn += bfintn;
+		b->bunchn += b->bfintn;
 
 			//  0 1 2 3 4 5 6
 			//0
@@ -561,17 +558,17 @@ docont:;
 			//5 ? ? ? - ?
 			//6 ? ? ? - ? 0
 			//7 ? ? ? - ? 0 0
-		for(m=obunchn;m<obunchn+bfintn+1;m++) //re-front all 'bfintn+1' pieces, using hints from bfint list
+		for(m=obunchn;m<obunchn+b->bfintn+1;m++) //re-front all 'b->bfintn+1' pieces, using hints from bfint list
 		{
 			j = (((m-1)*m)>>1);
 			for(k=0;k<obunchn;k++)
 			{
-				if (m > obunchn       ) for(o=bfintlut[m-obunchn-1];o<bfintlut[m-obunchn  ];o++) if (bfint[o].bun == k) { bunchgrid[j+k] = bfint[o].sid  ; goto bunchgrid_got; }
-				if (m < obunchn+bfintn) for(o=bfintlut[m-obunchn  ];o<bfintlut[m-obunchn+1];o++) if (bfint[o].bun == k) { bunchgrid[j+k] = bfint[o].sid^3; goto bunchgrid_got; }
-				bunchgrid[j+k] = bunchfront(m,k,0);
+				if (m > obunchn       ) for(o=b->bfintlut[m-obunchn-1];o<b->bfintlut[m-obunchn  ];o++) if (b->bfint[o].bun == k) { b->bunchgrid[j+k] = b->bfint[o].sid  ; goto bunchgrid_got; }
+				if (m < obunchn+b->bfintn) for(o=b->bfintlut[m-obunchn  ];o<b->bfintlut[m-obunchn+1];o++) if (b->bfint[o].bun == k) { b->bunchgrid[j+k] = b->bfint[o].sid^3; goto bunchgrid_got; }
+				b->bunchgrid[j+k] = bunchfront(m,k,0,b);
 bunchgrid_got:;
 			}
-			for(;k<m;k++) bunchgrid[j+k] = 0;
+			for(;k<m;k++) b->bunchgrid[j+k] = 0;
 		}
 
 #if 0
@@ -589,18 +586,18 @@ bunchgrid_got:;
 		}
 #endif
 
-		obunchn += bfintn;
+		obunchn += b->bfintn;
 	}
 
 		//remove null bunches (necessary for proper operation)
-	for(m=bunchn-1;m>=realobunchn;m--)
+	for(m=b->bunchn-1;m>=realobunchn;m--)
 	{
-		if (bunch[m].wal0 != bunch[m].wal1) continue;
-		if (bunch[m].fra0 < bunch[m].fra1) continue;
-		bunchn--; bunch[m] = bunch[bunchn];
-		j = (((bunchn-1)*bunchn)>>1);
-		memcpy(&bunchgrid[((m-1)*m)>>1],&bunchgrid[j],m*sizeof(bunchgrid[0]));
-		for(i=m+1;i<bunchn;i++) bunchgrid[(((i-1)*i)>>1)+m] = ((bunchgrid[j+i]&1)<<1) + (bunchgrid[j+i]>>1);
+		if (b->bunch[m].wal0 != b->bunch[m].wal1) continue;
+		if (b->bunch[m].fra0 < b->bunch[m].fra1) continue;
+		b->bunchn--; b->bunch[m] = b->bunch[b->bunchn];
+		j = (((b->bunchn-1)*b->bunchn)>>1);
+		memcpy(&b->bunchgrid[((m-1)*m)>>1],&b->bunchgrid[j],m*sizeof(b->bunchgrid[0]));
+		for(i=m+1;i<b->bunchn;i++) b->bunchgrid[(((i-1)*i)>>1)+m] = ((b->bunchgrid[j+i]&1)<<1) + (b->bunchgrid[j+i]>>1);
 	}
 
 }
@@ -885,131 +882,6 @@ static void drawtagfunc_ws(int rethead0, int rethead1)
 	eyepol[eyepoln].vert0 = eyepolvn;
 }
 
-
-
-/*
-	Purpose: Renders visible geometry polygons to screen
-	Converts 3D polygon vertices to 2D screen coordinates
-	Handles texture mapping setup (UV coordinates, skybox mapping)
-	Stores polygons in eyepol[] array for later rendering
-	Manages different rendering modes (walls, skybox, parallax sky)
- */
-static void drawtagfunc (int rethead0, int rethead1)
-{
-	float f, g, *fptr;
-	int i, j, k, h, rethead[2];
-
-	if ((rethead0|rethead1) < 0) { mono_deloop(rethead1); mono_deloop(rethead0); return; }
-	rethead[0] = rethead0; rethead[1] = rethead1;
-
-#if 0
-	//Old code to draw polygon immediately:
-	for (i = 2 - 1; i >= 0; i--) {
-		k = rethead[i];
-		do {
-			print6x8(&gcam.c, mp[k].x - 3, mp[k].y - 5, 0xffffff, -1, "x");
-			k = mp[k].n;
-		} while (k != rethead[i]);
-	}
-	drawpol_aftclip(rethead0, rethead1); for (i = 2 - 1; i >= 0; i--) mono_deloop(rethead[i]); return;
-#endif
-
-	// Put on FIFO:
-	for(h=0;h<2;h++)
-	{
-		i = rethead[h];
-		do
-		{
-			if (h)
-				i = mp[i].p;
-
-			if (eyepolvn >= eyepolvmal)
-			{
-				eyepolvmal = max(eyepolvmal<<1,16384);
-				eyepolv = (point3d *)realloc(eyepolv,eyepolvmal*sizeof(point3d));
-			}
-
-			// ORIGINAL CODE - REMOVE CLIPPING:
-			/*
-			f = gcam.h.z/(mp[i].x*xformmat[6] + mp[i].y*xformmat[7] + gnadd.z);
-			eyepolv[eyepolvn].x = (mp[i].x*xformmat[0] + mp[i].y*xformmat[1] + gnadd.x)*f + gcam.h.x;
-			eyepolv[eyepolvn].y = (mp[i].x*xformmat[3] + mp[i].y*xformmat[4] + gnadd.y)*f + gcam.h.y;
-			*/
-
-			// NEW CODE - No screen edge clamping:
-			f = gcam.h.z/(mp[i].x*xformmat[6] + mp[i].y*xformmat[7] + gnadd.z);
-			eyepolv[eyepolvn].x = (mp[i].x*xformmat[0] + mp[i].y*xformmat[1] + gnadd.x)*f + gcam.h.x;
-			eyepolv[eyepolvn].y = (mp[i].x*xformmat[3] + mp[i].y*xformmat[4] + gnadd.y)*f + gcam.h.y;
-
-			eyepolvn++;
-
-			if (!h) i = mp[i].n;
-		} while (i != rethead[h]);
-		mono_deloop(rethead[h]);
-	}
-
-
-	if (eyepoln+1 >= eyepolmal)
-	{
-		eyepolmal = max(eyepolmal<<1,4096); //den_01.map room of death uses ~ 3100 max
-		eyepol = (eyepol_t *)realloc(eyepol,eyepolmal*sizeof(eyepol_t));
-		eyepol[0].vert0 = 0;
-	}
-
-	if (gflags < 2)
-		memcpy((void *)eyepol[eyepoln].ouvmat,(void *)gouvmat,sizeof(gouvmat[0])*9);
-	else
-	{
-		//f = (((float)gtpic->tt.x)+1.15f)/((float)gtpic->tt.x); fptr = eyepol[eyepoln].ouvmat;
-		f = (((float)64)+1.15f)/((float)64); fptr = eyepol[eyepoln].ouvmat;
-		switch(gflags)
-		{
-			case 14: fptr[0] = +f                 ; fptr[3] = f*+2.f; fptr[6] =     0.f; //Front
-						fptr[1] = -1.f               ; fptr[4] =    0.f; fptr[7] =     0.f;
-						fptr[2] = (f*- 5.f - 1.f)/6.f; fptr[5] =    0.f; fptr[8] = f*+12.f;
-						break;
-			case 13: fptr[0] = +1.f               ; fptr[3] =    0.f; fptr[6] =     0.f; //Right
-						fptr[1] = -f                 ; fptr[4] = f*+2.f; fptr[7] =     0.f;
-						fptr[2] = (f*-17.f - 1.f)/6.f; fptr[5] =    0.f; fptr[8] = f*+12.f;
-						break;
-			case 15: fptr[0] = -f                 ; fptr[3] = f*-2.f; fptr[6] =     0.f; //Back
-						fptr[1] = +1.f               ; fptr[4] =    0.f; fptr[7] =     0.f;
-						fptr[2] = (f*-29.f - 1.f)/6.f; fptr[5] =    0.f; fptr[8] = f*+12.f;
-						break;
-			case 12: fptr[0] = -1.f               ; fptr[3] =    0.f; fptr[6] =     0.f; //Left
-						fptr[1] = +f                 ; fptr[4] = f*-2.f; fptr[7] =     0.f;
-						fptr[2] = (f*-41.f - 1.f)/6.f; fptr[5] =    0.f; fptr[8] = f*+12.f;
-						break;
-			case 11: fptr[0] = +f                 ; fptr[3] = f*+2.f; fptr[6] =     0.f; //Top
-						fptr[1] = (f*-17.f - 1.f)/6.f; fptr[4] =    0.f; fptr[7] = f*-12.f;
-						fptr[2] = -1.f               ; fptr[5] =    0.f; fptr[8] =     0.f;
-						break;
-			case 10: fptr[0] = -f                 ; fptr[3] = f*+2.f; fptr[6] =     0.f; //Bottom
-						fptr[1] = (f*+ 5.f + 1.f)/6.f; fptr[4] =    0.f; fptr[7] = f*+12.f;
-						fptr[2] = +1.f               ; fptr[5] =    0.f; fptr[8] =     0.f;
-						break;
-		}
-		for(i=9-3;i>=0;i-=3)
-		{
-			float ox, oy, oz;
-			ox = fptr[i+0]*65536.f; oy = fptr[i+1]*65536.f; oz = fptr[i+2]*65536.f;
-			fptr[i+0] = ox*gcam.r.x + oy*gcam.r.y + oz*gcam.r.z;
-			fptr[i+1] = ox*gcam.d.x + oy*gcam.d.y + oz*gcam.d.z;
-			fptr[i+2] = ox*gcam.f.x + oy*gcam.f.y + oz*gcam.f.z;
-		}
-		gentex_xform(fptr);
-	}
-
-	eyepol[eyepoln].tpic = gtpic;
-	eyepol[eyepoln].curcol = gcurcol;
-	eyepol[eyepoln].flags = (gflags != 0);
-	eyepol[eyepoln].b2sect = gligsect;
-	eyepol[eyepoln].b2wall = gligwall;
-	eyepol[eyepoln].b2slab = gligslab;
-	memcpy((void *)&eyepol[eyepoln].norm,(void *)&gnorm,sizeof(gnorm));
-	eyepoln++;
-	eyepol[eyepoln].vert0 = eyepolvn;
-}
 /*
 	Purpose: Renders skybox faces as background
 	Generates 6 cube faces for skybox rendering
@@ -1018,7 +890,8 @@ static void drawtagfunc (int rethead0, int rethead1)
 	Calls drawtagfunc for each visible skybox face
 	Uses special texture mapping flags (gflags = 10-15 for different cube faces)
 */
-static void skytagfunc (int rethead0, int rethead1)
+
+static void skytagfunc (int rethead0, int rethead1, bunchgrp* b)
 {
 	#define SSCISDIST 0.000001 //Reduces probability of glitch further
 	dpoint3d otp[4], tp[8];
@@ -1075,7 +948,7 @@ static void skytagfunc (int rethead0, int rethead1)
 		mono_genfromloop(&plothead[0],&plothead[1],tp,n);
 
 		gflags = p+10;
-		mono_bool(rethead0,rethead1,plothead[0],plothead[1],MONO_BOOL_AND,drawtagfunc);
+		mono_bool(rethead0,rethead1,plothead[0],plothead[1],MONO_BOOL_AND,b, drawtagfunc_ws);
 		mono_deloop(plothead[1]); mono_deloop(plothead[0]);
 skiprest:;
 	}
@@ -1167,11 +1040,11 @@ static int gnewtag, gdoscansector;
 	Maintains mph[] (mono polygon hierarchy) for spatial partitioning
 	"tag" refers to sector IDs
 */
-static void changetagfunc (int rethead0, int rethead1)
+static void changetagfunc (int rethead0, int rethead1, bunchgrp* b)
 {
 	if ((rethead0|rethead1) < 0) return;
 
-	if ((gdoscansector) && (!(sectgot[gnewtag>>5]&(1<<gnewtag)))) scansector(gnewtag);
+	if ((gdoscansector) && (!(sectgot[gnewtag>>5]&(1<<gnewtag)))) scansector(gnewtag,b);
 
 	mph_check(mphnum);
 	mph[mphnum].head[0] = rethead0;
@@ -1183,7 +1056,7 @@ static void changetagfunc (int rethead0, int rethead1)
 	//flags&1: do and
 	//flags&2: do sub
 	//flags&4: reverse cut for sub
-static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, int flags)
+static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, int flags, bunchgrp* b)
 {
 	#define BSCISDIST 0.000001 //Reduces probability of glitch further
 	//#define BSCISDIST 0.0001 //Gaps undetectable
@@ -1323,7 +1196,16 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 		if (newtag >= 0)
 		{
 			gnewtag = newtag; gdoscansector = 1; omph0 = mphnum;
-			for(i=mphnum-1;i>=0;i--) if (mph[i].tag == tag) mono_bool(mph[i].head[0],mph[i].head[1],plothead[0],plothead[1],MONO_BOOL_AND,changetagfunc); //follow portal
+			for (i = mphnum - 1; i >= 0; i--)
+				if (mph[i].tag == tag)
+					mono_bool(
+						mph[i].head[0],
+						mph[i].head[1],
+						plothead[0],
+						plothead[1],
+						MONO_BOOL_AND,
+						b,
+						changetagfunc); //follow portal
 
 #ifdef STANDALONE
 			if (!keystatus[0x1d])
@@ -1349,7 +1231,7 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 				  if (shadowtest2_rendmode == 4) mono_output = ligpoltagfunc; //add to light list // this will process point lights. otherwize will only use plr light.
 			else if (gflags < 2)                mono_output =   drawtagfunc_ws; //draw wall
 			else                                mono_output =    skytagfunc; //calls drawtagfunc inside
-			for(i=mphnum-1;i>=0;i--) if (mph[i].tag == tag) mono_bool(mph[i].head[0],mph[i].head[1],plothead[0],plothead[1],MONO_BOOL_AND,mono_output);
+			for(i=mphnum-1;i>=0;i--) if (mph[i].tag == tag) mono_bool(mph[i].head[0],mph[i].head[1],plothead[0],plothead[1],MONO_BOOL_AND,b,mono_output);
 		}
 	}
 	if (flags&2)
@@ -1361,7 +1243,7 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 		for(i=mphnum-1;i>=0;i--)
 		{
 			if (mph[i].tag != tag) continue;
-			mono_bool(mph[i].head[0],mph[i].head[1],plothead[0],plothead[1],j,changetagfunc);
+			mono_bool(mph[i].head[0],mph[i].head[1],plothead[0],plothead[1],j,b,changetagfunc);
 			mono_deloop(mph[i].head[1]);
 			mono_deloop(mph[i].head[0]);
 
@@ -1582,7 +1464,7 @@ the final visible geometry ready for 2D projection.
 The b parameter is a bunch index - this function processes one "bunch" (visible sector group) at a time. The traversal logic is in the caller that:
 */
 
-static void drawalls (int b, mapstate_t* map)
+static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 {
 	// === VARIABLE DECLARATIONS ===
 	//extern void loadpic (tile_t *);
@@ -1602,26 +1484,26 @@ static void drawalls (int b, mapstate_t* map)
 	int ks[2], ke[2], col, n0, n1;
 
     // === SETUP SECTOR AND WALL DATA ===
-	s = bunch[b].sec;
-	sec = gst->sect;
+	s = b->bunch[bid].sec;
+	sec = curMap->sect;
 
 	wal = sec[s].wall;
 #if 0
-	i = bunch[b].wal0;
+	i = bunch[bid].wal0;
 	x0 = wal[i].x; y0 = wal[i].y; i += wal[i].n;
-	x1 = wal[i].x; y1 = wal[i].y; f = bunch[b].fra0;
+	x1 = wal[i].x; y1 = wal[i].y; f = bunch[bid].fra0;
 	twalx0 = (x1-x0)*f + x0;
 	twaly0 = (y1-y0)*f + y0;
 
-	i = bunch[b].wal1;
+	i = b->bunch[bid].wal1;
 	x0 = wal[i].x; y0 = wal[i].y; i += wal[i].n;
-	x1 = wal[i].x; y1 = wal[i].y; f = bunch[b].fra1;
+	x1 = wal[i].x; y1 = wal[i].y; f = bunch[bid].fra1;
 	twalx1 = (x1-x0)*f + x0;
 	twaly1 = (y1-y0)*f + y0;
 #endif
 
-	twal = (bunchverts_t *)_alloca((gst->sect[bunch[b].sec].n+1)*sizeof(bunchverts_t));
-	twaln = prepbunch(b,twal);
+	twal = (bunchverts_t *)_alloca((curMap->sect[b->bunch[bid].sec].n+1)*sizeof(bunchverts_t));
+	twaln = prepbunch(bid,twal,b);
 	gligsect = s; gligslab = 0;
 
 	// === BUNCH MANAGEMENT: DELETE CURRENT BUNCH FROM GRID ===
@@ -1634,10 +1516,10 @@ static void drawalls (int b, mapstate_t* map)
 	//3  3:x x .
 	//4  6:x x . x
 	//5 10:x x . x x
-	bunchn--; bunch[b] = bunch[bunchn];
-	j = (((bunchn-1)*bunchn)>>1);
-	memcpy(&bunchgrid[((b-1)*b)>>1],&bunchgrid[j],b*sizeof(bunchgrid[0]));
-	for(i=b+1;i<bunchn;i++) bunchgrid[(((i-1)*i)>>1)+b] = ((bunchgrid[j+i]&1)<<1) + (bunchgrid[j+i]>>1);
+	b->bunchn--; b->bunch[bid] = b->bunch[b->bunchn];
+	j = (((b->bunchn-1)*b->bunchn)>>1);
+	memcpy(&b->bunchgrid[((bid-1)*bid)>>1],&b->bunchgrid[j],bid*sizeof(b->bunchgrid[0]));
+	for(i=bid+1;i<b->bunchn;i++) b->bunchgrid[(((i-1)*i)>>1)+bid] = ((b->bunchgrid[j+i]&1)<<1) + (b->bunchgrid[j+i]>>1);
 
 	// === DRAW CEILINGS & FLOORS ===
 	for(isflor=0;isflor<2;isflor++)
@@ -1686,7 +1568,7 @@ static void drawalls (int b, mapstate_t* map)
 			gentex_ceilflor(&sec[s], wal, sur, isflor);
 		}
 		gligwall = isflor - 2;
-		drawpol_befclip(s,-1,plothead[0],plothead[1],(isflor<<2)+3);
+		drawpol_befclip(s,-1,plothead[0],plothead[1],(isflor<<2)+3,b);
 #ifdef STANDALONE
 		gcnt--; if (gcnt <= 0) return;
 #endif
@@ -1776,7 +1658,7 @@ static void drawalls (int b, mapstate_t* map)
 			} else ns = verts[m>>1].s; // Portal to adjacent sector
 
 			// Render the wall polygon
-			drawpol_befclip(s,ns,plothead[0],plothead[1],((m>vn)<<2)+3);
+			drawpol_befclip(s,ns,plothead[0],plothead[1],((m>vn)<<2)+3,b);
 		}
 	}
 }
@@ -1793,9 +1675,22 @@ static void drawalls (int b, mapstate_t* map)
 	Generates shadow polygon lists (ligpol[]) for each light
 	Creates visibility data for shadow casting
 */
+void reset_context() {
+	camcursor = -1;
+}
 
-void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, player_transform *lps, int cursect)
+void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs)
 {
+	if (camcursor>=MAX_PORTAL_DEPTH)
+		return;
+	camcursor ++;
+	bunchgrp b;
+	b.bunchgot=0;
+	b.bunchn=0;
+	b.bunchmal=0;
+	b.bunchgrid =0;
+
+
 	wall_t *wal;
 	spri_t *spr;
 	dpoint3d dpos, drig, ddow, dfor;
@@ -1809,9 +1704,11 @@ void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, player_transform *lps, int c
 		glp = &shadowtest2_light[glignum];
 	//	if ((!(glp->flags&1)) || (!shadowtest2_useshadows)) return;
 	}
-	gcam = (*cc); gst = lgs; gps = lps;
+	camstack[camcursor] = (*cc);
+	gcam = camstack[camcursor];
+	curMap = lgs;
 
-	if ((lgs->numsects <= 0) || ((unsigned)cursect >= (unsigned)lgs->numsects))
+	if ((lgs->numsects <= 0) || ((unsigned)gcam.cursect >= (unsigned)lgs->numsects))
 	{
 		if (shadowtest2_rendmode != 4)
 		{
@@ -1821,12 +1718,12 @@ void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, player_transform *lps, int c
 		if (shadowtest2_rendmode != 4) eyepoln = 0; //Prevents drawpollig() from crashing
 		return;
 	}
-	if (!bunchmal)
+	if (!b.bunchmal)
 	{
-		bunchmal = 64;
-		bunch     = (bunch_t       *)malloc(bunchmal*sizeof(bunch[0]));
-		bunchgot  = (unsigned int  *)malloc(((bunchmal+31)&~31)>>3);
-		bunchgrid = (unsigned char *)malloc(((bunchmal-1)*bunchmal)>>1);
+		b.bunchmal = 64;
+		b.bunch     = (bunch_t       *)malloc(b.bunchmal*sizeof(b.bunch[0]));
+		b.bunchgot  = (unsigned int  *)malloc(((b.bunchmal+31)&~31)>>3);
+		b.bunchgrid = (unsigned char *)malloc(((b.bunchmal-1)*b.bunchmal)>>1);
 	}
 	if (lgs->numsects > sectgotn)
 	{
@@ -1851,18 +1748,18 @@ void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, player_transform *lps, int c
 #endif
 
 		//Hack to keep camera away from sector line; avoids clipping glitch in drawpol_befclip/changetagfunc
-	wal = lgs->sect[cursect].wall;
-	for(i=lgs->sect[cursect].n-1;i>=0;i--)
-	{
-		#define WALHAK 1e-3
-		j = wal[i].n+i;
-		d = distpoint2line2(gcam.p.x,gcam.p.y,wal[i].x,wal[i].y,wal[j].x,wal[j].y); if (d >= WALHAK*WALHAK) continue;
-		fp.x = wal[j].x-wal[i].x;
-		fp.y = wal[j].y-wal[i].y;
-		f = (WALHAK - sqrt(d))/sqrt(fp.x*fp.x + fp.y*fp.y);
-		gcam.p.x -= fp.y*f;
-		gcam.p.y += fp.x*f;
-	}
+	wal = lgs->sect[camstack[camcursor].cursect].wall;
+	//for(i=lgs->sect[camstack[camcursor].cursect].n-1;i>=0;i--)
+	//{
+	//	#define WALHAK 1e-3
+	//	j = wal[i].n+i;
+	//	d = distpoint2line2(gcam.p.x,gcam.p.y,wal[i].x,wal[i].y,wal[j].x,wal[j].y); if (d >= WALHAK*WALHAK) continue;
+	//	fp.x = wal[j].x-wal[i].x;
+	//	fp.y = wal[j].y-wal[i].y;
+	//	f = (WALHAK - sqrt(d))/sqrt(fp.x*fp.x + fp.y*fp.y);
+	//	gcam.p.x -= fp.y*f;
+	//	gcam.p.y += fp.x*f;
+	//}
 
 	if (shadowtest2_rendmode != 4)
 	{
@@ -1905,14 +1802,6 @@ void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, player_transform *lps, int c
 		g_qamb[1] = shadowtest2_ambrgb[1]*f;
 		g_qamb[2] = shadowtest2_ambrgb[2]*f;
 		g_qamb[3] = 0.f;
-
-#ifdef STANDALONE
-		if (keystatus[0x4a]) { keystatus[0x4a] = 0; curgcnt = max(curgcnt-1,1); } //KP-
-		if (keystatus[0x4e]) { keystatus[0x4e] = 0; curgcnt++;                  } //KP+
-		if (keystatus[0xc7]) { keystatus[0x4a] = 0; curgcnt = 1;                } //Home
-		if (keystatus[0xcf]) { keystatus[0x4e] = 0; curgcnt = 0x7fffffff;       } //End
-#endif
-
 		eyepoln = 0; eyepolvn = 0;
 	}
 	else
@@ -1998,24 +1887,19 @@ void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, player_transform *lps, int c
 		}
 
 			//FIX! once means not each frame! (of course it doesn't hurt functionality)
-		for(i=mphnum-1;i>=0;i--) { mono_deloop(mph[i].head[1]); mono_deloop(mph[i].head[0]); }
-		mono_genfromloop(&mph[0].head[0],&mph[0].head[1],bord2,n); mph[0].tag = cursect; mphnum = 1;
+		for (i = mphnum - 1; i >= 0; i--) {
+			mono_deloop(mph[i].head[1]);
+			mono_deloop(mph[i].head[0]);
+		}
+		mono_genfromloop(&mph[0].head[0], &mph[0].head[1], bord2, n);
+		mph[0].tag = gcam.cursect;
+		mphnum = 1;
 
-		bunchn = 0; scansector(cursect);
-		while (bunchn)
+		b.bunchn = 0; scansector(gcam.cursect,&b);
+		while (b.bunchn)
 		{
-			memset(bunchgot,0,(bunchn+7)>>3);
-#if 0
-			closest = 0;
-			for(i=1;i<bunchn;i++)
-			{
-				if (bunchgot[i>>5]&(1<<i)) continue;
-				j = bunchfront(i,closest,0); if (!j) continue;
-				if (j == 3) continue; //FIXFIXFIXFIX
-				bunchgot[i>>5] |= (1<<i);
-				if (j == 1) { closest = i; i = 0; }
-			}
-#else
+			memset(b.bunchgot,0,(b.bunchn+7)>>3);
+
 			//{
 			//char tbuf[1024]; sprintf(tbuf,"cnt=%d\n",(1<<31)-1-gcnt);
 			//for(i=0;i<bunchn;i++)
@@ -2028,70 +1912,19 @@ void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, player_transform *lps, int c
 			//MessageBox(ghwnd,tbuf,prognam,MB_OK);
 			//}
 
-			for(i=bunchn-1;i>0;i--) //assume: bunchgrid[(((j-1)*j)>>1)+i] = bunchfront(j,i,0); is valid iff:{i<j}
+			for(i=b.bunchn-1;i>0;i--) //assume: bunchgrid[(((j-1)*j)>>1)+i] = bunchfront(j,i,0); is valid iff:{i<j}
 			{
-					//for(j=bunchn-1;j>=0;j--) if (bunchfront(i,j,0)&2) goto nogood;
-				for(k=(((i-1)*i)>>1),j=0;j<     i;k+=1,j++) if (bunchgrid[k]&2) goto nogood;
-				for(k+=j            ,j++;j<bunchn;k+=j,j++) if (bunchgrid[k]&1) goto nogood;
+
+				for(k=(((i-1)*i)>>1),j=0;j<     i;k+=1,j++)
+					if (b.bunchgrid[k]&2) goto nogood;
+				for(k+=j            ,j++;j<b.bunchn;k+=j,j++)
+					if (b.bunchgrid[k]&1) goto nogood;
 				break;
 nogood:; }
 			closest = i;
-#endif
 
-			drawalls(closest,lgs);
-#ifdef STANDALONE
-			if (gcnt <= 0) break; //FIX
-#endif
+			drawalls(closest,lgs,&b);
 		}
-
-#ifdef STANDALONE
-#if 1
-		if ((shadowtest2_rendmode == 1) && (!keystatus[0x38]))
-		{
-			extern void loadpic (tile_t *); //gcnt = 1;
-			gtpic = &gtile[0]; if (!gtpic->tt.f) loadpic(gtpic);
-			gouvmat[0] =     0; gouvmat[3] =     0; gouvmat[6] = 1; //d
-			gouvmat[1] = 65536; gouvmat[4] =     0; gouvmat[7] = 0; //u
-			gouvmat[2] =     0; gouvmat[5] = 65536; gouvmat[8] = 0; //v
-			for(i=mphnum-1;i>=0;i--)
-			{
-				gcurcol = ((mph[i].tag*0x4357267+0x23457)&0x0f0f0f)+0x202020;
-				drawpol_aftclip(mph[i].head[0],mph[i].head[1]);
-			}
-		}
-#endif
-
-#if 0
-		n = 0;
-		for(i=mphnum-1;i>=0;i--) for(s=0;s<2;s++) { j = mph[i].head[s]; if (j < 0) continue; do { j = mp[j].n; n++; } while (j != mph[i].head[s]); }
-		print6x8(&gcam.c,96,16,0xffffff,0,"mp lists num =%6d, mphnum=%d",n,mphnum);
-
-		w = 0;
-		i = mpempty; do { i = mp[i].n; w++; } while (i != mpempty);
-		print6x8(&gcam.c,96,24,0xffffff,0," mpempty num =%6d",w);
-
-		//print6x8(&gcam.c,96,32,0xffffff,0,"memory leak! =%6d",MPMAX-(n+w));
-#endif
-
-#if 0
-		fixposy += 8; if (fixposy >= gdd.y) { fixposy = 0; fixposx += 256; }
-		for(k=0;k<mphnum;k++)
-		{
-			print6x8(&gcam.c,fixposx,fixposy,0xffffff,0,"%d (area=%f)",mph[k].tag,mono_area(mph[k].head[0],mph[k].head[1])); fixposy += 8; if (fixposy >= gdd.y) { fixposy = 0; fixposx += 256; }
-			for(s=0;s<2;s++)
-			{
-				i = mph[k].head[s]; if (i < 0) continue;
-				do
-				{
-					j = mp[i].n;
-					print6x8(&gcam.c,fixposx,fixposy,0xffffff,0,"%8.2f %8.2f",mp[i].x,mp[i].y); fixposy += 8; if (fixposy >= gdd.y) { fixposy = 0; fixposx += 256; }
-					i = j;
-				} while (i != mph[k].head[s]);
-				fixposy += 2;
-			}
-		}
-#endif
-#endif
 
 		if (shadowtest2_rendmode == 4) uptr = glp->sectgot;
 										  else uptr = shadowtest2_sectgot;
@@ -2123,6 +1956,7 @@ nogood:; }
 
 		if (!didcut) break;
 	}
+	camcursor--;
 }
 
 typedef struct { int sect; point3d p; float rgb[3]; int useshadow; } drawkv6_lightpos_t;

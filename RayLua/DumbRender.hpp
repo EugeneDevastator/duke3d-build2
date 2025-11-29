@@ -102,7 +102,7 @@ public:
         LoadPal(rootpath);
         LoadMapAndTiles();
         shadowtest2_numlights=0;
-        //Sprite hacks
+        //init lights
         for(int i=0;i<map->numspris;i++)
         {
             map->spri[i].owner = -1;
@@ -115,6 +115,23 @@ public:
                     map->light_spri[map->light_sprinum++] = i;
             }
         }
+// init portals;
+        for(int i=0;i<map->numsects;i++) {
+            for (int wn=0; wn< map->sect[i].n;wn++) {
+                if( map->sect[i].wall[wn].surf.hitag==5) {
+
+                    portals[portaln].entry_sect = i;
+                    portals[portaln].entry_sprite = map->sect[i].headspri;
+                    portals[portaln].entry_surfid = wn;
+                    portals[portaln].iswall = true;
+                    //tmp hak
+                    portals[portaln].target_portal = 1-portaln;
+                    portaln++;
+                }
+
+            }
+        }
+
         // auto paltex = ConvertPalToTexture();
         // tile_t* pic = static_cast<tile_t*>(malloc(sizeof(tile_t)));
         // strcpy_s(pic->filnam, "TILES000.art|1");
@@ -341,7 +358,9 @@ public:
             cam->d.x = playr->idow.x; cam->d.y = playr->idow.y; cam->d.z = playr->idow.z;
             cam->f.x = playr->ifor.x; cam->f.y = playr->ifor.y; cam->f.z = playr->ifor.z;
             cam->p.x = playr->ipos.x; cam->p.y = playr->ipos.y; cam->p.z = playr->ipos.z;
+            cam->cursect = playr->cursect;
         }
+
  // Main render scope
 			shadowtest2_useshadows = 1;//b2opts.shadows;
 			shadowtest2_numlights = 0;
@@ -378,7 +397,8 @@ public:
 
         //---
         shadowtest2_rendmode = 2;
-        draw_hsr_polymost(cam, map, playr, playr->cursect);
+        reset_context();
+        draw_hsr_polymost(cam, map);
         shadowtest2_rendmode = 4;
 
        // shadowtest2_numlights =1;
@@ -391,7 +411,9 @@ public:
             for(glignum=0;glignum<shadowtest2_numlights;glignum++)
             {
                 ncam.p = shadowtest2_light[glignum].p;
-                draw_hsr_polymost(&ncam,map,&plr,shadowtest2_light[glignum].sect);
+                reset_context();
+                ncam.cursect = shadowtest2_light[glignum].sect;
+                draw_hsr_polymost(&ncam,map);
             }
         }
         shadowtest2_setcam(cam);
@@ -406,11 +428,11 @@ public:
             if (vertCount < 3) return true;
 
             float *ouvmat = eyepol[i].ouvmat;
-
+        rlDrawRenderBatchActive();
            // BeginShaderMode(uvShader);
             rlBegin(RL_TRIANGLES);
             glEnable(GL_POLYGON_OFFSET_FILL);
-            glPolygonOffset(1.0f, 1.0f);
+            glPolygonOffset(-1.0f, 1.0f);
 
         for (int j = 1; j < vertCount - 1; j++) {
             int idx[] = {v0, v0 + j, v0 + j + 1};
@@ -424,15 +446,16 @@ public:
                 float final_u = u ;/// (65536.0f);
                 float final_v = v;// / (65536.0f);
 
-                rlColor4f(i*5, 1, 0.3f, 1);
+                rlColor4f(i*5, 1, 0.3f, 0.3);
                 rlTexCoord2f(final_u, final_v);
                 rlVertex3f(pt.x, -pt.z, pt.y);
             }
         }
-        glDisable(GL_POLYGON_OFFSET_FILL);
+
             rlEnd();
        //     EndShaderMode();
             rlDrawRenderBatchActive();
+        glDisable(GL_POLYGON_OFFSET_FILL);
             return false;
         }
 
@@ -1463,7 +1486,7 @@ private:
             if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
             map->blankheadspri = i;
         }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/e3l1.MAP", map);
+        loadmap_imp((char*)"c:/Eugene/Games/build2/prt.MAP", map);
     }
 };
 
