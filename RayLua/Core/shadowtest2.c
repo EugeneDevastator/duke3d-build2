@@ -718,7 +718,7 @@ static void drawpol_aftclip (int plothead0, int plothead1) //this function for d
 #endif
 
 eyepol_t *eyepol = 0; // 4096 eyepol_t's = 192KB
-point2d *eyepolv = 0; //16384 point2d's  = 128KB
+point3d *eyepolv = 0; //16384 point2d's  = 128KB
 int eyepoln = 0, glignum = 0;
 int eyepolmal = 0, eyepolvn = 0, eyepolvmal = 0;
 static int gligsect, gligwall, gligslab, gflags;
@@ -773,6 +773,111 @@ void eyepol_drawfunc (int ind)
 }
 
 static void gentex_xform(float *f);
+
+/*
+	Purpose: Renders visible geometry polygons to world space eyepol array
+	Converts 3D polygon vertices to world coordinates (no screen projection)
+	Handles texture mapping setup (UV coordinates, skybox mapping)
+	Stores polygons in eyepol[] array with world space vertices
+	Manages different rendering modes (walls, skybox, parallax sky)
+ */
+static void drawtagfunc_ws(int rethead0, int rethead1)
+{
+	float f, g, *fptr;
+	int i, j, k, h, rethead[2];
+
+	if ((rethead0|rethead1) < 0) { mono_deloop(rethead1); mono_deloop(rethead0); return; }
+	rethead[0] = rethead0; rethead[1] = rethead1;
+
+	// Put on FIFO in world space:
+	for(h=0;h<2;h++)
+	{
+		i = rethead[h];
+		do
+		{
+			if (h)
+				i = mp[i].p;
+
+			if (eyepolvn >= eyepolvmal)
+			{
+				eyepolvmal = max(eyepolvmal<<1,16384);
+				eyepolv = (point3d *)realloc(eyepolv,eyepolvmal*sizeof(point3d));
+			}
+
+			// WORLD SPACE COORDINATES - No projection, just transform back to world
+			// Convert from camera space back to world space
+			eyepolv[eyepolvn].x = mp[i].x*xformmat[0] + mp[i].y*xformmat[1] + gcam.p.x;
+			eyepolv[eyepolvn].y = mp[i].x*xformmat[3] + mp[i].y*xformmat[4] + gcam.p.y;
+			eyepolv[eyepolvn].z = mp[i].x*xformmat[2] + mp[i].y*xformmat[4] + gcam.p.z;
+
+			eyepolvn++;
+
+			if (!h) i = mp[i].n;
+		} while (i != rethead[h]);
+		mono_deloop(rethead[h]);
+	}
+
+	if (eyepoln+1 >= eyepolmal)
+	{
+		eyepolmal = max(eyepolmal<<1,4096);
+		eyepol = (eyepol_t *)realloc(eyepol,eyepolmal*sizeof(eyepol_t));
+		eyepol[0].vert0 = 0;
+	}
+
+	if (gflags < 2)
+		memcpy((void *)eyepol[eyepoln].ouvmat,(void *)gouvmat,sizeof(gouvmat[0])*9);
+	else
+	{
+		// Skybox texture mapping (same as original)
+		f = (((float)64)+1.15f)/((float)64); fptr = eyepol[eyepoln].ouvmat;
+		switch(gflags)
+		{
+			case 14: fptr[0] = +f                 ; fptr[3] = f*+2.f; fptr[6] =     0.f; //Front
+						fptr[1] = -1.f               ; fptr[4] =    0.f; fptr[7] =     0.f;
+						fptr[2] = (f*- 5.f - 1.f)/6.f; fptr[5] =    0.f; fptr[8] = f*+12.f;
+						break;
+			case 13: fptr[0] = +1.f               ; fptr[3] =    0.f; fptr[6] =     0.f; //Right
+						fptr[1] = -f                 ; fptr[4] = f*+2.f; fptr[7] =     0.f;
+						fptr[2] = (f*-17.f - 1.f)/6.f; fptr[5] =    0.f; fptr[8] = f*+12.f;
+						break;
+			case 15: fptr[0] = -f                 ; fptr[3] = f*-2.f; fptr[6] =     0.f; //Back
+						fptr[1] = +1.f               ; fptr[4] =    0.f; fptr[7] =     0.f;
+						fptr[2] = (f*-29.f - 1.f)/6.f; fptr[5] =    0.f; fptr[8] = f*+12.f;
+						break;
+			case 12: fptr[0] = -1.f               ; fptr[3] =    0.f; fptr[6] =     0.f; //Left
+						fptr[1] = +f                 ; fptr[4] = f*-2.f; fptr[7] =     0.f;
+						fptr[2] = (f*-41.f - 1.f)/6.f; fptr[5] =    0.f; fptr[8] = f*+12.f;
+						break;
+			case 11: fptr[0] = +f                 ; fptr[3] = f*+2.f; fptr[6] =     0.f; //Top
+						fptr[1] = (f*-17.f - 1.f)/6.f; fptr[4] =    0.f; fptr[7] = f*-12.f;
+						fptr[2] = -1.f               ; fptr[5] =    0.f; fptr[8] =     0.f;
+						break;
+			case 10: fptr[0] = -f                 ; fptr[3] = f*+2.f; fptr[6] =     0.f; //Bottom
+						fptr[1] = (f*+ 5.f + 1.f)/6.f; fptr[4] =    0.f; fptr[7] = f*+12.f;
+						fptr[2] = +1.f               ; fptr[5] =    0.f; fptr[8] =     0.f;
+						break;
+		}
+		for(i=9-3;i>=0;i-=3)
+		{
+			float ox, oy, oz;
+			ox = fptr[i+0]*65536.f; oy = fptr[i+1]*65536.f; oz = fptr[i+2]*65536.f;
+			fptr[i+0] = ox*gcam.r.x + oy*gcam.r.y + oz*gcam.r.z;
+			fptr[i+1] = ox*gcam.d.x + oy*gcam.d.y + oz*gcam.d.z;
+			fptr[i+2] = ox*gcam.f.x + oy*gcam.f.y + oz*gcam.f.z;
+		}
+		gentex_xform(fptr);
+	}
+
+	eyepol[eyepoln].tpic = gtpic;
+	eyepol[eyepoln].curcol = gcurcol;
+	eyepol[eyepoln].flags = (gflags != 0);
+	eyepol[eyepoln].b2sect = gligsect;
+	eyepol[eyepoln].b2wall = gligwall;
+	eyepol[eyepoln].b2slab = gligslab;
+	memcpy((void *)&eyepol[eyepoln].norm,(void *)&gnorm,sizeof(gnorm));
+	eyepoln++;
+	eyepol[eyepoln].vert0 = eyepolvn;
+}
 /*
 	Purpose: Renders visible geometry polygons to screen
 	Converts 3D polygon vertices to 2D screen coordinates
@@ -812,7 +917,7 @@ static void drawtagfunc (int rethead0, int rethead1)
 			if (eyepolvn >= eyepolvmal)
 			{
 				eyepolvmal = max(eyepolvmal<<1,16384);
-				eyepolv = (point2d *)realloc(eyepolv,eyepolvmal*sizeof(point2d));
+				eyepolv = (point3d *)realloc(eyepolv,eyepolvmal*sizeof(point3d));
 			}
 
 			// ORIGINAL CODE - REMOVE CLIPPING:
@@ -1233,7 +1338,7 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 		else
 		{
 				  if (shadowtest2_rendmode == 4) mono_output = ligpoltagfunc; //add to light list // this will process point lights. otherwize will only use plr light.
-			else if (gflags < 2)                mono_output =   drawtagfunc; //draw wall
+			else if (gflags < 2)                mono_output =   drawtagfunc_ws; //draw wall
 			else                                mono_output =    skytagfunc; //calls drawtagfunc inside
 			for(i=mphnum-1;i>=0;i--) if (mph[i].tag == tag) mono_bool(mph[i].head[0],mph[i].head[1],plothead[0],plothead[1],MONO_BOOL_AND,mono_output);
 		}

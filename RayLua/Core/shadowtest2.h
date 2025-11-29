@@ -107,7 +107,7 @@ extern int shadowtest2_sectgotn;                // Size of global sector bit arr
 // Rendering mode control
 extern int shadowtest2_rendmode;                // Current rendering mode (0-4)
 extern eyepol_t *eyepol; // 4096 eyepol_t's = 192KB
-extern point2d *eyepolv; //16384 point2d's  = 128KB
+extern point3d *eyepolv; //16384 point2d's  = 128KB
 extern int eyepoln, glignum;
 extern int eyepolmal, eyepolvn, eyepolvmal;
 
