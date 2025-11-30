@@ -72,9 +72,14 @@ typedef struct {
 	point3d gnadd;
 	unsigned int *sectgot, *sectgotmal;        // Visited sectors per level
 	int sectgotn;
-
+	int portal_clip[2];  // Current portal clipping region
+	bool has_portal_clip; // Whether portal clipping is active
 	int recursion_depth;
+
 	point3d testoffset;
+	int testignorewall;
+	int testignoresec;
+
 } bunchgrp;
 
 extern mp_t *mp;

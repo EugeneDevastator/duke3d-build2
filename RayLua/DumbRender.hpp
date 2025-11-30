@@ -400,7 +400,7 @@ public:
         //---
         shadowtest2_rendmode = 2;
         reset_context();
-        draw_hsr_polymost(cam, map,0,{0,0,0});
+        draw_hsr_polymost(cam, map,0);
         shadowtest2_rendmode = 4;
 
        // shadowtest2_numlights =1;
@@ -415,7 +415,7 @@ public:
                 ncam.p = shadowtest2_light[glignum].p;
                 reset_context();
                 ncam.cursect = shadowtest2_light[glignum].sect;
-                draw_hsr_polymost(&ncam,map,0,{0,0,0});
+                draw_hsr_polymost(&ncam,map,0);
             }
         }
         shadowtest2_setcam(cam);
@@ -510,6 +510,9 @@ public:
                 if (drawlines)
                 {
                     rlBegin(RL_LINES);
+                    rlDisableDepthMask();
+                    glEnable(GL_POLYGON_OFFSET_FILL);
+                    glPolygonOffset(-1.0f, 1.0f);
                     for (int j = 1; j < vertCount - 1; j++) {
                         int idx[] = {v0, v0 + j, v0 + j + 1};
                         for (int k = 0; k < 3; k++) {
@@ -519,6 +522,8 @@ public:
                         }
                     }
                     rlEnd();
+                    glDisable(GL_POLYGON_OFFSET_FILL);
+                    rlEnableDepthMask();
                 } // eyepol lines for each poly
             }
         }

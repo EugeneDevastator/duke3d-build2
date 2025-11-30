@@ -109,7 +109,7 @@ unsigned int *shadowtest2_sectgot = 0; //WARNING:code uses x86-32 bit shift tric
 static unsigned int *shadowtest2_sectgotmal = 0;
 static int sectgotn = 0, shadowtest2_sectgotn = 0;
 
-#define MAX_PORTAL_DEPTH 10
+#define MAX_PORTAL_DEPTH 5
 //Translation & rotation
 static mapstate_t *curMap;
 static player_transform *gps;
@@ -1638,11 +1638,10 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 			// Render wall segment if visible
 			int prtn = wal[w].tags[1];
 			if (prtn >= 0) { // ENTER PORTAL
-				//continue;
-				int nextspr = portals[prtn].entry_sprite;
-				int backp = portals[prtn].target_portal;
-				int entry = portals[backp].entry_sprite;
-				draw_hsr_enter_portal(gcam, map, entry, nextspr, b);
+
+				if (b->has_portal_clip &&  s==b->testignoresec && w==b->testignorewall)
+					continue;
+				draw_hsr_enter_portal(map, prtn, b,plothead[0],plothead[1]);
 			} else {
 				if ((!(m & 1)) || (wal[w].surf.flags & (1 << 5))) //Draw wall here //(1<<5): 1-way
 				{
@@ -1709,25 +1708,29 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 void reset_context() {
 	eyepoln = 0; eyepolvn = 0;
 }
-
-void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, int recursiveDepth, point3d offset)
-{
-	if (recursiveDepth > MAX_PORTAL_DEPTH)
-		return;
-
+void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
 	bunchgrp bs;
-	bunchgrp *b = &bs;
-	bs.bunchgot=0;
-	bs.bunchn=0;
-	bs.bunchmal=0;
-	bs.bunchgrid =0;
 	bs.cam = *cc;
-	bs.recursion_depth = recursiveDepth;
-	bs.sectgotn = 0;
-	bs.sectgot = 0;
-	bs.sectgotmal = 0;
-	bs.testoffset = offset;
-	cam_t gcam = bs.cam;
+	bs.recursion_depth = 0;
+	bs.testoffset = (point3d){0,0,0};
+	draw_hsr_polymost_ctx(map,&bs);
+}
+
+void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
+	if (!newctx) {
+		return;
+	}
+	int recursiveDepth = newctx->recursion_depth;
+	bunchgrp *b;
+	b = newctx;
+	b->sectgotn = 0;
+	b->sectgot = 0;
+	b->sectgotmal = 0;
+	b->bunchgot=0;
+	b->bunchn=0;
+	b->bunchmal=0;
+	b->bunchgrid =0;
+	cam_t gcam = b->cam;
 
 	wall_t *wal;
 	spri_t *spr;
@@ -1861,12 +1864,11 @@ void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, int recursiveDepth, point3d 
 	gcnt = curgcnt;
 #endif
 
-	for(halfplane=0;halfplane<2;halfplane++)
-	{
+	for(halfplane=0;halfplane<2;halfplane++) {
 		if (shadowtest2_rendmode == 4)
 		{
 			if (!halfplane) gcam.r.x = 1; else gcam.r.x = -1;
-							  gcam.d.x = 0; gcam.f.x = 0;
+			gcam.d.x = 0; gcam.f.x = 0;
 			gcam.r.y = 0; gcam.d.y = 0; gcam.f.y = -gcam.r.x;
 			gcam.r.z = 0; gcam.d.z = 1; gcam.f.z = 0;
 			xformprep(0.0, b);
@@ -1897,7 +1899,7 @@ void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, int recursiveDepth, point3d 
 			xformbac(+large_bound, +large_bound, gcam.h.z, &bord[2],b);
 			xformbac(-large_bound, +large_bound, gcam.h.z, &bord[3],b);
 
-				//Clip screen to front plane
+			//Clip screen to front plane
 			n = 0; didcut = 0;
 			for(i=4-1,j=0;j<4;i=j,j++)
 			{
@@ -1915,7 +1917,6 @@ void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, int recursiveDepth, point3d 
 		}
 
 		memset8(b->sectgot,0,(lgs->numsects+31)>>3);
-
 		for(j=0;j<n;j++)
 		{
 			f = gcam.h.z/bord2[j].z;
@@ -1924,11 +1925,21 @@ void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, int recursiveDepth, point3d 
 		}
 
 			//FIX! once means not each frame! (of course it doesn't hurt functionality)
-		for (i = mphnum - 1; i >= 0; i--) {
-			mono_deloop(mph[i].head[1]);
-			mono_deloop(mph[i].head[0]);
+// had to put false here, because otherwise it crashes due to mp[] being null in monoclip inside portal.
+		if ((false) && b->has_portal_clip && recursiveDepth > 0) {
+			// For portal renders, use inherited clipping region
+			mph[0].head[0] = b->portal_clip[0];
+			mph[0].head[1] = b->portal_clip[1];
+			mph[0].tag = gcam.cursect;
+			mphnum = 1;
+		} else {
+			// For top-level render, create screen bounds
+			for (i = mphnum - 1; i >= 0; i--) {
+				mono_deloop(mph[i].head[1]);
+				mono_deloop(mph[i].head[0]);
+			}
+			mono_genfromloop(&mph[0].head[0], &mph[0].head[1], bord2, n);
 		}
-		mono_genfromloop(&mph[0].head[0], &mph[0].head[1], bord2, n);
 		mph[0].tag = gcam.cursect;
 		mphnum = 1;
 
@@ -1999,11 +2010,21 @@ nogood:; }
 	}
 }
 
-static void draw_hsr_enter_portal(cam_t oricam, mapstate_t* map, int entryspr, int targetspr, bunchgrp *b) {
-	cam_t ncam = oricam;
+static void draw_hsr_enter_portal( mapstate_t* map, int endportaln, bunchgrp *parentctx, int plothead0, int plothead1) {
+	if (parentctx->recursion_depth >= MAX_PORTAL_DEPTH) {
+		mono_deloop(plothead1);
+		mono_deloop(plothead0);
+		return;
+	}
+	int tgtspi = portals[endportaln].entry_sprite;
+	int backp = portals[endportaln].target_portal;
+	int entry = portals[backp].entry_sprite;
+	cam_t ncam = parentctx->cam;
+	int ignw = portals[endportaln].entry_surfid;
+	int igns = portals[endportaln].entry_sect;
 
-	spri_t tgs = map->spri[targetspr];
-	spri_t ent = map->spri[entryspr];
+	spri_t tgs = map->spri[tgtspi];
+	spri_t ent = map->spri[entry];
 	float dx = tgs.p.x - ent.p.x;
 	float dy = tgs.p.y - ent.p.y;
 	float dz = tgs.p.z - ent.p.z;
@@ -2015,10 +2036,30 @@ static void draw_hsr_enter_portal(cam_t oricam, mapstate_t* map, int entryspr, i
 //	ncam.r = s.r;
 //	ncam.d = s.d;
 
-	dx+=b->testoffset.x;
-	dy+=b->testoffset.y;
-	dz+=b->testoffset.z;
-	draw_hsr_polymost(&ncam, map, b->recursion_depth+1,(point3d){dx,dy,dz});
+	dx+=parentctx->testoffset.x; // progressively add offset for portal in portal.
+	dy+=parentctx->testoffset.y;
+	dz+=parentctx->testoffset.z;
+
+	bunchgrp newctx={};
+	newctx.recursion_depth = parentctx->recursion_depth+1;
+	newctx.cam = ncam;
+	newctx.testoffset=(point3d){dx,dy,dz};
+	newctx.has_portal_clip = true;
+	newctx.portal_clip[0] = plothead0;
+	newctx.portal_clip[1] = plothead1;
+	newctx.sectgotn = 0;
+	newctx.sectgot = 0;
+	newctx.sectgotmal = 0;
+	newctx.bunchgot=0;
+	newctx.bunchn=0;
+	newctx.bunchmal=0;
+	newctx.bunchgrid =0;
+	newctx.testignorewall = ignw;
+	newctx.testignoresec = igns;
+	draw_hsr_polymost_ctx(map, &newctx);
+
+	mono_deloop(plothead1);
+	mono_deloop(plothead0);
 }
 
 typedef struct { int sect; point3d p; float rgb[3]; int useshadow; } drawkv6_lightpos_t;
