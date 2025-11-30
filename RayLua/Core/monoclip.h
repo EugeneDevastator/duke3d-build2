@@ -63,8 +63,18 @@ typedef struct {
 	unsigned int *bunchgot;
 	unsigned char *bunchgrid;
 	int bunchn, bunchmal;
+
 	bfint_t bfint[BFINTMAX];
 	int bfintn, bfintlut[BFINTMAX+1];
+// other context stuff
+	cam_t cam;                    // Camera per recursion level
+	double xformmat[9], xformmatc, xformmats;
+	point3d gnadd;
+	unsigned int *sectgot, *sectgotmal;        // Visited sectors per level
+	int sectgotn;
+
+	int recursion_depth;
+
 } bunchgrp;
 
 extern mp_t *mp;

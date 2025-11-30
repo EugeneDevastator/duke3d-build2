@@ -126,11 +126,12 @@ void drawpol_befclip(int tag, int newtag, int plothead0, int plothead1, int flag
  * @param cursect Current sector index
  */
 void reset_context();
-void draw_hsr_polymost(cam_t *cc, mapstate_t *lgs);
+void draw_hsr_polymost(cam_t *cc, mapstate_t *lgs, int recursiveDepth);
 
 // ================================================================================================
 // POLYGONAL SHADOW CREATION FUNCTIONS
 // ================================================================================================
+static void draw_hsr_enter_portal(cam_t oricam, mapstate_t* map, int targetspr, int currentDepth);
 
 /** Creates shadow polygon lists for light sources
  * @param rethead0 First polygon loop head from clipping
