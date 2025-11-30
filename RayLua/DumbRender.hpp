@@ -118,6 +118,7 @@ public:
 // init portals;
         for(int i=0;i<map->numsects;i++) {
             for (int wn=0; wn< map->sect[i].n;wn++) {
+                map->sect[i].wall[wn].tags[1]=-1;
                 if( map->sect[i].wall[wn].surf.hitag==5) {
 
                     portals[portaln].entry_sect = i;
@@ -126,6 +127,7 @@ public:
                     portals[portaln].iswall = true;
                     //tmp hak
                     portals[portaln].target_portal = 1-portaln;
+                    map->sect[i].wall[wn].tags[1] = portals[portaln].target_portal;
                     portaln++;
                 }
 
@@ -398,7 +400,7 @@ public:
         //---
         shadowtest2_rendmode = 2;
         reset_context();
-        draw_hsr_polymost(cam, map);
+        draw_hsr_polymost(cam, map,0);
         shadowtest2_rendmode = 4;
 
        // shadowtest2_numlights =1;
@@ -413,7 +415,7 @@ public:
                 ncam.p = shadowtest2_light[glignum].p;
                 reset_context();
                 ncam.cursect = shadowtest2_light[glignum].sect;
-                draw_hsr_polymost(&ncam,map);
+                draw_hsr_polymost(&ncam,map,0);
             }
         }
         shadowtest2_setcam(cam);

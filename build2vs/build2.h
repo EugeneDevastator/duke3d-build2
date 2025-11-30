@@ -6,8 +6,12 @@
 #include <windows.h>
 #include <malloc.h>
 
-#include "scenerender.h"
 #define STANDALONE
+#define USEHEIMAP 1
+
+#define NOSOUND 1
+#define STANDALONE 1
+#define OOS_CHECK 1
 
 #pragma pack(push,1)
 
