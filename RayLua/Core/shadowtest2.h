@@ -108,7 +108,7 @@ int bunchfront(int b0, int b1, int fixsplitnow, bunchgrp *b);
  * @param twal Output array for wall vertices (must be sector.n+1 size)
  * @return Number of vertices generated
  */
-int prepbunch(int b, bunchverts_t *twal);
+int prepbunch(int id, bunchverts_t *twal, bunchgrp* b);
 
 /** Clips polygons to viewing frustum before rendering
  * @param tag Current portal tag
@@ -131,7 +131,7 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *lgs, int recursiveDepth);
 // ================================================================================================
 // POLYGONAL SHADOW CREATION FUNCTIONS
 // ================================================================================================
-static void draw_hsr_enter_portal(cam_t oricam, mapstate_t* map, int targetspr, int currentDepth);
+static void draw_hsr_enter_portal(cam_t oricam, mapstate_t* map, int entryspr, int targetspr, int currentDepth);
 
 /** Creates shadow polygon lists for light sources
  * @param rethead0 First polygon loop head from clipping
@@ -176,13 +176,13 @@ void eyepol_drawfunc(int ind);
  * @param rethead0 First polygon loop head
  * @param rethead1 Second polygon loop head
  */
-void drawtagfunc(int rethead0, int rethead1);
+void drawtagfunc(int rethead0, int rethead1, bunchgrp * b);
 
 /** Software skybox rendering
  * @param rethead0 First polygon loop head
  * @param rethead1 Second polygon loop head
  */
-void skytagfunc(int rethead0, int rethead1);
+void skytagfunc(int rethead0, int rethead1, bunchgrp * b);
 
 // Texture coordinate generation functions
 //void gentex_wall(void *npol2, void *sur);       // Wall texture mapping

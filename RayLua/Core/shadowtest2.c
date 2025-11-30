@@ -192,6 +192,7 @@ int argb_interp(int c0, int c1, int mul15) {
 
 static int prepbunch (int id, bunchverts_t *twal, bunchgrp *b)
 {
+	cam_t gcam = b->cam;
 	wall_t *wal;
 	double f, x, y, x0, y0, x1, y1;
 	int i, n;
@@ -241,9 +242,9 @@ static int prepbunch (int id, bunchverts_t *twal, bunchgrp *b)
 	//   1: FRONT:RED(b0)
 	//   2: FRONT:GREEN(b1)
 	//   3: UNSORTABLE!
-static int bunchfront (int b0, int b1, int fixsplitnow, bunchgrp *b, cam_t gcam)
+static int bunchfront (int b0, int b1, int fixsplitnow, bunchgrp *b)
 {
-
+	cam_t gcam = b->cam;
 	bunchverts_t *twal[2];
 	wall_t *wal;
 	double d, a[2], x0, y0, x1, y1, x2, y2, x3, y3, t0, t1, t2, t3;
@@ -484,7 +485,7 @@ docont:;
 			//5 ? ? ? ? ?
 			//0,1,3,6,10,15,21,28,36,45,55,..
 		j = (((obunchn-1)*obunchn)>>1); b->bfintn = 0;
-		for(i=0;i<obunchn;i++) b->bunchgrid[j+i] = bunchfront(obunchn,i,1,b,gcam);
+		for(i=0;i<obunchn;i++) b->bunchgrid[j+i] = bunchfront(obunchn,i,1,b);
 
 		if (!b->bfintn) continue;
 
@@ -564,7 +565,7 @@ docont:;
 			{
 				if (m > obunchn       ) for(o=b->bfintlut[m-obunchn-1];o<b->bfintlut[m-obunchn  ];o++) if (b->bfint[o].bun == k) { b->bunchgrid[j+k] = b->bfint[o].sid  ; goto bunchgrid_got; }
 				if (m < obunchn+b->bfintn) for(o=b->bfintlut[m-obunchn  ];o<b->bfintlut[m-obunchn+1];o++) if (b->bfint[o].bun == k) { b->bunchgrid[j+k] = b->bfint[o].sid^3; goto bunchgrid_got; }
-				b->bunchgrid[j+k] = bunchfront(m,k,0,b,gcam);
+				b->bunchgrid[j+k] = bunchfront(m,k,0,b);
 bunchgrid_got:;
 			}
 			for(;k<m;k++) b->bunchgrid[j+k] = 0;
@@ -1636,10 +1637,12 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 
 			// Render wall segment if visible
 			int prtn = wal[w].tags[1];
-			if (prtn >= 0) {
-				continue; 
+			if (prtn >= 0) { // ENTER PORTAL
+				//continue;
 				int nextspr = portals[prtn].entry_sprite;
-				draw_hsr_enter_portal(gcam, map, nextspr, b->recursion_depth);
+				int backp = portals[prtn].target_portal;
+				int entry = portals[backp].entry_sprite;
+				draw_hsr_enter_portal(gcam, map, entry, nextspr, b->recursion_depth);
 			} else {
 				if ((!(m & 1)) || (wal[w].surf.flags & (1 << 5))) //Draw wall here //(1<<5): 1-way
 				{
@@ -1704,12 +1707,12 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 	Creates visibility data for shadow casting
 */
 void reset_context() {
-
+	eyepoln = 0; eyepolvn = 0;
 }
 
 void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, int recursiveDepth)
 {
-	if (recursiveDepth >= MAX_PORTAL_DEPTH)
+	if (recursiveDepth > MAX_PORTAL_DEPTH)
 		return;
 
 	bunchgrp bs;
@@ -1748,7 +1751,7 @@ void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, int recursiveDepth)
 			for(i=0,j=gcam.c.f;i<gcam.c.y;i++,j+=gcam.c.p) memset8((void *)j,0x00000000,gcam.c.x<<2);
 			for(i=0,j=gcam.z.f;i<gcam.z.y;i++,j+=gcam.z.p) memset8((void *)j,0x7f7f7f7f,gcam.z.x<<2);
 		}
-		if (shadowtest2_rendmode != 4) eyepoln = 0; //Prevents drawpollig() from crashing
+		//if (shadowtest2_rendmode != 4) eyepoln = 0; //Prevents drawpollig() from crashing
 		return;
 	}
 	if (!b->bunchmal)
@@ -1835,7 +1838,7 @@ void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, int recursiveDepth)
 		g_qamb[1] = shadowtest2_ambrgb[1]*f;
 		g_qamb[2] = shadowtest2_ambrgb[2]*f;
 		g_qamb[3] = 0.f;
-		eyepoln = 0; eyepolvn = 0;
+		//eyepoln = 0; eyepolvn = 0;
 	}
 	else
 	{
@@ -1995,13 +1998,21 @@ nogood:; }
 	}
 }
 
-static void draw_hsr_enter_portal(cam_t oricam, mapstate_t* map, int targetspr, int currentDepth) {
+static void draw_hsr_enter_portal(cam_t oricam, mapstate_t* map, int entryspr, int targetspr, int currentDepth) {
 	cam_t ncam = oricam;
-	spri_t s = map->spri[targetspr];
-	ncam.p = s.p;
-	ncam.f = s.f;
-	ncam.r = s.r;
-	ncam.d = s.d;
+
+	spri_t tgs = map->spri[targetspr];
+	spri_t ent = map->spri[entryspr];
+	float dx = tgs.p.x - ent.p.x;
+	float dy = tgs.p.y - ent.p.y;
+	float dz = tgs.p.z - ent.p.z;
+	ncam.p.x+=dx;
+	ncam.p.y+=dy;
+	ncam.p.z+=dz;
+	ncam.cursect = tgs.sect;
+//	ncam.f = s.f;
+//	ncam.r = s.r;
+//	ncam.d = s.d;
 	draw_hsr_polymost(&ncam, map, currentDepth+1);
 }
 
