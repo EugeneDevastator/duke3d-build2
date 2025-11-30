@@ -719,7 +719,6 @@ eyepol_t *eyepol = 0; // 4096 eyepol_t's = 192KB
 point3d *eyepolv = 0; //16384 point2d's  = 128KB
 int eyepoln = 0, glignum = 0;
 int eyepolmal = 0, eyepolvn = 0, eyepolvmal = 0;
-static int gligsect, gligwall, gligslab, gflags;
 static point3d gnorm;
 void eyepol_drawfunc (int ind)
 {
@@ -826,13 +825,13 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 		eyepol[0].vert0 = 0;
 	}
 
-	if (gflags < 2)
+	if (b->gflags < 2)
 		memcpy((void *)eyepol[eyepoln].ouvmat,(void *)b->gouvmat,sizeof(b->gouvmat[0])*9);
 	else
 	{
 		// Skybox texture mapping (same as original)
 		f = (((float)64)+1.15f)/((float)64); fptr = eyepol[eyepoln].ouvmat;
-		switch(gflags)
+		switch(b->gflags)
 		{
 			case 14: fptr[0] = +f                 ; fptr[3] = f*+2.f; fptr[6] =     0.f; //Front
 						fptr[1] = -1.f               ; fptr[4] =    0.f; fptr[7] =     0.f;
@@ -872,10 +871,10 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 
 	eyepol[eyepoln].tpic = gtpic;
 	eyepol[eyepoln].curcol = gcurcol;
-	eyepol[eyepoln].flags = (gflags != 0);
-	eyepol[eyepoln].b2sect = gligsect;
-	eyepol[eyepoln].b2wall = gligwall;
-	eyepol[eyepoln].b2slab = gligslab;
+	eyepol[eyepoln].flags = (b->gflags != 0);
+	eyepol[eyepoln].b2sect = b->gligsect;
+	eyepol[eyepoln].b2wall = b->gligwall;
+	eyepol[eyepoln].b2slab = b->gligslab;
 	memcpy((void *)&eyepol[eyepoln].norm,(void *)&gnorm,sizeof(gnorm));
 	eyepoln++;
 	eyepol[eyepoln].vert0 = eyepolvn;
@@ -887,7 +886,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 	Clips each face against view frustum
 	Projects cube vertices to screen space
 	Calls drawtagfunc for each visible skybox face
-	Uses special texture mapping flags (gflags = 10-15 for different cube faces)
+	Uses special texture mapping flags (b->gflags = 10-15 for different cube faces)
 */
 
 static void skytagfunc (int rethead0, int rethead1, bunchgrp* b, cam_t gcam)
@@ -946,7 +945,7 @@ static void skytagfunc (int rethead0, int rethead1, bunchgrp* b, cam_t gcam)
 			//generate vmono
 		mono_genfromloop(&plothead[0],&plothead[1],tp,n);
 
-		gflags = p+10;
+		b->gflags = p+10;
 		mono_bool(rethead0,rethead1,plothead[0],plothead[1],MONO_BOOL_AND,b, drawtagfunc_ws);
 		mono_deloop(plothead[1]); mono_deloop(plothead[0]);
 skiprest:;
@@ -979,7 +978,7 @@ static void ligpoltagfunc (int rethead0, int rethead1, bunchgrp *b)
 	if ((rethead0|rethead1) < 0) { mono_deloop(rethead1); mono_deloop(rethead0); return; }
 
 		//Use this for dynamic lights only! (doesn't seem to help speed much)
-	//if ((shadowtest2_rendmode == 4) && (!(shadowtest2_sectgot[gligsect>>5]&(1<<gligsect)))) return;
+	//if ((shadowtest2_rendmode == 4) && (!(shadowtest2_sectgot[b->gligsect>>5]&(1<<b->gligsect)))) return;
 
 		//Put on FIFO:
 	rethead[0] = rethead0; rethead[1] = rethead1;
@@ -1021,10 +1020,10 @@ static void ligpoltagfunc (int rethead0, int rethead1, bunchgrp *b)
 		glp->ligpol = (ligpol_t *)realloc(glp->ligpol,glp->ligpolmal*sizeof(ligpol_t));
 		glp->ligpol[0].vert0 = 0;
 	}
-	glp->ligpol[glp->ligpoln].b2sect = gligsect;
-	glp->ligpol[glp->ligpoln].b2wall = gligwall;
-	glp->ligpol[glp->ligpoln].b2slab = gligslab;
-	i = lighash(gligsect,gligwall,gligslab);
+	glp->ligpol[glp->ligpoln].b2sect = b->gligsect;
+	glp->ligpol[glp->ligpoln].b2wall = b->gligwall;
+	glp->ligpol[glp->ligpoln].b2slab = b->gligslab;
+	i = lighash(b->gligsect,b->gligwall,b->gligslab);
 	glp->ligpol[glp->ligpoln].b2hashn = glp->lighashead[i]; glp->lighashead[i] = glp->ligpoln;
 	ligpolmaxvert = max(ligpolmaxvert,glp->ligpolvn-glp->ligpol[glp->ligpoln].vert0);
 	glp->ligpoln++;
@@ -1161,7 +1160,7 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 		else
 		{
 				  if (shadowtest2_rendmode == 4) mono_output = ligpoltagfunc; //add to light list // this will process point lights. otherwize will only use plr light.
-			else if (gflags < 2)                mono_output =   drawtagfunc_ws; //draw wall
+			else if (b->gflags < 2)                mono_output =   drawtagfunc_ws; //draw wall
 			else                                mono_output =    skytagfunc; //calls drawtagfunc inside
 			for(i=mphnum-1;i>=0;i--) if (mph[i].tag == tag) mono_bool(mph[i].head[0],mph[i].head[1],plothead[0],plothead[1],MONO_BOOL_AND,b,mono_output);
 		}
@@ -1252,7 +1251,7 @@ static void gentex_sky (surf_t *sur, bunchgrp *b)
 	float f, g, h;
 	int i;
 
-	if (gflags >= 2) return; //if texture is skybox, return early
+	if (b->gflags >= 2) return; //if texture is skybox, return early
 
 		//Crappy paper sky :/
 	h = 65536;
@@ -1431,7 +1430,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 
 	twal = (bunchverts_t *)_alloca((curMap->sect[b->bunch[bid].sec].n+1)*sizeof(bunchverts_t));
 	twaln = prepbunch(bid,twal,b);
-	gligsect = s; gligslab = 0;
+	b->gligsect = s; b->gligslab = 0;
 
 	// === BUNCH MANAGEMENT: DELETE CURRENT BUNCH FROM GRID ===
 	// Removes processed bunch and compacts the bunch grid structure
@@ -1451,10 +1450,18 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 	// === DRAW CEILINGS & FLOORS ===
 	for(isflor=0;isflor<2;isflor++)
 	{
-		if (b->has_portal_clip && s==b->testignoresec)
-			continue;
+		// here, when we draw sector of the exit portal we get glitches when it would draw a triangle with point below the camera resulting in triangle spanning entire vertical of the screen
+		//if (b->has_portal_clip && s==b->testignoresec)
+		//	continue;
 		// Back-face culling: skip if camera is on wrong side of surface
-		if ((gcam.p.z >= getslopez(&sec[s],isflor,gcam.p.x,gcam.p.y)) == isflor) continue;
+
+		cam_t original_cam = b->cam;
+		original_cam.p.x -= b->testoffset.x;  // Undo portal offset
+		original_cam.p.y -= b->testoffset.y;
+		original_cam.p.z -= b->testoffset.z;
+
+		if ((original_cam.p.z >= getslopez(&sec[s],isflor,original_cam.p.x,original_cam.p.y)) == isflor)
+			continue;
 
 		// Setup surface properties (height, gradient, color)
 		fz = sec[s].z[isflor]; grad = &sec[s].grad[isflor];
@@ -1487,16 +1494,16 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		sur = &sec[s].surf[isflor];
 		gtpic = &gtile[sur->tilnum];
 		//if (!gtpic->tt.f) loadpic(gtpic);
-		if (sec[s].surf[isflor].flags & (1 << 17)) { gflags = 2; } //skybox ceil/flor
+		if (sec[s].surf[isflor].flags & (1 << 17)) { b->gflags = 2; } //skybox ceil/flor
 		else if (sec[s].surf[isflor].flags & (1 << 16)) {  //parallaxing ceil/flor
-			gflags = 1;
+			b->gflags = 1;
 			gentex_sky(sur, b);
 		}
 		else {
-			gflags = 0;
+			b->gflags = 0;
 			gentex_ceilflor(&sec[s], wal, sur, isflor, b);
 		}
-		gligwall = isflor - 2;
+		b->gligwall = isflor - 2;
 		drawpol_befclip(s,-1,plothead[0],plothead[1],(isflor<<2)+3,b);
 #ifdef STANDALONE
 		gcnt--; if (gcnt <= 0) return;
@@ -1566,9 +1573,9 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 				if ((!(m & 1)) || (wal[w].surf.flags & (1 << 5))) //Draw wall here //(1<<5): 1-way
 				{
 					//	gtpic = &gtile[sur->tilnum]; if (!gtpic->tt.f) loadpic(gtpic);
-					if (sur->flags & (1 << 17)) { gflags = 2; } //skybox ceil/flor
+					if (sur->flags & (1 << 17)) { b->gflags = 2; } //skybox ceil/flor
 					else if (sur->flags & (1 << 16)) {
-						gflags = 1;
+						b->gflags = 1;
 						gentex_sky(sur, b);
 					} //parallaxing ceil/flor
 					else {
@@ -1594,16 +1601,16 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 						npol2[1].v = sur->uv[1].y * dx + npol2[0].v;
 						npol2[2].u = sur->uv[2].x + npol2[0].u;
 						npol2[2].v = sur->uv[2].y + npol2[0].v;
-						gflags = 0;
+						b->gflags = 0;
 						gentex_wall(npol2, sur, b);
 					}
-					gligwall = w;
-					gligslab = m;
+					b->gligwall = w;
+					b->gligslab = m;
 					ns = -1;
 					/* notes:
-					 *	gligsect = s;        // Current sector
-						gligwall = w;        // Wall index
-						gligslab = m;        // Segment/slab number (0,1,2... for each vertical division)*/
+					 *	b->gligsect = s;        // Current sector
+						b->gligwall = w;        // Wall index
+						b->gligslab = m;        // Segment/slab number (0,1,2... for each vertical division)*/
 				} else ns = verts[m >> 1].s; // Portal to adjacent sector
 
 				// Render the wall polygon
@@ -1845,21 +1852,13 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 		}
 
 			//FIX! once means not each frame! (of course it doesn't hurt functionality)
-// had to put false here, because otherwise it crashes due to mp[] being null in monoclip inside portal.
-		if ((false) && b->has_portal_clip && recursiveDepth > 0) {
-			// For portal renders, use inherited clipping region
-			mph[0].head[0] = b->portal_clip[0];
-			mph[0].head[1] = b->portal_clip[1];
-			mph[0].tag = gcam.cursect;
-			mphnum = 1;
-		} else {
-			// For top-level render, create screen bounds
-			for (i = mphnum - 1; i >= 0; i--) {
-				mono_deloop(mph[i].head[1]);
-				mono_deloop(mph[i].head[0]);
-			}
-			mono_genfromloop(&mph[0].head[0], &mph[0].head[1], bord2, n);
+
+		for (i = mphnum - 1; i >= 0; i--) {
+			mono_deloop(mph[i].head[1]);
+			mono_deloop(mph[i].head[0]);
 		}
+		mono_genfromloop(&mph[0].head[0], &mph[0].head[1], bord2, n);
+
 		mph[0].tag = gcam.cursect;
 		mphnum = 1;
 
@@ -1978,8 +1977,8 @@ static void draw_hsr_enter_portal( mapstate_t* map, int endportaln, bunchgrp *pa
 	newctx.testignoresec = igns;
 	draw_hsr_polymost_ctx(map, &newctx);
 
-	mono_deloop(plothead1);
-	mono_deloop(plothead0);
+	//mono_deloop(plothead1);
+	//mono_deloop(plothead0);
 }
 
 typedef struct { int sect; point3d p; float rgb[3]; int useshadow; } drawkv6_lightpos_t;
