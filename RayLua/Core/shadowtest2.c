@@ -1031,7 +1031,7 @@ static void ligpoltagfunc (int rethead0, int rethead1, bunchgrp *b)
 	glp->ligpol[glp->ligpoln].vert0 = glp->ligpolvn;
 }
 
-static int gnewtag, gdoscansector;
+
 /*
 	Purpose: Portal traversal and sector visibility
 	Manages sector-to-sector transitions through portals
@@ -1044,12 +1044,12 @@ static void changetagfunc (int rethead0, int rethead1, bunchgrp *b)
 {
 	if ((rethead0|rethead1) < 0) return;
 
-	if ((gdoscansector) && (!(b->sectgot[gnewtag>>5]&(1<<gnewtag)))) scansector(gnewtag,b);
+	if ((b->gdoscansector) && (!(b->sectgot[b->gnewtag>>5]&(1<<b->gnewtag)))) scansector(b->gnewtag,b);
 
 	mph_check(mphnum);
 	mph[mphnum].head[0] = rethead0;
 	mph[mphnum].head[1] = rethead1;
-	mph[mphnum].tag = gnewtag;
+	mph[mphnum].tag = b->gnewtag;
 	mphnum++;
 }
 	//flags&1: do and
@@ -1127,7 +1127,7 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 	{
 		if (newtag >= 0)
 		{
-			gnewtag = newtag; gdoscansector = 1; omph0 = mphnum;
+			b->gnewtag = newtag; b->gdoscansector = 1; omph0 = mphnum;
 			for (i = mphnum - 1; i >= 0; i--)
 				if (mph[i].tag == tag)
 					mono_bool(
@@ -1152,7 +1152,7 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 					mph[omph0] = mph[l]; k = omph0; omph0++;
 					for(j=omph0-1;j>=0;j--) //Join monos
 					{
-						if (mph[j].tag != gnewtag) continue;
+						if (mph[j].tag != b->gnewtag) continue;
 						if (!mono_join(mph[j].head[0],mph[j].head[1],mph[k].head[0],mph[k].head[1],&i0,&i1)) continue;
 						for(i=2-1;i>=0;i--) { mono_deloop(mph[k].head[i]); mono_deloop(mph[j].head[i]); }
 						omph0--; mph[k] = mph[omph0];
@@ -1176,7 +1176,7 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 		if (!(flags&4)) j = MONO_BOOL_SUB;
 					  else j = MONO_BOOL_SUB_REV;
 
-		gnewtag = tag; gdoscansector = 0; omph0 = mphnum; omph1 = mphnum;
+		b->gnewtag = tag; b->gdoscansector = 0; omph0 = mphnum; omph1 = mphnum;
 		for(i=mphnum-1;i>=0;i--)
 		{
 			if (mph[i].tag != tag) continue;
@@ -1194,7 +1194,7 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 				mph[omph0] = mph[l]; k = omph0; omph0++;
 				for(j=omph0-1;j>=0;j--) //Join monos
 				{
-					if (mph[j].tag != gnewtag) continue;
+					if (mph[j].tag != b->gnewtag) continue;
 					if (!mono_join(mph[j].head[0], mph[j].head[1], mph[k].head[0], mph[k].head[1], &i0, &i1)) continue;
 					for (i = 2 - 1; i >= 0; i--) {
 						mono_deloop(mph[k].head[i]);
@@ -1521,7 +1521,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 	for(i=bid+1;i<b->bunchn;i++) b->bunchgrid[(((i-1)*i)>>1)+bid] = ((b->bunchgrid[j+i]&1)<<1) + (b->bunchgrid[j+i]>>1);
 
 	// === DRAW CEILINGS & FLOORS ===
-	for(isflor=0;isflor<2;isflor++)
+	for(isflor=0;isflor<2;isflor++) // floor ceil
 	{
 		// here, when we draw sector of the exit portal we get glitches when it would draw a triangle with point below the camera resulting in triangle spanning entire vertical of the screen
 		//if (b->has_portal_clip && s==b->testignoresec)
@@ -1643,60 +1643,62 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 
 			// Render wall segment if visible
 
-				if ((!(m & 1)) || (wal[w].surf.flags & (1 << 5))) //Draw wall here //(1<<5): 1-way
-				{
-					//	gtpic = &gtile[sur->tilnum]; if (!gtpic->tt.f) loadpic(gtpic);
-					if (sur->flags & (1 << 17)) { b->gflags = 2; } //skybox ceil/flor
-					else if (sur->flags & (1 << 16)) {
-						b->gflags = 1;
-						gentex_sky(sur, b);
-					} //parallaxing ceil/flor
-					else {
-						// Calculate UV mapping for wall texture
-						npol2[0].x = wal[w].x;
-						npol2[0].y = wal[w].y;
-						npol2[0].z = getslopez(&sec[s], 0, wal[w].x, wal[w].y);
-						npol2[1].x = wal[nw].x;
-						npol2[1].y = wal[nw].y;
-						npol2[1].z = npol2[0].z;
-						npol2[2].x = wal[w].x;
-						npol2[2].y = wal[w].y;
-						npol2[2].z = npol2[0].z + 1.f;
-						// Determine reference Z-level texture alignment
-						if (!(sur->flags & 4)) f = sec[s].z[0];
-						else if (!vn) f = sec[s].z[1]; //White walls don't have verts[]!
-						else if (!m) f = sec[verts[0].s].z[0];
-						else f = sec[verts[(m - 1) >> 1].s].z[0];
-						// Apply UV coordinates with proper scaling
-						npol2[0].u = sur->uv[0].x;
-						npol2[0].v = sur->uv[2].y * (npol2[0].z - f) + sur->uv[0].y;
-						npol2[1].u = sur->uv[1].x * dx + npol2[0].u;
-						npol2[1].v = sur->uv[1].y * dx + npol2[0].v;
-						npol2[2].u = sur->uv[2].x + npol2[0].u;
-						npol2[2].v = sur->uv[2].y + npol2[0].v;
-						b->gflags = 0;
-						gentex_wall(npol2, sur, b);
-					}
-					b->gligwall = w;
-					b->gligslab = m;
-					ns = -1;
-					/* notes:
-					 *	b->gligsect = s;        // Current sector
-						b->gligwall = w;        // Wall index
-						b->gligslab = m;        // Segment/slab number (0,1,2... for each vertical division)*/
-				} else ns = verts[m >> 1].s; // Portal to adjacent sector
-/*
-			*			int prtn = wal[w].tags[1];
-						if (prtn >= 0) {
-			//				if (b->has_portal_clip && s == b->testignoresec && w == b->testignorewall)
-			//					continue;
-							drawpol_befclip(s, portals[prtn].own_sec, plothead[0], plothead[1], ((m > vn) << 2) + 3, b);
-							draw_hsr_enter_portal(map, prtn, b,plothead[0],plothead[1]);
-						} else {
- **/
-				// Render the wall polygon
+			if ((!(m & 1)) || (wal[w].surf.flags & (1 << 5))) //Draw wall here //(1<<5): 1-way
+			{
+				//	gtpic = &gtile[sur->tilnum]; if (!gtpic->tt.f) loadpic(gtpic);
+				if (sur->flags & (1 << 17))
+				{ b->gflags = 2; } //skybox ceil/flor
+				else if (sur->flags & (1 << 16)) {
+					b->gflags = 1;
+					gentex_sky(sur, b);
+				} //parallaxing ceil/flor
+				else {
+					// Calculate UV mapping for wall texture
+					npol2[0].x = wal[w].x;
+					npol2[0].y = wal[w].y;
+					npol2[0].z = getslopez(&sec[s], 0, wal[w].x, wal[w].y);
+					npol2[1].x = wal[nw].x;
+					npol2[1].y = wal[nw].y;
+					npol2[1].z = npol2[0].z;
+					npol2[2].x = wal[w].x;
+					npol2[2].y = wal[w].y;
+					npol2[2].z = npol2[0].z + 1.f;
+					// Determine reference Z-level texture alignment
+					if (!(sur->flags & 4)) f = sec[s].z[0];
+					else if (!vn) f = sec[s].z[1]; //White walls don't have verts[]!
+					else if (!m) f = sec[verts[0].s].z[0];
+					else f = sec[verts[(m - 1) >> 1].s].z[0];
+					// Apply UV coordinates with proper scaling
+					npol2[0].u = sur->uv[0].x;
+					npol2[0].v = sur->uv[2].y * (npol2[0].z - f) + sur->uv[0].y;
+					npol2[1].u = sur->uv[1].x * dx + npol2[0].u;
+					npol2[1].v = sur->uv[1].y * dx + npol2[0].v;
+					npol2[2].u = sur->uv[2].x + npol2[0].u;
+					npol2[2].v = sur->uv[2].y + npol2[0].v;
+					b->gflags = 0;
+					gentex_wall(npol2, sur, b);
+				}
+				b->gligwall = w;
+				b->gligslab = m;
+				ns = -1;
+				/* notes:
+				 *	b->gligsect = s;        // Current sector
+					b->gligwall = w;        // Wall index
+					b->gligslab = m;        // Segment/slab number (0,1,2... for each vertical division)*/
+			} else {
+				ns = verts[m >> 1].s; // Portal to adjacent sector
+			}
+			// Render the wall polygon
+			int endpn = wal[w].tags[1];
+			if (endpn >= 0) {
+				//if (b->has_portal_clip && s == b->testignoresec && w == b->testignorewall)
+					//continue;
+				drawpol_befclip(s, portals[endpn].own_sec, plothead[0], plothead[1],  3, b);
+				draw_hsr_enter_portal(map, endpn, b,plothead[0],plothead[1]);
+			} else {
 				drawpol_befclip(s, ns, plothead[0], plothead[1], ((m > vn) << 2) + 3, b);
 			}
+		}
 
 	}
 }
@@ -1721,6 +1723,7 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
 	bs.cam = *cc;
 	bs.recursion_depth = 0;
 	bs.testoffset = (point3d){0,0,0};
+	bs.has_portal_clip = false;
 	draw_hsr_polymost_ctx(map,&bs);
 }
 
@@ -1728,6 +1731,10 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 	if (!newctx) {
 		return;
 	}
+	int prehead1 = -1;
+	int prehead2 = -1;
+	int presect = -1;
+
 	int recursiveDepth = newctx->recursion_depth;
 	bunchgrp *b;
 	b = newctx;
@@ -1796,18 +1803,18 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 #endif
 
 		//Hack to keep camera away from sector line; avoids clipping glitch in drawpol_befclip/changetagfunc
-	wal = lgs->sect[gcam.cursect].wall;
-	for(i=lgs->sect[gcam.cursect].n-1;i>=0;i--)
-	{
-		#define WALHAK 1e-3
-		j = wal[i].n+i;
-		d = distpoint2line2(gcam.p.x,gcam.p.y,wal[i].x,wal[i].y,wal[j].x,wal[j].y); if (d >= WALHAK*WALHAK) continue;
-		fp.x = wal[j].x-wal[i].x;
-		fp.y = wal[j].y-wal[i].y;
-		f = (WALHAK - sqrt(d))/sqrt(fp.x*fp.x + fp.y*fp.y);
-		gcam.p.x -= fp.y*f;
-		gcam.p.y += fp.x*f;
-	}
+//wal = lgs->sect[gcam.cursect].wall;
+//for(i=lgs->sect[gcam.cursect].n-1;i>=0;i--)
+//{
+//	#define WALHAK 1e-3
+//	j = wal[i].n+i;
+//	d = distpoint2line2(gcam.p.x,gcam.p.y,wal[i].x,wal[i].y,wal[j].x,wal[j].y); if (d >= WALHAK*WALHAK) continue;
+//	fp.x = wal[j].x-wal[i].x;
+//	fp.y = wal[j].y-wal[i].y;
+//	f = (WALHAK - sqrt(d))/sqrt(fp.x*fp.x + fp.y*fp.y);
+//	gcam.p.x -= fp.y*f;
+//	gcam.p.y += fp.x*f;
+//}
 
 	if (shadowtest2_rendmode != 4)
 	{
@@ -1931,33 +1938,26 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 			bord2[j].y = bord2[j].y*f + gcam.h.y;
 		}
 
+
 			//FIX! once means not each frame! (of course it doesn't hurt functionality)
+		if (!b->has_portal_clip) {
+			// Standard case: clear existing state and create new viewport
+			for (i = mphnum - 1; i >= 0; i--) {
+				mono_deloop(mph[i].head[1]);
+				mono_deloop(mph[i].head[0]);
+			}
 
-		for (i = mphnum - 1; i >= 0; i--) {
-			mono_deloop(mph[i].head[1]);
-			mono_deloop(mph[i].head[0]);
+			mono_genfromloop(&mph[0].head[0], &mph[0].head[1], bord2, n);
+			mph[0].tag = gcam.cursect;
+			mphnum = 1;
+		} else {
+			// dont do anything, because clipping is done by drawpol_befclip.
 		}
-		mono_genfromloop(&mph[0].head[0], &mph[0].head[1], bord2, n);
-
-		mph[0].tag = gcam.cursect;
-		mphnum = 1;
 
 		b->bunchn = 0; scansector(gcam.cursect,b);
 		while (b->bunchn)
 		{
 			memset(b->bunchgot,0,(b->bunchn+7)>>3);
-
-			//{
-			//char tbuf[1024]; sprintf(tbuf,"cnt=%d\n",(1<<31)-1-gcnt);
-			//for(i=0;i<bunchn;i++)
-			//{
-			//   for(j=0;j<bunchn;j++) sprintf(&tbuf[strlen(tbuf)],"bf(%d,%d)=%2d ",i,j,bunchfront(i,j,0));
-			//   sprintf(&tbuf[strlen(tbuf)],"\n");
-			//   //sprintf(&tbuf[strlen(tbuf)],"bunch %d: (%d:%f) (%d:%f)\n",i,bunch[i].wal0,bunch[i].fra0,bunch[i].wal1,bunch[i].fra1);
-			//}
-			//sprintf(&tbuf[strlen(tbuf)],"\n");
-			//MessageBox(ghwnd,tbuf,prognam,MB_OK);
-			//}
 
 			for(i=b->bunchn-1;i>0;i--) //assume: bunchgrid[(((j-1)*j)>>1)+i] = bunchfront(j,i,0); is valid iff:{i<j}
 			{
@@ -2007,14 +2007,20 @@ nogood:; }
 
 		if (!didcut) break;
 	}
+	if (presect>-1) {
+		// mph[0].head[0] = prehead1;
+		// mph[0].head[1] = prehead2;
+		//	mph[0].tag = presect ;
+
+
+	}
 }
 
 static void draw_hsr_enter_portal( mapstate_t* map, int endportaln, bunchgrp *parentctx, int plothead0, int plothead1) {
 	if (parentctx->recursion_depth >= MAX_PORTAL_DEPTH) {
-		mono_deloop(plothead1);
-		mono_deloop(plothead0);
 		return;
 	}
+
 	int tgtspi = portals[endportaln].own_spri;
 	int backp = portals[endportaln].target_portal;
 	int entry = portals[backp].own_spri;
@@ -2058,9 +2064,6 @@ static void draw_hsr_enter_portal( mapstate_t* map, int endportaln, bunchgrp *pa
 	newctx.testignorewall = ignw;
 	newctx.testignoresec = igns;
 	draw_hsr_polymost_ctx(map, &newctx);
-
-	//mono_deloop(plothead1);
-	//mono_deloop(plothead0);
 }
 
 typedef struct { int sect; point3d p; float rgb[3]; int useshadow; } drawkv6_lightpos_t;

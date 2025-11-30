@@ -77,6 +77,7 @@ static Shader uvShader ;
 static Shader lightShader ;
 static int lightPosLoc;
 static int lightRangeLoc;
+static bool syncam = true;
 class DumbRender
 {
 
@@ -121,9 +122,9 @@ public:
                 map->sect[i].wall[wn].tags[1]=-1;
                 if( map->sect[i].wall[wn].surf.hitag==5) {
 
-                    portals[portaln].entry_sect = i;
-                    portals[portaln].entry_sprite = map->sect[i].headspri;
-                    portals[portaln].entry_surfid = wn;
+                    portals[portaln].own_sec = i;
+                    portals[portaln].own_spri = map->sect[i].headspri;
+                    portals[portaln].own_surfid = wn;
                     portals[portaln].iswall = true;
                     //tmp hak
                     portals[portaln].target_portal = 1-portaln;
@@ -435,7 +436,7 @@ public:
             rlBegin(RL_TRIANGLES);
             glEnable(GL_POLYGON_OFFSET_FILL);
             glPolygonOffset(-1.0f, 1.0f);
-
+rlDisableDepthMask();
         for (int j = 1; j < vertCount - 1; j++) {
             int idx[] = {v0, v0 + j, v0 + j + 1};
             for (int k = 0; k < 3; k++) {
@@ -448,7 +449,7 @@ public:
                 float final_u = u ;/// (65536.0f);
                 float final_v = v;// / (65536.0f);
 
-                rlColor4f(i*5, 1, 0.3f, 0.3);
+                rlColor4f(i*15, 0.7, 0.3f, 0.5);
                 rlTexCoord2f(final_u, final_v);
                 rlVertex3f(pt.x, -pt.z, pt.y);
             }
@@ -469,23 +470,28 @@ public:
         ClearBackground({50,50,60,255});  // Set your desired color
 
         cam_t b2cam;
-        plr.ipos = {camsrc.position.x, camsrc.position.z, -camsrc.position.y};
-        updatesect_imp(plr.ipos.x,plr.ipos.y,plr.ipos.z, &plr.cursect, map);
+        if (syncam) {
+            plr.ipos = {camsrc.position.x, camsrc.position.z, -camsrc.position.y};
+            updatesect_imp(plr.ipos.x,plr.ipos.y,plr.ipos.z, &plr.cursect, map);
 
-        Vector3 forward = Vector3Normalize(Vector3Subtract(camsrc.target, camsrc.position));
-        Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camsrc.up));
-         Vector3 up = Vector3CrossProduct(right, forward); // Recalculate orthogonal up
+            Vector3 forward = Vector3Normalize(Vector3Subtract(camsrc.target, camsrc.position));
+            Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camsrc.up));
+            Vector3 up = Vector3CrossProduct(right, forward); // Recalculate orthogonal up
 
-        // Convert to Build2 coordinate system (x->x, y->z, z->-y)
-        plr.ifor.x = forward.x;  plr.ifor.y = forward.z;  plr.ifor.z = -forward.y;
-        plr.irig.x = right.x;    plr.irig.y = right.z;    plr.irig.z = -right.y;
-        plr.idow.x = -up.x;       plr.idow.y = -up.z;       plr.idow.z = up.y;
+            // Convert to Build2 coordinate system (x->x, y->z, z->-y)
+            plr.ifor.x = forward.x;  plr.ifor.y = forward.z;  plr.ifor.z = -forward.y;
+            plr.irig.x = right.x;    plr.irig.y = right.z;    plr.irig.z = -right.y;
+            plr.idow.x = -up.x;       plr.idow.y = -up.z;       plr.idow.z = up.y;
 
 
-        b2cam.p = plr.ipos;
-        b2cam.f = plr.ifor;
-        b2cam.r = plr.irig;
-        b2cam.d = plr.idow;
+            b2cam.p = plr.ipos;
+            b2cam.f = plr.ifor;
+            b2cam.r = plr.irig;
+            b2cam.d = plr.idow;
+        }
+
+        if (IsKeyPressed(KEY_U))
+            syncam = !syncam;
 
         DrawEyePoly(sw, sh, &plr, &b2cam); // ken render
 
@@ -504,7 +510,7 @@ public:
                 // eypolis
                 int v0;
                 int vertCount;
-
+                BeginBlendMode(BLEND_ADDITIVE);
                 if (draw_eyepol_wspace(sw, sh, i, v0, vertCount)) continue;
 
                 if (drawlines)

@@ -77,7 +77,7 @@ typedef struct {
 	int recursion_depth;
 	float gouvmat[9];
 	int gligsect, gligwall, gligslab, gflags;
-
+	int gnewtag, gdoscansector;
 	point3d testoffset;
 	int testignorewall;
 	int testignoresec;
