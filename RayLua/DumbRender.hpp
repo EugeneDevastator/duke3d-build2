@@ -400,7 +400,7 @@ public:
         //---
         shadowtest2_rendmode = 2;
         reset_context();
-        draw_hsr_polymost(cam, map,0);
+        draw_hsr_polymost(cam, map,0,{0,0,0});
         shadowtest2_rendmode = 4;
 
        // shadowtest2_numlights =1;
@@ -415,7 +415,7 @@ public:
                 ncam.p = shadowtest2_light[glignum].p;
                 reset_context();
                 ncam.cursect = shadowtest2_light[glignum].sect;
-                draw_hsr_polymost(&ncam,map,0);
+                draw_hsr_polymost(&ncam,map,0,{0,0,0});
             }
         }
         shadowtest2_setcam(cam);
@@ -1488,7 +1488,7 @@ private:
             if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
             map->blankheadspri = i;
         }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/prt.MAP", map);
+        loadmap_imp((char*)"c:/Eugene/Games/build2/prt3.MAP", map);
     }
 };
 

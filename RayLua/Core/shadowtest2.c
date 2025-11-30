@@ -811,9 +811,9 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 #else
 			f = 1.0/((gouvmat[0]*fx + gouvmat[3]*fy + gouvmat[6])*gcam.h.z);
 #endif
-			eyepolv[eyepolvn].x = ((fx-gcam.h.x)*gcam.r.x + (fy-gcam.h.y)*gcam.d.x + (gcam.h.z)*gcam.f.x)*f + gcam.p.x;
-			eyepolv[eyepolvn].y = ((fx-gcam.h.x)*gcam.r.y + (fy-gcam.h.y)*gcam.d.y + (gcam.h.z)*gcam.f.y)*f + gcam.p.y;
-			eyepolv[eyepolvn].z = ((fx-gcam.h.x)*gcam.r.z + (fy-gcam.h.y)*gcam.d.z + (gcam.h.z)*gcam.f.z)*f + gcam.p.z;
+			eyepolv[eyepolvn].x = -b->testoffset.x+((fx-gcam.h.x)*gcam.r.x + (fy-gcam.h.y)*gcam.d.x + (gcam.h.z)*gcam.f.x)*f + gcam.p.x;
+			eyepolv[eyepolvn].y = -b->testoffset.y+((fx-gcam.h.x)*gcam.r.y + (fy-gcam.h.y)*gcam.d.y + (gcam.h.z)*gcam.f.y)*f + gcam.p.y;
+			eyepolv[eyepolvn].z = -b->testoffset.z+((fx-gcam.h.x)*gcam.r.z + (fy-gcam.h.y)*gcam.d.z + (gcam.h.z)*gcam.f.z)*f + gcam.p.z;
 
 			eyepolvn++;
 
@@ -1642,7 +1642,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 				int nextspr = portals[prtn].entry_sprite;
 				int backp = portals[prtn].target_portal;
 				int entry = portals[backp].entry_sprite;
-				draw_hsr_enter_portal(gcam, map, entry, nextspr, b->recursion_depth);
+				draw_hsr_enter_portal(gcam, map, entry, nextspr, b);
 			} else {
 				if ((!(m & 1)) || (wal[w].surf.flags & (1 << 5))) //Draw wall here //(1<<5): 1-way
 				{
@@ -1710,7 +1710,7 @@ void reset_context() {
 	eyepoln = 0; eyepolvn = 0;
 }
 
-void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, int recursiveDepth)
+void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, int recursiveDepth, point3d offset)
 {
 	if (recursiveDepth > MAX_PORTAL_DEPTH)
 		return;
@@ -1726,6 +1726,7 @@ void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, int recursiveDepth)
 	bs.sectgotn = 0;
 	bs.sectgot = 0;
 	bs.sectgotmal = 0;
+	bs.testoffset = offset;
 	cam_t gcam = bs.cam;
 
 	wall_t *wal;
@@ -1998,7 +1999,7 @@ nogood:; }
 	}
 }
 
-static void draw_hsr_enter_portal(cam_t oricam, mapstate_t* map, int entryspr, int targetspr, int currentDepth) {
+static void draw_hsr_enter_portal(cam_t oricam, mapstate_t* map, int entryspr, int targetspr, bunchgrp *b) {
 	cam_t ncam = oricam;
 
 	spri_t tgs = map->spri[targetspr];
@@ -2013,7 +2014,11 @@ static void draw_hsr_enter_portal(cam_t oricam, mapstate_t* map, int entryspr, i
 //	ncam.f = s.f;
 //	ncam.r = s.r;
 //	ncam.d = s.d;
-	draw_hsr_polymost(&ncam, map, currentDepth+1);
+
+	dx+=b->testoffset.x;
+	dy+=b->testoffset.y;
+	dz+=b->testoffset.z;
+	draw_hsr_polymost(&ncam, map, b->recursion_depth+1,(point3d){dx,dy,dz});
 }
 
 typedef struct { int sect; point3d p; float rgb[3]; int useshadow; } drawkv6_lightpos_t;

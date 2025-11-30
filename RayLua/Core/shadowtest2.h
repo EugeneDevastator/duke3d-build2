@@ -126,7 +126,7 @@ void drawpol_befclip(int tag, int newtag, int plothead0, int plothead1, int flag
  * @param cursect Current sector index
  */
 void reset_context();
-void draw_hsr_polymost(cam_t *cc, mapstate_t *lgs, int recursiveDepth);
+void draw_hsr_polymost(cam_t *cc, mapstate_t *lgs, int recursiveDepth, point3d offset);
 
 // ================================================================================================
 // POLYGONAL SHADOW CREATION FUNCTIONS

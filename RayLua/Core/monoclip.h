@@ -74,7 +74,7 @@ typedef struct {
 	int sectgotn;
 
 	int recursion_depth;
-
+	point3d testoffset;
 } bunchgrp;
 
 extern mp_t *mp;
