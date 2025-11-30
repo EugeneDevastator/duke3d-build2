@@ -79,7 +79,7 @@ typedef struct {
 	point3d testoffset;
 	int testignorewall;
 	int testignoresec;
-
+	float gouvmat[9];
 } bunchgrp;
 
 extern mp_t *mp;

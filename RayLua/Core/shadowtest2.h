@@ -131,13 +131,13 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx);
 // ================================================================================================
 // POLYGONAL SHADOW CREATION FUNCTIONS
 // ================================================================================================
-static void draw_hsr_enter_portal(mapstate_t* map, int endportaln, bunchgrp *b, int plothead0, int plothead1);
-
+void draw_hsr_enter_portal(mapstate_t* map, int endportaln, bunchgrp *b, int plothead0, int plothead1);
+void gentex_xform (float *ouvmat, bunchgrp *b);
 /** Creates shadow polygon lists for light sources
  * @param rethead0 First polygon loop head from clipping
  * @param rethead1 Second polygon loop head from clipping
  */
-void ligpoltagfunc(int rethead0, int rethead1);
+void ligpoltagfunc(int rethead0, int rethead1, bunchgrp *b);
 
 /** Resets light polygon data structures
  * @param ind Light index to reset (-1 for all lights)

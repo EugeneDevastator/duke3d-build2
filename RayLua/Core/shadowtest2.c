@@ -118,7 +118,7 @@ static player_transform *gps;
 
 	//Texture mapping parameters
 static tile_t *gtpic;
-static float gouvmat[9];
+
 static int gcurcol;
 
 #define LIGHTMAX 256 //FIX:make dynamic!
@@ -688,7 +688,7 @@ static void drawpol_aftclip (int plothead0, int plothead1) //this function for d
 
 	i = RENDFLAGS_OUVMAT|RENDFLAGS_NODEPTHTEST|RENDFLAGS_NOTRCP|RENDFLAGS_GMAT;
 	if (renderinterp) i |= RENDFLAGS_INTERP;
-	drawpoly(&gtt,(vertyp *)vert,n,gcurcol,(((unsigned)gcurcol)>>24)/16.0,gouvmat,i);
+	drawpoly(&gtt,(vertyp *)vert,n,gcurcol,(((unsigned)gcurcol)>>24)/16.0,b->gouvmat,i);
 
 	if (shadowtest2_rendmode != 2)
 	{
@@ -769,9 +769,6 @@ void eyepol_drawfunc (int ind)
 	//												  drawpix(&gcam.c,i+0,j+2,0xffffff); drawpix(&gcam.c,i+1,j+2,0xffffff);
 	}
 }
-
-static void gentex_xform(float *f);
-
 /*
 	Purpose: Renders visible geometry polygons to world space eyepol array
 	Converts 3D polygon vertices to world coordinates (no screen projection)
@@ -807,9 +804,9 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 			fy        =  (mp[i].x*b->xformmat[3] + mp[i].y*b->xformmat[4] + b->gnadd.y)*f + gcam.h.y;
 
 #if (USEINTZ)
-			f = 1.0/((gouvmat[0]*fx + gouvmat[3]*fy + gouvmat[6])*1048576.0*256.0);
+			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*1048576.0*256.0);
 #else
-			f = 1.0/((gouvmat[0]*fx + gouvmat[3]*fy + gouvmat[6])*gcam.h.z);
+			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*gcam.h.z);
 #endif
 			eyepolv[eyepolvn].x = -b->testoffset.x+((fx-gcam.h.x)*gcam.r.x + (fy-gcam.h.y)*gcam.d.x + (gcam.h.z)*gcam.f.x)*f + gcam.p.x;
 			eyepolv[eyepolvn].y = -b->testoffset.y+((fx-gcam.h.x)*gcam.r.y + (fy-gcam.h.y)*gcam.d.y + (gcam.h.z)*gcam.f.y)*f + gcam.p.y;
@@ -830,7 +827,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 	}
 
 	if (gflags < 2)
-		memcpy((void *)eyepol[eyepoln].ouvmat,(void *)gouvmat,sizeof(gouvmat[0])*9);
+		memcpy((void *)eyepol[eyepoln].ouvmat,(void *)b->gouvmat,sizeof(b->gouvmat[0])*9);
 	else
 	{
 		// Skybox texture mapping (same as original)
@@ -870,7 +867,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 			fptr[i+1] = ox*gcam.d.x + oy*gcam.d.y + oz*gcam.d.z;
 			fptr[i+2] = ox*gcam.f.x + oy*gcam.f.y + oz*gcam.f.z;
 		}
-		gentex_xform(fptr);
+		gentex_xform(fptr,b);
 	}
 
 	eyepol[eyepoln].tpic = gtpic;
@@ -1004,9 +1001,9 @@ static void ligpoltagfunc (int rethead0, int rethead1, bunchgrp *b)
 			fy        =  (mp[i].x*b->xformmat[3] + mp[i].y*b->xformmat[4] + b->gnadd.y)*f + gcam.h.y;
 
 #if (USEINTZ)
-			f = 1.0/((gouvmat[0]*fx + gouvmat[3]*fy + gouvmat[6])*1048576.0*256.0);
+			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*1048576.0*256.0);
 #else
-			f = 1.0/((gouvmat[0]*fx + gouvmat[3]*fy + gouvmat[6])*gcam.h.z);
+			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*gcam.h.z);
 #endif
 			glp->ligpolv[glp->ligpolvn].x = ((fx-gcam.h.x)*gcam.r.x + (fy-gcam.h.y)*gcam.d.x + (gcam.h.z)*gcam.f.x)*f + gcam.p.x;
 			glp->ligpolv[glp->ligpolvn].y = ((fx-gcam.h.x)*gcam.r.y + (fy-gcam.h.y)*gcam.d.y + (gcam.h.z)*gcam.f.y)*f + gcam.p.y;
@@ -1064,45 +1061,13 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 	#define BSCISDIST 0.000001 //Reduces probability of glitch further
 	//#define BSCISDIST 0.0001 //Gaps undetectable
 	//#define BSCISDIST 0.1 //Huge gaps
-	void (*mono_output)(int h0, int h1);
+	void (*mono_output)(int h0, int h1, bunchgrp *b);
 	dpoint3d *otp, *tp;
 	double f, ox, oy, oz;
 	int i, j, k, l, h, on, n, plothead[2], imin, imax, i0, i1, omph0, omph1;
 
 	if ((plothead0|plothead1) < 0) return;
 	plothead[0] = plothead0; plothead[1] = plothead1;
-
-#if 0
-	for(h=0;h<2;h++)
-	{
-		i = plothead[h]; j = 0;
-		do
-		{
-			float ox2, oy2, oz2;
-
-			if (h) i = mp[i].p;
-
-			ox = mp[i].x-gcam.p.x; oy = mp[i].y-gcam.p.y;
-			ox2 = oy*b->xformmatc - ox*b->xformmats; oy2 = mp[i].z-gcam.p.z;
-			oz2 = ox*b->xformmatc + oy*b->xformmats;
-
-			if (oz2 > BSCISDIST)
-			{
-				f = gcam.h.z/oz2;
-				ox2 = ox2*f + gcam.h.x;
-				oy2 = oy2*f + gcam.h.y;
-				print6x8((tiltyp *)&gdd,ox2-3,oy2-4,0xffffff,-1,"o");
-			}
-			j++;
-
-			if (!h) i = mp[i].n;
-		} while (i != plothead[h]);
-
-		print6x8((tiltyp *)&gdd,fixposx+h*8,fixposy,0xffffff,-1,"%d",j);
-	}
-	print6x8((tiltyp *)&gdd,fixposx+24,fixposy,0xffffff,-1,"%d->%d",tag,newtag);
-	fixposy += 8;
-#endif
 
 	n = 2; for(h=0;h<2;h++) for(i=mp[plothead[h]].n;i!=plothead[h];i=mp[i].n) n++;
 	otp = (dpoint3d *)_alloca(n*sizeof(dpoint3d));
@@ -1154,46 +1119,6 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 	mono_genfromloop(&plothead[0],&plothead[1],tp,n);
 	if ((plothead[0]|plothead[1]) < 0) { mono_deloop(plothead[0]); mono_deloop(plothead[1]); return; }
 
-#ifdef STANDALONE
-	if ((gcnt <= 1) && (keystatus[0x38]))
-	{
-#if 1
-		drawpol_aftclip(plothead[0],plothead[1]);
-#endif
-#if 1
-		print6x8(&gcam.c,fixposx,fixposy,0xffffff,0,"%d -> %d",tag,newtag); fixposy += 8; if (fixposy >= gdd.y) { fixposy = 0; fixposx += 256; }
-		for(j=0;j<mphnum;j++)
-		{
-			if (mph[j].tag != tag) continue;
-			for(h=0;h<2;h++)
-			{
-				i = mph[j].head[h];
-				do
-				{
-					print6x8(&gcam.c,fixposx,fixposy,0xff8000,0,"   %6.2f %6.2f",mp[i].x,mp[i].y); fixposy += 8; if (fixposy >= gdd.y) { fixposy = 0; fixposx += 256; }
-					i = mp[i].n;
-				} while (i != mph[j].head[h]);
-				fixposy += 8;
-			}
-		}
-		for(h=0;h<2;h++)
-		{
-			//for(i=mp[plothead[h]].n;i!=plothead[h];i=mp[i].n) drawline2d(&gcam.c,mp[mp[i].p].x,mp[mp[i].p].y,mp[i].x,mp[i].y,0xffffff);
-			i = plothead[h];
-			do
-			{
-				if (keystatus[0x36]) if ((fabs(mp[i].x) < 1e-12) && (mp[i].y > 0)) mp[i].x = 0;
-				print6x8(&gcam.c,fixposx,fixposy,0xffffff,0,"   %6.2f %6.2f",mp[i].x,mp[i].y); fixposy += 8; if (fixposy >= gdd.y) { fixposy = 0; fixposx += 256; }
-				i = mp[i].n;
-			} while (i != plothead[h]);
-			fixposy += 8;
-		}
-#endif
-		for(i=2-1;i>=0;i--) mono_deloop(plothead[i]);
-		return;
-	}
-#endif
-
 	if (flags&1)
 	{
 		if (newtag >= 0)
@@ -1208,11 +1133,15 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 						plothead[1],
 						MONO_BOOL_AND,
 						b,
-						changetagfunc); //follow portal
+						changetagfunc); //follow portal -- probably here we should inject new rendering code somehow
+			///int prtn = wal[w].tags[1];
+			///if (prtn >= 0) { // ENTER PORTAL
+///
+			///	if (b->has_portal_clip &&  s==b->testignoresec && w==b->testignorewall)
+			///		continue;
+			///	draw_hsr_enter_portal(map, prtn, b,plothead[0],plothead[1]);
+			///}
 
-#ifdef STANDALONE
-			if (!keystatus[0x1d])
-#endif
 			{
 				for(l=omph0;l<mphnum;l++)
 				{
@@ -1254,10 +1183,7 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 		}
 
 			//valid mph's stored in 2 blocks: (0<=?<omph0), (omph1<=?<mphnum)
-#ifdef STANDALONE
-		if (!keystatus[0x1d])
-		{
-#endif
+
 			for(l=omph1;l<mphnum;l++)
 			{
 				mph[omph0] = mph[l]; k = omph0; omph0++;
@@ -1276,13 +1202,6 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 					k = j;
 				}
 			}
-#ifdef STANDALONE
-		}
-		else
-		{
-			for(l=omph1;l<mphnum;l++) { mph[omph0] = mph[l]; k = omph0; omph0++; }
-		}
-#endif
 		mphnum = omph0;
 
 	}
@@ -1339,10 +1258,10 @@ static void gentex_sky (surf_t *sur, bunchgrp *b)
 	h = 65536;
 	f = atan2(gcam.f.y,gcam.f.x)         *-h/PI*2.f;
 	g = asin(min(max(gcam.f.z,-1.f),1.f))*-h/PI*2.f;
-	gouvmat[0] = sur->uv[0].x*h + f; gouvmat[3] = sur->uv[1].x*h; gouvmat[6] = sur->uv[2].x*h;
-	gouvmat[1] = sur->uv[0].y*h + g; gouvmat[4] = sur->uv[1].y*h; gouvmat[7] = sur->uv[2].y*h;
-	gouvmat[2] =              h    ; gouvmat[5] =            0.f; gouvmat[8] =            0.f;
-	gentex_xform(gouvmat,b);
+	b->gouvmat[0] = sur->uv[0].x*h + f; b->gouvmat[3] = sur->uv[1].x*h; b->gouvmat[6] = sur->uv[2].x*h;
+	b->gouvmat[1] = sur->uv[0].y*h + g; b->gouvmat[4] = sur->uv[1].y*h; b->gouvmat[7] = sur->uv[2].y*h;
+	b->gouvmat[2] =              h    ; b->gouvmat[5] =            0.f; b->gouvmat[8] =            0.f;
+	gentex_xform(b->gouvmat,b);
 }
 
 static void gentex_ceilflor (sect_t *sec, wall_t *wal, surf_t *sur, int isflor, bunchgrp *b)
@@ -1379,17 +1298,17 @@ static void gentex_ceilflor (sect_t *sec, wall_t *wal, surf_t *sur, int isflor, 
 		oy = (fk[0]*fk[5] - fk[1]*fk[4])*f;
 		oz = getslopez(sec,isflor,ox,oy);
 		ox -= gcam.p.x; oy -= gcam.p.y; oz -= gcam.p.z;
-		gouvmat[i+0] = ox*gcam.r.x + oy*gcam.r.y + oz*gcam.r.z;
-		gouvmat[i+1] = ox*gcam.d.x + oy*gcam.d.y + oz*gcam.d.z;
-		gouvmat[i+2] = ox*gcam.f.x + oy*gcam.f.y + oz*gcam.f.z;
+		b->gouvmat[i+0] = ox*gcam.r.x + oy*gcam.r.y + oz*gcam.r.z;
+		b->gouvmat[i+1] = ox*gcam.d.x + oy*gcam.d.y + oz*gcam.d.z;
+		b->gouvmat[i+2] = ox*gcam.f.x + oy*gcam.f.y + oz*gcam.f.z;
 	}
 
-	for(i=9-1;i>=0;i--) gouvmat[i] *= 256.f;
+	for(i=9-1;i>=0;i--) b->gouvmat[i] *= 256.f;
 
-	gouvmat[3] -= gouvmat[0]; gouvmat[4] -= gouvmat[1]; gouvmat[5] -= gouvmat[2];
-	gouvmat[6] -= gouvmat[0]; gouvmat[7] -= gouvmat[1]; gouvmat[8] -= gouvmat[2];
+	b->gouvmat[3] -= b->gouvmat[0]; b->gouvmat[4] -= b->gouvmat[1]; b->gouvmat[5] -= b->gouvmat[2];
+	b->gouvmat[6] -= b->gouvmat[0]; b->gouvmat[7] -= b->gouvmat[1]; b->gouvmat[8] -= b->gouvmat[2];
 
-	gentex_xform(gouvmat, b);
+	gentex_xform(b->gouvmat, b);
 }
 
 static void gentex_wall (kgln_t *npol2, surf_t *sur, bunchgrp *b)
@@ -1408,10 +1327,10 @@ static void gentex_wall (kgln_t *npol2, surf_t *sur, bunchgrp *b)
 
 		//sx = npol2[i].x*gcam.h.z/npol2[i].z+gcam.h.x
 		//sy = npol2[i].y*gcam.h.z/npol2[i].z+gcam.h.y
-		//npol2[i].u = (gouvmat[1]*sx + gouvmat[4]*sy + gouvmat[7])/(gouvmat[0]*sx + gouvmat[3]*sy + gouvmat[6])
-		//npol2[i].v = (gouvmat[2]*sx + gouvmat[5]*sy + gouvmat[8])/(gouvmat[0]*sx + gouvmat[3]*sy + gouvmat[6])
-		//npol2[i].z =                                            1/(gouvmat[0]*sx + gouvmat[3]*sy + gouvmat[6])
-		//   Solve ^ for gouvmat[*]
+		//npol2[i].u = (b->gouvmat[1]*sx + b->gouvmat[4]*sy + b->gouvmat[7])/(b->gouvmat[0]*sx + b->gouvmat[3]*sy + b->gouvmat[6])
+		//npol2[i].v = (b->gouvmat[2]*sx + b->gouvmat[5]*sy + b->gouvmat[8])/(b->gouvmat[0]*sx + b->gouvmat[3]*sy + b->gouvmat[6])
+		//npol2[i].z =                                            1/(b->gouvmat[0]*sx + b->gouvmat[3]*sy + b->gouvmat[6])
+		//   Solve ^ for b->gouvmat[*]
 	fk[0] = npol2[0].z; fk[3] = npol2[0].x*gcam.h.z + npol2[0].z*gcam.h.x; fk[6] = npol2[0].y*gcam.h.z + npol2[0].z*gcam.h.y;
 	fk[1] = npol2[1].z; fk[4] = npol2[1].x*gcam.h.z + npol2[1].z*gcam.h.x; fk[7] = npol2[1].y*gcam.h.z + npol2[1].z*gcam.h.y;
 	fk[2] = npol2[2].z; fk[5] = npol2[2].x*gcam.h.z + npol2[2].z*gcam.h.x; fk[8] = npol2[2].y*gcam.h.z + npol2[2].z*gcam.h.y;
@@ -1424,27 +1343,27 @@ static void gentex_wall (kgln_t *npol2, surf_t *sur, bunchgrp *b)
 	fk[21] = fk[1]*fk[5] - fk[2]*fk[4];
 	fk[22] = fk[2]*fk[3] - fk[0]*fk[5];
 	fk[23] = fk[0]*fk[4] - fk[1]*fk[3];
-	gouvmat[6] = fk[12] + fk[13] + fk[14];
-	gouvmat[0] = fk[18] + fk[19] + fk[20];
-	gouvmat[3] = fk[21] + fk[22] + fk[23];
+	b->gouvmat[6] = fk[12] + fk[13] + fk[14];
+	b->gouvmat[0] = fk[18] + fk[19] + fk[20];
+	b->gouvmat[3] = fk[21] + fk[22] + fk[23];
 
-	fk[15] = gouvmat[6]*fk[0] + gouvmat[0]*fk[3] + gouvmat[3]*fk[6];
-	fk[16] = gouvmat[6]*fk[1] + gouvmat[0]*fk[4] + gouvmat[3]*fk[7];
-	fk[17] = gouvmat[6]*fk[2] + gouvmat[0]*fk[5] + gouvmat[3]*fk[8];
+	fk[15] = b->gouvmat[6]*fk[0] + b->gouvmat[0]*fk[3] + b->gouvmat[3]*fk[6];
+	fk[16] = b->gouvmat[6]*fk[1] + b->gouvmat[0]*fk[4] + b->gouvmat[3]*fk[7];
+	fk[17] = b->gouvmat[6]*fk[2] + b->gouvmat[0]*fk[5] + b->gouvmat[3]*fk[8];
 
 	fk[ 9] = fk[15]*npol2[0].u;
 	fk[10] = fk[16]*npol2[1].u;
 	fk[11] = fk[17]*npol2[2].u;
-	gouvmat[7] = fk[12]*fk[9] + fk[13]*fk[10] + fk[14]*fk[11];
-	gouvmat[1] = fk[18]*fk[9] + fk[19]*fk[10] + fk[20]*fk[11];
-	gouvmat[4] = fk[21]*fk[9] + fk[22]*fk[10] + fk[23]*fk[11];
+	b->gouvmat[7] = fk[12]*fk[9] + fk[13]*fk[10] + fk[14]*fk[11];
+	b->gouvmat[1] = fk[18]*fk[9] + fk[19]*fk[10] + fk[20]*fk[11];
+	b->gouvmat[4] = fk[21]*fk[9] + fk[22]*fk[10] + fk[23]*fk[11];
 
 	fk[ 9] = fk[15]*npol2[0].v;
 	fk[10] = fk[16]*npol2[1].v;
 	fk[11] = fk[17]*npol2[2].v;
-	gouvmat[8] = fk[12]*fk[9] + fk[13]*fk[10] + fk[14]*fk[11];
-	gouvmat[2] = fk[18]*fk[9] + fk[19]*fk[10] + fk[20]*fk[11];
-	gouvmat[5] = fk[21]*fk[9] + fk[22]*fk[10] + fk[23]*fk[11];
+	b->gouvmat[8] = fk[12]*fk[9] + fk[13]*fk[10] + fk[14]*fk[11];
+	b->gouvmat[2] = fk[18]*fk[9] + fk[19]*fk[10] + fk[20]*fk[11];
+	b->gouvmat[5] = fk[21]*fk[9] + fk[22]*fk[10] + fk[23]*fk[11];
 
 	rdet = 1.0/(fk[0]*fk[12] + fk[1]*fk[13] + fk[2]*fk[14]);
 
@@ -1453,15 +1372,15 @@ static void gentex_wall (kgln_t *npol2, surf_t *sur, bunchgrp *b)
 #else
 	g = rdet;
 #endif
-													 gouvmat[0] *= g; gouvmat[3] *= g; gouvmat[6] *= g; g *= rdet*65536.0;
-	f = (float)64*g;            gouvmat[1] *= f; gouvmat[4] *= f; gouvmat[7] *= f;
-	f = (float)64*g;            gouvmat[2] *= f; gouvmat[5] *= f; gouvmat[8] *= f;
+													 b->gouvmat[0] *= g; b->gouvmat[3] *= g; b->gouvmat[6] *= g; g *= rdet*65536.0;
+	f = (float)64*g;            b->gouvmat[1] *= f; b->gouvmat[4] *= f; b->gouvmat[7] *= f;
+	f = (float)64*g;            b->gouvmat[2] *= f; b->gouvmat[5] *= f; b->gouvmat[8] *= f;
 
 	if (renderinterp)
 	{
-		gouvmat[1] -= gouvmat[0]*32768.0; gouvmat[2] -= gouvmat[0]*32768.0;
-		gouvmat[4] -= gouvmat[3]*32768.0; gouvmat[5] -= gouvmat[3]*32768.0;
-		gouvmat[7] -= gouvmat[6]*32768.0; gouvmat[8] -= gouvmat[6]*32768.0;
+		b->gouvmat[1] -= b->gouvmat[0]*32768.0; b->gouvmat[2] -= b->gouvmat[0]*32768.0;
+		b->gouvmat[4] -= b->gouvmat[3]*32768.0; b->gouvmat[5] -= b->gouvmat[3]*32768.0;
+		b->gouvmat[7] -= b->gouvmat[6]*32768.0; b->gouvmat[8] -= b->gouvmat[6]*32768.0;
 	}
 }
 /*
@@ -1532,6 +1451,8 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 	// === DRAW CEILINGS & FLOORS ===
 	for(isflor=0;isflor<2;isflor++)
 	{
+		if (b->has_portal_clip && s==b->testignoresec)
+			continue;
 		// Back-face culling: skip if camera is on wrong side of surface
 		if ((gcam.p.z >= getslopez(&sec[s],isflor,gcam.p.x,gcam.p.y)) == isflor) continue;
 
@@ -1637,10 +1558,9 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 
 			// Render wall segment if visible
 			int prtn = wal[w].tags[1];
-			if (prtn >= 0) { // ENTER PORTAL
-
-				if (b->has_portal_clip &&  s==b->testignoresec && w==b->testignorewall)
-					continue;
+			if (prtn >= 0) {
+//				if (b->has_portal_clip && s == b->testignoresec && w == b->testignorewall)
+//					continue;
 				draw_hsr_enter_portal(map, prtn, b,plothead[0],plothead[1]);
 			} else {
 				if ((!(m & 1)) || (wal[w].surf.flags & (1 << 5))) //Draw wall here //(1<<5): 1-way
@@ -1789,17 +1709,17 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 
 		//Hack to keep camera away from sector line; avoids clipping glitch in drawpol_befclip/changetagfunc
 	wal = lgs->sect[gcam.cursect].wall;
-	//for(i=lgs->sect[camstack[camcursor].cursect].n-1;i>=0;i--)
-	//{
-	//	#define WALHAK 1e-3
-	//	j = wal[i].n+i;
-	//	d = distpoint2line2(gcam.p.x,gcam.p.y,wal[i].x,wal[i].y,wal[j].x,wal[j].y); if (d >= WALHAK*WALHAK) continue;
-	//	fp.x = wal[j].x-wal[i].x;
-	//	fp.y = wal[j].y-wal[i].y;
-	//	f = (WALHAK - sqrt(d))/sqrt(fp.x*fp.x + fp.y*fp.y);
-	//	gcam.p.x -= fp.y*f;
-	//	gcam.p.y += fp.x*f;
-	//}
+	for(i=lgs->sect[gcam.cursect].n-1;i>=0;i--)
+	{
+		#define WALHAK 1e-3
+		j = wal[i].n+i;
+		d = distpoint2line2(gcam.p.x,gcam.p.y,wal[i].x,wal[i].y,wal[j].x,wal[j].y); if (d >= WALHAK*WALHAK) continue;
+		fp.x = wal[j].x-wal[i].x;
+		fp.y = wal[j].y-wal[i].y;
+		f = (WALHAK - sqrt(d))/sqrt(fp.x*fp.x + fp.y*fp.y);
+		gcam.p.x -= fp.y*f;
+		gcam.p.y += fp.x*f;
+	}
 
 	if (shadowtest2_rendmode != 4)
 	{
