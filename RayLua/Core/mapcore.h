@@ -56,9 +56,9 @@ typedef struct { float x, y, z, u, v; int n; } kgln_t;
 typedef struct { double x, y, z; long n, filler; } genpoly_t;
 typedef struct {
 	// calculate only diff between sprites. ideally forward facing along normal.
-	int entry_sprite; // sprite in sector that defines portal transform - use position and forward vector for now.
-	int entry_surfid;
-	int entry_sect;
+	int own_spri; // sprite in sector that defines portal transform - use position and forward vector for now.
+	int own_surfid;
+	int own_sec;
 	bool iswall;
 	int target_portal;
 } portal;

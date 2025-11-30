@@ -889,8 +889,9 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 	Uses special texture mapping flags (b->gflags = 10-15 for different cube faces)
 */
 
-static void skytagfunc (int rethead0, int rethead1, bunchgrp* b, cam_t gcam)
+static void skytagfunc (int rethead0, int rethead1, bunchgrp* b)
 {
+	cam_t gcam = b->cam;
 	#define SSCISDIST 0.000001 //Reduces probability of glitch further
 	dpoint3d otp[4], tp[8];
 	double f, ox, oy, oz;
@@ -1115,8 +1116,12 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 	}
 
 		//generate vmono
-	mono_genfromloop(&plothead[0],&plothead[1],tp,n);
-	if ((plothead[0]|plothead[1]) < 0) { mono_deloop(plothead[0]); mono_deloop(plothead[1]); return; }
+	mono_genfromloop(&plothead[0], &plothead[1], tp, n);
+	if ((plothead[0] | plothead[1]) < 0) {
+		mono_deloop(plothead[0]);
+		mono_deloop(plothead[1]);
+		return;
+	}
 
 	if (flags&1)
 	{
@@ -1156,13 +1161,14 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 				}
 				mphnum = omph0;
 			}
-		}
-		else
-		{
-				  if (shadowtest2_rendmode == 4) mono_output = ligpoltagfunc; //add to light list // this will process point lights. otherwize will only use plr light.
-			else if (b->gflags < 2)                mono_output =   drawtagfunc_ws; //draw wall
-			else                                mono_output =    skytagfunc; //calls drawtagfunc inside
-			for(i=mphnum-1;i>=0;i--) if (mph[i].tag == tag) mono_bool(mph[i].head[0],mph[i].head[1],plothead[0],plothead[1],MONO_BOOL_AND,b,mono_output);
+		} else {
+			if (shadowtest2_rendmode == 4) mono_output = ligpoltagfunc;
+				//add to light list // this will process point lights. otherwize will only use plr light.
+			else if (b->gflags < 2) mono_output = drawtagfunc_ws; //draw wall
+			else mono_output = skytagfunc; //calls drawtagfunc inside
+			for (i = mphnum - 1; i >= 0; i--)
+				if (mph[i].tag == tag)
+					mono_bool(mph[i].head[0], mph[i].head[1], plothead[0], plothead[1],MONO_BOOL_AND, b, mono_output);
 		}
 	}
 	if (flags&2)
@@ -1382,6 +1388,73 @@ static void gentex_wall (kgln_t *npol2, surf_t *sur, bunchgrp *b)
 		b->gouvmat[7] -= b->gouvmat[6]*32768.0; b->gouvmat[8] -= b->gouvmat[6]*32768.0;
 	}
 }
+static void drawpol_befclip_stub (int plothead0, int plothead1,  bunchgrp* b) {
+	cam_t gcam = b->cam;
+#define BSCISDIST 0.000001 //Reduces probability of glitch further
+	//#define BSCISDIST 0.0001 //Gaps undetectable
+	//#define BSCISDIST 0.1 //Huge gaps
+	void (*mono_output)(int h0, int h1, bunchgrp *b);
+	dpoint3d *otp, *tp;
+	double f, ox, oy, oz;
+	int i, j, k, l, h, on, n, plothead[2], imin, imax, i0, i1, omph0, omph1;
+
+	if ((plothead0|plothead1) < 0) return;
+	plothead[0] = plothead0; plothead[1] = plothead1;
+
+	n = 2; for(h=0;h<2;h++) for(i=mp[plothead[h]].n;i!=plothead[h];i=mp[i].n) n++;
+	otp = (dpoint3d *)_alloca(n*sizeof(dpoint3d));
+	tp = (dpoint3d *)_alloca(n*sizeof(dpoint3d)*2);
+
+	//rotate, converting vmono to simple point3d loop
+	on = 0;
+	for(h=0;h<2;h++)
+	{
+		i = plothead[h];
+		do
+		{
+			if (h) i = mp[i].p;
+
+			ox = mp[i].x-gcam.p.x; oy = mp[i].y-gcam.p.y;
+			otp[on].x = oy*b->xformmatc - ox*b->xformmats; otp[on].y = mp[i].z-gcam.p.z;
+			otp[on].z = ox*b->xformmatc + oy*b->xformmats; on++;
+
+			if (!h) i = mp[i].n;
+		} while (i != plothead[h]);
+		mono_deloop(plothead[h]);
+	}
+
+	//clip
+	n = 0;
+	for(i=on-1,j=0;j<on;i=j,j++)
+	{
+		if (otp[i].z >= BSCISDIST) { tp[n] = otp[i]; n++; }
+		if ((otp[i].z >= BSCISDIST) != (otp[j].z >= BSCISDIST))
+		{
+			f = (BSCISDIST-otp[j].z)/(otp[i].z-otp[j].z);
+			tp[n].x = (otp[i].x-otp[j].x)*f + otp[j].x;
+			tp[n].y = (otp[i].y-otp[j].y)*f + otp[j].y;
+			tp[n].z = BSCISDIST; n++;
+		}
+	}
+	if (n < 3) return;
+
+	//project & find x extents
+	for(i=0;i<n;i++)
+	{
+		f = gcam.h.z/tp[i].z;
+		tp[i].x = tp[i].x*f + gcam.h.x;
+		tp[i].y = tp[i].y*f + gcam.h.y;
+	}
+
+	//generate vmono
+	mono_genfromloop(&plothead[0], &plothead[1], tp, n);
+	if ((plothead[0] | plothead[1]) < 0) {
+		mono_deloop(plothead[0]);
+		mono_deloop(plothead[1]);
+		return;
+	}
+}
+
 /*
 the mono engine produces camera-space polygons that are clipped to not overlap.
 The plothead[0] and plothead[1] contain monotone polygon pairs representing
@@ -1485,9 +1558,14 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 			//   (?       -      fz)*      1 = 0
 		// Build polygon for ceiling/floor using plane equation:
 		plothead[0] = -1; plothead[1] = -1;
-		for(ww=twaln;ww>=0;ww-=twaln) plothead[isflor] = mono_ins(plothead[isflor],twal[ww].x,twal[ww].y,gnorm.z*-1e32); //do not replace w/single zenith point - ruins precision
-		i = isflor^1;
-		for(ww=0;ww<=twaln;ww++) plothead[i] = mono_ins(plothead[i],twal[ww].x,twal[ww].y,(wal[0].x-twal[ww].x)*grad->x + (wal[0].y-twal[ww].y)*grad->y + fz);
+		for (ww = twaln; ww >= 0; ww -= twaln) plothead[isflor] = mono_ins(
+			                                       plothead[isflor], twal[ww].x, twal[ww].y,
+			                                       gnorm.z * -1e32);
+		//do not replace w/single zenith point - ruins precision
+		i = isflor ^ 1;
+		for (ww = 0; ww <= twaln; ww++) plothead[i] = mono_ins(plothead[i], twal[ww].x, twal[ww].y,
+		                                                       (wal[0].x - twal[ww].x) * grad->x + (
+			                                                       wal[0].y - twal[ww].y) * grad->y + fz);
 		plothead[i] = mp[plothead[i]].n;
 
 		// Setup texture and rendering flags
@@ -1564,12 +1642,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 				continue;
 
 			// Render wall segment if visible
-			int prtn = wal[w].tags[1];
-			if (prtn >= 0) {
-//				if (b->has_portal_clip && s == b->testignoresec && w == b->testignorewall)
-//					continue;
-				draw_hsr_enter_portal(map, prtn, b,plothead[0],plothead[1]);
-			} else {
+
 				if ((!(m & 1)) || (wal[w].surf.flags & (1 << 5))) //Draw wall here //(1<<5): 1-way
 				{
 					//	gtpic = &gtile[sur->tilnum]; if (!gtpic->tt.f) loadpic(gtpic);
@@ -1612,11 +1685,19 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 						b->gligwall = w;        // Wall index
 						b->gligslab = m;        // Segment/slab number (0,1,2... for each vertical division)*/
 				} else ns = verts[m >> 1].s; // Portal to adjacent sector
-
+/*
+			*			int prtn = wal[w].tags[1];
+						if (prtn >= 0) {
+			//				if (b->has_portal_clip && s == b->testignoresec && w == b->testignorewall)
+			//					continue;
+							drawpol_befclip(s, portals[prtn].own_sec, plothead[0], plothead[1], ((m > vn) << 2) + 3, b);
+							draw_hsr_enter_portal(map, prtn, b,plothead[0],plothead[1]);
+						} else {
+ **/
 				// Render the wall polygon
 				drawpol_befclip(s, ns, plothead[0], plothead[1], ((m > vn) << 2) + 3, b);
 			}
-		}
+
 	}
 }
 /*
@@ -1806,8 +1887,7 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 			xformbac(-65536.0,+65536.0,1.0,&bord2[3], b);
 			n = 4; didcut = 1;
 		}
-		else
-		{
+		else {
 			xformprep(((double)halfplane)*PI, b);
 
 			// ORIGINAL CODE - REMOVE THIS BLOCK:
@@ -1935,12 +2015,12 @@ static void draw_hsr_enter_portal( mapstate_t* map, int endportaln, bunchgrp *pa
 		mono_deloop(plothead0);
 		return;
 	}
-	int tgtspi = portals[endportaln].entry_sprite;
+	int tgtspi = portals[endportaln].own_spri;
 	int backp = portals[endportaln].target_portal;
-	int entry = portals[backp].entry_sprite;
+	int entry = portals[backp].own_spri;
 	cam_t ncam = parentctx->cam;
-	int ignw = portals[endportaln].entry_surfid;
-	int igns = portals[endportaln].entry_sect;
+	int ignw = portals[endportaln].own_surfid;
+	int igns = portals[endportaln].own_sec;
 
 	spri_t tgs = map->spri[tgtspi];
 	spri_t ent = map->spri[entry];
@@ -1955,14 +2035,16 @@ static void draw_hsr_enter_portal( mapstate_t* map, int endportaln, bunchgrp *pa
 //	ncam.r = s.r;
 //	ncam.d = s.d;
 
-	dx+=parentctx->testoffset.x; // progressively add offset for portal in portal.
-	dy+=parentctx->testoffset.y;
-	dz+=parentctx->testoffset.z;
 
 	bunchgrp newctx={};
 	newctx.recursion_depth = parentctx->recursion_depth+1;
 	newctx.cam = ncam;
+
+	dx+=parentctx->testoffset.x; // progressively add offset for portal in portal.
+	dy+=parentctx->testoffset.y;
+	dz+=parentctx->testoffset.z;
 	newctx.testoffset=(point3d){dx,dy,dz};
+
 	newctx.has_portal_clip = true;
 	newctx.portal_clip[0] = plothead0;
 	newctx.portal_clip[1] = plothead1;
