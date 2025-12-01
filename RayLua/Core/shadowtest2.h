@@ -62,6 +62,7 @@ typedef struct {
     tile_t *tpic;                       // Texture tile pointer
     float ouvmat[9];                    // inverse perspective transformation
     point3d norm;                       // Surface normal vector
+    int rdepth;
 } eyepol_t;
 
 // ================================================================================================

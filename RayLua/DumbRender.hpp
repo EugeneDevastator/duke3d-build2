@@ -142,7 +142,9 @@ public:
 
                         portals[portaln].own_sec = i;
                         portals[portaln].own_spri = map->sect[i].headspri;
+
                         portals[portaln].own_surfid = map->sect[i].surf[1].lotag; // hak to determine ceil or floor in map lotag1==floor.
+                        map->spri[portals[portaln].own_spri].p.z = map->sect[i].z[portals[portaln].own_surfid]; // resolve flor ceil in future
                         portals[portaln].iswall = false;
                         //tmp hak
                         portals[portaln].target_portal = 1-portaln;
@@ -465,7 +467,7 @@ rlDisableDepthMask();
                 float final_u = u ;/// (65536.0f);
                 float final_v = v;// / (65536.0f);
 
-                rlColor4f(i*15, 0.7, 0.3f, 0.5);
+                rlColor4f(0.7, 0.2, eyepol[i].rdepth/5.0f, 0.7);
                 rlTexCoord2f(final_u, final_v);
                 rlVertex3f(pt.x, -pt.z, pt.y);
             }

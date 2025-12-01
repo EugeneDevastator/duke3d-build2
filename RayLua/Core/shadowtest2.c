@@ -878,6 +878,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 	memcpy((void *)&eyepol[eyepoln].norm,(void *)&gnorm,sizeof(gnorm));
 	eyepoln++;
 	eyepol[eyepoln].vert0 = eyepolvn;
+	eyepol[eyepoln].rdepth = b->recursion_depth;
 }
 
 /*
@@ -1580,10 +1581,12 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		b->gligwall = isflor - 2;
 
 		int endpn = sec[s].tags[1];
-		if (endpn >= 0 && portals[endpn].own_surfid != isflor) {
-			if (b->has_portal_clip && s == b->testignoresec && isflor == b->testignorewall)
-				continue;//portals[endpn].own_sec
-			drawpol_befclip(s, portals[endpn].own_sec, plothead[0], plothead[1],  (isflor<<2)+3, b);
+		bool skipport= (b->has_portal_clip && s==b->testignoresec && isflor == b->testignorewall);
+		bool needsfinal = b->recursion_depth ==1;
+		if (!needsfinal && !skipport && endpn >= 0 && portals[endpn].own_surfid != isflor) {
+			//if (b->has_portal_clip && s == b->testignoresec && isflor == b->testignorewall)
+			//	continue;//portals[endpn].own_sec
+			drawpol_befclip(s, portals[endpn].own_sec, plothead[0], plothead[1], (!isflor<<2)+3, b);
 			draw_hsr_enter_portal(map, endpn, b,plothead[0],plothead[1]);
 		}
 		else {
