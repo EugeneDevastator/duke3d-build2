@@ -1524,13 +1524,13 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 	for(isflor=0;isflor<2;isflor++) // floor ceil
 	{
 		// here, when we draw sector of the exit portal we get glitches when it would draw a triangle with point below the camera resulting in triangle spanning entire vertical of the screen
-		//if (b->has_portal_clip && s==b->testignoresec && isflor == s!=b->testignorewall)
-		//	continue;
-		// Back-face culling: skip if camera is on wrong side of surface
+	//	if (b->has_portal_clip && s==b->testignoresec && isflor == s!=b->testignorewall)
+	//		continue;
+	//	// Back-face culling: skip if camera is on wrong side of surface
 
 // need to get original slope, as if camera was in origin.
-		//if ((b->cam.p.z >= getslopez(&sec[s],isflor,b->orcam.p.x,b->orcam.p.y)) == isflor)
-		//	continue;
+		if ((b->cam.p.z >= getslopez(&sec[s],isflor,b->orcam.p.x,b->orcam.p.y)) == isflor)
+			continue;
 
 		// Setup surface properties (height, gradient, color)
 		fz = sec[s].z[isflor]; grad = &sec[s].grad[isflor];
@@ -1582,8 +1582,8 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		int endpn = sec[s].tags[1];
 		if (endpn >= 0 && portals[endpn].own_surfid != isflor) {
 			if (b->has_portal_clip && s == b->testignoresec && isflor == b->testignorewall)
-				continue;
-			drawpol_befclip(s, portals[endpn].own_sec, plothead[0], plothead[1],  3, b);
+				continue;//portals[endpn].own_sec
+			drawpol_befclip(s, portals[endpn].own_sec, plothead[0], plothead[1],  (isflor<<2)+3, b);
 			draw_hsr_enter_portal(map, endpn, b,plothead[0],plothead[1]);
 		}
 		else {

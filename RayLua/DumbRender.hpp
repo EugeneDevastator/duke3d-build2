@@ -142,7 +142,7 @@ public:
 
                         portals[portaln].own_sec = i;
                         portals[portaln].own_spri = map->sect[i].headspri;
-                        portals[portaln].own_surfid = map->sect[i].surf[1].lotag; // hak to determine ceil or floor;
+                        portals[portaln].own_surfid = map->sect[i].surf[1].lotag; // hak to determine ceil or floor in map lotag1==floor.
                         portals[portaln].iswall = false;
                         //tmp hak
                         portals[portaln].target_portal = 1-portaln;
