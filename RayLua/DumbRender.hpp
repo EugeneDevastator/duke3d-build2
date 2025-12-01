@@ -116,7 +116,8 @@ public:
                     map->light_spri[map->light_sprinum++] = i;
             }
         }
-// init portals;
+// init portals; walls test
+        if (false)
         for(int i=0;i<map->numsects;i++) {
             for (int wn=0; wn< map->sect[i].n;wn++) {
                 map->sect[i].wall[wn].tags[1]=-1;
@@ -131,9 +132,24 @@ public:
                     map->sect[i].wall[wn].tags[1] = portals[portaln].target_portal;
                     portaln++;
                 }
-
             }
         }
+
+        if (true) // sectors
+            for(int i=0;i<map->numsects;i++) {
+                    map->sect[i].tags[1]=-1;
+                    if( map->sect[i].surf[1].hitag==5) {
+
+                        portals[portaln].own_sec = i;
+                        portals[portaln].own_spri = map->sect[i].headspri;
+                        portals[portaln].own_surfid = map->sect[i].surf[1].lotag; // hak to determine ceil or floor;
+                        portals[portaln].iswall = false;
+                        //tmp hak
+                        portals[portaln].target_portal = 1-portaln;
+                        map->sect[i].tags[1] = portals[portaln].target_portal;
+                        portaln++;
+                    }
+            }
 
         // auto paltex = ConvertPalToTexture();
         // tile_t* pic = static_cast<tile_t*>(malloc(sizeof(tile_t)));
@@ -212,7 +228,7 @@ public:
         numFloorMeshes = map->numsects * 2; // floor + ceiling
         floorMeshes = (FloorMeshData*)calloc(numFloorMeshes, sizeof(FloorMeshData));
 
-
+        if (false)
         for (int s = 0; s < map->numsects; s++)
         {
             sect_t* sect = &map->sect[s];

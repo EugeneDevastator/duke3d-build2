@@ -1524,17 +1524,13 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 	for(isflor=0;isflor<2;isflor++) // floor ceil
 	{
 		// here, when we draw sector of the exit portal we get glitches when it would draw a triangle with point below the camera resulting in triangle spanning entire vertical of the screen
-		//if (b->has_portal_clip && s==b->testignoresec)
+		//if (b->has_portal_clip && s==b->testignoresec && isflor == s!=b->testignorewall)
 		//	continue;
 		// Back-face culling: skip if camera is on wrong side of surface
 
-		cam_t original_cam = b->cam;
-		original_cam.p.x -= b->testoffset.x;  // Undo portal offset
-		original_cam.p.y -= b->testoffset.y;
-		original_cam.p.z -= b->testoffset.z;
-
-		if ((original_cam.p.z >= getslopez(&sec[s],isflor,original_cam.p.x,original_cam.p.y)) == isflor)
-			continue;
+// need to get original slope, as if camera was in origin.
+		//if ((b->cam.p.z >= getslopez(&sec[s],isflor,b->orcam.p.x,b->orcam.p.y)) == isflor)
+		//	continue;
 
 		// Setup surface properties (height, gradient, color)
 		fz = sec[s].z[isflor]; grad = &sec[s].grad[isflor];
@@ -1582,10 +1578,17 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 			gentex_ceilflor(&sec[s], wal, sur, isflor, b);
 		}
 		b->gligwall = isflor - 2;
-		drawpol_befclip(s,-1,plothead[0],plothead[1],(isflor<<2)+3,b);
-#ifdef STANDALONE
-		gcnt--; if (gcnt <= 0) return;
-#endif
+
+		int endpn = sec[s].tags[1];
+		if (endpn >= 0 && portals[endpn].own_surfid != isflor) {
+			if (b->has_portal_clip && s == b->testignoresec && isflor == b->testignorewall)
+				continue;
+			drawpol_befclip(s, portals[endpn].own_sec, plothead[0], plothead[1],  3, b);
+			draw_hsr_enter_portal(map, endpn, b,plothead[0],plothead[1]);
+		}
+		else {
+			drawpol_befclip(s,-1,plothead[0],plothead[1],(isflor<<2)+3,b);
+		}
 	}
 
 	// === DRAW WALLS ===
@@ -1690,7 +1693,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 			}
 			// Render the wall polygon
 			int endpn = wal[w].tags[1];
-			if (endpn >= 0) {
+			if (endpn >= 0 && portals[endpn].iswall) {
 				//if (b->has_portal_clip && s == b->testignoresec && w == b->testignorewall)
 					//continue;
 				drawpol_befclip(s, portals[endpn].own_sec, plothead[0], plothead[1],  3, b);
@@ -1721,6 +1724,7 @@ void reset_context() {
 void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
 	bunchgrp bs;
 	bs.cam = *cc;
+	bs.orcam = *cc;
 	bs.recursion_depth = 0;
 	bs.testoffset = (point3d){0,0,0};
 	bs.has_portal_clip = false;
@@ -2020,11 +2024,10 @@ static void draw_hsr_enter_portal( mapstate_t* map, int endportaln, bunchgrp *pa
 	if (parentctx->recursion_depth >= MAX_PORTAL_DEPTH) {
 		return;
 	}
-
+	cam_t ncam = parentctx->cam;
 	int tgtspi = portals[endportaln].own_spri;
 	int backp = portals[endportaln].target_portal;
 	int entry = portals[backp].own_spri;
-	cam_t ncam = parentctx->cam;
 	int ignw = portals[endportaln].own_surfid;
 	int igns = portals[endportaln].own_sec;
 
@@ -2045,6 +2048,7 @@ static void draw_hsr_enter_portal( mapstate_t* map, int endportaln, bunchgrp *pa
 	bunchgrp newctx={};
 	newctx.recursion_depth = parentctx->recursion_depth+1;
 	newctx.cam = ncam;
+	newctx.orcam = parentctx->orcam;
 
 	dx+=parentctx->testoffset.x; // progressively add offset for portal in portal.
 	dy+=parentctx->testoffset.y;

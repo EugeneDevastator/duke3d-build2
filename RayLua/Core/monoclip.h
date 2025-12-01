@@ -68,6 +68,7 @@ typedef struct {
 	int bfintn, bfintlut[BFINTMAX+1];
 // other context stuff
 	cam_t cam;                    // Camera per recursion level
+ 	cam_t orcam; // one true camera, read only.
 	double xformmat[9], xformmatc, xformmats;
 	point3d gnadd;
 	unsigned int *sectgot, *sectgotmal;        // Visited sectors per level

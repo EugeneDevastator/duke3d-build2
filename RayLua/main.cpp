@@ -21,6 +21,7 @@
 #include <chrono>
 
 #include "DumbRender.hpp"
+//#include "MonoTest.hpp"
 //#include "luabinder.hpp"
 #include "DumbCore.hpp"
 #include "raymath.h"
@@ -245,7 +246,11 @@ void UnloadCustomRenderTarget(CustomRenderTarget target) {
 }
 // Draw palette and texture preview on screen
 void MainLoop()
-{        DisableCursor();
+{
+    DisableCursor();
+    //RunVisualization();  // use this for mono sample.
+    //return;
+
     DumbRender::Init();
     auto map = DumbRender::GetMap();
     DumbCore::Init(map);
