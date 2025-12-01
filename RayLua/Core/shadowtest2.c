@@ -515,21 +515,6 @@ docont:;
 				{ b->bfintlut[b->bfintn] = i; b->bfintn++; }
 		b->bfintlut[b->bfintn] = obfintn;
 
-#if 0
-		if (sectnum == 0)
-		{
-			char tbuf[2048];
-			sprintf(tbuf,"bef (bunchn=%d obunchn=%d b->bfintn=%d)\n",bunchn,obunchn,b->bfintn);
-			for(m=0;m<bunchn;m++)
-			{
-				sprintf(&tbuf[strlen(tbuf)],"%d (%2d: %2d %15.12f %2d %15.12f) : ",m,bunch[m].sec,bunch[m].wal0,bunch[m].fra0,bunch[m].wal1,bunch[m].fra1);
-				for(k=0;k<m;k++) sprintf(&tbuf[strlen(tbuf)],"%d ",bunchgrid[(((m-1)*m)>>1)+k]);
-				sprintf(&tbuf[strlen(tbuf)],"\n");
-			}
-			MessageBox(ghwnd,tbuf,prognam,MB_OK);
-		}
-#endif
-
 			//obunchn gets its ass split 'b->bfintn' times into a total of 'b->bfintn+1' pieces
 		if (b->bunchn+b->bfintn > b->bunchmal)
 		{
@@ -570,22 +555,6 @@ bunchgrid_got:;
 			}
 			for(;k<m;k++) b->bunchgrid[j+k] = 0;
 		}
-
-#if 0
-		if (sectnum == 0)
-		{
-			char tbuf[2048];
-			sprintf(tbuf,"aft (bunchn=%d obunchn=%d bfintn=%d)\n",bunchn,obunchn,bfintn);
-			for(m=0;m<bunchn;m++)
-			{
-				sprintf(&tbuf[strlen(tbuf)],"%d (%2d: %2d %15.12f %2d %15.12f) : ",m,bunch[m].sec,bunch[m].wal0,bunch[m].fra0,bunch[m].wal1,bunch[m].fra1);
-				for(k=0;k<m;k++) sprintf(&tbuf[strlen(tbuf)],"%d ",bunchgrid[(((m-1)*m)>>1)+k]);
-				sprintf(&tbuf[strlen(tbuf)],"\n");
-			}
-			MessageBox(ghwnd,tbuf,prognam,MB_OK);
-		}
-#endif
-
 		obunchn += b->bfintn;
 	}
 
@@ -719,7 +688,7 @@ eyepol_t *eyepol = 0; // 4096 eyepol_t's = 192KB
 point3d *eyepolv = 0; //16384 point2d's  = 128KB
 int eyepoln = 0, glignum = 0;
 int eyepolmal = 0, eyepolvn = 0, eyepolvmal = 0;
-static point3d gnorm;
+
 void eyepol_drawfunc (int ind)
 {
 	kgln_t *vert;
@@ -875,7 +844,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 	eyepol[eyepoln].b2sect = b->gligsect;
 	eyepol[eyepoln].b2wall = b->gligwall;
 	eyepol[eyepoln].b2slab = b->gligslab;
-	memcpy((void *)&eyepol[eyepoln].norm,(void *)&gnorm,sizeof(gnorm));
+	memcpy((void *)&eyepol[eyepoln].norm,(void *)&b->gnorm,sizeof(b->gnorm));
 	eyepoln++;
 	eyepol[eyepoln].vert0 = eyepolvn;
 	eyepol[eyepoln].rdepth = b->recursion_depth;
@@ -1113,7 +1082,6 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 		f = gcam.h.z/tp[i].z;
 		tp[i].x = tp[i].x*f + gcam.h.x;
 		tp[i].y = tp[i].y*f + gcam.h.y;
-		//tp[i].z_linear = tp[i].z;  // Store linear depth BEFORE projection
 	}
 
 		//generate vmono
@@ -1542,10 +1510,10 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		gcurcol = argb_interp(gcurcol,(gcurcol&0xff000000)+((gcurcol&0xfcfcfc)>>2),(int)(compact2d*24576.0));
 
 		// Calculate surface normal vector
-		gnorm.x = grad->x;
-		gnorm.y = grad->y;
-		gnorm.z = 1.f; if (isflor) { gnorm.x = -gnorm.x; gnorm.y = -gnorm.y; gnorm.z = -gnorm.z; }
-		f = 1.0/sqrt(gnorm.x*gnorm.x + gnorm.y*gnorm.y + 1); gnorm.x *= f; gnorm.y *= f; gnorm.z *= f;
+		b->gnorm.x = grad->x;
+		b->gnorm.y = grad->y;
+		b->gnorm.z = 1.f; if (isflor) { b->gnorm.x = -b->gnorm.x; b->gnorm.y = -b->gnorm.y; b->gnorm.z = -b->gnorm.z; }
+		f = 1.0/sqrt(b->gnorm.x*b->gnorm.x + b->gnorm.y*b->gnorm.y + 1); b->gnorm.x *= f; b->gnorm.y *= f; b->gnorm.z *= f;
 
 			//plane point: (wal[0].x,wal[0].y,fz)
 			//plane norm: <grad->x,grad->y,1>
@@ -1557,7 +1525,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		plothead[0] = -1; plothead[1] = -1;
 		for (ww = twaln; ww >= 0; ww -= twaln) plothead[isflor] = mono_ins(
 			                                       plothead[isflor], twal[ww].x, twal[ww].y,
-			                                       gnorm.z * -1e32);
+			                                       b->gnorm.z * -1e32);
 		//do not replace w/single zenith point - ruins precision
 		i = isflor ^ 1;
 		for (ww = 0; ww <= twaln; ww++) plothead[i] = mono_ins(plothead[i], twal[ww].x, twal[ww].y,
@@ -1608,10 +1576,10 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 					 (min(sur->rsc>>5,255)<<16) +
 					 (min(sur->gsc>>5,255)<< 8) +
 					 (min(sur->bsc>>5,255)    );
-		gnorm.x = wal[w].y-wal[nw].y;
-		gnorm.y = wal[nw].x-wal[w].x;
-		gnorm.z = 0;
-		f = 1.0/sqrt(gnorm.x*gnorm.x + gnorm.y*gnorm.y); gnorm.x *= f; gnorm.y *= f;
+		b->gnorm.x = wal[w].y-wal[nw].y;
+		b->gnorm.y = wal[nw].x-wal[w].x;
+		b->gnorm.z = 0;
+		f = 1.0/sqrt(b->gnorm.x*b->gnorm.x + b->gnorm.y*b->gnorm.y); b->gnorm.x *= f; b->gnorm.y *= f;
 		// Setup base wall quad (floor to ceiling)
 		pol[0].x = twal[ww  ].x; pol[0].y = twal[ww  ].y; pol[0].z = getslopez(&sec[s],0,pol[0].x,pol[0].y); //pol[0].n = 1;
 		pol[1].x = twal[ww+1].x; pol[1].y = twal[ww+1].y; pol[1].z = getslopez(&sec[s],0,pol[1].x,pol[1].y); //pol[1].n = 1;
@@ -2070,6 +2038,8 @@ static void draw_hsr_enter_portal( mapstate_t* map, int endportaln, bunchgrp *pa
 	newctx.bunchgrid =0;
 	newctx.testignorewall = ignw;
 	newctx.testignoresec = igns;
+	newctx.gnewtagsect=-1;
+	newctx.gnewtag=-1;
 	draw_hsr_polymost_ctx(map, &newctx);
 }
 
@@ -2089,7 +2059,7 @@ typedef struct { float n2, d2, n1, d1, n0, d0, filler0[2], glk[12], bsc, gsc, rs
 typedef struct { float gk[16], gk2[12], bsc, gsc, rsc, filler1[1]; } hlighterp_t;
 __declspec(align(16)) static const float hligterp_maxzero[4] = {0.f,0.f,0.f,0.f};
 #endif
-void prepligramp (float *ouvmat, point3d *norm, int lig, hlighterp_t *hl)
+void prepligramp (float *ouvmat, point3d *norm, int lig, void *hl)
 {
 
 }
