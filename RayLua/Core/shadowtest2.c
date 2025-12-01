@@ -1529,7 +1529,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 	//	// Back-face culling: skip if camera is on wrong side of surface
 
 // need to get original slope, as if camera was in origin.
-		if ((b->cam.p.z >= getslopez(&sec[s],isflor,b->orcam.p.x,b->orcam.p.y)) == isflor)
+		if ((b->cam.p.z >= getslopez(&sec[s],isflor,b->cam.p.x,b->cam.p.y)) == isflor)
 			continue;
 
 		// Setup surface properties (height, gradient, color)
