@@ -578,7 +578,7 @@ static void xformprep (double hang, bunchgrp *b)
 	b->xformmatc = cos(f); b->xformmats = sin(f);
 	b->xformmat[0] = gcam.r.y*b->xformmatc - gcam.r.x*b->xformmats; b->xformmat[1] = gcam.r.z; b->xformmat[2] = gcam.r.x*b->xformmatc + gcam.r.y*b->xformmats;
 	b->xformmat[3] = gcam.d.y*b->xformmatc - gcam.d.x*b->xformmats; b->xformmat[4] = gcam.d.z; b->xformmat[5] = gcam.d.x*b->xformmatc + gcam.d.y*b->xformmats;
-	b->xformmat[6] = 0                                      ; b->xformmat[7] = gcam.f.z; b->xformmat[8] = gcam.f.x*b->xformmatc + gcam.f.y*b->xformmats;
+	b->xformmat[6] = gcam.f.y*b->xformmatc - gcam.f.x*b->xformmats; b->xformmat[7] = gcam.f.z; b->xformmat[8] = gcam.f.x*b->xformmatc + gcam.f.y*b->xformmats;
 	b->gnadd.x = -gcam.h.x*b->xformmat[0] - gcam.h.y*b->xformmat[1] + gcam.h.z*b->xformmat[2];
 	b->gnadd.y = -gcam.h.x*b->xformmat[3] - gcam.h.y*b->xformmat[4] + gcam.h.z*b->xformmat[5];
 	b->gnadd.z = -gcam.h.x*b->xformmat[6] - gcam.h.y*b->xformmat[7] + gcam.h.z*b->xformmat[8];
@@ -586,7 +586,7 @@ static void xformprep (double hang, bunchgrp *b)
 
 static void xformbac (double rx, double ry, double rz, dpoint3d *o, bunchgrp *b)
 {
-	o->x = rx*b->xformmat[0] + ry*b->xformmat[3];//+ rz*b->xformmat[6];
+	o->x = rx*b->xformmat[0] + ry*b->xformmat[3] + rz*b->xformmat[6];
 	o->y = rx*b->xformmat[1] + ry*b->xformmat[4] + rz*b->xformmat[7];
 	o->z = rx*b->xformmat[2] + ry*b->xformmat[5] + rz*b->xformmat[8];
 }
@@ -1062,7 +1062,8 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 			if (h) i = mp[i].p;
 
 			ox = mp[i].x-gcam.p.x; oy = mp[i].y-gcam.p.y;
-			otp[on].x = oy*b->xformmatc - ox*b->xformmats; otp[on].y = mp[i].z-gcam.p.z;
+			otp[on].x = oy*b->xformmatc - ox*b->xformmats;
+			otp[on].y = mp[i].z-gcam.p.z;
 			otp[on].z = ox*b->xformmatc + oy*b->xformmats; on++;
 
 			if (!h) i = mp[i].n;
@@ -1107,8 +1108,8 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 		{
 			b->gnewtagsect = newtagsect;
 			b->gnewtag = mnewtag; omph0 = mphnum;
-			b->gdoscansector = (flags & CLIP_PORTAL_FLAG) ? 0 : 1;
-			int bop = (flags & CLIP_PORTAL_FLAG) ? MONO_BOOL_SUB : MONO_BOOL_AND;
+			b->gdoscansector =  !(flags&8);
+			int bop = MONO_BOOL_AND;//(flags & CLIP_PORTAL_FLAG) ? MONO_BOOL_SUB_REV : MONO_BOOL_AND;
 			for (i = mphnum - 1; i >= 0; i--)
 				if (mph[i].tag == mtag)
 					mono_bool(
@@ -1134,10 +1135,12 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 				}
 				mphnum = omph0;
 			}
-		} else {
-			if (shadowtest2_rendmode == 4) mono_output = ligpoltagfunc;
+		}
+		else { // newtag == -1
+			if (shadowtest2_rendmode == 4)
+				mono_output = ligpoltagfunc;
 				//add to light list // this will process point lights. otherwize will only use plr light.
-			else if (b->gflags < 2) mono_output = drawtagfunc_ws; //draw wall
+			else if (b->gflags < 2) mono_output = drawtagfunc_ws;
 			else mono_output = skytagfunc; //calls drawtagfunc inside
 			for (i = mphnum - 1; i >= 0; i--)
 				if (mph[i].tag == mtag)
@@ -1147,7 +1150,7 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 	if (flags&2)
 	{
 		if (!(flags&4)) j = MONO_BOOL_SUB;
-					  else j = MONO_BOOL_SUB_REV;
+					  else j = MONO_BOOL_SUB_REV; // when floor.
 
 		b->gnewtag = mtag;
 		b->gnewtagsect = tagsect;
@@ -1441,7 +1444,9 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		float surfpos = getslopez(&sec[s],isflor,b->cam.p.x,b->cam.p.y);
 		if ((b->cam.p.z >= surfpos) == isflor) // ignore backfaces
 				continue;
-
+		bool skipport= (b->has_portal_clip && s==b->testignoresec && isflor == b->testignorewall);
+		if (skipport)
+			continue;
 		// Setup surface properties (height, gradient, color)
 		fz = sec[s].z[isflor]; grad = &sec[s].grad[isflor];
 		gcurcol = (min(sec[s].surf[isflor].asc>>8,255)<<24) +
@@ -1490,14 +1495,16 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		b->gligwall = isflor - 2;
 
 		int endpn = sec[s].tags[1];
-		bool skipport= (b->has_portal_clip && s==b->testignoresec && isflor == b->testignorewall);
+
 		bool needsfinal = b->recursion_depth == MAX_PORTAL_DEPTH;
-		if (!needsfinal && !skipport && endpn >= 0 && portals[endpn].own_surfid != isflor) {
-			//if (b->has_portal_clip && s == b->testignoresec && isflor == b->testignorewall)
-			//	continue;//portals[endpn].own_sec
-			drawpol_befclip(s, portals[endpn].own_sec+taginc, portals[endpn].own_sec,
-				plothead[0],plothead[1],  3, b);
-			draw_hsr_enter_portal(map, endpn, b,plothead[0],plothead[1]);
+		int ownps = portals[portals[endpn].target_portal].own_surfid;
+		bool isValidSurf = (isflor==ownps);
+		if (!needsfinal && endpn >= 0 && isValidSurf) {
+			int outsec = portals[endpn].own_sec;
+			// Do the clipping with correct isflor flag
+			drawpol_befclip(s, outsec+taginc * (b->recursion_depth + 1), outsec, plothead[0], plothead[1],
+							((isflor<<2)+3)|8, b); // flags inversion or other variations here dont solve the issue
+			draw_hsr_enter_portal(map, endpn, b, plothead[0], plothead[1]); // clipped heads are not needed as mono stat is shared.
 		}
 		else {
 			drawpol_befclip(s,-1,-1,plothead[0],plothead[1],(isflor<<2)+3,b);
@@ -1609,7 +1616,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 			if (endpn >= 0 && portals[endpn].iswall) {
 				//if (b->has_portal_clip && s == b->testignoresec && w == b->testignorewall)
 					//continue;
-				drawpol_befclip(s, portals[endpn].own_sec, portals[endpn].own_sec, plothead[0], plothead[1],  3, b);
+				drawpol_befclip(s, portals[endpn].own_sec+taginc, portals[endpn].own_sec, plothead[0], plothead[1],  3, b);
 				draw_hsr_enter_portal(map, endpn, b,plothead[0],plothead[1]);
 			} else {
 				// could be 7 or 3, .111 or .011
@@ -1664,6 +1671,7 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 	b->bunchmal=0;
 	b->bunchgrid =0;
 	cam_t gcam = b->cam;
+	cam_t oricam = b->orcam;
 
 	wall_t *wal;
 	spri_t *spr;
@@ -1793,11 +1801,14 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 			memset(glp->lighashead,-1,glp->lighasheadn*sizeof(glp->lighashead[0]));
 		}
 	}
-#ifdef STANDALONE
-	gcnt = curgcnt;
-#endif
 
 	for(halfplane=0;halfplane<2;halfplane++) {
+
+		if (!b->has_portal_clip)
+			b->currenthalfplane = halfplane;
+		else if (b->currenthalfplane != halfplane)
+			continue;
+
 		if (shadowtest2_rendmode == 4)
 		{
 			if (!halfplane) gcam.r.x = 1; else gcam.r.x = -1;
@@ -1814,15 +1825,6 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 		}
 		else {
 			xformprep(((double)halfplane)*PI, b);
-
-			// ORIGINAL CODE - REMOVE THIS BLOCK:
-			/*
-			i = 0; //i = 16;
-			xformbac(         i-gcam.h.x,         i-gcam.h.y,gcam.h.z,&bord[0]);
-			xformbac(gcam.c.x-i-gcam.h.x,         i-gcam.h.y,gcam.h.z,&bord[1]);
-			xformbac(gcam.c.x-i-gcam.h.x,gcam.c.y-i-gcam.h.y,gcam.h.z,&bord[2]);
-			xformbac(         i-gcam.h.x,gcam.c.y-i-gcam.h.y,gcam.h.z,&bord[3]);
-			*/
 
 			// NEW CODE - Use much larger bounds:
 			float large_bound = 1e6f;
@@ -1857,8 +1859,9 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 		}
 
 
-			//FIX! once means not each frame! (of course it doesn't hurt functionality)
+
 		if (!b->has_portal_clip) {
+			//FIX! once means not each frame! (of course it doesn't hurt functionality)
 			// Standard case: clear existing state and create new viewport
 			for (i = mphnum - 1; i >= 0; i--) {
 				mono_deloop(mph[i].head[1]);
@@ -1925,13 +1928,6 @@ nogood:; }
 
 		if (!didcut) break;
 	}
-	if (presect>-1) {
-		// mph[0].head[0] = prehead1;
-		// mph[0].head[1] = prehead2;
-		//	mph[0].tag = presect ;
-
-
-	}
 }
 
 static void draw_hsr_enter_portal( mapstate_t* map, int endportaln, bunchgrp *parentctx, int plothead0, int plothead1) {
@@ -1939,9 +1935,10 @@ static void draw_hsr_enter_portal( mapstate_t* map, int endportaln, bunchgrp *pa
 		return;
 	}
 	cam_t ncam = parentctx->cam;
-	int tgtspi = portals[endportaln].own_spri;
 	int backp = portals[endportaln].target_portal;
 	int entry = portals[backp].own_spri;
+
+	int tgtspi = portals[endportaln].own_spri;
 	int ignw = portals[endportaln].own_surfid;
 	int igns = portals[endportaln].own_sec;
 
@@ -1983,7 +1980,7 @@ static void draw_hsr_enter_portal( mapstate_t* map, int endportaln, bunchgrp *pa
 	newctx.testignoresec = igns;
 	newctx.gnewtagsect=-1;
 	newctx.gnewtag=-1;
-
+	newctx.currenthalfplane = parentctx->currenthalfplane;
 	draw_hsr_polymost_ctx(map, &newctx);
 }
 

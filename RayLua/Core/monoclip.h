@@ -83,6 +83,7 @@ typedef struct {
 	point3d testoffset;
 	int testignorewall;
 	int testignoresec;
+	int currenthalfplane;
 
 } bunchgrp;
 
