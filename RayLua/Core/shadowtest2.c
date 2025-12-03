@@ -109,7 +109,7 @@ unsigned int *shadowtest2_sectgot = 0; //WARNING:code uses x86-32 bit shift tric
 static unsigned int *shadowtest2_sectgotmal = 0;
 static int shadowtest2_sectgotn = 0;
 #define CLIP_PORTAL_FLAG 8
-#define MAX_PORTAL_DEPTH 2
+#define MAX_PORTAL_DEPTH 4
 //Translation & rotation
 static mapstate_t *curMap;
 static player_transform *gps;
@@ -1444,9 +1444,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		float surfpos = getslopez(&sec[s],isflor,b->cam.p.x,b->cam.p.y);
 		if ((b->cam.p.z >= surfpos) == isflor) // ignore backfaces
 				continue;
-		bool skipport= (b->has_portal_clip && s==b->testignoresec && isflor == b->testignorewall);
-		if (skipport)
-			continue;
+
 		// Setup surface properties (height, gradient, color)
 		fz = sec[s].z[isflor]; grad = &sec[s].grad[isflor];
 		gcurcol = (min(sec[s].surf[isflor].asc>>8,255)<<24) +
@@ -1495,16 +1493,14 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		b->gligwall = isflor - 2;
 
 		int endpn = sec[s].tags[1];
-
+		bool skipport= (b->has_portal_clip && s==b->testignoresec && isflor == b->testignorewall);
 		bool needsfinal = b->recursion_depth == MAX_PORTAL_DEPTH;
-		int ownps = portals[portals[endpn].target_portal].own_surfid;
-		bool isValidSurf = (isflor==ownps);
-		if (!needsfinal && endpn >= 0 && isValidSurf) {
-			int outsec = portals[endpn].own_sec;
-			// Do the clipping with correct isflor flag
-			drawpol_befclip(s, outsec+taginc * (b->recursion_depth + 1), outsec, plothead[0], plothead[1],
-							((isflor<<2)+3)|8, b); // flags inversion or other variations here dont solve the issue
-			draw_hsr_enter_portal(map, endpn, b, plothead[0], plothead[1]); // clipped heads are not needed as mono stat is shared.
+		if (!needsfinal && !skipport && endpn >= 0 && portals[endpn].own_surfid != isflor) {
+			//if (b->has_portal_clip && s == b->testignoresec && isflor == b->testignorewall)
+			//	continue;//portals[endpn].own_sec
+			drawpol_befclip(s, portals[endpn].own_sec+taginc, portals[endpn].own_sec,
+				plothead[0],plothead[1],  3, b);
+			draw_hsr_enter_portal(map, endpn, b,plothead[0],plothead[1]);
 		}
 		else {
 			drawpol_befclip(s,-1,-1,plothead[0],plothead[1],(isflor<<2)+3,b);
