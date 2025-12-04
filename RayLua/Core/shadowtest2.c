@@ -98,10 +98,6 @@ static tiletype gdd;
 int shadowtest2_rendmode = 1;
 extern int drawpoly_numcpu;
 int shadowtest2_updatelighting = 1;
-#ifdef STANDALONE
-	//For debug only!
-static int gcnt, curgcnt = 0x7fffffff, fixposx, fixposy;
-#endif
 
 	//Sorting
 
@@ -591,159 +587,11 @@ static void xformbac (double rx, double ry, double rz, dpoint3d *o, bunchgrp *b)
 	o->z = rx*b->xformmat[2] + ry*b->xformmat[5] + rz*b->xformmat[8];
 }
 
-#ifdef STANDALONE
-	//Assumes poly is clipped by mono_bool() to visible screen area
-static void drawpol_aftclip (int plothead0, int plothead1) //this function for debug only!
-{
-	kgln_t *overt, *vert;
-	tiltyp *pic, gtt;
-	double f;
-	int i, j, on, n, plothead[2];
-
-	if ((plothead0|plothead1) < 0) return;
-	plothead[0] = plothead0; plothead[1] = plothead1;
-
-	n = 2; for(j=0;j<2;j++) for(i=mp[plothead[j]].n;i!=plothead[j];i=mp[i].n) n++;
-	if (n < 3) return;
-
-	overt = (kgln_t *)_alloca(n*sizeof(overt[0]));
-	vert = (kgln_t *)_alloca(n*2*sizeof(vert[0]));
-
-	on = 0;
-	for(j=0;j<2;j++)
-	{
-		i = plothead[j];
-		do
-		{
-			if (j) i = mp[i].p;
-
-			overt[on].x = mp[i].x*b->xformmat[0] + mp[i].y*b->xformmat[1] + b->gnadd.x;
-			overt[on].y = mp[i].x*b->xformmat[3] + mp[i].y*b->xformmat[4] + b->gnadd.y;
-			overt[on].z = mp[i].x*b->xformmat[6] + mp[i].y*b->xformmat[7] + b->gnadd.z;
-			on++;
-
-			if (!j) i = mp[i].n;
-		} while (i != plothead[j]);
-	}
-
-		//clip
-	n = 0;
-	for(i=on-1,j=0;j<on;i=j,j++)
-	{
-		#define ASCISDIST 0.001
-		if (overt[i].z >= ASCISDIST) { vert[n] = overt[i]; n++; }
-		if ((overt[i].z >= ASCISDIST) != (overt[j].z >= ASCISDIST))
-		{
-			f = (ASCISDIST-overt[j].z)/(overt[i].z-overt[j].z);
-			vert[n].x = (overt[i].x-overt[j].x)*f + overt[j].x;
-			vert[n].y = (overt[i].y-overt[j].y)*f + overt[j].y;
-			vert[n].z = ASCISDIST; n++;
-		}
-	}
-	if (n < 3) return;
-
-		//project & find x extents
-	for(i=0;i<n;i++)
-	{
-		f = gcam.h.z/vert[i].z;
-		vert[i].x = vert[i].x*f + gcam.h.x;
-		vert[i].y = vert[i].y*f + gcam.h.y;
-		vert[i].n = i+1;
-	}
-	vert[n-1].n = 0;
-
-	pic = &gtpic->tt;
-	gtt.f = pic->f; gtt.p = pic->p; gtt.x = pic->x; gtt.y = pic->y; gtt.z = 1.0; gtt.shsc = 2.0; gtt.lowermip = pic->lowermip;
-
-	i = RENDFLAGS_OUVMAT|RENDFLAGS_NODEPTHTEST|RENDFLAGS_NOTRCP|RENDFLAGS_GMAT;
-	if (renderinterp) i |= RENDFLAGS_INTERP;
-	drawpoly(&gtt,(vertyp *)vert,n,gcurcol,(((unsigned)gcurcol)>>24)/16.0,b->gouvmat,i);
-
-	if (shadowtest2_rendmode != 2)
-	{
-		double x0, y0, x1, y1, fx, fy, f;
-
-		for(i=n-1,j=0;i>=0;j=i,i--) drawline2d(&gcam.c,vert[i].x,vert[i].y,vert[j].x,vert[j].y,0x808080);
-
-			//Find centroid of polygon (copied from Build2, which is from TAGPNT2.BAS 09/14/2006)
-		fx = 0.0; fy = 0.0; f = 0.0;
-		for(i=n-1,j=0;i>=0;j=i,i--)
-		{
-			x0 = vert[i].x; y0 = vert[i].y;
-			x1 = vert[j].x; y1 = vert[j].y;
-			fx += ((x0+x1)*x0 + x1*x1)*(y1-y0);
-			fy += ((y0+y1)*y0 + y1*y1)*(x0-x1);
-			f += (x0+x1)*(y1-y0);
-		}
-		f = 1.0/(f*3.0); i = (int)(fx*f); j = (int)(fy*f);
-													  drawpix(&gcam.c,i+0,j-1,0xffffff); drawpix(&gcam.c,i+1,j-1,0xffffff);
-		drawpix(&gcam.c,i-1,j+0,0xffffff); drawpix(&gcam.c,i+0,j+0,0x000000); drawpix(&gcam.c,i+1,j+0,0x000000); drawpix(&gcam.c,i+2,j+0,0xffffff);
-		drawpix(&gcam.c,i-1,j+1,0xffffff); drawpix(&gcam.c,i+0,j+1,0x000000); drawpix(&gcam.c,i+1,j+1,0x000000); drawpix(&gcam.c,i+2,j+1,0xffffff);
-													  drawpix(&gcam.c,i+0,j+2,0xffffff); drawpix(&gcam.c,i+1,j+2,0xffffff);
-	}
-}
-#endif
-
 eyepol_t *eyepol = 0; // 4096 eyepol_t's = 192KB
 point3d *eyepolv = 0; //16384 point2d's  = 128KB
 int eyepoln = 0, glignum = 0;
 int eyepolmal = 0, eyepolvn = 0, eyepolvmal = 0;
 
-void eyepol_drawfunc (int ind)
-{
-	kgln_t *vert;
-	point2d *lipv;
-	float f, fx, fy;
-	int i, j, n;
-
-	n = eyepol[ind+1].vert0-eyepol[ind].vert0; lipv = &eyepolv[eyepol[ind].vert0];
-	vert = (kgln_t *)_alloca(n*sizeof(vert[0]));
-	for(i=0;i<n;i++)
-	{
-		vert[i].x = lipv[i].x;
-		vert[i].y = lipv[i].y;
-		vert[i].n = i+1;
-	}
-	vert[n-1].n = 0;
-
-	//i = RENDFLAGS_OUVMAT|RENDFLAGS_NODEPTHTEST|RENDFLAGS_NOTRCP|RENDFLAGS_GMAT;
-	//if (renderinterp) i |= RENDFLAGS_INTERP;
-	//drawpoly_flat_threadsafe(&eyepol[ind].tpic->tt,(vertyp *)vert,n,eyepol[ind].curcol,(((unsigned)eyepol[ind].curcol)>>24)/16.0,eyepol[ind].ouvmat,i,gcam);
-
-	if (shadowtest2_rendmode == 1)
-	{
-	//	for(i=n-1,j=0;i>=0;j=i,i--) drawline2d(&gcam.c,vert[i].x,vert[i].y,vert[j].x,vert[j].y,0xa0a0a0); //WARNING:fusing this with centroid algo below fails.. compiler bug?
-#if 0
-		fx = 0.f; fy = 0.f;
-		for(i=n-1,j=0;i>=0;j=i,i--) { fx += vert[i].x; fy += vert[i].y; }
-		f = 1.f/(float)n; i = (int)(fx*f); j = (int)(fy*f);
-#else
-			//Find centroid of polygon
-		fx = 0.f; fy = 0.f; f = 0.f;
-		for(i=n-1,j=0;i>=0;j=i,i--)
-		{
-			float fx0, fy0, fx1, fy1;
-			fx0 = vert[i].x; fy0 = vert[i].y;
-			fx1 = vert[j].x; fy1 = vert[j].y;
-			fx += ((fx0+fx1)*fx0 + fx1*fx1)*(fy1-fy0);
-			fy += ((fy0+fy1)*fy0 + fy1*fy1)*(fx0-fx1);
-			f += (fx0+fx1)*(fy1-fy0);
-		}
-		f = 1.f/(f*3.f); i = (int)(fx*f); j = (int)(fy*f);
-#endif
-	//												  drawpix(&gcam.c,i+0,j-1,0xffffff); drawpix(&gcam.c,i+1,j-1,0xffffff);
-	//	drawpix(&gcam.c,i-1,j+0,0xffffff); drawpix(&gcam.c,i+0,j+0,0x000000); drawpix(&gcam.c,i+1,j+0,0x000000); drawpix(&gcam.c,i+2,j+0,0xffffff);
-	//	drawpix(&gcam.c,i-1,j+1,0xffffff); drawpix(&gcam.c,i+0,j+1,0x000000); drawpix(&gcam.c,i+1,j+1,0x000000); drawpix(&gcam.c,i+2,j+1,0xffffff);
-	//												  drawpix(&gcam.c,i+0,j+2,0xffffff); drawpix(&gcam.c,i+1,j+2,0xffffff);
-	}
-}
-/*
-	Purpose: Renders visible geometry polygons to world space eyepol array
-	Converts 3D polygon vertices to world coordinates (no screen projection)
-	Handles texture mapping setup (UV coordinates, skybox mapping)
-	Stores polygons in eyepol[] array with world space vertices
-	Manages different rendering modes (walls, skybox, parallax sky)
- */
 static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 {
 	cam_t gcam = b->orcam;
@@ -1720,10 +1568,6 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 	if (!mphmal)
 		mono_initonce();
 
-#ifdef STANDALONE
-	fixposx = 0; fixposy = 32;
-	//fixposx = 600; fixposy = 256;
-#endif
 
 		//Hack to keep camera away from sector line; avoids clipping glitch in drawpol_befclip/changetagfunc
 //wal = lgs->sect[gcam.cursect].wall;
