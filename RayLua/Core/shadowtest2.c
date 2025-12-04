@@ -1492,16 +1492,19 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		}
 		b->gligwall = isflor - 2;
 
-		int endpn = sec[s].tags[1];
+		int myport = sec[s].tags[1];
+		if (myport>=0)
+			int asd=1;
 		bool skipport= (b->has_portal_clip && s==b->testignoresec && isflor == b->testignorewall);
 		bool needsfinal = b->recursion_depth == MAX_PORTAL_DEPTH;
-		if (!needsfinal && !skipport && endpn >= 0 && portals[endpn].own_surfid != isflor) {
-			//if (b->has_portal_clip && s == b->testignoresec && isflor == b->testignorewall)
-			//	continue;//portals[endpn].own_sec
-			drawpol_befclip(s, portals[endpn].own_sec+taginc, portals[endpn].own_sec,
+		bool isportal = myport>=0 && portals[myport].destpn >=0 && portals[myport].surfid == isflor;
+		if (isportal && !needsfinal && !skipport) {
+			int endpn = portals[myport].destpn;
+			drawpol_befclip(s, portals[endpn].sect+taginc, portals[endpn].sect,
 				plothead[0],plothead[1],  3, b);
-			draw_hsr_enter_portal(map, endpn, b,plothead[0],plothead[1]);
+			draw_hsr_enter_portal(map, myport, b,plothead[0],plothead[1]);
 		}
+
 		else {
 			drawpol_befclip(s,-1,-1,plothead[0],plothead[1],(isflor<<2)+3,b);
 		}
@@ -1608,12 +1611,14 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 				ns = verts[m >> 1].s; // Portal to adjacent sector
 			}
 			// Render the wall polygon
-			int endpn = wal[w].tags[1];
-			if (endpn >= 0 && portals[endpn].iswall) {
+			int myport = wal[w].tags[1];
+			if (false && myport >= 0 && portals[myport].destpn >=0 && portals[myport].kind == PORT_WALL) {
 				//if (b->has_portal_clip && s == b->testignoresec && w == b->testignorewall)
 					//continue;
-				drawpol_befclip(s, portals[endpn].own_sec+taginc, portals[endpn].own_sec, plothead[0], plothead[1],  3, b);
-				draw_hsr_enter_portal(map, endpn, b,plothead[0],plothead[1]);
+					int endp = portals[myport].destpn;
+
+				drawpol_befclip(s, portals[endp].sect+taginc, portals[endp].sect, plothead[0], plothead[1],  3, b);
+				draw_hsr_enter_portal(map, myport, b,plothead[0],plothead[1]);
 			} else {
 				// could be 7 or 3, .111 or .011
 				drawpol_befclip(s, ns, ns, plothead[0], plothead[1], ((m > vn) << 2) + 3, b);
@@ -1687,13 +1692,13 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 
 	if ((lgs->numsects <= 0) || ((unsigned)gcam.cursect >= (unsigned)lgs->numsects))
 	{
-		if (shadowtest2_rendmode != 4)
-		{
-			for(i=0,j=gcam.c.f;i<gcam.c.y;i++,j+=gcam.c.p) memset8((void *)j,0x00000000,gcam.c.x<<2);
-			for(i=0,j=gcam.z.f;i<gcam.z.y;i++,j+=gcam.z.p) memset8((void *)j,0x7f7f7f7f,gcam.z.x<<2);
-		}
-		//if (shadowtest2_rendmode != 4) eyepoln = 0; //Prevents drawpollig() from crashing
-		return;
+	//if (shadowtest2_rendmode != 4)
+	//{
+	//	for(i=0,j=gcam.c.f;i<gcam.c.y;i++,j+=gcam.c.p) memset8((void *)j,0x00000000,gcam.c.x<<2);
+	//	for(i=0,j=gcam.z.f;i<gcam.z.y;i++,j+=gcam.z.p) memset8((void *)j,0x7f7f7f7f,gcam.z.x<<2);
+	//}
+	//if (shadowtest2_rendmode != 4) eyepoln = 0; //Prevents drawpollig() from crashing
+	//	return;
 	}
 	if (!b->bunchmal)
 	{
@@ -1926,17 +1931,17 @@ nogood:; }
 	}
 }
 
-static void draw_hsr_enter_portal( mapstate_t* map, int endportaln, bunchgrp *parentctx, int plothead0, int plothead1) {
+static void draw_hsr_enter_portal( mapstate_t* map, int myport, bunchgrp *parentctx, int plothead0, int plothead1) {
 	if (parentctx->recursion_depth >= MAX_PORTAL_DEPTH) {
 		return;
 	}
 	cam_t ncam = parentctx->cam;
-	int backp = portals[endportaln].target_portal;
-	int entry = portals[backp].own_spri;
+	int endp = portals[myport].destpn;
+	int entry = portals[myport].anchorspri;
 
-	int tgtspi = portals[endportaln].own_spri;
-	int ignw = portals[endportaln].own_surfid;
-	int igns = portals[endportaln].own_sec;
+	int tgtspi = portals[endp].anchorspri;
+	int ignw = portals[endp].surfid;
+	int igns = portals[endp].sect;
 
 	spri_t tgs = map->spri[tgtspi];
 	spri_t ent = map->spri[entry];

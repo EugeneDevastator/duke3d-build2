@@ -117,42 +117,65 @@ public:
             }
         }
 // init portals; walls test
-        if (false)
-        for(int i=0;i<map->numsects;i++) {
-            for (int wn=0; wn< map->sect[i].n;wn++) {
-                map->sect[i].wall[wn].tags[1]=-1;
-                if( map->sect[i].wall[wn].surf.hitag==5) {
-
-                    portals[portaln].own_sec = i;
-                    portals[portaln].own_spri = map->sect[i].headspri;
-                    portals[portaln].own_surfid = wn;
-                    portals[portaln].iswall = true;
-                    //tmp hak
-                    portals[portaln].target_portal = 1-portaln;
-                    map->sect[i].wall[wn].tags[1] = portals[portaln].target_portal;
+        for (int i = 0; i < map->numsects; i++) { // wall ports
+            for (int wn = 0; wn < map->sect[i].n; wn++) {
+                map->sect[i].wall[wn].tags[1] = -1;
+                if (map->sect[i].wall[wn].surf.pal == 30) {
+                    portal &p = portals[portaln];
+                    p.id = map->sect[i].surf[1].lotag;
+                    p.sect = i;
+                    p.anchorspri = map->sect[i].headspri;
+                    p.surfid = wn;
+                    p.kind = PORT_WALL;
+                    map->sect[i].wall[wn].tags[1] = portaln;
+                    p.destpn = map->sect[i].surf[1].hitag;
                     portaln++;
                 }
             }
         }
 
-        if (true) // sectors
-            for(int i=0;i<map->numsects;i++) {
-                    map->sect[i].tags[1]=-1;
-                    if( map->sect[i].surf[1].hitag==5) {
+        for (int i = 0; i < map->numsects; i++) { // floor ceil ports
+            map->sect[i].tags[1] = -1;
+            if (map->sect[i].surf[1].pal == 30 || map->sect[i].surf[0].pal == 30) {
+                portal &p = portals[portaln];
+                p.id = map->sect[i].surf[1].lotag;
+                p.sect = i;
+                p.anchorspri = map->sect[i].headspri;
 
-                        portals[portaln].own_sec = i;
-                        portals[portaln].own_spri = map->sect[i].headspri;
+                //p.surfid = map->sect[i].surf[1].lotag; // hak to determine ceil or floor in map lotag1==floor.
+                int sid1 = abs(map->spri[p.anchorspri].p.z - map->sect[i].z[1]);
+                int sid2 = abs(map->spri[p.anchorspri].p.z - map->sect[i].z[0]);
+                p.surfid = sid1 < sid2;
+                map->spri[p.anchorspri].p.z = map->sect[i].z[p.surfid]; // resolve flor ceil in future
+                p.kind = p.surfid;
 
-                        portals[portaln].own_surfid = map->sect[i].surf[1].lotag; // hak to determine ceil or floor in map lotag1==floor.
-                        map->spri[portals[portaln].own_spri].p.z = map->sect[i].z[portals[portaln].own_surfid]; // resolve flor ceil in future
-                        portals[portaln].iswall = false;
-                        //tmp hak
-                        portals[portaln].target_portal = 1-portaln;
-                        map->sect[i].tags[1] = portals[portaln].target_portal;
-                        portaln++;
-                    }
+                p.destpn = map->sect[i].surf[1].hitag;
+                map->sect[i].tags[1] = portaln;
+                portaln++;
+            }
+        }
+
+        for (int i = 0; i < portaln; i++) {
+            int target_tag = portals[i].destpn; // currently stores expected hitag
+            portals[i].destpn = -1; // mark as unresolved
+
+
+            // Find portal with matching lowtag
+            for (int j = 0; j < portaln; j++) {
+                if (i == j) continue; // skip self, disable for mirror
+                int id = portals[j].id;
+                if (id == target_tag) {
+                    portals[i].destpn = j;
+                    break;
+                }
             }
 
+            // Optional: warn about unresolved portals
+            if (portals[i].destpn == -1) {
+                // Portal destination not found
+                printf("Warning: Portal %d with target lotag %d has no matching hitag\n", i, target_tag);
+            }
+        }
         // auto paltex = ConvertPalToTexture();
         // tile_t* pic = static_cast<tile_t*>(malloc(sizeof(tile_t)));
         // strcpy_s(pic->filnam, "TILES000.art|1");
@@ -453,7 +476,7 @@ public:
            // BeginShaderMode(uvShader);
             rlBegin(RL_TRIANGLES);
             glEnable(GL_POLYGON_OFFSET_FILL);
-            glPolygonOffset(-1.0f, 1.0f);
+            glPolygonOffset(-0.5f, 1.0f);
 rlDisableDepthMask();
         for (int j = 1; j < vertCount - 1; j++) {
             int idx[] = {v0, v0 + j, v0 + j + 1};
@@ -537,18 +560,23 @@ rlDisableDepthMask();
                     rlDisableDepthMask();
                     glEnable(GL_POLYGON_OFFSET_FILL);
                     glPolygonOffset(-1.0f, 1.0f);
-                    for (int j = 1; j < vertCount - 1; j++) {
-                        int idx[] = {v0, v0 + j, v0 + j + 1};
-                        for (int k = 0; k < 3; k++) {
-                            Vector3 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y,eyepolv[idx[k]].z};
-                            rlColor4f(0, 1, 1, 1);
+                    rlColor4f(0, 1, 1, 1);
+                    for (int j = 0; j < vertCount; j++) {
+                       //int idx[] = {v0, v0 + j, v0 + j + 1};
+                       //for (int k = 0; k < 3; k++) {
+                           // Vector3 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y,eyepolv[idx[k]].z};
+                            Vector3 pt = {eyepolv[v0+j].x, eyepolv[v0+j].y,eyepolv[v0+j].z};
                             rlVertex3f(pt.x,-pt.z, pt.y);
-                        }
+                       // }
                     }
+                    Vector3 pt = {eyepolv[v0].x, eyepolv[v0].y,eyepolv[v0].z};
+                    rlVertex3f(pt.x,-pt.z, pt.y);
+
                     rlEnd();
                     glDisable(GL_POLYGON_OFFSET_FILL);
                     rlEnableDepthMask();
                 } // eyepol lines for each poly
+                EndBlendMode();
             }
         }
         EndMode3D();
