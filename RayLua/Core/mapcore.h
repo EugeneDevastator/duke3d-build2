@@ -44,7 +44,8 @@ typedef struct { intptr_t f; int p, x, y; } tiletype;
 typedef struct {
 	// color, zbuf
 	tiltyp c, z;
-	point3d p, r, d, f, h;
+	union { transform tr; struct { point3d p, r, d, f; }; };
+	point3d h;
 	int cursect;
 } cam_t;
 
