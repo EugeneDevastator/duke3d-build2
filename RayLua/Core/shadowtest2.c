@@ -1928,25 +1928,23 @@ nogood:; }
 }
 // 1. Normalize transform (makes vectors unit length and orthogonal)
 static float vlen(point3d *p) {
-	return sqrtf(p->x * p->x + p->y * p->y + p->z * p->z);
+    return sqrtf(p->x * p->x + p->y * p->y + p->z * p->z);
 }
-static float scalardivv(point3d *pt, float diver) {
-	return pt->x /= diver; pt->y /= diver; pt->z /= diver;
-}
-static void normalize_transform(transform *tr) {
-    // Normalize forward
-    float flen = vlen(&tr->f);
-	scalardivv(&tr->f,flen);
 
-    // Normalize right
-	flen = vlen(&tr->r);
-	scalardivv(&tr->r,flen);
-	flen = vlen(&tr->d);
-	scalardivv(&tr->d,flen);
-    // Recompute down as cross product to ensure orthogonality
-   // tr->d.x = f->y * r->z - f->z * r->y;
-   // tr->d.y = f->z * r->x - f->x * r->z;
-   // tr->d.z = f->x * r->y - f->y * r->x;
+static void scalardivv(point3d *pt, float diver) {
+    pt->x /= diver; pt->y /= diver; pt->z /= diver;
+}
+
+static void normalize_transform(transform *tr) {
+    // Normalize all axes
+    float flen = vlen(&tr->f);
+    if (flen > 0.0001f) scalardivv(&tr->f, flen);
+
+    flen = vlen(&tr->r);
+    if (flen > 0.0001f) scalardivv(&tr->r, flen);
+
+    flen = vlen(&tr->d);
+    if (flen > 0.0001f) scalardivv(&tr->d, flen);
 }
 
 // 2a. Transform a point from world space to local space of a transform
@@ -1975,67 +1973,97 @@ static point3d world_to_local_vec(point3d world_vec, transform *tr) {
     return local;
 }
 
-static void draw_hsr_enter_portal( mapstate_t* map, int myport, bunchgrp *parentctx, int plothead0, int plothead1) {
-	if (parentctx->recursion_depth >= MAX_PORTAL_DEPTH) {
-		return;
-	}
-/*
- *sprites and cams have same transform structure:
+// 2c. Transform a point from local space to world space
+static point3d local_to_world_point(point3d local_pos, transform *tr) {
+    point3d world;
+    world.x = tr->p.x + local_pos.x * tr->r.x + local_pos.y * tr->d.x + local_pos.z * tr->f.x;
+    world.y = tr->p.y + local_pos.x * tr->r.y + local_pos.y * tr->d.y + local_pos.z * tr->f.y;
+    world.z = tr->p.z + local_pos.x * tr->r.z + local_pos.y * tr->d.z + local_pos.z * tr->f.z;
 
-	typedef struct
-	{
-		point3d p, r, d, f; // pos, right, down, forward
-		...
-	}
-	*/
-
-	cam_t ncam = parentctx->cam;
-	int endp = portals[myport].destpn;
-	int entry = portals[myport].anchorspri;
-
-	int tgtspi = portals[endp].anchorspri;
-	int ignw = portals[endp].surfid;
-	int igns = portals[endp].sect;
-
-	spri_t tgs = map->spri[tgtspi];
-	spri_t ent = map->spri[entry];
-
-	// here we need to find how camera would look throug portal. code below is correct only for position shift.
-	float dx = tgs.p.x - ent.p.x;
-	float dy = tgs.p.y - ent.p.y;
-	float dz = tgs.p.z - ent.p.z;
-	ncam.p.x+=dx;
-	ncam.p.y+=dy;
-	ncam.p.z+=dz;
-// implement same increments for all rotations, maybe even replace with matrix transformations, assume we can reference both cam and sprite transforms as tr field: c.tr.p.z or spr.tr.f.y
-
-
-
-	ncam.cursect = portals[endp].sect;
-
-
-	bunchgrp newctx={};
-	newctx.recursion_depth = parentctx->recursion_depth+1;
-	newctx.cam = ncam;
-	newctx.orcam = parentctx->orcam;
-
-	newctx.has_portal_clip = true;
-	newctx.portal_clip[0] = plothead0;
-	newctx.portal_clip[1] = plothead1;
-	newctx.sectgotn = 0;
-	newctx.sectgot = 0;
-	newctx.sectgotmal = 0;
-	newctx.bunchgot=0;
-	newctx.bunchn=0;
-	newctx.bunchmal=0;
-	newctx.bunchgrid =0;
-	newctx.testignorewall = ignw;
-	newctx.testignoresec = igns;
-	newctx.gnewtagsect=-1;
-	newctx.gnewtag=-1;
-	newctx.currenthalfplane = parentctx->currenthalfplane;
-	draw_hsr_polymost_ctx(map, &newctx);
+    return world;
 }
+
+// 2d. Transform a vector from local space to world space
+static point3d local_to_world_vec(point3d local_vec, transform *tr) {
+    point3d world;
+    world.x = local_vec.x * tr->r.x + local_vec.y * tr->d.x + local_vec.z * tr->f.x;
+    world.y = local_vec.x * tr->r.y + local_vec.y * tr->d.y + local_vec.z * tr->f.y;
+    world.z = local_vec.x * tr->r.z + local_vec.y * tr->d.z + local_vec.z * tr->f.z;
+
+    return world;
+}
+static void draw_hsr_enter_portal(mapstate_t* map, int myport, bunchgrp *parentctx,
+                                   int plothead0, int plothead1) {
+    if (parentctx->recursion_depth >= MAX_PORTAL_DEPTH) {
+        return;
+    }
+
+    cam_t ncam = parentctx->cam;
+    int endp = portals[myport].destpn;
+    int entry = portals[myport].anchorspri;
+    int tgtspi = portals[endp].anchorspri;
+    int ignw = portals[endp].surfid;
+    int igns = portals[endp].sect;
+
+    spri_t tgs = map->spri[tgtspi];
+    spri_t ent = map->spri[entry];
+
+    // Normalize transforms to ensure orthonormality
+    normalize_transform(&ent.tr);
+    normalize_transform(&tgs.tr);
+
+    // Step 1: Transform camera to entry portal's local space
+    point3d cam_local_pos = world_to_local_point(ncam.p, &ent.tr);
+    point3d cam_local_r = world_to_local_vec(ncam.r, &ent.tr);
+    point3d cam_local_d = world_to_local_vec(ncam.d, &ent.tr);
+    point3d cam_local_f = world_to_local_vec(ncam.f, &ent.tr);
+
+    // Step 2: Flip 180 degrees around the portal's UP axis (D axis)
+    // This simulates going through the portal
+    // 180° rotation around Y: X -> -X, Z -> -Z, Y -> Y
+    cam_local_pos.x = -cam_local_pos.x;
+    cam_local_pos.z = -cam_local_pos.z;
+
+    cam_local_r.x = -cam_local_r.x;
+    cam_local_r.z = -cam_local_r.z;
+
+    cam_local_f.x = -cam_local_f.x;
+    cam_local_f.z = -cam_local_f.z;
+
+    // Down vector stays the same (rotation axis)
+    // cam_local_d unchanged
+
+    // Step 3: Transform from portal local space to target portal's world space
+    ncam.p = local_to_world_point(cam_local_pos, &tgs.tr);
+    ncam.r = local_to_world_vec(cam_local_r, &tgs.tr);
+    ncam.d = local_to_world_vec(cam_local_d, &tgs.tr);
+    ncam.f = local_to_world_vec(cam_local_f, &tgs.tr);
+
+    ncam.cursect = portals[endp].sect;
+
+    bunchgrp newctx = {};
+    newctx.recursion_depth = parentctx->recursion_depth + 1;
+    newctx.cam = ncam;
+    newctx.orcam = parentctx->orcam;
+    newctx.has_portal_clip = true;
+    newctx.portal_clip[0] = plothead0;
+    newctx.portal_clip[1] = plothead1;
+    newctx.sectgotn = 0;
+    newctx.sectgot = 0;
+    newctx.sectgotmal = 0;
+    newctx.bunchgot = 0;
+    newctx.bunchn = 0;
+    newctx.bunchmal = 0;
+    newctx.bunchgrid = 0;
+    newctx.testignorewall = ignw;
+    newctx.testignoresec = igns;
+    newctx.gnewtagsect = -1;
+    newctx.gnewtag = -1;
+    newctx.currenthalfplane = parentctx->currenthalfplane;
+
+    draw_hsr_polymost_ctx(map, &newctx);
+}
+
 
 typedef struct { int sect; point3d p; float rgb[3]; int useshadow; } drawkv6_lightpos_t;
 void drawsprites ()
