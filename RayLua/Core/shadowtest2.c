@@ -1612,11 +1612,8 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 			}
 			// Render the wall polygon
 			int myport = wal[w].tags[1];
-			if (false && myport >= 0 && portals[myport].destpn >=0 && portals[myport].kind == PORT_WALL) {
-				//if (b->has_portal_clip && s == b->testignoresec && w == b->testignorewall)
-					//continue;
+			if (myport >= 0 && portals[myport].destpn >=0 && portals[myport].kind == PORT_WALL) {
 					int endp = portals[myport].destpn;
-
 				drawpol_befclip(s, portals[endp].sect+taginc, portals[endp].sect, plothead[0], plothead[1],  3, b);
 				draw_hsr_enter_portal(map, myport, b,plothead[0],plothead[1]);
 			} else {
@@ -1690,16 +1687,16 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 
 	curMap = lgs;
 
-	if ((lgs->numsects <= 0) || ((unsigned)gcam.cursect >= (unsigned)lgs->numsects))
-	{
-	//if (shadowtest2_rendmode != 4)
+	//if ((lgs->numsects <= 0) || ((unsigned)gcam.cursect >= (unsigned)lgs->numsects))
 	//{
-	//	for(i=0,j=gcam.c.f;i<gcam.c.y;i++,j+=gcam.c.p) memset8((void *)j,0x00000000,gcam.c.x<<2);
-	//	for(i=0,j=gcam.z.f;i<gcam.z.y;i++,j+=gcam.z.p) memset8((void *)j,0x7f7f7f7f,gcam.z.x<<2);
+	////if (shadowtest2_rendmode != 4)
+	////{
+	////	for(i=0,j=gcam.c.f;i<gcam.c.y;i++,j+=gcam.c.p) memset8((void *)j,0x00000000,gcam.c.x<<2);
+	////	for(i=0,j=gcam.z.f;i<gcam.z.y;i++,j+=gcam.z.p) memset8((void *)j,0x7f7f7f7f,gcam.z.x<<2);
+	////}
+	////if (shadowtest2_rendmode != 4) eyepoln = 0; //Prevents drawpollig() from crashing
+	////	return;
 	//}
-	//if (shadowtest2_rendmode != 4) eyepoln = 0; //Prevents drawpollig() from crashing
-	//	return;
-	}
 	if (!b->bunchmal)
 	{
 		b->bunchmal = 64;
@@ -1951,7 +1948,7 @@ static void draw_hsr_enter_portal( mapstate_t* map, int myport, bunchgrp *parent
 	ncam.p.x+=dx;
 	ncam.p.y+=dy;
 	ncam.p.z+=dz;
-	ncam.cursect = tgs.sect;
+	ncam.cursect = portals[endp].sect;
 //	ncam.f = s.f;
 //	ncam.r = s.r;
 //	ncam.d = s.d;

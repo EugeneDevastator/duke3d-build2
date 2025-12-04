@@ -122,13 +122,14 @@ public:
                 map->sect[i].wall[wn].tags[1] = -1;
                 if (map->sect[i].wall[wn].surf.pal == 30) {
                     portal &p = portals[portaln];
-                    p.id = map->sect[i].surf[1].lotag;
+                    p.id = map->sect[i].wall[wn].surf.lotag;
                     p.sect = i;
                     p.anchorspri = map->sect[i].headspri;
                     p.surfid = wn;
                     p.kind = PORT_WALL;
+
                     map->sect[i].wall[wn].tags[1] = portaln;
-                    p.destpn = map->sect[i].surf[1].hitag;
+                    p.destpn = map->sect[i].wall[wn].surf.hitag;
                     portaln++;
                 }
             }
