@@ -1926,6 +1926,54 @@ nogood:; }
 		if (!didcut) break;
 	}
 }
+// 1. Normalize transform (makes vectors unit length and orthogonal)
+static float vlen(point3d *p) {
+	return sqrtf(p->x * p->x + p->y * p->y + p->z * p->z);
+}
+static float scalardivv(point3d *pt, float diver) {
+	return pt->x /= diver; pt->y /= diver; pt->z /= diver;
+}
+static void normalize_transform(transform *tr) {
+    // Normalize forward
+    float flen = vlen(&tr->f);
+	scalardivv(&tr->f,flen);
+
+    // Normalize right
+	flen = vlen(&tr->r);
+	scalardivv(&tr->r,flen);
+	flen = vlen(&tr->d);
+	scalardivv(&tr->d,flen);
+    // Recompute down as cross product to ensure orthogonality
+   // tr->d.x = f->y * r->z - f->z * r->y;
+   // tr->d.y = f->z * r->x - f->x * r->z;
+   // tr->d.z = f->x * r->y - f->y * r->x;
+}
+
+// 2a. Transform a point from world space to local space of a transform
+static point3d world_to_local_point(point3d world_pos, transform *tr) {
+    // Translate to origin
+    float dx = world_pos.x - tr->p.x;
+    float dy = world_pos.y - tr->p.y;
+    float dz = world_pos.z - tr->p.z;
+
+    // Project onto local axes (inverse rotation via dot products)
+    point3d local;
+    local.x = dx * tr->r.x + dy * tr->r.y + dz * tr->r.z;
+    local.y = dx * tr->d.x + dy * tr->d.y + dz * tr->d.z;
+    local.z = dx * tr->f.x + dy * tr->f.y + dz * tr->f.z;
+
+    return local;
+}
+
+// 2b. Transform a vector from world space to local space
+static point3d world_to_local_vec(point3d world_vec, transform *tr) {
+    point3d local;
+    local.x = world_vec.x * tr->r.x + world_vec.y * tr->r.y + world_vec.z * tr->r.z;
+    local.y = world_vec.x * tr->d.x + world_vec.y * tr->d.y + world_vec.z * tr->d.z;
+    local.z = world_vec.x * tr->f.x + world_vec.y * tr->f.y + world_vec.z * tr->f.z;
+
+    return local;
+}
 
 static void draw_hsr_enter_portal( mapstate_t* map, int myport, bunchgrp *parentctx, int plothead0, int plothead1) {
 	if (parentctx->recursion_depth >= MAX_PORTAL_DEPTH) {
