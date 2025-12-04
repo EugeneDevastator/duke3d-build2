@@ -149,7 +149,18 @@ public:
                 p.surfid = sid1 < sid2;
                 map->spri[p.anchorspri].p.z = map->sect[i].z[p.surfid]; // resolve flor ceil in future
                 p.kind = p.surfid;
-
+                spri_t *spr = &map->spri[p.anchorspri];
+              //  point3d newr = spr->tr.r;
+                point3d newd = spr->tr.f;
+                point3d newf = spr->tr.d;
+            //    vmulscal(&newr,-1.0f);
+             ///   if (p.surfid==1) {
+                  //  vmulscal(&newd,-1.0f);
+                    vmulscal(&newf,-1.0f);
+               // }
+              //  vmulscal(&spr->tr.r,-1);
+                spr->tr.d = newd;
+                spr->tr.f = newf;
                 p.destpn = map->sect[i].surf[1].hitag;
                 map->sect[i].tags[1] = portaln;
                 portaln++;
