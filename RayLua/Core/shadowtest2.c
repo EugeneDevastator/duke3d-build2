@@ -746,7 +746,7 @@ void eyepol_drawfunc (int ind)
  */
 static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 {
-	cam_t gcam = b->cam;
+	cam_t gcam = b->orcam;
 	float f,fx,fy, g, *fptr;
 	int i, j, k, h, rethead[2];
 
@@ -776,9 +776,9 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 #else
 			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*gcam.h.z);
 #endif
-			eyepolv[eyepolvn].x = -b->testoffset.x+((fx-gcam.h.x)*gcam.r.x + (fy-gcam.h.y)*gcam.d.x + (gcam.h.z)*gcam.f.x)*f + gcam.p.x;
-			eyepolv[eyepolvn].y = -b->testoffset.y+((fx-gcam.h.x)*gcam.r.y + (fy-gcam.h.y)*gcam.d.y + (gcam.h.z)*gcam.f.y)*f + gcam.p.y;
-			eyepolv[eyepolvn].z = -b->testoffset.z+((fx-gcam.h.x)*gcam.r.z + (fy-gcam.h.y)*gcam.d.z + (gcam.h.z)*gcam.f.z)*f + gcam.p.z;
+			eyepolv[eyepolvn].x = ((fx-gcam.h.x)*gcam.r.x + (fy-gcam.h.y)*gcam.d.x + (gcam.h.z)*gcam.f.x)*f + gcam.p.x;
+			eyepolv[eyepolvn].y = ((fx-gcam.h.x)*gcam.r.y + (fy-gcam.h.y)*gcam.d.y + (gcam.h.z)*gcam.f.y)*f + gcam.p.y;
+			eyepolv[eyepolvn].z = ((fx-gcam.h.x)*gcam.r.z + (fy-gcam.h.y)*gcam.d.z + (gcam.h.z)*gcam.f.z)*f + gcam.p.z;
 
 			eyepolvn++;
 
@@ -1645,7 +1645,6 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
 	bs.cam = *cc;
 	bs.orcam = *cc;
 	bs.recursion_depth = 0;
-	bs.testoffset = (point3d){0,0,0};
 	bs.has_portal_clip = false;
 	draw_hsr_polymost_ctx(map,&bs);
 }
@@ -1958,11 +1957,6 @@ static void draw_hsr_enter_portal( mapstate_t* map, int myport, bunchgrp *parent
 	newctx.recursion_depth = parentctx->recursion_depth+1;
 	newctx.cam = ncam;
 	newctx.orcam = parentctx->orcam;
-
-	dx+=parentctx->testoffset.x; // progressively add offset for portal in portal.
-	dy+=parentctx->testoffset.y;
-	dz+=parentctx->testoffset.z;
-	newctx.testoffset=(point3d){dx,dy,dz};
 
 	newctx.has_portal_clip = true;
 	newctx.portal_clip[0] = plothead0;

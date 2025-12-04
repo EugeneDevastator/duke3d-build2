@@ -80,7 +80,6 @@ typedef struct {
 	int gligsect, gligwall, gligslab, gflags;
 	int gnewtag, gdoscansector, gnewtagsect;
 	point3d gnorm;
-	point3d testoffset;
 	int testignorewall;
 	int testignoresec;
 	int currenthalfplane;
