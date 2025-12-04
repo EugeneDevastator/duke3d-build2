@@ -746,7 +746,7 @@ void eyepol_drawfunc (int ind)
  */
 static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 {
-	cam_t gcam = b->cam;
+	cam_t gcam = b->orcam;
 	float f,fx,fy, g, *fptr;
 	int i, j, k, h, rethead[2];
 
@@ -776,9 +776,9 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 #else
 			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*gcam.h.z);
 #endif
-			eyepolv[eyepolvn].x = -b->testoffset.x+((fx-gcam.h.x)*gcam.r.x + (fy-gcam.h.y)*gcam.d.x + (gcam.h.z)*gcam.f.x)*f + gcam.p.x;
-			eyepolv[eyepolvn].y = -b->testoffset.y+((fx-gcam.h.x)*gcam.r.y + (fy-gcam.h.y)*gcam.d.y + (gcam.h.z)*gcam.f.y)*f + gcam.p.y;
-			eyepolv[eyepolvn].z = -b->testoffset.z+((fx-gcam.h.x)*gcam.r.z + (fy-gcam.h.y)*gcam.d.z + (gcam.h.z)*gcam.f.z)*f + gcam.p.z;
+			eyepolv[eyepolvn].x = ((fx-gcam.h.x)*gcam.r.x + (fy-gcam.h.y)*gcam.d.x + (gcam.h.z)*gcam.f.x)*f + gcam.p.x;
+			eyepolv[eyepolvn].y = ((fx-gcam.h.x)*gcam.r.y + (fy-gcam.h.y)*gcam.d.y + (gcam.h.z)*gcam.f.y)*f + gcam.p.y;
+			eyepolv[eyepolvn].z = ((fx-gcam.h.x)*gcam.r.z + (fy-gcam.h.y)*gcam.d.z + (gcam.h.z)*gcam.f.z)*f + gcam.p.z;
 
 			eyepolvn++;
 
