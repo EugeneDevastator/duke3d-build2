@@ -1931,6 +1931,16 @@ static void draw_hsr_enter_portal( mapstate_t* map, int myport, bunchgrp *parent
 	if (parentctx->recursion_depth >= MAX_PORTAL_DEPTH) {
 		return;
 	}
+/*
+ *sprites and cams have same transform structure:
+
+	typedef struct
+	{
+		point3d p, r, d, f; // pos, right, down, forward
+		...
+	}
+	*/
+
 	cam_t ncam = parentctx->cam;
 	int endp = portals[myport].destpn;
 	int entry = portals[myport].anchorspri;
@@ -1941,16 +1951,19 @@ static void draw_hsr_enter_portal( mapstate_t* map, int myport, bunchgrp *parent
 
 	spri_t tgs = map->spri[tgtspi];
 	spri_t ent = map->spri[entry];
+
+	// here we need to find how camera would look throug portal. code below is correct only for position shift.
 	float dx = tgs.p.x - ent.p.x;
 	float dy = tgs.p.y - ent.p.y;
 	float dz = tgs.p.z - ent.p.z;
 	ncam.p.x+=dx;
 	ncam.p.y+=dy;
 	ncam.p.z+=dz;
+// implement same increments for all rotations, maybe even replace with matrix transformations, assume we can reference both cam and sprite transforms as tr field: c.tr.p.z or spr.tr.f.y
+
+
+
 	ncam.cursect = portals[endp].sect;
-//	ncam.f = s.f;
-//	ncam.r = s.r;
-//	ncam.d = s.d;
 
 
 	bunchgrp newctx={};
