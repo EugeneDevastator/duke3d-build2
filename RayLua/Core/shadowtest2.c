@@ -1994,51 +1994,60 @@ static point3d local_to_world_vec(point3d local_vec, transform *tr) {
 }
 static void draw_hsr_enter_portal(mapstate_t* map, int myport, bunchgrp *parentctx,
                                    int plothead0, int plothead1) {
-    if (parentctx->recursion_depth >= MAX_PORTAL_DEPTH) {
-        return;
-    }
+	if (parentctx->recursion_depth >= MAX_PORTAL_DEPTH) {
+		return;
+	}
 
-    cam_t ncam = parentctx->cam;
-    int endp = portals[myport].destpn;
-    int entry = portals[myport].anchorspri;
-    int tgtspi = portals[endp].anchorspri;
-    int ignw = portals[endp].surfid;
-    int igns = portals[endp].sect;
+	cam_t ncam = parentctx->cam;
+	int endp = portals[myport].destpn;
+	int entry = portals[myport].anchorspri;
+	int tgtspi = portals[endp].anchorspri;
+	int ignw = portals[endp].surfid;
+	int igns = portals[endp].sect;
 
-    spri_t tgs = map->spri[tgtspi];
-    spri_t ent = map->spri[entry];
+	spri_t tgs = map->spri[tgtspi];
+	spri_t ent = map->spri[entry];
 
-    // Normalize transforms to ensure orthonormality
-    normalize_transform(&ent.tr);
-    normalize_transform(&tgs.tr);
+	if (portals[myport].kind != PORT_WALL) { // need build 2 editing to remove this
+		float dx = tgs.p.x - ent.p.x;
+		float dy = tgs.p.y - ent.p.y;
+		float dz = tgs.p.z - ent.p.z;
+		ncam.p.x+=dx;
+		ncam.p.y+=dy;
+		ncam.p.z+=dz;
+	}
+	else
+{
+	// Normalize transforms to ensure orthonormality
+	normalize_transform(&ent.tr);
+	normalize_transform(&tgs.tr);
 
-    // Step 1: Transform camera to entry portal's local space
-    point3d cam_local_pos = world_to_local_point(ncam.p, &ent.tr);
-    point3d cam_local_r = world_to_local_vec(ncam.r, &ent.tr);
-    point3d cam_local_d = world_to_local_vec(ncam.d, &ent.tr);
-    point3d cam_local_f = world_to_local_vec(ncam.f, &ent.tr);
+	// Step 1: Transform camera to entry portal's local space
+	point3d cam_local_pos = world_to_local_point(ncam.p, &ent.tr);
+	point3d cam_local_r = world_to_local_vec(ncam.r, &ent.tr);
+	point3d cam_local_d = world_to_local_vec(ncam.d, &ent.tr);
+	point3d cam_local_f = world_to_local_vec(ncam.f, &ent.tr);
 
-    // Step 2: Flip 180 degrees around the portal's UP axis (D axis)
-    // This simulates going through the portal
-    // 180° rotation around Y: X -> -X, Z -> -Z, Y -> Y
-    cam_local_pos.x = -cam_local_pos.x;
-    cam_local_pos.z = -cam_local_pos.z;
+	// Step 2: Flip 180 degrees around the portal's UP axis (D axis)
+	// 180° rotation around Y: X -> -X, Z -> -Z, Y -> -Y
+	cam_local_pos.x = -cam_local_pos.x;
+	cam_local_pos.z = -cam_local_pos.z;
 
-    cam_local_r.x = -cam_local_r.x;
-    cam_local_r.z = -cam_local_r.z;
+	cam_local_r.x = -cam_local_r.x;
+	cam_local_r.z = -cam_local_r.z;
 
-    cam_local_f.x = -cam_local_f.x;
-    cam_local_f.z = -cam_local_f.z;
+	cam_local_d.x = -cam_local_d.x;
+	cam_local_d.z = -cam_local_d.z;
 
-    // Down vector stays the same (rotation axis)
-    // cam_local_d unchanged
+	cam_local_f.x = -cam_local_f.x;
+	cam_local_f.z = -cam_local_f.z;
 
-    // Step 3: Transform from portal local space to target portal's world space
-    ncam.p = local_to_world_point(cam_local_pos, &tgs.tr);
-    ncam.r = local_to_world_vec(cam_local_r, &tgs.tr);
-    ncam.d = local_to_world_vec(cam_local_d, &tgs.tr);
-    ncam.f = local_to_world_vec(cam_local_f, &tgs.tr);
-
+	// Step 3: Transform from portal local space to target portal's world space
+	ncam.p = local_to_world_point(cam_local_pos, &tgs.tr);
+	ncam.r = local_to_world_vec(cam_local_r, &tgs.tr);
+	ncam.d = local_to_world_vec(cam_local_d, &tgs.tr);
+	ncam.f = local_to_world_vec(cam_local_f, &tgs.tr);
+}
     ncam.cursect = portals[endp].sect;
 
     bunchgrp newctx = {};
