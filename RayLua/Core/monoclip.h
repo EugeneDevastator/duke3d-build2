@@ -1,4 +1,4 @@
-// MONOCLIP - Monotone Polygon Clipping Library (by Ken Silverman)
+ // MONOCLIP - Monotone Polygon Clipping Library (by Ken Silverman)
 //
 // This module implements efficient 2D/3D polygon clipping operations using monotone polygon
 // decomposition. It provides boolean operations (AND, SUB, SUB_REV) on polygons and handles
@@ -83,6 +83,9 @@ typedef struct {
 	int testignorewall;
 	int testignoresec;
 	int currenthalfplane;
+
+	cam_transform_t ct;     // NEW: clean transform for current camera
+	cam_transform_t ct_or;  // NEW: clean transform for original camera (for eyepol output)
 
 } bunchgrp;
 

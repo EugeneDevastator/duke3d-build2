@@ -26,6 +26,64 @@ for all porals same clipping plane is used, so mono state is shared, and should 
 in current version plane is always vertical.
 
 */
+//------ UTILS -------
+static void cam_transform_init(cam_transform_t *ct, cam_t *cam) {
+	ct->m[0] = cam->r.x; ct->m[1] = cam->r.y; ct->m[2] = cam->r.z;
+	ct->m[3] = cam->d.x; ct->m[4] = cam->d.y; ct->m[5] = cam->d.z;
+	ct->m[6] = cam->f.x; ct->m[7] = cam->f.y; ct->m[8] = cam->f.z;
+	ct->p = cam->p;
+	ct->h = cam->h;
+}
+
+// World point to camera space
+static void world_to_cam(double wx, double wy, double wz,
+						 cam_transform_t *ct,
+						 double *cx, double *cy, double *cz) {
+	double dx = wx - ct->p.x;
+	double dy = wy - ct->p.y;
+	double dz = wz - ct->p.z;
+	*cx = dx*ct->m[0] + dy*ct->m[1] + dz*ct->m[2];  // right
+	*cy = dx*ct->m[3] + dy*ct->m[4] + dz*ct->m[5];  // down
+	*cz = dx*ct->m[6] + dy*ct->m[7] + dz*ct->m[8];  // forward (depth)
+}
+
+static void cam_to_screen(double cx, double cy, double cz,
+						  cam_transform_t *ct,
+						  double *sx, double *sy, double *depth) {
+	double f = ct->h.z / cz;
+	*sx = cx * f + ct->h.x;
+	*sy = cy * f + ct->h.y;
+	*depth = cz;
+}
+
+// Screen space back to camera space (given depth)
+static void screen_to_cam(double sx, double sy, double depth,
+						  cam_transform_t *ct,
+						  double *cx, double *cy, double *cz) {
+	*cz = depth;
+	*cx = (sx - ct->h.x) * depth / ct->h.z;
+	*cy = (sy - ct->h.y) * depth / ct->h.z;
+}
+
+// Camera space to world space
+static void cam_to_world(double cx, double cy, double cz,
+						 cam_transform_t *ct,
+						 double *wx, double *wy, double *wz) {
+	// Transpose of rotation matrix
+	*wx = cx*ct->m[0] + cy*ct->m[3] + cz*ct->m[6] + ct->p.x;
+	*wy = cx*ct->m[1] + cy*ct->m[4] + cz*ct->m[7] + ct->p.y;
+	*wz = cx*ct->m[2] + cy*ct->m[5] + cz*ct->m[8] + ct->p.z;
+}
+
+// Full: screen + stored depth back to world
+static void screen_to_world(double sx, double sy, double depth,
+							cam_transform_t *ct,
+							double *wx, double *wy, double *wz) {
+	double cx, cy, cz;
+	screen_to_cam(sx, sy, depth, ct, &cx, &cy, &cz);
+	cam_to_world(cx, cy, cz, ct, wx, wy, wz);
+}
+
 //--------------------------------------------------------------------------------------------------
 static tiletype gdd;
 int shadowtest2_rendmode = 1;
@@ -1435,6 +1493,9 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 	if (!newctx) {
 		return;
 	}
+
+
+
 	int prehead1 = -1;
 	int prehead2 = -1;
 	int presect = -1;
@@ -1451,6 +1512,9 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 	b->bunchgrid =0;
 	cam_t gcam = b->cam;
 	cam_t oricam = b->orcam;
+
+	cam_transform_init(&b->ct, &b->cam);
+	cam_transform_init(&b->ct_or, &b->orcam);
 
 	wall_t *wal;
 	spri_t *spr;
@@ -1581,8 +1645,8 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 
 		if (!b->has_portal_clip)
 			b->currenthalfplane = halfplane;
-		else if (b->currenthalfplane != halfplane)
-			continue;
+	//	else if (b->currenthalfplane != halfplane)
+	//		continue;
 
 		if (shadowtest2_rendmode == 4)
 		{
