@@ -14,6 +14,7 @@
 #endif
 
 typedef struct { float x, y; } point2d;
+
 static long gnumtiles, gmaltiles, gtilehashead[1024];
 static char curmappath[MAX_PATH+1] = "";
 

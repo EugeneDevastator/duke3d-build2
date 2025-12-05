@@ -11,7 +11,7 @@ set(CMAKE_C_STANDARD 90)
 # Source files
 set(SOURCES
     build2.c
-    shadowtest2.c
+        shadowtest2.h
     drawpoly.c
     drawcone.c
     drawkv6.c
@@ -21,6 +21,10 @@ set(SOURCES
         Core/loaders.c
         Core/physics.c
         Core/artloader.c
+        Core/monoclip.c
+        softrender.c
+        shadowtest2.c
+        scenerender.c
 )
 set(SOURCES_CPP
         winmain.cpp
@@ -34,8 +38,11 @@ set(HEADERS
         Core/loaders.h
         Core/kplib.h
         Core/physics.h
+        Core/monoclip.h
+        softrender.h
+        shadowtest2.h
 
-
+        scenerender.h
 )
 set_source_files_properties(${SOURCES} PROPERTIES
         LANGUAGE C

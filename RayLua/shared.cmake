@@ -7,6 +7,9 @@ set(C_SOURCES
         core/kplib.c
         Core/loaders.c
         Core/physics.c
+        Core/monoclip.c
+        Core/scenerender.c
+        Core/shadowtest2.c
         interfaces/eventstore.c
 )
 set(C_HEADERS
@@ -15,6 +18,9 @@ set(C_HEADERS
         core/loaders.h
         core/kplib.h
         core/physics.h
+        Core/monoclip.h
+        Core/scenerender.h
+        Core/shadowtest2.h
         interfaces/engineapi.h
         interfaces/shared_types.h
         interfaces/eventstore.h
