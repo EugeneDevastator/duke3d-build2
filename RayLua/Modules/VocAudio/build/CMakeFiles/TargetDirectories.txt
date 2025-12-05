@@ -1,0 +1,7 @@
+/home/jaba/Documentos/gameengine/eugene/RayLua/Modules/VocAudio/build/CMakeFiles/voc_test.dir
+/home/jaba/Documentos/gameengine/eugene/RayLua/Modules/VocAudio/build/CMakeFiles/edit_cache.dir
+/home/jaba/Documentos/gameengine/eugene/RayLua/Modules/VocAudio/build/CMakeFiles/rebuild_cache.dir
+/home/jaba/Documentos/gameengine/eugene/RayLua/Modules/VocAudio/build/CMakeFiles/list_install_components.dir
+/home/jaba/Documentos/gameengine/eugene/RayLua/Modules/VocAudio/build/CMakeFiles/install.dir
+/home/jaba/Documentos/gameengine/eugene/RayLua/Modules/VocAudio/build/CMakeFiles/install/local.dir
+/home/jaba/Documentos/gameengine/eugene/RayLua/Modules/VocAudio/build/CMakeFiles/install/strip.dir

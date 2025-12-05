@@ -1,0 +1,1 @@
+/usr/bin/cc -Wl,--dependency-file=CMakeFiles/voc_test.dir/link.d CMakeFiles/voc_test.dir/src/test_voc.c.o CMakeFiles/voc_test.dir/src/voc_audio.c.o CMakeFiles/voc_test.dir/src/voc_decoder.c.o -o voc_test  /usr/lib/libraylib.so -lm -lpthread -ldl -L/usr/lib -lraylib
