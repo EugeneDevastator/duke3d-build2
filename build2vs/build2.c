@@ -13420,13 +13420,13 @@ void drawframe (cam_t *cc)
 			}
 			else
 			{
-			//	cam_t ncam; ncam = cam;
-			//	for(glignum=flashlight1st;glignum<shadowtest2_numlights;glignum++)
-			//	{
-			//		shadowtest2_ligpolreset(glignum);
-			//		ncam.p = shadowtest2_light[glignum].p;
-			//		draw_hsr_polymost(&ncam,(mapstate_t*)(&gst),(player_transform*)(&gdps),shadowtest2_light[glignum].sect);
-			//	}
+				cam_t ncam; ncam = cam;
+				for(glignum=flashlight1st;glignum<shadowtest2_numlights;glignum++)
+				{
+					shadowtest2_ligpolreset(glignum);
+					ncam.p = shadowtest2_light[glignum].p;
+					draw_hsr_polymost(&ncam,(mapstate_t*)(&gst),(player_transform*)(&gdps),shadowtest2_light[glignum].sect);
+				}
 			}
 
 			shadowtest2_setcam(&cam);
