@@ -55,7 +55,34 @@ static void cam_to_screen(double cx, double cy, double cz,
 	*sy = cy * f + ct->h.y;
 	*depth = cz;
 }
+// Convert point from mp (mono polygon) space to world coordinates
+// mp.x, mp.y are in half-plane rotated space; mp.z is NOT used (depth from gouvmat)
+static void mp_to_world(double mpx, double mpy, bunchgrp *b,
+						double *wx, double *wy, double *wz) {
+	cam_transform_t *ct_or = &b->ct_or;
 
+	// Step 1: Transform mp coords through xformmat to camera-aligned space
+	double cam_rx = mpx * b->xformmat[0] + mpy * b->xformmat[1] + b->gnadd.x;
+	double cam_ry = mpx * b->xformmat[3] + mpy * b->xformmat[4] + b->gnadd.y;
+	double cam_rz = mpx * b->xformmat[6] + mpy * b->xformmat[7] + b->gnadd.z;
+
+	// Step 2: Perspective project to screen
+	double f = ct_or->h.z / cam_rz;
+	double sx = cam_rx * f + ct_or->h.x;
+	double sy = cam_ry * f + ct_or->h.y;
+
+	// Step 3: Depth from plane equation (gouvmat row 0)
+	double depth = 1.0 / ((b->gouvmat[0] * sx + b->gouvmat[3] * sy + b->gouvmat[6]) * ct_or->h.z);
+
+	// Step 4: Unproject to world using original camera
+	// direction = (sx-h.x)*r + (sy-h.y)*d + h.z*f, then scale by depth
+	double dx = sx - ct_or->h.x;
+	double dy = sy - ct_or->h.y;
+
+	*wx = (dx * ct_or->m[0] + dy * ct_or->m[3] + ct_or->h.z * ct_or->m[6]) * depth + ct_or->p.x;
+	*wy = (dx * ct_or->m[1] + dy * ct_or->m[4] + ct_or->h.z * ct_or->m[7]) * depth + ct_or->p.y;
+	*wz = (dx * ct_or->m[2] + dy * ct_or->m[5] + ct_or->h.z * ct_or->m[8]) * depth + ct_or->p.z;
+}
 // Screen space back to camera space (given depth)
 static void screen_to_cam(double sx, double sy, double depth,
 						  cam_transform_t *ct,
@@ -585,109 +612,80 @@ int eyepolmal = 0, eyepolvn = 0, eyepolvmal = 0;
 
 static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 {
-	cam_t gcam = b->cam;
-	cam_t orcam = b->orcam;
-	float f,fx,fy, g, *fptr;
-	int i, j, k, h, rethead[2];
+    cam_t orcam = b->orcam;
+    int i, h, rethead[2];
 
-	if ((rethead0|rethead1) < 0) { mono_deloop(rethead1); mono_deloop(rethead0); return; }
-	rethead[0] = rethead0; rethead[1] = rethead1;
+    if ((rethead0|rethead1) < 0) { mono_deloop(rethead1); mono_deloop(rethead0); return; }
+    rethead[0] = rethead0; rethead[1] = rethead1;
 
-	// Put on FIFO in world space:
-	for(h=0;h<2;h++)
-	{
-		i = rethead[h];
-		do
-		{
-			if (h)
-				i = mp[i].p;
+    for(h=0; h<2; h++)
+    {
+        i = rethead[h];
+        do
+        {
+            if (h) i = mp[i].p;
 
-			if (eyepolvn >= eyepolvmal)
-			{
-				eyepolvmal = max(eyepolvmal<<1,16384);
-				eyepolv = (point3d *)realloc(eyepolv,eyepolvmal*sizeof(point3d));
-			}
-			f = gcam.h.z/(mp[i].x*b->xformmat[6] + mp[i].y*b->xformmat[7] + b->gnadd.z);
-			fx        =  (mp[i].x*b->xformmat[0] + mp[i].y*b->xformmat[1] + b->gnadd.x)*f + gcam.h.x;
-			fy        =  (mp[i].x*b->xformmat[3] + mp[i].y*b->xformmat[4] + b->gnadd.y)*f + gcam.h.y;
+            if (eyepolvn >= eyepolvmal)
+            {
+                eyepolvmal = max(eyepolvmal<<1, 16384);
+                eyepolv = (point3d *)realloc(eyepolv, eyepolvmal*sizeof(point3d));
+            }
 
-#if (USEINTZ)
-			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*1048576.0*256.0);
-#else
-			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*orcam.h.z);
-#endif
-			eyepolv[eyepolvn].x = ((fx-orcam.h.x)*orcam.r.x + (fy-orcam.h.y)*orcam.d.x + (orcam.h.z)*orcam.f.x)*f + orcam.p.x;
-			eyepolv[eyepolvn].y = ((fx-orcam.h.x)*orcam.r.y + (fy-orcam.h.y)*orcam.d.y + (orcam.h.z)*orcam.f.y)*f + orcam.p.y;
-			eyepolv[eyepolvn].z = ((fx-orcam.h.x)*orcam.r.z + (fy-orcam.h.y)*orcam.d.z + (orcam.h.z)*orcam.f.z)*f + orcam.p.z;
+            double wx, wy, wz;
+            mp_to_world(mp[i].x, mp[i].y, b, &wx, &wy, &wz);
 
-			eyepolvn++;
+            eyepolv[eyepolvn].x = (float)wx;
+            eyepolv[eyepolvn].y = (float)wy;
+            eyepolv[eyepolvn].z = (float)wz;
+            eyepolvn++;
 
-			if (!h) i = mp[i].n;
-		} while (i != rethead[h]);
-		mono_deloop(rethead[h]);
-	}
+            if (!h) i = mp[i].n;
+        } while (i != rethead[h]);
+        mono_deloop(rethead[h]);
+    }
 
-	if (eyepoln+1 >= eyepolmal)
-	{
-		eyepolmal = max(eyepolmal<<1,4096);
-		eyepol = (eyepol_t *)realloc(eyepol,eyepolmal*sizeof(eyepol_t));
-		eyepol[0].vert0 = 0;
-	}
+    if (eyepoln+1 >= eyepolmal)
+    {
+        eyepolmal = max(eyepolmal<<1, 4096);
+        eyepol = (eyepol_t *)realloc(eyepol, eyepolmal*sizeof(eyepol_t));
+        eyepol[0].vert0 = 0;
+    }
 
-	if (b->gflags < 2)
-		memcpy((void *)eyepol[eyepoln].ouvmat,(void *)b->gouvmat,sizeof(b->gouvmat[0])*9);
-	else
-	{
-		// Skybox texture mapping (same as original)
-		f = (((float)64)+1.15f)/((float)64); fptr = eyepol[eyepoln].ouvmat;
-		switch(b->gflags)
-		{
-			case 14: fptr[0] = +f                 ; fptr[3] = f*+2.f; fptr[6] =     0.f; //Front
-						fptr[1] = -1.f               ; fptr[4] =    0.f; fptr[7] =     0.f;
-						fptr[2] = (f*- 5.f - 1.f)/6.f; fptr[5] =    0.f; fptr[8] = f*+12.f;
-						break;
-			case 13: fptr[0] = +1.f               ; fptr[3] =    0.f; fptr[6] =     0.f; //Right
-						fptr[1] = -f                 ; fptr[4] = f*+2.f; fptr[7] =     0.f;
-						fptr[2] = (f*-17.f - 1.f)/6.f; fptr[5] =    0.f; fptr[8] = f*+12.f;
-						break;
-			case 15: fptr[0] = -f                 ; fptr[3] = f*-2.f; fptr[6] =     0.f; //Back
-						fptr[1] = +1.f               ; fptr[4] =    0.f; fptr[7] =     0.f;
-						fptr[2] = (f*-29.f - 1.f)/6.f; fptr[5] =    0.f; fptr[8] = f*+12.f;
-						break;
-			case 12: fptr[0] = -1.f               ; fptr[3] =    0.f; fptr[6] =     0.f; //Left
-						fptr[1] = +f                 ; fptr[4] = f*-2.f; fptr[7] =     0.f;
-						fptr[2] = (f*-41.f - 1.f)/6.f; fptr[5] =    0.f; fptr[8] = f*+12.f;
-						break;
-			case 11: fptr[0] = +f                 ; fptr[3] = f*+2.f; fptr[6] =     0.f; //Top
-						fptr[1] = (f*-17.f - 1.f)/6.f; fptr[4] =    0.f; fptr[7] = f*-12.f;
-						fptr[2] = -1.f               ; fptr[5] =    0.f; fptr[8] =     0.f;
-						break;
-			case 10: fptr[0] = -f                 ; fptr[3] = f*+2.f; fptr[6] =     0.f; //Bottom
-						fptr[1] = (f*+ 5.f + 1.f)/6.f; fptr[4] =    0.f; fptr[7] = f*+12.f;
-						fptr[2] = +1.f               ; fptr[5] =    0.f; fptr[8] =     0.f;
-						break;
-		}
-		for(i=9-3;i>=0;i-=3)
-		{
-			float ox, oy, oz;
-			ox = fptr[i+0]*65536.f; oy = fptr[i+1]*65536.f; oz = fptr[i+2]*65536.f;
-			fptr[i+0] = ox*orcam.r.x + oy*orcam.r.y + oz*orcam.r.z;
-			fptr[i+1] = ox*orcam.d.x + oy*orcam.d.y + oz*orcam.d.z;
-			fptr[i+2] = ox*orcam.f.x + oy*orcam.f.y + oz*orcam.f.z;
-		}
-		gentex_xform(fptr,b);
-	}
+    if (b->gflags < 2)
+        memcpy((void *)eyepol[eyepoln].ouvmat, (void *)b->gouvmat, sizeof(b->gouvmat[0])*9);
+    else
+    {
+        float f, *fptr;
+        f = (((float)64)+1.15f)/((float)64); fptr = eyepol[eyepoln].ouvmat;
+        switch(b->gflags)
+        {
+            case 14: fptr[0]=+f; fptr[3]=f*+2.f; fptr[6]=0.f; fptr[1]=-1.f; fptr[4]=0.f; fptr[7]=0.f; fptr[2]=(f*-5.f-1.f)/6.f; fptr[5]=0.f; fptr[8]=f*+12.f; break;
+            case 13: fptr[0]=+1.f; fptr[3]=0.f; fptr[6]=0.f; fptr[1]=-f; fptr[4]=f*+2.f; fptr[7]=0.f; fptr[2]=(f*-17.f-1.f)/6.f; fptr[5]=0.f; fptr[8]=f*+12.f; break;
+            case 15: fptr[0]=-f; fptr[3]=f*-2.f; fptr[6]=0.f; fptr[1]=+1.f; fptr[4]=0.f; fptr[7]=0.f; fptr[2]=(f*-29.f-1.f)/6.f; fptr[5]=0.f; fptr[8]=f*+12.f; break;
+            case 12: fptr[0]=-1.f; fptr[3]=0.f; fptr[6]=0.f; fptr[1]=+f; fptr[4]=f*-2.f; fptr[7]=0.f; fptr[2]=(f*-41.f-1.f)/6.f; fptr[5]=0.f; fptr[8]=f*+12.f; break;
+            case 11: fptr[0]=+f; fptr[3]=f*+2.f; fptr[6]=0.f; fptr[1]=(f*-17.f-1.f)/6.f; fptr[4]=0.f; fptr[7]=f*-12.f; fptr[2]=-1.f; fptr[5]=0.f; fptr[8]=0.f; break;
+            case 10: fptr[0]=-f; fptr[3]=f*+2.f; fptr[6]=0.f; fptr[1]=(f*+5.f+1.f)/6.f; fptr[4]=0.f; fptr[7]=f*+12.f; fptr[2]=+1.f; fptr[5]=0.f; fptr[8]=0.f; break;
+        }
+        for(int j=9-3; j>=0; j-=3)
+        {
+            float ox=fptr[j+0]*65536.f, oy=fptr[j+1]*65536.f, oz=fptr[j+2]*65536.f;
+            fptr[j+0] = ox*orcam.r.x + oy*orcam.r.y + oz*orcam.r.z;
+            fptr[j+1] = ox*orcam.d.x + oy*orcam.d.y + oz*orcam.d.z;
+            fptr[j+2] = ox*orcam.f.x + oy*orcam.f.y + oz*orcam.f.z;
+        }
+        gentex_xform(fptr, b);
+    }
 
-	eyepol[eyepoln].tpic = gtpic;
-	eyepol[eyepoln].curcol = gcurcol;
-	eyepol[eyepoln].flags = (b->gflags != 0);
-	eyepol[eyepoln].b2sect = b->gligsect;
-	eyepol[eyepoln].b2wall = b->gligwall;
-	eyepol[eyepoln].b2slab = b->gligslab;
-	memcpy((void *)&eyepol[eyepoln].norm,(void *)&b->gnorm,sizeof(b->gnorm));
-	eyepoln++;
-	eyepol[eyepoln].vert0 = eyepolvn;
-	eyepol[eyepoln].rdepth = b->recursion_depth;
+    eyepol[eyepoln].tpic = gtpic;
+    eyepol[eyepoln].curcol = gcurcol;
+    eyepol[eyepoln].flags = (b->gflags != 0);
+    eyepol[eyepoln].b2sect = b->gligsect;
+    eyepol[eyepoln].b2wall = b->gligwall;
+    eyepol[eyepoln].b2slab = b->gligslab;
+    memcpy((void *)&eyepol[eyepoln].norm, (void *)&b->gnorm, sizeof(b->gnorm));
+    eyepoln++;
+    eyepol[eyepoln].vert0 = eyepolvn;
+    eyepol[eyepoln].rdepth = b->recursion_depth;
 }
 
 /*
