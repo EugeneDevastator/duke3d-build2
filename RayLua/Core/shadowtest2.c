@@ -4,24 +4,6 @@
 #include <stdbool.h>
 
 #include "scenerender.h"
-#if 0
-shadowtest2.exe: shadowtest2.obj winmain.obj build2.obj drawpoly.obj drawcone.obj drawkv6.obj kplib.obj;
-				link shadowtest2.obj winmain.obj build2.obj drawpoly.obj drawcone.obj drawkv6.obj kplib.obj\
-	ddraw.lib dinput.lib dxguid.lib ole32.lib user32.lib gdi32.lib kernel32.lib /opt:nowin98
-	del shadowtest2.obj
-
-#zbufmode=/DUSEINTZ
-zbufmode=
-
-shadowtest2.obj: shadowtest2.c; cl /c /TP shadowtest2.c /Ox /G6Fy /MD /QIfist $(zbufmode) /DSTANDALONE
-build2.obj:      build2.c;      cl /c /TP build2.c      /Ox /G6Fy /MD         $(zbufmode)
-drawpoly.obj:    drawpoly.c;    cl /c /TP drawpoly.c    /Ox /G6Fy /MD /QIfist $(zbufmode)
-drawcone.obj:    drawcone.c;    cl /c /TP drawcone.c    /Ox /G6Fy /MD /QIfist $(zbufmode)
-drawkv6.obj:     drawkv6.c;     cl /c /TP drawkv6.c     /Ox /G6Fy /MD /QIfist $(zbufmode) /DUSEKZ
-kplib.obj:       kplib.c;       cl /c /TP kplib.c       /Ox /G6Fy /MD
-winmain.obj:     winmain.cpp;   cl /c /TP winmain.cpp   /Ox /G6Fy /MD
-!if 0
-#endif
 
 #include <malloc.h>
 #include <stdlib.h>
@@ -35,64 +17,15 @@ winmain.obj:     winmain.cpp;   cl /c /TP winmain.cpp   /Ox /G6Fy /MD
 #define USEGAMMAHACK 1 //FIXFIXFIX
 int renderinterp = 1;
 int compact2d = 0;
-#if 0
+/*
 
-typedef struct { char filnam[232]; float u0, v0, ux, uy, vx, vy; } sky_t;
+Monopoly uses xy as screen coords and z as depth
+Engine uses z as right, y as forward, z as down
+Portals: we move camera to supposed place instead of transforming entire world.
+for all porals same clipping plane is used, so mono state is shared, and should not reset
+in current version plane is always vertical.
 
-skytest.sky:
------------------------------------------
-"skytest.png" 0    0  256 0  0 256 //front
-"skytest.png" 0  256  256 0  0 256 //right
-"skytest.png" 0  512  256 0  0 256 //back
-"skytest.png" 0  768  256 0  0 256 //left
-"skytest.png" 0 1024  256 0  0 256 //up
-"skytest.png" 0 1280  256 0  0 256 //down
-
-#endif
-
-#if 0
-drawpol (..)
-{
-	...
-	for each visible light:
-	{
-		Prepare light ramping (12 floats/poly)
-		Project&write raster list (xi,x0,y0,yl,dir)
-	}
-	for each y:
-	{
-		//generate active list rasters from shadows touching this y
-		//sort span lefts
-		//sort span rights
-		//precalc light math for y
-		while (x not done)
-		{
-			xe = whole_raster_right
-			for active lights:
-			{
-				find next left  >= x on light's spans
-				find next right >= x on light's spans
-				xe = min(xe,left,right);
-			}
-			for active lights { sum RGB }
-			draw x..xe,y
-		}
-	}
-}
-
-drawscreen (..)
-{
-	render current view to lists, including texture info
-
-		//Generate shadow polygon list
-	for each light in map:
-		for each visible face in both light and current view, store:
-			xyz loop, norm, light_index
-
-	render current view from list
-}
-#endif
-
+*/
 //--------------------------------------------------------------------------------------------------
 static tiletype gdd;
 int shadowtest2_rendmode = 1;
@@ -594,6 +527,7 @@ int eyepolmal = 0, eyepolvn = 0, eyepolvmal = 0;
 
 static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 {
+	cam_t gcam = b->cam;
 	cam_t orcam = b->orcam;
 	float f,fx,fy, g, *fptr;
 	int i, j, k, h, rethead[2];
@@ -615,9 +549,9 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 				eyepolvmal = max(eyepolvmal<<1,16384);
 				eyepolv = (point3d *)realloc(eyepolv,eyepolvmal*sizeof(point3d));
 			}
-			f = orcam.h.z/(/*mp[i].x*b->xformmat[6]*/ + mp[i].y*b->xformmat[7] + b->gnadd.z);
-			fx        =  (mp[i].x*b->xformmat[0] + mp[i].y*b->xformmat[1] + b->gnadd.x)*f + orcam.h.x;
-			fy        =  (mp[i].x*b->xformmat[3] + mp[i].y*b->xformmat[4] + b->gnadd.y)*f + orcam.h.y;
+			f = gcam.h.z/(mp[i].x*b->xformmat[6] + mp[i].y*b->xformmat[7] + b->gnadd.z);
+			fx        =  (mp[i].x*b->xformmat[0] + mp[i].y*b->xformmat[1] + b->gnadd.x)*f + gcam.h.x;
+			fy        =  (mp[i].x*b->xformmat[3] + mp[i].y*b->xformmat[4] + b->gnadd.y)*f + gcam.h.y;
 
 #if (USEINTZ)
 			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*1048576.0*256.0);
@@ -902,7 +836,7 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 
 		//rotate, converting vmono to simple point3d loop
 	on = 0;
-	for(h=0;h<2;h++) // halfplane?
+	for(h=0; h<2; h++)
 	{
 		i = plothead[h];
 		do
@@ -1855,6 +1789,7 @@ static point3d local_to_world_vec(point3d local_vec, transform *tr) {
     // Normalize transforms to ensure orthonormality
     normalize_transform(&ent.tr);
     normalize_transform(&tgs.tr);
+    normalize_transform(&ncam.tr);
 
     // Step 1: Transform camera to entry portal's local space
     // This finds the camera's position and orientation RELATIVE to the entry portal
@@ -1875,6 +1810,8 @@ static point3d local_to_world_vec(point3d local_vec, transform *tr) {
 
     bunchgrp newctx = {};
     newctx.recursion_depth = parentctx->recursion_depth + 1;
+	if (newctx.recursion_depth >0 )
+		printf("ncam fw %f,%f,%f \r", ncam.f.x,ncam.f.y,ncam.f.z);
     newctx.cam = ncam;
     newctx.orcam = parentctx->orcam;
     newctx.has_portal_clip = true;
