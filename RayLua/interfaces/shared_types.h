@@ -104,6 +104,15 @@
 typedef struct { float x, y, z; } point3d;
 typedef struct { double x, y, z; } dpoint3d; 	//Note: pol doesn't support loops as dpoint3d's!
 typedef struct { float x, y; } point2d;
+static void vmulscal(point3d *p, float s) {
+	p->x*=s;
+	p->y*=s;
+	p->z*=s;
+}
+typedef struct {
+	point3d p, r, d, f;
+} transform;
+
 	//Map format:
 typedef struct {
 // view.xpos += xsize*scale * normal_offset * global_ppi.
@@ -144,7 +153,7 @@ typedef struct
 
 typedef struct
 {
-	point3d p, r, d, f;      //Position, orientation (right, down, forward)
+	union { transform tr; struct { point3d p, r, d, f; }; };
 	point3d v, av;           //Position velocity, Angular velocity (direction=axis, magnitude=vel)
 	float fat, mas, moi;     //Physics (moi=moment of inertia)
 	long tilnum;             //Model file. Ex:"TILES000.ART|64","CARDBOARD.PNG","CACO.KV6","HAND.KCM","IMP.MD3"
