@@ -594,7 +594,7 @@ int eyepolmal = 0, eyepolvn = 0, eyepolvmal = 0;
 
 static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 {
-	cam_t gcam = b->orcam;
+	cam_t orcam = b->orcam;
 	float f,fx,fy, g, *fptr;
 	int i, j, k, h, rethead[2];
 
@@ -615,18 +615,18 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 				eyepolvmal = max(eyepolvmal<<1,16384);
 				eyepolv = (point3d *)realloc(eyepolv,eyepolvmal*sizeof(point3d));
 			}
-			f = gcam.h.z/(/*mp[i].x*b->xformmat[6]*/ + mp[i].y*b->xformmat[7] + b->gnadd.z);
-			fx        =  (mp[i].x*b->xformmat[0] + mp[i].y*b->xformmat[1] + b->gnadd.x)*f + gcam.h.x;
-			fy        =  (mp[i].x*b->xformmat[3] + mp[i].y*b->xformmat[4] + b->gnadd.y)*f + gcam.h.y;
+			f = orcam.h.z/(/*mp[i].x*b->xformmat[6]*/ + mp[i].y*b->xformmat[7] + b->gnadd.z);
+			fx        =  (mp[i].x*b->xformmat[0] + mp[i].y*b->xformmat[1] + b->gnadd.x)*f + orcam.h.x;
+			fy        =  (mp[i].x*b->xformmat[3] + mp[i].y*b->xformmat[4] + b->gnadd.y)*f + orcam.h.y;
 
 #if (USEINTZ)
 			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*1048576.0*256.0);
 #else
-			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*gcam.h.z);
+			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*orcam.h.z);
 #endif
-			eyepolv[eyepolvn].x = ((fx-gcam.h.x)*gcam.r.x + (fy-gcam.h.y)*gcam.d.x + (gcam.h.z)*gcam.f.x)*f + gcam.p.x;
-			eyepolv[eyepolvn].y = ((fx-gcam.h.x)*gcam.r.y + (fy-gcam.h.y)*gcam.d.y + (gcam.h.z)*gcam.f.y)*f + gcam.p.y;
-			eyepolv[eyepolvn].z = ((fx-gcam.h.x)*gcam.r.z + (fy-gcam.h.y)*gcam.d.z + (gcam.h.z)*gcam.f.z)*f + gcam.p.z;
+			eyepolv[eyepolvn].x = ((fx-orcam.h.x)*orcam.r.x + (fy-orcam.h.y)*orcam.d.x + (orcam.h.z)*orcam.f.x)*f + orcam.p.x;
+			eyepolv[eyepolvn].y = ((fx-orcam.h.x)*orcam.r.y + (fy-orcam.h.y)*orcam.d.y + (orcam.h.z)*orcam.f.y)*f + orcam.p.y;
+			eyepolv[eyepolvn].z = ((fx-orcam.h.x)*orcam.r.z + (fy-orcam.h.y)*orcam.d.z + (orcam.h.z)*orcam.f.z)*f + orcam.p.z;
 
 			eyepolvn++;
 
@@ -679,9 +679,9 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 		{
 			float ox, oy, oz;
 			ox = fptr[i+0]*65536.f; oy = fptr[i+1]*65536.f; oz = fptr[i+2]*65536.f;
-			fptr[i+0] = ox*gcam.r.x + oy*gcam.r.y + oz*gcam.r.z;
-			fptr[i+1] = ox*gcam.d.x + oy*gcam.d.y + oz*gcam.d.z;
-			fptr[i+2] = ox*gcam.f.x + oy*gcam.f.y + oz*gcam.f.z;
+			fptr[i+0] = ox*orcam.r.x + oy*orcam.r.y + oz*orcam.r.z;
+			fptr[i+1] = ox*orcam.d.x + oy*orcam.d.y + oz*orcam.d.z;
+			fptr[i+2] = ox*orcam.f.x + oy*orcam.f.y + oz*orcam.f.z;
 		}
 		gentex_xform(fptr,b);
 	}
