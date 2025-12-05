@@ -57,9 +57,8 @@ static void cam_to_screen(double cx, double cy, double cz,
 }
 // Convert point from mp (mono polygon) space to world coordinates
 // mp.x, mp.y are in half-plane rotated space; mp.z is NOT used (depth from gouvmat)
-static void mp_to_world(double mpx, double mpy, bunchgrp *b,
+static void mp_to_world(double mpx, double mpy, bunchgrp *b,cam_transform_t* usecam,
 						double *wx, double *wy, double *wz) {
-	cam_transform_t *ct_or = &b->ct_or;
 
 	// Step 1: Transform mp coords through xformmat to camera-aligned space
 	double cam_rx = mpx * b->xformmat[0] + mpy * b->xformmat[1] + b->gnadd.x;
@@ -67,22 +66,52 @@ static void mp_to_world(double mpx, double mpy, bunchgrp *b,
 	double cam_rz = mpx * b->xformmat[6] + mpy * b->xformmat[7] + b->gnadd.z;
 
 	// Step 2: Perspective project to screen
-	double f = ct_or->h.z / cam_rz;
-	double sx = cam_rx * f + ct_or->h.x;
-	double sy = cam_ry * f + ct_or->h.y;
+	double f = usecam->h.z / cam_rz;
+	double sx = cam_rx * f + usecam->h.x;
+	double sy = cam_ry * f + usecam->h.y;
 
 	// Step 3: Depth from plane equation (gouvmat row 0)
-	double depth = 1.0 / ((b->gouvmat[0] * sx + b->gouvmat[3] * sy + b->gouvmat[6]) * ct_or->h.z);
+	double depth = 1.0 / ((b->gouvmat[0] * sx + b->gouvmat[3] * sy + b->gouvmat[6]) * usecam->h.z);
 
 	// Step 4: Unproject to world using original camera
 	// direction = (sx-h.x)*r + (sy-h.y)*d + h.z*f, then scale by depth
-	double dx = sx - ct_or->h.x;
-	double dy = sy - ct_or->h.y;
+	double dx = sx - usecam->h.x;
+	double dy = sy - usecam->h.y;
 
-	*wx = (dx * ct_or->m[0] + dy * ct_or->m[3] + ct_or->h.z * ct_or->m[6]) * depth + ct_or->p.x;
-	*wy = (dx * ct_or->m[1] + dy * ct_or->m[4] + ct_or->h.z * ct_or->m[7]) * depth + ct_or->p.y;
-	*wz = (dx * ct_or->m[2] + dy * ct_or->m[5] + ct_or->h.z * ct_or->m[8]) * depth + ct_or->p.z;
+	*wx = (dx * usecam->m[0] + dy * usecam->m[3] + usecam->h.z * usecam->m[6]) * depth + usecam->p.x;
+	*wy = (dx * usecam->m[1] + dy * usecam->m[4] + usecam->h.z * usecam->m[7]) * depth + usecam->p.y;
+	*wz = (dx * usecam->m[2] + dy * usecam->m[5] + usecam->h.z * usecam->m[8]) * depth + usecam->p.z;
 }
+
+static void world_to_mp(double wx, double wy, double wz, bunchgrp *b,
+						double *mpx, double *mpy) {
+	cam_transform_t *ct = &b->cam;
+
+	// Step 1: Transform world point to camera space
+	double cx, cy, cz;
+	world_to_cam(wx, wy, wz, &b->ct, &cx, &cy, &cz);
+
+	// Step 2: Project to screen space
+	double sx, sy, depth;
+	cam_to_screen(cx, cy, cz, &b->ct, &sx, &sy, &depth);
+
+	// Step 3: Transform screen coordinates to mp space using inverse xformmat
+	// mp coords = inverse(xformmat) * (screen_coords - gnadd)
+	double det = b->xformmat[0] * b->xformmat[4] - b->xformmat[1] * b->xformmat[3];
+	if (fabs(det) < 1e-10) {
+		*mpx = 0.0;
+		*mpy = 0.0;
+		return;
+	}
+
+	double inv_det = 1.0 / det;
+	double dx = sx - b->gnadd.x;
+	double dy = sy - b->gnadd.y;
+
+	*mpx = (b->xformmat[4] * dx - b->xformmat[1] * dy) * inv_det;
+	*mpy = (-b->xformmat[3] * dx + b->xformmat[0] * dy) * inv_det;
+}
+
 // Screen space back to camera space (given depth)
 static void screen_to_cam(double sx, double sy, double depth,
 						  cam_transform_t *ct,
@@ -632,7 +661,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
             }
 
             double wx, wy, wz;
-            mp_to_world(mp[i].x, mp[i].y, b, &wx, &wy, &wz);
+            mp_to_world(mp[i].x, mp[i].y, b, &b->ct_or, &wx, &wy, &wz);
 
             eyepolv[eyepolvn].x = (float)wx;
             eyepolv[eyepolvn].y = (float)wy;
