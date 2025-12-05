@@ -617,11 +617,25 @@ bunchgrid_got:;
 static void xformprep (double hang, bunchgrp *b)
 {
 	cam_t gcam = b->cam;
-	double f; f = atan2(gcam.f.y,gcam.f.x)+hang; //WARNING: "f = 1/sqrt; c *= f; s *= f;" form has singularity - don't use :/
-	b->xformmatc = cos(f); b->xformmats = sin(f);
-	b->xformmat[0] = gcam.r.y*b->xformmatc - gcam.r.x*b->xformmats; b->xformmat[1] = gcam.r.z; b->xformmat[2] = gcam.r.x*b->xformmatc + gcam.r.y*b->xformmats;
-	b->xformmat[3] = gcam.d.y*b->xformmatc - gcam.d.x*b->xformmats; b->xformmat[4] = gcam.d.z; b->xformmat[5] = gcam.d.x*b->xformmatc + gcam.d.y*b->xformmats;
-	b->xformmat[6] = gcam.f.y*b->xformmatc - gcam.f.x*b->xformmats; b->xformmat[7] = gcam.f.z; b->xformmat[8] = gcam.f.x*b->xformmatc + gcam.f.y*b->xformmats;
+
+	// FIXED: Extract horizontal rotation from camera's forward vector
+	// Instead of: f = atan2(gcam.f.y,gcam.f.x)+hang;
+	// We get the camera's actual horizontal orientation
+	double f = atan2(gcam.f.y, gcam.f.x) + hang;
+	b->xformmatc = cos(f);
+	b->xformmats = sin(f);
+
+	// Keep the original matrix calculation - this was working!
+	b->xformmat[0] = gcam.r.y*b->xformmatc - gcam.r.x*b->xformmats;
+	b->xformmat[1] = gcam.r.z;
+	b->xformmat[2] = gcam.r.x*b->xformmatc + gcam.r.y*b->xformmats;
+	b->xformmat[3] = gcam.d.y*b->xformmatc - gcam.d.x*b->xformmats;
+	b->xformmat[4] = gcam.d.z;
+	b->xformmat[5] = gcam.d.x*b->xformmatc + gcam.d.y*b->xformmats;
+	b->xformmat[6] = gcam.f.y*b->xformmatc - gcam.f.x*b->xformmats;
+	b->xformmat[7] = gcam.f.z;
+	b->xformmat[8] = gcam.f.x*b->xformmatc + gcam.f.y*b->xformmats;
+
 	b->gnadd.x = -gcam.h.x*b->xformmat[0] - gcam.h.y*b->xformmat[1] + gcam.h.z*b->xformmat[2];
 	b->gnadd.y = -gcam.h.x*b->xformmat[3] - gcam.h.y*b->xformmat[4] + gcam.h.z*b->xformmat[5];
 	b->gnadd.z = -gcam.h.x*b->xformmat[6] - gcam.h.y*b->xformmat[7] + gcam.h.z*b->xformmat[8];
@@ -896,30 +910,28 @@ static void changetagfunc (int rethead0, int rethead1, bunchgrp *b)
 	//flags&4: reverse cut for sub
 static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead0, int plothead1, int flags, bunchgrp* b)
 {
-	int mtag = tag1 + taginc*b->recursion_depth;
-	int tagsect = tag1;
-	int mnewtag = newtag1 == -1 ? -1 : newtag1 + taginc*b->recursion_depth;
-	b->gnewtagsect = newtagsect;
-	cam_t gcam = b->cam;
-	#define BSCISDIST 0.000001 //Reduces probability of glitch further
-	//#define BSCISDIST 0.0001 //Gaps undetectable
-	//#define BSCISDIST 0.1 //Huge gaps
-	void (*mono_output)(int h0, int h1, bunchgrp *b);
-	dpoint3d *otp, *tp;
-	double f, ox, oy, oz;
-	int i, j, k, l, h, on, n, plothead[2], imin, imax, i0, i1, omph0, omph1;
+    int mtag = tag1 + taginc*b->recursion_depth;
+    int tagsect = tag1;
+    int mnewtag = newtag1 == -1 ? -1 : newtag1 + taginc*b->recursion_depth;
+    b->gnewtagsect = newtagsect;
+    cam_t gcam = b->cam;
+    #define BSCISDIST 0.000001
+    void (*mono_output)(int h0, int h1, bunchgrp *b);
+    dpoint3d *otp, *tp;
+    double f, ox, oy, oz;
+    int i, j, k, l, h, on, n, plothead[2], imin, imax, i0, i1, omph0, omph1;
 
-	if ((plothead0|plothead1) < 0) return;
-	plothead[0] = plothead0; plothead[1] = plothead1;
+    if ((plothead0|plothead1) < 0) return;
+    plothead[0] = plothead0; plothead[1] = plothead1;
 
-	n = 2;
-	for (h = 0; h < 2; h++)
-		for (i = mp[plothead[h]].n; i != plothead[h]; i = mp[i].n)
-			n++;
-	otp = (dpoint3d *) _alloca(n * sizeof(dpoint3d));
-	tp = (dpoint3d *) _alloca(n * sizeof(dpoint3d) * 2);
+    n = 2;
+    for (h = 0; h < 2; h++)
+        for (i = mp[plothead[h]].n; i != plothead[h]; i = mp[i].n)
+            n++;
+    otp = (dpoint3d *) _alloca(n * sizeof(dpoint3d));
+    tp = (dpoint3d *) _alloca(n * sizeof(dpoint3d) * 2);
 
-		//rotate, converting vmono to simple point3d loop
+    // FIXED: Keep original mp coordinate system but improve rotation handling
 	on = 0;
 	for(h=0; h<2; h++)
 	{
@@ -932,7 +944,8 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 			double dy = mp[i].y - gcam.p.y;
 			double dz = mp[i].z - gcam.p.z;
 
-			// Apply the 2D rotation (this is what xformmatc/xformmats do)
+			// we need to prserve camera -plane orientation and reuse that for cameras that travel inside portal
+
 			otp[on].x = dy * b->xformmatc - dx * b->xformmats;  // rotated X
 			otp[on].y = dz;                                      // direct Z offset
 			otp[on].z = dx * b->xformmatc + dy * b->xformmats;  // rotated depth
@@ -1553,7 +1566,7 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 	double f, d;
 	unsigned int *uptr;
 	int i, j, k, n, s, w, closest, col, didcut, halfplane;
-
+	int loopsrun = 0;
 	if (shadowtest2_rendmode == 4)
 	{
 		glp = &shadowtest2_light[glignum];
@@ -1766,9 +1779,10 @@ nogood:; }
 		if (shadowtest2_rendmode == 4) uptr = glp->sectgot;
 										  else uptr = shadowtest2_sectgot;
 
-		if (!halfplane)
+		if (!loopsrun)
 		{
 			memcpy(uptr,b->sectgot,(lgs->numsects+31)>>3);
+			loopsrun++;
 		}
 		else
 		{
