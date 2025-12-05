@@ -123,7 +123,8 @@ void drawframe (cam_t *cc, player_transform *gdps, mapstate_t *gst) // draws sce
 		//	drawkv6_ambrgb[2] = shadowtest2_ambrgb[2];
 
 			shadowtest2_rendmode = 2;
-			draw_hsr_polymost(&cam,gst,gdps,gdps->cursect);
+			cam.cursect = gdps->cursect;
+			draw_hsr_polymost(&cam,gst,0);
 // and here we probably can stop and see eyepoln.
 
 			shadowtest2_rendmode = 4;
@@ -135,7 +136,8 @@ void drawframe (cam_t *cc, player_transform *gdps, mapstate_t *gst) // draws sce
 				for(glignum=0;glignum<shadowtest2_numlights;glignum++)
 				{
 					ncam.p = shadowtest2_light[glignum].p;
-					draw_hsr_polymost(&ncam,gst,gdps,shadowtest2_light[glignum].sect);
+					ncam.cursect = shadowtest2_light[glignum].sect;
+					draw_hsr_polymost(&ncam,gst,0);
 				}
 			}
 			else
@@ -145,7 +147,8 @@ void drawframe (cam_t *cc, player_transform *gdps, mapstate_t *gst) // draws sce
 				{
 					shadowtest2_ligpolreset(glignum);
 					ncam.p = shadowtest2_light[glignum].p;
-					draw_hsr_polymost(&ncam,gst,gdps,shadowtest2_light[glignum].sect);
+					ncam.cursect = shadowtest2_light[glignum].sect;
+					draw_hsr_polymost(&ncam,gst,0);
 				}
 			}
 

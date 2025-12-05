@@ -1926,21 +1926,25 @@ nogood:; }
 		}
 		else
 		{
-			if (!(cputype&(1<<25))) //Got SSE
-				{ for(i=((lgs->numsects+31)>>5)-1;i>=0;i--) uptr[i] |= sectgot[i]; }
+			if (false) // && !(cputype&(1<<25))) //Got SSE
+			{
+				for(i=((lgs->numsects+31)>>5)-1;i>=0;i--)
+					uptr[i] |= sectgot[i];
+			}
 			else
 			{
-				i = (((lgs->numsects+127)&~127)>>3);
-				_asm
-				{
-					mov eax, uptr
-					mov edx, sectgot
-					mov ecx, i
-		  begor: sub ecx, 16
-					movaps xmm0, [eax+ecx]
-					orps xmm0, [edx+ecx]
-					movaps [eax+ecx], xmm0
-					jg short begor
+				// Convert to portable C - process 16 bytes at a time using uint64_t
+				size_t total_bytes = ((lgs->numsects+127)&~127)>>3;
+				size_t chunks = total_bytes / 16;
+
+				// Process 16-byte chunks (2 x uint64_t)
+				uint64_t* uptr64 = (uint64_t*)uptr;
+				uint64_t* sectgot64 = (uint64_t*)sectgot;
+
+				for(size_t j = 0; j < chunks; j++) {
+					size_t idx = j * 2;
+					uptr64[idx] |= sectgot64[idx];
+					uptr64[idx + 1] |= sectgot64[idx + 1];
 				}
 			}
 		}

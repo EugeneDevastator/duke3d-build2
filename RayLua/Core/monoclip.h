@@ -31,6 +31,61 @@ typedef struct {
 	int n, p;  // next, previous indices for doubly-linked list
 } mp_t;
 
+// ================================================================================================
+// POLYGONAL SCENE CLIPPING DATA STRUCTURES
+// ================================================================================================
+#define BFINTMAX 256
+/** Wall segment bunch for front-to-back sorting */
+typedef struct {
+	int sec, wal0, wal1;                // Sector index and wall range
+	double fra0, fra1;                  // Parametric fractions for wall clipping
+} bunch_t;
+
+/** Bunch intersection data for polygon splitting */
+typedef struct {
+	int bun, sid;                       // Bunch index and intersection side (1:/, 2:\)
+	int wal;                            // Wall index on sector
+	double fra;                         // Intersection point ratio [0.0..1.0]
+} bfint_t;
+
+/** Temporary vertex structure for bunch processing
+* 	//for twal, it is always safe to allocate sector's number of walls + 1 indices
+typedef struct { int i; double x, y; } bunchverts_t; //temp structure holding verts of bunch - easier to work with
+
+ */
+typedef struct {
+	int i;                              // Original wall index
+	double x, y;                        // Clipped coordinates
+} bunchverts_t;
+
+typedef struct {
+	bunch_t *bunch;
+	unsigned int *bunchgot;
+	unsigned char *bunchgrid;
+	int bunchn, bunchmal;
+
+	bfint_t bfint[BFINTMAX];
+	int bfintn, bfintlut[BFINTMAX+1];
+// other context stuff
+	cam_t cam;                    // Camera per recursion level
+ 	cam_t orcam; // one true camera, read only.
+	double xformmat[9], xformmatc, xformmats;
+	point3d gnadd;
+	unsigned int *sectgot, *sectgotmal;        // Visited sectors per level
+	int sectgotn;
+	int portal_clip[2];  // Current portal clipping region
+	bool has_portal_clip; // Whether portal clipping is active
+	int recursion_depth;
+	float gouvmat[9];
+	int gligsect, gligwall, gligslab, gflags;
+	int gnewtag, gdoscansector, gnewtagsect;
+	point3d gnorm;
+	int testignorewall;
+	int testignoresec;
+	int currenthalfplane;
+
+} bunchgrp;
+
 extern mp_t *mp;
 extern mph_t *mph;
 extern int mphnum, mphmal;
@@ -86,7 +141,7 @@ int intersect_traps_mono (double x0, double y0, double x1, double y1,
 int mono_max (int hd0, int hd1, int maxsid, int mode);
 
 // Clip two monotone polygons against each other, calls output function for results
-int mono_clipself (int hd0, int hd1, void (*mono_output)(int h0, int h1));
+int mono_clipself (int hd0, int hd1, bunchgrp* b, void (*mono_output)(int h0, int h1,bunchgrp* b));
 
 #ifdef STANDALONE
 	//May be useful for splitting walls off of bunch processing
@@ -98,6 +153,6 @@ int mono_clipends (int hd, double x0, double x1);
 int mono_join (int hd0, int hd1, int hd2, int hd3, int *ho0, int *ho1);
 
 // Perform boolean operation on two polygon pairs (AND, SUB, SUB_REV)
-void mono_bool (int hr0, int hr1, int hw0, int hw1, int boolop, void (*mono_output)(int h0, int h1));
+void mono_bool (int hr0, int hr1, int hw0, int hw1, int boolop, bunchgrp* b, void (*mono_output)(int h0, int h1,bunchgrp* b));
 
 #endif //BUILD2_MONOCLIP_H

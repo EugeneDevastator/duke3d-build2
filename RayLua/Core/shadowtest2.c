@@ -98,34 +98,25 @@ static tiletype gdd;
 int shadowtest2_rendmode = 1;
 extern int drawpoly_numcpu;
 int shadowtest2_updatelighting = 1;
-#ifdef STANDALONE
-	//For debug only!
-static int gcnt, curgcnt = 0x7fffffff, fixposx, fixposy;
-#endif
 
 	//Sorting
-static unsigned int *sectgot = 0;      //WARNING:code uses x86-32 bit shift trick!
+
 unsigned int *shadowtest2_sectgot = 0; //WARNING:code uses x86-32 bit shift trick!
-static unsigned int *sectgotmal = 0, *shadowtest2_sectgotmal = 0;
-static int sectgotn = 0, shadowtest2_sectgotn = 0;
-
-static bunch_t *bunch = 0;
-static unsigned int *bunchgot = 0;
-static unsigned char *bunchgrid = 0;
-static int bunchn, bunchmal = 0;
-
-	//Translation & rotation
-static mapstate_t *gst;
+static unsigned int *shadowtest2_sectgotmal = 0;
+static int shadowtest2_sectgotn = 0;
+#define CLIP_PORTAL_FLAG 8
+#define MAX_PORTAL_DEPTH 4
+//Translation & rotation
+static mapstate_t *curMap;
 static player_transform *gps;
-static cam_t gcam;
-static point3d gnadd;
-static double xformmat[9], xformmatc, xformmats;
+//static point3d b->gnadd;
+//static double b->xformmat[9], b->xformmatc, b->xformmats;
 
 	//Texture mapping parameters
 static tile_t *gtpic;
-static float gouvmat[9];
-static int gcurcol;
 
+static int gcurcol;
+static int taginc= 30000;
 #define LIGHTMAX 256 //FIX:make dynamic!
 lightpos_t shadowtest2_light[LIGHTMAX];
 static lightpos_t *glp;
@@ -195,36 +186,37 @@ int argb_interp(int c0, int c1, int mul15) {
 				}
 }
 
-static int prepbunch (int b, bunchverts_t *twal)
+static int prepbunch (int id, bunchverts_t *twal, bunchgrp *b)
 {
+	cam_t gcam = b->cam;
 	wall_t *wal;
 	double f, x, y, x0, y0, x1, y1;
 	int i, n;
 
-	wal = gst->sect[bunch[b].sec].wall;
-	i = bunch[b].wal0; twal[0].i = i;
+	wal = curMap->sect[b->bunch[id].sec].wall;
+	i = b->bunch[id].wal0; twal[0].i = i;
 	x0 = wal[i].x; y0 = wal[i].y; i += wal[i].n;
-	x1 = wal[i].x; y1 = wal[i].y; f = bunch[b].fra0;
+	x1 = wal[i].x; y1 = wal[i].y; f = b->bunch[id].fra0;
 	twal[0].x = (x1-x0)*f + x0;
 	twal[0].y = (y1-y0)*f + y0;
-	if ((bunch[b].wal0 == bunch[b].wal1) && (bunch[b].fra0 < bunch[b].fra1))
+	if ((b->bunch[id].wal0 == b->bunch[id].wal1) && (b->bunch[id].fra0 < b->bunch[id].fra1))
 	{     //Hack for left side clip
-		f = bunch[b].fra1;
+		f = b->bunch[id].fra1;
 		twal[1].x = (x1-x0)*f + x0;
 		twal[1].y = (y1-y0)*f + y0;
 		return(1);
 	}
 	twal[1].x = x1;
 	twal[1].y = y1; n = 1;
-	while (i != bunch[b].wal1)
+	while (i != b->bunch[id].wal1)
 	{
 		twal[n].i = i; n++; i += wal[i].n;
 		twal[n].x = wal[i].x;
 		twal[n].y = wal[i].y;
 	}
-	if (bunch[b].fra1 > 0.0)
+	if (b->bunch[id].fra1 > 0.0)
 	{
-		x = wal[i].x; y = wal[i].y; f = bunch[b].fra1;
+		x = wal[i].x; y = wal[i].y; f = b->bunch[id].fra1;
 		twal[n].i = i; n++; i += wal[i].n;
 		twal[n].x = (wal[i].x-x)*f + x;
 		twal[n].y = (wal[i].y-y)*f + y;
@@ -237,9 +229,8 @@ static int prepbunch (int b, bunchverts_t *twal)
 	//   sid: which way bunch intersects 1:/, 2:backslash
 	//   wal: wall index on b0's sector {0..sec[s1].n-1}
 	//   fra: intersection point ratio (wal to wal_next) {0.0..1.0}
-#define BFINTMAX 256
-static bfint_t bfint[BFINTMAX];
-static int bfintn, bfintlut[BFINTMAX+1];
+
+
 
 	//See BUNCHFRONT2.KC for derivation.
 	//Returns:
@@ -247,8 +238,9 @@ static int bfintn, bfintlut[BFINTMAX+1];
 	//   1: FRONT:RED(b0)
 	//   2: FRONT:GREEN(b1)
 	//   3: UNSORTABLE!
-static int bunchfront (int b0, int b1, int fixsplitnow)
+static int bunchfront (int b0, int b1, int fixsplitnow, bunchgrp *b)
 {
+	cam_t gcam = b->cam;
 	bunchverts_t *twal[2];
 	wall_t *wal;
 	double d, a[2], x0, y0, x1, y1, x2, y2, x3, y3, t0, t1, t2, t3;
@@ -261,7 +253,7 @@ static int bunchfront (int b0, int b1, int fixsplitnow)
 #if 0 //This doen't work if 'B' of {A<B<C} is hidden from view :/
 	sect_t *sec;
 	int s0, s1, w, ns, nw;
-	sec = gst->sect;
+	sec = curMap->sect;
 	s0 = bunch[b0].sec;
 	s1 = bunch[b1].sec;
 	if (s0 != s1)
@@ -270,7 +262,7 @@ static int bunchfront (int b0, int b1, int fixsplitnow)
 		{
 			ns = sec[s0].wall[w].ns;
 			nw = sec[s0].wall[w].nw;
-			while (((unsigned)ns < (unsigned)gst->numsects) && (ns != s0))
+			while (((unsigned)ns < (unsigned)curMap->numsects) && (ns != s0))
 			{
 				if (ns == s1) goto good; //s0 and s1 are neighbors
 				i = ns;
@@ -292,9 +284,9 @@ good:;
 	//   ExitProcess(0);
 	//}
 
-	twal[0] = (bunchverts_t *)_alloca((gst->sect[bunch[b0].sec].n+gst->sect[bunch[b1].sec].n+2)*sizeof(bunchverts_t));
-	twaln[0] = prepbunch(b0,twal[0]); twal[1] = &twal[0][twaln[0]+1];
-	twaln[1] = prepbunch(b1,twal[1]);
+	twal[0] = (bunchverts_t *)_alloca((curMap->sect[b->bunch[b0].sec].n+curMap->sect[b->bunch[b1].sec].n+2)*sizeof(bunchverts_t));
+	twaln[0] = prepbunch(b0,twal[0],b); twal[1] = &twal[0][twaln[0]+1];
+	twaln[1] = prepbunch(b1,twal[1],b);
 
 		//Offset vertices (BUNCHNEAR of scansector() already puts them safely in front)
 	for(j=2-1;j>=0;j--) for(i=twaln[j];i>=0;i--) { twal[j][i].x -= gcam.p.x; twal[j][i].y -= gcam.p.y; }
@@ -339,7 +331,7 @@ good:;
 #else
 		//Calculate the areas between the 2 bunches (superset of above algo - can determine if unsortable)
 	ind[0] = 0; ind[1] = 0; cnt = 0; otx0 = 0; oty0 = 0; otx1 = 0; oty1 = 0;
-	j = 0; gotsid = 0; startsid = -1; obfintn = bfintn;
+	j = 0; gotsid = 0; startsid = -1; obfintn = b->bfintn;
 	while (1)
 	{
 		sid = (twal[0][ind[0]].x*twal[1][ind[1]].y < twal[0][ind[0]].y*twal[1][ind[1]].x);
@@ -372,10 +364,10 @@ good:;
 				else
 				{
 						//NOTE:must use original wall vertices to get correct value of t!
-					wal = gst->sect[bunch[b0].sec].wall; i = twal[0][ind[0]-1].i;
+					wal = curMap->sect[b->bunch[b0].sec].wall; i = twal[0][ind[0]-1].i;
 					x0 = wal[i].x-gcam.p.x; y0 = wal[i].y-gcam.p.y; i += wal[i].n;
 					x1 = wal[i].x-gcam.p.x; y1 = wal[i].y-gcam.p.y;
-					wal = gst->sect[bunch[b1].sec].wall; i = twal[1][ind[1]-1].i;
+					wal = curMap->sect[b->bunch[b1].sec].wall; i = twal[1][ind[1]-1].i;
 					x2 = wal[i].x-gcam.p.x; y2 = wal[i].y-gcam.p.y; i += wal[i].n;
 					x3 = wal[i].x-gcam.p.x; y3 = wal[i].y-gcam.p.y;
 
@@ -390,13 +382,13 @@ good:;
 					d0 = (oty0-oty1)*tix + (otx1-otx0)*tiy; a[oj] += d0;
 					d1 = ( ty1- ty0)*tix + ( tx0- tx1)*tiy; a[ j] += d1;
 
-					if ((fixsplitnow) && (bfintn < BFINTMAX))
+					if ((fixsplitnow) && (b->bfintn < BFINTMAX))
 					{
-						bfint[bfintn].bun = b1;
-						bfint[bfintn].sid = startsid+1; startsid ^= 1;
-						bfint[bfintn].wal = twal[0][ind[0]-1].i;
-						bfint[bfintn].fra = t;
-						bfintn++;
+						b->bfint[b->bfintn].bun = b1;
+						b->bfint[b->bfintn].sid = startsid+1; startsid ^= 1;
+						b->bfint[b->bfintn].wal = twal[0][ind[0]-1].i;
+						b->bfint[b->bfintn].fra = t;
+						b->bfintn++;
 					}
 				}
 			}
@@ -413,8 +405,9 @@ overflow:otx0 = tx0; oty0 = ty0; otx1 = tx1; oty1 = ty1;
 #endif
 }
 
-static void scansector (int sectnum)
+static void scansector (int sectnum, bunchgrp* b)
 {
+	cam_t gcam = b->cam;
 	#define BUNCHNEAR 1e-7
 	sect_t *sec;
 	wall_t *wal;
@@ -423,11 +416,11 @@ static void scansector (int sectnum)
 	int i, j, k, m, o, ie, obunchn, realobunchn, obfintn;
 
 	if (sectnum < 0) return;
-	sectgot[sectnum>>5] |= (1<<sectnum);
+	b->sectgot[sectnum>>5] |= (1<<sectnum);
 
-	sec = &gst->sect[sectnum]; wal = sec->wall;
+	sec = &curMap->sect[sectnum]; wal = sec->wall;
 
-	obunchn = bunchn; realobunchn = bunchn;
+	obunchn = b->bunchn; realobunchn = b->bunchn;
 	for(i=0,ie=sec->n;i<ie;i++)
 	{
 		j = wal[i].n+i;
@@ -435,48 +428,48 @@ static void scansector (int sectnum)
 		dx1 = wal[j].x-gcam.p.x; dy1 = wal[j].y-gcam.p.y; if (dy1*dx0 <= dx1*dy0) goto docont; //Back-face cull
 
 			//clip to near plane .. result is parametric fractions f0&f1
-		f0 = dx0*xformmatc + dy0*xformmats;
-		f1 = dx1*xformmatc + dy1*xformmats;
+		f0 = dx0 * b->xformmatc + dy0 * b->xformmats;
+		f1 = dx1 * b->xformmatc + dy1 * b->xformmats;
 			  if (f0 <= BUNCHNEAR) { if (f1 <= BUNCHNEAR) goto docont;
 											 f0 = (BUNCHNEAR-f0)/(f1-f0); f1 = 1.0; if (f0 >= f1) goto docont; }
 		else if (f1 <= BUNCHNEAR) { f1 = (BUNCHNEAR-f0)/(f1-f0); f0 = 0.0; if (f0 >= f1) goto docont; }
 		else                      { f0 = 0.0;                    f1 = 1.0; }
 
-		k = bunch[bunchn-1].wal1;
-		if ((bunchn > obunchn) && (wal[k].n+k == i) && (bunch[bunchn-1].fra1 == 1.0))
+		k = b->bunch[b->bunchn-1].wal1;
+		if ((b->bunchn > obunchn) && (wal[k].n+k == i) && (b->bunch[b->bunchn-1].fra1 == 1.0))
 		{
-			bunch[bunchn-1].wal1 = i; //continue from previous wall (typical case)
-			bunch[bunchn-1].fra1 = f1;
-			if ((bunchn-1 > obunchn) && (bunch[obunchn].wal0 == j) && (bunch[obunchn].fra0 == 0.0))
+			b->bunch[b->bunchn-1].wal1 = i; //continue from previous wall (typical case)
+			b->bunch[b->bunchn-1].fra1 = f1;
+			if ((b->bunchn-1 > obunchn) && (b->bunch[obunchn].wal0 == j) && (b->bunch[obunchn].fra0 == 0.0))
 			{
-				bunchn--; //attach to left side of 1st bunch on loop
-				bunch[obunchn].wal0 = bunch[bunchn].wal0;
-				bunch[obunchn].fra0 = bunch[bunchn].fra0;
+				b->bunchn--; //attach to left side of 1st bunch on loop
+				b->bunch[obunchn].wal0 = b->bunch[b->bunchn].wal0;
+				b->bunch[obunchn].fra0 = b->bunch[b->bunchn].fra0;
 			}
 		}
-		else if ((bunchn > obunchn) && (bunch[obunchn].wal0 == j) && (bunch[obunchn].fra0 == 0.0))
+		else if ((b->bunchn > obunchn) && (b->bunch[obunchn].wal0 == j) && (b->bunch[obunchn].fra0 == 0.0))
 		{
-			bunch[obunchn].wal0 = i; //update left side of 1st bunch on loop
-			bunch[obunchn].fra0 = f0;
+			b->bunch[obunchn].wal0 = i; //update left side of 1st bunch on loop
+			b->bunch[obunchn].fra0 = f0;
 		}
 		else
 		{
-			if (bunchn >= bunchmal)
+			if (b->bunchn >= b->bunchmal)
 			{
-				bunchmal <<= 1;
-				bunch     = (bunch_t       *)realloc(bunch    ,bunchmal*sizeof(bunch[0]));
-				bunchgot  = (unsigned int  *)realloc(bunchgot ,((bunchmal+31)&~31)>>3);
-				bunchgrid = (unsigned char *)realloc(bunchgrid,((bunchmal-1)*bunchmal)>>1);
+				b->bunchmal <<= 1;
+				b->bunch     = (bunch_t       *)realloc(b->bunch    ,b->bunchmal*sizeof(b->bunch[0]));
+				b->bunchgot  = (unsigned int  *)realloc(b->bunchgot ,((b->bunchmal+31)&~31)>>3);
+				b->bunchgrid = (unsigned char *)realloc(b->bunchgrid,((b->bunchmal-1)*b->bunchmal)>>1);
 			}
-			bunch[bunchn].wal0 = i; bunch[bunchn].fra0 = f0; //start new bunch
-			bunch[bunchn].wal1 = i; bunch[bunchn].fra1 = f1;
-			bunch[bunchn].sec = sectnum; bunchn++;
+			b->bunch[b->bunchn].wal0 = i; b->bunch[b->bunchn].fra0 = f0; //start new b->bunch
+			b->bunch[b->bunchn].wal1 = i; b->bunch[b->bunchn].fra1 = f1;
+			b->bunch[b->bunchn].sec = sectnum; b->bunchn++;
 		}
 docont:;
-		if (j < i) obunchn = bunchn;
+		if (j < i) obunchn = b->bunchn;
 	}
 
-	for(obunchn=realobunchn;obunchn<bunchn;obunchn++)
+	for(obunchn=realobunchn;obunchn<b->bunchn;obunchn++)
 	{
 			//insert bunch
 			//  0 1 2 3 4
@@ -487,70 +480,55 @@ docont:;
 			//4 x x x x
 			//5 ? ? ? ? ?
 			//0,1,3,6,10,15,21,28,36,45,55,..
-		j = (((obunchn-1)*obunchn)>>1); bfintn = 0;
-		for(i=0;i<obunchn;i++) bunchgrid[j+i] = bunchfront(obunchn,i,1);
+		j = (((obunchn-1)*obunchn)>>1); b->bfintn = 0;
+		for(i=0;i<obunchn;i++) b->bunchgrid[j+i] = bunchfront(obunchn,i,1,b);
 
-		if (!bfintn) continue;
+		if (!b->bfintn) continue;
 
 			//sort bfint's
-		for(j=1;j<bfintn;j++)
+		for(j=1;j<b->bfintn;j++)
 			for(i=0;i<j;i++)
 			{
 					//              bfint[i].wal vs. bfint[j].wal ?
 					//0    bunch[obunchn].wal0........bunch[obunchn].wal1       sec->n
 					//0....bunch[obunchn].wal1        bunch[obunchn].wal0.......sec->n
-				m = bfint[i].wal; o = bfint[j].wal;
-				if (bunch[obunchn].wal0 > bunch[obunchn].wal1) //handle wall index wrap-around
+				m = b->bfint[i].wal; o = b->bfint[j].wal;
+				if (b->bunch[obunchn].wal0 > b->bunch[obunchn].wal1) //handle wall index wrap-around
 				{
-					if (m <= bunch[obunchn].wal1) m += sec->n;
-					if (o <= bunch[obunchn].wal1) o += sec->n;
+					if (m <= b->bunch[obunchn].wal1) m += sec->n;
+					if (o <= b->bunch[obunchn].wal1) o += sec->n;
 				}
 				if (m < o) continue;
-				if ((bfint[i].wal == bfint[j].wal) && (bfint[i].fra <= bfint[j].fra)) continue;
+				if ((b->bfint[i].wal == b->bfint[j].wal) && (b->bfint[i].fra <= b->bfint[j].fra)) continue;
 
-				tbf = bfint[i]; bfint[i] = bfint[j]; bfint[j] = tbf;
+				tbf = b->bfint[i]; b->bfint[i] = b->bfint[j]; b->bfint[j] = tbf;
 			}
 
 			//combine null or tiny bunches
-		obfintn = bfintn; bfintlut[0] = 0; bfintn = 1;
+		obfintn = b->bfintn; b->bfintlut[0] = 0; b->bfintn = 1;
 		for(i=1;i<obfintn;i++)
-			if ((bfint[i-1].wal != bfint[i].wal) || (bfint[i].fra-bfint[i-1].fra >= 2e-7))
-				{ bfintlut[bfintn] = i; bfintn++; }
-		bfintlut[bfintn] = obfintn;
+			if ((b->bfint[i-1].wal != b->bfint[i].wal) || (b->bfint[i].fra-b->bfint[i-1].fra >= 2e-7))
+				{ b->bfintlut[b->bfintn] = i; b->bfintn++; }
+		b->bfintlut[b->bfintn] = obfintn;
 
-#if 0
-		if (sectnum == 0)
+			//obunchn gets its ass split 'b->bfintn' times into a total of 'b->bfintn+1' pieces
+		if (b->bunchn+b->bfintn > b->bunchmal)
 		{
-			char tbuf[2048];
-			sprintf(tbuf,"bef (bunchn=%d obunchn=%d bfintn=%d)\n",bunchn,obunchn,bfintn);
-			for(m=0;m<bunchn;m++)
-			{
-				sprintf(&tbuf[strlen(tbuf)],"%d (%2d: %2d %15.12f %2d %15.12f) : ",m,bunch[m].sec,bunch[m].wal0,bunch[m].fra0,bunch[m].wal1,bunch[m].fra1);
-				for(k=0;k<m;k++) sprintf(&tbuf[strlen(tbuf)],"%d ",bunchgrid[(((m-1)*m)>>1)+k]);
-				sprintf(&tbuf[strlen(tbuf)],"\n");
-			}
-			MessageBox(ghwnd,tbuf,prognam,MB_OK);
-		}
-#endif
-
-			//obunchn gets its ass split 'bfintn' times into a total of 'bfintn+1' pieces
-		if (bunchn+bfintn > bunchmal)
-		{
-			bunchmal = max(bunchmal<<1,bunchn+bfintn);
-			bunch     = (bunch_t       *)realloc(bunch    ,bunchmal*sizeof(bunch[0]));
-			bunchgot  = (unsigned int  *)realloc(bunchgot ,((bunchmal+31)&~31)>>3);
-			bunchgrid = (unsigned char *)realloc(bunchgrid,((bunchmal-1)*bunchmal)>>1);
+			b->bunchmal = max(b->bunchmal<<1,b->bunchn+b->bfintn);
+			b->bunch     = (bunch_t       *)realloc(b->bunch    ,b->bunchmal*sizeof(b->bunch[0]));
+			b->bunchgot  = (unsigned int  *)realloc(b->bunchgot ,((b->bunchmal+31)&~31)>>3);
+			b->bunchgrid = (unsigned char *)realloc(b->bunchgrid,((b->bunchmal-1)*b->bunchmal)>>1);
 		}
 
 			//Shove not-yet-processed neighbors to end of list. WARNING:be careful with indices/for loop order!
-		for(k=0;k<bfintn;k++) bunch[bunchn+bfintn-1-k] = bunch[obunchn+k+1];
-		for(k=bfintn-1;k>=0;k--) bunch[obunchn+k+1] = bunch[obunchn];
-		for(k=bfintn-1;k>=0;k--)
+		for(k=0;k<b->bfintn;k++) b->bunch[b->bunchn+b->bfintn-1-k] = b->bunch[obunchn+k+1];
+		for(k=b->bfintn-1;k>=0;k--) b->bunch[obunchn+k+1] = b->bunch[obunchn];
+		for(k=b->bfintn-1;k>=0;k--)
 		{
-			bunch[obunchn+k  ].wal1 = bfint[bfintlut[k  ]  ].wal; bunch[obunchn+k  ].fra1 = max(bfint[bfintlut[k  ]  ].fra-1e-7,0.0);
-			bunch[obunchn+k+1].wal0 = bfint[bfintlut[k+1]-1].wal; bunch[obunchn+k+1].fra0 = min(bfint[bfintlut[k+1]-1].fra+1e-7,1.0);
+			b->bunch[obunchn+k  ].wal1 = b->bfint[b->bfintlut[k  ]  ].wal; b->bunch[obunchn+k  ].fra1 = max(b->bfint[b->bfintlut[k  ]  ].fra-1e-7,0.0);
+			b->bunch[obunchn+k+1].wal0 = b->bfint[b->bfintlut[k+1]-1].wal; b->bunch[obunchn+k+1].fra0 = min(b->bfint[b->bfintlut[k+1]-1].fra+1e-7,1.0);
 		}
-		bunchn += bfintn;
+		b->bunchn += b->bfintn;
 
 			//  0 1 2 3 4 5 6
 			//0
@@ -561,246 +539,69 @@ docont:;
 			//5 ? ? ? - ?
 			//6 ? ? ? - ? 0
 			//7 ? ? ? - ? 0 0
-		for(m=obunchn;m<obunchn+bfintn+1;m++) //re-front all 'bfintn+1' pieces, using hints from bfint list
+		for(m=obunchn;m<obunchn+b->bfintn+1;m++) //re-front all 'b->bfintn+1' pieces, using hints from bfint list
 		{
 			j = (((m-1)*m)>>1);
 			for(k=0;k<obunchn;k++)
 			{
-				if (m > obunchn       ) for(o=bfintlut[m-obunchn-1];o<bfintlut[m-obunchn  ];o++) if (bfint[o].bun == k) { bunchgrid[j+k] = bfint[o].sid  ; goto bunchgrid_got; }
-				if (m < obunchn+bfintn) for(o=bfintlut[m-obunchn  ];o<bfintlut[m-obunchn+1];o++) if (bfint[o].bun == k) { bunchgrid[j+k] = bfint[o].sid^3; goto bunchgrid_got; }
-				bunchgrid[j+k] = bunchfront(m,k,0);
+				if (m > obunchn       ) for(o=b->bfintlut[m-obunchn-1];o<b->bfintlut[m-obunchn  ];o++) if (b->bfint[o].bun == k) { b->bunchgrid[j+k] = b->bfint[o].sid  ; goto bunchgrid_got; }
+				if (m < obunchn+b->bfintn) for(o=b->bfintlut[m-obunchn  ];o<b->bfintlut[m-obunchn+1];o++) if (b->bfint[o].bun == k) { b->bunchgrid[j+k] = b->bfint[o].sid^3; goto bunchgrid_got; }
+				b->bunchgrid[j+k] = bunchfront(m,k,0,b);
 bunchgrid_got:;
 			}
-			for(;k<m;k++) bunchgrid[j+k] = 0;
+			for(;k<m;k++) b->bunchgrid[j+k] = 0;
 		}
-
-#if 0
-		if (sectnum == 0)
-		{
-			char tbuf[2048];
-			sprintf(tbuf,"aft (bunchn=%d obunchn=%d bfintn=%d)\n",bunchn,obunchn,bfintn);
-			for(m=0;m<bunchn;m++)
-			{
-				sprintf(&tbuf[strlen(tbuf)],"%d (%2d: %2d %15.12f %2d %15.12f) : ",m,bunch[m].sec,bunch[m].wal0,bunch[m].fra0,bunch[m].wal1,bunch[m].fra1);
-				for(k=0;k<m;k++) sprintf(&tbuf[strlen(tbuf)],"%d ",bunchgrid[(((m-1)*m)>>1)+k]);
-				sprintf(&tbuf[strlen(tbuf)],"\n");
-			}
-			MessageBox(ghwnd,tbuf,prognam,MB_OK);
-		}
-#endif
-
-		obunchn += bfintn;
+		obunchn += b->bfintn;
 	}
 
 		//remove null bunches (necessary for proper operation)
-	for(m=bunchn-1;m>=realobunchn;m--)
+	for(m=b->bunchn-1;m>=realobunchn;m--)
 	{
-		if (bunch[m].wal0 != bunch[m].wal1) continue;
-		if (bunch[m].fra0 < bunch[m].fra1) continue;
-		bunchn--; bunch[m] = bunch[bunchn];
-		j = (((bunchn-1)*bunchn)>>1);
-		memcpy(&bunchgrid[((m-1)*m)>>1],&bunchgrid[j],m*sizeof(bunchgrid[0]));
-		for(i=m+1;i<bunchn;i++) bunchgrid[(((i-1)*i)>>1)+m] = ((bunchgrid[j+i]&1)<<1) + (bunchgrid[j+i]>>1);
+		if (b->bunch[m].wal0 != b->bunch[m].wal1) continue;
+		if (b->bunch[m].fra0 < b->bunch[m].fra1) continue;
+		b->bunchn--; b->bunch[m] = b->bunch[b->bunchn];
+		j = (((b->bunchn-1)*b->bunchn)>>1);
+		memcpy(&b->bunchgrid[((m-1)*m)>>1],&b->bunchgrid[j],m*sizeof(b->bunchgrid[0]));
+		for(i=m+1;i<b->bunchn;i++) b->bunchgrid[(((i-1)*i)>>1)+m] = ((b->bunchgrid[j+i]&1)<<1) + (b->bunchgrid[j+i]>>1);
 	}
 
 }
 
-static void xformprep (double hang)
+static void xformprep (double hang, bunchgrp *b)
 {
+	cam_t gcam = b->cam;
 	double f; f = atan2(gcam.f.y,gcam.f.x)+hang; //WARNING: "f = 1/sqrt; c *= f; s *= f;" form has singularity - don't use :/
-	xformmatc = cos(f); xformmats = sin(f);
-	xformmat[0] = gcam.r.y*xformmatc - gcam.r.x*xformmats; xformmat[1] = gcam.r.z; xformmat[2] = gcam.r.x*xformmatc + gcam.r.y*xformmats;
-	xformmat[3] = gcam.d.y*xformmatc - gcam.d.x*xformmats; xformmat[4] = gcam.d.z; xformmat[5] = gcam.d.x*xformmatc + gcam.d.y*xformmats;
-	xformmat[6] = 0                                      ; xformmat[7] = gcam.f.z; xformmat[8] = gcam.f.x*xformmatc + gcam.f.y*xformmats;
-	gnadd.x = -gcam.h.x*xformmat[0] - gcam.h.y*xformmat[1] + gcam.h.z*xformmat[2];
-	gnadd.y = -gcam.h.x*xformmat[3] - gcam.h.y*xformmat[4] + gcam.h.z*xformmat[5];
-	gnadd.z = -gcam.h.x*xformmat[6] - gcam.h.y*xformmat[7] + gcam.h.z*xformmat[8];
+	b->xformmatc = cos(f); b->xformmats = sin(f);
+	b->xformmat[0] = gcam.r.y*b->xformmatc - gcam.r.x*b->xformmats; b->xformmat[1] = gcam.r.z; b->xformmat[2] = gcam.r.x*b->xformmatc + gcam.r.y*b->xformmats;
+	b->xformmat[3] = gcam.d.y*b->xformmatc - gcam.d.x*b->xformmats; b->xformmat[4] = gcam.d.z; b->xformmat[5] = gcam.d.x*b->xformmatc + gcam.d.y*b->xformmats;
+	b->xformmat[6] = gcam.f.y*b->xformmatc - gcam.f.x*b->xformmats; b->xformmat[7] = gcam.f.z; b->xformmat[8] = gcam.f.x*b->xformmatc + gcam.f.y*b->xformmats;
+	b->gnadd.x = -gcam.h.x*b->xformmat[0] - gcam.h.y*b->xformmat[1] + gcam.h.z*b->xformmat[2];
+	b->gnadd.y = -gcam.h.x*b->xformmat[3] - gcam.h.y*b->xformmat[4] + gcam.h.z*b->xformmat[5];
+	b->gnadd.z = -gcam.h.x*b->xformmat[6] - gcam.h.y*b->xformmat[7] + gcam.h.z*b->xformmat[8];
 }
 
-static void xformbac (double rx, double ry, double rz, dpoint3d *o)
+static void xformbac (double rx, double ry, double rz, dpoint3d *o, bunchgrp *b)
 {
-	o->x = rx*xformmat[0] + ry*xformmat[3];//+ rz*xformmat[6];
-	o->y = rx*xformmat[1] + ry*xformmat[4] + rz*xformmat[7];
-	o->z = rx*xformmat[2] + ry*xformmat[5] + rz*xformmat[8];
+	o->x = rx*b->xformmat[0] + ry*b->xformmat[3] + rz*b->xformmat[6];
+	o->y = rx*b->xformmat[1] + ry*b->xformmat[4] + rz*b->xformmat[7];
+	o->z = rx*b->xformmat[2] + ry*b->xformmat[5] + rz*b->xformmat[8];
 }
-
-#ifdef STANDALONE
-	//Assumes poly is clipped by mono_bool() to visible screen area
-static void drawpol_aftclip (int plothead0, int plothead1) //this function for debug only!
-{
-	kgln_t *overt, *vert;
-	tiltyp *pic, gtt;
-	double f;
-	int i, j, on, n, plothead[2];
-
-	if ((plothead0|plothead1) < 0) return;
-	plothead[0] = plothead0; plothead[1] = plothead1;
-
-	n = 2; for(j=0;j<2;j++) for(i=mp[plothead[j]].n;i!=plothead[j];i=mp[i].n) n++;
-	if (n < 3) return;
-
-	overt = (kgln_t *)_alloca(n*sizeof(overt[0]));
-	vert = (kgln_t *)_alloca(n*2*sizeof(vert[0]));
-
-	on = 0;
-	for(j=0;j<2;j++)
-	{
-		i = plothead[j];
-		do
-		{
-			if (j) i = mp[i].p;
-
-			overt[on].x = mp[i].x*xformmat[0] + mp[i].y*xformmat[1] + gnadd.x;
-			overt[on].y = mp[i].x*xformmat[3] + mp[i].y*xformmat[4] + gnadd.y;
-			overt[on].z = mp[i].x*xformmat[6] + mp[i].y*xformmat[7] + gnadd.z;
-			on++;
-
-			if (!j) i = mp[i].n;
-		} while (i != plothead[j]);
-	}
-
-		//clip
-	n = 0;
-	for(i=on-1,j=0;j<on;i=j,j++)
-	{
-		#define ASCISDIST 0.001
-		if (overt[i].z >= ASCISDIST) { vert[n] = overt[i]; n++; }
-		if ((overt[i].z >= ASCISDIST) != (overt[j].z >= ASCISDIST))
-		{
-			f = (ASCISDIST-overt[j].z)/(overt[i].z-overt[j].z);
-			vert[n].x = (overt[i].x-overt[j].x)*f + overt[j].x;
-			vert[n].y = (overt[i].y-overt[j].y)*f + overt[j].y;
-			vert[n].z = ASCISDIST; n++;
-		}
-	}
-	if (n < 3) return;
-
-		//project & find x extents
-	for(i=0;i<n;i++)
-	{
-		f = gcam.h.z/vert[i].z;
-		vert[i].x = vert[i].x*f + gcam.h.x;
-		vert[i].y = vert[i].y*f + gcam.h.y;
-		vert[i].n = i+1;
-	}
-	vert[n-1].n = 0;
-
-	pic = &gtpic->tt;
-	gtt.f = pic->f; gtt.p = pic->p; gtt.x = pic->x; gtt.y = pic->y; gtt.z = 1.0; gtt.shsc = 2.0; gtt.lowermip = pic->lowermip;
-
-	i = RENDFLAGS_OUVMAT|RENDFLAGS_NODEPTHTEST|RENDFLAGS_NOTRCP|RENDFLAGS_GMAT;
-	if (renderinterp) i |= RENDFLAGS_INTERP;
-	drawpoly(&gtt,(vertyp *)vert,n,gcurcol,(((unsigned)gcurcol)>>24)/16.0,gouvmat,i);
-
-	if (shadowtest2_rendmode != 2)
-	{
-		double x0, y0, x1, y1, fx, fy, f;
-
-		for(i=n-1,j=0;i>=0;j=i,i--) drawline2d(&gcam.c,vert[i].x,vert[i].y,vert[j].x,vert[j].y,0x808080);
-
-			//Find centroid of polygon (copied from Build2, which is from TAGPNT2.BAS 09/14/2006)
-		fx = 0.0; fy = 0.0; f = 0.0;
-		for(i=n-1,j=0;i>=0;j=i,i--)
-		{
-			x0 = vert[i].x; y0 = vert[i].y;
-			x1 = vert[j].x; y1 = vert[j].y;
-			fx += ((x0+x1)*x0 + x1*x1)*(y1-y0);
-			fy += ((y0+y1)*y0 + y1*y1)*(x0-x1);
-			f += (x0+x1)*(y1-y0);
-		}
-		f = 1.0/(f*3.0); i = (int)(fx*f); j = (int)(fy*f);
-													  drawpix(&gcam.c,i+0,j-1,0xffffff); drawpix(&gcam.c,i+1,j-1,0xffffff);
-		drawpix(&gcam.c,i-1,j+0,0xffffff); drawpix(&gcam.c,i+0,j+0,0x000000); drawpix(&gcam.c,i+1,j+0,0x000000); drawpix(&gcam.c,i+2,j+0,0xffffff);
-		drawpix(&gcam.c,i-1,j+1,0xffffff); drawpix(&gcam.c,i+0,j+1,0x000000); drawpix(&gcam.c,i+1,j+1,0x000000); drawpix(&gcam.c,i+2,j+1,0xffffff);
-													  drawpix(&gcam.c,i+0,j+2,0xffffff); drawpix(&gcam.c,i+1,j+2,0xffffff);
-	}
-}
-#endif
 
 eyepol_t *eyepol = 0; // 4096 eyepol_t's = 192KB
-point2d *eyepolv = 0; //16384 point2d's  = 128KB
+point3d *eyepolv = 0; //16384 point2d's  = 128KB
 int eyepoln = 0, glignum = 0;
 int eyepolmal = 0, eyepolvn = 0, eyepolvmal = 0;
-static int gligsect, gligwall, gligslab, gflags;
-static point3d gnorm;
-void eyepol_drawfunc (int ind)
+
+static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 {
-	kgln_t *vert;
-	point2d *lipv;
-	float f, fx, fy;
-	int i, j, n;
-
-	n = eyepol[ind+1].vert0-eyepol[ind].vert0; lipv = &eyepolv[eyepol[ind].vert0];
-	vert = (kgln_t *)_alloca(n*sizeof(vert[0]));
-	for(i=0;i<n;i++)
-	{
-		vert[i].x = lipv[i].x;
-		vert[i].y = lipv[i].y;
-		vert[i].n = i+1;
-	}
-	vert[n-1].n = 0;
-
-	//i = RENDFLAGS_OUVMAT|RENDFLAGS_NODEPTHTEST|RENDFLAGS_NOTRCP|RENDFLAGS_GMAT;
-	//if (renderinterp) i |= RENDFLAGS_INTERP;
-	//drawpoly_flat_threadsafe(&eyepol[ind].tpic->tt,(vertyp *)vert,n,eyepol[ind].curcol,(((unsigned)eyepol[ind].curcol)>>24)/16.0,eyepol[ind].ouvmat,i,gcam);
-
-	if (shadowtest2_rendmode == 1)
-	{
-	//	for(i=n-1,j=0;i>=0;j=i,i--) drawline2d(&gcam.c,vert[i].x,vert[i].y,vert[j].x,vert[j].y,0xa0a0a0); //WARNING:fusing this with centroid algo below fails.. compiler bug?
-#if 0
-		fx = 0.f; fy = 0.f;
-		for(i=n-1,j=0;i>=0;j=i,i--) { fx += vert[i].x; fy += vert[i].y; }
-		f = 1.f/(float)n; i = (int)(fx*f); j = (int)(fy*f);
-#else
-			//Find centroid of polygon
-		fx = 0.f; fy = 0.f; f = 0.f;
-		for(i=n-1,j=0;i>=0;j=i,i--)
-		{
-			float fx0, fy0, fx1, fy1;
-			fx0 = vert[i].x; fy0 = vert[i].y;
-			fx1 = vert[j].x; fy1 = vert[j].y;
-			fx += ((fx0+fx1)*fx0 + fx1*fx1)*(fy1-fy0);
-			fy += ((fy0+fy1)*fy0 + fy1*fy1)*(fx0-fx1);
-			f += (fx0+fx1)*(fy1-fy0);
-		}
-		f = 1.f/(f*3.f); i = (int)(fx*f); j = (int)(fy*f);
-#endif
-	//												  drawpix(&gcam.c,i+0,j-1,0xffffff); drawpix(&gcam.c,i+1,j-1,0xffffff);
-	//	drawpix(&gcam.c,i-1,j+0,0xffffff); drawpix(&gcam.c,i+0,j+0,0x000000); drawpix(&gcam.c,i+1,j+0,0x000000); drawpix(&gcam.c,i+2,j+0,0xffffff);
-	//	drawpix(&gcam.c,i-1,j+1,0xffffff); drawpix(&gcam.c,i+0,j+1,0x000000); drawpix(&gcam.c,i+1,j+1,0x000000); drawpix(&gcam.c,i+2,j+1,0xffffff);
-	//												  drawpix(&gcam.c,i+0,j+2,0xffffff); drawpix(&gcam.c,i+1,j+2,0xffffff);
-	}
-}
-
-static void gentex_xform(float *f);
-/*
-	Purpose: Renders visible geometry polygons to screen
-	Converts 3D polygon vertices to 2D screen coordinates
-	Handles texture mapping setup (UV coordinates, skybox mapping)
-	Stores polygons in eyepol[] array for later rendering
-	Manages different rendering modes (walls, skybox, parallax sky)
- */
-static void drawtagfunc (int rethead0, int rethead1)
-{
-	float f, g, *fptr;
+	cam_t orcam = b->orcam;
+	float f,fx,fy, g, *fptr;
 	int i, j, k, h, rethead[2];
 
 	if ((rethead0|rethead1) < 0) { mono_deloop(rethead1); mono_deloop(rethead0); return; }
 	rethead[0] = rethead0; rethead[1] = rethead1;
 
-#if 0
-	//Old code to draw polygon immediately:
-	for (i = 2 - 1; i >= 0; i--) {
-		k = rethead[i];
-		do {
-			print6x8(&gcam.c, mp[k].x - 3, mp[k].y - 5, 0xffffff, -1, "x");
-			k = mp[k].n;
-		} while (k != rethead[i]);
-	}
-	drawpol_aftclip(rethead0, rethead1); for (i = 2 - 1; i >= 0; i--) mono_deloop(rethead[i]); return;
-#endif
-
-	// Put on FIFO:
+	// Put on FIFO in world space:
 	for(h=0;h<2;h++)
 	{
 		i = rethead[h];
@@ -812,20 +613,20 @@ static void drawtagfunc (int rethead0, int rethead1)
 			if (eyepolvn >= eyepolvmal)
 			{
 				eyepolvmal = max(eyepolvmal<<1,16384);
-				eyepolv = (point2d *)realloc(eyepolv,eyepolvmal*sizeof(point2d));
+				eyepolv = (point3d *)realloc(eyepolv,eyepolvmal*sizeof(point3d));
 			}
+			f = orcam.h.z/(/*mp[i].x*b->xformmat[6]*/ + mp[i].y*b->xformmat[7] + b->gnadd.z);
+			fx        =  (mp[i].x*b->xformmat[0] + mp[i].y*b->xformmat[1] + b->gnadd.x)*f + orcam.h.x;
+			fy        =  (mp[i].x*b->xformmat[3] + mp[i].y*b->xformmat[4] + b->gnadd.y)*f + orcam.h.y;
 
-			// ORIGINAL CODE - REMOVE CLIPPING:
-			/*
-			f = gcam.h.z/(mp[i].x*xformmat[6] + mp[i].y*xformmat[7] + gnadd.z);
-			eyepolv[eyepolvn].x = (mp[i].x*xformmat[0] + mp[i].y*xformmat[1] + gnadd.x)*f + gcam.h.x;
-			eyepolv[eyepolvn].y = (mp[i].x*xformmat[3] + mp[i].y*xformmat[4] + gnadd.y)*f + gcam.h.y;
-			*/
-
-			// NEW CODE - No screen edge clamping:
-			f = gcam.h.z/(mp[i].x*xformmat[6] + mp[i].y*xformmat[7] + gnadd.z);
-			eyepolv[eyepolvn].x = (mp[i].x*xformmat[0] + mp[i].y*xformmat[1] + gnadd.x)*f + gcam.h.x;
-			eyepolv[eyepolvn].y = (mp[i].x*xformmat[3] + mp[i].y*xformmat[4] + gnadd.y)*f + gcam.h.y;
+#if (USEINTZ)
+			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*1048576.0*256.0);
+#else
+			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*orcam.h.z);
+#endif
+			eyepolv[eyepolvn].x = ((fx-orcam.h.x)*orcam.r.x + (fy-orcam.h.y)*orcam.d.x + (orcam.h.z)*orcam.f.x)*f + orcam.p.x;
+			eyepolv[eyepolvn].y = ((fx-orcam.h.x)*orcam.r.y + (fy-orcam.h.y)*orcam.d.y + (orcam.h.z)*orcam.f.y)*f + orcam.p.y;
+			eyepolv[eyepolvn].z = ((fx-orcam.h.x)*orcam.r.z + (fy-orcam.h.y)*orcam.d.z + (orcam.h.z)*orcam.f.z)*f + orcam.p.z;
 
 			eyepolvn++;
 
@@ -834,21 +635,20 @@ static void drawtagfunc (int rethead0, int rethead1)
 		mono_deloop(rethead[h]);
 	}
 
-
 	if (eyepoln+1 >= eyepolmal)
 	{
-		eyepolmal = max(eyepolmal<<1,4096); //den_01.map room of death uses ~ 3100 max
+		eyepolmal = max(eyepolmal<<1,4096);
 		eyepol = (eyepol_t *)realloc(eyepol,eyepolmal*sizeof(eyepol_t));
 		eyepol[0].vert0 = 0;
 	}
 
-	if (gflags < 2)
-		memcpy((void *)eyepol[eyepoln].ouvmat,(void *)gouvmat,sizeof(gouvmat[0])*9);
+	if (b->gflags < 2)
+		memcpy((void *)eyepol[eyepoln].ouvmat,(void *)b->gouvmat,sizeof(b->gouvmat[0])*9);
 	else
 	{
-		//f = (((float)gtpic->tt.x)+1.15f)/((float)gtpic->tt.x); fptr = eyepol[eyepoln].ouvmat;
+		// Skybox texture mapping (same as original)
 		f = (((float)64)+1.15f)/((float)64); fptr = eyepol[eyepoln].ouvmat;
-		switch(gflags)
+		switch(b->gflags)
 		{
 			case 14: fptr[0] = +f                 ; fptr[3] = f*+2.f; fptr[6] =     0.f; //Front
 						fptr[1] = -1.f               ; fptr[4] =    0.f; fptr[7] =     0.f;
@@ -879,33 +679,37 @@ static void drawtagfunc (int rethead0, int rethead1)
 		{
 			float ox, oy, oz;
 			ox = fptr[i+0]*65536.f; oy = fptr[i+1]*65536.f; oz = fptr[i+2]*65536.f;
-			fptr[i+0] = ox*gcam.r.x + oy*gcam.r.y + oz*gcam.r.z;
-			fptr[i+1] = ox*gcam.d.x + oy*gcam.d.y + oz*gcam.d.z;
-			fptr[i+2] = ox*gcam.f.x + oy*gcam.f.y + oz*gcam.f.z;
+			fptr[i+0] = ox*orcam.r.x + oy*orcam.r.y + oz*orcam.r.z;
+			fptr[i+1] = ox*orcam.d.x + oy*orcam.d.y + oz*orcam.d.z;
+			fptr[i+2] = ox*orcam.f.x + oy*orcam.f.y + oz*orcam.f.z;
 		}
-		gentex_xform(fptr);
+		gentex_xform(fptr,b);
 	}
 
 	eyepol[eyepoln].tpic = gtpic;
 	eyepol[eyepoln].curcol = gcurcol;
-	eyepol[eyepoln].flags = (gflags != 0);
-	eyepol[eyepoln].b2sect = gligsect;
-	eyepol[eyepoln].b2wall = gligwall;
-	eyepol[eyepoln].b2slab = gligslab;
-	memcpy((void *)&eyepol[eyepoln].norm,(void *)&gnorm,sizeof(gnorm));
+	eyepol[eyepoln].flags = (b->gflags != 0);
+	eyepol[eyepoln].b2sect = b->gligsect;
+	eyepol[eyepoln].b2wall = b->gligwall;
+	eyepol[eyepoln].b2slab = b->gligslab;
+	memcpy((void *)&eyepol[eyepoln].norm,(void *)&b->gnorm,sizeof(b->gnorm));
 	eyepoln++;
 	eyepol[eyepoln].vert0 = eyepolvn;
+	eyepol[eyepoln].rdepth = b->recursion_depth;
 }
+
 /*
 	Purpose: Renders skybox faces as background
 	Generates 6 cube faces for skybox rendering
 	Clips each face against view frustum
 	Projects cube vertices to screen space
 	Calls drawtagfunc for each visible skybox face
-	Uses special texture mapping flags (gflags = 10-15 for different cube faces)
+	Uses special texture mapping flags (b->gflags = 10-15 for different cube faces)
 */
-static void skytagfunc (int rethead0, int rethead1)
+
+static void skytagfunc (int rethead0, int rethead1, bunchgrp* b)
 {
+	cam_t gcam = b->cam;
 	#define SSCISDIST 0.000001 //Reduces probability of glitch further
 	dpoint3d otp[4], tp[8];
 	double f, ox, oy, oz;
@@ -928,8 +732,8 @@ static void skytagfunc (int rethead0, int rethead1)
 		for(i=0;i<4;i++)
 		{
 			ox = (float)cubeverts[p][i][0]; oy = (float)cubeverts[p][i][1];
-			otp[i].x = oy*xformmatc - ox*xformmats; otp[i].y = cubeverts[p][i][2];
-			otp[i].z = ox*xformmatc + oy*xformmats;
+			otp[i].x = oy*b->xformmatc - ox*b->xformmats; otp[i].y = cubeverts[p][i][2];
+			otp[i].z = ox*b->xformmatc + oy*b->xformmats;
 		}
 
 			//clip
@@ -960,8 +764,8 @@ static void skytagfunc (int rethead0, int rethead1)
 			//generate vmono
 		mono_genfromloop(&plothead[0],&plothead[1],tp,n);
 
-		gflags = p+10;
-		mono_bool(rethead0,rethead1,plothead[0],plothead[1],MONO_BOOL_AND,drawtagfunc);
+		b->gflags = p+10;
+		mono_bool(rethead0,rethead1,plothead[0],plothead[1],MONO_BOOL_AND,b, drawtagfunc_ws);
 		mono_deloop(plothead[1]); mono_deloop(plothead[0]);
 skiprest:;
 	}
@@ -984,15 +788,16 @@ static int ligpolmaxvert = 0;
 	Used during shadow map generation phase (mode 4)
 	Creates hash table for fast polygon lookup by sector/wall/slab
  */
-static void ligpoltagfunc (int rethead0, int rethead1)
+static void ligpoltagfunc (int rethead0, int rethead1, bunchgrp *b)
 {
+	cam_t gcam = b->cam;
 	float f, fx, fy, fz;
 	int i, j, rethead[2];
 
 	if ((rethead0|rethead1) < 0) { mono_deloop(rethead1); mono_deloop(rethead0); return; }
 
 		//Use this for dynamic lights only! (doesn't seem to help speed much)
-	//if ((shadowtest2_rendmode == 4) && (!(shadowtest2_sectgot[gligsect>>5]&(1<<gligsect)))) return;
+	//if ((shadowtest2_rendmode == 4) && (!(shadowtest2_sectgot[b->gligsect>>5]&(1<<b->gligsect)))) return;
 
 		//Put on FIFO:
 	rethead[0] = rethead0; rethead[1] = rethead1;
@@ -1009,14 +814,14 @@ static void ligpoltagfunc (int rethead0, int rethead1)
 				glp->ligpolv = (point3d *)realloc(glp->ligpolv,glp->ligpolvmal*sizeof(point3d));
 			}
 
-			f = gcam.h.z/(/*mp[i].x*xformmat[6]*/ + mp[i].y*xformmat[7] + gnadd.z);
-			fx        =  (mp[i].x*xformmat[0] + mp[i].y*xformmat[1] + gnadd.x)*f + gcam.h.x;
-			fy        =  (mp[i].x*xformmat[3] + mp[i].y*xformmat[4] + gnadd.y)*f + gcam.h.y;
+			f = gcam.h.z/(/*mp[i].x*b->xformmat[6]*/ + mp[i].y*b->xformmat[7] + b->gnadd.z);
+			fx        =  (mp[i].x*b->xformmat[0] + mp[i].y*b->xformmat[1] + b->gnadd.x)*f + gcam.h.x;
+			fy        =  (mp[i].x*b->xformmat[3] + mp[i].y*b->xformmat[4] + b->gnadd.y)*f + gcam.h.y;
 
 #if (USEINTZ)
-			f = 1.0/((gouvmat[0]*fx + gouvmat[3]*fy + gouvmat[6])*1048576.0*256.0);
+			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*1048576.0*256.0);
 #else
-			f = 1.0/((gouvmat[0]*fx + gouvmat[3]*fy + gouvmat[6])*gcam.h.z);
+			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*gcam.h.z);
 #endif
 			glp->ligpolv[glp->ligpolvn].x = ((fx-gcam.h.x)*gcam.r.x + (fy-gcam.h.y)*gcam.d.x + (gcam.h.z)*gcam.f.x)*f + gcam.p.x;
 			glp->ligpolv[glp->ligpolvn].y = ((fx-gcam.h.x)*gcam.r.y + (fy-gcam.h.y)*gcam.d.y + (gcam.h.z)*gcam.f.y)*f + gcam.p.y;
@@ -1034,17 +839,17 @@ static void ligpoltagfunc (int rethead0, int rethead1)
 		glp->ligpol = (ligpol_t *)realloc(glp->ligpol,glp->ligpolmal*sizeof(ligpol_t));
 		glp->ligpol[0].vert0 = 0;
 	}
-	glp->ligpol[glp->ligpoln].b2sect = gligsect;
-	glp->ligpol[glp->ligpoln].b2wall = gligwall;
-	glp->ligpol[glp->ligpoln].b2slab = gligslab;
-	i = lighash(gligsect,gligwall,gligslab);
+	glp->ligpol[glp->ligpoln].b2sect = b->gligsect;
+	glp->ligpol[glp->ligpoln].b2wall = b->gligwall;
+	glp->ligpol[glp->ligpoln].b2slab = b->gligslab;
+	i = lighash(b->gligsect,b->gligwall,b->gligslab);
 	glp->ligpol[glp->ligpoln].b2hashn = glp->lighashead[i]; glp->lighashead[i] = glp->ligpoln;
 	ligpolmaxvert = max(ligpolmaxvert,glp->ligpolvn-glp->ligpol[glp->ligpoln].vert0);
 	glp->ligpoln++;
 	glp->ligpol[glp->ligpoln].vert0 = glp->ligpolvn;
 }
 
-static int gnewtag, gdoscansector;
+
 /*
 	Purpose: Portal traversal and sector visibility
 	Manages sector-to-sector transitions through portals
@@ -1053,28 +858,34 @@ static int gnewtag, gdoscansector;
 	Maintains mph[] (mono polygon hierarchy) for spatial partitioning
 	"tag" refers to sector IDs
 */
-static void changetagfunc (int rethead0, int rethead1)
+static void changetagfunc (int rethead0, int rethead1, bunchgrp *b)
 {
 	if ((rethead0|rethead1) < 0) return;
-
-	if ((gdoscansector) && (!(sectgot[gnewtag>>5]&(1<<gnewtag)))) scansector(gnewtag);
+	int mapsect = b->gnewtagsect;
+	if ((b->gdoscansector)
+		&& (!(b->sectgot[mapsect>>5]&(1<<mapsect))))
+		scansector(mapsect,b);
 
 	mph_check(mphnum);
 	mph[mphnum].head[0] = rethead0;
 	mph[mphnum].head[1] = rethead1;
-	mph[mphnum].tag = gnewtag;
+	mph[mphnum].tag = b->gnewtag;
 	mphnum++;
 }
-
 	//flags&1: do and
 	//flags&2: do sub
 	//flags&4: reverse cut for sub
-static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, int flags)
+static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead0, int plothead1, int flags, bunchgrp* b)
 {
+	int mtag = tag1 + taginc*b->recursion_depth;
+	int tagsect = tag1;
+	int mnewtag = newtag1 == -1 ? -1 : newtag1 + taginc*b->recursion_depth;
+	b->gnewtagsect = newtagsect;
+	cam_t gcam = b->cam;
 	#define BSCISDIST 0.000001 //Reduces probability of glitch further
 	//#define BSCISDIST 0.0001 //Gaps undetectable
 	//#define BSCISDIST 0.1 //Huge gaps
-	void (*mono_output)(int h0, int h1);
+	void (*mono_output)(int h0, int h1, bunchgrp *b);
 	dpoint3d *otp, *tp;
 	double f, ox, oy, oz;
 	int i, j, k, l, h, on, n, plothead[2], imin, imax, i0, i1, omph0, omph1;
@@ -1082,45 +893,16 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 	if ((plothead0|plothead1) < 0) return;
 	plothead[0] = plothead0; plothead[1] = plothead1;
 
-#if 0
-	for(h=0;h<2;h++)
-	{
-		i = plothead[h]; j = 0;
-		do
-		{
-			float ox2, oy2, oz2;
-
-			if (h) i = mp[i].p;
-
-			ox = mp[i].x-gcam.p.x; oy = mp[i].y-gcam.p.y;
-			ox2 = oy*xformmatc - ox*xformmats; oy2 = mp[i].z-gcam.p.z;
-			oz2 = ox*xformmatc + oy*xformmats;
-
-			if (oz2 > BSCISDIST)
-			{
-				f = gcam.h.z/oz2;
-				ox2 = ox2*f + gcam.h.x;
-				oy2 = oy2*f + gcam.h.y;
-				print6x8((tiltyp *)&gdd,ox2-3,oy2-4,0xffffff,-1,"o");
-			}
-			j++;
-
-			if (!h) i = mp[i].n;
-		} while (i != plothead[h]);
-
-		print6x8((tiltyp *)&gdd,fixposx+h*8,fixposy,0xffffff,-1,"%d",j);
-	}
-	print6x8((tiltyp *)&gdd,fixposx+24,fixposy,0xffffff,-1,"%d->%d",tag,newtag);
-	fixposy += 8;
-#endif
-
-	n = 2; for(h=0;h<2;h++) for(i=mp[plothead[h]].n;i!=plothead[h];i=mp[i].n) n++;
-	otp = (dpoint3d *)_alloca(n*sizeof(dpoint3d));
-	tp = (dpoint3d *)_alloca(n*sizeof(dpoint3d)*2);
+	n = 2;
+	for (h = 0; h < 2; h++)
+		for (i = mp[plothead[h]].n; i != plothead[h]; i = mp[i].n)
+			n++;
+	otp = (dpoint3d *) _alloca(n * sizeof(dpoint3d));
+	tp = (dpoint3d *) _alloca(n * sizeof(dpoint3d) * 2);
 
 		//rotate, converting vmono to simple point3d loop
 	on = 0;
-	for(h=0;h<2;h++)
+	for(h=0;h<2;h++) // halfplane?
 	{
 		i = plothead[h];
 		do
@@ -1128,8 +910,9 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 			if (h) i = mp[i].p;
 
 			ox = mp[i].x-gcam.p.x; oy = mp[i].y-gcam.p.y;
-			otp[on].x = oy*xformmatc - ox*xformmats; otp[on].y = mp[i].z-gcam.p.z;
-			otp[on].z = ox*xformmatc + oy*xformmats; on++;
+			otp[on].x = oy*b->xformmatc - ox*b->xformmats;
+			otp[on].y = mp[i].z-gcam.p.z;
+			otp[on].z = ox*b->xformmatc + oy*b->xformmats; on++;
 
 			if (!h) i = mp[i].n;
 		} while (i != plothead[h]);
@@ -1157,70 +940,41 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 		f = gcam.h.z/tp[i].z;
 		tp[i].x = tp[i].x*f + gcam.h.x;
 		tp[i].y = tp[i].y*f + gcam.h.y;
-		//tp[i].z_linear = tp[i].z;  // Store linear depth BEFORE projection
 	}
 
 		//generate vmono
-	mono_genfromloop(&plothead[0],&plothead[1],tp,n);
-	if ((plothead[0]|plothead[1]) < 0) { mono_deloop(plothead[0]); mono_deloop(plothead[1]); return; }
-
-#ifdef STANDALONE
-	if ((gcnt <= 1) && (keystatus[0x38]))
-	{
-#if 1
-		drawpol_aftclip(plothead[0],plothead[1]);
-#endif
-#if 1
-		print6x8(&gcam.c,fixposx,fixposy,0xffffff,0,"%d -> %d",tag,newtag); fixposy += 8; if (fixposy >= gdd.y) { fixposy = 0; fixposx += 256; }
-		for(j=0;j<mphnum;j++)
-		{
-			if (mph[j].tag != tag) continue;
-			for(h=0;h<2;h++)
-			{
-				i = mph[j].head[h];
-				do
-				{
-					print6x8(&gcam.c,fixposx,fixposy,0xff8000,0,"   %6.2f %6.2f",mp[i].x,mp[i].y); fixposy += 8; if (fixposy >= gdd.y) { fixposy = 0; fixposx += 256; }
-					i = mp[i].n;
-				} while (i != mph[j].head[h]);
-				fixposy += 8;
-			}
-		}
-		for(h=0;h<2;h++)
-		{
-			//for(i=mp[plothead[h]].n;i!=plothead[h];i=mp[i].n) drawline2d(&gcam.c,mp[mp[i].p].x,mp[mp[i].p].y,mp[i].x,mp[i].y,0xffffff);
-			i = plothead[h];
-			do
-			{
-				if (keystatus[0x36]) if ((fabs(mp[i].x) < 1e-12) && (mp[i].y > 0)) mp[i].x = 0;
-				print6x8(&gcam.c,fixposx,fixposy,0xffffff,0,"   %6.2f %6.2f",mp[i].x,mp[i].y); fixposy += 8; if (fixposy >= gdd.y) { fixposy = 0; fixposx += 256; }
-				i = mp[i].n;
-			} while (i != plothead[h]);
-			fixposy += 8;
-		}
-#endif
-		for(i=2-1;i>=0;i--) mono_deloop(plothead[i]);
+	mono_genfromloop(&plothead[0], &plothead[1], tp, n);
+	if ((plothead[0] | plothead[1]) < 0) {
+		mono_deloop(plothead[0]);
+		mono_deloop(plothead[1]);
 		return;
 	}
-#endif
 
-	if (flags&1)
+	if (flags&1 || flags&8)
 	{
-		if (newtag >= 0)
+		if (mnewtag >= 0)
 		{
-			gnewtag = newtag; gdoscansector = 1; omph0 = mphnum;
-			for(i=mphnum-1;i>=0;i--) if (mph[i].tag == tag) mono_bool(mph[i].head[0],mph[i].head[1],plothead[0],plothead[1],MONO_BOOL_AND,changetagfunc); //follow portal
-
-#ifdef STANDALONE
-			if (!keystatus[0x1d])
-#endif
+			b->gnewtagsect = newtagsect;
+			b->gnewtag = mnewtag; omph0 = mphnum;
+			b->gdoscansector =  !(flags&8);
+			int bop = MONO_BOOL_AND;//(flags & CLIP_PORTAL_FLAG) ? MONO_BOOL_SUB_REV : MONO_BOOL_AND;
+			for (i = mphnum - 1; i >= 0; i--)
+				if (mph[i].tag == mtag)
+					mono_bool(
+						mph[i].head[0],
+						mph[i].head[1],
+						plothead[0],
+						plothead[1],
+						bop,
+						b,
+						changetagfunc);
 			{
 				for(l=omph0;l<mphnum;l++)
 				{
 					mph[omph0] = mph[l]; k = omph0; omph0++;
 					for(j=omph0-1;j>=0;j--) //Join monos
 					{
-						if (mph[j].tag != gnewtag) continue;
+						if (mph[j].tag != b->gnewtag) continue;
 						if (!mono_join(mph[j].head[0],mph[j].head[1],mph[k].head[0],mph[k].head[1],&i0,&i1)) continue;
 						for(i=2-1;i>=0;i--) { mono_deloop(mph[k].head[i]); mono_deloop(mph[j].head[i]); }
 						omph0--; mph[k] = mph[omph0];
@@ -1230,24 +984,29 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 				mphnum = omph0;
 			}
 		}
-		else
-		{
-				  if (shadowtest2_rendmode == 4) mono_output = ligpoltagfunc; //add to light list // this will process point lights. otherwize will only use plr light.
-			else if (gflags < 2)                mono_output =   drawtagfunc; //draw wall
-			else                                mono_output =    skytagfunc; //calls drawtagfunc inside
-			for(i=mphnum-1;i>=0;i--) if (mph[i].tag == tag) mono_bool(mph[i].head[0],mph[i].head[1],plothead[0],plothead[1],MONO_BOOL_AND,mono_output);
+		else { // newtag == -1
+			if (shadowtest2_rendmode == 4)
+				mono_output = ligpoltagfunc;
+				//add to light list // this will process point lights. otherwize will only use plr light.
+			else if (b->gflags < 2) mono_output = drawtagfunc_ws;
+			else mono_output = skytagfunc; //calls drawtagfunc inside
+			for (i = mphnum - 1; i >= 0; i--)
+				if (mph[i].tag == mtag)
+					mono_bool(mph[i].head[0], mph[i].head[1], plothead[0], plothead[1],MONO_BOOL_AND, b, mono_output);
 		}
 	}
 	if (flags&2)
 	{
 		if (!(flags&4)) j = MONO_BOOL_SUB;
-					  else j = MONO_BOOL_SUB_REV;
+					  else j = MONO_BOOL_SUB_REV; // when floor.
 
-		gnewtag = tag; gdoscansector = 0; omph0 = mphnum; omph1 = mphnum;
+		b->gnewtag = mtag;
+		b->gnewtagsect = tagsect;
+		b->gdoscansector = 0; omph0 = mphnum; omph1 = mphnum;
 		for(i=mphnum-1;i>=0;i--)
 		{
-			if (mph[i].tag != tag) continue;
-			mono_bool(mph[i].head[0],mph[i].head[1],plothead[0],plothead[1],j,changetagfunc);
+			if (mph[i].tag != mtag) continue;
+			mono_bool(mph[i].head[0],mph[i].head[1],plothead[0],plothead[1],j,b,changetagfunc);
 			mono_deloop(mph[i].head[1]);
 			mono_deloop(mph[i].head[0]);
 
@@ -1255,16 +1014,13 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 		}
 
 			//valid mph's stored in 2 blocks: (0<=?<omph0), (omph1<=?<mphnum)
-#ifdef STANDALONE
-		if (!keystatus[0x1d])
-		{
-#endif
+
 			for(l=omph1;l<mphnum;l++)
 			{
 				mph[omph0] = mph[l]; k = omph0; omph0++;
 				for(j=omph0-1;j>=0;j--) //Join monos
 				{
-					if (mph[j].tag != gnewtag) continue;
+					if (mph[j].tag != b->gnewtag) continue;
 					if (!mono_join(mph[j].head[0], mph[j].head[1], mph[k].head[0], mph[k].head[1], &i0, &i1)) continue;
 					for (i = 2 - 1; i >= 0; i--) {
 						mono_deloop(mph[k].head[i]);
@@ -1277,16 +1033,10 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 					k = j;
 				}
 			}
-#ifdef STANDALONE
-		}
-		else
-		{
-			for(l=omph1;l<mphnum;l++) { mph[omph0] = mph[l]; k = omph0; omph0++; }
-		}
-#endif
 		mphnum = omph0;
 
 	}
+
 	mono_deloop(plothead[1]);
 	mono_deloop(plothead[0]);
 }
@@ -1294,8 +1044,9 @@ static void drawpol_befclip (int tag, int newtag, int plothead0, int plothead1, 
 
 
 	//FIXFIXFIX: clean this up!
-static void gentex_xform (float *ouvmat)
+static void gentex_xform (float *ouvmat, bunchgrp *b)
 {
+	cam_t gcam = b->cam;
 	float ax, ay, az, bx, by, bz, cx, cy, cz, p0x, p0y, p0z, p1x, p1y, p1z, p2x, p2y, p2z, f;
 
 	ax = ouvmat[3]; bx = ouvmat[6]; cx = ouvmat[0];
@@ -1327,25 +1078,27 @@ static void gentex_xform (float *ouvmat)
 	}
 }
 
-static void gentex_sky (surf_t *sur)
+static void gentex_sky (surf_t *sur, bunchgrp *b)
 {
+	cam_t gcam = b->cam;
 	float f, g, h;
 	int i;
 
-	if (gflags >= 2) return; //if texture is skybox, return early
+	if (b->gflags >= 2) return; //if texture is skybox, return early
 
 		//Crappy paper sky :/
 	h = 65536;
 	f = atan2(gcam.f.y,gcam.f.x)         *-h/PI*2.f;
 	g = asin(min(max(gcam.f.z,-1.f),1.f))*-h/PI*2.f;
-	gouvmat[0] = sur->uv[0].x*h + f; gouvmat[3] = sur->uv[1].x*h; gouvmat[6] = sur->uv[2].x*h;
-	gouvmat[1] = sur->uv[0].y*h + g; gouvmat[4] = sur->uv[1].y*h; gouvmat[7] = sur->uv[2].y*h;
-	gouvmat[2] =              h    ; gouvmat[5] =            0.f; gouvmat[8] =            0.f;
-	gentex_xform(gouvmat);
+	b->gouvmat[0] = sur->uv[0].x*h + f; b->gouvmat[3] = sur->uv[1].x*h; b->gouvmat[6] = sur->uv[2].x*h;
+	b->gouvmat[1] = sur->uv[0].y*h + g; b->gouvmat[4] = sur->uv[1].y*h; b->gouvmat[7] = sur->uv[2].y*h;
+	b->gouvmat[2] =              h    ; b->gouvmat[5] =            0.f; b->gouvmat[8] =            0.f;
+	gentex_xform(b->gouvmat,b);
 }
 
-static void gentex_ceilflor (sect_t *sec, wall_t *wal, surf_t *sur, int isflor)
+static void gentex_ceilflor (sect_t *sec, wall_t *wal, surf_t *sur, int isflor, bunchgrp *b)
 {
+	cam_t gcam = b->cam;
 	float f, g, fz, ax, ay, wx, wy, ox, oy, oz, fk[6];
 	int i;
 
@@ -1377,21 +1130,22 @@ static void gentex_ceilflor (sect_t *sec, wall_t *wal, surf_t *sur, int isflor)
 		oy = (fk[0]*fk[5] - fk[1]*fk[4])*f;
 		oz = getslopez(sec,isflor,ox,oy);
 		ox -= gcam.p.x; oy -= gcam.p.y; oz -= gcam.p.z;
-		gouvmat[i+0] = ox*gcam.r.x + oy*gcam.r.y + oz*gcam.r.z;
-		gouvmat[i+1] = ox*gcam.d.x + oy*gcam.d.y + oz*gcam.d.z;
-		gouvmat[i+2] = ox*gcam.f.x + oy*gcam.f.y + oz*gcam.f.z;
+		b->gouvmat[i+0] = ox*gcam.r.x + oy*gcam.r.y + oz*gcam.r.z;
+		b->gouvmat[i+1] = ox*gcam.d.x + oy*gcam.d.y + oz*gcam.d.z;
+		b->gouvmat[i+2] = ox*gcam.f.x + oy*gcam.f.y + oz*gcam.f.z;
 	}
 
-	for(i=9-1;i>=0;i--) gouvmat[i] *= 256.f;
+	for(i=9-1;i>=0;i--) b->gouvmat[i] *= 256.f;
 
-	gouvmat[3] -= gouvmat[0]; gouvmat[4] -= gouvmat[1]; gouvmat[5] -= gouvmat[2];
-	gouvmat[6] -= gouvmat[0]; gouvmat[7] -= gouvmat[1]; gouvmat[8] -= gouvmat[2];
+	b->gouvmat[3] -= b->gouvmat[0]; b->gouvmat[4] -= b->gouvmat[1]; b->gouvmat[5] -= b->gouvmat[2];
+	b->gouvmat[6] -= b->gouvmat[0]; b->gouvmat[7] -= b->gouvmat[1]; b->gouvmat[8] -= b->gouvmat[2];
 
-	gentex_xform(gouvmat);
+	gentex_xform(b->gouvmat, b);
 }
 
-static void gentex_wall (kgln_t *npol2, surf_t *sur)
+static void gentex_wall (kgln_t *npol2, surf_t *sur, bunchgrp *b)
 {
+	cam_t gcam = b->cam;
 	float f, g, ox, oy, oz, rdet, fk[24];
 	int i;
 
@@ -1405,10 +1159,10 @@ static void gentex_wall (kgln_t *npol2, surf_t *sur)
 
 		//sx = npol2[i].x*gcam.h.z/npol2[i].z+gcam.h.x
 		//sy = npol2[i].y*gcam.h.z/npol2[i].z+gcam.h.y
-		//npol2[i].u = (gouvmat[1]*sx + gouvmat[4]*sy + gouvmat[7])/(gouvmat[0]*sx + gouvmat[3]*sy + gouvmat[6])
-		//npol2[i].v = (gouvmat[2]*sx + gouvmat[5]*sy + gouvmat[8])/(gouvmat[0]*sx + gouvmat[3]*sy + gouvmat[6])
-		//npol2[i].z =                                            1/(gouvmat[0]*sx + gouvmat[3]*sy + gouvmat[6])
-		//   Solve ^ for gouvmat[*]
+		//npol2[i].u = (b->gouvmat[1]*sx + b->gouvmat[4]*sy + b->gouvmat[7])/(b->gouvmat[0]*sx + b->gouvmat[3]*sy + b->gouvmat[6])
+		//npol2[i].v = (b->gouvmat[2]*sx + b->gouvmat[5]*sy + b->gouvmat[8])/(b->gouvmat[0]*sx + b->gouvmat[3]*sy + b->gouvmat[6])
+		//npol2[i].z =                                            1/(b->gouvmat[0]*sx + b->gouvmat[3]*sy + b->gouvmat[6])
+		//   Solve ^ for b->gouvmat[*]
 	fk[0] = npol2[0].z; fk[3] = npol2[0].x*gcam.h.z + npol2[0].z*gcam.h.x; fk[6] = npol2[0].y*gcam.h.z + npol2[0].z*gcam.h.y;
 	fk[1] = npol2[1].z; fk[4] = npol2[1].x*gcam.h.z + npol2[1].z*gcam.h.x; fk[7] = npol2[1].y*gcam.h.z + npol2[1].z*gcam.h.y;
 	fk[2] = npol2[2].z; fk[5] = npol2[2].x*gcam.h.z + npol2[2].z*gcam.h.x; fk[8] = npol2[2].y*gcam.h.z + npol2[2].z*gcam.h.y;
@@ -1421,27 +1175,27 @@ static void gentex_wall (kgln_t *npol2, surf_t *sur)
 	fk[21] = fk[1]*fk[5] - fk[2]*fk[4];
 	fk[22] = fk[2]*fk[3] - fk[0]*fk[5];
 	fk[23] = fk[0]*fk[4] - fk[1]*fk[3];
-	gouvmat[6] = fk[12] + fk[13] + fk[14];
-	gouvmat[0] = fk[18] + fk[19] + fk[20];
-	gouvmat[3] = fk[21] + fk[22] + fk[23];
+	b->gouvmat[6] = fk[12] + fk[13] + fk[14];
+	b->gouvmat[0] = fk[18] + fk[19] + fk[20];
+	b->gouvmat[3] = fk[21] + fk[22] + fk[23];
 
-	fk[15] = gouvmat[6]*fk[0] + gouvmat[0]*fk[3] + gouvmat[3]*fk[6];
-	fk[16] = gouvmat[6]*fk[1] + gouvmat[0]*fk[4] + gouvmat[3]*fk[7];
-	fk[17] = gouvmat[6]*fk[2] + gouvmat[0]*fk[5] + gouvmat[3]*fk[8];
+	fk[15] = b->gouvmat[6]*fk[0] + b->gouvmat[0]*fk[3] + b->gouvmat[3]*fk[6];
+	fk[16] = b->gouvmat[6]*fk[1] + b->gouvmat[0]*fk[4] + b->gouvmat[3]*fk[7];
+	fk[17] = b->gouvmat[6]*fk[2] + b->gouvmat[0]*fk[5] + b->gouvmat[3]*fk[8];
 
 	fk[ 9] = fk[15]*npol2[0].u;
 	fk[10] = fk[16]*npol2[1].u;
 	fk[11] = fk[17]*npol2[2].u;
-	gouvmat[7] = fk[12]*fk[9] + fk[13]*fk[10] + fk[14]*fk[11];
-	gouvmat[1] = fk[18]*fk[9] + fk[19]*fk[10] + fk[20]*fk[11];
-	gouvmat[4] = fk[21]*fk[9] + fk[22]*fk[10] + fk[23]*fk[11];
+	b->gouvmat[7] = fk[12]*fk[9] + fk[13]*fk[10] + fk[14]*fk[11];
+	b->gouvmat[1] = fk[18]*fk[9] + fk[19]*fk[10] + fk[20]*fk[11];
+	b->gouvmat[4] = fk[21]*fk[9] + fk[22]*fk[10] + fk[23]*fk[11];
 
 	fk[ 9] = fk[15]*npol2[0].v;
 	fk[10] = fk[16]*npol2[1].v;
 	fk[11] = fk[17]*npol2[2].v;
-	gouvmat[8] = fk[12]*fk[9] + fk[13]*fk[10] + fk[14]*fk[11];
-	gouvmat[2] = fk[18]*fk[9] + fk[19]*fk[10] + fk[20]*fk[11];
-	gouvmat[5] = fk[21]*fk[9] + fk[22]*fk[10] + fk[23]*fk[11];
+	b->gouvmat[8] = fk[12]*fk[9] + fk[13]*fk[10] + fk[14]*fk[11];
+	b->gouvmat[2] = fk[18]*fk[9] + fk[19]*fk[10] + fk[20]*fk[11];
+	b->gouvmat[5] = fk[21]*fk[9] + fk[22]*fk[10] + fk[23]*fk[11];
 
 	rdet = 1.0/(fk[0]*fk[12] + fk[1]*fk[13] + fk[2]*fk[14]);
 
@@ -1450,17 +1204,18 @@ static void gentex_wall (kgln_t *npol2, surf_t *sur)
 #else
 	g = rdet;
 #endif
-													 gouvmat[0] *= g; gouvmat[3] *= g; gouvmat[6] *= g; g *= rdet*65536.0;
-	f = (float)64*g;            gouvmat[1] *= f; gouvmat[4] *= f; gouvmat[7] *= f;
-	f = (float)64*g;            gouvmat[2] *= f; gouvmat[5] *= f; gouvmat[8] *= f;
+													 b->gouvmat[0] *= g; b->gouvmat[3] *= g; b->gouvmat[6] *= g; g *= rdet*65536.0;
+	f = (float)64*g;            b->gouvmat[1] *= f; b->gouvmat[4] *= f; b->gouvmat[7] *= f;
+	f = (float)64*g;            b->gouvmat[2] *= f; b->gouvmat[5] *= f; b->gouvmat[8] *= f;
 
 	if (renderinterp)
 	{
-		gouvmat[1] -= gouvmat[0]*32768.0; gouvmat[2] -= gouvmat[0]*32768.0;
-		gouvmat[4] -= gouvmat[3]*32768.0; gouvmat[5] -= gouvmat[3]*32768.0;
-		gouvmat[7] -= gouvmat[6]*32768.0; gouvmat[8] -= gouvmat[6]*32768.0;
+		b->gouvmat[1] -= b->gouvmat[0]*32768.0; b->gouvmat[2] -= b->gouvmat[0]*32768.0;
+		b->gouvmat[4] -= b->gouvmat[3]*32768.0; b->gouvmat[5] -= b->gouvmat[3]*32768.0;
+		b->gouvmat[7] -= b->gouvmat[6]*32768.0; b->gouvmat[8] -= b->gouvmat[6]*32768.0;
 	}
 }
+
 /*
 the mono engine produces camera-space polygons that are clipped to not overlap.
 The plothead[0] and plothead[1] contain monotone polygon pairs representing
@@ -1468,8 +1223,9 @@ the final visible geometry ready for 2D projection.
 The b parameter is a bunch index - this function processes one "bunch" (visible sector group) at a time. The traversal logic is in the caller that:
 */
 
-static void drawalls (int b, mapstate_t* map)
+static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 {
+	cam_t gcam = b->cam;
 	// === VARIABLE DECLARATIONS ===
 	//extern void loadpic (tile_t *);
 	#define MAXVERTS 256 //FIX:timebomb: assumes there are never > 256 sectors connected at same vertex
@@ -1487,28 +1243,27 @@ static void drawalls (int b, mapstate_t* map)
 	int i, j, k, l, m, n, s, ns, isflor, plothead[2], wn, w, ww, nw, vn, ws, wi, we, kval[4], imin, imax;
 	int ks[2], ke[2], col, n0, n1;
 
-    // === SETUP SECTOR AND WALL DATA ===
-	s = bunch[b].sec;
-	sec = gst->sect;
-
+	// === SETUP SECTOR AND WALL DATA ===
+	s = b->bunch[bid].sec;
+	sec = curMap->sect;
 	wal = sec[s].wall;
 #if 0
-	i = bunch[b].wal0;
+	i = bunch[bid].wal0;
 	x0 = wal[i].x; y0 = wal[i].y; i += wal[i].n;
-	x1 = wal[i].x; y1 = wal[i].y; f = bunch[b].fra0;
+	x1 = wal[i].x; y1 = wal[i].y; f = bunch[bid].fra0;
 	twalx0 = (x1-x0)*f + x0;
 	twaly0 = (y1-y0)*f + y0;
 
-	i = bunch[b].wal1;
+	i = b->bunch[bid].wal1;
 	x0 = wal[i].x; y0 = wal[i].y; i += wal[i].n;
-	x1 = wal[i].x; y1 = wal[i].y; f = bunch[b].fra1;
+	x1 = wal[i].x; y1 = wal[i].y; f = bunch[bid].fra1;
 	twalx1 = (x1-x0)*f + x0;
 	twaly1 = (y1-y0)*f + y0;
 #endif
 
-	twal = (bunchverts_t *)_alloca((gst->sect[bunch[b].sec].n+1)*sizeof(bunchverts_t));
-	twaln = prepbunch(b,twal);
-	gligsect = s; gligslab = 0;
+	twal = (bunchverts_t *)_alloca((curMap->sect[b->bunch[bid].sec].n+1)*sizeof(bunchverts_t));
+	twaln = prepbunch(bid,twal,b);
+	b->gligsect = s; b->gligslab = 0;
 
 	// === BUNCH MANAGEMENT: DELETE CURRENT BUNCH FROM GRID ===
 	// Removes processed bunch and compacts the bunch grid structure
@@ -1520,16 +1275,23 @@ static void drawalls (int b, mapstate_t* map)
 	//3  3:x x .
 	//4  6:x x . x
 	//5 10:x x . x x
-	bunchn--; bunch[b] = bunch[bunchn];
-	j = (((bunchn-1)*bunchn)>>1);
-	memcpy(&bunchgrid[((b-1)*b)>>1],&bunchgrid[j],b*sizeof(bunchgrid[0]));
-	for(i=b+1;i<bunchn;i++) bunchgrid[(((i-1)*i)>>1)+b] = ((bunchgrid[j+i]&1)<<1) + (bunchgrid[j+i]>>1);
-
+	b->bunchn--; b->bunch[bid] = b->bunch[b->bunchn];
+	j = (((b->bunchn-1)*b->bunchn)>>1);
+	memcpy(&b->bunchgrid[((bid-1)*bid)>>1],&b->bunchgrid[j],bid*sizeof(b->bunchgrid[0]));
+	for(i=bid+1;i<b->bunchn;i++) b->bunchgrid[(((i-1)*i)>>1)+bid] = ((b->bunchgrid[j+i]&1)<<1) + (b->bunchgrid[j+i]>>1);
+	if (b->has_portal_clip)
+		int a =0;
 	// === DRAW CEILINGS & FLOORS ===
-	for(isflor=0;isflor<2;isflor++)
+	for(isflor=0;isflor<2;isflor++) // floor ceil
 	{
-		// Back-face culling: skip if camera is on wrong side of surface
-		if ((gcam.p.z >= getslopez(&sec[s],isflor,gcam.p.x,gcam.p.y)) == isflor) continue;
+		// here, when we draw sector of the exit portal we get glitches when it would draw a triangle with point below the camera resulting in triangle spanning entire vertical of the screen
+
+		     // Back-face culling: skip if camera is on wrong side of surface
+			// need to get original slope, as if camera was in origin.
+	//if (!b->has_portal_clip)
+		float surfpos = getslopez(&sec[s],isflor,b->cam.p.x,b->cam.p.y);
+		if ((b->cam.p.z >= surfpos) == isflor) // ignore backfaces
+				continue;
 
 		// Setup surface properties (height, gradient, color)
 		fz = sec[s].z[isflor]; grad = &sec[s].grad[isflor];
@@ -1540,10 +1302,10 @@ static void drawalls (int b, mapstate_t* map)
 		gcurcol = argb_interp(gcurcol,(gcurcol&0xff000000)+((gcurcol&0xfcfcfc)>>2),(int)(compact2d*24576.0));
 
 		// Calculate surface normal vector
-		gnorm.x = grad->x;
-		gnorm.y = grad->y;
-		gnorm.z = 1.f; if (isflor) { gnorm.x = -gnorm.x; gnorm.y = -gnorm.y; gnorm.z = -gnorm.z; }
-		f = 1.0/sqrt(gnorm.x*gnorm.x + gnorm.y*gnorm.y + 1); gnorm.x *= f; gnorm.y *= f; gnorm.z *= f;
+		b->gnorm.x = grad->x;
+		b->gnorm.y = grad->y;
+		b->gnorm.z = 1.f; if (isflor) { b->gnorm.x = -b->gnorm.x; b->gnorm.y = -b->gnorm.y; b->gnorm.z = -b->gnorm.z; }
+		f = 1.0/sqrt(b->gnorm.x*b->gnorm.x + b->gnorm.y*b->gnorm.y + 1); b->gnorm.x *= f; b->gnorm.y *= f; b->gnorm.z *= f;
 
 			//plane point: (wal[0].x,wal[0].y,fz)
 			//plane norm: <grad->x,grad->y,1>
@@ -1553,29 +1315,47 @@ static void drawalls (int b, mapstate_t* map)
 			//   (?       -      fz)*      1 = 0
 		// Build polygon for ceiling/floor using plane equation:
 		plothead[0] = -1; plothead[1] = -1;
-		for(ww=twaln;ww>=0;ww-=twaln) plothead[isflor] = mono_ins(plothead[isflor],twal[ww].x,twal[ww].y,gnorm.z*-1e32); //do not replace w/single zenith point - ruins precision
-		i = isflor^1;
-		for(ww=0;ww<=twaln;ww++) plothead[i] = mono_ins(plothead[i],twal[ww].x,twal[ww].y,(wal[0].x-twal[ww].x)*grad->x + (wal[0].y-twal[ww].y)*grad->y + fz);
+		for (ww = twaln; ww >= 0; ww -= twaln) plothead[isflor] = mono_ins(
+			                                       plothead[isflor], twal[ww].x, twal[ww].y,
+			                                       b->gnorm.z * -1e32);
+		//do not replace w/single zenith point - ruins precision
+		i = isflor ^ 1;
+		for (ww = 0; ww <= twaln; ww++) plothead[i] = mono_ins(plothead[i], twal[ww].x, twal[ww].y,
+		                                                       (wal[0].x - twal[ww].x) * grad->x + (
+			                                                       wal[0].y - twal[ww].y) * grad->y + fz);
 		plothead[i] = mp[plothead[i]].n;
 
 		// Setup texture and rendering flags
 		sur = &sec[s].surf[isflor];
 		gtpic = &gtile[sur->tilnum];
 		//if (!gtpic->tt.f) loadpic(gtpic);
-		if (sec[s].surf[isflor].flags & (1 << 17)) { gflags = 2; } //skybox ceil/flor
+		if (sec[s].surf[isflor].flags & (1 << 17)) { b->gflags = 2; } //skybox ceil/flor
 		else if (sec[s].surf[isflor].flags & (1 << 16)) {  //parallaxing ceil/flor
-			gflags = 1;
-			gentex_sky(sur);
+			b->gflags = 1;
+			gentex_sky(sur, b);
 		}
 		else {
-			gflags = 0;
-			gentex_ceilflor(&sec[s], wal, sur, isflor);
+			b->gflags = 0;
+			gentex_ceilflor(&sec[s], wal, sur, isflor, b);
 		}
-		gligwall = isflor - 2;
-		drawpol_befclip(s,-1,plothead[0],plothead[1],(isflor<<2)+3);
-#ifdef STANDALONE
-		gcnt--; if (gcnt <= 0) return;
-#endif
+		b->gligwall = isflor - 2;
+
+		int myport = sec[s].tags[1];
+		if (myport>=0)
+			int asd=1;
+		bool skipport= (b->has_portal_clip && s==b->testignoresec && isflor == b->testignorewall);
+		bool needsfinal = b->recursion_depth == MAX_PORTAL_DEPTH;
+		bool isportal = myport>=0 && portals[myport].destpn >=0 && portals[myport].surfid == isflor;
+		if (isportal && !needsfinal && !skipport) {
+			int endpn = portals[myport].destpn;
+			drawpol_befclip(s, portals[endpn].sect+taginc, portals[endpn].sect,
+				plothead[0],plothead[1],  3, b);
+			draw_hsr_enter_portal(map, myport, b,plothead[0],plothead[1]);
+		}
+
+		else {
+			drawpol_befclip(s,-1,-1,plothead[0],plothead[1],(isflor<<2)+3,b);
+		}
 	}
 
 	// === DRAW WALLS ===
@@ -1592,10 +1372,10 @@ static void drawalls (int b, mapstate_t* map)
 					 (min(sur->rsc>>5,255)<<16) +
 					 (min(sur->gsc>>5,255)<< 8) +
 					 (min(sur->bsc>>5,255)    );
-		gnorm.x = wal[w].y-wal[nw].y;
-		gnorm.y = wal[nw].x-wal[w].x;
-		gnorm.z = 0;
-		f = 1.0/sqrt(gnorm.x*gnorm.x + gnorm.y*gnorm.y); gnorm.x *= f; gnorm.y *= f;
+		b->gnorm.x = wal[w].y-wal[nw].y;
+		b->gnorm.y = wal[nw].x-wal[w].x;
+		b->gnorm.z = 0;
+		f = 1.0/sqrt(b->gnorm.x*b->gnorm.x + b->gnorm.y*b->gnorm.y); b->gnorm.x *= f; b->gnorm.y *= f;
 		// Setup base wall quad (floor to ceiling)
 		pol[0].x = twal[ww  ].x; pol[0].y = twal[ww  ].y; pol[0].z = getslopez(&sec[s],0,pol[0].x,pol[0].y); //pol[0].n = 1;
 		pol[1].x = twal[ww+1].x; pol[1].y = twal[ww+1].y; pol[1].z = getslopez(&sec[s],0,pol[1].x,pol[1].y); //pol[1].n = 1;
@@ -1628,42 +1408,68 @@ static void drawalls (int b, mapstate_t* map)
 			//if (!intersect_traps_mono(pol[0].x,pol[0].y, pol[1].x,pol[1].y, pol[0].z,pol[1].z,pol[2].z,pol[3].z, opolz[0],opolz[1],opolz[2],opolz[3], &plothead[0],&plothead[1])) continue;
 			// Calculate intersection of wall segment with clipping trapezoids
 			f = 1e-7; //FIXFIXFIXFIX:use ^ ?
-			if (!intersect_traps_mono(pol[0].x,pol[0].y, pol[1].x,pol[1].y, pol[0].z-f,pol[1].z-f,pol[2].z+f,pol[3].z+f, opolz[0]-f,opolz[1]-f,opolz[2]+f,opolz[3]+f, &plothead[0],&plothead[1])) continue;
+			if (!intersect_traps_mono(pol[0].x,pol[0].y, pol[1].x,pol[1].y, pol[0].z-f,pol[1].z-f,pol[2].z+f,pol[3].z+f, opolz[0]-f,opolz[1]-f,opolz[2]+f,opolz[3]+f, &plothead[0],&plothead[1]))
+				continue;
 
 			// Render wall segment if visible
-			if ((!(m&1)) || (wal[w].surf.flags&(1<<5))) //Draw wall here //(1<<5): 1-way
+
+			if ((!(m & 1)) || (wal[w].surf.flags & (1 << 5))) //Draw wall here //(1<<5): 1-way
 			{
-			//	gtpic = &gtile[sur->tilnum]; if (!gtpic->tt.f) loadpic(gtpic);
-					  if (sur->flags&(1<<17)) { gflags = 2;                  } //skybox ceil/flor
-				else if (sur->flags&(1<<16)) { gflags = 1; gentex_sky(sur); } //parallaxing ceil/flor
-				else
-				{
+				//	gtpic = &gtile[sur->tilnum]; if (!gtpic->tt.f) loadpic(gtpic);
+				if (sur->flags & (1 << 17))
+				{ b->gflags = 2; } //skybox ceil/flor
+				else if (sur->flags & (1 << 16)) {
+					b->gflags = 1;
+					gentex_sky(sur, b);
+				} //parallaxing ceil/flor
+				else {
 					// Calculate UV mapping for wall texture
-					npol2[0].x = wal[ w].x; npol2[0].y = wal[ w].y; npol2[0].z = getslopez(&sec[s],0,wal[w].x,wal[w].y);
-					npol2[1].x = wal[nw].x; npol2[1].y = wal[nw].y; npol2[1].z = npol2[0].z;
-					npol2[2].x = wal[ w].x; npol2[2].y = wal[ w].y; npol2[2].z = npol2[0].z + 1.f;
+					npol2[0].x = wal[w].x;
+					npol2[0].y = wal[w].y;
+					npol2[0].z = getslopez(&sec[s], 0, wal[w].x, wal[w].y);
+					npol2[1].x = wal[nw].x;
+					npol2[1].y = wal[nw].y;
+					npol2[1].z = npol2[0].z;
+					npol2[2].x = wal[w].x;
+					npol2[2].y = wal[w].y;
+					npol2[2].z = npol2[0].z + 1.f;
 					// Determine reference Z-level texture alignment
-						  if (!(sur->flags&4)) f = sec[                s].z[0];
-					else if (!vn)             f = sec[                s].z[1]; //White walls don't have verts[]!
-					else if (!m)              f = sec[verts[       0].s].z[0];
-					else                      f = sec[verts[(m-1)>>1].s].z[0];
+					if (!(sur->flags & 4)) f = sec[s].z[0];
+					else if (!vn) f = sec[s].z[1]; //White walls don't have verts[]!
+					else if (!m) f = sec[verts[0].s].z[0];
+					else f = sec[verts[(m - 1) >> 1].s].z[0];
 					// Apply UV coordinates with proper scaling
-					npol2[0].u = sur->uv[0].x;                 npol2[0].v = sur->uv[2].y*(npol2[0].z-f) + sur->uv[0].y;
-					npol2[1].u = sur->uv[1].x*dx + npol2[0].u; npol2[1].v = sur->uv[1].y*dx             + npol2[0].v;
-					npol2[2].u = sur->uv[2].x    + npol2[0].u; npol2[2].v = sur->uv[2].y                + npol2[0].v;
-					gflags = 0; gentex_wall(npol2,sur);
+					npol2[0].u = sur->uv[0].x;
+					npol2[0].v = sur->uv[2].y * (npol2[0].z - f) + sur->uv[0].y;
+					npol2[1].u = sur->uv[1].x * dx + npol2[0].u;
+					npol2[1].v = sur->uv[1].y * dx + npol2[0].v;
+					npol2[2].u = sur->uv[2].x + npol2[0].u;
+					npol2[2].v = sur->uv[2].y + npol2[0].v;
+					b->gflags = 0;
+					gentex_wall(npol2, sur, b);
 				}
-				gligwall = w; gligslab = m; ns = -1;
+				b->gligwall = w;
+				b->gligslab = m;
+				ns = -1;
 				/* notes:
-				 *	gligsect = s;        // Current sector
-					gligwall = w;        // Wall index
-					gligslab = m;        // Segment/slab number (0,1,2... for each vertical division)*/
-
-			} else ns = verts[m>>1].s; // Portal to adjacent sector
-
+				 *	b->gligsect = s;        // Current sector
+					b->gligwall = w;        // Wall index
+					b->gligslab = m;        // Segment/slab number (0,1,2... for each vertical division)*/
+			} else {
+				ns = verts[m >> 1].s; // Portal to adjacent sector
+			}
 			// Render the wall polygon
-			drawpol_befclip(s,ns,plothead[0],plothead[1],((m>vn)<<2)+3);
+			int myport = wal[w].tags[1];
+			if (myport >= 0 && portals[myport].destpn >=0 && portals[myport].kind == PORT_WALL) {
+					int endp = portals[myport].destpn;
+				drawpol_befclip(s, portals[endp].sect+taginc, portals[endp].sect, plothead[0], plothead[1],  3, b);
+				draw_hsr_enter_portal(map, myport, b,plothead[0],plothead[1]);
+			} else {
+				// could be 7 or 3, .111 or .011
+				drawpol_befclip(s, ns, ns, plothead[0], plothead[1], ((m > vn) << 2) + 3, b);
+			}
 		}
+
 	}
 }
 /*
@@ -1679,9 +1485,39 @@ static void drawalls (int b, mapstate_t* map)
 	Generates shadow polygon lists (ligpol[]) for each light
 	Creates visibility data for shadow casting
 */
+void reset_context() {
+	eyepoln = 0; eyepolvn = 0;
+}
+void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
+	bunchgrp bs;
+	bs.cam = *cc;
+	bs.orcam = *cc;
+	bs.recursion_depth = 0;
+	bs.has_portal_clip = false;
+	draw_hsr_polymost_ctx(map,&bs);
+}
 
-void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, player_transform *lps, int cursect)
-{
+void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
+	if (!newctx) {
+		return;
+	}
+	int prehead1 = -1;
+	int prehead2 = -1;
+	int presect = -1;
+
+	int recursiveDepth = newctx->recursion_depth;
+	bunchgrp *b;
+	b = newctx;
+	b->sectgotn = 0;
+	b->sectgot = 0;
+	b->sectgotmal = 0;
+	b->bunchgot=0;
+	b->bunchn=0;
+	b->bunchmal=0;
+	b->bunchgrid =0;
+	cam_t gcam = b->cam;
+	cam_t oricam = b->orcam;
+
 	wall_t *wal;
 	spri_t *spr;
 	dpoint3d dpos, drig, ddow, dfor;
@@ -1695,31 +1531,32 @@ void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, player_transform *lps, int c
 		glp = &shadowtest2_light[glignum];
 	//	if ((!(glp->flags&1)) || (!shadowtest2_useshadows)) return;
 	}
-	gcam = (*cc); gst = lgs; gps = lps;
 
-	if ((lgs->numsects <= 0) || ((unsigned)cursect >= (unsigned)lgs->numsects))
+	curMap = lgs;
+
+	//if ((lgs->numsects <= 0) || ((unsigned)gcam.cursect >= (unsigned)lgs->numsects))
+	//{
+	////if (shadowtest2_rendmode != 4)
+	////{
+	////	for(i=0,j=gcam.c.f;i<gcam.c.y;i++,j+=gcam.c.p) memset8((void *)j,0x00000000,gcam.c.x<<2);
+	////	for(i=0,j=gcam.z.f;i<gcam.z.y;i++,j+=gcam.z.p) memset8((void *)j,0x7f7f7f7f,gcam.z.x<<2);
+	////}
+	////if (shadowtest2_rendmode != 4) eyepoln = 0; //Prevents drawpollig() from crashing
+	////	return;
+	//}
+	if (!b->bunchmal)
 	{
-		if (shadowtest2_rendmode != 4)
-		{
-			for(i=0,j=gcam.c.f;i<gcam.c.y;i++,j+=gcam.c.p) memset8((void *)j,0x00000000,gcam.c.x<<2);
-			for(i=0,j=gcam.z.f;i<gcam.z.y;i++,j+=gcam.z.p) memset8((void *)j,0x7f7f7f7f,gcam.z.x<<2);
-		}
-		if (shadowtest2_rendmode != 4) eyepoln = 0; //Prevents drawpollig() from crashing
-		return;
+		b->bunchmal = 64;
+		b->bunch     = (bunch_t       *)malloc(b->bunchmal*sizeof(b->bunch[0]));
+		b->bunchgot  = (unsigned int  *)malloc(((b->bunchmal+31)&~31)>>3);
+		b->bunchgrid = (unsigned char *)malloc(((b->bunchmal-1)*b->bunchmal)>>1);
 	}
-	if (!bunchmal)
+	if (lgs->numsects > b->sectgotn)
 	{
-		bunchmal = 64;
-		bunch     = (bunch_t       *)malloc(bunchmal*sizeof(bunch[0]));
-		bunchgot  = (unsigned int  *)malloc(((bunchmal+31)&~31)>>3);
-		bunchgrid = (unsigned char *)malloc(((bunchmal-1)*bunchmal)>>1);
-	}
-	if (lgs->numsects > sectgotn)
-	{
-		if (sectgotmal) free((void *)sectgotmal);
-		sectgotn = ((lgs->numsects+127)&~127);
-		sectgotmal = (unsigned int *)malloc((sectgotn>>3)+16); //NOTE:malloc doesn't guarantee 16-byte alignment!
-		sectgot = (unsigned int *)((((intptr_t)sectgotmal)+15)&~15);
+		if (b->sectgotmal) free((void *)b->sectgotmal);
+		b->sectgotn = ((lgs->numsects+127)&~127);
+		b->sectgotmal = (unsigned int *)malloc((b->sectgotn>>3)+16); //NOTE:malloc doesn't guarantee 16-byte alignment!
+		b->sectgot = (unsigned int *)((((intptr_t)b->sectgotmal)+15)&~15);
 	}
 	if ((shadowtest2_rendmode != 4) && (lgs->numsects > shadowtest2_sectgotn))
 	{
@@ -1731,24 +1568,20 @@ void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, player_transform *lps, int c
 	if (!mphmal)
 		mono_initonce();
 
-#ifdef STANDALONE
-	fixposx = 0; fixposy = 32;
-	//fixposx = 600; fixposy = 256;
-#endif
 
 		//Hack to keep camera away from sector line; avoids clipping glitch in drawpol_befclip/changetagfunc
-	wal = lgs->sect[cursect].wall;
-	for(i=lgs->sect[cursect].n-1;i>=0;i--)
-	{
-		#define WALHAK 1e-3
-		j = wal[i].n+i;
-		d = distpoint2line2(gcam.p.x,gcam.p.y,wal[i].x,wal[i].y,wal[j].x,wal[j].y); if (d >= WALHAK*WALHAK) continue;
-		fp.x = wal[j].x-wal[i].x;
-		fp.y = wal[j].y-wal[i].y;
-		f = (WALHAK - sqrt(d))/sqrt(fp.x*fp.x + fp.y*fp.y);
-		gcam.p.x -= fp.y*f;
-		gcam.p.y += fp.x*f;
-	}
+//wal = lgs->sect[gcam.cursect].wall;
+//for(i=lgs->sect[gcam.cursect].n-1;i>=0;i--)
+//{
+//	#define WALHAK 1e-3
+//	j = wal[i].n+i;
+//	d = distpoint2line2(gcam.p.x,gcam.p.y,wal[i].x,wal[i].y,wal[j].x,wal[j].y); if (d >= WALHAK*WALHAK) continue;
+//	fp.x = wal[j].x-wal[i].x;
+//	fp.y = wal[j].y-wal[i].y;
+//	f = (WALHAK - sqrt(d))/sqrt(fp.x*fp.x + fp.y*fp.y);
+//	gcam.p.x -= fp.y*f;
+//	gcam.p.y += fp.x*f;
+//}
 
 	if (shadowtest2_rendmode != 4)
 	{
@@ -1791,15 +1624,7 @@ void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, player_transform *lps, int c
 		g_qamb[1] = shadowtest2_ambrgb[1]*f;
 		g_qamb[2] = shadowtest2_ambrgb[2]*f;
 		g_qamb[3] = 0.f;
-
-#ifdef STANDALONE
-		if (keystatus[0x4a]) { keystatus[0x4a] = 0; curgcnt = max(curgcnt-1,1); } //KP-
-		if (keystatus[0x4e]) { keystatus[0x4e] = 0; curgcnt++;                  } //KP+
-		if (keystatus[0xc7]) { keystatus[0x4a] = 0; curgcnt = 1;                } //Home
-		if (keystatus[0xcf]) { keystatus[0x4e] = 0; curgcnt = 0x7fffffff;       } //End
-#endif
-
-		eyepoln = 0; eyepolvn = 0;
+		//eyepoln = 0; eyepolvn = 0;
 	}
 	else
 	{
@@ -1817,47 +1642,39 @@ void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, player_transform *lps, int c
 			memset(glp->lighashead,-1,glp->lighasheadn*sizeof(glp->lighashead[0]));
 		}
 	}
-#ifdef STANDALONE
-	gcnt = curgcnt;
-#endif
 
-	for(halfplane=0;halfplane<2;halfplane++)
-	{
+	for(halfplane=0;halfplane<2;halfplane++) {
+
+		if (!b->has_portal_clip)
+			b->currenthalfplane = halfplane;
+		else if (b->currenthalfplane != halfplane)
+			continue;
+
 		if (shadowtest2_rendmode == 4)
 		{
 			if (!halfplane) gcam.r.x = 1; else gcam.r.x = -1;
-							  gcam.d.x = 0; gcam.f.x = 0;
+			gcam.d.x = 0; gcam.f.x = 0;
 			gcam.r.y = 0; gcam.d.y = 0; gcam.f.y = -gcam.r.x;
 			gcam.r.z = 0; gcam.d.z = 1; gcam.f.z = 0;
-			xformprep(0.0);
+			xformprep(0.0, b);
 
-			xformbac(-65536.0,-65536.0,1.0,&bord2[0]);
-			xformbac(+65536.0,-65536.0,1.0,&bord2[1]);
-			xformbac(+65536.0,+65536.0,1.0,&bord2[2]);
-			xformbac(-65536.0,+65536.0,1.0,&bord2[3]);
+			xformbac(-65536.0,-65536.0,1.0,&bord2[0], b);
+			xformbac(+65536.0,-65536.0,1.0,&bord2[1], b);
+			xformbac(+65536.0,+65536.0,1.0,&bord2[2], b);
+			xformbac(-65536.0,+65536.0,1.0,&bord2[3], b);
 			n = 4; didcut = 1;
 		}
-		else
-		{
-			xformprep(((double)halfplane)*PI);
-
-			// ORIGINAL CODE - REMOVE THIS BLOCK:
-			/*
-			i = 0; //i = 16;
-			xformbac(         i-gcam.h.x,         i-gcam.h.y,gcam.h.z,&bord[0]);
-			xformbac(gcam.c.x-i-gcam.h.x,         i-gcam.h.y,gcam.h.z,&bord[1]);
-			xformbac(gcam.c.x-i-gcam.h.x,gcam.c.y-i-gcam.h.y,gcam.h.z,&bord[2]);
-			xformbac(         i-gcam.h.x,gcam.c.y-i-gcam.h.y,gcam.h.z,&bord[3]);
-			*/
+		else {
+			xformprep(((double)halfplane)*PI, b);
 
 			// NEW CODE - Use much larger bounds:
 			float large_bound = 1e6f;
-			xformbac(-large_bound, -large_bound, gcam.h.z, &bord[0]);
-			xformbac(+large_bound, -large_bound, gcam.h.z, &bord[1]);
-			xformbac(+large_bound, +large_bound, gcam.h.z, &bord[2]);
-			xformbac(-large_bound, +large_bound, gcam.h.z, &bord[3]);
+			xformbac(-large_bound, -large_bound, gcam.h.z, &bord[0],b);
+			xformbac(+large_bound, -large_bound, gcam.h.z, &bord[1],b);
+			xformbac(+large_bound, +large_bound, gcam.h.z, &bord[2],b);
+			xformbac(-large_bound, +large_bound, gcam.h.z, &bord[3],b);
 
-				//Clip screen to front plane
+			//Clip screen to front plane
 			n = 0; didcut = 0;
 			for(i=4-1,j=0;j<4;i=j,j++)
 			{
@@ -1874,8 +1691,7 @@ void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, player_transform *lps, int c
 			if (n < 3) break;
 		}
 
-		memset8(sectgot,0,(lgs->numsects+31)>>3);
-
+		memset8(b->sectgot,0,(lgs->numsects+31)>>3);
 		for(j=0;j<n;j++)
 		{
 			f = gcam.h.z/bord2[j].z;
@@ -1883,126 +1699,70 @@ void draw_hsr_polymost (cam_t *cc, mapstate_t *lgs, player_transform *lps, int c
 			bord2[j].y = bord2[j].y*f + gcam.h.y;
 		}
 
+
+
+		if (!b->has_portal_clip) {
 			//FIX! once means not each frame! (of course it doesn't hurt functionality)
-		for(i=mphnum-1;i>=0;i--) { mono_deloop(mph[i].head[1]); mono_deloop(mph[i].head[0]); }
-		mono_genfromloop(&mph[0].head[0],&mph[0].head[1],bord2,n); mph[0].tag = cursect; mphnum = 1;
-
-		bunchn = 0; scansector(cursect);
-		while (bunchn)
-		{
-			memset(bunchgot,0,(bunchn+7)>>3);
-#if 0
-			closest = 0;
-			for(i=1;i<bunchn;i++)
-			{
-				if (bunchgot[i>>5]&(1<<i)) continue;
-				j = bunchfront(i,closest,0); if (!j) continue;
-				if (j == 3) continue; //FIXFIXFIXFIX
-				bunchgot[i>>5] |= (1<<i);
-				if (j == 1) { closest = i; i = 0; }
+			// Standard case: clear existing state and create new viewport
+			for (i = mphnum - 1; i >= 0; i--) {
+				mono_deloop(mph[i].head[1]);
+				mono_deloop(mph[i].head[0]);
 			}
-#else
-			//{
-			//char tbuf[1024]; sprintf(tbuf,"cnt=%d\n",(1<<31)-1-gcnt);
-			//for(i=0;i<bunchn;i++)
-			//{
-			//   for(j=0;j<bunchn;j++) sprintf(&tbuf[strlen(tbuf)],"bf(%d,%d)=%2d ",i,j,bunchfront(i,j,0));
-			//   sprintf(&tbuf[strlen(tbuf)],"\n");
-			//   //sprintf(&tbuf[strlen(tbuf)],"bunch %d: (%d:%f) (%d:%f)\n",i,bunch[i].wal0,bunch[i].fra0,bunch[i].wal1,bunch[i].fra1);
-			//}
-			//sprintf(&tbuf[strlen(tbuf)],"\n");
-			//MessageBox(ghwnd,tbuf,prognam,MB_OK);
-			//}
 
-			for(i=bunchn-1;i>0;i--) //assume: bunchgrid[(((j-1)*j)>>1)+i] = bunchfront(j,i,0); is valid iff:{i<j}
+			mono_genfromloop(&mph[0].head[0], &mph[0].head[1], bord2, n);
+			mph[0].tag = gcam.cursect;
+			mphnum = 1;
+		} else {
+			// dont do anything, because clipping is done by drawpol_befclip.
+		}
+
+		b->bunchn = 0; scansector(gcam.cursect,b);
+		while (b->bunchn)
+		{
+			memset(b->bunchgot,0,(b->bunchn+7)>>3);
+
+			for(i=b->bunchn-1;i>0;i--) //assume: bunchgrid[(((j-1)*j)>>1)+i] = bunchfront(j,i,0); is valid iff:{i<j}
 			{
-					//for(j=bunchn-1;j>=0;j--) if (bunchfront(i,j,0)&2) goto nogood;
-				for(k=(((i-1)*i)>>1),j=0;j<     i;k+=1,j++) if (bunchgrid[k]&2) goto nogood;
-				for(k+=j            ,j++;j<bunchn;k+=j,j++) if (bunchgrid[k]&1) goto nogood;
+
+				for(k=(((i-1)*i)>>1),j=0;j<     i;k+=1,j++)
+					if (b->bunchgrid[k]&2) goto nogood;
+				for(k+=j            ,j++;j<b->bunchn;k+=j,j++)
+					if (b->bunchgrid[k]&1) goto nogood;
 				break;
 nogood:; }
 			closest = i;
-#endif
 
-			drawalls(closest,lgs);
-#ifdef STANDALONE
-			if (gcnt <= 0) break; //FIX
-#endif
+			drawalls(closest,lgs,b);
 		}
-
-#ifdef STANDALONE
-#if 1
-		if ((shadowtest2_rendmode == 1) && (!keystatus[0x38]))
-		{
-			extern void loadpic (tile_t *); //gcnt = 1;
-			gtpic = &gtile[0]; if (!gtpic->tt.f) loadpic(gtpic);
-			gouvmat[0] =     0; gouvmat[3] =     0; gouvmat[6] = 1; //d
-			gouvmat[1] = 65536; gouvmat[4] =     0; gouvmat[7] = 0; //u
-			gouvmat[2] =     0; gouvmat[5] = 65536; gouvmat[8] = 0; //v
-			for(i=mphnum-1;i>=0;i--)
-			{
-				gcurcol = ((mph[i].tag*0x4357267+0x23457)&0x0f0f0f)+0x202020;
-				drawpol_aftclip(mph[i].head[0],mph[i].head[1]);
-			}
-		}
-#endif
-
-#if 0
-		n = 0;
-		for(i=mphnum-1;i>=0;i--) for(s=0;s<2;s++) { j = mph[i].head[s]; if (j < 0) continue; do { j = mp[j].n; n++; } while (j != mph[i].head[s]); }
-		print6x8(&gcam.c,96,16,0xffffff,0,"mp lists num =%6d, mphnum=%d",n,mphnum);
-
-		w = 0;
-		i = mpempty; do { i = mp[i].n; w++; } while (i != mpempty);
-		print6x8(&gcam.c,96,24,0xffffff,0," mpempty num =%6d",w);
-
-		//print6x8(&gcam.c,96,32,0xffffff,0,"memory leak! =%6d",MPMAX-(n+w));
-#endif
-
-#if 0
-		fixposy += 8; if (fixposy >= gdd.y) { fixposy = 0; fixposx += 256; }
-		for(k=0;k<mphnum;k++)
-		{
-			print6x8(&gcam.c,fixposx,fixposy,0xffffff,0,"%d (area=%f)",mph[k].tag,mono_area(mph[k].head[0],mph[k].head[1])); fixposy += 8; if (fixposy >= gdd.y) { fixposy = 0; fixposx += 256; }
-			for(s=0;s<2;s++)
-			{
-				i = mph[k].head[s]; if (i < 0) continue;
-				do
-				{
-					j = mp[i].n;
-					print6x8(&gcam.c,fixposx,fixposy,0xffffff,0,"%8.2f %8.2f",mp[i].x,mp[i].y); fixposy += 8; if (fixposy >= gdd.y) { fixposy = 0; fixposx += 256; }
-					i = j;
-				} while (i != mph[k].head[s]);
-				fixposy += 2;
-			}
-		}
-#endif
-#endif
 
 		if (shadowtest2_rendmode == 4) uptr = glp->sectgot;
 										  else uptr = shadowtest2_sectgot;
 
 		if (!halfplane)
 		{
-			memcpy(uptr,sectgot,(lgs->numsects+31)>>3);
+			memcpy(uptr,b->sectgot,(lgs->numsects+31)>>3);
 		}
 		else
 		{
-			if (false)// && !(cputype&(1<<25))) //Got SSE
-				{ for(i=((lgs->numsects+31)>>5)-1;i>=0;i--) uptr[i] |= sectgot[i]; }
+			if (false) // && !(cputype&(1<<25))) //Got SSE
+			{
+				for(i=((lgs->numsects+31)>>5)-1;i>=0;i--)
+					uptr[i] |= b->sectgot[i];
+			}
 			else
 			{
-				i = (((lgs->numsects+127)&~127)>>3);
-				_asm
-				{
-					mov eax, uptr
-					mov edx, sectgot
-					mov ecx, i
-		  begor: sub ecx, 16
-					movaps xmm0, [eax+ecx]
-					orps xmm0, [edx+ecx]
-					movaps [eax+ecx], xmm0
-					jg short begor
+				// Convert to portable C - process 16 bytes at a time using uint64_t
+				size_t total_bytes = ((lgs->numsects+127)&~127)>>3;
+				size_t chunks = total_bytes / 16;
+
+				// Process 16-byte chunks (2 x uint64_t)
+				uint64_t* uptr64 = (uint64_t*)uptr;
+				uint64_t* sectgot64 = (uint64_t*)b->sectgot;
+
+				for(size_t j = 0; j < chunks; j++) {
+					size_t idx = j * 2;
+					uptr64[idx] |= sectgot64[idx];
+					uptr64[idx + 1] |= sectgot64[idx + 1];
 				}
 			}
 		}
@@ -2010,6 +1770,132 @@ nogood:; }
 		if (!didcut) break;
 	}
 }
+// 1. Normalize transform (makes vectors unit length and orthogonal)
+static float vlen(point3d *p) {
+    return sqrtf(p->x * p->x + p->y * p->y + p->z * p->z);
+}
+
+static void scalardivv(point3d *pt, float diver) {
+    pt->x /= diver; pt->y /= diver; pt->z /= diver;
+}
+
+static void normalize_transform(transform *tr) {
+    // Normalize all axes
+    float flen = vlen(&tr->f);
+    if (flen > 0.0001f) scalardivv(&tr->f, flen);
+
+    flen = vlen(&tr->r);
+    if (flen > 0.0001f) scalardivv(&tr->r, flen);
+
+    flen = vlen(&tr->d);
+    if (flen > 0.0001f) scalardivv(&tr->d, flen);
+}
+
+// 2a. Transform a point from world space to local space of a transform
+static point3d world_to_local_point(point3d world_pos, transform *tr) {
+    // Translate to origin
+    float dx = world_pos.x - tr->p.x;
+    float dy = world_pos.y - tr->p.y;
+    float dz = world_pos.z - tr->p.z;
+
+    // Project onto local axes (inverse rotation via dot products)
+    point3d local;
+    local.x = dx * tr->r.x + dy * tr->r.y + dz * tr->r.z;
+    local.y = dx * tr->d.x + dy * tr->d.y + dz * tr->d.z;
+    local.z = dx * tr->f.x + dy * tr->f.y + dz * tr->f.z;
+
+    return local;
+}
+
+// 2b. Transform a vector from world space to local space
+static point3d world_to_local_vec(point3d world_vec, transform *tr) {
+    point3d local;
+    local.x = world_vec.x * tr->r.x + world_vec.y * tr->r.y + world_vec.z * tr->r.z;
+    local.y = world_vec.x * tr->d.x + world_vec.y * tr->d.y + world_vec.z * tr->d.z;
+    local.z = world_vec.x * tr->f.x + world_vec.y * tr->f.y + world_vec.z * tr->f.z;
+
+    return local;
+}
+
+// 2c. Transform a point from local space to world space
+static point3d local_to_world_point(point3d local_pos, transform *tr) {
+    point3d world;
+    world.x = tr->p.x + local_pos.x * tr->r.x + local_pos.y * tr->d.x + local_pos.z * tr->f.x;
+    world.y = tr->p.y + local_pos.x * tr->r.y + local_pos.y * tr->d.y + local_pos.z * tr->f.y;
+    world.z = tr->p.z + local_pos.x * tr->r.z + local_pos.y * tr->d.z + local_pos.z * tr->f.z;
+
+    return world;
+}
+
+// 2d. Transform a vector from local space to world space
+static point3d local_to_world_vec(point3d local_vec, transform *tr) {
+    point3d world;
+    world.x = local_vec.x * tr->r.x + local_vec.y * tr->d.x + local_vec.z * tr->f.x;
+    world.y = local_vec.x * tr->r.y + local_vec.y * tr->d.y + local_vec.z * tr->f.y;
+    world.z = local_vec.x * tr->r.z + local_vec.y * tr->d.z + local_vec.z * tr->f.z;
+
+    return world;
+}static void draw_hsr_enter_portal(mapstate_t* map, int myport, bunchgrp *parentctx,
+                                   int plothead0, int plothead1)
+{
+    if (parentctx->recursion_depth >= MAX_PORTAL_DEPTH) {
+        return;
+    }
+
+    cam_t ncam = parentctx->cam;
+    int endp = portals[myport].destpn;
+    int entry = portals[myport].anchorspri;
+    int tgtspi = portals[endp].anchorspri;
+    int ignw = portals[endp].surfid;
+    int igns = portals[endp].sect;
+
+    spri_t tgs = map->spri[tgtspi];
+    spri_t ent = map->spri[entry];
+
+    // Normalize transforms to ensure orthonormality
+    normalize_transform(&ent.tr);
+    normalize_transform(&tgs.tr);
+
+    // Step 1: Transform camera to entry portal's local space
+    // This finds the camera's position and orientation RELATIVE to the entry portal
+    point3d cam_local_pos = world_to_local_point(ncam.p, &ent.tr);
+    point3d cam_local_r = world_to_local_vec(ncam.r, &ent.tr);
+    point3d cam_local_d = world_to_local_vec(ncam.d, &ent.tr);
+    point3d cam_local_f = world_to_local_vec(ncam.f, &ent.tr);
+
+    // Step 2: Apply that same relative transform from the target portal's perspective
+    // Since entry.forward points IN and target.forward points OUT (already opposite),
+    // we just transform directly without any flips
+    ncam.p = local_to_world_point(cam_local_pos, &tgs.tr);
+    ncam.r = local_to_world_vec(cam_local_r, &tgs.tr);
+    ncam.d = local_to_world_vec(cam_local_d, &tgs.tr);
+    ncam.f = local_to_world_vec(cam_local_f, &tgs.tr);
+
+    ncam.cursect = portals[endp].sect;
+
+    bunchgrp newctx = {};
+    newctx.recursion_depth = parentctx->recursion_depth + 1;
+    newctx.cam = ncam;
+    newctx.orcam = parentctx->orcam;
+    newctx.has_portal_clip = true;
+    newctx.portal_clip[0] = plothead0;
+    newctx.portal_clip[1] = plothead1;
+    newctx.sectgotn = 0;
+    newctx.sectgot = 0;
+    newctx.sectgotmal = 0;
+    newctx.bunchgot = 0;
+    newctx.bunchn = 0;
+    newctx.bunchmal = 0;
+    newctx.bunchgrid = 0;
+    newctx.testignorewall = ignw;
+    newctx.testignoresec = igns;
+    newctx.gnewtagsect = -1;
+    newctx.gnewtag = -1;
+    newctx.currenthalfplane = parentctx->currenthalfplane;
+
+    draw_hsr_polymost_ctx(map, &newctx);
+}
+
 
 typedef struct { int sect; point3d p; float rgb[3]; int useshadow; } drawkv6_lightpos_t;
 void drawsprites ()
@@ -2018,7 +1904,7 @@ void drawsprites ()
 
 void shadowtest2_setcam (cam_t *ncam)
 {
-	gcam = *ncam;
+	//gcam = *ncam;
 }
 
 #if (USENEWLIGHT == 0)
@@ -2027,96 +1913,9 @@ typedef struct { float n2, d2, n1, d1, n0, d0, filler0[2], glk[12], bsc, gsc, rs
 typedef struct { float gk[16], gk2[12], bsc, gsc, rsc, filler1[1]; } hlighterp_t;
 __declspec(align(16)) static const float hligterp_maxzero[4] = {0.f,0.f,0.f,0.f};
 #endif
-void prepligramp (float *ouvmat, point3d *norm, int lig, hlighterp_t *hl)
+void prepligramp (float *ouvmat, point3d *norm, int lig, void *hl)
 {
-#if (USENEWLIGHT == 0)
-	float f, ox, oy, oz, p0x, p0y, p0z, p1x, p1y, p1z, p2x, p2y, p2z;
 
-		//Prepare light ramping
-#if (USEINTZ)
-	f = 1.0/(1048576.0*256.0);
-#else
-	f = 1.0/gcam.h.z;
-#endif
-	p0x = slightpos[lig].x*ouvmat[0] - f;
-	p0y = slightpos[lig].y*ouvmat[0];
-	p0z = slightpos[lig].z*ouvmat[0];
-	p1x = slightpos[lig].x*ouvmat[3];
-	p1y = slightpos[lig].y*ouvmat[3] - f;
-	p1z = slightpos[lig].z*ouvmat[3];
-	p2x = slightpos[lig].x*ouvmat[6] + gcam.h.x*f;
-	p2y = slightpos[lig].y*ouvmat[6] + gcam.h.y*f;
-	p2z = slightpos[lig].z*ouvmat[6] - gcam.h.z*f;
-	hl->glk[ 0] = (p0x*p0x + p0y*p0y + p0z*p0z)  ;
-	hl->glk[ 1] = (p1x*p0x + p1y*p0y + p1z*p0z)*2;
-	hl->glk[ 2] = (p2x*p0x + p2y*p0y + p2z*p0z)*2;
-	hl->glk[ 3] = (p1x*p1x + p1y*p1y + p1z*p1z)  ;
-	hl->glk[ 4] = (p1x*p2x + p1y*p2y + p1z*p2z)*2;
-	hl->glk[ 5] = (p2x*p2x + p2y*p2y + p2z*p2z)  ;
-	f = 1024.f;
-	ox = (p0x*norm->x + p0y*norm->y + p0z*norm->z)*f;
-	oy = (p1x*norm->x + p1y*norm->y + p1z*norm->z)*f;
-	oz = (p2x*norm->x + p2y*norm->y + p2z*norm->z)*f;
-	hl->glk[ 6] = ouvmat[0]*ox               ;
-	hl->glk[ 7] = ouvmat[3]*ox + ouvmat[0]*oy;
-	hl->glk[ 8] = ouvmat[6]*ox + ouvmat[0]*oz;
-	hl->glk[ 9] = ouvmat[3]*oy               ;
-	hl->glk[10] = ouvmat[3]*oz + ouvmat[6]*oy;
-	hl->glk[11] =                ouvmat[6]*oz;
-
-	hl->d2 = hl->glk[0];
-	hl->n2 = hl->glk[6];
-#else
-	float f, k, k0, k1, k3, k4, k5, k6, k7, k8, k9, ka, kb;
-
-		//Prepare light ramping
-	//point3d pt; pt.x = 0; pt.y = 0; pt.z = 1.0/(ouvmat[0]*gcam.h.x + ouvmat[3]*gcam.h.y + ouvmat[6]); k0 = pt.x*norm->x + pt.y*norm->y + pt.z*norm->z;
-	//k0 = norm->z/(ouvmat[0]*gcam.h.x + ouvmat[3]*gcam.h.y + ouvmat[6]);
-	k0 = (norm->x*norm->x + norm->y*norm->y + norm->z*gcam.h.z) / ((ouvmat[0]*(norm->x+gcam.h.x) + ouvmat[3]*(norm->y+gcam.h.y) + ouvmat[6])*gcam.h.z);
-
-	hl->gk[15] = gcam.h.x*norm->x + gcam.h.y*norm->y - gcam.h.z*norm->z;
-
-	k3 = slightpos[lig].x*norm->x - k0;
-	k4 = slightpos[lig].x*norm->y;
-	k5 =-slightpos[lig].x*hl->gk[15] + gcam.h.x*k0;
-	k6 = slightpos[lig].y*norm->x;
-	k7 = slightpos[lig].y*norm->y - k0;
-	k8 =-slightpos[lig].y*hl->gk[15] + gcam.h.y*k0;
-	k9 = slightpos[lig].z*norm->x;
-	ka = slightpos[lig].z*norm->y;
-	kb =-slightpos[lig].z*hl->gk[15] - gcam.h.z*k0;
-	hl->gk[0] = (k3*k3 + k6*k6 + k9*k9)*1; //x*x
-	hl->gk[1] = (k3*k4 + k6*k7 + k9*ka)*2; //x*y
-	hl->gk[2] = (k4*k4 + k7*k7 + ka*ka)*1; //y*y
-	hl->gk[3] = (k3*k5 + k6*k8 + k9*kb)*2; //x
-	hl->gk[4] = (k4*k5 + k7*k8 + ka*kb)*2; //y
-	hl->gk[5] = (k5*k5 + k8*k8 + kb*kb)*1; //1
-
-	k = (slightpos[lig].x*norm->x + slightpos[lig].y*norm->y + slightpos[lig].z*norm->z - k0)*-256*16;
-	hl->gk[6] = k*norm->x;
-	hl->gk[7] = k*norm->y;
-	hl->gk[8] = k*-hl->gk[15];
-
-	if (spotwid[lig] > -1)
-	{
-		k = slightpos[lig].x*slightdir[lig].x + slightpos[lig].y*slightdir[lig].y + slightpos[lig].z*slightdir[lig].z;
-		k1 = 1.0/(1.0-spotwid[lig]);
-		hl->gk[ 9] = (k*norm->x - k0*slightdir[lig].x)*k1;
-		hl->gk[10] = (k*norm->y - k0*slightdir[lig].y)*k1;
-		hl->gk[11] = ((gcam.h.x*slightdir[lig].x + gcam.h.y*slightdir[lig].y - gcam.h.z*slightdir[lig].z)*k0 - k*hl->gk[15])*k1;
-		hl->gk[12] = -spotwid[lig]*k1;
-	} else { hl->gk[9] = 0; hl->gk[10] = 0; hl->gk[11] = 0; hl->gk[12] = 1; }
-
-	hl->gk[13] = -norm->x;
-	hl->gk[14] = -norm->y;
-#endif
-	hl->bsc = shadowtest2_light[lig].rgb[0];
-	hl->gsc = shadowtest2_light[lig].rgb[1];
-	hl->rsc = shadowtest2_light[lig].rgb[2];
-#if (USEGAMMAHACK != 0)
-	f = 16384.0; hl->bsc *= f; hl->gsc *= f; hl->rsc *= f;
-#endif
-	hl->filler1[0] = 0.f; //Make sure this is not denormal!
 }
 
 
@@ -2204,929 +2003,6 @@ void shadowtest2_init ()
 
 void drawpollig(int ei) {
 
-    __declspec(align(16)) static const float dpqmulval[4] = {0,1,2,3}, dpqfours[4] = {4,4,4,4};
-    __declspec(align(16)) float qamb[4]; //holder for SSE to avoid degenerates
-#define PR0_USEFLOAT 0
-#define PR1_USEFLOAT 1
-#if (PR0_USEFLOAT != 0)
-    typedef struct { int y0, y1; float pos, inc; } rast_t;
-#else
-    typedef struct { int y0, y1, pos, inc; } rast_t;
-#endif
-    rast_t *rast, rtmp;
-#if (PR1_USEFLOAT != 0)
-    typedef struct { int y0, y1; float pos, inc; } lrast_t;
-#else
-    typedef struct { int y0, y1, pos, inc; } lrast_t;
-#endif
-#define LRASTMAX 8192             //FIX:make dynamic!
-    lrast_t lrast[LRASTMAX];          //FIX:make dynamic! FIX:make thread safe!
-    lrast_t *prast[LIGHTMAX], lrtmp; //FIX:make dynamic!
-    int plnum[LIGHTMAX], lpn3[LIGHTMAX], lpn4[LIGHTMAX], lpn5[LIGHTMAX], plnumi; //FIX:make dynamic!
-    //typedef struct { float n2, d2, n1, d1, n0, d0, filler0[2], bsc, gsc, rsc, filler1[1]; } hlighterp_t;
-    __declspec(align(16)) hlighterp_t hl[LIGHTMAX];
-    hlighterp_t *hlptr, *liglst[LIGHTMAX];
-    int liglstn;
-    static const float fone = 1.f;
-    __declspec(align(16)) float qlig[4], g_rgbmul[4];
-    __declspec(align(8)) unsigned short qs[4], qsi[4];
-    __declspec(align(16)) const double dmagic[2] = {6755399441055744.0,6755399441055744.0}; //3*2^51
-    __int64 qddmul, qmask;
-    int lmask0, lmask1;
-    point3d tp, norm;
-    point3d *lvt, *lvt2;
-    point2d *pt, *lpt;
-    int lig, olignum;
-    lightpos_t *lp;
-    float f, g, ox, oy, oz, d, u, v, vx, vy, di8, ui8, vi8, od, *ouvmat;
-    __declspec(align(8)) int iw[2], iwi[2];
-    intptr_t l, padd;
-    int id, idi, oid, oidi, p, p2, sy, *zptr, *lptr, xalign;
-    int ttps, ymsk, xmsk, xshift, ttf, ttp, rgbmul; //, nrgbmul;
-    int i, j, k, x, xe, xe2, xe3, iy0, iy1, pn, pn2, pn3, pn4, ymin, ymax, lnum, lpn, olpn2, lpn2, col;
-
-    pt = &eyepolv[eyepol[ei].vert0]; pn = eyepol[ei+1].vert0-eyepol[ei].vert0;
-
-    i =            pn  *sizeof(rast_t );
-    j = ligpolmaxvert*2*sizeof(point2d);
-    k = ligpolmaxvert  *sizeof(point3d);
-    l = (intptr_t)_alloca(i+j+k);
-    rast = (rast_t  *)(l);
-    lpt  = (point2d *)(l+i);
-    lvt2 = (point3d *)(l+i+j);
-
-    ymin = 0x7fffffff; ymax = 0x80000000; pn2 = 0; j = -1; iy1 = 0;
-    for(i=0;i<pn;i++)
-    {
-        if (i != j)                  iy0 = (int)min(max(ceil(pt[i].y),0),gcam.c.y); else iy0 = iy1;
-        j = i+1; if (j >= pn) j = 0; iy1 = (int)min(max(ceil(pt[j].y),0),gcam.c.y); if (iy0 == iy1) continue;
-        if (iy0 < iy1) { rast[pn2].y0 = iy0; rast[pn2].y1 = iy1; if (iy0 < ymin) ymin = iy0; }
-        else { rast[pn2].y0 = iy1; rast[pn2].y1 = iy0; if (iy0 > ymax) ymax = iy0; }
-#if (PR0_USEFLOAT != 0)
-        rast[pn2].inc = (pt[j].x - pt[i].x)/(pt[j].y - pt[i].y);
-        rast[pn2].pos = ((float)rast[pn2].y0 - pt[i].y)*rast[pn2].inc + pt[i].x;
-#else
-        g = (pt[j].x - pt[i].x)/(pt[j].y - pt[i].y);
-        f = ((float)rast[pn2].y0 - pt[i].y)*g + pt[i].x;
-        rast[pn2].inc = ((int)(g*65536.0));
-        rast[pn2].pos = ((int)(f*65536.0))+65535;
-#endif
-        pn2++;
-    }
-
-    ouvmat = eyepol[ei].ouvmat;
-
-    f = 1.0/2.f;
-    g_rgbmul[0] = ((eyepol[ei].curcol    )&255)*f;
-    g_rgbmul[1] = ((eyepol[ei].curcol>> 8)&255)*f;
-    g_rgbmul[2] = ((eyepol[ei].curcol>>16)&255)*f;
-    g_rgbmul[3] = 0.f;
-
-    //Translate & Rotate
-    ox = eyepol[ei].norm.x; oy = eyepol[ei].norm.y; oz = eyepol[ei].norm.z;
-    norm.x = ox*gcam.r.x + oy*gcam.r.y + oz*gcam.r.z;
-    norm.y = ox*gcam.d.x + oy*gcam.d.y + oz*gcam.d.z;
-    norm.z = ox*gcam.f.x + oy*gcam.f.y + oz*gcam.f.z;
-
-    lpn2 = 0; plnum[0] = 0; plnumi = 0; olignum = -1;
-    if (!(eyepol[ei].flags&1))
-    {
-        for(lig=0;lig<shadowtest2_numlights;lig++)
-        {
-            lp = &shadowtest2_light[lig];
-
-            if ((!(lp->flags&1)) || (!shadowtest2_useshadows))
-            {
-                //No shadow mode needs back-face cull
-                f = ouvmat[0]*gcam.h.x + ouvmat[3]*gcam.h.y + ouvmat[6];
-#if (USEINTZ)
-                if (((slightpos[lig].x*norm.x + slightpos[lig].y*norm.y + slightpos[lig].z*norm.z)*f*(1048576.0*256.0) < gcam.h.z*norm.z) == (f >= 0)) continue;
-#else
-                if ((((slightpos[lig].x*norm.x + slightpos[lig].y*norm.y + slightpos[lig].z*norm.z)*f <= norm.z) == (f > 0)) && (fabs(f) > 1e-4)) continue;
-#endif
-
-                prast[plnumi] = &lrast[lpn2];
-                if (plnumi > 0) { plnum[plnumi-1] = lpn2-olpn2; } olpn2 = lpn2;
-
-                prepligramp(ouvmat,&norm,lig,&hl[plnumi]);
-                plnumi++; if (plnumi >= LIGHTMAX) return;
-
-                lrast[lpn2].y0 = ymin; lrast[lpn2].inc = 0;
-                lrast[lpn2].y1 = ymax; lrast[lpn2].pos = 0;
-                lpn2++; if (lpn2 >= LRASTMAX) return;
-                continue;
-            }
-
-            for(l=lp->lighashead[lighash(eyepol[ei].b2sect,eyepol[ei].b2wall,eyepol[ei].b2slab)];l>=0;l=lp->ligpol[l].b2hashn)
-            {
-                if ((lp->ligpol[l].b2sect != eyepol[ei].b2sect) || (lp->ligpol[l].b2wall != eyepol[ei].b2wall) || (lp->ligpol[l].b2slab != eyepol[ei].b2slab)) continue;
-
-                lvt = &lp->ligpolv[lp->ligpol[l].vert0]; lnum = lp->ligpol[l+1].vert0-lp->ligpol[l].vert0;
-
-                for(i=0;i<lnum;i++)
-                {
-                    ox = lvt[i].x-gcam.p.x; oy = lvt[i].y-gcam.p.y; oz = lvt[i].z-gcam.p.z;
-                    lvt2[i].x = ox*gcam.r.x + oy*gcam.r.y + oz*gcam.r.z;
-                    lvt2[i].y = ox*gcam.d.x + oy*gcam.d.y + oz*gcam.d.z;
-                    lvt2[i].z = ox*gcam.f.x + oy*gcam.f.y + oz*gcam.f.z;
-                }
-
-                lpn = 0;
-                for(i=lnum-1,j=0;j<lnum;i=j,j++)
-                {
-                    if (lvt2[i].z >= SCISDIST)
-                    {
-                        f = gcam.h.z/lvt2[i].z;
-                        lpt[lpn].x = lvt2[i].x*f + gcam.h.x;
-                        lpt[lpn].y = lvt2[i].y*f + gcam.h.y;
-                        lpn++;
-                    }
-                    if ((lvt2[i].z >= SCISDIST) != (lvt2[j].z >= SCISDIST))
-                    {
-                        f = (SCISDIST-lvt2[i].z)/(lvt2[j].z-lvt2[i].z); g = gcam.h.z/SCISDIST;
-                        lpt[lpn].x = ((lvt2[j].x-lvt2[i].x)*f + lvt2[i].x)*g + gcam.h.x;
-                        lpt[lpn].y = ((lvt2[j].y-lvt2[i].y)*f + lvt2[i].y)*g + gcam.h.y;
-                        lpn++;
-                    }
-                }
-                if (lpn < 3) continue;
-
-                //use lpt,lpn
-                j = -1; iy1 = 0;
-                for(i=0;i<lpn;i++)
-                {
-                    if (i != j)                   iy0 = (int)min(max(ceil(lpt[i].y),ymin),ymax); else iy0 = iy1;
-                    j = i+1; if (j >= lpn) j = 0; iy1 = (int)min(max(ceil(lpt[j].y),ymin),ymax); if (iy0 == iy1) continue;
-
-                    if (lig != olignum)
-                    {
-                        olignum = lig; prast[plnumi] = &lrast[lpn2];
-                        if (plnumi > 0) { plnum[plnumi-1] = lpn2-olpn2; } olpn2 = lpn2;
-                        prepligramp(ouvmat,&norm,lig,&hl[plnumi]);
-                        plnumi++; if (plnumi >= LIGHTMAX) return;
-                    }
-
-                    if (iy0 < iy1) { lrast[lpn2].y0 = iy0; lrast[lpn2].y1 = iy1; }
-                    else { lrast[lpn2].y0 = iy1; lrast[lpn2].y1 = iy0; }
-#if (PR1_USEFLOAT != 0)
-                    lrast[lpn2].inc = (lpt[j].x - lpt[i].x)/(lpt[j].y - lpt[i].y);
-                    lrast[lpn2].pos = ((float)lrast[lpn2].y0 - lpt[i].y)*lrast[lpn2].inc + lpt[i].x+.5; //FIX:what makes this .5 hack necessary?
-#else
-                    g = (lpt[j].x - lpt[i].x)/(lpt[j].y - lpt[i].y);
-                    f = ((float)lrast[lpn2].y0 - lpt[i].y)*g + lpt[i].x;
-                    lrast[lpn2].inc = ((int)(g*65536.0));
-                    lrast[lpn2].pos = ((int)(f*65536.0))+65535;
-#endif
-                    lpn2++; if (lpn2 >= LRASTMAX) return;
-                }
-            }
-        }
-        if (plnumi > 0) plnum[plnumi-1] = lpn2-olpn2;
-        for(i=4-1;i>=0;i--) qamb[i] = g_qamb[i];
-    }
-	// If use this only - all will be brighht.
-    else //parallaxing sky does not use shadows
-    {
-#if (USEGAMMAHACK == 0)
-        f = 256.f;
-#else
-        f = 256.f*16384.f;
-#endif
-        qamb[0] = f; qamb[1] = f; qamb[2] = f; qamb[3] = 0.f;  // ambient parallax..
-    }
-
-    //Shell sort top y's
-    for(k=(pn2>>1);k;k>>=1)
-        for(i=0;i<pn2-k;i++)
-            for(j=i;j>=0;j-=k)
-            {
-                if (rast[j].y0 <= rast[j+k].y0) break;
-                rtmp = rast[j]; rast[j] = rast[j+k]; rast[j+k] = rtmp;
-            }
-    pn3 = 0; pn4 = 0;
-
-    for(l=plnumi-1;l>=0;l--)
-    {
-        //Shell sort top y's for light polies
-        for(k=(plnum[l]>>1);k;k>>=1)
-            for(i=0;i<plnum[l]-k;i++)
-                for(j=i;j>=0;j-=k)
-                {
-                    if (prast[l][j].y0 <= prast[l][j+k].y0) break;
-                    lrtmp = prast[l][j]; prast[l][j] = prast[l][j+k]; prast[l][j+k] = lrtmp;
-                }
-        lpn3[l] = 0; lpn4[l] = 0;
-    }
-
-    di8 = ouvmat[0]*FLATSTEPSIZ;
-    ui8 = ouvmat[1]*FLATSTEPSIZ;
-    vi8 = ouvmat[2]*FLATSTEPSIZ;
-    rgbmul = ((eyepol[ei].curcol&0xffffff)|0x80000000);
-    ttp = eyepol[ei].tpic->tt.p; ttf = eyepol[ei].tpic->tt.f; i = bsr(ttp);
-    xmsk = (1<<bsr(eyepol[ei].tpic->tt.x))-1; xmsk <<= 2; xshift = bsr(eyepol[ei].tpic->tt.x)+2;
-    ymsk = (1<<bsr(eyepol[ei].tpic->tt.y))-1; ymsk <<= i;
-    ttps = 16-i;
-    qddmul = (__int64)((ttp<<16)+4);
-    qmask = (__int64)(((eyepol[ei].tpic->tt.y-1)<<16) + (eyepol[ei].tpic->tt.x-1));
-    lmask0 = ((eyepol[ei].tpic->tt.x-1)<<2); lmask1 = ~lmask0;
-
-    for(sy=ymin;sy<ymax;sy++)
-    {
-        for(i=pn3-1;i>=0;i--)
-        {
-            if (sy >= rast[i].y1)
-            {     //Delete line segments
-                pn3--;
-                for(j=i;j<pn3;j++) rast[j] = rast[j+1];
-            }
-            else if (rast[i+1].pos < rast[i].pos)
-            {     //Refresh sort (needed for degenerate poly/intersections)
-                rtmp = rast[i];
-                for(j=i+1;(j < pn3) && (rast[j].pos < rtmp.pos);j++) rast[j-1] = rast[j];
-                rast[j-1] = rtmp;
-            }
-        }
-        //Insert line segments
-        while ((pn4 < pn2) && (sy >= rast[pn4].y0))
-        {
-            rtmp = rast[pn4];
-            for(j=pn3;(j > 0) && (rast[j-1].pos > rtmp.pos);j--) rast[j] = rast[j-1];
-            rast[j] = rtmp;
-
-            pn3++; pn4++;
-        }
-
-        //Same code as above, but for lights
-        for(l=plnumi-1;l>=0;l--)
-        {
-            for(i=lpn3[l]-1;i>=0;i--)
-            {
-                if (sy >= prast[l][i].y1)
-                {     //Delete line segments
-                    lpn3[l]--;
-                    for(j=i;j<lpn3[l];j++) prast[l][j] = prast[l][j+1];
-                }
-                else if (prast[l][i+1].pos < prast[l][i].pos)
-                {     //Refresh sort (needed for degenerate poly/intersections)
-                    lrtmp = prast[l][i];
-                    for(j=i+1;(j < lpn3[l]) && (prast[l][j].pos < lrtmp.pos);j++) prast[l][j-1] = prast[l][j];
-                    prast[l][j-1] = lrtmp;
-                }
-            }
-            //Insert line segments // no lights without it.
-            while ((lpn4[l] < plnum[l]) && (sy >= prast[l][lpn4[l]].y0))
-            {
-                lrtmp = prast[l][lpn4[l]];
-                for(j=lpn3[l];(j > 0) && (prast[l][j-1].pos > lrtmp.pos);j--) prast[l][j] = prast[l][j-1];
-                prast[l][j] = lrtmp;
-
-                lpn3[l]++; lpn4[l]++;
-            }
-
-            lpn5[l] = 0;
-        }
-
-        if (pn3)
-        {
-            //prep sy: some lightmap calc.
-            i = sy*sy;
-            for(lig=plnumi-1;lig>=0;lig--)
-            {
-#if (USENEWLIGHT == 0)
-                hl[lig].d1 = hl[lig].glk[1]*sy + hl[lig].glk[2]; hl[lig].d0 = hl[lig].glk[3]*i + hl[lig].glk[ 4]*sy + hl[lig].glk[ 5];
-                hl[lig].n1 = hl[lig].glk[7]*sy + hl[lig].glk[8]; hl[lig].n0 = hl[lig].glk[9]*i + hl[lig].glk[10]*sy + hl[lig].glk[11];
-#else
-                hl[lig].gk2[0] = hl[lig].gk[0];  hl[lig].gk2[4] = sy*hl[lig].gk[1]  + hl[lig].gk[3]; hl[lig].gk2[8] = i*hl[lig].gk[2] + sy*hl[lig].gk[4] + hl[lig].gk[5];
-                hl[lig].gk2[1] = hl[lig].gk[9];  hl[lig].gk2[5] = sy*hl[lig].gk[10] + hl[lig].gk[11];
-                hl[lig].gk2[2] = hl[lig].gk[6];  hl[lig].gk2[6] = sy*hl[lig].gk[7]  + hl[lig].gk[8];
-                hl[lig].gk2[3] = hl[lig].gk[13]; hl[lig].gk2[7] = sy*hl[lig].gk[14] + hl[lig].gk[15];
-#endif
-            }
-            i = gcam.c.p*sy;
-            zptr = (int *)(gcam.z.f+i);
-            lptr = (int *)(gcam.c.f+i);
-        }
-        //Draw hlines xor style
-        for(i=0;i<pn3;i+=2)
-        {
-#if (PR0_USEFLOAT != 0)
-            x  = (int)min(max(rast[i  ].pos,0.f),(float)gcam.c.x);
-            xe = (int)min(max(rast[i+1].pos,0.f),(float)gcam.c.x);
-#else
-            x  = (int)min(max(rast[i  ].pos>>16,0),gcam.c.x);
-            xe = (int)min(max(rast[i+1].pos>>16,0),gcam.c.x);
-#endif
-
-            //Prepare texture mapping
-            if (di8 < 0) j = ((x-xe+1)&(FLATSTEPSIZ-1)); else j = 0; //Hack to avoid horizon crossing artifact from interpolation
-            xalign = x-j; vx = (float)xalign; vy = (float)sy;
-            d = ouvmat[0]*vx + ouvmat[3]*vy + ouvmat[6]; f = 1.0/d;
-            u = ouvmat[1]*vx + ouvmat[4]*vy + ouvmat[7];
-            v = ouvmat[2]*vx + ouvmat[5]*vy + ouvmat[8];
-            d += di8;
-            id    = (int)(  f);
-            iw[0] = (int)(u*f);
-            iw[1] = (int)(v*f);
-            if (j)
-            {
-                f = 1.0/d; d += di8; u += ui8; v += vi8;
-                idi    = ((((int)(  f))-id   )>>LFLATSTEPSIZ); id    += idi   *j;
-                iwi[0] = ((((int)(u*f))-iw[0])>>LFLATSTEPSIZ); iw[0] += iwi[0]*j;
-                iwi[1] = ((((int)(v*f))-iw[1])>>LFLATSTEPSIZ); iw[1] += iwi[1]*j;
-            }
-
-            //Render Z's
-            padd = (intptr_t)&zptr[xe]; p = ((x-xe)<<2);
-#if 0
-            od = d; oid = id; oidi = idi;
-            p2 = min(p+((FLATSTEPSIZ-j)<<2),0); goto zbuf_in2it;
-            do
-            {
-                f = 1.0/d; d += di8;
-                idi = ((((int)f)-id)>>LFLATSTEPSIZ);
-                p2 = min(p+(FLATSTEPSIZ<<2),0);
-            zbuf_in2it: do { *(int *)(padd+p) = id;/*FIX:USEINTZ only!*/ id += idi; p += 4; } while (p < p2);
-            } while (p < 0);
-            d = od; id = oid; idi = oidi;
-#else
-            vx = (float)x;
-            _asm
-                    {
-                    mov eax, ouvmat
-                    mov ecx, p
-                    mov edx, padd
-
-                    movss xmm0, vx
-                    movss xmm1, [eax]     ;xmm1: ouvmat[0]
-                    movss xmm2, vy
-                    mulss xmm0, xmm1
-                    mulss xmm2, [eax+3*4]
-                    addss xmm0, xmm2
-                    addss xmm0, [eax+6*4] ;xmm0: ouvmat[0]*vx + ouvmat[3]*vy + ouvmat[6]
-
-                    add edx, ecx
-                    test edx, 12
-                    jz short zbufskp1
-                    zbufbeg1: rcpss xmm2, xmm0
-                    addss xmm0, xmm1
-#if (USEINTZ)
-                    cvttss2si eax, xmm2
-                    mov [edx], eax
-#else
-                    movss [edx], xmm2
-#endif
-                    add edx, 4
-                    add ecx, 4
-                    jge short zbufend
-                    test edx, 12
-                    jnz short zbufbeg1
-                    zbufskp1: sub edx, ecx
-
-                    shufps xmm1, xmm1, 0
-                    shufps xmm0, xmm0, 0
-                    movaps xmm2, xmm1
-                    mulps xmm2, dpqmulval ;{0,1,2,3}
-                    mulps xmm1, dpqfours  ;{4,4,4,4}
-                    addps xmm0, xmm2
-
-                    add ecx, 16
-                    jg short zbufend1
-
-                    zbufbeg4: rcpps xmm2, xmm0
-                    addps xmm0, xmm1
-#if ((USESSE2 != 0) || (!USEINTZ))
-#if (USEINTZ)
-                    cvttps2dq xmm2, xmm2
-#endif
-                    movaps [edx+ecx-16], xmm2
-#else
-                    cvttps2pi mm0, xmm2
-                    movhlps xmm2, xmm2
-                    cvttps2pi mm1, xmm2
-                    movq [edx+ecx-16], mm0
-                    movq [edx+ecx-8], mm1
-#endif
-                    add ecx, 16
-                    jle short zbufbeg4
-
-                    zbufend1: sub ecx, 16
-                    jz short zbufend
-                    rcpps xmm2, xmm0
-
-#if ((USESSE2 != 0) || (!USEINTZ))
-#if (USEINTZ)
-                    cvttps2dq xmm2, xmm2
-#endif
-                    zbufend2: movss [edx+ecx], xmm2
-#else
-                zbufend2: cvttss2si eax, xmm2
-                    mov [edx+ecx], eax
-#endif
-                    shufps xmm2, xmm2, 0x39
-                    add ecx, 4
-                    jl short zbufend2
-                    zbufend:
-#if ((USESSE2 == 0) && (USEINTZ))
-                    emms
-#endif
-                    }
-#endif
-
-            while (x < xe)
-            {
-                xe2 = xe;
-
-                liglstn = 0;
-                for(l=plnumi-1;l>=0;l--)
-                {
-                    while (lpn5[l] < lpn3[l])
-                    {
-#if (PR1_USEFLOAT != 0)
-                        j = ((int)prast[l][lpn5[l]].pos);
-#else
-                        j = (prast[l][lpn5[l]].pos>>16);
-#endif
-                        if (j <= x) lpn5[l]++; else { if (j+1 < xe2) xe2 = j+1; break; }
-                    }
-                    if (lpn5[l]&1) { liglst[liglstn] = &hl[l]; liglstn++; }
-                }
-
-#if 0
-                qlig[0] = qamb[0]; qlig[1] = qamb[1]; qlig[2] = qamb[2];
-                for(lig=liglstn-1;lig>=0;lig--)
-                {
-                    hlptr = liglst[lig];
-#if (USENEWLIGHT == 0)
-                f = ((hlptr->n2*x + hlptr->n1)*x + hlptr->n0) /
-                    ((hlptr->d2*x + hlptr->d1)*x + hlptr->d0);
-#else
-                //see conelight.kc for derivation
-                f = 1.0/sqrt((x*hlptr->gk2[0] + hlptr->gk2[4])*x + hlptr->gk2[8]); //k0
-                f =         ((x*hlptr->gk2[1] + hlptr->gk2[5])*f + hlptr->gk[12])  //k1
-                            *          (x*hlptr->gk2[2] + hlptr->gk2[6])*f                   //k2
-                            *          (x*hlptr->gk2[3] + hlptr->gk2[7])*f                   //k3
-                            *          (x*hlptr->gk2[3] + hlptr->gk2[7])*f;
-                f = sqrt(max(f,0.0));
-#endif
-                qlig[0] += f*hlptr->bsc;
-                qlig[1] += f*hlptr->gsc;
-                qlig[2] += f*hlptr->rsc;
-				}
-                qs[0] = min((int)(qlig[0]*g_rgbmul[0]),32767);
-                qs[1] = min((int)(qlig[1]*g_rgbmul[1]),32767);
-                qs[2] = min((int)(qlig[2]*g_rgbmul[2]),32767);
-#else
-            	// Vectorized per-pixel lighting with quadratic falloff
-                _asm
-                        {
-                        movaps xmm7, qamb
-                        mov eax, liglstn
-                        sub eax, 1
-                        js short endlig0
-                        cvtsi2ss xmm2, x
-
-                        ;movss xmm3, xmm2 ;FIX
-                        ;mulss xmm3, xmm3 ;FIX
-
-                        beglig0: mov edx, liglst[eax*4]
-#if (USENEWLIGHT == 0)
-                        movss xmm0, hlighterp_t.n2[edx]
-                        movss xmm1, hlighterp_t.d2[edx]
-                        mulss xmm0, xmm2
-                        mulss xmm1, xmm2
-                        addss xmm0, hlighterp_t.n1[edx]
-                        addss xmm1, hlighterp_t.d1[edx]
-                        mulss xmm0, xmm2
-                        mulss xmm1, xmm2
-                        addss xmm0, hlighterp_t.n0[edx]
-                        addss xmm1, hlighterp_t.d0[edx]
-                        rcpss xmm1, xmm1
-                        mulss xmm0, xmm1
-                        ;divss xmm0, xmm1
-#else
-                        movss xmm0, xmm2
-                        shufps xmm0, xmm0, 0 //<-- pshufd xmm0, sx, 0
-                        mulps xmm0, hlighterp_t.gk2[edx+0]
-                        addps xmm0, hlighterp_t.gk2[edx+4*4]
-                        mulss xmm0, xmm2
-                        addss xmm0, hlighterp_t.gk2[edx+8*4]
-                        rsqrtss xmm1, xmm0
-                        shufps xmm1, xmm1, 0
-                        shufps xmm0, xmm0, 0xf9  ;xmm0:[k3 k3 k2 k1]
-                        mulps xmm0, xmm1
-                        addss xmm0, hlighterp_t.gk[edx+12*4]  ;xmm0:[k3 k3 k2 k1]      [k3 k2 k3 k1]
-                        movhlps xmm1, xmm0       ;xmm1:[ ?  ? k3 k3]
-                        mulps xmm0, xmm1
-                        movss xmm1, xmm0
-                        shufps xmm0, xmm0, 1 //<-- pshufd xmm0, sx, 0
-                        mulss xmm0, xmm1
-                        maxps xmm0, hligterp_maxzero
-#endif
-                        shufps xmm0, xmm0, 0
-                        mulps xmm0, hlighterp_t.bsc[edx]
-                        addps xmm7, xmm0
-                        sub eax, 1
-                        jns short beglig0
-
-                        endlig0: mulps xmm7, g_rgbmul
-#if (USEGAMMAHACK)
-                        rsqrtps xmm7, xmm7
-                        rcpps xmm7, xmm7
-#endif
-                        cvtps2pi mm7, xmm7
-                        movhlps xmm7, xmm7
-                        cvtps2pi mm6, xmm7
-                        packssdw mm7, mm6
-                        movq qs, mm7
-                        emms
-                        }
-#endif
-
-                //Render cols
-                j = ((x-xalign)&(FLATSTEPSIZ-1)); if (j) { xe3 = min(x-j+FLATSTEPSIZ,xe2); goto shline_in2it; }
-                do
-                {
-#if (1)
-                    f = 1.0/d; d += di8; u += ui8; v += vi8; //slow&accurate
-                    iwi[0] = ((((int)(u*f))-iw[0])>>LFLATSTEPSIZ);
-                    iwi[1] = ((((int)(v*f))-iw[1])>>LFLATSTEPSIZ);
-#else
-                    _asm
-                            {
-                            movss xmm0, d
-                            ;rcpss xmm1, xmm0 ;Texture mapping is too fuzzy with this :/
-                            movss xmm1, fone
-                            divss xmm1, xmm0 ;xmm1:1.0/d
-                            addss xmm0, di8
-                            movss xmm2, u
-                            movss xmm3, v
-                            addss xmm2, ui8
-                            addss xmm3, vi8
-                            movss d, xmm0
-                            movss u, xmm2
-                            movss v, xmm3
-                            mulss xmm2, xmm1
-                            mulss xmm3, xmm1
-
-#if (USESSE2 == 0)
-                    unpcklps xmm2, xmm3 ;fast&inaccurate
-                    cvtps2pi mm0, xmm2
-                    psubd mm0, iw
-                    psrad mm0, LFLATSTEPSIZ
-                    movq iwi, mm0
-                    emms
-#else
-                    unpcklps xmm2, xmm3  ;fast&accurate
-
-                    cvtps2pd xmm2, xmm2  ;NOTE:requires SSE2!
-                    addpd xmm2, dmagic   ;NOTE:requires SSE2!
-
-                    movd eax, xmm2       ;NOTE:requires SSE2!
-                    sub eax, iw[0]
-                    sar eax, LFLATSTEPSIZ
-                    mov iwi[0], eax
-
-                    movhlps xmm2, xmm2
-                    movd eax, xmm2       ;NOTE:requires SSE2!
-                    sub eax, iw[4]
-                    sar eax, LFLATSTEPSIZ
-                    mov iwi[4], eax
-#endif
-					}
-#endif
-
-                    xe3 = min(x+FLATSTEPSIZ,xe2);
-                shline_in2it:;
-#if 0
-                    qlig[0] = qamb[0]; qlig[1] = qamb[1]; qlig[2] = qamb[2];
-                    for(lig=liglstn-1;lig>=0;lig--)
-                    {
-                        hlptr = liglst[lig];
-#if (USENEWLIGHT == 0)
-                    f = ((hlptr->n2*xe3 + hlptr->n1)*xe3 + hlptr->n0) /
-                        ((hlptr->d2*xe3 + hlptr->d1)*xe3 + hlptr->d0);
-#else
-                    //see conelight.kc for derivation
-                    f = 1.0/sqrt((xe3*hlptr->gk2[0] + hlptr->gk2[4])*xe3 + hlptr->gk2[8]); //k0
-                    f =         ((xe3*hlptr->gk2[1] + hlptr->gk2[5])*f + hlptr->gk[12])    //k1
-                                *          (xe3*hlptr->gk2[2] + hlptr->gk2[6])*f                     //k2
-                                *          (xe3*hlptr->gk2[3] + hlptr->gk2[7])*f                     //k3
-                                *          (xe3*hlptr->gk2[3] + hlptr->gk2[7])*f;
-                    f = sqrt(max(f,0.0));
-#endif
-                    qlig[0] += f*hlptr->bsc;
-                    qlig[1] += f*hlptr->gsc;
-                    qlig[2] += f*hlptr->rsc;
-					}
-                    qsi[0] = min((int)(qlig[0]*g_rgbmul[0]),32767);
-                    qsi[1] = min((int)(qlig[1]*g_rgbmul[1]),32767);
-                    qsi[2] = min((int)(qlig[2]*g_rgbmul[2]),32767);
-                    _asm movq mm7, qsi
-#else
-                    _asm
-                            {
-                            movaps xmm7, qamb
-                            mov eax, liglstn
-                            sub eax, 1
-                            js short endlig1
-                            cvtsi2ss xmm2, xe3
-
-                            beglig1: mov edx, liglst[eax*4]
-#if (USENEWLIGHT == 0)
-                            movss xmm0, hlighterp_t.n2[edx]
-                            movss xmm1, hlighterp_t.d2[edx]
-                            mulss xmm0, xmm2
-                            mulss xmm1, xmm2
-                            addss xmm0, hlighterp_t.n1[edx]
-                            addss xmm1, hlighterp_t.d1[edx]
-                            mulss xmm0, xmm2
-                            mulss xmm1, xmm2
-                            addss xmm0, hlighterp_t.n0[edx]
-                            addss xmm1, hlighterp_t.d0[edx]
-                            rcpss xmm1, xmm1
-                            mulss xmm0, xmm1
-                            ;divss xmm0, xmm1
-#else
-                            movss xmm0, xmm2
-                            shufps xmm0, xmm0, 0 //<-- pshufd xmm0, sx, 0
-                            mulps xmm0, hlighterp_t.gk2[edx+0]
-                            addps xmm0, hlighterp_t.gk2[edx+4*4]
-                            mulss xmm0, xmm2
-                            addss xmm0, hlighterp_t.gk2[edx+8*4]
-                            rsqrtss xmm1, xmm0
-                            shufps xmm1, xmm1, 0
-                            shufps xmm0, xmm0, 0xf9  ;xmm0:[k3 k3 k2 k1]
-                            mulps xmm0, xmm1
-                            addss xmm0, hlighterp_t.gk[edx+12*4]  ;xmm0:[k3 k3 k2 k1]      [k3 k2 k3 k1]
-                            movhlps xmm1, xmm0       ;xmm1:[ ?  ? k3 k3]
-                            mulps xmm0, xmm1
-                            movss xmm1, xmm0
-                            shufps xmm0, xmm0, 1 //<-- pshufd xmm0, sx, 0
-                            mulss xmm0, xmm1
-                            maxps xmm0, hligterp_maxzero
-#endif
-                            shufps xmm0, xmm0, 0
-                            mulps xmm0, hlighterp_t.bsc[edx]
-                            addps xmm7, xmm0
-                            sub eax, 1
-                            jns short beglig1
-
-                            endlig1: mulps xmm7, g_rgbmul
-#if (USEGAMMAHACK)
-                            rsqrtps xmm7, xmm7
-                            rcpps xmm7, xmm7
-#endif
-                            cvtps2pi mm7, xmm7
-                            movhlps xmm7, xmm7
-                            cvtps2pi mm6, xmm7
-                            packssdw mm7, mm6
-                            }
-#endif
-                    _asm
-                            {
-                            movq mm6, qs
-                            psubw mm7, mm6
-                            psraw mm7, LFLATSTEPSIZ
-
-                            movq mm5, mm7 ;add 1 if negative to avoid overflow
-                            psraw mm5, 15
-                            psubw mm7, mm5
-                            }
-#if (0)
-                    if (!gps->rendinterp)
-                    {
-                        do
-                        {
-                            j = *(int *)(((iw[1]>>ttps)&ymsk) + ((iw[0]>>14)&xmsk) + ttf);
-                            _asm
-                                    {
-                                    punpcklbw mm0, j
-                                    pmulhuw mm0, mm6
-                                    psrlw mm0, 6
-                                    packuswb mm0, mm0
-                                    mov eax, lptr
-                                    mov edx, x
-                                    movd [eax+edx*4], mm0
-                                    paddw mm6, mm7
-                                    }
-                            iw[0] += iwi[0]; iw[1] += iwi[1]; x++;
-                        } while (x < xe3);
-                    }
-                    else
-                    {
-                        do
-                        {
-                            int r0, g0, b0, r1, g1, b1;
-                            unsigned char *u0, *u1, *u2, *u3;
-                            j = ((iw[1]>>ttps)&ymsk) + ttf;
-                            u0 = (unsigned char *)(j + ( (iw[0]>>14)   &xmsk));
-                            u1 = (unsigned char *)(j + (((iw[0]>>14)+4)&xmsk));
-                            u2 = (unsigned char *)(u0+ttp);
-                            u3 = (unsigned char *)(u1+ttp); j = (iw[0]&65535);
-                            b0 = ((((int)u1[0]-(int)u0[0])*j)>>16) + (int)u0[0];
-                            g0 = ((((int)u1[1]-(int)u0[1])*j)>>16) + (int)u0[1];
-                            r0 = ((((int)u1[2]-(int)u0[2])*j)>>16) + (int)u0[2];
-                            b1 = ((((int)u3[0]-(int)u2[0])*j)>>16) + (int)u2[0];
-                            g1 = ((((int)u3[1]-(int)u2[1])*j)>>16) + (int)u2[1];
-                            r1 = ((((int)u3[2]-(int)u2[2])*j)>>16) + (int)u2[2]; j = (iw[1]&65535);
-                            b0 += (((b1-b0)*j)>>16);
-                            g0 += (((g1-g0)*j)>>16);
-                            r0 += (((r1-r0)*j)>>16);
-                            j = (r0<<16)+(g0<<8)+b0;
-                            _asm
-                                    {
-                                    punpcklbw mm0, j
-                                    pmulhuw mm0, mm6
-                                    psrlw mm0, 6
-                                    packuswb mm0, mm0
-                                    mov eax, lptr
-                                    mov edx, x
-                                    movd [eax+edx*4], mm0
-                                    paddw mm6, mm7
-                                    }
-                            iw[0] += iwi[0]; iw[1] += iwi[1]; x++;
-                        } while (x < xe3);
-                    }
-#else
-                	// === SCANLINE RASTERIZATION LOOP ===
-                	// High-performance texture mapping with lighting
-                	// Uses fixed-point arithmetic for speed
-                    if (renderinterp) // Nearest neighbor sampling
-                    {
-                        _asm
-                                {
-                                push esi
-                                push edi
-
-                                movq mm4, iw
-                                mov edx, ttf
-
-                                mov ecx, x
-                                mov eax, xe3
-                                mov edi, lptr
-                                lea edi, [edi+eax*4]
-                                sub ecx, eax
-                                near_beg: pshufw mm0, mm4, 0xdd  ;mm0:[? ?    vi  ui]
-                                pand mm0, qmask
-
-                                pmaddwd mm0, qddmul    ;mm0:[? ? src32.p 4]
-                                movd eax, mm0
-
-                                ;pextrw eax, mm0, 1
-                                ;shl eax, 8 ;byte ptr xshift FIXFIXFIX
-                                ;pextrw esi, mm0, 0
-                                ;lea eax, [eax+esi*4]
-
-                                punpcklbw mm0, [eax+edx]
-                                pmulhuw mm0, mm6
-                                psrlw mm0, 6
-                                packuswb mm0, mm0
-                                movd [edi+ecx*4], mm0
-                                paddd mm4, iwi
-                                paddw mm6, mm7
-                                add ecx, 1
-                                jl short near_beg
-
-                                movq iw, mm4
-                                add ecx, xe3
-                                mov x, ecx
-
-                                pop edi
-                                pop esi
-                                }
-                    }
-                    else
-                    {
-                        _asm
-                                {
-                                push ebx
-                                push esi
-                                push edi
-
-                                movq mm4, iw
-                                mov edx, ttf
-                                mov esi, ttp
-                                add esi, edx
-
-                                mov ecx, x
-                                mov eax, xe3
-                                mov edi, lptr
-                                lea edi, [edi+eax*4]
-                                sub ecx, eax
-                                bilin_beg: pshufw mm0, mm4, 0xdd  ;mm0:[? ?    vi  ui]
-                                pand mm0, qmask
-                                pmaddwd mm0, qddmul    ;mm0:[? ? src32.p 4]
-                                movd eax, mm0
-                                movd mm0, [eax+edx]
-                                movd mm2, [eax+esi]
-                                lea ebx, [eax+4]       ;ui_temp = (ui+1)&(u_width-1)
-                                and ebx, lmask0        ;
-                                and eax, lmask1        ;
-                                add eax, ebx           ;
-                                movd mm1, [eax+edx]
-                                movd mm3, [eax+esi]
-                                pxor mm5, mm5
-                                punpcklbw mm0, mm5
-                                punpcklbw mm1, mm5
-                                punpcklbw mm2, mm5
-                                punpcklbw mm3, mm5
-
-                                psubw mm1, mm0
-                                psubw mm3, mm2
-                                paddw mm1, mm1              ;
-                                paddw mm3, mm3              ;
-
-                                pshufw mm5, mm4, 0x00
-                                psrlw mm5, 1                ;
-                                pmulhw mm1, mm5
-                                pmulhw mm3, mm5
-                                paddw mm0, mm1
-                                paddw mm2, mm3
-
-                                pshufw mm5, mm4, 0xaa
-                                psrlw mm5, 1                ;
-                                psubw mm2, mm0
-                                paddw mm2, mm2              ;
-                                pmulhw mm2, mm5
-                                paddw mm0, mm2
-
-                                psllw mm0, 2                ;
-                                pmulhuw mm0, mm6
-                                packuswb mm0, mm0
-                                movd [edi+ecx*4], mm0
-                                paddd mm4, iwi
-                                paddw mm6, mm7
-                                add ecx, 1
-                                jl short bilin_beg
-
-                                movq iw, mm4
-                                add ecx, xe3
-                                mov x, ecx
-
-                                pop edi
-                                pop esi
-                                pop ebx
-                                }
-                    }
-
-#if 0
-                    //fu = (iw[0]&65535);
-                    //fv = (iw[1]&65535);
-                    //b0 = ((u0[0]*(65535-fu) + u1[0]*fu)>>16);
-                    //g0 = ((u0[1]*(65535-fu) + u1[1]*fu)>>16);
-                    //r0 = ((u0[2]*(65535-fu) + u1[2]*fu)>>16);
-                    //b1 = ((u2[0]*(65535-fu) + u3[0]*fu)>>16);
-                    //g1 = ((u2[1]*(65535-fu) + u3[1]*fu)>>16);
-                    //r1 = ((u2[2]*(65535-fu) + u3[2]*fu)>>16);
-                    //r0 = ((   r0*(65535-fv) +    r1*fv)>>16);
-                    //g0 = ((   g0*(65535-fv) +    g1*fv)>>16);
-                    //b0 = ((   b0*(65535-fv) +    b1*fv)>>16);
-                    __declspec(align(16)) const int sqmask0[4] = {-1,-1,-1,-1};
-                    __declspec(align(16)) const int dqmask1[4] = {-1,-1, 0, 0};
-                    ;xmm0:[ a3  r3  g3  b3  a1  r1  g1  b1]
-                            ;xmm1:[ a2  r2  g2  b2  a0  r0  g0  b0]
-                    movd xmm0, [e?]
-                    movd xmm1, [e?]
-                    movd xmm2, [e?]
-                    movd xmm3, [e?]
-                    punpckldq xmm1, xmm3 || unpcklps xmm1, xmm3
-                    punpckldq xmm0, xmm2 || unpcklps xmm0, xmm2
-                    punpcklbw xmm1, dqzero
-                    punpcklbw xmm0, dqzero
-                    pshuflw xmm2, xmm?, 0x??
-                    movlhlps xmm2, xmm2      ;xmm2:[ fu  fu  fu  fu  fu  fu  fu  fu]
-                    pmulhuw xmm0, xmm2
-                    pxor xmm2, dqmask0       ;xmm2:[~fu ~fu ~fu ~fu ~fu ~fu ~fu ~fu]
-                    pmulhuw xmm1, xmm2
-                    paddw xmm0, xmm1         ;xmm0:[ a1  r1  g1  b1  a0  r0  g0  b0]
-                    pshuflw xmm2, xmm?, 0x??
-                    movlhps xmm2, xmm2       ;xmm1:[ fv  fv  fv  fv ~fv ~fv ~fv ~fv]
-                    pxor xmm2, dqmask1
-                    pmulhuw xmm0, xmm2
-                    movhlps xmm1, xmm0
-                    paddw xmm0, xmm1         ;xmm0:[  ?   ?   ?   ?  a   r   g   b ]
-
-#endif
-
-#endif
-                    _asm
-                            {
-                            movq qs, mm6
-                            emms
-                            }
-                } while (x < xe2);
-#ifdef STANDALONE
-                if (keystatus[0x2a]) lptr[xe2-1] = 0xffffff;
-#endif
-            }
-        }
-
-        //Inc x-steps
-        for(i=pn3-1;i>=0;i--) rast[i].pos += rast[i].inc;
-        for(l=plnumi-1;l>=0;l--)
-            for(i=lpn3[l]-1;i>=0;i--)
-                prast[l][i].pos += prast[l][i].inc;
-    }
 }
 #if 0
 !endif

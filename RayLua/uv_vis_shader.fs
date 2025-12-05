@@ -11,7 +11,7 @@ void main()
 {
     // Use UV coordinates directly as colors
     // U -> Red channel, V -> Green channel
-    vec4 uvColor = vec4(fract(fragTexCoord.x), fract(fragTexCoord.y), 0.5, 1);
+    vec4 uvColor = vec4(fract(fragTexCoord.x), fract(fragTexCoord.y), 0.2, 1);
 
     // Optional: Add grid lines for better visualization
    // vec2 grid = abs(fract(fragTexCoord * 8.0) - 0.5) / fwidth(fragTexCoord * 8.0);

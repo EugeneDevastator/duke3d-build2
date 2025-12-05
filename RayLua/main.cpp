@@ -21,6 +21,7 @@
 #include <chrono>
 
 #include "DumbRender.hpp"
+//#include "MonoTest.hpp"
 //#include "luabinder.hpp"
 #include "DumbCore.hpp"
 #include "raymath.h"
@@ -245,7 +246,11 @@ void UnloadCustomRenderTarget(CustomRenderTarget target) {
 }
 // Draw palette and texture preview on screen
 void MainLoop()
-{        DisableCursor();
+{
+    DisableCursor();
+    //RunVisualization();  // use this for mono sample.
+    //return;
+
     DumbRender::Init();
     auto map = DumbRender::GetMap();
     DumbCore::Init(map);
@@ -294,7 +299,7 @@ void MainLoop()
                           {0, 0, 800, -600}, {0, 0}, WHITE);
 
             // Multiply blend lights
-            BeginBlendMode(RL_BLEND_MULTIPLIED);
+            BeginBlendMode(RL_BLEND_ADDITIVE);
             DrawTextureRec({lightTarget.colorTexture, 800, 600, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
                           {0, 0, 800, -600}, {0, 0}, WHITE);
             EndBlendMode();

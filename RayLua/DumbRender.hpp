@@ -69,14 +69,15 @@ static int numFloorMeshes = 0;
 static Texture2D* runtimeTextures;
 static mapstate_t* map;
 static long gnumtiles_i, gmaltiles_i, gtilehashead_i[1024];
-static bool drawWalls = true;
+static bool drawWalls = false;
 static bool drawSpris = true;
-static bool drawCeils = true;
+static bool drawCeils = false;
 static player_transform plr;
 static Shader uvShader ;
 static Shader lightShader ;
 static int lightPosLoc;
 static int lightRangeLoc;
+static bool syncam = true;
 class DumbRender
 {
 
@@ -102,7 +103,7 @@ public:
         LoadPal(rootpath);
         LoadMapAndTiles();
         shadowtest2_numlights=0;
-        //Sprite hacks
+        //init lights
         for(int i=0;i<map->numspris;i++)
         {
             map->spri[i].owner = -1;
@@ -113,6 +114,78 @@ public:
                 map->spri[i].flags |= SPRITE_B2_IS_LIGHT;
                 if (map->light_sprinum < MAXLIGHTS)
                     map->light_spri[map->light_sprinum++] = i;
+            }
+        }
+// init portals; walls test
+        for (int i = 0; i < map->numsects; i++) { // wall ports
+            for (int wn = 0; wn < map->sect[i].n; wn++) {
+                map->sect[i].wall[wn].tags[1] = -1;
+                if (map->sect[i].wall[wn].surf.pal == 30) {
+                    portal &p = portals[portaln];
+                    p.id = map->sect[i].wall[wn].surf.lotag;
+                    p.sect = i;
+                    p.anchorspri = map->sect[i].headspri;
+                    p.surfid = wn;
+                    p.kind = PORT_WALL;
+
+                    map->sect[i].wall[wn].tags[1] = portaln;
+                    p.destpn = map->sect[i].wall[wn].surf.hitag;
+                    portaln++;
+                }
+            }
+        }
+
+        for (int i = 0; i < map->numsects; i++) { // floor ceil ports
+            map->sect[i].tags[1] = -1;
+            if (map->sect[i].surf[1].pal == 30 || map->sect[i].surf[0].pal == 30) {
+                portal &p = portals[portaln];
+                p.id = map->sect[i].surf[1].lotag;
+                p.sect = i;
+                p.anchorspri = map->sect[i].headspri;
+
+                //p.surfid = map->sect[i].surf[1].lotag; // hak to determine ceil or floor in map lotag1==floor.
+                int sid1 = abs(map->spri[p.anchorspri].p.z - map->sect[i].z[1]);
+                int sid2 = abs(map->spri[p.anchorspri].p.z - map->sect[i].z[0]);
+                p.surfid = sid1 < sid2;
+                map->spri[p.anchorspri].p.z = map->sect[i].z[p.surfid]; // resolve flor ceil in future
+                p.kind = p.surfid;
+                spri_t *spr = &map->spri[p.anchorspri];
+              //  point3d newr = spr->tr.r;
+                point3d newd = spr->tr.f;
+                point3d newf = spr->tr.d;
+            //    vmulscal(&newr,-1.0f);
+             ///   if (p.surfid==1) {
+                  //  vmulscal(&newd,-1.0f);
+                    vmulscal(&newf,-1.0f);
+               // }
+              //  vmulscal(&spr->tr.r,-1);
+                spr->tr.d = newd;
+                spr->tr.f = newf;
+                p.destpn = map->sect[i].surf[1].hitag;
+                map->sect[i].tags[1] = portaln;
+                portaln++;
+            }
+        }
+
+        for (int i = 0; i < portaln; i++) {
+            int target_tag = portals[i].destpn; // currently stores expected hitag
+            portals[i].destpn = -1; // mark as unresolved
+
+
+            // Find portal with matching lowtag
+            for (int j = 0; j < portaln; j++) {
+                if (i == j) continue; // skip self, disable for mirror
+                int id = portals[j].id;
+                if (id == target_tag) {
+                    portals[i].destpn = j;
+                    break;
+                }
+            }
+
+            // Optional: warn about unresolved portals
+            if (portals[i].destpn == -1) {
+                // Portal destination not found
+                printf("Warning: Portal %d with target lotag %d has no matching hitag\n", i, target_tag);
             }
         }
         // auto paltex = ConvertPalToTexture();
@@ -192,7 +265,7 @@ public:
         numFloorMeshes = map->numsects * 2; // floor + ceiling
         floorMeshes = (FloorMeshData*)calloc(numFloorMeshes, sizeof(FloorMeshData));
 
-
+        if (false)
         for (int s = 0; s < map->numsects; s++)
         {
             sect_t* sect = &map->sect[s];
@@ -267,7 +340,39 @@ public:
             }
         }
     }
-
+    static bool draw_eyepol_scrspace(float sw, float sh, int i, int &v0dumm, int &vertCountdd) {
+        int v0 = eyepol[i].vert0;
+        int v1 = eyepol[i + 1].vert0;
+        int vertCount = v1 - v0;
+        if (vertCount < 3) return true;
+        // Check if polygon is clipped
+        float *ouvmat = eyepol[i].ouvmat;
+        {
+            //   BeginShaderMode(uvShader);
+            rlBegin(RL_TRIANGLES);
+            for (int j = 1; j < vertCount - 1; j++) {
+                int idx[] = {v0, v0 + j, v0 + j + 1};
+                for (int k = 0; k < 3; k++) {
+                    Vector2 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y};
+                    //float *ouvmat = eyepol[i].ouvmat;
+                    float depth = ouvmat[0] * pt.x + ouvmat[3] * pt.y + ouvmat[6];
+                    float u = ouvmat[1] * pt.x + ouvmat[4] * pt.y + ouvmat[7];
+                    float v = ouvmat[2] * pt.x + ouvmat[5] * pt.y + ouvmat[8];
+                    float f = 1.0 / depth;
+                    float final_u = u * f / (65536.0f * 64); // Corrected texture coordinate
+                    float final_v = v * f / (65536.0f * 64);
+                    rlColor4f(1, 1, fabs(depth), 0.2);
+                    rlTexCoord2f(final_u, final_v);
+                    //  rlNormal3f(0,1,0);
+                    rlVertex2f(pt.x, pt.y);
+                }
+            }
+            rlEnd();
+            // EndShaderMode();
+            rlDrawRenderBatchActive();
+        } // eypol polys
+        return false;
+    }
     static void DrawEyePoly(float sw, float sh, player_transform *playr, cam_t *cam) {
         dpoint3d dp, dr, dd, df;
         long i, j, k, l, m, flashlight1st;
@@ -295,7 +400,22 @@ public:
         cam->z.x = sw;
         cam->z.y = sh;
 
-
+        if (false)//((!useLights) || (gdps->cursect < 0))
+        {
+            cam->r.x = 1.f; cam->r.y = 0.f; cam->r.z = 0.f;
+            cam->d.x = 0.f; cam->d.y = 1.f; cam->d.z = 0.f;
+            cam->f.x = 0.f; cam->f.y = 0.f; cam->f.z = 1.f;
+            cam->p.x = 0.f; cam->p.y = 0.f; cam->p.z = 0.f;
+            //	drawkv6_numlights = -1;
+            //	drawview(&cam,gdps,0);
+        }
+        else {
+            cam->r.x = playr->irig.x; cam->r.y = playr->irig.y; cam->r.z = playr->irig.z;
+            cam->d.x = playr->idow.x; cam->d.y = playr->idow.y; cam->d.z = playr->idow.z;
+            cam->f.x = playr->ifor.x; cam->f.y = playr->ifor.y; cam->f.z = playr->ifor.z;
+            cam->p.x = playr->ipos.x; cam->p.y = playr->ipos.y; cam->p.z = playr->ipos.z;
+            cam->cursect = playr->cursect;
+        }
 
  // Main render scope
 			shadowtest2_useshadows = 1;//b2opts.shadows;
@@ -333,7 +453,8 @@ public:
 
         //---
         shadowtest2_rendmode = 2;
-        draw_hsr_polymost(cam, map, playr, playr->cursect);
+        reset_context();
+        draw_hsr_polymost(cam, map,0);
         shadowtest2_rendmode = 4;
 
        // shadowtest2_numlights =1;
@@ -346,63 +467,53 @@ public:
             for(glignum=0;glignum<shadowtest2_numlights;glignum++)
             {
                 ncam.p = shadowtest2_light[glignum].p;
-                draw_hsr_polymost(&ncam,map,&plr,shadowtest2_light[glignum].sect);
+                reset_context();
+                ncam.cursect = shadowtest2_light[glignum].sect;
+                draw_hsr_polymost(&ncam,map,0);
             }
         }
         shadowtest2_setcam(cam);
+        cam->p = playr->ipos; cam->r = playr->irig; cam->d = playr->idow; cam->f = playr->ifor;
+        cam->h.x = playr->ghx; cam->h.y = playr->ghy; cam->h.z = playr->ghz;
     }
-static void recalculateOuvmat(point2d* clippedVerts, int vertCount, float* originalOuvmat, float* newOuvmat) {
-    if (vertCount < 3) return;
 
-    // Use first 3 vertices to rebuild the matrix
-    point2d p0 = clippedVerts[0];
-    point2d p1 = clippedVerts[1];
-    point2d p2 = clippedVerts[2];
+    static bool draw_eyepol_wspace(float sw, float sh, int i, int &v0, int &vertCount) {
+            v0 = eyepol[i].vert0;
+            int v1 = eyepol[i + 1].vert0;
+            vertCount = v1 - v0;
+            if (vertCount < 3) return true;
 
-    // Calculate original depths for these points using old matrix
-    float d0 = originalOuvmat[0]*p0.x + originalOuvmat[3]*p0.y + originalOuvmat[6];
-    float d1 = originalOuvmat[0]*p1.x + originalOuvmat[3]*p1.y + originalOuvmat[6];
-    float d2 = originalOuvmat[0]*p2.x + originalOuvmat[3]*p2.y + originalOuvmat[6];
+            float *ouvmat = eyepol[i].ouvmat;
+        rlDrawRenderBatchActive();
+           // BeginShaderMode(uvShader);
+            rlBegin(RL_TRIANGLES);
+            glEnable(GL_POLYGON_OFFSET_FILL);
+            glPolygonOffset(-0.5f, 1.0f);
+rlDisableDepthMask();
+        for (int j = 1; j < vertCount - 1; j++) {
+            int idx[] = {v0, v0 + j, v0 + j + 1};
+            for (int k = 0; k < 3; k++) {
+                Vector3 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y, eyepolv[idx[k]].z};
 
-    // Calculate original UV coordinates
-    float u0 = (originalOuvmat[1]*p0.x + originalOuvmat[4]*p0.y + originalOuvmat[7]) / d0;
-    float v0 = (originalOuvmat[2]*p0.x + originalOuvmat[5]*p0.y + originalOuvmat[8]) / d0;
-    float u1 = (originalOuvmat[1]*p1.x + originalOuvmat[4]*p1.y + originalOuvmat[7]) / d1;
-    float v1 = (originalOuvmat[2]*p1.x + originalOuvmat[5]*p1.y + originalOuvmat[8]) / d1;
-    float u2 = (originalOuvmat[1]*p2.x + originalOuvmat[4]*p2.y + originalOuvmat[7]) / d2;
-    float v2 = (originalOuvmat[2]*p2.x + originalOuvmat[5]*p2.y + originalOuvmat[8]) / d2;
+                // CORRECTED UV transformation
+                float u = ouvmat[1] * pt.x + ouvmat[4] * pt.y + ouvmat[7] * pt.z;
+                float v = ouvmat[2] * pt.x + ouvmat[5] * pt.y + ouvmat[8] * pt.z;
 
-    // Solve for new matrix coefficients
-    // d = ax + by + c, u*d = dx + ey + f, v*d = gx + hy + i
-    float det = (p1.x - p0.x) * (p2.y - p0.y) - (p2.x - p0.x) * (p1.y - p0.y);
-    if (fabs(det) < 1e-6) return; // Degenerate
+                float final_u = u ;/// (65536.0f);
+                float final_v = v;// / (65536.0f);
 
-    // Solve 3x3 system for depth coefficients
-    newOuvmat[0] = ((d1-d0)*(p2.y-p0.y) - (d2-d0)*(p1.y-p0.y)) / det;
-    newOuvmat[3] = ((d2-d0)*(p1.x-p0.x) - (d1-d0)*(p2.x-p0.x)) / det;
-    newOuvmat[6] = d0 - newOuvmat[0]*p0.x - newOuvmat[3]*p0.y;
-
-    // Solve for U coefficients
-    float ud0 = u0*d0, ud1 = u1*d1, ud2 = u2*d2;
-    newOuvmat[1] = ((ud1-ud0)*(p2.y-p0.y) - (ud2-ud0)*(p1.y-p0.y)) / det;
-    newOuvmat[4] = ((ud2-ud0)*(p1.x-p0.x) - (ud1-ud0)*(p2.x-p0.x)) / det;
-    newOuvmat[7] = ud0 - newOuvmat[1]*p0.x - newOuvmat[4]*p0.y;
-
-    // Solve for V coefficients
-    float vd0 = v0*d0, vd1 = v1*d1, vd2 = v2*d2;
-    newOuvmat[2] = ((vd1-vd0)*(p2.y-p0.y) - (vd2-vd0)*(p1.y-p0.y)) / det;
-    newOuvmat[5] = ((vd2-vd0)*(p1.x-p0.x) - (vd1-vd0)*(p2.x-p0.x)) / det;
-    newOuvmat[8] = vd0 - newOuvmat[2]*p0.x - newOuvmat[5]*p0.y;
-}
-    static bool isPolygonClipped(point2d* verts, int vertCount, Rectangle screenBounds) {
-        for (int i = 0; i < vertCount; i++) {
-            if (verts[i].x < screenBounds.x || verts[i].x > screenBounds.x + screenBounds.width ||
-                verts[i].y < screenBounds.y || verts[i].y > screenBounds.y + screenBounds.height) {
-                return true;
-                }
+                rlColor4f(0.7, 0.2, eyepol[i].rdepth/5.0f, 0.7);
+                rlTexCoord2f(final_u, final_v);
+                rlVertex3f(pt.x, -pt.z, pt.y);
+            }
         }
-        return false;
-    }
+
+            rlEnd();
+       //     EndShaderMode();
+            rlDrawRenderBatchActive();
+        glDisable(GL_POLYGON_OFFSET_FILL);
+            return false;
+        }
 
     static void DrawPost3d(float sw, float sh, Camera3D camsrc) {
         // Vector2 v1 = {0, 0};
@@ -412,74 +523,78 @@ static void recalculateOuvmat(point2d* clippedVerts, int vertCount, float* origi
         ClearBackground({50,50,60,255});  // Set your desired color
 
         cam_t b2cam;
-        plr.ipos = {camsrc.position.x, camsrc.position.z, -camsrc.position.y};
-        b2cam.p = plr.ipos;
-        b2cam.f = plr.ifor;
-        b2cam.r = plr.irig;
-        b2cam.d = plr.idow;
+        if (syncam) {
+            plr.ipos = {camsrc.position.x, camsrc.position.z, -camsrc.position.y};
+            updatesect_imp(plr.ipos.x,plr.ipos.y,plr.ipos.z, &plr.cursect, map);
+
+            Vector3 forward = Vector3Normalize(Vector3Subtract(camsrc.target, camsrc.position));
+            Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camsrc.up));
+            Vector3 up = Vector3CrossProduct(right, forward); // Recalculate orthogonal up
+
+            // Convert to Build2 coordinate system (x->x, y->z, z->-y)
+            plr.ifor.x = forward.x;  plr.ifor.y = forward.z;  plr.ifor.z = -forward.y;
+            plr.irig.x = right.x;    plr.irig.y = right.z;    plr.irig.z = -right.y;
+            plr.idow.x = -up.x;       plr.idow.y = -up.z;       plr.idow.z = up.y;
+
+
+            b2cam.p = plr.ipos;
+            b2cam.f = plr.ifor;
+            b2cam.r = plr.irig;
+            b2cam.d = plr.idow;
+        }
+
+        if (IsKeyPressed(KEY_U))
+            syncam = !syncam;
 
         DrawEyePoly(sw, sh, &plr, &b2cam); // ken render
 
         // Eyepol polys
+        bool draweye = true;
+        bool drawlines = true;
+        bool drawlights = false;
 
         rlDisableBackfaceCulling();
-       // if (!eyepol || !eyepolv || eyepoln <= 0) return;
-        if (false) {
-            for (int i = 0; i < eyepoln; i++) { // eypolis
-                int v0 = eyepol[i].vert0;
-                int v1 = eyepol[i + 1].vert0;
-                int vertCount = v1 - v0;
-                if (vertCount < 3) continue;
-                // Check if polygon is clipped
-                Rectangle screenBounds = {0, 0, sw, sh};
-                point2d *polyVerts = &eyepolv[v0];
+        BeginMode3D(camsrc);
 
-                float *ouvmat = eyepol[i].ouvmat;
-                float di8 = ouvmat[0] * FLATSTEPSIZ;
-                // float j;
-                // if (di8 < 0) j = ((x-xe+1)&(FLATSTEPSIZ-1)); else j = 0;
 
-                {
-                    //   BeginShaderMode(uvShader);
-                    rlBegin(RL_TRIANGLES);
-                    for (int j = 1; j < vertCount - 1; j++) {
-                        int idx[] = {v0, v0 + j, v0 + j + 1};
-                        for (int k = 0; k < 3; k++) {
-                            Vector2 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y};
-                            //float *ouvmat = eyepol[i].ouvmat;
-                            float depth = ouvmat[0] * pt.x + ouvmat[3] * pt.y + ouvmat[6];
-                            float u = ouvmat[1] * pt.x + ouvmat[4] * pt.y + ouvmat[7];
-                            float v = ouvmat[2] * pt.x + ouvmat[5] * pt.y + ouvmat[8];
-                            float f = 1.0 / depth;
-                            float final_u = u * f / (65536.0f * 64); // Corrected texture coordinate
-                            float final_v = v * f / (65536.0f * 64);
-                            rlColor4f(1, 1, fabs(depth), 0.2);
-                            rlTexCoord2f(final_u, final_v);
-                            //  rlNormal3f(0,1,0);
-                            rlVertex2f(pt.x, pt.y);
-                        }
-                    }
-                    rlEnd();
-                    // EndShaderMode();
-                    rlDrawRenderBatchActive();
-                } // eypol polys
+        if (draweye && (!(!eyepol || !eyepolv || eyepoln <= 0)))
+            {
+            for (int i = 0; i < eyepoln; i++) {
+                // eypolis
+                int v0;
+                int vertCount;
+                BeginBlendMode(BLEND_ADDITIVE);
+                if (draw_eyepol_wspace(sw, sh, i, v0, vertCount)) continue;
+
+                if (drawlines)
                 {
                     rlBegin(RL_LINES);
-                    for (int j = 1; j < vertCount - 1; j++) {
-                        int idx[] = {v0, v0 + j, v0 + j + 1};
-                        for (int k = 0; k < 3; k++) {
-                            Vector2 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y};
-                            rlColor4f(0, 1, 1, 1);
-                            rlVertex2f(pt.x, pt.y);
-                        }
+                    rlDisableDepthMask();
+                    glEnable(GL_POLYGON_OFFSET_FILL);
+                    glPolygonOffset(-1.0f, 1.0f);
+                    rlColor4f(0, 1, 1, 1);
+                    for (int j = 0; j < vertCount; j++) {
+                       //int idx[] = {v0, v0 + j, v0 + j + 1};
+                       //for (int k = 0; k < 3; k++) {
+                           // Vector3 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y,eyepolv[idx[k]].z};
+                            Vector3 pt = {eyepolv[v0+j].x, eyepolv[v0+j].y,eyepolv[v0+j].z};
+                            rlVertex3f(pt.x,-pt.z, pt.y);
+                       // }
                     }
+                    Vector3 pt = {eyepolv[v0].x, eyepolv[v0].y,eyepolv[v0].z};
+                    rlVertex3f(pt.x,-pt.z, pt.y);
+
                     rlEnd();
+                    glDisable(GL_POLYGON_OFFSET_FILL);
+                    rlEnableDepthMask();
                 } // eyepol lines for each poly
+                EndBlendMode();
             }
         }
+        EndMode3D();
         //if (!lightpos_t || !eyepolv || eyepoln <= 0) return;}
 
-        { // Light polys
+        if (drawlights) { // Light polys
 
             BeginMode3D(camsrc);
             rlDisableBackfaceCulling();
@@ -504,8 +619,7 @@ static void recalculateOuvmat(point2d* clippedVerts, int vertCount, float* origi
 
                     //   BeginShaderMode(uvShader);
                     rlBegin(RL_TRIANGLES);
-                    glEnable(GL_POLYGON_OFFSET_FILL);
-                    glPolygonOffset(-1.0f, 1.0f);
+
                     //rlSetTexture(0);
                     for (int j = 1; j < vertCount - 1; j++) {
                         int idx[] = {v0, v0 + j, v0 + j + 1};
@@ -520,7 +634,7 @@ static void recalculateOuvmat(point2d* clippedVerts, int vertCount, float* origi
                         }
                     }
                    rlDrawRenderBatchActive();
-                    glDisable(GL_POLYGON_OFFSET_FILL);
+
 
                     rlEnd();
 
@@ -528,6 +642,7 @@ static void recalculateOuvmat(point2d* clippedVerts, int vertCount, float* origi
             }
             EndShaderMode();
             EndBlendMode();
+            glDisable(GL_POLYGON_OFFSET_FILL);
             rlEnableDepthMask();
             EndMode3D();
         }
@@ -1442,7 +1557,7 @@ private:
             if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
             map->blankheadspri = i;
         }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/LIG.MAP", map);
+        loadmap_imp((char*)"c:/Eugene/Games/build2/prt3.MAP", map);
     }
 };
 

@@ -6,6 +6,7 @@
 #pragma once
 #include <math.h>
 #include <malloc.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -43,7 +44,11 @@ typedef struct { intptr_t f; int p, x, y; } tiletype;
 typedef struct {
 	// color, zbuf
 	tiltyp c, z;
-	point3d p, r, d, f, h; } cam_t;
+	union { transform tr; struct { point3d p, r, d, f; }; };
+	point3d h;
+	int cursect;
+} cam_t;
+
 
 #endif
 
@@ -51,7 +56,36 @@ typedef struct { int w, s; } vertlist_t;
 typedef struct { float x, y, z, u, v; int n; } kgln_t;
 typedef struct { double x, y, z; long n, filler; } genpoly_t;
 
+typedef struct {
+	point3d position_offset;
+	point3d rotation_axis;
+	float rotation_angle;
+	float transform_matrix[16];  // 4x4 transformation matrix
+	bool is_active;
+	int entry_sprite_id;
+	int target_sprite_id;
+} portal_transform_t;
 
+#define PORT_WALL 2
+#define PORT_FLOR 1
+#define PORT_CEIL 0
+#define PORT_SPRI 3
+
+typedef struct {
+	// calculate only diff between sprites. ideally forward facing along normal.
+	// target portal idx
+	uint16_t destpn; // sprite in sector that defines portal transform - use position and forward vector for now.
+	uint16_t surfid; // either wall, floor sprite etc. depends on kind;
+	uint16_t anchorspri;
+	uint16_t sect;
+	uint16_t id;
+	// 0 = ceil, 1= floor, 2 = wall, 3 = sprite itself.
+	uint8_t kind;
+} portal;
+
+
+extern int portaln;
+extern portal portals[100];
 
 
 static _inline void dcossin (double a, double *c, double *s)

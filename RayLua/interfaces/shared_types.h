@@ -104,6 +104,15 @@
 typedef struct { float x, y, z; } point3d;
 typedef struct { double x, y, z; } dpoint3d; 	//Note: pol doesn't support loops as dpoint3d's!
 typedef struct { float x, y; } point2d;
+static void vmulscal(point3d *p, float s) {
+	p->x*=s;
+	p->y*=s;
+	p->z*=s;
+}
+typedef struct {
+	point3d p, r, d, f;
+} transform;
+
 	//Map format:
 typedef struct {
 // view.xpos += xsize*scale * normal_offset * global_ppi.
@@ -144,7 +153,7 @@ typedef struct
 
 typedef struct
 {
-	point3d p, r, d, f;      //Position, orientation (right, down, forward)
+	union { transform tr; struct { point3d p, r, d, f; }; };
 	point3d v, av;           //Position velocity, Angular velocity (direction=axis, magnitude=vel)
 	float fat, mas, moi;     //Physics (moi=moment of inertia)
 	long tilnum;             //Model file. Ex:"TILES000.ART|64","CARDBOARD.PNG","CACO.KV6","HAND.KCM","IMP.MD3"
@@ -156,7 +165,8 @@ typedef struct
 	//Bit0:Blocking, Bit2:1WayOtherSide, Bit5,Bit4:Face/Wall/Floor/.., Bit6:1side, Bit16:IsLight, Bit17-19:SpotAx(1-6), Bit20-29:SpotWid, Bit31:Invisible
 	union { long flags; struct { char _f1, _f2, _f3, pal; }; }; // temporary pal storage
 
-	long sect, sectn, sectp; //Current sector / doubly-linked list of indices
+	long sect; //Current sector
+	long sectn, sectp; // doubly-linked list of indices
 	int32_t tags[16];
 	///
 	uint8_t modid; // mod id - for game processors, like duke, doom, etc. 0 is reserved for core entities.

@@ -2,6 +2,7 @@
 #define SHADOWTEST2_H
 
 #include "scenerender.h"
+#include "monoclip.h"
 
 // ================================================================================================
 // CONSTANTS AND CONFIGURATION
@@ -47,32 +48,6 @@ typedef struct {
     int ligpolvn, ligpolvmal;           // Count and allocated size of ligpolv array
 } lightpos_t;
 
-// ================================================================================================
-// POLYGONAL SCENE CLIPPING DATA STRUCTURES
-// ================================================================================================
-
-/** Wall segment bunch for front-to-back sorting */
-typedef struct {
-    int sec, wal0, wal1;                // Sector index and wall range
-    double fra0, fra1;                  // Parametric fractions for wall clipping
-} bunch_t;
-
-/** Bunch intersection data for polygon splitting */
-typedef struct {
-    int bun, sid;                       // Bunch index and intersection side (1:/, 2:\)
-    int wal;                            // Wall index on sector
-    double fra;                         // Intersection point ratio [0.0..1.0]
-} bfint_t;
-
-/** Temporary vertex structure for bunch processing
-* 	//for twal, it is always safe to allocate sector's number of walls + 1 indices
-typedef struct { int i; double x, y; } bunchverts_t; //temp structure holding verts of bunch - easier to work with
-
- */
-typedef struct {
-    int i;                              // Original wall index
-    double x, y;                        // Clipped coordinates
-} bunchverts_t;
 
 // ================================================================================================
 // SOFTWARE RENDERING DATA STRUCTURES
@@ -87,6 +62,7 @@ typedef struct {
     tile_t *tpic;                       // Texture tile pointer
     float ouvmat[9];                    // inverse perspective transformation
     point3d norm;                       // Surface normal vector
+    int rdepth;
 } eyepol_t;
 
 // ================================================================================================
@@ -107,7 +83,7 @@ extern int shadowtest2_sectgotn;                // Size of global sector bit arr
 // Rendering mode control
 extern int shadowtest2_rendmode;                // Current rendering mode (0-4)
 extern eyepol_t *eyepol; // 4096 eyepol_t's = 192KB
-extern point2d *eyepolv; //16384 point2d's  = 128KB
+extern point3d *eyepolv; //16384 point2d's  = 128KB
 extern int eyepoln, glignum;
 extern int eyepolmal, eyepolvn, eyepolvmal;
 
@@ -118,7 +94,7 @@ extern int eyepolmal, eyepolvn, eyepolvmal;
 /** Main sector scanning with near-plane clipping
  * @param sectnum Sector index to scan and add to bunch list
  */
-void scansector(int sectnum);
+void scansector(int sectnum, bunchgrp *b);
 
 /** Polygon front-to-back sorting and intersection testing
  * @param b0 First bunch index for comparison
@@ -126,14 +102,14 @@ void scansector(int sectnum);
  * @param fixsplitnow Whether to generate split data for intersections
  * @return 0=no overlap, 1=b0 front, 2=b1 front, 3=unsortable
  */
-int bunchfront(int b0, int b1, int fixsplitnow);
+int bunchfront(int b0, int b1, int fixsplitnow, bunchgrp *b);
 
 /** Prepares wall segments for bunch processing
  * @param b Bunch index to process
  * @param twal Output array for wall vertices (must be sector.n+1 size)
  * @return Number of vertices generated
  */
-int prepbunch(int b, bunchverts_t *twal);
+int prepbunch(int id, bunchverts_t *twal, bunchgrp* b);
 
 /** Clips polygons to viewing frustum before rendering
  * @param tag Current portal tag
@@ -142,7 +118,7 @@ int prepbunch(int b, bunchverts_t *twal);
  * @param plothead1 Second polygon loop head
  * @param flags Clipping flags: &1=do and, &2=do sub, &4=reverse cut for sub
  */
-void drawpol_befclip(int tag, int newtag, int plothead0, int plothead1, int flags);
+void drawpol_befclip(int tag, int newtag, int newtagsect, int plothead0, int plothead1, int flags,bunchgrp *b);
 
 /** Main HSR (Hidden Surface Removal) function handling both clipping and rendering
  * @param cc Camera parameters
@@ -150,17 +126,19 @@ void drawpol_befclip(int tag, int newtag, int plothead0, int plothead1, int flag
  * @param lps Player state with rendering settings
  * @param cursect Current sector index
  */
-void draw_hsr_polymost(cam_t *cc, mapstate_t *lgs, player_transform *lps, int cursect);
-
+void reset_context();
+void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy);
+void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx);
 // ================================================================================================
 // POLYGONAL SHADOW CREATION FUNCTIONS
 // ================================================================================================
-
+void draw_hsr_enter_portal(mapstate_t* map, int endportaln, bunchgrp *b, int plothead0, int plothead1);
+void gentex_xform (float *ouvmat, bunchgrp *b);
 /** Creates shadow polygon lists for light sources
  * @param rethead0 First polygon loop head from clipping
  * @param rethead1 Second polygon loop head from clipping
  */
-void ligpoltagfunc(int rethead0, int rethead1);
+void ligpoltagfunc(int rethead0, int rethead1, bunchgrp *b);
 
 /** Resets light polygon data structures
  * @param ind Light index to reset (-1 for all lights)
@@ -199,13 +177,13 @@ void eyepol_drawfunc(int ind);
  * @param rethead0 First polygon loop head
  * @param rethead1 Second polygon loop head
  */
-void drawtagfunc(int rethead0, int rethead1);
+void drawtagfunc(int rethead0, int rethead1, bunchgrp * b);
 
 /** Software skybox rendering
  * @param rethead0 First polygon loop head
  * @param rethead1 Second polygon loop head
  */
-void skytagfunc(int rethead0, int rethead1);
+void skytagfunc(int rethead0, int rethead1, bunchgrp * b);
 
 // Texture coordinate generation functions
 //void gentex_wall(void *npol2, void *sur);       // Wall texture mapping
@@ -220,12 +198,12 @@ void skytagfunc(int rethead0, int rethead1);
  * @param rethead0 First polygon loop head
  * @param rethead1 Second polygon loop head
  */
-void changetagfunc(int rethead0, int rethead1);
+void changetagfunc(int rethead0, int rethead1, bunchgrp* b);
 
 /** Processes wall segments, handles both clipping and rendering setup
- * @param b Bunch index to process
+ * @param bid Bunch index to process
  */
-void drawalls(int b, mapstate_t* map);
+void drawalls(int bid, mapstate_t* map, bunchgrp *b);
 
 /** Renders sprites with lighting if available */
 void drawsprites();

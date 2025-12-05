@@ -364,7 +364,7 @@ int mono_max(int hd0, int hd1, int maxsid, int mode) {
     return (mp[ho].n);
 }
 
-int mono_clipself(int hd0, int hd1, void (*mono_output)(int h0, int h1)) {
+int mono_clipself(int hd0, int hd1, bunchgrp* b, void (*mono_output)(int h0, int h1,bunchgrp* b)) {
     double f, g, ix, iy, dx, dy, dx2, dy2, x0[2], y0[2], x1[2], y1[2];
     int i, j, k, ogood, good, hd[2], ind[2], ho[2], outnum = 0;
 
@@ -423,7 +423,7 @@ int mono_clipself(int hd0, int hd1, void (*mono_output)(int h0, int h1)) {
                 for (k = 2 - 1; k >= 0; k--) { ho[k] = mono_ins2d(ho[k], ix, iy); }
             }
             if (!good) {
-                mono_output(mp[ho[0]].n, mp[ho[1]].n);
+                mono_output(mp[ho[0]].n, mp[ho[1]].n,b);
                 ho[0] = -1;
                 ho[1] = -1;
                 outnum++;
@@ -445,7 +445,7 @@ int mono_clipself(int hd0, int hd1, void (*mono_output)(int h0, int h1)) {
 
     for (k = 2 - 1; k >= 0; k--) if (ho[k] >= 0) { ho[k] = mp[ho[k]].n; }
 bad:;
-    mono_output(ho[0], ho[1]);
+    mono_output(ho[0], ho[1],b);
     if ((ho[0] >= 0) && (ho[1] >= 0)) outnum++;
     return (outnum);
 }
@@ -524,7 +524,7 @@ int mono_join(int hd0, int hd1, int hd2, int hd3, int *ho0, int *ho1) {
     return (1);
 }
 
-void mono_bool(int hr0, int hr1, int hw0, int hw1, int boolop, void (*mono_output)(int h0, int h1)) {
+void mono_bool(int hr0, int hr1, int hw0, int hw1, int boolop, bunchgrp* b, void (*mono_output)(int h0, int h1,bunchgrp* b)) {
     int hd0, hd1;
 
     if (boolop == MONO_BOOL_AND) {
@@ -539,16 +539,16 @@ void mono_bool(int hr0, int hr1, int hw0, int hw1, int boolop, void (*mono_outpu
 
         hd0 = mono_max(hr0, hw0, +1, 0);
         hd1 = mono_max(hr1, hw1, -1, 0);
-        mono_clipself(hd0, hd1, mono_output);
+        mono_clipself(hd0, hd1, b, mono_output);
         mono_deloop(hd1);
         mono_deloop(hd0);
     } else {
         boolop = (boolop == MONO_BOOL_SUB);
         hd0 = mono_max(hr1, hw0, -1, boolop ^ 1);
-        mono_clipself(hr0, hd0, mono_output);
+        mono_clipself(hr0, hd0, b, mono_output);
         mono_deloop(hd0);
         hd0 = mono_max(hr0, hw1, +1, boolop);
-        mono_clipself(hd0, hr1, mono_output);
+        mono_clipself(hd0, hr1, b, mono_output);
         mono_deloop(hd0);
     }
 }
