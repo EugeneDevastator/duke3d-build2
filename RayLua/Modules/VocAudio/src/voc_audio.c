@@ -7,11 +7,6 @@
 #include <time.h>
 
 #include <raylib.h>
-
-#if defined(_WIN32)
-#include <windows.h>
-#endif
-
 //--------------------------------------------------------------
 // Helper: write WAV from PCM16 mono/ster
 //--------------------------------------------------------------
