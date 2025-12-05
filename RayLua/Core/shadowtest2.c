@@ -24,7 +24,7 @@ Engine uses z as right, y as forward, z as down
 Portals: we move camera to supposed place instead of transforming entire world.
 for all porals same clipping plane is used, so mono state is shared, and should not reset
 in current version plane is always vertical.
-
+mp.z is unreliable, or has some different meaning to it. to reconstruct world verts gouvmat info is used.
 */
 //------ UTILS -------
 static void cam_transform_init(cam_transform_t *ct, cam_t *cam) {
@@ -928,10 +928,15 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 		{
 			if (h) i = mp[i].p;
 
-			ox = mp[i].x-gcam.p.x; oy = mp[i].y-gcam.p.y;
-			otp[on].x = oy*b->xformmatc - ox*b->xformmats;
-			otp[on].y = mp[i].z-gcam.p.z;
-			otp[on].z = ox*b->xformmatc + oy*b->xformmats; on++;
+			double dx = mp[i].x - gcam.p.x;
+			double dy = mp[i].y - gcam.p.y;
+			double dz = mp[i].z - gcam.p.z;
+
+			// Apply the 2D rotation (this is what xformmatc/xformmats do)
+			otp[on].x = dy * b->xformmatc - dx * b->xformmats;  // rotated X
+			otp[on].y = dz;                                      // direct Z offset
+			otp[on].z = dx * b->xformmatc + dy * b->xformmats;  // rotated depth
+			on++;
 
 			if (!h) i = mp[i].n;
 		} while (i != plothead[h]);
@@ -1074,11 +1079,9 @@ static void gentex_xform (float *ouvmat, bunchgrp *b)
 	p2x = ay*bz - az*by; p2y = az*bx - ax*bz; p2z = ax*by - ay*bx; f = p2x*cx + p2y*cy + p2z*cz;
 	p0x = by*cz - bz*cy; p0y = bz*cx - bx*cz; p0z = bx*cy - by*cx;
 	p1x = cy*az - cz*ay; p1y = cz*ax - cx*az; p1z = cx*ay - cy*ax;
-#if (USEINTZ)
-	f = 1.0 / (f*16.0);
-#else
+
 	f = 1048576.0*16.0 / (f*gcam.h.z);
-#endif
+
 	ax = (1.0/65536.0 )*f;
 	ay = ((float)64)*f;
 	az = ((float)64)*f;
