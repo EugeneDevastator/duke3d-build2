@@ -1303,9 +1303,10 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		bool isportal = myport>=0 && portals[myport].destpn >=0 && portals[myport].surfid == isflor;
 		if (isportal && !needsfinal && !skipport) {
 			int endpn = portals[myport].destpn;
-			drawpol_befclip(s, portals[endpn].sect+taginc, portals[endpn].sect,
-				plothead[0],plothead[1],  3, b);
-			draw_hsr_enter_portal(map, myport, b,plothead[0],plothead[1]);
+			// Only SUB (flags&2), NOT AND (flags&1) - child handles the content
+			// This prevents parent creating mph entries that collide with child's tags
+			drawpol_befclip(s, -1, -1, plothead[0], plothead[1], 2 + (isflor<<2), b);
+			draw_hsr_enter_portal(map, myport, b, plothead[0], plothead[1]);
 		}
 
 		else {
@@ -1415,10 +1416,11 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 			}
 			// Render the wall polygon
 			int myport = wal[w].tags[1];
-			if (myport >= 0 && portals[myport].destpn >=0 && portals[myport].kind == PORT_WALL) {
-					int endp = portals[myport].destpn;
-				drawpol_befclip(s, portals[endp].sect+taginc, portals[endp].sect, plothead[0], plothead[1],  3, b);
-				draw_hsr_enter_portal(map, myport, b,plothead[0],plothead[1]);
+			if (myport >= 0 && portals[myport].destpn >= 0 && portals[myport].kind == PORT_WALL) {
+				int endp = portals[myport].destpn;
+				// Only SUB, not AND
+				drawpol_befclip(s, -1, -1, plothead[0], plothead[1], 2, b);
+				draw_hsr_enter_portal(map, myport, b, plothead[0], plothead[1]);
 			} else {
 				// could be 7 or 3, .111 or .011
 				drawpol_befclip(s, ns, ns, plothead[0], plothead[1], ((m > vn) << 2) + 3, b);
@@ -1548,9 +1550,6 @@ for(i=lgs->sect[gcam.cursect].n-1;i>=0;i--)
 		drig.x = 1.0; drig.y = 0.0; drig.z = 0.0;
 		ddow.x = 0.0; ddow.y = 1.0; ddow.z = 0.0;
 		dfor.x = 0.0; dfor.y = 0.0; dfor.z = 1.0;
-	//	drawpoly_setup(                           (tiletype *)&gcam.c,gcam.z.f-gcam.c.f,&dpos,&drig,&ddow,&dfor,gcam.h.x,gcam.h.y,gcam.h.z);
-		//drawcone_setup(cputype,shadowtest2_numcpu,(tiletype *)&gcam.c,gcam.z.f-gcam.c.f,&dpos,&drig,&ddow,&dfor,gcam.h.x,gcam.h.y,gcam.h.z);
-		// drawkv6_setup(&drawkv6_frame,            (tiletype *)&gcam.c,gcam.z.f-gcam.c.f,&dpos,&drig,&ddow,&dfor,gcam.h.x,gcam.h.y,gcam.h.z);
 
 		for(i=shadowtest2_numlights-1;i>=0;i--)
 		{
@@ -1600,8 +1599,8 @@ for(i=lgs->sect[gcam.cursect].n-1;i>=0;i--)
 			memset(glp->lighashead,-1,glp->lighasheadn*sizeof(glp->lighashead[0]));
 		}
 	}
-
-	for(halfplane=0;halfplane<2;halfplane++) {
+	int maxhfp = b->has_portal_clip ? 2 : 2;
+	for(halfplane=0;halfplane<maxhfp;halfplane++) {
 
 		if (!b->has_portal_clip)
 			b->currenthalfplane = halfplane;
