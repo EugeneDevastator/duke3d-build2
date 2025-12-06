@@ -835,7 +835,7 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
     int tagsect = tag1;
     int mnewtag = newtag1 == -1 ? -1 : newtag1 + taginc*b->recursion_depth;
     b->gnewtagsect = newtagsect;
-    cam_t gcam = b->orcam;
+    cam_t orcam = b->orcam;
     #define BSCISDIST 0.000001
     void (*mono_output)(int h0, int h1, bunchgrp *b);
     dpoint3d *otp, *tp;
@@ -861,9 +861,9 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 		{
 			if (h) i = mp[i].p;
 
-			double dx = mp[i].x - gcam.p.x;
-			double dy = mp[i].y - gcam.p.y;
-			double dz = mp[i].z - gcam.p.z;
+			double dx = mp[i].x - orcam.p.x;
+			double dy = mp[i].y - orcam.p.y;
+			double dz = mp[i].z - orcam.p.z;
 
 			otp[on].x = dy * b->xformmatc - dx * b->xformmats;  // rotated X
 			otp[on].y = dz;                                      // direct Z offset
@@ -893,9 +893,9 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 		//project & find x extents
 	for(i=0;i<n;i++)
 	{
-		f = gcam.h.z/tp[i].z;
-		tp[i].x = tp[i].x*f + gcam.h.x;
-		tp[i].y = tp[i].y*f + gcam.h.y;
+		f = orcam.h.z/tp[i].z;
+		tp[i].x = tp[i].x*f + orcam.h.x;
+		tp[i].y = tp[i].y*f + orcam.h.y;
 	}
 
 		//generate vmono
@@ -1003,7 +1003,7 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 	//FIXFIXFIX: clean this up!
 static void gentex_xform (float *ouvmat, bunchgrp *b)
 {
-	cam_t gcam = b->orcam;
+	cam_t orcam = b->orcam;
 	float ax, ay, az, bx, by, bz, cx, cy, cz, p0x, p0y, p0z, p1x, p1y, p1z, p2x, p2y, p2z, f;
 
 	ax = ouvmat[3]; bx = ouvmat[6]; cx = ouvmat[0];
@@ -1013,7 +1013,7 @@ static void gentex_xform (float *ouvmat, bunchgrp *b)
 	p0x = by*cz - bz*cy; p0y = bz*cx - bx*cz; p0z = bx*cy - by*cx;
 	p1x = cy*az - cz*ay; p1y = cz*ax - cx*az; p1z = cx*ay - cy*ax;
 
-	f = 1048576.0*16.0 / (f*gcam.h.z);
+	f = 1048576.0*16.0 / (f*orcam.h.z);
 
 	ax = (1.0/65536.0 )*f;
 	ay = ((float)64)*f;
@@ -1021,9 +1021,9 @@ static void gentex_xform (float *ouvmat, bunchgrp *b)
 	ouvmat[0] = p2x*ax; ouvmat[1] = p0x*ay; ouvmat[2] = p1x*az;
 	ouvmat[3] = p2y*ax; ouvmat[4] = p0y*ay; ouvmat[5] = p1y*az;
 	ouvmat[6] = p2z*ax; ouvmat[7] = p0z*ay; ouvmat[8] = p1z*az;
-	ouvmat[6] = ouvmat[6]*gcam.h.z - ouvmat[0]*gcam.h.x - ouvmat[3]*gcam.h.y;
-	ouvmat[7] = ouvmat[7]*gcam.h.z - ouvmat[1]*gcam.h.x - ouvmat[4]*gcam.h.y;
-	ouvmat[8] = ouvmat[8]*gcam.h.z - ouvmat[2]*gcam.h.x - ouvmat[5]*gcam.h.y;
+	ouvmat[6] = ouvmat[6]*orcam.h.z - ouvmat[0]*orcam.h.x - ouvmat[3]*orcam.h.y;
+	ouvmat[7] = ouvmat[7]*orcam.h.z - ouvmat[1]*orcam.h.x - ouvmat[4]*orcam.h.y;
+	ouvmat[8] = ouvmat[8]*orcam.h.z - ouvmat[2]*orcam.h.x - ouvmat[5]*orcam.h.y;
 
 	if (renderinterp)
 	{
