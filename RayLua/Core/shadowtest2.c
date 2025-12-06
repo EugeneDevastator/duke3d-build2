@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <stdarg.h>
 #define PI 3.14159265358979323
 #pragma warning(disable:4731)
 
@@ -30,6 +31,16 @@ in current version plane is always vertical.
 mp.z is unreliable, or has some different meaning to it. to reconstruct world verts gouvmat info is used.
 */
 //------ UTILS -------
+void logstep(const char* fmt, ...) {
+	if (!captureframe)
+		return;
+	va_list args;
+	va_start(args, fmt);
+	vprintf(fmt, args);
+	va_end(args);
+	printf("\n");
+}
+
 static void cam_transform_init(cam_transform_t *ct, cam_t *cam) {
 	ct->m[0] = cam->r.x; ct->m[1] = cam->r.y; ct->m[2] = cam->r.z;
 	ct->m[3] = cam->d.x; ct->m[4] = cam->d.y; ct->m[5] = cam->d.z;
@@ -155,7 +166,6 @@ unsigned int *shadowtest2_sectgot = 0; //WARNING:code uses x86-32 bit shift tric
 static unsigned int *shadowtest2_sectgotmal = 0;
 static int shadowtest2_sectgotn = 0;
 #define CLIP_PORTAL_FLAG 8
-#define MAX_PORTAL_DEPTH 1
 //Translation & rotation
 static mapstate_t *curMap;
 static player_transform *gps;
@@ -166,7 +176,7 @@ static player_transform *gps;
 static tile_t *gtpic;
 
 static int gcurcol;
-static int taginc= 0000;
+static int taginc= 30000;
 #define LIGHTMAX 256 //FIX:make dynamic!
 lightpos_t shadowtest2_light[LIGHTMAX];
 static lightpos_t *glp;
@@ -728,6 +738,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
     eyepoln++;
     eyepol[eyepoln].vert0 = eyepolvn;
     eyepol[eyepoln].rdepth = b->recursion_depth;
+	logstep("produce eyepol, depth:%d",b->recursion_depth);
 }
 
 /*
@@ -839,6 +850,7 @@ static void changetagfunc (int rethead0, int rethead1, bunchgrp *b)
 	mph[mphnum].head[1] = rethead1;
 	mph[mphnum].tag = b->gnewtag;
 	mphnum++;
+	logstep("changetag: doscan?:%d, newMtag:%d, new mphnum:%d",b->gdoscansector,b->gnewtag,mphnum);
 }
 	//flags&1: do and
 	//flags&2: do sub
@@ -926,7 +938,7 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 		{
 			b->gnewtagsect = newtagsect;
 			b->gnewtag = mnewtag; omph0 = mphnum;
-			b->gdoscansector =  !(flags&8);
+			b->gdoscansector =  1;//!(flags&8);
 			int bop = MONO_BOOL_AND;//(flags & CLIP_PORTAL_FLAG) ? MONO_BOOL_SUB_REV : MONO_BOOL_AND;
 			for (i = mphnum - 1; i >= 0; i--)
 				if (mph[i].tag == mtag)
@@ -958,6 +970,7 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 			if (shadowtest2_rendmode == 4)
 				mono_output = ligpoltagfunc;
 				//add to light list // this will process point lights. otherwize will only use plr light.
+
 			else if (b->gflags < 2) mono_output = drawtagfunc_ws;
 			else mono_output = drawtagfunc_ws;//skytagfunc;
 			for (i = mphnum - 1; i >= 0; i--)
@@ -1235,7 +1248,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 	memcpy(&b->bunchgrid[((bid-1)*bid)>>1],&b->bunchgrid[j],bid*sizeof(b->bunchgrid[0]));
 	for(i=bid+1;i<b->bunchn;i++)
 		b->bunchgrid[(((i-1)*i)>>1)+bid] = ((b->bunchgrid[j+i]&1)<<1) + (b->bunchgrid[j+i]>>1);
-
+	bool noportals = b->recursion_depth >= MAX_PORTAL_DEPTH;
 	// === DRAW CEILINGS & FLOORS ===
 	for(isflor=0;isflor<2;isflor++) // floor ceil
 	{
@@ -1298,18 +1311,24 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		int myport = sec[s].tags[1];
 		if (myport>=0)
 			int asd=1;
-		bool skipport= (b->has_portal_clip && s==b->testignoresec && isflor == b->testignorewall);
-		bool needsfinal = b->recursion_depth == MAX_PORTAL_DEPTH;
+		bool skipport= (b->has_portal_clip
+			&& s==b->testignoresec
+			&& isflor == b->testignorewall);
+
 		bool isportal = myport>=0 && portals[myport].destpn >=0 && portals[myport].surfid == isflor;
-		if (isportal && !needsfinal && !skipport) {
+		if (isportal && !noportals && !skipport) {
 			int endpn = portals[myport].destpn;
+			int endsec = portals[myport].sect;
 			// Only SUB (flags&2), NOT AND (flags&1) - child handles the content
 			// This prevents parent creating mph entries that collide with child's tags
+			logstep("entering portal floor?, %d, sec:%d, cur depth:%d, curhalf:%d", isflor, s, b->recursion_depth, b->currenthalfplane);
 			drawpol_befclip(s, -1, -1, plothead[0], plothead[1], 2 + (isflor<<2), b);
 			draw_hsr_enter_portal(map, myport, b, plothead[0], plothead[1]);
 		}
 
 		else {
+			logstep("drawing solid - floor?, %d, sec:%d, cur depth:%d, curhalf:%d", isflor, s, b->recursion_depth, b->currenthalfplane);
+
 			drawpol_befclip(s,-1,-1,plothead[0],plothead[1],(isflor<<2)+3,b);
 		}
 	}
@@ -1416,12 +1435,20 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 			}
 			// Render the wall polygon
 			int myport = wal[w].tags[1];
-			if (myport >= 0 && portals[myport].destpn >= 0 && portals[myport].kind == PORT_WALL) {
+			bool skipport= (b->has_portal_clip
+				&& s==b->testignoresec
+				&& w == b->testignorewall);
+
+			if (!skipport && !noportals && myport >= 0 && portals[myport].destpn >= 0 && portals[myport].kind == PORT_WALL) {
 				int endp = portals[myport].destpn;
+				logstep("entering wall port,wal:%d, sec:%d, cur depth:%d, curhalf:%d",w, s, b->recursion_depth, b->currenthalfplane);
+				int endsec = portals[myport].sect;
 				// Only SUB, not AND
 				drawpol_befclip(s, -1, -1, plothead[0], plothead[1], 2, b);
 				draw_hsr_enter_portal(map, myport, b, plothead[0], plothead[1]);
 			} else {
+				logstep("drawing solid - wall,wal:%d,  sec:%d, cur depth:%d, curhalf:%d",w, s, b->recursion_depth, b->currenthalfplane);
+
 				// could be 7 or 3, .111 or .011
 				drawpol_befclip(s, ns, ns, plothead[0], plothead[1], ((m > vn) << 2) + 3, b);
 			}
@@ -1429,9 +1456,6 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 
 	}
 }
-/*
- *The function operates in different modes based on shadowtest2_rendmode:
-	Mode 2 (Standard Rendering):
 
 	Renders visible geometry from camera viewpoint
 	Populates eyepol[] array with screen-space polygons
@@ -1451,12 +1475,15 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
 	bs.orcam = *cc;
 	bs.recursion_depth = 0;
 	bs.has_portal_clip = false;
+	bs.currenthalfplane = 0;
 	draw_hsr_polymost_ctx(map,&bs);
+	logstep("frame start");
 }
 
 void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 	if (!newctx) {
 		return;
+		if (captureframe) printf("discarding due to null ctx");
 	}
 	int prehead1 = -1;
 	int prehead2 = -1;
@@ -1472,9 +1499,10 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 	b->bunchn=0;
 	b->bunchmal=0;
 	b->bunchgrid =0;
+	//b->curportal=0;
 	cam_t gcam = b->cam;
 	cam_t oricam = b->orcam;
-
+	logstep("entered hsr_ctx, halfplane:%d",b->currenthalfplane);
 	cam_transform_init(&b->ct, &b->cam);
 	cam_transform_init(&b->ct_or, &b->orcam);
 
@@ -1496,11 +1524,6 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 
 	//if ((lgs->numsects <= 0) || ((unsigned)gcam.cursect >= (unsigned)lgs->numsects))
 	//{
-	////if (shadowtest2_rendmode != 4)
-	////{
-	////	for(i=0,j=gcam.c.f;i<gcam.c.y;i++,j+=gcam.c.p) memset8((void *)j,0x00000000,gcam.c.x<<2);
-	////	for(i=0,j=gcam.z.f;i<gcam.z.y;i++,j+=gcam.z.p) memset8((void *)j,0x7f7f7f7f,gcam.z.x<<2);
-	////}
 	////if (shadowtest2_rendmode != 4) eyepoln = 0; //Prevents drawpollig() from crashing
 	////	return;
 	//}
@@ -1601,11 +1624,15 @@ for(i=lgs->sect[gcam.cursect].n-1;i>=0;i--)
 	}
 	int maxhfp = b->has_portal_clip ? 2 : 2;
 	for(halfplane=0;halfplane<maxhfp;halfplane++) {
+		logstep("HALFPLANE change: %d, depth: %d",halfplane,b->recursion_depth);
 
 		if (!b->has_portal_clip)
 			b->currenthalfplane = halfplane;
-	//	else if (b->currenthalfplane != halfplane)  // temp disable to get all portals work
-	//		continue;
+		//else //if (b->currenthalfplane != halfplane)  // temp disable to get all portals work
+		//{
+		//	halfplane = b->currenthalfplane;
+		//	maxhfp=-1;
+		//}
 
 		if (shadowtest2_rendmode == 4)
 		{
@@ -1696,7 +1723,7 @@ nogood:; }
 		if (shadowtest2_rendmode == 4) uptr = glp->sectgot;
 										  else uptr = shadowtest2_sectgot;
 
-		if (!halfplane)
+		if (!loopsrun)
 		{
 			memcpy(uptr,b->sectgot,(lgs->numsects+31)>>3);
 			loopsrun++;
@@ -1791,7 +1818,9 @@ static point3d local_to_world_vec(point3d local_vec, transform *tr) {
                                    int plothead0, int plothead1)
 {
     if (parentctx->recursion_depth >= MAX_PORTAL_DEPTH) {
-        return;
+		logstep("portal entrance aborted due to max depth.");
+    	return;
+
     }
 
     cam_t ncam = parentctx->cam;
@@ -1828,8 +1857,8 @@ static point3d local_to_world_vec(point3d local_vec, transform *tr) {
 
     bunchgrp newctx = {};
     newctx.recursion_depth = parentctx->recursion_depth + 1;
-	if (newctx.recursion_depth >0 )
-		printf("ncam fw %f,%f,%f \r", ncam.f.x,ncam.f.y,ncam.f.z);
+	//if (newctx.recursion_depth >0 )
+	//	printf("ncam fw %f,%f,%f \r", ncam.f.x,ncam.f.y,ncam.f.z);
     newctx.cam = ncam;
     newctx.orcam = parentctx->orcam;
     newctx.has_portal_clip = true;
@@ -1854,9 +1883,8 @@ static point3d local_to_world_vec(point3d local_vec, transform *tr) {
 	//printf("test rt: %f %f %f",back.x,back.y,back.z);
 	lastcamtr = newctx.orcam.tr;
 	lastcamtr2 = newctx.cam.tr;
-	    draw_hsr_polymost_ctx(map, &newctx);
 
-	// here we return from the portal and continue.
+    draw_hsr_polymost_ctx(map, &newctx);
 }
 
 

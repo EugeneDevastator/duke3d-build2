@@ -78,6 +78,7 @@ static Shader lightShader ;
 static int lightPosLoc;
 static int lightRangeLoc;
 static bool syncam = true;
+static int cureyepoly = 0;
 class DumbRender
 {
 
@@ -147,30 +148,28 @@ public:
                 int sid1 = abs(map->spri[p.anchorspri].p.z - map->sect[i].z[1]);
                 int sid2 = abs(map->spri[p.anchorspri].p.z - map->sect[i].z[0]);
                 p.surfid = sid1 < sid2;
-                map->spri[p.anchorspri].p.z = map->sect[i].z[p.surfid]; // resolve flor ceil in future
+                map->spri[p.anchorspri].p.z = map->sect[i].z[p.surfid]+1; // resolve flor ceil in future
                 p.kind = p.surfid;
                 spri_t *spr = &map->spri[p.anchorspri];
               //  point3d newr = spr->tr.r;
-                point3d newd = spr->tr.f;
-                point3d newf = spr->tr.d;
-            //    vmulscal(&newr,-1.0f);
-             ///   if (p.surfid==1) {
-                  //  vmulscal(&newd,-1.0f);
-                    vmulscal(&newf,-1.0f);
-               // }
-              //  vmulscal(&spr->tr.r,-1);
+                point3d newd = spr->tr.r;
+                point3d newr = spr->tr.d;
+                vmulscal(&newd,-1.0f);
                 spr->tr.d = newd;
-                spr->tr.f = newf;
+                spr->tr.r = newr;
+              //  vmulscal(&spr->tr.f,-1.0f);
+                normalize_transform(&spr->tr);
                 p.destpn = map->sect[i].surf[1].hitag;
                 map->sect[i].tags[1] = portaln;
                 portaln++;
             }
         }
 
-        for (int i = 0; i < portaln; i++) {
+        for (int i = 0; i < portaln; i++) { // portal post pass
             int target_tag = portals[i].destpn; // currently stores expected hitag
             portals[i].destpn = -1; // mark as unresolved
-
+            spri_t *spr = &map->spri[portals[i].anchorspri];
+            normalize_transform(&spr->tr);
 
             // Find portal with matching lowtag
             for (int j = 0; j < portaln; j++) {
@@ -502,8 +501,8 @@ rlDisableDepthMask();
                 float final_u = u ;/// (65536.0f);
                 float final_v = v;// / (65536.0f);
 
-                rlColor4f(0.7, 0.2, eyepol[i].rdepth/5.0f, 0.7);
-                rlTexCoord2f(final_u, final_v);
+                rlColor4f((float)eyepol[i].b2sect/3.0f, 0.2, (float)eyepol[i].rdepth/3.0f, 0.7);
+               // rlTexCoord2f(final_u, final_v);
                 rlVertex3f(pt.x, -pt.z, pt.y);
             }
         }
@@ -564,7 +563,15 @@ rlDisableDepthMask();
                 int v0;
                 int vertCount;
                 BeginBlendMode(BLEND_ADDITIVE);
-                if (draw_eyepol_wspace(sw, sh, i, v0, vertCount)) continue;
+                if (IsKeyPressed(KEY_J)) {
+                    cureyepoly++;
+                    if (cureyepoly > eyepoln)
+                        cureyepoly = 0;
+                }
+                if (cureyepoly == 0 | cureyepoly == i) {
+                    if (draw_eyepol_wspace(sw, sh, i, v0, vertCount))
+                        continue;
+                } else continue;
 
                 if (drawlines)
                 {
@@ -653,6 +660,7 @@ rlDisableDepthMask();
     // Updated wall rendering with segments
     static void DrawMapstateTex(Camera3D rlcam)
     {
+
         rlDrawRenderBatchActive();
         rlDisableBackfaceCulling();
 
@@ -936,8 +944,18 @@ rlDisableDepthMask();
                 }
             }
         }
+        DrawTransform(&lastcamtr);
+        DrawTransform(&lastcamtr2);
     }
-
+    static void DrawTransform(transform *tr) {
+        Vector3 rg = {tr->r.x, -tr->r.z, tr->r.y};
+        Vector3 dw = {tr->d.x, -tr->d.z, tr->d.y};
+        Vector3 frw = {tr->f.x, -tr->f.z, tr->f.y};
+        Vector3 pos = {tr->p.x, -tr->p.z, tr->p.y};
+        DrawLine3D(pos, Vector3Add(pos, frw), BLUE); // Forward vector
+        DrawLine3D(pos, Vector3Add(pos, rg), RED); // Right vector
+        DrawLine3D(pos, Vector3Add(pos, dw), GREEN); // Down vector
+    }
     static void rlVertex3V(Vector3 v)
     {
         rlVertex3f(v.x, v.y, v.z);
@@ -1557,7 +1575,7 @@ private:
             if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
             map->blankheadspri = i;
         }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/prt3.MAP", map);
+        loadmap_imp((char*)"c:/Eugene/Games/build2/prt4.MAP", map);
     }
 };
 

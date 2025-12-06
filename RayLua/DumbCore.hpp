@@ -5,7 +5,9 @@
 #include "raymath.h"
 
 
+
 extern "C" {
+#include "shadowtest2.h"
 #include "mapcore.h"
 #include "physics.h"
 #include "loaders.h"
@@ -97,9 +99,23 @@ private:
 
         Vector3 forward = Vector3Normalize(Vector3Subtract(cam.target, cam.position));
         Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, cam.up));
+        captureframe = false;
+        if (IsKeyPressed(KEY_G)) {
+            captureframe = true;
+        }
 
         // pos in build2
+        if (IsKeyDown(KEY_Q)) {
+            float rollSpeed = 2.0f * deltaTime; // Adjust roll speed as needed
+            cam.up = Vector3RotateByAxisAngle(cam.up, forward, rollSpeed);
+        }
+        if (IsKeyDown(KEY_E)) {
+            float rollSpeed = 2.0f * deltaTime;
+            cam.up = Vector3RotateByAxisAngle(cam.up, forward, -rollSpeed);
+        }
 
+        // Normalize up vector to prevent drift
+        cam.up = Vector3Normalize(cam.up);
 
         // WASD movement
         if (IsKeyDown(KEY_W)) {
