@@ -27,8 +27,10 @@ Monopoly uses xy as screen coords and z as depth
 Engine uses z as right, y as forward, z as down
 Portals: we move camera to supposed place instead of transforming entire world.
 for all porals same clipping plane is used, so mono state is shared, and should not reset
-in current version plane is always vertical.
-mp.z is unreliable, or has some different meaning to it. to reconstruct world verts gouvmat info is used.
+word has coordinates right down forward, which correspond to x z y
+z grows down. and down vector is xyz=0,0,1;
+mono plane has xy as screen coords and z as some sort of depth, but better not use it at all.
+eyepols are generated from mono space AND plane equation stored in gouvmat.
 */
 //------ UTILS -------
 void logstep(const char* fmt, ...) {
@@ -71,9 +73,9 @@ static void cam_to_screen(double cx, double cy, double cz,
 }
 // Convert point from mp (mono polygon) space to world coordinates
 // mp.x, mp.y are in half-plane rotated space; mp.z is NOT used (depth from gouvmat)
-static void mp_to_world(double mpx, double mpy, bunchgrp *b,cam_transform_t* usecam,
+static void mp_to_world(double mpx, double mpy, bunchgrp *b,
 						double *wx, double *wy, double *wz) {
-
+		cam_transform_t *usecam = &b->orcam;
 	// Step 1: Transform mp coords through xformmat to camera-aligned space
 	double cam_rx = mpx * b->xformmat[0] + mpy * b->xformmat[1] + b->gnadd.x;
 	double cam_ry = mpx * b->xformmat[3] + mpy * b->xformmat[4] + b->gnadd.y;
@@ -97,34 +99,6 @@ static void mp_to_world(double mpx, double mpy, bunchgrp *b,cam_transform_t* use
 	*wz = (dx * usecam->m[2] + dy * usecam->m[5] + usecam->h.z * usecam->m[8]) * depth + usecam->p.z;
 }
 
-static void world_to_mp(double wx, double wy, double wz, bunchgrp *b,
-						double *mpx, double *mpy) {
-	cam_transform_t *ct = &b->ct;
-
-	// Step 1: Transform world point to camera space
-	double cx, cy, cz;
-	world_to_cam(wx, wy, wz, &b->ct, &cx, &cy, &cz);
-
-	// Step 2: Project to screen space
-	double sx, sy, depth;
-	cam_to_screen(cx, cy, cz, &b->ct, &sx, &sy, &depth);
-
-	// Step 3: Transform screen coordinates to mp space using inverse xformmat
-	// mp coords = inverse(xformmat) * (screen_coords - gnadd)
-	double det = b->xformmat[0] * b->xformmat[4] - b->xformmat[1] * b->xformmat[3];
-	if (fabs(det) < 1e-10) {
-		*mpx = 0.0;
-		*mpy = 0.0;
-		return;
-	}
-
-	double inv_det = 1.0 / det;
-	double dx = sx - b->gnadd.x;
-	double dy = sy - b->gnadd.y;
-
-	*mpx = (b->xformmat[4] * dx - b->xformmat[1] * dy) * inv_det;
-	*mpy = (-b->xformmat[3] * dx + b->xformmat[0] * dy) * inv_det;
-}
 
 // Screen space back to camera space (given depth)
 static void screen_to_cam(double sx, double sy, double depth,
@@ -861,7 +835,7 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
     int tagsect = tag1;
     int mnewtag = newtag1 == -1 ? -1 : newtag1 + taginc*b->recursion_depth;
     b->gnewtagsect = newtagsect;
-    cam_t gcam = b->cam;
+    cam_t gcam = b->orcam;
     #define BSCISDIST 0.000001
     void (*mono_output)(int h0, int h1, bunchgrp *b);
     dpoint3d *otp, *tp;
@@ -1029,7 +1003,7 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 	//FIXFIXFIX: clean this up!
 static void gentex_xform (float *ouvmat, bunchgrp *b)
 {
-	cam_t gcam = b->cam;
+	cam_t gcam = b->orcam;
 	float ax, ay, az, bx, by, bz, cx, cy, cz, p0x, p0y, p0z, p1x, p1y, p1z, p2x, p2y, p2z, f;
 
 	ax = ouvmat[3]; bx = ouvmat[6]; cx = ouvmat[0];
@@ -1059,7 +1033,7 @@ static void gentex_xform (float *ouvmat, bunchgrp *b)
 	}
 }
 
-static void gentex_sky (surf_t *sur, bunchgrp *b)
+static void gentransform_sky (surf_t *sur, bunchgrp *b)
 {
 	cam_t gcam = b->cam;
 	float f, g, h;
@@ -1077,7 +1051,7 @@ static void gentex_sky (surf_t *sur, bunchgrp *b)
 	gentex_xform(b->gouvmat,b);
 }
 
-static void gentex_ceilflor (sect_t *sec, wall_t *wal, surf_t *sur, int isflor, bunchgrp *b)
+static void gentransform_ceilflor (sect_t *sec, wall_t *wal, surf_t *sur, int isflor, bunchgrp *b)
 {
 	cam_t gcam = b->cam;
 	float f, g, fz, ax, ay, wx, wy, ox, oy, oz, fk[6];
@@ -1110,10 +1084,28 @@ static void gentex_ceilflor (sect_t *sec, wall_t *wal, surf_t *sur, int isflor, 
 		ox = (fk[3]*fk[4] - fk[2]*fk[5])*f;
 		oy = (fk[0]*fk[5] - fk[1]*fk[4])*f;
 		oz = getslopez(sec,isflor,ox,oy);
-		ox -= gcam.p.x; oy -= gcam.p.y; oz -= gcam.p.z;
-		b->gouvmat[i+0] = ox*gcam.r.x + oy*gcam.r.y + oz*gcam.r.z;
-		b->gouvmat[i+1] = ox*gcam.d.x + oy*gcam.d.y + oz*gcam.d.z;
-		b->gouvmat[i+2] = ox*gcam.f.x + oy*gcam.f.y + oz*gcam.f.z;
+
+		// PORTAL TRANSFORM: Convert world coordinates to original camera space
+		if (b->recursion_depth > 0) {
+			// Step 1: Transform world point to original camera space
+			double ocx, ocy, ocz;
+			world_to_cam(ox, oy, oz, &b->ct_or, &ocx, &ocy, &ocz);
+
+			// Use original camera coordinates for gouvmat calculation
+			ox = ocx; oy = ocy; oz = ocz;
+		} else {
+			// Standard case: transform to current camera space
+			ox -= gcam.p.x; oy -= gcam.p.y; oz -= gcam.p.z;
+			b->gouvmat[i+0] = ox*gcam.r.x + oy*gcam.r.y + oz*gcam.r.z;
+			b->gouvmat[i+1] = ox*gcam.d.x + oy*gcam.d.y + oz*gcam.d.z;
+			b->gouvmat[i+2] = ox*gcam.f.x + oy*gcam.f.y + oz*gcam.f.z;
+			continue;
+		}
+
+		// For portals: coordinates are already in original camera space
+		b->gouvmat[i+0] = ox;
+		b->gouvmat[i+1] = oy;
+		b->gouvmat[i+2] = oz;
 	}
 
 	for(i=9-1;i>=0;i--) b->gouvmat[i] *= 256.f;
@@ -1124,7 +1116,8 @@ static void gentex_ceilflor (sect_t *sec, wall_t *wal, surf_t *sur, int isflor, 
 	gentex_xform(b->gouvmat, b);
 }
 
-static void gentex_wall (kgln_t *npol2, surf_t *sur, bunchgrp *b)
+
+static void gentransform_wall (kgln_t *npol2, surf_t *sur, bunchgrp *b)
 {
 	cam_t gcam = b->cam;
 	float f, g, ox, oy, oz, rdet, fk[24];
@@ -1206,7 +1199,6 @@ The b parameter is a bunch index - this function processes one "bunch" (visible 
 
 static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 {
-	cam_t gcam = b->cam;
 	// === VARIABLE DECLARATIONS ===
 	//extern void loadpic (tile_t *);
 	#define MAXVERTS 256 //FIX:timebomb: assumes there are never > 256 sectors connected at same vertex
@@ -1300,11 +1292,11 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		if (sec[s].surf[isflor].flags & (1 << 17)) { b->gflags = 2; } //skybox ceil/flor
 		else if (sec[s].surf[isflor].flags & (1 << 16)) {  //parallaxing ceil/flor
 			b->gflags = 1;
-			gentex_sky(sur, b);
+			gentransform_sky(sur, b);
 		}
 		else {
 			b->gflags = 0;
-			gentex_ceilflor(&sec[s], wal, sur, isflor, b);
+			gentransform_ceilflor(&sec[s], wal, sur, isflor, b);
 		}
 		b->gligwall = isflor - 2;
 
@@ -1395,7 +1387,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 				{ b->gflags = 2; } //skybox ceil/flor
 				else if (sur->flags & (1 << 16)) {
 					b->gflags = 1;
-					gentex_sky(sur, b);
+					gentransform_sky(sur, b);
 				} //parallaxing ceil/flor
 				else {
 					// Calculate UV mapping for wall texture
@@ -1421,7 +1413,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 					npol2[2].u = sur->uv[2].x + npol2[0].u;
 					npol2[2].v = sur->uv[2].y + npol2[0].v;
 					b->gflags = 0;
-					gentex_wall(npol2, sur, b);
+					gentransform_wall(npol2, sur, b);
 				}
 				b->gligwall = w;
 				b->gligslab = m;
@@ -1628,7 +1620,10 @@ for(i=lgs->sect[gcam.cursect].n-1;i>=0;i--)
 
 		if (!b->has_portal_clip)
 			b->currenthalfplane = halfplane;
-		//else //if (b->currenthalfplane != halfplane)  // temp disable to get all portals work
+		else {
+			maxhfp=-1;
+			halfplane = b->currenthalfplane;
+		}//else //if (b->currenthalfplane != halfplane)  // temp disable to get all portals work
 		//{
 		//	halfplane = b->currenthalfplane;
 		//	maxhfp=-1;
@@ -1648,42 +1643,40 @@ for(i=lgs->sect[gcam.cursect].n-1;i>=0;i--)
 			xformbac(-65536.0,+65536.0,1.0,&bord2[3], b);
 			n = 4; didcut = 1;
 		}
-		else {
-			xformprep(((double)halfplane)*PI, b);
-
-			// NEW CODE - Use much larger bounds:
-			float large_bound = 1e6f;
-			xformbac(-large_bound, -large_bound, gcam.h.z, &bord[0],b);
-			xformbac(+large_bound, -large_bound, gcam.h.z, &bord[1],b);
-			xformbac(+large_bound, +large_bound, gcam.h.z, &bord[2],b);
-			xformbac(-large_bound, +large_bound, gcam.h.z, &bord[3],b);
-
-			//Clip screen to front plane
-			n = 0; didcut = 0;
-			for(i=4-1,j=0;j<4;i=j,j++)
+		else if (!b->has_portal_clip) {
 			{
-				if (bord[i].z >= SCISDIST) { bord2[n] = bord[i]; n++; }
-				if ((bord[i].z >= SCISDIST) != (bord[j].z >= SCISDIST))
+				xformprep(((double)halfplane)*PI, b);
+
+				// NEW CODE - Use much larger bounds:
+				float large_bound = 1e6f;
+				xformbac(-large_bound, -large_bound, gcam.h.z, &bord[0],b);
+				xformbac(+large_bound, -large_bound, gcam.h.z, &bord[1],b);
+				xformbac(+large_bound, +large_bound, gcam.h.z, &bord[2],b);
+				xformbac(-large_bound, +large_bound, gcam.h.z, &bord[3],b);
+
+				//Clip screen to front plane
+				n = 0; didcut = 0;
+				for(i=4-1,j=0;j<4;i=j,j++)
 				{
-					f = (SCISDIST-bord[i].z)/(bord[j].z-bord[i].z);
-					bord2[n].x = (bord[j].x-bord[i].x)*f + bord[i].x;
-					bord2[n].y = (bord[j].y-bord[i].y)*f + bord[i].y;
-					bord2[n].z = (bord[j].z-bord[i].z)*f + bord[i].z;
-					n++; didcut = 1;
+					if (bord[i].z >= SCISDIST) { bord2[n] = bord[i]; n++; }
+					if ((bord[i].z >= SCISDIST) != (bord[j].z >= SCISDIST))
+					{
+						f = (SCISDIST-bord[i].z)/(bord[j].z-bord[i].z);
+						bord2[n].x = (bord[j].x-bord[i].x)*f + bord[i].x;
+						bord2[n].y = (bord[j].y-bord[i].y)*f + bord[i].y;
+						bord2[n].z = (bord[j].z-bord[i].z)*f + bord[i].z;
+						n++; didcut = 1;
+					}
 				}
+				if (n < 3) break;
 			}
-			if (n < 3) break;
-		}
-
-		memset8(b->sectgot,0,(lgs->numsects+31)>>3);
-		for(j=0;j<n;j++)
-		{
-			f = gcam.h.z/bord2[j].z;
-			bord2[j].x = bord2[j].x*f + gcam.h.x;
-			bord2[j].y = bord2[j].y*f + gcam.h.y;
-		}
-
-		if (!b->has_portal_clip) {
+			memset8(b->sectgot,0,(lgs->numsects+31)>>3);
+			for(j=0;j<n;j++)
+			{
+				f = gcam.h.z/bord2[j].z;
+				bord2[j].x = bord2[j].x*f + gcam.h.x;
+				bord2[j].y = bord2[j].y*f + gcam.h.y;
+			}
 			//FIX! once means not each frame! (of course it doesn't hurt functionality)
 			// Standard case: clear existing state and create new viewport
 			for (i = mphnum - 1; i >= 0; i--) {
@@ -1695,6 +1688,8 @@ for(i=lgs->sect[gcam.cursect].n-1;i>=0;i--)
 			mph[0].tag = gcam.cursect;
 			mphnum = 1;
 		} else {
+			n=4;
+			didcut=1;
 			mph_check(mphnum);
 			mono_genfromloop(&mph[mphnum].head[0], &mph[mphnum].head[1], bord2, n);
 			mph[mphnum].tag = gcam.cursect + taginc*b->recursion_depth;
@@ -1756,6 +1751,7 @@ nogood:; }
 		if (!didcut) break;
 	}
 }
+
 // 1. Normalize transform (makes vectors unit length and orthogonal)
 static float vlen(point3d *p) {
     return sqrtf(p->x * p->x + p->y * p->y + p->z * p->z);
@@ -1814,9 +1810,15 @@ static point3d local_to_world_vec(point3d local_vec, transform *tr) {
 	world.z = local_vec.x * tr->r.z + local_vec.y * tr->f.z + local_vec.z * tr->d.z;
 
     return world;
-}static void draw_hsr_enter_portal(mapstate_t* map, int myport, bunchgrp *parentctx,
+}
+static void draw_hsr_enter_portal(mapstate_t* map, int myport, bunchgrp *parentctx,
                                    int plothead0, int plothead1)
 {
+// on entering portal we must rotate world verts, as if current camera was stationary.
+	// hopefully ouvmat traqnsforms yield camera space coords.
+	// we also should NOT modify xformmat beacuse of clipping planes shit.
+	// clipping planes are ONLY 2 ever, for first cam.
+
     if (parentctx->recursion_depth >= MAX_PORTAL_DEPTH) {
 		logstep("portal entrance aborted due to max depth.");
     	return;
@@ -1875,6 +1877,10 @@ static point3d local_to_world_vec(point3d local_vec, transform *tr) {
     newctx.testignoresec = igns;
     newctx.gnewtagsect = -1;
     newctx.gnewtag = -1;
+    memcpy(newctx.xformmat, parentctx->xformmat, sizeof(double)*9);
+    newctx.xformmatc = parentctx->xformmatc;
+    newctx.xformmats = parentctx->xformmats;
+    newctx.gnadd = parentctx->gnadd;
     newctx.currenthalfplane = parentctx->currenthalfplane;
 
 	//point3d test = {1, 2, 3};  -- this is ok.
