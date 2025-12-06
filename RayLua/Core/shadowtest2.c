@@ -75,7 +75,7 @@ static void cam_to_screen(double cx, double cy, double cz,
 // mp.x, mp.y are in half-plane rotated space; mp.z is NOT used (depth from gouvmat)
 static void mp_to_world(double mpx, double mpy, bunchgrp *b,
 						double *wx, double *wy, double *wz) {
-		cam_transform_t *usecam = &b->orcam;
+		cam_transform_t *usecam = &b->ct_or;
 	// Step 1: Transform mp coords through xformmat to camera-aligned space
 	double cam_rx = mpx * b->xformmat[0] + mpy * b->xformmat[1] + b->gnadd.x;
 	double cam_ry = mpx * b->xformmat[3] + mpy * b->xformmat[4] + b->gnadd.y;
@@ -681,7 +681,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
             }
 
             double wx, wy, wz;
-            mp_to_world(mp[i].x, mp[i].y, b, &b->ct_or, &wx, &wy, &wz);
+            mp_to_world(mp[i].x, mp[i].y, b, &wx, &wy, &wz);
 
             eyepolv[eyepolvn].x = (float)wx;
             eyepolv[eyepolvn].y = (float)wy;
@@ -1314,7 +1314,8 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 			// Only SUB (flags&2), NOT AND (flags&1) - child handles the content
 			// This prevents parent creating mph entries that collide with child's tags
 			logstep("entering portal floor?, %d, sec:%d, cur depth:%d, curhalf:%d", isflor, s, b->recursion_depth, b->currenthalfplane);
-			drawpol_befclip(s, -1, -1, plothead[0], plothead[1], 2 + (isflor<<2), b);
+			drawpol_befclip(s, portals[endpn].sect+taginc, portals[endpn].sect,
+				plothead[0],plothead[1],  3, b);
 			draw_hsr_enter_portal(map, myport, b, plothead[0], plothead[1]);
 		}
 
@@ -1432,11 +1433,11 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 				&& w == b->testignorewall);
 
 			if (!skipport && !noportals && myport >= 0 && portals[myport].destpn >= 0 && portals[myport].kind == PORT_WALL) {
-				int endp = portals[myport].destpn;
+				int endpn = portals[myport].destpn;
 				logstep("entering wall port,wal:%d, sec:%d, cur depth:%d, curhalf:%d",w, s, b->recursion_depth, b->currenthalfplane);
 				int endsec = portals[myport].sect;
 				// Only SUB, not AND
-				drawpol_befclip(s, -1, -1, plothead[0], plothead[1], 2, b);
+				drawpol_befclip(s, portals[endpn].sect+taginc, portals[endpn].sect,				plothead[0],plothead[1],  3, b);
 				draw_hsr_enter_portal(map, myport, b, plothead[0], plothead[1]);
 			} else {
 				logstep("drawing solid - wall,wal:%d,  sec:%d, cur depth:%d, curhalf:%d",w, s, b->recursion_depth, b->currenthalfplane);
@@ -1690,10 +1691,10 @@ for(i=lgs->sect[gcam.cursect].n-1;i>=0;i--)
 		} else {
 			n=4;
 			didcut=1;
-			mph_check(mphnum);
-			mono_genfromloop(&mph[mphnum].head[0], &mph[mphnum].head[1], bord2, n);
-			mph[mphnum].tag = gcam.cursect + taginc*b->recursion_depth;
-			mphnum++;
+			//mph_check(mphnum);
+			//mono_genfromloop(&mph[mphnum].head[0], &mph[mphnum].head[1], bord2, n);
+			//mph[mphnum].tag = gcam.cursect + taginc*b->recursion_depth;
+			//mphnum++;
 		}
 
 		b->bunchn = 0; scansector(gcam.cursect,b);
