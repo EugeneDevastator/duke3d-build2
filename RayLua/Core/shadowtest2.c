@@ -17,6 +17,9 @@
 #define USEGAMMAHACK 1 //FIXFIXFIX
 int renderinterp = 1;
 int compact2d = 0;
+bool captureframe = false;
+transform lastcamtr = {};
+transform lastcamtr2 = {};
 /*
 
 Monopoly uses xy as screen coords and z as depth
@@ -85,7 +88,7 @@ static void mp_to_world(double mpx, double mpy, bunchgrp *b,cam_transform_t* use
 
 static void world_to_mp(double wx, double wy, double wz, bunchgrp *b,
 						double *mpx, double *mpy) {
-	cam_transform_t *ct = &b->cam;
+	cam_transform_t *ct = &b->ct;
 
 	// Step 1: Transform world point to camera space
 	double cx, cy, cz;
@@ -152,7 +155,7 @@ unsigned int *shadowtest2_sectgot = 0; //WARNING:code uses x86-32 bit shift tric
 static unsigned int *shadowtest2_sectgotmal = 0;
 static int shadowtest2_sectgotn = 0;
 #define CLIP_PORTAL_FLAG 8
-#define MAX_PORTAL_DEPTH 4
+#define MAX_PORTAL_DEPTH 1
 //Translation & rotation
 static mapstate_t *curMap;
 static player_transform *gps;
@@ -163,7 +166,7 @@ static player_transform *gps;
 static tile_t *gtpic;
 
 static int gcurcol;
-static int taginc= 30000;
+static int taginc= 0000;
 #define LIGHTMAX 256 //FIX:make dynamic!
 lightpos_t shadowtest2_light[LIGHTMAX];
 static lightpos_t *glp;
@@ -618,14 +621,31 @@ static void xformprep (double hang, bunchgrp *b)
 {
 	cam_t gcam = b->cam;
 
-	// FIXED: Extract horizontal rotation from camera's forward vector
-	// Instead of: f = atan2(gcam.f.y,gcam.f.x)+hang;
-	// We get the camera's actual horizontal orientation
-	double f = atan2(gcam.f.y, gcam.f.x) + hang;
-	b->xformmatc = cos(f);
-	b->xformmats = sin(f);
+	// Extract all three Euler angles from camera orientation
+	// Assuming camera uses standard right-handed coordinate system
 
-	// Keep the original matrix calculation - this was working!
+	// Yaw (rotation around Z-axis) - horizontal rotation
+	double yaw = atan2(gcam.f.y, gcam.f.x) + hang;
+
+	// Pitch (rotation around X-axis) - vertical tilt
+	double pitch = atan2(-gcam.f.z, sqrt(gcam.f.x*gcam.f.x + gcam.f.y*gcam.f.y));
+
+	// Roll (rotation around Y-axis) - banking/tilting
+	// Extract from right vector's Z component relative to up vector
+	double roll = atan2(gcam.r.z, gcam.d.z);
+
+	// Precompute trigonometric values
+	double cy = cos(yaw);   // cos(yaw)
+	double sy = sin(yaw);   // sin(yaw)
+	double cp = cos(pitch); // cos(pitch)
+	double sp = sin(pitch); // sin(pitch)
+	double cr = cos(roll);  // cos(roll)
+	double sr = sin(roll);  // sin(roll)
+
+	// Store for backward compatibility
+	b->xformmatc = cy;
+	b->xformmats = sy;
+
 	b->xformmat[0] = gcam.r.y*b->xformmatc - gcam.r.x*b->xformmats;
 	b->xformmat[1] = gcam.r.z;
 	b->xformmat[2] = gcam.r.x*b->xformmatc + gcam.r.y*b->xformmats;
@@ -636,10 +656,12 @@ static void xformprep (double hang, bunchgrp *b)
 	b->xformmat[7] = gcam.f.z;
 	b->xformmat[8] = gcam.f.x*b->xformmatc + gcam.f.y*b->xformmats;
 
-	b->gnadd.x = -gcam.h.x*b->xformmat[0] - gcam.h.y*b->xformmat[1] + gcam.h.z*b->xformmat[2];
-	b->gnadd.y = -gcam.h.x*b->xformmat[3] - gcam.h.y*b->xformmat[4] + gcam.h.z*b->xformmat[5];
-	b->gnadd.z = -gcam.h.x*b->xformmat[6] - gcam.h.y*b->xformmat[7] + gcam.h.z*b->xformmat[8];
+	// Transform camera position rotation matrix
+	b->gnadd.x = -(gcam.h.x*b->xformmat[0] + gcam.h.y*b->xformmat[1])+ gcam.h.z*b->xformmat[2];
+	b->gnadd.y = -(gcam.h.x*b->xformmat[3] + gcam.h.y*b->xformmat[4])+ gcam.h.z*b->xformmat[5];
+	b->gnadd.z = -(gcam.h.x*b->xformmat[6] + gcam.h.y*b->xformmat[7])+ gcam.h.z*b->xformmat[8];
 }
+
 
 static void xformbac (double rx, double ry, double rz, dpoint3d *o, bunchgrp *b)
 {
@@ -694,30 +716,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
         eyepol[0].vert0 = 0;
     }
 
-    if (b->gflags < 2)
-        memcpy((void *)eyepol[eyepoln].ouvmat, (void *)b->gouvmat, sizeof(b->gouvmat[0])*9);
-    else
-    {
-        float f, *fptr;
-        f = (((float)64)+1.15f)/((float)64); fptr = eyepol[eyepoln].ouvmat;
-        switch(b->gflags)
-        {
-            case 14: fptr[0]=+f; fptr[3]=f*+2.f; fptr[6]=0.f; fptr[1]=-1.f; fptr[4]=0.f; fptr[7]=0.f; fptr[2]=(f*-5.f-1.f)/6.f; fptr[5]=0.f; fptr[8]=f*+12.f; break;
-            case 13: fptr[0]=+1.f; fptr[3]=0.f; fptr[6]=0.f; fptr[1]=-f; fptr[4]=f*+2.f; fptr[7]=0.f; fptr[2]=(f*-17.f-1.f)/6.f; fptr[5]=0.f; fptr[8]=f*+12.f; break;
-            case 15: fptr[0]=-f; fptr[3]=f*-2.f; fptr[6]=0.f; fptr[1]=+1.f; fptr[4]=0.f; fptr[7]=0.f; fptr[2]=(f*-29.f-1.f)/6.f; fptr[5]=0.f; fptr[8]=f*+12.f; break;
-            case 12: fptr[0]=-1.f; fptr[3]=0.f; fptr[6]=0.f; fptr[1]=+f; fptr[4]=f*-2.f; fptr[7]=0.f; fptr[2]=(f*-41.f-1.f)/6.f; fptr[5]=0.f; fptr[8]=f*+12.f; break;
-            case 11: fptr[0]=+f; fptr[3]=f*+2.f; fptr[6]=0.f; fptr[1]=(f*-17.f-1.f)/6.f; fptr[4]=0.f; fptr[7]=f*-12.f; fptr[2]=-1.f; fptr[5]=0.f; fptr[8]=0.f; break;
-            case 10: fptr[0]=-f; fptr[3]=f*+2.f; fptr[6]=0.f; fptr[1]=(f*+5.f+1.f)/6.f; fptr[4]=0.f; fptr[7]=f*+12.f; fptr[2]=+1.f; fptr[5]=0.f; fptr[8]=0.f; break;
-        }
-        for(int j=9-3; j>=0; j-=3)
-        {
-            float ox=fptr[j+0]*65536.f, oy=fptr[j+1]*65536.f, oz=fptr[j+2]*65536.f;
-            fptr[j+0] = ox*orcam.r.x + oy*orcam.r.y + oz*orcam.r.z;
-            fptr[j+1] = ox*orcam.d.x + oy*orcam.d.y + oz*orcam.d.z;
-            fptr[j+2] = ox*orcam.f.x + oy*orcam.f.y + oz*orcam.f.z;
-        }
-        gentex_xform(fptr, b);
-    }
+	memcpy((void *)eyepol[eyepoln].ouvmat, (void *)b->gouvmat, sizeof(b->gouvmat[0])*9);
 
     eyepol[eyepoln].tpic = gtpic;
     eyepol[eyepoln].curcol = gcurcol;
@@ -740,71 +739,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 	Uses special texture mapping flags (b->gflags = 10-15 for different cube faces)
 */
 
-static void skytagfunc (int rethead0, int rethead1, bunchgrp* b)
-{
-	cam_t gcam = b->cam;
-	#define SSCISDIST 0.000001 //Reduces probability of glitch further
-	dpoint3d otp[4], tp[8];
-	double f, ox, oy, oz;
-	int i, j, n, p, plothead[2];
-	static const signed char cubeverts[6][4][3] =
-	{
-		-1,-1,+1, +1,-1,+1, +1,+1,+1, -1,+1,+1, //Up
-		-1,+1,-1, +1,+1,-1, +1,-1,-1, -1,-1,-1, //Down
-		-1,-1,-1, -1,-1,+1, -1,+1,+1, -1,+1,-1, //Left
-		+1,+1,-1, +1,+1,+1, +1,-1,+1, +1,-1,-1, //Right
-		-1,-1,+1, -1,-1,-1, +1,-1,-1, +1,-1,+1, //Front
-		+1,+1,+1, +1,+1,-1, -1,+1,-1, -1,+1,+1, //Back
-	};
-
-	if ((rethead0|rethead1) < 0) { mono_deloop(rethead1); mono_deloop(rethead0); return; }
-
-	for(p=0;p<6;p++)
-	{
-			//rotate
-		for(i=0;i<4;i++)
-		{
-			ox = (float)cubeverts[p][i][0]; oy = (float)cubeverts[p][i][1];
-			otp[i].x = oy*b->xformmatc - ox*b->xformmats; otp[i].y = cubeverts[p][i][2];
-			otp[i].z = ox*b->xformmatc + oy*b->xformmats;
-		}
-
-			//clip
-		n = 0;
-		for(i=4-1,j=0;j<4;i=j,j++)
-		{
-			//Near-Plane Clipping (Sutherland-Hodgman)
-			if (otp[i].z >= SSCISDIST) { tp[n] = otp[i]; n++; }
-			if ((otp[i].z >= SSCISDIST) != (otp[j].z >= SSCISDIST))
-			{
-				f = (SSCISDIST-otp[j].z)/(otp[i].z-otp[j].z);
-				tp[n].x = (otp[i].x-otp[j].x)*f + otp[j].x;
-				tp[n].y = (otp[i].y-otp[j].y)*f + otp[j].y;
-				tp[n].z = SSCISDIST; n++;
-			}
-		}
-		if (n < 3) goto skiprest;
-
-			//project & find x extents, persp proj.
-			//Formula: screen_x = (world_x * focal_length) / depth + center_x
-		for(i=0;i<n;i++)
-		{
-			f = gcam.h.z/tp[i].z;
-			tp[i].x = tp[i].x*f + gcam.h.x;
-			tp[i].y = tp[i].y*f + gcam.h.y;
-		}
-
-			//generate vmono
-		mono_genfromloop(&plothead[0],&plothead[1],tp,n);
-
-		b->gflags = p+10;
-		mono_bool(rethead0,rethead1,plothead[0],plothead[1],MONO_BOOL_AND,b, drawtagfunc_ws);
-		mono_deloop(plothead[1]); mono_deloop(plothead[0]);
-skiprest:;
-	}
-	mono_deloop(rethead1); mono_deloop(rethead0);
-}
-
+static void skytagfunc (int rethead0, int rethead1, bunchgrp* b){}
 	// lignum: index of light source (shadowtest2_light[] index)
 	//  vert0: index into 1st vertex of ligpolv
 	// b2sect: Build2 sector
@@ -944,8 +879,6 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 			double dy = mp[i].y - gcam.p.y;
 			double dz = mp[i].z - gcam.p.z;
 
-			// we need to prserve camera -plane orientation and reuse that for cameras that travel inside portal
-
 			otp[on].x = dy * b->xformmatc - dx * b->xformmats;  // rotated X
 			otp[on].y = dz;                                      // direct Z offset
 			otp[on].z = dx * b->xformmatc + dy * b->xformmats;  // rotated depth
@@ -1026,7 +959,7 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 				mono_output = ligpoltagfunc;
 				//add to light list // this will process point lights. otherwize will only use plr light.
 			else if (b->gflags < 2) mono_output = drawtagfunc_ws;
-			else mono_output = skytagfunc; //calls drawtagfunc inside
+			else mono_output = drawtagfunc_ws;//skytagfunc;
 			for (i = mphnum - 1; i >= 0; i--)
 				if (mph[i].tag == mtag)
 					mono_bool(mph[i].head[0], mph[i].head[1], plothead[0], plothead[1],MONO_BOOL_AND, b, mono_output);
@@ -1282,19 +1215,6 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 	s = b->bunch[bid].sec;
 	sec = curMap->sect;
 	wal = sec[s].wall;
-#if 0
-	i = bunch[bid].wal0;
-	x0 = wal[i].x; y0 = wal[i].y; i += wal[i].n;
-	x1 = wal[i].x; y1 = wal[i].y; f = bunch[bid].fra0;
-	twalx0 = (x1-x0)*f + x0;
-	twaly0 = (y1-y0)*f + y0;
-
-	i = b->bunch[bid].wal1;
-	x0 = wal[i].x; y0 = wal[i].y; i += wal[i].n;
-	x1 = wal[i].x; y1 = wal[i].y; f = bunch[bid].fra1;
-	twalx1 = (x1-x0)*f + x0;
-	twaly1 = (y1-y0)*f + y0;
-#endif
 
 	twal = (bunchverts_t *)_alloca((curMap->sect[b->bunch[bid].sec].n+1)*sizeof(bunchverts_t));
 	twaln = prepbunch(bid,twal,b);
@@ -1313,9 +1233,9 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 	b->bunchn--; b->bunch[bid] = b->bunch[b->bunchn];
 	j = (((b->bunchn-1)*b->bunchn)>>1);
 	memcpy(&b->bunchgrid[((bid-1)*bid)>>1],&b->bunchgrid[j],bid*sizeof(b->bunchgrid[0]));
-	for(i=bid+1;i<b->bunchn;i++) b->bunchgrid[(((i-1)*i)>>1)+bid] = ((b->bunchgrid[j+i]&1)<<1) + (b->bunchgrid[j+i]>>1);
-	if (b->has_portal_clip)
-		int a =0;
+	for(i=bid+1;i<b->bunchn;i++)
+		b->bunchgrid[(((i-1)*i)>>1)+bid] = ((b->bunchgrid[j+i]&1)<<1) + (b->bunchgrid[j+i]>>1);
+
 	// === DRAW CEILINGS & FLOORS ===
 	for(isflor=0;isflor<2;isflor++) // floor ceil
 	{
@@ -1536,9 +1456,6 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 	if (!newctx) {
 		return;
 	}
-
-
-
 	int prehead1 = -1;
 	int prehead2 = -1;
 	int presect = -1;
@@ -1611,18 +1528,18 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 
 
 		//Hack to keep camera away from sector line; avoids clipping glitch in drawpol_befclip/changetagfunc
-//wal = lgs->sect[gcam.cursect].wall;
-//for(i=lgs->sect[gcam.cursect].n-1;i>=0;i--)
-//{
-//	#define WALHAK 1e-3
-//	j = wal[i].n+i;
-//	d = distpoint2line2(gcam.p.x,gcam.p.y,wal[i].x,wal[i].y,wal[j].x,wal[j].y); if (d >= WALHAK*WALHAK) continue;
-//	fp.x = wal[j].x-wal[i].x;
-//	fp.y = wal[j].y-wal[i].y;
-//	f = (WALHAK - sqrt(d))/sqrt(fp.x*fp.x + fp.y*fp.y);
-//	gcam.p.x -= fp.y*f;
-//	gcam.p.y += fp.x*f;
-//}
+wal = lgs->sect[gcam.cursect].wall;
+for(i=lgs->sect[gcam.cursect].n-1;i>=0;i--)
+{
+	#define WALHAK 1e-3
+	j = wal[i].n+i;
+	d = distpoint2line2(gcam.p.x,gcam.p.y,wal[i].x,wal[i].y,wal[j].x,wal[j].y); if (d >= WALHAK*WALHAK) continue;
+	fp.x = wal[j].x-wal[i].x;
+	fp.y = wal[j].y-wal[i].y;
+	f = (WALHAK - sqrt(d))/sqrt(fp.x*fp.x + fp.y*fp.y);
+	gcam.p.x -= fp.y*f;
+	gcam.p.y += fp.x*f;
+}
 
 	if (shadowtest2_rendmode != 4)
 	{
@@ -1688,7 +1605,7 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 
 		if (!b->has_portal_clip)
 			b->currenthalfplane = halfplane;
-	//	else if (b->currenthalfplane != halfplane)
+	//	else if (b->currenthalfplane != halfplane)  // temp disable to get all portals work
 	//		continue;
 
 		if (shadowtest2_rendmode == 4)
@@ -1740,8 +1657,6 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 			bord2[j].y = bord2[j].y*f + gcam.h.y;
 		}
 
-
-
 		if (!b->has_portal_clip) {
 			//FIX! once means not each frame! (of course it doesn't hurt functionality)
 			// Standard case: clear existing state and create new viewport
@@ -1782,7 +1697,7 @@ nogood:; }
 		if (shadowtest2_rendmode == 4) uptr = glp->sectgot;
 										  else uptr = shadowtest2_sectgot;
 
-		if (!loopsrun)
+		if (!halfplane)
 		{
 			memcpy(uptr,b->sectgot,(lgs->numsects+31)>>3);
 			loopsrun++;
@@ -1824,7 +1739,7 @@ static void scalardivv(point3d *pt, float diver) {
     pt->x /= diver; pt->y /= diver; pt->z /= diver;
 }
 
-static void normalize_transform(transform *tr) {
+void normalize_transform(transform *tr) {
     // Normalize all axes
     float flen = vlen(&tr->f);
     if (flen > 0.0001f) scalardivv(&tr->f, flen);
@@ -1835,49 +1750,42 @@ static void normalize_transform(transform *tr) {
     flen = vlen(&tr->d);
     if (flen > 0.0001f) scalardivv(&tr->d, flen);
 }
-
-// 2a. Transform a point from world space to local space of a transform
-static point3d world_to_local_point(point3d world_pos, transform *tr) {
-    // Translate to origin
-    float dx = world_pos.x - tr->p.x;
-    float dy = world_pos.y - tr->p.y;
-    float dz = world_pos.z - tr->p.z;
-
-    // Project onto local axes (inverse rotation via dot products)
-    point3d local;
-    local.x = dx * tr->r.x + dy * tr->r.y + dz * tr->r.z;
-    local.y = dx * tr->d.x + dy * tr->d.y + dz * tr->d.z;
-    local.z = dx * tr->f.x + dy * tr->f.y + dz * tr->f.z;
-
-    return local;
-}
-
-// 2b. Transform a vector from world space to local space
 static point3d world_to_local_vec(point3d world_vec, transform *tr) {
-    point3d local;
-    local.x = world_vec.x * tr->r.x + world_vec.y * tr->r.y + world_vec.z * tr->r.z;
-    local.y = world_vec.x * tr->d.x + world_vec.y * tr->d.y + world_vec.z * tr->d.z;
-    local.z = world_vec.x * tr->f.x + world_vec.y * tr->f.y + world_vec.z * tr->f.z;
+	point3d local;
+	local.x = world_vec.x * tr->r.x + world_vec.y * tr->r.y + world_vec.z * tr->r.z;  // right
+	local.y = world_vec.x * tr->f.x + world_vec.y * tr->f.y + world_vec.z * tr->f.z;  // forward
+	local.z = world_vec.x * tr->d.x + world_vec.y * tr->d.y + world_vec.z * tr->d.z;  // down
 
-    return local;
+	return local;
 }
 
-// 2c. Transform a point from local space to world space
 static point3d local_to_world_point(point3d local_pos, transform *tr) {
-    point3d world;
-    world.x = tr->p.x + local_pos.x * tr->r.x + local_pos.y * tr->d.x + local_pos.z * tr->f.x;
-    world.y = tr->p.y + local_pos.x * tr->r.y + local_pos.y * tr->d.y + local_pos.z * tr->f.y;
-    world.z = tr->p.z + local_pos.x * tr->r.z + local_pos.y * tr->d.z + local_pos.z * tr->f.z;
+	point3d world;
+	world.x = tr->p.x + local_pos.x * tr->r.x + local_pos.y * tr->f.x + local_pos.z * tr->d.x;
+	world.y = tr->p.y + local_pos.x * tr->r.y + local_pos.y * tr->f.y + local_pos.z * tr->d.y;
+	world.z = tr->p.z + local_pos.x * tr->r.z + local_pos.y * tr->f.z + local_pos.z * tr->d.z;
 
-    return world;
+	return world;
 }
 
-// 2d. Transform a vector from local space to world space
+static point3d world_to_local_point(point3d world_pos, transform *tr) {
+	float dx = world_pos.x - tr->p.x;
+	float dy = world_pos.y - tr->p.y;
+	float dz = world_pos.z - tr->p.z;
+
+	point3d local;
+	local.x = dx * tr->r.x + dy * tr->r.y + dz * tr->r.z;
+	local.y = dx * tr->f.x + dy * tr->f.y + dz * tr->f.z;
+	local.z = dx * tr->d.x + dy * tr->d.y + dz * tr->d.z;
+
+	return local;
+}
+
 static point3d local_to_world_vec(point3d local_vec, transform *tr) {
-    point3d world;
-    world.x = local_vec.x * tr->r.x + local_vec.y * tr->d.x + local_vec.z * tr->f.x;
-    world.y = local_vec.x * tr->r.y + local_vec.y * tr->d.y + local_vec.z * tr->f.y;
-    world.z = local_vec.x * tr->r.z + local_vec.y * tr->d.z + local_vec.z * tr->f.z;
+	point3d world;
+	world.x = local_vec.x * tr->r.x + local_vec.y * tr->f.x + local_vec.z * tr->d.x;
+	world.y = local_vec.x * tr->r.y + local_vec.y * tr->f.y + local_vec.z * tr->d.y;
+	world.z = local_vec.x * tr->r.z + local_vec.y * tr->f.z + local_vec.z * tr->d.z;
 
     return world;
 }static void draw_hsr_enter_portal(mapstate_t* map, int myport, bunchgrp *parentctx,
@@ -1902,12 +1810,12 @@ static point3d local_to_world_vec(point3d local_vec, transform *tr) {
     normalize_transform(&tgs.tr);
     normalize_transform(&ncam.tr);
 
-    // Step 1: Transform camera to entry portal's local space
-    // This finds the camera's position and orientation RELATIVE to the entry portal
-    point3d cam_local_pos = world_to_local_point(ncam.p, &ent.tr);
-    point3d cam_local_r = world_to_local_vec(ncam.r, &ent.tr);
-    point3d cam_local_d = world_to_local_vec(ncam.d, &ent.tr);
-    point3d cam_local_f = world_to_local_vec(ncam.f, &ent.tr);
+	point3d cam_local_pos = world_to_local_point(ncam.p, &ent.tr);
+	point3d cam_local_r = world_to_local_vec(ncam.r, &ent.tr);
+	point3d cam_local_d = world_to_local_vec(ncam.d, &ent.tr);
+	point3d cam_local_f = world_to_local_vec(ncam.f, &ent.tr);
+	//point3d cam_local_h = world_to_local_point(ncam.h, &ent.tr);
+
 
     // Step 2: Apply that same relative transform from the target portal's perspective
     // Since entry.forward points IN and target.forward points OUT (already opposite),
@@ -1941,7 +1849,15 @@ static point3d local_to_world_vec(point3d local_vec, transform *tr) {
     newctx.gnewtag = -1;
     newctx.currenthalfplane = parentctx->currenthalfplane;
 
-    draw_hsr_polymost_ctx(map, &newctx);
+	//point3d test = {1, 2, 3};  -- this is ok.
+	//point3d w = local_to_world_vec(test, &ncam.tr);
+	//point3d back = world_to_local_vec(w, &ncam.tr);
+	//printf("test rt: %f %f %f",back.x,back.y,back.z);
+	lastcamtr = newctx.orcam.tr;
+	lastcamtr2 = newctx.cam.tr;
+	    draw_hsr_polymost_ctx(map, &newctx);
+
+	// here we return from the portal and continue.
 }
 
 

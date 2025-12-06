@@ -685,7 +685,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				if (b7spr.cstat&8) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; spr->flags ^= 8; } //&8: y-flipped?
 				// note - replace with view setup
 				if (b7spr.cstat&128) { spr->p.z += (b7spr.yrepeat/4096.0*(float)tilesizy[l]); } //&128: real-centered centering (center at center) - originally half submerged sprite
-
+				spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; // down is flipped.
 				if ((unsigned)b7spr.sectnum < (unsigned)map->numsects) //Make shade relative to sector
 				{
 					j = b7spr.sectnum; j = 32 - map->sect[j].surf[map->sect[j].surf[0].flags&1^1].rsc/128;

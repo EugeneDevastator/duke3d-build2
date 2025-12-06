@@ -86,11 +86,13 @@ extern eyepol_t *eyepol; // 4096 eyepol_t's = 192KB
 extern point3d *eyepolv; //16384 point2d's  = 128KB
 extern int eyepoln, glignum;
 extern int eyepolmal, eyepolvn, eyepolvmal;
-
+extern transform lastcamtr;
+extern transform lastcamtr2;
+extern bool captureframe;
 // ================================================================================================
 // POLYGONAL SCENE CLIPPING FUNCTIONS
 // ================================================================================================
-
+void normalize_transform(transform *tr);
 /** Main sector scanning with near-plane clipping
  * @param sectnum Sector index to scan and add to bunch list
  */
