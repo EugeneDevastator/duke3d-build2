@@ -40,7 +40,10 @@ typedef struct {
 	int sec, wal0, wal1;                // Sector index and wall range
 	double fra0, fra1;                  // Parametric fractions for wall clipping
 } bunch_t;
-
+typedef struct {
+	float m[9];
+	point3d p,h;
+}cam_transform_t;
 /** Bunch intersection data for polygon splitting */
 typedef struct {
 	int bun, sid;                       // Bunch index and intersection side (1:/, 2:\)

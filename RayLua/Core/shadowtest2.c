@@ -1456,7 +1456,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 
 	}
 }
-
+/*
 	Renders visible geometry from camera viewpoint
 	Populates eyepol[] array with screen-space polygons
 	Each polygon contains texture mapping data and surface normals
