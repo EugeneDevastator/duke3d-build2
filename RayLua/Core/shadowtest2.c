@@ -1754,7 +1754,10 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 			mph[0].tag = gcam.cursect;
 			mphnum = 1;
 		} else {
-			// dont do anything, because clipping is done by drawpol_befclip.
+			mph_check(mphnum);
+			mono_genfromloop(&mph[mphnum].head[0], &mph[mphnum].head[1], bord2, n);
+			mph[mphnum].tag = gcam.cursect + taginc*b->recursion_depth;
+			mphnum++;
 		}
 
 		b->bunchn = 0; scansector(gcam.cursect,b);
