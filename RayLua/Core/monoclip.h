@@ -74,8 +74,7 @@ typedef struct {
 // other context stuff
 	cam_t cam;                    // Camera per recursion level
  	cam_t orcam; // one true camera, read only.
-	double xformmat[9], xformmatc, xformmats;
-	double xformmatc_g, xformmats_g;
+	double xformmat[9];
 	point3d gnadd;
 	unsigned int *sectgot, *sectgotmal;        // Visited sectors per level
 	int sectgotn;

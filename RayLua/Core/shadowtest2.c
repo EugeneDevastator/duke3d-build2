@@ -352,27 +352,12 @@ static void scansector(int sectnum, bunchgrp *b)
         if (j < i) obunchn = b->bunchn;
     }
 }
-static void xformprep_prt(bunchgrp *b)
-{
-	cam_t *cam = &b->cam;
-	double yaw = atan2(cam->f.y, cam->f.x);
-	b->xformmatc_g = cos(yaw);
-	b->xformmats_g = sin(yaw);
-}
+
 static void xformprep(bunchgrp *b)
 {
 	cam_t *cam = &b->orcam;
 
-	// For scansector back-face culling (still needs yaw in XY plane)
-	double yaw = atan2(cam->f.y, cam->f.x);
-	b->xformmatc = cos(yaw);
-	b->xformmats = sin(yaw);
-	b->xformmatc_g = b->xformmatc;
-	b->xformmats_g = b->xformmats;
-
-	// Store camera rotation matrix directly (no yaw mixing)
-	// This is the inverse/transpose of the camera orientation
-	// Maps world directions to camera-space directions
+	// Store camera rotation matrix directly
 	b->xformmat[0] = cam->r.x;
 	b->xformmat[1] = cam->r.y;
 	b->xformmat[2] = cam->r.z;
@@ -383,13 +368,11 @@ static void xformprep(bunchgrp *b)
 	b->xformmat[7] = cam->f.y;
 	b->xformmat[8] = cam->f.z;
 
-	// gnadd: offset for screen center in camera space
-	// Simplified: just store camera position offset projected to screen
+	// Screen center
 	b->gnadd.x = cam->h.x;
 	b->gnadd.y = cam->h.y;
 	b->gnadd.z = cam->h.z;
 }
-
 
 static void xformbac(double rx, double ry, double rz, dpoint3d *o, bunchgrp *b)
 {
@@ -1356,7 +1339,7 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
         n = b->planecuts;
         didcut = 1;
         memset8(b->sectgot, 0, (lgs->numsects + 31) >> 3);
-        xformprep_prt(b);
+        xformprep(b);
     }
 
     b->bunchn = 0;
@@ -1509,8 +1492,6 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport, bunchgrp *parentc
 
 
 	memcpy(newctx.xformmat, parentctx->xformmat, sizeof(double)*9);
-	newctx.xformmatc = parentctx->xformmatc;
-	newctx.xformmats = parentctx->xformmats;
 	newctx.gnadd = parentctx->gnadd;
 	//point3d test = {1, 2, 3};  -- this is ok.
 	//point3d w = local_to_world_vec(test, &ncam.tr);
