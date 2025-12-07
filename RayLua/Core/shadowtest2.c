@@ -91,8 +91,7 @@ static void cam_to_screen(double cx, double cy, double cz,
 // Convert point from mp (mono polygon) space to world coordinates
 // mp.x, mp.y are in half-plane rotated space; mp.z is NOT used (depth from gouvmat)
 static void mp_to_world(double mpx, double mpy, bunchgrp *b,
-						double *wx, double *wy, double *wz) {
-		cam_transform_t *usecam = &b->ct_or;
+						double *wx, double *wy, double *wz, cam_transform_t *usecam) {
 	// Step 1: Transform mp coords through xformmat to camera-aligned space
 	double cam_rx = mpx * b->xformmat[0] + mpy * b->xformmat[1] + b->gnadd.x;
 	double cam_ry = mpx * b->xformmat[3] + mpy * b->xformmat[4] + b->gnadd.y;
@@ -220,8 +219,7 @@ inline void memset8(void *d, long v, long n) {
 				}
 }
 
-static int prepbunch (int id, bunchverts_t *twal, bunchgrp *b)
-{
+static int prepbunch(int id, bunchverts_t *twal, bunchgrp *b) {
 	cam_t gcam = b->cam;
 	wall_t *wal;
 	double f, x, y, x0, y0, x1, y1;
@@ -236,31 +234,36 @@ static int prepbunch (int id, bunchverts_t *twal, bunchgrp *b)
 	x1 = wal[i].x;
 	y1 = wal[i].y;
 	f = b->bunch[id].fra0;
-	twal[0].x = (x1-x0)*f + x0;
-	twal[0].y = (y1-y0)*f + y0;
-	if ((b->bunch[id].wal0 == b->bunch[id].wal1) && (b->bunch[id].fra0 < b->bunch[id].fra1))
-	{     //Hack for left side clip
+	twal[0].x = (x1 - x0) * f + x0;
+	twal[0].y = (y1 - y0) * f + y0;
+	if ((b->bunch[id].wal0 == b->bunch[id].wal1) && (b->bunch[id].fra0 < b->bunch[id].fra1)) {
+		//Hack for left side clip
 		f = b->bunch[id].fra1;
-		twal[1].x = (x1-x0)*f + x0;
-		twal[1].y = (y1-y0)*f + y0;
-		return(1);
+		twal[1].x = (x1 - x0) * f + x0;
+		twal[1].y = (y1 - y0) * f + y0;
+		return (1);
 	}
 	twal[1].x = x1;
-	twal[1].y = y1; n = 1;
-	while (i != b->bunch[id].wal1)
-	{
-		twal[n].i = i; n++; i += wal[i].n;
+	twal[1].y = y1;
+	n = 1;
+	while (i != b->bunch[id].wal1) {
+		twal[n].i = i;
+		n++;
+		i += wal[i].n;
 		twal[n].x = wal[i].x;
 		twal[n].y = wal[i].y;
 	}
-	if (b->bunch[id].fra1 > 0.0)
-	{
-		x = wal[i].x; y = wal[i].y; f = b->bunch[id].fra1;
-		twal[n].i = i; n++; i += wal[i].n;
-		twal[n].x = (wal[i].x-x)*f + x;
-		twal[n].y = (wal[i].y-y)*f + y;
+	if (b->bunch[id].fra1 > 0.0) {
+		x = wal[i].x;
+		y = wal[i].y;
+		f = b->bunch[id].fra1;
+		twal[n].i = i;
+		n++;
+		i += wal[i].n;
+		twal[n].x = (wal[i].x - x) * f + x;
+		twal[n].y = (wal[i].y - y) * f + y;
 	}
-	return(n);
+	return (n);
 }
 
 	//bunchfront intersection structure:
@@ -277,152 +280,167 @@ static int prepbunch (int id, bunchverts_t *twal, bunchgrp *b)
 	//   1: FRONT:RED(b0)
 	//   2: FRONT:GREEN(b1)
 	//   3: UNSORTABLE!
-static int bunchfront (int b0, int b1, int fixsplitnow, bunchgrp *b)
-{
+static int bunchfront(int b0, int b1, int fixsplitnow, bunchgrp *b) {
 	//return 0;
 	cam_t gcam = b->cam;
 	bunchverts_t *twal[2];
 	wall_t *wal;
 	double d, a[2], x0, y0, x1, y1, x2, y2, x3, y3, t0, t1, t2, t3;
-	double x, y, ix, iy, tix, tiy, x10, y10, x23, y23, x20, y20, otx0, oty0, otx1, oty1, tx0, ty0, tx1, ty1, u, t, d0, d1;
+	double x, y, ix, iy, tix, tiy, x10, y10, x23, y23, x20, y20, otx0, oty0, otx1, oty1, tx0, ty0, tx1, ty1, u, t, d0,
+			d1;
 	int i, j, twaln[2], oj, ind[2], sid, cnt, gotsid, startsid, obfintn;
 
-	if (b0 == b1) return(0);
+	if (b0 == b1) return (0);
 
-		//FIXFIXFIXFIXFIX:remove block
-#if 0 //This doen't work if 'B' of {A<B<C} is hidden from view :/
-	sect_t *sec;
-	int s0, s1, w, ns, nw;
-	sec = curMap->sect;
-	s0 = bunch[b0].sec;
-	s1 = bunch[b1].sec;
-	if (s0 != s1)
-	{
-		for(w=sec[s0].n-1;w>=0;w--)
-		{
-			ns = sec[s0].wall[w].ns;
-			nw = sec[s0].wall[w].nw;
-			while (((unsigned)ns < (unsigned)curMap->numsects) && (ns != s0))
-			{
-				if (ns == s1) goto good; //s0 and s1 are neighbors
-				i = ns;
-				ns = sec[i].wall[nw].ns;
-				nw = sec[i].wall[nw].nw;
-			}
-		}
-		return(0); //bunches not on neighboring sectors are designated as incomparable
-good:;
+	twal[0] = (bunchverts_t *) _alloca(
+		(curMap->sect[b->bunch[b0].sec].n + curMap->sect[b->bunch[b1].sec].n + 2) * sizeof(bunchverts_t));
+	twaln[0] = prepbunch(b0, twal[0], b);
+	twal[1] = &twal[0][twaln[0] + 1];
+	twaln[1] = prepbunch(b1, twal[1], b);
+
+	//Offset vertices (BUNCHNEAR of scansector() already puts them safely in front)
+	for (j = 2 - 1; j >= 0; j--) for (i = twaln[j]; i >= 0; i--) {
+		twal[j][i].x -= gcam.p.x;
+		twal[j][i].y -= gcam.p.y;
 	}
-#endif
 
-		//FIXFIXFIXFIXFIX
-	//if ((((unsigned)b0 >= (unsigned)bunchn) || ((unsigned)b1 >= (unsigned)bunchn)) || (!bunch))
-	//{
-	//   char tbuf[1024];
-	//   sprintf(tbuf,"b0=%d/0x%08x\nb1=%d/0x%08x\nbunchn=%d/0x%08x",b0,b0,b1,b1,bunchn,bunchn);
-	//   MessageBox(ghwnd,tbuf,prognam,MB_OK);
-	//   ExitProcess(0);
-	//}
+	if (twal[0][0].y * twal[1][twaln[1]].x >= twal[1][twaln[1]].y * twal[0][0].x) return (0); //no overlap (whole bunch)
+	if (twal[1][0].y * twal[0][twaln[0]].x >= twal[0][twaln[0]].y * twal[1][0].x) return (0); //no overlap (whole bunch)
 
-	twal[0] = (bunchverts_t *)_alloca((curMap->sect[b->bunch[b0].sec].n+curMap->sect[b->bunch[b1].sec].n+2)*sizeof(bunchverts_t));
-	twaln[0] = prepbunch(b0,twal[0],b); twal[1] = &twal[0][twaln[0]+1];
-	twaln[1] = prepbunch(b1,twal[1],b);
+	a[0] = 0;
+	a[1] = 0;
+	//Calculate the areas between the 2 bunches (superset of above algo - can determine if unsortable)
+	ind[0] = 0;
+	ind[1] = 0;
+	cnt = 0;
+	otx0 = 0;
+	oty0 = 0;
+	otx1 = 0;
+	oty1 = 0;
+	j = 0;
+	gotsid = 0;
+	startsid = -1;
+	obfintn = b->bfintn;
+	while (1) {
+		sid = (twal[0][ind[0]].x * twal[1][ind[1]].y < twal[0][ind[0]].y * twal[1][ind[1]].x);
+		if (ind[1 - sid] > 0) {
+			x2 = twal[sid][ind[sid]].x;
+			x0 = twal[1 - sid][ind[1 - sid] - 1].x;
+			x1 = twal[1 - sid][ind[1 - sid] - 0].x;
+			y2 = twal[sid][ind[sid]].y;
+			y0 = twal[1 - sid][ind[1 - sid] - 1].y;
+			y1 = twal[1 - sid][ind[1 - sid] - 0].y;
 
-		//Offset vertices (BUNCHNEAR of scansector() already puts them safely in front)
-	for(j=2-1;j>=0;j--) for(i=twaln[j];i>=0;i--) { twal[j][i].x -= gcam.p.x; twal[j][i].y -= gcam.p.y; }
+			//intersect() inline
+			//(x1-x0)*t + (x2-x3)*u = (x2-x0)
+			//(y1-y0)*t + (y2-y3)*u = (y2-y0)
+			x10 = x1 - x0;
+			x20 = x2 - x0;
+			y10 = y1 - y0;
+			y20 = y2 - y0;
+			d = x10 * y2 - y10 * x2;
+			if (d == 0.0) goto overflow/*FIX?*/;
+			u = (x10 * y20 - y10 * x20) / d;
+			ix = (1.0 - u) * x2;
+			iy = (1.0 - u) * y2;
 
-	//{ //FIXFIXFIXFIXFIX
-	//char tbuf[1024]; sprintf(tbuf,"cnt=%d\n",(1<<31)-1-gcnt);
-	//for(j=0;j<2;j++)
-	//{
-	//   for(i=0;i<=twaln[0];i++) sprintf(&tbuf[strlen(tbuf)],"%f,%f  ",twal[j][i].x,twal[j][i].y);
-	//   sprintf(&tbuf[strlen(tbuf)],"\n");
-	//}
-	//MessageBox(ghwnd,tbuf,prognam,MB_OK);
-
-	if (twal[0][0].y*twal[1][twaln[1]].x >= twal[1][twaln[1]].y*twal[0][0].x) return(0); //no overlap (whole bunch)
-	if (twal[1][0].y*twal[0][twaln[0]].x >= twal[0][twaln[0]].y*twal[1][0].x) return(0); //no overlap (whole bunch)
-
-	a[0] = 0; a[1] = 0;
-		//Calculate the areas between the 2 bunches (superset of above algo - can determine if unsortable)
-	ind[0] = 0; ind[1] = 0; cnt = 0; otx0 = 0; oty0 = 0; otx1 = 0; oty1 = 0;
-	j = 0; gotsid = 0; startsid = -1; obfintn = b->bfintn;
-	while (1)
-	{
-		sid = (twal[0][ind[0]].x*twal[1][ind[1]].y < twal[0][ind[0]].y*twal[1][ind[1]].x);
-		if (ind[1-sid] > 0)
-		{
-			x2 = twal[sid][ind[sid]].x; x0 = twal[1-sid][ind[1-sid]-1].x; x1 = twal[1-sid][ind[1-sid]-0].x;
-			y2 = twal[sid][ind[sid]].y; y0 = twal[1-sid][ind[1-sid]-1].y; y1 = twal[1-sid][ind[1-sid]-0].y;
-
-				//intersect() inline
-				//(x1-x0)*t + (x2-x3)*u = (x2-x0)
-				//(y1-y0)*t + (y2-y3)*u = (y2-y0)
-			x10 = x1-x0; x20 = x2-x0;
-			y10 = y1-y0; y20 = y2-y0;
-			d =  x10*y2 - y10*x2; if (d == 0.0) goto overflow/*FIX?*/;
-			u = (x10*y20 - y10*x20)/d; ix = (1.0-u)*x2; iy = (1.0-u)*y2;
-
-			if (!sid) { tx0 = ix; ty0 = iy; tx1 = x2; ty1 = y2; }
-				  else { tx0 = x2; ty0 = y2; tx1 = ix; ty1 = iy; }
-			oj = j; if (u != 0.0) { j = ((u >= 0.0) == sid); if (!gotsid) { gotsid = 1; oj = j; startsid = j; } }
-			if (cnt)
-			{
-				if (j == oj)
-				{
-						//---ot0-ot1
-						// \  |  |
-						//   t0  |
-						//     \t1
-					d = oty0*tx0 - otx0*ty0 + otx1*ty1 - oty1*tx1; a[j] += d;
+			if (!sid) {
+				tx0 = ix;
+				ty0 = iy;
+				tx1 = x2;
+				ty1 = y2;
+			} else {
+				tx0 = x2;
+				ty0 = y2;
+				tx1 = ix;
+				ty1 = iy;
+			}
+			oj = j;
+			if (u != 0.0) {
+				j = ((u >= 0.0) == sid);
+				if (!gotsid) {
+					gotsid = 1;
+					oj = j;
+					startsid = j;
 				}
-				else
-				{
-						//NOTE:must use original wall vertices to get correct value of t!
-					wal = curMap->sect[b->bunch[b0].sec].wall; i = twal[0][ind[0]-1].i;
-					x0 = wal[i].x-gcam.p.x; y0 = wal[i].y-gcam.p.y; i += wal[i].n;
-					x1 = wal[i].x-gcam.p.x; y1 = wal[i].y-gcam.p.y;
-					wal = curMap->sect[b->bunch[b1].sec].wall; i = twal[1][ind[1]-1].i;
-					x2 = wal[i].x-gcam.p.x; y2 = wal[i].y-gcam.p.y; i += wal[i].n;
-					x3 = wal[i].x-gcam.p.x; y3 = wal[i].y-gcam.p.y;
+			}
+			if (cnt) {
+				if (j == oj) {
+					//---ot0-ot1
+					// \  |  |
+					//   t0  |
+					//     \t1
+					d = oty0 * tx0 - otx0 * ty0 + otx1 * ty1 - oty1 * tx1;
+					a[j] += d;
+				} else {
+					//NOTE:must use original wall vertices to get correct value of t!
+					wal = curMap->sect[b->bunch[b0].sec].wall;
+					i = twal[0][ind[0] - 1].i;
+					x0 = wal[i].x - gcam.p.x;
+					y0 = wal[i].y - gcam.p.y;
+					i += wal[i].n;
+					x1 = wal[i].x - gcam.p.x;
+					y1 = wal[i].y - gcam.p.y;
+					wal = curMap->sect[b->bunch[b1].sec].wall;
+					i = twal[1][ind[1] - 1].i;
+					x2 = wal[i].x - gcam.p.x;
+					y2 = wal[i].y - gcam.p.y;
+					i += wal[i].n;
+					x3 = wal[i].x - gcam.p.x;
+					y3 = wal[i].y - gcam.p.y;
 
-						//intersect() inline
-						//(x1-x0)*t + (x2-x3)*u = (x2-x0)
-						//(y1-y0)*t + (y2-y3)*u = (y2-y0)
-					x10 = x1-x0; x23 = x2-x3; x20 = x2-x0;
-					y10 = y1-y0; y23 = y2-y3; y20 = y2-y0;
-					d =  x10*y23 - y10*x23; if (d == 0.0) goto overflow/*FIX?*/; d = 1.0/d;
-					t = (x20*y23 - y20*x23)*d; tix = x10*t + x0; tiy = y10*t + y0;
+					//intersect() inline
+					//(x1-x0)*t + (x2-x3)*u = (x2-x0)
+					//(y1-y0)*t + (y2-y3)*u = (y2-y0)
+					x10 = x1 - x0;
+					x23 = x2 - x3;
+					x20 = x2 - x0;
+					y10 = y1 - y0;
+					y23 = y2 - y3;
+					y20 = y2 - y0;
+					d = x10 * y23 - y10 * x23;
+					if (d == 0.0) goto overflow/*FIX?*/;
+					d = 1.0 / d;
+					t = (x20 * y23 - y20 * x23) * d;
+					tix = x10 * t + x0;
+					tiy = y10 * t + y0;
 
-					d0 = (oty0-oty1)*tix + (otx1-otx0)*tiy; a[oj] += d0;
-					d1 = ( ty1- ty0)*tix + ( tx0- tx1)*tiy; a[ j] += d1;
+					d0 = (oty0 - oty1) * tix + (otx1 - otx0) * tiy;
+					a[oj] += d0;
+					d1 = (ty1 - ty0) * tix + (tx0 - tx1) * tiy;
+					a[j] += d1;
 
-					if ((fixsplitnow) && (b->bfintn < BFINTMAX))
-					{
+					if ((fixsplitnow) && (b->bfintn < BFINTMAX)) {
 						b->bfint[b->bfintn].bun = b1;
-						b->bfint[b->bfintn].sid = startsid+1; startsid ^= 1;
-						b->bfint[b->bfintn].wal = twal[0][ind[0]-1].i;
+						b->bfint[b->bfintn].sid = startsid + 1;
+						startsid ^= 1;
+						b->bfint[b->bfintn].wal = twal[0][ind[0] - 1].i;
 						b->bfint[b->bfintn].fra = t;
 						b->bfintn++;
 					}
 				}
 			}
-overflow:otx0 = tx0; oty0 = ty0; otx1 = tx1; oty1 = ty1;
+		overflow:
+			otx0 = tx0;
+			oty0 = ty0;
+			otx1 = tx1;
+			oty1 = ty1;
 			cnt++;
 		}
-		ind[sid]++; if (ind[sid] > twaln[sid]) break;
+		ind[sid]++;
+		if (ind[sid] > twaln[sid]) break;
 	}
-		//WARNING:1e-7's necessary for precision loss while calculating (ix,iy) - even for horz/vert lines
-	if ((a[0] <= +1e-7) && (a[1] >= -1e-7)) return(0);
-	if (a[0] <= +1e-7) return(1);
-	if (a[1] >= -1e-7) return(2);
-	return(3);
+	//WARNING:1e-7's necessary for precision loss while calculating (ix,iy) - even for horz/vert lines
+	if ((a[0] <= +1e-7) && (a[1] >= -1e-7)) return (0);
+	if (a[0] <= +1e-7) return (1);
+	if (a[1] >= -1e-7) return (2);
+	return (3);
 }
 
 static void scansector (int sectnum, bunchgrp* b)
 {
 	cam_t gcam = b->cam;
-	#define BUNCHNEAR 1e-7
+#define BUNCHNEAR 1e-7
 	sect_t *sec;
 	wall_t *wal;
 	bfint_t tbf;
@@ -430,83 +448,92 @@ static void scansector (int sectnum, bunchgrp* b)
 	int i, j, k, m, o, ie, obunchn, realobunchn, obfintn;
 
 	if (sectnum < 0) return;
-	b->sectgot[sectnum>>5] |= (1<<sectnum);
+	b->sectgot[sectnum >> 5] |= (1 << sectnum);
 
-	sec = &curMap->sect[sectnum]; wal = sec->wall;
+	sec = &curMap->sect[sectnum];
+	wal = sec->wall;
 
-	obunchn = b->bunchn; realobunchn = b->bunchn;
-	for(i=0,ie=sec->n;i<ie;i++)
-	{
-		j = wal[i].n+i;
-		dx0 = wal[i].x-gcam.p.x; dy0 = wal[i].y-gcam.p.y;
-		dx1 = wal[j].x-gcam.p.x; dy1 = wal[j].y-gcam.p.y; if (dy1*dx0 <= dx1*dy0) goto docont; //Back-face cull
+	obunchn = b->bunchn;
+	realobunchn = b->bunchn;
+	for (i = 0, ie = sec->n; i < ie; i++) {
+		j = wal[i].n + i;
+		dx0 = wal[i].x - gcam.p.x;
+		dy0 = wal[i].y - gcam.p.y;
+		dx1 = wal[j].x - gcam.p.x;
+		dy1 = wal[j].y - gcam.p.y;
+		if (dy1 * dx0 <= dx1 * dy0) goto docont; //Back-face cull
 
-			//clip to near plane .. result is parametric fractions f0&f1
+		//clip to near plane .. result is parametric fractions f0&f1
 		f0 = dx0 * b->xformmatc_g + dy0 * b->xformmats_g;
 		f1 = dx1 * b->xformmatc_g + dy1 * b->xformmats_g;
-			  if (f0 <= BUNCHNEAR) { if (f1 <= BUNCHNEAR) goto docont;
-											 f0 = (BUNCHNEAR-f0)/(f1-f0); f1 = 1.0; if (f0 >= f1) goto docont; }
-		else if (f1 <= BUNCHNEAR) { f1 = (BUNCHNEAR-f0)/(f1-f0); f0 = 0.0; if (f0 >= f1) goto docont; }
-		else                      { f0 = 0.0;                    f1 = 1.0; }
+		if (f0 <= BUNCHNEAR) {
+			if (f1 <= BUNCHNEAR) goto docont;
+			f0 = (BUNCHNEAR - f0) / (f1 - f0);
+			f1 = 1.0;
+			if (f0 >= f1) goto docont;
+		} else if (f1 <= BUNCHNEAR) {
+			f1 = (BUNCHNEAR - f0) / (f1 - f0);
+			f0 = 0.0;
+			if (f0 >= f1) goto docont;
+		} else {
+			f0 = 0.0;
+			f1 = 1.0;
+		}
 
-		k = b->bunch[b->bunchn-1].wal1;
-		if ((b->bunchn > obunchn) && (wal[k].n+k == i) && (b->bunch[b->bunchn-1].fra1 == 1.0))
-		{
-			b->bunch[b->bunchn-1].wal1 = i; //continue from previous wall (typical case)
-			b->bunch[b->bunchn-1].fra1 = f1;
-			if ((b->bunchn-1 > obunchn) && (b->bunch[obunchn].wal0 == j) && (b->bunch[obunchn].fra0 == 0.0))
-			{
+		k = b->bunch[b->bunchn - 1].wal1;
+		if ((b->bunchn > obunchn) && (wal[k].n + k == i) && (b->bunch[b->bunchn - 1].fra1 == 1.0)) {
+			b->bunch[b->bunchn - 1].wal1 = i; //continue from previous wall (typical case)
+			b->bunch[b->bunchn - 1].fra1 = f1;
+			if ((b->bunchn - 1 > obunchn) && (b->bunch[obunchn].wal0 == j) && (b->bunch[obunchn].fra0 == 0.0)) {
 				b->bunchn--; //attach to left side of 1st bunch on loop
 				b->bunch[obunchn].wal0 = b->bunch[b->bunchn].wal0;
 				b->bunch[obunchn].fra0 = b->bunch[b->bunchn].fra0;
 			}
-		}
-		else if ((b->bunchn > obunchn) && (b->bunch[obunchn].wal0 == j) && (b->bunch[obunchn].fra0 == 0.0))
-		{
+		} else if ((b->bunchn > obunchn) && (b->bunch[obunchn].wal0 == j) && (b->bunch[obunchn].fra0 == 0.0)) {
 			b->bunch[obunchn].wal0 = i; //update left side of 1st bunch on loop
 			b->bunch[obunchn].fra0 = f0;
-		}
-		else
-		{
-			if (b->bunchn >= b->bunchmal)
-			{
+		} else {
+			if (b->bunchn >= b->bunchmal) {
 				b->bunchmal <<= 1;
-				b->bunch     = (bunch_t       *)realloc(b->bunch    ,b->bunchmal*sizeof(b->bunch[0]));
-				b->bunchgot  = (unsigned int  *)realloc(b->bunchgot ,((b->bunchmal+31)&~31)>>3);
-				b->bunchgrid = (unsigned char *)realloc(b->bunchgrid,((b->bunchmal-1)*b->bunchmal)>>1);
+				b->bunch = (bunch_t *) realloc(b->bunch, b->bunchmal * sizeof(b->bunch[0]));
+				b->bunchgot = (unsigned int *) realloc(b->bunchgot, ((b->bunchmal + 31) & ~31) >> 3);
+				b->bunchgrid = (unsigned char *) realloc(b->bunchgrid, ((b->bunchmal - 1) * b->bunchmal) >> 1);
 			}
-			b->bunch[b->bunchn].wal0 = i; b->bunch[b->bunchn].fra0 = f0; //start new b->bunch
-			b->bunch[b->bunchn].wal1 = i; b->bunch[b->bunchn].fra1 = f1;
-			b->bunch[b->bunchn].sec = sectnum; b->bunchn++;
+			b->bunch[b->bunchn].wal0 = i;
+			b->bunch[b->bunchn].fra0 = f0; //start new b->bunch
+			b->bunch[b->bunchn].wal1 = i;
+			b->bunch[b->bunchn].fra1 = f1;
+			b->bunch[b->bunchn].sec = sectnum;
+			b->bunchn++;
 		}
-docont:;
+	docont:;
 		if (j < i) obunchn = b->bunchn;
 	}
 
-	for(obunchn=realobunchn;obunchn<b->bunchn;obunchn++)
-	{
-			//insert bunch
-			//  0 1 2 3 4
-			//0
-			//1 x
-			//2 x x
-			//3 x x x
-			//4 x x x x
-			//5 ? ? ? ? ?
-			//0,1,3,6,10,15,21,28,36,45,55,..
-		j = (((obunchn-1)*obunchn)>>1); b->bfintn = 0;
-		for(i=0;i<obunchn;i++) b->bunchgrid[j+i] = bunchfront(obunchn,i,1,b);
+	for (obunchn = realobunchn; obunchn < b->bunchn; obunchn++) {
+		//insert bunch
+		//  0 1 2 3 4
+		//0
+		//1 x
+		//2 x x
+		//3 x x x
+		//4 x x x x
+		//5 ? ? ? ? ?
+		//0,1,3,6,10,15,21,28,36,45,55,..
+		j = (((obunchn - 1) * obunchn) >> 1);
+		b->bfintn = 0;
+		for (i = 0; i < obunchn; i++) b->bunchgrid[j + i] = bunchfront(obunchn, i, 1, b);
 
 		if (!b->bfintn) continue;
 
-			//sort bfint's
-		for(j=1;j<b->bfintn;j++)
-			for(i=0;i<j;i++)
-			{
-					//              bfint[i].wal vs. bfint[j].wal ?
-					//0    bunch[obunchn].wal0........bunch[obunchn].wal1       sec->n
-					//0....bunch[obunchn].wal1        bunch[obunchn].wal0.......sec->n
-				m = b->bfint[i].wal; o = b->bfint[j].wal;
+		//sort bfint's
+		for (j = 1; j < b->bfintn; j++)
+			for (i = 0; i < j; i++) {
+				//              bfint[i].wal vs. bfint[j].wal ?
+				//0    bunch[obunchn].wal0........bunch[obunchn].wal1       sec->n
+				//0....bunch[obunchn].wal1        bunch[obunchn].wal0.......sec->n
+				m = b->bfint[i].wal;
+				o = b->bfint[j].wal;
 				if (b->bunch[obunchn].wal0 > b->bunch[obunchn].wal1) //handle wall index wrap-around
 				{
 					if (m <= b->bunch[obunchn].wal1) m += sec->n;
@@ -515,68 +542,83 @@ docont:;
 				if (m < o) continue;
 				if ((b->bfint[i].wal == b->bfint[j].wal) && (b->bfint[i].fra <= b->bfint[j].fra)) continue;
 
-				tbf = b->bfint[i]; b->bfint[i] = b->bfint[j]; b->bfint[j] = tbf;
+				tbf = b->bfint[i];
+				b->bfint[i] = b->bfint[j];
+				b->bfint[j] = tbf;
 			}
 
-			//combine null or tiny bunches
-		obfintn = b->bfintn; b->bfintlut[0] = 0; b->bfintn = 1;
-		for(i=1;i<obfintn;i++)
-			if ((b->bfint[i-1].wal != b->bfint[i].wal) || (b->bfint[i].fra-b->bfint[i-1].fra >= 2e-7))
-				{ b->bfintlut[b->bfintn] = i; b->bfintn++; }
+		//combine null or tiny bunches
+		obfintn = b->bfintn;
+		b->bfintlut[0] = 0;
+		b->bfintn = 1;
+		for (i = 1; i < obfintn; i++)
+			if ((b->bfint[i - 1].wal != b->bfint[i].wal) || (b->bfint[i].fra - b->bfint[i - 1].fra >= 2e-7)) {
+				b->bfintlut[b->bfintn] = i;
+				b->bfintn++;
+			}
 		b->bfintlut[b->bfintn] = obfintn;
 
-			//obunchn gets its ass split 'b->bfintn' times into a total of 'b->bfintn+1' pieces
-		if (b->bunchn+b->bfintn > b->bunchmal)
-		{
-			b->bunchmal = max(b->bunchmal<<1,b->bunchn+b->bfintn);
-			b->bunch     = (bunch_t       *)realloc(b->bunch    ,b->bunchmal*sizeof(b->bunch[0]));
-			b->bunchgot  = (unsigned int  *)realloc(b->bunchgot ,((b->bunchmal+31)&~31)>>3);
-			b->bunchgrid = (unsigned char *)realloc(b->bunchgrid,((b->bunchmal-1)*b->bunchmal)>>1);
+		//obunchn gets its ass split 'b->bfintn' times into a total of 'b->bfintn+1' pieces
+		if (b->bunchn + b->bfintn > b->bunchmal) {
+			b->bunchmal = max(b->bunchmal<<1, b->bunchn+b->bfintn);
+			b->bunch = (bunch_t *) realloc(b->bunch, b->bunchmal * sizeof(b->bunch[0]));
+			b->bunchgot = (unsigned int *) realloc(b->bunchgot, ((b->bunchmal + 31) & ~31) >> 3);
+			b->bunchgrid = (unsigned char *) realloc(b->bunchgrid, ((b->bunchmal - 1) * b->bunchmal) >> 1);
 		}
 
-			//Shove not-yet-processed neighbors to end of list. WARNING:be careful with indices/for loop order!
-		for(k=0;k<b->bfintn;k++) b->bunch[b->bunchn+b->bfintn-1-k] = b->bunch[obunchn+k+1];
-		for(k=b->bfintn-1;k>=0;k--) b->bunch[obunchn+k+1] = b->bunch[obunchn];
-		for(k=b->bfintn-1;k>=0;k--)
-		{
-			b->bunch[obunchn+k  ].wal1 = b->bfint[b->bfintlut[k  ]  ].wal; b->bunch[obunchn+k  ].fra1 = max(b->bfint[b->bfintlut[k  ]  ].fra-1e-7,0.0);
-			b->bunch[obunchn+k+1].wal0 = b->bfint[b->bfintlut[k+1]-1].wal; b->bunch[obunchn+k+1].fra0 = min(b->bfint[b->bfintlut[k+1]-1].fra+1e-7,1.0);
+		//Shove not-yet-processed neighbors to end of list. WARNING:be careful with indices/for loop order!
+		for (k = 0; k < b->bfintn; k++) b->bunch[b->bunchn + b->bfintn - 1 - k] = b->bunch[obunchn + k + 1];
+		for (k = b->bfintn - 1; k >= 0; k--) b->bunch[obunchn + k + 1] = b->bunch[obunchn];
+		for (k = b->bfintn - 1; k >= 0; k--) {
+			b->bunch[obunchn + k].wal1 = b->bfint[b->bfintlut[k]].wal;
+			b->bunch[obunchn + k].fra1 = max(b->bfint[b->bfintlut[k ] ].fra-1e-7, 0.0);
+			b->bunch[obunchn + k + 1].wal0 = b->bfint[b->bfintlut[k + 1] - 1].wal;
+			b->bunch[obunchn + k + 1].fra0 = min(b->bfint[b->bfintlut[k+1]-1].fra+1e-7, 1.0);
 		}
 		b->bunchn += b->bfintn;
 
-			//  0 1 2 3 4 5 6
-			//0
-			//1 x
-			//2 x x
-			//3 x x x
-			//4 x x x x
-			//5 ? ? ? - ?
-			//6 ? ? ? - ? 0
-			//7 ? ? ? - ? 0 0
-		for(m=obunchn;m<obunchn+b->bfintn+1;m++) //re-front all 'b->bfintn+1' pieces, using hints from bfint list
+		//  0 1 2 3 4 5 6
+		//0
+		//1 x
+		//2 x x
+		//3 x x x
+		//4 x x x x
+		//5 ? ? ? - ?
+		//6 ? ? ? - ? 0
+		//7 ? ? ? - ? 0 0
+		for (m = obunchn; m < obunchn + b->bfintn + 1; m++)
+		//re-front all 'b->bfintn+1' pieces, using hints from bfint list
 		{
-			j = (((m-1)*m)>>1);
-			for(k=0;k<obunchn;k++)
-			{
-				if (m > obunchn       ) for(o=b->bfintlut[m-obunchn-1];o<b->bfintlut[m-obunchn  ];o++) if (b->bfint[o].bun == k) { b->bunchgrid[j+k] = b->bfint[o].sid  ; goto bunchgrid_got; }
-				if (m < obunchn+b->bfintn) for(o=b->bfintlut[m-obunchn  ];o<b->bfintlut[m-obunchn+1];o++) if (b->bfint[o].bun == k) { b->bunchgrid[j+k] = b->bfint[o].sid^3; goto bunchgrid_got; }
-				b->bunchgrid[j+k] = bunchfront(m,k,0,b);
-bunchgrid_got:;
+			j = (((m - 1) * m) >> 1);
+			for (k = 0; k < obunchn; k++) {
+				if (m > obunchn) for (o = b->bfintlut[m - obunchn - 1]; o < b->bfintlut[m - obunchn]; o++) if (
+					b->bfint[o].bun == k) {
+					b->bunchgrid[j + k] = b->bfint[o].sid;
+					goto bunchgrid_got;
+				}
+				if (m < obunchn + b->bfintn) for (o = b->bfintlut[m - obunchn]; o < b->bfintlut[m - obunchn + 1]; o++)
+					if (b->bfint[o].bun == k) {
+						b->bunchgrid[j + k] = b->bfint[o].sid ^ 3;
+						goto bunchgrid_got;
+					}
+				b->bunchgrid[j + k] = bunchfront(m, k, 0, b);
+			bunchgrid_got:;
 			}
-			for(;k<m;k++) b->bunchgrid[j+k] = 0;
+			for (; k < m; k++) b->bunchgrid[j + k] = 0;
 		}
 		obunchn += b->bfintn;
 	}
 
-		//remove null bunches (necessary for proper operation)
-	for(m=b->bunchn-1;m>=realobunchn;m--)
-	{
+	//remove null bunches (necessary for proper operation)
+	for (m = b->bunchn - 1; m >= realobunchn; m--) {
 		if (b->bunch[m].wal0 != b->bunch[m].wal1) continue;
 		if (b->bunch[m].fra0 < b->bunch[m].fra1) continue;
-		b->bunchn--; b->bunch[m] = b->bunch[b->bunchn];
-		j = (((b->bunchn-1)*b->bunchn)>>1);
-		memcpy(&b->bunchgrid[((m-1)*m)>>1],&b->bunchgrid[j],m*sizeof(b->bunchgrid[0]));
-		for(i=m+1;i<b->bunchn;i++) b->bunchgrid[(((i-1)*i)>>1)+m] = ((b->bunchgrid[j+i]&1)<<1) + (b->bunchgrid[j+i]>>1);
+		b->bunchn--;
+		b->bunch[m] = b->bunch[b->bunchn];
+		j = (((b->bunchn - 1) * b->bunchn) >> 1);
+		memcpy(&b->bunchgrid[((m - 1) * m) >> 1], &b->bunchgrid[j], m * sizeof(b->bunchgrid[0]));
+		for (i = m + 1; i < b->bunchn; i++) b->bunchgrid[(((i - 1) * i) >> 1) + m] =
+		                                    ((b->bunchgrid[j + i] & 1) << 1) + (b->bunchgrid[j + i] >> 1);
 	}
 
 }
@@ -651,7 +693,7 @@ int eyepolmal = 0, eyepolvn = 0, eyepolvmal = 0;
 
 static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 {
-    cam_t orcam = b->orcam;
+    cam_transform_t usecam = b->ct_or; // ct_or is correct because we transfrom back to main cam.
     int i, h, rethead[2];
 
     if ((rethead0|rethead1) < 0) { mono_deloop(rethead1); mono_deloop(rethead0); return; }
@@ -671,7 +713,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
             }
 
             double wx, wy, wz;
-            mp_to_world(mp[i].x, mp[i].y, b, &wx, &wy, &wz);
+            mp_to_world(mp[i].x, mp[i].y, b, &wx, &wy, &wz, &usecam);
 
             eyepolv[eyepolvn].x = (float)wx;
             eyepolv[eyepolvn].y = (float)wy;
@@ -1535,20 +1577,15 @@ for(i=lgs->sect[gcam.cursect].n-1;i>=0;i--)
 			memset(glp->lighashead,-1,glp->lighasheadn*sizeof(glp->lighashead[0]));
 		}
 	}
-	int maxhfp =2;
-	for(halfplane=0;halfplane<maxhfp;halfplane++) {
+
+	for(halfplane=0;halfplane<2;halfplane++) {
 		logstep("HALFPLANE change: %d, depth: %d",halfplane,b->recursion_depth);
 
 		if (!b->has_portal_clip)
 			b->currenthalfplane = halfplane;
 		else {
-			maxhfp=-1;
 			halfplane = b->currenthalfplane;
-		}//else //if (b->currenthalfplane != halfplane)  // temp disable to get all portals work
-		//{
-		//	halfplane = b->currenthalfplane;
-		//	maxhfp=-1;
-		//}
+		}
 
 		if (shadowtest2_rendmode == 4)
 		{
@@ -1563,35 +1600,38 @@ for(i=lgs->sect[gcam.cursect].n-1;i>=0;i--)
 			xformbac(+65536.0,+65536.0,1.0,&bord2[2], b);
 			xformbac(-65536.0,+65536.0,1.0,&bord2[3], b);
 			n = 4; didcut = 1;
-		}
-		else if (!b->has_portal_clip) { // initial
-			{
-				xformprep(((double)halfplane)*PI, b);
+		} else if (!b->has_portal_clip) {
+			// initial
 
-				// NEW CODE - Use much larger bounds:
-				float large_bound = 1e6f;
-				xformbac(-large_bound, -large_bound, oricam.h.z, &bord[0],b);
-				xformbac(+large_bound, -large_bound, oricam.h.z, &bord[1],b);
-				xformbac(+large_bound, +large_bound, oricam.h.z, &bord[2],b);
-				xformbac(-large_bound, +large_bound, oricam.h.z, &bord[3],b);
+			xformprep(((double) halfplane) * PI, b);
 
-				//Clip screen to front plane
-				n = 0; didcut = 0;
-				for(i=4-1,j=0;j<4;i=j,j++)
-				{
-					if (bord[i].z >= SCISDIST) { bord2[n] = bord[i]; n++; }
-					if ((bord[i].z >= SCISDIST) != (bord[j].z >= SCISDIST))
-					{
-						f = (SCISDIST-bord[i].z)/(bord[j].z-bord[i].z);
-						bord2[n].x = (bord[j].x-bord[i].x)*f + bord[i].x;
-						bord2[n].y = (bord[j].y-bord[i].y)*f + bord[i].y;
-						bord2[n].z = (bord[j].z-bord[i].z)*f + bord[i].z;
-						n++; didcut = 1;
-					}
+			// NEW CODE - Use much larger bounds:
+			float large_bound = 1e6f;
+			xformbac(-large_bound, -large_bound, oricam.h.z, &bord[0], b);
+			xformbac(+large_bound, -large_bound, oricam.h.z, &bord[1], b);
+			xformbac(+large_bound, +large_bound, oricam.h.z, &bord[2], b);
+			xformbac(-large_bound, +large_bound, oricam.h.z, &bord[3], b);
+
+			//Clip screen to front plane
+			n = 0;
+			didcut = 0;
+			for (i = 4 - 1, j = 0; j < 4; i = j, j++) {
+				if (bord[i].z >= SCISDIST) {
+					bord2[n] = bord[i];
+					n++;
 				}
-				if (n < 3) break;
-				b->planecuts = n;
+				if ((bord[i].z >= SCISDIST) != (bord[j].z >= SCISDIST)) {
+					f = (SCISDIST - bord[i].z) / (bord[j].z - bord[i].z);
+					bord2[n].x = (bord[j].x - bord[i].x) * f + bord[i].x;
+					bord2[n].y = (bord[j].y - bord[i].y) * f + bord[i].y;
+					bord2[n].z = (bord[j].z - bord[i].z) * f + bord[i].z;
+					n++;
+					didcut = 1;
+				}
 			}
+			if (n < 3) break;
+			b->planecuts = n;
+
 			memset8(b->sectgot,0,(lgs->numsects+31)>>3);
 			for(j=0;j<n;j++)
 			{
@@ -1671,7 +1711,7 @@ nogood:; }
 			}
 		}
 
-		if (!didcut) break;
+		if (!didcut || b->has_portal_clip) break;
 	}
 }
 
