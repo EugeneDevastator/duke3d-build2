@@ -88,8 +88,7 @@ extern int eyepoln, glignum;
 extern int eyepolmal, eyepolvn, eyepolvmal;
 extern transform lastcamtr;
 extern transform lastcamtr2;
-extern cam_transform_t camm_tr;
-extern cam_transform_t orcamm_tr;
+
 extern bool captureframe;
 // ================================================================================================
 // POLYGONAL SCENE CLIPPING FUNCTIONS
@@ -99,7 +98,6 @@ void normalize_transform(transform *tr);
  * @param sectnum Sector index to scan and add to bunch list
  */
 void scansector(int sectnum, bunchgrp *b);
-void wccw_transform(dpoint3d *pinout, cam_transform_t *ctin, cam_transform_t *ctout);
 
 /** Prepares wall segments for bunch processing
  * @param b Bunch index to process

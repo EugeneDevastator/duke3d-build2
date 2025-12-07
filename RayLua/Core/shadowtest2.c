@@ -21,8 +21,6 @@ int compact2d = 0;
 bool captureframe = false;
 transform lastcamtr = {};
 transform lastcamtr2 = {};
-cam_transform_t camm_tr = {};
-cam_transform_t orcamm_tr = {};
 /*
 Monopoly uses xy as screen coords and z as depth
 Engine uses z as right, y as forward, z as down
@@ -44,50 +42,36 @@ void logstep(const char* fmt, ...) {
 	printf("\n");
 }
 
-static void cam_transform_init(cam_transform_t *ct, cam_t *cam) {
-	ct->m[0] = cam->r.x; ct->m[1] = cam->r.y; ct->m[2] = cam->r.z;
-	ct->m[3] = cam->d.x; ct->m[4] = cam->d.y; ct->m[5] = cam->d.z;
-	ct->m[6] = cam->f.x; ct->m[7] = cam->f.y; ct->m[8] = cam->f.z;
-	ct->p = cam->p;
-	ct->h = cam->h;
-}
 
 // World point to camera space. Valid.
 static void world_to_cam(double wx, double wy, double wz,
-						 cam_transform_t *ct,
+						 cam_t *ctin,
 						 double *cx, double *cy, double *cz) {
-	double dx = wx - ct->p.x;
-	double dy = wy - ct->p.y;
-	double dz = wz - ct->p.z;
-	*cx = dx*ct->m[0] + dy*ct->m[1] + dz*ct->m[2];  // right
-	*cy = dx*ct->m[3] + dy*ct->m[4] + dz*ct->m[5];  // down
-	*cz = dx*ct->m[6] + dy*ct->m[7] + dz*ct->m[8];  // forward (depth)
+	double dx = wx - ctin->p.x;
+	double dy = wy - ctin->p.y;
+	double dz = wz - ctin->p.z;
+
+	*cx = dx * ctin->r. x + dy * ctin->r.y + dz * ctin->r.z;
+	*cy = dx * ctin->d.x + dy * ctin->d.y + dz * ctin->d.z;
+	*cz = dx * ctin->f.x + dy * ctin->f.y + dz * ctin->f.z;
 }
 // Validated - works correctly.
-void wccw_transform(dpoint3d *pinout, cam_transform_t *ctin, cam_transform_t *ctout) {
+static void wccw_transform(dpoint3d *pinout, cam_t *ctin, cam_t *ctout) {
+	// World -> camera space (using ctin)
 	double dx = pinout->x - ctin->p.x;
 	double dy = pinout->y - ctin->p.y;
 	double dz = pinout->z - ctin->p.z;
-	pinout->x = dx*ctin->m[0] + dy*ctin->m[1] + dz*ctin->m[2];  // right
-	pinout->y = dx*ctin->m[3] + dy*ctin->m[4] + dz*ctin->m[5];  // down
-	pinout->z = dx*ctin->m[6] + dy*ctin->m[7] + dz*ctin->m[8];  // forward (depth)
-	double wx,wy,wz;
-	wx = pinout->x*ctout->m[0] + pinout->y*ctout->m[3] + pinout->z*ctout->m[6] + ctout->p.x;
-	wy = pinout->x*ctout->m[1] + pinout->y*ctout->m[4] + pinout->z*ctout->m[7] + ctout->p.y;
-	wz = pinout->x*ctout->m[2] + pinout->y*ctout->m[5] + pinout->z*ctout->m[8] + ctout->p.z;
-	pinout->x = wx;
-	pinout->y=wy;
-	pinout->z=wz;
+
+	double cx = dx * ctin->r. x + dy * ctin->r.y + dz * ctin->r.z;
+	double cy = dx * ctin->d.x + dy * ctin->d.y + dz * ctin->d.z;
+	double cz = dx * ctin->f.x + dy * ctin->f.y + dz * ctin->f.z;
+
+	// Camera space -> world (using ctout)
+	pinout->x = cx * ctout->r.x + cy * ctout->d.x + cz * ctout->f.x + ctout->p.x;
+	pinout->y = cx * ctout->r.y + cy * ctout->d.y + cz * ctout->f.y + ctout->p.y;
+	pinout->z = cx * ctout->r.z + cy * ctout->d.z + cz * ctout->f.z + ctout->p.z;
 }
 
-static void cam_to_screen(double cx, double cy, double cz,
-						  cam_transform_t *ct,
-						  double *sx, double *sy, double *depth) {
-	double f = ct->h.z / cz;
-	*sx = cx * f + ct->h.x;
-	*sy = cy * f + ct->h.y;
-	*depth = cz;
-}
 // Convert point from mp (mono polygon) space to world coordinates
 // mp.x, mp.y are in half-plane rotated space; mp.z is NOT used (depth from gouvmat)
 // REPLACE the existing mp_to_world with this simpler version:
@@ -96,58 +80,23 @@ static void cam_to_screen(double cx, double cy, double cz,
 // After drawpol_befclip changes, mp.x/mp.y ARE screen coordinates
 static void mp_to_world(double sx, double sy, bunchgrp *b,
 						double *wx, double *wy, double *wz,
-						cam_transform_t *usecam) {
-	// sx, sy are screen coordinates from mono polygon
-	// gouvmat encodes plane equation: depth = 1 / ((g0*sx + g3*sy + g6) * h.z)
-	double denom = (b->gouvmat[0] * sx + b->gouvmat[3] * sy + b->gouvmat[6]) * usecam->h.z;
+						cam_t *cam) {
+	double denom = (b->gouvmat[0] * sx + b->gouvmat[3] * sy + b->gouvmat[6]) * cam->h.z;
 
-	// Protect against division by zero
 	if (fabs(denom) < 1e-10) {
-		*wx = usecam->p.x;
-		*wy = usecam->p.y;
-		*wz = usecam->p.z;
+		*wx = cam->p.x;
+		*wy = cam->p.y;
+		*wz = cam->p.z;
 		return;
 	}
 
 	double depth = 1.0 / denom;
+	double dx = sx - cam->h.x;
+	double dy = sy - cam->h.y;
 
-	// Unproject: screen coords -> camera ray direction -> world position
-	double dx = sx - usecam->h.x;
-	double dy = sy - usecam->h.y;
-
-	// Ray direction in world space, scaled by depth, plus camera position
-	*wx = (dx * usecam->m[0] + dy * usecam->m[3] + usecam->h.z * usecam->m[6]) * depth + usecam->p.x;
-	*wy = (dx * usecam->m[1] + dy * usecam->m[4] + usecam->h.z * usecam->m[7]) * depth + usecam->p.y;
-	*wz = (dx * usecam->m[2] + dy * usecam->m[5] + usecam->h.z * usecam->m[8]) * depth + usecam->p.z;
-}
-
-
-// Screen space back to camera space (given depth)
-static void screen_to_cam(double sx, double sy, double depth,
-						  cam_transform_t *ct,
-						  double *cx, double *cy, double *cz) {
-	*cz = depth;
-	*cx = (sx - ct->h.x) * depth / ct->h.z;
-	*cy = (sy - ct->h.y) * depth / ct->h.z;
-}
-
-// Camera space to world space. Valid.
-static void cam_to_world(double cx, double cy, double cz,
-						 cam_transform_t *ct,
-						 double *wx, double *wy, double *wz) {
-	// Transpose of rotation matrix
-	*wx = cx*ct->m[0] + cy*ct->m[3] + cz*ct->m[6] + ct->p.x;
-	*wy = cx*ct->m[1] + cy*ct->m[4] + cz*ct->m[7] + ct->p.y;
-	*wz = cx*ct->m[2] + cy*ct->m[5] + cz*ct->m[8] + ct->p.z;
-}
-
-// Full: screen + stored depth back to world
-static void screen_to_world(double sx, double sy, double depth,
-							cam_transform_t *ct,
-							double *wx, double *wy, double *wz) {
-	double cx, cy, cz;
-	screen_to_cam(sx, sy, depth, ct, &cx, &cy, &cz);
-	cam_to_world(cx, cy, cz, ct, wx, wy, wz);
+	*wx = (dx * cam->r.x + dy * cam->d.x + cam->h.z * cam->f.x) * depth + cam->p.x;
+	*wy = (dx * cam->r.y + dy * cam->d.y + cam->h.z * cam->f.y) * depth + cam->p.y;
+	*wz = (dx * cam->r.z + dy * cam->d.z + cam->h.z * cam->f.z) * depth + cam->p.z;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -369,57 +318,58 @@ int eyepolmal = 0, eyepolvn = 0, eyepolvmal = 0;
 
 static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 {
-    cam_transform_t usecam = b->ct_or; // ct_or is correct because we transfrom back to main cam.
-    int i, h, rethead[2];
+	cam_t *usecam = &b->orcam;  // Changed from cam_transform_t to cam_t*
+	int i, h, rethead[2];
 
-    if ((rethead0|rethead1) < 0) { mono_deloop(rethead1); mono_deloop(rethead0); return; }
-    rethead[0] = rethead0; rethead[1] = rethead1;
+	if ((rethead0|rethead1) < 0) { mono_deloop(rethead1); mono_deloop(rethead0); return; }
+	rethead[0] = rethead0; rethead[1] = rethead1;
 
-    for(h=0; h<2; h++)
-    {
-        i = rethead[h];
-        do
-        {
-            if (h) i = mp[i].p;
+	for(h=0; h<2; h++)
+	{
+		i = rethead[h];
+		do
+		{
+			if (h) i = mp[i].p;
 
-            if (eyepolvn >= eyepolvmal)
-            {
-                eyepolvmal = max(eyepolvmal<<1, 16384);
-                eyepolv = (point3d *)realloc(eyepolv, eyepolvmal*sizeof(point3d));
-            }
+			if (eyepolvn >= eyepolvmal)
+			{
+				eyepolvmal = max(eyepolvmal<<1, 16384);
+				eyepolv = (point3d *)realloc(eyepolv, eyepolvmal*sizeof(point3d));
+			}
 
-            double wx, wy, wz;
-            mp_to_world(mp[i].x, mp[i].y, b, &wx, &wy, &wz, &usecam);
+			double wx, wy, wz;
+			mp_to_world(mp[i].x, mp[i].y, b, &wx, &wy, &wz, usecam);
 
-            eyepolv[eyepolvn].x = (float)wx;
-            eyepolv[eyepolvn].y = (float)wy;
-            eyepolv[eyepolvn].z = (float)wz;
-            eyepolvn++;
+			eyepolv[eyepolvn].x = (float)wx;
+			eyepolv[eyepolvn].y = (float)wy;
+			eyepolv[eyepolvn].z = (float)wz;
+			eyepolvn++;
 
-            if (!h) i = mp[i].n;
-        } while (i != rethead[h]);
-        mono_deloop(rethead[h]);
-    }
+			if (!h) i = mp[i].n;
+		} while (i != rethead[h]);
+		mono_deloop(rethead[h]);
+	}
 
-    if (eyepoln+1 >= eyepolmal)
-    {
-        eyepolmal = max(eyepolmal<<1, 4096);
-        eyepol = (eyepol_t *)realloc(eyepol, eyepolmal*sizeof(eyepol_t));
-        eyepol[0].vert0 = 0;
-    }
+	// Rest unchanged...
+	if (eyepoln+1 >= eyepolmal)
+	{
+		eyepolmal = max(eyepolmal<<1, 4096);
+		eyepol = (eyepol_t *)realloc(eyepol, eyepolmal*sizeof(eyepol_t));
+		eyepol[0].vert0 = 0;
+	}
 
 	memcpy((void *)eyepol[eyepoln].ouvmat, (void *)b->gouvmat, sizeof(b->gouvmat[0])*9);
 
-    eyepol[eyepoln].tpic = gtpic;
-    eyepol[eyepoln].curcol = gcurcol;
-    eyepol[eyepoln].flags = (b->gflags != 0);
-    eyepol[eyepoln].b2sect = b->gligsect;
-    eyepol[eyepoln].b2wall = b->gligwall;
-    eyepol[eyepoln].b2slab = b->gligslab;
-    memcpy((void *)&eyepol[eyepoln].norm, (void *)&b->gnorm, sizeof(b->gnorm));
-    eyepoln++;
-    eyepol[eyepoln].vert0 = eyepolvn;
-    eyepol[eyepoln].rdepth = b->recursion_depth;
+	eyepol[eyepoln].tpic = gtpic;
+	eyepol[eyepoln].curcol = gcurcol;
+	eyepol[eyepoln].flags = (b->gflags != 0);
+	eyepol[eyepoln].b2sect = b->gligsect;
+	eyepol[eyepoln].b2wall = b->gligwall;
+	eyepol[eyepoln].b2slab = b->gligslab;
+	memcpy((void *)&eyepol[eyepoln].norm, (void *)&b->gnorm, sizeof(b->gnorm));
+	eyepoln++;
+	eyepol[eyepoln].vert0 = eyepolvn;
+	eyepol[eyepoln].rdepth = b->recursion_depth;
 	logstep("produce eyepol, depth:%d",b->recursion_depth);
 }
 
@@ -807,7 +757,7 @@ static void portal_xform_world_at_z(double *x, double *y, double ref_z, bunchgrp
 	p.x = *x;
 	p.y = *y;
 	p.z = ref_z;
-	wccw_transform(&p, &b->ct, &b->ct_or);
+	wccw_transform(&p, &b->cam, &b->orcam);
 	*x = p.x;
 	*y = p.y;
 }
@@ -817,7 +767,7 @@ static void portal_xform_world_full(double *x, double *y, double *z, bunchgrp *b
 	p.x = *x;
 	p.y = *y;
 	p.z = *z;
-	wccw_transform(&p, &b->ct, &b->ct_or);
+	wccw_transform(&p, &b->cam, &b->orcam);
 	*x = p.x;
 	*y = p.y;
 	*z = p.z;
@@ -1009,15 +959,15 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 			dpoint3d trap2[4] = {{pol[0].x, pol[0].y, opolz[0]-f}, {pol[1].x, pol[1].y, opolz[1]-f},
 								{pol[2].x, pol[2].y, opolz[2]+f}, {pol[3].x, pol[3].y, opolz[3]+f}};
 			for (int i=0;i<4;i++) {
-				wccw_transform(&trap1[i],&b->ct,&b->ct_or);
-				wccw_transform(&trap2[i],&b->ct,&b->ct_or);
+				wccw_transform(&trap1[i],&b->cam,&b->orcam);
+				wccw_transform(&trap2[i],&b->cam,&b->orcam);
 			}
 
 			// Use copies to preserve original pol[] for subsequent loop iterations
 			dpoint3d pol0_xf = pol[0];
 			dpoint3d pol1_xf = pol[1];
-			wccw_transform(&pol1_xf, &b->ct, &b->ct_or);
-			wccw_transform(&pol0_xf, &b->ct, &b->ct_or);
+			wccw_transform(&pol1_xf, &b->cam,&b->orcam);
+			wccw_transform(&pol0_xf, &b->cam,&b->orcam);
 
 			if (!intersect_traps_mono_points(pol0_xf, pol1_xf, trap1, trap2, &plothead[0], &plothead[1]))
 				continue;
@@ -1143,10 +1093,6 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 	cam_t gcam = b->cam;
 	cam_t oricam = b->orcam;
 	logstep("entered hsr_ctx, halfplane:%d",0);
-	cam_transform_init(&b->ct, &b->cam);
-	cam_transform_init(&b->ct_or, &b->orcam);
-	camm_tr = b->ct;
-	orcamm_tr = b->ct_or;
 	wall_t *wal;
 	spri_t *spr;
 	dpoint3d dpos, drig, ddow, dfor;
@@ -1457,8 +1403,6 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport, bunchgrp *parentc
     newctx.gnewtag = -1;
     newctx.planecuts = parentctx->planecuts;
 	// Copy parent's clipping matrices (for mono clipping)
-	cam_transform_init(&newctx.ct, &newctx.cam);      // Current camera transform
-	cam_transform_init(&newctx.ct_or, &newctx.orcam); // Original camera transform
 	//point3d test = {1, 2, 3};  -- this is ok.
 	//point3d w = local_to_world_vec(test, &ncam.tr);
 	//point3d back = world_to_local_vec(w, &ncam.tr);
