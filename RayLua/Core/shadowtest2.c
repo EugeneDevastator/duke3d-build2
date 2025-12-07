@@ -1688,20 +1688,11 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 		b->bunchn = 0; scansector(gcam.cursect,b);
 		while (b->bunchn)
 		{
-			memset(b->bunchgot,0,(b->bunchn+7)>>3);
-
-			for(i=b->bunchn-1;i>0;i--) //assume: bunchgrid[(((j-1)*j)>>1)+i] = bunchfront(j,i,0); is valid iff:{i<j}
-			{
-
-				for(k=(((i-1)*i)>>1),j=0;j<     i;k+=1,j++)
-					if (b->bunchgrid[k]&2) goto nogood;
-				for(k+=j            ,j++;j<b->bunchn;k+=j,j++)
-					if (b->bunchgrid[k]&1) goto nogood;
-				break;
-nogood:; }
-			closest = i;
-			logstep("bunch draw close: %d, depth:%d",i,b->recursion_depth);
-			drawalls(closest,lgs,b);
+			// Simplified: just take the last bunch
+			// Mono system handles occlusion, so order doesn't matter much
+			closest = b->bunchn - 1;
+			logstep("bunch draw close: %d, depth:%d", closest, b->recursion_depth);
+			drawalls(closest, lgs, b);
 		}
 
 		if (shadowtest2_rendmode == 4) uptr = glp->sectgot;
