@@ -317,7 +317,6 @@ static void scansector(int sectnum, bunchgrp *b)
             if (b->bunchn >= b->bunchmal) {
                 b->bunchmal <<= 1;
                 b->bunch = (bunch_t *)realloc(b->bunch, b->bunchmal * sizeof(b->bunch[0]));
-                b->bunchgot = (unsigned int *)realloc(b->bunchgot, ((b->bunchmal + 31) & ~31) >> 3);
             }
             b->bunch[b->bunchn].wal0 = i;
             b->bunch[b->bunchn].fra0 = f0;
@@ -1165,7 +1164,6 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 	b->sectgotn = 0;
 	b->sectgot = 0;
 	b->sectgotmal = 0;
-	b->bunchgot=0;
 	b->bunchn=0;
 	b->bunchmal=0;
 
@@ -1202,7 +1200,6 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 	{
 		b->bunchmal = 64;
 		b->bunch     = (bunch_t       *)malloc(b->bunchmal*sizeof(b->bunch[0]));
-		b->bunchgot  = (unsigned int  *)malloc(((b->bunchmal+31)&~31)>>3);
 	}
 	if (lgs->numsects > b->sectgotn)
 	{
@@ -1542,7 +1539,6 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport, bunchgrp *parentc
     newctx.sectgotn = 0;
     newctx.sectgot = 0;
     newctx.sectgotmal = 0;
-    newctx.bunchgot = 0;
     newctx.bunchn = 0;
     newctx.bunchmal = 0;
     newctx.testignorewall = ignw;
