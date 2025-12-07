@@ -948,8 +948,8 @@ rlDisableDepthMask();
         DrawTransform(&lastcamtr2);
         dpoint3d testp = {lastcamtr2.p.x + lastcamtr2.d.x,lastcamtr2.p.y+ lastcamtr2.d.y,lastcamtr2.p.z+ lastcamtr2.d.z};
 
-        wccw_transform(&testp,&camm_tr,&orcamm_tr);
-        DrawB2Point(&testp);
+      // wccw_transform(&testp,&lastcamtr,&orcamm_tr);
+      // DrawB2Point(&testp);
     }
     static void DrawTransform(transform *tr) {
         Vector3 rg = {tr->r.x, -tr->r.z, tr->r.y};

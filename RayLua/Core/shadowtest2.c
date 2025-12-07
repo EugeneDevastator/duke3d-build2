@@ -353,34 +353,13 @@ static void scansector(int sectnum, bunchgrp *b)
     }
 }
 
-static void xformprep(bunchgrp *b)
-{
-	cam_t *cam = &b->orcam;
-
-	// Store camera rotation matrix directly
-	b->xformmat[0] = cam->r.x;
-	b->xformmat[1] = cam->r.y;
-	b->xformmat[2] = cam->r.z;
-	b->xformmat[3] = cam->d.x;
-	b->xformmat[4] = cam->d.y;
-	b->xformmat[5] = cam->d.z;
-	b->xformmat[6] = cam->f.x;
-	b->xformmat[7] = cam->f.y;
-	b->xformmat[8] = cam->f.z;
-
-	// Screen center
-	b->gnadd.x = cam->h.x;
-	b->gnadd.y = cam->h.y;
-	b->gnadd.z = cam->h.z;
-}
-
 static void xformbac(double rx, double ry, double rz, dpoint3d *o, bunchgrp *b)
 {
-	// Inverse transform: camera space -> world direction
-	// xformmat now stores camera vectors directly
-	o->x = rx * b->xformmat[0] + ry * b->xformmat[3] + rz * b->xformmat[6];
-	o->y = rx * b->xformmat[1] + ry * b->xformmat[4] + rz * b->xformmat[7];
-	o->z = rx * b->xformmat[2] + ry * b->xformmat[5] + rz * b->xformmat[8];
+	cam_t *cam = &b->orcam;
+	// Camera space to world direction (transpose of rotation)
+	o->x = rx * cam->r.x + ry * cam->d.x + rz * cam->f.x;
+	o->y = rx * cam->r.y + ry * cam->d.y + rz * cam->f.y;
+	o->z = rx * cam->r.z + ry * cam->d.z + rz * cam->f.z;
 }
 
 eyepol_t *eyepol = 0; // 4096 eyepol_t's = 192KB
@@ -843,7 +822,6 @@ static void portal_xform_world_full(double *x, double *y, double *z, bunchgrp *b
 	*y = p.y;
 	*z = p.z;
 }
-
 static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 {
 	int portal_draw = 3|8;
@@ -1289,75 +1267,67 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 
     logstep("HALFPLANE removed - single pass, depth: %d", b->recursion_depth);
 
-    if (shadowtest2_rendmode == 4)
-    {
-        gcam.r.x = 1; gcam.d.x = 0; gcam.f.x = 0;
-        gcam.r.y = 0; gcam.d.y = 0; gcam.f.y = -gcam.r.x;
-        gcam.r.z = 0; gcam.d.z = 1; gcam.f.z = 0;
-        xformprep(b);
-
-        xformbac(-65536.0, -65536.0, 1.0, &bord2[0], b);
-        xformbac(+65536.0, -65536.0, 1.0, &bord2[1], b);
-        xformbac(+65536.0, +65536.0, 1.0, &bord2[2], b);
-        xformbac(-65536.0, +65536.0, 1.0, &bord2[3], b);
-        n = 4; didcut = 1;
-    }
+		if (shadowtest2_rendmode == 4) {
+			// gcam.r.x = 1; gcam.d.x = 0; gcam.f.x = 0;
+			// gcam.r.y = 0; gcam.d.y = 0; gcam.f.y = -gcam.r.x;
+			// gcam.r.z = 0; gcam.d.z = 1; gcam.f.z = 0;
+			cam_t *cam = &b->orcam;
+			xformbac(-65536.0, -65536.0, 1.0, &bord2[0], b);
+			xformbac(+65536.0, -65536.0, 1.0, &bord2[1], b);
+			xformbac(+65536.0, +65536.0, 1.0, &bord2[2], b);
+			xformbac(-65536.0, +65536.0, 1.0, &bord2[3], b);
+			n = 4;
+			didcut = 1;
+		}
 		// In draw_hsr_ctx, replace the viewport setup:
-    else if (!b->has_portal_clip)
-    {
-    	xformprep(b);
+		else if (!b->has_portal_clip) {
+			// Screen-independent viewport - use huge bounds
+			double huge = 1e7;
+			bord2[0].x = -huge;
+			bord2[0].y = -huge;
+			bord2[1].x = +huge;
+			bord2[1].y = -huge;
+			bord2[2].x = +huge;
+			bord2[2].y = +huge;
+			bord2[3].x = -huge;
+			bord2[3].y = +huge;
+			n = 4;
+			b->planecuts = n;
+			didcut = 0;
 
-    	// Screen-independent viewport - use huge bounds
-    	// Mono will clip to actual geometry anyway
-    	double huge = 1e7;
-    	bord2[0].x = -huge;
-    	bord2[0].y = -huge;
-    	bord2[1].x = +huge;
-    	bord2[1].y = -huge;
-    	bord2[2].x = +huge;
-    	bord2[2].y = +huge;
-    	bord2[3].x = -huge;
-    	bord2[3].y = +huge;
-    	n = 4;
-    	b->planecuts = n;
-    	didcut = 0;
+			memset8(b->sectgot, 0, (lgs->numsects + 31) >> 3);
 
-    	memset8(b->sectgot, 0, (lgs->numsects + 31) >> 3);
+			for (i = mphnum - 1; i >= 0; i--) {
+				mono_deloop(mph[i].head[1]);
+				mono_deloop(mph[i].head[0]);
+			}
 
-    	for (i = mphnum - 1; i >= 0; i--) {
-    		mono_deloop(mph[i].head[1]);
-    		mono_deloop(mph[i].head[0]);
-    	}
+			mono_genfromloop(&mph[0].head[0], &mph[0].head[1], bord2, n);
+			mph[0].tag = gcam.cursect;
+			mphnum = 1;
+		} else {
+			// Portal case
+			n = b->planecuts;
+			didcut = 1;
+			memset8(b->sectgot, 0, (lgs->numsects + 31) >> 3);
+		}
 
-    	mono_genfromloop(&mph[0].head[0], &mph[0].head[1], bord2, n);
-    	mph[0].tag = gcam.cursect;
-    	mphnum = 1;
-    }
-    else
-    {
-        // Portal case
-        n = b->planecuts;
-        didcut = 1;
-        memset8(b->sectgot, 0, (lgs->numsects + 31) >> 3);
-        xformprep(b);
-    }
+		b->bunchn = 0;
+		scansector(gcam.cursect, b);
 
-    b->bunchn = 0;
-    scansector(gcam.cursect, b);
+		while (b->bunchn) {
+			closest = b->bunchn - 1;
+			logstep("bunch draw close: %d, depth:%d", closest, b->recursion_depth);
+			drawalls(closest, lgs, b);
+		}
 
-    while (b->bunchn) {
-        closest = b->bunchn - 1;
-        logstep("bunch draw close: %d, depth:%d", closest, b->recursion_depth);
-        drawalls(closest, lgs, b);
-    }
+		if (shadowtest2_rendmode == 4)
+			uptr = glp->sectgot;
+		else
+			uptr = shadowtest2_sectgot;
 
-    if (shadowtest2_rendmode == 4)
-        uptr = glp->sectgot;
-    else
-        uptr = shadowtest2_sectgot;
-
-    memcpy(uptr, b->sectgot, (lgs->numsects + 31) >> 3);
-}
+		memcpy(uptr, b->sectgot, (lgs->numsects + 31) >> 3);
+	}
 }
 
 // 1. Normalize transform (makes vectors unit length and orthogonal)
@@ -1489,10 +1459,6 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport, bunchgrp *parentc
 	// Copy parent's clipping matrices (for mono clipping)
 	cam_transform_init(&newctx.ct, &newctx.cam);      // Current camera transform
 	cam_transform_init(&newctx.ct_or, &newctx.orcam); // Original camera transform
-
-
-	memcpy(newctx.xformmat, parentctx->xformmat, sizeof(double)*9);
-	newctx.gnadd = parentctx->gnadd;
 	//point3d test = {1, 2, 3};  -- this is ok.
 	//point3d w = local_to_world_vec(test, &ncam.tr);
 	//point3d back = world_to_local_vec(w, &ncam.tr);
