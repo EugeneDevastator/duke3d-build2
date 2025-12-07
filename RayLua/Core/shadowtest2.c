@@ -1025,7 +1025,7 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 	mono_deloop(plothead[1]);
 	mono_deloop(plothead[0]);
 }
-
+// create plane EQ using GCAM
 static void gentransform_ceilflor (sect_t *sec, wall_t *wal, int isflor, bunchgrp *b)
 {
 	cam_t ucam = b->cam;
@@ -1042,7 +1042,7 @@ static void gentransform_ceilflor (sect_t *sec, wall_t *wal, int isflor, bunchgr
 
 	f = fk[0]*fk[3] - fk[1]*fk[2]; if (f > 0.f) f = 1.f/f;
 
-	for(i=6;i>=0;i-=3)
+	for(i=6;i>=0;i-=3)  // could it be attempt to get 3 walls and construct plane eq from them?
 	{          //u,v:
 		fk[4] = (i==3)*fz + ax;
 		fk[5] = (i==6)*fz + ay;
@@ -1080,7 +1080,7 @@ static void gentransform_ceilflor (sect_t *sec, wall_t *wal, int isflor, bunchgr
 }
 
 
-
+// create plane EQ using GCAM
 static void gentransform_wall (kgln_t *npol2, surf_t *sur, bunchgrp *b)
 {
 	cam_t usedcam = b->cam; // we can use camera hack to get plane equation in space of current cam, not necessart clipping cam.
@@ -1191,14 +1191,10 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		float surfpos = getslopez(&sec[s],isflor,b->cam.p.x,b->cam.p.y);
 		if ((b->cam.p.z >= surfpos) == isflor) // ignore backfaces
 				continue;
+		gentransform_ceilflor(&sec[s], wal, isflor, b);
 
 		// Setup surface properties (height, gradient, color)
 		fz = sec[s].z[isflor]; grad = &sec[s].grad[isflor];
-		gcurcol = (min(sec[s].surf[isflor].asc>>8,255)<<24) +
-					 (min(sec[s].surf[isflor].rsc>>5,255)<<16) +
-					 (min(sec[s].surf[isflor].gsc>>5,255)<< 8) +
-					 (min(sec[s].surf[isflor].bsc>>5,255)    );
-		gcurcol = argb_interp(gcurcol,(gcurcol&0xff000000)+((gcurcol&0xfcfcfc)>>2),(int)(compact2d*24576.0));
 
 		// Calculate surface normal vector
 		b->gnorm.x = grad->x;
@@ -1237,7 +1233,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		gtpic = &gtile[sur->tilnum];
 		//if (!gtpic->tt.f) loadpic(gtpic);
 		if (sec[s].surf[isflor].flags & (1 << 17)) { b->gflags = 2; } //skybox ceil/flor
-		gentransform_ceilflor(&sec[s], wal, isflor, b);
+
 		b->gligwall = isflor - 2;
 
 		int myport = sec[s].tags[1];
