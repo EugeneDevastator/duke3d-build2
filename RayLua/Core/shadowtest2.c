@@ -859,180 +859,197 @@ static void changetagfunc (int rethead0, int rethead1, bunchgrp *b)
 	//flags&1: do and
 	//flags&2: do sub
 	//flags&4: reverse cut for sub
-static void drawpol_befclip (int tag1, int newtag1, int sec, int newsec, int plothead0, int plothead1, int flags, bunchgrp* b)
+// Replace the existing drawpol_befclip with this version
+// Full 3D camera transform - handles pitch/roll correctly for portals
+
+static void drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
+                            int plothead0, int plothead1, int flags, bunchgrp *b)
 {
     int mtag = tag1;
     int tagsect = sec;
     int mnewtag = newtag1;
     b->gnewsec = newsec;
-    cam_t orcam = b->orcam;
+    cam_t *orcam = &b->orcam;
 
     #define BSCISDIST 0.000001
     void (*mono_output)(int h0, int h1, bunchgrp *b);
     dpoint3d *otp, *tp;
-    double f, ox, oy, oz;
-    int i, j, k, l, h, on, n, plothead[2], imin, imax, i0, i1, omph0, omph1;
+    double f;
+    int i, j, k, l, h, on, n, plothead[2], omph0, omph1, i0, i1;
 
-    if ((plothead0|plothead1) < 0) return;
-    plothead[0] = plothead0; plothead[1] = plothead1;
+    if ((plothead0 | plothead1) < 0) return;
+    plothead[0] = plothead0;
+    plothead[1] = plothead1;
 
+    // Count vertices
     n = 2;
     for (h = 0; h < 2; h++)
         for (i = mp[plothead[h]].n; i != plothead[h]; i = mp[i].n)
             n++;
-    otp = (dpoint3d *) _alloca(n * sizeof(dpoint3d));
-    tp = (dpoint3d *) _alloca(n * sizeof(dpoint3d) * 2);
 
-    // FIXED: Keep original mp coordinate system but improve rotation handling
-	on = 0;
-	for(h=0; h<2; h++)
-	{
-		i = plothead[h];
-		do
-		{
-			if (h) i = mp[i].p;
+    otp = (dpoint3d *)_alloca(n * sizeof(dpoint3d));
+    tp = (dpoint3d *)_alloca(n * sizeof(dpoint3d) * 2);
 
-			// FIXED: Transform world point first, then convert to camera space
-			double wx = mp[i].x;
-			double wy = mp[i].y;
-			double wz = mp[i].z;
+    // Transform world coordinates to camera space using FULL 3D rotation
+    // mp[] contains world-space coordinates (after wccw_transform in callers)
+    on = 0;
+    for (h = 0; h < 2; h++) {
+        i = plothead[h];
+        do {
+            if (h) i = mp[i].p;
 
-			// Now convert to camera space using original camera
-			double dx = wx - orcam.p.x;
-			double dy = wy - orcam.p.y;
-			double dz = wz - orcam.p.z;
+            // World position from mono polygon
+            double wx = mp[i].x;
+            double wy = mp[i].y;
+            double wz = mp[i].z;
 
-			otp[on].x = dy * b->xformmatc - dx * b->xformmats;  // rotated X
-			otp[on].y = dz;                                      // direct Z offset
-			otp[on].z = dx * b->xformmatc + dy * b->xformmats;  // rotated depth
-			on++;
+            // Vector from camera to point
+            double dx = wx - orcam->p.x;
+            double dy = wy - orcam->p.y;
+            double dz = wz - orcam->p.z;
 
-			if (!h) i = mp[i].n;
-		} while (i != plothead[h]);
-		mono_deloop(plothead[h]);
-	}
+            // Full 3D rotation to camera space
+            // r = right vector (screen X axis)
+            // d = down vector (screen Y axis)
+            // f = forward vector (depth axis)
+            otp[on].x = dx * orcam->r.x + dy * orcam->r.y + dz * orcam->r.z;
+            otp[on].y = dx * orcam->d.x + dy * orcam->d.y + dz * orcam->d.z;
+            otp[on].z = dx * orcam->f.x + dy * orcam->f.y + dz * orcam->f.z;
+            on++;
 
-		//clip
-	n = 0;
-	for(i=on-1,j=0;j<on;i=j,j++)
-	{
-		if (otp[i].z >= BSCISDIST) { tp[n] = otp[i]; n++; }
-		if ((otp[i].z >= BSCISDIST) != (otp[j].z >= BSCISDIST))
-		{
-			f = (BSCISDIST-otp[j].z)/(otp[i].z-otp[j].z);
-			tp[n].x = (otp[i].x-otp[j].x)*f + otp[j].x;
-			tp[n].y = (otp[i].y-otp[j].y)*f + otp[j].y;
-			tp[n].z = BSCISDIST; n++;
-		}
-	}
-	if (n < 3) return;
+            if (!h) i = mp[i].n;
+        } while (i != plothead[h]);
+        mono_deloop(plothead[h]);
+    }
 
-		//project & find x extents
-	for(i=0;i<n;i++)
-	{
-		f = orcam.h.z/tp[i].z;
-		tp[i].x = tp[i].x*f + orcam.h.x;
-		tp[i].y = tp[i].y*f + orcam.h.y;
-	}
+    // Clip against near plane (perpendicular to camera forward vector)
+    // This is now correct for any camera orientation including pitch/roll
+    n = 0;
+    for (i = on - 1, j = 0; j < on; i = j, j++) {
+        if (otp[i].z >= BSCISDIST) {
+            tp[n] = otp[i];
+            n++;
+        }
+        if ((otp[i].z >= BSCISDIST) != (otp[j].z >= BSCISDIST)) {
+            f = (BSCISDIST - otp[j].z) / (otp[i].z - otp[j].z);
+            tp[n].x = (otp[i].x - otp[j].x) * f + otp[j].x;
+            tp[n].y = (otp[i].y - otp[j].y) * f + otp[j].y;
+            tp[n].z = BSCISDIST;
+            n++;
+        }
+    }
+    if (n < 3) return;
 
-		//generate vmono
-	mono_genfromloop(&plothead[0], &plothead[1], tp, n);
-	if ((plothead[0] | plothead[1]) < 0) {
-		mono_deloop(plothead[0]);
-		mono_deloop(plothead[1]);
-		return;
-	}
+    // Project from camera space to screen space
+    for (i = 0; i < n; i++) {
+        f = orcam->h.z / tp[i].z;
+        tp[i].x = tp[i].x * f + orcam->h.x;
+        tp[i].y = tp[i].y * f + orcam->h.y;
+    }
 
-	if (flags&1)
-	{
-		if (mnewtag >= 0)
-		{
-			b->gnewsec = newsec;
-			b->gnewtag = mnewtag; omph0 = mphnum;
-			b->needsecscan = !(flags & CLIP_PORTAL_FLAG);
-			int bop = MONO_BOOL_AND;//(flags & CLIP_PORTAL_FLAG) ? MONO_BOOL_SUB_REV : MONO_BOOL_AND;
-			for (i = mphnum - 1; i >= 0; i--)
-				if (mph[i].tag == mtag)
-					mono_bool(
-						mph[i].head[0],
-						mph[i].head[1],
-						plothead[0],
-						plothead[1],
-						bop,
-						b,
-						changetagfunc);
-			{
-				for(l=omph0;l<mphnum;l++)
-				{
-					mph[omph0] = mph[l]; k = omph0; omph0++;
-					for(j=omph0-1;j>=0;j--) //Join monos
-					{
-						if (mph[j].tag != b->gnewtag) continue;
-						if (!mono_join(mph[j].head[0],mph[j].head[1],mph[k].head[0],mph[k].head[1],&i0,&i1)) continue;
-						for(i=2-1;i>=0;i--) { mono_deloop(mph[k].head[i]); mono_deloop(mph[j].head[i]); }
-						omph0--; mph[k] = mph[omph0];
-						mph[j].head[0] = i0; mph[j].head[1] = i1; k = j;
-					}
-				}
-				mphnum = omph0;
-			}
-		}
-		else { // newtag == -1
-			if (shadowtest2_rendmode == 4)
-				mono_output = ligpoltagfunc;
-				//add to light list // this will process point lights. otherwize will only use plr light.
+    // Generate mono polygon from projected vertices
+    mono_genfromloop(&plothead[0], &plothead[1], tp, n);
+    if ((plothead[0] | plothead[1]) < 0) {
+        mono_deloop(plothead[0]);
+        mono_deloop(plothead[1]);
+        return;
+    }
 
-			//else if (b->gflags < 2) mono_output = drawtagfunc_ws;
-			else mono_output = drawtagfunc_ws;//skytagfunc;
-			for (i = mphnum - 1; i >= 0; i--)
-				if (mph[i].tag == mtag)
-					mono_bool(mph[i].head[0], mph[i].head[1], plothead[0], plothead[1],MONO_BOOL_AND, b, mono_output);
-		}
-	}
-	if (flags&2)
-	{
-		if (!(flags&4)) j = MONO_BOOL_SUB;
-					  else j = MONO_BOOL_SUB_REV; // when floor.
+    // === AND operation (flags & 1) ===
+    if (flags & 1) {
+        if (mnewtag >= 0) {
+            b->gnewsec = newsec;
+            b->gnewtag = mnewtag;
+            omph0 = mphnum;
+            b->needsecscan = !(flags & CLIP_PORTAL_FLAG);
 
-		b->gnewtag = mtag;
-		b->gnewsec = tagsect;
-		b->needsecscan = 0; omph0 = mphnum; omph1 = mphnum;
-		for(i=mphnum-1;i>=0;i--)
-		{
-			if (mph[i].tag != mtag) continue;
-			mono_bool(mph[i].head[0],mph[i].head[1],plothead[0],plothead[1],j,b,changetagfunc);
-			mono_deloop(mph[i].head[1]);
-			mono_deloop(mph[i].head[0]);
+            for (i = mphnum - 1; i >= 0; i--)
+                if (mph[i].tag == mtag)
+                    mono_bool(mph[i].head[0], mph[i].head[1],
+                              plothead[0], plothead[1],
+                              MONO_BOOL_AND, b, changetagfunc);
 
-			omph0--; mph[i] = mph[omph0];
-		}
+            // Join adjacent monos with same tag
+            for (l = omph0; l < mphnum; l++) {
+                mph[omph0] = mph[l];
+                k = omph0;
+                omph0++;
+                for (j = omph0 - 1; j >= 0; j--) {
+                    if (mph[j].tag != b->gnewtag) continue;
+                    if (!mono_join(mph[j].head[0], mph[j].head[1],
+                                   mph[k].head[0], mph[k].head[1], &i0, &i1)) continue;
+                    for (i = 1; i >= 0; i--) {
+                        mono_deloop(mph[k].head[i]);
+                        mono_deloop(mph[j].head[i]);
+                    }
+                    omph0--;
+                    mph[k] = mph[omph0];
+                    mph[j].head[0] = i0;
+                    mph[j].head[1] = i1;
+                    k = j;
+                }
+            }
+            mphnum = omph0;
+        } else {
+            // newtag == -1: final output (solid surface)
+            if (shadowtest2_rendmode == 4)
+                mono_output = ligpoltagfunc;
+            else
+                mono_output = drawtagfunc_ws;
 
-			//valid mph's stored in 2 blocks: (0<=?<omph0), (omph1<=?<mphnum)
+            for (i = mphnum - 1; i >= 0; i--)
+                if (mph[i].tag == mtag)
+                    mono_bool(mph[i].head[0], mph[i].head[1],
+                              plothead[0], plothead[1],
+                              MONO_BOOL_AND, b, mono_output);
+        }
+    }
 
-			for(l=omph1;l<mphnum;l++)
-			{
-				mph[omph0] = mph[l]; k = omph0; omph0++;
-				for(j=omph0-1;j>=0;j--) //Join monos
-				{
-					if (mph[j].tag != b->gnewtag) continue;
-					if (!mono_join(mph[j].head[0], mph[j].head[1], mph[k].head[0], mph[k].head[1], &i0, &i1)) continue;
-					for (i = 2 - 1; i >= 0; i--) {
-						mono_deloop(mph[k].head[i]);
-						mono_deloop(mph[j].head[i]);
-					}
-					omph0--;
-					mph[k] = mph[omph0];
-					mph[j].head[0] = i0;
-					mph[j].head[1] = i1;
-					k = j;
-				}
-			}
-		mphnum = omph0;
+    // === SUB operation (flags & 2) ===
+    if (flags & 2) {
+        j = (flags & 4) ? MONO_BOOL_SUB_REV : MONO_BOOL_SUB;
 
-	}
+        b->gnewtag = mtag;
+        b->gnewsec = tagsect;
+        b->needsecscan = 0;
+        omph0 = mphnum;
+        omph1 = mphnum;
 
-	mono_deloop(plothead[1]);
-	mono_deloop(plothead[0]);
+        for (i = mphnum - 1; i >= 0; i--) {
+            if (mph[i].tag != mtag) continue;
+            mono_bool(mph[i].head[0], mph[i].head[1],
+                      plothead[0], plothead[1], j, b, changetagfunc);
+            mono_deloop(mph[i].head[1]);
+            mono_deloop(mph[i].head[0]);
+            omph0--;
+            mph[i] = mph[omph0];
+        }
+
+        // Join new entries
+        for (l = omph1; l < mphnum; l++) {
+            mph[omph0] = mph[l];
+            k = omph0;
+            omph0++;
+            for (j = omph0 - 1; j >= 0; j--) {
+                if (mph[j].tag != b->gnewtag) continue;
+                if (!mono_join(mph[j].head[0], mph[j].head[1],
+                               mph[k].head[0], mph[k].head[1], &i0, &i1)) continue;
+                for (i = 1; i >= 0; i--) {
+                    mono_deloop(mph[k].head[i]);
+                    mono_deloop(mph[j].head[i]);
+                }
+                omph0--;
+                mph[k] = mph[omph0];
+                mph[j].head[0] = i0;
+                mph[j].head[1] = i1;
+                k = j;
+            }
+        }
+        mphnum = omph0;
+    }
+
+    mono_deloop(plothead[1]);
+    mono_deloop(plothead[0]);
 }
 // create plane EQ using GCAM
 static void gentransform_ceilflor(sect_t *sec, wall_t *wal, int isflor, bunchgrp *b)
