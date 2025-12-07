@@ -68,7 +68,6 @@ typedef struct {
 typedef struct {
 	bunch_t *bunch;
 	unsigned int *bunchgot;
-	unsigned char *bunchgrid;
 	int bunchn, bunchmal;
 
 	bfint_t bfint[BFINTMAX];

@@ -880,22 +880,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 	b->gligsect = s; b->gligslab = 0;
 
 	// === BUNCH MANAGEMENT: DELETE CURRENT BUNCH FROM GRID ===
-	// Removes processed bunch and compacts the bunch grid structure
-	// Example: bunchn=6,closest=2 (before op)
-	//	 0 1 2 3 4
-	//0
-	//1  0:x
-	//2  1:. . ? ? ?
-	//3  3:x x .
-	//4  6:x x . x
-	//5 10:x x . x x
-	// bunches are calculated against GCAM,
 	b->bunchn--;
-	b->bunch[bid] = b->bunch[b->bunchn];
-	j = (((b->bunchn - 1) * b->bunchn) >> 1);
-	memcpy(&b->bunchgrid[((bid - 1) * bid) >> 1], &b->bunchgrid[j], bid * sizeof(b->bunchgrid[0]));
-	for (i = bid + 1; i < b->bunchn; i++)
-		b->bunchgrid[(((i - 1) * i) >> 1) + bid] = ((b->bunchgrid[j + i] & 1) << 1) + (b->bunchgrid[j + i] >> 1);
 	bool noportals = b->recursion_depth >= MAX_PORTAL_DEPTH;
 	// === DRAW CEILINGS & FLOORS ===
 	for(isflor=0;isflor<2;isflor++) // floor ceil
@@ -1183,7 +1168,6 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 	b->bunchgot=0;
 	b->bunchn=0;
 	b->bunchmal=0;
-	b->bunchgrid =0;
 
 	//b->curportal=0;
 	cam_t gcam = b->cam;
@@ -1219,7 +1203,6 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 		b->bunchmal = 64;
 		b->bunch     = (bunch_t       *)malloc(b->bunchmal*sizeof(b->bunch[0]));
 		b->bunchgot  = (unsigned int  *)malloc(((b->bunchmal+31)&~31)>>3);
-		b->bunchgrid = (unsigned char *)malloc(((b->bunchmal-1)*b->bunchmal)>>1);
 	}
 	if (lgs->numsects > b->sectgotn)
 	{
@@ -1562,7 +1545,6 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport, bunchgrp *parentc
     newctx.bunchgot = 0;
     newctx.bunchn = 0;
     newctx.bunchmal = 0;
-    newctx.bunchgrid = 0;
     newctx.testignorewall = ignw;
     newctx.testignoresec = igns;
     newctx.gnewsec = -1;
