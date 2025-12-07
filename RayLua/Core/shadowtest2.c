@@ -1066,30 +1066,25 @@ the final visible geometry ready for 2D projection.
 The b parameter is a bunch index - this function processes one "bunch" (visible sector group) at a time. The traversal logic is in the caller that:
 */// Transform world vertex through portal using wccw_transform
 // For infinity Z: transform XY at reference plane, preserve Z sign/magnitude
-static void portal_xform_world(double *x, double *y, double *z, bunchgrp *b) {
-	//if (!b->has_portal_clip)
-	//	return;
-
+static void portal_xform_world_at_z(double *x, double *y, double ref_z, bunchgrp *b) {
 	dpoint3d p;
 	p.x = *x;
 	p.y = *y;
+	p.z = ref_z;
+	wccw_transform(&p, &b->ct, &b->ct_or);
+	*x = p.x;
+	*y = p.y;
+}
 
-	if (fabs(*z) > 1e30) {
-		// Infinity point: use floor/ceil reference Z for transform
-		p.z = b->cam.p.z;  // transform at camera height
-		wccw_transform(&p, &b->ct, &b->ct_or);
-		*x = p.x;
-		*y = p.y;
-		// preserve infinity z, but may need sign flip
-		// if camera is inverted through portal
-	} else {
-		// Real world point: full transform
-		p.z = *z;
-		wccw_transform(&p, &b->ct, &b->ct_or);
-		*x = p.x;
-		*y = p.y;
-		*z = p.z;
-	}
+static void portal_xform_world_full(double *x, double *y, double *z, bunchgrp *b) {
+	dpoint3d p;
+	p.x = *x;
+	p.y = *y;
+	p.z = *z;
+	wccw_transform(&p, &b->ct, &b->ct_or);
+	*x = p.x;
+	*y = p.y;
+	*z = p.z;
 }
 
 static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
@@ -1182,8 +1177,12 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		for (ww = twaln; ww >= 0; ww -= twaln) {
 			double xw = twal[ww].x;
 			double yw = twal[ww].y;
-			double zw = b->gnorm.z * -1e32;
-			portal_xform_world(&xw, &yw, &zw, b);
+			double zw = b->gnorm.z * -1e32;  // keep this as output Z
+
+			// Calculate surface Z at this XY for consistent transform
+			double surface_z = (wal[0].x - xw) * grad->x + (wal[0].y - yw) * grad->y + fz;
+			portal_xform_world_at_z(&xw, &yw, surface_z, b);
+
 			plothead[isflor] = mono_ins(plothead[isflor], xw, yw, zw);
 		}
 
@@ -1192,8 +1191,10 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		for (ww = 0; ww <= twaln; ww++) {
 			double xw = twal[ww].x;
 			double yw = twal[ww].y;
-			double zw = (wal[0].x - twal[ww].x) * grad->x + (wal[0].y - twal[ww].y) * grad->y + fz;
-			portal_xform_world(&xw, &yw, &zw, b);
+			double zw = (wal[0].x - xw) * grad->x + (wal[0].y - yw) * grad->y + fz;
+
+			portal_xform_world_full(&xw, &yw, &zw, b);
+
 			plothead[i] = mono_ins(plothead[i], xw, yw, zw);
 		}
 		plothead[i] = mp[plothead[i]].n;
