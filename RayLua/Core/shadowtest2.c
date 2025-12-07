@@ -329,46 +329,28 @@ static void scansector(int sectnum, bunchgrp *b)
         if (j < i) obunchn = b->bunchn;
     }
 }
-static void xformprep_prt (double hang, bunchgrp *b)
+static void xformprep_prt(bunchgrp *b)
 {
 	cam_t gcam = b->cam;
-	double yaw = atan2(gcam.f.y, gcam.f.x) + hang;
-	double cy = cos(yaw);   // cos(yaw)
-	double sy = sin(yaw);   // sin(yaw)
-	b->xformmatc_g = cy;
-	b->xformmats_g = sy;
+	double yaw = atan2(gcam.f.y, gcam.f.x);
+	b->xformmatc_g = cos(yaw);
+	b->xformmats_g = sin(yaw);
 }
-static void xformprep (double hang, bunchgrp *b)
+static void xformprep(bunchgrp *b)
 {
 	cam_t usecam = b->orcam;
 
-	// Extract all three Euler angles from camera orientation
-	// Assuming camera uses standard right-handed coordinate system
+	// Yaw from camera forward vector (for scansector compatibility)
+	double yaw = atan2(usecam.f.y, usecam.f.x);
+	double cy = cos(yaw);
+	double sy = sin(yaw);
 
-	// Yaw (rotation around Z-axis) - horizontal rotation
-	double yaw = atan2(usecam.f.y, usecam.f.x) + hang;
-
-	// Pitch (rotation around X-axis) - vertical tilt
-	double pitch = atan2(-usecam.f.z, sqrt(usecam.f.x*usecam.f.x + usecam.f.y*usecam.f.y));
-
-	// Roll (rotation around Y-axis) - banking/tilting
-	// Extract from right vector's Z component relative to up vector
-	double roll = atan2(usecam.r.z, usecam.d.z);
-
-	// Precompute trigonometric values
-	double cy = cos(yaw);   // cos(yaw)
-	double sy = sin(yaw);   // sin(yaw)
-	double cp = cos(pitch); // cos(pitch)
-	double sp = sin(pitch); // sin(pitch)
-	double cr = cos(roll);  // cos(roll)
-	double sr = sin(roll);  // sin(roll)
-
-	// Store for backward compatibility
 	b->xformmatc = cy;
 	b->xformmats = sy;
 	b->xformmatc_g = cy;
 	b->xformmats_g = sy;
 
+	// Full rotation matrix from camera vectors
 	b->xformmat[0] = usecam.r.y*b->xformmatc - usecam.r.x*b->xformmats;
 	b->xformmat[1] = usecam.r.z;
 	b->xformmat[2] = usecam.r.x*b->xformmatc + usecam.r.y*b->xformmats;
@@ -379,10 +361,10 @@ static void xformprep (double hang, bunchgrp *b)
 	b->xformmat[7] = usecam.f.z;
 	b->xformmat[8] = usecam.f.x*b->xformmatc + usecam.f.y*b->xformmats;
 
-	// Transform camera position rotation matrix
-	b->gnadd.x = -(usecam.h.x*b->xformmat[0] + usecam.h.y*b->xformmat[1])+ usecam.h.z*b->xformmat[2];
-	b->gnadd.y = -(usecam.h.x*b->xformmat[3] + usecam.h.y*b->xformmat[4])+ usecam.h.z*b->xformmat[5];
-	b->gnadd.z = -(usecam.h.x*b->xformmat[6] + usecam.h.y*b->xformmat[7])+ usecam.h.z*b->xformmat[8];
+	// gnadd for screen center offset
+	b->gnadd.x = -(usecam.h.x * b->xformmat[0] + usecam.h.y * b->xformmat[1]) + usecam.h.z * b->xformmat[2];
+	b->gnadd.y = -(usecam.h.x * b->xformmat[3] + usecam.h.y * b->xformmat[4]) + usecam.h.z * b->xformmat[5];
+	b->gnadd.z = -(usecam.h.x * b->xformmat[6] + usecam.h.y * b->xformmat[7]) + usecam.h.z * b->xformmat[8];
 }
 
 
@@ -971,7 +953,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 			// Only SUB (flags&2), NOT AND (flags&1) - child handles the content
 			// This prevents parent creating mph entries that collide with child's tags
 
-			logstep("entering portal floor?, %d, sec:%d, cur depth:%d, curhalf:%d", isflor, s, b->recursion_depth, b->currenthalfplane);
+			logstep("entering portal floor?, %d, sec:%d, cur depth:%d", isflor, s, b->recursion_depth);
 
 			int ci = taginc *b->recursion_depth;
 			drawpol_befclip(s+ci,portals[endpn].sect+ci+taginc, s,portals[endpn].sect ,plothead[0],plothead[1],   ((isflor<<2)+3)|CLIP_PORTAL_FLAG, b);
@@ -979,7 +961,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		}
 
 		else {
-			logstep("drawing solid - floor?, %d, sec:%d, cur depth:%d, curhalf:%d", isflor, s, b->recursion_depth, b->currenthalfplane);
+			logstep("drawing solid - floor?, %d, sec:%d, cur depth:%d", isflor, s, b->recursion_depth);
 
 			drawpol_befclip(s+taginc*b->recursion_depth,-1,s,-1,plothead[0],plothead[1],(isflor<<2)+3,b);
 		}
@@ -1100,7 +1082,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 
 			if (!skipport && !noportals && myport >= 0 && portals[myport].destpn >= 0 && portals[myport].kind == PORT_WALL) {
 				int endpn = portals[myport].destpn;
-				logstep("entering wall port,wal:%d, sec:%d, cur depth:%d, curhalf:%d",w, s, b->recursion_depth, b->currenthalfplane);
+				logstep("entering wall port,wal:%d, sec:%d, cur depth:%d, curhalf:%d",w, s, b->recursion_depth,0);
 				// Only SUB, not AND
 				int drawflags = 2; // 2 is sub;
 				int ci = taginc*b->recursion_depth;
@@ -1111,10 +1093,10 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 			} else {
 				if (ns >= 0)
 					logstep("drawing nextsecw - sec-wall:%d-%d, ns:%d  sec:%d, cur depth:%d, curhalf:%d",
-							s, w, ns, s, b->recursion_depth, b->currenthalfplane);
+							s, w, ns, s, b->recursion_depth, 0);
 				else
 					logstep("drawing solid - sec-wall:%d-%d, ns:%d  sec:%d, cur depth:%d, curhalf:%d",
-							s, w, ns, s, b->recursion_depth, b->currenthalfplane);
+							s, w, ns, s, b->recursion_depth, 0);
 
 				int inc = taginc * b->recursion_depth;
 				int newtag = (ns >= 0) ? (ns + inc) : -1;  // FIX: preserve -1 for solid walls
@@ -1143,7 +1125,6 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
 	bs.orcam = *cc;
 	bs.recursion_depth = 0;
 	bs.has_portal_clip = false;
-	bs.currenthalfplane = 0;
 	logstep("frame start");
 	draw_hsr_ctx(map,&bs);
 
@@ -1170,7 +1151,7 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 	//b->curportal=0;
 	cam_t gcam = b->cam;
 	cam_t oricam = b->orcam;
-	logstep("entered hsr_ctx, halfplane:%d",b->currenthalfplane);
+	logstep("entered hsr_ctx, halfplane:%d",0);
 	cam_transform_init(&b->ct, &b->cam);
 	cam_transform_init(&b->ct_or, &b->orcam);
 	camm_tr = b->ct;
@@ -1290,134 +1271,97 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 		}
 	}
 
-	for(halfplane=0;halfplane<2;halfplane++) {
+{
+    int halfplane = 0;
 
+    logstep("HALFPLANE removed - single pass, depth: %d", b->recursion_depth);
 
-		if (!b->has_portal_clip)
-			b->currenthalfplane = halfplane;
-		else {
-			halfplane = b->currenthalfplane;
-		}
-		logstep("HALFPLANE change: %d, depth: %d",halfplane,b->recursion_depth);
+    if (shadowtest2_rendmode == 4)
+    {
+        gcam.r.x = 1; gcam.d.x = 0; gcam.f.x = 0;
+        gcam.r.y = 0; gcam.d.y = 0; gcam.f.y = -gcam.r.x;
+        gcam.r.z = 0; gcam.d.z = 1; gcam.f.z = 0;
+        xformprep(b);
 
-		if (shadowtest2_rendmode == 4)
-		{
-			if (!halfplane) gcam.r.x = 1; else gcam.r.x = -1;
-			gcam.d.x = 0; gcam.f.x = 0;
-			gcam.r.y = 0; gcam.d.y = 0; gcam.f.y = -gcam.r.x;
-			gcam.r.z = 0; gcam.d.z = 1; gcam.f.z = 0;
-			xformprep(0.0, b);
+        xformbac(-65536.0, -65536.0, 1.0, &bord2[0], b);
+        xformbac(+65536.0, -65536.0, 1.0, &bord2[1], b);
+        xformbac(+65536.0, +65536.0, 1.0, &bord2[2], b);
+        xformbac(-65536.0, +65536.0, 1.0, &bord2[3], b);
+        n = 4; didcut = 1;
+    }
+    else if (!b->has_portal_clip)
+    {
+        xformprep(b);
 
-			xformbac(-65536.0,-65536.0,1.0,&bord2[0], b);
-			xformbac(+65536.0,-65536.0,1.0,&bord2[1], b);
-			xformbac(+65536.0,+65536.0,1.0,&bord2[2], b);
-			xformbac(-65536.0,+65536.0,1.0,&bord2[3], b);
-			n = 4; didcut = 1;
-		} else if (!b->has_portal_clip) {
-			// initial
+        // Large bounds for full 360° coverage
+        float large_bound = 1e6f;
+        xformbac(-large_bound, -large_bound, oricam.h.z, &bord[0], b);
+        xformbac(+large_bound, -large_bound, oricam.h.z, &bord[1], b);
+        xformbac(+large_bound, +large_bound, oricam.h.z, &bord[2], b);
+        xformbac(-large_bound, +large_bound, oricam.h.z, &bord[3], b);
 
-			xformprep(((double) halfplane) * PI, b);
+        // Clip screen to front plane
+        n = 0;
+        didcut = 0;
+        for (i = 4 - 1, j = 0; j < 4; i = j, j++) {
+            if (bord[i].z >= SCISDIST) {
+                bord2[n] = bord[i];
+                n++;
+            }
+            if ((bord[i].z >= SCISDIST) != (bord[j].z >= SCISDIST)) {
+                f = (SCISDIST - bord[i].z) / (bord[j].z - bord[i].z);
+                bord2[n].x = (bord[j].x - bord[i].x) * f + bord[i].x;
+                bord2[n].y = (bord[j].y - bord[i].y) * f + bord[i].y;
+                bord2[n].z = (bord[j].z - bord[i].z) * f + bord[i].z;
+                n++;
+                didcut = 1;
+            }
+        }
+        if (n < 3) return;  // Changed from break to return
+        b->planecuts = n;
 
-			// NEW CODE - Use much larger bounds:
-			float large_bound = 1e6f;
-			xformbac(-large_bound, -large_bound, oricam.h.z, &bord[0], b);
-			xformbac(+large_bound, -large_bound, oricam.h.z, &bord[1], b);
-			xformbac(+large_bound, +large_bound, oricam.h.z, &bord[2], b);
-			xformbac(-large_bound, +large_bound, oricam.h.z, &bord[3], b);
+        memset8(b->sectgot, 0, (lgs->numsects + 31) >> 3);
+        for (j = 0; j < n; j++) {
+            f = gcam.h.z / bord2[j].z;
+            bord2[j].x = bord2[j].x * f + gcam.h.x;
+            bord2[j].y = bord2[j].y * f + gcam.h.y;
+        }
 
-			//Clip screen to front plane
-			n = 0;
-			didcut = 0;
-			for (i = 4 - 1, j = 0; j < 4; i = j, j++) {
-				if (bord[i].z >= SCISDIST) {
-					bord2[n] = bord[i];
-					n++;
-				}
-				if ((bord[i].z >= SCISDIST) != (bord[j].z >= SCISDIST)) {
-					f = (SCISDIST - bord[i].z) / (bord[j].z - bord[i].z);
-					bord2[n].x = (bord[j].x - bord[i].x) * f + bord[i].x;
-					bord2[n].y = (bord[j].y - bord[i].y) * f + bord[i].y;
-					bord2[n].z = (bord[j].z - bord[i].z) * f + bord[i].z;
-					n++;
-					didcut = 1;
-				}
-			}
-			if (n < 3) break;
-			b->planecuts = n;
+        // Clear and create viewport
+        for (i = mphnum - 1; i >= 0; i--) {
+            mono_deloop(mph[i].head[1]);
+            mono_deloop(mph[i].head[0]);
+        }
 
-			memset8(b->sectgot,0,(lgs->numsects+31)>>3);
-			for(j=0;j<n;j++)
-			{
-				f = gcam.h.z/bord2[j].z;
-				bord2[j].x = bord2[j].x*f + gcam.h.x;
-				bord2[j].y = bord2[j].y*f + gcam.h.y;
-			}
-			//FIX! once means not each frame! (of course it doesn't hurt functionality)
-			// Standard case: clear existing state and create new viewport
-			for (i = mphnum - 1; i >= 0; i--) {
-				mono_deloop(mph[i].head[1]);
-				mono_deloop(mph[i].head[0]);
-			}
+        mono_genfromloop(&mph[0].head[0], &mph[0].head[1], bord2, n);
+        mph[0].tag = gcam.cursect;
+        mphnum = 1;
+    }
+    else
+    {
+        // Portal case
+        n = b->planecuts;
+        didcut = 1;
+        memset8(b->sectgot, 0, (lgs->numsects + 31) >> 3);
+        xformprep_prt(b);
+    }
 
-			mono_genfromloop(&mph[0].head[0], &mph[0].head[1], bord2, n);
-			mph[0].tag = gcam.cursect;
-			mphnum = 1;
-		} else { // in portal
-			n=b->planecuts;
-			didcut=1;
-			memset8(b->sectgot,0,(lgs->numsects+31)>>3);
-			xformprep_prt(((double)halfplane)*PI, b);
-			//mph_check(mphnum);
-			//mono_genfromloop(&mph[mphnum].head[0], &mph[mphnum].head[1], bord2, n);
-			//mph[mphnum].tag = gcam.cursect + taginc*b->recursion_depth;
-			//mphnum++;
-		}
+    b->bunchn = 0;
+    scansector(gcam.cursect, b);
 
-		b->bunchn = 0; scansector(gcam.cursect,b);
-		while (b->bunchn)
-		{
-			// Simplified: just take the last bunch
-			// Mono system handles occlusion, so order doesn't matter much
-			closest = b->bunchn - 1;
-			logstep("bunch draw close: %d, depth:%d", closest, b->recursion_depth);
-			drawalls(closest, lgs, b);
-		}
+    while (b->bunchn) {
+        closest = b->bunchn - 1;
+        logstep("bunch draw close: %d, depth:%d", closest, b->recursion_depth);
+        drawalls(closest, lgs, b);
+    }
 
-		if (shadowtest2_rendmode == 4) uptr = glp->sectgot;
-										  else uptr = shadowtest2_sectgot;
+    if (shadowtest2_rendmode == 4)
+        uptr = glp->sectgot;
+    else
+        uptr = shadowtest2_sectgot;
 
-		if (!loopsrun)
-		{
-			memcpy(uptr,b->sectgot,(lgs->numsects+31)>>3);
-			loopsrun++;
-		}
-		else
-		{
-			if (false) // && !(cputype&(1<<25))) //Got SSE
-			{
-				for(i=((lgs->numsects+31)>>5)-1;i>=0;i--)
-					uptr[i] |= b->sectgot[i];
-			}
-			else
-			{
-				// Convert to portable C - process 16 bytes at a time using uint64_t
-				size_t total_bytes = ((lgs->numsects+127)&~127)>>3;
-				size_t chunks = total_bytes / 16;
-
-				// Process 16-byte chunks (2 x uint64_t)
-				uint64_t* uptr64 = (uint64_t*)uptr;
-				uint64_t* sectgot64 = (uint64_t*)b->sectgot;
-
-				for(size_t j = 0; j < chunks; j++) {
-					size_t idx = j * 2;
-					uptr64[idx] |= sectgot64[idx];
-					uptr64[idx + 1] |= sectgot64[idx + 1];
-				}
-			}
-		}
-
-		if (!didcut || b->has_portal_clip) break;
-	}
+    memcpy(uptr, b->sectgot, (lgs->numsects + 31) >> 3);
+}
 }
 
 // 1. Normalize transform (makes vectors unit length and orthogonal)
@@ -1555,7 +1499,6 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport, bunchgrp *parentc
 	newctx.xformmatc = parentctx->xformmatc;
 	newctx.xformmats = parentctx->xformmats;
 	newctx.gnadd = parentctx->gnadd;
-	newctx.currenthalfplane = parentctx->currenthalfplane;
 	//point3d test = {1, 2, 3};  -- this is ok.
 	//point3d w = local_to_world_vec(test, &ncam.tr);
 	//point3d back = world_to_local_vec(w, &ncam.tr);

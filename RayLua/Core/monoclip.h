@@ -88,7 +88,6 @@ typedef struct {
 	point3d gnorm;
 	int testignorewall;
 	int testignoresec;
-	int currenthalfplane;
 	int planecuts;
 	int prevsec,newsec;
 
