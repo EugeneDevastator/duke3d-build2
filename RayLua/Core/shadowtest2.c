@@ -1131,31 +1131,13 @@ static void gentransform_wall (kgln_t *npol2, surf_t *sur, bunchgrp *b)
 	b->gouvmat[0] = fk[18] + fk[19] + fk[20];
 	b->gouvmat[3] = fk[21] + fk[22] + fk[23];
 
-	fk[15] = b->gouvmat[6]*fk[0] + b->gouvmat[0]*fk[3] + b->gouvmat[3]*fk[6];
-	fk[16] = b->gouvmat[6]*fk[1] + b->gouvmat[0]*fk[4] + b->gouvmat[3]*fk[7];
-	fk[17] = b->gouvmat[6]*fk[2] + b->gouvmat[0]*fk[5] + b->gouvmat[3]*fk[8];
-
-	fk[ 9] = fk[15]*npol2[0].u;
-	fk[10] = fk[16]*npol2[1].u;
-	fk[11] = fk[17]*npol2[2].u;
-	b->gouvmat[7] = fk[12]*fk[9] + fk[13]*fk[10] + fk[14]*fk[11];
-	b->gouvmat[1] = fk[18]*fk[9] + fk[19]*fk[10] + fk[20]*fk[11];
-	b->gouvmat[4] = fk[21]*fk[9] + fk[22]*fk[10] + fk[23]*fk[11];
-
-	fk[ 9] = fk[15]*npol2[0].v;
-	fk[10] = fk[16]*npol2[1].v;
-	fk[11] = fk[17]*npol2[2].v;
-	b->gouvmat[8] = fk[12]*fk[9] + fk[13]*fk[10] + fk[14]*fk[11];
-	b->gouvmat[2] = fk[18]*fk[9] + fk[19]*fk[10] + fk[20]*fk[11];
-	b->gouvmat[5] = fk[21]*fk[9] + fk[22]*fk[10] + fk[23]*fk[11];
-
 	rdet = 1.0/(fk[0]*fk[12] + fk[1]*fk[13] + fk[2]*fk[14]);
 
 	g = rdet;
 
 								b->gouvmat[0] *= g; b->gouvmat[3] *= g; b->gouvmat[6] *= g; g *= rdet*65536.0;
-	f = (float)64*g;            b->gouvmat[1] *= f; b->gouvmat[4] *= f; b->gouvmat[7] *= f;
-	f = (float)64*g;            b->gouvmat[2] *= f; b->gouvmat[5] *= f; b->gouvmat[8] *= f;
+	f = (float)64*g;
+	f = (float)64*g;
 
 	if (renderinterp)
 	{
