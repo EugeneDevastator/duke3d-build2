@@ -63,6 +63,23 @@ static void world_to_cam(double wx, double wy, double wz,
 	*cz = dx*ct->m[6] + dy*ct->m[7] + dz*ct->m[8];  // forward (depth)
 }
 
+static void wccw_transform(dpoint3d *pinout, cam_transform_t *ctin, cam_transform_t *ctout) {
+	double dx = pinout->x - ctin->p.x;
+	double dy = pinout->y - ctin->p.y;
+	double dz = pinout->z - ctin->p.z;
+	pinout->x = dx*ctin->m[0] + dy*ctin->m[1] + dz*ctin->m[2];  // right
+	pinout->y = dx*ctin->m[3] + dy*ctin->m[4] + dz*ctin->m[5];  // down
+	pinout->z = dx*ctin->m[6] + dy*ctin->m[7] + dz*ctin->m[8];  // forward (depth)
+	double wx,wy,wz;
+	wx = pinout->x*ctout->m[0] + pinout->y*ctout->m[3] + pinout->z*ctout->m[6] + ctout->p.x;
+	wy = pinout->x*ctout->m[1] + pinout->y*ctout->m[4] + pinout->z*ctout->m[7] + ctout->p.y;
+	wz = pinout->x*ctout->m[2] + pinout->y*ctout->m[5] + pinout->z*ctout->m[8] + ctout->p.z;
+	pinout->x = wx;
+	pinout->y=wy;
+	pinout->z=wz;
+}
+
+
 static void cam_to_screen(double cx, double cy, double cz,
 						  cam_transform_t *ct,
 						  double *sx, double *sy, double *depth) {
