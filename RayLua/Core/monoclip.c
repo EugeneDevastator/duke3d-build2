@@ -207,7 +207,14 @@ void intersamexy(double x0, double y0, double x1, double y1, double z0, double z
     (*iy) = (y1 - y0) * f + y0;
     (*iz) = (z1 - z0) * f + z0;
 }
-
+int intersect_traps_mono_points(dpoint3d p0, dpoint3d p1, dpoint3d trap1[4], dpoint3d trap2[4], int *rh0, int *rh1) {
+    return intersect_traps_mono(
+        p0.x, p0.y, p1.x, p1.y,
+        trap1[0].z, trap1[1].z, trap1[2].z, trap1[3].z,
+        trap2[0].z, trap2[1].z, trap2[2].z, trap2[3].z,
+        rh0, rh1
+    );
+}
 int intersect_traps_mono(double x0, double y0, double x1, double y1, double z0, double z4, double z5, double z1,
                          double z2, double z6, double z7, double z3, int *rh0, int *rh1) {
     double fx, fy, fz;

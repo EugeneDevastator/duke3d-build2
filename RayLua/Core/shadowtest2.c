@@ -1243,10 +1243,6 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 
 		// Calculate wall length and setup color/normal
 		dx = sqrt((wal[nw].x-wal[w].x)*(wal[nw].x-wal[w].x) + (wal[nw].y-wal[w].y)*(wal[nw].y-wal[w].y));
-		gcurcol = (min(sur->asc>>8,255)<<24) +
-					 (min(sur->rsc>>5,255)<<16) +
-					 (min(sur->gsc>>5,255)<< 8) +
-					 (min(sur->bsc>>5,255)    );
 		b->gnorm.x = wal[w].y-wal[nw].y;
 		b->gnorm.y = wal[nw].x-wal[w].x;
 		b->gnorm.z = 0;
@@ -1285,9 +1281,13 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 
 			//if (!intersect_traps_mono(pol[0].x,pol[0].y, pol[1].x,pol[1].y, pol[0].z,pol[1].z,pol[2].z,pol[3].z, opolz[0],opolz[1],opolz[2],opolz[3], &plothead[0],&plothead[1])) continue;
 			// Calculate intersection of wall segment with clipping trapezoids
-			f = 1e-7; //FIXFIXFIXFIX:use ^ ?
+			f = 1e-7;
+			dpoint3d trap1[4] = {{pol[0].x, pol[0].y, pol[0].z-f}, {pol[1].x, pol[1].y, pol[1].z-f},
+								{pol[2].x, pol[2].y, pol[2].z+f}, {pol[3].x, pol[3].y, pol[3].z+f}};
+			dpoint3d trap2[4] = {{pol[0].x, pol[0].y, opolz[0]-f}, {pol[1].x, pol[1].y, opolz[1]-f},
+								{pol[2].x, pol[2].y, opolz[2]+f}, {pol[3].x, pol[3].y, opolz[3]+f}};
 
-			if (!intersect_traps_mono(pol[0].x,pol[0].y, pol[1].x,pol[1].y, pol[0].z-f,pol[1].z-f,pol[2].z+f,pol[3].z+f, opolz[0]-f,opolz[1]-f,opolz[2]+f,opolz[3]+f, &plothead[0],&plothead[1]))
+			if (!intersect_traps_mono_points(pol[0], pol[1], trap1, trap2, &plothead[0], &plothead[1]))
 				continue;
 
 			// Render wall segment if visible
@@ -1295,8 +1295,8 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 			if ((!(m & 1)) || (wal[w].surf.flags & (1 << 5))) //Draw wall here //(1<<5): 1-way
 			{
 				//	gtpic = &gtile[sur->tilnum]; if (!gtpic->tt.f) loadpic(gtpic);
-				//if (sur->flags & (1 << 17))
-				//{ b->gflags = 2; } //skybox ceil/flor
+				if (sur->flags & (1 << 17))
+				{ b->gflags = 2; } //skybox ceil/flor
 				//else if (sur->flags & (1 << 16)) {
 				//	b->gflags = 1;
 				//	gentransform_sky(sur, b);

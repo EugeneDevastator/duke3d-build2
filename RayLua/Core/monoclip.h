@@ -147,7 +147,7 @@ void intersamexy (double x0, double y0, double x1, double y1, double z0, double 
 int intersect_traps_mono (double x0, double y0, double x1, double y1,
 											double z0, double z4, double z5, double z1,
 											double z2, double z6, double z7, double z3, int *rh0, int *rh1);
-
+int intersect_traps_mono_points(dpoint3d p0, dpoint3d p1, dpoint3d trap1[4], dpoint3d trap2[4], int *rh0, int *rh1);
 // Find maximum/minimum envelope of two monotone polygons
 // maxsid: -1=top envelope, +1=bottom envelope; mode: 0=intersection, 1=union
 int mono_max (int hd0, int hd1, int maxsid, int mode);
