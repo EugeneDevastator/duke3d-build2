@@ -130,7 +130,7 @@ void drawpol_befclip(int tag, int newtag, int newtagsect, int plothead0, int plo
  */
 void reset_context();
 void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy);
-void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx);
+void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx);
 // ================================================================================================
 // POLYGONAL SHADOW CREATION FUNCTIONS
 // ================================================================================================

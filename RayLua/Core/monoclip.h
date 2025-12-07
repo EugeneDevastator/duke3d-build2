@@ -61,7 +61,7 @@ typedef struct {
 	double x, y;                        // Clipped coordinates
 } bunchverts_t;
 
-#define MAX_PORTAL_DEPTH 1
+#define MAX_PORTAL_DEPTH 0
 #define MAX_PORTAL_VERTS 32
 
 
@@ -77,6 +77,7 @@ typedef struct {
 	cam_t cam;                    // Camera per recursion level
  	cam_t orcam; // one true camera, read only.
 	double xformmat[9], xformmatc, xformmats;
+	double xformmatc_g, xformmats_g;
 	point3d gnadd;
 	unsigned int *sectgot, *sectgotmal;        // Visited sectors per level
 	int sectgotn;
@@ -85,11 +86,12 @@ typedef struct {
 	int recursion_depth;
 	float gouvmat[9];
 	int gligsect, gligwall, gligslab, gflags;
-	int gnewtag, gdoscansector, gnewtagsect;
+	int gnewtag, needsecscan, gnewtagsect;
 	point3d gnorm;
 	int testignorewall;
 	int testignoresec;
 	int currenthalfplane;
+	int planecuts;
 
 	cam_transform_t ct;     // NEW: clean transform for current camera
 	cam_transform_t ct_or;  // NEW: clean transform for original camera (for eyepol output)

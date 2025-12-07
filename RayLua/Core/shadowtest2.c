@@ -291,6 +291,7 @@ static int prepbunch (int id, bunchverts_t *twal, bunchgrp *b)
 	//   3: UNSORTABLE!
 static int bunchfront (int b0, int b1, int fixsplitnow, bunchgrp *b)
 {
+	//return 0;
 	cam_t gcam = b->cam;
 	bunchverts_t *twal[2];
 	wall_t *wal;
@@ -479,8 +480,8 @@ static void scansector (int sectnum, bunchgrp* b)
 		dx1 = wal[j].x-gcam.p.x; dy1 = wal[j].y-gcam.p.y; if (dy1*dx0 <= dx1*dy0) goto docont; //Back-face cull
 
 			//clip to near plane .. result is parametric fractions f0&f1
-		f0 = dx0 * b->xformmatc + dy0 * b->xformmats;
-		f1 = dx1 * b->xformmatc + dy1 * b->xformmats;
+		f0 = dx0 * b->xformmatc_g + dy0 * b->xformmats_g;
+		f1 = dx1 * b->xformmatc_g + dy1 * b->xformmats_g;
 			  if (f0 <= BUNCHNEAR) { if (f1 <= BUNCHNEAR) goto docont;
 											 f0 = (BUNCHNEAR-f0)/(f1-f0); f1 = 1.0; if (f0 >= f1) goto docont; }
 		else if (f1 <= BUNCHNEAR) { f1 = (BUNCHNEAR-f0)/(f1-f0); f0 = 0.0; if (f0 >= f1) goto docont; }
@@ -617,23 +618,31 @@ bunchgrid_got:;
 	}
 
 }
-
-static void xformprep (double hang, bunchgrp *b)
+static void xformprep_prt (double hang, bunchgrp *b)
 {
 	cam_t gcam = b->cam;
+	double yaw = atan2(gcam.f.y, gcam.f.x) + hang;
+	double cy = cos(yaw);   // cos(yaw)
+	double sy = sin(yaw);   // sin(yaw)
+	b->xformmatc_g = cy;
+	b->xformmats_g = sy;
+}
+static void xformprep (double hang, bunchgrp *b)
+{
+	cam_t orcam = b->orcam;
 
 	// Extract all three Euler angles from camera orientation
 	// Assuming camera uses standard right-handed coordinate system
 
 	// Yaw (rotation around Z-axis) - horizontal rotation
-	double yaw = atan2(gcam.f.y, gcam.f.x) + hang;
+	double yaw = atan2(orcam.f.y, orcam.f.x) + hang;
 
 	// Pitch (rotation around X-axis) - vertical tilt
-	double pitch = atan2(-gcam.f.z, sqrt(gcam.f.x*gcam.f.x + gcam.f.y*gcam.f.y));
+	double pitch = atan2(-orcam.f.z, sqrt(orcam.f.x*orcam.f.x + orcam.f.y*orcam.f.y));
 
 	// Roll (rotation around Y-axis) - banking/tilting
 	// Extract from right vector's Z component relative to up vector
-	double roll = atan2(gcam.r.z, gcam.d.z);
+	double roll = atan2(orcam.r.z, orcam.d.z);
 
 	// Precompute trigonometric values
 	double cy = cos(yaw);   // cos(yaw)
@@ -646,21 +655,23 @@ static void xformprep (double hang, bunchgrp *b)
 	// Store for backward compatibility
 	b->xformmatc = cy;
 	b->xformmats = sy;
+	b->xformmatc_g = cy;
+	b->xformmats_g = sy;
 
-	b->xformmat[0] = gcam.r.y*b->xformmatc - gcam.r.x*b->xformmats;
-	b->xformmat[1] = gcam.r.z;
-	b->xformmat[2] = gcam.r.x*b->xformmatc + gcam.r.y*b->xformmats;
-	b->xformmat[3] = gcam.d.y*b->xformmatc - gcam.d.x*b->xformmats;
-	b->xformmat[4] = gcam.d.z;
-	b->xformmat[5] = gcam.d.x*b->xformmatc + gcam.d.y*b->xformmats;
-	b->xformmat[6] = gcam.f.y*b->xformmatc - gcam.f.x*b->xformmats;
-	b->xformmat[7] = gcam.f.z;
-	b->xformmat[8] = gcam.f.x*b->xformmatc + gcam.f.y*b->xformmats;
+	b->xformmat[0] = orcam.r.y*b->xformmatc - orcam.r.x*b->xformmats;
+	b->xformmat[1] = orcam.r.z;
+	b->xformmat[2] = orcam.r.x*b->xformmatc + orcam.r.y*b->xformmats;
+	b->xformmat[3] = orcam.d.y*b->xformmatc - orcam.d.x*b->xformmats;
+	b->xformmat[4] = orcam.d.z;
+	b->xformmat[5] = orcam.d.x*b->xformmatc + orcam.d.y*b->xformmats;
+	b->xformmat[6] = orcam.f.y*b->xformmatc - orcam.f.x*b->xformmats;
+	b->xformmat[7] = orcam.f.z;
+	b->xformmat[8] = orcam.f.x*b->xformmatc + orcam.f.y*b->xformmats;
 
 	// Transform camera position rotation matrix
-	b->gnadd.x = -(gcam.h.x*b->xformmat[0] + gcam.h.y*b->xformmat[1])+ gcam.h.z*b->xformmat[2];
-	b->gnadd.y = -(gcam.h.x*b->xformmat[3] + gcam.h.y*b->xformmat[4])+ gcam.h.z*b->xformmat[5];
-	b->gnadd.z = -(gcam.h.x*b->xformmat[6] + gcam.h.y*b->xformmat[7])+ gcam.h.z*b->xformmat[8];
+	b->gnadd.x = -(orcam.h.x*b->xformmat[0] + orcam.h.y*b->xformmat[1])+ orcam.h.z*b->xformmat[2];
+	b->gnadd.y = -(orcam.h.x*b->xformmat[3] + orcam.h.y*b->xformmat[4])+ orcam.h.z*b->xformmat[5];
+	b->gnadd.z = -(orcam.h.x*b->xformmat[6] + orcam.h.y*b->xformmat[7])+ orcam.h.z*b->xformmat[8];
 }
 
 
@@ -832,7 +843,7 @@ static void changetagfunc (int rethead0, int rethead1, bunchgrp *b)
 {
 	if ((rethead0|rethead1) < 0) return;
 	int mapsect = b->gnewtagsect;
-	if ((b->gdoscansector)
+	if ((b->needsecscan)
 		&& (!(b->sectgot[mapsect>>5]&(1<<mapsect))))
 		scansector(mapsect,b);
 
@@ -841,7 +852,7 @@ static void changetagfunc (int rethead0, int rethead1, bunchgrp *b)
 	mph[mphnum].head[1] = rethead1;
 	mph[mphnum].tag = b->gnewtag;
 	mphnum++;
-	logstep("changetag: doscan?:%d, newMtag:%d, new mphnum:%d",b->gdoscansector,b->gnewtag,mphnum);
+	logstep("changetag: doscan?:%d, newMtag:%d, new mphnum:%d",b->needsecscan,b->gnewtag,mphnum);
 }
 	//flags&1: do and
 	//flags&2: do sub
@@ -853,6 +864,7 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
     int mnewtag = newtag1 == -1 ? -1 : newtag1 + taginc*b->recursion_depth;
     b->gnewtagsect = newtagsect;
     cam_t orcam = b->orcam;
+
     #define BSCISDIST 0.000001
     void (*mono_output)(int h0, int h1, bunchgrp *b);
     dpoint3d *otp, *tp;
@@ -929,7 +941,7 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 		{
 			b->gnewtagsect = newtagsect;
 			b->gnewtag = mnewtag; omph0 = mphnum;
-			b->gdoscansector =  1;//!(flags&8);
+			b->needsecscan = !(flags&8);
 			int bop = MONO_BOOL_AND;//(flags & CLIP_PORTAL_FLAG) ? MONO_BOOL_SUB_REV : MONO_BOOL_AND;
 			for (i = mphnum - 1; i >= 0; i--)
 				if (mph[i].tag == mtag)
@@ -976,7 +988,7 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 
 		b->gnewtag = mtag;
 		b->gnewtagsect = tagsect;
-		b->gdoscansector = 0; omph0 = mphnum; omph1 = mphnum;
+		b->needsecscan = 0; omph0 = mphnum; omph1 = mphnum;
 		for(i=mphnum-1;i>=0;i--)
 		{
 			if (mph[i].tag != mtag) continue;
@@ -1067,7 +1079,6 @@ static void gentransform_sky (surf_t *sur, bunchgrp *b)
 	b->gouvmat[2] =              h    ; b->gouvmat[5] =            0.f; b->gouvmat[8] =            0.f;
 	gentex_xform(b->gouvmat,b);
 }
-
 static void gentransform_ceilflor (sect_t *sec, wall_t *wal, surf_t *sur, int isflor, bunchgrp *b)
 {
 	cam_t gcam = b->cam;
@@ -1101,28 +1112,10 @@ static void gentransform_ceilflor (sect_t *sec, wall_t *wal, surf_t *sur, int is
 		ox = (fk[3]*fk[4] - fk[2]*fk[5])*f;
 		oy = (fk[0]*fk[5] - fk[1]*fk[4])*f;
 		oz = getslopez(sec,isflor,ox,oy);
-
-		// PORTAL TRANSFORM: Convert world coordinates to original camera space
-		if (b->recursion_depth > 0) {
-			// Step 1: Transform world point to original camera space
-			double ocx, ocy, ocz;
-			world_to_cam(ox, oy, oz, &b->ct_or, &ocx, &ocy, &ocz);
-
-			// Use original camera coordinates for gouvmat calculation
-			ox = ocx; oy = ocy; oz = ocz;
-		} else {
-			// Standard case: transform to current camera space
-			ox -= gcam.p.x; oy -= gcam.p.y; oz -= gcam.p.z;
-			b->gouvmat[i+0] = ox*gcam.r.x + oy*gcam.r.y + oz*gcam.r.z;
-			b->gouvmat[i+1] = ox*gcam.d.x + oy*gcam.d.y + oz*gcam.d.z;
-			b->gouvmat[i+2] = ox*gcam.f.x + oy*gcam.f.y + oz*gcam.f.z;
-			continue;
-		}
-
-		// For portals: coordinates are already in original camera space
-		b->gouvmat[i+0] = ox;
-		b->gouvmat[i+1] = oy;
-		b->gouvmat[i+2] = oz;
+		ox -= gcam.p.x; oy -= gcam.p.y; oz -= gcam.p.z;
+		b->gouvmat[i+0] = ox*gcam.r.x + oy*gcam.r.y + oz*gcam.r.z;
+		b->gouvmat[i+1] = ox*gcam.d.x + oy*gcam.d.y + oz*gcam.d.z;
+		b->gouvmat[i+2] = ox*gcam.f.x + oy*gcam.f.y + oz*gcam.f.z;
 	}
 
 	for(i=9-1;i>=0;i--) b->gouvmat[i] *= 256.f;
@@ -1132,6 +1125,7 @@ static void gentransform_ceilflor (sect_t *sec, wall_t *wal, surf_t *sur, int is
 
 	gentex_xform(b->gouvmat, b);
 }
+
 
 
 static void gentransform_wall (kgln_t *npol2, surf_t *sur, bunchgrp *b)
@@ -1281,8 +1275,16 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		// Calculate surface normal vector
 		b->gnorm.x = grad->x;
 		b->gnorm.y = grad->y;
-		b->gnorm.z = 1.f; if (isflor) { b->gnorm.x = -b->gnorm.x; b->gnorm.y = -b->gnorm.y; b->gnorm.z = -b->gnorm.z; }
-		f = 1.0/sqrt(b->gnorm.x*b->gnorm.x + b->gnorm.y*b->gnorm.y + 1); b->gnorm.x *= f; b->gnorm.y *= f; b->gnorm.z *= f;
+		b->gnorm.z = 1.f;
+		if (isflor) {
+			b->gnorm.x = -b->gnorm.x;
+			b->gnorm.y = -b->gnorm.y;
+			b->gnorm.z = -b->gnorm.z;
+		}
+		f = 1.0 / sqrt(b->gnorm.x * b->gnorm.x + b->gnorm.y * b->gnorm.y + 1);
+		b->gnorm.x *= f;
+		b->gnorm.y *= f;
+		b->gnorm.z *= f;
 
 			//plane point: (wal[0].x,wal[0].y,fz)
 			//plane norm: <grad->x,grad->y,1>
@@ -1332,7 +1334,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 			// This prevents parent creating mph entries that collide with child's tags
 			logstep("entering portal floor?, %d, sec:%d, cur depth:%d, curhalf:%d", isflor, s, b->recursion_depth, b->currenthalfplane);
 			drawpol_befclip(s, portals[endpn].sect+taginc, portals[endpn].sect,
-				plothead[0],plothead[1],  3, b);
+				plothead[0],plothead[1],  3|8, b);
 			draw_hsr_enter_portal(map, myport, b, plothead[0], plothead[1]);
 		}
 
@@ -1454,11 +1456,13 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 				logstep("entering wall port,wal:%d, sec:%d, cur depth:%d, curhalf:%d",w, s, b->recursion_depth, b->currenthalfplane);
 				int endsec = portals[myport].sect;
 				// Only SUB, not AND
-				drawpol_befclip(s, portals[endpn].sect+taginc, portals[endpn].sect,				plothead[0],plothead[1],  3, b);
+				drawpol_befclip(s, portals[endpn].sect+taginc, portals[endpn].sect, plothead[0],plothead[1], 3|8, b);
 				draw_hsr_enter_portal(map, myport, b, plothead[0], plothead[1]);
 			} else {
+				if (ns >= 0)
+				logstep("wall to next sec wal:%d, sec:%d, ns:%d,cur depth:%d, curhalf:%d",w, s, ns,b->recursion_depth, b->currenthalfplane);
+				else
 				logstep("drawing solid - wall,wal:%d,  sec:%d, cur depth:%d, curhalf:%d",w, s, b->recursion_depth, b->currenthalfplane);
-
 				// could be 7 or 3, .111 or .011
 				drawpol_befclip(s, ns, ns, plothead[0], plothead[1], ((m > vn) << 2) + 3, b);
 			}
@@ -1486,11 +1490,11 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
 	bs.recursion_depth = 0;
 	bs.has_portal_clip = false;
 	bs.currenthalfplane = 0;
-	draw_hsr_polymost_ctx(map,&bs);
+	draw_hsr_ctx(map,&bs);
 	logstep("frame start");
 }
 
-void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
+void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 	if (!newctx) {
 		return;
 		if (captureframe) printf("discarding due to null ctx");
@@ -1632,7 +1636,7 @@ for(i=lgs->sect[gcam.cursect].n-1;i>=0;i--)
 			memset(glp->lighashead,-1,glp->lighasheadn*sizeof(glp->lighashead[0]));
 		}
 	}
-	int maxhfp = b->has_portal_clip ? 2 : 2;
+	int maxhfp =2;
 	for(halfplane=0;halfplane<maxhfp;halfplane++) {
 		logstep("HALFPLANE change: %d, depth: %d",halfplane,b->recursion_depth);
 
@@ -1661,16 +1665,16 @@ for(i=lgs->sect[gcam.cursect].n-1;i>=0;i--)
 			xformbac(-65536.0,+65536.0,1.0,&bord2[3], b);
 			n = 4; didcut = 1;
 		}
-		else if (!b->has_portal_clip) {
+		else if (!b->has_portal_clip) { // initial
 			{
 				xformprep(((double)halfplane)*PI, b);
 
 				// NEW CODE - Use much larger bounds:
 				float large_bound = 1e6f;
-				xformbac(-large_bound, -large_bound, gcam.h.z, &bord[0],b);
-				xformbac(+large_bound, -large_bound, gcam.h.z, &bord[1],b);
-				xformbac(+large_bound, +large_bound, gcam.h.z, &bord[2],b);
-				xformbac(-large_bound, +large_bound, gcam.h.z, &bord[3],b);
+				xformbac(-large_bound, -large_bound, oricam.h.z, &bord[0],b);
+				xformbac(+large_bound, -large_bound, oricam.h.z, &bord[1],b);
+				xformbac(+large_bound, +large_bound, oricam.h.z, &bord[2],b);
+				xformbac(-large_bound, +large_bound, oricam.h.z, &bord[3],b);
 
 				//Clip screen to front plane
 				n = 0; didcut = 0;
@@ -1687,6 +1691,7 @@ for(i=lgs->sect[gcam.cursect].n-1;i>=0;i--)
 					}
 				}
 				if (n < 3) break;
+				b->planecuts = n;
 			}
 			memset8(b->sectgot,0,(lgs->numsects+31)>>3);
 			for(j=0;j<n;j++)
@@ -1705,9 +1710,10 @@ for(i=lgs->sect[gcam.cursect].n-1;i>=0;i--)
 			mono_genfromloop(&mph[0].head[0], &mph[0].head[1], bord2, n);
 			mph[0].tag = gcam.cursect;
 			mphnum = 1;
-		} else {
-			n=4;
+		} else { // in portal
+			n=b->planecuts;
 			didcut=1;
+			xformprep_prt(((double)halfplane)*PI, b);
 			//mph_check(mphnum);
 			//mono_genfromloop(&mph[mphnum].head[0], &mph[mphnum].head[1], bord2, n);
 			//mph[mphnum].tag = gcam.cursect + taginc*b->recursion_depth;
@@ -1895,6 +1901,7 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport, bunchgrp *parentc
     newctx.testignoresec = igns;
     newctx.gnewtagsect = -1;
     newctx.gnewtag = -1;
+    newctx.planecuts = parentctx->planecuts;
     memcpy(newctx.xformmat, parentctx->xformmat, sizeof(double)*9);
     newctx.xformmatc = parentctx->xformmatc;
     newctx.xformmats = parentctx->xformmats;
@@ -1908,7 +1915,7 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport, bunchgrp *parentc
 	lastcamtr = newctx.orcam.tr;
 	lastcamtr2 = newctx.cam.tr;
 
-    draw_hsr_polymost_ctx(map, &newctx);
+    draw_hsr_ctx(map, &newctx);
 }
 
 
