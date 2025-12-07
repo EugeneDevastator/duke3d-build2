@@ -436,191 +436,68 @@ static int bunchfront(int b0, int b1, int fixsplitnow, bunchgrp *b) {
 	if (a[1] >= -1e-7) return (2);
 	return (3);
 }
-
-static void scansector (int sectnum, bunchgrp* b)
-{
-	cam_t gcam = b->cam;
 #define BUNCHNEAR 1e-7
-	sect_t *sec;
-	wall_t *wal;
-	bfint_t tbf;
-	double f, dx0, dy0, dx1, dy1, f0, f1;
-	int i, j, k, m, o, ie, obunchn, realobunchn, obfintn;
+static void scansector(int sectnum, bunchgrp *b)
+{
+    cam_t gcam = b->cam;
+    sect_t *sec;
+    wall_t *wal;
+    double f, dx0, dy0, dx1, dy1, f0, f1;
+    int i, j, k, ie, obunchn;
 
-	if (sectnum < 0) return;
-	b->sectgot[sectnum >> 5] |= (1 << sectnum);
+    if (sectnum < 0) return;
+    b->sectgot[sectnum >> 5] |= (1 << sectnum);
 
-	sec = &curMap->sect[sectnum];
-	wal = sec->wall;
+    sec = &curMap->sect[sectnum];
+    wal = sec->wall;
 
-	obunchn = b->bunchn;
-	realobunchn = b->bunchn;
-	for (i = 0, ie = sec->n; i < ie; i++) {
-		j = wal[i].n + i;
-		dx0 = wal[i].x - gcam.p.x;
-		dy0 = wal[i].y - gcam.p.y;
-		dx1 = wal[j].x - gcam.p.x;
-		dy1 = wal[j].y - gcam.p.y;
-		if (dy1 * dx0 <= dx1 * dy0) goto docont; //Back-face cull
+    obunchn = b->bunchn;
+    for (i = 0, ie = sec->n; i < ie; i++) {
+        j = wal[i].n + i;
+        dx0 = wal[i].x - gcam.p.x;
+        dy0 = wal[i].y - gcam.p.y;
+        dx1 = wal[j].x - gcam.p.x;
+        dy1 = wal[j].y - gcam.p.y;
+        if (dy1 * dx0 <= dx1 * dy0) goto docont; // Back-face cull
 
-		//clip to near plane .. result is parametric fractions f0&f1
-		f0 = dx0 * b->xformmatc_g + dy0 * b->xformmats_g;
-		f1 = dx1 * b->xformmatc_g + dy1 * b->xformmats_g;
-		if (f0 <= BUNCHNEAR) {
-			if (f1 <= BUNCHNEAR) goto docont;
-			f0 = (BUNCHNEAR - f0) / (f1 - f0);
-			f1 = 1.0;
-			if (f0 >= f1) goto docont;
-		} else if (f1 <= BUNCHNEAR) {
-			f1 = (BUNCHNEAR - f0) / (f1 - f0);
-			f0 = 0.0;
-			if (f0 >= f1) goto docont;
-		} else {
-			f0 = 0.0;
-			f1 = 1.0;
-		}
+        // Clip to near plane
+        f0 = dx0 * b->xformmatc_g + dy0 * b->xformmats_g;
+        f1 = dx1 * b->xformmatc_g + dy1 * b->xformmats_g;
+        if (f0 <= BUNCHNEAR) {
+            if (f1 <= BUNCHNEAR) goto docont;
+            f0 = (BUNCHNEAR - f0) / (f1 - f0);
+            f1 = 1.0;
+            if (f0 >= f1) goto docont;
+        } else if (f1 <= BUNCHNEAR) {
+            f1 = (BUNCHNEAR - f0) / (f1 - f0);
+            f0 = 0.0;
+            if (f0 >= f1) goto docont;
+        } else {
+            f0 = 0.0;
+            f1 = 1.0;
+        }
 
-		k = b->bunch[b->bunchn - 1].wal1;
-		if ((b->bunchn > obunchn) && (wal[k].n + k == i) && (b->bunch[b->bunchn - 1].fra1 == 1.0)) {
-			b->bunch[b->bunchn - 1].wal1 = i; //continue from previous wall (typical case)
-			b->bunch[b->bunchn - 1].fra1 = f1;
-			if ((b->bunchn - 1 > obunchn) && (b->bunch[obunchn].wal0 == j) && (b->bunch[obunchn].fra0 == 0.0)) {
-				b->bunchn--; //attach to left side of 1st bunch on loop
-				b->bunch[obunchn].wal0 = b->bunch[b->bunchn].wal0;
-				b->bunch[obunchn].fra0 = b->bunch[b->bunchn].fra0;
-			}
-		} else if ((b->bunchn > obunchn) && (b->bunch[obunchn].wal0 == j) && (b->bunch[obunchn].fra0 == 0.0)) {
-			b->bunch[obunchn].wal0 = i; //update left side of 1st bunch on loop
-			b->bunch[obunchn].fra0 = f0;
-		} else {
-			if (b->bunchn >= b->bunchmal) {
-				b->bunchmal <<= 1;
-				b->bunch = (bunch_t *) realloc(b->bunch, b->bunchmal * sizeof(b->bunch[0]));
-				b->bunchgot = (unsigned int *) realloc(b->bunchgot, ((b->bunchmal + 31) & ~31) >> 3);
-				b->bunchgrid = (unsigned char *) realloc(b->bunchgrid, ((b->bunchmal - 1) * b->bunchmal) >> 1);
-			}
-			b->bunch[b->bunchn].wal0 = i;
-			b->bunch[b->bunchn].fra0 = f0; //start new b->bunch
-			b->bunch[b->bunchn].wal1 = i;
-			b->bunch[b->bunchn].fra1 = f1;
-			b->bunch[b->bunchn].sec = sectnum;
-			b->bunchn++;
-		}
-	docont:;
-		if (j < i) obunchn = b->bunchn;
-	}
-
-	for (obunchn = realobunchn; obunchn < b->bunchn; obunchn++) {
-		//insert bunch
-		//  0 1 2 3 4
-		//0
-		//1 x
-		//2 x x
-		//3 x x x
-		//4 x x x x
-		//5 ? ? ? ? ?
-		//0,1,3,6,10,15,21,28,36,45,55,..
-		j = (((obunchn - 1) * obunchn) >> 1);
-		b->bfintn = 0;
-		for (i = 0; i < obunchn; i++) b->bunchgrid[j + i] = bunchfront(obunchn, i, 1, b);
-
-		if (!b->bfintn) continue;
-
-		//sort bfint's
-		for (j = 1; j < b->bfintn; j++)
-			for (i = 0; i < j; i++) {
-				//              bfint[i].wal vs. bfint[j].wal ?
-				//0    bunch[obunchn].wal0........bunch[obunchn].wal1       sec->n
-				//0....bunch[obunchn].wal1        bunch[obunchn].wal0.......sec->n
-				m = b->bfint[i].wal;
-				o = b->bfint[j].wal;
-				if (b->bunch[obunchn].wal0 > b->bunch[obunchn].wal1) //handle wall index wrap-around
-				{
-					if (m <= b->bunch[obunchn].wal1) m += sec->n;
-					if (o <= b->bunch[obunchn].wal1) o += sec->n;
-				}
-				if (m < o) continue;
-				if ((b->bfint[i].wal == b->bfint[j].wal) && (b->bfint[i].fra <= b->bfint[j].fra)) continue;
-
-				tbf = b->bfint[i];
-				b->bfint[i] = b->bfint[j];
-				b->bfint[j] = tbf;
-			}
-
-		//combine null or tiny bunches
-		obfintn = b->bfintn;
-		b->bfintlut[0] = 0;
-		b->bfintn = 1;
-		for (i = 1; i < obfintn; i++)
-			if ((b->bfint[i - 1].wal != b->bfint[i].wal) || (b->bfint[i].fra - b->bfint[i - 1].fra >= 2e-7)) {
-				b->bfintlut[b->bfintn] = i;
-				b->bfintn++;
-			}
-		b->bfintlut[b->bfintn] = obfintn;
-
-		//obunchn gets its ass split 'b->bfintn' times into a total of 'b->bfintn+1' pieces
-		if (b->bunchn + b->bfintn > b->bunchmal) {
-			b->bunchmal = max(b->bunchmal<<1, b->bunchn+b->bfintn);
-			b->bunch = (bunch_t *) realloc(b->bunch, b->bunchmal * sizeof(b->bunch[0]));
-			b->bunchgot = (unsigned int *) realloc(b->bunchgot, ((b->bunchmal + 31) & ~31) >> 3);
-			b->bunchgrid = (unsigned char *) realloc(b->bunchgrid, ((b->bunchmal - 1) * b->bunchmal) >> 1);
-		}
-
-		//Shove not-yet-processed neighbors to end of list. WARNING:be careful with indices/for loop order!
-		for (k = 0; k < b->bfintn; k++) b->bunch[b->bunchn + b->bfintn - 1 - k] = b->bunch[obunchn + k + 1];
-		for (k = b->bfintn - 1; k >= 0; k--) b->bunch[obunchn + k + 1] = b->bunch[obunchn];
-		for (k = b->bfintn - 1; k >= 0; k--) {
-			b->bunch[obunchn + k].wal1 = b->bfint[b->bfintlut[k]].wal;
-			b->bunch[obunchn + k].fra1 = max(b->bfint[b->bfintlut[k ] ].fra-1e-7, 0.0);
-			b->bunch[obunchn + k + 1].wal0 = b->bfint[b->bfintlut[k + 1] - 1].wal;
-			b->bunch[obunchn + k + 1].fra0 = min(b->bfint[b->bfintlut[k+1]-1].fra+1e-7, 1.0);
-		}
-		b->bunchn += b->bfintn;
-
-		//  0 1 2 3 4 5 6
-		//0
-		//1 x
-		//2 x x
-		//3 x x x
-		//4 x x x x
-		//5 ? ? ? - ?
-		//6 ? ? ? - ? 0
-		//7 ? ? ? - ? 0 0
-		for (m = obunchn; m < obunchn + b->bfintn + 1; m++)
-		//re-front all 'b->bfintn+1' pieces, using hints from bfint list
-		{
-			j = (((m - 1) * m) >> 1);
-			for (k = 0; k < obunchn; k++) {
-				if (m > obunchn) for (o = b->bfintlut[m - obunchn - 1]; o < b->bfintlut[m - obunchn]; o++) if (
-					b->bfint[o].bun == k) {
-					b->bunchgrid[j + k] = b->bfint[o].sid;
-					goto bunchgrid_got;
-				}
-				if (m < obunchn + b->bfintn) for (o = b->bfintlut[m - obunchn]; o < b->bfintlut[m - obunchn + 1]; o++)
-					if (b->bfint[o].bun == k) {
-						b->bunchgrid[j + k] = b->bfint[o].sid ^ 3;
-						goto bunchgrid_got;
-					}
-				b->bunchgrid[j + k] = bunchfront(m, k, 0, b);
-			bunchgrid_got:;
-			}
-			for (; k < m; k++) b->bunchgrid[j + k] = 0;
-		}
-		obunchn += b->bfintn;
-	}
-
-	//remove null bunches (necessary for proper operation)
-	for (m = b->bunchn - 1; m >= realobunchn; m--) {
-		if (b->bunch[m].wal0 != b->bunch[m].wal1) continue;
-		if (b->bunch[m].fra0 < b->bunch[m].fra1) continue;
-		b->bunchn--;
-		b->bunch[m] = b->bunch[b->bunchn];
-		j = (((b->bunchn - 1) * b->bunchn) >> 1);
-		memcpy(&b->bunchgrid[((m - 1) * m) >> 1], &b->bunchgrid[j], m * sizeof(b->bunchgrid[0]));
-		for (i = m + 1; i < b->bunchn; i++) b->bunchgrid[(((i - 1) * i) >> 1) + m] =
-		                                    ((b->bunchgrid[j + i] & 1) << 1) + (b->bunchgrid[j + i] >> 1);
-	}
-
+        // Add to bunch list
+        k = b->bunch[b->bunchn - 1].wal1;
+        if ((b->bunchn > obunchn) && (wal[k].n + k == i) && (b->bunch[b->bunchn - 1].fra1 == 1.0)) {
+            b->bunch[b->bunchn - 1].wal1 = i;
+            b->bunch[b->bunchn - 1].fra1 = f1;
+        } else {
+            if (b->bunchn >= b->bunchmal) {
+                b->bunchmal <<= 1;
+                b->bunch = (bunch_t *)realloc(b->bunch, b->bunchmal * sizeof(b->bunch[0]));
+                b->bunchgot = (unsigned int *)realloc(b->bunchgot, ((b->bunchmal + 31) & ~31) >> 3);
+            }
+            b->bunch[b->bunchn].wal0 = i;
+            b->bunch[b->bunchn].fra0 = f0;
+            b->bunch[b->bunchn].wal1 = i;
+            b->bunch[b->bunchn].fra1 = f1;
+            b->bunch[b->bunchn].sec = sectnum;
+            b->bunchn++;
+        }
+    docont:;
+        if (j < i) obunchn = b->bunchn;
+    }
 }
 static void xformprep_prt (double hang, bunchgrp *b)
 {
