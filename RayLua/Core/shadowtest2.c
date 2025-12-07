@@ -71,7 +71,17 @@ static void wccw_transform(dpoint3d *pinout, cam_t *ctin, cam_t *ctout) {
 	pinout->y = cx * ctout->r.y + cy * ctout->d.y + cz * ctout->f.y + ctout->p.y;
 	pinout->z = cx * ctout->r.z + cy * ctout->d.z + cz * ctout->f.z + ctout->p.z;
 }
+// Add this helper function near wccw_transform:
+static void wccw_transform_dir(dpoint3d *dir, cam_t *ctin, cam_t *ctout) {
+	// Transform direction vector (no translation)
+	double cx = dir->x * ctin->r.x + dir->y * ctin->r.y + dir->z * ctin->r.z;
+	double cy = dir->x * ctin->d.x + dir->y * ctin->d.y + dir->z * ctin->d.z;
+	double cz = dir->x * ctin->f.x + dir->y * ctin->f.y + dir->z * ctin->f.z;
 
+	dir->x = cx * ctout->r.x + cy * ctout->d.x + cz * ctout->f.x;
+	dir->y = cx * ctout->r.y + cy * ctout->d.y + cz * ctout->f.y;
+	dir->z = cx * ctout->r.z + cy * ctout->d.z + cz * ctout->f.z;
+}
 // Convert point from mp (mono polygon) space to world coordinates
 // mp.x, mp.y are in half-plane rotated space; mp.z is NOT used (depth from gouvmat)
 // REPLACE the existing mp_to_world with this simpler version:
@@ -853,13 +863,19 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		for (ww = twaln; ww >= 0; ww -= twaln) {
 			double xw = twal[ww].x;
 			double yw = twal[ww].y;
-			double zw = b->gnorm.z * -1e32;  // keep this as output Z
-
-			// Calculate surface Z at this XY for consistent transform
 			double surface_z = (wal[0].x - xw) * grad->x + (wal[0].y - yw) * grad->y + fz;
-			portal_xform_world_at_z(&xw, &yw, surface_z, b);
 
-			plothead[isflor] = mono_ins(plothead[isflor], xw, yw, zw);
+			// Get normal and transform both point and normal
+			dpoint3d norm_xf = {b->gnorm.x, b->gnorm.y, b->gnorm.z};
+			portal_xform_world_full(&xw, &yw, &surface_z, b);
+			wccw_transform_dir(&norm_xf, &b->cam, &b->orcam);
+
+			// Extend to infinity along normal
+			double inf = 1e32;
+			plothead[isflor] = mono_ins(plothead[isflor],
+										 xw - norm_xf.x * inf,
+										 yw - norm_xf.y * inf,
+										 surface_z - norm_xf.z * inf);
 		}
 
 		// Second loop - real surface points
