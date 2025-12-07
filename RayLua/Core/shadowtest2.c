@@ -80,7 +80,6 @@ void wccw_transform(dpoint3d *pinout, cam_transform_t *ctin, cam_transform_t *ct
 	pinout->z=wz;
 }
 
-
 static void cam_to_screen(double cx, double cy, double cz,
 						  cam_transform_t *ct,
 						  double *sx, double *sy, double *depth) {
@@ -246,9 +245,14 @@ static int prepbunch (int id, bunchverts_t *twal, bunchgrp *b)
 	int i, n;
 
 	wal = curMap->sect[b->bunch[id].sec].wall;
-	i = b->bunch[id].wal0; twal[0].i = i;
-	x0 = wal[i].x; y0 = wal[i].y; i += wal[i].n;
-	x1 = wal[i].x; y1 = wal[i].y; f = b->bunch[id].fra0;
+	i = b->bunch[id].wal0;
+	twal[0].i = i;
+	x0 = wal[i].x;
+	y0 = wal[i].y;
+	i += wal[i].n;
+	x1 = wal[i].x;
+	y1 = wal[i].y;
+	f = b->bunch[id].fra0;
 	twal[0].x = (x1-x0)*f + x0;
 	twal[0].y = (y1-y0)*f + y0;
 	if ((b->bunch[id].wal0 == b->bunch[id].wal1) && (b->bunch[id].fra0 < b->bunch[id].fra1))
@@ -1187,14 +1191,23 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 			//   (?       -      fz)*      1 = 0
 		// Build polygon for ceiling/floor using plane equation:
 		plothead[0] = -1; plothead[1] = -1;
-		for (ww = twaln; ww >= 0; ww -= twaln) plothead[isflor] = mono_ins(
-			                                       plothead[isflor], twal[ww].x, twal[ww].y,
-			                                       b->gnorm.z * -1e32);
+		for (ww = twaln; ww >= 0; ww -= twaln) {
+			float xw = twal[ww].x;
+			float yw = twal[ww].y;
+			float zw = b->gnorm.z * -1e32;
+			dpoint3d wp = {xw,yw,zw};
+			//wccw_transform(&wp,&b->ct,&b->ct_or);
+			plothead[isflor] = mono_ins(plothead[isflor], wp.x, wp.y,wp.z);
+		}
 		//do not replace w/single zenith point - ruins precision
 		i = isflor ^ 1;
-		for (ww = 0; ww <= twaln; ww++) plothead[i] = mono_ins(plothead[i], twal[ww].x, twal[ww].y,
-		                                                       (wal[0].x - twal[ww].x) * grad->x + (
-			                                                       wal[0].y - twal[ww].y) * grad->y + fz);
+		for (ww = 0; ww <= twaln; ww++) {
+			float xw = twal[ww].x;
+			float yw = twal[ww].y;
+			float zw = (wal[0].x - twal[ww].x) * grad->x + ( wal[0].y - twal[ww].y) * grad->y + fz;
+			dpoint3d wp = {xw,yw,zw};
+			plothead[i] = mono_ins(plothead[i], twal[ww].x, twal[ww].y, zw);
+		}
 		plothead[i] = mp[plothead[i]].n;
 
 		// Setup texture and rendering flags
