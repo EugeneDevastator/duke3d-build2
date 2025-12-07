@@ -949,7 +949,7 @@ static void drawpol_befclip (int tag1, int newtag1, int sec, int newsec, int plo
 		{
 			b->gnewsec = newsec;
 			b->gnewtag = mnewtag; omph0 = mphnum;
-			b->needsecscan = 1;//!(flags&8);
+			b->needsecscan = !(flags & CLIP_PORTAL_FLAG);
 			int bop = MONO_BOOL_AND;//(flags & CLIP_PORTAL_FLAG) ? MONO_BOOL_SUB_REV : MONO_BOOL_AND;
 			for (i = mphnum - 1; i >= 0; i--)
 				if (mph[i].tag == mtag)
@@ -982,7 +982,7 @@ static void drawpol_befclip (int tag1, int newtag1, int sec, int newsec, int plo
 				mono_output = ligpoltagfunc;
 				//add to light list // this will process point lights. otherwize will only use plr light.
 
-			else if (b->gflags < 2) mono_output = drawtagfunc_ws;
+			//else if (b->gflags < 2) mono_output = drawtagfunc_ws;
 			else mono_output = drawtagfunc_ws;//skytagfunc;
 			for (i = mphnum - 1; i >= 0; i--)
 				if (mph[i].tag == mtag)
@@ -1263,7 +1263,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 			logstep("entering portal floor?, %d, sec:%d, cur depth:%d, curhalf:%d", isflor, s, b->recursion_depth, b->currenthalfplane);
 
 			int ci = taginc *b->recursion_depth;
-			drawpol_befclip(s+ci,portals[endpn].sect+ci+taginc, s,portals[endpn].sect ,plothead[0],plothead[1],   portal_draw, b);
+			drawpol_befclip(s+ci,portals[endpn].sect+ci+taginc, s,portals[endpn].sect ,plothead[0],plothead[1],   ((isflor<<2)+3)|CLIP_PORTAL_FLAG, b);
 			draw_hsr_enter_portal(map, myport, b, plothead[0], plothead[1]);
 		}
 
@@ -1334,7 +1334,10 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 				continue;
 
 			// Render wall segment if visible
-
+			//	gtpic = &gtile[sur->tilnum]; if (!gtpic->tt.f) loadpic(gtpic);
+			//if (sur->flags & (1 << 17))
+			//{ b->gflags = 2; } //skybox ceil/flor
+			//else
 			if ((!(m & 1)) || (wal[w].surf.flags & (1 << 5))) //Draw wall here //(1<<5): 1-way
 			{
 
@@ -1385,7 +1388,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 				// Only SUB, not AND
 				int drawflags = 2; // 2 is sub;
 				int ci = taginc*b->recursion_depth;
-				drawpol_befclip(s+ci,portals[endpn].sect+ci+taginc, s,portals[endpn].sect ,plothead[0],plothead[1],   portal_draw, b);
+				drawpol_befclip(s+ci,portals[endpn].sect+ci+taginc, s,portals[endpn].sect ,plothead[0],plothead[1],   (((m > vn) << 2) + 3)|CLIP_PORTAL_FLAG, b);
 				//drawpol_befclip(s, -1, -1, -1,plothead[0],plothead[1],  drawflags, b);
 
 				draw_hsr_enter_portal(map, myport, b, plothead[0], plothead[1]);
