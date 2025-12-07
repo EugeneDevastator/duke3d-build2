@@ -800,11 +800,9 @@ static void ligpoltagfunc (int rethead0, int rethead1, bunchgrp *b)
 			fx        =  (mp[i].x*b->xformmat[0] + mp[i].y*b->xformmat[1] + b->gnadd.x)*f + gcam.h.x;
 			fy        =  (mp[i].x*b->xformmat[3] + mp[i].y*b->xformmat[4] + b->gnadd.y)*f + gcam.h.y;
 
-#if (USEINTZ)
-			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*1048576.0*256.0);
-#else
+
 			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*gcam.h.z);
-#endif
+
 			glp->ligpolv[glp->ligpolvn].x = ((fx-gcam.h.x)*gcam.r.x + (fy-gcam.h.y)*gcam.d.x + (gcam.h.z)*gcam.f.x)*f + gcam.p.x;
 			glp->ligpolv[glp->ligpolvn].y = ((fx-gcam.h.x)*gcam.r.y + (fy-gcam.h.y)*gcam.d.y + (gcam.h.z)*gcam.f.y)*f + gcam.p.y;
 			glp->ligpolv[glp->ligpolvn].z = ((fx-gcam.h.x)*gcam.r.z + (fy-gcam.h.y)*gcam.d.z + (gcam.h.z)*gcam.f.z)*f + gcam.p.z;
@@ -1028,13 +1026,42 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 	mono_deloop(plothead[0]);
 }
 
-
-
-	//FIXFIXFIX: clean this up!
-static void gentex_xform (float *ouvmat, bunchgrp *b)
+static void gentransform_ceilflor (sect_t *sec, wall_t *wal, int isflor, bunchgrp *b)
 {
 	cam_t ucam = b->cam;
-	float ax, ay, az, bx, by, bz, cx, cy, cz, p0x, p0y, p0z, p1x, p1y, p1z, p2x, p2y, p2z, f;
+	float f, g, fz, ax, ay, wx, wy, ox, oy, oz, fk[6];
+	int i;
+
+	wx = wal[wal[0].n].x-wal[0].x;
+	wy = wal[wal[0].n].y-wal[0].y;
+	fk[0] = wx; fk[2] = wy;
+	fk[1] = -wy; fk[3] = wx;
+	fz = sqrt(wx*wx + wy*wy);
+	ax = wx*wal[0].x + wy*wal[0].y;
+	ay = wx*wal[0].y - wy*wal[0].x;
+
+	f = fk[0]*fk[3] - fk[1]*fk[2]; if (f > 0.f) f = 1.f/f;
+
+	for(i=6;i>=0;i-=3)
+	{          //u,v:
+		fk[4] = (i==3)*fz + ax;
+		fk[5] = (i==6)*fz + ay;
+		ox = (fk[3]*fk[4] - fk[2]*fk[5])*f;
+		oy = (fk[0]*fk[5] - fk[1]*fk[4])*f;
+		oz = getslopez(sec,isflor,ox,oy);
+		ox -= ucam.p.x; oy -= ucam.p.y; oz -= ucam.p.z;
+		b->gouvmat[i+0] = ox*ucam.r.x + oy*ucam.r.y + oz*ucam.r.z;
+		b->gouvmat[i+1] = ox*ucam.d.x + oy*ucam.d.y + oz*ucam.d.z;
+		b->gouvmat[i+2] = ox*ucam.f.x + oy*ucam.f.y + oz*ucam.f.z;
+	}
+
+	for(i=9-1;i>=0;i--) b->gouvmat[i] *= 256.f;
+
+	b->gouvmat[3] -= b->gouvmat[0]; b->gouvmat[4] -= b->gouvmat[1]; b->gouvmat[5] -= b->gouvmat[2];
+	b->gouvmat[6] -= b->gouvmat[0]; b->gouvmat[7] -= b->gouvmat[1]; b->gouvmat[8] -= b->gouvmat[2];
+
+	float *ouvmat = b->gouvmat;
+	float az, bx, by, bz, cx, cy, cz, p0x, p0y, p0z, p1x, p1y, p1z, p2x, p2y, p2z;
 
 	ax = ouvmat[3]; bx = ouvmat[6]; cx = ouvmat[0];
 	ay = ouvmat[4]; by = ouvmat[7]; cy = ouvmat[1];
@@ -1050,50 +1077,6 @@ static void gentex_xform (float *ouvmat, bunchgrp *b)
 	ouvmat[3] = p2y*ax;
 	ouvmat[6] = p2z*ax;
 	ouvmat[6] = ouvmat[6]*ucam.h.z - ouvmat[0]*ucam.h.x - ouvmat[3]*ucam.h.y;
-	//ouvmat[7] = ouvmat[7]*ucam.h.z - ouvmat[1]*ucam.h.x - ouvmat[4]*ucam.h.y;
-	//ouvmat[8] = ouvmat[8]*ucam.h.z - ouvmat[2]*ucam.h.x - ouvmat[5]*ucam.h.y;
-
-
-}
-
-static void gentransform_ceilflor (sect_t *sec, wall_t *wal, int isflor, bunchgrp *b)
-{
-	cam_t gcam = b->cam;
-	float f, g, fz, ax, ay, wx, wy, ox, oy, oz, fk[6];
-	int i;
-//sur->uv[1].x = 1;//sur->uv[1].y = 0;
-//sur->uv[0].x = 0;//sur->uv[0].y = 0;
-//sur->uv[2].x = 0;//sur->uv[2].y = 1;
-
-
-	wx = wal[wal[0].n].x-wal[0].x;
-	wy = wal[wal[0].n].y-wal[0].y;
-	fk[0] = wx; fk[2] = wy;
-	fk[1] =  -wy; fk[3] =  wx;
-	fz = sqrt(wx*wx + wy*wy);
-	ax = wx*wal[0].x + wy*wal[0].y;
-	ay = wx*wal[0].y - wy*wal[0].x;
-
-	f = fk[0]*fk[3] - fk[1]*fk[2]; if (f > 0.f) f = 1.f/f;
-	for(i=6;i>=0;i-=3)
-	{          //u,v:
-		fk[4] = (i==3)*fz + ax;
-		fk[5] = (i==6)*fz + ay;
-		ox = (fk[3]*fk[4] - fk[2]*fk[5])*f;
-		oy = (fk[0]*fk[5] - fk[1]*fk[4])*f;
-		oz = getslopez(sec,isflor,ox,oy);
-		ox -= gcam.p.x; oy -= gcam.p.y; oz -= gcam.p.z;
-		b->gouvmat[i+0] = ox*gcam.r.x + oy*gcam.r.y + oz*gcam.r.z;
-		b->gouvmat[i+1] = ox*gcam.d.x + oy*gcam.d.y + oz*gcam.d.z;
-		b->gouvmat[i+2] = ox*gcam.f.x + oy*gcam.f.y + oz*gcam.f.z;
-	}
-
-	for(i=9-1;i>=0;i--) b->gouvmat[i] *= 256.f;
-
-	b->gouvmat[3] -= b->gouvmat[0]; b->gouvmat[4] -= b->gouvmat[1]; b->gouvmat[5] -= b->gouvmat[2];
-	b->gouvmat[6] -= b->gouvmat[0]; b->gouvmat[7] -= b->gouvmat[1]; b->gouvmat[8] -= b->gouvmat[2];
-
-	gentex_xform(b->gouvmat, b);
 }
 
 
