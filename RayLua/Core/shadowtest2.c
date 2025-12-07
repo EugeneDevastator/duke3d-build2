@@ -1026,32 +1026,28 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 	mono_deloop(plothead[0]);
 }
 // create plane EQ using GCAM
-static void gentransform_ceilflor (sect_t *sec, wall_t *wal, int isflor, bunchgrp *b)
+static void gentransform_ceilflor(sect_t *sec, wall_t *wal, int isflor, bunchgrp *b)
 {
-	{
-		cam_t *cam = &b->cam;
-		float gx = sec->grad[isflor].x;
-		float gy = sec->grad[isflor].y;
+	cam_t *cam = &b->cam;
+	float gx = sec->grad[isflor].x;
+	float gy = sec->grad[isflor].y;
 
-		// Transform plane normal (gx, gy, 1) to camera space
-		float nx = cam->r.x * gx + cam->r.y * gy + cam->r.z;
-		float ny = cam->d.x * gx + cam->d.y * gy + cam->d.z;
-		float nz = cam->f.x * gx + cam->f.y * gy + cam->f.z;
+	// Transform plane normal (gx, gy, 1) to camera space
+	float nx = cam->r.x * gx + cam->r.y * gy + cam->r.z;
+	float ny = cam->d.x * gx + cam->d.y * gy + cam->d.z;
+	float nz = cam->f.x * gx + cam->f.y * gy + cam->f.z;
 
-		// Camera-space plane constant: D_c = N_world · (P0 - cam.p)
-		// Using reference point (wal[0].x, wal[0].y, base_z)
-		float D_c = gx * (wal[0].x - cam->p.x)
-				  + gy * (wal[0].y - cam->p.y)
-				  + (sec->z[isflor] - cam->p.z);
+	// Camera-space plane constant
+	float D_c = gx * (wal[0].x - cam->p.x)
+			  + gy * (wal[0].y - cam->p.y)
+			  + (sec->z[isflor] - cam->p.z);
 
-		// 1/depth coefficients: 1/z = ouvmat[0]*sx + ouvmat[3]*sy + ouvmat[6]
-		float scale = 1.0f / D_c;
-		b->gouvmat[0] = nx * scale;
-		b->gouvmat[3] = ny * scale;
-		b->gouvmat[6] = nz * scale * cam->h.z - b->gouvmat[0] * cam->h.x - b->gouvmat[3] * cam->h.y;
-	}
+	// Scale includes h.z for screen-space depth formula
+	float scale = 1.0f / (D_c * cam->h.z);
+	b->gouvmat[0] = nx * scale;
+	b->gouvmat[3] = ny * scale;
+	b->gouvmat[6] = nz / D_c - b->gouvmat[0] * cam->h.x - b->gouvmat[3] * cam->h.y;
 }
-
 
 // create plane EQ using GCAM
 static void gentransform_wall (kgln_t *npol2, surf_t *sur, bunchgrp *b)
