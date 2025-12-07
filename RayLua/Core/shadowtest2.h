@@ -100,13 +100,6 @@ void normalize_transform(transform *tr);
  */
 void scansector(int sectnum, bunchgrp *b);
 void wccw_transform(dpoint3d *pinout, cam_transform_t *ctin, cam_transform_t *ctout);
-/** Polygon front-to-back sorting and intersection testing
- * @param b0 First bunch index for comparison
- * @param b1 Second bunch index for comparison
- * @param fixsplitnow Whether to generate split data for intersections
- * @return 0=no overlap, 1=b0 front, 2=b1 front, 3=unsortable
- */
-int bunchfront(int b0, int b1, int fixsplitnow, bunchgrp *b);
 
 /** Prepares wall segments for bunch processing
  * @param b Bunch index to process
