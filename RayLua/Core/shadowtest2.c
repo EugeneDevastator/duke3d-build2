@@ -219,23 +219,6 @@ inline void memset8(void *d, long v, long n) {
 				emms
 				}
 }
-int argb_interp(int c0, int c1, int mul15) {
-	_asm
-			{
-				punpcklbw mm0, c0
-				punpcklbw mm1, c1
-				psrlw mm0, 8
-				psrlw mm1, 8
-				psubw mm1, mm0
-				paddw mm1, mm1
-				pshufw mm2, mul15, 0
-				pmulhw mm1, mm2
-				paddw mm1, mm0
-				packuswb mm1, mm1
-				movd eax, mm1
-				emms
-				}
-}
 
 static int prepbunch (int id, bunchverts_t *twal, bunchgrp *b)
 {
@@ -360,32 +343,7 @@ good:;
 	if (twal[0][0].y*twal[1][twaln[1]].x >= twal[1][twaln[1]].y*twal[0][0].x) return(0); //no overlap (whole bunch)
 	if (twal[1][0].y*twal[0][twaln[0]].x >= twal[0][twaln[0]].y*twal[1][0].x) return(0); //no overlap (whole bunch)
 
-
 	a[0] = 0; a[1] = 0;
-#if 0 //FIXFIXFIXFIXFIX:old (doesn't test unsortable)
-		//Calculate difference of area in overlapping section
-	for(j=2-1;j>=0;j--)
-	{
-		x2 = twal[1-j][0].x; x3 = twal[1-j][twaln[1-j]].x;
-		y2 = twal[1-j][0].y; y3 = twal[1-j][twaln[1-j]].y; i = twaln[j];
-		for(i--;i>=0;i--)
-		{
-			x0 = twal[j][i].x; x1 = twal[j][i+1].x;
-			y0 = twal[j][i].y; y1 = twal[j][i+1].y;
-
-				//(x0-x1)*t + x2*u = x0
-				//(y0-y1)*t + y2*u = y0
-			t0 = x1*y2 - x2*y1; if (t0 >= 0.0) continue; //no overlap
-			t1 = x0*y3 - x3*y0; if (t1 <= 0.0) continue; //no overlap
-			t2 = x0*y2 - x2*y0; if (t2 <= 0.0) t0 = 0.0; else t0 = t2/(t2-t0);
-			t3 = x1*y3 - x3*y1; if (t3 >= 0.0) t1 = 1.0; else t1 = t1/(t1-t3);
-			a[j] += (x0*y1 - x1*y0)*(t1-t0); //add area(*2) of triangular slice, clipped by other bunch
-		}
-	}
-	if (a[0] < a[1]) return(1);
-	if (a[0] > a[1]) return(2);
-	return(0);
-#else
 		//Calculate the areas between the 2 bunches (superset of above algo - can determine if unsortable)
 	ind[0] = 0; ind[1] = 0; cnt = 0; otx0 = 0; oty0 = 0; otx1 = 0; oty1 = 0;
 	j = 0; gotsid = 0; startsid = -1; obfintn = b->bfintn;
@@ -459,7 +417,6 @@ overflow:otx0 = tx0; oty0 = ty0; otx1 = tx1; oty1 = ty1;
 	if (a[0] <= +1e-7) return(1);
 	if (a[1] >= -1e-7) return(2);
 	return(3);
-#endif
 }
 
 static void scansector (int sectnum, bunchgrp* b)
@@ -1107,7 +1064,33 @@ the mono engine produces camera-space polygons that are clipped to not overlap.
 The plothead[0] and plothead[1] contain monotone polygon pairs representing
 the final visible geometry ready for 2D projection.
 The b parameter is a bunch index - this function processes one "bunch" (visible sector group) at a time. The traversal logic is in the caller that:
-*/
+*/// Transform world vertex through portal using wccw_transform
+// For infinity Z: transform XY at reference plane, preserve Z sign/magnitude
+static void portal_xform_world(double *x, double *y, double *z, bunchgrp *b) {
+	//if (!b->has_portal_clip)
+	//	return;
+
+	dpoint3d p;
+	p.x = *x;
+	p.y = *y;
+
+	if (fabs(*z) > 1e30) {
+		// Infinity point: use floor/ceil reference Z for transform
+		p.z = b->cam.p.z;  // transform at camera height
+		wccw_transform(&p, &b->ct, &b->ct_or);
+		*x = p.x;
+		*y = p.y;
+		// preserve infinity z, but may need sign flip
+		// if camera is inverted through portal
+	} else {
+		// Real world point: full transform
+		p.z = *z;
+		wccw_transform(&p, &b->ct, &b->ct_or);
+		*x = p.x;
+		*y = p.y;
+		*z = p.z;
+	}
+}
 
 static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 {
@@ -1147,11 +1130,13 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 	//3  3:x x .
 	//4  6:x x . x
 	//5 10:x x . x x
-	b->bunchn--; b->bunch[bid] = b->bunch[b->bunchn];
-	j = (((b->bunchn-1)*b->bunchn)>>1);
-	memcpy(&b->bunchgrid[((bid-1)*bid)>>1],&b->bunchgrid[j],bid*sizeof(b->bunchgrid[0]));
-	for(i=bid+1;i<b->bunchn;i++)
-		b->bunchgrid[(((i-1)*i)>>1)+bid] = ((b->bunchgrid[j+i]&1)<<1) + (b->bunchgrid[j+i]>>1);
+	// bunches are calculated against GCAM,
+	b->bunchn--;
+	b->bunch[bid] = b->bunch[b->bunchn];
+	j = (((b->bunchn - 1) * b->bunchn) >> 1);
+	memcpy(&b->bunchgrid[((bid - 1) * bid) >> 1], &b->bunchgrid[j], bid * sizeof(b->bunchgrid[0]));
+	for (i = bid + 1; i < b->bunchn; i++)
+		b->bunchgrid[(((i - 1) * i) >> 1) + bid] = ((b->bunchgrid[j + i] & 1) << 1) + (b->bunchgrid[j + i] >> 1);
 	bool noportals = b->recursion_depth >= MAX_PORTAL_DEPTH;
 	// === DRAW CEILINGS & FLOORS ===
 	for(isflor=0;isflor<2;isflor++) // floor ceil
@@ -1191,22 +1176,25 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 			//   (?       -      fz)*      1 = 0
 		// Build polygon for ceiling/floor using plane equation:
 		plothead[0] = -1; plothead[1] = -1;
+		// claude, look at that section, explain what is going into mono_ins, in what coordinate system, and how can i modify it
+		// with wccw transform to transform world around. think - how would i draw rotated world, if camera was stationary.
+		// First loop - infinity points
 		for (ww = twaln; ww >= 0; ww -= twaln) {
-			float xw = twal[ww].x;
-			float yw = twal[ww].y;
-			float zw = b->gnorm.z * -1e32;
-			dpoint3d wp = {xw,yw,zw};
-			//wccw_transform(&wp,&b->ct,&b->ct_or);
-			plothead[isflor] = mono_ins(plothead[isflor], wp.x, wp.y,wp.z);
+			double xw = twal[ww].x;
+			double yw = twal[ww].y;
+			double zw = b->gnorm.z * -1e32;
+			portal_xform_world(&xw, &yw, &zw, b);
+			plothead[isflor] = mono_ins(plothead[isflor], xw, yw, zw);
 		}
-		//do not replace w/single zenith point - ruins precision
+
+		// Second loop - real surface points
 		i = isflor ^ 1;
 		for (ww = 0; ww <= twaln; ww++) {
-			float xw = twal[ww].x;
-			float yw = twal[ww].y;
-			float zw = (wal[0].x - twal[ww].x) * grad->x + ( wal[0].y - twal[ww].y) * grad->y + fz;
-			dpoint3d wp = {xw,yw,zw};
-			plothead[i] = mono_ins(plothead[i], twal[ww].x, twal[ww].y, zw);
+			double xw = twal[ww].x;
+			double yw = twal[ww].y;
+			double zw = (wal[0].x - twal[ww].x) * grad->x + (wal[0].y - twal[ww].y) * grad->y + fz;
+			portal_xform_world(&xw, &yw, &zw, b);
+			plothead[i] = mono_ins(plothead[i], xw, yw, zw);
 		}
 		plothead[i] = mp[plothead[i]].n;
 
@@ -1267,7 +1255,10 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		pol[1].x = twal[ww+1].x; pol[1].y = twal[ww+1].y; pol[1].z = getslopez(&sec[s],0,pol[1].x,pol[1].y); //pol[1].n = 1;
 		pol[2].x = twal[ww+1].x; pol[2].y = twal[ww+1].y; pol[2].z = getslopez(&sec[s],1,pol[2].x,pol[2].y); //pol[2].n = 1;
 		pol[3].x = twal[ww  ].x; pol[3].y = twal[ww  ].y; pol[3].z = getslopez(&sec[s],1,pol[3].x,pol[3].y); //pol[3].n =-3;
-
+		// Transform all 4 wall corners
+		//for (int vi = 0; vi < 4; vi++) {
+		//	portal_xform_world(&pol[vi].x, &pol[vi].y, &pol[vi].z, b);
+		//}
 		// === WALL SEGMENT SUBDIVISION LOOP =		   // Process wall in segments, clipping against adjacent sectors
 		opolz[3] = pol[0].z; opolz[2] = pol[1].z;
 		for(m=0;m<=(vn<<1);m++) //Warning: do not reverse for loop!
@@ -1294,6 +1285,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 			//if (!intersect_traps_mono(pol[0].x,pol[0].y, pol[1].x,pol[1].y, pol[0].z,pol[1].z,pol[2].z,pol[3].z, opolz[0],opolz[1],opolz[2],opolz[3], &plothead[0],&plothead[1])) continue;
 			// Calculate intersection of wall segment with clipping trapezoids
 			f = 1e-7; //FIXFIXFIXFIX:use ^ ?
+
 			if (!intersect_traps_mono(pol[0].x,pol[0].y, pol[1].x,pol[1].y, pol[0].z-f,pol[1].z-f,pol[2].z+f,pol[3].z+f, opolz[0]-f,opolz[1]-f,opolz[2]+f,opolz[3]+f, &plothead[0],&plothead[1]))
 				continue;
 
