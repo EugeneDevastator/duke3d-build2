@@ -337,48 +337,50 @@ static void scansector(int sectnum, bunchgrp *b)
 }
 static void xformprep_prt(bunchgrp *b)
 {
-	cam_t gcam = b->cam;
-	double yaw = atan2(gcam.f.y, gcam.f.x);
+	cam_t *cam = &b->cam;
+	double yaw = atan2(cam->f.y, cam->f.x);
 	b->xformmatc_g = cos(yaw);
 	b->xformmats_g = sin(yaw);
 }
 static void xformprep(bunchgrp *b)
 {
-	cam_t usecam = b->orcam;
+	cam_t *cam = &b->orcam;
 
-	// Yaw from camera forward vector (for scansector compatibility)
-	double yaw = atan2(usecam.f.y, usecam.f.x);
-	double cy = cos(yaw);
-	double sy = sin(yaw);
+	// For scansector back-face culling (still needs yaw in XY plane)
+	double yaw = atan2(cam->f.y, cam->f.x);
+	b->xformmatc = cos(yaw);
+	b->xformmats = sin(yaw);
+	b->xformmatc_g = b->xformmatc;
+	b->xformmats_g = b->xformmats;
 
-	b->xformmatc = cy;
-	b->xformmats = sy;
-	b->xformmatc_g = cy;
-	b->xformmats_g = sy;
+	// Store camera rotation matrix directly (no yaw mixing)
+	// This is the inverse/transpose of the camera orientation
+	// Maps world directions to camera-space directions
+	b->xformmat[0] = cam->r.x;
+	b->xformmat[1] = cam->r.y;
+	b->xformmat[2] = cam->r.z;
+	b->xformmat[3] = cam->d.x;
+	b->xformmat[4] = cam->d.y;
+	b->xformmat[5] = cam->d.z;
+	b->xformmat[6] = cam->f.x;
+	b->xformmat[7] = cam->f.y;
+	b->xformmat[8] = cam->f.z;
 
-	// Full rotation matrix from camera vectors
-	b->xformmat[0] = usecam.r.y*b->xformmatc - usecam.r.x*b->xformmats;
-	b->xformmat[1] = usecam.r.z;
-	b->xformmat[2] = usecam.r.x*b->xformmatc + usecam.r.y*b->xformmats;
-	b->xformmat[3] = usecam.d.y*b->xformmatc - usecam.d.x*b->xformmats;
-	b->xformmat[4] = usecam.d.z;
-	b->xformmat[5] = usecam.d.x*b->xformmatc + usecam.d.y*b->xformmats;
-	b->xformmat[6] = usecam.f.y*b->xformmatc - usecam.f.x*b->xformmats;
-	b->xformmat[7] = usecam.f.z;
-	b->xformmat[8] = usecam.f.x*b->xformmatc + usecam.f.y*b->xformmats;
-
-	// gnadd for screen center offset
-	b->gnadd.x = -(usecam.h.x * b->xformmat[0] + usecam.h.y * b->xformmat[1]) + usecam.h.z * b->xformmat[2];
-	b->gnadd.y = -(usecam.h.x * b->xformmat[3] + usecam.h.y * b->xformmat[4]) + usecam.h.z * b->xformmat[5];
-	b->gnadd.z = -(usecam.h.x * b->xformmat[6] + usecam.h.y * b->xformmat[7]) + usecam.h.z * b->xformmat[8];
+	// gnadd: offset for screen center in camera space
+	// Simplified: just store camera position offset projected to screen
+	b->gnadd.x = cam->h.x;
+	b->gnadd.y = cam->h.y;
+	b->gnadd.z = cam->h.z;
 }
 
 
-static void xformbac (double rx, double ry, double rz, dpoint3d *o, bunchgrp *b)
+static void xformbac(double rx, double ry, double rz, dpoint3d *o, bunchgrp *b)
 {
-	o->x = rx*b->xformmat[0] + ry*b->xformmat[3] + rz*b->xformmat[6];
-	o->y = rx*b->xformmat[1] + ry*b->xformmat[4] + rz*b->xformmat[7];
-	o->z = rx*b->xformmat[2] + ry*b->xformmat[5] + rz*b->xformmat[8];
+	// Inverse transform: camera space -> world direction
+	// xformmat now stores camera vectors directly
+	o->x = rx * b->xformmat[0] + ry * b->xformmat[3] + rz * b->xformmat[6];
+	o->y = rx * b->xformmat[1] + ry * b->xformmat[4] + rz * b->xformmat[7];
+	o->z = rx * b->xformmat[2] + ry * b->xformmat[5] + rz * b->xformmat[8];
 }
 
 eyepol_t *eyepol = 0; // 4096 eyepol_t's = 192KB
@@ -468,63 +470,68 @@ static int ligpolmaxvert = 0;
 	Used during shadow map generation phase (mode 4)
 	Creates hash table for fast polygon lookup by sector/wall/slab
  */
-static void ligpoltagfunc (int rethead0, int rethead1, bunchgrp *b)
+static void ligpoltagfunc(int rethead0, int rethead1, bunchgrp *b)
 {
-	cam_t gcam = b->cam;
-	float f, fx, fy, fz;
-	int i, j, rethead[2];
+    cam_t *gcam = &b->cam;
+    float f;
+    int i, j, rethead[2];
 
-	if ((rethead0|rethead1) < 0) { mono_deloop(rethead1); mono_deloop(rethead0); return; }
+    if ((rethead0 | rethead1) < 0) { mono_deloop(rethead1); mono_deloop(rethead0); return; }
 
-		//Use this for dynamic lights only! (doesn't seem to help speed much)
-	//if ((shadowtest2_rendmode == 4) && (!(shadowtest2_sectgot[b->gligsect>>5]&(1<<b->gligsect)))) return;
+    rethead[0] = rethead0;
+    rethead[1] = rethead1;
 
-		//Put on FIFO:
-	rethead[0] = rethead0; rethead[1] = rethead1;
-	for(j=0;j<2;j++)
-	{
-		i = rethead[j];
-		do
-		{
-			if (j) i = mp[i].p;
+    for (j = 0; j < 2; j++)
+    {
+        i = rethead[j];
+        do
+        {
+            if (j) i = mp[i].p;
 
-			if (glp->ligpolvn >= glp->ligpolvmal)
-			{
-				glp->ligpolvmal = max(glp->ligpolvmal<<1,1024);
-				glp->ligpolv = (point3d *)realloc(glp->ligpolv,glp->ligpolvmal*sizeof(point3d));
-			}
+            if (glp->ligpolvn >= glp->ligpolvmal)
+            {
+                glp->ligpolvmal = max(glp->ligpolvmal << 1, 1024);
+                glp->ligpolv = (point3d *)realloc(glp->ligpolv, glp->ligpolvmal * sizeof(point3d));
+            }
 
-			f = gcam.h.z/(/*mp[i].x*b->xformmat[6]*/ + mp[i].y*b->xformmat[7] + b->gnadd.z);
-			fx        =  (mp[i].x*b->xformmat[0] + mp[i].y*b->xformmat[1] + b->gnadd.x)*f + gcam.h.x;
-			fy        =  (mp[i].x*b->xformmat[3] + mp[i].y*b->xformmat[4] + b->gnadd.y)*f + gcam.h.y;
+            // mp[i].x, mp[i].y are screen coordinates
+            // Use same unproject logic as mp_to_world
+            double sx = mp[i].x;
+            double sy = mp[i].y;
 
+            double denom = (b->gouvmat[0] * sx + b->gouvmat[3] * sy + b->gouvmat[6]) * gcam->h.z;
+            if (fabs(denom) < 1e-10) denom = 1e-10;
+            f = 1.0f / denom;
 
-			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*gcam.h.z);
+            double dx = sx - gcam->h.x;
+            double dy = sy - gcam->h.y;
 
-			glp->ligpolv[glp->ligpolvn].x = ((fx-gcam.h.x)*gcam.r.x + (fy-gcam.h.y)*gcam.d.x + (gcam.h.z)*gcam.f.x)*f + gcam.p.x;
-			glp->ligpolv[glp->ligpolvn].y = ((fx-gcam.h.x)*gcam.r.y + (fy-gcam.h.y)*gcam.d.y + (gcam.h.z)*gcam.f.y)*f + gcam.p.y;
-			glp->ligpolv[glp->ligpolvn].z = ((fx-gcam.h.x)*gcam.r.z + (fy-gcam.h.y)*gcam.d.z + (gcam.h.z)*gcam.f.z)*f + gcam.p.z;
+            glp->ligpolv[glp->ligpolvn].x = (dx * gcam->r.x + dy * gcam->d.x + gcam->h.z * gcam->f.x) * f + gcam->p.x;
+            glp->ligpolv[glp->ligpolvn].y = (dx * gcam->r.y + dy * gcam->d.y + gcam->h.z * gcam->f.y) * f + gcam->p.y;
+            glp->ligpolv[glp->ligpolvn].z = (dx * gcam->r.z + dy * gcam->d.z + gcam->h.z * gcam->f.z) * f + gcam->p.z;
 
-			glp->ligpolvn++;
-			if (!j) i = mp[i].n;
-		} while (i != rethead[j]);
-		mono_deloop(rethead[j]);
-	}
+            glp->ligpolvn++;
+            if (!j) i = mp[i].n;
+        } while (i != rethead[j]);
+        mono_deloop(rethead[j]);
+    }
 
-	if (glp->ligpoln+1 >= glp->ligpolmal)
-	{
-		glp->ligpolmal = max(glp->ligpolmal<<1,256);
-		glp->ligpol = (ligpol_t *)realloc(glp->ligpol,glp->ligpolmal*sizeof(ligpol_t));
-		glp->ligpol[0].vert0 = 0;
-	}
-	glp->ligpol[glp->ligpoln].b2sect = b->gligsect;
-	glp->ligpol[glp->ligpoln].b2wall = b->gligwall;
-	glp->ligpol[glp->ligpoln].b2slab = b->gligslab;
-	i = lighash(b->gligsect,b->gligwall,b->gligslab);
-	glp->ligpol[glp->ligpoln].b2hashn = glp->lighashead[i]; glp->lighashead[i] = glp->ligpoln;
-	ligpolmaxvert = max(ligpolmaxvert,glp->ligpolvn-glp->ligpol[glp->ligpoln].vert0);
-	glp->ligpoln++;
-	glp->ligpol[glp->ligpoln].vert0 = glp->ligpolvn;
+    // Rest unchanged...
+    if (glp->ligpoln + 1 >= glp->ligpolmal)
+    {
+        glp->ligpolmal = max(glp->ligpolmal << 1, 256);
+        glp->ligpol = (ligpol_t *)realloc(glp->ligpol, glp->ligpolmal * sizeof(ligpol_t));
+        glp->ligpol[0].vert0 = 0;
+    }
+    glp->ligpol[glp->ligpoln].b2sect = b->gligsect;
+    glp->ligpol[glp->ligpoln].b2wall = b->gligwall;
+    glp->ligpol[glp->ligpoln].b2slab = b->gligslab;
+    i = lighash(b->gligsect, b->gligwall, b->gligslab);
+    glp->ligpol[glp->ligpoln].b2hashn = glp->lighashead[i];
+    glp->lighashead[i] = glp->ligpoln;
+    ligpolmaxvert = max(ligpolmaxvert, glp->ligpolvn - glp->ligpol[glp->ligpoln].vert0);
+    glp->ligpoln++;
+    glp->ligpol[glp->ligpoln].vert0 = glp->ligpolvn;
 }
 
 
@@ -1295,53 +1302,36 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
         xformbac(-65536.0, +65536.0, 1.0, &bord2[3], b);
         n = 4; didcut = 1;
     }
+		// In draw_hsr_ctx, replace the viewport setup:
     else if (!b->has_portal_clip)
     {
-        xformprep(b);
+    	xformprep(b);
 
-        // Large bounds for full 360° coverage
-        float large_bound = 1e6f;
-        xformbac(-large_bound, -large_bound, oricam.h.z, &bord[0], b);
-        xformbac(+large_bound, -large_bound, oricam.h.z, &bord[1], b);
-        xformbac(+large_bound, +large_bound, oricam.h.z, &bord[2], b);
-        xformbac(-large_bound, +large_bound, oricam.h.z, &bord[3], b);
+    	// Screen-independent viewport - use huge bounds
+    	// Mono will clip to actual geometry anyway
+    	double huge = 1e7;
+    	bord2[0].x = -huge;
+    	bord2[0].y = -huge;
+    	bord2[1].x = +huge;
+    	bord2[1].y = -huge;
+    	bord2[2].x = +huge;
+    	bord2[2].y = +huge;
+    	bord2[3].x = -huge;
+    	bord2[3].y = +huge;
+    	n = 4;
+    	b->planecuts = n;
+    	didcut = 0;
 
-        // Clip screen to front plane
-        n = 0;
-        didcut = 0;
-        for (i = 4 - 1, j = 0; j < 4; i = j, j++) {
-            if (bord[i].z >= SCISDIST) {
-                bord2[n] = bord[i];
-                n++;
-            }
-            if ((bord[i].z >= SCISDIST) != (bord[j].z >= SCISDIST)) {
-                f = (SCISDIST - bord[i].z) / (bord[j].z - bord[i].z);
-                bord2[n].x = (bord[j].x - bord[i].x) * f + bord[i].x;
-                bord2[n].y = (bord[j].y - bord[i].y) * f + bord[i].y;
-                bord2[n].z = (bord[j].z - bord[i].z) * f + bord[i].z;
-                n++;
-                didcut = 1;
-            }
-        }
-        if (n < 3) return;  // Changed from break to return
-        b->planecuts = n;
+    	memset8(b->sectgot, 0, (lgs->numsects + 31) >> 3);
 
-        memset8(b->sectgot, 0, (lgs->numsects + 31) >> 3);
-        for (j = 0; j < n; j++) {
-            f = gcam.h.z / bord2[j].z;
-            bord2[j].x = bord2[j].x * f + gcam.h.x;
-            bord2[j].y = bord2[j].y * f + gcam.h.y;
-        }
+    	for (i = mphnum - 1; i >= 0; i--) {
+    		mono_deloop(mph[i].head[1]);
+    		mono_deloop(mph[i].head[0]);
+    	}
 
-        // Clear and create viewport
-        for (i = mphnum - 1; i >= 0; i--) {
-            mono_deloop(mph[i].head[1]);
-            mono_deloop(mph[i].head[0]);
-        }
-
-        mono_genfromloop(&mph[0].head[0], &mph[0].head[1], bord2, n);
-        mph[0].tag = gcam.cursect;
-        mphnum = 1;
+    	mono_genfromloop(&mph[0].head[0], &mph[0].head[1], bord2, n);
+    	mph[0].tag = gcam.cursect;
+    	mphnum = 1;
     }
     else
     {
