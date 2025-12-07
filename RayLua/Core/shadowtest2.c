@@ -1286,7 +1286,12 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 								{pol[2].x, pol[2].y, pol[2].z+f}, {pol[3].x, pol[3].y, pol[3].z+f}};
 			dpoint3d trap2[4] = {{pol[0].x, pol[0].y, opolz[0]-f}, {pol[1].x, pol[1].y, opolz[1]-f},
 								{pol[2].x, pol[2].y, opolz[2]+f}, {pol[3].x, pol[3].y, opolz[3]+f}};
-
+			for (int i=0;i<4;i++) {
+				wccw_transform(&trap1[i],&b->ct,&b->ct_or);
+				wccw_transform(&trap2[i],&b->ct,&b->ct_or);
+			}
+			wccw_transform(&pol[1],&b->ct,&b->ct_or);
+			wccw_transform(&pol[0],&b->ct,&b->ct_or);
 			if (!intersect_traps_mono_points(pol[0], pol[1], trap1, trap2, &plothead[0], &plothead[1]))
 				continue;
 
