@@ -276,7 +276,7 @@ static int prepbunch(int id, bunchverts_t *twal, bunchgrp *b) {
 #define BUNCHNEAR 1e-7
 static void scansector(int sectnum, bunchgrp *b)
 {
-    cam_t gcam = b->cam;
+    cam_t *gcam = &b->cam;
     sect_t *sec;
     wall_t *wal;
     double f, dx0, dy0, dx1, dy1, f0, f1;
@@ -288,18 +288,35 @@ static void scansector(int sectnum, bunchgrp *b)
     sec = &curMap->sect[sectnum];
     wal = sec->wall;
 
+    // Use camera forward XY components for near-plane test
+    // (walls are vertical, so only XY matters for front/back test)
+    double fwdx = gcam->f.x;
+    double fwdy = gcam->f.y;
+    double fwdlen = sqrt(fwdx * fwdx + fwdy * fwdy);
+    if (fwdlen > 1e-10) {
+        fwdx /= fwdlen;
+        fwdy /= fwdlen;
+    } else {
+        // Camera looking straight up/down - use right vector perpendicular
+        fwdx = gcam->r.y;
+        fwdy = -gcam->r.x;
+    }
+
     obunchn = b->bunchn;
     for (i = 0, ie = sec->n; i < ie; i++) {
         j = wal[i].n + i;
-        dx0 = wal[i].x - gcam.p.x;
-        dy0 = wal[i].y - gcam.p.y;
-        dx1 = wal[j].x - gcam.p.x;
-        dy1 = wal[j].y - gcam.p.y;
-        if (dy1 * dx0 <= dx1 * dy0) goto docont; // Back-face cull
+        dx0 = wal[i].x - gcam->p.x;
+        dy0 = wal[i].y - gcam->p.y;
+        dx1 = wal[j].x - gcam->p.x;
+        dy1 = wal[j].y - gcam->p.y;
 
-        // Clip to near plane
-        f0 = dx0 * b->xformmatc_g + dy0 * b->xformmats_g;
-        f1 = dx1 * b->xformmatc_g + dy1 * b->xformmats_g;
+        // Back-face cull (unchanged - this is correct)
+        if (dy1 * dx0 <= dx1 * dy0) goto docont;
+
+        // Near plane clip using camera forward direction
+        f0 = dx0 * fwdx + dy0 * fwdy;
+        f1 = dx1 * fwdx + dy1 * fwdy;
+
         if (f0 <= BUNCHNEAR) {
             if (f1 <= BUNCHNEAR) goto docont;
             f0 = (BUNCHNEAR - f0) / (f1 - f0);
@@ -314,7 +331,7 @@ static void scansector(int sectnum, bunchgrp *b)
             f1 = 1.0;
         }
 
-        // Add to bunch list
+        // Add to bunch list (unchanged)
         k = b->bunch[b->bunchn - 1].wal1;
         if ((b->bunchn > obunchn) && (wal[k].n + k == i) && (b->bunch[b->bunchn - 1].fra1 == 1.0)) {
             b->bunch[b->bunchn - 1].wal1 = i;
