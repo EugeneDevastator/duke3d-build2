@@ -1028,55 +1028,28 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 // create plane EQ using GCAM
 static void gentransform_ceilflor (sect_t *sec, wall_t *wal, int isflor, bunchgrp *b)
 {
-	cam_t ucam = b->cam;
-	float f, g, fz, ax, ay, wx, wy, ox, oy, oz, fk[6];
-	int i;
+	{
+		cam_t *cam = &b->cam;
+		float gx = sec->grad[isflor].x;
+		float gy = sec->grad[isflor].y;
 
-	wx = wal[wal[0].n].x-wal[0].x;
-	wy = wal[wal[0].n].y-wal[0].y;
-	fk[0] = wx; fk[2] = wy;
-	fk[1] = -wy; fk[3] = wx;
-	fz = sqrt(wx*wx + wy*wy);
-	ax = wx*wal[0].x + wy*wal[0].y;
-	ay = wx*wal[0].y - wy*wal[0].x;
+		// Transform plane normal (gx, gy, 1) to camera space
+		float nx = cam->r.x * gx + cam->r.y * gy + cam->r.z;
+		float ny = cam->d.x * gx + cam->d.y * gy + cam->d.z;
+		float nz = cam->f.x * gx + cam->f.y * gy + cam->f.z;
 
-	f = fk[0]*fk[3] - fk[1]*fk[2]; if (f > 0.f) f = 1.f/f;
+		// Camera-space plane constant: D_c = N_world · (P0 - cam.p)
+		// Using reference point (wal[0].x, wal[0].y, base_z)
+		float D_c = gx * (wal[0].x - cam->p.x)
+				  + gy * (wal[0].y - cam->p.y)
+				  + (sec->z[isflor] - cam->p.z);
 
-	for(i=6;i>=0;i-=3)  // could it be attempt to get 3 walls and construct plane eq from them?
-	{          //u,v:
-		fk[4] = (i==3)*fz + ax;
-		fk[5] = (i==6)*fz + ay;
-		ox = (fk[3]*fk[4] - fk[2]*fk[5])*f;
-		oy = (fk[0]*fk[5] - fk[1]*fk[4])*f;
-		oz = getslopez(sec,isflor,ox,oy);
-		ox -= ucam.p.x; oy -= ucam.p.y; oz -= ucam.p.z;
-		b->gouvmat[i+0] = ox*ucam.r.x + oy*ucam.r.y + oz*ucam.r.z;
-		b->gouvmat[i+1] = ox*ucam.d.x + oy*ucam.d.y + oz*ucam.d.z;
-		b->gouvmat[i+2] = ox*ucam.f.x + oy*ucam.f.y + oz*ucam.f.z;
+		// 1/depth coefficients: 1/z = ouvmat[0]*sx + ouvmat[3]*sy + ouvmat[6]
+		float scale = 1.0f / D_c;
+		b->gouvmat[0] = nx * scale;
+		b->gouvmat[3] = ny * scale;
+		b->gouvmat[6] = nz * scale * cam->h.z - b->gouvmat[0] * cam->h.x - b->gouvmat[3] * cam->h.y;
 	}
-
-	for(i=9-1;i>=0;i--) b->gouvmat[i] *= 256.f;
-
-	b->gouvmat[3] -= b->gouvmat[0]; b->gouvmat[4] -= b->gouvmat[1]; b->gouvmat[5] -= b->gouvmat[2];
-	b->gouvmat[6] -= b->gouvmat[0]; b->gouvmat[7] -= b->gouvmat[1]; b->gouvmat[8] -= b->gouvmat[2];
-
-	float *ouvmat = b->gouvmat;
-	float az, bx, by, bz, cx, cy, cz, p0x, p0y, p0z, p1x, p1y, p1z, p2x, p2y, p2z;
-
-	ax = ouvmat[3]; bx = ouvmat[6]; cx = ouvmat[0];
-	ay = ouvmat[4]; by = ouvmat[7]; cy = ouvmat[1];
-	az = ouvmat[5]; bz = ouvmat[8]; cz = ouvmat[2];
-	p2x = ay*bz - az*by; p2y = az*bx - ax*bz; p2z = ax*by - ay*bx; f = p2x*cx + p2y*cy + p2z*cz;
-
-	f = 1048576.0*16.0 / (f*ucam.h.z);
-
-	ax = (1.0/65536.0 )*f;
-	ay = ((float)64)*f;
-	az = ((float)64)*f;
-	ouvmat[0] = p2x*ax;
-	ouvmat[3] = p2y*ax;
-	ouvmat[6] = p2z*ax;
-	ouvmat[6] = ouvmat[6]*ucam.h.z - ouvmat[0]*ucam.h.x - ouvmat[3]*ucam.h.y;
 }
 
 
