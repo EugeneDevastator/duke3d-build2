@@ -90,26 +90,32 @@ static void cam_to_screen(double cx, double cy, double cz,
 }
 // Convert point from mp (mono polygon) space to world coordinates
 // mp.x, mp.y are in half-plane rotated space; mp.z is NOT used (depth from gouvmat)
-static void mp_to_world(double mpx, double mpy, bunchgrp *b,
-						double *wx, double *wy, double *wz, cam_transform_t *usecam) {
-	// Step 1: Transform mp coords through xformmat to camera-aligned space
-	double cam_rx = mpx * b->xformmat[0] + mpy * b->xformmat[1] + b->gnadd.x;
-	double cam_ry = mpx * b->xformmat[3] + mpy * b->xformmat[4] + b->gnadd.y;
-	double cam_rz = mpx * b->xformmat[6] + mpy * b->xformmat[7] + b->gnadd.z;
+// REPLACE the existing mp_to_world with this simpler version:
 
-	// Step 2: Perspective project to screen
-	double f = usecam->h.z / cam_rz;
-	double sx = cam_rx * f + usecam->h.x;
-	double sy = cam_ry * f + usecam->h.y;
+// Convert point from mp (mono polygon) space to world coordinates
+// After drawpol_befclip changes, mp.x/mp.y ARE screen coordinates
+static void mp_to_world(double sx, double sy, bunchgrp *b,
+						double *wx, double *wy, double *wz,
+						cam_transform_t *usecam) {
+	// sx, sy are screen coordinates from mono polygon
+	// gouvmat encodes plane equation: depth = 1 / ((g0*sx + g3*sy + g6) * h.z)
+	double denom = (b->gouvmat[0] * sx + b->gouvmat[3] * sy + b->gouvmat[6]) * usecam->h.z;
 
-	// Step 3: Depth from plane equation (gouvmat row 0)
-	double depth = 1.0 / ((b->gouvmat[0] * sx + b->gouvmat[3] * sy + b->gouvmat[6]) * usecam->h.z);
+	// Protect against division by zero
+	if (fabs(denom) < 1e-10) {
+		*wx = usecam->p.x;
+		*wy = usecam->p.y;
+		*wz = usecam->p.z;
+		return;
+	}
 
-	// Step 4: Unproject to world using original camera
-	// direction = (sx-h.x)*r + (sy-h.y)*d + h.z*f, then scale by depth
+	double depth = 1.0 / denom;
+
+	// Unproject: screen coords -> camera ray direction -> world position
 	double dx = sx - usecam->h.x;
 	double dy = sy - usecam->h.y;
 
+	// Ray direction in world space, scaled by depth, plus camera position
 	*wx = (dx * usecam->m[0] + dy * usecam->m[3] + usecam->h.z * usecam->m[6]) * depth + usecam->p.x;
 	*wy = (dx * usecam->m[1] + dy * usecam->m[4] + usecam->h.z * usecam->m[7]) * depth + usecam->p.y;
 	*wz = (dx * usecam->m[2] + dy * usecam->m[5] + usecam->h.z * usecam->m[8]) * depth + usecam->p.z;
