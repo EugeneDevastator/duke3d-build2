@@ -1033,49 +1033,46 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 	//FIXFIXFIX: clean this up!
 static void gentex_xform (float *ouvmat, bunchgrp *b)
 {
-	cam_t orcam = b->orcam;
+	cam_t ucam = b->cam;
 	float ax, ay, az, bx, by, bz, cx, cy, cz, p0x, p0y, p0z, p1x, p1y, p1z, p2x, p2y, p2z, f;
 
 	ax = ouvmat[3]; bx = ouvmat[6]; cx = ouvmat[0];
 	ay = ouvmat[4]; by = ouvmat[7]; cy = ouvmat[1];
 	az = ouvmat[5]; bz = ouvmat[8]; cz = ouvmat[2];
 	p2x = ay*bz - az*by; p2y = az*bx - ax*bz; p2z = ax*by - ay*bx; f = p2x*cx + p2y*cy + p2z*cz;
-	p0x = by*cz - bz*cy; p0y = bz*cx - bx*cz; p0z = bx*cy - by*cx;
-	p1x = cy*az - cz*ay; p1y = cz*ax - cx*az; p1z = cx*ay - cy*ax;
 
-	f = 1048576.0*16.0 / (f*orcam.h.z);
+	f = 1048576.0*16.0 / (f*ucam.h.z);
 
 	ax = (1.0/65536.0 )*f;
 	ay = ((float)64)*f;
 	az = ((float)64)*f;
-	ouvmat[0] = p2x*ax; ouvmat[1] = p0x*ay; ouvmat[2] = p1x*az;
-	ouvmat[3] = p2y*ax; ouvmat[4] = p0y*ay; ouvmat[5] = p1y*az;
-	ouvmat[6] = p2z*ax; ouvmat[7] = p0z*ay; ouvmat[8] = p1z*az;
-	ouvmat[6] = ouvmat[6]*orcam.h.z - ouvmat[0]*orcam.h.x - ouvmat[3]*orcam.h.y;
-	ouvmat[7] = ouvmat[7]*orcam.h.z - ouvmat[1]*orcam.h.x - ouvmat[4]*orcam.h.y;
-	ouvmat[8] = ouvmat[8]*orcam.h.z - ouvmat[2]*orcam.h.x - ouvmat[5]*orcam.h.y;
+	ouvmat[0] = p2x*ax;
+	ouvmat[3] = p2y*ax;
+	ouvmat[6] = p2z*ax;
+	ouvmat[6] = ouvmat[6]*ucam.h.z - ouvmat[0]*ucam.h.x - ouvmat[3]*ucam.h.y;
+	//ouvmat[7] = ouvmat[7]*ucam.h.z - ouvmat[1]*ucam.h.x - ouvmat[4]*ucam.h.y;
+	//ouvmat[8] = ouvmat[8]*ucam.h.z - ouvmat[2]*ucam.h.x - ouvmat[5]*ucam.h.y;
 
-	if (renderinterp)
-	{
-		ouvmat[1] -= ouvmat[0]*32768.0; ouvmat[2] -= ouvmat[0]*32768.0;
-		ouvmat[4] -= ouvmat[3]*32768.0; ouvmat[5] -= ouvmat[3]*32768.0;
-		ouvmat[7] -= ouvmat[6]*32768.0; ouvmat[8] -= ouvmat[6]*32768.0;
-	}
+
 }
 
-static void gentransform_ceilflor (sect_t *sec, wall_t *wal, surf_t *sur, int isflor, bunchgrp *b)
+static void gentransform_ceilflor (sect_t *sec, wall_t *wal, int isflor, bunchgrp *b)
 {
 	cam_t gcam = b->cam;
 	float f, g, fz, ax, ay, wx, wy, ox, oy, oz, fk[6];
 	int i;
+//sur->uv[1].x = 1;//sur->uv[1].y = 0;
+//sur->uv[0].x = 0;//sur->uv[0].y = 0;
+//sur->uv[2].x = 0;//sur->uv[2].y = 1;
+
 
 	wx = wal[wal[0].n].x-wal[0].x;
 	wy = wal[wal[0].n].y-wal[0].y;
-	fk[0] = sur->uv[1].x*wx - sur->uv[2].x*wy; fk[2] = sur->uv[1].x*wy + sur->uv[2].x*wx;
-	fk[1] = sur->uv[1].y*wx - sur->uv[2].y*wy; fk[3] = sur->uv[1].y*wy + sur->uv[2].y*wx;
+	fk[0] = wx; fk[2] = wy;
+	fk[1] =  -wy; fk[3] =  wx;
 	fz = sqrt(wx*wx + wy*wy);
-	ax = (wx*wal[0].x + wy*wal[0].y)*sur->uv[1].x + (wx*wal[0].y - wy*wal[0].x)*sur->uv[2].x - sur->uv[0].x*fz;
-	ay = (wx*wal[0].x + wy*wal[0].y)*sur->uv[1].y + (wx*wal[0].y - wy*wal[0].x)*sur->uv[2].y - sur->uv[0].y*fz;
+	ax = wx*wal[0].x + wy*wal[0].y;
+	ay = wx*wal[0].y - wy*wal[0].x;
 
 	f = fk[0]*fk[3] - fk[1]*fk[2]; if (f > 0.f) f = 1.f/f;
 	for(i=6;i>=0;i-=3)
@@ -1103,21 +1100,21 @@ static void gentransform_ceilflor (sect_t *sec, wall_t *wal, surf_t *sur, int is
 
 static void gentransform_wall (kgln_t *npol2, surf_t *sur, bunchgrp *b)
 {
-	cam_t gcam = b->cam;
+	cam_t usedcam = b->cam; // we can use camera hack to get plane equation in space of current cam, not necessart clipping cam.
 	float f, g, ox, oy, oz, rdet, fk[24];
 	int i;
 
 	for(i=0;i<3;i++)
 	{
-		ox = npol2[i].x-gcam.p.x; oy = npol2[i].y-gcam.p.y; oz = npol2[i].z-gcam.p.z;
-		npol2[i].x = ox*gcam.r.x + oy*gcam.r.y + oz*gcam.r.z;
-		npol2[i].y = ox*gcam.d.x + oy*gcam.d.y + oz*gcam.d.z;
-		npol2[i].z = ox*gcam.f.x + oy*gcam.f.y + oz*gcam.f.z;
+		ox = npol2[i].x-usedcam.p.x; oy = npol2[i].y-usedcam.p.y; oz = npol2[i].z-usedcam.p.z;
+		npol2[i].x = ox*usedcam.r.x + oy*usedcam.r.y + oz*usedcam.r.z;
+		npol2[i].y = ox*usedcam.d.x + oy*usedcam.d.y + oz*usedcam.d.z;
+		npol2[i].z = ox*usedcam.f.x + oy*usedcam.f.y + oz*usedcam.f.z;
 	}
 
-	fk[0] = npol2[0].z; fk[3] = npol2[0].x*gcam.h.z + npol2[0].z*gcam.h.x; fk[6] = npol2[0].y*gcam.h.z + npol2[0].z*gcam.h.y;
-	fk[1] = npol2[1].z; fk[4] = npol2[1].x*gcam.h.z + npol2[1].z*gcam.h.x; fk[7] = npol2[1].y*gcam.h.z + npol2[1].z*gcam.h.y;
-	fk[2] = npol2[2].z; fk[5] = npol2[2].x*gcam.h.z + npol2[2].z*gcam.h.x; fk[8] = npol2[2].y*gcam.h.z + npol2[2].z*gcam.h.y;
+	fk[0] = npol2[0].z; fk[3] = npol2[0].x*usedcam.h.z + npol2[0].z*usedcam.h.x; fk[6] = npol2[0].y*usedcam.h.z + npol2[0].z*usedcam.h.y;
+	fk[1] = npol2[1].z; fk[4] = npol2[1].x*usedcam.h.z + npol2[1].z*usedcam.h.x; fk[7] = npol2[1].y*usedcam.h.z + npol2[1].z*usedcam.h.y;
+	fk[2] = npol2[2].z; fk[5] = npol2[2].x*usedcam.h.z + npol2[2].z*usedcam.h.x; fk[8] = npol2[2].y*usedcam.h.z + npol2[2].z*usedcam.h.y;
 	fk[12] = fk[4]*fk[8] - fk[5]*fk[7];
 	fk[13] = fk[5]*fk[6] - fk[3]*fk[8];
 	fk[14] = fk[3]*fk[7] - fk[4]*fk[6];
@@ -1135,13 +1132,14 @@ static void gentransform_wall (kgln_t *npol2, surf_t *sur, bunchgrp *b)
 
 	g = rdet;
 
-								b->gouvmat[0] *= g; b->gouvmat[3] *= g; b->gouvmat[6] *= g; g *= rdet*65536.0;
-	f = (float)64*g;
-	f = (float)64*g;
+	b->gouvmat[0] *= g;
+	b->gouvmat[3] *= g;
+	b->gouvmat[6] *= g;
 
 	if (renderinterp)
 	{
 		// idx 0 3 6 store plane eq?
+
 	//	b->gouvmat[1] -= b->gouvmat[0]*32768.0; b->gouvmat[2] -= b->gouvmat[0]*32768.0;
 	//	b->gouvmat[4] -= b->gouvmat[3]*32768.0; b->gouvmat[5] -= b->gouvmat[3]*32768.0;
 	//	b->gouvmat[7] -= b->gouvmat[6]*32768.0; b->gouvmat[8] -= b->gouvmat[6]*32768.0;
@@ -1256,7 +1254,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		gtpic = &gtile[sur->tilnum];
 		//if (!gtpic->tt.f) loadpic(gtpic);
 		if (sec[s].surf[isflor].flags & (1 << 17)) { b->gflags = 2; } //skybox ceil/flor
-		gentransform_ceilflor(&sec[s], wal, sur, isflor, b);
+		gentransform_ceilflor(&sec[s], wal, isflor, b);
 		b->gligwall = isflor - 2;
 
 		int myport = sec[s].tags[1];

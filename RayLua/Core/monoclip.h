@@ -84,7 +84,7 @@ typedef struct {
 	int portal_clip[2];  // Current portal clipping region
 	bool has_portal_clip; // Whether portal clipping is active
 	int recursion_depth;
-	float gouvmat[9];
+	float gouvmat[9]; // 0 3 6 - store plane equation to convert back from mp.
 	int gligsect, gligwall, gligslab, gflags;
 	int gnewtag, needsecscan, gnewtagsect;
 	point3d gnorm;
