@@ -235,81 +235,51 @@ static int prepbunch(int id, bunchverts_t *twal, bunchgrp *b) {
 #define BUNCHNEAR 1e-7
 static void scansector(int sectnum, bunchgrp *b)
 {
-    cam_t *gcam = &b->cam;
-    sect_t *sec;
-    wall_t *wal;
-    double f, dx0, dy0, dx1, dy1, f0, f1;
-    int i, j, k, ie, obunchn;
+	cam_t *gcam = &b->cam;
+	sect_t *sec;
+	wall_t *wal;
+	double dx0, dy0, dx1, dy1;
+	int i, j, k, ie, obunchn;
 
-    if (sectnum < 0) return;
-    b->sectgot[sectnum >> 5] |= (1 << sectnum);
+	if (sectnum < 0) return;
+	b->sectgot[sectnum >> 5] |= (1 << sectnum);
 
-    sec = &curMap->sect[sectnum];
-    wal = sec->wall;
+	sec = &curMap->sect[sectnum];
+	wal = sec->wall;
 
-    // Use camera forward XY components for near-plane test
-    // (walls are vertical, so only XY matters for front/back test)
-    double fwdx = gcam->f.x;
-    double fwdy = gcam->f.y;
-    double fwdlen = sqrt(fwdx * fwdx + fwdy * fwdy);
-    if (fwdlen > 1e-10) {
-        fwdx /= fwdlen;
-        fwdy /= fwdlen;
-    } else {
-        // Camera looking straight up/down - use right vector perpendicular
-        fwdx = gcam->r.y;
-        fwdy = -gcam->r.x;
-    }
+	obunchn = b->bunchn;
+	for (i = 0, ie = sec->n; i < ie; i++) {
+		j = wal[i].n + i;
+		dx0 = wal[i].x - gcam->p.x;
+		dy0 = wal[i].y - gcam->p.y;
+		dx1 = wal[j].x - gcam->p.x;
+		dy1 = wal[j].y - gcam->p.y;
 
-    obunchn = b->bunchn;
-    for (i = 0, ie = sec->n; i < ie; i++) {
-        j = wal[i].n + i;
-        dx0 = wal[i].x - gcam->p.x;
-        dy0 = wal[i].y - gcam->p.y;
-        dx1 = wal[j].x - gcam->p.x;
-        dy1 = wal[j].y - gcam->p.y;
+		// Back-face cull only (XY cross product - which side of wall is camera)
+		// This is still valid for vertical walls regardless of camera pitch/roll
+		if (dy1 * dx0 <= dx1 * dy0) goto docont;
 
-        // Back-face cull (unchanged - this is correct)
-        if (dy1 * dx0 <= dx1 * dy0) goto docont;
-
-        // Near plane clip using camera forward direction
-        f0 = dx0 * fwdx + dy0 * fwdy;
-        f1 = dx1 * fwdx + dy1 * fwdy;
-
-        if (f0 <= BUNCHNEAR) {
-            if (f1 <= BUNCHNEAR) goto docont;
-            f0 = (BUNCHNEAR - f0) / (f1 - f0);
-            f1 = 1.0;
-            if (f0 >= f1) goto docont;
-        } else if (f1 <= BUNCHNEAR) {
-            f1 = (BUNCHNEAR - f0) / (f1 - f0);
-            f0 = 0.0;
-            if (f0 >= f1) goto docont;
-        } else {
-            f0 = 0.0;
-            f1 = 1.0;
-        }
-
-        // Add to bunch list (unchanged)
-        k = b->bunch[b->bunchn - 1].wal1;
-        if ((b->bunchn > obunchn) && (wal[k].n + k == i) && (b->bunch[b->bunchn - 1].fra1 == 1.0)) {
-            b->bunch[b->bunchn - 1].wal1 = i;
-            b->bunch[b->bunchn - 1].fra1 = f1;
-        } else {
-            if (b->bunchn >= b->bunchmal) {
-                b->bunchmal <<= 1;
-                b->bunch = (bunch_t *)realloc(b->bunch, b->bunchmal * sizeof(b->bunch[0]));
-            }
-            b->bunch[b->bunchn].wal0 = i;
-            b->bunch[b->bunchn].fra0 = f0;
-            b->bunch[b->bunchn].wal1 = i;
-            b->bunch[b->bunchn].fra1 = f1;
-            b->bunch[b->bunchn].sec = sectnum;
-            b->bunchn++;
-        }
-    docont:;
-        if (j < i) obunchn = b->bunchn;
-    }
+		// Add FULL wall to bunch - no near-plane clipping here
+		// 3D near-plane clipping happens later in drawpol_befclip
+		k = b->bunch[b->bunchn - 1].wal1;
+		if ((b->bunchn > obunchn) && (wal[k].n + k == i) && (b->bunch[b->bunchn - 1].fra1 == 1.0)) {
+			b->bunch[b->bunchn - 1].wal1 = i;
+			b->bunch[b->bunchn - 1].fra1 = 1.0;
+		} else {
+			if (b->bunchn >= b->bunchmal) {
+				b->bunchmal <<= 1;
+				b->bunch = (bunch_t *)realloc(b->bunch, b->bunchmal * sizeof(b->bunch[0]));
+			}
+			b->bunch[b->bunchn].wal0 = i;
+			b->bunch[b->bunchn].fra0 = 0.0;
+			b->bunch[b->bunchn].wal1 = i;
+			b->bunch[b->bunchn].fra1 = 1.0;
+			b->bunch[b->bunchn].sec = sectnum;
+			b->bunchn++;
+		}
+		docont:;
+		if (j < i) obunchn = b->bunchn;
+	}
 }
 
 static void xformbac(double rx, double ry, double rz, dpoint3d *o, bunchgrp *b)
