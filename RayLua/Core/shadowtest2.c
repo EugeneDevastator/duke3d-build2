@@ -1180,9 +1180,14 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		     // Back-face culling: skip if camera is on wrong side of surface
 			// need to get original slope, as if camera was in origin.
 	//if (!b->has_portal_clip)
-		float surfpos = getslopez(&sec[s],isflor,b->cam.p.x,b->cam.p.y);
-		if ((b->cam.p.z >= surfpos) == isflor) // ignore backfaces
-				continue;
+		bool skipport = (b->has_portal_clip
+				&& s == b->testignoresec
+				&& isflor == b->testignorewall);
+
+		// Back-face cull, but NOT for exit portal surface (we need to draw it solid)
+		float surfpos = getslopez(&sec[s], isflor, b->cam.p.x, b->cam.p.y);
+		if (!skipport && (b->cam.p.z >= surfpos) == isflor)
+			continue;
 		gentransform_ceilflor(&sec[s], wal, isflor, b);
 
 		// Setup surface properties (height, gradient, color)
@@ -1249,9 +1254,6 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		int myport = sec[s].tags[1];
 		if (myport>=0)
 			int asd=1;
-		bool skipport= (b->has_portal_clip
-			&& s==b->testignoresec
-			&& isflor == b->testignorewall);
 
 		bool isportal = myport>=0 && portals[myport].destpn >=0 && portals[myport].surfid == isflor;
 		if (isportal && !noportals && !skipport) {
@@ -1584,13 +1586,14 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 	}
 
 	for(halfplane=0;halfplane<2;halfplane++) {
-		logstep("HALFPLANE change: %d, depth: %d",halfplane,b->recursion_depth);
+
 
 		if (!b->has_portal_clip)
 			b->currenthalfplane = halfplane;
 		else {
 			halfplane = b->currenthalfplane;
 		}
+		logstep("HALFPLANE change: %d, depth: %d",halfplane,b->recursion_depth);
 
 		if (shadowtest2_rendmode == 4)
 		{
