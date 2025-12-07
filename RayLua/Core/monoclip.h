@@ -86,12 +86,13 @@ typedef struct {
 	int recursion_depth;
 	float gouvmat[9]; // 0 3 6 - store plane equation to convert back from mp.
 	int gligsect, gligwall, gligslab, gflags;
-	int gnewtag, needsecscan, gnewtagsect;
+	int gnewtag, needsecscan, gnewsec, scaninc;
 	point3d gnorm;
 	int testignorewall;
 	int testignoresec;
 	int currenthalfplane;
 	int planecuts;
+	int prevsec,newsec;
 
 	cam_transform_t ct;     // NEW: clean transform for current camera
 	cam_transform_t ct_or;  // NEW: clean transform for original camera (for eyepol output)
