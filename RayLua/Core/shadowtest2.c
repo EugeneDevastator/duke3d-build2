@@ -1328,9 +1328,14 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 				wccw_transform(&trap1[i],&b->ct,&b->ct_or);
 				wccw_transform(&trap2[i],&b->ct,&b->ct_or);
 			}
-			wccw_transform(&pol[1],&b->ct,&b->ct_or);
-			wccw_transform(&pol[0],&b->ct,&b->ct_or);
-			if (!intersect_traps_mono_points(pol[0], pol[1], trap1, trap2, &plothead[0], &plothead[1]))
+
+			// Use copies to preserve original pol[] for subsequent loop iterations
+			dpoint3d pol0_xf = pol[0];
+			dpoint3d pol1_xf = pol[1];
+			wccw_transform(&pol1_xf, &b->ct, &b->ct_or);
+			wccw_transform(&pol0_xf, &b->ct, &b->ct_or);
+
+			if (!intersect_traps_mono_points(pol0_xf, pol1_xf, trap1, trap2, &plothead[0], &plothead[1]))
 				continue;
 
 			// Render wall segment if visible
