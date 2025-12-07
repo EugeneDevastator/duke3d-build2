@@ -1127,7 +1127,7 @@ static void portal_xform_world_full(double *x, double *y, double *z, bunchgrp *b
 
 static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 {
-	int portal_draw = 3;
+	int portal_draw = 3|8;
 	// === VARIABLE DECLARATIONS ===
 	//extern void loadpic (tile_t *);
 	#define MAXVERTS 256 //FIX:timebomb: assumes there are never > 256 sectors connected at same vertex
@@ -1385,19 +1385,21 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 				// Only SUB, not AND
 				int drawflags = 2; // 2 is sub;
 				int ci = taginc*b->recursion_depth;
-				//drawpol_befclip(s, portals[endpn].sect+taginc, portals[endpn].sect, plothead[0],plothead[1], 3|8, b);
 				drawpol_befclip(s+ci,portals[endpn].sect+ci+taginc, s,portals[endpn].sect ,plothead[0],plothead[1],   portal_draw, b);
 				//drawpol_befclip(s, -1, -1, -1,plothead[0],plothead[1],  drawflags, b);
 
 				draw_hsr_enter_portal(map, myport, b, plothead[0], plothead[1]);
 			} else {
 				if (ns >= 0)
-				logstep("drawing nextsecw - sec-wall:%d-%d, ns:%d  sec:%d, cur depth:%d, curhalf:%d",s, w, wal->ns, b->recursion_depth, b->currenthalfplane);
+					logstep("drawing nextsecw - sec-wall:%d-%d, ns:%d  sec:%d, cur depth:%d, curhalf:%d",
+							s, w, ns, s, b->recursion_depth, b->currenthalfplane);
 				else
-				logstep("drawing solid - sec-wall:%d-%d, ns:%d  sec:%d, cur depth:%d, curhalf:%d",s, w, wal->ns, b->recursion_depth, b->currenthalfplane);
-				// could be 7 or 3, .111 or .011
-int inc = taginc*b->recursion_depth;
-				drawpol_befclip(s+inc,ns+inc ,s, ns, plothead[0], plothead[1], ((m > vn) << 2) + 3, b);
+					logstep("drawing solid - sec-wall:%d-%d, ns:%d  sec:%d, cur depth:%d, curhalf:%d",
+							s, w, ns, s, b->recursion_depth, b->currenthalfplane);
+
+				int inc = taginc * b->recursion_depth;
+				int newtag = (ns >= 0) ? (ns + inc) : -1;  // FIX: preserve -1 for solid walls
+				drawpol_befclip(s + inc, newtag, s, ns, plothead[0], plothead[1], ((m > vn) << 2) + 3, b);
 			}
 		}
 
