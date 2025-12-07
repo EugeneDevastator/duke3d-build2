@@ -61,7 +61,7 @@ typedef struct {
 	double x, y;                        // Clipped coordinates
 } bunchverts_t;
 
-#define MAX_PORTAL_DEPTH 0
+#define MAX_PORTAL_DEPTH 1
 #define MAX_PORTAL_VERTS 32
 
 

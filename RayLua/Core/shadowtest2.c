@@ -21,8 +21,9 @@ int compact2d = 0;
 bool captureframe = false;
 transform lastcamtr = {};
 transform lastcamtr2 = {};
+cam_transform_t camm_tr = {};
+cam_transform_t orcamm_tr = {};
 /*
-
 Monopoly uses xy as screen coords and z as depth
 Engine uses z as right, y as forward, z as down
 Portals: we move camera to supposed place instead of transforming entire world.
@@ -51,7 +52,7 @@ static void cam_transform_init(cam_transform_t *ct, cam_t *cam) {
 	ct->h = cam->h;
 }
 
-// World point to camera space
+// World point to camera space. Valid.
 static void world_to_cam(double wx, double wy, double wz,
 						 cam_transform_t *ct,
 						 double *cx, double *cy, double *cz) {
@@ -62,8 +63,8 @@ static void world_to_cam(double wx, double wy, double wz,
 	*cy = dx*ct->m[3] + dy*ct->m[4] + dz*ct->m[5];  // down
 	*cz = dx*ct->m[6] + dy*ct->m[7] + dz*ct->m[8];  // forward (depth)
 }
-
-static void wccw_transform(dpoint3d *pinout, cam_transform_t *ctin, cam_transform_t *ctout) {
+// Validated - works correctly.
+void wccw_transform(dpoint3d *pinout, cam_transform_t *ctin, cam_transform_t *ctout) {
 	double dx = pinout->x - ctin->p.x;
 	double dy = pinout->y - ctin->p.y;
 	double dz = pinout->z - ctin->p.z;
@@ -126,7 +127,7 @@ static void screen_to_cam(double sx, double sy, double depth,
 	*cy = (sy - ct->h.y) * depth / ct->h.z;
 }
 
-// Camera space to world space
+// Camera space to world space. Valid.
 static void cam_to_world(double cx, double cy, double cz,
 						 cam_transform_t *ct,
 						 double *wx, double *wy, double *wz) {
@@ -1062,47 +1063,19 @@ static void gentex_xform (float *ouvmat, bunchgrp *b)
 	}
 }
 
-static void gentransform_sky (surf_t *sur, bunchgrp *b)
-{
-	cam_t gcam = b->cam;
-	float f, g, h;
-	int i;
-
-	if (b->gflags >= 2) return; //if texture is skybox, return early
-
-		//Crappy paper sky :/
-	h = 65536;
-	f = atan2(gcam.f.y,gcam.f.x)         *-h/PI*2.f;
-	g = asin(min(max(gcam.f.z,-1.f),1.f))*-h/PI*2.f;
-	b->gouvmat[0] = sur->uv[0].x*h + f; b->gouvmat[3] = sur->uv[1].x*h; b->gouvmat[6] = sur->uv[2].x*h;
-	b->gouvmat[1] = sur->uv[0].y*h + g; b->gouvmat[4] = sur->uv[1].y*h; b->gouvmat[7] = sur->uv[2].y*h;
-	b->gouvmat[2] =              h    ; b->gouvmat[5] =            0.f; b->gouvmat[8] =            0.f;
-	gentex_xform(b->gouvmat,b);
-}
 static void gentransform_ceilflor (sect_t *sec, wall_t *wal, surf_t *sur, int isflor, bunchgrp *b)
 {
 	cam_t gcam = b->cam;
 	float f, g, fz, ax, ay, wx, wy, ox, oy, oz, fk[6];
 	int i;
 
-	if (!(sur->flags&4)) //Not relative alignment
-	{
-			//(sur->uv[1].x)*x + (sur->uv[2].x)*y = (u-sur->uv[0].x)
-			//(sur->uv[1].y)*x + (sur->uv[2].y)*y = (v-sur->uv[0].y)
-		fk[0] = sur->uv[1].x; fk[2] = sur->uv[2].x;
-		fk[1] = sur->uv[1].y; fk[3] = sur->uv[2].y;
-		fz = 1.0; ax = -sur->uv[0].x; ay = -sur->uv[0].y;
-	}
-	else //Relative alignment
-	{
-		wx = wal[wal[0].n].x-wal[0].x;
-		wy = wal[wal[0].n].y-wal[0].y;
-		fk[0] = sur->uv[1].x*wx - sur->uv[2].x*wy; fk[2] = sur->uv[1].x*wy + sur->uv[2].x*wx;
-		fk[1] = sur->uv[1].y*wx - sur->uv[2].y*wy; fk[3] = sur->uv[1].y*wy + sur->uv[2].y*wx;
-		fz = sqrt(wx*wx + wy*wy);
-		ax = (wx*wal[0].x + wy*wal[0].y)*sur->uv[1].x + (wx*wal[0].y - wy*wal[0].x)*sur->uv[2].x - sur->uv[0].x*fz;
-		ay = (wx*wal[0].x + wy*wal[0].y)*sur->uv[1].y + (wx*wal[0].y - wy*wal[0].x)*sur->uv[2].y - sur->uv[0].y*fz;
-	}
+	wx = wal[wal[0].n].x-wal[0].x;
+	wy = wal[wal[0].n].y-wal[0].y;
+	fk[0] = sur->uv[1].x*wx - sur->uv[2].x*wy; fk[2] = sur->uv[1].x*wy + sur->uv[2].x*wx;
+	fk[1] = sur->uv[1].y*wx - sur->uv[2].y*wy; fk[3] = sur->uv[1].y*wy + sur->uv[2].y*wx;
+	fz = sqrt(wx*wx + wy*wy);
+	ax = (wx*wal[0].x + wy*wal[0].y)*sur->uv[1].x + (wx*wal[0].y - wy*wal[0].x)*sur->uv[2].x - sur->uv[0].x*fz;
+	ay = (wx*wal[0].x + wy*wal[0].y)*sur->uv[1].y + (wx*wal[0].y - wy*wal[0].x)*sur->uv[2].y - sur->uv[0].y*fz;
 
 	f = fk[0]*fk[3] - fk[1]*fk[2]; if (f > 0.f) f = 1.f/f;
 	for(i=6;i>=0;i-=3)
@@ -1142,12 +1115,6 @@ static void gentransform_wall (kgln_t *npol2, surf_t *sur, bunchgrp *b)
 		npol2[i].z = ox*gcam.f.x + oy*gcam.f.y + oz*gcam.f.z;
 	}
 
-		//sx = npol2[i].x*gcam.h.z/npol2[i].z+gcam.h.x
-		//sy = npol2[i].y*gcam.h.z/npol2[i].z+gcam.h.y
-		//npol2[i].u = (b->gouvmat[1]*sx + b->gouvmat[4]*sy + b->gouvmat[7])/(b->gouvmat[0]*sx + b->gouvmat[3]*sy + b->gouvmat[6])
-		//npol2[i].v = (b->gouvmat[2]*sx + b->gouvmat[5]*sy + b->gouvmat[8])/(b->gouvmat[0]*sx + b->gouvmat[3]*sy + b->gouvmat[6])
-		//npol2[i].z =                                            1/(b->gouvmat[0]*sx + b->gouvmat[3]*sy + b->gouvmat[6])
-		//   Solve ^ for b->gouvmat[*]
 	fk[0] = npol2[0].z; fk[3] = npol2[0].x*gcam.h.z + npol2[0].z*gcam.h.x; fk[6] = npol2[0].y*gcam.h.z + npol2[0].z*gcam.h.y;
 	fk[1] = npol2[1].z; fk[4] = npol2[1].x*gcam.h.z + npol2[1].z*gcam.h.x; fk[7] = npol2[1].y*gcam.h.z + npol2[1].z*gcam.h.y;
 	fk[2] = npol2[2].z; fk[5] = npol2[2].x*gcam.h.z + npol2[2].z*gcam.h.x; fk[8] = npol2[2].y*gcam.h.z + npol2[2].z*gcam.h.y;
@@ -1184,20 +1151,18 @@ static void gentransform_wall (kgln_t *npol2, surf_t *sur, bunchgrp *b)
 
 	rdet = 1.0/(fk[0]*fk[12] + fk[1]*fk[13] + fk[2]*fk[14]);
 
-#if (USEINTZ)
-	g = gcam.h.z*rdet/(1048576.0*256.0);
-#else
 	g = rdet;
-#endif
-													 b->gouvmat[0] *= g; b->gouvmat[3] *= g; b->gouvmat[6] *= g; g *= rdet*65536.0;
+
+								b->gouvmat[0] *= g; b->gouvmat[3] *= g; b->gouvmat[6] *= g; g *= rdet*65536.0;
 	f = (float)64*g;            b->gouvmat[1] *= f; b->gouvmat[4] *= f; b->gouvmat[7] *= f;
 	f = (float)64*g;            b->gouvmat[2] *= f; b->gouvmat[5] *= f; b->gouvmat[8] *= f;
 
 	if (renderinterp)
 	{
-		b->gouvmat[1] -= b->gouvmat[0]*32768.0; b->gouvmat[2] -= b->gouvmat[0]*32768.0;
-		b->gouvmat[4] -= b->gouvmat[3]*32768.0; b->gouvmat[5] -= b->gouvmat[3]*32768.0;
-		b->gouvmat[7] -= b->gouvmat[6]*32768.0; b->gouvmat[8] -= b->gouvmat[6]*32768.0;
+		// idx 0 3 6 store plane eq?
+	//	b->gouvmat[1] -= b->gouvmat[0]*32768.0; b->gouvmat[2] -= b->gouvmat[0]*32768.0;
+	//	b->gouvmat[4] -= b->gouvmat[3]*32768.0; b->gouvmat[5] -= b->gouvmat[3]*32768.0;
+	//	b->gouvmat[7] -= b->gouvmat[6]*32768.0; b->gouvmat[8] -= b->gouvmat[6]*32768.0;
 	}
 }
 
@@ -1309,14 +1274,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		gtpic = &gtile[sur->tilnum];
 		//if (!gtpic->tt.f) loadpic(gtpic);
 		if (sec[s].surf[isflor].flags & (1 << 17)) { b->gflags = 2; } //skybox ceil/flor
-		else if (sec[s].surf[isflor].flags & (1 << 16)) {  //parallaxing ceil/flor
-			b->gflags = 1;
-			gentransform_sky(sur, b);
-		}
-		else {
-			b->gflags = 0;
-			gentransform_ceilflor(&sec[s], wal, sur, isflor, b);
-		}
+		gentransform_ceilflor(&sec[s], wal, sur, isflor, b);
 		b->gligwall = isflor - 2;
 
 		int myport = sec[s].tags[1];
@@ -1403,13 +1361,14 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 			if ((!(m & 1)) || (wal[w].surf.flags & (1 << 5))) //Draw wall here //(1<<5): 1-way
 			{
 				//	gtpic = &gtile[sur->tilnum]; if (!gtpic->tt.f) loadpic(gtpic);
-				if (sur->flags & (1 << 17))
-				{ b->gflags = 2; } //skybox ceil/flor
-				else if (sur->flags & (1 << 16)) {
-					b->gflags = 1;
-					gentransform_sky(sur, b);
-				} //parallaxing ceil/flor
-				else {
+				//if (sur->flags & (1 << 17))
+				//{ b->gflags = 2; } //skybox ceil/flor
+				//else if (sur->flags & (1 << 16)) {
+				//	b->gflags = 1;
+				//	gentransform_sky(sur, b);
+				//} //parallaxing ceil/flor
+				//else
+				{
 					// Calculate UV mapping for wall texture
 					npol2[0].x = wal[w].x;
 					npol2[0].y = wal[w].y;
@@ -1519,7 +1478,8 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 	logstep("entered hsr_ctx, halfplane:%d",b->currenthalfplane);
 	cam_transform_init(&b->ct, &b->cam);
 	cam_transform_init(&b->ct_or, &b->orcam);
-
+	camm_tr = b->ct;
+	orcamm_tr = b->ct_or;
 	wall_t *wal;
 	spri_t *spr;
 	dpoint3d dpos, drig, ddow, dfor;
