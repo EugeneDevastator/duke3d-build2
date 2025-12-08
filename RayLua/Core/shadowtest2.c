@@ -10,6 +10,8 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdarg.h>
+
+#include "buildmath.h"
 #define PI 3.14159265358979323
 #pragma warning(disable:4731)
 
@@ -43,71 +45,6 @@ void logstep(const char* fmt, ...) {
 }
 
 
-// World point to camera space. Valid.
-static void world_to_cam(double wx, double wy, double wz,
-						 cam_t *ctin,
-						 double *cx, double *cy, double *cz) {
-	double dx = wx - ctin->p.x;
-	double dy = wy - ctin->p.y;
-	double dz = wz - ctin->p.z;
-
-	*cx = dx * ctin->r. x + dy * ctin->r.y + dz * ctin->r.z;
-	*cy = dx * ctin->d.x + dy * ctin->d.y + dz * ctin->d.z;
-	*cz = dx * ctin->f.x + dy * ctin->f.y + dz * ctin->f.z;
-}
-// Validated - works correctly.
-static void wccw_transform(dpoint3d *pinout, cam_t *ctin, cam_t *ctout) {
-	// World -> camera space (using ctin)
-	double dx = pinout->x - ctin->p.x;
-	double dy = pinout->y - ctin->p.y;
-	double dz = pinout->z - ctin->p.z;
-
-	double cx = dx * ctin->r. x + dy * ctin->r.y + dz * ctin->r.z;
-	double cy = dx * ctin->d.x + dy * ctin->d.y + dz * ctin->d.z;
-	double cz = dx * ctin->f.x + dy * ctin->f.y + dz * ctin->f.z;
-
-	// Camera space -> world (using ctout)
-	pinout->x = cx * ctout->r.x + cy * ctout->d.x + cz * ctout->f.x + ctout->p.x;
-	pinout->y = cx * ctout->r.y + cy * ctout->d.y + cz * ctout->f.y + ctout->p.y;
-	pinout->z = cx * ctout->r.z + cy * ctout->d.z + cz * ctout->f.z + ctout->p.z;
-}
-// Add this helper function near wccw_transform:
-static void wccw_transform_dir(dpoint3d *dir, cam_t *ctin, cam_t *ctout) {
-	// Transform direction vector (no translation)
-	double cx = dir->x * ctin->r.x + dir->y * ctin->r.y + dir->z * ctin->r.z;
-	double cy = dir->x * ctin->d.x + dir->y * ctin->d.y + dir->z * ctin->d.z;
-	double cz = dir->x * ctin->f.x + dir->y * ctin->f.y + dir->z * ctin->f.z;
-
-	dir->x = cx * ctout->r.x + cy * ctout->d.x + cz * ctout->f.x;
-	dir->y = cx * ctout->r.y + cy * ctout->d.y + cz * ctout->f.y;
-	dir->z = cx * ctout->r.z + cy * ctout->d.z + cz * ctout->f.z;
-}
-// Convert point from mp (mono polygon) space to world coordinates
-// mp.x, mp.y are in half-plane rotated space; mp.z is NOT used (depth from gouvmat)
-// REPLACE the existing mp_to_world with this simpler version:
-
-// Convert point from mp (mono polygon) space to world coordinates
-// After drawpol_befclip changes, mp.x/mp.y ARE screen coordinates
-static void mp_to_world(double sx, double sy, bunchgrp *b,
-						double *wx, double *wy, double *wz,
-						cam_t *cam) {
-	double denom = (b->gouvmat[0] * sx + b->gouvmat[3] * sy + b->gouvmat[6]) * cam->h.z;
-
-	if (fabs(denom) < 1e-10) {
-		*wx = cam->p.x;
-		*wy = cam->p.y;
-		*wz = cam->p.z;
-		return;
-	}
-
-	double depth = 1.0 / denom;
-	double dx = sx - cam->h.x;
-	double dy = sy - cam->h.y;
-
-	*wx = (dx * cam->r.x + dy * cam->d.x + cam->h.z * cam->f.x) * depth + cam->p.x;
-	*wy = (dx * cam->r.y + dy * cam->d.y + cam->h.z * cam->f.y) * depth + cam->p.y;
-	*wz = (dx * cam->r.z + dy * cam->d.z + cam->h.z * cam->f.z) * depth + cam->p.z;
-}
 
 //--------------------------------------------------------------------------------------------------
 static tiletype gdd;
@@ -141,31 +78,16 @@ __declspec(align(16)) static float g_qamb[4]; //holder for SSE to avoid degenera
 static point3d slightpos[LIGHTMAX], slightdir[LIGHTMAX];
 static float spotwid[LIGHTMAX];
 
+eyepol_t *eyepol = 0; // 4096 eyepol_t's = 192KB
+point3d *eyepolv = 0; //16384 point2d's  = 128KB
+int eyepoln = 0, glignum = 0;
+int eyepolmal = 0, eyepolvn = 0, eyepolvmal = 0;
+#define LIGHASHSIZ 1024
+static int ligpolmaxvert = 0;
+#define lighash(sect,wall,slab) ((((slab)<<6)+((sect)<<4)+(wall))&(LIGHASHSIZ-1))
 //--------------------------------------------------------------------------------------------------
 extern void htrun (void (*dacallfunc)(int), int v0, int v1, int danumcpu);
 extern double distpoint2line2 (double x, double y, double x0, double y0, double x1, double y1);
-
-	//KPLIB.H (excerpt):
-extern int kzaddstack (const char *);
-
-	//DRAWKV6.H:
-typedef struct
-{
-	float hx[8], hy[8], hz[8], rhzup20[8];
-	short wmin[8], wmax[8];
-	short ighyxyx[4], igyxyx[4]; //32-bit only!
-	intptr_t ddp, ddf, ddx, ddy, zbufoff;
-	point3d p, r, d, f;
-} drawkv6_frame_t;
-drawkv6_frame_t drawkv6_frame;
-
-	//DRAWCONE.H:
-#define DRAWCONE_NOCAP0 1
-#define DRAWCONE_NOCAP1 2
-#define DRAWCONE_FLAT0 4
-#define DRAWCONE_FLAT1 8
-#define DRAWCONE_CENT 16
-//--------------------------------------------------------------------------------------------------
 
 //--------------------------------------------------------------------------------------------------
 inline void memset8(void *d, long v, long n) {
@@ -231,7 +153,6 @@ static int prepbunch(int id, bunchverts_t *twal, bunchgrp *b) {
 	return (n);
 }
 
-
 #define BUNCHNEAR 1e-7
 static void scansector(int sectnum, bunchgrp *b)
 {
@@ -291,10 +212,6 @@ static void xformbac(double rx, double ry, double rz, dpoint3d *o, bunchgrp *b)
 	o->z = rx * cam->r.z + ry * cam->d.z + rz * cam->f.z;
 }
 
-eyepol_t *eyepol = 0; // 4096 eyepol_t's = 192KB
-point3d *eyepolv = 0; //16384 point2d's  = 128KB
-int eyepoln = 0, glignum = 0;
-int eyepolmal = 0, eyepolvn = 0, eyepolvmal = 0;
 
 // In drawtagfunc_ws - fix the chain1_start calculation:
 static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
@@ -362,25 +279,8 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 
 }
 
-/*
-	Purpose: Renders skybox faces as background
-	Generates 6 cube faces for skybox rendering
-	Clips each face against view frustum
-	Projects cube vertices to screen space
-	Calls drawtagfunc for each visible skybox face
-	Uses special texture mapping flags (b->gflags = 10-15 for different cube faces)
-*/
-
 static void skytagfunc (int rethead0, int rethead1, bunchgrp* b){}
-	// lignum: index of light source (shadowtest2_light[] index)
-	//  vert0: index into 1st vertex of ligpolv
-	// b2sect: Build2 sector
-	// b2wall: Build2 wall (-2=ceil,-1=flor,&0x40000000=spri,else wall)
-	// b2slab: Build2 slab number for wall
-	//b2hashn: hash(b2sect,b2wall,b2slab) next index
-#define LIGHASHSIZ 1024
-static int ligpolmaxvert = 0;
-#define lighash(sect,wall,slab) ((((slab)<<6)+((sect)<<4)+(wall))&(LIGHASHSIZ-1))
+
 /*
 	Purpose: Generates shadow polygon lists for lighting
 	Converts screen-space polygons back to 3D world coordinates
@@ -451,7 +351,6 @@ static void ligpoltagfunc(int rethead0, int rethead1, bunchgrp *b)
     glp->ligpoln++;
     glp->ligpol[glp->ligpoln].vert0 = glp->ligpolvn;
 }
-
 
 /*
 	Purpose: Portal traversal and sector visibility
@@ -1303,66 +1202,6 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 
 		memcpy(uptr, b->sectgot, (lgs->numsects + 31) >> 3);
 	}
-}
-
-// 1. Normalize transform (makes vectors unit length and orthogonal)
-static float vlen(point3d *p) {
-    return sqrtf(p->x * p->x + p->y * p->y + p->z * p->z);
-}
-
-static void scalardivv(point3d *pt, float diver) {
-    pt->x /= diver; pt->y /= diver; pt->z /= diver;
-}
-
-void normalize_transform(transform *tr) {
-    // Normalize all axes
-    float flen = vlen(&tr->f);
-    if (flen > 0.0001f) scalardivv(&tr->f, flen);
-
-    flen = vlen(&tr->r);
-    if (flen > 0.0001f) scalardivv(&tr->r, flen);
-
-    flen = vlen(&tr->d);
-    if (flen > 0.0001f) scalardivv(&tr->d, flen);
-}
-static point3d world_to_local_vec(point3d world_vec, transform *tr) {
-	point3d local;
-	local.x = world_vec.x * tr->r.x + world_vec.y * tr->r.y + world_vec.z * tr->r.z;  // right
-	local.y = world_vec.x * tr->f.x + world_vec.y * tr->f.y + world_vec.z * tr->f.z;  // forward
-	local.z = world_vec.x * tr->d.x + world_vec.y * tr->d.y + world_vec.z * tr->d.z;  // down
-
-	return local;
-}
-
-static point3d local_to_world_point(point3d local_pos, transform *tr) {
-	point3d world;
-	world.x = tr->p.x + local_pos.x * tr->r.x + local_pos.y * tr->f.x + local_pos.z * tr->d.x;
-	world.y = tr->p.y + local_pos.x * tr->r.y + local_pos.y * tr->f.y + local_pos.z * tr->d.y;
-	world.z = tr->p.z + local_pos.x * tr->r.z + local_pos.y * tr->f.z + local_pos.z * tr->d.z;
-
-	return world;
-}
-
-static point3d world_to_local_point(point3d world_pos, transform *tr) {
-	float dx = world_pos.x - tr->p.x;
-	float dy = world_pos.y - tr->p.y;
-	float dz = world_pos.z - tr->p.z;
-
-	point3d local;
-	local.x = dx * tr->r.x + dy * tr->r.y + dz * tr->r.z;
-	local.y = dx * tr->f.x + dy * tr->f.y + dz * tr->f.z;
-	local.z = dx * tr->d.x + dy * tr->d.y + dz * tr->d.z;
-
-	return local;
-}
-
-static point3d local_to_world_vec(point3d local_vec, transform *tr) {
-	point3d world;
-	world.x = local_vec.x * tr->r.x + local_vec.y * tr->f.x + local_vec.z * tr->d.x;
-	world.y = local_vec.x * tr->r.y + local_vec.y * tr->f.y + local_vec.z * tr->d.y;
-	world.z = local_vec.x * tr->r.z + local_vec.y * tr->f.z + local_vec.z * tr->d.z;
-
-    return world;
 }
 static void draw_hsr_enter_portal(mapstate_t* map, int myport, bunchgrp *parentctx,
                                    int plothead0, int plothead1)

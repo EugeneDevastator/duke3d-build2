@@ -26,6 +26,7 @@ The forward direction can be visualized as moving away from the camera or viewer
 #include "loaders.h"
 #include "mapcore.h"
 #include "shadowtest2.h"
+#include "buildmath.h"
 }
 
 

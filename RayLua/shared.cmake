@@ -10,6 +10,7 @@ set(C_SOURCES
         Core/monoclip.c
         Core/scenerender.c
         Core/shadowtest2.c
+        Core/buildmath.c
         interfaces/eventstore.c
 )
 set(C_HEADERS
@@ -20,6 +21,7 @@ set(C_HEADERS
         core/physics.h
         Core/monoclip.h
         Core/scenerender.h
+        Core/buildmath.h
         Core/shadowtest2.h
         interfaces/engineapi.h
         interfaces/shared_types.h
