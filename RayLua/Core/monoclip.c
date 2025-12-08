@@ -502,6 +502,7 @@ int mono_join(int hd0, int hd1, int hd2, int hd3, int *ho0, int *ho1) {
             hd[j + 2] = t;
         }
     }
+    //(mp[mp[hd[1]].p].x != mp[hd[3]].x)) return (0); hd[1] is out of bounds sometimes.
     if ((mp[mp[hd[0]].p].x != mp[hd[2]].x) || (mp[mp[hd[1]].p].x != mp[hd[3]].x)) return (0);
     for (j = 2 - 1; j >= 0; j--) {
         iy[j + 0] = mp[hd[j + 0]].p;

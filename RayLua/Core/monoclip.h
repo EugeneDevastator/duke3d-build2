@@ -78,6 +78,7 @@ typedef struct {
 } wall_job_t;
 typedef struct {
 	bool *visited_walls;  // One flag per wall in entire map
+	bool *visited_sectors;
 	wall_job_t *jobs;
 	int jobcount, jobcap;
 	cam_t cam;                    // Camera per recursion level

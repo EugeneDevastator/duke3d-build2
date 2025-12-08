@@ -188,121 +188,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 	eyepol[eyepoln].rdepth = b->recursion_depth;
 
 }
-// In drawtagfunc_ws - fix the chain1_start calculation:
-// Replace the mono_triangulate_strip function with this simpler approach
-static void drawtagfunc_ws_strip(int rethead0, int rethead1, bdrawctx *b)
-{
-    cam_t *usecam = &b->orcam;
 
-    if ((rethead0|rethead1) < 0) {
-        mono_deloop(rethead1);
-        mono_deloop(rethead0);
-        return;
-    }
-
-    point3d *chain1;
-    point3d *chain2;
-    int c1count;
-    int c2count;
-    int has_triangulation = mono_generate_eyepol(rethead0, rethead1, &chain1, &chain2, &c1count, &c2count);
-    int mono_count = c1count + c2count;
-
-    if (!has_triangulation || mono_count < 3) {
-        if (chain1) free(chain1);
-        if (chain2) free(chain2);
-        mono_deloop(rethead1);
-        mono_deloop(rethead0);
-        return;
-    }
-
-    // Allocate space in eyepolv
-    if (eyepolvn + mono_count >= eyepolvmal) {
-        eyepolvmal = max(eyepolvmal << 1, eyepolvn + mono_count + 1024);
-        eyepolv = (point3d *)realloc(eyepolv, eyepolvmal * sizeof(point3d));
-    }
-
-    if (eyepoln + 1 >= eyepolmal) {
-        eyepolmal = max(eyepolmal << 1, 4096);
-        eyepol = (eyepol_t *)realloc(eyepol, eyepolmal * sizeof(eyepol_t));
-        eyepol[0].vert0 = 0;
-    }
-
-    // Transform chains to world coordinates
-    for (int i = 0; i < c1count; i++) {
-        double wx, wy, wz;
-        mp_to_world(chain1[i].x, chain1[i].y, b, &wx, &wy, &wz, usecam);
-        chain1[i].x = (float)wx;
-        chain1[i].y = (float)wy;
-        chain1[i].z = (float)wz;
-    }
-
-    for (int i = 0; i < c2count; i++) {
-        double wx, wy, wz;
-        mp_to_world(chain2[i].x, chain2[i].y, b, &wx, &wy, &wz, usecam);
-        chain2[i].x = (float)wx;
-        chain2[i].y = (float)wy;
-        chain2[i].z = (float)wz;
-    }
-
-    // Create triangle strip from monotone chains
-    // Assume chain1[0] and chain2[c2count-1] are the same vertex (top)
-    // chain1 goes left-to-right, chain2 goes right-to-left
-
-    int strip_idx = eyepolvn;
-    int i1 = 0, i2 = c2count - 1;
-
-    // Start with top vertex
-
-    eyepolv[strip_idx++] = chain1[0];
-    i1++;
-	printf ("\n\n Tri strip debug:\n");
-    // Alternate between chains based on x-coordinate to maintain strip order
-    while (i1 < c1count && i2 >= 0) {
-        if (i1 < c1count && (i2 < 0 || chain1[i1].x <= chain2[i2].x)) {
-        	printf("c1(%.2f,%.2f) ", chain1[i1].x, chain1[i1].z);
-        	eyepolv[strip_idx++] = chain1[i1++];
-
-        } else {
-        	printf("c2(%.2f,%.2f) ", chain2[i2].x, chain1[i2].z);
-            eyepolv[strip_idx++] = chain2[i2--];
-        }
-    }
-	printf ("tri strip remainder\n");
-    // Add remaining vertices
-    while (i1 < c1count) {
-		printf("c1(%.2f,%.2f) ", chain1[i1].x, chain1[i1].z);
-        eyepolv[strip_idx++] = chain1[i1++];
-    }
-    while (i2 >= 0) {
-    	printf("c2(%.2f,%.2f) ", chain2[i2].x, chain1[i2].z);
-        eyepolv[strip_idx++] = chain2[i2--];
-    }
-
-    // Set up eyepol entry
-    eyepol[eyepoln].tri_strip.indices = NULL;
-    eyepol[eyepoln].tri_strip.count = strip_idx - eyepolvn;
-    eyepol[eyepoln].tri_strip.capacity = 0;
-    eyepol[eyepoln].has_triangulation = true;
-
-    memcpy((void *)eyepol[eyepoln].ouvmat, (void *)b->gouvmat, sizeof(b->gouvmat[0])*9);
-    eyepol[eyepoln].tpic = gtpic;
-    eyepol[eyepoln].curcol = gcurcol;
-    eyepol[eyepoln].flags = (b->gflags != 0);
-    eyepol[eyepoln].b2sect = b->gligsect;
-    eyepol[eyepoln].b2wall = b->gligwall;
-    eyepol[eyepoln].b2slab = b->gligslab;
-    memcpy((void *)&eyepol[eyepoln].norm, (void *)&b->gnorm, sizeof(b->gnorm));
-
-    eyepolvn = strip_idx;
-    eyepoln++;
-    eyepol[eyepoln].vert0 = eyepolvn;
-    eyepol[eyepoln].rdepth = b->recursion_depth;
-
-    free(chain1);
-    free(chain2);
-    mono_deloop(rethead1);
-    mono_deloop(rethead0);
-}
 
 static void skytagfunc (int rethead0, int rethead1, bdrawctx* b){}
 
@@ -390,9 +276,6 @@ static void ligpoltagfunc(int rethead0, int rethead1, bdrawctx *b)
 static void changetagfunc (int rethead0, int rethead1, bdrawctx *b)
 {
 	if ((rethead0|rethead1) < 0) return;
-	int mapsect = b->gnewsec;
-	if ((b->needsecscan)
-		&& (!(b->sectgot[mapsect>>5]&(1<<mapsect))))
 
 	mono_mph_check(mphnum);
 	mph[mphnum].head[0] = rethead0;
@@ -1035,29 +918,34 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
 
 }
 
-void draw_hsr_ctx (mapstate_t *map, bdrawctx *newctx) {
+void draw_hsr_ctx(mapstate_t *map, bdrawctx *newctx) {
 	if (!newctx) {
 		return;
 		if (captureframe) printf("discarding due to null ctx");
 	}
+	bdrawctx *b;
+	b = newctx;
 	int total_walls = 0;
 	for (int i = 0; i < map->numsects; i++) {
 		total_walls += map->sect[i].n;
 	}
+	b->visited_walls = (bool *) calloc(total_walls, 1);
+	b->visited_sectors = (bool *) calloc(map->numsects, 1); // NEW
+	b->jobcount = 0;
+
 
 	int recursiveDepth = newctx->recursion_depth;
-	bdrawctx *b;
-	b = newctx;
+
 	b->sectgotn = 0;
 	b->sectgot = 0;
 	b->sectgotmal = 0;
-	b->visited_walls = (bool *)calloc(total_walls, 1);
+	b->visited_walls = (bool *) calloc(total_walls, 1);
 	b->jobcount = 0;
 	b->jobcap = 16;
 	//b->curportal=0;
 	cam_t gcam = b->cam;
 	cam_t oricam = b->orcam;
-	logstep("entered hsr_ctx, halfplane:%d",0);
+	logstep("entered hsr_ctx, halfplane:%d", 0);
 	wall_t *wal;
 	spri_t *spr;
 	dpoint3d dpos, drig, ddow, dfor;
@@ -1066,10 +954,9 @@ void draw_hsr_ctx (mapstate_t *map, bdrawctx *newctx) {
 	unsigned int *uptr;
 	int i, j, k, n, s, w, closest, col, didcut, halfplane;
 	int loopsrun = 0;
-	if (shadowtest2_rendmode == 4)
-	{
+	if (shadowtest2_rendmode == 4) {
 		glp = &shadowtest2_light[glignum];
-	//	if ((!(glp->flags&1)) || (!shadowtest2_useshadows)) return;
+		//	if ((!(glp->flags&1)) || (!shadowtest2_useshadows)) return;
 	}
 
 	curMap = map;
@@ -1079,49 +966,60 @@ void draw_hsr_ctx (mapstate_t *map, bdrawctx *newctx) {
 	////if (shadowtest2_rendmode != 4) eyepoln = 0; //Prevents drawpollig() from crashing
 	////	return;
 	//}
-	if (map->numsects > b->sectgotn)
-	{
-		if (b->sectgotmal) free((void *)b->sectgotmal);
-		b->sectgotn = ((map->numsects+127)&~127);
-		b->sectgotmal = (unsigned int *)malloc((b->sectgotn>>3)+16); //NOTE:malloc doesn't guarantee 16-byte alignment!
-		b->sectgot = (unsigned int *)((((intptr_t)b->sectgotmal)+15)&~15);
+	if (map->numsects > b->sectgotn) {
+		if (b->sectgotmal) free((void *) b->sectgotmal);
+		b->sectgotn = ((map->numsects + 127) & ~127);
+		b->sectgotmal = (unsigned int *) malloc((b->sectgotn >> 3) + 16);
+		//NOTE:malloc doesn't guarantee 16-byte alignment!
+		b->sectgot = (unsigned int *) ((((intptr_t) b->sectgotmal) + 15) & ~15);
 	}
-	if ((shadowtest2_rendmode != 4) && (map->numsects > shadowtest2_sectgotn))
-	{
-		if (shadowtest2_sectgotmal) free((void *)shadowtest2_sectgotmal);
-		shadowtest2_sectgotn = ((map->numsects+127)&~127);
-		shadowtest2_sectgotmal = (unsigned int *)malloc((shadowtest2_sectgotn>>3)+16); //NOTE:malloc doesn't guarantee 16-byte alignment!
-		shadowtest2_sectgot = (unsigned int *)((((intptr_t)shadowtest2_sectgotmal)+15)&~15);
+	if ((shadowtest2_rendmode != 4) && (map->numsects > shadowtest2_sectgotn)) {
+		if (shadowtest2_sectgotmal) free((void *) shadowtest2_sectgotmal);
+		shadowtest2_sectgotn = ((map->numsects + 127) & ~127);
+		shadowtest2_sectgotmal = (unsigned int *) malloc((shadowtest2_sectgotn >> 3) + 16);
+		//NOTE:malloc doesn't guarantee 16-byte alignment!
+		shadowtest2_sectgot = (unsigned int *) ((((intptr_t) shadowtest2_sectgotmal) + 15) & ~15);
 	}
 	if (!mphmal)
 		mono_initonce();
 
-	if (shadowtest2_rendmode != 4)
-	{
-			//Horrible hacks for internal build2 global variables
-		dpos.x = 0.0; dpos.y = 0.0; dpos.z = 0.0;
-		drig.x = 1.0; drig.y = 0.0; drig.z = 0.0;
-		ddow.x = 0.0; ddow.y = 1.0; ddow.z = 0.0;
-		dfor.x = 0.0; dfor.y = 0.0; dfor.z = 1.0;
+	if (shadowtest2_rendmode != 4) {
+		//Horrible hacks for internal build2 global variables
+		dpos.x = 0.0;
+		dpos.y = 0.0;
+		dpos.z = 0.0;
+		drig.x = 1.0;
+		drig.y = 0.0;
+		drig.z = 0.0;
+		ddow.x = 0.0;
+		ddow.y = 1.0;
+		ddow.z = 0.0;
+		dfor.x = 0.0;
+		dfor.y = 0.0;
+		dfor.z = 1.0;
 
-		for(i=shadowtest2_numlights-1;i>=0;i--)
-		{
-				//Transform shadowtest2_light to screen space
-			fp.x = shadowtest2_light[i].p.x-gcam.p.x;
-			fp.y = shadowtest2_light[i].p.y-gcam.p.y;
-			fp.z = shadowtest2_light[i].p.z-gcam.p.z;
-			slightpos[i].x = fp.x*gcam.r.x + fp.y*gcam.r.y + fp.z*gcam.r.z;
-			slightpos[i].y = fp.x*gcam.d.x + fp.y*gcam.d.y + fp.z*gcam.d.z;
-			slightpos[i].z = fp.x*gcam.f.x + fp.y*gcam.f.y + fp.z*gcam.f.z;
+		for (i = shadowtest2_numlights - 1; i >= 0; i--) {
+			//Transform shadowtest2_light to screen space
+			fp.x = shadowtest2_light[i].p.x - gcam.p.x;
+			fp.y = shadowtest2_light[i].p.y - gcam.p.y;
+			fp.z = shadowtest2_light[i].p.z - gcam.p.z;
+			slightpos[i].x = fp.x * gcam.r.x + fp.y * gcam.r.y + fp.z * gcam.r.z;
+			slightpos[i].y = fp.x * gcam.d.x + fp.y * gcam.d.y + fp.z * gcam.d.z;
+			slightpos[i].z = fp.x * gcam.f.x + fp.y * gcam.f.y + fp.z * gcam.f.z;
 
 			fp.x = shadowtest2_light[i].f.x;
 			fp.y = shadowtest2_light[i].f.y;
 			fp.z = shadowtest2_light[i].f.z;
-			f = fp.x*fp.x + fp.y*fp.y + fp.z*fp.z;
-			if (f > 0.f) { f = 1.f/sqrt(f); fp.x *= f; fp.y *= f; fp.z *= f; }
-			slightdir[i].x = fp.x*gcam.r.x + fp.y*gcam.r.y + fp.z*gcam.r.z;
-			slightdir[i].y = fp.x*gcam.d.x + fp.y*gcam.d.y + fp.z*gcam.d.z;
-			slightdir[i].z = fp.x*gcam.f.x + fp.y*gcam.f.y + fp.z*gcam.f.z;
+			f = fp.x * fp.x + fp.y * fp.y + fp.z * fp.z;
+			if (f > 0.f) {
+				f = 1.f / sqrt(f);
+				fp.x *= f;
+				fp.y *= f;
+				fp.z *= f;
+			}
+			slightdir[i].x = fp.x * gcam.r.x + fp.y * gcam.r.y + fp.z * gcam.r.z;
+			slightdir[i].y = fp.x * gcam.d.x + fp.y * gcam.d.y + fp.z * gcam.d.z;
+			slightdir[i].z = fp.x * gcam.f.x + fp.y * gcam.f.y + fp.z * gcam.f.z;
 
 			spotwid[i] = shadowtest2_light[i].spotwid;
 		}
@@ -1130,33 +1028,30 @@ void draw_hsr_ctx (mapstate_t *map, bdrawctx *newctx) {
 #else
 		f = 3072.f;
 #endif
-		g_qamb[0] = shadowtest2_ambrgb[0]*f;
-		g_qamb[1] = shadowtest2_ambrgb[1]*f;
-		g_qamb[2] = shadowtest2_ambrgb[2]*f;
+		g_qamb[0] = shadowtest2_ambrgb[0] * f;
+		g_qamb[1] = shadowtest2_ambrgb[1] * f;
+		g_qamb[2] = shadowtest2_ambrgb[2] * f;
 		g_qamb[3] = 0.f;
 		//eyepoln = 0; eyepolvn = 0;
-	}
-	else
-	{
-		if (map->numsects > glp->sectgotn)
-		{
-			if (glp->sectgotmal) free((void *)glp->sectgotmal);
-			glp->sectgotn = ((map->numsects+127)&~127);
-			glp->sectgotmal = (unsigned int *)malloc((glp->sectgotn>>3)+16); //NOTE:malloc doesn't guarantee 16-byte alignment!
-			glp->sectgot = (unsigned int *)((((intptr_t)glp->sectgotmal)+15)&~15);
+	} else {
+		if (map->numsects > glp->sectgotn) {
+			if (glp->sectgotmal) free((void *) glp->sectgotmal);
+			glp->sectgotn = ((map->numsects + 127) & ~127);
+			glp->sectgotmal = (unsigned int *) malloc((glp->sectgotn >> 3) + 16);
+			//NOTE:malloc doesn't guarantee 16-byte alignment!
+			glp->sectgot = (unsigned int *) ((((intptr_t) glp->sectgotmal) + 15) & ~15);
 		}
-		if (glp->lighasheadn <= 0)
-		{
+		if (glp->lighasheadn <= 0) {
 			glp->lighasheadn = LIGHASHSIZ;
-			glp->lighashead = (int *)realloc(glp->lighashead,glp->lighasheadn*sizeof(glp->lighashead[0]));
-			memset(glp->lighashead,-1,glp->lighasheadn*sizeof(glp->lighashead[0]));
+			glp->lighashead = (int *) realloc(glp->lighashead, glp->lighasheadn * sizeof(glp->lighashead[0]));
+			memset(glp->lighashead, -1, glp->lighasheadn * sizeof(glp->lighashead[0]));
 		}
 	}
 
-{
-    int halfplane = 0;
+	{
+		int halfplane = 0;
 
-    logstep("HALFPLANE removed - single pass, depth: %d", b->recursion_depth);
+		logstep("HALFPLANE removed - single pass, depth: %d", b->recursion_depth);
 
 		if (shadowtest2_rendmode == 4) {
 			// gcam.r.x = 1; gcam.d.x = 0; gcam.f.x = 0;
@@ -1172,16 +1067,17 @@ void draw_hsr_ctx (mapstate_t *map, bdrawctx *newctx) {
 		}
 		// In draw_hsr_ctx, replace the viewport setup:
 		else if (!b->has_portal_clip) {
-			    double far_dist = 1e6;
-    cam_t *cam = &b->orcam;
+			double far_dist = 1e6;
+			cam_t *cam = &b->orcam;
 
-    // Frustum corners in world space
-			float mc = 900; far_dist = 900;
-    xformbac(-mc, -mc, far_dist, &bord2[0], b);
-    xformbac(+mc, -mc, far_dist, &bord2[1], b);
-    xformbac(+mc, +mc, far_dist, &bord2[2], b);
-    xformbac(-mc, +mc, far_dist, &bord2[3], b);
-    n = 4;
+			// Frustum corners in world space
+			float mc = 900;
+			far_dist = 900;
+			xformbac(-mc, -mc, far_dist, &bord2[0], b);
+			xformbac(+mc, -mc, far_dist, &bord2[1], b);
+			xformbac(+mc, +mc, far_dist, &bord2[2], b);
+			xformbac(-mc, +mc, far_dist, &bord2[3], b);
+			n = 4;
 			// Screen-independent viewport - use huge bounds
 			double huge = 1e7;
 			bord2[0].x = -huge;
@@ -1213,19 +1109,18 @@ void draw_hsr_ctx (mapstate_t *map, bdrawctx *newctx) {
 			memset8(b->sectgot, 0, (map->numsects + 31) >> 3);
 		}
 
-    // Track which sectors have had their floors/ceilings drawn
 		// Track which sectors have had their floors/ceilings drawn
-		unsigned int *sectdrawn = (unsigned int *)_alloca(((map->numsects + 31) >> 3) + 4);
+		// Track which sectors have had their floors/ceilings drawn
+		unsigned int *sectdrawn = (unsigned int *) _alloca(((map->numsects + 31) >> 3) + 4);
 		memset(sectdrawn, 0, (map->numsects + 31) >> 3);
 
 		b->jobcount = 0;
-		b->jobs = malloc(sizeof(wall_job_t)*b->jobcap);
+		b->jobs = malloc(sizeof(wall_job_t) * b->jobcap);
 		add_sector_walls(b->cam.cursect, b);
 		qsort(b->jobs, b->jobcount, sizeof(wall_job_t), wall_dist_cmp);
 
-		// Group walls by sector for efficient getwalls_imp batching
 		int current_sec = -1;
-		int sec_walls[256];  // Temp array for walls in current sector
+		int sec_walls[256];
 		int sec_wall_count = 0;
 
 		for (int i = 0; i < b->jobcount; i++) {
@@ -1234,6 +1129,7 @@ void draw_hsr_ctx (mapstate_t *map, bdrawctx *newctx) {
 			if (job->sec != current_sec) {
 				if (sec_wall_count > 0) {
 					drawalls(map, current_sec, sec_walls, sec_wall_count, b);
+					b->visited_sectors[current_sec] = true; // NEW: Mark sector
 					sec_wall_count = 0;
 				}
 				current_sec = job->sec;
@@ -1241,7 +1137,6 @@ void draw_hsr_ctx (mapstate_t *map, bdrawctx *newctx) {
 
 			sec_walls[sec_wall_count++] = job->wall;
 
-			// FIX: Use .ns field, not tags[0]
 			int ns = map->sect[job->sec].wall[job->wall].ns;
 			if (ns >= 0 && ns != job->sec) {
 				add_sector_walls(ns, b);
@@ -1249,35 +1144,20 @@ void draw_hsr_ctx (mapstate_t *map, bdrawctx *newctx) {
 			}
 		}
 
-		// Flush last batch
 		if (sec_wall_count > 0) {
 			drawalls(map, current_sec, sec_walls, sec_wall_count, b);
+			b->visited_sectors[current_sec] = true; // NEW: Mark last sector
 		}
 
-		// Draw surfaces
+		// Draw floors/ceilings for all visited sectors
 		for (int i = 0; i < map->numsects; i++) {
-			if (!(b->sectgot[i >> 5] & (1 << i))) continue;
-			draw_sector_surface(i, 0, map, b);
-			draw_sector_surface(i, 1, map, b);
+			if (!b->visited_sectors[i]) continue; // NEW: Simple check
+			draw_sector_surface(i, 0, map, b); // Floor
+			draw_sector_surface(i, 1, map, b); // Ceiling
 		}
 
 		free(b->visited_walls);
-
-
-		// Draw any remaining sectors that were scanned but not reached via bunches
-		//for (i = 0; i < map->numsects; i++) {
-		//	if (!(b->sectgot[i >> 5] & (1 << i))) continue;
-		//	if (sectdrawn[i >> 5] & (1 << i)) continue;
-		//	draw_sector_surface(i, 0, map, b);
-		//	draw_sector_surface(i, 1, map, b);
-		//}
-
-		if (shadowtest2_rendmode == 4)
-			uptr = glp->sectgot;
-		else
-			uptr = shadowtest2_sectgot;
-
-		memcpy(uptr, b->sectgot, (map->numsects + 31) >> 3);
+		free(b->visited_sectors); // NEW: Cleanup
 	}
 }
 static void draw_hsr_enter_portal(mapstate_t* map, int myport, bdrawctx *parentctx,
