@@ -77,15 +77,9 @@ typedef struct {
 	float dist;
 } wall_job_t;
 typedef struct {
-	bunch_t *bunch;
-	int bunchn, bunchmal;
-	float *bunchdist;  // Distance cache for sorting
 	bool *visited_walls;  // One flag per wall in entire map
 	wall_job_t *jobs;
 	int jobcount, jobcap;
-	bfint_t bfint[BFINTMAX];
-	int bfintn, bfintlut[BFINTMAX+1];
-// other context stuff
 	cam_t cam;                    // Camera per recursion level
  	cam_t orcam; // one true camera, read only.
 	unsigned int *sectgot, *sectgotmal;        // Visited sectors per level
@@ -103,7 +97,7 @@ typedef struct {
 	int prevsec,newsec;
 
 
-} bunchgrp;
+} bdrawctx;
 
 extern mp_t *mp;
 extern mph_t *mph;
@@ -160,7 +154,7 @@ int intersect_traps_mono_points(dpoint3d p0, dpoint3d p1, dpoint3d trap1[4], dpo
 int mono_max (int hd0, int hd1, int maxsid, int mode);
 
 // Clip two monotone polygons against each other, calls output function for results
-int mono_clipself (int hd0, int hd1, bunchgrp* b, void (*mono_output)(int h0, int h1,bunchgrp* b));
+int mono_clipself (int hd0, int hd1, bdrawctx* b, void (*mono_output)(int h0, int h1,bdrawctx* b));
 
 #ifdef STANDALONE
 	//May be useful for splitting walls off of bunch processing
@@ -172,7 +166,7 @@ int mono_clipends (int hd, double x0, double x1);
 int mono_join (int hd0, int hd1, int hd2, int hd3, int *ho0, int *ho1);
 
 // Perform boolean operation on two polygon pairs (AND, SUB, SUB_REV)
-void mono_bool (int hr0, int hr1, int hw0, int hw1, int boolop, bunchgrp* b, void (*mono_output)(int h0, int h1,bunchgrp* b));
+void mono_bool (int hr0, int hr1, int hw0, int hw1, int boolop, bdrawctx* b, void (*mono_output)(int h0, int h1,bdrawctx* b));
 // Generate triangle strip vertices directly from monotone polygon
 int mono_generate_eyepol(int hd0, int hd1, point3d **out_verts1,  point3d **out_verts2, int *out_count1, int *out_count2);
 

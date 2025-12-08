@@ -99,17 +99,6 @@ extern bool captureframe;
 // POLYGONAL SCENE CLIPPING FUNCTIONS
 // ================================================================================================
 void normalize_transform(transform *tr);
-/** Main sector scanning with near-plane clipping
- * @param sectnum Sector index to scan and add to bunch list
- */
-void scansector(int sectnum, bunchgrp *b);
-
-/** Prepares wall segments for bunch processing
- * @param b Bunch index to process
- * @param twal Output array for wall vertices (must be sector.n+1 size)
- * @return Number of vertices generated
- */
-int prepbunch(int id, bunchverts_t *twal, bunchgrp* b);
 
 /** Clips polygons to viewing frustum before rendering
  * @param tag Current portal tag
@@ -119,7 +108,7 @@ int prepbunch(int id, bunchverts_t *twal, bunchgrp* b);
  * @param flags Clipping flags: &1=do and, &2=do sub, &4=reverse cut for sub
  */
 int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
-                            int plothead0, int plothead1, int flags, bunchgrp *b);
+                            int plothead0, int plothead1, int flags, bdrawctx *b);
 /** Main HSR (Hidden Surface Removal) function handling both clipping and rendering
  * @param cc Camera parameters
  * @param lgs Game state with geometry data
@@ -128,17 +117,17 @@ int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
  */
 void reset_context();
 void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy);
-void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx);
+void draw_hsr_ctx (mapstate_t *map, bdrawctx *newctx);
 // ================================================================================================
 // POLYGONAL SHADOW CREATION FUNCTIONS
 // ================================================================================================
-void draw_hsr_enter_portal(mapstate_t* map, int endportaln, bunchgrp *b, int plothead0, int plothead1);
+void draw_hsr_enter_portal(mapstate_t* map, int endportaln, bdrawctx *b, int plothead0, int plothead1);
 
 /** Creates shadow polygon lists for light sources
  * @param rethead0 First polygon loop head from clipping
  * @param rethead1 Second polygon loop head from clipping
  */
-void ligpoltagfunc(int rethead0, int rethead1, bunchgrp *b);
+void ligpoltagfunc(int rethead0, int rethead1, bdrawctx *b);
 
 /** Resets light polygon data structures
  * @param ind Light index to reset (-1 for all lights)
@@ -177,13 +166,13 @@ void eyepol_drawfunc(int ind);
  * @param rethead0 First polygon loop head
  * @param rethead1 Second polygon loop head
  */
-void drawtagfunc(int rethead0, int rethead1, bunchgrp * b);
+void drawtagfunc(int rethead0, int rethead1, bdrawctx * b);
 
 /** Software skybox rendering
  * @param rethead0 First polygon loop head
  * @param rethead1 Second polygon loop head
  */
-void skytagfunc(int rethead0, int rethead1, bunchgrp * b);
+void skytagfunc(int rethead0, int rethead1, bdrawctx * b);
 
 // Texture coordinate generation functions
 //void gentex_wall(void *npol2, void *sur);       // Wall texture mapping
@@ -198,12 +187,12 @@ void skytagfunc(int rethead0, int rethead1, bunchgrp * b);
  * @param rethead0 First polygon loop head
  * @param rethead1 Second polygon loop head
  */
-void changetagfunc(int rethead0, int rethead1, bunchgrp* b);
+void changetagfunc(int rethead0, int rethead1, bdrawctx* b);
 
 /** Processes wall segments, handles both clipping and rendering setup
  * @param bid Bunch index to process
  */
-static void drawalls(mapstate_t *map, int s, int *walls, int wallcount, bunchgrp *b);
+static void drawalls(mapstate_t *map, int s, int *walls, int wallcount, bdrawctx *b);
 
 /** Renders sprites with lighting if available */
 void drawsprites();

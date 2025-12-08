@@ -106,81 +106,6 @@ inline void memset8(void *d, long v, long n) {
 				}
 }
 
-static int prepbunch(int id, bunchverts_t *twal, bunchgrp *b) {
-	cam_t gcam = b->cam;
-	wall_t *wal;
-	double f, x, y, x0, y0, x1, y1;
-	int i, n;
-
-	wal = curMap->sect[b->bunch[id].sec].wall;
-	i = b->bunch[id].wal0;
-	twal[0].i = i;
-	x0 = wal[i].x;
-	y0 = wal[i].y;
-	i += wal[i].n;
-	x1 = wal[i].x;
-	y1 = wal[i].y;
-	f = b->bunch[id].fra0;
-	twal[0].x = (x1 - x0) * f + x0;
-	twal[0].y = (y1 - y0) * f + y0;
-	if ((b->bunch[id].wal0 == b->bunch[id].wal1) && (b->bunch[id].fra0 < b->bunch[id].fra1)) {
-		//Hack for left side clip
-		f = b->bunch[id].fra1;
-		twal[1].x = (x1 - x0) * f + x0;
-		twal[1].y = (y1 - y0) * f + y0;
-		return (1);
-	}
-	twal[1].x = x1;
-	twal[1].y = y1;
-	n = 1;
-	while (i != b->bunch[id].wal1) {
-		twal[n].i = i;
-		n++;
-		i += wal[i].n;
-		twal[n].x = wal[i].x;
-		twal[n].y = wal[i].y;
-	}
-	if (b->bunch[id].fra1 > 0.0) {
-		x = wal[i].x;
-		y = wal[i].y;
-		f = b->bunch[id].fra1;
-		twal[n].i = i;
-		n++;
-		i += wal[i].n;
-		twal[n].x = (wal[i].x - x) * f + x;
-		twal[n].y = (wal[i].y - y) * f + y;
-	}
-	return (n);
-}
-static void queue_sector_walls(int sectnum, bunchgrp *b) {
-    if (b->sectgot[sectnum >> 5] & (1 << sectnum)) return;
-    b->sectgot[sectnum >> 5] |= (1 << sectnum);
-
-    sect_t *sec = &curMap->sect[sectnum];
-    wall_t *wal = sec->wall;
-
-    for (int i = 0; i < sec->n; i++) {
-        int j = wal[i].n + i;
-        double dx0 = wal[i].x - b->cam.p.x;
-        double dy0 = wal[i].y - b->cam.p.y;
-        double dx1 = wal[j].x - b->cam.p.x;
-        double dy1 = wal[j].y - b->cam.p.y;
-
-        // Backface cull
-        if (dy1 * dx0 <= dx1 * dy0) continue;
-
-        // Queue wall
-        if (b->jobcount >= b->jobcap) {
-            b->jobcap = b->jobcap ? b->jobcap * 2 : 256;
-            b->jobs = (wall_job_t *)realloc(b->jobs, b->jobcap * sizeof(wall_job_t));
-        }
-
-        b->jobs[b->jobcount].sec = sectnum;
-        b->jobs[b->jobcount].wall = i;
-        b->jobs[b->jobcount].dist = dx0*dx0 + dy0*dy0;  // Squared distance
-        b->jobcount++;
-    }
-}
 // Simple sort comparator
 static int wall_dist_cmp(const void *a, const void *b) {
     float da = ((wall_job_t*)a)->dist;
@@ -189,56 +114,8 @@ static int wall_dist_cmp(const void *a, const void *b) {
 }
 
 #define BUNCHNEAR 1e-7
-static void scansector(int sectnum, bunchgrp *b)
-{
-	cam_t *gcam = &b->cam;
-	sect_t *sec;
-	wall_t *wal;
-	double dx0, dy0, dx1, dy1;
-	int i, j, k, ie, obunchn;
 
-	if (sectnum < 0) return;
-	b->sectgot[sectnum >> 5] |= (1 << sectnum);
-
-	sec = &curMap->sect[sectnum];
-	wal = sec->wall;
-
-	obunchn = b->bunchn;
-	for (i = 0, ie = sec->n; i < ie; i++) {
-		j = wal[i].n + i;
-		dx0 = wal[i].x - gcam->p.x;
-		dy0 = wal[i].y - gcam->p.y;
-		dx1 = wal[j].x - gcam->p.x;
-		dy1 = wal[j].y - gcam->p.y;
-
-		// Back-face cull only (XY cross product - which side of wall is camera)
-		// This is still valid for vertical walls regardless of camera pitch/roll
-		if (dy1 * dx0 <= dx1 * dy0) goto docont;
-
-		// Add FULL wall to bunch - no near-plane clipping here
-		// 3D near-plane clipping happens later in drawpol_befclip
-		k = b->bunch[b->bunchn - 1].wal1;
-		if ((b->bunchn > obunchn) && (wal[k].n + k == i) && (b->bunch[b->bunchn - 1].fra1 == 1.0)) {
-			b->bunch[b->bunchn - 1].wal1 = i;
-			b->bunch[b->bunchn - 1].fra1 = 1.0;
-		} else {
-			if (b->bunchn >= b->bunchmal) {
-				b->bunchmal <<= 1;
-				b->bunch = (bunch_t *)realloc(b->bunch, b->bunchmal * sizeof(b->bunch[0]));
-			}
-			b->bunch[b->bunchn].wal0 = i;
-			b->bunch[b->bunchn].fra0 = 0.0;
-			b->bunch[b->bunchn].wal1 = i;
-			b->bunch[b->bunchn].fra1 = 1.0;
-			b->bunch[b->bunchn].sec = sectnum;
-			b->bunchn++;
-		}
-		docont:;
-		if (j < i) obunchn = b->bunchn;
-	}
-}
-
-static void xformbac(double rx, double ry, double rz, dpoint3d *o, bunchgrp *b)
+static void xformbac(double rx, double ry, double rz, dpoint3d *o, bdrawctx *b)
 {
 	cam_t *cam = &b->orcam;
 	// Camera space to world direction (transpose of rotation)
@@ -247,7 +124,7 @@ static void xformbac(double rx, double ry, double rz, dpoint3d *o, bunchgrp *b)
 	o->z = rx * cam->r.z + ry * cam->d.z + rz * cam->f.z;
 }
 
-static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
+static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 {
 	cam_t *usecam = &b->orcam;
 	int i, h, rethead[2];
@@ -313,7 +190,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 }
 // In drawtagfunc_ws - fix the chain1_start calculation:
 // Replace the mono_triangulate_strip function with this simpler approach
-static void drawtagfunc_ws_strip(int rethead0, int rethead1, bunchgrp *b)
+static void drawtagfunc_ws_strip(int rethead0, int rethead1, bdrawctx *b)
 {
     cam_t *usecam = &b->orcam;
 
@@ -427,7 +304,7 @@ static void drawtagfunc_ws_strip(int rethead0, int rethead1, bunchgrp *b)
     mono_deloop(rethead0);
 }
 
-static void skytagfunc (int rethead0, int rethead1, bunchgrp* b){}
+static void skytagfunc (int rethead0, int rethead1, bdrawctx* b){}
 
 /*
 	Purpose: Generates shadow polygon lists for lighting
@@ -436,7 +313,7 @@ static void skytagfunc (int rethead0, int rethead1, bunchgrp* b){}
 	Used during shadow map generation phase (mode 4)
 	Creates hash table for fast polygon lookup by sector/wall/slab
  */
-static void ligpoltagfunc(int rethead0, int rethead1, bunchgrp *b)
+static void ligpoltagfunc(int rethead0, int rethead1, bdrawctx *b)
 {
 	return;// - revert this
     cam_t *gcam = &b->cam;
@@ -510,13 +387,12 @@ static void ligpoltagfunc(int rethead0, int rethead1, bunchgrp *b)
 	Maintains mph[] (mono polygon hierarchy) for spatial partitioning
 	"tag" refers to sector IDs
 */
-static void changetagfunc (int rethead0, int rethead1, bunchgrp *b)
+static void changetagfunc (int rethead0, int rethead1, bdrawctx *b)
 {
 	if ((rethead0|rethead1) < 0) return;
 	int mapsect = b->gnewsec;
 	if ((b->needsecscan)
 		&& (!(b->sectgot[mapsect>>5]&(1<<mapsect))))
-		scansector(mapsect,b);
 
 	mono_mph_check(mphnum);
 	mph[mphnum].head[0] = rethead0;
@@ -534,7 +410,7 @@ static void changetagfunc (int rethead0, int rethead1, bunchgrp *b)
 // Change return type from void to int
 // Returns: 1 if AND produced visible output, 0 if not
 static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
-                            int plothead0, int plothead1, int flags, bunchgrp *b)
+                            int plothead0, int plothead1, int flags, bdrawctx *b)
 {
     int mtag = tag1;
     int tagsect = sec;
@@ -545,7 +421,7 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
     int produced_output = 0;  // NEW: track if we produced anything
 
     #define BSCISDIST 0.000001
-    void (*mono_output)(int h0, int h1, bunchgrp *b);
+    void (*mono_output)(int h0, int h1, bdrawctx *b);
     dpoint3d *otp, *tp;
     double f;
     int i, j, k, l, h, on, n, plothead[2], omph0, omph1, i0, i1;
@@ -728,7 +604,7 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
     return produced_output;
 }
 // create plane EQ using GCAM
-static void gentransform_ceilflor(sect_t *sec, wall_t *wal, int isflor, bunchgrp *b)
+static void gentransform_ceilflor(sect_t *sec, wall_t *wal, int isflor, bdrawctx *b)
 {
 	cam_t *cam = &b->cam;
 	float gx = sec->grad[isflor].x;
@@ -752,7 +628,7 @@ static void gentransform_ceilflor(sect_t *sec, wall_t *wal, int isflor, bunchgrp
 }
 
 // create plane EQ using GCAM
-static void gentransform_wall (kgln_t *npol2, surf_t *sur, bunchgrp *b) {
+static void gentransform_wall (kgln_t *npol2, surf_t *sur, bdrawctx *b) {
 	cam_t usedcam = b->cam; // we can use camera hack to get plane equation in space of current cam, not necessart clipping cam.
 	float f, g, ox, oy, oz, rdet, fk[24];
 	int i;
@@ -797,7 +673,7 @@ the final visible geometry ready for 2D projection.
 The b parameter is a bunch index - this function processes one "bunch" (visible sector group) at a time. The traversal logic is in the caller that:
 */// Transform world vertex through portal using wccw_transform
 // For infinity Z: transform XY at reference plane, preserve Z sign/magnitude
-static void portal_xform_world_at_z(double *x, double *y, double ref_z, bunchgrp *b) {
+static void portal_xform_world_at_z(double *x, double *y, double ref_z, bdrawctx *b) {
 	dpoint3d p;
 	p.x = *x;
 	p.y = *y;
@@ -807,7 +683,7 @@ static void portal_xform_world_at_z(double *x, double *y, double ref_z, bunchgrp
 	*y = p.y;
 }
 
-static void portal_xform_world_full(double *x, double *y, double *z, bunchgrp *b) {
+static void portal_xform_world_full(double *x, double *y, double *z, bdrawctx *b) {
 	dpoint3d p;
 	p.x = *x;
 	p.y = *y;
@@ -818,7 +694,7 @@ static void portal_xform_world_full(double *x, double *y, double *z, bunchgrp *b
 	*z = p.z;
 }
 // New function: draw sector floor/ceiling using FULL sector polygon
-static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bunchgrp *b)
+static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bdrawctx *b)
 {
     sect_t *sec = &map->sect[sectnum];
     wall_t *wal = sec->wall;
@@ -902,31 +778,31 @@ static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bunchg
 
 	int mytag = sectnum + taginc * b->recursion_depth;
 
-	if (isportal && !noportals) {
-		int endpn = portals[myport].destpn;
-		int nexttag = portals[endpn].sect + taginc * (b->recursion_depth + 1);
+    if (isportal && !noportals) {
+	    int endpn = portals[myport].destpn;
+	    int nexttag = portals[endpn].sect + taginc * (b->recursion_depth + 1);
 
-		logstep("entering portal surf %d, sec:%d, depth:%d", isflor, sectnum, b->recursion_depth);
+	    logstep("entering portal surf %d, sec:%d, depth:%d", isflor, sectnum, b->recursion_depth);
 
-		int visible = drawpol_befclip(mytag, nexttag,
-						sectnum, portals[endpn].sect,
-						plothead[0], plothead[1],
-						((isflor << 2) + 3) | CLIP_PORTAL_FLAG, b);
-		if (visible) {
-							draw_hsr_enter_portal(map, myport, b, plothead[0], plothead[1]);
-						}
-	} else {
-		logstep("drawing solid surf %d, sec:%d, depth:%d", isflor, sectnum, b->recursion_depth);
-		drawpol_befclip(mytag, -1,
-						sectnum, -1,
-						plothead[0], plothead[1],
-						(isflor << 2) + 3, b);
-	}
+	    int visible = drawpol_befclip(mytag, nexttag,
+	                                  sectnum, portals[endpn].sect,
+	                                  plothead[0], plothead[1],
+	                                  ((isflor << 2) + 3) | CLIP_PORTAL_FLAG, b);
+	    if (visible) {
+		    draw_hsr_enter_portal(map, myport, b, plothead[0], plothead[1]);
+	    }
+    } else {
+	    logstep("drawing solid surf %d, sec:%d, depth:%d", isflor, sectnum, b->recursion_depth);
+	    drawpol_befclip(mytag, -1,
+	                    sectnum, -1,
+	                    plothead[0], plothead[1],
+	                    (isflor << 2) + 3, b);
+    }
 }
 
 
 
-static void drawalls(mapstate_t *map, int s, int *walls, int wallcount, bunchgrp *b)
+static void drawalls(mapstate_t *map, int s, int *walls, int wallcount, bdrawctx *b)
 {
     #define MAXVERTS 256
     vertlist_t verts[MAXVERTS];
@@ -1111,7 +987,7 @@ static int get_wall_global_id(int sec, int wall, mapstate_t *map) {
 }
 
 // Simplified sector wall adder
-static void add_sector_walls(int sectnum, bunchgrp *b) {
+static void add_sector_walls(int sectnum, bdrawctx *b) {
 	sect_t *sec = &curMap->sect[sectnum];
 	wall_t *wal = sec->wall;
 
@@ -1149,7 +1025,7 @@ static void add_sector_walls(int sectnum, bunchgrp *b) {
 }
 
 void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
-	bunchgrp bs;
+	bdrawctx bs;
 	bs.cam = *cc;
 	bs.orcam = *cc;
 	bs.recursion_depth = 0;
@@ -1159,24 +1035,22 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
 
 }
 
-void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
+void draw_hsr_ctx (mapstate_t *map, bdrawctx *newctx) {
 	if (!newctx) {
 		return;
 		if (captureframe) printf("discarding due to null ctx");
 	}
 	int total_walls = 0;
-	for (int i = 0; i < lgs->numsects; i++) {
-		total_walls += lgs->sect[i].n;
+	for (int i = 0; i < map->numsects; i++) {
+		total_walls += map->sect[i].n;
 	}
 
 	int recursiveDepth = newctx->recursion_depth;
-	bunchgrp *b;
+	bdrawctx *b;
 	b = newctx;
 	b->sectgotn = 0;
 	b->sectgot = 0;
 	b->sectgotmal = 0;
-	b->bunchn=0;
-	b->bunchmal=0;
 	b->visited_walls = (bool *)calloc(total_walls, 1);
 	b->jobcount = 0;
 	b->jobcap = 16;
@@ -1198,29 +1072,24 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 	//	if ((!(glp->flags&1)) || (!shadowtest2_useshadows)) return;
 	}
 
-	curMap = lgs;
+	curMap = map;
 
-	//if ((lgs->numsects <= 0) || ((unsigned)gcam.cursect >= (unsigned)lgs->numsects))
+	//if ((map->numsects <= 0) || ((unsigned)gcam.cursect >= (unsigned)map->numsects))
 	//{
 	////if (shadowtest2_rendmode != 4) eyepoln = 0; //Prevents drawpollig() from crashing
 	////	return;
 	//}
-	if (!b->bunchmal)
-	{
-		b->bunchmal = 64;
-		b->bunch     = (bunch_t       *)malloc(b->bunchmal*sizeof(b->bunch[0]));
-	}
-	if (lgs->numsects > b->sectgotn)
+	if (map->numsects > b->sectgotn)
 	{
 		if (b->sectgotmal) free((void *)b->sectgotmal);
-		b->sectgotn = ((lgs->numsects+127)&~127);
+		b->sectgotn = ((map->numsects+127)&~127);
 		b->sectgotmal = (unsigned int *)malloc((b->sectgotn>>3)+16); //NOTE:malloc doesn't guarantee 16-byte alignment!
 		b->sectgot = (unsigned int *)((((intptr_t)b->sectgotmal)+15)&~15);
 	}
-	if ((shadowtest2_rendmode != 4) && (lgs->numsects > shadowtest2_sectgotn))
+	if ((shadowtest2_rendmode != 4) && (map->numsects > shadowtest2_sectgotn))
 	{
 		if (shadowtest2_sectgotmal) free((void *)shadowtest2_sectgotmal);
-		shadowtest2_sectgotn = ((lgs->numsects+127)&~127);
+		shadowtest2_sectgotn = ((map->numsects+127)&~127);
 		shadowtest2_sectgotmal = (unsigned int *)malloc((shadowtest2_sectgotn>>3)+16); //NOTE:malloc doesn't guarantee 16-byte alignment!
 		shadowtest2_sectgot = (unsigned int *)((((intptr_t)shadowtest2_sectgotmal)+15)&~15);
 	}
@@ -1269,10 +1138,10 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 	}
 	else
 	{
-		if (lgs->numsects > glp->sectgotn)
+		if (map->numsects > glp->sectgotn)
 		{
 			if (glp->sectgotmal) free((void *)glp->sectgotmal);
-			glp->sectgotn = ((lgs->numsects+127)&~127);
+			glp->sectgotn = ((map->numsects+127)&~127);
 			glp->sectgotmal = (unsigned int *)malloc((glp->sectgotn>>3)+16); //NOTE:malloc doesn't guarantee 16-byte alignment!
 			glp->sectgot = (unsigned int *)((((intptr_t)glp->sectgotmal)+15)&~15);
 		}
@@ -1327,7 +1196,7 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 			b->planecuts = n;
 			didcut = 0;
 
-			memset8(b->sectgot, 0, (lgs->numsects + 31) >> 3);
+			memset8(b->sectgot, 0, (map->numsects + 31) >> 3);
 
 			for (i = mphnum - 1; i >= 0; i--) {
 				mono_deloop(mph[i].head[1]);
@@ -1341,19 +1210,15 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 			// Portal case
 			n = b->planecuts;
 			didcut = 1;
-			memset8(b->sectgot, 0, (lgs->numsects + 31) >> 3);
+			memset8(b->sectgot, 0, (map->numsects + 31) >> 3);
 		}
 
-		b->bunchn = 0;
-		scansector(gcam.cursect, b);
-
+    // Track which sectors have had their floors/ceilings drawn
 		// Track which sectors have had their floors/ceilings drawn
-		// Track which sectors have had their floors/ceilings drawn
-		unsigned int *sectdrawn = (unsigned int *)_alloca(((lgs->numsects + 31) >> 3) + 4);
-		memset(sectdrawn, 0, (lgs->numsects + 31) >> 3);
+		unsigned int *sectdrawn = (unsigned int *)_alloca(((map->numsects + 31) >> 3) + 4);
+		memset(sectdrawn, 0, (map->numsects + 31) >> 3);
 
 		b->jobcount = 0;
-		//queue_sector_walls(b->cam.cursect, b);
 		b->jobs = malloc(sizeof(wall_job_t)*b->jobcap);
 		add_sector_walls(b->cam.cursect, b);
 		qsort(b->jobs, b->jobcount, sizeof(wall_job_t), wall_dist_cmp);
@@ -1368,7 +1233,7 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 
 			if (job->sec != current_sec) {
 				if (sec_wall_count > 0) {
-					drawalls(lgs, current_sec, sec_walls, sec_wall_count, b);
+					drawalls(map, current_sec, sec_walls, sec_wall_count, b);
 					sec_wall_count = 0;
 				}
 				current_sec = job->sec;
@@ -1377,7 +1242,7 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 			sec_walls[sec_wall_count++] = job->wall;
 
 			// FIX: Use .ns field, not tags[0]
-			int ns = lgs->sect[job->sec].wall[job->wall].ns;
+			int ns = map->sect[job->sec].wall[job->wall].ns;
 			if (ns >= 0 && ns != job->sec) {
 				add_sector_walls(ns, b);
 				qsort(b->jobs, b->jobcount, sizeof(wall_job_t), wall_dist_cmp);
@@ -1386,25 +1251,25 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 
 		// Flush last batch
 		if (sec_wall_count > 0) {
-			drawalls(lgs, current_sec, sec_walls, sec_wall_count, b);
+			drawalls(map, current_sec, sec_walls, sec_wall_count, b);
 		}
 
 		// Draw surfaces
-		for (int i = 0; i < lgs->numsects; i++) {
+		for (int i = 0; i < map->numsects; i++) {
 			if (!(b->sectgot[i >> 5] & (1 << i))) continue;
-			draw_sector_surface(i, 0, lgs, b);
-			draw_sector_surface(i, 1, lgs, b);
+			draw_sector_surface(i, 0, map, b);
+			draw_sector_surface(i, 1, map, b);
 		}
 
 		free(b->visited_walls);
 
 
 		// Draw any remaining sectors that were scanned but not reached via bunches
-		//for (i = 0; i < lgs->numsects; i++) {
+		//for (i = 0; i < map->numsects; i++) {
 		//	if (!(b->sectgot[i >> 5] & (1 << i))) continue;
 		//	if (sectdrawn[i >> 5] & (1 << i)) continue;
-		//	draw_sector_surface(i, 0, lgs, b);
-		//	draw_sector_surface(i, 1, lgs, b);
+		//	draw_sector_surface(i, 0, map, b);
+		//	draw_sector_surface(i, 1, map, b);
 		//}
 
 		if (shadowtest2_rendmode == 4)
@@ -1412,10 +1277,10 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 		else
 			uptr = shadowtest2_sectgot;
 
-		memcpy(uptr, b->sectgot, (lgs->numsects + 31) >> 3);
+		memcpy(uptr, b->sectgot, (map->numsects + 31) >> 3);
 	}
 }
-static void draw_hsr_enter_portal(mapstate_t* map, int myport, bunchgrp *parentctx,
+static void draw_hsr_enter_portal(mapstate_t* map, int myport, bdrawctx *parentctx,
                                    int plothead0, int plothead1)
 {
 // on entering portal we must rotate world verts, as if current camera was stationary.
@@ -1461,7 +1326,7 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport, bunchgrp *parentc
 
     ncam.cursect = portals[endp].sect;
 
-    bunchgrp newctx = {};
+    bdrawctx newctx = {};
 	newctx.prevsec = portals[myport].sect;
 	newctx.newsec = portals[endp].sect;
 	newctx.recursion_depth = parentctx->recursion_depth + 1;
@@ -1475,9 +1340,7 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport, bunchgrp *parentc
     newctx.sectgotn = 0;
     newctx.sectgot = 0;
     newctx.sectgotmal = 0;
-    newctx.bunchn = 0;
-    newctx.bunchmal = 0;
-    newctx.testignorewall = ignw;
+newctx.testignorewall = ignw;
     newctx.testignoresec = igns;
     newctx.gnewsec = -1;
     newctx.gnewtag = -1;
@@ -1495,7 +1358,6 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport, bunchgrp *parentc
 }
 
 
-typedef struct { int sect; point3d p; float rgb[3]; int useshadow; } drawkv6_lightpos_t;
 void drawsprites ()
 {
 }

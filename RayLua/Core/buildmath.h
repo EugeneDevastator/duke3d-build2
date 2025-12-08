@@ -109,7 +109,7 @@ static inline void wccw_transform_dir(dpoint3d *dir, cam_t *ctin, cam_t *ctout) 
     dir->z = cx * ctout->r.z + cy * ctout->d.z + cz * ctout->f.z;
 }
 
-static inline void mp_to_world(double sx, double sy, bunchgrp *b, double *wx, double *wy, double *wz, cam_t *cam) {
+static inline void mp_to_world(double sx, double sy, bdrawctx *b, double *wx, double *wy, double *wz, cam_t *cam) {
     double denom = (b->gouvmat[0] * sx + b->gouvmat[3] * sy + b->gouvmat[6]) * cam->h.z;
 
     if (fabs(denom) < 1e-10) {

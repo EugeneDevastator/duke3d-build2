@@ -371,7 +371,7 @@ int mono_max(int hd0, int hd1, int maxsid, int mode) {
     return (mp[ho].n);
 }
 
-int mono_clipself(int hd0, int hd1, bunchgrp* b, void (*mono_output)(int h0, int h1,bunchgrp* b)) {
+int mono_clipself(int hd0, int hd1, bdrawctx* b, void (*mono_output)(int h0, int h1,bdrawctx* b)) {
     double f, g, ix, iy, dx, dy, dx2, dy2, x0[2], y0[2], x1[2], y1[2];
     int i, j, k, ogood, good, hd[2], ind[2], ho[2], outnum = 0;
 
@@ -531,7 +531,7 @@ int mono_join(int hd0, int hd1, int hd2, int hd3, int *ho0, int *ho1) {
     return (1);
 }
 
-void mono_bool(int hr0, int hr1, int hw0, int hw1, int boolop, bunchgrp* b, void (*mono_output)(int h0, int h1,bunchgrp* b)) {
+void mono_bool(int hr0, int hr1, int hw0, int hw1, int boolop, bdrawctx* b, void (*mono_output)(int h0, int h1,bdrawctx* b)) {
     int hd0, hd1;
 
     if (boolop == MONO_BOOL_AND) {
