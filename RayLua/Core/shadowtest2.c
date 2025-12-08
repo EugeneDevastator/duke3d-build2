@@ -224,37 +224,17 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
         mono_deloop(rethead0);
         return;
     }
-	printf("\n=== Chain Debug ===\n");
-	printf("Chain 0: ");
-	if (rethead0 >= 0) {
-		int i = rethead0;
-		int count = 0;
-		do {
-			printf("(%.2f,%.2f) ", mp[i].x, mp[i].y);
-			i = mp[i].n;
-			count++;
-		} while (i != rethead0 && count < 20);
-		printf("\n");
-	}
-
-	printf("Chain 1: ");
-	if (rethead1 >= 0) {
-		int i = rethead1;
-		int count = 0;
-		do {
-			printf("(%.2f,%.2f) ", mp[i].x, mp[i].y);
-			i = mp[i].n;
-			count++;
-		} while (i != rethead1 && count < 20);
-		printf("\n");
-	}
     // Generate triangle strip vertices from monotone polygon
-    point3d *mono_verts;
+    point3d *chain1;
+    point3d *chain2;
     int mono_count;
-    int has_triangulation = mono_generate_eyepol(rethead0, rethead1, &mono_verts, &mono_count);
-
+	int c1count;
+	int c2count;
+    int has_triangulation = mono_generate_eyepol(rethead0, rethead1, &chain1,&chain2, &c1count,&c2count);
+	mono_count=c1count+c2count;
     if (!has_triangulation || mono_count < 3) {
-        if (mono_verts) free(mono_verts);
+        if (chain1) free(chain1);
+        if (chain2) free(chain2);
         mono_deloop(rethead1);
         mono_deloop(rethead0);
         return;
@@ -271,21 +251,37 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
         eyepol = (eyepol_t *)realloc(eyepol, eyepolmal * sizeof(eyepol_t));
         eyepol[0].vert0 = 0;
     }
+	printf("chain1 for eyepolvn:/n");
 
     // Transform and copy vertices to eyepolv
-    for (int i = 0; i < mono_count; i++) {
+    for (int i = 0; i < c1count; i++) {
         double wx, wy, wz;
-        mp_to_world(mono_verts[i].x, mono_verts[i].y, b, &wx, &wy, &wz, usecam);
+        mp_to_world(chain1[i].x, chain1[i].y, b, &wx, &wy, &wz, usecam);
 
         eyepolv[eyepolvn].x = (float)wx;
         eyepolv[eyepolvn].y = (float)wy;
         eyepolv[eyepolvn].z = (float)wz;
         eyepolvn++;
+    		printf("(%.2f,%.2f) ", chain1[i].x, chain1[i].y);
     }
+	printf("chain2 for eyepolvn:/n");
+	for (int i = 0; i < c2count; i++) {
+		double wx, wy, wz;
+		mp_to_world(chain2[i].x, chain2[i].y, b, &wx, &wy, &wz, usecam);
 
-    free(mono_verts);
+		eyepolv[eyepolvn].x = (float)wx;
+		eyepolv[eyepolvn].y = (float)wy;
+		eyepolv[eyepolvn].z = (float)wz;
+		eyepolvn++;
+		printf("(%.2f,%.2f) ", chain1[i].x, chain1[i].y);
+	}
 
-    // Set up eyepol entry
+    // Set monotone up eyepol entry
+    // // chain 1: x increases;
+    // // chain2 : x decreases;
+    // chain1[0]~= chain2[last] almost equal.
+	// last in chain2 can be bigger than pre-last.
+
     eyepol[eyepoln].tri_strip.indices = NULL;
     eyepol[eyepoln].tri_strip.count = mono_count;
     eyepol[eyepoln].tri_strip.capacity = 0;
@@ -832,7 +828,7 @@ static void drawalls(int bid, mapstate_t *map, bunchgrp *b)
 
     // Remove bunch from list
     b->bunchn--;
-
+return;
     bool noportals = b->recursion_depth >= MAX_PORTAL_DEPTH;
 
     // === WALLS ONLY ===

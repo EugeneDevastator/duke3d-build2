@@ -162,6 +162,6 @@ int mono_join (int hd0, int hd1, int hd2, int hd3, int *ho0, int *ho1);
 // Perform boolean operation on two polygon pairs (AND, SUB, SUB_REV)
 void mono_bool (int hr0, int hr1, int hw0, int hw1, int boolop, bunchgrp* b, void (*mono_output)(int h0, int h1,bunchgrp* b));
 // Generate triangle strip vertices directly from monotone polygon
-int mono_generate_eyepol(int hd0, int hd1, point3d **out_verts, int *out_count);
+int mono_generate_eyepol(int hd0, int hd1, point3d **out_verts1,  point3d **out_verts2, int *out_count1, int *out_count2);
 
 #endif //BUILD2_MONOCLIP_H

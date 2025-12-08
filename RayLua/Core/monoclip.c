@@ -656,111 +656,51 @@ void mono_triangulate_strip(int hd0, int hd1, triangle_strip_t *strip) {
     free(chain0);
     free(chain1);
 }
-
-int mono_generate_eyepol(int hd0, int hd1, point3d **out_verts, int *out_count) {
+int mono_generate_eyepol(int hd0, int hd1, point3d **out_verts1,  point3d **out_verts2, int *out_count1, int *out_count2) {
     if ((hd0 | hd1) < 0) {
-        *out_verts = NULL;
-        *out_count = 0;
+        *out_verts1 = NULL;
+        *out_verts2 = NULL;
+        *out_count1 = 0;
+        *out_count2 = 0;
         return 0;
     }
 
-    // Collect chains without duplicates
-    int count0 = 0, count1 = 0;
-    int c0[1000], c1[1000];
-
+    point3d *verts1 = (point3d *)malloc((64) * sizeof(point3d));
+    point3d *verts2 = (point3d *)malloc((64) * sizeof(point3d));
+    int v1cnt = 0;
+    // Add chain0 forward
     int i = hd0;
-    double last_x = -1e30, last_y = -1e30;
     do {
-        double dx = mp[i].x - last_x;
-        double dy = mp[i].y - last_y;
-        if (count0 == 0 || dx*dx + dy*dy > 1e-12) {
-            c0[count0++] = i;
-            last_x = mp[i].x;
-            last_y = mp[i].y;
-        }
+        verts1[v1cnt].x = (float)mp[i].x;
+        verts1[v1cnt].y = (float)mp[i].y;
+        verts1[v1cnt].z = (float)mp[i].z;
+        printf("(%.2f,%.2f,%.2f) ", mp[i].x, mp[i].y, mp[i].z);
+        v1cnt++;
         i = mp[i].n;
     } while (i != hd0);
+    mono_deloop(hd0);
 
+
+    printf("Chain 1: ");
+    // Collect chain1 indices
     i = hd1;
-    last_x = -1e30; last_y = -1e30;
+    int v2cnt = 0;
     do {
-        double dx = mp[i].x - last_x;
-        double dy = mp[i].y - last_y;
-        if (count1 == 0 || dx*dx + dy*dy > 1e-12) {
-            c1[count1++] = i;
-            last_x = mp[i].x;
-            last_y = mp[i].y;
-        }
-        i = mp[i].n;
+        i = mp[i].p;
+        verts2[v2cnt].x = (float)mp[i].x;
+        verts2[v2cnt].y = (float)mp[i].y;
+        verts2[v2cnt].z = (float)mp[i].z;
+        printf("(%.2f,%.2f,%.2f) ", mp[i].x, mp[i].y, mp[i].z);
+        v2cnt++;
     } while (i != hd1);
 
-    // Allocate output
-    point3d *verts = (point3d *)malloc((count0 + count1) * sizeof(point3d));
-    int vert_count = 0;
 
-    // ZIGZAG MERGE: alternate between chains
-    int i0 = 0, i1 = 0;
+    mono_deloop(hd0);
+  //  free(chain1);
 
-    // Add first vertex (shared by both chains, skip duplicate)
-    verts[vert_count].x = (float)mp[c0[i0]].x;
-    verts[vert_count].y = (float)mp[c0[i0]].y;
-    verts[vert_count].z = (float)mp[c0[i0]].z;
-    vert_count++;
-
-    // Check if chain1 starts with same vertex
-    double dx = mp[c1[i1]].x - mp[c0[i0]].x;
-    double dy = mp[c1[i1]].y - mp[c0[i0]].y;
-    if (dx*dx + dy*dy < 1e-12) i1++; // Skip duplicate start
-
-    i0++;
-
-    // Zigzag between chains until both exhausted
-    bool use_chain0 = false; // Start with chain1 after adding from chain0
-
-    while (i0 < count0 || i1 < count1) {
-        if (i0 >= count0) {
-            // Chain0 done, finish chain1
-            while (i1 < count1) {
-                verts[vert_count].x = (float)mp[c1[i1]].x;
-                verts[vert_count].y = (float)mp[c1[i1]].y;
-                verts[vert_count].z = (float)mp[c1[i1]].z;
-                vert_count++;
-                i1++;
-            }
-            break;
-        }
-
-        if (i1 >= count1) {
-            // Chain1 done, finish chain0
-            while (i0 < count0) {
-                verts[vert_count].x = (float)mp[c0[i0]].x;
-                verts[vert_count].y = (float)mp[c0[i0]].y;
-                verts[vert_count].z = (float)mp[c0[i0]].z;
-                vert_count++;
-                i0++;
-            }
-            break;
-        }
-
-        // Both chains have vertices - STRICT ZIGZAG
-        if (use_chain0) {
-            verts[vert_count].x = (float)mp[c0[i0]].x;
-            verts[vert_count].y = (float)mp[c0[i0]].y;
-            verts[vert_count].z = (float)mp[c0[i0]].z;
-            vert_count++;
-            i0++;
-        } else {
-            verts[vert_count].x = (float)mp[c1[i1]].x;
-            verts[vert_count].y = (float)mp[c1[i1]].y;
-            verts[vert_count].z = (float)mp[c1[i1]].z;
-            vert_count++;
-            i1++;
-        }
-
-        use_chain0 = !use_chain0; // ALTERNATE
-    }
-
-    *out_verts = verts;
-    *out_count = vert_count;
-    return (vert_count >= 3) ? 1 : 0;
+    *out_count1 = v1cnt;
+    *out_count2 = v2cnt;
+    *out_verts1 = verts1;
+    *out_verts2 = verts2;
+    return (v1cnt+v2cnt >= 3) ? 1 : 0;
 }
