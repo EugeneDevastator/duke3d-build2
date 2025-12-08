@@ -1117,21 +1117,23 @@ static void add_sector_walls(int sectnum, bunchgrp *b) {
 
 	for (int i = 0; i < sec->n; i++) {
 		int j = wal[i].n + i;
+
+		// Midpoint for better distance metric
+		double mx = (wal[i].x + wal[j].x) * 0.5 - b->cam.p.x;
+		double my = (wal[i].y + wal[j].y) * 0.5 - b->cam.p.y;
+
+		// Backface cull using actual vertices
 		double dx0 = wal[i].x - b->cam.p.x;
 		double dy0 = wal[i].y - b->cam.p.y;
 		double dx1 = wal[j].x - b->cam.p.x;
 		double dy1 = wal[j].y - b->cam.p.y;
 
-		// Backface cull
 		if (dy1 * dx0 <= dx1 * dy0) continue;
 
-		// Check if already queued
 		int wall_id = get_wall_global_id(sectnum, i, curMap);
 		if (b->visited_walls[wall_id]) continue;
+		b->visited_walls[wall_id] = true;
 
-		b->visited_walls[wall_id] = true;  // ← FIX: Mark now, not later
-
-		// Add to queue
 		if (b->jobcount >= b->jobcap) {
 			b->jobcap = b->jobcap ? b->jobcap * 2 : 256;
 			b->jobs = (wall_job_t *)realloc(b->jobs, b->jobcap * sizeof(wall_job_t));
@@ -1139,7 +1141,7 @@ static void add_sector_walls(int sectnum, bunchgrp *b) {
 
 		b->jobs[b->jobcount].sec = sectnum;
 		b->jobs[b->jobcount].wall = i;
-		b->jobs[b->jobcount].dist = dx0*dx0 + dy0*dy0;
+		b->jobs[b->jobcount].dist = mx*mx + my*my;  // Midpoint distance
 		b->jobcount++;
 	}
 
