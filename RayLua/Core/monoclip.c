@@ -13,7 +13,7 @@ int mphmal = 0;
 mp_t *mp = 0;
 int mpempty, mpmal = 0;
 
-void mph_check(int mphnum) {
+void mono_mph_check(int mphnum) {
     if (mphnum >= mphmal) {
         mphmal <<= 1;
         mph = (mph_t *) realloc(mph, mphmal * sizeof(mph[0]));
@@ -191,7 +191,7 @@ void mono_genfromloop(int *plothead0, int *plothead1, dpoint3d *tp, int n) {
     (*plothead1) = plothead[1];
 }
 
-void intersamexy(double x0, double y0, double x1, double y1, double z0, double z1, double z2, double z3, double *ix,
+void mono_intersamexy(double x0, double y0, double x1, double y1, double z0, double z1, double z2, double z3, double *ix,
                  double *iy, double *iz) {
     double f;
     z2 -= z0;
@@ -240,8 +240,8 @@ int intersect_traps_mono(double x0, double y0, double x1, double y1, double z0, 
     h1 = -1;
     if ((i == 0) || (i == 5)) {
         if (i != j) {
-            if (i == 5) intersamexy(x0, y0, x1, y1, z0, z4, z3, z7, &fx, &fy, &fz);
-            else intersamexy(x0, y0, x1, y1, z1, z5, z2, z6, &fx, &fy, &fz);
+            if (i == 5) mono_intersamexy(x0, y0, x1, y1, z0, z4, z3, z7, &fx, &fy, &fz);
+            else mono_intersamexy(x0, y0, x1, y1, z1, z5, z2, z6, &fx, &fy, &fz);
             h0 = mono_ins(h0, fx, fy, fz);
             h1 = mono_ins(h1, fx, fy, fz);
         }
@@ -253,18 +253,18 @@ int intersect_traps_mono(double x0, double y0, double x1, double y1, double z0, 
     }
     if (i != j) {
         if ((i < 3) != (j < 3)) {
-            intersamexy(x0, y0, x1, y1, z0, z4, z2, z6, &fx, &fy, &fz);
+            mono_intersamexy(x0, y0, x1, y1, z0, z4, z2, z6, &fx, &fy, &fz);
             h0 = mono_ins(h0, fx, fy, fz);
         }
         if (((i ^ 1) < 3) != ((j ^ 1) < 3)) {
-            intersamexy(x0, y0, x1, y1, z1, z5, z3, z7, &fx, &fy, &fz);
+            mono_intersamexy(x0, y0, x1, y1, z1, z5, z3, z7, &fx, &fy, &fz);
             h1 = mono_ins(h1, fx, fy, fz);
         }
     }
     if ((j == 0) || (j == 5)) {
         if (i != j) {
-            if (j == 5) intersamexy(x0, y0, x1, y1, z0, z4, z3, z7, &fx, &fy, &fz);
-            else intersamexy(x0, y0, x1, y1, z1, z5, z2, z6, &fx, &fy, &fz);
+            if (j == 5) mono_intersamexy(x0, y0, x1, y1, z0, z4, z3, z7, &fx, &fy, &fz);
+            else mono_intersamexy(x0, y0, x1, y1, z1, z5, z2, z6, &fx, &fy, &fz);
             h0 = mono_ins(h0, fx, fy, fz);
             h1 = mono_ins(h1, fx, fy, fz);
         }

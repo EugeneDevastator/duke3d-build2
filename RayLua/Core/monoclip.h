@@ -91,7 +91,7 @@ extern mph_t *mph;
 extern int mphnum, mphmal;
 extern int mpempty, mpmal;
 // Memory management - ensures mph array has sufficient capacity
-void mph_check (int mphnum);
+void mono_mph_check (int mphnum);
 
 // Initialize memory pools and data structures (call once at startup)
 void mono_initonce ();
@@ -120,7 +120,7 @@ void mono_genfromloop (int *plothead0, int *plothead1, dpoint3d *tp, int n);
 	//  1. Assumes: x0=x2,y0=y2 and x1=x3,y1=y3
 	//  2. No error checking
 // 3D line intersection with same x,y endpoints but different z values
-void intersamexy (double x0, double y0, double x1, double y1, double z0, double z1, double z2, double z3, double *ix, double *iy, double *iz);
+void mono_intersamexy (double x0, double y0, double x1, double y1, double z0, double z1, double z2, double z3, double *ix, double *iy, double *iz);
 
 //(x0,y0) (x1,y1)
 	//   z0-----z1

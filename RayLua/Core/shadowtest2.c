@@ -460,7 +460,7 @@ static void changetagfunc (int rethead0, int rethead1, bunchgrp *b)
 		&& (!(b->sectgot[mapsect>>5]&(1<<mapsect))))
 		scansector(mapsect,b);
 
-	mph_check(mphnum);
+	mono_mph_check(mphnum);
 	mph[mphnum].head[0] = rethead0;
 	mph[mphnum].head[1] = rethead1;
 	mph[mphnum].tag = b->gnewtag;
@@ -473,7 +473,9 @@ static void changetagfunc (int rethead0, int rethead1, bunchgrp *b)
 // Replace the existing drawpol_befclip with this version
 // Full 3D camera transform - handles pitch/roll correctly for portals
 
-static void drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
+// Change return type from void to int
+// Returns: 1 if AND produced visible output, 0 if not
+static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
                             int plothead0, int plothead1, int flags, bunchgrp *b)
 {
     int mtag = tag1;
@@ -482,13 +484,15 @@ static void drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
     b->gnewsec = newsec;
     cam_t *orcam = &b->orcam;
 
+    int produced_output = 0;  // NEW: track if we produced anything
+
     #define BSCISDIST 0.000001
     void (*mono_output)(int h0, int h1, bunchgrp *b);
     dpoint3d *otp, *tp;
     double f;
     int i, j, k, l, h, on, n, plothead[2], omph0, omph1, i0, i1;
 
-    if ((plothead0 | plothead1) < 0) return;
+    if ((plothead0 | plothead1) < 0) return 0;
     plothead[0] = plothead0;
     plothead[1] = plothead1;
 
@@ -501,28 +505,21 @@ static void drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
     otp = (dpoint3d *)_alloca(n * sizeof(dpoint3d));
     tp = (dpoint3d *)_alloca(n * sizeof(dpoint3d) * 2);
 
-    // Transform world coordinates to camera space using FULL 3D rotation
-    // mp[] contains world-space coordinates (after wccw_transform in callers)
+    // Transform world coordinates to camera space
     on = 0;
     for (h = 0; h < 2; h++) {
         i = plothead[h];
         do {
             if (h) i = mp[i].p;
 
-            // World position from mono polygon
             double wx = mp[i].x;
             double wy = mp[i].y;
             double wz = mp[i].z;
 
-            // Vector from camera to point
             double dx = wx - orcam->p.x;
             double dy = wy - orcam->p.y;
             double dz = wz - orcam->p.z;
 
-            // Full 3D rotation to camera space
-            // r = right vector (screen X axis)
-            // d = down vector (screen Y axis)
-            // f = forward vector (depth axis)
             otp[on].x = dx * orcam->r.x + dy * orcam->r.y + dz * orcam->r.z;
             otp[on].y = dx * orcam->d.x + dy * orcam->d.y + dz * orcam->d.z;
             otp[on].z = dx * orcam->f.x + dy * orcam->f.y + dz * orcam->f.z;
@@ -533,8 +530,7 @@ static void drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
         mono_deloop(plothead[h]);
     }
 
-    // Clip against near plane (perpendicular to camera forward vector)
-    // This is now correct for any camera orientation including pitch/roll
+    // Clip against near plane
     n = 0;
     for (i = on - 1, j = 0; j < on; i = j, j++) {
         if (otp[i].z >= BSCISDIST) {
@@ -549,21 +545,20 @@ static void drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
             n++;
         }
     }
-    if (n < 3) return;
+    if (n < 3) return 0;
 
-    // Project from camera space to screen space
+    // Project to screen space
     for (i = 0; i < n; i++) {
         f = orcam->h.z / tp[i].z;
         tp[i].x = tp[i].x * f + orcam->h.x;
         tp[i].y = tp[i].y * f + orcam->h.y;
     }
 
-    // Generate mono polygon from projected vertices
     mono_genfromloop(&plothead[0], &plothead[1], tp, n);
     if ((plothead[0] | plothead[1]) < 0) {
         mono_deloop(plothead[0]);
         mono_deloop(plothead[1]);
-        return;
+        return 0;
     }
 
     // === AND operation (flags & 1) ===
@@ -574,11 +569,16 @@ static void drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
             omph0 = mphnum;
             b->needsecscan = !(flags & CLIP_PORTAL_FLAG);
 
+            int before_mphnum = mphnum;
             for (i = mphnum - 1; i >= 0; i--)
                 if (mph[i].tag == mtag)
                     mono_bool(mph[i].head[0], mph[i].head[1],
                               plothead[0], plothead[1],
                               MONO_BOOL_AND, b, changetagfunc);
+
+            // NEW: Check if AND produced any new regions
+            if (mphnum > before_mphnum)
+                produced_output = 1;
 
             // Join adjacent monos with same tag
             for (l = omph0; l < mphnum; l++) {
@@ -608,16 +608,21 @@ static void drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
             else
                 mono_output = drawtagfunc_ws;
 
+            int before_eyepoln = eyepoln;
             for (i = mphnum - 1; i >= 0; i--)
                 if (mph[i].tag == mtag)
                     mono_bool(mph[i].head[0], mph[i].head[1],
                               plothead[0], plothead[1],
                               MONO_BOOL_AND, b, mono_output);
+
+            // NEW: Check if AND produced any eyepols
+            if (eyepoln > before_eyepoln)
+                produced_output = 1;
         }
     }
 
-    // === SUB operation (flags & 2) ===
-    if (flags & 2) {
+    // === SUB operation (flags & 2) - ONLY if AND produced output ===
+    if ((flags & 2) && produced_output) {
         j = (flags & 4) ? MONO_BOOL_SUB_REV : MONO_BOOL_SUB;
 
         b->gnewtag = mtag;
@@ -643,7 +648,6 @@ static void drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
             omph0++;
             for (j = omph0 - 1; j >= 0; j--) {
                 if (mph[j].tag != b->gnewtag) continue;
-            	// here tags are equal above, but head has value of like 15000 for a case when looking into floor.
                 if (!mono_join(mph[j].head[0], mph[j].head[1],
                                mph[k].head[0], mph[k].head[1], &i0, &i1)) continue;
                 for (i = 1; i >= 0; i--) {
@@ -662,6 +666,8 @@ static void drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
 
     mono_deloop(plothead[1]);
     mono_deloop(plothead[0]);
+
+    return produced_output;
 }
 // create plane EQ using GCAM
 static void gentransform_ceilflor(sect_t *sec, wall_t *wal, int isflor, bunchgrp *b)
@@ -844,11 +850,13 @@ static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bunchg
 
 		logstep("entering portal surf %d, sec:%d, depth:%d", isflor, sectnum, b->recursion_depth);
 
-		drawpol_befclip(mytag, nexttag,
+		int visible = drawpol_befclip(mytag, nexttag,
 						sectnum, portals[endpn].sect,
 						plothead[0], plothead[1],
 						((isflor << 2) + 3) | CLIP_PORTAL_FLAG, b);
-		draw_hsr_enter_portal(map, myport, b, plothead[0], plothead[1]);
+		if (visible) {
+							draw_hsr_enter_portal(map, myport, b, plothead[0], plothead[1]);
+						}
 	} else {
 		logstep("drawing solid surf %d, sec:%d, depth:%d", isflor, sectnum, b->recursion_depth);
 		drawpol_befclip(mytag, -1,
@@ -1001,11 +1009,15 @@ static void drawalls(int bid, mapstate_t *map, bunchgrp *b)
             	int endpn = portals[myport].destpn;
             	int nexttag = portals[endpn].sect + taginc * (b->recursion_depth + 1);
 
-            	drawpol_befclip(mytag, nexttag,
+            	int visible = drawpol_befclip(mytag, nexttag,
 								s, portals[endpn].sect,
 								plothead[0], plothead[1],
 								(((m > vn) << 2) + 3) | CLIP_PORTAL_FLAG, b);
-
+            	if (visible) {
+            		logstep("wall %d: m=%d, VISIBLE, ns=%d", w, m, ns);
+            	} else {
+            		logstep("wall %d: m=%d, not visible, skipping", w, m);
+            	}
                 draw_hsr_enter_portal(map, myport, b, plothead[0], plothead[1]);
             } else {
             	int inc = taginc * b->recursion_depth;
@@ -1018,10 +1030,15 @@ static void drawalls(int bid, mapstate_t *map, bunchgrp *b)
             	} else {
             		newtag = -1;  // Solid wall - will produce eyepol
             	}
-
             	logstep("wall %d: m=%d, ns=%d, s=%d, newtag=%d", w, m, ns, s, newtag);
-            	drawpol_befclip(s + inc, newtag, s, ns, plothead[0], plothead[1], ((m > vn) << 2) + 3, b);
-            }
+            	int visible = drawpol_befclip(mytag, newtag, s, ns, plothead[0], plothead[1],
+							   ((m > vn) << 2) + 3, b);
+
+            	if (visible) {
+            		logstep("wall %d: m=%d, VISIBLE, ns=%d", w, m, ns);
+            	} else {
+            		logstep("wall %d: m=%d, not visible, skipping", w, m);
+            	}}
         }
     }
 }
@@ -1190,6 +1207,15 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 		}
 		// In draw_hsr_ctx, replace the viewport setup:
 		else if (!b->has_portal_clip) {
+			    double far_dist = 1e6;
+    cam_t *cam = &b->orcam;
+
+    // Frustum corners in world space
+    xformbac(-1e5, -1e5, far_dist, &bord2[0], b);
+    xformbac(+1e5, -1e5, far_dist, &bord2[1], b);
+    xformbac(+1e5, +1e5, far_dist, &bord2[2], b);
+    xformbac(-1e5, +1e5, far_dist, &bord2[3], b);
+    n = 4;
 			// Screen-independent viewport - use huge bounds
 			double huge = 1e7;
 			bord2[0].x = -huge;
