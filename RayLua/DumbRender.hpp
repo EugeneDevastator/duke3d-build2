@@ -440,7 +440,6 @@ public:
                 draw_hsr_polymost(&ncam,map,0);
             }
         }
-        shadowtest2_setcam(cam);
         cam->p = playr->ipos; cam->r = playr->irig; cam->d = playr->idow; cam->f = playr->ifor;
         cam->h.x = playr->ghx; cam->h.y = playr->ghy; cam->h.z = playr->ghz;
     }

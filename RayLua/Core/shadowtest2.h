@@ -197,11 +197,6 @@ static void drawalls(mapstate_t *map, int s, int *walls, int wallcount, bdrawctx
 /** Renders sprites with lighting if available */
 void drawsprites();
 
-/** Sets camera parameters for shadow system
- * @param ncam New camera parameters
- */
-void shadowtest2_setcam(cam_t *ncam);
-
 /** Removes a light source and frees its memory
  * @param i Light index to delete
  */

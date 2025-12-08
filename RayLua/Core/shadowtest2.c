@@ -44,25 +44,16 @@ void logstep(const char* fmt, ...) {
 	printf("\n");
 }
 
-
-
 //--------------------------------------------------------------------------------------------------
 static tiletype gdd;
 int shadowtest2_rendmode = 1;
-extern int drawpoly_numcpu;
 int shadowtest2_updatelighting = 1;
-
-	//Sorting
-
 unsigned int *shadowtest2_sectgot = 0; //WARNING:code uses x86-32 bit shift trick!
 static unsigned int *shadowtest2_sectgotmal = 0;
 static int shadowtest2_sectgotn = 0;
 #define CLIP_PORTAL_FLAG 8
-//Translation & rotation
 static mapstate_t *curMap;
 static player_transform *gps;
-//static point3d b->gnadd;
-//static double b->xformmat[9], b->xformmatc, b->xformmats;
 
 	//Texture mapping parameters
 static tile_t *gtpic;
@@ -186,9 +177,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 	eyepoln++;
 	eyepol[eyepoln].vert0 = eyepolvn;
 	eyepol[eyepoln].rdepth = b->recursion_depth;
-
 }
-
 
 static void skytagfunc (int rethead0, int rethead1, bdrawctx* b){}
 
@@ -247,7 +236,6 @@ static void ligpoltagfunc(int rethead0, int rethead1, bdrawctx *b)
         mono_deloop(rethead[j]);
     }
 
-    // Rest unchanged...
     if (glp->ligpoln + 1 >= glp->ligpolmal)
     {
         glp->ligpolmal = max(glp->ligpolmal << 1, 256);
@@ -486,6 +474,7 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
 
     return produced_output;
 }
+
 // create plane EQ using GCAM
 static void gentransform_ceilflor(sect_t *sec, wall_t *wal, int isflor, bdrawctx *b)
 {
@@ -556,26 +545,7 @@ the final visible geometry ready for 2D projection.
 The b parameter is a bunch index - this function processes one "bunch" (visible sector group) at a time. The traversal logic is in the caller that:
 */// Transform world vertex through portal using wccw_transform
 // For infinity Z: transform XY at reference plane, preserve Z sign/magnitude
-static void portal_xform_world_at_z(double *x, double *y, double ref_z, bdrawctx *b) {
-	dpoint3d p;
-	p.x = *x;
-	p.y = *y;
-	p.z = ref_z;
-	wccw_transform(&p, &b->cam, &b->orcam);
-	*x = p.x;
-	*y = p.y;
-}
 
-static void portal_xform_world_full(double *x, double *y, double *z, bdrawctx *b) {
-	dpoint3d p;
-	p.x = *x;
-	p.y = *y;
-	p.z = *z;
-	wccw_transform(&p, &b->cam, &b->orcam);
-	*x = p.x;
-	*y = p.y;
-	*z = p.z;
-}
 // New function: draw sector floor/ceiling using FULL sector polygon
 static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bdrawctx *b)
 {
@@ -682,8 +652,6 @@ static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bdrawc
 	                    (isflor << 2) + 3, b);
     }
 }
-
-
 
 static void drawalls(mapstate_t *map, int s, int *walls, int wallcount, bdrawctx *b)
 {
@@ -915,7 +883,6 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
 	bs.has_portal_clip = false;
 	logstep("frame start");
 	draw_hsr_ctx(map,&bs);
-
 }
 
 void draw_hsr_ctx(mapstate_t *map, bdrawctx *newctx) {
@@ -958,9 +925,7 @@ void draw_hsr_ctx(mapstate_t *map, bdrawctx *newctx) {
 		glp = &shadowtest2_light[glignum];
 		//	if ((!(glp->flags&1)) || (!shadowtest2_useshadows)) return;
 	}
-
 	curMap = map;
-
 	//if ((map->numsects <= 0) || ((unsigned)gcam.cursect >= (unsigned)map->numsects))
 	//{
 	////if (shadowtest2_rendmode != 4) eyepoln = 0; //Prevents drawpollig() from crashing
@@ -1122,6 +1087,8 @@ void draw_hsr_ctx(mapstate_t *map, bdrawctx *newctx) {
 		int current_sec = -1;
 		int sec_walls[256];
 		int sec_wall_count = 0;
+if (b->has_portal_clip)
+	int x= 1;
 
 		for (int i = 0; i < b->jobcount; i++) {
 			wall_job_t *job = &b->jobs[i];
@@ -1155,7 +1122,6 @@ void draw_hsr_ctx(mapstate_t *map, bdrawctx *newctx) {
 			draw_sector_surface(i, 0, map, b); // Floor
 			draw_sector_surface(i, 1, map, b); // Ceiling
 		}
-
 		free(b->visited_walls);
 		free(b->visited_sectors); // NEW: Cleanup
 	}
@@ -1171,7 +1137,6 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport, bdrawctx *parentc
     if (parentctx->recursion_depth >= MAX_PORTAL_DEPTH) {
 		logstep("portal entrance aborted due to max depth.");
     	return;
-
     }
 
     cam_t ncam = parentctx->cam;
@@ -1194,7 +1159,6 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport, bdrawctx *parentc
 	point3d cam_local_d = world_to_local_vec(ncam.d, &ent.tr);
 	point3d cam_local_f = world_to_local_vec(ncam.f, &ent.tr);
 	//point3d cam_local_h = world_to_local_point(ncam.h, &ent.tr);
-
 
     // Step 2: Apply that same relative transform from the target portal's perspective
     // Since entry.forward points IN and target.forward points OUT (already opposite),
@@ -1237,27 +1201,13 @@ newctx.testignorewall = ignw;
 	logstep("Finished portal %d, mphnum:%d", myport, mphnum);
 }
 
-
-void drawsprites ()
-{
-}
-
-void shadowtest2_setcam (cam_t *ncam)
-{
-	//gcam = *ncam;
-}
-
 #if (USENEWLIGHT == 0)
 typedef struct { float n2, d2, n1, d1, n0, d0, filler0[2], glk[12], bsc, gsc, rsc, filler1[1]; } hlighterp_t;
 #else
 typedef struct { float gk[16], gk2[12], bsc, gsc, rsc, filler1[1]; } hlighterp_t;
 __declspec(align(16)) static const float hligterp_maxzero[4] = {0.f,0.f,0.f,0.f};
 #endif
-void prepligramp (float *ouvmat, point3d *norm, int lig, void *hl)
-{
-
-}
-
+void prepligramp (float *ouvmat, point3d *norm, int lig, void *hl){}
 
 int shadowtest2_isgotsectintersect (int lignum)
 {
@@ -1329,10 +1279,7 @@ void shadowtest2_ligpolreset (int ind)
 	}
 }
 
-void shadowtest2_uninit ()
-{
-
-}
+void shadowtest2_uninit (){}
 
 void shadowtest2_init ()
 {
@@ -1341,9 +1288,7 @@ void shadowtest2_init ()
 
 //--------------------------------------------------------------------------------------------------
 
-void drawpollig(int ei) {
-
-}
+void drawpollig(int ei) {}
 #if 0
 !endif
 #endif
