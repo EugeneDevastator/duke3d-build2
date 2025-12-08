@@ -262,35 +262,82 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
         i = mp[i].n;
     }
 
-    // Generate triangle strip vertices directly
-    int p0 = 0, p1 = 0;
-    bool use_chain0 = true;
+    // Determine which chain is "top" and which is "bottom" based on y-coordinates
+    // at the leftmost point
+    int start0 = 0, start1 = 0;
 
-    // Add first vertex from each chain
+    // Find leftmost points in each chain
+    for (int j = 1; j < count0; j++) {
+        if (mp[chain0[j]].x < mp[chain0[start0]].x) start0 = j;
+    }
+    for (int j = 1; j < count1; j++) {
+        if (mp[chain1[j]].x < mp[chain1[start1]].x) start1 = j;
+    }
+
+    // Determine strip order - start with the chain that has smaller x, or smaller y if x is equal
+    bool start_with_0;
+    if (fabs(mp[chain0[start0]].x - mp[chain1[start1]].x) < 1e-8) {
+        start_with_0 = (mp[chain0[start0]].y < mp[chain1[start1]].y);
+    } else {
+        start_with_0 = (mp[chain0[start0]].x < mp[chain1[start1]].x);
+    }
+
+    // Generate triangle strip vertices
+    int p0 = start0, p1 = start1;
     double wx, wy, wz;
-    mp_to_world(mp[chain0[0]].x, mp[chain0[0]].y, b, &wx, &wy, &wz, usecam);
-    eyepolv[eyepolvn].x = (float)wx;
-    eyepolv[eyepolvn].y = (float)wy;
-    eyepolv[eyepolvn].z = (float)wz;
-    eyepolvn++;
 
-    mp_to_world(mp[chain1[0]].x, mp[chain1[0]].y, b, &wx, &wy, &wz, usecam);
-    eyepolv[eyepolvn].x = (float)wx;
-    eyepolv[eyepolvn].y = (float)wy;
-    eyepolv[eyepolvn].z = (float)wz;
-    eyepolvn++;
+    // Add first two vertices
+    if (start_with_0) {
+        mp_to_world(mp[chain0[p0]].x, mp[chain0[p0]].y, b, &wx, &wy, &wz, usecam);
+        eyepolv[eyepolvn].x = (float)wx;
+        eyepolv[eyepolvn].y = (float)wy;
+        eyepolv[eyepolvn].z = (float)wz;
+        eyepolvn++;
 
-    p0++; p1++;
+        mp_to_world(mp[chain1[p1]].x, mp[chain1[p1]].y, b, &wx, &wy, &wz, usecam);
+        eyepolv[eyepolvn].x = (float)wx;
+        eyepolv[eyepolvn].y = (float)wy;
+        eyepolv[eyepolvn].z = (float)wz;
+        eyepolvn++;
+    } else {
+        mp_to_world(mp[chain1[p1]].x, mp[chain1[p1]].y, b, &wx, &wy, &wz, usecam);
+        eyepolv[eyepolvn].x = (float)wx;
+        eyepolv[eyepolvn].y = (float)wy;
+        eyepolv[eyepolvn].z = (float)wz;
+        eyepolvn++;
 
-    // Generate remaining vertices in strip order
-    while (p0 < count0 && p1 < count1) {
+        mp_to_world(mp[chain0[p0]].x, mp[chain0[p0]].y, b, &wx, &wy, &wz, usecam);
+        eyepolv[eyepolvn].x = (float)wx;
+        eyepolv[eyepolvn].y = (float)wy;
+        eyepolv[eyepolvn].z = (float)wz;
+        eyepolvn++;
+    }
+
+    // Advance pointers
+    p0 = (p0 + 1) % count0;
+    p1 = (p1 + 1) % count1;
+
+    // Continue strip generation
+    bool use_chain0 = !start_with_0; // Alternate from the starting pattern
+    int verts_added = 2;
+
+    while (verts_added < total_verts) {
         int next_idx;
-        if (use_chain0) {
+
+        if (use_chain0 && p0 != start0) {
             next_idx = chain0[p0];
-            p0++;
-        } else {
+            p0 = (p0 + 1) % count0;
+        } else if (!use_chain0 && p1 != start1) {
             next_idx = chain1[p1];
-            p1++;
+            p1 = (p1 + 1) % count1;
+        } else if (p0 != start0) {
+            next_idx = chain0[p0];
+            p0 = (p0 + 1) % count0;
+        } else if (p1 != start1) {
+            next_idx = chain1[p1];
+            p1 = (p1 + 1) % count1;
+        } else {
+            break; // Both chains exhausted
         }
 
         mp_to_world(mp[next_idx].x, mp[next_idx].y, b, &wx, &wy, &wz, usecam);
@@ -299,30 +346,8 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
         eyepolv[eyepolvn].z = (float)wz;
         eyepolvn++;
 
-        // Alternate between chains based on x-coordinate
-        if (p0 < count0 && p1 < count1) {
-            use_chain0 = (mp[chain0[p0]].x <= mp[chain1[p1]].x);
-        } else {
-            use_chain0 = (p0 < count0);
-        }
-    }
-
-    // Add remaining vertices
-    while (p0 < count0) {
-        mp_to_world(mp[chain0[p0]].x, mp[chain0[p0]].y, b, &wx, &wy, &wz, usecam);
-        eyepolv[eyepolvn].x = (float)wx;
-        eyepolv[eyepolvn].y = (float)wy;
-        eyepolv[eyepolvn].z = (float)wz;
-        eyepolvn++;
-        p0++;
-    }
-    while (p1 < count1) {
-        mp_to_world(mp[chain1[p1]].x, mp[chain1[p1]].y, b, &wx, &wy, &wz, usecam);
-        eyepolv[eyepolvn].x = (float)wx;
-        eyepolv[eyepolvn].y = (float)wy;
-        eyepolv[eyepolvn].z = (float)wz;
-        eyepolvn++;
-        p1++;
+        use_chain0 = !use_chain0; // Alternate between chains
+        verts_added++;
     }
 
     free(chain0);
@@ -349,6 +374,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
     mono_deloop(rethead1);
     mono_deloop(rethead0);
 }
+
 
 
 static void skytagfunc (int rethead0, int rethead1, bunchgrp* b){}

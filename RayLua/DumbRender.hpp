@@ -341,39 +341,6 @@ public:
             }
         }
     }
-    static bool draw_eyepol_scrspace(float sw, float sh, int i, int &v0dumm, int &vertCountdd) {
-        int v0 = eyepol[i].vert0;
-        int v1 = eyepol[i + 1].vert0;
-        int vertCount = v1 - v0;
-        if (vertCount < 3) return true;
-        // Check if polygon is clipped
-        float *ouvmat = eyepol[i].ouvmat;
-        {
-            //   BeginShaderMode(uvShader);
-            rlBegin(RL_TRIANGLES);
-            for (int j = 1; j < vertCount - 1; j++) {
-                int idx[] = {v0, v0 + j, v0 + j + 1};
-                for (int k = 0; k < 3; k++) {
-                    Vector2 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y};
-                    //float *ouvmat = eyepol[i].ouvmat;
-                    float depth = ouvmat[0] * pt.x + ouvmat[3] * pt.y + ouvmat[6];
-                    float u = ouvmat[1] * pt.x + ouvmat[4] * pt.y + ouvmat[7];
-                    float v = ouvmat[2] * pt.x + ouvmat[5] * pt.y + ouvmat[8];
-                    float f = 1.0 / depth;
-                    float final_u = u * f / (65536.0f * 64); // Corrected texture coordinate
-                    float final_v = v * f / (65536.0f * 64);
-                    rlColor4f(1, 1, fabs(depth), 0.2);
-                    rlTexCoord2f(final_u, final_v);
-                    //  rlNormal3f(0,1,0);
-                    rlVertex2f(pt.x, pt.y);
-                }
-            }
-            rlEnd();
-            // EndShaderMode();
-            rlDrawRenderBatchActive();
-        } // eypol polys
-        return false;
-    }
     static void DrawEyePoly(float sw, float sh, player_transform *playr, cam_t *cam) {
         dpoint3d dp, dr, dd, df;
         long i, j, k, l, m, flashlight1st;
@@ -487,7 +454,7 @@ public:
         if (!eyepol[i].has_triangulation) return true;
 
         rlDrawRenderBatchActive();
-        rlBegin(RL_TRIANGLES);
+        rlDisableBackfaceCulling();
 
         glEnable(GL_POLYGON_OFFSET_FILL);
         glPolygonOffset(-0.5f, 1.0f);
@@ -501,12 +468,10 @@ public:
             pts[j] = {p.x, -p.z, p.y};
         }
 
-        Color col = ColorFromNormalized({(float)eyepol[i].b2sect/3.0f, 0.8, (float)eyepol[i].rdepth/3.0f, 0.7});
+        Color col = ColorFromNormalized({(float)(i%10)/10.0f, (float)(i%4)/4.0f, (float)eyepol[i].rdepth/3.0f, 0.7});
         DrawTriangleStrip3D(pts, vertCount, col);
         free(pts);
 
-        rlEnd();
-        rlDrawRenderBatchActive();
         glDisable(GL_POLYGON_OFFSET_FILL);
         return false;
     }
@@ -575,6 +540,7 @@ public:
                 {
                     rlBegin(RL_LINES);
                     rlDisableDepthMask();
+                    rlDisableBackfaceCulling();
                     glEnable(GL_POLYGON_OFFSET_FILL);
                     glPolygonOffset(-1.0f, 1.0f);
                     rlColor4f(0, 1, 1, 1);
