@@ -476,44 +476,76 @@ public:
         cam->h.x = playr->ghx; cam->h.y = playr->ghy; cam->h.z = playr->ghz;
     }
 
-    static bool draw_eyepol_wspace(float sw, float sh, int i, int &v0, int &vertCount) {
-            v0 = eyepol[i].vert0;
-            int v1 = eyepol[i + 1].vert0;
-            vertCount = v1 - v0;
-            if (vertCount < 3) return true;
+    // Monotone polygon triangulation - O(n), no allocations needed
+    static bool draw_eyepol_wspace(float sw, float sh, int ei, int &v0, int &vertCount) {
+        v0 = eyepol[ei].vert0;
+        int v1 = eyepol[ei + 1].vert0;
+        vertCount = v1 - v0;
+        if (vertCount < 3) return true;
 
-            float *ouvmat = eyepol[i].ouvmat;
+        int split = eyepol[ei].chain1_start;
+
+        // Validate split - if invalid, use simple fan
+        if (split < 1 || split >= vertCount) {
+            split = vertCount; // Treat as single chain
+        }
+
+        int n0 = split; // Chain 0 vertex count
+        int n1 = vertCount - split; // Chain 1 vertex count
+
         rlDrawRenderBatchActive();
-           // BeginShaderMode(uvShader);
-            rlBegin(RL_TRIANGLES);
-            glEnable(GL_POLYGON_OFFSET_FILL);
-            glPolygonOffset(-0.5f, 1.0f);
-rlDisableDepthMask();
-        for (int j = 1; j < vertCount - 1; j++) {
-            int idx[] = {v0, v0 + j, v0 + j + 1};
+        rlBegin(RL_TRIANGLES);
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(-0.5f, 1.0f);
+        rlDisableDepthMask();
+
+        auto emit_tri = [&](int a, int b, int c) {
+            int idx[3] = {a, b, c};
             for (int k = 0; k < 3; k++) {
-                Vector3 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y, eyepolv[idx[k]].z};
+                point3d &p = eyepolv[idx[k]];
+                rlColor4f((float) eyepol[ei].b2sect / 43.0f, 0.2f,
+                          (float) eyepol[ei].rdepth / 3.0f, 0.7f);
+                rlVertex3f(p.x, -p.z, p.y);
+            }
+        };
 
-                // CORRECTED UV transformation
-                float u = ouvmat[1] * pt.x + ouvmat[4] * pt.y + ouvmat[7] * pt.z;
-                float v = ouvmat[2] * pt.x + ouvmat[5] * pt.y + ouvmat[8] * pt.z;
+        if (n1 == 0) {
+            // Single chain - simple fan triangulation
+            for (int j = 1; j < n0 - 1; j++) {
+                emit_tri(v0, v0 + j, v0 + j + 1);
+            }
+        } else {
+            // Two chains - build proper polygon order then fan triangulate
+            // Polygon order: chain0 forward, then chain1 REVERSED
+            // chain0: v0, v0+1, ..., v0+split-1
+            // chain1 reversed: v0+vertCount-1, v0+vertCount-2, ..., v0+split
 
-                float final_u = u ;/// (65536.0f);
-                float final_v = v;// / (65536.0f);
+            int *poly = (int *) alloca(vertCount * sizeof(int));
+            int pi = 0;
 
-                rlColor4f((float)eyepol[i].b2sect/3.0f, 0.2, (float)eyepol[i].rdepth/3.0f, 0.7);
-               // rlTexCoord2f(final_u, final_v);
-                rlVertex3f(pt.x, -pt.z, pt.y);
+            // Chain 0 forward
+            for (int j = 0; j < n0; j++) {
+                poly[pi++] = v0 + j;
+            }
+            // Chain 1 reversed
+            for (int j = n1 - 1; j >= 0; j--) {
+                poly[pi++] = v0 + split + j;
+            }
+
+            // Fan triangulate from poly[0]
+            for (int j = 1; j < vertCount - 1; j++) {
+                emit_tri(poly[0], poly[j], poly[j + 1]);
             }
         }
 
-            rlEnd();
-       //     EndShaderMode();
-            rlDrawRenderBatchActive();
+        rlEnd();
+        rlDrawRenderBatchActive();
         glDisable(GL_POLYGON_OFFSET_FILL);
-            return false;
-        }
-
+        rlEnableDepthMask();
+        printf("eyepol %d: verts=%d, split=%d, n0=%d, n1=%d\n",
+               ei, vertCount, split, n0, n1);
+        return false;
+}
     static void DrawPost3d(float sw, float sh, Camera3D camsrc) {
         // Vector2 v1 = {0, 0};
         // Vector2 v2 = {sw, sh};
@@ -581,12 +613,12 @@ rlDisableDepthMask();
                     glPolygonOffset(-1.0f, 1.0f);
                     rlColor4f(0, 1, 1, 1);
                     for (int j = 0; j < vertCount; j++) {
-                       //int idx[] = {v0, v0 + j, v0 + j + 1};
-                       //for (int k = 0; k < 3; k++) {
-                           // Vector3 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y,eyepolv[idx[k]].z};
-                            Vector3 pt = {eyepolv[v0+j].x, eyepolv[v0+j].y,eyepolv[v0+j].z};
+                       int idx[] = {v0, v0 + j, v0 + j + 1};
+                       for (int k = 0; k < 3; k++) {
+                            Vector3 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y,eyepolv[idx[k]].z};
+                          //  Vector3 pt = {eyepolv[v0+j].x, eyepolv[v0+j].y,eyepolv[v0+j].z};
                             rlVertex3f(pt.x,-pt.z, pt.y);
-                       // }
+                        }
                     }
                     Vector3 pt = {eyepolv[v0].x, eyepolv[v0].y,eyepolv[v0].z};
                     rlVertex3f(pt.x,-pt.z, pt.y);
@@ -1584,7 +1616,7 @@ private:
             if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
             map->blankheadspri = i;
         }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/prt3.MAP", map);
+        loadmap_imp((char*)"c:/Eugene/Games/build2/prt4.MAP", map);
     }
 };
 

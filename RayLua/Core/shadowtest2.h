@@ -63,6 +63,7 @@ typedef struct {
     float ouvmat[9];                    // inverse perspective transformation
     point3d norm;                       // Surface normal vector
     int rdepth;
+    int chain1_start; // NEW: index where chain 1 begins (relative to vert0)
 } eyepol_t;
 
 // ================================================================================================

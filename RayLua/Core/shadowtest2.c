@@ -296,13 +296,17 @@ point3d *eyepolv = 0; //16384 point2d's  = 128KB
 int eyepoln = 0, glignum = 0;
 int eyepolmal = 0, eyepolvn = 0, eyepolvmal = 0;
 
+// In drawtagfunc_ws - fix the chain1_start calculation:
 static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 {
-	cam_t *usecam = &b->orcam;  // Changed from cam_transform_t to cam_t*
+	cam_t *usecam = &b->orcam;
 	int i, h, rethead[2];
 
 	if ((rethead0|rethead1) < 0) { mono_deloop(rethead1); mono_deloop(rethead0); return; }
 	rethead[0] = rethead0; rethead[1] = rethead1;
+
+	int start_vert = eyepolvn;
+	int chain0_end = 0;  // Will mark where chain 0 ends
 
 	for(h=0; h<2; h++)
 	{
@@ -327,10 +331,15 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 
 			if (!h) i = mp[i].n;
 		} while (i != rethead[h]);
+
+		if (h == 0) {
+			chain0_end = eyepolvn - start_vert;  // Record split point
+		}
+
 		mono_deloop(rethead[h]);
 	}
 
-	// Rest unchanged...
+	// Allocate eyepol entry
 	if (eyepoln+1 >= eyepolmal)
 	{
 		eyepolmal = max(eyepolmal<<1, 4096);
@@ -339,7 +348,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 	}
 
 	memcpy((void *)eyepol[eyepoln].ouvmat, (void *)b->gouvmat, sizeof(b->gouvmat[0])*9);
-
+	eyepol[eyepoln].chain1_start = chain0_end;  // Store the split
 	eyepol[eyepoln].tpic = gtpic;
 	eyepol[eyepoln].curcol = gcurcol;
 	eyepol[eyepoln].flags = (b->gflags != 0);
@@ -350,7 +359,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 	eyepoln++;
 	eyepol[eyepoln].vert0 = eyepolvn;
 	eyepol[eyepoln].rdepth = b->recursion_depth;
-	logstep("produce eyepol, depth:%d",b->recursion_depth);
+
 }
 
 /*
