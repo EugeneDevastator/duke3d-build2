@@ -444,7 +444,25 @@ public:
         cam->p = playr->ipos; cam->r = playr->irig; cam->d = playr->idow; cam->f = playr->ifor;
         cam->h.x = playr->ghx; cam->h.y = playr->ghy; cam->h.z = playr->ghz;
     }
+    static void DrawTriangleFan3D(const Vector3 *points, int pointCount, Color color)
+    {
+        if (pointCount >= 3)
+        {
+            //rlSetTexture(GetShapesTexture().id);
+            rlBegin(RL_QUADS);
+            rlColor4ub(color.r, color.g, color.b, color.a);
 
+            for (int i = 1; i < pointCount - 1; i++)
+            {
+               rlVertex3f(points[0].x, points[0].y,points[0].z);
+               rlVertex3f(points[i].x, points[i].y, points[i].z);
+                rlVertex3f(points[i + 1].x, points[i + 1].y, points[i + 1].z);
+                rlVertex3f(points[i + 1].x, points[i + 1].y, points[i + 1].z);
+            }
+            rlEnd();
+            //rlSetTexture(0);
+        }
+    }
     // Monotone polygon triangulation - O(n), no allocations needed
     static bool draw_eyepol_wspace(float sw, float sh, int i, int &v0, int &vertCount) {
         v0 = eyepol[i].vert0;
@@ -466,22 +484,12 @@ public:
             point3d p = eyepolv[v0 + j];
             pts[j] = {p.x, -p.z, p.y};
         }
+        unsigned char r = ((i)/5.0f)*255;
+        rlColor4ub(r,128,3,40);
+        //DrawTriangleFan3D(pts,vertCount,{r,128,3,30});
+        TriangAndDraw3D(pts,vertCount);
+        rlDrawRenderBatchActive();
 
-        Color col = ColorFromNormalized({(float)(i%10)/10.0f, (float)(i%4)/4.0f, (float)eyepol[i].rdepth/3.0f, 0.7});
-
-        // Debug: draw individual triangles to see winding
-        for (int j = 0; j < vertCount - 2; j++) {
-            int i0 = j;
-            int i1 = j + 1;
-            int i2 = j + 2;
-
-            // Triangle strip: even triangles use (i, i+1, i+2), odd use (i+1, i, i+2)
-            if (j % 2 == 0) {
-                DrawTriangle3D(pts[i0], pts[i1], pts[i2], col);
-            } else {
-                DrawTriangle3D(pts[i1], pts[i0], pts[i2], col);
-            }
-        }
 
         free(pts);
 
@@ -558,6 +566,7 @@ public:
                     glPolygonOffset(-1.0f, 1.0f);
                     rlColor4f(0, 1, 1, 1);
                     for (int j = 0; j < vertCount; j++) {
+                        rlColor4f(1, i/10.0f, 0, 1);
                        //int idx[] = {v0, v0 + j, v0 + j + 1};
                        //for (int k = 0; k < 3; k++) {
                           //  Vector3 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y,eyepolv[idx[k]].z};
@@ -1160,6 +1169,46 @@ public:
             }
         }
     }
+    static void TriangAndDraw3D(Vector3 *points, int count)
+    {
+        if (count < 3 || !points) return;
+
+        // Convert Vector3 points to 2D for triangulation
+        float* polyVertices = (float*)malloc(count * 2 * sizeof(float));
+        for (int i = 0; i < count; i++)
+        {
+            polyVertices[i * 2] = points[i].x;
+            polyVertices[i * 2 + 1] = points[i].z; // Use Z as Y for 2D triangulation
+        }
+
+        // Prepare triangulation output
+        int maxTriangles = count - 2;
+        unsigned short* indices = (unsigned short*)malloc(maxTriangles * 3 * sizeof(unsigned short));
+
+        // Triangulate the polygon
+        int triangleCount = DumbRender::TriangulatePolygon(polyVertices, count, indices);
+
+        // Draw triangulated mesh
+        rlBegin(RL_TRIANGLES);
+
+
+        for (int tri = 0; tri < triangleCount; tri++)
+        {
+            for (int vert = 0; vert < 3; vert++)
+            {
+                int idx = indices[tri * 3 + vert];
+                Vector3 pt = points[idx];
+                rlVertex3f(pt.x, pt.y, pt.z);
+            }
+        }
+
+        rlEnd();
+
+        // Cleanup
+        free(polyVertices);
+        free(indices);
+    }
+
 
     // Call every frame
     static void DrawMapstateTexOld(Camera3D cam)

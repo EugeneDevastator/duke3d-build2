@@ -212,10 +212,73 @@ static void xformbac(double rx, double ry, double rz, dpoint3d *o, bunchgrp *b)
 	o->z = rx * cam->r.z + ry * cam->d.z + rz * cam->f.z;
 }
 
+static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
+{
+	cam_t *usecam = &b->orcam;
+	int i, h, rethead[2];
 
+	if ((rethead0|rethead1) < 0) { mono_deloop(rethead1); mono_deloop(rethead0); return; }
+	rethead[0] = rethead0; rethead[1] = rethead1;
+
+	int start_vert = eyepolvn;
+	int chain0_end = 0;  // Will mark where chain 0 ends
+
+	for(h=0; h<2; h++)
+	{
+		i = rethead[h];
+		do
+		{
+			if (h) i = mp[i].p;
+
+			if (eyepolvn >= eyepolvmal)
+			{
+				eyepolvmal = max(eyepolvmal<<1, 16384);
+				eyepolv = (point3d *)realloc(eyepolv, eyepolvmal*sizeof(point3d));
+			}
+
+			double wx, wy, wz;
+			mp_to_world(mp[i].x, mp[i].y, b, &wx, &wy, &wz, usecam);
+
+			eyepolv[eyepolvn].x = (float)wx;
+			eyepolv[eyepolvn].y = (float)wy;
+			eyepolv[eyepolvn].z = (float)wz;
+			eyepolvn++;
+
+			if (!h) i = mp[i].n;
+		} while (i != rethead[h]);
+
+		if (h == 0) {
+			chain0_end = eyepolvn - start_vert;  // Record split point
+		}
+
+		mono_deloop(rethead[h]);
+	}
+
+	// Allocate eyepol entry
+	if (eyepoln+1 >= eyepolmal)
+	{
+		eyepolmal = max(eyepolmal<<1, 4096);
+		eyepol = (eyepol_t *)realloc(eyepol, eyepolmal*sizeof(eyepol_t));
+		eyepol[0].vert0 = 0;
+	}
+
+	memcpy((void *)eyepol[eyepoln].ouvmat, (void *)b->gouvmat, sizeof(b->gouvmat[0])*9);
+	eyepol[eyepoln].chain1_start = chain0_end;  // Store the split
+	eyepol[eyepoln].tpic = gtpic;
+	eyepol[eyepoln].curcol = gcurcol;
+	eyepol[eyepoln].flags = (b->gflags != 0);
+	eyepol[eyepoln].b2sect = b->gligsect;
+	eyepol[eyepoln].b2wall = b->gligwall;
+	eyepol[eyepoln].b2slab = b->gligslab;
+	memcpy((void *)&eyepol[eyepoln].norm, (void *)&b->gnorm, sizeof(b->gnorm));
+	eyepoln++;
+	eyepol[eyepoln].vert0 = eyepolvn;
+	eyepol[eyepoln].rdepth = b->recursion_depth;
+
+}
 // In drawtagfunc_ws - fix the chain1_start calculation:
 // Replace the mono_triangulate_strip function with this simpler approach
-static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
+static void drawtagfunc_ws_strip(int rethead0, int rethead1, bunchgrp *b)
 {
     cam_t *usecam = &b->orcam;
 
@@ -224,14 +287,14 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
         mono_deloop(rethead0);
         return;
     }
-    // Generate triangle strip vertices from monotone polygon
+
     point3d *chain1;
     point3d *chain2;
-    int mono_count;
-	int c1count;
-	int c2count;
-    int has_triangulation = mono_generate_eyepol(rethead0, rethead1, &chain1,&chain2, &c1count,&c2count);
-	mono_count=c1count+c2count;
+    int c1count;
+    int c2count;
+    int has_triangulation = mono_generate_eyepol(rethead0, rethead1, &chain1, &chain2, &c1count, &c2count);
+    int mono_count = c1count + c2count;
+
     if (!has_triangulation || mono_count < 3) {
         if (chain1) free(chain1);
         if (chain2) free(chain2);
@@ -251,41 +314,61 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
         eyepol = (eyepol_t *)realloc(eyepol, eyepolmal * sizeof(eyepol_t));
         eyepol[0].vert0 = 0;
     }
-	printf("chain1 for eyepolvn:/n");
 
-    // Transform and copy vertices to eyepolv
-	// we get proper monotone coords after mp to world.
+    // Transform chains to world coordinates
     for (int i = 0; i < c1count; i++) {
         double wx, wy, wz;
         mp_to_world(chain1[i].x, chain1[i].y, b, &wx, &wy, &wz, usecam);
-
         chain1[i].x = (float)wx;
         chain1[i].y = (float)wy;
         chain1[i].z = (float)wz;
-    		printf("(%.2f,%.2f) ", chain1[i].x, chain1[i].y);
     }
-	printf("chain2 for eyepolvn:/n");
-	for (int i = 0; i < c2count; i++) {
-		double wx, wy, wz;
-		mp_to_world(chain2[i].x, chain2[i].y, b, &wx, &wy, &wz, usecam);
 
-		chain2[eyepolvn].x = (float)wx;
-		chain2[eyepolvn].y = (float)wy;
-		chain2[eyepolvn].z = (float)wz;
-		printf("(%.2f,%.2f) ", chain1[i].x, chain1[i].y);
-	}
+    for (int i = 0; i < c2count; i++) {
+        double wx, wy, wz;
+        mp_to_world(chain2[i].x, chain2[i].y, b, &wx, &wy, &wz, usecam);
+        chain2[i].x = (float)wx;
+        chain2[i].y = (float)wy;
+        chain2[i].z = (float)wz;
+    }
 
-    // Set monotone up eyepol entry
-	//
-    // // chain 1: x increases;
-    // // chain2 : x decreases;
-    // chain1[0]~= chain2[last] almost equal.
-	// last in chain2 can be bigger than pre-last.
-	// need to create intermediate sorted array before creating eyepoln.
-	// eyepoln must be filled in triangle strip sequence.
+    // Create triangle strip from monotone chains
+    // Assume chain1[0] and chain2[c2count-1] are the same vertex (top)
+    // chain1 goes left-to-right, chain2 goes right-to-left
 
+    int strip_idx = eyepolvn;
+    int i1 = 0, i2 = c2count - 1;
+
+    // Start with top vertex
+
+    eyepolv[strip_idx++] = chain1[0];
+    i1++;
+	printf ("\n\n Tri strip debug:\n");
+    // Alternate between chains based on x-coordinate to maintain strip order
+    while (i1 < c1count && i2 >= 0) {
+        if (i1 < c1count && (i2 < 0 || chain1[i1].x <= chain2[i2].x)) {
+        	printf("c1(%.2f,%.2f) ", chain1[i1].x, chain1[i1].z);
+        	eyepolv[strip_idx++] = chain1[i1++];
+
+        } else {
+        	printf("c2(%.2f,%.2f) ", chain2[i2].x, chain1[i2].z);
+            eyepolv[strip_idx++] = chain2[i2--];
+        }
+    }
+	printf ("tri strip remainder\n");
+    // Add remaining vertices
+    while (i1 < c1count) {
+		printf("c1(%.2f,%.2f) ", chain1[i1].x, chain1[i1].z);
+        eyepolv[strip_idx++] = chain1[i1++];
+    }
+    while (i2 >= 0) {
+    	printf("c2(%.2f,%.2f) ", chain2[i2].x, chain1[i2].z);
+        eyepolv[strip_idx++] = chain2[i2--];
+    }
+
+    // Set up eyepol entry
     eyepol[eyepoln].tri_strip.indices = NULL;
-    eyepol[eyepoln].tri_strip.count = mono_count;
+    eyepol[eyepoln].tri_strip.count = strip_idx - eyepolvn;
     eyepol[eyepoln].tri_strip.capacity = 0;
     eyepol[eyepoln].has_triangulation = true;
 
@@ -297,14 +380,133 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
     eyepol[eyepoln].b2wall = b->gligwall;
     eyepol[eyepoln].b2slab = b->gligslab;
     memcpy((void *)&eyepol[eyepoln].norm, (void *)&b->gnorm, sizeof(b->gnorm));
+
+    eyepolvn = strip_idx;
     eyepoln++;
     eyepol[eyepoln].vert0 = eyepolvn;
     eyepol[eyepoln].rdepth = b->recursion_depth;
 
+    free(chain1);
+    free(chain2);
     mono_deloop(rethead1);
     mono_deloop(rethead0);
 }
+/* fan
+static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
+{
+    cam_t *usecam = &b->orcam;
 
+    if ((rethead0|rethead1) < 0) {
+        mono_deloop(rethead1);
+        mono_deloop(rethead0);
+        return;
+    }
+
+    point3d *chain1;
+    point3d *chain2;
+    int c1count;
+    int c2count;
+    int has_triangulation = mono_generate_eyepol(rethead0, rethead1, &chain1, &chain2, &c1count, &c2count);
+    int mono_count = c1count + c2count;
+
+    if (!has_triangulation || mono_count < 3) {
+        if (chain1) free(chain1);
+        if (chain2) free(chain2);
+        mono_deloop(rethead1);
+        mono_deloop(rethead0);
+        return;
+    }
+
+    // Allocate space in eyepolv
+    if (eyepolvn + mono_count >= eyepolvmal) {
+        eyepolvmal = max(eyepolvmal << 1, eyepolvn + mono_count + 1024);
+        eyepolv = (point3d *)realloc(eyepolv, eyepolvmal * sizeof(point3d));
+    }
+
+    if (eyepoln + 1 >= eyepolmal) {
+        eyepolmal = max(eyepolmal << 1, 4096);
+        eyepol = (eyepol_t *)realloc(eyepol, eyepolmal * sizeof(eyepol_t));
+        eyepol[0].vert0 = 0;
+    }
+
+    // Transform chains to world coordinates
+    for (int i = 0; i < c1count; i++) {
+        double wx, wy, wz;
+        mp_to_world(chain1[i].x, chain1[i].y, b, &wx, &wy, &wz, usecam);
+        chain1[i].x = (float)wx;
+        chain1[i].y = (float)wy;
+        chain1[i].z = (float)wz;
+    }
+
+    for (int i = 0; i < c2count; i++) {
+        double wx, wy, wz;
+        mp_to_world(chain2[i].x, chain2[i].y, b, &wx, &wy, &wz, usecam);
+        chain2[i].x = (float)wx;
+        chain2[i].y = (float)wy;
+        chain2[i].z = (float)wz;
+    }
+
+    // Create triangle strip from monotone chains
+    // Assume chain1[0] and chain2[c2count-1] are the same vertex (top)
+    // chain1 goes left-to-right, chain2 goes right-to-left
+
+	// Alternative: Fan triangulation for monotone polygons
+	int strip_idx = eyepolvn;
+
+	// Find the topmost vertex (highest y)
+	int top_idx = 0;
+	for (int i = 1; i < c1count; i++) {
+		if (chain1[i].y > chain1[top_idx].y) {
+			top_idx = i;
+		}
+	}
+
+	// Create triangle fan from top vertex
+	eyepolv[strip_idx++] = chain1[top_idx]; // Center vertex
+
+	// Add chain1 vertices (left side)
+	for (int i = 0; i < c1count; i++) {
+		if (i != top_idx) {
+			eyepolv[strip_idx++] = chain1[i];
+		}
+	}
+
+	// Add chain2 vertices (right side) in reverse order
+	for (int i = c2count - 1; i >= 0; i--) {
+		eyepolv[strip_idx++] = chain2[i];
+	}
+
+	// Close the fan
+	if (strip_idx > eyepolvn + 1) {
+		eyepolv[strip_idx++] = eyepolv[eyepolvn + 1]; // First vertex after center
+	}
+
+    // Set up eyepol entry
+    eyepol[eyepoln].tri_strip.indices = NULL;
+    eyepol[eyepoln].tri_strip.count = strip_idx - eyepolvn;
+    eyepol[eyepoln].tri_strip.capacity = 0;
+    eyepol[eyepoln].has_triangulation = true;
+
+    memcpy((void *)eyepol[eyepoln].ouvmat, (void *)b->gouvmat, sizeof(b->gouvmat[0])*9);
+    eyepol[eyepoln].tpic = gtpic;
+    eyepol[eyepoln].curcol = gcurcol;
+    eyepol[eyepoln].flags = (b->gflags != 0);
+    eyepol[eyepoln].b2sect = b->gligsect;
+    eyepol[eyepoln].b2wall = b->gligwall;
+    eyepol[eyepoln].b2slab = b->gligslab;
+    memcpy((void *)&eyepol[eyepoln].norm, (void *)&b->gnorm, sizeof(b->gnorm));
+
+    eyepolvn = strip_idx;
+    eyepoln++;
+    eyepol[eyepoln].vert0 = eyepolvn;
+    eyepol[eyepoln].rdepth = b->recursion_depth;
+
+    free(chain1);
+    free(chain2);
+    mono_deloop(rethead1);
+    mono_deloop(rethead0);
+}
+*/
 static void skytagfunc (int rethead0, int rethead1, bunchgrp* b){}
 
 /*
@@ -316,6 +518,7 @@ static void skytagfunc (int rethead0, int rethead1, bunchgrp* b){}
  */
 static void ligpoltagfunc(int rethead0, int rethead1, bunchgrp *b)
 {
+	return;// - revert this
     cam_t *gcam = &b->cam;
     float f;
     int i, j, rethead[2];
@@ -324,7 +527,7 @@ static void ligpoltagfunc(int rethead0, int rethead1, bunchgrp *b)
 
     rethead[0] = rethead0;
     rethead[1] = rethead1;
-	mono_triangulate_strip(rethead0, rethead1, &glp->ligpol[glp->ligpoln].tri_strip);
+	//mono_triangulate_strip(rethead0, rethead1, &glp->ligpol[glp->ligpoln].tri_strip);
 	glp->ligpol[glp->ligpoln].has_triangulation = true;
     for (j = 0; j < 2; j++)
     {
@@ -830,7 +1033,7 @@ static void drawalls(int bid, mapstate_t *map, bunchgrp *b)
 
     // Remove bunch from list
     b->bunchn--;
-return;
+
     bool noportals = b->recursion_depth >= MAX_PORTAL_DEPTH;
 
     // === WALLS ONLY ===
@@ -1146,10 +1349,11 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
     cam_t *cam = &b->orcam;
 
     // Frustum corners in world space
-    xformbac(-1e5, -1e5, far_dist, &bord2[0], b);
-    xformbac(+1e5, -1e5, far_dist, &bord2[1], b);
-    xformbac(+1e5, +1e5, far_dist, &bord2[2], b);
-    xformbac(-1e5, +1e5, far_dist, &bord2[3], b);
+			float mc = 900; far_dist = 900;
+    xformbac(-mc, -mc, far_dist, &bord2[0], b);
+    xformbac(+mc, -mc, far_dist, &bord2[1], b);
+    xformbac(+mc, +mc, far_dist, &bord2[2], b);
+    xformbac(-mc, +mc, far_dist, &bord2[3], b);
     n = 4;
 			// Screen-independent viewport - use huge bounds
 			double huge = 1e7;
