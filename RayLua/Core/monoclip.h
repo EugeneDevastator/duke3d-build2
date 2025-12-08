@@ -24,6 +24,8 @@ typedef struct {
 	int count;
 	int capacity;
 } triangle_strip_t;
+
+
 //Mono Polygon Head
 typedef struct {
 	int head[2], tag;
@@ -69,10 +71,17 @@ void mono_triangulate_strip(int hd0, int hd1, triangle_strip_t *strip);
 void strip_init(triangle_strip_t *strip);
 void strip_free(triangle_strip_t *strip);
 void strip_add(triangle_strip_t *strip, int index);
+
+typedef struct {
+	int sec, wall;
+	float dist;
+} wall_job_t;
 typedef struct {
 	bunch_t *bunch;
 	int bunchn, bunchmal;
-
+	float *bunchdist;  // Distance cache for sorting
+	wall_job_t *jobs;
+	int jobcount, jobcap;
 	bfint_t bfint[BFINTMAX];
 	int bfintn, bfintlut[BFINTMAX+1];
 // other context stuff
@@ -91,6 +100,8 @@ typedef struct {
 	int testignoresec;
 	int planecuts;
 	int prevsec,newsec;
+
+
 } bunchgrp;
 
 extern mp_t *mp;

@@ -152,6 +152,123 @@ static int prepbunch(int id, bunchverts_t *twal, bunchgrp *b) {
 	}
 	return (n);
 }
+static void queue_sector_walls(int sectnum, bunchgrp *b) {
+    if (b->sectgot[sectnum >> 5] & (1 << sectnum)) return;
+    b->sectgot[sectnum >> 5] |= (1 << sectnum);
+
+    sect_t *sec = &curMap->sect[sectnum];
+    wall_t *wal = sec->wall;
+
+    for (int i = 0; i < sec->n; i++) {
+        int j = wal[i].n + i;
+        double dx0 = wal[i].x - b->cam.p.x;
+        double dy0 = wal[i].y - b->cam.p.y;
+        double dx1 = wal[j].x - b->cam.p.x;
+        double dy1 = wal[j].y - b->cam.p.y;
+
+        // Backface cull
+        if (dy1 * dx0 <= dx1 * dy0) continue;
+
+        // Queue wall
+        if (b->jobcount >= b->jobcap) {
+            b->jobcap = b->jobcap ? b->jobcap * 2 : 256;
+            b->jobs = (wall_job_t *)realloc(b->jobs, b->jobcap * sizeof(wall_job_t));
+        }
+
+        b->jobs[b->jobcount].sec = sectnum;
+        b->jobs[b->jobcount].wall = i;
+        b->jobs[b->jobcount].dist = dx0*dx0 + dy0*dy0;  // Squared distance
+        b->jobcount++;
+    }
+}
+// Simple sort comparator
+static int wall_dist_cmp(const void *a, const void *b) {
+    float da = ((wall_job_t*)a)->dist;
+    float db = ((wall_job_t*)b)->dist;
+    return (da > db) - (da < db);
+}
+static void draw_single_wall(int sectnum, int wallnum, bunchgrp *b) {
+    sect_t *sec = &curMap->sect[sectnum];
+    wall_t *wal = sec->wall;
+    int w = wallnum;
+    int nw = wal[w].n + w;
+
+    // Get all vertical slabs for this wall
+    vertlist_t verts[MAXVERTS];
+    int vn = getwalls_imp(sectnum, w, verts, MAXVERTS, curMap);
+
+    // Build base trapezoid
+    dpoint3d pol[4];
+    pol[0].x = wal[w].x;  pol[0].y = wal[w].y;
+    pol[1].x = wal[nw].x; pol[1].y = wal[nw].y;
+    pol[0].z = getslopez(&sec[sectnum], 0, pol[0].x, pol[0].y);
+    pol[1].z = getslopez(&sec[sectnum], 0, pol[1].x, pol[1].y);
+    pol[2] = pol[1]; pol[2].z = getslopez(&sec[sectnum], 1, pol[2].x, pol[2].y);
+    pol[3] = pol[0]; pol[3].z = getslopez(&sec[sectnum], 1, pol[3].x, pol[3].y);
+
+    // Setup normal
+    b->gnorm.x = wal[w].y - wal[nw].y;
+    b->gnorm.y = wal[nw].x - wal[w].x;
+    b->gnorm.z = 0;
+    float f = 1.0f / sqrt(b->gnorm.x*b->gnorm.x + b->gnorm.y*b->gnorm.y);
+    b->gnorm.x *= f; b->gnorm.y *= f;
+
+    double opolz[4] = {pol[0].z, pol[1].z, 0, 0};
+
+    // Process each slab
+    for (int m = 0; m <= (vn << 1); m++) {
+        opolz[0] = opolz[3];
+        opolz[1] = opolz[2];
+
+        if (m == (vn << 1)) {
+            opolz[2] = pol[2].z;
+            opolz[3] = pol[3].z;
+        } else {
+            opolz[2] = getslopez(&curMap->sect[verts[m>>1].s], m&1, pol[2].x, pol[2].y);
+            opolz[3] = getslopez(&curMap->sect[verts[m>>1].s], m&1, pol[3].x, pol[3].y);
+        }
+
+        // Skip degenerate
+        if ((max(pol[0].z, opolz[0]) >= min(pol[3].z, opolz[3]) - 1e-4) &&
+            (max(pol[1].z, opolz[1]) >= min(pol[2].z, opolz[2]) - 1e-4))
+            continue;
+
+        // Build trapezoid, transform, clip
+        dpoint3d trap1[4] = {
+            {pol[0].x, pol[0].y, pol[0].z}, {pol[1].x, pol[1].y, pol[1].z},
+            {pol[2].x, pol[2].y, pol[2].z}, {pol[3].x, pol[3].y, pol[3].z}
+        };
+        dpoint3d trap2[4] = {
+            {pol[0].x, pol[0].y, opolz[0]}, {pol[1].x, pol[1].y, opolz[1]},
+            {pol[2].x, pol[2].y, opolz[2]}, {pol[3].x, pol[3].y, opolz[3]}
+        };
+
+        for (int i = 0; i < 4; i++) {
+            wccw_transform(&trap1[i], &b->cam, &b->orcam);
+            wccw_transform(&trap2[i], &b->cam, &b->orcam);
+        }
+
+        int plothead[2];
+        dpoint3d p0 = pol[0], p1 = pol[1];
+        wccw_transform(&p0, &b->cam, &b->orcam);
+        wccw_transform(&p1, &b->cam, &b->orcam);
+
+        if (!intersect_traps_mono_points(p0, p1, trap1, trap2, &plothead[0], &plothead[1]))
+            continue;
+
+        // Setup texture transform
+        b->gligsect = sectnum;
+        b->gligwall = w;
+        b->gligslab = m;
+
+        int ns = (m & 1) ? -1 : (vn ? verts[m>>1].s : -1);
+        int mytag = sectnum + taginc * b->recursion_depth;
+        int newtag = (ns >= 0) ? ns + taginc * b->recursion_depth : -1;
+
+        drawpol_befclip(mytag, newtag, sectnum, ns,
+                        plothead[0], plothead[1], 3, b);
+    }
+}
 
 #define BUNCHNEAR 1e-7
 static void scansector(int sectnum, bunchgrp *b)
@@ -391,122 +508,7 @@ static void drawtagfunc_ws_strip(int rethead0, int rethead1, bunchgrp *b)
     mono_deloop(rethead1);
     mono_deloop(rethead0);
 }
-/* fan
-static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
-{
-    cam_t *usecam = &b->orcam;
 
-    if ((rethead0|rethead1) < 0) {
-        mono_deloop(rethead1);
-        mono_deloop(rethead0);
-        return;
-    }
-
-    point3d *chain1;
-    point3d *chain2;
-    int c1count;
-    int c2count;
-    int has_triangulation = mono_generate_eyepol(rethead0, rethead1, &chain1, &chain2, &c1count, &c2count);
-    int mono_count = c1count + c2count;
-
-    if (!has_triangulation || mono_count < 3) {
-        if (chain1) free(chain1);
-        if (chain2) free(chain2);
-        mono_deloop(rethead1);
-        mono_deloop(rethead0);
-        return;
-    }
-
-    // Allocate space in eyepolv
-    if (eyepolvn + mono_count >= eyepolvmal) {
-        eyepolvmal = max(eyepolvmal << 1, eyepolvn + mono_count + 1024);
-        eyepolv = (point3d *)realloc(eyepolv, eyepolvmal * sizeof(point3d));
-    }
-
-    if (eyepoln + 1 >= eyepolmal) {
-        eyepolmal = max(eyepolmal << 1, 4096);
-        eyepol = (eyepol_t *)realloc(eyepol, eyepolmal * sizeof(eyepol_t));
-        eyepol[0].vert0 = 0;
-    }
-
-    // Transform chains to world coordinates
-    for (int i = 0; i < c1count; i++) {
-        double wx, wy, wz;
-        mp_to_world(chain1[i].x, chain1[i].y, b, &wx, &wy, &wz, usecam);
-        chain1[i].x = (float)wx;
-        chain1[i].y = (float)wy;
-        chain1[i].z = (float)wz;
-    }
-
-    for (int i = 0; i < c2count; i++) {
-        double wx, wy, wz;
-        mp_to_world(chain2[i].x, chain2[i].y, b, &wx, &wy, &wz, usecam);
-        chain2[i].x = (float)wx;
-        chain2[i].y = (float)wy;
-        chain2[i].z = (float)wz;
-    }
-
-    // Create triangle strip from monotone chains
-    // Assume chain1[0] and chain2[c2count-1] are the same vertex (top)
-    // chain1 goes left-to-right, chain2 goes right-to-left
-
-	// Alternative: Fan triangulation for monotone polygons
-	int strip_idx = eyepolvn;
-
-	// Find the topmost vertex (highest y)
-	int top_idx = 0;
-	for (int i = 1; i < c1count; i++) {
-		if (chain1[i].y > chain1[top_idx].y) {
-			top_idx = i;
-		}
-	}
-
-	// Create triangle fan from top vertex
-	eyepolv[strip_idx++] = chain1[top_idx]; // Center vertex
-
-	// Add chain1 vertices (left side)
-	for (int i = 0; i < c1count; i++) {
-		if (i != top_idx) {
-			eyepolv[strip_idx++] = chain1[i];
-		}
-	}
-
-	// Add chain2 vertices (right side) in reverse order
-	for (int i = c2count - 1; i >= 0; i--) {
-		eyepolv[strip_idx++] = chain2[i];
-	}
-
-	// Close the fan
-	if (strip_idx > eyepolvn + 1) {
-		eyepolv[strip_idx++] = eyepolv[eyepolvn + 1]; // First vertex after center
-	}
-
-    // Set up eyepol entry
-    eyepol[eyepoln].tri_strip.indices = NULL;
-    eyepol[eyepoln].tri_strip.count = strip_idx - eyepolvn;
-    eyepol[eyepoln].tri_strip.capacity = 0;
-    eyepol[eyepoln].has_triangulation = true;
-
-    memcpy((void *)eyepol[eyepoln].ouvmat, (void *)b->gouvmat, sizeof(b->gouvmat[0])*9);
-    eyepol[eyepoln].tpic = gtpic;
-    eyepol[eyepoln].curcol = gcurcol;
-    eyepol[eyepoln].flags = (b->gflags != 0);
-    eyepol[eyepoln].b2sect = b->gligsect;
-    eyepol[eyepoln].b2wall = b->gligwall;
-    eyepol[eyepoln].b2slab = b->gligslab;
-    memcpy((void *)&eyepol[eyepoln].norm, (void *)&b->gnorm, sizeof(b->gnorm));
-
-    eyepolvn = strip_idx;
-    eyepoln++;
-    eyepol[eyepoln].vert0 = eyepolvn;
-    eyepol[eyepoln].rdepth = b->recursion_depth;
-
-    free(chain1);
-    free(chain2);
-    mono_deloop(rethead1);
-    mono_deloop(rethead0);
-}
-*/
 static void skytagfunc (int rethead0, int rethead1, bunchgrp* b){}
 
 /*
@@ -1394,37 +1396,37 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 		unsigned int *sectdrawn = (unsigned int *)_alloca(((lgs->numsects + 31) >> 3) + 4);
 		memset(sectdrawn, 0, (lgs->numsects + 31) >> 3);
 
-		while (b->bunchn) {
-			closest = b->bunchn - 1;
-			int bunch_sec = b->bunch[closest].sec;
+		b->jobcount = 0;
+		queue_sector_walls(b->cam.cursect, b);
 
-			logstep("bunch draw walls: %d, sec:%d, depth:%d", closest, bunch_sec, b->recursion_depth);
-			drawalls(closest, lgs, b);
+		// Sort walls front-to-back
+		qsort(b->jobs, b->jobcount, sizeof(wall_job_t), wall_dist_cmp);
 
-			// Check if this sector has more bunches remaining
-			int more_bunches = 0;
-			for (int bi = 0; bi < b->bunchn; bi++) {
-				if (b->bunch[bi].sec == bunch_sec) {
-					more_bunches = 1;
-					break;
-				}
-			}
+		// Process walls in order
+		for (int i = 0; i < b->jobcount; i++) {
+			draw_single_wall(b->jobs[i].sec, b->jobs[i].wall, b);
 
-			// Only draw floor/ceiling when ALL bunches for this sector are done
-			if (!more_bunches && !(sectdrawn[bunch_sec >> 5] & (1 << bunch_sec))) {
-				sectdrawn[bunch_sec >> 5] |= (1 << bunch_sec);
-				draw_sector_surface(bunch_sec, 0, lgs, b);  // ceiling
-				draw_sector_surface(bunch_sec, 1, lgs, b);  // floor
+			// Check if wall leads to new sector
+			int ns = curMap->sect[b->jobs[i].sec].wall[b->jobs[i].wall].tags[0];
+			if (ns >= 0 && ns != b->jobs[i].sec) {
+				queue_sector_walls(ns, b);
 			}
 		}
 
-		// Draw any remaining sectors that were scanned but not reached via bunches
-		for (i = 0; i < lgs->numsects; i++) {
+		// Draw floors/ceilings once per sector
+		for (int i = 0; i < lgs->numsects; i++) {
 			if (!(b->sectgot[i >> 5] & (1 << i))) continue;
-			if (sectdrawn[i >> 5] & (1 << i)) continue;
 			draw_sector_surface(i, 0, lgs, b);
 			draw_sector_surface(i, 1, lgs, b);
 		}
+
+		// Draw any remaining sectors that were scanned but not reached via bunches
+		//for (i = 0; i < lgs->numsects; i++) {
+		//	if (!(b->sectgot[i >> 5] & (1 << i))) continue;
+		//	if (sectdrawn[i >> 5] & (1 << i)) continue;
+		//	draw_sector_surface(i, 0, lgs, b);
+		//	draw_sector_surface(i, 1, lgs, b);
+		//}
 
 		if (shadowtest2_rendmode == 4)
 			uptr = glp->sectgot;
