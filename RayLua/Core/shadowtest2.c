@@ -214,70 +214,142 @@ static void xformbac(double rx, double ry, double rz, dpoint3d *o, bunchgrp *b)
 
 
 // In drawtagfunc_ws - fix the chain1_start calculation:
+// Replace the mono_triangulate_strip function with this simpler approach
 static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 {
-	cam_t *usecam = &b->orcam;
-	int i, h, rethead[2];
+    cam_t *usecam = &b->orcam;
+    int i, count0 = 0, count1 = 0;
 
-	if ((rethead0|rethead1) < 0) { mono_deloop(rethead1); mono_deloop(rethead0); return; }
-	rethead[0] = rethead0; rethead[1] = rethead1;
+    if ((rethead0|rethead1) < 0) {
+        mono_deloop(rethead1);
+        mono_deloop(rethead0);
+        return;
+    }
 
-	int start_vert = eyepolvn;
-	int chain0_end = 0;  // Will mark where chain 0 ends
+    // Count vertices in each chain
+    i = rethead0;
+    do { count0++; i = mp[i].n; } while (i != rethead0);
 
-	for(h=0; h<2; h++)
-	{
-		i = rethead[h];
-		do
-		{
-			if (h) i = mp[i].p;
+    i = rethead1;
+    do { count1++; i = mp[i].n; } while (i != rethead1);
 
-			if (eyepolvn >= eyepolvmal)
-			{
-				eyepolvmal = max(eyepolvmal<<1, 16384);
-				eyepolv = (point3d *)realloc(eyepolv, eyepolvmal*sizeof(point3d));
-			}
+    // Allocate space for triangle strip vertices
+    int total_verts = count0 + count1;
+    if (eyepolvn + total_verts >= eyepolvmal) {
+        eyepolvmal = max(eyepolvmal << 1, eyepolvn + total_verts + 1024);
+        eyepolv = (point3d *)realloc(eyepolv, eyepolvmal * sizeof(point3d));
+    }
 
-			double wx, wy, wz;
-			mp_to_world(mp[i].x, mp[i].y, b, &wx, &wy, &wz, usecam);
+    if (eyepoln + 1 >= eyepolmal) {
+        eyepolmal = max(eyepolmal << 1, 4096);
+        eyepol = (eyepol_t *)realloc(eyepol, eyepolmal * sizeof(eyepol_t));
+        eyepol[0].vert0 = 0;
+    }
 
-			eyepolv[eyepolvn].x = (float)wx;
-			eyepolv[eyepolvn].y = (float)wy;
-			eyepolv[eyepolvn].z = (float)wz;
-			eyepolvn++;
+    // Build vertex arrays for strip generation
+    int *chain0 = (int *)malloc(count0 * sizeof(int));
+    int *chain1 = (int *)malloc(count1 * sizeof(int));
 
-			if (!h) i = mp[i].n;
-		} while (i != rethead[h]);
+    i = rethead0;
+    for (int j = 0; j < count0; j++) {
+        chain0[j] = i;
+        i = mp[i].n;
+    }
 
-		if (h == 0) {
-			chain0_end = eyepolvn - start_vert;  // Record split point
-		}
+    i = rethead1;
+    for (int j = 0; j < count1; j++) {
+        chain1[j] = i;
+        i = mp[i].n;
+    }
 
-		mono_deloop(rethead[h]);
-	}
+    // Generate triangle strip vertices directly
+    int p0 = 0, p1 = 0;
+    bool use_chain0 = true;
 
-	// Allocate eyepol entry
-	if (eyepoln+1 >= eyepolmal)
-	{
-		eyepolmal = max(eyepolmal<<1, 4096);
-		eyepol = (eyepol_t *)realloc(eyepol, eyepolmal*sizeof(eyepol_t));
-		eyepol[0].vert0 = 0;
-	}
+    // Add first vertex from each chain
+    double wx, wy, wz;
+    mp_to_world(mp[chain0[0]].x, mp[chain0[0]].y, b, &wx, &wy, &wz, usecam);
+    eyepolv[eyepolvn].x = (float)wx;
+    eyepolv[eyepolvn].y = (float)wy;
+    eyepolv[eyepolvn].z = (float)wz;
+    eyepolvn++;
 
-	memcpy((void *)eyepol[eyepoln].ouvmat, (void *)b->gouvmat, sizeof(b->gouvmat[0])*9);
-	eyepol[eyepoln].chain1_start = chain0_end;  // Store the split
-	eyepol[eyepoln].tpic = gtpic;
-	eyepol[eyepoln].curcol = gcurcol;
-	eyepol[eyepoln].flags = (b->gflags != 0);
-	eyepol[eyepoln].b2sect = b->gligsect;
-	eyepol[eyepoln].b2wall = b->gligwall;
-	eyepol[eyepoln].b2slab = b->gligslab;
-	memcpy((void *)&eyepol[eyepoln].norm, (void *)&b->gnorm, sizeof(b->gnorm));
-	eyepoln++;
-	eyepol[eyepoln].vert0 = eyepolvn;
-	eyepol[eyepoln].rdepth = b->recursion_depth;
+    mp_to_world(mp[chain1[0]].x, mp[chain1[0]].y, b, &wx, &wy, &wz, usecam);
+    eyepolv[eyepolvn].x = (float)wx;
+    eyepolv[eyepolvn].y = (float)wy;
+    eyepolv[eyepolvn].z = (float)wz;
+    eyepolvn++;
 
+    p0++; p1++;
+
+    // Generate remaining vertices in strip order
+    while (p0 < count0 && p1 < count1) {
+        int next_idx;
+        if (use_chain0) {
+            next_idx = chain0[p0];
+            p0++;
+        } else {
+            next_idx = chain1[p1];
+            p1++;
+        }
+
+        mp_to_world(mp[next_idx].x, mp[next_idx].y, b, &wx, &wy, &wz, usecam);
+        eyepolv[eyepolvn].x = (float)wx;
+        eyepolv[eyepolvn].y = (float)wy;
+        eyepolv[eyepolvn].z = (float)wz;
+        eyepolvn++;
+
+        // Alternate between chains based on x-coordinate
+        if (p0 < count0 && p1 < count1) {
+            use_chain0 = (mp[chain0[p0]].x <= mp[chain1[p1]].x);
+        } else {
+            use_chain0 = (p0 < count0);
+        }
+    }
+
+    // Add remaining vertices
+    while (p0 < count0) {
+        mp_to_world(mp[chain0[p0]].x, mp[chain0[p0]].y, b, &wx, &wy, &wz, usecam);
+        eyepolv[eyepolvn].x = (float)wx;
+        eyepolv[eyepolvn].y = (float)wy;
+        eyepolv[eyepolvn].z = (float)wz;
+        eyepolvn++;
+        p0++;
+    }
+    while (p1 < count1) {
+        mp_to_world(mp[chain1[p1]].x, mp[chain1[p1]].y, b, &wx, &wy, &wz, usecam);
+        eyepolv[eyepolvn].x = (float)wx;
+        eyepolv[eyepolvn].y = (float)wy;
+        eyepolv[eyepolvn].z = (float)wz;
+        eyepolvn++;
+        p1++;
+    }
+
+    free(chain0);
+    free(chain1);
+
+    // Set up eyepol entry
+    eyepol[eyepoln].tri_strip.indices = NULL;
+    eyepol[eyepoln].tri_strip.count = eyepolvn - eyepol[eyepoln].vert0;
+    eyepol[eyepoln].tri_strip.capacity = 0;
+    eyepol[eyepoln].has_triangulation = (eyepol[eyepoln].tri_strip.count >= 3);
+
+    memcpy((void *)eyepol[eyepoln].ouvmat, (void *)b->gouvmat, sizeof(b->gouvmat[0])*9);
+    eyepol[eyepoln].tpic = gtpic;
+    eyepol[eyepoln].curcol = gcurcol;
+    eyepol[eyepoln].flags = (b->gflags != 0);
+    eyepol[eyepoln].b2sect = b->gligsect;
+    eyepol[eyepoln].b2wall = b->gligwall;
+    eyepol[eyepoln].b2slab = b->gligslab;
+    memcpy((void *)&eyepol[eyepoln].norm, (void *)&b->gnorm, sizeof(b->gnorm));
+    eyepoln++;
+    eyepol[eyepoln].vert0 = eyepolvn;
+    eyepol[eyepoln].rdepth = b->recursion_depth;
+
+    mono_deloop(rethead1);
+    mono_deloop(rethead0);
 }
+
 
 static void skytagfunc (int rethead0, int rethead1, bunchgrp* b){}
 
@@ -298,7 +370,8 @@ static void ligpoltagfunc(int rethead0, int rethead1, bunchgrp *b)
 
     rethead[0] = rethead0;
     rethead[1] = rethead1;
-
+	mono_triangulate_strip(rethead0, rethead1, &glp->ligpol[glp->ligpoln].tri_strip);
+	glp->ligpol[glp->ligpoln].has_triangulation = true;
     for (j = 0; j < 2; j++)
     {
         i = rethead[j];

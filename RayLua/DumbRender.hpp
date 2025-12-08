@@ -25,6 +25,7 @@ The forward direction can be visualized as moving away from the camera or viewer
  extern "C" {
 #include "loaders.h"
 #include "mapcore.h"
+#include "monoclip.h"
 #include "shadowtest2.h"
 #include "buildmath.h"
 }
@@ -478,75 +479,39 @@ public:
     }
 
     // Monotone polygon triangulation - O(n), no allocations needed
-    static bool draw_eyepol_wspace(float sw, float sh, int ei, int &v0, int &vertCount) {
-        v0 = eyepol[ei].vert0;
-        int v1 = eyepol[ei + 1].vert0;
+    static bool draw_eyepol_wspace(float sw, float sh, int i, int &v0, int &vertCount) {
+        v0 = eyepol[i].vert0;
+        int v1 = eyepol[i + 1].vert0;
         vertCount = v1 - v0;
         if (vertCount < 3) return true;
-
-        int split = eyepol[ei].chain1_start;
-
-        // Validate split - if invalid, use simple fan
-        if (split < 1 || split >= vertCount) {
-            split = vertCount; // Treat as single chain
-        }
-
-        int n0 = split; // Chain 0 vertex count
-        int n1 = vertCount - split; // Chain 1 vertex count
+        if (!eyepol[i].has_triangulation) return true;
 
         rlDrawRenderBatchActive();
         rlBegin(RL_TRIANGLES);
+
         glEnable(GL_POLYGON_OFFSET_FILL);
         glPolygonOffset(-0.5f, 1.0f);
         rlDisableDepthMask();
 
-        auto emit_tri = [&](int a, int b, int c) {
-            int idx[3] = {a, b, c};
-            for (int k = 0; k < 3; k++) {
-                point3d &p = eyepolv[idx[k]];
-                rlColor4f((float) eyepol[ei].b2sect / 43.0f, 0.2f,
-                          (float) eyepol[ei].rdepth / 3.0f, 0.7f);
-                rlVertex3f(p.x, -p.z, p.y);
-            }
-        };
+        // Vertices are already arranged as triangle strip
+        Vector3* pts = static_cast<Vector3 *>(malloc(vertCount * sizeof(Vector3)));
 
-        if (n1 == 0) {
-            // Single chain - simple fan triangulation
-            for (int j = 1; j < n0 - 1; j++) {
-                emit_tri(v0, v0 + j, v0 + j + 1);
-            }
-        } else {
-            // Two chains - build proper polygon order then fan triangulate
-            // Polygon order: chain0 forward, then chain1 REVERSED
-            // chain0: v0, v0+1, ..., v0+split-1
-            // chain1 reversed: v0+vertCount-1, v0+vertCount-2, ..., v0+split
-
-            int *poly = (int *) alloca(vertCount * sizeof(int));
-            int pi = 0;
-
-            // Chain 0 forward
-            for (int j = 0; j < n0; j++) {
-                poly[pi++] = v0 + j;
-            }
-            // Chain 1 reversed
-            for (int j = n1 - 1; j >= 0; j--) {
-                poly[pi++] = v0 + split + j;
-            }
-
-            // Fan triangulate from poly[0]
-            for (int j = 1; j < vertCount - 1; j++) {
-                emit_tri(poly[0], poly[j], poly[j + 1]);
-            }
+        for (int j = 0; j < vertCount; j++) {
+            point3d p = eyepolv[v0 + j];
+            pts[j] = {p.x, -p.z, p.y};
         }
+
+        Color col = ColorFromNormalized({(float)eyepol[i].b2sect/3.0f, 0.8, (float)eyepol[i].rdepth/3.0f, 0.7});
+        DrawTriangleStrip3D(pts, vertCount, col);
+        free(pts);
 
         rlEnd();
         rlDrawRenderBatchActive();
         glDisable(GL_POLYGON_OFFSET_FILL);
-        rlEnableDepthMask();
-        printf("eyepol %d: verts=%d, split=%d, n0=%d, n1=%d\n",
-               ei, vertCount, split, n0, n1);
         return false;
-}
+    }
+
+
     static void DrawPost3d(float sw, float sh, Camera3D camsrc) {
         // Vector2 v1 = {0, 0};
         // Vector2 v2 = {sw, sh};
@@ -614,12 +579,12 @@ public:
                     glPolygonOffset(-1.0f, 1.0f);
                     rlColor4f(0, 1, 1, 1);
                     for (int j = 0; j < vertCount; j++) {
-                       int idx[] = {v0, v0 + j, v0 + j + 1};
-                       for (int k = 0; k < 3; k++) {
-                            Vector3 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y,eyepolv[idx[k]].z};
-                          //  Vector3 pt = {eyepolv[v0+j].x, eyepolv[v0+j].y,eyepolv[v0+j].z};
+                       //int idx[] = {v0, v0 + j, v0 + j + 1};
+                       //for (int k = 0; k < 3; k++) {
+                          //  Vector3 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y,eyepolv[idx[k]].z};
+                            Vector3 pt = {eyepolv[v0+j].x, eyepolv[v0+j].y,eyepolv[v0+j].z};
                             rlVertex3f(pt.x,-pt.z, pt.y);
-                        }
+                       // }
                     }
                     Vector3 pt = {eyepolv[v0].x, eyepolv[v0].y,eyepolv[v0].z};
                     rlVertex3f(pt.x,-pt.z, pt.y);

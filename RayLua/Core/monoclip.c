@@ -559,3 +559,100 @@ void mono_bool(int hr0, int hr1, int hw0, int hw1, int boolop, bunchgrp* b, void
         mono_deloop(hd0);
     }
 }
+void strip_init(triangle_strip_t *strip) {
+   // strip->indices = NULL;
+    strip->count = 0;
+    strip->capacity = 0;
+}
+
+void strip_free(triangle_strip_t *strip) {
+    if (strip->indices) {
+        free(strip->indices);
+        strip->indices = NULL;
+    }
+    strip->count = 0;
+    strip->capacity = 0;
+}
+
+void strip_add(triangle_strip_t *strip, int index) {
+    if (strip->count >= strip->capacity) {
+        strip->capacity = max(strip->capacity << 1, 16);
+        strip->indices = (int *)realloc(strip->indices, strip->capacity * sizeof(int));
+    }
+    strip->indices[strip->count++] = index;
+}
+
+void mono_triangulate_strip(int hd0, int hd1, triangle_strip_t *strip) {
+    if ((hd0 | hd1) < 0) return;
+
+    strip_init(strip);
+
+    // Count vertices in each chain
+    int count0 = 0, count1 = 0;
+    int i = hd0;
+    do {
+        count0++;
+        i = mp[i].n;
+    } while (i != hd0);
+
+    i = hd1;
+    do {
+        count1++;
+        i = mp[i].n;
+    } while (i != hd1);
+
+    // Build vertex arrays for easier indexing
+    int *chain0 = (int *)malloc(count0 * sizeof(int));
+    int *chain1 = (int *)malloc(count1 * sizeof(int));
+
+    i = hd0;
+    for (int j = 0; j < count0; j++) {
+        chain0[j] = i;
+        i = mp[i].n;
+    }
+
+    i = hd1;
+    for (int j = 0; j < count1; j++) {
+        chain1[j] = i;
+        i = mp[i].n;
+    }
+
+    // Generate triangle strip using two-pointer technique
+    int p0 = 0, p1 = 0;
+    bool use_chain0 = true;
+
+    // Start with first vertex from each chain
+    strip_add(strip, chain0[0]);
+    strip_add(strip, chain1[0]);
+    p0++; p1++;
+
+    while (p0 < count0 && p1 < count1) {
+        if (use_chain0) {
+            strip_add(strip, chain0[p0]);
+            p0++;
+        } else {
+            strip_add(strip, chain1[p1]);
+            p1++;
+        }
+
+        // Alternate between chains based on x-coordinate progression
+        if (p0 < count0 && p1 < count1) {
+            use_chain0 = (mp[chain0[p0]].x <= mp[chain1[p1]].x);
+        } else {
+            use_chain0 = (p0 < count0);
+        }
+    }
+
+    // Add remaining vertices
+    while (p0 < count0) {
+        strip_add(strip, chain0[p0]);
+        p0++;
+    }
+    while (p1 < count1) {
+        strip_add(strip, chain1[p1]);
+        p1++;
+    }
+
+    free(chain0);
+    free(chain1);
+}

@@ -19,7 +19,11 @@
 #define MONO_BOOL_AND 0
 #define MONO_BOOL_SUB 1
 #define MONO_BOOL_SUB_REV 2
-
+typedef struct {
+	int *indices;
+	int count;
+	int capacity;
+} triangle_strip_t;
 //Mono Polygon Head
 typedef struct {
 	int head[2], tag;
@@ -61,7 +65,10 @@ typedef struct {
 #define MAX_PORTAL_DEPTH 2
 #define MAX_PORTAL_VERTS 32
 
-
+void mono_triangulate_strip(int hd0, int hd1, triangle_strip_t *strip);
+void strip_init(triangle_strip_t *strip);
+void strip_free(triangle_strip_t *strip);
+void strip_add(triangle_strip_t *strip, int index);
 typedef struct {
 	bunch_t *bunch;
 	int bunchn, bunchmal;
