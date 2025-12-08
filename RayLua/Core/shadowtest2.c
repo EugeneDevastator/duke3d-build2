@@ -187,88 +187,6 @@ static int wall_dist_cmp(const void *a, const void *b) {
     float db = ((wall_job_t*)b)->dist;
     return (da > db) - (da < db);
 }
-static void draw_single_wall(int sectnum, int wallnum, bunchgrp *b) {
-    sect_t *sec = &curMap->sect[sectnum];
-    wall_t *wal = sec->wall;
-    int w = wallnum;
-    int nw = wal[w].n + w;
-
-    // Get all vertical slabs for this wall
-    vertlist_t verts[MAXVERTS];
-    int vn = getwalls_imp(sectnum, w, verts, MAXVERTS, curMap);
-
-    // Build base trapezoid
-    dpoint3d pol[4];
-    pol[0].x = wal[w].x;  pol[0].y = wal[w].y;
-    pol[1].x = wal[nw].x; pol[1].y = wal[nw].y;
-    pol[0].z = getslopez(&sec[sectnum], 0, pol[0].x, pol[0].y);
-    pol[1].z = getslopez(&sec[sectnum], 0, pol[1].x, pol[1].y);
-    pol[2] = pol[1]; pol[2].z = getslopez(&sec[sectnum], 1, pol[2].x, pol[2].y);
-    pol[3] = pol[0]; pol[3].z = getslopez(&sec[sectnum], 1, pol[3].x, pol[3].y);
-
-    // Setup normal
-    b->gnorm.x = wal[w].y - wal[nw].y;
-    b->gnorm.y = wal[nw].x - wal[w].x;
-    b->gnorm.z = 0;
-    float f = 1.0f / sqrt(b->gnorm.x*b->gnorm.x + b->gnorm.y*b->gnorm.y);
-    b->gnorm.x *= f; b->gnorm.y *= f;
-
-    double opolz[4] = {pol[0].z, pol[1].z, 0, 0};
-
-    // Process each slab
-    for (int m = 0; m <= (vn << 1); m++) {
-        opolz[0] = opolz[3];
-        opolz[1] = opolz[2];
-
-        if (m == (vn << 1)) {
-            opolz[2] = pol[2].z;
-            opolz[3] = pol[3].z;
-        } else {
-            opolz[2] = getslopez(&curMap->sect[verts[m>>1].s], m&1, pol[2].x, pol[2].y);
-            opolz[3] = getslopez(&curMap->sect[verts[m>>1].s], m&1, pol[3].x, pol[3].y);
-        }
-
-        // Skip degenerate
-        if ((max(pol[0].z, opolz[0]) >= min(pol[3].z, opolz[3]) - 1e-4) &&
-            (max(pol[1].z, opolz[1]) >= min(pol[2].z, opolz[2]) - 1e-4))
-            continue;
-
-        // Build trapezoid, transform, clip
-        dpoint3d trap1[4] = {
-            {pol[0].x, pol[0].y, pol[0].z}, {pol[1].x, pol[1].y, pol[1].z},
-            {pol[2].x, pol[2].y, pol[2].z}, {pol[3].x, pol[3].y, pol[3].z}
-        };
-        dpoint3d trap2[4] = {
-            {pol[0].x, pol[0].y, opolz[0]}, {pol[1].x, pol[1].y, opolz[1]},
-            {pol[2].x, pol[2].y, opolz[2]}, {pol[3].x, pol[3].y, opolz[3]}
-        };
-
-        for (int i = 0; i < 4; i++) {
-            wccw_transform(&trap1[i], &b->cam, &b->orcam);
-            wccw_transform(&trap2[i], &b->cam, &b->orcam);
-        }
-
-        int plothead[2];
-        dpoint3d p0 = pol[0], p1 = pol[1];
-        wccw_transform(&p0, &b->cam, &b->orcam);
-        wccw_transform(&p1, &b->cam, &b->orcam);
-
-        if (!intersect_traps_mono_points(p0, p1, trap1, trap2, &plothead[0], &plothead[1]))
-            continue;
-
-        // Setup texture transform
-        b->gligsect = sectnum;
-        b->gligwall = w;
-        b->gligslab = m;
-
-        int ns = (m & 1) ? -1 : (vn ? verts[m>>1].s : -1);
-        int mytag = sectnum + taginc * b->recursion_depth;
-        int newtag = (ns >= 0) ? ns + taginc * b->recursion_depth : -1;
-
-        drawpol_befclip(mytag, newtag, sectnum, ns,
-                        plothead[0], plothead[1], 3, b);
-    }
-}
 
 #define BUNCHNEAR 1e-7
 static void scansector(int sectnum, bunchgrp *b)
@@ -1008,41 +926,28 @@ static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bunchg
 
 
 
-static void drawalls(int bid, mapstate_t *map, bunchgrp *b)
+static void drawalls(mapstate_t *map, int s, int *walls, int wallcount, bunchgrp *b)
 {
     #define MAXVERTS 256
     vertlist_t verts[MAXVERTS];
-    bunchverts_t *twal;
-    int twaln;
     dpoint3d pol[4];
     double opolz[4];
     kgln_t npol2[3];
-    sect_t *sec;
-    wall_t *wal;
+    sect_t *sec = curMap->sect;
+    wall_t *wal = sec[s].wall;
     surf_t *sur;
     double f, dx;
-    int i, j, m, n, s, ns, w, ww, nw, vn;
-
-    s = b->bunch[bid].sec;
-    sec = map->sect;
-    wal = sec[s].wall;
-
-    twal = (bunchverts_t *)_alloca((map->sect[s].n + 1) * sizeof(bunchverts_t));
-    twaln = prepbunch(bid, twal, b);
+    int m, vn, w, nw, ns;
 
     b->gligsect = s;
     b->gligslab = 0;
-
-    // Remove bunch from list
-    b->bunchn--;
-
     bool noportals = b->recursion_depth >= MAX_PORTAL_DEPTH;
 
-    // === WALLS ONLY ===
-    for (ww = 0; ww < twaln; ww++)
+    // Loop through provided walls instead of bunch
+    for (int ww = 0; ww < wallcount; ww++)
     {
-        vn = getwalls_imp(s, twal[ww].i, verts, MAXVERTS, map);
-        w = twal[ww].i;
+        w = walls[ww];
+        vn = getwalls_imp(s, w, verts, MAXVERTS, curMap);
         nw = wal[w].n + w;
         sur = &wal[w].surf;
 
@@ -1056,16 +961,20 @@ static void drawalls(int bid, mapstate_t *map, bunchgrp *b)
         b->gnorm.x *= f;
         b->gnorm.y *= f;
 
-        // Base wall quad
-        pol[0].x = twal[ww].x;     pol[0].y = twal[ww].y;     pol[0].z = getslopez(&sec[s], 0, pol[0].x, pol[0].y);
-        pol[1].x = twal[ww + 1].x; pol[1].y = twal[ww + 1].y; pol[1].z = getslopez(&sec[s], 0, pol[1].x, pol[1].y);
-        pol[2].x = twal[ww + 1].x; pol[2].y = twal[ww + 1].y; pol[2].z = getslopez(&sec[s], 1, pol[2].x, pol[2].y);
-        pol[3].x = twal[ww].x;     pol[3].y = twal[ww].y;     pol[3].z = getslopez(&sec[s], 1, pol[3].x, pol[3].y);
+        // Base wall quad - use full wall, no bunch clipping
+        pol[0].x = wal[w].x;   pol[0].y = wal[w].y;
+        pol[1].x = wal[nw].x;  pol[1].y = wal[nw].y;
+        pol[0].z = getslopez(&sec[s], 0, pol[0].x, pol[0].y);
+        pol[1].z = getslopez(&sec[s], 0, pol[1].x, pol[1].y);
+        pol[2].x = pol[1].x; pol[2].y = pol[1].y;
+        pol[2].z = getslopez(&sec[s], 1, pol[2].x, pol[2].y);
+        pol[3].x = pol[0].x; pol[3].y = pol[0].y;
+        pol[3].z = getslopez(&sec[s], 1, pol[3].x, pol[3].y);
 
-        // Wall segment loop (unchanged)
         opolz[3] = pol[0].z;
         opolz[2] = pol[1].z;
 
+        // Process slabs (unchanged from here)
         for (m = 0; m <= (vn << 1); m++)
         {
             int plothead[2];
@@ -1094,7 +1003,7 @@ static void drawalls(int bid, mapstate_t *map, bunchgrp *b)
                 {pol[2].x, pol[2].y, opolz[2] + f}, {pol[3].x, pol[3].y, opolz[3] + f}
             };
 
-            for (i = 0; i < 4; i++) {
+            for (int i = 0; i < 4; i++) {
                 wccw_transform(&trap1[i], &b->cam, &b->orcam);
                 wccw_transform(&trap2[i], &b->cam, &b->orcam);
             }
@@ -1109,7 +1018,6 @@ static void drawalls(int bid, mapstate_t *map, bunchgrp *b)
 
             if ((!(m & 1)) || (wal[w].surf.flags & (1 << 5)))
             {
-                // Wall texture setup (unchanged)
                 npol2[0].x = wal[w].x;  npol2[0].y = wal[w].y;
                 npol2[0].z = getslopez(&sec[s], 0, wal[w].x, wal[w].y);
                 npol2[1].x = wal[nw].x; npol2[1].y = wal[nw].y;
@@ -1134,16 +1042,15 @@ static void drawalls(int bid, mapstate_t *map, bunchgrp *b)
                 b->gligwall = w;
                 b->gligslab = m;
                 ns = -1;
-				logstep("  slab %d: solid wall (m&1=%d, flags=%x)", m, m&1, wal[w].surf.flags);
-
+                logstep("  slab %d: solid wall", m);
             } else {
                 ns = verts[m >> 1].s;
-            	logstep("  slab %d: opening to sector %d", m, ns);
+                logstep("  slab %d: opening to sector %d", m, ns);
             }
 
             int myport = wal[w].tags[1];
             bool skipport = (b->has_portal_clip && s == b->testignoresec && w == b->testignorewall);
-        	int mytag = s + taginc * b->recursion_depth;
+            int mytag = s + taginc * b->recursion_depth;
 
             if (!skipport && !noportals && myport >= 0 && portals[myport].destpn >= 0 && portals[myport].kind == PORT_WALL) {
             	int endpn = portals[myport].destpn;
@@ -1195,6 +1102,50 @@ static void drawalls(int bid, mapstate_t *map, bunchgrp *b)
 void reset_context() {
 	eyepoln = 0; eyepolvn = 0;
 }
+static int get_wall_global_id(int sec, int wall, mapstate_t *map) {
+	int id = 0;
+	for (int i = 0; i < sec; i++) {
+		id += map->sect[i].n;
+	}
+	return id + wall;
+}
+
+// Simplified sector wall adder
+static void add_sector_walls(int sectnum, bunchgrp *b) {
+	sect_t *sec = &curMap->sect[sectnum];
+	wall_t *wal = sec->wall;
+
+	for (int i = 0; i < sec->n; i++) {
+		int j = wal[i].n + i;
+		double dx0 = wal[i].x - b->cam.p.x;
+		double dy0 = wal[i].y - b->cam.p.y;
+		double dx1 = wal[j].x - b->cam.p.x;
+		double dy1 = wal[j].y - b->cam.p.y;
+
+		// Backface cull
+		if (dy1 * dx0 <= dx1 * dy0) continue;
+
+		// Check if already queued
+		int wall_id = get_wall_global_id(sectnum, i, curMap);
+		if (b->visited_walls[wall_id]) continue;
+
+		b->visited_walls[wall_id] = true;  // ← FIX: Mark now, not later
+
+		// Add to queue
+		if (b->jobcount >= b->jobcap) {
+			b->jobcap = b->jobcap ? b->jobcap * 2 : 256;
+			b->jobs = (wall_job_t *)realloc(b->jobs, b->jobcap * sizeof(wall_job_t));
+		}
+
+		b->jobs[b->jobcount].sec = sectnum;
+		b->jobs[b->jobcount].wall = i;
+		b->jobs[b->jobcount].dist = dx0*dx0 + dy0*dy0;
+		b->jobcount++;
+	}
+
+	qsort(b->jobs, b->jobcount, sizeof(wall_job_t), wall_dist_cmp);
+}
+
 void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
 	bunchgrp bs;
 	bs.cam = *cc;
@@ -1211,9 +1162,10 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 		return;
 		if (captureframe) printf("discarding due to null ctx");
 	}
-	int prehead1 = -1;
-	int prehead2 = -1;
-	int presect = -1;
+	int total_walls = 0;
+	for (int i = 0; i < lgs->numsects; i++) {
+		total_walls += lgs->sect[i].n;
+	}
 
 	int recursiveDepth = newctx->recursion_depth;
 	bunchgrp *b;
@@ -1223,7 +1175,9 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 	b->sectgotmal = 0;
 	b->bunchn=0;
 	b->bunchmal=0;
-
+	b->visited_walls = (bool *)calloc(total_walls, 1);
+	b->jobcount = 0;
+	b->jobcap = 16;
 	//b->curportal=0;
 	cam_t gcam = b->cam;
 	cam_t oricam = b->orcam;
@@ -1397,28 +1351,51 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 		memset(sectdrawn, 0, (lgs->numsects + 31) >> 3);
 
 		b->jobcount = 0;
-		queue_sector_walls(b->cam.cursect, b);
-
-		// Sort walls front-to-back
+		//queue_sector_walls(b->cam.cursect, b);
+		b->jobs = malloc(sizeof(wall_job_t)*b->jobcap);
+		add_sector_walls(b->cam.cursect, b);
 		qsort(b->jobs, b->jobcount, sizeof(wall_job_t), wall_dist_cmp);
 
-		// Process walls in order
-		for (int i = 0; i < b->jobcount; i++) {
-			draw_single_wall(b->jobs[i].sec, b->jobs[i].wall, b);
+		// Group walls by sector for efficient getwalls_imp batching
+		int current_sec = -1;
+		int sec_walls[256];  // Temp array for walls in current sector
+		int sec_wall_count = 0;
 
-			// Check if wall leads to new sector
-			int ns = curMap->sect[b->jobs[i].sec].wall[b->jobs[i].wall].tags[0];
-			if (ns >= 0 && ns != b->jobs[i].sec) {
-				queue_sector_walls(ns, b);
+		for (int i = 0; i < b->jobcount; i++) {
+			wall_job_t *job = &b->jobs[i];
+
+			if (job->sec != current_sec) {
+				if (sec_wall_count > 0) {
+					drawalls(lgs, current_sec, sec_walls, sec_wall_count, b);
+					sec_wall_count = 0;
+				}
+				current_sec = job->sec;
+			}
+
+			sec_walls[sec_wall_count++] = job->wall;
+
+			// FIX: Use .ns field, not tags[0]
+			int ns = lgs->sect[job->sec].wall[job->wall].ns;
+			if (ns >= 0 && ns != job->sec) {
+				add_sector_walls(ns, b);
+				qsort(b->jobs, b->jobcount, sizeof(wall_job_t), wall_dist_cmp);
 			}
 		}
 
-		// Draw floors/ceilings once per sector
+		// Flush last batch
+		if (sec_wall_count > 0) {
+			drawalls(lgs, current_sec, sec_walls, sec_wall_count, b);
+		}
+
+		// Draw surfaces
 		for (int i = 0; i < lgs->numsects; i++) {
 			if (!(b->sectgot[i >> 5] & (1 << i))) continue;
 			draw_sector_surface(i, 0, lgs, b);
 			draw_sector_surface(i, 1, lgs, b);
 		}
+
+		free(b->visited_walls);
+
 
 		// Draw any remaining sectors that were scanned but not reached via bunches
 		//for (i = 0; i < lgs->numsects; i++) {

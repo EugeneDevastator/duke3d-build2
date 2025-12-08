@@ -203,7 +203,7 @@ void changetagfunc(int rethead0, int rethead1, bunchgrp* b);
 /** Processes wall segments, handles both clipping and rendering setup
  * @param bid Bunch index to process
  */
-void drawalls(int bid, mapstate_t* map, bunchgrp *b);
+static void drawalls(mapstate_t *map, int s, int *walls, int wallcount, bunchgrp *b);
 
 /** Renders sprites with lighting if available */
 void drawsprites();

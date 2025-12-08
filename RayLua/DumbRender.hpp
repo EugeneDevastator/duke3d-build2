@@ -469,7 +469,7 @@ public:
         int v1 = eyepol[i + 1].vert0;
         vertCount = v1 - v0;
         if (vertCount < 3) return true;
-        if (!eyepol[i].has_triangulation) return true;
+       // if (!eyepol[i].has_triangulation) return true;
 
         rlDrawRenderBatchActive();
         rlDisableBackfaceCulling();

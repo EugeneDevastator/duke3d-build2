@@ -80,6 +80,7 @@ typedef struct {
 	bunch_t *bunch;
 	int bunchn, bunchmal;
 	float *bunchdist;  // Distance cache for sorting
+	bool *visited_walls;  // One flag per wall in entire map
 	wall_job_t *jobs;
 	int jobcount, jobcap;
 	bfint_t bfint[BFINTMAX];
