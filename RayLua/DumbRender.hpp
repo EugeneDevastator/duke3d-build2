@@ -460,7 +460,6 @@ public:
         glPolygonOffset(-0.5f, 1.0f);
         rlDisableDepthMask();
 
-        // Vertices are already arranged as triangle strip
         Vector3* pts = static_cast<Vector3 *>(malloc(vertCount * sizeof(Vector3)));
 
         for (int j = 0; j < vertCount; j++) {
@@ -469,7 +468,21 @@ public:
         }
 
         Color col = ColorFromNormalized({(float)(i%10)/10.0f, (float)(i%4)/4.0f, (float)eyepol[i].rdepth/3.0f, 0.7});
-        DrawTriangleStrip3D(pts, vertCount, col);
+
+        // Debug: draw individual triangles to see winding
+        for (int j = 0; j < vertCount - 2; j++) {
+            int i0 = j;
+            int i1 = j + 1;
+            int i2 = j + 2;
+
+            // Triangle strip: even triangles use (i, i+1, i+2), odd use (i+1, i, i+2)
+            if (j % 2 == 0) {
+                DrawTriangle3D(pts[i0], pts[i1], pts[i2], col);
+            } else {
+                DrawTriangle3D(pts[i1], pts[i0], pts[i2], col);
+            }
+        }
+
         free(pts);
 
         glDisable(GL_POLYGON_OFFSET_FILL);

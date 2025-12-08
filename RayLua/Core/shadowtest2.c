@@ -218,25 +218,51 @@ static void xformbac(double rx, double ry, double rz, dpoint3d *o, bunchgrp *b)
 static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 {
     cam_t *usecam = &b->orcam;
-    int i, count0 = 0, count1 = 0;
 
     if ((rethead0|rethead1) < 0) {
         mono_deloop(rethead1);
         mono_deloop(rethead0);
         return;
     }
+	printf("\n=== Chain Debug ===\n");
+	printf("Chain 0: ");
+	if (rethead0 >= 0) {
+		int i = rethead0;
+		int count = 0;
+		do {
+			printf("(%.2f,%.2f) ", mp[i].x, mp[i].y);
+			i = mp[i].n;
+			count++;
+		} while (i != rethead0 && count < 20);
+		printf("\n");
+	}
 
-    // Count vertices in each chain
-    i = rethead0;
-    do { count0++; i = mp[i].n; } while (i != rethead0);
+	printf("Chain 1: ");
+	if (rethead1 >= 0) {
+		int i = rethead1;
+		int count = 0;
+		do {
+			printf("(%.2f,%.2f) ", mp[i].x, mp[i].y);
+			i = mp[i].n;
+			count++;
+		} while (i != rethead1 && count < 20);
+		printf("\n");
+	}
+    // Generate triangle strip vertices from monotone polygon
+    point3d *mono_verts;
+    int mono_count;
+    int has_triangulation = mono_generate_eyepol(rethead0, rethead1, &mono_verts, &mono_count);
 
-    i = rethead1;
-    do { count1++; i = mp[i].n; } while (i != rethead1);
+    if (!has_triangulation || mono_count < 3) {
+        if (mono_verts) free(mono_verts);
+        mono_deloop(rethead1);
+        mono_deloop(rethead0);
+        return;
+    }
 
-    // Allocate space for triangle strip vertices
-    int total_verts = count0 + count1;
-    if (eyepolvn + total_verts >= eyepolvmal) {
-        eyepolvmal = max(eyepolvmal << 1, eyepolvn + total_verts + 1024);
+    // Allocate space in eyepolv
+    if (eyepolvn + mono_count >= eyepolvmal) {
+        eyepolvmal = max(eyepolvmal << 1, eyepolvn + mono_count + 1024);
         eyepolv = (point3d *)realloc(eyepolv, eyepolvmal * sizeof(point3d));
     }
 
@@ -246,118 +272,24 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
         eyepol[0].vert0 = 0;
     }
 
-    // Build vertex arrays for strip generation
-    int *chain0 = (int *)malloc(count0 * sizeof(int));
-    int *chain1 = (int *)malloc(count1 * sizeof(int));
+    // Transform and copy vertices to eyepolv
+    for (int i = 0; i < mono_count; i++) {
+        double wx, wy, wz;
+        mp_to_world(mono_verts[i].x, mono_verts[i].y, b, &wx, &wy, &wz, usecam);
 
-    i = rethead0;
-    for (int j = 0; j < count0; j++) {
-        chain0[j] = i;
-        i = mp[i].n;
-    }
-
-    i = rethead1;
-    for (int j = 0; j < count1; j++) {
-        chain1[j] = i;
-        i = mp[i].n;
-    }
-
-    // Determine which chain is "top" and which is "bottom" based on y-coordinates
-    // at the leftmost point
-    int start0 = 0, start1 = 0;
-
-    // Find leftmost points in each chain
-    for (int j = 1; j < count0; j++) {
-        if (mp[chain0[j]].x < mp[chain0[start0]].x) start0 = j;
-    }
-    for (int j = 1; j < count1; j++) {
-        if (mp[chain1[j]].x < mp[chain1[start1]].x) start1 = j;
-    }
-
-    // Determine strip order - start with the chain that has smaller x, or smaller y if x is equal
-    bool start_with_0;
-    if (fabs(mp[chain0[start0]].x - mp[chain1[start1]].x) < 1e-8) {
-        start_with_0 = (mp[chain0[start0]].y < mp[chain1[start1]].y);
-    } else {
-        start_with_0 = (mp[chain0[start0]].x < mp[chain1[start1]].x);
-    }
-
-    // Generate triangle strip vertices
-    int p0 = start0, p1 = start1;
-    double wx, wy, wz;
-
-    // Add first two vertices
-    if (start_with_0) {
-        mp_to_world(mp[chain0[p0]].x, mp[chain0[p0]].y, b, &wx, &wy, &wz, usecam);
-        eyepolv[eyepolvn].x = (float)wx;
-        eyepolv[eyepolvn].y = (float)wy;
-        eyepolv[eyepolvn].z = (float)wz;
-        eyepolvn++;
-
-        mp_to_world(mp[chain1[p1]].x, mp[chain1[p1]].y, b, &wx, &wy, &wz, usecam);
-        eyepolv[eyepolvn].x = (float)wx;
-        eyepolv[eyepolvn].y = (float)wy;
-        eyepolv[eyepolvn].z = (float)wz;
-        eyepolvn++;
-    } else {
-        mp_to_world(mp[chain1[p1]].x, mp[chain1[p1]].y, b, &wx, &wy, &wz, usecam);
-        eyepolv[eyepolvn].x = (float)wx;
-        eyepolv[eyepolvn].y = (float)wy;
-        eyepolv[eyepolvn].z = (float)wz;
-        eyepolvn++;
-
-        mp_to_world(mp[chain0[p0]].x, mp[chain0[p0]].y, b, &wx, &wy, &wz, usecam);
         eyepolv[eyepolvn].x = (float)wx;
         eyepolv[eyepolvn].y = (float)wy;
         eyepolv[eyepolvn].z = (float)wz;
         eyepolvn++;
     }
 
-    // Advance pointers
-    p0 = (p0 + 1) % count0;
-    p1 = (p1 + 1) % count1;
-
-    // Continue strip generation
-    bool use_chain0 = !start_with_0; // Alternate from the starting pattern
-    int verts_added = 2;
-
-    while (verts_added < total_verts) {
-        int next_idx;
-
-        if (use_chain0 && p0 != start0) {
-            next_idx = chain0[p0];
-            p0 = (p0 + 1) % count0;
-        } else if (!use_chain0 && p1 != start1) {
-            next_idx = chain1[p1];
-            p1 = (p1 + 1) % count1;
-        } else if (p0 != start0) {
-            next_idx = chain0[p0];
-            p0 = (p0 + 1) % count0;
-        } else if (p1 != start1) {
-            next_idx = chain1[p1];
-            p1 = (p1 + 1) % count1;
-        } else {
-            break; // Both chains exhausted
-        }
-
-        mp_to_world(mp[next_idx].x, mp[next_idx].y, b, &wx, &wy, &wz, usecam);
-        eyepolv[eyepolvn].x = (float)wx;
-        eyepolv[eyepolvn].y = (float)wy;
-        eyepolv[eyepolvn].z = (float)wz;
-        eyepolvn++;
-
-        use_chain0 = !use_chain0; // Alternate between chains
-        verts_added++;
-    }
-
-    free(chain0);
-    free(chain1);
+    free(mono_verts);
 
     // Set up eyepol entry
     eyepol[eyepoln].tri_strip.indices = NULL;
-    eyepol[eyepoln].tri_strip.count = eyepolvn - eyepol[eyepoln].vert0;
+    eyepol[eyepoln].tri_strip.count = mono_count;
     eyepol[eyepoln].tri_strip.capacity = 0;
-    eyepol[eyepoln].has_triangulation = (eyepol[eyepoln].tri_strip.count >= 3);
+    eyepol[eyepoln].has_triangulation = true;
 
     memcpy((void *)eyepol[eyepoln].ouvmat, (void *)b->gouvmat, sizeof(b->gouvmat[0])*9);
     eyepol[eyepoln].tpic = gtpic;
@@ -374,8 +306,6 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
     mono_deloop(rethead1);
     mono_deloop(rethead0);
 }
-
-
 
 static void skytagfunc (int rethead0, int rethead1, bunchgrp* b){}
 
