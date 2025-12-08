@@ -254,14 +254,14 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 	printf("chain1 for eyepolvn:/n");
 
     // Transform and copy vertices to eyepolv
+	// we get proper monotone coords after mp to world.
     for (int i = 0; i < c1count; i++) {
         double wx, wy, wz;
         mp_to_world(chain1[i].x, chain1[i].y, b, &wx, &wy, &wz, usecam);
 
-        eyepolv[eyepolvn].x = (float)wx;
-        eyepolv[eyepolvn].y = (float)wy;
-        eyepolv[eyepolvn].z = (float)wz;
-        eyepolvn++;
+        chain1[i].x = (float)wx;
+        chain1[i].y = (float)wy;
+        chain1[i].z = (float)wz;
     		printf("(%.2f,%.2f) ", chain1[i].x, chain1[i].y);
     }
 	printf("chain2 for eyepolvn:/n");
@@ -269,18 +269,20 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 		double wx, wy, wz;
 		mp_to_world(chain2[i].x, chain2[i].y, b, &wx, &wy, &wz, usecam);
 
-		eyepolv[eyepolvn].x = (float)wx;
-		eyepolv[eyepolvn].y = (float)wy;
-		eyepolv[eyepolvn].z = (float)wz;
-		eyepolvn++;
+		chain2[eyepolvn].x = (float)wx;
+		chain2[eyepolvn].y = (float)wy;
+		chain2[eyepolvn].z = (float)wz;
 		printf("(%.2f,%.2f) ", chain1[i].x, chain1[i].y);
 	}
 
     // Set monotone up eyepol entry
+	//
     // // chain 1: x increases;
     // // chain2 : x decreases;
     // chain1[0]~= chain2[last] almost equal.
 	// last in chain2 can be bigger than pre-last.
+	// need to create intermediate sorted array before creating eyepoln.
+	// eyepoln must be filled in triangle strip sequence.
 
     eyepol[eyepoln].tri_strip.indices = NULL;
     eyepol[eyepoln].tri_strip.count = mono_count;
