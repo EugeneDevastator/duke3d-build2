@@ -752,286 +752,263 @@ static void portal_xform_world_full(double *x, double *y, double *z, bunchgrp *b
 	*y = p.y;
 	*z = p.z;
 }
-static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
+// New function: draw sector floor/ceiling using FULL sector polygon
+static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bunchgrp *b)
 {
-	int portal_draw = 3|8;
-	// === VARIABLE DECLARATIONS ===
-	//extern void loadpic (tile_t *);
-	#define MAXVERTS 256 //FIX:timebomb: assumes there are never > 256 sectors connected at same vertex
-	vertlist_t verts[MAXVERTS];
-	bunchverts_t *twal;
-	int twaln;
-	dpoint3d pol[4], npol[6];
-	kgln_t npol2[3];
-	double opolz[4];
-	sect_t *sec;
-	wall_t *wal;
-	surf_t *sur;
-	point2d *grad;
-	double f, fz, dx;
-	int i, j, k, l, m, n, s, ns, isflor, plothead[2], wn, w, ww, nw, vn, ws, wi, we, kval[4], imin, imax;
-	int ks[2], ke[2], col, n0, n1;
+    sect_t *sec = &map->sect[sectnum];
+    wall_t *wal = sec->wall;
+    point2d *grad = &sec->grad[isflor];
+    double fz = sec->z[isflor];
+    int plothead[2] = {-1, -1};
+    int i, n = sec->n;
 
-	// === SETUP SECTOR AND WALL DATA ===
-	s = b->bunch[bid].sec;
-	sec = curMap->sect;
-	wal = sec[s].wall;
+    if (n < 3) return;  // Need at least 3 vertices
 
-	twal = (bunchverts_t *)_alloca((curMap->sect[b->bunch[bid].sec].n+1)*sizeof(bunchverts_t));
-	twaln = prepbunch(bid,twal,b);
-	b->gligsect = s; b->gligslab = 0;
+    // Back-face cull
+    float surfpos = getslopez(sec, isflor, b->cam.p.x, b->cam.p.y);
+    if ((b->cam.p.z >= surfpos) == isflor) return;
 
-	// === BUNCH MANAGEMENT: DELETE CURRENT BUNCH FROM GRID ===
-	b->bunchn--;
-	bool noportals = b->recursion_depth >= MAX_PORTAL_DEPTH;
-	// === DRAW CEILINGS & FLOORS ===
-	for(isflor=0;isflor<2;isflor++) // floor ceil
-	{
-		// here, when we draw sector of the exit portal we get glitches when it would draw a triangle with point below the camera resulting in triangle spanning entire vertical of the screen
+    // Skip if this is the portal exit surface
+    bool skipport = (b->has_portal_clip
+                     && sectnum == b->testignoresec
+                     && isflor == b->testignorewall);
+    if (skipport) return;
 
-		     // Back-face culling: skip if camera is on wrong side of surface
-			// need to get original slope, as if camera was in origin.
-	//if (!b->has_portal_clip)
-		bool skipport = (b->has_portal_clip
-				&& s == b->testignoresec
-				&& isflor == b->testignorewall);
+    // Setup transform and normal
+    gentransform_ceilflor(sec, wal, isflor, b);
 
-		// Back-face cull, but NOT for exit portal surface (we need to draw it solid)
-		float surfpos = getslopez(&sec[s], isflor, b->cam.p.x, b->cam.p.y);
-		if (!skipport && (b->cam.p.z >= surfpos) == isflor)
-			continue;
-		gentransform_ceilflor(&sec[s], wal, isflor, b);
+    b->gnorm.x = grad->x;
+    b->gnorm.y = grad->y;
+    b->gnorm.z = 1.f;
+    if (isflor) {
+        b->gnorm.x = -b->gnorm.x;
+        b->gnorm.y = -b->gnorm.y;
+        b->gnorm.z = -b->gnorm.z;
+    }
+    double f = 1.0 / sqrt(b->gnorm.x * b->gnorm.x + b->gnorm.y * b->gnorm.y + 1);
+    b->gnorm.x *= f;
+    b->gnorm.y *= f;
+    b->gnorm.z *= f;
 
-		// Setup surface properties (height, gradient, color)
-		fz = sec[s].z[isflor]; grad = &sec[s].grad[isflor];
+    b->gligsect = sectnum;
+    b->gligwall = isflor - 2;
+    b->gligslab = 0;
 
-		// Calculate surface normal vector
-		b->gnorm.x = grad->x;
-		b->gnorm.y = grad->y;
-		b->gnorm.z = 1.f;
-		if (isflor) {
-			b->gnorm.x = -b->gnorm.x;
-			b->gnorm.y = -b->gnorm.y;
-			b->gnorm.z = -b->gnorm.z;
-		}
-		f = 1.0 / sqrt(b->gnorm.x * b->gnorm.x + b->gnorm.y * b->gnorm.y + 1);
-		b->gnorm.x *= f;
-		b->gnorm.y *= f;
-		b->gnorm.z *= f;
+    // Build vertex array from ALL sector walls
+    dpoint3d *verts = (dpoint3d *)_alloca(n * sizeof(dpoint3d));
 
-			//plane point: (wal[0].x,wal[0].y,fz)
-			//plane norm: <grad->x,grad->y,1>
-			//
-			//   (wal[i].x-wal[0].x)*grad->x +
-			//   (wal[i].y-wal[0].y)*grad->y +
-			//   (?       -      fz)*      1 = 0
-		// Build polygon for ceiling/floor using plane equation:
-		plothead[0] = -1; plothead[1] = -1;
-		// claude, look at that section, explain what is going into mono_ins, in what coordinate system, and how can i modify it
-		// with wccw transform to transform world around. think - how would i draw rotated world, if camera was stationary.
-		// First loop - infinity points
-		for (ww = twaln; ww >= 0; ww -= twaln) {
-			double xw = twal[ww].x;
-			double yw = twal[ww].y;
-			double surface_z = (wal[0].x - xw) * grad->x + (wal[0].y - yw) * grad->y + fz;
+    for (i = 0; i < n; i++) {
+        double xw = wal[i].x;
+        double yw = wal[i].y;
+        double zw = (wal[0].x - xw) * grad->x + (wal[0].y - yw) * grad->y + fz;
 
-			// Get normal and transform both point and normal
-			dpoint3d norm_xf = {b->gnorm.x, b->gnorm.y, b->gnorm.z};
-			portal_xform_world_full(&xw, &yw, &surface_z, b);
-			wccw_transform_dir(&norm_xf, &b->cam, &b->orcam);
+        // Transform through portal if needed
+        portal_xform_world_full(&xw, &yw, &zw, b);
 
-			// Extend to infinity along normal
-			double inf = 1e32;
-			plothead[isflor] = mono_ins(plothead[isflor],
-										 xw - norm_xf.x * inf,
-										 yw - norm_xf.y * inf,
-										 surface_z - norm_xf.z * inf);
-		}
+        verts[i].x = xw;
+        verts[i].y = yw;
+        verts[i].z = zw;
+    }
 
-		// Second loop - real surface points
-		i = isflor ^ 1;
-		for (ww = 0; ww <= twaln; ww++) {
-			double xw = twal[ww].x;
-			double yw = twal[ww].y;
-			double zw = (wal[0].x - xw) * grad->x + (wal[0].y - yw) * grad->y + fz;
+    // Use mono_genfromloop to create proper monotone polygon structure
+    // It expects the vertices in the correct winding order
+    // Floor: one order, Ceiling: reverse order
+    if (!isflor) {
+        // Ceiling - reverse the vertex order
+        for (i = 0; i < n / 2; i++) {
+            dpoint3d tmp = verts[i];
+            verts[i] = verts[n - 1 - i];
+            verts[n - 1 - i] = tmp;
+        }
+    }
 
-			portal_xform_world_full(&xw, &yw, &zw, b);
+    mono_genfromloop(&plothead[0], &plothead[1], verts, n);
 
-			plothead[i] = mono_ins(plothead[i], xw, yw, zw);
-		}
-		plothead[i] = mp[plothead[i]].n;
+    if ((plothead[0] | plothead[1]) < 0) {
+        mono_deloop(plothead[0]);
+        mono_deloop(plothead[1]);
+        return;
+    }
 
-		// Setup texture and rendering flags
-		sur = &sec[s].surf[isflor];
-		gtpic = &gtile[sur->tilnum];
-		//if (!gtpic->tt.f) loadpic(gtpic);
-		if (sec[s].surf[isflor].flags & (1 << 17)) { b->gflags = 2; } //skybox ceil/flor
+    // Check for portal
+    int myport = sec->tags[1];
+    bool isportal = myport >= 0 && portals[myport].destpn >= 0 && portals[myport].surfid == isflor;
+    bool noportals = b->recursion_depth >= MAX_PORTAL_DEPTH;
 
-		b->gligwall = isflor - 2;
+	int mytag = sectnum + taginc * b->recursion_depth;
 
-		int myport = sec[s].tags[1];
-		if (myport>=0)
-			int asd=1;
+	if (isportal && !noportals) {
+		int endpn = portals[myport].destpn;
+		int nexttag = portals[endpn].sect + taginc * (b->recursion_depth + 1);
 
-		bool isportal = myport>=0 && portals[myport].destpn >=0 && portals[myport].surfid == isflor;
-		if (isportal && !noportals && !skipport) {
-			int endpn = portals[myport].destpn;
-			int endsec = portals[myport].sect;
-			// Only SUB (flags&2), NOT AND (flags&1) - child handles the content
-			// This prevents parent creating mph entries that collide with child's tags
+		logstep("entering portal surf %d, sec:%d, depth:%d", isflor, sectnum, b->recursion_depth);
 
-			logstep("entering portal floor?, %d, sec:%d, cur depth:%d", isflor, s, b->recursion_depth);
-
-			int ci = taginc *b->recursion_depth;
-			drawpol_befclip(s+ci,portals[endpn].sect+ci+taginc, s,portals[endpn].sect ,plothead[0],plothead[1],   ((isflor<<2)+3)|CLIP_PORTAL_FLAG, b);
-			draw_hsr_enter_portal(map, myport, b, plothead[0], plothead[1]);
-		}
-
-		else {
-			logstep("drawing solid - floor?, %d, sec:%d, cur depth:%d", isflor, s, b->recursion_depth);
-
-			drawpol_befclip(s+taginc*b->recursion_depth,-1,s,-1,plothead[0],plothead[1],(isflor<<2)+3,b);
-		}
+		drawpol_befclip(mytag, nexttag,
+						sectnum, portals[endpn].sect,
+						plothead[0], plothead[1],
+						((isflor << 2) + 3) | CLIP_PORTAL_FLAG, b);
+		draw_hsr_enter_portal(map, myport, b, plothead[0], plothead[1]);
+	} else {
+		logstep("drawing solid surf %d, sec:%d, depth:%d", isflor, sectnum, b->recursion_depth);
+		drawpol_befclip(mytag, -1,
+						sectnum, -1,
+						plothead[0], plothead[1],
+						(isflor << 2) + 3, b);
 	}
+}
 
-	// === DRAW WALLS ===
-	for(ww=0;ww<twaln;ww++)
-	{
-		// Get wall vertices and setup wall segment
-		vn = getwalls_imp(s,twal[ww].i,verts,MAXVERTS,map);
-		w = twal[ww].i; nw = wal[w].n+w;
-		sur = &wal[w].surf;
 
-		// Calculate wall length and setup color/normal
-		dx = sqrt((wal[nw].x-wal[w].x)*(wal[nw].x-wal[w].x) + (wal[nw].y-wal[w].y)*(wal[nw].y-wal[w].y));
-		b->gnorm.x = wal[w].y-wal[nw].y;
-		b->gnorm.y = wal[nw].x-wal[w].x;
-		b->gnorm.z = 0;
-		f = 1.0/sqrt(b->gnorm.x*b->gnorm.x + b->gnorm.y*b->gnorm.y); b->gnorm.x *= f; b->gnorm.y *= f;
-		// Setup base wall quad (floor to ceiling)
-		pol[0].x = twal[ww  ].x; pol[0].y = twal[ww  ].y; pol[0].z = getslopez(&sec[s],0,pol[0].x,pol[0].y); //pol[0].n = 1;
-		pol[1].x = twal[ww+1].x; pol[1].y = twal[ww+1].y; pol[1].z = getslopez(&sec[s],0,pol[1].x,pol[1].y); //pol[1].n = 1;
-		pol[2].x = twal[ww+1].x; pol[2].y = twal[ww+1].y; pol[2].z = getslopez(&sec[s],1,pol[2].x,pol[2].y); //pol[2].n = 1;
-		pol[3].x = twal[ww  ].x; pol[3].y = twal[ww  ].y; pol[3].z = getslopez(&sec[s],1,pol[3].x,pol[3].y); //pol[3].n =-3;
 
-		// === WALL SEGMENT SUBDIVISION LOOP =		   // Process wall in segments, clipping against adjacent sectors
-		opolz[3] = pol[0].z; opolz[2] = pol[1].z;
-		for(m=0;m<=(vn<<1);m++) //Warning: do not reverse for loop!
-		{
-			// Update Z-coordinates for current segment
-			opolz[0] = opolz[3]; opolz[1] = opolz[2];
-			if (m == (vn<<1)) { opolz[2] = pol[2].z; opolz[3] = pol[3].z; }
-			else
-			{
-				opolz[2] = getslopez(&sec[verts[m>>1].s],m&1,pol[2].x,pol[2].y);
-				opolz[3] = getslopez(&sec[verts[m>>1].s],m&1,pol[3].x,pol[3].y);
-			}
-			//if ((opolz[0] >= opolz[3]) && (opolz[1] >= opolz[2])) continue; //Early-out optimization: skip walls with 0 height
+static void drawalls(int bid, mapstate_t *map, bunchgrp *b)
+{
+    #define MAXVERTS 256
+    vertlist_t verts[MAXVERTS];
+    bunchverts_t *twal;
+    int twaln;
+    dpoint3d pol[4];
+    double opolz[4];
+    kgln_t npol2[3];
+    sect_t *sec;
+    wall_t *wal;
+    surf_t *sur;
+    double f, dx;
+    int i, j, m, n, s, ns, w, ww, nw, vn;
 
-			// Skip zero-height wall segments (optimization)
-			if ((max(pol[0].z,opolz[0]) >= min(pol[3].z,opolz[3])-1e-4) &&
-				 (max(pol[1].z,opolz[1]) >= min(pol[2].z,opolz[2])-1e-4)) continue; //Early-out optimization: skip walls with 0 height FIXFIXFIXFIX
+    s = b->bunch[bid].sec;
+    sec = map->sect;
+    wal = sec[s].wall;
 
-			/*Most critical usage - determines visible wall segments
-			Intersects current wall trapezoid with adjacent sector geometry
-			Returns monotone polygon pair representing visible portion
-			If no intersection, wall segment is completely occluded*/
+    twal = (bunchverts_t *)_alloca((map->sect[s].n + 1) * sizeof(bunchverts_t));
+    twaln = prepbunch(bid, twal, b);
 
-			//if (!intersect_traps_mono(pol[0].x,pol[0].y, pol[1].x,pol[1].y, pol[0].z,pol[1].z,pol[2].z,pol[3].z, opolz[0],opolz[1],opolz[2],opolz[3], &plothead[0],&plothead[1])) continue;
-			// Calculate intersection of wall segment with clipping trapezoids
-			f = 1e-7;
-			dpoint3d trap1[4] = {{pol[0].x, pol[0].y, pol[0].z-f}, {pol[1].x, pol[1].y, pol[1].z-f},
-								{pol[2].x, pol[2].y, pol[2].z+f}, {pol[3].x, pol[3].y, pol[3].z+f}};
-			dpoint3d trap2[4] = {{pol[0].x, pol[0].y, opolz[0]-f}, {pol[1].x, pol[1].y, opolz[1]-f},
-								{pol[2].x, pol[2].y, opolz[2]+f}, {pol[3].x, pol[3].y, opolz[3]+f}};
-			for (int i=0;i<4;i++) {
-				wccw_transform(&trap1[i],&b->cam,&b->orcam);
-				wccw_transform(&trap2[i],&b->cam,&b->orcam);
-			}
+    b->gligsect = s;
+    b->gligslab = 0;
 
-			// Use copies to preserve original pol[] for subsequent loop iterations
-			dpoint3d pol0_xf = pol[0];
-			dpoint3d pol1_xf = pol[1];
-			wccw_transform(&pol1_xf, &b->cam,&b->orcam);
-			wccw_transform(&pol0_xf, &b->cam,&b->orcam);
+    // Remove bunch from list
+    b->bunchn--;
 
-			if (!intersect_traps_mono_points(pol0_xf, pol1_xf, trap1, trap2, &plothead[0], &plothead[1]))
-				continue;
+    bool noportals = b->recursion_depth >= MAX_PORTAL_DEPTH;
 
-			// Render wall segment if visible
-			//	gtpic = &gtile[sur->tilnum]; if (!gtpic->tt.f) loadpic(gtpic);
-			//if (sur->flags & (1 << 17))
-			//{ b->gflags = 2; } //skybox ceil/flor
-			//else
-			if ((!(m & 1)) || (wal[w].surf.flags & (1 << 5))) //Draw wall here //(1<<5): 1-way
-			{
+    // === WALLS ONLY ===
+    for (ww = 0; ww < twaln; ww++)
+    {
+        vn = getwalls_imp(s, twal[ww].i, verts, MAXVERTS, map);
+        w = twal[ww].i;
+        nw = wal[w].n + w;
+        sur = &wal[w].surf;
 
-					// Calculate UV mapping for wall texture
-					npol2[0].x = wal[w].x;
-					npol2[0].y = wal[w].y;
-					npol2[0].z = getslopez(&sec[s], 0, wal[w].x, wal[w].y);
-					npol2[1].x = wal[nw].x;
-					npol2[1].y = wal[nw].y;
-					npol2[1].z = npol2[0].z;
-					npol2[2].x = wal[w].x;
-					npol2[2].y = wal[w].y;
-					npol2[2].z = npol2[0].z + 1.f;
-					// Determine reference Z-level texture alignment
-					if (!(sur->flags & 4)) f = sec[s].z[0];
-					else if (!vn) f = sec[s].z[1]; //White walls don't have verts[]!
-					else if (!m) f = sec[verts[0].s].z[0];
-					else f = sec[verts[(m - 1) >> 1].s].z[0];
-					// Apply UV coordinates with proper scaling
-					npol2[0].u = sur->uv[0].x;
-					npol2[0].v = sur->uv[2].y * (npol2[0].z - f) + sur->uv[0].y;
-					npol2[1].u = sur->uv[1].x * dx + npol2[0].u;
-					npol2[1].v = sur->uv[1].y * dx + npol2[0].v;
-					npol2[2].u = sur->uv[2].x + npol2[0].u;
-					npol2[2].v = sur->uv[2].y + npol2[0].v;
-					b->gflags = 0;
-					gentransform_wall(npol2, sur, b);
+        dx = sqrt((wal[nw].x - wal[w].x) * (wal[nw].x - wal[w].x) +
+                  (wal[nw].y - wal[w].y) * (wal[nw].y - wal[w].y));
 
-				b->gligwall = w;
-				b->gligslab = m;
-				ns = -1;
-				/* notes:
-				 *	b->gligsect = s;        // Current sector
-					b->gligwall = w;        // Wall index
-					b->gligslab = m;        // Segment/slab number (0,1,2... for each vertical division)*/
-			} else {
-				ns = verts[m >> 1].s; // Portal to adjacent sector
-			}
-			// Render the wall polygon
-			int myport = wal[w].tags[1];
-			bool skipport= (b->has_portal_clip
-				&& s==b->testignoresec
-				&& w == b->testignorewall);
+        b->gnorm.x = wal[w].y - wal[nw].y;
+        b->gnorm.y = wal[nw].x - wal[w].x;
+        b->gnorm.z = 0;
+        f = 1.0 / sqrt(b->gnorm.x * b->gnorm.x + b->gnorm.y * b->gnorm.y);
+        b->gnorm.x *= f;
+        b->gnorm.y *= f;
 
-			if (!skipport && !noportals && myport >= 0 && portals[myport].destpn >= 0 && portals[myport].kind == PORT_WALL) {
-				int endpn = portals[myport].destpn;
-				logstep("entering wall port,wal:%d, sec:%d, cur depth:%d, curhalf:%d",w, s, b->recursion_depth,0);
-				// Only SUB, not AND
-				int drawflags = 2; // 2 is sub;
-				int ci = taginc*b->recursion_depth;
-				drawpol_befclip(s+ci,portals[endpn].sect+ci+taginc, s,portals[endpn].sect ,plothead[0],plothead[1],   (((m > vn) << 2) + 3)|CLIP_PORTAL_FLAG, b);
-				//drawpol_befclip(s, -1, -1, -1,plothead[0],plothead[1],  drawflags, b);
+        // Base wall quad
+        pol[0].x = twal[ww].x;     pol[0].y = twal[ww].y;     pol[0].z = getslopez(&sec[s], 0, pol[0].x, pol[0].y);
+        pol[1].x = twal[ww + 1].x; pol[1].y = twal[ww + 1].y; pol[1].z = getslopez(&sec[s], 0, pol[1].x, pol[1].y);
+        pol[2].x = twal[ww + 1].x; pol[2].y = twal[ww + 1].y; pol[2].z = getslopez(&sec[s], 1, pol[2].x, pol[2].y);
+        pol[3].x = twal[ww].x;     pol[3].y = twal[ww].y;     pol[3].z = getslopez(&sec[s], 1, pol[3].x, pol[3].y);
 
-				draw_hsr_enter_portal(map, myport, b, plothead[0], plothead[1]);
-			} else {
-				if (ns >= 0)
-					logstep("drawing nextsecw - sec-wall:%d-%d, ns:%d  sec:%d, cur depth:%d, curhalf:%d",
-							s, w, ns, s, b->recursion_depth, 0);
-				else
-					logstep("drawing solid - sec-wall:%d-%d, ns:%d  sec:%d, cur depth:%d, curhalf:%d",
-							s, w, ns, s, b->recursion_depth, 0);
+        // Wall segment loop (unchanged)
+        opolz[3] = pol[0].z;
+        opolz[2] = pol[1].z;
 
-				int inc = taginc * b->recursion_depth;
-				int newtag = (ns >= 0) ? (ns + inc) : -1;  // FIX: preserve -1 for solid walls
-				drawpol_befclip(s + inc, newtag, s, ns, plothead[0], plothead[1], ((m > vn) << 2) + 3, b);
-			}
-		}
+        for (m = 0; m <= (vn << 1); m++)
+        {
+            int plothead[2];
 
-	}
+            opolz[0] = opolz[3];
+            opolz[1] = opolz[2];
+            if (m == (vn << 1)) {
+                opolz[2] = pol[2].z;
+                opolz[3] = pol[3].z;
+            } else {
+                opolz[2] = getslopez(&sec[verts[m >> 1].s], m & 1, pol[2].x, pol[2].y);
+                opolz[3] = getslopez(&sec[verts[m >> 1].s], m & 1, pol[3].x, pol[3].y);
+            }
+
+            if ((max(pol[0].z, opolz[0]) >= min(pol[3].z, opolz[3]) - 1e-4) &&
+                (max(pol[1].z, opolz[1]) >= min(pol[2].z, opolz[2]) - 1e-4))
+                continue;
+
+            f = 1e-7;
+            dpoint3d trap1[4] = {
+                {pol[0].x, pol[0].y, pol[0].z - f}, {pol[1].x, pol[1].y, pol[1].z - f},
+                {pol[2].x, pol[2].y, pol[2].z + f}, {pol[3].x, pol[3].y, pol[3].z + f}
+            };
+            dpoint3d trap2[4] = {
+                {pol[0].x, pol[0].y, opolz[0] - f}, {pol[1].x, pol[1].y, opolz[1] - f},
+                {pol[2].x, pol[2].y, opolz[2] + f}, {pol[3].x, pol[3].y, opolz[3] + f}
+            };
+
+            for (i = 0; i < 4; i++) {
+                wccw_transform(&trap1[i], &b->cam, &b->orcam);
+                wccw_transform(&trap2[i], &b->cam, &b->orcam);
+            }
+
+            dpoint3d pol0_xf = pol[0];
+            dpoint3d pol1_xf = pol[1];
+            wccw_transform(&pol1_xf, &b->cam, &b->orcam);
+            wccw_transform(&pol0_xf, &b->cam, &b->orcam);
+
+            if (!intersect_traps_mono_points(pol0_xf, pol1_xf, trap1, trap2, &plothead[0], &plothead[1]))
+                continue;
+
+            if ((!(m & 1)) || (wal[w].surf.flags & (1 << 5)))
+            {
+                // Wall texture setup (unchanged)
+                npol2[0].x = wal[w].x;  npol2[0].y = wal[w].y;
+                npol2[0].z = getslopez(&sec[s], 0, wal[w].x, wal[w].y);
+                npol2[1].x = wal[nw].x; npol2[1].y = wal[nw].y;
+                npol2[1].z = npol2[0].z;
+                npol2[2].x = wal[w].x;  npol2[2].y = wal[w].y;
+                npol2[2].z = npol2[0].z + 1.f;
+
+                if (!(sur->flags & 4)) f = sec[s].z[0];
+                else if (!vn) f = sec[s].z[1];
+                else if (!m) f = sec[verts[0].s].z[0];
+                else f = sec[verts[(m - 1) >> 1].s].z[0];
+
+                npol2[0].u = sur->uv[0].x;
+                npol2[0].v = sur->uv[2].y * (npol2[0].z - f) + sur->uv[0].y;
+                npol2[1].u = sur->uv[1].x * dx + npol2[0].u;
+                npol2[1].v = sur->uv[1].y * dx + npol2[0].v;
+                npol2[2].u = sur->uv[2].x + npol2[0].u;
+                npol2[2].v = sur->uv[2].y + npol2[0].v;
+                b->gflags = 0;
+                gentransform_wall(npol2, sur, b);
+
+                b->gligwall = w;
+                b->gligslab = m;
+                ns = -1;
+            } else {
+                ns = verts[m >> 1].s;
+            }
+
+            int myport = wal[w].tags[1];
+            bool skipport = (b->has_portal_clip && s == b->testignoresec && w == b->testignorewall);
+        	int mytag = s + taginc * b->recursion_depth;
+
+            if (!skipport && !noportals && myport >= 0 && portals[myport].destpn >= 0 && portals[myport].kind == PORT_WALL) {
+            	int endpn = portals[myport].destpn;
+            	int nexttag = portals[endpn].sect + taginc * (b->recursion_depth + 1);
+
+            	drawpol_befclip(mytag, nexttag,
+								s, portals[endpn].sect,
+								plothead[0], plothead[1],
+								(((m > vn) << 2) + 3) | CLIP_PORTAL_FLAG, b);
+
+                draw_hsr_enter_portal(map, myport, b, plothead[0], plothead[1]);
+            } else {
+            	int newtag = (ns >= 0) ? (ns + taginc * b->recursion_depth) : -1;
+            	drawpol_befclip(mytag, newtag, s, ns, plothead[0], plothead[1], ((m > vn) << 2) + 3, b);
+            }
+        }
+    }
 }
 /*
 	Renders visible geometry from camera viewpoint
@@ -1121,21 +1098,6 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 	}
 	if (!mphmal)
 		mono_initonce();
-
-
-		//Hack to keep camera away from sector line; avoids clipping glitch in drawpol_befclip/changetagfunc
-//wal = lgs->sect[gcam.cursect].wall;
-//for(i=lgs->sect[gcam.cursect].n-1;i>=0;i--)
-//{
-//	#define WALHAK 1e-3
-//	j = wal[i].n+i;
-//	d = distpoint2line2(gcam.p.x,gcam.p.y,wal[i].x,wal[i].y,wal[j].x,wal[j].y); if (d >= WALHAK*WALHAK) continue;
-//	fp.x = wal[j].x-wal[i].x;
-//	fp.y = wal[j].y-wal[i].y;
-//	f = (WALHAK - sqrt(d))/sqrt(fp.x*fp.x + fp.y*fp.y);
-//	gcam.p.x -= fp.y*f;
-//	gcam.p.y += fp.x*f;
-//}
 
 	if (shadowtest2_rendmode != 4)
 	{
@@ -1235,7 +1197,7 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 			}
 
 			mono_genfromloop(&mph[0].head[0], &mph[0].head[1], bord2, n);
-			mph[0].tag = gcam.cursect;
+			mph[0].tag = gcam.cursect + taginc * b->recursion_depth;
 			mphnum = 1;
 		} else {
 			// Portal case
@@ -1247,10 +1209,19 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 		b->bunchn = 0;
 		scansector(gcam.cursect, b);
 
+		// First pass: draw all visible sector surfaces (floors/ceilings)
+		// Use sectgot to iterate visible sectors
 		while (b->bunchn) {
 			closest = b->bunchn - 1;
-			logstep("bunch draw close: %d, depth:%d", closest, b->recursion_depth);
+			logstep("bunch draw walls: %d, depth:%d", closest, b->recursion_depth);
 			drawalls(closest, lgs, b);
+		}
+
+		// FLOORS/CEILINGS AFTER - now mph contains properly carved sector regions
+		for (i = 0; i < lgs->numsects; i++) {
+			if (!(b->sectgot[i >> 5] & (1 << i))) continue;
+			draw_sector_surface(i, 0, lgs, b);  // ceiling
+			draw_sector_surface(i, 1, lgs, b);  // floor
 		}
 
 		if (shadowtest2_rendmode == 4)
