@@ -643,6 +643,7 @@ static void drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
             omph0++;
             for (j = omph0 - 1; j >= 0; j--) {
                 if (mph[j].tag != b->gnewtag) continue;
+            	// here tags are equal above, but head has value of like 15000 for a case when looking into floor.
                 if (!mono_join(mph[j].head[0], mph[j].head[1],
                                mph[k].head[0], mph[k].head[1], &i0, &i1)) continue;
                 for (i = 1; i >= 0; i--) {
@@ -985,8 +986,11 @@ static void drawalls(int bid, mapstate_t *map, bunchgrp *b)
                 b->gligwall = w;
                 b->gligslab = m;
                 ns = -1;
+				logstep("  slab %d: solid wall (m&1=%d, flags=%x)", m, m&1, wal[w].surf.flags);
+
             } else {
                 ns = verts[m >> 1].s;
+            	logstep("  slab %d: opening to sector %d", m, ns);
             }
 
             int myport = wal[w].tags[1];
@@ -1004,8 +1008,19 @@ static void drawalls(int bid, mapstate_t *map, bunchgrp *b)
 
                 draw_hsr_enter_portal(map, myport, b, plothead[0], plothead[1]);
             } else {
-            	int newtag = (ns >= 0) ? (ns + taginc * b->recursion_depth) : -1;
-            	drawpol_befclip(mytag, newtag, s, ns, plothead[0], plothead[1], ((m > vn) << 2) + 3, b);
+            	int inc = taginc * b->recursion_depth;
+            	int newtag;
+
+            	// FIX: if ns == s (same sector), treat as solid wall
+            	if (ns >= 0 && ns != s) {
+            		newtag = ns + inc;
+
+            	} else {
+            		newtag = -1;  // Solid wall - will produce eyepol
+            	}
+
+            	logstep("wall %d: m=%d, ns=%d, s=%d, newtag=%d", w, m, ns, s, newtag);
+            	drawpol_befclip(s + inc, newtag, s, ns, plothead[0], plothead[1], ((m > vn) << 2) + 3, b);
             }
         }
     }
@@ -1209,19 +1224,41 @@ void draw_hsr_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 		b->bunchn = 0;
 		scansector(gcam.cursect, b);
 
-		// First pass: draw all visible sector surfaces (floors/ceilings)
-		// Use sectgot to iterate visible sectors
+		// Track which sectors have had their floors/ceilings drawn
+		// Track which sectors have had their floors/ceilings drawn
+		unsigned int *sectdrawn = (unsigned int *)_alloca(((lgs->numsects + 31) >> 3) + 4);
+		memset(sectdrawn, 0, (lgs->numsects + 31) >> 3);
+
 		while (b->bunchn) {
 			closest = b->bunchn - 1;
-			logstep("bunch draw walls: %d, depth:%d", closest, b->recursion_depth);
+			int bunch_sec = b->bunch[closest].sec;
+
+			logstep("bunch draw walls: %d, sec:%d, depth:%d", closest, bunch_sec, b->recursion_depth);
 			drawalls(closest, lgs, b);
+
+			// Check if this sector has more bunches remaining
+			int more_bunches = 0;
+			for (int bi = 0; bi < b->bunchn; bi++) {
+				if (b->bunch[bi].sec == bunch_sec) {
+					more_bunches = 1;
+					break;
+				}
+			}
+
+			// Only draw floor/ceiling when ALL bunches for this sector are done
+			if (!more_bunches && !(sectdrawn[bunch_sec >> 5] & (1 << bunch_sec))) {
+				sectdrawn[bunch_sec >> 5] |= (1 << bunch_sec);
+				draw_sector_surface(bunch_sec, 0, lgs, b);  // ceiling
+				draw_sector_surface(bunch_sec, 1, lgs, b);  // floor
+			}
 		}
 
-		// FLOORS/CEILINGS AFTER - now mph contains properly carved sector regions
+		// Draw any remaining sectors that were scanned but not reached via bunches
 		for (i = 0; i < lgs->numsects; i++) {
 			if (!(b->sectgot[i >> 5] & (1 << i))) continue;
-			draw_sector_surface(i, 0, lgs, b);  // ceiling
-			draw_sector_surface(i, 1, lgs, b);  // floor
+			if (sectdrawn[i >> 5] & (1 << i)) continue;
+			draw_sector_surface(i, 0, lgs, b);
+			draw_sector_surface(i, 1, lgs, b);
 		}
 
 		if (shadowtest2_rendmode == 4)
