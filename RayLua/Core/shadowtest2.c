@@ -43,7 +43,7 @@ void logstep(const char* fmt, ...) {
 	va_end(args);
 	printf("\n");
 }
-int shadowtest2_backface_cull = 0;  // Toggle backface culling
+int shadowtest2_backface_cull = 1;  // Toggle backface culling
 int shadowtest2_distance_cull = 0;  // Toggle distance-based culling
 int shadowtest2_debug_walls = 1;    // Verbose wall logging
 int shadowtest2_debug_block_selfportals = 1;    // Verbose wall logging
@@ -483,35 +483,76 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
 // create plane EQ using GCAM
 static void gentransform_ceilflor(sect_t *sec, wall_t *wal, int isflor, bdrawctx *b)
 {
-	cam_t *cam = &b->cam;
+	cam_t *cam = &b->orcam;
+	float f, g, ox, oy, oz, rdet, fk[24];
+	int i;
+
 	float gx = sec->grad[isflor].x;
 	float gy = sec->grad[isflor].y;
+	float z0 = sec->z[isflor];
 
-	// Transform plane normal (gx, gy, 1) to camera space
-	float nx = cam->r.x * gx + cam->r.y * gy + cam->r.z;
-	float ny = cam->d.x * gx + cam->d.y * gy + cam->d.z;
-	float nz = cam->f.x * gx + cam->f.y * gy + cam->f.z;
+	// Create 3 points on the floor/ceiling plane
+	dpoint3d npol2[3];
+	npol2[0].x = wal[0].x;
+	npol2[0].y = wal[0].y;
+	npol2[0].z = z0;
 
-	// Camera-space plane constant
-	float D_c = gx * (wal[0].x - cam->p.x)
-			  + gy * (wal[0].y - cam->p.y)
-			  + (sec->z[isflor] - cam->p.z);
+	// Second point: offset by 1 in X direction, adjust Z for slope
+	npol2[1].x = wal[0].x + 1.0;
+	npol2[1].y = wal[0].y;
+	npol2[1].z = z0 - gx * 1.0;  // slope: z = z0 - gx*(x-x0) - gy*(y-y0)
 
-	// Scale includes h.z for screen-space depth formula
-	float scale = 1.0f / (D_c * cam->h.z);
-	b->gouvmat[0] = nx * scale;
-	b->gouvmat[3] = ny * scale;
-	b->gouvmat[6] = nz / D_c - b->gouvmat[0] * cam->h.x - b->gouvmat[3] * cam->h.y;
+	// Third point: offset by 1 in Y direction, adjust Z for slope
+	npol2[2].x = wal[0].x;
+	npol2[2].y = wal[0].y + 1.0;
+	npol2[2].z = z0 - gy * 1.0;
+
+	// Apply wccw transform first (portal space), then camera transform
+	for(i=0;i<3;i++)
+	{
+		wccw_transform(&npol2[i], &b->cam, &b->orcam);
+		ox = npol2[i].x - cam->p.x;
+		oy = npol2[i].y - cam->p.y;
+		oz = npol2[i].z - cam->p.z;
+		npol2[i].x = ox*cam->r.x + oy*cam->r.y + oz*cam->r.z;
+		npol2[i].y = ox*cam->d.x + oy*cam->d.y + oz*cam->d.z;
+		npol2[i].z = ox*cam->f.x + oy*cam->f.y + oz*cam->f.z;
+	}
+
+	// Compute plane equation in camera space (same method as gentransform_wall)
+	fk[0] = npol2[0].z; fk[3] = npol2[0].x*cam->h.z + npol2[0].z*cam->h.x; fk[6] = npol2[0].y*cam->h.z + npol2[0].z*cam->h.y;
+	fk[1] = npol2[1].z; fk[4] = npol2[1].x*cam->h.z + npol2[1].z*cam->h.x; fk[7] = npol2[1].y*cam->h.z + npol2[1].z*cam->h.y;
+	fk[2] = npol2[2].z; fk[5] = npol2[2].x*cam->h.z + npol2[2].z*cam->h.x; fk[8] = npol2[2].y*cam->h.z + npol2[2].z*cam->h.y;
+	fk[12] = fk[4]*fk[8] - fk[5]*fk[7];
+	fk[13] = fk[5]*fk[6] - fk[3]*fk[8];
+	fk[14] = fk[3]*fk[7] - fk[4]*fk[6];
+	fk[18] = fk[2]*fk[7] - fk[1]*fk[8];
+	fk[19] = fk[0]*fk[8] - fk[2]*fk[6];
+	fk[20] = fk[1]*fk[6] - fk[0]*fk[7];
+	fk[21] = fk[1]*fk[5] - fk[2]*fk[4];
+	fk[22] = fk[2]*fk[3] - fk[0]*fk[5];
+	fk[23] = fk[0]*fk[4] - fk[1]*fk[3];
+	b->gouvmat[6] = fk[12] + fk[13] + fk[14];
+	b->gouvmat[0] = fk[18] + fk[19] + fk[20];
+	b->gouvmat[3] = fk[21] + fk[22] + fk[23];
+
+	rdet = 1.0/(fk[0]*fk[12] + fk[1]*fk[13] + fk[2]*fk[14]);
+	g = rdet;
+
+	b->gouvmat[0] *= g;
+	b->gouvmat[3] *= g;
+	b->gouvmat[6] *= g;
 }
 
 // create plane EQ using GCAM
-static void gentransform_wall (kgln_t *npol2, surf_t *sur, bdrawctx *b) {
-	cam_t usedcam = b->cam; // we can use camera hack to get plane equation in space of current cam, not necessart clipping cam.
+static void gentransform_wall (dpoint3d *npol2, surf_t *sur, bdrawctx *b) {
+	cam_t usedcam = b->orcam; // we can use camera hack to get plane equation in space of current cam, not necessart clipping cam.
 	float f, g, ox, oy, oz, rdet, fk[24];
 	int i;
 
 	for(i=0;i<3;i++)
 	{
+		wccw_transform(&npol2[i],&b->cam,&b->orcam);
 		ox = npol2[i].x-usedcam.p.x; oy = npol2[i].y-usedcam.p.y; oz = npol2[i].z-usedcam.p.z;
 		npol2[i].x = ox*usedcam.r.x + oy*usedcam.r.y + oz*usedcam.r.z;
 		npol2[i].y = ox*usedcam.d.x + oy*usedcam.d.y + oz*usedcam.d.z;
@@ -654,11 +695,16 @@ static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bdrawc
 
         logstep("  entering SURFACE portal: myport=%d, dest=%d, surfid=%d",
                 myport, endpn, isflor);
-
         int visible = drawpol_befclip(mytag, nexttag,
                                       sectnum, portals[endpn].sect,
                                       plothead[0], plothead[1],
                                       ((isflor << 2) + 3) | CLIP_PORTAL_FLAG, b);
+
+		// alt -1 solution
+        //int visible = drawpol_befclip(mytag, -1,
+        //                             sectnum, -1,
+        //                             plothead[0], plothead[1],
+        //                             2|((isflor << 2) + 3), b);
         if (visible || true) { // sometimes all walls are red so cant rely on this check.
             logstep("  portal visible, entering");
             draw_hsr_enter_portal(map, myport, b, plothead[0], plothead[1]);
@@ -686,7 +732,7 @@ static void drawalls(mapstate_t *map, int s, int *walls, int wallcount, bdrawctx
     vertlist_t verts[MAXVERTS];
     dpoint3d pol[4];
     double opolz[4];
-    kgln_t npol2[3];
+    dpoint3d npol2[3];
     sect_t *sec = curMap->sect;
     wall_t *wal = sec[s].wall;
     surf_t *sur;
@@ -784,12 +830,12 @@ static void drawalls(mapstate_t *map, int s, int *walls, int wallcount, bdrawctx
                 else if (!m) f = sec[verts[0].s].z[0];
                 else f = sec[verts[(m - 1) >> 1].s].z[0];
 
-                npol2[0].u = sur->uv[0].x;
-                npol2[0].v = sur->uv[2].y * (npol2[0].z - f) + sur->uv[0].y;
-                npol2[1].u = sur->uv[1].x * dx + npol2[0].u;
-                npol2[1].v = sur->uv[1].y * dx + npol2[0].v;
-                npol2[2].u = sur->uv[2].x + npol2[0].u;
-                npol2[2].v = sur->uv[2].y + npol2[0].v;
+                //npol2[0].u = sur->uv[0].x;
+                //npol2[0].v = sur->uv[2].y * (npol2[0].z - f) + sur->uv[0].y;
+                //npol2[1].u = sur->uv[1].x * dx + npol2[0].u;
+                //npol2[1].v = sur->uv[1].y * dx + npol2[0].v;
+                //npol2[2].u = sur->uv[2].x + npol2[0].u;
+                //npol2[2].v = sur->uv[2].y + npol2[0].v;
                 b->gflags = 0;
                 gentransform_wall(npol2, sur, b);
 
@@ -810,11 +856,15 @@ static void drawalls(mapstate_t *map, int s, int *walls, int wallcount, bdrawctx
             if (!skipport && !noportals && isportal) {
             	int endpn = portals[myport].destpn;
             	int nexttag = portals[endpn].sect + taginc * (b->recursion_depth + 1);
-
             	int visible = drawpol_befclip(mytag, nexttag,
 								s, portals[endpn].sect,
 								plothead[0], plothead[1],
 								(((m > vn) << 2) + 3) | CLIP_PORTAL_FLAG, b);
+				// alt -1 solution currently broken
+            	//int visible = drawpol_befclip(mytag, -1,
+				//				s, -1,
+				//				plothead[0], plothead[1],
+				//				2|(((m > vn) << 2) + 3) , b);
             	if (visible) {
             		logstep("wall %d: m=%d, VISIBLE, ns=%d", w, m, ns);
             	} else {
@@ -925,6 +975,7 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
 	draw_hsr_ctx(map,&bs);
 }
 
+dpoint3d bord[4], bord2[8];
 void draw_hsr_ctx(mapstate_t *map, bdrawctx *newctx) {
 	if (!newctx) {
 		return;
@@ -956,7 +1007,7 @@ void draw_hsr_ctx(mapstate_t *map, bdrawctx *newctx) {
 	wall_t *wal;
 	spri_t *spr;
 	dpoint3d dpos, drig, ddow, dfor;
-	dpoint3d fp, bord[4], bord2[8];
+	dpoint3d fp;
 	double f, d;
 	unsigned int *uptr;
 	int i, j, k, n, s, w, closest, col, didcut, halfplane;
@@ -1112,6 +1163,11 @@ void draw_hsr_ctx(mapstate_t *map, bdrawctx *newctx) {
 			n = b->planecuts;
 			didcut = 1;
 			memset8(b->sectgot, 0, (map->numsects + 31) >> 3);
+			// alt path with -1 and flags 2
+			//mono_mph_check(mphnum);
+			//mono_genfromloop(&mph[mphnum].head[0], &mph[mphnum].head[1], bord2, n);
+			//mph[mphnum].tag = gcam.cursect + taginc*b->recursion_depth;
+			//mphnum++;
 		}
 
 		// Track which sectors have had their floors/ceilings drawn
