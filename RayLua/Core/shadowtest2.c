@@ -43,6 +43,10 @@ void logstep(const char* fmt, ...) {
 	va_end(args);
 	printf("\n");
 }
+int shadowtest2_backface_cull = 0;  // Toggle backface culling
+int shadowtest2_distance_cull = 0;  // Toggle distance-based culling
+int shadowtest2_debug_walls = 1;    // Verbose wall logging
+int shadowtest2_debug_block_selfportals = 1;    // Verbose wall logging
 
 //--------------------------------------------------------------------------------------------------
 static tiletype gdd;
@@ -288,6 +292,7 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
     int mnewtag = newtag1;
     b->gnewsec = newsec;
     cam_t *orcam = &b->orcam;
+    cam_t *gcam = &b->cam;
 
     int produced_output = 0;  // NEW: track if we produced anything
 
@@ -421,13 +426,13 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
                               MONO_BOOL_AND, b, mono_output);
 
             // NEW: Check if AND produced any eyepols
-            if (eyepoln > before_eyepoln)
+           // if (eyepoln > before_eyepoln)
                 produced_output = 1;
         }
     }
 
     // === SUB operation (flags & 2) - ONLY if AND produced output ===
-    if ((flags & 2) && produced_output) {
+    if (flags & 2) {
         j = (flags & 4) ? MONO_BOOL_SUB_REV : MONO_BOOL_SUB;
 
         b->gnewtag = mtag;
@@ -556,17 +561,31 @@ static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bdrawc
     int plothead[2] = {-1, -1};
     int i, n = sec->n;
 
-    if (n < 3) return;  // Need at least 3 vertices
+    if (n < 3) {
+        logstep("draw_sector_surface: sec=%d, isflor=%d SKIPPED (n=%d < 3)", sectnum, isflor, n);
+        return;
+    }
 
     // Back-face cull
     float surfpos = getslopez(sec, isflor, b->cam.p.x, b->cam.p.y);
-    if ((b->cam.p.z >= surfpos) == isflor) return;
+    bool should_cull = (b->cam.p.z >= surfpos) == isflor;
+
+    if (shadowtest2_backface_cull && should_cull) {
+        logstep("draw_sector_surface: sec=%d, isflor=%d CULLED (backface), cam.z=%.2f, surf.z=%.2f",
+                sectnum, isflor, b->cam.p.z, surfpos);
+        return;
+    }
 
     // Skip if this is the portal exit surface
-    bool skipport = (b->has_portal_clip
+    // FIX: Check if sector portal's surfid matches isflor
+    int myport = sec->tags[1];
+    bool skipport = !shadowtest2_debug_block_selfportals || (b->has_portal_clip
                      && sectnum == b->testignoresec
-                     && isflor == b->testignorewall);
-    if (skipport) return;
+                     && myport >= 0
+                     && portals[myport].kind == b->testignorewall);  // FIXED: Check surfid
+
+    logstep("draw_sector_surface: sec=%d, isflor=%d, n=%d, portal=%d",
+            sectnum, isflor, n, myport);
 
     // Setup transform and normal
     gentransform_ceilflor(sec, wal, isflor, b);
@@ -588,7 +607,7 @@ static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bdrawc
     b->gligwall = isflor - 2;
     b->gligslab = 0;
 
-    // Build vertex array from ALL sector walls
+    // Build vertex array
     dpoint3d *verts = (dpoint3d *)_alloca(n * sizeof(dpoint3d));
 
     for (i = 0; i < n; i++) {
@@ -596,7 +615,6 @@ static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bdrawc
         double yw = wal[i].y;
         double zw = (wal[0].x - xw) * grad->x + (wal[0].y - yw) * grad->y + fz;
 
-        // Transform through portal if needed
         portal_xform_world_full(&xw, &yw, &zw, b);
 
         verts[i].x = xw;
@@ -604,11 +622,8 @@ static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bdrawc
         verts[i].z = zw;
     }
 
-    // Use mono_genfromloop to create proper monotone polygon structure
-    // It expects the vertices in the correct winding order
-    // Floor: one order, Ceiling: reverse order
+    // Ceiling needs reverse winding
     if (!isflor) {
-        // Ceiling - reverse the vertex order
         for (i = 0; i < n / 2; i++) {
             dpoint3d tmp = verts[i];
             verts[i] = verts[n - 1 - i];
@@ -619,40 +634,52 @@ static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bdrawc
     mono_genfromloop(&plothead[0], &plothead[1], verts, n);
 
     if ((plothead[0] | plothead[1]) < 0) {
+        logstep("  mono_genfromloop failed");
         mono_deloop(plothead[0]);
         mono_deloop(plothead[1]);
         return;
     }
 
-    // Check for portal
-    int myport = sec->tags[1];
-    bool isportal = myport >= 0 && portals[myport].destpn >= 0 && portals[myport].surfid == isflor;
+    // Check for portal - FIX: surfid must match isflor
+    bool isportal = myport >= 0
+                    && portals[myport].destpn >= 0
+                    && portals[myport].kind == isflor;
     bool noportals = b->recursion_depth >= MAX_PORTAL_DEPTH;
 
-	int mytag = sectnum + taginc * b->recursion_depth;
+    int mytag = sectnum + taginc * b->recursion_depth;
 
-    if (isportal && !noportals) {
-	    int endpn = portals[myport].destpn;
-	    int nexttag = portals[endpn].sect + taginc * (b->recursion_depth + 1);
+    if (isportal && !noportals && !skipport) {
+        int endpn = portals[myport].destpn;
+        int nexttag = portals[endpn].sect + taginc * (b->recursion_depth + 1);
 
-	    logstep("entering portal surf %d, sec:%d, depth:%d", isflor, sectnum, b->recursion_depth);
+        logstep("  entering SURFACE portal: myport=%d, dest=%d, surfid=%d",
+                myport, endpn, isflor);
 
-	    int visible = drawpol_befclip(mytag, nexttag,
-	                                  sectnum, portals[endpn].sect,
-	                                  plothead[0], plothead[1],
-	                                  ((isflor << 2) + 3) | CLIP_PORTAL_FLAG, b);
-	    if (visible) {
-		    draw_hsr_enter_portal(map, myport, b, plothead[0], plothead[1]);
-	    }
+        int visible = drawpol_befclip(mytag, nexttag,
+                                      sectnum, portals[endpn].sect,
+                                      plothead[0], plothead[1],
+                                      ((isflor << 2) + 3) | CLIP_PORTAL_FLAG, b);
+        if (visible || true) { // sometimes all walls are red so cant rely on this check.
+            logstep("  portal visible, entering");
+            draw_hsr_enter_portal(map, myport, b, plothead[0], plothead[1]);
+        } else {
+            logstep("  portal not visible");
+        }
     } else {
-	    logstep("drawing solid surf %d, sec:%d, depth:%d", isflor, sectnum, b->recursion_depth);
-	    drawpol_befclip(mytag, -1,
-	                    sectnum, -1,
-	                    plothead[0], plothead[1],
-	                    (isflor << 2) + 3, b);
+        logstep("  drawing solid surface (isportal=%d, noportals=%d, depth=%d)", isportal, noportals, b->recursion_depth);
+        drawpol_befclip(mytag, -1,
+                        sectnum, -1,
+                        plothead[0], plothead[1],
+                        (isflor << 2) + 3, b);
     }
 }
+void shadowtest2_set_culling(int backface, int distance, int debug) {
+	shadowtest2_backface_cull = backface;
+	shadowtest2_distance_cull = distance;
+	shadowtest2_debug_walls = debug;
 
+	printf("Culling: backface=%d, distance=%d, debug=%d\n", backface, distance, debug);
+}
 static void drawalls(mapstate_t *map, int s, int *walls, int wallcount, bdrawctx *b)
 {
     #define MAXVERTS 256
@@ -776,10 +803,11 @@ static void drawalls(mapstate_t *map, int s, int *walls, int wallcount, bdrawctx
             }
 
             int myport = wal[w].tags[1];
-            bool skipport = (b->has_portal_clip && s == b->testignoresec && w == b->testignorewall);
+        	bool isportal = myport >= 0 && portals[myport].destpn >= 0 && portals[myport].kind == PORT_WALL;
+            bool skipport = isportal && !shadowtest2_debug_block_selfportals || b->has_portal_clip && s == b->testignoresec && w == b->testignorewall;
             int mytag = s + taginc * b->recursion_depth;
 
-            if (!skipport && !noportals && myport >= 0 && portals[myport].destpn >= 0 && portals[myport].kind == PORT_WALL) {
+            if (!skipport && !noportals && isportal) {
             	int endpn = portals[myport].destpn;
             	int nexttag = portals[endpn].sect + taginc * (b->recursion_depth + 1);
 
@@ -845,17 +873,25 @@ static void add_sector_walls(int sectnum, bdrawctx *b) {
 	for (int i = 0; i < sec->n; i++) {
 		int j = wal[i].n + i;
 
-		// Midpoint for better distance metric
-		double mx = (wal[i].x + wal[j].x) * 0.5 - b->cam.p.x;
-		double my = (wal[i].y + wal[j].y) * 0.5 - b->cam.p.y;
-
-		// Backface cull using actual vertices
+		// Vectors from camera to wall endpoints
 		double dx0 = wal[i].x - b->cam.p.x;
 		double dy0 = wal[i].y - b->cam.p.y;
 		double dx1 = wal[j].x - b->cam.p.x;
 		double dy1 = wal[j].y - b->cam.p.y;
 
-		if (dy1 * dx0 <= dx1 * dy0) continue;
+		// 2D cross product: positive if camera sees front (CCW winding)
+		double cross = dx0 * dy1 - dx1 * dy0;
+
+		if (shadowtest2_backface_cull && cross <= 0) {
+			if (shadowtest2_debug_walls) {
+				logstep("  wall %d: CULLED (backface), cross=%.2f", i, cross);
+			}
+			continue;
+		}
+
+		// Midpoint distance for sorting
+		double mx = (wal[i].x + wal[j].x) * 0.5 - b->cam.p.x;
+		double my = (wal[i].y + wal[j].y) * 0.5 - b->cam.p.y;
 
 		int wall_id = get_wall_global_id(sectnum, i, curMap);
 		if (b->visited_walls[wall_id]) continue;
@@ -868,8 +904,12 @@ static void add_sector_walls(int sectnum, bdrawctx *b) {
 
 		b->jobs[b->jobcount].sec = sectnum;
 		b->jobs[b->jobcount].wall = i;
-		b->jobs[b->jobcount].dist = mx*mx + my*my;  // Midpoint distance
+		b->jobs[b->jobcount].dist = mx*mx + my*my;
 		b->jobcount++;
+
+		if (shadowtest2_debug_walls) {
+			logstep("  wall %d: ADDED, dist=%.2f, cross=%.2f", i, sqrt(mx*mx + my*my), cross);
+		}
 	}
 
 	qsort(b->jobs, b->jobcount, sizeof(wall_job_t), wall_dist_cmp);
@@ -1081,7 +1121,12 @@ void draw_hsr_ctx(mapstate_t *map, bdrawctx *newctx) {
 
 		b->jobcount = 0;
 		b->jobs = malloc(sizeof(wall_job_t) * b->jobcap);
+		logstep("=== Wall Processing Start ===");
+		logstep("Starting sector: %d, walls in sector: %d", b->cam.cursect, map->sect[b->cam.cursect].n);
+
 		add_sector_walls(b->cam.cursect, b);
+		logstep("Initial queue: %d walls", b->jobcount);
+
 		qsort(b->jobs, b->jobcount, sizeof(wall_job_t), wall_dist_cmp);
 
 		int current_sec = -1;
