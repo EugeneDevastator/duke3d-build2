@@ -128,7 +128,6 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 	rethead[0] = rethead0; rethead[1] = rethead1;
 
 	int start_vert = eyepolvn;
-	int chain0_end = 0;  // Will mark where chain 0 ends
 
 	for(h=0; h<2; h++)
 	{
@@ -153,11 +152,6 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 
 			if (!h) i = mp[i].n;
 		} while (i != rethead[h]);
-
-		if (h == 0) {
-			chain0_end = eyepolvn - start_vert;  // Record split point
-		}
-
 		mono_deloop(rethead[h]);
 	}
 
@@ -170,7 +164,6 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 	}
 
 	memcpy((void *)eyepol[eyepoln].ouvmat, (void *)b->gouvmat, sizeof(b->gouvmat[0])*9);
-	eyepol[eyepoln].chain1_start = chain0_end;  // Store the split
 	eyepol[eyepoln].tpic = gtpic;
 	eyepol[eyepoln].curcol = gcurcol;
 	eyepol[eyepoln].flags = (b->gflags != 0);
@@ -274,7 +267,7 @@ static void changetagfunc (int rethead0, int rethead1, bdrawctx *b)
 	mph[mphnum].head[1] = rethead1;
 	mph[mphnum].tag = b->gnewtag;
 	mphnum++;
-	logstep("changetag: doscan?:%d, newMtag:%d, new mphnum:%d",b->needsecscan,b->gnewtag,mphnum);
+	printf("changetag: %d doscan?:%d, newMtag:%d, new mphnum:%d",b->gnewtag,b->needsecscan,b->gnewtag,mphnum);
 }
 	//flags&1: do and
 	//flags&2: do sub
@@ -310,7 +303,7 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
 
     // Count vertices
     n = 2;
-    for (h = 0; h < 2; h++)
+    for (int h = 0; h < 2; h++)
         for (i = mp[plothead[h]].n; i != plothead[h]; i = mp[i].n)
             n++;
 
@@ -333,9 +326,7 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
             double dy = wy - orcam->p.y;
             double dz = wz - orcam->p.z;
 
-            otp[on].x = dx * orcam->r.x + dy * orcam->r.y + dz * orcam->r.z;
-            otp[on].y = dx * orcam->d.x + dy * orcam->d.y + dz * orcam->d.z;
-            otp[on].z = dx * orcam->f.x + dy * orcam->f.y + dz * orcam->f.z;
+        	otp[on] = world_to_local_pointd((dpoint3d){mp[i].x,mp[i].y,mp[i].z},&orcam->tr);
         	loops[loopnum] = otp[on];
         	loopuse[loopnum]=true;
         	loopnum++;
@@ -391,13 +382,14 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
             omph0 = mphnum;
             b->needsecscan = !(flags & CLIP_PORTAL_FLAG);
 
+        	//printf("doing AND +changetag\n");
             int before_mphnum = mphnum;
             for (i = mphnum - 1; i >= 0; i--)
                 if (mph[i].tag == mtag)
                     mono_bool(mph[i].head[0], mph[i].head[1],
                               plothead[0], plothead[1],
                               MONO_BOOL_AND, b, changetagfunc);
-
+        	//printf("done\n");
             // NEW: Check if AND produced any new regions
             if (mphnum > before_mphnum)
                 produced_output = 1;
@@ -424,7 +416,7 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
             }
             mphnum = omph0;
         } else {
-            // newtag == -1: final output (solid surface)
+            // Final surface rendering
             if (shadowtest2_rendmode == 4)
                 mono_output = ligpoltagfunc;
             else
@@ -437,15 +429,13 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
                               plothead[0], plothead[1],
                               MONO_BOOL_AND, b, mono_output);
 
-            // NEW: Check if AND produced any eyepols
-        	// NEW (correct):
-        	if (eyepoln > before_eyepoln)
-        		produced_output = 1;
+            if (eyepoln > before_eyepoln && newtag1 >=0)
+                produced_output = 1;
         }
     }
 
-    // === SUB operation (flags & 2) - ONLY if AND produced output ===
-    if ((flags & 2 ) && produced_output) {
+    // SUB operation - only if AND produced visible geometry
+    if ((flags & 2) && produced_output) {
         j = (flags & 4) ? MONO_BOOL_SUB_REV : MONO_BOOL_SUB;
 
     	b->gnewtag = mtag;
@@ -517,12 +507,6 @@ static int gentransform_plane(dpoint3d *world_verts, int nverts, bdrawctx *b) {
         cam_verts[i].z = dx * cam->f.x + dy * cam->f.y + dz * cam->f.z;
     }
 
-    // Check if vertices are behind camera
-    if (cam_verts[0].z < 1e-6 && cam_verts[1].z < 1e-6 && cam_verts[2].z < 1e-6) {
-        logstep("  plane entirely behind camera");
-        return 0;
-    }
-
     // Build homogeneous coordinate matrix for plane equation
     // This solves: [x*h.z + z*h.x, y*h.z + z*h.y, z] · [A, B, C] = 1
     float fk[24];
@@ -557,13 +541,6 @@ static int gentransform_plane(dpoint3d *world_verts, int nverts, bdrawctx *b) {
     // Determinant = measure of non-degeneracy
     double det_val = fk[0] * fk[12] + fk[1] * fk[13] + fk[2] * fk[14];
 
-    // Reject near-degenerate planes (edge-on or collinear points)
-    if (fabs(det_val) < 1e-6) {
-        logstep("  DEGENERATE plane: det=%.2e [%.2e, %.2e, %.2e]",
-                det_val, b->gouvmat[0], b->gouvmat[3], b->gouvmat[6]);
-        b->gouvmat[0] = b->gouvmat[3] = b->gouvmat[6] = 0.0f;
-        return 0;
-    }
 
     // Normalize coefficients
     double rdet = 1.0 / det_val;
@@ -1006,6 +983,7 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
 
 dpoint3d bord[4], bord2[8];
 void draw_hsr_ctx(mapstate_t *map, bdrawctx *newctx) {
+
 	if (!newctx) {
 		return;
 		if (captureframe) printf("discarding due to null ctx");
@@ -1046,6 +1024,8 @@ void draw_hsr_ctx(mapstate_t *map, bdrawctx *newctx) {
 		//	if ((!(glp->flags&1)) || (!shadowtest2_useshadows)) return;
 	}
 	curMap = map;
+	if (b->cam.cursect <0 || b->orcam.cursect < 0)
+		return;
 	//if ((map->numsects <= 0) || ((unsigned)gcam.cursect >= (unsigned)map->numsects))
 	//{
 	////if (shadowtest2_rendmode != 4) eyepoln = 0; //Prevents drawpollig() from crashing
@@ -1067,6 +1047,8 @@ void draw_hsr_ctx(mapstate_t *map, bdrawctx *newctx) {
 	}
 	if (!mphmal)
 		mono_initonce();
+
+	int savedmpunum = mphnum;
 
 	if (shadowtest2_rendmode != 4) {
 		//Horrible hacks for internal build2 global variables
@@ -1207,7 +1189,7 @@ void draw_hsr_ctx(mapstate_t *map, bdrawctx *newctx) {
 		b->jobcount = 0;
 		b->jobs = malloc(sizeof(wall_job_t) * b->jobcap);
 		logstep("=== Wall Processing Start ===");
-		logstep("Starting sector: %d, walls in sector: %d", b->cam.cursect, map->sect[b->cam.cursect].n);
+		logstep("Starting sector: %d, walls in sector: %d", b->cam.cursect);
 
 		add_sector_walls(b->cam.cursect, b);
 		logstep("Initial queue: %d walls", b->jobcount);
@@ -1358,12 +1340,10 @@ newctx.testignorewall = ignw;
 	logstep("Finished portal %d, mphnum:%d", myport, mphnum);
 }
 
-#if (USENEWLIGHT == 0)
-typedef struct { float n2, d2, n1, d1, n0, d0, filler0[2], glk[12], bsc, gsc, rsc, filler1[1]; } hlighterp_t;
-#else
+
 typedef struct { float gk[16], gk2[12], bsc, gsc, rsc, filler1[1]; } hlighterp_t;
 __declspec(align(16)) static const float hligterp_maxzero[4] = {0.f,0.f,0.f,0.f};
-#endif
+
 void prepligramp (float *ouvmat, point3d *norm, int lig, void *hl){}
 
 int shadowtest2_isgotsectintersect (int lignum)
@@ -1375,10 +1355,7 @@ int shadowtest2_isgotsectintersect (int lignum)
 	u0 = shadowtest2_sectgot;
 	u1 = shadowtest2_light[lignum].sectgot;
 	i = (leng>>5); if (u0[i]&u1[i]&((1<<leng)-1)) return(1); //WARNING:code uses x86-32 bit shift trick!
-#if 0
-	for(i--;i>=0;i--) if (u0[i]&u1[i]) return(1);
-	return(0);
-#else
+
 	for(i--;((i&3)!=3);i--) if (u0[i]&u1[i]) return(1);
 	if (i < 0) return(0);
 	_asm
@@ -1403,7 +1380,6 @@ begit:movaps xmm0, [ecx+eax*4-12]
 endit:mov eax, 1
 skpit:pop esi
 	}
-#endif
 }
 
 void shadowtest2_dellight (int i)
@@ -1446,6 +1422,4 @@ void shadowtest2_init ()
 //--------------------------------------------------------------------------------------------------
 
 void drawpollig(int ei) {}
-#if 0
-!endif
-#endif
+

@@ -53,7 +53,18 @@ static inline point3d world_to_local_point(point3d world_pos, transform *tr) {
 
     return local;
 }
+static inline dpoint3d world_to_local_pointd(dpoint3d world_pos, transform *tr) {
+    float dx = world_pos.x - tr->p.x;
+    float dy = world_pos.y - tr->p.y;
+    float dz = world_pos.z - tr->p.z;
 
+    dpoint3d local;
+    local.x = dx * tr->r.x + dy * tr->r.y + dz * tr->r.z;
+    local.y = dx * tr->d.x + dy * tr->d.y + dz * tr->d.z;
+    local.z = dx * tr->f.x + dy * tr->f.y + dz * tr->f.z;
+
+    return local;
+}
 static inline point3d local_to_world_vec(point3d local_vec, transform *tr) {
     point3d world;
     world.x = local_vec.x * tr->r.x + local_vec.y * tr->d.x + local_vec.z * tr->f.x;
