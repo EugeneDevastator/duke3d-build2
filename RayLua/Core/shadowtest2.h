@@ -191,9 +191,7 @@ void changetagfunc(int rethead0, int rethead1, bdrawctx* b);
  * @param bid Bunch index to process
  */
 static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawctx *b);
-extern dpoint3d loops[70000];
-extern bool loopuse[70000];
-extern int loopnum;
+
 /** Renders sprites with lighting if available */
 void drawsprites();
 

@@ -36,5 +36,7 @@ void mono_dbg_clear(void);
 void mono_dbg_capture_chain(int hd, int chain_id, const char *label, int operation);
 void mono_dbg_capture_pair(int hd0, int hd1, const char *label, int operation);
 
-
+extern dpoint3d loops[70000];
+extern bool loopuse[70000];
+extern int loopnum;
 #endif

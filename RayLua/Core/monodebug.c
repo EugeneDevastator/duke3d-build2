@@ -6,11 +6,16 @@
 
 mono_dbg_capture_t g_mono_dbg = {0};
 int g_captureframe = 0;
-
+dpoint3d loops[70000]={};
+dpoint3d loopsm[70000]={};
+dpoint3d loopscam[70000]={};
+bool loopuse[70000]={};
+int loopnum=0;
 void mono_dbg_init(void) {
     g_mono_dbg.capacity = 64;
     g_mono_dbg.snapshots = (mono_dbg_snapshot_t*)malloc(g_mono_dbg.capacity * sizeof(mono_dbg_snapshot_t));
     g_mono_dbg.snapshot_count = 0;
+    loopnum=0;
 }
 
 void mono_dbg_free(void) {

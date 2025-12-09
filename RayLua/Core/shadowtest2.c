@@ -274,9 +274,7 @@ static void changetagfunc (int rethead0, int rethead1, bdrawctx *b)
 	//flags&4: reverse cut for sub
 // Replace the existing drawpol_befclip with this version
 // Full 3D camera transform - handles pitch/roll correctly for portals
-dpoint3d loops[70000]={};
-bool loopuse[70000]={};
-int loopnum=0;
+
 // Change return type from void to int
 // Returns: 1 if AND produced visible output, 0 if not
 static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
