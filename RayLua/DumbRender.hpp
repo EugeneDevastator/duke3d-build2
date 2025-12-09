@@ -521,15 +521,17 @@ public:
         int v=0;
         int l = 0;
         auto cam = DumbCore::GetCamera().position;
+        cam = {0,0,0};
+        float cdiv = 1.0;
         while (v<loopnum) {
             rlBegin(RL_LINES);
             while (loopuse[v]) {
                 rlColor4f(l/10.0f,1,l/100.0f,0.8f);
                 //    auto campos = DumbCore::GetCamera().position;
-                rlVertex3f(cam.x+loops[v].x/1 ,cam.y+ -loops[v].z/1,cam.z+loops[v].y/1);
+                rlVertex3f(cam.x+loops[v].x/cdiv ,cam.y+ -loops[v].z/cdiv,cam.z+loops[v].y/cdiv);
                 v++;
             }
-            v++; l++;
+            l++;v++;
             rlEnd();
         }
     }

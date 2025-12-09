@@ -82,7 +82,14 @@ static inline point3d world_to_local_vec(point3d world_vec, transform *tr) {
 
     return local;
 }
+static inline dpoint3d world_to_local_vecd(dpoint3d world_vec, transform *tr) {
+    dpoint3d local;
+    local.x = world_vec.x * tr->r.x + world_vec.y * tr->r.y + world_vec.z * tr->r.z;  // right
+    local.y = world_vec.x * tr->d.x + world_vec.y * tr->d.y + world_vec.z * tr->d.z;  // forward
+    local.z = world_vec.x * tr->f.x + world_vec.y * tr->f.y + world_vec.z * tr->f.z;  // down
 
+    return local;
+}
 static inline void world_to_cam(double wx, double wy, double wz, cam_t *ctin, double *cx, double *cy, double *cz) {
     double dx = wx - ctin->p.x;
     double dy = wy - ctin->p.y;

@@ -12,6 +12,7 @@
 #include <stdarg.h>
 
 #include "buildmath.h"
+#include "monodebug.h"
 #define PI 3.14159265358979323
 #pragma warning(disable:4731)
 
@@ -43,7 +44,7 @@ void logstep(const char* fmt, ...) {
 	va_end(args);
 	printf("\n");
 }
-int shadowtest2_backface_cull = 1;  // Toggle backface culling
+int shadowtest2_backface_cull = 0;  // Toggle backface culling
 int shadowtest2_distance_cull = 0;  // Toggle distance-based culling
 int shadowtest2_debug_walls = 1;    // Verbose wall logging
 int shadowtest2_debug_block_selfportals = 1;    // Verbose wall logging
@@ -51,13 +52,20 @@ int shadowtest2_debug_block_selfportals = 1;    // Verbose wall logging
 //--------------------------------------------------------------------------------------------------
 static tiletype gdd;
 int shadowtest2_rendmode = 1;
+extern int drawpoly_numcpu;
 int shadowtest2_updatelighting = 1;
+
+	//Sorting
+
 unsigned int *shadowtest2_sectgot = 0; //WARNING:code uses x86-32 bit shift trick!
 static unsigned int *shadowtest2_sectgotmal = 0;
 static int shadowtest2_sectgotn = 0;
 #define CLIP_PORTAL_FLAG 8
+//Translation & rotation
 static mapstate_t *curMap;
 static player_transform *gps;
+//static point3d b->gnadd;
+//static double b->xformmat[9], b->xformmatc, b->xformmats;
 
 	//Texture mapping parameters
 static tile_t *gtpic;
@@ -128,6 +136,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 	rethead[0] = rethead0; rethead[1] = rethead1;
 
 	int start_vert = eyepolvn;
+	int chain0_end = 0;  // Will mark where chain 0 ends
 
 	for(h=0; h<2; h++)
 	{
@@ -152,6 +161,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 
 			if (!h) i = mp[i].n;
 		} while (i != rethead[h]);
+
 		mono_deloop(rethead[h]);
 	}
 
@@ -164,6 +174,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 	}
 
 	memcpy((void *)eyepol[eyepoln].ouvmat, (void *)b->gouvmat, sizeof(b->gouvmat[0])*9);
+	//eyepol[eyepoln].chain1_start = chain0_end;  // Store the split
 	eyepol[eyepoln].tpic = gtpic;
 	eyepol[eyepoln].curcol = gcurcol;
 	eyepol[eyepoln].flags = (b->gflags != 0);
@@ -233,6 +244,7 @@ static void ligpoltagfunc(int rethead0, int rethead1, bdrawctx *b)
         mono_deloop(rethead[j]);
     }
 
+    // Rest unchanged...
     if (glp->ligpoln + 1 >= glp->ligpolmal)
     {
         glp->ligpolmal = max(glp->ligpolmal << 1, 256);
@@ -260,14 +272,18 @@ static void ligpoltagfunc(int rethead0, int rethead1, bdrawctx *b)
 */
 static void changetagfunc (int rethead0, int rethead1, bdrawctx *b)
 {
-	if ((rethead0|rethead1) < 0) return;
+	if ((rethead0|rethead1) < 0) {
+		mono_deloop(rethead0);
+		mono_deloop(rethead1);
+		return;
+	}
 
 	mono_mph_check(mphnum);
 	mph[mphnum].head[0] = rethead0;
 	mph[mphnum].head[1] = rethead1;
 	mph[mphnum].tag = b->gnewtag;
 	mphnum++;
-	printf("changetag: %d doscan?:%d, newMtag:%d, new mphnum:%d",b->gnewtag,b->needsecscan,b->gnewtag,mphnum);
+	logstep("changetag: doscan?:%d, newMtag:%d, new mphnum:%d",b->needsecscan,b->gnewtag,mphnum);
 }
 	//flags&1: do and
 	//flags&2: do sub
@@ -285,7 +301,6 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
     int mnewtag = newtag1;
     b->gnewsec = newsec;
     cam_t *orcam = &b->orcam;
-    cam_t *gcam = &b->cam;
 
     int produced_output = 0;  // NEW: track if we produced anything
 
@@ -301,7 +316,7 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
 
     // Count vertices
     n = 2;
-    for (int h = 0; h < 2; h++)
+    for (h = 0; h < 2; h++)
         for (i = mp[plothead[h]].n; i != plothead[h]; i = mp[i].n)
             n++;
 
@@ -310,7 +325,6 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
 
     // Transform world coordinates to camera space
     on = 0;
-
     for (h = 0; h < 2; h++) {
         i = plothead[h];
         do {
@@ -324,27 +338,26 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
             double dy = wy - orcam->p.y;
             double dz = wz - orcam->p.z;
 
-        	otp[on] = world_to_local_pointd((dpoint3d){mp[i].x,mp[i].y,mp[i].z},&orcam->tr);
-        	loops[loopnum] = otp[on];
-        	loopuse[loopnum]=true;
-        	loopnum++;
-        	on++;
+
+            otp[on].x = dx * orcam->r.x + dy * orcam->r.y + dz * orcam->r.z;
+            otp[on].y = dx * orcam->d.x + dy * orcam->d.y + dz * orcam->d.z;
+            otp[on].z = dx * orcam->f.x + dy * orcam->f.y + dz * orcam->f.z;
+
+            on++;
 
             if (!h) i = mp[i].n;
         } while (i != plothead[h]);
         mono_deloop(plothead[h]);
     }
-	loops[loopnum] = otp[0];
-	loopuse[loopnum]=true;
-	loopnum++;
-	loops[loopnum] = otp[0];
-	loopuse[loopnum]=false;
-	loopnum++;
+
     // Clip against near plane
     n = 0;
     for (i = on - 1, j = 0; j < on; i = j, j++) {
         if (otp[i].z >= BSCISDIST) {
             tp[n] = otp[i];
+        	loops[loopnum] = tp[n];
+        	loopuse[loopnum]=true;
+        	loopnum++;
             n++;
         }
         if ((otp[i].z >= BSCISDIST) != (otp[j].z >= BSCISDIST)) {
@@ -352,11 +365,19 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
             tp[n].x = (otp[i].x - otp[j].x) * f + otp[j].x;
             tp[n].y = (otp[i].y - otp[j].y) * f + otp[j].y;
             tp[n].z = BSCISDIST;
+        	loops[loopnum] = tp[n];
+        	loopuse[loopnum]=true;
+        	loopnum++;
             n++;
         }
     }
     if (n < 3) return 0;
-
+	loops[loopnum] = tp[0];
+	loopuse[loopnum]=true;
+	loopnum++;
+	loops[loopnum] = tp[0];
+	loopuse[loopnum]=false;
+	loopnum++;
     // Project to screen space
     for (i = 0; i < n; i++) {
         f = orcam->h.z / tp[i].z;
@@ -380,14 +401,13 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
             omph0 = mphnum;
             b->needsecscan = !(flags & CLIP_PORTAL_FLAG);
 
-        	//printf("doing AND +changetag\n");
             int before_mphnum = mphnum;
             for (i = mphnum - 1; i >= 0; i--)
                 if (mph[i].tag == mtag)
                     mono_bool(mph[i].head[0], mph[i].head[1],
                               plothead[0], plothead[1],
                               MONO_BOOL_AND, b, changetagfunc);
-        	//printf("done\n");
+
             // NEW: Check if AND produced any new regions
             if (mphnum > before_mphnum)
                 produced_output = 1;
@@ -414,7 +434,7 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
             }
             mphnum = omph0;
         } else {
-            // Final surface rendering
+            // newtag == -1: final output (solid surface)
             if (shadowtest2_rendmode == 4)
                 mono_output = ligpoltagfunc;
             else
@@ -427,12 +447,13 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
                               plothead[0], plothead[1],
                               MONO_BOOL_AND, b, mono_output);
 
-            if (eyepoln > before_eyepoln && newtag1 >=0)
+            // NEW: Check if AND produced any eyepols
+            if (eyepoln > before_eyepoln)
                 produced_output = 1;
         }
     }
 
-    // SUB operation - only if AND produced visible geometry
+    // === SUB operation (flags & 2) - ONLY if AND produced output ===
     if ((flags & 2) && produced_output) {
         j = (flags & 4) ? MONO_BOOL_SUB_REV : MONO_BOOL_SUB;
 
@@ -480,120 +501,72 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
 
     return produced_output;
 }
-// Unified plane equation generator - works for walls, floors, ceilings
-// Returns: 1 = success, 0 = degenerate plane (caller should skip)
-static int gentransform_plane(dpoint3d *world_verts, int nverts, bdrawctx *b) {
-    if (nverts < 3) return 0;
-
-    cam_t *cam = &b->orcam;
-    dpoint3d cam_verts[3];
-
-    // Transform first 3 non-collinear world vertices to camera space
-    for (int i = 0; i < 3; i++) {
-        dpoint3d v = world_verts[i];
-
-        // Apply portal transform chain (cam = clipping space, orcam = original camera)
-        wccw_transform(&v, &b->cam, &b->orcam);
-
-        // World to camera space
-        double dx = v.x - cam->p.x;
-        double dy = v.y - cam->p.y;
-        double dz = v.z - cam->p.z;
-
-        cam_verts[i].x = dx * cam->r.x + dy * cam->r.y + dz * cam->r.z;
-        cam_verts[i].y = dx * cam->d.x + dy * cam->d.y + dz * cam->d.z;
-        cam_verts[i].z = dx * cam->f.x + dy * cam->f.y + dz * cam->f.z;
-    }
-
-    // Build homogeneous coordinate matrix for plane equation
-    // This solves: [x*h.z + z*h.x, y*h.z + z*h.y, z] · [A, B, C] = 1
-    float fk[24];
-    fk[0] = cam_verts[0].z;
-    fk[3] = cam_verts[0].x * cam->h.z + cam_verts[0].z * cam->h.x;
-    fk[6] = cam_verts[0].y * cam->h.z + cam_verts[0].z * cam->h.y;
-
-    fk[1] = cam_verts[1].z;
-    fk[4] = cam_verts[1].x * cam->h.z + cam_verts[1].z * cam->h.x;
-    fk[7] = cam_verts[1].y * cam->h.z + cam_verts[1].z * cam->h.y;
-
-    fk[2] = cam_verts[2].z;
-    fk[5] = cam_verts[2].x * cam->h.z + cam_verts[2].z * cam->h.x;
-    fk[8] = cam_verts[2].y * cam->h.z + cam_verts[2].z * cam->h.y;
-
-    // Compute 3x3 cofactor matrix
-    fk[12] = fk[4] * fk[8] - fk[5] * fk[7];
-    fk[13] = fk[5] * fk[6] - fk[3] * fk[8];
-    fk[14] = fk[3] * fk[7] - fk[4] * fk[6];
-    fk[18] = fk[2] * fk[7] - fk[1] * fk[8];
-    fk[19] = fk[0] * fk[8] - fk[2] * fk[6];
-    fk[20] = fk[1] * fk[6] - fk[0] * fk[7];
-    fk[21] = fk[1] * fk[5] - fk[2] * fk[4];
-    fk[22] = fk[2] * fk[3] - fk[0] * fk[5];
-    fk[23] = fk[0] * fk[4] - fk[1] * fk[3];
-
-    // Plane coefficients (before normalization)
-    b->gouvmat[6] = fk[12] + fk[13] + fk[14];  // C
-    b->gouvmat[0] = fk[18] + fk[19] + fk[20];  // A
-    b->gouvmat[3] = fk[21] + fk[22] + fk[23];  // B
-
-    // Determinant = measure of non-degeneracy
-    double det_val = fk[0] * fk[12] + fk[1] * fk[13] + fk[2] * fk[14];
-
-
-    // Normalize coefficients
-    double rdet = 1.0 / det_val;
-    b->gouvmat[0] *= rdet;
-    b->gouvmat[3] *= rdet;
-    b->gouvmat[6] *= rdet;
-
-    logstep("  plane OK: [%.3e, %.3e, %.3e], det=%.3e",
-            b->gouvmat[0], b->gouvmat[3], b->gouvmat[6], det_val);
-
-    return 1;
-}
-// For walls - builds 3 points from wall segment + height
-static int gentransform_wall(sect_t *sec, wall_t *wal, int w, bdrawctx *b) {
-	int nw = wal[w].n + w;
-	dpoint3d verts[3];
-
-	// Three points on wall plane
-	verts[0].x = wal[w].x;
-	verts[0].y = wal[w].y;
-	verts[0].z = getslopez(sec, 0, verts[0].x, verts[0].y);
-
-	verts[1].x = wal[nw].x;
-	verts[1].y = wal[nw].y;
-	verts[1].z = verts[0].z;
-
-	verts[2].x = wal[w].x;
-	verts[2].y = wal[w].y;
-	verts[2].z = verts[0].z + 1.0;  // 1 unit up
-
-	return gentransform_plane(verts, 3, b);
-}
-
-// For floors/ceilings - builds 3 points on sloped surface
-static int gentransform_ceilflor(sect_t *sec, int isflor, bdrawctx *b) {
-	wall_t *wal = sec->wall;
+// create plane EQ using GCAM
+static void gentransform_ceilflor(sect_t *sec, wall_t *wal, int isflor, bdrawctx *b)
+{
+	cam_t *cam = &b->orcam;
 	float gx = sec->grad[isflor].x;
 	float gy = sec->grad[isflor].y;
-	float z0 = sec->z[isflor];
-	dpoint3d verts[3];
+	dpoint3d gvec={gx,gy,1};
+	dpoint3d sp={wal[0].x,wal[0].y,sec->z[isflor]};
+	wccw_transform_dir(&gvec,&b->cam,&b->orcam);
+	wccw_transform(&sp,&b->cam,&b->orcam);
 
-	// Three points defining the plane z = z0 - gx*(x-x0) - gy*(y-y0)
-	verts[0].x = wal[0].x;
-	verts[0].y = wal[0].y;
-	verts[0].z = z0;
+	// Transform plane normal (gx, gy, 1) to camera space
+	//float nx = cam->r.x * gx + cam->r.y * gy + cam->r.z;
+	//float ny = cam->d.x * gx + cam->d.y * gy + cam->d.z;
+	//float nz = cam->f.x * gx + cam->f.y * gy + cam->f.z;
+	dpoint3d npos = world_to_local_vecd(gvec,&b->orcam.tr);
 
-	verts[1].x = wal[0].x + 1.0;
-	verts[1].y = wal[0].y;
-	verts[1].z = z0 - gx;
+	// Camera-space plane constant
+	float D_c = gvec.x * (sp.x - cam->p.x)
+			  + gvec.y * (sp.y - cam->p.y)
+			  + gvec.z * (sp.z - cam->p.z);
 
-	verts[2].x = wal[0].x;
-	verts[2].y = wal[0].y + 1.0;
-	verts[2].z = z0 - gy;
+	// Scale includes h.z for screen-space depth formula
+	float scale = 1.0f / (D_c * cam->h.z);
+	b->gouvmat[0] = npos.x * scale;
+	b->gouvmat[3] = npos.y * scale;
+	b->gouvmat[6] = npos.z / D_c - b->gouvmat[0] * cam->h.x - b->gouvmat[3] * cam->h.y;
+}
 
-	return gentransform_plane(verts, 3, b);
+// create plane EQ using GCAM
+static void gentransform_wall (dpoint3d *npol2, int n, surf_t *sur, bdrawctx *b) {
+	cam_t usedcam = b->cam; // we can use camera hack to get plane equation in space of current cam, not necessart clipping cam.
+	float f, g, ox, oy, oz, rdet, fk[24];
+	int i;
+
+	for(i=0;i<3;i++)
+	{
+		ox = npol2[i].x-usedcam.p.x; oy = npol2[i].y-usedcam.p.y; oz = npol2[i].z-usedcam.p.z;
+		npol2[i].x = ox*usedcam.r.x + oy*usedcam.r.y + oz*usedcam.r.z;
+		npol2[i].y = ox*usedcam.d.x + oy*usedcam.d.y + oz*usedcam.d.z;
+		npol2[i].z = ox*usedcam.f.x + oy*usedcam.f.y + oz*usedcam.f.z;
+	}
+
+	fk[0] = npol2[0].z; fk[3] = npol2[0].x*usedcam.h.z + npol2[0].z*usedcam.h.x; fk[6] = npol2[0].y*usedcam.h.z + npol2[0].z*usedcam.h.y;
+	fk[1] = npol2[1].z; fk[4] = npol2[1].x*usedcam.h.z + npol2[1].z*usedcam.h.x; fk[7] = npol2[1].y*usedcam.h.z + npol2[1].z*usedcam.h.y;
+	fk[2] = npol2[2].z; fk[5] = npol2[2].x*usedcam.h.z + npol2[2].z*usedcam.h.x; fk[8] = npol2[2].y*usedcam.h.z + npol2[2].z*usedcam.h.y;
+	fk[12] = fk[4]*fk[8] - fk[5]*fk[7];
+	fk[13] = fk[5]*fk[6] - fk[3]*fk[8];
+	fk[14] = fk[3]*fk[7] - fk[4]*fk[6];
+	fk[18] = fk[2]*fk[7] - fk[1]*fk[8];
+	fk[19] = fk[0]*fk[8] - fk[2]*fk[6];
+	fk[20] = fk[1]*fk[6] - fk[0]*fk[7];
+	fk[21] = fk[1]*fk[5] - fk[2]*fk[4];
+	fk[22] = fk[2]*fk[3] - fk[0]*fk[5];
+	fk[23] = fk[0]*fk[4] - fk[1]*fk[3];
+	b->gouvmat[6] = fk[12] + fk[13] + fk[14];
+	b->gouvmat[0] = fk[18] + fk[19] + fk[20];
+	b->gouvmat[3] = fk[21] + fk[22] + fk[23];
+
+	rdet = 1.0/(fk[0]*fk[12] + fk[1]*fk[13] + fk[2]*fk[14]);
+
+	g = rdet;
+
+	b->gouvmat[0] *= g;
+	b->gouvmat[3] *= g;
+	b->gouvmat[6] *= g;
 }
 
 /*
@@ -614,11 +587,9 @@ static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bdrawc
     int plothead[2] = {-1, -1};
     int i, n = sec->n;
 
-    if (n < 3) {
-        logstep("draw_sector_surface: sec=%d, isflor=%d SKIPPED (n=%d < 3)", sectnum, isflor, n);
-        return;
-    }
+    if (n < 3) return;  // Need at least 3 vertices
 	int myport = sec->tags[1];
+	bool noportals = b->recursion_depth >= MAX_PORTAL_DEPTH;
 	bool isportal = myport >= 0
 				&& portals[myport].destpn >= 0
 				&& portals[myport].kind == isflor;
@@ -628,25 +599,12 @@ static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bdrawc
 					 && sectnum == b->testignoresec
 					 && portals[myport].kind == b->ignorekind
 					 && isflor == b->testignorewall);  // FIXED: Check surfid
-
     // Back-face cull
     float surfpos = getslopez(sec, isflor, b->cam.p.x, b->cam.p.y);
-    bool should_cull = (b->cam.p.z >= surfpos) == isflor;
-
-    if (shadowtest2_backface_cull && should_cull) {
-        logstep("draw_sector_surface: sec=%d, isflor=%d CULLED (backface), cam.z=%.2f, surf.z=%.2f",
-                sectnum, isflor, b->cam.p.z, surfpos);
-        return;
-    }
-
-    // Skip if this is the portal exit surface
-    // FIX: Check if sector portal's surfid matches isflor
-
-    logstep("draw_sector_surface: sec=%d, isflor=%d, n=%d, portal=%d",
-            sectnum, isflor, n, myport);
+    //if ((b->cam.p.z >= surfpos) == isflor) return;
 
     // Setup transform and normal
-    gentransform_ceilflor(sec, isflor, b);
+    gentransform_ceilflor(sec, wal, isflor, b);
 
     b->gnorm.x = grad->x;
     b->gnorm.y = grad->y;
@@ -665,7 +623,7 @@ static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bdrawc
     b->gligwall = isflor - 2;
     b->gligslab = 0;
 
-    // Build vertex array
+    // Build vertex array from ALL sector walls
     dpoint3d *verts = (dpoint3d *)_alloca(n * sizeof(dpoint3d));
 
     for (i = 0; i < n; i++) {
@@ -673,6 +631,7 @@ static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bdrawc
         double yw = wal[i].y;
         double zw = (wal[0].x - xw) * grad->x + (wal[0].y - yw) * grad->y + fz;
 
+        // Transform through portal if needed
         portal_xform_world_full(&xw, &yw, &zw, b);
 
         verts[i].x = xw;
@@ -680,8 +639,11 @@ static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bdrawc
         verts[i].z = zw;
     }
 
-    // Ceiling needs reverse winding
+    // Use mono_genfromloop to create proper monotone polygon structure
+    // It expects the vertices in the correct winding order
+    // Floor: one order, Ceiling: reverse order
     if (!isflor) {
+        // Ceiling - reverse the vertex order
         for (i = 0; i < n / 2; i++) {
             dpoint3d tmp = verts[i];
             verts[i] = verts[n - 1 - i];
@@ -691,41 +653,45 @@ static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bdrawc
 
     mono_genfromloop(&plothead[0], &plothead[1], verts, n);
 
- //   if ((plothead[0] | plothead[1]) < 0) {
- //       logstep("  mono_genfromloop failed");
- //       mono_deloop(plothead[0]);
- //       mono_deloop(plothead[1]);
- //       return;
- //   }
+    if ((plothead[0] | plothead[1]) < 0) {
+        mono_deloop(plothead[0]);
+        mono_deloop(plothead[1]);
+        return;
+    }
 
-    bool noportals = b->recursion_depth >= MAX_PORTAL_DEPTH;
-    int mytag = sectnum + taginc * b->recursion_depth;
+    // Check for portal
+
+
+
+	int mytag = sectnum + taginc * b->recursion_depth;
 
     if (isportal && !noportals && !skipport) {
         int endpn = portals[myport].destpn;
         int nexttag = portals[endpn].sect + taginc * (b->recursion_depth + 1);
 
-        logstep("  entering SURFACE portal: myport=%d, dest=%d, surfid=%d",
-                myport, endpn, isflor);
-        int visible = drawpol_befclip(mytag, nexttag,
-                                      sectnum, portals[endpn].sect,
-                                      plothead[0], plothead[1],
-                                      ((!isflor << 2) + 3) | CLIP_PORTAL_FLAG, b);
+	    logstep("entering portal surf %d, sec:%d, depth:%d", isflor, sectnum, b->recursion_depth);
 
-		// alt -1 solution
-        //int visible = drawpol_befclip(mytag, -1,
-        //                             sectnum, -1,
-        //                             plothead[0], plothead[1],
-        //                             2|((isflor << 2) + 3), b);
-    	if (visible)
-            draw_hsr_enter_portal(map, myport, b);
-
+	    int visible = drawpol_befclip(mytag, nexttag,
+	                                  sectnum, portals[endpn].sect,
+	                                  plothead[0], plothead[1],
+	                                  ((isflor << 2) + 3) | CLIP_PORTAL_FLAG, b);
+	    if (visible) {
+		    draw_hsr_enter_portal(map, myport, b);
+	    }
+    	else {
+    		mono_deloop(plothead[0]);
+    		mono_deloop(plothead[1]);
+    	}
     } else {
-        logstep("  drawing solid surface (isportal=%d, noportals=%d, depth=%d)", isportal, noportals, b->recursion_depth);
-        int visible = drawpol_befclip(mytag, -1,
-                        sectnum, -1,
-                        plothead[0], plothead[1],
-                        (isflor << 2) + 3, b);
+	    logstep("drawing solid surf %d, sec:%d, depth:%d", isflor, sectnum, b->recursion_depth);
+	    bool visible = drawpol_befclip(mytag, -1,
+	                    sectnum, -1,
+	                    plothead[0], plothead[1],
+	                    (isflor << 2) + 3, b);
+    	if (!visible) {
+    		mono_deloop(plothead[0]);
+    		mono_deloop(plothead[1]);
+    	}
     }
 }
 void shadowtest2_set_culling(int backface, int distance, int debug) {
@@ -803,107 +769,117 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
 	double f, dx;
 	int m, vn, w, nw, ns;
 
-	b->gligsect = s;
-	b->gligslab = 0;
-	bool noportals = b->recursion_depth >= MAX_PORTAL_DEPTH;
+    b->gligsect = s;
+    b->gligslab = 0;
+    bool noportals = b->recursion_depth >= MAX_PORTAL_DEPTH;
 
-	// Loop through provided walls instead of bunch
-	for (int ww = 0; ww < wallcount; ww++) {
-		w = walls[ww];
-		vn = getwalls_imp(s, w, verts, MAXVERTS, curMap);
-		nw = wal[w].n + w;
-		sur = &wal[w].surf;
+    // Loop through provided walls instead of bunch
+    for (int ww = 0; ww < sec[s].n; ww++)
+    {
+        w=ww;
+        vn = getwalls_imp(s, ww, verts, MAXVERTS, curMap);
+        nw = wal[w].n + w;
+        sur = &wal[w].surf;
 
-		dx = sqrt((wal[nw].x - wal[w].x) * (wal[nw].x - wal[w].x) +
-				  (wal[nw].y - wal[w].y) * (wal[nw].y - wal[w].y));
+        dx = sqrt((wal[nw].x - wal[w].x) * (wal[nw].x - wal[w].x) +
+                  (wal[nw].y - wal[w].y) * (wal[nw].y - wal[w].y));
 
-		b->gnorm.x = wal[w].y - wal[nw].y;
-		b->gnorm.y = wal[nw].x - wal[w].x;
-		b->gnorm.z = 0;
-		f = 1.0 / sqrt(b->gnorm.x * b->gnorm.x + b->gnorm.y * b->gnorm.y);
-		b->gnorm.x *= f;
-		b->gnorm.y *= f;
+        b->gnorm.x = wal[w].y - wal[nw].y;
+        b->gnorm.y = wal[nw].x - wal[w].x;
+        b->gnorm.z = 0;
+        f = 1.0 / sqrt(b->gnorm.x * b->gnorm.x + b->gnorm.y * b->gnorm.y);
+        b->gnorm.x *= f;
+        b->gnorm.y *= f;
 
-		// Base wall quad - use full wall, no bunch clipping
-		pol[0].x = wal[w].x;   pol[0].y = wal[w].y;
-		pol[1].x = wal[nw].x;  pol[1].y = wal[nw].y;
-		pol[0].z = getslopez(&sec[s], 0, pol[0].x, pol[0].y);
-		pol[1].z = getslopez(&sec[s], 0, pol[1].x, pol[1].y);
-		pol[2].x = pol[1].x; pol[2].y = pol[1].y;
-		pol[2].z = getslopez(&sec[s], 1, pol[2].x, pol[2].y);
-		pol[3].x = pol[0].x; pol[3].y = pol[0].y;
-		pol[3].z = getslopez(&sec[s], 1, pol[3].x, pol[3].y);
+        // Base wall quad - use full wall, no bunch clipping
+        pol[0].x = wal[w].x;   pol[0].y = wal[w].y;
+        pol[1].x = wal[nw].x;  pol[1].y = wal[nw].y;
+        pol[0].z = getslopez(&sec[s], 0, pol[0].x, pol[0].y);
+        pol[1].z = getslopez(&sec[s], 0, pol[1].x, pol[1].y);
+        pol[2].x = pol[1].x; pol[2].y = pol[1].y;
+        pol[2].z = getslopez(&sec[s], 1, pol[2].x, pol[2].y);
+        pol[3].x = pol[0].x; pol[3].y = pol[0].y;
+        pol[3].z = getslopez(&sec[s], 1, pol[3].x, pol[3].y);
 
-		opolz[3] = pol[0].z;
-		opolz[2] = pol[1].z;
+        opolz[3] = pol[0].z;
+        opolz[2] = pol[1].z;
 
-		// Process slabs (unchanged from here)
-		for (m = 0; m <= (vn << 1); m++)
-		{
-			int plothead[2];
+        // Process slabs (unchanged from here)
+        for (m = 0; m <= (vn << 1); m++)
+        {
+            int plothead[2];
 
-			opolz[0] = opolz[3];
-			opolz[1] = opolz[2];
-			if (m == (vn << 1)) {
-				opolz[2] = pol[2].z;
-				opolz[3] = pol[3].z;
-			} else {
-				opolz[2] = getslopez(&sec[verts[m >> 1].s], m & 1, pol[2].x, pol[2].y);
-				opolz[3] = getslopez(&sec[verts[m >> 1].s], m & 1, pol[3].x, pol[3].y);
-			}
+            opolz[0] = opolz[3];
+            opolz[1] = opolz[2];
+            if (m == (vn << 1)) {
+                opolz[2] = pol[2].z;
+                opolz[3] = pol[3].z;
+            } else {
+                opolz[2] = getslopez(&sec[verts[m >> 1].s], m & 1, pol[2].x, pol[2].y);
+                opolz[3] = getslopez(&sec[verts[m >> 1].s], m & 1, pol[3].x, pol[3].y);
+            }
 
-			if ((max(pol[0].z, opolz[0]) >= min(pol[3].z, opolz[3]) - 1e-4) &&
-				(max(pol[1].z, opolz[1]) >= min(pol[2].z, opolz[2]) - 1e-4))
-				continue;
+            if ((max(pol[0].z, opolz[0]) >= min(pol[3].z, opolz[3]) - 1e-4) &&
+                (max(pol[1].z, opolz[1]) >= min(pol[2].z, opolz[2]) - 1e-4))
+                continue;
 
-			f = 1e-7;
-			dpoint3d trap1[4] = {
-				{pol[0].x, pol[0].y, pol[0].z - f}, {pol[1].x, pol[1].y, pol[1].z - f},
-				{pol[2].x, pol[2].y, pol[2].z + f}, {pol[3].x, pol[3].y, pol[3].z + f}
-			};
-			dpoint3d trap2[4] = {
-				{pol[0].x, pol[0].y, opolz[0] - f}, {pol[1].x, pol[1].y, opolz[1] - f},
-				{pol[2].x, pol[2].y, opolz[2] + f}, {pol[3].x, pol[3].y, opolz[3] + f}
-			};
+            f = 1e-7;
+            dpoint3d trap1[4] = {
+                {pol[0].x, pol[0].y, pol[0].z - f}, {pol[1].x, pol[1].y, pol[1].z - f},
+                {pol[2].x, pol[2].y, pol[2].z + f}, {pol[3].x, pol[3].y, pol[3].z + f}
+            };
+            dpoint3d trap2[4] = {
+                {pol[0].x, pol[0].y, opolz[0] - f}, {pol[1].x, pol[1].y, opolz[1] - f},
+                {pol[2].x, pol[2].y, opolz[2] + f}, {pol[3].x, pol[3].y, opolz[3] + f}
+            };
 
-			for (int i = 0; i < 4; i++) {
-				wccw_transform(&trap1[i], &b->cam, &b->orcam);
-				wccw_transform(&trap2[i], &b->cam, &b->orcam);
-			}
+            for (int i = 0; i < 4; i++) {
+                wccw_transform(&trap1[i], &b->cam, &b->orcam);
+                wccw_transform(&trap2[i], &b->cam, &b->orcam);
+            }
 
-			dpoint3d pol0_xf = pol[0];
-			dpoint3d pol1_xf = pol[1];
-			wccw_transform(&pol1_xf, &b->cam, &b->orcam);
-			wccw_transform(&pol0_xf, &b->cam, &b->orcam);
+            dpoint3d pol0_xf = pol[0];
+            dpoint3d pol1_xf = pol[1];
+            wccw_transform(&pol1_xf, &b->cam, &b->orcam);
+            wccw_transform(&pol0_xf, &b->cam, &b->orcam);
 
-			if (!intersect_traps_mono_points(pol0_xf, pol1_xf, trap1, trap2, &plothead[0], &plothead[1]))
-				continue;
+            if (!intersect_traps_mono_points(pol0_xf, pol1_xf, trap1, trap2, &plothead[0], &plothead[1])) {
+				mono_deloop(plothead[0]);
+				mono_deloop(plothead[1]);
+            	continue;
+            }
 
-			if ((!(m & 1)) || (wal[w].surf.flags & (1 << 5)))
-			{
-				npol2[0].x = wal[w].x;  npol2[0].y = wal[w].y;
-				npol2[0].z = getslopez(&sec[s], 0, wal[w].x, wal[w].y);
-				npol2[1].x = wal[nw].x; npol2[1].y = wal[nw].y;
-				npol2[1].z = npol2[0].z;
-				npol2[2].x = wal[w].x;  npol2[2].y = wal[w].y;
-				npol2[2].z = npol2[0].z + 1.f;
+            if ((!(m & 1)) || (wal[w].surf.flags & (1 << 5)))
+            {
+                npol2[0].x = wal[w].x;  npol2[0].y = wal[w].y;
+                npol2[0].z = getslopez(&sec[s], 0, wal[w].x, wal[w].y);
+                npol2[1].x = wal[nw].x; npol2[1].y = wal[nw].y;
+                npol2[1].z = npol2[0].z;
+                npol2[2].x = wal[w].x;  npol2[2].y = wal[w].y;
+                npol2[2].z = npol2[0].z + 1.f;
 
-				if (!(sur->flags & 4)) f = sec[s].z[0];
-				else if (!vn) f = sec[s].z[1];
-				else if (!m) f = sec[verts[0].s].z[0];
-				else f = sec[verts[(m - 1) >> 1].s].z[0];
+                if (!(sur->flags & 4)) f = sec[s].z[0];
+                else if (!vn) f = sec[s].z[1];
+                else if (!m) f = sec[verts[0].s].z[0];
+                else f = sec[verts[(m - 1) >> 1].s].z[0];
 
-				b->gflags = 0;
-				gentransform_wall(sec, wal, w, b);
+              // npol2[0].u = sur->uv[0].x;
+              // npol2[0].v = sur->uv[2].y * (npol2[0].z - f) + sur->uv[0].y;
+              // npol2[1].u = sur->uv[1].x * dx + npol2[0].u;
+              // npol2[1].v = sur->uv[1].y * dx + npol2[0].v;
+              // npol2[2].u = sur->uv[2].x + npol2[0].u;
+              // npol2[2].v = sur->uv[2].y + npol2[0].v;
+                b->gflags = 0;
+                gentransform_wall(npol2, 3, sur, b);
 
-				b->gligwall = w;
-				b->gligslab = m;
-				ns = -1;
-				logstep("  slab %d: solid wall", m);
-			} else {
-				ns = verts[m >> 1].s;
-				logstep("  slab %d: opening to sector %d, depth:%d", m, ns, b->recursion_depth);
-			}
+                b->gligwall = w;
+                b->gligslab = m;
+                ns = -1;
+                logstep("  slab %d: solid wall", m);
+            } else {
+                ns = verts[m >> 1].s;
+                logstep("  slab %d: opening to sector %d", m, ns);
+            }
 
 			int myport = wal[w].tags[1];
 			bool isportal = myport >= 0 && portals[myport].destpn >= 0 && portals[myport].kind == PORT_WALL;
@@ -915,42 +891,45 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
 			&& portals[myport].kind == b->ignorekind;
 			int mytag = s + taginc * b->recursion_depth;
 
-			if (!skipport && !noportals && isportal) {
-				int endpn = portals[myport].destpn;
-				int nexttag = portals[endpn].sect + taginc * (b->recursion_depth + 1);
-				int visible = drawpol_befclip(mytag, nexttag,
+            if (!skipport && !noportals && isportal) {
+            	int endpn = portals[myport].destpn;
+            	int nexttag = portals[endpn].sect + taginc * (b->recursion_depth + 1);
+
+            	int visible = drawpol_befclip(mytag, nexttag,
 								s, portals[endpn].sect,
 								plothead[0], plothead[1],
 								(((m > vn) << 2) + 3) | CLIP_PORTAL_FLAG, b);
-				// alt -1 solution currently broken
-				//int visible = drawpol_befclip(mytag, -1,
-				//				s, -1,
-				//				plothead[0], plothead[1],
-				//				2|(((m > vn) << 2) + 3) , b);
-				if (visible)
-				draw_hsr_enter_portal(map, myport, b);
-			} else {
-				int inc = taginc * b->recursion_depth;
-				int newtag;
+            	if (visible) {
+            		logstep("wall %d: m=%d, VISIBLE, ns=%d", w, m, ns);
+            	} else {
+            		logstep("wall %d: m=%d, not visible, skipping", w, m);
+            	}
+                draw_hsr_enter_portal(map, myport, b);
+            } else {
+            	int inc = taginc * b->recursion_depth;
+            	int newtag;
 
-				// FIX: if ns == s (same sector), treat as solid wall
-				if (ns >= 0 && ns != s) {
-					newtag = ns + inc;
-					logstep("  opening to sector %d, tag=%d", ns, newtag);
-				} else {
-					// Solid wall or self-referencing
-					newtag = -1;
-					logstep("  solid wall (ns=%d)", ns);
-				}
-				int visible = drawpol_befclip(mytag, newtag, s, ns, plothead[0], plothead[1],
+            	// FIX: if ns == s (same sector), treat as solid wall
+            	if (ns >= 0 && ns != s) {
+            		newtag = ns + inc;
+
+            	} else {
+            		newtag = -1;  // Solid wall - will produce eyepol
+            	}
+            	logstep("wall %d: m=%d, ns=%d, s=%d, newtag=%d", w, m, ns, s, newtag);
+            	int visible = drawpol_befclip(mytag, newtag, s, ns, plothead[0], plothead[1],
 							   ((m > vn) << 2) + 3, b);
-				if (ns >= 0 && visible) {
-					add_sector_walls(ns, b);
-					qsort(b->jobs, b->jobcount, sizeof(wall_job_t), wall_dist_cmp);
-				}
-			}
-		}
-	}
+            	if (visible) {
+            		logstep("wall %d: m=%d, VISIBLE, ns=%d", w, m, ns);
+            	} else {
+            		mono_deloop(plothead[0]);
+            		mono_deloop(plothead[1]);
+            		logstep("wall %d: m=%d, not visible, skipping", w, m);
+            	}
+            }
+
+        }
+    }
 }
 /*
 	Renders visible geometry from camera viewpoint
@@ -967,21 +946,21 @@ void reset_context() {
 }
 
 
+// Simplified sector wall adder
 
 void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
-	loopnum=0;
 	bdrawctx bs;
+	loopnum=0;
 	bs.cam = *cc;
 	bs.orcam = *cc;
 	bs.recursion_depth = 0;
 	bs.has_portal_clip = false;
 	logstep("frame start");
 	draw_hsr_ctx(map,&bs);
+
 }
-
-dpoint3d bord[4], bord2[8];
-void draw_hsr_ctx(mapstate_t *map, bdrawctx *newctx) {
-
+int lastcamsect = 0;
+void draw_hsr_ctx (mapstate_t *map, bdrawctx *newctx) {
 	if (!newctx) {
 		return;
 		if (captureframe) printf("discarding due to null ctx");
@@ -998,93 +977,81 @@ void draw_hsr_ctx(mapstate_t *map, bdrawctx *newctx) {
 
 
 	int recursiveDepth = newctx->recursion_depth;
-
+	b = newctx;
 	b->sectgotn = 0;
 	b->sectgot = 0;
 	b->sectgotmal = 0;
-	b->visited_walls = (bool *) calloc(total_walls, 1);
+	b->visited_walls = (bool *)calloc(total_walls, 1);
 	b->jobcount = 0;
 	b->jobcap = 16;
 	//b->curportal=0;
 	cam_t gcam = b->cam;
 	cam_t oricam = b->orcam;
-	logstep("entered hsr_ctx, halfplane:%d", 0);
+	logstep("entered hsr_ctx, halfplane:%d",0);
 	wall_t *wal;
 	spri_t *spr;
 	dpoint3d dpos, drig, ddow, dfor;
-	dpoint3d fp;
+	dpoint3d fp, bord[4], bord2[8];
 	double f, d;
 	unsigned int *uptr;
 	int i, j, k, n, s, w, closest, col, didcut, halfplane;
 	int loopsrun = 0;
-	if (shadowtest2_rendmode == 4) {
+	if (shadowtest2_rendmode == 4)
+	{
 		glp = &shadowtest2_light[glignum];
-		//	if ((!(glp->flags&1)) || (!shadowtest2_useshadows)) return;
+	//	if ((!(glp->flags&1)) || (!shadowtest2_useshadows)) return;
 	}
+
 	curMap = map;
-	if (b->cam.cursect <0 || b->orcam.cursect < 0)
-		return;
+
 	//if ((map->numsects <= 0) || ((unsigned)gcam.cursect >= (unsigned)map->numsects))
 	//{
 	////if (shadowtest2_rendmode != 4) eyepoln = 0; //Prevents drawpollig() from crashing
 	////	return;
 	//}
-	if (map->numsects > b->sectgotn) {
-		if (b->sectgotmal) free((void *) b->sectgotmal);
-		b->sectgotn = ((map->numsects + 127) & ~127);
-		b->sectgotmal = (unsigned int *) malloc((b->sectgotn >> 3) + 16);
-		//NOTE:malloc doesn't guarantee 16-byte alignment!
-		b->sectgot = (unsigned int *) ((((intptr_t) b->sectgotmal) + 15) & ~15);
+	if (map->numsects > b->sectgotn)
+	{
+		if (b->sectgotmal) free((void *)b->sectgotmal);
+		b->sectgotn = ((map->numsects+127)&~127);
+		b->sectgotmal = (unsigned int *)malloc((b->sectgotn>>3)+16); //NOTE:malloc doesn't guarantee 16-byte alignment!
+		b->sectgot = (unsigned int *)((((intptr_t)b->sectgotmal)+15)&~15);
 	}
-	if ((shadowtest2_rendmode != 4) && (map->numsects > shadowtest2_sectgotn)) {
-		if (shadowtest2_sectgotmal) free((void *) shadowtest2_sectgotmal);
-		shadowtest2_sectgotn = ((map->numsects + 127) & ~127);
-		shadowtest2_sectgotmal = (unsigned int *) malloc((shadowtest2_sectgotn >> 3) + 16);
-		//NOTE:malloc doesn't guarantee 16-byte alignment!
-		shadowtest2_sectgot = (unsigned int *) ((((intptr_t) shadowtest2_sectgotmal) + 15) & ~15);
+	if ((shadowtest2_rendmode != 4) && (map->numsects > shadowtest2_sectgotn))
+	{
+		if (shadowtest2_sectgotmal) free((void *)shadowtest2_sectgotmal);
+		shadowtest2_sectgotn = ((map->numsects+127)&~127);
+		shadowtest2_sectgotmal = (unsigned int *)malloc((shadowtest2_sectgotn>>3)+16); //NOTE:malloc doesn't guarantee 16-byte alignment!
+		shadowtest2_sectgot = (unsigned int *)((((intptr_t)shadowtest2_sectgotmal)+15)&~15);
 	}
 	if (!mphmal)
 		mono_initonce();
 
-	int savedmpunum = mphnum;
+	if (shadowtest2_rendmode != 4)
+	{
+			//Horrible hacks for internal build2 global variables
+		dpos.x = 0.0; dpos.y = 0.0; dpos.z = 0.0;
+		drig.x = 1.0; drig.y = 0.0; drig.z = 0.0;
+		ddow.x = 0.0; ddow.y = 1.0; ddow.z = 0.0;
+		dfor.x = 0.0; dfor.y = 0.0; dfor.z = 1.0;
 
-	if (shadowtest2_rendmode != 4) {
-		//Horrible hacks for internal build2 global variables
-		dpos.x = 0.0;
-		dpos.y = 0.0;
-		dpos.z = 0.0;
-		drig.x = 1.0;
-		drig.y = 0.0;
-		drig.z = 0.0;
-		ddow.x = 0.0;
-		ddow.y = 1.0;
-		ddow.z = 0.0;
-		dfor.x = 0.0;
-		dfor.y = 0.0;
-		dfor.z = 1.0;
-
-		for (i = shadowtest2_numlights - 1; i >= 0; i--) {
-			//Transform shadowtest2_light to screen space
-			fp.x = shadowtest2_light[i].p.x - gcam.p.x;
-			fp.y = shadowtest2_light[i].p.y - gcam.p.y;
-			fp.z = shadowtest2_light[i].p.z - gcam.p.z;
-			slightpos[i].x = fp.x * gcam.r.x + fp.y * gcam.r.y + fp.z * gcam.r.z;
-			slightpos[i].y = fp.x * gcam.d.x + fp.y * gcam.d.y + fp.z * gcam.d.z;
-			slightpos[i].z = fp.x * gcam.f.x + fp.y * gcam.f.y + fp.z * gcam.f.z;
+		for(i=shadowtest2_numlights-1;i>=0;i--)
+		{
+				//Transform shadowtest2_light to screen space
+			fp.x = shadowtest2_light[i].p.x-gcam.p.x;
+			fp.y = shadowtest2_light[i].p.y-gcam.p.y;
+			fp.z = shadowtest2_light[i].p.z-gcam.p.z;
+			slightpos[i].x = fp.x*gcam.r.x + fp.y*gcam.r.y + fp.z*gcam.r.z;
+			slightpos[i].y = fp.x*gcam.d.x + fp.y*gcam.d.y + fp.z*gcam.d.z;
+			slightpos[i].z = fp.x*gcam.f.x + fp.y*gcam.f.y + fp.z*gcam.f.z;
 
 			fp.x = shadowtest2_light[i].f.x;
 			fp.y = shadowtest2_light[i].f.y;
 			fp.z = shadowtest2_light[i].f.z;
-			f = fp.x * fp.x + fp.y * fp.y + fp.z * fp.z;
-			if (f > 0.f) {
-				f = 1.f / sqrt(f);
-				fp.x *= f;
-				fp.y *= f;
-				fp.z *= f;
-			}
-			slightdir[i].x = fp.x * gcam.r.x + fp.y * gcam.r.y + fp.z * gcam.r.z;
-			slightdir[i].y = fp.x * gcam.d.x + fp.y * gcam.d.y + fp.z * gcam.d.z;
-			slightdir[i].z = fp.x * gcam.f.x + fp.y * gcam.f.y + fp.z * gcam.f.z;
+			f = fp.x*fp.x + fp.y*fp.y + fp.z*fp.z;
+			if (f > 0.f) { f = 1.f/sqrt(f); fp.x *= f; fp.y *= f; fp.z *= f; }
+			slightdir[i].x = fp.x*gcam.r.x + fp.y*gcam.r.y + fp.z*gcam.r.z;
+			slightdir[i].y = fp.x*gcam.d.x + fp.y*gcam.d.y + fp.z*gcam.d.z;
+			slightdir[i].z = fp.x*gcam.f.x + fp.y*gcam.f.y + fp.z*gcam.f.z;
 
 			spotwid[i] = shadowtest2_light[i].spotwid;
 		}
@@ -1093,30 +1060,36 @@ void draw_hsr_ctx(mapstate_t *map, bdrawctx *newctx) {
 #else
 		f = 3072.f;
 #endif
-		g_qamb[0] = shadowtest2_ambrgb[0] * f;
-		g_qamb[1] = shadowtest2_ambrgb[1] * f;
-		g_qamb[2] = shadowtest2_ambrgb[2] * f;
+		g_qamb[0] = shadowtest2_ambrgb[0]*f;
+		g_qamb[1] = shadowtest2_ambrgb[1]*f;
+		g_qamb[2] = shadowtest2_ambrgb[2]*f;
 		g_qamb[3] = 0.f;
 		//eyepoln = 0; eyepolvn = 0;
-	} else {
-		if (map->numsects > glp->sectgotn) {
-			if (glp->sectgotmal) free((void *) glp->sectgotmal);
-			glp->sectgotn = ((map->numsects + 127) & ~127);
-			glp->sectgotmal = (unsigned int *) malloc((glp->sectgotn >> 3) + 16);
-			//NOTE:malloc doesn't guarantee 16-byte alignment!
-			glp->sectgot = (unsigned int *) ((((intptr_t) glp->sectgotmal) + 15) & ~15);
+	}
+	else
+	{
+		if (map->numsects > glp->sectgotn)
+		{
+			if (glp->sectgotmal) free((void *)glp->sectgotmal);
+			glp->sectgotn = ((map->numsects+127)&~127);
+			glp->sectgotmal = (unsigned int *)malloc((glp->sectgotn>>3)+16); //NOTE:malloc doesn't guarantee 16-byte alignment!
+			glp->sectgot = (unsigned int *)((((intptr_t)glp->sectgotmal)+15)&~15);
 		}
-		if (glp->lighasheadn <= 0) {
+		if (glp->lighasheadn <= 0)
+		{
 			glp->lighasheadn = LIGHASHSIZ;
-			glp->lighashead = (int *) realloc(glp->lighashead, glp->lighasheadn * sizeof(glp->lighashead[0]));
-			memset(glp->lighashead, -1, glp->lighasheadn * sizeof(glp->lighashead[0]));
+			glp->lighashead = (int *)realloc(glp->lighashead,glp->lighasheadn*sizeof(glp->lighashead[0]));
+			memset(glp->lighashead,-1,glp->lighasheadn*sizeof(glp->lighashead[0]));
 		}
 	}
 
-	{
-		int halfplane = 0;
-
-		logstep("HALFPLANE removed - single pass, depth: %d", b->recursion_depth);
+{
+    int halfplane = 0;
+    if (b->orcam.cursect == -1)
+	    b->orcam.cursect = lastcamsect;
+    else
+	    lastcamsect = b->orcam.cursect;
+    logstep("HALFPLANE removed - single pass, depth: %d", b->recursion_depth);
 
 		if (shadowtest2_rendmode == 4) {
 			// gcam.r.x = 1; gcam.d.x = 0; gcam.f.x = 0;
@@ -1132,27 +1105,26 @@ void draw_hsr_ctx(mapstate_t *map, bdrawctx *newctx) {
 		}
 		// In draw_hsr_ctx, replace the viewport setup:
 		else if (!b->has_portal_clip) {
-			double far_dist = 1e6;
-			cam_t *cam = &b->orcam;
+			    double far_dist = 1e6;
+    cam_t *cam = &b->orcam;
 
-			// Frustum corners in world space
-			float mc = 900;
-			far_dist = 900;
-			xformbac(-65536.0, -65536.0, 1.0, &bord2[0], b);
-			xformbac(+65536.0, -65536.0, 1.0, &bord2[1], b);
-			xformbac(+65536.0, +65536.0, 1.0, &bord2[2], b);
-			xformbac(-65536.0, +65536.0, 1.0, &bord2[3], b);
-			n = 4;
+    // Frustum corners in world space
+			float mc = 900; far_dist = 900;
+    xformbac(-mc, -mc, far_dist, &bord2[0], b);
+    xformbac(+mc, -mc, far_dist, &bord2[1], b);
+    xformbac(+mc, +mc, far_dist, &bord2[2], b);
+    xformbac(-mc, +mc, far_dist, &bord2[3], b);
+    n = 4;
 			// Screen-independent viewport - use huge bounds
-			//double huge = 1e7;
-			//bord2[0].x = -huge;
-			//bord2[0].y = -huge;
-			//bord2[1].x = +huge;
-			//bord2[1].y = -huge;
-			//bord2[2].x = +huge;
-			//bord2[2].y = +huge;
-			//bord2[3].x = -huge;
-			//bord2[3].y = +huge;
+			double huge = 1e7;
+			bord2[0].x = -huge;
+			bord2[0].y = -huge;
+			bord2[1].x = +huge;
+			bord2[1].y = -huge;
+			bord2[2].x = +huge;
+			bord2[2].y = +huge;
+			bord2[3].x = -huge;
+			bord2[3].y = +huge;
 			n = 4;
 			b->planecuts = n;
 			didcut = 0;
@@ -1172,68 +1144,110 @@ void draw_hsr_ctx(mapstate_t *map, bdrawctx *newctx) {
 			n = b->planecuts;
 			didcut = 1;
 			memset8(b->sectgot, 0, (map->numsects + 31) >> 3);
-			// alt path with -1 and flags 2
-			//mono_mph_check(mphnum);
-			//mono_genfromloop(&mph[mphnum].head[0], &mph[mphnum].head[1], bord2, n);
-			//mph[mphnum].tag = gcam.cursect + taginc*b->recursion_depth;
-			//mphnum++;
 		}
 
+    // Track which sectors have had their floors/ceilings drawn
 		// Track which sectors have had their floors/ceilings drawn
-		// Track which sectors have had their floors/ceilings drawn
-		unsigned int *sectdrawn = (unsigned int *) _alloca(((map->numsects + 31) >> 3) + 4);
+		unsigned int *sectdrawn = (unsigned int *)_alloca(((map->numsects + 31) >> 3) + 4);
 		memset(sectdrawn, 0, (map->numsects + 31) >> 3);
 
 		b->jobcount = 0;
-		b->jobs = malloc(sizeof(wall_job_t) * b->jobcap);
-		logstep("=== Wall Processing Start ===");
-		logstep("Starting sector: %d, walls in sector: %d", b->cam.cursect);
-
+		b->jobs = malloc(sizeof(wall_job_t)*b->jobcap);
 		add_sector_walls(b->cam.cursect, b);
-		logstep("Initial queue: %d walls", b->jobcount);
-
 		qsort(b->jobs, b->jobcount, sizeof(wall_job_t), wall_dist_cmp);
 
+		// Group walls by sector for efficient getwalls_imp batching
 		int current_sec = -1;
-		int sec_walls[256];
+		int sec_walls[256];  // Temp array for walls in current sector
 		int sec_wall_count = 0;
-if (b->has_portal_clip)
-	int x= 1;
+		int *nextsecs = calloc(55,sizeof(int));
+		int nextsecsn=1;
+		nextsecs[0]= b->cam.cursect;
 
-		for (int i = 0; i < b->jobcount; i++) {
-			wall_job_t *job = &b->jobs[i];
-
-			if (job->sec != current_sec) {
-				if (sec_wall_count > 0) {
-					draw_walls(map, current_sec, sec_walls, sec_wall_count, b);
-					b->visited_sectors[current_sec] = true; // NEW: Mark sector
-					sec_wall_count = 0;
+		for (int gs=0;gs<=map->malsects;gs++) {
+			int acumsec[55];
+			int nss=0;
+			for (int ni=0;ni<nextsecsn;ni++) { // breadth loop;
+				int nxs = (nextsecs[ni]);
+				if (!b->visited_sectors[nxs]) { // loop for one sector
+					draw_walls(map, nxs, sec_walls, sec_wall_count, b);
+					gs++;
+					b->visited_sectors[nxs]=true;
+					draw_sector_surface(nxs, 0, map, b); // Floor
+					draw_sector_surface(nxs, 1, map, b); // Ceiling
+					// get all neighbors;
+					for (int wi=0;wi<map->sect[nxs].n;wi++) {
+						int ns = map->sect[nxs].wall[wi].ns;
+						if ( ns >= 0)
+							if (!b->visited_sectors[ns]) {
+								acumsec[nss]=ns;
+								nss++;
+							}
+					}
 				}
-				current_sec = job->sec;
+			}
+			nextsecs = acumsec;
+			nextsecsn=nss;
+			if (nss==0)
+				break;
+		}
+		if (false)//old one;
+		{
+			for (int ji = 0; ji < b->jobcount; ji++) {
+				wall_job_t *job = &b->jobs[ji];
+
+				if (job->sec != current_sec) {
+					if (sec_wall_count > 0) {
+						draw_walls(map, current_sec, sec_walls, sec_wall_count, b);
+						b->visited_sectors[current_sec] = true; // NEW: Mark sector
+						sec_wall_count = 0;
+					}
+					current_sec = job->sec;
+				}
+
+				sec_walls[sec_wall_count++] = job->wall;
+
+				// FIX: Use .ns field, not tags[0]
+				int ns = map->sect[job->sec].wall[job->wall].ns;
+				if (ns >= 0 && ns != job->sec) {
+					add_sector_walls(ns, b);
+					qsort(b->jobs, b->jobcount, sizeof(wall_job_t), wall_dist_cmp);
+				}
 			}
 
-			sec_walls[sec_wall_count++] = job->wall;
+    	// Flush last batch
+    	if (sec_wall_count > 0) {
+    		draw_walls(map, current_sec, sec_walls, sec_wall_count, b);
+    		b->visited_sectors[current_sec] = true; // NEW: Mark last sector
+    	}
 
-			int ns = map->sect[job->sec].wall[job->wall].ns;
-			if (ns >= 0 && ns != job->sec) {
-				add_sector_walls(ns, b);
-				qsort(b->jobs, b->jobcount, sizeof(wall_job_t), wall_dist_cmp);
-			}
+    	// Draw surfaces
+    	for (i = 0; i < map->numsects; i++) {
+    		if (!b->visited_sectors[i]) continue; // NEW: Simple check
+    		draw_sector_surface(i, 0, map, b); // Floor
+    		draw_sector_surface(i, 1, map, b); // Ceiling
+    	}
 		}
 
-		if (sec_wall_count > 0) {
-			draw_walls(map, current_sec, sec_walls, sec_wall_count, b);
-			b->visited_sectors[current_sec] = true; // NEW: Mark last sector
-		}
-
-		// Draw floors/ceilings for all visited sectors
-		for (int i = 0; i < map->numsects; i++) {
-			if (!b->visited_sectors[i]) continue; // NEW: Simple check
-			draw_sector_surface(i, 0, map, b); // Floor
-			draw_sector_surface(i, 1, map, b); // Ceiling
-		}
 		free(b->visited_walls);
 		free(b->visited_sectors); // NEW: Cleanup
+
+
+
+		// Draw any remaining sectors that were scanned but not reached via bunches
+		//for (i = 0; i < map->numsects; i++) {
+		//	if (!(b->sectgot[i >> 5] & (1 << i))) continue;
+		//	if (sectdrawn[i >> 5] & (1 << i)) continue;
+		//	draw_sector_surface(i, 0, map, b);
+		//	draw_sector_surface(i, 1, map, b);
+		//}
+
+		if (shadowtest2_rendmode == 4)
+			uptr = glp->sectgot;
+		else
+			uptr = shadowtest2_sectgot;
+
+		memcpy(uptr, b->sectgot, (map->numsects + 31) >> 3);
 	}
 }
 static void draw_hsr_enter_portal(mapstate_t* map, int myport, bdrawctx *parentctx)
@@ -1246,6 +1260,7 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport, bdrawctx *parentc
     if (parentctx->recursion_depth >= MAX_PORTAL_DEPTH) {
 		logstep("portal entrance aborted due to max depth.");
     	return;
+
     }
 
     cam_t ncam = parentctx->cam;
@@ -1270,6 +1285,7 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport, bdrawctx *parentc
 	point3d cam_local_f = world_to_local_vec(ncam.f, &ent.tr);
 	//point3d cam_local_h = world_to_local_point(ncam.h, &ent.tr);
 
+
     // Step 2: Apply that same relative transform from the target portal's perspective
     // Since entry.forward points IN and target.forward points OUT (already opposite),
     // we just transform directly without any flips
@@ -1277,19 +1293,7 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport, bdrawctx *parentc
     ncam.r = local_to_world_vec(cam_local_r, &tgs.tr);
     ncam.d = local_to_world_vec(cam_local_d, &tgs.tr);
     ncam.f = local_to_world_vec(cam_local_f, &tgs.tr);
-	// In draw_hsr_enter_portal - ACCEPT det = ±1
-	double det = ncam.r.x * (ncam.d.y * ncam.f.z - ncam.d.z * ncam.f.y)
-			   + ncam.r.y * (ncam.d.z * ncam.f.x - ncam.d.x * ncam.f.z)
-			   + ncam.r.z * (ncam.d.x * ncam.f.y - ncam.d.y * ncam.f.x);
 
-	if (fabs(fabs(det) - 1.0) > 0.01) {  // CHANGED: Allow -1 or +1
-		logstep("WARNING: Non-orthonormal transform: det=%.3f (should be ±1)", det);
-	}
-	logstep("Camera handedness: %s (det=%.3f)", det > 0 ? "RIGHT" : "LEFT", det);
-
-	if (fabs(det - 1.0) > 0.01) {
-		logstep("WARNING: Non-unit determinant: %.3f", det);
-	}
     ncam.cursect = portals[endp].sect;
 
     bdrawctx newctx = {};
@@ -1301,6 +1305,7 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport, bdrawctx *parentc
     newctx.cam = ncam;
     newctx.orcam = parentctx->orcam;
     newctx.has_portal_clip = true;
+
     newctx.sectgotn = 0;
     newctx.sectgot = 0;
     newctx.sectgotmal = 0;
@@ -1318,31 +1323,31 @@ newctx.testignorewall = ignw;
 	lastcamtr = newctx.orcam.tr;
 	lastcamtr2 = newctx.cam.tr;
 
-
-
-    // Count vertices in clip region
-
-    // VERIFY TRANSFORM
-    logstep("Portal transform:");
-    logstep("  entry: pos=(%.1f,%.1f,%.1f) fwd=(%.2f,%.2f,%.2f)",
-            ent.tr.p.x, ent.tr.p.y, ent.tr.p.z,
-            ent.tr.f.x, ent.tr.f.y, ent.tr.f.z);
-    logstep("  exit:  pos=(%.1f,%.1f,%.1f) fwd=(%.2f,%.2f,%.2f)",
-            tgs.tr.p.x, tgs.tr.p.y, tgs.tr.p.z,
-            tgs.tr.f.x, tgs.tr.f.y, tgs.tr.f.z);
-    logstep("  newcam: pos=(%.1f,%.1f,%.1f) fwd=(%.2f,%.2f,%.2f)",
-            ncam.p.x, ncam.p.y, ncam.p.z,
-            ncam.f.x, ncam.f.y, ncam.f.z);
-
     draw_hsr_ctx(map, &newctx);
 	logstep("Finished portal %d, mphnum:%d", myport, mphnum);
 }
 
 
+void drawsprites ()
+{
+}
+
+void shadowtest2_setcam (cam_t *ncam)
+{
+	//gcam = *ncam;
+}
+
+#if (USENEWLIGHT == 0)
+typedef struct { float n2, d2, n1, d1, n0, d0, filler0[2], glk[12], bsc, gsc, rsc, filler1[1]; } hlighterp_t;
+#else
 typedef struct { float gk[16], gk2[12], bsc, gsc, rsc, filler1[1]; } hlighterp_t;
 __declspec(align(16)) static const float hligterp_maxzero[4] = {0.f,0.f,0.f,0.f};
+#endif
+void prepligramp (float *ouvmat, point3d *norm, int lig, void *hl)
+{
 
-void prepligramp (float *ouvmat, point3d *norm, int lig, void *hl){}
+}
+
 
 int shadowtest2_isgotsectintersect (int lignum)
 {
@@ -1353,7 +1358,10 @@ int shadowtest2_isgotsectintersect (int lignum)
 	u0 = shadowtest2_sectgot;
 	u1 = shadowtest2_light[lignum].sectgot;
 	i = (leng>>5); if (u0[i]&u1[i]&((1<<leng)-1)) return(1); //WARNING:code uses x86-32 bit shift trick!
-
+#if 0
+	for(i--;i>=0;i--) if (u0[i]&u1[i]) return(1);
+	return(0);
+#else
 	for(i--;((i&3)!=3);i--) if (u0[i]&u1[i]) return(1);
 	if (i < 0) return(0);
 	_asm
@@ -1378,6 +1386,7 @@ begit:movaps xmm0, [ecx+eax*4-12]
 endit:mov eax, 1
 skpit:pop esi
 	}
+#endif
 }
 
 void shadowtest2_dellight (int i)
@@ -1410,7 +1419,10 @@ void shadowtest2_ligpolreset (int ind)
 	}
 }
 
-void shadowtest2_uninit (){}
+void shadowtest2_uninit ()
+{
+
+}
 
 void shadowtest2_init ()
 {
@@ -1419,5 +1431,9 @@ void shadowtest2_init ()
 
 //--------------------------------------------------------------------------------------------------
 
-void drawpollig(int ei) {}
+void drawpollig(int ei) {
 
+}
+#if 0
+!endif
+#endif
