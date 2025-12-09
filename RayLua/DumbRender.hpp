@@ -81,6 +81,8 @@ static int lightPosLoc;
 static int lightRangeLoc;
 static bool syncam = true;
 static int cureyepoly = 0;
+static int mono_cursnap = 0;
+static int mono_curchain = 0;
 class DumbRender
 {
 
@@ -495,7 +497,28 @@ public:
         glDisable(GL_POLYGON_OFFSET_FILL);
         return false;
     }
+    static void draw_mono_debug() {
+        int startsnap = mono_cursnap;
+        int endsnap = mono_cursnap == 0? g_mono_dbg.snapshot_count : mono_cursnap+1;
+        for (int i=startsnap;i<endsnap;i++) {
+            auto snap = g_mono_dbg.snapshots[i];
 
+
+            int startch = abs(mono_curchain % snap.chain_count);
+            int endch = startch == 0? snap.chain_count : startch+1;
+            for (int c = startch;c<endch;c++) {
+                auto chain = snap.chains[c];
+                rlBegin(RL_LINES);
+
+                for (int v =0;v<chain.count;v++)
+                {
+                    rlColor4f(i/20.0f,c/30.0f,0.8f,0.8f);
+                    rlVertex3f(chain.points[v].x/10,-chain.points[v].z/10,chain.points[v].y/10);
+                }
+                rlEnd();
+            }
+        }
+    }
 
     static void DrawPost3d(float sw, float sh, Camera3D camsrc) {
         // Vector2 v1 = {0, 0};
@@ -527,6 +550,21 @@ public:
 
         if (IsKeyPressed(KEY_U))
             syncam = !syncam;
+        if (IsKeyPressed(KEY_RIGHT)) {
+            mono_cursnap++;
+        }
+        if (IsKeyPressed(KEY_LEFT)) {
+                    mono_cursnap--;
+                }
+        if (IsKeyPressed(KEY_RIGHT_SHIFT)) {
+            mono_curchain++;
+        }
+        if (IsKeyPressed(KEY_LEFT_SHIFT)) {
+            mono_curchain--;
+        }
+
+        if (g_mono_dbg.snapshot_count > 0)
+            mono_cursnap = abs(mono_cursnap % g_mono_dbg.snapshot_count);
 
         DrawEyePoly(sw, sh, &plr, &b2cam); // ken render
 
@@ -580,8 +618,10 @@ public:
                     glDisable(GL_POLYGON_OFFSET_FILL);
                     rlEnableDepthMask();
                 } // eyepol lines for each poly
-                EndBlendMode();
+
             }
+            draw_mono_debug();
+            EndBlendMode();
         }
         EndMode3D();
         //if (!lightpos_t || !eyepolv || eyepoln <= 0) return;}

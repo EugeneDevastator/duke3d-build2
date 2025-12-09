@@ -11,6 +11,7 @@ set(C_SOURCES
         Core/scenerender.c
         Core/shadowtest2.c
         Core/buildmath.c
+        Core/monodebug.c
         interfaces/eventstore.c
 )
 set(C_HEADERS
@@ -28,6 +29,7 @@ set(C_HEADERS
         interfaces/eventstore.h
         interfaces/ev_projection.h
         interfaces/event_types.h
+        Core/monodebug.h
 )
 set(CORE_HEADERS
         dumbrender.hpp

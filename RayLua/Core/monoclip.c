@@ -4,6 +4,8 @@
 
 #include "monoclip.h"
 
+#include "monodebug.h"
+
 
 mph_t *mph = 0;
 int mphnum = 0;
@@ -35,6 +37,7 @@ void mono_initonce() {
     }
     mp[mpmal - 1].n = 0;
     mp[0].p = mpmal - 1;
+    mono_dbg_init();
 }
 
 int mono_ins2d(int i, double nx, double ny) {
@@ -534,7 +537,13 @@ int mono_join(int hd0, int hd1, int hd2, int hd3, int *ho0, int *ho1) {
 
 void mono_bool(int hr0, int hr1, int hw0, int hw1, int boolop, bdrawctx* b, void (*mono_output)(int h0, int h1,bdrawctx* b)) {
     int hd0, hd1;
-
+    if (g_captureframe) {
+        char buf[64];
+        sprintf(buf, "BEFORE_%s_hr", (boolop==MONO_BOOL_AND)?"AND":(boolop==MONO_BOOL_SUB)?"SUB":"SUBREV");
+        mono_dbg_capture_pair(hr0, hr1, buf, boolop);
+        sprintf(buf, "BEFORE_%s_hw", (boolop==MONO_BOOL_AND)?"AND":(boolop==MONO_BOOL_SUB)?"SUB":"SUBREV");
+        mono_dbg_capture_pair(hw0, hw1, buf, boolop);
+    }
     if (boolop == MONO_BOOL_AND) {
         //{ //Debug!
         //int i;
@@ -547,15 +556,24 @@ void mono_bool(int hr0, int hr1, int hw0, int hw1, int boolop, bdrawctx* b, void
 
         hd0 = mono_max(hr0, hw0, +1, 0);
         hd1 = mono_max(hr1, hw1, -1, 0);
+        if (g_captureframe) {
+            mono_dbg_capture_pair(hd0, hd1, "AFTER_MAX_AND", boolop);
+        }
         mono_clipself(hd0, hd1, b, mono_output);
         mono_deloop(hd1);
         mono_deloop(hd0);
     } else {
         boolop = (boolop == MONO_BOOL_SUB);
         hd0 = mono_max(hr1, hw0, -1, boolop ^ 1);
+        if (g_captureframe) {
+            mono_dbg_capture_chain(hd0, 0, "AFTER_MAX_SUB1", boolop);
+        }
         mono_clipself(hr0, hd0, b, mono_output);
         mono_deloop(hd0);
         hd0 = mono_max(hr0, hw1, +1, boolop);
+        if (g_captureframe) {
+            mono_dbg_capture_chain(hd0, 0, "AFTER_MAX_SUB2", boolop);
+        }
         mono_clipself(hd0, hr1, b, mono_output);
         mono_deloop(hd0);
     }

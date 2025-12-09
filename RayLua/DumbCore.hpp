@@ -1,6 +1,7 @@
 #ifndef DUMBCORE_HPP
 #define DUMBCORE_HPP
 
+
 #include "raylib.h"
 #include "raymath.h"
 
@@ -8,6 +9,7 @@
 
 extern "C" {
 #include "shadowtest2.h"
+#include "monodebug.h"
 #include "mapcore.h"
 #include "physics.h"
 #include "loaders.h"
@@ -100,8 +102,12 @@ private:
         Vector3 forward = Vector3Normalize(Vector3Subtract(cam.target, cam.position));
         Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, cam.up));
         captureframe = false;
+        g_captureframe = false;
+
         if (IsKeyPressed(KEY_G)) {
             captureframe = true;
+            g_captureframe = true;
+            mono_dbg_clear();
         }
 
         // pos in build2
@@ -138,6 +144,7 @@ private:
         //those funcs still use internal build coords.
         point3d movevec = RaylibToBuild(cam.position - startpos);
         point3d mv = {movevec.x, movevec.y, movevec.z};
+      //  camposb2.x+=movevec.x;        camposb2.y+=movevec.y;        camposb2.z+=movevec.z;
         collmove_p(&camposb2, &cursec, &mv, 0.25, 1, map);
         updatesect_imp(camposb2.x, camposb2.y, camposb2.z, &cursec, map);
 

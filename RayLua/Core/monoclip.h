@@ -97,7 +97,6 @@ typedef struct {
 	int planecuts;
 	int prevsec,newsec;
 
-
 } bdrawctx;
 
 extern mp_t *mp;
