@@ -438,8 +438,9 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
                               MONO_BOOL_AND, b, mono_output);
 
             // NEW: Check if AND produced any eyepols
-            if ((eyepoln > before_eyepoln) || (newtag1 != tag1))
-                produced_output = 1;
+        	// NEW (correct):
+        	if (eyepoln > before_eyepoln)
+        		produced_output = 1;
         }
     }
 
@@ -715,17 +716,14 @@ static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bdrawc
 
     mono_genfromloop(&plothead[0], &plothead[1], verts, n);
 
-    if ((plothead[0] | plothead[1]) < 0) {
-        logstep("  mono_genfromloop failed");
-        mono_deloop(plothead[0]);
-        mono_deloop(plothead[1]);
-        return;
-    }
-
-    // Check for portal - FIX: surfid must match isflor
+ //   if ((plothead[0] | plothead[1]) < 0) {
+ //       logstep("  mono_genfromloop failed");
+ //       mono_deloop(plothead[0]);
+ //       mono_deloop(plothead[1]);
+ //       return;
+ //   }
 
     bool noportals = b->recursion_depth >= MAX_PORTAL_DEPTH;
-
     int mytag = sectnum + taginc * b->recursion_depth;
 
     if (isportal && !noportals && !skipport) {
@@ -737,14 +735,16 @@ static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bdrawc
         int visible = drawpol_befclip(mytag, nexttag,
                                       sectnum, portals[endpn].sect,
                                       plothead[0], plothead[1],
-                                      ((isflor << 2) + 3) | CLIP_PORTAL_FLAG, b);
+                                      ((!isflor << 2) + 3) | CLIP_PORTAL_FLAG, b);
 
 		// alt -1 solution
         //int visible = drawpol_befclip(mytag, -1,
         //                             sectnum, -1,
         //                             plothead[0], plothead[1],
         //                             2|((isflor << 2) + 3), b);
+    	if (visible)
             draw_hsr_enter_portal(map, myport, b);
+
     } else {
         logstep("  drawing solid surface (isportal=%d, noportals=%d, depth=%d)", isportal, noportals, b->recursion_depth);
         int visible = drawpol_befclip(mytag, -1,
@@ -952,7 +952,7 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
 				//				s, -1,
 				//				plothead[0], plothead[1],
 				//				2|(((m > vn) << 2) + 3) , b);
-
+				if (visible)
 				draw_hsr_enter_portal(map, myport, b);
 			} else {
 				int inc = taginc * b->recursion_depth;
@@ -969,7 +969,7 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
 				}
 				int visible = drawpol_befclip(mytag, newtag, s, ns, plothead[0], plothead[1],
 							   ((m > vn) << 2) + 3, b);
-				if (newtag >= 0) {
+				if (ns >= 0 && visible) {
 					add_sector_walls(ns, b);
 					qsort(b->jobs, b->jobcount, sizeof(wall_job_t), wall_dist_cmp);
 				}
