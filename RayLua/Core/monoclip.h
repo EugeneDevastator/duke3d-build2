@@ -85,7 +85,6 @@ typedef struct {
  	cam_t orcam; // one true camera, read only.
 	unsigned int *sectgot, *sectgotmal;        // Visited sectors per level
 	int sectgotn;
-	int portal_clip[2];  // Current portal clipping region
 	bool has_portal_clip; // Whether portal clipping is active
 	int recursion_depth;
 	float gouvmat[9]; // 0 3 6 - store plane equation to convert back from mp.
