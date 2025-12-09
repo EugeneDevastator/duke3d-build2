@@ -192,7 +192,7 @@ void changetagfunc(int rethead0, int rethead1, bdrawctx* b);
 /** Processes wall segments, handles both clipping and rendering setup
  * @param bid Bunch index to process
  */
-static void drawalls(mapstate_t *map, int s, int *walls, int wallcount, bdrawctx *b);
+static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawctx *b);
 
 /** Renders sprites with lighting if available */
 void drawsprites();
