@@ -518,6 +518,19 @@ public:
                 rlEnd();
             }
         }
+        int v=0;
+        int l = 0;
+        while (v<loopnum) {
+            rlBegin(RL_LINES);
+            while (loopuse[v]) {
+                rlColor4f(l/10.0f,1,l/100.0f,0.8f);
+                //    auto campos = DumbCore::GetCamera().position;
+                rlVertex3f(loops[v].x/1 ,loops[v].y/1,loops[v].z/1);
+                v++;
+            }
+            v++; l++;
+            rlEnd();
+        }
     }
 
     static void DrawPost3d(float sw, float sh, Camera3D camsrc) {

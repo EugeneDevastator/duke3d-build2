@@ -281,7 +281,9 @@ static void changetagfunc (int rethead0, int rethead1, bdrawctx *b)
 	//flags&4: reverse cut for sub
 // Replace the existing drawpol_befclip with this version
 // Full 3D camera transform - handles pitch/roll correctly for portals
-
+dpoint3d loops[70000]={};
+bool loopuse[70000]={};
+int loopnum=0;
 // Change return type from void to int
 // Returns: 1 if AND produced visible output, 0 if not
 static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
@@ -317,6 +319,7 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
 
     // Transform world coordinates to camera space
     on = 0;
+
     for (h = 0; h < 2; h++) {
         i = plothead[h];
         do {
@@ -333,13 +336,21 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
             otp[on].x = dx * orcam->r.x + dy * orcam->r.y + dz * orcam->r.z;
             otp[on].y = dx * orcam->d.x + dy * orcam->d.y + dz * orcam->d.z;
             otp[on].z = dx * orcam->f.x + dy * orcam->f.y + dz * orcam->f.z;
-            on++;
+        	loops[loopnum] = otp[on];
+        	loopuse[loopnum]=true;
+        	loopnum++;
+        	on++;
 
             if (!h) i = mp[i].n;
         } while (i != plothead[h]);
         mono_deloop(plothead[h]);
     }
-
+	loops[loopnum] = otp[0];
+	loopuse[loopnum]=true;
+	loopnum++;
+	loops[loopnum] = otp[0];
+	loopuse[loopnum]=false;
+	loopnum++;
     // Clip against near plane
     n = 0;
     for (i = on - 1, j = 0; j < on; i = j, j++) {
@@ -362,6 +373,7 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
         f = orcam->h.z / tp[i].z;
         tp[i].x = tp[i].x * f + orcam->h.x;
         tp[i].y = tp[i].y * f + orcam->h.y;
+
     }
 
     mono_genfromloop(&plothead[0], &plothead[1], tp, n);
@@ -426,52 +438,52 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
                               MONO_BOOL_AND, b, mono_output);
 
             // NEW: Check if AND produced any eyepols
-           // if (eyepoln > before_eyepoln)
+            if ((eyepoln > before_eyepoln) || (newtag1 != tag1))
                 produced_output = 1;
         }
     }
 
     // === SUB operation (flags & 2) - ONLY if AND produced output ===
-    if (flags & 2) {
+    if ((flags & 2 ) && produced_output) {
         j = (flags & 4) ? MONO_BOOL_SUB_REV : MONO_BOOL_SUB;
 
-        b->gnewtag = mtag;
-        b->gnewsec = tagsect;
-        b->needsecscan = 0;
-        omph0 = mphnum;
-        omph1 = mphnum;
+    	b->gnewtag = mtag;
+    	b->gnewsec = tagsect;
+    	b->needsecscan = 0;
+    	omph0 = mphnum;
+    	omph1 = mphnum;
 
-        for (i = mphnum - 1; i >= 0; i--) {
-            if (mph[i].tag != mtag) continue;
-            mono_bool(mph[i].head[0], mph[i].head[1],
-                      plothead[0], plothead[1], j, b, changetagfunc);
-            mono_deloop(mph[i].head[1]);
-            mono_deloop(mph[i].head[0]);
-            omph0--;
-            mph[i] = mph[omph0];
-        }
+    	for (i = mphnum - 1; i >= 0; i--) {
+    		if (mph[i].tag != mtag) continue;
+    		mono_bool(mph[i].head[0], mph[i].head[1],
+					  plothead[0], plothead[1], j, b, changetagfunc);
+    		mono_deloop(mph[i].head[1]);
+    		mono_deloop(mph[i].head[0]);
+    		omph0--;
+    		mph[i] = mph[omph0];
+    	}
 
-        // Join new entries
-        for (l = omph1; l < mphnum; l++) {
-            mph[omph0] = mph[l];
-            k = omph0;
-            omph0++;
-            for (j = omph0 - 1; j >= 0; j--) {
-                if (mph[j].tag != b->gnewtag) continue;
-                if (!mono_join(mph[j].head[0], mph[j].head[1],
-                               mph[k].head[0], mph[k].head[1], &i0, &i1)) continue;
-                for (i = 1; i >= 0; i--) {
-                    mono_deloop(mph[k].head[i]);
-                    mono_deloop(mph[j].head[i]);
-                }
-                omph0--;
-                mph[k] = mph[omph0];
-                mph[j].head[0] = i0;
-                mph[j].head[1] = i1;
-                k = j;
-            }
-        }
-        mphnum = omph0;
+    	// Join new entries
+    	for (l = omph1; l < mphnum; l++) {
+    		mph[omph0] = mph[l];
+    		k = omph0;
+    		omph0++;
+    		for (j = omph0 - 1; j >= 0; j--) {
+    			if (mph[j].tag != b->gnewtag) continue;
+    			if (!mono_join(mph[j].head[0], mph[j].head[1],
+							   mph[k].head[0], mph[k].head[1], &i0, &i1)) continue;
+    			for (i = 1; i >= 0; i--) {
+    				mono_deloop(mph[k].head[i]);
+    				mono_deloop(mph[j].head[i]);
+    			}
+    			omph0--;
+    			mph[k] = mph[omph0];
+    			mph[j].head[0] = i0;
+    			mph[j].head[1] = i1;
+    			k = j;
+    		}
+    	}
+    	mphnum = omph0;
     }
 
     mono_deloop(plothead[1]);
@@ -631,16 +643,19 @@ static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bdrawc
         return;
     }
 	int myport = sec->tags[1];
-	bool skipport = !shadowtest2_debug_block_selfportals || (b->has_portal_clip
-					 && sectnum == b->testignoresec
-					 && myport >= 0
-					 && portals[myport].kind == b->testignorewall);  // FIXED: Check surfid
 	bool isportal = myport >= 0
-					&& portals[myport].destpn >= 0
-					&& portals[myport].kind == isflor;
+				&& portals[myport].destpn >= 0
+				&& portals[myport].kind == isflor;
+	bool skipport = !shadowtest2_debug_block_selfportals ||
+		(b->has_portal_clip
+					 && isportal
+					 && sectnum == b->testignoresec
+					 && portals[myport].kind == b->ignorekind
+					 && isflor == b->testignorewall);  // FIXED: Check surfid
+
     // Back-face cull
     float surfpos = getslopez(sec, isflor, b->cam.p.x, b->cam.p.y);
-    bool should_cull = !isportal && (b->cam.p.z >= surfpos) == isflor;
+    bool should_cull = (b->cam.p.z >= surfpos) == isflor;
 
     if (shadowtest2_backface_cull && should_cull) {
         logstep("draw_sector_surface: sec=%d, isflor=%d CULLED (backface), cam.z=%.2f, surf.z=%.2f",
@@ -732,7 +747,7 @@ static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bdrawc
             draw_hsr_enter_portal(map, myport, b);
     } else {
         logstep("  drawing solid surface (isportal=%d, noportals=%d, depth=%d)", isportal, noportals, b->recursion_depth);
-        drawpol_befclip(mytag, -1,
+        int visible = drawpol_befclip(mytag, -1,
                         sectnum, -1,
                         plothead[0], plothead[1],
                         (isflor << 2) + 3, b);
@@ -917,7 +932,12 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
 
 			int myport = wal[w].tags[1];
 			bool isportal = myport >= 0 && portals[myport].destpn >= 0 && portals[myport].kind == PORT_WALL;
-			bool skipport = isportal && !shadowtest2_debug_block_selfportals || b->has_portal_clip && s == b->testignoresec && w == b->testignorewall;
+			bool skipport = isportal &&
+				!shadowtest2_debug_block_selfportals
+			&& b->has_portal_clip
+			&& s == b->testignoresec
+			&& w == b->testignorewall
+			&& portals[myport].kind == b->ignorekind;
 			int mytag = s + taginc * b->recursion_depth;
 
 			if (!skipport && !noportals && isportal) {
@@ -926,7 +946,7 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
 				int visible = drawpol_befclip(mytag, nexttag,
 								s, portals[endpn].sect,
 								plothead[0], plothead[1],
-								2|(((m > vn) << 2) + 3) | CLIP_PORTAL_FLAG, b);
+								(((m > vn) << 2) + 3) | CLIP_PORTAL_FLAG, b);
 				// alt -1 solution currently broken
 				//int visible = drawpol_befclip(mytag, -1,
 				//				s, -1,
@@ -974,6 +994,7 @@ void reset_context() {
 
 
 void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
+	loopnum=0;
 	bdrawctx bs;
 	bs.cam = *cc;
 	bs.orcam = *cc;
@@ -1253,6 +1274,7 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport, bdrawctx *parentc
     int tgtspi = portals[endp].anchorspri;
     int ignw = portals[endp].surfid;
     int igns = portals[endp].sect;
+    int ignkind = portals[endp].kind;
 
     spri_t tgs = map->spri[tgtspi];
     spri_t ent = map->spri[entry];
@@ -1304,6 +1326,7 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport, bdrawctx *parentc
     newctx.sectgotmal = 0;
 newctx.testignorewall = ignw;
     newctx.testignoresec = igns;
+    newctx.ignorekind = ignkind;
     newctx.gnewsec = -1;
     newctx.gnewtag = -1;
     newctx.planecuts = parentctx->planecuts;

@@ -64,7 +64,7 @@ typedef struct {
 	double x, y;                        // Clipped coordinates
 } bunchverts_t;
 
-#define MAX_PORTAL_DEPTH 2
+#define MAX_PORTAL_DEPTH 1
 #define MAX_PORTAL_VERTS 32
 
 void mono_triangulate_strip(int hd0, int hd1, triangle_strip_t *strip);
@@ -92,6 +92,7 @@ typedef struct {
 	int gnewtag, needsecscan, gnewsec, scaninc;
 	point3d gnorm;
 	int testignorewall;
+	int ignorekind;
 	int testignoresec;
 	int planecuts;
 	int prevsec,newsec;

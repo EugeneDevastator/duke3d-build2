@@ -144,8 +144,8 @@ private:
         //those funcs still use internal build coords.
         point3d movevec = RaylibToBuild(cam.position - startpos);
         point3d mv = {movevec.x, movevec.y, movevec.z};
-      //  camposb2.x+=movevec.x;        camposb2.y+=movevec.y;        camposb2.z+=movevec.z;
-        collmove_p(&camposb2, &cursec, &mv, 0.25, 1, map);
+        camposb2.x+=movevec.x;        camposb2.y+=movevec.y;        camposb2.z+=movevec.z;
+      //  collmove_p(&camposb2, &cursec, &mv, 0.25, 1, map);
         updatesect_imp(camposb2.x, camposb2.y, camposb2.z, &cursec, map);
 
         b2pos = {camposb2.x, camposb2.y, camposb2.z};
