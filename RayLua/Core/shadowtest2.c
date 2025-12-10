@@ -35,6 +35,8 @@ mono plane has xy as screen coords and z as some sort of depth, but better not u
 eyepols are generated from mono space AND plane equation stored in gouvmat.
 */
 //------ UTILS -------
+#define DO_AND_SUB 3
+#define DO_AND_SUB_REV 7
 
 void logstep(const char* fmt, ...) {
 	if (!captureframe)
@@ -1067,25 +1069,25 @@ if (isbackface)
 				{pol[3].x, pol[3].y, opolz[3]}
         	};
         	int flags;
-        	bool isupper = (opolz[0] > pol[0].z);
+        	bool isupper = (opolz[0]  < pol[0].z);
 	        if (true){
-		       // bool is_upper = (opolz[0] < pol[0].z);
+		       // bool isupper = (opolz[0] < pol[0].z);
             	int winding = determine_slab_winding(slab_quad[0], slab_quad[1],
 													  slab_quad[2], slab_quad[3],
 													  b->cam.p);
-            	//if (is_upper) winding = !winding;
-            	flags = (winding || isSolid)
-					? (MONO_BOOL_AND | MONO_BOOL_SUB)
-					: (MONO_BOOL_AND | MONO_BOOL_SUB_REV);
+            	if (!isupper) winding = 1-winding;
+            	flags = (winding)
+					? (DO_AND_SUB)
+					: (DO_AND_SUB_REV);
 	        }
         	if (false)
 	        {
 		        double slab_cross = (slab_quad[1].y - slab_quad[0].y) * (b->cam.p.x - slab_quad[0].x)
 								  - (slab_quad[1].x - slab_quad[0].x) * (b->cam.p.y - slab_quad[0].y);
             	 // Old ceiling above new floor
-            	int winding_flag = (slab_cross < 0) ? MONO_BOOL_SUB : MONO_BOOL_SUB_REV;
-            	if (isupper) winding_flag ^= (MONO_BOOL_SUB | MONO_BOOL_SUB_REV);
-            	flags = winding_flag;
+            	int winding_flag = (slab_cross < 0);// ? DO_AND_SUB : DO_AND_SUB_REV;
+            	if (isupper) winding_flag = !winding_flag;
+            	flags = winding_flag ? DO_AND_SUB : DO_AND_SUB_REV;
 	        }
 
         	// portal branch
@@ -1096,7 +1098,7 @@ if (isbackface)
             	int visible = drawpol_befclip(mytag, nexttag,
 								s, portals[endpn].sect,
 								plothead[0], plothead[1],
-								flags | CLIP_PORTAL_FLAG, b);
+								flags , b);
             	if (visible) {
             		logstep("wall port %d: m=%d, VISIBLE,\t ns=%d", w, m, ns);
             	} else {
@@ -1299,7 +1301,7 @@ void draw_hsr_ctx (mapstate_t *map, bdrawctx *newctx) {
 			n = 4;
 			didcut = 1;
 		}
-		// In draw_hsr_ctx, replace the viewport setup:
+		// In drawdraw_hsr_ctx, replace the viewport setup:
 		else if (!b->has_portal_clip) {
 			    double far_dist = 1e6;
     cam_t *cam = &b->orcam;
