@@ -551,8 +551,10 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
     }
 
     // === SUB operation (flags & 2) - ONLY if AND produced output ===
-    if ((flags & 2)) {
-        j = (flags & 4) ? MONO_BOOL_SUB_REV : MONO_BOOL_SUB;
+	if (flags&2)
+	{
+		if (!(flags&4)) j = MONO_BOOL_SUB;
+		else j = MONO_BOOL_SUB_REV;
 
     	b->gnewtag = mtag;
     	b->gnewsec = tagsect;
@@ -935,9 +937,10 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
     	loopnum++;
     	// need not forward but direction?
     	point3d cp = b->cam.p;
+    	bool isflip=false;
     	dpoint3d dirtw = (dpoint3d){pol[0].x-cp.x,pol[0].y-cp.y,pol[0].z-cp.z};
-    	if (dotdp3(worldnorm, dirtw) < 0)
-    		continue;
+	if (dotdp3(worldnorm, dirtw) < 0)
+		isflip=true;
 
         opolz[3] = pol[0].z;
         opolz[2] = pol[1].z;
@@ -957,9 +960,9 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
                 opolz[3] = getslopez(&sec[verts[m >> 1].s], m & 1, pol[3].x, pol[3].y);
             }
 
-            if ((max(pol[0].z, opolz[0]) >= min(pol[3].z, opolz[3]) - 1e-4) &&
-                (max(pol[1].z, opolz[1]) >= min(pol[2].z, opolz[2]) - 1e-4))
-                continue;
+           if ((max(pol[0].z, opolz[0]) >= min(pol[3].z, opolz[3]) - 1e-4) &&
+               (max(pol[1].z, opolz[1]) >= min(pol[2].z, opolz[2]) - 1e-4))
+               continue;
 
             f = 1e-7;
             dpoint3d trap1[4] = {
@@ -971,10 +974,10 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
                 {pol[2].x, pol[2].y, opolz[2] + f}, {pol[3].x, pol[3].y, opolz[3] + f}
             };
 
-            for (int i = 0; i < 4; i++) {
+            //for (int i = 0; i < 4; i++) {
            //     portal_xform_world_fullp(&trap1[i], b);
            //     portal_xform_world_fullp(&trap2[i], b);
-            }
+          //  }
 
             dpoint3d pol0_xf = pol[0];
             dpoint3d pol1_xf = pol[1];
@@ -986,7 +989,7 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
 
 
 
-            if ((!(m & 1)) || (wal[w].surf.flags & (1 << 5)))
+            if (!(m & 1) || (wal[w].surf.flags & (1 << 5)))
             {
                 npol2[0].x = wal[w].x;  npol2[0].y = wal[w].y;
                 npol2[0].z = getslopez(&sec[s], 0, wal[w].x, wal[w].y);
@@ -1041,8 +1044,9 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
 				int fnorm = MONO_BOOL_AND | MONO_BOOL_SUB;
 				int frev = MONO_BOOL_AND | MONO_BOOL_SUB_REV;
 				int fdef = (((m > vn) << 2) + 3);
+            	bool isret = (m > vn);
             	int visible = drawpol_befclip(mytag, newtag, s, ns, plothead[0], plothead[1],
-							  fnorm , b);
+							  !isret ? fnorm : frev, b);
             	if (visible) {
             		logstep("wall %d: m=%d, VISIBLE, ns=%d", w, m, ns);
             	} else {
