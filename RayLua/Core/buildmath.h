@@ -157,5 +157,56 @@ static inline void portal_xform_world_at_z(double *x, double *y, double ref_z, b
     *y = p.y;
 }
 
+static inline dpoint3d gettrianglenorm(dpoint3d p0, dpoint3d p1, dpoint3d p2) {
+    dpoint3d v1, v2, normal;
 
+    // Calculate edge vectors
+    v1.x = p1.x - p0.x;
+    v1.y = p1.y - p0.y;
+    v1.z = p1.z - p0.z;
+
+    v2.x = p2.x - p0.x;
+    v2.y = p2.y - p0.y;
+    v2.z = p2.z - p0.z;
+
+    // Cross product v1 × v2
+    normal.x = v1.y * v2.z - v1.z * v2.y;
+    normal.y = v1.z * v2.x - v1.x * v2.z;
+    normal.z = v1.x * v2.y - v1.y * v2.x;
+
+    // Normalize
+    float length = sqrtf(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
+    if (length > 0.0f) {
+        normal.x /= length;
+        normal.y /= length;
+        normal.z /= length;
+    }
+
+    return normal;
+}
+
+static inline float dotdp3(dpoint3d a, dpoint3d b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+static inline dpoint3d crossdp3(dpoint3d a, dpoint3d b) {
+    dpoint3d result;
+    result.x = a.y * b.z - a.z * b.y;
+    result.y = a.z * b.x - a.x * b.z;
+    result.z = a.x * b.y - a.y * b.x;
+    return result;
+}
+
+static inline dpoint3d normalizedp3(dpoint3d v) {
+    dpoint3d result;
+    float length = sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
+    if (length > 0.0f) {
+        result.x = v.x / length;
+        result.y = v.y / length;
+        result.z = v.z / length;
+    } else {
+        result.x = result.y = result.z = 0.0f;
+    }
+    return result;
+}
 #endif //RAYLIB_LUA_IMGUI_BUILDMATH_H

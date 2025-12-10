@@ -51,9 +51,9 @@ static inline dpoint3d portal_xform_world_fullr(double x, double y, double z, bd
 	p.y = y;
 	p.z = z;
 	wccw_transform(&p, &b->cam, &b->orcam);
-	loops[loopnum] = p;
-	loopuse[loopnum] = true;
-	loopnum++;
+//loops[loopnum] = p;
+//loopuse[loopnum] = true;
+//loopnum++;
 	return p;
 }
 static inline void portal_xform_world_full(double *x, double *y, double *z, bdrawctx *b) {
@@ -62,18 +62,18 @@ static inline void portal_xform_world_full(double *x, double *y, double *z, bdra
 	p.y = *y;
 	p.z = *z;
 	wccw_transform(&p, &b->cam, &b->orcam);
-	loops[loopnum] = p;
-	loopuse[loopnum] = true;
-	loopnum++;
+//loops[loopnum] = p;
+//loopuse[loopnum] = true;
+//loopnum++;
 	*x = p.x;
 	*y = p.y;
 	*z = p.z;
 }
 static inline void portal_xform_world_fullp(dpoint3d *inp, bdrawctx *b) {
 	wccw_transform(inp, &b->cam, &b->orcam);
-	loops[loopnum] = *inp;
-	loopuse[loopnum] = true;
-	loopnum++;
+//loops[loopnum] = *inp;
+//loopuse[loopnum] = true;
+//loopnum++;
 
 }
 
@@ -876,7 +876,7 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
     // Loop through provided walls instead of bunch
     for (int ww = 0; ww < sec[s].n; ww++)
     {
-
+    	w=ww;
     	int myport = wal[ww].tags[1];
     	bool isportal = myport >= 0 && portals[myport].destpn >= 0 && portals[myport].kind == PORT_WALL;
     	if (b->has_portal_clip && sec[s].tags[1]>=0)
@@ -895,7 +895,7 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
 
     	loopuse[loopnum] = false;
     	loopnum++;
-        w=ww;
+
         vn = getwalls_imp(s, ww, verts, MAXVERTS, curMap);
         nw = wal[w].n + w;
         sur = &wal[w].surf;
@@ -919,6 +919,22 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
         pol[2].z = getslopez(&sec[s], 1, pol[2].x, pol[2].y);
         pol[3].x = pol[0].x; pol[3].y = pol[0].y;
         pol[3].z = getslopez(&sec[s], 1, pol[3].x, pol[3].y);
+
+    	dpoint3d worldnorm = gettrianglenorm(pol[0], pol[1], pol[2]);
+    	point3d cam_forward = b->cam.tr.f;
+    	//worldnorm = (dpoint3d){b->gnorm.x,b->gnorm.y,b->gnorm.z};
+    	loops[loopnum]=(dpoint3d){pol[0].x,pol[0].y,pol[0].z+1};
+    	loopuse[loopnum]=true;
+    	loopnum++;
+
+    	loops[loopnum]=(dpoint3d){worldnorm.x + pol[0].x,worldnorm.y + pol[0].y,worldnorm.z + pol[0].z+1};
+    	loopuse[loopnum]=true;
+    	loopnum++;
+
+    	loopuse[loopnum]=false;
+    	loopnum++;
+    	if (dotdp3(worldnorm, (dpoint3d){cam_forward.x, cam_forward.y, cam_forward.z}) < 0)
+    		continue;
 
         opolz[3] = pol[0].z;
         opolz[2] = pol[1].z;
@@ -959,14 +975,14 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
 
             dpoint3d pol0_xf = pol[0];
             dpoint3d pol1_xf = pol[1];
-         //   portal_xform_world_fullp(&pol1_xf,b);
+          //   portal_xform_world_fullp(&pol1_xf,b);
           //  portal_xform_world_fullp(&pol0_xf,b);
 // heres main fuker
             if (!intersect_traps_mono_points3d(pol0_xf, pol1_xf, trap1, trap2, &plothead[0], &plothead[1],b)) {
-			//mono_deloop(plothead[0]);
-			//mono_deloop(plothead[1]);
             	continue;
             }
+
+
 
             if ((!(m & 1)) || (wal[w].surf.flags & (1 << 5)))
             {
@@ -982,21 +998,14 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
                 else if (!m) f = sec[verts[0].s].z[0];
                 else f = sec[verts[(m - 1) >> 1].s].z[0];
 
-              // npol2[0].u = sur->uv[0].x;
-              // npol2[0].v = sur->uv[2].y * (npol2[0].z - f) + sur->uv[0].y;
-              // npol2[1].u = sur->uv[1].x * dx + npol2[0].u;
-              // npol2[1].v = sur->uv[1].y * dx + npol2[0].v;
-              // npol2[2].u = sur->uv[2].x + npol2[0].u;
-              // npol2[2].v = sur->uv[2].y + npol2[0].v;
                 b->gflags = 0;
-                gentransform_wall(npol2, 3, sur, b);
-
+            	gentransform_wall(npol2, 3, sur, b); // alters npol
                 b->gligwall = w;
                 b->gligslab = m;
                 ns = -1;
                 logstep("  slab %d: solid wall", m);
             } else {
-                ns = verts[m >> 1].s;
+                ns = verts[m >> 1].s; // this must be discarded if backwards.
                 logstep("  slab %d: opening to sector %d", m, ns);
             }
 
@@ -1017,7 +1026,7 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
             		logstep("wall %d: m=%d, not visible, skipping", w, m);
             	}
                 draw_hsr_enter_portal(map, myport, b);
-            } else {
+            } else { // normal wall handle
             	int inc = taginc * b->recursion_depth;
             	int newtag;
 
@@ -1036,8 +1045,6 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
             	if (visible) {
             		logstep("wall %d: m=%d, VISIBLE, ns=%d", w, m, ns);
             	} else {
-            		mono_deloop(plothead[0]);
-            		mono_deloop(plothead[1]);
             		logstep("wall %d: m=%d, not visible, skipping", w, m);
             	}
             }
@@ -1274,13 +1281,15 @@ void draw_hsr_ctx (mapstate_t *map, bdrawctx *newctx) {
 		int current_sec = -1;
 		int sec_walls[256];  // Temp array for walls in current sector
 		int sec_wall_count = 0;
-		int *nextsecs = calloc(55,sizeof(int));
+		int nextsecs_a[55];
+		int nextsecs_b[55];
+		int *nextsecs = nextsecs_a;
+		int *acumsec = nextsecs_b;
 		int nextsecsn=1;
 		nextsecs[0]= b->cam.cursect;
 		if (b->has_portal_clip)
 			int a =1;
 		for (int gs=0;gs<=map->malsects;gs++) {
-			int acumsec[55];
 			int nss=0;
 			for (int ni=0;ni<nextsecsn;ni++) { // breadth loop;
 				int nxs = (nextsecs[ni]);
@@ -1301,11 +1310,16 @@ void draw_hsr_ctx (mapstate_t *map, bdrawctx *newctx) {
 					}
 				}
 			}
+			// Swap pointers
+			int *temp = nextsecs;
 			nextsecs = acumsec;
-			nextsecsn=nss;
-			if (nss==0)
+			acumsec = temp;
+			nextsecsn = nss;
+
+			if (nss == 0)
 				break;
 		}
+
 		if (false)//old one;
 		{
 			for (int ji = 0; ji < b->jobcount; ji++) {
