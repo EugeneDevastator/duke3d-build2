@@ -957,12 +957,12 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
     	LOOPADD(vn2)
     	LOOPEND
 
-
     	// need not forward but direction?
     	point3d cp = b->cam.p;
     	dpoint3d dirtw = (dpoint3d){pol[0].x-cp.x,pol[0].y-cp.y,pol[0].z-cp.z};
     	bool isbackface = (dotdp3(worldnorm, dirtw) < 0);
-
+if (isbackface)
+	continue;
     	dpoint3d view_vec = {
     		b->cam.p.x - pol[0].x,
 			b->cam.p.y - pol[0].y,
@@ -1053,10 +1053,10 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
                 logstep("  slab %d: solid wall", m);
             } else {
                 ns = verts[m >> 1].s; // this must be discarded?
-				if( ns>=0 && b->visited_sectors[ns]) {
-					logstep("  slab %d: opening to visited sector %d", m, ns);
-					continue;
-				}
+			//	if( ns>=0 && b->visited_sectors[ns]) {
+			//		logstep("  slab %d: opening to visited sector %d", m, ns);
+			//		continue;
+			//	}
                 logstep("  slab %d: opening to sector %d", m, ns);
             }
 			int mytag = s + taginc * b->recursion_depth;
@@ -1066,17 +1066,27 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
 				{pol[2].x, pol[2].y, opolz[2]},
 				{pol[3].x, pol[3].y, opolz[3]}
         	};
-
-        	int winding = determine_slab_winding(slab_quad[0], slab_quad[1],
-												  slab_quad[2], slab_quad[3],
-												  b->cam.p);
-        	//alt method
-        	//bool slab_flip = (opolz[0] > pol[0].z); // ceiling vs floor
-        	//winding = slab_flip ? (1 - base_winding) : base_winding;
-
-            int flags = ((winding != 0) || isSolid)
-	                        ? (MONO_BOOL_AND | MONO_BOOL_SUB)
-	                        : (MONO_BOOL_AND | MONO_BOOL_SUB_REV);
+        	int flags;
+        	bool isupper = (opolz[0] > pol[0].z);
+	        if (true){
+		       // bool is_upper = (opolz[0] < pol[0].z);
+            	int winding = determine_slab_winding(slab_quad[0], slab_quad[1],
+													  slab_quad[2], slab_quad[3],
+													  b->cam.p);
+            	//if (is_upper) winding = !winding;
+            	flags = (winding || isSolid)
+					? (MONO_BOOL_AND | MONO_BOOL_SUB)
+					: (MONO_BOOL_AND | MONO_BOOL_SUB_REV);
+	        }
+        	if (false)
+	        {
+		        double slab_cross = (slab_quad[1].y - slab_quad[0].y) * (b->cam.p.x - slab_quad[0].x)
+								  - (slab_quad[1].x - slab_quad[0].x) * (b->cam.p.y - slab_quad[0].y);
+            	 // Old ceiling above new floor
+            	int winding_flag = (slab_cross < 0) ? MONO_BOOL_SUB : MONO_BOOL_SUB_REV;
+            	if (isupper) winding_flag ^= (MONO_BOOL_SUB | MONO_BOOL_SUB_REV);
+            	flags = winding_flag;
+	        }
 
         	// portal branch
             if (!skipport && !noportals && isportal) {

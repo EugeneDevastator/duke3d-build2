@@ -586,7 +586,7 @@ public:
 
         // Eyepol polys
         bool draweye = true;
-        bool drawlineseye = false;
+        bool drawlineseye = true;
         bool drawlights = false;
 
         rlDisableBackfaceCulling();
@@ -619,7 +619,7 @@ public:
                     glPolygonOffset(-1.0f, 1.0f);
                     rlColor4f(0, 1, 1, 1);
                     for (int j = 0; j < vertCount; j++) {
-                        rlColor4f(1, i/10.0f, 0, 1);
+                        rlColor4f(j/5.0f, j/5.0f, 1, 1);
                        //int idx[] = {v0, v0 + j, v0 + j + 1};
                        //for (int k = 0; k < 3; k++) {
                           //  Vector3 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y,eyepolv[idx[k]].z};
@@ -636,7 +636,7 @@ public:
                 } // eyepol lines for each poly
 
             }
-            draw_mono_debug();
+         //   draw_mono_debug();
             EndBlendMode();
         }
         EndMode3D();
