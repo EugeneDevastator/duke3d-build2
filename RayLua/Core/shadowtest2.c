@@ -983,9 +983,11 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
             dpoint3d pol1_xf = pol[1];
           //   portal_xform_world_fullp(&pol1_xf,b);
           //  portal_xform_world_fullp(&pol0_xf,b);
-            if (!intersect_traps_mono_points3d(pol0_xf, pol1_xf, trap1, trap2, &plothead[0], &plothead[1],b)) {
-            	continue;
-            }
+        	if (!intersect_traps_mono3d(pol[0].x,pol[0].y, pol[1].x,pol[1].y, pol[0].z-f,pol[1].z-f,pol[2].z+f,pol[3].z+f, opolz[0]-f,opolz[1]-f,opolz[2]+f,opolz[3]+f, &plothead[0],&plothead[1],b))
+        		continue;
+          // if (!intersect_traps_mono_points3d(pol0_xf, pol1_xf, trap1, trap2, &plothead[0], &plothead[1],b)) {
+          // 	continue;
+          // }
 
 
 
