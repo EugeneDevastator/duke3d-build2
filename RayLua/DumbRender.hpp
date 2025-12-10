@@ -523,10 +523,10 @@ public:
         auto cam = DumbCore::GetCamera().position;
         cam = {0,0,0};
         float cdiv = 1.0;
-        while (v<loopnum) {
+        while (v<loopnum) { // add keys to rotate closest sprite.
             rlBegin(RL_LINES);
             while (loopuse[v]) {
-                rlColor4f(l/10.0f,1,l/100.0f,0.8f);
+                rlColor4f(v/8.0f,v/4.0f,v/8.0f,0.4f);
                 //    auto campos = DumbCore::GetCamera().position;
                 rlVertex3f(cam.x+loops[v].x/cdiv ,cam.y+ -loops[v].z/cdiv,cam.z+loops[v].y/cdiv);
                 v++;
@@ -586,7 +586,7 @@ public:
 
         // Eyepol polys
         bool draweye = true;
-        bool drawlines = true;
+        bool drawlineseye = false;
         bool drawlights = false;
 
         rlDisableBackfaceCulling();
@@ -610,7 +610,7 @@ public:
                         continue;
                 } else continue;
 
-                if (drawlines)
+                if (drawlineseye)
                 {
                     rlBegin(RL_LINES);
                     rlDisableDepthMask();
@@ -1665,7 +1665,7 @@ private:
             if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
             map->blankheadspri = i;
         }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/prt4.MAP", map);
+        loadmap_imp((char*)"c:/Eugene/Games/build2/prt3.MAP", map);
     }
 };
 

@@ -157,14 +157,5 @@ static inline void portal_xform_world_at_z(double *x, double *y, double ref_z, b
     *y = p.y;
 }
 
-static inline void portal_xform_world_full(double *x, double *y, double *z, bdrawctx *b) {
-    dpoint3d p;
-    p.x = *x;
-    p.y = *y;
-    p.z = *z;
-    wccw_transform(&p, &b->cam, &b->orcam);
-    *x = p.x;
-    *y = p.y;
-    *z = p.z;
-}
+
 #endif //RAYLIB_LUA_IMGUI_BUILDMATH_H

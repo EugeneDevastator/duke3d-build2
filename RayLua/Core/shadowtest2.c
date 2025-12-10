@@ -35,6 +35,7 @@ mono plane has xy as screen coords and z as some sort of depth, but better not u
 eyepols are generated from mono space AND plane equation stored in gouvmat.
 */
 //------ UTILS -------
+
 void logstep(const char* fmt, ...) {
 	if (!captureframe)
 		return;
@@ -43,6 +44,26 @@ void logstep(const char* fmt, ...) {
 	vprintf(fmt, args);
 	va_end(args);
 	printf("\n");
+}
+static inline void portal_xform_world_full(double *x, double *y, double *z, bdrawctx *b) {
+	dpoint3d p;
+	p.x = *x;
+	p.y = *y;
+	p.z = *z;
+	wccw_transform(&p, &b->cam, &b->orcam);
+	loops[loopnum] = p;
+	loopuse[loopnum] = true;
+	loopnum++;
+	*x = p.x;
+	*y = p.y;
+	*z = p.z;
+}
+static inline void portal_xform_world_fullp(dpoint3d *inp, bdrawctx *b) {
+	wccw_transform(inp, &b->cam, &b->orcam);
+	loops[loopnum] = *inp;
+	loopuse[loopnum] = true;
+	loopnum++;
+
 }
 int shadowtest2_backface_cull = 0;  // Toggle backface culling
 int shadowtest2_distance_cull = 0;  // Toggle distance-based culling
@@ -355,9 +376,6 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
     for (i = on - 1, j = 0; j < on; i = j, j++) {
         if (otp[i].z >= BSCISDIST) {
             tp[n] = otp[i];
-        	loops[loopnum] = tp[n];
-        	loopuse[loopnum]=true;
-        	loopnum++;
             n++;
         }
         if ((otp[i].z >= BSCISDIST) != (otp[j].z >= BSCISDIST)) {
@@ -365,19 +383,11 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
             tp[n].x = (otp[i].x - otp[j].x) * f + otp[j].x;
             tp[n].y = (otp[i].y - otp[j].y) * f + otp[j].y;
             tp[n].z = BSCISDIST;
-        	loops[loopnum] = tp[n];
-        	loopuse[loopnum]=true;
-        	loopnum++;
             n++;
         }
     }
     if (n < 3) return 0;
-	loops[loopnum] = tp[0];
-	loopuse[loopnum]=true;
-	loopnum++;
-	loops[loopnum] = tp[0];
-	loopuse[loopnum]=false;
-	loopnum++;
+
     // Project to screen space
     for (i = 0; i < n; i++) {
         f = orcam->h.z / tp[i].z;
@@ -499,7 +509,7 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
     mono_deloop(plothead[1]);
     mono_deloop(plothead[0]);
 
-    return produced_output;
+    return 1;//produced_output;
 }
 // create plane EQ using GCAM
 static void gentransform_ceilflor(sect_t *sec, wall_t *wal, int isflor, bdrawctx *b)
@@ -586,22 +596,26 @@ static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bdrawc
     double fz = sec->z[isflor];
     int plothead[2] = {-1, -1};
     int i, n = sec->n;
-
+	loopuse[loopnum] = false;
+	loopnum++;
     if (n < 3) return;  // Need at least 3 vertices
 	int myport = sec->tags[1];
 	bool noportals = b->recursion_depth >= MAX_PORTAL_DEPTH;
 	bool isportal = myport >= 0
 				&& portals[myport].destpn >= 0
 				&& portals[myport].kind == isflor;
-	bool skipport = !shadowtest2_debug_block_selfportals ||
-		(b->has_portal_clip
-					 && isportal
-					 && sectnum == b->testignoresec
-					 && portals[myport].kind == b->ignorekind
-					 && isflor == b->testignorewall);  // FIXED: Check surfid
+    bool skipport = shadowtest2_debug_block_selfportals
+                    && b->has_portal_clip
+                    && isportal
+                    && sectnum == b->testignoresec
+                    && portals[myport].kind == b->ignorekind
+                    && isflor == b->testignorewall;
+    if (skipport)
+    	return;
+     // FIXED: Check surfid
     // Back-face cull
     float surfpos = getslopez(sec, isflor, b->cam.p.x, b->cam.p.y);
-    //if ((b->cam.p.z >= surfpos) == isflor) return;
+		if ((b->cam.p.z >= surfpos) == isflor) return;
 
     // Setup transform and normal
     gentransform_ceilflor(sec, wal, isflor, b);
@@ -674,7 +688,7 @@ static void draw_sector_surface(int sectnum, int isflor, mapstate_t *map, bdrawc
 	    int visible = drawpol_befclip(mytag, nexttag,
 	                                  sectnum, portals[endpn].sect,
 	                                  plothead[0], plothead[1],
-	                                  ((isflor << 2) + 3) | CLIP_PORTAL_FLAG, b);
+	                                  ((!isflor << 2) + 3) | CLIP_PORTAL_FLAG, b);
 	    if (visible) {
 		    draw_hsr_enter_portal(map, myport, b);
 	    }
@@ -776,6 +790,25 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
     // Loop through provided walls instead of bunch
     for (int ww = 0; ww < sec[s].n; ww++)
     {
+
+    	int myport = wal[ww].tags[1];
+    	bool isportal = myport >= 0 && portals[myport].destpn >= 0 && portals[myport].kind == PORT_WALL;
+    	if (b->has_portal_clip && isportal)
+    		int a =1;
+    	bool skipport = isportal &&
+			shadowtest2_debug_block_selfportals
+		&& b->has_portal_clip
+		&& s == b->testignoresec
+		&& w == b->testignorewall
+		&& portals[myport].kind == b->ignorekind;
+		if (skipport)
+{
+			logstep("skipped portal at wall %d at sec %d",ww,s);
+			continue; // drop this wall as it is not there.
+			}
+
+    	loopuse[loopnum] = false;
+    	loopnum++;
         w=ww;
         vn = getwalls_imp(s, ww, verts, MAXVERTS, curMap);
         nw = wal[w].n + w;
@@ -807,6 +840,8 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
         // Process slabs (unchanged from here)
         for (m = 0; m <= (vn << 1); m++)
         {
+
+
             int plothead[2];
 
             opolz[0] = opolz[3];
@@ -834,18 +869,18 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
             };
 
             for (int i = 0; i < 4; i++) {
-                wccw_transform(&trap1[i], &b->cam, &b->orcam);
-                wccw_transform(&trap2[i], &b->cam, &b->orcam);
+                portal_xform_world_fullp(&trap1[i], b);
+                portal_xform_world_fullp(&trap2[i], b);
             }
 
             dpoint3d pol0_xf = pol[0];
             dpoint3d pol1_xf = pol[1];
-            wccw_transform(&pol1_xf, &b->cam, &b->orcam);
-            wccw_transform(&pol0_xf, &b->cam, &b->orcam);
+            portal_xform_world_fullp(&pol1_xf,b);
+            portal_xform_world_fullp(&pol0_xf,b);
 
             if (!intersect_traps_mono_points(pol0_xf, pol1_xf, trap1, trap2, &plothead[0], &plothead[1])) {
-				mono_deloop(plothead[0]);
-				mono_deloop(plothead[1]);
+			//mono_deloop(plothead[0]);
+			//mono_deloop(plothead[1]);
             	continue;
             }
 
@@ -881,14 +916,7 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
                 logstep("  slab %d: opening to sector %d", m, ns);
             }
 
-			int myport = wal[w].tags[1];
-			bool isportal = myport >= 0 && portals[myport].destpn >= 0 && portals[myport].kind == PORT_WALL;
-			bool skipport = isportal &&
-				!shadowtest2_debug_block_selfportals
-			&& b->has_portal_clip
-			&& s == b->testignoresec
-			&& w == b->testignorewall
-			&& portals[myport].kind == b->ignorekind;
+
 			int mytag = s + taginc * b->recursion_depth;
 
             if (!skipport && !noportals && isportal) {
@@ -912,7 +940,6 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
             	// FIX: if ns == s (same sector), treat as solid wall
             	if (ns >= 0 && ns != s) {
             		newtag = ns + inc;
-
             	} else {
             		newtag = -1;  // Solid wall - will produce eyepol
             	}
@@ -1153,8 +1180,8 @@ void draw_hsr_ctx (mapstate_t *map, bdrawctx *newctx) {
 
 		b->jobcount = 0;
 		b->jobs = malloc(sizeof(wall_job_t)*b->jobcap);
-		add_sector_walls(b->cam.cursect, b);
-		qsort(b->jobs, b->jobcount, sizeof(wall_job_t), wall_dist_cmp);
+		//add_sector_walls(b->cam.cursect, b);
+		//qsort(b->jobs, b->jobcount, sizeof(wall_job_t), wall_dist_cmp);
 
 		// Group walls by sector for efficient getwalls_imp batching
 		int current_sec = -1;
