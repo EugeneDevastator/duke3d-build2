@@ -3,7 +3,8 @@
 #define MONODEBUG_H
 
 #include "monoclip.h"
-
+#define LOOPADD(p) loops[loopnum]=(p); loopuse[loopnum]=true; loopnum++;
+#define LOOPEND loopuse[loopnum]=false;loopnum++;
 typedef struct {
     double x, y, z;
 } mono_dbg_point_t;

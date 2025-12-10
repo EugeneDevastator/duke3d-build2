@@ -86,6 +86,7 @@ int mono_ins(int i, double nx, double ny, double nz) {
 int mono_insp(int i, dpoint3d p) {
     i = mono_ins2d(i, p.x, p.y);
     mp[i].z = p.z;
+    LOOPADD(p)
     return (i);
 }
 void mono_del(int i) {
