@@ -104,9 +104,9 @@ int intersect_traps_mono3d(double x0, double y0, double x1, double y1, double z0
         if (i != j) {
             if (i == 5) mono_intersamexy(x0, y0, x1, y1, z0, z4, z3, z7, &fx, &fy, &fz);
             else mono_intersamexy(x0, y0, x1, y1, z1, z5, z2, z6, &fx, &fy, &fz);
-portal_xform_world_full(&fx,&fy,&fz,b);
-        	h0 = mono_ins(h0, fx, fy, fz);
-            h1 = mono_ins(h1, fx, fy, fz);
+
+        	h0 = mono_insp(h0, PXF(fx, fy, fz));
+            h1 = mono_insp(h1, PXF(fx, fy, fz));
         }
     } else {
         if (i > 2) h0 = mono_insp(h0, PXF(x0, y0, z0));
@@ -551,7 +551,7 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
     }
 
     // === SUB operation (flags & 2) - ONLY if AND produced output ===
-    if ((flags & 2) && produced_output) {
+    if ((flags & 2)) {
         j = (flags & 4) ? MONO_BOOL_SUB_REV : MONO_BOOL_SUB;
 
     	b->gnewtag = mtag;
@@ -595,7 +595,7 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
     mono_deloop(plothead[1]);
     mono_deloop(plothead[0]);
 
-    return 1;//produced_output;
+    return produced_output;
 }
 // create plane EQ using GCAM
 static void gentransform_ceilflor(sect_t *sec, wall_t *wal, int isflor, bdrawctx *b)
@@ -921,7 +921,7 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
         pol[3].z = getslopez(&sec[s], 1, pol[3].x, pol[3].y);
 
     	dpoint3d worldnorm = gettrianglenorm(pol[0], pol[1], pol[2]);
-    	point3d cam_forward = b->cam.tr.f;
+
     	//worldnorm = (dpoint3d){b->gnorm.x,b->gnorm.y,b->gnorm.z};
     	loops[loopnum]=(dpoint3d){pol[0].x,pol[0].y,pol[0].z+1};
     	loopuse[loopnum]=true;
@@ -933,7 +933,10 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
 
     	loopuse[loopnum]=false;
     	loopnum++;
-    	if (dotdp3(worldnorm, (dpoint3d){cam_forward.x, cam_forward.y, cam_forward.z}) < 0)
+    	// need not forward but direction?
+    	point3d cp = b->cam.p;
+    	dpoint3d dirtw = (dpoint3d){pol[0].x-cp.x,pol[0].y-cp.y,pol[0].z-cp.z};
+    	if (dotdp3(worldnorm, dirtw) < 0)
     		continue;
 
         opolz[3] = pol[0].z;
@@ -977,7 +980,6 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
             dpoint3d pol1_xf = pol[1];
           //   portal_xform_world_fullp(&pol1_xf,b);
           //  portal_xform_world_fullp(&pol0_xf,b);
-// heres main fuker
             if (!intersect_traps_mono_points3d(pol0_xf, pol1_xf, trap1, trap2, &plothead[0], &plothead[1],b)) {
             	continue;
             }
@@ -1008,8 +1010,6 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
                 ns = verts[m >> 1].s; // this must be discarded if backwards.
                 logstep("  slab %d: opening to sector %d", m, ns);
             }
-
-
 			int mytag = s + taginc * b->recursion_depth;
 
             if (!skipport && !noportals && isportal) {
@@ -1021,9 +1021,10 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
 								plothead[0], plothead[1],
 								(((m > vn) << 2) + 3) | CLIP_PORTAL_FLAG, b);
             	if (visible) {
-            		logstep("wall %d: m=%d, VISIBLE, ns=%d", w, m, ns);
+            		logstep("wall port %d: m=%d, VISIBLE,\t ns=%d", w, m, ns);
             	} else {
-            		logstep("wall %d: m=%d, not visible, skipping", w, m);
+            		logstep("wall port %d: m=%d, not visible, skipping,\t ns=%d", w, m, ns);
+            		continue;
             	}
                 draw_hsr_enter_portal(map, myport, b);
             } else { // normal wall handle
@@ -1037,15 +1038,15 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
             		newtag = -1;  // Solid wall - will produce eyepol
             	}
                	logstep("wall %d: m=%d, ns=%d, s=%d, newtag=%d", w, m, ns, s, newtag);
-				int hn= b->has_portal_clip;
-				int fnorm = 1 | MONO_BOOL_SUB;
-				int frev = 1 | MONO_BOOL_SUB_REV;
+				int fnorm = MONO_BOOL_AND | MONO_BOOL_SUB;
+				int frev = MONO_BOOL_AND | MONO_BOOL_SUB_REV;
+				int fdef = (((m > vn) << 2) + 3);
             	int visible = drawpol_befclip(mytag, newtag, s, ns, plothead[0], plothead[1],
-							   hn ? 3 : 1, b);
+							  fnorm , b);
             	if (visible) {
             		logstep("wall %d: m=%d, VISIBLE, ns=%d", w, m, ns);
             	} else {
-            		logstep("wall %d: m=%d, not visible, skipping", w, m);
+            		logstep("wall %d: m=%d, not visible, skipping, ns=%d", w, m, ns);
             	}
             }
 
