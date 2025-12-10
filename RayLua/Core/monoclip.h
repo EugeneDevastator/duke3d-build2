@@ -89,7 +89,7 @@ typedef struct {
 	int recursion_depth;
 	float gouvmat[9]; // 0 3 6 - store plane equation to convert back from mp.
 	int gligsect, gligwall, gligslab, gflags;
-	int gnewtag, needsecscan, gnewsec, scaninc;
+	int gnewtag, gnewsec, scaninc;
 	point3d gnorm;
 	int testignorewall;
 	int ignorekind;
@@ -112,7 +112,7 @@ void mono_initonce ();
 // Insert vertex into polygon chain - if i<0 starts new loop, else inserts after vertex i
 int  mono_ins2d (int i, double nx, double ny);
 int  mono_ins (int i, double nx, double ny, double nz);  // 3D version
-
+int mono_insp(int i, dpoint3d p);
 // Remove vertex from polygon chain and return to free pool
 void mono_del (int i);
 

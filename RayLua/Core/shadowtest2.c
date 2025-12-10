@@ -45,6 +45,17 @@ void logstep(const char* fmt, ...) {
 	va_end(args);
 	printf("\n");
 }
+static inline dpoint3d portal_xform_world_fullr(double x, double y, double z, bdrawctx *b) {
+	dpoint3d p;
+	p.x = x;
+	p.y = y;
+	p.z = z;
+	wccw_transform(&p, &b->cam, &b->orcam);
+	loops[loopnum] = p;
+	loopuse[loopnum] = true;
+	loopnum++;
+	return p;
+}
 static inline void portal_xform_world_full(double *x, double *y, double *z, bdrawctx *b) {
 	dpoint3d p;
 	p.x = *x;
@@ -64,6 +75,81 @@ static inline void portal_xform_world_fullp(dpoint3d *inp, bdrawctx *b) {
 	loopuse[loopnum] = true;
 	loopnum++;
 
+}
+
+int intersect_traps_mono3d(double x0, double y0, double x1, double y1, double z0, double z4, double z5, double z1,
+                         double z2, double z6, double z7, double z3, int *rh0, int *rh1, bdrawctx* b) {
+    double fx, fy, fz;
+    int i, j, h0, h1;
+#define PXF(aa,bb,cc) portal_xform_world_fullr(aa,bb,cc,b)
+    //0123,0213,0231,2013,2031,2301
+    if (z0 < z2) {
+        if (z1 < z2) i = 0;
+        else i = (z1 >= z3) + 1;
+    } else {
+        if (z3 < z0) i = 5;
+        else i = (z3 < z1) + 3;
+    }
+    if (z4 < z6) {
+        if (z5 < z6) j = 0;
+        else j = (z5 >= z7) + 1;
+    } else {
+        if (z7 < z4) j = 5;
+        else j = (z7 < z5) + 3;
+    }
+
+    h0 = -1;
+    h1 = -1;
+    if ((i == 0) || (i == 5)) {
+        if (i != j) {
+            if (i == 5) mono_intersamexy(x0, y0, x1, y1, z0, z4, z3, z7, &fx, &fy, &fz);
+            else mono_intersamexy(x0, y0, x1, y1, z1, z5, z2, z6, &fx, &fy, &fz);
+portal_xform_world_full(&fx,&fy,&fz,b);
+        	h0 = mono_ins(h0, fx, fy, fz);
+            h1 = mono_ins(h1, fx, fy, fz);
+        }
+    } else {
+        if (i > 2) h0 = mono_insp(h0, PXF(x0, y0, z0));
+        else h0 = mono_insp(h0, PXF(x0, y0, z2));
+        if (i & 1) h1 = mono_insp(h1, PXF(x0, y0, z1));
+        else h1 = mono_insp(h1, PXF(x0, y0, z3));
+    }
+    if (i != j) {
+        if ((i < 3) != (j < 3)) {
+            mono_intersamexy(x0, y0, x1, y1, z0, z4, z2, z6, &fx, &fy, &fz);
+            h0 = mono_insp(h0, PXF(fx, fy, fz));
+        }
+        if (((i ^ 1) < 3) != ((j ^ 1) < 3)) {
+            mono_intersamexy(x0, y0, x1, y1, z1, z5, z3, z7, &fx, &fy, &fz);
+            h1 = mono_insp(h1, PXF(fx, fy, fz));
+        }
+    }
+    if ((j == 0) || (j == 5)) {
+        if (i != j) {
+            if (j == 5) mono_intersamexy(x0, y0, x1, y1, z0, z4, z3, z7, &fx, &fy, &fz);
+            else mono_intersamexy(x0, y0, x1, y1, z1, z5, z2, z6, &fx, &fy, &fz);
+            h0 = mono_insp(h0, PXF(fx, fy, fz));
+            h1 = mono_insp(h1, PXF(fx, fy, fz));
+        }
+    } else {
+        if (j > 2) h0 = mono_insp(h0, PXF(x1, y1, z4));
+        else h0 = mono_insp(h0, PXF(x1, y1, z6));
+        if (j & 1) h1 = mono_insp(h1, PXF(x1, y1, z5));
+        else h1 = mono_insp(h1, PXF(x1, y1, z7));
+    }
+
+    if ((h0 | h1) < 0) return (0);
+    (*rh0) = mp[h0].n;
+    (*rh1) = mp[h1].n;
+    return (1);
+}
+int intersect_traps_mono_points3d(dpoint3d p0, dpoint3d p1, dpoint3d trap1[4], dpoint3d trap2[4], int *rh0, int *rh1, bdrawctx* b) {
+	return intersect_traps_mono3d(
+		p0.x, p0.y, p1.x, p1.y,
+		trap1[0].z, trap1[1].z, trap1[2].z, trap1[3].z,
+		trap2[0].z, trap2[1].z, trap2[2].z, trap2[3].z,
+		rh0, rh1,b
+	);
 }
 int shadowtest2_backface_cull = 0;  // Toggle backface culling
 int shadowtest2_distance_cull = 0;  // Toggle distance-based culling
@@ -304,7 +390,7 @@ static void changetagfunc (int rethead0, int rethead1, bdrawctx *b)
 	mph[mphnum].head[1] = rethead1;
 	mph[mphnum].tag = b->gnewtag;
 	mphnum++;
-	logstep("changetag: doscan?:%d, newMtag:%d, new mphnum:%d",b->needsecscan,b->gnewtag,mphnum);
+	logstep("changetag: newMtag:%d, new mphnum:%d",b->gnewtag,mphnum);
 }
 	//flags&1: do and
 	//flags&2: do sub
@@ -317,6 +403,8 @@ static void changetagfunc (int rethead0, int rethead1, bdrawctx *b)
 static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
                             int plothead0, int plothead1, int flags, bdrawctx *b)
 {
+	if (b->has_portal_clip)
+		int a =1;
     int mtag = tag1;
     int tagsect = sec;
     int mnewtag = newtag1;
@@ -409,7 +497,6 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
             b->gnewsec = newsec;
             b->gnewtag = mnewtag;
             omph0 = mphnum;
-            b->needsecscan = !(flags & CLIP_PORTAL_FLAG);
 
             int before_mphnum = mphnum;
             for (i = mphnum - 1; i >= 0; i--)
@@ -469,8 +556,7 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
 
     	b->gnewtag = mtag;
     	b->gnewsec = tagsect;
-    	b->needsecscan = 0;
-    	omph0 = mphnum;
+        omph0 = mphnum;
     	omph1 = mphnum;
 
     	for (i = mphnum - 1; i >= 0; i--) {
@@ -793,7 +879,7 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
 
     	int myport = wal[ww].tags[1];
     	bool isportal = myport >= 0 && portals[myport].destpn >= 0 && portals[myport].kind == PORT_WALL;
-    	if (b->has_portal_clip && isportal)
+    	if (b->has_portal_clip && sec[s].tags[1]>=0)
     		int a =1;
     	bool skipport = isportal &&
 			shadowtest2_debug_block_selfportals
@@ -840,8 +926,6 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
         // Process slabs (unchanged from here)
         for (m = 0; m <= (vn << 1); m++)
         {
-
-
             int plothead[2];
 
             opolz[0] = opolz[3];
@@ -869,16 +953,16 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
             };
 
             for (int i = 0; i < 4; i++) {
-                portal_xform_world_fullp(&trap1[i], b);
-                portal_xform_world_fullp(&trap2[i], b);
+           //     portal_xform_world_fullp(&trap1[i], b);
+           //     portal_xform_world_fullp(&trap2[i], b);
             }
 
             dpoint3d pol0_xf = pol[0];
             dpoint3d pol1_xf = pol[1];
-            portal_xform_world_fullp(&pol1_xf,b);
-            portal_xform_world_fullp(&pol0_xf,b);
-
-            if (!intersect_traps_mono_points(pol0_xf, pol1_xf, trap1, trap2, &plothead[0], &plothead[1])) {
+         //   portal_xform_world_fullp(&pol1_xf,b);
+          //  portal_xform_world_fullp(&pol0_xf,b);
+// heres main fuker
+            if (!intersect_traps_mono_points3d(pol0_xf, pol1_xf, trap1, trap2, &plothead[0], &plothead[1],b)) {
 			//mono_deloop(plothead[0]);
 			//mono_deloop(plothead[1]);
             	continue;
@@ -943,9 +1027,12 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
             	} else {
             		newtag = -1;  // Solid wall - will produce eyepol
             	}
-            	logstep("wall %d: m=%d, ns=%d, s=%d, newtag=%d", w, m, ns, s, newtag);
+               	logstep("wall %d: m=%d, ns=%d, s=%d, newtag=%d", w, m, ns, s, newtag);
+				int hn= b->has_portal_clip;
+				int fnorm = 1 | MONO_BOOL_SUB;
+				int frev = 1 | MONO_BOOL_SUB_REV;
             	int visible = drawpol_befclip(mytag, newtag, s, ns, plothead[0], plothead[1],
-							   ((m > vn) << 2) + 3, b);
+							   hn ? 3 : 1, b);
             	if (visible) {
             		logstep("wall %d: m=%d, VISIBLE, ns=%d", w, m, ns);
             	} else {
@@ -1190,7 +1277,8 @@ void draw_hsr_ctx (mapstate_t *map, bdrawctx *newctx) {
 		int *nextsecs = calloc(55,sizeof(int));
 		int nextsecsn=1;
 		nextsecs[0]= b->cam.cursect;
-
+		if (b->has_portal_clip)
+			int a =1;
 		for (int gs=0;gs<=map->malsects;gs++) {
 			int acumsec[55];
 			int nss=0;

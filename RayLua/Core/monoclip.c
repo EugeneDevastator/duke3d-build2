@@ -83,7 +83,11 @@ int mono_ins(int i, double nx, double ny, double nz) {
     mp[i].z = nz;
     return (i);
 }
-
+int mono_insp(int i, dpoint3d p) {
+    i = mono_ins2d(i, p.x, p.y);
+    mp[i].z = p.z;
+    return (i);
+}
 void mono_del(int i) {
     int p, n;
 

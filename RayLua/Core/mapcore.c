@@ -153,7 +153,8 @@ int getwalls_imp (int s, int w, vertlist_t *ver, int maxverts, mapstate_t *map)
 	wal = sec[s].wall;
 	bs = wal[w].ns;
 
-	if ((unsigned)bs >= (unsigned)map->numsects) return(0);
+	if ((unsigned)bs >= (unsigned)map->numsects)
+		return(0);
 
 	vn = 0; // vertex count
 	nw = wal[w].n+w; // next wall in current sector
