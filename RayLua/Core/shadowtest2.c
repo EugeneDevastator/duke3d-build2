@@ -889,44 +889,48 @@ static int determine_slab_winding(dpoint3d p0, dpoint3d p1, dpoint3d p2, dpoint3
 
 static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawctx *b) {
 #define MAXVERTS 256
-	vertlist_t verts[MAXVERTS];
-	dpoint3d pol[4];
-	double opolz[4];
-	dpoint3d npol2[3];
-	sect_t *sec = curMap->sect;
-	wall_t *wal = sec[s].wall;
-	surf_t *sur;
-	double f, dx;
-	int m, vn, w, nw, ns;
+    vertlist_t verts[MAXVERTS];
+    dpoint3d pol[4];
+    double opolz[4];
+    dpoint3d npol2[3];
+    sect_t *sec = curMap->sect;
+    wall_t *wal = sec[s].wall;
+    surf_t *sur;
+    double f, dx;
+    int m, vn, w, nw, ns;
 
     b->gligsect = s;
     b->gligslab = 0;
     bool noportals = b->recursion_depth >= MAX_PORTAL_DEPTH;
 
-    // Loop through provided walls instead of bunch
     for (int ww = 0; ww < sec[s].n; ww++)
     {
-    	w=ww;
-    	int myport = wal[ww].tags[1];
-    	bool isportal = myport >= 0 && portals[myport].destpn >= 0 && portals[myport].kind == PORT_WALL;
-    	if (b->has_portal_clip && sec[s].tags[1]>=0)
-    		int a =1;
-    	bool skipport = isportal &&
-			shadowtest2_debug_block_selfportals
-		&& b->has_portal_clip
-		&& s == b->testignoresec
-		&& w == b->testignorewall
-		&& portals[myport].kind == b->ignorekind;
-		if (skipport)
-{
-			logstep("skipped portal at wall %d at sec %d",ww,s);
-			continue; // drop this wall as it is not there.
-			}
+        w = ww;
+        nw = wal[w].n + w;
 
-    	LOOPEND
+        // 2D backface cull (same as scansector)
+        double dx0 = wal[w].x - b->cam.p.x;
+        double dy0 = wal[w].y - b->cam.p.y;
+        double dx1 = wal[nw].x - b->cam.p.x;
+        double dy1 = wal[nw].y - b->cam.p.y;
+
+        if (dy1*dx0 <= dx1*dy0) {
+            logstep("wall %d: 2D backface culled", ww);
+            continue; // Back-facing in 2D
+        }
+
+        // Portal skip logic
+        int myport = wal[ww].tags[1];
+        bool isportal = myport >= 0 && portals[myport].destpn >= 0 && portals[myport].kind == PORT_WALL;
+        bool skipport = isportal && shadowtest2_debug_block_selfportals
+            && b->has_portal_clip && s == b->testignoresec
+            && w == b->testignorewall && portals[myport].kind == b->ignorekind;
+        if (skipport) {
+            logstep("skipped portal at wall %d at sec %d", ww, s);
+            continue;
+        }
 
         vn = getwalls_imp(s, ww, verts, MAXVERTS, curMap);
-        nw = wal[w].n + w;
         sur = &wal[w].surf;
 
         dx = sqrt((wal[nw].x - wal[w].x) * (wal[nw].x - wal[w].x) +
@@ -939,7 +943,6 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
         b->gnorm.x *= f;
         b->gnorm.y *= f;
 
-        // Base wall quad - use full wall, no bunch clipping
         pol[0].x = wal[w].x;   pol[0].y = wal[w].y;
         pol[1].x = wal[nw].x;  pol[1].y = wal[nw].y;
         pol[0].z = getslopez(&sec[s], 0, pol[0].x, pol[0].y);
@@ -949,34 +952,9 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
         pol[3].x = pol[0].x; pol[3].y = pol[0].y;
         pol[3].z = getslopez(&sec[s], 1, pol[3].x, pol[3].y);
 
-    	dpoint3d worldnorm = gettrianglenorm(pol[0], pol[1], pol[2]);
-
-    	//worldnorm = (dpoint3d){b->gnorm.x,b->gnorm.y,b->gnorm.z};
-    	dpoint3d vn1 = ((dpoint3d){pol[0].x,pol[0].y,pol[0].z+1});
-    	dpoint3d vn2 = ((dpoint3d){worldnorm.x + pol[0].x,worldnorm.y + pol[0].y,worldnorm.z + pol[0].z+1});
-
-    	LOOPADD(vn1)
-    	LOOPADD(vn2)
-    	LOOPEND
-
-    	// need not forward but direction?
-    	point3d cp = b->cam.p;
-    	dpoint3d dirtw = (dpoint3d){pol[0].x-cp.x,pol[0].y-cp.y,pol[0].z-cp.z};
-    	bool isbackface = (dotdp3(worldnorm, dirtw) < 0);
-if (isbackface)
-	continue;
-    	dpoint3d view_vec = {
-    		b->cam.p.x - pol[0].x,
-			b->cam.p.y - pol[0].y,
-			b->cam.p.z - pol[0].z
-		};
-
-    	double view_dot = dotdp3(worldnorm, view_vec);
-    	int base_winding = (view_dot > 0) ? 0 : 1;
         opolz[3] = pol[0].z;
         opolz[2] = pol[1].z;
 
-        // Process slabs (unchanged from here)
         for (m = 0; m <= (vn << 1); m++)
         {
             int plothead[2];
@@ -991,50 +969,21 @@ if (isbackface)
                 opolz[3] = getslopez(&sec[verts[m >> 1].s], m & 1, pol[3].x, pol[3].y);
             }
 
-           if ((max(pol[0].z, opolz[0]) >= min(pol[3].z, opolz[3]) - 1e-4) &&
-               (max(pol[1].z, opolz[1]) >= min(pol[2].z, opolz[2]) - 1e-4))
-               continue;
+            if ((max(pol[0].z, opolz[0]) >= min(pol[3].z, opolz[3]) - 1e-4) &&
+                (max(pol[1].z, opolz[1]) >= min(pol[2].z, opolz[2]) - 1e-4))
+                continue;
 
             f = 1e-7;
-            dpoint3d trap1[4] = {
-                {pol[0].x, pol[0].y, pol[0].z - f}, {pol[1].x, pol[1].y, pol[1].z - f},
-                {pol[2].x, pol[2].y, pol[2].z + f}, {pol[3].x, pol[3].y, pol[3].z + f}
-            };
-            dpoint3d trap2[4] = {
-                {pol[0].x, pol[0].y, opolz[0] - f}, {pol[1].x, pol[1].y, opolz[1] - f},
-                {pol[2].x, pol[2].y, opolz[2] + f}, {pol[3].x, pol[3].y, opolz[3] + f}
-            };
+            if (!intersect_traps_mono3d(pol[0].x, pol[0].y, pol[1].x, pol[1].y,
+                                        pol[0].z-f, pol[1].z-f, pol[2].z+f, pol[3].z+f,
+                                        opolz[0]-f, opolz[1]-f, opolz[2]+f, opolz[3]+f,
+                                        &plothead[0], &plothead[1], b))
+                continue;
 
-            //for (int i = 0; i < 4; i++) {
-           //     portal_xform_world_fullp(&trap1[i], b);
-           //     portal_xform_world_fullp(&trap2[i], b);
-          //  }
+            bool isSolid = !(m & 1);
+            bool onefaced = (wal[w].surf.flags & (1 << 5));
 
-            dpoint3d pol0_xf = pol[0];
-            dpoint3d pol1_xf = pol[1];
-          //   portal_xform_world_fullp(&pol1_xf,b);
-          //  portal_xform_world_fullp(&pol0_xf,b);
-        	if (!intersect_traps_mono3d(pol[0].x,pol[0].y, pol[1].x,pol[1].y, pol[0].z-f,pol[1].z-f,pol[2].z+f,pol[3].z+f, opolz[0]-f,opolz[1]-f,opolz[2]+f,opolz[3]+f, &plothead[0],&plothead[1],b))
-        		continue;
-          // if (!intersect_traps_mono_points3d(pol0_xf, pol1_xf, trap1, trap2, &plothead[0], &plothead[1],b)) {
-          // 	continue;
-          // }
-
-        //m=0: m>>1=0, m&1=0  → verts[0] floor  (solid)
-		//m=1: m>>1=0, m&1=1  → verts[0] ceiling (opening to verts[0].s)
-		//m=2: m>>1=1, m&1=0  → verts[1] floor   (solid)
-		//m=3: m>>1=1, m&1=1  → verts[1] ceiling (opening to verts[1].s)
-		//m=2*vn: final iteration → main sector ceiling (solid)
-
-        	bool isSolid = !(m&1);
-        	bool onefaced = (wal[w].surf.flags & (1 << 5));
-        	if (isbackface && isSolid)
-        		continue;
-
-            if (isSolid || onefaced)
-            {
-            	if (isbackface)
-            		continue;
+            if (isSolid || onefaced) {
                 npol2[0].x = wal[w].x;  npol2[0].y = wal[w].y;
                 npol2[0].z = getslopez(&sec[s], 0, wal[w].x, wal[w].y);
                 npol2[1].x = wal[nw].x; npol2[1].y = wal[nw].y;
@@ -1048,84 +997,38 @@ if (isbackface)
                 else f = sec[verts[(m - 1) >> 1].s].z[0];
 
                 b->gflags = 0;
-            	gentransform_wall(npol2, 3, sur, b); // alters npol
+                gentransform_wall(npol2, 3, sur, b);
                 b->gligwall = w;
                 b->gligslab = m;
                 ns = -1;
                 logstep("  slab %d: solid wall", m);
             } else {
-                ns = verts[m >> 1].s; // this must be discarded?
-			//	if( ns>=0 && b->visited_sectors[ns]) {
-			//		logstep("  slab %d: opening to visited sector %d", m, ns);
-			//		continue;
-			//	}
+                ns = verts[m >> 1].s;
                 logstep("  slab %d: opening to sector %d", m, ns);
             }
-			int mytag = s + taginc * b->recursion_depth;
-        	dpoint3d slab_quad[4] = {
-        		{pol[0].x, pol[0].y, opolz[0]},
-				{pol[1].x, pol[1].y, opolz[1]},
-				{pol[2].x, pol[2].y, opolz[2]},
-				{pol[3].x, pol[3].y, opolz[3]}
-        	};
-        	int flags;
-        	bool isupper = (opolz[0]  < pol[0].z);
-	        if (true){
-		       // bool isupper = (opolz[0] < pol[0].z);
-            	int winding = determine_slab_winding(slab_quad[0], slab_quad[1],
-													  slab_quad[2], slab_quad[3],
-													  b->cam.p);
-            	if (!isupper) winding = 1-winding;
-            	flags = (winding)
-					? (DO_AND_SUB)
-					: (DO_AND_SUB_REV);
-	        }
-        	if (false)
-	        {
-		        double slab_cross = (slab_quad[1].y - slab_quad[0].y) * (b->cam.p.x - slab_quad[0].x)
-								  - (slab_quad[1].x - slab_quad[0].x) * (b->cam.p.y - slab_quad[0].y);
-            	 // Old ceiling above new floor
-            	int winding_flag = (slab_cross < 0);// ? DO_AND_SUB : DO_AND_SUB_REV;
-            	if (isupper) winding_flag = !winding_flag;
-            	flags = winding_flag ? DO_AND_SUB : DO_AND_SUB_REV;
-	        }
 
-        	// portal branch
+            int mytag = s + taginc * b->recursion_depth;
+
+            // Original code uses simple flag: (m > vn) determines upper/lower
+            // Since 2D backface cull guarantees CCW winding, always use SUB
+            int flags = (m > vn) ? (DO_AND_SUB | 4) : DO_AND_SUB;
+
             if (!skipport && !noportals && isportal) {
-            	int endpn = portals[myport].destpn;
-            	int nexttag = portals[endpn].sect + taginc * (b->recursion_depth + 1);
-
-            	int visible = drawpol_befclip(mytag, nexttag,
-								s, portals[endpn].sect,
-								plothead[0], plothead[1],
-								flags , b);
-            	if (visible) {
-            		logstep("wall port %d: m=%d, VISIBLE,\t ns=%d", w, m, ns);
-            	} else {
-            		logstep("wall port %d: m=%d, not visible, skipping,\t ns=%d", w, m, ns);
-            		continue;
-            	}
-                draw_hsr_enter_portal(map, myport, b);
-            } else { // normal wall handle
-            	int inc = taginc * b->recursion_depth;
-            	int newtag;
-
-            	// FIX: if ns == s (same sector), treat as solid wall
-            	if (ns >= 0 && ns != s) {
-            		newtag = ns + inc;
-            	} else {
-            		newtag = -1;  // Solid wall - will produce eyepol
-            	}
-               	logstep("wall %d: m=%d, ns=%d, s=%d, newtag=%d", w, m, ns, s, newtag);
-            	int visible = drawpol_befclip(mytag, newtag, s, ns, plothead[0], plothead[1],
-							  flags, b);
-            	if (visible) {
-            		logstep("wall %d: m=%d, VISIBLE, ns=%d", w, m, ns);
-            	} else {
-            		logstep("wall %d: m=%d, not visible, skipping, ns=%d", w, m, ns);
-            	}
+                int endpn = portals[myport].destpn;
+                int nexttag = portals[endpn].sect + taginc * (b->recursion_depth + 1);
+                int visible = drawpol_befclip(mytag, nexttag, s, portals[endpn].sect,
+                                             plothead[0], plothead[1], flags | CLIP_PORTAL_FLAG, b);
+                if (visible) {
+                    logstep("wall port %d: m=%d, VISIBLE, ns=%d", w, m, ns);
+                    draw_hsr_enter_portal(map, myport, b);
+                } else {
+                    logstep("wall port %d: m=%d, not visible, skipping, ns=%d", w, m, ns);
+                }
+            } else {
+                int newtag = (ns >= 0 && ns != s) ? (ns + taginc * b->recursion_depth) : -1;
+                int visible = drawpol_befclip(mytag, newtag, s, ns, plothead[0], plothead[1], flags, b);
+                logstep("wall %d: m=%d, %s, ns=%d", w, m, visible ? "VISIBLE" : "not visible", ns);
             }
-
         }
     }
 }
@@ -1158,6 +1061,50 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
 
 }
 int lastcamsect = 0;
+static void draw_sector_recursive(mapstate_t *map, int s, bdrawctx *b)
+{
+	if (b->visited_sectors[s]) return;
+	b->visited_sectors[s] = true;
+
+	draw_sector_surface(s, 0, map, b); // Floor
+	draw_sector_surface(s, 1, map, b); // Ceiling
+
+	sect_t *sec = map->sect;
+	wall_t *wal = sec[s].wall;
+
+	// Process all walls, recurse on visible openings
+	for (int ww = 0; ww < sec[s].n; ww++) {
+		int w = ww;
+		int nw = wal[w].n + w;
+
+		// 2D backface cull
+		double dx0 = wal[w].x - b->cam.p.x;
+		double dy0 = wal[w].y - b->cam.p.y;
+		double dx1 = wal[nw].x - b->cam.p.x;
+		double dy1 = wal[nw].y - b->cam.p.y;
+		if (dy1*dx0 <= dx1*dy0) continue;
+
+		// ... intersect_traps_mono3d, slab loop ...
+		/*
+			if (!(m & 1)) {
+				// Solid wall
+				ns = -1;
+			} else {
+				ns = verts[m >> 1].s;
+				int visible = drawpol_befclip(...);
+
+				// ✅ Recurse ONLY if visible
+				if (visible && ns >= 0 && ns != s) {
+					draw_sector_recursive(map, ns, b);
+				}
+			}
+			*/
+	}
+}
+// // Entry point:
+// draw_sector_recursive(map, b->cam.cursect, b);
+
+
 void draw_hsr_ctx (mapstate_t *map, bdrawctx *newctx) {
 	if (!newctx) {
 		return;
@@ -1380,11 +1327,12 @@ void draw_hsr_ctx (mapstate_t *map, bdrawctx *newctx) {
 					for (int wi=0;wi<map->sect[nxs].n;wi++) {
 						int ns = map->sect[nxs].wall[wi].ns;
 						if ( ns >= 0)
-							if (!b->visited_sectors[ns]) {
+							if (!b->visited_sectors[ns]) { // !! Added WITHOUT checking if opening is visible! fix
 								acumsec[nss]=ns;
 								nss++;
 							}
 					}
+
 				}
 			}
 			// Swap pointers
@@ -1397,8 +1345,7 @@ void draw_hsr_ctx (mapstate_t *map, bdrawctx *newctx) {
 				break;
 		}
 
-		if (false)//old one;
-		{
+		if (false){//old one;
 			for (int ji = 0; ji < b->jobcount; ji++) {
 				wall_job_t *job = &b->jobs[ji];
 
@@ -1432,7 +1379,7 @@ void draw_hsr_ctx (mapstate_t *map, bdrawctx *newctx) {
     		if (!b->visited_sectors[i]) continue; // NEW: Simple check
     		draw_sector_surface(i, 0, map, b); // Floor
     		draw_sector_surface(i, 1, map, b); // Ceiling
-    	}
+    		}
 		}
 
 		free(b->visited_walls);
