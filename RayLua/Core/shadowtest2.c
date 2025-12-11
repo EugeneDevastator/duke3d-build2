@@ -807,55 +807,6 @@ static int get_wall_global_id(int sec, int wall, mapstate_t *map) {
 	}
 	return id + wall;
 }
-// Simplified sector wall adder
-static void add_sector_walls(int sectnum, bdrawctx *b) {
-	sect_t *sec = &curMap->sect[sectnum];
-	wall_t *wal = sec->wall;
-
-	for (int i = 0; i < sec->n; i++) {
-		int j = wal[i].n + i;
-
-		// Vectors from camera to wall endpoints
-		double dx0 = wal[i].x - b->cam.p.x;
-		double dy0 = wal[i].y - b->cam.p.y;
-		double dx1 = wal[j].x - b->cam.p.x;
-		double dy1 = wal[j].y - b->cam.p.y;
-
-		// 2D cross product: positive if camera sees front (CCW winding)
-		double cross = dx0 * dy1 - dx1 * dy0;
-
-		if (shadowtest2_backface_cull && cross <= 0 && wal[i].ns <0) {
-			if (shadowtest2_debug_walls) {
-				logstep("  wall %d: CULLED (backface) white wall, cross=%.2f", i, cross);
-			}
-			continue;
-		}
-
-		// Midpoint distance for sorting
-		double mx = (wal[i].x + wal[j].x) * 0.5 - b->cam.p.x;
-		double my = (wal[i].y + wal[j].y) * 0.5 - b->cam.p.y;
-
-		int wall_id = get_wall_global_id(sectnum, i, curMap);
-		if (b->visited_walls[wall_id]) continue;
-		b->visited_walls[wall_id] = true;
-
-		if (b->jobcount >= b->jobcap) {
-			b->jobcap = b->jobcap ? b->jobcap * 2 : 256;
-			b->jobs = (wall_job_t *)realloc(b->jobs, b->jobcap * sizeof(wall_job_t));
-		}
-
-		b->jobs[b->jobcount].sec = sectnum;
-		b->jobs[b->jobcount].wall = i;
-		b->jobs[b->jobcount].dist = mx*mx + my*my;
-		b->jobcount++;
-
-		if (shadowtest2_debug_walls) {
-			logstep("  wall %d: ADDED, dist=%.2f, cross=%.2f, depth=%d, sec:%d", i, sqrt(mx*mx + my*my), cross, b->recursion_depth, sectnum);
-		}
-	}
-
-	qsort(b->jobs, b->jobcount, sizeof(wall_job_t), wall_dist_cmp);
-}
 static int determine_slab_winding(dpoint3d p0, dpoint3d p1, dpoint3d p2, dpoint3d p3, point3d cam_pos) {
 	// Cross product of first two edges to get face normal
 	dpoint3d e1 = {p1.x - p0.x, p1.y - p0.y, p1.z - p0.z};
@@ -951,7 +902,6 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
 		point3d cp = b->cam.p;
     	dpoint3d dirtw = (dpoint3d){pol[0].x-cp.x,pol[0].y-cp.y,pol[0].z-cp.z};
     	bool isbackface = (dotdp3(worldnorm, dirtw) < 0);
-
     	if (isbackface)
     		continue;
 
@@ -1028,12 +978,12 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
         		int winding = determine_slab_winding(slab_quad[0], slab_quad[1],
 													  slab_quad[2], slab_quad[3],
 													  b->cam.p);
-        		if (!isupper) winding = 1-winding;
-        		flags = (winding)
-					? (DO_AND_SUB)
-					: (DO_AND_SUB_REV);
+        		//if (!isupper) winding = 1-winding;
+        		//flags = (!winding)
+				//	? (DO_AND_SUB)
+				//	: (DO_AND_SUB_REV);
         	}
-
+        	flags = (m>vn) ? DO_AND_SUB : DO_AND_SUB_REV;
             if (!skipport && !noportals && isportal) {
                 int endpn = portals[myport].destpn;
                 int nexttag = portals[endpn].sect + taginc * (b->recursion_depth + 1);
@@ -1049,13 +999,13 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
             } else {
 
                 int newtag = (ns >= 0 && ns != s) ? (ns + taginc * b->recursion_depth) : -1;
-                int visible = drawpol_befclip(mytag, newtag, s, ns, plothead[0], plothead[1], flags, b);
-            	if (ns >= 0 && !b->visited_sectors[ns]) {
+                int visible = drawpol_befclip(mytag, newtag, s, ns, plothead[0], plothead[1], 3, b);
+            	if (visible && ns >= 0 && !b->visited_sectors[ns]) {
+            		b->visited_sectors[ns] = true;  // ✅ Mark NOW, not later
             		b->sectq[b->sectqn] = ns;
             		b->sectqn++;
-            		b->visited_sectors[ns] = true;  // ✅ Mark NOW, not later
             	}
-            	logstep("wall %d: m=%d, %s, ns=%d", w, m, visible ? "VISIBLE" : "not visible", ns);
+            	logstep("wall %d: m=%d, vn=%d, %s, ns=%d", w, m, vn, visible ? "VISIBLE" : "not visible", ns);
 
             }
         }
@@ -1335,28 +1285,33 @@ void draw_hsr_ctx (mapstate_t *map, bdrawctx *newctx) {
 		int sec_walls[256];  // Temp array for walls in current sector
 		int sec_wall_count = 0;
 		int nextsecs_a[55];
-		int nextsecs_b[55];
-		int *cursecq = nextsecs_a;
+		int nextsecs_b[551];
 		int curqn=1;
-		cursecq[0]= b->orcam.cursect;
+		int qstart=0;
+		nextsecs_b[0]= b->orcam.cursect;
 		b->sectq = nextsecs_b;
 		b->sectqn=0;
-
+		int lastend =0;
+		b->visited_sectors[b->orcam.cursect] = true;
 		if (b->has_portal_clip)
 			int a =1;
-		for (int gs=0;gs<=map->malsects;gs++) {
-			//int nss=0;
-			b->sectqn=0;
-			for (int ni=0;ni<curqn;ni++) { // breadth loop;
-				int nxs = (cursecq[ni]);
-				//if (!b->visited_sectors[nxs]) // check moved to drawals
-				if (nxs >=0) // check moved to drawals
-					{ // loop for one sector
-					draw_walls(map, nxs, sec_walls, sec_wall_count, b);
-					gs++;
+		// Initialize queue
+		b->sectq[0] = b->orcam.cursect;
+		b->sectqn = 1;
+		b->visited_sectors[b->orcam.cursect] = true;
+
+		int processed = 0;
+		while (processed < b->sectqn) {
+			int current_sector = b->sectq[processed];
+			processed++;
+			if (current_sector < 0) continue;
+			lastend = curqn;
+
 					//b->visited_sectors[nxs]=true;
-					draw_sector_surface(nxs, 0, map, b); // Floor
-					draw_sector_surface(nxs, 1, map, b); // Ceiling
+					draw_walls(map, current_sector, sec_walls, sec_wall_count, b);
+
+					draw_sector_surface(current_sector, 0, map, b); // Floor
+					draw_sector_surface(current_sector, 1, map, b); // Ceiling
 					// get all neighbors;
 					//for (int wi=0;wi<map->sect[nxs].n;wi++) {
 					//	int ns = map->sect[nxs].wall[wi].ns;
@@ -1367,53 +1322,6 @@ void draw_hsr_ctx (mapstate_t *map, bdrawctx *newctx) {
 					//		}
 					//}
 
-				}
-			}
-			// Swap pointers
-			int *temp = cursecq;
-			cursecq = b->sectq;
-			b->sectq = temp;
-			curqn = b->sectqn;
-
-			if (b->sectqn == 0)
-				break;
-		}
-
-		if (false){//old one;
-			for (int ji = 0; ji < b->jobcount; ji++) {
-				wall_job_t *job = &b->jobs[ji];
-
-				if (job->sec != current_sec) {
-					if (sec_wall_count > 0) {
-						draw_walls(map, current_sec, sec_walls, sec_wall_count, b);
-						b->visited_sectors[current_sec] = true; // NEW: Mark sector
-						sec_wall_count = 0;
-					}
-					current_sec = job->sec;
-				}
-
-				sec_walls[sec_wall_count++] = job->wall;
-
-				// FIX: Use .ns field, not tags[0]
-				int ns = map->sect[job->sec].wall[job->wall].ns;
-				if (ns >= 0 && ns != job->sec) {
-					add_sector_walls(ns, b);
-					qsort(b->jobs, b->jobcount, sizeof(wall_job_t), wall_dist_cmp);
-				}
-			}
-
-    	// Flush last batch
-    	if (sec_wall_count > 0) {
-    		draw_walls(map, current_sec, sec_walls, sec_wall_count, b);
-    		b->visited_sectors[current_sec] = true; // NEW: Mark last sector
-    	}
-
-    	// Draw surfaces
-    	for (i = 0; i < map->numsects; i++) {
-    		if (!b->visited_sectors[i]) continue; // NEW: Simple check
-    		draw_sector_surface(i, 0, map, b); // Floor
-    		draw_sector_surface(i, 1, map, b); // Ceiling
-    		}
 		}
 
 		free(b->visited_walls);
