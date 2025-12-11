@@ -244,7 +244,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 
 	if ((rethead0|rethead1) < 0) { mono_deloop(rethead1); mono_deloop(rethead0); return; }
 	rethead[0] = rethead0; rethead[1] = rethead1;
-
+	int eyestart = eyepoln;
 	int start_vert = eyepolvn;
 	int chain0_end = 0;  // Will mark where chain 0 ends
 
@@ -295,6 +295,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 	eyepoln++;
 	eyepol[eyepoln].vert0 = eyepolvn;
 	eyepol[eyepoln].rdepth = b->recursion_depth;
+	b->has_mono_out = eyestart < eyepoln;
 }
 
 static void skytagfunc (int rethead0, int rethead1, bdrawctx* b){}
@@ -387,7 +388,7 @@ static void changetagfunc (int rethead0, int rethead1, bdrawctx *b)
 		mono_deloop(rethead1);
 		return;
 	}
-
+	b->has_mono_out = true;
 	mono_mph_check(mphnum);
 	mph[mphnum].head[0] = rethead0;
 	mph[mphnum].head[1] = rethead1;
@@ -408,6 +409,7 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
 {
 	if (b->has_portal_clip)
 		int a =1;
+	b->has_mono_out = false;
     int mtag = tag1;
     int tagsect = sec;
     int mnewtag = newtag1;
@@ -508,10 +510,6 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
                               plothead[0], plothead[1],
                               MONO_BOOL_AND, b, changetagfunc);
 
-            // NEW: Check if AND produced any new regions
-            if (mphnum > before_mphnum)
-                produced_output = 1;
-
             // Join adjacent monos with same tag
             for (l = omph0; l < mphnum; l++) {
                 mph[omph0] = mph[l];
@@ -546,10 +544,6 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
                     mono_bool(mph[i].head[0], mph[i].head[1],
                               plothead[0], plothead[1],
                               MONO_BOOL_AND, b, mono_output);
-
-            // NEW: Check if AND produced any eyepols
-            if (eyepoln > before_eyepoln)
-                produced_output = 1;
         }
     }
 
@@ -599,8 +593,9 @@ static int drawpol_befclip(int tag1, int newtag1, int sec, int newsec,
 
     mono_deloop(plothead[1]);
     mono_deloop(plothead[0]);
-
-    return produced_output;
+	bool res = b->has_mono_out;
+	b->has_mono_out = false;
+	return res;
 }
 // create plane EQ using GCAM
 static void gentransform_ceilflor(sect_t *sec, wall_t *wal, int isflor, bdrawctx *b)
@@ -908,17 +903,6 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
         w = ww;
         nw = wal[w].n + w;
 
-        // 2D backface cull (same as scansector)
-        double dx0 = wal[w].x - b->cam.p.x;
-        double dy0 = wal[w].y - b->cam.p.y;
-        double dx1 = wal[nw].x - b->cam.p.x;
-        double dy1 = wal[nw].y - b->cam.p.y;
-
-        if (dy1*dx0 <= dx1*dy0) {
-            logstep("wall %d: 2D backface culled", ww);
-            continue; // Back-facing in 2D
-        }
-
         // Portal skip logic
         int myport = wal[ww].tags[1];
         bool isportal = myport >= 0 && portals[myport].destpn >= 0 && portals[myport].kind == PORT_WALL;
@@ -951,6 +935,25 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
         pol[2].z = getslopez(&sec[s], 1, pol[2].x, pol[2].y);
         pol[3].x = pol[0].x; pol[3].y = pol[0].y;
         pol[3].z = getslopez(&sec[s], 1, pol[3].x, pol[3].y);
+
+    	dpoint3d worldnorm = gettrianglenorm(pol[0], pol[1], pol[2]);
+
+    	//worldnorm = (dpoint3d){b->gnorm.x,b->gnorm.y,b->gnorm.z};
+    	dpoint3d vn1 = ((dpoint3d){pol[0].x,pol[0].y,pol[0].z+1});
+    	dpoint3d vn2 = ((dpoint3d){worldnorm.x + pol[0].x,worldnorm.y + pol[0].y,worldnorm.z + pol[0].z+1});
+
+    	LOOPADD(vn1)
+		LOOPADD(vn2)
+		LOOPEND
+
+
+		// need not forward but direction?
+		point3d cp = b->cam.p;
+    	dpoint3d dirtw = (dpoint3d){pol[0].x-cp.x,pol[0].y-cp.y,pol[0].z-cp.z};
+    	bool isbackface = (dotdp3(worldnorm, dirtw) < 0);
+
+    	if (isbackface)
+    		continue;
 
         opolz[3] = pol[0].z;
         opolz[2] = pol[1].z;
@@ -1011,23 +1014,49 @@ static void draw_walls(mapstate_t *map, int s, int *walls, int wallcount, bdrawc
 
             // Original code uses simple flag: (m > vn) determines upper/lower
             // Since 2D backface cull guarantees CCW winding, always use SUB
-            int flags = (m > vn) ? (DO_AND_SUB | 4) : DO_AND_SUB;
+            int flags = (m < vn) ? DO_AND_SUB : DO_AND_SUB_REV;
+        	dpoint3d slab_quad[4] = {
+        		{pol[0].x, pol[0].y, opolz[0]},
+				{pol[1].x, pol[1].y, opolz[1]},
+				{pol[2].x, pol[2].y, opolz[2]},
+				{pol[3].x, pol[3].y, opolz[3]}
+        	};
+
+        	bool isupper = (opolz[0]  < pol[0].z);
+        	if (true){
+        		// bool isupper = (opolz[0] < pol[0].z);
+        		int winding = determine_slab_winding(slab_quad[0], slab_quad[1],
+													  slab_quad[2], slab_quad[3],
+													  b->cam.p);
+        		if (!isupper) winding = 1-winding;
+        		flags = (winding)
+					? (DO_AND_SUB)
+					: (DO_AND_SUB_REV);
+        	}
 
             if (!skipport && !noportals && isportal) {
                 int endpn = portals[myport].destpn;
                 int nexttag = portals[endpn].sect + taginc * (b->recursion_depth + 1);
                 int visible = drawpol_befclip(mytag, nexttag, s, portals[endpn].sect,
-                                             plothead[0], plothead[1], flags | CLIP_PORTAL_FLAG, b);
-                if (visible) {
-                    logstep("wall port %d: m=%d, VISIBLE, ns=%d", w, m, ns);
+                                             plothead[0], plothead[1], flags, b);
+
+            	if (visible) { // Enter Portal
+                     logstep("wall port %d: m=%d, VISIBLE, ns=%d", w, m, ns);
                     draw_hsr_enter_portal(map, myport, b);
-                } else {
+                } else { // discard Portal
                     logstep("wall port %d: m=%d, not visible, skipping, ns=%d", w, m, ns);
                 }
             } else {
+
                 int newtag = (ns >= 0 && ns != s) ? (ns + taginc * b->recursion_depth) : -1;
                 int visible = drawpol_befclip(mytag, newtag, s, ns, plothead[0], plothead[1], flags, b);
-                logstep("wall %d: m=%d, %s, ns=%d", w, m, visible ? "VISIBLE" : "not visible", ns);
+            	if (ns >= 0 && !b->visited_sectors[ns]) {
+            		b->sectq[b->sectqn] = ns;
+            		b->sectqn++;
+            		b->visited_sectors[ns] = true;  // ✅ Mark NOW, not later
+            	}
+            	logstep("wall %d: m=%d, %s, ns=%d", w, m, visible ? "VISIBLE" : "not visible", ns);
+
             }
         }
     }
@@ -1307,41 +1336,46 @@ void draw_hsr_ctx (mapstate_t *map, bdrawctx *newctx) {
 		int sec_wall_count = 0;
 		int nextsecs_a[55];
 		int nextsecs_b[55];
-		int *nextsecs = nextsecs_a;
-		int *acumsec = nextsecs_b;
-		int nextsecsn=1;
-		nextsecs[0]= b->cam.cursect;
+		int *cursecq = nextsecs_a;
+		int curqn=1;
+		cursecq[0]= b->orcam.cursect;
+		b->sectq = nextsecs_b;
+		b->sectqn=0;
+
 		if (b->has_portal_clip)
 			int a =1;
 		for (int gs=0;gs<=map->malsects;gs++) {
-			int nss=0;
-			for (int ni=0;ni<nextsecsn;ni++) { // breadth loop;
-				int nxs = (nextsecs[ni]);
-				if (!b->visited_sectors[nxs]) { // loop for one sector
+			//int nss=0;
+			b->sectqn=0;
+			for (int ni=0;ni<curqn;ni++) { // breadth loop;
+				int nxs = (cursecq[ni]);
+				//if (!b->visited_sectors[nxs]) // check moved to drawals
+				if (nxs >=0) // check moved to drawals
+					{ // loop for one sector
 					draw_walls(map, nxs, sec_walls, sec_wall_count, b);
 					gs++;
-					b->visited_sectors[nxs]=true;
+					//b->visited_sectors[nxs]=true;
 					draw_sector_surface(nxs, 0, map, b); // Floor
 					draw_sector_surface(nxs, 1, map, b); // Ceiling
 					// get all neighbors;
-					for (int wi=0;wi<map->sect[nxs].n;wi++) {
-						int ns = map->sect[nxs].wall[wi].ns;
-						if ( ns >= 0)
-							if (!b->visited_sectors[ns]) { // !! Added WITHOUT checking if opening is visible! fix
-								acumsec[nss]=ns;
-								nss++;
-							}
-					}
+					//for (int wi=0;wi<map->sect[nxs].n;wi++) {
+					//	int ns = map->sect[nxs].wall[wi].ns;
+					//	if ( ns >= 0)
+					//		if (!b->visited_sectors[ns]) { // !! Added WITHOUT checking if opening is visible! fix
+					//			acumsec[nss]=ns;
+					//			nss++;
+					//		}
+					//}
 
 				}
 			}
 			// Swap pointers
-			int *temp = nextsecs;
-			nextsecs = acumsec;
-			acumsec = temp;
-			nextsecsn = nss;
+			int *temp = cursecq;
+			cursecq = b->sectq;
+			b->sectq = temp;
+			curqn = b->sectqn;
 
-			if (nss == 0)
+			if (b->sectqn == 0)
 				break;
 		}
 

@@ -86,6 +86,7 @@ typedef struct {
 	unsigned int *sectgot, *sectgotmal;        // Visited sectors per level
 	int sectgotn;
 	bool has_portal_clip; // Whether portal clipping is active
+	bool has_mono_out; // Whether portal clipping is active
 	int recursion_depth;
 	float gouvmat[9]; // 0 3 6 - store plane equation to convert back from mp.
 	int gligsect, gligwall, gligslab, gflags;
@@ -96,6 +97,8 @@ typedef struct {
 	int testignoresec;
 	int planecuts;
 	int prevsec,newsec;
+	int* sectq;
+	int sectqn;
 
 } bdrawctx;
 
