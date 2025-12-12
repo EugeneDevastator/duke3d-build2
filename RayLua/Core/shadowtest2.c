@@ -986,7 +986,72 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 	mono_deloop(plothead[0]);
 }
 
+static void gentransform_ceilflor(sect_t *sec, wall_t *wal, int isflor, bdrawctx *b)
+{
+	cam_t *cam = &b->orcam;
+	float gx = sec->grad[isflor].x;
+	float gy = sec->grad[isflor].y;
+	dpoint3d gvec={gx,gy,1};
+	dpoint3d sp={wal[0].x,wal[0].y,sec->z[isflor]};
+	wccw_transform_dir(&gvec,&b->cam,&b->orcam);
+	wccw_transform(&sp,&b->cam,&b->orcam);
 
+	// Transform plane normal (gx, gy, 1) to camera space
+	//float nx = cam->r.x * gx + cam->r.y * gy + cam->r.z;
+	//float ny = cam->d.x * gx + cam->d.y * gy + cam->d.z;
+	//float nz = cam->f.x * gx + cam->f.y * gy + cam->f.z;
+	dpoint3d npos = world_to_local_vecd(gvec,&b->orcam.tr);
+
+	// Camera-space plane constant
+	float D_c = gvec.x * (sp.x - cam->p.x)
+			  + gvec.y * (sp.y - cam->p.y)
+			  + gvec.z * (sp.z - cam->p.z);
+
+	// Scale includes h.z for screen-space depth formula
+	float scale = 1.0f / (D_c * cam->h.z);
+	b->gouvmat[0] = npos.x * scale;
+	b->gouvmat[3] = npos.y * scale;
+	b->gouvmat[6] = npos.z / D_c - b->gouvmat[0] * cam->h.x - b->gouvmat[3] * cam->h.y;
+}
+
+// create plane EQ using GCAM
+static void gentransform_wall (dpoint3d *npol2, surf_t *sur, bdrawctx *b) {
+	cam_t usedcam = b->cam; // we can use camera hack to get plane equation in space of current cam, not necessart clipping cam.
+	float f, g, ox, oy, oz, rdet, fk[24];
+	int i;
+
+	for(i=0;i<3;i++)
+	{
+		ox = npol2[i].x-usedcam.p.x; oy = npol2[i].y-usedcam.p.y; oz = npol2[i].z-usedcam.p.z;
+		npol2[i].x = ox*usedcam.r.x + oy*usedcam.r.y + oz*usedcam.r.z;
+		npol2[i].y = ox*usedcam.d.x + oy*usedcam.d.y + oz*usedcam.d.z;
+		npol2[i].z = ox*usedcam.f.x + oy*usedcam.f.y + oz*usedcam.f.z;
+	}
+
+	fk[0] = npol2[0].z; fk[3] = npol2[0].x*usedcam.h.z + npol2[0].z*usedcam.h.x; fk[6] = npol2[0].y*usedcam.h.z + npol2[0].z*usedcam.h.y;
+	fk[1] = npol2[1].z; fk[4] = npol2[1].x*usedcam.h.z + npol2[1].z*usedcam.h.x; fk[7] = npol2[1].y*usedcam.h.z + npol2[1].z*usedcam.h.y;
+	fk[2] = npol2[2].z; fk[5] = npol2[2].x*usedcam.h.z + npol2[2].z*usedcam.h.x; fk[8] = npol2[2].y*usedcam.h.z + npol2[2].z*usedcam.h.y;
+	fk[12] = fk[4]*fk[8] - fk[5]*fk[7];
+	fk[13] = fk[5]*fk[6] - fk[3]*fk[8];
+	fk[14] = fk[3]*fk[7] - fk[4]*fk[6];
+	fk[18] = fk[2]*fk[7] - fk[1]*fk[8];
+	fk[19] = fk[0]*fk[8] - fk[2]*fk[6];
+	fk[20] = fk[1]*fk[6] - fk[0]*fk[7];
+	fk[21] = fk[1]*fk[5] - fk[2]*fk[4];
+	fk[22] = fk[2]*fk[3] - fk[0]*fk[5];
+	fk[23] = fk[0]*fk[4] - fk[1]*fk[3];
+	b->gouvmat[6] = fk[12] + fk[13] + fk[14];
+	b->gouvmat[0] = fk[18] + fk[19] + fk[20];
+	b->gouvmat[3] = fk[21] + fk[22] + fk[23];
+
+	rdet = 1.0/(fk[0]*fk[12] + fk[1]*fk[13] + fk[2]*fk[14]);
+
+	g = rdet;
+
+	b->gouvmat[0] *= g;
+	b->gouvmat[3] *= g;
+	b->gouvmat[6] *= g;
+}
 
 	//FIXFIXFIX: clean this up!
 static void gentex_xform (float *ouvmat, bdrawctx *b)
@@ -1178,7 +1243,7 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 	bunchverts_t *twal;
 	int twaln;
 	dpoint3d pol[4], npol[6];
-	kgln_t npol2[3];
+	dpoint3d npol2[3];
 	double opolz[4];
 	sect_t *sec;
 	wall_t *wal;
@@ -1274,7 +1339,7 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 		}
 		else {
 			b->gflags = 0;
-			gentex_ceilflor(&sec[s], wal, sur, isflor, b);
+			gentransform_ceilflor(&sec[s], wal, isflor, b);
 		}
 		b->gligwall = isflor - 2;
 
@@ -1377,14 +1442,14 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 					else if (!m) f = sec[verts[0].s].z[0];
 					else f = sec[verts[(m - 1) >> 1].s].z[0];
 					// Apply UV coordinates with proper scaling
-					npol2[0].u = sur->uv[0].x;
-					npol2[0].v = sur->uv[2].y * (npol2[0].z - f) + sur->uv[0].y;
-					npol2[1].u = sur->uv[1].x * dx + npol2[0].u;
-					npol2[1].v = sur->uv[1].y * dx + npol2[0].v;
-					npol2[2].u = sur->uv[2].x + npol2[0].u;
-					npol2[2].v = sur->uv[2].y + npol2[0].v;
+					//npol2[0].u = sur->uv[0].x;
+					//npol2[0].v = sur->uv[2].y * (npol2[0].z - f) + sur->uv[0].y;
+					//npol2[1].u = sur->uv[1].x * dx + npol2[0].u;
+					//npol2[1].v = sur->uv[1].y * dx + npol2[0].v;
+					//npol2[2].u = sur->uv[2].x + npol2[0].u;
+					//npol2[2].v = sur->uv[2].y + npol2[0].v;
 					b->gflags = 0;
-					gentex_wall(npol2, sur, b);
+					gentransform_wall(npol2, sur, b);
 				}
 				b->gligwall = w;
 				b->gligslab = m;
