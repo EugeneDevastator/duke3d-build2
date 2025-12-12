@@ -11,7 +11,9 @@ dpoint3d loopsm[70000]={};
 dpoint3d loopscam[70000]={};
 bool loopuse[70000]={};
 int loopnum=0;
-
+int captureframe=0;
+ transform lastcamtr = {};
+ transform lastcamtr2 = {};
 void mono_dbg_init(void) {
     g_mono_dbg.capacity = 64;
     g_mono_dbg.snapshots = (mono_dbg_snapshot_t*)malloc(g_mono_dbg.capacity * sizeof(mono_dbg_snapshot_t));

@@ -77,29 +77,34 @@ typedef struct {
 	float dist;
 } wall_job_t;
 typedef struct {
-	bool *visited_walls;  // One flag per wall in entire map
-	bool *visited_sectors;
-	wall_job_t *jobs;
-	int jobcount, jobcap;
-	cam_t cam;                    // Camera per recursion level
- 	cam_t orcam; // one true camera, read only.
+	// ---------- bunch context
+	bunch_t *bunch;
+	unsigned int *bunchgot;
+	unsigned char *bunchgrid;
+	int bunchn, bunchmal;
+	bfint_t bfint[BFINTMAX];
+	int bfintn, bfintlut[BFINTMAX+1];
 	unsigned int *sectgot, *sectgotmal;        // Visited sectors per level
 	int sectgotn;
-	bool has_portal_clip; // Whether portal clipping is active
+	// mono context
 	bool has_mono_out; // Whether portal clipping is active
-	int recursion_depth;
+	// transform context
+	cam_t cam;                    // Camera per recursion level
+ 	cam_t orcam; // one true camera, read only.
+	double xformmat[9], xformmatc, xformmats;
+	point3d gnadd;
+	point3d gnorm;
 	float gouvmat[9]; // 0 3 6 - store plane equation to convert back from mp.
 	int gligsect, gligwall, gligslab, gflags;
-	int gnewtag, gnewsec, scaninc;
-	point3d gnorm;
+	int gnewtag, gdoscansector, gnewtagsect;
+	// n-portals context
+	bool has_portal_clip; // Whether portal clipping is active
+	int recursion_depth;
 	int testignorewall;
 	int ignorekind;
 	int testignoresec;
 	int planecuts;
-	int prevsec,newsec;
-	int* sectq;
-	int sectqn;
-
+	int currenthalfplane;
 } bdrawctx;
 
 extern mp_t *mp;

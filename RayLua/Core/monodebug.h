@@ -40,4 +40,7 @@ void mono_dbg_capture_pair(int hd0, int hd1, const char *label, int operation);
 extern dpoint3d loops[70000];
 extern bool loopuse[70000];
 extern int loopnum;
+extern int captureframe;
+extern transform lastcamtr;
+extern transform lastcamtr2;
 #endif

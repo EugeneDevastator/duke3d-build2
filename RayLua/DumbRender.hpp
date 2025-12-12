@@ -985,9 +985,9 @@ public:
                 }
             }
         }
-        DrawTransform(&lastcamtr);
-        DrawTransform(&lastcamtr2);
-        dpoint3d testp = {lastcamtr2.p.x + lastcamtr2.d.x,lastcamtr2.p.y+ lastcamtr2.d.y,lastcamtr2.p.z+ lastcamtr2.d.z};
+      DrawTransform(&lastcamtr);
+      DrawTransform(&lastcamtr2);
+      dpoint3d testp = {lastcamtr2.p.x + lastcamtr2.d.x,lastcamtr2.p.y+ lastcamtr2.d.y,lastcamtr2.p.z+ lastcamtr2.d.z};
 
        wccw_transform_tr(&testp,&lastcamtr,&lastcamtr2);
        DrawB2Point(&testp);

@@ -866,7 +866,7 @@ static void changetagfunc (int rethead0, int rethead1, bdrawctx *b)
 		&& (!(b->sectgot[mapsect>>5]&(1<<mapsect))))
 		scansector(mapsect,b);
 
-	mph_check(mphnum);
+	mono_mph_check(mphnum);
 	mph[mphnum].head[0] = rethead0;
 	mph[mphnum].head[1] = rethead1;
 	mph[mphnum].tag = b->gnewtag;
@@ -1350,7 +1350,7 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 			int endpn = portals[myport].destpn;
 			drawpol_befclip(s, portals[endpn].sect+taginc, portals[endpn].sect,
 				plothead[0],plothead[1],  3, b);
-			draw_hsr_enter_portal(map, myport, b,plothead[0],plothead[1]);
+			draw_hsr_enter_portal(map, myport, b);
 		}
 
 		else {
@@ -1463,7 +1463,7 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 			if (myport >= 0 && portals[myport].destpn >=0 && portals[myport].kind == PORT_WALL) {
 					int endp = portals[myport].destpn;
 				drawpol_befclip(s, portals[endp].sect+taginc, portals[endp].sect, plothead[0], plothead[1],  3, b);
-				draw_hsr_enter_portal(map, myport, b,plothead[0],plothead[1]);
+				draw_hsr_enter_portal(map, myport, b);
 			} else {
 				// could be 7 or 3, .111 or .011
 				drawpol_befclip(s, ns, ns, plothead[0], plothead[1], ((m > vn) << 2) + 3, b);
@@ -1835,8 +1835,7 @@ static point3d local_to_world_vec(point3d local_vec, transform *tr) {
     world.z = local_vec.x * tr->r.z + local_vec.y * tr->d.z + local_vec.z * tr->f.z;
 
     return world;
-}static void draw_hsr_enter_portal(mapstate_t* map, int myport, bdrawctx *parentctx,
-                                   int plothead0, int plothead1)
+}static void draw_hsr_enter_portal(mapstate_t* map, int myport, bdrawctx *parentctx)
 {
     if (parentctx->recursion_depth >= MAX_PORTAL_DEPTH) {
         return;
@@ -1878,8 +1877,6 @@ static point3d local_to_world_vec(point3d local_vec, transform *tr) {
     newctx.cam = ncam;
     newctx.orcam = parentctx->orcam;
     newctx.has_portal_clip = true;
-    newctx.portal_clip[0] = plothead0;
-    newctx.portal_clip[1] = plothead1;
     newctx.sectgotn = 0;
     newctx.sectgot = 0;
     newctx.sectgotmal = 0;
