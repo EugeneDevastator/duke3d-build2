@@ -143,7 +143,7 @@ double getwallz (sect_t *s, int isflor, int wid)
 {
 	wall_t *wal = s->wall;
 	// Calculate Z using plane equation: gradient dot (point - reference) + base_z
-	return((wal[0].x-wal[wid].x)*s->grad[isflor].x + (wal[0].y-wal[wid].x)*s->grad[isflor].y + s->z[isflor]);
+	return((wal[0].x-wal[wid].x)*s->grad[isflor].x + (wal[0].y-wal[wid].y)*s->grad[isflor].y + s->z[isflor]);
 }
 
 // Gets all walls that share the same edge as the given wall

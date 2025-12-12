@@ -80,7 +80,7 @@ int mono_ins2d(int i, double nx, double ny) {
 
 int mono_ins(int i, double nx, double ny, double nz) {
     dpoint3d p = {nx,ny,nz};
-    LOOPADD(p)
+   // LOOPADD(p)
     i = mono_ins2d(i, nx, ny);
     mp[i].z = nz;
     return (i);
@@ -88,7 +88,7 @@ int mono_ins(int i, double nx, double ny, double nz) {
 int mono_insp(int i, dpoint3d p) {
     i = mono_ins2d(i, p.x, p.y);
     mp[i].z = p.z;
-    LOOPADD(p)
+  //  LOOPADD(p)
     return (i);
 }
 void mono_del(int i) {
