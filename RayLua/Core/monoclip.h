@@ -33,7 +33,11 @@ typedef struct {
 
 //Mono Polygon (vertex data)
 typedef struct {
-	double x, y, z;
+	union {
+		dpoint3d pos;
+		struct {double x, y, z;};
+	};
+
 	int n, p;  // next, previous indices for doubly-linked list
 } mp_t;
 

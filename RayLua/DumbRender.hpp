@@ -586,8 +586,9 @@ public:
 
         // Eyepol polys
         bool draweye = true;
-        bool drawlineseye = true;
+        bool drawlineseye = false;
         bool drawlights = false;
+        bool drawmonoloops = true;
 
         rlDisableBackfaceCulling();
         BeginMode3D(camsrc);
@@ -636,7 +637,7 @@ public:
                 } // eyepol lines for each poly
 
             }
-         //   draw_mono_debug();
+            if (drawmonoloops) draw_mono_debug();
             EndBlendMode();
         }
         EndMode3D();
