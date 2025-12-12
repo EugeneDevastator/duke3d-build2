@@ -80,7 +80,7 @@ int intersect_traps_mono3d(double x0, double y0, double x1, double y1, double z0
     int i, j, h0, h1;
 #define PXF(aa,bb,cc) portal_xform_world_fullr(aa,bb,cc,b)
     //0123,0213,0231,2013,2031,2301
-	LOOPEND
+	//LOOPEND
     if (z0 < z2) {
         if (z1 < z2) i = 0;
         else i = (z1 >= z3) + 1;
@@ -135,7 +135,7 @@ int intersect_traps_mono3d(double x0, double y0, double x1, double y1, double z0
         if (j & 1) h1 = mono_insp(h1, PXF(x1, y1, z5));
         else h1 = mono_insp(h1, PXF(x1, y1, z7));
     }
-LOOPEND
+
     if ((h0 | h1) < 0) return (0);
     (*rh0) = mp[h0].n;
     (*rh1) = mp[h1].n;
@@ -365,7 +365,7 @@ overflow:otx0 = tx0; oty0 = ty0; otx1 = tx1; oty1 = ty1;
 	if (a[1] >= -1e-7) return(2);
 	return(3);
 }
-
+// problem is before mono insertion (see drawpol,.)
 static void scansector (int sectnum, bdrawctx* b)
 {
 	cam_t gcam = b->cam;
@@ -390,7 +390,7 @@ static void scansector (int sectnum, bdrawctx* b)
 		if (false)
 		{
 			dpoint3d wcpi = portal_xform_world_fullr(wal[i].x,wal[i].y,getwallz(sec,1,i),b);
-			dpoint3d wcpj = portal_xform_world_fullr(wal[j].x,wal[j].y,getwallz(sec,1,i),b);
+			dpoint3d wcpj = portal_xform_world_fullr(wal[j].x,wal[j].y,getwallz(sec,1,j),b);
 			dx0 = wcpi.x-orcam.p.x; dy0 = wcpi.y-orcam.p.y;
 			dx1 = wcpj.x-orcam.p.x; dy1 = wcpj.y-orcam.p.y;
 			if (dy1*dx0 <= dx1*dy0) goto docont; //Back-face cull
@@ -609,7 +609,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 			eyepolv[eyepolvn].z = ((fx-cam.h.x)*cam.r.z + (fy-cam.h.y)*cam.d.z + (cam.h.z)*cam.f.z)*f + cam.p.z;
 dpoint3d e = {eyepolv[eyepolvn].x,eyepolv[eyepolvn].y,eyepolv[eyepolvn].z};
 			portal_xform_world_fullp(&e,b);
-			LOOPADD(e);
+			//LOOPADD(e);
 			eyepolvn++;
 
 			if (!h) i = mp[i].n;
@@ -739,12 +739,15 @@ static void changetagfunc (int rethead0, int rethead1, bdrawctx *b)
 	//flags&4: reverse cut for sub
 static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead0, int plothead1, int flags, bdrawctx* b)
 {
+	LOOPEND
 	int mtag = tag1 + taginc*b->recursion_depth;
 	int tagsect = tag1;
 	int mnewtag = newtag1 == -1 ? -1 : newtag1 + taginc*b->recursion_depth;
 	b->gnewtagsect = newtagsect;
 	cam_t gcam = b->cam;
-	double* xform = b->oxformmat;
+	double* xform = b->xformmat;
+	double xformc = b->xformmatc;
+	double xforms = b->xformmats;
 	#define BSCISDIST 0.000001 //Reduces probability of glitch further
 	//#define BSCISDIST 0.0001 //Gaps undetectable
 	//#define BSCISDIST 0.1 //Huge gaps
@@ -771,11 +774,12 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 		do
 		{
 			if (h) i = mp[i].p;
-
 			ox = mp[i].x-gcam.p.x; oy = mp[i].y-gcam.p.y;
-			otp[on].x = oy*b->xformmatc - ox*b->xformmats;
+			if (b->has_portal_clip)
+				LOOPADD(mp[i].pos)
+			otp[on].x = oy*xformc - ox*xforms;
 			otp[on].y = mp[i].z-gcam.p.z;
-			otp[on].z = ox*b->xformmatc + oy*b->xformmats; on++;
+			otp[on].z = ox*xformc + oy*xforms; on++;
 
 			if (!h) i = mp[i].n;
 		} while (i != plothead[h]);
@@ -803,6 +807,8 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 		f = gcam.h.z/tp[i].z;
 		tp[i].x = tp[i].x*f + gcam.h.x;
 		tp[i].y = tp[i].y*f + gcam.h.y;
+		// log herte.
+
 	}
 
 		//generate vmono
@@ -1157,7 +1163,6 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 		opolz[3] = pol[0].z; opolz[2] = pol[1].z;
 		for(m=0;m<=(vn<<1);m++) //Warning: do not reverse for loop!
 		{
-			LOOPEND
 			// Update Z-coordinates for current segment
 			opolz[0] = opolz[3]; opolz[1] = opolz[2];
 			if (m == (vn<<1)) { opolz[2] = pol[2].z; opolz[3] = pol[3].z; }
@@ -1409,11 +1414,18 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
 		}
 	}
 
-	for(halfplane=0;halfplane<2;halfplane++) {
+	for(int pass=0;pass<2;pass++) {
 
-		if (!b->has_portal_clip)
-			b->currenthalfplane = halfplane;
-		else halfplane = b->currenthalfplane;
+		if (!b->has_portal_clip) {
+			b->currenthalfplane = pass;
+			halfplane = pass;
+		}
+		else {
+			//	if (b->currenthalfplane == 1)
+			//		halfplane = 1-pass;
+			//	else
+				halfplane = pass;
+		}
 
 		if (shadowtest2_rendmode == 4)
 		{
@@ -1437,7 +1449,7 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
 				b->oxformmats = b->xformmats;
 				b->ognadd = b->gnadd;
 				memcpy(&b->oxformmat, &b->xformmat, sizeof(double) * 9);
-
+			}
 				// NEW CODE - Use much larger bounds:
 				float large_bound = 1e6f;
 				xformbac(-large_bound, -large_bound, gcam.h.z, &bord[0], b);
@@ -1469,24 +1481,25 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
 					bord2[j].x = bord2[j].x*f + gcam.h.x;
 					bord2[j].y = bord2[j].y*f + gcam.h.y;
 				}
-			} else {
-				n = 4;
-			}
+			//} else {
+			//	n = 4;
+			//	didcut=1;
+			//}
 		}
 
 		memset8(b->sectgot,0,(lgs->numsects+31)>>3);
 
 
-		if (!b->has_portal_clip) {
+		if (true) {
 			//FIX! once means not each frame! (of course it doesn't hurt functionality)
 			// Standard case: clear existing state and create new viewport
 			for (i = mphnum - 1; i >= 0; i--) {
 				mono_deloop(mph[i].head[1]);
 				mono_deloop(mph[i].head[0]);
 			}
-
+			// maybe need second run for alternating mono?
 			mono_genfromloop(&mph[0].head[0], &mph[0].head[1], bord2, n);
-			mph[0].tag = gcam.cursect;
+			mph[0].tag = gcam.cursect + taginc*b->recursion_depth;
 			mphnum = 1;
 		} else {
 			// dont do anything, because clipping is done by drawpol_befclip.
@@ -1513,10 +1526,10 @@ nogood:; }
 
 		if (shadowtest2_rendmode == 4) uptr = glp->sectgot;
 										  else uptr = shadowtest2_sectgot;
-		if (b->has_portal_clip)
-			return;
+		//if (b->has_portal_clip)
+		//	return;
 
-		if (!halfplane)
+		if (!pass) // write only after first pass.
 		{
 			memcpy(uptr,b->sectgot,(lgs->numsects+31)>>3);
 		}

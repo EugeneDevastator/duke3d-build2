@@ -485,8 +485,9 @@ public:
             point3d p = eyepolv[v0 + j];
             pts[j] = {p.x, -p.z, p.y};
         }
-        unsigned char r = ((i)/5.0f)*255;
-        rlColor4ub(r,128,3,40);
+        unsigned char r = (int)((eyepol[i].b2sect/6.0f)*255) % 255;
+        unsigned char b = (int)((eyepol[i].b2sect/17.0f)*255) % 255;
+        rlColor4ub(r,128,b,40);
         //DrawTriangleFan3D(pts,vertCount,{r,128,3,30});
         TriangAndDraw3D(pts,vertCount);
         rlDrawRenderBatchActive();
