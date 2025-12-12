@@ -614,11 +614,9 @@ dpoint3d e = {eyepolv[eyepolvn].x,eyepolv[eyepolvn].y,eyepolv[eyepolvn].z};
 
 			if (!h) i = mp[i].n;
 		} while (i != rethead[h]);
-
 		mono_deloop(rethead[h]);
 	}
-	LOOPEND
-	// Allocate eyepol entry
+
 	if (eyepoln+1 >= eyepolmal)
 	{
 		eyepolmal = max(eyepolmal<<1, 4096);
@@ -627,18 +625,20 @@ dpoint3d e = {eyepolv[eyepolvn].x,eyepolv[eyepolvn].y,eyepolv[eyepolvn].z};
 	}
 
 	memcpy((void *)eyepol[eyepoln].ouvmat, (void *)b->gouvmat, sizeof(b->gouvmat[0])*9);
-	//eyepol[eyepoln].chain1_start = chain0_end;  // Store the split
+
 	eyepol[eyepoln].tpic = gtpic;
 	eyepol[eyepoln].curcol = gcurcol;
 	eyepol[eyepoln].flags = (b->gflags != 0);
 	eyepol[eyepoln].b2sect = b->gligsect;
 	eyepol[eyepoln].b2wall = b->gligwall;
 	eyepol[eyepoln].b2slab = b->gligslab;
-	memcpy((void *)&eyepol[eyepoln].norm,(void *)&b->gnorm,sizeof(b->gnorm));
+	memcpy((void *)&eyepol[eyepoln].norm, (void *)&b->gnorm, sizeof(b->gnorm));
 	eyepoln++;
 	eyepol[eyepoln].vert0 = eyepolvn;
 	eyepol[eyepoln].rdepth = b->recursion_depth;
+	logstep("produce eyepol, depth:%d",b->recursion_depth);
 }
+
 
 static void skytagfunc (int rethead0, int rethead1, bdrawctx* b){}
 
@@ -906,30 +906,25 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 
 static void gentransform_ceilflor(sect_t *sec, wall_t *wal, int isflor, bdrawctx *b)
 {
-	cam_t *cam = &b->orcam;
+	cam_t *cam = &b->cam;
 	float gx = sec->grad[isflor].x;
 	float gy = sec->grad[isflor].y;
-	dpoint3d gvec={gx,gy,1};
-	dpoint3d sp={wal[0].x,wal[0].y,sec->z[isflor]};
-	wccw_transform_dir(&gvec,&b->cam,&b->orcam);
-	wccw_transform(&sp,&b->cam,&b->orcam);
 
 	// Transform plane normal (gx, gy, 1) to camera space
-	//float nx = cam->r.x * gx + cam->r.y * gy + cam->r.z;
-	//float ny = cam->d.x * gx + cam->d.y * gy + cam->d.z;
-	//float nz = cam->f.x * gx + cam->f.y * gy + cam->f.z;
-	dpoint3d npos = world_to_local_vecd(gvec,&b->orcam.tr);
+	float nx = cam->r.x * gx + cam->r.y * gy + cam->r.z;
+	float ny = cam->d.x * gx + cam->d.y * gy + cam->d.z;
+	float nz = cam->f.x * gx + cam->f.y * gy + cam->f.z;
 
 	// Camera-space plane constant
-	float D_c = gvec.x * (sp.x - cam->p.x)
-			  + gvec.y * (sp.y - cam->p.y)
-			  + gvec.z * (sp.z - cam->p.z);
+	float D_c = gx * (wal[0].x - cam->p.x)
+			  + gy * (wal[0].y - cam->p.y)
+			  + (sec->z[isflor] - cam->p.z);
 
 	// Scale includes h.z for screen-space depth formula
 	float scale = 1.0f / (D_c * cam->h.z);
-	b->gouvmat[0] = npos.x * scale;
-	b->gouvmat[3] = npos.y * scale;
-	b->gouvmat[6] = npos.z / D_c - b->gouvmat[0] * cam->h.x - b->gouvmat[3] * cam->h.y;
+	b->gouvmat[0] = nx * scale;
+	b->gouvmat[3] = ny * scale;
+	b->gouvmat[6] = nz / D_c - b->gouvmat[0] * cam->h.x - b->gouvmat[3] * cam->h.y;
 }
 
 // create plane EQ using GCAM
@@ -969,6 +964,15 @@ static void gentransform_wall (dpoint3d *npol2, surf_t *sur, bdrawctx *b) {
 	b->gouvmat[0] *= g;
 	b->gouvmat[3] *= g;
 	b->gouvmat[6] *= g;
+
+	if (renderinterp)
+	{
+		// idx 0 3 6 store plane eq?
+
+	//	b->gouvmat[1] -= b->gouvmat[0]*32768.0; b->gouvmat[2] -= b->gouvmat[0]*32768.0;
+	//	b->gouvmat[4] -= b->gouvmat[3]*32768.0; b->gouvmat[5] -= b->gouvmat[3]*32768.0;
+	//	b->gouvmat[7] -= b->gouvmat[6]*32768.0; b->gouvmat[8] -= b->gouvmat[6]*32768.0;
+	}
 }
 
 /*
