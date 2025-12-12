@@ -396,8 +396,8 @@ static void scansector (int sectnum, bdrawctx* b)
 			if (dy1*dx0 <= dx1*dy0) goto docont; //Back-face cull
 
 			//clip to near plane .. result is parametric fractions f0&f1
-			f0 = dx0 * b->xformmatcori + dy0 * b->xformmatsori;
-			f1 = dx1 * b->xformmatcori + dy1 * b->xformmatsori;
+			f0 = dx0 * b->oxformmatc + dy0 * b->oxformmats;
+			f1 = dx1 * b->oxformmatc + dy1 * b->oxformmats;
 		}
 		else
 		{
@@ -963,179 +963,6 @@ static void gentransform_wall (dpoint3d *npol2, surf_t *sur, bdrawctx *b) {
 	b->gouvmat[6] *= g;
 }
 
-	//FIXFIXFIX: clean this up!
-static void gentex_xform (float *ouvmat, bdrawctx *b)
-{
-	cam_t gcam = b->cam;
-	float ax, ay, az, bx, by, bz, cx, cy, cz, p0x, p0y, p0z, p1x, p1y, p1z, p2x, p2y, p2z, f;
-
-	ax = ouvmat[3]; bx = ouvmat[6]; cx = ouvmat[0];
-	ay = ouvmat[4]; by = ouvmat[7]; cy = ouvmat[1];
-	az = ouvmat[5]; bz = ouvmat[8]; cz = ouvmat[2];
-	p2x = ay*bz - az*by; p2y = az*bx - ax*bz; p2z = ax*by - ay*bx; f = p2x*cx + p2y*cy + p2z*cz;
-	p0x = by*cz - bz*cy; p0y = bz*cx - bx*cz; p0z = bx*cy - by*cx;
-	p1x = cy*az - cz*ay; p1y = cz*ax - cx*az; p1z = cx*ay - cy*ax;
-#if (USEINTZ)
-	f = 1.0 / (f*16.0);
-#else
-	f = 1048576.0*16.0 / (f*gcam.h.z);
-#endif
-	ax = (1.0/65536.0 )*f;
-	ay = ((float)64)*f;
-	az = ((float)64)*f;
-	ouvmat[0] = p2x*ax; ouvmat[1] = p0x*ay; ouvmat[2] = p1x*az;
-	ouvmat[3] = p2y*ax; ouvmat[4] = p0y*ay; ouvmat[5] = p1y*az;
-	ouvmat[6] = p2z*ax; ouvmat[7] = p0z*ay; ouvmat[8] = p1z*az;
-	ouvmat[6] = ouvmat[6]*gcam.h.z - ouvmat[0]*gcam.h.x - ouvmat[3]*gcam.h.y;
-	ouvmat[7] = ouvmat[7]*gcam.h.z - ouvmat[1]*gcam.h.x - ouvmat[4]*gcam.h.y;
-	ouvmat[8] = ouvmat[8]*gcam.h.z - ouvmat[2]*gcam.h.x - ouvmat[5]*gcam.h.y;
-
-	if (renderinterp)
-	{
-		ouvmat[1] -= ouvmat[0]*32768.0; ouvmat[2] -= ouvmat[0]*32768.0;
-		ouvmat[4] -= ouvmat[3]*32768.0; ouvmat[5] -= ouvmat[3]*32768.0;
-		ouvmat[7] -= ouvmat[6]*32768.0; ouvmat[8] -= ouvmat[6]*32768.0;
-	}
-}
-
-static void gentex_sky (surf_t *sur, bdrawctx *b)
-{
-	cam_t gcam = b->cam;
-	float f, g, h;
-	int i;
-
-	if (b->gflags >= 2) return; //if texture is skybox, return early
-
-		//Crappy paper sky :/
-	h = 65536;
-	f = atan2(gcam.f.y,gcam.f.x)         *-h/PI*2.f;
-	g = asin(min(max(gcam.f.z,-1.f),1.f))*-h/PI*2.f;
-	b->gouvmat[0] = sur->uv[0].x*h + f; b->gouvmat[3] = sur->uv[1].x*h; b->gouvmat[6] = sur->uv[2].x*h;
-	b->gouvmat[1] = sur->uv[0].y*h + g; b->gouvmat[4] = sur->uv[1].y*h; b->gouvmat[7] = sur->uv[2].y*h;
-	b->gouvmat[2] =              h    ; b->gouvmat[5] =            0.f; b->gouvmat[8] =            0.f;
-	gentex_xform(b->gouvmat,b);
-}
-
-static void gentex_ceilflor (sect_t *sec, wall_t *wal, surf_t *sur, int isflor, bdrawctx *b)
-{
-	cam_t gcam = b->cam;
-	float f, g, fz, ax, ay, wx, wy, ox, oy, oz, fk[6];
-	int i;
-
-	if (!(sur->flags&4)) //Not relative alignment
-	{
-			//(sur->uv[1].x)*x + (sur->uv[2].x)*y = (u-sur->uv[0].x)
-			//(sur->uv[1].y)*x + (sur->uv[2].y)*y = (v-sur->uv[0].y)
-		fk[0] = sur->uv[1].x; fk[2] = sur->uv[2].x;
-		fk[1] = sur->uv[1].y; fk[3] = sur->uv[2].y;
-		fz = 1.0; ax = -sur->uv[0].x; ay = -sur->uv[0].y;
-	}
-	else //Relative alignment
-	{
-		wx = wal[wal[0].n].x-wal[0].x;
-		wy = wal[wal[0].n].y-wal[0].y;
-		fk[0] = sur->uv[1].x*wx - sur->uv[2].x*wy; fk[2] = sur->uv[1].x*wy + sur->uv[2].x*wx;
-		fk[1] = sur->uv[1].y*wx - sur->uv[2].y*wy; fk[3] = sur->uv[1].y*wy + sur->uv[2].y*wx;
-		fz = sqrt(wx*wx + wy*wy);
-		ax = (wx*wal[0].x + wy*wal[0].y)*sur->uv[1].x + (wx*wal[0].y - wy*wal[0].x)*sur->uv[2].x - sur->uv[0].x*fz;
-		ay = (wx*wal[0].x + wy*wal[0].y)*sur->uv[1].y + (wx*wal[0].y - wy*wal[0].x)*sur->uv[2].y - sur->uv[0].y*fz;
-	}
-
-	f = fk[0]*fk[3] - fk[1]*fk[2]; if (f > 0.f) f = 1.f/f;
-	for(i=6;i>=0;i-=3)
-	{          //u,v:
-		fk[4] = (i==3)*fz + ax;
-		fk[5] = (i==6)*fz + ay;
-		ox = (fk[3]*fk[4] - fk[2]*fk[5])*f;
-		oy = (fk[0]*fk[5] - fk[1]*fk[4])*f;
-		oz = getslopez(sec,isflor,ox,oy);
-		ox -= gcam.p.x; oy -= gcam.p.y; oz -= gcam.p.z;
-		b->gouvmat[i+0] = ox*gcam.r.x + oy*gcam.r.y + oz*gcam.r.z;
-		b->gouvmat[i+1] = ox*gcam.d.x + oy*gcam.d.y + oz*gcam.d.z;
-		b->gouvmat[i+2] = ox*gcam.f.x + oy*gcam.f.y + oz*gcam.f.z;
-	}
-
-	for(i=9-1;i>=0;i--) b->gouvmat[i] *= 256.f;
-
-	b->gouvmat[3] -= b->gouvmat[0]; b->gouvmat[4] -= b->gouvmat[1]; b->gouvmat[5] -= b->gouvmat[2];
-	b->gouvmat[6] -= b->gouvmat[0]; b->gouvmat[7] -= b->gouvmat[1]; b->gouvmat[8] -= b->gouvmat[2];
-
-	gentex_xform(b->gouvmat, b);
-}
-
-static void gentex_wall (kgln_t *npol2, surf_t *sur, bdrawctx *b)
-{
-	cam_t gcam = b->cam;
-	float f, g, ox, oy, oz, rdet, fk[24];
-	int i;
-
-	for(i=0;i<3;i++)
-	{
-		ox = npol2[i].x-gcam.p.x; oy = npol2[i].y-gcam.p.y; oz = npol2[i].z-gcam.p.z;
-		npol2[i].x = ox*gcam.r.x + oy*gcam.r.y + oz*gcam.r.z;
-		npol2[i].y = ox*gcam.d.x + oy*gcam.d.y + oz*gcam.d.z;
-		npol2[i].z = ox*gcam.f.x + oy*gcam.f.y + oz*gcam.f.z;
-	}
-
-		//sx = npol2[i].x*cam.h.z/npol2[i].z+cam.h.x
-		//sy = npol2[i].y*cam.h.z/npol2[i].z+cam.h.y
-		//npol2[i].u = (b->gouvmat[1]*sx + b->gouvmat[4]*sy + b->gouvmat[7])/(b->gouvmat[0]*sx + b->gouvmat[3]*sy + b->gouvmat[6])
-		//npol2[i].v = (b->gouvmat[2]*sx + b->gouvmat[5]*sy + b->gouvmat[8])/(b->gouvmat[0]*sx + b->gouvmat[3]*sy + b->gouvmat[6])
-		//npol2[i].z =                                            1/(b->gouvmat[0]*sx + b->gouvmat[3]*sy + b->gouvmat[6])
-		//   Solve ^ for b->gouvmat[*]
-	fk[0] = npol2[0].z; fk[3] = npol2[0].x*gcam.h.z + npol2[0].z*gcam.h.x; fk[6] = npol2[0].y*gcam.h.z + npol2[0].z*gcam.h.y;
-	fk[1] = npol2[1].z; fk[4] = npol2[1].x*gcam.h.z + npol2[1].z*gcam.h.x; fk[7] = npol2[1].y*gcam.h.z + npol2[1].z*gcam.h.y;
-	fk[2] = npol2[2].z; fk[5] = npol2[2].x*gcam.h.z + npol2[2].z*gcam.h.x; fk[8] = npol2[2].y*gcam.h.z + npol2[2].z*gcam.h.y;
-	fk[12] = fk[4]*fk[8] - fk[5]*fk[7];
-	fk[13] = fk[5]*fk[6] - fk[3]*fk[8];
-	fk[14] = fk[3]*fk[7] - fk[4]*fk[6];
-	fk[18] = fk[2]*fk[7] - fk[1]*fk[8];
-	fk[19] = fk[0]*fk[8] - fk[2]*fk[6];
-	fk[20] = fk[1]*fk[6] - fk[0]*fk[7];
-	fk[21] = fk[1]*fk[5] - fk[2]*fk[4];
-	fk[22] = fk[2]*fk[3] - fk[0]*fk[5];
-	fk[23] = fk[0]*fk[4] - fk[1]*fk[3];
-	b->gouvmat[6] = fk[12] + fk[13] + fk[14];
-	b->gouvmat[0] = fk[18] + fk[19] + fk[20];
-	b->gouvmat[3] = fk[21] + fk[22] + fk[23];
-
-	fk[15] = b->gouvmat[6]*fk[0] + b->gouvmat[0]*fk[3] + b->gouvmat[3]*fk[6];
-	fk[16] = b->gouvmat[6]*fk[1] + b->gouvmat[0]*fk[4] + b->gouvmat[3]*fk[7];
-	fk[17] = b->gouvmat[6]*fk[2] + b->gouvmat[0]*fk[5] + b->gouvmat[3]*fk[8];
-
-	fk[ 9] = fk[15]*npol2[0].u;
-	fk[10] = fk[16]*npol2[1].u;
-	fk[11] = fk[17]*npol2[2].u;
-	b->gouvmat[7] = fk[12]*fk[9] + fk[13]*fk[10] + fk[14]*fk[11];
-	b->gouvmat[1] = fk[18]*fk[9] + fk[19]*fk[10] + fk[20]*fk[11];
-	b->gouvmat[4] = fk[21]*fk[9] + fk[22]*fk[10] + fk[23]*fk[11];
-
-	fk[ 9] = fk[15]*npol2[0].v;
-	fk[10] = fk[16]*npol2[1].v;
-	fk[11] = fk[17]*npol2[2].v;
-	b->gouvmat[8] = fk[12]*fk[9] + fk[13]*fk[10] + fk[14]*fk[11];
-	b->gouvmat[2] = fk[18]*fk[9] + fk[19]*fk[10] + fk[20]*fk[11];
-	b->gouvmat[5] = fk[21]*fk[9] + fk[22]*fk[10] + fk[23]*fk[11];
-
-	rdet = 1.0/(fk[0]*fk[12] + fk[1]*fk[13] + fk[2]*fk[14]);
-
-#if (USEINTZ)
-	g = gcam.h.z*rdet/(1048576.0*256.0);
-#else
-	g = rdet;
-#endif
-													 b->gouvmat[0] *= g; b->gouvmat[3] *= g; b->gouvmat[6] *= g; g *= rdet*65536.0;
-	f = (float)64*g;            b->gouvmat[1] *= f; b->gouvmat[4] *= f; b->gouvmat[7] *= f;
-	f = (float)64*g;            b->gouvmat[2] *= f; b->gouvmat[5] *= f; b->gouvmat[8] *= f;
-
-	if (renderinterp)
-	{
-		b->gouvmat[1] -= b->gouvmat[0]*32768.0; b->gouvmat[2] -= b->gouvmat[0]*32768.0;
-		b->gouvmat[4] -= b->gouvmat[3]*32768.0; b->gouvmat[5] -= b->gouvmat[3]*32768.0;
-		b->gouvmat[7] -= b->gouvmat[6]*32768.0; b->gouvmat[8] -= b->gouvmat[6]*32768.0;
-	}
-}
-
 /*
 the mono engine produces camera-space polygons that are clipped to not overlap.
 The plothead[0] and plothead[1] contain monotone polygon pairs representing
@@ -1191,6 +1018,7 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 	// === DRAW CEILINGS & FLOORS ===
 	for(isflor=0;isflor<2;isflor++) // floor ceil
 	{
+		LOOPEND
 		// here, when we draw sector of the exit portal we get glitches when it would draw a triangle with point below the camera resulting in triangle spanning entire vertical of the screen
 
 		     // Back-face culling: skip if camera is on wrong side of surface
@@ -1233,12 +1061,13 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 		if (sec[s].surf[isflor].flags & (1 << 17)) { b->gflags = 2; } //skybox ceil/flor
 		else if (sec[s].surf[isflor].flags & (1 << 16)) {  //parallaxing ceil/flor
 			b->gflags = 1;
-			gentex_sky(sur, b);
+			//gentex_sky(sur, b);
 		}
 		else {
 			b->gflags = 0;
-			gentransform_ceilflor(&sec[s], wal, isflor, b);
 		}
+			gentransform_ceilflor(&sec[s], wal, isflor, b);
+
 		b->gligwall = isflor - 2;
 
 		int myport = sec[s].tags[1];
@@ -1269,10 +1098,6 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 
 		// Calculate wall length and setup color/normal
 		dx = sqrt((wal[nw].x-wal[w].x)*(wal[nw].x-wal[w].x) + (wal[nw].y-wal[w].y)*(wal[nw].y-wal[w].y));
-		gcurcol = (min(sur->asc>>8,255)<<24) +
-					 (min(sur->rsc>>5,255)<<16) +
-					 (min(sur->gsc>>5,255)<< 8) +
-					 (min(sur->bsc>>5,255)    );
 		b->gnorm.x = wal[w].y-wal[nw].y;
 		b->gnorm.y = wal[nw].x-wal[w].x;
 		b->gnorm.z = 0;
@@ -1287,6 +1112,7 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 		opolz[3] = pol[0].z; opolz[2] = pol[1].z;
 		for(m=0;m<=(vn<<1);m++) //Warning: do not reverse for loop!
 		{
+			LOOPEND
 			// Update Z-coordinates for current segment
 			opolz[0] = opolz[3]; opolz[1] = opolz[2];
 			if (m == (vn<<1)) { opolz[2] = pol[2].z; opolz[3] = pol[3].z; }
@@ -1317,13 +1143,9 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 			if ((!(m & 1)) || (wal[w].surf.flags & (1 << 5))) //Draw wall here //(1<<5): 1-way
 			{
 				//	gtpic = &gtile[sur->tilnum]; if (!gtpic->tt.f) loadpic(gtpic);
-				if (sur->flags & (1 << 17))
-				{ b->gflags = 2; } //skybox ceil/flor
-				else if (sur->flags & (1 << 16)) {
-					b->gflags = 1;
-					gentex_sky(sur, b);
-				} //parallaxing ceil/flor
-				else {
+				if (sur->flags & (1 << 17))	{ b->gflags = 2; } //skybox ceil/flor
+				if (sur->flags & (1 << 16))  b->gflags = 1;
+{
 					// Calculate UV mapping for wall texture
 					npol2[0].x = wal[w].x;
 					npol2[0].y = wal[w].y;
@@ -1391,11 +1213,13 @@ void reset_context() {
 }
 void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
 	bdrawctx bs;
+	loopnum=0;
 	bs.cam = *cc;
 	bs.orcam = *cc;
 	bs.recursion_depth = 0;
 	bs.has_portal_clip = false;
 	draw_hsr_polymost_ctx(map,&bs);
+
 }
 
 void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
@@ -1559,45 +1383,53 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
 			xformbac(+65536.0,+65536.0,1.0,&bord2[2], b);
 			xformbac(-65536.0,+65536.0,1.0,&bord2[3], b);
 			n = 4; didcut = 1;
-		}
-		else {
-			xformprep(((double)halfplane)*PI, b);
-			if (!b->has_portal_clip) {
-				b->xformmatcori = b->xformmatc;
-				b->xformmatsori = b->xformmats;
-			}
-			// NEW CODE - Use much larger bounds:
-			float large_bound = 1e6f;
-			xformbac(-large_bound, -large_bound, gcam.h.z, &bord[0],b);
-			xformbac(+large_bound, -large_bound, gcam.h.z, &bord[1],b);
-			xformbac(+large_bound, +large_bound, gcam.h.z, &bord[2],b);
-			xformbac(-large_bound, +large_bound, gcam.h.z, &bord[3],b);
+		} else {
+			xformprep(((double) halfplane) * PI, b);
 
-			//Clip screen to front plane
-			n = 0; didcut = 0;
-			for(i=4-1,j=0;j<4;i=j,j++)
-			{
-				if (bord[i].z >= SCISDIST) { bord2[n] = bord[i]; n++; }
-				if ((bord[i].z >= SCISDIST) != (bord[j].z >= SCISDIST))
-				{
-					f = (SCISDIST-bord[i].z)/(bord[j].z-bord[i].z);
-					bord2[n].x = (bord[j].x-bord[i].x)*f + bord[i].x;
-					bord2[n].y = (bord[j].y-bord[i].y)*f + bord[i].y;
-					bord2[n].z = (bord[j].z-bord[i].z)*f + bord[i].z;
-					n++; didcut = 1;
+			if (!b->has_portal_clip) {
+				// store original if it is first context;
+				b->oxformmatc = b->xformmatc;
+				b->oxformmats = b->xformmats;
+				b->ognadd = b->gnadd;
+				memcpy(&b->oxformmat, &b->xformmat, sizeof(double) * 9);
+
+				// NEW CODE - Use much larger bounds:
+				float large_bound = 1e6f;
+				xformbac(-large_bound, -large_bound, gcam.h.z, &bord[0], b);
+				xformbac(+large_bound, -large_bound, gcam.h.z, &bord[1], b);
+				xformbac(+large_bound, +large_bound, gcam.h.z, &bord[2], b);
+				xformbac(-large_bound, +large_bound, gcam.h.z, &bord[3], b);
+
+				//Clip screen to front plane
+				n = 0;
+				didcut = 0;
+				for (i = 4 - 1, j = 0; j < 4; i = j, j++) {
+					if (bord[i].z >= SCISDIST) {
+						bord2[n] = bord[i];
+						n++;
+					}
+					if ((bord[i].z >= SCISDIST) != (bord[j].z >= SCISDIST)) {
+						f = (SCISDIST - bord[i].z) / (bord[j].z - bord[i].z);
+						bord2[n].x = (bord[j].x - bord[i].x) * f + bord[i].x;
+						bord2[n].y = (bord[j].y - bord[i].y) * f + bord[i].y;
+						bord2[n].z = (bord[j].z - bord[i].z) * f + bord[i].z;
+						n++;
+						didcut = 1;
+					}
 				}
+				if (n < 3) break;
+				for(j=0;j<n;j++)
+				{
+					f = gcam.h.z/bord2[j].z;
+					bord2[j].x = bord2[j].x*f + gcam.h.x;
+					bord2[j].y = bord2[j].y*f + gcam.h.y;
+				}
+			} else {
+				n = 4;
 			}
-			if (n < 3) break;
 		}
 
 		memset8(b->sectgot,0,(lgs->numsects+31)>>3);
-		for(j=0;j<n;j++)
-		{
-			f = gcam.h.z/bord2[j].z;
-			bord2[j].x = bord2[j].x*f + gcam.h.x;
-			bord2[j].y = bord2[j].y*f + gcam.h.y;
-		}
-
 
 
 		if (!b->has_portal_clip) {
@@ -1726,8 +1558,11 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport, bdrawctx *parentc
     newctx.gnewtagsect = -1;
     newctx.gnewtag = -1;
     newctx.currenthalfplane = parentctx->currenthalfplane;
-	newctx.xformmatcori = parentctx->xformmatc;
-	newctx.xformmatsori = parentctx->xformmats;
+	// propagate original xforms
+	newctx.oxformmatc = parentctx->oxformmatc;
+	newctx.oxformmats = parentctx->oxformmats;
+	newctx.ognadd = parentctx->ognadd;
+	memcpy(&parentctx->oxformmat, &newctx.oxformmat, sizeof(double)*9);
     draw_hsr_polymost_ctx(map, &newctx);
 }
 

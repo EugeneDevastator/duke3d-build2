@@ -79,6 +79,8 @@ int mono_ins2d(int i, double nx, double ny) {
 }
 
 int mono_ins(int i, double nx, double ny, double nz) {
+    dpoint3d p = {nx,ny,nz};
+    LOOPADD(p)
     i = mono_ins2d(i, nx, ny);
     mp[i].z = nz;
     return (i);
