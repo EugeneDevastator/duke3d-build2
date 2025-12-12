@@ -94,7 +94,7 @@ extern int eyepolmal, eyepolvn, eyepolvmal;
 /** Main sector scanning with near-plane clipping
  * @param sectnum Sector index to scan and add to bunch list
  */
-void scansector(int sectnum, bunchgrp *b);
+void scansector(int sectnum, bdrawctx *b);
 
 /** Polygon front-to-back sorting and intersection testing
  * @param b0 First bunch index for comparison
@@ -102,14 +102,14 @@ void scansector(int sectnum, bunchgrp *b);
  * @param fixsplitnow Whether to generate split data for intersections
  * @return 0=no overlap, 1=b0 front, 2=b1 front, 3=unsortable
  */
-int bunchfront(int b0, int b1, int fixsplitnow, bunchgrp *b);
+int bunchfront(int b0, int b1, int fixsplitnow, bdrawctx *b);
 
 /** Prepares wall segments for bunch processing
  * @param b Bunch index to process
  * @param twal Output array for wall vertices (must be sector.n+1 size)
  * @return Number of vertices generated
  */
-int prepbunch(int id, bunchverts_t *twal, bunchgrp* b);
+int prepbunch(int id, bunchverts_t *twal, bdrawctx* b);
 
 /** Clips polygons to viewing frustum before rendering
  * @param tag Current portal tag
@@ -118,7 +118,7 @@ int prepbunch(int id, bunchverts_t *twal, bunchgrp* b);
  * @param plothead1 Second polygon loop head
  * @param flags Clipping flags: &1=do and, &2=do sub, &4=reverse cut for sub
  */
-void drawpol_befclip(int tag, int newtag, int newtagsect, int plothead0, int plothead1, int flags,bunchgrp *b);
+void drawpol_befclip(int tag, int newtag, int newtagsect, int plothead0, int plothead1, int flags,bdrawctx *b);
 
 /** Main HSR (Hidden Surface Removal) function handling both clipping and rendering
  * @param cc Camera parameters
@@ -128,17 +128,17 @@ void drawpol_befclip(int tag, int newtag, int newtagsect, int plothead0, int plo
  */
 void reset_context();
 void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy);
-void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx);
+void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx);
 // ================================================================================================
 // POLYGONAL SHADOW CREATION FUNCTIONS
 // ================================================================================================
-void draw_hsr_enter_portal(mapstate_t* map, int endportaln, bunchgrp *b, int plothead0, int plothead1);
-void gentex_xform (float *ouvmat, bunchgrp *b);
+void draw_hsr_enter_portal(mapstate_t* map, int endportaln, bdrawctx *b, int plothead0, int plothead1);
+void gentex_xform (float *ouvmat, bdrawctx *b);
 /** Creates shadow polygon lists for light sources
  * @param rethead0 First polygon loop head from clipping
  * @param rethead1 Second polygon loop head from clipping
  */
-void ligpoltagfunc(int rethead0, int rethead1, bunchgrp *b);
+void ligpoltagfunc(int rethead0, int rethead1, bdrawctx *b);
 
 /** Resets light polygon data structures
  * @param ind Light index to reset (-1 for all lights)
@@ -177,13 +177,13 @@ void eyepol_drawfunc(int ind);
  * @param rethead0 First polygon loop head
  * @param rethead1 Second polygon loop head
  */
-void drawtagfunc(int rethead0, int rethead1, bunchgrp * b);
+void drawtagfunc(int rethead0, int rethead1, bdrawctx * b);
 
 /** Software skybox rendering
  * @param rethead0 First polygon loop head
  * @param rethead1 Second polygon loop head
  */
-void skytagfunc(int rethead0, int rethead1, bunchgrp * b);
+void skytagfunc(int rethead0, int rethead1, bdrawctx * b);
 
 // Texture coordinate generation functions
 //void gentex_wall(void *npol2, void *sur);       // Wall texture mapping
@@ -198,12 +198,12 @@ void skytagfunc(int rethead0, int rethead1, bunchgrp * b);
  * @param rethead0 First polygon loop head
  * @param rethead1 Second polygon loop head
  */
-void changetagfunc(int rethead0, int rethead1, bunchgrp* b);
+void changetagfunc(int rethead0, int rethead1, bdrawctx* b);
 
 /** Processes wall segments, handles both clipping and rendering setup
  * @param bid Bunch index to process
  */
-void drawalls(int bid, mapstate_t* map, bunchgrp *b);
+void drawalls(int bid, mapstate_t* map, bdrawctx *b);
 
 /** Renders sprites with lighting if available */
 void drawsprites();

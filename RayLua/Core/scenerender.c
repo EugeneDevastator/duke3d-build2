@@ -152,7 +152,6 @@ void drawframe (cam_t *cc, player_transform *gdps, mapstate_t *gst) // draws sce
 				}
 			}
 
-			shadowtest2_setcam(&cam);
 			// no need for it for now.
 			//htrun(drawpollig,0,eyepoln,shadowtest2_numcpu);
 			//drawsprites();

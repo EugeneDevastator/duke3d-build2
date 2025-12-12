@@ -186,7 +186,7 @@ int argb_interp(int c0, int c1, int mul15) {
 				}
 }
 
-static int prepbunch (int id, bunchverts_t *twal, bunchgrp *b)
+static int prepbunch (int id, bunchverts_t *twal, bdrawctx *b)
 {
 	cam_t gcam = b->cam;
 	wall_t *wal;
@@ -238,7 +238,7 @@ static int prepbunch (int id, bunchverts_t *twal, bunchgrp *b)
 	//   1: FRONT:RED(b0)
 	//   2: FRONT:GREEN(b1)
 	//   3: UNSORTABLE!
-static int bunchfront (int b0, int b1, int fixsplitnow, bunchgrp *b)
+static int bunchfront (int b0, int b1, int fixsplitnow, bdrawctx *b)
 {
 	cam_t gcam = b->cam;
 	bunchverts_t *twal[2];
@@ -405,7 +405,7 @@ overflow:otx0 = tx0; oty0 = ty0; otx1 = tx1; oty1 = ty1;
 #endif
 }
 
-static void scansector (int sectnum, bunchgrp* b)
+static void scansector (int sectnum, bdrawctx* b)
 {
 	cam_t gcam = b->cam;
 	#define BUNCHNEAR 1e-7
@@ -567,7 +567,7 @@ bunchgrid_got:;
 
 }
 
-static void xformprep (double hang, bunchgrp *b)
+static void xformprep (double hang, bdrawctx *b)
 {
 	cam_t gcam = b->cam;
 	double f; f = atan2(gcam.f.y,gcam.f.x)+hang; //WARNING: "f = 1/sqrt; c *= f; s *= f;" form has singularity - don't use :/
@@ -580,7 +580,7 @@ static void xformprep (double hang, bunchgrp *b)
 	b->gnadd.z = -gcam.h.x*b->xformmat[6] - gcam.h.y*b->xformmat[7] + gcam.h.z*b->xformmat[8];
 }
 
-static void xformbac (double rx, double ry, double rz, dpoint3d *o, bunchgrp *b)
+static void xformbac (double rx, double ry, double rz, dpoint3d *o, bdrawctx *b)
 {
 	o->x = rx*b->xformmat[0] + ry*b->xformmat[3] + rz*b->xformmat[6];
 	o->y = rx*b->xformmat[1] + ry*b->xformmat[4] + rz*b->xformmat[7];
@@ -592,7 +592,7 @@ point3d *eyepolv = 0; //16384 point2d's  = 128KB
 int eyepoln = 0, glignum = 0;
 int eyepolmal = 0, eyepolvn = 0, eyepolvmal = 0;
 
-static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
+static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 {
 	cam_t orcam = b->orcam;
 	float f,fx,fy, g, *fptr;
@@ -707,7 +707,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 	Uses special texture mapping flags (b->gflags = 10-15 for different cube faces)
 */
 
-static void skytagfunc (int rethead0, int rethead1, bunchgrp* b)
+static void skytagfunc (int rethead0, int rethead1, bdrawctx* b)
 {
 	cam_t gcam = b->cam;
 	#define SSCISDIST 0.000001 //Reduces probability of glitch further
@@ -788,7 +788,7 @@ static int ligpolmaxvert = 0;
 	Used during shadow map generation phase (mode 4)
 	Creates hash table for fast polygon lookup by sector/wall/slab
  */
-static void ligpoltagfunc (int rethead0, int rethead1, bunchgrp *b)
+static void ligpoltagfunc (int rethead0, int rethead1, bdrawctx *b)
 {
 	cam_t gcam = b->cam;
 	float f, fx, fy, fz;
@@ -858,7 +858,7 @@ static void ligpoltagfunc (int rethead0, int rethead1, bunchgrp *b)
 	Maintains mph[] (mono polygon hierarchy) for spatial partitioning
 	"tag" refers to sector IDs
 */
-static void changetagfunc (int rethead0, int rethead1, bunchgrp *b)
+static void changetagfunc (int rethead0, int rethead1, bdrawctx *b)
 {
 	if ((rethead0|rethead1) < 0) return;
 	int mapsect = b->gnewtagsect;
@@ -875,7 +875,7 @@ static void changetagfunc (int rethead0, int rethead1, bunchgrp *b)
 	//flags&1: do and
 	//flags&2: do sub
 	//flags&4: reverse cut for sub
-static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead0, int plothead1, int flags, bunchgrp* b)
+static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead0, int plothead1, int flags, bdrawctx* b)
 {
 	int mtag = tag1 + taginc*b->recursion_depth;
 	int tagsect = tag1;
@@ -885,7 +885,7 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 	#define BSCISDIST 0.000001 //Reduces probability of glitch further
 	//#define BSCISDIST 0.0001 //Gaps undetectable
 	//#define BSCISDIST 0.1 //Huge gaps
-	void (*mono_output)(int h0, int h1, bunchgrp *b);
+	void (*mono_output)(int h0, int h1, bdrawctx *b);
 	dpoint3d *otp, *tp;
 	double f, ox, oy, oz;
 	int i, j, k, l, h, on, n, plothead[2], imin, imax, i0, i1, omph0, omph1;
@@ -1044,7 +1044,7 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 
 
 	//FIXFIXFIX: clean this up!
-static void gentex_xform (float *ouvmat, bunchgrp *b)
+static void gentex_xform (float *ouvmat, bdrawctx *b)
 {
 	cam_t gcam = b->cam;
 	float ax, ay, az, bx, by, bz, cx, cy, cz, p0x, p0y, p0z, p1x, p1y, p1z, p2x, p2y, p2z, f;
@@ -1078,7 +1078,7 @@ static void gentex_xform (float *ouvmat, bunchgrp *b)
 	}
 }
 
-static void gentex_sky (surf_t *sur, bunchgrp *b)
+static void gentex_sky (surf_t *sur, bdrawctx *b)
 {
 	cam_t gcam = b->cam;
 	float f, g, h;
@@ -1096,7 +1096,7 @@ static void gentex_sky (surf_t *sur, bunchgrp *b)
 	gentex_xform(b->gouvmat,b);
 }
 
-static void gentex_ceilflor (sect_t *sec, wall_t *wal, surf_t *sur, int isflor, bunchgrp *b)
+static void gentex_ceilflor (sect_t *sec, wall_t *wal, surf_t *sur, int isflor, bdrawctx *b)
 {
 	cam_t gcam = b->cam;
 	float f, g, fz, ax, ay, wx, wy, ox, oy, oz, fk[6];
@@ -1143,7 +1143,7 @@ static void gentex_ceilflor (sect_t *sec, wall_t *wal, surf_t *sur, int isflor, 
 	gentex_xform(b->gouvmat, b);
 }
 
-static void gentex_wall (kgln_t *npol2, surf_t *sur, bunchgrp *b)
+static void gentex_wall (kgln_t *npol2, surf_t *sur, bdrawctx *b)
 {
 	cam_t gcam = b->cam;
 	float f, g, ox, oy, oz, rdet, fk[24];
@@ -1223,7 +1223,7 @@ the final visible geometry ready for 2D projection.
 The b parameter is a bunch index - this function processes one "bunch" (visible sector group) at a time. The traversal logic is in the caller that:
 */
 
-static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
+static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 {
 	cam_t gcam = b->cam;
 	// === VARIABLE DECLARATIONS ===
@@ -1489,7 +1489,7 @@ void reset_context() {
 	eyepoln = 0; eyepolvn = 0;
 }
 void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
-	bunchgrp bs;
+	bdrawctx bs;
 	bs.cam = *cc;
 	bs.orcam = *cc;
 	bs.recursion_depth = 0;
@@ -1497,7 +1497,7 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
 	draw_hsr_polymost_ctx(map,&bs);
 }
 
-void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
+void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
 	if (!newctx) {
 		return;
 	}
@@ -1506,7 +1506,7 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 	int presect = -1;
 
 	int recursiveDepth = newctx->recursion_depth;
-	bunchgrp *b;
+	bdrawctx *b;
 	b = newctx;
 	b->sectgotn = 0;
 	b->sectgot = 0;
@@ -1835,7 +1835,7 @@ static point3d local_to_world_vec(point3d local_vec, transform *tr) {
     world.z = local_vec.x * tr->r.z + local_vec.y * tr->d.z + local_vec.z * tr->f.z;
 
     return world;
-}static void draw_hsr_enter_portal(mapstate_t* map, int myport, bunchgrp *parentctx,
+}static void draw_hsr_enter_portal(mapstate_t* map, int myport, bdrawctx *parentctx,
                                    int plothead0, int plothead1)
 {
     if (parentctx->recursion_depth >= MAX_PORTAL_DEPTH) {
@@ -1873,7 +1873,7 @@ static point3d local_to_world_vec(point3d local_vec, transform *tr) {
 
     ncam.cursect = portals[endp].sect;
 
-    bunchgrp newctx = {};
+    bdrawctx newctx = {};
     newctx.recursion_depth = parentctx->recursion_depth + 1;
     newctx.cam = ncam;
     newctx.orcam = parentctx->orcam;

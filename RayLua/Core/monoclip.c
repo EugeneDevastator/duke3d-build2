@@ -4,6 +4,8 @@
 
 #include "monoclip.h"
 
+#include "monodebug.h"
+
 
 mph_t *mph = 0;
 int mphnum = 0;
@@ -13,7 +15,7 @@ int mphmal = 0;
 mp_t *mp = 0;
 int mpempty, mpmal = 0;
 
-void mph_check(int mphnum) {
+void mono_mph_check(int mphnum) {
     if (mphnum >= mphmal) {
         mphmal <<= 1;
         mph = (mph_t *) realloc(mph, mphmal * sizeof(mph[0]));
@@ -27,7 +29,7 @@ void mono_initonce() {
     mphmal = 512;
     mph = (mph_t *) realloc(mph, mphmal * sizeof(mph[0]));
     mpempty = 0;
-    mpmal = 2048;
+    mpmal = 12048;
     mp = (mp_t *) realloc(mp, mpmal * sizeof(mp[0]));
     for (i = 0; i < mpmal; i++) {
         mp[i].n = i + 1;
@@ -35,6 +37,7 @@ void mono_initonce() {
     }
     mp[mpmal - 1].n = 0;
     mp[0].p = mpmal - 1;
+    mono_dbg_init();
 }
 
 int mono_ins2d(int i, double nx, double ny) {
@@ -80,7 +83,12 @@ int mono_ins(int i, double nx, double ny, double nz) {
     mp[i].z = nz;
     return (i);
 }
-
+int mono_insp(int i, dpoint3d p) {
+    i = mono_ins2d(i, p.x, p.y);
+    mp[i].z = p.z;
+    LOOPADD(p)
+    return (i);
+}
 void mono_del(int i) {
     int p, n;
 
@@ -191,7 +199,7 @@ void mono_genfromloop(int *plothead0, int *plothead1, dpoint3d *tp, int n) {
     (*plothead1) = plothead[1];
 }
 
-void intersamexy(double x0, double y0, double x1, double y1, double z0, double z1, double z2, double z3, double *ix,
+void mono_intersamexy(double x0, double y0, double x1, double y1, double z0, double z1, double z2, double z3, double *ix,
                  double *iy, double *iz) {
     double f;
     z2 -= z0;
@@ -207,7 +215,14 @@ void intersamexy(double x0, double y0, double x1, double y1, double z0, double z
     (*iy) = (y1 - y0) * f + y0;
     (*iz) = (z1 - z0) * f + z0;
 }
-
+int intersect_traps_mono_points(dpoint3d p0, dpoint3d p1, dpoint3d trap1[4], dpoint3d trap2[4], int *rh0, int *rh1) {
+    return intersect_traps_mono(
+        p0.x, p0.y, p1.x, p1.y,
+        trap1[0].z, trap1[1].z, trap1[2].z, trap1[3].z,
+        trap2[0].z, trap2[1].z, trap2[2].z, trap2[3].z,
+        rh0, rh1
+    );
+}
 int intersect_traps_mono(double x0, double y0, double x1, double y1, double z0, double z4, double z5, double z1,
                          double z2, double z6, double z7, double z3, int *rh0, int *rh1) {
     double fx, fy, fz;
@@ -233,8 +248,8 @@ int intersect_traps_mono(double x0, double y0, double x1, double y1, double z0, 
     h1 = -1;
     if ((i == 0) || (i == 5)) {
         if (i != j) {
-            if (i == 5) intersamexy(x0, y0, x1, y1, z0, z4, z3, z7, &fx, &fy, &fz);
-            else intersamexy(x0, y0, x1, y1, z1, z5, z2, z6, &fx, &fy, &fz);
+            if (i == 5) mono_intersamexy(x0, y0, x1, y1, z0, z4, z3, z7, &fx, &fy, &fz);
+            else mono_intersamexy(x0, y0, x1, y1, z1, z5, z2, z6, &fx, &fy, &fz);
             h0 = mono_ins(h0, fx, fy, fz);
             h1 = mono_ins(h1, fx, fy, fz);
         }
@@ -246,18 +261,18 @@ int intersect_traps_mono(double x0, double y0, double x1, double y1, double z0, 
     }
     if (i != j) {
         if ((i < 3) != (j < 3)) {
-            intersamexy(x0, y0, x1, y1, z0, z4, z2, z6, &fx, &fy, &fz);
+            mono_intersamexy(x0, y0, x1, y1, z0, z4, z2, z6, &fx, &fy, &fz);
             h0 = mono_ins(h0, fx, fy, fz);
         }
         if (((i ^ 1) < 3) != ((j ^ 1) < 3)) {
-            intersamexy(x0, y0, x1, y1, z1, z5, z3, z7, &fx, &fy, &fz);
+            mono_intersamexy(x0, y0, x1, y1, z1, z5, z3, z7, &fx, &fy, &fz);
             h1 = mono_ins(h1, fx, fy, fz);
         }
     }
     if ((j == 0) || (j == 5)) {
         if (i != j) {
-            if (j == 5) intersamexy(x0, y0, x1, y1, z0, z4, z3, z7, &fx, &fy, &fz);
-            else intersamexy(x0, y0, x1, y1, z1, z5, z2, z6, &fx, &fy, &fz);
+            if (j == 5) mono_intersamexy(x0, y0, x1, y1, z0, z4, z3, z7, &fx, &fy, &fz);
+            else mono_intersamexy(x0, y0, x1, y1, z1, z5, z2, z6, &fx, &fy, &fz);
             h0 = mono_ins(h0, fx, fy, fz);
             h1 = mono_ins(h1, fx, fy, fz);
         }
@@ -364,7 +379,7 @@ int mono_max(int hd0, int hd1, int maxsid, int mode) {
     return (mp[ho].n);
 }
 
-int mono_clipself(int hd0, int hd1, bunchgrp* b, void (*mono_output)(int h0, int h1,bunchgrp* b)) {
+int mono_clipself(int hd0, int hd1, bdrawctx* b, void (*mono_output)(int h0, int h1,bdrawctx* b)) {
     double f, g, ix, iy, dx, dy, dx2, dy2, x0[2], y0[2], x1[2], y1[2];
     int i, j, k, ogood, good, hd[2], ind[2], ho[2], outnum = 0;
 
@@ -495,6 +510,7 @@ int mono_join(int hd0, int hd1, int hd2, int hd3, int *ho0, int *ho1) {
             hd[j + 2] = t;
         }
     }
+    //(mp[mp[hd[1]].p].x != mp[hd[3]].x)) return (0); hd[1] is out of bounds sometimes.
     if ((mp[mp[hd[0]].p].x != mp[hd[2]].x) || (mp[mp[hd[1]].p].x != mp[hd[3]].x)) return (0);
     for (j = 2 - 1; j >= 0; j--) {
         iy[j + 0] = mp[hd[j + 0]].p;
@@ -524,9 +540,15 @@ int mono_join(int hd0, int hd1, int hd2, int hd3, int *ho0, int *ho1) {
     return (1);
 }
 
-void mono_bool(int hr0, int hr1, int hw0, int hw1, int boolop, bunchgrp* b, void (*mono_output)(int h0, int h1,bunchgrp* b)) {
+void mono_bool(int hr0, int hr1, int hw0, int hw1, int boolop, bdrawctx* b, void (*mono_output)(int h0, int h1,bdrawctx* b)) {
     int hd0, hd1;
-
+    if (g_captureframe) {
+        char buf[64];
+        sprintf(buf, "BEFORE_%s_hr", (boolop==MONO_BOOL_AND)?"AND":(boolop==MONO_BOOL_SUB)?"SUB":"SUBREV");
+        mono_dbg_capture_pair(hr0, hr1, buf, boolop);
+        sprintf(buf, "BEFORE_%s_hw", (boolop==MONO_BOOL_AND)?"AND":(boolop==MONO_BOOL_SUB)?"SUB":"SUBREV");
+        mono_dbg_capture_pair(hw0, hw1, buf, boolop);
+    }
     if (boolop == MONO_BOOL_AND) {
         //{ //Debug!
         //int i;
@@ -539,16 +561,91 @@ void mono_bool(int hr0, int hr1, int hw0, int hw1, int boolop, bunchgrp* b, void
 
         hd0 = mono_max(hr0, hw0, +1, 0);
         hd1 = mono_max(hr1, hw1, -1, 0);
+        if (g_captureframe) {
+            mono_dbg_capture_pair(hd0, hd1, "AFTER_MAX_AND", boolop);
+        }
         mono_clipself(hd0, hd1, b, mono_output);
         mono_deloop(hd1);
         mono_deloop(hd0);
     } else {
         boolop = (boolop == MONO_BOOL_SUB);
         hd0 = mono_max(hr1, hw0, -1, boolop ^ 1);
+        if (g_captureframe) {
+            mono_dbg_capture_chain(hd0, 0, "AFTER_MAX_SUB1", boolop);
+        }
         mono_clipself(hr0, hd0, b, mono_output);
         mono_deloop(hd0);
         hd0 = mono_max(hr0, hw1, +1, boolop);
+        if (g_captureframe) {
+            mono_dbg_capture_chain(hd0, 0, "AFTER_MAX_SUB2", boolop);
+        }
         mono_clipself(hd0, hr1, b, mono_output);
         mono_deloop(hd0);
     }
+}
+void strip_init(triangle_strip_t *strip) {
+   // strip->indices = NULL;
+    strip->count = 0;
+    strip->capacity = 0;
+}
+
+void strip_free(triangle_strip_t *strip) {
+    if (strip->indices) {
+        free(strip->indices);
+        strip->indices = NULL;
+    }
+    strip->count = 0;
+    strip->capacity = 0;
+}
+
+void strip_add(triangle_strip_t *strip, int index) {
+    if (strip->count >= strip->capacity) {
+        strip->capacity = max(strip->capacity << 1, 16);
+        strip->indices = (int *)realloc(strip->indices, strip->capacity * sizeof(int));
+    }
+    strip->indices[strip->count++] = index;
+}
+int mono_generate_eyepol(int hd0, int hd1, point3d **out_verts1,  point3d **out_verts2, int *out_count1, int *out_count2) {
+    if ((hd0 | hd1) < 0) {
+        *out_verts1 = NULL;
+        *out_verts2 = NULL;
+        *out_count1 = 0;
+        *out_count2 = 0;
+        return 0;
+    }
+
+    point3d *verts1 = (point3d *)malloc((64) * sizeof(point3d));
+    point3d *verts2 = (point3d *)malloc((64) * sizeof(point3d));
+    int v1cnt = 0;
+    // Add chain0 forward
+    int i = hd0;
+    do {
+        verts1[v1cnt].x = (float)mp[i].x;
+        verts1[v1cnt].y = (float)mp[i].y;
+        verts1[v1cnt].z = (float)mp[i].z;
+        v1cnt++;
+        i = mp[i].n;
+    } while (i != hd0);
+    mono_deloop(hd0);
+
+    // Collect chain1 indices
+    i = hd1;
+    int v2cnt = 0;
+    do {
+        i = mp[i].p;
+        verts2[v2cnt].x = (float)mp[i].x;
+        verts2[v2cnt].y = (float)mp[i].y;
+        verts2[v2cnt].z = (float)mp[i].z;
+        v2cnt++;
+    } while (i != hd1);
+
+
+    mono_deloop(hd0);
+  //  free(chain1);
+
+    *out_count1 = v1cnt;
+    *out_count2 = v2cnt;
+    *out_verts1 = verts1;
+    *out_verts2 = verts2;
+    return (v1cnt+v2cnt >= 3) ? 1 : 0;
 }
