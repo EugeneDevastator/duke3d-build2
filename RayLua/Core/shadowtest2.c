@@ -1597,7 +1597,7 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport, bdrawctx *parentc
 	newctx.oxformmatc = parentctx->oxformmatc;
 	newctx.oxformmats = parentctx->oxformmats;
 	newctx.ognadd = parentctx->ognadd;
-	memcpy(&parentctx->oxformmat, &newctx.oxformmat, sizeof(double)*9);
+	memcpy(&newctx.oxformmat, &parentctx->oxformmat, sizeof(double)*9);
     draw_hsr_polymost_ctx(map, &newctx);
 }
 
