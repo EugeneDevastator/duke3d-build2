@@ -401,6 +401,12 @@ static void scansector (int sectnum, bdrawctx* b)
 		}
 		else
 		{
+			double zzz = getwallz(sec,1,i);
+			dpoint3d wp = {wal[i].x,wal[i].y,zzz};
+			//portal_xform_world_fullp(&wp,b);
+			//if (b->has_portal_clip)
+			//	LOOPADD(wp)
+
 			dx0 = wal[i].x-gcam.p.x; dy0 = wal[i].y-gcam.p.y;
 			dx1 = wal[j].x-gcam.p.x; dy1 = wal[j].y-gcam.p.y;
 			if (dy1*dx0 <= dx1*dy0) goto docont; //Back-face cull
@@ -738,6 +744,7 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 	int mnewtag = newtag1 == -1 ? -1 : newtag1 + taginc*b->recursion_depth;
 	b->gnewtagsect = newtagsect;
 	cam_t gcam = b->cam;
+	double* xform = b->oxformmat;
 	#define BSCISDIST 0.000001 //Reduces probability of glitch further
 	//#define BSCISDIST 0.0001 //Gaps undetectable
 	//#define BSCISDIST 0.1 //Huge gaps
