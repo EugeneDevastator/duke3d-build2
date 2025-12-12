@@ -4,29 +4,15 @@
 #include <stdbool.h>
 
 #include "scenerender.h"
-#if 0
-shadowtest2.exe: shadowtest2.obj winmain.obj build2.obj drawpoly.obj drawcone.obj drawkv6.obj kplib.obj;
-				link shadowtest2.obj winmain.obj build2.obj drawpoly.obj drawcone.obj drawkv6.obj kplib.obj\
-	ddraw.lib dinput.lib dxguid.lib ole32.lib user32.lib gdi32.lib kernel32.lib /opt:nowin98
-	del shadowtest2.obj
-
-#zbufmode=/DUSEINTZ
-zbufmode=
-
-shadowtest2.obj: shadowtest2.c; cl /c /TP shadowtest2.c /Ox /G6Fy /MD /QIfist $(zbufmode) /DSTANDALONE
-build2.obj:      build2.c;      cl /c /TP build2.c      /Ox /G6Fy /MD         $(zbufmode)
-drawpoly.obj:    drawpoly.c;    cl /c /TP drawpoly.c    /Ox /G6Fy /MD /QIfist $(zbufmode)
-drawcone.obj:    drawcone.c;    cl /c /TP drawcone.c    /Ox /G6Fy /MD /QIfist $(zbufmode)
-drawkv6.obj:     drawkv6.c;     cl /c /TP drawkv6.c     /Ox /G6Fy /MD /QIfist $(zbufmode) /DUSEKZ
-kplib.obj:       kplib.c;       cl /c /TP kplib.c       /Ox /G6Fy /MD
-winmain.obj:     winmain.cpp;   cl /c /TP winmain.cpp   /Ox /G6Fy /MD
-!if 0
-#endif
 
 #include <malloc.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <stdarg.h>
+
+#include "buildmath.h"
+#include "monodebug.h"
 #define PI 3.14159265358979323
 #pragma warning(disable:4731)
 
@@ -35,63 +21,140 @@ winmain.obj:     winmain.cpp;   cl /c /TP winmain.cpp   /Ox /G6Fy /MD
 #define USEGAMMAHACK 1 //FIXFIXFIX
 int renderinterp = 1;
 int compact2d = 0;
-#if 0
+/*
+Monopoly uses xy as screen coords and z as depth
+Engine uses z as right, y as forward, z as down
+Portals: we move camera to supposed place instead of transforming entire world.
+for all porals same clipping plane is used, so mono state is shared, and should not reset
+word has coordinates right down forward, which correspond to x z y
+z grows down. and down vector is xyz=0,0,1;
+mono plane has xy as screen coords and z as some sort of depth, but better not use it at all.
+eyepols are generated from mono space AND plane equation stored in gouvmat.
+*/
+//------ UTILS -------
+#define DO_AND_SUB 3
+#define DO_AND_SUB_REV 7
 
-typedef struct { char filnam[232]; float u0, v0, ux, uy, vx, vy; } sky_t;
+void logstep(const char* fmt, ...) {
+	if (!captureframe)
+		return;
+	va_list args;
+	va_start(args, fmt);
+	vprintf(fmt, args);
+	va_end(args);
+	printf("\n");
+}
+static inline dpoint3d portal_xform_world_fullr(double x, double y, double z, bdrawctx *b) {
+	dpoint3d p;
+	p.x = x;
+	p.y = y;
+	p.z = z;
+	wccw_transform(&p, &b->cam, &b->orcam);
+//loops[loopnum] = p;
+//loopuse[loopnum] = true;
+//loopnum++;
+	return p;
+}
+static inline void portal_xform_world_full(double *x, double *y, double *z, bdrawctx *b) {
+	dpoint3d p;
+	p.x = *x;
+	p.y = *y;
+	p.z = *z;
+	wccw_transform(&p, &b->cam, &b->orcam);
+//loops[loopnum] = p;
+//loopuse[loopnum] = true;
+//loopnum++;
+	*x = p.x;
+	*y = p.y;
+	*z = p.z;
+}
+static inline void portal_xform_world_fullp(dpoint3d *inp, bdrawctx *b) {
+	wccw_transform(inp, &b->cam, &b->orcam);
+//loops[loopnum] = *inp;
+//loopuse[loopnum] = true;
+//loopnum++;
 
-skytest.sky:
------------------------------------------
-"skytest.png" 0    0  256 0  0 256 //front
-"skytest.png" 0  256  256 0  0 256 //right
-"skytest.png" 0  512  256 0  0 256 //back
-"skytest.png" 0  768  256 0  0 256 //left
-"skytest.png" 0 1024  256 0  0 256 //up
-"skytest.png" 0 1280  256 0  0 256 //down
-
-#endif
-
-#if 0
-drawpol (..)
-{
-	...
-	for each visible light:
-	{
-		Prepare light ramping (12 floats/poly)
-		Project&write raster list (xi,x0,y0,yl,dir)
-	}
-	for each y:
-	{
-		//generate active list rasters from shadows touching this y
-		//sort span lefts
-		//sort span rights
-		//precalc light math for y
-		while (x not done)
-		{
-			xe = whole_raster_right
-			for active lights:
-			{
-				find next left  >= x on light's spans
-				find next right >= x on light's spans
-				xe = min(xe,left,right);
-			}
-			for active lights { sum RGB }
-			draw x..xe,y
-		}
-	}
 }
 
-drawscreen (..)
-{
-	render current view to lists, including texture info
+int intersect_traps_mono3d(double x0, double y0, double x1, double y1, double z0, double z4, double z5, double z1,
+                         double z2, double z6, double z7, double z3, int *rh0, int *rh1, bdrawctx* b) {
+    double fx, fy, fz;
+    int i, j, h0, h1;
+#define PXF(aa,bb,cc) portal_xform_world_fullr(aa,bb,cc,b)
+    //0123,0213,0231,2013,2031,2301
+	LOOPEND
+    if (z0 < z2) {
+        if (z1 < z2) i = 0;
+        else i = (z1 >= z3) + 1;
+    } else {
+        if (z3 < z0) i = 5;
+        else i = (z3 < z1) + 3;
+    }
+    if (z4 < z6) {
+        if (z5 < z6) j = 0;
+        else j = (z5 >= z7) + 1;
+    } else {
+        if (z7 < z4) j = 5;
+        else j = (z7 < z5) + 3;
+    }
 
-		//Generate shadow polygon list
-	for each light in map:
-		for each visible face in both light and current view, store:
-			xyz loop, norm, light_index
+    h0 = -1;
+    h1 = -1;
+    if ((i == 0) || (i == 5)) {
+        if (i != j) {
+            if (i == 5) mono_intersamexy(x0, y0, x1, y1, z0, z4, z3, z7, &fx, &fy, &fz);
+            else mono_intersamexy(x0, y0, x1, y1, z1, z5, z2, z6, &fx, &fy, &fz);
 
-	render current view from list
+        	h0 = mono_insp(h0, PXF(fx, fy, fz));
+            h1 = mono_insp(h1, PXF(fx, fy, fz));
+        }
+    } else {
+        if (i > 2) h0 = mono_insp(h0, PXF(x0, y0, z0));
+        else h0 = mono_insp(h0, PXF(x0, y0, z2));
+        if (i & 1) h1 = mono_insp(h1, PXF(x0, y0, z1));
+        else h1 = mono_insp(h1, PXF(x0, y0, z3));
+    }
+    if (i != j) {
+        if ((i < 3) != (j < 3)) {
+            mono_intersamexy(x0, y0, x1, y1, z0, z4, z2, z6, &fx, &fy, &fz);
+            h0 = mono_insp(h0, PXF(fx, fy, fz));
+        }
+        if (((i ^ 1) < 3) != ((j ^ 1) < 3)) {
+            mono_intersamexy(x0, y0, x1, y1, z1, z5, z3, z7, &fx, &fy, &fz);
+            h1 = mono_insp(h1, PXF(fx, fy, fz));
+        }
+    }
+    if ((j == 0) || (j == 5)) {
+        if (i != j) {
+            if (j == 5) mono_intersamexy(x0, y0, x1, y1, z0, z4, z3, z7, &fx, &fy, &fz);
+            else mono_intersamexy(x0, y0, x1, y1, z1, z5, z2, z6, &fx, &fy, &fz);
+            h0 = mono_insp(h0, PXF(fx, fy, fz));
+            h1 = mono_insp(h1, PXF(fx, fy, fz));
+        }
+    } else {
+        if (j > 2) h0 = mono_insp(h0, PXF(x1, y1, z4));
+        else h0 = mono_insp(h0, PXF(x1, y1, z6));
+        if (j & 1) h1 = mono_insp(h1, PXF(x1, y1, z5));
+        else h1 = mono_insp(h1, PXF(x1, y1, z7));
+    }
+LOOPEND
+    if ((h0 | h1) < 0) return (0);
+    (*rh0) = mp[h0].n;
+    (*rh1) = mp[h1].n;
+    return (1);
 }
-#endif
+int intersect_traps_mono_points3d(dpoint3d p0, dpoint3d p1, dpoint3d trap1[4], dpoint3d trap2[4], int *rh0, int *rh1, bdrawctx* b) {
+	return intersect_traps_mono3d(
+		p0.x, p0.y, p1.x, p1.y,
+		trap1[0].z, trap1[1].z, trap1[2].z, trap1[3].z,
+		trap2[0].z, trap2[1].z, trap2[2].z, trap2[3].z,
+		rh0, rh1,b
+	);
+}
+int shadowtest2_backface_cull = 0;  // Toggle backface culling
+int shadowtest2_distance_cull = 0;  // Toggle distance-based culling
+int shadowtest2_debug_walls = 1;    // Verbose wall logging
+int shadowtest2_debug_block_selfportals = 1;    // Verbose wall logging
 
 //--------------------------------------------------------------------------------------------------
 static tiletype gdd;
@@ -105,7 +168,6 @@ unsigned int *shadowtest2_sectgot = 0; //WARNING:code uses x86-32 bit shift tric
 static unsigned int *shadowtest2_sectgotmal = 0;
 static int shadowtest2_sectgotn = 0;
 #define CLIP_PORTAL_FLAG 8
-#define MAX_PORTAL_DEPTH 4
 //Translation & rotation
 static mapstate_t *curMap;
 static player_transform *gps;
@@ -126,31 +188,16 @@ __declspec(align(16)) static float g_qamb[4]; //holder for SSE to avoid degenera
 static point3d slightpos[LIGHTMAX], slightdir[LIGHTMAX];
 static float spotwid[LIGHTMAX];
 
+eyepol_t *eyepol = 0; // 4096 eyepol_t's = 192KB
+point3d *eyepolv = 0; //16384 point2d's  = 128KB
+int eyepoln = 0, glignum = 0;
+int eyepolmal = 0, eyepolvn = 0, eyepolvmal = 0;
+#define LIGHASHSIZ 1024
+static int ligpolmaxvert = 0;
+#define lighash(sect,wall,slab) ((((slab)<<6)+((sect)<<4)+(wall))&(LIGHASHSIZ-1))
 //--------------------------------------------------------------------------------------------------
 extern void htrun (void (*dacallfunc)(int), int v0, int v1, int danumcpu);
 extern double distpoint2line2 (double x, double y, double x0, double y0, double x1, double y1);
-
-	//KPLIB.H (excerpt):
-extern int kzaddstack (const char *);
-
-	//DRAWKV6.H:
-typedef struct
-{
-	float hx[8], hy[8], hz[8], rhzup20[8];
-	short wmin[8], wmax[8];
-	short ighyxyx[4], igyxyx[4]; //32-bit only!
-	intptr_t ddp, ddf, ddx, ddy, zbufoff;
-	point3d p, r, d, f;
-} drawkv6_frame_t;
-drawkv6_frame_t drawkv6_frame;
-
-	//DRAWCONE.H:
-#define DRAWCONE_NOCAP0 1
-#define DRAWCONE_NOCAP1 2
-#define DRAWCONE_FLAT0 4
-#define DRAWCONE_FLAT1 8
-#define DRAWCONE_CENT 16
-//--------------------------------------------------------------------------------------------------
 
 //--------------------------------------------------------------------------------------------------
 inline void memset8(void *d, long v, long n) {
@@ -168,25 +215,8 @@ inline void memset8(void *d, long v, long n) {
 				emms
 				}
 }
-int argb_interp(int c0, int c1, int mul15) {
-	_asm
-			{
-				punpcklbw mm0, c0
-				punpcklbw mm1, c1
-				psrlw mm0, 8
-				psrlw mm1, 8
-				psubw mm1, mm0
-				paddw mm1, mm1
-				pshufw mm2, mul15, 0
-				pmulhw mm1, mm2
-				paddw mm1, mm0
-				packuswb mm1, mm1
-				movd eax, mm1
-				emms
-				}
-}
 
-static int prepbunch (int id, bunchverts_t *twal, bunchgrp *b)
+static int prepbunch (int id, bunchverts_t *twal, bdrawctx *b)
 {
 	cam_t gcam = b->cam;
 	wall_t *wal;
@@ -238,7 +268,7 @@ static int prepbunch (int id, bunchverts_t *twal, bunchgrp *b)
 	//   1: FRONT:RED(b0)
 	//   2: FRONT:GREEN(b1)
 	//   3: UNSORTABLE!
-static int bunchfront (int b0, int b1, int fixsplitnow, bunchgrp *b)
+static int bunchfront (int b0, int b1, int fixsplitnow, bdrawctx *b)
 {
 	cam_t gcam = b->cam;
 	bunchverts_t *twal[2];
@@ -405,7 +435,7 @@ overflow:otx0 = tx0; oty0 = ty0; otx1 = tx1; oty1 = ty1;
 #endif
 }
 
-static void scansector (int sectnum, bunchgrp* b)
+static void scansector (int sectnum, bdrawctx* b)
 {
 	cam_t gcam = b->cam;
 	#define BUNCHNEAR 1e-7
@@ -567,7 +597,7 @@ bunchgrid_got:;
 
 }
 
-static void xformprep (double hang, bunchgrp *b)
+static void xformprep (double hang, bdrawctx *b)
 {
 	cam_t gcam = b->cam;
 	double f; f = atan2(gcam.f.y,gcam.f.x)+hang; //WARNING: "f = 1/sqrt; c *= f; s *= f;" form has singularity - don't use :/
@@ -580,19 +610,14 @@ static void xformprep (double hang, bunchgrp *b)
 	b->gnadd.z = -gcam.h.x*b->xformmat[6] - gcam.h.y*b->xformmat[7] + gcam.h.z*b->xformmat[8];
 }
 
-static void xformbac (double rx, double ry, double rz, dpoint3d *o, bunchgrp *b)
+static void xformbac (double rx, double ry, double rz, dpoint3d *o, bdrawctx *b)
 {
 	o->x = rx*b->xformmat[0] + ry*b->xformmat[3] + rz*b->xformmat[6];
 	o->y = rx*b->xformmat[1] + ry*b->xformmat[4] + rz*b->xformmat[7];
 	o->z = rx*b->xformmat[2] + ry*b->xformmat[5] + rz*b->xformmat[8];
 }
 
-eyepol_t *eyepol = 0; // 4096 eyepol_t's = 192KB
-point3d *eyepolv = 0; //16384 point2d's  = 128KB
-int eyepoln = 0, glignum = 0;
-int eyepolmal = 0, eyepolvn = 0, eyepolvmal = 0;
-
-static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
+static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 {
 	cam_t orcam = b->orcam;
 	float f,fx,fy, g, *fptr;
@@ -698,89 +723,8 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bunchgrp *b)
 	eyepol[eyepoln].rdepth = b->recursion_depth;
 }
 
-/*
-	Purpose: Renders skybox faces as background
-	Generates 6 cube faces for skybox rendering
-	Clips each face against view frustum
-	Projects cube vertices to screen space
-	Calls drawtagfunc for each visible skybox face
-	Uses special texture mapping flags (b->gflags = 10-15 for different cube faces)
-*/
+static void skytagfunc (int rethead0, int rethead1, bdrawctx* b){}
 
-static void skytagfunc (int rethead0, int rethead1, bunchgrp* b)
-{
-	cam_t gcam = b->cam;
-	#define SSCISDIST 0.000001 //Reduces probability of glitch further
-	dpoint3d otp[4], tp[8];
-	double f, ox, oy, oz;
-	int i, j, n, p, plothead[2];
-	static const signed char cubeverts[6][4][3] =
-	{
-		-1,-1,+1, +1,-1,+1, +1,+1,+1, -1,+1,+1, //Up
-		-1,+1,-1, +1,+1,-1, +1,-1,-1, -1,-1,-1, //Down
-		-1,-1,-1, -1,-1,+1, -1,+1,+1, -1,+1,-1, //Left
-		+1,+1,-1, +1,+1,+1, +1,-1,+1, +1,-1,-1, //Right
-		-1,-1,+1, -1,-1,-1, +1,-1,-1, +1,-1,+1, //Front
-		+1,+1,+1, +1,+1,-1, -1,+1,-1, -1,+1,+1, //Back
-	};
-
-	if ((rethead0|rethead1) < 0) { mono_deloop(rethead1); mono_deloop(rethead0); return; }
-
-	for(p=0;p<6;p++)
-	{
-			//rotate
-		for(i=0;i<4;i++)
-		{
-			ox = (float)cubeverts[p][i][0]; oy = (float)cubeverts[p][i][1];
-			otp[i].x = oy*b->xformmatc - ox*b->xformmats; otp[i].y = cubeverts[p][i][2];
-			otp[i].z = ox*b->xformmatc + oy*b->xformmats;
-		}
-
-			//clip
-		n = 0;
-		for(i=4-1,j=0;j<4;i=j,j++)
-		{
-			//Near-Plane Clipping (Sutherland-Hodgman)
-			if (otp[i].z >= SSCISDIST) { tp[n] = otp[i]; n++; }
-			if ((otp[i].z >= SSCISDIST) != (otp[j].z >= SSCISDIST))
-			{
-				f = (SSCISDIST-otp[j].z)/(otp[i].z-otp[j].z);
-				tp[n].x = (otp[i].x-otp[j].x)*f + otp[j].x;
-				tp[n].y = (otp[i].y-otp[j].y)*f + otp[j].y;
-				tp[n].z = SSCISDIST; n++;
-			}
-		}
-		if (n < 3) goto skiprest;
-
-			//project & find x extents, persp proj.
-			//Formula: screen_x = (world_x * focal_length) / depth + center_x
-		for(i=0;i<n;i++)
-		{
-			f = gcam.h.z/tp[i].z;
-			tp[i].x = tp[i].x*f + gcam.h.x;
-			tp[i].y = tp[i].y*f + gcam.h.y;
-		}
-
-			//generate vmono
-		mono_genfromloop(&plothead[0],&plothead[1],tp,n);
-
-		b->gflags = p+10;
-		mono_bool(rethead0,rethead1,plothead[0],plothead[1],MONO_BOOL_AND,b, drawtagfunc_ws);
-		mono_deloop(plothead[1]); mono_deloop(plothead[0]);
-skiprest:;
-	}
-	mono_deloop(rethead1); mono_deloop(rethead0);
-}
-
-	// lignum: index of light source (shadowtest2_light[] index)
-	//  vert0: index into 1st vertex of ligpolv
-	// b2sect: Build2 sector
-	// b2wall: Build2 wall (-2=ceil,-1=flor,&0x40000000=spri,else wall)
-	// b2slab: Build2 slab number for wall
-	//b2hashn: hash(b2sect,b2wall,b2slab) next index
-#define LIGHASHSIZ 1024
-static int ligpolmaxvert = 0;
-#define lighash(sect,wall,slab) ((((slab)<<6)+((sect)<<4)+(wall))&(LIGHASHSIZ-1))
 /*
 	Purpose: Generates shadow polygon lists for lighting
 	Converts screen-space polygons back to 3D world coordinates
@@ -788,7 +732,7 @@ static int ligpolmaxvert = 0;
 	Used during shadow map generation phase (mode 4)
 	Creates hash table for fast polygon lookup by sector/wall/slab
  */
-static void ligpoltagfunc (int rethead0, int rethead1, bunchgrp *b)
+static void ligpoltagfunc (int rethead0, int rethead1, bdrawctx *b)
 {
 	cam_t gcam = b->cam;
 	float f, fx, fy, fz;
@@ -858,7 +802,7 @@ static void ligpoltagfunc (int rethead0, int rethead1, bunchgrp *b)
 	Maintains mph[] (mono polygon hierarchy) for spatial partitioning
 	"tag" refers to sector IDs
 */
-static void changetagfunc (int rethead0, int rethead1, bunchgrp *b)
+static void changetagfunc (int rethead0, int rethead1, bdrawctx *b)
 {
 	if ((rethead0|rethead1) < 0) return;
 	int mapsect = b->gnewtagsect;
@@ -866,16 +810,17 @@ static void changetagfunc (int rethead0, int rethead1, bunchgrp *b)
 		&& (!(b->sectgot[mapsect>>5]&(1<<mapsect))))
 		scansector(mapsect,b);
 
-	mph_check(mphnum);
+	mono_mph_check(mphnum);
 	mph[mphnum].head[0] = rethead0;
 	mph[mphnum].head[1] = rethead1;
 	mph[mphnum].tag = b->gnewtag;
 	mphnum++;
+	logstep("changetag: newMtag:%d, new mphnum:%d",b->gnewtag,mphnum);
 }
 	//flags&1: do and
 	//flags&2: do sub
 	//flags&4: reverse cut for sub
-static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead0, int plothead1, int flags, bunchgrp* b)
+static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead0, int plothead1, int flags, bdrawctx* b)
 {
 	int mtag = tag1 + taginc*b->recursion_depth;
 	int tagsect = tag1;
@@ -885,7 +830,7 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 	#define BSCISDIST 0.000001 //Reduces probability of glitch further
 	//#define BSCISDIST 0.0001 //Gaps undetectable
 	//#define BSCISDIST 0.1 //Huge gaps
-	void (*mono_output)(int h0, int h1, bunchgrp *b);
+	void (*mono_output)(int h0, int h1, bdrawctx *b);
 	dpoint3d *otp, *tp;
 	double f, ox, oy, oz;
 	int i, j, k, l, h, on, n, plothead[2], imin, imax, i0, i1, omph0, omph1;
@@ -1041,10 +986,75 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 	mono_deloop(plothead[0]);
 }
 
+static void gentransform_ceilflor(sect_t *sec, wall_t *wal, int isflor, bdrawctx *b)
+{
+	cam_t *cam = &b->orcam;
+	float gx = sec->grad[isflor].x;
+	float gy = sec->grad[isflor].y;
+	dpoint3d gvec={gx,gy,1};
+	dpoint3d sp={wal[0].x,wal[0].y,sec->z[isflor]};
+	wccw_transform_dir(&gvec,&b->cam,&b->orcam);
+	wccw_transform(&sp,&b->cam,&b->orcam);
 
+	// Transform plane normal (gx, gy, 1) to camera space
+	//float nx = cam->r.x * gx + cam->r.y * gy + cam->r.z;
+	//float ny = cam->d.x * gx + cam->d.y * gy + cam->d.z;
+	//float nz = cam->f.x * gx + cam->f.y * gy + cam->f.z;
+	dpoint3d npos = world_to_local_vecd(gvec,&b->orcam.tr);
+
+	// Camera-space plane constant
+	float D_c = gvec.x * (sp.x - cam->p.x)
+			  + gvec.y * (sp.y - cam->p.y)
+			  + gvec.z * (sp.z - cam->p.z);
+
+	// Scale includes h.z for screen-space depth formula
+	float scale = 1.0f / (D_c * cam->h.z);
+	b->gouvmat[0] = npos.x * scale;
+	b->gouvmat[3] = npos.y * scale;
+	b->gouvmat[6] = npos.z / D_c - b->gouvmat[0] * cam->h.x - b->gouvmat[3] * cam->h.y;
+}
+
+// create plane EQ using GCAM
+static void gentransform_wall (dpoint3d *npol2, surf_t *sur, bdrawctx *b) {
+	cam_t usedcam = b->cam; // we can use camera hack to get plane equation in space of current cam, not necessart clipping cam.
+	float f, g, ox, oy, oz, rdet, fk[24];
+	int i;
+
+	for(i=0;i<3;i++)
+	{
+		ox = npol2[i].x-usedcam.p.x; oy = npol2[i].y-usedcam.p.y; oz = npol2[i].z-usedcam.p.z;
+		npol2[i].x = ox*usedcam.r.x + oy*usedcam.r.y + oz*usedcam.r.z;
+		npol2[i].y = ox*usedcam.d.x + oy*usedcam.d.y + oz*usedcam.d.z;
+		npol2[i].z = ox*usedcam.f.x + oy*usedcam.f.y + oz*usedcam.f.z;
+	}
+
+	fk[0] = npol2[0].z; fk[3] = npol2[0].x*usedcam.h.z + npol2[0].z*usedcam.h.x; fk[6] = npol2[0].y*usedcam.h.z + npol2[0].z*usedcam.h.y;
+	fk[1] = npol2[1].z; fk[4] = npol2[1].x*usedcam.h.z + npol2[1].z*usedcam.h.x; fk[7] = npol2[1].y*usedcam.h.z + npol2[1].z*usedcam.h.y;
+	fk[2] = npol2[2].z; fk[5] = npol2[2].x*usedcam.h.z + npol2[2].z*usedcam.h.x; fk[8] = npol2[2].y*usedcam.h.z + npol2[2].z*usedcam.h.y;
+	fk[12] = fk[4]*fk[8] - fk[5]*fk[7];
+	fk[13] = fk[5]*fk[6] - fk[3]*fk[8];
+	fk[14] = fk[3]*fk[7] - fk[4]*fk[6];
+	fk[18] = fk[2]*fk[7] - fk[1]*fk[8];
+	fk[19] = fk[0]*fk[8] - fk[2]*fk[6];
+	fk[20] = fk[1]*fk[6] - fk[0]*fk[7];
+	fk[21] = fk[1]*fk[5] - fk[2]*fk[4];
+	fk[22] = fk[2]*fk[3] - fk[0]*fk[5];
+	fk[23] = fk[0]*fk[4] - fk[1]*fk[3];
+	b->gouvmat[6] = fk[12] + fk[13] + fk[14];
+	b->gouvmat[0] = fk[18] + fk[19] + fk[20];
+	b->gouvmat[3] = fk[21] + fk[22] + fk[23];
+
+	rdet = 1.0/(fk[0]*fk[12] + fk[1]*fk[13] + fk[2]*fk[14]);
+
+	g = rdet;
+
+	b->gouvmat[0] *= g;
+	b->gouvmat[3] *= g;
+	b->gouvmat[6] *= g;
+}
 
 	//FIXFIXFIX: clean this up!
-static void gentex_xform (float *ouvmat, bunchgrp *b)
+static void gentex_xform (float *ouvmat, bdrawctx *b)
 {
 	cam_t gcam = b->cam;
 	float ax, ay, az, bx, by, bz, cx, cy, cz, p0x, p0y, p0z, p1x, p1y, p1z, p2x, p2y, p2z, f;
@@ -1078,7 +1088,7 @@ static void gentex_xform (float *ouvmat, bunchgrp *b)
 	}
 }
 
-static void gentex_sky (surf_t *sur, bunchgrp *b)
+static void gentex_sky (surf_t *sur, bdrawctx *b)
 {
 	cam_t gcam = b->cam;
 	float f, g, h;
@@ -1096,7 +1106,7 @@ static void gentex_sky (surf_t *sur, bunchgrp *b)
 	gentex_xform(b->gouvmat,b);
 }
 
-static void gentex_ceilflor (sect_t *sec, wall_t *wal, surf_t *sur, int isflor, bunchgrp *b)
+static void gentex_ceilflor (sect_t *sec, wall_t *wal, surf_t *sur, int isflor, bdrawctx *b)
 {
 	cam_t gcam = b->cam;
 	float f, g, fz, ax, ay, wx, wy, ox, oy, oz, fk[6];
@@ -1143,7 +1153,7 @@ static void gentex_ceilflor (sect_t *sec, wall_t *wal, surf_t *sur, int isflor, 
 	gentex_xform(b->gouvmat, b);
 }
 
-static void gentex_wall (kgln_t *npol2, surf_t *sur, bunchgrp *b)
+static void gentex_wall (kgln_t *npol2, surf_t *sur, bdrawctx *b)
 {
 	cam_t gcam = b->cam;
 	float f, g, ox, oy, oz, rdet, fk[24];
@@ -1223,7 +1233,7 @@ the final visible geometry ready for 2D projection.
 The b parameter is a bunch index - this function processes one "bunch" (visible sector group) at a time. The traversal logic is in the caller that:
 */
 
-static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
+static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 {
 	cam_t gcam = b->cam;
 	// === VARIABLE DECLARATIONS ===
@@ -1233,7 +1243,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 	bunchverts_t *twal;
 	int twaln;
 	dpoint3d pol[4], npol[6];
-	kgln_t npol2[3];
+	dpoint3d npol2[3];
 	double opolz[4];
 	sect_t *sec;
 	wall_t *wal;
@@ -1292,14 +1302,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		float surfpos = getslopez(&sec[s],isflor,b->cam.p.x,b->cam.p.y);
 		if ((b->cam.p.z >= surfpos) == isflor) // ignore backfaces
 				continue;
-
-		// Setup surface properties (height, gradient, color)
 		fz = sec[s].z[isflor]; grad = &sec[s].grad[isflor];
-		gcurcol = (min(sec[s].surf[isflor].asc>>8,255)<<24) +
-					 (min(sec[s].surf[isflor].rsc>>5,255)<<16) +
-					 (min(sec[s].surf[isflor].gsc>>5,255)<< 8) +
-					 (min(sec[s].surf[isflor].bsc>>5,255)    );
-		gcurcol = argb_interp(gcurcol,(gcurcol&0xff000000)+((gcurcol&0xfcfcfc)>>2),(int)(compact2d*24576.0));
 
 		// Calculate surface normal vector
 		b->gnorm.x = grad->x;
@@ -1336,7 +1339,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 		}
 		else {
 			b->gflags = 0;
-			gentex_ceilflor(&sec[s], wal, sur, isflor, b);
+			gentransform_ceilflor(&sec[s], wal, isflor, b);
 		}
 		b->gligwall = isflor - 2;
 
@@ -1350,7 +1353,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 			int endpn = portals[myport].destpn;
 			drawpol_befclip(s, portals[endpn].sect+taginc, portals[endpn].sect,
 				plothead[0],plothead[1],  3, b);
-			draw_hsr_enter_portal(map, myport, b,plothead[0],plothead[1]);
+			draw_hsr_enter_portal(map, myport, b);
 		}
 
 		else {
@@ -1439,14 +1442,14 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 					else if (!m) f = sec[verts[0].s].z[0];
 					else f = sec[verts[(m - 1) >> 1].s].z[0];
 					// Apply UV coordinates with proper scaling
-					npol2[0].u = sur->uv[0].x;
-					npol2[0].v = sur->uv[2].y * (npol2[0].z - f) + sur->uv[0].y;
-					npol2[1].u = sur->uv[1].x * dx + npol2[0].u;
-					npol2[1].v = sur->uv[1].y * dx + npol2[0].v;
-					npol2[2].u = sur->uv[2].x + npol2[0].u;
-					npol2[2].v = sur->uv[2].y + npol2[0].v;
+					//npol2[0].u = sur->uv[0].x;
+					//npol2[0].v = sur->uv[2].y * (npol2[0].z - f) + sur->uv[0].y;
+					//npol2[1].u = sur->uv[1].x * dx + npol2[0].u;
+					//npol2[1].v = sur->uv[1].y * dx + npol2[0].v;
+					//npol2[2].u = sur->uv[2].x + npol2[0].u;
+					//npol2[2].v = sur->uv[2].y + npol2[0].v;
 					b->gflags = 0;
-					gentex_wall(npol2, sur, b);
+					gentransform_wall(npol2, sur, b);
 				}
 				b->gligwall = w;
 				b->gligslab = m;
@@ -1463,7 +1466,7 @@ static void drawalls (int bid, mapstate_t* map, bunchgrp* b)
 			if (myport >= 0 && portals[myport].destpn >=0 && portals[myport].kind == PORT_WALL) {
 					int endp = portals[myport].destpn;
 				drawpol_befclip(s, portals[endp].sect+taginc, portals[endp].sect, plothead[0], plothead[1],  3, b);
-				draw_hsr_enter_portal(map, myport, b,plothead[0],plothead[1]);
+				draw_hsr_enter_portal(map, myport, b);
 			} else {
 				// could be 7 or 3, .111 or .011
 				drawpol_befclip(s, ns, ns, plothead[0], plothead[1], ((m > vn) << 2) + 3, b);
@@ -1489,7 +1492,7 @@ void reset_context() {
 	eyepoln = 0; eyepolvn = 0;
 }
 void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
-	bunchgrp bs;
+	bdrawctx bs;
 	bs.cam = *cc;
 	bs.orcam = *cc;
 	bs.recursion_depth = 0;
@@ -1497,7 +1500,7 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
 	draw_hsr_polymost_ctx(map,&bs);
 }
 
-void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
+void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
 	if (!newctx) {
 		return;
 	}
@@ -1506,7 +1509,7 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bunchgrp *newctx) {
 	int presect = -1;
 
 	int recursiveDepth = newctx->recursion_depth;
-	bunchgrp *b;
+	bdrawctx *b;
 	b = newctx;
 	b->sectgotn = 0;
 	b->sectgot = 0;
@@ -1770,73 +1773,8 @@ nogood:; }
 		if (!didcut) break;
 	}
 }
-// 1. Normalize transform (makes vectors unit length and orthogonal)
-static float vlen(point3d *p) {
-    return sqrtf(p->x * p->x + p->y * p->y + p->z * p->z);
-}
 
-static void scalardivv(point3d *pt, float diver) {
-    pt->x /= diver; pt->y /= diver; pt->z /= diver;
-}
-
-static void normalize_transform(transform *tr) {
-    // Normalize all axes
-    float flen = vlen(&tr->f);
-    if (flen > 0.0001f) scalardivv(&tr->f, flen);
-
-    flen = vlen(&tr->r);
-    if (flen > 0.0001f) scalardivv(&tr->r, flen);
-
-    flen = vlen(&tr->d);
-    if (flen > 0.0001f) scalardivv(&tr->d, flen);
-}
-
-// 2a. Transform a point from world space to local space of a transform
-static point3d world_to_local_point(point3d world_pos, transform *tr) {
-    // Translate to origin
-    float dx = world_pos.x - tr->p.x;
-    float dy = world_pos.y - tr->p.y;
-    float dz = world_pos.z - tr->p.z;
-
-    // Project onto local axes (inverse rotation via dot products)
-    point3d local;
-    local.x = dx * tr->r.x + dy * tr->r.y + dz * tr->r.z;
-    local.y = dx * tr->d.x + dy * tr->d.y + dz * tr->d.z;
-    local.z = dx * tr->f.x + dy * tr->f.y + dz * tr->f.z;
-
-    return local;
-}
-
-// 2b. Transform a vector from world space to local space
-static point3d world_to_local_vec(point3d world_vec, transform *tr) {
-    point3d local;
-    local.x = world_vec.x * tr->r.x + world_vec.y * tr->r.y + world_vec.z * tr->r.z;
-    local.y = world_vec.x * tr->d.x + world_vec.y * tr->d.y + world_vec.z * tr->d.z;
-    local.z = world_vec.x * tr->f.x + world_vec.y * tr->f.y + world_vec.z * tr->f.z;
-
-    return local;
-}
-
-// 2c. Transform a point from local space to world space
-static point3d local_to_world_point(point3d local_pos, transform *tr) {
-    point3d world;
-    world.x = tr->p.x + local_pos.x * tr->r.x + local_pos.y * tr->d.x + local_pos.z * tr->f.x;
-    world.y = tr->p.y + local_pos.x * tr->r.y + local_pos.y * tr->d.y + local_pos.z * tr->f.y;
-    world.z = tr->p.z + local_pos.x * tr->r.z + local_pos.y * tr->d.z + local_pos.z * tr->f.z;
-
-    return world;
-}
-
-// 2d. Transform a vector from local space to world space
-static point3d local_to_world_vec(point3d local_vec, transform *tr) {
-    point3d world;
-    world.x = local_vec.x * tr->r.x + local_vec.y * tr->d.x + local_vec.z * tr->f.x;
-    world.y = local_vec.x * tr->r.y + local_vec.y * tr->d.y + local_vec.z * tr->f.y;
-    world.z = local_vec.x * tr->r.z + local_vec.y * tr->d.z + local_vec.z * tr->f.z;
-
-    return world;
-}static void draw_hsr_enter_portal(mapstate_t* map, int myport, bunchgrp *parentctx,
-                                   int plothead0, int plothead1)
+static void draw_hsr_enter_portal(mapstate_t* map, int myport, bdrawctx *parentctx)
 {
     if (parentctx->recursion_depth >= MAX_PORTAL_DEPTH) {
         return;
@@ -1873,13 +1811,11 @@ static point3d local_to_world_vec(point3d local_vec, transform *tr) {
 
     ncam.cursect = portals[endp].sect;
 
-    bunchgrp newctx = {};
+    bdrawctx newctx = {};
     newctx.recursion_depth = parentctx->recursion_depth + 1;
     newctx.cam = ncam;
     newctx.orcam = parentctx->orcam;
     newctx.has_portal_clip = true;
-    newctx.portal_clip[0] = plothead0;
-    newctx.portal_clip[1] = plothead1;
     newctx.sectgotn = 0;
     newctx.sectgot = 0;
     newctx.sectgotmal = 0;
