@@ -572,7 +572,9 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 	cam_t orcam = b->orcam;
 	float f,fx,fy, g, *fptr;
 	int i, j, k, h, rethead[2];
-
+	cam_t cam = b->orcam;
+	double* xform = b->xformmat;
+	point3d add = b->gnadd;
 	if ((rethead0|rethead1) < 0) { mono_deloop(rethead1); mono_deloop(rethead0); return; }
 	rethead[0] = rethead0; rethead[1] = rethead1;
 
@@ -590,19 +592,18 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 				eyepolvmal = max(eyepolvmal<<1,16384);
 				eyepolv = (point3d *)realloc(eyepolv,eyepolvmal*sizeof(point3d));
 			}
-			f = orcam.h.z/(/*mp[i].x*b->xformmat[6]*/ + mp[i].y*b->xformmat[7] + b->gnadd.z);
-			fx        =  (mp[i].x*b->xformmat[0] + mp[i].y*b->xformmat[1] + b->gnadd.x)*f + orcam.h.x;
-			fy        =  (mp[i].x*b->xformmat[3] + mp[i].y*b->xformmat[4] + b->gnadd.y)*f + orcam.h.y;
+			f = cam.h.z/(mp[i].x*xform[6] + mp[i].y*xform[7] + add.z);
+			fx        =  (mp[i].x*xform[0] + mp[i].y*xform[1] + add.x)*f + cam.h.x;
+			fy        =  (mp[i].x*xform[3] + mp[i].y*xform[4] +add.y)*f + cam.h.y;
 
-#if (USEINTZ)
-			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*1048576.0*256.0);
-#else
-			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*orcam.h.z);
-#endif
-			eyepolv[eyepolvn].x = ((fx-orcam.h.x)*orcam.r.x + (fy-orcam.h.y)*orcam.d.x + (orcam.h.z)*orcam.f.x)*f + orcam.p.x;
-			eyepolv[eyepolvn].y = ((fx-orcam.h.x)*orcam.r.y + (fy-orcam.h.y)*orcam.d.y + (orcam.h.z)*orcam.f.y)*f + orcam.p.y;
-			eyepolv[eyepolvn].z = ((fx-orcam.h.x)*orcam.r.z + (fy-orcam.h.y)*orcam.d.z + (orcam.h.z)*orcam.f.z)*f + orcam.p.z;
+			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*cam.h.z);
 
+			eyepolv[eyepolvn].x = ((fx-cam.h.x)*cam.r.x + (fy-cam.h.y)*cam.d.x + (cam.h.z)*cam.f.x)*f + cam.p.x;
+			eyepolv[eyepolvn].y = ((fx-cam.h.x)*cam.r.y + (fy-cam.h.y)*cam.d.y + (cam.h.z)*cam.f.y)*f + cam.p.y;
+			eyepolv[eyepolvn].z = ((fx-cam.h.x)*cam.r.z + (fy-cam.h.y)*cam.d.z + (cam.h.z)*cam.f.z)*f + cam.p.z;
+dpoint3d e = {eyepolv[eyepolvn].x,eyepolv[eyepolvn].y,eyepolv[eyepolvn].z};
+			portal_xform_world_fullp(&e,b);
+			LOOPADD(e);
 			eyepolvn++;
 
 			if (!h) i = mp[i].n;
@@ -610,7 +611,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 
 		mono_deloop(rethead[h]);
 	}
-
+	LOOPEND
 	// Allocate eyepol entry
 	if (eyepoln+1 >= eyepolmal)
 	{
@@ -1016,14 +1017,33 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 	if (b->has_portal_clip)
 		int a =0;
 	// === DRAW CEILINGS & FLOORS ===
+	bool noportals = b->recursion_depth >= MAX_PORTAL_DEPTH;
 	for(isflor=0;isflor<2;isflor++) // floor ceil
 	{
-		LOOPEND
+
 		// here, when we draw sector of the exit portal we get glitches when it would draw a triangle with point below the camera resulting in triangle spanning entire vertical of the screen
 
 		     // Back-face culling: skip if camera is on wrong side of surface
 			// need to get original slope, as if camera was in origin.
 	//if (!b->has_portal_clip)
+
+
+			int myport = sec[s].tags[1]; // FLOOR PORTAL CHECK
+			bool isportal = myport >= 0
+							&& !noportals
+			                && portals[myport].destpn >= 0
+			                && portals[myport].surfid == isflor
+			                && portals[myport].kind == isflor;
+			bool skipport = shadowtest2_debug_block_selfportals
+			                && b->has_portal_clip
+			                && isportal
+			                && s == b->testignoresec
+			                && portals[myport].kind == b->ignorekind
+			                && isflor == b->testignorewall;
+			if (skipport)
+				continue;
+
+
 		float surfpos = getslopez(&sec[s],isflor,b->cam.p.x,b->cam.p.y);
 		if ((b->cam.p.z >= surfpos) == isflor) // ignore backfaces
 				continue;
@@ -1049,10 +1069,16 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 			                                       b->gnorm.z * -1e32);
 		//do not replace w/single zenith point - ruins precision
 		i = isflor ^ 1;
-		for (ww = 0; ww <= twaln; ww++) plothead[i] = mono_ins(plothead[i], twal[ww].x, twal[ww].y,
-		                                                       (wal[0].x - twal[ww].x) * grad->x + (
-			                                                       wal[0].y - twal[ww].y) * grad->y + fz);
-		plothead[i] = mp[plothead[i]].n;
+		for (ww = 0; ww <= twaln; ww++) {
+			plothead[i] = mono_ins(plothead[i], twal[ww].x, twal[ww].y,
+								  (wal[0].x - twal[ww].x) * grad->x + (
+									  wal[0].y - twal[ww].y) * grad->y + fz);
+		//	dpoint3d fp = {twal[ww].x,twal[ww].y,(wal[0].x - twal[ww].x) * grad->x + (wal[0].y - twal[ww].y) * grad->y + fz};
+		//	portal_xform_world_fullp(&fp,b);
+
+		}
+
+			plothead[i] = mp[plothead[i]].n;
 
 		// Setup texture and rendering flags
 		sur = &sec[s].surf[isflor];
@@ -1070,16 +1096,11 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 
 		b->gligwall = isflor - 2;
 
-		int myport = sec[s].tags[1];
-		if (myport>=0)
-			int asd=1;
-		bool skipport= (b->has_portal_clip && s==b->testignoresec && isflor == b->testignorewall);
-		bool needsfinal = b->recursion_depth == MAX_PORTAL_DEPTH;
-		bool isportal = myport>=0 && portals[myport].destpn >=0 && portals[myport].surfid == isflor;
-		if (isportal && !needsfinal && !skipport) {
+		if (isportal && !noportals) {
 			int endpn = portals[myport].destpn;
+			int portalpolyflags = ((!isflor<<2)+3) | CLIP_PORTAL_FLAG;
 			drawpol_befclip(s, portals[endpn].sect+taginc, portals[endpn].sect,
-				plothead[0],plothead[1],  3, b);
+				plothead[0],plothead[1], portalpolyflags , b);
 			draw_hsr_enter_portal(map, myport, b);
 		}
 
@@ -1091,6 +1112,19 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 	// === DRAW WALLS ===
 	for(ww=0;ww<twaln;ww++)
 	{
+		int myport = wal[ww].tags[1]; // FLOOR PORTAL CHECK
+		bool isportal = myport >= 0
+						&& !noportals
+						&& portals[myport].destpn >= 0
+						&& portals[myport].kind == isflor;
+		bool skipport = shadowtest2_debug_block_selfportals
+						&& b->has_portal_clip
+						&& isportal
+						&& s == b->testignoresec
+						&& portals[myport].kind == b->ignorekind
+						&& ww == b->testignorewall;
+		if (skipport)
+			continue;
 		// Get wall vertices and setup wall segment
 		vn = getwalls_imp(s,twal[ww].i,verts,MAXVERTS,map);
 		w = twal[ww].i; nw = wal[w].n+w;
@@ -1182,10 +1216,11 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 				ns = verts[m >> 1].s; // Portal to adjacent sector
 			}
 			// Render the wall polygon
-			int myport = wal[w].tags[1];
+			myport = wal[w].tags[1];
 			if (myport >= 0 && portals[myport].destpn >=0 && portals[myport].kind == PORT_WALL) {
 					int endp = portals[myport].destpn;
-				drawpol_befclip(s, portals[endp].sect+taginc, portals[endp].sect, plothead[0], plothead[1],  3, b);
+				int portalpolyflags = 3 | CLIP_PORTAL_FLAG;
+				drawpol_befclip(s, portals[endp].sect+taginc, portals[endp].sect, plothead[0], plothead[1],  portalpolyflags, b);
 				draw_hsr_enter_portal(map, myport, b);
 			} else {
 				// could be 7 or 3, .111 or .011
@@ -1554,6 +1589,7 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport, bdrawctx *parentc
     newctx.bunchgrid = 0;
     newctx.testignorewall = ignw;
     newctx.testignoresec = igns;
+    newctx.ignorekind = portals[endp].kind;
     newctx.gnewtagsect = -1;
     newctx.gnewtag = -1;
     newctx.currenthalfplane = parentctx->currenthalfplane;
