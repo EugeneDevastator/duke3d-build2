@@ -1367,8 +1367,7 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
 
 		if (!b->has_portal_clip)
 			b->currenthalfplane = halfplane;
-		else if (b->currenthalfplane != halfplane)
-			continue;
+		else halfplane = b->currenthalfplane;
 
 		if (shadowtest2_rendmode == 4)
 		{
