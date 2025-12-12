@@ -15,7 +15,7 @@ extern "C"{
 struct Polygon3D {
     std::vector<Vector3> vertices;
 };
-static bunchgrp b={};
+static bdrawctx b={};
 static std::vector<std::vector<Vector3>>* userdata = nullptr;
 class MonoClip3D {
 public:
@@ -31,7 +31,7 @@ public:
         }
 
         std::vector<std::vector<Vector3>> result;
-        bunchgrp b = {0};
+        bdrawctx b = {0};
         userdata = &result;
 
         // Convert to dpoint3d with Z=0 for 2D operation
@@ -69,7 +69,7 @@ public:
 private:
 
     // looks like it will be called multiple times with each resulting polygon,
-    static void output_callback_2d(int h0, int h1, bunchgrp* b) {
+    static void output_callback_2d(int h0, int h1, bdrawctx* b) {
         if (h0 < 0) return;
 
         std::vector<std::vector<Vector3>>* result = static_cast<std::vector<std::vector<Vector3>>*>(userdata);

@@ -25,7 +25,9 @@ The forward direction can be visualized as moving away from the camera or viewer
  extern "C" {
 #include "loaders.h"
 #include "mapcore.h"
+#include "monoclip.h"
 #include "shadowtest2.h"
+#include "buildmath.h"
 }
 
 
@@ -78,6 +80,9 @@ static Shader lightShader ;
 static int lightPosLoc;
 static int lightRangeLoc;
 static bool syncam = true;
+static int cureyepoly = 0;
+static int mono_cursnap = 0;
+static int mono_curchain = 0;
 class DumbRender
 {
 
@@ -147,30 +152,28 @@ public:
                 int sid1 = abs(map->spri[p.anchorspri].p.z - map->sect[i].z[1]);
                 int sid2 = abs(map->spri[p.anchorspri].p.z - map->sect[i].z[0]);
                 p.surfid = sid1 < sid2;
-                map->spri[p.anchorspri].p.z = map->sect[i].z[p.surfid]; // resolve flor ceil in future
+                map->spri[p.anchorspri].p.z = map->sect[i].z[p.surfid]+1; // resolve flor ceil in future
                 p.kind = p.surfid;
                 spri_t *spr = &map->spri[p.anchorspri];
               //  point3d newr = spr->tr.r;
-                point3d newd = spr->tr.f;
-                point3d newf = spr->tr.d;
-            //    vmulscal(&newr,-1.0f);
-             ///   if (p.surfid==1) {
-                  //  vmulscal(&newd,-1.0f);
-                    vmulscal(&newf,-1.0f);
-               // }
-              //  vmulscal(&spr->tr.r,-1);
+                point3d newd = spr->tr.r;
+                point3d newr = spr->tr.d;
+                vmulscal(&newd,-1.0f);
                 spr->tr.d = newd;
-                spr->tr.f = newf;
+                spr->tr.r = newr;
+              //  vmulscal(&spr->tr.f,-1.0f);
+                normalize_transform(&spr->tr);
                 p.destpn = map->sect[i].surf[1].hitag;
                 map->sect[i].tags[1] = portaln;
                 portaln++;
             }
         }
 
-        for (int i = 0; i < portaln; i++) {
+        for (int i = 0; i < portaln; i++) { // portal post pass
             int target_tag = portals[i].destpn; // currently stores expected hitag
             portals[i].destpn = -1; // mark as unresolved
-
+            spri_t *spr = &map->spri[portals[i].anchorspri];
+            normalize_transform(&spr->tr);
 
             // Find portal with matching lowtag
             for (int j = 0; j < portaln; j++) {
@@ -340,39 +343,6 @@ public:
             }
         }
     }
-    static bool draw_eyepol_scrspace(float sw, float sh, int i, int &v0dumm, int &vertCountdd) {
-        int v0 = eyepol[i].vert0;
-        int v1 = eyepol[i + 1].vert0;
-        int vertCount = v1 - v0;
-        if (vertCount < 3) return true;
-        // Check if polygon is clipped
-        float *ouvmat = eyepol[i].ouvmat;
-        {
-            //   BeginShaderMode(uvShader);
-            rlBegin(RL_TRIANGLES);
-            for (int j = 1; j < vertCount - 1; j++) {
-                int idx[] = {v0, v0 + j, v0 + j + 1};
-                for (int k = 0; k < 3; k++) {
-                    Vector2 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y};
-                    //float *ouvmat = eyepol[i].ouvmat;
-                    float depth = ouvmat[0] * pt.x + ouvmat[3] * pt.y + ouvmat[6];
-                    float u = ouvmat[1] * pt.x + ouvmat[4] * pt.y + ouvmat[7];
-                    float v = ouvmat[2] * pt.x + ouvmat[5] * pt.y + ouvmat[8];
-                    float f = 1.0 / depth;
-                    float final_u = u * f / (65536.0f * 64); // Corrected texture coordinate
-                    float final_v = v * f / (65536.0f * 64);
-                    rlColor4f(1, 1, fabs(depth), 0.2);
-                    rlTexCoord2f(final_u, final_v);
-                    //  rlNormal3f(0,1,0);
-                    rlVertex2f(pt.x, pt.y);
-                }
-            }
-            rlEnd();
-            // EndShaderMode();
-            rlDrawRenderBatchActive();
-        } // eypol polys
-        return false;
-    }
     static void DrawEyePoly(float sw, float sh, player_transform *playr, cam_t *cam) {
         dpoint3d dp, dr, dd, df;
         long i, j, k, l, m, flashlight1st;
@@ -472,48 +442,99 @@ public:
                 draw_hsr_polymost(&ncam,map,0);
             }
         }
-        shadowtest2_setcam(cam);
         cam->p = playr->ipos; cam->r = playr->irig; cam->d = playr->idow; cam->f = playr->ifor;
         cam->h.x = playr->ghx; cam->h.y = playr->ghy; cam->h.z = playr->ghz;
     }
+    static void DrawTriangleFan3D(const Vector3 *points, int pointCount, Color color)
+    {
+        if (pointCount >= 3)
+        {
+            //rlSetTexture(GetShapesTexture().id);
+            rlBegin(RL_QUADS);
+            rlColor4ub(color.r, color.g, color.b, color.a);
 
+            for (int i = 1; i < pointCount - 1; i++)
+            {
+               rlVertex3f(points[0].x, points[0].y,points[0].z);
+               rlVertex3f(points[i].x, points[i].y, points[i].z);
+                rlVertex3f(points[i + 1].x, points[i + 1].y, points[i + 1].z);
+                rlVertex3f(points[i + 1].x, points[i + 1].y, points[i + 1].z);
+            }
+            rlEnd();
+            //rlSetTexture(0);
+        }
+    }
+    // Monotone polygon triangulation - O(n), no allocations needed
     static bool draw_eyepol_wspace(float sw, float sh, int i, int &v0, int &vertCount) {
-            v0 = eyepol[i].vert0;
-            int v1 = eyepol[i + 1].vert0;
-            vertCount = v1 - v0;
-            if (vertCount < 3) return true;
+        v0 = eyepol[i].vert0;
+        int v1 = eyepol[i + 1].vert0;
+        vertCount = v1 - v0;
+        if (vertCount < 3) return true;
+       // if (!eyepol[i].has_triangulation) return true;
 
-            float *ouvmat = eyepol[i].ouvmat;
         rlDrawRenderBatchActive();
-           // BeginShaderMode(uvShader);
-            rlBegin(RL_TRIANGLES);
-            glEnable(GL_POLYGON_OFFSET_FILL);
-            glPolygonOffset(-0.5f, 1.0f);
-rlDisableDepthMask();
-        for (int j = 1; j < vertCount - 1; j++) {
-            int idx[] = {v0, v0 + j, v0 + j + 1};
-            for (int k = 0; k < 3; k++) {
-                Vector3 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y, eyepolv[idx[k]].z};
+        rlDisableBackfaceCulling();
 
-                // CORRECTED UV transformation
-                float u = ouvmat[1] * pt.x + ouvmat[4] * pt.y + ouvmat[7] * pt.z;
-                float v = ouvmat[2] * pt.x + ouvmat[5] * pt.y + ouvmat[8] * pt.z;
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(-0.5f, 1.0f);
+        rlDisableDepthMask();
 
-                float final_u = u ;/// (65536.0f);
-                float final_v = v;// / (65536.0f);
+        Vector3* pts = static_cast<Vector3 *>(malloc(vertCount * sizeof(Vector3)));
 
-                rlColor4f(0.7, 0.2, eyepol[i].rdepth/5.0f, 0.7);
-                rlTexCoord2f(final_u, final_v);
-                rlVertex3f(pt.x, -pt.z, pt.y);
+        for (int j = 0; j < vertCount; j++) {
+            point3d p = eyepolv[v0 + j];
+            pts[j] = {p.x, -p.z, p.y};
+        }
+        unsigned char r = ((i)/5.0f)*255;
+        rlColor4ub(r,128,3,40);
+        //DrawTriangleFan3D(pts,vertCount,{r,128,3,30});
+        TriangAndDraw3D(pts,vertCount);
+        rlDrawRenderBatchActive();
+
+
+        free(pts);
+
+        glDisable(GL_POLYGON_OFFSET_FILL);
+        return false;
+    }
+    static void draw_mono_debug() {
+        int startsnap = mono_cursnap;
+        int endsnap = mono_cursnap == 0? g_mono_dbg.snapshot_count : mono_cursnap+1;
+        for (int i=startsnap;i<endsnap;i++) {
+            auto snap = g_mono_dbg.snapshots[i];
+
+
+            int startch = abs(mono_curchain % snap.chain_count);
+            int endch = startch == 0? snap.chain_count : startch+1;
+            for (int c = startch;c<endch;c++) {
+                auto chain = snap.chains[c];
+                rlBegin(RL_LINES);
+
+                for (int v =0;v<chain.count;v++)
+                {
+                    rlColor4f(i/20.0f,c/30.0f,0.8f,0.8f);
+                    rlVertex3f(chain.points[v].x/10,-chain.points[v].z/10,chain.points[v].y/10);
+                }
+                rlEnd();
             }
         }
-
+        int v=0;
+        int l = 0;
+        auto cam = DumbCore::GetCamera().position;
+        cam = {0,0,0};
+        float cdiv = 1.0;
+        while (v<loopnum) { // add keys to rotate closest sprite.
+            rlBegin(RL_LINES);
+            while (loopuse[v]) {
+                rlColor4f(v/8.0f,v/4.0f,v/8.0f,0.4f);
+                //    auto campos = DumbCore::GetCamera().position;
+                rlVertex3f(cam.x+loops[v].x/cdiv ,cam.y+ -loops[v].z/cdiv,cam.z+loops[v].y/cdiv);
+                v++;
+            }
+            l++;v++;
             rlEnd();
-       //     EndShaderMode();
-            rlDrawRenderBatchActive();
-        glDisable(GL_POLYGON_OFFSET_FILL);
-            return false;
         }
+    }
 
     static void DrawPost3d(float sw, float sh, Camera3D camsrc) {
         // Vector2 v1 = {0, 0};
@@ -545,12 +566,27 @@ rlDisableDepthMask();
 
         if (IsKeyPressed(KEY_U))
             syncam = !syncam;
+        if (IsKeyPressed(KEY_RIGHT)) {
+            mono_cursnap++;
+        }
+        if (IsKeyPressed(KEY_LEFT)) {
+                    mono_cursnap--;
+                }
+        if (IsKeyPressed(KEY_RIGHT_SHIFT)) {
+            mono_curchain++;
+        }
+        if (IsKeyPressed(KEY_LEFT_SHIFT)) {
+            mono_curchain--;
+        }
+
+        if (g_mono_dbg.snapshot_count > 0)
+            mono_cursnap = abs(mono_cursnap % g_mono_dbg.snapshot_count);
 
         DrawEyePoly(sw, sh, &plr, &b2cam); // ken render
 
         // Eyepol polys
         bool draweye = true;
-        bool drawlines = true;
+        bool drawlineseye = true;
         bool drawlights = false;
 
         rlDisableBackfaceCulling();
@@ -564,19 +600,29 @@ rlDisableDepthMask();
                 int v0;
                 int vertCount;
                 BeginBlendMode(BLEND_ADDITIVE);
-                if (draw_eyepol_wspace(sw, sh, i, v0, vertCount)) continue;
+                if (IsKeyPressed(KEY_J)) {
+                    cureyepoly++;
+                    if (cureyepoly > eyepoln)
+                        cureyepoly = 0;
+                }
+                if (cureyepoly == 0 | cureyepoly == i) {
+                    if (draw_eyepol_wspace(sw, sh, i, v0, vertCount))
+                        continue;
+                } else continue;
 
-                if (drawlines)
+                if (drawlineseye)
                 {
                     rlBegin(RL_LINES);
                     rlDisableDepthMask();
+                    rlDisableBackfaceCulling();
                     glEnable(GL_POLYGON_OFFSET_FILL);
                     glPolygonOffset(-1.0f, 1.0f);
                     rlColor4f(0, 1, 1, 1);
                     for (int j = 0; j < vertCount; j++) {
+                        rlColor4f(j/5.0f, j/5.0f, 1, 1);
                        //int idx[] = {v0, v0 + j, v0 + j + 1};
                        //for (int k = 0; k < 3; k++) {
-                           // Vector3 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y,eyepolv[idx[k]].z};
+                          //  Vector3 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y,eyepolv[idx[k]].z};
                             Vector3 pt = {eyepolv[v0+j].x, eyepolv[v0+j].y,eyepolv[v0+j].z};
                             rlVertex3f(pt.x,-pt.z, pt.y);
                        // }
@@ -588,8 +634,10 @@ rlDisableDepthMask();
                     glDisable(GL_POLYGON_OFFSET_FILL);
                     rlEnableDepthMask();
                 } // eyepol lines for each poly
-                EndBlendMode();
+
             }
+         //   draw_mono_debug();
+            EndBlendMode();
         }
         EndMode3D();
         //if (!lightpos_t || !eyepolv || eyepoln <= 0) return;}
@@ -653,6 +701,7 @@ rlDisableDepthMask();
     // Updated wall rendering with segments
     static void DrawMapstateTex(Camera3D rlcam)
     {
+
         rlDrawRenderBatchActive();
         rlDisableBackfaceCulling();
 
@@ -936,6 +985,25 @@ rlDisableDepthMask();
                 }
             }
         }
+        DrawTransform(&lastcamtr);
+        DrawTransform(&lastcamtr2);
+        dpoint3d testp = {lastcamtr2.p.x + lastcamtr2.d.x,lastcamtr2.p.y+ lastcamtr2.d.y,lastcamtr2.p.z+ lastcamtr2.d.z};
+
+       wccw_transform_tr(&testp,&lastcamtr,&lastcamtr2);
+       DrawB2Point(&testp);
+    }
+    static void DrawTransform(transform *tr) {
+        Vector3 rg = {tr->r.x, -tr->r.z, tr->r.y};
+        Vector3 dw = {tr->d.x, -tr->d.z, tr->d.y};
+        Vector3 frw = {tr->f.x, -tr->f.z, tr->f.y};
+        Vector3 pos = {tr->p.x, -tr->p.z, tr->p.y};
+        DrawLine3D(pos, Vector3Add(pos, frw), BLUE); // Forward vector
+        DrawLine3D(pos, Vector3Add(pos, rg), RED); // Right vector
+        DrawLine3D(pos, Vector3Add(pos, dw), GREEN); // Down vector
+    }
+    static void DrawB2Point(dpoint3d *pt) {
+        Vector3 vecpt = {(float)pt->x,(float)pt->z*-1,(float)pt->y};
+        DrawPoint3D(vecpt, {255,255,255,255});
     }
 
     static void rlVertex3V(Vector3 v)
@@ -1156,6 +1224,46 @@ rlDisableDepthMask();
             }
         }
     }
+    static void TriangAndDraw3D(Vector3 *points, int count)
+    {
+        if (count < 3 || !points) return;
+
+        // Convert Vector3 points to 2D for triangulation
+        float* polyVertices = (float*)malloc(count * 2 * sizeof(float));
+        for (int i = 0; i < count; i++)
+        {
+            polyVertices[i * 2] = points[i].x;
+            polyVertices[i * 2 + 1] = points[i].z; // Use Z as Y for 2D triangulation
+        }
+
+        // Prepare triangulation output
+        int maxTriangles = count - 2;
+        unsigned short* indices = (unsigned short*)malloc(maxTriangles * 3 * sizeof(unsigned short));
+
+        // Triangulate the polygon
+        int triangleCount = DumbRender::TriangulatePolygon(polyVertices, count, indices);
+
+        // Draw triangulated mesh
+        rlBegin(RL_TRIANGLES);
+
+
+        for (int tri = 0; tri < triangleCount; tri++)
+        {
+            for (int vert = 0; vert < 3; vert++)
+            {
+                int idx = indices[tri * 3 + vert];
+                Vector3 pt = points[idx];
+                rlVertex3f(pt.x, pt.y, pt.z);
+            }
+        }
+
+        rlEnd();
+
+        // Cleanup
+        free(polyVertices);
+        free(indices);
+    }
+
 
     // Call every frame
     static void DrawMapstateTexOld(Camera3D cam)
