@@ -61,13 +61,11 @@ static inline void portal_xform_world_full(double *x, double *y, double *z, bdra
 	p.y = *y;
 	p.z = *z;
 	wccw_transform(&p, &b->cam, &b->orcam);
-//loops[loopnum] = p;
-//loopuse[loopnum] = true;
-//loopnum++;
 	*x = p.x;
 	*y = p.y;
 	*z = p.z;
 }
+
 static inline void portal_xform_world_fullp(dpoint3d *inp, bdrawctx *b) {
 	wccw_transform(inp, &b->cam, &b->orcam);
 //loops[loopnum] = *inp;
@@ -279,86 +277,20 @@ static int bunchfront (int b0, int b1, int fixsplitnow, bdrawctx *b)
 
 	if (b0 == b1) return(0);
 
-		//FIXFIXFIXFIXFIX:remove block
-#if 0 //This doen't work if 'B' of {A<B<C} is hidden from view :/
-	sect_t *sec;
-	int s0, s1, w, ns, nw;
-	sec = curMap->sect;
-	s0 = bunch[b0].sec;
-	s1 = bunch[b1].sec;
-	if (s0 != s1)
-	{
-		for(w=sec[s0].n-1;w>=0;w--)
-		{
-			ns = sec[s0].wall[w].ns;
-			nw = sec[s0].wall[w].nw;
-			while (((unsigned)ns < (unsigned)curMap->numsects) && (ns != s0))
-			{
-				if (ns == s1) goto good; //s0 and s1 are neighbors
-				i = ns;
-				ns = sec[i].wall[nw].ns;
-				nw = sec[i].wall[nw].nw;
-			}
-		}
-		return(0); //bunches not on neighboring sectors are designated as incomparable
-good:;
-	}
-#endif
-
-		//FIXFIXFIXFIXFIX
-	//if ((((unsigned)b0 >= (unsigned)bunchn) || ((unsigned)b1 >= (unsigned)bunchn)) || (!bunch))
-	//{
-	//   char tbuf[1024];
-	//   sprintf(tbuf,"b0=%d/0x%08x\nb1=%d/0x%08x\nbunchn=%d/0x%08x",b0,b0,b1,b1,bunchn,bunchn);
-	//   MessageBox(ghwnd,tbuf,prognam,MB_OK);
-	//   ExitProcess(0);
-	//}
-
 	twal[0] = (bunchverts_t *)_alloca((curMap->sect[b->bunch[b0].sec].n+curMap->sect[b->bunch[b1].sec].n+2)*sizeof(bunchverts_t));
 	twaln[0] = prepbunch(b0,twal[0],b); twal[1] = &twal[0][twaln[0]+1];
 	twaln[1] = prepbunch(b1,twal[1],b);
 
 		//Offset vertices (BUNCHNEAR of scansector() already puts them safely in front)
-	for(j=2-1;j>=0;j--) for(i=twaln[j];i>=0;i--) { twal[j][i].x -= gcam.p.x; twal[j][i].y -= gcam.p.y; }
-
-	//{ //FIXFIXFIXFIXFIX
-	//char tbuf[1024]; sprintf(tbuf,"cnt=%d\n",(1<<31)-1-gcnt);
-	//for(j=0;j<2;j++)
-	//{
-	//   for(i=0;i<=twaln[0];i++) sprintf(&tbuf[strlen(tbuf)],"%f,%f  ",twal[j][i].x,twal[j][i].y);
-	//   sprintf(&tbuf[strlen(tbuf)],"\n");
-	//}
-	//MessageBox(ghwnd,tbuf,prognam,MB_OK);
+	for (j = 2 - 1; j >= 0; j--) for (i = twaln[j]; i >= 0; i--) {
+		twal[j][i].x -= gcam.p.x;
+		twal[j][i].y -= gcam.p.y;
+	}
 
 	if (twal[0][0].y*twal[1][twaln[1]].x >= twal[1][twaln[1]].y*twal[0][0].x) return(0); //no overlap (whole bunch)
 	if (twal[1][0].y*twal[0][twaln[0]].x >= twal[0][twaln[0]].y*twal[1][0].x) return(0); //no overlap (whole bunch)
 
-
 	a[0] = 0; a[1] = 0;
-#if 0 //FIXFIXFIXFIXFIX:old (doesn't test unsortable)
-		//Calculate difference of area in overlapping section
-	for(j=2-1;j>=0;j--)
-	{
-		x2 = twal[1-j][0].x; x3 = twal[1-j][twaln[1-j]].x;
-		y2 = twal[1-j][0].y; y3 = twal[1-j][twaln[1-j]].y; i = twaln[j];
-		for(i--;i>=0;i--)
-		{
-			x0 = twal[j][i].x; x1 = twal[j][i+1].x;
-			y0 = twal[j][i].y; y1 = twal[j][i+1].y;
-
-				//(x0-x1)*t + x2*u = x0
-				//(y0-y1)*t + y2*u = y0
-			t0 = x1*y2 - x2*y1; if (t0 >= 0.0) continue; //no overlap
-			t1 = x0*y3 - x3*y0; if (t1 <= 0.0) continue; //no overlap
-			t2 = x0*y2 - x2*y0; if (t2 <= 0.0) t0 = 0.0; else t0 = t2/(t2-t0);
-			t3 = x1*y3 - x3*y1; if (t3 >= 0.0) t1 = 1.0; else t1 = t1/(t1-t3);
-			a[j] += (x0*y1 - x1*y0)*(t1-t0); //add area(*2) of triangular slice, clipped by other bunch
-		}
-	}
-	if (a[0] < a[1]) return(1);
-	if (a[0] > a[1]) return(2);
-	return(0);
-#else
 		//Calculate the areas between the 2 bunches (superset of above algo - can determine if unsortable)
 	ind[0] = 0; ind[1] = 0; cnt = 0; otx0 = 0; oty0 = 0; otx1 = 0; oty1 = 0;
 	j = 0; gotsid = 0; startsid = -1; obfintn = b->bfintn;
@@ -432,12 +364,12 @@ overflow:otx0 = tx0; oty0 = ty0; otx1 = tx1; oty1 = ty1;
 	if (a[0] <= +1e-7) return(1);
 	if (a[1] >= -1e-7) return(2);
 	return(3);
-#endif
 }
 
 static void scansector (int sectnum, bdrawctx* b)
 {
 	cam_t gcam = b->cam;
+	cam_t orcam = b->orcam;
 	#define BUNCHNEAR 1e-7
 	sect_t *sec;
 	wall_t *wal;
@@ -454,12 +386,31 @@ static void scansector (int sectnum, bdrawctx* b)
 	for(i=0,ie=sec->n;i<ie;i++)
 	{
 		j = wal[i].n+i;
-		dx0 = wal[i].x-gcam.p.x; dy0 = wal[i].y-gcam.p.y;
-		dx1 = wal[j].x-gcam.p.x; dy1 = wal[j].y-gcam.p.y; if (dy1*dx0 <= dx1*dy0) goto docont; //Back-face cull
+
+		if (false)
+		{
+			dpoint3d wcpi = portal_xform_world_fullr(wal[i].x,wal[i].y,getwallz(sec,1,i),b);
+			dpoint3d wcpj = portal_xform_world_fullr(wal[j].x,wal[j].y,getwallz(sec,1,i),b);
+			dx0 = wcpi.x-orcam.p.x; dy0 = wcpi.y-orcam.p.y;
+			dx1 = wcpj.x-orcam.p.x; dy1 = wcpj.y-orcam.p.y;
+			if (dy1*dx0 <= dx1*dy0) goto docont; //Back-face cull
 
 			//clip to near plane .. result is parametric fractions f0&f1
-		f0 = dx0 * b->xformmatc + dy0 * b->xformmats;
-		f1 = dx1 * b->xformmatc + dy1 * b->xformmats;
+			f0 = dx0 * b->xformmatcori + dy0 * b->xformmatsori;
+			f1 = dx1 * b->xformmatcori + dy1 * b->xformmatsori;
+		}
+		else
+		{
+			dx0 = wal[i].x-gcam.p.x; dy0 = wal[i].y-gcam.p.y;
+			dx1 = wal[j].x-gcam.p.x; dy1 = wal[j].y-gcam.p.y;
+			if (dy1*dx0 <= dx1*dy0) goto docont; //Back-face cull
+
+			//clip to near plane .. result is parametric fractions f0&f1
+			f0 = dx0 * b->xformmatc + dy0 * b->xformmats;
+			f1 = dx1 * b->xformmatc + dy1 * b->xformmats;
+
+		}
+
 			  if (f0 <= BUNCHNEAR) { if (f1 <= BUNCHNEAR) goto docont;
 											 f0 = (BUNCHNEAR-f0)/(f1-f0); f1 = 1.0; if (f0 >= f1) goto docont; }
 		else if (f1 <= BUNCHNEAR) { f1 = (BUNCHNEAR-f0)/(f1-f0); f0 = 0.0; if (f0 >= f1) goto docont; }
@@ -616,7 +567,6 @@ static void xformbac (double rx, double ry, double rz, dpoint3d *o, bdrawctx *b)
 	o->y = rx*b->xformmat[1] + ry*b->xformmat[4] + rz*b->xformmat[7];
 	o->z = rx*b->xformmat[2] + ry*b->xformmat[5] + rz*b->xformmat[8];
 }
-
 static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 {
 	cam_t orcam = b->orcam;
@@ -657,60 +607,20 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 
 			if (!h) i = mp[i].n;
 		} while (i != rethead[h]);
+
 		mono_deloop(rethead[h]);
 	}
 
+	// Allocate eyepol entry
 	if (eyepoln+1 >= eyepolmal)
 	{
-		eyepolmal = max(eyepolmal<<1,4096);
-		eyepol = (eyepol_t *)realloc(eyepol,eyepolmal*sizeof(eyepol_t));
+		eyepolmal = max(eyepolmal<<1, 4096);
+		eyepol = (eyepol_t *)realloc(eyepol, eyepolmal*sizeof(eyepol_t));
 		eyepol[0].vert0 = 0;
 	}
 
-	if (b->gflags < 2)
-		memcpy((void *)eyepol[eyepoln].ouvmat,(void *)b->gouvmat,sizeof(b->gouvmat[0])*9);
-	else
-	{
-		// Skybox texture mapping (same as original)
-		f = (((float)64)+1.15f)/((float)64); fptr = eyepol[eyepoln].ouvmat;
-		switch(b->gflags)
-		{
-			case 14: fptr[0] = +f                 ; fptr[3] = f*+2.f; fptr[6] =     0.f; //Front
-						fptr[1] = -1.f               ; fptr[4] =    0.f; fptr[7] =     0.f;
-						fptr[2] = (f*- 5.f - 1.f)/6.f; fptr[5] =    0.f; fptr[8] = f*+12.f;
-						break;
-			case 13: fptr[0] = +1.f               ; fptr[3] =    0.f; fptr[6] =     0.f; //Right
-						fptr[1] = -f                 ; fptr[4] = f*+2.f; fptr[7] =     0.f;
-						fptr[2] = (f*-17.f - 1.f)/6.f; fptr[5] =    0.f; fptr[8] = f*+12.f;
-						break;
-			case 15: fptr[0] = -f                 ; fptr[3] = f*-2.f; fptr[6] =     0.f; //Back
-						fptr[1] = +1.f               ; fptr[4] =    0.f; fptr[7] =     0.f;
-						fptr[2] = (f*-29.f - 1.f)/6.f; fptr[5] =    0.f; fptr[8] = f*+12.f;
-						break;
-			case 12: fptr[0] = -1.f               ; fptr[3] =    0.f; fptr[6] =     0.f; //Left
-						fptr[1] = +f                 ; fptr[4] = f*-2.f; fptr[7] =     0.f;
-						fptr[2] = (f*-41.f - 1.f)/6.f; fptr[5] =    0.f; fptr[8] = f*+12.f;
-						break;
-			case 11: fptr[0] = +f                 ; fptr[3] = f*+2.f; fptr[6] =     0.f; //Top
-						fptr[1] = (f*-17.f - 1.f)/6.f; fptr[4] =    0.f; fptr[7] = f*-12.f;
-						fptr[2] = -1.f               ; fptr[5] =    0.f; fptr[8] =     0.f;
-						break;
-			case 10: fptr[0] = -f                 ; fptr[3] = f*+2.f; fptr[6] =     0.f; //Bottom
-						fptr[1] = (f*+ 5.f + 1.f)/6.f; fptr[4] =    0.f; fptr[7] = f*+12.f;
-						fptr[2] = +1.f               ; fptr[5] =    0.f; fptr[8] =     0.f;
-						break;
-		}
-		for(i=9-3;i>=0;i-=3)
-		{
-			float ox, oy, oz;
-			ox = fptr[i+0]*65536.f; oy = fptr[i+1]*65536.f; oz = fptr[i+2]*65536.f;
-			fptr[i+0] = ox*orcam.r.x + oy*orcam.r.y + oz*orcam.r.z;
-			fptr[i+1] = ox*orcam.d.x + oy*orcam.d.y + oz*orcam.d.z;
-			fptr[i+2] = ox*orcam.f.x + oy*orcam.f.y + oz*orcam.f.z;
-		}
-		gentex_xform(fptr,b);
-	}
-
+	memcpy((void *)eyepol[eyepoln].ouvmat, (void *)b->gouvmat, sizeof(b->gouvmat[0])*9);
+	//eyepol[eyepoln].chain1_start = chain0_end;  // Store the split
 	eyepol[eyepoln].tpic = gtpic;
 	eyepol[eyepoln].curcol = gcurcol;
 	eyepol[eyepoln].flags = (b->gflags != 0);
@@ -1167,8 +1077,8 @@ static void gentex_wall (kgln_t *npol2, surf_t *sur, bdrawctx *b)
 		npol2[i].z = ox*gcam.f.x + oy*gcam.f.y + oz*gcam.f.z;
 	}
 
-		//sx = npol2[i].x*gcam.h.z/npol2[i].z+gcam.h.x
-		//sy = npol2[i].y*gcam.h.z/npol2[i].z+gcam.h.y
+		//sx = npol2[i].x*cam.h.z/npol2[i].z+cam.h.x
+		//sy = npol2[i].y*cam.h.z/npol2[i].z+cam.h.y
 		//npol2[i].u = (b->gouvmat[1]*sx + b->gouvmat[4]*sy + b->gouvmat[7])/(b->gouvmat[0]*sx + b->gouvmat[3]*sy + b->gouvmat[6])
 		//npol2[i].v = (b->gouvmat[2]*sx + b->gouvmat[5]*sy + b->gouvmat[8])/(b->gouvmat[0]*sx + b->gouvmat[3]*sy + b->gouvmat[6])
 		//npol2[i].z =                                            1/(b->gouvmat[0]*sx + b->gouvmat[3]*sy + b->gouvmat[6])
@@ -1257,19 +1167,6 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 	s = b->bunch[bid].sec;
 	sec = curMap->sect;
 	wal = sec[s].wall;
-#if 0
-	i = bunch[bid].wal0;
-	x0 = wal[i].x; y0 = wal[i].y; i += wal[i].n;
-	x1 = wal[i].x; y1 = wal[i].y; f = bunch[bid].fra0;
-	twalx0 = (x1-x0)*f + x0;
-	twaly0 = (y1-y0)*f + y0;
-
-	i = b->bunch[bid].wal1;
-	x0 = wal[i].x; y0 = wal[i].y; i += wal[i].n;
-	x1 = wal[i].x; y1 = wal[i].y; f = bunch[bid].fra1;
-	twalx1 = (x1-x0)*f + x0;
-	twaly1 = (y1-y0)*f + y0;
-#endif
 
 	twal = (bunchverts_t *)_alloca((curMap->sect[b->bunch[bid].sec].n+1)*sizeof(bunchverts_t));
 	twaln = prepbunch(bid,twal,b);
@@ -1318,6 +1215,7 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 			//   (?       -      fz)*      1 = 0
 		// Build polygon for ceiling/floor using plane equation:
 		plothead[0] = -1; plothead[1] = -1;
+		point3d locnorm = world_to_local_vec(b->gnorm, &b->cam.tr);
 		for (ww = twaln; ww >= 0; ww -= twaln) plothead[isflor] = mono_ins(
 			                                       plothead[isflor], twal[ww].x, twal[ww].y,
 			                                       b->gnorm.z * -1e32);
@@ -1537,13 +1435,8 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
 
 	curMap = lgs;
 
-	//if ((lgs->numsects <= 0) || ((unsigned)gcam.cursect >= (unsigned)lgs->numsects))
+	//if ((lgs->numsects <= 0) || ((unsigned)cam.cursect >= (unsigned)lgs->numsects))
 	//{
-	////if (shadowtest2_rendmode != 4)
-	////{
-	////	for(i=0,j=gcam.c.f;i<gcam.c.y;i++,j+=gcam.c.p) memset8((void *)j,0x00000000,gcam.c.x<<2);
-	////	for(i=0,j=gcam.z.f;i<gcam.z.y;i++,j+=gcam.z.p) memset8((void *)j,0x7f7f7f7f,gcam.z.x<<2);
-	////}
 	////if (shadowtest2_rendmode != 4) eyepoln = 0; //Prevents drawpollig() from crashing
 	////	return;
 	//}
@@ -1573,17 +1466,17 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
 
 
 		//Hack to keep camera away from sector line; avoids clipping glitch in drawpol_befclip/changetagfunc
-//wal = lgs->sect[gcam.cursect].wall;
-//for(i=lgs->sect[gcam.cursect].n-1;i>=0;i--)
+//wal = lgs->sect[cam.cursect].wall;
+//for(i=lgs->sect[cam.cursect].n-1;i>=0;i--)
 //{
 //	#define WALHAK 1e-3
 //	j = wal[i].n+i;
-//	d = distpoint2line2(gcam.p.x,gcam.p.y,wal[i].x,wal[i].y,wal[j].x,wal[j].y); if (d >= WALHAK*WALHAK) continue;
+//	d = distpoint2line2(cam.p.x,cam.p.y,wal[i].x,wal[i].y,wal[j].x,wal[j].y); if (d >= WALHAK*WALHAK) continue;
 //	fp.x = wal[j].x-wal[i].x;
 //	fp.y = wal[j].y-wal[i].y;
 //	f = (WALHAK - sqrt(d))/sqrt(fp.x*fp.x + fp.y*fp.y);
-//	gcam.p.x -= fp.y*f;
-//	gcam.p.y += fp.x*f;
+//	cam.p.x -= fp.y*f;
+//	cam.p.y += fp.x*f;
 //}
 
 	if (shadowtest2_rendmode != 4)
@@ -1593,9 +1486,9 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
 		drig.x = 1.0; drig.y = 0.0; drig.z = 0.0;
 		ddow.x = 0.0; ddow.y = 1.0; ddow.z = 0.0;
 		dfor.x = 0.0; dfor.y = 0.0; dfor.z = 1.0;
-	//	drawpoly_setup(                           (tiletype *)&gcam.c,gcam.z.f-gcam.c.f,&dpos,&drig,&ddow,&dfor,gcam.h.x,gcam.h.y,gcam.h.z);
-		//drawcone_setup(cputype,shadowtest2_numcpu,(tiletype *)&gcam.c,gcam.z.f-gcam.c.f,&dpos,&drig,&ddow,&dfor,gcam.h.x,gcam.h.y,gcam.h.z);
-		// drawkv6_setup(&drawkv6_frame,            (tiletype *)&gcam.c,gcam.z.f-gcam.c.f,&dpos,&drig,&ddow,&dfor,gcam.h.x,gcam.h.y,gcam.h.z);
+	//	drawpoly_setup(                           (tiletype *)&cam.c,cam.z.f-cam.c.f,&dpos,&drig,&ddow,&dfor,cam.h.x,cam.h.y,cam.h.z);
+		//drawcone_setup(cputype,shadowtest2_numcpu,(tiletype *)&cam.c,cam.z.f-cam.c.f,&dpos,&drig,&ddow,&dfor,cam.h.x,cam.h.y,cam.h.z);
+		// drawkv6_setup(&drawkv6_frame,            (tiletype *)&cam.c,cam.z.f-cam.c.f,&dpos,&drig,&ddow,&dfor,cam.h.x,cam.h.y,cam.h.z);
 
 		for(i=shadowtest2_numlights-1;i>=0;i--)
 		{
@@ -1669,7 +1562,10 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
 		}
 		else {
 			xformprep(((double)halfplane)*PI, b);
-
+			if (!b->has_portal_clip) {
+				b->xformmatcori = b->xformmatc;
+				b->xformmatsori = b->xformmats;
+			}
 			// NEW CODE - Use much larger bounds:
 			float large_bound = 1e6f;
 			xformbac(-large_bound, -large_bound, gcam.h.z, &bord[0],b);
@@ -1740,6 +1636,8 @@ nogood:; }
 
 		if (shadowtest2_rendmode == 4) uptr = glp->sectgot;
 										  else uptr = shadowtest2_sectgot;
+		if (b->has_portal_clip)
+			return;
 
 		if (!halfplane)
 		{
@@ -1828,7 +1726,8 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport, bdrawctx *parentc
     newctx.gnewtagsect = -1;
     newctx.gnewtag = -1;
     newctx.currenthalfplane = parentctx->currenthalfplane;
-
+	newctx.xformmatcori = parentctx->xformmatc;
+	newctx.xformmatsori = parentctx->xformmats;
     draw_hsr_polymost_ctx(map, &newctx);
 }
 
@@ -1840,7 +1739,7 @@ void drawsprites ()
 
 void shadowtest2_setcam (cam_t *ncam)
 {
-	//gcam = *ncam;
+	//cam = *ncam;
 }
 
 #if (USENEWLIGHT == 0)

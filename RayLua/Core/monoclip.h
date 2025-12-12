@@ -92,7 +92,9 @@ typedef struct {
 	cam_t cam;                    // Camera per recursion level
  	cam_t orcam; // one true camera, read only.
 	double xformmat[9], xformmatc, xformmats;
+	double xformmatcori, xformmatsori;
 	point3d gnadd;
+	point3d gnaddcurr;
 	point3d gnorm;
 	float gouvmat[9]; // 0 3 6 - store plane equation to convert back from mp.
 	int gligsect, gligwall, gligslab, gflags;
