@@ -44,6 +44,70 @@ void logstep(const char* fmt, ...) {
 	va_end(args);
 	printf("\n");
 }
+
+void bdrawctx_clear(bdrawctx *b) {
+	if (!b) return;
+
+	// Clear bunch context allocations
+	if (b->bunch) {
+		free(b->bunch);
+		b->bunch = NULL;
+	}
+
+	if (b->bunchgot) {
+		free(b->bunchgot);
+		b->bunchgot = NULL;
+	}
+
+	if (b->bunchgrid) {
+		free(b->bunchgrid);
+		b->bunchgrid = NULL;
+	}
+
+	// Clear sector allocations
+	if (b->sectgot) {
+		free(b->sectgot);
+		b->sectgot = NULL;
+	}
+
+	if (b->sectgotmal) free((void *)b->sectgotmal);
+
+	// Reset all counters and flags
+	b->bunchn = 0;
+	b->bunchmal = 0;
+	b->bfintn = 0;
+	b->sectgotn = 0;
+	b->entrysec = 0;
+	b->has_mono_out = false;
+	b->has_portal_clip = false;
+	b->recursion_depth = 0;
+	b->testignorewall = 0;
+	b->ignorekind = 0;
+	b->testignoresec = 0;
+	b->planecuts = 0;
+	b->currenthalfplane = 0;
+	b->gligsect = 0;
+	b->gligwall = 0;
+	b->gligslab = 0;
+	b->gflags = 0;
+	b->gnewtag = 0;
+	b->gdoscansector = 0;
+	b->gnewtagsect = 0;
+	b->chead[0] = 0;
+	b->chead[1] = 0;
+
+	// Zero out lookup tables and matrices
+	memset(b->bfintlut, 0, sizeof(b->bfintlut));
+	memset(b->xformmat, 0, sizeof(b->xformmat));
+	memset(b->oxformmat, 0, sizeof(b->oxformmat));
+	memset(b->gouvmat, 0, sizeof(b->gouvmat));
+
+	b->xformmatc = 0.0;
+	b->xformmats = 0.0;
+	b->oxformmatc = 0.0;
+	b->oxformmats = 0.0;
+}
+
 static inline dpoint3d portal_xform_world_fullr(double x, double y, double z, bdrawctx *b) {
 	dpoint3d p;
 	p.x = x;
@@ -737,12 +801,99 @@ static void changetagfunc (int rethead0, int rethead1, bdrawctx *b)
 	//flags&1: do and
 	//flags&2: do sub
 	//flags&4: reverse cut for sub
-static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead0, int plothead1, int flags, bdrawctx* b)
+
+static int drawpol_asis (int withtag, int plothead0, int plothead1,  bdrawctx* b) {
+	LOOPEND
+	cam_t gcam = b->cam;
+	double* xform = b->xformmat;
+	double xformc = b->xformmatc;
+	double xforms = b->xformmats;
+#define BSCISDIST 0.000001 //Reduces probability of glitch further
+	//#define BSCISDIST 0.0001 //Gaps undetectable
+	//#define BSCISDIST 0.1 //Huge gaps
+	void (*mono_output)(int h0, int h1, bdrawctx *b);
+	dpoint3d *otp, *tp;
+	double f, ox, oy, oz;
+	int i, j, k, l, h, on, n, plothead[2], imin, imax, i0, i1, omph0, omph1;
+
+	if ((plothead0|plothead1) < 0) return 0;
+	plothead[0] = plothead0; plothead[1] = plothead1;
+
+	n = 2;
+	for (h = 0; h < 2; h++)
+		for (i = mp[plothead[h]].n; i != plothead[h]; i = mp[i].n)
+			n++;
+	otp = (dpoint3d *) _alloca(n * sizeof(dpoint3d));
+	tp = (dpoint3d *) _alloca(n * sizeof(dpoint3d) * 2);
+
+	//rotate, converting vmono to simple point3d loop
+	on = 0;
+	for(h=0;h<2;h++)
+	{
+		i = plothead[h];
+		do
+		{
+			if (h) i = mp[i].p;
+			ox = mp[i].x-gcam.p.x; oy = mp[i].y-gcam.p.y;
+			if (b->has_portal_clip)
+				LOOPADD(mp[i].pos)
+			otp[on].x = oy*xformc - ox*xforms;
+			otp[on].y = mp[i].z-gcam.p.z;
+			otp[on].z = ox*xformc + oy*xforms; on++;
+
+			if (!h) i = mp[i].n;
+		} while (i != plothead[h]);
+		mono_deloop(plothead[h]);
+	}
+
+	//clip
+	n = 0;
+	for(i=on-1,j=0;j<on;i=j,j++)
+	{
+		if (otp[i].z >= BSCISDIST) { tp[n] = otp[i]; n++; }
+		if ((otp[i].z >= BSCISDIST) != (otp[j].z >= BSCISDIST))
+		{
+			f = (BSCISDIST-otp[j].z)/(otp[i].z-otp[j].z);
+			tp[n].x = (otp[i].x-otp[j].x)*f + otp[j].x;
+			tp[n].y = (otp[i].y-otp[j].y)*f + otp[j].y;
+			tp[n].z = BSCISDIST; n++;
+		}
+	}
+	if (n < 3) return 0;
+
+	//project & find x extents
+	for(i=0;i<n;i++)
+	{
+		f = gcam.h.z/tp[i].z;
+		tp[i].x = tp[i].x*f + gcam.h.x;
+		tp[i].y = tp[i].y*f + gcam.h.y;
+		// log herte.
+
+	}
+
+	//generate vmono
+	mono_genfromloop(&plothead[0], &plothead[1], tp, n);
+	if ((plothead[0] | plothead[1]) < 0) {
+		mono_deloop(plothead[0]);
+		mono_deloop(plothead[1]);
+		return 0;
+	}
+	mono_mph_check(mphnum);
+
+	mph[mphnum].head[0] = plothead[0];
+	mph[mphnum].head[1] = plothead[1];
+	mph[mphnum].tag = withtag;
+	mphnum++;
+	return 1;
+}
+static int drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead0, int plothead1, int flags, bdrawctx* b)
 {
+
 	LOOPEND
 	int mtag = tag1 + taginc*b->recursion_depth;
 	int tagsect = tag1;
 	int mnewtag = newtag1 == -1 ? -1 : newtag1 + taginc*b->recursion_depth;
+	logstep("drawpol tag:%d nwtag:%d\n",mtag , mnewtag);
 	b->gnewtagsect = newtagsect;
 	cam_t gcam = b->cam;
 	double* xform = b->xformmat;
@@ -756,7 +907,7 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 	double f, ox, oy, oz;
 	int i, j, k, l, h, on, n, plothead[2], imin, imax, i0, i1, omph0, omph1;
 
-	if ((plothead0|plothead1) < 0) return;
+	if ((plothead0|plothead1) < 0) return 0;
 	plothead[0] = plothead0; plothead[1] = plothead1;
 
 	n = 2;
@@ -799,7 +950,7 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 			tp[n].z = BSCISDIST; n++;
 		}
 	}
-	if (n < 3) return;
+	if (n < 3) return 0;
 
 		//project & find x extents
 	for(i=0;i<n;i++)
@@ -816,8 +967,18 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 	if ((plothead[0] | plothead[1]) < 0) {
 		mono_deloop(plothead[0]);
 		mono_deloop(plothead[1]);
-		return;
+		return 0;
 	}
+	if (flags & 8) { // portal logic.
+		mono_mph_check(mphnum);  // Ensure space
+		mph[mphnum].head[0] = plothead[0];
+		mph[mphnum].head[1] = plothead[1];
+		mph[mphnum].tag = mnewtag;
+		mphnum++;
+		printf("new mph:%d \n",mphnum);
+		return mphnum;
+	}
+	// -- plothead points to polygon clipped with camera plane.
 
 	if (flags&1 || flags&8)
 	{
@@ -826,7 +987,8 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 			b->gnewtagsect = newtagsect;
 			b->gnewtag = mnewtag; omph0 = mphnum;
 			b->gdoscansector =  !(flags&8);
-			int bop = MONO_BOOL_AND;//(flags & CLIP_PORTAL_FLAG) ? MONO_BOOL_SUB_REV : MONO_BOOL_AND;
+			//
+			int bop = (flags & CLIP_PORTAL_FLAG) ? MONO_BOOL_SUB_REV : MONO_BOOL_AND;
 			for (i = mphnum - 1; i >= 0; i--)
 				if (mph[i].tag == mtag)
 					mono_bool(
@@ -837,6 +999,7 @@ static void drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead
 						bop,
 						b,
 						changetagfunc);
+						OPERLOG
 			{
 				for(l=omph0;l<mphnum;l++)
 				{
@@ -1112,17 +1275,19 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 			gentransform_ceilflor(&sec[s], wal, isflor, b);
 
 		b->gligwall = isflor - 2;
-
+		// Render the wall polygon
+		// F L O O R S
+		//
 		if (isportal && !noportals) {
 			int endpn = portals[myport].destpn;
 			int portalpolyflags = ((!isflor<<2)+3) | CLIP_PORTAL_FLAG;
-			drawpol_befclip(s, portals[endpn].sect+taginc, portals[endpn].sect,
-				plothead[0],plothead[1], portalpolyflags , b);
-			draw_hsr_enter_portal(map, myport, b);
+			//drawpol_befclip(portals[endpn].sect, portals[endpn].sect+taginc, portals[endpn].sect,	plothead[0],plothead[1], portalpolyflags , b);
+			draw_hsr_enter_portal(map, myport, plothead[0],plothead[1],b);
 		}
 
 		else {
 			drawpol_befclip(s,-1,-1,plothead[0],plothead[1],(isflor<<2)+3,b);
+			OPERLOG
 		}
 	}
 
@@ -1232,19 +1397,24 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 				ns = verts[m >> 1].s; // Portal to adjacent sector
 			}
 			// Render the wall polygon
+			// W A L L S
+			//
 			myport = wal[w].tags[1];
 			if (myport >= 0 && portals[myport].destpn >=0 && portals[myport].kind == PORT_WALL) {
 					int endp = portals[myport].destpn;
 				int portalpolyflags = 3 | CLIP_PORTAL_FLAG;
-				drawpol_befclip(s, portals[endp].sect+taginc, portals[endp].sect, plothead[0], plothead[1],  portalpolyflags, b);
-				draw_hsr_enter_portal(map, myport, b);
+				//drawpol_befclip(portals[endp].sect+taginc, -1,-1, plothead[0], plothead[1],  portalpolyflags, b);
+				OPERLOG
+				draw_hsr_enter_portal(map, myport, plothead[0],plothead[1],b);
 			} else {
 				// could be 7 or 3, .111 or .011
 				drawpol_befclip(s, ns, ns, plothead[0], plothead[1], ((m > vn) << 2) + 3, b);
+				OPERLOG
 			}
 		}
 
 	}
+	return 1;
 }
 /*
  *The function operates in different modes based on shadowtest2_rendmode:
@@ -1269,6 +1439,7 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
 	bs.orcam = *cc;
 	bs.recursion_depth = 0;
 	bs.has_portal_clip = false;
+opercurr = 0;
 	draw_hsr_polymost_ctx(map,&bs);
 
 }
@@ -1277,10 +1448,6 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
 	if (!newctx) {
 		return;
 	}
-	int prehead1 = -1;
-	int prehead2 = -1;
-	int presect = -1;
-
 	int recursiveDepth = newctx->recursion_depth;
 	bdrawctx *b;
 	b = newctx;
@@ -1490,7 +1657,7 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
 
 		memset8(b->sectgot,0,(lgs->numsects+31)>>3);
 
-
+		int passmphstart;
 		if (!b->has_portal_clip) {
 			//FIX! once means not each frame! (of course it doesn't hurt functionality)
 			// Standard case: clear existing state and create new viewport
@@ -1567,7 +1734,7 @@ nogood:; }
 	}
 }
 
-static void draw_hsr_enter_portal(mapstate_t* map, int myport, bdrawctx *parentctx)
+static void draw_hsr_enter_portal(mapstate_t* map, int myport,  int head1, int head2,bdrawctx *parentctx)
 {
     if (parentctx->recursion_depth >= MAX_PORTAL_DEPTH) {
         return;
@@ -1605,7 +1772,8 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport, bdrawctx *parentc
     ncam.cursect = portals[endp].sect;
 
     bdrawctx newctx = {};
-    newctx.recursion_depth = parentctx->recursion_depth + 1;
+	newctx.entrysec = parentctx->cam.cursect;
+	newctx.recursion_depth = parentctx->recursion_depth + 1;
     newctx.cam = ncam;
     newctx.orcam = parentctx->orcam;
     newctx.has_portal_clip = true;
@@ -1627,6 +1795,8 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport, bdrawctx *parentc
 	newctx.oxformmats = parentctx->oxformmats;
 	newctx.ognadd = parentctx->ognadd;
 	memcpy(&newctx.oxformmat, &parentctx->oxformmat, sizeof(double)*9);
+	newctx.chead[0] = head1;
+	newctx.chead[1] = head2;
     draw_hsr_polymost_ctx(map, &newctx);
 }
 

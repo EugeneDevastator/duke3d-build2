@@ -6,17 +6,17 @@
 
 #include "monodebug.h"
 
-
+// array of head pairs; all mono polys known
 mph_t *mph = 0;
 int mphnum = 0;
 int mphmal = 0;
 
-
+// pool of heads.
 mp_t *mp = 0;
 int mpempty, mpmal = 0;
 
-void mono_mph_check(int mphnum) {
-    if (mphnum >= mphmal) {
+void mono_mph_check(int num) {
+    if (num >= mphmal) {
         mphmal <<= 1;
         mph = (mph_t *) realloc(mph, mphmal * sizeof(mph[0]));
     }

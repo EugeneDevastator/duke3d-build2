@@ -14,6 +14,8 @@ int loopnum=0;
 int captureframe=0;
  transform lastcamtr = {};
  transform lastcamtr2 = {};
+int opercurr=0;
+signed int operstopn=0;
 void mono_dbg_init(void) {
     g_mono_dbg.capacity = 64;
     g_mono_dbg.snapshots = (mono_dbg_snapshot_t*)malloc(g_mono_dbg.capacity * sizeof(mono_dbg_snapshot_t));

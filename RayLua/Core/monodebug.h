@@ -5,6 +5,10 @@
 #include "monoclip.h"
 #define LOOPADD(p) loops[loopnum]=(p); loopuse[loopnum]=true; loopnum++;
 #define LOOPEND loopuse[loopnum]=false;loopnum++;
+extern signed int operstopn;
+extern int opercurr;
+#define OPERLOG opercurr++; if (operstopn >=0 && opercurr >= operstopn) return 0;
+
 typedef struct {
     double x, y, z;
 } mono_dbg_point_t;

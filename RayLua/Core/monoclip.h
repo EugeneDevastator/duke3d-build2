@@ -90,6 +90,7 @@ typedef struct {
 	int bfintn, bfintlut[BFINTMAX+1];
 	unsigned int *sectgot, *sectgotmal;        // Visited sectors per level
 	int sectgotn;
+	int entrysec;
 	// mono context
 	bool has_mono_out; // Whether portal clipping is active
 	// transform context
@@ -110,23 +111,29 @@ typedef struct {
 	int testignoresec;
 	int planecuts;
 	int currenthalfplane;
+	int chead[2];
 } bdrawctx;
 
+// mono vertex chains
 extern mp_t *mp;
+// head indices pointing to mp
 extern mph_t *mph;
 extern int mphnum, mphmal;
 extern int mpempty, mpmal;
 // Memory management - ensures mph array has sufficient capacity
-void mono_mph_check (int mphnum);
+void mono_mph_check (int num);
 
 // Initialize memory pools and data structures (call once at startup)
 void mono_initonce ();
 
-// Insert vertex into polygon chain - if i<0 starts new loop, else inserts after vertex i
+// Insert vertex into heads pool
 int  mono_ins2d (int i, double nx, double ny);
+// Insert vertex into heads pool
 int  mono_ins (int i, double nx, double ny, double nz);  // 3D version
+// Insert vertex into heads pool
 int mono_insp(int i, dpoint3d p);
-// Remove vertex from polygon chain and return to free pool
+
+// Insert vertex into heads pool
 void mono_del (int i);
 
 // Delete entire polygon loop starting at vertex i
@@ -175,9 +182,15 @@ int mono_clipself (int hd0, int hd1, bdrawctx* b, void (*mono_output)(int h0, in
 int mono_clipends (int hd, double x0, double x1);
 #endif
 
-// Join four polygon segments into two output polygons
+// Returns 1 on success, 0 on failure
+// ho0 points to first joined chain: hd0 → iy[0] → iy[2] → hd2
+// ho1 points to second joined chain: hd1 → iy[1] → iy[3] → hd3
+
 int mono_join (int hd0, int hd1, int hd2, int hd3, int *ho0, int *ho1);
 
+//AND on A,B: Callback gets intersection pieces (A ∩ B)
+//SUB on A,B: Callback gets pieces of A outside B (A - B)
+//SUB_REVERSE on A,B: Callback gets pieces of B outside A (B - A)
 // Perform boolean operation on two polygon pairs (AND, SUB, SUB_REV)
 void mono_bool (int hr0, int hr1, int hw0, int hw1, int boolop, bdrawctx* b, void (*mono_output)(int h0, int h1,bdrawctx* b));
 // Generate triangle strip vertices directly from monotone polygon

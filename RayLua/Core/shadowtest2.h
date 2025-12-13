@@ -118,7 +118,7 @@ int prepbunch(int id, bunchverts_t *twal, bdrawctx* b);
  * @param plothead1 Second polygon loop head
  * @param flags Clipping flags: &1=do and, &2=do sub, &4=reverse cut for sub
  */
-void drawpol_befclip(int tag, int newtag, int newtagsect, int plothead0, int plothead1, int flags,bdrawctx *b);
+int drawpol_befclip(int tag, int newtag, int newtagsect, int plothead0, int plothead1, int flags,bdrawctx *b);
 
 /** Main HSR (Hidden Surface Removal) function handling both clipping and rendering
  * @param cc Camera parameters
@@ -132,7 +132,7 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx);
 // ================================================================================================
 // POLYGONAL SHADOW CREATION FUNCTIONS
 // ================================================================================================
-void draw_hsr_enter_portal(mapstate_t* map, int endportaln, bdrawctx *b);
+void draw_hsr_enter_portal(mapstate_t* map, int endportaln,  int h1, int h2,bdrawctx *b);
 void gentex_xform (float *ouvmat, bdrawctx *b);
 /** Creates shadow polygon lists for light sources
  * @param rethead0 First polygon loop head from clipping

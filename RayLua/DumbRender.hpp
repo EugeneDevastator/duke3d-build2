@@ -498,7 +498,61 @@ public:
         glDisable(GL_POLYGON_OFFSET_FILL);
         return false;
     }
-    static void draw_mono_debug() {
+    static void draw_mono_state() {
+            int w = 800;
+        int h = 600;
+            int i;
+float scaler = 0.01;
+        int xoff=1;
+        int yoff=1;
+        rlBegin(RL_LINES);
+        rlColor4f(1,1,1,1);
+        rlVertex2f(0,0);
+        rlVertex2f(40,40);
+        rlVertex2f(40,50);
+        rlEnd();
+            // Iterate through all head pairs
+          // for (i = 0; i < mphnum; i++) {
+          //     rlBegin(RL_LINES);
+          //     for(h=0;h<2;h++) {
+          //         i = mph[i].head[h];
+          //         do
+          //         {
+          //             if (h) i = mp[i].p;
+          //
+          //             if (!h) i = mp[i].n;
+          //         } while (i != mph[i].head[h]);
+          //         mono_deloop(mph[i].head[h]);
+          //     }
+          // }
+
+        for (i = 0; i < mphnum; i++) {
+            int hd0 = mph[i].head[0];
+            int hd1 = mph[i].head[1];
+            rlBegin(RL_LINES);
+            // Display first chain (hd0)
+            if (hd0 >= 0) {
+                int current = hd0;
+                do {
+                    rlVertex2f(mp[current].x*scaler+xoff, mp[current].y*scaler+yoff);
+                    current = mp[current].n;
+                } while (current != hd0);
+            }
+
+            // Display second chain (hd1)
+            if (hd1 >= 0) {
+                int current = hd1;
+                do {
+                    current = mp[current].p;
+                    rlVertex2f(mp[current].x*scaler+xoff, mp[current].y*scaler+yoff);
+
+                } while (current != hd1);
+            }
+            rlEnd();
+        }
+
+    }
+    static void draw_debug_lines() {
         int startsnap = mono_cursnap;
         int endsnap = mono_cursnap == 0? g_mono_dbg.snapshot_count : mono_cursnap+1;
         for (int i=startsnap;i<endsnap;i++) {
@@ -579,7 +633,12 @@ public:
         if (IsKeyPressed(KEY_LEFT_SHIFT)) {
             mono_curchain--;
         }
-
+        if (IsKeyPressed(KEY_P)) {
+            operstopn++;
+        }
+        if (IsKeyPressed(KEY_O)) {
+            operstopn--;
+        }
         if (g_mono_dbg.snapshot_count > 0)
             mono_cursnap = abs(mono_cursnap % g_mono_dbg.snapshot_count);
 
@@ -589,7 +648,8 @@ public:
         bool draweye = true;
         bool drawlineseye = false;
         bool drawlights = false;
-        bool drawmonoloops = true;
+        bool drawmonoloops = false;
+        bool drawmonostate = true;
 
         rlDisableBackfaceCulling();
         BeginMode3D(camsrc);
@@ -638,10 +698,12 @@ public:
                 } // eyepol lines for each poly
 
             }
-            if (drawmonoloops) draw_mono_debug();
+            if (drawmonoloops) draw_debug_lines();
+
             EndBlendMode();
         }
         EndMode3D();
+        if (drawmonostate) draw_mono_state();
         //if (!lightpos_t || !eyepolv || eyepoln <= 0) return;}
 
         if (drawlights) { // Light polys
