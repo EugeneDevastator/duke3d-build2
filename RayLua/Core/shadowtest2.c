@@ -1421,9 +1421,10 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
 			halfplane = pass;
 		}
 		else {
-			//	if (b->currenthalfplane == 1)
-			//		halfplane = 1-pass;
-			//	else
+			// both passes needed for rotated portals
+				if (b->currenthalfplane == 1)
+					halfplane = 1-pass;
+				else
 				halfplane = pass;
 		}
 
@@ -1490,7 +1491,7 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
 		memset8(b->sectgot,0,(lgs->numsects+31)>>3);
 
 
-		if (true) {
+		if (!b->has_portal_clip) {
 			//FIX! once means not each frame! (of course it doesn't hurt functionality)
 			// Standard case: clear existing state and create new viewport
 			for (i = mphnum - 1; i >= 0; i--) {
@@ -1502,7 +1503,11 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
 			mph[0].tag = gcam.cursect + taginc*b->recursion_depth;
 			mphnum = 1;
 		} else {
-			// dont do anything, because clipping is done by drawpol_befclip.
+// adding board seems essential.
+			mono_mph_check(mphnum);
+			mono_genfromloop(&mph[mphnum].head[0], &mph[mphnum].head[1], bord2, n);
+			mph[mphnum].tag = gcam.cursect + taginc*b->recursion_depth;
+			mphnum++;
 		}
 
 		b->bunchn = 0; scansector(gcam.cursect,b);
