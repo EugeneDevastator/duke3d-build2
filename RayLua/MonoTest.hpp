@@ -120,7 +120,7 @@ void PerformPolygonClipping2D() {
     };
 
     // Perform subtraction (cut hole)
-    std::vector<std::vector<Vector3>> result = MonoClip3D::ClipPolygons2D(square, triangle, MONO_BOOL_SUB);
+    std::vector<std::vector<Vector3>> result = MonoClip3D::ClipPolygons2D(square, triangle, MONO_BOOL_AND);
 
     // Draw original polygons
     for (size_t i = 0; i < square.size(); i++) {

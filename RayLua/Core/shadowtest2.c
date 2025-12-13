@@ -35,15 +35,7 @@ eyepols are generated from mono space AND plane equation stored in gouvmat.
 #define DO_AND_SUB 3
 #define DO_AND_SUB_REV 7
 
-void logstep(const char* fmt, ...) {
-	if (!captureframe)
-		return;
-	va_list args;
-	va_start(args, fmt);
-	vprintf(fmt, args);
-	va_end(args);
-	printf("\n");
-}
+
 
 void bdrawctx_clear(bdrawctx *b) {
 	if (!b) return;
@@ -962,22 +954,14 @@ static int drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead0
 
 	}
 
-		//generate vmono
+	//generate vmono
 	mono_genfromloop(&plothead[0], &plothead[1], tp, n);
 	if ((plothead[0] | plothead[1]) < 0) {
 		mono_deloop(plothead[0]);
 		mono_deloop(plothead[1]);
 		return 0;
 	}
-	if (flags & 8) { // portal logic.
-		mono_mph_check(mphnum);  // Ensure space
-		mph[mphnum].head[0] = plothead[0];
-		mph[mphnum].head[1] = plothead[1];
-		mph[mphnum].tag = mnewtag;
-		mphnum++;
-		printf("new mph:%d \n",mphnum);
-		return mphnum;
-	}
+
 	// -- plothead points to polygon clipped with camera plane.
 
 	if (flags&1 || flags&8)
@@ -985,32 +969,46 @@ static int drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead0
 		if (mnewtag >= 0)
 		{
 			b->gnewtagsect = newtagsect;
-			b->gnewtag = mnewtag; omph0 = mphnum;
+			b->gnewtag = mnewtag;
+			omph0 = mphnum;
 			b->gdoscansector =  !(flags&8);
 			//
-			int bop = (flags & CLIP_PORTAL_FLAG) ? MONO_BOOL_SUB_REV : MONO_BOOL_AND;
+			int bop =MONO_BOOL_AND;// (flags & CLIP_PORTAL_FLAG) ? MONO_BOOL_SUB_REV : MONO_BOOL_AND;
+			// intersect with same monos, and change tag for resulting piece?
+			logstep("bool AND, keep all, changetag, on tag %d", mtag);
 			for (i = mphnum - 1; i >= 0; i--)
-				if (mph[i].tag == mtag)
+				if (mph[i].tag == mtag) {
 					mono_bool(
-						mph[i].head[0],
-						mph[i].head[1],
-						plothead[0],
-						plothead[1],
-						bop,
-						b,
-						changetagfunc);
-						OPERLOG
+					   mph[i].head[0],
+					   mph[i].head[1],
+					   plothead[0],
+					   plothead[1],
+					   bop,
+					   b,
+					   changetagfunc);
+				}
 			{
-				for(l=omph0;l<mphnum;l++)
-				{
-					mph[omph0] = mph[l]; k = omph0; omph0++;
-					for(j=omph0-1;j>=0;j--) //Join monos
+				logstep ("Join and remove bases for tags, on upper res,  mhp[j]== %d, heads: [%d..%d]", b->gnewtag, omph0, mphnum-1);
+				for (l = omph0; l < mphnum; l++) {
+					logstep("set %d to %d",omph0, l);
+					mph[omph0] = mph[l];
+					k = omph0;
+					omph0++;
+
+					for (j = omph0 - 1; j >= 0; j--) //Join monos
 					{
 						if (mph[j].tag != b->gnewtag) continue;
-						if (!mono_join(mph[j].head[0],mph[j].head[1],mph[k].head[0],mph[k].head[1],&i0,&i1)) continue;
-						for(i=2-1;i>=0;i--) { mono_deloop(mph[k].head[i]); mono_deloop(mph[j].head[i]); }
-						omph0--; mph[k] = mph[omph0];
-						mph[j].head[0] = i0; mph[j].head[1] = i1; k = j;
+						if (!mono_join(mph[j].head[0], mph[j].head[1], mph[k].head[0], mph[k].head[1], &i0,
+						               &i1)) continue;
+						for (i = 2 - 1; i >= 0; i--) {
+							mono_deloop(mph[k].head[i]);
+							mono_deloop(mph[j].head[i]);
+						}
+						omph0--;
+						mph[k] = mph[omph0];
+						mph[j].head[0] = i0;
+						mph[j].head[1] = i1;
+						k = j;
 					}
 				}
 				mphnum = omph0;
@@ -1022,6 +1020,7 @@ static int drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead0
 				//add to light list // this will process point lights. otherwize will only use plr light.
 			else if (b->gflags < 2) mono_output = drawtagfunc_ws;
 			else mono_output = skytagfunc; //calls drawtagfunc inside
+			logstep ("Bool-AND for solids drawtag, againsst all heads, keep all, with mono N=%d, when tag==%d", mphnum-1,mtag);
 			for (i = mphnum - 1; i >= 0; i--)
 				if (mph[i].tag == mtag)
 					mono_bool(mph[i].head[0], mph[i].head[1], plothead[0], plothead[1],MONO_BOOL_AND, b, mono_output);
@@ -1035,6 +1034,9 @@ static int drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead0
 		b->gnewtag = mtag;
 		b->gnewtagsect = tagsect;
 		b->gdoscansector = 0; omph0 = mphnum; omph1 = mphnum;
+// cut this off frome same ones, subdividing them into monos.
+		logstep("stored head o0 o1 before op %d", omph1);
+		logstep("Bool cutting, changetag all heads N=%d, against mono, remove cutted bases, on tag == %d", mphnum-1, mtag);
 		for(i=mphnum-1;i>=0;i--)
 		{
 			if (mph[i].tag != mtag) continue;
@@ -1046,7 +1048,7 @@ static int drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead0
 		}
 
 			//valid mph's stored in 2 blocks: (0<=?<omph0), (omph1<=?<mphnum)
-
+			logstep("joining monos, on tag == %d", b->gnewtag);
 			for(l=omph1;l<mphnum;l++)
 			{
 				mph[omph0] = mph[l]; k = omph0; omph0++;
@@ -1068,7 +1070,7 @@ static int drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead0
 		mphnum = omph0;
 
 	}
-
+logstep ("removing originally produced mono");
 	mono_deloop(plothead[1]);
 	mono_deloop(plothead[0]);
 }
@@ -1287,7 +1289,6 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 
 		else {
 			drawpol_befclip(s,-1,-1,plothead[0],plothead[1],(isflor<<2)+3,b);
-			OPERLOG
 		}
 	}
 
@@ -1404,17 +1405,14 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 					int endp = portals[myport].destpn;
 				int portalpolyflags = 3 | CLIP_PORTAL_FLAG;
 				//drawpol_befclip(portals[endp].sect+taginc, -1,-1, plothead[0], plothead[1],  portalpolyflags, b);
-				OPERLOG
 				draw_hsr_enter_portal(map, myport, plothead[0],plothead[1],b);
 			} else {
 				// could be 7 or 3, .111 or .011
+				logstep("Draw wal pol s:%d ns:%d tag:%d",s,ns,wal[w].surf.lotag);
 				drawpol_befclip(s, ns, ns, plothead[0], plothead[1], ((m > vn) << 2) + 3, b);
-				OPERLOG
 			}
 		}
-
 	}
-	return 1;
 }
 /*
  *The function operates in different modes based on shadowtest2_rendmode:
@@ -1670,6 +1668,9 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
 			mph[0].tag = gcam.cursect + taginc*b->recursion_depth;
 			mphnum = 1;
 		} else {
+			//drawpol_befclip(gcam.cursect-taginc, gcam.cursect, gcam.cursect,	b->chead[0],b->chead[1], 8|3 , b);
+
+
 // adding board seems essential.
 			mono_mph_check(mphnum);
 			mono_genfromloop(&mph[mphnum].head[0], &mph[mphnum].head[1], bord2, n);

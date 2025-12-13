@@ -93,7 +93,7 @@ int mono_insp(int i, dpoint3d p) {
 }
 void mono_del(int i) {
     int p, n;
-
+logstep("Mono| Del %d",i);
     p = mp[i].p;
     n = mp[i].n;
     mp[n].p = p;
@@ -111,7 +111,7 @@ void mono_deloop(int i) {
 
     if (i < 0) return;
     //while (mp[i].n != i) mono_del(mp[i].n); mono_del(i);
-
+    logstep("Mono| DelLoop %d",i);
     //mpempty <-> {i .. mp[i].p} <-> mp[mpempty].n
     j = mp[i].p; //WARNING:this temp var needed for loops of only 1 element
     mp[j].n = mp[mpempty].n;
@@ -197,6 +197,7 @@ void mono_genfromloop(int *plothead0, int *plothead1, dpoint3d *tp, int n) {
         plothead[0] = mp[plothead[0]].n;
         plothead[1] = mp[plothead[1]].n;
     }
+    logstep("Mono| Gen from loop, HEADS %d:%d",plothead[0],plothead[1]);
     (*plothead0) = plothead[0];
     (*plothead1) = plothead[1];
 }
@@ -440,6 +441,7 @@ int mono_clipself(int hd0, int hd1, bdrawctx* b, void (*mono_output)(int h0, int
                 for (k = 2 - 1; k >= 0; k--) { ho[k] = mono_ins2d(ho[k], ix, iy); }
             }
             if (!good) {
+                logstep("Mono| clipself, callback bad HEADS %d:%d",mp[ho[0]].n,mp[ho[1]].n);
                 mono_output(mp[ho[0]].n, mp[ho[1]].n,b);
                 ho[0] = -1;
                 ho[1] = -1;
@@ -462,6 +464,7 @@ int mono_clipself(int hd0, int hd1, bdrawctx* b, void (*mono_output)(int h0, int
 
     for (k = 2 - 1; k >= 0; k--) if (ho[k] >= 0) { ho[k] = mp[ho[k]].n; }
 bad:;
+    logstep("Mono| clipself, callback bad HEADS %d:%d",ho[0],ho[1]);
     mono_output(ho[0], ho[1],b);
     if ((ho[0] >= 0) && (ho[1] >= 0)) outnum++;
     return (outnum);
@@ -536,7 +539,7 @@ int mono_join(int hd0, int hd1, int hd2, int hd3, int *ho0, int *ho1) {
         }
         ho[j] = mp[ho[j]].n;
     }
-
+    logstep("Mono| join ok, HEADS IN %d:%d %d:%d -> %d:%d",hd0,hd1,hd2,hd3, ho[0],ho[1]);
     (*ho0) = ho[0];
     (*ho1) = ho[1];
     return (1);
@@ -551,6 +554,7 @@ void mono_bool(int hr0, int hr1, int hw0, int hw1, int boolop, bdrawctx* b, void
         sprintf(buf, "BEFORE_%s_hw", (boolop==MONO_BOOL_AND)?"AND":(boolop==MONO_BOOL_SUB)?"SUB":"SUBREV");
         mono_dbg_capture_pair(hw0, hw1, buf, boolop);
     }
+    logstep("Mono|> BOOL, op = %d HEADS IN %d:%d %d:%d",boolop,hr0,hr1,hw0,hw1);
     if (boolop == MONO_BOOL_AND) {
         //{ //Debug!
         //int i;
@@ -584,6 +588,7 @@ void mono_bool(int hr0, int hr1, int hw0, int hw1, int boolop, bdrawctx* b, void
         mono_clipself(hd0, hr1, b, mono_output);
         mono_deloop(hd0);
     }
+    logstep("Mono|< BOOLEND");
 }
 void strip_init(triangle_strip_t *strip) {
    // strip->indices = NULL;

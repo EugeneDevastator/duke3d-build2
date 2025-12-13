@@ -2,6 +2,8 @@
 #ifndef MONODEBUG_H
 #define MONODEBUG_H
 
+#include <stdarg.h>
+
 #include "monoclip.h"
 #define LOOPADD(p) loops[loopnum]=(p); loopuse[loopnum]=true; loopnum++;
 #define LOOPEND loopuse[loopnum]=false;loopnum++;
@@ -34,6 +36,7 @@ typedef struct {
 
 extern mono_dbg_capture_t g_mono_dbg;
 extern int g_captureframe;
+void logstep(const char* fmt, ...);
 
 void mono_dbg_init(void);
 void mono_dbg_free(void);

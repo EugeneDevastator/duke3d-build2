@@ -16,7 +16,7 @@
 
 #include "mapcore.h"
 
-#define MONO_BOOL_AND 0
+#define MONO_BOOL_AND 0 // result is intersection
 #define MONO_BOOL_SUB 1
 #define MONO_BOOL_SUB_REV 2
 typedef struct {
