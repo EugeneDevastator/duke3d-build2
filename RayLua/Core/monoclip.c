@@ -5,6 +5,7 @@
 #include "monoclip.h"
 
 #include "monodebug.h"
+#define EXLOGS 0
 
 // array of head pairs; all mono polys known
 mph_t *mph = 0;
@@ -61,6 +62,9 @@ int mono_ins2d(int i, double nx, double ny) {
         mp[p].n = n;
         mpempty = n;
     }
+    #if EXLOGS
+    printf("Mono| MP alloc: got=%d, empty=%d, used=%d \n", got, mpempty, mpmal - (mpempty >= 0 ? 1 : 0));
+    #endif
 
     if (i < 0) //Start new loop
     {
@@ -94,6 +98,9 @@ int mono_insp(int i, dpoint3d p) {
 void mono_del(int i) {
     int p, n;
 logstep("Mono| Del %d",i);
+#if EXLOGS
+    printf("Mono| MP dealloc: freeing=%d, old_empty=%d \n", i, mpempty);
+#endif
     p = mp[i].p;
     n = mp[i].n;
     mp[n].p = p;
@@ -107,17 +114,30 @@ logstep("Mono| Del %d",i);
 }
 
 void mono_deloop(int i) {
-    int j;
-
+    if (i<0)
+        return;
+    int j, count = 0;
+    // ADD DEBUG - COUNT LOOP SIZE
+    j = i;
+    do {
+        count++;
+        j = mp[j].n;
+    } while (j != i);
     if (i < 0) return;
     //while (mp[i].n != i) mono_del(mp[i].n); mono_del(i);
-    logstep("Mono| DelLoop %d",i);
+    logstep("Mono| DelLoop %d (size=%d), old_empty=%d", i, count, mpempty);
+
     //mpempty <-> {i .. mp[i].p} <-> mp[mpempty].n
     j = mp[i].p; //WARNING:this temp var needed for loops of only 1 element
     mp[j].n = mp[mpempty].n;
     mp[mp[mpempty].n].p = j;
     mp[i].p = mpempty;
     mp[mpempty].n = i;
+    // ADD DEBUG AFTER BULK FREE
+#if EXLOGS
+    printf("Mono| DelLoop freed %d nodes, new_empty=%d \n", count, mpempty);
+#endif
+
 }
 
 void mono_centroid_addlin(int i0, int i1, double *cx, double *cy, double *area) {
@@ -142,7 +162,12 @@ double mono_area(int hd0, int hd1) { double fx, fy; return(mono_centroid(hd0,hd1
 
 void mono_genfromloop(int *plothead0, int *plothead1, dpoint3d *tp, int n) {
     int i, i0, i1, imin, imax, plothead[2];
-
+    if (n<3) {
+        *plothead0=-1;
+        *plothead1=-1;
+        printf("2 vertices for loop");
+        return;
+    }
     imin = 0;
     imax = 0;
     for (i = 0; i < n; i++) {
@@ -690,5 +715,15 @@ int mph_append(int h1, int h2, int tag) {
     mph[mphnum].tag = tag;
     mphnum++;
 }
+
+int mpcheck(int h1, int h2) {
+    if ((h1|h2)<0) {
+        mono_deloop(h1);
+        mono_deloop(h2);
+        return 0;
+    }
+    return 1;
+}
+
 
 

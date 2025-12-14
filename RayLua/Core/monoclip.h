@@ -203,4 +203,7 @@ int mph_appendloop(int *outh1, int *outh2, dpoint3d *tp, int n, int newtag);
 // removes mph and points from mph list.
 int mph_remove(int delid);
 int mph_append( int h1, int h2, int tag);
+
+
+int mpcheck(int h1,int h2);
 #endif //BUILD2_MONOCLIP_H

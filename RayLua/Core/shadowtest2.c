@@ -15,7 +15,7 @@
 #include "monodebug.h"
 #define PI 3.14159265358979323
 #pragma warning(disable:4731)
-
+#define EXLOGS 0
 #define USESSE2 0
 #define USENEWLIGHT 1 //FIXFIXFIX
 #define USEGAMMAHACK 1 //FIXFIXFIX
@@ -799,7 +799,8 @@ static void changetagfunc (int rethead0, int rethead1, bdrawctx *b)
 // this takes pair and projects it onto screen plane with a cam.
 // returns new heads.
 static int projectonmono (int *plothead0, int *plothead1,  bdrawctx* b) {
-
+	if (!mpcheck(*plothead0,*plothead1))
+		return 0;
 	cam_t gcam = b->cam;
 	double* xform = b->xformmat;
 	double xformc = b->xformmatc;
@@ -817,8 +818,16 @@ static int projectonmono (int *plothead0, int *plothead1,  bdrawctx* b) {
 
 	n = 2;
 	for (h = 0; h < 2; h++)
-		for (i = mp[plothead[h]].n; i != plothead[h]; i = mp[i].n)
+		for (i = mp[plothead[h]].n; i != plothead[h]; i = mp[i].n) {
+		//	printf("%d, ",n);
 			n++;
+			if (n > 10) {
+				printf ("fucked up mono");
+				mono_deloop(*plothead0);
+				mono_deloop(*plothead1);
+				return 0;
+			}
+		}
 	otp = (dpoint3d *) _alloca(n * sizeof(dpoint3d));
 	tp = (dpoint3d *) _alloca(n * sizeof(dpoint3d) * 2);
 
@@ -900,6 +909,9 @@ static int cliptonewregion(int fromtag, int newtag, int newsect, int h1,int h2, 
 
 static int drawpol_befclip (int fromtag, int newtag1, int fromsect, int newsect, int plothead0, int plothead1, int flags, bdrawctx* b)
 {
+#if EXLOGS
+	printf("drawpol from:%d, to:%d, h1:%d, h2:%d, depth:%d \n",fromtag,newtag1,plothead0,plothead1,b->recursion_depth);
+#endif
 	if ((plothead0|plothead1) < 0) {
 		mono_deloop(plothead0);
 		mono_deloop(plothead1);
@@ -938,7 +950,7 @@ static int drawpol_befclip (int fromtag, int newtag1, int fromsect, int newsect,
 			int bop =MONO_BOOL_AND;
 			// intersect with same monos, and change tag for resulting piece?
 			// cliptonewregion
-			logstep("bool AND, keep all, changetag, on tag %d", curtag);
+			logstep("bool AND, keep all, changetag, on tag %d to %d", curtag, b->gnewtag);
 			for (i = mphnum - 1; i >= 0; i--)
 				if (mph[i].tag == curtag) {
 					mono_bool(
@@ -999,7 +1011,7 @@ static int drawpol_befclip (int fromtag, int newtag1, int fromsect, int newsect,
 		b->gdoscansector = 0; omph0 = mphnum; omph1 = mphnum;
 // cut this off frome same ones, subdividing them into monos.
 		logstep("stored head o0 o1 before op %d", omph1);
-		logstep("Bool cutting, changetag all heads N=%d, against mono, remove cutted bases, on tag == %d", mphnum-1, curtag);
+		logstep("Bool cutting, changetag all heads N=%d, against mono, remove cutted bases, on tag == %d to %d", mphnum-1, curtag, b->gnewtag);
 		for(i=mphnum-1;i>=0;i--)
 		{
 			if (mph[i].tag != curtag) continue;
@@ -1036,6 +1048,7 @@ static int drawpol_befclip (int fromtag, int newtag1, int fromsect, int newsect,
 logstep ("removing originally produced mono");
 	mono_deloop(plothead[1]);
 	mono_deloop(plothead[0]);
+return 1;
 }
 
 static void gentransform_ceilflor(sect_t *sec, wall_t *wal, int isflor, bdrawctx *b)
@@ -1547,7 +1560,7 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
 			memset(glp->lighashead,-1,glp->lighasheadn*sizeof(glp->lighashead[0]));
 		}
 	}
-
+int wasclipped = 0;
 	for(int pass=0;pass<2;pass++) {
 
 		if (!b->has_portal_clip) {
@@ -1616,10 +1629,6 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
 					bord2[j].x = bord2[j].x*f + gcam.h.x;
 					bord2[j].y = bord2[j].y*f + gcam.h.y;
 				}
-			//} else {
-			//	n = 4;
-			//	didcut=1;
-			//}
 		}
 
 		memset8(b->sectgot,0,(lgs->numsects+31)>>3);
