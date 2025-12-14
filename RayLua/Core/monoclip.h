@@ -106,6 +106,7 @@ typedef struct {
 	// n-portals context
 	bool has_portal_clip; // Whether portal clipping is active
 	int recursion_depth;
+	int tagoffset;
 	int testignorewall;
 	int ignorekind;
 	int testignoresec;
@@ -195,5 +196,11 @@ int mono_join (int hd0, int hd1, int hd2, int hd3, int *ho0, int *ho1);
 void mono_bool (int hr0, int hr1, int hw0, int hw1, int boolop, bdrawctx* b, void (*mono_output)(int h0, int h1,bdrawctx* b));
 // Generate triangle strip vertices directly from monotone polygon
 int mono_generate_eyepol(int hd0, int hd1, point3d **out_verts1,  point3d **out_verts2, int *out_count1, int *out_count2);
+// adds mono to mph directly
 
+// registers loop into mono heads with tag
+int mph_appendloop(int *outh1, int *outh2, dpoint3d *tp, int n, int newtag);
+// removes mph and points from mph list.
+int mph_remove(int delid);
+int mph_append( int h1, int h2, int tag);
 #endif //BUILD2_MONOCLIP_H

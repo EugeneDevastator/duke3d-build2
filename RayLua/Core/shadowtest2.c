@@ -32,8 +32,11 @@ mono plane has xy as screen coords and z as some sort of depth, but better not u
 eyepols are generated from mono space AND plane equation stored in gouvmat.
 */
 //------ UTILS -------
-#define DO_AND_SUB 3
-#define DO_AND_SUB_REV 7
+#define DP_AND_SUB 3
+#define DP_AND_SUBREV 7
+#define DP_NO_SCANSECT 8
+#define DP_NO_PROJECT 16
+
 
 
 
@@ -221,7 +224,7 @@ int shadowtest2_updatelighting = 1;
 unsigned int *shadowtest2_sectgot = 0; //WARNING:code uses x86-32 bit shift trick!
 static unsigned int *shadowtest2_sectgotmal = 0;
 static int shadowtest2_sectgotn = 0;
-#define CLIP_PORTAL_FLAG 8
+
 //Translation & rotation
 static mapstate_t *curMap;
 static player_transform *gps;
@@ -793,9 +796,10 @@ static void changetagfunc (int rethead0, int rethead1, bdrawctx *b)
 	//flags&1: do and
 	//flags&2: do sub
 	//flags&4: reverse cut for sub
+// this takes pair and projects it onto screen plane with a cam.
+// returns new heads.
+static int projectonmono (int *plothead0, int *plothead1,  bdrawctx* b) {
 
-static int drawpol_asis (int withtag, int plothead0, int plothead1,  bdrawctx* b) {
-	LOOPEND
 	cam_t gcam = b->cam;
 	double* xform = b->xformmat;
 	double xformc = b->xformmatc;
@@ -803,13 +807,13 @@ static int drawpol_asis (int withtag, int plothead0, int plothead1,  bdrawctx* b
 #define BSCISDIST 0.000001 //Reduces probability of glitch further
 	//#define BSCISDIST 0.0001 //Gaps undetectable
 	//#define BSCISDIST 0.1 //Huge gaps
-	void (*mono_output)(int h0, int h1, bdrawctx *b);
+
 	dpoint3d *otp, *tp;
 	double f, ox, oy, oz;
 	int i, j, k, l, h, on, n, plothead[2], imin, imax, i0, i1, omph0, omph1;
 
-	if ((plothead0|plothead1) < 0) return 0;
-	plothead[0] = plothead0; plothead[1] = plothead1;
+	plothead[0] = *plothead0;
+	plothead[1] = *plothead1;
 
 	n = 2;
 	for (h = 0; h < 2; h++)
@@ -851,7 +855,11 @@ static int drawpol_asis (int withtag, int plothead0, int plothead1,  bdrawctx* b
 			tp[n].z = BSCISDIST; n++;
 		}
 	}
-	if (n < 3) return 0;
+	if (n < 3) {
+		mono_deloop(*plothead0);
+		mono_deloop(*plothead1);
+		return 0;
+	}
 
 	//project & find x extents
 	for(i=0;i<n;i++)
@@ -859,8 +867,6 @@ static int drawpol_asis (int withtag, int plothead0, int plothead1,  bdrawctx* b
 		f = gcam.h.z/tp[i].z;
 		tp[i].x = tp[i].x*f + gcam.h.x;
 		tp[i].y = tp[i].y*f + gcam.h.y;
-		// log herte.
-
 	}
 
 	//generate vmono
@@ -870,114 +876,71 @@ static int drawpol_asis (int withtag, int plothead0, int plothead1,  bdrawctx* b
 		mono_deloop(plothead[1]);
 		return 0;
 	}
-	mono_mph_check(mphnum);
-
-	mph[mphnum].head[0] = plothead[0];
-	mph[mphnum].head[1] = plothead[1];
-	mph[mphnum].tag = withtag;
-	mphnum++;
+	*plothead0 = plothead[0];
+	*plothead1 = plothead[1];
 	return 1;
 }
-static int drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead0, int plothead1, int flags, bdrawctx* b)
+static int cliptonewregion(int fromtag, int newtag, int newsect, int h1,int h2, bool doscan, bdrawctx *b) {
+
+	b->gdoscansector =  doscan;
+	// intersect with same monos, and change tag for resulting pieces, creating new clip group
+	logstep("bool AND, keep all, changetag, on tag %d -> %d", fromtag,newtag);
+	for (int i = mphnum - 1; i >= 0; i--)
+		if (mph[i].tag == fromtag) {
+			mono_bool(
+			   mph[i].head[0],
+			   mph[i].head[1],
+			   h1,
+			   h2,
+			   MONO_BOOL_AND,
+			   b,
+			   changetagfunc);
+		}
+}
+
+static int drawpol_befclip (int fromtag, int newtag1, int fromsect, int newsect, int plothead0, int plothead1, int flags, bdrawctx* b)
 {
+	if ((plothead0|plothead1) < 0) {
+		mono_deloop(plothead0);
+		mono_deloop(plothead1);
+		return 0;
+	}
 
 	LOOPEND
-	int mtag = tag1 + taginc*b->recursion_depth;
-	int tagsect = tag1;
-	int mnewtag = newtag1 == -1 ? -1 : newtag1 + taginc*b->recursion_depth;
-	logstep("drawpol tag:%d nwtag:%d\n",mtag , mnewtag);
-	b->gnewtagsect = newtagsect;
-	cam_t gcam = b->cam;
-	double* xform = b->xformmat;
-	double xformc = b->xformmatc;
-	double xforms = b->xformmats;
-	#define BSCISDIST 0.000001 //Reduces probability of glitch further
-	//#define BSCISDIST 0.0001 //Gaps undetectable
-	//#define BSCISDIST 0.1 //Huge gaps
-	void (*mono_output)(int h0, int h1, bdrawctx *b);
+	int curtag = fromtag;
+	int cursec = fromsect;
+	int newtag = newtag1;
+	logstep("drawpol tag:%d nwtag:%d\n",curtag , newtag);
+	b->gnewtagsect = newsect;
 	dpoint3d *otp, *tp;
 	double f, ox, oy, oz;
 	int i, j, k, l, h, on, n, plothead[2], imin, imax, i0, i1, omph0, omph1;
 
-	if ((plothead0|plothead1) < 0) return 0;
-	plothead[0] = plothead0; plothead[1] = plothead1;
+	void (*mono_output)(int h0, int h1, bdrawctx *b);
+	plothead[0] = plothead0;
+	plothead[1] = plothead1;
+	int projok = 1;
+	if (!(flags & DP_NO_PROJECT))
+		projok = projectonmono(&plothead[0],&plothead[1],b);
 
-	n = 2;
-	for (h = 0; h < 2; h++)
-		for (i = mp[plothead[h]].n; i != plothead[h]; i = mp[i].n)
-			n++;
-	otp = (dpoint3d *) _alloca(n * sizeof(dpoint3d));
-	tp = (dpoint3d *) _alloca(n * sizeof(dpoint3d) * 2);
-
-		//rotate, converting vmono to simple point3d loop
-	on = 0;
-	for(h=0;h<2;h++) // halfplane?
-	{
-		i = plothead[h];
-		do
-		{
-			if (h) i = mp[i].p;
-			ox = mp[i].x-gcam.p.x; oy = mp[i].y-gcam.p.y;
-			if (b->has_portal_clip)
-				LOOPADD(mp[i].pos)
-			otp[on].x = oy*xformc - ox*xforms;
-			otp[on].y = mp[i].z-gcam.p.z;
-			otp[on].z = ox*xformc + oy*xforms; on++;
-
-			if (!h) i = mp[i].n;
-		} while (i != plothead[h]);
-		mono_deloop(plothead[h]);
-	}
-
-		//clip
-	n = 0;
-	for(i=on-1,j=0;j<on;i=j,j++)
-	{
-		if (otp[i].z >= BSCISDIST) { tp[n] = otp[i]; n++; }
-		if ((otp[i].z >= BSCISDIST) != (otp[j].z >= BSCISDIST))
-		{
-			f = (BSCISDIST-otp[j].z)/(otp[i].z-otp[j].z);
-			tp[n].x = (otp[i].x-otp[j].x)*f + otp[j].x;
-			tp[n].y = (otp[i].y-otp[j].y)*f + otp[j].y;
-			tp[n].z = BSCISDIST; n++;
-		}
-	}
-	if (n < 3) return 0;
-
-		//project & find x extents
-	for(i=0;i<n;i++)
-	{
-		f = gcam.h.z/tp[i].z;
-		tp[i].x = tp[i].x*f + gcam.h.x;
-		tp[i].y = tp[i].y*f + gcam.h.y;
-		// log herte.
-
-	}
-
-	//generate vmono
-	mono_genfromloop(&plothead[0], &plothead[1], tp, n);
-	if ((plothead[0] | plothead[1]) < 0) {
-		mono_deloop(plothead[0]);
-		mono_deloop(plothead[1]);
+	if (!projok)
 		return 0;
-	}
 
 	// -- plothead points to polygon clipped with camera plane.
-
 	if (flags&1 || flags&8)
 	{
-		if (mnewtag >= 0)
+		if (newtag >= 0) // produces new clipping group
 		{
-			b->gnewtagsect = newtagsect;
-			b->gnewtag = mnewtag;
+			b->gnewtagsect = newsect;
+			b->gnewtag = newtag;
 			omph0 = mphnum;
 			b->gdoscansector =  !(flags&8);
-			//
-			int bop =MONO_BOOL_AND;// (flags & CLIP_PORTAL_FLAG) ? MONO_BOOL_SUB_REV : MONO_BOOL_AND;
+			int bop =MONO_BOOL_AND;
 			// intersect with same monos, and change tag for resulting piece?
-			logstep("bool AND, keep all, changetag, on tag %d", mtag);
+			// cliptonewregion
+			logstep("bool AND, keep all, changetag, on tag %d", curtag);
 			for (i = mphnum - 1; i >= 0; i--)
-				if (mph[i].tag == mtag) {
+				if (mph[i].tag == curtag) {
 					mono_bool(
 					   mph[i].head[0],
 					   mph[i].head[1],
@@ -1014,32 +977,32 @@ static int drawpol_befclip (int tag1, int newtag1, int newtagsect, int plothead0
 				mphnum = omph0;
 			}
 		}
-		else { // newtag == -1
+		else { // do AND with current mono, draw result, and discard it in drawtag.
 			if (shadowtest2_rendmode == 4)
 				mono_output = ligpoltagfunc;
 				//add to light list // this will process point lights. otherwize will only use plr light.
 			else if (b->gflags < 2) mono_output = drawtagfunc_ws;
 			else mono_output = skytagfunc; //calls drawtagfunc inside
-			logstep ("Bool-AND for solids drawtag, againsst all heads, keep all, with mono N=%d, when tag==%d", mphnum-1,mtag);
+			logstep ("Bool-AND for solids drawtag, againsst all heads, keep all, with mono N=%d, when tag==%d", mphnum-1,curtag);
 			for (i = mphnum - 1; i >= 0; i--)
-				if (mph[i].tag == mtag)
+				if (mph[i].tag == curtag)
 					mono_bool(mph[i].head[0], mph[i].head[1], plothead[0], plothead[1],MONO_BOOL_AND, b, mono_output);
 		}
 	}
-	if (flags&2)
+	if (flags&2)  // this entire section will chip current off of others with same tag, detalizing clip group.
 	{
 		if (!(flags&4)) j = MONO_BOOL_SUB;
 					  else j = MONO_BOOL_SUB_REV; // when floor.
 
-		b->gnewtag = mtag;
-		b->gnewtagsect = tagsect;
+		b->gnewtag = curtag;
+		b->gnewtagsect = cursec;
 		b->gdoscansector = 0; omph0 = mphnum; omph1 = mphnum;
 // cut this off frome same ones, subdividing them into monos.
 		logstep("stored head o0 o1 before op %d", omph1);
-		logstep("Bool cutting, changetag all heads N=%d, against mono, remove cutted bases, on tag == %d", mphnum-1, mtag);
+		logstep("Bool cutting, changetag all heads N=%d, against mono, remove cutted bases, on tag == %d", mphnum-1, curtag);
 		for(i=mphnum-1;i>=0;i--)
 		{
-			if (mph[i].tag != mtag) continue;
+			if (mph[i].tag != curtag) continue;
 			mono_bool(mph[i].head[0],mph[i].head[1],plothead[0],plothead[1],j,b,changetagfunc);
 			mono_deloop(mph[i].head[1]);
 			mono_deloop(mph[i].head[0]);
@@ -1280,15 +1243,17 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 		// Render the wall polygon
 		// F L O O R S
 		//
+		int surflag = ((isflor<<2)+3);
 		if (isportal && !noportals) {
 			int endpn = portals[myport].destpn;
-			int portalpolyflags = ((!isflor<<2)+3) | CLIP_PORTAL_FLAG;
-			//drawpol_befclip(portals[endpn].sect, portals[endpn].sect+taginc, portals[endpn].sect,	plothead[0],plothead[1], portalpolyflags , b);
+			int portalpolyflags =  surflag | DP_NO_SCANSECT;
+			int portaltag = b->tagoffset + taginc -1;
+			drawpol_befclip(s+b->tagoffset, portaltag, s, portals[endpn].sect,plothead[0],plothead[1], portalpolyflags , b);
 			draw_hsr_enter_portal(map, myport, plothead[0],plothead[1],b);
 		}
 
 		else {
-			drawpol_befclip(s,-1,-1,plothead[0],plothead[1],(isflor<<2)+3,b);
+			drawpol_befclip(s+b->tagoffset,-1,s,-1,plothead[0],plothead[1],surflag,b);
 		}
 	}
 
@@ -1401,15 +1366,18 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 			// W A L L S
 			//
 			myport = wal[w].tags[1];
+			int surflag = ((m > vn) << 2) + 3;
+			int newtag = ns == -1 ? -1 : ns+b->tagoffset;
 			if (myport >= 0 && portals[myport].destpn >=0 && portals[myport].kind == PORT_WALL) {
 					int endp = portals[myport].destpn;
-				int portalpolyflags = 3 | CLIP_PORTAL_FLAG;
-				//drawpol_befclip(portals[endp].sect+taginc, -1,-1, plothead[0], plothead[1],  portalpolyflags, b);
+				int portalpolyflags = surflag | DP_NO_SCANSECT;
+				int portaltag = +b->tagoffset + taginc -1;
+				drawpol_befclip(s+b->tagoffset, portaltag,s,portals[endp].sect, plothead[0], plothead[1],  portalpolyflags, b);
 				draw_hsr_enter_portal(map, myport, plothead[0],plothead[1],b);
 			} else {
 				// could be 7 or 3, .111 or .011
 				logstep("Draw wal pol s:%d ns:%d tag:%d",s,ns,wal[w].surf.lotag);
-				drawpol_befclip(s, ns, ns, plothead[0], plothead[1], ((m > vn) << 2) + 3, b);
+				drawpol_befclip(s+b->tagoffset, newtag, s, ns, plothead[0], plothead[1], surflag, b);
 			}
 		}
 	}
@@ -1437,6 +1405,7 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
 	bs.orcam = *cc;
 	bs.recursion_depth = 0;
 	bs.has_portal_clip = false;
+	bs.tagoffset=0;
 opercurr = 0;
 	draw_hsr_polymost_ctx(map,&bs);
 
@@ -1670,12 +1639,26 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
 		} else {
 			//drawpol_befclip(gcam.cursect-taginc, gcam.cursect, gcam.cursect,	b->chead[0],b->chead[1], 8|3 , b);
 
+			if (true) {
+				// adding board seems essential.
+				mono_mph_check(mphnum);
+				mono_genfromloop(&mph[mphnum].head[0], &mph[mphnum].head[1], bord2, n);
+				mph[mphnum].tag = gcam.cursect + taginc * b->recursion_depth;
+				mphnum++;
+			} else {
+				int h1 = 0, h2 = 0;
+				mono_mph_check(mphnum);
+				mono_genfromloop(&h1, &h1, bord2, n);
+				if ((h1 | h2) >= 0) {
+					int portaltag = b->tagoffset - 1;
+					int newtag = gcam.cursect + b->tagoffset;
+					int pclipflags = DP_AND_SUBREV | DP_NO_SCANSECT | DP_NO_PROJECT;
+					drawpol_befclip(portaltag, newtag, b->entrysec, gcam.cursect, h1, h2, pclipflags, b);
+				}
+			}
 
-// adding board seems essential.
-			mono_mph_check(mphnum);
-			mono_genfromloop(&mph[mphnum].head[0], &mph[mphnum].head[1], bord2, n);
-			mph[mphnum].tag = gcam.cursect + taginc*b->recursion_depth;
-			mphnum++;
+			// 1. draw with taginc-1 29999
+			// 2. clip with board, on each draw, again using drawpol with flags | 8
 		}
 
 		b->bunchn = 0; scansector(gcam.cursect,b);
@@ -1773,8 +1756,9 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport,  int head1, int h
     ncam.cursect = portals[endp].sect;
 
     bdrawctx newctx = {};
-	newctx.entrysec = parentctx->cam.cursect;
+	newctx.entrysec = portals[myport].sect;
 	newctx.recursion_depth = parentctx->recursion_depth + 1;
+	newctx.tagoffset = (newctx.recursion_depth)*taginc;
     newctx.cam = ncam;
     newctx.orcam = parentctx->orcam;
     newctx.has_portal_clip = true;

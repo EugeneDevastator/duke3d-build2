@@ -118,7 +118,7 @@ int prepbunch(int id, bunchverts_t *twal, bdrawctx* b);
  * @param plothead1 Second polygon loop head
  * @param flags Clipping flags: &1=do and, &2=do sub, &4=reverse cut for sub
  */
-int drawpol_befclip(int tag, int newtag, int newtagsect, int plothead0, int plothead1, int flags,bdrawctx *b);
+int drawpol_befclip(int fromtag, int newtag1, int fromsect, int newsect, int plothead0, int plothead1, int flags, bdrawctx* b);
 
 /** Main HSR (Hidden Surface Removal) function handling both clipping and rendering
  * @param cc Camera parameters
