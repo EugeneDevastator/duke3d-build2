@@ -693,11 +693,11 @@ int mph_appendloop(int *outh1, int *outh2, dpoint3d *tp, int n, int newtag) {
 }
 
 int mph_remove(int delid) {
-    if (delid <0 || delid == mphnum)
+    if (delid < 0 || delid == mphnum)
         return 0;
     mono_deloop(mph[delid].head[1]);
     mono_deloop(mph[delid].head[0]);
-    mph[delid] = mph[mphnum];
+    mph[delid] = mph[mphnum-1];
     mphnum--;
     return mphnum;
 }
@@ -710,6 +710,7 @@ int mph_append(int h1, int h2, int tag) {
     mphnum++;
 }
 
+
 int mpcheck(int h1, int h2) {
     if ((h1|h2)<0) {
         mono_deloop(h1);
@@ -717,6 +718,13 @@ int mpcheck(int h1, int h2) {
         return 0;
     }
     return 1;
+}
+
+int mphremoveontag(int tag) {
+    for (int i = mphnum - 1; i >= 0; i--) {
+        if (mph[i].tag == tag)
+            mph_remove(i);
+    }
 }
 
 

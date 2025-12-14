@@ -1629,7 +1629,8 @@ int wasclipped = 0;
 						didcut = 1;
 					}
 				}
-				if (n < 3) break;
+				if (n < 3)
+					break;
 				for(j=0;j<n;j++)
 				{
 					f = gcam.h.z/bord2[j].z;
@@ -1654,7 +1655,7 @@ int wasclipped = 0;
 			mphnum = 1;
 		} else {
 			//drawpol_befclip(gcam.cursect-taginc, gcam.cursect, gcam.cursect,	b->chead[0],b->chead[1], 8|3 , b);
-
+			int res=-1;
 			if (false) {
 				// adding board seems essential.
 				mono_mph_check(mphnum);
@@ -1663,14 +1664,13 @@ int wasclipped = 0;
 				mphnum++;
 			} else {
 				int bh1 = -1, bh2 = -1;
-				int res = -1, res2 = -1;
 				if (n < 3)
 					continue;
 				mono_genfromloop(&bh1, &bh2, bord2, n);
 				bool bordok = (mpcheck(bh1,bh2));
-				if (!bordok)
-					continue;
-
+				if (!bordok) {
+					return;
+				}
 
 				int portaltag = b->tagoffset - 1;
 				int newtag = gcam.cursect + b->tagoffset;
@@ -1704,9 +1704,11 @@ int wasclipped = 0;
 					//do AND with board and add only clipped portion to MPH.
 					b->gdoscansector=0;
 					b->gnewtag=gcam.cursect + b->tagoffset;
+					mphremoveontag(b->gnewtag);
 					mono_bool(b->chead[0],b->chead[1],bh1,bh2,MONO_BOOL_AND,b,changetagfunc);
 					//mono_dbg_capture_mph(mphnum - 1, "reprojected");
-
+					mono_deloop(bh1);
+					mono_deloop(bh2);
 			}
 		}
 
@@ -1730,9 +1732,7 @@ nogood:; }
 		}
 
 		if (shadowtest2_rendmode == 4) uptr = glp->sectgot;
-										  else uptr = shadowtest2_sectgot;
-		//if (b->has_portal_clip)
-		//	return;
+		else uptr = shadowtest2_sectgot;
 
 		if (!pass) // write only after first pass.
 		{
@@ -1763,7 +1763,7 @@ nogood:; }
 			}
 		}
 
-		if (!didcut) break;
+		if (!didcut && !b->has_portal_clip) break;
 	}
 }
 

@@ -206,4 +206,6 @@ int mph_append( int h1, int h2, int tag);
 
 
 int mpcheck(int h1,int h2);
+int mphremoveontag(int tag);
+
 #endif //BUILD2_MONOCLIP_H
