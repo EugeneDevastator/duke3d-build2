@@ -1634,12 +1634,12 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
 			}
 			// maybe need second run for alternating mono?
 			mono_genfromloop(&mph[0].head[0], &mph[0].head[1], bord2, n);
-			mph[0].tag = gcam.cursect + taginc*b->recursion_depth;
+			mph[0].tag = gcam.cursect;
 			mphnum = 1;
 		} else {
 			//drawpol_befclip(gcam.cursect-taginc, gcam.cursect, gcam.cursect,	b->chead[0],b->chead[1], 8|3 , b);
 
-			if (true) {
+			if (false) {
 				// adding board seems essential.
 				mono_mph_check(mphnum);
 				mono_genfromloop(&mph[mphnum].head[0], &mph[mphnum].head[1], bord2, n);
@@ -1647,8 +1647,7 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
 				mphnum++;
 			} else {
 				int h1 = 0, h2 = 0;
-				mono_mph_check(mphnum);
-				mono_genfromloop(&h1, &h1, bord2, n);
+				mono_genfromloop(&h1, &h2, bord2, n);
 				if ((h1 | h2) >= 0) {
 					int portaltag = b->tagoffset - 1;
 					int newtag = gcam.cursect + b->tagoffset;
