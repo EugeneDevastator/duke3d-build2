@@ -646,7 +646,7 @@ float scaler = 0.01;
 
         // Eyepol polys
         bool draweye = true;
-        bool drawlineseye = false;
+        bool drawlineseye = true;
         bool drawlights = false;
         bool drawmonoloops = false;
         bool drawmonostate = true;

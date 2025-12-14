@@ -1389,7 +1389,10 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 					int endp = portals[myport].destpn;
 				int portalpolyflags = surflag | DP_NO_SCANSECT;
 				int portaltag = +b->tagoffset + taginc -1;
-				drawpol_befclip(s+b->tagoffset, portaltag,s,portals[endp].sect, plothead[0], plothead[1],  portalpolyflags, b);
+				int endpn = portals[myport].destpn;
+				int ttag = b->tagoffset + taginc + portals[endpn].sect;
+
+			//	drawpol_befclip(s+b->tagoffset, ttag,s,portals[endp].sect, plothead[0], plothead[1],  portalpolyflags, b);
 				draw_hsr_enter_portal(map, myport, plothead[0],plothead[1],b);
 			} else {
 				// could be 7 or 3, .111 or .011
@@ -1573,9 +1576,9 @@ int wasclipped = 0;
 		}
 		else {
 			// both passes needed for rotated portals
-				if (b->currenthalfplane == 1)
-					halfplane = 1-pass;
-				else
+				//if (b->currenthalfplane == 1)
+				//	halfplane = 1-pass;
+				//else
 				halfplane = pass;
 		}
 
@@ -1659,18 +1662,52 @@ int wasclipped = 0;
 				mph[mphnum].tag = gcam.cursect + taginc * b->recursion_depth;
 				mphnum++;
 			} else {
-				int h1 = 0, h2 = 0;
-				mono_genfromloop(&h1, &h2, bord2, n);
-				if ((h1 | h2) >= 0) {
-					int portaltag = b->tagoffset - 1;
-					int newtag = gcam.cursect + b->tagoffset;
-					int pclipflags = DP_AND_SUBREV | DP_NO_SCANSECT | DP_NO_PROJECT;
-					drawpol_befclip(portaltag, newtag, b->entrysec, gcam.cursect, h1, h2, pclipflags, b);
-				}
-			}
+				int bh1 = -1, bh2 = -1;
+				int res = -1, res2 = -1;
+				if (n < 3)
+					continue;
+				mono_genfromloop(&bh1, &bh2, bord2, n);
+				bool bordok = (mpcheck(bh1,bh2));
+				if (!bordok)
+					continue;
 
-			// 1. draw with taginc-1 29999
-			// 2. clip with board, on each draw, again using drawpol with flags | 8
+
+				int portaltag = b->tagoffset - 1;
+				int newtag = gcam.cursect + b->tagoffset;
+
+					if (!wasclipped) {
+						bool wok = (mpcheck(b->chead[0], b->chead[1]));
+						if (!wok) return;
+
+						// reproject original opening.
+						for (int h = 0; h < 2; h++) {
+							i = b->chead[h];
+							do {
+								if (h) i = mp[i].p;
+								// must find previous in coords of new, may need previous camera, not orcam.
+								wccw_transform(&mp[i].pos, &b->orcam, &b->cam);
+								if (!h) i = mp[i].n;
+							} while (i != b->chead[h]);
+						}
+
+						b->gdoscansector=0;
+						b->gnewtag=gcam.cursect + b->tagoffset;
+						res = projectonmono(&b->chead[0], &b->chead[1], b);
+						//mono_clipself( b->chead[0], b->chead[1],b,changetagfunc);
+						//mph_append(b->chead[0], b->chead[1], gcam.cursect + b->tagoffset); // need to clip it with board.
+						//mono_deloop(b->chead[0]);
+						//mono_deloop(b->chead[1]);
+						if (!res)
+							return;
+						wasclipped = 1;
+					}
+					//do AND with board and add only clipped portion to MPH.
+					b->gdoscansector=0;
+					b->gnewtag=gcam.cursect + b->tagoffset;
+					mono_bool(b->chead[0],b->chead[1],bh1,bh2,MONO_BOOL_AND,b,changetagfunc);
+					//mono_dbg_capture_mph(mphnum - 1, "reprojected");
+
+			}
 		}
 
 		b->bunchn = 0; scansector(gcam.cursect,b);
@@ -1795,6 +1832,8 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport,  int head1, int h
 	newctx.chead[0] = head1;
 	newctx.chead[1] = head2;
     draw_hsr_polymost_ctx(map, &newctx);
+	mono_deloop(head1);
+	mono_deloop(head1);
 }
 
 
