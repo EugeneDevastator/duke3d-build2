@@ -4,7 +4,15 @@
 
 #include <stdarg.h>
 
+
 #include "monoclip.h"
+
+extern dpoint3d loops[70000];
+extern bool loopuse[70000];
+extern int loopnum;
+extern int captureframe;
+extern transform lastcamtr;
+extern transform lastcamtr2;
 #define LOOPADD(p) loops[loopnum]=(p); loopuse[loopnum]=true; loopnum++;
 #define LOOPEND loopuse[loopnum]=false;loopnum++;
 extern signed int operstopn;
@@ -43,11 +51,6 @@ void mono_dbg_free(void);
 void mono_dbg_clear(void);
 void mono_dbg_capture_chain(int hd, int chain_id, const char *label, int operation);
 void mono_dbg_capture_pair(int hd0, int hd1, const char *label, int operation);
+void mono_dbg_capture_mph(int id, const char *label);
 
-extern dpoint3d loops[70000];
-extern bool loopuse[70000];
-extern int loopnum;
-extern int captureframe;
-extern transform lastcamtr;
-extern transform lastcamtr2;
 #endif

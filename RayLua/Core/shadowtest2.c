@@ -790,6 +790,8 @@ static void changetagfunc (int rethead0, int rethead1, bdrawctx *b)
 	mph[mphnum].head[0] = rethead0;
 	mph[mphnum].head[1] = rethead1;
 	mph[mphnum].tag = b->gnewtag;
+	if (b->has_portal_clip)
+		mono_dbg_capture_mph(mphnum, "clip in potal");
 	mphnum++;
 	logstep("changetag: newMtag:%d, new mphnum:%d",b->gnewtag,mphnum);
 }
@@ -821,7 +823,7 @@ static int projectonmono (int *plothead0, int *plothead1,  bdrawctx* b) {
 		for (i = mp[plothead[h]].n; i != plothead[h]; i = mp[i].n) {
 		//	printf("%d, ",n);
 			n++;
-			if (n > 10) {
+			if (n > 20) {
 				printf ("fucked up mono");
 				mono_deloop(*plothead0);
 				mono_deloop(*plothead1);
@@ -840,8 +842,8 @@ static int projectonmono (int *plothead0, int *plothead1,  bdrawctx* b) {
 		{
 			if (h) i = mp[i].p;
 			ox = mp[i].x-gcam.p.x; oy = mp[i].y-gcam.p.y;
-			if (b->has_portal_clip)
-				LOOPADD(mp[i].pos)
+			//if (b->has_portal_clip)
+			//	LOOPADD(mp[i].pos)
 			otp[on].x = oy*xformc - ox*xforms;
 			otp[on].y = mp[i].z-gcam.p.z;
 			otp[on].z = ox*xformc + oy*xforms; on++;
@@ -1259,9 +1261,11 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 		int surflag = ((isflor<<2)+3);
 		if (isportal && !noportals) {
 			int endpn = portals[myport].destpn;
+			int ttag = b->tagoffset + taginc + portals[endpn].sect;
 			int portalpolyflags =  surflag | DP_NO_SCANSECT;
 			int portaltag = b->tagoffset + taginc -1;
-			drawpol_befclip(s+b->tagoffset, portaltag, s, portals[endpn].sect,plothead[0],plothead[1], portalpolyflags , b);
+
+		//	drawpol_befclip(s+b->tagoffset, ttag, s, portals[endpn].sect,plothead[0],plothead[1], portalpolyflags , b);
 			draw_hsr_enter_portal(map, myport, plothead[0],plothead[1],b);
 		}
 

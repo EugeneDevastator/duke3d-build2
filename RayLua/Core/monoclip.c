@@ -592,24 +592,18 @@ void mono_bool(int hr0, int hr1, int hw0, int hw1, int boolop, bdrawctx* b, void
 
         hd0 = mono_max(hr0, hw0, +1, 0);
         hd1 = mono_max(hr1, hw1, -1, 0);
-        if (g_captureframe) {
-            mono_dbg_capture_pair(hd0, hd1, "AFTER_MAX_AND", boolop);
-        }
+
         mono_clipself(hd0, hd1, b, mono_output);
         mono_deloop(hd1);
         mono_deloop(hd0);
     } else {
         boolop = (boolop == MONO_BOOL_SUB);
         hd0 = mono_max(hr1, hw0, -1, boolop ^ 1);
-        if (g_captureframe) {
-            mono_dbg_capture_chain(hd0, 0, "AFTER_MAX_SUB1", boolop);
-        }
+
         mono_clipself(hr0, hd0, b, mono_output);
         mono_deloop(hd0);
         hd0 = mono_max(hr0, hw1, +1, boolop);
-        if (g_captureframe) {
-            mono_dbg_capture_chain(hd0, 0, "AFTER_MAX_SUB2", boolop);
-        }
+
         mono_clipself(hd0, hr1, b, mono_output);
         mono_deloop(hd0);
     }
