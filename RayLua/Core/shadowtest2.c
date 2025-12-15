@@ -1302,7 +1302,7 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 		point3d locnorm = world_to_local_vec(b->gnorm, &b->cam.tr);
 		for (ww = twaln; ww >= 0; ww -= twaln) plothead[isflor] = mono_ins(
 			                                       plothead[isflor], twal[ww].x, twal[ww].y,
-			                                       b->gnorm.z * -1e32);
+			                                       b->gnorm.z * -1e5);
 		//do not replace w/single zenith point - ruins precision
 		i = isflor ^ 1;
 		for (ww = 0; ww <= twaln; ww++) {
