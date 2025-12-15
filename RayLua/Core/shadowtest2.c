@@ -37,6 +37,7 @@ eyepols are generated from mono space AND plane equation stored in gouvmat.
 #define DP_NO_SCANSECT 8
 #define DP_NO_PROJECT 16
 
+#define MAX_PORTAL_DEPTH 1
 
 
 
@@ -863,8 +864,8 @@ static void changetagfunc (int rethead0, int rethead1, bdrawctx *b)
 	if (b->has_portal_clip)
 		mono_dbg_capture_mph(mphnum, "clip in potal");
 	mphnum++;
-	//if (b->gnewtag==30022)
-	//	drawtag_debug(rethead0,rethead0,b);
+	if (b->gnewtag==29999)
+		drawtag_debug(rethead0,rethead0,b);
 	logstep("changetag: newMtag:%d, new mphnum:%d",b->gnewtag,mphnum);
 }
 	//flags&1: do and
@@ -1086,7 +1087,7 @@ static int drawpol_befclip (int fromtag, int newtag1, int fromsect, int newsect,
 		b->gnewtagsect = cursec;
 		b->gdoscansector = 0; omph0 = mphnum; omph1 = mphnum;
 		// cut this off result from initial areas
-		logstep("stored head o0 o1 before op %d", omph1);
+		//logstep("stored head o0 o1 before op %d", omph1);
 		logstep("Bool cutting, changetag all heads N=%d, against mono, remove cutted bases, on tag == %d to %d", mphnum-1, curtag, b->gnewtag);
 		for(i=mphnum-1;i>=0;i--)
 		{
@@ -1341,6 +1342,8 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 			int portaltag = b->tagoffset + taginc -1;
 
 		//	drawpol_befclip(s+b->tagoffset, portaltag, s, portals[endpn].sect,plothead[0],plothead[1], portalpolyflags , b);
+			//int c1, c2;
+			//monocopy(plothead[0],plothead[1], &c1,&c2);
 			draw_hsr_enter_portal(map, myport, plothead[0],plothead[1],b);
 		}
 
@@ -1468,6 +1471,8 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 				int ttag = b->tagoffset + taginc + portals[endpn].sect;
 
 			//	drawpol_befclip(s+b->tagoffset, portaltag,s,portals[endp].sect, plothead[0], plothead[1],  portalpolyflags, b);
+			//int c1, c2;
+			//monocopy(plothead[0],plothead[1], &c1,&c2);
 				draw_hsr_enter_portal(map, myport, plothead[0],plothead[1],b);
 			} else {
 				// could be 7 or 3, .111 or .011
@@ -1497,6 +1502,7 @@ int lastvalidsec=0;
 void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
 	bdrawctx bs;
 	loopnum=0;
+	operstopn=-1;
 	bs.cam = *cc;
 	bs.orcam = *cc;
 	bs.recursion_depth = 0;
@@ -1657,12 +1663,9 @@ int wasclipped = 0;
 			halfplane = pass;
 		}
 		else {
-			// both passes needed for rotated portals
-				//if (b->currenthalfplane == 1)
-				//	halfplane = 1-pass;
-				//else
-				halfplane = pass;
+			halfplane = pass;
 		}
+		logstep("Pass start pass:%d, hfp:%d, depth:%d, camsec:%d", pass, halfplane, b->recursion_depth, b->cam.cursect);
 
 		if (shadowtest2_rendmode == 4)
 		{
@@ -1711,8 +1714,9 @@ int wasclipped = 0;
 						didcut = 1;
 					}
 				}
-				if (n < 3)
-					break;
+				if (n < 3) {
+					continue;
+				}
 				for(j=0;j<n;j++)
 				{
 					f = gcam.h.z/bord2[j].z;
@@ -1739,13 +1743,7 @@ int wasclipped = 0;
 			//drawpol_befclip(gcam.cursect-taginc, gcam.cursect, gcam.cursect,	b->chead[0],b->chead[1], 8|3 , b);
 			int res=-1;
 			mphremoveaboveincl(b->tagoffset); // clean anything above.
-			if (false) {
-				// adding board seems essential.
-				mono_mph_check(mphnum);
-				mono_genfromloop(&mph[mphnum].head[0], &mph[mphnum].head[1], bord2, n);
-				mph[mphnum].tag = gcam.cursect + taginc * b->recursion_depth;
-				mphnum++;
-			} else {
+{
 				if (n < 3)
 					continue;
 				int bh1 = -1, bh2 = -1;
@@ -1795,7 +1793,7 @@ int wasclipped = 0;
 					//do AND with board and add only clipped portion to MPH.
 					b->gdoscansector=0;
 					b->gnewtag=gcam.cursect + b->tagoffset;
-					mphremoveontag(b->gnewtag);
+
 					mono_bool(whead[0],whead[1],bh1,bh2,MONO_BOOL_AND,b,changetagfunc);
 					//mono_dbg_capture_mph(mphnum - 1, "reprojected");
 				//	mono_deloop(bh1);
@@ -1868,6 +1866,7 @@ nogood:; }
 
 static void draw_hsr_enter_portal(mapstate_t* map, int myport,  int head1, int head2,bdrawctx *parentctx)
 {
+	OPERLOG;
     if (parentctx->recursion_depth >= MAX_PORTAL_DEPTH) {
         return;
     }
@@ -1931,6 +1930,7 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport,  int head1, int h
 	newctx.chead[0] = head1;
 	newctx.chead[1] = head2;
     draw_hsr_polymost_ctx(map, &newctx);
+	OPERLOG;
 }
 
 
