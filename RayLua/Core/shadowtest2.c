@@ -1738,6 +1738,7 @@ int wasclipped = 0;
 		} else {
 			//drawpol_befclip(gcam.cursect-taginc, gcam.cursect, gcam.cursect,	b->chead[0],b->chead[1], 8|3 , b);
 			int res=-1;
+			mphremoveaboveincl(b->tagoffset); // clean anything above.
 			if (false) {
 				// adding board seems essential.
 				mono_mph_check(mphnum);
@@ -1745,9 +1746,10 @@ int wasclipped = 0;
 				mph[mphnum].tag = gcam.cursect + taginc * b->recursion_depth;
 				mphnum++;
 			} else {
-				int bh1 = -1, bh2 = -1;
 				if (n < 3)
 					continue;
+				int bh1 = -1, bh2 = -1;
+
 				mono_genfromloop(&bh1, &bh2, bord2, n);
 				bool bordok = (mpcheck(bh1,bh2));
 				if (!bordok) {
@@ -1760,17 +1762,21 @@ int wasclipped = 0;
 				int bordar[] = {bh1,bh2};
 					if (!wasclipped) {
 						bool wok = (mpcheck(b->chead[0], b->chead[1])); // invalid window
-							if (!wok) return;
+							if (!wok) {
+								logstep("failed portal window chain");
+								return;
+							}
 						monocopy(b->chead[0], b->chead[1],&whead[0],&whead[1]);
 						// reproject original opening.
 						// MOVE TO ENTER PORTAL, to reproject from previous cam.
 						wasclipped = 1;
-					}
+						}
 					else { //
 						whead[0] = b->chead[0];
 						whead[1] = b->chead[1];
 					}
 
+				// wait, we have just same loop, so its redundant
 					for (int h = 0; h < 2; h++) {
 						i = whead[h];
 						do {
@@ -1782,8 +1788,10 @@ int wasclipped = 0;
 					}
 
 					res = projectonmono(&whead[0], &whead[1], b);
-					if (!res)
+					if (!res) {
+						logstep("projection fail");
 						continue;
+					}
 					//do AND with board and add only clipped portion to MPH.
 					b->gdoscansector=0;
 					b->gnewtag=gcam.cursect + b->tagoffset;
@@ -1846,10 +1854,14 @@ nogood:; }
 				}
 			}
 		}
-
-		if (!didcut && !b->has_portal_clip) break;
+	if (!b->has_portal_clip)
+		if (!didcut) {
+			logstep("break on no cut: pass:%d, hfp:%d, depth:%d, camsec:%d", pass, halfplane, b->recursion_depth, b->cam.cursect);
+			break;
+		}
 	}
 	if (b->has_portal_clip) {
+		logstep("mph clean after passes");
 		mphremoveaboveincl(b->tagoffset-1);
 	}
 }

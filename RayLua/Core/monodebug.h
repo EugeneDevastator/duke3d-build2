@@ -17,7 +17,7 @@ extern transform lastcamtr2;
 #define LOOPEND loopuse[loopnum]=false;loopnum++;
 extern signed int operstopn;
 extern int opercurr;
-#define OPERLOG opercurr++; if (operstopn >=0 && opercurr >= operstopn) return 0;
+#define OPERLOG opercurr++; if (operstopn >=0 && opercurr >= operstopn) return
 
 typedef struct {
     double x, y, z;
