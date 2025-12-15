@@ -191,9 +191,10 @@ int mono_join (int hd0, int hd1, int hd2, int hd3, int *ho0, int *ho1);
 
 //AND on A,B: Callback gets intersection pieces (A ∩ B)
 //SUB on A,B: Callback gets pieces of A outside B (A - B)
-//SUB_REVERSE on A,B: Callback gets pieces of B outside A (B - A)
+//SUB_REVERSE on A,B: Callback gets pieces of A outside B with reverse winding?.
 // Perform boolean operation on two polygon pairs (AND, SUB, SUB_REV)
-void mono_bool (int hr0, int hr1, int hw0, int hw1, int boolop, bdrawctx* b, void (*mono_output)(int h0, int h1,bdrawctx* b));
+// re
+void mono_bool (int subjh0, int subjh1, int cutter0, int cutter1, int boolop, bdrawctx* b, void (*mono_output)(int h0, int h1,bdrawctx* b));
 // Generate triangle strip vertices directly from monotone polygon
 int mono_generate_eyepol(int hd0, int hd1, point3d **out_verts1,  point3d **out_verts2, int *out_count1, int *out_count2);
 // adds mono to mph directly
@@ -207,5 +208,5 @@ int mph_append( int h1, int h2, int tag);
 
 int mpcheck(int h1,int h2);
 int mphremoveontag(int tag);
-
+int mphremoveaboveincl(int tag_including);
 #endif //BUILD2_MONOCLIP_H

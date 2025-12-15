@@ -634,10 +634,10 @@ static void xformbac (double rx, double ry, double rz, dpoint3d *o, bdrawctx *b)
 }
 static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 {
-	cam_t orcam = b->orcam;
+
 	float f,fx,fy, g, *fptr;
 	int i, j, k, h, rethead[2];
-	cam_t cam = b->orcam;
+	cam_t cam = b->cam;
 	double* xform = b->xformmat;
 	point3d add = b->gnadd;
 	if ((rethead0|rethead1) < 0) { mono_deloop(rethead1); mono_deloop(rethead0); return; }
@@ -663,11 +663,14 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 
 			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*cam.h.z);
 
-			eyepolv[eyepolvn].x = ((fx-cam.h.x)*cam.r.x + (fy-cam.h.y)*cam.d.x + (cam.h.z)*cam.f.x)*f + cam.p.x;
-			eyepolv[eyepolvn].y = ((fx-cam.h.x)*cam.r.y + (fy-cam.h.y)*cam.d.y + (cam.h.z)*cam.f.y)*f + cam.p.y;
-			eyepolv[eyepolvn].z = ((fx-cam.h.x)*cam.r.z + (fy-cam.h.y)*cam.d.z + (cam.h.z)*cam.f.z)*f + cam.p.z;
-dpoint3d e = {eyepolv[eyepolvn].x,eyepolv[eyepolvn].y,eyepolv[eyepolvn].z};
-			portal_xform_world_fullp(&e,b);
+			float retx = ((fx-cam.h.x)*cam.r.x + (fy-cam.h.y)*cam.d.x + (cam.h.z)*cam.f.x)*f + cam.p.x;
+			float rety = ((fx-cam.h.x)*cam.r.y + (fy-cam.h.y)*cam.d.y + (cam.h.z)*cam.f.y)*f + cam.p.y;
+			float retz = ((fx-cam.h.x)*cam.r.z + (fy-cam.h.y)*cam.d.z + (cam.h.z)*cam.f.z)*f + cam.p.z;
+			dpoint3d ret = {retx,rety,retz};
+			wccw_transform(&ret, &b->cam, &b->orcam);
+			eyepolv[eyepolvn] = (point3d){ret.x,ret.y,ret.z};
+			//dpoint3d e = {eyepolv[eyepolvn].x,eyepolv[eyepolvn].y,eyepolv[eyepolvn].z};
+			//portal_xform_world_fullp(&e,b);
 			//LOOPADD(e);
 			eyepolvn++;
 
@@ -825,8 +828,8 @@ static int projectonmono (int *plothead0, int *plothead1,  bdrawctx* b) {
 			n++;
 			if (n > 20) {
 				printf ("fucked up mono");
-				mono_deloop(*plothead0);
-				mono_deloop(*plothead1);
+				//mono_deloop(*plothead0);
+				//mono_deloop(*plothead1);
 				return 0;
 			}
 		}
@@ -867,8 +870,6 @@ static int projectonmono (int *plothead0, int *plothead1,  bdrawctx* b) {
 		}
 	}
 	if (n < 3) {
-		mono_deloop(*plothead0);
-		mono_deloop(*plothead1);
 		return 0;
 	}
 
@@ -908,7 +909,12 @@ static int cliptonewregion(int fromtag, int newtag, int newsect, int h1,int h2, 
 			   changetagfunc);
 		}
 }
-
+static int drawpol_nosect(int overlaptag, int newtag, int *heads, int flags,bdrawctx* b) {
+	flags = flags | DP_NO_SCANSECT;
+	if (newtag < 0)
+		return 0;
+	return drawpol_befclip(overlaptag,newtag,-1,-1,heads[0],heads[1],flags,b);
+}
 static int drawpol_befclip (int fromtag, int newtag1, int fromsect, int newsect, int plothead0, int plothead1, int flags, bdrawctx* b)
 {
 #if EXLOGS
@@ -948,7 +954,7 @@ static int drawpol_befclip (int fromtag, int newtag1, int fromsect, int newsect,
 			b->gnewtagsect = newsect;
 			b->gnewtag = newtag;
 			omph0 = mphnum;
-			b->gdoscansector =  !(flags&8);
+			b->gdoscansector = !(flags & DP_NO_SCANSECT);
 			int bop =MONO_BOOL_AND;
 			// intersect with same monos, and change tag for resulting piece?
 			// cliptonewregion
@@ -1011,7 +1017,7 @@ static int drawpol_befclip (int fromtag, int newtag1, int fromsect, int newsect,
 		b->gnewtag = curtag;
 		b->gnewtagsect = cursec;
 		b->gdoscansector = 0; omph0 = mphnum; omph1 = mphnum;
-// cut this off frome same ones, subdividing them into monos.
+		// cut this off result from initial areas
 		logstep("stored head o0 o1 before op %d", omph1);
 		logstep("Bool cutting, changetag all heads N=%d, against mono, remove cutted bases, on tag == %d to %d", mphnum-1, curtag, b->gnewtag);
 		for(i=mphnum-1;i>=0;i--)
@@ -1025,6 +1031,7 @@ static int drawpol_befclip (int fromtag, int newtag1, int fromsect, int newsect,
 		}
 
 			//valid mph's stored in 2 blocks: (0<=?<omph0), (omph1<=?<mphnum)
+		// join leftovers of the original tag
 			logstep("joining monos, on tag == %d", b->gnewtag);
 			for(l=omph1;l<mphnum;l++)
 			{
@@ -1418,6 +1425,7 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 void reset_context() {
 	eyepoln = 0; eyepolvn = 0;
 }
+int lastvalidsec=0;
 void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
 	bdrawctx bs;
 	loopnum=0;
@@ -1426,6 +1434,7 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
 	bs.recursion_depth = 0;
 	bs.has_portal_clip = false;
 	bs.tagoffset=0;
+
 opercurr = 0;
 	draw_hsr_polymost_ctx(map,&bs);
 
@@ -1447,6 +1456,11 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
 	b->bunchgrid =0;
 	cam_t gcam = b->cam;
 	cam_t oricam = b->orcam;
+
+	if (gcam.cursect >=0)
+		lastvalidsec = gcam.cursect;
+	else
+        gcam.cursect = lastvalidsec;
 
 	wall_t *wal;
 	spri_t *spr;
@@ -1707,8 +1721,8 @@ int wasclipped = 0;
 					mphremoveontag(b->gnewtag);
 					mono_bool(b->chead[0],b->chead[1],bh1,bh2,MONO_BOOL_AND,b,changetagfunc);
 					//mono_dbg_capture_mph(mphnum - 1, "reprojected");
-					mono_deloop(bh1);
-					mono_deloop(bh2);
+				//	mono_deloop(bh1);
+				//	mono_deloop(bh2);
 			}
 		}
 
@@ -1764,6 +1778,9 @@ nogood:; }
 		}
 
 		if (!didcut && !b->has_portal_clip) break;
+	}
+	if (b->has_portal_clip) {
+		mphremoveaboveincl(b->tagoffset-1);
 	}
 }
 
@@ -1832,8 +1849,6 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport,  int head1, int h
 	newctx.chead[0] = head1;
 	newctx.chead[1] = head2;
     draw_hsr_polymost_ctx(map, &newctx);
-	mono_deloop(head1);
-	mono_deloop(head1);
 }
 
 

@@ -112,6 +112,10 @@ logstep("Mono| Del %d",i);
     mp[n].p = i;
     mp[mpempty].n = i;
 }
+void mono_deloop2(int* i) {
+    mono_deloop(i[0]);
+    mono_deloop(i[1]);
+}
 
 void mono_deloop(int i) {
     if (i<0)
@@ -121,6 +125,9 @@ void mono_deloop(int i) {
     j = i;
     do {
         count++;
+        if (count >30) {
+            printf("Corrupt loop");
+        }
         j = mp[j].n;
     } while (j != i);
     if (i < 0) return;
@@ -693,7 +700,7 @@ int mph_appendloop(int *outh1, int *outh2, dpoint3d *tp, int n, int newtag) {
 }
 
 int mph_remove(int delid) {
-    if (delid < 0 || delid == mphnum)
+    if (delid < 0 || delid > mphnum)
         return 0;
     mono_deloop(mph[delid].head[1]);
     mono_deloop(mph[delid].head[0]);
@@ -703,18 +710,19 @@ int mph_remove(int delid) {
 }
 
 int mph_append(int h1, int h2, int tag) {
+    if ((h1 | h2)<0)
+        return 0;
     mono_mph_check(mphnum);
     mph[mphnum].head[0] = h1;
     mph[mphnum].head[1] = h2;
     mph[mphnum].tag = tag;
     mphnum++;
+    return mphnum;
 }
 
 
 int mpcheck(int h1, int h2) {
     if ((h1|h2)<0) {
-        mono_deloop(h1);
-        mono_deloop(h2);
         return 0;
     }
     return 1;
@@ -723,6 +731,13 @@ int mpcheck(int h1, int h2) {
 int mphremoveontag(int tag) {
     for (int i = mphnum - 1; i >= 0; i--) {
         if (mph[i].tag == tag)
+            mph_remove(i);
+    }
+}
+
+int mphremoveaboveincl(int tag_including) {
+    for (int i = mphnum - 1; i >= 0; i--) {
+        if (mph[i].tag >= tag_including)
             mph_remove(i);
     }
 }
