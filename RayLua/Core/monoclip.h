@@ -209,4 +209,6 @@ int mph_append( int h1, int h2, int tag);
 int mpcheck(int h1,int h2);
 int mphremoveontag(int tag);
 int mphremoveaboveincl(int tag_including);
+void monocopy(int h1, int h2, int *hout1, int *hout2);
+
 #endif //BUILD2_MONOCLIP_H

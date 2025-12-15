@@ -701,7 +701,6 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 	logstep("produce eyepol, depth:%d",b->recursion_depth);
 }
 
-
 static void skytagfunc (int rethead0, int rethead1, bdrawctx* b){}
 
 /*
@@ -781,6 +780,74 @@ static void ligpoltagfunc (int rethead0, int rethead1, bdrawctx *b)
 	Maintains mph[] (mono polygon hierarchy) for spatial partitioning
 	"tag" refers to sector IDs
 */
+static void drawtag_debug(int rethead0, int rethead1, bdrawctx *b)
+{
+
+	float f,fx,fy, g, *fptr;
+	int i, j, k, h, rethead[2];
+	cam_t cam = b->cam;
+	double* xform = b->xformmat;
+	point3d add = b->gnadd;
+	if ((rethead0|rethead1) < 0) { mono_deloop(rethead1); mono_deloop(rethead0); return; }
+	rethead[0] = rethead0; rethead[1] = rethead1;
+
+	// Put on FIFO in world space:
+	for(h=0;h<2;h++)
+	{
+		i = rethead[h];
+		do
+		{
+			if (h)
+				i = mp[i].p;
+
+			if (eyepolvn >= eyepolvmal)
+			{
+				eyepolvmal = max(eyepolvmal<<1,16384);
+				eyepolv = (point3d *)realloc(eyepolv,eyepolvmal*sizeof(point3d));
+			}
+			f = cam.h.z/(mp[i].x*xform[6] + mp[i].y*xform[7] + add.z);
+			fx        =  (mp[i].x*xform[0] + mp[i].y*xform[1] + add.x)*f + cam.h.x;
+			fy        =  (mp[i].x*xform[3] + mp[i].y*xform[4] +add.y)*f + cam.h.y;
+
+			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*cam.h.z);
+
+			float retx = ((fx-cam.h.x)*cam.r.x + (fy-cam.h.y)*cam.d.x + (cam.h.z)*cam.f.x)*f + cam.p.x;
+			float rety = ((fx-cam.h.x)*cam.r.y + (fy-cam.h.y)*cam.d.y + (cam.h.z)*cam.f.y)*f + cam.p.y;
+			float retz = ((fx-cam.h.x)*cam.r.z + (fy-cam.h.y)*cam.d.z + (cam.h.z)*cam.f.z)*f + cam.p.z;
+			dpoint3d ret = {retx,rety,retz};
+			wccw_transform(&ret, &b->cam, &b->orcam);
+			eyepolv[eyepolvn] = (point3d){ret.x,ret.y,ret.z};
+			//dpoint3d e = {eyepolv[eyepolvn].x,eyepolv[eyepolvn].y,eyepolv[eyepolvn].z};
+			//portal_xform_world_fullp(&e,b);
+			//LOOPADD(e);
+			eyepolvn++;
+
+			if (!h) i = mp[i].n;
+		} while (i != rethead[h]);
+	}
+
+	if (eyepoln+1 >= eyepolmal)
+	{
+		eyepolmal = max(eyepolmal<<1, 4096);
+		eyepol = (eyepol_t *)realloc(eyepol, eyepolmal*sizeof(eyepol_t));
+		eyepol[0].vert0 = 0;
+	}
+
+	memcpy((void *)eyepol[eyepoln].ouvmat, (void *)b->gouvmat, sizeof(b->gouvmat[0])*9);
+
+	eyepol[eyepoln].tpic = gtpic;
+	eyepol[eyepoln].curcol = gcurcol;
+	eyepol[eyepoln].flags = (b->gflags != 0);
+	eyepol[eyepoln].b2sect = b->gnewtag;
+	eyepol[eyepoln].b2wall = b->gligwall;
+	eyepol[eyepoln].b2slab = b->gligslab;
+	memcpy((void *)&eyepol[eyepoln].norm, (void *)&b->gnorm, sizeof(b->gnorm));
+	eyepoln++;
+	eyepol[eyepoln].vert0 = eyepolvn;
+	eyepol[eyepoln].rdepth = b->recursion_depth;
+	logstep("produce eyepol, depth:%d",b->recursion_depth);
+}
+
 static void changetagfunc (int rethead0, int rethead1, bdrawctx *b)
 {
 	if ((rethead0|rethead1) < 0) return;
@@ -796,6 +863,8 @@ static void changetagfunc (int rethead0, int rethead1, bdrawctx *b)
 	if (b->has_portal_clip)
 		mono_dbg_capture_mph(mphnum, "clip in potal");
 	mphnum++;
+	//if (b->gnewtag==30022)
+	//	drawtag_debug(rethead0,rethead0,b);
 	logstep("changetag: newMtag:%d, new mphnum:%d",b->gnewtag,mphnum);
 }
 	//flags&1: do and
@@ -926,7 +995,7 @@ static int drawpol_befclip (int fromtag, int newtag1, int fromsect, int newsect,
 		return 0;
 	}
 
-	LOOPEND
+	//LOOPEND
 	int curtag = fromtag;
 	int cursec = fromsect;
 	int newtag = newtag1;
@@ -955,7 +1024,6 @@ static int drawpol_befclip (int fromtag, int newtag1, int fromsect, int newsect,
 			b->gnewtag = newtag;
 			omph0 = mphnum;
 			b->gdoscansector = !(flags & DP_NO_SCANSECT);
-			int bop =MONO_BOOL_AND;
 			// intersect with same monos, and change tag for resulting piece?
 			// cliptonewregion
 			logstep("bool AND, keep all, changetag, on tag %d to %d", curtag, b->gnewtag);
@@ -966,7 +1034,7 @@ static int drawpol_befclip (int fromtag, int newtag1, int fromsect, int newsect,
 					   mph[i].head[1],
 					   plothead[0],
 					   plothead[1],
-					   bop,
+					   MONO_BOOL_AND,
 					   b,
 					   changetagfunc);
 				}
@@ -1269,10 +1337,10 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 		if (isportal && !noportals) {
 			int endpn = portals[myport].destpn;
 			int ttag = b->tagoffset + taginc + portals[endpn].sect;
-			int portalpolyflags =  surflag | DP_NO_SCANSECT;
+			int portalpolyflags =  ((isflor<<2)+3) | DP_NO_SCANSECT;
 			int portaltag = b->tagoffset + taginc -1;
 
-		//	drawpol_befclip(s+b->tagoffset, ttag, s, portals[endpn].sect,plothead[0],plothead[1], portalpolyflags , b);
+		//	drawpol_befclip(s+b->tagoffset, portaltag, s, portals[endpn].sect,plothead[0],plothead[1], portalpolyflags , b);
 			draw_hsr_enter_portal(map, myport, plothead[0],plothead[1],b);
 		}
 
@@ -1399,7 +1467,7 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 				int endpn = portals[myport].destpn;
 				int ttag = b->tagoffset + taginc + portals[endpn].sect;
 
-			//	drawpol_befclip(s+b->tagoffset, ttag,s,portals[endp].sect, plothead[0], plothead[1],  portalpolyflags, b);
+			//	drawpol_befclip(s+b->tagoffset, portaltag,s,portals[endp].sect, plothead[0], plothead[1],  portalpolyflags, b);
 				draw_hsr_enter_portal(map, myport, plothead[0],plothead[1],b);
 			} else {
 				// could be 7 or 3, .111 or .011
@@ -1651,7 +1719,7 @@ int wasclipped = 0;
 					bord2[j].x = bord2[j].x*f + gcam.h.x;
 					bord2[j].y = bord2[j].y*f + gcam.h.y;
 				}
-		}
+		}  // need to draw reproject original opening unfortunately.
 
 		memset8(b->sectgot,0,(lgs->numsects+31)>>3);
 
@@ -1683,43 +1751,44 @@ int wasclipped = 0;
 				mono_genfromloop(&bh1, &bh2, bord2, n);
 				bool bordok = (mpcheck(bh1,bh2));
 				if (!bordok) {
-					return;
+					continue;
 				}
 
 				int portaltag = b->tagoffset - 1;
 				int newtag = gcam.cursect + b->tagoffset;
-
+				int whead[2]={-1,-1};
+				int bordar[] = {bh1,bh2};
 					if (!wasclipped) {
-						bool wok = (mpcheck(b->chead[0], b->chead[1]));
-						if (!wok) return;
-
+						bool wok = (mpcheck(b->chead[0], b->chead[1])); // invalid window
+							if (!wok) return;
+						monocopy(b->chead[0], b->chead[1],&whead[0],&whead[1]);
 						// reproject original opening.
-						for (int h = 0; h < 2; h++) {
-							i = b->chead[h];
-							do {
-								if (h) i = mp[i].p;
-								// must find previous in coords of new, may need previous camera, not orcam.
-								wccw_transform(&mp[i].pos, &b->orcam, &b->cam);
-								if (!h) i = mp[i].n;
-							} while (i != b->chead[h]);
-						}
-
-						b->gdoscansector=0;
-						b->gnewtag=gcam.cursect + b->tagoffset;
-						res = projectonmono(&b->chead[0], &b->chead[1], b);
-						//mono_clipself( b->chead[0], b->chead[1],b,changetagfunc);
-						//mph_append(b->chead[0], b->chead[1], gcam.cursect + b->tagoffset); // need to clip it with board.
-						//mono_deloop(b->chead[0]);
-						//mono_deloop(b->chead[1]);
-						if (!res)
-							return;
+						// MOVE TO ENTER PORTAL, to reproject from previous cam.
 						wasclipped = 1;
 					}
+					else { //
+						whead[0] = b->chead[0];
+						whead[1] = b->chead[1];
+					}
+
+					for (int h = 0; h < 2; h++) {
+						i = whead[h];
+						do {
+							if (h) i = mp[i].p;
+							// must find previous in coords of new, may need previous camera, not orcam.
+							wccw_transform(&mp[i].pos, &b->orcam, &b->cam);
+							if (!h) i = mp[i].n;
+						} while (i != whead[h]);
+					}
+
+					res = projectonmono(&whead[0], &whead[1], b);
+					if (!res)
+						continue;
 					//do AND with board and add only clipped portion to MPH.
 					b->gdoscansector=0;
 					b->gnewtag=gcam.cursect + b->tagoffset;
 					mphremoveontag(b->gnewtag);
-					mono_bool(b->chead[0],b->chead[1],bh1,bh2,MONO_BOOL_AND,b,changetagfunc);
+					mono_bool(whead[0],whead[1],bh1,bh2,MONO_BOOL_AND,b,changetagfunc);
 					//mono_dbg_capture_mph(mphnum - 1, "reprojected");
 				//	mono_deloop(bh1);
 				//	mono_deloop(bh2);
@@ -1747,6 +1816,7 @@ nogood:; }
 
 		if (shadowtest2_rendmode == 4) uptr = glp->sectgot;
 		else uptr = shadowtest2_sectgot;
+
 
 		if (!pass) // write only after first pass.
 		{

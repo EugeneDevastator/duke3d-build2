@@ -742,5 +742,37 @@ int mphremoveaboveincl(int tag_including) {
     }
 }
 
+void monocopy(int h1, int h2, int *hout1, int *hout2) {
+    *hout1 = -1;
+    *hout2 = -1;
+
+    if ((h1 | h2) < 0) {
+        return;
+    }
+
+    // Copy first head chain
+    if (h1 >= 0) {
+        int i = h1;
+        do {
+            *hout1 = mono_ins(*hout1, mp[i].x, mp[i].y, mp[i].z);
+            i = mp[i].n;
+        } while (i != h1);
+        *hout1 = mp[*hout1].n;
+    }
+
+    // Copy second head chain
+    if (h2 >= 0) {
+        int i = h2;
+        do {
+            *hout2 = mono_ins(*hout2, mp[i].x, mp[i].y, mp[i].z);
+            i = mp[i].n;
+        } while (i != h2);
+        *hout2 = mp[*hout2].n;
+    }
+}
+
+
+
+
 
 
