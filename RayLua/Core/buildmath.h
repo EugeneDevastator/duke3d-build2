@@ -196,9 +196,27 @@ static inline dpoint3d crossdp3(dpoint3d a, dpoint3d b) {
     result.z = a.x * b.y - a.y * b.x;
     return result;
 }
-
+static inline point3d crossp3(point3d a, point3d b) {
+    point3d result;
+    result.x = a.y * b.z - a.z * b.y;
+    result.y = a.z * b.x - a.x * b.z;
+    result.z = a.x * b.y - a.y * b.x;
+    return result;
+}
 static inline dpoint3d normalizedp3(dpoint3d v) {
     dpoint3d result;
+    float length = sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
+    if (length > 0.0f) {
+        result.x = v.x / length;
+        result.y = v.y / length;
+        result.z = v.z / length;
+    } else {
+        result.x = result.y = result.z = 0.0f;
+    }
+    return result;
+}
+static inline point3d normalizep3(point3d v) {
+    point3d result;
     float length = sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
     if (length > 0.0f) {
         result.x = v.x / length;
