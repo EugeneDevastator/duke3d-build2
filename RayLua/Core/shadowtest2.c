@@ -662,13 +662,18 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 			fx        =  (mp[i].x*xform[0] + mp[i].y*xform[1] + add.x)*f + cam.h.x;
 			fy        =  (mp[i].x*xform[3] + mp[i].y*xform[4] +add.y)*f + cam.h.y;
 
+			float mul = b->has_portal_clip? -1 : 1;
 			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*cam.h.z);
 
 			float retx = ((fx-cam.h.x)*cam.r.x + (fy-cam.h.y)*cam.d.x + (cam.h.z)*cam.f.x)*f + cam.p.x;
 			float rety = ((fx-cam.h.x)*cam.r.y + (fy-cam.h.y)*cam.d.y + (cam.h.z)*cam.f.y)*f + cam.p.y;
 			float retz = ((fx-cam.h.x)*cam.r.z + (fy-cam.h.y)*cam.d.z + (cam.h.z)*cam.f.z)*f + cam.p.z;
 			dpoint3d ret = {retx,rety,retz};
-			wccw_transform(&ret, &b->cam, &b->orcam);
+			cam_t rcam =b->cam;
+			rcam.r.x*=mul;
+			rcam.r.y*=mul;
+			rcam.r.z*=mul;
+			wccw_transform(&ret, &rcam, &b->orcam);
 			eyepolv[eyepolvn] = (point3d){ret.x,ret.y,ret.z};
 			//dpoint3d e = {eyepolv[eyepolvn].x,eyepolv[eyepolvn].y,eyepolv[eyepolvn].z};
 			//portal_xform_world_fullp(&e,b);
@@ -1656,6 +1661,7 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
 		}
 	}
 int wasclipped = 0;
+	int passcomplete =0;
 	for(int pass=0;pass<2;pass++) {
 
 		if (!b->has_portal_clip) {
@@ -1716,6 +1722,7 @@ int wasclipped = 0;
 				}
 				if (n < 3) {
 					continue;
+					printf("n<3 1");
 				}
 				for(j=0;j<n;j++)
 				{
@@ -1744,15 +1751,18 @@ int wasclipped = 0;
 			int res=-1;
 			mphremoveaboveincl(b->tagoffset); // clean anything above.
 {
-				if (n < 3)
-					continue;
+				if (n < 3) {
+
+					printf("n<3 2");continue;
+				}
 				int bh1 = -1, bh2 = -1;
 
 				mono_genfromloop(&bh1, &bh2, bord2, n);
-				bool bordok = (mpcheck(bh1,bh2));
-				if (!bordok) {
+				bool bordok = (mpcheck(bh1,bh2)); if (!bordok) {
+					printf("bordok not");
 					continue;
 				}
+
 
 				int portaltag = b->tagoffset - 1;
 				int newtag = gcam.cursect + b->tagoffset;
@@ -1762,6 +1772,7 @@ int wasclipped = 0;
 						bool wok = (mpcheck(b->chead[0], b->chead[1])); // invalid window
 							if (!wok) {
 								logstep("failed portal window chain");
+								printf("window not");
 								return;
 							}
 						monocopy(b->chead[0], b->chead[1],&whead[0],&whead[1]);
@@ -1773,28 +1784,31 @@ int wasclipped = 0;
 						whead[0] = b->chead[0];
 						whead[1] = b->chead[1];
 					}
-
+					cam_t thiscam = b->cam; // this gives correct clipping
+					thiscam.r.x*=-1;
+					thiscam.r.y*=-1;
+					thiscam.r.z*=-1;
 				// wait, we have just same loop, so its redundant
 					for (int h = 0; h < 2; h++) {
 						i = whead[h];
 						do {
 							if (h) i = mp[i].p;
 							// must find previous in coords of new, may need previous camera, not orcam.
-							wccw_transform(&mp[i].pos, &b->orcam, &b->cam);
+							wccw_transform(&mp[i].pos, &b->orcam, &thiscam);
 							if (!h) i = mp[i].n;
 						} while (i != whead[h]);
 					}
 
 					res = projectonmono(&whead[0], &whead[1], b);
 					if (!res) {
-						logstep("projection fail");
+						printf("proj not");
 						continue;
 					}
 					//do AND with board and add only clipped portion to MPH.
 					b->gdoscansector=0;
 					b->gnewtag=gcam.cursect + b->tagoffset;
-
-					mono_bool(whead[0],whead[1],bh1,bh2,MONO_BOOL_AND,b,changetagfunc);
+					// and swap of indices is necessary.
+					mono_bool(whead[1],whead[0],bh1,bh2,MONO_BOOL_AND,b,changetagfunc);
 					//mono_dbg_capture_mph(mphnum - 1, "reprojected");
 				//	mono_deloop(bh1);
 				//	mono_deloop(bh2);
@@ -1808,11 +1822,10 @@ int wasclipped = 0;
 
 			for(i=b->bunchn-1;i>0;i--) //assume: bunchgrid[(((j-1)*j)>>1)+i] = bunchfront(j,i,0); is valid iff:{i<j}
 			{
-
-				for(k=(((i-1)*i)>>1),j=0;j<     i;k+=1,j++)
-					if (b->bunchgrid[k]&2) goto nogood;
-				for(k+=j            ,j++;j<b->bunchn;k+=j,j++)
-					if (b->bunchgrid[k]&1) goto nogood;
+				for (k = (((i - 1) * i) >> 1), j = 0; j < i; k += 1, j++)
+					if (b->bunchgrid[k] & 2) goto nogood;
+				for (k += j, j++; j < b->bunchn; k += j, j++)
+					if (b->bunchgrid[k] & 1) goto nogood;
 				break;
 nogood:; }
 			closest = i;
@@ -1857,6 +1870,7 @@ nogood:; }
 			logstep("break on no cut: pass:%d, hfp:%d, depth:%d, camsec:%d", pass, halfplane, b->recursion_depth, b->cam.cursect);
 			break;
 		}
+		passcomplete=1;
 	}
 	if (b->has_portal_clip) {
 		logstep("mph clean after passes");
@@ -1884,6 +1898,11 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport,  int head1, int h
     // Normalize transforms to ensure orthonormality
     normalize_transform(&ent.tr);
     normalize_transform(&tgs.tr);
+	transform tgttr = tgs.tr;
+	//tgttr.r.x *=-1;
+	//tgttr.r.y *=-1;
+	//tgttr.r.z *=-1;
+	//tgttr.r = crossp3(tgttr.d,tgttr.f);
 
     // Step 1: Transform camera to entry portal's local space
     // This finds the camera's position and orientation RELATIVE to the entry portal
@@ -1895,10 +1914,11 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport,  int head1, int h
     // Step 2: Apply that same relative transform from the target portal's perspective
     // Since entry.forward points IN and target.forward points OUT (already opposite),
     // we just transform directly without any flips
-    ncam.p = local_to_world_point(cam_local_pos, &tgs.tr);
-    ncam.r = local_to_world_vec(cam_local_r, &tgs.tr);
-    ncam.d = local_to_world_vec(cam_local_d, &tgs.tr);
-    ncam.f = local_to_world_vec(cam_local_f, &tgs.tr);
+    ncam.p = local_to_world_point(cam_local_pos, &tgttr);
+   // ncam.r = local_to_world_vec(cam_local_r, &tgttr);
+    ncam.d = local_to_world_vec(cam_local_d, &tgttr);
+    ncam.f = local_to_world_vec(cam_local_f, &tgttr);
+	ncam.r = normalizep3(crossp3(ncam.d,ncam.f));
 
     ncam.cursect = portals[endp].sect;
 
