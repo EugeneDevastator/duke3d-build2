@@ -188,6 +188,9 @@ static inline dpoint3d gettrianglenorm(dpoint3d p0, dpoint3d p1, dpoint3d p2) {
 static inline float dotdp3(dpoint3d a, dpoint3d b) {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
+static inline float dotp3(point3d a, point3d b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
 
 static inline dpoint3d crossdp3(dpoint3d a, dpoint3d b) {
     dpoint3d result;
@@ -226,5 +229,13 @@ static inline point3d normalizep3(point3d v) {
         result.x = result.y = result.z = 0.0f;
     }
     return result;
+}
+
+static inline bool is_transform_flipped(transform* tr) {
+    // Calculate determinant of the 3x3 rotation matrix
+    // det = r·(d×f)
+    point3d cross = crossp3(tr->d, tr->f);
+    float det = dotp3(tr->r, cross);
+    return det < 0.0f;
 }
 #endif //RAYLIB_LUA_IMGUI_BUILDMATH_H

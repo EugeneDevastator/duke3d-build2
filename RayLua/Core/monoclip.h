@@ -100,11 +100,12 @@ typedef struct {
 	double oxformmat[9], oxformmatc, oxformmats;
 	point3d gnadd, ognadd;
 	point3d gnorm;
-	float gouvmat[9]; // 0 3 6 - store plane equation to convert back from mp.
+	float gouvmat[9]; // 0 3 6 - store plane equation to convert back from monoplane.
 	int gligsect, gligwall, gligslab, gflags;
 	int gnewtag, gdoscansector, gnewtagsect;
 	// n-portals context
 	bool has_portal_clip; // Whether portal clipping is active
+	bool ismirrored;
 	int recursion_depth;
 	int tagoffset;
 	int testignorewall;

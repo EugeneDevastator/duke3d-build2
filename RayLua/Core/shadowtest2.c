@@ -629,7 +629,8 @@ static void xformprep (double hang, bdrawctx *b)
 
 static void xformbac (double rx, double ry, double rz, dpoint3d *o, bdrawctx *b)
 {
-	o->x = rx*b->xformmat[0] + ry*b->xformmat[3] + rz*b->xformmat[6];
+	float mul = b->ismirrored ? -1 : 1; // for flipped world
+	o->x = mul*rx*b->xformmat[0] + ry*b->xformmat[3] + rz*b->xformmat[6];
 	o->y = rx*b->xformmat[1] + ry*b->xformmat[4] + rz*b->xformmat[7];
 	o->z = rx*b->xformmat[2] + ry*b->xformmat[5] + rz*b->xformmat[8];
 }
@@ -669,11 +670,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 			float rety = ((fx-cam.h.x)*cam.r.y + (fy-cam.h.y)*cam.d.y + (cam.h.z)*cam.f.y)*f + cam.p.y;
 			float retz = ((fx-cam.h.x)*cam.r.z + (fy-cam.h.y)*cam.d.z + (cam.h.z)*cam.f.z)*f + cam.p.z;
 			dpoint3d ret = {retx,rety,retz};
-			cam_t rcam =b->cam;
-			rcam.r.x*=mul;
-			rcam.r.y*=mul;
-			rcam.r.z*=mul;
-			wccw_transform(&ret, &rcam, &b->orcam);
+			wccw_transform(&ret, &b->cam, &b->orcam);
 			eyepolv[eyepolvn] = (point3d){ret.x,ret.y,ret.z};
 			//dpoint3d e = {eyepolv[eyepolvn].x,eyepolv[eyepolvn].y,eyepolv[eyepolvn].z};
 			//portal_xform_world_fullp(&e,b);
@@ -1513,7 +1510,7 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
 	bs.recursion_depth = 0;
 	bs.has_portal_clip = false;
 	bs.tagoffset=0;
-
+	bs.ismirrored = false;
 opercurr = 0;
 	draw_hsr_polymost_ctx(map,&bs);
 
@@ -1784,17 +1781,14 @@ int wasclipped = 0;
 						whead[0] = b->chead[0];
 						whead[1] = b->chead[1];
 					}
-					cam_t thiscam = b->cam; // this gives correct clipping
-					thiscam.r.x*=-1;
-					thiscam.r.y*=-1;
-					thiscam.r.z*=-1;
+
 				// wait, we have just same loop, so its redundant
 					for (int h = 0; h < 2; h++) {
 						i = whead[h];
 						do {
 							if (h) i = mp[i].p;
 							// must find previous in coords of new, may need previous camera, not orcam.
-							wccw_transform(&mp[i].pos, &b->orcam, &thiscam);
+							wccw_transform(&mp[i].pos, &b->orcam, &b->cam);
 							if (!h) i = mp[i].n;
 						} while (i != whead[h]);
 					}
@@ -1808,8 +1802,11 @@ int wasclipped = 0;
 					b->gdoscansector=0;
 					b->gnewtag=gcam.cursect + b->tagoffset;
 					// and swap of indices is necessary.
+				if (b->ismirrored)
 					mono_bool(whead[1],whead[0],bh1,bh2,MONO_BOOL_AND,b,changetagfunc);
-					//mono_dbg_capture_mph(mphnum - 1, "reprojected");
+				else
+					mono_bool(whead[0],whead[1],bh1,bh2,MONO_BOOL_AND,b,changetagfunc);
+				//mono_dbg_capture_mph(mphnum - 1, "reprojected");
 				//	mono_deloop(bh1);
 				//	mono_deloop(bh2);
 			}
@@ -1914,15 +1911,18 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport,  int head1, int h
     // Step 2: Apply that same relative transform from the target portal's perspective
     // Since entry.forward points IN and target.forward points OUT (already opposite),
     // we just transform directly without any flips
-    ncam.p = local_to_world_point(cam_local_pos, &tgttr);
-   // ncam.r = local_to_world_vec(cam_local_r, &tgttr);
-    ncam.d = local_to_world_vec(cam_local_d, &tgttr);
-    ncam.f = local_to_world_vec(cam_local_f, &tgttr);
-	ncam.r = normalizep3(crossp3(ncam.d,ncam.f));
+    ncam.p = local_to_world_point(cam_local_pos, &tgs.tr);
+    ncam.r = local_to_world_vec(cam_local_r, &tgs.tr);
+    ncam.d = local_to_world_vec(cam_local_d, &tgs.tr);
+    ncam.f = local_to_world_vec(cam_local_f, &tgs.tr);
+	//ncam.r = normalizep3(crossp3(ncam.d,ncam.f));
+
+	bool tgttr_flipped = is_transform_flipped(&tgs.tr) ^  is_transform_flipped(&ent.tr);
 
     ncam.cursect = portals[endp].sect;
 
     bdrawctx newctx = {};
+	newctx.ismirrored = tgttr_flipped;
 	newctx.entrysec = portals[myport].sect;
 	newctx.recursion_depth = parentctx->recursion_depth + 1;
 	newctx.tagoffset = (newctx.recursion_depth)*taginc;
