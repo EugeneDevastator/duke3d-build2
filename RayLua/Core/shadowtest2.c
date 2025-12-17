@@ -429,7 +429,7 @@ overflow:otx0 = tx0; oty0 = ty0; otx1 = tx1; oty1 = ty1;
 static void scansector (int sectnum, bdrawctx* b)
 {
 	cam_t gcam = b->cam;
-	cam_t orcam = b->orcam;
+
 	#define BUNCHNEAR 1e-7
 	sect_t *sec;
 	wall_t *wal;
@@ -447,32 +447,19 @@ static void scansector (int sectnum, bdrawctx* b)
 	{
 		j = wal[i].n+i;
 
-		if (false)
-		{
-			dpoint3d wcpi = portal_xform_world_fullr(wal[i].x,wal[i].y,getwallz(sec,1,i),b);
-			dpoint3d wcpj = portal_xform_world_fullr(wal[j].x,wal[j].y,getwallz(sec,1,j),b);
-			dx0 = wcpi.x-orcam.p.x; dy0 = wcpi.y-orcam.p.y;
-			dx1 = wcpj.x-orcam.p.x; dy1 = wcpj.y-orcam.p.y;
-			if (dy1*dx0 <= dx1*dy0) goto docont; //Back-face cull
+		double zzz = getwallz(sec, 1, i);
+		dpoint3d wp = {wal[i].x, wal[i].y, zzz};
 
-			//clip to near plane .. result is parametric fractions f0&f1
-			f0 = dx0 * b->oxformmatc + dy0 * b->oxformmats;
-			f1 = dx1 * b->oxformmatc + dy1 * b->oxformmats;
-		}
-		else
-		{
-			double zzz = getwallz(sec,1,i);
-			dpoint3d wp = {wal[i].x,wal[i].y,zzz};
+		dx0 = wal[i].x - gcam.p.x;
+		dy0 = wal[i].y - gcam.p.y;
+		dx1 = wal[j].x - gcam.p.x;
+		dy1 = wal[j].y - gcam.p.y;
+		if (dy1 * dx0 <= dx1 * dy0) goto docont; //Back-face cull
 
-			dx0 = wal[i].x-gcam.p.x; dy0 = wal[i].y-gcam.p.y;
-			dx1 = wal[j].x-gcam.p.x; dy1 = wal[j].y-gcam.p.y;
-			if (dy1*dx0 <= dx1*dy0) goto docont; //Back-face cull
+		//clip to near plane .. result is parametric fractions f0&f1
+		f0 = dx0 * b->xformmatc + dy0 * b->xformmats;
+		f1 = dx1 * b->xformmatc + dy1 * b->xformmats;
 
-			//clip to near plane .. result is parametric fractions f0&f1
-			f0 = dx0 * b->xformmatc + dy0 * b->xformmats;
-			f1 = dx1 * b->xformmatc + dy1 * b->xformmats;
-
-		}
 
 			  if (f0 <= BUNCHNEAR) { if (f1 <= BUNCHNEAR) goto docont;
 											 f0 = (BUNCHNEAR-f0)/(f1-f0); f1 = 1.0; if (f0 >= f1) goto docont; }
@@ -619,6 +606,7 @@ static void xformprep (double hang, bdrawctx *b)
 	b->xformmat[0] = gcam.r.y*b->xformmatc - gcam.r.x*b->xformmats; b->xformmat[1] = gcam.r.z; b->xformmat[2] = gcam.r.x*b->xformmatc + gcam.r.y*b->xformmats;
 	b->xformmat[3] = gcam.d.y*b->xformmatc - gcam.d.x*b->xformmats; b->xformmat[4] = gcam.d.z; b->xformmat[5] = gcam.d.x*b->xformmatc + gcam.d.y*b->xformmats;
 	b->xformmat[6] = gcam.f.y*b->xformmatc - gcam.f.x*b->xformmats; b->xformmat[7] = gcam.f.z; b->xformmat[8] = gcam.f.x*b->xformmatc + gcam.f.y*b->xformmats;
+
 	b->gnadd.x = -gcam.h.x*b->xformmat[0] - gcam.h.y*b->xformmat[1] + gcam.h.z*b->xformmat[2];
 	b->gnadd.y = -gcam.h.x*b->xformmat[3] - gcam.h.y*b->xformmat[4] + gcam.h.z*b->xformmat[5];
 	b->gnadd.z = -gcam.h.x*b->xformmat[6] - gcam.h.y*b->xformmat[7] + gcam.h.z*b->xformmat[8];
@@ -656,11 +644,11 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 				eyepolvmal = max(eyepolvmal<<1,16384);
 				eyepolv = (point3d *)realloc(eyepolv,eyepolvmal*sizeof(point3d));
 			}
+
 			f = cam.h.z/(mp[i].x*xform[6] + mp[i].y*xform[7] + add.z);
 			fx        =  (mp[i].x*xform[0] + mp[i].y*xform[1] + add.x)*f + cam.h.x;
 			fy        =  (mp[i].x*xform[3] + mp[i].y*xform[4] +add.y)*f + cam.h.y;
-
-			float mul = b->has_portal_clip? -1 : 1;
+			//float mul = (b->ismirrored) ? -1 : 1;
 			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*cam.h.z);
 
 			float retx = ((fx-cam.h.x)*cam.r.x + (fy-cam.h.y)*cam.d.x + (cam.h.z)*cam.f.x)*f + cam.p.x;
@@ -670,7 +658,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 			wccw_transform(&ret, &b->cam, &b->orcam);
 			eyepolv[eyepolvn] = (point3d){ret.x,ret.y,ret.z};
 			eyepolvn++;
-
+//			vscalar(&b->cam.r,mul);
 			if (!h) i = mp[i].n;
 		} while (i != rethead[h]);
 		mono_deloop(rethead[h]);
@@ -857,8 +845,8 @@ static void changetagfunc (int rethead0, int rethead1, bdrawctx *b)
 	if (b->has_portal_clip)
 		mono_dbg_capture_mph(mphnum, "clip in potal");
 	mphnum++;
-	if (b->gnewtag==29999)
-		drawtag_debug(rethead0,rethead0,b);
+	//if (b->recursion_depth >=2)
+	//	drawtag_debug(rethead0,rethead0,b);
 	logstep("changetag: newMtag:%d, new mphnum:%d",b->gnewtag,mphnum);
 }
 	//flags&1: do and
@@ -1497,6 +1485,7 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
 	loopnum=0;
 	operstopn=-1;
 	bs.cam = *cc;
+	bs.movedcam = *cc;
 	bs.orcam = *cc;
 	bs.recursion_depth = 0;
 	bs.has_portal_clip = false;
@@ -1522,7 +1511,6 @@ void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx) {
 	b->bunchmal=0;
 	b->bunchgrid =0;
 	cam_t gcam = b->cam;
-	cam_t oricam = b->orcam;
 
 	if (gcam.cursect >=0)
 		lastvalidsec = gcam.cursect;
@@ -1712,24 +1700,18 @@ int wasclipped = 0;
 					continue;
 					printf("n<3 1");
 				}
+
 				for(j=0;j<n;j++)
 				{
 					f = gcam.h.z/bord2[j].z;
 					bord2[j].x = bord2[j].x*f + gcam.h.x;
 					bord2[j].y = bord2[j].y*f + gcam.h.y;
 				}
-			if (b->has_portal_clip && b->ismirrored) {
-				// Reverse winding for mirrored viewport bounds
-				for (int i = 0; i < n/2; i++) {
-					dpoint3d tmp = bord2[i];
-					bord2[i] = bord2[n-1-i];
-					bord2[n-1-i] = tmp;
-				}
-			}
 		}  // need to draw reproject original opening unfortunately.
 
 		memset8(b->sectgot,0,(lgs->numsects+31)>>3);
-
+if (b->recursion_depth==2)
+	int a =1;
 		int passmphstart;
 		if (!b->has_portal_clip) {
 			//FIX! once means not each frame! (of course it doesn't hurt functionality)
@@ -1876,6 +1858,8 @@ nogood:; }
 
 static void draw_hsr_enter_portal(mapstate_t* map, int myport,  int head1, int head2,bdrawctx *parentctx)
 {
+	if (parentctx->recursion_depth == 1)
+		lastcamtr = parentctx->orcam.tr;
 	OPERLOG;
     if (parentctx->recursion_depth >= MAX_PORTAL_DEPTH) {
         return;
@@ -1894,7 +1878,13 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport,  int head1, int h
     // Normalize transforms to ensure orthonormality
     normalize_transform(&ent.tr);
     normalize_transform(&tgs.tr);
-	transform tgttr = tgs.tr;
+
+	// sprites are flipped in a mirrored world.
+	// so, endportal is also mirrored against entry camera?
+	//if (parentctx->ismirrored) {
+	//	vscalar(&ent.tr.r,-1);
+	//	vscalar(&tgs.tr.r,-1);
+	//}
 	//tgttr.r.x *=-1;
 	//tgttr.r.y *=-1;
 	//tgttr.r.z *=-1;
