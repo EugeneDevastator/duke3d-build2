@@ -1917,16 +1917,17 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport,  int head1, int h
     ncam.f = local_to_world_vec(cam_local_f, &tgs.tr);
 	//ncam.r = normalizep3(crossp3(ncam.d,ncam.f));
 
-	bool tgttr_flipped = is_transform_flipped(&tgs.tr) ^  is_transform_flipped(&ent.tr);
-
+	bool portalflipped = is_transform_flipped(&tgs.tr) ^  is_transform_flipped(&ent.tr);
+	bool nextflip = portalflipped ? !parentctx->ismirrored : parentctx->ismirrored;
     ncam.cursect = portals[endp].sect;
+// skipport was failing, now fix mirror
 
-    bdrawctx newctx = {};
-	newctx.ismirrored = tgttr_flipped;
+	newctx.ismirrored = nextflip;
 	newctx.entrysec = portals[myport].sect;
 	newctx.recursion_depth = parentctx->recursion_depth + 1;
 	newctx.tagoffset = (newctx.recursion_depth)*taginc;
     newctx.cam = ncam;
+    newctx.prevcam = parentctx->cam;
     newctx.orcam = parentctx->orcam;
     newctx.has_portal_clip = true;
     newctx.sectgotn = 0;
