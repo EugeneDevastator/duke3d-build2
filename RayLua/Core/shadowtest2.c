@@ -627,7 +627,7 @@ static void xformprep (double hang, bdrawctx *b)
 static void xformbac (double rx, double ry, double rz, dpoint3d *o, bdrawctx *b)
 {
 	float mul = b->ismirrored ? -1 : 1; // for flipped world
-	o->x = mul*rx*b->xformmat[0] + ry*b->xformmat[3] + rz*b->xformmat[6];
+	o->x = rx*b->xformmat[0] + ry*b->xformmat[3] + rz*b->xformmat[6];
 	o->y = rx*b->xformmat[1] + ry*b->xformmat[4] + rz*b->xformmat[7];
 	o->z = rx*b->xformmat[2] + ry*b->xformmat[5] + rz*b->xformmat[8];
 }
@@ -1064,7 +1064,7 @@ static int drawpol_befclip (int fromtag, int newtag1, int fromsect, int newsect,
 				mono_output = ligpoltagfunc;
 				//add to light list // this will process point lights. otherwize will only use plr light.
 			else if (b->gflags < 2) mono_output = drawtagfunc_ws;
-			else mono_output = skytagfunc; //calls drawtagfunc inside
+			else mono_output = drawtagfunc_ws; //calls drawtagfunc inside
 			logstep ("Bool-AND for solids drawtag, againsst all heads, keep all, with mono N=%d, when tag==%d", mphnum-1,curtag);
 			for (i = mphnum - 1; i >= 0; i--)
 				if (mph[i].tag == curtag)
@@ -1718,6 +1718,14 @@ int wasclipped = 0;
 					bord2[j].x = bord2[j].x*f + gcam.h.x;
 					bord2[j].y = bord2[j].y*f + gcam.h.y;
 				}
+			if (b->has_portal_clip && b->ismirrored) {
+				// Reverse winding for mirrored viewport bounds
+				for (int i = 0; i < n/2; i++) {
+					dpoint3d tmp = bord2[i];
+					bord2[i] = bord2[n-1-i];
+					bord2[n-1-i] = tmp;
+				}
+			}
 		}  // need to draw reproject original opening unfortunately.
 
 		memset8(b->sectgot,0,(lgs->numsects+31)>>3);
