@@ -37,7 +37,7 @@ eyepols are generated from mono space AND plane equation stored in gouvmat.
 #define DP_NO_SCANSECT 8
 #define DP_NO_PROJECT 16
 
-#define MAX_PORTAL_DEPTH 1
+#define MAX_PORTAL_DEPTH 2
 
 
 
@@ -463,9 +463,6 @@ static void scansector (int sectnum, bdrawctx* b)
 		{
 			double zzz = getwallz(sec,1,i);
 			dpoint3d wp = {wal[i].x,wal[i].y,zzz};
-			//portal_xform_world_fullp(&wp,b);
-			//if (b->has_portal_clip)
-			//	LOOPADD(wp)
 
 			dx0 = wal[i].x-gcam.p.x; dy0 = wal[i].y-gcam.p.y;
 			dx1 = wal[j].x-gcam.p.x; dy1 = wal[j].y-gcam.p.y;
@@ -672,9 +669,6 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 			dpoint3d ret = {retx,rety,retz};
 			wccw_transform(&ret, &b->cam, &b->orcam);
 			eyepolv[eyepolvn] = (point3d){ret.x,ret.y,ret.z};
-			//dpoint3d e = {eyepolv[eyepolvn].x,eyepolv[eyepolvn].y,eyepolv[eyepolvn].z};
-			//portal_xform_world_fullp(&e,b);
-			//LOOPADD(e);
 			eyepolvn++;
 
 			if (!h) i = mp[i].n;
@@ -820,9 +814,6 @@ static void drawtag_debug(int rethead0, int rethead1, bdrawctx *b)
 			dpoint3d ret = {retx,rety,retz};
 			wccw_transform(&ret, &b->cam, &b->orcam);
 			eyepolv[eyepolvn] = (point3d){ret.x,ret.y,ret.z};
-			//dpoint3d e = {eyepolv[eyepolvn].x,eyepolv[eyepolvn].y,eyepolv[eyepolvn].z};
-			//portal_xform_world_fullp(&e,b);
-			//LOOPADD(e);
 			eyepolvn++;
 
 			if (!h) i = mp[i].n;
@@ -1311,9 +1302,6 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 			plothead[i] = mono_ins(plothead[i], twal[ww].x, twal[ww].y,
 								  (wal[0].x - twal[ww].x) * grad->x + (
 									  wal[0].y - twal[ww].y) * grad->y + fz);
-		//	dpoint3d fp = {twal[ww].x,twal[ww].y,(wal[0].x - twal[ww].x) * grad->x + (wal[0].y - twal[ww].y) * grad->y + fz};
-		//	portal_xform_world_fullp(&fp,b);
-
 		}
 
 			plothead[i] = mp[plothead[i]].n;
@@ -1357,11 +1345,18 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 	// === DRAW WALLS ===
 	for(ww=0;ww<twaln;ww++)
 	{
-		int myport = wal[ww].tags[1]; // FLOOR PORTAL CHECK
+
+		// Get wall vertices and setup wall segment
+		vn = getwalls_imp(s,twal[ww].i,verts,MAXVERTS,map);
+		w = twal[ww].i; nw = wal[w].n+w;
+		sur = &wal[w].surf;
+
+		int myport = wal[w].tags[1]; // FLOOR PORTAL CHECK
 		bool isportal = myport >= 0
 						&& !noportals
 						&& portals[myport].destpn >= 0
-						&& portals[myport].kind == isflor;
+						&& portals[myport].kind == PORT_WALL;
+						//&& portals[myport].surfid == w;
 		bool skipport = shadowtest2_debug_block_selfportals
 						&& b->has_portal_clip
 						&& isportal
@@ -1370,10 +1365,6 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 						&& ww == b->testignorewall;
 		if (skipport)
 			continue;
-		// Get wall vertices and setup wall segment
-		vn = getwalls_imp(s,twal[ww].i,verts,MAXVERTS,map);
-		w = twal[ww].i; nw = wal[w].n+w;
-		sur = &wal[w].surf;
 
 		// Calculate wall length and setup color/normal
 		dx = sqrt((wal[nw].x-wal[w].x)*(wal[nw].x-wal[w].x) + (wal[nw].y-wal[w].y)*(wal[nw].y-wal[w].y));
@@ -1465,8 +1456,8 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 			myport = wal[w].tags[1];
 			int surflag = ((m > vn) << 2) + 3;
 			int newtag = ns == -1 ? -1 : ns+b->tagoffset;
-			if (myport >= 0 && portals[myport].destpn >=0 && portals[myport].kind == PORT_WALL) {
-					int endp = portals[myport].destpn;
+			if (isportal) {
+				int endp = portals[myport].destpn;
 				int portalpolyflags = surflag | DP_NO_SCANSECT;
 				int portaltag = +b->tagoffset + taginc -1;
 				int endpn = portals[myport].destpn;
@@ -1788,7 +1779,7 @@ int wasclipped = 0;
 						do {
 							if (h) i = mp[i].p;
 							// must find previous in coords of new, may need previous camera, not orcam.
-							wccw_transform(&mp[i].pos, &b->orcam, &b->cam);
+							wccw_transform(&mp[i].pos, &b->prevcam, &b->cam);
 							if (!h) i = mp[i].n;
 						} while (i != whead[h]);
 					}
@@ -1881,7 +1872,7 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport,  int head1, int h
     if (parentctx->recursion_depth >= MAX_PORTAL_DEPTH) {
         return;
     }
-
+	bdrawctx newctx = {};
     cam_t ncam = parentctx->cam;
     int endp = portals[myport].destpn;
     int entry = portals[myport].anchorspri;
