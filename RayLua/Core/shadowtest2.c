@@ -655,7 +655,9 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 			float rety = ((fx-cam.h.x)*cam.r.y + (fy-cam.h.y)*cam.d.y + (cam.h.z)*cam.f.y)*f + cam.p.y;
 			float retz = ((fx-cam.h.x)*cam.r.z + (fy-cam.h.y)*cam.d.z + (cam.h.z)*cam.f.z)*f + cam.p.z;
 			dpoint3d ret = {retx,rety,retz};
-			wccw_transform(&ret, &b->cam, &b->orcam);
+
+//vscalar(&b->cam.r,mul);
+			wccw_transform(&ret, &b->movedcam, &b->orcam);
 			eyepolv[eyepolvn] = (point3d){ret.x,ret.y,ret.z};
 			eyepolvn++;
 //			vscalar(&b->cam.r,mul);
@@ -663,7 +665,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 		} while (i != rethead[h]);
 		mono_deloop(rethead[h]);
 	}
-
+LOOPEND
 	if (eyepoln+1 >= eyepolmal)
 	{
 		eyepolmal = max(eyepolmal<<1, 4096);
@@ -800,8 +802,12 @@ static void drawtag_debug(int rethead0, int rethead1, bdrawctx *b)
 			float rety = ((fx-cam.h.x)*cam.r.y + (fy-cam.h.y)*cam.d.y + (cam.h.z)*cam.f.y)*f + cam.p.y;
 			float retz = ((fx-cam.h.x)*cam.r.z + (fy-cam.h.y)*cam.d.z + (cam.h.z)*cam.f.z)*f + cam.p.z;
 			dpoint3d ret = {retx,rety,retz};
+			if (b->recursion_depth>1) {
+				LOOPADD(ret)
+			}
 			wccw_transform(&ret, &b->cam, &b->orcam);
 			eyepolv[eyepolvn] = (point3d){ret.x,ret.y,ret.z};
+
 			eyepolvn++;
 
 			if (!h) i = mp[i].n;
@@ -895,6 +901,9 @@ static int projectonmono (int *plothead0, int *plothead1,  bdrawctx* b) {
 		do
 		{
 			if (h) i = mp[i].p;
+			if (b->recursion_depth==2) {
+				LOOPADDP(mp[i])
+			}
 			ox = mp[i].x-gcam.p.x; oy = mp[i].y-gcam.p.y;
 			//if (b->has_portal_clip)
 			//	LOOPADD(mp[i].pos)
@@ -930,10 +939,11 @@ static int projectonmono (int *plothead0, int *plothead1,  bdrawctx* b) {
 		f = gcam.h.z/tp[i].z;
 		tp[i].x = tp[i].x*f + gcam.h.x;
 		tp[i].y = tp[i].y*f + gcam.h.y;
-	}
 
-	//generate vmono
-	mono_genfromloop(&plothead[0], &plothead[1], tp, n);
+	}
+LOOPEND
+	//generate vmon
+		mono_genfromloop(&plothead[0], &plothead[1], tp, n);
 	if ((plothead[0] | plothead[1]) < 0) {
 		mono_deloop(plothead[0]);
 		mono_deloop(plothead[1]);
@@ -1753,6 +1763,15 @@ if (b->recursion_depth==2)
 								printf("window not");
 								return;
 							}
+						for (int h = 0; h < 2; h++) {
+							i = b->chead[h];
+							do {
+								if (h) i = mp[i].p;
+								// must find previous in coords of new, may need previous camera, not orcam.
+								wccw_transform(&mp[i].pos, &b->prevcam, &b->movedcam);
+								if (!h) i = mp[i].n;
+							} while (i != b->chead[h]);
+						}
 						monocopy(b->chead[0], b->chead[1],&whead[0],&whead[1]);
 						// reproject original opening.
 						// MOVE TO ENTER PORTAL, to reproject from previous cam.
@@ -1763,20 +1782,8 @@ if (b->recursion_depth==2)
 						whead[1] = b->chead[1];
 					}
 
-				// wait, we have just same loop, so its redundant
-					for (int h = 0; h < 2; h++) {
-						i = whead[h];
-						do {
-							if (h) i = mp[i].p;
-							// must find previous in coords of new, may need previous camera, not orcam.
-							wccw_transform(&mp[i].pos, &b->prevcam, &b->cam);
-							if (!h) i = mp[i].n;
-						} while (i != whead[h]);
-					}
-
 					res = projectonmono(&whead[0], &whead[1], b);
 					if (!res) {
-						printf("proj not");
 						continue;
 					}
 					//do AND with board and add only clipped portion to MPH.
@@ -1787,6 +1794,7 @@ if (b->recursion_depth==2)
 					mono_bool(whead[1],whead[0],bh1,bh2,MONO_BOOL_AND,b,changetagfunc);
 				else
 					mono_bool(whead[0],whead[1],bh1,bh2,MONO_BOOL_AND,b,changetagfunc);
+
 				//mono_dbg_capture_mph(mphnum - 1, "reprojected");
 				//	mono_deloop(bh1);
 				//	mono_deloop(bh2);
@@ -1865,7 +1873,7 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport,  int head1, int h
         return;
     }
 	bdrawctx newctx = {};
-    cam_t ncam = parentctx->cam;
+    cam_t movcam = parentctx->movedcam;
     int endp = portals[myport].destpn;
     int entry = portals[myport].anchorspri;
     int tgtspi = portals[endp].anchorspri;
@@ -1892,31 +1900,38 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport,  int head1, int h
 
     // Step 1: Transform camera to entry portal's local space
     // This finds the camera's position and orientation RELATIVE to the entry portal
-    point3d cam_local_pos = world_to_local_point(ncam.p, &ent.tr);
-    point3d cam_local_r = world_to_local_vec(ncam.r, &ent.tr);
-    point3d cam_local_d = world_to_local_vec(ncam.d, &ent.tr);
-    point3d cam_local_f = world_to_local_vec(ncam.f, &ent.tr);
+    point3d cam_local_pos = world_to_local_point(movcam.p, &ent.tr);
+    point3d cam_local_r = world_to_local_vec(movcam.r, &ent.tr);
+    point3d cam_local_d = world_to_local_vec(movcam.d, &ent.tr);
+    point3d cam_local_f = world_to_local_vec(movcam.f, &ent.tr);
 
     // Step 2: Apply that same relative transform from the target portal's perspective
     // Since entry.forward points IN and target.forward points OUT (already opposite),
     // we just transform directly without any flips
-    ncam.p = local_to_world_point(cam_local_pos, &tgs.tr);
-    ncam.r = local_to_world_vec(cam_local_r, &tgs.tr);
-    ncam.d = local_to_world_vec(cam_local_d, &tgs.tr);
-    ncam.f = local_to_world_vec(cam_local_f, &tgs.tr);
-	//ncam.r = normalizep3(crossp3(ncam.d,ncam.f));
+    movcam.p = local_to_world_point(cam_local_pos, &tgs.tr);
+    movcam.r = local_to_world_vec(cam_local_r, &tgs.tr);
+    movcam.d = local_to_world_vec(cam_local_d, &tgs.tr);
+    movcam.f = local_to_world_vec(cam_local_f, &tgs.tr);
+	movcam.cursect = portals[endp].sect;
+// to avoid winding problems with mono, we render with normalized camera
+// then in draw eyepol we can just flip polygons as if camera was really flipped.
+// the only thing important is board output, as orientation is preserved in movedcam.
+	cam_t rencam = movcam;
+	rencam.r = normalizep3(crossp3(movcam.d,movcam.f));
 
 	bool portalflipped = is_transform_flipped(&tgs.tr) ^  is_transform_flipped(&ent.tr);
 	bool nextflip = portalflipped ? !parentctx->ismirrored : parentctx->ismirrored;
-    ncam.cursect = portals[endp].sect;
-// skipport was failing, now fix mirror
 
-	newctx.ismirrored = nextflip;
+// skipport was failing, now fix mirror
+	//if (parentctx->recursion_depth == 2) nextflip = false;
+	//if (parentctx->recursion_depth == 1) nextflip = true;
+	newctx.ismirrored = portalflipped; // flipping this flag doesn not affect rendering of anytihng inside flipped portal.
 	newctx.entrysec = portals[myport].sect;
 	newctx.recursion_depth = parentctx->recursion_depth + 1;
 	newctx.tagoffset = (newctx.recursion_depth)*taginc;
-    newctx.cam = ncam;
-    newctx.prevcam = parentctx->cam;
+    newctx.cam = rencam;
+    newctx.movedcam = movcam;
+    newctx.prevcam = parentctx->movedcam;
     newctx.orcam = parentctx->orcam;
     newctx.has_portal_clip = true;
     newctx.sectgotn = 0;
@@ -1939,7 +1954,9 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport,  int head1, int h
 	memcpy(&newctx.oxformmat, &parentctx->oxformmat, sizeof(double)*9);
 	newctx.chead[0] = head1;
 	newctx.chead[1] = head2;
+
     draw_hsr_polymost_ctx(map, &newctx);
+
 	OPERLOG;
 }
 

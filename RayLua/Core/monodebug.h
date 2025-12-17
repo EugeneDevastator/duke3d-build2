@@ -14,6 +14,7 @@ extern int captureframe;
 extern transform lastcamtr;
 extern transform lastcamtr2;
 #define LOOPADD(p) loops[loopnum]=(p); loopuse[loopnum]=true; loopnum++;
+#define LOOPADDP(p) loops[loopnum]=(dpoint3d){p.x,p.y,p.z}; loopuse[loopnum]=true; loopnum++;
 #define LOOPEND loopuse[loopnum]=false;loopnum++;
 extern signed int operstopn;
 extern int opercurr;

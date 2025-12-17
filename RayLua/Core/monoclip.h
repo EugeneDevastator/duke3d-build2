@@ -94,7 +94,10 @@ typedef struct {
 	// mono context
 	bool has_mono_out; // Whether portal clipping is active
 	// transform context
+	// normalized camera used for clipping
 	cam_t cam;                    // Camera per recursion level
+// true portaled camera used for movements
+	cam_t movedcam;
 	cam_t prevcam;                    // Camera per recursion level
  	cam_t orcam; // one true camera, read only.
 	double xformmat[9], xformmatc, xformmats;

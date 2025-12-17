@@ -177,7 +177,7 @@ void mono_dbg_capture_mph(int id, const char *label) {
         {
             if (h)
                 i = mp[i].p;
-            LOOPADD(mp[i].pos);
+        //   LOOPADD(mp[i].pos);
             if (!h) i = mp[i].n;
         } while (i != rethead[h]);
       //  mono_deloop(rethead[h]);
