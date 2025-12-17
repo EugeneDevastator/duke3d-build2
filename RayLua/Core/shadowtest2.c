@@ -1887,17 +1887,6 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport,  int head1, int h
     normalize_transform(&ent.tr);
     normalize_transform(&tgs.tr);
 
-	// sprites are flipped in a mirrored world.
-	// so, endportal is also mirrored against entry camera?
-	//if (parentctx->ismirrored) {
-	//	vscalar(&ent.tr.r,-1);
-	//	vscalar(&tgs.tr.r,-1);
-	//}
-	//tgttr.r.x *=-1;
-	//tgttr.r.y *=-1;
-	//tgttr.r.z *=-1;
-	//tgttr.r = crossp3(tgttr.d,tgttr.f);
-
     // Step 1: Transform camera to entry portal's local space
     // This finds the camera's position and orientation RELATIVE to the entry portal
     point3d cam_local_pos = world_to_local_point(movcam.p, &ent.tr);
@@ -1920,12 +1909,8 @@ static void draw_hsr_enter_portal(mapstate_t* map, int myport,  int head1, int h
 	rencam.r = normalizep3(crossp3(movcam.d,movcam.f));
 
 	bool portalflipped = is_transform_flipped(&tgs.tr) ^  is_transform_flipped(&ent.tr);
-	bool nextflip = portalflipped ? !parentctx->ismirrored : parentctx->ismirrored;
-
-// skipport was failing, now fix mirror
-	//if (parentctx->recursion_depth == 2) nextflip = false;
-	//if (parentctx->recursion_depth == 1) nextflip = true;
-	newctx.ismirrored = portalflipped; // flipping this flag doesn not affect rendering of anytihng inside flipped portal.
+	// we need to know only about flip in current portal switch to flip or not to flip the opening.
+	newctx.ismirrored = portalflipped;
 	newctx.entrysec = portals[myport].sect;
 	newctx.recursion_depth = parentctx->recursion_depth + 1;
 	newctx.tagoffset = (newctx.recursion_depth)*taginc;

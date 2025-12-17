@@ -158,10 +158,10 @@ public:
               //  point3d newr = spr->tr.r;
                 point3d newd = spr->tr.r;
                 point3d newr = spr->tr.d;
-                vmulscal(&newd,-1.0f);
+                vscalar(&newd,-1.0f);
                 spr->tr.d = newd;
                 spr->tr.r = newr;
-              //  vmulscal(&spr->tr.f,-1.0f);
+              //  vscalar(&spr->tr.f,-1.0f);
                 normalize_transform(&spr->tr);
                 p.destpn = map->sect[i].surf[1].hitag;
                 map->sect[i].tags[1] = portaln;
@@ -555,6 +555,7 @@ float scaler = 0.01;
     static void draw_debug_lines() {
         int startsnap = mono_cursnap;
         int endsnap = mono_cursnap == 0? g_mono_dbg.snapshot_count : mono_cursnap+1;
+        if (false)
         for (int i=startsnap;i<endsnap;i++) {
             auto snap = g_mono_dbg.snapshots[i];
 
@@ -581,7 +582,7 @@ float scaler = 0.01;
         while (v<loopnum) { // add keys to rotate closest sprite.
             rlBegin(RL_LINES);
             while (loopuse[v]) {
-                rlColor4f(v/8.0f,v/4.0f,v/8.0f,0.4f);
+                rlColor4f(v/8.0f,v/4.0f,v/8.0f,0.9f);
                 //    auto campos = DumbCore::GetCamera().position;
                 rlVertex3f(cam.x+loops[v].x/cdiv ,cam.y+ -loops[v].z/cdiv,cam.z+loops[v].y/cdiv);
                 v++;
@@ -646,10 +647,10 @@ float scaler = 0.01;
 
         // Eyepol polys
         bool draweye = true;
-        bool drawlineseye = true;
+        bool drawlineseye = false;
         bool drawlights = false;
-        bool drawmonoloops = false;
-        bool drawmonostate = true;
+        bool drawmonoloops = true;
+        bool drawmonostate = false;
 
         rlDisableBackfaceCulling();
         BeginMode3D(camsrc);
