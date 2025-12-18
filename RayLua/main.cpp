@@ -24,6 +24,7 @@
 //#include "MonoTest.hpp"
 //#include "luabinder.hpp"
 #include "DumbCore.hpp"
+#include "MonoTest.hpp"
 #include "raymath.h"
 #include "cmake-build-custom/_deps/raylib-src/src/external/glad.h"
 #include "DukeGame/source/dukewrap.h"
@@ -247,9 +248,9 @@ void UnloadCustomRenderTarget(CustomRenderTarget target) {
 // Draw palette and texture preview on screen
 void MainLoop()
 {
-    DisableCursor();
-    //RunVisualization();  // use this for mono sample.
-    //return;
+   DisableCursor();
+   //RunVisualization();  // use this for mono sample.
+   //return;
 
     DumbRender::Init();
     auto map = DumbRender::GetMap();

@@ -158,10 +158,10 @@ public:
               //  point3d newr = spr->tr.r;
                 point3d newd = spr->tr.r;
                 point3d newr = spr->tr.d;
-                vmulscal(&newd,-1.0f);
+                vscalar(&newd,-1.0f);
                 spr->tr.d = newd;
                 spr->tr.r = newr;
-              //  vmulscal(&spr->tr.f,-1.0f);
+              //  vscalar(&spr->tr.f,-1.0f);
                 normalize_transform(&spr->tr);
                 p.destpn = map->sect[i].surf[1].hitag;
                 map->sect[i].tags[1] = portaln;
@@ -175,6 +175,18 @@ public:
             spri_t *spr = &map->spri[portals[i].anchorspri];
             normalize_transform(&spr->tr);
 
+            if (portals[i].id == target_tag) {
+                portal &pcop = portals[portaln];
+                memcpy(&pcop,&portals[i],sizeof(portal));
+                int hspr = map->sect[pcop.sect].headspri;
+                int nextsp = map->spri[hspr].sectn;
+                if (nextsp < 0) printf("mirror with just one sprite detected! ERROR!");
+                pcop.anchorspri = nextsp;
+                pcop.destpn = i;
+                portals[i].destpn = portaln;
+                portaln++;
+                continue;
+            }
             // Find portal with matching lowtag
             for (int j = 0; j < portaln; j++) {
                 if (i == j) continue; // skip self, disable for mirror
@@ -485,8 +497,9 @@ public:
             point3d p = eyepolv[v0 + j];
             pts[j] = {p.x, -p.z, p.y};
         }
-        unsigned char r = ((i)/5.0f)*255;
-        rlColor4ub(r,128,3,40);
+        unsigned char r = (int)((eyepol[i].b2sect/6.0f)*255) % 255;
+        unsigned char b = (int)((eyepol[i].b2sect/17.0f)*255) % 255;
+        rlColor4ub(r,128,b,40);
         //DrawTriangleFan3D(pts,vertCount,{r,128,3,30});
         TriangAndDraw3D(pts,vertCount);
         rlDrawRenderBatchActive();
@@ -497,9 +510,64 @@ public:
         glDisable(GL_POLYGON_OFFSET_FILL);
         return false;
     }
-    static void draw_mono_debug() {
+    static void draw_mono_state() {
+            int w = 800;
+        int h = 600;
+            int i;
+float scaler = 0.01;
+        int xoff=1;
+        int yoff=1;
+        rlBegin(RL_LINES);
+        rlColor4f(1,1,1,1);
+        rlVertex2f(0,0);
+        rlVertex2f(40,40);
+        rlVertex2f(40,50);
+        rlEnd();
+            // Iterate through all head pairs
+          // for (i = 0; i < mphnum; i++) {
+          //     rlBegin(RL_LINES);
+          //     for(h=0;h<2;h++) {
+          //         i = mph[i].head[h];
+          //         do
+          //         {
+          //             if (h) i = mp[i].p;
+          //
+          //             if (!h) i = mp[i].n;
+          //         } while (i != mph[i].head[h]);
+          //         mono_deloop(mph[i].head[h]);
+          //     }
+          // }
+
+        for (i = 0; i < mphnum; i++) {
+            int hd0 = mph[i].head[0];
+            int hd1 = mph[i].head[1];
+            rlBegin(RL_LINES);
+            // Display first chain (hd0)
+            if (hd0 >= 0) {
+                int current = hd0;
+                do {
+                    rlVertex2f(mp[current].x*scaler+xoff, mp[current].y*scaler+yoff);
+                    current = mp[current].n;
+                } while (current != hd0);
+            }
+
+            // Display second chain (hd1)
+            if (hd1 >= 0) {
+                int current = hd1;
+                do {
+                    current = mp[current].p;
+                    rlVertex2f(mp[current].x*scaler+xoff, mp[current].y*scaler+yoff);
+
+                } while (current != hd1);
+            }
+            rlEnd();
+        }
+
+    }
+    static void draw_debug_lines() {
         int startsnap = mono_cursnap;
         int endsnap = mono_cursnap == 0? g_mono_dbg.snapshot_count : mono_cursnap+1;
+        if (false)
         for (int i=startsnap;i<endsnap;i++) {
             auto snap = g_mono_dbg.snapshots[i];
 
@@ -526,7 +594,7 @@ public:
         while (v<loopnum) { // add keys to rotate closest sprite.
             rlBegin(RL_LINES);
             while (loopuse[v]) {
-                rlColor4f(v/8.0f,v/4.0f,v/8.0f,0.4f);
+                rlColor4f(v/8.0f,v/4.0f,v/8.0f,0.9f);
                 //    auto campos = DumbCore::GetCamera().position;
                 rlVertex3f(cam.x+loops[v].x/cdiv ,cam.y+ -loops[v].z/cdiv,cam.z+loops[v].y/cdiv);
                 v++;
@@ -578,7 +646,12 @@ public:
         if (IsKeyPressed(KEY_LEFT_SHIFT)) {
             mono_curchain--;
         }
-
+        if (IsKeyPressed(KEY_P)) {
+            operstopn++;
+        }
+        if (IsKeyPressed(KEY_O)) {
+            operstopn--;
+        }
         if (g_mono_dbg.snapshot_count > 0)
             mono_cursnap = abs(mono_cursnap % g_mono_dbg.snapshot_count);
 
@@ -586,8 +659,10 @@ public:
 
         // Eyepol polys
         bool draweye = true;
-        bool drawlineseye = true;
+        bool drawlineseye = false;
         bool drawlights = false;
+        bool drawmonoloops = true;
+        bool drawmonostate = false;
 
         rlDisableBackfaceCulling();
         BeginMode3D(camsrc);
@@ -636,10 +711,12 @@ public:
                 } // eyepol lines for each poly
 
             }
-         //   draw_mono_debug();
+            if (drawmonoloops) draw_debug_lines();
+
             EndBlendMode();
         }
         EndMode3D();
+        if (drawmonostate) draw_mono_state();
         //if (!lightpos_t || !eyepolv || eyepoln <= 0) return;}
 
         if (drawlights) { // Light polys

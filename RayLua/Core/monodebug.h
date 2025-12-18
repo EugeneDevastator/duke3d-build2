@@ -2,9 +2,24 @@
 #ifndef MONODEBUG_H
 #define MONODEBUG_H
 
+#include <stdarg.h>
+
+
 #include "monoclip.h"
+
+extern dpoint3d loops[70000];
+extern bool loopuse[70000];
+extern int loopnum;
+extern int captureframe;
+extern transform lastcamtr;
+extern transform lastcamtr2;
 #define LOOPADD(p) loops[loopnum]=(p); loopuse[loopnum]=true; loopnum++;
+#define LOOPADDP(p) loops[loopnum]=(dpoint3d){p.x,p.y,p.z}; loopuse[loopnum]=true; loopnum++;
 #define LOOPEND loopuse[loopnum]=false;loopnum++;
+extern signed int operstopn;
+extern int opercurr;
+#define OPERLOG opercurr++; if (operstopn >=0 && opercurr >= operstopn) return
+
 typedef struct {
     double x, y, z;
 } mono_dbg_point_t;
@@ -30,17 +45,13 @@ typedef struct {
 
 extern mono_dbg_capture_t g_mono_dbg;
 extern int g_captureframe;
+void logstep(const char* fmt, ...);
 
 void mono_dbg_init(void);
 void mono_dbg_free(void);
 void mono_dbg_clear(void);
 void mono_dbg_capture_chain(int hd, int chain_id, const char *label, int operation);
 void mono_dbg_capture_pair(int hd0, int hd1, const char *label, int operation);
+void mono_dbg_capture_mph(int id, const char *label);
 
-extern dpoint3d loops[70000];
-extern bool loopuse[70000];
-extern int loopnum;
-extern int captureframe;
-extern transform lastcamtr;
-extern transform lastcamtr2;
 #endif

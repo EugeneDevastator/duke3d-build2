@@ -39,8 +39,14 @@ static inline point3d local_to_world_point(point3d local_pos, transform *tr) {
     world.z = tr->p.z + local_pos.x * tr->r.z + local_pos.y * tr->d.z + local_pos.z * tr->f.z;
 
     return world;
-}
+}static inline dpoint3d local_to_world_dpoint(dpoint3d local_pos, transform *tr) {
+    dpoint3d world;
+    world.x = tr->p.x + local_pos.x * tr->r.x + local_pos.y * tr->d.x + local_pos.z * tr->f.x;
+    world.y = tr->p.y + local_pos.x * tr->r.y + local_pos.y * tr->d.y + local_pos.z * tr->f.y;
+    world.z = tr->p.z + local_pos.x * tr->r.z + local_pos.y * tr->d.z + local_pos.z * tr->f.z;
 
+    return world;
+}
 static inline point3d world_to_local_point(point3d world_pos, transform *tr) {
     float dx = world_pos.x - tr->p.x;
     float dy = world_pos.y - tr->p.y;
@@ -188,6 +194,9 @@ static inline dpoint3d gettrianglenorm(dpoint3d p0, dpoint3d p1, dpoint3d p2) {
 static inline float dotdp3(dpoint3d a, dpoint3d b) {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
+static inline float dotp3(point3d a, point3d b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
 
 static inline dpoint3d crossdp3(dpoint3d a, dpoint3d b) {
     dpoint3d result;
@@ -196,7 +205,13 @@ static inline dpoint3d crossdp3(dpoint3d a, dpoint3d b) {
     result.z = a.x * b.y - a.y * b.x;
     return result;
 }
-
+static inline point3d crossp3(point3d a, point3d b) {
+    point3d result;
+    result.x = a.y * b.z - a.z * b.y;
+    result.y = a.z * b.x - a.x * b.z;
+    result.z = a.x * b.y - a.y * b.x;
+    return result;
+}
 static inline dpoint3d normalizedp3(dpoint3d v) {
     dpoint3d result;
     float length = sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
@@ -208,5 +223,25 @@ static inline dpoint3d normalizedp3(dpoint3d v) {
         result.x = result.y = result.z = 0.0f;
     }
     return result;
+}
+static inline point3d normalizep3(point3d v) {
+    point3d result;
+    float length = sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
+    if (length > 0.0f) {
+        result.x = v.x / length;
+        result.y = v.y / length;
+        result.z = v.z / length;
+    } else {
+        result.x = result.y = result.z = 0.0f;
+    }
+    return result;
+}
+
+static inline bool is_transform_flipped(transform* tr) {
+    // Calculate determinant of the 3x3 rotation matrix
+    // det = r·(d×f)
+    point3d cross = crossp3(tr->d, tr->f);
+    float det = dotp3(tr->r, cross);
+    return det < 0.0f;
 }
 #endif //RAYLIB_LUA_IMGUI_BUILDMATH_H

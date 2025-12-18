@@ -14,6 +14,19 @@ int loopnum=0;
 int captureframe=0;
  transform lastcamtr = {};
  transform lastcamtr2 = {};
+int opercurr=0;
+signed int operstopn=0;
+
+void logstep(const char *fmt, ...) {
+    if (!captureframe)
+        return;
+    va_list args;
+    va_start(args, fmt);
+    vprintf(fmt, args);
+    va_end(args);
+    printf("\n");
+}
+
 void mono_dbg_init(void) {
     g_mono_dbg.capacity = 64;
     g_mono_dbg.snapshots = (mono_dbg_snapshot_t*)malloc(g_mono_dbg.capacity * sizeof(mono_dbg_snapshot_t));
@@ -149,4 +162,24 @@ void mono_dbg_capture_pair(int hd0, int hd1, const char *label, int operation) {
         count++;
 
     } while (i != hd1);
+}
+
+void mono_dbg_capture_mph(int id, const char *label) {
+    int i;
+    int rethead[2];
+    rethead[0] = mph[id].head[0];
+    rethead[1] = mph[id].head[1];
+    LOOPEND
+    for(int h=0;h<2;h++)
+    {
+        i = rethead[h];
+        do
+        {
+            if (h)
+                i = mp[i].p;
+        //   LOOPADD(mp[i].pos);
+            if (!h) i = mp[i].n;
+        } while (i != rethead[h]);
+      //  mono_deloop(rethead[h]);
+    }
 }

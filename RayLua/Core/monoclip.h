@@ -16,7 +16,7 @@
 
 #include "mapcore.h"
 
-#define MONO_BOOL_AND 0
+#define MONO_BOOL_AND 0 // result is intersection
 #define MONO_BOOL_SUB 1
 #define MONO_BOOL_SUB_REV 2
 typedef struct {
@@ -33,7 +33,11 @@ typedef struct {
 
 //Mono Polygon (vertex data)
 typedef struct {
-	double x, y, z;
+	union {
+		dpoint3d pos;
+		struct {double x, y, z;};
+	};
+
 	int n, p;  // next, previous indices for doubly-linked list
 } mp_t;
 
@@ -64,7 +68,7 @@ typedef struct {
 	double x, y;                        // Clipped coordinates
 } bunchverts_t;
 
-#define MAX_PORTAL_DEPTH 1
+
 #define MAX_PORTAL_VERTS 32
 
 void mono_triangulate_strip(int hd0, int hd1, triangle_strip_t *strip);
@@ -86,42 +90,56 @@ typedef struct {
 	int bfintn, bfintlut[BFINTMAX+1];
 	unsigned int *sectgot, *sectgotmal;        // Visited sectors per level
 	int sectgotn;
+	int entrysec;
 	// mono context
 	bool has_mono_out; // Whether portal clipping is active
 	// transform context
+	// normalized camera used for clipping
 	cam_t cam;                    // Camera per recursion level
+// true portaled camera used for movements
+	cam_t movedcam;
+	cam_t prevcam;                    // Camera per recursion level
  	cam_t orcam; // one true camera, read only.
 	double xformmat[9], xformmatc, xformmats;
-	point3d gnadd;
+	double oxformmat[9], oxformmatc, oxformmats;
+	point3d gnadd, ognadd;
 	point3d gnorm;
-	float gouvmat[9]; // 0 3 6 - store plane equation to convert back from mp.
+	float gouvmat[9]; // 0 3 6 - store plane equation to convert back from monoplane.
 	int gligsect, gligwall, gligslab, gflags;
 	int gnewtag, gdoscansector, gnewtagsect;
 	// n-portals context
 	bool has_portal_clip; // Whether portal clipping is active
+	bool ismirrored;
 	int recursion_depth;
+	int tagoffset;
 	int testignorewall;
 	int ignorekind;
 	int testignoresec;
 	int planecuts;
 	int currenthalfplane;
+	int chead[2];
 } bdrawctx;
 
+// mono vertex chains
 extern mp_t *mp;
+// head indices pointing to mp
 extern mph_t *mph;
 extern int mphnum, mphmal;
 extern int mpempty, mpmal;
 // Memory management - ensures mph array has sufficient capacity
-void mono_mph_check (int mphnum);
+void mono_mph_check (int num);
 
 // Initialize memory pools and data structures (call once at startup)
 void mono_initonce ();
 
-// Insert vertex into polygon chain - if i<0 starts new loop, else inserts after vertex i
+// Insert vertex into heads pool
 int  mono_ins2d (int i, double nx, double ny);
+// Insert vertex into heads pool
 int  mono_ins (int i, double nx, double ny, double nz);  // 3D version
+// Insert vertex into heads pool
 int mono_insp(int i, dpoint3d p);
-// Remove vertex from polygon chain and return to free pool
+
+// Insert vertex into heads pool
 void mono_del (int i);
 
 // Delete entire polygon loop starting at vertex i
@@ -170,12 +188,32 @@ int mono_clipself (int hd0, int hd1, bdrawctx* b, void (*mono_output)(int h0, in
 int mono_clipends (int hd, double x0, double x1);
 #endif
 
-// Join four polygon segments into two output polygons
+// Returns 1 on success, 0 on failure
+// ho0 points to first joined chain: hd0 → iy[0] → iy[2] → hd2
+// ho1 points to second joined chain: hd1 → iy[1] → iy[3] → hd3
+
 int mono_join (int hd0, int hd1, int hd2, int hd3, int *ho0, int *ho1);
 
+//AND on A,B: Callback gets intersection pieces (A ∩ B)
+//SUB on A,B: Callback gets pieces of A outside B (A - B)
+//SUB_REVERSE on A,B: Callback gets pieces of A outside B with reverse winding?.
 // Perform boolean operation on two polygon pairs (AND, SUB, SUB_REV)
-void mono_bool (int hr0, int hr1, int hw0, int hw1, int boolop, bdrawctx* b, void (*mono_output)(int h0, int h1,bdrawctx* b));
+// re
+void mono_bool (int subjh0, int subjh1, int cutter0, int cutter1, int boolop, bdrawctx* b, void (*mono_output)(int h0, int h1,bdrawctx* b));
 // Generate triangle strip vertices directly from monotone polygon
 int mono_generate_eyepol(int hd0, int hd1, point3d **out_verts1,  point3d **out_verts2, int *out_count1, int *out_count2);
+// adds mono to mph directly
+
+// registers loop into mono heads with tag
+int mph_appendloop(int *outh1, int *outh2, dpoint3d *tp, int n, int newtag);
+// removes mph and points from mph list.
+int mph_remove(int delid);
+int mph_append( int h1, int h2, int tag);
+
+
+int mpcheck(int h1,int h2);
+int mphremoveontag(int tag);
+int mphremoveaboveincl(int tag_including);
+void monocopy(int h1, int h2, int *hout1, int *hout2);
 
 #endif //BUILD2_MONOCLIP_H

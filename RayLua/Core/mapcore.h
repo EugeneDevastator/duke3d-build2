@@ -170,6 +170,7 @@ long wallclippol (kgln_t *pol, kgln_t *npol);
 int dupwall_imp (sect_t *s, int w);
 long sect_isneighs_imp (int s0, int s1, mapstate_t* map);
 double getslopez (sect_t *s, int i, double x, double y);
+double getwallz (sect_t *s, int isflor, int wid);
 int wallprev (sect_t *s, int w);
 int getwalls_imp (int s, int w, vertlist_t *ver, int maxverts, mapstate_t* map);
 int getverts_imp (int s, int w, vertlist_t *ver, int maxverts, mapstate_t* map);

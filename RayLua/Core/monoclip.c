@@ -5,18 +5,19 @@
 #include "monoclip.h"
 
 #include "monodebug.h"
+#define EXLOGS 0
 
-
+// array of head pairs; all mono polys known
 mph_t *mph = 0;
 int mphnum = 0;
 int mphmal = 0;
 
-
+// pool of heads.
 mp_t *mp = 0;
 int mpempty, mpmal = 0;
 
-void mono_mph_check(int mphnum) {
-    if (mphnum >= mphmal) {
+void mono_mph_check(int num) {
+    if (num >= mphmal) {
         mphmal <<= 1;
         mph = (mph_t *) realloc(mph, mphmal * sizeof(mph[0]));
     }
@@ -61,6 +62,9 @@ int mono_ins2d(int i, double nx, double ny) {
         mp[p].n = n;
         mpempty = n;
     }
+    #if EXLOGS
+    printf("Mono| MP alloc: got=%d, empty=%d, used=%d \n", got, mpempty, mpmal - (mpempty >= 0 ? 1 : 0));
+    #endif
 
     if (i < 0) //Start new loop
     {
@@ -79,6 +83,8 @@ int mono_ins2d(int i, double nx, double ny) {
 }
 
 int mono_ins(int i, double nx, double ny, double nz) {
+    dpoint3d p = {nx,ny,nz};
+   // LOOPADD(p)
     i = mono_ins2d(i, nx, ny);
     mp[i].z = nz;
     return (i);
@@ -86,12 +92,15 @@ int mono_ins(int i, double nx, double ny, double nz) {
 int mono_insp(int i, dpoint3d p) {
     i = mono_ins2d(i, p.x, p.y);
     mp[i].z = p.z;
-    LOOPADD(p)
+  //  LOOPADD(p)
     return (i);
 }
 void mono_del(int i) {
     int p, n;
-
+logstep("Mono| Del %d",i);
+#if EXLOGS
+    printf("Mono| MP dealloc: freeing=%d, old_empty=%d \n", i, mpempty);
+#endif
     p = mp[i].p;
     n = mp[i].n;
     mp[n].p = p;
@@ -103,12 +112,28 @@ void mono_del(int i) {
     mp[n].p = i;
     mp[mpempty].n = i;
 }
+void mono_deloop2(int* i) {
+    mono_deloop(i[0]);
+    mono_deloop(i[1]);
+}
 
 void mono_deloop(int i) {
-    int j;
-
+    if (i<0)
+        return;
+    int j, count = 0;
+    // ADD DEBUG - COUNT LOOP SIZE
+    j = i;
+    do {
+        count++;
+        if (count >30) {
+            printf("Corrupt loop");
+        }
+        j = mp[j].n;
+    } while (j != i);
     if (i < 0) return;
     //while (mp[i].n != i) mono_del(mp[i].n); mono_del(i);
+
+    //logstep("Mono| DelLoop %d (size=%d), old_empty=%d", i, count, mpempty);
 
     //mpempty <-> {i .. mp[i].p} <-> mp[mpempty].n
     j = mp[i].p; //WARNING:this temp var needed for loops of only 1 element
@@ -116,6 +141,11 @@ void mono_deloop(int i) {
     mp[mp[mpempty].n].p = j;
     mp[i].p = mpempty;
     mp[mpempty].n = i;
+    // ADD DEBUG AFTER BULK FREE
+#if EXLOGS
+    printf("Mono| DelLoop freed %d nodes, new_empty=%d \n", count, mpempty);
+#endif
+
 }
 
 void mono_centroid_addlin(int i0, int i1, double *cx, double *cy, double *area) {
@@ -140,7 +170,12 @@ double mono_area(int hd0, int hd1) { double fx, fy; return(mono_centroid(hd0,hd1
 
 void mono_genfromloop(int *plothead0, int *plothead1, dpoint3d *tp, int n) {
     int i, i0, i1, imin, imax, plothead[2];
-
+    if (n<3) {
+        *plothead0=-1;
+        *plothead1=-1;
+        printf("2 vertices for loop");
+        return;
+    }
     imin = 0;
     imax = 0;
     for (i = 0; i < n; i++) {
@@ -195,6 +230,7 @@ void mono_genfromloop(int *plothead0, int *plothead1, dpoint3d *tp, int n) {
         plothead[0] = mp[plothead[0]].n;
         plothead[1] = mp[plothead[1]].n;
     }
+    //logstep("Mono| Gen from loop, HEADS %d:%d",plothead[0],plothead[1]);
     (*plothead0) = plothead[0];
     (*plothead1) = plothead[1];
 }
@@ -438,6 +474,7 @@ int mono_clipself(int hd0, int hd1, bdrawctx* b, void (*mono_output)(int h0, int
                 for (k = 2 - 1; k >= 0; k--) { ho[k] = mono_ins2d(ho[k], ix, iy); }
             }
             if (!good) {
+                //logstep("Mono| clipself, callback bad HEADS %d:%d",mp[ho[0]].n,mp[ho[1]].n);
                 mono_output(mp[ho[0]].n, mp[ho[1]].n,b);
                 ho[0] = -1;
                 ho[1] = -1;
@@ -460,6 +497,7 @@ int mono_clipself(int hd0, int hd1, bdrawctx* b, void (*mono_output)(int h0, int
 
     for (k = 2 - 1; k >= 0; k--) if (ho[k] >= 0) { ho[k] = mp[ho[k]].n; }
 bad:;
+    //logstep("Mono| clipself, callback bad HEADS %d:%d",ho[0],ho[1]);
     mono_output(ho[0], ho[1],b);
     if ((ho[0] >= 0) && (ho[1] >= 0)) outnum++;
     return (outnum);
@@ -534,7 +572,7 @@ int mono_join(int hd0, int hd1, int hd2, int hd3, int *ho0, int *ho1) {
         }
         ho[j] = mp[ho[j]].n;
     }
-
+    //logstep("Mono| join ok, HEADS IN %d:%d %d:%d -> %d:%d",hd0,hd1,hd2,hd3, ho[0],ho[1]);
     (*ho0) = ho[0];
     (*ho1) = ho[1];
     return (1);
@@ -549,6 +587,7 @@ void mono_bool(int hr0, int hr1, int hw0, int hw1, int boolop, bdrawctx* b, void
         sprintf(buf, "BEFORE_%s_hw", (boolop==MONO_BOOL_AND)?"AND":(boolop==MONO_BOOL_SUB)?"SUB":"SUBREV");
         mono_dbg_capture_pair(hw0, hw1, buf, boolop);
     }
+    //logstep("Mono|> BOOL, op = %d HEADS IN %d:%d %d:%d",boolop,hr0,hr1,hw0,hw1);
     if (boolop == MONO_BOOL_AND) {
         //{ //Debug!
         //int i;
@@ -561,27 +600,22 @@ void mono_bool(int hr0, int hr1, int hw0, int hw1, int boolop, bdrawctx* b, void
 
         hd0 = mono_max(hr0, hw0, +1, 0);
         hd1 = mono_max(hr1, hw1, -1, 0);
-        if (g_captureframe) {
-            mono_dbg_capture_pair(hd0, hd1, "AFTER_MAX_AND", boolop);
-        }
+
         mono_clipself(hd0, hd1, b, mono_output);
         mono_deloop(hd1);
         mono_deloop(hd0);
     } else {
         boolop = (boolop == MONO_BOOL_SUB);
         hd0 = mono_max(hr1, hw0, -1, boolop ^ 1);
-        if (g_captureframe) {
-            mono_dbg_capture_chain(hd0, 0, "AFTER_MAX_SUB1", boolop);
-        }
+
         mono_clipself(hr0, hd0, b, mono_output);
         mono_deloop(hd0);
         hd0 = mono_max(hr0, hw1, +1, boolop);
-        if (g_captureframe) {
-            mono_dbg_capture_chain(hd0, 0, "AFTER_MAX_SUB2", boolop);
-        }
+
         mono_clipself(hd0, hr1, b, mono_output);
         mono_deloop(hd0);
     }
+    //logstep("Mono|< BOOLEND");
 }
 void strip_init(triangle_strip_t *strip) {
    // strip->indices = NULL;
@@ -649,3 +683,97 @@ int mono_generate_eyepol(int hd0, int hd1, point3d **out_verts1,  point3d **out_
     *out_verts2 = verts2;
     return (v1cnt+v2cnt >= 3) ? 1 : 0;
 }
+// ============= Mono Polygons management ==============
+int mph_appendloop(int *outh1, int *outh2, dpoint3d *tp, int n, int newtag) {
+    *outh1=-1;
+    *outh2=-1;
+    mono_mph_check(mphnum);
+    mono_genfromloop(&mph[mphnum].head[0], &mph[mphnum].head[0], tp, n);
+
+    if ((mph[mphnum].head[0] | mph[mphnum].head[1]) < 0)
+    { mono_deloop(mph[mphnum].head[0]); mono_deloop(mph[mphnum].head[1]); return 0; }
+
+    mph[mphnum].tag = newtag;
+    mphnum++;
+    *outh1 = mph[mphnum].head[0] ;
+    *outh2 = mph[mphnum].head[1] ;
+    return mphnum;
+}
+
+int mph_remove(int delid) {
+    if (delid < 0 || delid > mphnum)
+        return 0;
+    mono_deloop(mph[delid].head[1]);
+    mono_deloop(mph[delid].head[0]);
+    mph[delid] = mph[mphnum-1];
+    mphnum--;
+    return mphnum;
+}
+
+int mph_append(int h1, int h2, int tag) {
+    if ((h1 | h2)<0)
+        return 0;
+    mono_mph_check(mphnum);
+    mph[mphnum].head[0] = h1;
+    mph[mphnum].head[1] = h2;
+    mph[mphnum].tag = tag;
+    mphnum++;
+    return mphnum;
+}
+
+
+int mpcheck(int h1, int h2) {
+    if ((h1|h2)<0) {
+        return 0;
+    }
+    return 1;
+}
+
+int mphremoveontag(int tag) {
+    for (int i = mphnum - 1; i >= 0; i--) {
+        if (mph[i].tag == tag)
+            mph_remove(i);
+    }
+}
+
+int mphremoveaboveincl(int tag_including) {
+    for (int i = mphnum - 1; i >= 0; i--) {
+        if (mph[i].tag >= tag_including)
+            mph_remove(i);
+    }
+}
+
+void monocopy(int h1, int h2, int *hout1, int *hout2) {
+    *hout1 = -1;
+    *hout2 = -1;
+
+    if ((h1 | h2) < 0) {
+        return;
+    }
+
+    // Copy first head chain
+    if (h1 >= 0) {
+        int i = h1;
+        do {
+            *hout1 = mono_ins(*hout1, mp[i].x, mp[i].y, mp[i].z);
+            i = mp[i].n;
+        } while (i != h1);
+        *hout1 = mp[*hout1].n;
+    }
+
+    // Copy second head chain
+    if (h2 >= 0) {
+        int i = h2;
+        do {
+            *hout2 = mono_ins(*hout2, mp[i].x, mp[i].y, mp[i].z);
+            i = mp[i].n;
+        } while (i != h2);
+        *hout2 = mp[*hout2].n;
+    }
+}
+
+
+
+
+
+

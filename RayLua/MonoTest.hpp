@@ -66,6 +66,40 @@ public:
 
         return result;
     }
+    static std::vector<std::vector<Vector3>> SelfClip(const std::vector<Vector3>& subject) {
+
+        static bool initialized = false;
+        if (!initialized) {
+            mono_initonce();
+            initialized = true;
+        }
+
+        std::vector<std::vector<Vector3>> result;
+        bdrawctx b = {0};
+        userdata = &result;
+
+        // Convert to dpoint3d with Z=0 for 2D operation
+        int subj_h0 = -1, subj_h1 = -1;
+        if (subject.size() >= 3) {
+            dpoint3d* subj_points = new dpoint3d[subject.size()];
+            for (size_t i = 0; i < subject.size(); i++) {
+                subj_points[i] = {subject[i].x, subject[i].y, subject[i].z};
+            }
+            mono_genfromloop(&subj_h0, &subj_h1, subj_points, subject.size());
+            delete[] subj_points;
+        }
+
+
+        // Perform boolean operation
+       //mono_max(subj_h0,subj_h1,1,1);
+        mono_clipself(subj_h0, subj_h1, &b, output_callback_2d);
+
+        // Cleanup
+        if (subj_h0 >= 0) mono_deloop(subj_h0);
+        if (subj_h1 >= 0) mono_deloop(subj_h1);
+
+        return result;
+    }
 private:
 
     // looks like it will be called multiple times with each resulting polygon,
@@ -94,7 +128,7 @@ private:
         }
         mono_deloop(h1);
 
-        for (int r = rchain.capacity()-1; r >= 0; r--) {
+        for (int r = rchain.size()-1; r >= 0; r--) {
             polygon.push_back(rchain[r]);
         }
         // Add polygon from h1 if different
@@ -118,9 +152,30 @@ void PerformPolygonClipping2D() {
         { 0.5f,  1.5f,-1.0f/3},
         {-0.5f,  0.5f,1.0f}
     };
+    std::vector<Vector3> cave = {
+        { 0.0f, 0.0f,0.1f},
 
+           { 0.9f, -0.2f,0.1f},
+           { 0.7f, -0.4f,0.1f},
+
+        { 0.0f, -1.0f,0.1f},
+            { 0.9f, -0.4f,0.1f},
+        { 1.0f, -1.0f,0.1f},
+        { 2.0f, -0.5f,0.1f},
+        { 1.5f, 0.7f,0.1f},
+        { 1.2f, -0.7f,0.1f},
+        { 1.0f, 0.0f,0.1f},
+
+    };
     // Perform subtraction (cut hole)
-    std::vector<std::vector<Vector3>> result = MonoClip3D::ClipPolygons2D(square, triangle, MONO_BOOL_SUB);
+    std::vector<std::vector<Vector3>> result;
+   // result = MonoClip3D::SelfClip(cave);
+    result= MonoClip3D::ClipPolygons2D(square, triangle, MONO_BOOL_SUB_REV);
+    //result
+    for (size_t i = 0; i < cave.size(); i++) {
+        size_t next = (i + 1) % cave.size();
+        DrawLine3D({cave[i].x, cave[i].y, cave[i].z}, {cave[next].x, cave[next].y, cave[next].z}, BLUE);
+    }
 
     // Draw original polygons
     for (size_t i = 0; i < square.size(); i++) {
@@ -128,10 +183,10 @@ void PerformPolygonClipping2D() {
         DrawLine3D({square[i].x, square[i].y, square[i].z}, {square[next].x, square[next].y, square[next].z}, BLUE);
     }
 
-    for (size_t i = 0; i < triangle.size(); i++) {
-        size_t next = (i + 1) % triangle.size();
-        DrawLine3D({triangle[i].x, triangle[i].y, triangle[i].z}, {triangle[next].x, triangle[next].y, triangle[next].z}, RED);
-    }
+     for (size_t i = 0; i < triangle.size(); i++) {
+         size_t next = (i + 1) % triangle.size();
+         DrawLine3D({triangle[i].x, triangle[i].y, triangle[i].z}, {triangle[next].x, triangle[next].y, triangle[next].z}, RED);
+     }
 
     // Draw all result polygons
     Color colors[] = {GREEN, YELLOW, ORANGE, PURPLE};
@@ -140,7 +195,7 @@ void PerformPolygonClipping2D() {
         const auto& polygon = result[p];
         for (size_t i = 0; i < polygon.size(); i++) {
             size_t next = (i + 1) % polygon.size();
-            DrawLine3D({polygon[i].x, polygon[i].y, polygon[i].z}, {polygon[next].x, polygon[next].y, polygon[next].z}, color);
+            DrawLine3D({polygon[i].x, polygon[i].y, polygon[i].z+p*0.2f}, {polygon[next].x, polygon[next].y, polygon[next].z+p*0.2f}, color);
         }
     }
 }
