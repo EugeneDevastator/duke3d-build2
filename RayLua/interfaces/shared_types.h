@@ -104,7 +104,7 @@
 typedef struct { float x, y, z; } point3d;
 typedef struct { double x, y, z; } dpoint3d; 	//Note: pol doesn't support loops as dpoint3d's!
 typedef struct { float x, y; } point2d;
-static void vmulscal(point3d *p, float s) {
+static void vscalar(point3d *p, float s) {
 	p->x*=s;
 	p->y*=s;
 	p->z*=s;

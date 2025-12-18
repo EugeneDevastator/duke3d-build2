@@ -175,6 +175,18 @@ public:
             spri_t *spr = &map->spri[portals[i].anchorspri];
             normalize_transform(&spr->tr);
 
+            if (portals[i].id == target_tag) {
+                portal &pcop = portals[portaln];
+                memcpy(&pcop,&portals[i],sizeof(portal));
+                int hspr = map->sect[pcop.sect].headspri;
+                int nextsp = map->spri[hspr].sectn;
+                if (nextsp < 0) printf("mirror with just one sprite detected! ERROR!");
+                pcop.anchorspri = nextsp;
+                pcop.destpn = i;
+                portals[i].destpn = portaln;
+                portaln++;
+                continue;
+            }
             // Find portal with matching lowtag
             for (int j = 0; j < portaln; j++) {
                 if (i == j) continue; // skip self, disable for mirror
