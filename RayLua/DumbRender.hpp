@@ -152,17 +152,17 @@ public:
                 int sid1 = abs(map->spri[p.anchorspri].p.z - map->sect[i].z[1]);
                 int sid2 = abs(map->spri[p.anchorspri].p.z - map->sect[i].z[0]);
                 p.surfid = sid1 < sid2;
-                map->spri[p.anchorspri].p.z = map->sect[i].z[p.surfid]+1; // resolve flor ceil in future
+                map->spri[p.anchorspri].p.z = map->sect[i].z[p.surfid]; // resolve flor ceil in future
                 p.kind = p.surfid;
                 spri_t *spr = &map->spri[p.anchorspri];
               //  point3d newr = spr->tr.r;
-                point3d newd = spr->tr.r;
-                point3d newr = spr->tr.d;
-                vscalar(&newd,-1.0f);
-                spr->tr.d = newd;
-                spr->tr.r = newr;
+             //   point3d newd = spr->tr.r;
+             //   point3d newr = spr->tr.d;
+             //   vscalar(&newd,-1.0f);
+             //   spr->tr.d = newd;
+             //   spr->tr.r = newr;
               //  vscalar(&spr->tr.f,-1.0f);
-                normalize_transform(&spr->tr);
+              //  normalize_transform(&spr->tr);
                 p.destpn = map->sect[i].surf[1].hitag;
                 map->sect[i].tags[1] = portaln;
                 portaln++;
@@ -181,9 +181,15 @@ public:
                 int hspr = map->sect[pcop.sect].headspri;
                 int nextsp = map->spri[hspr].sectn;
                 if (nextsp < 0) printf("mirror with just one sprite detected! ERROR!");
+            if (pcop.kind != PORT_WALL) // temp floor mirror hack
+                {
+                map->spri[nextsp].tr = map->spri[hspr].tr;
+                vscalar(&map->spri[nextsp].tr.d,-1);
+                }
                 pcop.anchorspri = nextsp;
                 pcop.destpn = i;
                 portals[i].destpn = portaln;
+
                 portaln++;
                 continue;
             }
