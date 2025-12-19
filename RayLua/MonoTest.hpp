@@ -117,12 +117,14 @@ private:
             i = mp[i].n;
         } while (i != h0);
         mono_deloop(h0);
+        result->push_back(polygon);
+        polygon.clear();
         std::vector<Vector3> rchain;
         i = h1;
         if (h1 >= 0 && h1 != h0) {
             i = h1;
             do {
-                rchain.push_back({(float)mp[i].x, (float)mp[i].y, 0});
+                rchain.push_back({(float)mp[i].x, (float)mp[i].y, 0.2});
                 i = mp[i].n;
             } while (i != h1);
         }
@@ -170,7 +172,7 @@ void PerformPolygonClipping2D() {
     // Perform subtraction (cut hole)
     std::vector<std::vector<Vector3>> result;
    // result = MonoClip3D::SelfClip(cave);
-    result= MonoClip3D::ClipPolygons2D(square, triangle, MONO_BOOL_SUB_REV);
+    result= MonoClip3D::ClipPolygons2D(square, triangle, MONO_BOOL_SUB);
     //result
     for (size_t i = 0; i < cave.size(); i++) {
         size_t next = (i + 1) % cave.size();
@@ -193,9 +195,9 @@ void PerformPolygonClipping2D() {
     for (size_t p = 0; p < result.size(); p++) {
         Color color = colors[p % 4];
         const auto& polygon = result[p];
-        for (size_t i = 0; i < polygon.size(); i++) {
+        for (size_t i = 0; i < polygon.size()-1; i++) {
             size_t next = (i + 1) % polygon.size();
-            DrawLine3D({polygon[i].x, polygon[i].y, polygon[i].z+p*0.2f}, {polygon[next].x, polygon[next].y, polygon[next].z+p*0.2f}, color);
+            DrawLine3D({polygon[i].x, polygon[i].y, polygon[i].z+p*0.3f}, {polygon[next].x, polygon[next].y, polygon[next].z+p*0.2f}, color);
         }
     }
 }

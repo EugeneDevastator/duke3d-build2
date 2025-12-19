@@ -621,7 +621,7 @@ static void xformbac (double rx, double ry, double rz, dpoint3d *o, bdrawctx *b)
 }
 static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 {
-
+// ouput is x-monotone, left to right.
 	float f,fx,fy, g, *fptr;
 	int i, j, k, h, rethead[2];
 	cam_t cam = b->cam;
@@ -629,43 +629,91 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 	point3d add = b->gnadd;
 	if ((rethead0|rethead1) < 0) { mono_deloop(rethead1); mono_deloop(rethead0); return; }
 	rethead[0] = rethead0; rethead[1] = rethead1;
+	bool log = eyepoln ==  1 && b->recursion_depth==0;
+
+	int *indices = NULL;
+	int index_count = 0;
+	int index_capacity = 0;
+	int chain_starts[2];
+	int chain_lengths[2] = {0, 0};
 
 	// Put on FIFO in world space:
-	for(h=0;h<2;h++)
+	//if (!log)
+	//	return;
+	for(h=0;h<2;h++) // h is head
 	{
+
 		i = rethead[h];
+		chain_starts[h] = eyepolvn;
 		do
 		{
-			if (h)
-				i = mp[i].p;
-
 			if (eyepolvn >= eyepolvmal)
 			{
 				eyepolvmal = max(eyepolvmal<<1,16384);
 				eyepolv = (point3d *)realloc(eyepolv,eyepolvmal*sizeof(point3d));
 			}
-
-			f = cam.h.z/(mp[i].x*xform[6] + mp[i].y*xform[7] + add.z);
-			fx        =  (mp[i].x*xform[0] + mp[i].y*xform[1] + add.x)*f + cam.h.x;
-			fy        =  (mp[i].x*xform[3] + mp[i].y*xform[4] +add.y)*f + cam.h.y;
-			//float mul = (b->ismirrored) ? -1 : 1;
-			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*cam.h.z);
-
-			float retx = ((fx-cam.h.x)*cam.r.x + (fy-cam.h.y)*cam.d.x + (cam.h.z)*cam.f.x)*f + cam.p.x;
-			float rety = ((fx-cam.h.x)*cam.r.y + (fy-cam.h.y)*cam.d.y + (cam.h.z)*cam.f.y)*f + cam.p.y;
-			float retz = ((fx-cam.h.x)*cam.r.z + (fy-cam.h.y)*cam.d.z + (cam.h.z)*cam.f.z)*f + cam.p.z;
-			dpoint3d ret = {retx,rety,retz};
-
-//vscalar(&b->cam.r,mul);
-			wccw_transform(&ret, &b->movedcam, &b->orcam);
-			eyepolv[eyepolvn] = (point3d){ret.x,ret.y,ret.z};
+			eyepolv[eyepolvn] = (point3d){mp[i].pos.x,mp[i].pos.y,mp[i].pos.z};
 			eyepolvn++;
-//			vscalar(&b->cam.r,mul);
-			if (!h) i = mp[i].n;
+			chain_lengths[h]++;
+			i = mp[i].n;
 		} while (i != rethead[h]);
 		mono_deloop(rethead[h]);
+
 	}
-LOOPEND
+	// Allocate indices array
+	int total_vertices = chain_lengths[0] + chain_lengths[1];
+	int triangle_count = total_vertices - 2;
+	index_capacity = triangle_count * 3;
+	indices = (int*)malloc(index_capacity * sizeof(int));
+	index_count = 0;
+	// Triangulate using two-pointer technique
+	int left = 0;  // pointer for first chain
+	int right = 0; // pointer for second chain
+	int left_start = chain_starts[0];
+	int right_start = chain_starts[1];
+
+	// Merge chains by X coordinate and triangulate
+	while (left < chain_lengths[0] - 1 || right < chain_lengths[1] - 1)
+	{
+		bool use_left;
+
+		if (left >= chain_lengths[0] - 1)
+			use_left = false;
+		else if (right >= chain_lengths[1] - 1)
+			use_left = true;
+		else
+		{
+			// Compare X coordinates to maintain monotonicity
+			float left_x = eyepolv[left_start + left + 1].x;
+			float right_x = eyepolv[right_start + right + 1].x;
+			use_left = (left_x < right_x);
+		}
+
+		if (use_left)
+		{
+			// Add triangle using current left vertex
+			if (right < chain_lengths[1])
+			{
+				indices[index_count++] = left_start + left;
+				indices[index_count++] = left_start + left + 1;
+				indices[index_count++] = right_start + right;
+			}
+			left++;
+		}
+		else
+		{
+			// Add triangle using current right vertex
+			if (left < chain_lengths[0])
+			{
+				indices[index_count++] = left_start + left;
+				indices[index_count++] = right_start + right;
+				indices[index_count++] = right_start + right + 1;
+			}
+			right++;
+		}
+	}
+
+	// Store triangulation in eyepol structure
 	if (eyepoln+1 >= eyepolmal)
 	{
 		eyepolmal = max(eyepolmal<<1, 4096);
@@ -673,8 +721,29 @@ LOOPEND
 		eyepol[0].vert0 = 0;
 	}
 
-	memcpy((void *)eyepol[eyepoln].ouvmat, (void *)b->gouvmat, sizeof(b->gouvmat[0])*9);
+	// transform verts to WS
+	for (int pn= chain_starts[0]; pn<eyepolvn;pn++) {
 
+		f = cam.h.z/(eyepolv[pn].x*xform[6] + eyepolv[pn].y*xform[7] + add.z);
+		fx        =  (eyepolv[pn].x*xform[0] + eyepolv[pn].y*xform[1] + add.x)*f + cam.h.x;
+		fy        =  (eyepolv[pn].x*xform[3] + eyepolv[pn].y*xform[4] +add.y)*f + cam.h.y;
+
+		f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*cam.h.z);
+
+		float retx = ((fx-cam.h.x)*cam.r.x + (fy-cam.h.y)*cam.d.x + (cam.h.z)*cam.f.x)*f + cam.p.x;
+		float rety = ((fx-cam.h.x)*cam.r.y + (fy-cam.h.y)*cam.d.y + (cam.h.z)*cam.f.y)*f + cam.p.y;
+		float retz = ((fx-cam.h.x)*cam.r.z + (fy-cam.h.y)*cam.d.z + (cam.h.z)*cam.f.z)*f + cam.p.z;
+		dpoint3d ret = {retx,rety,retz};
+		wccw_transform(&ret, &b->movedcam, &b->orcam);
+		eyepolv[pn] = (point3d){ret.x,ret.y,ret.z};
+		if (log) {LOOPADD(ret);}
+	}
+	if (log) { LOOPEND }
+
+	eyepol[eyepoln].vert0 = chain_starts[0];
+	eyepol[eyepoln].indices = indices;
+	eyepol[eyepoln].nid = index_count;
+	memcpy((void *)eyepol[eyepoln].ouvmat, (void *)b->gouvmat, sizeof(b->gouvmat[0])*9);
 	eyepol[eyepoln].tpic = gtpic;
 	eyepol[eyepoln].curcol = gcurcol;
 	eyepol[eyepoln].flags = (b->gflags != 0);
@@ -682,9 +751,10 @@ LOOPEND
 	eyepol[eyepoln].b2wall = b->gligwall;
 	eyepol[eyepoln].b2slab = b->gligslab;
 	memcpy((void *)&eyepol[eyepoln].norm, (void *)&b->gnorm, sizeof(b->gnorm));
+	eyepol[eyepoln].rdepth = b->recursion_depth;
 	eyepoln++;
 	eyepol[eyepoln].vert0 = eyepolvn;
-	eyepol[eyepoln].rdepth = b->recursion_depth;
+
 	logstep("produce eyepol, depth:%d",b->recursion_depth);
 }
 
@@ -803,7 +873,7 @@ static void drawtag_debug(int rethead0, int rethead1, bdrawctx *b)
 			float retz = ((fx-cam.h.x)*cam.r.z + (fy-cam.h.y)*cam.d.z + (cam.h.z)*cam.f.z)*f + cam.p.z;
 			dpoint3d ret = {retx,rety,retz};
 			if (b->recursion_depth>1) {
-				LOOPADD(ret)
+			//	LOOPADD(ret)
 			}
 			wccw_transform(&ret, &b->cam, &b->orcam);
 			eyepolv[eyepolvn] = (point3d){ret.x,ret.y,ret.z};
@@ -902,7 +972,7 @@ static int projectonmono (int *plothead0, int *plothead1,  bdrawctx* b) {
 		{
 			if (h) i = mp[i].p;
 			if (b->recursion_depth==2) {
-				LOOPADDP(mp[i])
+			//	LOOPADDP(mp[i])
 			}
 			ox = mp[i].x-gcam.p.x; oy = mp[i].y-gcam.p.y;
 			//if (b->has_portal_clip)
@@ -941,7 +1011,7 @@ static int projectonmono (int *plothead0, int *plothead1,  bdrawctx* b) {
 		tp[i].y = tp[i].y*f + gcam.h.y;
 
 	}
-LOOPEND
+//LOOPEND
 	//generate vmon
 		mono_genfromloop(&plothead[0], &plothead[1], tp, n);
 	if ((plothead[0] | plothead[1]) < 0) {

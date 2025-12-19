@@ -482,36 +482,34 @@ public:
             //rlSetTexture(0);
         }
     }
-    // Monotone polygon triangulation - O(n), no allocations needed
+
     static bool draw_eyepol_wspace(float sw, float sh, int i, int &v0, int &vertCount) {
         v0 = eyepol[i].vert0;
         int v1 = eyepol[i + 1].vert0;
         vertCount = v1 - v0;
         if (vertCount < 3) return true;
-       // if (!eyepol[i].has_triangulation) return true;
 
         rlDrawRenderBatchActive();
         rlDisableBackfaceCulling();
 
         glEnable(GL_POLYGON_OFFSET_FILL);
         glPolygonOffset(-0.5f, 1.0f);
-        rlDisableDepthMask();
+      //  rlDisableDepthMask();
 
-        Vector3* pts = static_cast<Vector3 *>(malloc(vertCount * sizeof(Vector3)));
-
-        for (int j = 0; j < vertCount; j++) {
-            point3d p = eyepolv[v0 + j];
-            pts[j] = {p.x, -p.z, p.y};
-        }
         unsigned char r = (int)((eyepol[i].b2sect/6.0f)*255) % 255;
         unsigned char b = (int)((eyepol[i].b2sect/17.0f)*255) % 255;
         rlColor4ub(r,128,b,40);
-        //DrawTriangleFan3D(pts,vertCount,{r,128,3,30});
-        TriangAndDraw3D(pts,vertCount);
+
+        rlBegin(RL_TRIANGLES);
+        for (int ii = 0; ii < eyepol[i].nid; ii += 3) {
+
+            for (int j = 0; j < 3; j++) {
+                int idx = eyepol[i].indices[ii+j];
+                rlVertex3f(eyepolv[idx].x, -eyepolv[idx].z, eyepolv[idx].y);
+            }
+        }
+        rlEnd();
         rlDrawRenderBatchActive();
-
-
-        free(pts);
 
         glDisable(GL_POLYGON_OFFSET_FILL);
         return false;
@@ -592,22 +590,31 @@ float scaler = 0.01;
                 rlEnd();
             }
         }
+
         int v=0;
         int l = 0;
         auto cam = DumbCore::GetCamera().position;
         cam = {0,0,0};
         float cdiv = 1.0;
+        rlBegin(RL_LINES);
         while (v<loopnum) { // add keys to rotate closest sprite.
-            rlBegin(RL_LINES);
+
+            rlDisableDepthMask();
+            rlDisableDepthTest();
+            int idx =0;
             while (loopuse[v]) {
-                rlColor4f(v/8.0f,v/4.0f,v/8.0f,0.9f);
+                rlColor4f(idx/13.0f,l%2,1.0f,1.0f);
                 //    auto campos = DumbCore::GetCamera().position;
-                rlVertex3f(cam.x+loops[v].x/cdiv ,cam.y+ -loops[v].z/cdiv,cam.z+loops[v].y/cdiv);
+                rlVertex3f(loops[v].x,-loops[v].z,loops[v].y);
                 v++;
+                idx++;
             }
             l++;v++;
-            rlEnd();
+            rlDrawRenderBatchActive();
+
+
         }
+        rlEnd();
     }
 
     static void DrawPost3d(float sw, float sh, Camera3D camsrc) {
@@ -665,10 +672,10 @@ float scaler = 0.01;
 
         // Eyepol polys
         bool draweye = true;
-        bool drawlineseye = false;
-        bool drawlights = false;
-        bool drawmonoloops = true;
-        bool drawmonostate = false;
+        bool drawlineseye = 1;
+        bool drawlights = 0;
+        bool drawmonoloops = 1;
+        bool drawmonostate = 0;
 
         rlDisableBackfaceCulling();
         BeginMode3D(camsrc);

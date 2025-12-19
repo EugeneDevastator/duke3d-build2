@@ -63,6 +63,8 @@ typedef struct {
     float ouvmat[9];                    // inverse perspective transformation
     point3d norm;                       // Surface normal vector
     int rdepth;
+    int* indices;
+    int nid; // num of indices
 } eyepol_t;
 
 // ================================================================================================
