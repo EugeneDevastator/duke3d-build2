@@ -672,6 +672,9 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 	int left_start = chain_starts[0];
 	int right_start = chain_starts[1];
 
+		if (total_vertices <=3)
+			int a =1;
+
 	// Merge chains by X coordinate and triangulate
 	while (left < chain_lengths[0] - 1 || right < chain_lengths[1] - 1)
 	{

@@ -69,7 +69,7 @@
 
 #define WALL_BLOCKING           (1 << 0)   // 1
 #define WALL_BOTTOM_SWAP        (1 << 1)   // 2
-#define WALL_ALIGN_FLOOR        (1 << 2)   // 4
+#define WALL_ALIGN_FLOOR        (1 << 2)   // 4 // default is align ceil.
 #define WALL_FLIP_X             (1 << 3)   // 8
 #define WALL_MASKED             (1 << 4)   // 16
 #define WALL_SOLID_MASKED       (1 << 5)   // 32
@@ -99,7 +99,46 @@
 #define SPRITE_B2_ONE_SIDED        (1 << 6)   // 64
 #define SPRITE_B2_IS_LIGHT     (1 << 16)   // 64
 //Bit0:Blocking, Bit2:1WayOtherSide, Bit5,Bit4:Face/Wall/Floor/.., Bit6:1side, Bit16:IsLight, Bit17-19:SpotAx(1-6), Bit20-29:SpotWid, Bit31:Invisible
+// ------ Duke Nukem tiling and coords.
+// 1024 build units(x,y) correspond to 64 pixels. at 8,8 repeat.
+// 1024 build units(x,y) correspond to 32 pixels. at 4,4 repeat
+// 8192 z build units correspond to 32 pixels at 8x8 repeat.
 
+
+#define PAN_TO_UV (1.0/8.0) // uvscale = pan * p2uv
+
+
+// assume one unit is one uv, given scale. so units*unitstouv*scale.
+// pan of 16 is 16 pixels. befre scaling.
+// duke3d:
+// x repeat 1 for wall means 8 pixels per entire wall length
+// y repeat 1 for wall means 4 pixels per 8192 z units.
+// x pan of 1 equals one pixel move before scaling. (so always 1 pixel)
+// y pan of 8 = 1 pixel of 32x32 texture
+// y pan of 2 = 1 pixel for 128x128  texture
+// also pans are limited by 256. so large textures wont work.
+static inline float GetPxOffsetVertical(int ysize, int ypan) {
+	int pansPerPx = 256.0/ysize;  // ex 32 size, pans per px = 8
+	float pxoffset = ypan / pansPerPx;  // ypan is 16; 16/8 = 2px offset.
+}
+static inline float GetPxOffsetHorizontal(int ypan) {
+	return ypan;
+}
+
+
+
+// above is regardless of texture size.
+// build seems to automatically change pan when you change texture
+// kens conversion is kinda ok. so
+// 512 build units will fit 32 px at 8,8 repeat
+// 32 pixels per unit. that will be scale of 1.
+// at scale 2 it becomes 64 and at 0.5 16 pxpu
+//				spr->p.x = ((float)b7spr.x)*(1.f/512.f);
+//				spr->p.y = ((float)b7spr.y)*(1.f/512.f);
+//				spr->p.z = ((float)b7spr.z)*(1.f/(512.f*16.f));
+// 					sur->uv[0].x = ((float)b7sec.surf[j].xpanning)/256.0;
+//					sur->uv[0].y = ((float)b7sec.surf[j].ypanning)/256.0;
+//
 
 typedef struct { float x, y, z; } point3d;
 typedef struct { double x, y, z; } dpoint3d; 	//Note: pol doesn't support loops as dpoint3d's!
@@ -131,8 +170,34 @@ typedef struct
 	//Bit0:Blocking, Bit2:RelativeAlignment, Bit5:1Way, Bit16:IsParallax, Bit17:IsSkybox
 	union { long flags; struct { char _f1, _f2, _f3, pal; }; }; // temporary pal storage
 	union { long tag; struct { short lotag, hitag; }; };
-	point2d uv[3];
+	point2d uv[3]; // legacy.
 	unsigned short asc, rsc, gsc, bsc; //4096 is no change
+//-------- uvs
+	point2d uvoffset[4]; // 0,1 - origin offset on the plane 2,3 - offset of the tile rect, for rotation anim for ex
+// 0 2 4 - wall ids 1 3 5 - ceil floor
+// // for ex. floor coords: 0=0,1=0 wall0 ceil is orogin.
+// 2=1 3=0 xvec is to ceil of next wall.
+// 4 = -1 5=-1 reconstruct. as perp to x.
+// for the ceil floor anchors on walls - we need at least 4 to gather own slabs - 3 lowest floor 0 - upper ceil.
+
+	// dumbly can encode to just points - 8 numbers for wall
+	// for floor -just two, for one side. other is reconstructed.
+	int8_t uvalig[6]; // 01 origin 23 xvector start end. 45 yvector start end
+// or save uvcoords per verts directly? - no, problematic lerps in mono engine, lets move as much to gpu..
+// world vectors per surf.
+// essentially those are fit for wall, and remain same. so if we want tile fit - thats ok
+	// if we dont - we normalize in shader, and done!
+	//float uvo = {wall[uvalig[0]].x ,wall[uvalig[0]].y, getslopez(uvalig[0],uvalig[1]));
+	//float uv = {wall[uvalig[2]].x ,wall[uvalig[2]].y, getslopez(uvalig[2],uvalig[3]));
+	//float vv = {wall[uvalig[4]].x ,wall[uvalig[4]].y, getslopez(uvalig[2],uvalig[5]));
+
+	//float4 scalexy(1=256px)  tileoffsetxy normalized
+	//float2 origin in plane offset in world units.
+	uint8_t uvalign; // edges tblr, whole side 1 tblr
+	uint8_t uvalignid; // wall or edge id. walls in case of sectors.
+	uint8_t uvmapkind; // uv amappings, regular, polar, hex, flipped variants etc.
+// runtime generated uv
+	point3d uvoriginw[2]; // world uv vectors. generated per poly.
 
 
 	short renderflags; // new flags;

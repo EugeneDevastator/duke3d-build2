@@ -547,13 +547,17 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 
 					sur->uv[0].x = b7wal.xpanning;
 					sur->uv[0].y = b7wal.ypanning;
-					sur->uv[1].x = b7wal.xrepeat; if (b7wal.cstat&  8) sur->uv[1].x *= -1;
+					sur->uv[1].x = b7wal.xrepeat;
+					if (b7wal.cstat & WALL_FLIP_X) sur->uv[1].x *= -1;
 					sur->uv[1].y = 0;
 					sur->uv[2].x = 0;
-					sur->uv[2].y = b7wal.yrepeat; if (b7wal.cstat&256) sur->uv[2].y *= -1;
-					if ((b7wal.nextsect < 0) ^ (!(b7wal.cstat&4))) sur->flags ^= 4;
-					if (HAS_FLAG(b7wal.cstat,WALL_BOTTOM_SWAP)) sur->flags ^= 2; //align bot/nextsec
-					if (b7wal.cstat&(16+32)) sur->flags |= 32; //bit4:masking, bit5:1-way
+					sur->uv[2].y = b7wal.yrepeat;
+					if (b7wal.cstat & WALL_FLIP_Y) sur->uv[2].y *= -1;
+					// if wall opens to next sector - we align to 'jawlines' for easier door setup
+					if ((b7wal.nextsect < 0) ^ (!(b7wal.cstat&WALL_ALIGN_FLOOR))) sur->flags ^= 4;
+
+					if (b7wal.cstat & WALL_BOTTOM_SWAP) sur->flags ^= 2; //align bot/nextsec
+					if (b7wal.cstat & (WALL_MASKED+WALL_SOLID_MASKED)) sur->flags |= 32; //bit4:masking, bit5:1-way
 					sur->asc = 4096;
 					sur->rsc = (32-b7wal.shade)*128;
 					sur->gsc = (32-b7wal.shade)*128;
@@ -675,16 +679,16 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						spr->d.x = cos((float)b7spr.ang*PI/1024.0)*(b7spr.yrepeat/4096.0*(float)tilesizy[l]);
 						spr->d.y = sin((float)b7spr.ang*PI/1024.0)*(b7spr.yrepeat/4096.0*(float)tilesizy[l]);
 						spr->f = (point3d){0,0,-1}; // facing up
-					if (b7spr.cstat&8) { spr->d.x *= -1; spr->d.y *= -1; }
+					if (b7spr.cstat&SPRITE_HITSCAN) { spr->d.x *= -1; spr->d.y *= -1; }
 						break;
 				}
 
-				if (b7spr.cstat&1) spr->flags |= 1; // blocking
-				if (HAS_FLAG(b7spr.cstat, SPRITE_ONE_SIDED)) spr->flags |= SPRITE_B2_ONE_SIDED; // 1 sided
-				if (b7spr.cstat&4) { spr->r.x *= -1; spr->r.y *= -1; spr->r.z *= -1; spr->flags ^= 4; } //&4: x-flipped
-				if (b7spr.cstat&8) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; spr->flags ^= 8; } //&8: y-flipped?
+				if (b7spr.cstat&SPRITE_BLOCKING) spr->flags |= 1; // blocking
+				if (b7spr.cstat& SPRITE_ONE_SIDED) spr->flags |= SPRITE_B2_ONE_SIDED; // 1 sided
+				if (b7spr.cstat&SPRITE_FLIP_X) { spr->r.x *= -1; spr->r.y *= -1; spr->r.z *= -1; spr->flags ^= 4; } //&4: x-flipped
+				if (b7spr.cstat&SPRITE_FLIP_Y) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; spr->flags ^= 8; } //&8: y-flipped?
 				// note - replace with view setup
-				if (b7spr.cstat&128) { spr->p.z += (b7spr.yrepeat/4096.0*(float)tilesizy[l]); } //&128: real-centered centering (center at center) - originally half submerged sprite
+				if (b7spr.cstat&SPRITE_TRUE_CENTERED) { spr->p.z += (b7spr.yrepeat/4096.0*(float)tilesizy[l]); } //&128: real-centered centering (center at center) - originally half submerged sprite
 				spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; // down is flipped.
 				if ((unsigned)b7spr.sectnum < (unsigned)map->numsects) //Make shade relative to sector
 				{
@@ -709,6 +713,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				spr->hitag = b7spr.hitag;
 				spr->pal = b7spr.pal;
 
+				// duke3d compat
 				spr->tags[MT_CSTAT] = b7spr.cstat;
 				spr->tags[MT_SHADELOW] = b7spr.shade;
 				spr->tags[MT_STATNUM] = b7spr.statnum;
