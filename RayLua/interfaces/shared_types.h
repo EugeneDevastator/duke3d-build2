@@ -98,6 +98,39 @@
 #define SPRITE_B2_FLAT_POLY    (1 << 5)   // 32
 #define SPRITE_B2_ONE_SIDED        (1 << 6)   // 64
 #define SPRITE_B2_IS_LIGHT     (1 << 16)   // 64
+
+#define UV_TEXELRATE 		0
+#define UV_NORMRATE 		1
+#define UV_TEXELFIT 		2
+#define UV_NORM_FIT 		3
+#define UV_PARALLAX_LIN 	4
+#define UV_PARALLAX_CYL 	5
+#define UV_PARALLAX_SPH 	6
+#define UV_SKYBOX 			7
+
+#define TILING_SQUARE	(1<<0)
+#define TILING_HEXSQ	(1<<1)
+#define TILING_HEXFULL	(1<<2)
+#define TILING_XMIRR	(1<<3)
+#define TILING_YMIRR	(1<<4)
+
+// can probably encode in bits:
+// this or next wal;
+// this or next sec;
+// flor or ceil;
+// raw z or slope z;
+#define TEZ_THISS 0
+#define TEZ_RAWZ 0
+#define TEZ_CEIL 0
+#define TEZ_FLOR 1<<0  // use floor or ceil
+#define TEZ_NS 1<<1 // this or next sect
+#define TEZ_SLOPE 1<<2 // slope or rawz;
+
+// auto resolution optioons, written in ouv wal
+#define TEW_WORLDF -1
+#define TEW_WORLDR -2
+#define TEW_WORLDD -3
+#define TEW_ORTHO -4
 //Bit0:Blocking, Bit2:1WayOtherSide, Bit5,Bit4:Face/Wall/Floor/.., Bit6:1side, Bit16:IsLight, Bit17-19:SpotAx(1-6), Bit20-29:SpotWid, Bit31:Invisible
 // ------ Duke Nukem tiling and coords.
 // 1024 build units(x,y) correspond to 64 pixels. at 8,8 repeat.
@@ -117,6 +150,7 @@
 // y pan of 8 = 1 pixel of 32x32 texture
 // y pan of 2 = 1 pixel for 128x128  texture
 // also pans are limited by 256. so large textures wont work.
+
 static inline float GetPxOffsetVertical(int ysize, int ypan) {
 	int pansPerPx = 256.0/ysize;  // ex 32 size, pans per px = 8
 	float pxoffset = ypan / pansPerPx;  // ypan is 16; 16/8 = 2px offset.
@@ -173,19 +207,30 @@ typedef struct
 	point2d uv[3]; // legacy.
 	unsigned short asc, rsc, gsc, bsc; //4096 is no change
 //-------- uvs
-	point2d uvoffset[4]; // 0,1 - origin offset on the plane 2,3 - offset of the tile rect, for rotation anim for ex
-// 0 2 4 - wall ids 1 3 5 - ceil floor
-// // for ex. floor coords: 0=0,1=0 wall0 ceil is orogin.
-// 2=1 3=0 xvec is to ceil of next wall.
-// 4 = -1 5=-1 reconstruct. as perp to x.
-// for the ceil floor anchors on walls - we need at least 4 to gather own slabs - 3 lowest floor 0 - upper ceil.
+	union {
+		// 0,1 - origin offset on the plane 2,3 - offset of the tile rect, for rotation anim for ex
+		point2d uvoffset[4];
+		struct {
+			point2d
+				planarworldoffset, // move origin in plane space in world.
+				tilerectoffset, // move tile against origin
+				crop1, // crop from 0,0
+				crop2; // crop from 1,1 both in tile rect.
+		};
+	};
 
-	// dumbly can encode to just points - 8 numbers for wall
-	// for floor -just two, for one side. other is reconstructed.
-	int8_t uvalig[6]; // 01 origin 23 xvector start end. 45 yvector start end
-// or save uvcoords per verts directly? - no, problematic lerps in mono engine, lets move as much to gpu..
-// world vectors per surf.
+	union{
+		// we dont use sectors, current one is constraint.
+		// origin, u , v
+		int8_t uvalig[6];
+		// tez = tex z source
+		struct { int8_t owal, otez, uwal, utez, vwal, vtez; };
+	};
+	uint8_t uvmapkind; // uv amappings, regular, polar, hex, flipped variants etc. paralax.
+	uint8_t tilingkind; // normal, polar, hex etc.
+
 // essentially those are fit for wall, and remain same. so if we want tile fit - thats ok
+
 	// if we dont - we normalize in shader, and done!
 	//float uvo = {wall[uvalig[0]].x ,wall[uvalig[0]].y, getslopez(uvalig[0],uvalig[1]));
 	//float uv = {wall[uvalig[2]].x ,wall[uvalig[2]].y, getslopez(uvalig[2],uvalig[3]));
@@ -193,15 +238,12 @@ typedef struct
 
 	//float4 scalexy(1=256px)  tileoffsetxy normalized
 	//float2 origin in plane offset in world units.
-	uint8_t uvalign; // edges tblr, whole side 1 tblr
-	uint8_t uvalignid; // wall or edge id. walls in case of sectors.
-	uint8_t uvmapkind; // uv amappings, regular, polar, hex, flipped variants etc.
-// runtime generated uv
-	point3d uvoriginw[2]; // world uv vectors. generated per poly.
 
-
+// ------- runtime gneerated data
+	point3d uvoriginw[3]; // world uv vectors. generated per poly. origin, u ,v
+	// can in theory use object space and encode it.
 	short renderflags; // new flags;
-	viewanchor view;
+
 } surf_t;
 
 typedef struct

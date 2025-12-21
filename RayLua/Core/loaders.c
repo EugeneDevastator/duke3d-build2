@@ -554,7 +554,10 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					sur->uv[2].y = b7wal.yrepeat;
 					if (b7wal.cstat & WALL_FLIP_Y) sur->uv[2].y *= -1;
 					// if wall opens to next sector - we align to 'jawlines' for easier door setup
-					if ((b7wal.nextsect < 0) ^ (!(b7wal.cstat&WALL_ALIGN_FLOOR))) sur->flags ^= 4;
+					if ((b7wal.nextsect < 0) ^ (!(b7wal.cstat & WALL_ALIGN_FLOOR))) {
+						sur->flags ^= 4;
+
+					}
 
 					if (b7wal.cstat & WALL_BOTTOM_SWAP) sur->flags ^= 2; //align bot/nextsec
 					if (b7wal.cstat & (WALL_MASKED+WALL_SOLID_MASKED)) sur->flags |= 32; //bit4:masking, bit5:1-way
@@ -569,8 +572,8 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					wall_t *thiswal = &sec[i].wall[j];
 					if (sec[i].wall[j].ns != -1) // handle split wall
 					{
-						thiswal->surfn =3;
-						thiswal->xsurf = malloc(sizeof(surf_t)*3);
+						thiswal->surfn = 3;
+						thiswal->xsurf = malloc(sizeof(surf_t) * 3);
 						thiswal->xsurf[0].tilnum = b7wal.picnum;
 						thiswal->xsurf[1].tilnum = b7wal.overpicnum;
 						int opacity = 0;
@@ -611,12 +614,14 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					}
 				}
 			}
+
 			//second pass for walls
 			for(i=k=0;i<map->numsects;i++) // second pass for double wall tex.
 			{
 				for(j=0;j<sec[i].n;j++,k++)
 				{
 					wall_t *walp = &sec[i].wall[j];
+					int nw = walp->nw;
 					if (walp->surfn == 3)
 					{
 						memcpy(walp->xsurf[0].uv,walp->surf.uv,sizeof(point2d)*3);
@@ -624,6 +629,60 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						memcpy(walp->xsurf[2].uv,walp->surf.uv,sizeof(point2d)*3);
 						int nextpic = sec[walp->ns].wall[walp->nw].surf.tilnum;
 						walp->xsurf[2].tilnum = nextpic;
+						if ((b7wal.nextsect < 0) ^ (!(b7wal.cstat & WALL_ALIGN_FLOOR))) {
+							// flor align when top and bot segs are in door format
+							//top'
+							walp->xsurf[0].owal = j; // next wall ?
+							walp->xsurf[0].otez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ce
+							walp->xsurf[0].uwal = nw; //
+							walp->xsurf[0].utez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ce
+							walp->xsurf[0].vwal = j; // next wall ?
+							walp->xsurf[0].vtez = TEZ_THISS | TEZ_CEIL; // next ceil raw z
+
+							//mid in that case is aligned to other ceil. mid is always aligned to ns.
+							walp->xsurf[1].owal = j; // next wall ?
+							walp->xsurf[1].otez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ceil raw z
+							walp->xsurf[1].uwal = nw; //
+							walp->xsurf[1].utez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ceil raw z
+							walp->xsurf[1].vwal = j; // next wall ?
+							walp->xsurf[1].vtez = TEZ_THISS | TEZ_FLOR; // next ceil raw z
+							// bot
+
+							walp->xsurf[2].owal = j; // wal
+							walp->xsurf[2].otez = TEZ_NS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j, not slope!
+							walp->xsurf[2].uwal = nw; // next wall
+							walp->xsurf[2].utez = TEZ_NS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
+							walp->xsurf[2].vwal = j; // next wall
+							walp->xsurf[2].vtez = TEZ_THISS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
+
+
+						}
+						else // other kind of align -- to own ceil, but mask to other flor.
+						// also when double tex - then both sides have own alignment, and lower seg borrows its flags from nw.
+						{
+							//top
+							walp->xsurf[0].owal = j; // wal
+							walp->xsurf[0].otez = TEZ_THISS | TEZ_CEIL | TEZ_RAWZ; // next floor Z of j, not slope!
+							walp->xsurf[0].uwal = nw; // next wall
+							walp->xsurf[0].utez = walp->xsurf[0].otez; // next floor Z of j
+							walp->xsurf[0].vwal = j; // next wall
+							walp->xsurf[0].vtez = TEZ_THISS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
+
+							//mid in that case is aligned to other ceil. mid is always aligned to ns.
+							walp->xsurf[1].owal = j; // next wall ?
+							walp->xsurf[1].otez = TEZ_NS | TEZ_FLOR | TEZ_RAWZ; // next ceil raw z
+							walp->xsurf[1].uwal = nw; //
+							walp->xsurf[1].utez = walp->xsurf[1].otez;
+							walp->xsurf[1].vwal = j; // next wall ?
+							walp->xsurf[1].vtez = TEZ_THISS | TEZ_CEIL | TEZ_RAWZ;
+							// bot // same as top.
+							walp->xsurf[0].owal = j; // wal
+							walp->xsurf[0].otez = TEZ_THISS | TEZ_CEIL | TEZ_RAWZ; // next floor Z of j, not slope!
+							walp->xsurf[0].uwal = nw; // next wall
+							walp->xsurf[0].utez = walp->xsurf[0].otez; // next flo // next floor Z of j
+							walp->xsurf[0].vwal = j; // next wall
+							walp->xsurf[0].vtez = TEZ_THISS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
+						}
 					}
 				}
 			}
