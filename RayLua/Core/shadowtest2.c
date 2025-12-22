@@ -244,10 +244,12 @@ int shadowtest2_numlights = 0, shadowtest2_useshadows = 1, shadowtest2_numcpu = 
 float shadowtest2_ambrgb[3] = {32.0,32.0,32.0};
 __declspec(align(16)) static float g_qamb[4]; //holder for SSE to avoid degenerates
 static point3d slightpos[LIGHTMAX], slightdir[LIGHTMAX];
+
 static float spotwid[LIGHTMAX];
 
+
 eyepol_t *eyepol = 0; // 4096 eyepol_t's = 192KB
-point3d *eyepolv = 0; //16384 point2d's  = 128KB
+vert3d_t *eyepolv = 0; //16384 point2d's  = 128KB
 int eyepoln = 0, glignum = 0;
 int eyepolmal = 0, eyepolvn = 0, eyepolvmal = 0;
 #define LIGHASHSIZ 1024
@@ -650,9 +652,9 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 			if (eyepolvn >= eyepolvmal)
 			{
 				eyepolvmal = max(eyepolvmal<<1,16384);
-				eyepolv = (point3d *)realloc(eyepolv,eyepolvmal*sizeof(point3d));
+				eyepolv = (vert3d_t *)realloc(eyepolv,eyepolvmal*sizeof(vert3d_t));
 			}
-			eyepolv[eyepolvn] = (point3d){mp[i].pos.x,mp[i].pos.y,mp[i].pos.z};
+			eyepolv[eyepolvn].wpos = (point3d){mp[i].pos.x,mp[i].pos.y,mp[i].pos.z};
 			eyepolvn++;
 			chain_lengths[h]++;
 			i = mp[i].n;
@@ -724,6 +726,9 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 		eyepol[0].vert0 = 0;
 	}
 
+	// setup uvs
+	eyepol->worlduvs = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab % 3].uvcoords;
+
 	// transform verts to WS
 	for (int pn= chain_starts[0]; pn<eyepolvn;pn++) {
 
@@ -737,8 +742,11 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 		float rety = ((fx-cam.h.x)*cam.r.y + (fy-cam.h.y)*cam.d.y + (cam.h.z)*cam.f.y)*f + cam.p.y;
 		float retz = ((fx-cam.h.x)*cam.r.z + (fy-cam.h.y)*cam.d.z + (cam.h.z)*cam.f.z)*f + cam.p.z;
 		dpoint3d ret = {retx,rety,retz};
+		eyepolv->uvpos = ret;
+		// get it in space of really moved cam, and return back to original space.
+		// vector transforms are working vell outside of mono plane.
 		wccw_transform(&ret, &b->movedcam, &b->orcam);
-		eyepolv[pn] = (point3d){ret.x,ret.y,ret.z};
+		eyepolv[pn].wpos = (point3d){ret.x,ret.y,ret.z};
 		if (log) {LOOPADD(ret);}
 	}
 	if (log) { LOOPEND }
@@ -863,7 +871,7 @@ static void drawtag_debug(int rethead0, int rethead1, bdrawctx *b)
 			if (eyepolvn >= eyepolvmal)
 			{
 				eyepolvmal = max(eyepolvmal<<1,16384);
-				eyepolv = (point3d *)realloc(eyepolv,eyepolvmal*sizeof(point3d));
+				eyepolv = (vert3d_t *)realloc(eyepolv,eyepolvmal*sizeof(vert3d_t));
 			}
 			f = cam.h.z/(mp[i].x*xform[6] + mp[i].y*xform[7] + add.z);
 			fx        =  (mp[i].x*xform[0] + mp[i].y*xform[1] + add.x)*f + cam.h.x;
@@ -879,7 +887,7 @@ static void drawtag_debug(int rethead0, int rethead1, bdrawctx *b)
 			//	LOOPADD(ret)
 			}
 			wccw_transform(&ret, &b->cam, &b->orcam);
-			eyepolv[eyepolvn] = (point3d){ret.x,ret.y,ret.z};
+			eyepolv[eyepolvn].wpos = (point3d){ret.x,ret.y,ret.z};
 
 			eyepolvn++;
 

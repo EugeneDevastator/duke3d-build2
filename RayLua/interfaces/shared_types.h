@@ -125,6 +125,7 @@
 #define TEZ_FLOR 1<<0  // use floor or ceil
 #define TEZ_NS 1<<1 // this or next sect
 #define TEZ_SLOPE 1<<2 // slope or rawz;
+#define TEZ_WALNX 1<<3 // use next continious wall
 
 // auto resolution optioons, written in ouv wal
 #define TEW_WORLDF -1
@@ -159,7 +160,11 @@ static inline float GetPxOffsetHorizontal(int ypan) {
 	return ypan;
 }
 
-
+// in vert shader: uv = orig world pos X uv transform.
+// i need all original wpos, because mono polys.
+// and i do need transform per poly.
+// but good news - no need for wccw on uv, because we can just use original world information
+// ow pos can be also baked, and updated only when walls move. but for now ill update always
 
 // above is regardless of texture size.
 // build seems to automatically change pan when you change texture
@@ -229,33 +234,48 @@ typedef struct
 	uint8_t uvmapkind; // uv amappings, regular, polar, hex, flipped variants etc. paralax.
 	uint8_t tilingkind; // normal, polar, hex etc.
 
-// essentially those are fit for wall, and remain same. so if we want tile fit - thats ok
-
-	// if we dont - we normalize in shader, and done!
-	//float uvo = {wall[uvalig[0]].x ,wall[uvalig[0]].y, getslopez(uvalig[0],uvalig[1]));
-	//float uv = {wall[uvalig[2]].x ,wall[uvalig[2]].y, getslopez(uvalig[2],uvalig[3]));
-	//float vv = {wall[uvalig[4]].x ,wall[uvalig[4]].y, getslopez(uvalig[2],uvalig[5]));
-
-	//float4 scalexy(1=256px)  tileoffsetxy normalized
-	//float2 origin in plane offset in world units.
-
-// ------- runtime gneerated data
-	point3d uvoriginw[3]; // world uv vectors. generated per poly. origin, u ,v
-	// can in theory use object space and encode it.
 	short renderflags; // new flags;
+// ------- runtime gneerated data
+	// for portals case - we dont care and use original world for everything.
+	// interpolator will lerp worldpositions, regardless of poly location
+	point3d uvcoords[3]; // world uv vectors. generated per poly. origin, u ,v
+	// can in theory use object space and encode it.
 
 } surf_t;
 
 typedef struct
 {
-	float x, y;
+	union {
+		point2d pos;
+		struct {
+			float x, y;
+		};
+	};
+
+	/* ai
+	*Positive values: Point to the next wall in the loop
+
+	wal[w].n + w gives the absolute index of the next wall
+	Used to traverse walls in order around a sector
+	Negative values: Mark special wall positions in loops
+
+	-1: Indicates the last wall in a loop
+	-2, -3: Mark end positions for clipped polygons
+
+	Looking at the code patterns, ideally only one wall per loop should have a negative n value - the last wall that closes the loop.
+	*/
+
 	long n, ns, nw; //n:rel. wall ind.; ns & nw : nextsect & nextwall_of_sect
 	long owner; //for dragging while editing, other effects during game
 	long surfn;
-	// maybe make portal innate?
-
 	surf_t surf, *xsurf; //additional malloced surfs when (surfn > 1)
-	int32_t tags[16];
+
+	union {
+		int64_t tags8b[8];
+		int32_t tags[16]; // standard tag is 4bytes
+		int16_t tags2b[32];
+	};
+
 } wall_t;
 
 typedef struct

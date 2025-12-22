@@ -1,4 +1,4 @@
- //
+  //
 // Created by omnis on 10/27/2025.
 //
 /*
@@ -41,6 +41,8 @@ struct WallSegment
     bool isVisible;
     int adjacentSector;
 };
+
+
 
 typedef struct
 {
@@ -496,13 +498,14 @@ public:
         glPolygonOffset(-0.5f, 1.0f);
       //  rlDisableDepthMask();
 
-        unsigned char r = (int)((eyepol[i].b2sect/6.0f)*255) % 255;
-        unsigned char b = (int)((eyepol[i].b2sect/17.0f)*255) % 255;
-        rlColor4ub(r,128,b,40);
+        float r = eyepol[i].b2sect/6.0;
+        float b = eyepol[i].b2sect/17.0;
+
 
         rlBegin(RL_TRIANGLES);
-        for (int ii = 0; ii < eyepol[i].nid; ii += 3) {
-
+        for (int ii = 0; ii < eyepol[i].nid-3; ii += 3) {
+            float g = (ii/3 /5.0f);
+            rlColor4f(r,g+0.1f,b,0.2);
             for (int j = 0; j < 3; j++) {
                 int idx = eyepol[i].indices[ii+j];
                 rlVertex3f(eyepolv[idx].x, -eyepolv[idx].z, eyepolv[idx].y);
@@ -527,20 +530,7 @@ float scaler = 0.01;
         rlVertex2f(40,40);
         rlVertex2f(40,50);
         rlEnd();
-            // Iterate through all head pairs
-          // for (i = 0; i < mphnum; i++) {
-          //     rlBegin(RL_LINES);
-          //     for(h=0;h<2;h++) {
-          //         i = mph[i].head[h];
-          //         do
-          //         {
-          //             if (h) i = mp[i].p;
-          //
-          //             if (!h) i = mp[i].n;
-          //         } while (i != mph[i].head[h]);
-          //         mono_deloop(mph[i].head[h]);
-          //     }
-          // }
+
 
         for (i = 0; i < mphnum; i++) {
             int hd0 = mph[i].head[0];
@@ -700,25 +690,24 @@ float scaler = 0.01;
 
                 if (drawlineseye)
                 {
-                    rlBegin(RL_LINES);
+
                     rlDisableDepthMask();
+                    rlDisableDepthTest();
                     rlDisableBackfaceCulling();
                     glEnable(GL_POLYGON_OFFSET_FILL);
-                    glPolygonOffset(-1.0f, 1.0f);
+                    glPolygonOffset(-2.0f, 1.0f);
                     rlColor4f(0, 1, 1, 1);
-                    for (int j = 0; j < vertCount; j++) {
-                        rlColor4f(j/5.0f, j/5.0f, 1, 1);
-                       //int idx[] = {v0, v0 + j, v0 + j + 1};
-                       //for (int k = 0; k < 3; k++) {
-                          //  Vector3 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y,eyepolv[idx[k]].z};
-                            Vector3 pt = {eyepolv[v0+j].x, eyepolv[v0+j].y,eyepolv[v0+j].z};
-                            rlVertex3f(pt.x,-pt.z, pt.y);
-                       // }
+                    for (int ii = 0; ii < eyepol[i].nid; ii += 3) {
+                        rlBegin(RL_LINES);
+                        for (int j = 0; j < 3; j++) {
+                            int idx = eyepol[i].indices[ii+j];
+                            rlVertex3f(eyepolv[idx].x, -eyepolv[idx].z, eyepolv[idx].y);
+                        }
+                        rlDrawRenderBatchActive();
+                        rlEnd();
                     }
-                    Vector3 pt = {eyepolv[v0].x, eyepolv[v0].y,eyepolv[v0].z};
-                    rlVertex3f(pt.x,-pt.z, pt.y);
 
-                    rlEnd();
+
                     glDisable(GL_POLYGON_OFFSET_FILL);
                     rlEnableDepthMask();
                 } // eyepol lines for each poly

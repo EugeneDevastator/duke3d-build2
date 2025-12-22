@@ -63,10 +63,22 @@ typedef struct {
     float ouvmat[9];                    // inverse perspective transformation
     point3d norm;                       // Surface normal vector
     int rdepth;
+    // triangulation data
     int* indices;
     int nid; // num of indices
+
+    // uv data
+    point3d *worlduvs; // origin, u ,v
+
 } eyepol_t;
 
+typedef struct {
+    union {
+        point3d wpos; // true world pos after all transforms
+        struct { float x, y, z; }; // compat.
+    };
+    dpoint3d uvpos; // world pos in original space;
+} vert3d_t;
 // ================================================================================================
 // GLOBAL VARIABLES
 // ================================================================================================
@@ -85,7 +97,7 @@ extern int shadowtest2_sectgotn;                // Size of global sector bit arr
 // Rendering mode control
 extern int shadowtest2_rendmode;                // Current rendering mode (0-4)
 extern eyepol_t *eyepol; // 4096 eyepol_t's = 192KB
-extern point3d *eyepolv; //16384 point2d's  = 128KB
+extern vert3d_t *eyepolv; //16384 point2d's  = 128KB
 extern int eyepoln, glignum;
 extern int eyepolmal, eyepolvn, eyepolvmal;
 
@@ -179,7 +191,7 @@ void eyepol_drawfunc(int ind);
  * @param rethead0 First polygon loop head
  * @param rethead1 Second polygon loop head
  */
-void drawtagfunc(int rethead0, int rethead1, bdrawctx * b);
+void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx * b);
 
 /** Software skybox rendering
  * @param rethead0 First polygon loop head
