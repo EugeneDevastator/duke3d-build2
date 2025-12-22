@@ -105,14 +105,14 @@ public:
         uvShaderDesc = {0};
 
         // Load the shader
-        uvShaderDesc.shader = LoadShader("Shaders/uv_vertex.vert", "Shaders/uv_fragment.frag");
+        uvShaderDesc.shader = LoadShader("Shaders/uv_opaq.vert", "Shaders/uv_opaq.frag");
 
         // Get uniform locations
+        uvShaderDesc.vertexTexCoord = GetShaderLocationAttrib(uvShaderDesc.shader, "vertexTexCoord");
         uvShaderDesc.worldOriginLoc = GetShaderLocation(uvShaderDesc.shader, "worldOrigin");
         uvShaderDesc.worldULoc = GetShaderLocation(uvShaderDesc.shader, "worldU");
         uvShaderDesc.worldVLoc = GetShaderLocation(uvShaderDesc.shader, "worldV");
-        uvShaderDesc.vertexTexCoord = rlGetLocationAttrib(uvShaderDesc.shader.id, "vertexTexCoord");
-    }
+           }
    static  void SetUVShaderParams(UVShaderDesc uvShader, Vector3 worldOrigin, Vector3 worldU, Vector3 worldV) {
         SetShaderValue(uvShader.shader, uvShader.worldOriginLoc, &worldOrigin, SHADER_UNIFORM_VEC3);
         SetShaderValue(uvShader.shader, uvShader.worldULoc, &worldU, SHADER_UNIFORM_VEC3);
@@ -121,9 +121,9 @@ public:
     static void Init()
     {
         char rootpath[256];
-        uvShader_plain = LoadShader("uv_vis_shader.vs", "uv_vis_shader.fs");
+        uvShader_plain = LoadShader("Shaders/uv_vis_shader.vert", "Shaders/uv_vis_shader.frag");
         LoadUVShader();
-        lightShader = LoadShader("light.vs", "light.fs");
+        lightShader = LoadShader("Shaders/light.vert", "Shaders/light.frag");
 
         lightPosLoc = GetShaderLocation(lightShader, "lightPosition");
         lightRangeLoc = GetShaderLocation(lightShader, "lightRange");
@@ -534,9 +534,9 @@ public:
         // shader.setvector3 worldV to eyepol->worlduvs[2]
         BeginShaderMode(uvShaderDesc.shader);
         SetUVShaderParams(uvShaderDesc,
-            buildToRaylibPos(eyepol->worlduvs[0]),
-            buildToRaylibPos(eyepol->worlduvs[1]),
-            buildToRaylibPos(eyepol->worlduvs[2]));
+            buildToRaylibPos(eyepol[i].worlduvs[0]),
+            buildToRaylibPos(eyepol[i].worlduvs[1]),
+            buildToRaylibPos(eyepol[i].worlduvs[2]));
 
         rlBegin(RL_TRIANGLES);
         for (int ii = 0; ii < eyepol[i].nid-3; ii += 3) {
@@ -546,15 +546,15 @@ public:
                 int idx = eyepol[i].indices[ii+j];
                 Vector3 verwpos = buildToRaylibPos(eyepolv[idx].wpos);
                 Vector3 uvwpos = buildToRaylibPos(eyepolv[idx].uvpos);
-                // set vertex uv1 = uvpos (vector3)
-//                rlTexCoord2f(uvwpos.x, -uvwpos.z, uvwpos.y);
-                rlSetVertexAttributeDefault(uvShaderDesc.vertexTexCoord, &uvwpos, SHADER_ATTRIB_VEC3, 3);
+                rlColor4f(1,1,1,1);
+                rlEnableVertexAttribute(uvShaderDesc.vertexTexCoord);
+                rlSetVertexAttributeDefault(uvShaderDesc.vertexTexCoord, &uvwpos, SHADER_ATTRIB_VEC3,3);
                 rlVertex3f(eyepolv[idx].x, -eyepolv[idx].z, eyepolv[idx].y);
             }
         }
         rlEnd();
         rlDrawRenderBatchActive();
-
+        EndShaderMode();
         glDisable(GL_POLYGON_OFFSET_FILL);
         return false;
     }
@@ -734,7 +734,7 @@ float scaler = 0.01;
         // Eyepol polys
         bool draweye = true;
         bool drawtrilines = 1;
-        bool drawtripoly = 1;
+        bool drawtripoly = 0;
         bool drawlights = 0;
         bool drawmonoloops = 1;
         bool drawmonostate = 0;

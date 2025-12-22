@@ -70,15 +70,27 @@ set(EXE_FOLDER_PATH "${CMAKE_CURRENT_SOURCE_DIR}/Bin/Debug")
 message(STATUS "Binary directory: ${EXE_FOLDER_PATH}")
 
 # Copy with verbose output
+# Define shader files
 file(GLOB SHADER_FILES "Shaders/*.vert" "Shaders/*.frag")
-file(COPY ${SHADER_FILES} DESTINATION "${EXE_FOLDER_PATH}/Shaders")
+
+# Create custom target that always runs
+add_custom_target(copy_shaders ALL
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${EXE_FOLDER_PATH}/Shaders"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SHADER_FILES} "${EXE_FOLDER_PATH}/Shaders"
+        COMMENT "Copying shader files"
+        VERBATIM
+)
+
+# Make your executable depend on this target
+add_dependencies(RayGame copy_shaders)
+
 message(STATUS "Install destination: ${CMAKE_INSTALL_PREFIX}/bin")
 message(STATUS "Current binary dir: ${CMAKE_CURRENT_BINARY_DIR}")
 message(STATUS "EXE_FOLDER_PATH: ${EXE_FOLDER_PATH}")
 message(STATUS "cmake cur bin dir:" ${CMAKE_CURRENT_BINARY_DIR})
 message(STATUS "cmake cur out dir: ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_${CMAKE_BUILD_TYPE}}")
-# configure_file(Shaders/uv_vis_shader.vs ${EXE_FOLDER_PATH}/uv_vis_shader.vs COPYONLY)
-# configure_file(Shaders/uv_vis_shader.vs ${EXE_FOLDER_PATH}/uv_vis_shader.vs COPYONLY)
-# configure_file(Shaders/light.vs ${EXE_FOLDER_PATH}/light.vs COPYONLY)
-# configure_file(Shaders/light.fs ${EXE_FOLDER_PATH}/light.fs COPYONLY)
+# configure_file(Shaders/uv_vis_shader.vert ${EXE_FOLDER_PATH}/uv_vis_shader.vert COPYONLY)
+# configure_file(Shaders/uv_vis_shader.vert ${EXE_FOLDER_PATH}/uv_vis_shader.vert COPYONLY)
+# configure_file(Shaders/light.vert ${EXE_FOLDER_PATH}/light.vert COPYONLY)
+# configure_file(Shaders/light.frag ${EXE_FOLDER_PATH}/light.frag COPYONLY)
 

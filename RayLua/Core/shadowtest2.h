@@ -66,7 +66,7 @@ typedef struct {
     // triangulation data
     int* indices;
     int nid; // num of indices
-
+    bool hasuvs;
     // uv data
     point3d *worlduvs; // origin, u ,v
 

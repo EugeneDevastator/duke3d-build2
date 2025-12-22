@@ -616,16 +616,17 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			}
 
 			//second pass for walls
-			for(i=k=0;i<map->numsects;i++) // second pass for double wall tex.
+			for(i=0;i<map->numsects;i++) // second pass for double wall tex.
 			{
-				for(j=0;j<sec[i].n;j++,k++)
+				for(j=0;j<sec[i].n;j++)
 				{
 					wall_t *walp = &sec[i].wall[j];
-					int nw = walp->nw;
+					int nwid = j + walp->n;
+					int curwalid = j;
 					// check.
 					walp->surf.owal = j; // next wall ?
 					walp->surf.otez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ce
-					walp->surf.uwal = nw; //
+					walp->surf.uwal = nwid; //
 					walp->surf.utez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ce
 					walp->surf.vwal = j; // next wall ?
 					walp->surf.vtez = TEZ_THISS | TEZ_CEIL; // next ceil raw z
@@ -644,7 +645,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							//top'
 							walp->xsurf[0].owal = j; // next wall ?
 							walp->xsurf[0].otez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ce
-							walp->xsurf[0].uwal = nw; //
+							walp->xsurf[0].uwal = nwid; //
 							walp->xsurf[0].utez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ce
 							walp->xsurf[0].vwal = j; // next wall ?
 							walp->xsurf[0].vtez = TEZ_THISS | TEZ_CEIL; // next ceil raw z
@@ -652,7 +653,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							//mid in that case is aligned to other ceil. mid is always aligned to ns.
 							walp->xsurf[1].owal = j; // next wall ?
 							walp->xsurf[1].otez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ceil raw z
-							walp->xsurf[1].uwal = nw; //
+							walp->xsurf[1].uwal = nwid; //
 							walp->xsurf[1].utez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ceil raw z
 							walp->xsurf[1].vwal = j; // next wall ?
 							walp->xsurf[1].vtez = TEZ_THISS | TEZ_FLOR; // next ceil raw z
@@ -660,7 +661,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 
 							walp->xsurf[2].owal = j; // wal
 							walp->xsurf[2].otez = TEZ_NS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j, not slope!
-							walp->xsurf[2].uwal = nw; // next wall
+							walp->xsurf[2].uwal = nwid; // next wall
 							walp->xsurf[2].utez = TEZ_NS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
 							walp->xsurf[2].vwal = j; // next wall
 							walp->xsurf[2].vtez = TEZ_THISS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
@@ -673,7 +674,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							//top
 							walp->xsurf[0].owal = j; // wal
 							walp->xsurf[0].otez = TEZ_THISS | TEZ_CEIL | TEZ_RAWZ; // next floor Z of j, not slope!
-							walp->xsurf[0].uwal = nw; // next wall
+							walp->xsurf[0].uwal = nwid; // next wall
 							walp->xsurf[0].utez = walp->xsurf[0].otez; // next floor Z of j
 							walp->xsurf[0].vwal = j; // next wall
 							walp->xsurf[0].vtez = TEZ_THISS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
@@ -681,19 +682,21 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							//mid in that case is aligned to other ceil. mid is always aligned to ns.
 							walp->xsurf[1].owal = j; // next wall ?
 							walp->xsurf[1].otez = TEZ_NS | TEZ_FLOR | TEZ_RAWZ; // next ceil raw z
-							walp->xsurf[1].uwal = nw; //
+							walp->xsurf[1].uwal = nwid; //
 							walp->xsurf[1].utez = walp->xsurf[1].otez;
 							walp->xsurf[1].vwal = j; // next wall ?
 							walp->xsurf[1].vtez = TEZ_THISS | TEZ_CEIL | TEZ_RAWZ;
 							// bot // same as top.
 							walp->xsurf[0].owal = j; // wal
 							walp->xsurf[0].otez = TEZ_THISS | TEZ_CEIL | TEZ_RAWZ; // next floor Z of j, not slope!
-							walp->xsurf[0].uwal = nw; // next wall
+							walp->xsurf[0].uwal = nwid; // next wall
 							walp->xsurf[0].utez = walp->xsurf[0].otez; // next flo // next floor Z of j
 							walp->xsurf[0].vwal = j; // next wall
 							walp->xsurf[0].vtez = TEZ_THISS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
 						}
 					}
+
+					makewaluvs(&sec[i],curwalid,nwid,map);
 				}
 			}
 

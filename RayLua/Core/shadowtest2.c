@@ -727,7 +727,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 	}
 
 	// setup uvs
-	eyepol->worlduvs = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab % 3].uvcoords;
+	eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].wall[b->gligwall].surf.uvcoords;//xsurf[b->gligslab % 3].uvcoords;
 
 	// transform verts to WS
 	for (int pn= chain_starts[0]; pn<eyepolvn;pn++) {
@@ -742,7 +742,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 		float rety = ((fx-cam.h.x)*cam.r.y + (fy-cam.h.y)*cam.d.y + (cam.h.z)*cam.f.y)*f + cam.p.y;
 		float retz = ((fx-cam.h.x)*cam.r.z + (fy-cam.h.y)*cam.d.z + (cam.h.z)*cam.f.z)*f + cam.p.z;
 		dpoint3d ret = {retx,rety,retz};
-		eyepolv->uvpos = ret;
+		eyepolv[pn].uvpos = ret;
 		// get it in space of really moved cam, and return back to original space.
 		// vector transforms are working vell outside of mono plane.
 		wccw_transform(&ret, &b->movedcam, &b->orcam);
