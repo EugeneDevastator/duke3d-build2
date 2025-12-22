@@ -550,7 +550,7 @@ public:
             bpv3(eyepol[i].worlduvs[2]));
 
         rlBegin(RL_TRIANGLES);
-        for (int ii = 0; ii < eyepol[i].nid-3; ii += 3) {
+        for (int ii = 0; ii < eyepol[i].nid; ii += 3) {
             float g = (ii/3 /5.0f);
             rlColor4f(r,g+0.1f,b,0.2);
             for (int j = 0; j < 3; j++) {
