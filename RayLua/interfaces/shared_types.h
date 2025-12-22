@@ -107,6 +107,7 @@
 #define UV_PARALLAX_CYL 	5
 #define UV_PARALLAX_SPH 	6
 #define UV_SKYBOX 			7
+#define UV_WORLDXY 			7
 
 #define TILING_SQUARE	(1<<0)
 #define TILING_HEXSQ	(1<<1)
@@ -119,9 +120,13 @@
 // this or next sec;
 // flor or ceil;
 // raw z or slope z;
-#define TEZ_THISS 0
+
+// placeholders for readability
+// Own sector
+#define TEZ_OS 0
 #define TEZ_RAWZ 0
 #define TEZ_CEIL 0
+
 #define TEZ_FLOR 1<<0  // use floor or ceil
 #define TEZ_NS 1<<1 // this or next sect
 #define TEZ_SLOPE 1<<2 // slope or rawz;

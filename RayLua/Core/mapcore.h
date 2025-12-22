@@ -170,9 +170,9 @@ static inline wall_t walnext(sect_t *sec, int wid) {
 
 float getzoftez(int tezflags, sect_t *mysec, int wid, mapstate_t *map);
 
-void makewaluvs(sect_t *sect, int wid, int nwid, mapstate_t *map);
+void makewaluvs(sect_t *sect, int wid, mapstate_t *map);
 
-void makesecuvs(sect_t *sect, int wid, int nwid, mapstate_t *map);
+void makesecuvs(sect_t *sect, mapstate_t *map);
 
 static double distpoint2line2 (double x, double y, double x0, double y0, double x1, double y1)
 {

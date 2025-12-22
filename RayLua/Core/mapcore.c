@@ -501,7 +501,7 @@ float getzoftez(int tezflags, sect_t *mysec, int wid, mapstate_t *map) {
 	return usedsec->z[isflor];
 }
 
-void makewaluvs(sect_t *sect, int wid, int nwid, mapstate_t *map) {
+void makewaluvs(sect_t *sect, int wid, mapstate_t *map) {
 	wall_t *w = &sect->wall[wid];
 
 	surf_t *sur = &w->surf;
@@ -518,9 +518,24 @@ void makewaluvs(sect_t *sect, int wid, int nwid, mapstate_t *map) {
 
 }
 
-void makesecuvs(sect_t *sect, int wid, int nwid, mapstate_t *map) {
-	wall_t *w = &sect->wall[wid];
-	// todo
+void makesecuvs(sect_t *sect, mapstate_t *map) {
+	wall_t *w = &sect->wall[0];
+	point2d wp = w->pos;
+	float z = sect->z[0];
+	surf_t* sur = &sect->surf[0];
+	if (sur->uvmapkind == UV_WORLDXY) {
+		sur->uvcoords[0] = (point3d){   wp.x,   wp.y,z};
+		sur->uvcoords[1] = (point3d){wp.x+2, wp.y,z};
+		sur->uvcoords[2] = (point3d){wp.x,wp.y+2,z};
+	}
+	// Floor
+	z = sect->z[1];
+	sur = &sect->surf[1];
+	if (sur->uvmapkind == UV_WORLDXY) {
+		sur->uvcoords[0] = (point3d){wp.x,wp.y,z};
+		sur->uvcoords[1] = (point3d){wp.x+2,wp.y,z};
+		sur->uvcoords[2] = (point3d){wp.x,wp.y+2,z};
+	}
 }
 
 int polyspli(wall_t *owal, int on, wall_t **retwal, double kx, double ky, double ka) {

@@ -516,6 +516,12 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				sec[i].tags[MT_EXTRA] = b7sec.extra;
 				sec[i].tags[MT_SEC_FWALL] = b7sec.wallptr;
 				sec[i].tags[MT_SEC_WALLNUM] = b7sec.wallnum;
+
+				// CEIL world based map
+				sec[i].surf[0].uvmapkind = UV_WORLDXY;
+				// FLOR world based map.
+				sec[i].surf[1].uvmapkind = UV_WORLDXY;
+
 			}
 			kzread(&s,2); //numwalls
 			printf("walls:%d",s);
@@ -625,11 +631,11 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					int curwalid = j;
 					// check.
 					walp->surf.owal = j;
-					walp->surf.otez = TEZ_THISS | TEZ_CEIL | TEZ_RAWZ; // next ce
+					walp->surf.otez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ; // next ce
 					walp->surf.uwal = nwid; //
-					walp->surf.utez = TEZ_THISS | TEZ_CEIL | TEZ_RAWZ; // next ce
+					walp->surf.utez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ; // next ce
 					walp->surf.vwal = j; // next wall ?
-					walp->surf.vtez = TEZ_THISS | TEZ_FLOR | TEZ_RAWZ; // next ceil raw z
+					walp->surf.vtez = TEZ_OS | TEZ_FLOR | TEZ_RAWZ; // next ceil raw z
 
 					if (walp->surfn == 3)
 					{
@@ -648,7 +654,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							walp->xsurf[0].uwal = nwid; //
 							walp->xsurf[0].utez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ce
 							walp->xsurf[0].vwal = j; // next wall ?
-							walp->xsurf[0].vtez = TEZ_THISS | TEZ_CEIL; // next ceil raw z
+							walp->xsurf[0].vtez = TEZ_OS | TEZ_CEIL; // next ceil raw z
 
 							//mid in that case is aligned to other ceil. mid is always aligned to ns.
 							walp->xsurf[1].owal = j; // next wall ?
@@ -656,7 +662,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							walp->xsurf[1].uwal = nwid; //
 							walp->xsurf[1].utez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ceil raw z
 							walp->xsurf[1].vwal = j; // next wall ?
-							walp->xsurf[1].vtez = TEZ_THISS | TEZ_FLOR; // next ceil raw z
+							walp->xsurf[1].vtez = TEZ_OS | TEZ_FLOR; // next ceil raw z
 							// bot
 
 							walp->xsurf[2].owal = j; // wal
@@ -664,20 +670,21 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							walp->xsurf[2].uwal = nwid; // next wall
 							walp->xsurf[2].utez = TEZ_NS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
 							walp->xsurf[2].vwal = j; // next wall
-							walp->xsurf[2].vtez = TEZ_THISS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
+							walp->xsurf[2].vtez = TEZ_OS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
 
 
 						}
 						else // other kind of align -- to own ceil, but mask to other flor.
 						// also when double tex - then both sides have own alignment, and lower seg borrows its flags from nw.
+							// TO IMPLEMENT the above! ^^
 						{
 							//top
 							walp->xsurf[0].owal = j; // wal
-							walp->xsurf[0].otez = TEZ_THISS | TEZ_CEIL | TEZ_RAWZ; // next floor Z of j, not slope!
+							walp->xsurf[0].otez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ; // next floor Z of j, not slope!
 							walp->xsurf[0].uwal = nwid; // next wall
 							walp->xsurf[0].utez = walp->xsurf[0].otez; // next floor Z of j
 							walp->xsurf[0].vwal = j; // next wall
-							walp->xsurf[0].vtez = TEZ_THISS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
+							walp->xsurf[0].vtez = TEZ_OS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
 
 							//mid in that case is aligned to other ceil. mid is always aligned to ns.
 							walp->xsurf[1].owal = j; // next wall ?
@@ -685,19 +692,22 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							walp->xsurf[1].uwal = nwid; //
 							walp->xsurf[1].utez = walp->xsurf[1].otez;
 							walp->xsurf[1].vwal = j; // next wall ?
-							walp->xsurf[1].vtez = TEZ_THISS | TEZ_CEIL | TEZ_RAWZ;
+							walp->xsurf[1].vtez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ;
+
 							// bot // same as top.
 							walp->xsurf[0].owal = j; // wal
-							walp->xsurf[0].otez = TEZ_THISS | TEZ_CEIL | TEZ_RAWZ; // next floor Z of j, not slope!
+							walp->xsurf[0].otez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ; // next floor Z of j, not slope!
 							walp->xsurf[0].uwal = nwid; // next wall
 							walp->xsurf[0].utez = walp->xsurf[0].otez; // next flo // next floor Z of j
 							walp->xsurf[0].vwal = j; // next wall
-							walp->xsurf[0].vtez = TEZ_THISS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
+							walp->xsurf[0].vtez = TEZ_OS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
 						}
 					}
 
-					makewaluvs(&sec[i],curwalid,nwid,map);
+					makewaluvs(&sec[i],curwalid,map);
 				}
+				// can make uvs only when walls are there.
+				makesecuvs(&sec[i],map);
 			}
 
 			kzread(&s,2); map->numspris = (int)s;

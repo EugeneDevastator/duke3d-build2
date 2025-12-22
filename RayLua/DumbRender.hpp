@@ -513,6 +513,15 @@ public:
     {
         return {buildcoord.x, -buildcoord.z, buildcoord.y};
     }
+    // build to vector3 as is
+    static Vector3 bpv3(point3d buildcoord)
+    {
+        return {buildcoord.x, buildcoord.y, buildcoord.z};
+    }
+    static Vector3 bpv3(dpoint3d buildcoord)
+    {
+        return {(float)buildcoord.x, (float)buildcoord.y, (float)buildcoord.z};
+    }
     static Vector3 buildToRaylibPos(dpoint3d buildcoord)
     {
         return {(float)buildcoord.x, (float)-buildcoord.z, (float)buildcoord.y};
@@ -536,9 +545,9 @@ public:
         // shader.setvector3 worldV to eyepol->worlduvs[2]
         BeginShaderMode(uvShaderDesc.shader);
         SetUVShaderParams(uvShaderDesc,
-            buildToRaylibPos(eyepol[i].worlduvs[0]),
-            buildToRaylibPos(eyepol[i].worlduvs[1]),
-            buildToRaylibPos(eyepol[i].worlduvs[2]));
+            bpv3(eyepol[i].worlduvs[0]),
+            bpv3(eyepol[i].worlduvs[1]),
+            bpv3(eyepol[i].worlduvs[2]));
 
         rlBegin(RL_TRIANGLES);
         for (int ii = 0; ii < eyepol[i].nid-3; ii += 3) {
@@ -547,12 +556,12 @@ public:
             for (int j = 0; j < 3; j++) {
                 int idx = eyepol[i].indices[ii+j];
                 Vector3 verwpos = buildToRaylibPos(eyepolv[idx].wpos);
-                Vector3 uvwpos = buildToRaylibPos(eyepolv[idx].uvpos);
+                Vector3 uvwpos = bpv3(eyepolv[idx].uvpos);
                 rlColor4f(1,1,1,1);
               //  rlEnableVertexAttribute(uvShaderDesc.vertexTexCoord);
-                Vector3 worldOrigin = buildToRaylibPos(eyepol[i].worlduvs[0]);
-                Vector3 worldU = buildToRaylibPos(eyepol[i].worlduvs[1]);
-                Vector3 worldV = buildToRaylibPos(eyepol[i].worlduvs[2]);
+                Vector3 worldOrigin = bpv3(eyepol[i].worlduvs[0]);
+                Vector3 worldU = bpv3(eyepol[i].worlduvs[1]);
+                Vector3 worldV = bpv3(eyepol[i].worlduvs[2]);
                 Vector3 localPos = uvwpos - worldOrigin;
                 Vector3 locU = worldU - worldOrigin;
                 Vector3 locV = worldV - worldOrigin;

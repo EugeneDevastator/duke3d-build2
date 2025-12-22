@@ -642,6 +642,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 	// Put on FIFO in world space:
 	//if (!log)
 	//	return;
+	//
 	for(h=0;h<2;h++) // h is head
 	{
 
@@ -662,6 +663,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 		mono_deloop(rethead[h]);
 
 	}
+	// TRIANGULATION
 	// Allocate indices array
 	int total_vertices = chain_lengths[0] + chain_lengths[1];
 	int triangle_count = total_vertices - 2;
@@ -727,7 +729,12 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 	}
 
 	// setup uvs
-	eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].wall[b->gligwall].surf.uvcoords;//xsurf[b->gligslab % 3].uvcoords;
+	if (b->gisflor < 2) {
+		eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].surf[b->gisflor].uvcoords;
+	} else {
+		eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].wall[b->gligwall].surf.uvcoords;
+		//xsurf[b->gligslab % 3].uvcoords;
+	}
 
 	// transform verts to WS
 	for (int pn= chain_starts[0]; pn<eyepolvn;pn++) {
@@ -968,7 +975,7 @@ static int projectonmono (int *plothead0, int *plothead1,  bdrawctx* b) {
 				printf ("fucked up mono");
 				//mono_deloop(*plothead0);
 				//mono_deloop(*plothead1);
-				return 0;
+				//return 0;
 			}
 		}
 	otp = (dpoint3d *) _alloca(n * sizeof(dpoint3d));
@@ -1329,13 +1336,7 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 	bool noportals = b->recursion_depth >= MAX_PORTAL_DEPTH;
 	for(isflor=0;isflor<2;isflor++) // floor ceil
 	{
-
-		// here, when we draw sector of the exit portal we get glitches when it would draw a triangle with point below the camera resulting in triangle spanning entire vertical of the screen
-
-		     // Back-face culling: skip if camera is on wrong side of surface
-			// need to get original slope, as if camera was in origin.
-	//if (!b->has_portal_clip)
-
+		b->gisflor = isflor;
 
 			int myport = sec[s].tags[1]; // FLOOR PORTAL CHECK
 			bool isportal = myport >= 0
@@ -1375,7 +1376,7 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 		point3d locnorm = world_to_local_vec(b->gnorm, &b->cam.tr);
 		for (ww = twaln; ww >= 0; ww -= twaln) plothead[isflor] = mono_ins(
 			                                       plothead[isflor], twal[ww].x, twal[ww].y,
-			                                       b->gnorm.z * -1e5);
+			                                       b->gnorm.z * -1e9);
 		//do not replace w/single zenith point - ruins precision
 		i = isflor ^ 1;
 		for (ww = 0; ww <= twaln; ww++) {
@@ -1401,7 +1402,6 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 			gentransform_ceilflor(&sec[s], wal, isflor, b);
 
 		b->gligwall = isflor - 2;
-		// Render the wall polygon
 		// F L O O R S
 		//
 		int surflag = ((isflor<<2)+3);
@@ -1421,7 +1421,7 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 			drawpol_befclip(s+b->tagoffset,-1,s,-1,plothead[0],plothead[1],surflag,b);
 		}
 	}
-
+	b->gisflor = 2;
 	// === DRAW WALLS ===
 	for(ww=0;ww<twaln;ww++)
 	{
