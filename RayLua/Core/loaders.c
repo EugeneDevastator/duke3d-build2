@@ -622,11 +622,21 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				{
 					wall_t *walp = &sec[i].wall[j];
 					int nw = walp->nw;
+					// check.
+					walp->surf.owal = j; // next wall ?
+					walp->surf.otez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ce
+					walp->surf.uwal = nw; //
+					walp->surf.utez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ce
+					walp->surf.vwal = j; // next wall ?
+					walp->surf.vtez = TEZ_THISS | TEZ_CEIL; // next ceil raw z
+
 					if (walp->surfn == 3)
 					{
+						// old code.
 						memcpy(walp->xsurf[0].uv,walp->surf.uv,sizeof(point2d)*3);
 						memcpy(walp->xsurf[1].uv,walp->surf.uv,sizeof(point2d)*3);
 						memcpy(walp->xsurf[2].uv,walp->surf.uv,sizeof(point2d)*3);
+
 						int nextpic = sec[walp->ns].wall[walp->nw].surf.tilnum;
 						walp->xsurf[2].tilnum = nextpic;
 						if ((b7wal.nextsect < 0) ^ (!(b7wal.cstat & WALL_ALIGN_FLOOR))) {

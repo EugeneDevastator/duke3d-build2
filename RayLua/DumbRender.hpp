@@ -34,7 +34,13 @@ The forward direction can be visualized as moving away from the camera or viewer
 #include "raylib.h"
 #include "raymath.h"
 #include "rlgl.h"
-
+typedef struct {
+     Shader shader;
+     int worldOriginLoc;
+     int worldULoc;
+     int worldVLoc;
+     int vertexTexCoord;
+ } UVShaderDesc;
 struct WallSegment
 {
     float z[4]; // bottom-left, bottom-right, top-right, top-left
@@ -77,7 +83,8 @@ static bool drawWalls = false;
 static bool drawSpris = true;
 static bool drawCeils = false;
 static player_transform plr;
-static Shader uvShader ;
+static Shader uvShader_plain ;
+static UVShaderDesc uvShaderDesc;
 static Shader lightShader ;
 static int lightPosLoc;
 static int lightRangeLoc;
@@ -94,12 +101,28 @@ public:
     {
         return map;
     }
+    static void LoadUVShader(void) {
+        uvShaderDesc = {0};
 
+        // Load the shader
+        uvShaderDesc.shader = LoadShader("Shaders/uv_vertex.vert", "Shaders/uv_fragment.frag");
+
+        // Get uniform locations
+        uvShaderDesc.worldOriginLoc = GetShaderLocation(uvShaderDesc.shader, "worldOrigin");
+        uvShaderDesc.worldULoc = GetShaderLocation(uvShaderDesc.shader, "worldU");
+        uvShaderDesc.worldVLoc = GetShaderLocation(uvShaderDesc.shader, "worldV");
+        uvShaderDesc.vertexTexCoord = rlGetLocationAttrib(uvShaderDesc.shader.id, "vertexTexCoord");
+    }
+   static  void SetUVShaderParams(UVShaderDesc uvShader, Vector3 worldOrigin, Vector3 worldU, Vector3 worldV) {
+        SetShaderValue(uvShader.shader, uvShader.worldOriginLoc, &worldOrigin, SHADER_UNIFORM_VEC3);
+        SetShaderValue(uvShader.shader, uvShader.worldULoc, &worldU, SHADER_UNIFORM_VEC3);
+        SetShaderValue(uvShader.shader, uvShader.worldVLoc, &worldV, SHADER_UNIFORM_VEC3);
+    }
     static void Init()
     {
         char rootpath[256];
-        uvShader = LoadShader("uv_vis_shader.vs", "uv_vis_shader.fs");
-
+        uvShader_plain = LoadShader("uv_vis_shader.vs", "uv_vis_shader.fs");
+        LoadUVShader();
         lightShader = LoadShader("light.vs", "light.fs");
 
         lightPosLoc = GetShaderLocation(lightShader, "lightPosition");
@@ -484,12 +507,60 @@ public:
             //rlSetTexture(0);
         }
     }
-
-    static bool draw_eyepol_wspace(float sw, float sh, int i, int &v0, int &vertCount) {
-        v0 = eyepol[i].vert0;
+    static Vector3 buildToRaylibPos(point3d buildcoord)
+    {
+        return {buildcoord.x, -buildcoord.z, buildcoord.y};
+    }
+    static Vector3 buildToRaylibPos(dpoint3d buildcoord)
+    {
+        return {(float)buildcoord.x, (float)-buildcoord.z, (float)buildcoord.y};
+    }
+    static bool draw_eyepol_withuvtex(float sw, float sh, int i, int v0, int vertCount) {
         int v1 = eyepol[i + 1].vert0;
-        vertCount = v1 - v0;
-        if (vertCount < 3) return true;
+
+        rlDrawRenderBatchActive();
+        rlDisableBackfaceCulling();
+
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(-0.5f, 1.0f);
+        //  rlDisableDepthMask();
+
+        float r = eyepol[i].b2sect/6.0;
+        float b = eyepol[i].b2sect/17.0;
+
+        // set global shader variables. all 3 are points in world space (custom one)
+        // shader.setvector3 worldorigin to eyepol->worlduvs[0] //
+        // shader.setvector3 worldU to eyepol->worlduvs[1]
+        // shader.setvector3 worldV to eyepol->worlduvs[2]
+        BeginShaderMode(uvShaderDesc.shader);
+        SetUVShaderParams(uvShaderDesc,
+            buildToRaylibPos(eyepol->worlduvs[0]),
+            buildToRaylibPos(eyepol->worlduvs[1]),
+            buildToRaylibPos(eyepol->worlduvs[2]));
+
+        rlBegin(RL_TRIANGLES);
+        for (int ii = 0; ii < eyepol[i].nid-3; ii += 3) {
+            float g = (ii/3 /5.0f);
+            rlColor4f(r,g+0.1f,b,0.2);
+            for (int j = 0; j < 3; j++) {
+                int idx = eyepol[i].indices[ii+j];
+                Vector3 verwpos = buildToRaylibPos(eyepolv[idx].wpos);
+                Vector3 uvwpos = buildToRaylibPos(eyepolv[idx].uvpos);
+                // set vertex uv1 = uvpos (vector3)
+//                rlTexCoord2f(uvwpos.x, -uvwpos.z, uvwpos.y);
+                rlSetVertexAttributeDefault(uvShaderDesc.vertexTexCoord, &uvwpos, SHADER_ATTRIB_VEC3, 3);
+                rlVertex3f(eyepolv[idx].x, -eyepolv[idx].z, eyepolv[idx].y);
+            }
+        }
+        rlEnd();
+        rlDrawRenderBatchActive();
+
+        glDisable(GL_POLYGON_OFFSET_FILL);
+        return false;
+    }
+
+    static bool draw_eyepol_tridebug(float sw, float sh, int i, int v0, int vertCount) {
+        int v1 = eyepol[i + 1].vert0;
 
         rlDrawRenderBatchActive();
         rlDisableBackfaceCulling();
@@ -662,10 +733,12 @@ float scaler = 0.01;
 
         // Eyepol polys
         bool draweye = true;
-        bool drawlineseye = 1;
+        bool drawtrilines = 1;
+        bool drawtripoly = 1;
         bool drawlights = 0;
         bool drawmonoloops = 1;
         bool drawmonostate = 0;
+        bool drawopaqes = 1;
 
         rlDisableBackfaceCulling();
         BeginMode3D(camsrc);
@@ -683,12 +756,21 @@ float scaler = 0.01;
                     if (cureyepoly > eyepoln)
                         cureyepoly = 0;
                 }
+
                 if (cureyepoly == 0 | cureyepoly == i) {
-                    if (draw_eyepol_wspace(sw, sh, i, v0, vertCount))
-                        continue;
+                    v0 = eyepol[i].vert0;
+                    int v1 = eyepol[i + 1].vert0;
+                    vertCount = v1 - v0;
+                    if (vertCount < 3) continue;
+
+                    if (drawtripoly)
+                        draw_eyepol_tridebug(sw, sh, i, v0, vertCount);
+                    if (drawopaqes)
+                        draw_eyepol_withuvtex(sw, sh, i, v0, vertCount);
+
                 } else continue;
 
-                if (drawlineseye)
+                if (drawtrilines)
                 {
 
                     rlDisableDepthMask();
@@ -744,7 +826,7 @@ float scaler = 0.01;
                     int vertCount = v1 - v0;
                     if (vertCount < 3) continue;
 
-                    //   BeginShaderMode(uvShader);
+                    //   BeginShaderMode(uvShader_plain);
                     rlBegin(RL_TRIANGLES);
 
                     //rlSetTexture(0);
