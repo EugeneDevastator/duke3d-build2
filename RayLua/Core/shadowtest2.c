@@ -623,6 +623,7 @@ static void xformbac (double rx, double ry, double rz, dpoint3d *o, bdrawctx *b)
 }
 static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 {
+
 // ouput is x-monotone, left to right.
 	float f,fx,fy, g, *fptr;
 	int i, j, k, h, rethead[2];
@@ -639,10 +640,6 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 	int chain_starts[2];
 	int chain_lengths[2] = {0, 0};
 
-	// Put on FIFO in world space:
-	//if (!log)
-	//	return;
-	//
 	for(h=0;h<2;h++) // h is head
 	{
 
@@ -671,50 +668,57 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 	indices = (int*)malloc(index_capacity * sizeof(int));
 	index_count = 0;
 	// Triangulate using two-pointer technique
-	int left = 0;  // pointer for first chain
-	int right = 0; // pointer for second chain
+	int left = 0;
+	int right = 0;
 	int left_start = chain_starts[0];
 	int right_start = chain_starts[1];
 
-		if (total_vertices <=3)
-			int a =1;
+	if (total_vertices <= 3) {
+		// Handle degenerate case
+		return;
+	}
 
-	// Merge chains by X coordinate and triangulate
-	while (left < chain_lengths[0] - 1 || right < chain_lengths[1] - 1)
-	{
+	// Determine polygon orientation (assuming CCW is desired)
+	// You might need to adjust this based on your coordinate system
+	bool ccw_orientation = true; // Set based on your needs
+
+	while (left < chain_lengths[0] - 1 || right < chain_lengths[1] - 1) {
 		bool use_left;
 
 		if (left >= chain_lengths[0] - 1)
 			use_left = false;
 		else if (right >= chain_lengths[1] - 1)
 			use_left = true;
-		else
-		{
-			// Compare X coordinates to maintain monotonicity
+		else {
 			float left_x = eyepolv[left_start + left + 1].x;
 			float right_x = eyepolv[right_start + right + 1].x;
 			use_left = (left_x < right_x);
 		}
 
-		if (use_left)
-		{
-			// Add triangle using current left vertex
-			if (right < chain_lengths[1])
-			{
-				indices[index_count++] = left_start + left;
-				indices[index_count++] = left_start + left + 1;
-				indices[index_count++] = right_start + right;
+		if (use_left) {
+			if (right < chain_lengths[1]) {
+				if (ccw_orientation) {
+					indices[index_count++] = left_start + left;
+					indices[index_count++] = right_start + right;
+					indices[index_count++] = left_start + left + 1;
+				} else {
+					indices[index_count++] = left_start + left;
+					indices[index_count++] = left_start + left + 1;
+					indices[index_count++] = right_start + right;
+				}
 			}
 			left++;
-		}
-		else
-		{
-			// Add triangle using current right vertex
-			if (left < chain_lengths[0])
-			{
-				indices[index_count++] = left_start + left;
-				indices[index_count++] = right_start + right;
-				indices[index_count++] = right_start + right + 1;
+		} else {
+			if (left < chain_lengths[0]) {
+				if (ccw_orientation) {
+					indices[index_count++] = left_start + left;
+					indices[index_count++] = right_start + right;
+					indices[index_count++] = right_start + right + 1;
+				} else {
+					indices[index_count++] = left_start + left;
+					indices[index_count++] = right_start + right + 1;
+					indices[index_count++] = right_start + right;
+				}
 			}
 			right++;
 		}
