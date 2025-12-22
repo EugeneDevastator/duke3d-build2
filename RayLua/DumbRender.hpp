@@ -550,9 +550,21 @@ public:
                 Vector3 uvwpos = buildToRaylibPos(eyepolv[idx].uvpos);
                 rlColor4f(1,1,1,1);
               //  rlEnableVertexAttribute(uvShaderDesc.vertexTexCoord);
-                rlTexCoord2f(0,1);
-                rlNormal3f(uvwpos.x,uvwpos.y,uvwpos.z);
-                rlVertex3f(eyepolv[idx].x, -eyepolv[idx].z, eyepolv[idx].y);
+                Vector3 worldOrigin = buildToRaylibPos(eyepol[i].worlduvs[0]);
+                Vector3 worldU = buildToRaylibPos(eyepol[i].worlduvs[1]);
+                Vector3 worldV = buildToRaylibPos(eyepol[i].worlduvs[2]);
+                Vector3 localPos = uvwpos - worldOrigin;
+                Vector3 locU = worldU - worldOrigin;
+                Vector3 locV = worldV - worldOrigin;
+                // Project onto UV plane using dot products
+                float u = Vector3DotProduct(localPos, Vector3Normalize(locU)) / Vector3Length(locU);
+                float vdot = Vector3DotProduct(localPos, Vector3Normalize(locV));
+                float vlen = Vector3Length(locV);
+                float v = vdot/vlen;
+                rlTexCoord2f(u,v);
+
+                // rlNormal3f(uvwpos.x,uvwpos.y,uvwpos.z); // this bitch gets transformed.
+                rlVertex3f(verwpos.x, verwpos.y, verwpos.z);
             }
         }
         rlEnd();

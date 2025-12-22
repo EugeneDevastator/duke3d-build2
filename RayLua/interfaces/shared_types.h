@@ -229,7 +229,7 @@ typedef struct
 		// origin, u , v
 		int8_t uvalig[6];
 		// tez = tex z source
-		struct { int8_t owal, otez, uwal, utez, vwal, vtez; };
+		struct { int8_t owal, otez, uwal, utez, vwal, vtez; }; // wals are always wals of this sector.
 	};
 	uint8_t uvmapkind; // uv amappings, regular, polar, hex, flipped variants etc. paralax.
 	uint8_t tilingkind; // normal, polar, hex etc.

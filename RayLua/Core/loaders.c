@@ -621,15 +621,15 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				for(j=0;j<sec[i].n;j++)
 				{
 					wall_t *walp = &sec[i].wall[j];
-					int nwid = j + walp->n;
+					int nwid = walp->n+j;
 					int curwalid = j;
 					// check.
-					walp->surf.owal = j; // next wall ?
-					walp->surf.otez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ce
+					walp->surf.owal = j;
+					walp->surf.otez = TEZ_THISS | TEZ_CEIL | TEZ_RAWZ; // next ce
 					walp->surf.uwal = nwid; //
-					walp->surf.utez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ce
+					walp->surf.utez = TEZ_THISS | TEZ_CEIL | TEZ_RAWZ; // next ce
 					walp->surf.vwal = j; // next wall ?
-					walp->surf.vtez = TEZ_THISS | TEZ_CEIL; // next ceil raw z
+					walp->surf.vtez = TEZ_THISS | TEZ_FLOR | TEZ_RAWZ; // next ceil raw z
 
 					if (walp->surfn == 3)
 					{

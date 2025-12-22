@@ -1306,7 +1306,8 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 
 	twal = (bunchverts_t *)_alloca((curMap->sect[b->bunch[bid].sec].n+1)*sizeof(bunchverts_t));
 	twaln = prepbunch(bid,twal,b);
-	b->gligsect = s; b->gligslab = 0;
+	b->gligsect = s;
+	b->gligslab = 0;
 
 	// === BUNCH MANAGEMENT: DELETE CURRENT BUNCH FROM GRID ===
 	// Removes processed bunch and compacts the bunch grid structure

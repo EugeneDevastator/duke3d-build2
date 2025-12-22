@@ -125,7 +125,7 @@ void mono_deloop(int i) {
     j = i;
     do {
         count++;
-        if (count >30) {
+        if (count >70) {
             printf("Corrupt loop");
         }
         j = mp[j].n;
