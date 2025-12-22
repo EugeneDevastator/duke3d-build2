@@ -1506,9 +1506,9 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 					npol2[2].y = wal[w].y;
 					npol2[2].z = npol2[0].z + 1.f;
 					// Determine reference Z-level texture alignment
-					if (!(sur->flags & 4)) f = sec[s].z[0];
-					else if (!vn) f = sec[s].z[1]; //White walls don't have verts[]!
-					else if (!m) f = sec[verts[0].s].z[0];
+					if (!(sur->flags & 4)) f = sec[s].z[0]; // default is ceil align
+					else if (!vn) f = sec[s].z[1]; //White walls don't have verts[]! and align is different.
+					else if (!m) f = sec[verts[0].s].z[0]; //
 					else f = sec[verts[(m - 1) >> 1].s].z[0];
 					// Apply UV coordinates with proper scaling
 					//npol2[0].u = sur->uv[0].x;
