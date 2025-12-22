@@ -8,6 +8,6 @@ out vec4 finalColor;
 
 void main() {
     // Use UV position as color for visualization
-    vec2 uvColor = fract(abs(uvPosition));
-    finalColor = vec4(uvColor.x, uvColor.y, 0, 1);
+    vec2 uvColor = fract(abs(uvPosition*10));
+    finalColor = vec4(uvColor.x, uvColor.y, 0.2, 1);
 }

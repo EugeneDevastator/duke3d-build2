@@ -108,7 +108,9 @@ public:
         uvShaderDesc.shader = LoadShader("Shaders/uv_opaq.vert", "Shaders/uv_opaq.frag");
 
         // Get uniform locations
-        uvShaderDesc.vertexTexCoord = GetShaderLocationAttrib(uvShaderDesc.shader, "vertexTexCoord");
+        uvShaderDesc.vertexTexCoord = rlGetLocationUniform(uvShaderDesc.shader.id, "vertexTexCoord");
+      //  int vertexIndexLoc = rlGetLocationUniform(uvShaderDesc.shader.id, "vertexIndex");
+
         uvShaderDesc.worldOriginLoc = GetShaderLocation(uvShaderDesc.shader, "worldOrigin");
         uvShaderDesc.worldULoc = GetShaderLocation(uvShaderDesc.shader, "worldU");
         uvShaderDesc.worldVLoc = GetShaderLocation(uvShaderDesc.shader, "worldV");
@@ -547,8 +549,9 @@ public:
                 Vector3 verwpos = buildToRaylibPos(eyepolv[idx].wpos);
                 Vector3 uvwpos = buildToRaylibPos(eyepolv[idx].uvpos);
                 rlColor4f(1,1,1,1);
-                rlEnableVertexAttribute(uvShaderDesc.vertexTexCoord);
-                rlSetVertexAttributeDefault(uvShaderDesc.vertexTexCoord, &uvwpos, SHADER_ATTRIB_VEC3,3);
+              //  rlEnableVertexAttribute(uvShaderDesc.vertexTexCoord);
+                rlTexCoord2f(0,1);
+                rlNormal3f(uvwpos.x,uvwpos.y,uvwpos.z);
                 rlVertex3f(eyepolv[idx].x, -eyepolv[idx].z, eyepolv[idx].y);
             }
         }
