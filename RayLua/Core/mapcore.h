@@ -168,7 +168,7 @@ static inline wall_t walnext(sect_t *sec, int wid) {
 		];
 }
 
-float getzoftez(int tezflags, sect_t *mysec, int wid, mapstate_t *map);
+float getzoftez(int tezflags, sect_t *mysec, int thiswall, point2d worldxy, mapstate_t *map);
 
 void makewaluvs(sect_t *sect, int wid, mapstate_t *map);
 

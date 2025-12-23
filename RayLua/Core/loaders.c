@@ -976,7 +976,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						} else // other kind of align -- to own ceil, but mask to other flor.
 						// also when double tex - then both sides have own alignment, and lower seg borrows its flags from nw.
 						// TO IMPLEMENT the above! ^^
-						{
+						{ // THIS WORKS!
 							//top
 							walp->xsurf[0].owal = j; // wal
 							walp->xsurf[0].otez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ; // next floor Z of j, not slope!

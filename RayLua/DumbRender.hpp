@@ -554,6 +554,13 @@ public:
 
         SetShaderValueTexture(uvShaderDesc.shader,uvShaderDesc.textureLoc,tex);
         rlBegin(RL_TRIANGLES);
+        if (eyepol[i].tilnum == 163)
+            int a =1;
+        Vector3 worldOrigin = bpv3(eyepol[i].worlduvs[0]);
+        Vector3 worldU = bpv3(eyepol[i].worlduvs[1]);
+        Vector3 worldV = bpv3(eyepol[i].worlduvs[2]);
+        Vector3 locU = worldU - worldOrigin;
+        Vector3 locV = worldV - worldOrigin;
         for (int ii = 0; ii < eyepol[i].nid; ii += 3) {
             float g = (ii/3 /5.0f);
             rlColor4f(r,g+0.1f,b,0.2);
@@ -563,17 +570,11 @@ public:
                 Vector3 uvwpos = bpv3(eyepolv[idx].uvpos);
                 rlColor4f(1,1,1,1);
               //  rlEnableVertexAttribute(uvShaderDesc.vertexTexCoord);
-                Vector3 worldOrigin = bpv3(eyepol[i].worlduvs[0]);
-                Vector3 worldU = bpv3(eyepol[i].worlduvs[1]);
-                Vector3 worldV = bpv3(eyepol[i].worlduvs[2]);
                 Vector3 localPos = uvwpos - worldOrigin;
-                Vector3 locU = worldU - worldOrigin;
-                Vector3 locV = worldV - worldOrigin;
                 // Project onto UV plane using dot products
                 float u = Vector3DotProduct(localPos, Vector3Normalize(locU)) / Vector3Length(locU);
-                float vdot = Vector3DotProduct(localPos, Vector3Normalize(locV));
-                float vlen = Vector3Length(locV);
-                float v = vdot/vlen;
+                float v = Vector3DotProduct(localPos, Vector3Normalize(locV)) / Vector3Length(locV);
+
                 u = u * eyepol[i].uvform[0] + eyepol[i].uvform[2];
                 v = v * eyepol[i].uvform[1] + eyepol[i].uvform[3];
 

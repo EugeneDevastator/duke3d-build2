@@ -485,15 +485,14 @@ void changesprisect_imp (int i, int nsect, mapstate_t *map)
 	spr->sect = nsect;
 }
 
-float getzoftez(int tezflags, sect_t *mysec, int wid, mapstate_t *map) {
+float getzoftez(int tezflags, sect_t *mysec, int thiswall, point2d worldxy, mapstate_t *map) {
 
 	// cant use this because floor/ceil will use wall id.
 	//point2d worldxy = tezflags & TEZ_WALNX
-	//	                  ? walnext(mysec, wid).pos
-	//	                  : mysec->wall[wid].pos;
-	point2d worldxy = mysec->wall[wid].pos;
+	//	                  ? walnext(mysec, thiswall).pos
+	//	                  : mysec->wall[thiswall].pos;
 	sect_t *usedsec = tezflags & TEZ_NS
-		                  ? &map->sect[mysec->wall[wid].ns]
+		                  ? &map->sect[mysec->wall[thiswall].ns]
 		                  : mysec;
 
 	bool isflor = tezflags & TEZ_FLOR;
@@ -511,11 +510,11 @@ void makewaluvs(sect_t *sect, int wid, mapstate_t *map) {
 	for (int sl = 0; sl < w->surfn;sl++) {
 		sur = &w->xsurf[sl]; // dope hack to process raw wall surf first.
 		wall_t *usewal = &sect->wall[sur->owal];
-		sur->uvcoords[0] = (point3d) {usewal->x, usewal->y,getzoftez(sur->otez, sect, sur->owal, map) };
+		sur->uvcoords[0] = (point3d) {usewal->x, usewal->y,getzoftez(sur->otez, sect, wid, usewal->pos, map) };
 		usewal = &sect->wall[sur->uwal];
-		sur->uvcoords[1] = (point3d) {usewal->x,usewal->y,getzoftez(sur->utez, sect, sur->uwal, map) };
+		sur->uvcoords[1] = (point3d) {usewal->x,usewal->y,getzoftez(sur->utez, sect, wid, usewal->pos, map) };
 		usewal = &sect->wall[sur->vwal];
-		sur->uvcoords[2] = (point3d) {usewal->x,usewal->y,getzoftez(sur->vtez, sect, sur->vwal, map) };
+		sur->uvcoords[2] = (point3d) {usewal->x,usewal->y,getzoftez(sur->vtez, sect, wid, usewal->pos, map) };
 
 		if (sur->vtez & TEZ_INVZ) {
 			float dz = sur->uvcoords[2].z-sur->uvcoords[0].z;
