@@ -16,6 +16,24 @@ static inline float vlen(point3d *p) {
     return sqrtf(p->x * p->x + p->y * p->y + p->z * p->z);
 }
 
+static inline point3d subtract(point3d a, point3d b) {
+    point3d p;
+    p.x = a.x - b.x;
+    p.y = a.y - b.y;
+    p.z = a.z - b.z;
+    return p;
+}
+static inline void addto(point3d *a, point3d b) {
+    a->x += b.x;
+    a->y += b.y;
+    a->z += b.z;
+}
+static inline void rot90cwz(point3d *a) {
+    float t = a->x;
+    a->x = a->y;
+    a->y = -t;
+}
+
 static inline void scalardivv(point3d *pt, float diver) {
     pt->x /= diver; pt->y /= diver; pt->z /= diver;
 }

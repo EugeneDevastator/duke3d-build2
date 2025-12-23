@@ -481,18 +481,18 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						sur->uv[1].x = 32.0/((float)tilesizy[l]);
 						sur->uv[2].y = 32.0/((float)tilesizx[l]);
 					}
-					if (b7sec.stat[j]&8) { sur->uv[1].x *= 2; sur->uv[2].y *= 2; } //double smooshiness
-					if (b7sec.stat[j]&16) sur->uv[1].x *= -1; //x-flip
-					if (!(b7sec.stat[j]&32)) sur->uv[2].y *= -1; //y-flip
-					if (b7sec.stat[j]&64) //relative alignment
+					if (b7sec.stat[j] & SECTOR_EXPAND_TEXTURE) { sur->uv[1].x *= 2; sur->uv[2].y *= 2; } //double smooshiness
+					if (b7sec.stat[j] & SECTOR_FLIP_X) sur->uv[1].x *= -1; //x-flip
+					if (!(b7sec.stat[j] & SECTOR_FLIP_Y)) sur->uv[2].y *= -1; //y-flip
+					if (b7sec.stat[j] & SECTOR_TEXWALL_ALIGN) //relative alignment
 					{
 						f = ((float)b7sec.surf[j].heinum)*(1.f/4096.f);
 						sur->uv[2].y *= -sqrt(f*f + 1.f);
 						sur->flags |= 4;
 					}
-					if (b7sec.stat[j]&4) //swap x&y
+					if (b7sec.stat[j] & SECTOR_SWAP_XY) //swap x&y
 					{
-						if (((b7sec.stat[j]&16) != 0) != ((b7sec.stat[j]&32) != 0))
+						if (((b7sec.stat[j] & SECTOR_FLIP_X) != 0) != ((b7sec.stat[j] & SECTOR_FLIP_Y) != 0))
 							{ sur->uv[1].x *= -1; sur->uv[2].y *= -1; }
 						sur->uv[1].y = sur->uv[1].x; sur->uv[1].x = 0;
 						sur->uv[2].x = sur->uv[2].y; sur->uv[2].y = 0;
@@ -501,6 +501,8 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					//FIX:This hack corrects an LHS vs. RHS bug in a later stage of texture mapping (drawsectfill?)
 					if (sur->uv[1].x*sur->uv[2].y < sur->uv[1].y*sur->uv[2].x)
 						{ sur->uv[2].x *= -1; sur->uv[2].y *= -1; }
+
+					sec[i].surf[j].uvmapkind = b7sec.stat[j] & SECTOR_TEXWALL_ALIGN ? UV_TEXELRATE : UV_WORLDXY;
 				}
 
 				sec[i].headspri = -1;
@@ -516,12 +518,6 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				sec[i].tags[MT_EXTRA] = b7sec.extra;
 				sec[i].tags[MT_SEC_FWALL] = b7sec.wallptr;
 				sec[i].tags[MT_SEC_WALLNUM] = b7sec.wallnum;
-
-				// CEIL world based map
-				sec[i].surf[0].uvmapkind = UV_WORLDXY;
-				// FLOR world based map.
-				sec[i].surf[1].uvmapkind = UV_WORLDXY;
-
 			}
 			kzread(&s,2); //numwalls
 			printf("walls:%d",s);

@@ -1,6 +1,8 @@
 //This version also handles u&v. Note: Input should still be simple wall quad
 #include "mapcore.h"
 
+#include "buildmath.h"
+
 #define USEHEIMAP 1
 #define NOSOUND 1
 #define STANDALONE 1
@@ -521,20 +523,26 @@ void makewaluvs(sect_t *sect, int wid, mapstate_t *map) {
 void makesecuvs(sect_t *sect, mapstate_t *map) {
 	wall_t *w = &sect->wall[0];
 	point2d wp = w->pos;
-	float z = sect->z[0];
-	surf_t* sur = &sect->surf[0];
-	if (sur->uvmapkind == UV_WORLDXY) {
-		sur->uvcoords[0] = (point3d){   wp.x,   wp.y,z};
-		sur->uvcoords[1] = (point3d){wp.x+2, wp.y,z};
-		sur->uvcoords[2] = (point3d){wp.x,wp.y+2,z};
-	}
-	// Floor
-	z = sect->z[1];
-	sur = &sect->surf[1];
-	if (sur->uvmapkind == UV_WORLDXY) {
-		sur->uvcoords[0] = (point3d){wp.x,wp.y,z};
-		sur->uvcoords[1] = (point3d){wp.x+2,wp.y,z};
-		sur->uvcoords[2] = (point3d){wp.x,wp.y+2,z};
+	for (int fl=0;fl<2;fl++) {
+		float z = sect->z[fl];
+		surf_t* sur = &sect->surf[fl];
+		if (sur->uvmapkind == UV_WORLDXY) {
+			sur->uvcoords[0] = (point3d){   wp.x,   wp.y,z};
+			sur->uvcoords[1] = (point3d){wp.x+2, wp.y,z};
+			sur->uvcoords[2] = (point3d){wp.x,wp.y+2,z};
+		}
+		else
+			if (sur->uvmapkind == UV_TEXELRATE) {
+				point2d nwp = walnext(sect,0).pos;
+				sur->uvcoords[0] = (point3d){   wp.x,   wp.y,z};
+				sur->uvcoords[1] = (point3d){   nwp.x, nwp.y,z};
+				// get ortho to wall,
+				point3d rectpt = subtract(sur->uvcoords[1],sur->uvcoords[0]);
+				rot90cwz(&rectpt);
+				addto(&rectpt,sur->uvcoords[0]);
+				float vz = getslopez(sect,fl,rectpt.x,rectpt.y);
+				sur->uvcoords[2] = (point3d){rectpt.x,rectpt.y,vz};
+			}
 	}
 }
 
