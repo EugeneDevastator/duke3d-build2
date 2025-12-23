@@ -507,9 +507,9 @@ float getzoftez(int tezflags, sect_t *mysec, int wid, mapstate_t *map) {
 
 void makewaluvs(sect_t *sect, int wid, mapstate_t *map) {
 	wall_t *w = &sect->wall[wid];
-
-	surf_t *sur = &w->surf;
-	for (int sl = 0;sl <= w->surfn;sl++) {
+	surf_t *sur;// = &w->surf;
+	for (int sl = 0; sl < w->surfn;sl++) {
+		sur = &w->xsurf[sl]; // dope hack to process raw wall surf first.
 		wall_t *usewal = &sect->wall[sur->owal];
 		sur->uvcoords[0] = (point3d) {usewal->x, usewal->y,getzoftez(sur->otez, sect, sur->owal, map) };
 		usewal = &sect->wall[sur->uwal];
@@ -522,8 +522,6 @@ void makewaluvs(sect_t *sect, int wid, mapstate_t *map) {
 			sur->uvcoords[2].z = -dz + sur->uvcoords[0].z;
 		}
 
-
-		sur = &w->xsurf[sl]; // dope hack to process raw wall surf first.
 	}
 
 }
