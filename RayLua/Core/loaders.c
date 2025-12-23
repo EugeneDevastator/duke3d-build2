@@ -606,14 +606,15 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					float normuvperz = pix4 * b7wal.yrepeat;
 					float scalery = wallh * normuvperz;
 
-					float px1 = 1.0f/xsize;
+					float px1x = 1.0f/xsize;
+					float px1y = 1.0f/ysize;
 					float ypans_per_px = 256.f/ysize;
-					thiswal->surf.owal = b7wal.yrepeat; // need for second pass. // set to ypan
-					thiswal->surf.uwal = b7wal.cstat & WALL_ALIGN_FLOOR; // need for second pass. // set to ypan
+					thiswal->surf.owal = b7wal.yrepeat; // need for second pass.
+					thiswal->surf.uwal = b7wal.cstat & WALL_ALIGN_FLOOR; // need for second pass.
 					thiswal->surf.uvform[0]=scalerx;
 					thiswal->surf.uvform[1]=scalery;
-					thiswal->surf.uvform[2]=px1 * b7wal.xpanning;
-					thiswal->surf.uvform[3]=px1 * (b7wal.ypanning/ypans_per_px);
+					thiswal->surf.uvform[2]=px1x * b7wal.xpanning;
+					thiswal->surf.uvform[3]=px1y * (b7wal.ypanning/ypans_per_px);
 				}
 				// tile adjust?
 				for(j=0;j<sec[i].n;j++)
@@ -903,22 +904,52 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					int curwalid = j;
 					int yrepeat = walp->surf.owal;
 					int isfloralign = walp->surf.uwal;
+					int yrepeatbot = yrepeat;
+					int isfloralignbot = isfloralign;
 
-					walp->surf.owal = j;
-					walp->surf.otez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ;
-					walp->surf.uwal = nwid; //
-					walp->surf.utez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ;
-					walp->surf.vwal = j; // next wall ?
-					walp->surf.vtez = TEZ_OS | TEZ_FLOR | TEZ_RAWZ;
+					//walp->surf.owal = j;
+					//walp->surf.otez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ;
+					//walp->surf.uwal = nwid; //
+					//walp->surf.utez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ;
+					//walp->surf.vwal = j; // next wall ?
+					//walp->surf.vtez = TEZ_OS | TEZ_FLOR | TEZ_RAWZ;
 
 
 					memcpy(&walp->xsurf[0].uvform, &walp->surf.uvform, sizeof(float) * 6);
 					int ns = walp->ns;
 					if (walp->surfn == 3 && ns >= 0) // handle multi wall.
 					{
+						int nextpic = sec[walp->ns].wall[walp->nw].surf.tilnum;
+						bool isbotswap = walp->xsurf[2].tilnum == -2;
+						wall_t *oppwal;
 						memcpy(&walp->xsurf[1].uvform, &walp->surf.uvform, sizeof(float) * 6);
 						memcpy(&walp->xsurf[2].uvform, &walp->surf.uvform, sizeof(float) * 6);
-						int nextpic = sec[walp->ns].wall[walp->nw].surf.tilnum;
+						if (isbotswap) //
+						{
+							oppwal = &sec[walp->ns].wall[walp->nw];
+
+						//	memcpy(&walp->xsurf[2].uvform, oppwal->surf.uvform, sizeof(float) * 6);
+							isfloralignbot = oppwal->surf.uwal;
+							yrepeatbot = oppwal->surf.owal;
+							int cursizx = tilesizx[walp->xsurf[0].tilnum];
+							int newsizx = tilesizx[nextpic];
+
+							int cursizy = tilesizy[walp->xsurf[0].tilnum];
+							int newsizy = tilesizy[nextpic];
+
+							walp->xsurf[2].uvform[0] *= cursizx/(float)newsizx;
+							walp->xsurf[2].uvform[1] *= cursizy/(float)newsizy;
+							walp->xsurf[2].uvform[2] = oppwal->surf.uvform[2];
+							walp->xsurf[2].uvform[3] = oppwal->surf.uvform[3];
+
+							walp->xsurf[2].tilnum = nextpic;
+							// also pans are limited by 256. so large textures wont work.
+							//*newx/oldx;
+						}
+						else {
+
+						}
+
 
 						// assume one unit is one uv, given scale. so units*unitstouv*scale.
 						// pan of 16 is 16 pixels. befre scaling.
@@ -939,17 +970,19 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						slabh[0] = (sec[ns].z[0] - sec[i].z[0]);
 						slabh[1] = (sec[ns].z[1] - sec[ns].z[0]);
 						slabh[2] = (sec[i].z[1] - sec[ns].z[1]);
-						if (walp->xsurf[2].tilnum == -2) //
-							walp->xsurf[2].tilnum = nextpic;
+						bool floralig[3] = {isfloralign,isfloralign,isfloralignbot};
+
+						// this is here because we need to know params of next sector.
 						for (int sl=0;sl<3;sl++) {
 							float ysize = tilesizy[walp->xsurf[sl].tilnum];
 							float pix4 = 4.0f / ysize;
 							float normuvperz = pix4 * yrepeat;
-							if(!isfloralign & (sl!=1)) // for flor aligned we use same rect for both chunks
+							if(!floralig[sl]) // for flor aligned we use same rect for both chunks
 								walp->xsurf[sl].uvform[1] = slabh[sl] * normuvperz;
 						}
 
-						if (!isfloralign) {  // in case of standard align - we do door-snapping style,
+						if (!isfloralign) {
+							// in case of standard align - we do door-snapping style,
 							//top'
 							walp->xsurf[0].owal = j; // next wall ?
 							walp->xsurf[0].otez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ce
@@ -965,17 +998,9 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							walp->xsurf[1].utez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ceil raw z
 							walp->xsurf[1].vwal = j; // next wall ?
 							walp->xsurf[1].vtez = TEZ_OS | TEZ_FLOR; // next ceil raw z
-
-							//bot;
-							walp->xsurf[2].owal = j; // wal
-							walp->xsurf[2].otez = TEZ_NS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j, not slope!
-							walp->xsurf[2].uwal = nwid; // next wall
-							walp->xsurf[2].utez = TEZ_NS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
-							walp->xsurf[2].vwal = j; // next wall
-							walp->xsurf[2].vtez = TEZ_OS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
-						} else // other kind of align -- to own ceil, but mask to other flor.
-						// also when double tex - then both sides have own alignment, and lower seg borrows its flags from nw.
-						// TO IMPLEMENT the above! ^^
+						}
+						else
+						 // other kind of align -- to own ceil, but mask to other flor.
 						{ // THIS WORKS!
 							//top
 							walp->xsurf[0].owal = j; // wal
@@ -992,8 +1017,19 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							walp->xsurf[1].utez = walp->xsurf[1].otez;
 							walp->xsurf[1].vwal = j; // next wall ?
 							walp->xsurf[1].vtez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ;
-
-							// bot // same as top.
+						}
+						// also when double tex - then both sides have own alignment, and lower seg borrows its flags from nw.
+						// TO IMPLEMENT the above! ^^
+						if (!isfloralignbot){	//bot;
+							walp->xsurf[2].owal = j; // wal
+							walp->xsurf[2].otez = TEZ_NS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j, not slope!
+							walp->xsurf[2].uwal = nwid; // next wall
+							walp->xsurf[2].utez = TEZ_NS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
+							walp->xsurf[2].vwal = j; // next wall
+							walp->xsurf[2].vtez = TEZ_OS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
+						}
+						else {
+							// bot
 							walp->xsurf[2].owal = j; // wal
 							walp->xsurf[2].otez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ; // next floor Z of j, not slope!
 							walp->xsurf[2].uwal = nwid; // next wall
@@ -1001,8 +1037,8 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							walp->xsurf[2].vwal = j; // next wall
 							walp->xsurf[2].vtez = TEZ_OS | TEZ_FLOR | TEZ_RAWZ ; // next floor Z of j
 						}
-					} else {
-						// single wall.
+					} else { // single wall.
+
 						if (isfloralign) {
 							// flor align when top and bot segs are in door format
 							//top'

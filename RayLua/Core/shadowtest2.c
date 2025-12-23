@@ -736,12 +736,14 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 	if (b->gisflor < 2) {
 		eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].surf[b->gisflor].uvcoords;
 		eyepol[eyepoln].uvform = curMap->sect[b->gligsect].surf[b->gisflor].uvform;
+		eyepol[eyepoln].tilnum = curMap->sect[b->gligsect].surf[b->gisflor].tilnum;
 	} else { // walls
 		eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].uvcoords;
 		eyepol[eyepoln].uvform = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].uvform;
+		eyepol[eyepoln].tilnum = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].tilnum;
 		//xsurf[b->gligslab % 3].uvcoords;
 	}
-	eyepol[eyepoln].tilnum = gtilenum;
+
 	eyepol[eyepoln].slabid = b->gligslab; // 0 -top, 1 - mid, 2-bot.
 
 	// transform verts to WS
