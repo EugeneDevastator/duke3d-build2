@@ -570,6 +570,9 @@ public:
                 float vdot = Vector3DotProduct(localPos, Vector3Normalize(locV));
                 float vlen = Vector3Length(locV);
                 float v = vdot/vlen;
+                u = u * eyepol[i].uvform[0] + eyepol[i].uvform[2];
+                v = v * eyepol[i].uvform[1] + eyepol[i].uvform[3];
+
                 rlTexCoord2f(u,v);
 
                 // rlNormal3f(uvwpos.x,uvwpos.y,uvwpos.z); // this bitch gets transformed.

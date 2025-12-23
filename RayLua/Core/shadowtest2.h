@@ -69,7 +69,7 @@ typedef struct {
     bool hasuvs;
     // uv data
     point3d *worlduvs; // origin, u ,v
-
+    float* uvform;
 } eyepol_t;
 
 typedef struct {

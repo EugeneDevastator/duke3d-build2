@@ -735,8 +735,10 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 	// setup uvs
 	if (b->gisflor < 2) {
 		eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].surf[b->gisflor].uvcoords;
+		eyepol[eyepoln].uvform = curMap->sect[b->gligsect].surf[b->gisflor].uvform;
 	} else {
 		eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].wall[b->gligwall].surf.uvcoords;
+		eyepol[eyepoln].uvform = curMap->sect[b->gligsect].wall[b->gligwall].surf.uvform;
 		//xsurf[b->gligslab % 3].uvcoords;
 	}
 

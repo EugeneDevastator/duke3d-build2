@@ -698,12 +698,53 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							walp->xsurf[0].vwal = j; // next wall
 							walp->xsurf[0].vtez = TEZ_OS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
 						}
+
+
+
 					}
+					// assume one unit is one uv, given scale. so units*unitstouv*scale.
+					// pan of 16 is 16 pixels. befre scaling.
+					// duke3d:
+					// x repeat 1 for wall means 8 pixels per entire wall length
+					// y repeat 1 for wall means 4 pixels per 8192 z units. = 1 z unit of b2
+					// x pan of 1 equals one pixel move before scaling. (so always 1 pixel)
+					// y pan of 8 = 1 pixel of 32x32 texture
+					// y pan of 2 = 1 pixel for 128x128  texture
+					// y pan of 2 - 1/4 pixel of 32x32.
+					// 128/2 = 1;
+					// 32/8=1;
+					// 256/32 = 8;
+					// 256/128 = 2;
+					// 256 / size = pans/pixel.
+
+
+					// also pans are limited by 256. so large textures wont work.
+					float xsize = tilesizx[walp->surf.tilnum];
+					float pix8 = 8.0f/xsize; //64/8 = 8
+					float scalerx = b7wal.xrepeat * pix8;
+
+					float ysize = tilesizy[walp->surf.tilnum];
+					float pix4 = 4.0f/ysize;
+					float nofp4 = (sec[i].z[0]-sec[i].z[1]);
+					float scalery = nofp4*pix4 *b7wal.yrepeat;
+
+					float px1 = 1.0f/xsize;
+					float ypans_per_px = 256.f/ysize;
+
+					walp->surf.uvform[0]=scalerx;
+					walp->surf.uvform[1]=scalery;
+					walp->surf.uvform[2]=px1 * b7wal.xpanning;
+					walp->surf.uvform[2]=px1 * (b7wal.ypanning/ypans_per_px);
 
 					makewaluvs(&sec[i],curwalid,map);
 				}
 				// can make uvs only when walls are there.
 				makesecuvs(&sec[i],map);
+
+				sec[i].surf[0].uvform[0]=1;
+				sec[i].surf[0].uvform[1]=1;
+				sec[i].surf[1].uvform[0]=1;
+				sec[i].surf[1].uvform[1]=1;
 			}
 
 			kzread(&s,2); map->numspris = (int)s;
