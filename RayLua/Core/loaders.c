@@ -328,7 +328,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			short sectnum, statnum, ang, owner, xvel, yvel, zvel, lotag, hitag, extra;
 		} build7spri_t;
 		build7sect_t b7sec;
-		build7wall_t b7wal;
+
 		build7spri_t b7spr;
 
 			//Cubes5 format variables:
@@ -524,6 +524,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			int wallidx =0;
 			for(i=k=0;i<map->numsects;i++) // Parse walls
 			{
+				build7wall_t b7wal;
 				for(j=0;j<sec[i].n;j++,k++) // walls
 				{
 					kzread(&b7wal,sizeof(b7wal));
@@ -558,7 +559,6 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					// if wall opens to next sector - we align to 'jawlines' for easier door setup
 					if ((b7wal.nextsect < 0) ^ (!(b7wal.cstat & WALL_ALIGN_FLOOR))) {
 						sur->flags ^= 4;
-
 					}
 
 					if (b7wal.cstat & WALL_BOTTOM_SWAP) sur->flags ^= 2; //align bot/nextsec
@@ -572,12 +572,14 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					sec[i].wall[j].surfn = 1;
 					sec[i].wall[j].owner = -1;
 					wall_t *thiswal = &sec[i].wall[j];
-					if (sec[i].wall[j].ns != -1) // handle split wall
+
+					if (b7wal.nextsect >= 0 ) // (sec[i].wall[j].ns != -1) // ns are parsed later! nut we need to alloc now.
 					{
 						thiswal->surfn = 3;
 						thiswal->xsurf = malloc(sizeof(surf_t) * 3);
 						thiswal->xsurf[0].tilnum = b7wal.picnum;
 						thiswal->xsurf[1].tilnum = b7wal.overpicnum;
+						thiswal->xsurf[2].tilnum = b7wal.cstat & WALL_BOTTOM_SWAP ? -2 : b7wal.picnum;
 						int opacity = 0;
 							if (HAS_FLAG(b7wal.cstat, WALL_MASKED))
 						{
@@ -589,6 +591,29 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 
 						thiswal->xsurf[1].asc = opacity;
 					}
+					else {
+						thiswal->xsurf = malloc(sizeof(surf_t) * 1);
+						thiswal->xsurf[0].tilnum = b7wal.picnum;
+					}
+					// also pans are limited by 256. so large textures wont work.
+					float xsize = tilesizx[thiswal->surf.tilnum];
+					float pix8 = 8.0f/xsize; //64/8 = 8
+					float scalerx = b7wal.xrepeat * pix8;
+
+					float ysize = tilesizy[thiswal->surf.tilnum];
+					float pix4 = 4.0f/ysize;
+					float wallh = (sec[i].z[1]-sec[i].z[0]);
+					float normuvperz = pix4 * b7wal.yrepeat;
+					float scalery = wallh * normuvperz;
+
+					float px1 = 1.0f/xsize;
+					float ypans_per_px = 256.f/ysize;
+					thiswal->surf.owal = b7wal.yrepeat; // need for second pass. // set to ypan
+					thiswal->surf.uwal = b7wal.cstat & WALL_ALIGN_FLOOR; // need for second pass. // set to ypan
+					thiswal->surf.uvform[0]=scalerx;
+					thiswal->surf.uvform[1]=scalery;
+					thiswal->surf.uvform[2]=px1 * b7wal.xpanning;
+					thiswal->surf.uvform[2]=px1 * (b7wal.ypanning/ypans_per_px);
 				}
 				// tile adjust?
 				for(j=0;j<sec[i].n;j++)
@@ -615,136 +640,6 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						sec[i].grad[j].y = fy*sec[i].grad[j].y;
 					}
 				}
-			}
-
-			//second pass for walls
-			for(i=0;i<map->numsects;i++) // second pass for double wall tex.
-			{
-				for(j=0;j<sec[i].n;j++)
-				{
-					wall_t *walp = &sec[i].wall[j];
-					int nwid = walp->n+j;
-					int curwalid = j;
-					// check.
-					walp->surf.owal = j;
-					walp->surf.otez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ; // next ce
-					walp->surf.uwal = nwid; //
-					walp->surf.utez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ; // next ce
-					walp->surf.vwal = j; // next wall ?
-					walp->surf.vtez = TEZ_OS | TEZ_FLOR | TEZ_RAWZ; // next ceil raw z
-
-					if (walp->surfn == 3)
-					{
-						// old code.
-						memcpy(walp->xsurf[0].uv,walp->surf.uv,sizeof(point2d)*3);
-						memcpy(walp->xsurf[1].uv,walp->surf.uv,sizeof(point2d)*3);
-						memcpy(walp->xsurf[2].uv,walp->surf.uv,sizeof(point2d)*3);
-
-						int nextpic = sec[walp->ns].wall[walp->nw].surf.tilnum;
-						walp->xsurf[2].tilnum = nextpic;
-						if ((b7wal.nextsect < 0) ^ (!(b7wal.cstat & WALL_ALIGN_FLOOR))) {
-							// flor align when top and bot segs are in door format
-							//top'
-							walp->xsurf[0].owal = j; // next wall ?
-							walp->xsurf[0].otez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ce
-							walp->xsurf[0].uwal = nwid; //
-							walp->xsurf[0].utez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ce
-							walp->xsurf[0].vwal = j; // next wall ?
-							walp->xsurf[0].vtez = TEZ_OS | TEZ_CEIL; // next ceil raw z
-
-							//mid in that case is aligned to other ceil. mid is always aligned to ns.
-							walp->xsurf[1].owal = j; // next wall ?
-							walp->xsurf[1].otez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ceil raw z
-							walp->xsurf[1].uwal = nwid; //
-							walp->xsurf[1].utez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ceil raw z
-							walp->xsurf[1].vwal = j; // next wall ?
-							walp->xsurf[1].vtez = TEZ_OS | TEZ_FLOR; // next ceil raw z
-							// bot
-
-							walp->xsurf[2].owal = j; // wal
-							walp->xsurf[2].otez = TEZ_NS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j, not slope!
-							walp->xsurf[2].uwal = nwid; // next wall
-							walp->xsurf[2].utez = TEZ_NS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
-							walp->xsurf[2].vwal = j; // next wall
-							walp->xsurf[2].vtez = TEZ_OS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
-
-
-						}
-						else // other kind of align -- to own ceil, but mask to other flor.
-						// also when double tex - then both sides have own alignment, and lower seg borrows its flags from nw.
-							// TO IMPLEMENT the above! ^^
-						{
-							//top
-							walp->xsurf[0].owal = j; // wal
-							walp->xsurf[0].otez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ; // next floor Z of j, not slope!
-							walp->xsurf[0].uwal = nwid; // next wall
-							walp->xsurf[0].utez = walp->xsurf[0].otez; // next floor Z of j
-							walp->xsurf[0].vwal = j; // next wall
-							walp->xsurf[0].vtez = TEZ_OS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
-
-							//mid in that case is aligned to other ceil. mid is always aligned to ns.
-							walp->xsurf[1].owal = j; // next wall ?
-							walp->xsurf[1].otez = TEZ_NS | TEZ_FLOR | TEZ_RAWZ; // next ceil raw z
-							walp->xsurf[1].uwal = nwid; //
-							walp->xsurf[1].utez = walp->xsurf[1].otez;
-							walp->xsurf[1].vwal = j; // next wall ?
-							walp->xsurf[1].vtez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ;
-
-							// bot // same as top.
-							walp->xsurf[0].owal = j; // wal
-							walp->xsurf[0].otez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ; // next floor Z of j, not slope!
-							walp->xsurf[0].uwal = nwid; // next wall
-							walp->xsurf[0].utez = walp->xsurf[0].otez; // next flo // next floor Z of j
-							walp->xsurf[0].vwal = j; // next wall
-							walp->xsurf[0].vtez = TEZ_OS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
-						}
-
-
-
-					}
-					// assume one unit is one uv, given scale. so units*unitstouv*scale.
-					// pan of 16 is 16 pixels. befre scaling.
-					// duke3d:
-					// x repeat 1 for wall means 8 pixels per entire wall length
-					// y repeat 1 for wall means 4 pixels per 8192 z units. = 1 z unit of b2
-					// x pan of 1 equals one pixel move before scaling. (so always 1 pixel)
-					// y pan of 8 = 1 pixel of 32x32 texture
-					// y pan of 2 = 1 pixel for 128x128  texture
-					// y pan of 2 - 1/4 pixel of 32x32.
-					// 128/2 = 1;
-					// 32/8=1;
-					// 256/32 = 8;
-					// 256/128 = 2;
-					// 256 / size = pans/pixel.
-
-
-					// also pans are limited by 256. so large textures wont work.
-					float xsize = tilesizx[walp->surf.tilnum];
-					float pix8 = 8.0f/xsize; //64/8 = 8
-					float scalerx = b7wal.xrepeat * pix8;
-
-					float ysize = tilesizy[walp->surf.tilnum];
-					float pix4 = 4.0f/ysize;
-					float nofp4 = (sec[i].z[0]-sec[i].z[1]);
-					float scalery = nofp4*pix4 *b7wal.yrepeat;
-
-					float px1 = 1.0f/xsize;
-					float ypans_per_px = 256.f/ysize;
-
-					walp->surf.uvform[0]=scalerx;
-					walp->surf.uvform[1]=scalery;
-					walp->surf.uvform[2]=px1 * b7wal.xpanning;
-					walp->surf.uvform[2]=px1 * (b7wal.ypanning/ypans_per_px);
-
-					makewaluvs(&sec[i],curwalid,map);
-				}
-				// can make uvs only when walls are there.
-				makesecuvs(&sec[i],map);
-
-				sec[i].surf[0].uvform[0]=1;
-				sec[i].surf[0].uvform[1]=1;
-				sec[i].surf[1].uvform[0]=1;
-				sec[i].surf[1].uvform[1]=1;
 			}
 
 			kzread(&s,2); map->numspris = (int)s;
@@ -992,15 +887,160 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				loadpic(gtpic,curmappath);
 		}
 
-		if (tilesizx) free(tilesizx);
-		if (tilesizy) free(tilesizy);
-		if (tilefile) free(tilefile);
-
 #ifdef STANDALONE
 	//	for(i=numplayers-1;i>=0;i--) gst->p[i].sec.n = 0;
 #endif
 		checknextwalls_imp(map);
 		checksprisect_imp(-1,map);
+
+
+			//second pass for walls
+			for (i = 0; i < map->numsects; i++) // second pass for double wall tex.
+			{
+				for (j = 0; j < sec[i].n; j++) {
+					wall_t *walp = &sec[i].wall[j];
+					int nwid = walp->n + j;
+					int curwalid = j;
+					int yrepeat = walp->surf.owal;
+					int isfloralign = walp->surf.uwal;
+
+					walp->surf.owal = j;
+					walp->surf.otez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ;
+					walp->surf.uwal = nwid; //
+					walp->surf.utez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ;
+					walp->surf.vwal = j; // next wall ?
+					walp->surf.vtez = TEZ_OS | TEZ_FLOR | TEZ_RAWZ;
+
+
+					memcpy(&walp->xsurf[0].uvform, &walp->surf.uvform, sizeof(float) * 6);
+					int ns = walp->ns;
+					if (walp->surfn == 3 && ns >= 0) // handle multi wall.
+					{
+						memcpy(&walp->xsurf[1].uvform, &walp->surf.uvform, sizeof(float) * 6);
+						memcpy(&walp->xsurf[2].uvform, &walp->surf.uvform, sizeof(float) * 6);
+						int nextpic = sec[walp->ns].wall[walp->nw].surf.tilnum;
+
+						// assume one unit is one uv, given scale. so units*unitstouv*scale.
+						// pan of 16 is 16 pixels. befre scaling.
+						// duke3d:
+						// x repeat 1 for wall means 8 pixels per entire wall length
+						// y repeat 1 for wall means 4 pixels per 8192 z units. = 1 z unit of b2
+						// x pan of 1 equals one pixel move before scaling. (so always 1 pixel)
+						// y pan of 8 = 1 pixel of 32x32 texture
+						// y pan of 2 = 1 pixel for 128x128  texture
+						// y pan of 2 - 1/4 pixel of 32x32.
+						// 128/2 = 1;
+						// 32/8=1;
+						// 256/32 = 8;
+						// 256/128 = 2;
+						// 256 / size = pans/pixel.
+						float slabh[3];
+						// top to bottom. positive H = floor-ceil.
+						slabh[0] = (sec[ns].z[0] - sec[i].z[0]);
+						slabh[1] = (sec[ns].z[1] - sec[ns].z[0]);
+						slabh[2] = (sec[i].z[1] - sec[ns].z[1]);
+						if (walp->xsurf[2].tilnum == -2) //(b7wal.cstat & WALL_BOTTOM_SWAP)
+							walp->xsurf[2].tilnum = nextpic;
+						for (int sl=0;sl<3;sl++) {
+							float ysize = tilesizy[walp->xsurf[sl].tilnum];
+							float pix4 = 4.0f / ysize;
+							float normuvperz = pix4 * yrepeat;
+							walp->xsurf[0].uvform[1] = slabh[sl] * normuvperz;
+						}
+
+
+						if ((walp->surfn == 3) ^ (!isfloralign)) {
+							// flor align when top and bot segs are in door format
+							//top'
+							walp->xsurf[0].owal = j; // next wall ?
+							walp->xsurf[0].otez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ce
+							walp->xsurf[0].uwal = nwid; //
+							walp->xsurf[0].utez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ce
+							walp->xsurf[0].vwal = j; // next wall ?
+							walp->xsurf[0].vtez = TEZ_OS | TEZ_CEIL; // next ceil raw z
+
+
+							//mid in that case is aligned to other ceil. mid is always aligned to ns.
+							walp->xsurf[1].owal = j; // next wall ?
+							walp->xsurf[1].otez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ceil raw z
+							walp->xsurf[1].uwal = nwid; //
+							walp->xsurf[1].utez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ceil raw z
+							walp->xsurf[1].vwal = j; // next wall ?
+							walp->xsurf[1].vtez = TEZ_OS | TEZ_FLOR; // next ceil raw z
+
+							//bot;
+							walp->xsurf[2].owal = j; // wal
+							walp->xsurf[2].otez = TEZ_NS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j, not slope!
+							walp->xsurf[2].uwal = nwid; // next wall
+							walp->xsurf[2].utez = TEZ_NS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
+							walp->xsurf[2].vwal = j; // next wall
+							walp->xsurf[2].vtez = TEZ_OS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
+						} else // other kind of align -- to own ceil, but mask to other flor.
+						// also when double tex - then both sides have own alignment, and lower seg borrows its flags from nw.
+						// TO IMPLEMENT the above! ^^
+						{
+							//top
+							walp->xsurf[0].owal = j; // wal
+							walp->xsurf[0].otez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ; // next floor Z of j, not slope!
+							walp->xsurf[0].uwal = nwid; // next wall
+							walp->xsurf[0].utez = walp->xsurf[0].otez; // next floor Z of j
+							walp->xsurf[0].vwal = j; // next wall
+							walp->xsurf[0].vtez = TEZ_OS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
+
+							//mid in that case is aligned to other ceil. mid is always aligned to ns.
+							walp->xsurf[1].owal = j; // next wall ?
+							walp->xsurf[1].otez = TEZ_NS | TEZ_FLOR | TEZ_RAWZ; // next ceil raw z
+							walp->xsurf[1].uwal = nwid; //
+							walp->xsurf[1].utez = walp->xsurf[1].otez;
+							walp->xsurf[1].vwal = j; // next wall ?
+							walp->xsurf[1].vtez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ;
+
+							// bot // same as top.
+							walp->xsurf[0].owal = j; // wal
+							walp->xsurf[0].otez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ; // next floor Z of j, not slope!
+							walp->xsurf[0].uwal = nwid; // next wall
+							walp->xsurf[0].utez = walp->xsurf[0].otez; // next flo // next floor Z of j
+							walp->xsurf[0].vwal = j; // next wall
+							walp->xsurf[0].vtez = TEZ_OS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
+						}
+					}
+					else { // single wall.
+						if (isfloralign) {
+							// flor align when top and bot segs are in door format
+							//top'
+							walp->xsurf[0].owal = j; // next wall ?
+							walp->xsurf[0].otez = TEZ_OS | TEZ_FLOR | TEZ_RAWZ; // next ce
+							walp->xsurf[0].uwal = nwid; //
+							walp->xsurf[0].utez = walp->xsurf[0].otez; // next ce
+							walp->xsurf[0].vwal = j; // next wall ?
+							walp->xsurf[0].vtez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ; // next ceil raw z
+						}
+							else {
+								walp->xsurf[0].owal = j; // wal
+								walp->xsurf[0].otez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ; // next floor Z of j, not slope!
+								walp->xsurf[0].uwal = nwid; // next wall
+								walp->xsurf[0].utez = walp->xsurf[0].otez; // next floor Z of j
+								walp->xsurf[0].vwal = j; // next wall
+								walp->xsurf[0].vtez = TEZ_OS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
+							}
+					}
+
+
+					makewaluvs(&sec[i], curwalid, map);
+				}
+				// can make uvs only when walls are there.
+				makesecuvs(&sec[i], map);
+
+				sec[i].surf[0].uvform[0] = 1;
+				sec[i].surf[0].uvform[1] = 1;
+				sec[i].surf[1].uvform[0] = 1;
+				sec[i].surf[1].uvform[1] = 1;
+			}
+
+		if (tilesizx) free(tilesizx);
+		if (tilesizy) free(tilesizy);
+		if (tilefile) free(tilefile);
+
 		kzclose();
 		return(1);
 	}

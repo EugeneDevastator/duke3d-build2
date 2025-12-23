@@ -235,7 +235,7 @@ static player_transform *gps;
 	//Texture mapping parameters
 static tile_t *gtpic;
 
-static int gcurcol;
+static int gcurcol, gtilenum;
 static int taginc= 30000;
 #define LIGHTMAX 256 //FIX:make dynamic!
 lightpos_t shadowtest2_light[LIGHTMAX];
@@ -736,11 +736,13 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 	if (b->gisflor < 2) {
 		eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].surf[b->gisflor].uvcoords;
 		eyepol[eyepoln].uvform = curMap->sect[b->gligsect].surf[b->gisflor].uvform;
-	} else {
-		eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].wall[b->gligwall].surf.uvcoords;
-		eyepol[eyepoln].uvform = curMap->sect[b->gligsect].wall[b->gligwall].surf.uvform;
+	} else { // walls
+		eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].uvcoords;
+		eyepol[eyepoln].uvform = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].uvform;
 		//xsurf[b->gligslab % 3].uvcoords;
 	}
+	eyepol[eyepoln].tilnum = gtilenum;
+	eyepol[eyepoln].slabid = b->gligslab; // 0 -top, 1 - mid, 2-bot.
 
 	// transform verts to WS
 	for (int pn= chain_starts[0]; pn<eyepolvn;pn++) {
@@ -1396,6 +1398,7 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 		// Setup texture and rendering flags
 		sur = &sec[s].surf[isflor];
 		gtpic = &gtile[sur->tilnum];
+		gtilenum = sur->tilnum;
 		//if (!gtpic->tt.f) loadpic(gtpic);
 		if (sec[s].surf[isflor].flags & (1 << 17)) { b->gflags = 2; } //skybox ceil/flor
 		else if (sec[s].surf[isflor].flags & (1 << 16)) {  //parallaxing ceil/flor
@@ -1435,7 +1438,7 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 		// Get wall vertices and setup wall segment
 		vn = getwalls_imp(s,twal[ww].i,verts,MAXVERTS,map);
 		w = twal[ww].i; nw = wal[w].n+w;
-		sur = &wal[w].surf;
+		sur = &wal[w].xsurf[0];
 
 		int myport = wal[w].tags[1]; // FLOOR PORTAL CHECK
 		bool isportal = myport >= 0
@@ -1497,7 +1500,8 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 
 			if ((!(m & 1)) || (wal[w].surf.flags & (1 << 5))) //Draw wall here //(1<<5): 1-way
 			{
-				//	gtpic = &gtile[sur->tilnum]; if (!gtpic->tt.f) loadpic(gtpic);
+					gtilenum = sur->tilnum;
+					//gtpic = &gtile[sur->tilnum];// if (!gtpic->tt.f) loadpic(gtpic);
 				if (sur->flags & (1 << 17))	{ b->gflags = 2; } //skybox ceil/flor
 				if (sur->flags & (1 << 16))  b->gflags = 1;
 {

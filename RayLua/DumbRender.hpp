@@ -39,6 +39,7 @@ typedef struct {
      int worldOriginLoc;
      int worldULoc;
      int worldVLoc;
+     int textureLoc;
      int vertexTexCoord;
  } UVShaderDesc;
 struct WallSegment
@@ -110,10 +111,11 @@ public:
         // Get uniform locations
         uvShaderDesc.vertexTexCoord = rlGetLocationUniform(uvShaderDesc.shader.id, "vertexTexCoord");
       //  int vertexIndexLoc = rlGetLocationUniform(uvShaderDesc.shader.id, "vertexIndex");
-
+        uvShaderDesc.textureLoc = GetShaderLocation(uvShaderDesc.shader, "textureSampler");
         uvShaderDesc.worldOriginLoc = GetShaderLocation(uvShaderDesc.shader, "worldOrigin");
         uvShaderDesc.worldULoc = GetShaderLocation(uvShaderDesc.shader, "worldU");
         uvShaderDesc.worldVLoc = GetShaderLocation(uvShaderDesc.shader, "worldV");
+
            }
    static  void SetUVShaderParams(UVShaderDesc uvShader, Vector3 worldOrigin, Vector3 worldU, Vector3 worldV) {
         SetShaderValue(uvShader.shader, uvShader.worldOriginLoc, &worldOrigin, SHADER_UNIFORM_VEC3);
@@ -548,7 +550,9 @@ public:
             bpv3(eyepol[i].worlduvs[0]),
             bpv3(eyepol[i].worlduvs[1]),
             bpv3(eyepol[i].worlduvs[2]));
+        const Texture2D tex = runtimeTextures[eyepol[i].tilnum];
 
+        SetShaderValueTexture(uvShaderDesc.shader,uvShaderDesc.textureLoc,tex);
         rlBegin(RL_TRIANGLES);
         for (int ii = 0; ii < eyepol[i].nid; ii += 3) {
             float g = (ii/3 /5.0f);
@@ -603,7 +607,7 @@ public:
         rlBegin(RL_TRIANGLES);
         for (int ii = 0; ii < eyepol[i].nid-3; ii += 3) {
             float g = (ii/3 /5.0f);
-            rlColor4f(r,g+0.1f,b,0.2);
+            rlColor4f(eyepol[i].slabid/3.0f,g+0.1f,b,0.2);
             for (int j = 0; j < 3; j++) {
                 int idx = eyepol[i].indices[ii+j];
                 rlVertex3f(eyepolv[idx].x, -eyepolv[idx].z, eyepolv[idx].y);
@@ -1853,7 +1857,7 @@ private:
             if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
             map->blankheadspri = i;
         }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/uv.MAP", map);
+        loadmap_imp((char*)"c:/Eugene/Games/build2/uvsim.MAP", map);
     }
 };
 
