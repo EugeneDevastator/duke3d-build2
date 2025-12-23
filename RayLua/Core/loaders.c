@@ -613,7 +613,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					thiswal->surf.uvform[0]=scalerx;
 					thiswal->surf.uvform[1]=scalery;
 					thiswal->surf.uvform[2]=px1 * b7wal.xpanning;
-					thiswal->surf.uvform[2]=px1 * (b7wal.ypanning/ypans_per_px);
+					thiswal->surf.uvform[3]=px1 * (b7wal.ypanning/ypans_per_px);
 				}
 				// tile adjust?
 				for(j=0;j<sec[i].n;j++)
@@ -1013,7 +1013,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							walp->xsurf[0].uwal = nwid; //
 							walp->xsurf[0].utez = walp->xsurf[0].otez; // next ce
 							walp->xsurf[0].vwal = j; // next wall ?
-							walp->xsurf[0].vtez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ; // next ceil raw z
+							walp->xsurf[0].vtez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ | TEZ_INVZ; // next ceil raw z
 						}
 							else {
 								walp->xsurf[0].owal = j; // wal
