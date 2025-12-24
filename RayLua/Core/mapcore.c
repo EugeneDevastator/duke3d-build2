@@ -590,7 +590,7 @@ void makesecuvs(sect_t *sect, mapstate_t *map) {
 		float xpan = sur->uvform[2];
 		float ypan = sur->uvform[3];
 
-		int scaler = sect->mflags[fl] & SECTOR_EXPAND_TEXTURE ? 1 : 2;
+		float scaler = (sect->mflags[fl] & SECTOR_EXPAND_TEXTURE) ? 1 : 2.0f;
 		ymul *= -1; // world x-flipped
 
 
@@ -601,21 +601,24 @@ void makesecuvs(sect_t *sect, mapstate_t *map) {
 			sur->uvform[0] = 1;
 			sur->uvform[1] = 1;
 		} else if (sur->uvmapkind == UV_TEXELRATE) {
+			scaler = (sect->mflags[fl] & SECTOR_EXPAND_TEXTURE) ? 4 : 1;
 			point2d nwp = walnext(sect, 0).pos;
 			sur->uvcoords[0] = (point3d){wp.x, wp.y, z};
 			point3d vvec = (point3d){nwp.x, nwp.y, z};
 			// get ortho to wall,
 			point3d normU = subtract(vvec, sur->uvcoords[0]);
-
 			normU = normalizep3(normU);
 			sur->uvcoords[1] = normU;
 			addto(&sur->uvcoords[1], sur->uvcoords[0]);
 
 			rot90cwz(&normU);
-			addto(&normU, sur->uvcoords[0]);
-			float vz = getslopez(sect, fl, normU.x, normU.y);
+			// get sloped Z and normalize;
+			float vz = getslopez(sect, fl, normU.x+sur->uvcoords[0].x, normU.y+sur->uvcoords[0].y);
+			normU.z = vz-z;
+			normU = normalizep3(normU);
 
-			sur->uvcoords[2] = (point3d){normU.x, normU.y, vz};
+			addto(&normU, sur->uvcoords[0]);
+			sur->uvcoords[2] = normU;
 			sur->uvform[0] = xmul * scaler;
 			sur->uvform[1] = ymul * scaler;
 		}
