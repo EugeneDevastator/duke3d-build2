@@ -603,25 +603,26 @@ void makesecuvs(sect_t *sect, mapstate_t *map) {
 		} else if (sur->uvmapkind == UV_TEXELRATE) {
 			point2d nwp = walnext(sect, 0).pos;
 			sur->uvcoords[0] = (point3d){wp.x, wp.y, z};
-			sur->uvcoords[1] = (point3d){nwp.x, nwp.y, z};
+			point3d vvec = (point3d){nwp.x, nwp.y, z};
 			// get ortho to wall,
-			point3d normU = subtract(sur->uvcoords[1], sur->uvcoords[0]);
+			point3d normU = subtract(vvec, sur->uvcoords[0]);
 
 			normU = normalizep3(normU);
-			sur->uvcoords[2] = normU;
-			addto(&sur->uvcoords[2], sur->uvcoords[0]);
+			sur->uvcoords[1] = normU;
+			addto(&sur->uvcoords[1], sur->uvcoords[0]);
 
 			rot90cwz(&normU);
 			addto(&normU, sur->uvcoords[0]);
 			float vz = getslopez(sect, fl, normU.x, normU.y);
 
-			sur->uvcoords[1] = (point3d){normU.x, normU.y, vz};
+			sur->uvcoords[2] = (point3d){normU.x, normU.y, vz};
 			sur->uvform[0] = xmul * scaler;
 			sur->uvform[1] = ymul * scaler;
 		}
 
 		if ((sect->mflags[fl] & SECTOR_FLIP_X)) sur->uvform[0] *= -1;
 		if ((sect->mflags[fl] & SECTOR_FLIP_Y)) sur->uvform[1] *= -1;
+
 		if (sect->mflags[fl] & SECTOR_SWAP_XY) {
 			if (((sect->mflags[fl] & SECTOR_FLIP_X) != 0) != ((sect->mflags[fl] & SECTOR_FLIP_Y) != 0)) {
 				sur->uvform[0] *= -1;
