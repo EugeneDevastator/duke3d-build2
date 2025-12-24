@@ -327,7 +327,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			short sectnum, statnum, ang, owner, xvel, yvel, zvel, lotag, hitag, extra;
 		} build7spri_t;
 		build7sect_t b7sec;
-
+		build7wall_t b7wal;
 		build7spri_t b7spr;
 
 		//Cubes5 format variables:
@@ -538,7 +538,6 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			int wallidx =0;
 			for(i=k=0;i<map->numsects;i++) // Parse walls
 			{
-				build7wall_t b7wal;
 				for(j=0;j<sec[i].n;j++,k++) // walls
 				{
 					kzread(&b7wal,sizeof(b7wal));
