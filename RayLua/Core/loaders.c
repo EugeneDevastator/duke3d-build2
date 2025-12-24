@@ -590,9 +590,9 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						}
 
 						thiswal->xsurf[1].asc = opacity;
-						makeslabuvform(1, -1, thiswal,
-						               (int[4]){b7wal.xrepeat, b7wal.yrepeat, b7wal.xpanning, b7wal.ypanning},
-						               (int[2]){0, 0});
+						//makeslabuvform(1, -1, thiswal,
+						//               (int[4]){b7wal.xrepeat, b7wal.yrepeat, b7wal.xpanning, b7wal.ypanning},
+						//               (int[2]){0, 0});
 					}
 					else {
 						thiswal->xsurf = malloc(sizeof(surf_t) * 1);
@@ -619,6 +619,8 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					thiswal->surf.uvform[1]=scalery;
 					thiswal->surf.uvform[2]=px1x * b7wal.xpanning;
 					thiswal->surf.uvform[3]=px1y * (b7wal.ypanning/ypans_per_px);
+
+
 				}
 				// tile adjust?
 				for(j=0;j<sec[i].n;j++)
@@ -996,6 +998,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							int newsizy = tilesizy[walp->xsurf[1].tilnum];
 //
 							walp->xsurf[1].uvform[0] *= cursizx/(float)newsizx;
+							walp->xsurf[1].uvform[2] *= cursizx/(float)newsizx;
 						//	walp->xsurf[1].uvform[1] *= cursizy/(float)newsizy;
 						}
 
