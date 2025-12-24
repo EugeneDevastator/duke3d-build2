@@ -470,7 +470,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					sur->uv[0].x = ((float)b7sec.surf[j].xpanning)/256.0;
 					sur->uv[0].y = ((float)b7sec.surf[j].ypanning)/256.0;
 					sur->uv[1].y = sur->uv[2].x = 0;
-					if (!(b7sec.stat[j]&4))
+					if (!(b7sec.stat[j]&SECTOR_SWAP_XY))
 					{
 						sur->uv[1].x = 32.0/((float)tilesizx[l]);
 						sur->uv[2].y = 32.0/((float)tilesizy[l]);

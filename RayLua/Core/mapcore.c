@@ -575,45 +575,71 @@ void makesecuvs(sect_t *sect, mapstate_t *map) {
 	wall_t *w = &sect->wall[0];
 	point2d wp = w->pos;
 
-	for (int fl=0;fl<2;fl++) {
-
+	for (int fl = 0; fl < 2; fl++) {
 		float z = sect->z[fl];
-		surf_t* sur = &sect->surf[fl];
-		float xmul = sur->uvform[0];
-		float ymul = sur->uvform[1];
+		surf_t *sur = &sect->surf[fl];
+		float xmul,ymul;
+		if ((sect->mflags[fl] &SECTOR_SWAP_XY)) {
+			 xmul = sur->uvform[1];
+			 ymul = sur->uvform[0];
+		}else {
+			xmul = sur->uvform[0];
+			ymul = sur->uvform[1];
+		}
+
 		float xpan = sur->uvform[2];
 		float ypan = sur->uvform[3];
 
-		sur->uvform[0] = 1;
-		sur->uvform[1] = 1;
 		int scaler = sect->mflags[fl] & SECTOR_EXPAND_TEXTURE ? 1 : 2;
-		xmul *=-1; // world y is flipped;
+		ymul *= -1; // world x-flipped
+
+
 		if (sur->uvmapkind == UV_WORLDXY) {
-			sur->uvcoords[0] = (point3d){   0,0,z};
-			sur->uvcoords[2] = (point3d){0,scaler*xmul,z};
-			sur->uvcoords[1] = (point3d){scaler*ymul,0,z};
+			sur->uvcoords[0] = (point3d){0, 0, z};
+			sur->uvcoords[1] = (point3d){scaler * xmul, 0, z};
+			sur->uvcoords[2] = (point3d){0, scaler * ymul, z};
+			sur->uvform[0] = 1;
+			sur->uvform[1] = 1;
+		} else if (sur->uvmapkind == UV_TEXELRATE) {
+			point2d nwp = walnext(sect, 0).pos;
+			sur->uvcoords[0] = (point3d){wp.x, wp.y, z};
+			sur->uvcoords[1] = (point3d){nwp.x, nwp.y, z};
+			// get ortho to wall,
+			point3d normU = subtract(sur->uvcoords[1], sur->uvcoords[0]);
+
+			normU = normalizep3(normU);
+			sur->uvcoords[2] = normU;
+			addto(&sur->uvcoords[2], sur->uvcoords[0]);
+
+			rot90cwz(&normU);
+			addto(&normU, sur->uvcoords[0]);
+			float vz = getslopez(sect, fl, normU.x, normU.y);
+
+			sur->uvcoords[1] = (point3d){normU.x, normU.y, vz};
+			sur->uvform[0] = xmul * scaler;
+			sur->uvform[1] = ymul * scaler;
 		}
-		else
-			if (sur->uvmapkind == UV_TEXELRATE) {
-				point2d nwp = walnext(sect,0).pos;
-				sur->uvcoords[0] = (point3d){   wp.x,   wp.y,z};
-				sur->uvcoords[1] = (point3d){   nwp.x, nwp.y,z};
-				// get ortho to wall,
-				point3d normU = subtract(sur->uvcoords[1],sur->uvcoords[0]);
 
-				normU = normalizep3(normU);
-				sur->uvcoords[2] = normU;
-				addto(&sur->uvcoords[2],sur->uvcoords[0]);
-
-				normU = normalizep3(normU);
-				rot90cwz(&normU);
-				addto(&normU,sur->uvcoords[0]);
-				float vz = getslopez(sect,fl,normU.x,normU.y);
-
-				sur->uvcoords[1] = (point3d){normU.x,normU.y,vz};
-				sur->uvform[0]=xmul*scaler;
-				sur->uvform[1]=ymul*scaler;
+		if ((sect->mflags[fl] & SECTOR_FLIP_X)) sur->uvform[0] *= -1;
+		if ((sect->mflags[fl] & SECTOR_FLIP_Y)) sur->uvform[1] *= -1;
+		if (sect->mflags[fl] & SECTOR_SWAP_XY) {
+			if (((sect->mflags[fl] & SECTOR_FLIP_X) != 0) != ((sect->mflags[fl] & SECTOR_FLIP_Y) != 0)) {
+				sur->uvform[0] *= -1;
+				sur->uvform[1] *= -1;
 			}
+			float t;
+			t = sur->uvform[0];
+			sur->uvform[0] = sur->uvform[1];
+			sur->uvform[1] = t;
+			t = 0;
+			t = sur->uvform[2];
+			sur->uvform[2] = sur->uvform[3];
+			sur->uvform[3] = t;
+
+			point3d tp = sur->uvcoords[1];
+			sur->uvcoords[1] = sur->uvcoords[2];
+			sur->uvcoords[2] = tp;
+		}
 	}
 }
 
