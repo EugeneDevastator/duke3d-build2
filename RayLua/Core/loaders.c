@@ -509,8 +509,14 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					float ysize = tilesizy[sec[i].surf[j].tilnum];
 					//float pix8 = 8.0f/xsize; //64/8 = 8
 					//float scalerx = pix8;
-					sec[i].surf[j].uvcoords[0].x = xsize/64;
-					sec[i].surf[j].uvcoords[0].y = ysize/64;
+					sec[i].surf[j].uvform[0] = xsize/64.0; // scale is always off 64.
+					sec[i].surf[j].uvform[1] = ysize/64.0;
+					// mull px = tile / 256
+					//  64 / 256 = 4;
+					// 1 px =
+					sec[i].surf[j].uvform[2] = (1.0/256.0)*b7sec.surf[j].xpanning; // 1 pixel per 16 pans, before scaling. 4 pans for 64 tile
+					sec[i].surf[j].uvform[3] = (1.0/256.0)*b7sec.surf[j].ypanning;
+
 				}
 
 				sec[i].headspri = -1;
