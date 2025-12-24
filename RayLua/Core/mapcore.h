@@ -117,6 +117,7 @@ int getverts_imp (int s, int w, vertlist_t *ver, int maxverts, mapstate_t* map);
 long insspri_imp (int sect, float x, float y, float z, mapstate_t *map);
 void delspri_imp (int i, mapstate_t *map);
 void changesprisect_imp (int i, int nsect, mapstate_t *map);
+void makeslabuvform(int surfid, float slabH, wall_t *wal, int dukescales[4], int tilesize[2]);
 //Clip wall slopes. Returns loop ordered poly (0, 3, or 4 points)
 //pol[0]   pol[1]
 //pol[3]   pol[2]

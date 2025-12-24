@@ -590,11 +590,15 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						}
 
 						thiswal->xsurf[1].asc = opacity;
+						makeslabuvform(1, -1, thiswal,
+						               (int[4]){b7wal.xrepeat, b7wal.yrepeat, b7wal.xpanning, b7wal.ypanning},
+						               (int[2]){0, 0});
 					}
 					else {
 						thiswal->xsurf = malloc(sizeof(surf_t) * 1);
 						thiswal->xsurf[0].tilnum = b7wal.picnum;
 					}
+					float wallh = (sec[i].z[1]-sec[i].z[0]);
 					// also pans are limited by 256. so large textures wont work.
 					float xsize = tilesizx[thiswal->surf.tilnum];
 					float pix8 = 8.0f/xsize; //64/8 = 8
@@ -602,7 +606,6 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 
 					float ysize = tilesizy[thiswal->surf.tilnum];
 					float pix4 = 4.0f/ysize;
-					float wallh = (sec[i].z[1]-sec[i].z[0]);
 					float normuvperz = pix4 * b7wal.yrepeat;
 					float scalery = wallh * normuvperz;
 
@@ -610,6 +613,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					float px1y = 1.0f/ysize;
 					float ypans_per_px = 256.f/ysize;
 					thiswal->surf.owal = b7wal.yrepeat; // need for second pass.
+					thiswal->surf.vwal = b7wal.xrepeat; // need for second pass.
 					thiswal->surf.uwal = b7wal.cstat & WALL_ALIGN_FLOOR; // need for second pass.
 					thiswal->surf.uvform[0]=scalerx;
 					thiswal->surf.uvform[1]=scalery;
@@ -914,8 +918,8 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					//walp->surf.vwal = j; // next wall ?
 					//walp->surf.vtez = TEZ_OS | TEZ_FLOR | TEZ_RAWZ;
 
-
 					memcpy(&walp->xsurf[0].uvform, &walp->surf.uvform, sizeof(float) * 6);
+
 					int ns = walp->ns;
 					if (walp->surfn == 3 && ns >= 0) // handle multi wall.
 					{
@@ -963,8 +967,9 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						// 256 / size = pans/pixel.
 						float slabh[3];
 						// top to bottom. positive H = floor-ceil.
+
 						slabh[0] = (sec[ns].z[0] - sec[i].z[0]);
-						slabh[1] = (max(sec[ns].z[1],sec[i].z[1]) - min(sec[ns].z[0],sec[i].z[0]));
+						slabh[1] = (min(sec[ns].z[1],sec[i].z[1]) - max(sec[ns].z[0],sec[i].z[0]));
 						slabh[2] = (sec[i].z[1] - sec[ns].z[1]);
 
 						// for tomorrow - deal with x,y flips
@@ -992,8 +997,6 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 //
 							walp->xsurf[1].uvform[0] *= cursizx/(float)newsizx;
 						//	walp->xsurf[1].uvform[1] *= cursizy/(float)newsizy;
-							//	walp->xsurf[1].uvform[2] = oppwal->surf.uvform[2];
-							//	walp->xsurf[1].uvform[3] = oppwal->surf.uvform[3];
 						}
 
 						if (!isfloralign) {
@@ -1063,7 +1066,8 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							walp->xsurf[0].utez = walp->xsurf[0].otez; // next ce
 							walp->xsurf[0].vwal = j; // next wall ?
 							walp->xsurf[0].vtez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ | TEZ_INVZ; // next ceil raw z
-						} else {
+						}
+						else {
 							walp->xsurf[0].owal = j; // wal
 							walp->xsurf[0].otez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ; // next floor Z of j, not slope!
 							walp->xsurf[0].uwal = nwid; // next wall
@@ -1072,7 +1076,6 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							walp->xsurf[0].vtez = TEZ_OS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
 						}
 					}
-
 
 					makewaluvs(&sec[i], curwalid, map);
 				}
