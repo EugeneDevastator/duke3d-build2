@@ -1077,11 +1077,9 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 
 					makewaluvs(&sec[i], curwalid, map);
 
-					if (isyuvflip)
-						for (int sl=0;sl<walp->surfn;sl++) {
-							walp->xsurf[sl].uvform[1] *= yflipmul[sl];
-							walp->xsurf[sl].uvform[3] *= yflipmul[sl];
-						}
+					for (int sl=0;sl<walp->surfn;sl++) {
+						walp->xsurf[sl].uvform[1] *= yflipmul[sl];
+					}
 				}
 				// can make uvs only when walls are there.
 				makesecuvs(&sec[i], map);
