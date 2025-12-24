@@ -84,7 +84,7 @@
 #define SECTOR_EXPAND_TEXTURE   (1 << 3)   // 8
 #define SECTOR_FLIP_X           (1 << 4)   // 16
 #define SECTOR_FLIP_Y           (1 << 5)   // 32
-#define SECTOR_RELATIVE_ALIGN   (1 << 6)   // 64
+#define SECTOR_TEXWALL_ALIGN    (1 << 6)   // 64
 #define SECTOR_MASKED           (1 << 7)   // 128
 #define SECTOR_TRANSLUCENT      (1 << 8)   // 256
 #define SECTOR_REVERSE_TRANS    (SECTOR_MASKED | SECTOR_TRANSLUCENT) // 384
@@ -99,10 +99,10 @@
 #define SPRITE_B2_ONE_SIDED        (1 << 6)   // 64
 #define SPRITE_B2_IS_LIGHT     (1 << 16)   // 64
 
-#define UV_TEXELRATE 		0
-#define UV_NORMRATE 		1
-#define UV_TEXELFIT 		2
-#define UV_NORM_FIT 		3
+#define UV_TEXELRATE 		0 // pixel-rated = duke default.
+#define UV_NORMRATE 		1 // tile-rated
+#define UV_TEXELFIT 		2 // fit preserving texelrate
+#define UV_NORMFIT 		3 // fit to entire square
 #define UV_PARALLAX_LIN 	4
 #define UV_PARALLAX_CYL 	5
 #define UV_PARALLAX_SPH 	6
@@ -122,7 +122,7 @@
 // raw z or slope z;
 
 // placeholders for readability
-// Own sector
+// Dont use in main parser!
 #define TEZ_OS 0
 #define TEZ_RAWZ 0
 #define TEZ_CEIL 0
@@ -130,7 +130,8 @@
 #define TEZ_FLOR 1<<0  // use floor or ceil
 #define TEZ_NS 1<<1 // this or next sect
 #define TEZ_SLOPE 1<<2 // slope or rawz;
-#define TEZ_WALNX 1<<3 // use next continious wall
+#define TEZ_INVZ 1<<3 // use next continious wall
+#define TEZ_CLOSEST 1<<4 // closest height point instead of arbitrary.
 
 // auto resolution optioons, written in ouv wal
 #define TEW_WORLDF -1
@@ -244,6 +245,7 @@ typedef struct
 	// for portals case - we dont care and use original world for everything.
 	// interpolator will lerp worldpositions, regardless of poly location
 	point3d uvcoords[3]; // world uv vectors. generated per poly. origin, u ,v
+	float uvform[6]; // scalexy, panxy
 	// can in theory use object space and encode it.
 
 } surf_t;

@@ -928,7 +928,6 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						{
 							oppwal = &sec[walp->ns].wall[walp->nw];
 
-						//	memcpy(&walp->xsurf[2].uvform, oppwal->surf.uvform, sizeof(float) * 6);
 							isfloralignbot = oppwal->surf.uwal;
 							yrepeatbot = oppwal->surf.owal;
 							int cursizx = tilesizx[walp->xsurf[0].tilnum];
@@ -941,14 +940,11 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							walp->xsurf[2].uvform[1] *= cursizy/(float)newsizy;
 							walp->xsurf[2].uvform[2] = oppwal->surf.uvform[2];
 							walp->xsurf[2].uvform[3] = oppwal->surf.uvform[3];
-
 							walp->xsurf[2].tilnum = nextpic;
 							// also pans are limited by 256. so large textures wont work.
 							//*newx/oldx;
 						}
-						else {
 
-						}
 
 
 						// assume one unit is one uv, given scale. so units*unitstouv*scale.
@@ -968,36 +964,55 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						float slabh[3];
 						// top to bottom. positive H = floor-ceil.
 						slabh[0] = (sec[ns].z[0] - sec[i].z[0]);
-						slabh[1] = (sec[ns].z[1] - sec[ns].z[0]);
+						slabh[1] = (max(sec[ns].z[1],sec[i].z[1]) - min(sec[ns].z[0],sec[i].z[0]));
 						slabh[2] = (sec[i].z[1] - sec[ns].z[1]);
-						bool floralig[3] = {isfloralign,isfloralign,isfloralignbot};
 
+						// for tomorrow - deal with x,y flips
+						// deal with masked wall scaling.
 						// this is here because we need to know params of next sector.
+						bool floralig[3] = {isfloralign,0,isfloralignbot};
 						for (int sl=0;sl<3;sl++) {
+							if(sl==2 && floralig[sl])
+								continue;
+
 							float ysize = tilesizy[walp->xsurf[sl].tilnum];
 							float pix4 = 4.0f / ysize;
 							float normuvperz = pix4 * yrepeat;
-							if(!floralig[sl]) // for flor aligned we use same rect for both chunks
+							if(!floralig[sl])// for flor aligned we use same rect for both chunks
 								walp->xsurf[sl].uvform[1] = slabh[sl] * normuvperz;
+						}
+
+						//rescale mid texture
+						{
+							int cursizx = tilesizx[walp->xsurf[0].tilnum];
+							int newsizx = tilesizx[walp->xsurf[1].tilnum];
+//
+							int cursizy = tilesizy[walp->xsurf[0].tilnum];
+							int newsizy = tilesizy[walp->xsurf[1].tilnum];
+//
+							walp->xsurf[1].uvform[0] *= cursizx/(float)newsizx;
+						//	walp->xsurf[1].uvform[1] *= cursizy/(float)newsizy;
+							//	walp->xsurf[1].uvform[2] = oppwal->surf.uvform[2];
+							//	walp->xsurf[1].uvform[3] = oppwal->surf.uvform[3];
 						}
 
 						if (!isfloralign) {
 							// in case of standard align - we do door-snapping style,
 							//top'
 							walp->xsurf[0].owal = j; // next wall ?
-							walp->xsurf[0].otez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ce
+							walp->xsurf[0].otez = TEZ_NS ;//| TEZ_CEIL | TEZ_RAWZ; // next ce
 							walp->xsurf[0].uwal = nwid; //
-							walp->xsurf[0].utez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ce
+							walp->xsurf[0].utez = TEZ_NS ;//| TEZ_CEIL | TEZ_RAWZ; // next ce
 							walp->xsurf[0].vwal = j; // next wall ?
-							walp->xsurf[0].vtez = TEZ_OS | TEZ_CEIL | TEZ_INVZ; // next ceil raw z
+							walp->xsurf[0].vtez = TEZ_INVZ; // TEZ_OS | TEZ_CEIL |
 
 							//mid in that case is aligned to other ceil. mid is always aligned to ns.
 							walp->xsurf[1].owal = j; // next wall ?
-							walp->xsurf[1].otez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ceil raw z
 							walp->xsurf[1].uwal = nwid; //
-							walp->xsurf[1].utez = TEZ_NS | TEZ_CEIL | TEZ_RAWZ; // next ceil raw z
-							walp->xsurf[1].vwal = j; // next wall ?
-							walp->xsurf[1].vtez = TEZ_OS | TEZ_FLOR; // next ceil raw z
+							walp->xsurf[1].vwal = j;
+							walp->xsurf[1].otez = TEZ_CLOSEST; // CEIL
+							walp->xsurf[1].utez = TEZ_CLOSEST; // CEIL
+							walp->xsurf[1].vtez = TEZ_FLOR | TEZ_CLOSEST;
 						}
 						else
 						 // other kind of align -- to own ceil, but mask to other flor.
@@ -1012,11 +1027,11 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 
 							//mid in that case is aligned to other ceil. mid is always aligned to ns.
 							walp->xsurf[1].owal = j; // next wall ?
-							walp->xsurf[1].otez = TEZ_NS | TEZ_FLOR | TEZ_RAWZ; // next ceil raw z
 							walp->xsurf[1].uwal = nwid; //
-							walp->xsurf[1].utez = walp->xsurf[1].otez;
 							walp->xsurf[1].vwal = j; // next wall ?
-							walp->xsurf[1].vtez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ;
+							walp->xsurf[1].otez = TEZ_FLOR | TEZ_CLOSEST; // next ceil raw z
+							walp->xsurf[1].utez = TEZ_FLOR | TEZ_CLOSEST; // next ceil raw z
+							walp->xsurf[1].vtez = TEZ_INVZ | TEZ_CLOSEST;
 						}
 						// also when double tex - then both sides have own alignment, and lower seg borrows its flags from nw.
 						// TO IMPLEMENT the above! ^^

@@ -20,6 +20,6 @@ void main() {
     // finalColor = texColor * fragColor;
 
     // Or keep your UV visualization for debugging:
-    // vec2 uvColor = fract(uvPosition);
-    // finalColor = vec4(uvColor.x, uvColor.y, 0.0, 1);
+   // vec2 uvColor = fract(uvPosition);
+   // finalColor = vec4(uvColor.x, uvColor.y, 0.0, 1);
 }

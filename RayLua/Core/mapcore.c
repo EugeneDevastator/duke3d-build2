@@ -485,22 +485,68 @@ void changesprisect_imp (int i, int nsect, mapstate_t *map)
 	spr->sect = nsect;
 }
 
+// dukescales = xy rep, xypan
+void makeslabuvform(int surfid, float slabH, wall_t *wal, int dukescales[4], int tilesize[2]) {
+	int xsize=tilesize[0];
+	int ysize=tilesize[1];
+	// also pans are limited by 256. so large textures wont work.
+
+	float pix8 = 8.0f/xsize; //64/8 = 8
+	float scalerx = dukescales[0] * pix8; // xrep
+
+	float pix4 = 4.0f/ysize;
+	float normuvperz = pix4 * dukescales[1];
+	float scalery = slabH * normuvperz;
+
+	float px1x = 1.0f/xsize;
+	float px1y = 1.0f/ysize;
+	float ypans_per_px = 256.f/ysize;
+	wal->xsurf[surfid].uvform[0]=scalerx;
+	wal->xsurf[surfid].uvform[1]=scalery;
+	wal->xsurf[surfid].uvform[2]=px1x * dukescales[2];
+	wal->xsurf[surfid].uvform[3]=px1y * (dukescales[3]/ypans_per_px);
+
+}
+
 float getzoftez(int tezflags, sect_t *mysec, int thiswall, point2d worldxy, mapstate_t *map) {
 
 	// cant use this because floor/ceil will use wall id.
 	//point2d worldxy = tezflags & TEZ_WALNX
 	//	                  ? walnext(mysec, thiswall).pos
 	//	                  : mysec->wall[thiswall].pos;
+
+	sect_t *nsec = &map->sect[mysec->wall[thiswall].ns];
 	sect_t *usedsec = tezflags & TEZ_NS
-		                  ? &map->sect[mysec->wall[thiswall].ns]
+		                  ? nsec
 		                  : mysec;
 
 	bool isflor = tezflags & TEZ_FLOR;
 	float retz;
-	if (tezflags & TEZ_SLOPE)
-		retz = getslopezpt(usedsec, isflor, worldxy);
-	else
-	retz = usedsec->z[isflor];
+
+	if (tezflags & TEZ_CLOSEST) {
+		if (tezflags & TEZ_SLOPE) {
+			float z1 = getslopezpt(mysec, isflor, worldxy);
+			float z2 = getslopezpt(nsec, isflor, worldxy);
+			if (isflor)
+				retz = max(z1, z2);
+			else
+				retz = min(z1, z2);
+		} else {
+			float z1 = mysec->z[isflor];
+			float z2 = nsec->z[isflor];
+			if (isflor)
+				retz = max(z1, z2);
+			else
+				retz = min(z1, z2);
+		}
+	} else {
+		if (tezflags & TEZ_SLOPE)
+			retz = getslopezpt(usedsec, isflor, worldxy);
+		else
+			retz = usedsec->z[isflor];
+	}
+
+
 	return retz;
 }
 
