@@ -296,15 +296,14 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 		kzclose();
 		return(1);
 	}
-	else if ((fileid == 0x00000007) || //Build1 .MAP format 7
-				(fileid == 0x00000cbe))   //Cubes5 .CUB format
+	else if ((fileid == 0x00000007) || (fileid == 0x00000cbe))   //Build1 .MAP format 7 //Cubes5 .CUB format
 	{
-			//Build1 format variables:
-			typedef struct {
-				short picnum, heinum;
-				signed char shade;
-				char pal, xpanning, ypanning;
-			} build7surf_t;
+		//Build1 format variables:
+		typedef struct {
+			short picnum, heinum;
+			signed char shade;
+			char pal, xpanning, ypanning;
+		} build7surf_t;
 		typedef struct
 		{
 			short wallptr, wallnum;
@@ -331,8 +330,8 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 
 		build7spri_t b7spr;
 
-			//Cubes5 format variables:
-		#define BSIZ 16
+		//Cubes5 format variables:
+#define BSIZ 16
 		double c1, c2, c3, s1, s2, s3, c1c3, c1s3, s1c3, s1s3;
 		signed short board[6][BSIZ][BSIZ][BSIZ]; //Board layout
 		long posx, posy, posz, a1, a2, a3, oy, yy;
@@ -416,14 +415,14 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			map->startdow.x = 0.f;
 			map->startdow.y = 0.f;
 			map->startdow.z = 1.f;
-		//	for(i=numplayers-1;i>=0;i--)
-		//	{
-		//		gst->p[i].ipos = gst->startpos;
-		//		gst->p[i].ifor = gst->startfor;
-		//		gst->p[i].irig = gst->startrig;
-		//		gst->p[i].idow = gst->startdow;
-		//		gst->p[i].cursect = cursect;
-		//	}
+			//	for(i=numplayers-1;i>=0;i--)
+			//	{
+			//		gst->p[i].ipos = gst->startpos;
+			//		gst->p[i].ifor = gst->startfor;
+			//		gst->p[i].irig = gst->startrig;
+			//		gst->p[i].idow = gst->startdow;
+			//		gst->p[i].cursect = cursect;
+			//	}
 
 			kzread(&s,2);
 			map->numsects = (int)s; //numsectors
@@ -493,16 +492,25 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					if (b7sec.stat[j] & SECTOR_SWAP_XY) //swap x&y
 					{
 						if (((b7sec.stat[j] & SECTOR_FLIP_X) != 0) != ((b7sec.stat[j] & SECTOR_FLIP_Y) != 0))
-							{ sur->uv[1].x *= -1; sur->uv[2].y *= -1; }
+						{ sur->uv[1].x *= -1; sur->uv[2].y *= -1; }
 						sur->uv[1].y = sur->uv[1].x; sur->uv[1].x = 0;
 						sur->uv[2].x = sur->uv[2].y; sur->uv[2].y = 0;
 					}
 
 					//FIX:This hack corrects an LHS vs. RHS bug in a later stage of texture mapping (drawsectfill?)
 					if (sur->uv[1].x*sur->uv[2].y < sur->uv[1].y*sur->uv[2].x)
-						{ sur->uv[2].x *= -1; sur->uv[2].y *= -1; }
+					{ sur->uv[2].x *= -1; sur->uv[2].y *= -1; }
 
 					sec[i].surf[j].uvmapkind = b7sec.stat[j] & SECTOR_TEXWALL_ALIGN ? UV_TEXELRATE : UV_WORLDXY;
+					sec[i].mflags[j] = b7sec.stat[j];
+
+					// also pans are limited by 256. so large textures wont work.
+					float xsize = tilesizx[sec[i].surf[j].tilnum];
+					float ysize = tilesizy[sec[i].surf[j].tilnum];
+					float pix8 = 8.0f/xsize; //64/8 = 8
+					float scalerx = pix8;
+					sec[i].surf[j].uvcoords[0].x = xsize/64;
+					sec[i].surf[j].uvcoords[0].y = ysize/64;
 				}
 
 				sec[i].headspri = -1;
@@ -581,12 +589,12 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						thiswal->xsurf[1].tilnum = b7wal.overpicnum;
 						thiswal->xsurf[2].tilnum = b7wal.cstat & WALL_BOTTOM_SWAP ? -2 : b7wal.picnum;
 						int opacity = 0;
-							if (HAS_FLAG(b7wal.cstat, WALL_MASKED))
+						if (HAS_FLAG(b7wal.cstat, WALL_MASKED))
 						{
 							if (HAS_FLAG(b7wal.cstat, WALL_SEMI_TRANSPARENT))
 								opacity = 128;
-								if (HAS_FLAG(b7wal.cstat, WALL_TRANSPARENT))
-									opacity = 32;
+							if (HAS_FLAG(b7wal.cstat, WALL_TRANSPARENT))
+								opacity = 32;
 						}
 
 						thiswal->xsurf[1].asc = opacity;
@@ -681,26 +689,26 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 
 				point3d buildFW = (point3d){cos((float)b7spr.ang*PI/1024.0),sin((float)b7spr.ang*PI/1024.0),0};
 				switch(flagsw)  // https://wiki.eduke32.com/wiki/Cstat_(sprite)
-					{
+				{
 					case 0: //facing
 					case 48: //Voxel sprite
 						//no break intentional
 					case SPRITE_WALL_ALIGNED: //Wall sprite
 						// need to not alter sprite positions, but change view xforms.
-				//		spr->p.z -= (b7spr.yrepeat/4096.0*(float)tilesizy[l]);
+						//		spr->p.z -= (b7spr.yrepeat/4096.0*(float)tilesizy[l]);
 						spr->r.x = -sin((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
 						spr->r.y = cos((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
 						spr->d.z = -(b7spr.yrepeat/4096.0*(float)tilesizy[l]);
 						spr->f = buildFW;
 						break;
 					case SPRITE_FLOOR_ALIGNED: //Floor sprite
-					// forward faces up, right faces right, down faces along build's forward;
+						// forward faces up, right faces right, down faces along build's forward;
 						spr->r.x = sin((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
 						spr->r.y =-cos((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
 						spr->d.x = cos((float)b7spr.ang*PI/1024.0)*(b7spr.yrepeat/4096.0*(float)tilesizy[l]);
 						spr->d.y = sin((float)b7spr.ang*PI/1024.0)*(b7spr.yrepeat/4096.0*(float)tilesizy[l]);
 						spr->f = (point3d){0,0,-1}; // facing up
-					if (b7spr.cstat&SPRITE_HITSCAN) { spr->d.x *= -1; spr->d.y *= -1; }
+						if (b7spr.cstat&SPRITE_HITSCAN) { spr->d.x *= -1; spr->d.y *= -1; }
 						break;
 				}
 
@@ -770,18 +778,18 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			map->startfor.x = s1*c2;
 			map->startfor.y = -c1*c2;
 			map->startfor.z = s2;
-		//	for(i=numplayers-1;i>=0;i--)  //netcode
-		//	{
-		//		gst->p[i].ipos = gst->startpos;
-		//		gst->p[i].irig = gst->startrig;
-		//		gst->p[i].idow = gst->startdow;
-		//		gst->p[i].ifor = gst->startfor;
-		//		gst->p[i].cursect = -1;
-		//	}
+			//	for(i=numplayers-1;i>=0;i--)  //netcode
+			//	{
+			//		gst->p[i].ipos = gst->startpos;
+			//		gst->p[i].irig = gst->startrig;
+			//		gst->p[i].idow = gst->startdow;
+			//		gst->p[i].ifor = gst->startfor;
+			//		gst->p[i].cursect = -1;
+			//	}
 
 
-				//6 faces * BSIZ^3 board map * 2 bytes for picnum
-				//if face 0 is -1, the cube is air
+			//6 faces * BSIZ^3 board map * 2 bytes for picnum
+			//if face 0 is -1, the cube is air
 			kzread(board,6*BSIZ*BSIZ*BSIZ*sizeof(short));
 			map->numsects = 0;
 			for(x=0;x<BSIZ;x++)
@@ -819,7 +827,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							sur->bsc = 4096-768+1536*j;
 
 							if (!j) l = board[4][x][oy-1][z];
-								else l = board[1][x][ y+1][z];
+							else l = board[1][x][ y+1][z];
 							if ((unsigned)l >= (unsigned)arttiles) l = 0;
 							sur->tilnum = l; hitile = max(hitile,l);
 							sur->uv[1].x = max(64.f/((float)tilesizx[l]),1.f);
@@ -867,38 +875,38 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 
 			map->numspris = 0;
 		}
-
+		if (true) { // Postprocessing of the loaded map
 			//Set texture names..
-		for(i=gnumtiles-1;i>=0;i--)
-			if (gtile[i].tt.f) { free((void *)gtile[i].tt.f); gtile[i].tt.f = 0; }
-		gnumtiles = 0; memset(gtilehashead,-1,sizeof(gtilehashead));
+			for(i=gnumtiles-1;i>=0;i--)
+				if (gtile[i].tt.f) { free((void *)gtile[i].tt.f); gtile[i].tt.f = 0; }
+			gnumtiles = 0; memset(gtilehashead,-1,sizeof(gtilehashead));
 
-		hitile++;
-		hitile = 1000;
-		if (hitile > gmaltiles)
-		{
-			gmaltiles = hitile;
-			gtile = (tile_t *)realloc(gtile,gmaltiles*sizeof(tile_t));
-		}
+			hitile++;
+			hitile = 1000;
+			if (hitile > gmaltiles)
+			{
+				gmaltiles = hitile;
+				gtile = (tile_t *)realloc(gtile,gmaltiles*sizeof(tile_t));
+			}
 
-		for(i=0;i<hitile;i++)
-		{
-			sprintf(tbuf,"tiles%03d.art|%d",tilefile[i],i);
-			gettileind(tbuf);
-		}
-		tile_t* gtpic;
-		for(i=0;i<gmaltiles;i++)
-		{
-			gtpic = &gtile[i];
-			if (!gtpic->tt.f)
-				loadpic(gtpic,curmappath);
-		}
+			for(i=0;i<hitile;i++)
+			{
+				sprintf(tbuf,"tiles%03d.art|%d",tilefile[i],i);
+				gettileind(tbuf);
+			}
+			tile_t* gtpic;
+			for(i=0;i<gmaltiles;i++)
+			{
+				gtpic = &gtile[i];
+				if (!gtpic->tt.f)
+					loadpic(gtpic,curmappath);
+			}
 
 #ifdef STANDALONE
-	//	for(i=numplayers-1;i>=0;i--) gst->p[i].sec.n = 0;
+			//	for(i=numplayers-1;i>=0;i--) gst->p[i].sec.n = 0;
 #endif
-		checknextwalls_imp(map);
-		checksprisect_imp(-1,map);
+			checknextwalls_imp(map);
+			checksprisect_imp(-1,map);
 
 			//second pass for walls
 			for (i = 0; i < map->numsects; i++) // second pass for double wall tex.
@@ -997,13 +1005,13 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						{
 							int cursizx = tilesizx[walp->xsurf[0].tilnum];
 							int newsizx = tilesizx[walp->xsurf[1].tilnum];
-//
+							//
 							int cursizy = tilesizy[walp->xsurf[0].tilnum];
 							int newsizy = tilesizy[walp->xsurf[1].tilnum];
-//
+							//
 							walp->xsurf[1].uvform[0] *= cursizx/(float)newsizx;
 							walp->xsurf[1].uvform[2] *= cursizx/(float)newsizx;
-						//	walp->xsurf[1].uvform[1] *= cursizy/(float)newsizy;
+							//	walp->xsurf[1].uvform[1] *= cursizy/(float)newsizy;
 						}
 
 						// ==== UV VECTORS SETUP
@@ -1021,7 +1029,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							walp->xsurf[1].vtez = TEZ_FLOR | TEZ_CLOSEST;
 						}
 						else
-						 // other kind of align -- to own ceil, but mask to other flor.
+							// other kind of align -- to own ceil, but mask to other flor.
 						{ // THIS WORKS!
 							//top
 							walp->xsurf[0].otez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ; // next floor Z of j, not slope!
@@ -1068,7 +1076,6 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							walp->xsurf[sl].uvform[1] *= yflipmul[sl];
 							walp->xsurf[sl].uvform[3] *= yflipmul[sl];
 						}
-
 				}
 				// can make uvs only when walls are there.
 				makesecuvs(&sec[i], map);
@@ -1079,12 +1086,13 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				sec[i].surf[1].uvform[1] = 1;
 			}
 
-		if (tilesizx) free(tilesizx);
-		if (tilesizy) free(tilesizy);
-		if (tilefile) free(tilefile);
+			if (tilesizx) free(tilesizx);
+			if (tilesizy) free(tilesizy);
+			if (tilefile) free(tilefile);
 
-		kzclose();
-		return(1);
+			kzclose();
+			return(1);
+		}
+		else { return(0); } //MessageBox(ghwnd,"Invalid MAP format",prognam,MB_OK);
 	}
-	else { return(0); } //MessageBox(ghwnd,"Invalid MAP format",prognam,MB_OK);
 }

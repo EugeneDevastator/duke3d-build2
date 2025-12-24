@@ -332,7 +332,7 @@ typedef struct
 	long foglev;
 	long owner;      //for dragging while editing, other effects during game
 	int32_t tags[16];
-
+	uint16_t mflags[4];
 	// int nwperim - perimeter walls, would be first in sequence
 	// int nwnested - nested walls for fully inner sectors
 	// could be purely runtime info.

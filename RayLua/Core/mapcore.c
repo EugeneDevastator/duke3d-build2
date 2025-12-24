@@ -577,10 +577,13 @@ void makesecuvs(sect_t *sect, mapstate_t *map) {
 	for (int fl=0;fl<2;fl++) {
 		float z = sect->z[fl];
 		surf_t* sur = &sect->surf[fl];
+		int scaler = sect->mflags[fl] & SECTOR_EXPAND_TEXTURE ? 1 : 2;
+		float xmul = sur->uvcoords[0].x;
+		float ymul = sur->uvcoords[0].y;
 		if (sur->uvmapkind == UV_WORLDXY) {
-			sur->uvcoords[0] = (point3d){   wp.x,   wp.y,z};
-			sur->uvcoords[1] = (point3d){wp.x+2, wp.y,z};
-			sur->uvcoords[2] = (point3d){wp.x,wp.y+2,z};
+			sur->uvcoords[0] = (point3d){   0,0,z};
+			sur->uvcoords[1] = (point3d){0,scaler*xmul,z};
+			sur->uvcoords[2] = (point3d){scaler*ymul,0,z};
 		}
 		else
 			if (sur->uvmapkind == UV_TEXELRATE) {
