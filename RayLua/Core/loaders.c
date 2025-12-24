@@ -507,8 +507,8 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					// also pans are limited by 256. so large textures wont work.
 					float xsize = tilesizx[sec[i].surf[j].tilnum];
 					float ysize = tilesizy[sec[i].surf[j].tilnum];
-					float pix8 = 8.0f/xsize; //64/8 = 8
-					float scalerx = pix8;
+					//float pix8 = 8.0f/xsize; //64/8 = 8
+					//float scalerx = pix8;
 					sec[i].surf[j].uvcoords[0].x = xsize/64;
 					sec[i].surf[j].uvcoords[0].y = ysize/64;
 				}
@@ -1080,10 +1080,6 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				// can make uvs only when walls are there.
 				makesecuvs(&sec[i], map);
 
-				sec[i].surf[0].uvform[0] = 1;
-				sec[i].surf[0].uvform[1] = 1;
-				sec[i].surf[1].uvform[0] = 1;
-				sec[i].surf[1].uvform[1] = 1;
 			}
 
 			if (tilesizx) free(tilesizx);

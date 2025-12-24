@@ -632,8 +632,6 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 	point3d add = b->gnadd;
 	if ((rethead0|rethead1) < 0) { mono_deloop(rethead1); mono_deloop(rethead0); return; }
 	rethead[0] = rethead0; rethead[1] = rethead1;
-	bool log = eyepoln ==  1 && b->recursion_depth==0;
-
 	int *indices = NULL;
 	int index_count = 0;
 	int index_capacity = 0;
@@ -731,12 +729,12 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 		eyepol = (eyepol_t *)realloc(eyepol, eyepolmal*sizeof(eyepol_t));
 		eyepol[0].vert0 = 0;
 	}
-
+	eyepol[eyepoln].tilnum = gtilenum;
 	// setup uvs
 	if (b->gisflor < 2) {
 		eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].surf[b->gisflor].uvcoords;
 		eyepol[eyepoln].uvform = curMap->sect[b->gligsect].surf[b->gisflor].uvform;
-		eyepol[eyepoln].tilnum = curMap->sect[b->gligsect].surf[b->gisflor].tilnum;
+	//	eyepol[eyepoln].tilnum = curMap->sect[b->gligsect].surf[b->gisflor].tilnum;
 	} else { // walls
 		eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].uvcoords;
 		eyepol[eyepoln].uvform = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].uvform;
@@ -764,9 +762,8 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 		// vector transforms are working vell outside of mono plane.
 		wccw_transform(&ret, &b->movedcam, &b->orcam);
 		eyepolv[pn].wpos = (point3d){ret.x,ret.y,ret.z};
-		if (log) {LOOPADD(ret);}
 	}
-	if (log) { LOOPEND }
+
 
 	eyepol[eyepoln].vert0 = chain_starts[0];
 	eyepol[eyepoln].indices = indices;
@@ -1298,6 +1295,7 @@ The b parameter is a bunch index - this function processes one "bunch" (visible 
 
 static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 {
+	gtilenum = 0;
 	cam_t gcam = b->cam;
 	// === VARIABLE DECLARATIONS ===
 	//extern void loadpic (tile_t *);
@@ -1362,7 +1360,7 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 			                && isflor == b->testignorewall;
 			if (skipport)
 				continue;
-
+		gtilenum = sec[s].surf[isflor].tilnum;
 
 		float surfpos = getslopez(&sec[s],isflor,b->cam.p.x,b->cam.p.y);
 		if ((b->cam.p.z >= surfpos) == isflor) // ignore backfaces

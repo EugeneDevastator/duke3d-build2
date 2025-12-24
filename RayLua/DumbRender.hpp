@@ -550,6 +550,8 @@ public:
             bpv3(eyepol[i].worlduvs[0]),
             bpv3(eyepol[i].worlduvs[1]),
             bpv3(eyepol[i].worlduvs[2]));
+        if (eyepol[i].tilnum>900)
+            eyepol[i].tilnum=5;
         const Texture2D tex = runtimeTextures[eyepol[i].tilnum];
 
         SetShaderValueTexture(uvShaderDesc.shader,uvShaderDesc.textureLoc,tex);

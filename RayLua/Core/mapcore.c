@@ -574,12 +574,20 @@ void makewaluvs(sect_t *sect, int wid, mapstate_t *map) {
 void makesecuvs(sect_t *sect, mapstate_t *map) {
 	wall_t *w = &sect->wall[0];
 	point2d wp = w->pos;
+
 	for (int fl=0;fl<2;fl++) {
+
+
 		float z = sect->z[fl];
 		surf_t* sur = &sect->surf[fl];
+
+		sur->uvform[0] = 1;
+		sur->uvform[1] = 1;
+
 		int scaler = sect->mflags[fl] & SECTOR_EXPAND_TEXTURE ? 1 : 2;
 		float xmul = sur->uvcoords[0].x;
 		float ymul = sur->uvcoords[0].y;
+		xmul *=-1; // world y is flipped;
 		if (sur->uvmapkind == UV_WORLDXY) {
 			sur->uvcoords[0] = (point3d){   0,0,z};
 			sur->uvcoords[1] = (point3d){0,scaler*xmul,z};
@@ -591,11 +599,20 @@ void makesecuvs(sect_t *sect, mapstate_t *map) {
 				sur->uvcoords[0] = (point3d){   wp.x,   wp.y,z};
 				sur->uvcoords[1] = (point3d){   nwp.x, nwp.y,z};
 				// get ortho to wall,
-				point3d rectpt = subtract(sur->uvcoords[1],sur->uvcoords[0]);
-				rot90cwz(&rectpt);
-				addto(&rectpt,sur->uvcoords[0]);
-				float vz = getslopez(sect,fl,rectpt.x,rectpt.y);
-				sur->uvcoords[2] = (point3d){rectpt.x,rectpt.y,vz};
+				point3d normU = subtract(sur->uvcoords[1],sur->uvcoords[0]);
+
+				normU = normalizep3(normU);
+				sur->uvcoords[2] = normU;
+				addto(&sur->uvcoords[2],sur->uvcoords[0]);
+
+				normU = normalizep3(normU);
+				rot90cwz(&normU);
+				addto(&normU,sur->uvcoords[0]);
+				float vz = getslopez(sect,fl,normU.x,normU.y);
+
+				sur->uvcoords[1] = (point3d){normU.x,normU.y,vz};
+				sur->uvform[0]=xmul*scaler;
+				sur->uvform[1]=ymul*scaler;
 			}
 	}
 }
