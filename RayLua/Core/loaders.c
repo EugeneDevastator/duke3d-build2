@@ -915,7 +915,8 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					bool isyuvflip = walp->mflags[0] & WALL_FLIP_Y;
 					int uwalid = isxalignflip ? j : nwid;
 					int orwal = isxalignflip ? nwid : j;
-
+					int basemul = isyuvflip ? -1 : 1;
+					int yflipmul[3] = {basemul,basemul,basemul};
 					memcpy(&walp->xsurf[0].uvform, &walp->surf.uvform, sizeof(float) * 6);
 
 					// all walls use same origin xy based on x flip.
@@ -938,6 +939,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							oppwal = &sec[walp->ns].wall[walp->nw];
 
 							isfloralignbot = oppwal->mflags[0] & WALL_ALIGN_FLOOR;
+							yflipmul[2] = oppwal->mflags[0] & WALL_FLIP_Y ? -1 : 1;
 							yrepeatbot = oppwal->surf.owal;
 							int cursizx = tilesizx[walp->xsurf[0].tilnum];
 							int newsizx = tilesizx[nextpic];
@@ -953,8 +955,6 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							// also pans are limited by 256. so large textures wont work.
 							//*newx/oldx;
 						}
-
-
 
 						// assume one unit is one uv, given scale. so units*unitstouv*scale.
 						// pan of 16 is 16 pixels. befre scaling.
@@ -1065,8 +1065,10 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 
 					if (isyuvflip)
 						for (int sl=0;sl<walp->surfn;sl++) {
-							walp->xsurf[sl].uvform[1] *= -1;
+							walp->xsurf[sl].uvform[1] *= yflipmul[sl];
+							walp->xsurf[sl].uvform[3] *= yflipmul[sl];
 						}
+
 				}
 				// can make uvs only when walls are there.
 				makesecuvs(&sec[i], map);
