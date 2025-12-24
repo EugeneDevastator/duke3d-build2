@@ -276,7 +276,7 @@ typedef struct
 	long owner; //for dragging while editing, other effects during game
 	long surfn;
 	surf_t surf, *xsurf; //additional malloced surfs when (surfn > 1)
-
+	uint16_t mflags[4]; // modflags
 	union {
 		int64_t tags8b[8];
 		int32_t tags[16]; // standard tag is 4bytes
