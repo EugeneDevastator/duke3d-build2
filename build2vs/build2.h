@@ -7,7 +7,6 @@
 #include <malloc.h>
 
 #include "scenerender.h"
-#define STANDALONE
 
 #pragma pack(push,1)
 

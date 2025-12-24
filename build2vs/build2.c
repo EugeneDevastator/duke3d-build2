@@ -30,7 +30,14 @@ winmain.obj:     winmain.cpp                  ; cl /c /TP winmain.cpp   /Ox /Ob2
 !if 0
 #endif
 
+#define USEHEIMAP 1
+
+#define NOSOUND 1
+#define STANDALONE 1
+#define OOS_CHECK 1
+#if (OOS_CHECK != 0)
 long dispoos = 0, totcrcbytes = 0;
+#endif
 
 #if 0
 Use Ctrl+Enter on the following lines in MEPAINT, press use your Visual C macro hotkey to run
