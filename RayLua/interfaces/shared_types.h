@@ -328,7 +328,7 @@ typedef struct
 	surf_t surf[2];  //ceil&flor texture info
 	wall_t *wall;
 	long n, nmax;    //n:numwalls, nmax:walls malloced (nmax >= n)
-	long headspri;   //head sprite index (-1 if none)
+	long headspri;   //hd sprite index (-1 if none)
 	long foglev;
 	long owner;      //for dragging while editing, other effects during game
 	int32_t tags[16];

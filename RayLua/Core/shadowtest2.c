@@ -621,6 +621,14 @@ static void xformbac (double rx, double ry, double rz, dpoint3d *o, bdrawctx *b)
 	o->y = rx*b->xformmat[1] + ry*b->xformmat[4] + rz*b->xformmat[7];
 	o->z = rx*b->xformmat[2] + ry*b->xformmat[5] + rz*b->xformmat[8];
 }
+// Helper function to check turn direction
+float cross_product (int a, int b, int c) {
+	point3d pa = eyepolv[a].wpos;
+	point3d pb = eyepolv[b].wpos;
+	point3d pc = eyepolv[c].wpos;
+	return (pb.x - pa.x) * (pc.y - pa.y) - (pb.y - pa.y) * (pc.x - pa.x);
+};
+
 static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 {
 
@@ -660,67 +668,137 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 	}
 	// TRIANGULATION
 	// Allocate indices array
-	int total_vertices = chain_lengths[0] + chain_lengths[1];
-	int triangle_count = total_vertices - 2;
-	index_capacity = triangle_count * 3;
-	indices = (int*)malloc(index_capacity * sizeof(int));
-	index_count = 0;
-	// Triangulate using two-pointer technique
-	int left = 0;
-	int right = 0;
-	int left_start = chain_starts[0];
-	int right_start = chain_starts[1];
+// Stack for monotone triangulation
 
-	if (total_vertices <= 3) {
-		// Handle degenerate case
-		return;
-	}
 
-	// Determine polygon orientation (assuming CCW is desired)
-	// You might need to adjust this based on your coordinate system
-	bool ccw_orientation = true; // Set based on your needs
+int total_vertices = chain_lengths[0] + chain_lengths[1];
+	int* stack = (int*)malloc(total_vertices * sizeof(int));
+	int stack_top = -1;
+int triangle_count = total_vertices - 2;
+index_capacity = triangle_count * 3;
+indices = (int*)malloc(index_capacity * sizeof(int));
+index_count = 0;
 
-	while (left < chain_lengths[0] - 1 || right < chain_lengths[1] - 1) {
-		bool use_left;
+if (total_vertices <= 3) {
+    free(stack);
+    return;
+}
 
-		if (left >= chain_lengths[0] - 1)
-			use_left = false;
-		else if (right >= chain_lengths[1] - 1)
-			use_left = true;
-		else {
-			float left_x = eyepolv[left_start + left + 1].x;
-			float right_x = eyepolv[right_start + right + 1].x;
-			use_left = (left_x < right_x);
-		}
+// Merge chains into sorted order by x-coordinate
+int* sorted_vertices = (int*)malloc(total_vertices * sizeof(int));
+int* chain_id = (int*)malloc(total_vertices * sizeof(int)); // 0 for left chain, 1 for right chain
 
-		if (use_left) {
-			if (right < chain_lengths[1]) {
-				if (ccw_orientation) {
-					indices[index_count++] = left_start + left;
-					indices[index_count++] = right_start + right;
-					indices[index_count++] = left_start + left + 1;
-				} else {
-					indices[index_count++] = left_start + left;
-					indices[index_count++] = left_start + left + 1;
-					indices[index_count++] = right_start + right;
-				}
-			}
-			left++;
-		} else {
-			if (left < chain_lengths[0]) {
-				if (ccw_orientation) {
-					indices[index_count++] = left_start + left;
-					indices[index_count++] = right_start + right;
-					indices[index_count++] = right_start + right + 1;
-				} else {
-					indices[index_count++] = left_start + left;
-					indices[index_count++] = right_start + right + 1;
-					indices[index_count++] = right_start + right;
-				}
-			}
-			right++;
-		}
-	}
+int left_idx = 0, right_idx = 0, merge_idx = 0;
+
+// Merge the two chains
+while (left_idx < chain_lengths[0] && right_idx < chain_lengths[1]) {
+    float left_x = eyepolv[chain_starts[0] + left_idx].x;
+    float right_x = eyepolv[chain_starts[1] + right_idx].x;
+
+    if (left_x <= right_x) {
+        sorted_vertices[merge_idx] = chain_starts[0] + left_idx;
+        chain_id[merge_idx] = 0;
+        left_idx++;
+    } else {
+        sorted_vertices[merge_idx] = chain_starts[1] + right_idx;
+        chain_id[merge_idx] = 1;
+        right_idx++;
+    }
+    merge_idx++;
+}
+
+// Add remaining vertices
+while (left_idx < chain_lengths[0]) {
+    sorted_vertices[merge_idx] = chain_starts[0] + left_idx;
+    chain_id[merge_idx] = 0;
+    left_idx++;
+    merge_idx++;
+}
+while (right_idx < chain_lengths[1]) {
+    sorted_vertices[merge_idx] = chain_starts[1] + right_idx;
+    chain_id[merge_idx] = 1;
+    right_idx++;
+    merge_idx++;
+}
+
+// Cross product for turn test
+
+
+// Initialize stack with first two vertices
+stack[++stack_top] = sorted_vertices[0];
+stack[++stack_top] = sorted_vertices[1];
+
+// Process remaining vertices
+for (int i = 2; i < total_vertices; i++) {
+    int current_vertex = sorted_vertices[i];
+    int current_chain = chain_id[i];
+    int top_chain = chain_id[stack_top];
+
+    if (current_chain != top_chain) {
+        // Different chains - triangulate with all stack vertices except the last
+        while (stack_top > 0) {
+            int v1 = stack[stack_top - 1];
+            int v2 = stack[stack_top];
+
+            // Check orientation for proper winding
+            float cross = cross_product(v1, v2, current_vertex);
+            if (cross > 0) { // CCW orientation
+                indices[index_count++] = v1;
+                indices[index_count++] = v2;
+                indices[index_count++] = current_vertex;
+            } else {
+                indices[index_count++] = v1;
+                indices[index_count++] = current_vertex;
+                indices[index_count++] = v2;
+            }
+            stack_top--;
+        }
+
+        // Keep last vertex and add current
+        stack[++stack_top] = current_vertex;
+    } else {
+        // Same chain - check for valid triangles
+        while (stack_top > 0) {
+            int v1 = stack[stack_top - 1];
+            int v2 = stack[stack_top];
+
+            // Check if we can form a valid triangle
+            float cross = cross_product(v1, v2, current_vertex);
+
+            // For monotone polygon, we need to check if the triangle is inside
+            bool valid_triangle = false;
+            if (current_chain == 0) { // Left chain
+                valid_triangle = (cross < 0); // CW turn for left chain
+            } else { // Right chain
+                valid_triangle = (cross > 0); // CCW turn for right chain
+            }
+
+            if (valid_triangle) {
+                // Add triangle with proper winding
+                if (cross > 0) {
+                    indices[index_count++] = v1;
+                    indices[index_count++] = v2;
+                    indices[index_count++] = current_vertex;
+                } else {
+                    indices[index_count++] = v1;
+                    indices[index_count++] = current_vertex;
+                    indices[index_count++] = v2;
+                }
+                stack_top--; // Remove the middle vertex
+            } else {
+                break; // No more valid triangles
+            }
+        }
+
+        // Add current vertex to stack
+        stack[++stack_top] = current_vertex;
+    }
+}
+
+free(stack);
+free(sorted_vertices);
+free(chain_id);
+
 
 	// Store triangulation in eyepol structure
 	if (eyepoln+1 >= eyepolmal)
@@ -784,8 +862,10 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 	eyepoln++;
 	eyepol[eyepoln].vert0 = eyepolvn;
 
-	logstep("produce eyepol, depth:%d",b->recursion_depth);
+    logstep("produce eyepol, depth:%d",b->recursion_depth);
 }
+
+
 
 static void skytagfunc (int rethead0, int rethead1, bdrawctx* b){}
 
@@ -1589,7 +1669,7 @@ int lastvalidsec=0;
 void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy){
 	bdrawctx bs;
 	loopnum=0;
-	operstopn=-1;
+	//operstopn=-1;
 	bs.cam = *cc;
 	bs.movedcam = *cc;
 	bs.orcam = *cc;
