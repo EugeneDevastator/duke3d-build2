@@ -768,9 +768,7 @@ for (int i = 2; i < total_vertices; i++) {
             int v2 = curr_v;
 
             // Stack is on opposite chain from current vertex
-            // If stack is chain 0 (upper), current is chain 1 (lower): wind v0,v2,v1
-            // If stack is chain 1 (lower), current is chain 0 (upper): wind v0,v1,v2
-            if (stack_chain[j] == 0) {
+            if (stack_chain[j] != 0) {
                 indices[index_count++] = v0;
                 indices[index_count++] = v2;
                 indices[index_count++] = v1;
