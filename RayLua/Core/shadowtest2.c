@@ -775,15 +775,15 @@ if (curr_chain != top_chain) {
         float cross = ax * by - ay * bx;
 
         if (cross > 0.0f) {
-            // CCW - emit as is for CCW winding
+            // CCW - flip to make CW
             indices[index_count++] = v0;
-            indices[index_count++] = v1;
             indices[index_count++] = v2;
+            indices[index_count++] = v1;
         } else {
-            // CW - flip to make CCW
+            // CW - emit as is for CW winding
             indices[index_count++] = v0;
-            indices[index_count++] = v2;
             indices[index_count++] = v1;
+            indices[index_count++] = v2;
         }
     }
 
@@ -822,13 +822,15 @@ if (curr_chain != top_chain) {
         float tcross = tax * tby - tay * tbx;
 
         if (tcross > 0.0f) {
+            // CCW - flip to make CW
             indices[index_count++] = v0;
-            indices[index_count++] = v1;
             indices[index_count++] = v2;
+            indices[index_count++] = v1;
         } else {
+            // CW - emit as is for CW winding
             indices[index_count++] = v0;
-            indices[index_count++] = v2;
             indices[index_count++] = v1;
+            indices[index_count++] = v2;
         }
 
         stack_top--;
@@ -837,6 +839,7 @@ if (curr_chain != top_chain) {
     stack[++stack_top] = curr_v;
     stack_chain[stack_top] = curr_chain;
 }
+
 
 }
 
