@@ -673,13 +673,6 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 		} while (i != rethead[h]);
 		mono_deloop(rethead[h]);
 	}
-	// TRIANGULATION
-	// Allocate indices array
-// Stack for monotone triangulation
-
-
-
-// Check for shared endpoints
 // Check for shared endpoints
 bool shared_start = (eyepolv[chain_starts[0]].x == eyepolv[chain_starts[1]].x &&
                     eyepolv[chain_starts[0]].y == eyepolv[chain_starts[1]].y);
@@ -693,34 +686,31 @@ if (total_vertices < 3) {
 }
 
 int* stack = (int*)malloc(total_vertices * sizeof(int));
+int* stack_chain = (int*)malloc(total_vertices * sizeof(int));
 int stack_top = -1;
 int triangle_count = total_vertices - 2;
 index_capacity = triangle_count * 3;
 indices = (int*)malloc(index_capacity * sizeof(int));
 index_count = 0;
 
-// Merge chains into sorted order by x-coordinate
 int* sorted_vertices = (int*)malloc(total_vertices * sizeof(int));
-int* chain_id = (int*)malloc(total_vertices * sizeof(int));
+int* vertex_chain = (int*)malloc(total_vertices * sizeof(int));
 int left_idx = 0;
 int right_idx = 0;
 int merge_idx = 0;
 
-// Handle shared start vertex
 if (shared_start) {
     sorted_vertices[merge_idx] = chain_starts[0];
-    chain_id[merge_idx] = 0; // Assign to left chain
+    vertex_chain[merge_idx] = 0;
     merge_idx++;
     left_idx = 1;
     right_idx = 1;
 }
 
-// Merge the two chains
 while (left_idx < chain_lengths[0] && right_idx < chain_lengths[1]) {
-    // Skip shared end vertex from one chain
     if (shared_end && left_idx == chain_lengths[0] - 1 && right_idx == chain_lengths[1] - 1) {
         sorted_vertices[merge_idx] = chain_starts[0] + left_idx;
-        chain_id[merge_idx] = 0;
+        vertex_chain[merge_idx] = 0;
         merge_idx++;
         break;
     }
@@ -730,29 +720,29 @@ while (left_idx < chain_lengths[0] && right_idx < chain_lengths[1]) {
 
     if (left_x <= right_x) {
         sorted_vertices[merge_idx] = chain_starts[0] + left_idx;
-        chain_id[merge_idx] = 0;
+        vertex_chain[merge_idx] = 0;
         left_idx++;
     } else {
         sorted_vertices[merge_idx] = chain_starts[1] + right_idx;
-        chain_id[merge_idx] = 1;
+        vertex_chain[merge_idx] = 1;
         right_idx++;
     }
     merge_idx++;
 }
 
-// Add remaining vertices (avoiding shared end)
 while (left_idx < chain_lengths[0]) {
     if (!(shared_end && left_idx == chain_lengths[0] - 1)) {
         sorted_vertices[merge_idx] = chain_starts[0] + left_idx;
-        chain_id[merge_idx] = 0;
+        vertex_chain[merge_idx] = 0;
         merge_idx++;
     }
     left_idx++;
 }
+
 while (right_idx < chain_lengths[1]) {
     if (!(shared_end && right_idx == chain_lengths[1] - 1)) {
         sorted_vertices[merge_idx] = chain_starts[1] + right_idx;
-        chain_id[merge_idx] = 1;
+        vertex_chain[merge_idx] = 1;
         merge_idx++;
     }
     right_idx++;
@@ -760,69 +750,88 @@ while (right_idx < chain_lengths[1]) {
 
 total_vertices = merge_idx;
 
-// Initialize stack with first vertex
 stack[++stack_top] = sorted_vertices[0];
+stack_chain[stack_top] = vertex_chain[0];
 
-// Process vertices
-for (int i = 1; i < total_vertices; i++) {
-    int current_vertex = sorted_vertices[i];
-    int current_chain = chain_id[i];
+if (total_vertices > 1) {
+    stack[++stack_top] = sorted_vertices[1];
+    stack_chain[stack_top] = vertex_chain[1];
+}
 
-    if (stack_top == 0) {
-        stack[++stack_top] = current_vertex;
-        continue;
-    }
+for (int i = 2; i < total_vertices; i++) {
+    int curr_v = sorted_vertices[i];
+    int curr_chain = vertex_chain[i];
+    int top_chain = stack_chain[stack_top];
 
-    // Find chain of top stack vertex
-    int top_vertex = stack[stack_top];
-    int top_chain = -1;
-    for (int j = 0; j < i; j++) {
-        if (sorted_vertices[j] == top_vertex) {
-            top_chain = chain_id[j];
-            break;
-        }
-    }
-
-    if (current_chain != top_chain) {
-        // Different chains - triangulate with all stack vertices except last
+    if (curr_chain != top_chain) {
+        // Different chain - fan triangulate from current vertex to all stack edges
         for (int j = 0; j < stack_top; j++) {
-            indices[index_count++] = stack[j];
-            indices[index_count++] = stack[j + 1];
-            indices[index_count++] = current_vertex;
-        }
+            int v0 = stack[j];
+            int v1 = stack[j + 1];
+            int v2 = curr_v;
 
-        // Keep only the last vertex and add current
-        int last_vertex = stack[stack_top];
-        stack_top = 0;
-        stack[0] = last_vertex;
-        stack[++stack_top] = current_vertex;
-    } else {
-        // Same chain - check for valid triangles
-        while (stack_top > 0) {
-            int v0 = stack[stack_top - 1];
-            int v1 = stack[stack_top];
-            int v2 = current_vertex;
-
-            // Calculate cross product
-            float dx1 = eyepolv[v1].x - eyepolv[v0].x;
-            float dy1 = eyepolv[v1].y - eyepolv[v0].y;
-            float dx2 = eyepolv[v2].x - eyepolv[v1].x;
-            float dy2 = eyepolv[v2].y - eyepolv[v1].y;
-            float cross = dx1 * dy2 - dy1 * dx2;
-
-            // For monotone polygon: left chain needs CCW, right chain needs CW
-            bool is_valid = (current_chain == 0) ? (cross > 0) : (cross < 0);
-
-            if (is_valid) {
+            // Stack is on opposite chain from current vertex
+            // If stack is chain 0 (upper), current is chain 1 (lower): wind v0,v2,v1
+            // If stack is chain 1 (lower), current is chain 0 (upper): wind v0,v1,v2
+            if (stack_chain[j] == 0) {
+                indices[index_count++] = v0;
+                indices[index_count++] = v2;
+                indices[index_count++] = v1;
+            } else {
                 indices[index_count++] = v0;
                 indices[index_count++] = v1;
                 indices[index_count++] = v2;
-                stack_top--;
-            } else {
-                break;
             }
         }
-        stack[++stack_top] = current_vertex;
+
+        int last_v = stack[stack_top];
+        int last_chain = stack_chain[stack_top];
+        stack_top = 0;
+        stack[0] = last_v;
+        stack_chain[0] = last_chain;
+        stack[++stack_top] = curr_v;
+        stack_chain[stack_top] = curr_chain;
+
+    } else {
+        // Same chain - pop while diagonal is inside polygon
+        while (stack_top > 0) {
+            int v0 = stack[stack_top - 1];
+            int v1 = stack[stack_top];
+            int v2 = curr_v;
+
+            float ax = eyepolv[v1].x - eyepolv[v0].x;
+            float ay = eyepolv[v1].y - eyepolv[v0].y;
+            float bx = eyepolv[v2].x - eyepolv[v1].x;
+            float by = eyepolv[v2].y - eyepolv[v1].y;
+            float cross = ax * by - ay * bx;
+
+            // Chain 0 (upper): valid if cross > 0 (left turn)
+            // Chain 1 (lower): valid if cross < 0 (right turn)
+            bool valid = (curr_chain == 0) ? (cross > 0.0f) : (cross < 0.0f);
+
+            if (!valid) {
+                break;
+            }
+
+            // Emit with consistent winding
+            // Chain 0: cross > 0 means CCW order is v0,v1,v2 -> emit v0,v2,v1 for CW
+            // Chain 1: cross < 0 means CW order is v0,v1,v2 -> emit v0,v1,v2 for CW
+            // (flip both if you want CCW output)
+            if (curr_chain == 0) {
+                indices[index_count++] = v0;
+                indices[index_count++] = v2;
+                indices[index_count++] = v1;
+            } else {
+                indices[index_count++] = v0;
+                indices[index_count++] = v1;
+                indices[index_count++] = v2;
+            }
+
+            stack_top--;
+        }
+
+        stack[++stack_top] = curr_v;
+        stack_chain[stack_top] = curr_chain;
     }
 }
 
@@ -869,10 +878,10 @@ for (int i = 1; i < total_vertices; i++) {
 		wccw_transform(&ret, &b->movedcam, &b->orcam);
 		eyepolv[pn].wpos = (point3d){ret.x,ret.y,ret.z};
 	}
-
 	free(stack);
+	free(stack_chain);
 	free(sorted_vertices);
-	free(chain_id);
+	free(vertex_chain);
 
 	eyepol[eyepoln].c1 = chain_starts[0];
 	eyepol[eyepoln].c2 = chain_starts[1];
@@ -1096,12 +1105,6 @@ static int projectonmono (int *plothead0, int *plothead1,  bdrawctx* b) {
 		for (i = mp[plothead[h]].n; i != plothead[h]; i = mp[i].n) {
 		//	printf("%d, ",n);
 			n++;
-			if (n > 20) {
-				printf ("fucked up mono");
-				//mono_deloop(*plothead0);
-				//mono_deloop(*plothead1);
-				//return 0;
-			}
 		}
 	otp = (dpoint3d *) _alloca(n * sizeof(dpoint3d));
 	tp = (dpoint3d *) _alloca(n * sizeof(dpoint3d) * 2);
