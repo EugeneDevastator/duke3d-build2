@@ -1,4 +1,4 @@
- //
+  //
 // Created by omnis on 10/27/2025.
 //
 /*
@@ -34,13 +34,22 @@ The forward direction can be visualized as moving away from the camera or viewer
 #include "raylib.h"
 #include "raymath.h"
 #include "rlgl.h"
-
+typedef struct {
+     Shader shader;
+     int worldOriginLoc;
+     int worldULoc;
+     int worldVLoc;
+     int textureLoc;
+     int vertexTexCoord;
+ } UVShaderDesc;
 struct WallSegment
 {
     float z[4]; // bottom-left, bottom-right, top-right, top-left
     bool isVisible;
     int adjacentSector;
 };
+
+
 
 typedef struct
 {
@@ -75,7 +84,8 @@ static bool drawWalls = false;
 static bool drawSpris = true;
 static bool drawCeils = false;
 static player_transform plr;
-static Shader uvShader ;
+static Shader uvShader_plain ;
+static UVShaderDesc uvShaderDesc;
 static Shader lightShader ;
 static int lightPosLoc;
 static int lightRangeLoc;
@@ -92,13 +102,32 @@ public:
     {
         return map;
     }
+    static void LoadUVShader(void) {
+        uvShaderDesc = {0};
 
+        // Load the shader
+        uvShaderDesc.shader = LoadShader("Shaders/uv_opaq.vert", "Shaders/uv_opaq.frag");
+
+        // Get uniform locations
+        uvShaderDesc.vertexTexCoord = rlGetLocationUniform(uvShaderDesc.shader.id, "vertexTexCoord");
+      //  int vertexIndexLoc = rlGetLocationUniform(uvShaderDesc.shader.id, "vertexIndex");
+        uvShaderDesc.textureLoc = GetShaderLocation(uvShaderDesc.shader, "textureSampler");
+        uvShaderDesc.worldOriginLoc = GetShaderLocation(uvShaderDesc.shader, "worldOrigin");
+        uvShaderDesc.worldULoc = GetShaderLocation(uvShaderDesc.shader, "worldU");
+        uvShaderDesc.worldVLoc = GetShaderLocation(uvShaderDesc.shader, "worldV");
+
+           }
+   static  void SetUVShaderParams(UVShaderDesc uvShader, Vector3 worldOrigin, Vector3 worldU, Vector3 worldV) {
+        SetShaderValue(uvShader.shader, uvShader.worldOriginLoc, &worldOrigin, SHADER_UNIFORM_VEC3);
+        SetShaderValue(uvShader.shader, uvShader.worldULoc, &worldU, SHADER_UNIFORM_VEC3);
+        SetShaderValue(uvShader.shader, uvShader.worldVLoc, &worldV, SHADER_UNIFORM_VEC3);
+    }
     static void Init()
     {
         char rootpath[256];
-        uvShader = LoadShader("uv_vis_shader.vs", "uv_vis_shader.fs");
-
-        lightShader = LoadShader("light.vs", "light.fs");
+        uvShader_plain = LoadShader("Shaders/uv_vis_shader.vert", "Shaders/uv_vis_shader.frag");
+        LoadUVShader();
+        lightShader = LoadShader("Shaders/light.vert", "Shaders/light.frag");
 
         lightPosLoc = GetShaderLocation(lightShader, "lightPosition");
         lightRangeLoc = GetShaderLocation(lightShader, "lightRange");
@@ -152,17 +181,17 @@ public:
                 int sid1 = abs(map->spri[p.anchorspri].p.z - map->sect[i].z[1]);
                 int sid2 = abs(map->spri[p.anchorspri].p.z - map->sect[i].z[0]);
                 p.surfid = sid1 < sid2;
-                map->spri[p.anchorspri].p.z = map->sect[i].z[p.surfid]+1; // resolve flor ceil in future
+                map->spri[p.anchorspri].p.z = map->sect[i].z[p.surfid]; // resolve flor ceil in future
                 p.kind = p.surfid;
                 spri_t *spr = &map->spri[p.anchorspri];
               //  point3d newr = spr->tr.r;
-                point3d newd = spr->tr.r;
-                point3d newr = spr->tr.d;
-                vscalar(&newd,-1.0f);
-                spr->tr.d = newd;
-                spr->tr.r = newr;
+             //   point3d newd = spr->tr.r;
+             //   point3d newr = spr->tr.d;
+             //   vscalar(&newd,-1.0f);
+             //   spr->tr.d = newd;
+             //   spr->tr.r = newr;
               //  vscalar(&spr->tr.f,-1.0f);
-                normalize_transform(&spr->tr);
+              //  normalize_transform(&spr->tr);
                 p.destpn = map->sect[i].surf[1].hitag;
                 map->sect[i].tags[1] = portaln;
                 portaln++;
@@ -181,9 +210,15 @@ public:
                 int hspr = map->sect[pcop.sect].headspri;
                 int nextsp = map->spri[hspr].sectn;
                 if (nextsp < 0) printf("mirror with just one sprite detected! ERROR!");
+            if (pcop.kind != PORT_WALL) // temp floor mirror hack
+                {
+                map->spri[nextsp].tr = map->spri[hspr].tr;
+                vscalar(&map->spri[nextsp].tr.d,-1);
+                }
                 pcop.anchorspri = nextsp;
                 pcop.destpn = i;
                 portals[i].destpn = portaln;
+
                 portaln++;
                 continue;
             }
@@ -476,36 +511,113 @@ public:
             //rlSetTexture(0);
         }
     }
-    // Monotone polygon triangulation - O(n), no allocations needed
-    static bool draw_eyepol_wspace(float sw, float sh, int i, int &v0, int &vertCount) {
-        v0 = eyepol[i].vert0;
+    static Vector3 buildToRaylibPos(point3d buildcoord)
+    {
+        return {buildcoord.x, -buildcoord.z, buildcoord.y};
+    }
+    // build to vector3 as is
+    static Vector3 bpv3(point3d buildcoord)
+    {
+        return {buildcoord.x, buildcoord.y, buildcoord.z};
+    }
+    static Vector3 bpv3(dpoint3d buildcoord)
+    {
+        return {(float)buildcoord.x, (float)buildcoord.y, (float)buildcoord.z};
+    }
+    static Vector3 buildToRaylibPos(dpoint3d buildcoord)
+    {
+        return {(float)buildcoord.x, (float)-buildcoord.z, (float)buildcoord.y};
+    }
+    static bool draw_eyepol_withuvtex(float sw, float sh, int i, int v0, int vertCount) {
         int v1 = eyepol[i + 1].vert0;
-        vertCount = v1 - v0;
-        if (vertCount < 3) return true;
-       // if (!eyepol[i].has_triangulation) return true;
 
         rlDrawRenderBatchActive();
         rlDisableBackfaceCulling();
 
         glEnable(GL_POLYGON_OFFSET_FILL);
         glPolygonOffset(-0.5f, 1.0f);
-        rlDisableDepthMask();
+        //  rlDisableDepthMask();
 
-        Vector3* pts = static_cast<Vector3 *>(malloc(vertCount * sizeof(Vector3)));
+        float r = eyepol[i].b2sect/6.0;
+        float b = eyepol[i].b2sect/17.0;
 
-        for (int j = 0; j < vertCount; j++) {
-            point3d p = eyepolv[v0 + j];
-            pts[j] = {p.x, -p.z, p.y};
+        // set global shader variables. all 3 are points in world space (custom one)
+        // shader.setvector3 worldorigin to eyepol->worlduvs[0] //
+        // shader.setvector3 worldU to eyepol->worlduvs[1]
+        // shader.setvector3 worldV to eyepol->worlduvs[2]
+        BeginShaderMode(uvShaderDesc.shader);
+        SetUVShaderParams(uvShaderDesc,
+            bpv3(eyepol[i].worlduvs[0]),
+            bpv3(eyepol[i].worlduvs[1]),
+            bpv3(eyepol[i].worlduvs[2]));
+        if (eyepol[i].tilnum>900)
+            eyepol[i].tilnum=5;
+        const Texture2D tex = runtimeTextures[eyepol[i].tilnum];
+
+        SetShaderValueTexture(uvShaderDesc.shader,uvShaderDesc.textureLoc,tex);
+        rlBegin(RL_TRIANGLES);
+        if (eyepol[i].tilnum == 163)
+            int a =1;
+        Vector3 worldOrigin = bpv3(eyepol[i].worlduvs[0]);
+        Vector3 worldU = bpv3(eyepol[i].worlduvs[1]);
+        Vector3 worldV = bpv3(eyepol[i].worlduvs[2]);
+        Vector3 locU = worldU - worldOrigin;
+        Vector3 locV = worldV - worldOrigin;
+        for (int ii = 0; ii < eyepol[i].nid; ii += 3) {
+            float g = (ii/3 /5.0f);
+            rlColor4f(r,g+0.1f,b,0.2);
+            for (int j = 0; j < 3; j++) {
+                int idx = eyepol[i].indices[ii+j];
+                Vector3 verwpos = buildToRaylibPos(eyepolv[idx].wpos);
+                Vector3 uvwpos = bpv3(eyepolv[idx].uvpos);
+                rlColor4f(1,1,1,1);
+              //  rlEnableVertexAttribute(uvShaderDesc.vertexTexCoord);
+                Vector3 localPos = uvwpos - worldOrigin;
+                // Project onto UV plane using dot products
+                float u = Vector3DotProduct(localPos, Vector3Normalize(locU)) / Vector3Length(locU);
+                float v = Vector3DotProduct(localPos, Vector3Normalize(locV)) / Vector3Length(locV);
+
+                u = u * eyepol[i].uvform[0] + eyepol[i].uvform[2];
+                v = v * eyepol[i].uvform[1] + eyepol[i].uvform[3];
+
+                rlTexCoord2f(u,v);
+
+                // rlNormal3f(uvwpos.x,uvwpos.y,uvwpos.z); // this bitch gets transformed.
+                rlVertex3f(verwpos.x, verwpos.y, verwpos.z);
+            }
         }
-        unsigned char r = (int)((eyepol[i].b2sect/6.0f)*255) % 255;
-        unsigned char b = (int)((eyepol[i].b2sect/17.0f)*255) % 255;
-        rlColor4ub(r,128,b,40);
-        //DrawTriangleFan3D(pts,vertCount,{r,128,3,30});
-        TriangAndDraw3D(pts,vertCount);
+        rlEnd();
         rlDrawRenderBatchActive();
+        EndShaderMode();
+        glDisable(GL_POLYGON_OFFSET_FILL);
+        return false;
+    }
+
+    static bool draw_eyepol_tridebug(float sw, float sh, int i, int v0, int vertCount) {
+        int v1 = eyepol[i + 1].vert0;
+
+        rlDrawRenderBatchActive();
+        rlDisableBackfaceCulling();
+
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(-0.5f, 1.0f);
+      //  rlDisableDepthMask();
+
+        float r = eyepol[i].b2sect/6.0;
+        float b = eyepol[i].b2sect/17.0;
 
 
-        free(pts);
+        rlBegin(RL_TRIANGLES);
+        for (int ii = 0; ii < eyepol[i].nid-3; ii += 3) {
+            float g = (ii/3 /5.0f);
+            rlColor4f(eyepol[i].slabid/3.0f,g+0.1f,b,0.2);
+            for (int j = 0; j < 3; j++) {
+                int idx = eyepol[i].indices[ii+j];
+                rlVertex3f(eyepolv[idx].x, -eyepolv[idx].z, eyepolv[idx].y);
+            }
+        }
+        rlEnd();
+        rlDrawRenderBatchActive();
 
         glDisable(GL_POLYGON_OFFSET_FILL);
         return false;
@@ -523,20 +635,7 @@ float scaler = 0.01;
         rlVertex2f(40,40);
         rlVertex2f(40,50);
         rlEnd();
-            // Iterate through all head pairs
-          // for (i = 0; i < mphnum; i++) {
-          //     rlBegin(RL_LINES);
-          //     for(h=0;h<2;h++) {
-          //         i = mph[i].head[h];
-          //         do
-          //         {
-          //             if (h) i = mp[i].p;
-          //
-          //             if (!h) i = mp[i].n;
-          //         } while (i != mph[i].head[h]);
-          //         mono_deloop(mph[i].head[h]);
-          //     }
-          // }
+
 
         for (i = 0; i < mphnum; i++) {
             int hd0 = mph[i].head[0];
@@ -586,22 +685,31 @@ float scaler = 0.01;
                 rlEnd();
             }
         }
+
         int v=0;
         int l = 0;
         auto cam = DumbCore::GetCamera().position;
         cam = {0,0,0};
         float cdiv = 1.0;
+        rlBegin(RL_LINES);
         while (v<loopnum) { // add keys to rotate closest sprite.
-            rlBegin(RL_LINES);
+
+            rlDisableDepthMask();
+            rlDisableDepthTest();
+            int idx =0;
             while (loopuse[v]) {
-                rlColor4f(v/8.0f,v/4.0f,v/8.0f,0.9f);
+                rlColor4f(idx/13.0f,l%2,1.0f,1.0f);
                 //    auto campos = DumbCore::GetCamera().position;
-                rlVertex3f(cam.x+loops[v].x/cdiv ,cam.y+ -loops[v].z/cdiv,cam.z+loops[v].y/cdiv);
+                rlVertex3f(loops[v].x,-loops[v].z,loops[v].y);
                 v++;
+                idx++;
             }
             l++;v++;
-            rlEnd();
+            rlDrawRenderBatchActive();
+
+
         }
+        rlEnd();
     }
 
     static void DrawPost3d(float sw, float sh, Camera3D camsrc) {
@@ -659,10 +767,12 @@ float scaler = 0.01;
 
         // Eyepol polys
         bool draweye = true;
-        bool drawlineseye = false;
-        bool drawlights = false;
-        bool drawmonoloops = true;
-        bool drawmonostate = false;
+        bool drawtrilines = 1;
+        bool drawtripoly = 0;
+        bool drawlights = 0;
+        bool drawmonoloops = 1;
+        bool drawmonostate = 0;
+        bool drawopaqes = 1;
 
         rlDisableBackfaceCulling();
         BeginMode3D(camsrc);
@@ -680,32 +790,40 @@ float scaler = 0.01;
                     if (cureyepoly > eyepoln)
                         cureyepoly = 0;
                 }
+
                 if (cureyepoly == 0 | cureyepoly == i) {
-                    if (draw_eyepol_wspace(sw, sh, i, v0, vertCount))
-                        continue;
+                    v0 = eyepol[i].vert0;
+                    int v1 = eyepol[i + 1].vert0;
+                    vertCount = v1 - v0;
+                    if (vertCount < 3) continue;
+
+                    if (drawtripoly)
+                        draw_eyepol_tridebug(sw, sh, i, v0, vertCount);
+                    if (drawopaqes)
+                        draw_eyepol_withuvtex(sw, sh, i, v0, vertCount);
+
                 } else continue;
 
-                if (drawlineseye)
+                if (drawtrilines)
                 {
-                    rlBegin(RL_LINES);
+
                     rlDisableDepthMask();
+                    rlDisableDepthTest();
                     rlDisableBackfaceCulling();
                     glEnable(GL_POLYGON_OFFSET_FILL);
-                    glPolygonOffset(-1.0f, 1.0f);
+                    glPolygonOffset(-2.0f, 1.0f);
                     rlColor4f(0, 1, 1, 1);
-                    for (int j = 0; j < vertCount; j++) {
-                        rlColor4f(j/5.0f, j/5.0f, 1, 1);
-                       //int idx[] = {v0, v0 + j, v0 + j + 1};
-                       //for (int k = 0; k < 3; k++) {
-                          //  Vector3 pt = {eyepolv[idx[k]].x, eyepolv[idx[k]].y,eyepolv[idx[k]].z};
-                            Vector3 pt = {eyepolv[v0+j].x, eyepolv[v0+j].y,eyepolv[v0+j].z};
-                            rlVertex3f(pt.x,-pt.z, pt.y);
-                       // }
+                    for (int ii = 0; ii < eyepol[i].nid; ii += 3) {
+                        rlBegin(RL_LINES);
+                        for (int j = 0; j < 3; j++) {
+                            int idx = eyepol[i].indices[ii+j];
+                            rlVertex3f(eyepolv[idx].x, -eyepolv[idx].z, eyepolv[idx].y);
+                        }
+                        rlDrawRenderBatchActive();
+                        rlEnd();
                     }
-                    Vector3 pt = {eyepolv[v0].x, eyepolv[v0].y,eyepolv[v0].z};
-                    rlVertex3f(pt.x,-pt.z, pt.y);
 
-                    rlEnd();
+
                     glDisable(GL_POLYGON_OFFSET_FILL);
                     rlEnableDepthMask();
                 } // eyepol lines for each poly
@@ -742,7 +860,7 @@ float scaler = 0.01;
                     int vertCount = v1 - v0;
                     if (vertCount < 3) continue;
 
-                    //   BeginShaderMode(uvShader);
+                    //   BeginShaderMode(uvShader_plain);
                     rlBegin(RL_TRIANGLES);
 
                     //rlSetTexture(0);
@@ -1742,7 +1860,7 @@ private:
             if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
             map->blankheadspri = i;
         }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/prt3.MAP", map);
+        loadmap_imp((char*)"c:/Eugene/Games/build2/prt31.MAP", map);
     }
 };
 

@@ -69,7 +69,7 @@
 
 #define WALL_BLOCKING           (1 << 0)   // 1
 #define WALL_BOTTOM_SWAP        (1 << 1)   // 2
-#define WALL_ALIGN_FLOOR        (1 << 2)   // 4
+#define WALL_ALIGN_FLOOR        (1 << 2)   // 4 // default is align ceil.
 #define WALL_FLIP_X             (1 << 3)   // 8
 #define WALL_MASKED             (1 << 4)   // 16
 #define WALL_SOLID_MASKED       (1 << 5)   // 32
@@ -84,7 +84,7 @@
 #define SECTOR_EXPAND_TEXTURE   (1 << 3)   // 8
 #define SECTOR_FLIP_X           (1 << 4)   // 16
 #define SECTOR_FLIP_Y           (1 << 5)   // 32
-#define SECTOR_RELATIVE_ALIGN   (1 << 6)   // 64
+#define SECTOR_TEXWALL_ALIGN    (1 << 6)   // 64
 #define SECTOR_MASKED           (1 << 7)   // 128
 #define SECTOR_TRANSLUCENT      (1 << 8)   // 256
 #define SECTOR_REVERSE_TRANS    (SECTOR_MASKED | SECTOR_TRANSLUCENT) // 384
@@ -98,8 +98,92 @@
 #define SPRITE_B2_FLAT_POLY    (1 << 5)   // 32
 #define SPRITE_B2_ONE_SIDED        (1 << 6)   // 64
 #define SPRITE_B2_IS_LIGHT     (1 << 16)   // 64
-//Bit0:Blocking, Bit2:1WayOtherSide, Bit5,Bit4:Face/Wall/Floor/.., Bit6:1side, Bit16:IsLight, Bit17-19:SpotAx(1-6), Bit20-29:SpotWid, Bit31:Invisible
 
+#define UV_TEXELRATE 		0 // pixel-rated = duke default.
+#define UV_NORMRATE 		1 // tile-rated
+#define UV_TEXELFIT 		2 // fit preserving texelrate
+#define UV_NORMFIT 		3 // fit to entire square
+#define UV_PARALLAX_LIN 	4
+#define UV_PARALLAX_CYL 	5
+#define UV_PARALLAX_SPH 	6
+#define UV_SKYBOX 			7
+#define UV_WORLDXY 			7
+
+#define TILING_SQUARE	(1<<0)
+#define TILING_HEXSQ	(1<<1)
+#define TILING_HEXFULL	(1<<2)
+#define TILING_XMIRR	(1<<3)
+#define TILING_YMIRR	(1<<4)
+
+// can probably encode in bits:
+// this or next wal;
+// this or next sec;
+// flor or ceil;
+// raw z or slope z;
+
+// placeholders for readability
+// Dont use in main parser!
+#define TEZ_OS 0
+#define TEZ_RAWZ 0
+#define TEZ_CEIL 0
+
+#define TEZ_FLOR 1<<0  // use floor or ceil
+#define TEZ_NS 1<<1 // this or next sect
+#define TEZ_SLOPE 1<<2 // slope or rawz;
+#define TEZ_INVZ 1<<3 // use next continious wall
+#define TEZ_CLOSEST 1<<4 // closest height point instead of arbitrary.
+
+// auto resolution optioons, written in ouv wal
+#define TEW_WORLDF -1
+#define TEW_WORLDR -2
+#define TEW_WORLDD -3
+#define TEW_ORTHO -4
+//Bit0:Blocking, Bit2:1WayOtherSide, Bit5,Bit4:Face/Wall/Floor/.., Bit6:1side, Bit16:IsLight, Bit17-19:SpotAx(1-6), Bit20-29:SpotWid, Bit31:Invisible
+// ------ Duke Nukem tiling and coords.
+// 1024 build units(x,y) correspond to 64 pixels. at 8,8 repeat.
+// 1024 build units(x,y) correspond to 32 pixels. at 4,4 repeat
+// 8192 z build units correspond to 32 pixels at 8x8 repeat.
+
+
+#define PAN_TO_UV (1.0/8.0) // uvscale = pan * p2uv
+
+
+// assume one unit is one uv, given scale. so units*unitstouv*scale.
+// pan of 16 is 16 pixels. befre scaling.
+// duke3d:
+// x repeat 1 for wall means 8 pixels per entire wall length
+// y repeat 1 for wall means 4 pixels per 8192 z units.
+// x pan of 1 equals one pixel move before scaling. (so always 1 pixel)
+// y pan of 8 = 1 pixel of 32x32 texture
+// y pan of 2 = 1 pixel for 128x128  texture
+// also pans are limited by 256. so large textures wont work.
+
+static inline float GetPxOffsetVertical(int ysize, int ypan) {
+	int pansPerPx = 256.0/ysize;  // ex 32 size, pans per px = 8
+	float pxoffset = ypan / pansPerPx;  // ypan is 16; 16/8 = 2px offset.
+}
+static inline float GetPxOffsetHorizontal(int ypan) {
+	return ypan;
+}
+
+// in vert shader: uv = orig world pos X uv transform.
+// i need all original wpos, because mono polys.
+// and i do need transform per poly.
+// but good news - no need for wccw on uv, because we can just use original world information
+// ow pos can be also baked, and updated only when walls move. but for now ill update always
+
+// above is regardless of texture size.
+// build seems to automatically change pan when you change texture
+// kens conversion is kinda ok. so
+// 512 build units will fit 32 px at 8,8 repeat
+// 32 pixels per unit. that will be scale of 1.
+// at scale 2 it becomes 64 and at 0.5 16 pxpu
+//				spr->p.x = ((float)b7spr.x)*(1.f/512.f);
+//				spr->p.y = ((float)b7spr.y)*(1.f/512.f);
+//				spr->p.z = ((float)b7spr.z)*(1.f/(512.f*16.f));
+// 					sur->uv[0].x = ((float)b7sec.surf[j].xpanning)/256.0;
+//					sur->uv[0].y = ((float)b7sec.surf[j].ypanning)/256.0;
+//
 
 typedef struct { float x, y, z; } point3d;
 typedef struct { double x, y, z; } dpoint3d; 	//Note: pol doesn't support loops as dpoint3d's!
@@ -131,24 +215,74 @@ typedef struct
 	//Bit0:Blocking, Bit2:RelativeAlignment, Bit5:1Way, Bit16:IsParallax, Bit17:IsSkybox
 	union { long flags; struct { char _f1, _f2, _f3, pal; }; }; // temporary pal storage
 	union { long tag; struct { short lotag, hitag; }; };
-	point2d uv[3];
+	point2d uv[3]; // legacy.
 	unsigned short asc, rsc, gsc, bsc; //4096 is no change
+//-------- uvs
+	union {
+		// 0,1 - origin offset on the plane 2,3 - offset of the tile rect, for rotation anim for ex
+		point2d uvoffset[4];
+		struct {
+			point2d
+				planarworldoffset, // move origin in plane space in world.
+				tilerectoffset, // move tile against origin
+				crop1, // crop from 0,0
+				crop2; // crop from 1,1 both in tile rect.
+		};
+	};
 
+	union{
+		// we dont use sectors, current one is constraint.
+		// origin, u , v
+		int8_t uvalig[6];
+		// tez = tex z source
+		struct { int8_t owal, otez, uwal, utez, vwal, vtez; }; // wals are always wals of this sector.
+	};
+	uint8_t uvmapkind; // uv amappings, regular, polar, hex, flipped variants etc. paralax.
+	uint8_t tilingkind; // normal, polar, hex etc.
 
 	short renderflags; // new flags;
-	viewanchor view;
+// ------- runtime gneerated data
+	// for portals case - we dont care and use original world for everything.
+	// interpolator will lerp worldpositions, regardless of poly location
+	point3d uvcoords[3]; // world uv vectors. generated per poly. origin, u ,v
+	float uvform[6]; // scalexy, panxy
+	// can in theory use object space and encode it.
+
 } surf_t;
 
 typedef struct
 {
-	float x, y;
+	union {
+		point2d pos;
+		struct {
+			float x, y;
+		};
+	};
+
+	/* ai
+	*Positive values: Point to the next wall in the loop
+
+	wal[w].n + w gives the absolute index of the next wall
+	Used to traverse walls in order around a sector
+	Negative values: Mark special wall positions in loops
+
+	-1: Indicates the last wall in a loop
+	-2, -3: Mark end positions for clipped polygons
+
+	Looking at the code patterns, ideally only one wall per loop should have a negative n value - the last wall that closes the loop.
+	*/
+
 	long n, ns, nw; //n:rel. wall ind.; ns & nw : nextsect & nextwall_of_sect
 	long owner; //for dragging while editing, other effects during game
 	long surfn;
-	// maybe make portal innate?
-
 	surf_t surf, *xsurf; //additional malloced surfs when (surfn > 1)
-	int32_t tags[16];
+	uint16_t mflags[4]; // modflags
+	union {
+		int64_t tags8b[8];
+		int32_t tags[16]; // standard tag is 4bytes
+		int16_t tags2b[32];
+	};
+
 } wall_t;
 
 typedef struct
@@ -198,7 +332,7 @@ typedef struct
 	long foglev;
 	long owner;      //for dragging while editing, other effects during game
 	int32_t tags[16];
-
+	uint16_t mflags[4];
 	// int nwperim - perimeter walls, would be first in sequence
 	// int nwnested - nested walls for fully inner sectors
 	// could be purely runtime info.

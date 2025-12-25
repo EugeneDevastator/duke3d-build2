@@ -235,7 +235,7 @@ static player_transform *gps;
 	//Texture mapping parameters
 static tile_t *gtpic;
 
-static int gcurcol;
+static int gcurcol, gtilenum;
 static int taginc= 30000;
 #define LIGHTMAX 256 //FIX:make dynamic!
 lightpos_t shadowtest2_light[LIGHTMAX];
@@ -244,10 +244,12 @@ int shadowtest2_numlights = 0, shadowtest2_useshadows = 1, shadowtest2_numcpu = 
 float shadowtest2_ambrgb[3] = {32.0,32.0,32.0};
 __declspec(align(16)) static float g_qamb[4]; //holder for SSE to avoid degenerates
 static point3d slightpos[LIGHTMAX], slightdir[LIGHTMAX];
+
 static float spotwid[LIGHTMAX];
 
+
 eyepol_t *eyepol = 0; // 4096 eyepol_t's = 192KB
-point3d *eyepolv = 0; //16384 point2d's  = 128KB
+vert3d_t *eyepolv = 0; //16384 point2d's  = 128KB
 int eyepoln = 0, glignum = 0;
 int eyepolmal = 0, eyepolvn = 0, eyepolvmal = 0;
 #define LIGHASHSIZ 1024
@@ -622,6 +624,7 @@ static void xformbac (double rx, double ry, double rz, dpoint3d *o, bdrawctx *b)
 static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 {
 
+// ouput is x-monotone, left to right.
 	float f,fx,fy, g, *fptr;
 	int i, j, k, h, rethead[2];
 	cam_t cam = b->cam;
@@ -629,52 +632,143 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 	point3d add = b->gnadd;
 	if ((rethead0|rethead1) < 0) { mono_deloop(rethead1); mono_deloop(rethead0); return; }
 	rethead[0] = rethead0; rethead[1] = rethead1;
+	int *indices = NULL;
+	int index_count = 0;
+	int index_capacity = 0;
+	int chain_starts[2];
+	int chain_lengths[2] = {0, 0};
 
-	// Put on FIFO in world space:
-	for(h=0;h<2;h++)
+	for(h=0;h<2;h++) // h is head
 	{
+
 		i = rethead[h];
+		chain_starts[h] = eyepolvn;
 		do
 		{
-			if (h)
-				i = mp[i].p;
-
 			if (eyepolvn >= eyepolvmal)
 			{
 				eyepolvmal = max(eyepolvmal<<1,16384);
-				eyepolv = (point3d *)realloc(eyepolv,eyepolvmal*sizeof(point3d));
+				eyepolv = (vert3d_t *)realloc(eyepolv,eyepolvmal*sizeof(vert3d_t));
 			}
-
-			f = cam.h.z/(mp[i].x*xform[6] + mp[i].y*xform[7] + add.z);
-			fx        =  (mp[i].x*xform[0] + mp[i].y*xform[1] + add.x)*f + cam.h.x;
-			fy        =  (mp[i].x*xform[3] + mp[i].y*xform[4] +add.y)*f + cam.h.y;
-			//float mul = (b->ismirrored) ? -1 : 1;
-			f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*cam.h.z);
-
-			float retx = ((fx-cam.h.x)*cam.r.x + (fy-cam.h.y)*cam.d.x + (cam.h.z)*cam.f.x)*f + cam.p.x;
-			float rety = ((fx-cam.h.x)*cam.r.y + (fy-cam.h.y)*cam.d.y + (cam.h.z)*cam.f.y)*f + cam.p.y;
-			float retz = ((fx-cam.h.x)*cam.r.z + (fy-cam.h.y)*cam.d.z + (cam.h.z)*cam.f.z)*f + cam.p.z;
-			dpoint3d ret = {retx,rety,retz};
-
-//vscalar(&b->cam.r,mul);
-			wccw_transform(&ret, &b->movedcam, &b->orcam);
-			eyepolv[eyepolvn] = (point3d){ret.x,ret.y,ret.z};
+			eyepolv[eyepolvn].wpos = (point3d){mp[i].pos.x,mp[i].pos.y,mp[i].pos.z};
 			eyepolvn++;
-//			vscalar(&b->cam.r,mul);
-			if (!h) i = mp[i].n;
+			chain_lengths[h]++;
+			i = mp[i].n;
 		} while (i != rethead[h]);
 		mono_deloop(rethead[h]);
+
 	}
-LOOPEND
+	// TRIANGULATION
+	// Allocate indices array
+	int total_vertices = chain_lengths[0] + chain_lengths[1];
+	int triangle_count = total_vertices - 2;
+	index_capacity = triangle_count * 3;
+	indices = (int*)malloc(index_capacity * sizeof(int));
+	index_count = 0;
+	// Triangulate using two-pointer technique
+	int left = 0;
+	int right = 0;
+	int left_start = chain_starts[0];
+	int right_start = chain_starts[1];
+
+	if (total_vertices <= 3) {
+		// Handle degenerate case
+		return;
+	}
+
+	// Determine polygon orientation (assuming CCW is desired)
+	// You might need to adjust this based on your coordinate system
+	bool ccw_orientation = true; // Set based on your needs
+
+	while (left < chain_lengths[0] - 1 || right < chain_lengths[1] - 1) {
+		bool use_left;
+
+		if (left >= chain_lengths[0] - 1)
+			use_left = false;
+		else if (right >= chain_lengths[1] - 1)
+			use_left = true;
+		else {
+			float left_x = eyepolv[left_start + left + 1].x;
+			float right_x = eyepolv[right_start + right + 1].x;
+			use_left = (left_x < right_x);
+		}
+
+		if (use_left) {
+			if (right < chain_lengths[1]) {
+				if (ccw_orientation) {
+					indices[index_count++] = left_start + left;
+					indices[index_count++] = right_start + right;
+					indices[index_count++] = left_start + left + 1;
+				} else {
+					indices[index_count++] = left_start + left;
+					indices[index_count++] = left_start + left + 1;
+					indices[index_count++] = right_start + right;
+				}
+			}
+			left++;
+		} else {
+			if (left < chain_lengths[0]) {
+				if (ccw_orientation) {
+					indices[index_count++] = left_start + left;
+					indices[index_count++] = right_start + right;
+					indices[index_count++] = right_start + right + 1;
+				} else {
+					indices[index_count++] = left_start + left;
+					indices[index_count++] = right_start + right + 1;
+					indices[index_count++] = right_start + right;
+				}
+			}
+			right++;
+		}
+	}
+
+	// Store triangulation in eyepol structure
 	if (eyepoln+1 >= eyepolmal)
 	{
 		eyepolmal = max(eyepolmal<<1, 4096);
 		eyepol = (eyepol_t *)realloc(eyepol, eyepolmal*sizeof(eyepol_t));
 		eyepol[0].vert0 = 0;
 	}
+	eyepol[eyepoln].tilnum = gtilenum;
+	// setup uvs
+	if (b->gisflor < 2) {
+		eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].surf[b->gisflor].uvcoords;
+		eyepol[eyepoln].uvform = curMap->sect[b->gligsect].surf[b->gisflor].uvform;
+	//	eyepol[eyepoln].tilnum = curMap->sect[b->gligsect].surf[b->gisflor].tilnum;
+	} else { // walls
+		eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].uvcoords;
+		eyepol[eyepoln].uvform = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].uvform;
+		eyepol[eyepoln].tilnum = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].tilnum;
+		//xsurf[b->gligslab % 3].uvcoords;
+	}
 
+	eyepol[eyepoln].slabid = b->gligslab; // 0 -top, 1 - mid, 2-bot.
+
+	// transform verts to WS
+	for (int pn= chain_starts[0]; pn<eyepolvn;pn++) {
+
+		f = cam.h.z/(eyepolv[pn].x*xform[6] + eyepolv[pn].y*xform[7] + add.z);
+		fx        =  (eyepolv[pn].x*xform[0] + eyepolv[pn].y*xform[1] + add.x)*f + cam.h.x;
+		fy        =  (eyepolv[pn].x*xform[3] + eyepolv[pn].y*xform[4] +add.y)*f + cam.h.y;
+
+		f = 1.0/((b->gouvmat[0]*fx + b->gouvmat[3]*fy + b->gouvmat[6])*cam.h.z);
+
+		float retx = ((fx-cam.h.x)*cam.r.x + (fy-cam.h.y)*cam.d.x + (cam.h.z)*cam.f.x)*f + cam.p.x;
+		float rety = ((fx-cam.h.x)*cam.r.y + (fy-cam.h.y)*cam.d.y + (cam.h.z)*cam.f.y)*f + cam.p.y;
+		float retz = ((fx-cam.h.x)*cam.r.z + (fy-cam.h.y)*cam.d.z + (cam.h.z)*cam.f.z)*f + cam.p.z;
+		dpoint3d ret = {retx,rety,retz};
+		eyepolv[pn].uvpos = ret;
+		// get it in space of really moved cam, and return back to original space.
+		// vector transforms are working vell outside of mono plane.
+		wccw_transform(&ret, &b->movedcam, &b->orcam);
+		eyepolv[pn].wpos = (point3d){ret.x,ret.y,ret.z};
+	}
+
+
+	eyepol[eyepoln].vert0 = chain_starts[0];
+	eyepol[eyepoln].indices = indices;
+	eyepol[eyepoln].nid = index_count;
 	memcpy((void *)eyepol[eyepoln].ouvmat, (void *)b->gouvmat, sizeof(b->gouvmat[0])*9);
-
 	eyepol[eyepoln].tpic = gtpic;
 	eyepol[eyepoln].curcol = gcurcol;
 	eyepol[eyepoln].flags = (b->gflags != 0);
@@ -682,9 +776,10 @@ LOOPEND
 	eyepol[eyepoln].b2wall = b->gligwall;
 	eyepol[eyepoln].b2slab = b->gligslab;
 	memcpy((void *)&eyepol[eyepoln].norm, (void *)&b->gnorm, sizeof(b->gnorm));
+	eyepol[eyepoln].rdepth = b->recursion_depth;
 	eyepoln++;
 	eyepol[eyepoln].vert0 = eyepolvn;
-	eyepol[eyepoln].rdepth = b->recursion_depth;
+
 	logstep("produce eyepol, depth:%d",b->recursion_depth);
 }
 
@@ -790,7 +885,7 @@ static void drawtag_debug(int rethead0, int rethead1, bdrawctx *b)
 			if (eyepolvn >= eyepolvmal)
 			{
 				eyepolvmal = max(eyepolvmal<<1,16384);
-				eyepolv = (point3d *)realloc(eyepolv,eyepolvmal*sizeof(point3d));
+				eyepolv = (vert3d_t *)realloc(eyepolv,eyepolvmal*sizeof(vert3d_t));
 			}
 			f = cam.h.z/(mp[i].x*xform[6] + mp[i].y*xform[7] + add.z);
 			fx        =  (mp[i].x*xform[0] + mp[i].y*xform[1] + add.x)*f + cam.h.x;
@@ -803,10 +898,10 @@ static void drawtag_debug(int rethead0, int rethead1, bdrawctx *b)
 			float retz = ((fx-cam.h.x)*cam.r.z + (fy-cam.h.y)*cam.d.z + (cam.h.z)*cam.f.z)*f + cam.p.z;
 			dpoint3d ret = {retx,rety,retz};
 			if (b->recursion_depth>1) {
-				LOOPADD(ret)
+			//	LOOPADD(ret)
 			}
 			wccw_transform(&ret, &b->cam, &b->orcam);
-			eyepolv[eyepolvn] = (point3d){ret.x,ret.y,ret.z};
+			eyepolv[eyepolvn].wpos = (point3d){ret.x,ret.y,ret.z};
 
 			eyepolvn++;
 
@@ -887,7 +982,7 @@ static int projectonmono (int *plothead0, int *plothead1,  bdrawctx* b) {
 				printf ("fucked up mono");
 				//mono_deloop(*plothead0);
 				//mono_deloop(*plothead1);
-				return 0;
+				//return 0;
 			}
 		}
 	otp = (dpoint3d *) _alloca(n * sizeof(dpoint3d));
@@ -902,7 +997,7 @@ static int projectonmono (int *plothead0, int *plothead1,  bdrawctx* b) {
 		{
 			if (h) i = mp[i].p;
 			if (b->recursion_depth==2) {
-				LOOPADDP(mp[i])
+			//	LOOPADDP(mp[i])
 			}
 			ox = mp[i].x-gcam.p.x; oy = mp[i].y-gcam.p.y;
 			//if (b->has_portal_clip)
@@ -941,7 +1036,7 @@ static int projectonmono (int *plothead0, int *plothead1,  bdrawctx* b) {
 		tp[i].y = tp[i].y*f + gcam.h.y;
 
 	}
-LOOPEND
+//LOOPEND
 	//generate vmon
 		mono_genfromloop(&plothead[0], &plothead[1], tp, n);
 	if ((plothead[0] | plothead[1]) < 0) {
@@ -1200,6 +1295,7 @@ The b parameter is a bunch index - this function processes one "bunch" (visible 
 
 static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 {
+	gtilenum = 0;
 	cam_t gcam = b->cam;
 	// === VARIABLE DECLARATIONS ===
 	//extern void loadpic (tile_t *);
@@ -1225,7 +1321,8 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 
 	twal = (bunchverts_t *)_alloca((curMap->sect[b->bunch[bid].sec].n+1)*sizeof(bunchverts_t));
 	twaln = prepbunch(bid,twal,b);
-	b->gligsect = s; b->gligslab = 0;
+	b->gligsect = s;
+	b->gligslab = 0;
 
 	// === BUNCH MANAGEMENT: DELETE CURRENT BUNCH FROM GRID ===
 	// Removes processed bunch and compacts the bunch grid structure
@@ -1247,13 +1344,7 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 	bool noportals = b->recursion_depth >= MAX_PORTAL_DEPTH;
 	for(isflor=0;isflor<2;isflor++) // floor ceil
 	{
-
-		// here, when we draw sector of the exit portal we get glitches when it would draw a triangle with point below the camera resulting in triangle spanning entire vertical of the screen
-
-		     // Back-face culling: skip if camera is on wrong side of surface
-			// need to get original slope, as if camera was in origin.
-	//if (!b->has_portal_clip)
-
+		b->gisflor = isflor;
 
 			int myport = sec[s].tags[1]; // FLOOR PORTAL CHECK
 			bool isportal = myport >= 0
@@ -1269,7 +1360,7 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 			                && isflor == b->testignorewall;
 			if (skipport)
 				continue;
-
+		gtilenum = sec[s].surf[isflor].tilnum;
 
 		float surfpos = getslopez(&sec[s],isflor,b->cam.p.x,b->cam.p.y);
 		if ((b->cam.p.z >= surfpos) == isflor) // ignore backfaces
@@ -1293,7 +1384,7 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 		point3d locnorm = world_to_local_vec(b->gnorm, &b->cam.tr);
 		for (ww = twaln; ww >= 0; ww -= twaln) plothead[isflor] = mono_ins(
 			                                       plothead[isflor], twal[ww].x, twal[ww].y,
-			                                       b->gnorm.z * -1e5);
+			                                       b->gnorm.z * -1e9);
 		//do not replace w/single zenith point - ruins precision
 		i = isflor ^ 1;
 		for (ww = 0; ww <= twaln; ww++) {
@@ -1307,6 +1398,7 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 		// Setup texture and rendering flags
 		sur = &sec[s].surf[isflor];
 		gtpic = &gtile[sur->tilnum];
+		gtilenum = sur->tilnum;
 		//if (!gtpic->tt.f) loadpic(gtpic);
 		if (sec[s].surf[isflor].flags & (1 << 17)) { b->gflags = 2; } //skybox ceil/flor
 		else if (sec[s].surf[isflor].flags & (1 << 16)) {  //parallaxing ceil/flor
@@ -1319,7 +1411,6 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 			gentransform_ceilflor(&sec[s], wal, isflor, b);
 
 		b->gligwall = isflor - 2;
-		// Render the wall polygon
 		// F L O O R S
 		//
 		int surflag = ((isflor<<2)+3);
@@ -1339,7 +1430,7 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 			drawpol_befclip(s+b->tagoffset,-1,s,-1,plothead[0],plothead[1],surflag,b);
 		}
 	}
-
+	b->gisflor = 2;
 	// === DRAW WALLS ===
 	for(ww=0;ww<twaln;ww++)
 	{
@@ -1347,7 +1438,7 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 		// Get wall vertices and setup wall segment
 		vn = getwalls_imp(s,twal[ww].i,verts,MAXVERTS,map);
 		w = twal[ww].i; nw = wal[w].n+w;
-		sur = &wal[w].surf;
+		sur = &wal[w].xsurf[0];
 
 		int myport = wal[w].tags[1]; // FLOOR PORTAL CHECK
 		bool isportal = myport >= 0
@@ -1409,7 +1500,8 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 
 			if ((!(m & 1)) || (wal[w].surf.flags & (1 << 5))) //Draw wall here //(1<<5): 1-way
 			{
-				//	gtpic = &gtile[sur->tilnum]; if (!gtpic->tt.f) loadpic(gtpic);
+					gtilenum = sur->tilnum;
+					//gtpic = &gtile[sur->tilnum];// if (!gtpic->tt.f) loadpic(gtpic);
 				if (sur->flags & (1 << 17))	{ b->gflags = 2; } //skybox ceil/flor
 				if (sur->flags & (1 << 16))  b->gflags = 1;
 {
@@ -1424,9 +1516,9 @@ static void drawalls (int bid, mapstate_t* map, bdrawctx* b)
 					npol2[2].y = wal[w].y;
 					npol2[2].z = npol2[0].z + 1.f;
 					// Determine reference Z-level texture alignment
-					if (!(sur->flags & 4)) f = sec[s].z[0];
-					else if (!vn) f = sec[s].z[1]; //White walls don't have verts[]!
-					else if (!m) f = sec[verts[0].s].z[0];
+					if (!(sur->flags & 4)) f = sec[s].z[0]; // default is ceil align
+					else if (!vn) f = sec[s].z[1]; //White walls don't have verts[]! and align is different.
+					else if (!m) f = sec[verts[0].s].z[0]; //
 					else f = sec[verts[(m - 1) >> 1].s].z[0];
 					// Apply UV coordinates with proper scaling
 					//npol2[0].u = sur->uv[0].x;
