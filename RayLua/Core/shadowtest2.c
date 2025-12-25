@@ -674,13 +674,10 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 		mono_deloop(rethead[h]);
 	}
 // Check for shared endpoints
-bool shared_start = (eyepolv[chain_starts[0]].x == eyepolv[chain_starts[1]].x &&
-                    eyepolv[chain_starts[0]].y == eyepolv[chain_starts[1]].y);
-bool shared_end = (eyepolv[chain_starts[0] + chain_lengths[0] - 1].x == eyepolv[chain_starts[1] + chain_lengths[1] - 1].x &&
-                  eyepolv[chain_starts[0] + chain_lengths[0] - 1].y == eyepolv[chain_starts[1] + chain_lengths[1] - 1].y);
+bool shared_start = (issamexy(eyepolv[chain_starts[0]].wpos,eyepolv[chain_starts[1]].wpos));
+bool shared_end =(issamexy(eyepolv[chain_starts[0]+chain_lengths[0]-1].wpos,eyepolv[chain_starts[1]+chain_lengths[1]-1].wpos));
 
 int total_vertices = chain_lengths[0] + chain_lengths[1] - (shared_start ? 1 : 0) - (shared_end ? 1 : 0);
-
 if (total_vertices < 3) {
     return;
 }
