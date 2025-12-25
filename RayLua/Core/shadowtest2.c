@@ -645,33 +645,50 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 	int index_capacity = 0;
 	int chain_starts[2];
 	int chain_lengths[2] = {0, 0};
-
+	point3d curmp;
+	//point3d ch1start = (point3d){mp[i].pos.x,mp[i].pos.y,mp[i].pos.z};
 	for(h=0;h<2;h++) // h is head
 	{
 
 		i = rethead[h];
+	//// compare first point of chain 2 to first of chain 1;
+	//if (h && issamexy(eyepolv[eyepolvn].wpos,ch1start)) { // handle same points on ch1 end.
+	//		// advance for ch2.
+	//	i = mp[i].n;
+	//}
+
 		chain_starts[h] = eyepolvn;
 		do
 		{
+			curmp = (point3d){mp[i].pos.x,mp[i].pos.y,mp[i].pos.z};
 			if (eyepolvn >= eyepolvmal)
 			{
 				eyepolvmal = max(eyepolvmal<<1,16384);
 				eyepolv = (vert3d_t *)realloc(eyepolv,eyepolvmal*sizeof(vert3d_t));
 			}
-			eyepolv[eyepolvn].wpos = (point3d){mp[i].pos.x,mp[i].pos.y,mp[i].pos.z};
+			eyepolv[eyepolvn].wpos = curmp;
 			eyepolvn++;
 			chain_lengths[h]++;
 			i = mp[i].n;
 		} while (i != rethead[h]);
 		mono_deloop(rethead[h]);
-
 	}
 	// TRIANGULATION
 	// Allocate indices array
 // Stack for monotone triangulation
 
 
-int total_vertices = chain_lengths[0] + chain_lengths[1];
+
+// Check for shared endpoints
+bool shared_start = (eyepolv[chain_starts[0]].x == eyepolv[chain_starts[1]].x &&
+                    eyepolv[chain_starts[0]].y == eyepolv[chain_starts[1]].y);
+bool shared_end = (eyepolv[chain_starts[0] + chain_lengths[0] - 1].x == eyepolv[chain_starts[1] + chain_lengths[1] - 1].x &&
+                  eyepolv[chain_starts[0] + chain_lengths[0] - 1].y == eyepolv[chain_starts[1] + chain_lengths[1] - 1].y);
+	int total_vertices = chain_lengths[0] + chain_lengths[1] - shared_start - shared_end;
+
+	if (total_vertices < 3) {
+    return;
+}
 int* stack = (int*)malloc(total_vertices * sizeof(int));
 int stack_top = -1;
 int triangle_count = total_vertices - 2;
@@ -679,16 +696,30 @@ index_capacity = triangle_count * 3;
 indices = (int*)malloc(index_capacity * sizeof(int));
 index_count = 0;
 
-if (total_vertices <= 3) {
-    free(stack);
-    return;
-}
-
-// Merge chains into sorted order by x-coordinate
+// Merge chains into sorted order by x-coordinate, skipping duplicates
 int* sorted_vertices = (int*)malloc(total_vertices * sizeof(int));
 int* chain_id = (int*)malloc(total_vertices * sizeof(int));
-
-int left_idx = 0, right_idx = 0, merge_idx = 0;
+	int right_idx = 0;
+	int merge_idx = 0;
+int left_idx=0;
+if (shared_start) {
+	if (chain_lengths[0] >= chain_lengths[1])
+	{	chain_starts[0]++; // Skip first if shared
+		chain_lengths[0]--;
+	}
+	else {
+		chain_starts[1]++;
+		chain_lengths[1]--;
+	}
+}
+	if (shared_end) {
+		if (chain_lengths[0] > chain_lengths[1]) {
+			chain_lengths[0]--;
+		} else {
+			chain_lengths[1]--;
+			eyepolvn--;
+		}
+	}
 
 // Merge the two chains
 while (left_idx < chain_lengths[0] && right_idx < chain_lengths[1]) {
@@ -707,6 +738,7 @@ while (left_idx < chain_lengths[0] && right_idx < chain_lengths[1]) {
     merge_idx++;
 }
 
+// Add remaining vertices
 while (left_idx < chain_lengths[0]) {
     sorted_vertices[merge_idx] = chain_starts[0] + left_idx;
     chain_id[merge_idx] = 0;
@@ -785,12 +817,6 @@ for (int i = 1; i < total_vertices; i++) {
     }
 }
 
-free(stack);
-free(sorted_vertices);
-free(chain_id);
-
-
-
 	// Store triangulation in eyepol structure
 	if (eyepoln+1 >= eyepolmal)
 	{
@@ -814,8 +840,8 @@ free(chain_id);
 	eyepol[eyepoln].slabid = b->gligslab; // 0 -top, 1 - mid, 2-bot.
 
 	// transform verts to WS
-	for (int pn= chain_starts[0]; pn<eyepolvn;pn++) {
-
+	for (int ip= 0; ip<total_vertices;ip++) {
+		int pn = sorted_vertices[ip];
 		f = cam.h.z/(eyepolv[pn].x*xform[6] + eyepolv[pn].y*xform[7] + add.z);
 		fx        =  (eyepolv[pn].x*xform[0] + eyepolv[pn].y*xform[1] + add.x)*f + cam.h.x;
 		fy        =  (eyepolv[pn].x*xform[3] + eyepolv[pn].y*xform[4] +add.y)*f + cam.h.y;
@@ -832,6 +858,11 @@ free(chain_id);
 		wccw_transform(&ret, &b->movedcam, &b->orcam);
 		eyepolv[pn].wpos = (point3d){ret.x,ret.y,ret.z};
 	}
+
+	free(stack);
+	free(sorted_vertices);
+	free(chain_id);
+
 	eyepol[eyepoln].c1 = chain_starts[0];
 	eyepol[eyepoln].c2 = chain_starts[1];
 	eyepol[eyepoln].l1 = chain_lengths[0];
@@ -850,7 +881,8 @@ free(chain_id);
 	eyepol[eyepoln].b2slab = b->gligslab;
 	memcpy((void *)&eyepol[eyepoln].norm, (void *)&b->gnorm, sizeof(b->gnorm));
 	eyepol[eyepoln].rdepth = b->recursion_depth;
-	eyepoln++;
+
+	eyepoln++; // set start for next vert.
 	eyepol[eyepoln].vert0 = eyepolvn;
 
     logstep("produce eyepol, depth:%d",b->recursion_depth);

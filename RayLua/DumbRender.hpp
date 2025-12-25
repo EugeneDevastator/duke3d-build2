@@ -801,7 +801,7 @@ float scaler = 0.01;
                     opercurr++;
                     if (drawtripoly)
                         draw_eyepol_tridebug(sw, sh, i, v0, vertCount);
-                    if (drawopaqes && (opercurr < operstopn))
+                    if (drawopaqes)
                         draw_eyepol_withuvtex(sw, sh, i, v0, vertCount);
                     if (draweyepolheads) {
 

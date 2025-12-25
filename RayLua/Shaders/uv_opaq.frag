@@ -12,7 +12,7 @@ uniform sampler2D textureSampler;
 void main() {
     // Sample the texture using UV coordinates
     vec4 texColor = texture(textureSampler, fract((uvPosition)));
-
+    texColor.a = 0.3f;
     // Output the sampled texture color
     finalColor = texColor;
 
