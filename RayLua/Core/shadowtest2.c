@@ -680,15 +680,18 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 
 
 // Check for shared endpoints
+// Check for shared endpoints
 bool shared_start = (eyepolv[chain_starts[0]].x == eyepolv[chain_starts[1]].x &&
                     eyepolv[chain_starts[0]].y == eyepolv[chain_starts[1]].y);
 bool shared_end = (eyepolv[chain_starts[0] + chain_lengths[0] - 1].x == eyepolv[chain_starts[1] + chain_lengths[1] - 1].x &&
                   eyepolv[chain_starts[0] + chain_lengths[0] - 1].y == eyepolv[chain_starts[1] + chain_lengths[1] - 1].y);
-	int total_vertices = chain_lengths[0] + chain_lengths[1] - shared_start - shared_end;
 
-	if (total_vertices < 3) {
+int total_vertices = chain_lengths[0] + chain_lengths[1] - (shared_start ? 1 : 0) - (shared_end ? 1 : 0);
+
+if (total_vertices < 3) {
     return;
 }
+
 int* stack = (int*)malloc(total_vertices * sizeof(int));
 int stack_top = -1;
 int triangle_count = total_vertices - 2;
@@ -696,33 +699,32 @@ index_capacity = triangle_count * 3;
 indices = (int*)malloc(index_capacity * sizeof(int));
 index_count = 0;
 
-// Merge chains into sorted order by x-coordinate, skipping duplicates
+// Merge chains into sorted order by x-coordinate
 int* sorted_vertices = (int*)malloc(total_vertices * sizeof(int));
 int* chain_id = (int*)malloc(total_vertices * sizeof(int));
-	int right_idx = 0;
-	int merge_idx = 0;
-int left_idx=0;
+int left_idx = 0;
+int right_idx = 0;
+int merge_idx = 0;
+
+// Handle shared start vertex
 if (shared_start) {
-	if (chain_lengths[0] >= chain_lengths[1])
-	{	chain_starts[0]++; // Skip first if shared
-		chain_lengths[0]--;
-	}
-	else {
-		chain_starts[1]++;
-		chain_lengths[1]--;
-	}
+    sorted_vertices[merge_idx] = chain_starts[0];
+    chain_id[merge_idx] = 0; // Assign to left chain
+    merge_idx++;
+    left_idx = 1;
+    right_idx = 1;
 }
-	if (shared_end) {
-		if (chain_lengths[0] > chain_lengths[1]) {
-			chain_lengths[0]--;
-		} else {
-			chain_lengths[1]--;
-			eyepolvn--;
-		}
-	}
 
 // Merge the two chains
 while (left_idx < chain_lengths[0] && right_idx < chain_lengths[1]) {
+    // Skip shared end vertex from one chain
+    if (shared_end && left_idx == chain_lengths[0] - 1 && right_idx == chain_lengths[1] - 1) {
+        sorted_vertices[merge_idx] = chain_starts[0] + left_idx;
+        chain_id[merge_idx] = 0;
+        merge_idx++;
+        break;
+    }
+
     float left_x = eyepolv[chain_starts[0] + left_idx].x;
     float right_x = eyepolv[chain_starts[1] + right_idx].x;
 
@@ -738,19 +740,25 @@ while (left_idx < chain_lengths[0] && right_idx < chain_lengths[1]) {
     merge_idx++;
 }
 
-// Add remaining vertices
+// Add remaining vertices (avoiding shared end)
 while (left_idx < chain_lengths[0]) {
-    sorted_vertices[merge_idx] = chain_starts[0] + left_idx;
-    chain_id[merge_idx] = 0;
+    if (!(shared_end && left_idx == chain_lengths[0] - 1)) {
+        sorted_vertices[merge_idx] = chain_starts[0] + left_idx;
+        chain_id[merge_idx] = 0;
+        merge_idx++;
+    }
     left_idx++;
-    merge_idx++;
 }
 while (right_idx < chain_lengths[1]) {
-    sorted_vertices[merge_idx] = chain_starts[1] + right_idx;
-    chain_id[merge_idx] = 1;
+    if (!(shared_end && right_idx == chain_lengths[1] - 1)) {
+        sorted_vertices[merge_idx] = chain_starts[1] + right_idx;
+        chain_id[merge_idx] = 1;
+        merge_idx++;
+    }
     right_idx++;
-    merge_idx++;
 }
+
+total_vertices = merge_idx;
 
 // Initialize stack with first vertex
 stack[++stack_top] = sorted_vertices[0];
@@ -761,61 +769,64 @@ for (int i = 1; i < total_vertices; i++) {
     int current_chain = chain_id[i];
 
     if (stack_top == 0) {
-        // Just add second vertex
         stack[++stack_top] = current_vertex;
         continue;
     }
 
-    int top_chain = chain_id[stack_top];
+    // Find chain of top stack vertex
+    int top_vertex = stack[stack_top];
+    int top_chain = -1;
+    for (int j = 0; j < i; j++) {
+        if (sorted_vertices[j] == top_vertex) {
+            top_chain = chain_id[j];
+            break;
+        }
+    }
 
     if (current_chain != top_chain) {
-        // Different chains - create triangles with all stack vertices except last
+        // Different chains - triangulate with all stack vertices except last
         for (int j = 0; j < stack_top; j++) {
             indices[index_count++] = stack[j];
             indices[index_count++] = stack[j + 1];
             indices[index_count++] = current_vertex;
         }
 
-        // Clear stack and add last vertex from previous chain and current
+        // Keep only the last vertex and add current
         int last_vertex = stack[stack_top];
-        stack_top = -1;
-        stack[++stack_top] = last_vertex;
+        stack_top = 0;
+        stack[0] = last_vertex;
         stack[++stack_top] = current_vertex;
     } else {
-        // Same chain - check for ear triangles
+        // Same chain - check for valid triangles
         while (stack_top > 0) {
             int v0 = stack[stack_top - 1];
             int v1 = stack[stack_top];
             int v2 = current_vertex;
 
-            // Calculate cross product for turn direction
+            // Calculate cross product
             float dx1 = eyepolv[v1].x - eyepolv[v0].x;
             float dy1 = eyepolv[v1].y - eyepolv[v0].y;
             float dx2 = eyepolv[v2].x - eyepolv[v1].x;
             float dy2 = eyepolv[v2].y - eyepolv[v1].y;
             float cross = dx1 * dy2 - dy1 * dx2;
 
-            // For monotone polygon, valid triangle depends on chain
-            bool is_ear = false;
-            if (current_chain == 0) {
-                is_ear = (cross > 0); // Left chain needs CCW turn
-            } else {
-                is_ear = (cross < 0); // Right chain needs CW turn
-            }
+            // For monotone polygon: left chain needs CCW, right chain needs CW
+            bool is_valid = (current_chain == 0) ? (cross > 0) : (cross < 0);
 
-            if (is_ear) {
+            if (is_valid) {
                 indices[index_count++] = v0;
                 indices[index_count++] = v1;
                 indices[index_count++] = v2;
-                stack_top--; // Remove middle vertex
+                stack_top--;
             } else {
                 break;
             }
         }
-
         stack[++stack_top] = current_vertex;
     }
 }
+
+
 
 	// Store triangulation in eyepol structure
 	if (eyepoln+1 >= eyepolmal)
