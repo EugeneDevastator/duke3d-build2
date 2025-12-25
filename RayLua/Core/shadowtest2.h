@@ -72,6 +72,7 @@ typedef struct {
     point3d *worlduvs; // origin, u ,v
     float* uvform;
     int slabid;
+    int c1,c2,l1,l2;
 } eyepol_t;
 
 typedef struct {
@@ -80,6 +81,7 @@ typedef struct {
         struct { float x, y, z; }; // compat.
     };
     dpoint3d uvpos; // world pos in original space;
+
 } vert3d_t;
 // ================================================================================================
 // GLOBAL VARIABLES

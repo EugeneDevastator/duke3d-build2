@@ -531,8 +531,7 @@ public:
     static bool draw_eyepol_withuvtex(float sw, float sh, int i, int v0, int vertCount) {
         int v1 = eyepol[i + 1].vert0;
 
-        rlDrawRenderBatchActive();
-        rlDisableBackfaceCulling();
+       // rlDisableBackfaceCulling();
 
         glEnable(GL_POLYGON_OFFSET_FILL);
         glPolygonOffset(-0.5f, 1.0f);
@@ -564,13 +563,13 @@ public:
         Vector3 locU = worldU - worldOrigin;
         Vector3 locV = worldV - worldOrigin;
         for (int ii = 0; ii < eyepol[i].nid; ii += 3) {
-            float g = (ii/3 /5.0f);
+            float g = (ii/3.0f /5.0f);
             rlColor4f(r,g+0.1f,b,0.2);
             for (int j = 0; j < 3; j++) {
                 int idx = eyepol[i].indices[ii+j];
                 Vector3 verwpos = buildToRaylibPos(eyepolv[idx].wpos);
                 Vector3 uvwpos = bpv3(eyepolv[idx].uvpos);
-                rlColor4f(1,1,1,1);
+                rlColor4f(1,g,1,1);
               //  rlEnableVertexAttribute(uvShaderDesc.vertexTexCoord);
                 Vector3 localPos = uvwpos - worldOrigin;
                 // Project onto UV plane using dot products
@@ -606,9 +605,9 @@ public:
         float r = eyepol[i].b2sect/6.0;
         float b = eyepol[i].b2sect/17.0;
 
-
         rlBegin(RL_TRIANGLES);
-        for (int ii = 0; ii < eyepol[i].nid-3; ii += 3) {
+
+        for (int ii = 0; ii < eyepol[i].nid; ii += 3) {
             float g = (ii/3 /5.0f);
             rlColor4f(eyepol[i].slabid/3.0f,g+0.1f,b,0.2);
             for (int j = 0; j < 3; j++) {
@@ -767,10 +766,11 @@ float scaler = 0.01;
 
         // Eyepol polys
         bool draweye = true;
-        bool drawtrilines = 1;
+        bool drawtrilines =0;
         bool drawtripoly = 0;
         bool drawlights = 0;
-        bool drawmonoloops = 1;
+        bool drawmonoloops = 0;
+        bool draweyepolheads = 1;
         bool drawmonostate = 0;
         bool drawopaqes = 1;
 
@@ -780,11 +780,13 @@ float scaler = 0.01;
 
         if (draweye && (!(!eyepol || !eyepolv || eyepoln <= 0)))
             {
+            BeginBlendMode(BLEND_ADDITIVE);
+            rlEnableBackfaceCulling();
             for (int i = 0; i < eyepoln; i++) {
                 // eypolis
                 int v0;
                 int vertCount;
-                BeginBlendMode(BLEND_ADDITIVE);
+
                 if (IsKeyPressed(KEY_J)) {
                     cureyepoly++;
                     if (cureyepoly > eyepoln)
@@ -801,31 +803,64 @@ float scaler = 0.01;
                         draw_eyepol_tridebug(sw, sh, i, v0, vertCount);
                     if (drawopaqes)
                         draw_eyepol_withuvtex(sw, sh, i, v0, vertCount);
+                    if (draweyepolheads) {
+                        opercurr++;
+                        if (opercurr < operstopn && opercurr > operstopn-2) {
 
+                            rlDisableDepthMask();
+                            rlDisableDepthTest();
+
+                            rlDrawRenderBatchActive();
+                            glEnable(GL_POLYGON_OFFSET_FILL);
+                            glPolygonOffset(-2.0f, 1.0f);
+                            rlColor4f(0, 1, 1, 1);
+                            int s = eyepol[i].c1;
+                            int e = eyepol[i].c1 + eyepol[i].l1;
+                            rlColor4f(1, 0, 0, 1);
+                            for (int ii = 0; ii < 2; ii++) {
+                                rlBegin(RL_LINES);
+                                for (int vi = s+1; vi < e; vi++) {
+                                    rlColor4f(1, ii, (vi-s-1)/5.0, 1);
+                                    rlVertex3f(eyepolv[vi-1].x, -eyepolv[vi-1].z, eyepolv[vi-1].y);
+                                    rlVertex3f(eyepolv[vi].x, -eyepolv[vi].z, eyepolv[vi].y);
+                                }
+                                s = eyepol[i].c2;
+                                e = eyepol[i].c2 + eyepol[i].l2;
+                                rlDrawRenderBatchActive();
+                                rlColor4f(1, 1, 0, 1);
+                            }
+
+                            rlEnd();
+                            glDisable(GL_POLYGON_OFFSET_FILL);
+                            rlEnableDepthMask();
+                        }
+                    } // eyepol lines for each poly
                 } else continue;
 
                 if (drawtrilines)
                 {
+                    if (opercurr < operstopn) {
+                        rlDisableDepthMask();
+                        rlDisableDepthTest();
 
-                    rlDisableDepthMask();
-                    rlDisableDepthTest();
-                    rlDisableBackfaceCulling();
-                    glEnable(GL_POLYGON_OFFSET_FILL);
-                    glPolygonOffset(-2.0f, 1.0f);
-                    rlColor4f(0, 1, 1, 1);
-                    for (int ii = 0; ii < eyepol[i].nid; ii += 3) {
-                        rlBegin(RL_LINES);
-                        for (int j = 0; j < 3; j++) {
-                            int idx = eyepol[i].indices[ii+j];
-                            rlVertex3f(eyepolv[idx].x, -eyepolv[idx].z, eyepolv[idx].y);
+
+                        glEnable(GL_POLYGON_OFFSET_FILL);
+                        glPolygonOffset(-2.0f, 1.0f);
+                        rlColor4f(0, 1, 1, 1);
+                        for (int ii = 0; ii < eyepol[i].nid; ii += 3) {
+                            rlBegin(RL_LINES);
+                            for (int j = 0; j < 3; j++) {
+                                int idx = eyepol[i].indices[ii+j];
+                                rlVertex3f(eyepolv[idx].x, -eyepolv[idx].z, eyepolv[idx].y);
+                            }
+                            rlDrawRenderBatchActive();
+                            rlEnd();
                         }
-                        rlDrawRenderBatchActive();
-                        rlEnd();
+
+
+                        glDisable(GL_POLYGON_OFFSET_FILL);
+                        rlEnableDepthMask();
                     }
-
-
-                    glDisable(GL_POLYGON_OFFSET_FILL);
-                    rlEnableDepthMask();
                 } // eyepol lines for each poly
 
             }
@@ -1860,7 +1895,7 @@ private:
             if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
             map->blankheadspri = i;
         }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/prt31.MAP", map);
+        loadmap_imp((char*)"c:/Eugene/Games/build2/uv.MAP", map);
     }
 };
 

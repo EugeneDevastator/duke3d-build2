@@ -763,6 +763,10 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 		wccw_transform(&ret, &b->movedcam, &b->orcam);
 		eyepolv[pn].wpos = (point3d){ret.x,ret.y,ret.z};
 	}
+	eyepol[eyepoln].c1 = chain_starts[0];
+	eyepol[eyepoln].c2 = chain_starts[1];
+	eyepol[eyepoln].l1 = chain_lengths[0];
+	eyepol[eyepoln].l2 = chain_lengths[1];
 
 
 	eyepol[eyepoln].vert0 = chain_starts[0];
