@@ -760,74 +760,84 @@ for (int i = 2; i < total_vertices; i++) {
     int curr_chain = vertex_chain[i];
     int top_chain = stack_chain[stack_top];
 
-    if (curr_chain != top_chain) {
-        // Different chain - fan triangulate from current vertex to all stack edges
-        for (int j = 0; j < stack_top; j++) {
-            int v0 = stack[j];
-            int v1 = stack[j + 1];
-            int v2 = curr_v;
+if (curr_chain != top_chain) {
+    // Different chain - fan triangulate from current vertex to all stack edges
+    for (int j = 0; j < stack_top; j++) {
+        int v0 = stack[j];
+        int v1 = stack[j + 1];
+        int v2 = curr_v;
 
-            // Stack is on opposite chain from current vertex
-            if (stack_chain[j] != 0) {
-                indices[index_count++] = v0;
-                indices[index_count++] = v2;
-                indices[index_count++] = v1;
-            } else {
-                indices[index_count++] = v0;
-                indices[index_count++] = v1;
-                indices[index_count++] = v2;
-            }
+        // Check orientation of the triangle to maintain consistent winding
+        float ax = eyepolv[v1].x - eyepolv[v0].x;
+        float ay = eyepolv[v1].y - eyepolv[v0].y;
+        float bx = eyepolv[v2].x - eyepolv[v0].x;
+        float by = eyepolv[v2].y - eyepolv[v0].y;
+        float cross = ax * by - ay * bx;
+
+        if (cross > 0.0f) {
+            // CCW - emit as is for CCW winding
+            indices[index_count++] = v0;
+            indices[index_count++] = v1;
+            indices[index_count++] = v2;
+        } else {
+            // CW - flip to make CCW
+            indices[index_count++] = v0;
+            indices[index_count++] = v2;
+            indices[index_count++] = v1;
         }
-
-        int last_v = stack[stack_top];
-        int last_chain = stack_chain[stack_top];
-        stack_top = 0;
-        stack[0] = last_v;
-        stack_chain[0] = last_chain;
-        stack[++stack_top] = curr_v;
-        stack_chain[stack_top] = curr_chain;
-
-    } else {
-        // Same chain - pop while diagonal is inside polygon
-        while (stack_top > 0) {
-            int v0 = stack[stack_top - 1];
-            int v1 = stack[stack_top];
-            int v2 = curr_v;
-
-            float ax = eyepolv[v1].x - eyepolv[v0].x;
-            float ay = eyepolv[v1].y - eyepolv[v0].y;
-            float bx = eyepolv[v2].x - eyepolv[v1].x;
-            float by = eyepolv[v2].y - eyepolv[v1].y;
-            float cross = ax * by - ay * bx;
-
-            // Chain 0 (upper): valid if cross > 0 (left turn)
-            // Chain 1 (lower): valid if cross < 0 (right turn)
-            bool valid = (curr_chain == 0) ? (cross > 0.0f) : (cross < 0.0f);
-
-            if (!valid) {
-                break;
-            }
-
-            // Emit with consistent winding
-            // Chain 0: cross > 0 means CCW order is v0,v1,v2 -> emit v0,v2,v1 for CW
-            // Chain 1: cross < 0 means CW order is v0,v1,v2 -> emit v0,v1,v2 for CW
-            // (flip both if you want CCW output)
-            if (curr_chain == 0) {
-                indices[index_count++] = v0;
-                indices[index_count++] = v2;
-                indices[index_count++] = v1;
-            } else {
-                indices[index_count++] = v0;
-                indices[index_count++] = v1;
-                indices[index_count++] = v2;
-            }
-
-            stack_top--;
-        }
-
-        stack[++stack_top] = curr_v;
-        stack_chain[stack_top] = curr_chain;
     }
+
+    int last_v = stack[stack_top];
+    int last_chain = stack_chain[stack_top];
+    stack_top = 0;
+    stack[0] = last_v;
+    stack_chain[0] = last_chain;
+    stack[++stack_top] = curr_v;
+    stack_chain[stack_top] = curr_chain;
+
+} else {
+    // Same chain - pop while diagonal is inside polygon
+    while (stack_top > 0) {
+        int v0 = stack[stack_top - 1];
+        int v1 = stack[stack_top];
+        int v2 = curr_v;
+
+        float ax = eyepolv[v1].x - eyepolv[v0].x;
+        float ay = eyepolv[v1].y - eyepolv[v0].y;
+        float bx = eyepolv[v2].x - eyepolv[v1].x;
+        float by = eyepolv[v2].y - eyepolv[v1].y;
+        float cross = ax * by - ay * bx;
+
+        bool valid = (curr_chain == 0) ? (cross > 0.0f) : (cross < 0.0f);
+
+        if (!valid) {
+            break;
+        }
+
+        // Check triangle orientation for consistent winding
+        float tax = eyepolv[v1].x - eyepolv[v0].x;
+        float tay = eyepolv[v1].y - eyepolv[v0].y;
+        float tbx = eyepolv[v2].x - eyepolv[v0].x;
+        float tby = eyepolv[v2].y - eyepolv[v0].y;
+        float tcross = tax * tby - tay * tbx;
+
+        if (tcross > 0.0f) {
+            indices[index_count++] = v0;
+            indices[index_count++] = v1;
+            indices[index_count++] = v2;
+        } else {
+            indices[index_count++] = v0;
+            indices[index_count++] = v2;
+            indices[index_count++] = v1;
+        }
+
+        stack_top--;
+    }
+
+    stack[++stack_top] = curr_v;
+    stack_chain[stack_top] = curr_chain;
+}
+
 }
 
 
