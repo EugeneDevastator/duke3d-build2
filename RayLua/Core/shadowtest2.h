@@ -72,6 +72,7 @@ typedef struct {
     point3d *worlduvs; // origin, u ,v
     float* uvform;
     int slabid;
+    int c1,c2,e1,e2;
 } eyepol_t;
 
 typedef struct {
@@ -80,6 +81,7 @@ typedef struct {
         struct { float x, y, z; }; // compat.
     };
     dpoint3d uvpos; // world pos in original space;
+
 } vert3d_t;
 // ================================================================================================
 // GLOBAL VARIABLES
@@ -144,7 +146,7 @@ int drawpol_befclip(int fromtag, int newtag1, int fromsect, int newsect, int plo
  */
 void reset_context();
 void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy);
-void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx);
+void draw_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx);
 // ================================================================================================
 // POLYGONAL SHADOW CREATION FUNCTIONS
 // ================================================================================================

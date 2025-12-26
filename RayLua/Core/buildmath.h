@@ -11,7 +11,7 @@
 //
 
 #include "buildmath.h"
-
+#define epsilon 0.0000001f
 static inline float vlen(point3d *p) {
     return sqrtf(p->x * p->x + p->y * p->y + p->z * p->z);
 }
@@ -49,7 +49,9 @@ static inline void normalize_transform(transform *tr) {
     flen = vlen(&tr->d);
     if (flen > 0.0001f) scalardivv(&tr->d, flen);
 }
-
+static inline bool issamexy(point3d a, point3d b) {
+    return ((fabsf(a.x - b.x) + fabsf(a.y-b.y)) < epsilon);
+}
 static inline point3d local_to_world_point(point3d local_pos, transform *tr) {
     point3d world;
     world.x = tr->p.x + local_pos.x * tr->r.x + local_pos.y * tr->d.x + local_pos.z * tr->f.x;

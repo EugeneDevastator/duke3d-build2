@@ -132,6 +132,7 @@
 #define TEZ_SLOPE 1<<2 // slope or rawz;
 #define TEZ_INVZ 1<<3 // use next continious wall
 #define TEZ_CLOSEST 1<<4 // closest height point instead of arbitrary.
+#define TEZ_WORLDZ1 1<<5 // closest height point instead of arbitrary.
 
 // auto resolution optioons, written in ouv wal
 #define TEW_WORLDF -1
@@ -328,7 +329,7 @@ typedef struct
 	surf_t surf[2];  //ceil&flor texture info
 	wall_t *wall;
 	long n, nmax;    //n:numwalls, nmax:walls malloced (nmax >= n)
-	long headspri;   //head sprite index (-1 if none)
+	long headspri;   //hd sprite index (-1 if none)
 	long foglev;
 	long owner;      //for dragging while editing, other effects during game
 	int32_t tags[16];

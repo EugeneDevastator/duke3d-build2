@@ -15,7 +15,7 @@ int captureframe=0;
  transform lastcamtr = {};
  transform lastcamtr2 = {};
 int opercurr=0;
-signed int operstopn=0;
+signed int operstopn=-1;
 
 void logstep(const char *fmt, ...) {
     if (!captureframe)

@@ -508,12 +508,17 @@ void makeslabuvform(int surfid, float slabH, wall_t *wal, int dukescales[4], int
 
 }
 
+
 float getzoftez(int tezflags, sect_t *mysec, int thiswall, point2d worldxy, mapstate_t *map) {
+
+	// for doored walls when flor = ceil but trhere is slope - doesnt work well.
 
 	// cant use this because floor/ceil will use wall id.
 	//point2d worldxy = tezflags & TEZ_WALNX
 	//	                  ? walnext(mysec, thiswall).pos
 	//	                  : mysec->wall[thiswall].pos;
+	if (tezflags & TEZ_WORLDZ1)
+{		return (tezflags & TEZ_FLOR) ? 1 : -1;}
 
 	sect_t *nsec = &map->sect[mysec->wall[thiswall].ns];
 	sect_t *usedsec = tezflags & TEZ_NS
@@ -557,10 +562,15 @@ void makewaluvs(sect_t *sect, int wid, mapstate_t *map) {
 		sur = &w->xsurf[sl]; // dope hack to process raw wall surf first.
 		wall_t *usewal = &sect->wall[sur->owal];
 		sur->uvcoords[0] = (point3d) {usewal->x, usewal->y,getzoftez(sur->otez, sect, wid, usewal->pos, map) };
+
 		usewal = &sect->wall[sur->uwal];
 		sur->uvcoords[1] = (point3d) {usewal->x,usewal->y,getzoftez(sur->utez, sect, wid, usewal->pos, map) };
+
 		usewal = &sect->wall[sur->vwal];
-		sur->uvcoords[2] = (point3d) {usewal->x,usewal->y,getzoftez(sur->vtez, sect, wid, usewal->pos, map) };
+		float z = getzoftez(sur->vtez, sect, wid, usewal->pos, map);
+		if (sur->vtez & TEZ_WORLDZ1)
+			z+=sur->uvcoords[0].z;
+		sur->uvcoords[2] = (point3d) {usewal->x,usewal->y,z };
 
 		if (sur->vtez & TEZ_INVZ) {
 			float dz = sur->uvcoords[2].z-sur->uvcoords[0].z;
@@ -570,7 +580,6 @@ void makewaluvs(sect_t *sect, int wid, mapstate_t *map) {
 	}
 
 }
-
 void makesecuvs(sect_t *sect, mapstate_t *map) {
 	wall_t *w = &sect->wall[0];
 	point2d wp = w->pos;
@@ -582,7 +591,8 @@ void makesecuvs(sect_t *sect, mapstate_t *map) {
 		if ((sect->mflags[fl] &SECTOR_SWAP_XY)) {
 			 xmul = sur->uvform[1];
 			 ymul = sur->uvform[0];
-		}else {
+		}else
+			{
 			xmul = sur->uvform[0];
 			ymul = sur->uvform[1];
 		}
@@ -590,23 +600,24 @@ void makesecuvs(sect_t *sect, mapstate_t *map) {
 		float xpan = sur->uvform[2];
 		float ypan = sur->uvform[3];
 
-		float scaler = (sect->mflags[fl] & SECTOR_EXPAND_TEXTURE) ? 1 : 2.0f;
+
 		ymul *= -1; // world x-flipped
 
-
+float scaler=1;
 		if (sur->uvmapkind == UV_WORLDXY) {
+			scaler = (sect->mflags[fl] & SECTOR_EXPAND_TEXTURE) ? 1 : 2;
 			sur->uvcoords[0] = (point3d){0, 0, z};
-			sur->uvcoords[1] = (point3d){scaler * xmul, 0, z};
-			sur->uvcoords[2] = (point3d){0, scaler * ymul, z};
+			sur->uvcoords[1] = (point3d){xmul*scaler, 0, z};
+			sur->uvcoords[2] = (point3d){0, ymul*scaler, z};
 			sur->uvform[0] = 1;
 			sur->uvform[1] = 1;
-		} else if (sur->uvmapkind == UV_TEXELRATE) {
-			scaler = (sect->mflags[fl] & SECTOR_EXPAND_TEXTURE) ? 4 : 1;
+		} else if (sur->uvmapkind == UV_TEXELRATE) { //
+			scaler = (sect->mflags[fl] & SECTOR_EXPAND_TEXTURE) ?  2 : 1;
 			point2d nwp = walnext(sect, 0).pos;
 			sur->uvcoords[0] = (point3d){wp.x, wp.y, z};
-			point3d vvec = (point3d){nwp.x, nwp.y, z};
+			point3d uvec = (point3d){nwp.x, nwp.y, z};
 			// get ortho to wall,
-			point3d normU = subtract(vvec, sur->uvcoords[0]);
+			point3d normU = subtract(uvec, sur->uvcoords[0]);
 			normU = normalizep3(normU);
 			sur->uvcoords[1] = normU;
 			addto(&sur->uvcoords[1], sur->uvcoords[0]);
@@ -617,25 +628,26 @@ void makesecuvs(sect_t *sect, mapstate_t *map) {
 			normU.z = vz-z;
 			normU = normalizep3(normU);
 
-			addto(&normU, sur->uvcoords[0]);
 			sur->uvcoords[2] = normU;
+			addto(&sur->uvcoords[2], sur->uvcoords[0]);
+
 			sur->uvform[0] = xmul * scaler;
 			sur->uvform[1] = ymul * scaler;
 		}
 
+
 		if ((sect->mflags[fl] & SECTOR_FLIP_X)) sur->uvform[0] *= -1;
 		if ((sect->mflags[fl] & SECTOR_FLIP_Y)) sur->uvform[1] *= -1;
-
 		if (sect->mflags[fl] & SECTOR_SWAP_XY) {
 			if (((sect->mflags[fl] & SECTOR_FLIP_X) != 0) != ((sect->mflags[fl] & SECTOR_FLIP_Y) != 0)) {
 				sur->uvform[0] *= -1;
 				sur->uvform[1] *= -1;
 			}
 			float t;
-			t = sur->uvform[0];
-			sur->uvform[0] = sur->uvform[1];
-			sur->uvform[1] = t;
-			t = 0;
+		t = sur->uvform[0];
+		sur->uvform[0] = sur->uvform[1];
+		sur->uvform[1] = t;
+
 			t = sur->uvform[2];
 			sur->uvform[2] = sur->uvform[3];
 			sur->uvform[3] = t;
