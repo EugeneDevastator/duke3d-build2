@@ -730,288 +730,308 @@ float cross_product(int a, int b, int c) {
 };
 
 static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
-	// ouput is x-monotone, left to right.
-	float f, fx, fy, g, *fptr;
-	int i, j, k, h, rethead[2];
-	cam_t cam = b->cam;
-	double *xform = b->xformmat;
-	point3d add = b->gnadd;
-	if ((rethead0 | rethead1) < 0) {
-		mono_deloop(rethead1);
-		mono_deloop(rethead0);
-		return;
-	}
-	rethead[0] = rethead0;
-	rethead[1] = rethead1;
-	int *indices = NULL;
-	int index_count = 0;
-	int index_capacity = 0;
-	int chain_starts[2];
-	int chain_lengths[2] = {0, 0};
-	point3d curmp;
-	//point3d ch1start = (point3d){mp[i].pos.x,mp[i].pos.y,mp[i].pos.z};
-	int debhl[4]; // start 01 end 01
+    // ouput is x-monotone, left to right.
+    float f, fx, fy, g, *fptr;
+    int i, j, k, h, rethead[2];
+    cam_t cam = b->cam;
+    double *xform = b->xformmat;
+    point3d add = b->gnadd;
 
-	for (h = 0; h < 2; h++) // h is head
-	{
-		i = rethead[h];
-		debhl[h * 2] = eyepolvn;
-		chain_starts[h] = eyepolvn;
-		do {
-			curmp = (point3d){mp[i].pos.x, mp[i].pos.y, mp[i].pos.z};
-			if (eyepolvn >= eyepolvmal) {
-				eyepolvmal = max(eyepolvmal<<1, 16384);
-				eyepolv = (vert3d_t *) realloc(eyepolv, eyepolvmal * sizeof(vert3d_t));
-			}
-			eyepolv[eyepolvn].wpos = curmp;
-			eyepolvn++;
-			chain_lengths[h]++;
-			i = mp[i].n;
-		} while (i != rethead[h]);
-		mono_deloop(rethead[h]);
-		debhl[h * 2 + 1] = eyepolvn - 1;
-	}
-	// Check for shared endpoints
-	bool shared_start = 0; //(issamexy(eyepolv[chain_starts[0]].wpos,eyepolv[chain_starts[1]].wpos));
-	bool shared_end = 0;
-	//(issamexy(eyepolv[chain_starts[0]+chain_lengths[0]-1].wpos,eyepolv[chain_starts[1]+chain_lengths[1]-1].wpos));
-	// need to store proper verts for chain debug
-	int total_vertices = chain_lengths[0] + chain_lengths[1] - (shared_start ? 1 : 0) - (shared_end ? 1 : 0);
-	if (total_vertices < 3) {
-		return;
-	}
+    #define EPSILON 1e-6f
 
-	int *stack = (int *) malloc(total_vertices * sizeof(int));
-	int *stack_chain = (int *) malloc(total_vertices * sizeof(int));
-	int stack_top = -1;
-	int triangle_count = total_vertices - 2;
-	index_capacity = triangle_count * 3;
-	indices = (int *) malloc(index_capacity * sizeof(int));
-	index_count = 0;
+    if ((rethead0 | rethead1) < 0) {
+        mono_deloop(rethead1);
+        mono_deloop(rethead0);
+        return;
+    }
 
-	int *sorted_vertices = (int *) malloc(total_vertices * sizeof(int));
-	int *vertex_chain = (int *) malloc(total_vertices * sizeof(int));
-	int left_idx = 0;
-	int right_idx = 0;
-	int merge_idx = 0;
+    rethead[0] = rethead0;
+    rethead[1] = rethead1;
+    int *indices = NULL;
+    int index_count = 0;
+    int index_capacity = 0;
+    int chain_starts[2];
+    int chain_lengths[2] = {0, 0};
+    point3d curmp;
+    int debhl[4]; // start 01 end 01
 
-	if (shared_start) {
-		sorted_vertices[merge_idx] = chain_starts[0];
-		vertex_chain[merge_idx] = 0;
-		merge_idx++;
-		left_idx = 1;
-		right_idx = 1;
-	}
+    for (h = 0; h < 2; h++) {
+        i = rethead[h];
+        debhl[h * 2] = eyepolvn;
+        chain_starts[h] = eyepolvn;
+        do {
+            curmp = (point3d){mp[i].pos.x, mp[i].pos.y, mp[i].pos.z};
+            if (eyepolvn >= eyepolvmal) {
+                eyepolvmal = max(eyepolvmal<<1, 16384);
+                eyepolv = (vert3d_t *) realloc(eyepolv, eyepolvmal * sizeof(vert3d_t));
+            }
+            eyepolv[eyepolvn].wpos = curmp;
+            eyepolvn++;
+            chain_lengths[h]++;
+            i = mp[i].n;
+        } while (i != rethead[h]);
+        mono_deloop(rethead[h]);
+        debhl[h * 2 + 1] = eyepolvn - 1;
+    }
 
-	while (left_idx < chain_lengths[0] && right_idx < chain_lengths[1]) {
-		if (shared_end && left_idx == chain_lengths[0] - 1 && right_idx == chain_lengths[1] - 1) {
-			sorted_vertices[merge_idx] = chain_starts[0] + left_idx;
-			vertex_chain[merge_idx] = 0;
-			merge_idx++;
-			break;
-		}
+    bool shared_start = 0;
+    bool shared_end = 0;
+    int total_vertices = chain_lengths[0] + chain_lengths[1] - (shared_start ? 1 : 0) - (shared_end ? 1 : 0);
 
-		float left_x = eyepolv[chain_starts[0] + left_idx].x;
-		float right_x = eyepolv[chain_starts[1] + right_idx].x;
+    if (total_vertices < 3) {
+        return;
+    }
 
-		if (left_x <= right_x) {
-			sorted_vertices[merge_idx] = chain_starts[0] + left_idx;
-			vertex_chain[merge_idx] = 0;
-			left_idx++;
-		} else {
-			sorted_vertices[merge_idx] = chain_starts[1] + right_idx;
-			vertex_chain[merge_idx] = 1;
-			right_idx++;
-		}
-		merge_idx++;
-	}
+    int *stack = (int *) malloc(total_vertices * sizeof(int));
+    int *stack_chain = (int *) malloc(total_vertices * sizeof(int));
+    int stack_top = -1;
+    int triangle_count = total_vertices - 2;
+    index_capacity = triangle_count * 3;
+    indices = (int *) malloc(index_capacity * sizeof(int));
+    index_count = 0;
 
-	while (left_idx < chain_lengths[0]) {
-		if (!(shared_end && left_idx == chain_lengths[0] - 1)) {
-			sorted_vertices[merge_idx] = chain_starts[0] + left_idx;
-			vertex_chain[merge_idx] = 0;
-			merge_idx++;
-		}
-		left_idx++;
-	}
+    int *sorted_vertices = (int *) malloc(total_vertices * sizeof(int));
+    int *vertex_chain = (int *) malloc(total_vertices * sizeof(int));
+    int left_idx = 0;
+    int right_idx = 0;
+    int merge_idx = 0;
 
-	while (right_idx < chain_lengths[1]) {
-		if (!(shared_end && right_idx == chain_lengths[1] - 1)) {
-			sorted_vertices[merge_idx] = chain_starts[1] + right_idx;
-			vertex_chain[merge_idx] = 1;
-			merge_idx++;
-		}
-		right_idx++;
-	}
+    // Improved merge with epsilon tolerance and tie-breaking
+    if (shared_start) {
+        sorted_vertices[merge_idx] = chain_starts[0];
+        vertex_chain[merge_idx] = 0;
+        merge_idx++;
+        left_idx = 1;
+        right_idx = 1;
+    }
 
-	total_vertices = merge_idx;
+    while (left_idx < chain_lengths[0] && right_idx < chain_lengths[1]) {
+        if (shared_end && left_idx == chain_lengths[0] - 1 && right_idx == chain_lengths[1] - 1) {
+            sorted_vertices[merge_idx] = chain_starts[0] + left_idx;
+            vertex_chain[merge_idx] = 0;
+            merge_idx++;
+            break;
+        }
 
-	stack[++stack_top] = sorted_vertices[0];
-	stack_chain[stack_top] = vertex_chain[0];
+        float left_x = eyepolv[chain_starts[0] + left_idx].x;
+        float right_x = eyepolv[chain_starts[1] + right_idx].x;
+        float x_diff = left_x - right_x;
 
-	if (total_vertices > 1) {
-		stack[++stack_top] = sorted_vertices[1];
-		stack_chain[stack_top] = vertex_chain[1];
-	}
+        if (fabs(x_diff) < EPSILON) {
+            // Tie-breaking: use y-coordinate, then prefer chain 0
+            float left_y = eyepolv[chain_starts[0] + left_idx].y;
+            float right_y = eyepolv[chain_starts[1] + right_idx].y;
 
-	for (int i = 2; i < total_vertices; i++) {
-		int curr_v = sorted_vertices[i];
-		int curr_chain = vertex_chain[i];
-		int top_chain = stack_chain[stack_top];
+            if (left_y <= right_y) {
+                sorted_vertices[merge_idx] = chain_starts[0] + left_idx;
+                vertex_chain[merge_idx] = 0;
+                left_idx++;
+            } else {
+                sorted_vertices[merge_idx] = chain_starts[1] + right_idx;
+                vertex_chain[merge_idx] = 1;
+                right_idx++;
+            }
+        } else if (x_diff <= 0) {
+            sorted_vertices[merge_idx] = chain_starts[0] + left_idx;
+            vertex_chain[merge_idx] = 0;
+            left_idx++;
+        } else {
+            sorted_vertices[merge_idx] = chain_starts[1] + right_idx;
+            vertex_chain[merge_idx] = 1;
+            right_idx++;
+        }
+        merge_idx++;
+    }
 
-		if (curr_chain != top_chain) {
-			// Different chain - fan triangulate from current vertex to all stack edges
-			for (int j = 0; j < stack_top; j++) {
-				int v0 = stack[j];
-				int v1 = stack[j + 1];
-				int v2 = curr_v;
+    while (left_idx < chain_lengths[0]) {
+        if (!(shared_end && left_idx == chain_lengths[0] - 1)) {
+            sorted_vertices[merge_idx] = chain_starts[0] + left_idx;
+            vertex_chain[merge_idx] = 0;
+            merge_idx++;
+        }
+        left_idx++;
+    }
 
-				// Check orientation of the triangle to maintain consistent winding
-				float ax = eyepolv[v1].x - eyepolv[v0].x;
-				float ay = eyepolv[v1].y - eyepolv[v0].y;
-				float bx = eyepolv[v2].x - eyepolv[v0].x;
-				float by = eyepolv[v2].y - eyepolv[v0].y;
-				float cross = ax * by - ay * bx;
+    while (right_idx < chain_lengths[1]) {
+        if (!(shared_end && right_idx == chain_lengths[1] - 1)) {
+            sorted_vertices[merge_idx] = chain_starts[1] + right_idx;
+            vertex_chain[merge_idx] = 1;
+            merge_idx++;
+        }
+        right_idx++;
+    }
 
-				if (cross > 0.0f) {
-					// CCW - flip to make CW
-					indices[index_count++] = v0;
-					indices[index_count++] = v2;
-					indices[index_count++] = v1;
-				} else {
-					// CW - emit as is for CW winding
-					indices[index_count++] = v0;
-					indices[index_count++] = v1;
-					indices[index_count++] = v2;
-				}
-			}
+    total_vertices = merge_idx;
 
-			int last_v = stack[stack_top];
-			int last_chain = stack_chain[stack_top];
-			stack_top = 0;
-			stack[0] = last_v;
-			stack_chain[0] = last_chain;
-			stack[++stack_top] = curr_v;
-			stack_chain[stack_top] = curr_chain;
-		} else {
-			// Same chain - pop while diagonal is inside polygon
-			while (stack_top > 0) {
-				int v0 = stack[stack_top - 1];
-				int v1 = stack[stack_top];
-				int v2 = curr_v;
+    // Improved triangulation with better degeneracy handling
+    stack[++stack_top] = sorted_vertices[0];
+    stack_chain[stack_top] = vertex_chain[0];
 
-				float ax = eyepolv[v1].x - eyepolv[v0].x;
-				float ay = eyepolv[v1].y - eyepolv[v0].y;
-				float bx = eyepolv[v2].x - eyepolv[v1].x;
-				float by = eyepolv[v2].y - eyepolv[v1].y;
-				float cross = ax * by - ay * bx;
+    if (total_vertices > 1) {
+        stack[++stack_top] = sorted_vertices[1];
+        stack_chain[stack_top] = vertex_chain[1];
+    }
 
-				bool valid = (curr_chain == 0) ? (cross > 0.0f) : (cross < 0.0f);
+    for (int i = 2; i < total_vertices; i++) {
+        int curr_v = sorted_vertices[i];
+        int curr_chain = vertex_chain[i];
+        int top_chain = stack_chain[stack_top];
 
-				if (!valid) {
-					break;
-				}
+        if (curr_chain != top_chain) {
+            // Different chain - fan triangulate
+            for (int j = 0; j < stack_top; j++) {
+                int v0 = stack[j];
+                int v1 = stack[j + 1];
+                int v2 = curr_v;
 
-				// Check triangle orientation for consistent winding
-				float tax = eyepolv[v1].x - eyepolv[v0].x;
-				float tay = eyepolv[v1].y - eyepolv[v0].y;
-				float tbx = eyepolv[v2].x - eyepolv[v0].x;
-				float tby = eyepolv[v2].y - eyepolv[v0].y;
-				float tcross = tax * tby - tay * tbx;
+                // Skip degenerate triangles
+                float ax = eyepolv[v1].x - eyepolv[v0].x;
+                float ay = eyepolv[v1].y - eyepolv[v0].y;
+                float bx = eyepolv[v2].x - eyepolv[v0].x;
+                float by = eyepolv[v2].y - eyepolv[v0].y;
+                float cross = ax * by - ay * bx;
 
-				if (tcross > 0.0f) {
-					// CCW - flip to make CW
-					indices[index_count++] = v0;
-					indices[index_count++] = v2;
-					indices[index_count++] = v1;
-				} else {
-					// CW - emit as is for CW winding
-					indices[index_count++] = v0;
-					indices[index_count++] = v1;
-					indices[index_count++] = v2;
-				}
+                if (fabs(cross) < EPSILON) continue; // Skip degenerate
 
-				stack_top--;
-			}
+                if (cross > 0.0f) {
+                    indices[index_count++] = v0;
+                    indices[index_count++] = v2;
+                    indices[index_count++] = v1;
+                } else {
+                    indices[index_count++] = v0;
+                    indices[index_count++] = v1;
+                    indices[index_count++] = v2;
+                }
+            }
 
-			stack[++stack_top] = curr_v;
-			stack_chain[stack_top] = curr_chain;
-		}
-	}
+            int last_v = stack[stack_top];
+            int last_chain = stack_chain[stack_top];
+            stack_top = 0;
+            stack[0] = last_v;
+            stack_chain[0] = last_chain;
+            stack[++stack_top] = curr_v;
+            stack_chain[stack_top] = curr_chain;
+        } else {
+            // Same chain - improved validation
+            while (stack_top > 0) {
+                int v0 = stack[stack_top - 1];
+                int v1 = stack[stack_top];
+                int v2 = curr_v;
 
+                // Check for collinear points
+                float ax = eyepolv[v1].x - eyepolv[v0].x;
+                float ay = eyepolv[v1].y - eyepolv[v0].y;
+                float bx = eyepolv[v2].x - eyepolv[v1].x;
+                float by = eyepolv[v2].y - eyepolv[v1].y;
+                float cross = ax * by - ay * bx;
 
-	// Store triangulation in eyepol structure
-	if (eyepoln + 1 >= eyepolmal) {
-		eyepolmal = max(eyepolmal<<1, 4096);
-		eyepol = (eyepol_t *) realloc(eyepol, eyepolmal * sizeof(eyepol_t));
-		eyepol[0].vert0 = 0;
-	}
-	eyepol[eyepoln].tilnum = gtilenum;
-	// setup uvs
-	if (b->gisflor < 2) {
-		eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].surf[b->gisflor].uvcoords;
-		eyepol[eyepoln].uvform = curMap->sect[b->gligsect].surf[b->gisflor].uvform;
-		//	eyepol[eyepoln].tilnum = curMap->sect[b->gligsect].surf[b->gisflor].tilnum;
-	} else {
-		// walls
-		eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].uvcoords;
-		eyepol[eyepoln].uvform = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].uvform;
-		eyepol[eyepoln].tilnum = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].tilnum;
-		//xsurf[b->gligslab % 3].uvcoords;
-	}
+                // Skip if points are collinear
+                if (fabs(cross) < EPSILON) {
+                    stack_top--;
+                    continue;
+                }
 
-	eyepol[eyepoln].slabid = b->gligslab; // 0 -top, 1 - mid, 2-bot.
+                bool valid = (curr_chain == 0) ? (cross > 0.0f) : (cross < 0.0f);
 
-	// project all verts into 3d
-	for (int ip = debhl[0]; ip < eyepolvn; ip++) {
-		// transform verts to WS
-		//for (int ip= 0; ip<total_vertices;ip++) {
-		//	int pn = sorted_vertices[ip];
-		int pn = ip;
-		f = cam.h.z / (eyepolv[pn].x * xform[6] + eyepolv[pn].y * xform[7] + add.z);
-		fx = (eyepolv[pn].x * xform[0] + eyepolv[pn].y * xform[1] + add.x) * f + cam.h.x;
-		fy = (eyepolv[pn].x * xform[3] + eyepolv[pn].y * xform[4] + add.y) * f + cam.h.y;
+                if (!valid) {
+                    break;
+                }
 
-		f = 1.0 / ((b->gouvmat[0] * fx + b->gouvmat[3] * fy + b->gouvmat[6]) * cam.h.z);
+                // Emit triangle with degeneracy check
+                float tax = eyepolv[v1].x - eyepolv[v0].x;
+                float tay = eyepolv[v1].y - eyepolv[v0].y;
+                float tbx = eyepolv[v2].x - eyepolv[v0].x;
+                float tby = eyepolv[v2].y - eyepolv[v0].y;
+                float tcross = tax * tby - tay * tbx;
 
-		float retx = ((fx - cam.h.x) * cam.r.x + (fy - cam.h.y) * cam.d.x + (cam.h.z) * cam.f.x) * f + cam.p.x;
-		float rety = ((fx - cam.h.x) * cam.r.y + (fy - cam.h.y) * cam.d.y + (cam.h.z) * cam.f.y) * f + cam.p.y;
-		float retz = ((fx - cam.h.x) * cam.r.z + (fy - cam.h.y) * cam.d.z + (cam.h.z) * cam.f.z) * f + cam.p.z;
-		dpoint3d ret = {retx, rety, retz};
-		eyepolv[pn].uvpos = ret;
-		// get it in space of really moved cam, and return back to original space.
-		// vector transforms are working vell outside of mono plane.
-		wccw_transform(&ret, &b->movedcam, &b->orcam);
-		eyepolv[pn].wpos = (point3d){ret.x, ret.y, ret.z};
-	}
-	free(stack);
-	free(stack_chain);
-	free(sorted_vertices);
-	free(vertex_chain);
+                if (fabs(tcross) >= EPSILON) { // Only emit non-degenerate triangles
+                    if (tcross > 0.0f) {
+                        indices[index_count++] = v0;
+                        indices[index_count++] = v2;
+                        indices[index_count++] = v1;
+                    } else {
+                        indices[index_count++] = v0;
+                        indices[index_count++] = v1;
+                        indices[index_count++] = v2;
+                    }
+                }
 
-	eyepol[eyepoln].c1 = debhl[0]; // Start index of chain 1
-	eyepol[eyepoln].c2 = debhl[2]; // Start index of chain 2
-	eyepol[eyepoln].e1 = debhl[1]; // Length of chain 1
-	eyepol[eyepoln].e2 = debhl[3]; // Length of chain 2
+                stack_top--;
+            }
 
-	eyepol[eyepoln].vert0 = chain_starts[0];
-	eyepol[eyepoln].indices = indices;
-	eyepol[eyepoln].nid = index_count;
-	memcpy((void *) eyepol[eyepoln].ouvmat, (void *) b->gouvmat, sizeof(b->gouvmat[0]) * 9);
-	eyepol[eyepoln].tpic = gtpic;
-	eyepol[eyepoln].curcol = gcurcol;
-	eyepol[eyepoln].flags = (b->gflags != 0);
-	eyepol[eyepoln].b2sect = b->gligsect;
-	eyepol[eyepoln].b2wall = b->gligwall;
-	eyepol[eyepoln].b2slab = b->gligslab;
-	memcpy((void *) &eyepol[eyepoln].norm, (void *) &b->gnorm, sizeof(b->gnorm));
-	eyepol[eyepoln].rdepth = b->recursion_depth;
+            stack[++stack_top] = curr_v;
+            stack_chain[stack_top] = curr_chain;
+        }
+    }
 
-	eyepoln++; // set start for next vert.
-	eyepol[eyepoln].vert0 = eyepolvn;
+    // Rest of the function remains the same...
+    if (eyepoln + 1 >= eyepolmal) {
+        eyepolmal = max(eyepolmal<<1, 4096);
+        eyepol = (eyepol_t *) realloc(eyepol, eyepolmal * sizeof(eyepol_t));
+        eyepol[0].vert0 = 0;
+    }
 
-	logstep("produce eyepol, depth:%d", b->recursion_depth);
+    eyepol[eyepoln].tilnum = gtilenum;
+
+    if (b->gisflor < 2) {
+        eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].surf[b->gisflor].uvcoords;
+        eyepol[eyepoln].uvform = curMap->sect[b->gligsect].surf[b->gisflor].uvform;
+    } else {
+        eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].uvcoords;
+        eyepol[eyepoln].uvform = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].uvform;
+        eyepol[eyepoln].tilnum = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].tilnum;
+    }
+
+    eyepol[eyepoln].slabid = b->gligslab;
+
+    for (int ip = debhl[0]; ip < eyepolvn; ip++) {
+        int pn = ip;
+        f = cam.h.z / (eyepolv[pn].x * xform[6] + eyepolv[pn].y * xform[7] + add.z);
+        fx = (eyepolv[pn].x * xform[0] + eyepolv[pn].y * xform[1] + add.x) * f + cam.h.x;
+        fy = (eyepolv[pn].x * xform[3] + eyepolv[pn].y * xform[4] + add.y) * f + cam.h.y;
+
+        f = 1.0 / ((b->gouvmat[0] * fx + b->gouvmat[3] * fy + b->gouvmat[6]) * cam.h.z);
+
+        float retx = ((fx - cam.h.x) * cam.r.x + (fy - cam.h.y) * cam.d.x + (cam.h.z) * cam.f.x) * f + cam.p.x;
+        float rety = ((fx - cam.h.x) * cam.r.y + (fy - cam.h.y) * cam.d.y + (cam.h.z) * cam.f.y) * f + cam.p.y;
+        float retz = ((fx - cam.h.x) * cam.r.z + (fy - cam.h.y) * cam.d.z + (cam.h.z) * cam.f.z) * f + cam.p.z;
+        dpoint3d ret = {retx, rety, retz};
+        eyepolv[pn].uvpos = ret;
+        wccw_transform(&ret, &b->movedcam, &b->orcam);
+        eyepolv[pn].wpos = (point3d){ret.x, ret.y, ret.z};
+    }
+
+    free(stack);
+    free(stack_chain);
+    free(sorted_vertices);
+    free(vertex_chain);
+
+    eyepol[eyepoln].c1 = debhl[0];
+    eyepol[eyepoln].c2 = debhl[2];
+    eyepol[eyepoln].e1 = debhl[1];
+    eyepol[eyepoln].e2 = debhl[3];
+    eyepol[eyepoln].vert0 = chain_starts[0];
+    eyepol[eyepoln].indices = indices;
+    eyepol[eyepoln].nid = index_count;
+    memcpy((void *) eyepol[eyepoln].ouvmat, (void *) b->gouvmat, sizeof(b->gouvmat[0]) * 9);
+    eyepol[eyepoln].tpic = gtpic;
+    eyepol[eyepoln].curcol = gcurcol;
+    eyepol[eyepoln].flags = (b->gflags != 0);
+    eyepol[eyepoln].b2sect = b->gligsect;
+    eyepol[eyepoln].b2wall = b->gligwall;
+    eyepol[eyepoln].b2slab = b->gligslab;
+    memcpy((void *) &eyepol[eyepoln].norm, (void *) &b->gnorm, sizeof(b->gnorm));
+    eyepol[eyepoln].rdepth = b->recursion_depth;
+
+    eyepoln++;
+    eyepol[eyepoln].vert0 = eyepolvn;
+
+    logstep("produce eyepol, depth:%d", b->recursion_depth);
+
+    #undef EPSILON
 }
+
+
 
 
 static void skytagfunc(int rethead0, int rethead1, bdrawctx *b) {
