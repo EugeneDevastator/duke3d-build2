@@ -509,8 +509,8 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					float ysize = tilesizy[sec[i].surf[j].tilnum];
 					//float pix8 = 8.0f/xsize; //64/8 = 8
 					//float scalerx = pix8;
-					sec[i].surf[j].uvform[0] = xsize/64.0; // scale is always off 64.
-					sec[i].surf[j].uvform[1] = ysize/64.0;
+					sec[i].surf[j].uvform[0] = 128/xsize; // scale is always off 64.
+					sec[i].surf[j].uvform[1] = 128/ysize;
 					// mull px = tile / 256
 					//  64 / 256 = 4;
 					// 1 px =

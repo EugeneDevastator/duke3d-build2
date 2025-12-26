@@ -599,18 +599,19 @@ void makesecuvs(sect_t *sect, mapstate_t *map) {
 		float xpan = sur->uvform[2];
 		float ypan = sur->uvform[3];
 
-		float scaler = (sect->mflags[fl] & SECTOR_EXPAND_TEXTURE) ? 1 : 2.0f;
+
 		ymul *= -1; // world x-flipped
 
-
+float scaler=1;
 		if (sur->uvmapkind == UV_WORLDXY) {
+			scaler = (sect->mflags[fl] & SECTOR_EXPAND_TEXTURE) ? 2 : 4;
 			sur->uvcoords[0] = (point3d){0, 0, z};
 			sur->uvcoords[1] = (point3d){scaler * xmul, 0, z};
 			sur->uvcoords[2] = (point3d){0, scaler * ymul, z};
 			sur->uvform[0] = 1;
 			sur->uvform[1] = 1;
-		} else if (sur->uvmapkind == UV_TEXELRATE) {
-			scaler = (sect->mflags[fl] & SECTOR_EXPAND_TEXTURE) ? 4 : 1;
+		} else if (sur->uvmapkind == UV_TEXELRATE) { //
+			scaler = (sect->mflags[fl] & SECTOR_EXPAND_TEXTURE) ? 0.5: 0.25;
 			point2d nwp = walnext(sect, 0).pos;
 			sur->uvcoords[0] = (point3d){wp.x, wp.y, z};
 			point3d vvec = (point3d){nwp.x, nwp.y, z};
