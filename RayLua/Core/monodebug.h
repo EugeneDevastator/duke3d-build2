@@ -19,6 +19,8 @@ extern transform lastcamtr2;
 extern signed int operstopn;
 extern int opercurr;
 #define OPERLOG opercurr++; if (operstopn >=0 && opercurr >= operstopn) return
+#define OPERONLYLAST (opercurr < operstopn && opercurr > operstopn-2)
+#define OPERISOK (opercurr < operstopn)
 
 typedef struct {
     double x, y, z;

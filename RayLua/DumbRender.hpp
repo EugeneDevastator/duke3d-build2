@@ -801,11 +801,10 @@ float scaler = 0.01;
                     opercurr++;
                     if (drawtripoly)
                         draw_eyepol_tridebug(sw, sh, i, v0, vertCount);
-                    if (drawopaqes)
+                    if (drawopaqes && OPERISOK )
                         draw_eyepol_withuvtex(sw, sh, i, v0, vertCount);
-                    if (draweyepolheads) {
-
-                        if (opercurr < operstopn && opercurr > operstopn-2) {
+                    if (draweyepolheads && OPERONLYLAST) {
+                             {
 
                             rlDisableDepthMask();
                             rlDisableDepthTest();
@@ -815,23 +814,23 @@ float scaler = 0.01;
                             glPolygonOffset(-2.0f, 1.0f);
                             rlColor4f(0, 1, 1, 1);
                             int s = eyepol[i].c1;
-                            int e = eyepol[i].c1 + eyepol[i].l1;
+                            int e = eyepol[i].e1;
                             rlColor4f(1, 0, 0, 1);
-                            for (int ii = 0; ii < 2; ii++) {
+                            for (int hd = 0; hd < 2; hd++) {
                                 rlBegin(RL_LINES);
-                                for (int vi = s + 1; vi < e; vi++) {
-                                    if (vi - s - 1 == 0)
+                                for (int vi = s+1; vi <= e; vi++) { // LINES draw in pairs a-b a-b ;..
+                                    if (vi - s-1 == 0)
                                         {rlColor4f(1, 1, 1, 1);}
                                     else
-                                        {rlColor4f(1 - ii, ii * 0.3f, ii, 1);}
+                                        {rlColor4f(1 - hd, hd * 0.3f, hd, 1);}
 
-                                    rlVertex3f(eyepolv[vi - 1].x, -eyepolv[vi - 1].z, eyepolv[vi - 1].y);
+                                    rlVertex3f(eyepolv[vi-1].x, -eyepolv[vi - 1].z, eyepolv[vi - 1].y);
 
-                                    rlColor4f(1 - ii, ii * 0.3f, ii, 1);
+                                    rlColor4f(1 - hd, hd * 0.3f, hd, 1);
                                     rlVertex3f(eyepolv[vi].x, -eyepolv[vi].z, eyepolv[vi].y);
                                 }
                                 s = eyepol[i].c2;
-                                e = eyepol[i].c2 + eyepol[i].l2;
+                                e = eyepol[i].e2;
                                 rlDrawRenderBatchActive();
                                // rlColor4f(1, 1, 0, 1);
                             }

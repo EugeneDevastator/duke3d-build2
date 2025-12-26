@@ -72,7 +72,7 @@ typedef struct {
     point3d *worlduvs; // origin, u ,v
     float* uvform;
     int slabid;
-    int c1,c2,l1,l2;
+    int c1,c2,e1,e2;
 } eyepol_t;
 
 typedef struct {

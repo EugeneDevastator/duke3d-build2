@@ -647,16 +647,12 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 	int chain_lengths[2] = {0, 0};
 	point3d curmp;
 	//point3d ch1start = (point3d){mp[i].pos.x,mp[i].pos.y,mp[i].pos.z};
+	int debhl[4]; // start 01 end 01
+
 	for(h=0;h<2;h++) // h is head
 	{
-
 		i = rethead[h];
-	//// compare first point of chain 2 to first of chain 1;
-	//if (h && issamexy(eyepolv[eyepolvn].wpos,ch1start)) { // handle same points on ch1 end.
-	//		// advance for ch2.
-	//	i = mp[i].n;
-	//}
-
+		debhl[h*2] = eyepolvn;
 		chain_starts[h] = eyepolvn;
 		do
 		{
@@ -672,11 +668,12 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b)
 			i = mp[i].n;
 		} while (i != rethead[h]);
 		mono_deloop(rethead[h]);
+		debhl[h*2 + 1]=eyepolvn-1;
 	}
 // Check for shared endpoints
 bool shared_start = (issamexy(eyepolv[chain_starts[0]].wpos,eyepolv[chain_starts[1]].wpos));
 bool shared_end =(issamexy(eyepolv[chain_starts[0]+chain_lengths[0]-1].wpos,eyepolv[chain_starts[1]+chain_lengths[1]-1].wpos));
-
+// need to store proper verts for chain debug
 int total_vertices = chain_lengths[0] + chain_lengths[1] - (shared_start ? 1 : 0) - (shared_end ? 1 : 0);
 if (total_vertices < 3) {
     return;
@@ -867,9 +864,14 @@ if (curr_chain != top_chain) {
 
 	eyepol[eyepoln].slabid = b->gligslab; // 0 -top, 1 - mid, 2-bot.
 
+	// project all verts into 3d
+	for (int ip= debhl[0]; ip<eyepolvn;ip++) {
+
+
 	// transform verts to WS
-	for (int ip= 0; ip<total_vertices;ip++) {
-		int pn = sorted_vertices[ip];
+	//for (int ip= 0; ip<total_vertices;ip++) {
+	//	int pn = sorted_vertices[ip];
+	int pn=ip;
 		f = cam.h.z/(eyepolv[pn].x*xform[6] + eyepolv[pn].y*xform[7] + add.z);
 		fx        =  (eyepolv[pn].x*xform[0] + eyepolv[pn].y*xform[1] + add.x)*f + cam.h.x;
 		fy        =  (eyepolv[pn].x*xform[3] + eyepolv[pn].y*xform[4] +add.y)*f + cam.h.y;
@@ -891,11 +893,10 @@ if (curr_chain != top_chain) {
 	free(sorted_vertices);
 	free(vertex_chain);
 
-	eyepol[eyepoln].c1 = chain_starts[0];
-	eyepol[eyepoln].c2 = chain_starts[1];
-	eyepol[eyepoln].l1 = chain_lengths[0];
-	eyepol[eyepoln].l2 = chain_lengths[1];
-
+	eyepol[eyepoln].c1 = debhl[0];    // Start index of chain 1
+	eyepol[eyepoln].c2 = debhl[2];    // Start index of chain 2
+	eyepol[eyepoln].e1 = debhl[1];   // Length of chain 1
+	eyepol[eyepoln].e2 = debhl[3];   // Length of chain 2
 
 	eyepol[eyepoln].vert0 = chain_starts[0];
 	eyepol[eyepoln].indices = indices;
