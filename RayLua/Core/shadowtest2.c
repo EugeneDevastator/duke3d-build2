@@ -737,7 +737,8 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
     double *xform = b->xformmat;
     point3d add = b->gnadd;
 
-    #define EPSILON 1e-6f
+    #define EPSILON 1e-5f
+    #define ANGLE_EPSILON 1e-14f
 
     if ((rethead0 | rethead1) < 0) {
         mono_deloop(rethead1);
@@ -753,8 +754,9 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
     int chain_starts[2];
     int chain_lengths[2] = {0, 0};
     point3d curmp;
-    int debhl[4]; // start 01 end 01
+    int debhl[4];
 
+    // Chain building remains the same...
     for (h = 0; h < 2; h++) {
         i = rethead[h];
         debhl[h * 2] = eyepolvn;
@@ -796,7 +798,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
     int right_idx = 0;
     int merge_idx = 0;
 
-    // Improved merge with epsilon tolerance and tie-breaking
+    // Merge logic with improved tie-breaking
     if (shared_start) {
         sorted_vertices[merge_idx] = chain_starts[0];
         vertex_chain[merge_idx] = 0;
@@ -818,7 +820,6 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
         float x_diff = left_x - right_x;
 
         if (fabs(x_diff) < EPSILON) {
-            // Tie-breaking: use y-coordinate, then prefer chain 0
             float left_y = eyepolv[chain_starts[0] + left_idx].y;
             float right_y = eyepolv[chain_starts[1] + right_idx].y;
 
@@ -863,7 +864,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 
     total_vertices = merge_idx;
 
-    // Improved triangulation with better degeneracy handling
+    // Enhanced triangulation with long-edge handling
     stack[++stack_top] = sorted_vertices[0];
     stack_chain[stack_top] = vertex_chain[0];
 
@@ -884,14 +885,13 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
                 int v1 = stack[j + 1];
                 int v2 = curr_v;
 
-                // Skip degenerate triangles
                 float ax = eyepolv[v1].x - eyepolv[v0].x;
                 float ay = eyepolv[v1].y - eyepolv[v0].y;
                 float bx = eyepolv[v2].x - eyepolv[v0].x;
                 float by = eyepolv[v2].y - eyepolv[v0].y;
                 float cross = ax * by - ay * bx;
 
-                if (fabs(cross) < EPSILON) continue; // Skip degenerate
+                if (fabs(cross) < EPSILON) continue;
 
                 if (cross > 0.0f) {
                     indices[index_count++] = v0;
@@ -912,39 +912,83 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
             stack[++stack_top] = curr_v;
             stack_chain[stack_top] = curr_chain;
         } else {
-            // Same chain - improved validation
+            // Same chain - enhanced validation for long edges
             while (stack_top > 0) {
                 int v0 = stack[stack_top - 1];
                 int v1 = stack[stack_top];
                 int v2 = curr_v;
 
-                // Check for collinear points
+                // Calculate edge vectors
                 float ax = eyepolv[v1].x - eyepolv[v0].x;
                 float ay = eyepolv[v1].y - eyepolv[v0].y;
                 float bx = eyepolv[v2].x - eyepolv[v1].x;
                 float by = eyepolv[v2].y - eyepolv[v1].y;
-                float cross = ax * by - ay * bx;
 
-                // Skip if points are collinear
-                if (fabs(cross) < EPSILON) {
+                // Edge lengths for normalization
+                float len_a = sqrtf(ax * ax + ay * ay);
+                float len_b = sqrtf(bx * bx + by * by);
+
+                // Skip if either edge is degenerate
+                if (len_a < EPSILON || len_b < EPSILON) {
+                    stack_top--;
+                    continue;
+                }
+
+                // Normalize for better angle calculation
+                float norm_ax = ax / len_a;
+                float norm_ay = ay / len_a;
+                float norm_bx = bx / len_b;
+                float norm_by = by / len_b;
+
+                float cross = norm_ax * norm_by - norm_ay * norm_bx;
+
+                // For very long edges, use more lenient validation
+                float max_len = fmaxf(len_a, len_b);
+                float min_len = fminf(len_a, len_b);
+                float length_ratio = max_len / (min_len + EPSILON);
+
+                // Adaptive threshold based on edge length ratio
+                float cross_threshold = ANGLE_EPSILON;
+                if (length_ratio > 100.0f) {
+                    cross_threshold *= 10.0f; // More lenient for very long edges
+                }
+
+                // Check if points are effectively collinear
+                if (fabs(cross) < cross_threshold) {
                     stack_top--;
                     continue;
                 }
 
                 bool valid = (curr_chain == 0) ? (cross > 0.0f) : (cross < 0.0f);
 
+                // Additional check: ensure we're not creating inverted triangles
+                if (valid) {
+                    // Check triangle orientation in original coordinates
+                    float tax = eyepolv[v1].x - eyepolv[v0].x;
+                    float tay = eyepolv[v1].y - eyepolv[v0].y;
+                    float tbx = eyepolv[v2].x - eyepolv[v0].x;
+                    float tby = eyepolv[v2].y - eyepolv[v0].y;
+                    float tcross = tax * tby - tay * tbx;
+
+                    // Ensure triangle has reasonable area
+                    float triangle_area = fabs(tcross) * 0.5f;
+                    if (triangle_area < EPSILON) {
+                        valid = false;
+                    }
+                }
+
                 if (!valid) {
                     break;
                 }
 
-                // Emit triangle with degeneracy check
+                // Emit triangle
                 float tax = eyepolv[v1].x - eyepolv[v0].x;
                 float tay = eyepolv[v1].y - eyepolv[v0].y;
                 float tbx = eyepolv[v2].x - eyepolv[v0].x;
                 float tby = eyepolv[v2].y - eyepolv[v0].y;
                 float tcross = tax * tby - tay * tbx;
 
-                if (fabs(tcross) >= EPSILON) { // Only emit non-degenerate triangles
+                if (fabs(tcross) >= EPSILON) {
                     if (tcross > 0.0f) {
                         indices[index_count++] = v0;
                         indices[index_count++] = v2;
@@ -964,7 +1008,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
         }
     }
 
-    // Rest of the function remains the same...
+    // Rest remains the same...
     if (eyepoln + 1 >= eyepolmal) {
         eyepolmal = max(eyepolmal<<1, 4096);
         eyepol = (eyepol_t *) realloc(eyepol, eyepolmal * sizeof(eyepol_t));
@@ -1029,7 +1073,9 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
     logstep("produce eyepol, depth:%d", b->recursion_depth);
 
     #undef EPSILON
+    #undef ANGLE_EPSILON
 }
+
 
 
 
