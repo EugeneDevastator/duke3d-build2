@@ -1027,7 +1027,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
     } else {
         eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].uvcoords;
         eyepol[eyepoln].uvform = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].uvform;
-        eyepol[eyepoln].tilnum = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].tilnum;
+      //  eyepol[eyepoln].tilnum = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].tilnum;
     }
 
     eyepol[eyepoln].slabid = b->gligslab;
@@ -1836,10 +1836,10 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 				continue;
 
 			// Render wall segment if visible
-
+			gtilenum = wal[w].xsurf[m].tilnum;
 			if ((!(m & 1)) || (wal[w].surf.flags & (1 << 5))) //Draw wall here //(1<<5): 1-way
 			{
-				gtilenum = sur->tilnum;
+
 				//gtpic = &gtile[sur->tilnum];// if (!gtpic->tt.f) loadpic(gtpic);
 				if (sur->flags & (1 << 17)) { b->gflags = 2; } //skybox ceil/flor
 				if (sur->flags & (1 << 16)) b->gflags = 1;
@@ -2332,7 +2332,7 @@ static void draw_hsr_enter_portal(mapstate_t *map, int myport, int head1, int he
 	movcam.f = local_to_world_vec(cam_local_f, &tgs.tr);
 	movcam.cursect = portals[endp].sect;
 	// to avoid winding problems with mono, we render with normalized camera
-	// then in draw eyepol we can just flip polygons as if camera was really flipped.
+	// then in dra eyepol we can just flip polygons as if camera was really flipped.
 	// the only thing important is board output, as orientation is preserved in movedcam.
 	cam_t rencam = movcam;
 	rencam.r = normalizep3(crossp3(movcam.d, movcam.f));

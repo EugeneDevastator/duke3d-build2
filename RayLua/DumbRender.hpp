@@ -531,7 +531,7 @@ public:
     static bool draw_eyepol_withuvtex(float sw, float sh, int i, int v0, int vertCount) {
         int v1 = eyepol[i + 1].vert0;
 
-       // rlDisableBackfaceCulling();
+        rlDisableBackfaceCulling();
 
         glEnable(GL_POLYGON_OFFSET_FILL);
         glPolygonOffset(-0.5f, 1.0f);
@@ -1900,7 +1900,7 @@ private:
             if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
             map->blankheadspri = i;
         }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/prt31.MAP", map);
+        loadmap_imp((char*)"c:/Eugene/Games/build2/e2l7.MAP", map);
     }
 };
 
