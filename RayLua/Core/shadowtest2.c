@@ -1261,6 +1261,84 @@ static void changetagfunc(int rethead0, int rethead1, bdrawctx *b) {
 //flags&4: reverse cut for sub
 // this takes pair and projects it onto screen plane with a cam.
 // returns new heads.
+static int unprojectonmono(int *plothead0, int *plothead1, bdrawctx *b) {
+    if (!mpcheck(*plothead0, *plothead1))
+        return 0;
+
+    cam_t gcam = b->cam;
+    double xformc = b->xformmatc;
+    double xforms = b->xformmats;
+
+    dpoint3d *otp, *tp;
+    double f, ox, oy, oz;
+    int i, j, k, l, h, on, n, plothead[2];
+
+    plothead[0] = *plothead0;
+    plothead[1] = *plothead1;
+
+    // Count points
+    n = 2;
+    for (h = 0; h < 2; h++)
+        for (i = mp[plothead[h]].n; i != plothead[h]; i = mp[i].n) {
+            n++;
+        }
+
+    otp = (dpoint3d *) _alloca(n * sizeof(dpoint3d));
+    tp = (dpoint3d *) _alloca(n * sizeof(dpoint3d) * 2);
+
+    // Extract projected points from vmono
+    on = 0;
+    for (h = 0; h < 2; h++) {
+        i = plothead[h];
+        do {
+            if (h) i = mp[i].p;
+
+            // Store projected coordinates
+            otp[on].x = mp[i].x;
+            otp[on].y = mp[i].y;
+            otp[on].z = mp[i].z; // This should be the depth value
+            on++;
+
+            if (!h) i = mp[i].n;
+        } while (i != plothead[h]);
+        mono_deloop(plothead[h]);
+    }
+
+    // Reverse projection: convert screen coordinates back to camera space
+    for (i = 0; i < on; i++) {
+        // Reverse perspective projection
+        f = gcam.h.z / otp[i].z; // Use stored depth
+        tp[i].x = (otp[i].x - gcam.h.x) / f;
+        tp[i].y = (otp[i].y - gcam.h.y) / f;
+        tp[i].z = otp[i].z;
+    }
+
+    // Reverse rotation and translation: convert camera space back to world space
+    for (i = 0; i < on; i++) {
+        // Reverse rotation (transpose of rotation matrix)
+        ox = tp[i].x * xformc + tp[i].z * xforms;
+        oy = tp[i].x * (-xforms) + tp[i].z * xformc;
+        oz = tp[i].y;
+
+        // Reverse translation
+        tp[i].x = ox + gcam.p.x;
+        tp[i].y = oy + gcam.p.y;
+        tp[i].z = oz + gcam.p.z;
+    }
+
+    // Generate vmono from world coordinates
+    mono_genfromloop(&plothead[0], &plothead[1], tp, on);
+    if ((plothead[0] | plothead[1]) < 0) {
+        mono_deloop(plothead[0]);
+        mono_deloop(plothead[1]);
+        return 0;
+    }
+
+    *plothead0 = plothead[0];
+    *plothead1 = plothead[1];
+    return 1;
+}
+
 static int projectonmono(int *plothead0, int *plothead1, bdrawctx *b) {
 	if (!mpcheck(*plothead0, *plothead1))
 		return 0;
@@ -1273,19 +1351,22 @@ static int projectonmono(int *plothead0, int *plothead1, bdrawctx *b) {
 
 	dpoint3d *otp, *tp;
 	double f, ox, oy, oz;
-	int i, j, k, l, h, on, n, plothead[2], imin, imax, i0, i1, omph0, omph1;
+	int i, j, k, l, h, on, nverts, plothead[2], imin, imax, i0, i1, omph0, omph1;
 
 	plothead[0] = *plothead0;
 	plothead[1] = *plothead1;
 
-	n = 2;
+	nverts = 2;
 	for (h = 0; h < 2; h++)
 		for (i = mp[plothead[h]].n; i != plothead[h]; i = mp[i].n) {
 			//	printf("%d, ",n);
-			n++;
+			if (nverts > 30)
+				return 0;
+			nverts++;
 		}
-	otp = (dpoint3d *) _alloca(n * sizeof(dpoint3d));
-	tp = (dpoint3d *) _alloca(n * sizeof(dpoint3d) * 2);
+
+	otp = (dpoint3d *) _alloca(nverts * sizeof(dpoint3d));
+	tp = (dpoint3d *) _alloca(nverts * sizeof(dpoint3d) * 2);
 
 	//rotate, converting vmono to simple point3d loop
 	on = 0;
@@ -1311,33 +1392,33 @@ static int projectonmono(int *plothead0, int *plothead1, bdrawctx *b) {
 	}
 
 	//clip
-	n = 0;
+	nverts = 0;
 	for (i = on - 1, j = 0; j < on; i = j, j++) {
 		if (otp[i].z >= BSCISDIST) {
-			tp[n] = otp[i];
-			n++;
+			tp[nverts] = otp[i];
+			nverts++;
 		}
 		if ((otp[i].z >= BSCISDIST) != (otp[j].z >= BSCISDIST)) {
 			f = (BSCISDIST - otp[j].z) / (otp[i].z - otp[j].z);
-			tp[n].x = (otp[i].x - otp[j].x) * f + otp[j].x;
-			tp[n].y = (otp[i].y - otp[j].y) * f + otp[j].y;
-			tp[n].z = BSCISDIST;
-			n++;
+			tp[nverts].x = (otp[i].x - otp[j].x) * f + otp[j].x;
+			tp[nverts].y = (otp[i].y - otp[j].y) * f + otp[j].y;
+			tp[nverts].z = BSCISDIST;
+			nverts++;
 		}
 	}
-	if (n < 3) {
+	if (nverts < 3) {
 		return 0;
 	}
 
 	//project & find x extents
-	for (i = 0; i < n; i++) {
+	for (i = 0; i < nverts; i++) {
 		f = gcam.h.z / tp[i].z;
 		tp[i].x = tp[i].x * f + gcam.h.x;
 		tp[i].y = tp[i].y * f + gcam.h.y;
 	}
 	//LOOPEND
 	//generate vmon
-	mono_genfromloop(&plothead[0], &plothead[1], tp, n);
+	mono_genfromloop(&plothead[0], &plothead[1], tp, nverts);
 	if ((plothead[0] | plothead[1]) < 0) {
 		mono_deloop(plothead[0]);
 		mono_deloop(plothead[1]);
@@ -1350,6 +1431,7 @@ static int projectonmono(int *plothead0, int *plothead1, bdrawctx *b) {
 
 static int cliptonewregion(int fromtag, int newtag, int newsect, int h1, int h2, bool doscan, bdrawctx *b) {
 	b->gdoscansector = doscan;
+	b->gnewtag = newtag;
 	// intersect with same monos, and change tag for resulting pieces, creating new clip group
 	logstep("bool AND, keep all, changetag, on tag %d -> %d", fromtag, newtag);
 	for (int i = mphnum - 1; i >= 0; i--)
@@ -1363,6 +1445,7 @@ static int cliptonewregion(int fromtag, int newtag, int newsect, int h1, int h2,
 				b,
 				changetagfunc);
 		}
+
 }
 
 static int drawpol_nosect(int overlaptag, int newtag, int *heads, int flags, bdrawctx *b) {
@@ -1735,7 +1818,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			b->gflags = 0;
 		}
 		gentransform_ceilflor(&sec[s], wal, isflor, b);
-
+		int mytag = s + b->tagoffset;
 		b->gligwall = isflor - 2;
 		// F L O O R S
 		//
@@ -1745,13 +1828,22 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			int ttag = b->tagoffset + taginc + portals[endpn].sect;
 			int portalpolyflags = ((isflor << 2) + 3) | DP_NO_SCANSECT;
 			int portaltag = b->tagoffset + taginc - 1;
+			int mphsaved = mphnum;
+			//cliptonewregion(mytag, portaltag, -1, plothead[0], plothead[1], false, b );
+			drawpol_befclip(mytag, portaltag, s, s, plothead[0], plothead[1], surflag | DP_NO_SCANSECT, b);
+			for (int mm = 0; mm < mphnum;mm++)
+				if (mph[mm].tag == portaltag) {
+					// unproject to have world coords back.
+					unprojectonmono(&mph[mm].head[0],&mph[mm].head[1],b);
+				}
 
+			//unprojectonmono
 			//	drawpol_befclip(s+b->tagoffset, portaltag, s, portals[endpn].sect,plothead[0],plothead[1], portalpolyflags , b);
 			//int c1, c2;
 			//monocopy(plothead[0],plothead[1], &c1,&c2);
-			draw_hsr_enter_portal(map, myport, plothead[0], plothead[1], b);
+			draw_hsr_enter_portal(map, myport, plothead[0], mphsaved, b);
 		} else {
-			drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1], surflag, b);
+			drawpol_befclip(mytag, -1, s, -1, plothead[0], plothead[1], surflag, b);
 		}
 	}
 	b->gisflor = 2;
@@ -1938,10 +2030,10 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy) {
 	bs.ismirrored = false;
 	bs.istrimirror = false;
 	opercurr = 0;
-	draw_hsr_polymost_ctx(map, &bs);
+	draw_polymost_ctx(map, &bs);
 }
 
-void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
+void draw_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 	if (!newctx) {
 		return;
 	}
@@ -2181,50 +2273,42 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 					continue;
 				}
 
-
+				int mphprev = b->chead[1]; // temp hak
 				int portaltag = b->tagoffset - 1;
 				int newtag = gcam.cursect + b->tagoffset;
 				int whead[2] = {-1, -1};
 				int bordar[] = {bh1, bh2};
-				if (!wasclipped) {
-					bool wok = (mpcheck(b->chead[0], b->chead[1])); // invalid window
-					if (!wok) {
-						logstep("failed portal window chain");
-						printf("window not");
-						return;
-					}
-					for (int h = 0; h < 2; h++) {
-						i = b->chead[h];
-						do {
-							if (h) i = mp[i].p;
-							// must find previous in coords of new, may need previous camera, not orcam.
-							wccw_transform(&mp[i].pos, &b->prevcam, &b->movedcam);
-							if (!h) i = mp[i].n;
-						} while (i != b->chead[h]);
-					}
-					monocopy(b->chead[0], b->chead[1], &whead[0], &whead[1]);
-					// reproject original opening.
-					// MOVE TO ENTER PORTAL, to reproject from previous cam.
-					wasclipped = 1;
-				} else {
-					//
-					whead[0] = b->chead[0];
-					whead[1] = b->chead[1];
-				}
 
-				res = projectonmono(&whead[0], &whead[1], b);
-				if (!res) {
-					continue;
-				}
+					//transform all clippers to new space
+					for (int m = 0; m < mphnum;m++)
+						if (mph[m].tag == portaltag) {
+							// transform
+							for (int h = 0; h < 2; h++) {
+								i = mph[m].head[h];
+								do {
+									// must find previous in coords of new, may need previous camera, not orcam.
+									wccw_transform(&mp[i].pos, &b->prevcam, &b->movedcam);
+									i = mp[i].n;
+								} while (i != mph[m].head[h]);
+							}
+
+							// mirror
+							if (!projectonmono(&mph[m].head[0],&mph[m].head[1],b))
+								continue;
+							if (b->ismirrored) { // swap heads;
+								int t = mph[m].head[1];mph[m].head[1]=mph[m].head[0]; mph[m].head[0]=t;
+							}
+						//	mph[m].tag = gcam.cursect+b->tagoffset;
+						}
+
 				//do AND with board and add only clipped portion to MPH.
 				b->gdoscansector = 0;
 				b->gnewtag = gcam.cursect + b->tagoffset;
+			//	drawpol_befclip(portaltag, gcam.cursect+b->tagoffset, b->entrysec, gcam.cursect, bh1 , bh2, 3|DP_NO_PROJECT,b);
 				// and swap of indices is necessary.
-				if (b->ismirrored) { // swap heads;
-					int t = whead[1]; whead[1]=whead[0]; whead[0]=t;
-				}
 
-				mono_bool(whead[0], whead[1], bh1, bh2,MONO_BOOL_AND, b, changetagfunc);
+
+			//	mono_bool(whead[0], whead[1], bh1, bh2,MONO_BOOL_AND, b, changetagfunc);
 				//for int
 				//mono_dbg_capture_mph(mphnum - 1, "reprojected");
 				//	mono_deloop(bh1);
@@ -2370,7 +2454,7 @@ static void draw_hsr_enter_portal(mapstate_t *map, int myport, int head1, int he
 	newctx.chead[0] = head1;
 	newctx.chead[1] = head2;
 
-	draw_hsr_polymost_ctx(map, &newctx);
+	draw_polymost_ctx(map, &newctx);
 
 	OPERLOG;
 }

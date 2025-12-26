@@ -591,7 +591,8 @@ void makesecuvs(sect_t *sect, mapstate_t *map) {
 		if ((sect->mflags[fl] &SECTOR_SWAP_XY)) {
 			 xmul = sur->uvform[1];
 			 ymul = sur->uvform[0];
-		}else {
+		}else
+			{
 			xmul = sur->uvform[0];
 			ymul = sur->uvform[1];
 		}
@@ -604,19 +605,19 @@ void makesecuvs(sect_t *sect, mapstate_t *map) {
 
 float scaler=1;
 		if (sur->uvmapkind == UV_WORLDXY) {
-			scaler = (sect->mflags[fl] & SECTOR_EXPAND_TEXTURE) ? 2 : 4;
+			scaler = (sect->mflags[fl] & SECTOR_EXPAND_TEXTURE) ? 1 : 2;
 			sur->uvcoords[0] = (point3d){0, 0, z};
-			sur->uvcoords[1] = (point3d){scaler * xmul, 0, z};
-			sur->uvcoords[2] = (point3d){0, scaler * ymul, z};
+			sur->uvcoords[1] = (point3d){xmul*scaler, 0, z};
+			sur->uvcoords[2] = (point3d){0, ymul*scaler, z};
 			sur->uvform[0] = 1;
 			sur->uvform[1] = 1;
 		} else if (sur->uvmapkind == UV_TEXELRATE) { //
-			scaler = (sect->mflags[fl] & SECTOR_EXPAND_TEXTURE) ? 0.5: 0.25;
+			scaler = (sect->mflags[fl] & SECTOR_EXPAND_TEXTURE) ?  2 : 1;
 			point2d nwp = walnext(sect, 0).pos;
 			sur->uvcoords[0] = (point3d){wp.x, wp.y, z};
-			point3d vvec = (point3d){nwp.x, nwp.y, z};
+			point3d uvec = (point3d){nwp.x, nwp.y, z};
 			// get ortho to wall,
-			point3d normU = subtract(vvec, sur->uvcoords[0]);
+			point3d normU = subtract(uvec, sur->uvcoords[0]);
 			normU = normalizep3(normU);
 			sur->uvcoords[1] = normU;
 			addto(&sur->uvcoords[1], sur->uvcoords[0]);
@@ -627,25 +628,26 @@ float scaler=1;
 			normU.z = vz-z;
 			normU = normalizep3(normU);
 
-			addto(&normU, sur->uvcoords[0]);
 			sur->uvcoords[2] = normU;
+			addto(&sur->uvcoords[2], sur->uvcoords[0]);
+
 			sur->uvform[0] = xmul * scaler;
 			sur->uvform[1] = ymul * scaler;
 		}
 
+
 		if ((sect->mflags[fl] & SECTOR_FLIP_X)) sur->uvform[0] *= -1;
 		if ((sect->mflags[fl] & SECTOR_FLIP_Y)) sur->uvform[1] *= -1;
-
 		if (sect->mflags[fl] & SECTOR_SWAP_XY) {
 			if (((sect->mflags[fl] & SECTOR_FLIP_X) != 0) != ((sect->mflags[fl] & SECTOR_FLIP_Y) != 0)) {
 				sur->uvform[0] *= -1;
 				sur->uvform[1] *= -1;
 			}
 			float t;
-			t = sur->uvform[0];
-			sur->uvform[0] = sur->uvform[1];
-			sur->uvform[1] = t;
-			t = 0;
+		t = sur->uvform[0];
+		sur->uvform[0] = sur->uvform[1];
+		sur->uvform[1] = t;
+
 			t = sur->uvform[2];
 			sur->uvform[2] = sur->uvform[3];
 			sur->uvform[3] = t;
