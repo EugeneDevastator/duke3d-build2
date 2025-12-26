@@ -715,7 +715,6 @@ static void xformprep(double hang, bdrawctx *b) {
 }
 
 static void xformbac(double rx, double ry, double rz, dpoint3d *o, bdrawctx *b) {
-	float mul = b->ismirrored ? -1 : 1; // for flipped world
 	o->x = rx * b->xformmat[0] + ry * b->xformmat[3] + rz * b->xformmat[6];
 	o->y = rx * b->xformmat[1] + ry * b->xformmat[4] + rz * b->xformmat[7];
 	o->z = rx * b->xformmat[2] + ry * b->xformmat[5] + rz * b->xformmat[8];
@@ -1266,7 +1265,6 @@ static int projectonmono(int *plothead0, int *plothead1, bdrawctx *b) {
 	if (!mpcheck(*plothead0, *plothead1))
 		return 0;
 	cam_t gcam = b->cam;
-	double *xform = b->xformmat;
 	double xformc = b->xformmatc;
 	double xforms = b->xformmats;
 #define BSCISDIST 0.000001 //Reduces probability of glitch further
@@ -2007,21 +2005,6 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 	if (!mphmal)
 		mono_initonce();
 
-
-	//Hack to keep camera away from sector line; avoids clipping glitch in drawpol_befclip/changetagfunc
-	//wal = lgs->sect[cam.cursect].wall;
-	//for(i=lgs->sect[cam.cursect].n-1;i>=0;i--)
-	//{
-	//	#define WALHAK 1e-3
-	//	j = wal[i].n+i;
-	//	d = distpoint2line2(cam.p.x,cam.p.y,wal[i].x,wal[i].y,wal[j].x,wal[j].y); if (d >= WALHAK*WALHAK) continue;
-	//	fp.x = wal[j].x-wal[i].x;
-	//	fp.y = wal[j].y-wal[i].y;
-	//	f = (WALHAK - sqrt(d))/sqrt(fp.x*fp.x + fp.y*fp.y);
-	//	cam.p.x -= fp.y*f;
-	//	cam.p.y += fp.x*f;
-	//}
-
 	if (shadowtest2_rendmode != 4) {
 		//Horrible hacks for internal build2 global variables
 		dpos.x = 0.0;
@@ -2130,7 +2113,7 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 				memcpy(&b->oxformmat, &b->xformmat, sizeof(double) * 9);
 			}
 			// NEW CODE - Use much larger bounds:
-			float large_bound = 1e6f;
+			float large_bound = 1e9f;
 			xformbac(-large_bound, -large_bound, gcam.h.z, &bord[0], b);
 			xformbac(+large_bound, -large_bound, gcam.h.z, &bord[1], b);
 			xformbac(+large_bound, +large_bound, gcam.h.z, &bord[2], b);
@@ -2237,11 +2220,12 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 				b->gdoscansector = 0;
 				b->gnewtag = gcam.cursect + b->tagoffset;
 				// and swap of indices is necessary.
-				if (b->ismirrored)
-					mono_bool(whead[1], whead[0], bh1, bh2,MONO_BOOL_AND, b, changetagfunc);
-				else
-					mono_bool(whead[0], whead[1], bh1, bh2,MONO_BOOL_AND, b, changetagfunc);
+				if (b->ismirrored) { // swap heads;
+					int t = whead[1]; whead[1]=whead[0]; whead[0]=t;
+				}
 
+				mono_bool(whead[0], whead[1], bh1, bh2,MONO_BOOL_AND, b, changetagfunc);
+				//for int
 				//mono_dbg_capture_mph(mphnum - 1, "reprojected");
 				//	mono_deloop(bh1);
 				//	mono_deloop(bh2);
