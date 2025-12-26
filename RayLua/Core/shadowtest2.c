@@ -762,6 +762,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
         debhl[h * 2] = eyepolvn;
         chain_starts[h] = eyepolvn;
         do {
+
             curmp = (point3d){mp[i].pos.x, mp[i].pos.y, mp[i].pos.z};
             if (eyepolvn >= eyepolvmal) {
                 eyepolvmal = max(eyepolvmal<<1, 16384);
@@ -775,6 +776,8 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
         mono_deloop(rethead[h]);
         debhl[h * 2 + 1] = eyepolvn - 1;
     }
+
+    bool needflip = b->istrimirror;
 
     bool shared_start = 0;
     bool shared_end = 0;
@@ -864,7 +867,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 
     total_vertices = merge_idx;
 
-    // Enhanced triangulation with long-edge handling
+    // Enhanced triangulation with triangle flipping support
     stack[++stack_top] = sorted_vertices[0];
     stack_chain[stack_top] = vertex_chain[0];
 
@@ -893,7 +896,8 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 
                 if (fabs(cross) < EPSILON) continue;
 
-                if (cross > 0.0f) {
+                // Apply triangle flipping based on needflip flag
+                if ((cross > 0.0f) ^ needflip) {
                     indices[index_count++] = v0;
                     indices[index_count++] = v2;
                     indices[index_count++] = v1;
@@ -981,7 +985,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
                     break;
                 }
 
-                // Emit triangle
+                // Emit triangle with flipping support
                 float tax = eyepolv[v1].x - eyepolv[v0].x;
                 float tay = eyepolv[v1].y - eyepolv[v0].y;
                 float tbx = eyepolv[v2].x - eyepolv[v0].x;
@@ -989,7 +993,8 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
                 float tcross = tax * tby - tay * tbx;
 
                 if (fabs(tcross) >= EPSILON) {
-                    if (tcross > 0.0f) {
+                    // Apply triangle flipping based on needflip flag
+                    if ((tcross > 0.0f) ^ needflip) {
                         indices[index_count++] = v0;
                         indices[index_count++] = v2;
                         indices[index_count++] = v1;
@@ -1075,6 +1080,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
     #undef EPSILON
     #undef ANGLE_EPSILON
 }
+
 
 
 
@@ -1932,6 +1938,7 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy) {
 	bs.has_portal_clip = false;
 	bs.tagoffset = 0;
 	bs.ismirrored = false;
+	bs.istrimirror = false;
 	opercurr = 0;
 	draw_hsr_polymost_ctx(map, &bs);
 }
@@ -2349,6 +2356,7 @@ static void draw_hsr_enter_portal(mapstate_t *map, int myport, int head1, int he
 	bool portalflipped = is_transform_flipped(&tgs.tr) ^ is_transform_flipped(&ent.tr);
 	// we need to know only about flip in current portal switch to flip or not to flip the opening.
 	newctx.ismirrored = portalflipped;
+	newctx.istrimirror = parentctx->ismirrored ^ portalflipped;
 	newctx.entrysec = portals[myport].sect;
 	newctx.recursion_depth = parentctx->recursion_depth + 1;
 	newctx.tagoffset = (newctx.recursion_depth) * taginc;

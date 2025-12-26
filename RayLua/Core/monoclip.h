@@ -110,6 +110,7 @@ typedef struct {
 	// n-portals context
 	bool has_portal_clip; // Whether portal clipping is active
 	bool ismirrored;
+	bool istrimirror;
 	int recursion_depth;
 	int tagoffset;
 	int testignorewall;
