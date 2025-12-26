@@ -508,12 +508,17 @@ void makeslabuvform(int surfid, float slabH, wall_t *wal, int dukescales[4], int
 
 }
 
+
 float getzoftez(int tezflags, sect_t *mysec, int thiswall, point2d worldxy, mapstate_t *map) {
+
+	// for doored walls when flor = ceil but trhere is slope - doesnt work well.
 
 	// cant use this because floor/ceil will use wall id.
 	//point2d worldxy = tezflags & TEZ_WALNX
 	//	                  ? walnext(mysec, thiswall).pos
 	//	                  : mysec->wall[thiswall].pos;
+	if (tezflags & TEZ_WORLDZ1)
+{		return (tezflags & TEZ_FLOR) ? 1 : -1;}
 
 	sect_t *nsec = &map->sect[mysec->wall[thiswall].ns];
 	sect_t *usedsec = tezflags & TEZ_NS
@@ -557,10 +562,15 @@ void makewaluvs(sect_t *sect, int wid, mapstate_t *map) {
 		sur = &w->xsurf[sl]; // dope hack to process raw wall surf first.
 		wall_t *usewal = &sect->wall[sur->owal];
 		sur->uvcoords[0] = (point3d) {usewal->x, usewal->y,getzoftez(sur->otez, sect, wid, usewal->pos, map) };
+
 		usewal = &sect->wall[sur->uwal];
 		sur->uvcoords[1] = (point3d) {usewal->x,usewal->y,getzoftez(sur->utez, sect, wid, usewal->pos, map) };
+
 		usewal = &sect->wall[sur->vwal];
-		sur->uvcoords[2] = (point3d) {usewal->x,usewal->y,getzoftez(sur->vtez, sect, wid, usewal->pos, map) };
+		float z = getzoftez(sur->vtez, sect, wid, usewal->pos, map);
+		if (sur->vtez & TEZ_WORLDZ1)
+			z+=sur->uvcoords[0].z;
+		sur->uvcoords[2] = (point3d) {usewal->x,usewal->y,z };
 
 		if (sur->vtez & TEZ_INVZ) {
 			float dz = sur->uvcoords[2].z-sur->uvcoords[0].z;
@@ -570,7 +580,6 @@ void makewaluvs(sect_t *sect, int wid, mapstate_t *map) {
 	}
 
 }
-
 void makesecuvs(sect_t *sect, mapstate_t *map) {
 	wall_t *w = &sect->wall[0];
 	point2d wp = w->pos;
