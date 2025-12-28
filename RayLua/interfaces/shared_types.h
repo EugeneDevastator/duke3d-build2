@@ -318,7 +318,10 @@ typedef struct
 			unsigned int blend	: 4; // |13, additive, multiply, etc.
 			unsigned int _		: 3; // 16
 		} fx;
-
+	// float3 [0..1] for local positioning based on scaling.
+	point3d anchor;
+	// scale and pan - inside of the generated rect, dont affect world size.
+	float uv[4];
 } spri_t;
 
 typedef struct

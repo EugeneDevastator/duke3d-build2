@@ -729,7 +729,14 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				if (b7spr.cstat&SPRITE_FLIP_X) { spr->r.x *= -1; spr->r.y *= -1; spr->r.z *= -1; spr->flags ^= 4; } //&4: x-flipped
 				if (b7spr.cstat&SPRITE_FLIP_Y) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; spr->flags ^= 8; } //&8: y-flipped?
 				// note - replace with view setup
-				if (b7spr.cstat&SPRITE_TRUE_CENTERED) { spr->p.z += (b7spr.yrepeat/4096.0*(float)tilesizy[l]); } //&128: real-centered centering (center at center) - originally half submerged sprite
+				spr->anchor.x=0.5f;
+				spr->anchor.y=0; // forward
+				spr->anchor.z = 1.0f; // 1 on the V to the pivot. - normal duke3d sprite.
+				if (b7spr.cstat&SPRITE_TRUE_CENTERED) {
+					//spr->p.z += (b7spr.yrepeat/4096.0*(float)tilesizy[l]);
+					spr->anchor.z = 0.5f;
+				}
+				//&128: real-centered centering (center at center) - originally half submerged sprite
 			//	spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; // down is flipped.
 			//	spr->r.x *= -1; spr->r.y *= -1; spr->r.z *= -1; // also flipping r to restore chirality
 				if ((unsigned)b7spr.sectnum < (unsigned)map->numsects) //Make shade relative to sector

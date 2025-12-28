@@ -1185,15 +1185,18 @@ static void DrawKenGeometry(float sw, float sh, Camera3D camsrc) {
                     spr->tilnum = gnumtiles_i - 10;
 
                 Texture2D spriteTex = runtimeTextures[spr->tilnum];
+                // vectors are half a size
                 Vector3 rg = {spr->r.x, -spr->r.z, spr->r.y};
                 Vector3 dw = {spr->d.x, -spr->d.z, spr->d.y};
                 Vector3 frw = {spr->f.x, -spr->f.z, spr->f.y};
                 Vector3 pos = {spr->p.x, -spr->p.z, spr->p.y};
-                pos += frw * 0.1; // bias agains fighting
-                Vector3 a = pos + rg + dw;
-                Vector3 b = pos + rg - dw;
-                Vector3 c = pos - rg - dw;
-                Vector3 d = pos - rg + dw;
+                auto xs = Vector3Length(rg);
+                auto ys = Vector3Length(dw);
+               // pos += frw * 0.00001; // bias agains fighting
+                Vector3 a = pos + rg*spr->anchor.x*2 + dw*spr->anchor.z*2;
+                Vector3 b = pos + rg*spr->anchor.x*2 - dw*(1-spr->anchor.z)*2;
+                Vector3 c = pos - rg*(1-spr->anchor.x)*2 - dw*(1-spr->anchor.z)*2;
+                Vector3 d = pos - rg*(1-spr->anchor.x)*2 + dw*spr->anchor.z*2;
                 // Debug vectors
                 DrawLine3D(pos, Vector3Add(pos, frw), BLUE); // Forward vector
                 DrawLine3D(pos, Vector3Add(pos, rg), RED); // Right vector
@@ -1219,16 +1222,22 @@ static void DrawKenGeometry(float sw, float sh, Camera3D camsrc) {
                     rlSetTexture(0);
                     rlEnableDepthMask();
                 }
-                else
+                else // billboards
                 {
-                    auto xs = Vector3Length(rg);
-                    auto ys = Vector3Length(dw);
+
                     int xflip = spr->flags & 4 ? -1 : 1;
                     int yflip = spr->flags & 8 ? -1 : 1;
-                    Vector3 pos = {spr->p.x, -spr->p.z, spr->p.y};
-                    Rectangle source = {0.0f, 0.0f, (float)spriteTex.width, (float)spriteTex.height};
                     xs *= 2;
                     ys *= 2;
+                    // need to shift view position for raylib's billboard.
+                    Vector3 centeroffset = rg*((spr->anchor.x-0.5))*2 + dw*(spr->anchor.z-0.5f)*2;
+                    Vector3 pos = {spr->p.x, -spr->p.z, spr->p.y};
+pos+= centeroffset;
+                    //pos.x+=xs;
+                    //pos.z-=ys;
+
+                    Rectangle source = {0.0f, 0.0f, (float)spriteTex.width, (float)spriteTex.height};
+
 
                     DrawBillboardRec(rlcam, spriteTex, source, pos, {xs * xflip, ys * yflip}, WHITE);
                 }
@@ -1914,7 +1923,7 @@ private:
             if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
             map->blankheadspri = i;
         }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/e2l6.MAP", map);
+        loadmap_imp((char*)"c:/Eugene/Games/build2/spr.MAP", map);
     }
 };
 
