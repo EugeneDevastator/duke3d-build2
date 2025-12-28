@@ -132,7 +132,8 @@
 #define TEZ_SLOPE 1<<2 // slope or rawz;
 #define TEZ_INVZ 1<<3 // use next continious wall
 #define TEZ_CLOSEST 1<<4 // closest height point instead of arbitrary.
-#define TEZ_WORLDZ1 1<<5 // closest height point instead of arbitrary.
+#define TEZ_FURTHEST 1<<5 // closest height point instead of arbitrary.
+#define TEZ_WORLDZ1 1<<6 // closest height point instead of arbitrary.
 
 // auto resolution optioons, written in ouv wal
 #define TEW_WORLDF -1
