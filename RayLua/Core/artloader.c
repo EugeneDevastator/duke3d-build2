@@ -241,7 +241,7 @@ void loadpic(tile_t *tpic, char* rootpath) {
             kzseek(j,SEEK_SET);
             uptr = (unsigned char *)_alloca(pic->y);
             pic->p = (nx<<2);
-            pic->f = (long)malloc((ny+1)*pic->p+4);
+            pic->f = (uint32_t)malloc((ny+1)*pic->p+4);
 
             for(x=0;x<pic->x;x++) {
                 kzread(uptr,pic->y);

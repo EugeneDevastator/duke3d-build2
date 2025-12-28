@@ -736,8 +736,8 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
     double *xform = b->xformmat;
     point3d add = b->gnadd;
 
-    #define EPSILON 1e-5f
-    #define ANGLE_EPSILON 1e-14f
+    #define EPSILON 1e-12f
+    #define ANGLE_EPSILON 1e-24f
 
     if ((rethead0 | rethead1) < 0) {
         mono_deloop(rethead1);
