@@ -577,6 +577,7 @@ public:
                 float u = Vector3DotProduct(localPos, Vector3Normalize(locU)) / Vector3Length(locU);
                 float v = Vector3DotProduct(localPos, Vector3Normalize(locV)) / Vector3Length(locV);
 
+                // post-unwrap transformation
                 u = u * eyepol[i].uvform[0] + eyepol[i].uvform[2];
                 v = v * eyepol[i].uvform[1] + eyepol[i].uvform[3];
 
@@ -1923,7 +1924,7 @@ private:
             if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
             map->blankheadspri = i;
         }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/spr.MAP", map);
+        loadmap_imp((char*)"c:/Eugene/Games/build2/e2l6.MAP", map);
     }
 };
 

@@ -313,10 +313,10 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 		} build7sect_t;
 		typedef struct
 		{
-			long x, y;
+			int32_t x, y;  // long is 32bit in Ken's format
 			short point2, nextwall, nextsect, cstat, picnum, overpicnum;
-			signed char shade;
-			char pal, xrepeat, yrepeat, xpanning, ypanning;
+			int8_t  shade;
+			uint8_t pal, xrepeat, yrepeat, xpanning, ypanning;
 			short lotag, hitag, extra;
 		} build7wall_t;
 		typedef struct
@@ -618,6 +618,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						thiswal->xsurf = malloc(sizeof(surf_t) * 1);
 						thiswal->xsurf[0].tilnum = b7wal.picnum;
 					}
+					thiswal->surf.tilnum= b7wal.picnum;
 					//float wallh = (sec[i].z[1]-sec[i].z[0]);
 					// also pans are limited by 256. so large textures wont work.
 					float xsize = tilesizx[thiswal->surf.tilnum];
@@ -637,7 +638,10 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					thiswal->mflags[0] = b7wal.cstat; // need for second pass.
 					thiswal->surf.uvform[0]=scalerx;
 					thiswal->surf.uvform[1]=scalery;
-					thiswal->surf.uvform[2]=px1x * b7wal.xpanning;
+					if (thiswal->surf.tilnum == 157)
+						int a =1;
+// so negative flips are wierd. for ex 80-xsize with 255 pan = 16 pan. because it is next 80...
+					thiswal->surf.uvform[2]=  px1x * b7wal.xpanning;
 					thiswal->surf.uvform[3]=px1y * (b7wal.ypanning/ypans_per_px);
 
 
@@ -927,7 +931,20 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 #endif
 			checknextwalls_imp(map);
 			checksprisect_imp(-1,map);
-
+			// assume one unit is one uv, given scale. so units*unitstouv*scale.
+			// pan of 16 is 16 pixels. befre scaling.
+			// duke3d:
+			// x repeat 1 for wall means 8 pixels per entire wall length
+			// y repeat 1 for wall means 4 pixels per 8192 z units. = 1 z unit of b2
+			// x pan of 1 equals one pixel move before scaling. (so always 1 pixel)
+			// y pan of 8 = 1 pixel of 32x32 texture
+			// y pan of 2 = 1 pixel for 128x128  texture
+			// y pan of 2 - 1/4 pixel of 32x32.
+			// 128/2 = 1;
+			// 32/8=1;
+			// 256/32 = 8;
+			// 256/128 = 2;
+			// 256 / size = pans/pixel.
 			//second pass for walls
 			for (i = 0; i < map->numsects; i++) // second pass for double wall tex.
 			{
@@ -944,6 +961,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					int uwalid = isxalignflip ? j : nwid;
 					int orwal = isxalignflip ? nwid : j;
 					int basemul = isyuvflip ? -1 : 1;
+					int basexmul = isxalignflip ? -1 : 1;
 					int yflipmul[3] = {basemul,basemul,basemul};
 					memcpy(&walp->xsurf[0].uvform, &walp->surf.uvform, sizeof(float) * 6);
 
@@ -984,20 +1002,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							//*newx/oldx;
 						}
 
-						// assume one unit is one uv, given scale. so units*unitstouv*scale.
-						// pan of 16 is 16 pixels. befre scaling.
-						// duke3d:
-						// x repeat 1 for wall means 8 pixels per entire wall length
-						// y repeat 1 for wall means 4 pixels per 8192 z units. = 1 z unit of b2
-						// x pan of 1 equals one pixel move before scaling. (so always 1 pixel)
-						// y pan of 8 = 1 pixel of 32x32 texture
-						// y pan of 2 = 1 pixel for 128x128  texture
-						// y pan of 2 - 1/4 pixel of 32x32.
-						// 128/2 = 1;
-						// 32/8=1;
-						// 256/32 = 8;
-						// 256/128 = 2;
-						// 256 / size = pans/pixel.
+
 
 						// for tomorrow - deal with x,y flips
 						// deal with masked wall scaling.
@@ -1030,11 +1035,11 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 
 						// ==== UV VECTORS SETUP
 
-						if (!isfloralign) {
+						if (!isfloralign) { // default for split door
 							// in case of standard align - we do door-snapping style,
 							//top'
 							walp->xsurf[0].otez = TEZ_NS ;//| TEZ_CEIL | TEZ_RAWZ; // next ce
-							walp->xsurf[0].utez = TEZ_NS ;//| TEZ_CEIL | TEZ_RAWZ; // next ce
+							walp->xsurf[0].utez = walp->xsurf[0].otez ;//| TEZ_CEIL | TEZ_RAWZ; // next ce
 							walp->xsurf[0].vtez = TEZ_INVZ | TEZ_WORLDZ1; // TEZ_OS | TEZ_CEIL |
 
 							//mid in that case is aligned to other ceil. mid is always aligned to ns.
@@ -1044,8 +1049,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						}
 						else
 							// other kind of align -- to own ceil, but mask to other flor.
-						{ // THIS WORKS!
-							//top
+						{
 							walp->xsurf[0].otez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ; // next floor Z of j, not slope!
 							walp->xsurf[0].utez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ; // next floor Z of j
 							walp->xsurf[0].vtez = TEZ_OS | TEZ_FLOR | TEZ_RAWZ| TEZ_WORLDZ1; // next floor Z of j
