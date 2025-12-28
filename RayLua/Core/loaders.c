@@ -642,7 +642,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						int a =1;
 // so negative flips are wierd. for ex 80-xsize with 255 pan = 16 pan. because it is next 80...
 					thiswal->surf.uvform[2]=  px1x * b7wal.xpanning;
-					thiswal->surf.uvform[3]=px1y * (b7wal.ypanning/ypans_per_px);
+					thiswal->surf.uvform[3]= px1y * (b7wal.ypanning/ypans_per_px);
 
 
 				}
@@ -1002,8 +1002,6 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							//*newx/oldx;
 						}
 
-
-
 						// for tomorrow - deal with x,y flips
 						// deal with masked wall scaling.
 						// this is here because we need to know params of next sector.
@@ -1016,12 +1014,11 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							float ysize = tilesizy[walp->xsurf[sl].tilnum];
 							float pix4 = 4.0f / ysize;
 							float normuvperz = pix4 * yrepeat;
-							//if(!floralig[sl])// for flor aligned we use same rect for both chunks
+							if(!floralig[sl])// for flor aligned we use same rect for both chunks
 								walp->xsurf[sl].uvform[1] = (4*yrepeat)/ysize;// normuvperz;
 						}
 
-						//rescale mid texture
-						{
+						{ //rescale mid texture
 							int cursizx = tilesizx[walp->xsurf[0].tilnum];
 							int newsizx = tilesizx[walp->xsurf[1].tilnum];
 							//
@@ -1030,7 +1027,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							//
 							walp->xsurf[1].uvform[0] *= cursizx/(float)newsizx;
 							walp->xsurf[1].uvform[2] *= cursizx/(float)newsizx;
-							//	walp->xsurf[1].uvform[1] *= cursizy/(float)newsizy;
+							//walp->xsurf[1].uvform[3] *= cursizy/(float)newsizy;
 						}
 
 						// ==== UV VECTORS SETUP
@@ -1043,24 +1040,27 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							walp->xsurf[0].vtez = TEZ_INVZ | TEZ_WORLDZ1; // TEZ_OS | TEZ_CEIL |
 
 							//mid in that case is aligned to other ceil. mid is always aligned to ns.
-							walp->xsurf[1].otez = TEZ_CLOSEST; // CEIL
-							walp->xsurf[1].utez = TEZ_CLOSEST; // CEIL
+							walp->xsurf[1].otez = TEZ_CLOSEST ; // CEIL
+							walp->xsurf[1].utez = TEZ_CLOSEST ; // CEIL
 							walp->xsurf[1].vtez = TEZ_FLOR | TEZ_WORLDZ1;
 						}
-						else
-							// other kind of align -- to own ceil, but mask to other flor.
-						{
+						else { // other kind of align -- to own ceil, but mask to other flor.
 							walp->xsurf[0].otez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ; // next floor Z of j, not slope!
 							walp->xsurf[0].utez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ; // next floor Z of j
 							walp->xsurf[0].vtez = TEZ_OS | TEZ_FLOR | TEZ_RAWZ| TEZ_WORLDZ1; // next floor Z of j
 
-							//mid in that case is aligned to other ceil. mid is always aligned to ns.
-							walp->xsurf[1].otez = TEZ_FLOR | TEZ_CLOSEST; // next ceil raw z
-							walp->xsurf[1].utez = TEZ_FLOR | TEZ_CLOSEST; // next ceil raw z
+							// for solid masked we always align to ceil - only for ceil aligned option
+							int flags1;
+							if (walp->mflags[0] & WALL_SOLID_MASKED)
+								flags1= 0;
+							else
+								flags1 = TEZ_CLOSEST  | TEZ_FLOR;
+
+							walp->xsurf[1].otez = flags1;
+							walp->xsurf[1].utez = flags1;
 							walp->xsurf[1].vtez = TEZ_INVZ | TEZ_CLOSEST| TEZ_WORLDZ1;
 						}
-						// also when double tex - then both sides have own alignment, and lower seg borrows its flags from nw.
-						// TO IMPLEMENT the above! ^^
+						// Handle lower segment separately, because could be walswapped.
 						if (!isfloralignbot){	//bot;
 							walp->xsurf[2].otez = TEZ_NS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j, not slope!
 							walp->xsurf[2].utez = TEZ_NS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j

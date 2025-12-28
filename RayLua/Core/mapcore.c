@@ -528,18 +528,19 @@ float getzoftez(int tezflags, sect_t *mysec, int thiswall, point2d worldxy, maps
 	bool isflor = tezflags & TEZ_FLOR;
 	float retz;
 
-	if (tezflags & TEZ_CLOSEST) {
+	if (tezflags & (TEZ_CLOSEST | TEZ_FURTHEST) ) {
+		bool useFar = tezflags & TEZ_FURTHEST;
 		if (tezflags & TEZ_SLOPE) {
 			float z1 = getslopezpt(mysec, isflor, worldxy);
 			float z2 = getslopezpt(nsec, isflor, worldxy);
-			if (isflor)
+			if (isflor ^ useFar)
 				retz = min(z1, z2);
 			else
 				retz = max(z1, z2);
 		} else {
 			float z1 = mysec->z[isflor];
 			float z2 = nsec->z[isflor];
-			if (isflor)
+			if (isflor ^ useFar)
 				retz = min(z1, z2);
 			else
 				retz = max(z1, z2);
