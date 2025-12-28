@@ -531,10 +531,11 @@ public:
     static bool draw_eyepol_withuvtex(float sw, float sh, int i, int v0, int vertCount) {
         int v1 = eyepol[i + 1].vert0;
 
-        rlDisableBackfaceCulling();
+        rlDrawRenderBatchActive();
+       // rlDisableBackfaceCulling();
 
-        glEnable(GL_POLYGON_OFFSET_FILL);
-        glPolygonOffset(-0.5f, 1.0f);
+     //   glEnable(GL_POLYGON_OFFSET_FILL);
+     //   glPolygonOffset(-0.5f, 1.0f);
         //  rlDisableDepthMask();
 
         float r = eyepol[i].b2sect/6.0;
@@ -588,7 +589,7 @@ public:
         rlEnd();
         rlDrawRenderBatchActive();
         EndShaderMode();
-        glDisable(GL_POLYGON_OFFSET_FILL);
+     //   glDisable(GL_POLYGON_OFFSET_FILL);
         return false;
     }
 
@@ -710,14 +711,7 @@ float scaler = 0.01;
         }
         rlEnd();
     }
-
-    static void DrawPost3d(float sw, float sh, Camera3D camsrc) {
-        // Vector2 v1 = {0, 0};
-        // Vector2 v2 = {sw, sh};
-        // Vector2 v3 = {sw / 2, sh};
-        Color transparentWhite = {255, 255, 255, 128};
-        ClearBackground({50,50,60,255});  // Set your desired color
-
+static void DrawKenGeometry(float sw, float sh, Camera3D camsrc) {
         cam_t b2cam;
         if (syncam) {
             plr.ipos = {camsrc.position.x, camsrc.position.z, -camsrc.position.y};
@@ -738,6 +732,30 @@ float scaler = 0.01;
             b2cam.r = plr.irig;
             b2cam.d = plr.idow;
         }
+        DrawEyePoly(sw, sh, &plr, &b2cam); // ken render
+        //rlDisableDepthTest();
+        rlEnableDepthTest();
+        rlEnableDepthMask();
+        rlDisableBackfaceCulling();
+       // BeginBlendMode(BLEND_ADDITIVE);
+        if ((!(!eyepol || !eyepolv || eyepoln <= 0))) {
+            for (int i = 0; i < eyepoln; i++) {
+                int v0 = eyepol[i].vert0;
+                int v1 = eyepol[i + 1].vert0;
+                int vertCount = v1 - v0;
+                if (vertCount < 3) continue;
+
+                draw_eyepol_withuvtex(sw, sh, i, v0, vertCount);
+            }
+        }
+    }
+    static void DrawPost3d(float sw, float sh, Camera3D camsrc) {
+        // Vector2 v1 = {0, 0};
+        // Vector2 v2 = {sw, sh};
+        // Vector2 v3 = {sw / 2, sh};
+        Color transparentWhite = {255, 255, 255, 128};
+        ClearBackground({50,50,60,255});  // Set your desired color
+
 
         if (IsKeyPressed(KEY_U))
             syncam = !syncam;
@@ -762,7 +780,7 @@ float scaler = 0.01;
         if (g_mono_dbg.snapshot_count > 0)
             mono_cursnap = abs(mono_cursnap % g_mono_dbg.snapshot_count);
 
-        DrawEyePoly(sw, sh, &plr, &b2cam); // ken render
+        // DrawEyePoly(sw, sh, &plr, &b2cam); // ken render
 
         // Eyepol polys
         bool draweye = true;
@@ -776,7 +794,6 @@ float scaler = 0.01;
 
         rlDisableBackfaceCulling();
         BeginMode3D(camsrc);
-
 
         if (draweye && (!(!eyepol || !eyepolv || eyepoln <= 0)))
             {
@@ -844,29 +861,26 @@ float scaler = 0.01;
 
                 if (drawtrilines)
                 {
-                    if (opercurr < operstopn) {
-                        rlDisableDepthMask();
-                        rlDisableDepthTest();
 
-
-                        glEnable(GL_POLYGON_OFFSET_FILL);
-                        glPolygonOffset(-2.0f, 1.0f);
-                        rlColor4f(0, 1, 1, 1);
-                        for (int ii = 0; ii < eyepol[i].nid; ii += 3) {
-                            rlBegin(RL_LINES);
-                            for (int j = 0; j < 3; j++) {
-                                int idx = eyepol[i].indices[ii+j];
-                                rlVertex3f(eyepolv[idx].x, -eyepolv[idx].z, eyepolv[idx].y);
-                            }
-                            rlDrawRenderBatchActive();
-                            rlEnd();
+                    rlDisableDepthMask();
+                    rlDisableDepthTest();
+                    rlDisableBackfaceCulling();
+                    glEnable(GL_POLYGON_OFFSET_FILL);
+                    glPolygonOffset(-2.0f, 1.0f);
+                    rlColor4f(0, 1, 1, 0.6f);
+                    for (int ii = 0; ii < eyepol[i].nid; ii += 3) {
+                        rlBegin(RL_LINES);
+                        for (int j = 0; j < 3; j++) {
+                            int idx = eyepol[i].indices[ii+j];
+                            rlVertex3f(eyepolv[idx].x, -eyepolv[idx].z, eyepolv[idx].y);
                         }
-
-
-                        glDisable(GL_POLYGON_OFFSET_FILL);
-                        rlEnableDepthMask();
+                        rlDrawRenderBatchActive();
+                        rlEnd();
                     }
-                } // eyepol lines for each poly
+                }
+
+                glDisable(GL_POLYGON_OFFSET_FILL);
+                rlEnableDepthMask();
 
             }
             if (drawmonoloops) draw_debug_lines();

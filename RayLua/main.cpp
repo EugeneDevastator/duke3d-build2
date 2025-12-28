@@ -271,6 +271,8 @@ void MainLoop()
         ClearBackground(BLACK);
 
         BeginMode3D(DumbCore::GetCamera());
+
+        DumbRender::DrawKenGeometry(GetScreenWidth(),GetScreenHeight(),DumbCore::GetCamera());
         DumbRender::DrawMapstateTex(DumbCore::GetCamera());
         //   DumbRender::DrawMapstateLines();
          EndMode3D();
@@ -281,7 +283,7 @@ void MainLoop()
         glEnable(GL_DEPTH_TEST);
         glDepthMask(GL_FALSE); // Disable depth writing
 
-        DumbRender::DrawPost3d(GetScreenWidth(),GetScreenHeight(),DumbCore::GetCamera());
+      //  DumbRender::DrawPost3d(GetScreenWidth(),GetScreenHeight(),DumbCore::GetCamera());
 
         //DumbRender::TestRenderTextures();
         // DumbRender::DrawPaletteAndTexture();
