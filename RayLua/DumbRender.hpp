@@ -20,9 +20,10 @@ The forward direction can be visualized as moving away from the camera or viewer
 #define RAYLIB_LUA_IMGUI_DUMBRENDER_H
 #include "DumbCore.hpp"
 #include "cmake-build-custom/_deps/raylib-src/src/external/glad.h"
+#include "Shaders/renderhelper.h"
 
 
- extern "C" {
+  extern "C" {
 #include "loaders.h"
 #include "mapcore.h"
 #include "monoclip.h"
@@ -550,7 +551,7 @@ public:
             bpv3(eyepol[i].worlduvs[0]),
             bpv3(eyepol[i].worlduvs[1]),
             bpv3(eyepol[i].worlduvs[2]));
-        if (eyepol[i].tilnum>900)
+        if (eyepol[i].tilnum> gnumtiles_i)
             eyepol[i].tilnum=5;
         const Texture2D tex = runtimeTextures[eyepol[i].tilnum];
 
@@ -1175,8 +1176,9 @@ static void DrawKenGeometry(float sw, float sh, Camera3D camsrc) {
             }
         }
         rlEnableDepthMask();
-        //rlEnableBackfaceCulling();
+        rlEnableBackfaceCulling();
         // Draw sprites (unchanged)
+        rlDisableDepthMask();
         for (int i = 0; i < map->numspris; i++)
         {
             spri_t* spr = &map->spri[i];
@@ -1199,13 +1201,16 @@ static void DrawKenGeometry(float sw, float sh, Camera3D camsrc) {
                 Vector3 c = pos - rg*(1-spr->anchor.x)*2 - dw*(1-spr->anchor.z)*2;
                 Vector3 d = pos - rg*(1-spr->anchor.x)*2 + dw*spr->anchor.z*2;
                 // Debug vectors
-                DrawLine3D(pos, Vector3Add(pos, frw), BLUE); // Forward vector
-                DrawLine3D(pos, Vector3Add(pos, rg), RED); // Right vector
-                DrawLine3D(pos, Vector3Add(pos, dw), GREEN); // Down vector
+                DrawTransform(&spr->tr);
+            //   DrawLine3D(pos, Vector3Add(pos, frw), BLUE); // Forward vector
+            //   DrawLine3D(pos, Vector3Add(pos, rg), RED); // Right vector
+            //   DrawLine3D(pos, Vector3Add(pos, dw), GREEN); // Down vector
+
 
                 if (spr->flags & 32) // spr->flags |= SPRITE_B2_FLAT_POLY;
                 {
-                    rlDisableDepthMask();
+                    EnableDepthOffset(-2.0);
+
                     rlSetTexture(spriteTex.id);
                     rlBegin(RL_QUADS);
                     rlColor4ub(255, 255, 255, 255); // todo update transp.
@@ -1219,13 +1224,13 @@ static void DrawKenGeometry(float sw, float sh, Camera3D camsrc) {
                     rlTexCoord2f(0.0f, 0.0f);
                     rlVertex3V(a);
 
+                    rlDrawRenderBatchActive();
                     rlEnd();
+                    DisableDepthOffset();
                     rlSetTexture(0);
-                    rlEnableDepthMask();
                 }
                 else // billboards
                 {
-
                     int xflip = spr->flags & 4 ? -1 : 1;
                     int yflip = spr->flags & 8 ? -1 : 1;
                     xs *= 2;
@@ -1238,8 +1243,6 @@ pos+= centeroffset;
                     //pos.z-=ys;
 
                     Rectangle source = {0.0f, 0.0f, (float)spriteTex.width, (float)spriteTex.height};
-
-
                     DrawBillboardRec(rlcam, spriteTex, source, pos, {xs * xflip, ys * yflip}, WHITE);
                 }
             }
@@ -1252,6 +1255,7 @@ pos+= centeroffset;
        DrawB2Point(&testp);
     }
     static void DrawTransform(transform *tr) {
+        rlDisableDepthTest();
         Vector3 rg = {tr->r.x, -tr->r.z, tr->r.y};
         Vector3 dw = {tr->d.x, -tr->d.z, tr->d.y};
         Vector3 frw = {tr->f.x, -tr->f.z, tr->f.y};
@@ -1259,6 +1263,7 @@ pos+= centeroffset;
         DrawLine3D(pos, Vector3Add(pos, frw), BLUE); // Forward vector
         DrawLine3D(pos, Vector3Add(pos, rg), RED); // Right vector
         DrawLine3D(pos, Vector3Add(pos, dw), GREEN); // Down vector
+        rlEnableDepthTest();
     }
     static void DrawB2Point(dpoint3d *pt) {
         Vector3 vecpt = {(float)pt->x,(float)pt->z*-1,(float)pt->y};
@@ -1924,7 +1929,7 @@ private:
             if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
             map->blankheadspri = i;
         }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/spr.MAP", map);
+        loadmap_imp((char*)"c:/Eugene/Games/build2/e3l1.MAP", map);
     }
 };
 
