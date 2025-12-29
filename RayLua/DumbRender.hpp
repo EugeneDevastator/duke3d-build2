@@ -568,42 +568,27 @@ public:
     {
         return {(float)buildcoord.x, (float)-buildcoord.z, (float)buildcoord.y};
     }
-    static bool draw_eyepol_withuvtex(float sw, float sh, int i, int v0, int vertCount) {
+    static bool draw_eyepol_withuvtex(float sw, float sh, int i, int v0, int vertCount, bool isopaque) {
         int v1 = eyepol[i + 1].vert0;
 
         rlDrawRenderBatchActive();
-        rlDisableBackfaceCulling();
+        //rlDisableBackfaceCulling();
+      //  rlDisableDepthTest();
 
      //   glEnable(GL_POLYGON_OFFSET_FILL);
      //   glPolygonOffset(-0.5f, 1.0f);
         //  rlDisableDepthMask();
 
-        float r = eyepol[i].b2sect/6.0;
-        float b = eyepol[i].b2sect/17.0;
-
         // set global shader variables. all 3 are points in world space (custom one)
         // shader.setvector3 worldorigin to eyepol->worlduvs[0] //
         // shader.setvector3 worldU to eyepol->worlduvs[1]
         // shader.setvector3 worldV to eyepol->worlduvs[2]
-        BeginShaderMode(uvShaderDesc.shader);
-        SetUVShaderParams(uvShaderDesc,
-            bpv3(eyepol[i].worlduvs[0]),
-            bpv3(eyepol[i].worlduvs[1]),
-            bpv3(eyepol[i].worlduvs[2]));
-        if (eyepol[i].tilnum> gnumtiles_i)
-            eyepol[i].tilnum=5;
-        const Texture2D tex = runtimeTextures[eyepol[i].tilnum];
 
-        SetShaderValueTexture(uvShaderDesc.shader,uvShaderDesc.textureLoc,tex);
-        rlBegin(RL_TRIANGLES);
-        if (eyepol[i].tilnum == 163)
-            int a =1;
         Vector3 worldOrigin = bpv3(eyepol[i].worlduvs[0]);
         Vector3 worldU = bpv3(eyepol[i].worlduvs[1]);
         Vector3 worldV = bpv3(eyepol[i].worlduvs[2]);
         Vector3 locU = worldU - worldOrigin;
         Vector3 locV = worldV - worldOrigin;
-        float a  = 1-eyepol[i].alpha;
         int useGrad = 1;
         Vector4 usedcol = {1,1,1,1};
         switch (eyepol[i].pal) {
@@ -614,18 +599,47 @@ public:
             case 7: usedcol = {0.8,0.9,0,1}; break;
             default: useGrad = 0;break;
         }
+      //  if (map->sect[eyepol[i].b2sect].surf[1].lotag==2) // water
+      //  {
+      //      usedcol *= Vector4{0.2f,0.7f,0.5f,1};
+      //      useGrad  = 1;
+      //  }
+
+        if (eyepol[i].alpha < 1.0f) {
+            if (isopaque) return true;
+            rlDisableDepthMask();
+            rlDisableBackfaceCulling();
+            BeginBlendMode(RL_BLEND_ALPHA_PREMULTIPLY);
+            usedcol.w = 0.6f;
+
+        }
+        else {
+            if (!isopaque) return true;
+       //     rlEnableBackfaceCulling();
+            rlEnableDepthMask();
+            usedcol.w = 1;
+        }
+
+        BeginShaderMode(uvShaderDesc.shader);
+        rlBegin(RL_TRIANGLES);
+        SetUVShaderParams(uvShaderDesc,
+            bpv3(eyepol[i].worlduvs[0]),
+            bpv3(eyepol[i].worlduvs[1]),
+            bpv3(eyepol[i].worlduvs[2]));
+        if (eyepol[i].tilnum> gnumtiles_i)
+            eyepol[i].tilnum=5;
+        const Texture2D tex = runtimeTextures[eyepol[i].tilnum];
+
+        SetShaderValueTexture(uvShaderDesc.shader,uvShaderDesc.textureLoc,tex);
+
         SetShaderValue(uvShaderDesc.shader, uvShaderDesc.useGradientloc,&useGrad, SHADER_UNIFORM_INT);
 
         for (int ii = 0; ii < eyepol[i].nid; ii += 3) {
-            float g = (ii/3.0f /5.0f);
-
 
             for (int j = 0; j < 3; j++) {
                 int idx = eyepol[i].indices[ii+j];
                 Vector3 verwpos = buildToRaylibPos(eyepolv[idx].wpos);
                 Vector3 uvwpos = bpv3(eyepolv[idx].uvpos);
-              //  rlColor4f(1,g,1,1);
-              //  rlEnableVertexAttribute(uvShaderDesc.vertexTexCoord);
                 Vector3 localPos = uvwpos - worldOrigin;
                 // Project onto UV plane using dot products
                 float u = Vector3DotProduct(localPos, Vector3Normalize(locU)) / Vector3Length(locU);
@@ -634,16 +648,19 @@ public:
                 // post-unwrap transformation
                 u = u * eyepol[i].uvform[0] + eyepol[i].uvform[2];
                 v = v * eyepol[i].uvform[1] + eyepol[i].uvform[3];
+
                 rlColor4f(usedcol.x,usedcol.y,usedcol.z,usedcol.w);
                 rlTexCoord2f(u,v);
-
                 // rlNormal3f(uvwpos.x,uvwpos.y,uvwpos.z); // this bitch gets transformed.
                 rlVertex3f(verwpos.x, verwpos.y, verwpos.z);
             }
         }
-        rlEnd();
         rlDrawRenderBatchActive();
+        EndBlendMode();
         EndShaderMode();
+        rlEnd();
+
+
      //   glDisable(GL_POLYGON_OFFSET_FILL);
         return false;
     }
@@ -794,13 +811,15 @@ static void DrawKenGeometry(float sw, float sh, Camera3D camsrc) {
         rlDisableBackfaceCulling();
        // BeginBlendMode(BLEND_ADDITIVE);
         if ((!(!eyepol || !eyepolv || eyepoln <= 0))) {
-            for (int i = 0; i < eyepoln; i++) {
-                int v0 = eyepol[i].vert0;
-                int v1 = eyepol[i + 1].vert0;
-                int vertCount = v1 - v0;
-                if (vertCount < 3) continue;
+            for (int opaq = 1; opaq >= 0; opaq--) {
+                for (int i = 0; i < eyepoln; i++) {
+                    int v0 = eyepol[i].vert0;
+                    int v1 = eyepol[i + 1].vert0;
+                    int vertCount = v1 - v0;
+                    if (vertCount < 3) continue;
 
-                draw_eyepol_withuvtex(sw, sh, i, v0, vertCount);
+                    draw_eyepol_withuvtex(sw, sh, i, v0, vertCount, opaq);
+                }
             }
         }
     }
@@ -877,7 +896,7 @@ static void DrawKenGeometry(float sw, float sh, Camera3D camsrc) {
                     if (drawtripoly)
                         draw_eyepol_tridebug(sw, sh, i, v0, vertCount);
                     if (drawopaqes && OPERISOK )
-                        draw_eyepol_withuvtex(sw, sh, i, v0, vertCount);
+                        draw_eyepol_withuvtex(sw, sh, i, v0, vertCount,1);
                     if (draweyepolheads && OPERONLYLAST) {
                              {
 
@@ -1985,7 +2004,7 @@ private:
             if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
             map->blankheadspri = i;
         }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/e3l1.MAP", map);
+        loadmap_imp((char*)"c:/Eugene/Games/build2/e3l3.MAP", map);
     }
 };
 

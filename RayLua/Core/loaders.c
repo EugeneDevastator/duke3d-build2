@@ -620,6 +620,10 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					{
 						thiswal->surfn = 3;
 						thiswal->xsurf = malloc(sizeof(surf_t) * 3);
+						thiswal->xsurf[0].alpha=1;
+						thiswal->xsurf[1].alpha=1;
+						thiswal->xsurf[2].alpha=1;
+						thiswal->surf.alpha=1;
 						thiswal->xsurf[0].tilnum = b7wal.picnum;
 						thiswal->xsurf[1].tilnum = b7wal.overpicnum;
 						thiswal->xsurf[2].tilnum = b7wal.cstat & WALL_BOTTOM_SWAP ? -2 : b7wal.picnum;
@@ -938,7 +942,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			gnumtiles = 0; memset(gtilehashead,-1,sizeof(gtilehashead));
 
 			hitile++;
-			hitile = 4000;
+			hitile = 5080;
 			if (hitile > gmaltiles)
 			{
 				gmaltiles = hitile;

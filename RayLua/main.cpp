@@ -258,8 +258,8 @@ void MainLoop()
     SetTargetFPS(60);
     DumbRender::LoadTexturesToGPU();
     // Create render targets with shared depth
-    CustomRenderTarget albedoTarget = CreateCustomRenderTarget(800, 600, 0); // Creates own depth
-    CustomRenderTarget lightTarget = CreateCustomRenderTarget(800, 600, albedoTarget.depthTexture); // Shares depth
+    CustomRenderTarget albedoTarget = CreateCustomRenderTarget(GetScreenWidth(), GetScreenHeight(), 0); // Creates own depth
+    CustomRenderTarget lightTarget = CreateCustomRenderTarget(GetScreenWidth(), GetScreenHeight(), albedoTarget.depthTexture); // Shares depth
 
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
@@ -296,15 +296,16 @@ void MainLoop()
         {
             BeginDrawing();
             ClearBackground(BLACK);
-
+int w = GetScreenWidth();
+            int h = GetScreenHeight();
             // Draw albedo
-            DrawTextureRec({albedoTarget.colorTexture, 800, 600, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
-                          {0, 0, 800, -600}, {0, 0}, WHITE);
+            DrawTextureRec({albedoTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
+                          {0, 0, (float)w, (float)-h}, {0, 0}, WHITE);
 
             // Multiply blend lights
             BeginBlendMode(RL_BLEND_ADDITIVE);
-            DrawTextureRec({lightTarget.colorTexture, 800, 600, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
-                          {0, 0, 800, -600}, {0, 0}, WHITE);
+            DrawTextureRec({lightTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
+                          {0, 0, (float)w, (float)-h}, {0, 0}, WHITE);
             EndBlendMode();
 
             EndDrawing();
@@ -318,7 +319,7 @@ void MainLoop()
 
 int main() {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
-    InitWindow(800, 600, "Raylib + Lua + ImGui");
+    InitWindow(1024, 768, "Raylib + Lua + ImGui");
     SetTargetFPS(120);
     rlImGuiSetup(true);
    // LuaBinder::Init();

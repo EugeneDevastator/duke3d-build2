@@ -36,6 +36,8 @@ eyepols are generated from mono space AND plane equation stored in gouvmat.
 #define DP_AND_SUBREV 7
 #define DP_NO_SCANSECT 8
 #define DP_NO_PROJECT 16
+#define DP_EMIT_MASK 32
+#define DP_PRESERVE_LOOP 64
 
 #define MAX_PORTAL_DEPTH 2
 
@@ -238,6 +240,7 @@ static player_transform *gps;
 static tile_t *gtpic;
 
 static int gcurcol, gtilenum;
+static float alphamul;
 static int taginc = 30000;
 #define LIGHTMAX 256 //FIX:make dynamic!
 lightpos_t shadowtest2_light[LIGHTMAX];
@@ -1021,21 +1024,23 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 
     eyepol[eyepoln].tilnum = gtilenum;
 	eyepol[eyepoln].pal = 0;
+	eyepol[eyepoln].alpha = alphamul;
     if (b->gisflor < 2) {
-        eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].surf[b->gisflor].uvcoords;
-        eyepol[eyepoln].uvform = curMap->sect[b->gligsect].surf[b->gisflor].uvform;
+	    eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].surf[b->gisflor].uvcoords;
+    	eyepol[eyepoln].uvform = curMap->sect[b->gligsect].surf[b->gisflor].uvform;
     	eyepol[eyepoln].pal = curMap->sect[b->gligsect].surf[b->gisflor].pal;
-        //eyepol[eyepoln].alpha = curMap->sect[b->gligsect].surf[b->gisflor].uvform;
-    } else {
+    }
+    else    { // handle walls.
         eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].uvcoords;
         eyepol[eyepoln].uvform = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].uvform;
         eyepol[eyepoln].alpha = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].alpha;
         eyepol[eyepoln].pal = curMap->sect[b->gligsect].wall[b->gligwall].surf.pal;
       //  eyepol[eyepoln].tilnum = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].tilnum;
     }
-
     eyepol[eyepoln].slabid = b->gligslab;
 
+	if (eyepol[eyepoln].alpha <0)
+		eyepol[eyepoln].alpha=1;
     for (int ip = debhl[0]; ip < eyepolvn; ip++) {
         int pn = ip;
         f = cam.h.z / (eyepolv[pn].x * xform[6] + eyepolv[pn].y * xform[7] + add.z);
@@ -1400,8 +1405,12 @@ static int drawpol_befclip(int fromtag, int newtag1, int fromsect, int newsect, 
 	int i, j, k, l, h, on, n, plothead[2], imin, imax, i0, i1, omph0, omph1;
 
 	void (*mono_output)(int h0, int h1, bdrawctx *b);
-	plothead[0] = plothead0;
-	plothead[1] = plothead1;
+	if (flags & DP_PRESERVE_LOOP) {
+		monocopy(plothead0, plothead1, &plothead[0], &plothead[1]);
+	} else {
+		plothead[0] = plothead0;
+		plothead[1] = plothead1;
+	}
 	int projok = 1;
 	if (!(flags & DP_NO_PROJECT))
 		projok = projectonmono(&plothead[0], &plothead[1], b);
@@ -1419,6 +1428,8 @@ static int drawpol_befclip(int fromtag, int newtag1, int fromsect, int newsect, 
 			b->gdoscansector = !(flags & DP_NO_SCANSECT);
 			// intersect with same monos, and change tag for resulting piece?
 			// cliptonewregion
+			if (flags & DP_EMIT_MASK) mono_output = drawtagfunc_ws;
+				else mono_output = changetagfunc;
 			logstep("bool AND, keep all, changetag, on tag %d to %d", curtag, b->gnewtag);
 			for (i = mphnum - 1; i >= 0; i--)
 				if (mph[i].tag == curtag) {
@@ -1429,8 +1440,9 @@ static int drawpol_befclip(int fromtag, int newtag1, int fromsect, int newsect, 
 						plothead[1],
 						MONO_BOOL_AND,
 						b,
-						changetagfunc);
+						mono_output);
 				}
+			if (flags & DP_EMIT_MASK) return 1;
 			{
 				logstep("Join and remove bases for tags, on upper res,  mhp[j]== %d, heads: [%d..%d]", b->gnewtag,
 				        omph0, mphnum - 1);
@@ -1612,6 +1624,7 @@ The b parameter is a bunch index - this function processes one "bunch" (visible 
 */
 
 static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
+	alphamul=1;
 	gtilenum = 0;
 	cam_t gcam = b->cam;
 	// === VARIABLE DECLARATIONS ===
@@ -1754,6 +1767,9 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			//	drawpol_befclip(s+b->tagoffset, portaltag, s, portals[endpn].sect,plothead[0],plothead[1], portalpolyflags , b);
 			//int c1, c2;
 			//monocopy(plothead[0],plothead[1], &c1,&c2);
+			alphamul = 0.3f;
+			drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1], DP_PRESERVE_LOOP| DP_EMIT_MASK |1, b);
+			alphamul = 1;
 			draw_hsr_enter_portal(map, myport, plothead[0], plothead[1], b);
 		} else {
 			drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1], surflag, b);
@@ -1887,6 +1903,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			// Render the wall polygon
 			// W A L L S
 			//
+			b->gligwall = w; // could affect light?
 			myport = wal[w].tags[1];
 			int surflag = ((m > vn) << 2) + 3;
 			int newtag = ns == -1 ? -1 : ns + b->tagoffset;
@@ -1900,6 +1917,10 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 				//	drawpol_befclip(s+b->tagoffset, portaltag,s,portals[endp].sect, plothead[0], plothead[1],  portalpolyflags, b);
 				//int c1, c2;
 				//monocopy(plothead[0],plothead[1], &c1,&c2);
+				alphamul = 0.3f;
+				// emit this as poly for eyes only, non destructive unaffects mph.
+				drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1], DP_PRESERVE_LOOP| DP_EMIT_MASK |1, b);
+				alphamul = 1;
 				draw_hsr_enter_portal(map, myport, plothead[0], plothead[1], b);
 			} else {
 				// could be 7 or 3, .111 or .011
@@ -1950,6 +1971,7 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 	if (!newctx) {
 		return;
 	}
+	alphamul=1;
 	int recursiveDepth = newctx->recursion_depth;
 	bdrawctx *b;
 	b = newctx;
