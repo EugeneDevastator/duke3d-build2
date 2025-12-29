@@ -232,7 +232,7 @@ void loadpic(tile_t *tpic, char* rootpath) {
         	// Read picanm data - use _alloca, don't free it
         	picanm_t *picanm_data = (picanm_t *)_alloca(loctile1<<2);
         	kzread(picanm_data, loctile1<<2);
-        	pic->animdata = picanm_data[tilenum];  // Get specific tile's picanm
+        	pic->animdata = picanm_data[tilenum];  // Get specific tile's picanm uint32
             if (pic->x <= 1) lnx = 0; else lnx = bsr(pic->x-1)+1;
             if (pic->y <= 1) lny = 0; else lny = bsr(pic->y-1)+1;
             nx = (1<<lnx); ny = (1<<lny);

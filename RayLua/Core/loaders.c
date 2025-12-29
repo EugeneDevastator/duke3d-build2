@@ -339,6 +339,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 		//------------------------------------------------------------------------
 		long filnum, arttiles, loctile0, loctile1, iskenbuild = 0;
 		short *tilesizx = 0, *tilesizy = 0, *tilefile = 0;
+		picanm_t *picanm= 0;
 		char tbuf[MAX_PATH*2];
 
 		kzclose();
@@ -347,7 +348,9 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 		for(i=j=0;curmappath[i];i++) if ((curmappath[i] == '/') || (curmappath[i] == '\\')) j = i+1;
 		curmappath[j] = 0;
 
-		arttiles = 0; //Scan .ART files, incrementing number until tile is in range
+
+		// Modified scanning code
+		arttiles = 0;
 		for(filnum=0;1;filnum++)
 		{
 			sprintf(tbuf,"TILES%03d.ART",filnum);
@@ -356,25 +359,42 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				sprintf(tbuf,"%sTILES%03d.ART",curmappath,filnum);
 				if (!kzopen(tbuf)) break;
 			}
-			kzread(tbuf,16); if (*(long *)&tbuf[0] != 1) break;
+			kzread(tbuf,16);
+			if (*(long *)&tbuf[0] != 1) break;
 			loctile0 = *(long *)&tbuf[8];
 			loctile1 = (*(long *)&tbuf[12])+1;
 			if ((loctile0 < 0) || (loctile1 <= arttiles) || (loctile0 >= loctile1)) continue;
+
 			i = arttiles; arttiles = loctile1;
 			tilesizx = (short *)realloc(tilesizx,arttiles*sizeof(tilesizx[0]));
 			tilesizy = (short *)realloc(tilesizy,arttiles*sizeof(tilesizy[0]));
 			tilefile = (short *)realloc(tilefile,arttiles*sizeof(tilefile[0]));
-			for(;i<arttiles;i++) { tilesizx[i] = 0; tilesizy[i] = 0; tilefile[i] = 0; }
+			picanm = (picanm_t *)realloc(picanm,arttiles*sizeof(picanm[0])); // Add this line
+
+			for(;i<arttiles;i++) {
+				tilesizx[i] = 0;
+				tilesizy[i] = 0;
+				tilefile[i] = 0;
+				picanm[i].asint = 0; // Initialize animdata
+			}
+
 			kzread(&tilesizx[loctile0],(loctile1-loctile0)*sizeof(short));
 			kzread(&tilesizy[loctile0],(loctile1-loctile0)*sizeof(short));
+			kzread(&picanm[loctile0],(loctile1-loctile0)*sizeof(long)); // Read animdata
+
 			for(i=loctile0;i<loctile1;i++) tilefile[i] = filnum;
 		}
+
 		if (!arttiles)
 		{
 			tilesizx = (short *)malloc(sizeof(tilesizx[0]));
 			tilesizy = (short *)malloc(sizeof(tilesizy[0]));
 			tilefile = (short *)malloc(sizeof(tilefile[0]));
-			tilesizx[0] = tilesizy[0] = 2; tilefile[0] = 0; arttiles = 1;
+			picanm = (picanm_t *)malloc(sizeof(picanm[0])); // Add this line
+			tilesizx[0] = tilesizy[0] = 2;
+			tilefile[0] = 0;
+			picanm[0].asint = 0; // Initialize
+			arttiles = 1;
 		}
 		else if (arttiles >= 20) //Autodetect KenBuild data
 		{
@@ -743,6 +763,14 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					//spr->p.z += (b7spr.yrepeat/4096.0*(float)tilesizy[l]);
 					spr->anchor.z = 0.5f;
 				}
+
+				spr->tilnum = l; hitile = max(hitile,l);
+
+				float tileoffu = picanm[spr->tilnum].x_center_offset/(float)tilesizx[spr->tilnum];
+				float tileoffv = picanm[spr->tilnum].y_center_offset/(float)tilesizy[spr->tilnum];
+				spr->anchor.x+=tileoffu;
+				spr->anchor.z+=tileoffv;
+
 				//&128: real-centered centering (center at center) - originally half submerged sprite
 			//	spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; // down is flipped.
 			//	spr->r.x *= -1; spr->r.y *= -1; spr->r.z *= -1; // also flipping r to restore chirality
@@ -762,7 +790,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				spr->mas = spr->moi = 1.0;
 				spr->owner = -1;
 
-				spr->tilnum = l; hitile = max(hitile,l);
+
 				spr->sect = b7spr.sectnum;
 				spr->sectn = spr->sectp = -1;
 				spr->lotag = b7spr.lotag;
@@ -909,7 +937,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			gnumtiles = 0; memset(gtilehashead,-1,sizeof(gtilehashead));
 
 			hitile++;
-			hitile = 1000;
+			hitile = 4000;
 			if (hitile > gmaltiles)
 			{
 				gmaltiles = hitile;
