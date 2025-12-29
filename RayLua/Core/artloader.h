@@ -7,12 +7,23 @@
 #include "kplib.h"
 #include "stdint.h"
 #define USEGROU 1
+typedef union {
+	uint32_t asint;
+	struct {
+		uint8_t animate_number : 6;    // bits 0-5: animate number (0-63)
+		uint8_t animate_type : 2;      // bits 6-7: animate type (0=NoAnm, 1=Oscil, 2=AnmFd, 3=AnmBk)
+		int8_t x_center_offset;        // bits 8-15: signed X-center offset
+		int8_t y_center_offset;        // bits 16-23: signed Y-center offset
+		uint8_t anim_speed :4;            // bits 24-28: animation speed
+	};
+} picanm_t;
+
 typedef struct tiltyp {
 	intptr_t f, p;           // f=frame buffer pointer, p=pitch/stride
 	int x, y, z;            // x,y=dimensions, z=depth/format info
 	float shsc;             // shsc=suggested height scale
 	struct tiltyp *lowermip; // pointer to lower mipmap level
-	uint32_t anmdata;
+	picanm_t animdata;
 } tiltyp;
 
 static long nullpic [64+1][64]; //Null set icon (image not found)

@@ -1924,7 +1924,7 @@ private:
             if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
             map->blankheadspri = i;
         }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/e2l6.MAP", map);
+        loadmap_imp((char*)"c:/Eugene/Games/build2/spr.MAP", map);
     }
 };
 

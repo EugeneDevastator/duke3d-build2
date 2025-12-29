@@ -94,7 +94,7 @@ void InitEngineApi(mapstate_t *map) {
     for (i=0;i<gmaltiles;i++) {
         engine.tilesizex[i] = gtile[i].tt.x;
         engine.tilesizey[i] = gtile[i].tt.y;
-        engine.picanms[i] = gtile[i].tt.anmdata;
+        engine.picanms[i] = gtile[i].tt.animdata.asint;
     }
 
 

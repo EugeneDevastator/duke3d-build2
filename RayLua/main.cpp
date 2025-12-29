@@ -275,7 +275,7 @@ void MainLoop()
         DumbRender::DrawKenGeometry(GetScreenWidth(),GetScreenHeight(),DumbCore::GetCamera());
         DumbRender::DrawMapstateTex(DumbCore::GetCamera());
         //   DumbRender::DrawMapstateLines();
-         EndMode3D();
+        EndMode3D();
         EndCustomRenderTarget();
 
         BeginCustomRenderTarget(lightTarget);
