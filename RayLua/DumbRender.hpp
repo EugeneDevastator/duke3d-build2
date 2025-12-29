@@ -42,6 +42,7 @@ typedef struct {
      int worldVLoc;
      int textureLoc;
      int vertexTexCoord;
+     int useGradientloc;
  } UVShaderDesc;
 struct WallSegment
 {
@@ -116,6 +117,7 @@ public:
         uvShaderDesc.worldOriginLoc = GetShaderLocation(uvShaderDesc.shader, "worldOrigin");
         uvShaderDesc.worldULoc = GetShaderLocation(uvShaderDesc.shader, "worldU");
         uvShaderDesc.worldVLoc = GetShaderLocation(uvShaderDesc.shader, "worldV");
+        uvShaderDesc.useGradientloc = GetShaderLocation(uvShaderDesc.shader, "useGradient");
 
            }
    static  void SetUVShaderParams(UVShaderDesc uvShader, Vector3 worldOrigin, Vector3 worldU, Vector3 worldV) {
@@ -564,9 +566,23 @@ public:
         Vector3 worldV = bpv3(eyepol[i].worlduvs[2]);
         Vector3 locU = worldU - worldOrigin;
         Vector3 locV = worldV - worldOrigin;
+        float a  = 1-eyepol[i].alpha;
+        int useGrad = 1;
+        Vector4 usedcol = {1,1,1,1};
+        switch (eyepol[i].pal) {
+            case 0: useGrad = 0; break;
+            case 1: usedcol = {0.2,0.5,1,1}; break;
+            case 2: usedcol = {1,0.35,0.1,1}; break;
+            case 8: usedcol = {0.3,1,0.2,1}; break;
+            case 7: usedcol = {0.8,0.9,0,1}; break;
+            default: break;
+        }
+        SetShaderValue(uvShaderDesc.shader, uvShaderDesc.useGradientloc,&useGrad, SHADER_UNIFORM_INT);
+
         for (int ii = 0; ii < eyepol[i].nid; ii += 3) {
             float g = (ii/3.0f /5.0f);
-            rlColor4f(r,g+0.1f,b,0.2);
+
+
             for (int j = 0; j < 3; j++) {
                 int idx = eyepol[i].indices[ii+j];
                 Vector3 verwpos = buildToRaylibPos(eyepolv[idx].wpos);
@@ -581,7 +597,7 @@ public:
                 // post-unwrap transformation
                 u = u * eyepol[i].uvform[0] + eyepol[i].uvform[2];
                 v = v * eyepol[i].uvform[1] + eyepol[i].uvform[3];
-
+                rlColor4f(usedcol.x,usedcol.y,usedcol.z,usedcol.w);
                 rlTexCoord2f(u,v);
 
                 // rlNormal3f(uvwpos.x,uvwpos.y,uvwpos.z); // this bitch gets transformed.

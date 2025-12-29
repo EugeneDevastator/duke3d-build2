@@ -219,6 +219,7 @@ typedef struct
 	union { long tag; struct { short lotag, hitag; }; };
 	point2d uv[3]; // legacy.
 	unsigned short asc, rsc, gsc, bsc; //4096 is no change
+	float alpha;
 //-------- uvs
 	union {
 		// 0,1 - origin offset on the plane 2,3 - offset of the tile rect, for rotation anim for ex

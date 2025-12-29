@@ -3,19 +3,40 @@
 
 in vec4 fragColor;
 in vec2 uvPosition;
-
+uniform int  useGradient;
 out vec4 finalColor;
 
 // Declare a uniform for the texture
 uniform sampler2D textureSampler;
 
 void main() {
-    // Sample the texture using UV coordinates
     vec4 texColor = texture(textureSampler, fract((uvPosition)));
-    texColor.a = 0.8f;
-    // Output the sampled texture color
-    finalColor = texColor;
+if (useGradient==1) {
+    // Sample the texture using UV coordinates
 
+    //texColor.a = 0.8f;
+    // Output the sampled texture color
+
+    // Convert original RGB to luminance (0.0 to 1.0)
+    // Divide by 3.0 since max sum is 3.0
+    float luminance = (texColor.r + texColor.g + texColor.b) / 3.0;
+
+    // Create gradient: 0 (black) -> fragColor -> 1 (white)
+    vec3 result;
+    if (luminance <= 0.5) {
+        // 0 to 0.5: interpolate from black to fragColor
+        result = fragColor.rgb * (luminance * 2.0);
+    } else {
+        // 0.5 to 1.0: interpolate from fragColor to white
+        result = mix(fragColor.rgb, vec3(1.0), (luminance - 0.5) * 2.0);
+    }
+
+    finalColor = vec4(result, texColor.a * fragColor.a);
+    } else {
+        // Standard texture * color
+        finalColor = texColor * vec4(1,1,1,fragColor.a);
+    }
+   // finalColor = vec4(result, texColor.a * fragColor.a);
     // Alternatively, you can blend with the original color visualization:
     // finalColor = texColor * fragColor;
 
