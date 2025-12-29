@@ -1016,13 +1016,17 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
     }
 
     eyepol[eyepoln].tilnum = gtilenum;
-
+	eyepol[eyepoln].pal = 0;
     if (b->gisflor < 2) {
         eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].surf[b->gisflor].uvcoords;
         eyepol[eyepoln].uvform = curMap->sect[b->gligsect].surf[b->gisflor].uvform;
+    	eyepol[eyepoln].pal = curMap->sect[b->gligsect].surf[b->gisflor].pal;
+        //eyepol[eyepoln].alpha = curMap->sect[b->gligsect].surf[b->gisflor].uvform;
     } else {
         eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].uvcoords;
         eyepol[eyepoln].uvform = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].uvform;
+        eyepol[eyepoln].alpha = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].alpha;
+        eyepol[eyepoln].pal = curMap->sect[b->gligsect].wall[b->gligwall].surf.pal;
       //  eyepol[eyepoln].tilnum = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].tilnum;
     }
 
@@ -1958,7 +1962,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 					gentransform_wall(npol2, sur, b);
 				}
 				b->gligwall = w;
-				b->gligslab = slabn % 3;
+				b->gligslab = slabn;
 				ns = -1;
 				/* notes:
 				 *	b->gligsect = s;        // Current sector

@@ -153,7 +153,7 @@ public:
                     map->light_spri[map->light_sprinum++] = i;
             }
         }
-// init portals; walls test
+        // Portal WALLS
         for (int i = 0; i < map->numsects; i++) { // wall ports
             for (int wn = 0; wn < map->sect[i].n; wn++) {
                 map->sect[i].wall[wn].tags[1] = -1;
@@ -171,9 +171,46 @@ public:
                 }
             }
         }
-
+        // PORTAL SECTOR SURFS
         for (int i = 0; i < map->numsects; i++) { // floor ceil ports
             map->sect[i].tags[1] = -1;
+
+            if (map->sect[i].surf[1].lotag == 1 || map->sect[i].surf[1].tag ==2) {
+                // temp handle duke water
+                portal &p = portals[portaln];
+                int stag = map->sect[i].surf[1].lotag;
+                int isflor = 2-stag;
+                // find transporter sprite;
+                int si = map->sect[i].headspri;
+                int linkid = 0;
+                while (si > 0) {
+                    if (map->spri[si].tilnum == 1 && map->spri[si].lotag == 7) {
+                        linkid = map->spri[si].hitag;
+
+                        map->spri[si].p.z = map->sect[i].z[2 - stag];
+                        break;
+                    }
+                    si = map->spri[si].sectn;
+                }
+                if (linkid == 0) continue;
+                uint32_t offset = (2 - stag) * 10000;
+                uint32_t offsetother = (-1 + stag) * 10000;
+                p.id = linkid + offset;
+                p.sect = i;
+                p.anchorspri = si;
+
+                //p.surfid = map->sect[i].surf[1].lotag; // hak to determine ceil or floor in map lotag1==floor.
+               // int sid1 = abs(map->spri[p.anchorspri].p.z - map->sect[i].z[1]);
+               // int sid2 = abs(map->spri[p.anchorspri].p.z - map->sect[i].z[0]);
+                p.surfid = isflor;
+                map->spri[p.anchorspri].p.z = map->sect[i].z[p.surfid]; // resolve flor ceil in future
+                p.kind = p.surfid;
+                spri_t *spr = &map->spri[p.anchorspri];
+                p.destpn = offsetother + linkid;
+                map->sect[i].tags[1] = portaln;
+                portaln++;
+            }
+            else
             if (map->sect[i].surf[1].pal == 30 || map->sect[i].surf[0].pal == 30) {
                 portal &p = portals[portaln];
                 p.id = map->sect[i].surf[1].lotag;
@@ -202,21 +239,21 @@ public:
         }
 
         for (int i = 0; i < portaln; i++) { // portal post pass
-            int target_tag = portals[i].destpn; // currently stores expected hitag
+            uint32_t target_tag = portals[i].destpn; // currently stores expected hitag
             portals[i].destpn = -1; // mark as unresolved
             spri_t *spr = &map->spri[portals[i].anchorspri];
             normalize_transform(&spr->tr);
 
-            if (portals[i].id == target_tag) {
+            if (portals[i].id == target_tag) { // handle mirrors.
                 portal &pcop = portals[portaln];
-                memcpy(&pcop,&portals[i],sizeof(portal));
+                memcpy(&pcop, &portals[i], sizeof(portal));
                 int hspr = map->sect[pcop.sect].headspri;
                 int nextsp = map->spri[hspr].sectn;
                 if (nextsp < 0) printf("mirror with just one sprite detected! ERROR!");
-            if (pcop.kind != PORT_WALL) // temp floor mirror hack
+                if (pcop.kind != PORT_WALL) // temp floor mirror hack
                 {
-                map->spri[nextsp].tr = map->spri[hspr].tr;
-                vscalar(&map->spri[nextsp].tr.d,-1);
+                    map->spri[nextsp].tr = map->spri[hspr].tr;
+                    vscalar(&map->spri[nextsp].tr.d, -1);
                 }
                 pcop.anchorspri = nextsp;
                 pcop.destpn = i;
@@ -226,9 +263,9 @@ public:
                 continue;
             }
             // Find portal with matching lowtag
-            for (int j = 0; j < portaln; j++) {
+            for (unsigned int j = 0; j < portaln; j++) {
                 if (i == j) continue; // skip self, disable for mirror
-                int id = portals[j].id;
+                uint32_t id = portals[j].id;
                 if (id == target_tag) {
                     portals[i].destpn = j;
                     break;
@@ -535,7 +572,7 @@ public:
         int v1 = eyepol[i + 1].vert0;
 
         rlDrawRenderBatchActive();
-       // rlDisableBackfaceCulling();
+        rlDisableBackfaceCulling();
 
      //   glEnable(GL_POLYGON_OFFSET_FILL);
      //   glPolygonOffset(-0.5f, 1.0f);
@@ -575,7 +612,7 @@ public:
             case 2: usedcol = {1,0.35,0.1,1}; break;
             case 8: usedcol = {0.3,1,0.2,1}; break;
             case 7: usedcol = {0.8,0.9,0,1}; break;
-            default: break;
+            default: useGrad = 0;break;
         }
         SetShaderValue(uvShaderDesc.shader, uvShaderDesc.useGradientloc,&useGrad, SHADER_UNIFORM_INT);
 
@@ -767,13 +804,7 @@ static void DrawKenGeometry(float sw, float sh, Camera3D camsrc) {
             }
         }
     }
-    static void DrawPost3d(float sw, float sh, Camera3D camsrc) {
-        // Vector2 v1 = {0, 0};
-        // Vector2 v2 = {sw, sh};
-        // Vector2 v3 = {sw / 2, sh};
-        Color transparentWhite = {255, 255, 255, 128};
-        ClearBackground({50,50,60,255});  // Set your desired color
-
+    static void ProcessKeys() {
 
         if (IsKeyPressed(KEY_U))
             syncam = !syncam;
@@ -781,8 +812,8 @@ static void DrawKenGeometry(float sw, float sh, Camera3D camsrc) {
             mono_cursnap++;
         }
         if (IsKeyPressed(KEY_LEFT)) {
-                    mono_cursnap--;
-                }
+            mono_cursnap--;
+        }
         if (IsKeyPressed(KEY_RIGHT_SHIFT)) {
             mono_curchain++;
         }
@@ -795,6 +826,15 @@ static void DrawKenGeometry(float sw, float sh, Camera3D camsrc) {
         if (IsKeyPressed(KEY_O)) {
             operstopn--;
         }
+    }
+    static void DrawPost3d(float sw, float sh, Camera3D camsrc) {
+        // Vector2 v1 = {0, 0};
+        // Vector2 v2 = {sw, sh};
+        // Vector2 v3 = {sw / 2, sh};
+        Color transparentWhite = {255, 255, 255, 128};
+        ClearBackground({50,50,60,255});  // Set your desired color
+
+
         if (g_mono_dbg.snapshot_count > 0)
             mono_cursnap = abs(mono_cursnap % g_mono_dbg.snapshot_count);
 
@@ -1945,7 +1985,7 @@ private:
             if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
             map->blankheadspri = i;
         }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/e3l1.MAP", map);
+        loadmap_imp((char*)"c:/Eugene/Games/build2/prt31.MAP", map);
     }
 };
 

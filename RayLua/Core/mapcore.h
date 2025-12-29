@@ -74,17 +74,17 @@ typedef struct {
 typedef struct {
 	// calculate only diff between sprites. ideally forward facing along normal.
 	// target portal idx
-	uint16_t destpn; // sprite in sector that defines portal transform - use position and forward vector for now.
+	uint32_t destpn; // sprite in sector that defines portal transform - use position and forward vector for now.
 	uint16_t surfid; // either wall, floor sprite etc. depends on kind;
 	uint16_t anchorspri;
 	uint16_t sect;
-	uint16_t id;
+	uint32_t id;
 	// 0 = ceil, 1= floor, 2 = wall, 3 = sprite itself.
 	uint8_t kind;
 } portal;
 
 
-extern int portaln;
+extern uint16_t portaln;
 extern portal portals[100];
 
 

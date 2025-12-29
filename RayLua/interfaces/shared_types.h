@@ -303,6 +303,7 @@ typedef struct
 	union { long flags; struct { char _f1, _f2, _f3, pal; }; }; // temporary pal storage
 
 	long sect; //Current sector
+	// to access next or prev sprite in sector of this sprite..
 	long sectn, sectp; // doubly-linked list of indices
 	int32_t tags[16];
 	///

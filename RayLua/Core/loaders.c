@@ -623,7 +623,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						thiswal->xsurf[0].tilnum = b7wal.picnum;
 						thiswal->xsurf[1].tilnum = b7wal.overpicnum;
 						thiswal->xsurf[2].tilnum = b7wal.cstat & WALL_BOTTOM_SWAP ? -2 : b7wal.picnum;
-						int opacity = 0;
+						int opacity = 255;
 						if (HAS_FLAG(b7wal.cstat, WALL_MASKED))
 						{
 							if (HAS_FLAG(b7wal.cstat, WALL_SEMI_TRANSPARENT))
@@ -633,6 +633,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						}
 
 						thiswal->xsurf[1].asc = opacity;
+						thiswal->xsurf[1].alpha = opacity/255;
 						//makeslabuvform(1, -1, thiswal,
 						//               (int[4]){b7wal.xrepeat, b7wal.yrepeat, b7wal.xpanning, b7wal.ypanning},
 						//               (int[2]){0, 0});

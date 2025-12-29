@@ -73,6 +73,8 @@ typedef struct {
     float* uvform;
     int slabid;
     int c1,c2,e1,e2;
+    int pal;
+    float alpha;
 } eyepol_t;
 
 typedef struct {
