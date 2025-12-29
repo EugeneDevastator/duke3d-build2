@@ -522,7 +522,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					float xpansperpx = 256.0/xsize;
 					float ypansperpx = 256.0/ysize;
 					float xpan = (b7sec.surf[j].xpanning/(256.0/xsize))/xsize;
-					float ypan = (b7sec.surf[j].ypanning/(256.0/ysize) * )/ysize;
+					float ypan = (b7sec.surf[j].ypanning/(256.0/ysize))/ysize;
 
 					sec[i].surf[j].uvform[2] = xpan; // 1 pixel per 16 pans, before scaling. 4 pans for 64 tile
 					sec[i].surf[j].uvform[3] = ypan;
