@@ -345,8 +345,7 @@ static int bunchfront(int b0, int b1, int fixsplitnow, bdrawctx *b) {
 	bunchverts_t *twal[2];
 	wall_t *wal;
 	double d, a[2], x0, y0, x1, y1, x2, y2, x3, y3, t0, t1, t2, t3;
-	double x, y, ix, iy, tix, tiy, x10, y10, x23, y23, x20, y20, otx0, oty0, otx1, oty1, tx0, ty0, tx1, ty1, u, t, d0,
-			d1;
+	double x, y, ix, iy, tix, tiy, x10, y10, x23, y23, x20, y20, otx0, oty0, otx1, oty1, tx0, ty0, tx1, ty1, u, t, d0, d1;
 	int i, j, twaln[2], oj, ind[2], sid, cnt, gotsid, startsid, obfintn;
 
 	if (b0 == b1) return (0);
@@ -518,9 +517,6 @@ static void scansector(int sectnum, bdrawctx *b) {
 	realobunchn = b->bunchn;
 	for (i = 0, ie = sec->n; i < ie; i++) {
 		j = wal[i].n + i;
-
-		double zzz = getwallz(sec, 1, i);
-		dpoint3d wp = {wal[i].x, wal[i].y, zzz};
 
 		dx0 = wal[i].x - gcam.p.x;
 		dy0 = wal[i].y - gcam.p.y;
@@ -1706,7 +1702,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 	surf_t *sur;
 	point2d *grad;
 	double f, fz, dx;
-	int i, j, k, l, m, n, s, ns, isflor, plothead[2], wn, w, ww, nw, vn, ws, wi, we, kval[4], imin, imax;
+	int i, j, k, l, slabn, n, s, ns, isflor, plothead[2], wn, w, ww, nw, vn, ws, wi, we, kval[4], imin, imax;
 	int ks[2], ke[2], col, n0, n1;
 
 	// === SETUP SECTOR AND WALL DATA ===
@@ -1895,17 +1891,17 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		// === WALL SEGMENT SUBDIVISION LOOP =		   // Process wall in segments, clipping against adjacent sectors
 		opolz[3] = pol[0].z;
 		opolz[2] = pol[1].z;
-		for (m = 0; m <= (vn << 1); m++) //Warning: do not reverse for loop!
+		for (slabn = 0; slabn <= (vn << 1); slabn++) //Warning: do not reverse for loop!
 		{
 			// Update Z-coordinates for current segment
 			opolz[0] = opolz[3];
 			opolz[1] = opolz[2];
-			if (m == (vn << 1)) {
+			if (slabn == (vn << 1)) {
 				opolz[2] = pol[2].z;
 				opolz[3] = pol[3].z;
 			} else {
-				opolz[2] = getslopez(&sec[verts[m >> 1].s], m & 1, pol[2].x, pol[2].y);
-				opolz[3] = getslopez(&sec[verts[m >> 1].s], m & 1, pol[3].x, pol[3].y);
+				opolz[2] = getslopez(&sec[verts[slabn >> 1].s], slabn & 1, pol[2].x, pol[2].y);
+				opolz[3] = getslopez(&sec[verts[slabn >> 1].s], slabn & 1, pol[3].x, pol[3].y);
 			}
 			//if ((opolz[0] >= opolz[3]) && (opolz[1] >= opolz[2])) continue; //Early-out optimization: skip walls with 0 height
 
@@ -1928,8 +1924,8 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 				continue;
 
 			// Render wall segment if visible
-			gtilenum = wal[w].xsurf[m].tilnum;
-			if ((!(m & 1)) || (wal[w].surf.flags & (1 << 5))) //Draw wall here //(1<<5): 1-way
+			gtilenum = wal[w].xsurf[slabn].tilnum;
+			if ((!(slabn & 1)) || (wal[w].surf.flags & (1 << 5))) //Draw wall here //(1<<5): 1-way
 			{
 
 				//gtpic = &gtile[sur->tilnum];// if (!gtpic->tt.f) loadpic(gtpic);
@@ -1949,8 +1945,8 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 					// Determine reference Z-level texture alignment
 					if (!(sur->flags & 4)) f = sec[s].z[0]; // default is ceil align
 					else if (!vn) f = sec[s].z[1]; //White walls don't have verts[]! and align is different.
-					else if (!m) f = sec[verts[0].s].z[0]; //
-					else f = sec[verts[(m - 1) >> 1].s].z[0];
+					else if (!slabn) f = sec[verts[0].s].z[0]; //
+					else f = sec[verts[(slabn - 1) >> 1].s].z[0];
 					// Apply UV coordinates with proper scaling
 					//npol2[0].u = sur->uv[0].x;
 					//npol2[0].v = sur->uv[2].y * (npol2[0].z - f) + sur->uv[0].y;
@@ -1962,20 +1958,20 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 					gentransform_wall(npol2, sur, b);
 				}
 				b->gligwall = w;
-				b->gligslab = m;
+				b->gligslab = slabn % 3;
 				ns = -1;
 				/* notes:
 				 *	b->gligsect = s;        // Current sector
 				    b->gligwall = w;        // Wall index
 				    b->gligslab = m;        // Segment/slab number (0,1,2... for each vertical division)*/
 			} else {
-				ns = verts[m >> 1].s; // Portal to adjacent sector
+				ns = verts[slabn >> 1].s; // Portal to adjacent sector
 			}
 			// Render the wall polygon
 			// W A L L S
 			//
 			myport = wal[w].tags[1];
-			int surflag = ((m > vn) << 2) + 3;
+			int surflag = ((slabn > vn) << 2) + 3;
 			int newtag = ns == -1 ? -1 : ns + b->tagoffset;
 			if (isportal) {
 				int endp = portals[myport].destpn;

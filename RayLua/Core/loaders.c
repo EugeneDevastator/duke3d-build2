@@ -302,7 +302,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 		typedef struct {
 			short picnum, heinum;
 			signed char shade;
-			char pal, xpanning, ypanning;
+			uint8_t pal, xpanning, ypanning;
 		} build7surf_t;
 		typedef struct
 		{
@@ -512,17 +512,20 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					if (sec[i].surf[j].uvmapkind == UV_TEXELRATE) {
 						sec[i].surf[j].uvform[0] = 32/xsize; // scale is always off 64.
 						sec[i].surf[j].uvform[1] = 32/ysize;
-					}
-					else
-					{
+					} else	{
 						sec[i].surf[j].uvform[0] = xsize/64; // scale is always off 64.
 						sec[i].surf[j].uvform[1] = ysize/64;
 					}
-					// mull px = tile / 256
-					//  64 / 256 = 4;
-					// 1 px =
-					sec[i].surf[j].uvform[2] = (1.0/256.0)*b7sec.surf[j].xpanning; // 1 pixel per 16 pans, before scaling. 4 pans for 64 tile
-					sec[i].surf[j].uvform[3] = (1.0/256.0)*b7sec.surf[j].ypanning;
+					// regardless of scaling etc.
+					// pan of 16 = 1 px for 16  tex
+					// 4 = 1 px for 128
+					float xpansperpx = 256.0/xsize;
+					float ypansperpx = 256.0/ysize;
+					float xpan = (b7sec.surf[j].xpanning/(256.0/xsize))/xsize;
+					float ypan = (b7sec.surf[j].ypanning/(256.0/ysize) * )/ysize;
+
+					sec[i].surf[j].uvform[2] = xpan; // 1 pixel per 16 pans, before scaling. 4 pans for 64 tile
+					sec[i].surf[j].uvform[3] = ypan;
 
 				}
 

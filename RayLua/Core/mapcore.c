@@ -645,13 +645,13 @@ float scaler=1;
 				sur->uvform[1] *= -1;
 			}
 			float t;
-		t = sur->uvform[0];
-		sur->uvform[0] = sur->uvform[1];
-		sur->uvform[1] = t;
-
-			t = sur->uvform[2];
-			sur->uvform[2] = sur->uvform[3];
-			sur->uvform[3] = t;
+			t = sur->uvform[0];
+			sur->uvform[0] = sur->uvform[1];
+			sur->uvform[1] = t;
+			// duh probably thats how duke works - pan is not swapped.
+			//	t = sur->uvform[2];
+			//	sur->uvform[2] = sur->uvform[3];
+			//	sur->uvform[3] = t;
 
 			point3d tp = sur->uvcoords[1];
 			sur->uvcoords[1] = sur->uvcoords[2];
