@@ -143,7 +143,10 @@ static inline void wccw_transform_tr(dpoint3d *pinout, transform *ctin, transfor
 static inline void wccw_transform(dpoint3d *pinout, cam_t *ctin, cam_t *ctout) {
     wccw_transform_tr(pinout, &ctin->tr,&ctout->tr);
 }
-
+// is not power of two
+static inline bool isnpot(int n) {
+    return n <= 0 || (n & (n - 1)) != 0;
+}
 static inline void wccw_transform_dir(dpoint3d *dir, cam_t *ctin, cam_t *ctout) {
     // Transform direction vector (no translation)
     double cx = dir->x * ctin->r.x + dir->y * ctin->r.y + dir->z * ctin->r.z;

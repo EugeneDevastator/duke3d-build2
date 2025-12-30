@@ -2,6 +2,8 @@
 // Created by omnis on 10/22/2025.
 //
 #include "loaders.h"
+
+#include "buildmath.h"
 // TODO : Replace types with stdint like uint8_t
 // TODO : new mapstate should have raylib friendly coords by default. period.
 point3d buildToRaylib(point3d buildcoord)
@@ -663,6 +665,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					float px1x = 1.0f/xsize;
 					float px1y = 1.0f/ysize;
 					float ypans_per_px = 256.f/ysize;
+
 					thiswal->surf.owal = b7wal.yrepeat; // need for second pass.
 					thiswal->surf.vwal = b7wal.xrepeat; // need for second pass.
 					thiswal->mflags[0] = b7wal.cstat; // need for second pass.
@@ -670,9 +673,23 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					thiswal->surf.uvform[1]=scalery;
 					if (thiswal->surf.tilnum == 157)
 						int a =1;
-// so negative flips are wierd. for ex 80-xsize with 255 pan = 16 pan. because it is next 80...
+
+					// NPOT wall textures dont align well in duke.
+					// you need to offset them by YRes * 2 pans.
+					// and do this twice if Yres is odd.
+					float  ypansub = 0;
+					if (isnpot(ysize) ) // not power of two
+					{
+						// there are some shenanigans when texture yres is odd. skip for now.
+						//if ((int) ysize % 2)
+						//	ypansub = (ceil(ysize * 0.5f) * 4);
+						//	//*(((int)ysize % 2)+1);// if non divisible by 2 add twice.
+						//else
+							ypansub = (ysize * 2); //*(((int)ysize % 2)+1);// if non divisible by 2 add twice.
+
+					}
 					thiswal->surf.uvform[2]=  px1x * b7wal.xpanning;
-					thiswal->surf.uvform[3]= px1y * (b7wal.ypanning/ypans_per_px);
+					thiswal->surf.uvform[3]= px1y * ((b7wal.ypanning-ypansub)/ypans_per_px);
 
 
 				}
