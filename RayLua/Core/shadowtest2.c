@@ -1767,9 +1767,13 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			//	drawpol_befclip(s+b->tagoffset, portaltag, s, portals[endpn].sect,plothead[0],plothead[1], portalpolyflags , b);
 			//int c1, c2;
 			//monocopy(plothead[0],plothead[1], &c1,&c2);
-			alphamul = 0.3f;
+			alphamul = 0.3f; // only emit mask here
 			drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1], DP_PRESERVE_LOOP| DP_EMIT_MASK |1, b);
-			alphamul = 1;
+			alphamul = 1;// draw as portal, to mark clip space mph
+			// gurantees masks wont dupe on top of one another.
+			// could be done with drawpol mod simpler
+			drawpol_befclip(s + b->tagoffset, portaltag, s, portals[endpn].sect, plothead[0], plothead[1],  DP_PRESERVE_LOOP|DP_NO_SCANSECT|surflag, b);
+
 			draw_hsr_enter_portal(map, myport, plothead[0], plothead[1], b);
 		} else {
 			drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1], surflag, b);
