@@ -572,6 +572,7 @@ public:
         int v1 = eyepol[i + 1].vert0;
 
         rlDrawRenderBatchActive();
+        rlEnableBackfaceCulling();
         //rlDisableBackfaceCulling();
       //  rlDisableDepthTest();
 
@@ -593,7 +594,7 @@ public:
         Vector4 usedcol = {1,1,1,1};
         switch (eyepol[i].pal) {
             case 0: useGrad = 0; break;
-            case 1: usedcol = {0.2,0.5,1,1}; break;
+            case 1: usedcol = {0.5,0.6,1,1}; break;
             case 2: usedcol = {1,0.35,0.1,1}; break;
             case 8: usedcol = {0.3,1,0.2,1}; break;
             case 7: usedcol = {0.8,0.9,0,1}; break;
@@ -608,8 +609,8 @@ public:
         if (eyepol[i].alpha < 1.0f) {
             if (isopaque) return true;
             rlDisableDepthMask();
-            rlDisableBackfaceCulling();
-            BeginBlendMode(RL_BLEND_ALPHA_PREMULTIPLY);
+           // rlDisableBackfaceCulling();
+          // BeginBlendMode(RL_BLEND_ALP);
             usedcol.w = 0.6f;
 
         }
@@ -1250,9 +1251,8 @@ static void DrawKenGeometry(float sw, float sh, Camera3D camsrc) {
                 }
             }
         }
-        rlEnableDepthMask();
+       // rlEnableDepthMask();
         rlEnableBackfaceCulling();
-        // Draw sprites (unchanged)
         rlDisableDepthMask();
         for (int i = 0; i < map->numspris; i++)
         {
@@ -1290,11 +1290,11 @@ static void DrawKenGeometry(float sw, float sh, Camera3D camsrc) {
                     rlBegin(RL_QUADS);
                     rlColor4ub(255, 255, 255, 255); // todo update transp.
 
-                    rlTexCoord2f(0.0f, 1.0f);
+                    rlTexCoord2f(0.0f, spr->uv[1]*1.0f);
                     rlVertex3V(b);
-                    rlTexCoord2f(1.0f, 1.0f);
+                    rlTexCoord2f(spr->uv[0]*1.0f, spr->uv[1]*1.0f);
                     rlVertex3V(c);
-                    rlTexCoord2f(1.0f, 0.0f);
+                    rlTexCoord2f(spr->uv[0]*1.0f, 0.0f);
                     rlVertex3V(d);
                     rlTexCoord2f(0.0f, 0.0f);
                     rlVertex3V(a);
@@ -1306,8 +1306,8 @@ static void DrawKenGeometry(float sw, float sh, Camera3D camsrc) {
                 }
                 else // billboards
                 {
-                    int xflip = spr->flags & 4 ? -1 : 1;
-                    int yflip = spr->flags & 8 ? -1 : 1;
+                    float xscaler = spr->uv[0];
+                    float yscaler = spr->uv[1];
                     xs *= 2;
                     ys *= 2;
                     // need to shift view position for raylib's billboard.
@@ -1318,7 +1318,7 @@ pos+= centeroffset;
                     //pos.z-=ys;
 
                     Rectangle source = {0.0f, 0.0f, (float)spriteTex.width, (float)spriteTex.height};
-                    DrawBillboardRec(rlcam, spriteTex, source, pos, {xs * xflip, ys * yflip}, WHITE);
+                    DrawBillboardRec(rlcam, spriteTex, source, pos, {xs * xscaler, ys * yscaler}, WHITE);
                 }
             }
         }
@@ -2004,7 +2004,7 @@ private:
             if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
             map->blankheadspri = i;
         }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/e3l3.MAP", map);
+        loadmap_imp((char*)"c:/Eugene/Games/build2/e1l1.MAP", map);
     }
 };
 

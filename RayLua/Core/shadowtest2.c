@@ -1031,9 +1031,9 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
     	eyepol[eyepoln].pal = curMap->sect[b->gligsect].surf[b->gisflor].pal;
     }
     else    { // handle walls.
-        eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].uvcoords;
-        eyepol[eyepoln].uvform = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].uvform;
-        eyepol[eyepoln].alpha = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].alpha;
+        eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab%3].uvcoords;
+        eyepol[eyepoln].uvform = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab%3].uvform;
+     //   eyepol[eyepoln].alpha = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].alpha;
         eyepol[eyepoln].pal = curMap->sect[b->gligsect].wall[b->gligwall].surf.pal;
       //  eyepol[eyepoln].tilnum = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].tilnum;
     }
@@ -1858,7 +1858,8 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 
 			// Render wall segment if visible
 			gtilenum = wal[w].xsurf[m].tilnum;
-			if ((!(m & 1)) || (wal[w].surf.flags & (1 << 5))) //Draw wall here //(1<<5): 1-way
+			bool ismasked = wal[w].surf.flags & 32; // only ever use mask and alpha
+			if ((!(m & 1)) || (ismasked)) //Draw wall here //(1<<5): 1-way
 			{
 
 				//gtpic = &gtile[sur->tilnum];// if (!gtpic->tt.f) loadpic(gtpic);
@@ -1925,6 +1926,16 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			} else {
 				// could be 7 or 3, .111 or .011
 				logstep("Draw wal pol s:%d ns:%d tag:%d", s, ns, wal[w].surf.lotag);
+				if (m==1 && ismasked && wal[w].xsurf[1].alpha < 1) {
+					alphamul = wal[w].xsurf[1].alpha;
+					// emit this as poly for eyes only, non destructive unaffects mph.
+					drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1], 1 | DP_PRESERVE_LOOP| DP_EMIT_MASK, b);
+					alphamul = 1;
+					ns =  wal[w].ns;
+					newtag = ns == -1 ? -1 : ns + b->tagoffset;
+					// and then draw as portal.
+				}
+
 				drawpol_befclip(s + b->tagoffset, newtag, s, ns, plothead[0], plothead[1], surflag, b);
 			}
 		}

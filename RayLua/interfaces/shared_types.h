@@ -49,6 +49,7 @@
 
  // Convenience macros for flag operations
 #define HAS_FLAG(flags, flag)    ((flags) & (flag))
+ #define FLAG_ISOFF(flags, flag)    !((flags) & (flag))
 #define SET_FLAG(flags, flag)    ((flags) |= (flag))
 #define CLEAR_FLAG(flags, flag)  ((flags) &= ~(flag))
 #define TOGGLE_FLAG(flags, flag) ((flags) ^= (flag))
@@ -215,7 +216,7 @@ typedef struct
 	long tilnum, tilanm/*???*/;
 
 	//Bit0:Blocking, Bit2:RelativeAlignment, Bit5:1Way, Bit16:IsParallax, Bit17:IsSkybox
-	union { long flags; struct { char _f1, _f2, _f3, pal; }; }; // temporary pal storage
+	union { uint32_t flags; struct { char _f1, _f2, _f3, pal; }; }; // temporary pal storage
 	union { long tag; struct { short lotag, hitag; }; };
 	point2d uv[3]; // legacy.
 	unsigned short asc, rsc, gsc, bsc; //4096 is no change

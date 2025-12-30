@@ -605,7 +605,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					}
 
 					if (b7wal.cstat & WALL_BOTTOM_SWAP) sur->flags ^= 2; //align bot/nextsec
-					if (b7wal.cstat & (WALL_MASKED+WALL_SOLID_MASKED)) sur->flags |= 32; //bit4:masking, bit5:1-way
+					if (b7wal.cstat & (WALL_MASKED + WALL_SOLID_MASKED)) sur->flags |= 32; //bit4:masking, bit5:1-way
 					sur->asc = 4096;
 					sur->rsc = (32-b7wal.shade)*128;
 					sur->gsc = (32-b7wal.shade)*128;
@@ -628,8 +628,10 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						thiswal->xsurf[1].tilnum = b7wal.overpicnum;
 						thiswal->xsurf[2].tilnum = b7wal.cstat & WALL_BOTTOM_SWAP ? -2 : b7wal.picnum;
 						int opacity = 255;
-						if (HAS_FLAG(b7wal.cstat, WALL_MASKED))
+						// solid masked is nevewr transparent
+						if (HAS_FLAG(b7wal.cstat, WALL_MASKED) && !(b7wal.cstat & WALL_SOLID_MASKED))
 						{
+							opacity = 254; // hack to draw in transparent passanyway - refactor later with data structure
 							if (HAS_FLAG(b7wal.cstat, WALL_SEMI_TRANSPARENT))
 								opacity = 128;
 							if (HAS_FLAG(b7wal.cstat, WALL_TRANSPARENT))
@@ -637,7 +639,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						}
 
 						thiswal->xsurf[1].asc = opacity;
-						thiswal->xsurf[1].alpha = opacity/255;
+						thiswal->xsurf[1].alpha = opacity/(float)255.0;
 						//makeslabuvform(1, -1, thiswal,
 						//               (int[4]){b7wal.xrepeat, b7wal.yrepeat, b7wal.xpanning, b7wal.ypanning},
 						//               (int[2]){0, 0});
@@ -751,20 +753,31 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						spr->r.y =-cos((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
 						spr->d.x = cos((float)b7spr.ang*PI/1024.0)*(b7spr.yrepeat/4096.0*(float)tilesizy[l]);
 						spr->d.y = sin((float)b7spr.ang*PI/1024.0)*(b7spr.yrepeat/4096.0*(float)tilesizy[l]);
-						spr->f = (point3d){0,0,-1}; // facing up
-						if (b7spr.cstat&SPRITE_HITSCAN) { spr->d.x *= -1; spr->d.y *= -1; }
+						int upvec = b7spr.cstat&(SPRITE_FLIP_Y) ? 1 : -1;
+						spr->f = (point3d){0,0,upvec}; // facing up
+						spr->r = (point3d){spr->r.x *upvec, spr->r.y*upvec, spr->r.z};
+						//if (b7spr.cstat&SPRITE_HITSCAN) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z*=-1; }
 						break;
 				}
 
 				if (b7spr.cstat&SPRITE_BLOCKING) spr->flags |= 1; // blocking
+				// do 2-sided flag for such sprites, as both sites must render.
+				// also floor sprites do swityhc facing on flip// uhh/
 				if (b7spr.cstat& SPRITE_ONE_SIDED) spr->flags |= SPRITE_B2_ONE_SIDED; // 1 sided
-				if (b7spr.cstat&SPRITE_FLIP_X) { spr->r.x *= -1; spr->r.y *= -1; spr->r.z *= -1; spr->flags ^= 4; } //&4: x-flipped
-				if (b7spr.cstat&SPRITE_FLIP_Y) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; spr->flags ^= 8; } //&8: y-flipped?
+				//if (b7spr.cstat&SPRITE_FLIP_X) { spr->r.x *= -1; spr->r.y *= -1; spr->r.z *= -1; spr->flags ^= 4; } //&4: x-flipped
+				// floor sprites do this only.
+				if (b7spr.cstat&(SPRITE_FLIP_Y | SPRITE_FLOOR_ALIGNED)) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; spr->flags ^= 8; } //&8: y-flipped?
+				spr->uv[0]=1;
+				spr->uv[1]=1;
+				if (b7spr.cstat&SPRITE_FLIP_X) { spr->uv[0] = -1; } //&4: x-flipped
+				if (b7spr.cstat&SPRITE_FLIP_Y) { spr->uv[1] = -1; } //&8: y-flipped?
+
 				// note - replace with view setup
 				spr->anchor.x=0.5f;
 				spr->anchor.y=0; // forward
 				spr->anchor.z = 1.0f; // 1 on the V to the pivot. - normal duke3d sprite.
-				if (b7spr.cstat&SPRITE_TRUE_CENTERED) {
+				//if (FLAG_ISOFF(b7spr.cstat, SPRITE_FLOOR_ALIGNED))
+				if (b7spr.cstat&SPRITE_TRUE_CENTERED || b7spr.cstat & SPRITE_FLOOR_ALIGNED) {
 					//spr->p.z += (b7spr.yrepeat/4096.0*(float)tilesizy[l]);
 					spr->anchor.z = 0.5f;
 				}
@@ -942,7 +955,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			gnumtiles = 0; memset(gtilehashead,-1,sizeof(gtilehashead));
 
 			hitile++;
-			hitile = 5080;
+			hitile = 1000;//5080;
 			if (hitile > gmaltiles)
 			{
 				gmaltiles = hitile;
