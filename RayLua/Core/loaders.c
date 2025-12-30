@@ -744,11 +744,11 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 
 				int flagsw=b7spr.cstat & (SPRITE_WALL_ALIGNED | SPRITE_FLOOR_ALIGNED);
 				if  (flagsw ==0) //Face sprite
-					spr->flags |= SPRITE_B2_FACING;
-				if  (flagsw & SPRITE_WALL_ALIGNED)
-					spr->flags |= SPRITE_B2_FLAT_POLY;
-				if  (flagsw & SPRITE_FLOOR_ALIGNED)
-					spr->flags |= SPRITE_B2_FLAT_POLY;
+					spr->view.rtype = billbord;
+				if  (flagsw & (SPRITE_WALL_ALIGNED | SPRITE_FLOOR_ALIGNED)) {
+					spr->view.rtype = quad;
+					spr->view.isdblside =  !(b7spr.cstat& SPRITE_ONE_SIDED);
+				}
 
 				point3d buildFW = (point3d){cos((float)b7spr.ang*PI/1024.0),sin((float)b7spr.ang*PI/1024.0),0};
 				switch(flagsw)  // https://wiki.eduke32.com/wiki/Cstat_(sprite)
@@ -778,33 +778,28 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				}
 
 				if (b7spr.cstat&SPRITE_BLOCKING) spr->flags |= 1; // blocking
-				// do 2-sided flag for such sprites, as both sites must render.
-				// also floor sprites do swityhc facing on flip// uhh/
-				if (b7spr.cstat& SPRITE_ONE_SIDED) spr->flags |= SPRITE_B2_ONE_SIDED; // 1 sided
-				//if (b7spr.cstat&SPRITE_FLIP_X) { spr->r.x *= -1; spr->r.y *= -1; spr->r.z *= -1; spr->flags ^= 4; } //&4: x-flipped
 				// floor sprites do this only.
 				if (b7spr.cstat&(SPRITE_FLIP_Y | SPRITE_FLOOR_ALIGNED)) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; spr->flags ^= 8; } //&8: y-flipped?
-				spr->uv[0]=1;
-				spr->uv[1]=1;
-				if (b7spr.cstat&SPRITE_FLIP_X) { spr->uv[0] = -1; } //&4: x-flipped
-				if (b7spr.cstat&SPRITE_FLIP_Y) { spr->uv[1] = -1; } //&8: y-flipped?
+				spr->view.uv[0]=1;
+				spr->view.uv[1]=1;
+				if (b7spr.cstat&SPRITE_FLIP_X) { spr->view.uv[0] = -1; } //&4: x-flipped
+				if (b7spr.cstat&SPRITE_FLIP_Y) { spr->view.uv[1] = -1; } //&8: y-flipped?
 
 				// note - replace with view setup
-				spr->anchor.x=0.5f;
-				spr->anchor.y=0; // forward
-				spr->anchor.z = 1.0f; // 1 on the V to the pivot. - normal duke3d sprite.
-				//if (FLAG_ISOFF(b7spr.cstat, SPRITE_FLOOR_ALIGNED))
-				if (b7spr.cstat&SPRITE_TRUE_CENTERED || b7spr.cstat & SPRITE_FLOOR_ALIGNED) {
+				spr->view.anchor.x=0.5f;
+				spr->view.anchor.y=0; // forward
+				spr->view.anchor.z = 1.0f; // 1 on the V to the pivot. - normal duke3d sprite.
+				if (b7spr.cstat & SPRITE_TRUE_CENTERED || b7spr.cstat & SPRITE_FLOOR_ALIGNED) {
 					//spr->p.z += (b7spr.yrepeat/4096.0*(float)tilesizy[l]);
-					spr->anchor.z = 0.5f;
+					spr->view.anchor.z = 0.5f;
 				}
 
 				spr->tilnum = l; hitile = max(hitile,l);
 
 				float tileoffu = picanm[spr->tilnum].x_center_offset/(float)tilesizx[spr->tilnum];
 				float tileoffv = picanm[spr->tilnum].y_center_offset/(float)tilesizy[spr->tilnum];
-				spr->anchor.x+=tileoffu;
-				spr->anchor.z+=tileoffv;
+				spr->view.anchor.x+=tileoffu;
+				spr->view.anchor.z+=tileoffv;
 
 				//&128: real-centered centering (center at center) - originally half submerged sprite
 			//	spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; // down is flipped.
@@ -817,10 +812,10 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 
 
 				spr->fat = 0.f;
-				spr->asc = 4096;
-				spr->rsc = (32-b7spr.shade)*128;
-				spr->gsc = (32-b7spr.shade)*128;
-				spr->bsc = (32-b7spr.shade)*128;
+			//	spr->asc = 4096;
+			//	spr->rsc = (32-b7spr.shade)*128;
+			//	spr->gsc = (32-b7spr.shade)*128;
+			//	spr->bsc = (32-b7spr.shade)*128;
 
 				spr->mas = spr->moi = 1.0;
 				spr->owner = -1;
@@ -830,7 +825,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				spr->sectn = spr->sectp = -1;
 				spr->lotag = b7spr.lotag;
 				spr->hitag = b7spr.hitag;
-				spr->pal = b7spr.pal;
+				spr->view.pal = b7spr.pal;
 
 				// duke3d compat
 				spr->tags[MT_CSTAT] = b7spr.cstat;

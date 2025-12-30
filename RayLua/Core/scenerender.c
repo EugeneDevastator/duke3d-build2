@@ -81,9 +81,9 @@ void drawframe (cam_t *cc, player_transform *gdps, mapstate_t *gst) // draws sce
 						}
 						if (!(k&1)) { shadowtest2_light[shadowtest2_numlights].f.x *= -1; shadowtest2_light[shadowtest2_numlights].f.y *= -1; shadowtest2_light[shadowtest2_numlights].f.z *= -1; }
 					}
-					shadowtest2_light[shadowtest2_numlights].rgb[0] = gst->spri[gst->light_spri[i]].bsc/8192.f; //gsc/8192   gst->spri[gst->light_spri[i]].fat;
-					shadowtest2_light[shadowtest2_numlights].rgb[1] = gst->spri[gst->light_spri[i]].gsc/8192.f;
-					shadowtest2_light[shadowtest2_numlights].rgb[2] = gst->spri[gst->light_spri[i]].rsc/8192.f;
+					shadowtest2_light[shadowtest2_numlights].rgb[0] = gst->spri[gst->light_spri[i]].view.color.x;//gst->spri[gst->light_spri[i]].bsc/8192.f; //gsc/8192   gst->spri[gst->light_spri[i]].fat;
+					shadowtest2_light[shadowtest2_numlights].rgb[1] = gst->spri[gst->light_spri[i]].view.color.y;//gst->spri[gst->light_spri[i]].gsc/8192.f;
+					shadowtest2_light[shadowtest2_numlights].rgb[2] = gst->spri[gst->light_spri[i]].view.color.z;//gst->spri[gst->light_spri[i]].rsc/8192.f;
 					shadowtest2_light[shadowtest2_numlights].flags  = 1;
 					shadowtest2_numlights++;
 				}

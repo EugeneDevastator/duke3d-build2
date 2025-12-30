@@ -4,6 +4,7 @@
 
 #ifndef RAYLIB_LUA_IMGUI_SHARED_TYPES_H
 #define RAYLIB_LUA_IMGUI_SHARED_TYPES_H
+#include <stdbool.h>
 #include <stdint.h>
 // duke tags defs.
 #define MT_LAST 15 // index, not count
@@ -200,16 +201,33 @@ typedef struct {
 	point3d p, r, d, f;
 } transform;
 
-	//Map format:
-typedef struct {
-// view.xpos += xsize*scale * normal_offset * global_ppi.
-	point3d scaling;
+enum renderType {
+	billbord,
+	vbord,
+	quad,
+	voxel,
+	mesh,
+	procedural
+};
 
-	// 0,0,0 = sprite is to the right and above pivot
-	// y for flat sprites is disregarded, as we scale in world along x - right, and z - up.
-	// 1,0,1 - will align upper right corner to pivot.
-	point3d noffset;
-} viewanchor; // maybe for billboards or do uvs union. it looks like this shouldbe full 3d transform matrix
+enum renderQ {
+	opaq,
+	atest,
+	transp,
+	pp,
+};
+
+typedef struct {
+	enum renderType rtype;
+	enum renderQ rq;
+	bool isdblside;
+	float uv[8]; // scalexy, panxy, cropAB
+	point3d anchor; // normalized
+	point3d color;
+	int16_t lum; // yes allow negative values, why not.
+	uint8_t pal;
+} sprview;
+	//Map format:
 
 typedef struct
 {
@@ -295,37 +313,23 @@ typedef struct
 	point3d v, av;           //Position velocity, Angular velocity (direction=axis, magnitude=vel)
 	float fat, mas, moi;     //Physics (moi=moment of inertia)
 	long tilnum;             //Model file. Ex:"TILES000.ART|64","CARDBOARD.PNG","CACO.KV6","HAND.KCM","IMP.MD3"
-	unsigned short asc, rsc, gsc, bsc; //Color scales. 4096 is no change
 	long owner;
-	union { long tag; struct { short lotag, hitag; }; };
-	long tim, otim;          //Time (in milliseconds) for animation
-
-	//Bit0:Blocking, Bit2:1WayOtherSide, Bit5,Bit4:Face/Wall/Floor/.., Bit6:1side, Bit16:IsLight, Bit17-19:SpotAx(1-6), Bit20-29:SpotWid, Bit31:Invisible
-	union { long flags; struct { char _f1, _f2, _f3, pal; }; }; // temporary pal storage
-
+	short lotag, hitag;
 	long sect; //Current sector
 	// to access next or prev sprite in sector of this sprite..
 	long sectn, sectp; // doubly-linked list of indices
 	int32_t tags[16];
+
+	long tim, otim;          //Time (in milliseconds) for animation
+
+	//Bit0:Blocking, Bit2:1WayOtherSide, Bit5,Bit4:Face/Wall/Floor/.., Bit6:1side, Bit16:IsLight, Bit17-19:SpotAx(1-6), Bit20-29:SpotWid, Bit31:Invisible
+	long flags;  // temporary pal storage
 	///
 	uint8_t modid; // mod id - for game processors, like duke, doom, etc. 0 is reserved for core entities.
 	uint16_t classid; // instead of implicit class recognition by spritenum or pal - use explicit. so for ex. we can just make 3d rpg rocket as prop.
 	uint8_t clipmask; // block, hitscan, trigger, - for physics engine
 	uint8_t linkmask; // damage, signal, use, - everything for linking with other communicators
-
-	uint8_t renderflags; // isinvisible, one-way,
-	uint8_t renderclass; // billboard, flat, flat-box, flat-box-bupe, pipe-down-aligned, voxel, mesh, sdf, etc.
-
-		struct {
-			unsigned int pal	: 6;    // 64 pals
-			unsigned int filt   : 3; // |9, for ex find edges, invert, mask etc.
-			unsigned int blend	: 4; // |13, additive, multiply, etc.
-			unsigned int _		: 3; // 16
-		} fx;
-	// float3 [0..1] for local positioning based on scaling.
-	point3d anchor;
-	// scale and pan - inside of the generated rect, dont affect world size.
-	float uv[4];
+	sprview view;
 } spri_t;
 
 typedef struct

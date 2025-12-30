@@ -500,9 +500,9 @@ public:
 						}
 						if (!(k&1)) { shadowtest2_light[shadowtest2_numlights].f.x *= -1; shadowtest2_light[shadowtest2_numlights].f.y *= -1; shadowtest2_light[shadowtest2_numlights].f.z *= -1; }
 					}
-					shadowtest2_light[shadowtest2_numlights].rgb[0] = map->spri[map->light_spri[i]].bsc/8192.f; //gsc/8192   map->spri[map->light_spri[i]].fat;
-					shadowtest2_light[shadowtest2_numlights].rgb[1] = map->spri[map->light_spri[i]].gsc/8192.f;
-					shadowtest2_light[shadowtest2_numlights].rgb[2] = map->spri[map->light_spri[i]].rsc/8192.f;
+					shadowtest2_light[shadowtest2_numlights].rgb[0] = map->spri[map->light_spri[i]].view.color.x;//map->spri[map->light_spri[i]].bsc/8192.f; //gsc/8192   map->spri[map->light_spri[i]].fat;
+					shadowtest2_light[shadowtest2_numlights].rgb[1] = map->spri[map->light_spri[i]].view.color.y;//map->spri[map->light_spri[i]].gsc/8192.f;
+					shadowtest2_light[shadowtest2_numlights].rgb[2] = map->spri[map->light_spri[i]].view.color.z;//map->spri[map->light_spri[i]].rsc/8192.f;
 					shadowtest2_light[shadowtest2_numlights].flags  = 1;
 					shadowtest2_numlights++;
 				}
@@ -1254,13 +1254,19 @@ static void DrawKenGeometry(float sw, float sh, Camera3D camsrc) {
        // rlEnableDepthMask();
         rlEnableBackfaceCulling();
         rlDisableDepthMask();
+        // draw sprites.
         for (int i = 0; i < map->numspris; i++)
         {
+
             spri_t* spr = &map->spri[i];
             if (spr->tilnum >= 0 ) // sprites
             {
                 if (spr->tilnum >= gnumtiles_i)
                     spr->tilnum = gnumtiles_i - 10;
+
+                rlEnableBackfaceCulling();
+                if (spr->view.isdblside)
+                    rlDisableBackfaceCulling();
 
                 Texture2D spriteTex = runtimeTextures[spr->tilnum];
                 // vectors are half a size
@@ -1271,18 +1277,14 @@ static void DrawKenGeometry(float sw, float sh, Camera3D camsrc) {
                 auto xs = Vector3Length(rg);
                 auto ys = Vector3Length(dw);
                // pos += frw * 0.00001; // bias agains fighting
-                Vector3 a = pos + rg*spr->anchor.x*2 + dw*spr->anchor.z*2;
-                Vector3 b = pos + rg*spr->anchor.x*2 - dw*(1-spr->anchor.z)*2;
-                Vector3 c = pos - rg*(1-spr->anchor.x)*2 - dw*(1-spr->anchor.z)*2;
-                Vector3 d = pos - rg*(1-spr->anchor.x)*2 + dw*spr->anchor.z*2;
+                Vector3 a = pos + rg*spr->view.anchor.x*2 + dw*spr->view.anchor.z*2;
+                Vector3 b = pos + rg*spr->view.anchor.x*2 - dw*(1-spr->view.anchor.z)*2;
+                Vector3 c = pos - rg*(1-spr->view.anchor.x)*2 - dw*(1-spr->view.anchor.z)*2;
+                Vector3 d = pos - rg*(1-spr->view.anchor.x)*2 + dw*spr->view.anchor.z*2;
                 // Debug vectors
                 DrawTransform(&spr->tr);
-            //   DrawLine3D(pos, Vector3Add(pos, frw), BLUE); // Forward vector
-            //   DrawLine3D(pos, Vector3Add(pos, rg), RED); // Right vector
-            //   DrawLine3D(pos, Vector3Add(pos, dw), GREEN); // Down vector
 
-
-                if (spr->flags & 32) // spr->flags |= SPRITE_B2_FLAT_POLY;
+                if (spr->view.rtype==quad)
                 {
                     EnableDepthOffset(-2.0);
 
@@ -1290,11 +1292,11 @@ static void DrawKenGeometry(float sw, float sh, Camera3D camsrc) {
                     rlBegin(RL_QUADS);
                     rlColor4ub(255, 255, 255, 255); // todo update transp.
 
-                    rlTexCoord2f(0.0f, spr->uv[1]*1.0f);
+                    rlTexCoord2f(0.0f, spr->view.uv[1]*1.0f);
                     rlVertex3V(b);
-                    rlTexCoord2f(spr->uv[0]*1.0f, spr->uv[1]*1.0f);
+                    rlTexCoord2f(spr->view.uv[0]*1.0f, spr->view.uv[1]*1.0f);
                     rlVertex3V(c);
-                    rlTexCoord2f(spr->uv[0]*1.0f, 0.0f);
+                    rlTexCoord2f(spr->view.uv[0]*1.0f, 0.0f);
                     rlVertex3V(d);
                     rlTexCoord2f(0.0f, 0.0f);
                     rlVertex3V(a);
@@ -1304,14 +1306,14 @@ static void DrawKenGeometry(float sw, float sh, Camera3D camsrc) {
                     DisableDepthOffset();
                     rlSetTexture(0);
                 }
-                else // billboards
+                else if (spr->view.rtype == billbord) // billboards
                 {
-                    float xscaler = spr->uv[0];
-                    float yscaler = spr->uv[1];
+                    float xscaler = spr->view.uv[0];
+                    float yscaler = spr->view.uv[1];
                     xs *= 2;
                     ys *= 2;
                     // need to shift view position for raylib's billboard.
-                    Vector3 centeroffset = rg*((spr->anchor.x-0.5))*2 + dw*(spr->anchor.z-0.5f)*2;
+                    Vector3 centeroffset = rg*((spr->view.anchor.x-0.5))*2 + dw*(spr->view.anchor.z-0.5f)*2;
                     Vector3 pos = {spr->p.x, -spr->p.z, spr->p.y};
 pos+= centeroffset;
                     //pos.x+=xs;
