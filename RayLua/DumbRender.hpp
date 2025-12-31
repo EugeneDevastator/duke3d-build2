@@ -175,7 +175,7 @@ public:
         for (int i = 0; i < map->numsects; i++) { // floor ceil ports
             map->sect[i].tags[1] = -1;
 
-            if (map->sect[i].surf[1].lotag == 1 || map->sect[i].surf[1].tag ==2) {
+            if (map->sect[i].surf[1].lotag == 1 || map->sect[i].surf[1].lotag ==2) {
                 // temp handle duke water
                 portal &p = portals[portaln];
                 int stag = map->sect[i].surf[1].lotag;
@@ -268,6 +268,8 @@ public:
                 uint32_t id = portals[j].id;
                 if (id == target_tag) {
                     portals[i].destpn = j;
+                    if (portals[i].kind<2)
+                        map->sect[portals[i].sect].destpn[portals[i].kind] = j;
                     break;
                 }
             }
@@ -785,11 +787,23 @@ float scaler = 0.01;
         rlEnd();
     }
 static void DrawKenGeometry(float sw, float sh, Camera3D camsrc) {
-        cam_t b2cam;
+        cam_t localb2cam;
         if (syncam) {
             plr.ipos = {camsrc.position.x, camsrc.position.z, -camsrc.position.y};
-            updatesect_imp(plr.ipos.x,plr.ipos.y,plr.ipos.z, &plr.cursect, map);
-
+            int ported = updatesect_portmove(&plr.tri, &plr.cursect, map);
+            if (!ported)
+                updatesect_imp(plr.ipos.x,plr.ipos.y,plr.ipos.z, &plr.cursect, map);
+            else {
+                localb2cam.cursect = plr.cursect;
+                DumbCore::b2pos = plr.ipos;
+                Vector3 tgn = Vector3Subtract(camsrc.target, camsrc.position);
+                camsrc.position = {
+                    plr.ipos.x, -plr.ipos.z, plr.ipos.y
+                };
+                //camsrc.up = { -plr.idow.x, -plr.idow.z, plr.idow.y};
+                camsrc.target = camsrc.position + tgn;
+                updatesect_imp(plr.ipos.x,plr.ipos.y,plr.ipos.z, &plr.cursect, map);
+            }
             Vector3 forward = Vector3Normalize(Vector3Subtract(camsrc.target, camsrc.position));
             Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camsrc.up));
             Vector3 up = Vector3CrossProduct(right, forward); // Recalculate orthogonal up
@@ -800,12 +814,12 @@ static void DrawKenGeometry(float sw, float sh, Camera3D camsrc) {
             plr.idow.x = -up.x;       plr.idow.y = -up.z;       plr.idow.z = up.y;
 
 
-            b2cam.p = plr.ipos;
-            b2cam.f = plr.ifor;
-            b2cam.r = plr.irig;
-            b2cam.d = plr.idow;
+            localb2cam.p = plr.ipos;
+            localb2cam.f = plr.ifor;
+            localb2cam.r = plr.irig;
+            localb2cam.d = plr.idow;
         }
-        DrawEyePoly(sw, sh, &plr, &b2cam); // ken render
+        DrawEyePoly(sw, sh, &plr, &localb2cam); // ken render
         //rlDisableDepthTest();
         rlEnableDepthTest();
         rlEnableDepthMask();
@@ -2006,7 +2020,7 @@ private:
             if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
             map->blankheadspri = i;
         }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/e1l1.MAP", map);
+        loadmap_imp((char*)"c:/Eugene/Games/build2/e3l3.MAP", map);
     }
 };
 

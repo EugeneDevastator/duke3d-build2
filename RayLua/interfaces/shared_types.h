@@ -201,7 +201,7 @@ typedef struct {
 	point3d p, r, d, f;
 } transform;
 
-enum renderType {
+enum srenderType {
 	billbord,
 	vbord,
 	quad,
@@ -210,6 +210,13 @@ enum renderType {
 	procedural
 };
 
+enum frenderType {
+	flat,
+	parallaxcyl,
+	parallaxrect,
+	parallaxdome,
+	cubemap,
+};
 enum renderQ {
 	opaq,
 	atest,
@@ -218,7 +225,7 @@ enum renderQ {
 };
 
 typedef struct {
-	enum renderType rtype;
+	enum srenderType rtype;
 	enum renderQ rq;
 	bool isdblside;
 	float uv[8]; // scalexy, panxy, cropAB
@@ -234,24 +241,13 @@ typedef struct
 	long tilnum, tilanm/*???*/;
 
 	//Bit0:Blocking, Bit2:RelativeAlignment, Bit5:1Way, Bit16:IsParallax, Bit17:IsSkybox
-	union { uint32_t flags; struct { char _f1, _f2, _f3, pal; }; }; // temporary pal storage
-	union { long tag; struct { short lotag, hitag; }; };
-	point2d uv[3]; // legacy.
-	unsigned short asc, rsc, gsc, bsc; //4096 is no change
-	float alpha;
-//-------- uvs
-	union {
-		// 0,1 - origin offset on the plane 2,3 - offset of the tile rect, for rotation anim for ex
-		point2d uvoffset[4];
-		struct {
-			point2d
-				planarworldoffset, // move origin in plane space in world.
-				tilerectoffset, // move tile against origin
-				crop1, // crop from 0,0
-				crop2; // crop from 1,1 both in tile rect.
-		};
-	};
+	uint32_t flags;
 
+	short lotag, hitag;
+
+	uint8_t pal; // temporary pal storage
+	float alpha;
+	float uvform[9]; // scale xy, pan xy, crop AB, rotation
 	union{
 		// we dont use sectors, current one is constraint.
 		// origin, u , v
@@ -261,13 +257,15 @@ typedef struct
 	};
 	uint8_t uvmapkind; // uv amappings, regular, polar, hex, flipped variants etc. paralax.
 	uint8_t tilingkind; // normal, polar, hex etc.
+// ------------
+	point2d uv[3]; // legacy.
+	unsigned short asc, rsc, gsc, bsc; //4096 is no change
 
-	short renderflags; // new flags;
 // ------- runtime gneerated data
 	// for portals case - we dont care and use original world for everything.
 	// interpolator will lerp worldpositions, regardless of poly location
 	point3d uvcoords[3]; // world uv vectors. generated per poly. origin, u ,v
-	float uvform[6]; // scalexy, panxy
+
 	// can in theory use object space and encode it.
 
 } surf_t;
@@ -345,11 +343,12 @@ typedef struct
 	long owner;      //for dragging while editing, other effects during game
 	int32_t tags[16];
 	uint16_t mflags[4];
+	short scriptid,lotag,hitag;
 	// int nwperim - perimeter walls, would be first in sequence
 	// int nwnested - nested walls for fully inner sectors
 	// could be purely runtime info.
 	// but also inverted sector should be much easier to do.
-
+	int32_t destpn[2]; // nextsec flor ceil
 
 } sect_t;
 

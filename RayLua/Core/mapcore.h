@@ -253,6 +253,9 @@ int polybool (wall_t *wal0, int on0, wall_t *wal1, int on1, wall_t **retwal, int
 
 int insidesect (double x, double y, wall_t *wal, int w);
 
+// first pass updatesect to ONLY check nearest + portals.
+int updatesect_portmove(transform *tr, int *cursect, mapstate_t *map);
+
 //Pass z as >1e30 to make updatesect ignore height return first sector containing (x,y)
 static void updatesect_imp (float x, float y, float z, int *cursect, mapstate_t* map)
 {

@@ -6,17 +6,7 @@
 #include "buildmath.h"
 // TODO : Replace types with stdint like uint8_t
 // TODO : new mapstate should have raylib friendly coords by default. period.
-point3d buildToRaylib(point3d buildcoord)
-{
-	return (point3d){buildcoord.x, -buildcoord.z, buildcoord.y};
-}
-// In-place conversion - modifies original
-void toRaylibInPlace(point3d *buildcoord)
-{
-	float temp_y = buildcoord->y;
-	buildcoord->y = -buildcoord->z;
-	buildcoord->z = temp_y;
-}
+
 // build format 7 flags.
 
 
@@ -463,6 +453,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 
 				for(j=0;j<2;j++)
 				{
+					sec[i].destpn[j] = -1;
 					sec[i].z[j] = ((float)b7sec.z[j])*(1.f/(512.f*16.f));
 					sec[i].grad[j].x = sec[i].grad[j].y = 0;
 					if (b7sec.stat[j]&2) //Enable slopes flag

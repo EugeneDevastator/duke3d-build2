@@ -912,6 +912,39 @@ int insidesect(double x, double y, wall_t *wal, int w) {
 	return(c&1);
 }
 
+int updatesect_portmove(transform *tr, int *cursect, mapstate_t *map) {
+	point3d* pos = &tr->p;
+	long s = *cursect;
+	sect_t *sec = map->sect;
+	if (map->sect[s].destpn[0] + map->sect[s].destpn[1] > -2) {
+		if (insidesect(pos->x, pos->y, sec[s].wall, sec[s].n)) {
+			for (int j = 0; j < 2; j++) {
+				if (sec[s].destpn[j] > -1) {
+					float h = getslopez(&sec[s], j, pos->x, pos->y);
+					bool crossed = 0;
+					if (!j)
+						crossed = h > pos->z;
+					else
+						crossed = h < pos->z;
+
+					if (crossed) {
+						int d = sec[s].destpn[j];
+						int ow = portals[d].destpn;
+						*cursect = portals[d].sect;
+
+						//wccw_transform_trp(pos, &map->spri[portals[ow].anchorspri].tr,
+						//                   &map->spri[portals[d].anchorspri].tr);
+						wccw_transform_full(tr, &map->spri[portals[ow].anchorspri].tr,
+										   &map->spri[portals[d].anchorspri].tr);
+						return 1;
+					}
+				}
+			}
+		}
+	}
+	return 0;
+}
+
 void getcentroid(wall_t *wal, int n, float *retcx, float *retcy) {
 	float r, cx, cy, x0, y0, x1, y1, area;
 	int w0, w1;
