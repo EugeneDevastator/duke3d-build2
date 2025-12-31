@@ -4,6 +4,7 @@
 #include "loaders.h"
 
 #include "buildmath.h"
+#include "../cmake-build-custom/_deps/raylib-src/src/external/jar_mod.h"
 // TODO : Replace types with stdint like uint8_t
 // TODO : new mapstate should have raylib friendly coords by default. period.
 
@@ -671,18 +672,24 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					float  ypansub = 0;
 					if (isnpot(ysize) ) // not power of two
 					{
+						// probably need for other texture sizes too, but those are most common
+						float mul = ysize > 128 ? 1 : 2;
 						// there are some shenanigans when texture yres is odd. skip for now.
 						//if ((int) ysize % 2)
 						//	ypansub = (ceil(ysize * 0.5f) * 4);
 						//	//*(((int)ysize % 2)+1);// if non divisible by 2 add twice.
 						//else
-							ypansub = (ysize * 2); //*(((int)ysize % 2)+1);// if non divisible by 2 add twice.
+							ypansub = (ysize * mul); //*(((int)ysize % 2)+1);// if non divisible by 2 add twice.
 
 					}
 					thiswal->surf.uvform[2]=  px1x * b7wal.xpanning;
-					thiswal->surf.uvform[3]= px1y * ((b7wal.ypanning-ypansub)/ypans_per_px);
 
-
+					for (int xw=0;xw<thiswal->surfn;xw++) {
+						memcpy(thiswal->xsurf[xw].uvform,thiswal->surf.uvform,sizeof(float)*6);
+					}
+					thiswal->xsurf[0].uvform[3]= px1y * ((b7wal.ypanning-ypansub)/ypans_per_px);
+					thiswal->xsurf[1].uvform[3]= px1y * ((b7wal.ypanning-ypansub)/ypans_per_px);
+					thiswal->xsurf[2].uvform[3]= px1y * ((b7wal.ypanning)/ypans_per_px);
 				}
 				// tile adjust?
 				for(j=0;j<sec[i].n;j++)
@@ -958,7 +965,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			gnumtiles = 0; memset(gtilehashead,-1,sizeof(gtilehashead));
 
 			hitile++;
-			hitile = 1000;//5080;
+			hitile =  5080;
 			if (hitile > gmaltiles)
 			{
 				gmaltiles = hitile;
@@ -1015,7 +1022,6 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					int basemul = isyuvflip ? -1 : 1;
 					int basexmul = isxalignflip ? -1 : 1;
 					int yflipmul[3] = {basemul,basemul,basemul};
-					memcpy(&walp->xsurf[0].uvform, &walp->surf.uvform, sizeof(float) * 6);
 
 					// all walls use same origin xy based on x flip.
 					for (int sl=0;sl<walp->surfn;sl++) {
@@ -1030,8 +1036,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						int nextpic = sec[walp->ns].wall[walp->nw].surf.tilnum;
 						bool isbotswap = walp->xsurf[2].tilnum == -2;
 						wall_t *oppwal;
-						memcpy(&walp->xsurf[1].uvform, &walp->surf.uvform, sizeof(float) * 6);
-						memcpy(&walp->xsurf[2].uvform, &walp->surf.uvform, sizeof(float) * 6);
+
 						if (isbotswap) //
 						{
 							oppwal = &sec[walp->ns].wall[walp->nw];
