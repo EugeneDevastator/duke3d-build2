@@ -270,10 +270,10 @@ void MainLoop()
         glEnable(GL_DEPTH_TEST);
         ClearBackground(BLACK);
 
-        BeginMode3D(DumbCore::GetCamera());
+        BeginMode3D(*DumbCore::GetCamera());
         DumbRender::ProcessKeys();
         DumbRender::DrawKenGeometry(GetScreenWidth(),GetScreenHeight(),DumbCore::GetCamera());
-        DumbRender::DrawMapstateTex(DumbCore::GetCamera());
+        DumbRender::DrawMapstateTex(*DumbCore::GetCamera());
         //   DumbRender::DrawMapstateLines();
         EndMode3D();
         EndCustomRenderTarget();

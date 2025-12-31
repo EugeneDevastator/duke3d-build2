@@ -24,21 +24,23 @@ static inline void toRaylibInPlace(point3d *buildcoord)
 static inline void camfromb2(Camera3D* rlcam, transform* b2tr){
 	rlcam->position = buildToRaylib(b2tr->p);
 	Vector3 forward = buildToRaylib(b2tr->f);
-	Vector3 right = buildToRaylib(b2tr->r);
-	Vector3 up = Vector3CrossProduct(right, forward); // Recalculate orthogonal up
-	rlcam->up = up;
+	Vector3 up = buildToRaylib(b2tr->d); // Recalculate orthogonal up
+	rlcam->up = Vector3Scale(up,-1);
 	rlcam->target = rlcam->position + forward;
 }
-static inline void camfromrl(transform* b2tr,Camera3D* rlcam){
-
+static inline void camfromrl(transform* b2tr, Camera3D* rlcam){
 	b2tr->p = raylibtobuild(rlcam->position);
 
-	Vector3 forward = Vector3Normalize(Vector3Subtract(rlcam->target,rlcam->position));
-	Vector3 up = rlcam->up; // Recalculate orthogonal up
-	Vector3 right = Vector3Normalize(Vector3CrossProduct(up, forward));
+	Vector3 forward = Vector3Normalize(Vector3Subtract(rlcam->target, rlcam->position));
+	Vector3 up = Vector3Normalize(rlcam->up);
+	Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, up));
+
+	// Recalculate orthogonal up vector
+	up = Vector3CrossProduct(right, forward);
 
 	b2tr->f = raylibtobuild(forward);
 	b2tr->r = raylibtobuild(right);
-	b2tr->d = raylibtobuild(Vector3Scale(up,-1.0f));
+	b2tr->d = raylibtobuild(Vector3Scale(up, -1.0f));
 }
+
 #endif //RAYLIB_LUA_IMGUI_B2RLMATH_H

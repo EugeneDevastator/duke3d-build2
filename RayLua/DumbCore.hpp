@@ -77,8 +77,8 @@ public:
         camera.up = camera.up;
     }
 
-    static Camera3D GetCamera() {
-        return camera;
+    static Camera3D* GetCamera() {
+        return &camera;
     }
 
     static void SetCameraPosition(Vector3 pos) {
@@ -141,7 +141,7 @@ private:
         //those funcs still use internal build coords.
         point3d movevec = RaylibToBuild(camera.position - startpos);
         point3d mv = {movevec.x, movevec.y, movevec.z};
-        camposb2.x+=movevec.x;        camposb2.y+=movevec.y;        camposb2.z+=movevec.z;
+        camposb2.x +=movevec.x;        camposb2.y+=movevec.y;        camposb2.z+=movevec.z;
       //  collmove_p(&camposb2, &cursec, &mv, 0.25, 1, map);
         updatesect_imp(camposb2.x, camposb2.y, camposb2.z, &cursec, map);
 
@@ -150,16 +150,25 @@ private:
         camera.position.x = b2pos.x;
         camera.position.y = -b2pos.z;
         camera.position.z = b2pos.y;
-        // Mouse look
         Vector2 mouseDelta = GetMouseDelta();
         if (mouseDelta.x != 0 || mouseDelta.y != 0) {
             float sensitivity = 0.003f;
 
             Vector3 targetOffset = Vector3Subtract(camera.target, camera.position);
-            targetOffset = Vector3RotateByAxisAngle(targetOffset, camera.up, -mouseDelta.x * sensitivity);
+
+            // Yaw around WORLD up (0,1,0), not camera up
+            Vector3 worldUp = {0, 1, 0};
+            targetOffset = Vector3RotateByAxisAngle(targetOffset, worldUp, -mouseDelta.x * sensitivity);
+
+            // Pitch around current right vector (this stays the same)
+            Vector3 right = Vector3Normalize(Vector3CrossProduct(targetOffset, worldUp));
             targetOffset = Vector3RotateByAxisAngle(targetOffset, right, -mouseDelta.y * sensitivity);
 
             camera.target = Vector3Add(camera.position, targetOffset);
+
+            // Update camera up to match new orientation
+            Vector3 forward = Vector3Normalize(targetOffset);
+            camera.up = Vector3Normalize(Vector3CrossProduct(right, forward));
         }
     }
 #if IS_DUKE_INCLUDED

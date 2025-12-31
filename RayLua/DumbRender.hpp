@@ -763,7 +763,7 @@ float scaler = 0.01;
 
         int v=0;
         int l = 0;
-        auto cam = DumbCore::GetCamera().position;
+        auto cam = (*DumbCore::GetCamera()).position;
         cam = {0,0,0};
         float cdiv = 1.0;
         rlBegin(RL_LINES);
@@ -786,32 +786,28 @@ float scaler = 0.01;
         }
         rlEnd();
     }
-static void DrawKenGeometry(float sw, float sh, Camera3D camsrc) {
+static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
         cam_t localb2cam;
         if (syncam) {
-            plr.ipos = {camsrc.position.x, camsrc.position.z, -camsrc.position.y};
+            camfromrl(&plr.tri, camsrc);
             int ported = updatesect_portmove(&plr.tri, &plr.cursect, map);
             if (!ported)
                 updatesect_imp(plr.ipos.x,plr.ipos.y,plr.ipos.z, &plr.cursect, map);
             else {
                 localb2cam.cursect = plr.cursect;
-                DumbCore::b2pos = plr.ipos;
-                Vector3 tgn = Vector3Subtract(camsrc.target, camsrc.position);
-                camsrc.position = {
-                    plr.ipos.x, -plr.ipos.z, plr.ipos.y
-                };
-                //camsrc.up = { -plr.idow.x, -plr.idow.z, plr.idow.y};
-                camsrc.target = camsrc.position + tgn;
-                updatesect_imp(plr.ipos.x,plr.ipos.y,plr.ipos.z, &plr.cursect, map);
-            }
-            Vector3 forward = Vector3Normalize(Vector3Subtract(camsrc.target, camsrc.position));
-            Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camsrc.up));
-            Vector3 up = Vector3CrossProduct(right, forward); // Recalculate orthogonal up
 
-            // Convert to Build2 coordinate system (x->x, y->z, z->-y)
-            plr.ifor.x = forward.x;  plr.ifor.y = forward.z;  plr.ifor.z = -forward.y;
-            plr.irig.x = right.x;    plr.irig.y = right.z;    plr.irig.z = -right.y;
-            plr.idow.x = -up.x;       plr.idow.y = -up.z;       plr.idow.z = up.y;
+//                updatesect_imp(plr.ipos.x,plr.ipos.y,plr.ipos.z, &plr.cursect, map);
+            }
+            DumbCore::b2pos = plr.ipos;
+            camfromb2(camsrc,&plr.tri);
+          //  Vector3 forward = Vector3Normalize(Vector3Subtract(camsrc.target, camsrc.position));
+          //  Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camsrc.up));
+          //  Vector3 up = Vector3CrossProduct(right, forward); // Recalculate orthogonal up
+//
+          //  // Convert to Build2 coordinate system (x->x, y->z, z->-y)
+          //  plr.ifor.x = forward.x;  plr.ifor.y = forward.z;  plr.ifor.z = -forward.y;
+          //  plr.irig.x = right.x;    plr.irig.y = right.z;    plr.irig.z = -right.y;
+          //  plr.idow.x = -up.x;       plr.idow.y = -up.z;       plr.idow.z = up.y;
 
 
             localb2cam.p = plr.ipos;
