@@ -129,10 +129,11 @@ def convert_lut_to_palette(neutral_lut, target_palette):
     return palette_lut
 
 def save_lut_image(lut_data, filename):
-    """Save LUT data as PNG image"""
+    """Save LUT data as PNG image with nearest neighbor sampling"""
     height = len(lut_data)
     width = len(lut_data[0])
     
+    # Create image with nearest neighbor resampling
     image = Image.new('RGB', (width, height))
     pixels = []
     
@@ -141,7 +142,10 @@ def save_lut_image(lut_data, filename):
             pixels.append(color)
     
     image.putdata(pixels)
-    image.save(filename)
+    
+    # Save with no compression and nearest neighbor hint
+    image.save(filename, optimize=False, compress_level=0)
+    print(f"Saved {filename} ({width}x{height}) with nearest neighbor sampling")
 
 def main():
     # Read palette data
@@ -159,13 +163,11 @@ def main():
     print("Generating neutral 256x16 LUT...")
     neutral_lut = generate_neutral_lut_256x16()
     save_lut_image(neutral_lut, "neutral_lut.png")
-    print("Neutral LUT saved as neutral_lut.png")
     
     # Generate base palette LUT
     print("Converting to base palette LUT...")
     base_palette_lut = convert_lut_to_palette(neutral_lut, base_palette)
     save_lut_image(base_palette_lut, "duke3d_base_lut.png")
-    print("Base palette LUT saved as duke3d_base_lut.png")
     
     # Generate palette swap LUTs (applied to base palette)
     for swap_index, swap_table in palette_swaps:
@@ -173,14 +175,12 @@ def main():
         swapped_palette = apply_palette_swap(base_palette, swap_table)
         swap_lut = convert_lut_to_palette(neutral_lut, swapped_palette)
         save_lut_image(swap_lut, f"duke3d_swap_{swap_index}_lut.png")
-        print(f"Palette swap {swap_index} LUT saved as duke3d_swap_{swap_index}_lut.png")
     
     # Generate alternate palette LUTs (underwater, animation, etc.)
     for alt_index, alt_palette in alt_palettes:
         print(f"Generating alternate palette {alt_index} LUT...")
         alt_lut = convert_lut_to_palette(neutral_lut, alt_palette)
         save_lut_image(alt_lut, f"duke3d_alt_{alt_index}_lut.png")
-        print(f"Alternate palette {alt_index} LUT saved as duke3d_alt_{alt_index}_lut.png")
         
         # Also generate palette swaps applied to alternate palettes
         for swap_index, swap_table in palette_swaps:
@@ -188,12 +188,12 @@ def main():
             swapped_alt_palette = apply_palette_swap(alt_palette, swap_table)
             swap_alt_lut = convert_lut_to_palette(neutral_lut, swapped_alt_palette)
             save_lut_image(swap_alt_lut, f"duke3d_alt_{alt_index}_swap_{swap_index}_lut.png")
-            print(f"Alt {alt_index} swap {swap_index} LUT saved as duke3d_alt_{alt_index}_swap_{swap_index}_lut.png")
     
     total_luts = 1 + len(palette_swaps) + len(alt_palettes) + (len(alt_palettes) * len(palette_swaps))
-    print(f"Generated {total_luts} LUT files total")
+    print(f"\nGenerated {total_luts} LUT files total")
     print("LUT dimensions: 256x16")
     print("Use with lutSize = 16.0 in shader")
+    print("All images saved with nearest neighbor sampling (no interpolation)")
     
     # Print summary
     print(f"\nSummary:")
