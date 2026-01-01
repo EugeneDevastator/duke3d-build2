@@ -307,7 +307,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 						{
 							for(;i>=0;i--) free(sec[i].wall);
 							map->numsects = 0;
-							return(-1);
+							return(NULL);
 						}
 					}
 				}
