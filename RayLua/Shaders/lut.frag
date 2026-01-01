@@ -13,34 +13,16 @@ vec3 applyLUT(vec3 color, sampler2D lut) {
     // Clamp input to valid range
     color = clamp(color, 0.0, 1.0);
 
-    // Scale to LUT coordinate space
-    vec3 scaledColor = color * (lutSize - 1.0);
+    // Scale to LUT coordinate space and floor everything for nearest sampling
+    vec3 scaledColor = floor(color * (lutSize - 1.0));
 
-    // Get integer and fractional parts
-    vec3 baseColor = floor(scaledColor);
-    vec3 fracColor = scaledColor - baseColor;
-
-    // Calculate 2D coordinates for 3D LUT
-    // Standard layout: blue slices arranged horizontally
-    float slice0 = baseColor.b;
-    float slice1 = min(slice0 + 1.0, lutSize - 1.0);
-
-    // Calculate UV coordinates for both slices
-    vec2 uv0 = vec2(
-    (slice0 + baseColor.r / lutSize) / lutSize,
-    baseColor.g / lutSize
+    // Calculate 2D coordinates for 3D LUT - single slice only
+    vec2 uv = vec2(
+    (scaledColor.b + scaledColor.r / lutSize) / lutSize,
+    scaledColor.g / lutSize
     );
 
-    vec2 uv1 = vec2(
-    (slice1 + baseColor.r / lutSize) / lutSize,
-    baseColor.g / lutSize
-    );
-
-    // Sample both slices and interpolate
-    vec3 color0 = texture(lut, uv0).rgb;
-    vec3 color1 = texture(lut, uv1).rgb;
-
-    return mix(color0, color1, fracColor.b);
+    return texture(lut, uv).rgb;
 }
 
 void main() {
