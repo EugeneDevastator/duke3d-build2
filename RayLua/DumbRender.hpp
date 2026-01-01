@@ -595,8 +595,8 @@ public:
         switch (eyepol[i].pal) {
             case 0: useGrad = 0; break;
             case 1: usedcol = {0.5,0.6,1,1}; break;
-            case 2: usedcol = {1,0.4,0,0.5}       ; break;
-            case 8: usedcol = {0.6,0.9,0.2,0.4}; break;
+            case 2: usedcol = {1,0.35,0.1,1}; break;
+            case 8: usedcol = {0.6,0.9,0.2,1}; break;
             case 7: usedcol = {0.8,0.9,0,0.4}; break;
             default: useGrad = 0;break;
         }
@@ -611,14 +611,14 @@ public:
             rlDisableDepthMask();
            // rlDisableBackfaceCulling();
           // BeginBlendMode(RL_BLEND_ALP);
-            usedcol.w = 0.6f;
+            usedcol.w *= 0.6f;
 
         }
         else {
             if (!isopaque) return true;
        //     rlEnableBackfaceCulling();
             rlEnableDepthMask();
-            usedcol.w = 1;
+            usedcol.w *= 1;
         }
 
         BeginShaderMode(uvShaderDesc.shader);
