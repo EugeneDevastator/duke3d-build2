@@ -68,7 +68,7 @@ void SetImguiFonts()
     io.Fonts->Build();
 }
 
-
+int lutTextureLocation;
 typedef struct {
     Vector3 position;
     Vector3 target;
@@ -259,10 +259,10 @@ void InitLUTSystem() {
     lutTexture = LoadTexture("Shaders/lut.png");
 
     // Set shader uniforms
-    int lutTextureLocation = GetShaderLocation(lutShader, "lutTexture");
+    lutTextureLocation = GetShaderLocation(lutShader, "lutTexture");
     int lutIntensityLocation = GetShaderLocation(lutShader, "lutIntensity");
 
-    SetShaderValue(lutShader, lutIntensityLocation, &lutIntensity, SHADER_UNIFORM_FLOAT);
+   // SetShaderValue(lutShader, lutIntensityLocation, &lutIntensity, SHADER_UNIFORM_FLOAT);
     SetShaderValueTexture(lutShader, lutTextureLocation, lutTexture);
 
     // Create final render target for post-processing
@@ -344,7 +344,9 @@ void MainLoop()
         glClear(GL_COLOR_BUFFER_BIT);
         glDisable(GL_DEPTH_TEST);
 
+
         BeginShaderMode(lutShader);
+        SetShaderValueTexture(lutShader, lutTextureLocation, lutTexture);
         DrawTextureRec({combinedTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
                       {0, 0, (float)w, (float)-h}, {0, 0}, WHITE);
         EndShaderMode();
@@ -383,7 +385,7 @@ int main() {
 
     //VisualizeMapstate();
     MainLoop();
-    DumbRender::CleanupMapstateTex();
+    //DumbRender::CleanupMapstateTex();
     return 0;
     //MapTest();
 

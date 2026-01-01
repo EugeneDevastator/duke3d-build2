@@ -19,9 +19,7 @@ The forward direction can be visualized as moving away from the camera or viewer
 #ifndef RAYLIB_LUA_IMGUI_DUMBRENDER_H
 #define RAYLIB_LUA_IMGUI_DUMBRENDER_H
 #include "DumbCore.hpp"
-#include "cmake-build-custom/_deps/raylib-src/src/external/glad.h"
-#include "Shaders/renderhelper.h"
-
+#include "renderhelper.h"
 
   extern "C" {
 #include "loaders.h"
@@ -597,7 +595,7 @@ public:
         switch (eyepol[i].pal) {
             case 0: useGrad = 0; break;
             case 1: usedcol = {0.5,0.6,1,1}; break;
-            case 2: usedcol = {1,0.35,0.1,1}; break;
+            case 2: usedcol = {1,0.35,0.1,0.5}; break;
             case 8: usedcol = {0.3,1,0.2,1}; break;
             case 7: usedcol = {0.8,0.9,0,1}; break;
             default: useGrad = 0;break;
@@ -1759,7 +1757,9 @@ pos+= centeroffset;
             free(floorMeshes);
             floorMeshes = NULL;
             numFloorMeshes = 0;
+
         }
+        freemap(map);
     }
 
 
@@ -1990,33 +1990,7 @@ private:
 
     static void LoadMapAndTiles()
     {
-        map = static_cast<mapstate_t*>(malloc(sizeof(mapstate_t)));
-        memset(map, 0, sizeof(mapstate_t));
-        initcrc32();
-
-        map->numsects = 0;
-        map->malsects = 256;
-        map->sect = static_cast<sect_t*>(malloc(map->malsects * sizeof(sect_t)));
-        if (!map->sect) return;
-        memset(map->sect, 0, map->malsects * sizeof(sect_t));
-
-        map->numspris = 0;
-        map->malspris = 256;
-        map->spri = static_cast<spri_t*>(malloc(map->malspris * sizeof(spri_t)));
-        if (!map->spri) return;
-        memset(map->spri, 0, map->malspris * sizeof(spri_t));
-        map->blankheadspri = -1;
-
-        map->blankheadspri = -1;
-        for (int i = 0; i < map->malspris; i++)
-        {
-            map->spri[i].sectn = map->blankheadspri;
-            map->spri[i].sectp = -1;
-            map->spri[i].sect = -1;
-            if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
-            map->blankheadspri = i;
-        }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/e3l3.MAP", map);
+        map = loadmap_imp((char*)"c:/Eugene/Games/build2/e2l5.MAP", NULL);
     }
 };
 
