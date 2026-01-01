@@ -24,6 +24,46 @@
 9 	512 	Set as transparent (must be combined with cstat value 128). The keypress applies itself to both sides. 	[T]
 10-15 	1024-32768 	*RESERVED* 	N/A
  */
+
+typedef struct {
+	surf_t *pool;
+	int used, capacity;
+} surf_allocator_t;
+surf_allocator_t sural={0};
+void free_surf_allocator(surf_allocator_t *alloc) {
+	if (alloc && alloc->pool) {
+		free(alloc->pool);
+		alloc->pool = NULL;
+		alloc->used = 0;
+		alloc->capacity = 0;
+	}
+}
+void init_surf_allocator(surf_allocator_t *alloc) {
+	free_surf_allocator(alloc);
+	alloc->pool = NULL;
+	alloc->used = 0;
+	alloc->capacity = 0;
+}
+surf_t* alloc_surfs(surf_allocator_t *alloc, int count) {
+	if (alloc->used + count > alloc->capacity) {
+		// Proper growth: ensure minimum size and handle zero capacity
+		int new_capacity = alloc->capacity == 0 ? 64 : alloc->capacity * 2;
+		while (new_capacity < alloc->used + count) {
+			new_capacity *= 2;
+		}
+
+		alloc->pool = realloc(alloc->pool, new_capacity * sizeof(surf_t));
+		if (!alloc->pool) {
+			// Handle allocation failure
+			return NULL;
+		}
+		alloc->capacity = new_capacity;
+	}
+
+	surf_t *result = &alloc->pool[alloc->used];
+	alloc->used += count;
+	return result;
+}
 void initTiles()
 {
 	gnumtiles = 0;
@@ -33,8 +73,58 @@ void initTiles()
 	//if (!gtile)
 	//	memset(gtile,0,gmaltiles*sizeof(tile_t)); //FIX
 }
-int loadmap_imp (char *filnam, mapstate_t* map)
+void freetiles() {
+	for (int i = 0; i < gnumtiles; i++) {
+		if (gtile[i].tt.f) {
+			free((void*)gtile[i].tt.f);
+		//	gtile[i].tt.f = NULL;
+		}
+	}
+	if (gtile) {
+		free(gtile);
+	//	gtile = NULL;
+	}
+	gnumtiles = 0;
+}
+
+void freemap(mapstate_t *map) {
+	if (!map) return;
+
+	// Free wall surfaces first
+	for (int i = 0; i < map->numsects; i++) {
+		if (map->sect[i].wall) {
+			for (int j = 0; j < map->sect[i].n; j++) {
+				//if (map->sect[i].wall[j].xsurf) {
+				//	free(map->sect[i].wall[j].xsurf);
+				//	map->sect[i].wall[j].xsurf = NULL;
+				//}
+			}
+			free(map->sect[i].wall);
+		//	map->sect[i].wall = NULL;
+		}
+	}
+
+	// Free sectors array
+	if (map->sect) {
+		free(map->sect);
+	//	map->sect = NULL;
+	}
+
+	// Free sprites array
+	if (map->spri) {
+		free(map->spri);
+	//	map->spri = NULL;
+	}
+
+	// Reset counters
+	map->numsects = 0;
+	map->numspris = 0;
+	freetiles();
+}
+
+mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 {
+	init_surf_allocator(&sural);
 	surf_t *sur;
 	sect_t *sec;
 	wall_t *wal;
@@ -44,6 +134,37 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 	long x, y, z, fileid, hitile, warned = 0, altsects, nnumtiles, nnumspris;
 	short s, cursect;
 	char och, tbuf[256];
+//	freemap(map);
+
+	freemap(oldmap);  // Clean up old one
+
+	mapstate_t* map = (mapstate_t*)malloc(sizeof(mapstate_t));
+	if (!map) return NULL;
+	memset(map, 0, sizeof(mapstate_t));
+	initcrc32();
+
+	map->numsects = 0;
+	map->malsects = 256;
+	map->sect = (sect_t*)(malloc(map->malsects * sizeof(sect_t)));
+	if (!map->sect) return 0;
+	memset(map->sect, 0, map->malsects * sizeof(sect_t));
+
+	map->numspris = 0;
+	map->malspris = 256;
+	map->spri = (spri_t*)(malloc(map->malspris * sizeof(spri_t)));
+	if (!map->spri) return 0;
+	memset(map->spri, 0, map->malspris * sizeof(spri_t));
+	map->blankheadspri = -1;
+
+	map->blankheadspri = -1;
+	for (int i = 0; i < map->malspris; i++)
+	{
+		map->spri[i].sectn = map->blankheadspri;
+		map->spri[i].sectp = -1;
+		map->spri[i].sect = -1;
+		if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
+		map->blankheadspri = i;
+	}
 
 	initTiles();
 
@@ -56,7 +177,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 	}
 	kzread(&fileid,4);
 	if ((fileid == 0x04034b50) || (fileid == 0x536e654b)) //'PK\3\4' is ZIP file id, 'KenS' is GRP file id
-		{ kzclose(); kzaddstack(filnam); return(1); }
+		{ kzclose(); kzaddstack(filnam); return(map); }
 	sec = map->sect; map->light_sprinum = 0;
 	if (fileid == 0x3142534b) //KSB1
 	{
@@ -194,8 +315,10 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				sec[i].wall[j].owner = -1;
 				if (sec[i].wall[j].surfn > 1)
 				{
-					sec[i].wall[j].xsurf = (surf_t *)malloc((sec[i].wall[j].surfn-1)*sizeof(surf_t));
-					kzread(sec[i].wall[j].xsurf,(sec[i].wall[j].surfn-1)*sizeof(surf_t));
+					//sec[i].wall[j].xsurf = (surf_t *)malloc((sec[i].wall[j].surfn-1)*sizeof(surf_t));
+					//kzread(sec[i].wall[j].xsurf,(sec[i].wall[j].surfn-1)*sizeof(surf_t));
+					// replaced to simplify xsurfs and stick to 3 per wall max.
+					kzread(sec[i].wall[j].xsurf,(3)*sizeof(surf_t));
 				}
 			}
 		}
@@ -286,7 +409,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 #endif
 
 		kzclose();
-		return(1);
+		return(map);
 	}
 	else if ((fileid == 0x00000007) || (fileid == 0x00000cbe))   //Build1 .MAP format 7 //Cubes5 .CUB format
 	{
@@ -612,12 +735,15 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					if (b7wal.nextsect >= 0 ) // (sec[i].wall[j].ns != -1) // ns are parsed later! nut we need to alloc now.
 					{
 						thiswal->surfn = 3;
-						thiswal->xsurf = malloc(sizeof(surf_t) * 3);
+					//	thiswal->xsurf = alloc_surfs(&sural,3);
+
 						thiswal->xsurf[0].alpha=1;
 						thiswal->xsurf[1].alpha=1;
 						thiswal->xsurf[2].alpha=1;
 						thiswal->surf.alpha=1;
 						thiswal->xsurf[0].tilnum = b7wal.picnum;
+						if (thiswal->xsurf[0].tilnum<0 || thiswal->xsurf[0].tilnum>9000)
+							int x=0;
 						thiswal->xsurf[1].tilnum = b7wal.overpicnum;
 						thiswal->xsurf[2].tilnum = b7wal.cstat & WALL_BOTTOM_SWAP ? -2 : b7wal.picnum;
 						int opacity = 255;
@@ -638,8 +764,10 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						//               (int[2]){0, 0});
 					}
 					else {
-						thiswal->xsurf = malloc(sizeof(surf_t) * 1);
+					//	thiswal->xsurf = alloc_surfs(&sural,1);
+						thiswal->surfn=1;
 						thiswal->xsurf[0].tilnum = b7wal.picnum;
+						thiswal->xsurf[0].alpha=1;
 					}
 					thiswal->surf.tilnum= b7wal.picnum;
 					//float wallh = (sec[i].z[1]-sec[i].z[0]);
@@ -687,8 +815,10 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						memcpy(thiswal->xsurf[xw].uvform,thiswal->surf.uvform,sizeof(float)*6);
 					}
 					thiswal->xsurf[0].uvform[3]= px1y * ((b7wal.ypanning-ypansub)/ypans_per_px);
-					thiswal->xsurf[1].uvform[3]= px1y * ((b7wal.ypanning-ypansub)/ypans_per_px);
-					thiswal->xsurf[2].uvform[3]= px1y * ((b7wal.ypanning)/ypans_per_px);
+					if (thiswal->surfn==3) {
+						thiswal->xsurf[1].uvform[3]= px1y * ((b7wal.ypanning-ypansub)/ypans_per_px);
+						thiswal->xsurf[2].uvform[3]= px1y * ((b7wal.ypanning)/ypans_per_px);
+					}
 				}
 				// tile adjust?
 				for(j=0;j<sec[i].n;j++)
@@ -964,7 +1094,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			gnumtiles = 0; memset(gtilehashead,-1,sizeof(gtilehashead));
 
 			hitile++;
-			hitile =  1000;
+			hitile =  3000;
 			if (hitile > gmaltiles)
 			{
 				gmaltiles = hitile;
@@ -1010,7 +1140,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					wall_t *walp = &sec[i].wall[j];
 					int nwid = walp->n + j;
 					int curwalid = j;
-					int yrepeat = walp->surf.owal;
+					int yrepeat = (unsigned char)walp->surf.owal;
 					int isfloralign = walp->mflags[0] & WALL_ALIGN_FLOOR;
 					int yrepeatbot = yrepeat;
 					int isfloralignbot = isfloralign;
@@ -1066,7 +1196,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 
 							if(sl==2 && floralig[sl])
 								continue;
-
+// Claude here walp->xsurf[sl].tilnum is invalid, when sl==0, even tho initially all tilnums are set correct
 							float ysize = tilesizy[walp->xsurf[sl].tilnum];
 							float pix4 = 4.0f / ysize;
 							float normuvperz = pix4 * yrepeat;
@@ -1159,8 +1289,8 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			if (tilefile) free(tilefile);
 
 			kzclose();
-			return(1);
+			return(map);
 		}
-		else { return(0); } //MessageBox(ghwnd,"Invalid MAP format",prognam,MB_OK);
+		else { return(NULL); } //MessageBox(ghwnd,"Invalid MAP format",prognam,MB_OK);
 	}
 }

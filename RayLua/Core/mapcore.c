@@ -724,7 +724,7 @@ int polyspli(wall_t *owal, int on, wall_t **retwal, double kx, double ky, double
 			(*retwal)[n2].owner = twal->owner;
 			(*retwal)[n2].surf  = twal->surf; (*retwal)[n].surf.flags &= ~0x20;/*annoying hack to disable 1-way walls*/
 			(*retwal)[n2].surfn = twal->surfn;
-			(*retwal)[n2].xsurf = twal->xsurf;
+			memcpy((*retwal)[n2].xsurf, twal->xsurf,sizeof(surf_t)*3);
 			n2++;
 
 			got[i] = 1; i += tpal[i].n;
@@ -888,7 +888,7 @@ int polybool(wall_t *wal0, int on0, wall_t *wal1, int on1, wall_t **retwal, int 
 			(*retwal)[n].owner = twal->owner;
 			(*retwal)[n].surf  = twal->surf; (*retwal)[n].surf.flags &= ~0x20;/*annoying hack to disable 1-way walls*/
 			(*retwal)[n].surfn = twal->surfn;
-			(*retwal)[n].xsurf = twal->xsurf;
+			memcpy((*retwal)[n].xsurf, twal->xsurf,sizeof(surf_t)*3);
 			lin0[i].i = -1; n++;
 
 			for(j=n0-1;j>=0;j--) //FIX:visit hash|bbox(x1,y1,x1,y1){lin0,n0}

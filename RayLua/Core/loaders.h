@@ -387,6 +387,7 @@ cnw_break2:;
 }
 
 
-int loadmap_imp (char *filnam, mapstate_t* map);
+mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap);
+void freemap (mapstate_t* map);
 
 #endif //BUILD2_LOADERS_H

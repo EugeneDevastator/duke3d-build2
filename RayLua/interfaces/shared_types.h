@@ -238,7 +238,7 @@ typedef struct {
 
 typedef struct
 {
-	long tilnum, tilanm/*???*/;
+	long tilnum, tilanm ;/*???*/
 
 	//Bit0:Blocking, Bit2:RelativeAlignment, Bit5:1Way, Bit16:IsParallax, Bit17:IsSkybox
 	uint32_t flags;
@@ -294,8 +294,8 @@ typedef struct
 
 	long n, ns, nw; //n:rel. wall ind.; ns & nw : nextsect & nextwall_of_sect
 	long owner; //for dragging while editing, other effects during game
-	long surfn;
-	surf_t surf, *xsurf; //additional malloced surfs when (surfn > 1)
+	uint8_t surfn;
+	surf_t surf, xsurf[3]; //additional malloced surfs when (surfn > 1)
 	uint16_t mflags[4]; // modflags
 	union {
 		int64_t tags8b[8];
