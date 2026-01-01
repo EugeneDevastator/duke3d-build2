@@ -71,7 +71,7 @@ message(STATUS "Binary directory: ${EXE_FOLDER_PATH}")
 
 # Copy with verbose output
 # Define shader files
-file(GLOB SHADER_FILES "Shaders/*.vert" "Shaders/*.frag")
+file(GLOB SHADER_FILES "Shaders/*.vert" "Shaders/*.frag" "Shaders/*.png")
 
 # Create custom target that always runs
 add_custom_target(copy_shaders ALL
