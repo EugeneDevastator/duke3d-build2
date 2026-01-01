@@ -4,7 +4,6 @@
 #include "loaders.h"
 
 #include "buildmath.h"
-#include "../cmake-build-custom/_deps/raylib-src/src/external/jar_mod.h"
 // TODO : Replace types with stdint like uint8_t
 // TODO : new mapstate should have raylib friendly coords by default. period.
 
@@ -965,7 +964,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			gnumtiles = 0; memset(gtilehashead,-1,sizeof(gtilehashead));
 
 			hitile++;
-			hitile =  5080;
+			hitile =  1000;
 			if (hitile > gmaltiles)
 			{
 				gmaltiles = hitile;
