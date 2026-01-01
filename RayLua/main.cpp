@@ -257,7 +257,8 @@ void InitLUTSystem() {
 
     // Load LUT texture
     lutTexture = LoadTexture("Shaders/lut.png");
-
+    SetTextureWrap(lutTexture, TEXTURE_WRAP_CLAMP);
+    SetTextureFilter(lutTexture, TEXTURE_FILTER_POINT);
     // Set shader uniforms
     lutTextureLocation = GetShaderLocation(lutShader, "lutTexture");
     int lutIntensityLocation = GetShaderLocation(lutShader, "lutIntensity");
