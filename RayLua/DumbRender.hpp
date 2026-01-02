@@ -2024,7 +2024,7 @@ private:
 
     static void LoadMapAndTiles()
     {
-        map = loadmap_imp((char*)"c:/Eugene/Games/build2/e3l8.MAP", NULL);
+        map = loadmap_imp((char*)"c:/Eugene/Games/build2/e3l6.MAP", NULL);
     }
 };
 
