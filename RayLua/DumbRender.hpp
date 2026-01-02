@@ -547,7 +547,7 @@ public:
             for(glignum=0;glignum<shadowtest2_numlights;glignum++)
             {
                 ncam.p = shadowtest2_light[glignum].p;
-                reset_context();
+                //reset_context();
                 ncam.cursect = shadowtest2_light[glignum].sect;
                 draw_hsr_polymost(&ncam,map,0);
             }
@@ -596,17 +596,6 @@ public:
 
         rlDrawRenderBatchActive();
         rlEnableBackfaceCulling();
-        //rlDisableBackfaceCulling();
-      //  rlDisableDepthTest();
-
-     //   glEnable(GL_POLYGON_OFFSET_FILL);
-     //   glPolygonOffset(-0.5f, 1.0f);
-        //  rlDisableDepthMask();
-
-        // set global shader variables. all 3 are points in world space (custom one)
-        // shader.setvector3 worldorigin to eyepol->worlduvs[0] //
-        // shader.setvector3 worldU to eyepol->worlduvs[1]
-        // shader.setvector3 worldV to eyepol->worlduvs[2]
 
         Vector3 worldOrigin = bpv3(eyepol[i].worlduvs[0]);
         Vector3 worldU = bpv3(eyepol[i].worlduvs[1]);
@@ -623,9 +612,11 @@ public:
             case 7: usedcol = {0.3,0.3,0,1}; break;
             default: useGrad = 0;break;
         }
-        float shd = Clamp(eyepol[i].shade,0.2,1);
+        float shd = Clamp(eyepol[i].shade*0.5+0.5,0.2,1);
         if (useGrad) usedcol.w *= shd;
             else { usedcol*=shd; }
+
+
       //  if (map->sect[eyepol[i].b2sect].surf[1].lotag==2) // water
       //  {
       //      usedcol *= Vector4{0.2f,0.7f,0.5f,1};
@@ -903,14 +894,14 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
         // DrawEyePoly(sw, sh, &plr, &b2cam); // ken render
 
         // Eyepol polys
-        bool draweye = true;
+        bool draweye = 0;
         bool drawtrilines =0;
         bool drawtripoly = 0;
-        bool drawlights = 0;
+        bool drawlights = 1;
         bool drawmonoloops = 0;
-        bool draweyepolheads = 1;
+        bool draweyepolheads = 0;
         bool drawmonostate = 0;
-        bool drawopaqes = 1;
+        bool drawopaqes = 0;
 
         rlDisableBackfaceCulling();
         BeginMode3D(camsrc);
@@ -1011,13 +1002,18 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
         if (drawmonostate) draw_mono_state();
         //if (!lightpos_t || !eyepolv || eyepoln <= 0) return;}
 
-        if (drawlights) { // Light polys
 
+    }
+
+
+    static void DrawLightsPost3d(float sw, float sh, Camera3D camsrc) {
+        { // Light polys
+            glEnable(GL_POLYGON_OFFSET_FILL);
+            glPolygonOffset(-2.0f, 1.0f);
             BeginMode3D(camsrc);
             rlDisableBackfaceCulling();
             rlDisableDepthMask();
             BeginBlendMode(BLEND_ADDITIVE);
-
             BeginShaderMode(lightShader);
 
             int lightRange = 10;
@@ -1051,8 +1047,6 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
                         }
                     }
                    rlDrawRenderBatchActive();
-
-
                     rlEnd();
 
                 }
@@ -1064,9 +1058,6 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
             EndMode3D();
         }
     }
-
-
-
     // Updated wall rendering with segments
     static void DrawMapstateTex(Camera3D rlcam)
     {
@@ -2024,7 +2015,7 @@ private:
 
     static void LoadMapAndTiles()
     {
-        map = loadmap_imp((char*)"c:/Eugene/Games/build2/e3l6.MAP", NULL);
+        map = loadmap_imp((char*)"c:/Eugene/Games/build2/lig.MAP", NULL);
     }
 };
 

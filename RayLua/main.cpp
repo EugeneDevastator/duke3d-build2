@@ -294,7 +294,8 @@ void MainLoop()
     CustomRenderTarget albedoTarget = CreateCustomRenderTarget(GetScreenWidth(), GetScreenHeight(), 0);
     CustomRenderTarget lightTarget = CreateCustomRenderTarget(GetScreenWidth(), GetScreenHeight(), albedoTarget.depthTexture);
     CustomRenderTarget combinedTarget = CreateCustomRenderTarget(GetScreenWidth(), GetScreenHeight(), 0);
-
+    int w = GetScreenWidth();
+    int h = GetScreenHeight();
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
         DumbCore::Update(deltaTime);
@@ -317,6 +318,7 @@ void MainLoop()
         glClear(GL_COLOR_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
         glDepthMask(GL_FALSE);
+        DumbRender::DrawLightsPost3d(w,h,*DumbCore::GetCamera());
         glDepthMask(GL_TRUE);
         EndCustomRenderTarget();
 
@@ -325,8 +327,7 @@ void MainLoop()
         glClear(GL_COLOR_BUFFER_BIT);
         glDisable(GL_DEPTH_TEST);
 
-        int w = GetScreenWidth();
-        int h = GetScreenHeight();
+
 
         // Draw albedo
         DrawTextureRec({albedoTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
@@ -334,6 +335,7 @@ void MainLoop()
 
         // Multiply blend lights
         BeginBlendMode(RL_BLEND_ADDITIVE);
+
         DrawTextureRec({lightTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
                       {0, 0, (float)w, (float)-h}, {0, 0}, WHITE);
         EndBlendMode();

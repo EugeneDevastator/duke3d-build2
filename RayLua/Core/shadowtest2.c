@@ -758,7 +758,6 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
     point3d curmp;
     int debhl[4];
 
-    // Chain building remains the same...
     for (h = 0; h < 2; h++) {
         i = rethead[h];
         debhl[h * 2] = eyepolvn;
@@ -1031,7 +1030,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 	    eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].surf[b->gisflor].uvcoords;
     	eyepol[eyepoln].uvform = curMap->sect[b->gligsect].surf[b->gisflor].uvform;
     	eyepol[eyepoln].pal = curMap->sect[b->gligsect].surf[b->gisflor].pal;
-    	eyepol[eyepoln].shade = curMap->sect[b->gligsect].surf[b->gisflor].rsc/4092.0f;
+    	eyepol[eyepoln].shade = curMap->sect[b->gligsect].surf[b->gisflor].rsc/8192.0f;
     }
     else    { // handle walls.
         eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab%3].uvcoords;
@@ -1039,7 +1038,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
      //   eyepol[eyepoln].alpha = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].alpha;
         eyepol[eyepoln].pal = curMap->sect[b->gligsect].wall[b->gligwall].surf.pal;
       //  eyepol[eyepoln].tilnum = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].tilnum;
-    	eyepol[eyepoln].shade = curMap->sect[b->gligsect].wall[b->gligwall].surf.rsc/4092.0f;
+    	eyepol[eyepoln].shade = curMap->sect[b->gligsect].wall[b->gligwall].surf.rsc/8192.0f;
     }
     eyepol[eyepoln].slabid = b->gligslab;
 
