@@ -34,7 +34,7 @@ if (useGradient==1) {
     finalColor = vec4(result, texColor.a * fragColor.a);
     } else {
         // Standard texture * color
-        finalColor = texColor * vec4(1,1,1,fragColor.a);
+        finalColor = vec4(texColor * fragColor);
     }
    // finalColor = vec4(result, texColor.a * fragColor.a);
     // Alternatively, you can blend with the original color visualization:

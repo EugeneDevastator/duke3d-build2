@@ -623,6 +623,9 @@ public:
             case 7: usedcol = {0.3,0.3,0,1}; break;
             default: useGrad = 0;break;
         }
+        float shd = Clamp(eyepol[i].shade,0.2,1);
+        if (useGrad) usedcol.w *= shd;
+            else { usedcol*=shd; }
       //  if (map->sect[eyepol[i].b2sect].surf[1].lotag==2) // water
       //  {
       //      usedcol *= Vector4{0.2f,0.7f,0.5f,1};
@@ -2021,7 +2024,7 @@ private:
 
     static void LoadMapAndTiles()
     {
-        map = loadmap_imp((char*)"c:/Eugene/Games/build2/e2l9.MAP", NULL);
+        map = loadmap_imp((char*)"c:/Eugene/Games/build2/e3l8.MAP", NULL);
     }
 };
 

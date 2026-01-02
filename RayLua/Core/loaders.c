@@ -731,7 +731,9 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 					sec[i].wall[j].surfn = 1;
 					sec[i].wall[j].owner = -1;
 					wall_t *thiswal = &sec[i].wall[j];
-
+					thiswal->xsurf[0].rsc=sur->rsc;
+					thiswal->xsurf[1].rsc=sur->rsc;
+					thiswal->xsurf[2].rsc=sur->rsc;
 					if (b7wal.nextsect >= 0 ) // (sec[i].wall[j].ns != -1) // ns are parsed later! nut we need to alloc now.
 					{
 						thiswal->surfn = 3;

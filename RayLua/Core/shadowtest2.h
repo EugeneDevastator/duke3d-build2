@@ -61,6 +61,7 @@ typedef struct {
     int curcol, flags;                  // Color and rendering flags
     tile_t *tpic;                       // Texture tile pointer
     int tilnum;
+    float shade;
     float ouvmat[9];                    // inverse perspective transformation
     point3d norm;                       // Surface normal vector
     int rdepth;

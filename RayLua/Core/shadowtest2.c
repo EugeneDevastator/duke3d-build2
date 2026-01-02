@@ -1031,6 +1031,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 	    eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].surf[b->gisflor].uvcoords;
     	eyepol[eyepoln].uvform = curMap->sect[b->gligsect].surf[b->gisflor].uvform;
     	eyepol[eyepoln].pal = curMap->sect[b->gligsect].surf[b->gisflor].pal;
+    	eyepol[eyepoln].shade = curMap->sect[b->gligsect].surf[b->gisflor].rsc/4092.0f;
     }
     else    { // handle walls.
         eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab%3].uvcoords;
@@ -1038,6 +1039,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
      //   eyepol[eyepoln].alpha = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].alpha;
         eyepol[eyepoln].pal = curMap->sect[b->gligsect].wall[b->gligwall].surf.pal;
       //  eyepol[eyepoln].tilnum = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].tilnum;
+    	eyepol[eyepoln].shade = curMap->sect[b->gligsect].wall[b->gligwall].surf.rsc/4092.0f;
     }
     eyepol[eyepoln].slabid = b->gligslab;
 
@@ -1775,7 +1777,8 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			// gurantees masks wont dupe on top of one another.
 			// could be done with drawpol mod simpler
 			drawpol_befclip(s + b->tagoffset, portaltag, s, portals[endpn].sect, plothead[0], plothead[1],  DP_PRESERVE_LOOP|DP_NO_SCANSECT|surflag, b);
-
+			// the problem here still remains - because rendering two areas in other spaces can overlap one another.
+			// seems that we need to do wccw for every vert to gurantee shared space.. darn
 			draw_hsr_enter_portal(map, myport, plothead[0], plothead[1], b);
 		} else {
 			drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1], surflag, b);
@@ -2210,6 +2213,7 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 		} else {
 			//drawpol_befclip(gcam.cursect-taginc, gcam.cursect, gcam.cursect,	b->chead[0],b->chead[1], 8|3 , b);
 			int res = -1;
+
 			mphremoveaboveincl(b->tagoffset); // clean anything above.
 			{
 				if (n < 3) {
