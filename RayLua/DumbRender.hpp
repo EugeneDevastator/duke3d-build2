@@ -172,24 +172,47 @@ public:
         // PORTAL SECTOR SURFS
         for (int i = 0; i < map->numsects; i++) { // floor ceil ports
             map->sect[i].tags[1] = -1;
+// duke part.
+            int portsi =-1;
+            int si = map->sect[i].headspri;
+            while (si > 0) {
+                if (map->spri[si].tilnum == 1 && map->spri[si].lotag == 7) {
+                    portsi = si;
+                    break;
+                }
+                si = map->spri[si].sectn;
+            }
 
-            if (map->sect[i].surf[1].lotag == 1 || map->sect[i].surf[1].lotag ==2) {
+            bool iswater = map->sect[i].surf[1].lotag == 1 || map->sect[i].surf[1].lotag ==2;
+            // duke3d water temp hak
+            if (iswater || portsi >= 0) {
+
                 // temp handle duke water
                 portal &p = portals[portaln];
                 int stag = map->sect[i].surf[1].lotag;
-                int isflor = 2-stag;
+
                 // find transporter sprite;
                 int si = map->sect[i].headspri;
                 int linkid = 0;
+                if (iswater)
                 while (si > 0) {
                     if (map->spri[si].tilnum == 1 && map->spri[si].lotag == 7) {
                         linkid = map->spri[si].hitag;
-
                         map->spri[si].p.z = map->sect[i].z[2 - stag];
                         break;
                     }
                     si = map->spri[si].sectn;
                 }
+                else { // not water
+                    si = portsi;
+                    int sid1 = abs(map->spri[si].p.z - map->sect[i].z[1]);
+                    int sid2 = abs(map->spri[si].p.z - map->sect[i].z[0]);
+                    p.surfid = sid1 < sid2;
+                    linkid = map->spri[si].hitag;
+                    map->sect[i].z[p.surfid]=map->spri[si].p.z;
+                    stag = (1-p.surfid)+1;
+                }
+                int isflor = 2-stag;
                 if (linkid == 0) continue;
                 uint32_t offset = (2 - stag) * 10000;
                 uint32_t offsetother = (-1 + stag) * 10000;
@@ -208,7 +231,7 @@ public:
                 map->sect[i].tags[1] = portaln;
                 portaln++;
             }
-            else
+            else // new temp portals for test.
             if (map->sect[i].surf[1].pal == 30 || map->sect[i].surf[0].pal == 30) {
                 portal &p = portals[portaln];
                 p.id = map->sect[i].surf[1].lotag;
@@ -597,7 +620,7 @@ public:
             case 1: usedcol = {0.5,0.6,1,1}; break;
             case 2: usedcol = {1,0.35,0.1,1}; break;
             case 8: usedcol = {0.6,0.9,0.2,1}; break;
-            case 7: usedcol = {0.8,0.9,0,0.4}; break;
+            case 7: usedcol = {0.3,0.3,0,1}; break;
             default: useGrad = 0;break;
         }
       //  if (map->sect[eyepol[i].b2sect].surf[1].lotag==2) // water
@@ -608,6 +631,14 @@ public:
 
         if (eyepol[i].alpha < 1.0f) {
             if (isopaque) return true;
+            int isf = eyepol[i].isflor;
+            if (isf>-1) {
+                int s = eyepol[i].b2sect;
+                int lo = map->sect[s].surf[1].lotag;
+                if (lo <1 || lo>2)
+                    return true; // skip non-water floors and ceils.
+            }
+
             rlDisableDepthMask();
            // rlDisableBackfaceCulling();
           // BeginBlendMode(RL_BLEND_ALP);
@@ -1990,7 +2021,7 @@ private:
 
     static void LoadMapAndTiles()
     {
-        map = loadmap_imp((char*)"c:/Eugene/Games/build2/e2l5.MAP", NULL);
+        map = loadmap_imp((char*)"c:/Eugene/Games/build2/e2l9.MAP", NULL);
     }
 };
 

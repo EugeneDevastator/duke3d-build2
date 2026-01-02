@@ -68,6 +68,7 @@ typedef struct {
     int* indices;
     int nid; // num of indices
     bool hasuvs;
+    int8_t isflor;
     // uv data
     point3d *worlduvs; // origin, u ,v
     float* uvform;

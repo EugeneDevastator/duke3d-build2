@@ -1025,7 +1025,9 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
     eyepol[eyepoln].tilnum = gtilenum;
 	eyepol[eyepoln].pal = 0;
 	eyepol[eyepoln].alpha = alphamul;
+	eyepol[eyepoln].isflor = -1;
     if (b->gisflor < 2) {
+    	eyepol[eyepoln].isflor = b->gisflor;
 	    eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].surf[b->gisflor].uvcoords;
     	eyepol[eyepoln].uvform = curMap->sect[b->gligsect].surf[b->gisflor].uvform;
     	eyepol[eyepoln].pal = curMap->sect[b->gligsect].surf[b->gisflor].pal;
