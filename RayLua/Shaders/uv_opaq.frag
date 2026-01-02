@@ -20,7 +20,17 @@ if (useGradient==1) {
     // Convert original RGB to luminance (0.0 to 1.0)
     // Divide by 3.0 since max sum is 3.0
     float luminance = (texColor.r + texColor.g + texColor.b) / 3.0;
-    luminance *= fragColor.a;
+    luminance *= (fragColor.a);
+
+    // easy contrast adjust with powering 1.
+    //luminance = pow(luminance, 3);
+
+    //inversion for pal 6, lookin hot
+    //luminance = 1.0-luminance;
+
+    // can also multiply lum.
+    //luminance*=2;
+
     // Create gradient: 0 (black) -> fragColor -> 1 (white)
     vec3 result;
     if (luminance <= 0.5) {

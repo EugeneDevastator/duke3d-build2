@@ -210,6 +210,7 @@ enum srenderType {
 	procedural
 };
 
+// flats aka surfs.
 enum frenderType {
 	flat,
 	parallaxcyl,
