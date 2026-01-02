@@ -90,6 +90,31 @@ def find_nearest_palette_color(target_color, palette):
     
     return nearest_color
 
+def create_color_replacement_mapping(base_palette, alt_palette):
+    """Create color replacement mapping from base palette to alternate palette"""
+    replacement_map = {}
+    
+    for i in range(256):
+        base_color = base_palette[i]
+        alt_color = alt_palette[i]
+        replacement_map[base_color] = alt_color
+    
+    return replacement_map
+
+def apply_color_replacement_to_lut(base_lut, replacement_map):
+    """Apply color replacement mapping to existing LUT"""
+    replaced_lut = []
+    
+    for row in base_lut:
+        replaced_row = []
+        for color in row:
+            # Find the replacement color, or use original if not found
+            replaced_color = replacement_map.get(color, color)
+            replaced_row.append(replaced_color)
+        replaced_lut.append(replaced_row)
+    
+    return replaced_lut
+
 def generate_neutral_lut():
     """Generate neutral LUT with configurable size"""
     lut_width = LUT_SIZE * LUT_SIZE
@@ -174,25 +199,35 @@ def main():
     save_lut_image(base_palette_lut, "duke3d_base_lut.png")
     
     # Generate palette swap LUTs (applied to base palette)
-    if genSwaps :
+    if genSwaps:
         for swap_index, swap_table in palette_swaps:
             print(f"Generating palette swap {swap_index} LUT...")
             swapped_palette = apply_palette_swap(base_palette, swap_table)
             swap_lut = convert_lut_to_palette(neutral_lut, swapped_palette)
             save_lut_image(swap_lut, f"duke3d_swap_{swap_index}_lut.png")
     
-    # Generate alternate palette LUTs (underwater, animation, etc.)
+    # Generate alternate palette LUTs using color replacement
     for alt_index, alt_palette in alt_palettes:
-        print(f"Generating alternate palette {alt_index} LUT...")
-        alt_lut = convert_lut_to_palette(neutral_lut, alt_palette)
+        print(f"Generating alternate palette {alt_index} LUT with color replacement...")
+        
+        # Create color replacement mapping
+        replacement_map = create_color_replacement_mapping(base_palette, alt_palette)
+        
+        # Apply replacement to base LUT
+        alt_lut = apply_color_replacement_to_lut(base_palette_lut, replacement_map)
         save_lut_image(alt_lut, f"duke3d_alt_{alt_index}_lut.png")
         
         # Also generate palette swaps applied to alternate palettes
-        if genSwaps :
+        if genSwaps:
             for swap_index, swap_table in palette_swaps:
                 print(f"Generating alternate palette {alt_index} with swap {swap_index} LUT...")
                 swapped_alt_palette = apply_palette_swap(alt_palette, swap_table)
-                swap_alt_lut = convert_lut_to_palette(neutral_lut, swapped_alt_palette)
+                
+                # Create replacement mapping for swapped alternate palette
+                swap_replacement_map = create_color_replacement_mapping(base_palette, swapped_alt_palette)
+                
+                # Apply replacement to base LUT
+                swap_alt_lut = apply_color_replacement_to_lut(base_palette_lut, swap_replacement_map)
                 save_lut_image(swap_alt_lut, f"duke3d_alt_{alt_index}_swap_{swap_index}_lut.png")
         
     total_luts = 1 + len(palette_swaps) + len(alt_palettes) + (len(alt_palettes) * len(palette_swaps))
@@ -200,12 +235,13 @@ def main():
     print(f"LUT dimensions: {LUT_SIZE * LUT_SIZE}x{LUT_SIZE}")
     print(f"Use with lutSize = {LUT_SIZE}.0 in shader")
     print("All images saved with nearest neighbor sampling (no interpolation)")
+    print("Alternate palettes use color replacement based on original palette mapping")
     
     # Print summary
     print(f"\nSummary:")
     print(f"- Base palette: 1 LUT")
     print(f"- Palette swaps: {len(palette_swaps)} LUTs")
-    print(f"- Alternate palettes: {len(alt_palettes)} LUTs")
+    print(f"- Alternate palettes (color replacement): {len(alt_palettes)} LUTs")
     print(f"- Alt palettes with swaps: {len(alt_palettes) * len(palette_swaps)} LUTs")
 
 if __name__ == "__main__":
