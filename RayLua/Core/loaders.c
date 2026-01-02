@@ -799,8 +799,11 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 					float  ypansub = 0;
 					if (isnpot(ysize) ) // not power of two
 					{
+						int powr = floor(sqrt(ysize));
+						int yclamsiz = pow(2,powr);
+
 						// probably need for other texture sizes too, but those are most common
-						float mul = ysize > 128 ? 1 : 2;
+						float mul = 256.0/yclamsiz;
 						// there are some shenanigans when texture yres is odd. skip for now.
 						//if ((int) ysize % 2)
 						//	ypansub = (ceil(ysize * 0.5f) * 4);
