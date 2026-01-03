@@ -843,10 +843,11 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 			// Fan from stack to new vertex
 			for (int j = 0; j < stack_top; j++) {
 				int v0 = stack[j], v1 = stack[j + 1], v2 = next_v;
-				double cross = (eyepolv[v1].x - eyepolv[v0].x) * (eyepolv[v2].y - eyepolv[v0].y) -
-				               (eyepolv[v1].y - eyepolv[v0].y) * (eyepolv[v2].x - eyepolv[v0].x);
 
-				if ((cross > 0) ^ needflip) {
+				// Determine winding based on chain orientation
+				bool upper_chain_triangle = (top_chain == 0);
+
+				if (upper_chain_triangle ^ needflip) {
 					eyepoli[eyepolin++] = v0;
 					eyepoli[eyepolin++] = v1;
 					eyepoli[eyepolin++] = v2;
@@ -861,19 +862,27 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 			stack[1] = next_v;
 			stack_top = 1;
 		} else {
-			// Pop convex vertices from same chain
+			// Pop convex vertices from same chain using sequence logic
 			while (stack_top > 0) {
 				int v0 = stack[stack_top - 1], v1 = stack[stack_top], v2 = next_v;
-				double cross = (eyepolv[v1].x - eyepolv[v0].x) * (eyepolv[v2].y - eyepolv[v1].y) -
-				               (eyepolv[v1].y - eyepolv[v0].y) * (eyepolv[v2].x - eyepolv[v1].x);
 
-				bool convex = (next_chain == 0) ? (cross > 0) : (cross < 0);
-				if (!convex) break;
+				// For monotone chains, convexity is determined by y-progression
+				// Chain 0 (upper): convex if y decreases then increases
+				// Chain 1 (lower): convex if y increases then decreases
+				bool y_turn_convex;
+				if (next_chain == 0) {
+					// Upper chain: convex if we have a "valley" (y goes down then up)
+					y_turn_convex = (eyepolv[v1].y <= eyepolv[v0].y) && (eyepolv[v2].y >= eyepolv[v1].y);
+				} else {
+					// Lower chain: convex if we have a "peak" (y goes up then down)
+					y_turn_convex = (eyepolv[v1].y >= eyepolv[v0].y) && (eyepolv[v2].y <= eyepolv[v1].y);
+				}
 
-				double tcross = (eyepolv[v1].x - eyepolv[v0].x) * (eyepolv[v2].y - eyepolv[v0].y) -
-				                (eyepolv[v1].y - eyepolv[v0].y) * (eyepolv[v2].x - eyepolv[v0].x);
+				if (!y_turn_convex) break;
 
-				if ((tcross > 0) ^ needflip) {
+				bool upper_chain_triangle = (next_chain == 0);
+
+				if (upper_chain_triangle ^ needflip) {
 					eyepoli[eyepolin++] = v0;
 					eyepoli[eyepolin++] = v1;
 					eyepoli[eyepolin++] = v2;
@@ -889,7 +898,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 		}
 	}
 
-	// Setup polygon record
+	// --------------- Setup polygon record
 	if (eyepoln + 1 >= eyepolmal) {
 		eyepolmal = max(eyepolmal<<1, 4096);
 		eyepol = (eyepol_t *) realloc(eyepol, eyepolmal * sizeof(eyepol_t));
