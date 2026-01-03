@@ -733,7 +733,9 @@ float cross_product(int a, int b, int c) {
 	point3d pc = eyepolv[c].wpos;
 	return (pb.x - pa.x) * (pc.y - pa.y) - (pb.y - pa.y) * (pc.x - pa.x);
 };
-
+static bool iseyeshared(int e1,int e2) {
+	return issamexy(eyepolv[e1].wpos,eyepolv[e2].wpos);
+}
 static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
     // ouput is x-monotone, left to right.
     float f, fx, fy, g, *fptr;
@@ -783,9 +785,26 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 
     bool needflip = b->istrimirror;
 
-    bool shared_start = 0;
-    bool shared_end = 0;
-    int total_vertices = chain_lengths[0] + chain_lengths[1] - (shared_start ? 1 : 0) - (shared_end ? 1 : 0);
+    bool shared_start = iseyeshared(chain_starts[0],chain_starts[1]);
+    bool shared_end = iseyeshared(chain_starts[0] + chain_lengths[0]-1,chain_starts[1] + chain_lengths[1]-1);
+	if (shared_start) {
+		int clipstart =0;
+		if (chain_lengths[1]>=chain_lengths[0])
+			clipstart = 1;
+		if (chain_lengths[clipstart]>3) {
+			chain_starts[clipstart]++;
+			chain_lengths[clipstart]--;
+		}
+	}
+	if (shared_end) {
+		int clipend =0;
+		if (chain_lengths[1]>=chain_lengths[0])
+			clipend=1;
+		if (chain_lengths[clipend]>3)
+			chain_lengths[clipend]--;
+	}
+
+	int total_vertices = chain_lengths[0] + chain_lengths[1];
 
     if (total_vertices < 3) {
         return;
