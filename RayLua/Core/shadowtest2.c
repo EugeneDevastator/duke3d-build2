@@ -795,120 +795,92 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
             chain_lengths[clipend]--;
         }
     }
+int total_vertices = chain_lengths[0] + chain_lengths[1];
+if (total_vertices < 3) return;
+int max_triangles = total_vertices;
+int tridx_start = eyepolin;
+ARENA_EXPAND(eyepoli, max_triangles * 3);
 
-    int total_vertices = chain_lengths[0] + chain_lengths[1];
-    if (total_vertices < 3) return;
-    int max_triangles = total_vertices;
-    int tridx_start = eyepolin;
-    ARENA_EXPAND(eyepoli, max_triangles * 3);
+int i0 = 0, i1 = 0;
+int stack[256];
+int stack_top = 0;
+bool needflip = !b->istrimirror;
+int triangle_count = 0;
 
+// Start with leftmost vertex
+if (eyepolv[chain_starts[0]].x <= eyepolv[chain_starts[1]].x) {
+    stack[0] = chain_starts[0];
+    i0 = 1;
+} else {
+    stack[0] = chain_starts[1];
+    i1 = 1;
+}
 
-    int i0 = 0, i1 = 0;
-    int stack[256];
-    int stack_top = 0;
-    bool needflip = !b->istrimirror;
-    int triangle_count = 0;
-    // Initialize with first two vertices (leftmost first)
-    if (eyepolv[chain_starts[0]].x <= eyepolv[chain_starts[1]].x) {
-	    stack[0] = chain_starts[0];
-	    stack[1] = chain_starts[1];
-	    i0 = 1;
+// Process all remaining vertices left to right
+while (i0 < chain_lengths[0] || i1 < chain_lengths[1]) {
+    int next_v, next_chain;
+
+    // Pick next vertex by x coordinate
+    if (i0 >= chain_lengths[0]) {
+        next_v = chain_starts[1] + i1++;
+        next_chain = 1;
+    } else if (i1 >= chain_lengths[1]) {
+        next_v = chain_starts[0] + i0++;
+        next_chain = 0;
     } else {
-	    stack[0] = chain_starts[1];
-	    stack[1] = chain_starts[0];
-	    i1 = 1;
-    }
-    stack_top = 1;
-
-    // Process vertices left to right
-    while (i0 < chain_lengths[0] || i1 < chain_lengths[1]) {
-        int next_v, next_chain;
-
-        // Select next vertex by x coordinate
-        if (i0 >= chain_lengths[0]) {
-            next_v = chain_starts[1] + i1++;
-            next_chain = 1;
-        } else if (i1 >= chain_lengths[1]) {
+        if (eyepolv[chain_starts[0] + i0].x <= eyepolv[chain_starts[1] + i1].x) {
             next_v = chain_starts[0] + i0++;
             next_chain = 0;
         } else {
-            if (eyepolv[chain_starts[0] + i0].x <= eyepolv[chain_starts[1] + i1].x) {
-                next_v = chain_starts[0] + i0++;
-                next_chain = 0;
-            } else {
-                next_v = chain_starts[1] + i1++;
-                next_chain = 1;
-            }
-        }
-
-        int top_chain = (stack[stack_top] >= chain_starts[1]) ? 1 : 0;
-
-        if (next_chain != top_chain) {
-            // Different chain - fan triangulation
-            for (int j = 0; j < stack_top; j++) {
-                int v0 = stack[j];
-                int v1 = stack[j + 1];
-                int v2 = next_v;
-
-                // Calculate triangle orientation
-                double ax = eyepolv[v1].x - eyepolv[v0].x;
-                double ay = eyepolv[v1].y - eyepolv[v0].y;
-                double bx = eyepolv[v2].x - eyepolv[v0].x;
-                double by = eyepolv[v2].y - eyepolv[v0].y;
-                double cross = ax * by - ay * bx;
-
-                if ((cross > -0.01f) ^ needflip) {
-                    eyepoli[eyepolin++] = v0;
-                    eyepoli[eyepolin++] = v1;
-                    eyepoli[eyepolin++] = v2;
-                } else {
-                    eyepoli[eyepolin++] = v0;
-                    eyepoli[eyepolin++] = v2;
-                    eyepoli[eyepolin++] = v1;
-                }
-                triangle_count++;
-            }
-            stack[0] = stack[stack_top];
-            stack[1] = next_v;
-            stack_top = 1;
-        } else {
-            // Same chain - pop convex vertices
-            while (stack_top > 0) {
-                int v0 = stack[stack_top - 1];
-                int v1 = stack[stack_top];
-                int v2 = next_v;
-
-                double ax = eyepolv[v1].x - eyepolv[v0].x;
-                double ay = eyepolv[v1].y - eyepolv[v0].y;
-                double bx = eyepolv[v2].x - eyepolv[v1].x;
-                double by = eyepolv[v2].y - eyepolv[v1].y;
-                double cross = ax * by - ay * bx;
-
-                bool convex = (next_chain == 0) ? (cross > 0.0f) : (cross < 0.0f);
-                if (!convex) break;
-
-                // Calculate triangle orientation for output
-                double tax = eyepolv[v1].x - eyepolv[v0].x;
-                double tay = eyepolv[v1].y - eyepolv[v0].y;
-                double tbx = eyepolv[v2].x - eyepolv[v0].x;
-                double tby = eyepolv[v2].y - eyepolv[v0].y;
-                double tcross = tax * tby - tay * tbx;
-
-                if ((tcross > -0.01f) ^ needflip) {
-                    eyepoli[eyepolin++] = v0;
-                    eyepoli[eyepolin++] = v1;
-                    eyepoli[eyepolin++] = v2;
-                } else {
-                    eyepoli[eyepolin++] = v0;
-                    eyepoli[eyepolin++] = v2;
-                    eyepoli[eyepolin++] = v1;
-                }
-                triangle_count++;
-                stack_top--;
-            }
-            stack[++stack_top] = next_v;
+            next_v = chain_starts[1] + i1++;
+            next_chain = 1;
         }
     }
+
+    int top_chain = (stack[stack_top] >= chain_starts[1]) ? 1 : 0;
+
+    if (next_chain != top_chain) {
+        // Fan from stack to new vertex
+        for (int j = 0; j < stack_top; j++) {
+            int v0 = stack[j], v1 = stack[j + 1], v2 = next_v;
+            double cross = (eyepolv[v1].x - eyepolv[v0].x) * (eyepolv[v2].y - eyepolv[v0].y) -
+                          (eyepolv[v1].y - eyepolv[v0].y) * (eyepolv[v2].x - eyepolv[v0].x);
+
+            if ((cross > 0) ^ needflip) {
+                eyepoli[eyepolin++] = v0; eyepoli[eyepolin++] = v1; eyepoli[eyepolin++] = v2;
+            } else {
+                eyepoli[eyepolin++] = v0; eyepoli[eyepolin++] = v2; eyepoli[eyepolin++] = v1;
+            }
+            triangle_count++;
+        }
+        stack[0] = stack[stack_top];
+        stack[1] = next_v;
+        stack_top = 1;
+    } else {
+        // Pop convex vertices from same chain
+        while (stack_top > 0) {
+            int v0 = stack[stack_top - 1], v1 = stack[stack_top], v2 = next_v;
+            double cross = (eyepolv[v1].x - eyepolv[v0].x) * (eyepolv[v2].y - eyepolv[v1].y) -
+                          (eyepolv[v1].y - eyepolv[v0].y) * (eyepolv[v2].x - eyepolv[v1].x);
+
+            bool convex = (next_chain == 0) ? (cross > 0) : (cross < 0);
+            if (!convex) break;
+
+            double tcross = (eyepolv[v1].x - eyepolv[v0].x) * (eyepolv[v2].y - eyepolv[v0].y) -
+                           (eyepolv[v1].y - eyepolv[v0].y) * (eyepolv[v2].x - eyepolv[v0].x);
+
+            if ((tcross > 0) ^ needflip) {
+                eyepoli[eyepolin++] = v0; eyepoli[eyepolin++] = v1; eyepoli[eyepolin++] = v2;
+            } else {
+                eyepoli[eyepolin++] = v0; eyepoli[eyepolin++] = v2; eyepoli[eyepolin++] = v1;
+            }
+            triangle_count++;
+            stack_top--;
+        }
+        stack[++stack_top] = next_v;
+    }
+}
+
     // Setup polygon record
     if (eyepoln + 1 >= eyepolmal) {
         eyepolmal = max(eyepolmal<<1, 4096);

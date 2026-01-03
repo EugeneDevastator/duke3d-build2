@@ -10,6 +10,7 @@
 //
 
 #define epsilon 0.0000001f
+#define epsilond 0.000001
 static inline float vlen(point3d *p) {
     return sqrtf(p->x * p->x + p->y * p->y + p->z * p->z);
 }
@@ -51,7 +52,7 @@ static inline bool issamexy(point3d a, point3d b) {
     return ((fabsf(a.x - b.x) + fabsf(a.y-b.y)) < epsilon);
 }
 static inline bool issamexyd(dpoint3d a, dpoint3d b) {
-    return ((fabsf(a.x - b.x) + fabsf(a.y-b.y)) < epsilon);
+    return ((fabs(a.x - b.x) + fabs(a.y-b.y)) < epsilond);
 }
 static inline point3d local_to_world_point(point3d local_pos, transform *tr) {
     point3d world;

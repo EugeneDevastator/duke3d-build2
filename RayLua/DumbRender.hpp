@@ -844,7 +844,7 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
         rlEnableDepthTest();
         rlEnableDepthMask();
         rlDisableBackfaceCulling();
-       // BeginBlendMode(BLEND_ADDITIVE);
+        BeginBlendMode(BLEND_ADDITIVE);
         if ((!(!eyepol || !eyepolv || eyepoln <= 0))) {
             for (int opaq = 1; opaq >= 0; opaq--) {
                 for (int i = 0; i < eyepoln; i++) {
