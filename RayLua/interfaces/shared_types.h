@@ -17,10 +17,18 @@ int name##mal = 0; \
 int name##siz = sizeof(typ)
 
 // Add and assign value to arena, returns pointer to new element
+// Expand arena to hold at least 'count' total elements
+#define ARENA_EXPAND(name, count) \
+do { \
+if ((name##mal+count) > name##mal) { \
+name##mal += (count); \
+name = realloc(name, name##mal * name##siz); \
+} \
+} while(0)
+
+// Add and assign value to arena, returns pointer to new element
+// Assumes sufficient capacity already allocated
 #define ARENA_ADD(name, val) ( \
-(name##n >= name##mal) ? \
-(name##mal = name##mal ? (name##mal << 1) : 16, \
-name = realloc(name, name##mal * name##siz)) : name, \
 name[name##n] = (val), \
 &name[name##n++] \
 )
