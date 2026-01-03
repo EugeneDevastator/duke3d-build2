@@ -319,6 +319,7 @@ void MainLoop()
         glEnable(GL_DEPTH_TEST);
         glDepthMask(GL_FALSE);
         DumbRender::DrawLightsPost3d(w,h,*DumbCore::GetCamera());
+        DumbRender::DrawPost3d(w,h,*DumbCore::GetCamera());
         glDepthMask(GL_TRUE);
         EndCustomRenderTarget();
 
@@ -326,8 +327,6 @@ void MainLoop()
         BeginCustomRenderTarget(combinedTarget);
         glClear(GL_COLOR_BUFFER_BIT);
         glDisable(GL_DEPTH_TEST);
-
-
 
         // Draw albedo
         DrawTextureRec({albedoTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},

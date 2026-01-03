@@ -1,4 +1,4 @@
-//
+ //
 // Created by omnis on 12/8/2025.
 //
 
@@ -48,6 +48,9 @@ static inline void normalize_transform(transform *tr) {
     if (flen > 0.0001f) scalardivv(&tr->d, flen);
 }
 static inline bool issamexy(point3d a, point3d b) {
+    return ((fabsf(a.x - b.x) + fabsf(a.y-b.y)) < epsilon);
+}
+static inline bool issamexyd(dpoint3d a, dpoint3d b) {
     return ((fabsf(a.x - b.x) + fabsf(a.y-b.y)) < epsilon);
 }
 static inline point3d local_to_world_point(point3d local_pos, transform *tr) {

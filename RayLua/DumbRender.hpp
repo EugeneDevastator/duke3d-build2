@@ -592,7 +592,6 @@ public:
         return {(float)buildcoord.x, (float)-buildcoord.z, (float)buildcoord.y};
     }
     static bool draw_eyepol_withuvtex(float sw, float sh, int i, int v0, int vertCount, bool isopaque) {
-        int v1 = eyepol[i + 1].vert0;
 
         rlDrawRenderBatchActive();
         rlEnableBackfaceCulling();
@@ -645,7 +644,8 @@ public:
             rlEnableDepthMask();
             usedcol.w *= 1;
         }
-
+        BeginBlendMode(BLEND_ADDITIVE);
+        usedcol.w=0.3;
         BeginShaderMode(uvShaderDesc.shader);
         rlBegin(RL_TRIANGLES);
         SetUVShaderParams(uvShaderDesc,
@@ -848,15 +848,16 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
         if ((!(!eyepol || !eyepolv || eyepoln <= 0))) {
             for (int opaq = 1; opaq >= 0; opaq--) {
                 for (int i = 0; i < eyepoln; i++) {
-                    int v0 = eyepol[i].vert0;
+                    int v0 = eyepol[i].tricnt;
                     int v1 = eyepol[i + 1].vert0;
                     int vertCount = v1 - v0;
-                    if (vertCount < 3) continue;
-
+                    if (eyepol[i].tricnt < 1) continue;
                     draw_eyepol_withuvtex(sw, sh, i, v0, vertCount, opaq);
                 }
             }
         }
+
+        EndBlendMode();
     }
     static void ProcessKeys() {
 
@@ -874,7 +875,7 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
         if (IsKeyPressed(KEY_LEFT_SHIFT)) {
             mono_curchain--;
         }
-        if (IsKeyPressed(KEY_P)) {
+        if (IsKeyDown(KEY_P)) {
             operstopn++;
         }
         if (IsKeyPressed(KEY_O)) {
@@ -885,8 +886,8 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
         // Vector2 v1 = {0, 0};
         // Vector2 v2 = {sw, sh};
         // Vector2 v3 = {sw / 2, sh};
-        Color transparentWhite = {255, 255, 255, 128};
-        ClearBackground({50,50,60,255});  // Set your desired color
+     //   Color transparentWhite = {255, 255, 255, 128};
+    //    ClearBackground({50,50,60,255});  // Set your desired color
 
 
         if (g_mono_dbg.snapshot_count > 0)
@@ -895,19 +896,19 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
         // DrawEyePoly(sw, sh, &plr, &b2cam); // ken render
 
         // Eyepol polys
-        bool draweye = 0;
+        bool draweye = 1;
         bool drawtrilines =0;
         bool drawtripoly = 0;
         bool drawlights = 1;
         bool drawmonoloops = 0;
-        bool draweyepolheads = 0;
+        bool draweyepolheads = 1;
         bool drawmonostate = 0;
         bool drawopaqes = 0;
 
         rlDisableBackfaceCulling();
         BeginMode3D(camsrc);
 
-        if (draweye && (!(!eyepol || !eyepolv || eyepoln <= 0)))
+        if ((!(!eyepol || !eyepolv || eyepoln <= 0)))
             {
             BeginBlendMode(BLEND_ADDITIVE);
             rlEnableBackfaceCulling();
@@ -930,9 +931,9 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
                     opercurr++;
                     if (drawtripoly)
                         draw_eyepol_tridebug(sw, sh, i, v0, vertCount);
-                    if (drawopaqes && OPERISOK )
-                        draw_eyepol_withuvtex(sw, sh, i, v0, vertCount,1);
-                    if (draweyepolheads && OPERONLYLAST) {
+                  //  if (drawopaqes && OPERISOK )
+                  //      draw_eyepol_withuvtex(sw, sh, i, v0, vertCount,1);
+                    if ((draweyepolheads) && OPERONLYLAST) {
                              {
 
                             rlDisableDepthMask();
@@ -2016,7 +2017,7 @@ private:
 
     static void LoadMapAndTiles()
     {
-        map = loadmap_imp((char*)"c:/Eugene/Games/build2/e2l5.MAP", NULL);
+        map = loadmap_imp((char*)"c:/Eugene/Games/build2/uv.MAP", NULL);
     }
 };
 

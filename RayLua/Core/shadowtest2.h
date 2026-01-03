@@ -80,10 +80,10 @@ typedef struct {
 
 typedef struct {
     union {
-        point3d wpos; // true world pos after all transforms
-        struct { float x, y, z; }; // compat.
+        dpoint3d wpos; // true world pos after all transforms
+        struct { double x, y, z; }; // compat.
     };
-    dpoint3d uvpos; // world pos in original space;
+    dpoint3d uvpos; // world pos in original map space;
 
 } vert3d_t;
 // ================================================================================================

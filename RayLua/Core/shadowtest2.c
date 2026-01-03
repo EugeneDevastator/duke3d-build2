@@ -728,17 +728,17 @@ static void xformbac(double rx, double ry, double rz, dpoint3d *o, bdrawctx *b) 
 
 // Helper function to check turn direction
 float cross_product_eyev(int a, int b, int c) {
-	point3d pa = eyepolv[a].wpos;
-	point3d pb = eyepolv[b].wpos;
-	point3d pc = eyepolv[c].wpos;
+	dpoint3d pa = eyepolv[a].wpos;
+	dpoint3d pb = eyepolv[b].wpos;
+	dpoint3d pc = eyepolv[c].wpos;
 	return (pb.x - pa.x) * (pc.y - pa.y) - (pb.y - pa.y) * (pc.x - pa.x);
 };
 static bool iseyeshared(int e1,int e2) {
-	return issamexy(eyepolv[e1].wpos,eyepolv[e2].wpos);
+	return issamexyd(eyepolv[e1].wpos,eyepolv[e2].wpos);
 }
 
 static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
-    float f, fx, fy;
+    double f, fx, fy;
     int i, h, rethead[2];
     cam_t cam = b->cam;
     double *xform = b->xformmat;
@@ -754,7 +754,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
     rethead[1] = rethead1;
     int chain_starts[2];
     int chain_lengths[2] = {0, 0};
-    point3d curmp;
+    dpoint3d curmp;
     int debhl[4];
 
     // Build vertex chains
@@ -763,12 +763,11 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
         debhl[h * 2] = eyepolvn;
         chain_starts[h] = eyepolvn;
         do {
-            curmp = (point3d){mp[i].pos.x, mp[i].pos.y, mp[i].pos.z};
             if (eyepolvn >= eyepolvmal) {
                 eyepolvmal = max(eyepolvmal<<1, 16384);
                 eyepolv = (vert3d_t *) realloc(eyepolv, eyepolvmal * sizeof(vert3d_t));
             }
-            eyepolv[eyepolvn].wpos = curmp;
+            eyepolv[eyepolvn].wpos = mp[i].pos;
             eyepolvn++;
             chain_lengths[h]++;
             i = mp[i].n;
@@ -799,25 +798,25 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 
     int total_vertices = chain_lengths[0] + chain_lengths[1];
     if (total_vertices < 3) return;
-
-    // Conservative triangle allocation
     int max_triangles = total_vertices;
     int tridx_start = eyepolin;
     ARENA_EXPAND(eyepoli, max_triangles * 3);
+
 
     int i0 = 0, i1 = 0;
     int stack[256];
     int stack_top = 0;
     bool needflip = !b->istrimirror;
     int triangle_count = 0;
-
-    // Initialize with leftmost vertex
+    // Initialize with first two vertices (leftmost first)
     if (eyepolv[chain_starts[0]].x <= eyepolv[chain_starts[1]].x) {
-        stack[0] = chain_starts[0];
-        stack[1] = (i1 < chain_lengths[1]) ? chain_starts[1] + i1++ : chain_starts[0] + ++i0;
+	    stack[0] = chain_starts[0];
+	    stack[1] = chain_starts[1];
+	    i0 = 1;
     } else {
-        stack[0] = chain_starts[1];
-        stack[1] = (i0 < chain_lengths[0]) ? chain_starts[0] + i0++ : chain_starts[1] + ++i1;
+	    stack[0] = chain_starts[1];
+	    stack[1] = chain_starts[0];
+	    i1 = 1;
     }
     stack_top = 1;
 
@@ -852,11 +851,11 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
                 int v2 = next_v;
 
                 // Calculate triangle orientation
-                float ax = eyepolv[v1].x - eyepolv[v0].x;
-                float ay = eyepolv[v1].y - eyepolv[v0].y;
-                float bx = eyepolv[v2].x - eyepolv[v0].x;
-                float by = eyepolv[v2].y - eyepolv[v0].y;
-                float cross = ax * by - ay * bx;
+                double ax = eyepolv[v1].x - eyepolv[v0].x;
+                double ay = eyepolv[v1].y - eyepolv[v0].y;
+                double bx = eyepolv[v2].x - eyepolv[v0].x;
+                double by = eyepolv[v2].y - eyepolv[v0].y;
+                double cross = ax * by - ay * bx;
 
                 if ((cross > -0.01f) ^ needflip) {
                     eyepoli[eyepolin++] = v0;
@@ -879,21 +878,21 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
                 int v1 = stack[stack_top];
                 int v2 = next_v;
 
-                float ax = eyepolv[v1].x - eyepolv[v0].x;
-                float ay = eyepolv[v1].y - eyepolv[v0].y;
-                float bx = eyepolv[v2].x - eyepolv[v1].x;
-                float by = eyepolv[v2].y - eyepolv[v1].y;
-                float cross = ax * by - ay * bx;
+                double ax = eyepolv[v1].x - eyepolv[v0].x;
+                double ay = eyepolv[v1].y - eyepolv[v0].y;
+                double bx = eyepolv[v2].x - eyepolv[v1].x;
+                double by = eyepolv[v2].y - eyepolv[v1].y;
+                double cross = ax * by - ay * bx;
 
                 bool convex = (next_chain == 0) ? (cross > 0.0f) : (cross < 0.0f);
                 if (!convex) break;
 
                 // Calculate triangle orientation for output
-                float tax = eyepolv[v1].x - eyepolv[v0].x;
-                float tay = eyepolv[v1].y - eyepolv[v0].y;
-                float tbx = eyepolv[v2].x - eyepolv[v0].x;
-                float tby = eyepolv[v2].y - eyepolv[v0].y;
-                float tcross = tax * tby - tay * tbx;
+                double tax = eyepolv[v1].x - eyepolv[v0].x;
+                double tay = eyepolv[v1].y - eyepolv[v0].y;
+                double tbx = eyepolv[v2].x - eyepolv[v0].x;
+                double tby = eyepolv[v2].y - eyepolv[v0].y;
+                double tcross = tax * tby - tay * tbx;
 
                 if ((tcross > -0.01f) ^ needflip) {
                     eyepoli[eyepolin++] = v0;
@@ -910,7 +909,6 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
             stack[++stack_top] = next_v;
         }
     }
-
     // Setup polygon record
     if (eyepoln + 1 >= eyepolmal) {
         eyepolmal = max(eyepolmal<<1, 4096);
@@ -947,14 +945,14 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 
         f = 1.0 / ((b->gouvmat[0] * fx + b->gouvmat[3] * fy + b->gouvmat[6]) * cam.h.z);
 
-        float retx = ((fx - cam.h.x) * cam.r.x + (fy - cam.h.y) * cam.d.x + cam.h.z * cam.f.x) * f + cam.p.x;
-        float rety = ((fx - cam.h.x) * cam.r.y + (fy - cam.h.y) * cam.d.y + cam.h.z * cam.f.y) * f + cam.p.y;
-        float retz = ((fx - cam.h.x) * cam.r.z + (fy - cam.h.y) * cam.d.z + cam.h.z * cam.f.z) * f + cam.p.z;
+        double retx = ((fx - cam.h.x) * cam.r.x + (fy - cam.h.y) * cam.d.x + cam.h.z * cam.f.x) * f + cam.p.x;
+        double rety = ((fx - cam.h.x) * cam.r.y + (fy - cam.h.y) * cam.d.y + cam.h.z * cam.f.y) * f + cam.p.y;
+        double retz = ((fx - cam.h.x) * cam.r.z + (fy - cam.h.y) * cam.d.z + cam.h.z * cam.f.z) * f + cam.p.z;
 
         dpoint3d ret = {retx, rety, retz};
         eyepolv[ip].uvpos = ret;
         wccw_transform(&ret, &b->movedcam, &b->orcam);
-        eyepolv[ip].wpos = (point3d){ret.x, ret.y, ret.z};
+        eyepolv[ip].wpos = ret;
     }
 
     eyepol[eyepoln].c1 = debhl[0];
@@ -1107,7 +1105,7 @@ static void drawtag_debug(int rethead0, int rethead1, bdrawctx *b) {
 				//	LOOPADD(ret)
 			}
 			wccw_transform(&ret, &b->cam, &b->orcam);
-			eyepolv[eyepolvn].wpos = (point3d){ret.x, ret.y, ret.z};
+			eyepolv[eyepolvn].wpos = (dpoint3d){ret.x, ret.y, ret.z};
 
 			eyepolvn++;
 
@@ -1618,7 +1616,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		for (ww = twaln; ww >= 0; ww -= twaln)
 			plothead[isflor] = mono_ins(
 				plothead[isflor], twal[ww].x, twal[ww].y,
-				b->gnorm.z * -1e9);
+				b->gnorm.z * -1e12);
 		//do not replace w/single zenith point - ruins precision
 		i = isflor ^ 1;
 		for (ww = 0; ww <= twaln; ww++) {
