@@ -613,7 +613,7 @@ public:
         }
         float shd = Clamp(eyepol[i].shade*0.5+0.5,0.5 ,1);
         if (useGrad) usedcol.w *= shd;
-           else { usedcol*=shd; }
+           else { usedcol*=shd; usedcol.w=1.0;}
 
 
       //  if (map->sect[eyepol[i].b2sect].surf[1].lotag==2) // water
@@ -644,8 +644,8 @@ public:
             rlEnableDepthMask();
             usedcol.w *= 1;
         }
-        BeginBlendMode(BLEND_ADDITIVE);
-        usedcol.w=0.3;
+      //  BeginBlendMode(BLEND_ADDITIVE);        usedcol.w=0.3;
+
         BeginShaderMode(uvShaderDesc.shader);
         rlBegin(RL_TRIANGLES);
         SetUVShaderParams(uvShaderDesc,
@@ -2017,7 +2017,7 @@ private:
 
     static void LoadMapAndTiles()
     {
-        map = loadmap_imp((char*)"c:/Eugene/Games/build2/e2l5.MAP", NULL);
+        map = loadmap_imp((char*)"c:/Eugene/Games/build2/prt31.MAP", NULL);
     }
 };
 

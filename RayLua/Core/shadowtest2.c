@@ -809,7 +809,8 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 	int triangle_count = 0;
 
 	// Start with leftmost vertex
-	if (eyepolv[chain_starts[0]].x <= eyepolv[chain_starts[1]].x) {
+
+	if ((eyepolv[chain_starts[0]].x <= eyepolv[chain_starts[1]].x)) {
 		stack[0] = chain_starts[0];
 		i0 = 1;
 	} else {
