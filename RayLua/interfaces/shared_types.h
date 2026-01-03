@@ -6,6 +6,46 @@
 #define RAYLIB_LUA_IMGUI_SHARED_TYPES_H
 #include <stdbool.h>
 #include <stdint.h>
+
+// type defines
+// Declare an arena for type 'typ' with base name 'name'
+// Creates: name (pointer), name##n (count), name##mal (capacity), name##siz (sizeof)
+#define ARENA(typ, name) \
+typ* name = NULL; \
+int name##n = 0; \
+int name##mal = 0; \
+int name##siz = sizeof(typ)
+
+// Add and assign value to arena, returns pointer to new element
+#define ARENA_ADD(name, val) ( \
+(name##n >= name##mal) ? \
+(name##mal = name##mal ? (name##mal << 1) : 16, \
+name = realloc(name, name##mal * name##siz)) : name, \
+name[name##n] = (val), \
+&name[name##n++] \
+)
+
+// Add without assignment, returns pointer to new element
+#define ARENA_PUSH(name) ( \
+(name##n >= name##mal) ? \
+(name##mal = name##mal ? (name##mal << 1) : 16, \
+name = realloc(name, name##mal * name##siz)) : name, \
+&name[name##n++] \
+)
+
+// Free arena
+#define ARENA_FREE(name) \
+do { \
+free(name); \
+name = NULL; \
+name##n = 0; \
+name##mal = 0; \
+} while(0)
+
+// Reset without freeing
+#define ARENA_RESET(name) (name##n = 0)
+
+// ------------------------------------------------
 // duke tags defs.
 #define MT_LAST 15 // index, not count
 

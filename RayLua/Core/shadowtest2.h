@@ -67,7 +67,7 @@ typedef struct {
     int rdepth;
     // triangulation data
     int* indices;
-    int nid; // num of indices
+    int tridx, nid; // start ids and num of indice
     bool hasuvs;
     int8_t isflor;
     // uv data

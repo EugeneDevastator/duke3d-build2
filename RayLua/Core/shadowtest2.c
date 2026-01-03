@@ -19,6 +19,7 @@
 #define USESSE2 0
 #define USENEWLIGHT 1 //FIXFIXFIX
 #define USEGAMMAHACK 1 //FIXFIXFIX
+
 int renderinterp = 1;
 int compact2d = 0;
 /*
@@ -251,12 +252,14 @@ __declspec(align(16)) static float g_qamb[4]; //holder for SSE to avoid degenera
 static point3d slightpos[LIGHTMAX], slightdir[LIGHTMAX];
 
 static float spotwid[LIGHTMAX];
-
-
-eyepol_t *eyepol = 0; // 4096 eyepol_t's = 192KB
-vert3d_t *eyepolv = 0; //16384 point2d's  = 128KB
-int eyepoln = 0, glignum = 0;
-int eyepolmal = 0, eyepolvn = 0, eyepolvmal = 0;
+// define ARENA(t,n) t* n =0; int nmal=0, nn=0;
+ARENA(eyepol_t, eyepol);
+ARENA(vert3d_t, eyepolv);
+ARENA(uint32_t, eyepoli);
+//eyepol_t *eyepol = 0; // 4096 eyepol_t's = 192KB
+//vert3d_t *eyepolv = 0; //16384 point2d's  = 128KB
+int glignum = 0;
+//int eyepolvn = 0, eyepolvmal = 0;
 #define LIGHASHSIZ 1024
 static int ligpolmaxvert = 0;
 #define lighash(sect,wall,slab) ((((slab)<<6)+((sect)<<4)+(wall))&(LIGHASHSIZ-1))
