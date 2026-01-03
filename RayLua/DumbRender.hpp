@@ -611,9 +611,9 @@ public:
             case 7: usedcol = {0.3,0.3,0,1}; break;
             default: useGrad = 0;break;
         }
-      //  float shd = Clamp(eyepol[i].shade*0.5+0.5,0.2,1);
-     //  if (useGrad) usedcol.w *= shd;
-     //      else { usedcol*=shd; }
+        float shd = Clamp(eyepol[i].shade*0.5+0.5,0.5 ,1);
+        if (useGrad) usedcol.w *= shd;
+           else { usedcol*=shd; }
 
 
       //  if (map->sect[eyepol[i].b2sect].surf[1].lotag==2) // water
@@ -843,7 +843,8 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
         //rlDisableDepthTest();
         rlEnableDepthTest();
         rlEnableDepthMask();
-        rlDisableBackfaceCulling();
+        //rlDisableBackfaceCulling();
+        rlEnableBackfaceCulling();
         BeginBlendMode(BLEND_ADDITIVE);
         if ((!(!eyepol || !eyepolv || eyepoln <= 0))) {
             for (int opaq = 1; opaq >= 0; opaq--) {
@@ -955,9 +956,8 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
                                         {rlColor4f(1 - hd, hd * 0.3f, hd, 1);}
 
                                     rlVertex3f(eyepolv[vi-1].x, -eyepolv[vi - 1].z, eyepolv[vi - 1].y);
-
                                     rlColor4f(1 - hd, hd * 0.3f, hd, 1);
-                                    rlVertex3f(eyepolv[vi].x, -eyepolv[vi].z, eyepolv[vi].y);
+                                    rlVertex3f(eyepolv[vi].x, -eyepolv[vi].z+0.1, eyepolv[vi].y);
                                 }
                                 s = eyepol[i].c2;
                                 e = eyepol[i].e2;
@@ -2017,7 +2017,7 @@ private:
 
     static void LoadMapAndTiles()
     {
-        map = loadmap_imp((char*)"c:/Eugene/Games/build2/uv.MAP", NULL);
+        map = loadmap_imp((char*)"c:/Eugene/Games/build2/e2l5.MAP", NULL);
     }
 };
 

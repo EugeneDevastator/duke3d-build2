@@ -781,20 +781,21 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 	bool shared_end = iseyeshared(chain_starts[0] + chain_lengths[0] - 1,
 	                              chain_starts[1] + chain_lengths[1] - 1);
 
-	if (shared_start) {
-		int clipstart = (chain_lengths[1] >= chain_lengths[0]) ? 1 : 0;
-		if (chain_lengths[clipstart] > 1) {
-			chain_starts[clipstart]++;
-			chain_lengths[clipstart]--;
-		}
-	}
+//	if (shared_start) {
+//		int clipstart = (chain_lengths[1] >= chain_lengths[0]) ? 1 : 0;
+//		if (chain_lengths[clipstart] > 1) {
+//			chain_starts[clipstart]++;
+//			chain_lengths[clipstart]--;
+//		}
+//	}
+//
+//	if (shared_end) {
+//		int clipend = (chain_lengths[1] >= chain_lengths[0]) ? 1 : 0;
+//		if (chain_lengths[clipend] > 1) {
+//			chain_lengths[clipend]--;
+//		}
+//	}
 
-	if (shared_end) {
-		int clipend = (chain_lengths[1] >= chain_lengths[0]) ? 1 : 0;
-		if (chain_lengths[clipend] > 1) {
-			chain_lengths[clipend]--;
-		}
-	}
 	int total_vertices = chain_lengths[0] + chain_lengths[1];
 	if (total_vertices < 3) return;
 	int max_triangles = total_vertices;
@@ -1601,7 +1602,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		for (ww = twaln; ww >= 0; ww -= twaln)
 			plothead[isflor] = mono_ins(
 				plothead[isflor], twal[ww].x, twal[ww].y,
-				b->gnorm.z * -1e12);
+				b->gnorm.z * -1e9);
 		//do not replace w/single zenith point - ruins precision
 		i = isflor ^ 1;
 		for (ww = 0; ww <= twaln; ww++) {
