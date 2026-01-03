@@ -66,8 +66,7 @@ typedef struct {
     point3d norm;                       // Surface normal vector
     int rdepth;
     // triangulation data
-    int* indices;
-    int tridx, nid; // start ids and num of indice
+    int triidstart, tricnt; // start ids and num of indice
     bool hasuvs;
     int8_t isflor;
     // uv data
@@ -105,6 +104,7 @@ extern int shadowtest2_sectgotn;                // Size of global sector bit arr
 // Rendering mode control
 extern int shadowtest2_rendmode;                // Current rendering mode (0-4)
 extern eyepol_t *eyepol; // 4096 eyepol_t's = 192KB
+extern uint32_t *eyepoli; // 4096 eyepol_t's = 192KB
 extern vert3d_t *eyepolv; //16384 point2d's  = 128KB
 extern int eyepoln, glignum;
 extern int eyepolmal, eyepolvn, eyepolvmal;

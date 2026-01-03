@@ -607,14 +607,14 @@ public:
         switch (eyepol[i].pal) {
             case 0: useGrad = 0; break;
             case 1: usedcol = {0.5,0.6,1,1}; break;
-            case 2: usedcol = {1,0.35,0.1,1}; break;
+            case 2: usedcol = {1,0.35,0.05,0.95f}; break;
             case 8: usedcol = {0.6,0.9,0.2,1}; break;
             case 7: usedcol = {0.3,0.3,0,1}; break;
             default: useGrad = 0;break;
         }
-        float shd = Clamp(eyepol[i].shade*0.5+0.5,0.2,1);
-        if (useGrad) usedcol.w *= shd;
-            else { usedcol*=shd; }
+      //  float shd = Clamp(eyepol[i].shade*0.5+0.5,0.2,1);
+     //  if (useGrad) usedcol.w *= shd;
+     //      else { usedcol*=shd; }
 
 
       //  if (map->sect[eyepol[i].b2sect].surf[1].lotag==2) // water
@@ -660,10 +660,11 @@ public:
 
         SetShaderValue(uvShaderDesc.shader, uvShaderDesc.useGradientloc,&useGrad, SHADER_UNIFORM_INT);
 
-        for (int ii = 0; ii < eyepol[i].nid; ii += 3) {
+        for (int locidx = 0; locidx < eyepol[i].tricnt; locidx += 1) {
 
             for (int j = 0; j < 3; j++) {
-                int idx = eyepol[i].indices[ii+j];
+                int iidx = eyepol[i].triidstart + locidx*3 +j;
+                uint32_t idx = eyepoli[iidx];
                 Vector3 verwpos = buildToRaylibPos(eyepolv[idx].wpos);
                 Vector3 uvwpos = bpv3(eyepolv[idx].uvpos);
                 Vector3 localPos = uvwpos - worldOrigin;
@@ -706,14 +707,14 @@ public:
 
         rlBegin(RL_TRIANGLES);
 
-        for (int ii = 0; ii < eyepol[i].nid; ii += 3) {
-            float g = (ii/3 /5.0f);
-            rlColor4f(eyepol[i].slabid/3.0f,g+0.1f,b,0.2);
-            for (int j = 0; j < 3; j++) {
-                int idx = eyepol[i].indices[ii+j];
-                rlVertex3f(eyepolv[idx].x, -eyepolv[idx].z, eyepolv[idx].y);
-            }
-        }
+     //  for (int ii = 0; ii < eyepol[i].nid; ii += 3) {
+     //      float g = (ii/3 /5.0f);
+     //      rlColor4f(eyepol[i].slabid/3.0f,g+0.1f,b,0.2);
+     //      for (int j = 0; j < 3; j++) {
+     //          int idx = eyepol[i].indices[ii+j];
+     //          rlVertex3f(eyepolv[idx].x, -eyepolv[idx].z, eyepolv[idx].y);
+     //      }
+     //  }
         rlEnd();
         rlDrawRenderBatchActive();
 
@@ -979,15 +980,15 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
                     glEnable(GL_POLYGON_OFFSET_FILL);
                     glPolygonOffset(-2.0f, 1.0f);
                     rlColor4f(0, 1, 1, 0.6f);
-                    for (int ii = 0; ii < eyepol[i].nid; ii += 3) {
-                        rlBegin(RL_LINES);
-                        for (int j = 0; j < 3; j++) {
-                            int idx = eyepol[i].indices[ii+j];
-                            rlVertex3f(eyepolv[idx].x, -eyepolv[idx].z, eyepolv[idx].y);
-                        }
-                        rlDrawRenderBatchActive();
-                        rlEnd();
-                    }
+                   // for (int ii = 0; ii < eyepol[i].nid; ii += 3) {
+                   //     rlBegin(RL_LINES);
+                   //     for (int j = 0; j < 3; j++) {
+                   //         int idx = eyepol[i].indices[ii+j];
+                   //         rlVertex3f(eyepolv[idx].x, -eyepolv[idx].z, eyepolv[idx].y);
+                   //     }
+                   //     rlDrawRenderBatchActive();
+                   //     rlEnd();
+                   // }
                 }
 
                 glDisable(GL_POLYGON_OFFSET_FILL);
@@ -2015,7 +2016,7 @@ private:
 
     static void LoadMapAndTiles()
     {
-        map = loadmap_imp((char*)"c:/Eugene/Games/build2/lig.MAP", NULL);
+        map = loadmap_imp((char*)"c:/Eugene/Games/build2/e2l5.MAP", NULL);
     }
 };
 

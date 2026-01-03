@@ -796,7 +796,8 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
     int stack_top = -1;
     int triangle_count = total_vertices - 2;
     index_capacity = triangle_count * 3;
-    indices = (int *) malloc(index_capacity * sizeof(int));
+	int tridx_start = eyepolin;
+	ARENA_EXPAND(eyepoli,index_capacity);
     index_count = 0;
 
     int *sorted_vertices = (int *) malloc(total_vertices * sizeof(int));
@@ -902,14 +903,15 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 
                 // Apply triangle flipping based on needflip flag
                 if ((cross > 0.0f) ^ needflip) {
-                    indices[index_count++] = v0;
-                    indices[index_count++] = v2;
-                    indices[index_count++] = v1;
+                    ARENA_ADD(eyepoli,v0);
+                    ARENA_ADD(eyepoli,v2);
+                    ARENA_ADD(eyepoli,v1);
                 } else {
-                    indices[index_count++] = v0;
-                    indices[index_count++] = v1;
-                    indices[index_count++] = v2;
+                    ARENA_ADD(eyepoli,v0);
+                    ARENA_ADD(eyepoli,v1);
+                    ARENA_ADD(eyepoli,v2);
                 }
+            	index_count+=3;
             }
 
             int last_v = stack[stack_top];
@@ -999,14 +1001,15 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
                 if (fabs(tcross) >= EPSILON) {
                     // Apply triangle flipping based on needflip flag
                     if ((tcross > 0.0f) ^ needflip) {
-                        indices[index_count++] = v0;
-                        indices[index_count++] = v2;
-                        indices[index_count++] = v1;
+                        ARENA_ADD(eyepoli,v0);
+                        ARENA_ADD(eyepoli,v2);
+                        ARENA_ADD(eyepoli,v1);
                     } else {
-                        indices[index_count++] = v0;
-                        indices[index_count++] = v1;
-                        indices[index_count++] = v2;
+                        ARENA_ADD(eyepoli,v0);
+                        ARENA_ADD(eyepoli,v1);
+                        ARENA_ADD(eyepoli,v2);
                     }
+                	index_count+=3;
                 }
 
                 stack_top--;
@@ -1074,8 +1077,9 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
     eyepol[eyepoln].e1 = debhl[1];
     eyepol[eyepoln].e2 = debhl[3];
     eyepol[eyepoln].vert0 = chain_starts[0];
-    eyepol[eyepoln].indices = indices;
-    eyepol[eyepoln].nid = index_count;
+    eyepol[eyepoln].triidstart = tridx_start;
+    eyepol[eyepoln].tricnt = index_count/3;//triangle_count;
+    //eyepol[eyepoln].nid = index_count;
     memcpy((void *) eyepol[eyepoln].ouvmat, (void *) b->gouvmat, sizeof(b->gouvmat[0]) * 9);
     eyepol[eyepoln].tpic = gtpic;
     eyepol[eyepoln].curcol = gcurcol;
@@ -1967,8 +1971,9 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 	Creates visibility data for shadow casting
 */
 void reset_context() {
-	eyepoln = 0;
-	eyepolvn = 0;
+	ARENA_RESET(eyepol);
+	ARENA_RESET(eyepolv);
+	ARENA_RESET(eyepoli);
 }
 
 int lastvalidsec = 0;
