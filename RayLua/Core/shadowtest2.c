@@ -857,8 +857,8 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
                 float bx = eyepolv[v2].x - eyepolv[v0].x;
                 float by = eyepolv[v2].y - eyepolv[v0].y;
                 float cross = ax * by - ay * bx;
-
-                if ((cross > 0.0f) ^ needflip) {
+// negative value fixes floors
+                if ((cross > -0.0001f) ^ needflip) {
                     eyepoli[eyepolin++] = v0;
                     eyepoli[eyepolin++] = v1;
                     eyepoli[eyepolin++] = v2;
@@ -885,8 +885,8 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
                 float by = eyepolv[v2].y - eyepolv[v1].y;
                 float cross = ax * by - ay * bx;
 
-                bool convex = (next_chain == 0) ? (cross > 0.0f) : (cross < 0.0f);
-                if (!convex) break;
+                //bool convex = (next_chain == 0) ? (cross > 0.02f) : (cross < -0.02f);
+                //if (!convex) break;
 
                 // Calculate triangle orientation for output
                 float tax = eyepolv[v1].x - eyepolv[v0].x;
@@ -895,7 +895,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
                 float tby = eyepolv[v2].y - eyepolv[v0].y;
                 float tcross = tax * tby - tay * tbx;
 
-                if ((tcross > 0.0f) ^ needflip) {
+                if ((cross > -0.01f) ^ needflip) {
                     eyepoli[eyepolin++] = v0;
                     eyepoli[eyepolin++] = v1;
                     eyepoli[eyepolin++] = v2;
@@ -910,7 +910,31 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
             stack[++stack_top] = next_v;
         }
     }
+	// Complete remaining triangles from stack
+	while (false && stack_top > 1) {
+		int v0 = stack[stack_top - 2];
+		int v1 = stack[stack_top - 1];
+		int v2 = stack[stack_top];
 
+		// Calculate triangle orientation
+		float ax = eyepolv[v1].x - eyepolv[v0].x;
+		float ay = eyepolv[v1].y - eyepolv[v0].y;
+		float bx = eyepolv[v2].x - eyepolv[v0].x;
+		float by = eyepolv[v2].y - eyepolv[v0].y;
+		float cross = ax * by - ay * bx;
+
+		if ((cross > 0.0f) ^ needflip) {
+			eyepoli[eyepolin++] = v0;
+			eyepoli[eyepolin++] = v1;
+			eyepoli[eyepolin++] = v2;
+		} else {
+			eyepoli[eyepolin++] = v0;
+			eyepoli[eyepolin++] = v2;
+			eyepoli[eyepolin++] = v1;
+		}
+		triangle_count++;
+		stack_top--;
+	}
     // Setup polygon record
     if (eyepoln + 1 >= eyepolmal) {
         eyepolmal = max(eyepolmal<<1, 4096);
@@ -963,7 +987,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
     eyepol[eyepoln].e2 = debhl[3];
     eyepol[eyepoln].vert0 = chain_starts[0];
     eyepol[eyepoln].triidstart = tridx_start;
-    eyepol[eyepoln].tricnt = triangle_count;
+    eyepol[eyepoln].tricnt = (eyepolin - tridx_start) / 3;
     memcpy(eyepol[eyepoln].ouvmat, b->gouvmat, sizeof(b->gouvmat[0]) * 9);
     eyepol[eyepoln].tpic = gtpic;
     eyepol[eyepoln].curcol = gcurcol;
