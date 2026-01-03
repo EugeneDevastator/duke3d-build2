@@ -727,7 +727,7 @@ static void xformbac(double rx, double ry, double rz, dpoint3d *o, bdrawctx *b) 
 }
 
 // Helper function to check turn direction
-float cross_product(int a, int b, int c) {
+float cross_product_eyev(int a, int b, int c) {
 	point3d pa = eyepolv[a].wpos;
 	point3d pb = eyepolv[b].wpos;
 	point3d pc = eyepolv[c].wpos;
@@ -791,7 +791,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 		int clipstart =0;
 		if (chain_lengths[1]>=chain_lengths[0])
 			clipstart = 1;
-		if (chain_lengths[clipstart]>3) {
+		if (chain_lengths[clipstart]>1) {
 			chain_starts[clipstart]++;
 			chain_lengths[clipstart]--;
 		}
@@ -800,7 +800,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 		int clipend =0;
 		if (chain_lengths[1]>=chain_lengths[0])
 			clipend=1;
-		if (chain_lengths[clipend]>3)
+		if (chain_lengths[clipend]>1)
 			chain_lengths[clipend]--;
 	}
 
@@ -815,8 +815,8 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
     int stack_top = -1;
     int triangle_count = total_vertices - 2;
     index_capacity = triangle_count * 3;
-	int tridx_start = eyepolin;
-	ARENA_EXPAND(eyepoli,index_capacity);
+    int tridx_start = eyepolin;
+    ARENA_EXPAND(eyepoli,index_capacity);
     index_count = 0;
 
     int *sorted_vertices = (int *) malloc(total_vertices * sizeof(int));
@@ -825,23 +825,8 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
     int right_idx = 0;
     int merge_idx = 0;
 
-    // Merge logic with improved tie-breaking
-    if (shared_start) {
-        sorted_vertices[merge_idx] = chain_starts[0];
-        vertex_chain[merge_idx] = 0;
-        merge_idx++;
-        left_idx = 1;
-        right_idx = 1;
-    }
-
+    // Merge chains by x-coordinate
     while (left_idx < chain_lengths[0] && right_idx < chain_lengths[1]) {
-        if (shared_end && left_idx == chain_lengths[0] - 1 && right_idx == chain_lengths[1] - 1) {
-            sorted_vertices[merge_idx] = chain_starts[0] + left_idx;
-            vertex_chain[merge_idx] = 0;
-            merge_idx++;
-            break;
-        }
-
         float left_x = eyepolv[chain_starts[0] + left_idx].x;
         float right_x = eyepolv[chain_starts[1] + right_idx].x;
         float x_diff = left_x - right_x;
@@ -872,26 +857,22 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
     }
 
     while (left_idx < chain_lengths[0]) {
-        if (!(shared_end && left_idx == chain_lengths[0] - 1)) {
-            sorted_vertices[merge_idx] = chain_starts[0] + left_idx;
-            vertex_chain[merge_idx] = 0;
-            merge_idx++;
-        }
+        sorted_vertices[merge_idx] = chain_starts[0] + left_idx;
+        vertex_chain[merge_idx] = 0;
+        merge_idx++;
         left_idx++;
     }
 
     while (right_idx < chain_lengths[1]) {
-        if (!(shared_end && right_idx == chain_lengths[1] - 1)) {
-            sorted_vertices[merge_idx] = chain_starts[1] + right_idx;
-            vertex_chain[merge_idx] = 1;
-            merge_idx++;
-        }
+        sorted_vertices[merge_idx] = chain_starts[1] + right_idx;
+        vertex_chain[merge_idx] = 1;
+        merge_idx++;
         right_idx++;
     }
 
     total_vertices = merge_idx;
 
-    // Enhanced triangulation with triangle flipping support
+    // Triangulation
     stack[++stack_top] = sorted_vertices[0];
     stack_chain[stack_top] = vertex_chain[0];
 
@@ -920,7 +901,6 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 
                 if (fabs(cross) < EPSILON) continue;
 
-                // Apply triangle flipping based on needflip flag
                 if ((cross > 0.0f) ^ needflip) {
                     ARENA_ADD(eyepoli,v0);
                     ARENA_ADD(eyepoli,v2);
@@ -930,7 +910,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
                     ARENA_ADD(eyepoli,v1);
                     ARENA_ADD(eyepoli,v2);
                 }
-            	index_count+=3;
+                index_count+=3;
             }
 
             int last_v = stack[stack_top];
@@ -941,29 +921,25 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
             stack[++stack_top] = curr_v;
             stack_chain[stack_top] = curr_chain;
         } else {
-            // Same chain - enhanced validation for long edges
+            // Same chain
             while (stack_top > 0) {
                 int v0 = stack[stack_top - 1];
                 int v1 = stack[stack_top];
                 int v2 = curr_v;
 
-                // Calculate edge vectors
                 float ax = eyepolv[v1].x - eyepolv[v0].x;
                 float ay = eyepolv[v1].y - eyepolv[v0].y;
                 float bx = eyepolv[v2].x - eyepolv[v1].x;
                 float by = eyepolv[v2].y - eyepolv[v1].y;
 
-                // Edge lengths for normalization
                 float len_a = sqrtf(ax * ax + ay * ay);
                 float len_b = sqrtf(bx * bx + by * by);
 
-                // Skip if either edge is degenerate
                 if (len_a < EPSILON || len_b < EPSILON) {
                     stack_top--;
                     continue;
                 }
 
-                // Normalize for better angle calculation
                 float norm_ax = ax / len_a;
                 float norm_ay = ay / len_a;
                 float norm_bx = bx / len_b;
@@ -971,18 +947,15 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 
                 float cross = norm_ax * norm_by - norm_ay * norm_bx;
 
-                // For very long edges, use more lenient validation
                 float max_len = fmaxf(len_a, len_b);
                 float min_len = fminf(len_a, len_b);
                 float length_ratio = max_len / (min_len + EPSILON);
 
-                // Adaptive threshold based on edge length ratio
                 float cross_threshold = ANGLE_EPSILON;
-                if (length_ratio > 100.0f) {
-                    cross_threshold *= 10.0f; // More lenient for very long edges
+                if (length_ratio > 1000.0f) {
+                    cross_threshold *= 10.0f;
                 }
 
-                // Check if points are effectively collinear
                 if (fabs(cross) < cross_threshold) {
                     stack_top--;
                     continue;
@@ -990,16 +963,13 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 
                 bool valid = (curr_chain == 0) ? (cross > 0.0f) : (cross < 0.0f);
 
-                // Additional check: ensure we're not creating inverted triangles
                 if (valid) {
-                    // Check triangle orientation in original coordinates
                     float tax = eyepolv[v1].x - eyepolv[v0].x;
                     float tay = eyepolv[v1].y - eyepolv[v0].y;
                     float tbx = eyepolv[v2].x - eyepolv[v0].x;
                     float tby = eyepolv[v2].y - eyepolv[v0].y;
                     float tcross = tax * tby - tay * tbx;
 
-                    // Ensure triangle has reasonable area
                     float triangle_area = fabs(tcross) * 0.5f;
                     if (triangle_area < EPSILON) {
                         valid = false;
@@ -1028,7 +998,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
                         ARENA_ADD(eyepoli,v1);
                         ARENA_ADD(eyepoli,v2);
                     }
-                	index_count+=3;
+                    index_count+=3;
                 }
 
                 stack_top--;
@@ -1039,7 +1009,6 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
         }
     }
 
-    // Rest remains the same...
     if (eyepoln + 1 >= eyepolmal) {
         eyepolmal = max(eyepolmal<<1, 4096);
         eyepol = (eyepol_t *) realloc(eyepol, eyepolmal * sizeof(eyepol_t));
@@ -1097,8 +1066,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
     eyepol[eyepoln].e2 = debhl[3];
     eyepol[eyepoln].vert0 = chain_starts[0];
     eyepol[eyepoln].triidstart = tridx_start;
-    eyepol[eyepoln].tricnt = index_count/3;//triangle_count;
-    //eyepol[eyepoln].nid = index_count;
+    eyepol[eyepoln].tricnt = index_count/3;
     memcpy((void *) eyepol[eyepoln].ouvmat, (void *) b->gouvmat, sizeof(b->gouvmat[0]) * 9);
     eyepol[eyepoln].tpic = gtpic;
     eyepol[eyepoln].curcol = gcurcol;
@@ -1117,8 +1085,6 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
     #undef EPSILON
     #undef ANGLE_EPSILON
 }
-
-
 
 
 
