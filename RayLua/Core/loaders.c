@@ -2,19 +2,11 @@
 // Created by omnis on 10/22/2025.
 //
 #include "loaders.h"
+
+#include "buildmath.h"
 // TODO : Replace types with stdint like uint8_t
 // TODO : new mapstate should have raylib friendly coords by default. period.
-point3d buildToRaylib(point3d buildcoord)
-{
-	return (point3d){buildcoord.x, -buildcoord.z, buildcoord.y};
-}
-// In-place conversion - modifies original
-void toRaylibInPlace(point3d *buildcoord)
-{
-	float temp_y = buildcoord->y;
-	buildcoord->y = -buildcoord->z;
-	buildcoord->z = temp_y;
-}
+
 // build format 7 flags.
 
 
@@ -32,6 +24,46 @@ void toRaylibInPlace(point3d *buildcoord)
 9 	512 	Set as transparent (must be combined with cstat value 128). The keypress applies itself to both sides. 	[T]
 10-15 	1024-32768 	*RESERVED* 	N/A
  */
+
+typedef struct {
+	surf_t *pool;
+	int used, capacity;
+} surf_allocator_t;
+surf_allocator_t sural={0};
+void free_surf_allocator(surf_allocator_t *alloc) {
+	if (alloc && alloc->pool) {
+		free(alloc->pool);
+		alloc->pool = NULL;
+		alloc->used = 0;
+		alloc->capacity = 0;
+	}
+}
+void init_surf_allocator(surf_allocator_t *alloc) {
+	free_surf_allocator(alloc);
+	alloc->pool = NULL;
+	alloc->used = 0;
+	alloc->capacity = 0;
+}
+surf_t* alloc_surfs(surf_allocator_t *alloc, int count) {
+	if (alloc->used + count > alloc->capacity) {
+		// Proper growth: ensure minimum size and handle zero capacity
+		int new_capacity = alloc->capacity == 0 ? 64 : alloc->capacity * 2;
+		while (new_capacity < alloc->used + count) {
+			new_capacity *= 2;
+		}
+
+		alloc->pool = realloc(alloc->pool, new_capacity * sizeof(surf_t));
+		if (!alloc->pool) {
+			// Handle allocation failure
+			return NULL;
+		}
+		alloc->capacity = new_capacity;
+	}
+
+	surf_t *result = &alloc->pool[alloc->used];
+	alloc->used += count;
+	return result;
+}
 void initTiles()
 {
 	gnumtiles = 0;
@@ -41,8 +73,58 @@ void initTiles()
 	//if (!gtile)
 	//	memset(gtile,0,gmaltiles*sizeof(tile_t)); //FIX
 }
-int loadmap_imp (char *filnam, mapstate_t* map)
+void freetiles() {
+	for (int i = 0; i < gnumtiles; i++) {
+		if (gtile[i].tt.f) {
+			free((void*)gtile[i].tt.f);
+		//	gtile[i].tt.f = NULL;
+		}
+	}
+	if (gtile) {
+		free(gtile);
+	//	gtile = NULL;
+	}
+	gnumtiles = 0;
+}
+
+void freemap(mapstate_t *map) {
+	if (!map) return;
+
+	// Free wall surfaces first
+	for (int i = 0; i < map->numsects; i++) {
+		if (map->sect[i].wall) {
+			for (int j = 0; j < map->sect[i].n; j++) {
+				//if (map->sect[i].wall[j].xsurf) {
+				//	free(map->sect[i].wall[j].xsurf);
+				//	map->sect[i].wall[j].xsurf = NULL;
+				//}
+			}
+			free(map->sect[i].wall);
+		//	map->sect[i].wall = NULL;
+		}
+	}
+
+	// Free sectors array
+	if (map->sect) {
+		free(map->sect);
+	//	map->sect = NULL;
+	}
+
+	// Free sprites array
+	if (map->spri) {
+		free(map->spri);
+	//	map->spri = NULL;
+	}
+
+	// Reset counters
+	map->numsects = 0;
+	map->numspris = 0;
+	freetiles();
+}
+
+mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 {
+	init_surf_allocator(&sural);
 	surf_t *sur;
 	sect_t *sec;
 	wall_t *wal;
@@ -52,6 +134,37 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 	long x, y, z, fileid, hitile, warned = 0, altsects, nnumtiles, nnumspris;
 	short s, cursect;
 	char och, tbuf[256];
+//	freemap(map);
+
+	freemap(oldmap);  // Clean up old one
+
+	mapstate_t* map = (mapstate_t*)malloc(sizeof(mapstate_t));
+	if (!map) return NULL;
+	memset(map, 0, sizeof(mapstate_t));
+	initcrc32();
+
+	map->numsects = 0;
+	map->malsects = 256;
+	map->sect = (sect_t*)(malloc(map->malsects * sizeof(sect_t)));
+	if (!map->sect) return 0;
+	memset(map->sect, 0, map->malsects * sizeof(sect_t));
+
+	map->numspris = 0;
+	map->malspris = 256;
+	map->spri = (spri_t*)(malloc(map->malspris * sizeof(spri_t)));
+	if (!map->spri) return 0;
+	memset(map->spri, 0, map->malspris * sizeof(spri_t));
+	map->blankheadspri = -1;
+
+	map->blankheadspri = -1;
+	for (int i = 0; i < map->malspris; i++)
+	{
+		map->spri[i].sectn = map->blankheadspri;
+		map->spri[i].sectp = -1;
+		map->spri[i].sect = -1;
+		if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
+		map->blankheadspri = i;
+	}
 
 	initTiles();
 
@@ -64,7 +177,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 	}
 	kzread(&fileid,4);
 	if ((fileid == 0x04034b50) || (fileid == 0x536e654b)) //'PK\3\4' is ZIP file id, 'KenS' is GRP file id
-		{ kzclose(); kzaddstack(filnam); return(1); }
+		{ kzclose(); kzaddstack(filnam); return(map); }
 	sec = map->sect; map->light_sprinum = 0;
 	if (fileid == 0x3142534b) //KSB1
 	{
@@ -194,7 +307,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						{
 							for(;i>=0;i--) free(sec[i].wall);
 							map->numsects = 0;
-							return(-1);
+							return(NULL);
 						}
 					}
 				}
@@ -202,8 +315,10 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				sec[i].wall[j].owner = -1;
 				if (sec[i].wall[j].surfn > 1)
 				{
-					sec[i].wall[j].xsurf = (surf_t *)malloc((sec[i].wall[j].surfn-1)*sizeof(surf_t));
-					kzread(sec[i].wall[j].xsurf,(sec[i].wall[j].surfn-1)*sizeof(surf_t));
+					//sec[i].wall[j].xsurf = (surf_t *)malloc((sec[i].wall[j].surfn-1)*sizeof(surf_t));
+					//kzread(sec[i].wall[j].xsurf,(sec[i].wall[j].surfn-1)*sizeof(surf_t));
+					// replaced to simplify xsurfs and stick to 3 per wall max.
+					kzread(sec[i].wall[j].xsurf,(3)*sizeof(surf_t));
 				}
 			}
 		}
@@ -294,7 +409,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 #endif
 
 		kzclose();
-		return(1);
+		return(map);
 	}
 	else if ((fileid == 0x00000007) || (fileid == 0x00000cbe))   //Build1 .MAP format 7 //Cubes5 .CUB format
 	{
@@ -302,7 +417,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 		typedef struct {
 			short picnum, heinum;
 			signed char shade;
-			char pal, xpanning, ypanning;
+			uint8_t pal, xpanning, ypanning;
 		} build7surf_t;
 		typedef struct
 		{
@@ -313,10 +428,10 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 		} build7sect_t;
 		typedef struct
 		{
-			long x, y;
+			int32_t x, y;  // long is 32bit in Ken's format
 			short point2, nextwall, nextsect, cstat, picnum, overpicnum;
-			signed char shade;
-			char pal, xrepeat, yrepeat, xpanning, ypanning;
+			int8_t  shade;
+			uint8_t pal, xrepeat, yrepeat, xpanning, ypanning;
 			short lotag, hitag, extra;
 		} build7wall_t;
 		typedef struct
@@ -339,6 +454,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 		//------------------------------------------------------------------------
 		long filnum, arttiles, loctile0, loctile1, iskenbuild = 0;
 		short *tilesizx = 0, *tilesizy = 0, *tilefile = 0;
+		picanm_t *picanm= 0;
 		char tbuf[MAX_PATH*2];
 
 		kzclose();
@@ -347,7 +463,9 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 		for(i=j=0;curmappath[i];i++) if ((curmappath[i] == '/') || (curmappath[i] == '\\')) j = i+1;
 		curmappath[j] = 0;
 
-		arttiles = 0; //Scan .ART files, incrementing number until tile is in range
+
+		// Modified scanning code
+		arttiles = 0;
 		for(filnum=0;1;filnum++)
 		{
 			sprintf(tbuf,"TILES%03d.ART",filnum);
@@ -356,25 +474,42 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 				sprintf(tbuf,"%sTILES%03d.ART",curmappath,filnum);
 				if (!kzopen(tbuf)) break;
 			}
-			kzread(tbuf,16); if (*(long *)&tbuf[0] != 1) break;
+			kzread(tbuf,16);
+			if (*(long *)&tbuf[0] != 1) break;
 			loctile0 = *(long *)&tbuf[8];
 			loctile1 = (*(long *)&tbuf[12])+1;
 			if ((loctile0 < 0) || (loctile1 <= arttiles) || (loctile0 >= loctile1)) continue;
+
 			i = arttiles; arttiles = loctile1;
 			tilesizx = (short *)realloc(tilesizx,arttiles*sizeof(tilesizx[0]));
 			tilesizy = (short *)realloc(tilesizy,arttiles*sizeof(tilesizy[0]));
 			tilefile = (short *)realloc(tilefile,arttiles*sizeof(tilefile[0]));
-			for(;i<arttiles;i++) { tilesizx[i] = 0; tilesizy[i] = 0; tilefile[i] = 0; }
+			picanm = (picanm_t *)realloc(picanm,arttiles*sizeof(picanm[0])); // Add this line
+
+			for(;i<arttiles;i++) {
+				tilesizx[i] = 0;
+				tilesizy[i] = 0;
+				tilefile[i] = 0;
+				picanm[i].asint = 0; // Initialize animdata
+			}
+
 			kzread(&tilesizx[loctile0],(loctile1-loctile0)*sizeof(short));
 			kzread(&tilesizy[loctile0],(loctile1-loctile0)*sizeof(short));
+			kzread(&picanm[loctile0],(loctile1-loctile0)*sizeof(long)); // Read animdata
+
 			for(i=loctile0;i<loctile1;i++) tilefile[i] = filnum;
 		}
+
 		if (!arttiles)
 		{
 			tilesizx = (short *)malloc(sizeof(tilesizx[0]));
 			tilesizy = (short *)malloc(sizeof(tilesizy[0]));
 			tilefile = (short *)malloc(sizeof(tilefile[0]));
-			tilesizx[0] = tilesizy[0] = 2; tilefile[0] = 0; arttiles = 1;
+			picanm = (picanm_t *)malloc(sizeof(picanm[0])); // Add this line
+			tilesizx[0] = tilesizy[0] = 2;
+			tilefile[0] = 0;
+			picanm[0].asint = 0; // Initialize
+			arttiles = 1;
 		}
 		else if (arttiles >= 20) //Autodetect KenBuild data
 		{
@@ -441,6 +576,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 
 				for(j=0;j<2;j++)
 				{
+					sec[i].destpn[j] = -1;
 					sec[i].z[j] = ((float)b7sec.z[j])*(1.f/(512.f*16.f));
 					sec[i].grad[j].x = sec[i].grad[j].y = 0;
 					if (b7sec.stat[j]&2) //Enable slopes flag
@@ -512,17 +648,20 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					if (sec[i].surf[j].uvmapkind == UV_TEXELRATE) {
 						sec[i].surf[j].uvform[0] = 32/xsize; // scale is always off 64.
 						sec[i].surf[j].uvform[1] = 32/ysize;
-					}
-					else
-					{
+					} else	{
 						sec[i].surf[j].uvform[0] = xsize/64; // scale is always off 64.
 						sec[i].surf[j].uvform[1] = ysize/64;
 					}
-					// mull px = tile / 256
-					//  64 / 256 = 4;
-					// 1 px =
-					sec[i].surf[j].uvform[2] = (1.0/256.0)*b7sec.surf[j].xpanning; // 1 pixel per 16 pans, before scaling. 4 pans for 64 tile
-					sec[i].surf[j].uvform[3] = (1.0/256.0)*b7sec.surf[j].ypanning;
+					// regardless of scaling etc.
+					// pan of 16 = 1 px for 16  tex
+					// 4 = 1 px for 128
+					float xpansperpx = 256.0/xsize;
+					float ypansperpx = 256.0/ysize;
+					float xpan = (b7sec.surf[j].xpanning/(256.0/xsize))/xsize;
+					float ypan = (b7sec.surf[j].ypanning/(256.0/ysize))/ysize;
+
+					sec[i].surf[j].uvform[2] = xpan; // 1 pixel per 16 pans, before scaling. 4 pans for 64 tile
+					sec[i].surf[j].uvform[3] = ypan;
 
 				}
 
@@ -582,7 +721,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					}
 
 					if (b7wal.cstat & WALL_BOTTOM_SWAP) sur->flags ^= 2; //align bot/nextsec
-					if (b7wal.cstat & (WALL_MASKED+WALL_SOLID_MASKED)) sur->flags |= 32; //bit4:masking, bit5:1-way
+					if (b7wal.cstat & (WALL_MASKED + WALL_SOLID_MASKED)) sur->flags |= 32; //bit4:masking, bit5:1-way
 					sur->asc = 4096;
 					sur->rsc = (32-b7wal.shade)*128;
 					sur->gsc = (32-b7wal.shade)*128;
@@ -592,17 +731,28 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					sec[i].wall[j].surfn = 1;
 					sec[i].wall[j].owner = -1;
 					wall_t *thiswal = &sec[i].wall[j];
-
+					thiswal->xsurf[0].rsc=sur->rsc;
+					thiswal->xsurf[1].rsc=sur->rsc;
+					thiswal->xsurf[2].rsc=sur->rsc;
 					if (b7wal.nextsect >= 0 ) // (sec[i].wall[j].ns != -1) // ns are parsed later! nut we need to alloc now.
 					{
 						thiswal->surfn = 3;
-						thiswal->xsurf = malloc(sizeof(surf_t) * 3);
+					//	thiswal->xsurf = alloc_surfs(&sural,3);
+
+						thiswal->xsurf[0].alpha=1;
+						thiswal->xsurf[1].alpha=1;
+						thiswal->xsurf[2].alpha=1;
+						thiswal->surf.alpha=1;
 						thiswal->xsurf[0].tilnum = b7wal.picnum;
+						if (thiswal->xsurf[0].tilnum<0 || thiswal->xsurf[0].tilnum>9000)
+							int x=0;
 						thiswal->xsurf[1].tilnum = b7wal.overpicnum;
 						thiswal->xsurf[2].tilnum = b7wal.cstat & WALL_BOTTOM_SWAP ? -2 : b7wal.picnum;
-						int opacity = 0;
-						if (HAS_FLAG(b7wal.cstat, WALL_MASKED))
+						int opacity = 255;
+						// solid masked is nevewr transparent
+						if (HAS_FLAG(b7wal.cstat, WALL_MASKED) && !(b7wal.cstat & WALL_SOLID_MASKED))
 						{
+							opacity = 254; // hack to draw in transparent passanyway - refactor later with data structure
 							if (HAS_FLAG(b7wal.cstat, WALL_SEMI_TRANSPARENT))
 								opacity = 128;
 							if (HAS_FLAG(b7wal.cstat, WALL_TRANSPARENT))
@@ -610,14 +760,18 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						}
 
 						thiswal->xsurf[1].asc = opacity;
+						thiswal->xsurf[1].alpha = opacity/(float)255.0;
 						//makeslabuvform(1, -1, thiswal,
 						//               (int[4]){b7wal.xrepeat, b7wal.yrepeat, b7wal.xpanning, b7wal.ypanning},
 						//               (int[2]){0, 0});
 					}
 					else {
-						thiswal->xsurf = malloc(sizeof(surf_t) * 1);
+					//	thiswal->xsurf = alloc_surfs(&sural,1);
+						thiswal->surfn=1;
 						thiswal->xsurf[0].tilnum = b7wal.picnum;
+						thiswal->xsurf[0].alpha=1;
 					}
+					thiswal->surf.tilnum= b7wal.picnum;
 					//float wallh = (sec[i].z[1]-sec[i].z[0]);
 					// also pans are limited by 256. so large textures wont work.
 					float xsize = tilesizx[thiswal->surf.tilnum];
@@ -632,15 +786,44 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					float px1x = 1.0f/xsize;
 					float px1y = 1.0f/ysize;
 					float ypans_per_px = 256.f/ysize;
+
 					thiswal->surf.owal = b7wal.yrepeat; // need for second pass.
 					thiswal->surf.vwal = b7wal.xrepeat; // need for second pass.
 					thiswal->mflags[0] = b7wal.cstat; // need for second pass.
 					thiswal->surf.uvform[0]=scalerx;
 					thiswal->surf.uvform[1]=scalery;
-					thiswal->surf.uvform[2]=px1x * b7wal.xpanning;
-					thiswal->surf.uvform[3]=px1y * (b7wal.ypanning/ypans_per_px);
+					if (thiswal->surf.tilnum == 157)
+						int a =1;
 
+					// NPOT wall textures dont align well in duke.
+					// you need to offset them by YRes * 2 pans.
+					// and do this twice if Yres is odd.
+					float  ypansub = 0;
+					if (isnpot(ysize) ) // not power of two
+					{
+						int powr = floor(sqrt(ysize));
+						int yclamsiz = pow(2,powr);
 
+						// probably need for other texture sizes too, but those are most common
+						float mul = 256.0/yclamsiz;
+						// there are some shenanigans when texture yres is odd. skip for now.
+						//if ((int) ysize % 2)
+						//	ypansub = (ceil(ysize * 0.5f) * 4);
+						//	//*(((int)ysize % 2)+1);// if non divisible by 2 add twice.
+						//else
+							ypansub = (ysize * mul); //*(((int)ysize % 2)+1);// if non divisible by 2 add twice.
+
+					}
+					thiswal->surf.uvform[2]=  px1x * b7wal.xpanning;
+
+					for (int xw=0;xw<thiswal->surfn;xw++) {
+						memcpy(thiswal->xsurf[xw].uvform,thiswal->surf.uvform,sizeof(float)*6);
+					}
+					thiswal->xsurf[0].uvform[3]= px1y * ((b7wal.ypanning-ypansub)/ypans_per_px);
+					if (thiswal->surfn==3) {
+						thiswal->xsurf[1].uvform[3]= px1y * ((b7wal.ypanning-ypansub)/ypans_per_px);
+						thiswal->xsurf[2].uvform[3]= px1y * ((b7wal.ypanning)/ypans_per_px);
+					}
 				}
 				// tile adjust?
 				for(j=0;j<sec[i].n;j++)
@@ -693,11 +876,11 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 
 				int flagsw=b7spr.cstat & (SPRITE_WALL_ALIGNED | SPRITE_FLOOR_ALIGNED);
 				if  (flagsw ==0) //Face sprite
-					spr->flags |= SPRITE_B2_FACING;
-				if  (flagsw & SPRITE_WALL_ALIGNED)
-					spr->flags |= SPRITE_B2_FLAT_POLY;
-				if  (flagsw & SPRITE_FLOOR_ALIGNED)
-					spr->flags |= SPRITE_B2_FLAT_POLY;
+					spr->view.rtype = billbord;
+				if  (flagsw & (SPRITE_WALL_ALIGNED | SPRITE_FLOOR_ALIGNED)) {
+					spr->view.rtype = quad;
+					spr->view.isdblside =  !(b7spr.cstat& SPRITE_ONE_SIDED);
+				}
 
 				point3d buildFW = (point3d){cos((float)b7spr.ang*PI/1024.0),sin((float)b7spr.ang*PI/1024.0),0};
 				switch(flagsw)  // https://wiki.eduke32.com/wiki/Cstat_(sprite)
@@ -719,18 +902,40 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						spr->r.y =-cos((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
 						spr->d.x = cos((float)b7spr.ang*PI/1024.0)*(b7spr.yrepeat/4096.0*(float)tilesizy[l]);
 						spr->d.y = sin((float)b7spr.ang*PI/1024.0)*(b7spr.yrepeat/4096.0*(float)tilesizy[l]);
-						spr->f = (point3d){0,0,-1}; // facing up
-						if (b7spr.cstat&SPRITE_HITSCAN) { spr->d.x *= -1; spr->d.y *= -1; }
+						int upvec = b7spr.cstat&(SPRITE_FLIP_Y) ? 1 : -1;
+						spr->f = (point3d){0,0,upvec}; // facing up
+						spr->r = (point3d){spr->r.x *upvec, spr->r.y*upvec, spr->r.z};
+						//if (b7spr.cstat&SPRITE_HITSCAN) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z*=-1; }
 						break;
 				}
 
 				if (b7spr.cstat&SPRITE_BLOCKING) spr->flags |= 1; // blocking
-				if (b7spr.cstat& SPRITE_ONE_SIDED) spr->flags |= SPRITE_B2_ONE_SIDED; // 1 sided
-				if (b7spr.cstat&SPRITE_FLIP_X) { spr->r.x *= -1; spr->r.y *= -1; spr->r.z *= -1; spr->flags ^= 4; } //&4: x-flipped
-				if (b7spr.cstat&SPRITE_FLIP_Y) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; spr->flags ^= 8; } //&8: y-flipped?
+				// floor sprites do this only.
+				if (b7spr.cstat&(SPRITE_FLIP_Y | SPRITE_FLOOR_ALIGNED)) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; spr->flags ^= 8; } //&8: y-flipped?
+				spr->view.uv[0]=1;
+				spr->view.uv[1]=1;
+				if (b7spr.cstat&SPRITE_FLIP_X) { spr->view.uv[0] = -1; } //&4: x-flipped
+				if (b7spr.cstat&SPRITE_FLIP_Y) { spr->view.uv[1] = -1; } //&8: y-flipped?
+
 				// note - replace with view setup
-				if (b7spr.cstat&SPRITE_TRUE_CENTERED) { spr->p.z += (b7spr.yrepeat/4096.0*(float)tilesizy[l]); } //&128: real-centered centering (center at center) - originally half submerged sprite
-				spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; // down is flipped.
+				spr->view.anchor.x=0.5f;
+				spr->view.anchor.y=0; // forward
+				spr->view.anchor.z = 1.0f; // 1 on the V to the pivot. - normal duke3d sprite.
+				if (b7spr.cstat & SPRITE_TRUE_CENTERED || b7spr.cstat & SPRITE_FLOOR_ALIGNED) {
+					//spr->p.z += (b7spr.yrepeat/4096.0*(float)tilesizy[l]);
+					spr->view.anchor.z = 0.5f;
+				}
+
+				spr->tilnum = l; hitile = max(hitile,l);
+
+				float tileoffu = picanm[spr->tilnum].x_center_offset/(float)tilesizx[spr->tilnum];
+				float tileoffv = picanm[spr->tilnum].y_center_offset/(float)tilesizy[spr->tilnum];
+				spr->view.anchor.x+=tileoffu;
+				spr->view.anchor.z+=tileoffv;
+
+				//&128: real-centered centering (center at center) - originally half submerged sprite
+			//	spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; // down is flipped.
+			//	spr->r.x *= -1; spr->r.y *= -1; spr->r.z *= -1; // also flipping r to restore chirality
 				if ((unsigned)b7spr.sectnum < (unsigned)map->numsects) //Make shade relative to sector
 				{
 					j = b7spr.sectnum; j = 32 - map->sect[j].surf[map->sect[j].surf[0].flags&1^1].rsc/128;
@@ -739,20 +944,20 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 
 
 				spr->fat = 0.f;
-				spr->asc = 4096;
-				spr->rsc = (32-b7spr.shade)*128;
-				spr->gsc = (32-b7spr.shade)*128;
-				spr->bsc = (32-b7spr.shade)*128;
+			//	spr->asc = 4096;
+			//	spr->rsc = (32-b7spr.shade)*128;
+			//	spr->gsc = (32-b7spr.shade)*128;
+			//	spr->bsc = (32-b7spr.shade)*128;
 
 				spr->mas = spr->moi = 1.0;
 				spr->owner = -1;
 
-				spr->tilnum = l; hitile = max(hitile,l);
+
 				spr->sect = b7spr.sectnum;
 				spr->sectn = spr->sectp = -1;
 				spr->lotag = b7spr.lotag;
 				spr->hitag = b7spr.hitag;
-				spr->pal = b7spr.pal;
+				spr->view.pal = b7spr.pal;
 
 				// duke3d compat
 				spr->tags[MT_CSTAT] = b7spr.cstat;
@@ -894,7 +1099,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			gnumtiles = 0; memset(gtilehashead,-1,sizeof(gtilehashead));
 
 			hitile++;
-			hitile = 1000;
+			hitile =  3000;
 			if (hitile > gmaltiles)
 			{
 				gmaltiles = hitile;
@@ -919,7 +1124,20 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 #endif
 			checknextwalls_imp(map);
 			checksprisect_imp(-1,map);
-
+			// assume one unit is one uv, given scale. so units*unitstouv*scale.
+			// pan of 16 is 16 pixels. befre scaling.
+			// duke3d:
+			// x repeat 1 for wall means 8 pixels per entire wall length
+			// y repeat 1 for wall means 4 pixels per 8192 z units. = 1 z unit of b2
+			// x pan of 1 equals one pixel move before scaling. (so always 1 pixel)
+			// y pan of 8 = 1 pixel of 32x32 texture
+			// y pan of 2 = 1 pixel for 128x128  texture
+			// y pan of 2 - 1/4 pixel of 32x32.
+			// 128/2 = 1;
+			// 32/8=1;
+			// 256/32 = 8;
+			// 256/128 = 2;
+			// 256 / size = pans/pixel.
 			//second pass for walls
 			for (i = 0; i < map->numsects; i++) // second pass for double wall tex.
 			{
@@ -927,7 +1145,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					wall_t *walp = &sec[i].wall[j];
 					int nwid = walp->n + j;
 					int curwalid = j;
-					int yrepeat = walp->surf.owal;
+					int yrepeat = (unsigned char)walp->surf.owal;
 					int isfloralign = walp->mflags[0] & WALL_ALIGN_FLOOR;
 					int yrepeatbot = yrepeat;
 					int isfloralignbot = isfloralign;
@@ -936,8 +1154,8 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 					int uwalid = isxalignflip ? j : nwid;
 					int orwal = isxalignflip ? nwid : j;
 					int basemul = isyuvflip ? -1 : 1;
+					int basexmul = isxalignflip ? -1 : 1;
 					int yflipmul[3] = {basemul,basemul,basemul};
-					memcpy(&walp->xsurf[0].uvform, &walp->surf.uvform, sizeof(float) * 6);
 
 					// all walls use same origin xy based on x flip.
 					for (int sl=0;sl<walp->surfn;sl++) {
@@ -952,8 +1170,7 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 						int nextpic = sec[walp->ns].wall[walp->nw].surf.tilnum;
 						bool isbotswap = walp->xsurf[2].tilnum == -2;
 						wall_t *oppwal;
-						memcpy(&walp->xsurf[1].uvform, &walp->surf.uvform, sizeof(float) * 6);
-						memcpy(&walp->xsurf[2].uvform, &walp->surf.uvform, sizeof(float) * 6);
+
 						if (isbotswap) //
 						{
 							oppwal = &sec[walp->ns].wall[walp->nw];
@@ -976,21 +1193,6 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							//*newx/oldx;
 						}
 
-						// assume one unit is one uv, given scale. so units*unitstouv*scale.
-						// pan of 16 is 16 pixels. befre scaling.
-						// duke3d:
-						// x repeat 1 for wall means 8 pixels per entire wall length
-						// y repeat 1 for wall means 4 pixels per 8192 z units. = 1 z unit of b2
-						// x pan of 1 equals one pixel move before scaling. (so always 1 pixel)
-						// y pan of 8 = 1 pixel of 32x32 texture
-						// y pan of 2 = 1 pixel for 128x128  texture
-						// y pan of 2 - 1/4 pixel of 32x32.
-						// 128/2 = 1;
-						// 32/8=1;
-						// 256/32 = 8;
-						// 256/128 = 2;
-						// 256 / size = pans/pixel.
-
 						// for tomorrow - deal with x,y flips
 						// deal with masked wall scaling.
 						// this is here because we need to know params of next sector.
@@ -999,16 +1201,15 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 
 							if(sl==2 && floralig[sl])
 								continue;
-
+// Claude here walp->xsurf[sl].tilnum is invalid, when sl==0, even tho initially all tilnums are set correct
 							float ysize = tilesizy[walp->xsurf[sl].tilnum];
 							float pix4 = 4.0f / ysize;
 							float normuvperz = pix4 * yrepeat;
-							//if(!floralig[sl])// for flor aligned we use same rect for both chunks
+							if(!floralig[sl])// for flor aligned we use same rect for both chunks
 								walp->xsurf[sl].uvform[1] = (4*yrepeat)/ysize;// normuvperz;
 						}
 
-						//rescale mid texture
-						{
+						{ //rescale mid texture
 							int cursizx = tilesizx[walp->xsurf[0].tilnum];
 							int newsizx = tilesizx[walp->xsurf[1].tilnum];
 							//
@@ -1017,38 +1218,40 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 							//
 							walp->xsurf[1].uvform[0] *= cursizx/(float)newsizx;
 							walp->xsurf[1].uvform[2] *= cursizx/(float)newsizx;
-							//	walp->xsurf[1].uvform[1] *= cursizy/(float)newsizy;
+							//walp->xsurf[1].uvform[3] *= cursizy/(float)newsizy;
 						}
 
 						// ==== UV VECTORS SETUP
 
-						if (!isfloralign) {
+						if (!isfloralign) { // default for split door
 							// in case of standard align - we do door-snapping style,
 							//top'
 							walp->xsurf[0].otez = TEZ_NS ;//| TEZ_CEIL | TEZ_RAWZ; // next ce
-							walp->xsurf[0].utez = TEZ_NS ;//| TEZ_CEIL | TEZ_RAWZ; // next ce
+							walp->xsurf[0].utez = walp->xsurf[0].otez ;//| TEZ_CEIL | TEZ_RAWZ; // next ce
 							walp->xsurf[0].vtez = TEZ_INVZ | TEZ_WORLDZ1; // TEZ_OS | TEZ_CEIL |
 
 							//mid in that case is aligned to other ceil. mid is always aligned to ns.
-							walp->xsurf[1].otez = TEZ_CLOSEST; // CEIL
-							walp->xsurf[1].utez = TEZ_CLOSEST; // CEIL
+							walp->xsurf[1].otez = TEZ_CLOSEST ; // CEIL
+							walp->xsurf[1].utez = TEZ_CLOSEST ; // CEIL
 							walp->xsurf[1].vtez = TEZ_FLOR | TEZ_WORLDZ1;
 						}
-						else
-							// other kind of align -- to own ceil, but mask to other flor.
-						{ // THIS WORKS!
-							//top
+						else { // other kind of align -- to own ceil, but mask to other flor.
 							walp->xsurf[0].otez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ; // next floor Z of j, not slope!
 							walp->xsurf[0].utez = TEZ_OS | TEZ_CEIL | TEZ_RAWZ; // next floor Z of j
 							walp->xsurf[0].vtez = TEZ_OS | TEZ_FLOR | TEZ_RAWZ| TEZ_WORLDZ1; // next floor Z of j
 
-							//mid in that case is aligned to other ceil. mid is always aligned to ns.
-							walp->xsurf[1].otez = TEZ_FLOR | TEZ_CLOSEST; // next ceil raw z
-							walp->xsurf[1].utez = TEZ_FLOR | TEZ_CLOSEST; // next ceil raw z
+							// for solid masked we always align to ceil - only for ceil aligned option
+							int flags1;
+							if (walp->mflags[0] & WALL_SOLID_MASKED)
+								flags1= 0;
+							else
+								flags1 = TEZ_CLOSEST  | TEZ_FLOR;
+
+							walp->xsurf[1].otez = flags1;
+							walp->xsurf[1].utez = flags1;
 							walp->xsurf[1].vtez = TEZ_INVZ | TEZ_CLOSEST| TEZ_WORLDZ1;
 						}
-						// also when double tex - then both sides have own alignment, and lower seg borrows its flags from nw.
-						// TO IMPLEMENT the above! ^^
+						// Handle lower segment separately, because could be walswapped.
 						if (!isfloralignbot){	//bot;
 							walp->xsurf[2].otez = TEZ_NS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j, not slope!
 							walp->xsurf[2].utez = TEZ_NS | TEZ_FLOR | TEZ_RAWZ; // next floor Z of j
@@ -1091,8 +1294,8 @@ int loadmap_imp (char *filnam, mapstate_t* map)
 			if (tilefile) free(tilefile);
 
 			kzclose();
-			return(1);
+			return(map);
 		}
-		else { return(0); } //MessageBox(ghwnd,"Invalid MAP format",prognam,MB_OK);
+		else { return(NULL); } //MessageBox(ghwnd,"Invalid MAP format",prognam,MB_OK);
 	}
 }

@@ -61,18 +61,22 @@ typedef struct {
     int curcol, flags;                  // Color and rendering flags
     tile_t *tpic;                       // Texture tile pointer
     int tilnum;
+    float shade;
     float ouvmat[9];                    // inverse perspective transformation
     point3d norm;                       // Surface normal vector
     int rdepth;
     // triangulation data
     int* indices;
-    int nid; // num of indices
+    int tridx, nid; // start ids and num of indice
     bool hasuvs;
+    int8_t isflor;
     // uv data
     point3d *worlduvs; // origin, u ,v
     float* uvform;
     int slabid;
     int c1,c2,e1,e2;
+    int pal;
+    float alpha;
 } eyepol_t;
 
 typedef struct {
@@ -146,7 +150,7 @@ int drawpol_befclip(int fromtag, int newtag1, int fromsect, int newsect, int plo
  */
 void reset_context();
 void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy);
-void draw_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx);
+void draw_hsr_polymost_ctx (mapstate_t *lgs, bdrawctx *newctx);
 // ================================================================================================
 // POLYGONAL SHADOW CREATION FUNCTIONS
 // ================================================================================================

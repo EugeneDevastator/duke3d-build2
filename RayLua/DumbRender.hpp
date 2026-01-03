@@ -19,10 +19,9 @@ The forward direction can be visualized as moving away from the camera or viewer
 #ifndef RAYLIB_LUA_IMGUI_DUMBRENDER_H
 #define RAYLIB_LUA_IMGUI_DUMBRENDER_H
 #include "DumbCore.hpp"
-#include "cmake-build-custom/_deps/raylib-src/src/external/glad.h"
+#include "renderhelper.h"
 
-
- extern "C" {
+  extern "C" {
 #include "loaders.h"
 #include "mapcore.h"
 #include "monoclip.h"
@@ -41,6 +40,7 @@ typedef struct {
      int worldVLoc;
      int textureLoc;
      int vertexTexCoord;
+     int useGradientloc;
  } UVShaderDesc;
 struct WallSegment
 {
@@ -115,6 +115,7 @@ public:
         uvShaderDesc.worldOriginLoc = GetShaderLocation(uvShaderDesc.shader, "worldOrigin");
         uvShaderDesc.worldULoc = GetShaderLocation(uvShaderDesc.shader, "worldU");
         uvShaderDesc.worldVLoc = GetShaderLocation(uvShaderDesc.shader, "worldV");
+        uvShaderDesc.useGradientloc = GetShaderLocation(uvShaderDesc.shader, "useGradient");
 
            }
    static  void SetUVShaderParams(UVShaderDesc uvShader, Vector3 worldOrigin, Vector3 worldU, Vector3 worldV) {
@@ -150,7 +151,7 @@ public:
                     map->light_spri[map->light_sprinum++] = i;
             }
         }
-// init portals; walls test
+        // Portal WALLS
         for (int i = 0; i < map->numsects; i++) { // wall ports
             for (int wn = 0; wn < map->sect[i].n; wn++) {
                 map->sect[i].wall[wn].tags[1] = -1;
@@ -168,9 +169,69 @@ public:
                 }
             }
         }
-
+        // PORTAL SECTOR SURFS
         for (int i = 0; i < map->numsects; i++) { // floor ceil ports
             map->sect[i].tags[1] = -1;
+// duke part.
+            int portsi =-1;
+            int si = map->sect[i].headspri;
+            while (si > 0) {
+                if (map->spri[si].tilnum == 1 && map->spri[si].lotag == 7) {
+                    portsi = si;
+                    break;
+                }
+                si = map->spri[si].sectn;
+            }
+
+            bool iswater = map->sect[i].surf[1].lotag == 1 || map->sect[i].surf[1].lotag ==2;
+            // duke3d water temp hak
+            if (iswater || portsi >= 0) {
+
+                // temp handle duke water
+                portal &p = portals[portaln];
+                int stag = map->sect[i].surf[1].lotag;
+
+                // find transporter sprite;
+                int si = map->sect[i].headspri;
+                int linkid = 0;
+                if (iswater)
+                while (si > 0) {
+                    if (map->spri[si].tilnum == 1 && map->spri[si].lotag == 7) {
+                        linkid = map->spri[si].hitag;
+                        map->spri[si].p.z = map->sect[i].z[2 - stag];
+                        break;
+                    }
+                    si = map->spri[si].sectn;
+                }
+                else { // not water
+                    si = portsi;
+                    int sid1 = abs(map->spri[si].p.z - map->sect[i].z[1]);
+                    int sid2 = abs(map->spri[si].p.z - map->sect[i].z[0]);
+                    p.surfid = sid1 < sid2;
+                    linkid = map->spri[si].hitag;
+                    map->sect[i].z[p.surfid]=map->spri[si].p.z;
+                    stag = (1-p.surfid)+1;
+                }
+                int isflor = 2-stag;
+                if (linkid == 0) continue;
+                uint32_t offset = (2 - stag) * 10000;
+                uint32_t offsetother = (-1 + stag) * 10000;
+                p.id = linkid + offset;
+                p.sect = i;
+                p.anchorspri = si;
+
+                //p.surfid = map->sect[i].surf[1].lotag; // hak to determine ceil or floor in map lotag1==floor.
+               // int sid1 = abs(map->spri[p.anchorspri].p.z - map->sect[i].z[1]);
+               // int sid2 = abs(map->spri[p.anchorspri].p.z - map->sect[i].z[0]);
+                p.surfid = isflor;
+                map->spri[p.anchorspri].p.z = map->sect[i].z[p.surfid]; // resolve flor ceil in future
+                p.kind = p.surfid;
+                spri_t *spr = &map->spri[p.anchorspri];
+                p.destpn = offsetother + linkid;
+                map->sect[i].tags[1] = portaln;
+                portaln++;
+            }
+            else // new temp portals for test.
             if (map->sect[i].surf[1].pal == 30 || map->sect[i].surf[0].pal == 30) {
                 portal &p = portals[portaln];
                 p.id = map->sect[i].surf[1].lotag;
@@ -199,21 +260,21 @@ public:
         }
 
         for (int i = 0; i < portaln; i++) { // portal post pass
-            int target_tag = portals[i].destpn; // currently stores expected hitag
+            uint32_t target_tag = portals[i].destpn; // currently stores expected hitag
             portals[i].destpn = -1; // mark as unresolved
             spri_t *spr = &map->spri[portals[i].anchorspri];
             normalize_transform(&spr->tr);
 
-            if (portals[i].id == target_tag) {
+            if (portals[i].id == target_tag) { // handle mirrors.
                 portal &pcop = portals[portaln];
-                memcpy(&pcop,&portals[i],sizeof(portal));
+                memcpy(&pcop, &portals[i], sizeof(portal));
                 int hspr = map->sect[pcop.sect].headspri;
                 int nextsp = map->spri[hspr].sectn;
                 if (nextsp < 0) printf("mirror with just one sprite detected! ERROR!");
-            if (pcop.kind != PORT_WALL) // temp floor mirror hack
+                if (pcop.kind != PORT_WALL) // temp floor mirror hack
                 {
-                map->spri[nextsp].tr = map->spri[hspr].tr;
-                vscalar(&map->spri[nextsp].tr.d,-1);
+                    map->spri[nextsp].tr = map->spri[hspr].tr;
+                    vscalar(&map->spri[nextsp].tr.d, -1);
                 }
                 pcop.anchorspri = nextsp;
                 pcop.destpn = i;
@@ -223,11 +284,13 @@ public:
                 continue;
             }
             // Find portal with matching lowtag
-            for (int j = 0; j < portaln; j++) {
+            for (unsigned int j = 0; j < portaln; j++) {
                 if (i == j) continue; // skip self, disable for mirror
-                int id = portals[j].id;
+                uint32_t id = portals[j].id;
                 if (id == target_tag) {
                     portals[i].destpn = j;
+                    if (portals[i].kind<2)
+                        map->sect[portals[i].sect].destpn[portals[i].kind] = j;
                     break;
                 }
             }
@@ -460,9 +523,9 @@ public:
 						}
 						if (!(k&1)) { shadowtest2_light[shadowtest2_numlights].f.x *= -1; shadowtest2_light[shadowtest2_numlights].f.y *= -1; shadowtest2_light[shadowtest2_numlights].f.z *= -1; }
 					}
-					shadowtest2_light[shadowtest2_numlights].rgb[0] = map->spri[map->light_spri[i]].bsc/8192.f; //gsc/8192   map->spri[map->light_spri[i]].fat;
-					shadowtest2_light[shadowtest2_numlights].rgb[1] = map->spri[map->light_spri[i]].gsc/8192.f;
-					shadowtest2_light[shadowtest2_numlights].rgb[2] = map->spri[map->light_spri[i]].rsc/8192.f;
+					shadowtest2_light[shadowtest2_numlights].rgb[0] = map->spri[map->light_spri[i]].view.color.x;//map->spri[map->light_spri[i]].bsc/8192.f; //gsc/8192   map->spri[map->light_spri[i]].fat;
+					shadowtest2_light[shadowtest2_numlights].rgb[1] = map->spri[map->light_spri[i]].view.color.y;//map->spri[map->light_spri[i]].gsc/8192.f;
+					shadowtest2_light[shadowtest2_numlights].rgb[2] = map->spri[map->light_spri[i]].view.color.z;//map->spri[map->light_spri[i]].rsc/8192.f;
 					shadowtest2_light[shadowtest2_numlights].flags  = 1;
 					shadowtest2_numlights++;
 				}
@@ -484,7 +547,7 @@ public:
             for(glignum=0;glignum<shadowtest2_numlights;glignum++)
             {
                 ncam.p = shadowtest2_light[glignum].p;
-                reset_context();
+                //reset_context();
                 ncam.cursect = shadowtest2_light[glignum].sect;
                 draw_hsr_polymost(&ncam,map,0);
             }
@@ -528,67 +591,103 @@ public:
     {
         return {(float)buildcoord.x, (float)-buildcoord.z, (float)buildcoord.y};
     }
-    static bool draw_eyepol_withuvtex(float sw, float sh, int i, int v0, int vertCount) {
+    static bool draw_eyepol_withuvtex(float sw, float sh, int i, int v0, int vertCount, bool isopaque) {
         int v1 = eyepol[i + 1].vert0;
 
-        rlDisableBackfaceCulling();
+        rlDrawRenderBatchActive();
+        rlEnableBackfaceCulling();
 
-        glEnable(GL_POLYGON_OFFSET_FILL);
-        glPolygonOffset(-0.5f, 1.0f);
-        //  rlDisableDepthMask();
-
-        float r = eyepol[i].b2sect/6.0;
-        float b = eyepol[i].b2sect/17.0;
-
-        // set global shader variables. all 3 are points in world space (custom one)
-        // shader.setvector3 worldorigin to eyepol->worlduvs[0] //
-        // shader.setvector3 worldU to eyepol->worlduvs[1]
-        // shader.setvector3 worldV to eyepol->worlduvs[2]
-        BeginShaderMode(uvShaderDesc.shader);
-        SetUVShaderParams(uvShaderDesc,
-            bpv3(eyepol[i].worlduvs[0]),
-            bpv3(eyepol[i].worlduvs[1]),
-            bpv3(eyepol[i].worlduvs[2]));
-        if (eyepol[i].tilnum>900)
-            eyepol[i].tilnum=5;
-        const Texture2D tex = runtimeTextures[eyepol[i].tilnum];
-
-        SetShaderValueTexture(uvShaderDesc.shader,uvShaderDesc.textureLoc,tex);
-        rlBegin(RL_TRIANGLES);
-        if (eyepol[i].tilnum == 163)
-            int a =1;
         Vector3 worldOrigin = bpv3(eyepol[i].worlduvs[0]);
         Vector3 worldU = bpv3(eyepol[i].worlduvs[1]);
         Vector3 worldV = bpv3(eyepol[i].worlduvs[2]);
         Vector3 locU = worldU - worldOrigin;
         Vector3 locV = worldV - worldOrigin;
+        int useGrad = 1;
+        Vector4 usedcol = {1,1,1,1};
+        switch (eyepol[i].pal) {
+            case 0: useGrad = 0; break;
+            case 1: usedcol = {0.5,0.6,1,1}; break;
+            case 2: usedcol = {1,0.35,0.1,1}; break;
+            case 8: usedcol = {0.6,0.9,0.2,1}; break;
+            case 7: usedcol = {0.3,0.3,0,1}; break;
+            default: useGrad = 0;break;
+        }
+        float shd = Clamp(eyepol[i].shade*0.5+0.5,0.2,1);
+        if (useGrad) usedcol.w *= shd;
+            else { usedcol*=shd; }
+
+
+      //  if (map->sect[eyepol[i].b2sect].surf[1].lotag==2) // water
+      //  {
+      //      usedcol *= Vector4{0.2f,0.7f,0.5f,1};
+      //      useGrad  = 1;
+      //  }
+
+        if (eyepol[i].alpha < 1.0f) {
+            if (isopaque) return true;
+            int isf = eyepol[i].isflor;
+            if (isf>-1) {
+                int s = eyepol[i].b2sect;
+                int lo = map->sect[s].surf[1].lotag;
+                if (lo <1 || lo>2)
+                    return true; // skip non-water floors and ceils.
+            }
+
+            rlDisableDepthMask();
+           // rlDisableBackfaceCulling();
+          // BeginBlendMode(RL_BLEND_ALP);
+            usedcol.w *= 0.6f;
+
+        }
+        else {
+            if (!isopaque) return true;
+       //     rlEnableBackfaceCulling();
+            rlEnableDepthMask();
+            usedcol.w *= 1;
+        }
+
+        BeginShaderMode(uvShaderDesc.shader);
+        rlBegin(RL_TRIANGLES);
+        SetUVShaderParams(uvShaderDesc,
+            bpv3(eyepol[i].worlduvs[0]),
+            bpv3(eyepol[i].worlduvs[1]),
+            bpv3(eyepol[i].worlduvs[2]));
+        if (eyepol[i].tilnum> gnumtiles_i)
+            eyepol[i].tilnum=5;
+        const Texture2D tex = runtimeTextures[eyepol[i].tilnum];
+
+        SetShaderValueTexture(uvShaderDesc.shader,uvShaderDesc.textureLoc,tex);
+
+        SetShaderValue(uvShaderDesc.shader, uvShaderDesc.useGradientloc,&useGrad, SHADER_UNIFORM_INT);
+
         for (int ii = 0; ii < eyepol[i].nid; ii += 3) {
-            float g = (ii/3.0f /5.0f);
-            rlColor4f(r,g+0.1f,b,0.2);
+
             for (int j = 0; j < 3; j++) {
                 int idx = eyepol[i].indices[ii+j];
                 Vector3 verwpos = buildToRaylibPos(eyepolv[idx].wpos);
                 Vector3 uvwpos = bpv3(eyepolv[idx].uvpos);
-              //  rlColor4f(1,g,1,1);
-              //  rlEnableVertexAttribute(uvShaderDesc.vertexTexCoord);
                 Vector3 localPos = uvwpos - worldOrigin;
                 // Project onto UV plane using dot products
                 float u = Vector3DotProduct(localPos, Vector3Normalize(locU)) / Vector3Length(locU);
                 float v = Vector3DotProduct(localPos, Vector3Normalize(locV)) / Vector3Length(locV);
 
+                // post-unwrap transformation
                 u = u * eyepol[i].uvform[0] + eyepol[i].uvform[2];
                 v = v * eyepol[i].uvform[1] + eyepol[i].uvform[3];
 
+                rlColor4f(usedcol.x,usedcol.y,usedcol.z,usedcol.w);
                 rlTexCoord2f(u,v);
-
                 // rlNormal3f(uvwpos.x,uvwpos.y,uvwpos.z); // this bitch gets transformed.
                 rlVertex3f(verwpos.x, verwpos.y, verwpos.z);
             }
         }
-        rlEnd();
         rlDrawRenderBatchActive();
+        EndBlendMode();
         EndShaderMode();
-        glDisable(GL_POLYGON_OFFSET_FILL);
+        rlEnd();
+
+
+     //   glDisable(GL_POLYGON_OFFSET_FILL);
         return false;
     }
 
@@ -687,7 +786,7 @@ float scaler = 0.01;
 
         int v=0;
         int l = 0;
-        auto cam = DumbCore::GetCamera().position;
+        auto cam = (*DumbCore::GetCamera()).position;
         cam = {0,0,0};
         float cdiv = 1.0;
         rlBegin(RL_LINES);
@@ -710,34 +809,55 @@ float scaler = 0.01;
         }
         rlEnd();
     }
-
-    static void DrawPost3d(float sw, float sh, Camera3D camsrc) {
-        // Vector2 v1 = {0, 0};
-        // Vector2 v2 = {sw, sh};
-        // Vector2 v3 = {sw / 2, sh};
-        Color transparentWhite = {255, 255, 255, 128};
-        ClearBackground({50,50,60,255});  // Set your desired color
-
-        cam_t b2cam;
+static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
+        cam_t localb2cam;
         if (syncam) {
-            plr.ipos = {camsrc.position.x, camsrc.position.z, -camsrc.position.y};
-            updatesect_imp(plr.ipos.x,plr.ipos.y,plr.ipos.z, &plr.cursect, map);
+            camfromrl(&plr.tri, camsrc);
+            int ported = updatesect_portmove(&plr.tri, &plr.cursect, map);
+            if (!ported)
+                updatesect_imp(plr.ipos.x,plr.ipos.y,plr.ipos.z, &plr.cursect, map);
+            else {
+                localb2cam.cursect = plr.cursect;
 
-            Vector3 forward = Vector3Normalize(Vector3Subtract(camsrc.target, camsrc.position));
-            Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camsrc.up));
-            Vector3 up = Vector3CrossProduct(right, forward); // Recalculate orthogonal up
+//                updatesect_imp(plr.ipos.x,plr.ipos.y,plr.ipos.z, &plr.cursect, map);
+            }
+            DumbCore::b2pos = plr.ipos;
+            camfromb2(camsrc,&plr.tri);
+          //  Vector3 forward = Vector3Normalize(Vector3Subtract(camsrc.target, camsrc.position));
+          //  Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camsrc.up));
+          //  Vector3 up = Vector3CrossProduct(right, forward); // Recalculate orthogonal up
+//
+          //  // Convert to Build2 coordinate system (x->x, y->z, z->-y)
+          //  plr.ifor.x = forward.x;  plr.ifor.y = forward.z;  plr.ifor.z = -forward.y;
+          //  plr.irig.x = right.x;    plr.irig.y = right.z;    plr.irig.z = -right.y;
+          //  plr.idow.x = -up.x;       plr.idow.y = -up.z;       plr.idow.z = up.y;
 
-            // Convert to Build2 coordinate system (x->x, y->z, z->-y)
-            plr.ifor.x = forward.x;  plr.ifor.y = forward.z;  plr.ifor.z = -forward.y;
-            plr.irig.x = right.x;    plr.irig.y = right.z;    plr.irig.z = -right.y;
-            plr.idow.x = -up.x;       plr.idow.y = -up.z;       plr.idow.z = up.y;
 
-
-            b2cam.p = plr.ipos;
-            b2cam.f = plr.ifor;
-            b2cam.r = plr.irig;
-            b2cam.d = plr.idow;
+            localb2cam.p = plr.ipos;
+            localb2cam.f = plr.ifor;
+            localb2cam.r = plr.irig;
+            localb2cam.d = plr.idow;
         }
+        DrawEyePoly(sw, sh, &plr, &localb2cam); // ken render
+        //rlDisableDepthTest();
+        rlEnableDepthTest();
+        rlEnableDepthMask();
+        rlDisableBackfaceCulling();
+       // BeginBlendMode(BLEND_ADDITIVE);
+        if ((!(!eyepol || !eyepolv || eyepoln <= 0))) {
+            for (int opaq = 1; opaq >= 0; opaq--) {
+                for (int i = 0; i < eyepoln; i++) {
+                    int v0 = eyepol[i].vert0;
+                    int v1 = eyepol[i + 1].vert0;
+                    int vertCount = v1 - v0;
+                    if (vertCount < 3) continue;
+
+                    draw_eyepol_withuvtex(sw, sh, i, v0, vertCount, opaq);
+                }
+            }
+        }
+    }
+    static void ProcessKeys() {
 
         if (IsKeyPressed(KEY_U))
             syncam = !syncam;
@@ -745,8 +865,8 @@ float scaler = 0.01;
             mono_cursnap++;
         }
         if (IsKeyPressed(KEY_LEFT)) {
-                    mono_cursnap--;
-                }
+            mono_cursnap--;
+        }
         if (IsKeyPressed(KEY_RIGHT_SHIFT)) {
             mono_curchain++;
         }
@@ -759,24 +879,32 @@ float scaler = 0.01;
         if (IsKeyPressed(KEY_O)) {
             operstopn--;
         }
+    }
+    static void DrawPost3d(float sw, float sh, Camera3D camsrc) {
+        // Vector2 v1 = {0, 0};
+        // Vector2 v2 = {sw, sh};
+        // Vector2 v3 = {sw / 2, sh};
+        Color transparentWhite = {255, 255, 255, 128};
+        ClearBackground({50,50,60,255});  // Set your desired color
+
+
         if (g_mono_dbg.snapshot_count > 0)
             mono_cursnap = abs(mono_cursnap % g_mono_dbg.snapshot_count);
 
-        DrawEyePoly(sw, sh, &plr, &b2cam); // ken render
+        // DrawEyePoly(sw, sh, &plr, &b2cam); // ken render
 
         // Eyepol polys
-        bool draweye = true;
+        bool draweye = 0;
         bool drawtrilines =0;
         bool drawtripoly = 0;
-        bool drawlights = 0;
+        bool drawlights = 1;
         bool drawmonoloops = 0;
-        bool draweyepolheads = 1;
+        bool draweyepolheads = 0;
         bool drawmonostate = 0;
-        bool drawopaqes = 1;
+        bool drawopaqes = 0;
 
         rlDisableBackfaceCulling();
         BeginMode3D(camsrc);
-
 
         if (draweye && (!(!eyepol || !eyepolv || eyepoln <= 0)))
             {
@@ -802,7 +930,7 @@ float scaler = 0.01;
                     if (drawtripoly)
                         draw_eyepol_tridebug(sw, sh, i, v0, vertCount);
                     if (drawopaqes && OPERISOK )
-                        draw_eyepol_withuvtex(sw, sh, i, v0, vertCount);
+                        draw_eyepol_withuvtex(sw, sh, i, v0, vertCount,1);
                     if (draweyepolheads && OPERONLYLAST) {
                              {
 
@@ -844,29 +972,26 @@ float scaler = 0.01;
 
                 if (drawtrilines)
                 {
-                    if (opercurr < operstopn) {
-                        rlDisableDepthMask();
-                        rlDisableDepthTest();
 
-
-                        glEnable(GL_POLYGON_OFFSET_FILL);
-                        glPolygonOffset(-2.0f, 1.0f);
-                        rlColor4f(0, 1, 1, 1);
-                        for (int ii = 0; ii < eyepol[i].nid; ii += 3) {
-                            rlBegin(RL_LINES);
-                            for (int j = 0; j < 3; j++) {
-                                int idx = eyepol[i].indices[ii+j];
-                                rlVertex3f(eyepolv[idx].x, -eyepolv[idx].z, eyepolv[idx].y);
-                            }
-                            rlDrawRenderBatchActive();
-                            rlEnd();
+                    rlDisableDepthMask();
+                    rlDisableDepthTest();
+                    rlDisableBackfaceCulling();
+                    glEnable(GL_POLYGON_OFFSET_FILL);
+                    glPolygonOffset(-2.0f, 1.0f);
+                    rlColor4f(0, 1, 1, 0.6f);
+                    for (int ii = 0; ii < eyepol[i].nid; ii += 3) {
+                        rlBegin(RL_LINES);
+                        for (int j = 0; j < 3; j++) {
+                            int idx = eyepol[i].indices[ii+j];
+                            rlVertex3f(eyepolv[idx].x, -eyepolv[idx].z, eyepolv[idx].y);
                         }
-
-
-                        glDisable(GL_POLYGON_OFFSET_FILL);
-                        rlEnableDepthMask();
+                        rlDrawRenderBatchActive();
+                        rlEnd();
                     }
-                } // eyepol lines for each poly
+                }
+
+                glDisable(GL_POLYGON_OFFSET_FILL);
+                rlEnableDepthMask();
 
             }
             if (drawmonoloops) draw_debug_lines();
@@ -877,13 +1002,18 @@ float scaler = 0.01;
         if (drawmonostate) draw_mono_state();
         //if (!lightpos_t || !eyepolv || eyepoln <= 0) return;}
 
-        if (drawlights) { // Light polys
 
+    }
+
+
+    static void DrawLightsPost3d(float sw, float sh, Camera3D camsrc) {
+        { // Light polys
+            glEnable(GL_POLYGON_OFFSET_FILL);
+            glPolygonOffset(-2.0f, 1.0f);
             BeginMode3D(camsrc);
             rlDisableBackfaceCulling();
             rlDisableDepthMask();
             BeginBlendMode(BLEND_ADDITIVE);
-
             BeginShaderMode(lightShader);
 
             int lightRange = 10;
@@ -917,8 +1047,6 @@ float scaler = 0.01;
                         }
                     }
                    rlDrawRenderBatchActive();
-
-
                     rlEnd();
 
                 }
@@ -930,9 +1058,6 @@ float scaler = 0.01;
             EndMode3D();
         }
     }
-
-
-
     // Updated wall rendering with segments
     static void DrawMapstateTex(Camera3D rlcam)
     {
@@ -1159,64 +1284,76 @@ float scaler = 0.01;
                 }
             }
         }
-        rlEnableDepthMask();
-        //rlEnableBackfaceCulling();
-        // Draw sprites (unchanged)
+       // rlEnableDepthMask();
+        rlEnableBackfaceCulling();
+        rlDisableDepthMask();
+        // draw sprites.
         for (int i = 0; i < map->numspris; i++)
         {
+
             spri_t* spr = &map->spri[i];
             if (spr->tilnum >= 0 ) // sprites
             {
                 if (spr->tilnum >= gnumtiles_i)
                     spr->tilnum = gnumtiles_i - 10;
 
+                rlEnableBackfaceCulling();
+                if (spr->view.isdblside)
+                    rlDisableBackfaceCulling();
+
                 Texture2D spriteTex = runtimeTextures[spr->tilnum];
+                // vectors are half a size
                 Vector3 rg = {spr->r.x, -spr->r.z, spr->r.y};
                 Vector3 dw = {spr->d.x, -spr->d.z, spr->d.y};
                 Vector3 frw = {spr->f.x, -spr->f.z, spr->f.y};
                 Vector3 pos = {spr->p.x, -spr->p.z, spr->p.y};
-                pos += frw * 0.1; // bias agains fighting
-                Vector3 a = pos + rg + dw;
-                Vector3 b = pos + rg - dw;
-                Vector3 c = pos - rg - dw;
-                Vector3 d = pos - rg + dw;
+                auto xs = Vector3Length(rg);
+                auto ys = Vector3Length(dw);
+               // pos += frw * 0.00001; // bias agains fighting
+                Vector3 a = pos + rg*spr->view.anchor.x*2 + dw*spr->view.anchor.z*2;
+                Vector3 b = pos + rg*spr->view.anchor.x*2 - dw*(1-spr->view.anchor.z)*2;
+                Vector3 c = pos - rg*(1-spr->view.anchor.x)*2 - dw*(1-spr->view.anchor.z)*2;
+                Vector3 d = pos - rg*(1-spr->view.anchor.x)*2 + dw*spr->view.anchor.z*2;
                 // Debug vectors
-                DrawLine3D(pos, Vector3Add(pos, frw), BLUE); // Forward vector
-                DrawLine3D(pos, Vector3Add(pos, rg), RED); // Right vector
-                DrawLine3D(pos, Vector3Add(pos, dw), GREEN); // Down vector
+                DrawTransform(&spr->tr);
 
-                if (spr->flags & 32) // spr->flags |= SPRITE_B2_FLAT_POLY;
+                if (spr->view.rtype==quad)
                 {
-                    rlDisableDepthMask();
+                    EnableDepthOffset(-2.0);
+
                     rlSetTexture(spriteTex.id);
                     rlBegin(RL_QUADS);
                     rlColor4ub(255, 255, 255, 255); // todo update transp.
 
-                    rlTexCoord2f(0.0f, 1.0f);
+                    rlTexCoord2f(0.0f, spr->view.uv[1]*1.0f);
                     rlVertex3V(b);
-                    rlTexCoord2f(1.0f, 1.0f);
+                    rlTexCoord2f(spr->view.uv[0]*1.0f, spr->view.uv[1]*1.0f);
                     rlVertex3V(c);
-                    rlTexCoord2f(1.0f, 0.0f);
+                    rlTexCoord2f(spr->view.uv[0]*1.0f, 0.0f);
                     rlVertex3V(d);
                     rlTexCoord2f(0.0f, 0.0f);
                     rlVertex3V(a);
 
+                    rlDrawRenderBatchActive();
                     rlEnd();
+                    DisableDepthOffset();
                     rlSetTexture(0);
-                    rlEnableDepthMask();
                 }
-                else
+                else if (spr->view.rtype == billbord) // billboards
                 {
-                    auto xs = Vector3Length(rg);
-                    auto ys = Vector3Length(dw);
-                    int xflip = spr->flags & 4 ? -1 : 1;
-                    int yflip = spr->flags & 8 ? -1 : 1;
-                    Vector3 pos = {spr->p.x, -spr->p.z, spr->p.y};
-                    Rectangle source = {0.0f, 0.0f, (float)spriteTex.width, (float)spriteTex.height};
+                    float xscaler = spr->view.uv[0];
+                    float yscaler = spr->view.uv[1];
                     xs *= 2;
                     ys *= 2;
+                    // need to shift view position for raylib's billboard.
+                    Vector3 centeroffset = rg*((spr->view.anchor.x-0.5))*2 + dw*(spr->view.anchor.z-0.5f)*2;
+                    Vector3 pos = {spr->p.x, -spr->p.z, spr->p.y};
+pos+= centeroffset;
+                    //pos.x+=xs;
+                    //pos.z-=ys;
 
-                    DrawBillboardRec(rlcam, spriteTex, source, pos, {xs * xflip, ys * yflip}, WHITE);
+                    Rectangle source = {0.0f, 0.0f, (float)spriteTex.width, (float)spriteTex.height};
+                    DrawBillboardRec(rlcam, spriteTex, source, pos, {xs * xscaler, ys * yscaler}, WHITE);
                 }
             }
         }
@@ -1228,6 +1365,7 @@ float scaler = 0.01;
        DrawB2Point(&testp);
     }
     static void DrawTransform(transform *tr) {
+        rlDisableDepthTest();
         Vector3 rg = {tr->r.x, -tr->r.z, tr->r.y};
         Vector3 dw = {tr->d.x, -tr->d.z, tr->d.y};
         Vector3 frw = {tr->f.x, -tr->f.z, tr->f.y};
@@ -1235,6 +1373,7 @@ float scaler = 0.01;
         DrawLine3D(pos, Vector3Add(pos, frw), BLUE); // Forward vector
         DrawLine3D(pos, Vector3Add(pos, rg), RED); // Right vector
         DrawLine3D(pos, Vector3Add(pos, dw), GREEN); // Down vector
+        rlEnableDepthTest();
     }
     static void DrawB2Point(dpoint3d *pt) {
         Vector3 vecpt = {(float)pt->x,(float)pt->z*-1,(float)pt->y};
@@ -1643,7 +1782,9 @@ float scaler = 0.01;
             free(floorMeshes);
             floorMeshes = NULL;
             numFloorMeshes = 0;
+
         }
+        freemap(map);
     }
 
 
@@ -1874,33 +2015,7 @@ private:
 
     static void LoadMapAndTiles()
     {
-        map = static_cast<mapstate_t*>(malloc(sizeof(mapstate_t)));
-        memset(map, 0, sizeof(mapstate_t));
-        initcrc32();
-
-        map->numsects = 0;
-        map->malsects = 256;
-        map->sect = static_cast<sect_t*>(malloc(map->malsects * sizeof(sect_t)));
-        if (!map->sect) return;
-        memset(map->sect, 0, map->malsects * sizeof(sect_t));
-
-        map->numspris = 0;
-        map->malspris = 256;
-        map->spri = static_cast<spri_t*>(malloc(map->malspris * sizeof(spri_t)));
-        if (!map->spri) return;
-        memset(map->spri, 0, map->malspris * sizeof(spri_t));
-        map->blankheadspri = -1;
-
-        map->blankheadspri = -1;
-        for (int i = 0; i < map->malspris; i++)
-        {
-            map->spri[i].sectn = map->blankheadspri;
-            map->spri[i].sectp = -1;
-            map->spri[i].sect = -1;
-            if (map->blankheadspri >= 0) map->spri[map->blankheadspri].sectp = i;
-            map->blankheadspri = i;
-        }
-        loadmap_imp((char*)"c:/Eugene/Games/build2/uv.MAP", map);
+        map = loadmap_imp((char*)"c:/Eugene/Games/build2/lig.MAP", NULL);
     }
 };
 

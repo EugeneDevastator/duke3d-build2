@@ -230,10 +230,9 @@ void loadpic(tile_t *tpic, char* rootpath) {
             pic->x = (long)sxsiz[tilenum];
             pic->y = (long)sysiz[tilenum];
         	// Read picanm data - use _alloca, don't free it
-        	uint32_t *picanm_data = (uint32_t *)_alloca(loctile1<<2);
+        	picanm_t *picanm_data = (picanm_t *)_alloca(loctile1<<2);
         	kzread(picanm_data, loctile1<<2);
-        	pic->anmdata = picanm_data[tilenum];  // Get specific tile's picanm
-
+        	pic->animdata = picanm_data[tilenum];  // Get specific tile's picanm uint32
             if (pic->x <= 1) lnx = 0; else lnx = bsr(pic->x-1)+1;
             if (pic->y <= 1) lny = 0; else lny = bsr(pic->y-1)+1;
             nx = (1<<lnx); ny = (1<<lny);
@@ -241,7 +240,7 @@ void loadpic(tile_t *tpic, char* rootpath) {
             kzseek(j,SEEK_SET);
             uptr = (unsigned char *)_alloca(pic->y);
             pic->p = (nx<<2);
-            pic->f = (long)malloc((ny+1)*pic->p+4);
+            pic->f = (uint32_t)malloc((ny+1)*pic->p+4);
 
             for(x=0;x<pic->x;x++) {
                 kzread(uptr,pic->y);

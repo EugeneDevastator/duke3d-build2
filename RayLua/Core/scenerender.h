@@ -9,7 +9,11 @@
 typedef struct {
     //screen/camera state
     float ghx, ghy, ghz, zoom, ozoom;
-    point3d ipos, irig, idow, ifor;
+    union {
+struct { point3d ipos, irig, idow, ifor;};
+        transform tri;
+    };
+
     point3d npos, nrig, ndow, nfor; //for 2d/3d swap animation
     point3d grdc, grdu, grdv, grdn; //center,u,v,normal
     int cursect;

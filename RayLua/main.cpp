@@ -42,6 +42,17 @@ double luaUITime = 0.0;
 double drawingTime = 0.0;
 bool renderOpaque = false;
 
+typedef struct {
+    unsigned int fbo;
+    unsigned int colorTexture;
+    unsigned int depthTexture;
+    int width, height;
+} CustomRenderTarget;
+
+Shader lutShader = {0};
+Texture2D lutTexture = {0};
+float lutIntensity = 1.0f;
+CustomRenderTarget finalTarget = {0};
 
 void SetImguiFonts()
 {
@@ -57,7 +68,7 @@ void SetImguiFonts()
     io.Fonts->Build();
 }
 
-
+int lutTextureLocation;
 typedef struct {
     Vector3 position;
     Vector3 target;
@@ -182,12 +193,6 @@ void VisualizeMapstate() {  //unused
 
     CloseWindow();
 }
-typedef struct {
-    unsigned int fbo;
-    unsigned int colorTexture;
-    unsigned int depthTexture;
-    int width, height;
-} CustomRenderTarget;
 
 CustomRenderTarget CreateCustomRenderTarget(int width, int height, unsigned int sharedDepth) {
     CustomRenderTarget target = {0};
@@ -245,78 +250,134 @@ void UnloadCustomRenderTarget(CustomRenderTarget target) {
     glDeleteFramebuffers(1, &target.fbo);
     // Don't delete shared depth texture here
 }
+
+void InitLUTSystem() {
+    // Load LUT shader
+    lutShader = LoadShader(0, "Shaders/lut.frag");
+
+    // Load LUT texture
+    lutTexture = LoadTexture("Shaders/lut.png");
+    SetTextureWrap(lutTexture, TEXTURE_WRAP_CLAMP);
+    SetTextureFilter(lutTexture, TEXTURE_FILTER_POINT);
+    // Set shader uniforms
+    lutTextureLocation = GetShaderLocation(lutShader, "lutTexture");
+    int lutIntensityLocation = GetShaderLocation(lutShader, "lutIntensity");
+
+   // SetShaderValue(lutShader, lutIntensityLocation, &lutIntensity, SHADER_UNIFORM_FLOAT);
+    SetShaderValueTexture(lutShader, lutTextureLocation, lutTexture);
+
+    // Create final render target for post-processing
+    finalTarget = CreateCustomRenderTarget(GetScreenWidth(), GetScreenHeight(), 0);
+}
+
+// Add this function to cleanup LUT resources
+void CleanupLUTSystem() {
+    UnloadShader(lutShader);
+    UnloadTexture(lutTexture);
+    UnloadCustomRenderTarget(finalTarget);
+}
 // Draw palette and texture preview on screen
 void MainLoop()
 {
-   DisableCursor();
-   //RunVisualization();  // use this for mono sample.
-   //return;
+    DisableCursor();
 
     DumbRender::Init();
     auto map = DumbRender::GetMap();
     DumbCore::Init(map);
     SetTargetFPS(60);
     DumbRender::LoadTexturesToGPU();
-    // Create render targets with shared depth
-    CustomRenderTarget albedoTarget = CreateCustomRenderTarget(800, 600, 0); // Creates own depth
-    CustomRenderTarget lightTarget = CreateCustomRenderTarget(800, 600, albedoTarget.depthTexture); // Shares depth
 
+    // Initialize LUT system
+    InitLUTSystem();
+
+    // Create render targets with shared depth
+    CustomRenderTarget albedoTarget = CreateCustomRenderTarget(GetScreenWidth(), GetScreenHeight(), 0);
+    CustomRenderTarget lightTarget = CreateCustomRenderTarget(GetScreenWidth(), GetScreenHeight(), albedoTarget.depthTexture);
+    CustomRenderTarget combinedTarget = CreateCustomRenderTarget(GetScreenWidth(), GetScreenHeight(), 0);
+    int w = GetScreenWidth();
+    int h = GetScreenHeight();
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
         DumbCore::Update(deltaTime);
-       // printf("detaT:%f",deltaTime);
+
+        // Render albedo pass
         BeginCustomRenderTarget(albedoTarget);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
         ClearBackground(BLACK);
 
-        BeginMode3D(DumbCore::GetCamera());
-        DumbRender::DrawMapstateTex(DumbCore::GetCamera());
-        //   DumbRender::DrawMapstateLines();
-         EndMode3D();
+        BeginMode3D(*DumbCore::GetCamera());
+        DumbRender::ProcessKeys();
+        DumbRender::DrawKenGeometry(GetScreenWidth(), GetScreenHeight(), DumbCore::GetCamera());
+        DumbRender::DrawMapstateTex(*DumbCore::GetCamera());
+        EndMode3D();
         EndCustomRenderTarget();
 
+        // Render light pass
         BeginCustomRenderTarget(lightTarget);
-        glClear(GL_COLOR_BUFFER_BIT); // Don't clear depth!
+        glClear(GL_COLOR_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
-        glDepthMask(GL_FALSE); // Disable depth writing
-
-        DumbRender::DrawPost3d(GetScreenWidth(),GetScreenHeight(),DumbCore::GetCamera());
-
-        //DumbRender::TestRenderTextures();
-        // DumbRender::DrawPaletteAndTexture();
-    //    DrawImgui();
-    //    DrawText("WASD: Move, Mouse: Look", 10, 10, 20, WHITE);
-     //   DrawFPS(10, 40);
-        glDepthMask(GL_TRUE); // Re-enable depth writing
+        glDepthMask(GL_FALSE);
+        DumbRender::DrawLightsPost3d(w,h,*DumbCore::GetCamera());
+        glDepthMask(GL_TRUE);
         EndCustomRenderTarget();
 
-        {
-            BeginDrawing();
-            ClearBackground(BLACK);
+        // Combine albedo and lights
+        BeginCustomRenderTarget(combinedTarget);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glDisable(GL_DEPTH_TEST);
 
-            // Draw albedo
-            DrawTextureRec({albedoTarget.colorTexture, 800, 600, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
-                          {0, 0, 800, -600}, {0, 0}, WHITE);
 
-            // Multiply blend lights
-            BeginBlendMode(RL_BLEND_ADDITIVE);
-            DrawTextureRec({lightTarget.colorTexture, 800, 600, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
-                          {0, 0, 800, -600}, {0, 0}, WHITE);
-            EndBlendMode();
 
-            EndDrawing();
-        }
+        // Draw albedo
+        DrawTextureRec({albedoTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
+                      {0, 0, (float)w, (float)-h}, {0, 0}, WHITE);
+
+        // Multiply blend lights
+        BeginBlendMode(RL_BLEND_ADDITIVE);
+
+        DrawTextureRec({lightTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
+                      {0, 0, (float)w, (float)-h}, {0, 0}, WHITE);
+        EndBlendMode();
+
+        EndCustomRenderTarget();
+
+        // Apply LUT to final result
+        BeginCustomRenderTarget(finalTarget);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glDisable(GL_DEPTH_TEST);
+
+
+        BeginShaderMode(lutShader);
+        SetShaderValueTexture(lutShader, lutTextureLocation, lutTexture);
+        DrawTextureRec({combinedTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
+                      {0, 0, (float)w, (float)-h}, {0, 0}, WHITE);
+        EndShaderMode();
+
+        EndCustomRenderTarget();
+
+        // Final draw to screen
+        BeginDrawing();
+        ClearBackground(BLACK);
+
+        DrawTextureRec({finalTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
+                      {0, 0, (float)w, (float)-h}, {0, 0}, WHITE);
+
+        EndDrawing();
     }
-    glDeleteTextures(1, &albedoTarget.depthTexture); // Delete shared depth once
+
+    // Cleanup
+    glDeleteTextures(1, &albedoTarget.depthTexture);
     UnloadCustomRenderTarget(albedoTarget);
     UnloadCustomRenderTarget(lightTarget);
+    UnloadCustomRenderTarget(combinedTarget);
+    CleanupLUTSystem();
     DumbRender::CleanupMapstateTex();
 }
 
 int main() {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
-    InitWindow(800, 600, "Raylib + Lua + ImGui");
+    InitWindow(1024, 768, "Raylib + Lua + ImGui");
     SetTargetFPS(120);
     rlImGuiSetup(true);
    // LuaBinder::Init();
@@ -327,7 +388,7 @@ int main() {
 
     //VisualizeMapstate();
     MainLoop();
-    DumbRender::CleanupMapstateTex();
+    //DumbRender::CleanupMapstateTex();
     return 0;
     //MapTest();
 

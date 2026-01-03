@@ -4,13 +4,11 @@
 
 #ifndef RAYLIB_LUA_IMGUI_BUILDMATH_H
 #define RAYLIB_LUA_IMGUI_BUILDMATH_H
-#include "mapcore.h"
 #include "monoclip.h"
 //
 // Created by omnis on 12/8/2025.
 //
 
-#include "buildmath.h"
 #define epsilon 0.0000001f
 static inline float vlen(point3d *p) {
     return sqrtf(p->x * p->x + p->y * p->y + p->z * p->z);
@@ -140,10 +138,32 @@ static inline void wccw_transform_tr(dpoint3d *pinout, transform *ctin, transfor
     pinout->y = cx * ctout->r.y + cy * ctout->d.y + cz * ctout->f.y + ctout->p.y;
     pinout->z = cx * ctout->r.z + cy * ctout->d.z + cz * ctout->f.z + ctout->p.z;
 }
+
+static inline void wccw_transform_trp(point3d *pinout, transform *ctin, transform *ctout) {
+    // World -> camera space (using ctin)
+    double dx = pinout->x - ctin->p.x;
+    double dy = pinout->y - ctin->p.y;
+    double dz = pinout->z - ctin->p.z;
+
+    double cx = dx * ctin->r.x + dy * ctin->r.y + dz * ctin->r.z;
+    double cy = dx * ctin->d.x + dy * ctin->d.y + dz * ctin->d.z;
+    double cz = dx * ctin->f.x + dy * ctin->f.y + dz * ctin->f.z;
+
+    // Camera space -> world (using ctout)
+    pinout->x = cx * ctout->r.x + cy * ctout->d.x + cz * ctout->f.x + ctout->p.x;
+    pinout->y = cx * ctout->r.y + cy * ctout->d.y + cz * ctout->f.y + ctout->p.y;
+    pinout->z = cx * ctout->r.z + cy * ctout->d.z + cz * ctout->f.z + ctout->p.z;
+}
+
 static inline void wccw_transform(dpoint3d *pinout, cam_t *ctin, cam_t *ctout) {
     wccw_transform_tr(pinout, &ctin->tr,&ctout->tr);
 }
 
+
+// is not power of two
+static inline bool isnpot(int n) {
+    return n <= 0 || (n & (n - 1)) != 0;
+}
 static inline void wccw_transform_dir(dpoint3d *dir, cam_t *ctin, cam_t *ctout) {
     // Transform direction vector (no translation)
     double cx = dir->x * ctin->r.x + dir->y * ctin->r.y + dir->z * ctin->r.z;
@@ -154,7 +174,22 @@ static inline void wccw_transform_dir(dpoint3d *dir, cam_t *ctin, cam_t *ctout) 
     dir->y = cx * ctout->r.y + cy * ctout->d.y + cz * ctout->f.y;
     dir->z = cx * ctout->r.z + cy * ctout->d.z + cz * ctout->f.z;
 }
+static inline void wccw_transform_dirp(point3d *dir, transform *ctin, transform *ctout) {
+    // Transform direction vector (no translation)
+    double cx = dir->x * ctin->r.x + dir->y * ctin->r.y + dir->z * ctin->r.z;
+    double cy = dir->x * ctin->d.x + dir->y * ctin->d.y + dir->z * ctin->d.z;
+    double cz = dir->x * ctin->f.x + dir->y * ctin->f.y + dir->z * ctin->f.z;
 
+    dir->x = cx * ctout->r.x + cy * ctout->d.x + cz * ctout->f.x;
+    dir->y = cx * ctout->r.y + cy * ctout->d.y + cz * ctout->f.y;
+    dir->z = cx * ctout->r.z + cy * ctout->d.z + cz * ctout->f.z;
+}
+static inline void wccw_transform_full(transform *tr, transform *ctin, transform *ctout) {
+    wccw_transform_trp(&tr->p, ctin,ctout);
+    wccw_transform_dirp(&tr->f,ctin,ctout);
+    wccw_transform_dirp(&tr->r,ctin,ctout);
+    wccw_transform_dirp(&tr->d,ctin,ctout);
+}
 static inline void mp_to_world(double sx, double sy, bdrawctx *b, double *wx, double *wy, double *wz, cam_t *cam) {
     double denom = (b->gouvmat[0] * sx + b->gouvmat[3] * sy + b->gouvmat[6]) * cam->h.z;
 

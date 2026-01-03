@@ -34,7 +34,6 @@ static void initcrc32 (void)
 		crctab32[i] = k;
 	}
 }
-point3d buildToRaylib(point3d buildcoord);
 static long getcrc32z (long crc32, unsigned char *buf) { long i; for(i=0;buf[i];i++) updatecrc32(buf[i],crc32); return(crc32); }
 
 static void compacttilelist_tilenums_imp (mapstate_t *map) //uses gtile[?].namcrc32 as the lut - a complete hack to avoid extra allocs :P
@@ -388,6 +387,7 @@ cnw_break2:;
 }
 
 
-int loadmap_imp (char *filnam, mapstate_t* map);
+mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap);
+void freemap (mapstate_t* map);
 
 #endif //BUILD2_LOADERS_H

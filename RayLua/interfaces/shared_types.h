@@ -4,7 +4,56 @@
 
 #ifndef RAYLIB_LUA_IMGUI_SHARED_TYPES_H
 #define RAYLIB_LUA_IMGUI_SHARED_TYPES_H
+#include <stdbool.h>
 #include <stdint.h>
+
+// type defines
+// Declare an arena for type 'typ' with base name 'name'
+// Creates: name (pointer), name##n (count), name##mal (capacity), name##siz (sizeof)
+#define ARENA(typ, name) \
+typ* name = NULL; \
+int name##n = 0; \
+int name##mal = 0; \
+int name##siz = sizeof(typ)
+
+// Add and assign value to arena, returns pointer to new element
+// Expand arena to hold at least 'count' total elements
+#define ARENA_EXPAND(name, count) \
+do { \
+if ((name##mal+count) > name##mal) { \
+name##mal += (count); \
+name = realloc(name, name##mal * name##siz); \
+} \
+} while(0)
+
+// Add and assign value to arena, returns pointer to new element
+// Assumes sufficient capacity already allocated
+#define ARENA_ADD(name, val) ( \
+name[name##n] = (val), \
+&name[name##n++] \
+)
+
+// Add without assignment, returns pointer to new element
+#define ARENA_PUSH(name) ( \
+(name##n >= name##mal) ? \
+(name##mal = name##mal ? (name##mal << 1) : 16, \
+name = realloc(name, name##mal * name##siz)) : name, \
+&name[name##n++] \
+)
+
+// Free arena
+#define ARENA_FREE(name) \
+do { \
+free(name); \
+name = NULL; \
+name##n = 0; \
+name##mal = 0; \
+} while(0)
+
+// Reset without freeing
+#define ARENA_RESET(name) (name##n = 0)
+
+// ------------------------------------------------
 // duke tags defs.
 #define MT_LAST 15 // index, not count
 
@@ -49,6 +98,7 @@
 
  // Convenience macros for flag operations
 #define HAS_FLAG(flags, flag)    ((flags) & (flag))
+ #define FLAG_ISOFF(flags, flag)    !((flags) & (flag))
 #define SET_FLAG(flags, flag)    ((flags) |= (flag))
 #define CLEAR_FLAG(flags, flag)  ((flags) &= ~(flag))
 #define TOGGLE_FLAG(flags, flag) ((flags) ^= (flag))
@@ -132,7 +182,8 @@
 #define TEZ_SLOPE 1<<2 // slope or rawz;
 #define TEZ_INVZ 1<<3 // use next continious wall
 #define TEZ_CLOSEST 1<<4 // closest height point instead of arbitrary.
-#define TEZ_WORLDZ1 1<<5 // closest height point instead of arbitrary.
+#define TEZ_FURTHEST 1<<5 // closest height point instead of arbitrary.
+#define TEZ_WORLDZ1 1<<6 // closest height point instead of arbitrary.
 
 // auto resolution optioons, written in ouv wal
 #define TEW_WORLDF -1
@@ -198,39 +249,54 @@ typedef struct {
 	point3d p, r, d, f;
 } transform;
 
-	//Map format:
-typedef struct {
-// view.xpos += xsize*scale * normal_offset * global_ppi.
-	point3d scaling;
+enum srenderType {
+	billbord,
+	vbord,
+	quad,
+	voxel,
+	mesh,
+	procedural
+};
 
-	// 0,0,0 = sprite is to the right and above pivot
-	// y for flat sprites is disregarded, as we scale in world along x - right, and z - up.
-	// 1,0,1 - will align upper right corner to pivot.
-	point3d noffset;
-} viewanchor; // maybe for billboards or do uvs union. it looks like this shouldbe full 3d transform matrix
+// flats aka surfs.
+enum frenderType {
+	flat,
+	parallaxcyl,
+	parallaxrect,
+	parallaxdome,
+	cubemap,
+};
+enum renderQ {
+	opaq,
+	atest,
+	transp,
+	pp,
+};
+
+typedef struct {
+	enum srenderType rtype;
+	enum renderQ rq;
+	bool isdblside;
+	float uv[8]; // scalexy, panxy, cropAB
+	point3d anchor; // normalized
+	point3d color;
+	int16_t lum; // yes allow negative values, why not.
+	uint8_t pal;
+} sprview;
+	//Map format:
 
 typedef struct
 {
-	long tilnum, tilanm/*???*/;
+	long tilnum, tilanm ;/*???*/
 
 	//Bit0:Blocking, Bit2:RelativeAlignment, Bit5:1Way, Bit16:IsParallax, Bit17:IsSkybox
-	union { long flags; struct { char _f1, _f2, _f3, pal; }; }; // temporary pal storage
-	union { long tag; struct { short lotag, hitag; }; };
-	point2d uv[3]; // legacy.
-	unsigned short asc, rsc, gsc, bsc; //4096 is no change
-//-------- uvs
-	union {
-		// 0,1 - origin offset on the plane 2,3 - offset of the tile rect, for rotation anim for ex
-		point2d uvoffset[4];
-		struct {
-			point2d
-				planarworldoffset, // move origin in plane space in world.
-				tilerectoffset, // move tile against origin
-				crop1, // crop from 0,0
-				crop2; // crop from 1,1 both in tile rect.
-		};
-	};
+	uint32_t flags;
 
+	short lotag, hitag;
+
+	uint8_t pal; // temporary pal storage
+	float alpha;
+	float uvform[9]; // scale xy, pan xy, crop AB, rotation
 	union{
 		// we dont use sectors, current one is constraint.
 		// origin, u , v
@@ -240,13 +306,15 @@ typedef struct
 	};
 	uint8_t uvmapkind; // uv amappings, regular, polar, hex, flipped variants etc. paralax.
 	uint8_t tilingkind; // normal, polar, hex etc.
+// ------------
+	point2d uv[3]; // legacy.
+	unsigned short asc, rsc, gsc, bsc; //4096 is no change
 
-	short renderflags; // new flags;
 // ------- runtime gneerated data
 	// for portals case - we dont care and use original world for everything.
 	// interpolator will lerp worldpositions, regardless of poly location
 	point3d uvcoords[3]; // world uv vectors. generated per poly. origin, u ,v
-	float uvform[6]; // scalexy, panxy
+
 	// can in theory use object space and encode it.
 
 } surf_t;
@@ -275,8 +343,8 @@ typedef struct
 
 	long n, ns, nw; //n:rel. wall ind.; ns & nw : nextsect & nextwall_of_sect
 	long owner; //for dragging while editing, other effects during game
-	long surfn;
-	surf_t surf, *xsurf; //additional malloced surfs when (surfn > 1)
+	uint8_t surfn;
+	surf_t surf, xsurf[3]; //additional malloced surfs when (surfn > 1)
 	uint16_t mflags[4]; // modflags
 	union {
 		int64_t tags8b[8];
@@ -292,33 +360,23 @@ typedef struct
 	point3d v, av;           //Position velocity, Angular velocity (direction=axis, magnitude=vel)
 	float fat, mas, moi;     //Physics (moi=moment of inertia)
 	long tilnum;             //Model file. Ex:"TILES000.ART|64","CARDBOARD.PNG","CACO.KV6","HAND.KCM","IMP.MD3"
-	unsigned short asc, rsc, gsc, bsc; //Color scales. 4096 is no change
 	long owner;
-	union { long tag; struct { short lotag, hitag; }; };
+	short lotag, hitag;
+	long sect; //Current sector
+	// to access next or prev sprite in sector of this sprite..
+	long sectn, sectp; // doubly-linked list of indices
+	int32_t tags[16];
+
 	long tim, otim;          //Time (in milliseconds) for animation
 
 	//Bit0:Blocking, Bit2:1WayOtherSide, Bit5,Bit4:Face/Wall/Floor/.., Bit6:1side, Bit16:IsLight, Bit17-19:SpotAx(1-6), Bit20-29:SpotWid, Bit31:Invisible
-	union { long flags; struct { char _f1, _f2, _f3, pal; }; }; // temporary pal storage
-
-	long sect; //Current sector
-	long sectn, sectp; // doubly-linked list of indices
-	int32_t tags[16];
+	long flags;  // temporary pal storage
 	///
 	uint8_t modid; // mod id - for game processors, like duke, doom, etc. 0 is reserved for core entities.
 	uint16_t classid; // instead of implicit class recognition by spritenum or pal - use explicit. so for ex. we can just make 3d rpg rocket as prop.
 	uint8_t clipmask; // block, hitscan, trigger, - for physics engine
 	uint8_t linkmask; // damage, signal, use, - everything for linking with other communicators
-
-	uint8_t renderflags; // isinvisible, one-way,
-	uint8_t renderclass; // billboard, flat, flat-box, flat-box-bupe, pipe-down-aligned, voxel, mesh, sdf, etc.
-
-		struct {
-			unsigned int pal	: 6;    // 64 pals
-			unsigned int filt   : 3; // |9, for ex find edges, invert, mask etc.
-			unsigned int blend	: 4; // |13, additive, multiply, etc.
-			unsigned int _		: 3; // 16
-		} fx;
-
+	sprview view;
 } spri_t;
 
 typedef struct
@@ -334,11 +392,12 @@ typedef struct
 	long owner;      //for dragging while editing, other effects during game
 	int32_t tags[16];
 	uint16_t mflags[4];
+	short scriptid,lotag,hitag;
 	// int nwperim - perimeter walls, would be first in sequence
 	// int nwnested - nested walls for fully inner sectors
 	// could be purely runtime info.
 	// but also inverted sector should be much easier to do.
-
+	int32_t destpn[2]; // nextsec flor ceil
 
 } sect_t;
 

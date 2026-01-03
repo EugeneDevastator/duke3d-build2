@@ -13,6 +13,7 @@ extern "C" {
 #include "mapcore.h"
 #include "physics.h"
 #include "loaders.h"
+#include "b2rlmath.h"
 #include "interfaces/engineapi.h"
 #if IS_DUKE_INCLUDED
 #include "DukeGame/source/dukewrap.h"
@@ -20,13 +21,10 @@ extern "C" {
 #endif
 }
 
-
 class DumbCore {
+
 private:
     struct FreeCamera {
-        Vector3 position;
-        Vector3 target;
-        Vector3 up;
         float speed;
     };
 
@@ -34,26 +32,25 @@ private:
     static Camera3D camera;
     static bool initialized;
     static int cursec;
-    static point3d b2pos;
+
 
 public:
     static mapstate_t *map;
-
+    static point3d b2pos;
     static void Init(mapstate_t *loadedMap) {
         if (initialized) return;
         map = loadedMap;
         b2pos = map->startpos;
-        point3d pos = buildToRaylib(b2pos);
-        cam.position = {pos.x, pos.y, pos.z};
-        updatesect_imp(cam.position.x, -cam.position.z, cam.position.y, &cursec, map);
+        camera.position = buildToRaylib(b2pos);
+        updatesect_imp(camera.position.x, -camera.position.z, camera.position.y, &cursec, map);
 
-        cam.target = {0.0f, 0.0f, 0.0f};
-        cam.up = {0.0f, 1.0f, 0.0f};
+        camera.target = {0.0f, 0.0f, 0.0f};
+        camera.up = {0.0f, 1.0f, 0.0f};
         cam.speed = 10.0f;
 
-        camera.position = cam.position;
-        camera.target = cam.target;
-        camera.up = cam.up;
+        camera.position = camera.position;
+        camera.target = camera.target;
+        camera.up = camera.up;
         camera.fovy = 90.0f;
         camera.projection = CAMERA_PERSPECTIVE;
 
@@ -75,18 +72,18 @@ public:
 #endif
         HandleInteraction();
 
-        camera.position = cam.position;
-        camera.target = cam.target;
-        camera.up = cam.up;
+        camera.position = camera.position;
+        camera.target = camera.target;
+        camera.up = camera.up;
     }
 
-    static Camera3D GetCamera() {
-        return camera;
+    static Camera3D* GetCamera() {
+        return &camera;
     }
 
     static void SetCameraPosition(Vector3 pos) {
-        cam.position = pos;
-        cam.target = Vector3Add(pos, {0, 0, -1});
+        camera.position = pos;
+        camera.target = Vector3Add(pos, {0, 0, -1});
     }
 
 private:
@@ -96,11 +93,11 @@ private:
 
     static void UpdateFreeCamera(float deltaTime) {
         point3d camposb2 = {b2pos.x, b2pos.y, b2pos.z};
-        Vector3 startpos = cam.position;
+        Vector3 startpos = camera.position;
         float speed = cam.speed * deltaTime;
 
-        Vector3 forward = Vector3Normalize(Vector3Subtract(cam.target, cam.position));
-        Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, cam.up));
+        Vector3 forward = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
+        Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camera.up));
         captureframe = false;
         g_captureframe = false;
 
@@ -113,56 +110,65 @@ private:
         // pos in build2
         if (IsKeyDown(KEY_Q)) {
             float rollSpeed = 2.0f * deltaTime; // Adjust roll speed as needed
-            cam.up = Vector3RotateByAxisAngle(cam.up, forward, rollSpeed);
+            camera.up = Vector3RotateByAxisAngle(camera.up, forward, rollSpeed);
         }
         if (IsKeyDown(KEY_E)) {
             float rollSpeed = 2.0f * deltaTime;
-            cam.up = Vector3RotateByAxisAngle(cam.up, forward, -rollSpeed);
+            camera.up = Vector3RotateByAxisAngle(camera.up, forward, -rollSpeed);
         }
 
         // Normalize up vector to prevent drift
-        cam.up = Vector3Normalize(cam.up);
+        camera.up = Vector3Normalize(camera.up);
 
         // WASD movement
         if (IsKeyDown(KEY_W)) {
-            cam.position = Vector3Add(cam.position, Vector3Scale(forward, speed));
-            cam.target = Vector3Add(cam.target, Vector3Scale(forward, speed));
+            camera.position = Vector3Add(camera.position, Vector3Scale(forward, speed));
+            camera.target = Vector3Add(camera.target, Vector3Scale(forward, speed));
         }
         if (IsKeyDown(KEY_S)) {
-            cam.position = Vector3Subtract(cam.position, Vector3Scale(forward, speed));
-            cam.target = Vector3Subtract(cam.target, Vector3Scale(forward, speed));
+            camera.position = Vector3Subtract(camera.position, Vector3Scale(forward, speed));
+            camera.target = Vector3Subtract(camera.target, Vector3Scale(forward, speed));
         }
         if (IsKeyDown(KEY_A)) {
-            cam.position = Vector3Subtract(cam.position, Vector3Scale(right, speed));
-            cam.target = Vector3Subtract(cam.target, Vector3Scale(right, speed));
+            camera.position = Vector3Subtract(camera.position, Vector3Scale(right, speed));
+            camera.target = Vector3Subtract(camera.target, Vector3Scale(right, speed));
         }
         if (IsKeyDown(KEY_D)) {
-            cam.position = Vector3Add(cam.position, Vector3Scale(right, speed));
-            cam.target = Vector3Add(cam.target, Vector3Scale(right, speed));
+            camera.position = Vector3Add(camera.position, Vector3Scale(right, speed));
+            camera.target = Vector3Add(camera.target, Vector3Scale(right, speed));
         }
 
         //those funcs still use internal build coords.
-        point3d movevec = RaylibToBuild(cam.position - startpos);
+        point3d movevec = RaylibToBuild(camera.position - startpos);
         point3d mv = {movevec.x, movevec.y, movevec.z};
-        camposb2.x+=movevec.x;        camposb2.y+=movevec.y;        camposb2.z+=movevec.z;
+        camposb2.x +=movevec.x;        camposb2.y+=movevec.y;        camposb2.z+=movevec.z;
       //  collmove_p(&camposb2, &cursec, &mv, 0.25, 1, map);
         updatesect_imp(camposb2.x, camposb2.y, camposb2.z, &cursec, map);
 
         b2pos = {camposb2.x, camposb2.y, camposb2.z};
 
-        cam.position.x = b2pos.x;
-        cam.position.y = -b2pos.z;
-        cam.position.z = b2pos.y;
-        // Mouse look
+        camera.position.x = b2pos.x;
+        camera.position.y = -b2pos.z;
+        camera.position.z = b2pos.y;
         Vector2 mouseDelta = GetMouseDelta();
         if (mouseDelta.x != 0 || mouseDelta.y != 0) {
             float sensitivity = 0.003f;
 
-            Vector3 targetOffset = Vector3Subtract(cam.target, cam.position);
-            targetOffset = Vector3RotateByAxisAngle(targetOffset, cam.up, -mouseDelta.x * sensitivity);
+            Vector3 targetOffset = Vector3Subtract(camera.target, camera.position);
+
+            // Yaw around WORLD up (0,1,0), not camera up
+            Vector3 worldUp = {0, 1, 0};
+            targetOffset = Vector3RotateByAxisAngle(targetOffset, worldUp, -mouseDelta.x * sensitivity);
+
+            // Pitch around current right vector (this stays the same)
+            Vector3 right = Vector3Normalize(Vector3CrossProduct(targetOffset, worldUp));
             targetOffset = Vector3RotateByAxisAngle(targetOffset, right, -mouseDelta.y * sensitivity);
 
-            cam.target = Vector3Add(cam.position, targetOffset);
+            camera.target = Vector3Add(camera.position, targetOffset);
+
+            // Update camera up to match new orientation
+            Vector3 forward = Vector3Normalize(targetOffset);
+            camera.up = Vector3Normalize(Vector3CrossProduct(right, forward));
         }
     }
 #if IS_DUKE_INCLUDED
@@ -189,10 +195,10 @@ private:
         ForwardEngineUpdate(deltaTime);
         point3d ppos = GetPlayerPos();
         point3d frw = GetPlayerFrw();
-        cam.position.x = ppos.x;
-        cam.position.y = -ppos.z;
-        cam.position.z = ppos.y;
-        cam.target = Vector3Add(cam.position, {frw.x, -frw.z, frw.y});
+        camera.position.x = ppos.x;
+        camera.position.y = -ppos.z;
+        camera.position.z = ppos.y;
+        camera.target = Vector3Add(camera.position, {frw.x, -frw.z, frw.y});
     }
 #endif
     static void HandleInteraction() {
@@ -212,6 +218,7 @@ DumbCore::FreeCamera DumbCore::cam = {};
 Camera3D DumbCore::camera = {};
 bool DumbCore::initialized = false;
 int DumbCore::cursec = false;
-point3d DumbCore::b2pos = {0, 0, 0};
+
 mapstate_t *DumbCore::map = nullptr;
+point3d DumbCore::b2pos;
 #endif // DUMBCORE_HPP

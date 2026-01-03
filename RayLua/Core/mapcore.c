@@ -8,7 +8,7 @@
 #define STANDALONE 1
 #define OOS_CHECK 1
 
-int portaln=0;
+uint16_t portaln=0;
 portal portals[100] ={};
 long gnumtiles, gmaltiles, gtilehashead[1024];
 char curmappath[MAX_PATH+1]="";
@@ -395,7 +395,7 @@ long insspri_imp (int sect, float x, float y, float z, mapstate_t *map)
 	spr->p.x = x; spr->p.y = y; spr->p.z = z;
 	spr->r.x = .5; spr->d.z = .5; spr->f.y =-.5;
 	spr->fat = .5; spr->mas = spr->moi = 1.0;
-	spr->tilnum = -1; spr->asc = spr->rsc = spr->gsc = spr->bsc = 4096;
+	spr->tilnum = -1; //spr->asc = spr->rsc = spr->gsc = spr->bsc = 4096;
 	spr->owner = -1; spr->flags = 0;
 	spr->sect = sect; spr->sectn = map->sect[sect].headspri; spr->sectp = -1;
 	if (map->sect[sect].headspri >= 0) map->spri[map->sect[sect].headspri].sectp = i;
@@ -528,18 +528,19 @@ float getzoftez(int tezflags, sect_t *mysec, int thiswall, point2d worldxy, maps
 	bool isflor = tezflags & TEZ_FLOR;
 	float retz;
 
-	if (tezflags & TEZ_CLOSEST) {
+	if (tezflags & (TEZ_CLOSEST | TEZ_FURTHEST) ) {
+		bool useFar = tezflags & TEZ_FURTHEST;
 		if (tezflags & TEZ_SLOPE) {
 			float z1 = getslopezpt(mysec, isflor, worldxy);
 			float z2 = getslopezpt(nsec, isflor, worldxy);
-			if (isflor)
+			if (isflor ^ useFar)
 				retz = min(z1, z2);
 			else
 				retz = max(z1, z2);
 		} else {
 			float z1 = mysec->z[isflor];
 			float z2 = nsec->z[isflor];
-			if (isflor)
+			if (isflor ^ useFar)
 				retz = min(z1, z2);
 			else
 				retz = max(z1, z2);
@@ -644,13 +645,13 @@ float scaler=1;
 				sur->uvform[1] *= -1;
 			}
 			float t;
-		t = sur->uvform[0];
-		sur->uvform[0] = sur->uvform[1];
-		sur->uvform[1] = t;
-
-			t = sur->uvform[2];
-			sur->uvform[2] = sur->uvform[3];
-			sur->uvform[3] = t;
+			t = sur->uvform[0];
+			sur->uvform[0] = sur->uvform[1];
+			sur->uvform[1] = t;
+			// duh probably thats how duke works - pan is not swapped.
+			//	t = sur->uvform[2];
+			//	sur->uvform[2] = sur->uvform[3];
+			//	sur->uvform[3] = t;
 
 			point3d tp = sur->uvcoords[1];
 			sur->uvcoords[1] = sur->uvcoords[2];
@@ -723,7 +724,7 @@ int polyspli(wall_t *owal, int on, wall_t **retwal, double kx, double ky, double
 			(*retwal)[n2].owner = twal->owner;
 			(*retwal)[n2].surf  = twal->surf; (*retwal)[n].surf.flags &= ~0x20;/*annoying hack to disable 1-way walls*/
 			(*retwal)[n2].surfn = twal->surfn;
-			(*retwal)[n2].xsurf = twal->xsurf;
+			memcpy((*retwal)[n2].xsurf, twal->xsurf,sizeof(surf_t)*3);
 			n2++;
 
 			got[i] = 1; i += tpal[i].n;
@@ -887,7 +888,7 @@ int polybool(wall_t *wal0, int on0, wall_t *wal1, int on1, wall_t **retwal, int 
 			(*retwal)[n].owner = twal->owner;
 			(*retwal)[n].surf  = twal->surf; (*retwal)[n].surf.flags &= ~0x20;/*annoying hack to disable 1-way walls*/
 			(*retwal)[n].surfn = twal->surfn;
-			(*retwal)[n].xsurf = twal->xsurf;
+			memcpy((*retwal)[n].xsurf, twal->xsurf,sizeof(surf_t)*3);
 			lin0[i].i = -1; n++;
 
 			for(j=n0-1;j>=0;j--) //FIX:visit hash|bbox(x1,y1,x1,y1){lin0,n0}
@@ -909,6 +910,39 @@ int insidesect(double x, double y, wall_t *wal, int w) {
 		     ((double)wal[v].y-(double)wal[w].y)*(x-(double)wal[w].x)) != (wal[v].y < wal[w].y)) c++;
 	}
 	return(c&1);
+}
+
+int updatesect_portmove(transform *tr, int *cursect, mapstate_t *map) {
+	point3d* pos = &tr->p;
+	long s = *cursect;
+	sect_t *sec = map->sect;
+	if (map->sect[s].destpn[0] + map->sect[s].destpn[1] > -2) {
+		if (insidesect(pos->x, pos->y, sec[s].wall, sec[s].n)) {
+			for (int j = 0; j < 2; j++) {
+				if (sec[s].destpn[j] > -1) {
+					float h = getslopez(&sec[s], j, pos->x, pos->y);
+					bool crossed = 0;
+					if (!j)
+						crossed = h > pos->z;
+					else
+						crossed = h < pos->z;
+
+					if (crossed) {
+						int d = sec[s].destpn[j];
+						int ow = portals[d].destpn;
+						*cursect = portals[d].sect;
+
+						//wccw_transform_trp(pos, &map->spri[portals[ow].anchorspri].tr,
+						//                   &map->spri[portals[d].anchorspri].tr);
+						wccw_transform_full(tr, &map->spri[portals[ow].anchorspri].tr,
+										   &map->spri[portals[d].anchorspri].tr);
+						return 1;
+					}
+				}
+			}
+		}
+	}
+	return 0;
 }
 
 void getcentroid(wall_t *wal, int n, float *retcx, float *retcy) {

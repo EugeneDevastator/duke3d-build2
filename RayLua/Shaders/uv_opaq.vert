@@ -29,6 +29,7 @@ void main() {
     float v = dot(localPos, locV) / dot(locV, locV);
 
     uvPosition = vec2(vertexTexCoord.x,vertexTexCoord.y);
+    fragColor = vertexColor;  // Pass the default color to fragment shader
 
     gl_Position = mvp * vec4(vertexPosition, 1.0);
 }
