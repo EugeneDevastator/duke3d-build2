@@ -665,8 +665,8 @@ public:
             for (int j = 0; j < 3; j++) {
                 int iidx = eyepol[i].triidstart + locidx*3 +j;
                 uint32_t idx = eyepoli[iidx];
-                Vector3 verwpos = buildToRaylibPos(eyepolv[idx].wpos);
-                Vector3 uvwpos = bpv3(eyepolv[idx].uvpos);
+                Vector3 verwpos = buildToRaylibPos(eyepolv[idx]);
+                Vector3 uvwpos = bpv3(eyepolvori[idx]);
                 Vector3 localPos = uvwpos - worldOrigin;
                 // Project onto UV plane using dot products
                 float u = Vector3DotProduct(localPos, Vector3Normalize(locU)) / Vector3Length(locU);
@@ -2017,7 +2017,7 @@ private:
 
     static void LoadMapAndTiles()
     {
-        map = loadmap_imp((char*)"c:/Eugene/Games/build2/prt31.MAP", NULL);
+        map = loadmap_imp((char*)"c:/Eugene/Games/build2/e3l3.MAP", NULL);
     }
 };
 

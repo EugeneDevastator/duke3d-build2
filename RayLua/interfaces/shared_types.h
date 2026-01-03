@@ -16,11 +16,24 @@ int name##n = 0; \
 int name##mal = 0; \
 int name##siz = sizeof(typ)
 
+#define ARENA_WRAPPED(typ, name) \
+typ* name; \
+int name##n; \
+int name##mal; \
+int name##siz
+
+#define ARENA_INIT_WRAP(typ, name,wrap) \
+wrap.name = NULL; \
+wrap.name##n =0; \
+wrap.name##mal =0; \
+wrap.name##siz = sizeof(typ)
+
+
 // Add and assign value to arena, returns pointer to new element
 // Expand arena to hold at least 'count' total elements
 #define ARENA_EXPAND(name, count) \
 do { \
-if ((name##mal+count) > name##mal) { \
+if ((name##n+count) > name##mal) { \
 name##mal += (count); \
 name = realloc(name, name##mal * name##siz); \
 } \

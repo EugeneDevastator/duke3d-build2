@@ -44,7 +44,7 @@ typedef struct {
     int lighasheadn;                    // Size of hash table
     ligpol_t *ligpol;                   // Light polygon match info array
     int ligpoln, ligpolmal;             // Count and allocated size of ligpol array
-    point3d *ligpolv;                   // Vertices for light polygon geometry
+    dpoint3d *ligpolv;                   // Vertices for light polygon geometry
     int ligpolvn, ligpolvmal;           // Count and allocated size of ligpolv array
 } lightpos_t;
 
@@ -105,7 +105,8 @@ extern int shadowtest2_sectgotn;                // Size of global sector bit arr
 extern int shadowtest2_rendmode;                // Current rendering mode (0-4)
 extern eyepol_t *eyepol; // 4096 eyepol_t's = 192KB
 extern uint32_t *eyepoli; // 4096 eyepol_t's = 192KB
-extern vert3d_t *eyepolv; //16384 point2d's  = 128KB
+extern dpoint3d *eyepolv; //16384 point2d's  = 128KB
+extern dpoint3d *eyepolvori; //16384 point2d's  = 128KB
 extern int eyepoln, glignum;
 extern int eyepolmal, eyepolvn, eyepolvmal;
 

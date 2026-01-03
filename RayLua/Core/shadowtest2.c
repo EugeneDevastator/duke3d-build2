@@ -254,7 +254,8 @@ static point3d slightpos[LIGHTMAX], slightdir[LIGHTMAX];
 static float spotwid[LIGHTMAX];
 // define ARENA(t,n) t* n =0; int nmal=0, nn=0;
 ARENA(eyepol_t, eyepol);
-ARENA(vert3d_t, eyepolv);
+ARENA(dpoint3d, eyepolv);
+ARENA(dpoint3d, eyepolvori);
 ARENA(uint32_t, eyepoli);
 //eyepol_t *eyepol = 0; // 4096 eyepol_t's = 192KB
 //vert3d_t *eyepolv = 0; //16384 point2d's  = 128KB
@@ -728,13 +729,115 @@ static void xformbac(double rx, double ry, double rz, dpoint3d *o, bdrawctx *b) 
 
 // Helper function to check turn direction
 float cross_product_eyev(int a, int b, int c) {
-	dpoint3d pa = eyepolv[a].wpos;
-	dpoint3d pb = eyepolv[b].wpos;
-	dpoint3d pc = eyepolv[c].wpos;
+	dpoint3d pa = eyepolv[a];
+	dpoint3d pb = eyepolv[b];
+	dpoint3d pc = eyepolv[c];
 	return (pb.x - pa.x) * (pc.y - pa.y) - (pb.y - pa.y) * (pc.x - pa.x);
 };
 static bool iseyeshared(int e1,int e2) {
-	return issamexyd(eyepolv[e1].wpos,eyepolv[e2].wpos);
+	return issamexyd(eyepolv[e1],eyepolv[e2]);
+}
+
+static int triangulate(const int *chain_starts, const int *chain_lengths, dpoint3d* verts, uint32_t* inds, int *indsn, bool needflip) {
+	int triangle_count =0;
+	int i0 = 0, i1 = 0;
+	int stack[256];
+	int stack_top = 0;
+	//bool needflip = !b->istrimirror;
+
+
+	// Start with leftmost vertex
+
+	if ((verts[chain_starts[0]].x <= verts[chain_starts[1]].x)) {
+		stack[0] = chain_starts[0];
+		i0 = 1;
+	} else {
+		stack[0] = chain_starts[1];
+		i1 = 1;
+	}
+
+	// Process all remaining vertices left to right
+	while (i0 < chain_lengths[0] || i1 < chain_lengths[1]) {
+		int next_v, next_chain;
+
+		// Pick next vertex by x coordinate
+		if (i0 >= chain_lengths[0]) {
+			next_v = chain_starts[1] + i1++;
+			next_chain = 1;
+		} else if (i1 >= chain_lengths[1]) {
+			next_v = chain_starts[0] + i0++;
+			next_chain = 0;
+		} else {
+			if (verts[chain_starts[0] + i0].x <= verts[chain_starts[1] + i1].x) {
+				next_v = chain_starts[0] + i0++;
+				next_chain = 0;
+			} else {
+				next_v = chain_starts[1] + i1++;
+				next_chain = 1;
+			}
+		}
+
+		int top_chain = (stack[stack_top] >= chain_starts[1]) ? 1 : 0;
+
+		if (next_chain != top_chain) {
+			// Fan from stack to new vertex
+			for (int j = 0; j < stack_top; j++) {
+				int v0 = stack[j], v1 = stack[j + 1], v2 = next_v;
+
+				// Determine winding based on chain orientation
+				bool upper_chain_triangle = (top_chain == 0);
+
+				if (upper_chain_triangle ^ needflip) {
+					inds[(*indsn)++] = v0;
+					inds[(*indsn)++] = v1;
+					inds[(*indsn)++] = v2;
+				} else {
+					inds[(*indsn)++] = v0;
+					inds[(*indsn)++] = v2;
+					inds[(*indsn)++] = v1;
+				}
+				triangle_count++;
+			}
+			stack[0] = stack[stack_top];
+			stack[1] = next_v;
+			stack_top = 1;
+		} else {
+			// Pop convex vertices from same chain using sequence logic
+			while (stack_top > 0) {
+				int v0 = stack[stack_top - 1], v1 = stack[stack_top], v2 = next_v;
+
+				// For monotone chains, convexity is determined by y-progression
+				// Chain 0 (upper): convex if y decreases then increases
+				// Chain 1 (lower): convex if y increases then decreases
+				bool y_turn_convex;
+				if (next_chain == 0) {
+					// Upper chain: convex if we have a "valley" (y goes down then up)
+					y_turn_convex = (verts[v1].y <= verts[v0].y) && (verts[v2].y >= verts[v1].y);
+				} else {
+					// Lower chain: convex if we have a "peak" (y goes up then down)
+					y_turn_convex = (verts[v1].y >= verts[v0].y) && (verts[v2].y <= verts[v1].y);
+				}
+
+				if (!y_turn_convex) break;
+
+				bool upper_chain_triangle = (next_chain == 0);
+
+				if (upper_chain_triangle ^ needflip) {
+					inds[(*indsn)++] = v0;
+					inds[(*indsn)++] = v1;
+					inds[(*indsn)++] = v2;
+				} else {
+					inds[(*indsn)++] = v0;
+					inds[(*indsn)++] = v2;
+					inds[(*indsn)++] = v1;
+				}
+				triangle_count++;
+				stack_top--;
+			}
+			stack[++stack_top] = next_v;
+		}
+	}
+	return triangle_count;
 }
 
 static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
@@ -762,12 +865,11 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 		i = rethead[h];
 		debhl[h * 2] = eyepolvn;
 		chain_starts[h] = eyepolvn;
+		ARENA_EXPAND(eyepolv,50);
+		ARENA_EXPAND(eyepolvori,50);
 		do {
-			if (eyepolvn >= eyepolvmal) {
-				eyepolvmal = max(eyepolvmal<<1, 16384);
-				eyepolv = (vert3d_t *) realloc(eyepolv, eyepolvmal * sizeof(vert3d_t));
-			}
-			eyepolv[eyepolvn].wpos = mp[i].pos;
+			eyepolv[eyepolvn] = mp[i].pos;
+			eyepolvorin++;
 			eyepolvn++;
 			chain_lengths[h]++;
 			i = mp[i].n;
@@ -801,104 +903,8 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 	int max_triangles = total_vertices;
 	int tridx_start = eyepolin;
 	ARENA_EXPAND(eyepoli, max_triangles * 3);
-
-	int i0 = 0, i1 = 0;
-	int stack[256];
-	int stack_top = 0;
-	bool needflip = !b->istrimirror;
 	int triangle_count = 0;
-
-	// Start with leftmost vertex
-
-	if ((eyepolv[chain_starts[0]].x <= eyepolv[chain_starts[1]].x)) {
-		stack[0] = chain_starts[0];
-		i0 = 1;
-	} else {
-		stack[0] = chain_starts[1];
-		i1 = 1;
-	}
-
-	// Process all remaining vertices left to right
-	while (i0 < chain_lengths[0] || i1 < chain_lengths[1]) {
-		int next_v, next_chain;
-
-		// Pick next vertex by x coordinate
-		if (i0 >= chain_lengths[0]) {
-			next_v = chain_starts[1] + i1++;
-			next_chain = 1;
-		} else if (i1 >= chain_lengths[1]) {
-			next_v = chain_starts[0] + i0++;
-			next_chain = 0;
-		} else {
-			if (eyepolv[chain_starts[0] + i0].x <= eyepolv[chain_starts[1] + i1].x) {
-				next_v = chain_starts[0] + i0++;
-				next_chain = 0;
-			} else {
-				next_v = chain_starts[1] + i1++;
-				next_chain = 1;
-			}
-		}
-
-		int top_chain = (stack[stack_top] >= chain_starts[1]) ? 1 : 0;
-
-		if (next_chain != top_chain) {
-			// Fan from stack to new vertex
-			for (int j = 0; j < stack_top; j++) {
-				int v0 = stack[j], v1 = stack[j + 1], v2 = next_v;
-
-				// Determine winding based on chain orientation
-				bool upper_chain_triangle = (top_chain == 0);
-
-				if (upper_chain_triangle ^ needflip) {
-					eyepoli[eyepolin++] = v0;
-					eyepoli[eyepolin++] = v1;
-					eyepoli[eyepolin++] = v2;
-				} else {
-					eyepoli[eyepolin++] = v0;
-					eyepoli[eyepolin++] = v2;
-					eyepoli[eyepolin++] = v1;
-				}
-				triangle_count++;
-			}
-			stack[0] = stack[stack_top];
-			stack[1] = next_v;
-			stack_top = 1;
-		} else {
-			// Pop convex vertices from same chain using sequence logic
-			while (stack_top > 0) {
-				int v0 = stack[stack_top - 1], v1 = stack[stack_top], v2 = next_v;
-
-				// For monotone chains, convexity is determined by y-progression
-				// Chain 0 (upper): convex if y decreases then increases
-				// Chain 1 (lower): convex if y increases then decreases
-				bool y_turn_convex;
-				if (next_chain == 0) {
-					// Upper chain: convex if we have a "valley" (y goes down then up)
-					y_turn_convex = (eyepolv[v1].y <= eyepolv[v0].y) && (eyepolv[v2].y >= eyepolv[v1].y);
-				} else {
-					// Lower chain: convex if we have a "peak" (y goes up then down)
-					y_turn_convex = (eyepolv[v1].y >= eyepolv[v0].y) && (eyepolv[v2].y <= eyepolv[v1].y);
-				}
-
-				if (!y_turn_convex) break;
-
-				bool upper_chain_triangle = (next_chain == 0);
-
-				if (upper_chain_triangle ^ needflip) {
-					eyepoli[eyepolin++] = v0;
-					eyepoli[eyepolin++] = v1;
-					eyepoli[eyepolin++] = v2;
-				} else {
-					eyepoli[eyepolin++] = v0;
-					eyepoli[eyepolin++] = v2;
-					eyepoli[eyepolin++] = v1;
-				}
-				triangle_count++;
-				stack_top--;
-			}
-			stack[++stack_top] = next_v;
-		}
-	}
+	triangle_count = triangulate(chain_starts,chain_lengths,eyepolv,eyepoli, &eyepolin, !b->istrimirror);
 
 	// --------------- Setup polygon record
 	if (eyepoln + 1 >= eyepolmal) {
@@ -941,9 +947,9 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 		double retz = ((fx - cam.h.x) * cam.r.z + (fy - cam.h.y) * cam.d.z + cam.h.z * cam.f.z) * f + cam.p.z;
 
 		dpoint3d ret = {retx, rety, retz};
-		eyepolv[ip].uvpos = ret;
+		eyepolvori[ip] = ret;
 		wccw_transform(&ret, &b->movedcam, &b->orcam);
-		eyepolv[ip].wpos = ret;
+		eyepolv[ip] = ret;
 	}
 
 	eyepol[eyepoln].c1 = debhl[0];
@@ -981,7 +987,7 @@ static void skytagfunc(int rethead0, int rethead1, bdrawctx *b) {
  */
 static void ligpoltagfunc(int rethead0, int rethead1, bdrawctx *b) {
 	cam_t gcam = b->cam;
-	float f, fx, fy, fz;
+	double f, fx, fy, fz;
 	int i, j, rethead[2];
 
 	if ((rethead0 | rethead1) < 0) {
@@ -1003,18 +1009,15 @@ static void ligpoltagfunc(int rethead0, int rethead1, bdrawctx *b) {
 
 			if (glp->ligpolvn >= glp->ligpolvmal) {
 				glp->ligpolvmal = max(glp->ligpolvmal<<1, 1024);
-				glp->ligpolv = (point3d *) realloc(glp->ligpolv, glp->ligpolvmal * sizeof(point3d));
+				glp->ligpolv = (dpoint3d *) realloc(glp->ligpolv, glp->ligpolvmal * sizeof(dpoint3d));
 			}
 
 			f = gcam.h.z / (/*mp[i].x*b->xformmat[6]*/ +mp[i].y * b->xformmat[7] + b->gnadd.z);
 			fx = (mp[i].x * b->xformmat[0] + mp[i].y * b->xformmat[1] + b->gnadd.x) * f + gcam.h.x;
 			fy = (mp[i].x * b->xformmat[3] + mp[i].y * b->xformmat[4] + b->gnadd.y) * f + gcam.h.y;
 
-#if (USEINTZ)
-			f = 1.0 / ((b->gouvmat[0] * fx + b->gouvmat[3] * fy + b->gouvmat[6]) * 1048576.0 * 256.0);
-#else
 			f = 1.0 / ((b->gouvmat[0] * fx + b->gouvmat[3] * fy + b->gouvmat[6]) * gcam.h.z);
-#endif
+
 			glp->ligpolv[glp->ligpolvn].x = ((fx - gcam.h.x) * gcam.r.x + (fy - gcam.h.y) * gcam.d.x + (gcam.h.z) * gcam
 			                                 .f.x) * f + gcam.p.x;
 			glp->ligpolv[glp->ligpolvn].y = ((fx - gcam.h.x) * gcam.r.y + (fy - gcam.h.y) * gcam.d.y + (gcam.h.z) * gcam
@@ -1076,7 +1079,7 @@ static void drawtag_debug(int rethead0, int rethead1, bdrawctx *b) {
 
 			if (eyepolvn >= eyepolvmal) {
 				eyepolvmal = max(eyepolvmal<<1, 16384);
-				eyepolv = (vert3d_t *) realloc(eyepolv, eyepolvmal * sizeof(vert3d_t));
+				eyepolv = (dpoint3d *) realloc(eyepolv, eyepolvmal * sizeof(dpoint3d));
 			}
 			f = cam.h.z / (mp[i].x * xform[6] + mp[i].y * xform[7] + add.z);
 			fx = (mp[i].x * xform[0] + mp[i].y * xform[1] + add.x) * f + cam.h.x;
@@ -1092,7 +1095,7 @@ static void drawtag_debug(int rethead0, int rethead1, bdrawctx *b) {
 				//	LOOPADD(ret)
 			}
 			wccw_transform(&ret, &b->cam, &b->orcam);
-			eyepolv[eyepolvn].wpos = (dpoint3d){ret.x, ret.y, ret.z};
+			eyepolv[eyepolvn] = (dpoint3d){ret.x, ret.y, ret.z};
 
 			eyepolvn++;
 
@@ -1838,6 +1841,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 void reset_context() {
 	ARENA_RESET(eyepol);
 	ARENA_RESET(eyepolv);
+	ARENA_RESET(eyepolvori);
 	ARENA_RESET(eyepoli);
 }
 
