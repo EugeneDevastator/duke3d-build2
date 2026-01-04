@@ -65,7 +65,39 @@ name##mal = 0; \
 
 // Reset without freeing
 #define ARENA_RESET(name) (name##n = 0)
+// --------------- struct arena --------------------
 
+#define ARENAST_DECLARE(typ, name) \
+struct { \
+typ* data; \
+int count; \
+int capacity; \
+} name = {0}
+
+#define ARENAST_EXPAND(arena, needed) \
+do { \
+if ((arena).count + (needed) > (arena).capacity) { \
+(arena).capacity = ((arena).count + (needed)) * 2; \
+(arena).data = realloc((arena).data, (arena).capacity * sizeof(*(arena).data)); \
+} \
+} while(0)
+
+#define ARENAST_PUSH(arena) \
+(((arena).count >= (arena).capacity) ? \
+((arena).capacity = (arena).capacity ? (arena).capacity * 2 : 16, \
+(arena).data = realloc((arena).data, (arena).capacity * sizeof(*(arena).data))) : (arena).data, \
+&(arena).data[(arena).count++])
+
+#define ARENAST_ADD(arena, val) \
+(*(ARENA_PUSH(arena)) = (val), &(arena).data[(arena).count-1])
+
+#define ARENAST_FREE(arena) \
+do { \
+free((arena).data); \
+(arena) = (typeof(arena)){0}; \
+} while(0)
+
+#define ARENAST_RESET(arena) ((arena).count = 0)
 // ------------------------------------------------
 // duke tags defs.
 #define MT_LAST 15 // index, not count
@@ -334,6 +366,7 @@ typedef struct
 
 typedef struct
 {
+	uint32_t guid; // unique per wall. surfs alway follow top-bottom order.
 	union {
 		point2d pos;
 		struct {
@@ -369,6 +402,7 @@ typedef struct
 
 typedef struct
 {
+	uint32_t guid; // uniq per sprite. automatic.
 	union { transform tr; struct { point3d p, r, d, f; }; };
 	point3d v, av;           //Position velocity, Angular velocity (direction=axis, magnitude=vel)
 	float fat, mas, moi;     //Physics (moi=moment of inertia)
@@ -394,6 +428,7 @@ typedef struct
 
 typedef struct
 {
+	uint32_t guid; // uniq per sector
 	float minx, miny, maxx, maxy; //bounding box
 	float z[2];      //ceil&flor height
 	point2d grad[2]; //ceil&flor grad. grad.x = norm.x/norm.z, grad.y = norm.y/norm.z

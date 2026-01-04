@@ -26,7 +26,7 @@ extern unsigned int *shadowtest2_sectgot;
 /** Light polygon data for shadow casting */
 typedef struct
 {
-    int vert0, b2sect, b2wall, b2slab, b2hashn;
+    int vert0, b2sect, b2wall, b2slab, b2hashn, tristart, tricnt;
 } ligpol_t;
 /** Light source definition and shadow polygon storage */
 typedef struct {
@@ -45,7 +45,9 @@ typedef struct {
     ligpol_t *ligpol;                   // Light polygon match info array
     int ligpoln, ligpolmal;             // Count and allocated size of ligpol array
     dpoint3d *ligpolv;                   // Vertices for light polygon geometry
-    int ligpolvn, ligpolvmal;           // Count and allocated size of ligpolv array
+    int ligpolvn, ligpolvmal;
+
+    // Count and allocated size of ligpolv array
 } lightpos_t;
 
 
@@ -96,7 +98,7 @@ extern int shadowtest2_numlights;               // Current number of active ligh
 extern int shadowtest2_useshadows;              // Global shadow enable flag
 extern int shadowtest2_numcpu;                  // Number of CPU threads to use
 extern float shadowtest2_ambrgb[3];             // Ambient light RGB values
-
+extern uint32_t* ligpoli;
 // Sector visibility tracking
 extern unsigned int *shadowtest2_sectgot;       // Global sector visibility bit array
 extern int shadowtest2_sectgotn;                // Size of global sector bit array

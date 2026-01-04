@@ -257,6 +257,7 @@ ARENA(eyepol_t, eyepol);
 ARENA(dpoint3d, eyepolv);
 ARENA(dpoint3d, eyepolvori);
 ARENA(uint32_t, eyepoli);
+ARENA(uint32_t, ligpoli);
 //eyepol_t *eyepol = 0; // 4096 eyepol_t's = 192KB
 //vert3d_t *eyepolv = 0; //16384 point2d's  = 128KB
 int glignum = 0;
@@ -995,40 +996,60 @@ static void ligpoltagfunc(int rethead0, int rethead1, bdrawctx *b) {
 		mono_deloop(rethead0);
 		return;
 	}
-
-	//Use this for dynamic lights only! (doesn't seem to help speed much)
-	//if ((shadowtest2_rendmode == 4) && (!(shadowtest2_sectgot[b->gligsect>>5]&(1<<b->gligsect)))) return;
-
-	//Put on FIFO:
 	rethead[0] = rethead0;
 	rethead[1] = rethead1;
-	for (j = 0; j < 2; j++) {
-		i = rethead[j];
-		do {
-			if (j) i = mp[i].p;
+	//Use this for dynamic lights only! (doesn't seem to help speed much)
+	//if ((shadowtest2_rendmode == 4) && (!(shadowtest2_sectgot[b->gligsect>>5]&(1<<b->gligsect)))) return;
+	int chain_starts[2];
+	int chain_lengths[2] = {0, 0};
+	dpoint3d curmp;
+	int debhl[4];
 
+	// Build vertex chains
+	for (int h = 0; h < 2; h++) {
+		i = rethead[h];
+		debhl[h * 2] = glp->ligpolvn;
+		chain_starts[h] = glp->ligpolvn;
+		do {
 			if (glp->ligpolvn >= glp->ligpolvmal) {
 				glp->ligpolvmal = max(glp->ligpolvmal<<1, 1024);
 				glp->ligpolv = (dpoint3d *) realloc(glp->ligpolv, glp->ligpolvmal * sizeof(dpoint3d));
 			}
+			glp->ligpolv[glp->ligpolvn] = mp[i].pos;
+			glp->ligpolvn++;
+			chain_lengths[h]++;
+			i = mp[i].n;
+		} while (i != rethead[h]);
+		mono_deloop(rethead[h]);
+		debhl[h * 2 + 1] = glp->ligpolvn - 1;
+	}
+	int total_vertices = chain_lengths[0] + chain_lengths[1];
+	if (total_vertices < 3) return;
+	int max_triangles = total_vertices;
+	int tridx_start = ligpolin;
+	ARENA_EXPAND(ligpoli, max_triangles * 3);
+	int triangle_count = 0;
+	triangle_count = triangulate(chain_starts,chain_lengths,glp->ligpolv,ligpoli, &ligpolin, !b->istrimirror);
 
-			f = gcam.h.z / (/*mp[i].x*b->xformmat[6]*/ +mp[i].y * b->xformmat[7] + b->gnadd.z);
-			fx = (mp[i].x * b->xformmat[0] + mp[i].y * b->xformmat[1] + b->gnadd.x) * f + gcam.h.x;
-			fy = (mp[i].x * b->xformmat[3] + mp[i].y * b->xformmat[4] + b->gnadd.y) * f + gcam.h.y;
+
+	//Put on FIFO:
+	rethead[0] = rethead0;
+	rethead[1] = rethead1;
+	for (int ip = debhl[0]; ip < glp->ligpolvn; ip++) {
+			dpoint3d lv = glp->ligpolv[ip];
+			f = gcam.h.z / (/*lv.x*b->xformmat[6]*/ +lv.y * b->xformmat[7] + b->gnadd.z);
+			fx = (lv.x * b->xformmat[0] + lv.y * b->xformmat[1] + b->gnadd.x) * f + gcam.h.x;
+			fy = (lv.x * b->xformmat[3] + lv.y * b->xformmat[4] + b->gnadd.y) * f + gcam.h.y;
 
 			f = 1.0 / ((b->gouvmat[0] * fx + b->gouvmat[3] * fy + b->gouvmat[6]) * gcam.h.z);
 
-			glp->ligpolv[glp->ligpolvn].x = ((fx - gcam.h.x) * gcam.r.x + (fy - gcam.h.y) * gcam.d.x + (gcam.h.z) * gcam
+			glp->ligpolv[ip].x = ((fx - gcam.h.x) * gcam.r.x + (fy - gcam.h.y) * gcam.d.x + (gcam.h.z) * gcam
 			                                 .f.x) * f + gcam.p.x;
-			glp->ligpolv[glp->ligpolvn].y = ((fx - gcam.h.x) * gcam.r.y + (fy - gcam.h.y) * gcam.d.y + (gcam.h.z) * gcam
+			glp->ligpolv[ip].y = ((fx - gcam.h.x) * gcam.r.y + (fy - gcam.h.y) * gcam.d.y + (gcam.h.z) * gcam
 			                                 .f.y) * f + gcam.p.y;
-			glp->ligpolv[glp->ligpolvn].z = ((fx - gcam.h.x) * gcam.r.z + (fy - gcam.h.y) * gcam.d.z + (gcam.h.z) * gcam
+			glp->ligpolv[ip].z = ((fx - gcam.h.x) * gcam.r.z + (fy - gcam.h.y) * gcam.d.z + (gcam.h.z) * gcam
 			                                 .f.z) * f + gcam.p.z;
-
-			glp->ligpolvn++;
-			if (!j) i = mp[i].n;
-		} while (i != rethead[j]);
-		mono_deloop(rethead[j]);
+		wccw_transform(&glp->ligpolv[ip], &b->movedcam, &b->orcam);
 	}
 
 	if (glp->ligpoln + 1 >= glp->ligpolmal) {
@@ -1036,6 +1057,8 @@ static void ligpoltagfunc(int rethead0, int rethead1, bdrawctx *b) {
 		glp->ligpol = (ligpol_t *) realloc(glp->ligpol, glp->ligpolmal * sizeof(ligpol_t));
 		glp->ligpol[0].vert0 = 0;
 	}
+	glp->ligpol[glp->ligpoln].tristart = tridx_start;
+	glp->ligpol[glp->ligpoln].tricnt = triangle_count;
 	glp->ligpol[glp->ligpoln].b2sect = b->gligsect;
 	glp->ligpol[glp->ligpoln].b2wall = b->gligwall;
 	glp->ligpol[glp->ligpoln].b2slab = b->gligslab;
@@ -1843,6 +1866,7 @@ void reset_context() {
 	ARENA_RESET(eyepolv);
 	ARENA_RESET(eyepolvori);
 	ARENA_RESET(eyepoli);
+	ARENA_RESET(ligpoli);
 }
 
 int lastvalidsec = 0;
@@ -2025,7 +2049,8 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 			xformbac(-65536.0, +65536.0, 1.0, &bord2[3], b);
 			n = 4;
 			didcut = 1;
-		} else {
+		}
+		else{
 			xformprep(((double) halfplane) * PI, b);
 
 			if (!b->has_portal_clip) {
@@ -2214,7 +2239,7 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 	}
 	if (b->has_portal_clip) {
 		logstep("mph clean after passes");
-		mphremoveaboveincl(b->tagoffset - 1);
+		//mphremoveaboveincl(b->tagoffset - 1);
 	}
 }
 

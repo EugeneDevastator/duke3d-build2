@@ -1027,21 +1027,18 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
                 SetShaderValue(lightShader, lightRangeLoc, &lightRange, SHADER_UNIFORM_FLOAT);
 
                 for (int i = 0; i < lght->ligpoln; i++) {
-                    int v0 = lght->ligpol[i].vert0;
-                    int v1 = lght->ligpol[i + 1].vert0;
-                    int vertCount = v1 - v0;
-                    if (vertCount < 3) continue;
+                    if (lght->ligpol[i].tricnt < 1) continue;
 
                     //   BeginShaderMode(uvShader_plain);
                     rlBegin(RL_TRIANGLES);
 
                     //rlSetTexture(0);
-                    for (int j = 1; j < vertCount - 1; j++) {
-                        int idx[] = {v0, v0 + j, v0 + j + 1};
-                        for (int k = 0; k < 3; k++) {
-                            Vector3 ptb2 = {lght->ligpolv[idx[k]].x, lght->ligpolv[idx[k]].y, lght->ligpolv[idx[k]].z};
-                            Vector3 pt = {ptb2.x,-ptb2.z, ptb2.y};
+                    for (int locidx = 0; locidx < lght->ligpol[i].tricnt; locidx += 1) {
 
+                        for (int j = 0; j < 3; j++) {
+                            int iidx = lght->ligpol[i].tristart + locidx*3 +j;
+                            uint32_t idx = ligpoli[iidx];
+                            Vector3 pt = buildToRaylibPos(lght->ligpolv[idx]);
                             rlColor4f(lightIndex, (1-lightIndex), 0, 1);
                             rlNormal3f(0,1,0);
                             rlTexCoord2f(0,0.5);
@@ -2017,7 +2014,7 @@ private:
 
     static void LoadMapAndTiles()
     {
-        map = loadmap_imp((char*)"c:/Eugene/Games/build2/e3l3.MAP", NULL);
+        map = loadmap_imp((char*)"c:/Eugene/Games/build2/lig.MAP", NULL);
     }
 };
 
