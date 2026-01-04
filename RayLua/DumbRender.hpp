@@ -1045,10 +1045,9 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
                             rlVertex3f(pt.x, pt.y, pt.z);
                         }
                     }
-                   rlDrawRenderBatchActive();
-                    rlEnd();
-
                 }
+                rlDrawRenderBatchActive();
+                rlEnd();
             }
             EndShaderMode();
             EndBlendMode();

@@ -2029,7 +2029,8 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 			halfplane = pass;
 		}
 		logstep("Pass start pass:%d, hfp:%d, depth:%d, camsec:%d", pass, halfplane, b->recursion_depth, b->cam.cursect);
-
+		float large_bound = 1e9f;
+		float lightbound = 95000.0f;
 		if (shadowtest2_rendmode == 4) {
 			if (!halfplane) gcam.r.x = 1;
 			else gcam.r.x = -1;
@@ -2041,12 +2042,13 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 			gcam.r.z = 0;
 			gcam.d.z = 1;
 			gcam.f.z = 0;
+			b->cam = gcam; // THAT IS IMPORTANT!
 			xformprep(0.0, b);
 
-			xformbac(-65536.0, -65536.0, 1.0, &bord2[0], b);
-			xformbac(+65536.0, -65536.0, 1.0, &bord2[1], b);
-			xformbac(+65536.0, +65536.0, 1.0, &bord2[2], b);
-			xformbac(-65536.0, +65536.0, 1.0, &bord2[3], b);
+			xformbac(-lightbound, -lightbound, 1.0, &bord2[0], b);
+			xformbac(+lightbound, -lightbound, 1.0, &bord2[1], b);
+			xformbac(+lightbound, +lightbound, 1.0, &bord2[2], b);
+			xformbac(-lightbound, +lightbound, 1.0, &bord2[3], b);
 			n = 4;
 			didcut = 1;
 		}
@@ -2061,7 +2063,7 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 				memcpy(&b->oxformmat, &b->xformmat, sizeof(double) * 9);
 			}
 			// NEW CODE - Use much larger bounds:
-			float large_bound = 1e9f;
+
 			xformbac(-large_bound, -large_bound, gcam.h.z, &bord[0], b);
 			xformbac(+large_bound, -large_bound, gcam.h.z, &bord[1], b);
 			xformbac(+large_bound, +large_bound, gcam.h.z, &bord[2], b);
@@ -2115,7 +2117,7 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 			//drawpol_befclip(gcam.cursect-taginc, gcam.cursect, gcam.cursect,	b->chead[0],b->chead[1], 8|3 , b);
 			int res = -1;
 
-			mphremoveaboveincl(b->tagoffset); // clean anything above.
+		//	mphremoveaboveincl(b->tagoffset); // clean anything above.
 			{
 				if (n < 3) {
 					printf("n<3 2");

@@ -318,8 +318,9 @@ void MainLoop()
         glClear(GL_COLOR_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
         glDepthMask(GL_FALSE);
+        // batching improves perf significantly, so atlases are way to go
         DumbRender::DrawLightsPost3d(w,h,*DumbCore::GetCamera());
-        DumbRender::DrawPost3d(w,h,*DumbCore::GetCamera());
+       // DumbRender::DrawPost3d(w,h,*DumbCore::GetCamera());
         glDepthMask(GL_TRUE);
         EndCustomRenderTarget();
 
