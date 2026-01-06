@@ -12,7 +12,7 @@
 #define epsilon 0.0000001f
 #define epsilond 0.000001
 static const point3d down = {0,0,1};
-static const point3d right = {1,0,0};
+static const point3d right = {1,0,0}; // note - either quats misuse it or smth wrong.
 static const point3d forward = {0,1,0};
 
 static inline float vlen(point3d *p) {
@@ -31,7 +31,7 @@ static inline point3d subtract(point3d a, point3d b) {
     p.z = a.z - b.z;
     return p;
 }
-static inline void addto(point3d *a, point3d b) {
+static inline void addto(point3d *a, const point3d b) {
     a->x += b.x;
     a->y += b.y;
     a->z += b.z;
@@ -49,7 +49,18 @@ static inline void rot90cwz(point3d *a) {
     a->x = a->y;
     a->y = -t;
 }
-
+static void vscalar(point3d *p, float s) {
+    p->x*=s;
+    p->y*=s;
+    p->z*=s;
+}
+static point3d scaled(const point3d pt, float s) {
+point3d p = pt;
+    p.x*=s;
+    p.y*=s;
+    p.z*=s;
+    return p;
+}
 static inline void scalardivv(point3d *pt, float diver) {
     pt->x /= diver; pt->y /= diver; pt->z /= diver;
 }
@@ -464,13 +475,13 @@ static inline quat quat_from_transform(transform *tr) {
     }
     return q;
 }
-
-static inline void qrotaxis(transform *tr, const point3d axis, float angleDeg) {
+static inline void qrotaxis(transform *tr, point3d axis, float angleDeg) {
     point3d normAxis = normalizep3(axis);
     quat rotation = quat_from_axis_angle(normAxis, angleDeg);
-    quat current = quat_from_transform(tr);
-    quat result = quat_multiply(rotation, current);
-    quat_to_transform(result, tr);
+
+    tr->r = quat_rotate_point(rotation, tr->r);
+    tr->d = quat_rotate_point(rotation, tr->d);
+    tr->f = quat_rotate_point(rotation, tr->f);
 }
 
 static inline void qrotwhole(transform *tr, point3d axis, point3d axisorigin, float angleDeg) {
@@ -481,16 +492,30 @@ static inline void qrotwhole(transform *tr, point3d axis, point3d axisorigin, fl
     point3d rotatedOffset = quat_rotate_point(rotation, offset);
     tr->p = sump3(axisorigin, rotatedOffset);
 
-    quat current = quat_from_transform(tr);
-    quat result = quat_multiply(rotation, current);
-    quat_to_transform(result, tr);
+    tr->r = quat_rotate_point(rotation, tr->r);
+    tr->d = quat_rotate_point(rotation, tr->d);
+    tr->f = quat_rotate_point(rotation, tr->f);
 }
 
 static inline void qrotslerp(transform *trsubj, transform *trto, float normt) {
     quat qsubj = quat_from_transform(trsubj);
     quat qto = quat_from_transform(trto);
     quat result = quat_slerp(qsubj, qto, normt);
+
+    // Preserve original axis lengths
+    float rlen = vlen(&trsubj->r);
+    float dlen = vlen(&trsubj->d);
+    float flen = vlen(&trsubj->f);
+
     quat_to_transform(result, trsubj);
+
+    scalardivv(&trsubj->r, vlen(&trsubj->r));
+    scalardivv(&trsubj->d, vlen(&trsubj->d));
+    scalardivv(&trsubj->f, vlen(&trsubj->f));
+
+    trsubj->r.x *= rlen; trsubj->r.y *= rlen; trsubj->r.z *= rlen;
+    trsubj->d.x *= dlen; trsubj->d.y *= dlen; trsubj->d.z *= dlen;
+    trsubj->f.x *= flen; trsubj->f.y *= flen; trsubj->f.z *= flen;
 }
 
 static inline void qrotlookat(transform *trsubj, point3d to, float normt) {
@@ -511,10 +536,15 @@ static inline void qrotlookat(transform *trsubj, point3d to, float normt) {
     scalardivv(&right, rightLen);
     up = crossp3(dir, right);
 
+    // Preserve original axis lengths
+    float rlen = vlen(&trsubj->r);
+    float dlen = vlen(&trsubj->d);
+    float flen = vlen(&trsubj->f);
+
     transform target = *trsubj;
-    target.f = dir;
-    target.r = right;
-    target.d = up;
+    target.f.x = dir.x * flen; target.f.y = dir.y * flen; target.f.z = dir.z * flen;
+    target.r.x = right.x * rlen; target.r.y = right.y * rlen; target.r.z = right.z * rlen;
+    target.d.x = up.x * dlen; target.d.y = up.y * dlen; target.d.z = up.z * dlen;
 
     qrotslerp(trsubj, &target, normt);
 }
