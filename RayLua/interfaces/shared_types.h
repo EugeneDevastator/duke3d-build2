@@ -194,6 +194,8 @@ free((arena).data); \
 #define SPRITE_B2_ONE_SIDED        (1 << 6)   // 64
 #define SPRITE_B2_IS_LIGHT     (1 << 16)   // 64
 
+#define SURF_SEE_THROUGH (1<<16) // for parallax
+
 #define UV_TEXELRATE 		0 // pixel-rated = duke default.
 #define UV_NORMRATE 		1 // tile-rated
 #define UV_TEXELFIT 		2 // fit preserving texelrate
@@ -285,11 +287,7 @@ static inline float GetPxOffsetHorizontal(int ypan) {
 typedef struct { float x, y, z; } point3d;
 typedef struct { double x, y, z; } dpoint3d; 	//Note: pol doesn't support loops as dpoint3d's!
 typedef struct { float x, y; } point2d;
-static void vscalar(point3d *p, float s) {
-	p->x*=s;
-	p->y*=s;
-	p->z*=s;
-}
+
 typedef struct {
 	point3d p, r, d, f;
 } transform;
@@ -327,17 +325,16 @@ typedef struct {
 	point3d color;
 	int16_t lum; // yes allow negative values, why not.
 	uint8_t pal;
+	uint16_t tilnum;
+	uint8_t tilset; // sortof mod id
 } sprview;
 	//Map format:
 
 typedef struct
 {
 	long tilnum, tilanm ;/*???*/
-
 	//Bit0:Blocking, Bit2:RelativeAlignment, Bit5:1Way, Bit16:IsParallax, Bit17:IsSkybox
-	uint32_t flags;
-
-	short lotag, hitag;
+	uint32_t flags;	short lotag, hitag;
 
 	uint8_t pal; // temporary pal storage
 	float alpha;

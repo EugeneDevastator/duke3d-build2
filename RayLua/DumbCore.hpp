@@ -1,6 +1,11 @@
 #ifndef DUMBCORE_HPP
 #define DUMBCORE_HPP
 
+// todo: get map loaded from console
+// add pal 6
+// stub to select one sprite, move around xy and rotate. - ask ai to gen the code.
+// make quats.
+// focus - automatic - R enter rotation - space confirm return
 
 #include "raylib.h"
 #include "raymath.h"
@@ -146,7 +151,6 @@ private:
         updatesect_imp(camposb2.x, camposb2.y, camposb2.z, &cursec, map);
 
         b2pos = {camposb2.x, camposb2.y, camposb2.z};
-
         camera.position.x = b2pos.x;
         camera.position.y = -b2pos.z;
         camera.position.z = b2pos.y;

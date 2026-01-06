@@ -611,7 +611,7 @@ public:
             case 7: usedcol = {0.3,0.3,0,1}; break;
             default: useGrad = 0;break;
         }
-        float shd = Clamp(eyepol[i].shade*0.5+0.5,0.5 ,1);
+        float shd = Clamp(eyepol[i].shade*0.5,0.5 ,1);
         if (useGrad) usedcol.w *= shd;
            else { usedcol*=shd; usedcol.w=1.0;}
 
@@ -882,6 +882,12 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
         if (IsKeyPressed(KEY_O)) {
             operstopn--;
         }
+
+        float mv = GetMouseWheelMove();
+        if (focusedSprite >=0) {
+            qrotaxis(&map->spri[focusedSprite].tr, map->spri[focusedSprite].tr.r, mv);
+         //   addto(&map->spri[focusedSprite].tr.p,scaled(right,mv));
+        }
     }
     static void DrawPost3d(float sw, float sh, Camera3D camsrc) {
         // Vector2 v1 = {0, 0};
@@ -1025,12 +1031,12 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
                 Vector3 lightpos = {lght->p.x,-lght->p.z,lght->p.y};
                 SetShaderValue(lightShader, lightPosLoc, &lightpos, SHADER_UNIFORM_VEC3);
                 SetShaderValue(lightShader, lightRangeLoc, &lightRange, SHADER_UNIFORM_FLOAT);
-
+                //   BeginShaderMode(uvShader_plain);
+                rlBegin(RL_TRIANGLES);
                 for (int i = 0; i < lght->ligpoln; i++) {
                     if (lght->ligpol[i].tricnt < 1) continue;
 
-                    //   BeginShaderMode(uvShader_plain);
-                    rlBegin(RL_TRIANGLES);
+
 
                     //rlSetTexture(0);
                     for (int locidx = 0; locidx < lght->ligpol[i].tricnt; locidx += 1) {
@@ -1039,9 +1045,10 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
                             int iidx = lght->ligpol[i].tristart + locidx*3 +j;
                             uint32_t idx = ligpoli[iidx];
                             Vector3 pt = buildToRaylibPos(lght->ligpolv[idx]);
-                            rlColor4f(lightIndex, (1-lightIndex), 0, 1);
-                            rlNormal3f(0,1,0);
-                            rlTexCoord2f(0,0.5);
+                            rlColor4f(0.0, 0.2, 0.3, 1);
+                            //rlColor4f(0.6, 0.2, 0.1, 1);
+                           // rlNormal3f(0,1,0);
+                           // rlTexCoord2f(0,0.5);
                             rlVertex3f(pt.x, pt.y, pt.z);
                         }
                     }
@@ -1049,6 +1056,7 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
                 rlDrawRenderBatchActive();
                 rlEnd();
             }
+
             EndShaderMode();
             EndBlendMode();
             glDisable(GL_POLYGON_OFFSET_FILL);
@@ -1339,6 +1347,7 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
                 }
                 else if (spr->view.rtype == billbord) // billboards
                 {
+                   // Vector3 up =
                     float xscaler = spr->view.uv[0];
                     float yscaler = spr->view.uv[1];
                     xs *= 2;
@@ -1352,6 +1361,7 @@ pos+= centeroffset;
 
                     Rectangle source = {0.0f, 0.0f, (float)spriteTex.width, (float)spriteTex.height};
                     DrawBillboardRec(rlcam, spriteTex, source, pos, {xs * xscaler, ys * yscaler}, WHITE);
+                    DrawBillboardPro(rlcam,spriteTex,source, pos, dw, {xs * xscaler, ys * yscaler}, {0,0},30, WHITE);
                 }
             }
         }
@@ -2013,7 +2023,7 @@ private:
 
     static void LoadMapAndTiles()
     {
-        map = loadmap_imp((char*)"c:/Eugene/Games/build2/lig.MAP", NULL);
+        map = loadmap_imp((char*)"c:/Eugene/Games/build2/e2l7.MAP", NULL);
     }
 };
 

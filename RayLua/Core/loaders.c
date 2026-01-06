@@ -583,7 +583,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 						sec[i].grad[j].y = ((float)b7sec.surf[j].heinum)*(1.f/4096.f);
 					sur = &sec[i].surf[j];
 					sur->flags = 0;
-					if (b7sec.stat[j]&1) sur->flags |= (1<<16);
+					if (b7sec.stat[j]&1) sur->flags |= SURF_SEE_THROUGH; // parallax
 					sur->asc = 4096;
 					sur->rsc = (32-b7sec.surf[j].shade)*128;
 					sur->gsc = (32-b7sec.surf[j].shade)*128;
@@ -1099,7 +1099,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 			gnumtiles = 0; memset(gtilehashead,-1,sizeof(gtilehashead));
 
 			hitile++;
-			hitile =  3000;
+			hitile =  4000;
 			if (hitile > gmaltiles)
 			{
 				gmaltiles = hitile;

@@ -13,6 +13,7 @@
 
 #include "buildmath.h"
 #include "monodebug.h"
+#include "physics.h"
 #define PI 3.14159265358979323
 #pragma warning(disable:4731)
 #define EXLOGS 0
@@ -1680,6 +1681,9 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			// seems that we need to do wccw for every vert to gurantee shared space.. darn
 			draw_hsr_enter_portal(map, myport, plothead[0], plothead[1], b);
 		} else {
+			//if (sec[s].surf[isflor].flags & SURF_SEE_THROUGH)
+			//	{			}
+			//else
 			drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1], surflag, b);
 		}
 	}
@@ -1789,13 +1793,6 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 					else if (!vn) f = sec[s].z[1]; //White walls don't have verts[]! and align is different.
 					else if (!m) f = sec[verts[0].s].z[0]; //
 					else f = sec[verts[(m - 1) >> 1].s].z[0];
-					// Apply UV coordinates with proper scaling
-					//npol2[0].u = sur->uv[0].x;
-					//npol2[0].v = sur->uv[2].y * (npol2[0].z - f) + sur->uv[0].y;
-					//npol2[1].u = sur->uv[1].x * dx + npol2[0].u;
-					//npol2[1].v = sur->uv[1].y * dx + npol2[0].v;
-					//npol2[2].u = sur->uv[2].x + npol2[0].u;
-					//npol2[2].v = sur->uv[2].y + npol2[0].v;
 					b->gflags = 0;
 					gentransform_wall(npol2, sur, b);
 				}
@@ -1872,12 +1869,17 @@ void reset_context() {
 }
 
 int lastvalidsec = 0;
-
+int focusedSprite=-1;
 void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy) {
 	bdrawctx bs;
 	loopnum = 0;
 	//operstopn=-1;
 	bs.cam = *cc;
+	cc->fov_h = 1.047f;  // 60 degrees in radians
+	cc->fov_v = 0.785f;  // 45 degrees in radians
+	cc->persp_h = 1.0f;
+	cc->persp_v = 1.0f;
+
 	bs.movedcam = *cc;
 	bs.orcam = *cc;
 	bs.recursion_depth = 0;
@@ -1886,6 +1888,21 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy) {
 	bs.ismirrored = false;
 	bs.istrimirror = false;
 	opercurr = 0;
+	int sec=-1,wal=-1,spr =-1;
+	point3d hit;
+	point3d f = sump3(cc->p,cc->f);
+
+	//this raycast works.
+	raycast(&cc->p,&cc->f,1e32,cc->cursect,&sec,&wal,&spr,&hit,map);
+	//hitscan_b2(&cc->p,&cc->f,&cc->r,&cc->d,1e32,cc->cursect,&sec,&wal,&hit,map);
+	//if (wal>=0 && sec>=0)
+	//	map->sect[sec].wall[wal].xsurf[0].tilnum=2;
+	if (spr>=0) {
+		//map->spri[spr].tilnum=2;
+		focusedSprite = spr;
+	}
+
+
 	draw_hsr_polymost_ctx(map, &bs);
 }
 
@@ -2032,7 +2049,7 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 		}
 		logstep("Pass start pass:%d, hfp:%d, depth:%d, camsec:%d", pass, halfplane, b->recursion_depth, b->cam.cursect);
 		float large_bound = 1e9f;
-		float lightbound = 95000.0f;
+		float lightbound = 211.0f;
 		if (shadowtest2_rendmode == 4) {
 			if (!halfplane) gcam.r.x = 1;
 			else gcam.r.x = -1;
@@ -2044,13 +2061,16 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 			gcam.r.z = 0;
 			gcam.d.z = 1;
 			gcam.f.z = 0;
+			gcam.h.z = 21;
+			gcam.h.x = 21;
+			gcam.h.y = 21;
 			b->cam = gcam; // THAT IS IMPORTANT!
 			xformprep(0.0, b);
 
-			xformbac(-lightbound, -lightbound, 1.0, &bord2[0], b);
-			xformbac(+lightbound, -lightbound, 1.0, &bord2[1], b);
-			xformbac(+lightbound, +lightbound, 1.0, &bord2[2], b);
-			xformbac(-lightbound, +lightbound, 1.0, &bord2[3], b);
+			xformbac(-lightbound, -lightbound, 0.0, &bord2[0], b);
+			xformbac(+lightbound, -lightbound, 0.0, &bord2[1], b);
+			xformbac(+lightbound, +lightbound, 0.0, &bord2[2], b);
+			xformbac(-lightbound, +lightbound, 0.0, &bord2[3], b);
 			n = 4;
 			didcut = 1;
 		}
@@ -2248,6 +2268,10 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 }
 
 static void draw_hsr_enter_portal(mapstate_t *map, int myport, int head1, int head2, bdrawctx *parentctx) {
+// Lights and portals
+	// lights work with portals because we sample final rendered geometry, which is combined in world space.
+	// and distance is calculated correctly for portaled lights
+	// so for mirrors, we shold not do wccw in drawpoly? and draw poly in original cam space.
 	if (parentctx->recursion_depth == 1)
 		lastcamtr = parentctx->orcam.tr;
 	OPERLOG;
@@ -2327,36 +2351,6 @@ static void draw_hsr_enter_portal(mapstate_t *map, int myport, int head1, int he
 
 	OPERLOG;
 }
-
-
-typedef struct {
-	int sect;
-	point3d p;
-	float rgb[3];
-	int useshadow;
-} drawkv6_lightpos_t;
-
-void drawsprites() {
-}
-
-void shadowtest2_setcam(cam_t *ncam) {
-	//cam = *ncam;
-}
-
-#if (USENEWLIGHT == 0)
-typedef struct {
-	float n2, d2, n1, d1, n0, d0, filler0[2], glk[12], bsc, gsc, rsc, filler1[1];
-} hlighterp_t;
-#else
-typedef struct {
-	float gk[16], gk2[12], bsc, gsc, rsc, filler1[1];
-} hlighterp_t;
-
-__declspec(align(16)) static const float hligterp_maxzero[4] = {0.f, 0.f, 0.f, 0.f};
-#endif
-void prepligramp(float *ouvmat, point3d *norm, int lig, void *hl) {
-}
-
 
 int shadowtest2_isgotsectintersect(int lignum) {
 	int i, leng;
@@ -2439,10 +2433,6 @@ void shadowtest2_init() {
 	shadowtest2_ligpolreset(-1);
 }
 
-//--------------------------------------------------------------------------------------------------
-
-void drawpollig(int ei) {
-}
 #if 0
 !endif
 #endif

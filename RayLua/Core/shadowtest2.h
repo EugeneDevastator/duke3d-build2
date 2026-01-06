@@ -102,7 +102,7 @@ extern uint32_t* ligpoli;
 // Sector visibility tracking
 extern unsigned int *shadowtest2_sectgot;       // Global sector visibility bit array
 extern int shadowtest2_sectgotn;                // Size of global sector bit array
-
+extern int focusedSprite;
 // Rendering mode control
 extern int shadowtest2_rendmode;                // Current rendering mode (0-4)
 extern eyepol_t *eyepol; // 4096 eyepol_t's = 192KB

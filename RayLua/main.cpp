@@ -276,6 +276,31 @@ void CleanupLUTSystem() {
     UnloadTexture(lutTexture);
     UnloadCustomRenderTarget(finalTarget);
 }
+void DrawInfoUI() {
+    rlImGuiBegin();
+
+    // Get main viewport size
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImVec2 work_pos = viewport->WorkPos;
+    ImVec2 work_size = viewport->WorkSize;
+
+    // Set window position to upper right
+    ImVec2 window_pos = ImVec2(work_pos.x + work_size.x - 200.0f, work_pos.y + 10.0f);
+    ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always);
+
+    // Create window without title bar, resize, move, collapse
+    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoTitleBar |
+                                   ImGuiWindowFlags_NoResize |
+                                   ImGuiWindowFlags_NoMove |
+                                   ImGuiWindowFlags_NoCollapse |
+                                   ImGuiWindowFlags_AlwaysAutoResize;
+
+    ImGui::Begin("##info_panel", NULL, window_flags);
+    ImGui::Text("press G to move");
+    ImGui::End();
+
+    rlImGuiEnd();
+}
 // Draw palette and texture preview on screen
 void MainLoop()
 {
@@ -339,7 +364,7 @@ void MainLoop()
         DrawTextureRec({lightTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
                       {0, 0, (float)w, (float)-h}, {0, 0}, WHITE);
         EndBlendMode();
-
+        DrawFPS(10, 10);
         EndCustomRenderTarget();
 
         // Apply LUT to final result
@@ -362,7 +387,8 @@ void MainLoop()
 
         DrawTextureRec({finalTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
                       {0, 0, (float)w, (float)-h}, {0, 0}, WHITE);
-
+        DrawInfoUI();
+        DisableCursor();
         EndDrawing();
     }
 
