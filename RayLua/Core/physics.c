@@ -5,8 +5,137 @@
 
 #include "mapcore.h"
 clipdata build2;
+// version with simplified sprite checking. temporary, before sprite visualization is reworked. or colliders implementd
+int raycast (point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, int *hitwall, int *hitsprite, point3d *hit, mapstate_t* map)
+{
+	sect_t *sec;
+	wall_t *wal, *wal2;
+	spri_t *spr;
+	float d, t, u, v, x, y, z, z0, z1, bestt;
+	long *gotsect;
+	int i, s, w, nw, bs, bw, passthru, *secfif, secfifw, secfifr;
 
-static int hitscan_b2 (point3d *p0, point3d *pv, point3d *viewright,point3d *viewdown, float vscale, int cursect, int *hitsect, int *hitwall, point3d *hit, mapstate_t* map)
+	i = (((map->numsects+31)>>5)<<2);
+	gotsect = (long *)_alloca(i);
+	secfif = (int *)_alloca(map->numsects*sizeof(secfif[0]));
+	if ((unsigned)cursect >= (unsigned)map->numsects)
+	{
+		memset(gotsect,-1,i);
+		for(i=0;i<map->numsects;i++) secfif[i] = i; secfifr = 0; secfifw = map->numsects;
+	}
+	else
+	{
+		memset(gotsect,0,i); gotsect[cursect>>5] |= (1<<cursect);
+		secfif[0] = cursect; secfifr = 0; secfifw = 1;
+	}
+
+	sec = map->sect;
+
+	bestt = vscale; (*hitsect) = -1; (*hitwall) = -1; (*hitsprite) = -1;
+	if ((pv->x == 0.f) && (pv->y == 0.f) && (pv->z == 0.f)) { (*hit) = (*p0); return(0); }
+	hit->x = pv->x + p0->x;
+	hit->y = pv->y + p0->y;
+	hit->z = pv->z + p0->z;
+	while (secfifr < secfifw)
+	{
+		s = secfif[secfifr]; secfifr++;
+
+		wal = sec[s].wall;
+		if (pv->z != 0.0)
+		{
+			for(i=2-1;i>=0;i--)
+			{
+				if ((pv->x*sec[s].grad[i].x + pv->y*sec[s].grad[i].y + pv->z < 0.f) == (i)) continue;
+
+				t = pv->x*sec[s].grad[i].x + pv->y*sec[s].grad[i].y + pv->z;
+				if (t == 0.f) continue;
+				t = ((wal[0].x-p0->x)*sec[s].grad[i].x + (wal[0].y-p0->y)*sec[s].grad[i].y + (sec[s].z[i]-p0->z)) / t;
+				x = pv->x*t + p0->x;
+				y = pv->y*t + p0->y;
+				if ((t > 0) && (t < bestt) && (insidesect(x,y,sec[s].wall,sec[s].n)))
+					{ bestt = t; hit->x = x; hit->y = y; hit->z = pv->z*t + p0->z; (*hitsect) = s; (*hitwall) = i-2; (*hitsprite) = -1; }
+			}
+		}
+
+		for(w=sec[s].n-1;w>=0;w--)
+		{
+			nw = wal[w].n+w;
+
+			d = (wal[w].y-wal[nw].y)*pv->x - (wal[w].x-wal[nw].x)*pv->y; if (d >= 0) continue;
+			d = 1.0/d;
+			t = ((wal[w].x-p0->x)*(wal[w].y-wal[nw].y) - (wal[w].y-p0->y)*(wal[w].x-wal[nw].x))*d;
+			u = ((wal[w].y-p0->y)*pv->x                - (wal[w].x-p0->x)*pv->y               )*d;
+			if ((t <= 0) || (t >= bestt) || (u < 0) || (u > 1)) continue;
+			x = pv->x*t + p0->x;
+			y = pv->y*t + p0->y;
+			z = pv->z*t + p0->z;
+			z0 = getslopez(&sec[s],0,x,y); if (z < z0) continue;
+			z1 = getslopez(&sec[s],1,x,y); if (z > z1) continue;
+			bs = wal[w].ns; passthru = 0;
+			if (bs >= 0)
+			{
+				bw = wal[w].nw;
+				do
+				{
+					wal2 = sec[bs].wall; i = wal2[bw].n+bw;
+					if ((wal[w].x == wal2[i].x) && (wal[nw].x == wal2[bw].x) &&
+						 (wal[w].y == wal2[i].y) && (wal[nw].y == wal2[bw].y))
+						if ((z > getslopez(&sec[bs],0,x,y)) && (z < getslopez(&sec[bs],1,x,y)))
+						{
+							if (!(wal[w].surf.flags&32))
+							{
+								if (!(gotsect[bs>>5]&(1<<bs)))
+									{ secfif[secfifw] = bs; secfifw++; gotsect[bs>>5] |= (1<<bs); }
+								passthru = 1;
+							}
+						}
+					bs = wal2[bw].ns;
+					bw = wal2[bw].nw;
+				} while (bs != s);
+			}
+			if (!passthru) { bestt = t; hit->x = x; hit->y = y; hit->z = z; (*hitsect) = s; (*hitwall) = w; (*hitsprite) = -1; }
+		}
+
+		for(w=sec[s].headspri;w>=0;w=map->spri[w].sectn)
+		{
+			point3d fp;
+			float Za, Zb, Zc, R;
+
+			spr = &map->spri[w];
+			if (spr->owner >= 0) continue;
+
+			fp.x = spr->p.x-p0->x;
+			fp.y = spr->p.y-p0->y;
+			fp.z = spr->p.z-p0->z;
+
+			if (spr->fat > 0.f)
+			{
+				R = spr->fat;
+			}
+			else
+			{
+				R = sqrt(spr->r.x*spr->r.x + spr->r.y*spr->r.y + spr->r.z*spr->r.z) * 0.5f;
+			}
+
+			Za = pv->x*pv->x + pv->y*pv->y + pv->z*pv->z;
+			Zb = fp.x*pv->x + fp.y*pv->y + fp.z*pv->z;
+			Zc = fp.x*fp.x + fp.y*fp.y + fp.z*fp.z - R*R;
+			t = Zb*Zb - Za*Zc; if (t < 0) continue;
+			t = (Zb-sqrt(t))/Za;
+
+			if ((t <= 0) || (t >= bestt)) continue;
+			bestt = t;
+			hit->x = pv->x*t + p0->x;
+			hit->y = pv->y*t + p0->y;
+			hit->z = pv->z*t + p0->z;
+			(*hitsect) = s; (*hitwall) = -1; (*hitsprite) = w;
+		}
+	}
+	return(bestt < vscale);
+}
+
+
+int hitscan_b2 (point3d *p0, point3d *pv, point3d *viewright,point3d *viewdown, float vscale, int cursect, int *hitsect, int *hitwall, point3d *hit, mapstate_t* map)
 {
 	sect_t *sec;
 	wall_t *wal, *wal2;
