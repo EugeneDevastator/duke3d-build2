@@ -885,7 +885,17 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
 
         float mv = GetMouseWheelMove();
         if (focusedSprite >=0) {
-            qrotaxis(&map->spri[focusedSprite].tr, map->spri[focusedSprite].tr.r, mv);
+            transform* sptr = &map->spri[focusedSprite].tr;
+            qrotaxis(sptr, sptr->r, mv);
+
+            Vector3 pos = buildToRaylibPos(sptr->p);
+            Vector3 fw = buildToRaylibPos(sptr->r);
+            Vector3 rg = buildToRaylibPos(sptr->d);
+            Vector3 dw = buildToRaylibPos(sptr->f);
+            float l = Vector3Length(rg);
+            Vector3 bbmin = pos + Vector3{l,l,l};
+            Vector3 bbmax = pos - Vector3{l,l,l};
+            DrawBoundingBox({bbmax,bbmin}, LIME);
          //   addto(&map->spri[focusedSprite].tr.p,scaled(right,mv));
         }
     }
@@ -1361,7 +1371,7 @@ pos+= centeroffset;
 
                     Rectangle source = {0.0f, 0.0f, (float)spriteTex.width, (float)spriteTex.height};
                     DrawBillboardRec(rlcam, spriteTex, source, pos, {xs * xscaler, ys * yscaler}, WHITE);
-                    DrawBillboardPro(rlcam,spriteTex,source, pos, dw, {xs * xscaler, ys * yscaler}, {0,0},30, WHITE);
+                  //  DrawBillboardPro(rlcam,spriteTex,source, pos, dw, {xs * xscaler, ys * yscaler}, {0,0},30, WHITE);
                 }
             }
         }
