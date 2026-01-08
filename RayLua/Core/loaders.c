@@ -943,13 +943,13 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 				}
 
 
-				spr->fat = 0.f;
+				spr->phys.fat = 0.f;
 			//	spr->asc = 4096;
 			//	spr->rsc = (32-b7spr.shade)*128;
 			//	spr->gsc = (32-b7spr.shade)*128;
 			//	spr->bsc = (32-b7spr.shade)*128;
 
-				spr->mas = spr->moi = 1.0;
+				spr->phys.mas = spr->phys.moi = 1.0;
 				spr->owner = -1;
 
 

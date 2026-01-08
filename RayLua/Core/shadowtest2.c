@@ -980,13 +980,11 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 static void skytagfunc(int rethead0, int rethead1, bdrawctx *b) {
 }
 
-/*
-	Purpose: Generates shadow polygon lists for lighting
-	Converts screen-space polygons back to 3D world coordinates
-	Stores shadow-casting geometry in ligpol[] arrays per light source
-	Used during shadow map generation phase (mode 4)
-	Creates hash table for fast polygon lookup by sector/wall/slab
- */
+// There is way to do masks and semitransparency. At least for walls.
+// when we encounter first mask wall - we set up parameters for created mph.
+// if then we cut masked mph with another masked mph - we produce two mph pieces:
+// with mask1 and mask2, and both have light value divided by 2. - tho will overblend..
+//
 static void ligpoltagfunc(int rethead0, int rethead1, bdrawctx *b) {
 	cam_t gcam = b->cam;
 	double f, fx, fy, fz;

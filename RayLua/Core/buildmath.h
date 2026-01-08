@@ -172,6 +172,25 @@ static inline void wccw_transform_tr(dpoint3d *pinout, transform *ctin, transfor
     pinout->z = cx * ctout->r.z + cy * ctout->d.z + cz * ctout->f.z + ctout->p.z;
 }
 
+
+static inline transform world_to_local_transform_p(const transform tin, transform *totr) {
+    // World -> camera space (using ctin)
+    transform ret;
+    ret.p = world_to_local_point(tin.p, totr);
+    ret.r = world_to_local_vec(tin.r, totr);
+    ret.d = world_to_local_vec(tin.d, totr);
+    ret.f = world_to_local_vec(tin.f, totr);
+    return ret;
+}
+static inline transform local_to_world_transform_p(const transform tin, transform *tfrom) {
+    // World -> camera space (using ctin)
+    transform ret;
+    ret.p = local_to_world_point(tin.p, tfrom);
+    ret.r = local_to_world_vec(tin.r, tfrom);
+    ret.d = local_to_world_vec(tin.d, tfrom);
+    ret.f = local_to_world_vec(tin.f, tfrom);
+    return ret;
+}
 static inline void wccw_transform_trp(point3d *pinout, transform *ctin, transform *ctout) {
     // World -> camera space (using ctin)
     double dx = pinout->x - ctin->p.x;

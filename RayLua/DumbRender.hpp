@@ -74,6 +74,7 @@ typedef struct
     int textureIndex;
     bool isValid;
 } FloorMeshData;
+extern player_transform plr;
 
 static FloorMeshData* floorMeshes = NULL;
 static int numFloorMeshes = 0;
@@ -83,7 +84,7 @@ static long gnumtiles_i, gmaltiles_i, gtilehashead_i[1024];
 static bool drawWalls = false;
 static bool drawSpris = true;
 static bool drawCeils = false;
-static player_transform plr;
+player_transform plr = {};
 static Shader uvShader_plain ;
 static UVShaderDesc uvShaderDesc;
 static Shader lightShader ;
@@ -2033,7 +2034,7 @@ private:
 
     static void LoadMapAndTiles()
     {
-        map = loadmap_imp((char*)"c:/Eugene/Games/build2/e2l7.MAP", NULL);
+        map = loadmap_imp((char*)"c:/Eugene/Games/build2/e2l5.MAP", NULL);
     }
 };
 

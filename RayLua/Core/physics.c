@@ -144,7 +144,7 @@ int raycast(point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, i
 			fp.y = spr->p.y - p0->y;
 			fp.z = spr->p.z - p0->z;
 
-			R = (spr->fat > 0.f) ? spr->fat : 1.0f;
+			R = (spr->phys.fat > 0.f) ? spr->phys.fat : 1.0f;
 
 			Za = pv->x * pv->x + pv->y * pv->y + pv->z * pv->z;
 			Zb = fp.x * pv->x + fp.y * pv->y + fp.z * pv->z;
@@ -305,7 +305,7 @@ int hitscan_b2 (point3d *p0, point3d *pv, point3d *viewright,point3d *viewdown, 
 			fp.x = spr->p.x-p0->x;
 			fp.y = spr->p.y-p0->y;
 			fp.z = spr->p.z-p0->z;
-			if (spr->fat > 0.f) //Sphere of KV6: uses spherical collision
+			if (spr->phys.fat > 0.f) //Sphere of KV6: uses spherical collision
 			{
 					//x = pv->x*t + p0->x;
 					//y = pv->y*t + p0->y;
@@ -313,7 +313,7 @@ int hitscan_b2 (point3d *p0, point3d *pv, point3d *viewright,point3d *viewdown, 
 					//(pv->x*t + p0->x-spr->p.x)^2 + "y + "z = spr->fat^2
 				Za = pv->x*pv->x + pv->y*pv->y + pv->z*pv->z;
 				Zb = fp.x*pv->x + fp.y*pv->y + fp.z*pv->z;
-				Zc = fp.x*fp.x + fp.y*fp.y + fp.z*fp.z - spr->fat*spr->fat;
+				Zc = fp.x*fp.x + fp.y*fp.y + fp.z*fp.z - spr->phys.fat*spr->phys.fat;
 				t = Zb*Zb - Za*Zc; if (t < 0) continue;
 				t = (Zb-sqrt(t))/Za;
 			}
@@ -531,16 +531,16 @@ double findmaxcr (dpoint3d *p0, int cursect, double mindist, dpoint3d *hit, maps
 		{
 			//if (spr[w].owner >= 0) continue;
 			if (!(spr[w].flags&1)) continue;
-			if (spr[w].fat > 0)
+			if (spr[w].phys.fat > 0)
 			{
 				np.x = p0->x-spr[w].p.x;
 				np.y = p0->y-spr[w].p.y;
 				np.z = p0->z-spr[w].p.z;
 				d = sqrt(np.x*np.x + np.y*np.y + np.z*np.z);
-				f = d-spr[w].fat;
+				f = d-spr[w].phys.fat;
 				if ((f <= 0.0) || (f*f >= mindist2)) continue;
 				mindist2 = f*f;
-				d = spr[w].fat/d;
+				d = spr[w].phys.fat/d;
 				hit->x = spr[w].p.x + np.x*d;
 				hit->y = spr[w].p.y + np.y*d;
 				hit->z = spr[w].p.z + np.z*d;
@@ -848,7 +848,7 @@ double sphtracerec (dpoint3d *p0, dpoint3d *v0, dpoint3d *hit, int *cursect, dou
 			//if (spr[w].owner >= 0) continue;
 			if (!(spr[w].flags&1)) continue;
 
-			if (spr[w].fat > 0.f)
+			if (spr[w].phys.fat > 0.f)
 			{
 					//Raytrace to sphere
 				np.x = p0->x-spr[w].p.x;
@@ -857,13 +857,13 @@ double sphtracerec (dpoint3d *p0, dpoint3d *v0, dpoint3d *hit, int *cursect, dou
 				Za = v0->x*v0->x + v0->y*v0->y + v0->z*v0->z; //FIX:optimize
 				Zb = v0->x*np.x + v0->y*np.y + v0->z*np.z;
 				d = np.x*np.x + np.y*np.y + np.z*np.z;
-				Zc = d - (spr[w].fat+cr)*(spr[w].fat+cr);
+				Zc = d - (spr[w].phys.fat+cr)*(spr[w].phys.fat+cr);
 				u = Zb*Zb - Za*Zc; if ((u < 0.0) || (Za == 0.0)) continue;
 			 //t = -(sqrt(u)+Zb) / Za; //Classic quadratic equation (Zb premultiplied by .5)
 				t = Zc / (sqrt(u)-Zb); //Alternate quadratic equation (Zb premultiplied by .5)
 				if ((t < 0.0) || (t >= mint)) continue;
 				mint = t;
-				if (d != 0) d = spr[w].fat/sqrt(d);
+				if (d != 0) d = spr[w].phys.fat/sqrt(d);
 				hit->x = spr[w].p.x + np.x*d;
 				hit->y = spr[w].p.y + np.y*d;
 				hit->z = spr[w].p.z + np.z*d;

@@ -24,6 +24,7 @@
 //#include "MonoTest.hpp"
 //#include "luabinder.hpp"
 #include "DumbCore.hpp"
+#include "DumbEdit.hpp"
 #include "MonoTest.hpp"
 #include "raymath.h"
 #include "cmake-build-custom/_deps/raylib-src/src/external/glad.h"
@@ -297,6 +298,8 @@ void DrawInfoUI() {
 
     ImGui::Begin("##info_panel", NULL, window_flags);
     ImGui::Text("press G to move");
+    ImGui::Text("press Q to pickmove");
+    ImGui::Text("press ` to discard");
     ImGui::End();
 
     rlImGuiEnd();
@@ -311,7 +314,7 @@ void MainLoop()
     DumbCore::Init(map);
     SetTargetFPS(60);
     DumbRender::LoadTexturesToGPU();
-
+    InitEditor(map);
     // Initialize LUT system
     InitLUTSystem();
 
@@ -324,7 +327,7 @@ void MainLoop()
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
         DumbCore::Update(deltaTime);
-
+        EditorFrameMin();
         // Render albedo pass
         BeginCustomRenderTarget(albedoTarget);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

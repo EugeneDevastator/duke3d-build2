@@ -328,15 +328,27 @@ typedef struct {
 	uint16_t tilnum;
 	uint8_t tilset; // sortof mod id
 } sprview;
+
+typedef struct {
+	point3d v, av;           //Position velocity, Angular velocity (direction=axis, magnitude=vel)
+	float fat, mas, moi;     //Physics (moi=moment of inertia)
+	uint16_t clipmask; // block, hitscan, trigger, - for physics engine // aka layer
+} physdata;
+// on asset loadin.
+// art collection id + tilenum ==> runtime atlasnum and atlaspos.
+// art collections are separate from mods, and mods depend on their id so match is coincidental!
+// art collection have formats: art, waf, pngs.
+// inside it resolves into raw array of rgba images.
+// then packed into atlases
+// then lookup tables are made.
 	//Map format:
 
-typedef struct
+typedef struct // surf_t
 {
 	long tilnum, tilanm ;/*???*/
 	//Bit0:Blocking, Bit2:RelativeAlignment, Bit5:1Way, Bit16:IsParallax, Bit17:IsSkybox
 	uint32_t flags;	short lotag, hitag;
-
-	uint8_t pal; // temporary pal storage
+	uint8_t pal;
 	float alpha;
 	float uvform[9]; // scale xy, pan xy, crop AB, rotation
 	union{
@@ -397,12 +409,11 @@ typedef struct
 
 } wall_t;
 
-typedef struct
+typedef struct // spri_t
 {
 	uint32_t guid; // uniq per sprite. automatic.
 	union { transform tr; struct { point3d p, r, d, f; }; };
-	point3d v, av;           //Position velocity, Angular velocity (direction=axis, magnitude=vel)
-	float fat, mas, moi;     //Physics (moi=moment of inertia)
+
 	long tilnum;             //Model file. Ex:"TILES000.ART|64","CARDBOARD.PNG","CACO.KV6","HAND.KCM","IMP.MD3"
 	long owner;
 	short lotag, hitag;
@@ -410,30 +421,32 @@ typedef struct
 	// to access next or prev sprite in sector of this sprite..
 	long sectn, sectp; // doubly-linked list of indices
 	int32_t tags[16];
-
 	long tim, otim;          //Time (in milliseconds) for animation
 
 	//Bit0:Blocking, Bit2:1WayOtherSide, Bit5,Bit4:Face/Wall/Floor/.., Bit6:1side, Bit16:IsLight, Bit17-19:SpotAx(1-6), Bit20-29:SpotWid, Bit31:Invisible
-	long flags;  // temporary pal storage
-	///
+	long flags;
 	uint8_t modid; // mod id - for game processors, like duke, doom, etc. 0 is reserved for core entities.
 	uint16_t classid; // instead of implicit class recognition by spritenum or pal - use explicit. so for ex. we can just make 3d rpg rocket as prop.
-	uint8_t clipmask; // block, hitscan, trigger, - for physics engine
 	uint8_t linkmask; // damage, signal, use, - everything for linking with other communicators
+
 	sprview view;
+	physdata phys;
 } spri_t;
 
 typedef struct
 {
+	// BuildEngine base data
 	uint32_t guid; // uniq per sector
-	float minx, miny, maxx, maxy; //bounding box
 	float z[2];      //ceil&flor height
 	point2d grad[2]; //ceil&flor grad. grad.x = norm.x/norm.z, grad.y = norm.y/norm.z
 	surf_t surf[2];  //ceil&flor texture info
 	wall_t *wall;
 	long n, nmax;    //n:numwalls, nmax:walls malloced (nmax >= n)
 	long headspri;   //hd sprite index (-1 if none)
-	long foglev;
+	float minx, miny, maxx, maxy; //bounding box
+
+	// other
+
 	long owner;      //for dragging while editing, other effects during game
 	int32_t tags[16];
 	uint16_t mflags[4];

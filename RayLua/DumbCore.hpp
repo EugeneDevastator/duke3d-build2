@@ -113,11 +113,11 @@ private:
         }
 
         // pos in build2
-        if (IsKeyDown(KEY_Q)) {
+        if (IsKeyDown(KEY_Q) && IsKeyDown(KEY_LEFT_SHIFT)) {
             float rollSpeed = 2.0f * deltaTime; // Adjust roll speed as needed
             camera.up = Vector3RotateByAxisAngle(camera.up, forward, rollSpeed);
         }
-        if (IsKeyDown(KEY_E)) {
+        if (IsKeyDown(KEY_E)&& IsKeyDown(KEY_LEFT_SHIFT)) {
             float rollSpeed = 2.0f * deltaTime;
             camera.up = Vector3RotateByAxisAngle(camera.up, forward, -rollSpeed);
         }
