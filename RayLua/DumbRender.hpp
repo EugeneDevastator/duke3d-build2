@@ -613,7 +613,7 @@ public:
             case 7: usedcol = {0.3,0.3,0,1}; break;
             default: useGrad = 0;break;
         }
-        float shd = Clamp(eyepol[i].shade*0.5,0.5 ,1);
+        float shd = Clamp(eyepol[i].shade,0.0 ,1);
         if (useGrad) usedcol.w *= shd;
            else { usedcol*=shd; usedcol.w=1.0;}
 
@@ -1028,7 +1028,7 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
     static void DrawLightsPost3d(float sw, float sh, Camera3D camsrc) {
         { // Light polys
             glEnable(GL_POLYGON_OFFSET_FILL);
-            glPolygonOffset(-1.0f, 0.3f);
+            glPolygonOffset(-1.0f, -4.3f);
             glDepthFunc(GL_LEQUAL);
             BeginMode3D(camsrc);
             rlDisableBackfaceCulling();

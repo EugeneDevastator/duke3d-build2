@@ -304,7 +304,7 @@ typedef struct {
     signed short luminance;
 } ColorData;
 
-ColorData currentColor = {255, 255, 255, 1000};
+ColorData currentColor = {255, 255, 255, 4000};
 
 void DrawPicker() {
     ImVec2 work_pos = viewport->WorkPos;
@@ -371,6 +371,7 @@ void MainLoop()
     CustomRenderTarget combinedTarget = CreateCustomRenderTarget(GetScreenWidth(), GetScreenHeight(), 0);
     int w = GetScreenWidth();
     int h = GetScreenHeight();
+    showPicker = false;
     DisableCursor();
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
