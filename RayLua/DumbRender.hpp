@@ -613,7 +613,7 @@ public:
             case 7: usedcol = {0.3,0.3,0,1}; break;
             default: useGrad = 0;break;
         }
-        float shd = Clamp(eyepol[i].shade,0.0 ,1);
+        float shd = Clamp(eyepol[i].shade,0.2 ,1);
         if (useGrad) usedcol.w *= shd;
            else { usedcol*=shd; usedcol.w=1.0;}
 
@@ -2036,7 +2036,7 @@ private:
 
     static void LoadMapAndTiles()
     {
-        map = loadmap_imp((char*)"c:/Eugene/Games/build2/e2l5.MAP", NULL);
+        map = loadmap_imp((char*)"c:/Eugene/Games/build2/e3l1.MAP", NULL);
     }
 };
 
