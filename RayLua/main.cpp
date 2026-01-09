@@ -304,7 +304,7 @@ typedef struct {
     signed short luminance;
 } ColorData;
 
-ColorData currentColor = {255, 255, 255, 0};
+ColorData currentColor = {255, 255, 255, 1000};
 
 void DrawPicker() {
     ImVec2 work_pos = viewport->WorkPos;
@@ -312,47 +312,50 @@ void DrawPicker() {
 
     ImVec2 window_pos = ImVec2(work_pos.x + work_size.x * 0.5f - 150.0f, work_pos.y + work_size.y * 0.5f - 100.0f);
     ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(300.0f, 200.0f), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(400.0f, 400.0f), ImGuiCond_Always);
 
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
 
     if (ImGui::Begin("Color Picker", &showPicker, window_flags)) {
         float rgb[3] = {currentColor.r / 255.0f, currentColor.g / 255.0f, currentColor.b / 255.0f};
 
-        if (ImGui::ColorPicker3("RGB", rgb)) {
+        // Main color picker with only hue bar and saturation/value square
+        ImGui::BeginGroup();
+        if (ImGui::ColorPicker3("##picker", rgb,
+            ImGuiColorEditFlags_PickerHueBar |
+            ImGuiColorEditFlags_NoSidePreview |
+            ImGuiColorEditFlags_NoInputs |
+            ImGuiColorEditFlags_NoAlpha)) {
             currentColor.r = (unsigned char)(rgb[0] * 255.0f);
             currentColor.g = (unsigned char)(rgb[1] * 255.0f);
             currentColor.b = (unsigned char)(rgb[2] * 255.0f);
-        }
+            }
+        ImGui::EndGroup();
 
-        ImGui::Spacing();
-
+        // Vertical luminance bar on the right
+        ImGui::SameLine();
+        ImGui::BeginGroup();
+        ImGui::Text("Lum");
         int lum = currentColor.luminance;
-        if (ImGui::SliderInt("Luminance", &lum, -32767, 32767)) {
+        ImGui::PushStyleVar(ImGuiStyleVar_GrabMinSize, 10.0f);
+        if (ImGui::VSliderInt("##luminance", ImVec2(20.0f, 150.0f), &lum, -32767, 32767)) {
             currentColor.luminance = (signed short)lum;
         }
+        ImGui::PopStyleVar();
+        ImGui::EndGroup();
 
         ImGui::Spacing();
-
-        ImVec4 preview_color = ImVec4(rgb[0], rgb[1], rgb[2], 1.0f);
-        ImGui::ColorButton("Preview", preview_color, ImGuiColorEditFlags_NoTooltip, ImVec2(50.0f, 30.0f));
-        ImGui::SameLine();
-        ImGui::Text("R:%d G:%d B:%d L:%d", currentColor.r, currentColor.g, currentColor.b, currentColor.luminance);
-
-        //if (ImGui::Button("Apply")) {
-                    //    showPicker = false;
-       // }
-        ImGui::SameLine();
         if (ImGui::Button("Close")) {
             showPicker = false;
         }
         ImGui::End();
     }
 }
+
 // Draw palette and texture preview on screen
 void MainLoop()
 {
-    DisableCursor();
+
     DumbRender::Init();
     auto map = DumbRender::GetMap();
     DumbCore::Init(map);
@@ -368,6 +371,7 @@ void MainLoop()
     CustomRenderTarget combinedTarget = CreateCustomRenderTarget(GetScreenWidth(), GetScreenHeight(), 0);
     int w = GetScreenWidth();
     int h = GetScreenHeight();
+    DisableCursor();
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
 
@@ -379,11 +383,11 @@ void MainLoop()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
         ClearBackground(BLACK);
-        DumbCore::Update(deltaTime);
+        if (!showPicker) DumbCore::Update(deltaTime);
+
         BeginMode3D(*DumbCore::GetCamera());
-        if (!showPicker) {
-            DumbRender::ProcessKeys();
-        }
+
+        if (!showPicker) { DumbRender::ProcessKeys(); }
         DumbRender::DrawKenGeometry(GetScreenWidth(), GetScreenHeight(), DumbCore::GetCamera());
         DumbRender::DrawMapstateTex(*DumbCore::GetCamera());
         EndMode3D();
@@ -449,7 +453,9 @@ void MainLoop()
             DrawPicker();
             SetColorum(currentColor.r, currentColor.g, currentColor.b, currentColor.luminance);
         }
-
+        if (IsKeyPressed(KEY_L)) {
+            SetColorum(currentColor.r, currentColor.g, currentColor.b, currentColor.luminance);
+        }
         if (IsKeyPressed(KEY_C)) {
             showPicker = !showPicker;
             if (showPicker) {

@@ -1022,15 +1022,14 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
         EndMode3D();
         if (drawmonostate) draw_mono_state();
         //if (!lightpos_t || !eyepolv || eyepoln <= 0) return;}
-
-
     }
 
 
     static void DrawLightsPost3d(float sw, float sh, Camera3D camsrc) {
         { // Light polys
             glEnable(GL_POLYGON_OFFSET_FILL);
-            glPolygonOffset(-2.0f, 1.0f);
+            glPolygonOffset(-1.0f, 0.3f);
+            glDepthFunc(GL_LEQUAL);
             BeginMode3D(camsrc);
             rlDisableBackfaceCulling();
             rlDisableDepthMask();
@@ -1072,6 +1071,7 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
 
             EndShaderMode();
             EndBlendMode();
+            glDepthFunc(GL_LESS);
             glDisable(GL_POLYGON_OFFSET_FILL);
             rlEnableDepthMask();
             EndMode3D();
