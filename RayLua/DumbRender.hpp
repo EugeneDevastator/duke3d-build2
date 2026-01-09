@@ -865,6 +865,7 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
 
         if (IsKeyPressed(KEY_U))
             syncam = !syncam;
+
         if (IsKeyPressed(KEY_RIGHT)) {
             mono_cursnap++;
         }

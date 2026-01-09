@@ -2047,7 +2047,7 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 		}
 		logstep("Pass start pass:%d, hfp:%d, depth:%d, camsec:%d", pass, halfplane, b->recursion_depth, b->cam.cursect);
 		float large_bound = 1e9f;
-		float lightbound = 211.0f;
+		float lightbound = 1e9f;
 		if (shadowtest2_rendmode == 4) {
 			if (!halfplane) gcam.r.x = 1;
 			else gcam.r.x = -1;

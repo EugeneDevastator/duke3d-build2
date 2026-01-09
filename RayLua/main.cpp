@@ -54,7 +54,7 @@ Shader lutShader = {0};
 Texture2D lutTexture = {0};
 float lutIntensity = 1.0f;
 CustomRenderTarget finalTarget = {0};
-
+ImGuiViewport* viewport;
 void SetImguiFonts()
 {
     ImGuiIO& io = ImGui::GetIO();
@@ -185,7 +185,6 @@ void VisualizeMapstate() {  //unused
 //DumbRender::TestRenderTextures();
 
         DrawImgui();
-        DisableCursor();
         DrawText("WASD: Move, Mouse: Look", 10, 10, 20, WHITE);
         DrawFPS(10, 40);
 
@@ -278,10 +277,6 @@ void CleanupLUTSystem() {
     UnloadCustomRenderTarget(finalTarget);
 }
 void DrawInfoUI() {
-    rlImGuiBegin();
-
-    // Get main viewport size
-    ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImVec2 work_pos = viewport->WorkPos;
     ImVec2 work_size = viewport->WorkSize;
 
@@ -301,14 +296,63 @@ void DrawInfoUI() {
     ImGui::Text("press Q to pickmove");
     ImGui::Text("press ` to discard");
     ImGui::End();
+}
 
-    rlImGuiEnd();
+bool showPicker = false;
+typedef struct {
+    unsigned char r, g, b;
+    signed short luminance;
+} ColorData;
+
+ColorData currentColor = {255, 255, 255, 0};
+
+void DrawPicker() {
+    ImVec2 work_pos = viewport->WorkPos;
+    ImVec2 work_size = viewport->WorkSize;
+
+    ImVec2 window_pos = ImVec2(work_pos.x + work_size.x * 0.5f - 150.0f, work_pos.y + work_size.y * 0.5f - 100.0f);
+    ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(300.0f, 200.0f), ImGuiCond_Always);
+
+    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+
+    if (ImGui::Begin("Color Picker", &showPicker, window_flags)) {
+        float rgb[3] = {currentColor.r / 255.0f, currentColor.g / 255.0f, currentColor.b / 255.0f};
+
+        if (ImGui::ColorPicker3("RGB", rgb)) {
+            currentColor.r = (unsigned char)(rgb[0] * 255.0f);
+            currentColor.g = (unsigned char)(rgb[1] * 255.0f);
+            currentColor.b = (unsigned char)(rgb[2] * 255.0f);
+        }
+
+        ImGui::Spacing();
+
+        int lum = currentColor.luminance;
+        if (ImGui::SliderInt("Luminance", &lum, -32767, 32767)) {
+            currentColor.luminance = (signed short)lum;
+        }
+
+        ImGui::Spacing();
+
+        ImVec4 preview_color = ImVec4(rgb[0], rgb[1], rgb[2], 1.0f);
+        ImGui::ColorButton("Preview", preview_color, ImGuiColorEditFlags_NoTooltip, ImVec2(50.0f, 30.0f));
+        ImGui::SameLine();
+        ImGui::Text("R:%d G:%d B:%d L:%d", currentColor.r, currentColor.g, currentColor.b, currentColor.luminance);
+
+        //if (ImGui::Button("Apply")) {
+                    //    showPicker = false;
+       // }
+        ImGui::SameLine();
+        if (ImGui::Button("Close")) {
+            showPicker = false;
+        }
+        ImGui::End();
+    }
 }
 // Draw palette and texture preview on screen
 void MainLoop()
 {
     DisableCursor();
-
     DumbRender::Init();
     auto map = DumbRender::GetMap();
     DumbCore::Init(map);
@@ -326,7 +370,12 @@ void MainLoop()
     int h = GetScreenHeight();
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
-        DumbCore::Update(deltaTime);
+
+        if (!showPicker) {
+            DumbCore::Update(deltaTime);
+            DumbRender::ProcessKeys();
+        }
+
         EditorFrameMin();
         // Render albedo pass
         BeginCustomRenderTarget(albedoTarget);
@@ -335,7 +384,7 @@ void MainLoop()
         ClearBackground(BLACK);
 
         BeginMode3D(*DumbCore::GetCamera());
-        DumbRender::ProcessKeys();
+
         DumbRender::DrawKenGeometry(GetScreenWidth(), GetScreenHeight(), DumbCore::GetCamera());
         DumbRender::DrawMapstateTex(*DumbCore::GetCamera());
         EndMode3D();
@@ -387,11 +436,35 @@ void MainLoop()
         // Final draw to screen
         BeginDrawing();
         ClearBackground(BLACK);
-
+        // draw frame;
         DrawTextureRec({finalTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
                       {0, 0, (float)w, (float)-h}, {0, 0}, WHITE);
+
+        // IMGUI SECTION
+        viewport = ImGui::GetMainViewport();
+        rlImGuiBegin();
+
         DrawInfoUI();
-        DisableCursor();
+
+        if (showPicker) {
+            DrawPicker();
+            SetColorum(currentColor.r, currentColor.g, currentColor.b, currentColor.luminance);
+        }
+
+        if (IsKeyPressed(KEY_C)) {
+            showPicker = !showPicker;
+            if (showPicker) {
+                EnableCursor();
+            } else {
+                DisableCursor();
+            }
+        }
+
+
+
+
+        rlImGuiEnd();
+
         EndDrawing();
     }
 

@@ -373,7 +373,7 @@ typedef struct // surf_t
 
 } surf_t;
 
-typedef struct
+typedef struct // wall t
 {
 	uint32_t guid; // unique per wall. surfs alway follow top-bottom order.
 	union {
