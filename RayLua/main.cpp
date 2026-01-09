@@ -371,10 +371,7 @@ void MainLoop()
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
 
-        if (!showPicker) {
-            DumbCore::Update(deltaTime);
-            DumbRender::ProcessKeys();
-        }
+
 
         EditorFrameMin();
         // Render albedo pass
@@ -382,9 +379,11 @@ void MainLoop()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
         ClearBackground(BLACK);
-
+        DumbCore::Update(deltaTime);
         BeginMode3D(*DumbCore::GetCamera());
-
+        if (!showPicker) {
+            DumbRender::ProcessKeys();
+        }
         DumbRender::DrawKenGeometry(GetScreenWidth(), GetScreenHeight(), DumbCore::GetCamera());
         DumbRender::DrawMapstateTex(*DumbCore::GetCamera());
         EndMode3D();
@@ -459,9 +458,6 @@ void MainLoop()
                 DisableCursor();
             }
         }
-
-
-
 
         rlImGuiEnd();
 

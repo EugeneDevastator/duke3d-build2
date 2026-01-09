@@ -103,6 +103,11 @@ void PickgrabUpdate() {
 	float scrol = GetMouseWheelMove();
 	addto(&trdiff.p, scaled(down,scrol*0.2f));
 	map->spri[savedfocus].tr = local_to_world_transform_p(trdiff, &plr.tri);
+
+	int s = map->spri[savedfocus].sect;
+	updatesect_p(map->spri[savedfocus].p, &s, map);
+	changesprisect_imp(savedfocus, s, map);
+
 	if (IsKeyPressed(K_PICKGRAB)) {
 		PickgrabAccept();
 		savedfocus = -1;
@@ -177,8 +182,10 @@ void EditorFrameMin() {
 				}
 			}
 
-			if (!wasdel && map->light_sprinum < MAXLIGHTS)
+			if (!wasdel && map->light_sprinum < MAXLIGHTS) {
+				map->spri[focusedSprite].view.lum=255;
 				map->light_spri[map->light_sprinum++] = focusedSprite;
+			}
 		}
 	}
 

@@ -12,8 +12,8 @@ out vec4 finalColor;
 void main()
 {
     float distance = length(lightPosition - fragPosition);
-    float attenuation = 1.0 - clamp(distance/22, 0.0, 1.0);
+    float attenuation = 1.0 - clamp(distance/(fragColor.a*100), 0.0, 1.0);
     float intensity = attenuation * attenuation;
 
-    finalColor = vec4(fragColor.rgb*5, intensity);
+    finalColor = vec4(fragColor.rgb, intensity);
 }

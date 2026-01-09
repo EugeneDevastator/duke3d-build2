@@ -34,7 +34,7 @@ typedef struct {
     int sect, sprilink;                 // Current sector and sprite link index
     float rgb[3], spotwid;              // RGB intensity and spotlight width (-1=omnidirectional)
     int flags;                          // Bit flags: &1=use shadows, &(1<<31)=moved this frame
-
+    float lum;
     // Sector visibility tracking for this light
     unsigned int *sectgot, *sectgotmal; // Bit array of sectors illuminated by this light
     int sectgotn;                       // Number of sectors in bit array

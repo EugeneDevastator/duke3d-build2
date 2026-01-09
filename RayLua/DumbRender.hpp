@@ -509,7 +509,7 @@ public:
 				{
 					shadowtest2_light[shadowtest2_numlights].sect   = map->spri[map->light_spri[i]].sect;
 					shadowtest2_light[shadowtest2_numlights].p      = map->spri[map->light_spri[i]].p;
-				    shadowtest2_light[shadowtest2_numlights].p.x += sin(GetTime()+shadowtest2_light[shadowtest2_numlights].p.y)*3;
+				 //   shadowtest2_light[shadowtest2_numlights].p.x += sin(GetTime()+shadowtest2_light[shadowtest2_numlights].p.y)*3;
 					k = ((map->spri[map->light_spri[i]].flags>>17)&7);
 					if (!k) { shadowtest2_light[shadowtest2_numlights].spotwid = -1.0; }
 					else
@@ -527,6 +527,7 @@ public:
 					shadowtest2_light[shadowtest2_numlights].rgb[0] = map->spri[map->light_spri[i]].view.color.x;//map->spri[map->light_spri[i]].bsc/8192.f; //gsc/8192   map->spri[map->light_spri[i]].fat;
 					shadowtest2_light[shadowtest2_numlights].rgb[1] = map->spri[map->light_spri[i]].view.color.y;//map->spri[map->light_spri[i]].gsc/8192.f;
 					shadowtest2_light[shadowtest2_numlights].rgb[2] = map->spri[map->light_spri[i]].view.color.z;//map->spri[map->light_spri[i]].rsc/8192.f;
+					shadowtest2_light[shadowtest2_numlights].lum = (float)map->spri[map->light_spri[i]].view.lum/32768.0f;
 					shadowtest2_light[shadowtest2_numlights].flags  = 1;
 					shadowtest2_numlights++;
 				}
@@ -1057,7 +1058,7 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
                             int iidx = lght->ligpol[i].tristart + locidx*3 +j;
                             uint32_t idx = ligpoli[iidx];
                             Vector3 pt = buildToRaylibPos(lght->ligpolv[idx]);
-                            rlColor4f(0.0, 0.2, 0.3, 1);
+                            rlColor4f(lght->rgb[0], lght->rgb[1], lght->rgb[2], lght->lum);
                             //rlColor4f(0.6, 0.2, 0.1, 1);
                            // rlNormal3f(0,1,0);
                            // rlTexCoord2f(0,0.5);
