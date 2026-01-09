@@ -148,6 +148,16 @@ void InitEditor(mapstate_t *m) {
 	ctx.state = Empty;
 }
 
+void SetColorum(uint8_t r,uint8_t g,uint8_t b, int16_t lum) {
+	if (focusedSprite >=0) {
+		map->spri[focusedSprite].view.color.x=r/255.0F;
+		map->spri[focusedSprite].view.color.y=g/255.0F;
+		map->spri[focusedSprite].view.color.z=b/255.0F;
+		map->spri[focusedSprite].view.lum=lum;
+	}
+}
+
+
 void EditorFrameMin() {
 	ctx.state.update();
 
@@ -156,8 +166,21 @@ void EditorFrameMin() {
 			ctx.state = PickGrabState;
 			ctx.state.start();
 		}
-	}
 
+		if (IsKeyPressed(KEY_L)) {
+			map->spri[focusedSprite].flags ^= SPRITE_B2_IS_LIGHT;
+			bool wasdel = false;
+			for (int j = map->light_sprinum - 1; j >= 0; j--) {
+				if (map->light_spri[j] == focusedSprite) {
+					map->light_spri[j] = map->light_spri[--map->light_sprinum];
+					wasdel = true;
+				}
+			}
+
+			if (!wasdel && map->light_sprinum < MAXLIGHTS)
+				map->light_spri[map->light_sprinum++] = focusedSprite;
+		}
+	}
 
 	if (IsKeyPressed(K_DISCARD)) {
 		ctx.state.discard();
