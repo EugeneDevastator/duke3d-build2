@@ -189,7 +189,7 @@ void EditorFrameMin() {
 		}
 	}
 
-	if (IsKeyPressed(K_DISCARD)) {
+	if (IsKeyPressed(K_DISCARD) || IsKeyPressed(KEY_ESCAPE)) {
 		ctx.state.discard();
 		ctx.state = Empty;
 	}

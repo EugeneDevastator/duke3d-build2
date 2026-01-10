@@ -142,7 +142,7 @@ void UpdateFreeCamera(FreeCamera* cam, float deltaTime) {
 }
 
 void VisualizeMapstate() {  //unused
-    DumbRender::Init();
+    DumbRender::Init("c:/Eugene/Games/build2/e3l3,map");
 
     auto map = DumbRender::GetMap();
     //InitWindow(1024, 768, "Mapstate Visualizer");
@@ -292,9 +292,10 @@ void DrawInfoUI() {
                                    ImGuiWindowFlags_AlwaysAutoResize;
 
     ImGui::Begin("##info_panel", NULL, window_flags);
-    ImGui::Text("press G to move");
-    ImGui::Text("press Q to pickmove");
-    ImGui::Text("press ` to discard");
+    ImGui::Text("Q = pick & move");
+    ImGui::Text("` = discard");
+    ImGui::Text("L = sprite to light");
+    ImGui::Text("C = pick Color");
     ImGui::End();
 }
 
@@ -356,7 +357,7 @@ void DrawPicker() {
 void MainLoop()
 {
 
-    DumbRender::Init();
+    DumbRender::Init("c:/Eugene/Games/build2/e3l3.map");
     auto map = DumbRender::GetMap();
     DumbCore::Init(map);
     SetTargetFPS(60);
@@ -483,6 +484,7 @@ void MainLoop()
 int main() {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
     InitWindow(1024, 768, "Raylib + Lua + ImGui");
+    SetExitKey(KEY_NULL);
     SetTargetFPS(120);
     rlImGuiSetup(true);
    // LuaBinder::Init();
@@ -498,6 +500,9 @@ int main() {
     //MapTest();
 
     while (!WindowShouldClose()) {
+        if (IsKeyPressed(KEY_ESCAPE) && IsKeyPressed(KEY_LEFT_ALT))
+            break;
+
        // if (watcher.HasChanged()) {
           //  LuaBinder::LoadScript();
        // }

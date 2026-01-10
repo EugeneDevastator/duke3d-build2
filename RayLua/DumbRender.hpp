@@ -124,7 +124,7 @@ public:
         SetShaderValue(uvShader.shader, uvShader.worldULoc, &worldU, SHADER_UNIFORM_VEC3);
         SetShaderValue(uvShader.shader, uvShader.worldVLoc, &worldV, SHADER_UNIFORM_VEC3);
     }
-    static void Init()
+    static void Init(const char* fullmappath)
     {
         char rootpath[256];
         uvShader_plain = LoadShader("Shaders/uv_vis_shader.vert", "Shaders/uv_vis_shader.frag");
@@ -133,11 +133,18 @@ public:
 
         lightPosLoc = GetShaderLocation(lightShader, "lightPosition");
         lightRangeLoc = GetShaderLocation(lightShader, "lightRange");
-
-
-        strcpy_s(rootpath, "c:/Eugene/Games/build2/");
+        char* lastSlash;
+        // Extract root path from full map path
+        strcpy_s(rootpath, fullmappath);
+        lastSlash = strrchr(rootpath, '/');
+        if (!lastSlash) {
+            lastSlash = strrchr(rootpath, '\\');
+        }
+        if (lastSlash) {
+            *(lastSlash + 1) = '\0';
+        }
         LoadPal(rootpath);
-        LoadMapAndTiles();
+        LoadMapAndTiles(fullmappath);
         shadowtest2_numlights=0;
         //init lights
         for(int i=0;i<map->numspris;i++)
@@ -2034,9 +2041,9 @@ private:
         int a = 1;
     }
 
-    static void LoadMapAndTiles()
+    static void LoadMapAndTiles(const char* fullmapname)
     {
-        map = loadmap_imp((char*)"c:/Eugene/Games/build2/e3l1.MAP", NULL);
+        map = loadmap_imp((char*)fullmapname, NULL);
     }
 };
 
