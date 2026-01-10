@@ -29,7 +29,10 @@
 #include "raymath.h"
 #include "cmake-build-custom/_deps/raylib-src/src/external/glad.h"
 #include "DukeGame/source/dukewrap.h"
-
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
 
 extern "C" {
 #include "Core/loaders.h"
@@ -55,6 +58,98 @@ Texture2D lutTexture = {0};
 float lutIntensity = 1.0f;
 CustomRenderTarget finalTarget = {0};
 ImGuiViewport* viewport;
+
+
+int file_exists(const char* path) {
+    FILE* file = fopen(path, "r");
+    if (file) {
+        fclose(file);
+        return 1;
+    }
+    return 0;
+}
+
+int has_extension(const char* path, const char* ext) {
+    const char* dot = strrchr(path, '.');
+    return dot && strcmp(dot, ext) == 0;
+}
+
+int check_tiles_art_exists(const char* dir_path) {
+    char pattern[512];
+    snprintf(pattern, sizeof(pattern), "%s/tiles*.art", dir_path);
+
+    // Simple check for tiles000.art as minimum requirement
+    char tiles_path[512];
+    snprintf(tiles_path, sizeof(tiles_path), "%s/tiles000.art", dir_path);
+    return file_exists(tiles_path);
+}
+
+void extract_directory(const char* filepath, char* dir_path, size_t dir_size) {
+    strncpy(dir_path, filepath, dir_size - 1);
+    dir_path[dir_size - 1] = '\0';
+
+    char* last_slash = strrchr(dir_path, '/');
+    char* last_backslash = strrchr(dir_path, '\\');
+    char* last_sep = (last_slash > last_backslash) ? last_slash : last_backslash;
+
+    if (last_sep) {
+        *last_sep = '\0';
+    } else {
+        strcpy(dir_path, ".");
+    }
+}
+
+bool loadifvalid() {
+    if (__argc < 2) {
+        printf("Error: No map file path provided\n");
+        return false;
+    }
+
+    const char* map_path = __argv[1];
+
+    // Check if path points to .map file
+    if (!has_extension(map_path, ".map")) {
+        printf("Error: File must have .map extension\n");
+        return false;
+    }
+
+    if (!file_exists(map_path)) {
+        printf("Error: Map file does not exist: %s\n", map_path);
+        return false;
+    }
+
+    // Extract directory from map path
+    char dir_path[512];
+    extract_directory(map_path, dir_path, sizeof(dir_path));
+
+    // Check for palette.dat
+    char palette_path[512];
+    snprintf(palette_path, sizeof(palette_path), "%s/palette.dat", dir_path);
+    if (!file_exists(palette_path)) {
+        printf("Error: palette.dat not found in %s\n", dir_path);
+        return false;
+    }
+
+    // Check for lookup.dat not needed actually!
+   //char lookup_path[512];
+   //snprintf(lookup_path, sizeof(lookup_path), "%s/lookup.dat", dir_path);
+   //if (!file_exists(lookup_path)) {
+   //    printf("Error: lookup.dat not found in %s\n", dir_path);
+   //    return false;
+   //}
+
+    // Check for at least one tiles*.art file
+    if (!check_tiles_art_exists(dir_path)) {
+        printf("Error: No tiles*.art files found in %s\n", dir_path);
+        return false;
+    }
+
+    DumbRender::Init(map_path);
+    return true;
+}
+
+
+
 void SetImguiFonts()
 {
     ImGuiIO& io = ImGui::GetIO();
@@ -356,8 +451,9 @@ void DrawPicker() {
 // Draw palette and texture preview on screen
 void MainLoop()
 {
-
-    DumbRender::Init("c:/Eugene/Games/build2/e3l3.map");
+    if (!loadifvalid())
+        return;
+//    DumbRender::Init("c:/Eugene/Games/build2/e3l3.map");
     auto map = DumbRender::GetMap();
     DumbCore::Init(map);
     SetTargetFPS(60);
