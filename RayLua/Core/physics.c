@@ -1,12 +1,205 @@
-//
-// Created by omnis on 11/8/2025.
-//
+/*
+*       BUILD2 Physics module by Ken Silverman (http://advsys.net/ken)
+ *      This file has been modified from Ken Silverman's original release
+ *
+ *       Things added:
+ *       - content moved to separate file
+ *       - minimal structure updates
+ */
 #include "physics.h"
 
 #include "mapcore.h"
 clipdata build2;
+// version with simplified sprite checking. temporary, before sprite visualization is reworked. or colliders implementd
+int raycast(point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, int *hitwall, int *hitsprite,
+            point3d *hit, mapstate_t *map) {
+	sect_t *sec;
+	wall_t *wal, *wal2;
+	spri_t *spr;
+	float d, t, u, v, x, y, z, z0, z1, bestt;
+	long *gotsect;
+	int i, s, w, nw, bs, bw, passthru, *secfif, secfifw, secfifr;
 
-static int hitscan_b2 (point3d *p0, point3d *pv, point3d *viewright,point3d *viewdown, float vscale, int cursect, int *hitsect, int *hitwall, point3d *hit, mapstate_t* map)
+	i = (((map->numsects + 31) >> 5) << 2);
+	gotsect = (long *) _alloca(i);
+	secfif = (int *) _alloca(map->numsects * sizeof(secfif[0]));
+	if ((unsigned) cursect >= (unsigned) map->numsects) {
+		memset(gotsect, -1, i);
+		for (i = 0; i < map->numsects; i++) secfif[i] = i;
+		secfifr = 0;
+		secfifw = map->numsects;
+	} else {
+		memset(gotsect, 0, i);
+		gotsect[cursect >> 5] |= (1 << cursect);
+		secfif[0] = cursect;
+		secfifr = 0;
+		secfifw = 1;
+	}
+
+	sec = map->sect;
+
+	bestt = vscale;
+	(*hitsect) = -1;
+	(*hitwall) = -1;
+	(*hitsprite) = -1;
+	if ((pv->x == 0.f) && (pv->y == 0.f) && (pv->z == 0.f)) {
+		(*hit) = (*p0);
+		return (0);
+	}
+	hit->x = pv->x + p0->x;
+	hit->y = pv->y + p0->y;
+	hit->z = pv->z + p0->z;
+
+	while (secfifr < secfifw) {
+		s = secfif[secfifr];
+		secfifr++;
+
+		wal = sec[s].wall;
+		if (pv->z != 0.0) {
+			for (i = 2 - 1; i >= 0; i--) {
+				if ((pv->x * sec[s].grad[i].x + pv->y * sec[s].grad[i].y + pv->z < 0.f) == (i)) continue;
+
+				t = pv->x * sec[s].grad[i].x + pv->y * sec[s].grad[i].y + pv->z;
+				if (t == 0.f) continue;
+				t = ((wal[0].x - p0->x) * sec[s].grad[i].x + (wal[0].y - p0->y) * sec[s].grad[i].y + (
+					     sec[s].z[i] - p0->z)) / t;
+				x = pv->x * t + p0->x;
+				y = pv->y * t + p0->y;
+				if ((t > 0) && (t < bestt) && (insidesect(x, y, sec[s].wall, sec[s].n))) {
+					bestt = t;
+					hit->x = x;
+					hit->y = y;
+					hit->z = pv->z * t + p0->z;
+					(*hitsect) = s;
+					(*hitwall) = i - 2;
+					(*hitsprite) = -1;
+				}
+			}
+		}
+
+		for (w = sec[s].n - 1; w >= 0; w--) {
+			nw = wal[w].n + w;
+
+			d = (wal[w].y - wal[nw].y) * pv->x - (wal[w].x - wal[nw].x) * pv->y;
+			if (d >= 0) continue;
+			d = 1.0 / d;
+			t = ((wal[w].x - p0->x) * (wal[w].y - wal[nw].y) - (wal[w].y - p0->y) * (wal[w].x - wal[nw].x)) * d;
+			u = ((wal[w].y - p0->y) * pv->x - (wal[w].x - p0->x) * pv->y) * d;
+			if ((t <= 0) || (t >= bestt) || (u < 0) || (u > 1)) continue;
+			x = pv->x * t + p0->x;
+			y = pv->y * t + p0->y;
+			z = pv->z * t + p0->z;
+			z0 = getslopez(&sec[s], 0, x, y);
+			if (z < z0) continue;
+			z1 = getslopez(&sec[s], 1, x, y);
+			if (z > z1) continue;
+			bs = wal[w].ns;
+			passthru = 0;
+			if (bs >= 0) {
+				bw = wal[w].nw;
+				do {
+					wal2 = sec[bs].wall;
+					i = wal2[bw].n + bw;
+					if ((wal[w].x == wal2[i].x) && (wal[nw].x == wal2[bw].x) &&
+					    (wal[w].y == wal2[i].y) && (wal[nw].y == wal2[bw].y))
+						if ((z > getslopez(&sec[bs], 0, x, y)) && (z < getslopez(&sec[bs], 1, x, y))) {
+							if (!(wal[w].surf.flags & 32)) {
+								if (!(gotsect[bs >> 5] & (1 << bs))) {
+									secfif[secfifw] = bs;
+									secfifw++;
+									gotsect[bs >> 5] |= (1 << bs);
+								}
+								passthru = 1;
+							}
+						}
+					bs = wal2[bw].ns;
+					bw = wal2[bw].nw;
+				} while (bs != s);
+			}
+			if (!passthru) {
+				bestt = t;
+				hit->x = x;
+				hit->y = y;
+				hit->z = z;
+				(*hitsect) = s;
+				(*hitwall) = w;
+				(*hitsprite) = -1;
+			}
+		}
+	}
+
+	/* Scan all sprites after wall processing to find closest to ray */
+	secfifr = 0;
+	float best_sprite_dist = 1e30f;
+	int best_sprite_sect = -1, best_sprite_idx = -1;
+	point3d best_sprite_hit;
+
+	while (secfifr < secfifw) {
+		s = secfif[secfifr];
+		secfifr++;
+
+		for (w = sec[s].headspri; w >= 0; w = map->spri[w].sectn) {
+			point3d fp, closest_point;
+			float Za, Zb, R, t_closest, dist_to_ray;
+
+			spr = &map->spri[w];
+			if (spr->owner >= 0) continue;
+
+			fp.x = spr->p.x - p0->x;
+			fp.y = spr->p.y - p0->y;
+			fp.z = spr->p.z - p0->z;
+
+			R = (spr->phys.fat > 0.f) ? spr->phys.fat : 1.0f;
+
+			Za = pv->x * pv->x + pv->y * pv->y + pv->z * pv->z;
+			Zb = fp.x * pv->x + fp.y * pv->y + fp.z * pv->z;
+
+			/* Find closest point on ray to sprite center */
+			t_closest = Zb / Za;
+			if (t_closest < 0) t_closest = 0; /* Clamp to ray start */
+			if (t_closest > bestt) continue; /* Beyond wall hit */
+
+			closest_point.x = pv->x * t_closest;
+			closest_point.y = pv->y * t_closest;
+			closest_point.z = pv->z * t_closest;
+
+			/* Calculate distance from sprite center to closest point on ray */
+			dist_to_ray = sqrt((fp.x - closest_point.x) * (fp.x - closest_point.x) +
+			                   (fp.y - closest_point.y) * (fp.y - closest_point.y) +
+			                   (fp.z - closest_point.z) * (fp.z - closest_point.z));
+
+			if (dist_to_ray > R) continue; /* Ray misses sprite */
+			if (dist_to_ray >= best_sprite_dist) continue; /* Not closest */
+
+			/* Calculate actual intersection point */
+			float Zc = fp.x * fp.x + fp.y * fp.y + fp.z * fp.z - R * R;
+			t = Zb * Zb - Za * Zc;
+			if (t < 0) continue;
+			t = (Zb - sqrt(t)) / Za;
+			if (t <= 0 || t >= bestt) continue;
+
+			best_sprite_dist = dist_to_ray;
+			best_sprite_sect = s;
+			best_sprite_idx = w;
+			best_sprite_hit.x = pv->x * t + p0->x;
+			best_sprite_hit.y = pv->y * t + p0->y;
+			best_sprite_hit.z = pv->z * t + p0->z;
+		}
+	}
+
+	/* Apply best sprite hit if found */
+	if (best_sprite_idx >= 0) {
+		*hit = best_sprite_hit;
+		*hitsect = best_sprite_sect;
+		*hitwall = -1;
+		*hitsprite = best_sprite_idx;
+	}
+
+	return (bestt < vscale);
+}
+
+
+int hitscan_b2 (point3d *p0, point3d *pv, point3d *viewright,point3d *viewdown, float vscale, int cursect, int *hitsect, int *hitwall, point3d *hit, mapstate_t* map)
 {
 	sect_t *sec;
 	wall_t *wal, *wal2;
@@ -117,7 +310,7 @@ static int hitscan_b2 (point3d *p0, point3d *pv, point3d *viewright,point3d *vie
 			fp.x = spr->p.x-p0->x;
 			fp.y = spr->p.y-p0->y;
 			fp.z = spr->p.z-p0->z;
-			if (spr->fat > 0.f) //Sphere of KV6: uses spherical collision
+			if (spr->phys.fat > 0.f) //Sphere of KV6: uses spherical collision
 			{
 					//x = pv->x*t + p0->x;
 					//y = pv->y*t + p0->y;
@@ -125,7 +318,7 @@ static int hitscan_b2 (point3d *p0, point3d *pv, point3d *viewright,point3d *vie
 					//(pv->x*t + p0->x-spr->p.x)^2 + "y + "z = spr->fat^2
 				Za = pv->x*pv->x + pv->y*pv->y + pv->z*pv->z;
 				Zb = fp.x*pv->x + fp.y*pv->y + fp.z*pv->z;
-				Zc = fp.x*fp.x + fp.y*fp.y + fp.z*fp.z - spr->fat*spr->fat;
+				Zc = fp.x*fp.x + fp.y*fp.y + fp.z*fp.z - spr->phys.fat*spr->phys.fat;
 				t = Zb*Zb - Za*Zc; if (t < 0) continue;
 				t = (Zb-sqrt(t))/Za;
 			}
@@ -343,16 +536,16 @@ double findmaxcr (dpoint3d *p0, int cursect, double mindist, dpoint3d *hit, maps
 		{
 			//if (spr[w].owner >= 0) continue;
 			if (!(spr[w].flags&1)) continue;
-			if (spr[w].fat > 0)
+			if (spr[w].phys.fat > 0)
 			{
 				np.x = p0->x-spr[w].p.x;
 				np.y = p0->y-spr[w].p.y;
 				np.z = p0->z-spr[w].p.z;
 				d = sqrt(np.x*np.x + np.y*np.y + np.z*np.z);
-				f = d-spr[w].fat;
+				f = d-spr[w].phys.fat;
 				if ((f <= 0.0) || (f*f >= mindist2)) continue;
 				mindist2 = f*f;
-				d = spr[w].fat/d;
+				d = spr[w].phys.fat/d;
 				hit->x = spr[w].p.x + np.x*d;
 				hit->y = spr[w].p.y + np.y*d;
 				hit->z = spr[w].p.z + np.z*d;
@@ -660,7 +853,7 @@ double sphtracerec (dpoint3d *p0, dpoint3d *v0, dpoint3d *hit, int *cursect, dou
 			//if (spr[w].owner >= 0) continue;
 			if (!(spr[w].flags&1)) continue;
 
-			if (spr[w].fat > 0.f)
+			if (spr[w].phys.fat > 0.f)
 			{
 					//Raytrace to sphere
 				np.x = p0->x-spr[w].p.x;
@@ -669,13 +862,13 @@ double sphtracerec (dpoint3d *p0, dpoint3d *v0, dpoint3d *hit, int *cursect, dou
 				Za = v0->x*v0->x + v0->y*v0->y + v0->z*v0->z; //FIX:optimize
 				Zb = v0->x*np.x + v0->y*np.y + v0->z*np.z;
 				d = np.x*np.x + np.y*np.y + np.z*np.z;
-				Zc = d - (spr[w].fat+cr)*(spr[w].fat+cr);
+				Zc = d - (spr[w].phys.fat+cr)*(spr[w].phys.fat+cr);
 				u = Zb*Zb - Za*Zc; if ((u < 0.0) || (Za == 0.0)) continue;
 			 //t = -(sqrt(u)+Zb) / Za; //Classic quadratic equation (Zb premultiplied by .5)
 				t = Zc / (sqrt(u)-Zb); //Alternate quadratic equation (Zb premultiplied by .5)
 				if ((t < 0.0) || (t >= mint)) continue;
 				mint = t;
-				if (d != 0) d = spr[w].fat/sqrt(d);
+				if (d != 0) d = spr[w].phys.fat/sqrt(d);
 				hit->x = spr[w].p.x + np.x*d;
 				hit->y = spr[w].p.y + np.y*d;
 				hit->z = spr[w].p.z + np.z*d;

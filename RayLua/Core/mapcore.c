@@ -394,7 +394,7 @@ long insspri_imp (int sect, float x, float y, float z, mapstate_t *map)
 	memset(spr,0,sizeof(spri_t));
 	spr->p.x = x; spr->p.y = y; spr->p.z = z;
 	spr->r.x = .5; spr->d.z = .5; spr->f.y =-.5;
-	spr->fat = .5; spr->mas = spr->moi = 1.0;
+	spr->phys.fat = .5; spr->phys.mas = spr->phys.moi = 1.0;
 	spr->tilnum = -1; //spr->asc = spr->rsc = spr->gsc = spr->bsc = 4096;
 	spr->owner = -1; spr->flags = 0;
 	spr->sect = sect; spr->sectn = map->sect[sect].headspri; spr->sectp = -1;

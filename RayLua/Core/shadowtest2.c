@@ -1,3 +1,14 @@
+/*
+ *       BUILD2 engine by Ken Silverman (http://advsys.net/ken)
+ *       This file has been modified from Ken Silverman's original release
+ *
+ *       Things added:
+ *       - True portal handling
+ *       - changed way polygons are outputted
+ *       - lots of data structures were refactored
+ *       - transient context for rendering introduced
+ */
+
 #include "monoclip.h"
 #include "shadowtest2.h"
 
@@ -13,6 +24,7 @@
 
 #include "buildmath.h"
 #include "monodebug.h"
+#include "physics.h"
 #define PI 3.14159265358979323
 #pragma warning(disable:4731)
 #define EXLOGS 0
@@ -254,8 +266,10 @@ static point3d slightpos[LIGHTMAX], slightdir[LIGHTMAX];
 static float spotwid[LIGHTMAX];
 // define ARENA(t,n) t* n =0; int nmal=0, nn=0;
 ARENA(eyepol_t, eyepol);
-ARENA(vert3d_t, eyepolv);
+ARENA(dpoint3d, eyepolv);
+ARENA(dpoint3d, eyepolvori);
 ARENA(uint32_t, eyepoli);
+ARENA(uint32_t, ligpoli);
 //eyepol_t *eyepol = 0; // 4096 eyepol_t's = 192KB
 //vert3d_t *eyepolv = 0; //16384 point2d's  = 128KB
 int glignum = 0;
@@ -727,393 +741,124 @@ static void xformbac(double rx, double ry, double rz, dpoint3d *o, bdrawctx *b) 
 }
 
 // Helper function to check turn direction
-float cross_product(int a, int b, int c) {
-	point3d pa = eyepolv[a].wpos;
-	point3d pb = eyepolv[b].wpos;
-	point3d pc = eyepolv[c].wpos;
+float cross_product_eyev(int a, int b, int c) {
+	dpoint3d pa = eyepolv[a];
+	dpoint3d pb = eyepolv[b];
+	dpoint3d pc = eyepolv[c];
 	return (pb.x - pa.x) * (pc.y - pa.y) - (pb.y - pa.y) * (pc.x - pa.x);
 };
+static bool iseyeshared(int e1,int e2) {
+	return issamexyd(eyepolv[e1],eyepolv[e2]);
+}
+
+static int triangulate(const int *chain_starts, const int *chain_lengths, dpoint3d* verts, uint32_t* inds, int *indsn, bool needflip) {
+	int triangle_count =0;
+	int i0 = 0, i1 = 0;
+	int stack[256];
+	int stack_top = 0;
+	//bool needflip = !b->istrimirror;
+
+
+	// Start with leftmost vertex
+
+	if ((verts[chain_starts[0]].x <= verts[chain_starts[1]].x)) {
+		stack[0] = chain_starts[0];
+		i0 = 1;
+	} else {
+		stack[0] = chain_starts[1];
+		i1 = 1;
+	}
+
+	// Process all remaining vertices left to right
+	while (i0 < chain_lengths[0] || i1 < chain_lengths[1]) {
+		int next_v, next_chain;
+
+		// Pick next vertex by x coordinate
+		if (i0 >= chain_lengths[0]) {
+			next_v = chain_starts[1] + i1++;
+			next_chain = 1;
+		} else if (i1 >= chain_lengths[1]) {
+			next_v = chain_starts[0] + i0++;
+			next_chain = 0;
+		} else {
+			if (verts[chain_starts[0] + i0].x <= verts[chain_starts[1] + i1].x) {
+				next_v = chain_starts[0] + i0++;
+				next_chain = 0;
+			} else {
+				next_v = chain_starts[1] + i1++;
+				next_chain = 1;
+			}
+		}
+
+		int top_chain = (stack[stack_top] >= chain_starts[1]) ? 1 : 0;
+
+		if (next_chain != top_chain) {
+			// Fan from stack to new vertex
+			for (int j = 0; j < stack_top; j++) {
+				int v0 = stack[j], v1 = stack[j + 1], v2 = next_v;
+
+				// Determine winding based on chain orientation
+				bool upper_chain_triangle = (top_chain == 0);
+
+				if (upper_chain_triangle ^ needflip) {
+					inds[(*indsn)++] = v0;
+					inds[(*indsn)++] = v1;
+					inds[(*indsn)++] = v2;
+				} else {
+					inds[(*indsn)++] = v0;
+					inds[(*indsn)++] = v2;
+					inds[(*indsn)++] = v1;
+				}
+				triangle_count++;
+			}
+			stack[0] = stack[stack_top];
+			stack[1] = next_v;
+			stack_top = 1;
+		} else {
+			// Pop convex vertices from same chain using sequence logic
+			while (stack_top > 0) {
+				int v0 = stack[stack_top - 1], v1 = stack[stack_top], v2 = next_v;
+
+				// For monotone chains, convexity is determined by y-progression
+				// Chain 0 (upper): convex if y decreases then increases
+				// Chain 1 (lower): convex if y increases then decreases
+				bool y_turn_convex;
+				if (next_chain == 0) {
+					// Upper chain: convex if we have a "valley" (y goes down then up)
+					y_turn_convex = (verts[v1].y <= verts[v0].y) && (verts[v2].y >= verts[v1].y);
+				} else {
+					// Lower chain: convex if we have a "peak" (y goes up then down)
+					y_turn_convex = (verts[v1].y >= verts[v0].y) && (verts[v2].y <= verts[v1].y);
+				}
+
+				if (!y_turn_convex) break;
+
+				bool upper_chain_triangle = (next_chain == 0);
+
+				if (upper_chain_triangle ^ needflip) {
+					inds[(*indsn)++] = v0;
+					inds[(*indsn)++] = v1;
+					inds[(*indsn)++] = v2;
+				} else {
+					inds[(*indsn)++] = v0;
+					inds[(*indsn)++] = v2;
+					inds[(*indsn)++] = v1;
+				}
+				triangle_count++;
+				stack_top--;
+			}
+			stack[++stack_top] = next_v;
+		}
+	}
+	return triangle_count;
+}
 
 static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
-    // ouput is x-monotone, left to right.
-    float f, fx, fy, g, *fptr;
-    int i, j, k, h, rethead[2];
-    cam_t cam = b->cam;
-    double *xform = b->xformmat;
-    point3d add = b->gnadd;
-
-    #define EPSILON 1e-12f
-    #define ANGLE_EPSILON 1e-24f
-
-    if ((rethead0 | rethead1) < 0) {
-        mono_deloop(rethead1);
-        mono_deloop(rethead0);
-        return;
-    }
-
-    rethead[0] = rethead0;
-    rethead[1] = rethead1;
-    int *indices = NULL;
-    int index_count = 0;
-    int index_capacity = 0;
-    int chain_starts[2];
-    int chain_lengths[2] = {0, 0};
-    point3d curmp;
-    int debhl[4];
-
-    for (h = 0; h < 2; h++) {
-        i = rethead[h];
-        debhl[h * 2] = eyepolvn;
-        chain_starts[h] = eyepolvn;
-        do {
-
-            curmp = (point3d){mp[i].pos.x, mp[i].pos.y, mp[i].pos.z};
-            if (eyepolvn >= eyepolvmal) {
-                eyepolvmal = max(eyepolvmal<<1, 16384);
-                eyepolv = (vert3d_t *) realloc(eyepolv, eyepolvmal * sizeof(vert3d_t));
-            }
-            eyepolv[eyepolvn].wpos = curmp;
-            eyepolvn++;
-            chain_lengths[h]++;
-            i = mp[i].n;
-        } while (i != rethead[h]);
-        mono_deloop(rethead[h]);
-        debhl[h * 2 + 1] = eyepolvn - 1;
-    }
-
-    bool needflip = b->istrimirror;
-
-    bool shared_start = 0;
-    bool shared_end = 0;
-    int total_vertices = chain_lengths[0] + chain_lengths[1] - (shared_start ? 1 : 0) - (shared_end ? 1 : 0);
-
-    if (total_vertices < 3) {
-        return;
-    }
-
-    int *stack = (int *) malloc(total_vertices * sizeof(int));
-    int *stack_chain = (int *) malloc(total_vertices * sizeof(int));
-    int stack_top = -1;
-    int triangle_count = total_vertices - 2;
-    index_capacity = triangle_count * 3;
-    indices = (int *) malloc(index_capacity * sizeof(int));
-    index_count = 0;
-
-    int *sorted_vertices = (int *) malloc(total_vertices * sizeof(int));
-    int *vertex_chain = (int *) malloc(total_vertices * sizeof(int));
-    int left_idx = 0;
-    int right_idx = 0;
-    int merge_idx = 0;
-
-    // Merge logic with improved tie-breaking
-    if (shared_start) {
-        sorted_vertices[merge_idx] = chain_starts[0];
-        vertex_chain[merge_idx] = 0;
-        merge_idx++;
-        left_idx = 1;
-        right_idx = 1;
-    }
-
-    while (left_idx < chain_lengths[0] && right_idx < chain_lengths[1]) {
-        if (shared_end && left_idx == chain_lengths[0] - 1 && right_idx == chain_lengths[1] - 1) {
-            sorted_vertices[merge_idx] = chain_starts[0] + left_idx;
-            vertex_chain[merge_idx] = 0;
-            merge_idx++;
-            break;
-        }
-
-        float left_x = eyepolv[chain_starts[0] + left_idx].x;
-        float right_x = eyepolv[chain_starts[1] + right_idx].x;
-        float x_diff = left_x - right_x;
-
-        if (fabs(x_diff) < EPSILON) {
-            float left_y = eyepolv[chain_starts[0] + left_idx].y;
-            float right_y = eyepolv[chain_starts[1] + right_idx].y;
-
-            if (left_y <= right_y) {
-                sorted_vertices[merge_idx] = chain_starts[0] + left_idx;
-                vertex_chain[merge_idx] = 0;
-                left_idx++;
-            } else {
-                sorted_vertices[merge_idx] = chain_starts[1] + right_idx;
-                vertex_chain[merge_idx] = 1;
-                right_idx++;
-            }
-        } else if (x_diff <= 0) {
-            sorted_vertices[merge_idx] = chain_starts[0] + left_idx;
-            vertex_chain[merge_idx] = 0;
-            left_idx++;
-        } else {
-            sorted_vertices[merge_idx] = chain_starts[1] + right_idx;
-            vertex_chain[merge_idx] = 1;
-            right_idx++;
-        }
-        merge_idx++;
-    }
-
-    while (left_idx < chain_lengths[0]) {
-        if (!(shared_end && left_idx == chain_lengths[0] - 1)) {
-            sorted_vertices[merge_idx] = chain_starts[0] + left_idx;
-            vertex_chain[merge_idx] = 0;
-            merge_idx++;
-        }
-        left_idx++;
-    }
-
-    while (right_idx < chain_lengths[1]) {
-        if (!(shared_end && right_idx == chain_lengths[1] - 1)) {
-            sorted_vertices[merge_idx] = chain_starts[1] + right_idx;
-            vertex_chain[merge_idx] = 1;
-            merge_idx++;
-        }
-        right_idx++;
-    }
-
-    total_vertices = merge_idx;
-
-    // Enhanced triangulation with triangle flipping support
-    stack[++stack_top] = sorted_vertices[0];
-    stack_chain[stack_top] = vertex_chain[0];
-
-    if (total_vertices > 1) {
-        stack[++stack_top] = sorted_vertices[1];
-        stack_chain[stack_top] = vertex_chain[1];
-    }
-
-    for (int i = 2; i < total_vertices; i++) {
-        int curr_v = sorted_vertices[i];
-        int curr_chain = vertex_chain[i];
-        int top_chain = stack_chain[stack_top];
-
-        if (curr_chain != top_chain) {
-            // Different chain - fan triangulate
-            for (int j = 0; j < stack_top; j++) {
-                int v0 = stack[j];
-                int v1 = stack[j + 1];
-                int v2 = curr_v;
-
-                float ax = eyepolv[v1].x - eyepolv[v0].x;
-                float ay = eyepolv[v1].y - eyepolv[v0].y;
-                float bx = eyepolv[v2].x - eyepolv[v0].x;
-                float by = eyepolv[v2].y - eyepolv[v0].y;
-                float cross = ax * by - ay * bx;
-
-                if (fabs(cross) < EPSILON) continue;
-
-                // Apply triangle flipping based on needflip flag
-                if ((cross > 0.0f) ^ needflip) {
-                    indices[index_count++] = v0;
-                    indices[index_count++] = v2;
-                    indices[index_count++] = v1;
-                } else {
-                    indices[index_count++] = v0;
-                    indices[index_count++] = v1;
-                    indices[index_count++] = v2;
-                }
-            }
-
-            int last_v = stack[stack_top];
-            int last_chain = stack_chain[stack_top];
-            stack_top = 0;
-            stack[0] = last_v;
-            stack_chain[0] = last_chain;
-            stack[++stack_top] = curr_v;
-            stack_chain[stack_top] = curr_chain;
-        } else {
-            // Same chain - enhanced validation for long edges
-            while (stack_top > 0) {
-                int v0 = stack[stack_top - 1];
-                int v1 = stack[stack_top];
-                int v2 = curr_v;
-
-                // Calculate edge vectors
-                float ax = eyepolv[v1].x - eyepolv[v0].x;
-                float ay = eyepolv[v1].y - eyepolv[v0].y;
-                float bx = eyepolv[v2].x - eyepolv[v1].x;
-                float by = eyepolv[v2].y - eyepolv[v1].y;
-
-                // Edge lengths for normalization
-                float len_a = sqrtf(ax * ax + ay * ay);
-                float len_b = sqrtf(bx * bx + by * by);
-
-                // Skip if either edge is degenerate
-                if (len_a < EPSILON || len_b < EPSILON) {
-                    stack_top--;
-                    continue;
-                }
-
-                // Normalize for better angle calculation
-                float norm_ax = ax / len_a;
-                float norm_ay = ay / len_a;
-                float norm_bx = bx / len_b;
-                float norm_by = by / len_b;
-
-                float cross = norm_ax * norm_by - norm_ay * norm_bx;
-
-                // For very long edges, use more lenient validation
-                float max_len = fmaxf(len_a, len_b);
-                float min_len = fminf(len_a, len_b);
-                float length_ratio = max_len / (min_len + EPSILON);
-
-                // Adaptive threshold based on edge length ratio
-                float cross_threshold = ANGLE_EPSILON;
-                if (length_ratio > 100.0f) {
-                    cross_threshold *= 10.0f; // More lenient for very long edges
-                }
-
-                // Check if points are effectively collinear
-                if (fabs(cross) < cross_threshold) {
-                    stack_top--;
-                    continue;
-                }
-
-                bool valid = (curr_chain == 0) ? (cross > 0.0f) : (cross < 0.0f);
-
-                // Additional check: ensure we're not creating inverted triangles
-                if (valid) {
-                    // Check triangle orientation in original coordinates
-                    float tax = eyepolv[v1].x - eyepolv[v0].x;
-                    float tay = eyepolv[v1].y - eyepolv[v0].y;
-                    float tbx = eyepolv[v2].x - eyepolv[v0].x;
-                    float tby = eyepolv[v2].y - eyepolv[v0].y;
-                    float tcross = tax * tby - tay * tbx;
-
-                    // Ensure triangle has reasonable area
-                    float triangle_area = fabs(tcross) * 0.5f;
-                    if (triangle_area < EPSILON) {
-                        valid = false;
-                    }
-                }
-
-                if (!valid) {
-                    break;
-                }
-
-                // Emit triangle with flipping support
-                float tax = eyepolv[v1].x - eyepolv[v0].x;
-                float tay = eyepolv[v1].y - eyepolv[v0].y;
-                float tbx = eyepolv[v2].x - eyepolv[v0].x;
-                float tby = eyepolv[v2].y - eyepolv[v0].y;
-                float tcross = tax * tby - tay * tbx;
-
-                if (fabs(tcross) >= EPSILON) {
-                    // Apply triangle flipping based on needflip flag
-                    if ((tcross > 0.0f) ^ needflip) {
-                        indices[index_count++] = v0;
-                        indices[index_count++] = v2;
-                        indices[index_count++] = v1;
-                    } else {
-                        indices[index_count++] = v0;
-                        indices[index_count++] = v1;
-                        indices[index_count++] = v2;
-                    }
-                }
-
-                stack_top--;
-            }
-
-            stack[++stack_top] = curr_v;
-            stack_chain[stack_top] = curr_chain;
-        }
-    }
-
-    // Rest remains the same...
-    if (eyepoln + 1 >= eyepolmal) {
-        eyepolmal = max(eyepolmal<<1, 4096);
-        eyepol = (eyepol_t *) realloc(eyepol, eyepolmal * sizeof(eyepol_t));
-        eyepol[0].vert0 = 0;
-    }
-
-    eyepol[eyepoln].tilnum = gtilenum;
-	eyepol[eyepoln].pal = 0;
-	eyepol[eyepoln].alpha = alphamul;
-	eyepol[eyepoln].isflor = -1;
-    if (b->gisflor < 2) {
-    	eyepol[eyepoln].isflor = b->gisflor;
-	    eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].surf[b->gisflor].uvcoords;
-    	eyepol[eyepoln].uvform = curMap->sect[b->gligsect].surf[b->gisflor].uvform;
-    	eyepol[eyepoln].pal = curMap->sect[b->gligsect].surf[b->gisflor].pal;
-    	eyepol[eyepoln].shade = curMap->sect[b->gligsect].surf[b->gisflor].rsc/8192.0f;
-    }
-    else    { // handle walls.
-        eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab%3].uvcoords;
-        eyepol[eyepoln].uvform = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab%3].uvform;
-     //   eyepol[eyepoln].alpha = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].alpha;
-        eyepol[eyepoln].pal = curMap->sect[b->gligsect].wall[b->gligwall].surf.pal;
-      //  eyepol[eyepoln].tilnum = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab].tilnum;
-    	eyepol[eyepoln].shade = curMap->sect[b->gligsect].wall[b->gligwall].surf.rsc/8192.0f;
-    }
-    eyepol[eyepoln].slabid = b->gligslab;
-
-	if (eyepol[eyepoln].alpha <0)
-		eyepol[eyepoln].alpha=1;
-    for (int ip = debhl[0]; ip < eyepolvn; ip++) {
-        int pn = ip;
-        f = cam.h.z / (eyepolv[pn].x * xform[6] + eyepolv[pn].y * xform[7] + add.z);
-        fx = (eyepolv[pn].x * xform[0] + eyepolv[pn].y * xform[1] + add.x) * f + cam.h.x;
-        fy = (eyepolv[pn].x * xform[3] + eyepolv[pn].y * xform[4] + add.y) * f + cam.h.y;
-
-        f = 1.0 / ((b->gouvmat[0] * fx + b->gouvmat[3] * fy + b->gouvmat[6]) * cam.h.z);
-
-        float retx = ((fx - cam.h.x) * cam.r.x + (fy - cam.h.y) * cam.d.x + (cam.h.z) * cam.f.x) * f + cam.p.x;
-        float rety = ((fx - cam.h.x) * cam.r.y + (fy - cam.h.y) * cam.d.y + (cam.h.z) * cam.f.y) * f + cam.p.y;
-        float retz = ((fx - cam.h.x) * cam.r.z + (fy - cam.h.y) * cam.d.z + (cam.h.z) * cam.f.z) * f + cam.p.z;
-        dpoint3d ret = {retx, rety, retz};
-        eyepolv[pn].uvpos = ret;
-        wccw_transform(&ret, &b->movedcam, &b->orcam);
-        eyepolv[pn].wpos = (point3d){ret.x, ret.y, ret.z};
-    }
-
-    free(stack);
-    free(stack_chain);
-    free(sorted_vertices);
-    free(vertex_chain);
-
-    eyepol[eyepoln].c1 = debhl[0];
-    eyepol[eyepoln].c2 = debhl[2];
-    eyepol[eyepoln].e1 = debhl[1];
-    eyepol[eyepoln].e2 = debhl[3];
-    eyepol[eyepoln].vert0 = chain_starts[0];
-    eyepol[eyepoln].indices = indices;
-    eyepol[eyepoln].nid = index_count;
-    memcpy((void *) eyepol[eyepoln].ouvmat, (void *) b->gouvmat, sizeof(b->gouvmat[0]) * 9);
-    eyepol[eyepoln].tpic = gtpic;
-    eyepol[eyepoln].curcol = gcurcol;
-    eyepol[eyepoln].flags = (b->gflags != 0);
-    eyepol[eyepoln].b2sect = b->gligsect;
-    eyepol[eyepoln].b2wall = b->gligwall;
-    eyepol[eyepoln].b2slab = b->gligslab;
-    memcpy((void *) &eyepol[eyepoln].norm, (void *) &b->gnorm, sizeof(b->gnorm));
-    eyepol[eyepoln].rdepth = b->recursion_depth;
-
-    eyepoln++;
-    eyepol[eyepoln].vert0 = eyepolvn;
-
-    logstep("produce eyepol, depth:%d", b->recursion_depth);
-
-    #undef EPSILON
-    #undef ANGLE_EPSILON
-}
-
-
-
-
-
-
-static void skytagfunc(int rethead0, int rethead1, bdrawctx *b) {
-}
-
-/*
-	Purpose: Generates shadow polygon lists for lighting
-	Converts screen-space polygons back to 3D world coordinates
-	Stores shadow-casting geometry in ligpol[] arrays per light source
-	Used during shadow map generation phase (mode 4)
-	Creates hash table for fast polygon lookup by sector/wall/slab
- */
-static void ligpoltagfunc(int rethead0, int rethead1, bdrawctx *b) {
-	cam_t gcam = b->cam;
-	float f, fx, fy, fz;
-	int i, j, rethead[2];
+	double f, fx, fy;
+	int i, h, rethead[2];
+	cam_t cam = b->cam;
+	double *xform = b->xformmat;
+	point3d add = b->gnadd;
 
 	if ((rethead0 | rethead1) < 0) {
 		mono_deloop(rethead1);
@@ -1121,42 +866,200 @@ static void ligpoltagfunc(int rethead0, int rethead1, bdrawctx *b) {
 		return;
 	}
 
+	rethead[0] = rethead0;
+	rethead[1] = rethead1;
+	int chain_starts[2];
+	int chain_lengths[2] = {0, 0};
+	dpoint3d curmp;
+	int debhl[4];
+
+	// Build vertex chains
+	for (h = 0; h < 2; h++) {
+		i = rethead[h];
+		debhl[h * 2] = eyepolvn;
+		chain_starts[h] = eyepolvn;
+		ARENA_EXPAND(eyepolv,50);
+		ARENA_EXPAND(eyepolvori,50);
+		do {
+			eyepolv[eyepolvn] = mp[i].pos;
+			eyepolvorin++;
+			eyepolvn++;
+			chain_lengths[h]++;
+			i = mp[i].n;
+		} while (i != rethead[h]);
+		mono_deloop(rethead[h]);
+		debhl[h * 2 + 1] = eyepolvn - 1;
+	}
+
+	// Remove shared endpoints
+	bool shared_start = iseyeshared(chain_starts[0], chain_starts[1]);
+	bool shared_end = iseyeshared(chain_starts[0] + chain_lengths[0] - 1,
+	                              chain_starts[1] + chain_lengths[1] - 1);
+
+//	if (shared_start) {
+//		int clipstart = (chain_lengths[1] >= chain_lengths[0]) ? 1 : 0;
+//		if (chain_lengths[clipstart] > 1) {
+//			chain_starts[clipstart]++;
+//			chain_lengths[clipstart]--;
+//		}
+//	}
+//
+//	if (shared_end) {
+//		int clipend = (chain_lengths[1] >= chain_lengths[0]) ? 1 : 0;
+//		if (chain_lengths[clipend] > 1) {
+//			chain_lengths[clipend]--;
+//		}
+//	}
+
+	int total_vertices = chain_lengths[0] + chain_lengths[1];
+	if (total_vertices < 3) return;
+	int max_triangles = total_vertices;
+	int tridx_start = eyepolin;
+	ARENA_EXPAND(eyepoli, max_triangles * 3);
+	int triangle_count = 0;
+	triangle_count = triangulate(chain_starts,chain_lengths,eyepolv,eyepoli, &eyepolin, !b->istrimirror);
+
+	// --------------- Setup polygon record
+	if (eyepoln + 1 >= eyepolmal) {
+		eyepolmal = max(eyepolmal<<1, 4096);
+		eyepol = (eyepol_t *) realloc(eyepol, eyepolmal * sizeof(eyepol_t));
+		eyepol[0].vert0 = 0;
+	}
+
+	eyepol[eyepoln].tilnum = gtilenum;
+	eyepol[eyepoln].pal = 0;
+	eyepol[eyepoln].alpha = alphamul;
+	eyepol[eyepoln].isflor = -1;
+
+	if (b->gisflor < 2) {
+		eyepol[eyepoln].isflor = b->gisflor;
+		eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].surf[b->gisflor].uvcoords;
+		eyepol[eyepoln].uvform = curMap->sect[b->gligsect].surf[b->gisflor].uvform;
+		eyepol[eyepoln].pal = curMap->sect[b->gligsect].surf[b->gisflor].pal;
+		eyepol[eyepoln].shade = curMap->sect[b->gligsect].surf[b->gisflor].rsc / 8192.0f;
+	} else {
+		eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab % 3].uvcoords;
+		eyepol[eyepoln].uvform = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab % 3].uvform;
+		eyepol[eyepoln].pal = curMap->sect[b->gligsect].wall[b->gligwall].surf.pal;
+		eyepol[eyepoln].shade = curMap->sect[b->gligsect].wall[b->gligwall].surf.rsc / 8192.0f;
+	}
+
+	eyepol[eyepoln].slabid = b->gligslab;
+	if (eyepol[eyepoln].alpha < 0) eyepol[eyepoln].alpha = 1;
+
+	// Transform vertices
+	for (int ip = debhl[0]; ip < eyepolvn; ip++) {
+		f = cam.h.z / (eyepolv[ip].x * xform[6] + eyepolv[ip].y * xform[7] + add.z);
+		fx = (eyepolv[ip].x * xform[0] + eyepolv[ip].y * xform[1] + add.x) * f + cam.h.x;
+		fy = (eyepolv[ip].x * xform[3] + eyepolv[ip].y * xform[4] + add.y) * f + cam.h.y;
+
+		f = 1.0 / ((b->gouvmat[0] * fx + b->gouvmat[3] * fy + b->gouvmat[6]) * cam.h.z);
+
+		double retx = ((fx - cam.h.x) * cam.r.x + (fy - cam.h.y) * cam.d.x + cam.h.z * cam.f.x) * f + cam.p.x;
+		double rety = ((fx - cam.h.x) * cam.r.y + (fy - cam.h.y) * cam.d.y + cam.h.z * cam.f.y) * f + cam.p.y;
+		double retz = ((fx - cam.h.x) * cam.r.z + (fy - cam.h.y) * cam.d.z + cam.h.z * cam.f.z) * f + cam.p.z;
+
+		dpoint3d ret = {retx, rety, retz};
+		eyepolvori[ip] = ret;
+		wccw_transform(&ret, &b->movedcam, &b->orcam);
+		eyepolv[ip] = ret;
+	}
+
+	eyepol[eyepoln].c1 = debhl[0];
+	eyepol[eyepoln].c2 = debhl[2];
+	eyepol[eyepoln].e1 = debhl[1];
+	eyepol[eyepoln].e2 = debhl[3];
+	eyepol[eyepoln].vert0 = chain_starts[0];
+	eyepol[eyepoln].triidstart = tridx_start;
+	eyepol[eyepoln].tricnt = triangle_count;
+	memcpy(eyepol[eyepoln].ouvmat, b->gouvmat, sizeof(b->gouvmat[0]) * 9);
+	eyepol[eyepoln].tpic = gtpic;
+	eyepol[eyepoln].curcol = gcurcol;
+	eyepol[eyepoln].flags = (b->gflags != 0);
+	eyepol[eyepoln].b2sect = b->gligsect;
+	eyepol[eyepoln].b2wall = b->gligwall;
+	eyepol[eyepoln].b2slab = b->gligslab;
+	memcpy(&eyepol[eyepoln].norm, &b->gnorm, sizeof(b->gnorm));
+	eyepol[eyepoln].rdepth = b->recursion_depth;
+
+	eyepoln++;
+	eyepol[eyepoln].vert0 = eyepolvn;
+
+	logstep("produce eyepol, depth:%d", b->recursion_depth);
+}
+
+static void skytagfunc(int rethead0, int rethead1, bdrawctx *b) {
+}
+
+// There is way to do masks and semitransparency. At least for walls.
+// when we encounter first mask wall - we set up parameters for created mph.
+// if then we cut masked mph with another masked mph - we produce two mph pieces:
+// with mask1 and mask2, and both have light value divided by 2. - tho will overblend..
+//
+static void ligpoltagfunc(int rethead0, int rethead1, bdrawctx *b) {
+	cam_t gcam = b->cam;
+	double f, fx, fy, fz;
+	int i, j, rethead[2];
+
+	if ((rethead0 | rethead1) < 0) {
+		mono_deloop(rethead1);
+		mono_deloop(rethead0);
+		return;
+	}
+	rethead[0] = rethead0;
+	rethead[1] = rethead1;
 	//Use this for dynamic lights only! (doesn't seem to help speed much)
 	//if ((shadowtest2_rendmode == 4) && (!(shadowtest2_sectgot[b->gligsect>>5]&(1<<b->gligsect)))) return;
+	int chain_starts[2];
+	int chain_lengths[2] = {0, 0};
+	dpoint3d curmp;
+	int debhl[4];
+
+	// Build vertex chains
+	for (int h = 0; h < 2; h++) {
+		i = rethead[h];
+		debhl[h * 2] = glp->ligpolvn;
+		chain_starts[h] = glp->ligpolvn;
+		do {
+			if (glp->ligpolvn >= glp->ligpolvmal) {
+				glp->ligpolvmal = max(glp->ligpolvmal<<1, 1024);
+				glp->ligpolv = (dpoint3d *) realloc(glp->ligpolv, glp->ligpolvmal * sizeof(dpoint3d));
+			}
+			glp->ligpolv[glp->ligpolvn] = mp[i].pos;
+			glp->ligpolvn++;
+			chain_lengths[h]++;
+			i = mp[i].n;
+		} while (i != rethead[h]);
+		mono_deloop(rethead[h]);
+		debhl[h * 2 + 1] = glp->ligpolvn - 1;
+	}
+	int total_vertices = chain_lengths[0] + chain_lengths[1];
+	if (total_vertices < 3) return;
+	int max_triangles = total_vertices;
+	int tridx_start = ligpolin;
+	ARENA_EXPAND(ligpoli, max_triangles * 3);
+	int triangle_count = 0;
+	triangle_count = triangulate(chain_starts,chain_lengths,glp->ligpolv,ligpoli, &ligpolin, !b->istrimirror);
+
 
 	//Put on FIFO:
 	rethead[0] = rethead0;
 	rethead[1] = rethead1;
-	for (j = 0; j < 2; j++) {
-		i = rethead[j];
-		do {
-			if (j) i = mp[i].p;
+	for (int ip = debhl[0]; ip < glp->ligpolvn; ip++) {
+			dpoint3d lv = glp->ligpolv[ip];
+			f = gcam.h.z / (/*lv.x*b->xformmat[6]*/ +lv.y * b->xformmat[7] + b->gnadd.z);
+			fx = (lv.x * b->xformmat[0] + lv.y * b->xformmat[1] + b->gnadd.x) * f + gcam.h.x;
+			fy = (lv.x * b->xformmat[3] + lv.y * b->xformmat[4] + b->gnadd.y) * f + gcam.h.y;
 
-			if (glp->ligpolvn >= glp->ligpolvmal) {
-				glp->ligpolvmal = max(glp->ligpolvmal<<1, 1024);
-				glp->ligpolv = (point3d *) realloc(glp->ligpolv, glp->ligpolvmal * sizeof(point3d));
-			}
-
-			f = gcam.h.z / (/*mp[i].x*b->xformmat[6]*/ +mp[i].y * b->xformmat[7] + b->gnadd.z);
-			fx = (mp[i].x * b->xformmat[0] + mp[i].y * b->xformmat[1] + b->gnadd.x) * f + gcam.h.x;
-			fy = (mp[i].x * b->xformmat[3] + mp[i].y * b->xformmat[4] + b->gnadd.y) * f + gcam.h.y;
-
-#if (USEINTZ)
-			f = 1.0 / ((b->gouvmat[0] * fx + b->gouvmat[3] * fy + b->gouvmat[6]) * 1048576.0 * 256.0);
-#else
 			f = 1.0 / ((b->gouvmat[0] * fx + b->gouvmat[3] * fy + b->gouvmat[6]) * gcam.h.z);
-#endif
-			glp->ligpolv[glp->ligpolvn].x = ((fx - gcam.h.x) * gcam.r.x + (fy - gcam.h.y) * gcam.d.x + (gcam.h.z) * gcam
-			                                 .f.x) * f + gcam.p.x;
-			glp->ligpolv[glp->ligpolvn].y = ((fx - gcam.h.x) * gcam.r.y + (fy - gcam.h.y) * gcam.d.y + (gcam.h.z) * gcam
-			                                 .f.y) * f + gcam.p.y;
-			glp->ligpolv[glp->ligpolvn].z = ((fx - gcam.h.x) * gcam.r.z + (fy - gcam.h.y) * gcam.d.z + (gcam.h.z) * gcam
-			                                 .f.z) * f + gcam.p.z;
 
-			glp->ligpolvn++;
-			if (!j) i = mp[i].n;
-		} while (i != rethead[j]);
-		mono_deloop(rethead[j]);
+			glp->ligpolv[ip].x = ((fx - gcam.h.x) * gcam.r.x + (fy - gcam.h.y) * gcam.d.x + (gcam.h.z) * gcam
+			                                 .f.x) * f + gcam.p.x;
+			glp->ligpolv[ip].y = ((fx - gcam.h.x) * gcam.r.y + (fy - gcam.h.y) * gcam.d.y + (gcam.h.z) * gcam
+			                                 .f.y) * f + gcam.p.y;
+			glp->ligpolv[ip].z = ((fx - gcam.h.x) * gcam.r.z + (fy - gcam.h.y) * gcam.d.z + (gcam.h.z) * gcam
+			                                 .f.z) * f + gcam.p.z;
+		wccw_transform(&glp->ligpolv[ip], &b->movedcam, &b->orcam);
 	}
 
 	if (glp->ligpoln + 1 >= glp->ligpolmal) {
@@ -1164,6 +1067,8 @@ static void ligpoltagfunc(int rethead0, int rethead1, bdrawctx *b) {
 		glp->ligpol = (ligpol_t *) realloc(glp->ligpol, glp->ligpolmal * sizeof(ligpol_t));
 		glp->ligpol[0].vert0 = 0;
 	}
+	glp->ligpol[glp->ligpoln].tristart = tridx_start;
+	glp->ligpol[glp->ligpoln].tricnt = triangle_count;
 	glp->ligpol[glp->ligpoln].b2sect = b->gligsect;
 	glp->ligpol[glp->ligpoln].b2wall = b->gligwall;
 	glp->ligpol[glp->ligpoln].b2slab = b->gligslab;
@@ -1207,7 +1112,7 @@ static void drawtag_debug(int rethead0, int rethead1, bdrawctx *b) {
 
 			if (eyepolvn >= eyepolvmal) {
 				eyepolvmal = max(eyepolvmal<<1, 16384);
-				eyepolv = (vert3d_t *) realloc(eyepolv, eyepolvmal * sizeof(vert3d_t));
+				eyepolv = (dpoint3d *) realloc(eyepolv, eyepolvmal * sizeof(dpoint3d));
 			}
 			f = cam.h.z / (mp[i].x * xform[6] + mp[i].y * xform[7] + add.z);
 			fx = (mp[i].x * xform[0] + mp[i].y * xform[1] + add.x) * f + cam.h.x;
@@ -1223,7 +1128,7 @@ static void drawtag_debug(int rethead0, int rethead1, bdrawctx *b) {
 				//	LOOPADD(ret)
 			}
 			wccw_transform(&ret, &b->cam, &b->orcam);
-			eyepolv[eyepolvn].wpos = (point3d){ret.x, ret.y, ret.z};
+			eyepolv[eyepolvn] = (dpoint3d){ret.x, ret.y, ret.z};
 
 			eyepolvn++;
 
@@ -1774,8 +1679,10 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			//int c1, c2;
 			//monocopy(plothead[0],plothead[1], &c1,&c2);
 			alphamul = 0.3f; // only emit mask here
+			if (shadowtest2_rendmode != 4) // no mask with light
 			drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1], DP_PRESERVE_LOOP| DP_EMIT_MASK |1, b);
 			alphamul = 1;// draw as portal, to mark clip space mph
+
 			// gurantees masks wont dupe on top of one another.
 			// could be done with drawpol mod simpler
 			drawpol_befclip(s + b->tagoffset, portaltag, s, portals[endpn].sect, plothead[0], plothead[1],  DP_PRESERVE_LOOP|DP_NO_SCANSECT|surflag, b);
@@ -1783,6 +1690,9 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			// seems that we need to do wccw for every vert to gurantee shared space.. darn
 			draw_hsr_enter_portal(map, myport, plothead[0], plothead[1], b);
 		} else {
+			//if (sec[s].surf[isflor].flags & SURF_SEE_THROUGH)
+			//	{			}
+			//else
 			drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1], surflag, b);
 		}
 	}
@@ -1892,13 +1802,6 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 					else if (!vn) f = sec[s].z[1]; //White walls don't have verts[]! and align is different.
 					else if (!m) f = sec[verts[0].s].z[0]; //
 					else f = sec[verts[(m - 1) >> 1].s].z[0];
-					// Apply UV coordinates with proper scaling
-					//npol2[0].u = sur->uv[0].x;
-					//npol2[0].v = sur->uv[2].y * (npol2[0].z - f) + sur->uv[0].y;
-					//npol2[1].u = sur->uv[1].x * dx + npol2[0].u;
-					//npol2[1].v = sur->uv[1].y * dx + npol2[0].v;
-					//npol2[2].u = sur->uv[2].x + npol2[0].u;
-					//npol2[2].v = sur->uv[2].y + npol2[0].v;
 					b->gflags = 0;
 					gentransform_wall(npol2, sur, b);
 				}
@@ -1967,17 +1870,25 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 	Creates visibility data for shadow casting
 */
 void reset_context() {
-	eyepoln = 0;
-	eyepolvn = 0;
+	ARENA_RESET(eyepol);
+	ARENA_RESET(eyepolv);
+	ARENA_RESET(eyepolvori);
+	ARENA_RESET(eyepoli);
+	ARENA_RESET(ligpoli);
 }
 
 int lastvalidsec = 0;
-
+int focusedSprite=-1;
 void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy) {
 	bdrawctx bs;
 	loopnum = 0;
 	//operstopn=-1;
 	bs.cam = *cc;
+	cc->fov_h = 1.047f;  // 60 degrees in radians
+	cc->fov_v = 0.785f;  // 45 degrees in radians
+	cc->persp_h = 1.0f;
+	cc->persp_v = 1.0f;
+
 	bs.movedcam = *cc;
 	bs.orcam = *cc;
 	bs.recursion_depth = 0;
@@ -1986,6 +1897,21 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy) {
 	bs.ismirrored = false;
 	bs.istrimirror = false;
 	opercurr = 0;
+	int sec=-1,wal=-1,spr =-1;
+	point3d hit;
+	point3d f = sump3(cc->p,cc->f);
+
+	//this raycast works.
+	raycast(&cc->p,&cc->f,1e32,cc->cursect,&sec,&wal,&spr,&hit,map);
+	//hitscan_b2(&cc->p,&cc->f,&cc->r,&cc->d,1e32,cc->cursect,&sec,&wal,&hit,map);
+	//if (wal>=0 && sec>=0)
+	//	map->sect[sec].wall[wal].xsurf[0].tilnum=2;
+	if (spr>=0) {
+		//map->spri[spr].tilnum=2;
+		focusedSprite = spr;
+	}
+
+
 	draw_hsr_polymost_ctx(map, &bs);
 }
 
@@ -2131,7 +2057,8 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 			halfplane = pass;
 		}
 		logstep("Pass start pass:%d, hfp:%d, depth:%d, camsec:%d", pass, halfplane, b->recursion_depth, b->cam.cursect);
-
+		float large_bound = 1e9f;
+		float lightbound = 1e7f;
 		if (shadowtest2_rendmode == 4) {
 			if (!halfplane) gcam.r.x = 1;
 			else gcam.r.x = -1;
@@ -2143,15 +2070,20 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 			gcam.r.z = 0;
 			gcam.d.z = 1;
 			gcam.f.z = 0;
+			gcam.h.z = 21;
+			gcam.h.x = 21;
+			gcam.h.y = 21;
+			b->cam = gcam; // THAT IS IMPORTANT!
 			xformprep(0.0, b);
 
-			xformbac(-65536.0, -65536.0, 1.0, &bord2[0], b);
-			xformbac(+65536.0, -65536.0, 1.0, &bord2[1], b);
-			xformbac(+65536.0, +65536.0, 1.0, &bord2[2], b);
-			xformbac(-65536.0, +65536.0, 1.0, &bord2[3], b);
+			xformbac(-lightbound, -lightbound, 0.0, &bord2[0], b);
+			xformbac(+lightbound, -lightbound, 0.0, &bord2[1], b);
+			xformbac(+lightbound, +lightbound, 0.0, &bord2[2], b);
+			xformbac(-lightbound, +lightbound, 0.0, &bord2[3], b);
 			n = 4;
 			didcut = 1;
-		} else {
+		}
+		else{
 			xformprep(((double) halfplane) * PI, b);
 
 			if (!b->has_portal_clip) {
@@ -2162,7 +2094,7 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 				memcpy(&b->oxformmat, &b->xformmat, sizeof(double) * 9);
 			}
 			// NEW CODE - Use much larger bounds:
-			float large_bound = 1e9f;
+
 			xformbac(-large_bound, -large_bound, gcam.h.z, &bord[0], b);
 			xformbac(+large_bound, -large_bound, gcam.h.z, &bord[1], b);
 			xformbac(+large_bound, +large_bound, gcam.h.z, &bord[2], b);
@@ -2216,7 +2148,7 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 			//drawpol_befclip(gcam.cursect-taginc, gcam.cursect, gcam.cursect,	b->chead[0],b->chead[1], 8|3 , b);
 			int res = -1;
 
-			mphremoveaboveincl(b->tagoffset); // clean anything above.
+		//	mphremoveaboveincl(b->tagoffset); // clean anything above.
 			{
 				if (n < 3) {
 					printf("n<3 2");
@@ -2340,11 +2272,15 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 	}
 	if (b->has_portal_clip) {
 		logstep("mph clean after passes");
-		mphremoveaboveincl(b->tagoffset - 1);
+		//mphremoveaboveincl(b->tagoffset - 1);
 	}
 }
 
 static void draw_hsr_enter_portal(mapstate_t *map, int myport, int head1, int head2, bdrawctx *parentctx) {
+// Lights and portals
+	// lights work with portals because we sample final rendered geometry, which is combined in world space.
+	// and distance is calculated correctly for portaled lights
+	// so for mirrors, we shold not do wccw in drawpoly? and draw poly in original cam space.
 	if (parentctx->recursion_depth == 1)
 		lastcamtr = parentctx->orcam.tr;
 	OPERLOG;
@@ -2424,36 +2360,6 @@ static void draw_hsr_enter_portal(mapstate_t *map, int myport, int head1, int he
 
 	OPERLOG;
 }
-
-
-typedef struct {
-	int sect;
-	point3d p;
-	float rgb[3];
-	int useshadow;
-} drawkv6_lightpos_t;
-
-void drawsprites() {
-}
-
-void shadowtest2_setcam(cam_t *ncam) {
-	//cam = *ncam;
-}
-
-#if (USENEWLIGHT == 0)
-typedef struct {
-	float n2, d2, n1, d1, n0, d0, filler0[2], glk[12], bsc, gsc, rsc, filler1[1];
-} hlighterp_t;
-#else
-typedef struct {
-	float gk[16], gk2[12], bsc, gsc, rsc, filler1[1];
-} hlighterp_t;
-
-__declspec(align(16)) static const float hligterp_maxzero[4] = {0.f, 0.f, 0.f, 0.f};
-#endif
-void prepligramp(float *ouvmat, point3d *norm, int lig, void *hl) {
-}
-
 
 int shadowtest2_isgotsectintersect(int lignum) {
 	int i, leng;
@@ -2536,10 +2442,6 @@ void shadowtest2_init() {
 	shadowtest2_ligpolreset(-1);
 }
 
-//--------------------------------------------------------------------------------------------------
-
-void drawpollig(int ei) {
-}
 #if 0
 !endif
 #endif

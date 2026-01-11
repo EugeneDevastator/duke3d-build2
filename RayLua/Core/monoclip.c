@@ -1,6 +1,11 @@
-//
-// Created by omnis on 11/21/2025.
-//
+/*
+*       BUILD2 Monotone Clipping engine by Ken Silverman (http://advsys.net/ken)
+ *      This file has been modified from Ken Silverman's original release
+ *
+ *       Things added:
+ *       - couple of utility functions
+ *       - moved into separate module
+ */
 
 #include "monoclip.h"
 

@@ -1,18 +1,31 @@
 //
-// Created by omnis on 12/8/2025.
+// Created by Eugene
+// Build2 helper methods
 //
 
 #ifndef RAYLIB_LUA_IMGUI_BUILDMATH_H
 #define RAYLIB_LUA_IMGUI_BUILDMATH_H
 #include "monoclip.h"
-//
-// Created by omnis on 12/8/2025.
-//
+
 
 #define epsilon 0.0000001f
+#define epsilond 0.000001
+
+static const point3d right = {1,0,0};
+static const point3d forward = {0,1,0};
+static const point3d down = {0,0,1};
+
 static inline float vlen(point3d *p) {
     return sqrtf(p->x * p->x + p->y * p->y + p->z * p->z);
 }
+static inline float vlensquared(point3d *p) {
+    return (p->x * p->x + p->y * p->y + p->z * p->z);
+}
+/*
+*typedef struct {
+point3d p, r, d, f; // pos right down forward.
+} transform;
+*/
 
 static inline point3d subtract(point3d a, point3d b) {
     point3d p;
@@ -21,17 +34,36 @@ static inline point3d subtract(point3d a, point3d b) {
     p.z = a.z - b.z;
     return p;
 }
-static inline void addto(point3d *a, point3d b) {
+static inline void addto(point3d *a, const point3d b) {
     a->x += b.x;
     a->y += b.y;
     a->z += b.z;
 }
+static inline point3d sump3(point3d a, point3d b) {
+point3d r;
+    r.x=a.x+b.x;
+    r.y=a.y+b.y;
+    r.z=a.z+b.z;
+    return r;
+}
+
 static inline void rot90cwz(point3d *a) {
     float t = a->x;
     a->x = a->y;
     a->y = -t;
 }
-
+static void vscalar(point3d *p, float s) {
+    p->x*=s;
+    p->y*=s;
+    p->z*=s;
+}
+static point3d scaled(const point3d pt, float s) {
+point3d p = pt;
+    p.x*=s;
+    p.y*=s;
+    p.z*=s;
+    return p;
+}
 static inline void scalardivv(point3d *pt, float diver) {
     pt->x /= diver; pt->y /= diver; pt->z /= diver;
 }
@@ -49,6 +81,9 @@ static inline void normalize_transform(transform *tr) {
 }
 static inline bool issamexy(point3d a, point3d b) {
     return ((fabsf(a.x - b.x) + fabsf(a.y-b.y)) < epsilon);
+}
+static inline bool issamexyd(dpoint3d a, dpoint3d b) {
+    return ((fabs(a.x - b.x) + fabs(a.y-b.y)) < epsilond);
 }
 static inline point3d local_to_world_point(point3d local_pos, transform *tr) {
     point3d world;
@@ -139,6 +174,25 @@ static inline void wccw_transform_tr(dpoint3d *pinout, transform *ctin, transfor
     pinout->z = cx * ctout->r.z + cy * ctout->d.z + cz * ctout->f.z + ctout->p.z;
 }
 
+
+static inline transform world_to_local_transform_p(const transform tin, transform *totr) {
+    // World -> camera space (using ctin)
+    transform ret;
+    ret.p = world_to_local_point(tin.p, totr);
+    ret.r = world_to_local_vec(tin.r, totr);
+    ret.d = world_to_local_vec(tin.d, totr);
+    ret.f = world_to_local_vec(tin.f, totr);
+    return ret;
+}
+static inline transform local_to_world_transform_p(const transform tin, transform *tfrom) {
+    // World -> camera space (using ctin)
+    transform ret;
+    ret.p = local_to_world_point(tin.p, tfrom);
+    ret.r = local_to_world_vec(tin.r, tfrom);
+    ret.d = local_to_world_vec(tin.d, tfrom);
+    ret.f = local_to_world_vec(tin.f, tfrom);
+    return ret;
+}
 static inline void wccw_transform_trp(point3d *pinout, transform *ctin, transform *ctout) {
     // World -> camera space (using ctin)
     double dx = pinout->x - ctin->p.x;
@@ -299,4 +353,222 @@ static inline bool is_transform_flipped(transform* tr) {
     float det = dotp3(tr->r, cross);
     return det < 0.0f;
 }
+// --------------------- quats
+typedef struct {
+    float x, y, z, w;
+} quat;
+
+static inline quat quat_identity() {
+    quat q = {0.0f, 0.0f, 0.0f, 1.0f};
+    return q;
+}
+
+static inline quat quat_from_axis_angle(point3d axis, float angleDeg) {
+    float angleRad = angleDeg * 0.017453292519943295f; // deg to rad
+    float halfAngle = angleRad * 0.5f;
+    float s = sinf(halfAngle);
+
+    quat q;
+    q.x = axis.x * s;
+    q.y = axis.y * s;
+    q.z = axis.z * s;
+    q.w = cosf(halfAngle);
+    return q;
+}
+
+static inline quat quat_multiply(quat a, quat b) {
+    quat result;
+    result.w = a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z;
+    result.x = a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y;
+    result.y = a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x;
+    result.z = a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w;
+    return result;
+}
+
+static inline point3d quat_rotate_point(quat q, point3d p) {
+    float qx2 = q.x * 2.0f;
+    float qy2 = q.y * 2.0f;
+    float qz2 = q.z * 2.0f;
+    float qxqx2 = q.x * qx2;
+    float qyqy2 = q.y * qy2;
+    float qzqz2 = q.z * qz2;
+    float qxqy2 = q.x * qy2;
+    float qxqz2 = q.x * qz2;
+    float qyqz2 = q.y * qz2;
+    float qwqx2 = q.w * qx2;
+    float qwqy2 = q.w * qy2;
+    float qwqz2 = q.w * qz2;
+
+    point3d result;
+    result.x = p.x * (1.0f - qyqy2 - qzqz2) + p.y * (qxqy2 - qwqz2) + p.z * (qxqz2 + qwqy2);
+    result.y = p.x * (qxqy2 + qwqz2) + p.y * (1.0f - qxqx2 - qzqz2) + p.z * (qyqz2 - qwqx2);
+    result.z = p.x * (qxqz2 - qwqy2) + p.y * (qyqz2 + qwqx2) + p.z * (1.0f - qxqx2 - qyqy2);
+    return result;
+}
+
+static inline quat quat_slerp(quat a, quat b, float t) {
+    float dot = a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+
+    if (dot < 0.0f) {
+        b.x = -b.x; b.y = -b.y; b.z = -b.z; b.w = -b.w;
+        dot = -dot;
+    }
+
+    if (dot > 0.9995f) {
+        quat result;
+        result.x = a.x + t * (b.x - a.x);
+        result.y = a.y + t * (b.y - a.y);
+        result.z = a.z + t * (b.z - a.z);
+        result.w = a.w + t * (b.w - a.w);
+
+        float len = sqrtf(result.x * result.x + result.y * result.y + result.z * result.z + result.w * result.w);
+        result.x /= len; result.y /= len; result.z /= len; result.w /= len;
+        return result;
+    }
+
+    float theta = acosf(dot);
+    float sinTheta = sinf(theta);
+    float wa = sinf((1.0f - t) * theta) / sinTheta;
+    float wb = sinf(t * theta) / sinTheta;
+
+    quat result;
+    result.x = wa * a.x + wb * b.x;
+    result.y = wa * a.y + wb * b.y;
+    result.z = wa * a.z + wb * b.z;
+    result.w = wa * a.w + wb * b.w;
+    return result;
+}
+
+static inline void quat_to_transform(quat q, transform *tr) {
+    float x2 = q.x * 2.0f;
+    float y2 = q.y * 2.0f;
+    float z2 = q.z * 2.0f;
+    float xx2 = q.x * x2;
+    float yy2 = q.y * y2;
+    float zz2 = q.z * z2;
+    float xy2 = q.x * y2;
+    float xz2 = q.x * z2;
+    float yz2 = q.y * z2;
+    float wx2 = q.w * x2;
+    float wy2 = q.w * y2;
+    float wz2 = q.w * z2;
+
+    tr->r.x = 1.0f - yy2 - zz2;
+    tr->r.y = xy2 + wz2;
+    tr->r.z = xz2 - wy2;
+
+    tr->d.x = xy2 - wz2;
+    tr->d.y = 1.0f - xx2 - zz2;
+    tr->d.z = yz2 + wx2;
+
+    tr->f.x = xz2 + wy2;
+    tr->f.y = yz2 - wx2;
+    tr->f.z = 1.0f - xx2 - yy2;
+}
+
+static inline quat quat_from_transform(transform *tr) {
+    float trace = tr->r.x + tr->d.y + tr->f.z;
+    quat q;
+
+    if (trace > 0.0f) {
+        float s = sqrtf(trace + 1.0f) * 2.0f;
+        q.w = 0.25f * s;
+        q.x = (tr->d.z - tr->f.y) / s;
+        q.y = (tr->f.x - tr->r.z) / s;
+        q.z = (tr->r.y - tr->d.x) / s;
+    } else if (tr->r.x > tr->d.y && tr->r.x > tr->f.z) {
+        float s = sqrtf(1.0f + tr->r.x - tr->d.y - tr->f.z) * 2.0f;
+        q.w = (tr->d.z - tr->f.y) / s;
+        q.x = 0.25f * s;
+        q.y = (tr->d.x + tr->r.y) / s;
+        q.z = (tr->f.x + tr->r.z) / s;
+    } else if (tr->d.y > tr->f.z) {
+        float s = sqrtf(1.0f + tr->d.y - tr->r.x - tr->f.z) * 2.0f;
+        q.w = (tr->f.x - tr->r.z) / s;
+        q.x = (tr->d.x + tr->r.y) / s;
+        q.y = 0.25f * s;
+        q.z = (tr->f.y + tr->d.z) / s;
+    } else {
+        float s = sqrtf(1.0f + tr->f.z - tr->r.x - tr->d.y) * 2.0f;
+        q.w = (tr->r.y - tr->d.x) / s;
+        q.x = (tr->f.x + tr->r.z) / s;
+        q.y = (tr->f.y + tr->d.z) / s;
+        q.z = 0.25f * s;
+    }
+    return q;
+}
+static inline void qrotaxis(transform *tr, point3d axis, float angleDeg) {
+    point3d normAxis = normalizep3(axis);
+    quat rotation = quat_from_axis_angle(normAxis, angleDeg);
+
+    tr->r = quat_rotate_point(rotation, tr->r);
+    tr->d = quat_rotate_point(rotation, tr->d);
+    tr->f = quat_rotate_point(rotation, tr->f);
+}
+
+static inline void qrotwhole(transform *tr, point3d axis, point3d axisorigin, float angleDeg) {
+    point3d normAxis = normalizep3(axis);
+    quat rotation = quat_from_axis_angle(normAxis, angleDeg);
+
+    point3d offset = subtract(tr->p, axisorigin);
+    point3d rotatedOffset = quat_rotate_point(rotation, offset);
+    tr->p = sump3(axisorigin, rotatedOffset);
+
+    tr->r = quat_rotate_point(rotation, tr->r);
+    tr->d = quat_rotate_point(rotation, tr->d);
+    tr->f = quat_rotate_point(rotation, tr->f);
+}
+
+static inline void qrotslerp(transform *trsubj, transform *trto, float normt) {
+    quat qsubj = quat_from_transform(trsubj);
+    quat qto = quat_from_transform(trto);
+    quat result = quat_slerp(qsubj, qto, normt);
+
+    // Preserve original axis lengths
+    float rlen = vlen(&trsubj->r);
+    float dlen = vlen(&trsubj->d);
+    float flen = vlen(&trsubj->f);
+
+    quat_to_transform(result, trsubj);
+
+    scalardivv(&trsubj->r, vlen(&trsubj->r));
+    scalardivv(&trsubj->d, vlen(&trsubj->d));
+    scalardivv(&trsubj->f, vlen(&trsubj->f));
+
+    trsubj->r.x *= rlen; trsubj->r.y *= rlen; trsubj->r.z *= rlen;
+    trsubj->d.x *= dlen; trsubj->d.y *= dlen; trsubj->d.z *= dlen;
+    trsubj->f.x *= flen; trsubj->f.y *= flen; trsubj->f.z *= flen;
+}
+
+static inline void qrotlookat(transform *trsubj, point3d to, float normt) {
+    point3d dir = subtract(to, trsubj->p);
+    float len = vlen(&dir);
+    if (len < epsilon) return;
+
+    scalardivv(&dir, len);
+
+    point3d up = {0.0f, 0.0f, 1.0f};
+    point3d right = crossp3(up, dir);
+    float rightLen = vlen(&right);
+    if (rightLen < epsilon) {
+        up.x = 1.0f; up.y = 0.0f; up.z = 0.0f;
+        right = crossp3(up, dir);
+        rightLen = vlen(&right);
+    }
+    scalardivv(&right, rightLen);
+    up = crossp3(dir, right);
+
+    // Preserve original axis lengths
+    float rlen = vlen(&trsubj->r);
+    float dlen = vlen(&trsubj->d);
+    float flen = vlen(&trsubj->f);
+
+    transform target = *trsubj;
+    target.f.x = dir.x * flen; target.f.y = dir.y * flen; target.f.z = dir.z * flen;
+    target.r.x = right.x * rlen; target.r.y = right.y * rlen; target.r.z = right.z * rlen;
+    target.d.x = up.x * dlen; target.d.y = up.y * dlen; target.d.z = up.z * dlen;
+
+    qrotslerp(trsubj, &target, normt);
+}
+
 #endif //RAYLIB_LUA_IMGUI_BUILDMATH_H

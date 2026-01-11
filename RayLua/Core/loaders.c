@@ -1,6 +1,11 @@
-//
-// Created by omnis on 10/22/2025.
-//
+/*
+*       BUILD2 map loading module by Ken Silverman (http://advsys.net/ken)
+ *      This file has been modified from Ken Silverman's original release
+ *
+ *       Things changed (by Eugene):
+ *       - updated data structures and read all the needed info from duke nukem maps
+ *       - added compatibility storage to main types
+ */
 #include "loaders.h"
 
 #include "buildmath.h"
@@ -583,7 +588,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 						sec[i].grad[j].y = ((float)b7sec.surf[j].heinum)*(1.f/4096.f);
 					sur = &sec[i].surf[j];
 					sur->flags = 0;
-					if (b7sec.stat[j]&1) sur->flags |= (1<<16);
+					if (b7sec.stat[j]&1) sur->flags |= SURF_SEE_THROUGH; // parallax
 					sur->asc = 4096;
 					sur->rsc = (32-b7sec.surf[j].shade)*128;
 					sur->gsc = (32-b7sec.surf[j].shade)*128;
@@ -943,13 +948,13 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 				}
 
 
-				spr->fat = 0.f;
+				spr->phys.fat = 0.f;
 			//	spr->asc = 4096;
 			//	spr->rsc = (32-b7spr.shade)*128;
 			//	spr->gsc = (32-b7spr.shade)*128;
 			//	spr->bsc = (32-b7spr.shade)*128;
 
-				spr->mas = spr->moi = 1.0;
+				spr->phys.mas = spr->phys.moi = 1.0;
 				spr->owner = -1;
 
 
@@ -1099,7 +1104,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 			gnumtiles = 0; memset(gtilehashead,-1,sizeof(gtilehashead));
 
 			hitile++;
-			hitile =  3000;
+			hitile =  4000;
 			if (hitile > gmaltiles)
 			{
 				gmaltiles = hitile;

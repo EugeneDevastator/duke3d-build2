@@ -24,11 +24,15 @@
 //#include "MonoTest.hpp"
 //#include "luabinder.hpp"
 #include "DumbCore.hpp"
+#include "DumbEdit.hpp"
 #include "MonoTest.hpp"
 #include "raymath.h"
 #include "cmake-build-custom/_deps/raylib-src/src/external/glad.h"
 #include "DukeGame/source/dukewrap.h"
-
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
 
 extern "C" {
 #include "Core/loaders.h"
@@ -53,6 +57,98 @@ Shader lutShader = {0};
 Texture2D lutTexture = {0};
 float lutIntensity = 1.0f;
 CustomRenderTarget finalTarget = {0};
+ImGuiViewport* viewport;
+
+
+int file_exists(const char* path) {
+    FILE* file = fopen(path, "r");
+    if (file) {
+        fclose(file);
+        return 1;
+    }
+    return 0;
+}
+
+int has_extension(const char* path, const char* ext) {
+    const char* dot = strrchr(path, '.');
+    return dot && strcmp(dot, ext) == 0;
+}
+
+int check_tiles_art_exists(const char* dir_path) {
+    char pattern[512];
+    snprintf(pattern, sizeof(pattern), "%s/tiles*.art", dir_path);
+
+    // Simple check for tiles000.art as minimum requirement
+    char tiles_path[512];
+    snprintf(tiles_path, sizeof(tiles_path), "%s/tiles000.art", dir_path);
+    return file_exists(tiles_path);
+}
+
+void extract_directory(const char* filepath, char* dir_path, size_t dir_size) {
+    strncpy(dir_path, filepath, dir_size - 1);
+    dir_path[dir_size - 1] = '\0';
+
+    char* last_slash = strrchr(dir_path, '/');
+    char* last_backslash = strrchr(dir_path, '\\');
+    char* last_sep = (last_slash > last_backslash) ? last_slash : last_backslash;
+
+    if (last_sep) {
+        *last_sep = '\0';
+    } else {
+        strcpy(dir_path, ".");
+    }
+}
+
+bool loadifvalid() {
+    if (__argc < 2) {
+        printf("Error: No map file path provided\n");
+        return false;
+    }
+
+    const char* map_path = __argv[1];
+
+    // Check if path points to .map file
+    if (!has_extension(map_path, ".map")) {
+        printf("Error: File must have .map extension\n");
+        return false;
+    }
+
+    if (!file_exists(map_path)) {
+        printf("Error: Map file does not exist: %s\n", map_path);
+        return false;
+    }
+
+    // Extract directory from map path
+    char dir_path[512];
+    extract_directory(map_path, dir_path, sizeof(dir_path));
+
+    // Check for palette.dat
+    char palette_path[512];
+    snprintf(palette_path, sizeof(palette_path), "%s/palette.dat", dir_path);
+    if (!file_exists(palette_path)) {
+        printf("Error: palette.dat not found in %s\n", dir_path);
+        return false;
+    }
+
+    // Check for lookup.dat not needed actually!
+   //char lookup_path[512];
+   //snprintf(lookup_path, sizeof(lookup_path), "%s/lookup.dat", dir_path);
+   //if (!file_exists(lookup_path)) {
+   //    printf("Error: lookup.dat not found in %s\n", dir_path);
+   //    return false;
+   //}
+
+    // Check for at least one tiles*.art file
+    if (!check_tiles_art_exists(dir_path)) {
+        printf("Error: No tiles*.art files found in %s\n", dir_path);
+        return false;
+    }
+
+    DumbRender::Init(map_path);
+    return true;
+}
+
+
 
 void SetImguiFonts()
 {
@@ -141,7 +237,7 @@ void UpdateFreeCamera(FreeCamera* cam, float deltaTime) {
 }
 
 void VisualizeMapstate() {  //unused
-    DumbRender::Init();
+    DumbRender::Init("c:/Eugene/Games/build2/e3l3,map");
 
     auto map = DumbRender::GetMap();
     //InitWindow(1024, 768, "Mapstate Visualizer");
@@ -184,7 +280,6 @@ void VisualizeMapstate() {  //unused
 //DumbRender::TestRenderTextures();
 
         DrawImgui();
-        DisableCursor();
         DrawText("WASD: Move, Mouse: Look", 10, 10, 20, WHITE);
         DrawFPS(10, 40);
 
@@ -276,17 +371,111 @@ void CleanupLUTSystem() {
     UnloadTexture(lutTexture);
     UnloadCustomRenderTarget(finalTarget);
 }
+void DrawInfoUI() {
+    ImVec2 work_pos = viewport->WorkPos;
+    ImVec2 work_size = viewport->WorkSize;
+
+    // Set window position to upper right
+    ImVec2 window_pos = ImVec2(work_pos.x + work_size.x - 200.0f, work_pos.y + 10.0f);
+    ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always);
+
+    // Create window without title bar, resize, move, collapse
+    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoTitleBar |
+                                   ImGuiWindowFlags_NoResize |
+                                   ImGuiWindowFlags_NoMove |
+                                   ImGuiWindowFlags_NoCollapse |
+                                   ImGuiWindowFlags_AlwaysAutoResize;
+
+    ImGui::Begin("##info_panel", NULL, window_flags);
+    ImGui::Text("Q = pick & move");
+    ImGui::Text("` = discard");
+    ImGui::Text("L = sprite to light");
+    ImGui::Text("C = pick Color");
+    ImGui::End();
+}
+
+bool showPicker = false;
+typedef struct {
+    unsigned char r, g, b;
+    signed short luminance;
+} ColorData;
+
+ColorData currentColor = {255, 255, 255, 4000};
+
+void DrawPicker() {
+    ImVec2 work_pos = viewport->WorkPos;
+    ImVec2 work_size = viewport->WorkSize;
+
+    ImVec2 window_pos = ImVec2(work_pos.x + work_size.x * 0.5f - 150.0f, work_pos.y + work_size.y * 0.5f - 100.0f);
+    ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(400.0f, 400.0f), ImGuiCond_Always);
+
+    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+
+    if (ImGui::Begin("Color Picker", &showPicker, window_flags)) {
+        float rgb[3] = {currentColor.r / 255.0f, currentColor.g / 255.0f, currentColor.b / 255.0f};
+
+        // Main color picker with only hue bar and saturation/value square
+        ImGui::BeginGroup();
+        if (ImGui::ColorPicker3("##picker", rgb,
+            ImGuiColorEditFlags_PickerHueBar |
+            ImGuiColorEditFlags_NoSidePreview |
+            ImGuiColorEditFlags_NoInputs |
+            ImGuiColorEditFlags_NoAlpha)) {
+            currentColor.r = (unsigned char)(rgb[0] * 255.0f);
+            currentColor.g = (unsigned char)(rgb[1] * 255.0f);
+            currentColor.b = (unsigned char)(rgb[2] * 255.0f);
+            }
+        ImGui::EndGroup();
+
+        // Vertical luminance bar on the right
+        ImGui::SameLine();
+        ImGui::BeginGroup();
+        ImGui::Text("Lum");
+        int lum = currentColor.luminance;
+        ImGui::PushStyleVar(ImGuiStyleVar_GrabMinSize, 10.0f);
+        if (ImGui::VSliderInt("##luminance", ImVec2(20.0f, 150.0f), &lum, -32767, 32767)) {
+            currentColor.luminance = (signed short)lum;
+        }
+        ImGui::PopStyleVar();
+        ImGui::EndGroup();
+
+        ImGui::Spacing();
+        if (ImGui::Button("Close")) {
+            showPicker = false;
+        }
+        ImGui::End();
+    }
+}
+
+/* priority orderring list
+ * 0. make ap exit
+1. hdr lights
+2. sprites from portals
+3. render atest and sprite ordering
+4. extrusion ops
+5. floor ceil wall move
+6. linux build
+7. 4. light+portals
+8. 5. duke game fix
+9. 6. release polish
+10. 7. floor ceil ports mono fix
+11. 8. palforms
+
+-- draw original wall on portal failures.
+*/
+
 // Draw palette and texture preview on screen
 void MainLoop()
 {
-    DisableCursor();
-
-    DumbRender::Init();
+    //    if (!loadifvalid())
+ //       return;
+    DumbRender::Init("c:/Eugene/Games/build2/prt31.map");
     auto map = DumbRender::GetMap();
     DumbCore::Init(map);
     SetTargetFPS(60);
     DumbRender::LoadTexturesToGPU();
-
+    InitEditor(map);
     // Initialize LUT system
     InitLUTSystem();
 
@@ -296,18 +485,24 @@ void MainLoop()
     CustomRenderTarget combinedTarget = CreateCustomRenderTarget(GetScreenWidth(), GetScreenHeight(), 0);
     int w = GetScreenWidth();
     int h = GetScreenHeight();
+    showPicker = false;
+    DisableCursor();
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
-        DumbCore::Update(deltaTime);
-
+#if !IS_DUKE_INCLUDED
+        EditorFrameMin();
+#endif
         // Render albedo pass
         BeginCustomRenderTarget(albedoTarget);
+
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
         ClearBackground(BLACK);
+        if (!showPicker) DumbCore::Update(deltaTime);
 
         BeginMode3D(*DumbCore::GetCamera());
-        DumbRender::ProcessKeys();
+
+        if (!showPicker) { DumbRender::ProcessKeys(); }
         DumbRender::DrawKenGeometry(GetScreenWidth(), GetScreenHeight(), DumbCore::GetCamera());
         DumbRender::DrawMapstateTex(*DumbCore::GetCamera());
         EndMode3D();
@@ -318,7 +513,9 @@ void MainLoop()
         glClear(GL_COLOR_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
         glDepthMask(GL_FALSE);
+        // batching improves perf significantly, so atlases are way to go
         DumbRender::DrawLightsPost3d(w,h,*DumbCore::GetCamera());
+       // DumbRender::DrawPost3d(w,h,*DumbCore::GetCamera());
         glDepthMask(GL_TRUE);
         EndCustomRenderTarget();
 
@@ -326,8 +523,6 @@ void MainLoop()
         BeginCustomRenderTarget(combinedTarget);
         glClear(GL_COLOR_BUFFER_BIT);
         glDisable(GL_DEPTH_TEST);
-
-
 
         // Draw albedo
         DrawTextureRec({albedoTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
@@ -339,7 +534,7 @@ void MainLoop()
         DrawTextureRec({lightTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
                       {0, 0, (float)w, (float)-h}, {0, 0}, WHITE);
         EndBlendMode();
-
+        DrawFPS(10, 10);
         EndCustomRenderTarget();
 
         // Apply LUT to final result
@@ -359,9 +554,34 @@ void MainLoop()
         // Final draw to screen
         BeginDrawing();
         ClearBackground(BLACK);
-
+        // draw frame;
         DrawTextureRec({finalTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
                       {0, 0, (float)w, (float)-h}, {0, 0}, WHITE);
+        if (IsKeyPressed(KEY_ESCAPE))
+            DisableCursor();
+#if !IS_DUKE_INCLUDED
+        // IMGUI SECTION
+        viewport = ImGui::GetMainViewport();
+        rlImGuiBegin();
+        DrawInfoUI();
+        if (showPicker) {
+            DrawPicker();
+            SetColorum(currentColor.r, currentColor.g, currentColor.b, currentColor.luminance);
+        }
+        if (IsKeyPressed(KEY_L)) {
+            SetColorum(currentColor.r, currentColor.g, currentColor.b, currentColor.luminance);
+        }
+        if (IsKeyPressed(KEY_C)) {
+            showPicker = !showPicker;
+            if (showPicker) {
+                EnableCursor();
+            } else {
+                DisableCursor();
+            }
+        }
+
+        rlImGuiEnd();
+#endif
 
         EndDrawing();
     }
@@ -378,6 +598,7 @@ void MainLoop()
 int main() {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
     InitWindow(1024, 768, "Raylib + Lua + ImGui");
+    SetExitKey(KEY_NULL);
     SetTargetFPS(120);
     rlImGuiSetup(true);
    // LuaBinder::Init();
@@ -393,6 +614,9 @@ int main() {
     //MapTest();
 
     while (!WindowShouldClose()) {
+        if (IsKeyPressed(KEY_ESCAPE) && IsKeyPressed(KEY_LEFT_ALT))
+            break;
+
        // if (watcher.HasChanged()) {
           //  LuaBinder::LoadScript();
        // }

@@ -26,7 +26,7 @@ extern unsigned int *shadowtest2_sectgot;
 /** Light polygon data for shadow casting */
 typedef struct
 {
-    int vert0, b2sect, b2wall, b2slab, b2hashn;
+    int vert0, b2sect, b2wall, b2slab, b2hashn, tristart, tricnt;
 } ligpol_t;
 /** Light source definition and shadow polygon storage */
 typedef struct {
@@ -34,7 +34,7 @@ typedef struct {
     int sect, sprilink;                 // Current sector and sprite link index
     float rgb[3], spotwid;              // RGB intensity and spotlight width (-1=omnidirectional)
     int flags;                          // Bit flags: &1=use shadows, &(1<<31)=moved this frame
-
+    float lum;
     // Sector visibility tracking for this light
     unsigned int *sectgot, *sectgotmal; // Bit array of sectors illuminated by this light
     int sectgotn;                       // Number of sectors in bit array
@@ -44,8 +44,10 @@ typedef struct {
     int lighasheadn;                    // Size of hash table
     ligpol_t *ligpol;                   // Light polygon match info array
     int ligpoln, ligpolmal;             // Count and allocated size of ligpol array
-    point3d *ligpolv;                   // Vertices for light polygon geometry
-    int ligpolvn, ligpolvmal;           // Count and allocated size of ligpolv array
+    dpoint3d *ligpolv;                   // Vertices for light polygon geometry
+    int ligpolvn, ligpolvmal;
+
+    // Count and allocated size of ligpolv array
 } lightpos_t;
 
 
@@ -66,8 +68,7 @@ typedef struct {
     point3d norm;                       // Surface normal vector
     int rdepth;
     // triangulation data
-    int* indices;
-    int tridx, nid; // start ids and num of indice
+    int triidstart, tricnt; // start ids and num of indice
     bool hasuvs;
     int8_t isflor;
     // uv data
@@ -81,10 +82,10 @@ typedef struct {
 
 typedef struct {
     union {
-        point3d wpos; // true world pos after all transforms
-        struct { float x, y, z; }; // compat.
+        dpoint3d wpos; // true world pos after all transforms
+        struct { double x, y, z; }; // compat.
     };
-    dpoint3d uvpos; // world pos in original space;
+    dpoint3d uvpos; // world pos in original map space;
 
 } vert3d_t;
 // ================================================================================================
@@ -97,15 +98,17 @@ extern int shadowtest2_numlights;               // Current number of active ligh
 extern int shadowtest2_useshadows;              // Global shadow enable flag
 extern int shadowtest2_numcpu;                  // Number of CPU threads to use
 extern float shadowtest2_ambrgb[3];             // Ambient light RGB values
-
+extern uint32_t* ligpoli;
 // Sector visibility tracking
 extern unsigned int *shadowtest2_sectgot;       // Global sector visibility bit array
 extern int shadowtest2_sectgotn;                // Size of global sector bit array
-
+extern int focusedSprite;
 // Rendering mode control
 extern int shadowtest2_rendmode;                // Current rendering mode (0-4)
 extern eyepol_t *eyepol; // 4096 eyepol_t's = 192KB
-extern vert3d_t *eyepolv; //16384 point2d's  = 128KB
+extern uint32_t *eyepoli; // 4096 eyepol_t's = 192KB
+extern dpoint3d *eyepolv; //16384 point2d's  = 128KB
+extern dpoint3d *eyepolvori; //16384 point2d's  = 128KB
 extern int eyepoln, glignum;
 extern int eyepolmal, eyepolvn, eyepolvmal;
 

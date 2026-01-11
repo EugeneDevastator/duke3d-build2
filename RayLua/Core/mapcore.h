@@ -47,6 +47,10 @@ typedef struct {
 	union { transform tr; struct { point3d p, r, d, f; }; };
 	point3d h;
 	int cursect;
+	float fov_h;           // Horizontal FOV in radians
+	float fov_v;           // Vertical FOV in radians
+	float persp_h;         // Horizontal perspectiveness [0.0-1.0]
+	float persp_v;
 } cam_t;
 
 
@@ -316,7 +320,9 @@ static void updatesect_imp (float x, float y, float z, int *cursect, mapstate_t*
 			{ (*cursect) = s; return; }
 	}
 }
-
+static void updatesect_p (point3d p, int *cursect, mapstate_t* map) {
+	updatesect_imp(p.x ,p.y ,p.z, cursect, map);
+}
 //s: sector of sprites to check
 //Pass -1 to check and compact all valid sprites
 static void checksprisect_imp (int s, mapstate_t *map)

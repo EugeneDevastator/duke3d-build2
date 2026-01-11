@@ -6,6 +6,7 @@ add_executable(RayGame
         ${C_HEADERS}
         ${C_SOURCES}
         MonoTest.hpp
+        DumbEdit.hpp
 )
 
 add_shared_definitions(RayGame)

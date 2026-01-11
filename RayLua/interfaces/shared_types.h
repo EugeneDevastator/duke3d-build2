@@ -16,11 +16,24 @@ int name##n = 0; \
 int name##mal = 0; \
 int name##siz = sizeof(typ)
 
+#define ARENA_WRAPPED(typ, name) \
+typ* name; \
+int name##n; \
+int name##mal; \
+int name##siz
+
+#define ARENA_INIT_WRAP(typ, name,wrap) \
+wrap.name = NULL; \
+wrap.name##n =0; \
+wrap.name##mal =0; \
+wrap.name##siz = sizeof(typ)
+
+
 // Add and assign value to arena, returns pointer to new element
 // Expand arena to hold at least 'count' total elements
 #define ARENA_EXPAND(name, count) \
 do { \
-if ((name##mal+count) > name##mal) { \
+if ((name##n+count) > name##mal) { \
 name##mal += (count); \
 name = realloc(name, name##mal * name##siz); \
 } \
@@ -52,7 +65,39 @@ name##mal = 0; \
 
 // Reset without freeing
 #define ARENA_RESET(name) (name##n = 0)
+// --------------- struct arena --------------------
 
+#define ARENAST_DECLARE(typ, name) \
+struct { \
+typ* data; \
+int count; \
+int capacity; \
+} name = {0}
+
+#define ARENAST_EXPAND(arena, needed) \
+do { \
+if ((arena).count + (needed) > (arena).capacity) { \
+(arena).capacity = ((arena).count + (needed)) * 2; \
+(arena).data = realloc((arena).data, (arena).capacity * sizeof(*(arena).data)); \
+} \
+} while(0)
+
+#define ARENAST_PUSH(arena) \
+(((arena).count >= (arena).capacity) ? \
+((arena).capacity = (arena).capacity ? (arena).capacity * 2 : 16, \
+(arena).data = realloc((arena).data, (arena).capacity * sizeof(*(arena).data))) : (arena).data, \
+&(arena).data[(arena).count++])
+
+#define ARENAST_ADD(arena, val) \
+(*(ARENA_PUSH(arena)) = (val), &(arena).data[(arena).count-1])
+
+#define ARENAST_FREE(arena) \
+do { \
+free((arena).data); \
+(arena) = (typeof(arena)){0}; \
+} while(0)
+
+#define ARENAST_RESET(arena) ((arena).count = 0)
 // ------------------------------------------------
 // duke tags defs.
 #define MT_LAST 15 // index, not count
@@ -149,6 +194,8 @@ name##mal = 0; \
 #define SPRITE_B2_ONE_SIDED        (1 << 6)   // 64
 #define SPRITE_B2_IS_LIGHT     (1 << 16)   // 64
 
+#define SURF_SEE_THROUGH (1<<16) // for parallax
+
 #define UV_TEXELRATE 		0 // pixel-rated = duke default.
 #define UV_NORMRATE 		1 // tile-rated
 #define UV_TEXELFIT 		2 // fit preserving texelrate
@@ -240,11 +287,7 @@ static inline float GetPxOffsetHorizontal(int ypan) {
 typedef struct { float x, y, z; } point3d;
 typedef struct { double x, y, z; } dpoint3d; 	//Note: pol doesn't support loops as dpoint3d's!
 typedef struct { float x, y; } point2d;
-static void vscalar(point3d *p, float s) {
-	p->x*=s;
-	p->y*=s;
-	p->z*=s;
-}
+
 typedef struct {
 	point3d p, r, d, f;
 } transform;
@@ -282,19 +325,30 @@ typedef struct {
 	point3d color;
 	int16_t lum; // yes allow negative values, why not.
 	uint8_t pal;
+	uint16_t tilnum;
+	uint8_t tilset; // sortof mod id
 } sprview;
+
+typedef struct {
+	point3d v, av;           //Position velocity, Angular velocity (direction=axis, magnitude=vel)
+	float fat, mas, moi;     //Physics (moi=moment of inertia)
+	uint16_t clipmask; // block, hitscan, trigger, - for physics engine // aka layer
+} physdata;
+// on asset loadin.
+// art collection id + tilenum ==> runtime atlasnum and atlaspos.
+// art collections are separate from mods, and mods depend on their id so match is coincidental!
+// art collection have formats: art, waf, pngs.
+// inside it resolves into raw array of rgba images.
+// then packed into atlases
+// then lookup tables are made.
 	//Map format:
 
-typedef struct
+typedef struct // surf_t
 {
 	long tilnum, tilanm ;/*???*/
-
 	//Bit0:Blocking, Bit2:RelativeAlignment, Bit5:1Way, Bit16:IsParallax, Bit17:IsSkybox
-	uint32_t flags;
-
-	short lotag, hitag;
-
-	uint8_t pal; // temporary pal storage
+	uint32_t flags;	short lotag, hitag;
+	uint8_t pal;
 	float alpha;
 	float uvform[9]; // scale xy, pan xy, crop AB, rotation
 	union{
@@ -319,8 +373,9 @@ typedef struct
 
 } surf_t;
 
-typedef struct
+typedef struct // wall t
 {
+	uint32_t guid; // unique per wall. surfs alway follow top-bottom order.
 	union {
 		point2d pos;
 		struct {
@@ -354,11 +409,11 @@ typedef struct
 
 } wall_t;
 
-typedef struct
+typedef struct // spri_t
 {
+	uint32_t guid; // uniq per sprite. automatic.
 	union { transform tr; struct { point3d p, r, d, f; }; };
-	point3d v, av;           //Position velocity, Angular velocity (direction=axis, magnitude=vel)
-	float fat, mas, moi;     //Physics (moi=moment of inertia)
+
 	long tilnum;             //Model file. Ex:"TILES000.ART|64","CARDBOARD.PNG","CACO.KV6","HAND.KCM","IMP.MD3"
 	long owner;
 	short lotag, hitag;
@@ -366,29 +421,32 @@ typedef struct
 	// to access next or prev sprite in sector of this sprite..
 	long sectn, sectp; // doubly-linked list of indices
 	int32_t tags[16];
-
 	long tim, otim;          //Time (in milliseconds) for animation
 
 	//Bit0:Blocking, Bit2:1WayOtherSide, Bit5,Bit4:Face/Wall/Floor/.., Bit6:1side, Bit16:IsLight, Bit17-19:SpotAx(1-6), Bit20-29:SpotWid, Bit31:Invisible
-	long flags;  // temporary pal storage
-	///
+	long flags;
 	uint8_t modid; // mod id - for game processors, like duke, doom, etc. 0 is reserved for core entities.
 	uint16_t classid; // instead of implicit class recognition by spritenum or pal - use explicit. so for ex. we can just make 3d rpg rocket as prop.
-	uint8_t clipmask; // block, hitscan, trigger, - for physics engine
 	uint8_t linkmask; // damage, signal, use, - everything for linking with other communicators
+
 	sprview view;
+	physdata phys;
 } spri_t;
 
 typedef struct
 {
-	float minx, miny, maxx, maxy; //bounding box
+	// BuildEngine base data
+	uint32_t guid; // uniq per sector
 	float z[2];      //ceil&flor height
 	point2d grad[2]; //ceil&flor grad. grad.x = norm.x/norm.z, grad.y = norm.y/norm.z
 	surf_t surf[2];  //ceil&flor texture info
 	wall_t *wall;
 	long n, nmax;    //n:numwalls, nmax:walls malloced (nmax >= n)
 	long headspri;   //hd sprite index (-1 if none)
-	long foglev;
+	float minx, miny, maxx, maxy; //bounding box
+
+	// other
+
 	long owner;      //for dragging while editing, other effects during game
 	int32_t tags[16];
 	uint16_t mflags[4];
