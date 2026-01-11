@@ -18,6 +18,9 @@ static const point3d down = {0,0,1};
 static inline float vlen(point3d *p) {
     return sqrtf(p->x * p->x + p->y * p->y + p->z * p->z);
 }
+static inline float vlensquared(point3d *p) {
+    return (p->x * p->x + p->y * p->y + p->z * p->z);
+}
 /*
 *typedef struct {
 point3d p, r, d, f; // pos right down forward.
