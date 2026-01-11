@@ -1,6 +1,11 @@
-//
-// Created by omnis on 11/8/2025.
-//
+/*
+*       BUILD2 Physics module by Ken Silverman (http://advsys.net/ken)
+ *      This file has been modified from Ken Silverman's original release
+ *
+ *       Things added:
+ *       - content moved to separate file
+ *       - minimal structure updates
+ */
 #include "physics.h"
 
 #include "mapcore.h"

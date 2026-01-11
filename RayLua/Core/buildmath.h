@@ -1,13 +1,12 @@
- //
-// Created by omnis on 12/8/2025.
+//
+// Created by Eugene
+// Build2 helper methods
 //
 
 #ifndef RAYLIB_LUA_IMGUI_BUILDMATH_H
 #define RAYLIB_LUA_IMGUI_BUILDMATH_H
 #include "monoclip.h"
-//
-// Created by omnis on 12/8/2025.
-//
+
 
 #define epsilon 0.0000001f
 #define epsilond 0.000001

@@ -1,6 +1,10 @@
-//
-// Created by omnis on 10/25/2025.
-//
+/*
+*       BUILD2 Art Loading moduykle by Ken Silverman (http://advsys.net/ken)
+ *      This file has been modified from Ken Silverman's original release
+ *
+ *       Things changd:
+ *       - moved into separate module
+ */
 #include "artloader.h"
 
 #include <string.h>

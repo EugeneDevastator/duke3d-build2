@@ -1,5 +1,5 @@
- // MONOCLIP - Monotone Polygon Clipping Library (by Ken Silverman)
-//
+// MONOCLIP - Monotone Polygon Clipping Library (by Ken Silverman)
+// updated by Eugene Bolshakow
 // This module implements efficient 2D/3D polygon clipping operations using monotone polygon
 // decomposition. It provides boolean operations (AND, SUB, SUB_REV) on polygons and handles
 // polygon intersection, union, and difference calculations.

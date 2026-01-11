@@ -1,6 +1,11 @@
-//
-// Created by omnis on 10/22/2025.
-//
+/*
+*       BUILD2 map loading module by Ken Silverman (http://advsys.net/ken)
+ *      This file has been modified from Ken Silverman's original release
+ *
+ *       Things changed (by Eugene):
+ *       - updated data structures and read all the needed info from duke nukem maps
+ *       - added compatibility storage to main types
+ */
 #include "loaders.h"
 
 #include "buildmath.h"

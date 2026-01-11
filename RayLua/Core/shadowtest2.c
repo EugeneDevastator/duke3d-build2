@@ -1,3 +1,14 @@
+/*
+ *       BUILD2 engine by Ken Silverman (http://advsys.net/ken)
+ *       This file has been modified from Ken Silverman's original release
+ *
+ *       Things added:
+ *       - True portal handling
+ *       - changed way polygons are outputted
+ *       - lots of data structures were refactored
+ *       - transient context for rendering introduced
+ */
+
 #include "monoclip.h"
 #include "shadowtest2.h"
 

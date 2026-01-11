@@ -448,12 +448,29 @@ void DrawPicker() {
     }
 }
 
+/* priority orderring list
+ * 0. make ap exit
+1. hdr lights
+2. sprites from portals
+3. render atest and sprite ordering
+4. extrusion ops
+5. floor ceil wall move
+6. linux build
+7. 4. light+portals
+8. 5. duke game fix
+9. 6. release polish
+10. 7. floor ceil ports mono fix
+11. 8. palforms
+
+-- draw original wall on portal failures.
+*/
+
 // Draw palette and texture preview on screen
 void MainLoop()
 {
-    if (!loadifvalid())
-        return;
-//    DumbRender::Init("c:/Eugene/Games/build2/e3l3.map");
+    //    if (!loadifvalid())
+ //       return;
+    DumbRender::Init("c:/Eugene/Games/build2/prt31.map");
     auto map = DumbRender::GetMap();
     DumbCore::Init(map);
     SetTargetFPS(60);
@@ -472,12 +489,12 @@ void MainLoop()
     DisableCursor();
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
-
-
-
+#if !IS_DUKE_INCLUDED
         EditorFrameMin();
+#endif
         // Render albedo pass
         BeginCustomRenderTarget(albedoTarget);
+
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
         ClearBackground(BLACK);
@@ -540,13 +557,13 @@ void MainLoop()
         // draw frame;
         DrawTextureRec({finalTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
                       {0, 0, (float)w, (float)-h}, {0, 0}, WHITE);
-
+        if (IsKeyPressed(KEY_ESCAPE))
+            DisableCursor();
+#if !IS_DUKE_INCLUDED
         // IMGUI SECTION
         viewport = ImGui::GetMainViewport();
         rlImGuiBegin();
-
         DrawInfoUI();
-
         if (showPicker) {
             DrawPicker();
             SetColorum(currentColor.r, currentColor.g, currentColor.b, currentColor.luminance);
@@ -564,6 +581,7 @@ void MainLoop()
         }
 
         rlImGuiEnd();
+#endif
 
         EndDrawing();
     }
