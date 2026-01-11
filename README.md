@@ -3,7 +3,6 @@ Welcome to the repo of second life of Build2
 Build 2 by Ken Silverman: https://www.advsys.net/ken/build.htm
 This is port of the engine onto raylib and hardware render.
 
-/!\ Work is actively in progress /!\
 (also im looking for a job, any jobs pls?)
 
 # License info
