@@ -18,6 +18,8 @@ The forward direction can be visualized as moving away from the camera or viewer
 
 #ifndef RAYLIB_LUA_IMGUI_DUMBRENDER_H
 #define RAYLIB_LUA_IMGUI_DUMBRENDER_H
+
+
 #include "DumbCore.hpp"
 #include "renderhelper.h"
 
@@ -27,7 +29,7 @@ The forward direction can be visualized as moving away from the camera or viewer
 #include "monoclip.h"
 #include "shadowtest2.h"
 #include "buildmath.h"
-}
+  }
 
 
 #include "raylib.h"
@@ -94,11 +96,13 @@ static bool syncam = true;
 static int cureyepoly = 0;
 static int mono_cursnap = 0;
 static int mono_curchain = 0;
+static cam_t localb2cam;
 class DumbRender
 {
 
 
 public:
+
     static mapstate_t* GetMap()
     {
         return map;
@@ -819,8 +823,9 @@ float scaler = 0.01;
         }
         rlEnd();
     }
+
 static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
-        cam_t localb2cam;
+
         if (syncam) {
             camfromrl(&plr.tri, camsrc);
             int ported = updatesect_portmove(&plr.tri, &plr.cursect, map);
@@ -893,21 +898,7 @@ static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
             operstopn--;
         }
 
-        float mv = GetMouseWheelMove();
-        if (focusedSprite >=0) {
-            transform* sptr = &map->spri[focusedSprite].tr;
-            qrotaxis(sptr, sptr->r, mv);
 
-            Vector3 pos = buildToRaylibPos(sptr->p);
-            Vector3 fw = buildToRaylibPos(sptr->r);
-            Vector3 rg = buildToRaylibPos(sptr->d);
-            Vector3 dw = buildToRaylibPos(sptr->f);
-            float l = Vector3Length(rg);
-            Vector3 bbmin = pos + Vector3{l,l,l};
-            Vector3 bbmax = pos - Vector3{l,l,l};
-            DrawBoundingBox({bbmax,bbmin}, LIME);
-         //   addto(&map->spri[focusedSprite].tr.p,scaled(right,mv));
-        }
     }
     static void DrawPost3d(float sw, float sh, Camera3D camsrc) {
         // Vector2 v1 = {0, 0};

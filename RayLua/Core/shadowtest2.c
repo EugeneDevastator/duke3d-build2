@@ -1878,7 +1878,6 @@ void reset_context() {
 }
 
 int lastvalidsec = 0;
-int focusedSprite=-1;
 void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy) {
 	bdrawctx bs;
 	loopnum = 0;
@@ -1900,17 +1899,6 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy) {
 	int sec=-1,wal=-1,spr =-1;
 	point3d hit;
 	point3d f = sump3(cc->p,cc->f);
-
-	//this raycast works.
-	raycast(&cc->p,&cc->f,1e32,cc->cursect,&sec,&wal,&spr,&hit,map);
-	//hitscan_b2(&cc->p,&cc->f,&cc->r,&cc->d,1e32,cc->cursect,&sec,&wal,&hit,map);
-	//if (wal>=0 && sec>=0)
-	//	map->sect[sec].wall[wal].xsurf[0].tilnum=2;
-	if (spr>=0) {
-		//map->spri[spr].tilnum=2;
-		focusedSprite = spr;
-	}
-
 
 	draw_hsr_polymost_ctx(map, &bs);
 }

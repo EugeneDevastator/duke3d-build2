@@ -559,6 +559,7 @@ void MainLoop()
                       {0, 0, (float)w, (float)-h}, {0, 0}, WHITE);
         if (IsKeyPressed(KEY_ESCAPE))
             DisableCursor();
+
 #if !IS_DUKE_INCLUDED
         // IMGUI SECTION
         viewport = ImGui::GetMainViewport();
@@ -614,7 +615,7 @@ int main() {
     //MapTest();
 
     while (!WindowShouldClose()) {
-        if (IsKeyPressed(KEY_ESCAPE) && IsKeyPressed(KEY_LEFT_ALT))
+        if (IsKeyPressed(KEY_ESCAPE) && IsKeyPressed(KEY_LEFT_SHIFT))
             break;
 
        // if (watcher.HasChanged()) {

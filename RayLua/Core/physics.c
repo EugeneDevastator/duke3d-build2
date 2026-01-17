@@ -11,6 +11,7 @@
 #include "mapcore.h"
 clipdata build2;
 // version with simplified sprite checking. temporary, before sprite visualization is reworked. or colliders implementd
+// *hitwall: -2 for floor, -1 for ceiling
 int raycast(point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, int *hitwall, int *hitsprite,
             point3d *hit, mapstate_t *map) {
 	sect_t *sec;

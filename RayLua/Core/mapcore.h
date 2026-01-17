@@ -55,6 +55,7 @@ typedef struct {
 
 
 #endif
+typedef struct { int w, s; } wall_idx;
 
 typedef struct { int w, s; } vertlist_t;
 typedef struct { float x, y, z, u, v; int n; } kgln_t;
@@ -87,6 +88,7 @@ typedef struct {
 	uint8_t kind;
 } portal;
 
+static wall_t* getwall(wall_idx idx, mapstate_t * map) { return &map->sect[idx.s].wall[idx.w]; };
 
 extern uint16_t portaln;
 extern portal portals[100];
@@ -111,6 +113,7 @@ double roundcylminpath2 (double a0x, double a0y, double a1x, double a1y,
                          double b0x, double b0y, double b1x, double b1y);
 long wallclippol (kgln_t *pol, kgln_t *npol);
 int dupwall_imp (sect_t *s, int w);
+int getwallsofvert (int s, int w, wall_idx *ver, int maxverts, mapstate_t *map);
 long sect_isneighs_imp (int s0, int s1, mapstate_t* map);
 double getslopez (sect_t *s, int i, double x, double y);
 double getslopezpt(sect_t *s, int isflor, point2d pos);

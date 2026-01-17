@@ -277,8 +277,57 @@ int wallprev (sect_t *s, int w)
 	}
 #endif
 }
+
 // Gets all sectors/walls that share the same vertex point
 // Finds all walls that meet at the same corner point
+int getwallsofvert (int s, int w, wall_idx *ver, int maxverts, mapstate_t *map)
+{
+	sect_t *sec;
+	float x, y;
+	int i, ir, iw, ns, nw;
+
+	if ((maxverts <= 0) || ((unsigned)s >= (unsigned)map->numsects)) return(0);
+	if ((unsigned)w >= (unsigned)map->sect[s].n) return(0);
+
+	ver[0].s = s; ver[0].w = w; if (maxverts == 1) return(1);
+	sec = map->sect;
+	x = sec[s].wall[w].x;
+	y = sec[s].wall[w].y;
+	ir = 0; iw = 1;
+	do
+	{
+		//CCW next sect
+		ns = sec[s].wall[w].ns;
+		if (ns >= 0)
+		{
+			nw = sec[s].wall[w].nw;
+			if ((sec[ns].wall[nw].x != x) || (sec[ns].wall[nw].y != y)) nw += sec[ns].wall[nw].n;
+			for(i=iw-1;i>=0;i--)
+				if ((ver[i].s == ns) && (ver[i].w == nw)) break;
+			if ((i < 0) && (sec[ns].wall[nw].x == x) && (sec[ns].wall[nw].y == y))
+			{ ver[iw].s = ns; ver[iw].w = nw; iw++; if (iw >= maxverts) break; }
+		}
+
+		//CW next sect
+		w = wallprev(&sec[s],w);
+		ns = sec[s].wall[w].ns;
+		if (ns >= 0)
+		{
+			nw = sec[s].wall[w].nw;
+			if ((sec[ns].wall[nw].x != x) || (sec[ns].wall[nw].y != y)) nw += sec[ns].wall[nw].n;
+			for(i=iw-1;i>=0;i--)
+				if ((ver[i].s == ns) && (ver[i].w == nw)) break;
+			if ((i < 0) && (sec[ns].wall[nw].x == x) && (sec[ns].wall[nw].y == y))
+			{ ver[iw].s = ns; ver[iw].w = nw; iw++; if (iw >= maxverts) break; }
+		}
+
+		if (ir >= iw) break;
+		s = ver[ir].s; w = ver[ir].w; ir++;
+	} while (1);
+	return(iw);
+}
+
+
 int getverts_imp (int s, int w, vertlist_t *ver, int maxverts, mapstate_t *map)
 {
 	sect_t *sec;
