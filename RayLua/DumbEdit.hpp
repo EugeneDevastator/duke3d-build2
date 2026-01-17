@@ -315,8 +315,9 @@ void DrawGizmos(){
 		Vector3 bbmax = pos - Vector3{l,l,l};
 		DrawBoundingBox({bbmax,bbmin}, LIME);
 		//   addto(&map->spri[focusedSprite].tr.p,scaled(right,mv));
-		DrawPoint3D(buildToRaylibPos(hoverfoc.hitpos), RED);
 	}
+	DrawPoint3D(buildToRaylibPos(hoverfoc.hitpos), RED);
+
 }
 void EditorFrame() {
 	if (ctx.mode == Fly) {

@@ -489,7 +489,9 @@ void MainLoop()
     DisableCursor();
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
+
 #if !IS_DUKE_INCLUDED
+        Editor_DoRaycasts(&localb2cam);
         EditorFrameMin();
 #endif
         // Render albedo pass
@@ -505,6 +507,7 @@ void MainLoop()
         if (!showPicker) { DumbRender::ProcessKeys(); }
         DumbRender::DrawKenGeometry(GetScreenWidth(), GetScreenHeight(), DumbCore::GetCamera());
         DumbRender::DrawMapstateTex(*DumbCore::GetCamera());
+        DrawGizmos();
         EndMode3D();
         EndCustomRenderTarget();
 
