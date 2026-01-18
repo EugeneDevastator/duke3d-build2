@@ -385,8 +385,8 @@ typedef struct // wall t
 
 	/* ai
 	*Positive values: Point to the next wall in the loop
-
-	wal[w].n + w gives the absolute index of the next wall
+	wal[Wid].n is relative index to tihs wall's index.
+	wal[Wid].n + Wid gives the absolute index of the next wall
 	Used to traverse walls in order around a sector
 	Negative values: Mark special wall positions in loops
 

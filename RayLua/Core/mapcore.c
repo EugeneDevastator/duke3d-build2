@@ -2,6 +2,7 @@
 #include "mapcore.h"
 
 #include "buildmath.h"
+#include "loaders.h"
 
 #define USEHEIMAP 1
 #define NOSOUND 1
@@ -15,7 +16,31 @@ char curmappath[MAX_PATH+1]="";
 long get_gnumtiles(void) { return gnumtiles; }
 long get_gmaltiles(void) { return gmaltiles; }
 long* get_gtilehashead(void) { return gtilehashead; }
+void splitwallat(int sid, int wid, point3d pos, mapstate_t* map) {
 
+sect_t *sec = &map->sect[sid];
+	int i = dupwall_imp(&map->sect[sid],wid);
+	wall_t* wal = map->sect[sid].wall;
+	wal[i].x = pos.x;
+	wal[i].y = pos.y;
+
+	int s = wal[wid].ns; if (s < 0) { checknextwalls_imp(map); checksprisect_imp(-1,map); return; }
+	int w = wal[wid].nw;
+	int j;
+	do
+	{
+		j = dupwall_imp(sec,w);
+		wal = sec->wall;
+		wal[j].x = pos.x;
+		wal[j].y = pos.y;
+		s = wal[w].ns; if ((s < 0) || (s == sid)) break;
+		w = wal[w].nw;
+	} while (1);
+
+checknextwalls_imp(map);
+checksprisect_imp(-1,map);
+
+}
 long wallclippol (kgln_t *pol, kgln_t *npol)
 {
 	double f, dz0, dz1;

@@ -117,7 +117,6 @@ int K_DISCARD = KEY_GRAVE;
 cam_t *cam;
 econtext ctx;
 econtext ctxprev;
-int savedfocus;
 
 typedef struct {
 	int wal;
@@ -125,22 +124,27 @@ typedef struct {
 	int sec;
 	int spri;
 	point3d hitpos;
-} focus;
+} focus_t;
 
 bool hasgrab = false;
 point3d *wcursor;
-focus hoverfoc;
-focus grabfoc;
+focus_t hoverfoc;
+focus_t grabfoc;
 
 // ------------------ PICKGRAB
 transform savedtr;
+point3d localp1;
+point3d localp2;
 transform trdiff;
 wall_idx verts[256];
+wall_idx verts2[256];
 int totalverts;
+int totalverts2;
+point2d secondwalldif;
 
 void PickgrabDiscard() {
 	if (grabfoc.spri>=0) {
-		map->spri[savedfocus].tr= savedtr;
+		map->spri[grabfoc.spri].tr= savedtr;
 	}
 	else
 		if (ISGRABWAL) {
@@ -149,46 +153,64 @@ void PickgrabDiscard() {
 			for (int i = 0; i < totalverts; ++i) {
 				map->sect[verts[i].s].wall[verts[i].w].x = savedtr.p.x;
 				map->sect[verts[i].s].wall[verts[i].w].y = savedtr.p.y;
+				// move nextwall
+			//map->sect[grabfoc.sec].wall[grabfoc.wal2].x=tp2.x;
+			//map->sect[grabfoc.sec].wall[grabfoc.wal2].y=tp2.y;
+			//for (int i = 0; i < totalverts2; ++i) {
+			//	map->sect[verts2[i].s].wall[verts2[i].w].x = tp2.x;
+			//	map->sect[verts2[i].s].wall[verts2[i].w].y = tp2.y;
+			//}
+
 			}
 		}
 }
 void PickgrabAccept() {
 	if (grabfoc.spri>=0) {
-		int s = map->spri[savedfocus].sect;
-		updatesect_p(map->spri[savedfocus].p, &s, map);
-		changesprisect_imp(savedfocus, s, map);
+		int s = map->spri[grabfoc.spri].sect;
+		updatesect_p(map->spri[grabfoc.spri].p, &s, map);
+		changesprisect_imp(grabfoc.spri, s, map);
 	}
 	else if (grabfoc.wal>=0 && grabfoc.sec >=0) {
 		// need to update sprites here.
 //		map->sect[grabfoc.sec].wall[grabfoc.wal].x=savedtr.p.x;
 	//	map->sect[grabfoc.sec].wall[grabfoc.wal].y=savedtr.p.y;
 	}
-	savedfocus = -1; // jsut do noting now.
+	grabfoc.spri = -1; // jsut do noting now.
 	ctx.mode = Fly;
 }
 void PickgrabUpdate() {
 	Vector2 dmov = GetMouseDelta();
 	float scrol = GetMouseWheelMove();
 	addto(&trdiff.p, scaled(down,scrol*0.2f));
-	if (grabfoc.spri>=0) {
-		map->spri[savedfocus].tr = local_to_world_transform_p(trdiff, &cam->tr);
-		int s = map->spri[savedfocus].sect;
-		updatesect_p(map->spri[savedfocus].p, &s, map);
-		changesprisect_imp(savedfocus, s, map);
+	addto(&localp2, scaled(down,scrol*0.2f));
+	if (ISGRABSPRI) {
+		map->spri[grabfoc.spri].tr = local_to_world_transform_p(trdiff, &cam->tr);
+		int s = map->spri[grabfoc.spri].sect;
+		updatesect_p(map->spri[grabfoc.spri].p, &s, map);
+		changesprisect_imp(grabfoc.spri, s, map);
 	}
-	else if (grabfoc.wal>=0 && grabfoc.sec >=0) {
+
+	else if (ISGRABWAL) {
 		transform tmp = local_to_world_transform_p(trdiff, &cam->tr);
+		point3d tp2 = local_to_world_point(localp2,&cam->tr);
 		map->sect[grabfoc.sec].wall[grabfoc.wal].x=tmp.p.x;
 		map->sect[grabfoc.sec].wall[grabfoc.wal].y=tmp.p.y;
 		for (int i = 0; i < totalverts; ++i) {
 			map->sect[verts[i].s].wall[verts[i].w].x = tmp.p.x;
 			map->sect[verts[i].s].wall[verts[i].w].y = tmp.p.y;
 		}
+		// move nextwall
+		map->sect[grabfoc.sec].wall[grabfoc.wal2].x=tp2.x;
+		map->sect[grabfoc.sec].wall[grabfoc.wal2].y=tp2.y;
+		for (int i = 0; i < totalverts2; ++i) {
+			map->sect[verts2[i].s].wall[verts2[i].w].x = tp2.x;
+			map->sect[verts2[i].s].wall[verts2[i].w].y = tp2.y;
+		}
 	}
 
 	if (IsKeyPressed(K_PICKGRAB)) {
 		PickgrabAccept();
-		savedfocus = -1;
+		grabfoc.spri = -1;
 		ctx.op = accept;
 	}
 }
@@ -196,14 +218,20 @@ void PickgrabStart() {
 	if (grabfoc.spri>=0) {
 		savedtr = map->spri[grabfoc.spri].tr;
 	}
-	else
-		if (grabfoc.wal>=0 && grabfoc.sec >=0) {
+	else if (grabfoc.wal>=0 && grabfoc.sec >=0) {
 			//for red walls we'd need to grab verts of all adjacent walls.
 			// something in build2 was there for it.
 			savedtr = cam->tr;
 			savedtr.p.x = map->sect[grabfoc.sec].wall[grabfoc.wal].x;
 			savedtr.p.y = map->sect[grabfoc.sec].wall[grabfoc.wal].y;
+
 			totalverts = getwallsofvert(grabfoc.sec,grabfoc.wal,verts,256,map);
+
+			grabfoc.wal2 = map->sect[grabfoc.sec].wall[grabfoc.wal].n + grabfoc.wal;
+			point2d wpos = getwall({grabfoc.wal2,grabfoc.sec},map)->pos;
+			point3d wpos3d = {wpos.x,wpos.y,0};
+			localp2 = world_to_local_point(wpos3d,&cam->tr);
+			totalverts2 = getwallsofvert(grabfoc.sec,grabfoc.wal2,verts2,256,map);
 		}
 	trdiff =  world_to_local_transform_p(savedtr, &cam->tr);
 }
@@ -221,10 +249,10 @@ void MoveObjContextDiscard() {
 	map->spri[grabfoc.spri].p = savedpos;
 }
 void MoveObjContextAccept() {
-	savedfocus = -1; // jsut do noting now.
+	grabfoc.spri = -1; // jsut do noting now.
 }
 void MoveObjContextStart() {
-	savedfocus = grabfoc.spri;
+	grabfoc.spri = grabfoc.spri;
 	savedpos = map->spri[grabfoc.spri].p;
 }
 
@@ -244,11 +272,11 @@ void InitEditor(mapstate_t *m) {
 }
 
 void SetColorum(uint8_t r,uint8_t g,uint8_t b, int16_t lum) {
-	if (grabfoc.spri >=0) {
-		map->spri[grabfoc.spri].view.color.x=r/255.0F;
-		map->spri[grabfoc.spri].view.color.y=g/255.0F;
-		map->spri[grabfoc.spri].view.color.z=b/255.0F;
-		map->spri[grabfoc.spri].view.lum=lum;
+	if (hoverfoc.spri >=0) {
+		map->spri[hoverfoc.spri].view.color.x=r/255.0F;
+		map->spri[hoverfoc.spri].view.color.y=g/255.0F;
+		map->spri[hoverfoc.spri].view.color.z=b/255.0F;
+		map->spri[hoverfoc.spri].view.lum=lum;
 	}
 }
 
@@ -272,23 +300,30 @@ void EditorFrameMin() {
 		ctx.state.start();
 	}
 
-	if (grabfoc.spri >= 0) {
+	if (hoverfoc.spri >= 0) {
 		if (IsKeyPressed(KEY_L)) {
-			map->spri[grabfoc.spri].flags ^= SPRITE_B2_IS_LIGHT;
+			map->spri[hoverfoc.spri].flags ^= SPRITE_B2_IS_LIGHT;
 			bool wasdel = false;
 			for (int j = map->light_sprinum - 1; j >= 0; j--) {
-				if (map->light_spri[j] == grabfoc.spri) {
+				if (map->light_spri[j] == hoverfoc.spri) {
 					map->light_spri[j] = map->light_spri[--map->light_sprinum];
 					wasdel = true;
 				}
 			}
 
 			if (!wasdel && map->light_sprinum < MAXLIGHTS) {
-				map->spri[grabfoc.spri].view.lum=255;
-				map->light_spri[map->light_sprinum++] = grabfoc.spri;
+				map->spri[hoverfoc.spri].view.lum=255;
+				map->light_spri[map->light_sprinum++] = hoverfoc.spri;
 			}
 		}
 	}
+
+	if (IsKeyPressed(KEY_INSERT)) { // split walls
+		if (hoverfoc.wal>=0) {
+			splitwallat(hoverfoc.sec,hoverfoc.wal,hoverfoc.hitpos,map);
+		}
+	}
+
 
 	if (IsKeyPressed(K_DISCARD) || IsKeyPressed(KEY_ESCAPE)) {
 		ctx.state.discard();
@@ -302,8 +337,8 @@ void EditorFrameMin() {
 }
 void DrawGizmos(){
 	float mv = GetMouseWheelMove();
-	if (grabfoc.spri >=0) {
-		transform* sptr = &map->spri[grabfoc.spri].tr;
+	if (hoverfoc.spri >=0) {
+		transform* sptr = &map->spri[hoverfoc.spri].tr;
 		qrotaxis(sptr, sptr->r, mv);
 
 		Vector3 pos = buildToRaylibPos(sptr->p);
