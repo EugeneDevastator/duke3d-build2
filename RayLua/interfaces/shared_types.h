@@ -437,6 +437,7 @@ typedef struct
 {
 	// BuildEngine base data
 	uint32_t guid; // uniq per sector
+	uint16_t areaid; // for trigger purposes. 0 = none
 	float z[2];      //ceil&flor height
 	point2d grad[2]; //ceil&flor grad. grad.x = norm.x/norm.z, grad.y = norm.y/norm.z
 	surf_t surf[2];  //ceil&flor texture info
@@ -456,6 +457,9 @@ typedef struct
 	// could be purely runtime info.
 	// but also inverted sector should be much easier to do.
 	int32_t destpn[2]; // nextsec flor ceil
+	uint8_t hintw1,hintw2,hintmode; // wall hints for procedural slope.
+	// first is always used as 2verts w, w+nw, second is just as point
+	// mode is follow 1 follow 2 follow 1+2 or ignore.
 
 } sect_t;
 

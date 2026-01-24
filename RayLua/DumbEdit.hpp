@@ -69,6 +69,8 @@ extern "C"{
 
 #define ISGRABSPRI (grabfoc.spri >= 0)
 #define ISGRABWAL (grabfoc.wal >= 0 && grabfoc.sec >= 0)
+#define ISHOVERWAL (hoverfoc.wal >= 0 && hoverfoc.sec >= 0)
+#define ISHOVERCAP (hoverfoc.wal < 0 && hoverfoc.sec >= 0)
 
 enum editorMode {
 	Fly,
@@ -130,6 +132,97 @@ bool hasgrab = false;
 point3d *wcursor;
 focus_t hoverfoc;
 focus_t grabfoc;
+// -------- RL Drawing funcs
+const float vertside = 0.3f;
+const float vertholeNorm = 0.85f;
+const Color vertColor = {64,255,64,255};
+static Camera3D cam3d;
+void drawVert(int sec, int w) {
+	wall_t *wal = &map->sect[sec].wall[w];
+	Vector3 pos = {wal->x, -1 * (float) getwallz(&map->sect[sec], 1, w), wal->y};
+
+	float holeside = vertside * vertholeNorm;
+	float half_vert = vertside * 0.5f;
+	float half_hole = holeside * 0.5f;
+
+	rlSetTexture(0);
+	rlColor4ub(255,255,255,255);
+
+	rlDisableDepthTest();
+	rlDisableDepthMask();
+	// Get camera forward vector to align billboard
+	Vector3 forward = Vector3Subtract(cam3d.target, cam3d.position);
+	forward = Vector3Normalize(forward);
+
+	// Calculate right and up vectors for billboard orientation
+	Vector3 up = {0, 1, 0};
+	Vector3 right = Vector3CrossProduct(up, forward);
+	right = Vector3Normalize(right);
+	up = Vector3CrossProduct(forward, right);
+
+	// Scale vectors
+	Vector3 rightScaled = Vector3Scale(right, half_vert);
+	Vector3 upScaled = Vector3Scale(up, half_vert);
+	Vector3 rightHole = Vector3Scale(right, half_hole);
+	Vector3 upHole = Vector3Scale(up, half_hole);
+
+	rlBegin(RL_QUADS);
+	rlColor4ub(vertColor.r, vertColor.g, vertColor.b, vertColor.a);
+
+	// Top strip
+	Vector3 tl = Vector3Add(Vector3Subtract(pos, rightScaled), upScaled);
+	Vector3 tr = Vector3Add(Vector3Add(pos, rightScaled), upScaled);
+	Vector3 br = Vector3Add(Vector3Add(pos, rightScaled), upHole);
+	Vector3 bl = Vector3Add(Vector3Subtract(pos, rightScaled), upHole);
+
+	rlVertex3f(tl.x, tl.y, tl.z);
+	rlVertex3f(tr.x, tr.y, tr.z);
+	rlVertex3f(br.x, br.y, br.z);
+	rlVertex3f(bl.x, bl.y, bl.z);
+
+	// Bottom strip
+	tl = Vector3Add(Vector3Subtract(pos, rightScaled), Vector3Scale(upHole, -1));
+	tr = Vector3Add(Vector3Add(pos, rightScaled), Vector3Scale(upHole, -1));
+	br = Vector3Add(Vector3Add(pos, rightScaled), Vector3Scale(upScaled, -1));
+	bl = Vector3Add(Vector3Subtract(pos, rightScaled), Vector3Scale(upScaled, -1));
+
+	rlVertex3f(tl.x, tl.y, tl.z);
+	rlVertex3f(tr.x, tr.y, tr.z);
+	rlVertex3f(br.x, br.y, br.z);
+	rlVertex3f(bl.x, bl.y, bl.z);
+
+	// Left strip
+	tl = Vector3Add(Vector3Subtract(pos, rightScaled), upHole);
+	tr = Vector3Add(Vector3Subtract(pos, rightHole), upHole);
+	br = Vector3Add(Vector3Subtract(pos, rightHole), Vector3Scale(upHole, -1));
+	bl = Vector3Add(Vector3Subtract(pos, rightScaled), Vector3Scale(upHole, -1));
+
+	rlVertex3f(tl.x, tl.y, tl.z);
+	rlVertex3f(tr.x, tr.y, tr.z);
+	rlVertex3f(br.x, br.y, br.z);
+	rlVertex3f(bl.x, bl.y, bl.z);
+
+	// Right strip
+	tl = Vector3Add(Vector3Add(pos, rightHole), upHole);
+	tr = Vector3Add(Vector3Add(pos, rightScaled), upHole);
+	br = Vector3Add(Vector3Add(pos, rightScaled), Vector3Scale(upHole, -1));
+	bl = Vector3Add(Vector3Add(pos, rightHole), Vector3Scale(upHole, -1));
+
+	rlVertex3f(tl.x, tl.y, tl.z);
+	rlVertex3f(tr.x, tr.y, tr.z);
+	rlVertex3f(br.x, br.y, br.z);
+	rlVertex3f(bl.x, bl.y, bl.z);
+
+	rlEnd();
+}
+
+
+void drawCylBoard(point3d origin, point3d localUp, float length, float width) {
+
+}
+void drawCylBoard(point3d origin, point3d endpoint, float width) {
+
+}
 
 // ------------------ PICKGRAB
 transform savedtr;
@@ -181,8 +274,8 @@ void PickgrabAccept() {
 void PickgrabUpdate() {
 	Vector2 dmov = GetMouseDelta();
 	float scrol = GetMouseWheelMove();
-	addto(&trdiff.p, scaled(down,scrol*0.2f));
-	addto(&localp2, scaled(down,scrol*0.2f));
+	addto(&trdiff.p, scaled(BBDOWN,scrol*0.2f));
+	addto(&localp2, scaled(BBDOWN,scrol*0.2f));
 	if (ISGRABSPRI) {
 		map->spri[grabfoc.spri].tr = local_to_world_transform_p(trdiff, &cam->tr);
 		int s = map->spri[grabfoc.spri].sect;
@@ -289,9 +382,9 @@ void Editor_DoRaycasts(cam_t *cc) {
 	raycast(&cc->p,&cc->f,1e32,cc->cursect,&hoverfoc.sec,&hoverfoc.wal,&hoverfoc.spri,&hoverfoc.hitpos,map);
 }
 
-void EditorFrameMin() {
+void EditorFrameMin(const Camera3D rlcam) {
 // process raycasts;
-
+	cam3d = rlcam;
 	ctx.state.update();
 	if (IsKeyPressed(K_PICKGRAB)) {
 		hasgrab = true;
@@ -350,6 +443,9 @@ void DrawGizmos(){
 		Vector3 bbmax = pos - Vector3{l,l,l};
 		DrawBoundingBox({bbmax,bbmin}, LIME);
 		//   addto(&map->spri[focusedSprite].tr.p,scaled(right,mv));
+	}
+	if (ISHOVERWAL) {
+		drawVert(hoverfoc.sec,hoverfoc.wal);
 	}
 	DrawPoint3D(buildToRaylibPos(hoverfoc.hitpos), RED);
 

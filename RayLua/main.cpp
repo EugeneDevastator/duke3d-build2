@@ -492,7 +492,7 @@ void MainLoop()
 
 #if !IS_DUKE_INCLUDED
         Editor_DoRaycasts(&localb2cam);
-        EditorFrameMin();
+        EditorFrameMin(*DumbCore::GetCamera());
 #endif
         // Render albedo pass
         BeginCustomRenderTarget(albedoTarget);
@@ -518,7 +518,9 @@ void MainLoop()
         glDepthMask(GL_FALSE);
         // batching improves perf significantly, so atlases are way to go
         DumbRender::DrawLightsPost3d(w,h,*DumbCore::GetCamera());
-       // DumbRender::DrawPost3d(w,h,*DumbCore::GetCamera());
+
+        // DumbRender::DrawPost3d(w,h,*DumbCore::GetCamera());
+
         glDepthMask(GL_TRUE);
         EndCustomRenderTarget();
 

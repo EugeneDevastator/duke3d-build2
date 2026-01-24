@@ -11,9 +11,9 @@
 #define epsilon 0.0000001f
 #define epsilond 0.000001
 
-static const point3d right = {1,0,0};
-static const point3d forward = {0,1,0};
-static const point3d down = {0,0,1};
+static const point3d BBRIGHT = {1,0,0};
+static const point3d BBFORWARD = {0,1,0};
+static const point3d BBDOWN = {0,0,1};
 
 static inline float vlen(point3d *p) {
     return sqrtf(p->x * p->x + p->y * p->y + p->z * p->z);
