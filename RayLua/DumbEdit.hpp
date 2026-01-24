@@ -226,7 +226,6 @@ void drawCylBoard(Vector3 origin, Vector3 endpoint, float width) {
     rlSetTexture(0);
     rlDisableDepthTest();
     rlDisableDepthMask();
-    rlDisableBackfaceCulling();
 
     // Calculate line axis
     Vector3 axis = Vector3Subtract(endpoint, origin);
@@ -247,7 +246,6 @@ void drawCylBoard(Vector3 origin, Vector3 endpoint, float width) {
     Vector3 facing;
 
     if (projLen < 0.001f) {
-        // Camera is looking straight down the line
         Vector3 up = {0, 1, 0};
         if (fabsf(Vector3DotProduct(axis, up)) > 0.99f) {
             up = {1, 0, 0};
@@ -261,54 +259,43 @@ void drawCylBoard(Vector3 origin, Vector3 endpoint, float width) {
         right = Vector3Normalize(right);
     }
 
-    float halfWidth = width * 0.5f;
-    Vector3 rightScaled = Vector3Scale(right, halfWidth);
-    Vector3 facingScaled = Vector3Scale(facing, halfWidth);
+    // Build transformation matrix (column-major for raylib)
+    // Local space: X = right, Y = axis (along line), Z = facing (toward camera)
+    Matrix transform = {
+        right.x,  axis.x,  facing.x, origin.x,
+        right.y,  axis.y,  facing.y, origin.y,
+        right.z,  axis.z,  facing.z, origin.z,
+        0,        0,       0,        1
+    };
 
-    // === Main quad (faces camera, along the line) ===
-    Vector3 tl = Vector3Add(origin, rightScaled);
-    Vector3 tr = Vector3Subtract(origin, rightScaled);
-    Vector3 br = Vector3Subtract(endpoint, rightScaled);
-    Vector3 bl = Vector3Add(endpoint, rightScaled);
+    rlPushMatrix();
+    rlMultMatrixf(MatrixToFloat(transform));
 
-    rlBegin(RL_QUADS);
-    rlVertex3f(tl.x, tl.y, tl.z);
-    rlVertex3f(tr.x, tr.y, tr.z);
-    rlVertex3f(br.x, br.y, br.z);
-    rlVertex3f(bl.x, bl.y, bl.z);
-    rlEnd();
-
-    // === End cap at origin (perpendicular to axis, facing outward from line) ===
-    // This is a half-quad: full width along 'right', half width along 'facing' (toward camera)
-    // The cap extends OUTSIDE the line (away from endpoint)
-    Vector3 axisHalf = Vector3Scale(axis, halfWidth);
-
-    // Origin cap - extends backward from origin (away from endpoint)
-    Vector3 capO_inner_right = Vector3Add(origin, rightScaled);      // on the line, +right
-    Vector3 capO_inner_left  = Vector3Subtract(origin, rightScaled); // on the line, -right
-    Vector3 capO_outer_right = Vector3Subtract(capO_inner_right, axisHalf); // extended back
-    Vector3 capO_outer_left  = Vector3Subtract(capO_inner_left, axisHalf);  // extended back
-rlColor4ub(0,128,255,255);
-    rlBegin(RL_QUADS);
-    rlVertex3f(capO_outer_right.x, capO_outer_right.y, capO_outer_right.z);
-    rlVertex3f(capO_outer_left.x, capO_outer_left.y, capO_outer_left.z);
-    rlVertex3f(capO_inner_left.x, capO_inner_left.y, capO_inner_left.z);
-    rlVertex3f(capO_inner_right.x, capO_inner_right.y, capO_inner_right.z);
-    rlEnd();
-
-    // Endpoint cap - extends forward from endpoint (away from origin)
-    Vector3 capE_inner_right = Vector3Add(endpoint, rightScaled);
-    Vector3 capE_inner_left  = Vector3Subtract(endpoint, rightScaled);
-    Vector3 capE_outer_right = Vector3Add(capE_inner_right, axisHalf);
-    Vector3 capE_outer_left  = Vector3Add(capE_inner_left, axisHalf);
+    float hw = width * 0.5f;
 
     rlBegin(RL_QUADS);
-    rlVertex3f(capE_inner_right.x, capE_inner_right.y, capE_inner_right.z);
-    rlVertex3f(capE_inner_left.x, capE_inner_left.y, capE_inner_left.z);
-    rlVertex3f(capE_outer_left.x, capE_outer_left.y, capE_outer_left.z);
-    rlVertex3f(capE_outer_right.x, capE_outer_right.y, capE_outer_right.z);
+
+    // Main quad (front face, XY plane at Z=0, facing +Z toward camera)
+    rlVertex3f(-hw, 0,      0);
+    rlVertex3f( hw, 0,      0);
+    rlVertex3f( hw, length, 0);
+    rlVertex3f(-hw, length, 0);
+
+    // Origin end cap (at Y=0, XZ plane, extends along +Z)
+    rlVertex3f(-hw, 0, 0);
+    rlVertex3f(-hw, 0, hw);
+    rlVertex3f( hw, 0, hw);
+    rlVertex3f( hw, 0, 0);
+
+    // Endpoint end cap (at Y=length, XZ plane, extends along +Z)
+    rlVertex3f( hw, length, 0);
+    rlVertex3f( hw, length, hw);
+    rlVertex3f(-hw, length, hw);
+    rlVertex3f(-hw, length, 0);
+
     rlEnd();
 
+    rlPopMatrix();
 }
 // ------------------ PICKGRAB
 transform savedtr;
