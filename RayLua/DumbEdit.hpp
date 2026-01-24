@@ -220,76 +220,96 @@ void drawVert(int sec, int w) {
 
 
 void drawCylBoard(Vector3 origin, Vector3 localUp, float length, float width) {
-
 }
+
 void drawCylBoard(Vector3 origin, Vector3 endpoint, float width) {
     rlSetTexture(0);
-
     rlDisableDepthTest();
     rlDisableDepthMask();
+    rlDisableBackfaceCulling();
 
-    // Get camera forward vector
-    Vector3 forward = Vector3Subtract(cam3d.target, cam3d.position);
-    forward = Vector3Normalize(forward);
-
-    // Calculate cylinder axis
+    // Calculate line axis
     Vector3 axis = Vector3Subtract(endpoint, origin);
     float length = Vector3Length(axis);
-    if (length < 0.001f) return; // Degenerate case
-
+    if (length < 0.001f) return;
     axis = Vector3Normalize(axis);
 
-    // Calculate right vector perpendicular to both axis and camera forward
-    Vector3 right = Vector3CrossProduct(axis, forward);
-    float rightLen = Vector3Length(right);
+    // Get direction from line midpoint to camera
+    Vector3 midpoint = Vector3Scale(Vector3Add(origin, endpoint), 0.5f);
+    Vector3 toCamera = Vector3Subtract(cam3d.position, midpoint);
 
-    // Critical angle check - if axis is parallel to camera forward
-    if (rightLen < 0.1f) {
-        // Draw simple quad facing camera
+    // Project toCamera onto plane perpendicular to axis
+    float dot = Vector3DotProduct(toCamera, axis);
+    Vector3 toCameraProjected = Vector3Subtract(toCamera, Vector3Scale(axis, dot));
+    float projLen = Vector3Length(toCameraProjected);
+
+    Vector3 right;
+    Vector3 facing;
+
+    if (projLen < 0.001f) {
+        // Camera is looking straight down the line
         Vector3 up = {0, 1, 0};
-        Vector3 camRight = Vector3CrossProduct(up, forward);
-        camRight = Vector3Normalize(camRight);
-        up = Vector3CrossProduct(forward, camRight);
-
-        Vector3 rightScaled = Vector3Scale(camRight, width * 0.5f);
-        Vector3 upScaled = Vector3Scale(up, width * 0.5f);
-
-        Vector3 center = Vector3Scale(Vector3Add(origin, endpoint), 0.5f);
-
-        rlBegin(RL_QUADS);
-
-        Vector3 tl = Vector3Add(Vector3Subtract(center, rightScaled), upScaled);
-        Vector3 tr = Vector3Add(Vector3Add(center, rightScaled), upScaled);
-        Vector3 br = Vector3Add(Vector3Add(center, rightScaled), Vector3Scale(upScaled, -1));
-        Vector3 bl = Vector3Add(Vector3Subtract(center, rightScaled), Vector3Scale(upScaled, -1));
-
-        rlVertex3f(tl.x, tl.y, tl.z);
-        rlVertex3f(tr.x, tr.y, tr.z);
-        rlVertex3f(br.x, br.y, br.z);
-        rlVertex3f(bl.x, bl.y, bl.z);
-        rlEnd();
-        return;
+        if (fabsf(Vector3DotProduct(axis, up)) > 0.99f) {
+            up = {1, 0, 0};
+        }
+        right = Vector3CrossProduct(axis, up);
+        right = Vector3Normalize(right);
+        facing = Vector3CrossProduct(right, axis);
+    } else {
+        facing = Vector3Normalize(toCameraProjected);
+        right = Vector3CrossProduct(axis, facing);
+        right = Vector3Normalize(right);
     }
 
-    right = Vector3Normalize(right);
-    Vector3 rightScaled = Vector3Scale(right, width * 0.5f);
+    float halfWidth = width * 0.5f;
+    Vector3 rightScaled = Vector3Scale(right, halfWidth);
+    Vector3 facingScaled = Vector3Scale(facing, halfWidth);
 
-    rlBegin(RL_QUADS);
-
-    // Main cylinder quad
+    // === Main quad (faces camera, along the line) ===
     Vector3 tl = Vector3Add(origin, rightScaled);
     Vector3 tr = Vector3Subtract(origin, rightScaled);
     Vector3 br = Vector3Subtract(endpoint, rightScaled);
     Vector3 bl = Vector3Add(endpoint, rightScaled);
 
+    rlBegin(RL_QUADS);
     rlVertex3f(tl.x, tl.y, tl.z);
     rlVertex3f(tr.x, tr.y, tr.z);
     rlVertex3f(br.x, br.y, br.z);
     rlVertex3f(bl.x, bl.y, bl.z);
     rlEnd();
+
+    // === End cap at origin (perpendicular to axis, facing outward from line) ===
+    // This is a half-quad: full width along 'right', half width along 'facing' (toward camera)
+    // The cap extends OUTSIDE the line (away from endpoint)
+    Vector3 axisHalf = Vector3Scale(axis, halfWidth);
+
+    // Origin cap - extends backward from origin (away from endpoint)
+    Vector3 capO_inner_right = Vector3Add(origin, rightScaled);      // on the line, +right
+    Vector3 capO_inner_left  = Vector3Subtract(origin, rightScaled); // on the line, -right
+    Vector3 capO_outer_right = Vector3Subtract(capO_inner_right, axisHalf); // extended back
+    Vector3 capO_outer_left  = Vector3Subtract(capO_inner_left, axisHalf);  // extended back
+rlColor4ub(0,128,255,255);
+    rlBegin(RL_QUADS);
+    rlVertex3f(capO_outer_right.x, capO_outer_right.y, capO_outer_right.z);
+    rlVertex3f(capO_outer_left.x, capO_outer_left.y, capO_outer_left.z);
+    rlVertex3f(capO_inner_left.x, capO_inner_left.y, capO_inner_left.z);
+    rlVertex3f(capO_inner_right.x, capO_inner_right.y, capO_inner_right.z);
+    rlEnd();
+
+    // Endpoint cap - extends forward from endpoint (away from origin)
+    Vector3 capE_inner_right = Vector3Add(endpoint, rightScaled);
+    Vector3 capE_inner_left  = Vector3Subtract(endpoint, rightScaled);
+    Vector3 capE_outer_right = Vector3Add(capE_inner_right, axisHalf);
+    Vector3 capE_outer_left  = Vector3Add(capE_inner_left, axisHalf);
+
+    rlBegin(RL_QUADS);
+    rlVertex3f(capE_inner_right.x, capE_inner_right.y, capE_inner_right.z);
+    rlVertex3f(capE_inner_left.x, capE_inner_left.y, capE_inner_left.z);
+    rlVertex3f(capE_outer_left.x, capE_outer_left.y, capE_outer_left.z);
+    rlVertex3f(capE_outer_right.x, capE_outer_right.y, capE_outer_right.z);
+    rlEnd();
+
 }
-
-
 // ------------------ PICKGRAB
 transform savedtr;
 point3d localp1;
@@ -518,6 +538,7 @@ void DrawGizmos(){
 		float z1= getwallz(&map->sect[hoverfoc.sec], 0, hoverfoc.wal);
 		float z2= getwallz(&map->sect[hoverfoc.sec], 1, hoverfoc.wal);
 		wall_t *w = &map->sect[hoverfoc.sec].wall[hoverfoc.wal];
+		wall_t *w2 = &map->sect[hoverfoc.sec].wall[hoverfoc.wal2];
 		Vector3 rlp1 ={w->x,-z1,w->y};
 		Vector3 rlp2 ={w->x,-z2,w->y};
 		rlColor4ub(255, 128, 128, 255);
