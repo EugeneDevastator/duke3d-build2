@@ -1017,7 +1017,7 @@ int updatesect_portmove(transform *tr, int *cursect, mapstate_t *map) {
 	point3d* pos = &tr->p;
 	long s = *cursect;
 	sect_t *sec = map->sect;
-	if (map->sect[s].destpn[0] + map->sect[s].destpn[1] > -2) {
+	if (map->sect[s].destpn[0]>=0 || map->sect[s].destpn[1] >= 0) {
 		if (insidesect(pos->x, pos->y, sec[s].wall, sec[s].n)) {
 			for (int j = 0; j < 2; j++) {
 				if (sec[s].destpn[j] > -1) {
