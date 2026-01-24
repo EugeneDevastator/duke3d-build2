@@ -54,6 +54,9 @@ eyepols are generated from mono space AND plane equation stored in gouvmat.
 
 #define MAX_PORTAL_DEPTH 2
 
+#define RM_LIGHTS 4
+#define RM_GEO 1
+
 
 void bdrawctx_clear(bdrawctx *b) {
 	if (!b) return;
@@ -1606,16 +1609,29 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			continue;
 		gtilenum = sec[s].surf[isflor].tilnum;
 
+
 		float surfpos = getslopez(&sec[s], isflor, b->cam.p.x, b->cam.p.y);
+		bool drawcap=0;
 		if ((b->cam.p.z >= surfpos) == isflor) // ignore backfaces
-			continue;
+		{
+			if( shadowtest2_rendmode == RM_LIGHTS && b->cam.cursect == s)// dont backface when in own sector for ceil lights,
+			{
+				drawcap=1;
+				// step 1. draw portal and preserve loop
+				// step +2. emit mask. // maybe emit when drawing portal?
+				// no need to draw opaque one in that case.
+			}
+			else
+				continue;
+		}
+
 		fz = sec[s].z[isflor];
 		grad = &sec[s].grad[isflor];
 
 		// Calculate surface normal vector
 		b->gnorm.x = grad->x;
 		b->gnorm.y = grad->y;
-		b->gnorm.z = 1.f;
+		b->gnorm.z = 1;
 		if (isflor) {
 			b->gnorm.x = -b->gnorm.x;
 			b->gnorm.y = -b->gnorm.y;
@@ -1636,6 +1652,12 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		plothead[0] = -1;
 		plothead[1] = -1;
 		point3d locnorm = world_to_local_vec(b->gnorm, &b->cam.tr);
+		int ft=0;
+		if (drawcap)
+			ft = 1-isflor;
+		else
+			ft = isflor;
+
 		for (ww = twaln; ww >= 0; ww -= twaln)
 			plothead[isflor] = mono_ins(
 				plothead[isflor], twal[ww].x, twal[ww].y,
@@ -1668,7 +1690,16 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		b->gligwall = isflor - 2;
 		// F L O O R S
 		//
-		int surflag = ((isflor << 2) + 3);
+
+		int newsect=-1;
+		int newtag=-1;
+		int surflag = (((isflor)<< 2) + 3);
+		if ( ft==1) {
+		//	surflag |= DP_EMIT_MASK;
+		//	newsect = s;  // use same flow as for walls with masks - emit lightpoly, and draw it as portal.
+		//	newtag= s +b->tagoffset;
+		}
+
 		if (isportal && !noportals) {
 			int endpn = portals[myport].destpn;
 			int ttag = b->tagoffset + taginc + portals[endpn].sect;
@@ -1933,7 +1964,7 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 	unsigned int *uptr;
 	int i, j, k, n, s, w, closest, col, didcut, halfplane;
 
-	if (shadowtest2_rendmode == 4) {
+	if (shadowtest2_rendmode == RM_LIGHTS) {
 		glp = &shadowtest2_light[glignum];
 		//	if ((!(glp->flags&1)) || (!shadowtest2_useshadows)) return;
 	}
