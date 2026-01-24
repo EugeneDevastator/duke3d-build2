@@ -16,30 +16,31 @@ char curmappath[MAX_PATH+1]="";
 long get_gnumtiles(void) { return gnumtiles; }
 long get_gmaltiles(void) { return gmaltiles; }
 long* get_gtilehashead(void) { return gtilehashead; }
-void splitwallat(int sid, int wid, point3d pos, mapstate_t* map) {
 
-sect_t *sec = &map->sect[sid];
-	int i = dupwall_imp(&map->sect[sid],wid);
-	wall_t* wal = map->sect[sid].wall;
+void splitwallat(int sid, int wid, point3d pos, mapstate_t *map) {
+	int bs = sid;
+	int bw = wid;
+	int i,j;
+	sect_t * sec= map->sect;
+	i = dupwall_imp(&map->sect[bs],bw);
+	wall_t * wal = sec[bs].wall;
 	wal[i].x = pos.x;
 	wal[i].y = pos.y;
 
-	int s = wal[wid].ns; if (s < 0) { checknextwalls_imp(map); checksprisect_imp(-1,map); return; }
-	int w = wal[wid].nw;
-	int j;
+	int s = wal[bw].ns; if (s < 0) { checknextwalls_imp(map); checksprisect_imp(-1,map); return; }
+	int w = wal[bw].nw;
 	do
 	{
-		j = dupwall_imp(sec,w);
-		wal = sec->wall;
+		j = dupwall_imp(&sec[s],w);
+		wal = sec[s].wall;
 		wal[j].x = pos.x;
 		wal[j].y = pos.y;
-		s = wal[w].ns; if ((s < 0) || (s == sid)) break;
+		s = wal[w].ns; if ((s < 0) || (s == bs)) break;
 		w = wal[w].nw;
 	} while (1);
 
-checknextwalls_imp(map);
-checksprisect_imp(-1,map);
-
+	checknextwalls_imp(map);
+	checksprisect_imp(-1,map);
 }
 long wallclippol (kgln_t *pol, kgln_t *npol)
 {
@@ -221,6 +222,32 @@ int dupwall_imp (sect_t *s, int w)
 	return(w+1);  // Return index of the new wall
 }
 
+int dupwall (sect_t *s, int w)
+{
+	wall_t *wal;
+	int i, j;
+
+	if (s->n >= s->nmax)
+	{
+		s->nmax = max(s->n+1,s->nmax<<1); s->nmax = max(s->nmax,8);
+		s->wall = (wall_t *)realloc(s->wall,s->nmax*sizeof(wall_t));
+	}
+	wal = s->wall;
+
+	if (!s->n)
+	{
+		memset(wal,0,sizeof(wall_t));
+		wal[0].surf.uv[1].x = wal[0].surf.uv[2].y = 1.f;
+		wal[0].ns = wal[0].nw = -1; s->n = 1;
+		return(0);
+	}
+	for(i=s->n;i>w;i--) wal[i] = wal[i-1];
+	if (!wal[0].n)    { wal[0].n = 1; wal[1].n = -1; }
+	else if (wal[w].n < 0) { wal[w+1].n = wal[w].n-1; wal[w].n = 1; }
+	else { for(i=w+1;wal[i].n>0;i++); wal[i].n--; }
+	s->n++;
+	return(w+1);
+}
 // Calculates the Z height at point (x,y) on a sloped surface
 // Uses the sector's gradient and base Z value
 

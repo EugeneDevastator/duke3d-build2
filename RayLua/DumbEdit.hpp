@@ -410,13 +410,14 @@ void EditorFrameMin(const Camera3D rlcam) {
 			}
 		}
 	}
-
-	if (IsKeyPressed(KEY_INSERT)) { // split walls
-		if (hoverfoc.wal>=0) {
-			splitwallat(hoverfoc.sec,hoverfoc.wal,hoverfoc.hitpos,map);
+	if (ISHOVERWAL) {
+		hoverfoc.wal2 = map->sect[hoverfoc.sec].wall[hoverfoc.wal].n + hoverfoc.wal;
+		if (IsKeyPressed(KEY_INSERT)) { // split walls
+			if (hoverfoc.wal>=0) {
+				splitwallat(hoverfoc.sec,hoverfoc.wal,hoverfoc.hitpos,map);
+			}
 		}
 	}
-
 
 	if (IsKeyPressed(K_DISCARD) || IsKeyPressed(KEY_ESCAPE)) {
 		ctx.state.discard();
@@ -446,6 +447,7 @@ void DrawGizmos(){
 	}
 	if (ISHOVERWAL) {
 		drawVert(hoverfoc.sec,hoverfoc.wal);
+		drawVert(hoverfoc.sec,hoverfoc.wal2);
 	}
 	DrawPoint3D(buildToRaylibPos(hoverfoc.hitpos), RED);
 
