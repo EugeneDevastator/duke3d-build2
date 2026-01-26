@@ -17,7 +17,7 @@ long get_gnumtiles(void) { return gnumtiles; }
 long get_gmaltiles(void) { return gmaltiles; }
 long* get_gtilehashead(void) { return gtilehashead; }
 
-void splitwallat(int sid, int wid, point3d pos, mapstate_t *map) {
+int splitwallat(int sid, int wid, point3d pos, mapstate_t *map) {
 	int bs = sid;
 	int bw = wid;
 	int i,j;
@@ -27,7 +27,13 @@ void splitwallat(int sid, int wid, point3d pos, mapstate_t *map) {
 	wal[i].x = pos.x;
 	wal[i].y = pos.y;
 
-	int s = wal[bw].ns; if (s < 0) { checknextwalls_imp(map); checksprisect_imp(-1,map); return; }
+	int s = wal[bw].ns;
+	if (s < 0) {
+		checknextwalls_imp(map);
+		checksprisect_imp(-1,map);
+		return -1;
+	}
+
 	int w = wal[bw].nw;
 	do
 	{
@@ -41,7 +47,9 @@ void splitwallat(int sid, int wid, point3d pos, mapstate_t *map) {
 
 	checknextwalls_imp(map);
 	checksprisect_imp(-1,map);
+	return j;
 }
+
 long wallclippol (kgln_t *pol, kgln_t *npol)
 {
 	double f, dz0, dz1;
@@ -584,6 +592,79 @@ void changesprisect_imp (int i, int nsect, mapstate_t *map)
 	//}
 
 	spr->sect = nsect;
+}
+
+void makewall(wall_t *w, int8_t wid, int8_t nwid) {
+	w->xsurf[0].tilnum=0;
+	w->xsurf[0].owal = wid;
+	w->xsurf[0].uwal = nwid;
+	w->xsurf[0].vwal = wid;
+	w->xsurf[0].otez = 0;
+	w->xsurf[0].utez = 0;
+	w->xsurf[0].vtez = TEZ_WORLDZ1;
+	w->xsurf[0].alpha=1;
+	w->xsurf[0].uvcoords[0] = (point3d){0,0,0};
+	w->xsurf[0].uvcoords[1] = (point3d){1,0,0};
+	w->xsurf[0].uvcoords[2] = (point3d){0,0,1};
+
+	w->xsurf[0].uvform[0]=1;
+	w->xsurf[0].uvform[1]=1;
+	w->xsurf[0].uvform[2]=0;
+	w->xsurf[0].uvform[3]=0;
+
+	w->xsurf[1]=w->xsurf[0];
+	w->xsurf[2]=w->xsurf[0];
+	w->surf=w->xsurf[0];
+	w->surfn=3;
+	w->nw = -1;
+	w->ns = -1;
+	w->n = nwid - wid;
+}
+
+int appendsect(mapstate_t *map, int nwalls) {
+	int i = map->numsects;
+	if (map->numsects+1 >= map->malsects) {
+		map->malsects = max(map->numsects+1,map->malsects << 1);
+		map->sect =  (sect_t *)realloc(map->sect,map->malsects*sizeof(sect_t));
+		memset(&map->sect[i],0,(map->malsects-i)*sizeof(sect_t));
+	}
+	// init walls
+	map->sect[i].wall = malloc(nwalls * sizeof(wall_t));
+	map->sect[i].n = 0; map->sect[i].nmax = 8;
+	map->sect[i].wall = (wall_t *)malloc(map->sect[i].nmax*sizeof(wall_t));
+}
+
+int appendwalls(sect_t *sec, int nwalls) {
+	int i = sec->n;
+	if (sec->n + nwalls >= sec->nmax) {
+		sec->nmax = max(sec->n + nwalls, sec->nmax << 1);
+		sec->wall = (wall_t *)realloc(sec->wall, sec->nmax * sizeof(wall_t));
+		memset(&sec->wall[i], 0, (sec->nmax - i) * sizeof(wall_t));
+	}
+	sec->n += nwalls;
+	return i;
+}
+
+int appendwall_loop(sect_t *sec, int nwalls, point3d *coords) {
+	int start_idx = appendwalls(sec, nwalls);
+
+	// Set up wall coordinates and loop linking
+	for (int i = 0; i < nwalls; i++) {
+		int wall_idx = start_idx + i;
+		sec->wall[wall_idx].x = coords[i].x;
+		sec->wall[wall_idx].y = coords[i].y;
+
+		if (i == nwalls - 1) {
+			// Last wall points back to start of loop (negative offset)
+			sec->wall[wall_idx].n = -nwalls+1;
+		} else {
+			// Other walls point to next wall
+			sec->wall[wall_idx].n = 1;
+		}
+
+		makewall(&sec->wall[wall_idx], wall_idx, wall_idx + sec->wall[wall_idx].n);
+	}
+	return start_idx;
 }
 
 // dukescales = xy rep, xypan

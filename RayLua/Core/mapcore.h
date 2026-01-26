@@ -124,8 +124,18 @@ int getverts_imp (int s, int w, vertlist_t *ver, int maxverts, mapstate_t* map);
 long insspri_imp (int sect, float x, float y, float z, mapstate_t *map);
 void delspri_imp (int i, mapstate_t *map);
 void changesprisect_imp (int i, int nsect, mapstate_t *map);
+void makewall(wall_t* w, int8_t wid , int8_t nwid);
+
+int appendsect(mapstate_t *map, int nwalls);
+
+int appendwalls(sect_t *sec, int nwalls);
+
+// outer loop is CW, inner is CCW
+int appendwall_loop(sect_t *sec, int nwalls, point3d* coords);
+
+
 void makeslabuvform(int surfid, float slabH, wall_t *wal, int dukescales[4], int tilesize[2]);
-void splitwallat(int sid, int wid, point3d pos, mapstate_t* map);
+int splitwallat(int sid, int wid, point3d pos, mapstate_t* map);
 //Clip wall slopes. Returns loop ordered poly (0, 3, or 4 points)
 //pol[0]   pol[1]
 //pol[3]   pol[2]
@@ -179,6 +189,7 @@ static inline wall_t walnext(sect_t *sec, int wid) {
 
 float getzoftez(int tezflags, sect_t *mysec, int thiswall, point2d worldxy, mapstate_t *map);
 
+// proper b2 method to generate uv vectors from ouv tez-params
 void makewaluvs(sect_t *sect, int wid, mapstate_t *map);
 
 void makesecuvs(sect_t *sect, mapstate_t *map);

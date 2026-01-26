@@ -106,12 +106,22 @@ typedef struct {
 } econtext;
 
 typedef struct {
+	long sect;
+	int wal; // -1 = ceil -2 = fllor;
+	point3d pos;
+} loopt; // draw loop point
+
+inline bool islptoncap(loopt p) { return p.wal>=0 ? false: true; }
+
+
+typedef struct {
 	Vector3 camdelta;
 	Vector3 targetDelta;
 } viewmodel;
 viewmodel editormodel = {};
 
 int K_PICKGRAB = KEY_Q;
+int K_LOOPDRAW = KEY_SPACE;
 int K_ACCEPT = KEY_SPACE;
 int K_DISCARD = KEY_GRAVE;
 
@@ -139,10 +149,7 @@ const float vertside = 0.3f;
 const float vertholeNorm = 0.85f;
 const Color vertColor = {64,255,64,255};
 static Camera3D cam3d;
-void drawVert(int sec, int w) {
-	wall_t *wal = &map->sect[sec].wall[w];
-	Vector3 pos = {wal->x, -1 * (float) getwallz(&map->sect[sec], 1, w), wal->y};
-
+void drawVert(Vector3 pos){
 	float holeside = vertside * vertholeNorm;
 	float half_vert = vertside * 0.5f;
 	float half_hole = holeside * 0.5f;
@@ -217,7 +224,11 @@ void drawVert(int sec, int w) {
 
 	rlEnd();
 }
-
+void drawVert(int sec, int w) {
+	wall_t *wal = &map->sect[sec].wall[w];
+	Vector3 pos = {wal->x, -1 * (float) getwallz(&map->sect[sec], 1, w), wal->y};
+	drawVert(pos);
+}
 
 void drawCylBoard(Vector3 origin, Vector3 localUp, float length, float width) {
 }
@@ -357,20 +368,35 @@ void PickgrabUpdate() {
 	}
 
 	else if (ISGRABWAL) {
-		transform tmp = local_to_world_transform_p(trdiff, &cam->tr);
-		point3d tp2 = local_to_world_point(localp2,&cam->tr);
+		transform tmp;
+		point3d tp2;
+		// kinda messes up with currently rendered wall.
+		if (true && hoverfoc.wal < 0 && hoverfoc.sec >= 0) {
+			// nah we just need to slide wall along the floor. because textures and stuff.
+			// so need raycast control base on mode.
+			// move wall along floor or ceil.
+			tmp.p.x = hoverfoc.hitpos.x;
+			tmp.p.y = hoverfoc.hitpos.y;
+			tp2.x = tmp.p.x + localp2.x;
+			tp2.y = tmp.p.y + localp2.y;
+		} else {
+			tmp = local_to_world_transform_p(trdiff, &cam->tr);
+			tp2 = local_to_world_point(localp2, &cam->tr);
+		}
 		map->sect[grabfoc.sec].wall[grabfoc.wal].x=tmp.p.x;
 		map->sect[grabfoc.sec].wall[grabfoc.wal].y=tmp.p.y;
 		for (int i = 0; i < totalverts; ++i) {
 			map->sect[verts[i].s].wall[verts[i].w].x = tmp.p.x;
 			map->sect[verts[i].s].wall[verts[i].w].y = tmp.p.y;
 		}
-		// move nextwall
-		map->sect[grabfoc.sec].wall[grabfoc.wal2].x=tp2.x;
-		map->sect[grabfoc.sec].wall[grabfoc.wal2].y=tp2.y;
-		for (int i = 0; i < totalverts2; ++i) {
-			map->sect[verts2[i].s].wall[verts2[i].w].x = tp2.x;
-			map->sect[verts2[i].s].wall[verts2[i].w].y = tp2.y;
+		// move ahead-wall
+		if (selmode & SEL_SURF) {
+			map->sect[grabfoc.sec].wall[grabfoc.wal2].x=tp2.x;
+			map->sect[grabfoc.sec].wall[grabfoc.wal2].y=tp2.y;
+			for (int i = 0; i < totalverts2; ++i) {
+				map->sect[verts2[i].s].wall[verts2[i].w].x = tp2.x;
+				map->sect[verts2[i].s].wall[verts2[i].w].y = tp2.y;
+			}
 		}
 	}
 
@@ -401,6 +427,55 @@ void PickgrabStart() {
 		}
 	trdiff =  world_to_local_transform_p(savedtr, &cam->tr);
 }
+// ----------------------- draw loop OPER ---------------------
+loopt loopts[100];
+point3d loopts_p3d[100];
+int loopn=0;
+
+void LoopDrawUpdate() {
+	if (IsKeyPressed(KEY_SPACE)) {
+		//add
+		if (hoverfoc.sec >= 0) {
+			loopts[loopn].sect = hoverfoc.sec;
+			loopts[loopn].wal = hoverfoc.wal;
+		} else {
+			loopts[loopn].sect = -1;
+			loopts[loopn].wal = 0;
+		}
+		loopts[loopn].pos = hoverfoc.hitpos;
+		loopn++;
+	}
+	if (IsKeyPressed(KEY_R)) {
+		// del last;
+		loopn = max(0, loopn-1);
+	}
+
+	if (IsKeyPressed(KEY_T)) {
+		for (int i = 0; i < loopn; ++i) {
+			loopts_p3d[i]=loopts[i].pos;
+		}
+		appendwall_loop(&map->sect[hoverfoc.sec],loopn,loopts_p3d);
+		loopn=0;
+	}
+	// so walls are just i as t is, nw can look like this: 1 1 -2 1 1 1 -3 essentially two loops 3 and 4 verts.
+	// inner loop is counter clockwise.
+	// outer is clockwize.
+}
+
+void LoopDrawDiscard() {
+	loopn=0;
+}
+void LoopDrawAccept() {
+	loopn=0;
+	K_ACCEPT = KEY_SPACE;
+}
+void LoopDrawStart() {
+	loopn=0;
+	K_ACCEPT = KEY_E;
+	LoopDrawUpdate();
+}
+
+
 // ----------------------- MOVE OPER ---------------------
 point3d savedpos;
 
@@ -425,10 +500,13 @@ void MoveObjContextStart() {
 
 // ------------------------ all operators-----------------
 void empty(){}
+#define MAKESTATE(id, name) const estate name##State = { id, name##Start, name##Update, name##Accept, name##Discard };
 const estate RotateState = { 3,MoveObjContextStart, MoveObjContextUpdate, MoveObjContextAccept, MoveObjContextDiscard};
 const estate MoveState = { 2,MoveObjContextStart, MoveObjContextUpdate, MoveObjContextAccept, MoveObjContextDiscard};
 const estate FlyState = { 1,MoveObjContextStart, MoveObjContextUpdate, MoveObjContextAccept, MoveObjContextDiscard};
-const estate PickGrabState = { 4,PickgrabStart, PickgrabUpdate, PickgrabAccept, PickgrabDiscard};
+MAKESTATE(5,LoopDraw)
+MAKESTATE(4,Pickgrab)
+
 const estate Empty = { 0, empty, empty, empty, empty};
 // ----------------- MAIN
 void InitEditor(mapstate_t *m) {
@@ -451,21 +529,31 @@ void Editor_DoRaycasts(cam_t *cc) {
 	int iwal=0;
 	int ispri=0;
 	cam = cc;
-	//this raycast works.
+	//ctx.state.discard();// to restore original map state for raycast.
+
 	raycast(&cc->p,&cc->f,1e32,cc->cursect,&hoverfoc.sec,&hoverfoc.wal,&hoverfoc.spri,&hoverfoc.hitpos,map);
+
 }
 
 void EditorFrameMin(const Camera3D rlcam) {
 // process raycasts;
 	cam3d = rlcam;
 	ctx.state.update();
-	if (IsKeyPressed(K_PICKGRAB)) {
-		hasgrab = true;
-		grabfoc = hoverfoc;
-		ctx.state = PickGrabState;
-		ctx.state.start();
+	if (ctx.state.id == Empty.id) {
+		if (IsKeyPressed(K_PICKGRAB)) {
+			hasgrab = true;
+			grabfoc = hoverfoc;
+			ctx.state = PickgrabState;
+			ctx.state.start();
+		}
+		else if (IsKeyPressed(K_LOOPDRAW)) {
+			hasgrab = true;
+			grabfoc = hoverfoc;
+			ctx.state = LoopDrawState;
+			ctx.state.start();
+		}
 	}
-
+// how to unpress the key here to prevent further intercept?
 	if (hoverfoc.spri >= 0) {
 		if (IsKeyPressed(KEY_L)) {
 			map->spri[hoverfoc.spri].flags ^= SPRITE_B2_IS_LIGHT;
@@ -503,6 +591,7 @@ void EditorFrameMin(const Camera3D rlcam) {
 	}
 }
 void DrawGizmos(){
+
 	float mv = GetMouseWheelMove();
 	if (hoverfoc.spri >=0) {
 		transform* sptr = &map->spri[hoverfoc.spri].tr;
@@ -533,6 +622,15 @@ void DrawGizmos(){
 	}
 	DrawPoint3D(buildToRaylibPos(hoverfoc.hitpos), RED);
 
+// Draw loops that are drawn:
+	int n = 0;
+	for (int i = 0; i < loopn; ++i) {
+		n = (i + 1) % loopn;
+		rlColor4ub(255, 255, 255, 255);
+		drawVert(buildToRaylib(loopts[i].pos));
+		rlColor4ub(230, 230, 230, 255);
+		drawCylBoard(buildToRaylib(loopts[i].pos), buildToRaylib(loopts[n].pos), 0.01);
+	}
 }
 void EditorFrame() {
 	if (ctx.mode == Fly) {
