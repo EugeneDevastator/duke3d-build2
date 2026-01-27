@@ -700,6 +700,8 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 					sec[i].wall[j].tags[MT_WAL_NEXTSEC] = b7wal.nextsect;
 					sec[i].wall[j].tags[MT_NEXTWALL] = b7wal.nextwall;
 					sec[i].wall[j].tags[MT_WAL_WALLIDX] = wallidx;
+					sec[i].wall[j].nschain=-1;
+					sec[i].wall[j].nwchain=-1;
 					wallidx++;
 
 					sur = &sec[i].wall[j].surf;
@@ -1148,6 +1150,9 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 			{
 				for (j = 0; j < sec[i].n; j++) {
 					wall_t *walp = &sec[i].wall[j];
+
+					upgradewallportchain(i,j,map);
+
 					int nwid = walp->n + j;
 					int curwalid = j;
 					int yrepeat = (unsigned char)walp->surf.owal;

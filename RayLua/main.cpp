@@ -470,7 +470,7 @@ void MainLoop()
 {
     //    if (!loadifvalid())
  //       return;
-    DumbRender::Init("c:/Eugene/Games/build2/ror2.map");
+    DumbRender::Init("c:/Eugene/Games/build2/ror3.map");
     auto map = DumbRender::GetMap();
     DumbCore::Init(map);
     SetTargetFPS(60);

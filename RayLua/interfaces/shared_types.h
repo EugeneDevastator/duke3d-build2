@@ -230,7 +230,7 @@ free((arena).data); \
 #define TEZ_INVZ 1<<3 // use next continious wall
 #define TEZ_CLOSEST 1<<4 // closest height point instead of arbitrary.
 #define TEZ_FURTHEST 1<<5 // closest height point instead of arbitrary.
-#define TEZ_WORLDZ1 1<<6 // closest height point instead of arbitrary.
+#define TEZ_WORLDZ1 1<<6 // use unit world z vector
 
 // auto resolution optioons, written in ouv wal
 #define TEW_WORLDF -1
@@ -351,13 +351,7 @@ typedef struct // surf_t
 	uint8_t pal;
 	float alpha;
 	float uvform[9]; // scale xy, pan xy, crop AB, rotation
-	union{
-		// we dont use sectors, current one is constraint.
-		// origin, u , v
-		int8_t uvalig[6];
-		// tez = tex z source
-		struct { int8_t owal, otez, uwal, utez, vwal, vtez; }; // wals are always wals of this sector.
-	};
+	int8_t owal, otez, uwal, utez, vwal, vtez; // wals are always wals of this sector.
 	uint8_t uvmapkind; // uv amappings, regular, polar, hex, flipped variants etc. paralax.
 	uint8_t tilingkind; // normal, polar, hex etc.
 // ------------
@@ -397,15 +391,12 @@ typedef struct // wall t
 	*/
 
 	long n, ns, nw; //n:rel. wall ind.; ns & nw : nextsect & nextwall_of_sect
+	long nschain, nwchain; // for multiportal.
 	long owner; //for dragging while editing, other effects during game
 	uint8_t surfn;
 	surf_t surf, xsurf[3]; //additional malloced surfs when (surfn > 1)
 	uint16_t mflags[4]; // modflags
-	union {
-		int64_t tags8b[8];
-		int32_t tags[16]; // standard tag is 4bytes
-		int16_t tags2b[32];
-	};
+	int32_t tags[16]; // standard tag is 4bytes
 
 } wall_t;
 

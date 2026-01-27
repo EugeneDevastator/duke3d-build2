@@ -1162,6 +1162,103 @@ int updatesect_portmove(transform *tr, int *cursect, mapstate_t *map) {
 	return 0;
 }
 
+void upgradewallportchain(int startwal_sec, int startwal_idx, mapstate_t *map) {
+	wall_t *startwal = &map->sect[startwal_sec].wall[startwal_idx];
+	if (startwal->ns < 0)
+		return;
+
+	// Skip if chain already built
+	if (startwal->nschain >= 0)
+		return;
+
+	// Discover all walls in the legacy chain using old getwalls_imp logic
+	vertlist_t chain_walls[32];
+	int chain_count = 0;
+
+	int current_s = startwal_sec;
+	int current_w = startwal_idx;
+	int start_s = startwal_sec;
+
+	// Follow legacy ns/nw links to discover full chain
+	do {
+		chain_walls[chain_count].s = current_s;
+		chain_walls[chain_count].w = current_w;
+		chain_count++;
+
+		wall_t *current_wall = &map->sect[current_s].wall[current_w];
+		if (current_wall->ns < 0) break;
+
+		current_s = current_wall->ns;
+		current_w = current_wall->nw;
+
+	} while (current_s != start_s && chain_count < 32);
+
+	// Now build explicit chain structure
+	for (int i = 0; i < chain_count; i++) {
+		int next_i = (i + 1) % chain_count;
+		wall_t *wall = &map->sect[chain_walls[i].s].wall[chain_walls[i].w];
+
+		// Set chain pointers to next wall in discovered chain
+		wall->nschain = chain_walls[next_i].s;
+		wall->nwchain = chain_walls[next_i].w;
+	}
+}
+
+int getwalls_chain(int s, int w, vertlist_t *ver, int maxverts, mapstate_t *map) {
+	sect_t *sec = map->sect;
+	wall_t *startwal = &sec[s].wall[w];
+	wall_t *wal;
+	float fx, fy;
+	int vn = 0;
+	int current_s, current_w;
+	int start_s = s, start_w = w;
+
+	// If no connection, return 0
+	if (startwal->ns < 0)
+		return 0;
+
+	// Start with first chain link
+	current_s = startwal->nschain >= 0 ? startwal->nschain : startwal->ns;
+	current_w = startwal->nwchain >= 0 ? startwal->nwchain : startwal->nw;
+
+	do {
+		if (vn < maxverts) {
+			ver[vn].s = current_s;
+			ver[vn].w = current_w;
+			vn++;
+		}
+
+		wal = &sec[current_s].wall[current_w];
+
+		// Move to next in chain
+		current_s = wal->nschain >= 0 ? wal->nschain : wal->ns;
+		current_w = wal->nwchain >= 0 ? wal->nwchain : wal->nw;
+
+	} while ((current_s != start_s || current_w != start_w) && vn < maxverts);
+
+	// Sort by height at wall midpoint
+	wall_t *nextwal = &sec[s].wall[(w + 1) % sec[s].n];
+	fx = (startwal->x + nextwal->x) * 0.5f;
+	fy = (startwal->y + nextwal->y) * 0.5f;
+
+	// Bubble sort
+	vertlist_t tver;
+	for (int k = 1; k < vn; k++) {
+		for (int j = 0; j < k; j++) {
+			float h1 = getslopez(&sec[ver[j].s], 0, fx, fy) + getslopez(&sec[ver[j].s], 1, fx, fy);
+			float h2 = getslopez(&sec[ver[k].s], 0, fx, fy) + getslopez(&sec[ver[k].s], 1, fx, fy);
+
+			if (h1 > h2) {
+				tver = ver[j];
+				ver[j] = ver[k];
+				ver[k] = tver;
+			}
+		}
+	}
+
+	return vn;
+}
+
 void getcentroid(wall_t *wal, int n, float *retcx, float *retcy) {
 	float r, cx, cy, x0, y0, x1, y1, area;
 	int w0, w1;

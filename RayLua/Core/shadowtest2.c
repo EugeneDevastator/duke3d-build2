@@ -1731,7 +1731,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 	// === DRAW WALLS ===
 	for (ww = 0; ww < twaln; ww++) {
 		// Get wall vertices and setup wall segment
-		vn = getwalls_imp(s, twal[ww].i, verts,MAXVERTS, map);
+		vn = getwalls_chain(s, twal[ww].i, verts,MAXVERTS, map);
 		w = twal[ww].i;
 		nw = wal[w].n + w;
 		sur = &wal[w].xsurf[0];
