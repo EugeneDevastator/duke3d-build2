@@ -73,6 +73,9 @@ uint16_t selmode = SEL_ALL;
 #define ISGRABWAL (grabfoc.wal >= 0 && grabfoc.sec >= 0)
 #define ISHOVERWAL (hoverfoc.wal >= 0 && hoverfoc.sec >= 0)
 #define ISHOVERCAP (hoverfoc.wal < 0 && hoverfoc.sec >= 0)
+#define HOVERSEC map->sect[hoverfoc.sec]
+#define HOVERWAL HOVERSEC.wall[hoverfoc.wal]
+#define HOVERWAL2 HOVERSEC.wall[hoverfoc.wal2]
 
 enum editorMode {
 	Fly,
@@ -429,7 +432,7 @@ void PickgrabStart() {
 }
 // ----------------------- draw loop OPER ---------------------
 loopt loopts[100];
-point3d loopts_p3d[100];
+point2d loopts_p3d[100];
 int loopn=0;
 
 void LoopDrawUpdate() {
@@ -452,11 +455,13 @@ void LoopDrawUpdate() {
 
 	if (IsKeyPressed(KEY_T)) {
 		for (int i = 0; i < loopn; ++i) {
-			loopts_p3d[i]=loopts[i].pos;
+			loopts_p3d[i]={loopts[i].pos.x,loopts[i].pos.y};
 		}
 		appendwall_loop(&map->sect[hoverfoc.sec],loopn,loopts_p3d);
 		loopn=0;
+		ctx.op = accept;
 	}
+
 	// so walls are just i as t is, nw can look like this: 1 1 -2 1 1 1 -3 essentially two loops 3 and 4 verts.
 	// inner loop is counter clockwise.
 	// outer is clockwize.
@@ -552,6 +557,58 @@ void EditorFrameMin(const Camera3D rlcam) {
 			ctx.state = LoopDrawState;
 			ctx.state.start();
 		}
+		else
+			// test for extrude
+			if (IsKeyPressed(KEY_K)) {
+				point2d p0 = HOVERWAL.pos;
+				point2d p3 = HOVERWAL2.pos;
+				float offsy = -(p3.x-p0.x);
+				float offsx = (p3.y-p0.y);
+
+				point2d p1 = p0;
+				point2d p2 = p3;
+				p1.x+= offsx;
+				p1.y+= offsy;
+				p2.x+= offsx;
+				p2.y+= offsy;
+
+
+				float capr = HOVERSEC.z[0]-HOVERSEC.z[1];
+				float florz = HOVERSEC.z[1] + capr*0.1;
+				if (HOVERWAL.ns >=0) {
+					if (map->sect[HOVERWAL.ns].z[0] < hoverfoc.hitpos.z) {
+						// upper seg.
+						florz = map->sect[HOVERWAL.ns].z[0];
+						capr = HOVERSEC.z[0] - florz;
+						florz += capr*0.1;
+					}
+					else // lower seg then;
+					{
+						// upper seg.
+						florz = HOVERSEC.z[1];
+						capr = map->sect[HOVERWAL.ns].z[1] - florz;
+						florz+= capr*0.1;
+					}
+				}
+				float height=capr*0.5;
+				point2d loop[4] = {p0,p1,p2,p3};
+				int nsid = addsectfromloop(4,loop,florz,height,map);
+				sect_t *sec = &map->sect[nsid];
+				sec->wall[0].xsurf[0].tilnum = HOVERWAL.xsurf[0].tilnum;
+				sec->wall[1].xsurf[0].tilnum = HOVERWAL.xsurf[0].tilnum;
+				sec->wall[2].xsurf[0].tilnum = HOVERWAL.xsurf[0].tilnum;
+				sec->wall[3].xsurf[0].tilnum = HOVERWAL.xsurf[0].tilnum;
+				sec->grad[0] = HOVERSEC.grad[0];
+				sec->grad[1] = HOVERSEC.grad[1];
+
+				if (HOVERWAL.ns <0) {
+					sec->wall[3].ns = hoverfoc.sec;
+					sec->wall[3].nw = hoverfoc.wal;
+
+					HOVERWAL.nw = 3;
+					HOVERWAL.ns = nsid;
+				}
+			}
 	}
 // how to unpress the key here to prevent further intercept?
 	if (hoverfoc.spri >= 0) {

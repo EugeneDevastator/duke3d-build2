@@ -124,6 +124,8 @@ int getverts_imp (int s, int w, vertlist_t *ver, int maxverts, mapstate_t* map);
 long insspri_imp (int sect, float x, float y, float z, mapstate_t *map);
 void delspri_imp (int i, mapstate_t *map);
 void changesprisect_imp (int i, int nsect, mapstate_t *map);
+surf_t makeSurfWall(int w1, int wnex);
+surf_t makeSurfCap();
 void makewall(wall_t* w, int8_t wid , int8_t nwid);
 
 int appendsect(mapstate_t *map, int nwalls);
@@ -131,8 +133,9 @@ int appendsect(mapstate_t *map, int nwalls);
 int appendwalls(sect_t *sec, int nwalls);
 
 // outer loop is CW, inner is CCW
-int appendwall_loop(sect_t *sec, int nwalls, point3d* coords);
+int appendwall_loop(sect_t *sec, int nwalls, point2d* coords);
 
+int addsectfromloop(int nwalls, point2d *coords, float floorz, float height, mapstate_t *map);
 
 void makeslabuvform(int surfid, float slabH, wall_t *wal, int dukescales[4], int tilesize[2]);
 int splitwallat(int sid, int wid, point3d pos, mapstate_t* map);

@@ -594,26 +594,41 @@ void changesprisect_imp (int i, int nsect, mapstate_t *map)
 	spr->sect = nsect;
 }
 
+surf_t makeSurfWall(int w1, int wnex) {
+	surf_t s = {0};
+	s.tilnum=0;
+	s.owal = w1;
+	s.uwal = wnex;
+	s.vwal = w1;
+	s.otez = 0;
+	s.utez = 0;
+	s.vtez = TEZ_WORLDZ1;
+	s.alpha=1;
+	s.uvcoords[0] = (point3d){0,0,0};
+	s.uvcoords[1] = (point3d){1,0,0};
+	s.uvcoords[2] = (point3d){0,0,1};
+
+	s.uvform[0]=1;
+	s.uvform[1]=1;
+	s.uvform[2]=0;
+	s.uvform[3]=0;
+	s.rsc=8192; // FIX THIS CRAP! its shade
+	return s;
+}
+
+surf_t makeSurfCap() {
+	surf_t s = makeSurfWall(0,1);
+	s.uvcoords[0] = (point3d){0,0,0};
+	s.uvcoords[1] = (point3d){1,0,0};
+	s.uvcoords[2] = (point3d){0,1,0};
+	return s;
+}
+
 void makewall(wall_t *w, int8_t wid, int8_t nwid) {
-	w->xsurf[0].tilnum=0;
-	w->xsurf[0].owal = wid;
-	w->xsurf[0].uwal = nwid;
-	w->xsurf[0].vwal = wid;
-	w->xsurf[0].otez = 0;
-	w->xsurf[0].utez = 0;
-	w->xsurf[0].vtez = TEZ_WORLDZ1;
-	w->xsurf[0].alpha=1;
-	w->xsurf[0].uvcoords[0] = (point3d){0,0,0};
-	w->xsurf[0].uvcoords[1] = (point3d){1,0,0};
-	w->xsurf[0].uvcoords[2] = (point3d){0,0,1};
-
-	w->xsurf[0].uvform[0]=1;
-	w->xsurf[0].uvform[1]=1;
-	w->xsurf[0].uvform[2]=0;
-	w->xsurf[0].uvform[3]=0;
-
+	w->xsurf[0] = makeSurfWall(wid,nwid);
 	w->xsurf[1]=w->xsurf[0];
 	w->xsurf[2]=w->xsurf[0];
+	w->tags[1]=-1;
 	w->surf=w->xsurf[0];
 	w->surfn=3;
 	w->nw = -1;
@@ -629,9 +644,11 @@ int appendsect(mapstate_t *map, int nwalls) {
 		memset(&map->sect[i],0,(map->malsects-i)*sizeof(sect_t));
 	}
 	// init walls
-	map->sect[i].wall = malloc(nwalls * sizeof(wall_t));
-	map->sect[i].n = 0; map->sect[i].nmax = 8;
-	map->sect[i].wall = (wall_t *)malloc(map->sect[i].nmax*sizeof(wall_t));
+	map->numsects++;
+	map->sect[i].n = nwalls; map->sect[i].nmax = 8;
+	map->sect[i].tags[1] = -1;
+	map->sect[i].wall = (wall_t *)malloc(map->sect[i].nmax * sizeof(wall_t));
+	return i;
 }
 
 int appendwalls(sect_t *sec, int nwalls) {
@@ -639,13 +656,13 @@ int appendwalls(sect_t *sec, int nwalls) {
 	if (sec->n + nwalls >= sec->nmax) {
 		sec->nmax = max(sec->n + nwalls, sec->nmax << 1);
 		sec->wall = (wall_t *)realloc(sec->wall, sec->nmax * sizeof(wall_t));
-		memset(&sec->wall[i], 0, (sec->nmax - i) * sizeof(wall_t));
 	}
+	memset(&sec->wall[i], 0, (sec->nmax - i) * sizeof(wall_t));
 	sec->n += nwalls;
 	return i;
 }
 
-int appendwall_loop(sect_t *sec, int nwalls, point3d *coords) {
+int appendwall_loop(sect_t *sec, int nwalls, point2d *coords) {
 	int start_idx = appendwalls(sec, nwalls);
 
 	// Set up wall coordinates and loop linking
@@ -665,6 +682,22 @@ int appendwall_loop(sect_t *sec, int nwalls, point3d *coords) {
 		makewall(&sec->wall[wall_idx], wall_idx, wall_idx + sec->wall[wall_idx].n);
 	}
 	return start_idx;
+}
+
+int addsectfromloop(int nwalls, point2d *coords, float floorz, float height, mapstate_t *map) {
+	int nsec = appendsect(map,0);
+	sect_t *s  =&map->sect[nsec];
+	appendwall_loop(s,nwalls, coords);
+	s->surf[0] = makeSurfCap();
+	s->surf[1] = s->surf[0];
+	s->z[0]=floorz+height;
+	s->z[1]=floorz;
+	s->destpn[0]=-1;
+	s->destpn[1]=-1;
+	//s->grad[0].x=0.5;
+	//s->grad[0].y=0.5;
+	//s->grad[1]= s->grad[0];
+	return nsec;
 }
 
 // dukescales = xy rep, xypan

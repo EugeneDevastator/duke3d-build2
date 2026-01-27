@@ -1104,6 +1104,7 @@ public:
 		rlDisableBackfaceCulling();
 
 		// Draw floors and ceilings with slopes
+		if (false)
 		for (int s = 0; s < map->numsects; s++) {
 			for (int isFloor = 0; isFloor < 2; isFloor++) {
 				int meshIdx = s * 2 + isFloor;
