@@ -356,7 +356,9 @@ void PickgrabAccept() {
 		// need to update sprites here.
 //		map->sect[grabfoc.sec].wall[grabfoc.wal].x=savedtr.p.x;
 	//	map->sect[grabfoc.sec].wall[grabfoc.wal].y=savedtr.p.y;
+		checksprisect_imp(-1, map);
 	}
+
 	grabfoc.spri = -1; // jsut do noting now.
 	ctx.mode = Fly;
 }
