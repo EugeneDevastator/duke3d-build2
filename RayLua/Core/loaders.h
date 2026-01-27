@@ -179,7 +179,7 @@ static int arewallstouching (int s0, int w0, int s1, int w1, mapstate_t* map)
 	return(0);
 }
 
-
+// LEGACY - remove.
 static void checknextwalls_imp (mapstate_t *map)
 {
 #if 0

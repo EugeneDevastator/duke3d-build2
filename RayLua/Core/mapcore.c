@@ -18,76 +18,122 @@ long get_gmaltiles(void) { return gmaltiles; }
 long* get_gtilehashead(void) { return gtilehashead; }
 
 int splitwallat(int sid, int wid, point3d pos, mapstate_t *map) {
-	int bs = sid;
-	int bw = wid;
-	int i, j;
-	sect_t *sec = map->sect;
+    int bs = sid;
+    int bw = wid;
+    int i, j;
+    sect_t *sec = map->sect;
 
-	// TODO: Check if inserted point is on other walls
-	// For now, insert to all walls anyway
+    // TODO: Check if inserted point is on other walls
+    // For now, insert to all walls anyway
 
-	i = dupwall_imp(&map->sect[bs], bw);
-	wall_t *wal = sec[bs].wall;
-	wal[i].x = pos.x;
-	wal[i].y = pos.y;
+    i = dupwall_imp(&map->sect[bs], bw);
+    wall_t *wal = sec[bs].wall;
+    wal[i].x = pos.x;
+    wal[i].y = pos.y;
 
-	int s = wal[bw].ns;
-	if (s < 0) {
+    // Fix all external references to this sector's walls after insertion
+    for (int fix_s = 0; fix_s < map->numsects; fix_s++) {
+        for (int fix_w = 0; fix_w < sec[fix_s].n; fix_w++) {
+            wall_t *fix_wall = &sec[fix_s].wall[fix_w];
 
-		checknextwalls_imp(map);
-		checksprisect_imp(-1, map);
-		return -1;
-	}
+            // Update ns/nw references
+            if (fix_wall->ns == bs && fix_wall->nw > bw) {
+                fix_wall->nw++;  // Shift wall index
+            }
 
-	// Get all walls in the chain using legacy method first
-	int w = wal[bw].nw;
-	int new_walls[32];  // Store indices of newly created walls
-	int new_sectors[32]; // Store sector indices
-	int new_count = 1;
+            // Update nschain/nwchain references
+            if (fix_wall->nschain == bs && fix_wall->nwchain > bw) {
+                fix_wall->nwchain++;  // Shift chain wall index
+            }
+        }
+    }
 
-	new_sectors[0] = bs;
-	new_walls[0] = i;
+    int s = wal[bw].ns;
+    if (s < 0) {
+        // No connected sector - just set chain pointers to -1
+        wal[i].nschain = -1;
+        wal[i].nwchain = -1;
+        wal[bw].nschain = -1;
+        wal[bw].nwchain = -1;
 
-	do {
-		j = dupwall_imp(&sec[s], w);
-		wal = sec[s].wall; // Refresh pointer after realloc
-		wal[j].x = pos.x;
-		wal[j].y = pos.y;
+      //  checknextwalls_imp(map);
+        checksprisect_imp(-1, map);
+        return i;
+    }
 
-		// Store the new wall info
-		new_sectors[new_count] = s;
-		new_walls[new_count] = j;
-		new_count++;
+    // Continue with chain processing...
+    int w = wal[bw].nw;
+    int new_walls[32];
+    int new_sectors[32];
+    int new_count = 1;
 
-		s = wal[w].ns;
-		if ((s < 0) || (s == bs)) break;
-		w = wal[w].nw;
-	} while (1);
+    new_sectors[0] = bs;
+    new_walls[0] = i;
 
-	// Now set up basic ns/nw connections for new walls only
-	for (int idx = 0; idx < new_count; idx++) {
-		int next_idx = (idx + 1) % new_count;
+    int chain_length = 1;
+    int current_s = s;
+    int current_w = w;
 
-		wall_t *current_wall = &sec[new_sectors[idx]].wall[new_walls[idx]];
-		current_wall->ns = new_sectors[next_idx];
-		current_wall->nw = new_walls[next_idx];
+    do {
+        j = dupwall_imp(&sec[current_s], current_w);
 
-		// Initialize chain pointers to -1
-		current_wall->nschain = -1;
-		current_wall->nwchain = -1;
-	}
+        // Fix external references after each dupwall_imp
+        for (int fix_s = 0; fix_s < map->numsects; fix_s++) {
+            for (int fix_w = 0; fix_w < sec[fix_s].n; fix_w++) {
+                wall_t *fix_wall = &sec[fix_s].wall[fix_w];
 
-	// Now upgrade each new wall to create proper chain structure
-	for (int idx = 0; idx < new_count; idx++) {
-		upgradewallportchain(new_sectors[idx], new_walls[idx], map);
-	}
+                if (fix_wall->ns == current_s && fix_wall->nw > current_w) {
+                    fix_wall->nw++;
+                }
+                if (fix_wall->nschain == current_s && fix_wall->nwchain > current_w) {
+                    fix_wall->nwchain++;
+                }
+            }
+        }
 
-	checknextwalls_imp(map);
-	checksprisect_imp(-1, map);
-	return j;
+        wal = sec[current_s].wall; // Refresh pointer
+        wal[j].x = pos.x;
+        wal[j].y = pos.y;
+
+        new_sectors[new_count] = current_s;
+        new_walls[new_count] = j;
+        new_count++;
+        chain_length++;
+
+        current_s = wal[current_w].ns;
+        if ((current_s < 0) || (current_s == bs)) break;
+        current_w = wal[current_w].nw;
+    } while (1);
+
+    // Rest of the logic remains the same...
+    if (chain_length >= 3) {
+        for (int idx = 0; idx < new_count; idx++) {
+            int next_idx = (idx + 1) % new_count;
+
+            wall_t *current_wall = &sec[new_sectors[idx]].wall[new_walls[idx]];
+            current_wall->ns = new_sectors[next_idx];
+            current_wall->nw = new_walls[next_idx];
+            current_wall->nschain = -1;
+            current_wall->nwchain = -1;
+        }
+
+        for (int idx = 0; idx < new_count; idx++) {
+            upgradewallportchain(new_sectors[idx], new_walls[idx], map);
+        }
+    } else {
+        for (int idx = 0; idx < new_count; idx++) {
+            wall_t *current_wall = &sec[new_sectors[idx]].wall[new_walls[idx]];
+            current_wall->nschain = -1;
+            current_wall->nwchain = -1;
+        }
+    }
+
+    checknextwalls_imp(map);
+    checksprisect_imp(-1, map);
+    return j;
 }
 
-// TODO: Implement point-on-wall checking
+ // TODO: Implement point-on-wall checking
 int is_point_on_wall(point3d pos, int sid, int wid, mapstate_t *map, float tolerance) {
     // Check if pos lies on the line segment defined by wall wid in sector sid
     // Return 1 if on wall, 0 if not
@@ -1275,7 +1321,7 @@ int getwalls_chain(int s, int w, vertlist_t *ver, int maxverts, mapstate_t *map)
 			ver[vn].w = current_w;
 			vn++;
 		}
-
+// here current_s becomes -1 and current_w -1
 		wal = &sec[current_s].wall[current_w];
 
 		// Move to next in chain
