@@ -359,56 +359,77 @@ void PickgrabAccept() {
 	ctx.mode = Fly;
 }
 void PickgrabUpdate() {
-	Vector2 dmov = GetMouseDelta();
-	float scrol = GetMouseWheelMove();
-	addto(&trdiff.p, scaled(BBDOWN,scrol*0.2f));
-	addto(&localp2, scaled(BBDOWN,scrol*0.2f));
-	if (ISGRABSPRI) {
-		map->spri[grabfoc.spri].tr = local_to_world_transform_p(trdiff, &cam->tr);
-		int s = map->spri[grabfoc.spri].sect;
-		updatesect_p(map->spri[grabfoc.spri].p, &s, map);
-		changesprisect_imp(grabfoc.spri, s, map);
-	}
+    Vector2 dmov = GetMouseDelta();
+    float scrol = GetMouseWheelMove();
+    addto(&trdiff.p, scaled(BBDOWN,scrol*0.2f));
+    addto(&localp2, scaled(BBDOWN,scrol*0.2f));
 
-	else if (ISGRABWAL) {
-		transform tmp;
-		point3d tp2;
-		// kinda messes up with currently rendered wall.
-		if (true && hoverfoc.wal < 0 && hoverfoc.sec >= 0) {
-			// nah we just need to slide wall along the floor. because textures and stuff.
-			// so need raycast control base on mode.
-			// move wall along floor or ceil.
-			tmp.p.x = hoverfoc.hitpos.x;
-			tmp.p.y = hoverfoc.hitpos.y;
-			tp2.x = tmp.p.x + localp2.x;
-			tp2.y = tmp.p.y + localp2.y;
-		} else {
-			tmp = local_to_world_transform_p(trdiff, &cam->tr);
-			tp2 = local_to_world_point(localp2, &cam->tr);
-		}
-		map->sect[grabfoc.sec].wall[grabfoc.wal].x=tmp.p.x;
-		map->sect[grabfoc.sec].wall[grabfoc.wal].y=tmp.p.y;
-		for (int i = 0; i < totalverts; ++i) {
-			map->sect[verts[i].s].wall[verts[i].w].x = tmp.p.x;
-			map->sect[verts[i].s].wall[verts[i].w].y = tmp.p.y;
-		}
-		// move ahead-wall
-		if (selmode & SEL_SURF) {
-			map->sect[grabfoc.sec].wall[grabfoc.wal2].x=tp2.x;
-			map->sect[grabfoc.sec].wall[grabfoc.wal2].y=tp2.y;
-			for (int i = 0; i < totalverts2; ++i) {
-				map->sect[verts2[i].s].wall[verts2[i].w].x = tp2.x;
-				map->sect[verts2[i].s].wall[verts2[i].w].y = tp2.y;
-			}
-		}
-	}
+    if (ISGRABSPRI) {
+        map->spri[grabfoc.spri].tr = local_to_world_transform_p(trdiff, &cam->tr);
+        int s = map->spri[grabfoc.spri].sect;
+        updatesect_p(map->spri[grabfoc.spri].p, &s, map);
+        changesprisect_imp(grabfoc.spri, s, map);
+    }
+    else if (ISGRABWAL) {
+        transform tmp;
+        point3d tp2;
 
-	if (IsKeyPressed(K_PICKGRAB)) {
-		PickgrabAccept();
-		grabfoc.spri = -1;
-		ctx.op = accept;
-	}
+        // Wall dragging along floor/ceiling plane
+        //if (hoverfoc.wal < 0 && hoverfoc.sec >= 0)
+        	{
+            // Project camera ray onto horizontal plane
+
+            // Calculate intersection of camera ray with horizontal plane at target_z
+            point3d ray_start = cam->p;
+            point3d ray_dir = cam->f;
+        	//float target_z = map->sect[grabfoc.sec].z[ray_dir.z > 0]; // floor : ceiling
+        	float target_z = grabfoc.hitpos.z; // floor : ceiling
+
+            if (fabsf(ray_dir.z) > 0.001f) {
+                float t = (target_z - ray_start.z) / ray_dir.z;
+                tmp.p.x = ray_start.x + ray_dir.x * t;
+                tmp.p.y = ray_start.y + ray_dir.y * t;
+            } else {
+                // Ray parallel to plane, use mouse delta for movement
+                point3d right = cam->tr.r;
+                point3d down = cam->tr.d;
+                tmp.p.x = savedtr.p.x + dmov.x * 0.1f * right.x + dmov.y * -0.1f * down.x;
+                tmp.p.y = savedtr.p.y + dmov.x * 0.1f * right.y + dmov.y * -0.1f * down.y;
+            }
+
+            tp2.x = tmp.p.x + localp2.x;
+            tp2.y = tmp.p.y + localp2.y;
+        }
+    	//else {
+        //    tmp = local_to_world_transform_p(trdiff, &cam->tr);
+        //    tp2 = local_to_world_point(localp2, &cam->tr);
+        //}
+
+        map->sect[grabfoc.sec].wall[grabfoc.wal].x = tmp.p.x;
+        map->sect[grabfoc.sec].wall[grabfoc.wal].y = tmp.p.y;
+        for (int i = 0; i < totalverts; ++i) {
+            map->sect[verts[i].s].wall[verts[i].w].x = tmp.p.x;
+            map->sect[verts[i].s].wall[verts[i].w].y = tmp.p.y;
+        }
+
+        // Move ahead-wall
+        if (selmode & SEL_SURF) {
+            map->sect[grabfoc.sec].wall[grabfoc.wal2].x = tp2.x;
+            map->sect[grabfoc.sec].wall[grabfoc.wal2].y = tp2.y;
+            for (int i = 0; i < totalverts2; ++i) {
+                map->sect[verts2[i].s].wall[verts2[i].w].x = tp2.x;
+                map->sect[verts2[i].s].wall[verts2[i].w].y = tp2.y;
+            }
+        }
+    }
+
+    if (IsKeyPressed(K_PICKGRAB)) {
+        PickgrabAccept();
+        grabfoc.spri = -1;
+        ctx.op = accept;
+    }
 }
+
 void PickgrabStart() {
 	if (grabfoc.spri>=0) {
 		savedtr = map->spri[grabfoc.spri].tr;
@@ -758,14 +779,19 @@ void DrawGizmos(){
 		DrawBoundingBox({bbmax,bbmin}, LIME);
 		//   addto(&map->spri[focusedSprite].tr.p,scaled(right,mv));
 	}
-	if (ISHOVERWAL) {
-		drawVert(hoverfoc.sec,hoverfoc.wal);
-		drawVert(hoverfoc.sec,hoverfoc.wal2);
+	focus_t usefoc;
 
-		float z1= getwallz(&map->sect[hoverfoc.sec], 0, hoverfoc.wal);
-		float z2= getwallz(&map->sect[hoverfoc.sec], 1, hoverfoc.wal);
-		wall_t *w = &map->sect[hoverfoc.sec].wall[hoverfoc.wal];
-		wall_t *w2 = &map->sect[hoverfoc.sec].wall[hoverfoc.wal2];
+	if (ISHOVERWAL) {
+		if (ctx.state.id == Empty.id)
+			usefoc = hoverfoc;
+		else usefoc = grabfoc;
+		drawVert(hoverfoc.sec,usefoc.wal);
+		drawVert(hoverfoc.sec,usefoc.wal2);
+
+		float z1= getwallz(&map->sect[usefoc.sec], 0, usefoc.wal);
+		float z2= getwallz(&map->sect[usefoc.sec], 1, usefoc.wal);
+		wall_t *w = &map->sect[usefoc.sec].wall[usefoc.wal];
+		wall_t *w2 = &map->sect[usefoc.sec].wall[usefoc.wal2];
 		Vector3 rlp1 ={w->x,-z1,w->y};
 		Vector3 rlp2 ={w->x,-z2,w->y};
 		rlColor4ub(255, 128, 128, 255);
