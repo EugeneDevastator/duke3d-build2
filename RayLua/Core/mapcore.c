@@ -20,34 +20,79 @@ long* get_gtilehashead(void) { return gtilehashead; }
 int splitwallat(int sid, int wid, point3d pos, mapstate_t *map) {
 	int bs = sid;
 	int bw = wid;
-	int i,j;
-	sect_t * sec= map->sect;
-	i = dupwall_imp(&map->sect[bs],bw);
-	wall_t * wal = sec[bs].wall;
+	int i, j;
+	sect_t *sec = map->sect;
+
+	// TODO: Check if inserted point is on other walls
+	// For now, insert to all walls anyway
+
+	i = dupwall_imp(&map->sect[bs], bw);
+	wall_t *wal = sec[bs].wall;
 	wal[i].x = pos.x;
 	wal[i].y = pos.y;
 
 	int s = wal[bw].ns;
 	if (s < 0) {
+
 		checknextwalls_imp(map);
-		checksprisect_imp(-1,map);
+		checksprisect_imp(-1, map);
 		return -1;
 	}
 
+	// Get all walls in the chain using legacy method first
 	int w = wal[bw].nw;
-	do
-	{
-		j = dupwall_imp(&sec[s],w);
-		wal = sec[s].wall;
+	int new_walls[32];  // Store indices of newly created walls
+	int new_sectors[32]; // Store sector indices
+	int new_count = 1;
+
+	new_sectors[0] = bs;
+	new_walls[0] = i;
+
+	do {
+		j = dupwall_imp(&sec[s], w);
+		wal = sec[s].wall; // Refresh pointer after realloc
 		wal[j].x = pos.x;
 		wal[j].y = pos.y;
-		s = wal[w].ns; if ((s < 0) || (s == bs)) break;
+
+		// Store the new wall info
+		new_sectors[new_count] = s;
+		new_walls[new_count] = j;
+		new_count++;
+
+		s = wal[w].ns;
+		if ((s < 0) || (s == bs)) break;
 		w = wal[w].nw;
 	} while (1);
 
+	// Now set up basic ns/nw connections for new walls only
+	for (int idx = 0; idx < new_count; idx++) {
+		int next_idx = (idx + 1) % new_count;
+
+		wall_t *current_wall = &sec[new_sectors[idx]].wall[new_walls[idx]];
+		current_wall->ns = new_sectors[next_idx];
+		current_wall->nw = new_walls[next_idx];
+
+		// Initialize chain pointers to -1
+		current_wall->nschain = -1;
+		current_wall->nwchain = -1;
+	}
+
+	// Now upgrade each new wall to create proper chain structure
+	for (int idx = 0; idx < new_count; idx++) {
+		upgradewallportchain(new_sectors[idx], new_walls[idx], map);
+	}
+
 	checknextwalls_imp(map);
-	checksprisect_imp(-1,map);
+	checksprisect_imp(-1, map);
 	return j;
+}
+
+// TODO: Implement point-on-wall checking
+int is_point_on_wall(point3d pos, int sid, int wid, mapstate_t *map, float tolerance) {
+    // Check if pos lies on the line segment defined by wall wid in sector sid
+    // Return 1 if on wall, 0 if not
+    // This would use line-point distance calculation
+    return 0; // Placeholder
 }
 
 long wallclippol (kgln_t *pol, kgln_t *npol)
@@ -246,6 +291,7 @@ int dupwall (sect_t *s, int w)
 	{
 		memset(wal,0,sizeof(wall_t));
 		wal[0].surf.uv[1].x = wal[0].surf.uv[2].y = 1.f;
+		wal[0].nschain = wal[0].nwchain = -1;
 		wal[0].ns = wal[0].nw = -1; s->n = 1;
 		return(0);
 	}
@@ -634,6 +680,8 @@ void makewall(wall_t *w, int8_t wid, int8_t nwid) {
 	w->surf.flags  =0;
 	w->nw = -1;
 	w->ns = -1;
+	w->nschain = -1;
+	w->nwchain = -1;
 	w->n = nwid - wid;
 }
 
