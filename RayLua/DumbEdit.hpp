@@ -228,9 +228,11 @@ void drawVert(Vector3 pos){
 	rlEnd();
 }
 void drawVert(int sec, int w) {
-	wall_t *wal = &map->sect[sec].wall[w];
-	Vector3 pos = {wal->x, -1 * (float) getwallz(&map->sect[sec], 1, w), wal->y};
-	drawVert(pos);
+	if (sec>=0 && w>=0) {
+		wall_t *wal = &map->sect[sec].wall[w];
+		Vector3 pos = {wal->x, -1 * (float) getwallz(&map->sect[sec], 1, w), wal->y};
+		drawVert(pos);
+	}
 }
 
 void drawCylBoard(Vector3 origin, Vector3 localUp, float length, float width) {

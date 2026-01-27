@@ -697,7 +697,7 @@ public:
 		                  bpv3(eyepol[i].worlduvs[0]),
 		                  bpv3(eyepol[i].worlduvs[1]),
 		                  bpv3(eyepol[i].worlduvs[2]));
-		if (eyepol[i].tilnum > gnumtiles_i)
+		if (eyepol[i].tilnum > gnumtiles_i || eyepol[i].tilnum <0)
 			eyepol[i].tilnum = 5;
 		const Texture2D tex = runtimeTextures[eyepol[i].tilnum];
 
