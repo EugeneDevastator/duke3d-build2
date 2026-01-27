@@ -573,24 +573,25 @@ void EditorFrameMin(const Camera3D rlcam) {
 				p2.y+= offsy;
 
 
-				float capr = HOVERSEC.z[0]-HOVERSEC.z[1];
-				float florz = HOVERSEC.z[1] + capr*0.1;
+				float capr = HOVERSEC.z[1]-HOVERSEC.z[0];
+				float florz = HOVERSEC.z[1] - capr*0.1;
+				//axis grows down to floor.
 				if (HOVERWAL.ns >=0) {
-					if (map->sect[HOVERWAL.ns].z[0] < hoverfoc.hitpos.z) {
+					if ( hoverfoc.hitpos.z < map->sect[HOVERWAL.ns].z[0]) {
 						// upper seg.
 						florz = map->sect[HOVERWAL.ns].z[0];
-						capr = HOVERSEC.z[0] - florz;
-						florz += capr*0.1;
+						capr = florz - HOVERSEC.z[0];
+						florz -= capr*0.1;
 					}
 					else // lower seg then;
 					{
 						// upper seg.
 						florz = HOVERSEC.z[1];
-						capr = map->sect[HOVERWAL.ns].z[1] - florz;
-						florz+= capr*0.1;
+						capr = florz-map->sect[HOVERWAL.ns].z[1];
+						florz-= capr*0.1;
 					}
 				}
-				float height=capr*0.5;
+				float height=capr*0.2;
 				point2d loop[4] = {p0,p1,p2,p3};
 				int nsid = addsectfromloop(4,loop,florz,height,map);
 				sect_t *sec = &map->sect[nsid];
@@ -601,12 +602,30 @@ void EditorFrameMin(const Camera3D rlcam) {
 				sec->grad[0] = HOVERSEC.grad[0];
 				sec->grad[1] = HOVERSEC.grad[1];
 
+				// seems that for SOS, new sectors point to wall and sector of firstly made sector hm.
 				if (HOVERWAL.ns <0) {
 					sec->wall[3].ns = hoverfoc.sec;
 					sec->wall[3].nw = hoverfoc.wal;
-
+					sec->wall[3].nw = hoverfoc.wal;
+					sec->wall[3].surfn = 3;
+					sec->wall[3].xsurf[1] = sec->wall[3].xsurf[0];
+					sec->wall[3].xsurf[2] = sec->wall[3].xsurf[0];
+					sec->wall[3].surf.flags = 4;
 					HOVERWAL.nw = 3;
 					HOVERWAL.ns = nsid;
+					HOVERWAL.surfn=3;
+					HOVERWAL.surf.flags=4;
+					HOVERWAL.xsurf[1]=HOVERWAL.xsurf[0];
+					HOVERWAL.xsurf[2]=HOVERWAL.xsurf[0];
+				}
+				else {
+					sec->wall[3].ns = HOVERWAL.ns;
+					sec->wall[3].nw = HOVERWAL.nw;
+					sec->wall[3].surfn = 3;
+					sec->wall[3].surf.flags = 4;
+					sec->wall[3].xsurf[1] = sec->wall[3].xsurf[0];
+					sec->wall[3].xsurf[2] = sec->wall[3].xsurf[0];
+
 				}
 			}
 	}

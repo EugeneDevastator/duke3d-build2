@@ -578,7 +578,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 				sec[i].n = sec[i].nmax = b7sec.wallnum;
 				sec[i].wall = (wall_t *)realloc(sec[i].wall,sec[i].nmax*sizeof(wall_t));
 				memset(sec[i].wall,0,sec[i].nmax*sizeof(wall_t));
-
+				sec[i].lotag = b7sec.lotag;
 				for(j=0;j<2;j++)
 				{
 					sec[i].destpn[j] = -1;

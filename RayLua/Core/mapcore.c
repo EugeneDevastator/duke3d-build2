@@ -631,6 +631,7 @@ void makewall(wall_t *w, int8_t wid, int8_t nwid) {
 	w->tags[1]=-1;
 	w->surf=w->xsurf[0];
 	w->surfn=3;
+	w->surf.flags  =0;
 	w->nw = -1;
 	w->ns = -1;
 	w->n = nwid - wid;
@@ -690,7 +691,7 @@ int addsectfromloop(int nwalls, point2d *coords, float floorz, float height, map
 	appendwall_loop(s,nwalls, coords);
 	s->surf[0] = makeSurfCap();
 	s->surf[1] = s->surf[0];
-	s->z[0]=floorz+height;
+	s->z[0]=floorz-height;
 	s->z[1]=floorz;
 	s->destpn[0]=-1;
 	s->destpn[1]=-1;
@@ -1131,7 +1132,8 @@ int updatesect_portmove(transform *tr, int *cursect, mapstate_t *map) {
 	point3d* pos = &tr->p;
 	long s = *cursect;
 	sect_t *sec = map->sect;
-	if (map->sect[s].destpn[0]>=0 || map->sect[s].destpn[1] >= 0) {
+	if (s>=0 && (map->sect[s].destpn[0]>=0 || map->sect[s].destpn[1] >= 0)) {
+
 		if (insidesect(pos->x, pos->y, sec[s].wall, sec[s].n)) {
 			for (int j = 0; j < 2; j++) {
 				if (sec[s].destpn[j] > -1) {
