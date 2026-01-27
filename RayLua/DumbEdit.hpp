@@ -604,44 +604,87 @@ void EditorFrameMin(const Camera3D rlcam) {
 
 				// seems that for SOS, new sectors point to wall and sector of firstly made sector hm.
 				// SOS linking section
-				if (HOVERWAL.ns < 0) {
-					// First sector on this wall - simple case
-					sec->wall[3].ns = hoverfoc.sec;
-					sec->wall[3].nw = hoverfoc.wal;
-					sec->wall[3].surfn = 3;
-					sec->wall[3].xsurf[1] = sec->wall[3].xsurf[0];
-					sec->wall[3].xsurf[2] = sec->wall[3].xsurf[0];
-					sec->wall[3].surf.flags = 4;
+			// Enhanced SOS linking that handles existing chains
+if (HOVERWAL.ns < 0) {
+    // First sector on this wall - simple case
+    sec->wall[3].ns = hoverfoc.sec;
+    sec->wall[3].nw = hoverfoc.wal;
+    sec->wall[3].surfn = 3;
+    sec->wall[3].xsurf[1] = sec->wall[3].xsurf[0];
+    sec->wall[3].xsurf[2] = sec->wall[3].xsurf[0];
+    sec->wall[3].surf.flags = 4;
 
-					// Update original wall to point to new sector
-					HOVERWAL.ns = nsid;
-					HOVERWAL.nw = 3;
-					HOVERWAL.surfn = 3;
-					HOVERWAL.surf.flags = 4;
-					HOVERWAL.xsurf[1] = HOVERWAL.xsurf[0];
-					HOVERWAL.xsurf[2] = HOVERWAL.xsurf[0];
-				} else {
-					// Multiple sectors case - insert into chain
-					int old_ns = HOVERWAL.ns;
-					int old_nw = HOVERWAL.nw;
+    // Update original wall to point to new sector
+    HOVERWAL.ns = nsid;
+    HOVERWAL.nw = 3;
+    HOVERWAL.surfn = 3;
+    HOVERWAL.surf.flags = 4;
+    HOVERWAL.xsurf[1] = HOVERWAL.xsurf[0];
+    HOVERWAL.xsurf[2] = HOVERWAL.xsurf[0];
+} else {
+    // Multiple sectors case - get existing chain
+    vertlist_t existing_chain[32];
+    int chain_count = getwalls_imp(hoverfoc.sec, hoverfoc.wal, existing_chain, 32, map);
 
-					// New sector points to what original wall pointed to
-					sec->wall[3].ns = old_ns;
-					sec->wall[3].nw = old_nw;
-					sec->wall[3].surfn = 3;
-					sec->wall[3].surf.flags = 4;
-					sec->wall[3].xsurf[1] = sec->wall[3].xsurf[0];
-					sec->wall[3].xsurf[2] = sec->wall[3].xsurf[0];
+    if (chain_count > 0) {
+        // Find insertion point based on height
+        float new_height = sec->z[0] + sec->z[1]; // floor + ceiling
+        float fx = (HOVERWAL.pos.x + HOVERWAL2.pos.x) * 0.5f;
+        float fy = (HOVERWAL.pos.y + HOVERWAL2.pos.y) * 0.5f;
 
-					// Original wall now points to new sector
-					HOVERWAL.ns = nsid;
-					HOVERWAL.nw = 3;
+        int insert_after = -1;
+        for (int i = 0; i < chain_count; i++) {
+            float chain_height = getslopez(&map->sect[existing_chain[i].s], 0, fx, fy) +
+                                getslopez(&map->sect[existing_chain[i].s], 1, fx, fy);
+            if (new_height > chain_height) {
+                insert_after = i;
+            } else {
+                break;
+            }
+        }
 
-					// CRITICAL: Update the target wall to complete chain
-					wall_t *target_wall = &map->sect[old_ns].wall[old_nw];
-					target_wall->ns = hoverfoc.sec;  // Point back to original sector
-					target_wall->nw = hoverfoc.wal;  // Point to original wall
-				}
+        if (insert_after == -1) {
+            // Insert at beginning of chain
+            sec->wall[3].ns = existing_chain[0].s;
+            sec->wall[3].nw = existing_chain[0].w;
+
+            // Update original wall to point to new sector
+            HOVERWAL.ns = nsid;
+            HOVERWAL.nw = 3;
+        } else if (insert_after == chain_count - 1) {
+            // Insert at end of chain
+            wall_t *last_wall = &map->sect[existing_chain[insert_after].s].wall[existing_chain[insert_after].w];
+            sec->wall[3].ns = last_wall->ns;
+            sec->wall[3].nw = last_wall->nw;
+
+            // Update last wall to point to new sector
+            last_wall->ns = nsid;
+            last_wall->nw = 3;
+        } else {
+            // Insert in middle of chain
+            wall_t *prev_wall = &map->sect[existing_chain[insert_after].s].wall[existing_chain[insert_after].w];
+            sec->wall[3].ns = prev_wall->ns;
+            sec->wall[3].nw = prev_wall->nw;
+
+            // Update previous wall to point to new sector
+            prev_wall->ns = nsid;
+            prev_wall->nw = 3;
+        }
+    }
+
+    // Set surface properties
+    sec->wall[3].surfn = 3;
+    sec->wall[3].surf.flags = 4;
+    sec->wall[3].xsurf[1] = sec->wall[3].xsurf[0];
+    sec->wall[3].xsurf[2] = sec->wall[3].xsurf[0];
+
+    // Update original wall surface properties
+    HOVERWAL.surfn = 3;
+    HOVERWAL.surf.flags = 4;
+    HOVERWAL.xsurf[1] = HOVERWAL.xsurf[0];
+    HOVERWAL.xsurf[2] = HOVERWAL.xsurf[0];
+}
+
 			}
 	}
 // how to unpress the key here to prevent further intercept?
