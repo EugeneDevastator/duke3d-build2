@@ -277,67 +277,221 @@ int insidesect (double x, double y, wall_t *wal, int w);
 
 // first pass updatesect to ONLY check nearest + portals.
 int updatesect_portmove(transform *tr, int *cursect, mapstate_t *map);
+void upgradewallportchain(wall_t *startwal, mapstate_t *map) {
+	//  sect.n = number of walls in sector
+	if (startwal->ns < 0)
+		return;
 
+	sect_t *nsec = &map->sect[startwal->ns];
+	wall_t *nwal = &nsec->wall[startwal->nw];
+
+	// If target wall already has chains, we need to insert into existing chain
+	if (nwal->nschain >= 0) {
+		// Insert startwal into existing chain
+		startwal->nschain = nwal->nschain;
+		startwal->nwchain = nwal->nwchain;
+
+		// Update target wall to point to startwal as next in chain
+		// claude  thats sometihng fishy. nschain and nswall are just longs.
+		nwal->nschain = (startwal - map->sect[0].wall) / sizeof(wall_t); // Calculate sector index
+		nwal->nwchain = (startwal - &map->sect[(startwal - map->sect[0].wall) / sizeof(wall_t)].wall[0]); // Calculate wall index within sector
+
+		// Find startwal's sector index properly
+		int startwal_sec = -1;
+		for (int s = 0; s < map->numsects; s++) {
+			if (startwal >= map->sect[s].wall && startwal < map->sect[s].wall + map->sect[s].n) {
+				startwal_sec = s;
+				break;
+			}
+		}
+		int startwal_idx = startwal - map->sect[startwal_sec].wall;
+
+		nwal->nschain = startwal_sec;
+		nwal->nwchain = startwal_idx;
+	} else {
+		// Simple case - create new chain between two walls
+		int nsec_idx = startwal->ns;
+		int nwal_idx = startwal->nw;
+
+		// Find startwal's sector index
+		int startwal_sec = -1;
+		for (int s = 0; s < map->numsects; s++) {
+			if (startwal >= map->sect[s].wall && startwal < map->sect[s].wall + map->sect[s].n) {
+				startwal_sec = s;
+				break;
+			}
+		}
+		int startwal_idx = startwal - map->sect[startwal_sec].wall;
+
+		// Create circular chain
+		startwal->nschain = nsec_idx;
+		startwal->nwchain = nwal_idx;
+		nwal->nschain = startwal_sec;
+		nwal->nwchain = startwal_idx;
+	}
+}
+
+int getwalls_chain(int s, int w, vertlist_t *ver, int maxverts, mapstate_t *map) {
+	sect_t *sec = map->sect;
+	wall_t *startwal = &sec[s].wall[w];
+	wall_t *wal, *nwal;
+	float fx, fy;
+	int vn = 0;
+	int current_s, current_w;
+	int start_s = s, start_w = w;
+
+	// If no connection, return 0
+	if (startwal->ns < 0)
+		return 0;
+
+	// Follow chain using nschain/nwchain
+	current_s = startwal->nschain >= 0 ? startwal->nschain : startwal->ns;
+	current_w = startwal->nwchain >= 0 ? startwal->nwchain : startwal->nw;
+
+	do {
+		if (vn < maxverts) {
+			ver[vn].s = current_s;
+			ver[vn].w = current_w;
+			vn++;
+		}
+
+		wal = &sec[current_s].wall[current_w];
+
+		// Move to next in chain
+		if (wal->nschain >= 0) {
+			current_s = wal->nschain;
+			current_w = wal->nwchain;
+		} else {
+			// Fallback to direct connection
+			current_s = wal->ns;
+			current_w = wal->nw;
+		}
+
+	} while ((current_s != start_s || current_w != start_w) && vn < maxverts);
+
+	// Sort by height at wall midpoint
+	wal = &sec[s].wall[w];
+	nwal = &sec[s].wall[(w + 1) % sec[s].n];
+	fx = (wal->x + nwal->x) * 0.5f;
+	fy = (wal->y + nwal->y) * 0.5f;
+
+	// Bubble sort (keeping Ken's algorithm)
+	vertlist_t tver;
+	for (int k = 1; k < vn; k++) {
+		for (int j = 0; j < k; j++) {
+			float h1 = getslopez(&sec[ver[j].s], 0, fx, fy) + getslopez(&sec[ver[j].s], 1, fx, fy);
+			float h2 = getslopez(&sec[ver[k].s], 0, fx, fy) + getslopez(&sec[ver[k].s], 1, fx, fy);
+
+			if (h1 > h2) {
+				tver = ver[j];
+				ver[j] = ver[k];
+				ver[k] = tver;
+			}
+		}
+	}
+
+	return vn;
+}
 //Pass z as >1e30 to make updatesect ignore height return first sector containing (x,y)
-static void updatesect_imp (float x, float y, float z, int *cursect, mapstate_t* map)
+static int updatesect_imp (float x, float y, float z, int *cursect, mapstate_t* map)
 {
 	sect_t *sec;
 	long *gotsect;
 	int i, s, w, ns, nw, allsec, cnt, *secfif, secfifw, secfifr;
+	int max_iterations;
+
+	if (!cursect || !map || !map->sect) return -1;
 
 	sec = map->sect;
 	s = (*cursect);
+
 	if ((unsigned)s >= (unsigned)map->numsects) //reference invalid; brute force search
 	{
 		for(s=map->numsects-1;s>=0;s--)
 			if (insidesect(x,y,sec[s].wall,sec[s].n))
-				if ((z > 1e30) || ((z >= getslopez(&sec[s],0,x,y)) && (z <= getslopez(&sec[s],1,x,y)))) break;
-		(*cursect) = s; return;
+				if ((z > 1e30) || ((z >= getslopez(&sec[s],0,x,y)) && (z <= getslopez(&sec[s],1,x,y))))
+				{
+					(*cursect) = s;
+					return s;
+				}
+		(*cursect) = -1;
+		return -1;
 	}
 
 	if (insidesect(x,y,sec[s].wall,sec[s].n))
-		if ((z > 1e30) || ((z >= getslopez(&sec[s],0,x,y)) && (z <= getslopez(&sec[s],1,x,y)))) return;
+		if ((z > 1e30) || ((z >= getslopez(&sec[s],0,x,y)) && (z <= getslopez(&sec[s],1,x,y))))
+			return s;
 
 	w = (((map->numsects+31)>>5)<<2);
 	gotsect = (long *)_alloca(w);
-	memset(gotsect,0,w); gotsect[s>>5] |= (1<<s);
-	secfif = (int *)_alloca(map->numsects*sizeof(secfif[0]));
-	secfifw = secfifr = 0;
+	if (!gotsect) return -1;
 
-	(*cursect) = -1; allsec = map->numsects-1;
-	for(cnt=map->numsects-1;cnt>0;cnt--)
+	memset(gotsect,0,w);
+	gotsect[s>>5] |= (1<<s);
+
+	secfif = (int *)_alloca(map->numsects*sizeof(secfif[0]));
+	if (!secfif) return -1;
+
+	secfifw = secfifr = 0;
+	(*cursect) = -1;
+	allsec = map->numsects-1;
+	max_iterations = map->numsects * 2; // Safety limit
+
+	for(cnt=map->numsects-1;cnt>0 && max_iterations>0;cnt--,max_iterations--)
 	{
 		for(w=sec[s].n-1;w>=0;w--)
 		{
 			ns = sec[s].wall[w].ns;
 			nw = sec[s].wall[w].nw;
-			while (((unsigned)ns < (unsigned)map->numsects) && (ns != s))
+
+			// Limit wall traversal iterations
+			int wall_iterations = 0;
+			while (((unsigned)ns < (unsigned)map->numsects) && (ns != s) && wall_iterations < map->numsects)
 			{
+				wall_iterations++;
 				if (!(gotsect[ns>>5]&(1<<ns)))
 				{
 					gotsect[ns>>5] |= (1<<ns);
-					secfif[secfifw] = ns; secfifw++;
+					if (secfifw < map->numsects) {
+						secfif[secfifw] = ns;
+						secfifw++;
+					}
 				}
 				i = ns;
-				ns = sec[i].wall[nw].ns;
-				nw = sec[i].wall[nw].nw;
+				if (i >= 0 && i < map->numsects && nw >= 0 && nw < sec[i].n) {
+					ns = sec[i].wall[nw].ns;
+					nw = sec[i].wall[nw].nw;
+				} else {
+					break; // Invalid indices
+				}
 			}
 		}
 
 		if (secfifr < secfifw)
-		{ s = secfif[secfifr]; secfifr++; } //breadth-first
+		{
+			s = secfif[secfifr];
+			secfifr++;
+		}
 		else
-		{     //fifo was empty.. must be some disjoint sectors
+		{
 			while ((allsec >= 0) && (gotsect[allsec>>5]&(1<<allsec))) allsec--;
-			s = allsec; if (s < 0) break;
+			s = allsec;
+			if (s < 0) break;
 			gotsect[s>>5] |= (1<<s);
 		}
 
-		if (insidesect(x,y,sec[s].wall,sec[s].n))
+		if (s >= 0 && s < map->numsects && insidesect(x,y,sec[s].wall,sec[s].n))
 			if ((z > 1e30) || ((z >= getslopez(&sec[s],0,x,y)) && (z <= getslopez(&sec[s],1,x,y))))
-			{ (*cursect) = s; return; }
+			{
+				(*cursect) = s;
+				return s;
+			}
 	}
+
+	(*cursect) = -1;
+	return -1;
 }
+
 static void updatesect_p (point3d p, int *cursect, mapstate_t* map) {
 	updatesect_imp(p.x ,p.y ,p.z, cursect, map);
 }
