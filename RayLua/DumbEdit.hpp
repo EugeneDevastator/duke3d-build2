@@ -604,11 +604,13 @@ void EditorFrameMin(const Camera3D rlcam) {
 
 				// seems that for SOS, new sectors point to wall and sector of firstly made sector hm.
 				// SOS linking section
-			// Enhanced SOS linking that handles existing chains
+		// Enhanced SOS linking using chain approach
 if (HOVERWAL.ns < 0) {
     // First sector on this wall - simple case
     sec->wall[3].ns = hoverfoc.sec;
     sec->wall[3].nw = hoverfoc.wal;
+    sec->wall[3].nschain = hoverfoc.sec;
+    sec->wall[3].nwchain = hoverfoc.wal;
     sec->wall[3].surfn = 3;
     sec->wall[3].xsurf[1] = sec->wall[3].xsurf[0];
     sec->wall[3].xsurf[2] = sec->wall[3].xsurf[0];
@@ -617,14 +619,19 @@ if (HOVERWAL.ns < 0) {
     // Update original wall to point to new sector
     HOVERWAL.ns = nsid;
     HOVERWAL.nw = 3;
+    HOVERWAL.nschain = nsid;
+    HOVERWAL.nwchain = 3;
     HOVERWAL.surfn = 3;
     HOVERWAL.surf.flags = 4;
     HOVERWAL.xsurf[1] = HOVERWAL.xsurf[0];
     HOVERWAL.xsurf[2] = HOVERWAL.xsurf[0];
 } else {
-    // Multiple sectors case - get existing chain
+    // Multiple sectors case - upgrade existing chain first
+    upgradewallportchain(hoverfoc.sec, hoverfoc.wal, map);
+
+    // Get existing chain using new method
     vertlist_t existing_chain[32];
-    int chain_count = getwalls_imp(hoverfoc.sec, hoverfoc.wal, existing_chain, 32, map);
+    int chain_count = getwalls_chain(hoverfoc.sec, hoverfoc.wal, existing_chain, 32, map);
 
     if (chain_count > 0) {
         // Find insertion point based on height
@@ -647,28 +654,38 @@ if (HOVERWAL.ns < 0) {
             // Insert at beginning of chain
             sec->wall[3].ns = existing_chain[0].s;
             sec->wall[3].nw = existing_chain[0].w;
+            sec->wall[3].nschain = existing_chain[0].s;
+            sec->wall[3].nwchain = existing_chain[0].w;
 
             // Update original wall to point to new sector
             HOVERWAL.ns = nsid;
             HOVERWAL.nw = 3;
+            HOVERWAL.nschain = nsid;
+            HOVERWAL.nwchain = 3;
         } else if (insert_after == chain_count - 1) {
             // Insert at end of chain
             wall_t *last_wall = &map->sect[existing_chain[insert_after].s].wall[existing_chain[insert_after].w];
-            sec->wall[3].ns = last_wall->ns;
-            sec->wall[3].nw = last_wall->nw;
+
+            sec->wall[3].ns = last_wall->nschain;
+            sec->wall[3].nw = last_wall->nwchain;
+            sec->wall[3].nschain = last_wall->nschain;
+            sec->wall[3].nwchain = last_wall->nwchain;
 
             // Update last wall to point to new sector
-            last_wall->ns = nsid;
-            last_wall->nw = 3;
+            last_wall->nschain = nsid;
+            last_wall->nwchain = 3;
         } else {
             // Insert in middle of chain
             wall_t *prev_wall = &map->sect[existing_chain[insert_after].s].wall[existing_chain[insert_after].w];
-            sec->wall[3].ns = prev_wall->ns;
-            sec->wall[3].nw = prev_wall->nw;
+
+            sec->wall[3].ns = prev_wall->nschain;
+            sec->wall[3].nw = prev_wall->nwchain;
+            sec->wall[3].nschain = prev_wall->nschain;
+            sec->wall[3].nwchain = prev_wall->nwchain;
 
             // Update previous wall to point to new sector
-            prev_wall->ns = nsid;
-            prev_wall->nw = 3;
+            prev_wall->nschain = nsid;
+            prev_wall->nwchain = 3;
         }
     }
 
