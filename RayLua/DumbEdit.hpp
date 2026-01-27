@@ -603,29 +603,44 @@ void EditorFrameMin(const Camera3D rlcam) {
 				sec->grad[1] = HOVERSEC.grad[1];
 
 				// seems that for SOS, new sectors point to wall and sector of firstly made sector hm.
-				if (HOVERWAL.ns <0) {
+				// SOS linking section
+				if (HOVERWAL.ns < 0) {
+					// First sector on this wall - simple case
 					sec->wall[3].ns = hoverfoc.sec;
-					sec->wall[3].nw = hoverfoc.wal;
 					sec->wall[3].nw = hoverfoc.wal;
 					sec->wall[3].surfn = 3;
 					sec->wall[3].xsurf[1] = sec->wall[3].xsurf[0];
 					sec->wall[3].xsurf[2] = sec->wall[3].xsurf[0];
 					sec->wall[3].surf.flags = 4;
-					HOVERWAL.nw = 3;
+
+					// Update original wall to point to new sector
 					HOVERWAL.ns = nsid;
-					HOVERWAL.surfn=3;
-					HOVERWAL.surf.flags=4;
-					HOVERWAL.xsurf[1]=HOVERWAL.xsurf[0];
-					HOVERWAL.xsurf[2]=HOVERWAL.xsurf[0];
-				}
-				else {
-					sec->wall[3].ns = HOVERWAL.ns;
-					sec->wall[3].nw = HOVERWAL.nw;
+					HOVERWAL.nw = 3;
+					HOVERWAL.surfn = 3;
+					HOVERWAL.surf.flags = 4;
+					HOVERWAL.xsurf[1] = HOVERWAL.xsurf[0];
+					HOVERWAL.xsurf[2] = HOVERWAL.xsurf[0];
+				} else {
+					// Multiple sectors case - insert into chain
+					int old_ns = HOVERWAL.ns;
+					int old_nw = HOVERWAL.nw;
+
+					// New sector points to what original wall pointed to
+					sec->wall[3].ns = old_ns;
+					sec->wall[3].nw = old_nw;
 					sec->wall[3].surfn = 3;
 					sec->wall[3].surf.flags = 4;
 					sec->wall[3].xsurf[1] = sec->wall[3].xsurf[0];
 					sec->wall[3].xsurf[2] = sec->wall[3].xsurf[0];
 
+					// Original wall now points to new sector
+					HOVERWAL.ns = nsid;
+					HOVERWAL.nw = 3;
+
+					// CRITICAL: Update the target wall to complete chain
+					wall_t *target_wall = &map->sect[old_ns].wall[old_nw];
+					target_wall->ns = hoverfoc.sec;  // Point back to original sector
+					target_wall->nw = hoverfoc.wal;  // Point to original wall
 				}
 			}
 	}
