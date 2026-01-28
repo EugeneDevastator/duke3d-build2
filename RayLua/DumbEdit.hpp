@@ -138,6 +138,7 @@ econtext ctxprev;
 typedef struct {
 	int wal;
 	int wal2;
+	int onewall;
 	int sec;
 	int spri;
 	point3d hitpos;
@@ -323,7 +324,8 @@ wall_idx verts2[256];
 int totalverts;
 int totalverts2;
 point2d secondwalldif;
-
+bool pg_graballverts = true;
+bool usehitZ = false;
 void PickgrabDiscard() {
 	if (grabfoc.spri>=0) {
 		map->spri[grabfoc.spri].tr= savedtr;
@@ -386,8 +388,16 @@ void PickgrabUpdate() {
             // Calculate intersection of camera ray with horizontal plane at target_z
             point3d ray_start = cam->p;
             point3d ray_dir = cam->f;
-        	//float target_z = map->sect[grabfoc.sec].z[ray_dir.z > 0]; // floor : ceiling
-        	float target_z = grabfoc.hitpos.z; // floor : ceiling
+        	float target_z ;
+
+            if (IsKeyPressed(KEY_F))
+	            usehitZ = !usehitZ;
+            if (usehitZ)
+	            target_z = grabfoc.hitpos.z; // floor : ceiling
+            else
+	            target_z = map->sect[grabfoc.sec].z[ray_dir.z > 0]; // floor : ceiling
+
+
 
             if (fabsf(ray_dir.z) > 0.001f) {
                 float t = (target_z - ray_start.z) / ray_dir.z;
@@ -411,6 +421,8 @@ void PickgrabUpdate() {
 
         map->sect[grabfoc.sec].wall[grabfoc.wal].x = tmp.p.x;
         map->sect[grabfoc.sec].wall[grabfoc.wal].y = tmp.p.y;
+
+    	if (pg_graballverts)
         for (int i = 0; i < totalverts; ++i) {
             map->sect[verts[i].s].wall[verts[i].w].x = tmp.p.x;
             map->sect[verts[i].s].wall[verts[i].w].y = tmp.p.y;
@@ -439,6 +451,11 @@ void PickgrabStart() {
 		savedtr = map->spri[grabfoc.spri].tr;
 	}
 	else if (grabfoc.wal>=0 && grabfoc.sec >=0) {
+		bool grabboth = false;
+		if (!grabboth) // grab both walls
+		{
+			grabfoc.wal = hoverfoc.onewall;
+		}
 			//for red walls we'd need to grab verts of all adjacent walls.
 			// something in build2 was there for it.
 			savedtr = cam->tr;
@@ -562,7 +579,16 @@ void Editor_DoRaycasts(cam_t *cc) {
 	//ctx.state.discard();// to restore original map state for raycast.
 
 	raycast(&cc->p,&cc->f,1e32,cc->cursect,&hoverfoc.sec,&hoverfoc.wal,&hoverfoc.spri,&hoverfoc.hitpos,map);
-
+	if (ISHOVERWAL) {
+		float z1 = getwallz(&map->sect[hoverfoc.sec], 1, hoverfoc.wal);
+		float z2 = getwallz(&map->sect[hoverfoc.sec], 1, hoverfoc.wal2);
+		float d1 = bmathdistsqrp2d({HOVERWAL.x, HOVERWAL.y}, BPXY(hoverfoc.hitpos));
+		float d2 = bmathdistsqrp2d({HOVERWAL2.x, HOVERWAL2.y}, BPXY(hoverfoc.hitpos));
+		hoverfoc.onewall = hoverfoc.wal;
+		if (d2 < d1) {
+			hoverfoc.onewall = hoverfoc.wal2;
+		}
+	}
 }
 
 void EditorFrameMin(const Camera3D rlcam) {
@@ -630,27 +656,27 @@ void EditorFrameMin(const Camera3D rlcam) {
 				// seems that for SOS, new sectors point to wall and sector of firstly made sector hm.
 				// SOS linking section
 		// Enhanced SOS linking using chain approach
-if (HOVERWAL.ns < 0) {
-    // First sector on this wall - simple case
-    sec->wall[3].ns = hoverfoc.sec;
-    sec->wall[3].nw = hoverfoc.wal;
-    sec->wall[3].nschain = hoverfoc.sec;
-    sec->wall[3].nwchain = hoverfoc.wal;
-    sec->wall[3].surfn = 3;
-    sec->wall[3].xsurf[1] = sec->wall[3].xsurf[0];
-    sec->wall[3].xsurf[2] = sec->wall[3].xsurf[0];
-    sec->wall[3].surf.flags = 4;
+	if (HOVERWAL.ns < 0) {
+	    // First sector on this wall - simple case
+	    sec->wall[3].ns = hoverfoc.sec;
+	    sec->wall[3].nw = hoverfoc.wal;
+	    sec->wall[3].nschain = hoverfoc.sec;
+	    sec->wall[3].nwchain = hoverfoc.wal;
+	    sec->wall[3].surfn = 3;
+	    sec->wall[3].xsurf[1] = sec->wall[3].xsurf[0];
+	    sec->wall[3].xsurf[2] = sec->wall[3].xsurf[0];
+	    sec->wall[3].surf.flags = 4;
 
-    // Update original wall to point to new sector
-    HOVERWAL.ns = nsid;
-    HOVERWAL.nw = 3;
-    HOVERWAL.nschain = nsid;
-    HOVERWAL.nwchain = 3;
-    HOVERWAL.surfn = 3;
-    HOVERWAL.surf.flags = 4;
-    HOVERWAL.xsurf[1] = HOVERWAL.xsurf[0];
-    HOVERWAL.xsurf[2] = HOVERWAL.xsurf[0];
-} else {
+	    // Update original wall to point to new sector
+	    HOVERWAL.ns = nsid;
+	    HOVERWAL.nw = 3;
+	    HOVERWAL.nschain = nsid;
+	    HOVERWAL.nwchain = 3;
+	    HOVERWAL.surfn = 3;
+	    HOVERWAL.surf.flags = 4;
+	    HOVERWAL.xsurf[1] = HOVERWAL.xsurf[0];
+	    HOVERWAL.xsurf[2] = HOVERWAL.xsurf[0];
+	} else {
     // Multiple sectors case - upgrade existing chain first
     upgradewallportchain(hoverfoc.sec, hoverfoc.wal, map);
 
@@ -785,17 +811,18 @@ void DrawGizmos(){
 	}
 	focus_t usefoc;
 
-	if (ISHOVERWAL) {
+	if (ISHOVERWAL || ctx.state.id != Empty.id) {
 		if (ctx.state.id == Empty.id)
 			usefoc = hoverfoc;
-		else usefoc = grabfoc;
-		drawVert(hoverfoc.sec,usefoc.wal);
-		drawVert(hoverfoc.sec,usefoc.wal2);
+		else
+			usefoc = grabfoc;
+		drawVert(usefoc.sec,usefoc.wal);
+		drawVert(usefoc.sec,usefoc.wal2);
 
-		float z1= getwallz(&map->sect[usefoc.sec], 0, usefoc.wal);
-		float z2= getwallz(&map->sect[usefoc.sec], 1, usefoc.wal);
-		wall_t *w = &map->sect[usefoc.sec].wall[usefoc.wal];
-		wall_t *w2 = &map->sect[usefoc.sec].wall[usefoc.wal2];
+		float z1= getwallz(&map->sect[usefoc.sec], 0, usefoc.onewall);
+		float z2= getwallz(&map->sect[usefoc.sec], 1, usefoc.onewall);
+		wall_t *w = &map->sect[usefoc.sec].wall[usefoc.onewall];
+	//	wall_t *w2 = &map->sect[usefoc.sec].wall[usefoc.wal2];
 		Vector3 rlp1 ={w->x,-z1,w->y};
 		Vector3 rlp2 ={w->x,-z2,w->y};
 		rlColor4ub(255, 128, 128, 255);
@@ -803,7 +830,7 @@ void DrawGizmos(){
 	}
 	DrawPoint3D(buildToRaylibPos(hoverfoc.hitpos), RED);
 
-// Draw loops that are drawn:
+// Draw loops that are userdrawn:
 	int n = 0;
 	for (int i = 0; i < loopn; ++i) {
 		n = (i + 1) % loopn;

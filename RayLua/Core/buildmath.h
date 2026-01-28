@@ -15,11 +15,25 @@ static const point3d BBRIGHT = {1,0,0};
 static const point3d BBFORWARD = {0,1,0};
 static const point3d BBDOWN = {0,0,1};
 
+#define BPXY(p3d) {p3d.x, p3d.y}
+
+
 static inline float vlen(point3d *p) {
     return sqrtf(p->x * p->x + p->y * p->y + p->z * p->z);
 }
 static inline float vlensquared(point3d *p) {
     return (p->x * p->x + p->y * p->y + p->z * p->z);
+}
+static inline float bmathdistsqrp3d(point3d p1, point3d p2) {
+    float dx = p1.x-p2.x;
+    float dy = p1.y-p2.y;
+    float dz = p1.z-p2.z;
+    return (dx*dx + dy*dy + dz*dz);
+}
+static inline float bmathdistsqrp2d(point2d p1, point2d p2) {
+    float dx = p1.x-p2.x;
+    float dy = p1.y-p2.y;
+    return (dx*dx + dy*dy);
 }
 /*
 *typedef struct {
