@@ -23,6 +23,9 @@ int splitwallat(int sid, int wid, point3d pos, mapstate_t *map) {
     int i, j;
     sect_t *sec = map->sect;
 
+    // TODO: Check if inserted point is on other walls
+    // For now, insert to all walls anyway
+
     i = dupwall_imp(&map->sect[bs], bw);
     wall_t *wal = sec[bs].wall;
     wal[i].x = pos.x;
@@ -33,24 +36,27 @@ int splitwallat(int sid, int wid, point3d pos, mapstate_t *map) {
         for (int fix_w = 0; fix_w < sec[fix_s].n; fix_w++) {
             wall_t *fix_wall = &sec[fix_s].wall[fix_w];
 
+            // Update ns/nw references
             if (fix_wall->ns == bs && fix_wall->nw > bw) {
-                fix_wall->nw++;
+                fix_wall->nw++;  // Shift wall index
             }
+
+            // Update nschain/nwchain references
             if (fix_wall->nschain == bs && fix_wall->nwchain > bw) {
-                fix_wall->nwchain++;
+                fix_wall->nwchain++;  // Shift chain wall index
             }
         }
     }
 
     int s = wal[bw].ns;
     if (s < 0) {
-        // No connected sector
-        wal[i].ns = -1;
-        wal[i].nw = -1;
+        // No connected sector - just set chain pointers to -1
         wal[i].nschain = -1;
         wal[i].nwchain = -1;
+        wal[bw].nschain = -1;
+        wal[bw].nwchain = -1;
 
-        checknextwalls_imp(map);
+      //  checknextwalls_imp(map);
         checksprisect_imp(-1, map);
         return i;
     }
@@ -131,7 +137,7 @@ int splitwallat(int sid, int wid, point3d pos, mapstate_t *map) {
         upgradewallportchain(new_sectors[idx], new_walls[idx], map);
     }
 
-    checknextwalls_imp(map);
+  //  checknextwalls_imp(map);
     checksprisect_imp(-1, map);
     return j;
 }
@@ -310,6 +316,7 @@ int dupwall_imp (sect_t *s, int w)
 		memset(wal,0,sizeof(wall_t));
 		wal[0].surf.uv[1].x = wal[0].surf.uv[2].y = 1.f;
 		wal[0].ns = wal[0].nw = -1; s->n = 1;
+		wal[0].surf.flags = 4;
 		return(0);
 	}
 
@@ -321,36 +328,10 @@ int dupwall_imp (sect_t *s, int w)
 	else { for(i=w+1;wal[i].n>0;i++); wal[i].n--; }
 
 	s->n++;  // Increment wall count
+	wal[w+1].surf.flags=4;
 	return(w+1);  // Return index of the new wall
 }
 
-int dupwall (sect_t *s, int w)
-{
-	wall_t *wal;
-	int i, j;
-
-	if (s->n >= s->nmax)
-	{
-		s->nmax = max(s->n+1,s->nmax<<1); s->nmax = max(s->nmax,8);
-		s->wall = (wall_t *)realloc(s->wall,s->nmax*sizeof(wall_t));
-	}
-	wal = s->wall;
-
-	if (!s->n)
-	{
-		memset(wal,0,sizeof(wall_t));
-		wal[0].surf.uv[1].x = wal[0].surf.uv[2].y = 1.f;
-		wal[0].nschain = wal[0].nwchain = -1;
-		wal[0].ns = wal[0].nw = -1; s->n = 1;
-		return(0);
-	}
-	for(i=s->n;i>w;i--) wal[i] = wal[i-1];
-	if (!wal[0].n)    { wal[0].n = 1; wal[1].n = -1; }
-	else if (wal[w].n < 0) { wal[w+1].n = wal[w].n-1; wal[w].n = 1; }
-	else { for(i=w+1;wal[i].n>0;i++); wal[i].n--; }
-	s->n++;
-	return(w+1);
-}
 // Calculates the Z height at point (x,y) on a sloped surface
 // Uses the sector's gradient and base Z value
 
@@ -599,15 +580,16 @@ long insspri_imp (int sect, float x, float y, float z, mapstate_t *map)
 	spr->p.x = x; spr->p.y = y; spr->p.z = z;
 	spr->r.x = .5; spr->d.z = .5; spr->f.y =-.5;
 	spr->phys.fat = .5; spr->phys.mas = spr->phys.moi = 1.0;
-	spr->tilnum = -1; //spr->asc = spr->rsc = spr->gsc = spr->bsc = 4096;
+	spr->view.tilnum=1;
+	spr->view.anchor=(point3d){0.5,0.5,0.5};
+	spr->view.uv[0]=1;
+	spr->view.uv[1]=1;
 	spr->owner = -1; spr->flags = 0;
 	spr->sect = sect; spr->sectn = map->sect[sect].headspri; spr->sectp = -1;
 	if (map->sect[sect].headspri >= 0) map->spri[map->sect[sect].headspri].sectp = i;
 	map->sect[sect].headspri = i;
 	return(i);
 }
-
-
 
 //          -1      i
 //headspri     i      j
@@ -1276,7 +1258,6 @@ void upgradewallportchain(int startwal_sec, int startwal_idx, mapstate_t *map) {
     int current_w = startwal_idx;
     int start_s = startwal_sec;
 
-    // Follow legacy ns/nw links to discover full chain
     do {
         chain_walls[chain_count].s = current_s;
         chain_walls[chain_count].w = current_w;

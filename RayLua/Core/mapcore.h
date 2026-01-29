@@ -121,7 +121,11 @@ double getwallz (sect_t *s, int isflor, int wid);
 int wallprev (sect_t *s, int w);
 int getwalls_imp (int s, int w, vertlist_t *ver, int maxverts, mapstate_t* map);
 int getverts_imp (int s, int w, vertlist_t *ver, int maxverts, mapstate_t* map);
+
 long insspri_imp (int sect, float x, float y, float z, mapstate_t *map);
+static inline long mapspriteadd (int sect, point3d p, mapstate_t *map) {
+	return insspri_imp(sect,p.x,p.y,p.z, map);
+}
 void delspri_imp (int i, mapstate_t *map);
 void changesprisect_imp (int i, int nsect, mapstate_t *map);
 surf_t makeSurfWall(int w1, int wnex);

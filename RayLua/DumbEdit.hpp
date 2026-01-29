@@ -71,9 +71,11 @@ uint16_t selmode = SEL_ALL;
 
 #define ISGRABSPRI (grabfoc.spri >= 0)
 #define ISGRABWAL (grabfoc.wal >= 0 && grabfoc.sec >= 0)
+#define ISGRABCAP (grabfoc.wal < 0 && grabfoc.sec >= 0)
 #define ISHOVERWAL (hoverfoc.wal >= 0 && hoverfoc.sec >= 0)
 #define ISHOVERCAP (hoverfoc.wal < 0 && hoverfoc.sec >= 0)
 #define HOVERSEC map->sect[hoverfoc.sec]
+#define GRABSEC map->sect[grabfoc.sec]
 #define HOVERWAL HOVERSEC.wall[hoverfoc.wal]
 #define HOVERWAL2 HOVERSEC.wall[hoverfoc.wal2]
 
@@ -326,6 +328,7 @@ int totalverts2;
 point2d secondwalldif;
 bool pg_graballverts = true;
 bool usehitZ = false;
+float savedHeight;
 void PickgrabDiscard() {
 	if (grabfoc.spri>=0) {
 		map->spri[grabfoc.spri].tr= savedtr;
@@ -376,6 +379,14 @@ void PickgrabUpdate() {
         updatesect_p(map->spri[grabfoc.spri].p, &s, map);
         changesprisect_imp(grabfoc.spri, s, map);
     }
+	else if (ISGRABCAP) {
+		float newz = local_to_world_point(trdiff.p, &cam->tr).z;
+		int isflor = grabfoc.wal+2;
+		GRABSEC.z[isflor] = newz;
+		if (IsKeyDown(KEY_LEFT_SHIFT)) {
+			GRABSEC.z[1-isflor] = newz+savedHeight*((1-isflor)*2-1);
+		}
+	}
     else if (ISGRABWAL) {
         transform tmp;
         point3d tp2;
@@ -396,8 +407,6 @@ void PickgrabUpdate() {
 	            target_z = grabfoc.hitpos.z; // floor : ceiling
             else
 	            target_z = map->sect[grabfoc.sec].z[ray_dir.z > 0]; // floor : ceiling
-
-
 
             if (fabsf(ray_dir.z) > 0.001f) {
                 float t = (target_z - ray_start.z) / ray_dir.z;
@@ -450,10 +459,16 @@ void PickgrabStart() {
 	if (grabfoc.spri>=0) {
 		savedtr = map->spri[grabfoc.spri].tr;
 	}
+	else if (ISGRABCAP) {
+		savedtr = cam->tr;
+		savedtr.p = grabfoc.hitpos;
+		savedHeight = GRABSEC.z[1]-GRABSEC.z[0];
+	}
 	else if (grabfoc.wal>=0 && grabfoc.sec >=0) {
 		bool grabboth = false;
 		if (!grabboth) // grab both walls
 		{
+			savedtr = cam->tr;
 			grabfoc.wal = hoverfoc.onewall;
 		}
 			//for red walls we'd need to grab verts of all adjacent walls.
@@ -478,6 +493,11 @@ point2d loopts_p3d[100];
 int loopn=0;
 
 void LoopDrawUpdate() {
+	if (IsKeyPressed(KEY_THREE) && loopn==1) {
+		long s = mapspriteadd(loopts[0].sect,loopts[0].pos,map);
+		map->spri[s].tilnum = 1;
+		ctx.op=discard;
+	}
 	if (IsKeyPressed(KEY_SPACE)) {
 		//add
 		if (hoverfoc.sec >= 0) {
@@ -511,6 +531,7 @@ void LoopDrawUpdate() {
 
 void LoopDrawDiscard() {
 	loopn=0;
+	K_ACCEPT = KEY_SPACE;
 }
 void LoopDrawAccept() {
 	loopn=0;
@@ -756,20 +777,21 @@ void EditorFrameMin(const Camera3D rlcam) {
 			}
 	}
 // how to unpress the key here to prevent further intercept?
-	if (hoverfoc.spri >= 0) {
+	if (hoverfoc.spri >= 0 || grabfoc.spri >=0) {
+		focus_t usefoc = (ctx.state.id == Empty.id) ? hoverfoc : grabfoc;
 		if (IsKeyPressed(KEY_L)) {
-			map->spri[hoverfoc.spri].flags ^= SPRITE_B2_IS_LIGHT;
+			map->spri[usefoc.spri].flags ^= SPRITE_B2_IS_LIGHT;
 			bool wasdel = false;
 			for (int j = map->light_sprinum - 1; j >= 0; j--) {
-				if (map->light_spri[j] == hoverfoc.spri) {
+				if (map->light_spri[j] == usefoc.spri) {
 					map->light_spri[j] = map->light_spri[--map->light_sprinum];
 					wasdel = true;
 				}
 			}
 
 			if (!wasdel && map->light_sprinum < MAXLIGHTS) {
-				map->spri[hoverfoc.spri].view.lum=255;
-				map->light_spri[map->light_sprinum++] = hoverfoc.spri;
+				map->spri[usefoc.spri].view.lum=255;
+				map->light_spri[map->light_sprinum++] = usefoc.spri;
 			}
 		}
 	}
@@ -782,9 +804,10 @@ void EditorFrameMin(const Camera3D rlcam) {
 		}
 	}
 
-	if (IsKeyPressed(K_DISCARD) || IsKeyPressed(KEY_ESCAPE)) {
+	if (IsKeyPressed(K_DISCARD) || IsKeyPressed(KEY_ESCAPE) || ctx.op == discard) {
 		ctx.state.discard();
 		ctx.state = Empty;
+		ctx.op = noop;
 	}
 	if (IsKeyPressed(K_ACCEPT) || ctx.op == accept) {
 		ctx.state.accept();
@@ -823,8 +846,8 @@ void DrawGizmos(){
 		float z2= getwallz(&map->sect[usefoc.sec], 1, usefoc.onewall);
 		wall_t *w = &map->sect[usefoc.sec].wall[usefoc.onewall];
 	//	wall_t *w2 = &map->sect[usefoc.sec].wall[usefoc.wal2];
-		Vector3 rlp1 ={w->x,-z1,w->y};
-		Vector3 rlp2 ={w->x,-z2,w->y};
+		Vector3 rlp1 ={w->x,-z1-0.1f,w->y};
+		Vector3 rlp2 ={w->x,-z2+0.1f,w->y};
 		rlColor4ub(255, 128, 128, 255);
 		drawCylBoard(rlp1,rlp2,0.1f);
 	}

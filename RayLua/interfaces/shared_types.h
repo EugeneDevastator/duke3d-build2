@@ -284,7 +284,9 @@ static inline float GetPxOffsetHorizontal(int ypan) {
 //					sur->uv[0].y = ((float)b7sec.surf[j].ypanning)/256.0;
 //
 
-typedef struct { float x, y, z; } point3d;
+typedef struct {
+	float x, y, z;
+} point3d;
 typedef struct { double x, y, z; } dpoint3d; 	//Note: pol doesn't support loops as dpoint3d's!
 typedef struct { float x, y; } point2d;
 
