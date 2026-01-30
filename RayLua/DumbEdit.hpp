@@ -149,6 +149,7 @@ typedef struct {
 bool hasgrab = false;
 point3d *wcursor;
 focus_t hoverfoc;
+focus_t bufferfoc;
 focus_t grabfoc;
 // -------- RL Drawing funcs
 const float vertside = 0.3f;

@@ -649,6 +649,8 @@ void changesprisect_imp (int i, int nsect, mapstate_t *map)
 	if ((unsigned)nsect >= (unsigned)map->numsects) return;
 
 	spr = &map->spri[i];
+	//if (spr->flags &  SPRITE_B2_IS_LIGHT)
+	//	return;
 	osect = spr->sect;
 
 	//Remove from old sector list
