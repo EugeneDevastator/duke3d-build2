@@ -479,7 +479,7 @@ void MainLoop()
 {
     //    if (!loadifvalid())
  //       return;
-    DumbRender::Init("c:/Eugene/Games/build2/e2l6.map");
+    DumbRender::Init("c:/Eugene/Games/build2/e2l2.map");
     auto map = DumbRender::GetMap();
     DumbCore::Init(map);
     SetTargetFPS(60);
