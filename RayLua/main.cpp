@@ -391,6 +391,9 @@ void DrawInfoUI() {
     ImGui::Text("` = discard");
     ImGui::Text("L = sprite to light");
     ImGui::Text("C = pick Color");
+    if (ISGRABSPRI && GRABSPRI.flags&SPRITE_B2_IS_LIGHT) {
+        ImGui::Text("IsLIGHT.");
+    }
 if (ISHOVERWAL) {
     ImGui::Text("Nsw:%i %i",HOVERWAL.ns, HOVERWAL.nw);
     ImGui::Text("NCsw:%i %i",HOVERWAL.nschain, HOVERWAL.nwchain);
@@ -476,7 +479,7 @@ void MainLoop()
 {
     //    if (!loadifvalid())
  //       return;
-    DumbRender::Init("c:/Eugene/Games/build2/e3l2.map");
+    DumbRender::Init("c:/Eugene/Games/build2/e2l6.map");
     auto map = DumbRender::GetMap();
     DumbCore::Init(map);
     SetTargetFPS(60);

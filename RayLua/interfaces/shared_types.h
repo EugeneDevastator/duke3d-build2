@@ -193,6 +193,7 @@ free((arena).data); \
 #define SPRITE_B2_FLAT_POLY    (1 << 5)   // 32
 #define SPRITE_B2_ONE_SIDED        (1 << 6)   // 64
 #define SPRITE_B2_IS_LIGHT     (1 << 16)   // 64
+#define SPRITE_B2_IS_DYNAMIC     (1 << 17)    // for dynamic lights and all dynamic stuff.
 
 #define SURF_SEE_THROUGH (1<<16) // for parallax
 
@@ -415,7 +416,7 @@ typedef struct // spri_t
 	long sectn, sectp; // doubly-linked list of indices
 	int32_t tags[16];
 	long tim, otim;          //Time (in milliseconds) for animation
-
+	int8_t walcon; // wall constraint -1 -2 = floor ceil, resolve as 2-wc; -3 = none;
 	//Bit0:Blocking, Bit2:1WayOtherSide, Bit5,Bit4:Face/Wall/Floor/.., Bit6:1side, Bit16:IsLight, Bit17-19:SpotAx(1-6), Bit20-29:SpotWid, Bit31:Invisible
 	long flags;
 	uint8_t modid; // mod id - for game processors, like duke, doom, etc. 0 is reserved for core entities.

@@ -880,6 +880,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 				spr->p.y = ((float)b7spr.y)*(1.f/512.f);
 				spr->p.z = ((float)b7spr.z)*(1.f/(512.f*16.f));
 				spr->flags = 0;
+				spr->walcon = -3;
 
 				int flagsw=b7spr.cstat & (SPRITE_WALL_ALIGNED | SPRITE_FLOOR_ALIGNED);
 				if  (flagsw ==0) //Face sprite

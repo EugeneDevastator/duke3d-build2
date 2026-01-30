@@ -16,7 +16,7 @@
 #define LFLATSTEPSIZ 3
 #define FLATSTEPSIZ (1<<LFLATSTEPSIZ)
 #define SCISDIST .001
-extern int shadowtest2_numlights, shadowtest2_useshadows, shadowtest2_numcpu;
+extern int shadowtest2_numlights, shadowtest2_useshadows, shadowtest2_numcpu, shadowtest_curlight;
 extern int shadowtest2_rendmode, eyepoln, glignum;
 extern unsigned int *shadowtest2_sectgot;
 // ================================================================================================
@@ -31,7 +31,7 @@ typedef struct
 /** Light source definition and shadow polygon storage */
 typedef struct {
     point3d p, f;                       // Position and forward direction vector
-    int sect, sprilink;                 // Current sector and sprite link index
+    int sect, ligspri;                 // Current sector and sprite link index
     float rgb[3], spotwid;              // RGB intensity and spotlight width (-1=omnidirectional)
     int flags;                          // Bit flags: &1=use shadows, &(1<<31)=moved this frame
     float lum;

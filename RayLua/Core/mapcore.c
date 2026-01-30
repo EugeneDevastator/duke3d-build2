@@ -578,13 +578,8 @@ long insspri_imp (int sect, float x, float y, float z, mapstate_t *map)
 	spr = &map->spri[i];
 	memset(spr,0,sizeof(spri_t));
 	spr->p.x = x; spr->p.y = y; spr->p.z = z;
-	spr->r.x = .5; spr->d.z = .5; spr->f.y =-.5;
-	spr->phys.fat = .5; spr->phys.mas = spr->phys.moi = 1.0;
-	spr->view.tilnum=1;
-	spr->view.anchor=(point3d){0.5,0.5,0.5};
-	spr->view.uv[0]=1;
-	spr->view.uv[1]=1;
-	spr->owner = -1; spr->flags = 0;
+	spritemakedefault(spr);
+
 	spr->sect = sect; spr->sectn = map->sect[sect].headspri; spr->sectp = -1;
 	if (map->sect[sect].headspri >= 0) map->spri[map->sect[sect].headspri].sectp = i;
 	map->sect[sect].headspri = i;
@@ -649,8 +644,10 @@ void changesprisect_imp (int i, int nsect, mapstate_t *map)
 	if ((unsigned)nsect >= (unsigned)map->numsects) return;
 
 	spr = &map->spri[i];
-	//if (spr->flags &  SPRITE_B2_IS_LIGHT)
-	//	return;
+	// we skip this unless lights is dynamic.
+	if (spr->flags &  SPRITE_B2_IS_LIGHT)
+		return;
+
 	osect = spr->sect;
 
 	//Remove from old sector list
@@ -702,6 +699,7 @@ surf_t makeSurfCap() {
 	s.uvcoords[2] = (point3d){0,1,0};
 	return s;
 }
+
 
 void makewall(wall_t *w, int8_t wid, int8_t nwid) {
 	w->xsurf[0] = makeSurfWall(wid,nwid);
@@ -1353,6 +1351,17 @@ int getwalls_chain(int s, int w, vertlist_t *ver, int maxverts, mapstate_t *map)
 	}
 
 	return vn;
+}
+
+void spritemakedefault(spri_t *spr) {
+	spr->walcon=-3;
+	spr->r.x = .5; spr->d.z = .5; spr->f.y =-.5;
+	spr->phys.fat = .5; spr->phys.mas = spr->phys.moi = 1.0;
+	spr->view.tilnum=1;
+	spr->view.anchor=(point3d){0.5,0.5,0.5};
+	spr->view.uv[0]=1;
+	spr->view.uv[1]=1;
+	spr->owner = -1; spr->flags = 0;
 }
 
 void getcentroid(wall_t *wal, int n, float *retcx, float *retcy) {

@@ -1901,7 +1901,7 @@ void reset_context() {
 	ARENA_RESET(eyepoli);
 	ARENA_RESET(ligpoli);
 }
-
+int shadowtest_curlight;
 int lastvalidsec = 0;
 void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy) {
 	bdrawctx bs;
@@ -2160,18 +2160,21 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 			mono_genfromloop(&mph[0].head[0], &mph[0].head[1], bord2, n);
 			mph[0].tag = gcam.cursect;
 			mphnum = 1;
+
 			// experimental code for future light walls/floors.
 			//  rn works for whole wall. at least process is like this.
-			bool useWallLight = false;
-			if (shadowtest2_rendmode ==4 && useWallLight) { // PREP LIGHT PORTAL
-			//	mph[0].tag = map->numsects;
+			int spnum = map->light_spri[shadowtest2_light[glignum].ligspri];
+			signed char ww = map->spri[spnum].walcon;
+			bool useWallLight = true && ww>=0;
+			if (shadowtest2_rendmode ==4)
+				if (useWallLight)
+				{ // PREP LIGHT PORTAL
+				mph[0].tag = map->numsects;
 				// draw surf as initial portal
-				int ww=0;
 				dpoint3d pol[4];
 				s = gcam.cursect;
 				sect_t* sec = map->sect;
 				wall_t *lwal = map->sect[s].wall;
-
 
 				int nwrl = map->sect[s].wall[ww].n;
 				int nw = ww  +nwrl;
@@ -2202,15 +2205,19 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 				pol[3].x = lwal[ww].x;
 				pol[3].y = lwal[ww].y;
 				pol[3].z = getslopez(&sec[s], 1, pol[3].x, pol[3].y); //pol[3].n =-3;
-
+// dirty hack to trick mono engine. it discards if all x'es are the same.
+					if (pol[3].x==pol[2].x) {
+						pol[3].x-=0.0000001;
+						pol[1].x-=0.0000001;
+					}
 				int ph1,ph2 = -1;
 				mono_genfromloop(&ph1,&ph2,pol,4);
 
 				gentransform_wall(pol,&lwal[ww].xsurf[0],b); // this shit alters pol...
 
-				//	drawpol_befclip(mph[0].tag,gcam.cursect,mph[0].tag,gcam.cursect, ph1,ph2, 1| DP_EMIT_MASK | DP_NO_SCANSECT ,b);
 				//	drawpol_befclip(gcam.cursect,-1,gcam.cursect,-1, ph1,ph2, DP_AND_SUB | DP_EMIT_MASK | DP_NO_SCANSECT,b);
-					drawpol_befclip(gcam.cursect,-1,gcam.cursect,-1, ph2,ph1, 1 | DP_EMIT_MASK | DP_NO_SCANSECT,b);
+				drawpol_befclip(mph[0].tag,-1,mph[0].tag,-1, ph2,ph1, 1 | DP_EMIT_MASK | DP_NO_SCANSECT| DP_PRESERVE_LOOP,b);
+				drawpol_befclip(mph[0].tag,gcam.cursect,mph[0].tag,gcam.cursect, ph2,ph1, DP_AND_SUBREV | DP_NO_SCANSECT ,b);
 			}
 
 		} else { // SETUP PORTAL ENTRY WITH WCCW TRANSFORM

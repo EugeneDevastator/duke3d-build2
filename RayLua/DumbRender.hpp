@@ -530,6 +530,7 @@ public:
 			    && (map->spri[map->light_spri[i]].sect >= 0)
 			    && (shadowtest2_numlights < MAXLIGHTS)) {
 				shadowtest2_light[shadowtest2_numlights].sect = map->spri[map->light_spri[i]].sect;
+				shadowtest2_light[shadowtest2_numlights].ligspri = i;
 				shadowtest2_light[shadowtest2_numlights].p = map->spri[map->light_spri[i]].p;
 				//   shadowtest2_light[shadowtest2_numlights].p.x += sin(GetTime()+shadowtest2_light[shadowtest2_numlights].p.y)*3;
 				k = ((map->spri[map->light_spri[i]].flags >> 17) & 7);
