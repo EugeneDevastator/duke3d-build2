@@ -76,6 +76,7 @@ uint16_t selmode = SEL_ALL;
 #define ISHOVERWAL (hoverfoc.wal >= 0 && hoverfoc.sec >= 0)
 #define ISHOVERCAP (hoverfoc.wal < 0 && hoverfoc.sec >= 0)
 #define HOVERSEC map->sect[hoverfoc.sec]
+#define HOVERSPRI map->spri[hoverfoc.spri]
 #define GRABSEC map->sect[grabfoc.sec]
 #define GRABSPRI map->spri[grabfoc.spri]
 #define HOVERWAL HOVERSEC.wall[hoverfoc.wal]
@@ -105,6 +106,20 @@ typedef struct estate {
 
 	void (*discard)();
 };
+enum dateditop {
+	dNone,
+	dTiles,
+	dColor,
+	dValue,
+};
+
+typedef struct {
+	dateditop op;
+	bool haschanged;
+	int32_t curval;
+	char* text;
+	Color color;
+} datedit_t;
 
 
 typedef struct {
@@ -134,6 +149,7 @@ viewmodel editormodel = {};
 
 int K_PICKGRAB = KEY_Q;
 int K_LOOPDRAW = KEY_SPACE;
+int K_PICKTILE = KEY_V;
 int K_ACCEPT = KEY_SPACE;
 int K_DISCARD = KEY_GRAVE;
 
@@ -150,6 +166,7 @@ typedef struct {
 	int onewall;
 	int sec;
 	int spri;
+	int surf;
 	point3d hitpos;
 } focus_t;
 
@@ -158,6 +175,7 @@ point3d *wcursor;
 focus_t hoverfoc;
 focus_t bufferfoc;
 focus_t grabfoc;
+datedit_t datstate;
 // -------- RL Drawing funcs
 const float vertside = 0.3f;
 const float vertholeNorm = 0.85f;
@@ -556,6 +574,32 @@ void LoopDrawStart() {
 	LoopDrawUpdate();
 }
 
+//----------------------- tile editing
+void TilsedStart() {
+
+}
+void TilsedUpdate() {
+	if (IsKeyDown(KEY_TAB)) {
+		if (hoverfoc.spri>=0)	datstate.curval = HOVERSPRI.tilnum;
+		else if (ISHOVERWAL)
+			datstate.curval = HOVERWAL.xsurf[hoverfoc.surf].tilnum;
+		else if (ISHOVERCAP)
+			datstate.curval = HOVERSEC.surf[hoverfoc.surf].tilnum;
+	}
+	if (IsKeyPressed(KEY_E)) {
+		if (hoverfoc.spri>=0)HOVERSPRI.tilnum = datstate.curval;
+		else if (ISHOVERWAL) HOVERWAL.xsurf[hoverfoc.surf].tilnum = datstate.curval;
+		else if (ISHOVERCAP) HOVERSEC.surf[hoverfoc.surf].tilnum = datstate.curval;
+	}
+}
+void TilsedAccept() {
+
+}
+void TilsedDiscard() {
+
+}
+
+
 
 // ----------------------- MOVE OPER ---------------------
 point3d savedpos;
@@ -590,8 +634,9 @@ void empty() {
 const estate RotateState = {3, MoveObjContextStart, MoveObjContextUpdate, MoveObjContextAccept, MoveObjContextDiscard};
 const estate MoveState = {2, MoveObjContextStart, MoveObjContextUpdate, MoveObjContextAccept, MoveObjContextDiscard};
 const estate FlyState = {1, MoveObjContextStart, MoveObjContextUpdate, MoveObjContextAccept, MoveObjContextDiscard};
-MAKESTATE(5, LoopDraw)
-MAKESTATE(4, Pickgrab)
+MAKESTATE(5, LoopDraw);
+MAKESTATE(4, Pickgrab);
+MAKESTATE(6, Tilsed);
 
 const estate Empty = {0, empty, empty, empty, empty};
 // ----------------- MAIN
@@ -616,8 +661,7 @@ void Editor_DoRaycasts(cam_t *cc) {
 	int ispri = 0;
 	cam = cc;
 	//ctx.state.discard();// to restore original map state for raycast.
-
-	raycast(&cc->p, &cc->f, 1e32, cc->cursect, &hoverfoc.sec, &hoverfoc.wal, &hoverfoc.spri, &hoverfoc.hitpos, map);
+	raycast(&cc->p, &cc->f, 1e32, cc->cursect, &hoverfoc.sec, &hoverfoc.wal, &hoverfoc.spri,&hoverfoc.surf, &hoverfoc.hitpos, map);
 	if (ISHOVERWAL) {
 		float z1 = getwallz(&map->sect[hoverfoc.sec], 1, hoverfoc.wal);
 		float z2 = getwallz(&map->sect[hoverfoc.sec], 1, hoverfoc.wal2);
@@ -645,9 +689,16 @@ void EditorFrameMin(const Camera3D rlcam) {
 			grabfoc = hoverfoc;
 			ctx.state = LoopDrawState;
 			ctx.state.start();
-		} else
-		// test for extrude
-			if (IsKeyPressed(KEY_K)) {
+		} 	else if (IsKeyPressed(K_PICKTILE)) {
+// dont lock up to the surf.
+			// e = apply tile
+			// r = read from hover. and refocus selected tile.
+			datstate.op = dTiles;
+			ctx.state = TilsedState;
+			ctx.state.start();
+		} else {
+			datstate.op=dNone;
+			if (IsKeyPressed(KEY_K)) { // EXTRUDE PROTOTYPE
 				point2d p0 = HOVERWAL.pos;
 				point2d p3 = HOVERWAL2.pos;
 				float offsy = -(p3.x - p0.x);
@@ -729,7 +780,7 @@ void EditorFrameMin(const Camera3D rlcam) {
 						int insert_after = -1;
 						for (int i = 0; i < chain_count; i++) {
 							float chain_height = getslopez(&map->sect[existing_chain[i].s], 0, fx, fy) +
-							                     getslopez(&map->sect[existing_chain[i].s], 1, fx, fy);
+												 getslopez(&map->sect[existing_chain[i].s], 1, fx, fy);
 							if (new_height > chain_height) {
 								insert_after = i;
 							} else {
@@ -791,6 +842,7 @@ void EditorFrameMin(const Camera3D rlcam) {
 					HOVERWAL.xsurf[2] = HOVERWAL.xsurf[0];
 				}
 			}
+		}
 	}
 	// how to unpress the key here to prevent further intercept?
 	if (hoverfoc.spri >= 0 || grabfoc.spri >= 0) {

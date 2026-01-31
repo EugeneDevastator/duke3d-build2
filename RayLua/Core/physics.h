@@ -22,7 +22,7 @@ typedef struct {
 
 extern clipdata build2;
 int hitscan_b2 (point3d *p0, point3d *pv, point3d *viewright,point3d *viewdown, float vscale, int cursect, int *hitsect, int *hitwall, point3d *hit, mapstate_t* map);
-int raycast(point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, int *hitwall, int *hitsprite,
+int raycast(point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, int *hitwall, int *hitsprite,int *hitsurf,
                    point3d *hit, mapstate_t *map);
 
 void collmove(dpoint3d *p, int *cursect, dpoint3d *v, double cr, long doslide, mapstate_t *map);
