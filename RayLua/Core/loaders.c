@@ -1107,7 +1107,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 			gnumtiles = 0; memset(gtilehashead,-1,sizeof(gtilehashead));
 
 			hitile++;
-			hitile =  4000;
+			hitile =  2000;
 			if (hitile > gmaltiles)
 			{
 				gmaltiles = hitile;

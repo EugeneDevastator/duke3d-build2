@@ -295,8 +295,48 @@ typedef struct {
 	point3d p, r, d, f;
 } transform;
 
-enum srenderType {
-	billbord,
+
+typedef struct {
+	unsigned int receive_shadow : 1;
+	unsigned int block_light : 1; //2
+	unsigned int is_light : 1; //3
+	unsigned int is_visible : 1; //4
+	unsigned int queue : 2; //6       // 0-3: opaque, atest, transparent, postproc
+	unsigned int blend_mode : 3;//9   // 0-7 blend modes
+	unsigned int shader : 4;   //13
+	unsigned int shadermode : 4;   //17
+	unsigned int RESERVED : 5;    // padding to 32 bits
+} renderflags_t;
+
+// Queue types
+#define BB_QUEUE_OPAQUE      0
+#define BB_QUEUE_ATEST       1
+#define BB_QUEUE_TRANSPARENT 2
+#define BB_QUEUE_OVERLAY     3   // depth test = always.
+
+// Blend modes (example)
+#define BB_BLEND_NODRAW      0
+#define BB_BLEND_ALPHA       1
+#define BB_BLEND_ADDITIVE    2
+#define BB_BLEND_MULTIPLY    3
+
+#define SHADER_FLAT			0,
+#define SHADER_PARALAX      1,
+#define SHADER_CUBEMAP		2,
+#define SHADER_USER		    7,
+
+#define MODE_PARALLAX_CYL			0,
+#define MODE_PARALLAX_CYLPERSP			0,
+#define MODE_PARALLAX_DOME			0,
+
+#define MODE_CUBEMAP_CUBE			0,
+#define MODE_CUBEMAP_SPHERE			0,
+#define MODE_PARALLAX_DOME			0,
+
+
+
+enum srenderType { // not part of the flags because must be chosen before any flags take place
+	billbord,     // also is very sprite- specific.
 	vbord,
 	quad,
 	voxel,

@@ -479,6 +479,7 @@ void MainLoop()
 {
     //    if (!loadifvalid())
  //       return;
+    //DumbRender::Init("c:/Eugene/Games/build2/Content/GAL_002/E1L1.MAP ");
     DumbRender::Init("c:/Eugene/Games/build2/e2l2.map");
     auto map = DumbRender::GetMap();
     DumbCore::Init(map);
