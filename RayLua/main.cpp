@@ -40,6 +40,142 @@ extern "C" {
 
 }
 
+typedef struct {
+    Texture2D* textures;
+    int totalCount;
+    int selected;
+    int columns;
+    float thumbnailSize;
+    int startIndex;
+    int tilesPerPage;
+} TextureBrowser;
+
+void DrawTextureBrowser(TextureBrowser* browser) {
+    // Position on left side
+    ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(300, GetScreenHeight()), ImGuiCond_FirstUseEver);
+
+    if (!ImGui::Begin("Texture Browser")) {
+        ImGui::End();
+        return;
+    }
+
+    // Handle scroll wheel for page navigation
+    if (ImGui::IsWindowHovered()) {
+        float wheel = ImGui::GetIO().MouseWheel;
+        if (wheel != 0.0f) {
+            int pageSize = browser->columns;
+            browser->startIndex -= (int)(wheel * pageSize);
+
+            // Clamp startIndex
+            if (browser->startIndex < 0) browser->startIndex = 0;
+            int maxStart = browser->totalCount - browser->tilesPerPage;
+            if (maxStart < 0) maxStart = 0;
+            if (browser->startIndex > maxStart) browser->startIndex = maxStart;
+        }
+    }
+
+    // Controls
+    ImGui::SliderInt("Columns", &browser->columns, 1, 6);
+    ImGui::SliderFloat("Size", &browser->thumbnailSize, 32.0f, 128.0f);
+    ImGui::SliderInt("Max Visible", &browser->tilesPerPage, 10, 200);
+
+    // Navigation
+    int maxStart = browser->totalCount - browser->tilesPerPage;
+    if (maxStart < 0) maxStart = 0;
+    if (ImGui::SliderInt("Start Index", &browser->startIndex, 0, maxStart)) {
+        if (browser->startIndex < 0) browser->startIndex = 0;
+        if (browser->startIndex > maxStart) browser->startIndex = maxStart;
+    }
+
+    int actualEnd = browser->startIndex + browser->tilesPerPage;
+    if (actualEnd > browser->totalCount) actualEnd = browser->totalCount;
+
+    ImGui::Text("Showing %d-%d of %d",
+                browser->startIndex + 1,
+                actualEnd,
+                browser->totalCount);
+    ImGui::Separator();
+
+    if (browser->totalCount == 0) {
+        ImGui::Text("No textures loaded");
+        ImGui::End();
+        return;
+    }
+
+    if (browser->textures == NULL) {
+        ImGui::Text("Textures array is NULL");
+        ImGui::End();
+        return;
+    }
+
+    float padding = 4.0f;
+    int endIndex = browser->startIndex + browser->tilesPerPage;
+    if (endIndex > browser->totalCount) endIndex = browser->totalCount;
+
+    for (int i = browser->startIndex; i < endIndex; i++) {
+        ImGui::PushID(i);
+
+        Texture2D tex = browser->textures[i];
+        bool isValidTexture = !(tex.id == 0 || tex.width == 0 || tex.height == 0);
+
+        // Always use square size
+        ImVec2 buttonSize = ImVec2(browser->thumbnailSize, browser->thumbnailSize);
+
+        bool isSelected = (browser->selected == i);
+
+        if (isValidTexture) {
+            if (isSelected) {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.5f, 0.8f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.6f, 0.9f, 1.0f));
+            }
+
+            if (ImGui::ImageButton("##thumb", (void*)(intptr_t)tex.id, buttonSize)) {
+                browser->selected = i;
+            }
+
+            if (isSelected) {
+                ImGui::PopStyleColor(2);
+            }
+        } else {
+            // Invalid texture - draw disabled button
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
+
+            ImGui::Button("NULL", buttonSize);
+
+            ImGui::PopStyleColor(3);
+        }
+
+        if (ImGui::IsItemHovered()) {
+            if (isValidTexture) {
+                ImGui::SetTooltip("Texture %d\n%dx%d", i, tex.width, tex.height);
+            } else {
+                ImGui::SetTooltip("Texture %d\nNULL/Invalid", i);
+            }
+        }
+
+        int relativeIndex = i - browser->startIndex;
+        if ((relativeIndex + 1) % browser->columns != 0 && i < endIndex - 1) {
+            ImGui::SameLine(0.0f, padding);
+        }
+
+        ImGui::PopID();
+    }
+
+    ImGui::End();
+}
+
+TextureBrowser texb={0};
+void InitTexBrowser() {
+    texb.selected=2;
+    texb.totalCount=1811;
+    texb.columns=4;
+    texb.startIndex = 0;
+    texb.thumbnailSize=64;
+    texb.tilesPerPage = 32; // Show 50 at a time
+}
 // Profiling variables
 double luaRenderTime = 0.0;
 double luaUITime = 0.0;
@@ -371,6 +507,7 @@ void CleanupLUTSystem() {
     UnloadTexture(lutTexture);
     UnloadCustomRenderTarget(finalTarget);
 }
+
 void DrawInfoUI() {
     ImVec2 work_pos = viewport->WorkPos;
     ImVec2 work_size = viewport->WorkSize;
@@ -385,12 +522,14 @@ void DrawInfoUI() {
                                    ImGuiWindowFlags_NoMove |
                                    ImGuiWindowFlags_NoCollapse |
                                    ImGuiWindowFlags_AlwaysAutoResize;
-
+    texb.textures = DumbRender::RuntimeTextures();
+    DrawTextureBrowser(&texb);
     ImGui::Begin("##info_panel", NULL, window_flags);
     ImGui::Text("Q = pick & move");
     ImGui::Text("` = discard");
     ImGui::Text("L = sprite to light");
     ImGui::Text("C = pick Color");
+
     if (ISGRABSPRI && GRABSPRI.flags&SPRITE_B2_IS_LIGHT) {
         ImGui::Text("IsLIGHT.");
     }
@@ -477,6 +616,7 @@ void DrawPicker() {
 // Draw palette and texture preview on screen
 void MainLoop()
 {
+InitTexBrowser();
     //    if (!loadifvalid())
  //       return;
     //DumbRender::Init("c:/Eugene/Games/build2/Content/GAL_002/E1L1.MAP ");

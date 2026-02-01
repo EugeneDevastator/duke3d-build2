@@ -102,6 +102,7 @@ public:
 	static mapstate_t *GetMap() {
 		return map;
 	}
+	static Texture2D * RuntimeTextures(){return runtimeTextures;}
 
 	static void LoadUVShader(void) {
 		uvShaderDesc = {0};
@@ -1877,8 +1878,15 @@ public:
 
 	// converts INDEXED pics only!
 	static Texture2D ConvertPicToTexture(tile_t *tpic) {
-		if (!tpic || !tpic->tt.f)
-			return {0};
+		if (!tpic || !tpic->tt.f) {
+			Texture2D invalid = {0};
+			invalid.id = 0;
+			invalid.width = 0;
+			invalid.height = 0;
+			invalid.mipmaps = 0;
+			invalid.format = 0;
+			return invalid;
+		}
 
 		tiltyp *pic = &tpic->tt;
 
