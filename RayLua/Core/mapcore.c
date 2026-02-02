@@ -16,6 +16,139 @@ long get_gnumtiles(void) { return gnumtiles; }
 long get_gmaltiles(void) { return gmaltiles; }
 long* get_gtilehashead(void) { return gtilehashead; }
 
+int splitwallat(int sid, int wid, point3d pos, mapstate_t *map) {
+    int bs = sid;
+    int bw = wid;
+    int i, j;
+    sect_t *sec = map->sect;
+
+    // TODO: Check if inserted point is on other walls
+    // For now, insert to all walls anyway
+
+    i = dupwall_imp(&map->sect[bs], bw);
+    wall_t *wal = sec[bs].wall;
+    wal[i].x = pos.x;
+    wal[i].y = pos.y;
+
+    // Fix all external references to this sector's walls after insertion
+    for (int fix_s = 0; fix_s < map->numsects; fix_s++) {
+        for (int fix_w = 0; fix_w < sec[fix_s].n; fix_w++) {
+            wall_t *fix_wall = &sec[fix_s].wall[fix_w];
+
+            // Update ns/nw references
+            if (fix_wall->ns == bs && fix_wall->nw > bw) {
+                fix_wall->nw++;  // Shift wall index
+            }
+
+            // Update nschain/nwchain references
+            if (fix_wall->nschain == bs && fix_wall->nwchain > bw) {
+                fix_wall->nwchain++;  // Shift chain wall index
+            }
+        }
+    }
+
+    int s = wal[bw].ns;
+    if (s < 0) {
+        // No connected sector - just set chain pointers to -1
+        wal[i].nschain = -1;
+        wal[i].nwchain = -1;
+        wal[bw].nschain = -1;
+        wal[bw].nwchain = -1;
+
+      //  checknextwalls_imp(map);
+        checksprisect_imp(-1, map);
+        return i;
+    }
+
+    // Get original connection info before we modify anything
+    int orig_target_s = s;
+    int orig_target_w = wal[bw].nw;
+
+    // Try to follow the chain to see how many walls we have
+    int w = orig_target_w;
+    int chain_length = 1;
+    int current_s = s;
+    int current_w = w;
+
+    // Count chain length first
+    do {
+        wall_t *current_wall = &sec[current_s].wall[current_w];
+        current_s = current_wall->ns;
+        if ((current_s < 0) || (current_s == bs)) break;
+        current_w = current_wall->nw;
+        chain_length++;
+    } while (chain_length < 32);
+
+    // Now create walls in all connected sectors
+    int new_walls[32];
+    int new_sectors[32];
+    int new_count = 1;
+
+    new_sectors[0] = bs;
+    new_walls[0] = i;
+
+    current_s = orig_target_s;
+    current_w = orig_target_w;
+
+    do {
+        j = dupwall_imp(&sec[current_s], current_w);
+
+        // Fix external references after each dupwall_imp
+        for (int fix_s = 0; fix_s < map->numsects; fix_s++) {
+            for (int fix_w = 0; fix_w < sec[fix_s].n; fix_w++) {
+                wall_t *fix_wall = &sec[fix_s].wall[fix_w];
+
+                if (fix_wall->ns == current_s && fix_wall->nw > current_w) {
+                    fix_wall->nw++;
+                }
+                if (fix_wall->nschain == current_s && fix_wall->nwchain > current_w) {
+                    fix_wall->nwchain++;
+                }
+            }
+        }
+
+        wal = sec[current_s].wall;
+        wal[j].x = pos.x;
+        wal[j].y = pos.y;
+
+        new_sectors[new_count] = current_s;
+        new_walls[new_count] = j;
+        new_count++;
+
+        current_s = wal[current_w].ns;
+        if ((current_s < 0) || (current_s == bs)) break;
+        current_w = wal[current_w].nw;
+    } while (1);
+
+    // Set up connections for ALL cases (simple and complex)
+    for (int idx = 0; idx < new_count; idx++) {
+        int next_idx = (idx + 1) % new_count;
+
+        wall_t *current_wall = &sec[new_sectors[idx]].wall[new_walls[idx]];
+        current_wall->ns = new_sectors[next_idx];
+        current_wall->nw = new_walls[next_idx];
+        current_wall->nschain = -1;
+        current_wall->nwchain = -1;
+    }
+
+    // Upgrade chains for all new walls
+    for (int idx = 0; idx < new_count; idx++) {
+        upgradewallportchain(new_sectors[idx], new_walls[idx], map);
+    }
+
+  //  checknextwalls_imp(map);
+    checksprisect_imp(-1, map);
+    return j;
+}
+
+ // TODO: Implement point-on-wall checking
+int is_point_on_wall(point3d pos, int sid, int wid, mapstate_t *map, float tolerance) {
+    // Check if pos lies on the line segment defined by wall wid in sector sid
+    // Return 1 if on wall, 0 if not
+    // This would use line-point distance calculation
+    return 0; // Placeholder
+}
+
 long wallclippol (kgln_t *pol, kgln_t *npol)
 {
 	double f, dz0, dz1;
@@ -182,6 +315,7 @@ int dupwall_imp (sect_t *s, int w)
 		memset(wal,0,sizeof(wall_t));
 		wal[0].surf.uv[1].x = wal[0].surf.uv[2].y = 1.f;
 		wal[0].ns = wal[0].nw = -1; s->n = 1;
+		wal[0].surf.flags = 4;
 		return(0);
 	}
 
@@ -193,6 +327,7 @@ int dupwall_imp (sect_t *s, int w)
 	else { for(i=w+1;wal[i].n>0;i++); wal[i].n--; }
 
 	s->n++;  // Increment wall count
+	wal[w+1].surf.flags=4;
 	return(w+1);  // Return index of the new wall
 }
 
@@ -277,8 +412,57 @@ int wallprev (sect_t *s, int w)
 	}
 #endif
 }
+
 // Gets all sectors/walls that share the same vertex point
 // Finds all walls that meet at the same corner point
+int getwallsofvert (int s, int w, wall_idx *ver, int maxverts, mapstate_t *map)
+{
+	sect_t *sec;
+	float x, y;
+	int i, ir, iw, ns, nw;
+
+	if ((maxverts <= 0) || ((unsigned)s >= (unsigned)map->numsects)) return(0);
+	if ((unsigned)w >= (unsigned)map->sect[s].n) return(0);
+
+	ver[0].s = s; ver[0].w = w; if (maxverts == 1) return(1);
+	sec = map->sect;
+	x = sec[s].wall[w].x;
+	y = sec[s].wall[w].y;
+	ir = 0; iw = 1;
+	do
+	{
+		//CCW next sect
+		ns = sec[s].wall[w].ns;
+		if (ns >= 0)
+		{
+			nw = sec[s].wall[w].nw;
+			if ((sec[ns].wall[nw].x != x) || (sec[ns].wall[nw].y != y)) nw += sec[ns].wall[nw].n;
+			for(i=iw-1;i>=0;i--)
+				if ((ver[i].s == ns) && (ver[i].w == nw)) break;
+			if ((i < 0) && (sec[ns].wall[nw].x == x) && (sec[ns].wall[nw].y == y))
+			{ ver[iw].s = ns; ver[iw].w = nw; iw++; if (iw >= maxverts) break; }
+		}
+
+		//CW next sect
+		w = wallprev(&sec[s],w);
+		ns = sec[s].wall[w].ns;
+		if (ns >= 0)
+		{
+			nw = sec[s].wall[w].nw;
+			if ((sec[ns].wall[nw].x != x) || (sec[ns].wall[nw].y != y)) nw += sec[ns].wall[nw].n;
+			for(i=iw-1;i>=0;i--)
+				if ((ver[i].s == ns) && (ver[i].w == nw)) break;
+			if ((i < 0) && (sec[ns].wall[nw].x == x) && (sec[ns].wall[nw].y == y))
+			{ ver[iw].s = ns; ver[iw].w = nw; iw++; if (iw >= maxverts) break; }
+		}
+
+		if (ir >= iw) break;
+		s = ver[ir].s; w = ver[ir].w; ir++;
+	} while (1);
+	return(iw);
+}
+
+
 int getverts_imp (int s, int w, vertlist_t *ver, int maxverts, mapstate_t *map)
 {
 	sect_t *sec;
@@ -393,17 +577,13 @@ long insspri_imp (int sect, float x, float y, float z, mapstate_t *map)
 	spr = &map->spri[i];
 	memset(spr,0,sizeof(spri_t));
 	spr->p.x = x; spr->p.y = y; spr->p.z = z;
-	spr->r.x = .5; spr->d.z = .5; spr->f.y =-.5;
-	spr->phys.fat = .5; spr->phys.mas = spr->phys.moi = 1.0;
-	spr->tilnum = -1; //spr->asc = spr->rsc = spr->gsc = spr->bsc = 4096;
-	spr->owner = -1; spr->flags = 0;
+	spritemakedefault(spr);
+
 	spr->sect = sect; spr->sectn = map->sect[sect].headspri; spr->sectp = -1;
 	if (map->sect[sect].headspri >= 0) map->spri[map->sect[sect].headspri].sectp = i;
 	map->sect[sect].headspri = i;
 	return(i);
 }
-
-
 
 //          -1      i
 //headspri     i      j
@@ -463,6 +643,10 @@ void changesprisect_imp (int i, int nsect, mapstate_t *map)
 	if ((unsigned)nsect >= (unsigned)map->numsects) return;
 
 	spr = &map->spri[i];
+	// we skip this unless lights is dynamic.
+	if (spr->flags &  SPRITE_B2_IS_LIGHT)
+		return;
+
 	osect = spr->sect;
 
 	//Remove from old sector list
@@ -483,6 +667,116 @@ void changesprisect_imp (int i, int nsect, mapstate_t *map)
 	//}
 
 	spr->sect = nsect;
+}
+
+surf_t makeSurfWall(int w1, int wnex) {
+	surf_t s = {0};
+	s.tilnum=0;
+	s.owal = w1;
+	s.uwal = wnex;
+	s.vwal = w1;
+	s.otez = 0;
+	s.utez = 0;
+	s.vtez = TEZ_WORLDZ1;
+	s.alpha=1;
+	s.uvcoords[0] = (point3d){0,0,0};
+	s.uvcoords[1] = (point3d){1,0,0};
+	s.uvcoords[2] = (point3d){0,0,1};
+
+	s.uvform[0]=1;
+	s.uvform[1]=1;
+	s.uvform[2]=0;
+	s.uvform[3]=0;
+	s.rsc=8192; // FIX THIS CRAP! its shade
+	return s;
+}
+
+surf_t makeSurfCap() {
+	surf_t s = makeSurfWall(0,1);
+	s.uvcoords[0] = (point3d){0,0,0};
+	s.uvcoords[1] = (point3d){1,0,0};
+	s.uvcoords[2] = (point3d){0,1,0};
+	return s;
+}
+
+
+void makewall(wall_t *w, int8_t wid, int8_t nwid) {
+	w->xsurf[0] = makeSurfWall(wid,nwid);
+	w->xsurf[1]=w->xsurf[0];
+	w->xsurf[2]=w->xsurf[0];
+	w->tags[1]=-1;
+	w->surf=w->xsurf[0];
+	w->surfn=3;
+	w->surf.flags  =0;
+	w->nw = -1;
+	w->ns = -1;
+	w->nschain = -1;
+	w->nwchain = -1;
+	w->n = nwid - wid;
+}
+
+int appendsect(mapstate_t *map, int nwalls) {
+	int i = map->numsects;
+	if (map->numsects+1 >= map->malsects) {
+		map->malsects = max(map->numsects+1,map->malsects << 1);
+		map->sect =  (sect_t *)realloc(map->sect,map->malsects*sizeof(sect_t));
+		memset(&map->sect[i],0,(map->malsects-i)*sizeof(sect_t));
+	}
+	// init walls
+	map->numsects++;
+	map->sect[i].n = nwalls; map->sect[i].nmax = 8;
+	map->sect[i].tags[1] = -1;
+	map->sect[i].wall = (wall_t *)malloc(map->sect[i].nmax * sizeof(wall_t));
+	return i;
+}
+
+int appendwalls(sect_t *sec, int nwalls) {
+	int i = sec->n;
+	if (sec->n + nwalls >= sec->nmax) {
+		sec->nmax = max(sec->n + nwalls, sec->nmax << 1);
+		sec->wall = (wall_t *)realloc(sec->wall, sec->nmax * sizeof(wall_t));
+	}
+	memset(&sec->wall[i], 0, (sec->nmax - i) * sizeof(wall_t));
+	sec->n += nwalls;
+	return i;
+}
+
+int appendwall_loop(sect_t *sec, int nwalls, point2d *coords) {
+	int start_idx = appendwalls(sec, nwalls);
+
+	// Set up wall coordinates and loop linking
+	for (int i = 0; i < nwalls; i++) {
+		int wall_idx = start_idx + i;
+		sec->wall[wall_idx].x = coords[i].x;
+		sec->wall[wall_idx].y = coords[i].y;
+
+		if (i == nwalls - 1) {
+			// Last wall points back to start of loop (negative offset)
+			sec->wall[wall_idx].n = -nwalls+1;
+		} else {
+			// Other walls point to next wall
+			sec->wall[wall_idx].n = 1;
+		}
+
+		makewall(&sec->wall[wall_idx], wall_idx, wall_idx + sec->wall[wall_idx].n);
+	}
+	return start_idx;
+}
+
+int addsectfromloop(int nwalls, point2d *coords, float floorz, float height, mapstate_t *map) {
+	int nsec = appendsect(map,0);
+	sect_t *s  =&map->sect[nsec];
+	appendwall_loop(s,nwalls, coords);
+	s->surf[0] = makeSurfCap();
+	s->surf[1] = s->surf[0];
+	s->z[0]=floorz-height;
+	s->z[1]=floorz;
+	s->destpn[0]=-1;
+	s->destpn[1]=-1;
+	//s->grad[0].x=0.5;
+	//s->grad[0].y=0.5;
+	//s->grad[1]= s->grad[0];
+	return nsec;
 }
 
 // dukescales = xy rep, xypan
@@ -916,7 +1210,8 @@ int updatesect_portmove(transform *tr, int *cursect, mapstate_t *map) {
 	point3d* pos = &tr->p;
 	long s = *cursect;
 	sect_t *sec = map->sect;
-	if (map->sect[s].destpn[0] + map->sect[s].destpn[1] > -2) {
+	if (s>=0 && (map->sect[s].destpn[0]>=0 || map->sect[s].destpn[1] >= 0)) {
+
 		if (insidesect(pos->x, pos->y, sec[s].wall, sec[s].n)) {
 			for (int j = 0; j < 2; j++) {
 				if (sec[s].destpn[j] > -1) {
@@ -943,6 +1238,129 @@ int updatesect_portmove(transform *tr, int *cursect, mapstate_t *map) {
 		}
 	}
 	return 0;
+}
+
+void upgradewallportchain(int startwal_sec, int startwal_idx, mapstate_t *map) {
+    wall_t *startwal = &map->sect[startwal_sec].wall[startwal_idx];
+    if (startwal->ns < 0)
+        return;
+
+    // Skip if chain already built
+    if (startwal->nschain >= 0)
+        return;
+
+    // Discover all walls in the legacy chain using old getwalls_imp logic
+    vertlist_t chain_walls[32];
+    int chain_count = 0;
+
+    int current_s = startwal_sec;
+    int current_w = startwal_idx;
+    int start_s = startwal_sec;
+
+    do {
+        chain_walls[chain_count].s = current_s;
+        chain_walls[chain_count].w = current_w;
+        chain_count++;
+
+        wall_t *current_wall = &map->sect[current_s].wall[current_w];
+        if (current_wall->ns < 0) break;
+
+        current_s = current_wall->ns;
+        current_w = current_wall->nw;
+
+    } while (current_s != start_s && chain_count < 32);
+
+    // Handle all cases consistently - even single connections
+    if (chain_count == 1) {
+        // Single wall with connection - point to itself for consistency
+        startwal->nschain = startwal->ns;
+        startwal->nwchain = startwal->nw;
+
+        // Also set up the target wall to point back
+        if (startwal->ns >= 0) {
+            wall_t *target_wall = &map->sect[startwal->ns].wall[startwal->nw];
+            if (target_wall->nschain < 0) {  // Only if not already set
+                target_wall->nschain = startwal_sec;
+                target_wall->nwchain = startwal_idx;
+            }
+        }
+    } else {
+        // Build explicit chain structure for multi-wall chains
+        for (int i = 0; i < chain_count; i++) {
+            int next_i = (i + 1) % chain_count;
+            wall_t *wall = &map->sect[chain_walls[i].s].wall[chain_walls[i].w];
+
+            // Set chain pointers to next wall in discovered chain
+            wall->nschain = chain_walls[next_i].s;
+            wall->nwchain = chain_walls[next_i].w;
+        }
+    }
+}
+
+int getwalls_chain(int s, int w, vertlist_t *ver, int maxverts, mapstate_t *map) {
+	sect_t *sec = map->sect;
+	wall_t *startwal = &sec[s].wall[w];
+	wall_t *wal;
+	float fx, fy;
+	int vn = 0;
+	int current_s, current_w;
+	int start_s = s, start_w = w;
+
+	// If no connection, return 0
+	if (startwal->ns < 0)
+		return 0;
+
+	// Start with first chain link
+	current_s = startwal->nschain >= 0 ? startwal->nschain : startwal->ns;
+	current_w = startwal->nwchain >= 0 ? startwal->nwchain : startwal->nw;
+
+	do {
+		if (vn < maxverts) {
+			ver[vn].s = current_s;
+			ver[vn].w = current_w;
+			vn++;
+		}
+// here current_s becomes -1 and current_w -1
+		wal = &sec[current_s].wall[current_w];
+
+		// Move to next in chain
+		current_s = wal->nschain >= 0 ? wal->nschain : wal->ns;
+		current_w = wal->nwchain >= 0 ? wal->nwchain : wal->nw;
+
+	} while ((current_s != start_s || current_w != start_w) && vn < maxverts);
+
+	// Sort by height at wall midpoint
+	wall_t *nextwal = &sec[s].wall[(w + 1) % sec[s].n];
+	fx = (startwal->x + nextwal->x) * 0.5f;
+	fy = (startwal->y + nextwal->y) * 0.5f;
+
+	// Bubble sort
+	vertlist_t tver;
+	for (int k = 1; k < vn; k++) {
+		for (int j = 0; j < k; j++) {
+			float h1 = getslopez(&sec[ver[j].s], 0, fx, fy) + getslopez(&sec[ver[j].s], 1, fx, fy);
+			float h2 = getslopez(&sec[ver[k].s], 0, fx, fy) + getslopez(&sec[ver[k].s], 1, fx, fy);
+
+			if (h1 > h2) {
+				tver = ver[j];
+				ver[j] = ver[k];
+				ver[k] = tver;
+			}
+		}
+	}
+
+	return vn;
+}
+
+void spritemakedefault(spri_t *spr) {
+	spr->walcon=-3;
+	spr->r.x = .5; spr->d.z = .5; spr->f.y =-.5;
+	spr->phys.fat = .5; spr->phys.mas = spr->phys.moi = 1.0;
+	spr->view.tilnum=1;
+	spr->view.anchor=(point3d){0.5,0.5,0.5};
+	spr->view.uv[0]=1;
+	spr->view.uv[1]=1;
+	spr->owner = -1; spr->flags = 0;
 }
 
 void getcentroid(wall_t *wal, int n, float *retcx, float *retcy) {

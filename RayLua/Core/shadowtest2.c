@@ -49,10 +49,13 @@ eyepols are generated from mono space AND plane equation stored in gouvmat.
 #define DP_AND_SUBREV 7
 #define DP_NO_SCANSECT 8
 #define DP_NO_PROJECT 16
-#define DP_EMIT_MASK 32
+#define DP_EMIT_MASK 32 // doesnt alter mono clip spasce
 #define DP_PRESERVE_LOOP 64
 
 #define MAX_PORTAL_DEPTH 2
+
+#define RM_LIGHTS 4
+#define RM_GEO 1
 
 
 void bdrawctx_clear(bdrawctx *b) {
@@ -517,7 +520,6 @@ static int bunchfront(int b0, int b1, int fixsplitnow, bdrawctx *b) {
 	return (3);
 }
 
-// problem is before mono insertion (see drawpol,.)
 static void scansector(int sectnum, bdrawctx *b) {
 	cam_t gcam = b->cam;
 
@@ -1339,8 +1341,12 @@ static int drawpol_befclip(int fromtag, int newtag1, int fromsect, int newsect, 
 			b->gdoscansector = !(flags & DP_NO_SCANSECT);
 			// intersect with same monos, and change tag for resulting piece?
 			// cliptonewregion
-			if (flags & DP_EMIT_MASK) mono_output = drawtagfunc_ws;
-				else mono_output = changetagfunc;
+			if (flags & DP_EMIT_MASK) {
+				if (shadowtest2_rendmode == 4)
+					mono_output = ligpoltagfunc;
+				else
+					mono_output = drawtagfunc_ws;
+			} else mono_output = changetagfunc;
 			logstep("bool AND, keep all, changetag, on tag %d to %d", curtag, b->gnewtag);
 			for (i = mphnum - 1; i >= 0; i--)
 				if (mph[i].tag == curtag) {
@@ -1353,36 +1359,38 @@ static int drawpol_befclip(int fromtag, int newtag1, int fromsect, int newsect, 
 						b,
 						mono_output);
 				}
-			if (flags & DP_EMIT_MASK) return 1;
-			{
-				logstep("Join and remove bases for tags, on upper res,  mhp[j]== %d, heads: [%d..%d]", b->gnewtag,
-				        omph0, mphnum - 1);
-				for (l = omph0; l < mphnum; l++) {
-					logstep("set %d to %d", omph0, l);
-					mph[omph0] = mph[l];
-					k = omph0;
-					omph0++;
+			if (flags & DP_EMIT_MASK)
+				return 1;
 
-					for (j = omph0 - 1; j >= 0; j--) //Join monos
-					{
-						if (mph[j].tag != b->gnewtag) continue;
-						if (!mono_join(mph[j].head[0], mph[j].head[1], mph[k].head[0], mph[k].head[1], &i0,
-						               &i1))
-							continue;
-						for (i = 2 - 1; i >= 0; i--) {
-							mono_deloop(mph[k].head[i]);
-							mono_deloop(mph[j].head[i]);
-						}
-						omph0--;
-						mph[k] = mph[omph0];
-						mph[j].head[0] = i0;
-						mph[j].head[1] = i1;
-						k = j;
+
+			logstep("Join and remove bases for tags, on upper res,  mhp[j]== %d, heads: [%d..%d]", b->gnewtag,
+			        omph0, mphnum - 1);
+			for (l = omph0; l < mphnum; l++) {
+				logstep("set %d to %d", omph0, l);
+				mph[omph0] = mph[l];
+				k = omph0;
+				omph0++;
+
+				for (j = omph0 - 1; j >= 0; j--) //Join monos
+				{
+					if (mph[j].tag != b->gnewtag) continue;
+					if (!mono_join(mph[j].head[0], mph[j].head[1], mph[k].head[0], mph[k].head[1], &i0,
+					               &i1))
+						continue;
+					for (i = 2 - 1; i >= 0; i--) {
+						mono_deloop(mph[k].head[i]);
+						mono_deloop(mph[j].head[i]);
 					}
+					omph0--;
+					mph[k] = mph[omph0];
+					mph[j].head[0] = i0;
+					mph[j].head[1] = i1;
+					k = j;
 				}
-				mphnum = omph0;
 			}
-		} else {
+			mphnum = omph0;
+		}
+		else {
 			// do AND with current mono, draw result, and discard it in drawtag.
 			if (shadowtest2_rendmode == 4)
 				mono_output = ligpoltagfunc;
@@ -1606,16 +1614,29 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			continue;
 		gtilenum = sec[s].surf[isflor].tilnum;
 
+
 		float surfpos = getslopez(&sec[s], isflor, b->cam.p.x, b->cam.p.y);
+		bool drawcap=0;
 		if ((b->cam.p.z >= surfpos) == isflor) // ignore backfaces
-			continue;
+		{
+			//if( shadowtest2_rendmode == RM_LIGHTS && b->cam.cursect == s)// dont backface when in own sector for ceil lights,
+			//{
+			//	drawcap=1;
+			//	// step 1. draw portal and preserve loop
+			//	// step +2. emit mask. // maybe emit when drawing portal?
+			//	// no need to draw opaque one in that case.
+			//}
+			//else
+				continue;
+		}
+
 		fz = sec[s].z[isflor];
 		grad = &sec[s].grad[isflor];
 
 		// Calculate surface normal vector
 		b->gnorm.x = grad->x;
 		b->gnorm.y = grad->y;
-		b->gnorm.z = 1.f;
+		b->gnorm.z = 1;
 		if (isflor) {
 			b->gnorm.x = -b->gnorm.x;
 			b->gnorm.y = -b->gnorm.y;
@@ -1636,6 +1657,12 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		plothead[0] = -1;
 		plothead[1] = -1;
 		point3d locnorm = world_to_local_vec(b->gnorm, &b->cam.tr);
+		int ft=0;
+		if (drawcap)
+			ft = 1-isflor;
+		else
+			ft = isflor;
+
 		for (ww = twaln; ww >= 0; ww -= twaln)
 			plothead[isflor] = mono_ins(
 				plothead[isflor], twal[ww].x, twal[ww].y,
@@ -1668,7 +1695,16 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		b->gligwall = isflor - 2;
 		// F L O O R S
 		//
-		int surflag = ((isflor << 2) + 3);
+
+		int newsect=-1;
+		int newtag=-1;
+		int surflag = (((isflor)<< 2) + 3);
+		if ( ft==1) {
+		//	surflag |= DP_EMIT_MASK;
+		//	newsect = s;  // use same flow as for walls with masks - emit lightpoly, and draw it as portal.
+		//	newtag= s +b->tagoffset;
+		}
+
 		if (isportal && !noportals) {
 			int endpn = portals[myport].destpn;
 			int ttag = b->tagoffset + taginc + portals[endpn].sect;
@@ -1700,7 +1736,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 	// === DRAW WALLS ===
 	for (ww = 0; ww < twaln; ww++) {
 		// Get wall vertices and setup wall segment
-		vn = getwalls_imp(s, twal[ww].i, verts,MAXVERTS, map);
+		vn = getwalls_chain(s, twal[ww].i, verts,MAXVERTS, map);
 		w = twal[ww].i;
 		nw = wal[w].n + w;
 		sur = &wal[w].xsurf[0];
@@ -1757,7 +1793,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 				opolz[2] = getslopez(&sec[verts[m >> 1].s], m & 1, pol[2].x, pol[2].y);
 				opolz[3] = getslopez(&sec[verts[m >> 1].s], m & 1, pol[3].x, pol[3].y);
 			}
-			//if ((opolz[0] >= opolz[3]) && (opolz[1] >= opolz[2])) continue; //Early-out optimization: skip walls with 0 height
+			if ((opolz[0] >= opolz[3]) && (opolz[1] >= opolz[2])) continue; //Early-out optimization: skip walls with 0 height
 
 			// Skip zero-height wall segments (optimization)
 			if ((max(pol[0].z, opolz[0]) >= min(pol[3].z, opolz[3]) - 1e-4) &&
@@ -1772,6 +1808,8 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			//if (!intersect_traps_mono(pol[0].x,pol[0].y, pol[1].x,pol[1].y, pol[0].z,pol[1].z,pol[2].z,pol[3].z, opolz[0],opolz[1],opolz[2],opolz[3], &plothead[0],&plothead[1])) continue;
 			// Calculate intersection of wall segment with clipping trapezoids
 			f = 1e-7; //FIXFIXFIXFIX:use ^ ?
+
+
 			if (!intersect_traps_mono(pol[0].x, pol[0].y, pol[1].x, pol[1].y, pol[0].z - f, pol[1].z - f, pol[2].z + f,
 			                          pol[3].z + f, opolz[0] - f, opolz[1] - f, opolz[2] + f, opolz[3] + f,
 			                          &plothead[0], &plothead[1]))
@@ -1856,19 +1894,6 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 	}
 }
 
-/*
- *The function operates in different modes based on shadowtest2_rendmode:
-	Mode 2 (Standard Rendering):
-
-	Renders visible geometry from camera viewpoint
-	Populates eyepol[] array with screen-space polygons
-	Each polygon contains texture mapping data and surface normals
-	Mode 4 (Shadow Map Generation):
-
-	Renders from light source positions
-	Generates shadow polygon lists (ligpol[]) for each light
-	Creates visibility data for shadow casting
-*/
 void reset_context() {
 	ARENA_RESET(eyepol);
 	ARENA_RESET(eyepolv);
@@ -1876,9 +1901,8 @@ void reset_context() {
 	ARENA_RESET(eyepoli);
 	ARENA_RESET(ligpoli);
 }
-
+int shadowtest_curlight;
 int lastvalidsec = 0;
-int focusedSprite=-1;
 void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy) {
 	bdrawctx bs;
 	loopnum = 0;
@@ -1901,21 +1925,10 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy) {
 	point3d hit;
 	point3d f = sump3(cc->p,cc->f);
 
-	//this raycast works.
-	raycast(&cc->p,&cc->f,1e32,cc->cursect,&sec,&wal,&spr,&hit,map);
-	//hitscan_b2(&cc->p,&cc->f,&cc->r,&cc->d,1e32,cc->cursect,&sec,&wal,&hit,map);
-	//if (wal>=0 && sec>=0)
-	//	map->sect[sec].wall[wal].xsurf[0].tilnum=2;
-	if (spr>=0) {
-		//map->spri[spr].tilnum=2;
-		focusedSprite = spr;
-	}
-
-
 	draw_hsr_polymost_ctx(map, &bs);
 }
 
-void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
+void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 	if (!newctx) {
 		return;
 	}
@@ -1945,12 +1958,12 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 	unsigned int *uptr;
 	int i, j, k, n, s, w, closest, col, didcut, halfplane;
 
-	if (shadowtest2_rendmode == 4) {
+	if (shadowtest2_rendmode == RM_LIGHTS) {
 		glp = &shadowtest2_light[glignum];
 		//	if ((!(glp->flags&1)) || (!shadowtest2_useshadows)) return;
 	}
 
-	curMap = lgs;
+	curMap = map;
 
 	//if ((lgs->numsects <= 0) || ((unsigned)cam.cursect >= (unsigned)lgs->numsects))
 	//{
@@ -1963,16 +1976,16 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 		b->bunchgot = (unsigned int *) malloc(((b->bunchmal + 31) & ~31) >> 3);
 		b->bunchgrid = (unsigned char *) malloc(((b->bunchmal - 1) * b->bunchmal) >> 1);
 	}
-	if (lgs->numsects > b->sectgotn) {
+	if (map->numsects > b->sectgotn) {
 		if (b->sectgotmal) free((void *) b->sectgotmal);
-		b->sectgotn = ((lgs->numsects + 127) & ~127);
+		b->sectgotn = ((map->numsects + 127) & ~127);
 		b->sectgotmal = (unsigned int *) malloc((b->sectgotn >> 3) + 16);
 		//NOTE:malloc doesn't guarantee 16-byte alignment!
 		b->sectgot = (unsigned int *) ((((intptr_t) b->sectgotmal) + 15) & ~15);
 	}
-	if ((shadowtest2_rendmode != 4) && (lgs->numsects > shadowtest2_sectgotn)) {
+	if ((shadowtest2_rendmode != 4) && (map->numsects > shadowtest2_sectgotn)) {
 		if (shadowtest2_sectgotmal) free((void *) shadowtest2_sectgotmal);
-		shadowtest2_sectgotn = ((lgs->numsects + 127) & ~127);
+		shadowtest2_sectgotn = ((map->numsects + 127) & ~127);
 		shadowtest2_sectgotmal = (unsigned int *) malloc((shadowtest2_sectgotn >> 3) + 16);
 		//NOTE:malloc doesn't guarantee 16-byte alignment!
 		shadowtest2_sectgot = (unsigned int *) ((((intptr_t) shadowtest2_sectgotmal) + 15) & ~15);
@@ -2034,9 +2047,9 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 		g_qamb[3] = 0.f;
 		//eyepoln = 0; eyepolvn = 0;
 	} else {
-		if (lgs->numsects > glp->sectgotn) {
+		if (map->numsects > glp->sectgotn) {
 			if (glp->sectgotmal) free((void *) glp->sectgotmal);
-			glp->sectgotn = ((lgs->numsects + 127) & ~127);
+			glp->sectgotn = ((map->numsects + 127) & ~127);
 			glp->sectgotmal = (unsigned int *) malloc((glp->sectgotn >> 3) + 16);
 			//NOTE:malloc doesn't guarantee 16-byte alignment!
 			glp->sectgot = (unsigned int *) ((((intptr_t) glp->sectgotmal) + 15) & ~15);
@@ -2074,6 +2087,9 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 			gcam.h.x = 21;
 			gcam.h.y = 21;
 			b->cam = gcam; // THAT IS IMPORTANT!
+		//	b->movedcam = gcam;
+		//	b->orcam = gcam;
+
 			xformprep(0.0, b);
 
 			xformbac(-lightbound, -lightbound, 0.0, &bord2[0], b);
@@ -2129,11 +2145,11 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 			}
 		} // need to draw reproject original opening unfortunately.
 
-		memset8(b->sectgot, 0, (lgs->numsects + 31) >> 3);
+		memset8(b->sectgot, 0, (map->numsects + 31) >> 3);
 		if (b->recursion_depth == 2)
 			int a = 1;
 		int passmphstart;
-		if (!b->has_portal_clip) {
+		if (!b->has_portal_clip) {  // FIRST PASS ENTRY
 			//FIX! once means not each frame! (of course it doesn't hurt functionality)
 			// Standard case: clear existing state and create new viewport
 			for (i = mphnum - 1; i >= 0; i--) {
@@ -2144,7 +2160,67 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 			mono_genfromloop(&mph[0].head[0], &mph[0].head[1], bord2, n);
 			mph[0].tag = gcam.cursect;
 			mphnum = 1;
-		} else {
+
+			// experimental code for future light walls/floors.
+			//  rn works for whole wall. at least process is like this.
+			int spnum = map->light_spri[shadowtest2_light[glignum].ligspri];
+			signed char ww = map->spri[spnum].walcon;
+			bool useWallLight = true && ww>=0;
+			if (shadowtest2_rendmode ==4)
+				if (useWallLight)
+				{ // PREP LIGHT PORTAL
+				mph[0].tag = map->numsects;
+				// draw surf as initial portal
+				dpoint3d pol[4];
+				s = gcam.cursect;
+				sect_t* sec = map->sect;
+				wall_t *lwal = map->sect[s].wall;
+
+				int nwrl = map->sect[s].wall[ww].n;
+				int nw = ww  +nwrl;
+				double dx = sqrt((lwal[nw].x - lwal[ww].x) * (lwal[nw].x - lwal[ww].x) + (lwal[nw].y - lwal[ww].y) * (lwal[nw].y - lwal[ww].y));
+				b->gnorm.x = lwal[ww].y - lwal[nw].y;
+				b->gnorm.y = lwal[nw].x - lwal[ww].x;
+				b->gnorm.z = 0;
+				double ff = 1.0 / sqrt(b->gnorm.x * b->gnorm.x + b->gnorm.y * b->gnorm.y);
+				b->gnorm.x *= ff;
+				b->gnorm.y *= ff;
+				b->gligwall = ww;
+				b->gflags = 0;
+				b->gligslab = 0;
+				b->gisflor = 2;
+
+				pol[0].x = lwal[ww].x;
+				pol[0].y = lwal[ww].y;
+				pol[0].z = getslopez(&sec[s], 0, pol[0].x, pol[0].y); //pol[0].n = 1;
+
+				pol[1].x = lwal[ww + nwrl].x;
+				pol[1].y = lwal[ww + nwrl].y;
+				pol[1].z = getslopez(&sec[s], 0, pol[1].x, pol[1].y); //pol[1].n = 1;
+
+				pol[2].x = lwal[ww + nwrl].x;
+				pol[2].y = lwal[ww + nwrl].y;
+				pol[2].z = getslopez(&sec[s], 1, pol[2].x, pol[2].y); //pol[2].n = 1;
+
+				pol[3].x = lwal[ww].x;
+				pol[3].y = lwal[ww].y;
+				pol[3].z = getslopez(&sec[s], 1, pol[3].x, pol[3].y); //pol[3].n =-3;
+// dirty hack to trick mono engine. it discards if all x'es are the same.
+					if (pol[3].x==pol[2].x) {
+						pol[3].x-=0.0000001;
+						pol[1].x-=0.0000001;
+					}
+				int ph1,ph2 = -1;
+				mono_genfromloop(&ph1,&ph2,pol,4);
+
+				gentransform_wall(pol,&lwal[ww].xsurf[0],b); // this shit alters pol...
+
+				//	drawpol_befclip(gcam.cursect,-1,gcam.cursect,-1, ph1,ph2, DP_AND_SUB | DP_EMIT_MASK | DP_NO_SCANSECT,b);
+				drawpol_befclip(mph[0].tag,-1,mph[0].tag,-1, ph2,ph1, 1 | DP_EMIT_MASK | DP_NO_SCANSECT| DP_PRESERVE_LOOP,b);
+				drawpol_befclip(mph[0].tag,gcam.cursect,mph[0].tag,gcam.cursect, ph2,ph1, DP_AND_SUBREV | DP_NO_SCANSECT ,b);
+			}
+
+		} else { // SETUP PORTAL ENTRY WITH WCCW TRANSFORM
 			//drawpol_befclip(gcam.cursect-taginc, gcam.cursect, gcam.cursect,	b->chead[0],b->chead[1], 8|3 , b);
 			int res = -1;
 
@@ -2231,7 +2307,7 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 			}
 			closest = i;
 
-			drawalls(closest, lgs, b);
+			drawalls(closest, map, b);
 		}
 
 		if (shadowtest2_rendmode == 4) uptr = glp->sectgot;
@@ -2240,15 +2316,15 @@ void draw_hsr_polymost_ctx(mapstate_t *lgs, bdrawctx *newctx) {
 
 		if (!pass) // write only after first pass.
 		{
-			memcpy(uptr, b->sectgot, (lgs->numsects + 31) >> 3);
+			memcpy(uptr, b->sectgot, (map->numsects + 31) >> 3);
 		} else {
 			if (false) // && !(cputype&(1<<25))) //Got SSE
 			{
-				for (i = ((lgs->numsects + 31) >> 5) - 1; i >= 0; i--)
+				for (i = ((map->numsects + 31) >> 5) - 1; i >= 0; i--)
 					uptr[i] |= b->sectgot[i];
 			} else {
 				// Convert to portable C - process 16 bytes at a time using uint64_t
-				size_t total_bytes = ((lgs->numsects + 127) & ~127) >> 3;
+				size_t total_bytes = ((map->numsects + 127) & ~127) >> 3;
 				size_t chunks = total_bytes / 16;
 
 				// Process 16-byte chunks (2 x uint64_t)

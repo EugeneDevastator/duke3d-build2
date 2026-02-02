@@ -10,8 +10,6 @@
 #include "raylib.h"
 #include "raymath.h"
 
-
-
 extern "C" {
 #include "shadowtest2.h"
 #include "monodebug.h"
@@ -40,7 +38,7 @@ private:
 
 
 public:
-    static mapstate_t *map;
+
     static point3d b2pos;
     static void Init(mapstate_t *loadedMap) {
         if (initialized) return;
@@ -92,6 +90,7 @@ public:
     }
 
 private:
+    static mapstate_t *map;
     static point3d RaylibToBuild(Vector3 vec) {
         return {vec.x, vec.z, -vec.y};
     }

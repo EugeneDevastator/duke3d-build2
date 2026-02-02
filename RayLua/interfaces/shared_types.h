@@ -193,6 +193,7 @@ free((arena).data); \
 #define SPRITE_B2_FLAT_POLY    (1 << 5)   // 32
 #define SPRITE_B2_ONE_SIDED        (1 << 6)   // 64
 #define SPRITE_B2_IS_LIGHT     (1 << 16)   // 64
+#define SPRITE_B2_IS_DYNAMIC     (1 << 17)    // for dynamic lights and all dynamic stuff.
 
 #define SURF_SEE_THROUGH (1<<16) // for parallax
 
@@ -230,7 +231,7 @@ free((arena).data); \
 #define TEZ_INVZ 1<<3 // use next continious wall
 #define TEZ_CLOSEST 1<<4 // closest height point instead of arbitrary.
 #define TEZ_FURTHEST 1<<5 // closest height point instead of arbitrary.
-#define TEZ_WORLDZ1 1<<6 // closest height point instead of arbitrary.
+#define TEZ_WORLDZ1 1<<6 // use unit world z vector
 
 // auto resolution optioons, written in ouv wal
 #define TEW_WORLDF -1
@@ -284,7 +285,9 @@ static inline float GetPxOffsetHorizontal(int ypan) {
 //					sur->uv[0].y = ((float)b7sec.surf[j].ypanning)/256.0;
 //
 
-typedef struct { float x, y, z; } point3d;
+typedef struct {
+	float x, y, z;
+} point3d;
 typedef struct { double x, y, z; } dpoint3d; 	//Note: pol doesn't support loops as dpoint3d's!
 typedef struct { float x, y; } point2d;
 
@@ -292,8 +295,48 @@ typedef struct {
 	point3d p, r, d, f;
 } transform;
 
-enum srenderType {
-	billbord,
+
+typedef struct {
+	unsigned int receive_shadow : 1;
+	unsigned int block_light : 1; //2
+	unsigned int is_light : 1; //3
+	unsigned int is_visible : 1; //4
+	unsigned int queue : 2; //6       // 0-3: opaque, atest, transparent, postproc
+	unsigned int blend_mode : 3;//9   // 0-7 blend modes
+	unsigned int shader : 4;   //13
+	unsigned int shadermode : 4;   //17
+	unsigned int RESERVED : 5;    // padding to 32 bits
+} renderflags_t;
+
+// Queue types
+#define BB_QUEUE_OPAQUE      0
+#define BB_QUEUE_ATEST       1
+#define BB_QUEUE_TRANSPARENT 2
+#define BB_QUEUE_OVERLAY     3   // depth test = always.
+
+// Blend modes (example)
+#define BB_BLEND_NODRAW      0
+#define BB_BLEND_ALPHA       1
+#define BB_BLEND_ADDITIVE    2
+#define BB_BLEND_MULTIPLY    3
+
+#define SHADER_FLAT			0,
+#define SHADER_PARALAX      1,
+#define SHADER_CUBEMAP		2,
+#define SHADER_USER		    7,
+
+#define MODE_PARALLAX_CYL			0,
+#define MODE_PARALLAX_CYLPERSP			0,
+#define MODE_PARALLAX_DOME			0,
+
+#define MODE_CUBEMAP_CUBE			0,
+#define MODE_CUBEMAP_SPHERE			0,
+#define MODE_PARALLAX_DOME			0,
+
+
+
+enum srenderType { // not part of the flags because must be chosen before any flags take place
+	billbord,     // also is very sprite- specific.
 	vbord,
 	quad,
 	voxel,
@@ -351,13 +394,7 @@ typedef struct // surf_t
 	uint8_t pal;
 	float alpha;
 	float uvform[9]; // scale xy, pan xy, crop AB, rotation
-	union{
-		// we dont use sectors, current one is constraint.
-		// origin, u , v
-		int8_t uvalig[6];
-		// tez = tex z source
-		struct { int8_t owal, otez, uwal, utez, vwal, vtez; }; // wals are always wals of this sector.
-	};
+	int8_t owal, otez, uwal, utez, vwal, vtez; // wals are always wals of this sector.
 	uint8_t uvmapkind; // uv amappings, regular, polar, hex, flipped variants etc. paralax.
 	uint8_t tilingkind; // normal, polar, hex etc.
 // ------------
@@ -385,8 +422,8 @@ typedef struct // wall t
 
 	/* ai
 	*Positive values: Point to the next wall in the loop
-
-	wal[w].n + w gives the absolute index of the next wall
+	wal[Wid].n is relative index to tihs wall's index.
+	wal[Wid].n + Wid gives the absolute index of the next wall
 	Used to traverse walls in order around a sector
 	Negative values: Mark special wall positions in loops
 
@@ -397,15 +434,12 @@ typedef struct // wall t
 	*/
 
 	long n, ns, nw; //n:rel. wall ind.; ns & nw : nextsect & nextwall_of_sect
+	long nschain, nwchain; // for multiportal.
 	long owner; //for dragging while editing, other effects during game
 	uint8_t surfn;
 	surf_t surf, xsurf[3]; //additional malloced surfs when (surfn > 1)
 	uint16_t mflags[4]; // modflags
-	union {
-		int64_t tags8b[8];
-		int32_t tags[16]; // standard tag is 4bytes
-		int16_t tags2b[32];
-	};
+	int32_t tags[16]; // standard tag is 4bytes
 
 } wall_t;
 
@@ -422,7 +456,7 @@ typedef struct // spri_t
 	long sectn, sectp; // doubly-linked list of indices
 	int32_t tags[16];
 	long tim, otim;          //Time (in milliseconds) for animation
-
+	int8_t walcon; // wall constraint -1 -2 = floor ceil, resolve as 2-wc; -3 = none;
 	//Bit0:Blocking, Bit2:1WayOtherSide, Bit5,Bit4:Face/Wall/Floor/.., Bit6:1side, Bit16:IsLight, Bit17-19:SpotAx(1-6), Bit20-29:SpotWid, Bit31:Invisible
 	long flags;
 	uint8_t modid; // mod id - for game processors, like duke, doom, etc. 0 is reserved for core entities.
@@ -437,6 +471,7 @@ typedef struct
 {
 	// BuildEngine base data
 	uint32_t guid; // uniq per sector
+	uint16_t areaid; // for trigger purposes. 0 = none
 	float z[2];      //ceil&flor height
 	point2d grad[2]; //ceil&flor grad. grad.x = norm.x/norm.z, grad.y = norm.y/norm.z
 	surf_t surf[2];  //ceil&flor texture info
@@ -456,6 +491,9 @@ typedef struct
 	// could be purely runtime info.
 	// but also inverted sector should be much easier to do.
 	int32_t destpn[2]; // nextsec flor ceil
+	uint8_t hintw1,hintw2,hintmode; // wall hints for procedural slope.
+	// first is always used as 2verts w, w+nw, second is just as point
+	// mode is follow 1 follow 2 follow 1+2 or ignore.
 
 } sect_t;
 

@@ -25,10 +25,6 @@ typedef struct tiltyp {
 	struct tiltyp *lowermip; // pointer to lower mipmap level
 	picanm_t animdata;
 } tiltyp;
-
-static long nullpic [64+1][64]; //Null set icon (image not found)
-static __forceinline unsigned int bsf (unsigned int a) { _asm bsf eax, a }
-static __forceinline unsigned int bsr (unsigned int a) { _asm bsr eax, a }
 typedef struct
 {
 	// could be 'tiles014|4323'
@@ -36,6 +32,22 @@ typedef struct
 	tiltyp tt; //union! if (!tt.p), it's a 3D model, tt.f points to raw model data, tt.x is type
 	long namcrc32, hashnext;
 } tile_t;
+
+typedef struct {
+	tile_t *gtile;
+	int gnumtiles;
+	int gmaltiles;
+	int gtilehashead[1024];
+	char curmappath[260];
+	unsigned char globalpal[256][4];
+	unsigned char gammlut[256];
+	unsigned char gotpal;
+} gallery;
+
+static long nullpic [64+1][64]; //Null set icon (image not found)
+static __forceinline unsigned int bsf (unsigned int a) { _asm bsf eax, a }
+static __forceinline unsigned int bsr (unsigned int a) { _asm bsr eax, a }
+
 static unsigned char gammlut[256], gotpal = 0;
 extern tile_t *gtile;
 extern unsigned char globalpal[256][4];

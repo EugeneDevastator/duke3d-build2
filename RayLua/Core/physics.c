@@ -11,8 +11,9 @@
 #include "mapcore.h"
 clipdata build2;
 // version with simplified sprite checking. temporary, before sprite visualization is reworked. or colliders implementd
-int raycast(point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, int *hitwall, int *hitsprite,
-            point3d *hit, mapstate_t *map) {
+// *hitwall: -2 for floor, -1 for ceiling
+int raycast(point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, int *hitwall, int *hitsprite,int *hitsurf,
+            point3d *hit,  mapstate_t *map) {
 	sect_t *sec;
 	wall_t *wal, *wal2;
 	spri_t *spr;
@@ -72,6 +73,7 @@ int raycast(point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, i
 					hit->z = pv->z * t + p0->z;
 					(*hitsect) = s;
 					(*hitwall) = i - 2;
+					(*hitsurf) = i;
 					(*hitsprite) = -1;
 				}
 			}
@@ -95,14 +97,16 @@ int raycast(point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, i
 			if (z > z1) continue;
 			bs = wal[w].ns;
 			passthru = 0;
+			bool islower = false;
 			if (bs >= 0) {
 				bw = wal[w].nw;
 				do {
 					wal2 = sec[bs].wall;
 					i = wal2[bw].n + bw;
 					if ((wal[w].x == wal2[i].x) && (wal[nw].x == wal2[bw].x) &&
-					    (wal[w].y == wal2[i].y) && (wal[nw].y == wal2[bw].y))
-						if ((z > getslopez(&sec[bs], 0, x, y)) && (z < getslopez(&sec[bs], 1, x, y))) {
+					    (wal[w].y == wal2[i].y) && (wal[nw].y == wal2[bw].y)) {
+						islower = (z > getslopez(&sec[bs], 0, x, y));
+						if (islower && (z < getslopez(&sec[bs], 1, x, y))) {
 							if (!(wal[w].surf.flags & 32)) {
 								if (!(gotsect[bs >> 5] & (1 << bs))) {
 									secfif[secfifw] = bs;
@@ -112,6 +116,7 @@ int raycast(point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, i
 								passthru = 1;
 							}
 						}
+					}
 					bs = wal2[bw].ns;
 					bw = wal2[bw].nw;
 				} while (bs != s);
@@ -124,6 +129,7 @@ int raycast(point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, i
 				(*hitsect) = s;
 				(*hitwall) = w;
 				(*hitsprite) = -1;
+				(*hitsurf) = islower ? 2 : 0; // need to add mask which is 1;
 			}
 		}
 	}

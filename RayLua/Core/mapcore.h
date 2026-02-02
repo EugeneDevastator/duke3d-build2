@@ -55,6 +55,7 @@ typedef struct {
 
 
 #endif
+typedef struct { int w, s; } wall_idx;
 
 typedef struct { int w, s; } vertlist_t;
 typedef struct { float x, y, z, u, v; int n; } kgln_t;
@@ -87,6 +88,7 @@ typedef struct {
 	uint8_t kind;
 } portal;
 
+static wall_t* getwall(wall_idx idx, mapstate_t * map) { return &map->sect[idx.s].wall[idx.w]; };
 
 extern uint16_t portaln;
 extern portal portals[100];
@@ -111,6 +113,7 @@ double roundcylminpath2 (double a0x, double a0y, double a1x, double a1y,
                          double b0x, double b0y, double b1x, double b1y);
 long wallclippol (kgln_t *pol, kgln_t *npol);
 int dupwall_imp (sect_t *s, int w);
+int getwallsofvert (int s, int w, wall_idx *ver, int maxverts, mapstate_t *map);
 long sect_isneighs_imp (int s0, int s1, mapstate_t* map);
 double getslopez (sect_t *s, int i, double x, double y);
 double getslopezpt(sect_t *s, int isflor, point2d pos);
@@ -118,10 +121,28 @@ double getwallz (sect_t *s, int isflor, int wid);
 int wallprev (sect_t *s, int w);
 int getwalls_imp (int s, int w, vertlist_t *ver, int maxverts, mapstate_t* map);
 int getverts_imp (int s, int w, vertlist_t *ver, int maxverts, mapstate_t* map);
+
 long insspri_imp (int sect, float x, float y, float z, mapstate_t *map);
+static inline long mapspriteadd (int sect, point3d p, mapstate_t *map) {
+	return insspri_imp(sect,p.x,p.y,p.z, map);
+}
 void delspri_imp (int i, mapstate_t *map);
 void changesprisect_imp (int i, int nsect, mapstate_t *map);
+surf_t makeSurfWall(int w1, int wnex);
+surf_t makeSurfCap();
+void makewall(wall_t* w, int8_t wid , int8_t nwid);
+
+int appendsect(mapstate_t *map, int nwalls);
+
+int appendwalls(sect_t *sec, int nwalls);
+
+// outer loop is CW, inner is CCW
+int appendwall_loop(sect_t *sec, int nwalls, point2d* coords);
+
+int addsectfromloop(int nwalls, point2d *coords, float floorz, float height, mapstate_t *map);
+
 void makeslabuvform(int surfid, float slabH, wall_t *wal, int dukescales[4], int tilesize[2]);
+int splitwallat(int sid, int wid, point3d pos, mapstate_t* map);
 //Clip wall slopes. Returns loop ordered poly (0, 3, or 4 points)
 //pol[0]   pol[1]
 //pol[3]   pol[2]
@@ -175,6 +196,7 @@ static inline wall_t walnext(sect_t *sec, int wid) {
 
 float getzoftez(int tezflags, sect_t *mysec, int thiswall, point2d worldxy, mapstate_t *map);
 
+// proper b2 method to generate uv vectors from ouv tez-params
 void makewaluvs(sect_t *sect, int wid, mapstate_t *map);
 
 void makesecuvs(sect_t *sect, mapstate_t *map);
@@ -259,70 +281,116 @@ int insidesect (double x, double y, wall_t *wal, int w);
 
 // first pass updatesect to ONLY check nearest + portals.
 int updatesect_portmove(transform *tr, int *cursect, mapstate_t *map);
+void upgradewallportchain(int startwal_sec,int startwal_idx, mapstate_t *map);
+
+int getwalls_chain(int s, int w, vertlist_t *ver, int maxverts, mapstate_t *map);
 
 //Pass z as >1e30 to make updatesect ignore height return first sector containing (x,y)
-static void updatesect_imp (float x, float y, float z, int *cursect, mapstate_t* map)
+static int updatesect_imp (float x, float y, float z, int *cursect, mapstate_t* map)
 {
 	sect_t *sec;
 	long *gotsect;
 	int i, s, w, ns, nw, allsec, cnt, *secfif, secfifw, secfifr;
+	int max_iterations;
+
+	if (!cursect || !map || !map->sect) return -1;
 
 	sec = map->sect;
 	s = (*cursect);
+
 	if ((unsigned)s >= (unsigned)map->numsects) //reference invalid; brute force search
 	{
 		for(s=map->numsects-1;s>=0;s--)
 			if (insidesect(x,y,sec[s].wall,sec[s].n))
-				if ((z > 1e30) || ((z >= getslopez(&sec[s],0,x,y)) && (z <= getslopez(&sec[s],1,x,y)))) break;
-		(*cursect) = s; return;
+				if ((z > 1e30) || ((z >= getslopez(&sec[s],0,x,y)) && (z <= getslopez(&sec[s],1,x,y))))
+				{
+					(*cursect) = s;
+					return s;
+				}
+		(*cursect) = -1;
+		return -1;
 	}
 
 	if (insidesect(x,y,sec[s].wall,sec[s].n))
-		if ((z > 1e30) || ((z >= getslopez(&sec[s],0,x,y)) && (z <= getslopez(&sec[s],1,x,y)))) return;
+		if ((z > 1e30) || ((z >= getslopez(&sec[s],0,x,y)) && (z <= getslopez(&sec[s],1,x,y))))
+			return s;
 
 	w = (((map->numsects+31)>>5)<<2);
 	gotsect = (long *)_alloca(w);
-	memset(gotsect,0,w); gotsect[s>>5] |= (1<<s);
-	secfif = (int *)_alloca(map->numsects*sizeof(secfif[0]));
-	secfifw = secfifr = 0;
+	if (!gotsect) return -1;
 
-	(*cursect) = -1; allsec = map->numsects-1;
-	for(cnt=map->numsects-1;cnt>0;cnt--)
+	memset(gotsect,0,w);
+	gotsect[s>>5] |= (1<<s);
+
+	secfif = (int *)_alloca(map->numsects*sizeof(secfif[0]));
+	if (!secfif) return -1;
+
+	secfifw = secfifr = 0;
+	(*cursect) = -1;
+	allsec = map->numsects-1;
+	max_iterations = map->numsects * 2; // Safety limit
+
+	for(cnt=map->numsects-1;cnt>0 && max_iterations>0;cnt--,max_iterations--)
 	{
 		for(w=sec[s].n-1;w>=0;w--)
 		{
 			ns = sec[s].wall[w].ns;
 			nw = sec[s].wall[w].nw;
-			while (((unsigned)ns < (unsigned)map->numsects) && (ns != s))
+
+			// Limit wall traversal iterations
+			int wall_iterations = 0;
+			while (((unsigned)ns < (unsigned)map->numsects) && (ns != s) && wall_iterations < map->numsects)
 			{
+				wall_iterations++;
 				if (!(gotsect[ns>>5]&(1<<ns)))
 				{
 					gotsect[ns>>5] |= (1<<ns);
-					secfif[secfifw] = ns; secfifw++;
+					if (secfifw < map->numsects) {
+						secfif[secfifw] = ns;
+						secfifw++;
+					}
 				}
 				i = ns;
-				ns = sec[i].wall[nw].ns;
-				nw = sec[i].wall[nw].nw;
+				if (i >= 0 && i < map->numsects && nw >= 0 && nw < sec[i].n) {
+					ns = sec[i].wall[nw].ns;
+					nw = sec[i].wall[nw].nw;
+				} else {
+					break; // Invalid indices
+				}
 			}
 		}
 
 		if (secfifr < secfifw)
-		{ s = secfif[secfifr]; secfifr++; } //breadth-first
+		{
+			s = secfif[secfifr];
+			secfifr++;
+		}
 		else
-		{     //fifo was empty.. must be some disjoint sectors
+		{
 			while ((allsec >= 0) && (gotsect[allsec>>5]&(1<<allsec))) allsec--;
-			s = allsec; if (s < 0) break;
+			s = allsec;
+			if (s < 0) break;
 			gotsect[s>>5] |= (1<<s);
 		}
 
-		if (insidesect(x,y,sec[s].wall,sec[s].n))
+		if (s >= 0 && s < map->numsects && insidesect(x,y,sec[s].wall,sec[s].n))
 			if ((z > 1e30) || ((z >= getslopez(&sec[s],0,x,y)) && (z <= getslopez(&sec[s],1,x,y))))
-			{ (*cursect) = s; return; }
+			{
+				(*cursect) = s;
+				return s;
+			}
 	}
+
+	(*cursect) = -1;
+	return -1;
 }
+
 static void updatesect_p (point3d p, int *cursect, mapstate_t* map) {
 	updatesect_imp(p.x ,p.y ,p.z, cursect, map);
 }
+
+static void spritemakedefault(spri_t *spr);
+
 //s: sector of sprites to check
 //Pass -1 to check and compact all valid sprites
 static void checksprisect_imp (int s, mapstate_t *map)

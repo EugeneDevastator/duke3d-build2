@@ -578,7 +578,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 				sec[i].n = sec[i].nmax = b7sec.wallnum;
 				sec[i].wall = (wall_t *)realloc(sec[i].wall,sec[i].nmax*sizeof(wall_t));
 				memset(sec[i].wall,0,sec[i].nmax*sizeof(wall_t));
-
+				sec[i].lotag = b7sec.lotag;
 				for(j=0;j<2;j++)
 				{
 					sec[i].destpn[j] = -1;
@@ -700,6 +700,8 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 					sec[i].wall[j].tags[MT_WAL_NEXTSEC] = b7wal.nextsect;
 					sec[i].wall[j].tags[MT_NEXTWALL] = b7wal.nextwall;
 					sec[i].wall[j].tags[MT_WAL_WALLIDX] = wallidx;
+					sec[i].wall[j].nschain=-1;
+					sec[i].wall[j].nwchain=-1;
 					wallidx++;
 
 					sur = &sec[i].wall[j].surf;
@@ -878,6 +880,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 				spr->p.y = ((float)b7spr.y)*(1.f/512.f);
 				spr->p.z = ((float)b7spr.z)*(1.f/(512.f*16.f));
 				spr->flags = 0;
+				spr->walcon = -3;
 
 				int flagsw=b7spr.cstat & (SPRITE_WALL_ALIGNED | SPRITE_FLOOR_ALIGNED);
 				if  (flagsw ==0) //Face sprite
@@ -1104,7 +1107,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 			gnumtiles = 0; memset(gtilehashead,-1,sizeof(gtilehashead));
 
 			hitile++;
-			hitile =  4000;
+			hitile =  2000;
 			if (hitile > gmaltiles)
 			{
 				gmaltiles = hitile;
@@ -1148,6 +1151,9 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 			{
 				for (j = 0; j < sec[i].n; j++) {
 					wall_t *walp = &sec[i].wall[j];
+
+					upgradewallportchain(i,j,map);
+
 					int nwid = walp->n + j;
 					int curwalid = j;
 					int yrepeat = (unsigned char)walp->surf.owal;
