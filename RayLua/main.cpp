@@ -523,7 +523,7 @@ void DrawInfoUI() {
                                    ImGuiWindowFlags_NoCollapse |
                                    ImGuiWindowFlags_AlwaysAutoResize;
     texb.textures = DumbRender::RuntimeTextures();
-    DrawTextureBrowser(&texb);
+    //DrawTextureBrowser(&texb);
     ImGui::Begin("##info_panel", NULL, window_flags);
     ImGui::Text("Q = pick & move");
     ImGui::Text("` = discard");
@@ -616,7 +616,7 @@ void DrawPicker() {
 // Draw palette and texture preview on screen
 void MainLoop()
 {
-InitTexBrowser();
+    InitTexBrowser();
     //    if (!loadifvalid())
  //       return;
     //DumbRender::Init("c:/Eugene/Games/build2/Content/GAL_002/E1L1.MAP ");
