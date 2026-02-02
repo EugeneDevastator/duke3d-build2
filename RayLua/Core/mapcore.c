@@ -2,7 +2,6 @@
 #include "mapcore.h"
 
 #include "buildmath.h"
-#include "loaders.h"
 
 #define USEHEIMAP 1
 #define NOSOUND 1

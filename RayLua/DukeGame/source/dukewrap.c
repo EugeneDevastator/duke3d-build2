@@ -12,7 +12,7 @@
 dukewrapper bbeng;
 engineapi_t *rayl;
 char *inputs;
-static mapstate_t* map;
+mapstate_t* map;
 // mt = map transfer
 // populating tags from the end.
 #define PI 3.14159265358979323846
