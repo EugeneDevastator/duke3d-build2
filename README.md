@@ -1,13 +1,13 @@
 # Build2 - next iteration
 Welcome to the repo of second life of Build2
-Build 2 by Ken Silverman: https://www.advsys.net/ken/build.htm
+Build 2 by Ken Silverman: https://www.advsys.net/ken/build.htm <br>
 This is port of the engine onto raylib and hardware render.
 ## Contacts
-Want to develop? - contact me on discord server here: https://discord.gg/wmM444UU
-Want just daily updates? - welcome to duke4.net discord: https://discord.gg/ChAnq8wt
-(also im looking for a job, any jobs pls? my contact's here https://dave-astator.com)
+Want to develop? - contact me on discord server here: https://discord.gg/wmM444UU <br>
+Want just daily updates? - welcome to duke4.net discord: https://discord.gg/ChAnq8wt <br>
+also im looking for a job, any jobs pls? my contact's here https://dave-astator.com <br>
 
-For now our team is me and Jaba, and i can find task for everyone.
+For now our dev team is me and Jaba, and i can find task for everyone. <br>
 
 # License info
 NON-COMMERCIAL OPEN SOURCE LICENSE
