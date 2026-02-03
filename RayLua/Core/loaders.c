@@ -469,7 +469,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 		curmappath[j] = 0;
 
 
-		// Modified scanning code
+		// Modified scanning code; this entire section must be abolished and moved into art loader.
 		arttiles = 0;
 		for(filnum=0;1;filnum++)
 		{
@@ -1101,7 +1101,9 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 			map->numspris = 0;
 		}
 		if (true) { // Postprocessing of the loaded map
-			//Set texture names..
+			// this is where actual loading happens, also needs to be migrated.
+			// we dont seem to be using hash, and only using direct indexing - extract hashes
+			// into separate method for later use and commment on their usage.
 			for(i=gnumtiles-1;i>=0;i--)
 				if (gtile[i].tt.f) { free((void *)gtile[i].tt.f); gtile[i].tt.f = 0; }
 			gnumtiles = 0; memset(gtilehashead,-1,sizeof(gtilehashead));

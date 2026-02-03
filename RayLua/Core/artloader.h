@@ -33,16 +33,24 @@ typedef struct
 	long namcrc32, hashnext;
 } tile_t;
 
+// responsible for storing info and temporary image data.
+// image pixel data will be purged after it is loaded into gpu, so gallery will remain only as info source.
 typedef struct {
 	tile_t *gtile;
 	int gnumtiles;
 	int gmaltiles;
+	uint16_t* sizex;
+	uint16_t* sizey;
+	picanm_t* picanm_data;  // Changed from uint16_t* picanm_t
 	int gtilehashead[1024];
 	char curmappath[260];
 	unsigned char globalpal[256][4];
 	unsigned char gammlut[256];
 	unsigned char gotpal;
+	uint16_t numtiles;
 } gallery;
+
+extern gallery g_gals[16];
 
 static long nullpic [64+1][64]; //Null set icon (image not found)
 static __forceinline unsigned int bsf (unsigned int a) { _asm bsf eax, a }
@@ -53,8 +61,9 @@ extern tile_t *gtile;
 extern unsigned char globalpal[256][4];
 tile_t* getGtile(int i);
 unsigned char* getColor(int idx);
-
+void galfreetextures(int gal_idx);
 void loadpic (tile_t *tpic, char* rootpath);
 void setgammlut (double gammval);
 void LoadPal(const char *basepath);
+int loadgal(int gal_idx, const char* path);
 #endif //BUILD2_ARTLOADER_H

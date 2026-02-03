@@ -144,7 +144,6 @@ public:
 		if (lastSlash) {
 			*(lastSlash + 1) = '\0';
 		}
-		LoadPal(rootpath);
 		LoadMapAndTiles(fullmappath);
 		shadowtest2_numlights = 0;
 		//init lights
@@ -311,15 +310,12 @@ public:
 				printf("Warning: Portal %d with target lotag %d has no matching hitag\n", i, target_tag);
 			}
 		}
-		// auto paltex = ConvertPalToTexture();
-		// tile_t* pic = static_cast<tile_t*>(malloc(sizeof(tile_t)));
-		// strcpy_s(pic->filnam, "TILES000.art|1");
-		// auto tex = ConvertPicToTexture(pic);
+
+		InitMapstateTex();
 	}
 
 	static void LoadTexturesToGPU() {
 		GenerateTextures();
-		InitMapstateTex();
 	}
 
 	// Calculates the Z height at point (x,y) on a sloped surface
@@ -1877,6 +1873,48 @@ public:
 	}
 
 	// converts INDEXED pics only!
+
+	static void DrawPaletteAndTexture() {
+		DrawPaletteAndTexture(runtimeTextures[6], runtimeTextures[10], 660, 660);
+	}
+
+	static void DrawPaletteAndTexture(Texture2D palTexture, Texture2D picTexture, int screenWidth, int screenHeight) {
+		//  BeginDrawing();
+		//  ClearBackground(DARKGRAY);
+
+		// Draw palette in top-left corner
+		if (palTexture.id > 0) {
+			DrawTextureEx(palTexture, {10, 10}, 0.0f, 8.0f, WHITE);
+			DrawText("PALETTE", 10, 150, 20, WHITE);
+		}
+
+		// Draw texture in center-right area
+		if (picTexture.id > 0) {
+			float scale = 2.0f;
+			int maxSize = 400;
+
+			// Scale texture to fit preview area
+			if (picTexture.width > maxSize || picTexture.height > maxSize) {
+				float scaleX = (float) maxSize / picTexture.width;
+				float scaleY = (float) maxSize / picTexture.height;
+				scale = (scaleX < scaleY) ? scaleX : scaleY;
+			}
+
+			Vector2 pos = {
+				screenWidth - picTexture.width * scale - 20,
+				(screenHeight - picTexture.height * scale) / 2
+			};
+
+			DrawTextureEx(picTexture, pos, 0.0f, scale, WHITE);
+
+			// Draw texture info
+			char info[256];
+			sprintf(info, "SIZE: %dx%d", picTexture.width, picTexture.height);
+			DrawText(info, (int) pos.x, (int) pos.y - 25, 20, WHITE);
+		}
+
+		//  EndDrawing();
+	}
 	static Texture2D ConvertPicToTexture(tile_t *tpic) {
 		if (!tpic || !tpic->tt.f) {
 			Texture2D invalid = {0};
@@ -1927,62 +1965,26 @@ public:
 		return texture;
 	}
 
-	static void DrawPaletteAndTexture() {
-		DrawPaletteAndTexture(runtimeTextures[6], runtimeTextures[10], 660, 660);
-	}
-
-	static void DrawPaletteAndTexture(Texture2D palTexture, Texture2D picTexture, int screenWidth, int screenHeight) {
-		//  BeginDrawing();
-		//  ClearBackground(DARKGRAY);
-
-		// Draw palette in top-left corner
-		if (palTexture.id > 0) {
-			DrawTextureEx(palTexture, {10, 10}, 0.0f, 8.0f, WHITE);
-			DrawText("PALETTE", 10, 150, 20, WHITE);
-		}
-
-		// Draw texture in center-right area
-		if (picTexture.id > 0) {
-			float scale = 2.0f;
-			int maxSize = 400;
-
-			// Scale texture to fit preview area
-			if (picTexture.width > maxSize || picTexture.height > maxSize) {
-				float scaleX = (float) maxSize / picTexture.width;
-				float scaleY = (float) maxSize / picTexture.height;
-				scale = (scaleX < scaleY) ? scaleX : scaleY;
-			}
-
-			Vector2 pos = {
-				screenWidth - picTexture.width * scale - 20,
-				(screenHeight - picTexture.height * scale) / 2
-			};
-
-			DrawTextureEx(picTexture, pos, 0.0f, scale, WHITE);
-
-			// Draw texture info
-			char info[256];
-			sprintf(info, "SIZE: %dx%d", picTexture.width, picTexture.height);
-			DrawText(info, (int) pos.x, (int) pos.y - 25, 20, WHITE);
-		}
-
-		//  EndDrawing();
-	}
-
 private:
 	static void GenerateTextures() {
-		gnumtiles_i = get_gnumtiles();
-		gmaltiles_i = get_gmaltiles();
+		// todo: make tile arrays per gal.
+		gnumtiles_i = g_gals[0].gnumtiles;
+
 		// static long gnumtiles, gmaltiles, gtilehashead[1024];
 		// static *long get_gtilehashead() { return gtilehashead; } // in outer file
-		long *source = get_gtilehashead();
-		memcpy(gtilehashead_i, source, sizeof(long) * 1024);
+		//long *source = get_gtilehashead();
+		//memcpy(gtilehashead_i, source, sizeof(long) * 1024);
 
 		runtimeTextures = static_cast<Texture2D *>(malloc(sizeof(Texture2D) * gnumtiles_i));
 		int end = gnumtiles_i;
 		for (int i = 0; i < end; ++i) {
-			runtimeTextures[i] = ConvertPicToTexture(getGtile(i)); // returns Texture2D
-		}
+			tile_t *til;
+			til = &g_gals[0].gtile[i];
+			if (til->tt.p==0)
+				runtimeTextures[i]=runtimeTextures[0];
+			runtimeTextures[i] = ConvertPicToTexture(til); // returns Texture2D
+		} // end = gallery.nutiles; tile_t* getGtile(int i){return &gtile[i];}
+		galfreetextures(0);
 		int a = 1;
 	}
 
