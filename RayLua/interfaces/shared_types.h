@@ -367,9 +367,6 @@ typedef struct {
 	point3d anchor; // normalized
 	point3d color;
 	int16_t lum; // yes allow negative values, why not.
-	uint8_t pal;
-	uint16_t tilnum;
-	uint8_t tilset; // sortof mod id
 } sprview;
 
 typedef struct {
@@ -388,17 +385,24 @@ typedef struct {
 
 typedef struct // surf_t
 {
-	long tilnum, tilanm ;/*???*/
+	// TEXTURE PARAMS.
+	union {
+		uint32_t packed_tile_data;
+		struct {
+			uint32_t tilnum : 15;  // 32k tiles
+			uint32_t galnum : 8;   // 256 gals
+			uint32_t pal : 9;      // 512 pals.
+		};
+	};
 	//Bit0:Blocking, Bit2:RelativeAlignment, Bit5:1Way, Bit16:IsParallax, Bit17:IsSkybox
 	uint32_t flags;	short lotag, hitag;
-	uint8_t pal;
+	//uint8_t pal;
 	float alpha;
 	float uvform[9]; // scale xy, pan xy, crop AB, rotation
 	int8_t owal, otez, uwal, utez, vwal, vtez; // wals are always wals of this sector.
 	uint8_t uvmapkind; // uv amappings, regular, polar, hex, flipped variants etc. paralax.
 	uint8_t tilingkind; // normal, polar, hex etc.
 // ------------
-	point2d uv[3]; // legacy.
 	unsigned short asc, rsc, gsc, bsc; //4096 is no change
 
 // ------- runtime gneerated data
@@ -448,7 +452,16 @@ typedef struct // spri_t
 	uint32_t guid; // uniq per sprite. automatic.
 	union { transform tr; struct { point3d p, r, d, f; }; };
 
-	long tilnum;             //Model file. Ex:"TILES000.ART|64","CARDBOARD.PNG","CACO.KV6","HAND.KCM","IMP.MD3"
+	//long tilnum;             //Model file. Ex:"TILES000.ART|64","CARDBOARD.PNG","CACO.KV6","HAND.KCM","IMP.MD3"
+	union {
+		uint32_t packed_tile_data;
+		struct {
+			uint32_t tilnum : 15;  // 32k tiles
+			uint32_t galnum : 8;   // 256 gals
+			uint32_t pal : 9;      // 512 pals.
+		};
+	};
+
 	long owner;
 	short lotag, hitag;
 	long sect; //Current sector

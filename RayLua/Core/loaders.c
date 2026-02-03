@@ -7,15 +7,18 @@
  *       - added compatibility storage to main types
  */
 #include "loaders.h"
-
 #include "buildmath.h"
 // TODO : Replace types with stdint like uint8_t
 // TODO : new mapstate should have raylib friendly coords by default. period.
 
 // build format 7 flags.
+#define TILSIZEX(g,t) g_gals[g].sizex[t]
+#define TILSIZEY(g,t) g_gals[g].sizey[t]
 
-
-
+#define GET_TILSIZEX(e) g_gals[e.galnum].sizex[e.tilnum]
+#define GET_TILSIZEY(e) g_gals[e.galnum].sizey[e.tilnum]
+#define GET_TILSIZEX_PTR(e) g_gals[e->galnum].sizex[e->tilnum]
+#define GET_TILSIZEY_PTR(e) g_gals[e->galnum].sizey[e->tilnum]
 /* WALL FLAGS
 *0 	1 	Enable blocking flag. 	[B]
 1 	2 	Enable "bottom texture swap". This makes the top and bottom half of a wall separately editable. However, they will still share repeat values. 	[2]
@@ -211,7 +214,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 				sec[i].z[j] = sect1.z[j];
 				sec[i].grad[j] = sect1.grad[j];
 				//for(k=0;k<3;k++) sec[i].surf[j].uv[k] = sect1.surf[j].uv[k];
-				sec[i].surf[j].uv[1].x = sec[i].surf[j].uv[2].y = 1.f;
+				//sec[i].surf[j].uv[1].x = sec[i].surf[j].uv[2].y = 1.f;
 				sec[i].surf[j].asc = sect1.surf[j].asc;
 				sec[i].surf[j].rsc = sect1.surf[j].rsc;
 				sec[i].surf[j].gsc = sect1.surf[j].gsc;
@@ -236,8 +239,8 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 				wal[j].ns = wall1.ns;
 				wal[j].nw = wall1.nw;
 				if (!stricmp(&filnam[max(strlen(filnam)-13,0)],"sos_test3.map"))
-					  { for(k=0;k<3;k++) wal[j].surf.uv[k] = wall1.surf.uv[k]; }
-				else { wal[j].surf.uv[1].x = wal[j].surf.uv[2].y = 1.f; }
+				//	  { for(k=0;k<3;k++) wal[j].surf.uv[k] = wall1.surf.uv[k]; }
+				//else { wal[j].surf.uv[1].x = wal[j].surf.uv[2].y = 1.f; }
 				wal[j].surf.asc = wall1.surf.asc;
 				wal[j].surf.rsc = wall1.surf.rsc;
 				wal[j].surf.gsc = wall1.surf.gsc;
@@ -255,7 +258,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 		checknextwalls_imp(map);
 		checksprisect_imp(-1,map);
 		kzclose();
-		return(1);
+		return(map);
 	}
 	else if (fileid == 0x3242534b) //KSB2 (current BUILD2 map format)
 	{
@@ -458,8 +461,8 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 
 		//------------------------------------------------------------------------
 		long filnum, arttiles, loctile0, loctile1, iskenbuild = 0;
-		short *tilesizx = 0, *tilesizy = 0, *tilefile = 0;
-		picanm_t *picanm= 0;
+
+        short *tilefile = 0;
 		char tbuf[MAX_PATH*2];
 
 		kzclose();
@@ -468,7 +471,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 		for(i=j=0;curmappath[i];i++) if ((curmappath[i] == '/') || (curmappath[i] == '\\')) j = i+1;
 		curmappath[j] = 0;
 
-
+/*
 		// Modified scanning code; this entire section must be abolished and moved into art loader.
 		arttiles = 0;
 		for(filnum=0;1;filnum++)
@@ -528,12 +531,14 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 		}
 
 		kzclose();
+		*/
 		kzopen(filnam);
 		kzread(&i,4);
 		//------------------------------------------------------------------------
 
 		hitile = 0;
-
+		int defaultGal=0;
+		arttiles = g_gals[0].numtiles;
 		if (fileid == 0x00000007) //Build1 .MAP format 7
 		{
 			kzread(&x,4); //posx
@@ -596,7 +601,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 					l = b7sec.surf[j].picnum;
 					if ((unsigned)l >= (unsigned)arttiles) l = 0;
 					sur->tilnum = l; hitile = max(hitile,l);
-
+					sur->galnum = defaultGal; // assume duke.
 					// Convert lotag/hitag to single tag field
 					// j=0 is ceiling, j=1 is floor - assign to floor surface only
 					if (j == 1) // Floor surface
@@ -608,46 +613,46 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 
 					sur->pal = b7sec.surf[j].pal;
 
-					sur->uv[0].x = ((float)b7sec.surf[j].xpanning)/256.0;
-					sur->uv[0].y = ((float)b7sec.surf[j].ypanning)/256.0;
-					sur->uv[1].y = sur->uv[2].x = 0;
-					if (!(b7sec.stat[j]&SECTOR_SWAP_XY))
-					{
-						sur->uv[1].x = 32.0/((float)tilesizx[l]);
-						sur->uv[2].y = 32.0/((float)tilesizy[l]);
-					}
-					else
-					{
-						sur->uv[1].x = 32.0/((float)tilesizy[l]);
-						sur->uv[2].y = 32.0/((float)tilesizx[l]);
-					}
-					if (b7sec.stat[j] & SECTOR_EXPAND_TEXTURE) { sur->uv[1].x *= 2; sur->uv[2].y *= 2; } //double smooshiness
-					if (b7sec.stat[j] & SECTOR_FLIP_X) sur->uv[1].x *= -1; //x-flip
-					if (!(b7sec.stat[j] & SECTOR_FLIP_Y)) sur->uv[2].y *= -1; //y-flip
+					//sur->uv[0].x = ((float)b7sec.surf[j].xpanning)/256.0;
+					//sur->uv[0].y = ((float)b7sec.surf[j].ypanning)/256.0;
+					//sur->uv[1].y = sur->uv[2].x = 0;
+					//if (!(b7sec.stat[j]&SECTOR_SWAP_XY))
+					//{
+					//	sur->uv[1].x = 32.0/((float)GET_TILSIZEX_PTR(sur));
+					//	sur->uv[2].y = 32.0/((float)GET_TILSIZEY_PTR(sur));
+					//}
+					//else
+					//{
+					//	sur->uv[1].x = 32.0/((float)GET_TILSIZEX_PTR(sur));
+					//	sur->uv[2].y = 32.0/((float)GET_TILSIZEY_PTR(sur));
+					//}
+					//if (b7sec.stat[j] & SECTOR_EXPAND_TEXTURE) { sur->uv[1].x *= 2; sur->uv[2].y *= 2; } //double smooshiness
+					//if (b7sec.stat[j] & SECTOR_FLIP_X) sur->uv[1].x *= -1; //x-flip
+					//if (!(b7sec.stat[j] & SECTOR_FLIP_Y)) sur->uv[2].y *= -1; //y-flip
 					if (b7sec.stat[j] & SECTOR_TEXWALL_ALIGN) //relative alignment
 					{
 						f = ((float)b7sec.surf[j].heinum)*(1.f/4096.f);
-						sur->uv[2].y *= -sqrt(f*f + 1.f);
+						//sur->uv[2].y *= -sqrt(f*f + 1.f);
 						sur->flags |= 4;
 					}
-					if (b7sec.stat[j] & SECTOR_SWAP_XY) //swap x&y
-					{
-						if (((b7sec.stat[j] & SECTOR_FLIP_X) != 0) != ((b7sec.stat[j] & SECTOR_FLIP_Y) != 0))
-						{ sur->uv[1].x *= -1; sur->uv[2].y *= -1; }
-						sur->uv[1].y = sur->uv[1].x; sur->uv[1].x = 0;
-						sur->uv[2].x = sur->uv[2].y; sur->uv[2].y = 0;
-					}
+					// if (b7sec.stat[j] & SECTOR_SWAP_XY) //swap x&y
+					// {
+					// 	if (((b7sec.stat[j] & SECTOR_FLIP_X) != 0) != ((b7sec.stat[j] & SECTOR_FLIP_Y) != 0))
+					// 	{ sur->uv[1].x *= -1; sur->uv[2].y *= -1; }
+					// 	sur->uv[1].y = sur->uv[1].x; sur->uv[1].x = 0;
+					// 	sur->uv[2].x = sur->uv[2].y; sur->uv[2].y = 0;
+					// }
 
 					//FIX:This hack corrects an LHS vs. RHS bug in a later stage of texture mapping (drawsectfill?)
-					if (sur->uv[1].x*sur->uv[2].y < sur->uv[1].y*sur->uv[2].x)
-					{ sur->uv[2].x *= -1; sur->uv[2].y *= -1; }
+					//if (sur->uv[1].x*sur->uv[2].y < sur->uv[1].y*sur->uv[2].x)
+					//{ sur->uv[2].x *= -1; sur->uv[2].y *= -1; }
 
 					sec[i].surf[j].uvmapkind = b7sec.stat[j] & SECTOR_TEXWALL_ALIGN ? UV_TEXELRATE : UV_WORLDXY;
 					sec[i].mflags[j] = b7sec.stat[j];
 
 					// also pans are limited by 256. so large textures wont work.
-					float xsize = tilesizx[sec[i].surf[j].tilnum];
-					float ysize = tilesizy[sec[i].surf[j].tilnum];
+					float xsize = GET_TILSIZEX(sec[i].surf[j]);
+					float ysize = GET_TILSIZEY(sec[i].surf[j]);
 					//float pix8 = 8.0f/xsize; //64/8 = 8
 					//float scalerx = pix8;
 					if (sec[i].surf[j].uvmapkind == UV_TEXELRATE) {
@@ -714,14 +719,14 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 					sur->hitag = b7wal.hitag;
 					sur->pal = b7wal.pal;
 
-					sur->uv[0].x = b7wal.xpanning;
-					sur->uv[0].y = b7wal.ypanning;
-					sur->uv[1].x = b7wal.xrepeat;
-					if (b7wal.cstat & WALL_FLIP_X) sur->uv[1].x *= -1;
-					sur->uv[1].y = 0;
-					sur->uv[2].x = 0;
-					sur->uv[2].y = b7wal.yrepeat;
-					if (b7wal.cstat & WALL_FLIP_Y) sur->uv[2].y *= -1;
+					//sur->uv[0].x = b7wal.xpanning;
+					//sur->uv[0].y = b7wal.ypanning;
+					//sur->uv[1].x = b7wal.xrepeat;
+					//if (b7wal.cstat & WALL_FLIP_X) sur->uv[1].x *= -1;
+					//sur->uv[1].y = 0;
+					//sur->uv[2].x = 0;
+					//sur->uv[2].y = b7wal.yrepeat;
+					//if (b7wal.cstat & WALL_FLIP_Y) sur->uv[2].y *= -1;
 					// if wall opens to next sector - we align to 'jawlines' for easier door setup
 					if ((b7wal.nextsect < 0) ^ (!(b7wal.cstat & WALL_ALIGN_FLOOR))) {
 						sur->flags ^= 4;
@@ -735,9 +740,11 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 					sur->bsc = (32-b7wal.shade)*128;
 					l = b7wal.picnum; if ((unsigned)l >= (unsigned)arttiles) l = 0;
 					sur->tilnum = l; hitile = max(hitile,l);
+					sur->galnum = defaultGal;
 					sec[i].wall[j].surfn = 1;
 					sec[i].wall[j].owner = -1;
 					wall_t *thiswal = &sec[i].wall[j];
+					thiswal->xsurf[0].galnum = defaultGal;
 					thiswal->xsurf[0].rsc=sur->rsc;
 					thiswal->xsurf[1].rsc=sur->rsc;
 					thiswal->xsurf[2].rsc=sur->rsc;
@@ -781,11 +788,11 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 					thiswal->surf.tilnum= b7wal.picnum;
 					//float wallh = (sec[i].z[1]-sec[i].z[0]);
 					// also pans are limited by 256. so large textures wont work.
-					float xsize = tilesizx[thiswal->surf.tilnum];
+					float xsize = GET_TILSIZEX(thiswal->surf);
 					float pix8 = 8.0f/xsize; //64/8 = 8
 					float scalerx = b7wal.xrepeat * pix8;
 
-					float ysize = tilesizy[thiswal->surf.tilnum];
+					float ysize = GET_TILSIZEY(thiswal->surf);
 					float pix4 = 4.0f/ysize;
 					float normuvperz = pix4 * b7wal.yrepeat;
 					float scalery =  normuvperz;
@@ -841,10 +848,10 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 					f = sqrt(fx*fx + fy*fy);
 					sur = &sec[i].wall[j].surf;
 					l = sur->tilnum;
-					sur->uv[1].x = ((float)sur->uv[1].x*8.0)/(f*((float)tilesizx[l]));
-					sur->uv[2].y = ((float)sur->uv[2].y*4.0)/((float)tilesizy[l]);
-					sur->uv[0].x = ((float)sur->uv[0].x)/((float)tilesizx[l]);
-					sur->uv[0].y = ((float)sur->uv[0].y)/256.f * (1-2*(sur->uv[2].y < 0));
+					//sur->uv[1].x = ((float)sur->uv[1].x*8.0)/(f*((float)tilesizx[l]));
+					//sur->uv[2].y = ((float)sur->uv[2].y*4.0)/((float)tilesizy[l]);
+					//sur->uv[0].x = ((float)sur->uv[0].x)/((float)tilesizx[l]);
+					//sur->uv[0].y = ((float)sur->uv[0].y)/256.f * (1-2*(sur->uv[2].y < 0));
 				}
 
 				{ // setting sector slope gradient
@@ -881,6 +888,8 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 				spr->p.z = ((float)b7spr.z)*(1.f/(512.f*16.f));
 				spr->flags = 0;
 				spr->walcon = -3;
+				spr->tilnum = l;
+				spr->galnum = defaultGal;
 
 				int flagsw=b7spr.cstat & (SPRITE_WALL_ALIGNED | SPRITE_FLOOR_ALIGNED);
 				if  (flagsw ==0) //Face sprite
@@ -899,17 +908,17 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 					case SPRITE_WALL_ALIGNED: //Wall sprite
 						// need to not alter sprite positions, but change view xforms.
 						//		spr->p.z -= (b7spr.yrepeat/4096.0*(float)tilesizy[l]);
-						spr->r.x = -sin((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
-						spr->r.y = cos((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
-						spr->d.z = -(b7spr.yrepeat/4096.0*(float)tilesizy[l]);
+						spr->r.x = -sin((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)GET_TILSIZEX_PTR(spr));
+						spr->r.y = cos((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)GET_TILSIZEX_PTR(spr));
+						spr->d.z = -(b7spr.yrepeat/4096.0*(float)GET_TILSIZEY_PTR(spr));
 						spr->f = buildFW;
 						break;
 					case SPRITE_FLOOR_ALIGNED: //Floor sprite
 						// forward faces up, right faces right, down faces along build's forward;
-						spr->r.x = sin((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
-						spr->r.y =-cos((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)tilesizx[l]);
-						spr->d.x = cos((float)b7spr.ang*PI/1024.0)*(b7spr.yrepeat/4096.0*(float)tilesizy[l]);
-						spr->d.y = sin((float)b7spr.ang*PI/1024.0)*(b7spr.yrepeat/4096.0*(float)tilesizy[l]);
+						spr->r.x = sin((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)GET_TILSIZEX_PTR(spr));
+						spr->r.y =-cos((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)GET_TILSIZEX_PTR(spr));
+						spr->d.x = cos((float)b7spr.ang*PI/1024.0)*(b7spr.yrepeat/4096.0*(float)GET_TILSIZEY_PTR(spr));
+						spr->d.y = sin((float)b7spr.ang*PI/1024.0)*(b7spr.yrepeat/4096.0*(float)GET_TILSIZEY_PTR(spr));
 						int upvec = b7spr.cstat&(SPRITE_FLIP_Y) ? 1 : -1;
 						spr->f = (point3d){0,0,upvec}; // facing up
 						spr->r = (point3d){spr->r.x *upvec, spr->r.y*upvec, spr->r.z};
@@ -936,8 +945,8 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 
 				spr->tilnum = l; hitile = max(hitile,l);
 
-				float tileoffu = picanm[spr->tilnum].x_center_offset/(float)tilesizx[spr->tilnum];
-				float tileoffv = picanm[spr->tilnum].y_center_offset/(float)tilesizy[spr->tilnum];
+				float tileoffu = g_gals[defaultGal].picanm_data[spr->tilnum].x_center_offset/GET_TILSIZEX_PTR(spr);
+				float tileoffv = g_gals[defaultGal].picanm_data[spr->tilnum].y_center_offset/GET_TILSIZEY_PTR(spr);
 				spr->view.anchor.x+=tileoffu;
 				spr->view.anchor.z+=tileoffv;
 
@@ -965,7 +974,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 				spr->sectn = spr->sectp = -1;
 				spr->lotag = b7spr.lotag;
 				spr->hitag = b7spr.hitag;
-				spr->view.pal = b7spr.pal;
+				spr->pal = b7spr.pal;
 
 				// duke3d compat
 				spr->tags[MT_CSTAT] = b7spr.cstat;
@@ -1045,7 +1054,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 						{
 							sec[i].grad[j].x = sec[i].grad[j].y = 0;
 							sur = &sec[i].surf[j];
-							sur->uv[1].x = sur->uv[2].y = 1.f;
+							//sur->uv[1].x = sur->uv[2].y = 1.f;
 							sur->asc = 4096;
 							sur->rsc = 4096-768+1536*j;
 							sur->gsc = 4096-768+1536*j;
@@ -1055,8 +1064,9 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 							else l = board[1][x][ y+1][z];
 							if ((unsigned)l >= (unsigned)arttiles) l = 0;
 							sur->tilnum = l; hitile = max(hitile,l);
-							sur->uv[1].x = max(64.f/((float)tilesizx[l]),1.f);
-							sur->uv[2].y = max(64.f/((float)tilesizy[l]),1.f);
+							sur->galnum = defaultGal;
+							//sur->uv[1].x = max(64.f/((float)GET_TILSIZEX_PTR(sur)),1.f);
+							//sur->uv[2].y = max(64.f/((float)tilesizy[l]),1.f);
 						}
 						//sec[i].foglev = ?;
 						sec[i].headspri = -1;
@@ -1067,7 +1077,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 							sec[i].wall[j].x = ((float)(       x+(((j+1)>>1)&1)))*(1.f);
 							sec[i].wall[j].y = ((float)(BSIZ-1-z+(( j  )>>1)   ))*(1.f);
 							if (j < 3) sec[i].wall[j].n = 1; else sec[i].wall[j].n = -3;
-							sec[i].wall[j].surf.uv[1].x = sec[i].wall[j].surf.uv[2].y = 1;
+							//sec[i].wall[j].surf.uv[1].x = sec[i].wall[j].surf.uv[2].y = 1;
 							sec[i].wall[j].surf.asc = 4096;
 							sec[i].wall[j].surf.rsc = 4096+(labs(j-1)-1)*512;
 							sec[i].wall[j].surf.gsc = 4096+(labs(j-1)-1)*512;
@@ -1088,9 +1098,12 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 								if ((unsigned)l < (unsigned)arttiles) break;
 							}
 							if ((unsigned)l >= (unsigned)arttiles) l = 0;
-							sec[i].wall[j].surf.tilnum = l; hitile = max(hitile,l);
-							sec[i].wall[j].surf.uv[1].x = max(64.f/((float)tilesizx[l]),1.f);
-							sec[i].wall[j].surf.uv[2].y = max(64.f/((float)tilesizy[l]),1.f);
+
+							sur = &sec[i].wall[j].surf;
+							sur->tilnum = l; hitile = max(hitile,l);
+							sur->galnum = defaultGal;
+							//sur->uv[1].x = max(64.f/((float)GET_TILSIZEX_PTR(sur)),1.f);
+							//sur->uv[2].y = max(64.f/((float)GET_TILSIZEY_PTR(sur)),1.f);
 						}
 						map->numsects++;
 
@@ -1101,33 +1114,33 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 			map->numspris = 0;
 		}
 		if (true) { // Postprocessing of the loaded map
-			// this is where actual loading happens, also needs to be migrated.
-			// we dont seem to be using hash, and only using direct indexing - extract hashes
-			// into separate method for later use and commment on their usage.
-			for(i=gnumtiles-1;i>=0;i--)
-				if (gtile[i].tt.f) { free((void *)gtile[i].tt.f); gtile[i].tt.f = 0; }
-			gnumtiles = 0; memset(gtilehashead,-1,sizeof(gtilehashead));
-
-			hitile++;
-			hitile =  2000;
-			if (hitile > gmaltiles)
-			{
-				gmaltiles = hitile;
-				gtile = (tile_t *)realloc(gtile,gmaltiles*sizeof(tile_t));
-			}
-
-			for(i=0;i<hitile;i++)
-			{
-				sprintf(tbuf,"tiles%03d.art|%d",tilefile[i],i);
-				gettileind(tbuf);
-			}
-			tile_t* gtpic;
-			for(i=0;i<gmaltiles;i++)
-			{
-				gtpic = &gtile[i];
-				if (!gtpic->tt.f)
-					loadpic(gtpic,curmappath);
-			}
+			//// this is where actual loading happens, also needs to be migrated.
+			//// we dont seem to be using hash, and only using direct indexing - extract hashes
+			//// into separate method for later use and commment on their usage.
+			//for(i=gnumtiles-1;i>=0;i--)
+			//	if (gtile[i].tt.f) { free((void *)gtile[i].tt.f); gtile[i].tt.f = 0; }
+			//gnumtiles = 0; memset(gtilehashead,-1,sizeof(gtilehashead));
+//
+			//hitile++;
+			//hitile =  2000;
+			//if (hitile > gmaltiles)
+			//{
+			//	gmaltiles = hitile;
+			//	gtile = (tile_t *)realloc(gtile,gmaltiles*sizeof(tile_t));
+			//}
+//
+			//for(i=0;i<hitile;i++)
+			//{
+			//	sprintf(tbuf,"tiles%03d.art|%d",tilefile[i],i);
+			//	gettileind(tbuf);
+			//}
+			//tile_t* gtpic;
+			//for(i=0;i<gmaltiles;i++)
+			//{
+			//	gtpic = &gtile[i];
+			//	if (!gtpic->tt.f)
+			//		loadpic(gtpic,curmappath);
+			//}
 
 #ifdef STANDALONE
 			//	for(i=numplayers-1;i>=0;i--) gst->p[i].sec.n = 0;
@@ -1180,7 +1193,8 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 					int ns = walp->ns;
 					if (walp->surfn == 3 && ns >= 0) // handle multi wall.
 					{
-						int nextpic = sec[walp->ns].wall[walp->nw].surf.tilnum;
+						surf_t nextsurf = sec[walp->ns].wall[walp->nw].surf;
+						int nxgal = sec[walp->ns].wall[walp->nw].surf.galnum;
 						bool isbotswap = walp->xsurf[2].tilnum == -2;
 						wall_t *oppwal;
 
@@ -1191,17 +1205,17 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 							isfloralignbot = oppwal->mflags[0] & WALL_ALIGN_FLOOR;
 							yflipmul[2] = oppwal->mflags[0] & WALL_FLIP_Y ? -1 : 1;
 							yrepeatbot = oppwal->surf.owal;
-							int cursizx = tilesizx[walp->xsurf[0].tilnum];
-							int newsizx = tilesizx[nextpic];
+							int cursizx = GET_TILSIZEX(walp->xsurf[0]);
+							int newsizx = GET_TILSIZEX(nextsurf);
 
-							int cursizy = tilesizy[walp->xsurf[0].tilnum];
-							int newsizy = tilesizy[nextpic];
+							int cursizy = GET_TILSIZEY(walp->xsurf[0]);
+							int newsizy = GET_TILSIZEY(nextsurf);
 
 							walp->xsurf[2].uvform[0] *= cursizx/(float)newsizx;
 							walp->xsurf[2].uvform[1] *= cursizy/(float)newsizy;
 							walp->xsurf[2].uvform[2] = oppwal->surf.uvform[2];
 							walp->xsurf[2].uvform[3] = oppwal->surf.uvform[3];
-							walp->xsurf[2].tilnum = nextpic;
+							walp->xsurf[2].tilnum = nextsurf.tilnum;
 							// also pans are limited by 256. so large textures wont work.
 							//*newx/oldx;
 						}
@@ -1215,7 +1229,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 							if(sl==2 && floralig[sl])
 								continue;
 // Claude here walp->xsurf[sl].tilnum is invalid, when sl==0, even tho initially all tilnums are set correct
-							float ysize = tilesizy[walp->xsurf[sl].tilnum];
+							float ysize = GET_TILSIZEY(walp->xsurf[sl]);
 							float pix4 = 4.0f / ysize;
 							float normuvperz = pix4 * yrepeat;
 							if(!floralig[sl])// for flor aligned we use same rect for both chunks
@@ -1223,11 +1237,11 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 						}
 
 						{ //rescale mid texture
-							int cursizx = tilesizx[walp->xsurf[0].tilnum];
-							int newsizx = tilesizx[walp->xsurf[1].tilnum];
+							int cursizx = GET_TILSIZEX(walp->xsurf[0]);
+							int newsizx = GET_TILSIZEX(walp->xsurf[1]);
 							//
-							int cursizy = tilesizy[walp->xsurf[0].tilnum];
-							int newsizy = tilesizy[walp->xsurf[1].tilnum];
+							int cursizy = GET_TILSIZEY(walp->xsurf[0]);
+							int newsizy = GET_TILSIZEY(walp->xsurf[1]);
 							//
 							walp->xsurf[1].uvform[0] *= cursizx/(float)newsizx;
 							walp->xsurf[1].uvform[2] *= cursizx/(float)newsizx;
@@ -1302,8 +1316,6 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 
 			}
 
-			if (tilesizx) free(tilesizx);
-			if (tilesizy) free(tilesizy);
 			if (tilefile) free(tilefile);
 
 			kzclose();

@@ -422,11 +422,11 @@ public:
 							// [u]   [uv[1].x  uv[2].x  uv[0].x] [wall->x]
 							// [v] = [uv[1].y  uv[2].y  uv[0].y] [wall->y]
 							// [1]   [   0        0        1   ] [   1   ]
-							triMesh.texcoords[w * 2] =
-									wall->x * sect->surf[isFloor].uv[1].x + wall->y * sect->surf[isFloor]
-									.uv[2].x + sect->surf[isFloor].uv[0].x;
-							triMesh.texcoords[w * 2 + 1] = wall->x * sect->surf[isFloor].uv[1].y + wall->y * sect->surf[
-								                               isFloor].uv[2].y + sect->surf[isFloor].uv[0].y;
+							//triMesh.texcoords[w * 2] =
+							//		wall->x * sect->surf[isFloor].uv[1].x + wall->y * sect->surf[isFloor]
+							//		.uv[2].x + sect->surf[isFloor].uv[0].x;
+							//triMesh.texcoords[w * 2 + 1] = wall->x * sect->surf[isFloor].uv[1].y + wall->y * sect->surf[
+							//	                               isFloor].uv[2].y + sect->surf[isFloor].uv[0].y;
 						}
 
 						// Triangulate
@@ -1180,14 +1180,14 @@ public:
 							rlBegin(RL_QUADS);
 							rlColor4ub(255, 255, 255, 255);
 
-							rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y * dy);
-							rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
-							rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 1.0f * wall->surf.uv[2].y * dy);
-							rlVertex3f(bottomRight.x, bottomRight.y, bottomRight.z);
-							rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 0.0f);
-							rlVertex3f(topRight.x, topRight.y, topRight.z);
-							rlTexCoord2f(0.0f, 0.0f);
-							rlVertex3f(topLeft.x, topLeft.y, topLeft.z);
+							//rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y * dy);
+							//rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
+							//rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 1.0f * wall->surf.uv[2].y * dy);
+							//rlVertex3f(bottomRight.x, bottomRight.y, bottomRight.z);
+							//rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 0.0f);
+							//rlVertex3f(topRight.x, topRight.y, topRight.z);
+							//rlTexCoord2f(0.0f, 0.0f);
+							//rlVertex3f(topLeft.x, topLeft.y, topLeft.z);
 
 							rlEnd();
 							rlSetTexture(0);
@@ -1223,14 +1223,14 @@ public:
 								rlBegin(RL_QUADS);
 								rlColor4ub(255, 255, 255, 255);
 
-								rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y * (upperDy + selfDy));
-								rlVertex3f(bottom_left.x, bottom_left.y, bottom_left.z);
+							//rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y * (upperDy + selfDy));
+							//rlVertex3f(bottom_left.x, bottom_left.y, bottom_left.z);
 
-								rlTexCoord2f(wall->surf.uv[1].x * dx, wall->surf.uv[2].y * (upperDy + dh));
-								rlVertex3f(bottom_right.x, bottom_right.y, bottom_right.z);
+							//rlTexCoord2f(wall->surf.uv[1].x * dx, wall->surf.uv[2].y * (upperDy + dh));
+							//rlVertex3f(bottom_right.x, bottom_right.y, bottom_right.z);
 
-								rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 0.0f);
-								rlVertex3f(topRight.x, topRight.y, topRight.z);
+							//rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 0.0f);
+							//rlVertex3f(topRight.x, topRight.y, topRight.z);
 
 								rlTexCoord2f(0.0f, 0.0);
 								rlVertex3f(topLeft.x, topLeft.y, topLeft.z);
@@ -1256,16 +1256,16 @@ public:
 
 								rlColor4ub(255, 255, 255, 255);
 								// CW starting from upper left
-								rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y * (largeDy + selfDy));
+								//rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y * (largeDy + selfDy));
 								rlVertex3f(thisTopLeft.x, thisTopLeft.y, thisTopLeft.z);
 
-								rlTexCoord2f(wall->surf.uv[1].x * dx, wall->surf.uv[2].y * (largeDy + dh));
+								//rlTexCoord2f(wall->surf.uv[1].x * dx, wall->surf.uv[2].y * (largeDy + dh));
 								rlVertex3f(thisTopRight.x, thisTopRight.y, thisTopRight.z);
 
-								rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 0.0f);
+								//rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 0.0f);
 								rlVertex3f(bottomRight.x, bottomRight.y, bottomRight.z);
 
-								rlTexCoord2f(0.0f, 0.0);
+								//rlTexCoord2f(0.0f, 0.0);
 								rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
 								rlEnd();
 								rlSetTexture(0);
@@ -1572,8 +1572,8 @@ public:
 					triMesh.vertices[w * 3 + 1] = z;
 					triMesh.vertices[w * 3 + 2] = wall->y;
 
-					triMesh.texcoords[w * 2] = 0.2f * wall->x * sect->surf->uv[1].x;
-					triMesh.texcoords[w * 2 + 1] = 0.2f * wall->y * sect->surf->uv[2].y;
+					//triMesh.texcoords[w * 2] = 0.2f * wall->x * sect->surf->uv[1].x;
+					//triMesh.texcoords[w * 2 + 1] = 0.2f * wall->y * sect->surf->uv[2].y;
 				}
 
 				// Triangulate polygon
@@ -1719,11 +1719,11 @@ public:
 						rlSetTexture(wallTex.id);
 						rlBegin(RL_QUADS);
 						rlColor4ub(255, 255, 255, 255);
-						rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y * dy);
+						//rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y * dy);
 						rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
-						rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 1.0f * wall->surf.uv[2].y * dy);
+						//rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 1.0f * wall->surf.uv[2].y * dy);
 						rlVertex3f(bottomRight.x, bottomRight.y, bottomRight.z);
-						rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 0.0f);
+						//rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 0.0f);
 						rlVertex3f(topRight.x, topRight.y, topRight.z);
 						rlTexCoord2f(0.0f, 0.0f);
 						rlVertex3f(topLeft.x, topLeft.y, topLeft.z);

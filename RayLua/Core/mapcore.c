@@ -313,7 +313,7 @@ int dupwall_imp (sect_t *s, int w)
 	if (!s->n)
 	{
 		memset(wal,0,sizeof(wall_t));
-		wal[0].surf.uv[1].x = wal[0].surf.uv[2].y = 1.f;
+		//wal[0].surf.uv[1].x = wal[0].surf.uv[2].y = 1.f;
 		wal[0].ns = wal[0].nw = -1; s->n = 1;
 		wal[0].surf.flags = 4;
 		return(0);
@@ -1356,7 +1356,7 @@ void spritemakedefault(spri_t *spr) {
 	spr->walcon=-3;
 	spr->r.x = .5; spr->d.z = .5; spr->f.y =-.5;
 	spr->phys.fat = .5; spr->phys.mas = spr->phys.moi = 1.0;
-	spr->view.tilnum=1;
+	spr->tilnum=1;
 	spr->view.anchor=(point3d){0.5,0.5,0.5};
 	spr->view.uv[0]=1;
 	spr->view.uv[1]=1;
