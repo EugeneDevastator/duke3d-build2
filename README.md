@@ -8,6 +8,8 @@ Want just daily updates? - welcome to duke4.net discord: https://discord.gg/ChAn
 also im looking for a job, any jobs pls? my contact's here https://dave-astator.com <br>
 
 For now our dev team is me and Jaba, and i can find task for everyone. <br>
+<img src="intro.png" alt="looknsee" width="640" style="display: block; margin: 0 auto;">
+
 
 # License info
 NON-COMMERCIAL OPEN SOURCE LICENSE
