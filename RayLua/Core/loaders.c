@@ -333,19 +333,22 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 
 			//Load tiles
 		kzread(&nnumtiles,4); gnumtiles += nnumtiles;
-		if (gnumtiles > gmaltiles)
+		if (false) // dont read tile data.
 		{
-			gmaltiles = max(gnumtiles+1,gmaltiles<<1);
-			gtile = (tile_t *)realloc(gtile,gmaltiles*sizeof(tile_t));
-		}
-		tile_t* gtpic;
-		for(i=gnumtiles-nnumtiles;i<gnumtiles;i++)
-		{
-			kzread(&s,2); kzread(gtile[i].filnam,s); gtile[i].filnam[s] = 0; //FIX:possible buffer overflow here
-			gtile[i].tt.f = 0;
-			gtile[i].namcrc32 = getcrc32z(0,(unsigned char *)gtile[i].filnam);
-			gtpic = &gtile[sur->tilnum];
-			if (!gtpic->tt.f) loadpic(gtpic,curmappath);
+		//	if (gnumtiles > gmaltiles)
+		//	{
+		//		gmaltiles = max(gnumtiles+1,gmaltiles<<1);
+		//		gtile = (tile_t *)realloc(gtile,gmaltiles*sizeof(tile_t));
+		//	}
+		//	tile_t* gtpic;
+		//	for(i=gnumtiles-nnumtiles;i<gnumtiles;i++)
+		//	{
+		//		kzread(&s,2); kzread(gtile[i].filnam,s); gtile[i].filnam[s] = 0; //FIX:possible buffer overflow here
+		//		gtile[i].tt.f = 0;
+		//		gtile[i].namcrc32 = getcrc32z(0,(unsigned char *)gtile[i].filnam);
+		//		gtpic = &gtile[sur->tilnum];
+		//		if (!gtpic->tt.f) loadpic(gtpic,curmappath);
+		//	}
 		}
 
 			//Load sprites

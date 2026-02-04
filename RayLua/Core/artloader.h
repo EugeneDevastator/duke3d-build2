@@ -23,7 +23,6 @@ typedef struct tiltyp {
 	int x, y, z;            // x,y=dimensions, z=depth/format info
 	float shsc;             // shsc=suggested height scale
 	struct tiltyp *lowermip; // pointer to lower mipmap level
-	picanm_t animdata;
 } tiltyp;
 typedef struct
 {

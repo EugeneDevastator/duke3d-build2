@@ -1980,8 +1980,8 @@ private:
 		for (int i = 0; i < end; ++i) {
 			tile_t *til;
 			til = &g_gals[0].gtile[i];
-			if (til->tt.p==0)
-				runtimeTextures[i]=runtimeTextures[0];
+			//if (til->tt.f==0)
+			//	runtimeTextures[i]=runtimeTextures[0];
 			runtimeTextures[i] = ConvertPicToTexture(til); // returns Texture2D
 		} // end = gallery.nutiles; tile_t* getGtile(int i){return &gtile[i];}
 		galfreetextures(0);

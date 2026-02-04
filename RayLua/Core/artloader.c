@@ -200,7 +200,6 @@ void loadpic(tile_t *tpic, char* rootpath) {
         // Use gallery data
         pic->x = g_gals[0].sizex[tilenum];
         pic->y = g_gals[0].sizey[tilenum];
-        pic->animdata = g_gals[0].picanm_data[tilenum];
 
         if (pic->x <= 0 || pic->y <= 0) {
             pic->f = (long)nullpic;
@@ -335,13 +334,16 @@ void galfreetextures(int gal_idx) {
 			}
 		}
 	}
-
+}
+void galfree(int gal_idx) {
+	if (gal_idx < 0 || gal_idx >= 16) return;
+	gallery* gal = &g_gals[gal_idx];
+	galfreetextures(gal_idx);
 	if (gal->picanm_data) {
 		free(gal->picanm_data);
 		gal->picanm_data = NULL;
 	}
 }
-
 int loadgal(int gal_idx, const char* path) {
     if (gal_idx < 0 || gal_idx >= 16) return 0;
 
@@ -436,13 +438,12 @@ int loadgal(int gal_idx, const char* path) {
     gal->gmaltiles = arttiles;
 
     // Initialize tile array
-    gal->gtile = (tile_t*)malloc(arttiles * sizeof(tile_t));
+    gal->gtile = (tile_t*)malloc(arttiles * sizeof(tile_t))	;
     memset(gal->gtile, 0, arttiles * sizeof(tile_t));
 
     for(int i = 0; i < arttiles; i++) {
         sprintf(gal->gtile[i].filnam, "tiles000.art|%d", i);
         gal->gtile[i].tt.f = 0;
-        gal->gtile[i].tt.animdata = picanm[i];
     }
 
     // Load ALL image data immediately
