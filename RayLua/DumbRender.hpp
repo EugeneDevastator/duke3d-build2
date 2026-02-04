@@ -81,7 +81,7 @@ static FloorMeshData *floorMeshes = NULL;
 static int numFloorMeshes = 0;
 static Texture2D *runtimeTextures;
 static mapstate_t *map;
-static long gnumtiles_i, gmaltiles_i, gtilehashead_i[1024];
+static long numartiles, gmaltiles_i, gtilehashead_i[1024];
 static bool drawWalls = false;
 static bool drawSpris = true;
 static bool drawCeils = false;
@@ -96,9 +96,10 @@ static int cureyepoly = 0;
 static int mono_cursnap = 0;
 static int mono_curchain = 0;
 static cam_t localb2cam;
-
+static Texture2D* galtextures[16];
 class DumbRender {
 public:
+	inline static Texture2D* galtextures[16] = {nullptr};
 	static mapstate_t *GetMap() {
 		return map;
 	}
@@ -695,9 +696,9 @@ public:
 		                  bpv3(eyepol[i].worlduvs[0]),
 		                  bpv3(eyepol[i].worlduvs[1]),
 		                  bpv3(eyepol[i].worlduvs[2]));
-		if (eyepol[i].tilnum > gnumtiles_i || eyepol[i].tilnum <0)
+		if (eyepol[i].tilnum > numartiles || eyepol[i].tilnum <0)
 			eyepol[i].tilnum = 5;
-		const Texture2D tex = runtimeTextures[eyepol[i].tilnum];
+		const Texture2D tex = galtextures[eyepol[i].galnum][eyepol[i].tilnum];
 
 		SetShaderValueTexture(uvShaderDesc.shader, uvShaderDesc.textureLoc, tex);
 
@@ -1313,14 +1314,14 @@ public:
 			spri_t *spr = &map->spri[i];
 			if (spr->tilnum >= 0) // sprites
 			{
-				if (spr->tilnum >= gnumtiles_i)
-					spr->tilnum = gnumtiles_i - 10;
+				if (spr->tilnum >= numartiles)
+					spr->tilnum = numartiles - 10;
 
 				rlEnableBackfaceCulling();
 				if (spr->view.isdblside)
 					rlDisableBackfaceCulling();
 
-				Texture2D spriteTex = runtimeTextures[spr->tilnum];
+				Texture2D spriteTex = galtextures[spr->galnum][spr->tilnum];
 				// vectors are half a size
 				Vector3 rg = {spr->r.x, -spr->r.z, spr->r.y};
 				Vector3 dw = {spr->d.x, -spr->d.z, spr->d.y};
@@ -1736,7 +1737,7 @@ public:
 		// Draw sprites (unchanged - already efficient)
 		for (int i = 0; i < map->numspris; i++) {
 			spri_t *spr = &map->spri[i];
-			if (spr->tilnum >= 0 && spr->tilnum < gnumtiles_i) {
+			if (spr->tilnum >= 0 && spr->tilnum < numartiles) {
 				Texture2D spriteTex = runtimeTextures[spr->tilnum];
 				Vector3 rg = {spr->r.x, spr->r.y, spr->r.z};
 				Vector3 dw = {spr->d.x, spr->d.y, spr->d.z};
@@ -1968,24 +1969,28 @@ public:
 private:
 	static void GenerateTextures() {
 		// todo: make tile arrays per gal.
-		gnumtiles_i = g_gals[0].gnumtiles;
+		for (int gn=0;gn<2;gn++) {
+			numartiles = g_gals[gn].gnumtiles;
 
-		// static long gnumtiles, gmaltiles, gtilehashead[1024];
-		// static *long get_gtilehashead() { return gtilehashead; } // in outer file
-		//long *source = get_gtilehashead();
-		//memcpy(gtilehashead_i, source, sizeof(long) * 1024);
-
-		runtimeTextures = static_cast<Texture2D *>(malloc(sizeof(Texture2D) * gnumtiles_i));
-		int end = gnumtiles_i;
-		for (int i = 0; i < end; ++i) {
-			tile_t *til;
-			til = &g_gals[0].gtile[i];
-			if (til->tt.f == (long)nullpic)
-				runtimeTextures[i]=runtimeTextures[0];
-			runtimeTextures[i] = ConvertPicToTexture(til); // returns Texture2D
-		} // end = gallery.nutiles; tile_t* getGtile(int i){return &gtile[i];}
-		galfreetextures(0);
-		int a = 1;
+			// static long gnumtiles, gmaltiles, gtilehashead[1024];
+			// static *long get_gtilehashead() { return gtilehashead; } // in outer file
+			//long *source = get_gtilehashead();
+			//memcpy(gtilehashead_i, source, sizeof(long) * 1024);
+			Texture2D *arr = static_cast<Texture2D *>(malloc(sizeof(Texture2D) * numartiles));
+			int end = numartiles;
+			for (int i = 0; i < end; ++i) {
+				tile_t *til;
+				til = &g_gals[gn].gtile[i];
+				if (!til->tt.f || til->tt.f == (long)nullpic)
+					arr[i]=arr[0];
+				arr[i] = ConvertPicToTexture(til); // returns Texture2D
+			} // end = gallery.nutiles; tile_t* getGtile(int i){return &gtile[i];}
+			if (gn==0)
+				runtimeTextures = arr;
+			galtextures[gn]=arr;
+			galfreetextures(gn);
+			// Look for gals[0] usages elsewhere!
+		}
 	}
 
 	static void LoadMapAndTiles(const char *fullmapname) {

@@ -34,23 +34,20 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#include "Editor/uimodels.h"
+
 extern "C" {
 #include "Core/loaders.h"
 #include "Core/artloader.h"
 
 }
 
-typedef struct {
-    Texture2D* textures;
-    int totalCount;
-    int selected;
-    int columns;
-    float thumbnailSize;
-    int startIndex;
-    int tilesPerPage;
-} TextureBrowser;
 
 void DrawTextureBrowser(TextureBrowser* browser) {
+    int  totalGals = 2;
+    if (IsKeyPressed(KEY_N)) {
+        browser->galnum = (browser->galnum +1) %2;
+    }
     // Position on left side
     ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(300, GetScreenHeight()), ImGuiCond_FirstUseEver);
@@ -103,7 +100,7 @@ void DrawTextureBrowser(TextureBrowser* browser) {
         return;
     }
 
-    if (browser->textures == NULL) {
+    if (DumbRender::galtextures[browser->galnum] == NULL) {
         ImGui::Text("Textures array is NULL");
         ImGui::End();
         return;
@@ -116,7 +113,7 @@ void DrawTextureBrowser(TextureBrowser* browser) {
     for (int i = browser->startIndex; i < endIndex; i++) {
         ImGui::PushID(i);
 
-        Texture2D tex = browser->textures[i];
+        Texture2D tex = DumbRender::galtextures[browser->galnum][i];
         bool isValidTexture = !(tex.id == 0 || tex.width == 0 || tex.height == 0);
 
         // Always use square size
@@ -522,8 +519,7 @@ void DrawInfoUI() {
                                    ImGuiWindowFlags_NoMove |
                                    ImGuiWindowFlags_NoCollapse |
                                    ImGuiWindowFlags_AlwaysAutoResize;
-    texb.textures = DumbRender::RuntimeTextures();
-    //DrawTextureBrowser(&texb);
+    DrawTextureBrowser(&texb);
     ImGui::Begin("##info_panel", NULL, window_flags);
     ImGui::Text("Q = pick & move");
     ImGui::Text("` = discard");
@@ -617,10 +613,12 @@ void DrawPicker() {
 void MainLoop()
 {
     InitTexBrowser();
+    EditorSetTileState(&texb);
     //    if (!loadifvalid())
  //       return;
     //DumbRender::Init("c:/Eugene/Games/build2/Content/GAL_002/E1L1.MAP ");
     loadgal(0,"c:/Eugene/Games/build2/");
+    loadgal(1,"c:/Eugene/Games/build2/Content/GAL_002_SW/");
     DumbRender::LoadTexturesToGPU();
     DumbRender::Init("c:/Eugene/Games/build2/e2l2.map");
     auto map = DumbRender::GetMap();

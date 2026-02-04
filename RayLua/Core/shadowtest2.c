@@ -255,7 +255,7 @@ static player_transform *gps;
 //Texture mapping parameters
 static tile_t *gtpic;
 
-static int gcurcol, gtilenum;
+static int gcurcol, gtilenum, ggalnum;
 static float alphamul;
 static int taginc = 30000;
 #define LIGHTMAX 256 //FIX:make dynamic!
@@ -929,6 +929,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 	}
 
 	eyepol[eyepoln].tilnum = gtilenum;
+	eyepol[eyepoln].galnum = ggalnum;
 	eyepol[eyepoln].pal = 0;
 	eyepol[eyepoln].alpha = alphamul;
 	eyepol[eyepoln].isflor = -1;
@@ -1545,6 +1546,7 @@ The b parameter is a bunch index - this function processes one "bunch" (visible 
 static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 	alphamul=1;
 	gtilenum = 0;
+	ggalnum = 0;
 	cam_t gcam = b->cam;
 	// === VARIABLE DECLARATIONS ===
 	//extern void loadpic (tile_t *);
@@ -1613,6 +1615,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		if (skipport)
 			continue;
 		gtilenum = sec[s].surf[isflor].tilnum;
+		ggalnum = sec[s].surf[isflor].galnum;
 
 
 		float surfpos = getslopez(&sec[s], isflor, b->cam.p.x, b->cam.p.y);
@@ -1681,6 +1684,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		sur = &sec[s].surf[isflor];
 		gtpic = &gtile[sur->tilnum];
 		gtilenum = sur->tilnum;
+		ggalnum = sur->galnum;
 		//if (!gtpic->tt.f) loadpic(gtpic);
 		if (sec[s].surf[isflor].flags & (1 << 17)) { b->gflags = 2; } //skybox ceil/flor
 		else if (sec[s].surf[isflor].flags & (1 << 16)) {
@@ -1817,6 +1821,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 
 			// Render wall segment if visible
 			gtilenum = wal[w].xsurf[m].tilnum;
+			ggalnum = wal[w].xsurf[m].galnum;
 			bool ismasked = wal[w].surf.flags & 32; // only ever use mask and alpha
 			if ((!(m & 1)) || (ismasked)) //Draw wall here //(1<<5): 1-way
 			{

@@ -20,7 +20,7 @@ typedef union {
 
 typedef struct tiltyp {
 	intptr_t f, p;           // f=frame buffer pointer, p=pitch/stride
-	int x, y, z;            // x,y=dimensions, z=depth/format info
+	signed int x, y, z;            // x,y=dimensions, z=depth/format info
 	float shsc;             // shsc=suggested height scale
 	struct tiltyp *lowermip; // pointer to lower mipmap level
 } tiltyp;
@@ -57,11 +57,11 @@ static __forceinline unsigned int bsr (unsigned int a) { _asm bsr eax, a }
 
 static unsigned char gammlut[256], gotpal = 0;
 extern tile_t *gtile;
-extern unsigned char globalpal[256][4];
+//extern unsigned char globalpal[256][4];
 tile_t* getGtile(int i);
 unsigned char* getColor(int idx);
 void galfreetextures(int gal_idx);
-void loadpic (tile_t *tpic, char* rootpath);
+void loadpic (tile_t *tpic, char* rootpath, int gal_idx);
 void setgammlut (double gammval);
 void LoadPal(const char *basepath);
 int loadgal(int gal_idx, const char* path);

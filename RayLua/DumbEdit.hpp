@@ -4,7 +4,8 @@
 
 #ifndef RAYLIB_LUA_IMGUI_DUMBEDIT_HPP
 #define RAYLIB_LUA_IMGUI_DUMBEDIT_HPP
-
+#include "Editor/uimodels.h"
+static TextureBrowser *texbstate;
 static Vector3 buildToRaylibPos(point3d buildcoord) {
 	return {buildcoord.x, -buildcoord.z, buildcoord.y};
 }
@@ -117,6 +118,7 @@ typedef struct {
 	dateditop op;
 	bool haschanged;
 	int32_t curval;
+	int32_t curval2;
 	char* text;
 	Color color;
 } datedit_t;
@@ -578,18 +580,36 @@ void LoopDrawStart() {
 void TilsedStart() {
 
 }
+
 void TilsedUpdate() {
 	if (IsKeyDown(KEY_TAB)) {
-		if (hoverfoc.spri>=0)	datstate.curval = HOVERSPRI.tilnum;
-		else if (ISHOVERWAL)
+		if (hoverfoc.spri >= 0) {
+			datstate.curval = HOVERSPRI.tilnum;
+			datstate.curval2 = HOVERSPRI.galnum;
+		} else if (ISHOVERWAL) {
 			datstate.curval = HOVERWAL.xsurf[hoverfoc.surf].tilnum;
-		else if (ISHOVERCAP)
+			datstate.curval2 = HOVERWAL.xsurf[hoverfoc.surf].galnum;
+		} else if (ISHOVERCAP) {
 			datstate.curval = HOVERSEC.surf[hoverfoc.surf].tilnum;
+			datstate.curval2 = HOVERSEC.surf[hoverfoc.surf].galnum;
+		}
+
+		texbstate->selected = datstate.curval;
+		texbstate->galnum = datstate.curval2;
 	}
-	if (IsKeyPressed(KEY_E)) {
-		if (hoverfoc.spri>=0)HOVERSPRI.tilnum = datstate.curval;
-		else if (ISHOVERWAL) HOVERWAL.xsurf[hoverfoc.surf].tilnum = datstate.curval;
-		else if (ISHOVERCAP) HOVERSEC.surf[hoverfoc.surf].tilnum = datstate.curval;
+	if (IsKeyPressed(KEY_R)) {
+		datstate.curval = texbstate->selected;
+		datstate.curval2 = texbstate->galnum;
+		if (hoverfoc.spri >= 0) {
+			HOVERSPRI.tilnum = datstate.curval;
+			HOVERSPRI.galnum = datstate.curval2;
+		} else if (ISHOVERWAL) {
+			HOVERWAL.xsurf[hoverfoc.surf].tilnum = datstate.curval;
+			HOVERWAL.xsurf[hoverfoc.surf].galnum = datstate.curval2;
+		} else if (ISHOVERCAP) {
+			HOVERSEC.surf[hoverfoc.surf].tilnum = datstate.curval;
+			HOVERSEC.surf[hoverfoc.surf].tilnum = datstate.curval2;
+		}
 	}
 }
 void TilsedAccept() {
@@ -655,6 +675,11 @@ void SetColorum(uint8_t r, uint8_t g, uint8_t b, int16_t lum) {
 	}
 }
 
+
+
+void EditorSetTileState(TextureBrowser *ts) {
+	texbstate = ts;
+}
 void Editor_DoRaycasts(cam_t *cc) {
 	int isec = 0;
 	int iwal = 0;
