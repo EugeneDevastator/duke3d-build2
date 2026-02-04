@@ -46,6 +46,7 @@ extern "C" {
 void DrawTextureBrowser(TextureBrowser* browser) {
     int totalGals = 2;
     browser->totalCount = g_gals[browser->galnum].gnumtiles;
+
     // Position on left side
     ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(300, GetScreenHeight()), ImGuiCond_FirstUseEver);
@@ -57,8 +58,27 @@ void DrawTextureBrowser(TextureBrowser* browser) {
 
     // Gallery selection
     if (ImGui::SliderInt("Gallery", &browser->galnum, 0, totalGals - 1)) {
-        browser->startIndex = 0;
-        browser->selected = 0;
+        browser->totalCount = g_gals[browser->galnum].gnumtiles;
+
+        // Clamp selection to new gallery range
+        if (browser->selected >= browser->totalCount) {
+            browser->selected = browser->totalCount - 1;
+        }
+        if (browser->selected < 0) {
+            browser->selected = 0;
+        }
+
+        // Scroll to show selected tile
+        int selectedRow = browser->selected / browser->columns;
+        int startRow = selectedRow - (browser->tilesPerPage / browser->columns) / 2;
+        if (startRow < 0) startRow = 0;
+
+        browser->startIndex = startRow * browser->columns;
+
+        // Clamp startIndex
+        int maxStart = browser->totalCount - browser->tilesPerPage;
+        if (maxStart < 0) maxStart = 0;
+        if (browser->startIndex > maxStart) browser->startIndex = maxStart;
     }
 
     // Settings toggle
@@ -227,6 +247,7 @@ void DrawTextureBrowser(TextureBrowser* browser) {
 
     ImGui::End();
 }
+
 
 TextureBrowser texb={0};
 void InitTexBrowser() {
