@@ -99,11 +99,30 @@ void DrawTextureBrowser(TextureBrowser* browser) {
         }
     }
 
-    // Handle scroll wheel - move selection and adjust view
-    if (ImGui::IsWindowHovered()) {
-        float wheel = ImGui::GetIO().MouseWheel;
-        if (wheel != 0.0f) {
-            int scrollDirection = wheel > 0 ? -1 : 1;
+    // Handle scroll wheel - always capture, not just when hovering
+    float wheel = ImGui::GetIO().MouseWheel;
+    if (wheel != 0.0f) {
+        int scrollDirection = wheel > 0 ? -1 : 1;
+        bool ctrlHeld = ImGui::GetIO().KeyCtrl;
+        if (ctrlHeld) {
+            // Page mode - jump by full pages aligned to page boundaries
+            int currentPage = browser->startIndex / browser->tilesPerPage;
+            int newPage = currentPage + scrollDirection;
+
+            if (newPage < 0) newPage = 0;
+
+            int maxPage = (browser->totalCount - 1) / browser->tilesPerPage;
+            if (newPage > maxPage) newPage = maxPage;
+
+            browser->startIndex = newPage * browser->tilesPerPage;
+
+            // Move selection to first item of new page
+            browser->selected = browser->startIndex;
+            if (browser->selected >= browser->totalCount) {
+                browser->selected = browser->totalCount - 1;
+            }
+        } else {
+            // Row/tile mode
             int viewStart = browser->startIndex;
             int viewEnd = browser->startIndex + browser->tilesPerPage - 1;
 
@@ -151,8 +170,13 @@ void DrawTextureBrowser(TextureBrowser* browser) {
     int actualEnd = browser->startIndex + browser->tilesPerPage;
     if (actualEnd > browser->totalCount) actualEnd = browser->totalCount;
 
-    ImGui::Text("Gallery %d | Showing %d-%d of %d | Selected: %d",
+    int currentPage = browser->startIndex / browser->tilesPerPage;
+    int totalPages = (browser->totalCount + browser->tilesPerPage - 1) / browser->tilesPerPage;
+
+    ImGui::Text("Gallery %d | Page %d/%d | Showing %d-%d of %d | Selected: %d",
                 browser->galnum,
+                currentPage + 1,
+                totalPages,
                 browser->startIndex + 1,
                 actualEnd,
                 browser->totalCount,
@@ -247,6 +271,9 @@ void DrawTextureBrowser(TextureBrowser* browser) {
 
     ImGui::End();
 }
+
+
+
 
 
 TextureBrowser texb={0};
