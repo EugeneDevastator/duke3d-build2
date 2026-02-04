@@ -608,7 +608,7 @@ void TilsedUpdate() {
 			HOVERWAL.xsurf[hoverfoc.surf].galnum = datstate.curval2;
 		} else if (ISHOVERCAP) {
 			HOVERSEC.surf[hoverfoc.surf].tilnum = datstate.curval;
-			HOVERSEC.surf[hoverfoc.surf].tilnum = datstate.curval2;
+			HOVERSEC.surf[hoverfoc.surf].galnum = datstate.curval2;
 		}
 	}
 }

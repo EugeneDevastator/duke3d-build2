@@ -12,6 +12,8 @@ typedef struct {
 	int startIndex;
 	int tilesPerPage;
 	int galnum;
+	int edgeDirection;
+	int showSettings;
 } TextureBrowser;
 
 #endif //RAYLIB_LUA_IMGUI_UIMODELS_H

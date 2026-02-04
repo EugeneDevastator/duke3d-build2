@@ -44,10 +44,8 @@ extern "C" {
 
 
 void DrawTextureBrowser(TextureBrowser* browser) {
-    int  totalGals = 2;
-    if (IsKeyPressed(KEY_N)) {
-        browser->galnum = (browser->galnum +1) %2;
-    }
+    int totalGals = 2;
+
     // Position on left side
     ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(300, GetScreenHeight()), ImGuiCond_FirstUseEver);
@@ -57,41 +55,88 @@ void DrawTextureBrowser(TextureBrowser* browser) {
         return;
     }
 
-    // Handle scroll wheel for page navigation
-    if (ImGui::IsWindowHovered()) {
-        float wheel = ImGui::GetIO().MouseWheel;
-        if (wheel != 0.0f) {
-            int pageSize = browser->columns;
-            browser->startIndex -= (int)(wheel * pageSize);
+    // Gallery selection
+    if (ImGui::SliderInt("Gallery", &browser->galnum, 0, totalGals - 1)) {
+        browser->startIndex = 0;
+        browser->selected = 0;
+    }
 
-            // Clamp startIndex
+    // Settings toggle
+    if (ImGui::Button(browser->showSettings ? "Hide Settings" : "Show Settings")) {
+        browser->showSettings = !browser->showSettings;
+    }
+
+    if (browser->showSettings) {
+        ImGui::SliderInt("Columns", &browser->columns, 1, 6);
+        ImGui::SliderFloat("Size", &browser->thumbnailSize, 32.0f, 128.0f);
+        ImGui::SliderInt("Max Visible", &browser->tilesPerPage, 10, 200);
+
+        int maxStart = browser->totalCount - browser->tilesPerPage;
+        if (maxStart < 0) maxStart = 0;
+        if (ImGui::SliderInt("Start Index", &browser->startIndex, 0, maxStart)) {
             if (browser->startIndex < 0) browser->startIndex = 0;
-            int maxStart = browser->totalCount - browser->tilesPerPage;
-            if (maxStart < 0) maxStart = 0;
             if (browser->startIndex > maxStart) browser->startIndex = maxStart;
         }
     }
 
-    // Controls
-    ImGui::SliderInt("Columns", &browser->columns, 1, 6);
-    ImGui::SliderFloat("Size", &browser->thumbnailSize, 32.0f, 128.0f);
-    ImGui::SliderInt("Max Visible", &browser->tilesPerPage, 10, 200);
+    // Handle scroll wheel - move selection and adjust view
+    if (ImGui::IsWindowHovered()) {
+        float wheel = ImGui::GetIO().MouseWheel;
+        if (wheel != 0.0f) {
+            int scrollDirection = wheel > 0 ? -1 : 1;
+            int viewStart = browser->startIndex;
+            int viewEnd = browser->startIndex + browser->tilesPerPage - 1;
 
-    // Navigation
-    int maxStart = browser->totalCount - browser->tilesPerPage;
-    if (maxStart < 0) maxStart = 0;
-    if (ImGui::SliderInt("Start Index", &browser->startIndex, 0, maxStart)) {
-        if (browser->startIndex < 0) browser->startIndex = 0;
-        if (browser->startIndex > maxStart) browser->startIndex = maxStart;
+            // Check if selection is at edge of current view
+            bool atTopEdge = (browser->selected < viewStart + browser->columns);
+            bool atBottomEdge = (browser->selected > viewEnd - browser->columns);
+
+            int moveAmount;
+            if ((scrollDirection == -1 && atTopEdge) || (scrollDirection == 1 && atBottomEdge)) {
+                // At edge - move by full row
+                moveAmount = scrollDirection * browser->columns;
+            } else {
+                // Not at edge - move by 1
+                moveAmount = scrollDirection;
+            }
+
+            int newSelected = browser->selected + moveAmount;
+
+            // Clamp selection
+            if (newSelected < 0) newSelected = 0;
+            if (newSelected >= browser->totalCount) newSelected = browser->totalCount - 1;
+
+            browser->selected = newSelected;
+
+            // Adjust view to keep selection visible
+            viewStart = browser->startIndex;
+            viewEnd = browser->startIndex + browser->tilesPerPage - 1;
+
+            if (browser->selected < viewStart) {
+                // Selection above view - scroll up by rows
+                int rowsToScroll = (viewStart - browser->selected + browser->columns - 1) / browser->columns;
+                browser->startIndex -= rowsToScroll * browser->columns;
+                if (browser->startIndex < 0) browser->startIndex = 0;
+            } else if (browser->selected > viewEnd) {
+                // Selection below view - scroll down by rows
+                int rowsToScroll = (browser->selected - viewEnd + browser->columns - 1) / browser->columns;
+                browser->startIndex += rowsToScroll * browser->columns;
+                int maxStart = browser->totalCount - browser->tilesPerPage;
+                if (maxStart < 0) maxStart = 0;
+                if (browser->startIndex > maxStart) browser->startIndex = maxStart;
+            }
+        }
     }
 
     int actualEnd = browser->startIndex + browser->tilesPerPage;
     if (actualEnd > browser->totalCount) actualEnd = browser->totalCount;
 
-    ImGui::Text("Showing %d-%d of %d",
+    ImGui::Text("Gallery %d | Showing %d-%d of %d | Selected: %d",
+                browser->galnum,
                 browser->startIndex + 1,
                 actualEnd,
-                browser->totalCount);
+                browser->totalCount,
+                browser->selected);
     ImGui::Separator();
 
     if (browser->totalCount == 0) {
@@ -115,33 +160,37 @@ void DrawTextureBrowser(TextureBrowser* browser) {
 
         Texture2D tex = DumbRender::galtextures[browser->galnum][i];
         bool isValidTexture = !(tex.id == 0 || tex.width == 0 || tex.height == 0);
-
-        // Always use square size
-        ImVec2 buttonSize = ImVec2(browser->thumbnailSize, browser->thumbnailSize);
-
         bool isSelected = (browser->selected == i);
 
-        if (isValidTexture) {
-            if (isSelected) {
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.5f, 0.8f, 1.0f));
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.6f, 0.9f, 1.0f));
-            }
+        ImVec2 buttonSize = ImVec2(browser->thumbnailSize, browser->thumbnailSize);
 
+        // Draw selection outline
+        if (isSelected) {
+            ImVec2 pos = ImGui::GetCursorScreenPos();
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+            drawList->AddRect(
+                ImVec2(pos.x - 2, pos.y - 2),
+                ImVec2(pos.x + buttonSize.x + 2, pos.y + buttonSize.y + 2),
+                IM_COL32(255, 255, 255, 255),
+                0.0f,
+                0,
+                2.0f
+            );
+        }
+
+        if (isValidTexture) {
             if (ImGui::ImageButton("##thumb", (void*)(intptr_t)tex.id, buttonSize)) {
                 browser->selected = i;
             }
-
-            if (isSelected) {
-                ImGui::PopStyleColor(2);
-            }
         } else {
-            // Invalid texture - draw disabled button
+            // NULL texture - use same size button with dark color
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
 
-            ImGui::Button("NULL", buttonSize);
-
+            if (ImGui::Button("NULL", buttonSize)) {
+                browser->selected = i;
+            }
             ImGui::PopStyleColor(3);
         }
 
