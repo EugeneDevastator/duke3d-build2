@@ -464,7 +464,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 
 		//------------------------------------------------------------------------
 		long filnum, arttiles, loctile0, loctile1, iskenbuild = 0;
-
+		arttiles = g_gals[0].gnumtiles;
         short *tilefile = 0;
 		char tbuf[MAX_PATH*2];
 
@@ -602,8 +602,8 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 					sur->gsc = (32-b7sec.surf[j].shade)*128;
 					sur->bsc = (32-b7sec.surf[j].shade)*128;
 					l = b7sec.surf[j].picnum;
-					if ((unsigned)l >= (unsigned)arttiles) l = 0;
-					sur->tilnum = l; hitile = max(hitile,l);
+					sur->tilnum = l;
+					hitile = max(hitile,l);
 					sur->galnum = defaultGal; // assume duke.
 					// Convert lotag/hitag to single tag field
 					// j=0 is ceiling, j=1 is floor - assign to floor surface only
@@ -741,13 +741,15 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 					sur->rsc = (32-b7wal.shade)*128;
 					sur->gsc = (32-b7wal.shade)*128;
 					sur->bsc = (32-b7wal.shade)*128;
-					l = b7wal.picnum; if ((unsigned)l >= (unsigned)arttiles) l = 0;
+					l = b7wal.picnum;
 					sur->tilnum = l; hitile = max(hitile,l);
 					sur->galnum = defaultGal;
 					sec[i].wall[j].surfn = 1;
 					sec[i].wall[j].owner = -1;
 					wall_t *thiswal = &sec[i].wall[j];
 					thiswal->xsurf[0].galnum = defaultGal;
+					thiswal->xsurf[1].galnum = defaultGal;
+					thiswal->xsurf[2].galnum = defaultGal;
 					thiswal->xsurf[0].rsc=sur->rsc;
 					thiswal->xsurf[1].rsc=sur->rsc;
 					thiswal->xsurf[2].rsc=sur->rsc;
@@ -761,8 +763,6 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 						thiswal->xsurf[2].alpha=1;
 						thiswal->surf.alpha=1;
 						thiswal->xsurf[0].tilnum = b7wal.picnum;
-						if (thiswal->xsurf[0].tilnum<0 || thiswal->xsurf[0].tilnum>9000)
-							int x=0;
 						thiswal->xsurf[1].tilnum = b7wal.overpicnum;
 						thiswal->xsurf[2].tilnum = b7wal.cstat & WALL_BOTTOM_SWAP ? -2 : b7wal.picnum;
 						int opacity = 255;
@@ -789,6 +789,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 						thiswal->xsurf[0].alpha=1;
 					}
 					thiswal->surf.tilnum= b7wal.picnum;
+					thiswal->surf.galnum= defaultGal;
 					//float wallh = (sec[i].z[1]-sec[i].z[0]);
 					// also pans are limited by 256. so large textures wont work.
 					float xsize = GET_TILSIZEX(thiswal->surf);
@@ -809,8 +810,6 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 					thiswal->mflags[0] = b7wal.cstat; // need for second pass.
 					thiswal->surf.uvform[0]=scalerx;
 					thiswal->surf.uvform[1]=scalery;
-					if (thiswal->surf.tilnum == 157)
-						int a =1;
 
 					// NPOT wall textures dont align well in duke.
 					// you need to offset them by YRes * 2 pans.
@@ -885,7 +884,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 				spr = &map->spri[i];
 				memset(spr,0,sizeof(spri_t));
 
-				l = b7spr.picnum; if ((unsigned)l >= (unsigned)arttiles) l = 0;
+				l = b7spr.picnum;
 				spr->p.x = ((float)b7spr.x)*(1.f/512.f);
 				spr->p.y = ((float)b7spr.y)*(1.f/512.f);
 				spr->p.z = ((float)b7spr.z)*(1.f/(512.f*16.f));
