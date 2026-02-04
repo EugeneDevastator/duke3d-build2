@@ -387,28 +387,29 @@ typedef struct // surf_t
 {
 	// TEXTURE PARAMS.
 	union {
-		uint32_t packed_tile_data;
 		struct {
 			uint32_t tilnum : 15;  // 32k tiles
 			uint32_t galnum : 8;   // 256 gals
 			uint32_t pal : 9;      // 512 pals.
 		};
+		uint32_t packed_tile_data;
 	};
 	//Bit0:Blocking, Bit2:RelativeAlignment, Bit5:1Way, Bit16:IsParallax, Bit17:IsSkybox
 	uint32_t flags;	short lotag, hitag;
-	//uint8_t pal;
 	float alpha;
 	float uvform[9]; // scale xy, pan xy, crop AB, rotation
-	int8_t owal, otez, uwal, utez, vwal, vtez; // wals are always wals of this sector.
+	int8_t owal, otez, uwal, utez, vwal, vtez, wtez; // wals are always wals of this sector.
+	// wtez is second skew vector, originating at v end. by default parallel to u. but can be inverted for trapezoid map.
 	uint8_t uvmapkind; // uv amappings, regular, polar, hex, flipped variants etc. paralax.
 	uint8_t tilingkind; // normal, polar, hex etc.
+
 // ------------
 	unsigned short asc, rsc, gsc, bsc; //4096 is no change
 
 // ------- runtime gneerated data
 	// for portals case - we dont care and use original world for everything.
 	// interpolator will lerp worldpositions, regardless of poly location
-	point3d uvcoords[3]; // world uv vectors. generated per poly. origin, u ,v
+	point3d uvcoords[3]; // world uv vectors. generated per poly. origin, u ,v, w
 
 	// can in theory use object space and encode it.
 
@@ -440,10 +441,12 @@ typedef struct // wall t
 	long n, ns, nw; //n:rel. wall ind.; ns & nw : nextsect & nextwall_of_sect
 	long nschain, nwchain; // for multiportal.
 	long owner; //for dragging while editing, other effects during game
+
 	uint8_t surfn;
 	surf_t surf, xsurf[3]; //additional malloced surfs when (surfn > 1)
 	uint16_t mflags[4]; // modflags
 	int32_t tags[16]; // standard tag is 4bytes
+	int8_t tempflags; // used only in editor for data transfers.
 
 } wall_t;
 

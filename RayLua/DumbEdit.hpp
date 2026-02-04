@@ -161,8 +161,8 @@ econtext ctx;
 econtext ctxprev;
 
 typedef struct {
-	int wal;
-	int wal2;
+	signed int wal;
+	signed int wal2;
 	int onewall;
 	int sec;
 	int spri;
@@ -662,7 +662,9 @@ void Editor_DoRaycasts(cam_t *cc) {
 	cam = cc;
 	//ctx.state.discard();// to restore original map state for raycast.
 	raycast(&cc->p, &cc->f, 1e32, cc->cursect, &hoverfoc.sec, &hoverfoc.wal, &hoverfoc.spri,&hoverfoc.surf, &hoverfoc.hitpos, map);
+	hoverfoc.wal2=-1;
 	if (ISHOVERWAL) {
+		hoverfoc.wal2 = mapwallnextid(hoverfoc.sec,hoverfoc.wal,map);
 		float z1 = getwallz(&map->sect[hoverfoc.sec], 1, hoverfoc.wal);
 		float z2 = getwallz(&map->sect[hoverfoc.sec], 1, hoverfoc.wal2);
 		float d1 = bmathdistsqrp2d({HOVERWAL.x, HOVERWAL.y}, BPXY(hoverfoc.hitpos));

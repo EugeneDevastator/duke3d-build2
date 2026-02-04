@@ -489,5 +489,7 @@ static void delsect_imp (int s, mapstate_t* map)
 	map->numsects--; sec[s] = sec[map->numsects];
 	memset(&sec[map->numsects],0,sizeof(sect_t));
 }
-
+static inline int mapwallnextid(int s, int w, mapstate_t *map) {
+	return map->sect[s].wall[w].n+w;
+}
 #endif //BUILD2_MAPCORE_H

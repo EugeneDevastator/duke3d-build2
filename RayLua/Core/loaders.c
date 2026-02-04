@@ -541,7 +541,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 
 		hitile = 0;
 		int defaultGal=0;
-		arttiles = g_gals[0].numtiles;
+		arttiles = g_gals[defaultGal].numtiles;
 		if (fileid == 0x00000007) //Build1 .MAP format 7
 		{
 			kzread(&x,4); //posx
@@ -764,7 +764,8 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 						thiswal->surf.alpha=1;
 						thiswal->xsurf[0].tilnum = b7wal.picnum;
 						thiswal->xsurf[1].tilnum = b7wal.overpicnum;
-						thiswal->xsurf[2].tilnum = b7wal.cstat & WALL_BOTTOM_SWAP ? -2 : b7wal.picnum;
+						thiswal->xsurf[2].tilnum = b7wal.picnum;
+						thiswal->tempflags = b7wal.cstat & WALL_BOTTOM_SWAP ? -2 : 0;
 						int opacity = 255;
 						// solid masked is nevewr transparent
 						if (HAS_FLAG(b7wal.cstat, WALL_MASKED) && !(b7wal.cstat & WALL_SOLID_MASKED))
@@ -1197,7 +1198,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 					{
 						surf_t nextsurf = sec[walp->ns].wall[walp->nw].surf;
 						int nxgal = sec[walp->ns].wall[walp->nw].surf.galnum;
-						bool isbotswap = walp->xsurf[2].tilnum == -2;
+						bool isbotswap = walp->tempflags == -2;
 						wall_t *oppwal;
 
 						if (isbotswap) //
