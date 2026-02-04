@@ -45,7 +45,7 @@ extern "C" {
 
 void DrawTextureBrowser(TextureBrowser* browser) {
     int totalGals = 2;
-
+    browser->totalCount = g_gals[browser->galnum].gnumtiles;
     // Position on left side
     ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(300, GetScreenHeight()), ImGuiCond_FirstUseEver);
@@ -151,6 +151,9 @@ void DrawTextureBrowser(TextureBrowser* browser) {
         return;
     }
 
+    // Push consistent button styling for all tiles
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+
     float padding = 4.0f;
     int endIndex = browser->startIndex + browser->tilesPerPage;
     if (endIndex > browser->totalCount) endIndex = browser->totalCount;
@@ -178,20 +181,30 @@ void DrawTextureBrowser(TextureBrowser* browser) {
             );
         }
 
+        bool clicked = false;
         if (isValidTexture) {
-            if (ImGui::ImageButton("##thumb", (void*)(intptr_t)tex.id, buttonSize)) {
-                browser->selected = i;
-            }
+            clicked = ImGui::ImageButton("##thumb", (void*)(intptr_t)tex.id, buttonSize);
         } else {
-            // NULL texture - use same size button with dark color
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
+            // Use invisible button with same size, then draw dark overlay
+            clicked = ImGui::InvisibleButton("##thumb", buttonSize);
 
-            if (ImGui::Button("NULL", buttonSize)) {
-                browser->selected = i;
-            }
-            ImGui::PopStyleColor(3);
+            // Draw dark background for NULL texture
+            ImVec2 pos = ImGui::GetItemRectMin();
+            ImVec2 endPos = ImGui::GetItemRectMax();
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+            drawList->AddRectFilled(pos, endPos, IM_COL32(50, 50, 50, 255));
+
+            // Draw "NULL" text centered
+            ImVec2 textSize = ImGui::CalcTextSize("NULL");
+            ImVec2 textPos = ImVec2(
+                pos.x + (buttonSize.x - textSize.x) * 0.5f,
+                pos.y + (buttonSize.y - textSize.y) * 0.5f
+            );
+            drawList->AddText(textPos, IM_COL32(150, 150, 150, 255), "NULL");
+        }
+
+        if (clicked) {
+            browser->selected = i;
         }
 
         if (ImGui::IsItemHovered()) {
@@ -209,6 +222,8 @@ void DrawTextureBrowser(TextureBrowser* browser) {
 
         ImGui::PopID();
     }
+
+    ImGui::PopStyleVar(); // FramePadding
 
     ImGui::End();
 }
