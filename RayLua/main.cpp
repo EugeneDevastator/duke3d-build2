@@ -45,8 +45,8 @@ extern "C" {
 
 void DrawTextureBrowser(TextureBrowser* browser) {
     int totalGals = 2;
-    float dxmul=0.5;
-    float dymul=0.5;
+    float dxmul=0.4;
+    float dymul=0.4;
 
     // Store per-gallery state
     static int galSelected[2] = {0, 0};
