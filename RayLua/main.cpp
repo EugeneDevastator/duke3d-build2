@@ -45,6 +45,7 @@ extern "C" {
 
 void DrawTextureBrowser(TextureBrowser* browser) {
     int totalGals = 2;
+    bool drawnulls = false;
     float dxmul=0.4;
     float dymul=0.4;
 
@@ -265,7 +266,34 @@ void DrawTextureBrowser(TextureBrowser* browser) {
         int scrollDirection = wheel > 0 ? -1 : 1;
         bool ctrlHeld = ImGui::GetIO().KeyCtrl;
 
-        if (ctrlHeld) {
+        if (shiftHeld) {
+            // Shift + scroll: move by 1/3 page in whole rows
+            int rowsPerPage = browser->tilesPerPage / browser->columns;
+            int scrollRows = (rowsPerPage + 2) / 3; // 1/3 of page, rounded up
+            if (scrollRows < 1) scrollRows = 1;
+
+            int scrollAmount = scrollRows * browser->columns;
+
+            // Move view
+            browser->startIndex += scrollDirection * scrollAmount;
+
+            // Clamp view
+            int maxStart = browser->totalCount - browser->tilesPerPage;
+            if (maxStart < 0) maxStart = 0;
+            if (browser->startIndex < 0) browser->startIndex = 0;
+            if (browser->startIndex > maxStart) browser->startIndex = maxStart;
+
+            // Move selection by same amount
+            browser->selected += scrollDirection * scrollAmount;
+
+            // Clamp selection
+            if (browser->selected < 0) browser->selected = 0;
+            if (browser->selected >= browser->totalCount) browser->selected = browser->totalCount - 1;
+
+            // Update stored states
+            galStartIndex[browser->galnum] = browser->startIndex;
+            galSelected[browser->galnum] = browser->selected;
+        } else if (ctrlHeld) {
             // Page mode - jump by full pages aligned to page boundaries
             int currentPage = browser->startIndex / browser->tilesPerPage;
             int newPage = currentPage + scrollDirection;
@@ -438,6 +466,7 @@ void DrawTextureBrowser(TextureBrowser* browser) {
 
     ImGui::End();
 }
+
 
 TextureBrowser texb={0};
 void InitTexBrowser() {
