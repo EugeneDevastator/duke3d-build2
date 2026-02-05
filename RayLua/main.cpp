@@ -45,6 +45,13 @@ extern "C" {
 
 void DrawTextureBrowser(TextureBrowser* browser) {
     int totalGals = 2;
+    float dxmul=0.5;
+    float dymul=0.5;
+
+    // Store per-gallery state
+    static int galSelected[2] = {0, 0};
+    static int galStartIndex[2] = {0, 0};
+
     browser->totalCount = g_gals[browser->galnum].gnumtiles;
 
     // Position on left side
@@ -58,7 +65,15 @@ void DrawTextureBrowser(TextureBrowser* browser) {
 
     // Gallery selection
     if (ImGui::SliderInt("Gallery", &browser->galnum, 0, totalGals - 1)) {
+        // Save current gallery state
+        galSelected[browser->galnum] = browser->selected;
+        galStartIndex[browser->galnum] = browser->startIndex;
+
         browser->totalCount = g_gals[browser->galnum].gnumtiles;
+
+        // Restore state for new gallery
+        browser->selected = galSelected[browser->galnum];
+        browser->startIndex = galStartIndex[browser->galnum];
 
         // Clamp selection to new gallery range
         if (browser->selected >= browser->totalCount) {
@@ -68,17 +83,79 @@ void DrawTextureBrowser(TextureBrowser* browser) {
             browser->selected = 0;
         }
 
-        // Scroll to show selected tile
-        int selectedRow = browser->selected / browser->columns;
-        int startRow = selectedRow - (browser->tilesPerPage / browser->columns) / 2;
-        if (startRow < 0) startRow = 0;
-
-        browser->startIndex = startRow * browser->columns;
-
         // Clamp startIndex
         int maxStart = browser->totalCount - browser->tilesPerPage;
         if (maxStart < 0) maxStart = 0;
         if (browser->startIndex > maxStart) browser->startIndex = maxStart;
+
+        // Update stored state after clamping
+        galSelected[browser->galnum] = browser->selected;
+        galStartIndex[browser->galnum] = browser->startIndex;
+    }
+
+    // Handle shift + A/D for gallery switching
+    bool shiftHeld = ImGui::GetIO().KeyShift;
+    if (shiftHeld) {
+        if (ImGui::IsKeyPressed(ImGuiKey_A)) {
+            // Save current state
+            galSelected[browser->galnum] = browser->selected;
+            galStartIndex[browser->galnum] = browser->startIndex;
+
+            browser->galnum--;
+            if (browser->galnum < 0) browser->galnum = totalGals - 1;
+
+            browser->totalCount = g_gals[browser->galnum].gnumtiles;
+
+            // Restore state for new gallery
+            browser->selected = galSelected[browser->galnum];
+            browser->startIndex = galStartIndex[browser->galnum];
+
+            // Clamp to new gallery bounds
+            if (browser->selected >= browser->totalCount) {
+                browser->selected = browser->totalCount - 1;
+            }
+            if (browser->selected < 0) {
+                browser->selected = 0;
+            }
+
+            int maxStart = browser->totalCount - browser->tilesPerPage;
+            if (maxStart < 0) maxStart = 0;
+            if (browser->startIndex > maxStart) browser->startIndex = maxStart;
+
+            // Update stored state after clamping
+            galSelected[browser->galnum] = browser->selected;
+            galStartIndex[browser->galnum] = browser->startIndex;
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_D)) {
+            // Save current state
+            galSelected[browser->galnum] = browser->selected;
+            galStartIndex[browser->galnum] = browser->startIndex;
+
+            browser->galnum++;
+            if (browser->galnum >= totalGals) browser->galnum = 0;
+
+            browser->totalCount = g_gals[browser->galnum].gnumtiles;
+
+            // Restore state for new gallery
+            browser->selected = galSelected[browser->galnum];
+            browser->startIndex = galStartIndex[browser->galnum];
+
+            // Clamp to new gallery bounds
+            if (browser->selected >= browser->totalCount) {
+                browser->selected = browser->totalCount - 1;
+            }
+            if (browser->selected < 0) {
+                browser->selected = 0;
+            }
+
+            int maxStart = browser->totalCount - browser->tilesPerPage;
+            if (maxStart < 0) maxStart = 0;
+            if (browser->startIndex > maxStart) browser->startIndex = maxStart;
+
+            // Update stored state after clamping
+            galSelected[browser->galnum] = browser->selected;
+            galStartIndex[browser->galnum] = browser->startIndex;
+        }
     }
 
     // Settings toggle
@@ -96,23 +173,24 @@ void DrawTextureBrowser(TextureBrowser* browser) {
         if (ImGui::SliderInt("Start Index", &browser->startIndex, 0, maxStart)) {
             if (browser->startIndex < 0) browser->startIndex = 0;
             if (browser->startIndex > maxStart) browser->startIndex = maxStart;
+            // Update stored state when manually changed
+            galStartIndex[browser->galnum] = browser->startIndex;
         }
     }
 
-    // Handle shift + mouse delta for selection movement
-    bool shiftHeld = ImGui::GetIO().KeyShift;
+    // Handle shift + mouse delta for 2D selection movement
     if (shiftHeld) {
         ImVec2 mouseDelta = ImGui::GetIO().MouseDelta;
         static float accumulatedX = 0.0f;
         static float accumulatedY = 0.0f;
 
-        accumulatedX += mouseDelta.x;
-        accumulatedY += mouseDelta.y;
+        accumulatedX += mouseDelta.x*dxmul;
+        accumulatedY += mouseDelta.y*dymul;
 
         int moveX = 0;
         int moveY = 0;
 
-        // Threshold for movement (adjust as needed)
+        // Threshold for movement
         float threshold = 10.0f;
 
         if (accumulatedX > threshold) {
@@ -132,13 +210,34 @@ void DrawTextureBrowser(TextureBrowser* browser) {
         }
 
         if (moveX != 0 || moveY != 0) {
-            int newSelected = browser->selected + moveX + (moveY * browser->columns);
+            int currentRow = browser->selected / browser->columns;
+            int currentCol = browser->selected % browser->columns;
 
-            // Clamp selection
-            if (newSelected < 0) newSelected = 0;
-            if (newSelected >= browser->totalCount) newSelected = browser->totalCount - 1;
+            // Apply 2D movement
+            currentCol += moveX;
+            currentRow += moveY;
+
+            // Clamp column within row bounds
+            if (currentCol < 0) currentCol = 0;
+            if (currentCol >= browser->columns) currentCol = browser->columns - 1;
+
+            // Clamp row
+            if (currentRow < 0) currentRow = 0;
+            int maxRow = (browser->totalCount - 1) / browser->columns;
+            if (currentRow > maxRow) currentRow = maxRow;
+
+            int newSelected = currentRow * browser->columns + currentCol;
+
+            // Final clamp to total count
+            if (newSelected >= browser->totalCount) {
+                newSelected = browser->totalCount - 1;
+            }
+            if (newSelected < 0) {
+                newSelected = 0;
+            }
 
             browser->selected = newSelected;
+            galSelected[browser->galnum] = browser->selected; // Update stored state
 
             // Adjust view to keep selection visible
             int viewStart = browser->startIndex;
@@ -148,12 +247,14 @@ void DrawTextureBrowser(TextureBrowser* browser) {
                 int rowsToScroll = (viewStart - browser->selected + browser->columns - 1) / browser->columns;
                 browser->startIndex -= rowsToScroll * browser->columns;
                 if (browser->startIndex < 0) browser->startIndex = 0;
+                galStartIndex[browser->galnum] = browser->startIndex; // Update stored state
             } else if (browser->selected > viewEnd) {
                 int rowsToScroll = (browser->selected - viewEnd + browser->columns - 1) / browser->columns;
                 browser->startIndex += rowsToScroll * browser->columns;
                 int maxStart = browser->totalCount - browser->tilesPerPage;
                 if (maxStart < 0) maxStart = 0;
                 if (browser->startIndex > maxStart) browser->startIndex = maxStart;
+                galStartIndex[browser->galnum] = browser->startIndex; // Update stored state
             }
         }
     }
@@ -175,12 +276,14 @@ void DrawTextureBrowser(TextureBrowser* browser) {
             if (newPage > maxPage) newPage = maxPage;
 
             browser->startIndex = newPage * browser->tilesPerPage;
+            galStartIndex[browser->galnum] = browser->startIndex; // Update stored state
 
             // Move selection to first item of new page
             browser->selected = browser->startIndex;
             if (browser->selected >= browser->totalCount) {
                 browser->selected = browser->totalCount - 1;
             }
+            galSelected[browser->galnum] = browser->selected; // Update stored state
         } else {
             // Row/tile mode
             int viewStart = browser->startIndex;
@@ -206,6 +309,7 @@ void DrawTextureBrowser(TextureBrowser* browser) {
             if (newSelected >= browser->totalCount) newSelected = browser->totalCount - 1;
 
             browser->selected = newSelected;
+            galSelected[browser->galnum] = browser->selected; // Update stored state
 
             // Adjust view to keep selection visible
             viewStart = browser->startIndex;
@@ -216,6 +320,7 @@ void DrawTextureBrowser(TextureBrowser* browser) {
                 int rowsToScroll = (viewStart - browser->selected + browser->columns - 1) / browser->columns;
                 browser->startIndex -= rowsToScroll * browser->columns;
                 if (browser->startIndex < 0) browser->startIndex = 0;
+                galStartIndex[browser->galnum] = browser->startIndex; // Update stored state
             } else if (browser->selected > viewEnd) {
                 // Selection below view - scroll down by rows
                 int rowsToScroll = (browser->selected - viewEnd + browser->columns - 1) / browser->columns;
@@ -223,6 +328,7 @@ void DrawTextureBrowser(TextureBrowser* browser) {
                 int maxStart = browser->totalCount - browser->tilesPerPage;
                 if (maxStart < 0) maxStart = 0;
                 if (browser->startIndex > maxStart) browser->startIndex = maxStart;
+                galStartIndex[browser->galnum] = browser->startIndex; // Update stored state
             }
         }
     }
@@ -309,6 +415,7 @@ void DrawTextureBrowser(TextureBrowser* browser) {
 
         if (clicked) {
             browser->selected = i;
+            galSelected[browser->galnum] = browser->selected; // Update stored state
         }
 
         if (ImGui::IsItemHovered()) {
@@ -336,10 +443,10 @@ TextureBrowser texb={0};
 void InitTexBrowser() {
     texb.selected=2;
     texb.totalCount=1811;
-    texb.columns=4;
+    texb.columns=7;
     texb.startIndex = 0;
-    texb.thumbnailSize=64;
-    texb.tilesPerPage = 32; // Show 50 at a time
+    texb.thumbnailSize=84;
+    texb.tilesPerPage = 63; // Show 50 at a time
 }
 // Profiling variables
 double luaRenderTime = 0.0;
