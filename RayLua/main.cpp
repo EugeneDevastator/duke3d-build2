@@ -99,11 +99,71 @@ void DrawTextureBrowser(TextureBrowser* browser) {
         }
     }
 
+    // Handle shift + mouse delta for selection movement
+    bool shiftHeld = ImGui::GetIO().KeyShift;
+    if (shiftHeld) {
+        ImVec2 mouseDelta = ImGui::GetIO().MouseDelta;
+        static float accumulatedX = 0.0f;
+        static float accumulatedY = 0.0f;
+
+        accumulatedX += mouseDelta.x;
+        accumulatedY += mouseDelta.y;
+
+        int moveX = 0;
+        int moveY = 0;
+
+        // Threshold for movement (adjust as needed)
+        float threshold = 10.0f;
+
+        if (accumulatedX > threshold) {
+            moveX = 1;
+            accumulatedX = 0.0f;
+        } else if (accumulatedX < -threshold) {
+            moveX = -1;
+            accumulatedX = 0.0f;
+        }
+
+        if (accumulatedY > threshold) {
+            moveY = 1;
+            accumulatedY = 0.0f;
+        } else if (accumulatedY < -threshold) {
+            moveY = -1;
+            accumulatedY = 0.0f;
+        }
+
+        if (moveX != 0 || moveY != 0) {
+            int newSelected = browser->selected + moveX + (moveY * browser->columns);
+
+            // Clamp selection
+            if (newSelected < 0) newSelected = 0;
+            if (newSelected >= browser->totalCount) newSelected = browser->totalCount - 1;
+
+            browser->selected = newSelected;
+
+            // Adjust view to keep selection visible
+            int viewStart = browser->startIndex;
+            int viewEnd = browser->startIndex + browser->tilesPerPage - 1;
+
+            if (browser->selected < viewStart) {
+                int rowsToScroll = (viewStart - browser->selected + browser->columns - 1) / browser->columns;
+                browser->startIndex -= rowsToScroll * browser->columns;
+                if (browser->startIndex < 0) browser->startIndex = 0;
+            } else if (browser->selected > viewEnd) {
+                int rowsToScroll = (browser->selected - viewEnd + browser->columns - 1) / browser->columns;
+                browser->startIndex += rowsToScroll * browser->columns;
+                int maxStart = browser->totalCount - browser->tilesPerPage;
+                if (maxStart < 0) maxStart = 0;
+                if (browser->startIndex > maxStart) browser->startIndex = maxStart;
+            }
+        }
+    }
+
     // Handle scroll wheel - always capture, not just when hovering
     float wheel = ImGui::GetIO().MouseWheel;
     if (wheel != 0.0f) {
         int scrollDirection = wheel > 0 ? -1 : 1;
         bool ctrlHeld = ImGui::GetIO().KeyCtrl;
+
         if (ctrlHeld) {
             // Page mode - jump by full pages aligned to page boundaries
             int currentPage = browser->startIndex / browser->tilesPerPage;
@@ -271,10 +331,6 @@ void DrawTextureBrowser(TextureBrowser* browser) {
 
     ImGui::End();
 }
-
-
-
-
 
 TextureBrowser texb={0};
 void InitTexBrowser() {
@@ -720,7 +776,23 @@ void DrawPicker() {
 
 -- draw original wall on portal failures.
 */
+void RecreateRenderTargets(CustomRenderTarget* albedo, CustomRenderTarget* light, CustomRenderTarget* combined, CustomRenderTarget* final) {
+    int w = GetScreenWidth();
+    int h = GetScreenHeight();
 
+    // Cleanup old targets
+    glDeleteTextures(1, &albedo->depthTexture);
+    UnloadCustomRenderTarget(*albedo);
+    UnloadCustomRenderTarget(*light);
+    UnloadCustomRenderTarget(*combined);
+    UnloadCustomRenderTarget(*final);
+
+    // Create new targets with current screen size
+    *albedo = CreateCustomRenderTarget(w, h, 0);
+    *light = CreateCustomRenderTarget(w, h, albedo->depthTexture);
+    *combined = CreateCustomRenderTarget(w, h, 0);
+    *final = CreateCustomRenderTarget(w, h, 0);
+}
 // Draw palette and texture preview on screen
 void MainLoop()
 {
@@ -751,7 +823,15 @@ void MainLoop()
     DisableCursor();
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
+        // Check for window resize
+        int currentW = GetScreenWidth();
+        int currentH = GetScreenHeight();
 
+        if (currentW != w || currentH != h) {
+            w = currentW;
+            h = currentH;
+            RecreateRenderTargets(&albedoTarget, &lightTarget, &combinedTarget, &finalTarget);
+        }
 #if !IS_DUKE_INCLUDED
         Editor_DoRaycasts(&localb2cam);
         EditorFrameMin(*DumbCore::GetCamera());
