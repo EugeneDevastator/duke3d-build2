@@ -480,6 +480,8 @@ int loadgal(int gal_idx, const char* path) {
     gal->gtile = (tile_t*)malloc(arttiles * sizeof(tile_t))	;
     memset(gal->gtile, 0, arttiles * sizeof(tile_t));
 
+	arttiles = 1000;
+
     for(int i = 0; i < arttiles; i++) {
         sprintf(gal->gtile[i].filnam, "tiles000.art|%d", i);
         gal->gtile[i].tt.f = 0;

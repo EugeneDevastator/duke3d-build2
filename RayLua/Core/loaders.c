@@ -596,7 +596,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 						sec[i].grad[j].y = ((float)b7sec.surf[j].heinum)*(1.f/4096.f);
 					sur = &sec[i].surf[j];
 					sur->flags = 0;
-					if (b7sec.stat[j]&1) sur->flags |= SURF_SEE_THROUGH; // parallax
+					if (b7sec.stat[j]&1) sur->flags |= SURF_PARALLAX_DISCARD; // parallax
 					sur->asc = 4096;
 					sur->rsc = (32-b7sec.surf[j].shade)*128;
 					sur->gsc = (32-b7sec.surf[j].shade)*128;
@@ -1169,6 +1169,17 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 			{
 				for (j = 0; j < sec[i].n; j++) {
 					wall_t *walp = &sec[i].wall[j];
+
+					// duke-style parallax surf marking;
+					if (walp->ns >=0) {
+						for (int isf=0;isf<2;isf++) {
+							// must check both sectors.
+							if ((sec[i].surf[isf].flags & SURF_PARALLAX_DISCARD) &&
+								(sec[walp->ns].surf[isf].flags & SURF_PARALLAX_DISCARD)) {
+								walp->xsurf[isf*2].flags |= SURF_PARALLAX_DISCARD;
+							}
+						}
+					}
 
 					upgradewallportchain(i,j,map);
 

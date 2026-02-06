@@ -12,8 +12,8 @@
 clipdata build2;
 // version with simplified sprite checking. temporary, before sprite visualization is reworked. or colliders implementd
 // *hitwall: -2 for floor, -1 for ceiling
-int raycast(point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, int *hitwall, int *hitsprite,int *hitsurf,
-            point3d *hit,  mapstate_t *map) {
+int raycast(point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, int *hitwall, int *hitsprite, int *hitsurf,
+            point3d *hit, uint32_t scanflags, mapstate_t *map) {
 	sect_t *sec;
 	wall_t *wal, *wal2;
 	spri_t *spr;
@@ -113,7 +113,7 @@ int raycast(point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, i
 									secfifw++;
 									gotsect[bs >> 5] |= (1 << bs);
 								}
-								passthru = 1;
+								passthru = 1 && !(scanflags & RHIT_REDWALLS);
 							}
 						}
 					}

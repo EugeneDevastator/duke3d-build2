@@ -233,6 +233,7 @@ int shadowtest2_backface_cull = 0; // Toggle backface culling
 int shadowtest2_distance_cull = 0; // Toggle distance-based culling
 int shadowtest2_debug_walls = 1; // Verbose wall logging
 int shadowtest2_debug_block_selfportals = 1; // Verbose wall logging
+static bool st2_use_parallax_discards = 0; // Verbose wall logging
 
 //--------------------------------------------------------------------------------------------------
 static tiletype gdd;
@@ -1708,7 +1709,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		//	newsect = s;  // use same flow as for walls with masks - emit lightpoly, and draw it as portal.
 		//	newtag= s +b->tagoffset;
 		}
-
+		int touchwid = twal[0].i;
 		if (isportal && !noportals) {
 			int endpn = portals[myport].destpn;
 			int ttag = b->tagoffset + taginc + portals[endpn].sect;
@@ -1729,7 +1730,14 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			// the problem here still remains - because rendering two areas in other spaces can overlap one another.
 			// seems that we need to do wccw for every vert to gurantee shared space.. darn
 			draw_hsr_enter_portal(map, myport, plothead[0], plothead[1], b);
-		} else {
+		}
+
+		else if (st2_use_parallax_discards && wal[touchwid].ns >=0
+			&& (wal[touchwid].xsurf[isflor*2].flags & SURF_PARALLAX_DISCARD)) {
+			drawpol_befclip(s + b->tagoffset, wal[touchwid].ns + b->tagoffset, s, wal[touchwid].ns, plothead[0], plothead[1], surflag, b);
+		}
+
+		else{
 			//if (sec[s].surf[isflor].flags & SURF_SEE_THROUGH)
 			//	{			}
 			//else
@@ -1880,17 +1888,21 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 				drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1], DP_PRESERVE_LOOP| DP_EMIT_MASK |1, b);
 				alphamul = 1;
 				draw_hsr_enter_portal(map, myport, plothead[0], plothead[1], b);
+			} else if (st2_use_parallax_discards && wal[w].xsurf[m].flags & SURF_PARALLAX_DISCARD) {
+				ns = wal[w].ns;
+				newtag = ns + b->tagoffset;
+				drawpol_befclip(s + b->tagoffset, newtag, s, ns, plothead[0], plothead[1], surflag, b);
 			} else {
 				// could be 7 or 3, .111 or .011
 				logstep("Draw wal pol s:%d ns:%d tag:%d", s, ns, wal[w].surf.lotag);
 				if (m==1 && ismasked && wal[w].xsurf[1].alpha < 1) {
 					alphamul = wal[w].xsurf[1].alpha;
 					// emit this as poly for eyes only, non destructive unaffects mph.
-					drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1], 1 | DP_PRESERVE_LOOP| DP_EMIT_MASK, b);
+					// replace with drawpol_nosect
+					drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1],
+						1 | DP_PRESERVE_LOOP| DP_EMIT_MASK, b);
 					alphamul = 1;
 					ns =  wal[w].ns;
-					newtag = ns == -1 ? -1 : ns + b->tagoffset;
-					// and then draw as portal.
 				}
 
 				drawpol_befclip(s + b->tagoffset, newtag, s, ns, plothead[0], plothead[1], surflag, b);
