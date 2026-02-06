@@ -55,8 +55,10 @@ void main() {
       //  ysample *= ysample*ysample;
       //  ysample = 1-ysample;
       //  ysample = mix(ysample,1,ndc.y);
+      //  ysample = mix(ysample, (-ndc.y)*0.5, abs(forward.y));
+      // could be some options with ndc, to get rid of top/down glitching
         uv.x = (worldAngle / (2*3.14159265)) + 0.5;
-        uv.y = ysample * 0.5 + 0.5;
+        uv.y = ysample * 0.5;
     }  else if (parallaxMode == 2) // spherical
     {
         float angle = atan(viewDir.x, viewDir.z);
@@ -71,7 +73,7 @@ void main() {
 
     // Apply pan and scale
     uv.x = uv.x * scaleX + panX;
-    uv.y = uv.y * scaleY + panY;
+    uv.y = uv.y * scaleY + panY + 0.5; // offset by 0.5 so that midline = horizon.
 
     vec4 texColor = texture(textureSampler, fract(uv));
 
@@ -90,5 +92,5 @@ void main() {
     } else {
         finalColor = vec4(texColor * fragColor);
     }
-   // finalColor = vec4(uv,0,1);
+  // finalColor = vec4(uv,forward.y,1);
 }
