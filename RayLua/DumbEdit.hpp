@@ -686,7 +686,7 @@ void Editor_DoRaycasts(cam_t *cc) {
 	int ispri = 0;
 	cam = cc;
 	//ctx.state.discard();// to restore original map state for raycast.
-	raycast(&cc->p, &cc->f, 1e32, cc->cursect, &hoverfoc.sec, &hoverfoc.wal, &hoverfoc.spri,&hoverfoc.surf, &hoverfoc.hitpos, map);
+	raycast(&cc->p, &cc->f, 1e32, cc->cursect, &hoverfoc.sec, &hoverfoc.wal, &hoverfoc.spri,&hoverfoc.surf, &hoverfoc.hitpos, RHIT_REDWALLS, map);
 	hoverfoc.wal2=-1;
 	if (ISHOVERWAL) {
 		hoverfoc.wal2 = mapwallnextid(hoverfoc.sec,hoverfoc.wal,map);

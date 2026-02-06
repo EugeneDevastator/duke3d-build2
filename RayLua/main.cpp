@@ -41,7 +41,9 @@ extern "C" {
 #include "Core/artloader.h"
 
 }
-
+// make parallax
+// for floors and walls - if own flor is paralax - tag floor trap and wall trap as ns portal.
+//
 
 void DrawTextureBrowser(TextureBrowser* browser) {
     int totalGals = 2;
@@ -940,7 +942,7 @@ void MainLoop()
     loadgal(0,"c:/Eugene/Games/build2/");
     loadgal(1,"c:/Eugene/Games/build2/Content/GAL_002_SW/");
     DumbRender::LoadTexturesToGPU();
-    DumbRender::Init("c:/Eugene/Games/build2/e2l2.map");
+    DumbRender::Init("c:/Eugene/Games/build2/prx.map");
     auto map = DumbRender::GetMap();
     DumbCore::Init(map);
     SetTargetFPS(60);

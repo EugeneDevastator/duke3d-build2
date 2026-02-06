@@ -89,6 +89,7 @@ player_transform plr = {};
 static Shader uvShader_plain;
 static UVShaderDesc uvShaderDesc;
 static Shader lightShader;
+static Shader skyShader;
 static int lightPosLoc;
 static int lightRangeLoc;
 static bool syncam = true;
@@ -132,6 +133,7 @@ public:
 		uvShader_plain = LoadShader("Shaders/uv_vis_shader.vert", "Shaders/uv_vis_shader.frag");
 		LoadUVShader();
 		lightShader = LoadShader("Shaders/light.vert", "Shaders/light.frag");
+		skyShader = LoadShader("Shaders/skyparallax.vert", "Shaders/skyparallax.frag");
 
 		lightPosLoc = GetShaderLocation(lightShader, "lightPosition");
 		lightRangeLoc = GetShaderLocation(lightShader, "lightRange");
@@ -688,21 +690,45 @@ public:
 			rlEnableDepthMask();
 			usedcol.w *= 1;
 		}
+		const Texture2D tex = galtextures[eyepol[i].galnum][eyepol[i].tilnum];
 		//  BeginBlendMode(BLEND_ADDITIVE);        usedcol.w=0.3;
+		if (eyepol[i].isflor >= 0) {
+			BeginShaderMode(skyShader);
 
-		BeginShaderMode(uvShaderDesc.shader);
+			// Set texture BEFORE setting shader values
+		//	rlActiveTextureSlot(0);
+		//	rlEnableTexture(tex.id);
+
+			int cameraPosLoc = GetShaderLocation(skyShader, "cameraPosition");
+			int cameraTargetLoc = GetShaderLocation(skyShader, "cameraTarget");
+			int cameraUpLoc = GetShaderLocation(skyShader, "cameraUp");
+
+			Vector3 camPos = DumbCore::GetCamera()->position;
+			Vector3 camTarget = DumbCore::GetCamera()->target;
+			Vector3 camUp = DumbCore::GetCamera()->up;
+
+			SetShaderValue(skyShader, cameraPosLoc, &camPos, SHADER_UNIFORM_VEC3);
+			SetShaderValue(skyShader, cameraTargetLoc, &camTarget, SHADER_UNIFORM_VEC3);
+			SetShaderValue(skyShader, cameraUpLoc, &camUp, SHADER_UNIFORM_VEC3);
+			SetShaderValue(skyShader, GetShaderLocation(skyShader, "useGradient"), &useGrad, SHADER_UNIFORM_INT);
+
+			int texloc = GetShaderLocation(skyShader, "textureSampler");
+			SetShaderValueTexture(skyShader, texloc, tex);
+		}
+		else {
+			BeginShaderMode(uvShaderDesc.shader);
+			SetUVShaderParams(uvShaderDesc,
+					  bpv3(eyepol[i].worlduvs[0]),
+					  bpv3(eyepol[i].worlduvs[1]),
+					  bpv3(eyepol[i].worlduvs[2]));
+			SetShaderValueTexture(uvShaderDesc.shader, uvShaderDesc.textureLoc, tex);
+			SetShaderValue(uvShaderDesc.shader, uvShaderDesc.useGradientloc, &useGrad, SHADER_UNIFORM_INT);
+		}
 		rlBegin(RL_TRIANGLES);
-		SetUVShaderParams(uvShaderDesc,
-		                  bpv3(eyepol[i].worlduvs[0]),
-		                  bpv3(eyepol[i].worlduvs[1]),
-		                  bpv3(eyepol[i].worlduvs[2]));
 		if (eyepol[i].tilnum > numartiles || eyepol[i].tilnum <0)
 			eyepol[i].tilnum = 5;
-		const Texture2D tex = galtextures[eyepol[i].galnum][eyepol[i].tilnum];
 
-		SetShaderValueTexture(uvShaderDesc.shader, uvShaderDesc.textureLoc, tex);
 
-		SetShaderValue(uvShaderDesc.shader, uvShaderDesc.useGradientloc, &useGrad, SHADER_UNIFORM_INT);
 
 		for (int locidx = 0; locidx < eyepol[i].tricnt; locidx += 1) {
 			for (int j = 0; j < 3; j++) {

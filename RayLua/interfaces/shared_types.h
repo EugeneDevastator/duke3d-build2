@@ -195,7 +195,7 @@ free((arena).data); \
 #define SPRITE_B2_IS_LIGHT     (1 << 16)   // 64
 #define SPRITE_B2_IS_DYNAMIC     (1 << 17)    // for dynamic lights and all dynamic stuff.
 
-#define SURF_SEE_THROUGH (1<<16) // for parallax
+#define SURF_PARALLAX_DISCARD (1<<16) // marker for old build style parallax mode.
 
 #define UV_TEXELRATE 		0 // pixel-rated = duke default.
 #define UV_NORMRATE 		1 // tile-rated
