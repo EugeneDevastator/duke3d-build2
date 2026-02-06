@@ -22,8 +22,9 @@ void main() {
     vec3 viewDir = normalize(worldPos - cameraPosition);
     panX=0;
     panY=0;
-    scaleX=1;
-    scaleY=1;
+    scaleX=6;
+    scaleY=-1;
+    parallaxMode=0;
     vec2 uv;
 
     if (parallaxMode == 0) {
