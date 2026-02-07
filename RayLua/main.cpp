@@ -49,7 +49,7 @@ void DrawTextureBrowser(TextureBrowser* browser) {
     int totalGals = 2;
     float dxmul = 0.4f;
     float dymul = 0.4f;
-
+    static bool useRepeat = true;
     static int galSelected[2] = {0, 0};
     static int galStartIndex[2] = {0, 0};
 
@@ -91,6 +91,7 @@ void DrawTextureBrowser(TextureBrowser* browser) {
         ImGui::SliderInt("Columns", &browser->columns, 1, 6);
         ImGui::SliderFloat("Size", &browser->thumbnailSize, 32.0f, 128.0f);
         ImGui::SliderInt("Max Visible", &browser->tilesPerPage, 10, 200);
+        ImGui::Checkbox("Use Repeat", &useRepeat);
 
         int maxStart = browser->totalCount - browser->tilesPerPage;
         if (maxStart < 0) maxStart = 0;
@@ -267,21 +268,50 @@ void DrawTextureBrowser(TextureBrowser* browser) {
         }
 
         bool clicked = false;
-        if (isValidTexture) {
+
+         if (isValidTexture) {
             float texW = (float)tex.width;
             float texH = (float)tex.height;
-            ImVec2 uv0 = ImVec2(0, 0);
-            ImVec2 uv1 = ImVec2(1, 1);
 
-            if (texW != texH) {
-                if (texW > texH) {
-                    uv1.y = texW / texH;
-                } else {
-                    uv1.x = texH / texW;
-                }
+            // Determine image size that fits inside the square button while preserving aspect ratio
+            float fitW, fitH;
+            if (texW > texH) {
+                fitW = buttonSize.x;
+                fitH = buttonSize.x * (texH / texW);
+            } else {
+                fitH = buttonSize.y;
+                fitW = buttonSize.y * (texW / texH);
             }
 
-            clicked = ImGui::ImageButton("##thumb", (void*)(intptr_t)tex.id, buttonSize, uv0, uv1);
+            // Draw an invisible button for the click area
+            clicked = ImGui::InvisibleButton("##thumb", buttonSize);
+
+            // Draw background (optional, mimics button look)
+            ImVec2 btnMin = ImGui::GetItemRectMin();
+            ImVec2 btnMax = ImGui::GetItemRectMax();
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+            bool hovered = ImGui::IsItemHovered();
+            bool active = ImGui::IsItemActive();
+            ImU32 bgCol = ImGui::GetColorU32(
+                active  ? ImGuiCol_ButtonActive :
+                hovered ? ImGuiCol_ButtonHovered :
+                          ImGuiCol_Button
+            );
+            drawList->AddRectFilled(btnMin, btnMax, bgCol);
+
+            // Center the image within the button
+            float offsetX = (buttonSize.x - fitW) * 0.5f;
+            float offsetY = (buttonSize.y - fitH) * 0.5f;
+
+            ImVec2 imgMin = ImVec2(btnMin.x + offsetX, btnMin.y + offsetY);
+            ImVec2 imgMax = ImVec2(imgMin.x + fitW, imgMin.y + fitH);
+
+            drawList->AddImage(
+                (intptr_t)tex.id,
+                imgMin, imgMax,
+                ImVec2(0, 0), ImVec2(1, 1)
+            );
         } else {
             clicked = ImGui::InvisibleButton("##thumb", buttonSize);
 
