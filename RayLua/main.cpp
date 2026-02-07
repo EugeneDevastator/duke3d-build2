@@ -93,25 +93,28 @@ void DrawTextureBrowser(TextureBrowser* browser) {
     }
 
     if (browser->showSettings) {
+        ImGui::PushItemWidth(250.0f);
         if (ImGui::SliderInt("Columns", &browser->columns, 1, 6)) settingsChanged = true;
         if (ImGui::SliderFloat("Size", &browser->thumbnailSize, 32.0f, 128.0f)) settingsChanged = true;
         if (ImGui::SliderInt("Max Visible Rows", &browser->maxVisibleRows, 2, 20)) settingsChanged = true;
         ImGui::Checkbox("Use Repeat", &useRepeat);
+        ImGui::PopItemWidth();
 
-        int maxStart = browser->totalCount - (browser->maxVisibleRows * browser->columns);
+        // Calculate tiles per page at runtime
+        int tilesPerPage = browser->maxVisibleRows * browser->columns;
+        int maxStart = browser->totalCount - tilesPerPage;
         if (maxStart < 0) maxStart = 0;
         if (ImGui::SliderInt("Start Index", &browser->startIndex, 0, maxStart)) {
             galStartIndex[browser->galnum] = browser->startIndex;
         }
     }
 
-    // Calculate window content area
-    ImVec2 contentMin = ImGui::GetCursorScreenPos();
+    // Calculate window content area after settings
+    float settingsHeight = ImGui::GetCursorPosY();
     ImVec2 windowSize = ImGui::GetWindowSize();
-    ImVec2 windowPos = ImGui::GetWindowPos();
 
     // Calculate available space for thumbnails
-    float availableHeight = windowSize.y - (ImGui::GetCursorPosY() + ImGui::GetStyle().WindowPadding.y);
+    float availableHeight = windowSize.y - (settingsHeight + ImGui::GetStyle().WindowPadding.y);
     float availableWidth = windowSize.x - (2 * ImGui::GetStyle().WindowPadding.x);
 
     // If resizing, adjust rows/columns to fit
@@ -134,7 +137,7 @@ void DrawTextureBrowser(TextureBrowser* browser) {
     if (wasResizing && !isResizing) {
         float padding = 4.0f;
         float neededWidth = browser->columns * browser->thumbnailSize + (browser->columns - 1) * padding + 2 * ImGui::GetStyle().WindowPadding.x;
-        float neededHeight = ImGui::GetCursorPosY() + browser->maxVisibleRows * (browser->thumbnailSize + padding) + ImGui::GetStyle().WindowPadding.y;
+        float neededHeight = settingsHeight + browser->maxVisibleRows * (browser->thumbnailSize + padding) + ImGui::GetStyle().WindowPadding.y;
 
         ImGui::SetWindowSize(ImVec2(neededWidth, neededHeight));
         wasResizing = false;
@@ -144,13 +147,13 @@ void DrawTextureBrowser(TextureBrowser* browser) {
     if (settingsChanged) {
         float padding = 4.0f;
         float neededWidth = browser->columns * browser->thumbnailSize + (browser->columns - 1) * padding + 2 * ImGui::GetStyle().WindowPadding.x;
-        float neededHeight = ImGui::GetCursorPosY() + browser->maxVisibleRows * (browser->thumbnailSize + padding) + ImGui::GetStyle().WindowPadding.y;
+        float neededHeight = settingsHeight + browser->maxVisibleRows * (browser->thumbnailSize + padding) + ImGui::GetStyle().WindowPadding.y;
 
         ImGui::SetWindowSize(ImVec2(neededWidth, neededHeight));
     }
 
     // Calculate tiles per page based on visible rows
-    browser->tilesPerPage = browser->maxVisibleRows * browser->columns;
+    int tilesPerPage = browser->maxVisibleRows * browser->columns;
 
     // Handle shift + mouse delta for 2D selection movement
     if (shiftHeld) {
@@ -198,15 +201,15 @@ void DrawTextureBrowser(TextureBrowser* browser) {
             moveView = true;
             moveSelection = true;
         } else if (ctrlHeld) {
-            int currentPage = browser->startIndex / browser->tilesPerPage;
+            int currentPage = browser->startIndex / tilesPerPage;
             int newPage = currentPage + scrollDirection;
-            viewDelta = (newPage * browser->tilesPerPage) - browser->startIndex;
+            viewDelta = (newPage * tilesPerPage) - browser->startIndex;
             selDelta = browser->startIndex + viewDelta - browser->selected;
             moveView = true;
             moveSelection = true;
         } else {
             int viewStart = browser->startIndex;
-            int viewEnd = browser->startIndex + browser->tilesPerPage - 1;
+            int viewEnd = browser->startIndex + tilesPerPage - 1;
             bool atTopEdge = (browser->selected < viewStart + browser->columns);
             bool atBottomEdge = (browser->selected > viewEnd - browser->columns);
 
@@ -245,14 +248,14 @@ void DrawTextureBrowser(TextureBrowser* browser) {
     if (browser->selected < 0) browser->selected = 0;
     if (browser->selected >= browser->totalCount) browser->selected = browser->totalCount - 1;
 
-    int maxStart = browser->totalCount - browser->tilesPerPage;
+    int maxStart = browser->totalCount - tilesPerPage;
     if (maxStart < 0) maxStart = 0;
     if (browser->startIndex < 0) browser->startIndex = 0;
     if (browser->startIndex > maxStart) browser->startIndex = maxStart;
 
     // Adjust view to keep selection visible
     int viewStart = browser->startIndex;
-    int viewEnd = browser->startIndex + browser->tilesPerPage - 1;
+    int viewEnd = browser->startIndex + tilesPerPage - 1;
 
     if (browser->selected < viewStart) {
         int rowsToScroll = (viewStart - browser->selected + browser->columns - 1) / browser->columns;
@@ -269,15 +272,16 @@ void DrawTextureBrowser(TextureBrowser* browser) {
     galStartIndex[browser->galnum] = browser->startIndex;
 
     // Display info
-    int actualEnd = browser->startIndex + browser->tilesPerPage;
+    int actualEnd = browser->startIndex + tilesPerPage;
     if (actualEnd > browser->totalCount) actualEnd = browser->totalCount;
 
-    int currentPage = browser->startIndex / browser->tilesPerPage;
-    int totalPages = (browser->totalCount + browser->tilesPerPage - 1) / browser->tilesPerPage;
+    int currentPage = browser->startIndex / tilesPerPage;
+    int totalPages = (browser->totalCount + tilesPerPage - 1) / tilesPerPage;
 
-    ImGui::Text("Gallery %d | Page %d/%d | Showing %d-%d of %d | Selected: %d",
+    ImGui::Text("Gallery %d | Page %d/%d | Showing %d-%d of %d | Selected: %d | Cols: %d Rows: %d",
                 browser->galnum, currentPage + 1, totalPages,
-                browser->startIndex + 1, actualEnd, browser->totalCount, browser->selected);
+                browser->startIndex + 1, actualEnd, browser->totalCount, browser->selected,
+                browser->columns, browser->maxVisibleRows);
     ImGui::Separator();
 
     if (browser->totalCount == 0) {
@@ -296,7 +300,7 @@ void DrawTextureBrowser(TextureBrowser* browser) {
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 
     float padding = 4.0f;
-    int endIndex = browser->startIndex + browser->tilesPerPage;
+    int endIndex = browser->startIndex + tilesPerPage;
     if (endIndex > browser->totalCount) endIndex = browser->totalCount;
 
     for (int i = browser->startIndex; i < endIndex; i++) {
@@ -391,6 +395,7 @@ void DrawTextureBrowser(TextureBrowser* browser) {
     ImGui::PopStyleVar();
     ImGui::End();
 }
+
 
 TextureBrowser texb={0};
 void InitTexBrowser() {
