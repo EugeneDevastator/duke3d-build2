@@ -105,7 +105,11 @@ public:
 		return map;
 	}
 	static Texture2D * RuntimeTextures(){return runtimeTextures;}
-
+	static Texture2D GetGalTex(int gal, int texid) {
+		gal = Clamp(gal,0,1);
+		texid = Clamp(texid, 0, g_gals[gal].gmaltiles-1);
+		return galtextures[gal][texid];
+	}
 	static void LoadUVShader(void) {
 		uvShaderDesc = {0};
 
@@ -690,7 +694,8 @@ public:
 			rlEnableDepthMask();
 			usedcol.w *= 1;
 		}
-		const Texture2D tex = galtextures[eyepol[i].galnum][eyepol[i].tilnum];
+
+		const Texture2D tex = GetGalTex(eyepol[i].galnum,eyepol[i].tilnum);
 		//  BeginBlendMode(BLEND_ADDITIVE);        usedcol.w=0.3;
 		if (eyepol[i].isflor >= 0) {
 			BeginShaderMode(skyShader);

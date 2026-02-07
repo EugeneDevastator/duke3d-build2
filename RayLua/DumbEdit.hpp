@@ -424,7 +424,7 @@ void PickgrabUpdate() {
 	} else if (ISGRABWAL) {
 		transform tmp;
 		point3d tp2;
-		bool isConstrainted = true;
+		bool isConstrainted = IsKeyDown(KEY_LEFT_SHIFT);
 		point3d outpos;
 		{
 			// Project camera ray onto horizontal plane
@@ -461,9 +461,27 @@ void PickgrabUpdate() {
 		if (isConstrainted) { // move along neighbor wallss
 			wall_t wnex = map->sect[grabfoc.sec].wall[grabfoc.wal2];
 			wall_t wprev = map->sect[grabfoc.sec].wall[grabfoc.walprev];
-			float dwn = distpoint2line2(tmp.p.x,tmp.p.y, origVert.x,origVert.y,wnex.x,wnex.y);
-			float dwp = distpoint2line2(tmp.p.x,tmp.p.y, wprev.x,wprev.y, origVert.x,origVert.y);
-			wall_t tgw = (dwn<dwp ? wnex : wprev);
+
+			// Calculate vectors from tmp point to each ray
+			Vector2 tmppos = {tmp.p.x, tmp.p.y};
+			Vector2 origpos = {origVert.x, origVert.y};
+			Vector2 wnexpos = {wnex.x, wnex.y};
+			Vector2 wprevpos = {wprev.x, wprev.y};
+
+			// Ray directions (normalized)
+			Vector2 ray_wnex = Vector2Normalize(Vector2Subtract(origpos, wnexpos));
+			Vector2 ray_wprev = Vector2Normalize(Vector2Subtract(origpos, wprevpos));
+
+			// Vectors from ray origins to tmp point
+			Vector2 to_tmp_wnex = Vector2Normalize(Vector2Subtract(tmppos, wnexpos));
+			Vector2 to_tmp_wprev = Vector2Normalize(Vector2Subtract(tmppos, wprevpos));
+
+			// Dot products (higher = more aligned with ray direction)
+			float dot_wnex = Vector2DotProduct(to_tmp_wnex, ray_wnex);
+			float dot_wprev = Vector2DotProduct(to_tmp_wprev, ray_wprev);
+
+			// Choose ray with higher alignment
+			wall_t tgw = (abs(dot_wnex) > abs(dot_wprev) ? wnex : wprev);
 			Vector2 tgwpos = {tgw.x,tgw.y};
 			Vector2 moverpos =  {tmp.p.x,tmp.p.y};
 			Vector2 toOrig = origVert - tgwpos;
@@ -487,7 +505,7 @@ void PickgrabUpdate() {
 				map->sect[verts[i].s].wall[verts[i].w].y = outpos.y;
 			}
 
-		// Move ahead-wall
+		// Move ahead-wall todo - rework entirely leave section for verts only.
 		if (selmode & SEL_SURF) {
 			map->sect[grabfoc.sec].wall[grabfoc.wal2].x = tp2.x;
 			map->sect[grabfoc.sec].wall[grabfoc.wal2].y = tp2.y;
@@ -519,6 +537,9 @@ void PickgrabStart() {
 			savedtr = cam->tr;
 			grabfoc.wal = hoverfoc.onewall;
 		}
+
+		grabfoc.wal2 = map->sect[grabfoc.sec].wall[grabfoc.wal].n + grabfoc.wal;
+		grabfoc.walprev = wallprev(&GRABSEC,grabfoc.wal);
 		//for red walls we'd need to grab verts of all adjacent walls.
 		// something in build2 was there for it.
 		savedtr = cam->tr;
@@ -527,7 +548,6 @@ void PickgrabStart() {
 		origVert = {savedtr.p.x,savedtr.p.y};
 		totalverts = getwallsofvert(grabfoc.sec, grabfoc.wal, verts, 256, map);
 
-		grabfoc.wal2 = map->sect[grabfoc.sec].wall[grabfoc.wal].n + grabfoc.wal;
 		point2d wpos = getwall({grabfoc.wal2, grabfoc.sec}, map)->pos;
 		point3d wpos3d = {wpos.x, wpos.y, 0};
 		localp2 = world_to_local_point(wpos3d, &cam->tr);
@@ -957,6 +977,8 @@ void DrawGizmos() {
 			usefoc = hoverfoc;
 		else
 			usefoc = grabfoc;
+		if (usefoc.sec<0)
+			return;
 		drawVert(usefoc.sec, usefoc.wal);
 		drawVert(usefoc.sec, usefoc.wal2);
 
