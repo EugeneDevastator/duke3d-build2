@@ -52,6 +52,7 @@ void DrawTextureBrowser(TextureBrowser* browser) {
     static bool useRepeat = true;
     static int galSelected[2] = {0, 0};
     static int galStartIndex[2] = {0, 0};
+    static bool wasResizing = false;
 
     browser->totalCount = g_gals[browser->galnum].gnumtiles;
 
@@ -63,12 +64,16 @@ void DrawTextureBrowser(TextureBrowser* browser) {
         return;
     }
 
+    // Check if window is being resized
+    bool isResizing = ImGui::IsWindowHovered() && ImGui::IsMouseDragging(ImGuiMouseButton_Left);
+
     // Movement operations - simple deltas
     int galDelta = 0;
     int selDelta = 0;
     int viewDelta = 0;
     bool moveSelection = false;
     bool moveView = false;
+    bool settingsChanged = false;
 
     // Gallery selection
     if (ImGui::SliderInt("Gallery", &browser->galnum, 0, totalGals - 1)) {
@@ -88,17 +93,64 @@ void DrawTextureBrowser(TextureBrowser* browser) {
     }
 
     if (browser->showSettings) {
-        ImGui::SliderInt("Columns", &browser->columns, 1, 6);
-        ImGui::SliderFloat("Size", &browser->thumbnailSize, 32.0f, 128.0f);
-        ImGui::SliderInt("Max Visible", &browser->tilesPerPage, 10, 200);
+        if (ImGui::SliderInt("Columns", &browser->columns, 1, 6)) settingsChanged = true;
+        if (ImGui::SliderFloat("Size", &browser->thumbnailSize, 32.0f, 128.0f)) settingsChanged = true;
+        if (ImGui::SliderInt("Max Visible Rows", &browser->maxVisibleRows, 2, 20)) settingsChanged = true;
         ImGui::Checkbox("Use Repeat", &useRepeat);
 
-        int maxStart = browser->totalCount - browser->tilesPerPage;
+        int maxStart = browser->totalCount - (browser->maxVisibleRows * browser->columns);
         if (maxStart < 0) maxStart = 0;
         if (ImGui::SliderInt("Start Index", &browser->startIndex, 0, maxStart)) {
             galStartIndex[browser->galnum] = browser->startIndex;
         }
     }
+
+    // Calculate window content area
+    ImVec2 contentMin = ImGui::GetCursorScreenPos();
+    ImVec2 windowSize = ImGui::GetWindowSize();
+    ImVec2 windowPos = ImGui::GetWindowPos();
+
+    // Calculate available space for thumbnails
+    float availableHeight = windowSize.y - (ImGui::GetCursorPosY() + ImGui::GetStyle().WindowPadding.y);
+    float availableWidth = windowSize.x - (2 * ImGui::GetStyle().WindowPadding.x);
+
+    // If resizing, adjust rows/columns to fit
+    if (isResizing) {
+        float padding = 4.0f;
+        int newColumns = (int)((availableWidth + padding) / (browser->thumbnailSize + padding));
+        if (newColumns < 1) newColumns = 1;
+        if (newColumns > 6) newColumns = 6;
+
+        int newRows = (int)(availableHeight / (browser->thumbnailSize + padding));
+        if (newRows < 2) newRows = 2;
+        if (newRows > 20) newRows = 20;
+
+        browser->columns = newColumns;
+        browser->maxVisibleRows = newRows;
+        wasResizing = true;
+    }
+
+    // If just finished resizing, clamp window to fit perfectly
+    if (wasResizing && !isResizing) {
+        float padding = 4.0f;
+        float neededWidth = browser->columns * browser->thumbnailSize + (browser->columns - 1) * padding + 2 * ImGui::GetStyle().WindowPadding.x;
+        float neededHeight = ImGui::GetCursorPosY() + browser->maxVisibleRows * (browser->thumbnailSize + padding) + ImGui::GetStyle().WindowPadding.y;
+
+        ImGui::SetWindowSize(ImVec2(neededWidth, neededHeight));
+        wasResizing = false;
+    }
+
+    // If settings changed, resize window to fit
+    if (settingsChanged) {
+        float padding = 4.0f;
+        float neededWidth = browser->columns * browser->thumbnailSize + (browser->columns - 1) * padding + 2 * ImGui::GetStyle().WindowPadding.x;
+        float neededHeight = ImGui::GetCursorPosY() + browser->maxVisibleRows * (browser->thumbnailSize + padding) + ImGui::GetStyle().WindowPadding.y;
+
+        ImGui::SetWindowSize(ImVec2(neededWidth, neededHeight));
+    }
+
+    // Calculate tiles per page based on visible rows
+    browser->tilesPerPage = browser->maxVisibleRows * browser->columns;
 
     // Handle shift + mouse delta for 2D selection movement
     if (shiftHeld) {
@@ -137,8 +189,7 @@ void DrawTextureBrowser(TextureBrowser* browser) {
         bool ctrlHeld = ImGui::GetIO().KeyCtrl;
 
         if (shiftHeld) {
-            int rowsPerPage = browser->tilesPerPage / browser->columns;
-            int scrollRows = (rowsPerPage + 2) / 3;
+            int scrollRows = (browser->maxVisibleRows + 2) / 3;
             if (scrollRows < 1) scrollRows = 1;
             int scrollAmount = scrollRows * browser->columns;
 
@@ -283,7 +334,7 @@ void DrawTextureBrowser(TextureBrowser* browser) {
                 hovered ? ImGuiCol_ButtonHovered :
                           ImGuiCol_Button
             );
-            drawList->AddRectFilled(btnMin, btnMax, bgCol);  // <-- this was missing
+            drawList->AddRectFilled(btnMin, btnMax, bgCol);
 
             float texW = (float)tex.width;
             float texH = (float)tex.height;
@@ -329,18 +380,6 @@ void DrawTextureBrowser(TextureBrowser* browser) {
             drawList->AddText(textPos, IM_COL32(150, 150, 150, 255), "NULL");
         }
 
-        //if (clicked) {
-        //    browser->selected = i;
-        //}
-
-        //if (ImGui::IsItemHovered()) {
-        //    if (isValidTexture) {
-        //        ImGui::SetTooltip("Texture %d\n%dx%d", i, tex.width, tex.height);
-        //    } else {
-        //        ImGui::SetTooltip("Texture %d\nNULL/Invalid", i);
-        //    }
-        //}
-
         int relativeIndex = i - browser->startIndex;
         if ((relativeIndex + 1) % browser->columns != 0 && i < endIndex - 1) {
             ImGui::SameLine(0.0f, padding);
@@ -353,7 +392,6 @@ void DrawTextureBrowser(TextureBrowser* browser) {
     ImGui::End();
 }
 
-
 TextureBrowser texb={0};
 void InitTexBrowser() {
     texb.selected=2;
@@ -362,6 +400,7 @@ void InitTexBrowser() {
     texb.startIndex = 0;
     texb.thumbnailSize=84;
     texb.tilesPerPage = 63; // Show 50 at a time
+    texb.maxVisibleRows = 16; // Show 50 at a time
 }
 // Profiling variables
 double luaRenderTime = 0.0;
