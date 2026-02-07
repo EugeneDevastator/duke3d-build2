@@ -329,17 +329,17 @@ void DrawTextureBrowser(TextureBrowser* browser) {
             drawList->AddText(textPos, IM_COL32(150, 150, 150, 255), "NULL");
         }
 
-        if (clicked) {
-            browser->selected = i;
-        }
+        //if (clicked) {
+        //    browser->selected = i;
+        //}
 
-        if (ImGui::IsItemHovered()) {
-            if (isValidTexture) {
-                ImGui::SetTooltip("Texture %d\n%dx%d", i, tex.width, tex.height);
-            } else {
-                ImGui::SetTooltip("Texture %d\nNULL/Invalid", i);
-            }
-        }
+        //if (ImGui::IsItemHovered()) {
+        //    if (isValidTexture) {
+        //        ImGui::SetTooltip("Texture %d\n%dx%d", i, tex.width, tex.height);
+        //    } else {
+        //        ImGui::SetTooltip("Texture %d\nNULL/Invalid", i);
+        //    }
+        //}
 
         int relativeIndex = i - browser->startIndex;
         if ((relativeIndex + 1) % browser->columns != 0 && i < endIndex - 1) {
