@@ -269,26 +269,9 @@ void DrawTextureBrowser(TextureBrowser* browser) {
 
         bool clicked = false;
 
-         if (isValidTexture) {
-            float texW = (float)tex.width;
-            float texH = (float)tex.height;
-
-            // Determine image size that fits inside the square button while preserving aspect ratio
-            float fitW, fitH;
-            if (texW > texH) {
-                fitW = buttonSize.x;
-                fitH = buttonSize.x * (texH / texW);
-            } else {
-                fitH = buttonSize.y;
-                fitW = buttonSize.y * (texW / texH);
-            }
-
-            // Draw an invisible button for the click area
+        if (isValidTexture) {
             clicked = ImGui::InvisibleButton("##thumb", buttonSize);
 
-            // Draw background (optional, mimics button look)
-            ImVec2 btnMin = ImGui::GetItemRectMin();
-            ImVec2 btnMax = ImGui::GetItemRectMax();
             ImDrawList* drawList = ImGui::GetWindowDrawList();
 
             bool hovered = ImGui::IsItemHovered();
@@ -298,21 +281,40 @@ void DrawTextureBrowser(TextureBrowser* browser) {
                 hovered ? ImGuiCol_ButtonHovered :
                           ImGuiCol_Button
             );
-            drawList->AddRectFilled(btnMin, btnMax, bgCol);
 
-            // Center the image within the button
-            float offsetX = (buttonSize.x - fitW) * 0.5f;
-            float offsetY = (buttonSize.y - fitH) * 0.5f;
+            float texW = (float)tex.width;
+            float texH = (float)tex.height;
+            ImVec2 image_topleft, image_botright;
 
-            ImVec2 imgMin = ImVec2(btnMin.x + offsetX, btnMin.y + offsetY);
-            ImVec2 imgMax = ImVec2(imgMin.x + fitW, imgMin.y + fitH);
+            if (texW > texH) {
+                float eside = 0.5*(1-texH/texW);
+                image_topleft  = ImVec2(0.0f, eside);
+                image_botright = ImVec2(1.0f, 1-eside);
+            } else { // H >= W
+                float eside = 0.5*(1-texW/texH);
+                image_topleft  = ImVec2( eside,0.0);
+                image_botright = ImVec2( 1-(eside),1.0);
+            }
+
+            // Usage: convert normalized coords to screen coords for drawing
+            ImVec2 btnMin = ImGui::GetItemRectMin();
+            ImVec2 btnMax = ImGui::GetItemRectMax();
+
+            ImVec2 imgMin = ImVec2(
+                btnMin.x + image_topleft.x * buttonSize.x,
+                btnMin.y + image_topleft.y * buttonSize.y
+            );
+            ImVec2 imgMax = ImVec2(
+                btnMin.x + image_botright.x * buttonSize.x,
+                btnMin.y + image_botright.y * buttonSize.y
+            );
 
             drawList->AddImage(
                 (intptr_t)tex.id,
                 imgMin, imgMax,
                 ImVec2(0, 0), ImVec2(1, 1)
             );
-        } else {
+        }else {
             clicked = ImGui::InvisibleButton("##thumb", buttonSize);
 
             ImVec2 pos = ImGui::GetItemRectMin();
