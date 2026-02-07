@@ -12,7 +12,8 @@
 clipdata build2;
 // version with simplified sprite checking. temporary, before sprite visualization is reworked. or colliders implementd
 // *hitwall: -2 for floor, -1 for ceiling
-int raycast(point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, int *hitwall, int *hitsprite, int *hitsurf,
+int raycast(point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, int *hitwall, int *hitsprite,
+            int *hitsurf,
             point3d *hit, uint32_t scanflags, mapstate_t *map) {
 	sect_t *sec;
 	wall_t *wal, *wal2;
@@ -95,32 +96,36 @@ int raycast(point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, i
 			if (z < z0) continue;
 			z1 = getslopez(&sec[s], 1, x, y);
 			if (z > z1) continue;
-			bs = wal[w].ns;
+
 			passthru = 0;
 			bool islower = false;
-			if (bs >= 0) {
-				bw = wal[w].nw;
+
+			// Use chain system instead of coordinate matching
+			if (wal[w].ns >= 0) {
+				int current_s = wal[w].nschain >= 0 ? wal[w].nschain : wal[w].ns;
+				int current_w = wal[w].nwchain >= 0 ? wal[w].nwchain : wal[w].nw;
+				int start_s = s, start_w = w;
+
 				do {
-					wal2 = sec[bs].wall;
-					i = wal2[bw].n + bw;
-					if ((wal[w].x == wal2[i].x) && (wal[nw].x == wal2[bw].x) &&
-					    (wal[w].y == wal2[i].y) && (wal[nw].y == wal2[bw].y)) {
-						islower = (z > getslopez(&sec[bs], 0, x, y));
-						if (islower && (z < getslopez(&sec[bs], 1, x, y))) {
-							if (!(wal[w].surf.flags & 32)) {
-								if (!(gotsect[bs >> 5] & (1 << bs))) {
-									secfif[secfifw] = bs;
-									secfifw++;
-									gotsect[bs >> 5] |= (1 << bs);
-								}
-								passthru = 1 && !(scanflags & RHIT_REDWALLS);
+					islower = (z > getslopez(&sec[current_s], 0, x, y));
+					if (islower && (z < getslopez(&sec[current_s], 1, x, y))) {
+						if (!(wal[w].surf.flags & 32)) {
+							if (!(gotsect[current_s >> 5] & (1 << current_s))) {
+								secfif[secfifw] = current_s;
+								secfifw++;
+								gotsect[current_s >> 5] |= (1 << current_s);
 							}
+							passthru = 1 && !(scanflags & RHIT_REDWALLS);
 						}
 					}
-					bs = wal2[bw].ns;
-					bw = wal2[bw].nw;
-				} while (bs != s);
+
+					// Move to next in chain
+					wall_t *chainwal = &sec[current_s].wall[current_w];
+					current_s = chainwal->nschain >= 0 ? chainwal->nschain : chainwal->ns;
+					current_w = chainwal->nwchain >= 0 ? chainwal->nwchain : chainwal->nw;
+				} while ((current_s != start_s || current_w != start_w));
 			}
+
 			if (!passthru) {
 				bestt = t;
 				hit->x = x;
@@ -129,7 +134,7 @@ int raycast(point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, i
 				(*hitsect) = s;
 				(*hitwall) = w;
 				(*hitsprite) = -1;
-				(*hitsurf) = islower ? 2 : 0; // need to add mask which is 1;
+				(*hitsurf) = islower ? 2 : 0;
 			}
 		}
 	}

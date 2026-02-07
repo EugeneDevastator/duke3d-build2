@@ -8,16 +8,16 @@
 
 // Raycasting flags and modes
 
-#define RHIT_SPRITES		 1<<0
-#define RHIT_WALLS  		 1<<1
-#define RHIT_CAPS   		 1<<2
-#define RHIT_ACTORS 		 1<<3
-#define RHIT_PROPS  		 1<<4
-#define RHIT_INVISIBLE		 1<<5
-#define RHIT_REDWALLS 		 1<<6 // if on will stop at standard wall portals
-#define RHIT_PORTALS		 1<<7 // for new wccw style portals
+#define RHIT_SPRITES		 (1<<0)
+#define RHIT_WALLS  		 (1<<1)
+#define RHIT_CAPS   		 (1<<2)
+#define RHIT_ACTORS 		 (1<<3)
+#define RHIT_PROPS  		 (1<<4)
+#define RHIT_INVISIBLE		 (1<<5)
+#define RHIT_REDWALLS 		 (1<<6) // if on will stop at standard wall portals
+#define RHIT_PORTALS		 (1<<7) // for new wccw style portals
 
-#define RHIT_ALLNORMAL = RHIT_SPRITES | RHIT_WALLS | RHIT_CAPS
+#define RHIT_ALLNORMAL RHIT_SPRITES | RHIT_WALLS | RHIT_CAPS
 
 
 
