@@ -462,11 +462,14 @@ void PickgrabUpdate() {
 			wall_t wnex = map->sect[grabfoc.sec].wall[grabfoc.wal2];
 			wall_t wprev = map->sect[grabfoc.sec].wall[grabfoc.walprev];
 			float dwn = distpoint2line2(tmp.p.x,tmp.p.y, origVert.x,origVert.y,wnex.x,wnex.y);
-			float dwp = distpoint2line2(tmp.p.x,tmp.p.y, origVert.x,origVert.y,wprev.x,wprev.y);
-			wall_t tgw = dwn<dwp ? wnex : wprev;
-			float norm = Vector2DistanceSqr(origVert, {tmp.p.x,tmp.p.y})
-			/ Vector2DistanceSqr({tgw.x,tgw.y}, {tmp.p.x,tmp.p.y});
-			Vector2 constrpos = Vector2Lerp(origVert, {tgw.x,tgw.y}, norm);
+			float dwp = distpoint2line2(tmp.p.x,tmp.p.y, wprev.x,wprev.y, origVert.x,origVert.y);
+			wall_t tgw = (dwn<dwp ? wnex : wprev);
+			Vector2 tgwpos = {tgw.x,tgw.y};
+			Vector2 moverpos =  {tmp.p.x,tmp.p.y};
+			Vector2 toOrig = origVert - tgwpos;
+			Vector2 toCurs = moverpos - tgwpos;
+			float projratio = Vector2DotProduct(toCurs,toOrig)/ Vector2DotProduct(toOrig,toOrig);
+			Vector2 constrpos = Vector2Lerp(tgwpos, origVert, max(projratio,0));
 			outpos = {constrpos.x, constrpos.y, 0};
 		}
 
