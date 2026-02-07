@@ -52,20 +52,45 @@ void DrawTextureBrowser(TextureBrowser* browser) {
     static bool useRepeat = true;
     static int galSelected[2] = {0, 0};
     static int galStartIndex[2] = {0, 0};
-    static bool wasResizing = false;
+    static bool needsResize = false;
 
     browser->totalCount = g_gals[browser->galnum].gnumtiles;
 
-    ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2(300, GetScreenHeight()), ImGuiCond_FirstUseEver);
+    // Calculate window size based on current parameters
+    float padding = 4.0f;
+    float windowPadding = ImGui::GetStyle().WindowPadding.x;
 
-    if (!ImGui::Begin("Texture Browser")) {
+    // Calculate content height for settings area
+    float settingsHeight = 0.0f;
+    if (browser->showSettings) {
+        settingsHeight = 6 * ImGui::GetFrameHeight() + 5 * ImGui::GetStyle().ItemSpacing.y; // 6 controls
+    }
+
+    float headerHeight = ImGui::GetFrameHeight() + // Gallery slider
+                        ImGui::GetFrameHeight() + // Settings button
+                        ImGui::GetFrameHeight() + // Info text
+                        ImGui::GetStyle().SeparatorTextPadding.y + // Separator
+                        settingsHeight +
+                        4 * ImGui::GetStyle().ItemSpacing.y; // Spacing between elements
+
+    float neededWidth = browser->columns * browser->thumbnailSize +
+                       (browser->columns - 1) * padding +
+                       2 * windowPadding;
+
+    float neededHeight = headerHeight +
+                        browser->maxVisibleRows * (browser->thumbnailSize + padding) - padding +
+                        2 * windowPadding;
+
+    ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(neededWidth, neededHeight), ImGuiCond_Always);
+
+    // Disable resizing but allow moving
+    ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar;
+
+    if (!ImGui::Begin("Texture Browser", NULL, windowFlags)) {
         ImGui::End();
         return;
     }
-
-    // Check if window is being resized
-    bool isResizing = ImGui::IsWindowHovered() && ImGui::IsMouseDragging(ImGuiMouseButton_Left);
 
     // Movement operations - simple deltas
     int galDelta = 0;
@@ -90,12 +115,22 @@ void DrawTextureBrowser(TextureBrowser* browser) {
     // Settings
     if (ImGui::Button(browser->showSettings ? "Hide Settings" : "Show Settings")) {
         browser->showSettings = !browser->showSettings;
+        needsResize = true;
     }
 
     if (browser->showSettings) {
-        if (ImGui::SliderInt("Columns", &browser->columns, 1, 6)) settingsChanged = true;
-        if (ImGui::SliderFloat("Size", &browser->thumbnailSize, 32.0f, 128.0f)) settingsChanged = true;
-        if (ImGui::SliderInt("Max Visible Rows", &browser->maxVisibleRows, 2, 20)) settingsChanged = true;
+        if (ImGui::SliderInt("Columns", &browser->columns, 1, 6)) {
+            settingsChanged = true;
+            needsResize = true;
+        }
+        if (ImGui::SliderFloat("Size", &browser->thumbnailSize, 32.0f, 128.0f)) {
+            settingsChanged = true;
+            needsResize = true;
+        }
+        if (ImGui::SliderInt("Max Visible Rows", &browser->maxVisibleRows, 2, 20)) {
+            settingsChanged = true;
+            needsResize = true;
+        }
         ImGui::Checkbox("Use Repeat", &useRepeat);
 
         int maxStart = browser->totalCount - (browser->maxVisibleRows * browser->columns);
@@ -105,48 +140,30 @@ void DrawTextureBrowser(TextureBrowser* browser) {
         }
     }
 
-    // Calculate window content area
-    ImVec2 contentMin = ImGui::GetCursorScreenPos();
-    ImVec2 windowSize = ImGui::GetWindowSize();
-    ImVec2 windowPos = ImGui::GetWindowPos();
+    // Resize window if needed
+    if (needsResize) {
+        float newSettingsHeight = 0.0f;
+        if (browser->showSettings) {
+            newSettingsHeight = 6 * ImGui::GetFrameHeight() + 5 * ImGui::GetStyle().ItemSpacing.y;
+        }
 
-    // Calculate available space for thumbnails
-    float availableHeight = windowSize.y - (ImGui::GetCursorPosY() + ImGui::GetStyle().WindowPadding.y);
-    float availableWidth = windowSize.x - (2 * ImGui::GetStyle().WindowPadding.x);
+        float newHeaderHeight = ImGui::GetFrameHeight() +
+                               ImGui::GetFrameHeight() +
+                               ImGui::GetFrameHeight() +
+                               ImGui::GetStyle().SeparatorTextPadding.y +
+                               newSettingsHeight +
+                               4 * ImGui::GetStyle().ItemSpacing.y;
 
-    // If resizing, adjust rows/columns to fit
-    if (isResizing) {
-        float padding = 4.0f;
-        int newColumns = (int)((availableWidth + padding) / (browser->thumbnailSize + padding));
-        if (newColumns < 1) newColumns = 1;
-        if (newColumns > 6) newColumns = 6;
+        float newWidth = browser->columns * browser->thumbnailSize +
+                        (browser->columns - 1) * padding +
+                        2 * windowPadding;
 
-        int newRows = (int)(availableHeight / (browser->thumbnailSize + padding));
-        if (newRows < 2) newRows = 2;
-        if (newRows > 20) newRows = 20;
+        float newHeight = newHeaderHeight +
+                         browser->maxVisibleRows * (browser->thumbnailSize + padding) - padding +
+                         2 * windowPadding;
 
-        browser->columns = newColumns;
-        browser->maxVisibleRows = newRows;
-        wasResizing = true;
-    }
-
-    // If just finished resizing, clamp window to fit perfectly
-    if (wasResizing && !isResizing) {
-        float padding = 4.0f;
-        float neededWidth = browser->columns * browser->thumbnailSize + (browser->columns - 1) * padding + 2 * ImGui::GetStyle().WindowPadding.x;
-        float neededHeight = ImGui::GetCursorPosY() + browser->maxVisibleRows * (browser->thumbnailSize + padding) + ImGui::GetStyle().WindowPadding.y;
-
-        ImGui::SetWindowSize(ImVec2(neededWidth, neededHeight));
-        wasResizing = false;
-    }
-
-    // If settings changed, resize window to fit
-    if (settingsChanged) {
-        float padding = 4.0f;
-        float neededWidth = browser->columns * browser->thumbnailSize + (browser->columns - 1) * padding + 2 * ImGui::GetStyle().WindowPadding.x;
-        float neededHeight = ImGui::GetCursorPosY() + browser->maxVisibleRows * (browser->thumbnailSize + padding) + ImGui::GetStyle().WindowPadding.y;
-
-        ImGui::SetWindowSize(ImVec2(neededWidth, neededHeight));
+        ImGui::SetWindowSize(ImVec2(newWidth, newHeight));
+        needsResize = false;
     }
 
     // Calculate tiles per page based on visible rows
@@ -295,7 +312,6 @@ void DrawTextureBrowser(TextureBrowser* browser) {
     // Render tiles
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 
-    float padding = 4.0f;
     int endIndex = browser->startIndex + browser->tilesPerPage;
     if (endIndex > browser->totalCount) endIndex = browser->totalCount;
 

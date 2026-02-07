@@ -597,7 +597,7 @@ void TilsedUpdate() {
 		texbstate->selected = datstate.curval;
 		texbstate->galnum = datstate.curval2;
 	}
-	if (IsKeyPressed(KEY_R)) {
+	if (IsKeyPressed(KEY_E)) {
 		datstate.curval = texbstate->selected;
 		datstate.curval2 = texbstate->galnum;
 		if (hoverfoc.spri >= 0) {
