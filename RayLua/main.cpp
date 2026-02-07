@@ -418,7 +418,7 @@ void InitTexBrowser() {
     texb.startIndex = 0;
     texb.thumbnailSize=84;
     texb.tilesPerPage = 63; // Show 50 at a time
-    texb.maxVisibleRows = 16; // Show 50 at a time
+    texb.maxVisibleRows = 9; // Show 50 at a time
 }
 // Profiling variables
 double luaRenderTime = 0.0;
