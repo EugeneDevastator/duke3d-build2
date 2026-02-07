@@ -46,6 +46,8 @@ extern "C" {
 //
 
 void DrawTextureBrowser(TextureBrowser* browser) {
+    if (!browser->shown)
+        return;
     int totalGals = 2;
     float dxmul = 0.4f;
     float dymul = 0.4f;

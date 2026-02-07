@@ -578,7 +578,7 @@ void LoopDrawStart() {
 
 //----------------------- tile editing
 void TilsedStart() {
-
+	texbstate->shown = true;
 }
 
 void TilsedUpdate() {
@@ -611,12 +611,15 @@ void TilsedUpdate() {
 			HOVERSEC.surf[hoverfoc.surf].galnum = datstate.curval2;
 		}
 	}
+	if (IsKeyPressed(KEY_V)) {
+		ctx.op = accept;
+	}
 }
 void TilsedAccept() {
-
+	texbstate->shown = false;
 }
 void TilsedDiscard() {
-
+	texbstate->shown = false;
 }
 
 
