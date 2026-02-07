@@ -124,7 +124,7 @@ void DrawTextureBrowser(TextureBrowser* browser) {
 
             currentCol += moveX;
             currentRow += moveY;
-
+            currentCol = Clamp(currentCol,0,browser->columns-1);
             selDelta = (currentRow * browser->columns + currentCol) - browser->selected;
             moveSelection = true;
         }
@@ -250,8 +250,7 @@ void DrawTextureBrowser(TextureBrowser* browser) {
 
     for (int i = browser->startIndex; i < endIndex; i++) {
         ImGui::PushID(i);
-        if (i>144)
-            int a =1;
+
         Texture2D tex = DumbRender::galtextures[browser->galnum][i];
         bool isValidTexture = !(tex.id == 0 || tex.width == 0 || tex.height == 0);
         bool isSelected = (browser->selected == i);
