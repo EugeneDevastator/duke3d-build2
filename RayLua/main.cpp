@@ -250,7 +250,8 @@ void DrawTextureBrowser(TextureBrowser* browser) {
 
     for (int i = browser->startIndex; i < endIndex; i++) {
         ImGui::PushID(i);
-
+        if (i>144)
+            int a =1;
         Texture2D tex = DumbRender::galtextures[browser->galnum][i];
         bool isValidTexture = !(tex.id == 0 || tex.width == 0 || tex.height == 0);
         bool isSelected = (browser->selected == i);
@@ -273,6 +274,8 @@ void DrawTextureBrowser(TextureBrowser* browser) {
             clicked = ImGui::InvisibleButton("##thumb", buttonSize);
 
             ImDrawList* drawList = ImGui::GetWindowDrawList();
+            ImVec2 btnMin = ImGui::GetItemRectMin();
+            ImVec2 btnMax = ImGui::GetItemRectMax();
 
             bool hovered = ImGui::IsItemHovered();
             bool active = ImGui::IsItemActive();
@@ -281,24 +284,21 @@ void DrawTextureBrowser(TextureBrowser* browser) {
                 hovered ? ImGuiCol_ButtonHovered :
                           ImGuiCol_Button
             );
+            drawList->AddRectFilled(btnMin, btnMax, bgCol);  // <-- this was missing
 
             float texW = (float)tex.width;
             float texH = (float)tex.height;
             ImVec2 image_topleft, image_botright;
 
             if (texW > texH) {
-                float eside = 0.5*(1-texH/texW);
+                float eside = 0.5f * (1.0f - texH / texW);
                 image_topleft  = ImVec2(0.0f, eside);
-                image_botright = ImVec2(1.0f, 1-eside);
-            } else { // H >= W
-                float eside = 0.5*(1-texW/texH);
-                image_topleft  = ImVec2( eside,0.0);
-                image_botright = ImVec2( 1-(eside),1.0);
+                image_botright = ImVec2(1.0f, 1.0f - eside);
+            } else {
+                float eside = 0.5f * (1.0f - texW / texH);
+                image_topleft  = ImVec2(eside, 0.0f);
+                image_botright = ImVec2(1.0f - eside, 1.0f);
             }
-
-            // Usage: convert normalized coords to screen coords for drawing
-            ImVec2 btnMin = ImGui::GetItemRectMin();
-            ImVec2 btnMax = ImGui::GetItemRectMax();
 
             ImVec2 imgMin = ImVec2(
                 btnMin.x + image_topleft.x * buttonSize.x,
