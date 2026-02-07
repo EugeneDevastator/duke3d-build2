@@ -165,6 +165,7 @@ econtext ctxprev;
 typedef struct {
 	signed int wal;
 	signed int wal2;
+	signed int walprev;
 	int onewall;
 	int sec;
 	int spri;
@@ -360,6 +361,7 @@ point2d secondwalldif;
 bool pg_graballverts = true;
 bool usehitZ = false;
 float savedHeight;
+Vector2 origVert;
 
 void PickgrabDiscard() {
 	if (grabfoc.spri >= 0) {
@@ -422,9 +424,8 @@ void PickgrabUpdate() {
 	} else if (ISGRABWAL) {
 		transform tmp;
 		point3d tp2;
-
-		// Wall dragging along floor/ceiling plane
-		//if (hoverfoc.wal < 0 && hoverfoc.sec >= 0)
+		bool isConstrainted = true;
+		point3d outpos;
 		{
 			// Project camera ray onto horizontal plane
 
@@ -433,7 +434,7 @@ void PickgrabUpdate() {
 			point3d ray_dir = cam->f;
 			float target_z;
 
-			if (IsKeyPressed(KEY_F))
+			if (IsKeyPressed(KEY_F)) // swap mode.
 				usehitZ = !usehitZ;
 			if (usehitZ)
 				target_z = grabfoc.hitpos.z; // floor : ceiling
@@ -454,19 +455,33 @@ void PickgrabUpdate() {
 
 			tp2.x = tmp.p.x + localp2.x;
 			tp2.y = tmp.p.y + localp2.y;
+			outpos = tmp.p;
 		}
+
+		if (isConstrainted) { // move along neighbor wallss
+			wall_t wnex = map->sect[grabfoc.sec].wall[grabfoc.wal2];
+			wall_t wprev = map->sect[grabfoc.sec].wall[grabfoc.walprev];
+			float dwn = distpoint2line2(tmp.p.x,tmp.p.y, origVert.x,origVert.y,wnex.x,wnex.y);
+			float dwp = distpoint2line2(tmp.p.x,tmp.p.y, origVert.x,origVert.y,wprev.x,wprev.y);
+			wall_t tgw = dwn<dwp ? wnex : wprev;
+			float norm = Vector2DistanceSqr(origVert, {tmp.p.x,tmp.p.y})
+			/ Vector2DistanceSqr({tgw.x,tgw.y}, {tmp.p.x,tmp.p.y});
+			Vector2 constrpos = Vector2Lerp(origVert, {tgw.x,tgw.y}, norm);
+			outpos = {constrpos.x, constrpos.y, 0};
+		}
+
 		//else {
 		//    tmp = local_to_world_transform_p(trdiff, &cam->tr);
 		//    tp2 = local_to_world_point(localp2, &cam->tr);
 		//}
 
-		map->sect[grabfoc.sec].wall[grabfoc.wal].x = tmp.p.x;
-		map->sect[grabfoc.sec].wall[grabfoc.wal].y = tmp.p.y;
+		map->sect[grabfoc.sec].wall[grabfoc.wal].x = outpos.x;
+		map->sect[grabfoc.sec].wall[grabfoc.wal].y = outpos.y;
 
 		if (pg_graballverts)
 			for (int i = 0; i < totalverts; ++i) {
-				map->sect[verts[i].s].wall[verts[i].w].x = tmp.p.x;
-				map->sect[verts[i].s].wall[verts[i].w].y = tmp.p.y;
+				map->sect[verts[i].s].wall[verts[i].w].x = outpos.x;
+				map->sect[verts[i].s].wall[verts[i].w].y = outpos.y;
 			}
 
 		// Move ahead-wall
@@ -506,7 +521,7 @@ void PickgrabStart() {
 		savedtr = cam->tr;
 		savedtr.p.x = map->sect[grabfoc.sec].wall[grabfoc.wal].x;
 		savedtr.p.y = map->sect[grabfoc.sec].wall[grabfoc.wal].y;
-
+		origVert = {savedtr.p.x,savedtr.p.y};
 		totalverts = getwallsofvert(grabfoc.sec, grabfoc.wal, verts, 256, map);
 
 		grabfoc.wal2 = map->sect[grabfoc.sec].wall[grabfoc.wal].n + grabfoc.wal;
@@ -693,6 +708,7 @@ void Editor_DoRaycasts(cam_t *cc) {
 	hoverfoc.wal2=-1;
 	if (ISHOVERWAL) {
 		hoverfoc.wal2 = mapwallnextid(hoverfoc.sec,hoverfoc.wal,map);
+		hoverfoc.walprev = wallprev(&HOVERSEC,hoverfoc.wal);
 		float z1 = getwallz(&map->sect[hoverfoc.sec], 1, hoverfoc.wal);
 		float z2 = getwallz(&map->sect[hoverfoc.sec], 1, hoverfoc.wal2);
 		float d1 = bmathdistsqrp2d({HOVERWAL.x, HOVERWAL.y}, BPXY(hoverfoc.hitpos));
