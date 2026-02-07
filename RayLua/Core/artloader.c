@@ -211,7 +211,110 @@ void CleanTiles(){
     //
 	//gotpal = 0; //Force palette to reload
 }
+void loadpic_raw(tile_t *tpic, char* rootpath, int gal_idx) {
+    long i, j, x, y, filnum, tilenum, loctile0, loctile1;
+    short *sxsiz, *sysiz;
+    unsigned char *uptr;
+    char tbuf[MAX_PATH*2];
 
+    if (gal_idx < 0 || gal_idx >= 16) return;
+
+    gallery* gal = &g_gals[gal_idx];
+    tiltyp *pic = &tpic->tt;
+
+    if (pic->f && pic->f != (long)nullpic) {
+        free((void *)pic->f);
+        pic->f = 0;
+    }
+
+    strcpy(tbuf, tpic->filnam);
+
+    // Extract tile number from filename
+    for(i=j=0;tbuf[i];i++) if (tbuf[i] == '|') j = i;
+    if (!j) { tilenum = 0; } else { tilenum = atol(&tbuf[j+1]); tbuf[j] = 0; i = j; }
+
+    if ((i >= 5) && (!stricmp(&tbuf[i-4],".ART"))) {
+        // Use gallery data
+        pic->x = g_gals[gal_idx].sizex[tilenum];
+        pic->y = g_gals[gal_idx].sizey[tilenum];
+
+        if (pic->x <= 0 || pic->y <= 0) {
+            pic->f = (long)nullpic;
+            pic->x = 4;
+            pic->y = 4;
+            pic->p = (pic->x<<2);
+            pic->lowermip = 0;
+            return;
+        }
+
+        // Find correct ART file and load pixel data
+        filnum = 0;
+        do {
+            sprintf(tbuf, "%sTILES%03d.ART", rootpath, filnum);
+            if (!kzopen(tbuf)) {
+                filnum = -1;
+                break;
+            }
+
+            kzread(tbuf,16);
+            if (*(long *)&tbuf[0] != 1) { filnum = -1; break; }
+            loctile0 = *(long *)&tbuf[8];
+            loctile1 = (*(long *)&tbuf[12])-loctile0+1;
+            i = tilenum-loctile0;
+            if ((unsigned)i < (unsigned)loctile1) { tilenum = i; break; }
+            filnum++;
+            kzclose();
+        } while (1);
+
+        if (filnum >= 0) {
+            sxsiz = (short *)_alloca(loctile1<<2);
+            sysiz = &sxsiz[loctile1];
+            kzread(sxsiz,loctile1<<2);
+            kzseek(kztell() + (loctile1<<2), SEEK_SET); // Skip picanm data
+
+            for(i=0,j=16+(loctile1<<3);i<tilenum;i++) j += ((long)sxsiz[i])*((long)sysiz[i]);
+
+            kzseek(j,SEEK_SET);
+
+            // Keep original size - no power of 2 padding
+            pic->p = (pic->x<<2);
+            pic->f = (uint32_t)malloc((pic->y+1)*pic->p+4);
+
+            // Clear the buffer first
+            memset((void*)pic->f, 0, (pic->y+1)*pic->p+4);
+
+            // Read column by column (ART format is column-major)
+            for(x=0;x<pic->x;x++) {
+                uptr = (unsigned char *)_alloca(pic->y);
+                kzread(uptr,pic->y);
+
+                // Write pixels for this column
+                for(y=0;y<pic->y;y++) {
+                    long *pixel_ptr = (long*)(pic->f + y*pic->p + (x<<2));
+                    *pixel_ptr = *(long *)&gal->globalpal[(long)uptr[y]][0];
+                }
+            }
+            kzclose();
+
+            fixtex4grou_intr((tiltyp *)pic);
+            pic->lowermip = 0;
+        }
+    } else {
+        tiltyp gtt;
+        kpzload4grou_intr(tbuf,&gtt,1.0,2);
+        pic->f = gtt.f; pic->p = gtt.p; pic->x = gtt.x; pic->y = gtt.y; pic->lowermip = gtt.lowermip;
+    }
+
+    if (!pic->f) {
+        pic->f = (long)nullpic;
+        pic->x = 4;
+        pic->y = 4;
+        pic->p = (pic->x<<2);
+        pic->lowermip = 0;
+    }
+}
+
+// this will alter texture to be multiple of 4.
 void loadpic(tile_t *tpic, char* rootpath, int gal_idx) {
 
     long i, j, x, y, filnum, tilenum, loctile0, loctile1, lnx, lny, nx, ny;
@@ -468,6 +571,7 @@ int loadgal(int gal_idx, const char* path) {
         picanm[0].asint = 0;
         arttiles = 1;
     }
+	arttiles = 1001; // HACK LIMIT for speed.
 
     // Store in gallery
     gal->sizex = tilesizx;
@@ -480,7 +584,7 @@ int loadgal(int gal_idx, const char* path) {
     gal->gtile = (tile_t*)malloc(arttiles * sizeof(tile_t))	;
     memset(gal->gtile, 0, arttiles * sizeof(tile_t));
 
-	arttiles = 1000;
+
 
     for(int i = 0; i < arttiles; i++) {
         sprintf(gal->gtile[i].filnam, "tiles000.art|%d", i);
@@ -490,7 +594,7 @@ int loadgal(int gal_idx, const char* path) {
     // Load ALL image data immediately
     for(int i = 0; i < arttiles; i++) {
         if (tilesizx[i] > 0 && tilesizy[i] > 0) {
-            loadpic(&gal->gtile[i], gal->curmappath, gal_idx);
+            loadpic_raw(&gal->gtile[i], gal->curmappath, gal_idx);
         }
     }
 
