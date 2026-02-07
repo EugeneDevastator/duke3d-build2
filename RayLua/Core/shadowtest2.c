@@ -1753,6 +1753,10 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		nw = wal[w].n + w;
 		sur = &wal[w].xsurf[0];
 
+		// here, the bug is that we can exit sector a, and then loop back to backwall. which should not be drawn because protal has moved forward.
+		// so we shouldnt draw wall, who's forwardest vertex is already behind.
+		// only reproducible in impossible spaces.
+
 		int myport = wal[w].tags[1]; // FLOOR PORTAL CHECK
 		bool isportal = myport >= 0
 		                && !noportals
