@@ -5,12 +5,14 @@
 #ifndef RAYLIB_LUA_IMGUI_UIMODELS_H
 #define RAYLIB_LUA_IMGUI_UIMODELS_H
 typedef struct {
+	bool shown;
 	int totalCount;
 	int selected;
 	int columns;
 	float thumbnailSize;
 	int startIndex;
 	int tilesPerPage;
+	int maxVisibleRows;
 	int galnum;
 	int edgeDirection;
 	int showSettings;
