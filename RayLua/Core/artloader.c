@@ -571,7 +571,7 @@ int loadgal(int gal_idx, const char* path) {
         picanm[0].asint = 0;
         arttiles = 1;
     }
-	arttiles = 1001; // HACK LIMIT for speed.
+//	arttiles = 1001; // HACK LIMIT for speed.
 
     // Store in gallery
     gal->sizex = tilesizx;

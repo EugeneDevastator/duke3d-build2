@@ -4,6 +4,7 @@
 
 #ifndef RAYLIB_LUA_IMGUI_DUMBEDIT_HPP
 #define RAYLIB_LUA_IMGUI_DUMBEDIT_HPP
+#include "Editor/ieditorhudview.h"
 #include "Editor/uimodels.h"
 static TextureBrowser *texbstate;
 static Vector3 buildToRaylibPos(point3d buildcoord) {
@@ -59,17 +60,19 @@ extern "C" {
 #define SEL_WAL 1<<2
 #define SEL_SEC 1<<3
 #define SEL_CHUNK 1<<4
+#define SEL_LOOP 1<<5
+#define SEL_UV 1<<6
 
-#define SEL_UP 1<<5
-#define SEL_DOWN 1<<6
-#define SEL_MID 1<<7
+#define SEL_UP 1<<7
+#define SEL_DOWN 1<<8
+#define SEL_MID 1<<9
 
-#define SEL_NEAR 1<<8
-#define SEL_FAR 1<<9
+#define SEL_NEAR 1<<10
+#define SEL_FAR 1<<11
 
-#define SEL_ALL 1<<10
+#define SEL_ALL 1<<12
 
-uint16_t selmode = SEL_ALL;
+uint16_t edselmode = SEL_ALL; // claude - use this.
 
 #define ISGRABSPRI (grabfoc.spri >= 0)
 #define ISGRABWAL (grabfoc.wal >= 0 && grabfoc.sec >= 0)
@@ -131,6 +134,7 @@ typedef struct {
 	enum editorop op;
 	bool hasOp;
 	estate state;
+	uint32_t selmode;
 } econtext;
 
 typedef struct {
@@ -173,11 +177,30 @@ typedef struct {
 	point3d hitpos;
 } focus_t;
 
+struct selbuffer_t {
+	std::vector<wall_idx> walls;
+	std::vector<wall_idx> caps;
+	std::vector<int> sprites;
+	std::vector<int> sectors;
+
+	void clear() {
+		walls.clear();
+		caps.clear();
+		sprites.clear();
+		sectors.clear();
+	}
+};
+
+selbuffer_t selcurrent;
+selbuffer_t selstack[10];
+
 bool hasgrab = false;
 point3d *wcursor;
 focus_t hoverfoc;
 focus_t bufferfoc;
 focus_t grabfoc;
+
+
 datedit_t datstate;
 // -------- RL Drawing funcs
 const float vertside = 0.3f;
@@ -506,7 +529,7 @@ void PickgrabUpdate() {
 			}
 
 		// Move ahead-wall todo - rework entirely leave section for verts only.
-		if (selmode & SEL_SURF) {
+		if (edselmode & SEL_SURF) {
 			map->sect[grabfoc.sec].wall[grabfoc.wal2].x = tp2.x;
 			map->sect[grabfoc.sec].wall[grabfoc.wal2].y = tp2.y;
 			for (int i = 0; i < totalverts2; ++i) {
@@ -701,6 +724,85 @@ MAKESTATE(6, Tilsed);
 
 const estate Empty = {0, empty, empty, empty, empty};
 // ----------------- MAIN
+	//Claude - implement this section
+// 1- sprites only or pickgrab anythin
+	// 2- wall verts, or entire surfs, including caps.
+	// 3- single sectors, or fine select of sector loops.
+	// 5 - uv modes.
+	// ech key toggles betwween two own options,
+	// only one option of them all is active at the time.
+	// if we are in '1' and press '2' we return to last mode that was in '2'
+void HandleSelectionModes() {
+	static uint16_t prev_selmode = SEL_ALL;
+	static uint16_t sprite_mode = SEL_SPRI;
+	static uint16_t wall_mode = SEL_WAL;
+	static uint16_t sector_mode = SEL_SEC;
+	static uint16_t uv_mode = SEL_UV;
+
+	// Store previous mode for each category
+	if (IsKeyPressed(KEY_ONE)) {
+		if (edselmode & SEL_SPRI) {
+			// Toggle between sprite only and all
+			sprite_mode = (sprite_mode == SEL_SPRI) ? (SEL_SPRI | SEL_ALL) : SEL_SPRI;
+			edselmode = sprite_mode;
+		} else {
+			edselmode = sprite_mode;
+		}
+	}
+
+	if (IsKeyPressed(KEY_TWO)) {
+		if (edselmode & (SEL_WAL | SEL_SURF)) {
+			// Toggle between vertex mode and surface mode
+			wall_mode = (wall_mode & SEL_SURF) ? SEL_WAL : (SEL_WAL | SEL_SURF);
+			edselmode = wall_mode;
+		} else {
+			edselmode = wall_mode;
+		}
+	}
+
+	if (IsKeyPressed(KEY_THREE)) {
+		if (edselmode & (SEL_SEC | SEL_LOOP)) {
+			// Toggle between single sectors and sector loops
+			sector_mode = (sector_mode & SEL_LOOP) ? SEL_SEC : (SEL_SEC | SEL_LOOP);
+			edselmode = sector_mode;
+		} else {
+			edselmode = sector_mode;
+		}
+	}
+
+	if (IsKeyPressed(KEY_FOUR)) {
+		//	if (selmode & SEL_UV) {
+		//		// Toggle UV mode variants
+		//		uv_mode = (uv_mode == SEL_UV) ? (SEL_UV | SEL_NEAR) :
+		//				 (uv_mode & SEL_NEAR) ? (SEL_UV | SEL_FAR) : SEL_UV;
+		//		selmode = uv_mode;
+		//	} else {
+		edselmode = uv_mode;
+		//	}
+	}
+	switch (edselmode) {
+		case SEL_SPRI:
+			EditorHudDrawTopInfo("Selecting: Sprites");			break;
+		case SEL_SPRI | SEL_ALL:
+			EditorHudDrawTopInfo("Selecting: Quick Any");			break;
+		case SEL_WAL:
+			EditorHudDrawTopInfo("Selecting: Wall Verts");			break;
+		case SEL_WAL | SEL_SURF:
+			EditorHudDrawTopInfo("Selecting: Surfaces");			break;
+		case SEL_SEC:
+			EditorHudDrawTopInfo("Selecting: Sectors");			break;
+		case SEL_SEC | SEL_LOOP:
+			EditorHudDrawTopInfo("Selecting: Whole Loops");			break;
+		case SEL_UV:
+			EditorHudDrawTopInfo("Selecting: UV");			break;
+		default:
+			EditorHudDrawTopInfo("Selecting: Unknown");
+			break;
+	}
+}
+
+
+
 void InitEditor(mapstate_t *m) {
 	map = m;
 	ctx.mode = Fly;
@@ -727,7 +829,7 @@ void Editor_DoRaycasts(cam_t *cc) {
 	int ispri = 0;
 	cam = cc;
 	//ctx.state.discard();// to restore original map state for raycast.
-	uint32_t castflags = RHIT_ALLNORMAL; // mark what we want to hit.
+	uint32_t castflags = RHIT_REDWALLS; // mark what we want to hit.
 	raycast(&cc->p, &cc->f, 1e32, cc->cursect, &hoverfoc.sec, &hoverfoc.wal, &hoverfoc.spri,&hoverfoc.surf, &hoverfoc.hitpos, castflags, map);
 	hoverfoc.wal2=-1;
 	if (ISHOVERWAL) {
@@ -744,8 +846,9 @@ void Editor_DoRaycasts(cam_t *cc) {
 	}
 }
 
-void EditorFrameMin(const Camera3D rlcam) {
+void EditorUpdate(const Camera3D rlcam) {
 	// process raycasts;
+	HandleSelectionModes();
 	cam3d = rlcam;
 	ctx.state.update();
 	if (ctx.state.id == Empty.id) {

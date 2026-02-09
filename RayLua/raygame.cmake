@@ -8,6 +8,7 @@ add_executable(RayGame
         MonoTest.hpp
         DumbEdit.hpp
         Editor/uimodels.h
+        Editor/ieditorhudview.
 )
 
 add_shared_definitions(RayGame)

@@ -12,6 +12,7 @@ add_executable(DukeGame
         ${C_SOURCES}
         ${DUKE_C}
         ${DUKE_H}
+        Editor/ieditorhudview.
 )
 
 add_shared_definitions(DukeGame)

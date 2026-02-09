@@ -1761,6 +1761,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		bool isportal = myport >= 0
 		                && !noportals
 		                && portals[myport].destpn >= 0
+
 		                && portals[myport].kind == PORT_WALL;
 		//&& portals[myport].surfid == w;
 		bool skipport = shadowtest2_debug_block_selfportals
