@@ -23,6 +23,7 @@
 #include "DumbRender.hpp"
 //#include "MonoTest.hpp"
 //#include "luabinder.hpp"
+// Depends
 #include "DumbCore.hpp"
 #include "DumbEdit.hpp"
 #include "MonoTest.hpp"
@@ -33,8 +34,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-
 #include "Editor/uimodels.h"
+
+// Implements
+#include "Editor/ieditorhudview.h"
+
 
 extern "C" {
 #include "Core/loaders.h"
@@ -53,13 +57,16 @@ void DrawTextureBrowser(TextureBrowser* browser) {
     float dymul = 0.4f;
     static bool useRepeat = true;
     static int galSelected[2] = {0, 0};
-    static int galStartIndex[2] = {0, 0};
+    static int galStartRow[2] = {0, 0};
     static bool needsResize = false;
 
     browser->totalCount = g_gals[browser->galnum].gnumtiles;
 
     // Calculate tiles per page from rows and columns
     int tilesPerPage = browser->maxVisibleRows * browser->columns;
+
+    // Calculate start index from start row
+    int startIndex = browser->startRow * browser->columns;
 
     // Calculate window size based on current parameters
     float padding = 4.0f;
@@ -100,7 +107,7 @@ void DrawTextureBrowser(TextureBrowser* browser) {
     // Movement operations - simple deltas
     int galDelta = 0;
     int selDelta = 0;
-    int viewDelta = 0;
+    int viewRowDelta = 0;
     bool moveSelection = false;
     bool moveView = false;
     bool settingsChanged = false;
@@ -138,10 +145,11 @@ void DrawTextureBrowser(TextureBrowser* browser) {
         }
         ImGui::Checkbox("Use Repeat", &useRepeat);
 
-        int maxStart = browser->totalCount - tilesPerPage;
-        if (maxStart < 0) maxStart = 0;
-        if (ImGui::SliderInt("Start Index", &browser->startIndex, 0, maxStart)) {
-            galStartIndex[browser->galnum] = browser->startIndex;
+        int totalRows = (browser->totalCount + browser->columns - 1) / browser->columns;
+        int maxStartRow = totalRows - browser->maxVisibleRows;
+        if (maxStartRow < 0) maxStartRow = 0;
+        if (ImGui::SliderInt("Start Row", &browser->startRow, 0, maxStartRow)) {
+            galStartRow[browser->galnum] = browser->startRow;
         }
     }
 
@@ -210,24 +218,21 @@ void DrawTextureBrowser(TextureBrowser* browser) {
         if (shiftHeld) {
             int scrollRows = (browser->maxVisibleRows + 2) / 3;
             if (scrollRows < 1) scrollRows = 1;
-            int scrollAmount = scrollRows * browser->columns;
 
-            viewDelta = scrollDirection * scrollAmount;
-            selDelta = scrollDirection * scrollAmount;
+            viewRowDelta = scrollDirection * scrollRows;
+            selDelta = scrollDirection * scrollRows * browser->columns;
             moveView = true;
             moveSelection = true;
         } else if (ctrlHeld) {
-            int currentPage = browser->startIndex / tilesPerPage;
-            int newPage = currentPage + scrollDirection;
-            viewDelta = (newPage * tilesPerPage) - browser->startIndex;
-            selDelta = browser->startIndex + viewDelta - browser->selected;
+            viewRowDelta = scrollDirection * browser->maxVisibleRows;
+            selDelta = browser->startRow * browser->columns + viewRowDelta * browser->columns - browser->selected;
             moveView = true;
             moveSelection = true;
         } else {
-            int viewStart = browser->startIndex;
-            int viewEnd = browser->startIndex + tilesPerPage - 1;
-            bool atTopEdge = (browser->selected < viewStart + browser->columns);
-            bool atBottomEdge = (browser->selected > viewEnd - browser->columns);
+            int viewStartIndex = browser->startRow * browser->columns;
+            int viewEndIndex = viewStartIndex + tilesPerPage - 1;
+            bool atTopEdge = (browser->selected < viewStartIndex + browser->columns);
+            bool atBottomEdge = (browser->selected > viewEndIndex - browser->columns);
 
             if ((scrollDirection == -1 && atTopEdge) || (scrollDirection == 1 && atBottomEdge)) {
                 selDelta = scrollDirection * browser->columns;
@@ -241,7 +246,7 @@ void DrawTextureBrowser(TextureBrowser* browser) {
     // Apply gallery change
     if (galDelta != 0) {
         galSelected[browser->galnum] = browser->selected;
-        galStartIndex[browser->galnum] = browser->startIndex;
+        galStartRow[browser->galnum] = browser->startRow;
 
         browser->galnum += galDelta;
         if (browser->galnum < 0) browser->galnum = totalGals - 1;
@@ -249,7 +254,7 @@ void DrawTextureBrowser(TextureBrowser* browser) {
 
         browser->totalCount = g_gals[browser->galnum].gnumtiles;
         browser->selected = galSelected[browser->galnum];
-        browser->startIndex = galStartIndex[browser->galnum];
+        browser->startRow = galStartRow[browser->galnum];
     }
 
     // Apply movements
@@ -257,46 +262,48 @@ void DrawTextureBrowser(TextureBrowser* browser) {
         browser->selected += selDelta;
     }
     if (moveView) {
-        browser->startIndex += viewDelta;
+        browser->startRow += viewRowDelta;
     }
 
     // Single clamping pass
     if (browser->selected < 0) browser->selected = 0;
     if (browser->selected >= browser->totalCount) browser->selected = browser->totalCount - 1;
 
-    int maxStart = browser->totalCount - tilesPerPage;
-    if (maxStart < 0) maxStart = 0;
-    if (browser->startIndex < 0) browser->startIndex = 0;
-    if (browser->startIndex > maxStart) browser->startIndex = maxStart;
+    int totalRows = (browser->totalCount + browser->columns - 1) / browser->columns;
+    int maxStartRow = totalRows - browser->maxVisibleRows;
+    if (maxStartRow < 0) maxStartRow = 0;
+    if (browser->startRow < 0) browser->startRow = 0;
+    if (browser->startRow > maxStartRow) browser->startRow = maxStartRow;
 
     // Adjust view to keep selection visible
-    int viewStart = browser->startIndex;
-    int viewEnd = browser->startIndex + tilesPerPage - 1;
+    int selectedRow = browser->selected / browser->columns;
+    int viewStartRow = browser->startRow;
+    int viewEndRow = browser->startRow + browser->maxVisibleRows - 1;
 
-    if (browser->selected < viewStart) {
-        int rowsToScroll = (viewStart - browser->selected + browser->columns - 1) / browser->columns;
-        browser->startIndex -= rowsToScroll * browser->columns;
-        if (browser->startIndex < 0) browser->startIndex = 0;
-    } else if (browser->selected > viewEnd) {
-        int rowsToScroll = (browser->selected - viewEnd + browser->columns - 1) / browser->columns;
-        browser->startIndex += rowsToScroll * browser->columns;
-        if (browser->startIndex > maxStart) browser->startIndex = maxStart;
+    if (selectedRow < viewStartRow) {
+        browser->startRow = selectedRow;
+    } else if (selectedRow > viewEndRow) {
+        browser->startRow = selectedRow - browser->maxVisibleRows + 1;
+        if (browser->startRow > maxStartRow) browser->startRow = maxStartRow;
     }
 
     // Update stored states once
     galSelected[browser->galnum] = browser->selected;
-    galStartIndex[browser->galnum] = browser->startIndex;
+    galStartRow[browser->galnum] = browser->startRow;
+
+    // Recalculate start index for display
+    startIndex = browser->startRow * browser->columns;
 
     // Display info
-    int actualEnd = browser->startIndex + tilesPerPage;
+    int actualEnd = startIndex + tilesPerPage;
     if (actualEnd > browser->totalCount) actualEnd = browser->totalCount;
 
-    int currentPage = browser->startIndex / tilesPerPage;
+    int currentPage = startIndex / tilesPerPage;
     int totalPages = (browser->totalCount + tilesPerPage - 1) / tilesPerPage;
 
     ImGui::Text("Gallery %d | Page %d/%d | Showing %d-%d of %d | Selected: %d",
                 browser->galnum, currentPage + 1, totalPages,
-                browser->startIndex + 1, actualEnd, browser->totalCount, browser->selected);
+                startIndex + 1, actualEnd, browser->totalCount, browser->selected);
     ImGui::Separator();
 
     if (browser->totalCount == 0) {
@@ -314,10 +321,10 @@ void DrawTextureBrowser(TextureBrowser* browser) {
     // Render tiles
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 
-    int endIndex = browser->startIndex + tilesPerPage;
+    int endIndex = startIndex + tilesPerPage;
     if (endIndex > browser->totalCount) endIndex = browser->totalCount;
 
-    for (int i = browser->startIndex; i < endIndex; i++) {
+    for (int i = startIndex; i < endIndex; i++) {
         ImGui::PushID(i);
 
         Texture2D tex = DumbRender::galtextures[browser->galnum][i];
@@ -398,7 +405,7 @@ void DrawTextureBrowser(TextureBrowser* browser) {
             drawList->AddText(textPos, IM_COL32(150, 150, 150, 255), "NULL");
         }
 
-        int relativeIndex = i - browser->startIndex;
+        int relativeIndex = i - startIndex;
         if ((relativeIndex + 1) % browser->columns != 0 && i < endIndex - 1) {
             ImGui::SameLine(0.0f, padding);
         }
@@ -415,7 +422,7 @@ void InitTexBrowser() {
     texb.selected=2;
     texb.totalCount=1811;
     texb.columns=7;
-    texb.startIndex = 0;
+    texb.startRow = 0;
     texb.thumbnailSize=84;
     texb.tilesPerPage = 63; // Show 50 at a time
     texb.maxVisibleRows = 9; // Show 50 at a time
@@ -772,6 +779,11 @@ void DrawInfoUI() {
     ImGui::Text("` = discard");
     ImGui::Text("L = sprite to light");
     ImGui::Text("C = pick Color");
+    ImGui::Text("1234 selmodes");
+    ImGui::Text("V tile pick");
+    ImGui::Text("G geo ops.");
+    ImGui::Text("K - temp extrude");
+
 
     if (ISGRABSPRI && GRABSPRI.flags&SPRITE_B2_IS_LIGHT) {
         ImGui::Text("IsLIGHT.");
@@ -838,6 +850,44 @@ void DrawPicker() {
         ImGui::End();
     }
 }
+
+// --------------------- infos
+static char info_message[256] = {0};
+static float info_timer = 0.0f;
+static const float INFO_DISPLAY_TIME = 3.0f;
+
+void EditorHudDrawTopInfo(const char* message) {
+    strncpy(info_message, message, sizeof(info_message) - 1);
+    info_message[sizeof(info_message) - 1] = '\0';
+    info_timer = INFO_DISPLAY_TIME;
+}
+
+void DrawInfoMessage() {
+    if (info_timer <= 0.0f) return;
+
+    info_timer -= ImGui::GetIO().DeltaTime;
+
+    ImVec2 work_pos = viewport->WorkPos;
+    ImVec2 work_size = viewport->WorkSize;
+
+    // Center horizontally at top
+    ImVec2 window_pos = ImVec2(work_pos.x + work_size.x * 0.5f, work_pos.y + 20.0f);
+    ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.5f, 0.0f));
+
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar |
+                            ImGuiWindowFlags_NoResize |
+                            ImGuiWindowFlags_NoMove |
+                            ImGuiWindowFlags_NoCollapse |
+                            ImGuiWindowFlags_AlwaysAutoResize |
+                            ImGuiWindowFlags_NoBackground |
+                            ImGuiWindowFlags_NoInputs;
+
+    ImGui::Begin("##top_info", NULL, flags);
+    ImGui::Text("%s", info_message);
+    ImGui::End();
+}
+
+// ------------------------------------
 
 /* priority orderring list
  * 0. make ap exit
@@ -913,7 +963,7 @@ void MainLoop()
         }
 #if !IS_DUKE_INCLUDED
         Editor_DoRaycasts(&localb2cam);
-        EditorFrameMin(*DumbCore::GetCamera());
+        EditorUpdate(*DumbCore::GetCamera());
 #endif
         // Render albedo pass
         BeginCustomRenderTarget(albedoTarget);
@@ -991,6 +1041,7 @@ void MainLoop()
         viewport = ImGui::GetMainViewport();
         rlImGuiBegin();
         DrawInfoUI();
+        DrawInfoMessage();
         if (showPicker) {
             DrawPicker();
             SetColorum(currentColor.r, currentColor.g, currentColor.b, currentColor.luminance);

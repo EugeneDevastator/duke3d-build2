@@ -10,7 +10,7 @@ typedef struct {
 	int selected;
 	int columns;
 	float thumbnailSize;
-	int startIndex;
+	int startRow;
 	int tilesPerPage;
 	int maxVisibleRows;
 	int galnum;
