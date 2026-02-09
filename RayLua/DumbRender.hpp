@@ -697,8 +697,11 @@ public:
 
 		const Texture2D tex = GetGalTex(eyepol[i].galnum,eyepol[i].tilnum);
 		//  BeginBlendMode(BLEND_ADDITIVE);        usedcol.w=0.3;
-		if (eyepol[i].isflor >= 0) {
-			BeginShaderMode(skyShader);
+		int surfid = eyepol[i].isflor;
+		if ((surfid >= 0)
+			&& (map->sect[eyepol[i].b2sect].surf[surfid].rendertype == parallaxcyl))
+			{
+				BeginShaderMode(skyShader);
 
 			// Set texture BEFORE setting shader values
 		//	rlActiveTextureSlot(0);

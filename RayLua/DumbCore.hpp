@@ -71,7 +71,7 @@ public:
 #if IS_DUKE_INCLUDED
         UpdateViaDuke(deltaTime);
 #else
-        if (!IsKeyDown(KEY_LEFT_SHIFT))
+     //   if (!IsKeyDown(KEY_LEFT_SHIFT))
             UpdateFreeCamera(deltaTime);
 #endif
         HandleInteraction();

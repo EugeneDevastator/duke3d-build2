@@ -70,7 +70,8 @@ extern "C" {
 #define SEL_NEAR 1<<10
 #define SEL_FAR 1<<11
 
-#define SEL_ALL 1<<12
+#define SEL_REDWALLPORTS 1<<12
+#define SEL_ALL 1<<13
 
 uint16_t edselmode = SEL_ALL; // claude - use this.
 
@@ -85,6 +86,8 @@ uint16_t edselmode = SEL_ALL; // claude - use this.
 #define GRABSPRI map->spri[grabfoc.spri]
 #define HOVERWAL HOVERSEC.wall[hoverfoc.wal]
 #define HOVERWAL2 HOVERSEC.wall[hoverfoc.wal2]
+
+// DO LAST VALID HOVER.
 
 enum editorMode {
 	Fly,
@@ -624,12 +627,12 @@ void LoopDrawUpdate() {
 		}
 		// filp loop if needed.
 		// add bool to not auto insec.
-		bool donewsec = !IsKeyPressed(KEY_LEFT_SHIFT);
+		bool alsoMakeSec = !IsKeyDown(KEY_LEFT_SHIFT);
 		int isflip = (is_loop_ccw(loopts_p2d,loopn));
 		int thiswid = sect_appendwall_loop(&map->sect[hoverfoc.sec], loopn, loopts_p2d, isflip);
 
 
-		if (donewsec) {
+		if (alsoMakeSec) {
 			int newsec = map_append_sect_from_loop(loopn, loopts_p2d, HOVERSEC.z[1], HOVERSEC.z[1] - HOVERSEC.z[0], map,
 			                                       !isflip);
 			loopinfo lithis = getLoop(loopts[0].sect, thiswid, map);
@@ -763,16 +766,19 @@ void HandleSelectionModes() {
 	static uint16_t wall_mode = SEL_WAL;
 	static uint16_t sector_mode = SEL_SEC;
 	static uint16_t uv_mode = SEL_UV;
-
+	static uint16_t redthrough = 0;
 	// Store previous mode for each category
+	if (IsKeyPressed(KEY_GRAVE)) {
+		edselmode = SEL_ALL;
+	}
 	if (IsKeyPressed(KEY_ONE)) {
-		if (edselmode & SEL_SPRI) {
-			// Toggle between sprite only and all
-			sprite_mode = (sprite_mode == SEL_SPRI) ? (SEL_SPRI | SEL_ALL) : SEL_SPRI;
+		//if (edselmode & SEL_SPRI) {
+		//	// Toggle between sprite only and all
+		//	sprite_mode = (sprite_mode == SEL_SPRI) ? (SEL_SPRI | SEL_ALL) : SEL_SPRI;
+		//	edselmode = sprite_mode;
+		//} else {
 			edselmode = sprite_mode;
-		} else {
-			edselmode = sprite_mode;
-		}
+		//}
 	}
 
 	if (IsKeyPressed(KEY_TWO)) {
@@ -805,25 +811,47 @@ void HandleSelectionModes() {
 		edselmode = uv_mode;
 		//	}
 	}
-	switch (edselmode) {
-		case SEL_SPRI:
-			EditorHudDrawTopInfo("Selecting: Sprites");			break;
-		case SEL_SPRI | SEL_ALL:
-			EditorHudDrawTopInfo("Selecting: Quick Any");			break;
-		case SEL_WAL:
-			EditorHudDrawTopInfo("Selecting: Wall Verts");			break;
-		case SEL_WAL | SEL_SURF:
-			EditorHudDrawTopInfo("Selecting: Surfaces");			break;
-		case SEL_SEC:
-			EditorHudDrawTopInfo("Selecting: Sectors");			break;
-		case SEL_SEC | SEL_LOOP:
-			EditorHudDrawTopInfo("Selecting: Whole Loops");			break;
-		case SEL_UV:
-			EditorHudDrawTopInfo("Selecting: UV");			break;
-		default:
-			EditorHudDrawTopInfo("Selecting: Unknown");
-			break;
+
+	if (IsKeyPressed(KEY_FIVE)) {
+		if (redthrough & SEL_REDWALLPORTS)
+			redthrough = 0;
+		else
+			redthrough = SEL_REDWALLPORTS;
 	}
+
+	// Clear the flag first, then set if needed
+	edselmode &= ~SEL_REDWALLPORTS;  // Clear the flag
+	edselmode |= redthrough;         // Set if redthrough has it
+
+	// Build string with +R suffix if needed
+	char seltext[64];
+	const char* basetext;
+	switch (edselmode & ~SEL_REDWALLPORTS) {
+		case SEL_SPRI:
+			basetext = "Selecting: Sprites"; break;
+		case SEL_ALL:
+			basetext = "Selecting: Quick Any"; break;
+		case SEL_WAL:
+			basetext = "Selecting: Wall Verts"; break;
+		case SEL_WAL | SEL_SURF:
+			basetext = "Selecting: Surfaces"; break;
+		case SEL_SEC:
+			basetext = "Selecting: Sectors"; break;
+		case SEL_SEC | SEL_LOOP:
+			basetext = "Selecting: Whole Loops"; break;
+		case SEL_UV:
+			basetext = "Selecting: UV"; break;
+		default:
+			basetext = "Selecting: Unknown"; break;
+	}
+
+	if (edselmode & SEL_REDWALLPORTS) {
+		snprintf(seltext, sizeof(seltext), "%s +R", basetext);
+		EditorHudDrawTopInfo(seltext);
+	} else {
+		EditorHudDrawTopInfo(basetext);
+	}
+
 }
 
 
@@ -854,7 +882,9 @@ void Editor_DoRaycasts(cam_t *cc) {
 	int ispri = 0;
 	cam = cc;
 	//ctx.state.discard();// to restore original map state for raycast.
-	uint32_t castflags = RHIT_REDWALLS; // mark what we want to hit.
+	uint32_t castflags = 0; // mark what we want to hit.
+	if (edselmode & SEL_REDWALLPORTS)
+		castflags |= RHIT_REDWALLS;
 	raycast(&cc->p, &cc->f, 1e32, cc->cursect, &hoverfoc.sec, &hoverfoc.wal, &hoverfoc.spri,&hoverfoc.surf, &hoverfoc.hitpos, castflags, map);
 	hoverfoc.wal2=-1;
 	if (ISHOVERWAL) {

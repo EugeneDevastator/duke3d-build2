@@ -363,6 +363,7 @@ typedef struct {
 	enum srenderType rtype;
 	enum renderQ rq;
 	bool isdblside;
+	// need some geometry flags for build, like do we skip, emit mask etc. could be better than just transparency.
 	float uv[8]; // scalexy, panxy, cropAB
 	point3d anchor; // normalized
 	point3d color;
@@ -402,7 +403,7 @@ typedef struct // surf_t
 	// wtez is second skew vector, originating at v end. by default parallel to u. but can be inverted for trapezoid map.
 	uint8_t uvmapkind; // uv amappings, regular, polar, hex, flipped variants etc. paralax.
 	uint8_t tilingkind; // normal, polar, hex etc.
-
+	enum frenderType rendertype;
 // ------------
 	unsigned short asc, rsc, gsc, bsc; //4096 is no change
 
