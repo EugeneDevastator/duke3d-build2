@@ -571,7 +571,7 @@ int loadgal(int gal_idx, const char* path) {
         picanm[0].asint = 0;
         arttiles = 1;
     }
-//	arttiles = 1001; // HACK LIMIT for speed.
+	arttiles = 1001; // HACK LIMIT for speed.
 
     // Store in gallery
     gal->sizex = tilesizx;
@@ -583,8 +583,6 @@ int loadgal(int gal_idx, const char* path) {
     // Initialize tile array
     gal->gtile = (tile_t*)malloc(arttiles * sizeof(tile_t))	;
     memset(gal->gtile, 0, arttiles * sizeof(tile_t));
-
-
 
     for(int i = 0; i < arttiles; i++) {
         sprintf(gal->gtile[i].filnam, "tiles000.art|%d", i);

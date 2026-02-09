@@ -1181,7 +1181,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 						}
 					}
 
-					upgradewallportchain(i,j,map);
+					map_wall_regen_nsw_chain(i,j,map);
 
 					int nwid = walp->n + j;
 					int curwalid = j;

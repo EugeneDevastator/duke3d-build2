@@ -133,7 +133,7 @@ int splitwallat(int sid, int wid, point3d pos, mapstate_t *map) {
 
     // Upgrade chains for all new walls
     for (int idx = 0; idx < new_count; idx++) {
-        upgradewallportchain(new_sectors[idx], new_walls[idx], map);
+        map_wall_regen_nsw_chain(new_sectors[idx], new_walls[idx], map);
     }
 
   //  checknextwalls_imp(map);
@@ -141,7 +141,24 @@ int splitwallat(int sid, int wid, point3d pos, mapstate_t *map) {
     return j;
 }
 
- // TODO: Implement point-on-wall checking
+void map_loop_reversewalls(wall_t *wal, int n) {
+	wall_t twal;
+	int i, j, k, n0, n1;
+
+	for(i=j=0;j<n;j++)
+	{
+		if (wal[j].n >= 0) continue;
+		for(k=((j-i-1)>>1);k>=0;k--) //reverse loop wal[i<=?<=j].x&y (CW <-> CCW)
+		{
+			n0 = wal[i+k].n; n1 = wal[j-k].n;
+			twal = wal[i+k]; wal[i+k] = wal[j-k]; wal[j-k] = twal;
+			wal[i+k].n = n0; wal[j-k].n = n1;
+		}
+		i = j+1;
+	}
+}
+
+// TODO: Implement point-on-wall checking
 int is_point_on_wall(point3d pos, int sid, int wid, mapstate_t *map, float tolerance) {
     // Check if pos lies on the line segment defined by wall wid in sector sid
     // Return 1 if on wall, 0 if not
@@ -770,8 +787,31 @@ void makewall(wall_t *w, int8_t wid, int8_t nwid) {
 	w->nwchain = -1;
 	w->n = nwid - wid;
 }
+// helper function to join same loop with inverted one.
+// assume that indices are not mixed.
+int map_loops_join(loopinfo li1, loopinfo li2, mapstate_t *map) {
+	if (li1.nwalls != li2.nwalls)
+		return -1;
 
-int appendsect(mapstate_t *map, int nwalls) {
+	map->sect[li1.sect].wall[li1.wallids[0]].ns = li2.sect; // ns = next sector
+	map->sect[li1.sect].wall[li1.wallids[0]].nw = li2.wallids[li2.nwalls]; // ns = next sector
+
+	int totalInLoop = li1.nwalls;
+	for (int i = 0; i < totalInLoop; i++) {
+		int counterid = totalInLoop-1-i-1;
+		if (counterid == -1) counterid = totalInLoop-1;
+		map->sect[li1.sect].wall[li1.wallids[i]].ns = li2.sect; // ns = next sector
+		map->sect[li1.sect].wall[li1.wallids[i]].nw = li2.wallids[counterid]; // ns = next sector
+		map->sect[li2.sect].wall[li2.wallids[i]].ns = li1.sect; // ns = next sector
+		map->sect[li2.sect].wall[li2.wallids[i]].nw = li1.wallids[counterid]; // ns = next sector
+	}
+	// second pass when all walls are linked.
+	for (int i = 0; i < totalInLoop; i++) {
+		map_wall_regen_nsw_chain(li1.sect,li1.wallids[i],map); // will autopick next wall;
+	}
+}
+
+int map_append_sect(mapstate_t *map, int nwalls) {
 	int i = map->numsects;
 	if (map->numsects+1 >= map->malsects) {
 		map->malsects = max(map->numsects+1,map->malsects << 1);
@@ -786,7 +826,7 @@ int appendsect(mapstate_t *map, int nwalls) {
 	return i;
 }
 
-int appendwalls(sect_t *sec, int nwalls) {
+int sect_append_walls(sect_t *sec, int nwalls) {
 	int i = sec->n;
 	if (sec->n + nwalls >= sec->nmax) {
 		sec->nmax = max(sec->n + nwalls, sec->nmax << 1);
@@ -797,14 +837,17 @@ int appendwalls(sect_t *sec, int nwalls) {
 	return i;
 }
 
-int appendwall_loop(sect_t *sec, int nwalls, point2d *coords) {
-	int start_idx = appendwalls(sec, nwalls);
+//returns start wall index of this loop
+int sect_appendwall_loop(sect_t *sec, int nwalls, point2d *coords, int invert) {
+	int start_idx = sect_append_walls(sec, nwalls);
 
 	// Set up wall coordinates and loop linking
 	for (int i = 0; i < nwalls; i++) {
 		int wall_idx = start_idx + i;
-		sec->wall[wall_idx].x = coords[i].x;
-		sec->wall[wall_idx].y = coords[i].y;
+		int coord_idx = invert ? (nwalls - 1 - i) : i;
+
+		sec->wall[wall_idx].x = coords[coord_idx].x;
+		sec->wall[wall_idx].y = coords[coord_idx].y;
 
 		if (i == nwalls - 1) {
 			// Last wall points back to start of loop (negative offset)
@@ -818,20 +861,16 @@ int appendwall_loop(sect_t *sec, int nwalls, point2d *coords) {
 	}
 	return start_idx;
 }
-
-int addsectfromloop(int nwalls, point2d *coords, float floorz, float height, mapstate_t *map) {
-	int nsec = appendsect(map,0);
-	sect_t *s  =&map->sect[nsec];
-	appendwall_loop(s,nwalls, coords);
+int map_append_sect_from_loop(int nwalls, point2d *coords, float floorz, float height, mapstate_t *map, int invert) {
+	int nsec = map_append_sect(map,0);
+	sect_t *s = &map->sect[nsec];
+	sect_appendwall_loop(s, nwalls, coords, invert);
 	s->surf[0] = makeSurfCap();
 	s->surf[1] = s->surf[0];
-	s->z[0]=floorz-height;
-	s->z[1]=floorz;
-	s->destpn[0]=-1;
-	s->destpn[1]=-1;
-	//s->grad[0].x=0.5;
-	//s->grad[0].y=0.5;
-	//s->grad[1]= s->grad[0];
+	s->z[0] = floorz - height;
+	s->z[1] = floorz;
+	s->destpn[0] = -1;
+	s->destpn[1] = -1;
 	return nsec;
 }
 
@@ -1295,9 +1334,9 @@ int updatesect_portmove(transform *tr, int *cursect, mapstate_t *map) {
 	}
 	return 0;
 }
-
-void upgradewallportchain(int startwal_sec, int startwal_idx, mapstate_t *map) {
-    wall_t *startwal = &map->sect[startwal_sec].wall[startwal_idx];
+// regenerates innate portal chain for touching walls.
+void map_wall_regen_nsw_chain(int start_sec, int start_wal, mapstate_t *map) {
+    wall_t *startwal = &map->sect[start_sec].wall[start_wal];
     if (startwal->ns < 0)
         return;
 
@@ -1309,9 +1348,9 @@ void upgradewallportchain(int startwal_sec, int startwal_idx, mapstate_t *map) {
     vertlist_t chain_walls[32];
     int chain_count = 0;
 
-    int current_s = startwal_sec;
-    int current_w = startwal_idx;
-    int start_s = startwal_sec;
+    int current_s = start_sec;
+    int current_w = start_wal;
+    int start_s = start_sec;
 
     do {
         chain_walls[chain_count].s = current_s;
@@ -1336,8 +1375,8 @@ void upgradewallportchain(int startwal_sec, int startwal_idx, mapstate_t *map) {
         if (startwal->ns >= 0) {
             wall_t *target_wall = &map->sect[startwal->ns].wall[startwal->nw];
             if (target_wall->nschain < 0) {  // Only if not already set
-                target_wall->nschain = startwal_sec;
-                target_wall->nwchain = startwal_idx;
+                target_wall->nschain = start_sec;
+                target_wall->nwchain = start_wal;
             }
         }
     } else {

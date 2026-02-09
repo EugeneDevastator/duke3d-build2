@@ -53,6 +53,13 @@ typedef struct {
 	float persp_v;
 } cam_t;
 
+typedef struct {
+	long sect;
+	long startwall;
+	int nwalls;
+	uint16_t wallids[256];
+} loopinfo;
+
 
 #endif
 typedef struct { int w, s; } wall_idx;
@@ -132,14 +139,45 @@ surf_t makeSurfWall(int w1, int wnex);
 surf_t makeSurfCap();
 void makewall(wall_t* w, int8_t wid , int8_t nwid);
 
-int appendsect(mapstate_t *map, int nwalls);
+static inline loopinfo getLoop(int secid, int startwal, mapstate_t* map) {
+	loopinfo result = {0};
+	sect_t* sect = &map->sect[secid];
 
-int appendwalls(sect_t *sec, int nwalls);
+	// First pass - count walls
+	int wid = sect->wall[startwal].n + startwal;
+	int count = 1;
+	while (wid != startwal) {
+		count++;
+		wid = sect->wall[wid].n + wid;
+	}
+
+	// Allocate memory for wall IDs
+	result.sect = secid;
+	result.startwall = startwal;
+	result.nwalls = count;
+
+	// Second pass - fill wall IDs
+	result.wallids[0] = startwal;
+	wid = sect->wall[startwal].n + startwal;
+	int i = 1;
+	while (wid != startwal) {
+		result.wallids[i] = wid;
+		i++;
+		wid = sect->wall[wid].n + wid;
+	}
+	return result;
+}
+
+int map_loops_join(loopinfo li1, loopinfo li2, mapstate_t *map);
+
+int map_append_sect(mapstate_t *map, int nwalls);
+
+int sect_append_walls(sect_t *sec, int nwalls);
 
 // outer loop is CW, inner is CCW
-int appendwall_loop(sect_t *sec, int nwalls, point2d* coords);
+int sect_appendwall_loop(sect_t *sec, int nwalls, point2d* coords, int invert);
 
-int addsectfromloop(int nwalls, point2d *coords, float floorz, float height, mapstate_t *map);
+int map_append_sect_from_loop(int nwalls, point2d *coords, float floorz, float height, mapstate_t *map, int invert);
 
 void makeslabuvform(int surfid, float slabH, wall_t *wal, int dukescales[4], int tilesize[2]);
 int splitwallat(int sid, int wid, point3d pos, mapstate_t* map);
@@ -180,6 +218,7 @@ static long wallclip (dpoint3d *pol, dpoint3d npol[4])
 	npol[2] = pol[2];
 	return(3);
 }
+void map_loop_reversewalls (wall_t *wal, int n);
 
 //Split complex polygon by line. Returns complex polygon.
 // owal[],on: input wall list
@@ -281,7 +320,7 @@ int insidesect (double x, double y, wall_t *wal, int w);
 
 // first pass updatesect to ONLY check nearest + portals.
 int updatesect_portmove(transform *tr, int *cursect, mapstate_t *map);
-void upgradewallportchain(int startwal_sec,int startwal_idx, mapstate_t *map);
+void map_wall_regen_nsw_chain(int start_sec,int start_wal, mapstate_t *map);
 
 int getwalls_chain(int s, int w, vertlist_t *ver, int maxverts, mapstate_t *map);
 
@@ -445,7 +484,7 @@ static void checksprisect_imp (int s, mapstate_t *map)
 //Find centroid of polygon (algo copied from TAGPNT2.BAS 09/14/2006)
 static void getcentroid (wall_t *wal, int n, float *retcx, float *retcy);
 
-static float getarea (wall_t *wal, int n);
+float getarea(wall_t *wal, int n);
 
 static void delwall_imp (sect_t *s, int w, mapstate_t* map)
 {

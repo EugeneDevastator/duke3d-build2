@@ -581,9 +581,20 @@ void PickgrabStart() {
 
 // ----------------------- draw loop OPER ---------------------
 loopt loopts[100];
-point2d loopts_p3d[100];
+point2d loopts_p2d[100];
 int loopn = 0;
+int is_loop_ccw(point2d* points, int count) {
+	if (count < 3) return 1; // Not a valid polygon and dont flip it then. could be 2-wal tempor.
 
+	double signed_area = 0.0;
+
+	for (int i = 0; i < count; i++) {
+		int next = (i + 1) % count;
+		signed_area += (points[next].x - points[i].x) * (points[next].y + points[i].y);
+	}
+
+	return signed_area < 0; // CCW if negative, CW if positive
+}
 void LoopDrawUpdate() {
 	if (IsKeyPressed(KEY_THREE) && loopn == 1) {
 		long s = mapspriteadd(loopts[0].sect, loopts[0].pos, map);
@@ -609,10 +620,24 @@ void LoopDrawUpdate() {
 
 	if (IsKeyPressed(KEY_T)) {
 		for (int i = 0; i < loopn; ++i) {
-			loopts_p3d[i] = {loopts[i].pos.x, loopts[i].pos.y};
+			loopts_p2d[i] = {loopts[i].pos.x, loopts[i].pos.y};
 		}
-		appendwall_loop(&map->sect[hoverfoc.sec], loopn, loopts_p3d);
+		// filp loop if needed.
+		// add bool to not auto insec.
+		bool donewsec = !IsKeyPressed(KEY_LEFT_SHIFT);
+		int isflip = (is_loop_ccw(loopts_p2d,loopn));
+		int thiswid = sect_appendwall_loop(&map->sect[hoverfoc.sec], loopn, loopts_p2d, isflip);
+
+
+		if (donewsec) {
+			int newsec = map_append_sect_from_loop(loopn, loopts_p2d, HOVERSEC.z[1], HOVERSEC.z[1] - HOVERSEC.z[0], map,
+			                                       !isflip);
+			loopinfo lithis = getLoop(loopts[0].sect, thiswid, map);
+			loopinfo linew = getLoop(newsec, 0, map);
+			int res = map_loops_join(lithis, linew, map);
+		}
 		loopn = 0;
+
 		ctx.op = accept;
 	}
 
@@ -904,7 +929,7 @@ void EditorUpdate(const Camera3D rlcam) {
 				}
 				float height = capr * 0.2;
 				point2d loop[4] = {p0, p1, p2, p3};
-				int nsid = addsectfromloop(4, loop, florz, height, map);
+				int nsid = map_append_sect_from_loop(4, loop, florz, height, map,0);
 				sect_t *sec = &map->sect[nsid];
 				sec->wall[0].xsurf[0].tilnum = HOVERWAL.xsurf[0].tilnum;
 				sec->wall[1].xsurf[0].tilnum = HOVERWAL.xsurf[0].tilnum;
@@ -938,7 +963,7 @@ void EditorUpdate(const Camera3D rlcam) {
 					HOVERWAL.xsurf[2] = HOVERWAL.xsurf[0];
 				} else {
 					// Multiple sectors case - upgrade existing chain first
-					upgradewallportchain(hoverfoc.sec, hoverfoc.wal, map);
+					map_wall_regen_nsw_chain(hoverfoc.sec, hoverfoc.wal, map);
 
 					// Get existing chain using new method
 					vertlist_t existing_chain[32];
@@ -1082,6 +1107,12 @@ void DrawGizmos() {
 		else
 			usefoc = grabfoc;
 		if (usefoc.sec<0)
+			return;
+		if (usefoc.onewall >=map->sect[usefoc.sec].n)
+			return;
+		if (usefoc.wal >=map->sect[usefoc.sec].n)
+			return;
+		if (usefoc.wal2 >=map->sect[usefoc.sec].n)
 			return;
 		drawVert(usefoc.sec, usefoc.wal);
 		drawVert(usefoc.sec, usefoc.wal2);
