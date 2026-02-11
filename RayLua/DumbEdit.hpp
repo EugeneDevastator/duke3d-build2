@@ -744,23 +744,17 @@ void WallDrawAccept() {
     int entry_point_A = -1, entry_point_C = -1;
     float snap_dist = 1.0f;
 
-    // Find wall closest to start point (A)
     for (int w = 0; w < sect->n; w++) {
         float dx = sect->wall[w].x - loopts[0].pos.x;
         float dy = sect->wall[w].y - loopts[0].pos.y;
-        if (dx*dx + dy*dy < snap_dist) {
+        if (dx*dx + dy*dy < snap_dist && entry_point_A < 0) {
             entry_point_A = w;
-            break;
         }
-    }
 
-    // Find wall closest to end point (C)
-    for (int w = 0; w < sect->n; w++) {
-        float dx = sect->wall[w].x - loopts[loopn-1].pos.x;
-        float dy = sect->wall[w].y - loopts[loopn-1].pos.y;
-        if (dx*dx + dy*dy < snap_dist) {
+        dx = sect->wall[w].x - loopts[loopn-1].pos.x;
+        dy = sect->wall[w].y - loopts[loopn-1].pos.y;
+        if (dx*dx + dy*dy < snap_dist && entry_point_C < 0) {
             entry_point_C = w;
-            break;
         }
     }
 
@@ -770,89 +764,47 @@ void WallDrawAccept() {
         return;
     }
 
-    // Store what entry points originally pointed to
-    int A_next = sect->wall[entry_point_A].n;
-    int C_next = sect->wall[entry_point_C].n;
+	int walAprev = wallprev(sect, entry_point_A);
+	int walCprev = wallprev(sect, entry_point_C);
 
-    // Ensure we have space for new walls: segments * 2
+	// all is important that we link Wal_A -> B C -> prev_C;
+	// Wal_C -> B' A' -> prev_A;
+
+    // Ensure we have space for new walls: (loopn-1) * 2 walls
     int new_walls_count = (loopn - 1) * 2;
     if (sect->n + new_walls_count > sect->nmax) {
         sect->nmax = sect->n + new_walls_count + 8;
         sect->wall = (wall_t*)realloc(sect->wall, sect->nmax * sizeof(wall_t));
     }
 
-    int original_n = sect->n;
-// Outer walls normally go into CCW order.
-	// inner in CW.
-    // Add forward path: A, B, C
-    int forward_start = sect->n;
-    for (int i = 0; i < loopn - 1; i++) {
-        wall_t *new_wall = &sect->wall[sect->n];
-        makewall(new_wall, sect->n, sect->n + 1);
-        new_wall->x = loopts[i].pos.x;
-        new_wall->y = loopts[i].pos.y;
-        new_wall->ns = target_sect;
-        new_wall->nw = sect->n + (loopn - 1) + (loopn - 2 - i); // point to mirror
-        new_wall->owner = -1;
-        sect->n++;
-    }
+    // claude - write here new linking
 
-    // Add backward path: C', B', A'
-    int backward_start = sect->n;
-    for (int i = loopn - 1; i > 0; i--) {
-        wall_t *new_wall = &sect->wall[sect->n];
-        makewall(new_wall, sect->n, sect->n + 1);
-        new_wall->x = loopts[i].pos.x;
-        new_wall->y = loopts[i].pos.y;
-        new_wall->ns = target_sect;
-        new_wall->nw = forward_start + (loopn - 1 - i); // point to mirror
-        new_wall->owner = -1;
-        sect->n++;
-    }
 
-    // Now link the chains:
-    // entry_point_A -> forward_start (A)
-    sect->wall[entry_point_A].n = forward_start - entry_point_A;
-
-    // last forward wall (C) -> backward_start (C')
-    sect->wall[forward_start + loopn - 2].n = backward_start - (forward_start + loopn - 2);
-
-    // entry_point_C -> backward_start (C')
-    sect->wall[entry_point_C].n = backward_start - entry_point_C;
-
-    // last backward wall (A') -> A_next (original continuation from A)
-    sect->wall[sect->n - 1].n = (entry_point_A + A_next) - (sect->n - 1);
-
-    // Check for sector splitting by traversing loops
+	// claude - update following code for variables
+    // Check for sector splitting by traversing from first_entry
     bool needs_split = true;
-
-    // Traverse from entry_point_A and see if we reach entry_point_C
-    int w = entry_point_A;
+    w = first_entry;
     int steps = 0;
     do {
         w = mapwallnextid(target_sect, w, map);
         steps++;
-        if (w == entry_point_C) {
+        if (w == second_entry) {
             needs_split = false;
             break;
         }
-    } while (w != entry_point_A && steps < sect->n * 2);
+    } while (w != first_entry && steps < sect->n * 2);
 
     if (needs_split) {
-        // Split sector: separate the two loops
-        // Count walls in each loop
-        int loop1_count = 0, loop2_count = 0;
-
-        // Count loop starting from entry_point_A
-        w = entry_point_A;
+        // Create split - count walls in each loop and separate smaller one
+        int loop1_count = 0;
+        w = first_entry;
         do {
             loop1_count++;
             w = mapwallnextid(target_sect, w, map);
-        } while (w != entry_point_A && loop1_count < sect->n);
+        } while (w != first_entry && loop1_count < sect->n);
 
-        loop2_count = sect->n - loop1_count;
+        int loop2_count = sect->n - loop1_count;
 
-        // Create new sector for smaller loop
         if (loop1_count < loop2_count) {
             int new_sect = map_append_sect(map, loop1_count + 4);
             if (new_sect >= 0) {
@@ -861,26 +813,23 @@ void WallDrawAccept() {
                 new_sector->wall = (wall_t*)malloc(new_sector->nmax * sizeof(wall_t));
                 new_sector->n = 0;
 
-                // Copy loop1 to new sector
-                w = entry_point_A;
+                // Copy smaller loop to new sector
+                w = first_entry;
                 do {
                     new_sector->wall[new_sector->n] = sect->wall[w];
                     makewall(&new_sector->wall[new_sector->n], new_sector->n, new_sector->n + 1);
                     new_sector->wall[new_sector->n].x = sect->wall[w].x;
                     new_sector->wall[new_sector->n].y = sect->wall[w].y;
                     new_sector->n++;
-
-                    // Mark original for deletion
-                    sect->wall[w].owner = -2;
+                    sect->wall[w].owner = -2; // mark for deletion
                     w = mapwallnextid(target_sect, w, map);
-                } while (w != entry_point_A && new_sector->n < loop1_count);
+                } while (w != first_entry && new_sector->n < loop1_count);
 
-                // Fix last wall in new sector
                 if (new_sector->n > 0) {
                     new_sector->wall[new_sector->n - 1].n = -(new_sector->n - 1);
                 }
 
-                // Compact original sector (remove marked walls)
+                // Compact original sector
                 int write_pos = 0;
                 for (int r = 0; r < sect->n; r++) {
                     if (sect->wall[r].owner != -2) {
@@ -892,7 +841,7 @@ void WallDrawAccept() {
                 }
                 sect->n = write_pos;
 
-                // Fix remaining sector wall connections
+                // Fix remaining walls
                 if (sect->n > 0) {
                     for (int i = 0; i < sect->n - 1; i++) {
                         sect->wall[i].n = 1;
