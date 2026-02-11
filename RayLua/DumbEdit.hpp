@@ -711,8 +711,315 @@ void TilsedDiscard() {
 	texbstate->shown = false;
 }
 
+// ------------------ B-Cutter
+void WallDrawDiscard() {
+	loopn = 0;
+	K_ACCEPT = KEY_SPACE;
+}
+void WallDrawAccept() {
+    if (loopn < 2) {
+        WallDrawDiscard();
+        return;
+    }
 
+    // Find correct sector by scanning midpoint of first segment
+    point3d midpoint = {
+        (loopts[0].pos.x + loopts[1].pos.x) * 0.5f,
+        (loopts[0].pos.y + loopts[1].pos.y) * 0.5f,
+        (loopts[0].pos.z + loopts[1].pos.z) * 0.5f
+    };
 
+    int target_sect = -1;
+	updatesect_p(midpoint,&target_sect,map);
+
+    if (target_sect < 0) {
+        EditorHudDrawTopInfo("No sector found at midpoint");
+        WallDrawDiscard();
+        return;
+    }
+
+    sect_t *sect = &map->sect[target_sect];
+
+    // Find wall indices by coordinates for start and end points
+    int start_wall = -1, end_wall = -1;
+    float snap_dist = 1.0f;
+
+    for (int w = 0; w < sect->n; w++) {
+        wall_t *wall = &sect->wall[w];
+
+        // Check start point
+        float dx = wall->x - loopts[0].pos.x;
+        float dy = wall->y - loopts[0].pos.y;
+        if (dx*dx + dy*dy < snap_dist && start_wall < 0) {
+            start_wall = w;
+        }
+
+        // Check end point
+        dx = wall->x - loopts[loopn-1].pos.x;
+        dy = wall->y - loopts[loopn-1].pos.y;
+        if (dx*dx + dy*dy < snap_dist && end_wall < 0) {
+            end_wall = w;
+        }
+    }
+
+    // If no exact wall matches, find closest walls to line endpoints
+    if (start_wall < 0 || end_wall < 0) {
+        for (int w = 0; w < sect->n; w++) {
+            wall_t *wall = &sect->wall[w];
+            int next_w = mapwallnextid(target_sect, w, map);
+            wall_t *next_wall = &sect->wall[next_w];
+
+            if (start_wall < 0) {
+                float d = distpoint2line2(loopts[0].pos.x, loopts[0].pos.y,
+                                        wall->x, wall->y, next_wall->x, next_wall->y);
+                if (d < 2.0f) start_wall = w;
+            }
+
+            if (end_wall < 0) {
+                float d = distpoint2line2(loopts[loopn-1].pos.x, loopts[loopn-1].pos.y,
+                                        wall->x, wall->y, next_wall->x, next_wall->y);
+                if (d < 2.0f) end_wall = w;
+            }
+        }
+    }
+
+    if (start_wall < 0 || end_wall < 0) {
+        EditorHudDrawTopInfo("Could not find wall insertion points");
+        WallDrawDiscard();
+        return;
+    }
+
+    // Remember original state
+    int saved_n = sect->n;
+    int start_next = sect->wall[start_wall].n;
+
+    // Ensure we have space for new walls
+    int new_walls_count = (loopn - 1) * 2;
+    if (sect->n + new_walls_count > sect->nmax) {
+        sect->nmax = sect->n + new_walls_count + 8;
+        sect->wall = (wall_t*)realloc(sect->wall, sect->nmax * sizeof(wall_t));
+    }
+
+    // Add forward path walls
+    int forward_start = sect->n;
+    for (int i = 0; i < loopn - 1; i++) {
+        wall_t *new_wall = &sect->wall[sect->n];
+        memset(new_wall, 0, sizeof(wall_t));
+        new_wall->x = loopts[i].pos.x;
+        new_wall->y = loopts[i].pos.y;
+        new_wall->n = 1;
+        new_wall->ns = target_sect; // point to same sector
+        new_wall->nw = sect->n + (loopn - 1) + (loopn - 2 - i); // point to mirror wall
+        new_wall->owner = -1;
+        sect->n++;
+    }
+
+    // Add backward path walls
+    int backward_start = sect->n;
+    for (int i = loopn - 1; i > 0; i--) {
+        wall_t *new_wall = &sect->wall[sect->n];
+        memset(new_wall, 0, sizeof(wall_t));
+        new_wall->x = loopts[i].pos.x;
+        new_wall->y = loopts[i].pos.y;
+        new_wall->n = 1;
+        new_wall->ns = target_sect; // point to same sector
+        new_wall->nw = forward_start + (loopn - 1 - i); // point to mirror wall
+        new_wall->owner = -1;
+        sect->n++;
+    }
+
+    // Fix wall connections
+    sect->wall[start_wall].n = forward_start - start_wall;
+    sect->wall[sect->n - 1].n = (start_wall + start_next) - (sect->n - 1);
+
+    // Check for sector splitting
+    // Traverse from start_wall and see if we encounter any backward path walls
+    bool needs_split = true;
+    int w = start_wall;
+    int steps = 0;
+
+    do {
+        w = mapwallnextid(target_sect, w, map);
+        steps++;
+
+        // If we hit any backward path wall, no split needed
+        if (w >= backward_start && w < sect->n) {
+            needs_split = false;
+            break;
+        }
+
+        // Safety check
+        if (steps > sect->n) break;
+
+    } while (w != start_wall);
+
+    if (needs_split) {
+        // Count walls in each loop to decide which to separate
+        int loop1_count = 0, loop2_count = 0;
+
+        // Count loop1 (from start_wall, including forward path)
+        w = start_wall;
+        do {
+            loop1_count++;
+            w = mapwallnextid(target_sect, w, map);
+        } while (w != start_wall && loop1_count < sect->n);
+
+        loop2_count = sect->n - loop1_count;
+
+        // Separate the smaller loop into new sector
+        if (loop1_count < loop2_count) {
+            // Create new sector from loop1
+            int new_sect = map_append_sect(map,loop1_count + 4);
+            if (new_sect >= 0) {
+                sect_t *new_sector = &map->sect[new_sect];
+                *new_sector = *sect; // Copy properties
+                new_sector->wall = (wall_t*)malloc(new_sector->nmax * sizeof(wall_t));
+
+                // Copy loop1 walls
+                w = start_wall;
+                do {
+                    new_sector->wall[new_sector->n] = sect->wall[w];
+                    new_sector->wall[new_sector->n].n = 1;
+                    w = mapwallnextid(target_sect, w, map);
+                } while (w != start_wall && new_sector->n < loop1_count);
+
+                // Fix last wall
+                if (new_sector->n > 0) {
+                    new_sector->wall[new_sector->n - 1].n = -(new_sector->n - 1);
+                }
+
+                // Remove loop1 walls from original sector
+                // This is complex, so for now just mark them as deleted
+                w = start_wall;
+                do {
+                    sect->wall[w].owner = -2; // Mark for deletion
+                    w = mapwallnextid(target_sect, w, map);
+                } while (w != start_wall);
+
+                // Compact original sector
+                int write_pos = 0;
+                for (int r = 0; r < sect->n; r++) {
+                    if (sect->wall[r].owner != -2) {
+                        if (write_pos != r) {
+                            sect->wall[write_pos] = sect->wall[r];
+                        }
+                        write_pos++;
+                    }
+                }
+                sect->n = write_pos;
+
+                // Fix wall connections in remaining sector
+                if (sect->n > 0) {
+                    for (int i = 0; i < sect->n - 1; i++) {
+                        sect->wall[i].n = 1;
+                    }
+                    sect->wall[sect->n - 1].n = -(sect->n - 1);
+                }
+            }
+        }
+    }
+
+    checksprisect_imp(-1, map);
+    loopn = 0;
+    ctx.op = accept;
+}
+
+void WallDrawStart() {
+	loopn = 0;
+	K_ACCEPT = KEY_E;
+
+	// Add first point immediately like LoopDraw does
+	if (ISHOVERWAL) {
+		loopts[0].sect = hoverfoc.sec;
+		loopts[0].wal = hoverfoc.onewall;
+		loopts[0].pos.x = map->sect[hoverfoc.sec].wall[hoverfoc.onewall].x;
+		loopts[0].pos.y = map->sect[hoverfoc.sec].wall[hoverfoc.onewall].y;
+		loopts[0].pos.z = hoverfoc.hitpos.z;
+		loopn = 1;
+	} else if (ISHOVERCAP) {
+		loopts[0].sect = hoverfoc.sec;
+		loopts[0].wal = hoverfoc.surf;
+		loopts[0].pos = hoverfoc.hitpos;
+		loopn = 1;
+	}
+}
+
+void WallDrawUpdate() {
+    if (IsKeyPressed(KEY_SPACE)) {
+        if (loopn < 100) {
+            point3d add_pos = hoverfoc.hitpos;
+
+            // Snap to wall vertices if close enough
+            if (ISHOVERWAL) {
+                wall_t *w1 = &map->sect[hoverfoc.sec].wall[hoverfoc.wal];
+                wall_t *w2 = &map->sect[hoverfoc.sec].wall[hoverfoc.wal2];
+
+                float d1 = (hoverfoc.hitpos.x - w1->x) * (hoverfoc.hitpos.x - w1->x) +
+                          (hoverfoc.hitpos.y - w1->y) * (hoverfoc.hitpos.y - w1->y);
+                float d2 = (hoverfoc.hitpos.x - w2->x) * (hoverfoc.hitpos.x - w2->x) +
+                          (hoverfoc.hitpos.y - w2->y) * (hoverfoc.hitpos.y - w2->y);
+
+                if (d1 < 4.0f) {
+                    add_pos.x = w1->x;
+                    add_pos.y = w1->y;
+                } else if (d2 < 4.0f) {
+                    add_pos.x = w2->x;
+                    add_pos.y = w2->y;
+                }
+            }
+
+            loopts[loopn].sect = hoverfoc.sec >= 0 ? hoverfoc.sec : -1;
+            loopts[loopn].wal = hoverfoc.wal;
+            loopts[loopn].pos = add_pos;
+            loopn++;
+        }
+    }
+
+    if (IsKeyPressed(KEY_R)) {
+        if (loopn > 0) loopn--;
+    }
+
+    // E key - auto-connect to hovered wall and finish
+    if (IsKeyPressed(KEY_E)) {
+        if (ISHOVERWAL && loopn >= 1) {
+            // Add connection point
+            wall_t *w1 = &map->sect[hoverfoc.sec].wall[hoverfoc.wal];
+            wall_t *w2 = &map->sect[hoverfoc.sec].wall[hoverfoc.wal2];
+
+            float d1 = (hoverfoc.hitpos.x - w1->x) * (hoverfoc.hitpos.x - w1->x) +
+                      (hoverfoc.hitpos.y - w1->y) * (hoverfoc.hitpos.y - w1->y);
+            float d2 = (hoverfoc.hitpos.x - w2->x) * (hoverfoc.hitpos.x - w2->x) +
+                      (hoverfoc.hitpos.y - w2->y) * (hoverfoc.hitpos.y - w2->y);
+
+            if (d1 < d2) {
+                loopts[loopn].pos.x = w1->x;
+                loopts[loopn].pos.y = w1->y;
+                loopts[loopn].wal = hoverfoc.wal;
+            } else {
+                loopts[loopn].pos.x = w2->x;
+                loopts[loopn].pos.y = w2->y;
+                loopts[loopn].wal = hoverfoc.wal2;
+            }
+            loopts[loopn].pos.z = hoverfoc.hitpos.z;
+            loopts[loopn].sect = hoverfoc.sec;
+            loopn++;
+        }
+
+        // Immediately accept
+        WallDrawAccept();
+        return;
+    }
+
+    // Auto-close check
+    if (loopn > 2) {
+        float dx = hoverfoc.hitpos.x - loopts[0].pos.x;
+        float dy = hoverfoc.hitpos.y - loopts[0].pos.y;
+        if (dx*dx + dy*dy < 4.0f) {
+            WallDrawAccept();
+            return;
+        }
+    }
+}
 // ----------------------- MOVE OPER ---------------------
 point3d savedpos;
 
@@ -749,6 +1056,8 @@ const estate FlyState = {1, MoveObjContextStart, MoveObjContextUpdate, MoveObjCo
 MAKESTATE(5, LoopDraw);
 MAKESTATE(4, Pickgrab);
 MAKESTATE(6, Tilsed);
+// Keep original state name
+MAKESTATE(8, WallDraw);
 
 const estate Empty = {0, empty, empty, empty, empty};
 // ----------------- MAIN
@@ -924,7 +1233,13 @@ void EditorUpdate(const Camera3D rlcam) {
 			datstate.op = dTiles;
 			ctx.state = TilsedState;
 			ctx.state.start();
-		} else {
+		}
+		// Add to Empty state in EditorUpdate:
+		else if (IsKeyPressed(KEY_B)) {
+			ctx.state = WallDrawState;
+			ctx.state.start();
+		}
+		else {
 			datstate.op=dNone;
 			if (IsKeyPressed(KEY_K)) { // EXTRUDE PROTOTYPE
 				point2d p0 = HOVERWAL.pos;
@@ -1132,7 +1447,7 @@ void DrawGizmos() {
 	focus_t usefoc;
 
 	if (ISHOVERWAL || ctx.state.id != Empty.id) {
-		if (ctx.state.id == Empty.id)
+		if (ctx.state.id == Empty.id || ctx.state.id == WallDrawState.id)
 			usefoc = hoverfoc;
 		else
 			usefoc = grabfoc;
