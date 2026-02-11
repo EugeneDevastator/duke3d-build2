@@ -742,7 +742,7 @@ void WallDrawAccept() {
 
     // Find entry points by coordinates
     int entry_point_A = -1, entry_point_C = -1;
-    float snap_dist = 1.0f;
+    float snap_dist = 0.001f;
 
     for (int w = 0; w < sect->n; w++) {
         float dx = sect->wall[w].x - loopts[0].pos.x;
@@ -764,11 +764,12 @@ void WallDrawAccept() {
         return;
     }
 
-	int walAprev = wallprev(sect, entry_point_A);
-	int walCprev = wallprev(sect, entry_point_C);
+    int walAprev = wallprev(sect, entry_point_A);
+    int walCprev = wallprev(sect, entry_point_C);
 
-	// all is important that we link Wal_A -> B C -> prev_C;
-	// Wal_C -> B' A' -> prev_A;
+    // Store original connections
+    int A_next = sect->wall[entry_point_A].n;
+    int C_next = sect->wall[entry_point_C].n;
 
     // Ensure we have space for new walls: (loopn-1) * 2 walls
     int new_walls_count = (loopn - 1) * 2;
@@ -776,32 +777,75 @@ void WallDrawAccept() {
         sect->nmax = sect->n + new_walls_count + 8;
         sect->wall = (wall_t*)realloc(sect->wall, sect->nmax * sizeof(wall_t));
     }
+ // Aprev - A B
+	// dprev -> C' B'
+    // Add forward path: A->B->C (skip first and last points, they're existing walls)
+    int forward_start = sect->n;
+    for (int i = 0; i <= loopn - 2; i++) {
+        wall_t *new_wall = &sect->wall[sect->n];
+        makewall(new_wall, sect->n, sect->n + 1);
+        new_wall->x = loopts[i].pos.x;
+        new_wall->y = loopts[i].pos.y;
+        new_wall->ns = target_sect;
+        new_wall->owner = -1;
+        sect->n++;
+    }
 
-    // claude - write here new linking
+    // Add backward path: WAL_C->B'->A' - aprev (reverse order, skip endpoints)
+    int backward_start = sect->n;
+    for (int i = loopn - 1; i >= 1; i--) {
+        wall_t *new_wall = &sect->wall[sect->n];
+        makewall(new_wall, sect->n, sect->n + 1);
+        new_wall->x = loopts[i].pos.x;
+        new_wall->y = loopts[i].pos.y;
+        new_wall->ns = target_sect;
+        new_wall->owner = -1;
+        sect->n++;
+    }
 
+    // Set up mirror wall connections
+    int one_side_count = loopn-1;
+	// all is important that we link Wal_A -> B C -> prev_C;
 
-	// claude - update following code for variables
-    // Check for sector splitting by traversing from first_entry
+	// Add forward path: A->B->C (skip first and last points, they're existing walls)
+
+	// Aprev - A B
+	// dprev -> C' B'
+	sect->wall[walAprev].n = forward_start - walAprev;
+	int newC = backward_start-1;
+	sect->wall[newC].n = entry_point_C - newC;
+	// link Wal_C -> B' A' -> prev_A;
+	// backward start is B'
+	sect->wall[walCprev].n = backward_start - walCprev;
+	// A' is last.
+	sect->wall[sect->n-1].n = entry_point_A-(sect->n-1);
+
+    for (int i = 0; i < one_side_count; i++) {
+        sect->wall[forward_start + i].nw = backward_start + (one_side_count - 1 - i);
+        sect->wall[backward_start + (one_side_count - 1 - i)].nw = forward_start + i;
+    }
+
+    // Check for sector splitting by traversing from entry_point_A
     bool needs_split = true;
-    w = first_entry;
+    int w = entry_point_A;
     int steps = 0;
     do {
         w = mapwallnextid(target_sect, w, map);
         steps++;
-        if (w == second_entry) {
+        if (w == entry_point_C) {
             needs_split = false;
             break;
         }
-    } while (w != first_entry && steps < sect->n * 2);
+    } while (w != entry_point_A && steps < sect->n * 2);
 
     if (needs_split) {
         // Create split - count walls in each loop and separate smaller one
         int loop1_count = 0;
-        w = first_entry;
+        w = entry_point_A;
         do {
             loop1_count++;
             w = mapwallnextid(target_sect, w, map);
-        } while (w != first_entry && loop1_count < sect->n);
+        } while (w != entry_point_A && loop1_count < sect->n);
 
         int loop2_count = sect->n - loop1_count;
 
@@ -814,7 +858,7 @@ void WallDrawAccept() {
                 new_sector->n = 0;
 
                 // Copy smaller loop to new sector
-                w = first_entry;
+                w = entry_point_A;
                 do {
                     new_sector->wall[new_sector->n] = sect->wall[w];
                     makewall(&new_sector->wall[new_sector->n], new_sector->n, new_sector->n + 1);
@@ -823,7 +867,7 @@ void WallDrawAccept() {
                     new_sector->n++;
                     sect->wall[w].owner = -2; // mark for deletion
                     w = mapwallnextid(target_sect, w, map);
-                } while (w != first_entry && new_sector->n < loop1_count);
+                } while (w != entry_point_A && new_sector->n < loop1_count);
 
                 if (new_sector->n > 0) {
                     new_sector->wall[new_sector->n - 1].n = -(new_sector->n - 1);
@@ -858,6 +902,7 @@ void WallDrawAccept() {
 }
 
 
+
 void WallDrawStart() {
 	loopn = 0;
 	K_ACCEPT = KEY_E;
@@ -870,11 +915,8 @@ void WallDrawStart() {
 		loopts[0].pos.y = map->sect[hoverfoc.sec].wall[hoverfoc.onewall].y;
 		loopts[0].pos.z = hoverfoc.hitpos.z;
 		loopn = 1;
-	} else if (ISHOVERCAP) {
-		loopts[0].sect = hoverfoc.sec;
-		loopts[0].wal = hoverfoc.surf;
-		loopts[0].pos = hoverfoc.hitpos;
-		loopn = 1;
+	} else {
+		ctx.op = discard;
 	}
 }
 
@@ -916,43 +958,30 @@ void WallDrawUpdate() {
     // E key - auto-connect to hovered wall and finish
     if (IsKeyPressed(KEY_B)) {
         if (ISHOVERWAL && loopn >= 1) {
-            // Add connection point
-            wall_t *w1 = &map->sect[hoverfoc.sec].wall[hoverfoc.wal];
-            wall_t *w2 = &map->sect[hoverfoc.sec].wall[hoverfoc.wal2];
-
-            float d1 = (hoverfoc.hitpos.x - w1->x) * (hoverfoc.hitpos.x - w1->x) +
-                      (hoverfoc.hitpos.y - w1->y) * (hoverfoc.hitpos.y - w1->y);
-            float d2 = (hoverfoc.hitpos.x - w2->x) * (hoverfoc.hitpos.x - w2->x) +
-                      (hoverfoc.hitpos.y - w2->y) * (hoverfoc.hitpos.y - w2->y);
-
-            if (d1 < d2) {
-                loopts[loopn].pos.x = w1->x;
-                loopts[loopn].pos.y = w1->y;
-                loopts[loopn].wal = hoverfoc.wal;
-            } else {
-                loopts[loopn].pos.x = w2->x;
-                loopts[loopn].pos.y = w2->y;
-                loopts[loopn].wal = hoverfoc.wal2;
-            }
-            loopts[loopn].pos.z = hoverfoc.hitpos.z;
-            loopts[loopn].sect = hoverfoc.sec;
-            loopn++;
+        	if (ISHOVERWAL) {
+        		loopts[loopn].sect = hoverfoc.sec;
+        		loopts[loopn].wal = hoverfoc.onewall;
+        		loopts[loopn].pos.x = map->sect[hoverfoc.sec].wall[hoverfoc.onewall].x;
+        		loopts[loopn].pos.y = map->sect[hoverfoc.sec].wall[hoverfoc.onewall].y;
+        		loopts[loopn].pos.z = hoverfoc.hitpos.z;
+        		loopn++;
+        		WallDrawAccept();
+        	}
         }
-
         // Immediately accept
-        WallDrawAccept();
         return;
     }
 
     // Auto-close check
-    if (loopn > 2) {
-        float dx = hoverfoc.hitpos.x - loopts[0].pos.x;
-        float dy = hoverfoc.hitpos.y - loopts[0].pos.y;
-        if (dx*dx + dy*dy < 4.0f) {
-            WallDrawAccept();
-            return;
-        }
-    }
+   //if (loopn > 2) {
+   //    float dx = hoverfoc.hitpos.x - loopts[0].pos.x;
+   //    float dy = hoverfoc.hitpos.y - loopts[0].pos.y;
+   //    if (dx*dx + dy*dy < 4.0f) {
+
+   //        WallDrawAccept();
+   //        return;
+   //    }
+   //}
 }
 // ----------------------- MOVE OPER ---------------------
 point3d savedpos;
