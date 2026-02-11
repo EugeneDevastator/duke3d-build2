@@ -197,6 +197,8 @@ free((arena).data); \
 
 #define SURF_PARALLAX_DISCARD (1<<16) // marker for old build style parallax mode.
 
+#define GEO_NO_BUNCHING (1<<1)
+
 #define UV_TEXELRATE 		0 // pixel-rated = duke default.
 #define UV_NORMRATE 		1 // tile-rated
 #define UV_TEXELFIT 		2 // fit preserving texelrate
@@ -444,6 +446,7 @@ typedef struct // wall t
 	long owner; //for dragging while editing, other effects during game
 
 	uint8_t surfn;
+	uint8_t geoflags;
 	surf_t surf, xsurf[3]; //additional malloced surfs when (surfn > 1)
 	uint16_t mflags[4]; // modflags
 	int32_t tags[16]; // standard tag is 4bytes
@@ -536,4 +539,6 @@ typedef struct
 #define MAXLIGHTS 256
 	int light_spri[MAXLIGHTS], light_sprinum;
 } mapstate_t;
+
+#define pBREAKSBUNCH .flags & SURF_PARALLAX_DISCARD
 #endif //RAYLIB_LUA_IMGUI_SHARED_TYPES_H
