@@ -1173,7 +1173,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 			{
 				for (j = 0; j < sec[i].n; j++) {
 					wall_t *walp = &sec[i].wall[j];
-
+					walp->geoflags = 0;
 					// duke-style parallax surf marking;
 					if (walp->ns >=0) {
 						for (int isf=0;isf<2;isf++) {
@@ -1183,6 +1183,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 								(sec[walp->ns].surf[isf].flags & SURF_PARALLAX_DISCARD)) {
 								walp->xsurf[isf*2].flags |= SURF_PARALLAX_DISCARD;
 								walp->xsurf[isf*2].rendertype = parallaxcyl;
+								walp->geoflags |= GEO_NO_BUNCHING;
 							}
 						}
 					}

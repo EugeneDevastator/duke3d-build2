@@ -31,6 +31,11 @@
 #define USESSE2 0
 #define USENEWLIGHT 1 //FIXFIXFIX
 #define USEGAMMAHACK 1 //FIXFIXFIX
+int shadowtest2_backface_cull = 0; // Toggle backface culling
+int shadowtest2_distance_cull = 0; // Toggle distance-based culling
+int shadowtest2_debug_walls = 1; // Verbose wall logging
+int shadowtest2_debug_block_selfportals = 1; // Verbose wall logging
+static bool st2_use_parallax_discards = 1; // Verbose wall logging
 
 int renderinterp = 1;
 int compact2d = 0;
@@ -229,11 +234,7 @@ int intersect_traps_mono_points3d(dpoint3d p0, dpoint3d p1, dpoint3d trap1[4], d
 	);
 }
 
-int shadowtest2_backface_cull = 0; // Toggle backface culling
-int shadowtest2_distance_cull = 0; // Toggle distance-based culling
-int shadowtest2_debug_walls = 1; // Verbose wall logging
-int shadowtest2_debug_block_selfportals = 1; // Verbose wall logging
-static bool st2_use_parallax_discards = 0; // Verbose wall logging
+
 
 //--------------------------------------------------------------------------------------------------
 static tiletype gdd;
@@ -521,6 +522,11 @@ static int bunchfront(int b0, int b1, int fixsplitnow, bdrawctx *b) {
 	return (3);
 }
 
+// WALL BUNCHING ALGORITHM
+// Groups adjacent coplanar walls into "bunches" for efficient rendering
+// Each bunch represents a continuous span of walls that can be drawn together
+// This reduces draw calls and enables efficient floor/ceiling polygon generation
+
 static void scansector(int sectnum, bdrawctx *b) {
 	cam_t gcam = b->cam;
 
@@ -537,10 +543,23 @@ static void scansector(int sectnum, bdrawctx *b) {
 	sec = &curMap->sect[sectnum];
 	wal = sec->wall;
 
+
+	// PHASE 1: WALL PROCESSING & INITIAL BUNCHING
+	// Iterate through all walls in sector, performing:
+	// - Back-face culling (skip walls facing away from camera)
+	// - Near-plane clipping (clip walls too close to camera)
+	// - Bunch formation (group adjacent walls into rendering spans)
+
+	// TODO: make continious progression of front plane
+	// render only things that have at least point in front of the last min front clipping plane.
 	obunchn = b->bunchn;
 	realobunchn = b->bunchn;
 	for (i = 0, ie = sec->n; i < ie; i++) {
 		j = wal[i].n + i;
+
+		// Check nobunch flag - if set, skip bunching for this wall
+		// this interestingly works by discarding sector from outside.n
+		//if (wal[i].geoflags & GEO_NO_BUNCHING) goto docont;
 
 		double zzz = getwallz(sec, 1, i);
 		dpoint3d wp = {wal[i].x, wal[i].y, zzz};
@@ -571,7 +590,7 @@ static void scansector(int sectnum, bdrawctx *b) {
 		}
 
 		k = b->bunch[b->bunchn - 1].wal1;
-		if ((b->bunchn > obunchn) && (wal[k].n + k == i) && (b->bunch[b->bunchn - 1].fra1 == 1.0)) {
+		if ((b->bunchn > obunchn) && (wal[k].n + k == i) && (b->bunch[b->bunchn - 1].fra1 == 1.0) && !(wal[i].geoflags & GEO_NO_BUNCHING)) {
 			b->bunch[b->bunchn - 1].wal1 = i; //continue from previous wall (typical case)
 			b->bunch[b->bunchn - 1].fra1 = f1;
 			if ((b->bunchn - 1 > obunchn) && (b->bunch[obunchn].wal0 == j) && (b->bunch[obunchn].fra0 == 0.0)) {
@@ -579,10 +598,11 @@ static void scansector(int sectnum, bdrawctx *b) {
 				b->bunch[obunchn].wal0 = b->bunch[b->bunchn].wal0;
 				b->bunch[obunchn].fra0 = b->bunch[b->bunchn].fra0;
 			}
-		} else if ((b->bunchn > obunchn) && (b->bunch[obunchn].wal0 == j) && (b->bunch[obunchn].fra0 == 0.0)) {
+		} else if ((b->bunchn > obunchn) && (b->bunch[obunchn].wal0 == j) && (b->bunch[obunchn].fra0 == 0.0) && !(wal[i].geoflags & GEO_NO_BUNCHING)) {
 			b->bunch[obunchn].wal0 = i; //update left side of 1st bunch on loop
 			b->bunch[obunchn].fra0 = f0;
 		} else {
+			// Start new bunch (this handles nobunch walls by forcing new bunch creation)
 			if (b->bunchn >= b->bunchmal) {
 				b->bunchmal <<= 1;
 				b->bunch = (bunch_t *) realloc(b->bunch, b->bunchmal * sizeof(b->bunch[0]));
@@ -590,7 +610,7 @@ static void scansector(int sectnum, bdrawctx *b) {
 				b->bunchgrid = (unsigned char *) realloc(b->bunchgrid, ((b->bunchmal - 1) * b->bunchmal) >> 1);
 			}
 			b->bunch[b->bunchn].wal0 = i;
-			b->bunch[b->bunchn].fra0 = f0; //start new b->bunch
+			b->bunch[b->bunchn].fra0 = f0; //start new bunch
 			b->bunch[b->bunchn].wal1 = i;
 			b->bunch[b->bunchn].fra1 = f1;
 			b->bunch[b->bunchn].sec = sectnum;
@@ -599,6 +619,9 @@ static void scansector(int sectnum, bdrawctx *b) {
 	docont:;
 		if (j < i) obunchn = b->bunchn;
 	}
+	// PHASE 2: DEPTH SORTING & BUNCH INTERSECTION RESOLUTION
+	// For each newly created bunch, determine rendering order relative to existing bunches
+	// Uses geometric intersection tests to build depth-sorting grid
 
 	for (obunchn = realobunchn; obunchn < b->bunchn; obunchn++) {
 		//insert bunch
@@ -613,6 +636,10 @@ static void scansector(int sectnum, bdrawctx *b) {
 		j = (((obunchn - 1) * obunchn) >> 1);
 		b->bfintn = 0;
 		for (i = 0; i < obunchn; i++) b->bunchgrid[j + i] = bunchfront(obunchn, i, 1, b);
+
+		// PHASE 3: BUNCH SPLITTING
+		// If intersections found, split current bunch at intersection points
+		// This resolves depth-sorting conflicts by creating smaller, non-intersecting bunches
 
 		if (!b->bfintn) continue;
 
