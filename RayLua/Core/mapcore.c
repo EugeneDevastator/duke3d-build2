@@ -1494,7 +1494,7 @@ int map_sect_remove_loop_data(int sect_id, int any_wall_id, mapstate_t *map) {
     sect_t *sec = &map->sect[sect_id];
 
     // Get the loop to remove
-    loopinfo remove_loop = getLoop(sect_id, any_wall_id, map);
+    loopinfo remove_loop = map_sect_get_loopinfo(sect_id, any_wall_id, map);
 
     // Calculate new wall count
     int new_wall_count = sec->n - remove_loop.nwalls;
@@ -1520,7 +1520,7 @@ int map_sect_remove_loop_data(int sect_id, int any_wall_id, mapstate_t *map) {
         if (processed[start_wall]) continue;
 
         // Get this loop
-        loopinfo keep_loop = getLoop(sect_id, start_wall, map);
+        loopinfo keep_loop = map_sect_get_loopinfo(sect_id, start_wall, map);
 
         // Copy walls from this loop
         for (int i = 0; i < keep_loop.nwalls; i++) {
@@ -1566,7 +1566,7 @@ sector_loops_t map_sect_get_loops(int sect_id, mapstate_t *map) {
 	for (int w = 0; w < sec->n; w++) {
 		if (processed[w]) continue;
 
-		result.loops[result.loop_count] = getLoop(sect_id, w, map);
+		result.loops[result.loop_count] = map_sect_get_loopinfo(sect_id, w, map);
 
 		// Mark all walls in this loop as processed
 		for (int i = 0; i < result.loops[result.loop_count].nwalls; i++) {
@@ -1649,7 +1649,7 @@ int map_sect_destroy_loop(int sect_id, int loop_wall_id, mapstate_t *map) {
 }
 
 int map_sect_extract_loop_to_new_sector(int origin_sect, int loop_wall_id, mapstate_t *map) {
-	loopinfo extract_loop = getLoop(origin_sect, loop_wall_id, map);
+	loopinfo extract_loop = map_sect_get_loopinfo(origin_sect, loop_wall_id, map);
 	sect_t *orig_sec = &map->sect[origin_sect];
 
 	// Create new sector
@@ -1694,8 +1694,8 @@ int map_sect_extract_loop_to_new_sector(int origin_sect, int loop_wall_id, mapst
 
 int map_sect_chip_off_smaller_loop(int origin_sect, int entry_point_A, int entry_point_C, mapstate_t *map) {
 	// Count walls in each potential loop
-	loopinfo loop1 = getLoop(origin_sect, entry_point_A, map);
-	loopinfo loop2 = getLoop(origin_sect, entry_point_C, map);
+	loopinfo loop1 = map_sect_get_loopinfo(origin_sect, entry_point_A, map);
+	loopinfo loop2 = map_sect_get_loopinfo(origin_sect, entry_point_C, map);
 
 	// Determine which loop is smaller (inner loop)
 	int chip_wall_id = (loop1.nwalls < loop2.nwalls) ? entry_point_A : entry_point_C;
@@ -1716,7 +1716,7 @@ int map_sect_chip_off_smaller_loop(int origin_sect, int entry_point_A, int entry
 
 int map_sect_chip_off_loop(int origin_sect, int wal, mapstate_t *map) {
 	// Count walls in each potential loop
-	loopinfo loop1 = getLoop(origin_sect, wal, map);
+	loopinfo loop1 = map_sect_get_loopinfo(origin_sect, wal, map);
 
 	// Determine which loop is smaller (inner loop)
 	int chip_wall_id = wal;
@@ -1736,7 +1736,7 @@ int map_sect_chip_off_loop(int origin_sect, int wal, mapstate_t *map) {
 }
 
 int duplicate_loop_to_new_sector(int origin_sect, int loop_wall_id, mapstate_t *map, remap_table_t *remap) {
-	loopinfo extract_loop = getLoop(origin_sect, loop_wall_id, map);
+	loopinfo extract_loop = map_sect_get_loopinfo(origin_sect, loop_wall_id, map);
 	sect_t *orig_sec = &map->sect[origin_sect];
 
 	int new_sect_id = map_append_sect(map, extract_loop.nwalls);

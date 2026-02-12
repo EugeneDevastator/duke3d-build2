@@ -149,7 +149,7 @@ surf_t makeSurfWall(int w1, int wnex);
 surf_t makeSurfCap();
 void makewall(wall_t* w, int8_t wid , int8_t nwid);
 
-static inline loopinfo getLoop(int secid, int startwal, mapstate_t* map) {
+static inline loopinfo map_sect_get_loopinfo(int secid, int startwal, mapstate_t* map) {
 	loopinfo result = {0};
 	sect_t* sect = &map->sect[secid];
 

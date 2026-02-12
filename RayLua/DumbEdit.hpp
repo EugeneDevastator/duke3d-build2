@@ -295,10 +295,7 @@ void drawVert(int sec, int w) {
 	}
 }
 
-void drawCylBoard(Vector3 origin, Vector3 localUp, float length, float width) {
-}
-
-void drawCylBoard(Vector3 origin, Vector3 endpoint, float width) {
+void drawCylBoard2(Vector3 origin, Vector3 endpoint, float width, float width2) {
 	rlSetTexture(0);
 	rlDisableDepthTest();
 	rlDisableDepthMask();
@@ -348,14 +345,15 @@ void drawCylBoard(Vector3 origin, Vector3 endpoint, float width) {
 	rlMultMatrixf(MatrixToFloat(transform));
 
 	float hw = width * 0.5f;
+	float hw2 = width2 * 0.5f;
 
 	rlBegin(RL_QUADS);
 
 	// Main quad (front face, XY plane at Z=0, facing +Z toward camera)
 	rlVertex3f(-hw, 0, 0);
 	rlVertex3f(hw, 0, 0);
-	rlVertex3f(hw, length, 0);
-	rlVertex3f(-hw, length, 0);
+	rlVertex3f(hw2, length, 0);
+	rlVertex3f(-hw2, length, 0);
 
 	// Origin end cap (at Y=0, XZ plane, extends along +Z)
 	rlVertex3f(-hw, 0, 0);
@@ -364,16 +362,21 @@ void drawCylBoard(Vector3 origin, Vector3 endpoint, float width) {
 	rlVertex3f(hw, 0, 0);
 
 	// Endpoint end cap (at Y=length, XZ plane, extends along +Z)
-	rlVertex3f(hw, length, 0);
-	rlVertex3f(hw, length, hw);
-	rlVertex3f(-hw, length, hw);
-	rlVertex3f(-hw, length, 0);
+	rlVertex3f(hw2, length, 0);
+	rlVertex3f(hw2, length, hw2);
+	rlVertex3f(-hw2, length, hw2);
+	rlVertex3f(-hw2, length, 0);
 
 	rlEnd();
 
 	rlPopMatrix();
 }
-
+void drawCylBoardLen(Vector3 origin, Vector3 localUp, float length, float width) {
+	drawCylBoard2( origin,  origin+localUp*length,  width,  width);
+}
+void drawCylBoard(Vector3 origin, Vector3 endpoint, float width) {
+	drawCylBoard2( origin,  endpoint,  width,  width);
+}
 // ------------------ PICKGRAB
 transform savedtr;
 point3d localp1;
@@ -635,8 +638,8 @@ void LoopDrawUpdate() {
 		if (alsoMakeSec) {
 			int newsec = map_append_sect_from_loop(loopn, loopts_p2d, HOVERSEC.z[1], HOVERSEC.z[1] - HOVERSEC.z[0], map,
 			                                       !isflip);
-			loopinfo lithis = getLoop(loopts[0].sect, thiswid, map);
-			loopinfo linew = getLoop(newsec, 0, map);
+			loopinfo lithis = map_sect_get_loopinfo(loopts[0].sect, thiswid, map);
+			loopinfo linew = map_sect_get_loopinfo(newsec, 0, map);
 			int res = map_loops_join_mirrored(lithis, linew, map);
 		}
 		loopn = 0;
@@ -711,7 +714,7 @@ void TilsedDiscard() {
 	texbstate->shown = false;
 }
 
-// ------------------ B-Cutter
+// ------------------ B-Cutter --------------------------------
 void WallDrawDiscard() {
 	loopn = 0;
 	K_ACCEPT = KEY_SPACE;
@@ -788,6 +791,8 @@ void WallDrawAccept() {
 		new_wall->owner = -1;
 		sect->n++;
 	}
+	int last_of_forward = sect->n-1;
+	sect->wall[last_of_forward].n = entry_point_A - (last_of_forward);
 
 	// Add backward path: WAL_C->B'->A' - aprev (reverse order, skip endpoints)
 	int backward_start = sect->n;
@@ -801,10 +806,10 @@ void WallDrawAccept() {
 		new_wall->owner = -1;
 		sect->n++;
 	}
-
+	int last_of_backward = sect->n-1;
+	sect->wall[last_of_backward].n = entry_point_C - (last_of_backward);
 	// Set up mirror wall connections
 	int one_side_count = loopn - 1;
-	// all is important that we link Wal_A -> B C -> prev_C;
 
 	// Add forward path: A->B->C (skip first and last points, they're existing walls)
 
@@ -813,11 +818,11 @@ void WallDrawAccept() {
 	// aprev to A chain
 	sect->wall[walAprev].n = forward_start - walAprev;
 	// last in A chain to wall c
-	int newC = forward_start + one_side_count-1;
+	int newC = backward_start-1;
 	sect->wall[newC].n = entry_point_C - newC;
 	// cprev to c' chain
 	sect->wall[walCprev].n = backward_start - walCprev;
-	int newA = backward_start+one_side_count-1;
+	int newA = sect->n-1;
 	sect->wall[newA].n = entry_point_A - newA;
 	// link newly added walls.
 	for (int i = 0; i < one_side_count; i++) {
@@ -845,22 +850,12 @@ printf("needs split = %o", needs_split);
 		int loop1_count = 0;
 		int loop2_count = 0;
 
-		// Count first loop from entry_point_A to entry_point_C
-		w = entry_point_A;
-		do {
-			loop1_count++;
-			printf("%i",w);
-			w = mapwallnextid(origin_sect, w, map);
-		} while (w != entry_point_A);
-		printf("loop1_count = %i", loop1_count);
-
-		w = walAprev;
-		do {
-			loop2_count++;
-			printf("%i",w);
-			w = mapwallnextid(origin_sect, w, map);
-		} while (w != walAprev);
-		printf("loop2_count = %i", loop2_count);
+		// getting into infinite loops here
+		loopinfo l1 = map_sect_get_loopinfo(origin_sect, entry_point_A, map);
+		loopinfo l2 = map_sect_get_loopinfo(origin_sect, walAprev, map);
+loop1_count = l1.nwalls;
+loop1_count = l2.nwalls;
+		printf("loop_counts = %i, %i of %i", loop1_count, loop2_count, map->sect[origin_sect].n);
 		int decidedcount = loop1_count < loop2_count ? loop1_count : loop2_count;
 		int chipwall = loop1_count < loop2_count ? entry_point_A : walAprev;
 		int res = map_sect_chip_off_loop_clean(origin_sect,chipwall, map);
@@ -1460,6 +1455,20 @@ void DrawGizmos() {
 		Vector3 rlp2 = {w->x, -z2 + 0.1f, w->y};
 		rlColor4ub(255, 128, 128, 255);
 		drawCylBoard(rlp1, rlp2, 0.1f);
+		// draw loop.
+		loopinfo cloop = map_sect_get_loopinfo(usefoc.sec, usefoc.onewall, map);
+		rlp2.y = rlp1.y;
+		rlColor4ub(255, 255, 255, 190);
+		for (int i = 0; i <= cloop.nwalls; i++) {
+			wall_t tw1= map->sect[usefoc.sec].wall[cloop.wallids[i]];
+			int nwid = (i+1) % cloop.nwalls;
+			wall_t tw2= map->sect[usefoc.sec].wall[cloop.wallids[nwid]];
+			rlp1.x=tw1.x; rlp1.z=tw1.y;
+			rlp2.x=tw2.x; rlp2.z=tw2.y;
+			drawCylBoard2(rlp1, rlp2, 0.1f, 0.03f);
+
+		}
+
 	}
 	DrawPoint3D(buildToRaylibPos(hoverfoc.hitpos), RED);
 
