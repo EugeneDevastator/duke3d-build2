@@ -1430,6 +1430,9 @@ void DrawGizmos() {
 		//   addto(&map->spri[focusedSprite].tr.p,scaled(right,mv));
 	}
 	focus_t usefoc;
+	Vector3 rlp1;
+	Vector3 rlp2;
+	int loopwall = -1;
 
 	if (ISHOVERWAL || ctx.state.id != Empty.id) {
 		if (ctx.state.id == Empty.id || ctx.state.id == WallDrawState.id)
@@ -1456,19 +1459,26 @@ void DrawGizmos() {
 		rlColor4ub(255, 128, 128, 255);
 		drawCylBoard(rlp1, rlp2, 0.1f);
 		// draw loop.
-		loopinfo cloop = map_sect_get_loopinfo(usefoc.sec, usefoc.onewall, map);
-		rlp2.y = rlp1.y;
+		loopwall = usefoc.onewall;
+	}
+	else if (ISHOVERCAP) {
+		usefoc = hoverfoc;
+		loopwall = 0;
+	}
+	else
+	usefoc = hoverfoc;
+	if (usefoc.sec >=0) {
+		loopinfo cloop = map_sect_get_loopinfo(usefoc.sec, loopwall, map);
+		rlp2.y = rlp1.y = -map->sect[usefoc.sec].z[1];
 		rlColor4ub(255, 255, 255, 190);
-		for (int i = 0; i <= cloop.nwalls; i++) {
+		for (int i = 0; i < cloop.nwalls; i++) {
 			wall_t tw1= map->sect[usefoc.sec].wall[cloop.wallids[i]];
 			int nwid = (i+1) % cloop.nwalls;
 			wall_t tw2= map->sect[usefoc.sec].wall[cloop.wallids[nwid]];
 			rlp1.x=tw1.x; rlp1.z=tw1.y;
 			rlp2.x=tw2.x; rlp2.z=tw2.y;
 			drawCylBoard2(rlp1, rlp2, 0.1f, 0.03f);
-
 		}
-
 	}
 	DrawPoint3D(buildToRaylibPos(hoverfoc.hitpos), RED);
 
