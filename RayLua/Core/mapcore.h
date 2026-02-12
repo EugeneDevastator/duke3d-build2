@@ -16,6 +16,9 @@
 #ifndef PI
 #define PI 3.141592653589793
 #endif
+#define MAX_WALLS_PER_SECT 256
+#define MAX_LOOPS_PER_SECT 64
+
 
 extern long gnumtiles, gmaltiles, gtilehashead[1024];
 extern char curmappath[MAX_PATH+1];
@@ -57,8 +60,15 @@ typedef struct {
 	long sect;
 	long startwall;
 	int nwalls;
-	uint16_t wallids[256];
+	uint16_t wallids[MAX_WALLS_PER_SECT];
 } loopinfo;
+
+// Core loop operations
+typedef struct {
+	int sect_id;
+	int loop_count;
+	loopinfo loops[MAX_LOOPS_PER_SECT]; // Max loops per sector
+} sector_loops_t;
 
 
 #endif
@@ -168,7 +178,7 @@ static inline loopinfo getLoop(int secid, int startwal, mapstate_t* map) {
 	return result;
 }
 
-int map_loops_join(loopinfo li1, loopinfo li2, mapstate_t *map);
+int map_loops_join_mirrored(loopinfo li1, loopinfo li2, mapstate_t *map);
 
 int map_append_sect(mapstate_t *map, int nwalls);
 
@@ -531,4 +541,41 @@ static void delsect_imp (int s, mapstate_t* map)
 static inline int mapwallnextid(int s, int w, mapstate_t *map) {
 	return map->sect[s].wall[w].n+w;
 }
+
+void change_wall_links(int sec_orig, int wall_orig, int sec_new, int wall_new, mapstate_t *map);
+// will only remove loop witohut any relinking.
+int map_sect_remove_loop_data(int sect_id, int any_wall_id, mapstate_t *map);
+sector_loops_t map_sect_get_loops(int sect_id, mapstate_t *map);
+// Remove loop from sector destroying its references.
+int map_sect_destroy_loop(int sect_id, int loop_wall_id, mapstate_t *map);
+// Extract loop into new sector
+int map_sect_extract_loop_to_new_sector(int origin_sect, int loop_wall_id, mapstate_t *map);
+// High-level operation: chip off inner loop, doesnt preseve red walls
+int map_sect_chip_off_smaller_loop(int origin_sect, int entry_point_A, int entry_point_C, mapstate_t *map);
+// doesnt preserve red walls
+int map_sect_chip_off_loop(int origin_sect, int wal, mapstate_t *map);
+// - options 2
+// Wall remapping structure
+typedef struct {
+	int old_sect, old_wall;
+	int new_sect, new_wall;
+} wall_remap_t;
+
+typedef struct {
+	wall_remap_t *remaps;
+	int count;
+	int capacity;
+} remap_table_t;
+
+// Step 1: Duplicate loop to new sector (no link updates yet)
+int duplicate_loop_to_new_sector(int origin_sect, int loop_wall_id, mapstate_t *map, remap_table_t *remap);
+
+// Step 2: Remove loop from original sector and record remapping
+int compact_sector_remove_loop(int sect_id, int loop_wall_id, remap_table_t *remap, mapstate_t *map);
+
+// Step 3: Apply all remappings
+void apply_wall_remapping(remap_table_t *remap, mapstate_t *map);
+
+// High-level clean operation
+int map_sect_chip_off_loop_clean(int origin_sect, int loop_wall_id, mapstate_t *map);
 #endif //BUILD2_MAPCORE_H

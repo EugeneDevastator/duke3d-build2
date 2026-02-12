@@ -637,7 +637,7 @@ void LoopDrawUpdate() {
 			                                       !isflip);
 			loopinfo lithis = getLoop(loopts[0].sect, thiswid, map);
 			loopinfo linew = getLoop(newsec, 0, map);
-			int res = map_loops_join(lithis, linew, map);
+			int res = map_loops_join_mirrored(lithis, linew, map);
 		}
 		loopn = 0;
 
@@ -716,191 +716,212 @@ void WallDrawDiscard() {
 	loopn = 0;
 	K_ACCEPT = KEY_SPACE;
 }
+
 void WallDrawAccept() {
-    if (loopn < 2) {
-        WallDrawDiscard();
-        return;
-    }
+	if (loopn < 2) {
+		ctx.op = discard;
+		return;
+	}
 
-    // Find correct sector by scanning midpoint of first segment
-    point3d midpoint = {
-        (loopts[0].pos.x + loopts[1].pos.x) * 0.5f,
-        (loopts[0].pos.y + loopts[1].pos.y) * 0.5f,
-        (loopts[0].pos.z + loopts[1].pos.z) * 0.5f
-    };
+	// Find correct sector by scanning midpoint of first segment
+	point3d midpoint = {
+		(loopts[0].pos.x + loopts[1].pos.x) * 0.5f,
+		(loopts[0].pos.y + loopts[1].pos.y) * 0.5f,
+		(loopts[0].pos.z + loopts[1].pos.z) * 0.5f
+	};
 
-    int target_sect = -1;
-    updatesect_p(midpoint, &target_sect, map);
+	int origin_sect = -1;
+	updatesect_p(midpoint, &origin_sect, map);
 
-    if (target_sect < 0) {
-        EditorHudDrawTopInfo("No sector found at midpoint");
-        WallDrawDiscard();
-        return;
-    }
+	if (origin_sect < 0) {
+		EditorHudDrawTopInfo("No sector found at midpoint");
+		WallDrawDiscard();
+		return;
+	}
 
-    sect_t *sect = &map->sect[target_sect];
+	sect_t *sect = &map->sect[origin_sect];
 
-    // Find entry points by coordinates
-    int entry_point_A = -1, entry_point_C = -1;
-    float snap_dist = 0.001f;
+	// Find entry points by coordinates
+	int entry_point_A = -1, entry_point_C = -1;
+	float snap_dist = 0.001f;
 
-    for (int w = 0; w < sect->n; w++) {
-        float dx = sect->wall[w].x - loopts[0].pos.x;
-        float dy = sect->wall[w].y - loopts[0].pos.y;
-        if (dx*dx + dy*dy < snap_dist && entry_point_A < 0) {
-            entry_point_A = w;
-        }
+	for (int w = 0; w < sect->n; w++) {
+		float dx = sect->wall[w].x - loopts[0].pos.x;
+		float dy = sect->wall[w].y - loopts[0].pos.y;
+		if (dx * dx + dy * dy < snap_dist && entry_point_A < 0) {
+			entry_point_A = w;
+		}
 
-        dx = sect->wall[w].x - loopts[loopn-1].pos.x;
-        dy = sect->wall[w].y - loopts[loopn-1].pos.y;
-        if (dx*dx + dy*dy < snap_dist && entry_point_C < 0) {
-            entry_point_C = w;
-        }
-    }
+		dx = sect->wall[w].x - loopts[loopn - 1].pos.x;
+		dy = sect->wall[w].y - loopts[loopn - 1].pos.y;
+		if (dx * dx + dy * dy < snap_dist && entry_point_C < 0) {
+			entry_point_C = w;
+		}
+	}
 
-    if (entry_point_A < 0 || entry_point_C < 0) {
-        EditorHudDrawTopInfo("Could not find entry points");
-        WallDrawDiscard();
-        return;
-    }
+	if (entry_point_A < 0 || entry_point_C < 0) {
+		EditorHudDrawTopInfo("Could not find entry points");
+		WallDrawDiscard();
+		return;
+	}
 
-    int walAprev = wallprev(sect, entry_point_A);
-    int walCprev = wallprev(sect, entry_point_C);
+	int walAprev = wallprev(sect, entry_point_A);
+	int walCprev = wallprev(sect, entry_point_C);
 
-    // Store original connections
-    int A_next = sect->wall[entry_point_A].n;
-    int C_next = sect->wall[entry_point_C].n;
-
-    // Ensure we have space for new walls: (loopn-1) * 2 walls
-    int new_walls_count = (loopn - 1) * 2;
-    if (sect->n + new_walls_count > sect->nmax) {
-        sect->nmax = sect->n + new_walls_count + 8;
-        sect->wall = (wall_t*)realloc(sect->wall, sect->nmax * sizeof(wall_t));
-    }
- // Aprev - A B
+	// Ensure we have space for new walls: (loopn-1) * 2 walls
+	int new_walls_count = (loopn - 1) * 2;
+	if (sect->n + new_walls_count > sect->nmax) {
+		sect->nmax = sect->n + new_walls_count + 8;
+		sect->wall = (wall_t *) realloc(sect->wall, sect->nmax * sizeof(wall_t));
+	}
+	// Aprev - A B
 	// dprev -> C' B'
-    // Add forward path: A->B->C (skip first and last points, they're existing walls)
-    int forward_start = sect->n;
-    for (int i = 0; i <= loopn - 2; i++) {
-        wall_t *new_wall = &sect->wall[sect->n];
-        makewall(new_wall, sect->n, sect->n + 1);
-        new_wall->x = loopts[i].pos.x;
-        new_wall->y = loopts[i].pos.y;
-        new_wall->ns = target_sect;
-        new_wall->owner = -1;
-        sect->n++;
-    }
+	// Add forward path: A->B->C (skip first and last points, they're existing walls)
+	int forward_start = sect->n;
+	for (int i = 0; i <= loopn - 2; i++) {
+		wall_t *new_wall = &sect->wall[sect->n];
+		makewall(new_wall, sect->n, sect->n + 1);
+		new_wall->x = loopts[i].pos.x;
+		new_wall->y = loopts[i].pos.y;
+		new_wall->ns = origin_sect;
+		new_wall->nschain = origin_sect;
+		new_wall->owner = -1;
+		sect->n++;
+	}
 
-    // Add backward path: WAL_C->B'->A' - aprev (reverse order, skip endpoints)
-    int backward_start = sect->n;
-    for (int i = loopn - 1; i >= 1; i--) {
-        wall_t *new_wall = &sect->wall[sect->n];
-        makewall(new_wall, sect->n, sect->n + 1);
-        new_wall->x = loopts[i].pos.x;
-        new_wall->y = loopts[i].pos.y;
-        new_wall->ns = target_sect;
-        new_wall->owner = -1;
-        sect->n++;
-    }
+	// Add backward path: WAL_C->B'->A' - aprev (reverse order, skip endpoints)
+	int backward_start = sect->n;
+	for (int i = loopn - 1; i >= 1; i--) {
+		wall_t *new_wall = &sect->wall[sect->n];
+		makewall(new_wall, sect->n, sect->n + 1);
+		new_wall->x = loopts[i].pos.x;
+		new_wall->y = loopts[i].pos.y;
+		new_wall->ns = origin_sect;
+		new_wall->nschain = origin_sect;
+		new_wall->owner = -1;
+		sect->n++;
+	}
 
-    // Set up mirror wall connections
-    int one_side_count = loopn-1;
+	// Set up mirror wall connections
+	int one_side_count = loopn - 1;
 	// all is important that we link Wal_A -> B C -> prev_C;
 
 	// Add forward path: A->B->C (skip first and last points, they're existing walls)
 
-	// Aprev - A B
-	// dprev -> C' B'
+	// aprev - a b wallc
+	// cprev - c' b' walla
+	// aprev to A chain
 	sect->wall[walAprev].n = forward_start - walAprev;
-	int newC = backward_start-1;
+	// last in A chain to wall c
+	int newC = forward_start + one_side_count-1;
 	sect->wall[newC].n = entry_point_C - newC;
-	// link Wal_C -> B' A' -> prev_A;
-	// backward start is B'
+	// cprev to c' chain
 	sect->wall[walCprev].n = backward_start - walCprev;
-	// A' is last.
-	sect->wall[sect->n-1].n = entry_point_A-(sect->n-1);
+	int newA = backward_start+one_side_count-1;
+	sect->wall[newA].n = entry_point_A - newA;
+	// link newly added walls.
+	for (int i = 0; i < one_side_count; i++) {
+		sect->wall[forward_start + i].nw = backward_start + (one_side_count - i - 1);
+		sect->wall[forward_start + i].nwchain = sect->wall[forward_start + i].nw ;
+		sect->wall[backward_start + (one_side_count - i - 1)].nw = forward_start + i;
+		sect->wall[backward_start + (one_side_count - i - 1)].nwchain = sect->wall[backward_start + (one_side_count - i - 1)].nw;
+	}
 
-    for (int i = 0; i < one_side_count; i++) {
-        sect->wall[forward_start + i].nw = backward_start + (one_side_count - 1 - i);
-        sect->wall[backward_start + (one_side_count - 1 - i)].nw = forward_start + i;
-    }
+	bool needs_split = true;
+	int w = entry_point_A;
+	int steps = 0;
+	do {
+		w = mapwallnextid(origin_sect, w, map);
+		steps++;
+		if (w == walAprev) { // if we  arrive at previous wall, then it was not split.
+			needs_split = false;
+			break;
+		}
+	} while (w != entry_point_A);
 
-    // Check for sector splitting by traversing from entry_point_A
-    bool needs_split = true;
-    int w = entry_point_A;
-    int steps = 0;
-    do {
-        w = mapwallnextid(target_sect, w, map);
-        steps++;
-        if (w == entry_point_C) {
-            needs_split = false;
-            break;
-        }
-    } while (w != entry_point_A && steps < sect->n * 2);
+printf("needs split = %o", needs_split);
+	if (needs_split) {
+		// Count walls in each potential loop to determine which is smaller
+		int loop1_count = 0;
+		int loop2_count = 0;
 
-    if (needs_split) {
-        // Create split - count walls in each loop and separate smaller one
-        int loop1_count = 0;
-        w = entry_point_A;
-        do {
-            loop1_count++;
-            w = mapwallnextid(target_sect, w, map);
-        } while (w != entry_point_A && loop1_count < sect->n);
+		// Count first loop from entry_point_A to entry_point_C
+		w = entry_point_A;
+		do {
+			loop1_count++;
+			printf("%i",w);
+			w = mapwallnextid(origin_sect, w, map);
+		} while (w != entry_point_A);
+		printf("loop1_count = %i", loop1_count);
 
-        int loop2_count = sect->n - loop1_count;
+		w = walAprev;
+		do {
+			loop2_count++;
+			printf("%i",w);
+			w = mapwallnextid(origin_sect, w, map);
+		} while (w != walAprev);
+		printf("loop2_count = %i", loop2_count);
+		int decidedcount = loop1_count < loop2_count ? loop1_count : loop2_count;
+		int chipwall = loop1_count < loop2_count ? entry_point_A : walAprev;
+		int res = map_sect_chip_off_loop_clean(origin_sect,chipwall, map);
+		if (false)
+		{
+			int dest_wall_offset = 0; // start at wall 0 for new sector.
 
-        if (loop1_count < loop2_count) {
-            int new_sect = map_append_sect(map, loop1_count + 4);
-            if (new_sect >= 0) {
-                sect_t *new_sector = &map->sect[new_sect];
-                *new_sector = *sect;
-                new_sector->wall = (wall_t*)malloc(new_sector->nmax * sizeof(wall_t));
-                new_sector->n = 0;
+			int new_sectid = map_append_sect(map, decidedcount);
+			if (new_sectid < 0)
+				return;
+			sect_t *new_sector = &map->sect[new_sectid];
 
-                // Copy smaller loop to new sector
-                w = entry_point_A;
-                do {
-                    new_sector->wall[new_sector->n] = sect->wall[w];
-                    makewall(&new_sector->wall[new_sector->n], new_sector->n, new_sector->n + 1);
-                    new_sector->wall[new_sector->n].x = sect->wall[w].x;
-                    new_sector->wall[new_sector->n].y = sect->wall[w].y;
-                    new_sector->n++;
-                    sect->wall[w].owner = -2; // mark for deletion
-                    w = mapwallnextid(target_sect, w, map);
-                } while (w != entry_point_A && new_sector->n < loop1_count);
+			// Copy all sector properties from original
+			new_sector->z[0] = sect->z[0];
+			new_sector->z[1] = sect->z[1];
+			new_sector->grad[0] = sect->grad[0];
+			new_sector->grad[1] = sect->grad[1];
+			new_sector->surf[0] = sect->surf[0];
+			new_sector->surf[1] = sect->surf[1];
+			new_sector->headspri = -1;
+			new_sector->owner = -1;
+			new_sector->n = decidedcount;
 
-                if (new_sector->n > 0) {
-                    new_sector->wall[new_sector->n - 1].n = -(new_sector->n - 1);
-                }
+			int iwall = chipwall;
+			int newindex = dest_wall_offset;
+			// 1. scan walls in loop we want to move.
+			// retarget corresponding walls to new dst indices. dstoff+i;
+			do {
+				wall_t* oriw =&map->sect[origin_sect].wall[iwall];
+				wall_t* neww =&map->sect[new_sectid].wall[newindex];
+				memcpy(neww, oriw, sizeof(wall_t));
+				new_sector->wall[newindex].n = 1; // relative index, just next wall in array.
 
-                // Compact original sector
-                int write_pos = 0;
-                for (int r = 0; r < sect->n; r++) {
-                    if (sect->wall[r].owner != -2) {
-                        if (write_pos != r) {
-                            sect->wall[write_pos] = sect->wall[r];
-                        }
-                        write_pos++;
-                    }
-                }
-                sect->n = write_pos;
+				int counterwall = -1;
+				if (sect->wall[iwall].ns == origin_sect)
+					counterwall = sect->wall[iwall].nw;
+				// change links for all walls that are not pointing to sector we chip off.
+				if (counterwall == -1)
+					change_wall_links(origin_sect, iwall, new_sectid, newindex, map);
+				else {
+					// change links for parent's walls
+					sect->wall[counterwall].nw = newindex;
+					sect->wall[counterwall].ns = new_sectid;
+					sect->wall[counterwall].nwchain = newindex;
+					sect->wall[counterwall].nschain = new_sectid;
+				}
 
-                // Fix remaining walls
-                if (sect->n > 0) {
-                    for (int i = 0; i < sect->n - 1; i++) {
-                        sect->wall[i].n = 1;
-                    }
-                    sect->wall[sect->n - 1].n = -(sect->n - 1);
-                }
-            }
-        }
-    }
+				iwall += sect->wall[iwall].n;
+				newindex++;
+			} while (iwall != chipwall);
+			new_sector->wall[newindex].n = -decidedcount+1; // final wall loop.
 
-    checksprisect_imp(-1, map);
-    loopn = 0;
-    ctx.op = accept;
+			// here during loop removal we must also retarget walls that origin sector leads to.
+			// so for each changed segment - do change wall links.
+			map_sect_remove_loop_data(origin_sect, chipwall, map);
+		}
+	}
+	checksprisect_imp(-1, map);
+	loopn = 0;
+	ctx.op = accept;
 }
-
 
 
 void WallDrawStart() {
@@ -965,7 +986,7 @@ void WallDrawUpdate() {
         		loopts[loopn].pos.y = map->sect[hoverfoc.sec].wall[hoverfoc.onewall].y;
         		loopts[loopn].pos.z = hoverfoc.hitpos.z;
         		loopn++;
-        		WallDrawAccept();
+        		ctx.op = accept;
         	}
         }
         // Immediately accept
@@ -1174,6 +1195,12 @@ void Editor_DoRaycasts(cam_t *cc) {
 }
 
 void EditorUpdate(const Camera3D rlcam) {
+
+	if (IsKeyPressed(KEY_M) && ISHOVERWAL) {
+		// this works
+		//map_sect_remove_loop_data(hoverfoc.sec,hoverfoc.wal, map);
+		map_sect_chip_off_loop(hoverfoc.sec,hoverfoc.wal, map);
+	}
 	// process raycasts;
 	HandleSelectionModes();
 	cam3d = rlcam;
@@ -1462,7 +1489,6 @@ void EditorFrame() {
 		FlyState.update();
 		return;
 	}
-
 	if (IsKeyPressed(KEY_SPACE)) {
 		ctx.state.accept();
 
@@ -1473,6 +1499,7 @@ void EditorFrame() {
 		ctx.mode = Fly;
 		// ctx.curstate =
 	}
+
 	// parse state change
 	if (ctxprev.mode != ctx.mode) {
 	}
