@@ -787,6 +787,20 @@ void makewall(wall_t *w, int8_t wid, int8_t nwid) {
 	w->nwchain = -1;
 	w->n = nwid - wid;
 }
+
+int is_loop2d_ccw(point2d *points, int count) {
+	if (count < 3) return 1; // Not a valid polygon and dont flip it then. could be 2-wal tempor.
+
+	double signed_area = 0.0;
+
+	for (int i = 0; i < count; i++) {
+		int next = (i + 1) % count;
+		signed_area += (points[next].x - points[i].x) * (points[next].y + points[i].y);
+	}
+
+	return signed_area < 0; // CCW if negative, CW if positive
+}
+
 // helper function to join same loop with inverted one.
 // assume that indices are not mixed.
 int map_loops_join_mirrored(loopinfo li1, loopinfo li2, mapstate_t *map) {
@@ -1692,27 +1706,6 @@ int map_sect_extract_loop_to_new_sector(int origin_sect, int loop_wall_id, mapst
 	return new_sect_id;
 }
 
-int map_sect_chip_off_smaller_loop(int origin_sect, int entry_point_A, int entry_point_C, mapstate_t *map) {
-	// Count walls in each potential loop
-	loopinfo loop1 = map_sect_get_loopinfo(origin_sect, entry_point_A, map);
-	loopinfo loop2 = map_sect_get_loopinfo(origin_sect, entry_point_C, map);
-
-	// Determine which loop is smaller (inner loop)
-	int chip_wall_id = (loop1.nwalls < loop2.nwalls) ? entry_point_A : entry_point_C;
-
-	// Extract the smaller loop to new sector
-	int new_sect_id = map_sect_extract_loop_to_new_sector(origin_sect, chip_wall_id, map);
-	if (new_sect_id < 0) return -1;
-
-	// Remove the loop from original sector
-	int result = map_sect_destroy_loop(origin_sect, chip_wall_id, map);
-	if (result < 0) {
-		// TODO: cleanup new sector if removal failed
-		return -1;
-	}
-
-	return new_sect_id;
-}
 
 int map_sect_chip_off_loop(int origin_sect, int wal, mapstate_t *map) {
 	// Count walls in each potential loop
@@ -1868,30 +1861,111 @@ void apply_wall_remapping(remap_table_t *remap, mapstate_t *map) {
 	}
 }
 
+// must also move loops to appropriate cut sector by points checking.
 int map_sect_chip_off_loop_clean(int origin_sect, int loop_wall_id, mapstate_t *map) {
 	remap_table_t remap = {0};
 	remap.capacity = 512;
 	remap.remaps = malloc(remap.capacity * sizeof(wall_remap_t));
 
 	// Step 1: Duplicate to new sector
-	int new_sect_id = duplicate_loop_to_new_sector(origin_sect, loop_wall_id, map, &remap);
+	int new_sect_id = map_sect_extract_loop_to_new_sector(origin_sect, loop_wall_id, map);
 	if (new_sect_id < 0) {
 		free(remap.remaps);
 		return -1;
 	}
 
-	// Step 2: Remove from original sector
-	int result = compact_sector_remove_loop(origin_sect, loop_wall_id, &remap, map);
-	if (result < 0) {
-		free(remap.remaps);
-		return -1;
-	}
+	//// Step 2: Remove from original sector
+	//int result = compact_sector_remove_loop(origin_sect, loop_wall_id, &remap, map);
+	//if (result < 0) {
+	//	free(remap.remaps);
+	//	return -1;
+	//}
+//
+	//// Step 3: Apply all remappings
+	//apply_wall_remapping(&remap, map);
 
-	// Step 3: Apply all remappings
-	apply_wall_remapping(&remap, map);
+	// Step 4: Check and move other loops to appropriate sectors
+	sector_loops_t orig_loops = map_sect_get_loops(origin_sect, map);
+
+	bool moved = true;
+	while (moved) {
+		moved = false;
+		orig_loops = map_sect_get_loops(origin_sect, map);
+		for (int i = 0; i < orig_loops.loop_count; i++) {
+			loopinfo loop = orig_loops.loops[i];
+			if (!is_loop_inner(loop, map))
+				continue;
+			// Get test point from first wall of loop
+			wall_t *test_wall = &map->sect[origin_sect].wall[loop.wallids[0]];
+			int test_x = test_wall->x;
+			int test_y = test_wall->y;
+
+			// Check ifit is not other loop.
+
+			if (insidesect(test_x, test_y, map->sect[new_sect_id].wall, map->sect[new_sect_id].n)) {
+				printf("moved loop %i \n",  loop.wallids[0]);
+				map_loop_move_to_new_sect(origin_sect, loop.wallids[0], new_sect_id, map);
+
+				moved = true;
+			}
+		}
+	}
 
 	free(remap.remaps);
 	return new_sect_id;
+}
+
+
+void map_loop_move_to_new_sect(int orig_sect, int wall, int new_sect, mapstate_t *map) {
+	loopinfo loop = map_sect_get_loopinfo(orig_sect, wall, map);
+	sect_t *orig_sec = &map->sect[orig_sect];
+	sect_t *new_sec = &map->sect[new_sect];
+
+	// Expand new sector if needed
+	int new_total = new_sec->n + loop.nwalls;
+	if (new_total > new_sec->nmax) {
+		new_sec->nmax = new_total + 16;
+		new_sec->wall = realloc(new_sec->wall, new_sec->nmax * sizeof(wall_t));
+	}
+
+	// Copy walls to new sector
+	for (int i = 0; i < loop.nwalls; i++) {
+		int old_idx = loop.wallids[i];
+		int new_idx = new_sec->n + i;
+
+		new_sec->wall[new_idx] = orig_sec->wall[old_idx];
+
+		// Set loop structure
+		if (i == loop.nwalls - 1) {
+			new_sec->wall[new_idx].n = -loop.nwalls + 1;
+		} else {
+			new_sec->wall[new_idx].n = 1;
+		}
+
+		// Update external references
+		change_wall_links(orig_sect, old_idx, new_sect, new_idx, map);
+	}
+
+	new_sec->n = new_total;
+
+	// Remove loop from original sector
+	compact_sector_remove_loop(orig_sect, wall, &(remap_table_t){0}, map);
+}
+
+int map_sect_chip_off_via_copy(int origin_sect, int loop_wall_id, mapstate_t *map) {
+	// New algo proposal:
+	// recreate sectors using outer loops.
+	// 1. find outermost loop of oriignal sector.
+	// 1.1 make new sector out of it SOri
+	// 1.2 make new sector out of chipped loop SChi, maintain wall mapping. old -> new wall.
+	// remap all walls of SOri immideately - preserve original sector id for unchanged walls. and use mapping from schi to remap those.
+	// 2. scan all loops _belonging_ to orig. sectror,
+	// check tif they belong to smallest of orig or new loop - and make copies of them to proper one,
+	// this check will alow us to even draw around sectors, which is sortof dope.
+	// applying wall remapping right away.
+	// need method map_loops_copy(sect_from, sect_to, wall_from, map)
+	// 3. after copies are made - walls of original sector can be  created by that of SOri.
+	// 4. SChi remains as is because it is new.
 }
 
 

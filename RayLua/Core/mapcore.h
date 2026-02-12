@@ -148,6 +148,17 @@ void changesprisect_imp (int i, int nsect, mapstate_t *map);
 surf_t makeSurfWall(int w1, int wnex);
 surf_t makeSurfCap();
 void makewall(wall_t* w, int8_t wid , int8_t nwid);
+int is_loop2d_ccw(point2d* points, int count);
+
+// true if it is pillar inside sector. not outer border.
+static inline int is_loop_inner(loopinfo li, mapstate_t *map) {
+	point2d* pt = (point2d*)malloc(sizeof(point2d)*li.nwalls);
+	for (int i = 0; i < li.nwalls; ++i) {
+		pt[i] = map->sect[li.sect].wall[li.wallids[i]].pos;
+	}
+	free(pt);
+	return is_loop2d_ccw(pt, li.nwalls);
+}
 
 static inline loopinfo map_sect_get_loopinfo(int secid, int startwal, mapstate_t* map) {
 	loopinfo result = {0};
@@ -575,6 +586,8 @@ int compact_sector_remove_loop(int sect_id, int loop_wall_id, remap_table_t *rem
 
 // Step 3: Apply all remappings
 void apply_wall_remapping(remap_table_t *remap, mapstate_t *map);
+void map_loop_move_to_new_sect(int orig_sect, int wall, int new_sect, mapstate_t *map);
+int map_sect_chip_off_via_copy(int origin_sect, int loop_wall_id, mapstate_t *map);
 
 // High-level clean operation
 int map_sect_chip_off_loop_clean(int origin_sect, int loop_wall_id, mapstate_t *map);

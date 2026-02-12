@@ -589,18 +589,7 @@ void PickgrabStart() {
 loopt loopts[100];
 point2d loopts_p2d[100];
 int loopn = 0;
-int is_loop_ccw(point2d* points, int count) {
-	if (count < 3) return 1; // Not a valid polygon and dont flip it then. could be 2-wal tempor.
 
-	double signed_area = 0.0;
-
-	for (int i = 0; i < count; i++) {
-		int next = (i + 1) % count;
-		signed_area += (points[next].x - points[i].x) * (points[next].y + points[i].y);
-	}
-
-	return signed_area < 0; // CCW if negative, CW if positive
-}
 void LoopDrawUpdate() {
 	if (IsKeyPressed(KEY_THREE) && loopn == 1) {
 		long s = mapspriteadd(loopts[0].sect, loopts[0].pos, map);
@@ -631,7 +620,7 @@ void LoopDrawUpdate() {
 		// filp loop if needed.
 		// add bool to not auto insec.
 		bool alsoMakeSec = !IsKeyDown(KEY_LEFT_SHIFT);
-		int isflip = (is_loop_ccw(loopts_p2d,loopn));
+		int isflip = (is_loop2d_ccw(loopts_p2d,loopn));
 		int thiswid = sect_appendwall_loop(&map->sect[hoverfoc.sec], loopn, loopts_p2d, isflip);
 
 
@@ -843,6 +832,22 @@ void WallDrawAccept() {
 			break;
 		}
 	} while (w != entry_point_A);
+// New algo proposal:
+	// recreate sectors using outer loops.
+	// 1. find outermost loop of oriignal sector.
+	// 1.1 make new sector out of it SOri
+	// 1.2 make new sector out of chipped loop SChi, maintain wall mapping. old -> new wall.
+	// remap all walls of SOri immideately - preserve original sector id for unchanged walls. and use mapping from schi to remap those.
+	// 2. scan all loops _belonging_ to orig. sectror,
+	// check tif they belong to smallest of orig or new loop - and make copies of them to proper one,
+	// this check will alow us to even draw around sectors, which is sortof dope.
+	// applying wall remapping right away.
+	// need method map_loops_copy(sect_from, sect_to, wall_from, map)
+	// 3. after copies are made - walls of original sector can be  created by that of SOri.
+	// 4. SChi remains as is because it is new.
+
+
+
 
 printf("needs split = %o", needs_split);
 	if (needs_split) {
@@ -854,64 +859,11 @@ printf("needs split = %o", needs_split);
 		loopinfo l1 = map_sect_get_loopinfo(origin_sect, entry_point_A, map);
 		loopinfo l2 = map_sect_get_loopinfo(origin_sect, walAprev, map);
 loop1_count = l1.nwalls;
-loop1_count = l2.nwalls;
+loop2_count = l2.nwalls;
 		printf("loop_counts = %i, %i of %i", loop1_count, loop2_count, map->sect[origin_sect].n);
 		int decidedcount = loop1_count < loop2_count ? loop1_count : loop2_count;
 		int chipwall = loop1_count < loop2_count ? entry_point_A : walAprev;
 		int res = map_sect_chip_off_loop_clean(origin_sect,chipwall, map);
-		if (false)
-		{
-			int dest_wall_offset = 0; // start at wall 0 for new sector.
-
-			int new_sectid = map_append_sect(map, decidedcount);
-			if (new_sectid < 0)
-				return;
-			sect_t *new_sector = &map->sect[new_sectid];
-
-			// Copy all sector properties from original
-			new_sector->z[0] = sect->z[0];
-			new_sector->z[1] = sect->z[1];
-			new_sector->grad[0] = sect->grad[0];
-			new_sector->grad[1] = sect->grad[1];
-			new_sector->surf[0] = sect->surf[0];
-			new_sector->surf[1] = sect->surf[1];
-			new_sector->headspri = -1;
-			new_sector->owner = -1;
-			new_sector->n = decidedcount;
-
-			int iwall = chipwall;
-			int newindex = dest_wall_offset;
-			// 1. scan walls in loop we want to move.
-			// retarget corresponding walls to new dst indices. dstoff+i;
-			do {
-				wall_t* oriw =&map->sect[origin_sect].wall[iwall];
-				wall_t* neww =&map->sect[new_sectid].wall[newindex];
-				memcpy(neww, oriw, sizeof(wall_t));
-				new_sector->wall[newindex].n = 1; // relative index, just next wall in array.
-
-				int counterwall = -1;
-				if (sect->wall[iwall].ns == origin_sect)
-					counterwall = sect->wall[iwall].nw;
-				// change links for all walls that are not pointing to sector we chip off.
-				if (counterwall == -1)
-					change_wall_links(origin_sect, iwall, new_sectid, newindex, map);
-				else {
-					// change links for parent's walls
-					sect->wall[counterwall].nw = newindex;
-					sect->wall[counterwall].ns = new_sectid;
-					sect->wall[counterwall].nwchain = newindex;
-					sect->wall[counterwall].nschain = new_sectid;
-				}
-
-				iwall += sect->wall[iwall].n;
-				newindex++;
-			} while (iwall != chipwall);
-			new_sector->wall[newindex].n = -decidedcount+1; // final wall loop.
-
-			// here during loop removal we must also retarget walls that origin sector leads to.
-			// so for each changed segment - do change wall links.
-			map_sect_remove_loop_data(origin_sect, chipwall, map);
-		}
 	}
 	checksprisect_imp(-1, map);
 	loopn = 0;
