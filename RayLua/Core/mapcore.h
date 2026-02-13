@@ -560,7 +560,7 @@ void change_wall_links(int sec_orig, int wall_orig, int sec_new, int wall_new, m
 // will only remove loop witohut any relinking.
 
 // will rename specific links on given wall chan
-void map_wall_chain_rename(wall_t* wall_of_chain, long scansectid, int sec_orig, int wall_orig, int sec_new, int wall_new, mapstate_t *map);
+void map_wall_chain_rename(wall_t* wall_of_chain, long scansectid, int secid_old, int wallid_old, int secid_new, int wallid_new, mapstate_t *map);
 
 int map_sect_remove_loop_data(int sect_id, int any_wall_id, mapstate_t *map);
 sector_loops_t map_sect_get_loops(int sect_id, mapstate_t *map);

@@ -1522,7 +1522,7 @@ void change_wall_links(int sec_orig, int wall_orig, int sec_new, int wall_new, m
 	}
 }
 
-void map_wall_chain_rename(wall_t* wall_of_chain, long scansectid, int sec_orig, int wall_orig, int sec_new, int wall_new, mapstate_t *map) {
+void map_wall_chain_rename(wall_t* wall_of_chain, long scansectid, int secid_old, int wallid_old, int secid_new, int wallid_new, mapstate_t *map) {
 	sect_t *msects = map->sect;
 	wall_t *orig_wall = wall_of_chain;//&sec[sec_orig].wall[wall_orig];
 
@@ -1543,19 +1543,29 @@ void map_wall_chain_rename(wall_t* wall_of_chain, long scansectid, int sec_orig,
 		wall_t *wal = &msects[current_s].wall[current_w];
 
 		// Check if this wall points to original
-		if (wal->ns == sec_orig && wal->nw == wall_orig) {
+		if (wal->ns == secid_old && wal->nw == wallid_old) {
 			updates[update_count].s = current_s;
 			updates[update_count].w = current_w;
 			updates[update_count].is_chain = 0;
 			update_count++;
 		}
-		if (wal->nschain == sec_orig && wal->nwchain == wall_orig) {
+		if (wal->nschain == secid_old && wal->nwchain == wallid_old) {
 			updates[update_count].s = current_s;
 			updates[update_count].w = current_w;
 			updates[update_count].is_chain = 1;
 			update_count++;
 		}
-
+		// this check for cases when we moved new sector.
+		//if (wal->ns == current_s || wal->nschain == current_s) {
+		//	updates[update_count].s = secid_new;
+		//	updates[update_count].w = wal->nw;
+		//	updates[update_count].is_chain = 0;
+		//	update_count++;
+		//	updates[update_count].s = secid_new;
+		//	updates[update_count].w = wal->nwchain;
+		//	updates[update_count].is_chain = 1;
+		//	update_count++;
+		//}
 		// Move to next in chain
 		current_s = wal->nschain >= 0 ? wal->nschain : wal->ns;
 		current_w = wal->nwchain >= 0 ? wal->nwchain : wal->nw;
@@ -1566,11 +1576,11 @@ void map_wall_chain_rename(wall_t* wall_of_chain, long scansectid, int sec_orig,
 	for (int i = 0; i < update_count; i++) {
 		wall_t *wal = &msects[updates[i].s].wall[updates[i].w];
 		if (updates[i].is_chain) {
-			wal->nschain = sec_new;
-			wal->nwchain = wall_new;
+			wal->nschain = secid_new;
+			wal->nwchain = wallid_new;
 		} else {
-			wal->ns = sec_new;
-			wal->nw = wall_new;
+			wal->ns = secid_new;
+			wal->nw = wallid_new;
 		}
 	}
 }
@@ -1808,16 +1818,20 @@ int map_sect_chip_off_loop(int orig_sectid, int walmove, int wallretain, mapstat
 	int chip_wall_id = walmove;
 
 	// before we do anything we must remap retained walls to point to new sector.
-	wall_t *wcur = &map->sect[orig_sectid].wall[wallretain];
-	int idxsum = 0;
-	do {
-		if (wcur->ns == orig_sectid || wcur->nschain == orig_sectid) {
-			wcur->ns = new_sect_id;
-			wcur->nschain = new_sect_id;
-		}
-		idxsum += wcur->n;
-		wcur = wcur+wcur->n;
-	} while (idxsum != 0);
+//wall_t *wcur = &map->sect[orig_sectid].wall[wallretain];
+//int idxsum = 0;
+//do {
+//	if (wcur->ns == orig_sectid || wcur->nschain == orig_sectid) {
+//		wcur->ns = new_sect_id;
+//		wcur->nschain = new_sect_id;
+//	}
+//	else {
+//		// also repoint other sectors to new sector.
+//		map_wall_chain_rename(wcur,orig_sectid,orig_sectid,wallretain+idxsum,new_sect_id,wallretain+idxsum,map);
+//	}
+//	idxsum += wcur->n;
+//	wcur = wcur+wcur->n;
+//} while (idxsum != 0);
 
 	// opy-relocate loop to new sector. and then build it as we go.
 	map_loop_copy_and_remap(new_sect_id,orig_sectid,walmove,map);
