@@ -757,9 +757,9 @@ void WallDrawAccept() {
 		return;
 	}
 
-	int walAprev = wallprev(sect, entry_point_A);
-	int walCprev = wallprev(sect, entry_point_C);
-
+	int walAprev = map_wall_prev_in_loop(sect, entry_point_A);
+	int walCprev = map_wall_prev_in_loop(sect, entry_point_C);
+	printf("used entry points: A: %i,%i, C: %i,%i", entry_point_A, walAprev, entry_point_C, walCprev);
 	// Ensure we have space for new walls: (loopn-1) * 2 walls
 	int new_walls_count = (loopn - 1) * 2;
 	if (sect->n + new_walls_count > sect->nmax) {

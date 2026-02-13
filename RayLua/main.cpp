@@ -789,7 +789,7 @@ void DrawInfoUI() {
         ImGui::Text("IsLIGHT.");
     }
 if (ISHOVERWAL) {
-    ImGui::Text("S:%i w:%i\nNs:%i Nw:%i",hoverfoc.sec, hoverfoc.wal, HOVERWAL.ns, HOVERWAL.nw);
+    ImGui::Text("S:%i w:%i w.n:%i \nNs:%i Nw:%i",hoverfoc.sec, hoverfoc.wal, HOVERWAL.n, HOVERWAL.ns, HOVERWAL.nw);
     ImGui::Text("NCsw:%i %i",HOVERWAL.nschain, HOVERWAL.nwchain);
     ImGui::Text("flags: %i %d", HOVERWAL.surf.asc, HOVERWAL.surf.alpha);// need show as uint32_t binary with zeros.
 }

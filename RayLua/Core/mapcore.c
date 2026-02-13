@@ -485,7 +485,16 @@ int wallprev (sect_t *s, int w)
 	}
 #endif
 }
-
+int map_wall_prev_in_loop (sect_t *s, int w)
+{
+	int pwid = w;
+	int nextwid = s->wall[w].n+w;
+	while (nextwid != w) {
+		pwid = nextwid;
+		nextwid = s->wall[nextwid].n+nextwid;
+	}
+	return pwid;
+}
 // Gets all sectors/walls that share the same vertex point
 // Finds all walls that meet at the same corner point
 int getwallsofvert (int s, int w, wall_idx *ver, int maxverts, mapstate_t *map)
