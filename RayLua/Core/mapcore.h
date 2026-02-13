@@ -338,7 +338,9 @@ int polbool_splitlinepoint (polbool_lin_t **lin, int *linmal, wall_t *wal, int n
 	//if retwal is null, returns # walls without generating wall list
 int polybool (wall_t *wal0, int on0, wall_t *wal1, int on1, wall_t **retwal, int *retn, int op);
 
-int insidesect (double x, double y, wall_t *wal, int w);
+int insidesect(double x, double y, wall_t *wal, int w);
+
+int insideloop(double x, double y, wall_t *wal);
 
 // first pass updatesect to ONLY check nearest + portals.
 int updatesect_portmove(transform *tr, int *cursect, mapstate_t *map);
@@ -569,7 +571,7 @@ int map_sect_extract_loop_to_new_sector(int origin_sect, int loop_wall_id, mapst
 // High-level operation: chip off inner loop, doesnt preseve red walls
 int map_sect_chip_off_smaller_loop(int origin_sect, int entry_point_A, int entry_point_C, mapstate_t *map);
 // doesnt preserve red walls
-int map_sect_chip_off_loop(int origin_sect, int wal, mapstate_t *map);
+int map_sect_chip_off_loop(int orig_sectid, int walmove, int wallretain, mapstate_t *map);
 // - options 2
 // Wall remapping structure
 typedef struct {
@@ -584,20 +586,20 @@ typedef struct {
 } remap_table_t;
 
 // Step 1: Duplicate loop to new sector (no link updates yet)
-int duplicate_loop_to_new_sector(int origin_sect, int loop_wall_id, mapstate_t *map, remap_table_t *remap);
+//int duplicate_loop_to_new_sector(int origin_sect, int loop_wall_id, mapstate_t *map, remap_table_t *remap);
 
 // Step 2: Remove loop from original sector and record remapping
-int compact_sector_remove_loop(int sect_id, int loop_wall_id, remap_table_t *remap, mapstate_t *map);
+//int compact_sector_remove_loop(int sect_id, int loop_wall_id, remap_table_t *remap, mapstate_t *map);
 
 // Step 3: Apply all remappings
-void apply_wall_remapping(remap_table_t *remap, mapstate_t *map);
+//void apply_wall_remapping(remap_table_t *remap, mapstate_t *map);
 
-int map_sect_chip_off_via_copy(int origin_sect, int chip_loop_wall_id, int retained_wall_id, mapstate_t *map);
+//int map_sect_chip_off_via_copy(int origin_sect, int chip_loop_wall_id, int retained_wall_id, mapstate_t *map);
 
 // High-level clean operation
-int map_sect_chip_off_loop_clean(int origin_sect, int loop_wall_id, mapstate_t *map);
+//int map_sect_chip_off_loop_clean(int origin_sect, int loop_wall_id, mapstate_t *map);
 
-static inline void map_wall_copy( wall_t *target, wall_t *source_wall) {
+static inline void map_wall_memcopy_one( wall_t *target, wall_t *source_wall) {
 	memcpy(target, source_wall, sizeof(wall_t));
 }
 // -------------- SECT OPS --------------
@@ -611,20 +613,24 @@ static inline void map_sect_walls_add_empty(int sectid, int additional_wall_numb
 	//new_sec->n = new_total;
 }
 	// -------------- LOOP OPERATIONS ------------------
-void map_loop_move_to_new_sect(int orig_sect, int wall, int new_sect, mapstate_t *map);
+//void map_loop_move_to_new_sect(int new_sect, int orig_sect, int wall_of_loop, mapstate_t *map);
 
-
+int map_loop_append_by_info(loopinfo lp, int new_sector, point2d offset, mapstate_t *map);
 int map_loop_move_by_info(loopinfo lp, int new_sector, point2d offset, mapstate_t *map);
-
-// will dupe the loop, but retarget destination walls!
-static inline void map_loop_copy_relocate(int sect_orig, int wall_of_loop, int new_sector, mapstate_t *map) {
-	loopinfo li = map_sect_get_loopinfo(sect_orig, wall_of_loop, map);
+void map_sect_loop_erase(int sectid, int wall_of_loop, mapstate_t *map);
+// will dupe the loop, AND retarget destination walls. affects other sectors.
+static inline void map_loop_copy_and_remap(int sect_to, int sect_from, int wall_of_loop, mapstate_t *map) {
+	loopinfo li = map_sect_get_loopinfo(sect_from, wall_of_loop, map);
 	point2d p = {0,0};
-	map_loop_move_by_info(li, new_sector, p, map);
+	map_loop_append_by_info(li, sect_to, p, map);
 }
-
+static inline void map_loop_move_and_remap(int sect_to, int sect_from, int wall_of_loop, mapstate_t *map) {
+	loopinfo li = map_sect_get_loopinfo(sect_from, wall_of_loop, map);
+	point2d p = {0,0};
+	map_loop_move_by_info(li, sect_to, p, map);
+}
 // will discard loop from sector memory, no relinking will be done!
 // can call with -1 to just rearrange loops.
-void map_sect_loop_erase(int sectid, int wall_of_loop, mapstate_t *map);
+
 
 #endif //BUILD2_MAPCORE_H
