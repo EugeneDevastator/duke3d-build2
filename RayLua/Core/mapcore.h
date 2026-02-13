@@ -602,11 +602,11 @@ static inline void map_wall_copy( wall_t *target, wall_t *source_wall) {
 }
 // -------------- SECT OPS --------------
 static inline void map_sect_walls_add_empty(int sectid, int additional_wall_number, mapstate_t* map) {
-	sect_t* new_sec = &map->sect[sectid];
-	int new_total = new_sec->n + additional_wall_number;
-	if (new_total > new_sec->nmax) {
-		new_sec->nmax = new_total + 16;
-		new_sec->wall = (wall_t*)realloc(new_sec->wall, new_sec->nmax * sizeof(wall_t));
+	sect_t* sectr = &map->sect[sectid];
+	int new_total = sectr->n + additional_wall_number;
+	if (new_total > sectr->nmax) {
+		sectr->nmax = new_total + 16;
+		sectr->wall = (wall_t*)realloc(sectr->wall, sectr->nmax * sizeof(wall_t));
 	}
 	//new_sec->n = new_total;
 }

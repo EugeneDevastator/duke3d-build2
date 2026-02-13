@@ -2048,12 +2048,16 @@ int map_loop_move_by_info(loopinfo lp, int new_sector, point2d offset, mapstate_
 		wall_t *loopw = &lpsect->wall[loopwid];
 		wall_t *emptyw = &tsect->wall[pastedwid];
 		map_wall_copy(emptyw, loopw);
+		tsect->n++;
 		// after we paste, we must rename loop sector to target and loop wall id to new id.
 		map_wall_chain_rename(emptyw, new_sector, lp.sect, loopwid, new_sector, pastedwid, map);
-
+		emptyw->n=1;
 		emptyw->pos.x+= offset.x;
 		emptyw->pos.y+= offset.y;
 	}
+	tsect->wall[tsect->n-1].n = -lp.nwalls+1; // close loop.
+
+
 	// new loop is now repointed. - this means no bugs from linked sectors.
 	// now old loop is invalid so we can erase it
 	map_sect_loop_erase(lp.sect,lp.wallids[0],map);
