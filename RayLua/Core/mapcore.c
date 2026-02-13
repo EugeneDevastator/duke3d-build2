@@ -1648,74 +1648,6 @@ sector_loops_t map_sect_get_loops(int sect_id, mapstate_t *map) {
 	return result;
 }
 
-int map_sect_destroy_loop(int sect_id, int loop_wall_id, mapstate_t *map) {
-	sector_loops_t sector_loops = map_sect_get_loops(sect_id, map);
-
-	// Find which loop contains the wall
-	int target_loop_idx = -1;
-	for (int i = 0; i < sector_loops.loop_count; i++) {
-		for (int j = 0; j < sector_loops.loops[i].nwalls; j++) {
-			if (sector_loops.loops[i].wallids[j] == loop_wall_id) {
-				target_loop_idx = i;
-				break;
-			}
-		}
-		if (target_loop_idx >= 0) break;
-	}
-
-	if (target_loop_idx < 0) return -1; // Wall not found
-
-	sect_t *sec = &map->sect[sect_id];
-	loopinfo remove_loop = sector_loops.loops[target_loop_idx];
-
-	// Calculate new wall count
-	int new_wall_count = sec->n - remove_loop.nwalls;
-	if (new_wall_count <= 0) {
-		sec->n = 0;
-		return -1; // Sector becomes empty
-	}
-
-	// Create new wall array with remaining loops
-	wall_t *new_walls = malloc(sec->nmax * sizeof(wall_t));
-	int new_idx = 0;
-
-	// Copy all loops except the target one
-	for (int loop_i = 0; loop_i < sector_loops.loop_count; loop_i++) {
-		if (loop_i == target_loop_idx) continue; // Skip target loop
-
-		loopinfo keep_loop = sector_loops.loops[loop_i];
-
-		// Copy walls from this loop
-		for (int wall_i = 0; wall_i < keep_loop.nwalls; wall_i++) {
-			int old_idx = keep_loop.wallids[wall_i];
-			new_walls[new_idx] = sec->wall[old_idx];
-
-			// Set up loop linking
-			if (wall_i == keep_loop.nwalls - 1) {
-				new_walls[new_idx].n = -keep_loop.nwalls + 1; // Last wall
-			} else {
-				new_walls[new_idx].n = 1; // Next wall
-			}
-
-			// Update external references
-			change_wall_links(sect_id, old_idx, sect_id, new_idx, map);
-
-			new_idx++;
-		}
-	}
-
-	// Disconnect external walls that pointed to removed loop
-	for (int i = 0; i < remove_loop.nwalls; i++) {
-		change_wall_links(sect_id, remove_loop.wallids[i], -1, -1, map);
-	}
-
-	// Replace old wall array
-	free(sec->wall);
-	sec->wall = new_walls;
-	sec->n = new_wall_count;
-
-	return 0;
-}
 
 int map_sect_extract_loop_to_new_sector(int origin_sect, int loop_wall_id, mapstate_t *map) {
 	loopinfo extract_loop = map_sect_get_loopinfo(origin_sect, loop_wall_id, map);
@@ -1783,6 +1715,71 @@ int map_sect_chip_off_loop(int origin_sect, int wal, mapstate_t *map) {
 	return new_sect_id;
 }
 
+
+#if 1 // ==================== HUMAN MADE BEAUTY =======================
+// HELPER only does mem write, sector and wall ids are used for chain rename only. And repoints walls.
+static void map_wall_loop_write_over_linear(wall_t* wall_array, loopinfo lp, int sectid_for_new_loop, int wall_start, mapstate_t *map) {
+	sect_t *tsect = &map->sect[sectid_for_new_loop];
+	sect_t *lpsect = &map->sect[lp.sect];
+	for (int i = 0; i < lp.nwalls; i++) {
+		int pastewid = wall_start + i;
+		int loopwid = lp.wallids[i];
+		wall_t *loopw = &lpsect->wall[loopwid];
+		wall_t *emptyw = &wall_array[pastewid];
+		map_wall_copy(emptyw, loopw);
+		emptyw->n = 1;
+		// sector remains, walls ordering changed.
+		map_wall_chain_rename(emptyw, sectid_for_new_loop, lp.sect, loopwid, sectid_for_new_loop, pastewid, map);
+		pastewid++;
+	}
+	wall_array[wall_start+lp.nwalls-1].n = -lp.nwalls+1; // close the loop.
+}
+
+// will erase loop and rearange all the other loops. expensive operation.
+void map_sect_loop_erase(int sectid, int wall_of_loop, mapstate_t *map) {
+	sector_loops_t slinfo = map_sect_get_loops(sectid, map);
+	int loopid = slinfo.loop_of_wall[wall_of_loop];
+	int new_wall_n = map->sect[sectid].n - slinfo.loops[loopid].nwalls;
+	wall_t *tempwalls = (wall_t*)malloc(new_wall_n * sizeof(wall_t));
+	sect_t *sect = &map->sect[sectid];
+	int spandex = 0;
+	for (int i = 0; i < slinfo.loop_count; i++) {
+		if (i == loopid)
+			continue;
+		loopinfo lp = slinfo.loops[i];
+		map_wall_loop_write_over_linear(tempwalls,lp, sectid, spandex,map);
+		spandex += lp.nwalls;
+	}
+	sect->n = new_wall_n;
+	// sect->nmax retained - we removed loop!
+	// dst, source, n elements
+	memcpy(sect->wall, tempwalls, new_wall_n*sizeof(wall_t));
+	free(tempwalls);
+}
+// non destructive loop, but will produce incorrect state due to double pointing.
+int map_loop_append_by_info(loopinfo lp, int new_sector, point2d offset, mapstate_t *map) {
+	sect_t* tsect = &map->sect[new_sector];
+	sect_t* lpsect = &map->sect[lp.sect];
+	int tsect_wall_start = tsect->n;
+	map_sect_walls_add_empty(new_sector, lp.nwalls, map);
+	map_wall_loop_write_over_linear(tsect->wall, lp, new_sector, tsect_wall_start, map);
+	tsect->n+= lp.nwalls;
+
+	return tsect_wall_start;
+}
+
+// destructive for sector of the moved loop.
+int map_loop_move_by_info(loopinfo lp, int new_sector, point2d offset, mapstate_t *map) {
+	int new_loop_start = map_loop_append_by_info(lp, new_sector, offset, map);
+
+	// new loop is now repointed. - this means no bugs from linked sectors.
+	// now old loop is invalid so we can erase it
+	map_sect_loop_erase(lp.sect,lp.wallids[0],map);
+	return new_loop_start;
+}
+
+#endif
+#if 1 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ai slop ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 int duplicate_loop_to_new_sector(int origin_sect, int loop_wall_id, mapstate_t *map, remap_table_t *remap) {
 	loopinfo extract_loop = map_sect_get_loopinfo(origin_sect, loop_wall_id, map);
 	sect_t *orig_sec = &map->sect[origin_sect];
@@ -1916,6 +1913,74 @@ void apply_wall_remapping(remap_table_t *remap, mapstate_t *map) {
 	}
 }
 
+int map_sect_destroy_loop(int sect_id, int loop_wall_id, mapstate_t *map) {
+	sector_loops_t sector_loops = map_sect_get_loops(sect_id, map);
+
+	// Find which loop contains the wall
+	int target_loop_idx = -1;
+	for (int i = 0; i < sector_loops.loop_count; i++) {
+		for (int j = 0; j < sector_loops.loops[i].nwalls; j++) {
+			if (sector_loops.loops[i].wallids[j] == loop_wall_id) {
+				target_loop_idx = i;
+				break;
+			}
+		}
+		if (target_loop_idx >= 0) break;
+	}
+
+	if (target_loop_idx < 0) return -1; // Wall not found
+
+	sect_t *sec = &map->sect[sect_id];
+	loopinfo remove_loop = sector_loops.loops[target_loop_idx];
+
+	// Calculate new wall count
+	int new_wall_count = sec->n - remove_loop.nwalls;
+	if (new_wall_count <= 0) {
+		sec->n = 0;
+		return -1; // Sector becomes empty
+	}
+
+	// Create new wall array with remaining loops
+	wall_t *new_walls = malloc(sec->nmax * sizeof(wall_t));
+	int new_idx = 0;
+
+	// Copy all loops except the target one
+	for (int loop_i = 0; loop_i < sector_loops.loop_count; loop_i++) {
+		if (loop_i == target_loop_idx) continue; // Skip target loop
+
+		loopinfo keep_loop = sector_loops.loops[loop_i];
+
+		// Copy walls from this loop
+		for (int wall_i = 0; wall_i < keep_loop.nwalls; wall_i++) {
+			int old_idx = keep_loop.wallids[wall_i];
+			new_walls[new_idx] = sec->wall[old_idx];
+
+			// Set up loop linking
+			if (wall_i == keep_loop.nwalls - 1) {
+				new_walls[new_idx].n = -keep_loop.nwalls + 1; // Last wall
+			} else {
+				new_walls[new_idx].n = 1; // Next wall
+			}
+
+			// Update external references
+			change_wall_links(sect_id, old_idx, sect_id, new_idx, map);
+
+			new_idx++;
+		}
+	}
+
+	// Disconnect external walls that pointed to removed loop
+	for (int i = 0; i < remove_loop.nwalls; i++) {
+		change_wall_links(sect_id, remove_loop.wallids[i], -1, -1, map);
+	}
+
+	// Replace old wall array
+	free(sec->wall);
+	sec->wall = new_walls;
+	sec->n = new_wall_count;
+
+	return 0;
+}
 // must also move loops to appropriate cut sector by points checking.
 int map_sect_chip_off_loop_clean(int origin_sect, int loop_wall_id, mapstate_t *map) {
 	remap_table_t remap = {0};
@@ -1969,8 +2034,6 @@ int map_sect_chip_off_loop_clean(int origin_sect, int loop_wall_id, mapstate_t *
 	free(remap.remaps);
 	return new_sect_id;
 }
-
-
 void map_loop_move_to_new_sect(int orig_sect, int wall, int new_sect, mapstate_t *map) {
 	loopinfo loop = map_sect_get_loopinfo(orig_sect, wall, map);
 	sect_t *orig_sec = &map->sect[orig_sect];
@@ -2005,63 +2068,6 @@ void map_loop_move_to_new_sect(int orig_sect, int wall, int new_sect, mapstate_t
 
 	// Remove loop from original sector
 	compact_sector_remove_loop(orig_sect, wall, &(remap_table_t){0}, map);
-}
-
-
-void map_sect_loop_erase(int sectid, int wall_of_loop, mapstate_t *map) {
-	sector_loops_t slinfo = map_sect_get_loops(sectid, map);
-	int loopid = slinfo.loop_of_wall[wall_of_loop];
-	int new_wall_n = map->sect[sectid].n - slinfo.loops[loopid].nwalls;
-	wall_t *tempwalls = (wall_t*)malloc(new_wall_n * sizeof(wall_t));
-	sect_t *sect = &map->sect[sectid];
-	int spandex = 0;
-	for (int i = 0; i < slinfo.loop_count; i++) {
-		if (i == loopid)
-			continue;
-		// recopy walls into new array and do rename for wall indices only.
-		loopinfo lp = slinfo.loops[i];
-		for (int iloopwal = 0; iloopwal < lp.nwalls; iloopwal++) {
-			int oriwalid = lp.wallids[iloopwal];
-			map_wall_copy(&tempwalls[spandex], &sect->wall[oriwalid]);
-			tempwalls[spandex].n = 1;
-			// sector remains, walls ordering changed.
-			map_wall_chain_rename(&tempwalls[spandex], sectid, sectid, oriwalid, sectid, spandex, map);
-			spandex++;
-		}
-		tempwalls[spandex - 1].n = -lp.nwalls + 1; // close the loop.
-	}
-	sect->n = new_wall_n;
-	// sect->nmax retained - we removed loop!
-	// dst, source, n elements
-	memcpy(sect->wall, tempwalls, new_wall_n*sizeof(wall_t));
-	free(tempwalls);
-}
-
-int map_loop_move_by_info(loopinfo lp, int new_sector, point2d offset, mapstate_t *map) {
-	sect_t* tsect = &map->sect[new_sector];
-	sect_t* lpsect = &map->sect[lp.sect];
-	int tsect_wall_start = tsect->n;
-	map_sect_walls_add_empty(new_sector, lp.nwalls, map);
-	for (int i=0; i<lp.nwalls; i++) {
-		int loopwid = lp.wallids[i];
-		int pastedwid = i+tsect_wall_start;
-		wall_t *loopw = &lpsect->wall[loopwid];
-		wall_t *emptyw = &tsect->wall[pastedwid];
-		map_wall_copy(emptyw, loopw);
-		tsect->n++;
-		// after we paste, we must rename loop sector to target and loop wall id to new id.
-		map_wall_chain_rename(emptyw, new_sector, lp.sect, loopwid, new_sector, pastedwid, map);
-		emptyw->n=1;
-		emptyw->pos.x+= offset.x;
-		emptyw->pos.y+= offset.y;
-	}
-	tsect->wall[tsect->n-1].n = -lp.nwalls+1; // close loop.
-
-
-	// new loop is now repointed. - this means no bugs from linked sectors.
-	// now old loop is invalid so we can erase it
-	map_sect_loop_erase(lp.sect,lp.wallids[0],map);
-	return tsect_wall_start;
 }
 void map_loop_copy_to_sector(int from_sect, int wall_id, int to_sect, mapstate_t *map) {
 	loopinfo loop = map_sect_get_loopinfo(from_sect, wall_id, map);
@@ -2207,8 +2213,4 @@ int map_sect_chip_off_via_copy(int origin_sect, int chip_loop_wall_id, int retai
     return schi_id;
 }
 
-
-
-
-
-
+#endif
