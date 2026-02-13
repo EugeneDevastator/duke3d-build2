@@ -1323,13 +1323,19 @@ int insideloop(double x, double y, wall_t *wal) {
 	wall_t *wcur = wal;
 	int idxsum = 0;
 	do {
-		if ((wcur->y < y) != (y <= wnex->y)) continue;
+		if ((wcur->y < y) != (y <= wnex->y)) {
+			idxsum+=wcur->n;
+			wcur = wnex;
+			wnex = wcur+wcur->n;
+			if (idxsum==0) break;
+			continue;
+		}
 		if ((((double) wnex->x - (double) wcur->x) * (y - (double) wcur->y) <
 		     ((double) wnex->y - (double) wcur->y) * (x - (double) wcur->x)) != (wnex->y < wcur->y))
 			c++;
+		idxsum+=wcur->n;
 		wcur = wnex;
-		idxsum+=wal->n;
-		wnex = wal+wal->n;
+		wnex = wcur+wcur->n;
 	} while (idxsum != 0);
 	return(c&1);
 }
@@ -1555,14 +1561,15 @@ void map_wall_chain_rename(wall_t* wall_of_chain, long scansectid, int secid_old
 			updates[update_count].is_chain = 1;
 			update_count++;
 		}
-		// this check for cases when we moved new sector.
+
+		//// this check for cases when we moved new sector.
 		//if (wal->ns == current_s || wal->nschain == current_s) {
-		//	updates[update_count].s = secid_new;
-		//	updates[update_count].w = wal->nw;
+		//	updates[update_count].s = current_s;
+		//	updates[update_count].w = current_w;
 		//	updates[update_count].is_chain = 0;
 		//	update_count++;
-		//	updates[update_count].s = secid_new;
-		//	updates[update_count].w = wal->nwchain;
+		//	updates[update_count].s = current_s;
+		//	updates[update_count].w = current_w;
 		//	updates[update_count].is_chain = 1;
 		//	update_count++;
 		//}
@@ -1806,6 +1813,7 @@ int map_sect_chip_off_loop(int orig_sectid, int walmove, int wallretain, mapstat
 
 	int new_sect_id = map_append_sect(map,0);
 	if (new_sect_id < 0) return -1;
+	map_sect_copy_prop_data(orig_sectid, new_sect_id, map);
 	// Count walls in each potential loop
 
 	sector_loops_t slinfo = map_sect_get_loops(orig_sectid, map);
@@ -1817,6 +1825,7 @@ int map_sect_chip_off_loop(int orig_sectid, int walmove, int wallretain, mapstat
 	// Determine which loop is smaller (inner loop)
 	int chip_wall_id = walmove;
 
+	// no need
 	// before we do anything we must remap retained walls to point to new sector.
 //wall_t *wcur = &map->sect[orig_sectid].wall[wallretain];
 //int idxsum = 0;
@@ -1841,7 +1850,7 @@ int map_sect_chip_off_loop(int orig_sectid, int walmove, int wallretain, mapstat
 	int nmainwalls = loopold.nwalls;
 
 	// pass to check which loops go where.
-	wall_t *move_checkwwall = &map->sect[orig_sectid].wall[walmove];
+	wall_t *move_checkwwall = &map->sect[new_sect_id].wall[0]; // check against first loop,
 	int spandex = 0;
 	for (int i = 0; i < slinfo.loop_count; i++) {
 		if (i == loopidchip || i == loopidbig)

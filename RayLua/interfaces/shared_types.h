@@ -246,6 +246,7 @@ free((arena).data); \
 // 1024 build units(x,y) correspond to 32 pixels. at 4,4 repeat
 // 8192 z build units correspond to 32 pixels at 8x8 repeat.
 
+#define TAG_COUNT_PER_SECT 16
 
 #define PAN_TO_UV (1.0/8.0) // uvscale = pan * p2uv
 
@@ -503,7 +504,7 @@ typedef struct
 	// other
 
 	long owner;      //for dragging while editing, other effects during game
-	int32_t tags[16];
+	int32_t tags[TAG_COUNT_PER_SECT];
 	uint16_t mflags[4];
 	short scriptid,lotag,hitag;
 	// int nwperim - perimeter walls, would be first in sequence

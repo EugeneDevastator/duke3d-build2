@@ -832,21 +832,6 @@ void WallDrawAccept() {
 			break;
 		}
 	} while (w != entry_point_A);
-// New algo proposal:
-	// recreate sectors using outer loops.
-	// 1. find outermost loop of oriignal sector.
-	// 1.1 make new sector out of it SOri
-	// 1.2 make new sector out of chipped loop SChi, maintain wall mapping. old -> new wall.
-	// remap all walls of SOri immideately - preserve original sector id for unchanged walls. and use mapping from schi to remap those.
-	// 2. scan all loops _belonging_ to orig. sectror,
-	// check tif they belong to smallest of orig or new loop - and make copies of them to proper one,
-	// this check will alow us to even draw around sectors, which is sortof dope.
-	// applying wall remapping right away.
-	// need method map_loops_copy(sect_from, sect_to, wall_from, map)
-	// 3. after copies are made - walls of original sector can be  created by that of SOri.
-	// 4. SChi remains as is because it is new.
-
-
 
 
 printf("needs split = %o", needs_split);
