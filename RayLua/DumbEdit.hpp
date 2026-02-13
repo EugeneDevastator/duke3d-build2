@@ -863,7 +863,8 @@ loop2_count = l2.nwalls;
 		printf("loop_counts = %i, %i of %i", loop1_count, loop2_count, map->sect[origin_sect].n);
 		int decidedcount = loop1_count < loop2_count ? loop1_count : loop2_count;
 		int chipwall = loop1_count < loop2_count ? entry_point_A : walAprev;
-		int res = map_sect_chip_off_loop_clean(origin_sect,chipwall, map);
+		int redainwall = loop1_count >= loop2_count ? entry_point_A : walAprev;
+		int res = map_sect_chip_off_via_copy(origin_sect,chipwall, redainwall, map);
 	}
 	checksprisect_imp(-1, map);
 	loopn = 0;
@@ -1146,7 +1147,7 @@ void EditorUpdate(const Camera3D rlcam) {
 	if (IsKeyPressed(KEY_M) && ISHOVERWAL) {
 		// this works
 		//map_sect_remove_loop_data(hoverfoc.sec,hoverfoc.wal, map);
-		map_sect_chip_off_loop(hoverfoc.sec,hoverfoc.wal, map);
+		map_loop_copy_relocate(hoverfoc.sec,hoverfoc.wal, hoverfoc.sec, map);
 	}
 	// process raycasts;
 	HandleSelectionModes();

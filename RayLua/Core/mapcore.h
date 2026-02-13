@@ -12,6 +12,7 @@
 
 #include "kplib.h"
 #include "artloader.h"
+#include "../DukeGame/source/build.h"
 #include "../interfaces/shared_types.h"
 #ifndef PI
 #define PI 3.141592653589793
@@ -58,7 +59,6 @@ typedef struct {
 
 typedef struct {
 	long sect;
-	long startwall;
 	int nwalls;
 	uint16_t wallids[MAX_WALLS_PER_SECT];
 } loopinfo;
@@ -68,6 +68,8 @@ typedef struct {
 	int sect_id;
 	int loop_count;
 	loopinfo loops[MAX_LOOPS_PER_SECT]; // Max loops per sector
+	uint8_t loop_of_wall[MAX_WALLS_PER_SECT];
+
 } sector_loops_t;
 
 
@@ -174,7 +176,6 @@ static inline loopinfo map_sect_get_loopinfo(int secid, int startwal, mapstate_t
 
 	// Allocate memory for wall IDs
 	result.sect = secid;
-	result.startwall = startwal;
 	result.nwalls = count;
 
 	// Second pass - fill wall IDs
@@ -552,9 +553,13 @@ static void delsect_imp (int s, mapstate_t* map)
 static inline int mapwallnextid(int s, int w, mapstate_t *map) {
 	return map->sect[s].wall[w].n+w;
 }
-
+// will scan based on sector
 void change_wall_links(int sec_orig, int wall_orig, int sec_new, int wall_new, mapstate_t *map);
 // will only remove loop witohut any relinking.
+
+// will rename specific links on given wall chan
+void map_wall_chain_rename(wall_t* wall_of_chain, long scansectid, int sec_orig, int wall_orig, int sec_new, int wall_new, mapstate_t *map);
+
 int map_sect_remove_loop_data(int sect_id, int any_wall_id, mapstate_t *map);
 sector_loops_t map_sect_get_loops(int sect_id, mapstate_t *map);
 // Remove loop from sector destroying its references.
@@ -586,9 +591,40 @@ int compact_sector_remove_loop(int sect_id, int loop_wall_id, remap_table_t *rem
 
 // Step 3: Apply all remappings
 void apply_wall_remapping(remap_table_t *remap, mapstate_t *map);
-void map_loop_move_to_new_sect(int orig_sect, int wall, int new_sect, mapstate_t *map);
-int map_sect_chip_off_via_copy(int origin_sect, int loop_wall_id, mapstate_t *map);
+
+int map_sect_chip_off_via_copy(int origin_sect, int chip_loop_wall_id, int retained_wall_id, mapstate_t *map);
 
 // High-level clean operation
 int map_sect_chip_off_loop_clean(int origin_sect, int loop_wall_id, mapstate_t *map);
+
+static inline void map_wall_copy( wall_t *target, wall_t *source_wall) {
+	memcpy(target, source_wall, sizeof(wall_t));
+}
+// -------------- SECT OPS --------------
+static inline void map_sect_walls_add_empty(int sectid, int additional_wall_number, mapstate_t* map) {
+	sect_t* new_sec = &map->sect[sectid];
+	int new_total = new_sec->n + additional_wall_number;
+	if (new_total > new_sec->nmax) {
+		new_sec->nmax = new_total + 16;
+		new_sec->wall = (wall_t*)realloc(new_sec->wall, new_sec->nmax * sizeof(wall_t));
+	}
+	//new_sec->n = new_total;
+}
+	// -------------- LOOP OPERATIONS ------------------
+void map_loop_move_to_new_sect(int orig_sect, int wall, int new_sect, mapstate_t *map);
+
+
+int map_loop_move_by_info(loopinfo lp, int new_sector, point2d offset, mapstate_t *map);
+
+// will dupe the loop, but retarget destination walls!
+static inline void map_loop_copy_relocate(int sect_orig, int wall_of_loop, int new_sector, mapstate_t *map) {
+	loopinfo li = map_sect_get_loopinfo(sect_orig, wall_of_loop, map);
+	point2d p = {0,0};
+	map_loop_move_by_info(li, new_sector, p, map);
+}
+
+// will discard loop from sector memory, no relinking will be done!
+// can call with -1 to just rearrange loops.
+void map_sect_loop_erase(int sectid, int wall_of_loop, mapstate_t *map);
+
 #endif //BUILD2_MAPCORE_H
