@@ -1774,34 +1774,47 @@ void map_sect_loop_erase(int sectid, int wall_of_loop, mapstate_t *map) {
 #if 1 // ======================= LOOP AND SECTOR  GROUPED MOVEMENT ==================
 
 // HELPER
-static void map_sect_translate_raw(int s, point3d offset, mapstate_t * map) {
+static void map_sect_translate_raw(int s, point3d offset, mapstate_t *map) {
 	sect_t *sectr = &map->sect[s];
 	for (int i = 0; i < sectr->n; ++i) {
-		sectr->wall[i].pos.x+offset.x;
-		sectr->wall[i].pos.y+offset.y;
-		sectr->z[0]+= offset.z;
-		sectr->z[1]+= offset.z;
+		if (offset.x > 0.4f)
+			int a = 1;
+		sectr->wall[i].pos.x += offset.x;
+		sectr->wall[i].pos.y += offset.y;
+		sectr->z[0] += offset.z;
+		sectr->z[1] += offset.z;
 	}
 }
+static int sect_translate_border_s;
 // HELPER
 static void map_sect_translate_recurse(int s_toscan, point3d offset, mapstate_t * map) {
 	sectmask_mark_sector(s_toscan);
 	map_sect_translate_raw(s_toscan, offset,map);
+
 	int wallnum= map->sect[s_toscan].n;
 	for (int i = 0; i < wallnum; ++i) {
-		vertlist_t* v;
+		vertlist_t v[256];
 		int nverts = getwalls_chain(s_toscan, i, v,256, map);
 		for (int iv=0;iv< nverts;iv++) {
 			if (!sectmask_was_marked(v[iv].s))
-				map_sect_translate_raw(v[iv].s, offset, map);
+				map_sect_translate_recurse(v[iv].s, offset, map);
+// move only touching walls of border sector.
+			if (v[iv].s == sect_translate_border_s) {
+				map->sect[v[iv].s].wall[v[iv].w].pos.x += offset.x;
+				map->sect[v[iv].s].wall[v[iv].w].pos.y += offset.y;
+			}
 		}
 	}
 }
+
 void map_sect_translate(int s_start, int outer_ignore, point3d offset, mapstate_t *map) {
 	sectmask_reset();
 	sectmask_mark_sector(outer_ignore);
 	sect_t *sectr = &map->sect[s_start];
+	sect_translate_border_s = outer_ignore;
 	map_sect_translate_recurse(s_start, offset,map);
+
+
 }
 
 // non destructive loop, but will produce incorrect state due to double pointing.
