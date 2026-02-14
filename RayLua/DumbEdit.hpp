@@ -596,6 +596,13 @@ void LoopDrawUpdate() {
 		map->spri[s].tilnum = 1;
 		ctx.op = discard;
 	}
+	if (IsKeyPressed(KEY_TWO) && loopn == 1) {
+		// split walls
+		if (hoverfoc.wal >= 0) {
+			splitwallat(hoverfoc.sec, hoverfoc.wal, hoverfoc.hitpos, map);
+		}
+		ctx.op = discard;
+	}
 	if (IsKeyPressed(KEY_SPACE)) {
 		//add
 		if (hoverfoc.sec >= 0) {
@@ -621,15 +628,16 @@ void LoopDrawUpdate() {
 		// add bool to not auto insec.
 		bool alsoMakeSec = !IsKeyDown(KEY_LEFT_SHIFT);
 		int isflip = (is_loop2d_ccw(loopts_p2d,loopn));
-		int thiswid = sect_appendwall_loop(&map->sect[hoverfoc.sec], loopn, loopts_p2d, isflip);
+		int own_wid_new = sect_appendwall_loop(&map->sect[hoverfoc.sec], loopn, loopts_p2d, isflip);
 
 
 		if (alsoMakeSec) {
 			int newsec = map_append_sect_from_loop(loopn, loopts_p2d, HOVERSEC.z[1], HOVERSEC.z[1] - HOVERSEC.z[0], map,
 			                                       !isflip);
-			loopinfo lithis = map_sect_get_loopinfo(loopts[0].sect, thiswid, map);
+			loopinfo lithis = map_sect_get_loopinfo(loopts[0].sect, own_wid_new, map);
 			loopinfo linew = map_sect_get_loopinfo(newsec, 0, map);
 			int res = map_loops_join_mirrored(lithis, linew, map);
+			map_sect_rearrange_loops(hoverfoc.sec, newsec,own_wid_new,map);
 		}
 		loopn = 0;
 
@@ -722,6 +730,7 @@ void WallDrawAccept() {
 		(loopts[0].pos.z + loopts[1].pos.z) * 0.5f
 	};
 
+	// can potentially backfire
 	int origin_sect = -1;
 	updatesect_p(midpoint, &origin_sect, map);
 

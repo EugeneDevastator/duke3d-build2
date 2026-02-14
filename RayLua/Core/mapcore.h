@@ -615,7 +615,8 @@ static inline void map_sect_walls_add_empty(int sectid, int additional_wall_numb
 }
 	// -------------- LOOP OPERATIONS ------------------
 //void map_loop_move_to_new_sect(int new_sect, int orig_sect, int wall_of_loop, mapstate_t *map);
-
+// distributes loops between sectors, after bool ops etc.
+int map_sect_rearrange_loops(int orig_sectid, int second_sect_id, int ignorewall, mapstate_t *map);
 int map_loop_append_by_info(loopinfo lp, int new_sector, point2d offset, mapstate_t *map);
 int map_loop_move_by_info(loopinfo lp, int new_sector, point2d offset, mapstate_t *map);
 void map_sect_loop_erase(int sectid, int wall_of_loop, mapstate_t *map);
