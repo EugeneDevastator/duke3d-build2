@@ -2,7 +2,7 @@
 #include "mapcore.h"
 
 #include "buildmath.h"
-
+#include "sectmask.h"
 #define USEHEIMAP 1
 #define NOSOUND 1
 #define STANDALONE 1
@@ -1770,6 +1770,40 @@ void map_sect_loop_erase(int sectid, int wall_of_loop, mapstate_t *map) {
 	memcpy(sect->wall, tempwalls, new_wall_n*sizeof(wall_t));
 	free(tempwalls);
 }
+
+#if 1 // ======================= LOOP AND SECTOR  GROUPED MOVEMENT ==================
+
+// HELPER
+static void map_sect_translate_raw(int s, point3d offset, mapstate_t * map) {
+	sect_t *sectr = &map->sect[s];
+	for (int i = 0; i < sectr->n; ++i) {
+		sectr->wall[i].pos.x+offset.x;
+		sectr->wall[i].pos.y+offset.y;
+		sectr->z[0]+= offset.z;
+		sectr->z[1]+= offset.z;
+	}
+}
+// HELPER
+static void map_sect_translate_recurse(int s_toscan, point3d offset, mapstate_t * map) {
+	sectmask_mark_sector(s_toscan);
+	map_sect_translate_raw(s_toscan, offset,map);
+	int wallnum= map->sect[s_toscan].n;
+	for (int i = 0; i < wallnum; ++i) {
+		vertlist_t* v;
+		int nverts = getwalls_chain(s_toscan, i, v,256, map);
+		for (int iv=0;iv< nverts;iv++) {
+			if (!sectmask_was_marked(v[iv].s))
+				map_sect_translate_raw(v[iv].s, offset, map);
+		}
+	}
+}
+void map_sect_translate(int s_start, int outer_ignore, point3d offset, mapstate_t *map) {
+	sectmask_reset();
+	sectmask_mark_sector(outer_ignore);
+	sect_t *sectr = &map->sect[s_start];
+	map_sect_translate_recurse(s_start, offset,map);
+}
+
 // non destructive loop, but will produce incorrect state due to double pointing.
 int map_loop_append_by_info(loopinfo lp, int new_sector, point2d offset, mapstate_t *map) {
 	sect_t* tsect = &map->sect[new_sector];
@@ -1781,7 +1815,7 @@ int map_loop_append_by_info(loopinfo lp, int new_sector, point2d offset, mapstat
 
 	return tsect_wall_start;
 }
-
+#endif
 // destructive for sector of the moved loop.
 int map_loop_move_by_info(loopinfo lp, int new_sector, point2d offset, mapstate_t *map) {
 	int new_loop_start = map_loop_append_by_info(lp, new_sector, offset, map);

@@ -634,5 +634,6 @@ static inline void map_loop_move_and_remap(int sect_to, int sect_from, int wall_
 // will discard loop from sector memory, no relinking will be done!
 // can call with -1 to just rearrange loops.
 
+void map_sect_translate(int s_start, int outer_ignore, point3d offset, mapstate_t * map);
 
 #endif //BUILD2_MAPCORE_H
