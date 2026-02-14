@@ -194,6 +194,11 @@ struct selbuffer_t {
 	}
 };
 
+// shared loop structure
+loopt loopts[100];
+point2d loopts_p2d[100];
+int loopn = 0;
+
 selbuffer_t selcurrent;
 selbuffer_t selstack[10];
 
@@ -378,10 +383,10 @@ void drawCylBoard(Vector3 origin, Vector3 endpoint, float width) {
 	drawCylBoard2( origin,  endpoint,  width,  width);
 }
 // ------------------ PICKGRAB
-transform savedtr;
+transform savedwtr;
 point3d localp1;
 point3d localp2;
-transform trdiff;
+transform virt_incam_tr;
 wall_idx verts[256];
 wall_idx verts2[256];
 int totalverts;
@@ -394,13 +399,13 @@ Vector2 origVert;
 
 void PickgrabDiscard() {
 	if (grabfoc.spri >= 0) {
-		map->spri[grabfoc.spri].tr = savedtr;
+		map->spri[grabfoc.spri].tr = savedwtr;
 	} else if (ISGRABWAL) {
-		map->sect[grabfoc.sec].wall[grabfoc.wal].x = savedtr.p.x;
-		map->sect[grabfoc.sec].wall[grabfoc.wal].y = savedtr.p.y;
+		map->sect[grabfoc.sec].wall[grabfoc.wal].x = savedwtr.p.x;
+		map->sect[grabfoc.sec].wall[grabfoc.wal].y = savedwtr.p.y;
 		for (int i = 0; i < totalverts; ++i) {
-			map->sect[verts[i].s].wall[verts[i].w].x = savedtr.p.x;
-			map->sect[verts[i].s].wall[verts[i].w].y = savedtr.p.y;
+			map->sect[verts[i].s].wall[verts[i].w].x = savedwtr.p.x;
+			map->sect[verts[i].s].wall[verts[i].w].y = savedwtr.p.y;
 			// move nextwall
 			//map->sect[grabfoc.sec].wall[grabfoc.wal2].x=tp2.x;
 			//map->sect[grabfoc.sec].wall[grabfoc.wal2].y=tp2.y;
@@ -427,15 +432,21 @@ void PickgrabAccept() {
 	grabfoc.spri = -1; // jsut do noting now.
 	ctx.mode = Fly;
 }
-
+int savedsec =0;
 void PickgrabUpdate() {
 	Vector2 dmov = GetMouseDelta();
 	float scrol = GetMouseWheelMove();
-	addto(&trdiff.p, scaled(BBDOWN, scrol * 0.2f));
-	addto(&localp2, scaled(BBDOWN, scrol * 0.2f));
+	// we need more transforms:
+	// 1. define transform on hitpoint or whenever virtr;
+	// 2. save it as copy.
+	// 3. save cam transform as copy.
+	// 4. when we move camera
+
+	//addto(&virt_incam_tr.p, p3scaled(BBDOWN, scrol * 0.2f));
+	addto(&localp2, p3scaled(BBDOWN, scrol * 0.2f));
 
 	if (ISGRABSPRI) {
-		map->spri[grabfoc.spri].tr = local_to_world_transform_p(trdiff, &cam->tr);
+		map->spri[grabfoc.spri].tr = local_to_world_transform_p(virt_incam_tr, &cam->tr);
 		int s = map->spri[grabfoc.spri].sect;
 		if (hoverfoc.sec >= 0) {
 			GRABSPRI.walcon = (signed char)hoverfoc.wal;
@@ -443,14 +454,26 @@ void PickgrabUpdate() {
 
 		updatesect_p(map->spri[grabfoc.spri].p, &s, map);
 		changesprisect_imp(grabfoc.spri, s, map);
-	} else if (ISGRABCAP) {
-		float newz = local_to_world_point(trdiff.p, &cam->tr).z;
-		int isflor = grabfoc.wal + 2;
-		GRABSEC.z[isflor] = newz;
-		if (IsKeyDown(KEY_LEFT_SHIFT)) {
-			GRABSEC.z[1 - isflor] = newz + savedHeight * ((1 - isflor) * 2 - 1);
-		}
-	} else if (ISGRABWAL) {
+	}
+	else if (ISGRABCAP) {
+		point3d newpos = local_to_world_point(virt_incam_tr.p, &cam->tr);
+		loopn =2;
+		loopts[0].pos = newpos;
+		loopts[1].pos = savedwtr.p;
+		//float newz = newpos.z;
+		//int isflor = grabfoc.wal + 2;
+		point3d offset = subtract(newpos, savedwtr.p);
+		map_sect_translate(grabfoc.sec, savedsec, offset,map);
+		savedwtr.p = newpos;
+		//if (false)
+		//{
+		//	GRABSEC.z[isflor] = newz;
+		//	if (IsKeyDown(KEY_LEFT_SHIFT)) {
+		//		GRABSEC.z[1 - isflor] = newz + savedHeight * ((1 - isflor) * 2 - 1);
+		//	}
+		//}
+	}
+	else if (ISGRABWAL) {
 		transform tmp;
 		point3d tp2;
 		bool isConstrainted = IsKeyDown(KEY_LEFT_SHIFT);
@@ -478,8 +501,8 @@ void PickgrabUpdate() {
 				// Ray parallel to plane, use mouse delta for movement
 				point3d right = cam->tr.r;
 				point3d down = cam->tr.d;
-				tmp.p.x = savedtr.p.x + dmov.x * 0.1f * right.x + dmov.y * -0.1f * down.x;
-				tmp.p.y = savedtr.p.y + dmov.x * 0.1f * right.y + dmov.y * -0.1f * down.y;
+				tmp.p.x = savedwtr.p.x + dmov.x * 0.1f * right.x + dmov.y * -0.1f * down.x;
+				tmp.p.y = savedwtr.p.y + dmov.x * 0.1f * right.y + dmov.y * -0.1f * down.y;
 			}
 
 			tp2.x = tmp.p.x + localp2.x;
@@ -554,16 +577,17 @@ void PickgrabUpdate() {
 
 void PickgrabStart() {
 	if (grabfoc.spri >= 0) {
-		savedtr = map->spri[grabfoc.spri].tr;
+		savedwtr = map->spri[grabfoc.spri].tr;
 	} else if (ISGRABCAP) {
-		savedtr = cam->tr;
-		savedtr.p = grabfoc.hitpos;
+		savedwtr = cam->tr;
+		savedwtr.p = hoverfoc.hitpos;
 		savedHeight = GRABSEC.z[1] - GRABSEC.z[0];
+		savedsec = cam->cursect;
 	} else if (grabfoc.wal >= 0 && grabfoc.sec >= 0) {
 		bool grabboth = false;
 		if (!grabboth) // grab both walls
 		{
-			savedtr = cam->tr;
+			savedwtr = cam->tr;
 			grabfoc.wal = hoverfoc.onewall;
 		}
 
@@ -571,10 +595,10 @@ void PickgrabStart() {
 		grabfoc.walprev = wallprev(&GRABSEC,grabfoc.wal);
 		//for red walls we'd need to grab verts of all adjacent walls.
 		// something in build2 was there for it.
-		savedtr = cam->tr;
-		savedtr.p.x = map->sect[grabfoc.sec].wall[grabfoc.wal].x;
-		savedtr.p.y = map->sect[grabfoc.sec].wall[grabfoc.wal].y;
-		origVert = {savedtr.p.x,savedtr.p.y};
+		savedwtr = cam->tr;
+		savedwtr.p.x = map->sect[grabfoc.sec].wall[grabfoc.wal].x;
+		savedwtr.p.y = map->sect[grabfoc.sec].wall[grabfoc.wal].y;
+		origVert = {savedwtr.p.x,savedwtr.p.y};
 		totalverts = getwallsofvert(grabfoc.sec, grabfoc.wal, verts, 256, map);
 
 		point2d wpos = getwall({grabfoc.wal2, grabfoc.sec}, map)->pos;
@@ -582,13 +606,13 @@ void PickgrabStart() {
 		localp2 = world_to_local_point(wpos3d, &cam->tr);
 		totalverts2 = getwallsofvert(grabfoc.sec, grabfoc.wal2, verts2, 256, map);
 	}
-	trdiff = world_to_local_transform_p(savedtr, &cam->tr);
+	virt_incam_tr = world_to_local_transform_p(savedwtr, &cam->tr);
+	//virt_incam_tr = savedwtr;
+	//virt_incam_tr.p = p3asvec(cam->tr.p,hoverfoc.hitpos);
 }
 
 // ----------------------- draw loop OPER ---------------------
-loopt loopts[100];
-point2d loopts_p2d[100];
-int loopn = 0;
+
 
 void LoopDrawUpdate() {
 	if (IsKeyPressed(KEY_THREE) && loopn == 1) {
@@ -1415,6 +1439,7 @@ void DrawGizmos() {
 	}
 	else
 	usefoc = hoverfoc;
+
 	if (usefoc.sec >=0) {
 		loopinfo cloop = map_sect_get_loopinfo(usefoc.sec, loopwall, map);
 		rlp2.y = rlp1.y = -map->sect[usefoc.sec].z[1];
@@ -1437,6 +1462,7 @@ void DrawGizmos() {
 		rlColor4ub(255, 255, 255, 255);
 		drawVert(buildToRaylib(loopts[i].pos));
 		rlColor4ub(230, 230, 230, 255);
+		//loop white line
 		drawCylBoard(buildToRaylib(loopts[i].pos), buildToRaylib(loopts[n].pos), 0.01);
 	}
 }

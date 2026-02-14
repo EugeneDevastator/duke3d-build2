@@ -442,8 +442,10 @@ typedef struct // wall t
 	Looking at the code patterns, ideally only one wall per loop should have a negative n value - the last wall that closes the loop.
 	*/
 
-	long n, ns, nw; //n:rel. wall ind.; ns & nw : nextsect & nextwall_of_sect
-	long nschain, nwchain; // for multiportal.
+	// difference between ns and nschain is that ns points right to the target opening
+	// but chains will be looped, similar to walls.
+	signed long n, ns, nw; //n:rel. wall ind.; ns & nw : nextsect & nextwall_of_sect
+	signed long nschain, nwchain; // for multiportal.
 	long owner; //for dragging while editing, other effects during game
 
 	uint8_t surfn;

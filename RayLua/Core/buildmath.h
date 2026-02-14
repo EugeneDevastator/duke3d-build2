@@ -48,6 +48,14 @@ static inline point3d subtract(point3d a, point3d b) {
     p.z = a.z - b.z;
     return p;
 }
+// inverse sub
+static inline point3d p3asvec(point3d origin, point3d endpoint) {
+    point3d p;
+    p.x = endpoint.x - origin.x;
+    p.y = endpoint.y - origin.y;
+    p.z = endpoint.z - origin.z;
+    return p;
+}
 static inline void addto(point3d *a, const point3d b) {
     a->x += b.x;
     a->y += b.y;
@@ -78,6 +86,14 @@ point3d p = pt;
     p.z*=s;
     return p;
 }
+static inline point3d p3scaled(const point3d pt, float s) {
+point3d p = pt;
+    p.x*=s;
+    p.y*=s;
+    p.z*=s;
+    return p;
+}
+
 static inline void scalardivv(point3d *pt, float diver) {
     pt->x /= diver; pt->y /= diver; pt->z /= diver;
 }

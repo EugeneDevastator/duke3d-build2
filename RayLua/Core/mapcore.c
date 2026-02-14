@@ -412,7 +412,7 @@ int getwalls_imp (int s, int w, vertlist_t *ver, int maxverts, mapstate_t *map)
 	return(vn);
 }
 
-// newer method
+// newer method, for render only,
 int getwalls_chain(int s, int w, vertlist_t *ver, int maxverts, mapstate_t *map) {
 	sect_t *sec = map->sect;
 	wall_t *startwal = &sec[s].wall[w];
@@ -1781,35 +1781,60 @@ static void map_sect_translate_raw(int s, point3d offset, mapstate_t *map) {
 			int a = 1;
 		sectr->wall[i].pos.x += offset.x;
 		sectr->wall[i].pos.y += offset.y;
-		sectr->z[0] += offset.z;
-		sectr->z[1] += offset.z;
 	}
+	sectr->z[0] += offset.z;
+	sectr->z[1] += offset.z;
 }
 static int sect_translate_border_s;
 // HELPER
 static void map_sect_translate_recurse(int s_toscan, point3d offset, mapstate_t * map) {
-	sectmask_mark_sector(s_toscan);
+	sectmask_mark_sector((s_toscan+1)*1000);
 	map_sect_translate_raw(s_toscan, offset,map);
 
-	int wallnum= map->sect[s_toscan].n;
-	for (int i = 0; i < wallnum; ++i) {
-		vertlist_t v[256];
-		int nverts = getwalls_chain(s_toscan, i, v,256, map);
-		for (int iv=0;iv< nverts;iv++) {
-			if (!sectmask_was_marked(v[iv].s))
-				map_sect_translate_recurse(v[iv].s, offset, map);
-// move only touching walls of border sector.
-			if (v[iv].s == sect_translate_border_s) {
-				map->sect[v[iv].s].wall[v[iv].w].pos.x += offset.x;
-				map->sect[v[iv].s].wall[v[iv].w].pos.y += offset.y;
+	int walln= map->sect[s_toscan].n;
+	for (int i = 0; i < walln; ++i) {
+
+		signed long nsc=-1;
+		signed long nwc=-1;
+		// scann wall slab.
+		nsc = map->sect[s_toscan].wall[i].nschain;
+		nwc = map->sect[s_toscan].wall[i].nwchain;
+		if (nsc<0)
+			continue;
+// maybe we dont care and cahins gurantee that each opposite wall will get scanned once.
+
+		while (nsc != s_toscan) {
+			if (nsc<0)
+				break;
+			if (nsc == sect_translate_border_s) {
+				if (!sectmask_was_marked(nwc)) {
+					sectmask_mark_sector(nwc);
+					map->sect[nsc].wall[nwc].pos.x += offset.x;
+					map->sect[nsc].wall[nwc].pos.y += offset.y;
+				}
+				// and we also need to move all verts here, not just nextwal.
+				int nexwid = map->sect[nsc].wall[nwc].n +nwc;
+				{
+					if (!sectmask_was_marked(nexwid))
+						sectmask_mark_sector(nexwid);
+					map->sect[nsc].wall[nexwid].pos.x += offset.x;
+					map->sect[nsc].wall[nexwid].pos.y += offset.y;
+				}
 			}
+			else if (!sectmask_was_marked((nsc+1)*1000)) {
+				map_sect_translate_recurse(nsc, offset, map);
+			}
+			wall_t *wall = &map->sect[nsc].wall[nwc];
+			signed long nsec = wall->nschain;
+			nwc = wall->nwchain;
+			nsc = nsec;
 		}
 	}
 }
 
 void map_sect_translate(int s_start, int outer_ignore, point3d offset, mapstate_t *map) {
 	sectmask_reset();
-	sectmask_mark_sector(outer_ignore);
+	sectmask_mark_sector((outer_ignore+1)*1000);
 	sect_t *sectr = &map->sect[s_start];
 	sect_translate_border_s = outer_ignore;
 	map_sect_translate_recurse(s_start, offset,map);
