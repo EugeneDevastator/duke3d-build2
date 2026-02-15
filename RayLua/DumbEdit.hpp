@@ -442,7 +442,7 @@ void PickgrabUpdate() {
 	// 3. save cam transform as copy.
 	// 4. when we move camera
 
-	//addto(&virt_incam_tr.p, p3scaled(BBDOWN, scrol * 0.2f));
+	addto(&virt_incam_tr.p, p3scaled(BBDOWN, scrol * 0.2f));
 	addto(&localp2, p3scaled(BBDOWN, scrol * 0.2f));
 
 	if (ISGRABSPRI) {
@@ -457,21 +457,24 @@ void PickgrabUpdate() {
 	}
 	else if (ISGRABCAP) {
 		point3d newpos = local_to_world_point(virt_incam_tr.p, &cam->tr);
-		loopn =2;
-		loopts[0].pos = newpos;
-		loopts[1].pos = savedwtr.p;
-		//float newz = newpos.z;
-		//int isflor = grabfoc.wal + 2;
-		point3d offset = subtract(newpos, savedwtr.p);
-		map_sect_translate(grabfoc.sec, savedsec, offset,map);
-		savedwtr.p = newpos;
-		//if (false)
-		//{
-		//	GRABSEC.z[isflor] = newz;
-		//	if (IsKeyDown(KEY_LEFT_SHIFT)) {
-		//		GRABSEC.z[1 - isflor] = newz + savedHeight * ((1 - isflor) * 2 - 1);
-		//	}
-		//}
+		if (false) // grab entire sect
+		{
+			loopn =2;
+			loopts[0].pos = newpos;
+			loopts[1].pos = savedwtr.p;
+			point3d offset = subtract(newpos, savedwtr.p);
+			map_sect_translate(grabfoc.sec, savedsec, offset,map);
+			savedwtr.p = newpos;
+		}
+		else if (true)
+		{
+			float newz = local_to_world_point(virt_incam_tr.p, &cam->tr).z;
+			int isflor = grabfoc.wal + 2;
+			GRABSEC.z[isflor] = newz;
+			if (IsKeyDown(KEY_LEFT_SHIFT)) {
+				GRABSEC.z[1 - isflor] = newz + savedHeight * ((1 - isflor) * 2 - 1);
+			}
+		}
 	}
 	else if (ISGRABWAL) {
 		transform tmp;
