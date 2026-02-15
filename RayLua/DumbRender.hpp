@@ -91,6 +91,7 @@ static UVShaderDesc uvShaderDesc;
 static Shader lightShader;
 static Shader skyShader;
 static int lightPosLoc;
+static int lightForLoc;
 static int lightRangeLoc;
 static bool syncam = true;
 static int cureyepoly = 0;
@@ -140,6 +141,7 @@ public:
 		skyShader = LoadShader("Shaders/skyparallax.vert", "Shaders/skyparallax.frag");
 
 		lightPosLoc = GetShaderLocation(lightShader, "lightPosition");
+		lightForLoc = GetShaderLocation(lightShader, "lightForwardVec");
 		lightRangeLoc = GetShaderLocation(lightShader, "lightRange");
 		char *lastSlash;
 		// Extract root path from full map path
@@ -536,6 +538,7 @@ public:
 				shadowtest2_light[shadowtest2_numlights].sect = map->spri[map->light_spri[i]].sect;
 				shadowtest2_light[shadowtest2_numlights].ligspri = i;
 				shadowtest2_light[shadowtest2_numlights].p = map->spri[map->light_spri[i]].p;
+				shadowtest2_light[shadowtest2_numlights].f = map->spri[map->light_spri[i]].f;
 				//   shadowtest2_light[shadowtest2_numlights].p.x += sin(GetTime()+shadowtest2_light[shadowtest2_numlights].p.y)*3;
 				k = ((map->spri[map->light_spri[i]].flags >> 17) & 7);
 				if (!k) { shadowtest2_light[shadowtest2_numlights].spotwid = -1.0; } else {
@@ -1096,7 +1099,9 @@ public:
 			for (int lightIndex = 0; lightIndex < shadowtest2_numlights; lightIndex++) {
 				lightpos_t *lght = &shadowtest2_light[lightIndex];
 				Vector3 lightpos = {lght->p.x, -lght->p.z, lght->p.y};
+				Vector3 lightf = {lght->f.x, -lght->f.z, lght->f.y};
 				SetShaderValue(lightShader, lightPosLoc, &lightpos, SHADER_UNIFORM_VEC3);
+				SetShaderValue(lightShader, lightForLoc, &lightf, SHADER_UNIFORM_VEC3);
 				SetShaderValue(lightShader, lightRangeLoc, &lightRange, SHADER_UNIFORM_FLOAT);
 				//   BeginShaderMode(uvShader_plain);
 				rlBegin(RL_TRIANGLES);
