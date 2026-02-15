@@ -14,9 +14,26 @@
 static const point3d BBRIGHT = {1,0,0};
 static const point3d BBFORWARD = {0,1,0};
 static const point3d BBDOWN = {0,0,1};
+static const point3d BBPZERO = {0,0,0};
+static const point3d BBPONE = {1,1,1};
 
 #define BPXY(p3d) {p3d.x, p3d.y}
 
+#if 1 // scalac p3 functions
+
+#endif
+
+#if 1 // p3 - p3 functions like distance
+
+#endif
+
+#if 1 // transform functions
+
+#endif
+
+#if 1 // Quats
+
+#endif
 
 static inline float vlen(point3d *p) {
     return sqrtf(p->x * p->x + p->y * p->y + p->z * p->z);
@@ -74,6 +91,12 @@ static inline void rot90cwz(point3d *a) {
     a->x = a->y;
     a->y = -t;
 }
+static inline point3d p3_rotated_90_cwz(point3d a) {
+    float t = a.x;
+    a.x = a.y;
+    a.y = -t;
+    return a;
+}
 static void vscalar(point3d *p, float s) {
     p->x*=s;
     p->y*=s;
@@ -93,6 +116,7 @@ point3d p = pt;
     p.z*=s;
     return p;
 }
+
 
 static inline void scalardivv(point3d *pt, float diver) {
     pt->x /= diver; pt->y /= diver; pt->z /= diver;
@@ -600,5 +624,17 @@ static inline void qrotlookat(transform *trsubj, point3d to, float normt) {
 
     qrotslerp(trsubj, &target, normt);
 }
+static inline transform tr_xyplanar_from_forward(point3d forwardvec) {
+    forwardvec.z=0;
+    point3d newf = normalizep3(forwardvec);
+    transform tr;
+    tr.f = newf;
+    tr.r = p3_rotated_90_cwz(newf);
+    tr.d = BBDOWN;
+    tr.p = BBPZERO;
+}
+
+
+
 
 #endif //RAYLIB_LUA_IMGUI_BUILDMATH_H

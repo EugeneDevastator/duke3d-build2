@@ -1570,7 +1570,9 @@ The plothead[0] and plothead[1] contain monotone polygon pairs representing
 the final visible geometry ready for 2D projection.
 The b parameter is a bunch index - this function processes one "bunch" (visible sector group) at a time. The traversal logic is in the caller that:
 */
-
+//  lights option: store eyepol chunks that WERE DRAWN
+//  before light gets drawn - reproject needed eyepols onto lights MPH space
+//  AND with light polys, and draw resulting intersections only.
 static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 	alphamul=1;
 	gtilenum = 0;
