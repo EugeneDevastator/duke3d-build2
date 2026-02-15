@@ -442,11 +442,11 @@ void PickgrabUpdate() {
 	// 3. save cam transform as copy.
 	// 4. when we move camera
 
-	addto(&virt_incam_tr.p, p3scaled(BBDOWN, scrol * 0.2f));
-	addto(&localp2, p3scaled(BBDOWN, scrol * 0.2f));
+	p3_addto(&virt_incam_tr.p, p3_scalar_mul_of(BBDOWN, scrol * 0.2f));
+	p3_addto(&localp2, p3_scalar_mul_of(BBDOWN, scrol * 0.2f));
 
 	if (ISGRABSPRI) {
-		map->spri[grabfoc.spri].tr = local_to_world_transform_p(virt_incam_tr, &cam->tr);
+		map->spri[grabfoc.spri].tr = tr_local_to_world(virt_incam_tr, &cam->tr);
 		int s = map->spri[grabfoc.spri].sect;
 		if (hoverfoc.sec >= 0) {
 			GRABSPRI.walcon = (signed char)hoverfoc.wal;
@@ -456,19 +456,19 @@ void PickgrabUpdate() {
 		changesprisect_imp(grabfoc.spri, s, map);
 	}
 	else if (ISGRABCAP) {
-		point3d newpos = local_to_world_point(virt_incam_tr.p, &cam->tr);
+		point3d newpos = p3_local_to_world(virt_incam_tr.p, &cam->tr);
 		if (false) // grab entire sect
 		{
 			loopn =2;
 			loopts[0].pos = newpos;
 			loopts[1].pos = savedwtr.p;
-			point3d offset = subtract(newpos, savedwtr.p);
+			point3d offset = p3_diff(newpos, savedwtr.p);
 			map_sect_translate(grabfoc.sec, savedsec, offset,map);
 			savedwtr.p = newpos;
 		}
 		else if (true)
 		{
-			float newz = local_to_world_point(virt_incam_tr.p, &cam->tr).z;
+			float newz = p3_local_to_world(virt_incam_tr.p, &cam->tr).z;
 			int isflor = grabfoc.wal + 2;
 			GRABSEC.z[isflor] = newz;
 			if (IsKeyDown(KEY_LEFT_SHIFT)) {
@@ -547,8 +547,8 @@ void PickgrabUpdate() {
 		}
 
 		//else {
-		//    tmp = local_to_world_transform_p(trdiff, &cam->tr);
-		//    tp2 = local_to_world_point(localp2, &cam->tr);
+		//    tmp = tr_local_to_world(trdiff, &cam->tr);
+		//    tp2 = p3_local_to_world(localp2, &cam->tr);
 		//}
 
 		map->sect[grabfoc.sec].wall[grabfoc.wal].x = outpos.x;
@@ -606,12 +606,12 @@ void PickgrabStart() {
 
 		point2d wpos = getwall({grabfoc.wal2, grabfoc.sec}, map)->pos;
 		point3d wpos3d = {wpos.x, wpos.y, 0};
-		localp2 = world_to_local_point(wpos3d, &cam->tr);
+		localp2 = p3_world_to_local(wpos3d, &cam->tr);
 		totalverts2 = getwallsofvert(grabfoc.sec, grabfoc.wal2, verts2, 256, map);
 	}
-	virt_incam_tr = world_to_local_transform_p(savedwtr, &cam->tr);
+	virt_incam_tr = tr_world_to_local(savedwtr, &cam->tr);
 	//virt_incam_tr = savedwtr;
-	//virt_incam_tr.p = p3asvec(cam->tr.p,hoverfoc.hitpos);
+	//virt_incam_tr.p = p3_make_vector(cam->tr.p,hoverfoc.hitpos);
 }
 
 // ----------------------- draw loop OPER ---------------------
@@ -1155,8 +1155,8 @@ void Editor_DoRaycasts(cam_t *cc) {
 		hoverfoc.walprev = wallprev(&HOVERSEC,hoverfoc.wal);
 		float z1 = getwallz(&map->sect[hoverfoc.sec], 1, hoverfoc.wal);
 		float z2 = getwallz(&map->sect[hoverfoc.sec], 1, hoverfoc.wal2);
-		float d1 = bmathdistsqrp2d({HOVERWAL.x, HOVERWAL.y}, BPXY(hoverfoc.hitpos));
-		float d2 = bmathdistsqrp2d({HOVERWAL2.x, HOVERWAL2.y}, BPXY(hoverfoc.hitpos));
+		float d1 = p2_distance({HOVERWAL.x, HOVERWAL.y}, BPXY(hoverfoc.hitpos));
+		float d2 = p2_distance({HOVERWAL2.x, HOVERWAL2.y}, BPXY(hoverfoc.hitpos));
 		hoverfoc.onewall = hoverfoc.wal;
 		if (d2 < d1) {
 			hoverfoc.onewall = hoverfoc.wal2;
@@ -1392,7 +1392,7 @@ void DrawGizmos() {
 	float mv = GetMouseWheelMove();
 	if (hoverfoc.spri >= 0) {
 		transform *sptr = &map->spri[hoverfoc.spri].tr;
-		qrotaxis(sptr, sptr->r, mv);
+		tr_quat_rotate_on_axis(sptr, sptr->r, mv);
 
 		Vector3 pos = buildToRaylibPos(sptr->p);
 		Vector3 fw = buildToRaylibPos(sptr->r);
@@ -1402,7 +1402,7 @@ void DrawGizmos() {
 		Vector3 bbmin = pos + Vector3{l, l, l};
 		Vector3 bbmax = pos - Vector3{l, l, l};
 		DrawBoundingBox({bbmax, bbmin}, LIME);
-		//   addto(&map->spri[focusedSprite].tr.p,scaled(right,mv));
+		//   p3_addto(&map->spri[focusedSprite].tr.p,p3_scalar_mul_of(right,mv));
 	}
 	focus_t usefoc;
 	Vector3 rlp1;

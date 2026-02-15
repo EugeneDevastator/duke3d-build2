@@ -262,11 +262,11 @@ public:
 					//  point3d newr = spr->tr.r;
 					//   point3d newd = spr->tr.r;
 					//   point3d newr = spr->tr.d;
-					//   vscalar(&newd,-1.0f);
+					//   p3_scalar_mul(&newd,-1.0f);
 					//   spr->tr.d = newd;
 					//   spr->tr.r = newr;
-					//  vscalar(&spr->tr.f,-1.0f);
-					//  normalize_transform(&spr->tr);
+					//  p3_scalar_mul(&spr->tr.f,-1.0f);
+					//  tr_normalize(&spr->tr);
 					p.destpn = map->sect[i].surf[1].hitag;
 					map->sect[i].tags[1] = portaln;
 					portaln++;
@@ -278,7 +278,7 @@ public:
 			uint32_t target_tag = portals[i].destpn; // currently stores expected hitag
 			portals[i].destpn = -1; // mark as unresolved
 			spri_t *spr = &map->spri[portals[i].anchorspri];
-			normalize_transform(&spr->tr);
+			tr_normalize(&spr->tr);
 
 			if (portals[i].id == target_tag) {
 				// handle mirrors.
@@ -290,7 +290,7 @@ public:
 				if (pcop.kind != PORT_WALL) // temp floor mirror hack
 				{
 					map->spri[nextsp].tr = map->spri[hspr].tr;
-					vscalar(&map->spri[nextsp].tr.d, -1);
+					p3_scalar_mul(&map->spri[nextsp].tr.d, -1);
 				}
 				pcop.anchorspri = nextsp;
 				pcop.destpn = i;
@@ -1417,7 +1417,7 @@ public:
 			lastcamtr2.p.x + lastcamtr2.d.x, lastcamtr2.p.y + lastcamtr2.d.y, lastcamtr2.p.z + lastcamtr2.d.z
 		};
 
-		wccw_transform_tr(&testp, &lastcamtr, &lastcamtr2);
+		tr_transform_wccw(&testp, &lastcamtr, &lastcamtr2);
 		DrawB2Point(&testp);
 	}
 

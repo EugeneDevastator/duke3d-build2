@@ -1030,19 +1030,19 @@ float scaler=1;
 			sur->uvcoords[0] = (point3d){wp.x, wp.y, z};
 			point3d uvec = (point3d){nwp.x, nwp.y, z};
 			// get ortho to wall,
-			point3d normU = subtract(uvec, sur->uvcoords[0]);
-			normU = normalizep3(normU);
+			point3d normU = p3_diff(uvec, sur->uvcoords[0]);
+			normU = p3_normalized(normU);
 			sur->uvcoords[1] = normU;
-			addto(&sur->uvcoords[1], sur->uvcoords[0]);
+			p3_addto(&sur->uvcoords[1], sur->uvcoords[0]);
 
-			rot90cwz(&normU);
+			p3_rot90_cwz(&normU);
 			// get sloped Z and normalize;
 			float vz = getslopez(sect, fl, normU.x+sur->uvcoords[0].x, normU.y+sur->uvcoords[0].y);
 			normU.z = vz-z;
-			normU = normalizep3(normU);
+			normU = p3_normalized(normU);
 
 			sur->uvcoords[2] = normU;
-			addto(&sur->uvcoords[2], sur->uvcoords[0]);
+			p3_addto(&sur->uvcoords[2], sur->uvcoords[0]);
 
 			sur->uvform[0] = xmul * scaler;
 			sur->uvform[1] = ymul * scaler;
@@ -1369,7 +1369,7 @@ int updatesect_portmove(transform *tr, int *cursect, mapstate_t *map) {
 						int ow = portals[d].destpn;
 						*cursect = portals[d].sect;
 
-						//wccw_transform_trp(pos, &map->spri[portals[ow].anchorspri].tr,
+						//p3_transform_wccw(pos, &map->spri[portals[ow].anchorspri].tr,
 						//                   &map->spri[portals[d].anchorspri].tr);
 						wccw_transform_full(tr, &map->spri[portals[ow].anchorspri].tr,
 										   &map->spri[portals[d].anchorspri].tr);

@@ -131,7 +131,7 @@ static inline dpoint3d portal_xform_world_fullr(double x, double y, double z, bd
 	p.x = x;
 	p.y = y;
 	p.z = z;
-	wccw_transform(&p, &b->cam, &b->orcam);
+	p3d_transform_wccw(&p, &b->cam, &b->orcam);
 	//loops[loopnum] = p;
 	//loopuse[loopnum] = true;
 	//loopnum++;
@@ -143,14 +143,14 @@ static inline void portal_xform_world_full(double *x, double *y, double *z, bdra
 	p.x = *x;
 	p.y = *y;
 	p.z = *z;
-	wccw_transform(&p, &b->cam, &b->orcam);
+	p3d_transform_wccw(&p, &b->cam, &b->orcam);
 	*x = p.x;
 	*y = p.y;
 	*z = p.z;
 }
 
 static inline void portal_xform_world_fullp(dpoint3d *inp, bdrawctx *b) {
-	wccw_transform(inp, &b->cam, &b->orcam);
+	p3d_transform_wccw(inp, &b->cam, &b->orcam);
 	//loops[loopnum] = *inp;
 	//loopuse[loopnum] = true;
 	//loopnum++;
@@ -778,7 +778,7 @@ float cross_product_eyev(int a, int b, int c) {
 	return (pb.x - pa.x) * (pc.y - pa.y) - (pb.y - pa.y) * (pc.x - pa.x);
 };
 static bool iseyeshared(int e1,int e2) {
-	return issamexyd(eyepolv[e1],eyepolv[e2]);
+	return p3d_issamexy(eyepolv[e1],eyepolv[e2]);
 }
 
 static int triangulate(const int *chain_starts, const int *chain_lengths, dpoint3d* verts, uint32_t* inds, int *indsn, bool needflip) {
@@ -992,7 +992,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 
 		dpoint3d ret = {retx, rety, retz};
 		eyepolvori[ip] = ret;
-		wccw_transform(&ret, &b->movedcam, &b->orcam);
+		p3d_transform_wccw(&ret, &b->movedcam, &b->orcam);
 		eyepolv[ip] = ret;
 	}
 
@@ -1090,7 +1090,7 @@ static void ligpoltagfunc(int rethead0, int rethead1, bdrawctx *b) {
 			                                 .f.y) * f + gcam.p.y;
 			glp->ligpolv[ip].z = ((fx - gcam.h.x) * gcam.r.z + (fy - gcam.h.y) * gcam.d.z + (gcam.h.z) * gcam
 			                                 .f.z) * f + gcam.p.z;
-		wccw_transform(&glp->ligpolv[ip], &b->movedcam, &b->orcam);
+		p3d_transform_wccw(&glp->ligpolv[ip], &b->movedcam, &b->orcam);
 	}
 
 	if (glp->ligpoln + 1 >= glp->ligpolmal) {
@@ -1158,7 +1158,7 @@ static void drawtag_debug(int rethead0, int rethead1, bdrawctx *b) {
 			if (b->recursion_depth > 1) {
 				//	LOOPADD(ret)
 			}
-			wccw_transform(&ret, &b->cam, &b->orcam);
+			p3d_transform_wccw(&ret, &b->cam, &b->orcam);
 			eyepolv[eyepolvn] = (dpoint3d){ret.x, ret.y, ret.z};
 
 			eyepolvn++;
@@ -1689,7 +1689,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		// Build polygon for ceiling/floor using plane equation:
 		plothead[0] = -1;
 		plothead[1] = -1;
-		point3d locnorm = world_to_local_vec(b->gnorm, &b->cam.tr);
+		point3d locnorm = p3_world_to_local_vec(b->gnorm, &b->cam.tr);
 		int ft=0;
 		if (drawcap)
 			ft = 1-isflor;
@@ -1974,7 +1974,7 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy) {
 	opercurr = 0;
 	int sec=-1,wal=-1,spr =-1;
 	point3d hit;
-	point3d f = sump3(cc->p,cc->f);
+	point3d f = p3sum(cc->p,cc->f);
 
 	draw_hsr_polymost_ctx(map, &bs);
 }
@@ -2307,7 +2307,7 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 						do {
 							if (h) i = mp[i].p;
 							// must find previous in coords of new, may need previous camera, not orcam.
-							wccw_transform(&mp[i].pos, &b->prevcam, &b->movedcam);
+							p3d_transform_wccw(&mp[i].pos, &b->prevcam, &b->movedcam);
 							if (!h) i = mp[i].n;
 						} while (i != b->chead[h]);
 					}
@@ -2426,31 +2426,31 @@ static void draw_hsr_enter_portal(mapstate_t *map, int myport, int head1, int he
 	spri_t ent = map->spri[entry];
 
 	// Normalize transforms to ensure orthonormality
-	normalize_transform(&ent.tr);
-	normalize_transform(&tgs.tr);
+	tr_normalize(&ent.tr);
+	tr_normalize(&tgs.tr);
 
 	// Step 1: Transform camera to entry portal's local space
 	// This finds the camera's position and orientation RELATIVE to the entry portal
-	point3d cam_local_pos = world_to_local_point(movcam.p, &ent.tr);
-	point3d cam_local_r = world_to_local_vec(movcam.r, &ent.tr);
-	point3d cam_local_d = world_to_local_vec(movcam.d, &ent.tr);
-	point3d cam_local_f = world_to_local_vec(movcam.f, &ent.tr);
+	point3d cam_local_pos = p3_world_to_local(movcam.p, &ent.tr);
+	point3d cam_local_r = p3_world_to_local_vec(movcam.r, &ent.tr);
+	point3d cam_local_d = p3_world_to_local_vec(movcam.d, &ent.tr);
+	point3d cam_local_f = p3_world_to_local_vec(movcam.f, &ent.tr);
 
 	// Step 2: Apply that same relative transform from the target portal's perspective
 	// Since entry.forward points IN and target.forward points OUT (already opposite),
 	// we just transform directly without any flips
-	movcam.p = local_to_world_point(cam_local_pos, &tgs.tr);
-	movcam.r = local_to_world_vec(cam_local_r, &tgs.tr);
-	movcam.d = local_to_world_vec(cam_local_d, &tgs.tr);
-	movcam.f = local_to_world_vec(cam_local_f, &tgs.tr);
+	movcam.p = p3_local_to_world(cam_local_pos, &tgs.tr);
+	movcam.r = p3d_local_to_world_vector(cam_local_r, &tgs.tr);
+	movcam.d = p3d_local_to_world_vector(cam_local_d, &tgs.tr);
+	movcam.f = p3d_local_to_world_vector(cam_local_f, &tgs.tr);
 	movcam.cursect = portals[endp].sect;
 	// to avoid winding problems with mono, we render with normalized camera
 	// then in dra eyepol we can just flip polygons as if camera was really flipped.
 	// the only thing important is board output, as orientation is preserved in movedcam.
 	cam_t rencam = movcam;
-	rencam.r = normalizep3(crossp3(movcam.d, movcam.f));
+	rencam.r = p3_normalized(p3_cross(movcam.d, movcam.f));
 
-	bool portalflipped = is_transform_flipped(&tgs.tr) ^ is_transform_flipped(&ent.tr);
+	bool portalflipped = tr_is_flipped(&tgs.tr) ^ tr_is_flipped(&ent.tr);
 	// we need to know only about flip in current portal switch to flip or not to flip the opening.
 	newctx.ismirrored = portalflipped;
 	newctx.istrimirror = parentctx->ismirrored ^ portalflipped;
