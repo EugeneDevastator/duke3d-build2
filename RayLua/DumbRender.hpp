@@ -93,6 +93,7 @@ static Shader skyShader;
 static int lightPosLoc;
 static int lightForLoc;
 static int lightRangeLoc;
+static int lightIntenseLoc;
 static bool syncam = true;
 static int cureyepoly = 0;
 static int mono_cursnap = 0;
@@ -143,6 +144,7 @@ public:
 		lightPosLoc = GetShaderLocation(lightShader, "lightPosition");
 		lightForLoc = GetShaderLocation(lightShader, "lightForwardVec");
 		lightRangeLoc = GetShaderLocation(lightShader, "lightRange");
+		lightIntenseLoc = GetShaderLocation(lightShader, "lightIntensity");
 		char *lastSlash;
 		// Extract root path from full map path
 		strcpy_s(rootpath, fullmappath);
@@ -569,7 +571,7 @@ public:
 				shadowtest2_light[shadowtest2_numlights].rgb[2] = map->spri[map->light_spri[i]].view.color.z;
 				//map->spri[map->light_spri[i]].rsc/8192.f;
 				shadowtest2_light[shadowtest2_numlights].lum =
-						(float) map->spri[map->light_spri[i]].view.lum / 32768.0f;
+						(float) map->spri[map->light_spri[i]].view.lum / 256.0f;
 				shadowtest2_light[shadowtest2_numlights].flags = 1;
 				shadowtest2_numlights++;
 			}
@@ -1103,6 +1105,7 @@ public:
 				SetShaderValue(lightShader, lightPosLoc, &lightpos, SHADER_UNIFORM_VEC3);
 				SetShaderValue(lightShader, lightForLoc, &lightf, SHADER_UNIFORM_VEC3);
 				SetShaderValue(lightShader, lightRangeLoc, &lightRange, SHADER_UNIFORM_FLOAT);
+				SetShaderValue(lightShader, lightIntenseLoc, &lght->lum, SHADER_UNIFORM_FLOAT);
 				//   BeginShaderMode(uvShader_plain);
 				rlBegin(RL_TRIANGLES);
 				for (int i = 0; i < lght->ligpoln; i++) {

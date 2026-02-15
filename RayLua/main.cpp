@@ -681,19 +681,18 @@ CustomRenderTarget CreateCustomRenderTarget(int width, int height, unsigned int 
     target.width = width;
     target.height = height;
 
-    // Generate framebuffer
     glGenFramebuffers(1, &target.fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, target.fbo);
 
-    // Create color texture
+    // Create HDR color texture (16-bit float)
     glGenTextures(1, &target.colorTexture);
     glBindTexture(GL_TEXTURE_2D, target.colorTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_HALF_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, target.colorTexture, 0);
 
-    // Use shared depth or create new one
+    // Depth buffer remains the same
     if (sharedDepth != 0) {
         target.depthTexture = sharedDepth;
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, sharedDepth, 0);
@@ -706,15 +705,13 @@ CustomRenderTarget CreateCustomRenderTarget(int width, int height, unsigned int 
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, target.depthTexture, 0);
     }
 
-    // Check framebuffer completeness
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        TraceLog(LOG_ERROR, "Framebuffer not complete!");
+        TraceLog(LOG_ERROR, "HDR Framebuffer not complete!");
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     return target;
 }
-
 void BeginCustomRenderTarget(CustomRenderTarget target) {
     rlDrawRenderBatchActive();
     glBindFramebuffer(GL_FRAMEBUFFER, target.fbo);
@@ -925,6 +922,10 @@ void RecreateRenderTargets(CustomRenderTarget* albedo, CustomRenderTarget* light
 // Draw palette and texture preview on screen
 void MainLoop()
 {
+    Shader multiplyShader = LoadShader(NULL, "Shaders/lightmul.frag");
+    // Get uniform locations
+    int albedoLocation = GetShaderLocation(multiplyShader, "albedoTexture");
+    int lightLocation = GetShaderLocation(multiplyShader, "lightTexture");
     InitTexBrowser();
     EditorSetTileState(&texb);
     //    if (!loadifvalid())
@@ -933,7 +934,7 @@ void MainLoop()
     loadgal(0,"c:/Eugene/Games/build2/");
     loadgal(1,"c:/Eugene/Games/build2/Content/GAL_002_SW/");
     DumbRender::LoadTexturesToGPU();
-    DumbRender::Init("c:/Eugene/Games/build2/e3l5.map");
+    DumbRender::Init("c:/Eugene/Games/build2/e1l5.map");
     auto map = DumbRender::GetMap();
     DumbCore::Init(map);
     SetTargetFPS(60);
@@ -982,61 +983,79 @@ void MainLoop()
         EndMode3D();
         EndCustomRenderTarget();
 
-        // Render light pass
-        BeginCustomRenderTarget(lightTarget);
-        glClear(GL_COLOR_BUFFER_BIT);
-        glEnable(GL_DEPTH_TEST);
-        glDepthMask(GL_FALSE);
-        // batching improves perf significantly, so atlases are way to go
-        DumbRender::DrawLightsPost3d(w,h,*DumbCore::GetCamera());
+    // Render light pass (HDR accumulation)
+    BeginCustomRenderTarget(lightTarget);
+    glClearColor(0.0f, 0.0f, 0.0f, 0.0f); // Clear to black for light accumulation
+    glClear(GL_COLOR_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
 
-        // DumbRender::DrawPost3d(w,h,*DumbCore::GetCamera());
+    // Enable additive blending for light accumulation
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE);
 
-        glDepthMask(GL_TRUE);
-        EndCustomRenderTarget();
+    DumbRender::DrawLightsPost3d(w, h, *DumbCore::GetCamera());
 
-        // Combine albedo and lights
+    glDisable(GL_BLEND);
+    glDepthMask(GL_TRUE);
+    EndCustomRenderTarget();
+
+    // Combine albedo and lights (multiply)
+    BeginCustomRenderTarget(combinedTarget);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glDisable(GL_DEPTH_TEST);
+
+        // In the combine pass, use proper fullscreen quad instead of DrawRectangle:
         BeginCustomRenderTarget(combinedTarget);
         glClear(GL_COLOR_BUFFER_BIT);
         glDisable(GL_DEPTH_TEST);
 
-        // Draw albedo
-        DrawTextureRec({albedoTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
-                      {0, 0, (float)w, (float)-h}, {0, 0}, WHITE);
+        BeginShaderMode(multiplyShader);
+        SetShaderValueTexture(multiplyShader, GetShaderLocation(multiplyShader, "albedoTexture"),
+                             {albedoTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R16G16B16A16});
+        SetShaderValueTexture(multiplyShader, GetShaderLocation(multiplyShader, "lightTexture"),
+                             {lightTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R16G16B16A16});
 
-        // Multiply blend lights
-        BeginBlendMode(RL_BLEND_ADDITIVE);
-
-        DrawTextureRec({lightTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
-                      {0, 0, (float)w, (float)-h}, {0, 0}, WHITE);
-        EndBlendMode();
-        DrawFPS(10, 10);
-        EndCustomRenderTarget();
-
-        // Apply LUT to final result
-        BeginCustomRenderTarget(finalTarget);
-        glClear(GL_COLOR_BUFFER_BIT);
-        glDisable(GL_DEPTH_TEST);
-
-
-        BeginShaderMode(lutShader);
-        SetShaderValueTexture(lutShader, lutTextureLocation, lutTexture);
-        DrawTextureRec({combinedTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
+        // Use DrawTextureRec instead of DrawRectangle for proper UV mapping
+        DrawTextureRec({albedoTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R16G16B16A16},
                       {0, 0, (float)w, (float)-h}, {0, 0}, WHITE);
         EndShaderMode();
+
 
         EndCustomRenderTarget();
 
         // Final draw to screen
         BeginDrawing();
         ClearBackground(BLACK);
-        // draw frame;
+
+        // Draw final texture with proper Y-flip for OpenGL framebuffer
         DrawTextureRec({finalTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
-                      {0, 0, (float)w, (float)-h}, {0, 0}, WHITE);
+                      {0, 0, (float)w, (float)-h}, {0, 0}, WHITE);  // Keep the -h for Y-flip
+
+        // Also fix the LUT pass:
+        BeginCustomRenderTarget(finalTarget);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glDisable(GL_DEPTH_TEST);
+
+        BeginShaderMode(lutShader);
+        SetShaderValueTexture(lutShader, lutTextureLocation, lutTexture);
+        DrawTextureRec({combinedTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R16G16B16A16},
+                      {0, 0, (float)w, (float)-h}, {0, 0}, WHITE);  // Keep Y-flip here too
+        EndShaderMode();
+        EndCustomRenderTarget();
         if (IsKeyPressed(KEY_ESCAPE))
             DisableCursor();
 
 #if !IS_DUKE_INCLUDED
+
+        // Restore complete GL state for ImGui
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(0, 0, w, h);
+        glDisable(GL_DEPTH_TEST);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  // Standard alpha blending
+        glBlendEquation(GL_FUNC_ADD);
+        DrawFPS(10, 10);
         // IMGUI SECTION
         viewport = ImGui::GetMainViewport();
         rlImGuiBegin();
@@ -1112,18 +1131,8 @@ int main() {
         BeginDrawing();
         ClearBackground(DARKGRAY);
 
-
-
         // Drawing phase timing
         auto drawStart = std::chrono::high_resolution_clock::now();
-
-     //   for (const auto& rect : transparentRects) {
-     //       Color drawColor = rect.color;
-     //       if (renderOpaque) {
-     //           drawColor.a = 255;
-     //       }
-     //       DrawRectangle(rect.x, rect.y, rect.width, rect.height, drawColor);
-     //   }
 
         // Lua Render timing
         auto luaRenderStart = std::chrono::high_resolution_clock::now();
@@ -1154,7 +1163,7 @@ int main() {
         auto drawEnd = std::chrono::high_resolution_clock::now();
         drawingTime = std::chrono::duration<double, std::milli>(drawEnd - drawStart).count();
 
-        DrawFPS(10, 10);
+
       //  DrawPaletteAndTexture(paltex,tex,600,600);
         EndDrawing();
     }

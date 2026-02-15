@@ -35,7 +35,7 @@ int shadowtest2_backface_cull = 0; // Toggle backface culling
 int shadowtest2_distance_cull = 0; // Toggle distance-based culling
 int shadowtest2_debug_walls = 1; // Verbose wall logging
 int shadowtest2_debug_block_selfportals = 1; // Verbose wall logging
-static bool st2_use_parallax_discards = 1; // Verbose wall logging
+static bool st2_use_parallax_discards = 0; // Verbose wall logging
 
 int renderinterp = 1;
 int compact2d = 0;

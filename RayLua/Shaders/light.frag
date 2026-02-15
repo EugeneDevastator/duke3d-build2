@@ -7,6 +7,7 @@ in vec4 fragColor;
 uniform vec3 lightPosition;
 uniform vec3 lightForwardVec;
 uniform float lightRange;
+uniform float lightIntensity;
 
 out vec4 finalColor;
 
@@ -29,7 +30,11 @@ void main()
 
     // Distance attenuation
     float distance = length(lightPosition - fragPosition);
-    float distanceAttenuation = 1.0 - clamp(distance / (fragColor.a * 100.0), 0.0, 1.0);
+    float distanceAttenuation = 1.0 - clamp(distance / (lightIntensity), 0.0, 1.0);
+    //    float distanceAttenuation = 1.0 - clamp(distance / lightRange, 0.0, 1.0);
+    //
+
+    float physicalAttenuation = 1.0 / (1.0 + distance * distance * 0.01);
 
     // Spot light cone calculation
     float halfConeAngle = arcAngle * 0.5;
@@ -44,8 +49,10 @@ void main()
             spotAttenuation = 1.0 - (fadeDistance / fadeAngle);
         }
     }
+    // Combine attenuations with HDR intensity - why tho? dist * phys
+    //float finalAttenuation = distanceAttenuation * physicalAttenuation * spotAttenuation;
 
-    float intensity = distanceAttenuation * distanceAttenuation * spotAttenuation;
+    vec3 lightContribution = fragColor.rgb * lightIntensity * physicalAttenuation;
 
-    finalColor = vec4(fragColor.rgb, intensity);
+    finalColor = vec4(lightContribution, 1);
 }
