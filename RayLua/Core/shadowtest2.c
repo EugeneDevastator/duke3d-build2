@@ -31,6 +31,11 @@
 #define USESSE2 0
 #define USENEWLIGHT 1 //FIXFIXFIX
 #define USEGAMMAHACK 1 //FIXFIXFIX
+int shadowtest2_backface_cull = 0; // Toggle backface culling
+int shadowtest2_distance_cull = 0; // Toggle distance-based culling
+int shadowtest2_debug_walls = 1; // Verbose wall logging
+int shadowtest2_debug_block_selfportals = 1; // Verbose wall logging
+static bool st2_use_parallax_discards = 1; // Verbose wall logging
 
 int renderinterp = 1;
 int compact2d = 0;
@@ -229,10 +234,7 @@ int intersect_traps_mono_points3d(dpoint3d p0, dpoint3d p1, dpoint3d trap1[4], d
 	);
 }
 
-int shadowtest2_backface_cull = 0; // Toggle backface culling
-int shadowtest2_distance_cull = 0; // Toggle distance-based culling
-int shadowtest2_debug_walls = 1; // Verbose wall logging
-int shadowtest2_debug_block_selfportals = 1; // Verbose wall logging
+
 
 //--------------------------------------------------------------------------------------------------
 static tiletype gdd;
@@ -255,7 +257,7 @@ static player_transform *gps;
 //Texture mapping parameters
 static tile_t *gtpic;
 
-static int gcurcol, gtilenum;
+static int gcurcol, gtilenum, ggalnum;
 static float alphamul;
 static int taginc = 30000;
 #define LIGHTMAX 256 //FIX:make dynamic!
@@ -520,6 +522,11 @@ static int bunchfront(int b0, int b1, int fixsplitnow, bdrawctx *b) {
 	return (3);
 }
 
+// WALL BUNCHING ALGORITHM
+// Groups adjacent coplanar walls into "bunches" for efficient rendering
+// Each bunch represents a continuous span of walls that can be drawn together
+// This reduces draw calls and enables efficient floor/ceiling polygon generation
+
 static void scansector(int sectnum, bdrawctx *b) {
 	cam_t gcam = b->cam;
 
@@ -536,10 +543,23 @@ static void scansector(int sectnum, bdrawctx *b) {
 	sec = &curMap->sect[sectnum];
 	wal = sec->wall;
 
+
+	// PHASE 1: WALL PROCESSING & INITIAL BUNCHING
+	// Iterate through all walls in sector, performing:
+	// - Back-face culling (skip walls facing away from camera)
+	// - Near-plane clipping (clip walls too close to camera)
+	// - Bunch formation (group adjacent walls into rendering spans)
+
+	// TODO: make continious progression of front plane
+	// render only things that have at least point in front of the last min front clipping plane.
 	obunchn = b->bunchn;
 	realobunchn = b->bunchn;
 	for (i = 0, ie = sec->n; i < ie; i++) {
 		j = wal[i].n + i;
+
+		// Check nobunch flag - if set, skip bunching for this wall
+		// this interestingly works by discarding sector from outside.n
+		//if (wal[i].geoflags & GEO_NO_BUNCHING) goto docont;
 
 		double zzz = getwallz(sec, 1, i);
 		dpoint3d wp = {wal[i].x, wal[i].y, zzz};
@@ -570,7 +590,7 @@ static void scansector(int sectnum, bdrawctx *b) {
 		}
 
 		k = b->bunch[b->bunchn - 1].wal1;
-		if ((b->bunchn > obunchn) && (wal[k].n + k == i) && (b->bunch[b->bunchn - 1].fra1 == 1.0)) {
+		if ((b->bunchn > obunchn) && (wal[k].n + k == i) && (b->bunch[b->bunchn - 1].fra1 == 1.0) && !(wal[i].geoflags & GEO_NO_BUNCHING)) {
 			b->bunch[b->bunchn - 1].wal1 = i; //continue from previous wall (typical case)
 			b->bunch[b->bunchn - 1].fra1 = f1;
 			if ((b->bunchn - 1 > obunchn) && (b->bunch[obunchn].wal0 == j) && (b->bunch[obunchn].fra0 == 0.0)) {
@@ -578,10 +598,11 @@ static void scansector(int sectnum, bdrawctx *b) {
 				b->bunch[obunchn].wal0 = b->bunch[b->bunchn].wal0;
 				b->bunch[obunchn].fra0 = b->bunch[b->bunchn].fra0;
 			}
-		} else if ((b->bunchn > obunchn) && (b->bunch[obunchn].wal0 == j) && (b->bunch[obunchn].fra0 == 0.0)) {
+		} else if ((b->bunchn > obunchn) && (b->bunch[obunchn].wal0 == j) && (b->bunch[obunchn].fra0 == 0.0) && !(wal[i].geoflags & GEO_NO_BUNCHING)) {
 			b->bunch[obunchn].wal0 = i; //update left side of 1st bunch on loop
 			b->bunch[obunchn].fra0 = f0;
 		} else {
+			// Start new bunch (this handles nobunch walls by forcing new bunch creation)
 			if (b->bunchn >= b->bunchmal) {
 				b->bunchmal <<= 1;
 				b->bunch = (bunch_t *) realloc(b->bunch, b->bunchmal * sizeof(b->bunch[0]));
@@ -589,7 +610,7 @@ static void scansector(int sectnum, bdrawctx *b) {
 				b->bunchgrid = (unsigned char *) realloc(b->bunchgrid, ((b->bunchmal - 1) * b->bunchmal) >> 1);
 			}
 			b->bunch[b->bunchn].wal0 = i;
-			b->bunch[b->bunchn].fra0 = f0; //start new b->bunch
+			b->bunch[b->bunchn].fra0 = f0; //start new bunch
 			b->bunch[b->bunchn].wal1 = i;
 			b->bunch[b->bunchn].fra1 = f1;
 			b->bunch[b->bunchn].sec = sectnum;
@@ -598,6 +619,9 @@ static void scansector(int sectnum, bdrawctx *b) {
 	docont:;
 		if (j < i) obunchn = b->bunchn;
 	}
+	// PHASE 2: DEPTH SORTING & BUNCH INTERSECTION RESOLUTION
+	// For each newly created bunch, determine rendering order relative to existing bunches
+	// Uses geometric intersection tests to build depth-sorting grid
 
 	for (obunchn = realobunchn; obunchn < b->bunchn; obunchn++) {
 		//insert bunch
@@ -612,6 +636,10 @@ static void scansector(int sectnum, bdrawctx *b) {
 		j = (((obunchn - 1) * obunchn) >> 1);
 		b->bfintn = 0;
 		for (i = 0; i < obunchn; i++) b->bunchgrid[j + i] = bunchfront(obunchn, i, 1, b);
+
+		// PHASE 3: BUNCH SPLITTING
+		// If intersections found, split current bunch at intersection points
+		// This resolves depth-sorting conflicts by creating smaller, non-intersecting bunches
 
 		if (!b->bfintn) continue;
 
@@ -929,6 +957,7 @@ static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
 	}
 
 	eyepol[eyepoln].tilnum = gtilenum;
+	eyepol[eyepoln].galnum = ggalnum;
 	eyepol[eyepoln].pal = 0;
 	eyepol[eyepoln].alpha = alphamul;
 	eyepol[eyepoln].isflor = -1;
@@ -1541,10 +1570,13 @@ The plothead[0] and plothead[1] contain monotone polygon pairs representing
 the final visible geometry ready for 2D projection.
 The b parameter is a bunch index - this function processes one "bunch" (visible sector group) at a time. The traversal logic is in the caller that:
 */
-
+//  lights option: store eyepol chunks that WERE DRAWN
+//  before light gets drawn - reproject needed eyepols onto lights MPH space
+//  AND with light polys, and draw resulting intersections only.
 static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 	alphamul=1;
 	gtilenum = 0;
+	ggalnum = 0;
 	cam_t gcam = b->cam;
 	// === VARIABLE DECLARATIONS ===
 	//extern void loadpic (tile_t *);
@@ -1613,6 +1645,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		if (skipport)
 			continue;
 		gtilenum = sec[s].surf[isflor].tilnum;
+		ggalnum = sec[s].surf[isflor].galnum;
 
 
 		float surfpos = getslopez(&sec[s], isflor, b->cam.p.x, b->cam.p.y);
@@ -1681,6 +1714,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		sur = &sec[s].surf[isflor];
 		gtpic = &gtile[sur->tilnum];
 		gtilenum = sur->tilnum;
+		ggalnum = sur->galnum;
 		//if (!gtpic->tt.f) loadpic(gtpic);
 		if (sec[s].surf[isflor].flags & (1 << 17)) { b->gflags = 2; } //skybox ceil/flor
 		else if (sec[s].surf[isflor].flags & (1 << 16)) {
@@ -1704,7 +1738,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		//	newsect = s;  // use same flow as for walls with masks - emit lightpoly, and draw it as portal.
 		//	newtag= s +b->tagoffset;
 		}
-
+		int touchwid = twal[0].i;
 		if (isportal && !noportals) {
 			int endpn = portals[myport].destpn;
 			int ttag = b->tagoffset + taginc + portals[endpn].sect;
@@ -1725,7 +1759,14 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			// the problem here still remains - because rendering two areas in other spaces can overlap one another.
 			// seems that we need to do wccw for every vert to gurantee shared space.. darn
 			draw_hsr_enter_portal(map, myport, plothead[0], plothead[1], b);
-		} else {
+		}
+
+		else if (st2_use_parallax_discards && wal[touchwid].ns >=0
+			&& (wal[touchwid].xsurf[isflor*2].flags & SURF_PARALLAX_DISCARD)) {
+			drawpol_befclip(s + b->tagoffset, wal[touchwid].ns + b->tagoffset, s, wal[touchwid].ns, plothead[0], plothead[1], surflag, b);
+		}
+
+		else{
 			//if (sec[s].surf[isflor].flags & SURF_SEE_THROUGH)
 			//	{			}
 			//else
@@ -1741,10 +1782,15 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		nw = wal[w].n + w;
 		sur = &wal[w].xsurf[0];
 
+		// here, the bug is that we can exit sector a, and then loop back to backwall. which should not be drawn because protal has moved forward.
+		// so we shouldnt draw wall, who's forwardest vertex is already behind.
+		// only reproducible in impossible spaces.
+
 		int myport = wal[w].tags[1]; // FLOOR PORTAL CHECK
 		bool isportal = myport >= 0
 		                && !noportals
 		                && portals[myport].destpn >= 0
+
 		                && portals[myport].kind == PORT_WALL;
 		//&& portals[myport].surfid == w;
 		bool skipport = shadowtest2_debug_block_selfportals
@@ -1817,6 +1863,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 
 			// Render wall segment if visible
 			gtilenum = wal[w].xsurf[m].tilnum;
+			ggalnum = wal[w].xsurf[m].galnum;
 			bool ismasked = wal[w].surf.flags & 32; // only ever use mask and alpha
 			if ((!(m & 1)) || (ismasked)) //Draw wall here //(1<<5): 1-way
 			{
@@ -1875,17 +1922,21 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 				drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1], DP_PRESERVE_LOOP| DP_EMIT_MASK |1, b);
 				alphamul = 1;
 				draw_hsr_enter_portal(map, myport, plothead[0], plothead[1], b);
+			} else if (st2_use_parallax_discards && wal[w].xsurf[m].flags & SURF_PARALLAX_DISCARD) {
+				ns = wal[w].ns;
+				newtag = ns + b->tagoffset;
+				drawpol_befclip(s + b->tagoffset, newtag, s, ns, plothead[0], plothead[1], surflag, b);
 			} else {
 				// could be 7 or 3, .111 or .011
 				logstep("Draw wal pol s:%d ns:%d tag:%d", s, ns, wal[w].surf.lotag);
 				if (m==1 && ismasked && wal[w].xsurf[1].alpha < 1) {
 					alphamul = wal[w].xsurf[1].alpha;
 					// emit this as poly for eyes only, non destructive unaffects mph.
-					drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1], 1 | DP_PRESERVE_LOOP| DP_EMIT_MASK, b);
+					// replace with drawpol_nosect
+					drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1],
+						1 | DP_PRESERVE_LOOP| DP_EMIT_MASK, b);
 					alphamul = 1;
 					ns =  wal[w].ns;
-					newtag = ns == -1 ? -1 : ns + b->tagoffset;
-					// and then draw as portal.
 				}
 
 				drawpol_befclip(s + b->tagoffset, newtag, s, ns, plothead[0], plothead[1], surflag, b);

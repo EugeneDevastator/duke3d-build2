@@ -81,7 +81,7 @@ static FloorMeshData *floorMeshes = NULL;
 static int numFloorMeshes = 0;
 static Texture2D *runtimeTextures;
 static mapstate_t *map;
-static long gnumtiles_i, gmaltiles_i, gtilehashead_i[1024];
+static long numartiles, gmaltiles_i, gtilehashead_i[1024];
 static bool drawWalls = false;
 static bool drawSpris = true;
 static bool drawCeils = false;
@@ -89,6 +89,7 @@ player_transform plr = {};
 static Shader uvShader_plain;
 static UVShaderDesc uvShaderDesc;
 static Shader lightShader;
+static Shader skyShader;
 static int lightPosLoc;
 static int lightRangeLoc;
 static bool syncam = true;
@@ -96,14 +97,19 @@ static int cureyepoly = 0;
 static int mono_cursnap = 0;
 static int mono_curchain = 0;
 static cam_t localb2cam;
-
+static Texture2D* galtextures[16];
 class DumbRender {
 public:
+	inline static Texture2D* galtextures[16] = {nullptr};
 	static mapstate_t *GetMap() {
 		return map;
 	}
 	static Texture2D * RuntimeTextures(){return runtimeTextures;}
-
+	static Texture2D GetGalTex(int gal, int texid) {
+		gal = Clamp(gal,0,1);
+		texid = Clamp(texid, 0, g_gals[gal].gmaltiles-1);
+		return galtextures[gal][texid];
+	}
 	static void LoadUVShader(void) {
 		uvShaderDesc = {0};
 
@@ -131,6 +137,7 @@ public:
 		uvShader_plain = LoadShader("Shaders/uv_vis_shader.vert", "Shaders/uv_vis_shader.frag");
 		LoadUVShader();
 		lightShader = LoadShader("Shaders/light.vert", "Shaders/light.frag");
+		skyShader = LoadShader("Shaders/skyparallax.vert", "Shaders/skyparallax.frag");
 
 		lightPosLoc = GetShaderLocation(lightShader, "lightPosition");
 		lightRangeLoc = GetShaderLocation(lightShader, "lightRange");
@@ -144,7 +151,6 @@ public:
 		if (lastSlash) {
 			*(lastSlash + 1) = '\0';
 		}
-		LoadPal(rootpath);
 		LoadMapAndTiles(fullmappath);
 		shadowtest2_numlights = 0;
 		//init lights
@@ -311,15 +317,12 @@ public:
 				printf("Warning: Portal %d with target lotag %d has no matching hitag\n", i, target_tag);
 			}
 		}
-		// auto paltex = ConvertPalToTexture();
-		// tile_t* pic = static_cast<tile_t*>(malloc(sizeof(tile_t)));
-		// strcpy_s(pic->filnam, "TILES000.art|1");
-		// auto tex = ConvertPicToTexture(pic);
+
+		InitMapstateTex();
 	}
 
 	static void LoadTexturesToGPU() {
 		GenerateTextures();
-		InitMapstateTex();
 	}
 
 	// Calculates the Z height at point (x,y) on a sloped surface
@@ -426,11 +429,11 @@ public:
 							// [u]   [uv[1].x  uv[2].x  uv[0].x] [wall->x]
 							// [v] = [uv[1].y  uv[2].y  uv[0].y] [wall->y]
 							// [1]   [   0        0        1   ] [   1   ]
-							triMesh.texcoords[w * 2] =
-									wall->x * sect->surf[isFloor].uv[1].x + wall->y * sect->surf[isFloor]
-									.uv[2].x + sect->surf[isFloor].uv[0].x;
-							triMesh.texcoords[w * 2 + 1] = wall->x * sect->surf[isFloor].uv[1].y + wall->y * sect->surf[
-								                               isFloor].uv[2].y + sect->surf[isFloor].uv[0].y;
+							//triMesh.texcoords[w * 2] =
+							//		wall->x * sect->surf[isFloor].uv[1].x + wall->y * sect->surf[isFloor]
+							//		.uv[2].x + sect->surf[isFloor].uv[0].x;
+							//triMesh.texcoords[w * 2 + 1] = wall->x * sect->surf[isFloor].uv[1].y + wall->y * sect->surf[
+							//	                               isFloor].uv[2].y + sect->surf[isFloor].uv[0].y;
 						}
 
 						// Triangulate
@@ -691,21 +694,49 @@ public:
 			rlEnableDepthMask();
 			usedcol.w *= 1;
 		}
+
+		const Texture2D tex = GetGalTex(eyepol[i].galnum,eyepol[i].tilnum);
 		//  BeginBlendMode(BLEND_ADDITIVE);        usedcol.w=0.3;
+		int surfid = eyepol[i].isflor;
+		if ((surfid >= 0)
+			&& (map->sect[eyepol[i].b2sect].surf[surfid].rendertype == parallaxcyl))
+			{
+				BeginShaderMode(skyShader);
 
-		BeginShaderMode(uvShaderDesc.shader);
+			// Set texture BEFORE setting shader values
+		//	rlActiveTextureSlot(0);
+		//	rlEnableTexture(tex.id);
+
+			int cameraPosLoc = GetShaderLocation(skyShader, "cameraPosition");
+			int cameraTargetLoc = GetShaderLocation(skyShader, "cameraTarget");
+			int cameraUpLoc = GetShaderLocation(skyShader, "cameraUp");
+
+			Vector3 camPos = DumbCore::GetCamera()->position;
+			Vector3 camTarget = DumbCore::GetCamera()->target;
+			Vector3 camUp = DumbCore::GetCamera()->up;
+
+			SetShaderValue(skyShader, cameraPosLoc, &camPos, SHADER_UNIFORM_VEC3);
+			SetShaderValue(skyShader, cameraTargetLoc, &camTarget, SHADER_UNIFORM_VEC3);
+			SetShaderValue(skyShader, cameraUpLoc, &camUp, SHADER_UNIFORM_VEC3);
+			SetShaderValue(skyShader, GetShaderLocation(skyShader, "useGradient"), &useGrad, SHADER_UNIFORM_INT);
+
+			int texloc = GetShaderLocation(skyShader, "textureSampler");
+			SetShaderValueTexture(skyShader, texloc, tex);
+		}
+		else {
+			BeginShaderMode(uvShaderDesc.shader);
+			SetUVShaderParams(uvShaderDesc,
+					  bpv3(eyepol[i].worlduvs[0]),
+					  bpv3(eyepol[i].worlduvs[1]),
+					  bpv3(eyepol[i].worlduvs[2]));
+			SetShaderValueTexture(uvShaderDesc.shader, uvShaderDesc.textureLoc, tex);
+			SetShaderValue(uvShaderDesc.shader, uvShaderDesc.useGradientloc, &useGrad, SHADER_UNIFORM_INT);
+		}
 		rlBegin(RL_TRIANGLES);
-		SetUVShaderParams(uvShaderDesc,
-		                  bpv3(eyepol[i].worlduvs[0]),
-		                  bpv3(eyepol[i].worlduvs[1]),
-		                  bpv3(eyepol[i].worlduvs[2]));
-		if (eyepol[i].tilnum > gnumtiles_i || eyepol[i].tilnum <0)
+		if (eyepol[i].tilnum > numartiles || eyepol[i].tilnum <0)
 			eyepol[i].tilnum = 5;
-		const Texture2D tex = runtimeTextures[eyepol[i].tilnum];
 
-		SetShaderValueTexture(uvShaderDesc.shader, uvShaderDesc.textureLoc, tex);
 
-		SetShaderValue(uvShaderDesc.shader, uvShaderDesc.useGradientloc, &useGrad, SHADER_UNIFORM_INT);
 
 		for (int locidx = 0; locidx < eyepol[i].tricnt; locidx += 1) {
 			for (int j = 0; j < 3; j++) {
@@ -1184,14 +1215,14 @@ public:
 							rlBegin(RL_QUADS);
 							rlColor4ub(255, 255, 255, 255);
 
-							rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y * dy);
-							rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
-							rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 1.0f * wall->surf.uv[2].y * dy);
-							rlVertex3f(bottomRight.x, bottomRight.y, bottomRight.z);
-							rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 0.0f);
-							rlVertex3f(topRight.x, topRight.y, topRight.z);
-							rlTexCoord2f(0.0f, 0.0f);
-							rlVertex3f(topLeft.x, topLeft.y, topLeft.z);
+							//rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y * dy);
+							//rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
+							//rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 1.0f * wall->surf.uv[2].y * dy);
+							//rlVertex3f(bottomRight.x, bottomRight.y, bottomRight.z);
+							//rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 0.0f);
+							//rlVertex3f(topRight.x, topRight.y, topRight.z);
+							//rlTexCoord2f(0.0f, 0.0f);
+							//rlVertex3f(topLeft.x, topLeft.y, topLeft.z);
 
 							rlEnd();
 							rlSetTexture(0);
@@ -1227,14 +1258,14 @@ public:
 								rlBegin(RL_QUADS);
 								rlColor4ub(255, 255, 255, 255);
 
-								rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y * (upperDy + selfDy));
-								rlVertex3f(bottom_left.x, bottom_left.y, bottom_left.z);
+							//rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y * (upperDy + selfDy));
+							//rlVertex3f(bottom_left.x, bottom_left.y, bottom_left.z);
 
-								rlTexCoord2f(wall->surf.uv[1].x * dx, wall->surf.uv[2].y * (upperDy + dh));
-								rlVertex3f(bottom_right.x, bottom_right.y, bottom_right.z);
+							//rlTexCoord2f(wall->surf.uv[1].x * dx, wall->surf.uv[2].y * (upperDy + dh));
+							//rlVertex3f(bottom_right.x, bottom_right.y, bottom_right.z);
 
-								rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 0.0f);
-								rlVertex3f(topRight.x, topRight.y, topRight.z);
+							//rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 0.0f);
+							//rlVertex3f(topRight.x, topRight.y, topRight.z);
 
 								rlTexCoord2f(0.0f, 0.0);
 								rlVertex3f(topLeft.x, topLeft.y, topLeft.z);
@@ -1260,16 +1291,16 @@ public:
 
 								rlColor4ub(255, 255, 255, 255);
 								// CW starting from upper left
-								rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y * (largeDy + selfDy));
+								//rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y * (largeDy + selfDy));
 								rlVertex3f(thisTopLeft.x, thisTopLeft.y, thisTopLeft.z);
 
-								rlTexCoord2f(wall->surf.uv[1].x * dx, wall->surf.uv[2].y * (largeDy + dh));
+								//rlTexCoord2f(wall->surf.uv[1].x * dx, wall->surf.uv[2].y * (largeDy + dh));
 								rlVertex3f(thisTopRight.x, thisTopRight.y, thisTopRight.z);
 
-								rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 0.0f);
+								//rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 0.0f);
 								rlVertex3f(bottomRight.x, bottomRight.y, bottomRight.z);
 
-								rlTexCoord2f(0.0f, 0.0);
+								//rlTexCoord2f(0.0f, 0.0);
 								rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
 								rlEnd();
 								rlSetTexture(0);
@@ -1317,14 +1348,14 @@ public:
 			spri_t *spr = &map->spri[i];
 			if (spr->tilnum >= 0) // sprites
 			{
-				if (spr->tilnum >= gnumtiles_i)
-					spr->tilnum = gnumtiles_i - 10;
+				if (spr->tilnum >= numartiles)
+					spr->tilnum = numartiles - 10;
 
 				rlEnableBackfaceCulling();
 				if (spr->view.isdblside)
 					rlDisableBackfaceCulling();
 
-				Texture2D spriteTex = runtimeTextures[spr->tilnum];
+				Texture2D spriteTex = galtextures[spr->galnum][spr->tilnum];
 				// vectors are half a size
 				Vector3 rg = {spr->r.x, -spr->r.z, spr->r.y};
 				Vector3 dw = {spr->d.x, -spr->d.z, spr->d.y};
@@ -1576,8 +1607,8 @@ public:
 					triMesh.vertices[w * 3 + 1] = z;
 					triMesh.vertices[w * 3 + 2] = wall->y;
 
-					triMesh.texcoords[w * 2] = 0.2f * wall->x * sect->surf->uv[1].x;
-					triMesh.texcoords[w * 2 + 1] = 0.2f * wall->y * sect->surf->uv[2].y;
+					//triMesh.texcoords[w * 2] = 0.2f * wall->x * sect->surf->uv[1].x;
+					//triMesh.texcoords[w * 2 + 1] = 0.2f * wall->y * sect->surf->uv[2].y;
 				}
 
 				// Triangulate polygon
@@ -1723,11 +1754,11 @@ public:
 						rlSetTexture(wallTex.id);
 						rlBegin(RL_QUADS);
 						rlColor4ub(255, 255, 255, 255);
-						rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y * dy);
+						//rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y * dy);
 						rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
-						rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 1.0f * wall->surf.uv[2].y * dy);
+						//rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 1.0f * wall->surf.uv[2].y * dy);
 						rlVertex3f(bottomRight.x, bottomRight.y, bottomRight.z);
-						rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 0.0f);
+						//rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 0.0f);
 						rlVertex3f(topRight.x, topRight.y, topRight.z);
 						rlTexCoord2f(0.0f, 0.0f);
 						rlVertex3f(topLeft.x, topLeft.y, topLeft.z);
@@ -1740,7 +1771,7 @@ public:
 		// Draw sprites (unchanged - already efficient)
 		for (int i = 0; i < map->numspris; i++) {
 			spri_t *spr = &map->spri[i];
-			if (spr->tilnum >= 0 && spr->tilnum < gnumtiles_i) {
+			if (spr->tilnum >= 0 && spr->tilnum < numartiles) {
 				Texture2D spriteTex = runtimeTextures[spr->tilnum];
 				Vector3 rg = {spr->r.x, spr->r.y, spr->r.z};
 				Vector3 dw = {spr->d.x, spr->d.y, spr->d.z};
@@ -1877,6 +1908,48 @@ public:
 	}
 
 	// converts INDEXED pics only!
+
+	static void DrawPaletteAndTexture() {
+		DrawPaletteAndTexture(runtimeTextures[6], runtimeTextures[10], 660, 660);
+	}
+
+	static void DrawPaletteAndTexture(Texture2D palTexture, Texture2D picTexture, int screenWidth, int screenHeight) {
+		//  BeginDrawing();
+		//  ClearBackground(DARKGRAY);
+
+		// Draw palette in top-left corner
+		if (palTexture.id > 0) {
+			DrawTextureEx(palTexture, {10, 10}, 0.0f, 8.0f, WHITE);
+			DrawText("PALETTE", 10, 150, 20, WHITE);
+		}
+
+		// Draw texture in center-right area
+		if (picTexture.id > 0) {
+			float scale = 2.0f;
+			int maxSize = 400;
+
+			// Scale texture to fit preview area
+			if (picTexture.width > maxSize || picTexture.height > maxSize) {
+				float scaleX = (float) maxSize / picTexture.width;
+				float scaleY = (float) maxSize / picTexture.height;
+				scale = (scaleX < scaleY) ? scaleX : scaleY;
+			}
+
+			Vector2 pos = {
+				screenWidth - picTexture.width * scale - 20,
+				(screenHeight - picTexture.height * scale) / 2
+			};
+
+			DrawTextureEx(picTexture, pos, 0.0f, scale, WHITE);
+
+			// Draw texture info
+			char info[256];
+			sprintf(info, "SIZE: %dx%d", picTexture.width, picTexture.height);
+			DrawText(info, (int) pos.x, (int) pos.y - 25, 20, WHITE);
+		}
+
+		//  EndDrawing();
+	}
 	static Texture2D ConvertPicToTexture(tile_t *tpic) {
 		if (!tpic || !tpic->tt.f) {
 			Texture2D invalid = {0};
@@ -1927,63 +2000,31 @@ public:
 		return texture;
 	}
 
-	static void DrawPaletteAndTexture() {
-		DrawPaletteAndTexture(runtimeTextures[6], runtimeTextures[10], 660, 660);
-	}
-
-	static void DrawPaletteAndTexture(Texture2D palTexture, Texture2D picTexture, int screenWidth, int screenHeight) {
-		//  BeginDrawing();
-		//  ClearBackground(DARKGRAY);
-
-		// Draw palette in top-left corner
-		if (palTexture.id > 0) {
-			DrawTextureEx(palTexture, {10, 10}, 0.0f, 8.0f, WHITE);
-			DrawText("PALETTE", 10, 150, 20, WHITE);
-		}
-
-		// Draw texture in center-right area
-		if (picTexture.id > 0) {
-			float scale = 2.0f;
-			int maxSize = 400;
-
-			// Scale texture to fit preview area
-			if (picTexture.width > maxSize || picTexture.height > maxSize) {
-				float scaleX = (float) maxSize / picTexture.width;
-				float scaleY = (float) maxSize / picTexture.height;
-				scale = (scaleX < scaleY) ? scaleX : scaleY;
-			}
-
-			Vector2 pos = {
-				screenWidth - picTexture.width * scale - 20,
-				(screenHeight - picTexture.height * scale) / 2
-			};
-
-			DrawTextureEx(picTexture, pos, 0.0f, scale, WHITE);
-
-			// Draw texture info
-			char info[256];
-			sprintf(info, "SIZE: %dx%d", picTexture.width, picTexture.height);
-			DrawText(info, (int) pos.x, (int) pos.y - 25, 20, WHITE);
-		}
-
-		//  EndDrawing();
-	}
-
 private:
 	static void GenerateTextures() {
-		gnumtiles_i = get_gnumtiles();
-		gmaltiles_i = get_gmaltiles();
-		// static long gnumtiles, gmaltiles, gtilehashead[1024];
-		// static *long get_gtilehashead() { return gtilehashead; } // in outer file
-		long *source = get_gtilehashead();
-		memcpy(gtilehashead_i, source, sizeof(long) * 1024);
+		// todo: make tile arrays per gal.
+		for (int gn=0;gn<2;gn++) {
+			numartiles = g_gals[gn].gnumtiles;
 
-		runtimeTextures = static_cast<Texture2D *>(malloc(sizeof(Texture2D) * gnumtiles_i));
-		int end = gnumtiles_i;
-		for (int i = 0; i < end; ++i) {
-			runtimeTextures[i] = ConvertPicToTexture(getGtile(i)); // returns Texture2D
+			// static long gnumtiles, gmaltiles, gtilehashead[1024];
+			// static *long get_gtilehashead() { return gtilehashead; } // in outer file
+			//long *source = get_gtilehashead();
+			//memcpy(gtilehashead_i, source, sizeof(long) * 1024);
+			Texture2D *arr = static_cast<Texture2D *>(malloc(sizeof(Texture2D) * numartiles));
+			int end = numartiles;
+			for (int i = 0; i < end; ++i) {
+				tile_t *til;
+				til = &g_gals[gn].gtile[i];
+				if (!til->tt.f || til->tt.f == (long)nullpic)
+					arr[i]=arr[0];
+				arr[i] = ConvertPicToTexture(til); // returns Texture2D
+			} // end = gallery.nutiles; tile_t* getGtile(int i){return &gtile[i];}
+			if (gn==0)
+				runtimeTextures = arr;
+			galtextures[gn]=arr;
+			galfreetextures(gn);
+			// Look for gals[0] usages elsewhere!
 		}
-		int a = 1;
 	}
 
 	static void LoadMapAndTiles(const char *fullmapname) {

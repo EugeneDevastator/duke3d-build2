@@ -12,6 +12,7 @@ add_executable(DukeGame
         ${C_SOURCES}
         ${DUKE_C}
         ${DUKE_H}
+
 )
 
 add_shared_definitions(DukeGame)

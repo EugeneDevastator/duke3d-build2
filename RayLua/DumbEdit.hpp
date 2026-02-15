@@ -4,7 +4,9 @@
 
 #ifndef RAYLIB_LUA_IMGUI_DUMBEDIT_HPP
 #define RAYLIB_LUA_IMGUI_DUMBEDIT_HPP
-
+#include "Editor/ieditorhudview.h"
+#include "Editor/uimodels.h"
+static TextureBrowser *texbstate;
 static Vector3 buildToRaylibPos(point3d buildcoord) {
 	return {buildcoord.x, -buildcoord.z, buildcoord.y};
 }
@@ -58,17 +60,20 @@ extern "C" {
 #define SEL_WAL 1<<2
 #define SEL_SEC 1<<3
 #define SEL_CHUNK 1<<4
+#define SEL_LOOP 1<<5
+#define SEL_UV 1<<6
 
-#define SEL_UP 1<<5
-#define SEL_DOWN 1<<6
-#define SEL_MID 1<<7
+#define SEL_UP 1<<7
+#define SEL_DOWN 1<<8
+#define SEL_MID 1<<9
 
-#define SEL_NEAR 1<<8
-#define SEL_FAR 1<<9
+#define SEL_NEAR 1<<10
+#define SEL_FAR 1<<11
 
-#define SEL_ALL 1<<10
+#define SEL_REDWALLPORTS 1<<12
+#define SEL_ALL 1<<13
 
-uint16_t selmode = SEL_ALL;
+uint16_t edselmode = SEL_ALL; // claude - use this.
 
 #define ISGRABSPRI (grabfoc.spri >= 0)
 #define ISGRABWAL (grabfoc.wal >= 0 && grabfoc.sec >= 0)
@@ -81,6 +86,8 @@ uint16_t selmode = SEL_ALL;
 #define GRABSPRI map->spri[grabfoc.spri]
 #define HOVERWAL HOVERSEC.wall[hoverfoc.wal]
 #define HOVERWAL2 HOVERSEC.wall[hoverfoc.wal2]
+
+// DO LAST VALID HOVER.
 
 enum editorMode {
 	Fly,
@@ -117,6 +124,7 @@ typedef struct {
 	dateditop op;
 	bool haschanged;
 	int32_t curval;
+	int32_t curval2;
 	char* text;
 	Color color;
 } datedit_t;
@@ -129,6 +137,7 @@ typedef struct {
 	enum editorop op;
 	bool hasOp;
 	estate state;
+	uint32_t selmode;
 } econtext;
 
 typedef struct {
@@ -161,8 +170,9 @@ econtext ctx;
 econtext ctxprev;
 
 typedef struct {
-	int wal;
-	int wal2;
+	signed int wal;
+	signed int wal2;
+	signed int walprev;
 	int onewall;
 	int sec;
 	int spri;
@@ -170,11 +180,35 @@ typedef struct {
 	point3d hitpos;
 } focus_t;
 
+struct selbuffer_t {
+	std::vector<wall_idx> walls;
+	std::vector<wall_idx> caps;
+	std::vector<int> sprites;
+	std::vector<int> sectors;
+
+	void clear() {
+		walls.clear();
+		caps.clear();
+		sprites.clear();
+		sectors.clear();
+	}
+};
+
+// shared loop structure
+loopt loopts[100];
+point2d loopts_p2d[100];
+int loopn = 0;
+
+selbuffer_t selcurrent;
+selbuffer_t selstack[10];
+
 bool hasgrab = false;
 point3d *wcursor;
 focus_t hoverfoc;
 focus_t bufferfoc;
 focus_t grabfoc;
+
+
 datedit_t datstate;
 // -------- RL Drawing funcs
 const float vertside = 0.3f;
@@ -266,10 +300,7 @@ void drawVert(int sec, int w) {
 	}
 }
 
-void drawCylBoard(Vector3 origin, Vector3 localUp, float length, float width) {
-}
-
-void drawCylBoard(Vector3 origin, Vector3 endpoint, float width) {
+void drawCylBoard2(Vector3 origin, Vector3 endpoint, float width, float width2) {
 	rlSetTexture(0);
 	rlDisableDepthTest();
 	rlDisableDepthMask();
@@ -319,14 +350,15 @@ void drawCylBoard(Vector3 origin, Vector3 endpoint, float width) {
 	rlMultMatrixf(MatrixToFloat(transform));
 
 	float hw = width * 0.5f;
+	float hw2 = width2 * 0.5f;
 
 	rlBegin(RL_QUADS);
 
 	// Main quad (front face, XY plane at Z=0, facing +Z toward camera)
 	rlVertex3f(-hw, 0, 0);
 	rlVertex3f(hw, 0, 0);
-	rlVertex3f(hw, length, 0);
-	rlVertex3f(-hw, length, 0);
+	rlVertex3f(hw2, length, 0);
+	rlVertex3f(-hw2, length, 0);
 
 	// Origin end cap (at Y=0, XZ plane, extends along +Z)
 	rlVertex3f(-hw, 0, 0);
@@ -335,21 +367,26 @@ void drawCylBoard(Vector3 origin, Vector3 endpoint, float width) {
 	rlVertex3f(hw, 0, 0);
 
 	// Endpoint end cap (at Y=length, XZ plane, extends along +Z)
-	rlVertex3f(hw, length, 0);
-	rlVertex3f(hw, length, hw);
-	rlVertex3f(-hw, length, hw);
-	rlVertex3f(-hw, length, 0);
+	rlVertex3f(hw2, length, 0);
+	rlVertex3f(hw2, length, hw2);
+	rlVertex3f(-hw2, length, hw2);
+	rlVertex3f(-hw2, length, 0);
 
 	rlEnd();
 
 	rlPopMatrix();
 }
-
+void drawCylBoardLen(Vector3 origin, Vector3 localUp, float length, float width) {
+	drawCylBoard2( origin,  origin+localUp*length,  width,  width);
+}
+void drawCylBoard(Vector3 origin, Vector3 endpoint, float width) {
+	drawCylBoard2( origin,  endpoint,  width,  width);
+}
 // ------------------ PICKGRAB
-transform savedtr;
+transform savedwtr;
 point3d localp1;
 point3d localp2;
-transform trdiff;
+transform virt_incam_tr;
 wall_idx verts[256];
 wall_idx verts2[256];
 int totalverts;
@@ -358,16 +395,17 @@ point2d secondwalldif;
 bool pg_graballverts = true;
 bool usehitZ = false;
 float savedHeight;
+Vector2 origVert;
 
 void PickgrabDiscard() {
 	if (grabfoc.spri >= 0) {
-		map->spri[grabfoc.spri].tr = savedtr;
+		map->spri[grabfoc.spri].tr = savedwtr;
 	} else if (ISGRABWAL) {
-		map->sect[grabfoc.sec].wall[grabfoc.wal].x = savedtr.p.x;
-		map->sect[grabfoc.sec].wall[grabfoc.wal].y = savedtr.p.y;
+		map->sect[grabfoc.sec].wall[grabfoc.wal].x = savedwtr.p.x;
+		map->sect[grabfoc.sec].wall[grabfoc.wal].y = savedwtr.p.y;
 		for (int i = 0; i < totalverts; ++i) {
-			map->sect[verts[i].s].wall[verts[i].w].x = savedtr.p.x;
-			map->sect[verts[i].s].wall[verts[i].w].y = savedtr.p.y;
+			map->sect[verts[i].s].wall[verts[i].w].x = savedwtr.p.x;
+			map->sect[verts[i].s].wall[verts[i].w].y = savedwtr.p.y;
 			// move nextwall
 			//map->sect[grabfoc.sec].wall[grabfoc.wal2].x=tp2.x;
 			//map->sect[grabfoc.sec].wall[grabfoc.wal2].y=tp2.y;
@@ -394,15 +432,21 @@ void PickgrabAccept() {
 	grabfoc.spri = -1; // jsut do noting now.
 	ctx.mode = Fly;
 }
-
+int savedsec =0;
 void PickgrabUpdate() {
 	Vector2 dmov = GetMouseDelta();
 	float scrol = GetMouseWheelMove();
-	addto(&trdiff.p, scaled(BBDOWN, scrol * 0.2f));
-	addto(&localp2, scaled(BBDOWN, scrol * 0.2f));
+	// we need more transforms:
+	// 1. define transform on hitpoint or whenever virtr;
+	// 2. save it as copy.
+	// 3. save cam transform as copy.
+	// 4. when we move camera
+
+	addto(&virt_incam_tr.p, p3scaled(BBDOWN, scrol * 0.2f));
+	addto(&localp2, p3scaled(BBDOWN, scrol * 0.2f));
 
 	if (ISGRABSPRI) {
-		map->spri[grabfoc.spri].tr = local_to_world_transform_p(trdiff, &cam->tr);
+		map->spri[grabfoc.spri].tr = local_to_world_transform_p(virt_incam_tr, &cam->tr);
 		int s = map->spri[grabfoc.spri].sect;
 		if (hoverfoc.sec >= 0) {
 			GRABSPRI.walcon = (signed char)hoverfoc.wal;
@@ -410,19 +454,33 @@ void PickgrabUpdate() {
 
 		updatesect_p(map->spri[grabfoc.spri].p, &s, map);
 		changesprisect_imp(grabfoc.spri, s, map);
-	} else if (ISGRABCAP) {
-		float newz = local_to_world_point(trdiff.p, &cam->tr).z;
-		int isflor = grabfoc.wal + 2;
-		GRABSEC.z[isflor] = newz;
-		if (IsKeyDown(KEY_LEFT_SHIFT)) {
-			GRABSEC.z[1 - isflor] = newz + savedHeight * ((1 - isflor) * 2 - 1);
+	}
+	else if (ISGRABCAP) {
+		point3d newpos = local_to_world_point(virt_incam_tr.p, &cam->tr);
+		if (false) // grab entire sect
+		{
+			loopn =2;
+			loopts[0].pos = newpos;
+			loopts[1].pos = savedwtr.p;
+			point3d offset = subtract(newpos, savedwtr.p);
+			map_sect_translate(grabfoc.sec, savedsec, offset,map);
+			savedwtr.p = newpos;
 		}
-	} else if (ISGRABWAL) {
+		else if (true)
+		{
+			float newz = local_to_world_point(virt_incam_tr.p, &cam->tr).z;
+			int isflor = grabfoc.wal + 2;
+			GRABSEC.z[isflor] = newz;
+			if (IsKeyDown(KEY_LEFT_SHIFT)) {
+				GRABSEC.z[1 - isflor] = newz + savedHeight * ((1 - isflor) * 2 - 1);
+			}
+		}
+	}
+	else if (ISGRABWAL) {
 		transform tmp;
 		point3d tp2;
-
-		// Wall dragging along floor/ceiling plane
-		//if (hoverfoc.wal < 0 && hoverfoc.sec >= 0)
+		bool isConstrainted = IsKeyDown(KEY_LEFT_SHIFT);
+		point3d outpos;
 		{
 			// Project camera ray onto horizontal plane
 
@@ -431,7 +489,7 @@ void PickgrabUpdate() {
 			point3d ray_dir = cam->f;
 			float target_z;
 
-			if (IsKeyPressed(KEY_F))
+			if (IsKeyPressed(KEY_F)) // swap mode.
 				usehitZ = !usehitZ;
 			if (usehitZ)
 				target_z = grabfoc.hitpos.z; // floor : ceiling
@@ -446,29 +504,64 @@ void PickgrabUpdate() {
 				// Ray parallel to plane, use mouse delta for movement
 				point3d right = cam->tr.r;
 				point3d down = cam->tr.d;
-				tmp.p.x = savedtr.p.x + dmov.x * 0.1f * right.x + dmov.y * -0.1f * down.x;
-				tmp.p.y = savedtr.p.y + dmov.x * 0.1f * right.y + dmov.y * -0.1f * down.y;
+				tmp.p.x = savedwtr.p.x + dmov.x * 0.1f * right.x + dmov.y * -0.1f * down.x;
+				tmp.p.y = savedwtr.p.y + dmov.x * 0.1f * right.y + dmov.y * -0.1f * down.y;
 			}
 
 			tp2.x = tmp.p.x + localp2.x;
 			tp2.y = tmp.p.y + localp2.y;
+			outpos = tmp.p;
 		}
+
+		if (isConstrainted) { // move along neighbor wallss
+			wall_t wnex = map->sect[grabfoc.sec].wall[grabfoc.wal2];
+			wall_t wprev = map->sect[grabfoc.sec].wall[grabfoc.walprev];
+
+			// Calculate vectors from tmp point to each ray
+			Vector2 tmppos = {tmp.p.x, tmp.p.y};
+			Vector2 origpos = {origVert.x, origVert.y};
+			Vector2 wnexpos = {wnex.x, wnex.y};
+			Vector2 wprevpos = {wprev.x, wprev.y};
+
+			// Ray directions (normalized)
+			Vector2 ray_wnex = Vector2Normalize(Vector2Subtract(origpos, wnexpos));
+			Vector2 ray_wprev = Vector2Normalize(Vector2Subtract(origpos, wprevpos));
+
+			// Vectors from ray origins to tmp point
+			Vector2 to_tmp_wnex = Vector2Normalize(Vector2Subtract(tmppos, wnexpos));
+			Vector2 to_tmp_wprev = Vector2Normalize(Vector2Subtract(tmppos, wprevpos));
+
+			// Dot products (higher = more aligned with ray direction)
+			float dot_wnex = Vector2DotProduct(to_tmp_wnex, ray_wnex);
+			float dot_wprev = Vector2DotProduct(to_tmp_wprev, ray_wprev);
+
+			// Choose ray with higher alignment
+			wall_t tgw = (abs(dot_wnex) > abs(dot_wprev) ? wnex : wprev);
+			Vector2 tgwpos = {tgw.x,tgw.y};
+			Vector2 moverpos =  {tmp.p.x,tmp.p.y};
+			Vector2 toOrig = origVert - tgwpos;
+			Vector2 toCurs = moverpos - tgwpos;
+			float projratio = Vector2DotProduct(toCurs,toOrig)/ Vector2DotProduct(toOrig,toOrig);
+			Vector2 constrpos = Vector2Lerp(tgwpos, origVert, max(projratio,0));
+			outpos = {constrpos.x, constrpos.y, 0};
+		}
+
 		//else {
 		//    tmp = local_to_world_transform_p(trdiff, &cam->tr);
 		//    tp2 = local_to_world_point(localp2, &cam->tr);
 		//}
 
-		map->sect[grabfoc.sec].wall[grabfoc.wal].x = tmp.p.x;
-		map->sect[grabfoc.sec].wall[grabfoc.wal].y = tmp.p.y;
+		map->sect[grabfoc.sec].wall[grabfoc.wal].x = outpos.x;
+		map->sect[grabfoc.sec].wall[grabfoc.wal].y = outpos.y;
 
 		if (pg_graballverts)
 			for (int i = 0; i < totalverts; ++i) {
-				map->sect[verts[i].s].wall[verts[i].w].x = tmp.p.x;
-				map->sect[verts[i].s].wall[verts[i].w].y = tmp.p.y;
+				map->sect[verts[i].s].wall[verts[i].w].x = outpos.x;
+				map->sect[verts[i].s].wall[verts[i].w].y = outpos.y;
 			}
 
-		// Move ahead-wall
-		if (selmode & SEL_SURF) {
+		// Move ahead-wall todo - rework entirely leave section for verts only.
+		if (edselmode & SEL_SURF) {
 			map->sect[grabfoc.sec].wall[grabfoc.wal2].x = tp2.x;
 			map->sect[grabfoc.sec].wall[grabfoc.wal2].y = tp2.y;
 			for (int i = 0; i < totalverts2; ++i) {
@@ -487,44 +580,54 @@ void PickgrabUpdate() {
 
 void PickgrabStart() {
 	if (grabfoc.spri >= 0) {
-		savedtr = map->spri[grabfoc.spri].tr;
+		savedwtr = map->spri[grabfoc.spri].tr;
 	} else if (ISGRABCAP) {
-		savedtr = cam->tr;
-		savedtr.p = grabfoc.hitpos;
+		savedwtr = cam->tr;
+		savedwtr.p = hoverfoc.hitpos;
 		savedHeight = GRABSEC.z[1] - GRABSEC.z[0];
+		savedsec = cam->cursect;
 	} else if (grabfoc.wal >= 0 && grabfoc.sec >= 0) {
 		bool grabboth = false;
 		if (!grabboth) // grab both walls
 		{
-			savedtr = cam->tr;
+			savedwtr = cam->tr;
 			grabfoc.wal = hoverfoc.onewall;
 		}
-		//for red walls we'd need to grab verts of all adjacent walls.
-		// something in build2 was there for it.
-		savedtr = cam->tr;
-		savedtr.p.x = map->sect[grabfoc.sec].wall[grabfoc.wal].x;
-		savedtr.p.y = map->sect[grabfoc.sec].wall[grabfoc.wal].y;
-
-		totalverts = getwallsofvert(grabfoc.sec, grabfoc.wal, verts, 256, map);
 
 		grabfoc.wal2 = map->sect[grabfoc.sec].wall[grabfoc.wal].n + grabfoc.wal;
+		grabfoc.walprev = wallprev(&GRABSEC,grabfoc.wal);
+		//for red walls we'd need to grab verts of all adjacent walls.
+		// something in build2 was there for it.
+		savedwtr = cam->tr;
+		savedwtr.p.x = map->sect[grabfoc.sec].wall[grabfoc.wal].x;
+		savedwtr.p.y = map->sect[grabfoc.sec].wall[grabfoc.wal].y;
+		origVert = {savedwtr.p.x,savedwtr.p.y};
+		totalverts = getwallsofvert(grabfoc.sec, grabfoc.wal, verts, 256, map);
+
 		point2d wpos = getwall({grabfoc.wal2, grabfoc.sec}, map)->pos;
 		point3d wpos3d = {wpos.x, wpos.y, 0};
 		localp2 = world_to_local_point(wpos3d, &cam->tr);
 		totalverts2 = getwallsofvert(grabfoc.sec, grabfoc.wal2, verts2, 256, map);
 	}
-	trdiff = world_to_local_transform_p(savedtr, &cam->tr);
+	virt_incam_tr = world_to_local_transform_p(savedwtr, &cam->tr);
+	//virt_incam_tr = savedwtr;
+	//virt_incam_tr.p = p3asvec(cam->tr.p,hoverfoc.hitpos);
 }
 
 // ----------------------- draw loop OPER ---------------------
-loopt loopts[100];
-point2d loopts_p3d[100];
-int loopn = 0;
+
 
 void LoopDrawUpdate() {
 	if (IsKeyPressed(KEY_THREE) && loopn == 1) {
 		long s = mapspriteadd(loopts[0].sect, loopts[0].pos, map);
 		map->spri[s].tilnum = 1;
+		ctx.op = discard;
+	}
+	if (IsKeyPressed(KEY_TWO) && loopn == 1) {
+		// split walls
+		if (hoverfoc.wal >= 0) {
+			splitwallat(hoverfoc.sec, hoverfoc.wal, hoverfoc.hitpos, map);
+		}
 		ctx.op = discard;
 	}
 	if (IsKeyPressed(KEY_SPACE)) {
@@ -546,10 +649,25 @@ void LoopDrawUpdate() {
 
 	if (IsKeyPressed(KEY_T)) {
 		for (int i = 0; i < loopn; ++i) {
-			loopts_p3d[i] = {loopts[i].pos.x, loopts[i].pos.y};
+			loopts_p2d[i] = {loopts[i].pos.x, loopts[i].pos.y};
 		}
-		appendwall_loop(&map->sect[hoverfoc.sec], loopn, loopts_p3d);
+		// filp loop if needed.
+		// add bool to not auto insec.
+		bool alsoMakeSec = !IsKeyDown(KEY_LEFT_SHIFT);
+		int isflip = (is_loop2d_ccw(loopts_p2d,loopn));
+		int own_wid_new = sect_appendwall_loop(&map->sect[hoverfoc.sec], loopn, loopts_p2d, isflip);
+
+
+		if (alsoMakeSec) {
+			int newsec = map_append_sect_from_loop(loopn, loopts_p2d, HOVERSEC.z[1], HOVERSEC.z[1] - HOVERSEC.z[0], map,
+			                                       !isflip);
+			loopinfo lithis = map_sect_get_loopinfo(loopts[0].sect, own_wid_new, map);
+			loopinfo linew = map_sect_get_loopinfo(newsec, 0, map);
+			int res = map_loops_join_mirrored(lithis, linew, map);
+			map_sect_rearrange_loops(hoverfoc.sec, newsec,own_wid_new,map);
+		}
 		loopn = 0;
+
 		ctx.op = accept;
 	}
 
@@ -576,31 +694,286 @@ void LoopDrawStart() {
 
 //----------------------- tile editing
 void TilsedStart() {
-
+	texbstate->shown = true;
 }
+
 void TilsedUpdate() {
 	if (IsKeyDown(KEY_TAB)) {
-		if (hoverfoc.spri>=0)	datstate.curval = HOVERSPRI.tilnum;
-		else if (ISHOVERWAL)
+		if (hoverfoc.spri >= 0) {
+			datstate.curval = HOVERSPRI.tilnum;
+			datstate.curval2 = HOVERSPRI.galnum;
+		} else if (ISHOVERWAL) {
 			datstate.curval = HOVERWAL.xsurf[hoverfoc.surf].tilnum;
-		else if (ISHOVERCAP)
+			datstate.curval2 = HOVERWAL.xsurf[hoverfoc.surf].galnum;
+		} else if (ISHOVERCAP) {
 			datstate.curval = HOVERSEC.surf[hoverfoc.surf].tilnum;
+			datstate.curval2 = HOVERSEC.surf[hoverfoc.surf].galnum;
+		}
+
+		texbstate->selected = datstate.curval;
+		texbstate->galnum = datstate.curval2;
 	}
 	if (IsKeyPressed(KEY_E)) {
-		if (hoverfoc.spri>=0)HOVERSPRI.tilnum = datstate.curval;
-		else if (ISHOVERWAL) HOVERWAL.xsurf[hoverfoc.surf].tilnum = datstate.curval;
-		else if (ISHOVERCAP) HOVERSEC.surf[hoverfoc.surf].tilnum = datstate.curval;
+		datstate.curval = texbstate->selected;
+		datstate.curval2 = texbstate->galnum;
+		if (hoverfoc.spri >= 0) {
+			HOVERSPRI.tilnum = datstate.curval;
+			HOVERSPRI.galnum = datstate.curval2;
+		} else if (ISHOVERWAL) {
+			HOVERWAL.xsurf[hoverfoc.surf].tilnum = datstate.curval;
+			HOVERWAL.xsurf[hoverfoc.surf].galnum = datstate.curval2;
+		} else if (ISHOVERCAP) {
+			HOVERSEC.surf[hoverfoc.surf].tilnum = datstate.curval;
+			HOVERSEC.surf[hoverfoc.surf].galnum = datstate.curval2;
+		}
+	}
+	if (IsKeyPressed(KEY_V)) {
+		ctx.op = accept;
 	}
 }
 void TilsedAccept() {
-
+	texbstate->shown = false;
 }
 void TilsedDiscard() {
+	texbstate->shown = false;
+}
 
+// ------------------ B-Cutter --------------------------------
+void WallDrawDiscard() {
+	loopn = 0;
+	K_ACCEPT = KEY_SPACE;
+}
+
+void WallDrawAccept() {
+	if (loopn < 2) {
+		ctx.op = discard;
+		return;
+	}
+
+	// Find correct sector by scanning midpoint of first segment
+	point3d midpoint = {
+		(loopts[0].pos.x + loopts[1].pos.x) * 0.5f,
+		(loopts[0].pos.y + loopts[1].pos.y) * 0.5f,
+		(loopts[0].pos.z + loopts[1].pos.z) * 0.5f
+	};
+
+	// can potentially backfire
+	int origin_sect = -1;
+	updatesect_p(midpoint, &origin_sect, map);
+
+	if (origin_sect < 0) {
+		EditorHudDrawTopInfo("No sector found at midpoint");
+		WallDrawDiscard();
+		return;
+	}
+
+	sect_t *sect = &map->sect[origin_sect];
+
+	// Find entry points by coordinates
+	int entry_point_A = -1, entry_point_C = -1;
+	float snap_dist = 0.001f;
+
+	for (int w = 0; w < sect->n; w++) {
+		float dx = sect->wall[w].x - loopts[0].pos.x;
+		float dy = sect->wall[w].y - loopts[0].pos.y;
+		if (dx * dx + dy * dy < snap_dist && entry_point_A < 0) {
+			entry_point_A = w;
+		}
+
+		dx = sect->wall[w].x - loopts[loopn - 1].pos.x;
+		dy = sect->wall[w].y - loopts[loopn - 1].pos.y;
+		if (dx * dx + dy * dy < snap_dist && entry_point_C < 0) {
+			entry_point_C = w;
+		}
+	}
+
+	if (entry_point_A < 0 || entry_point_C < 0) {
+		EditorHudDrawTopInfo("Could not find entry points");
+		WallDrawDiscard();
+		return;
+	}
+
+	int walAprev = map_wall_prev_in_loop(sect, entry_point_A);
+	int walCprev = map_wall_prev_in_loop(sect, entry_point_C);
+	printf("used entry points: A: %i,%i, C: %i,%i", entry_point_A, walAprev, entry_point_C, walCprev);
+	// Ensure we have space for new walls: (loopn-1) * 2 walls
+	int new_walls_count = (loopn - 1) * 2;
+	if (sect->n + new_walls_count > sect->nmax) {
+		sect->nmax = sect->n + new_walls_count + 8;
+		sect->wall = (wall_t *) realloc(sect->wall, sect->nmax * sizeof(wall_t));
+	}
+	// Aprev - A B
+	// dprev -> C' B'
+	// Add forward path: A->B->C (skip first and last points, they're existing walls)
+	int forward_start = sect->n;
+	for (int i = 0; i <= loopn - 2; i++) {
+		wall_t *new_wall = &sect->wall[sect->n];
+		makewall(new_wall, sect->n, sect->n + 1);
+		new_wall->x = loopts[i].pos.x;
+		new_wall->y = loopts[i].pos.y;
+		new_wall->ns = origin_sect;
+		new_wall->nschain = origin_sect;
+		new_wall->owner = -1;
+		sect->n++;
+	}
+	int last_of_forward = sect->n-1;
+	sect->wall[last_of_forward].n = entry_point_A - (last_of_forward);
+
+	// Add backward path: WAL_C->B'->A' - aprev (reverse order, skip endpoints)
+	int backward_start = sect->n;
+	for (int i = loopn - 1; i >= 1; i--) {
+		wall_t *new_wall = &sect->wall[sect->n];
+		makewall(new_wall, sect->n, sect->n + 1);
+		new_wall->x = loopts[i].pos.x;
+		new_wall->y = loopts[i].pos.y;
+		new_wall->ns = origin_sect;
+		new_wall->nschain = origin_sect;
+		new_wall->owner = -1;
+		sect->n++;
+	}
+	int last_of_backward = sect->n-1;
+	sect->wall[last_of_backward].n = entry_point_C - (last_of_backward);
+	// Set up mirror wall connections
+	int one_side_count = loopn - 1;
+
+	// Add forward path: A->B->C (skip first and last points, they're existing walls)
+
+	// aprev - a b wallc
+	// cprev - c' b' walla
+	// aprev to A chain
+	sect->wall[walAprev].n = forward_start - walAprev;
+	// last in A chain to wall c
+	int newC = backward_start-1;
+	sect->wall[newC].n = entry_point_C - newC;
+	// cprev to c' chain
+	sect->wall[walCprev].n = backward_start - walCprev;
+	int newA = sect->n-1;
+	sect->wall[newA].n = entry_point_A - newA;
+	// link newly added walls.
+	for (int i = 0; i < one_side_count; i++) {
+		sect->wall[forward_start + i].nw = backward_start + (one_side_count - i - 1);
+		sect->wall[forward_start + i].nwchain = sect->wall[forward_start + i].nw ;
+		sect->wall[backward_start + (one_side_count - i - 1)].nw = forward_start + i;
+		sect->wall[backward_start + (one_side_count - i - 1)].nwchain = sect->wall[backward_start + (one_side_count - i - 1)].nw;
+	}
+
+	bool needs_split = true;
+	int w = entry_point_A;
+	int steps = 0;
+	do {
+		w = mapwallnextid(origin_sect, w, map);
+		steps++;
+		if (w == walAprev) { // if we  arrive at previous wall, then it was not split.
+			needs_split = false;
+			break;
+		}
+	} while (w != entry_point_A);
+
+
+printf("needs split = %o", needs_split);
+	if (needs_split) {
+		// Count walls in each potential loop to determine which is smaller
+		int loop1_count = 0;
+		int loop2_count = 0;
+
+		// getting into infinite loops here
+		loopinfo l1 = map_sect_get_loopinfo(origin_sect, entry_point_A, map);
+		loopinfo l2 = map_sect_get_loopinfo(origin_sect, walAprev, map);
+		loop1_count = l1.nwalls;
+		loop2_count = l2.nwalls;
+		printf("loop_counts = %i, %i of %i", loop1_count, loop2_count, map->sect[origin_sect].n);
+		int decidedcount = loop1_count < loop2_count ? loop1_count : loop2_count;
+		int chipwall = loop1_count < loop2_count ? entry_point_A : walAprev;
+		int redainwall = loop1_count >= loop2_count ? entry_point_A : walAprev;
+		//int res = map_sect_chip_off_via_copy(origin_sect,chipwall, redainwall, map);
+		int res = map_sect_chip_off_loop(origin_sect,chipwall,redainwall, map);
+	}
+	checksprisect_imp(-1, map);
+	loopn = 0;
+	ctx.op = accept;
 }
 
 
+void WallDrawStart() {
+	loopn = 0;
+	K_ACCEPT = KEY_E;
 
+	// Add first point immediately like LoopDraw does
+	if (ISHOVERWAL) {
+		loopts[0].sect = hoverfoc.sec;
+		loopts[0].wal = hoverfoc.onewall;
+		loopts[0].pos.x = map->sect[hoverfoc.sec].wall[hoverfoc.onewall].x;
+		loopts[0].pos.y = map->sect[hoverfoc.sec].wall[hoverfoc.onewall].y;
+		loopts[0].pos.z = hoverfoc.hitpos.z;
+		loopn = 1;
+	} else {
+		ctx.op = discard;
+	}
+}
+
+void WallDrawUpdate() {
+    if (IsKeyPressed(KEY_SPACE)) {
+        if (loopn < 100) {
+            point3d add_pos = hoverfoc.hitpos;
+
+            // Snap to wall vertices if close enough
+            if (ISHOVERWAL) {
+                wall_t *w1 = &map->sect[hoverfoc.sec].wall[hoverfoc.wal];
+                wall_t *w2 = &map->sect[hoverfoc.sec].wall[hoverfoc.wal2];
+
+                float d1 = (hoverfoc.hitpos.x - w1->x) * (hoverfoc.hitpos.x - w1->x) +
+                          (hoverfoc.hitpos.y - w1->y) * (hoverfoc.hitpos.y - w1->y);
+                float d2 = (hoverfoc.hitpos.x - w2->x) * (hoverfoc.hitpos.x - w2->x) +
+                          (hoverfoc.hitpos.y - w2->y) * (hoverfoc.hitpos.y - w2->y);
+
+                if (d1 < 4.0f) {
+                    add_pos.x = w1->x;
+                    add_pos.y = w1->y;
+                } else if (d2 < 4.0f) {
+                    add_pos.x = w2->x;
+                    add_pos.y = w2->y;
+                }
+            }
+
+            loopts[loopn].sect = hoverfoc.sec >= 0 ? hoverfoc.sec : -1;
+            loopts[loopn].wal = hoverfoc.wal;
+            loopts[loopn].pos = add_pos;
+            loopn++;
+        }
+    }
+
+    if (IsKeyPressed(KEY_R)) {
+        if (loopn > 0) loopn--;
+    }
+
+    // E key - auto-connect to hovered wall and finish
+    if (IsKeyPressed(KEY_B)) {
+        if (ISHOVERWAL && loopn >= 1) {
+        	if (ISHOVERWAL) {
+        		loopts[loopn].sect = hoverfoc.sec;
+        		loopts[loopn].wal = hoverfoc.onewall;
+        		loopts[loopn].pos.x = map->sect[hoverfoc.sec].wall[hoverfoc.onewall].x;
+        		loopts[loopn].pos.y = map->sect[hoverfoc.sec].wall[hoverfoc.onewall].y;
+        		loopts[loopn].pos.z = hoverfoc.hitpos.z;
+        		loopn++;
+        		ctx.op = accept;
+        	}
+        }
+        // Immediately accept
+        return;
+    }
+
+    // Auto-close check
+   //if (loopn > 2) {
+   //    float dx = hoverfoc.hitpos.x - loopts[0].pos.x;
+   //    float dy = hoverfoc.hitpos.y - loopts[0].pos.y;
+   //    if (dx*dx + dy*dy < 4.0f) {
+
+   //        WallDrawAccept();
+   //        return;
+   //    }
+   //}
+}
 // ----------------------- MOVE OPER ---------------------
 point3d savedpos;
 
@@ -637,9 +1010,115 @@ const estate FlyState = {1, MoveObjContextStart, MoveObjContextUpdate, MoveObjCo
 MAKESTATE(5, LoopDraw);
 MAKESTATE(4, Pickgrab);
 MAKESTATE(6, Tilsed);
+// Keep original state name
+MAKESTATE(8, WallDraw);
 
 const estate Empty = {0, empty, empty, empty, empty};
 // ----------------- MAIN
+	//Claude - implement this section
+// 1- sprites only or pickgrab anythin
+	// 2- wall verts, or entire surfs, including caps.
+	// 3- single sectors, or fine select of sector loops.
+	// 5 - uv modes.
+	// ech key toggles betwween two own options,
+	// only one option of them all is active at the time.
+	// if we are in '1' and press '2' we return to last mode that was in '2'
+void HandleSelectionModes() {
+	static uint16_t prev_selmode = SEL_ALL;
+	static uint16_t sprite_mode = SEL_SPRI;
+	static uint16_t wall_mode = SEL_WAL;
+	static uint16_t sector_mode = SEL_SEC;
+	static uint16_t uv_mode = SEL_UV;
+	static uint16_t redthrough = 0;
+	// Store previous mode for each category
+	if (IsKeyPressed(KEY_GRAVE)) {
+		edselmode = SEL_ALL;
+	}
+	if (IsKeyPressed(KEY_ONE)) {
+		//if (edselmode & SEL_SPRI) {
+		//	// Toggle between sprite only and all
+		//	sprite_mode = (sprite_mode == SEL_SPRI) ? (SEL_SPRI | SEL_ALL) : SEL_SPRI;
+		//	edselmode = sprite_mode;
+		//} else {
+			edselmode = sprite_mode;
+		//}
+	}
+
+	if (IsKeyPressed(KEY_TWO)) {
+		if (edselmode & (SEL_WAL | SEL_SURF)) {
+			// Toggle between vertex mode and surface mode
+			wall_mode = (wall_mode & SEL_SURF) ? SEL_WAL : (SEL_WAL | SEL_SURF);
+			edselmode = wall_mode;
+		} else {
+			edselmode = wall_mode;
+		}
+	}
+
+	if (IsKeyPressed(KEY_THREE)) {
+		if (edselmode & (SEL_SEC | SEL_LOOP)) {
+			// Toggle between single sectors and sector loops
+			sector_mode = (sector_mode & SEL_LOOP) ? SEL_SEC : (SEL_SEC | SEL_LOOP);
+			edselmode = sector_mode;
+		} else {
+			edselmode = sector_mode;
+		}
+	}
+
+	if (IsKeyPressed(KEY_FOUR)) {
+		//	if (selmode & SEL_UV) {
+		//		// Toggle UV mode variants
+		//		uv_mode = (uv_mode == SEL_UV) ? (SEL_UV | SEL_NEAR) :
+		//				 (uv_mode & SEL_NEAR) ? (SEL_UV | SEL_FAR) : SEL_UV;
+		//		selmode = uv_mode;
+		//	} else {
+		edselmode = uv_mode;
+		//	}
+	}
+
+	if (IsKeyPressed(KEY_FIVE)) {
+		if (redthrough & SEL_REDWALLPORTS)
+			redthrough = 0;
+		else
+			redthrough = SEL_REDWALLPORTS;
+	}
+
+	// Clear the flag first, then set if needed
+	edselmode &= ~SEL_REDWALLPORTS;  // Clear the flag
+	edselmode |= redthrough;         // Set if redthrough has it
+
+	// Build string with +R suffix if needed
+	char seltext[64];
+	const char* basetext;
+	switch (edselmode & ~SEL_REDWALLPORTS) {
+		case SEL_SPRI:
+			basetext = "Selecting: Sprites"; break;
+		case SEL_ALL:
+			basetext = "Selecting: Quick Any"; break;
+		case SEL_WAL:
+			basetext = "Selecting: Wall Verts"; break;
+		case SEL_WAL | SEL_SURF:
+			basetext = "Selecting: Surfaces"; break;
+		case SEL_SEC:
+			basetext = "Selecting: Sectors"; break;
+		case SEL_SEC | SEL_LOOP:
+			basetext = "Selecting: Whole Loops"; break;
+		case SEL_UV:
+			basetext = "Selecting: UV"; break;
+		default:
+			basetext = "Selecting: Unknown"; break;
+	}
+
+	if (edselmode & SEL_REDWALLPORTS) {
+		snprintf(seltext, sizeof(seltext), "%s +R", basetext);
+		EditorHudDrawTopInfo(seltext);
+	} else {
+		EditorHudDrawTopInfo(basetext);
+	}
+
+}
+
+
+
 void InitEditor(mapstate_t *m) {
 	map = m;
 	ctx.mode = Fly;
@@ -655,14 +1134,25 @@ void SetColorum(uint8_t r, uint8_t g, uint8_t b, int16_t lum) {
 	}
 }
 
+
+
+void EditorSetTileState(TextureBrowser *ts) {
+	texbstate = ts;
+}
 void Editor_DoRaycasts(cam_t *cc) {
 	int isec = 0;
 	int iwal = 0;
 	int ispri = 0;
 	cam = cc;
 	//ctx.state.discard();// to restore original map state for raycast.
-	raycast(&cc->p, &cc->f, 1e32, cc->cursect, &hoverfoc.sec, &hoverfoc.wal, &hoverfoc.spri,&hoverfoc.surf, &hoverfoc.hitpos, map);
+	uint32_t castflags = 0; // mark what we want to hit.
+	if (edselmode & SEL_REDWALLPORTS)
+		castflags |= RHIT_REDWALLS;
+	raycast(&cc->p, &cc->f, 1e32, cc->cursect, &hoverfoc.sec, &hoverfoc.wal, &hoverfoc.spri,&hoverfoc.surf, &hoverfoc.hitpos, castflags, map);
+	hoverfoc.wal2=-1;
 	if (ISHOVERWAL) {
+		hoverfoc.wal2 = mapwallnextid(hoverfoc.sec,hoverfoc.wal,map);
+		hoverfoc.walprev = wallprev(&HOVERSEC,hoverfoc.wal);
 		float z1 = getwallz(&map->sect[hoverfoc.sec], 1, hoverfoc.wal);
 		float z2 = getwallz(&map->sect[hoverfoc.sec], 1, hoverfoc.wal2);
 		float d1 = bmathdistsqrp2d({HOVERWAL.x, HOVERWAL.y}, BPXY(hoverfoc.hitpos));
@@ -674,8 +1164,15 @@ void Editor_DoRaycasts(cam_t *cc) {
 	}
 }
 
-void EditorFrameMin(const Camera3D rlcam) {
+void EditorUpdate(const Camera3D rlcam) {
+
+	if (IsKeyPressed(KEY_M) && ISHOVERWAL) {
+		// this works
+		//map_sect_remove_loop_data(hoverfoc.sec,hoverfoc.wal, map);
+		map_loop_move_and_remap(hoverfoc.sec,hoverfoc.sec, hoverfoc.wal, map);
+	}
 	// process raycasts;
+	HandleSelectionModes();
 	cam3d = rlcam;
 	ctx.state.update();
 	if (ctx.state.id == Empty.id) {
@@ -696,7 +1193,13 @@ void EditorFrameMin(const Camera3D rlcam) {
 			datstate.op = dTiles;
 			ctx.state = TilsedState;
 			ctx.state.start();
-		} else {
+		}
+		// Add to Empty state in EditorUpdate:
+		else if (IsKeyPressed(KEY_B)) {
+			ctx.state = WallDrawState;
+			ctx.state.start();
+		}
+		else {
 			datstate.op=dNone;
 			if (IsKeyPressed(KEY_K)) { // EXTRUDE PROTOTYPE
 				point2d p0 = HOVERWAL.pos;
@@ -731,7 +1234,7 @@ void EditorFrameMin(const Camera3D rlcam) {
 				}
 				float height = capr * 0.2;
 				point2d loop[4] = {p0, p1, p2, p3};
-				int nsid = addsectfromloop(4, loop, florz, height, map);
+				int nsid = map_append_sect_from_loop(4, loop, florz, height, map,0);
 				sect_t *sec = &map->sect[nsid];
 				sec->wall[0].xsurf[0].tilnum = HOVERWAL.xsurf[0].tilnum;
 				sec->wall[1].xsurf[0].tilnum = HOVERWAL.xsurf[0].tilnum;
@@ -765,7 +1268,7 @@ void EditorFrameMin(const Camera3D rlcam) {
 					HOVERWAL.xsurf[2] = HOVERWAL.xsurf[0];
 				} else {
 					// Multiple sectors case - upgrade existing chain first
-					upgradewallportchain(hoverfoc.sec, hoverfoc.wal, map);
+					map_wall_regen_nsw_chain(hoverfoc.sec, hoverfoc.wal, map);
 
 					// Get existing chain using new method
 					vertlist_t existing_chain[32];
@@ -902,12 +1405,23 @@ void DrawGizmos() {
 		//   addto(&map->spri[focusedSprite].tr.p,scaled(right,mv));
 	}
 	focus_t usefoc;
+	Vector3 rlp1;
+	Vector3 rlp2;
+	int loopwall = -1;
 
 	if (ISHOVERWAL || ctx.state.id != Empty.id) {
-		if (ctx.state.id == Empty.id)
+		if (ctx.state.id == Empty.id || ctx.state.id == WallDrawState.id)
 			usefoc = hoverfoc;
 		else
 			usefoc = grabfoc;
+		if (usefoc.sec<0)
+			return;
+		if (usefoc.onewall >=map->sect[usefoc.sec].n)
+			return;
+		if (usefoc.wal >=map->sect[usefoc.sec].n)
+			return;
+		if (usefoc.wal2 >=map->sect[usefoc.sec].n)
+			return;
 		drawVert(usefoc.sec, usefoc.wal);
 		drawVert(usefoc.sec, usefoc.wal2);
 
@@ -919,6 +1433,28 @@ void DrawGizmos() {
 		Vector3 rlp2 = {w->x, -z2 + 0.1f, w->y};
 		rlColor4ub(255, 128, 128, 255);
 		drawCylBoard(rlp1, rlp2, 0.1f);
+		// draw loop.
+		loopwall = usefoc.onewall;
+	}
+	else if (ISHOVERCAP) {
+		usefoc = hoverfoc;
+		loopwall = 0;
+	}
+	else
+	usefoc = hoverfoc;
+
+	if (usefoc.sec >=0) {
+		loopinfo cloop = map_sect_get_loopinfo(usefoc.sec, loopwall, map);
+		rlp2.y = rlp1.y = -map->sect[usefoc.sec].z[1];
+		rlColor4ub(255, 255, 255, 190);
+		for (int i = 0; i < cloop.nwalls; i++) {
+			wall_t tw1= map->sect[usefoc.sec].wall[cloop.wallids[i]];
+			int nwid = (i+1) % cloop.nwalls;
+			wall_t tw2= map->sect[usefoc.sec].wall[cloop.wallids[nwid]];
+			rlp1.x=tw1.x; rlp1.z=tw1.y;
+			rlp2.x=tw2.x; rlp2.z=tw2.y;
+			drawCylBoard2(rlp1, rlp2, 0.1f, 0.03f);
+		}
 	}
 	DrawPoint3D(buildToRaylibPos(hoverfoc.hitpos), RED);
 
@@ -929,6 +1465,7 @@ void DrawGizmos() {
 		rlColor4ub(255, 255, 255, 255);
 		drawVert(buildToRaylib(loopts[i].pos));
 		rlColor4ub(230, 230, 230, 255);
+		//loop white line
 		drawCylBoard(buildToRaylib(loopts[i].pos), buildToRaylib(loopts[n].pos), 0.01);
 	}
 }
@@ -948,7 +1485,6 @@ void EditorFrame() {
 		FlyState.update();
 		return;
 	}
-
 	if (IsKeyPressed(KEY_SPACE)) {
 		ctx.state.accept();
 
@@ -959,6 +1495,7 @@ void EditorFrame() {
 		ctx.mode = Fly;
 		// ctx.curstate =
 	}
+
 	// parse state change
 	if (ctxprev.mode != ctx.mode) {
 	}

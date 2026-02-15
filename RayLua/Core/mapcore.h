@@ -12,10 +12,14 @@
 
 #include "kplib.h"
 #include "artloader.h"
+#include "../DukeGame/source/build.h"
 #include "../interfaces/shared_types.h"
 #ifndef PI
 #define PI 3.141592653589793
 #endif
+#define MAX_WALLS_PER_SECT 256
+#define MAX_LOOPS_PER_SECT 64
+
 
 extern long gnumtiles, gmaltiles, gtilehashead[1024];
 extern char curmappath[MAX_PATH+1];
@@ -52,6 +56,21 @@ typedef struct {
 	float persp_h;         // Horizontal perspectiveness [0.0-1.0]
 	float persp_v;
 } cam_t;
+
+typedef struct {
+	long sect;
+	int nwalls;
+	uint16_t wallids[MAX_WALLS_PER_SECT];
+} loopinfo;
+
+// Core loop operations
+typedef struct {
+	int sect_id;
+	int loop_count;
+	loopinfo loops[MAX_LOOPS_PER_SECT]; // Max loops per sector
+	uint8_t loop_of_wall[MAX_WALLS_PER_SECT];
+
+} sector_loops_t;
 
 
 #endif
@@ -118,6 +137,7 @@ long sect_isneighs_imp (int s0, int s1, mapstate_t* map);
 double getslopez (sect_t *s, int i, double x, double y);
 double getslopezpt(sect_t *s, int isflor, point2d pos);
 double getwallz (sect_t *s, int isflor, int wid);
+int map_wall_prev_in_loop (sect_t *s, int w);
 int wallprev (sect_t *s, int w);
 int getwalls_imp (int s, int w, vertlist_t *ver, int maxverts, mapstate_t* map);
 int getverts_imp (int s, int w, vertlist_t *ver, int maxverts, mapstate_t* map);
@@ -131,15 +151,56 @@ void changesprisect_imp (int i, int nsect, mapstate_t *map);
 surf_t makeSurfWall(int w1, int wnex);
 surf_t makeSurfCap();
 void makewall(wall_t* w, int8_t wid , int8_t nwid);
+int is_loop2d_ccw(point2d* points, int count);
 
-int appendsect(mapstate_t *map, int nwalls);
+// true if it is pillar inside sector. not outer border.
+static inline int is_loop_inner(loopinfo li, mapstate_t *map) {
+	point2d* pt = (point2d*)malloc(sizeof(point2d)*li.nwalls);
+	for (int i = 0; i < li.nwalls; ++i) {
+		pt[i] = map->sect[li.sect].wall[li.wallids[i]].pos;
+	}
+	free(pt);
+	return is_loop2d_ccw(pt, li.nwalls);
+}
 
-int appendwalls(sect_t *sec, int nwalls);
+static inline loopinfo map_sect_get_loopinfo(int secid, int startwal, mapstate_t* map) {
+	loopinfo result = {0};
+	sect_t* sect = &map->sect[secid];
+
+	// First pass - count walls
+	int wid = sect->wall[startwal].n + startwal;
+	int count = 1;
+	while (wid != startwal) {
+		count++;
+		wid = sect->wall[wid].n + wid;
+	}
+
+	// Allocate memory for wall IDs
+	result.sect = secid;
+	result.nwalls = count;
+
+	// Second pass - fill wall IDs
+	result.wallids[0] = startwal;
+	wid = sect->wall[startwal].n + startwal;
+	int i = 1;
+	while (wid != startwal) {
+		result.wallids[i] = wid;
+		i++;
+		wid = sect->wall[wid].n + wid;
+	}
+	return result;
+}
+
+int map_loops_join_mirrored(loopinfo li1, loopinfo li2, mapstate_t *map);
+
+int map_append_sect(mapstate_t *map, int nwalls);
+
+int sect_append_walls(sect_t *sec, int nwalls);
 
 // outer loop is CW, inner is CCW
-int appendwall_loop(sect_t *sec, int nwalls, point2d* coords);
+int sect_appendwall_loop(sect_t *sec, int nwalls, point2d* coords, int invert);
 
-int addsectfromloop(int nwalls, point2d *coords, float floorz, float height, mapstate_t *map);
+int map_append_sect_from_loop(int nwalls, point2d *coords, float floorz, float height, mapstate_t *map, int invert);
 
 void makeslabuvform(int surfid, float slabH, wall_t *wal, int dukescales[4], int tilesize[2]);
 int splitwallat(int sid, int wid, point3d pos, mapstate_t* map);
@@ -180,6 +241,7 @@ static long wallclip (dpoint3d *pol, dpoint3d npol[4])
 	npol[2] = pol[2];
 	return(3);
 }
+void map_loop_reversewalls (wall_t *wal, int n);
 
 //Split complex polygon by line. Returns complex polygon.
 // owal[],on: input wall list
@@ -277,11 +339,13 @@ int polbool_splitlinepoint (polbool_lin_t **lin, int *linmal, wall_t *wal, int n
 	//if retwal is null, returns # walls without generating wall list
 int polybool (wall_t *wal0, int on0, wall_t *wal1, int on1, wall_t **retwal, int *retn, int op);
 
-int insidesect (double x, double y, wall_t *wal, int w);
+int insidesect(double x, double y, wall_t *wal, int w);
+
+int insideloop(double x, double y, wall_t *wal);
 
 // first pass updatesect to ONLY check nearest + portals.
 int updatesect_portmove(transform *tr, int *cursect, mapstate_t *map);
-void upgradewallportchain(int startwal_sec,int startwal_idx, mapstate_t *map);
+void map_wall_regen_nsw_chain(int start_sec,int start_wal, mapstate_t *map);
 
 int getwalls_chain(int s, int w, vertlist_t *ver, int maxverts, mapstate_t *map);
 
@@ -445,7 +509,7 @@ static void checksprisect_imp (int s, mapstate_t *map)
 //Find centroid of polygon (algo copied from TAGPNT2.BAS 09/14/2006)
 static void getcentroid (wall_t *wal, int n, float *retcx, float *retcy);
 
-static float getarea (wall_t *wal, int n);
+float getarea(wall_t *wal, int n);
 
 static void delwall_imp (sect_t *s, int w, mapstate_t* map)
 {
@@ -489,5 +553,87 @@ static void delsect_imp (int s, mapstate_t* map)
 	map->numsects--; sec[s] = sec[map->numsects];
 	memset(&sec[map->numsects],0,sizeof(sect_t));
 }
+static inline int mapwallnextid(int s, int w, mapstate_t *map) {
+	return map->sect[s].wall[w].n+w;
+}
+// will scan based on sector
+void change_wall_links(int sec_orig, int wall_orig, int sec_new, int wall_new, mapstate_t *map);
+// will only remove loop witohut any relinking.
+
+// will rename specific links on given wall chan
+void map_wall_chain_rename(wall_t* wall_of_chain, long scansectid, int secid_old, int wallid_old, int secid_new, int wallid_new, mapstate_t *map);
+
+int map_sect_remove_loop_data(int sect_id, int any_wall_id, mapstate_t *map);
+sector_loops_t map_sect_get_loops(int sect_id, mapstate_t *map);
+// Remove loop from sector destroying its references.
+int map_sect_destroy_loop(int sect_id, int loop_wall_id, mapstate_t *map);
+// Extract loop into new sector
+int map_sect_extract_loop_to_new_sector(int origin_sect, int loop_wall_id, mapstate_t *map);
+// High-level operation: chip off inner loop, doesnt preseve red walls
+int map_sect_chip_off_smaller_loop(int origin_sect, int entry_point_A, int entry_point_C, mapstate_t *map);
+// doesnt preserve red walls
+int map_sect_chip_off_loop(int orig_sectid, int walmove, int wallretain, mapstate_t *map);
+// - options 2
+// Wall remapping structure
+typedef struct {
+	int old_sect, old_wall;
+	int new_sect, new_wall;
+} wall_remap_t;
+
+typedef struct {
+	wall_remap_t *remaps;
+	int count;
+	int capacity;
+} remap_table_t;
+
+// Step 1: Duplicate loop to new sector (no link updates yet)
+//int duplicate_loop_to_new_sector(int origin_sect, int loop_wall_id, mapstate_t *map, remap_table_t *remap);
+
+// Step 2: Remove loop from original sector and record remapping
+//int compact_sector_remove_loop(int sect_id, int loop_wall_id, remap_table_t *remap, mapstate_t *map);
+
+// Step 3: Apply all remappings
+//void apply_wall_remapping(remap_table_t *remap, mapstate_t *map);
+
+//int map_sect_chip_off_via_copy(int origin_sect, int chip_loop_wall_id, int retained_wall_id, mapstate_t *map);
+
+// High-level clean operation
+//int map_sect_chip_off_loop_clean(int origin_sect, int loop_wall_id, mapstate_t *map);
+
+static inline void map_wall_memcopy_one( wall_t *target, wall_t *source_wall) {
+	memcpy(target, source_wall, sizeof(wall_t));
+}
+// -------------- SECT OPS --------------
+static inline void map_sect_walls_add_empty(int sectid, int additional_wall_number, mapstate_t* map) {
+	sect_t* sectr = &map->sect[sectid];
+	int new_total = sectr->n + additional_wall_number;
+	if (new_total > sectr->nmax) {
+		sectr->nmax = new_total + 16;
+		sectr->wall = (wall_t*)realloc(sectr->wall, sectr->nmax * sizeof(wall_t));
+	}
+	//new_sec->n = new_total;
+}
+	// -------------- LOOP OPERATIONS ------------------
+//void map_loop_move_to_new_sect(int new_sect, int orig_sect, int wall_of_loop, mapstate_t *map);
+// distributes loops between sectors, after bool ops etc.
+int map_sect_rearrange_loops(int orig_sectid, int second_sect_id, int ignorewall, mapstate_t *map);
+int map_loop_append_by_info(loopinfo lp, int new_sector, point2d offset, mapstate_t *map);
+int map_loop_move_by_info(loopinfo lp, int new_sector, point2d offset, mapstate_t *map);
+void map_sect_loop_erase(int sectid, int wall_of_loop, mapstate_t *map);
+// will dupe the loop, AND retarget destination walls. affects other sectors.
+static inline void map_loop_copy_and_remap(int sect_to, int sect_from, int wall_of_loop, mapstate_t *map) {
+	loopinfo li = map_sect_get_loopinfo(sect_from, wall_of_loop, map);
+	point2d p = {0,0};
+	map_loop_append_by_info(li, sect_to, p, map);
+}
+static inline void map_loop_move_and_remap(int sect_to, int sect_from, int wall_of_loop, mapstate_t *map) {
+	loopinfo li = map_sect_get_loopinfo(sect_from, wall_of_loop, map);
+	point2d p = {0,0};
+	map_loop_move_by_info(li, sect_to, p, map);
+}
+// will discard loop from sector memory, no relinking will be done!
+// can call with -1 to just rearrange loops.
+
+void map_sect_translate(int s_start, int outer_ignore, point3d offset, mapstate_t * map);
 
 #endif //BUILD2_MAPCORE_H

@@ -195,7 +195,9 @@ free((arena).data); \
 #define SPRITE_B2_IS_LIGHT     (1 << 16)   // 64
 #define SPRITE_B2_IS_DYNAMIC     (1 << 17)    // for dynamic lights and all dynamic stuff.
 
-#define SURF_SEE_THROUGH (1<<16) // for parallax
+#define SURF_PARALLAX_DISCARD (1<<16) // marker for old build style parallax mode.
+
+#define GEO_NO_BUNCHING (1<<1)
 
 #define UV_TEXELRATE 		0 // pixel-rated = duke default.
 #define UV_NORMRATE 		1 // tile-rated
@@ -244,6 +246,7 @@ free((arena).data); \
 // 1024 build units(x,y) correspond to 32 pixels. at 4,4 repeat
 // 8192 z build units correspond to 32 pixels at 8x8 repeat.
 
+#define TAG_COUNT_PER_SECT 16
 
 #define PAN_TO_UV (1.0/8.0) // uvscale = pan * p2uv
 
@@ -363,13 +366,11 @@ typedef struct {
 	enum srenderType rtype;
 	enum renderQ rq;
 	bool isdblside;
+	// need some geometry flags for build, like do we skip, emit mask etc. could be better than just transparency.
 	float uv[8]; // scalexy, panxy, cropAB
 	point3d anchor; // normalized
 	point3d color;
 	int16_t lum; // yes allow negative values, why not.
-	uint8_t pal;
-	uint16_t tilnum;
-	uint8_t tilset; // sortof mod id
 } sprview;
 
 typedef struct {
@@ -388,23 +389,31 @@ typedef struct {
 
 typedef struct // surf_t
 {
-	long tilnum, tilanm ;/*???*/
+	// TEXTURE PARAMS.
+	union {
+		struct {
+			uint32_t tilnum : 15;  // 32k tiles
+			uint32_t galnum : 8;   // 256 gals
+			uint32_t pal : 9;      // 512 pals.
+		};
+		uint32_t packed_tile_data;
+	};
 	//Bit0:Blocking, Bit2:RelativeAlignment, Bit5:1Way, Bit16:IsParallax, Bit17:IsSkybox
 	uint32_t flags;	short lotag, hitag;
-	uint8_t pal;
 	float alpha;
 	float uvform[9]; // scale xy, pan xy, crop AB, rotation
-	int8_t owal, otez, uwal, utez, vwal, vtez; // wals are always wals of this sector.
+	int8_t owal, otez, uwal, utez, vwal, vtez, wtez; // wals are always wals of this sector.
+	// wtez is second skew vector, originating at v end. by default parallel to u. but can be inverted for trapezoid map.
 	uint8_t uvmapkind; // uv amappings, regular, polar, hex, flipped variants etc. paralax.
 	uint8_t tilingkind; // normal, polar, hex etc.
+	enum frenderType rendertype;
 // ------------
-	point2d uv[3]; // legacy.
 	unsigned short asc, rsc, gsc, bsc; //4096 is no change
 
 // ------- runtime gneerated data
 	// for portals case - we dont care and use original world for everything.
 	// interpolator will lerp worldpositions, regardless of poly location
-	point3d uvcoords[3]; // world uv vectors. generated per poly. origin, u ,v
+	point3d uvcoords[3]; // world uv vectors. generated per poly. origin, u ,v, w
 
 	// can in theory use object space and encode it.
 
@@ -433,13 +442,18 @@ typedef struct // wall t
 	Looking at the code patterns, ideally only one wall per loop should have a negative n value - the last wall that closes the loop.
 	*/
 
-	long n, ns, nw; //n:rel. wall ind.; ns & nw : nextsect & nextwall_of_sect
-	long nschain, nwchain; // for multiportal.
+	// difference between ns and nschain is that ns points right to the target opening
+	// but chains will be looped, similar to walls.
+	signed long n, ns, nw; //n:rel. wall ind.; ns & nw : nextsect & nextwall_of_sect
+	signed long nschain, nwchain; // for multiportal.
 	long owner; //for dragging while editing, other effects during game
+
 	uint8_t surfn;
+	uint8_t geoflags;
 	surf_t surf, xsurf[3]; //additional malloced surfs when (surfn > 1)
 	uint16_t mflags[4]; // modflags
 	int32_t tags[16]; // standard tag is 4bytes
+	int8_t tempflags; // used only in editor for data transfers.
 
 } wall_t;
 
@@ -448,7 +462,16 @@ typedef struct // spri_t
 	uint32_t guid; // uniq per sprite. automatic.
 	union { transform tr; struct { point3d p, r, d, f; }; };
 
-	long tilnum;             //Model file. Ex:"TILES000.ART|64","CARDBOARD.PNG","CACO.KV6","HAND.KCM","IMP.MD3"
+	//long tilnum;             //Model file. Ex:"TILES000.ART|64","CARDBOARD.PNG","CACO.KV6","HAND.KCM","IMP.MD3"
+	union {
+		uint32_t packed_tile_data;
+		struct {
+			uint32_t tilnum : 15;  // 32k tiles
+			uint32_t galnum : 8;   // 256 gals
+			uint32_t pal : 9;      // 512 pals.
+		};
+	};
+
 	long owner;
 	short lotag, hitag;
 	long sect; //Current sector
@@ -483,7 +506,7 @@ typedef struct
 	// other
 
 	long owner;      //for dragging while editing, other effects during game
-	int32_t tags[16];
+	int32_t tags[TAG_COUNT_PER_SECT];
 	uint16_t mflags[4];
 	short scriptid,lotag,hitag;
 	// int nwperim - perimeter walls, would be first in sequence
@@ -519,4 +542,6 @@ typedef struct
 #define MAXLIGHTS 256
 	int light_spri[MAXLIGHTS], light_sprinum;
 } mapstate_t;
+
+#define pBREAKSBUNCH .flags & SURF_PARALLAX_DISCARD
 #endif //RAYLIB_LUA_IMGUI_SHARED_TYPES_H

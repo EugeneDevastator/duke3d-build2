@@ -7,6 +7,8 @@ add_executable(RayGame
         ${C_SOURCES}
         MonoTest.hpp
         DumbEdit.hpp
+        Editor/uimodels.h
+
 )
 
 add_shared_definitions(RayGame)
