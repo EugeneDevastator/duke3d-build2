@@ -1807,6 +1807,7 @@ static void map_sect_translate_recurse(int s_toscan, point3d offset, mapstate_t 
 			if (nsc<0)
 				break;
 			if (nsc == sect_translate_border_s) {
+			// using sectmask 0-1000 for walls of block sector.
 				if (!sectmask_was_marked(nwc)) {
 					sectmask_mark_sector(nwc);
 					map->sect[nsc].wall[nwc].pos.x += offset.x;
@@ -1819,6 +1820,7 @@ static void map_sect_translate_recurse(int s_toscan, point3d offset, mapstate_t 
 						sectmask_mark_sector(nexwid);
 					map->sect[nsc].wall[nexwid].pos.x += offset.x;
 					map->sect[nsc].wall[nexwid].pos.y += offset.y;
+					// here we must scan this wall as well i trhink.
 				}
 			}
 			else if (!sectmask_was_marked((nsc+1)*1000)) {
@@ -1833,13 +1835,18 @@ static void map_sect_translate_recurse(int s_toscan, point3d offset, mapstate_t 
 }
 
 void map_sect_translate(int s_start, int outer_ignore, point3d offset, mapstate_t *map) {
+	// problem - sectror inside split-space.
+	// we must move only it, its internals and connecting walls,
+	// find sector's outermost loop (enclosing one)
+	// for and make loop-move operation, which will ONLY translate loop verts.
+	// for outer loops we never scan touching sectors, only touching wall chains.
+	// for every opening wall - also move nextwall if it's ns == -1
+
 	sectmask_reset();
 	sectmask_mark_sector((outer_ignore+1)*1000);
 	sect_t *sectr = &map->sect[s_start];
 	sect_translate_border_s = outer_ignore;
 	map_sect_translate_recurse(s_start, offset,map);
-
-
 }
 
 // non destructive loop, but will produce incorrect state due to double pointing.
@@ -1854,6 +1861,7 @@ int map_loop_append_by_info(loopinfo lp, int new_sector, point2d offset, mapstat
 	return tsect_wall_start;
 }
 #endif
+
 // destructive for sector of the moved loop.
 int map_loop_move_by_info(loopinfo lp, int new_sector, point2d offset, mapstate_t *map) {
 	int new_loop_start = map_loop_append_by_info(lp, new_sector, offset, map);
@@ -1905,23 +1913,6 @@ int map_sect_chip_off_loop(int orig_sectid, int walmove, int wallretain, mapstat
 
 	// Determine which loop is smaller (inner loop)
 	int chip_wall_id = walmove;
-
-	// no need
-	// before we do anything we must remap retained walls to point to new sector.
-//wall_t *wcur = &map->sect[orig_sectid].wall[wallretain];
-//int idxsum = 0;
-//do {
-//	if (wcur->ns == orig_sectid || wcur->nschain == orig_sectid) {
-//		wcur->ns = new_sect_id;
-//		wcur->nschain = new_sect_id;
-//	}
-//	else {
-//		// also repoint other sectors to new sector.
-//		map_wall_chain_rename(wcur,orig_sectid,orig_sectid,wallretain+idxsum,new_sect_id,wallretain+idxsum,map);
-//	}
-//	idxsum += wcur->n;
-//	wcur = wcur+wcur->n;
-//} while (idxsum != 0);
 
 	// opy-relocate loop to new sector. and then build it as we go.
 	map_loop_copy_and_remap(new_sect_id,orig_sectid,walmove,map);
