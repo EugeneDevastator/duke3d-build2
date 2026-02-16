@@ -2227,7 +2227,7 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 				sect_t* sec = map->sect;
 				wall_t *lwal = map->sect[s].wall;
 
-				int nwrl = map->sect[s].wall[ww].n;
+				signed int nwrl = map->sect[s].wall[ww].n;
 				int nw = ww  +nwrl;
 				double dx = sqrt((lwal[nw].x - lwal[ww].x) * (lwal[nw].x - lwal[ww].x) + (lwal[nw].y - lwal[ww].y) * (lwal[nw].y - lwal[ww].y));
 				b->gnorm.x = lwal[ww].y - lwal[nw].y;

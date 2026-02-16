@@ -726,8 +726,9 @@ void changesprisect_imp (int i, int nsect, mapstate_t *map)
 
 	spr = &map->spri[i];
 	// we skip this unless lights is dynamic.
-	if (spr->flags &  SPRITE_B2_IS_LIGHT)
-		return;
+	//if (spr->flags &  SPRITE_B2_IS_LIGHT)
+	//	return;
+	// replace with lights distance bias
 
 	osect = spr->sect;
 
