@@ -314,9 +314,11 @@ typedef struct {
 
 typedef struct {
 	unsigned int is_bunchbreak : 1;
-	unsigned int is_mask : 1; // can be alpha test
+	unsigned int is_mask_emitter : 1; // can be alpha test
+	unsigned int is_portal : 1; // for new style portals
+	unsigned int is_traversal_blocker : 1; // for full masks for ex.
 	unsigned int RESERVED : 6;    // padding to 32 bits
-} w;
+} geoflags8_t;
 
 
 enum vertRenderMode { // not part of the flags because must be chosen before any flags take place
