@@ -25,6 +25,7 @@
 #include "buildmath.h"
 #include "monodebug.h"
 #include "physics.h"
+#include "sectmask.h"
 #define PI 3.14159265358979323
 #pragma warning(disable:4731)
 #define EXLOGS 0
@@ -62,7 +63,7 @@ eyepols are generated from mono space AND plane equation stored in gouvmat.
 #define RM_LIGHTS 4
 #define RM_GEO 1
 
-
+sectmask_t *framesectgot;
 void bdrawctx_clear(bdrawctx *b) {
 	if (!b) return;
 
@@ -540,6 +541,9 @@ static void scansector(int sectnum, bdrawctx *b) {
 	if (sectnum < 0) return;
 	b->sectgot[sectnum >> 5] |= (1 << sectnum);
 
+	if (shadowtest2_rendmode != 4) // store non-light sectors.
+		sectmask_mark_sector(framesectgot, sectnum);
+
 	sec = &curMap->sect[sectnum];
 	wal = sec->wall;
 
@@ -883,7 +887,7 @@ static int triangulate(const int *chain_starts, const int *chain_lengths, dpoint
 	return triangle_count;
 }
 
-static void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx *b) {
+static void emit_wallpoly_func(int rethead0, int rethead1, bdrawctx *b) {
 	double f, fx, fy;
 	int i, h, rethead[2];
 	cam_t cam = b->cam;
@@ -1027,7 +1031,15 @@ static void skytagfunc(int rethead0, int rethead1, bdrawctx *b) {
 // if then we cut masked mph with another masked mph - we produce two mph pieces:
 // with mask1 and mask2, and both have light value divided by 2. - tho will overblend..
 //
-static void ligpoltagfunc(int rethead0, int rethead1, bdrawctx *b) {
+static void emit_lighpol_func(int rethead0, int rethead1, bdrawctx *b) {
+
+	// skip polys in unseen sectors. can only skip drawing, to not ruin shadows.
+	if (!sectmask_was_marked(framesectgot, b->gligsect)) {
+		mono_deloop(rethead1);
+		mono_deloop(rethead0);
+		return;
+	}
+
 	cam_t gcam = b->cam;
 	double f, fx, fy, fz;
 	int i, j, rethead[2];
@@ -1372,9 +1384,9 @@ static int drawpol_befclip(int fromtag, int newtag1, int fromsect, int newsect, 
 			// cliptonewregion
 			if (flags & DP_EMIT_MASK) {
 				if (shadowtest2_rendmode == 4)
-					mono_output = ligpoltagfunc;
+					mono_output = emit_lighpol_func;
 				else
-					mono_output = drawtagfunc_ws;
+					mono_output = emit_wallpoly_func;
 			} else mono_output = changetagfunc;
 			logstep("bool AND, keep all, changetag, on tag %d to %d", curtag, b->gnewtag);
 			for (i = mphnum - 1; i >= 0; i--)
@@ -1422,10 +1434,10 @@ static int drawpol_befclip(int fromtag, int newtag1, int fromsect, int newsect, 
 		else {
 			// do AND with current mono, draw result, and discard it in drawtag.
 			if (shadowtest2_rendmode == 4)
-				mono_output = ligpoltagfunc;
+				mono_output = emit_lighpol_func;
 				//add to light list // this will process point lights. otherwize will only use plr light.
-			else if (b->gflags < 2) mono_output = drawtagfunc_ws;
-			else mono_output = drawtagfunc_ws; //calls drawtagfunc inside
+			else if (b->gflags < 2) mono_output = emit_wallpoly_func;
+			else mono_output = emit_wallpoly_func; //calls drawtagfunc inside
 			logstep("Bool-AND for solids drawtag, againsst all heads, keep all, with mono N=%d, when tag==%d",
 			        mphnum - 1, curtag);
 			for (i = mphnum - 1; i >= 0; i--)
@@ -1954,7 +1966,16 @@ void reset_context() {
 }
 int shadowtest_curlight;
 int lastvalidsec = 0;
+void draw_hsr_polymost_lights(cam_t *cc, mapstate_t *map, int dummy) {
+// prep ctx,
+}
+
 void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy) {
+
+	if (shadowtest2_rendmode != 4) {
+		sectmask_destroy(framesectgot);
+		framesectgot = sectmask_create();
+	}
 	bdrawctx bs;
 	loopnum = 0;
 	//operstopn=-1;

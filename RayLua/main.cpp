@@ -898,7 +898,23 @@ void DrawInfoMessage() {
 10. 7. floor ceil ports mono fix
 11. 8. palforms
 
--- draw original wall on portal failures.
+-- draw original wall on portal failure handling.
+
+sprites:
+1. draw geo to albedo
+2. also collect sprites to draw with portalxforms.
+2. draw geo lights as alpha test, using geo zbuf.
+3. draw sprites to albedo using a-test for all
+4. draw sprite lights using zbuf from albedo.
+
+draw sprites as polys inside light pass.
+sort them together as walls, or just by poss.
+1. collect sprites in camera pass
+2. draw only those sprites in light passes.
+3. sort them together with walls.
+3. dont emit light polys if sect was not in camera pass
+
+
 */
 void RecreateRenderTargets(CustomRenderTarget* albedo, CustomRenderTarget* light, CustomRenderTarget* combined, CustomRenderTarget* final) {
     int w = GetScreenWidth();

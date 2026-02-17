@@ -10,8 +10,8 @@ typedef struct {
 	size_t size;
 } sectmask_t;
 
-static sectmask_t* sectmask_create(void) {
-	sectmask_t *mask = malloc(sizeof(sectmask_t));
+static sectmask_t* sectmask_create() {
+	sectmask_t *mask = (sectmask_t*)malloc(sizeof(sectmask_t));
 	mask->bits = NULL;
 	mask->size = 0;
 	return mask;
@@ -21,7 +21,7 @@ static void sectmask_ensure_capacity(sectmask_t *mask, long id) {
 	size_t needed_bytes = (id / 8) + 1;
 	if (needed_bytes > mask->size) {
 		size_t new_size = (needed_bytes + 1023) & ~1023;
-		mask->bits = realloc(mask->bits, new_size);
+		mask->bits = (unsigned char *)realloc(mask->bits, new_size);
 		memset(mask->bits + mask->size, 0, new_size - mask->size);
 		mask->size = new_size;
 	}

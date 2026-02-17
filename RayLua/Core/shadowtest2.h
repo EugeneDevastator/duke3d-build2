@@ -3,6 +3,7 @@
 
 #include "scenerender.h"
 #include "monoclip.h"
+#include "sectmask.h"
 
 // ================================================================================================
 // CONSTANTS AND CONFIGURATION
@@ -19,6 +20,7 @@
 extern int shadowtest2_numlights, shadowtest2_useshadows, shadowtest2_numcpu, shadowtest_curlight;
 extern int shadowtest2_rendmode, eyepoln, glignum;
 extern unsigned int *shadowtest2_sectgot;
+extern sectmask_t *framesectgot;
 // ================================================================================================
 // LIGHT SYSTEM DATA STRUCTURES
 // ================================================================================================
@@ -163,7 +165,7 @@ void gentex_xform (float *ouvmat, bdrawctx *b);
  * @param rethead0 First polygon loop head from clipping
  * @param rethead1 Second polygon loop head from clipping
  */
-void ligpoltagfunc(int rethead0, int rethead1, bdrawctx *b);
+void emit_lighpol_func(int rethead0, int rethead1, bdrawctx *b);
 
 /** Resets light polygon data structures
  * @param ind Light index to reset (-1 for all lights)
@@ -202,7 +204,7 @@ void eyepol_drawfunc(int ind);
  * @param rethead0 First polygon loop head
  * @param rethead1 Second polygon loop head
  */
-void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx * b);
+void emit_wallpoly_func(int rethead0, int rethead1, bdrawctx * b);
 
 /** Software skybox rendering
  * @param rethead0 First polygon loop head
