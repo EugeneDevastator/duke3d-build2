@@ -5,35 +5,44 @@
 #include <string.h>
 #include <stdbool.h>
 
-static unsigned char *sector_bits = NULL;
-static size_t sector_bits_size = 0;
+typedef struct {
+	unsigned char *bits;
+	size_t size;
+} sectmask_t;
 
-static void sectmask_ensure_capacity(long id) {
+static sectmask_t* sectmask_create(void) {
+	sectmask_t *mask = malloc(sizeof(sectmask_t));
+	mask->bits = NULL;
+	mask->size = 0;
+	return mask;
+}
+
+static void sectmask_ensure_capacity(sectmask_t *mask, long id) {
 	size_t needed_bytes = (id / 8) + 1;
-	if (needed_bytes > sector_bits_size) {
+	if (needed_bytes > mask->size) {
 		size_t new_size = (needed_bytes + 1023) & ~1023;
-		sector_bits = realloc(sector_bits, new_size);
-		memset(sector_bits + sector_bits_size, 0, new_size - sector_bits_size);
-		sector_bits_size = new_size;
+		mask->bits = realloc(mask->bits, new_size);
+		memset(mask->bits + mask->size, 0, new_size - mask->size);
+		mask->size = new_size;
 	}
 }
 
-static void sectmask_mark_sector(long id) {
-	sectmask_ensure_capacity(id);
-	sector_bits[id / 8] |= (1 << (id % 8));
+static void sectmask_mark_sector(sectmask_t *mask, long id) {
+	sectmask_ensure_capacity(mask, id);
+	mask->bits[id / 8] |= (1 << (id % 8));
 }
 
-static bool sectmask_was_marked(long id) {
-	if (id / 8 >= sector_bits_size) return false;
-	return (sector_bits[id / 8] >> (id % 8)) & 1;
+static bool sectmask_was_marked(sectmask_t *mask, long id) {
+	if (id / 8 >= mask->size) return false;
+	return (mask->bits[id / 8] >> (id % 8)) & 1;
 }
 
-static void sectmask_reset(void) {
-	if (sector_bits) {
-		free(sector_bits);
-		sector_bits = NULL;
+static void sectmask_destroy(sectmask_t *mask) {
+	if (mask) {
+		free(mask->bits);
+		mask->bits = NULL;
+		free(mask);
 	}
-	sector_bits_size = 0;
 }
 
 #endif

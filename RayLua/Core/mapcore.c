@@ -1788,8 +1788,9 @@ static void map_sect_translate_raw(int s, point3d offset, mapstate_t *map) {
 }
 static int sect_translate_border_s;
 // HELPER
+sectmask_t *mask1;
 static void map_sect_translate_recurse(int s_toscan, point3d offset, mapstate_t * map) {
-	sectmask_mark_sector((s_toscan+1)*1000);
+	sectmask_mark_sector(mask1,(s_toscan+1)*1000);
 	map_sect_translate_raw(s_toscan, offset,map);
 
 	int walln= map->sect[s_toscan].n;
@@ -1809,22 +1810,22 @@ static void map_sect_translate_recurse(int s_toscan, point3d offset, mapstate_t 
 				break;
 			if (nsc == sect_translate_border_s) {
 			// using sectmask 0-1000 for walls of block sector.
-				if (!sectmask_was_marked(nwc)) {
-					sectmask_mark_sector(nwc);
+				if (!sectmask_was_marked(mask1,nwc)) {
+					sectmask_mark_sector(mask1,nwc);
 					map->sect[nsc].wall[nwc].pos.x += offset.x;
 					map->sect[nsc].wall[nwc].pos.y += offset.y;
 				}
 				// and we also need to move all verts here, not just nextwal.
 				int nexwid = map->sect[nsc].wall[nwc].n +nwc;
 				{
-					if (!sectmask_was_marked(nexwid))
-						sectmask_mark_sector(nexwid);
+					if (!sectmask_was_marked(mask1,nexwid))
+						sectmask_mark_sector(mask1,nexwid);
 					map->sect[nsc].wall[nexwid].pos.x += offset.x;
 					map->sect[nsc].wall[nexwid].pos.y += offset.y;
 					// here we must scan this wall as well i trhink.
 				}
 			}
-			else if (!sectmask_was_marked((nsc+1)*1000)) {
+			else if (!sectmask_was_marked(mask1,(nsc+1)*1000)) {
 				map_sect_translate_recurse(nsc, offset, map);
 			}
 			wall_t *wall = &map->sect[nsc].wall[nwc];
@@ -1842,9 +1843,9 @@ void map_sect_translate(int s_start, int outer_ignore, point3d offset, mapstate_
 	// for and make loop-move operation, which will ONLY translate loop verts.
 	// for outer loops we never scan touching sectors, only touching wall chains.
 	// for every opening wall - also move nextwall if it's ns == -1
-
-	sectmask_reset();
-	sectmask_mark_sector((outer_ignore+1)*1000);
+	sectmask_t *mask1 = sectmask_create();
+	sectmask_destroy(mask1);
+	sectmask_mark_sector(mask1,(outer_ignore+1)*1000);
 	sect_t *sectr = &map->sect[s_start];
 	sect_translate_border_s = outer_ignore;
 	map_sect_translate_recurse(s_start, offset,map);
