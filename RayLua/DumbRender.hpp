@@ -1354,7 +1354,7 @@ public:
 		// draw sprites.
 		for (int i = 0; i < map->numspris; i++) {
 			spri_t *spr = &map->spri[i];
-			if (spr->tilnum >= 0) // sprites
+			if (spr->tilnum >= 0 && sectmask_was_marked(framesectgot, spr->sect)) // sprites
 			{
 				if (spr->tilnum >= numartiles)
 					spr->tilnum = numartiles - 10;
