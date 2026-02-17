@@ -89,6 +89,7 @@ player_transform plr = {};
 static Shader uvShader_plain;
 static UVShaderDesc uvShaderDesc;
 static Shader lightShader;
+static Shader atestShader;
 static Shader skyShader;
 static int lightPosLoc;
 static int lightForLoc;
@@ -140,6 +141,7 @@ public:
 		LoadUVShader();
 		lightShader = LoadShader("Shaders/light.vert", "Shaders/light.frag");
 		skyShader = LoadShader("Shaders/skyparallax.vert", "Shaders/skyparallax.frag");
+		atestShader = LoadShader(NULL, "Shaders/atest.frag");
 
 		lightPosLoc = GetShaderLocation(lightShader, "lightPosition");
 		lightForLoc = GetShaderLocation(lightShader, "lightForwardVec");
@@ -1350,8 +1352,10 @@ public:
 			}
 		// rlEnableDepthMask();
 		rlEnableBackfaceCulling();
-		rlDisableDepthMask();
+		rlEnableDepthMask();
+		rlEnableDepthTest();
 		// draw sprites.
+		BeginShaderMode(atestShader);
 		for (int i = 0; i < map->numspris; i++) {
 			spri_t *spr = &map->spri[i];
 			if (spr->tilnum >= 0 && sectmask_was_marked(framesectgot, spr->sect)) // sprites
@@ -1419,6 +1423,7 @@ public:
 				}
 			}
 		}
+		EndShaderMode();
 		DrawTransform(&lastcamtr);
 		DrawTransform(&lastcamtr2);
 		dpoint3d testp = {
