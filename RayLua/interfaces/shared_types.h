@@ -300,74 +300,57 @@ typedef struct {
 
 
 typedef struct {
-	unsigned int receive_shadow : 1;
-	unsigned int block_light : 1; //2
-	unsigned int is_light : 1; //3
-	unsigned int is_visible : 1; //4
-	unsigned int queue : 2; //6       // 0-3: opaque, atest, transparent, postproc
-	unsigned int blend_mode : 3;//9   // 0-7 blend modes
-	unsigned int shader : 4;   //13
-	unsigned int shadermode : 4;   //17
-	unsigned int RESERVED : 5;    // padding to 32 bits
-} renderflags_t;
+	unsigned int is_visible : 1;
+	unsigned int is_light : 1;
+	unsigned int shadow_get : 1;
+	unsigned int shadow_cast : 1; // 4
+	unsigned int is_dblside : 1; // 5
+	unsigned int queue : 2;        // 0-3: opaque, atest, transparent, postproc
+	unsigned int blend_mode : 3;  // 0-7 blend modes
+	unsigned int vert_mode : 4; // for anything that affects geometry
+	unsigned int frag_mode : 4;   // for surface effects 1 = parallax.
+	unsigned int RESERVED : 4;    // padding to 32 bits
+} renderflags32_t;
 
-// Queue types
-#define BB_QUEUE_OPAQUE      0
-#define BB_QUEUE_ATEST       1
-#define BB_QUEUE_TRANSPARENT 2
-#define BB_QUEUE_OVERLAY     3   // depth test = always.
-
-// Blend modes (example)
-#define BB_BLEND_NODRAW      0
-#define BB_BLEND_ALPHA       1
-#define BB_BLEND_ADDITIVE    2
-#define BB_BLEND_MULTIPLY    3
-
-#define SHADER_FLAT			0,
-#define SHADER_PARALAX      1,
-#define SHADER_CUBEMAP		2,
-#define SHADER_USER		    7,
-
-#define MODE_PARALLAX_CYL			0,
-#define MODE_PARALLAX_CYLPERSP			0,
-#define MODE_PARALLAX_DOME			0,
-
-#define MODE_CUBEMAP_CUBE			0,
-#define MODE_CUBEMAP_SPHERE			0,
-#define MODE_PARALLAX_DOME			0,
+typedef struct {
+	unsigned int is_bunchbreak : 1;
+	unsigned int is_mask : 1; // can be alpha test
+	unsigned int RESERVED : 6;    // padding to 32 bits
+} w;
 
 
-
-enum srenderType { // not part of the flags because must be chosen before any flags take place
-	billbord,     // also is very sprite- specific.
-	vbord,
-	quad,
-	voxel,
-	mesh,
-	procedural
+enum vertRenderMode { // not part of the flags because must be chosen before any flags take place
+	vmode_billbord = 0,     // also is very sprite- specific.
+	vmode_wall = 0,     // also is very sprite- specific.
+	vmode_vbord = 1,
+	vmode_quad = 2,
+	vmode_voxel = 3,
+	vmode_mesh = 4,
+	vmode_procedural = 5
 };
 
 // flats aka surfs.
-enum frenderType {
-	flat,
-	parallaxcyl,
-	parallaxrect,
-	parallaxdome,
-	cubemap,
-};
-enum renderQ {
-	opaq,
-	atest,
-	transp,
-	pp,
+enum fragRenderMode {
+	fmode_flat,
+	fmode_parallaxcyl,
+	fmode_parallaxrect,
+	fmode_parallaxdome,
+	fmode_cubemap,
 };
 
+enum blendb2Mode {
+	bmode_alpha = 0 , // standard blending aka normal
+	bmode_add =1,
+	bmode_mul =2 ,
+	bmode_vectoradd = 3, // blend as vectors.in complex space
+	bmode_error = 4,
+};
+
+
 typedef struct {
-	enum srenderType rtype;
-	enum renderQ rq;
-	bool isdblside;
+	renderflags32_t rflags;
 	// need some geometry flags for build, like do we skip, emit mask etc. could be better than just transparency.
-	float uv[8]; // scalexy, panxy, cropAB
+	float uv[8]; // scale xy, pan xy, crop Axy Bxy
 	point3d anchor; // normalized
 	point3d color;
 	int16_t lum; // yes allow negative values, why not.
@@ -406,7 +389,7 @@ typedef struct // surf_t
 	// wtez is second skew vector, originating at v end. by default parallel to u. but can be inverted for trapezoid map.
 	uint8_t uvmapkind; // uv amappings, regular, polar, hex, flipped variants etc. paralax.
 	uint8_t tilingkind; // normal, polar, hex etc.
-	enum frenderType rendertype;
+	enum fragRenderMode frMode;
 // ------------
 	unsigned short asc, rsc, gsc, bsc; //4096 is no change
 
@@ -422,6 +405,9 @@ typedef struct // surf_t
 typedef struct // wall t
 {
 	uint32_t guid; // unique per wall. surfs alway follow top-bottom order.
+	signed long n, ns, nw; //n:rel. wall ind.; ns & nw : nextsect & nextwall_of_sect
+	signed long nschain, nwchain; // for multiportal.
+	long owner; //for dragging while editing, other effects during game
 	union {
 		point2d pos;
 		struct {
@@ -444,9 +430,7 @@ typedef struct // wall t
 
 	// difference between ns and nschain is that ns points right to the target opening
 	// but chains will be looped, similar to walls.
-	signed long n, ns, nw; //n:rel. wall ind.; ns & nw : nextsect & nextwall_of_sect
-	signed long nschain, nwchain; // for multiportal.
-	long owner; //for dragging while editing, other effects during game
+
 
 	uint8_t surfn;
 	uint8_t geoflags;

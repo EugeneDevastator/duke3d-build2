@@ -596,10 +596,10 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 						sec[i].grad[j].y = ((float)b7sec.surf[j].heinum)*(1.f/4096.f);
 					sur = &sec[i].surf[j];
 					sur->flags = 0;
-					sur->rendertype = flat;
+					sur->frMode = fmode_flat;
 					if (b7sec.stat[j]&1) {
 						sur->flags |= SURF_PARALLAX_DISCARD; // parallax
-						sur->rendertype = parallaxcyl;
+						sur->frMode = fmode_parallaxcyl;
 						}
 					sur->asc = 4096;
 					sur->rsc = (32-b7sec.surf[j].shade)*128;
@@ -900,10 +900,10 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 
 				int flagsw=b7spr.cstat & (SPRITE_WALL_ALIGNED | SPRITE_FLOOR_ALIGNED);
 				if  (flagsw ==0) //Face sprite
-					spr->view.rtype = billbord;
+					spr->view.rflags.vert_mode = vmode_billbord;
 				if  (flagsw & (SPRITE_WALL_ALIGNED | SPRITE_FLOOR_ALIGNED)) {
-					spr->view.rtype = quad;
-					spr->view.isdblside =  !(b7spr.cstat& SPRITE_ONE_SIDED);
+					spr->view.rflags.vert_mode  = vmode_quad;
+					spr->view.rflags.is_dblside =  !(b7spr.cstat& SPRITE_ONE_SIDED);
 				}
 
 				point3d buildFW = (point3d){cos((float)b7spr.ang*PI/1024.0),sin((float)b7spr.ang*PI/1024.0),0};
@@ -1178,11 +1178,11 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 					if (walp->ns >=0) {
 						for (int isf=0;isf<2;isf++) {
 							// must check both sectors.
-							walp->xsurf[isf*2].rendertype = flat;
+							walp->xsurf[isf*2].frMode = fmode_flat;
 							if ((sec[i].surf[isf].flags & SURF_PARALLAX_DISCARD) &&
 								(sec[walp->ns].surf[isf].flags & SURF_PARALLAX_DISCARD)) {
 								walp->xsurf[isf*2].flags |= SURF_PARALLAX_DISCARD;
-								walp->xsurf[isf*2].rendertype = parallaxcyl;
+								walp->xsurf[isf*2].frMode = fmode_parallaxcyl;
 								walp->geoflags |= GEO_NO_BUNCHING;
 							}
 						}

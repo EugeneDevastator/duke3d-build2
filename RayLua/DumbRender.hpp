@@ -706,7 +706,7 @@ public:
 		//  BeginBlendMode(BLEND_ADDITIVE);        usedcol.w=0.3;
 		int surfid = eyepol[i].isflor;
 		if ((surfid >= 0)
-			&& (map->sect[eyepol[i].b2sect].surf[surfid].rendertype == parallaxcyl))
+			&& (map->sect[eyepol[i].b2sect].surf[surfid].frMode == fmode_parallaxcyl))
 			{
 				BeginShaderMode(skyShader);
 
@@ -1364,7 +1364,7 @@ public:
 					spr->tilnum = numartiles - 10;
 
 				rlEnableBackfaceCulling();
-				if (spr->view.isdblside)
+				if (spr->view.rflags.is_dblside)
 					rlDisableBackfaceCulling();
 
 				Texture2D spriteTex = galtextures[spr->galnum][spr->tilnum];
@@ -1382,13 +1382,15 @@ public:
 				Vector3 d = pos - rg * (1 - spr->view.anchor.x) * 2 + dw * spr->view.anchor.z * 2;
 				// Debug vectors
 				DrawTransform(&spr->tr);
+				float mul = 5;
+				rlColor4f(1*mul, 1*mul, 1*mul, 1); // todo update transp.
 
-				if (spr->view.rtype == quad) {
+				if (spr->view.rflags.vert_mode == vmode_quad) {
 					EnableDepthOffset(-2.0);
 
 					rlSetTexture(spriteTex.id);
 					rlBegin(RL_QUADS);
-					rlColor4ub(255, 255, 255, 255); // todo update transp.
+					//rlColor4ub(255, 255, 255, 255); // todo update transp.
 
 					rlTexCoord2f(0.0f, spr->view.uv[1] * 1.0f);
 					rlVertex3V(b);
@@ -1403,7 +1405,7 @@ public:
 					rlEnd();
 					DisableDepthOffset();
 					rlSetTexture(0);
-				} else if (spr->view.rtype == billbord) // billboards
+				} else if (spr->view.rflags.vert_mode == vmode_billbord) // billboards
 				{
 					// Vector3 up =
 					float xscaler = spr->view.uv[0];
@@ -1416,6 +1418,7 @@ public:
 					pos += centeroffset;
 					//pos.x+=xs;
 					//pos.z-=ys;
+					rlColor4f(1*mul, 1*mul, 1*mul, 1); // todo update transp.
 
 					Rectangle source = {0.0f, 0.0f, (float) spriteTex.width, (float) spriteTex.height};
 					DrawBillboardRec(rlcam, spriteTex, source, pos, {xs * xscaler, ys * yscaler}, WHITE);
