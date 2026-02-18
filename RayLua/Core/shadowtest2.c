@@ -57,6 +57,7 @@ eyepols are generated from mono space AND plane equation stored in gouvmat.
 #define DP_NO_PROJECT 16
 #define DP_EMIT_MASK 32 // doesnt alter mono clip spasce
 #define DP_PRESERVE_LOOP 64
+#define DP_ADD_AS_PROJECTOR 128
 
 #define MAX_PORTAL_DEPTH 2
 
@@ -1340,10 +1341,10 @@ static int drawpol_nosect(int overlaptag, int newtag, int *heads, int flags, bdr
 	return drawpol_befclip(overlaptag, newtag, -1, -1, heads[0], heads[1], flags, b);
 }
 
-static int drawpol_befclip(int fromtag, int newtag1, int fromsect, int newsect, int plothead0, int plothead1, int flags,
+static int drawpol_befclip(int fromtag, int newtag, int fromsect, int newsect, int plothead0, int plothead1, int flags,
                            bdrawctx *b) {
 #if EXLOGS
-	printf("drawpol from:%d, to:%d, h1:%d, h2:%d, depth:%d \n", fromtag, newtag1, plothead0, plothead1,
+	printf("drawpol from:%d, to:%d, h1:%d, h2:%d, depth:%d \n", fromtag, newtag, plothead0, plothead1,
 	       b->recursion_depth);
 #endif
 	if ((plothead0 | plothead1) < 0) {
@@ -1353,10 +1354,7 @@ static int drawpol_befclip(int fromtag, int newtag1, int fromsect, int newsect, 
 	}
 
 	//LOOPEND
-	int curtag = fromtag;
-	int cursec = fromsect;
-	int newtag = newtag1;
-	logstep("drawpol tag:%d nwtag:%d\n", curtag, newtag);
+	logstep("drawpol tag:%d nwtag:%d\n", fromtag, newtag);
 	b->gnewtagsect = newsect;
 	dpoint3d *otp, *tp;
 	double f, ox, oy, oz;
@@ -1377,7 +1375,7 @@ static int drawpol_befclip(int fromtag, int newtag1, int fromsect, int newsect, 
 		return 0;
 
 	// -- plothead points to polygon clipped with camera plane.
-	if (flags & 1 || flags & 8) {
+	if (flags & 1 || flags & 8) { // portal traversals
 		if (newtag >= 0) // produces new clipping group
 		{
 			b->gnewtagsect = newsect;
@@ -1386,15 +1384,17 @@ static int drawpol_befclip(int fromtag, int newtag1, int fromsect, int newsect, 
 			b->gdoscansector = !(flags & DP_NO_SCANSECT);
 			// intersect with same monos, and change tag for resulting piece?
 			// cliptonewregion
+			// this could be incorrect, because we need to do portal traversal AND mask emission, not only emission.
+			// but for some reason i use double projection. we could handle mask and portals in same place -here
 			if (flags & DP_EMIT_MASK) {
 				if (shadowtest2_rendmode == 4)
 					mono_output = emit_lighpol_func;
 				else
 					mono_output = emit_wallpoly_func;
 			} else mono_output = changetagfunc;
-			logstep("bool AND, keep all, changetag, on tag %d to %d", curtag, b->gnewtag);
+			logstep("bool AND, keep all, changetag, on tag %d to %d", fromtag, b->gnewtag);
 			for (i = mphnum - 1; i >= 0; i--)
-				if (mph[i].tag == curtag) {
+				if (mph[i].tag == fromtag) {
 					mono_bool(
 						mph[i].head[0],
 						mph[i].head[1],
@@ -1435,18 +1435,20 @@ static int drawpol_befclip(int fromtag, int newtag1, int fromsect, int newsect, 
 			}
 			mphnum = omph0;
 		}
-		else {
-			// do AND with current mono, draw result, and discard it in drawtag.
+		else { // produce solid result // do AND with current mono, draw result, and discard it in drawtag.
 			if (shadowtest2_rendmode == 4)
 				mono_output = emit_lighpol_func;
 				//add to light list // this will process point lights. otherwize will only use plr light.
 			else if (b->gflags < 2) mono_output = emit_wallpoly_func;
-			else mono_output = emit_wallpoly_func; //calls drawtagfunc inside
+			else mono_output = emit_wallpoly_func; // was skytag before, so need to ignore it later.
 			logstep("Bool-AND for solids drawtag, againsst all heads, keep all, with mono N=%d, when tag==%d",
-			        mphnum - 1, curtag);
-			for (i = mphnum - 1; i >= 0; i--)
-				if (mph[i].tag == curtag)
+			        mphnum - 1, fromtag);
+			for (i = mphnum - 1; i >= 0; i--) {
+				if (mph[i].tag == fromtag)
 					mono_bool(mph[i].head[0], mph[i].head[1], plothead[0], plothead[1],MONO_BOOL_AND, b, mono_output);
+				// here bool with semantic==shadow
+				// and then also chip it off.
+			}
 		}
 	}
 	if (flags & 2) // this entire section will chip current off of others with same tag, detalizing clip group.
@@ -1454,17 +1456,16 @@ static int drawpol_befclip(int fromtag, int newtag1, int fromsect, int newsect, 
 		if (!(flags & 4)) j = MONO_BOOL_SUB;
 		else j = MONO_BOOL_SUB_REV; // when floor.
 
-		b->gnewtag = curtag;
-		b->gnewtagsect = cursec;
+		b->gnewtag = fromtag;
+		b->gnewtagsect = fromsect;
 		b->gdoscansector = 0;
 		omph0 = mphnum;
 		omph1 = mphnum;
-		// cut this off result from initial areas
-		//logstep("stored head o0 o1 before op %d", omph1);
+		// cut off pieces of existing tag after we drew new portal/geo.
 		logstep("Bool cutting, changetag all heads N=%d, against mono, remove cutted bases, on tag == %d to %d",
-		        mphnum - 1, curtag, b->gnewtag);
+		        mphnum - 1, fromtag, b->gnewtag);
 		for (i = mphnum - 1; i >= 0; i--) {
-			if (mph[i].tag != curtag) continue;
+			if (mph[i].tag != fromtag) continue;
 			mono_bool(mph[i].head[0], mph[i].head[1], plothead[0], plothead[1], j, b, changetagfunc);
 			mono_deloop(mph[i].head[1]);
 			mono_deloop(mph[i].head[0]);
@@ -1474,7 +1475,7 @@ static int drawpol_befclip(int fromtag, int newtag1, int fromsect, int newsect, 
 		}
 
 		//valid mph's stored in 2 blocks: (0<=?<omph0), (omph1<=?<mphnum)
-		// join leftovers of the original tag
+		// join leftovers after cutoffs.
 		logstep("joining monos, on tag == %d", b->gnewtag);
 		for (l = omph1; l < mphnum; l++) {
 			mph[omph0] = mph[l];
