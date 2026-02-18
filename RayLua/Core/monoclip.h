@@ -26,9 +26,12 @@ typedef struct {
 } triangle_strip_t;
 
 
+#define MPH_GEO 0;
+#define MPH_SHADE 2;
 //Mono Polygon Head
 typedef struct {
 	int head[2], tag;
+	uint8_t semantic; //
 } mph_t;
 
 //Mono Polygon (vertex data)
@@ -107,6 +110,7 @@ typedef struct {
 	float gouvmat[9]; // 0 3 6 - store plane equation to convert back from monoplane.
 	int gligsect, gligwall, gligslab, gflags, gisflor;
 	int gnewtag, gdoscansector, gnewtagsect;
+	uint8_t gmonosemantic;
 	// n-portals context
 	bool has_portal_clip; // Whether portal clipping is active
 	bool ismirrored;
@@ -206,10 +210,10 @@ int mono_generate_eyepol(int hd0, int hd1, point3d **out_verts1,  point3d **out_
 // adds mono to mph directly
 
 // registers loop into mono heads with tag
-int mph_appendloop(int *outh1, int *outh2, dpoint3d *tp, int n, int newtag);
+int mph_appendloop(int *outh1, int *outh2, dpoint3d *tp, int n, int newtag, int semantic);
 // removes mph and points from mph list.
 int mph_remove(int delid);
-int mph_append( int h1, int h2, int tag);
+int mph_append(int h1, int h2, int tag, uint8_t semantic);
 
 
 int mpcheck(int h1,int h2);

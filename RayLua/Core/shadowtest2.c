@@ -63,6 +63,15 @@ eyepols are generated from mono space AND plane equation stored in gouvmat.
 #define RM_LIGHTS 4
 #define RM_GEO 1
 
+// output for sprite renderer.
+transform *frame_sprite_trs;
+uint32_t *frame_sprite_ids;
+// we can also store per-sprite or even per-quad-vertex color, for them, instead of doing full poly overdraw
+// and just accumulate lights there! do this once per frame
+//point3d *frame_sprite_corners; x4
+// and probably we cqan do same trick with breaking of vertices.
+
+
 sectmask_t *framesectgot;
 void bdrawctx_clear(bdrawctx *b) {
 	if (!b) return;
@@ -1210,7 +1219,8 @@ static void changetagfunc(int rethead0, int rethead1, bdrawctx *b) {
 	mono_mph_check(mphnum);
 	mph[mphnum].head[0] = rethead0;
 	mph[mphnum].head[1] = rethead1;
-	mph[mphnum].tag = b->gnewtag;
+	mph[mphnum].tag = b->gnewtag; // here
+	mph[mphnum].semantic = b->gmonosemantic; // here
 	if (b->has_portal_clip)
 		mono_dbg_capture_mph(mphnum, "clip in potal");
 	mphnum++;
@@ -1585,6 +1595,17 @@ The b parameter is a bunch index - this function processes one "bunch" (visible 
 //  lights option: store eyepol chunks that WERE DRAWN
 //  before light gets drawn - reproject needed eyepols onto lights MPH space
 //  AND with light polys, and draw resulting intersections only.
+
+// for that we would need to add some semantic to polys
+// when we traverse portal - we split shadowed poly into more which are retained
+// each shadow poly would only be affected by geometry polygons.
+// imagine . Gs, Gp1 Gp2 Ls1 Ls2;
+// Gs clips both l1 l2
+// gp1 clis both l1 l2,
+// l1 l2 never interact with one another, or we'll explode into multitudes of polys.
+// when l1 is clipped by solid it id clipped for good and emitter as lightpoly, together with main poly.
+// in the end we hack shadows by simple subtraction - not mathematically correct but work for env with lots of lights.
+
 static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 	alphamul=1;
 	gtilenum = 0;
@@ -1990,6 +2011,7 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy) {
 	bs.recursion_depth = 0;
 	bs.has_portal_clip = false;
 	bs.tagoffset = 0;
+	bs.gmonosemantic = MPH_GEO;
 	bs.ismirrored = false;
 	bs.istrimirror = false;
 	opercurr = 0;
@@ -2231,6 +2253,7 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 			// maybe need second run for alternating mono?
 			mono_genfromloop(&mph[0].head[0], &mph[0].head[1], bord2, n);
 			mph[0].tag = gcam.cursect;
+			mph[0].semantic = MPH_GEO;
 			mphnum = 1;
 
 			// experimental code for future light walls/floors.
@@ -2242,6 +2265,7 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 				if (useWallLight)
 				{ // PREP LIGHT PORTAL
 				mph[0].tag = map->numsects;
+				mph[0].tag = MPH_GEO;
 				// draw surf as initial portal
 				dpoint3d pol[4];
 				s = gcam.cursect;

@@ -686,7 +686,7 @@ int mono_generate_eyepol(int hd0, int hd1, point3d **out_verts1,  point3d **out_
     return (v1cnt+v2cnt >= 3) ? 1 : 0;
 }
 // ============= Mono Polygons management ==============
-int mph_appendloop(int *outh1, int *outh2, dpoint3d *tp, int n, int newtag) {
+int mph_appendloop(int *outh1, int *outh2, dpoint3d *tp, int n, int newtag, int semantic) {
     *outh1=-1;
     *outh2=-1;
     mono_mph_check(mphnum);
@@ -696,6 +696,7 @@ int mph_appendloop(int *outh1, int *outh2, dpoint3d *tp, int n, int newtag) {
     { mono_deloop(mph[mphnum].head[0]); mono_deloop(mph[mphnum].head[1]); return 0; }
 
     mph[mphnum].tag = newtag;
+    mph[mphnum].semantic = semantic;
     mphnum++;
     *outh1 = mph[mphnum].head[0] ;
     *outh2 = mph[mphnum].head[1] ;
@@ -712,13 +713,14 @@ int mph_remove(int delid) {
     return mphnum;
 }
 
-int mph_append(int h1, int h2, int tag) {
+int mph_append(int h1, int h2, int tag, uint8_t semantic) {
     if ((h1 | h2)<0)
         return 0;
     mono_mph_check(mphnum);
     mph[mphnum].head[0] = h1;
     mph[mphnum].head[1] = h2;
     mph[mphnum].tag = tag;
+    mph[mphnum].semantic = semantic;
     mphnum++;
     return mphnum;
 }
