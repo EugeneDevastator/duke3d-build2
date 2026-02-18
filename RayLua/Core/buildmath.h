@@ -81,7 +81,43 @@ static inline void p3_addto(point3d *awrite, const point3d b) {
 	awrite->y += b.y;
 	awrite->z += b.z;
 }
+static inline point3d p3_sum(const point3d a, const point3d b) {
+	point3d awrite;
+	awrite.x += b.x;
+	awrite.y += b.y;
+	awrite.z += b.z;
+	return awrite;
+}
 
+static inline dpoint3d p3_todbl(const point3d b) {
+	dpoint3d awrite;
+	awrite.x = b.x;
+	awrite.y = b.y;
+	awrite.z = b.z;
+	return awrite;
+}
+
+static inline point3d p3d_sum(const dpoint3d a, const dpoint3d b) {
+	point3d awrite;
+	awrite.x += b.x;
+	awrite.y += b.y;
+	awrite.z += b.z;
+	return awrite;
+}
+static inline dpoint3d p3d_inv(const point3d a) {
+	dpoint3d awrite;
+	awrite.x = -a.x;
+	awrite.y += -a.y;
+	awrite.z += -a.z;
+	return awrite;
+}
+static inline point3d p3_inv(const point3d a) {
+	point3d awrite;
+	awrite.x = -a.x;
+	awrite.y += -a.y;
+	awrite.z += -a.z;
+	return awrite;
+}
 static void p3_scalar_mul(point3d *p, float s) {
 	p->x *= s;
 	p->y *= s;

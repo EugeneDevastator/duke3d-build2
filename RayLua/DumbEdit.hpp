@@ -1351,6 +1351,8 @@ void EditorUpdate(const Camera3D rlcam) {
 	if (hoverfoc.spri >= 0 || grabfoc.spri >= 0) {
 		focus_t usefoc = (ctx.state.id == Empty.id) ? hoverfoc : grabfoc;
 		if (IsKeyPressed(KEY_L)) {
+			if (usefoc.spri <0)
+				return;
 			map->spri[usefoc.spri].flags ^= SPRITE_B2_IS_LIGHT;
 			bool wasdel = false;
 			for (int j = map->light_sprinum - 1; j >= 0; j--) {
