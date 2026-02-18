@@ -35,7 +35,7 @@ void mono_initonce() {
     mphmal = 512;
     mph = (mph_t *) realloc(mph, mphmal * sizeof(mph[0]));
     mpempty = 0;
-    mpmal = 12048;
+    mpmal = 256;
     mp = (mp_t *) realloc(mp, mpmal * sizeof(mp[0]));
     for (i = 0; i < mpmal; i++) {
         mp[i].n = i + 1;

@@ -92,12 +92,6 @@ void bdrawctx_clear(bdrawctx *b) {
 		b->bunchgrid = NULL;
 	}
 
-	// Clear sector allocations
-	if (b->sectgot) {
-		free(b->sectgot);
-		b->sectgot = NULL;
-	}
-
 	if (b->sectgotmal) free((void *) b->sectgotmal);
 
 	// Reset all counters and flags
@@ -2250,6 +2244,18 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 				mono_deloop(mph[i].head[1]);
 				mono_deloop(mph[i].head[0]);
 			}
+
+			{ // Clean mp state. It seems that this is prone to corruption but also - doesnt really produce that much loops
+				// find way to clean it even faster later.
+				mpempty = 0;
+				for (i = 0; i < mpmal; i++) {
+					mp[i].n = i + 1;
+					mp[i].p = i - 1;
+				}
+				mp[mpmal - 1].n = 0;
+				mp[0].p = mpmal - 1;
+			}
+
 			// maybe need second run for alternating mono?
 			mono_genfromloop(&mph[0].head[0], &mph[0].head[1], bord2, n);
 			mph[0].tag = gcam.cursect;
