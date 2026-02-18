@@ -1580,7 +1580,33 @@ static void gentransform_wall(dpoint3d *npol2, surf_t *sur, bdrawctx *b) {
 		//	b->gouvmat[7] -= b->gouvmat[6]*32768.0; b->gouvmat[8] -= b->gouvmat[6]*32768.0;
 	}
 }
+static void drawspriteshadow(int sprid, int sectid, int tagid, transform cam, mapstate_t* map, bdrawctx* b) {
+	spri_t *spr = &map->spri[sprid];
+	point3d ll  = p3_sum(spr->p,cam.r);
+	point3d ul  = p3_sum(ll,p3_inv(cam.d));
 
+	point3d lr  = p3_sum(spr->p,p3_inv(cam.r));
+	point3d ur  = p3_sum(lr,p3_inv(cam.d));
+
+	dpoint3d poly[4] = {p3_todbl(ll),p3_todbl(ul),p3_todbl(ur),p3_todbl(lr)};
+	int ph1,ph2=-1;
+	mono_genfromloop(&ph1,&ph2,poly, 4);
+
+	// oh beauty is here - that when i add this - i can clip it same way as other walls
+	// and this will only retain us portion of projection that is wisible. amazing!
+	// we also must store sprite id for this thing in mph unfortunately...
+
+	// we also dont care on portals - just cut it with solid geo only!
+	//in fact cut all projections with solid geo only!
+	// when adding new projector - it cuts of pieces from every other projection. emits them as shadowpoly,
+	// because furthest object gives sharpest shadow. so it has priority
+	// another important thing - we do not want wall light to be cut ou right away, to be able to smear shadow.
+	// except maybe with mask walls.
+	// and obvious - we want to emit light poly when we add projection for sprites - to light them, duh.
+	int flags = DP_NO_SCANSECT | DP_AND_SUB | DP_ADD_AS_PROJECTOR;
+	// newtag is irrelevant here.
+	int res = drawpol_befclip(tagid, sectid, tagid, sectid, ph1,ph2, flags, b);
+}
 /*
 the mono engine produces camera-space polygons that are clipped to not overlap.
 The plothead[0] and plothead[1] contain monotone polygon pairs representing
