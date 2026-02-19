@@ -485,7 +485,10 @@ typedef struct // spri_t
 	short lotag, hitag;
 	long sect; //Current sector
 	// to access next or prev sprite in sector of this sprite..
-	long sectn, sectp; // doubly-linked list of indices
+	// doubly-linked list of indices  inside sprites sector
+	// bounded by -1 on both sides.
+	long sectn, sectp;
+
 	int32_t tags[16];
 	long tim, otim;          //Time (in milliseconds) for animation
 	int8_t walcon; // wall constraint -1 -2 = floor ceil, resolve as 2-wc; -3 = none;

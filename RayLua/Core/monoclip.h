@@ -26,8 +26,8 @@ typedef struct {
 } triangle_strip_t;
 
 
-#define MPH_GEO 0;
-#define MPH_SHADE 2;
+#define MPH_GEO 0
+#define MPH_SHADE 2
 //Mono Polygon Head
 typedef struct {
 	int head[2], tag;
