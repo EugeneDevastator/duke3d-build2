@@ -1601,11 +1601,15 @@ static void gentransform_wall(dpoint3d *npol2, surf_t *sur, bdrawctx *b) {
 }
 static void drawspriteshadow(int sprid, int sectid, int tagid, transform cam, mapstate_t* map, bdrawctx* b) {
 	spri_t *spr = &map->spri[sprid];
-	point3d ll  = p3_sum(spr->p,cam.r);
-	point3d ul  = p3_sum(ll,p3_inv(cam.d));
+	point3d ftocam = p3_make_vector(spr->p, cam.p);
+	transform trf = tr_xyplanar_from_forward(p3_normalized(ftocam));
+	p3_scalar_mul(&trf.r,0.5);
+	point3d upvec =  p3_scalar_mul_of(p3_inv(spr->d),2);
+	point3d ll  = p3_sum(spr->p,trf.r);
+	point3d ul  = p3_sum(ll,upvec);
 
-	point3d lr  = p3_sum(spr->p,p3_inv(cam.r));
-	point3d ur  = p3_sum(lr,p3_inv(cam.d));
+	point3d lr  = p3_sum(spr->p,p3_inv(trf.r));
+	point3d ur  = p3_sum(lr,upvec);
 
 	//dpoint3d poly[4] = {p3_todbl(ll),p3_todbl(ul),p3_todbl(ur),p3_todbl(lr)};
 // ccw
