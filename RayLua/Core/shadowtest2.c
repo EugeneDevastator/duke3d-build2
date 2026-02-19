@@ -74,6 +74,7 @@ uint32_t *frame_sprite_ids;
 
 
 sectmask_t *framesectgot;
+sectmask_t *lightsectgot;
 void bdrawctx_clear(bdrawctx *b) {
 	if (!b) return;
 
@@ -1387,6 +1388,12 @@ static int drawpol_befclip(int fromtag, int newtag, int fromsect, int newsect, i
 	if (!projok)
 		return 0;
 
+	// overall process:
+	// 1. And with current region - if we are portal - go deeper. otherwise - draw.
+	// 2. clean up:
+	// 2.1. cut out existing region
+	// 2.2  join new with existing new region pieces.
+
 	// -- plothead points to polygon clipped with camera plane.
 	if (flags & 1 || flags & 8) { // portal traversals
 		if (newtag >= 0) // produces new clipping group
@@ -1600,8 +1607,11 @@ static void drawspriteshadow(int sprid, int sectid, int tagid, transform cam, ma
 	point3d lr  = p3_sum(spr->p,p3_inv(cam.r));
 	point3d ur  = p3_sum(lr,p3_inv(cam.d));
 
-	dpoint3d poly[4] = {p3_todbl(ll),p3_todbl(ul),p3_todbl(ur),p3_todbl(lr)};
+	//dpoint3d poly[4] = {p3_todbl(ll),p3_todbl(ul),p3_todbl(ur),p3_todbl(lr)};
+// ccw
+	dpoint3d poly[4] = {p3_todbl(ll),p3_todbl(lr),p3_todbl(ur),p3_todbl(ul)};
 	int ph1,ph2=-1;
+
 	mono_genfromloop(&ph1,&ph2,poly, 4);
 
 	// oh beauty is here - that when i add this - i can clip it same way as other walls
@@ -1615,7 +1625,7 @@ static void drawspriteshadow(int sprid, int sectid, int tagid, transform cam, ma
 	// another important thing - we do not want wall light to be cut ou right away, to be able to smear shadow.
 	// except maybe with mask walls.
 	// and obvious - we want to emit light poly when we add projection for sprites - to light them, duh.
-	int flags = DP_NO_SCANSECT | DP_AND_SUB | DP_ADD_AS_PROJECTOR;
+	int flags = DP_NO_SCANSECT | DP_AND_SUB | DP_ADD_AS_PROJECTOR | 3;
 	// newtag is irrelevant here.
 	int res = drawpol_befclip(tagid, sectid, tagid, sectid, ph1,ph2, flags, b);
 }
@@ -2051,6 +2061,10 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 	if (!newctx) {
 		return;
 	}
+
+	sectmask_destroy(lightsectgot);
+	lightsectgot = sectmask_create();
+
 	alphamul=1;
 	int recursiveDepth = newctx->recursion_depth;
 	bdrawctx *b;
