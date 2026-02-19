@@ -9,7 +9,7 @@ void main() {
     vec3 albedo = texture(albedoTexture, fragTexCoord).rgb;
     vec3 light = texture(lightTexture, fragTexCoord).rgb;
     // Proper ambient + diffuse lighting
-    vec3 ambient = albedo * 0.2;
+    vec3 ambient = albedo * 0.6;
     float blend = 0.0;
     vec3 diffuse_foggy = light; // sumw
     vec3 diffuse_real = albedo * light; // mult

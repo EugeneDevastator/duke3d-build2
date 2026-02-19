@@ -620,6 +620,7 @@ void PickgrabStart() {
 void LoopDrawUpdate() {
 	if (IsKeyPressed(KEY_THREE) && loopn == 1) {
 		long s = mapspriteadd(loopts[0].sect, loopts[0].pos, map);
+		if (s<0) return;
 		map->spri[s].tilnum = 1;
 		ctx.op = discard;
 	}

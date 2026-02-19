@@ -947,7 +947,7 @@ void MainLoop() {
     loadgal(0, "c:/Eugene/Games/build2/");
     loadgal(1, "c:/Eugene/Games/build2/Content/GAL_002_SW/");
     DumbRender::LoadTexturesToGPU();
-    DumbRender::Init("c:/Eugene/Games/build2/e3l1.map");
+    DumbRender::Init("c:/Eugene/Games/build2/e2l9.map");
     auto map = DumbRender::GetMap();
     DumbCore::Init(map);
     SetTargetFPS(60);

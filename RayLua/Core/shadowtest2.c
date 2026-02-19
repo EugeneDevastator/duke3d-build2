@@ -1225,6 +1225,18 @@ static void changetagfunc(int rethead0, int rethead1, bdrawctx *b) {
 	logstep("changetag: newMtag:%d, new mphnum:%d", b->gnewtag, mphnum);
 }
 
+static void changetag_andlight(int rethead0, int rethead1, bdrawctx *b) {
+	int h1,h2;
+	monocopy(rethead0,rethead1, &h1,&h2);
+	emit_lighpol_func(rethead0,rethead1,b);
+	changetagfunc(h1,h2,b);
+}
+static void changetag_andsolid(int rethead0, int rethead1, bdrawctx *b) {
+	int h1,h2;
+	monocopy(rethead0,rethead1, &h1,&h2);
+	emit_wallpoly_func(rethead0,rethead1,b);
+	changetagfunc(h1,h2,b);
+}
 //flags&1: do and
 //flags&2: do sub
 //flags&4: reverse cut for sub
@@ -1389,10 +1401,12 @@ static int drawpol_befclip(int fromtag, int newtag, int fromsect, int newsect, i
 			// but for some reason i use double projection. we could handle mask and portals in same place -here
 			if (flags & DP_EMIT_MASK) {
 				if (shadowtest2_rendmode == 4)
-					mono_output = emit_lighpol_func;
+					mono_output = changetag_andlight;
 				else
-					mono_output = emit_wallpoly_func;
-			} else mono_output = changetagfunc;
+					mono_output = changetag_andsolid;
+			}
+			else
+				mono_output = changetagfunc;
 			logstep("bool AND, keep all, changetag, on tag %d to %d", fromtag, b->gnewtag);
 			for (i = mphnum - 1; i >= 0; i--)
 				if (mph[i].tag == fromtag) {
@@ -1405,9 +1419,6 @@ static int drawpol_befclip(int fromtag, int newtag, int fromsect, int newsect, i
 						b,
 						mono_output);
 				}
-			if (flags & DP_EMIT_MASK)
-				return 1;
-
 
 			logstep("Join and remove bases for tags, on upper res,  mhp[j]== %d, heads: [%d..%d]", b->gnewtag,
 			        omph0, mphnum - 1);
@@ -1800,17 +1811,13 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			int portalpolyflags = ((isflor << 2) + 3) | DP_NO_SCANSECT;
 			int portaltag = b->tagoffset + taginc - 1;
 
-			//	drawpol_befclip(s+b->tagoffset, portaltag, s, portals[endpn].sect,plothead[0],plothead[1], portalpolyflags , b);
-			//int c1, c2;
-			//monocopy(plothead[0],plothead[1], &c1,&c2);
 			alphamul = 0.3f; // only emit mask here
-			if (shadowtest2_rendmode != 4) // no mask with light
-			drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1], DP_PRESERVE_LOOP| DP_EMIT_MASK |1, b);
-			alphamul = 1;// draw as portal, to mark clip space mph
 
-			// gurantees masks wont dupe on top of one another.
-			// could be done with drawpol mod simpler
-			drawpol_befclip(s + b->tagoffset, portaltag, s, portals[endpn].sect, plothead[0], plothead[1],  DP_PRESERVE_LOOP|DP_NO_SCANSECT|surflag, b);
+			//if (shadowtest2_rendmode != 4) // no mask with light
+			//drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1], DP_PRESERVE_LOOP| DP_EMIT_MASK |1, b);
+
+			drawpol_befclip(s + b->tagoffset, portaltag, s, portals[endpn].sect, plothead[0], plothead[1],  DP_PRESERVE_LOOP|DP_NO_SCANSECT| DP_EMIT_MASK| surflag, b);
+			alphamul = 1;// draw as portal, to mark clip space mph
 			// the problem here still remains - because rendering two areas in other spaces can overlap one another.
 			// seems that we need to do wccw for every vert to gurantee shared space.. darn
 			draw_hsr_enter_portal(map, myport, plothead[0], plothead[1], b);
@@ -1969,12 +1976,10 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 				int endpn = portals[myport].destpn;
 				int ttag = b->tagoffset + taginc + portals[endpn].sect;
 
-				//	drawpol_befclip(s+b->tagoffset, portaltag,s,portals[endp].sect, plothead[0], plothead[1],  portalpolyflags, b);
-				//int c1, c2;
-				//monocopy(plothead[0],plothead[1], &c1,&c2);
 				alphamul = 0.3f;
 				// emit this as poly for eyes only, non destructive unaffects mph.
-				drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1], DP_PRESERVE_LOOP| DP_EMIT_MASK |1, b);
+				drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1],
+					DP_PRESERVE_LOOP| DP_EMIT_MASK |1, b);
 				alphamul = 1;
 				draw_hsr_enter_portal(map, myport, plothead[0], plothead[1], b);
 			} else if (st2_use_parallax_discards && wal[w].xsurf[m].flags & SURF_PARALLAX_DISCARD) {
@@ -1982,19 +1987,17 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 				newtag = ns + b->tagoffset;
 				drawpol_befclip(s + b->tagoffset, newtag, s, ns, plothead[0], plothead[1], surflag, b);
 			} else {
-				// could be 7 or 3, .111 or .011
 				logstep("Draw wal pol s:%d ns:%d tag:%d", s, ns, wal[w].surf.lotag);
 				if (m==1 && ismasked && wal[w].xsurf[1].alpha < 1) {
+					// handle masked wall flags
 					alphamul = wal[w].xsurf[1].alpha;
-					// emit this as poly for eyes only, non destructive unaffects mph.
-					// replace with drawpol_nosect
-					drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1],
-						1 | DP_PRESERVE_LOOP| DP_EMIT_MASK, b);
-					alphamul = 1;
+					surflag |= DP_EMIT_MASK;
 					ns =  wal[w].ns;
+					newtag = ns + b->tagoffset;
 				}
 
 				drawpol_befclip(s + b->tagoffset, newtag, s, ns, plothead[0], plothead[1], surflag, b);
+				alphamul = 1;
 			}
 		}
 	}
