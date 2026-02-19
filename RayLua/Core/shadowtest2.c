@@ -280,6 +280,7 @@ ARENA(dpoint3d, eyepolv);
 ARENA(dpoint3d, eyepolvori);
 ARENA(uint32_t, eyepoli);
 ARENA(uint32_t, ligpoli);
+ARENA(uint32_t, sshadepoli);
 //eyepol_t *eyepol = 0; // 4096 eyepol_t's = 192KB
 //vert3d_t *eyepolv = 0; //16384 point2d's  = 128KB
 int glignum = 0;
@@ -2274,7 +2275,7 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 
 			{ // Clean mp state. It seems that this is prone to corruption but also - doesnt really produce that much loops
 				// find way to clean it even faster later.
-				mpempty = 0;
+ 				mpempty = 0;
 				for (i = 0; i < mpmal; i++) {
 					mp[i].n = i + 1;
 					mp[i].p = i - 1;

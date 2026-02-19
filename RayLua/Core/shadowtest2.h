@@ -84,6 +84,36 @@ typedef struct {
 } eyepol_t;
 
 typedef struct {
+    int vert0;                          // Index into first vertex in eyepolv
+    int triidstart, tricnt; // start ids and num of indice
+
+    uint32_t id; // spr or sec
+    uint8_t id2; // wall or flor
+    uint8_t id3; // slab.
+    enum fragRenderMode fragmode;
+    enum vertRenderMode vertmode;
+    transform tr;
+    point3d norm;                       // Surface normal vector
+    int pal;
+
+    int tilnum;
+    int galnum;
+    int rdepth;
+    float alpha;
+    renderflags32_t rflags;
+
+    // uv data
+    bool hasuvs;
+    point3d *worlduvs; // origin, u ,v
+    float* uvform;
+
+    // debug data
+    int c1,c2,e1,e2;
+
+} polyout_t;
+
+
+typedef struct {
     union {
         dpoint3d wpos; // true world pos after all transforms
         struct { double x, y, z; }; // compat.

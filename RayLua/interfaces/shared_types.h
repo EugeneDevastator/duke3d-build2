@@ -227,13 +227,15 @@ free((arena).data); \
 #define TEZ_RAWZ 0
 #define TEZ_CEIL 0
 
-#define TEZ_FLOR 1<<0  // use floor or ceil
-#define TEZ_NS 1<<1 // this or next sect
-#define TEZ_SLOPE 1<<2 // slope or rawz;
-#define TEZ_INVZ 1<<3 // use next continious wall
-#define TEZ_CLOSEST 1<<4 // closest height point instead of arbitrary.
-#define TEZ_FURTHEST 1<<5 // closest height point instead of arbitrary.
-#define TEZ_WORLDZ1 1<<6 // use unit world z vector
+#define TEZ_NW		 (1<<0)  // use floor or ceil
+#define TEZ_NS		 (1<<1) // this or next sect
+#define TEZ_FLOR	 (1<<2)  // use floor or ceil
+#define TEZ_SLOPE	 (1<<3) // slope or rawz;
+#define TEZ_CLOSEST	 (1<<4) // closest height point instead of arbitrary.
+#define TEZ_FURTHEST (1<<5) // closest height point instead of arbitrary.
+#define TEZ_WORLDZ1	 (1<<6) // use unit world z vector
+
+#define TEZ_INVZ	 (1<<7) // use next continious wall move to multiplier
 
 // auto resolution optioons, written in ouv wal
 #define TEW_WORLDF -1
@@ -301,11 +303,11 @@ typedef struct {
 
 typedef struct {
 	unsigned int is_visible : 1;
-	unsigned int is_light : 1;
+	unsigned int is_light : 1; // for lights just store them. in separate struct.
 	unsigned int shadow_get : 1;
-	unsigned int shadow_cast : 1; // 4
-	unsigned int is_dblside : 1; // 5
-	unsigned int queue : 2;        // 0-3: opaque, atest, transparent, postproc
+	unsigned int shadow_cast : 1; //  for lights = ambient
+	unsigned int is_dblside : 1; //  for lights - marks if it appies to backfaces,
+	unsigned int q: 2;        // queue 0-3: opaque, atest, transparent, postproc
 	unsigned int blend_mode : 3;  // 0-7 blend modes
 	unsigned int vert_mode : 4; // for anything that affects geometry
 	unsigned int frag_mode : 4;   // for surface effects 1 = parallax.
@@ -320,6 +322,27 @@ typedef struct {
 	unsigned int RESERVED : 6;    // padding to 32 bits
 } geoflags8_t;
 
+typedef struct {
+	unsigned int otez : 6; // TEZ
+	unsigned int utez : 6;
+	unsigned int vtez : 6;
+	unsigned int ctez : 6; // 4th corner vector C = o + v + c
+	unsigned int o_do_regen : 1; // do we regen it on movement, if not, then vectors wont regenerate.
+	unsigned int u_do_regen : 1; // v persp. vp1 = o +v; vp2 = o+v+vp.
+	unsigned int v_do_regen : 1; // v persp. vp1 = o +v; vp2 = o+v+vp.
+	unsigned int c_do_regen : 1; // v persp. vp1 = o +v; vp2 = o+v+vp.
+	unsigned int _PAD : 4; // v persp. vp1 = o +v; vp2 = o+v+vp.
+} procuv32_t; // procedural uv data
+
+
+typedef struct {
+	point3d ori;    // origin
+	point3d u;      // U axis
+	point3d v;		// V axis
+	point3d c;    // 4th corner (BR) - unused in planar/persp mode
+	point3d norm;   // projection direction (normalized)
+	point3d eye;	// eye/apex point (push far along -N for ortho)
+} uv_world_t;  // generated uv structure. runtime only.
 
 enum vertRenderMode { // not part of the flags because must be chosen before any flags take place
 	vmode_billbord = 0,     // also is very sprite- specific.
