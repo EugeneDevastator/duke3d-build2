@@ -1216,8 +1216,11 @@ static void changetagfunc(int rethead0, int rethead1, bdrawctx *b) {
 	mono_mph_check(mphnum);
 	mph[mphnum].head[0] = rethead0;
 	mph[mphnum].head[1] = rethead1;
-	mph[mphnum].tag = b->gnewtag; // here
-	mph[mphnum].semantic = b->gmonosemantic; // here
+	int usetag = -1;
+	if (!(b->gmonosemantic == MPH_SHADE))
+		usetag = b->gnewtag;
+	mph[mphnum].tag = usetag;
+	mph[mphnum].semantic = b->gmonosemantic;
 	if (b->has_portal_clip)
 		mono_dbg_capture_mph(mphnum, "clip in potal");
 	mphnum++;
@@ -1414,6 +1417,11 @@ static int drawpol_befclip(int fromtag, int newtag, int fromsect, int newsect, i
 			}
 			else
 				mono_output = changetagfunc;
+
+			b->gmonosemantic = MPH_GEO;
+			if (flags & DP_ADD_AS_PROJECTOR)
+				b->gmonosemantic = MPH_SHADE;
+
 			logstep("bool AND, keep all, changetag, on tag %d to %d", fromtag, b->gnewtag);
 			for (i = mphnum - 1; i >= 0; i--)
 				if (mph[i].tag == fromtag) {
@@ -1426,6 +1434,13 @@ static int drawpol_befclip(int fromtag, int newtag, int fromsect, int newsect, i
 						b,
 						mono_output);
 				}
+
+			// dont do anything else now we added - its over.
+
+			b->gmonosemantic = MPH_GEO;
+
+			if (flags & DP_ADD_AS_PROJECTOR)
+				return 1;
 
 			logstep("Join and remove bases for tags, on upper res,  mhp[j]== %d, heads: [%d..%d]", b->gnewtag,
 			        omph0, mphnum - 1);
@@ -1460,17 +1475,27 @@ static int drawpol_befclip(int fromtag, int newtag, int fromsect, int newsect, i
 				//add to light list // this will process point lights. otherwize will only use plr light.
 			else if (b->gflags < 2) mono_output = emit_wallpoly_func;
 			else mono_output = emit_wallpoly_func; // was skytag before, so need to ignore it later.
-			logstep("Bool-AND for solids drawtag, againsst all heads, keep all, with mono N=%d, when tag==%d",
-			        mphnum - 1, fromtag);
+
+			// draw solid piece of projection
+			if (shadowtest2_rendmode == 4) {
+				for (i = mphnum - 1; i >= 0; i--) {
+					if (mph[i].semantic == MPH_SHADE)
+						mono_bool(mph[i].head[0], mph[i].head[1], plothead[0], plothead[1],MONO_BOOL_AND, b,
+						          emit_lighpol_func);
+				}
+			}
+			// emitting target surf.
 			for (i = mphnum - 1; i >= 0; i--) {
-				if (mph[i].tag == fromtag)
+				if (mph[i].tag == fromtag && mph[i].semantic == MPH_GEO)
 					mono_bool(mph[i].head[0], mph[i].head[1], plothead[0], plothead[1],MONO_BOOL_AND, b, mono_output);
 				// here bool with semantic==shadow
 				// and then also chip it off.
 			}
 		}
 	}
-	if (flags & 2) // this entire section will chip current off of others with same tag, detalizing clip group.
+	// projectors don modify existing geo. Except other projectors? but skip that for now.
+
+	if (flags & 2 && !(flags & DP_ADD_AS_PROJECTOR)) // this entire section will chip current off of others with same tag, detalizing clip group.
 	{
 		if (!(flags & 4)) j = MONO_BOOL_SUB;
 		else j = MONO_BOOL_SUB_REV; // when floor.
@@ -1484,7 +1509,8 @@ static int drawpol_befclip(int fromtag, int newtag, int fromsect, int newsect, i
 		logstep("Bool cutting, changetag all heads N=%d, against mono, remove cutted bases, on tag == %d to %d",
 		        mphnum - 1, fromtag, b->gnewtag);
 		for (i = mphnum - 1; i >= 0; i--) {
-			if (mph[i].tag != fromtag) continue;
+			// cut off rendered geometry, including drawn projections
+			if (mph[i].tag != fromtag && mph[i].semantic != MPH_SHADE) continue;
 			mono_bool(mph[i].head[0], mph[i].head[1], plothead[0], plothead[1], j, b, changetagfunc);
 			mono_deloop(mph[i].head[1]);
 			mono_deloop(mph[i].head[0]);
@@ -1704,6 +1730,20 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 				((b->bunchgrid[j + i] & 1) << 1) + (b->bunchgrid[j + i] >> 1);
 	if (b->has_portal_clip)
 		int a = 0;
+
+	// === SPRITE SHADOWS ====
+	if (shadowtest2_rendmode == 4) {
+		if (!sectmask_was_marked(lightsectgot,s)) {
+			sectmask_mark_sector(lightsectgot,s);
+			int nxs = sec[s].headspri;
+			while (nxs>0) {
+				if (!(map->spri[nxs].flags & SPRITE_B2_IS_LIGHT))
+					drawspriteshadow(nxs,s,s,b->cam.tr, map, b);
+				nxs = map->spri[nxs].sectn;
+			};
+		}
+	}
+
 	// === DRAW CEILINGS & FLOORS ===
 	bool noportals = b->recursion_depth >= MAX_PORTAL_DEPTH;
 	for (isflor = 0; isflor < 2; isflor++) // floor ceil

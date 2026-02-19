@@ -233,6 +233,7 @@ static inline transform tr_xyplanar_from_forward(point3d forwardvec) {
 	tr.r = p3_rotated_90_cwz(newf);
 	tr.d = BBDOWN;
 	tr.p = BBPZERO;
+	return tr;
 }
 
 static inline void tr_normalize(transform *tr) {
