@@ -1113,14 +1113,18 @@ public:
 				for (int i = 0; i < lght->ligpoln; i++) {
 					if (lght->ligpol[i].tricnt < 1) continue;
 
-
+					ligpol_t poly = lght->ligpol[i];
+					float plum = lght->lum*poly.a;
+					//SetShaderValue(lightShader, lightIntenseLoc, &plum, SHADER_UNIFORM_FLOAT);
 					//rlSetTexture(0);
 					for (int locidx = 0; locidx < lght->ligpol[i].tricnt; locidx += 1) {
 						for (int j = 0; j < 3; j++) {
 							int iidx = lght->ligpol[i].tristart + locidx * 3 + j;
 							uint32_t idx = ligpoli[iidx];
+
 							Vector3 pt = buildToRaylibPos(lght->ligpolv[idx]);
-							rlColor4f(lght->rgb[0], lght->rgb[1], lght->rgb[2], lght->lum);
+
+							rlColor4f(lght->rgb[0], lght->rgb[1], lght->rgb[2], poly.a >0 ?1 : 0);
 							//rlColor4f(0.6, 0.2, 0.1, 1);
 							// rlNormal3f(0,1,0);
 							// rlTexCoord2f(0,0.5);

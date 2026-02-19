@@ -265,6 +265,7 @@ static tile_t *gtpic;
 
 static int gcurcol, gtilenum, ggalnum;
 static float alphamul;
+static float lalphamul;
 static int taginc = 30000;
 #define LIGHTMAX 256 //FIX:make dynamic!
 lightpos_t shadowtest2_light[LIGHTMAX];
@@ -1121,7 +1122,9 @@ static void emit_lighpol_func(int rethead0, int rethead1, bdrawctx *b) {
 	glp->ligpol[glp->ligpoln].b2sect = b->gligsect;
 	glp->ligpol[glp->ligpoln].b2wall = b->gligwall;
 	glp->ligpol[glp->ligpoln].b2slab = b->gligslab;
-	glp->ligpol[glp->ligpoln].a = alphamul;
+	if (lalphamul <0)
+		int bnnn=1;
+	glp->ligpol[glp->ligpoln].a = lalphamul;
 	i = lighash(b->gligsect, b->gligwall, b->gligslab);
 	glp->ligpol[glp->ligpoln].b2hashn = glp->lighashead[i];
 	glp->lighashead[i] = glp->ligpoln;
@@ -1479,13 +1482,13 @@ static int drawpol_befclip(int fromtag, int newtag, int fromsect, int newsect, i
 
 			// draw solid piece of projection
 			if (shadowtest2_rendmode == 4) {
-				alphamul = -1;
+				lalphamul = -3;
 				for (i = mphnum - 1; i >= 0; i--) {
 					if (mph[i].semantic == MPH_SHADE) {
 						mono_bool(mph[i].head[0], mph[i].head[1], plothead[0], plothead[1],MONO_BOOL_AND, b, emit_lighpol_func);
 					}
 				}
-				alphamul = 1;
+				lalphamul = 1;
 			}
 			// emitting target surf.
 			for (i = mphnum - 1; i >= 0; i--) {
@@ -2143,7 +2146,7 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 	double f, d;
 	unsigned int *uptr;
 	int i, j, k, n, s, w, closest, col, didcut, halfplane;
-
+	s=-1;
 	if (shadowtest2_rendmode == RM_LIGHTS) {
 		glp = &shadowtest2_light[glignum];
 		//	if ((!(glp->flags&1)) || (!shadowtest2_useshadows)) return;
@@ -2364,7 +2367,10 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 			//  rn works for whole wall. at least process is like this.
 			int spnum = map->light_spri[shadowtest2_light[glignum].ligspri];
 			signed char ww = map->spri[spnum].walcon;
-			bool useWallLight = true && ww>=0;
+			bool useWallLight = true
+			&& ww>=0
+			&& s>=0 && s < map->numsects
+			&& map->sect[s].n>ww;
 			if (shadowtest2_rendmode ==4)
 				if (useWallLight)
 				{ // PREP LIGHT PORTAL
