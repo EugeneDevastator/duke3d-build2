@@ -1121,6 +1121,7 @@ static void emit_lighpol_func(int rethead0, int rethead1, bdrawctx *b) {
 	glp->ligpol[glp->ligpoln].b2sect = b->gligsect;
 	glp->ligpol[glp->ligpoln].b2wall = b->gligwall;
 	glp->ligpol[glp->ligpoln].b2slab = b->gligslab;
+	glp->ligpol[glp->ligpoln].a = alphamul;
 	i = lighash(b->gligsect, b->gligwall, b->gligslab);
 	glp->ligpol[glp->ligpoln].b2hashn = glp->lighashead[i];
 	glp->lighashead[i] = glp->ligpoln;
@@ -1478,11 +1479,13 @@ static int drawpol_befclip(int fromtag, int newtag, int fromsect, int newsect, i
 
 			// draw solid piece of projection
 			if (shadowtest2_rendmode == 4) {
+				alphamul = -1;
 				for (i = mphnum - 1; i >= 0; i--) {
-					if (mph[i].semantic == MPH_SHADE)
-						mono_bool(mph[i].head[0], mph[i].head[1], plothead[0], plothead[1],MONO_BOOL_AND, b,
-						          emit_lighpol_func);
+					if (mph[i].semantic == MPH_SHADE) {
+						mono_bool(mph[i].head[0], mph[i].head[1], plothead[0], plothead[1],MONO_BOOL_AND, b, emit_lighpol_func);
+					}
 				}
+				alphamul = 1;
 			}
 			// emitting target surf.
 			for (i = mphnum - 1; i >= 0; i--) {
@@ -1508,15 +1511,20 @@ static int drawpol_befclip(int fromtag, int newtag, int fromsect, int newsect, i
 		// cut off pieces of existing tag after we drew new portal/geo.
 		logstep("Bool cutting, changetag all heads N=%d, against mono, remove cutted bases, on tag == %d to %d",
 		        mphnum - 1, fromtag, b->gnewtag);
+		bool isshade;
 		for (i = mphnum - 1; i >= 0; i--) {
 			// cut off rendered geometry, including drawn projections
-			if (mph[i].tag != fromtag && mph[i].semantic != MPH_SHADE) continue;
-			mono_bool(mph[i].head[0], mph[i].head[1], plothead[0], plothead[1], j, b, changetagfunc);
-			mono_deloop(mph[i].head[1]);
-			mono_deloop(mph[i].head[0]);
-
-			omph0--;
-			mph[i] = mph[omph0];
+			isshade = mph[i].semantic == MPH_SHADE && newtag == -1;
+			if (mph[i].tag == fromtag || isshade) {
+				if (isshade)
+					b->gmonosemantic = MPH_SHADE;
+				mono_bool(mph[i].head[0], mph[i].head[1], plothead[0], plothead[1], j, b, changetagfunc);
+				mono_deloop(mph[i].head[1]);
+				mono_deloop(mph[i].head[0]);
+				b->gmonosemantic = MPH_GEO;
+				omph0--;
+				mph[i] = mph[omph0];
+			}
 		}
 
 		//valid mph's stored in 2 blocks: (0<=?<omph0), (omph1<=?<mphnum)
@@ -2075,6 +2083,7 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy) {
 	if (shadowtest2_rendmode != 4) {
 		sectmask_destroy(framesectgot);
 		framesectgot = sectmask_create();
+
 	}
 	bdrawctx bs;
 	loopnum = 0;

@@ -29,6 +29,7 @@ extern sectmask_t *framesectgot;
 typedef struct
 {
     int vert0, b2sect, b2wall, b2slab, b2hashn, tristart, tricnt;
+    float a;
 } ligpol_t;
 /** Light source definition and shadow polygon storage */
 typedef struct {
