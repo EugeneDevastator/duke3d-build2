@@ -1840,7 +1840,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		// Build polygon for ceiling/floor using plane equation:
 		plothead[0] = -1;
 		plothead[1] = -1;
-		point3d locnorm = p3_world_to_local_vec(b->gnorm, &b->cam.tr);
+		point3d locnorm = p3_world_to_local_vec(b->gnorm, b->cam.tr);
 		int ft=0;
 		if (drawcap)
 			ft = 1-isflor;
@@ -2612,10 +2612,10 @@ static void draw_hsr_enter_portal(mapstate_t *map, int myport, int head1, int he
 
 	// Step 1: Transform camera to entry portal's local space
 	// This finds the camera's position and orientation RELATIVE to the entry portal
-	point3d cam_local_pos = p3_world_to_local(movcam.p, &ent.tr);
-	point3d cam_local_r = p3_world_to_local_vec(movcam.r, &ent.tr);
-	point3d cam_local_d = p3_world_to_local_vec(movcam.d, &ent.tr);
-	point3d cam_local_f = p3_world_to_local_vec(movcam.f, &ent.tr);
+	point3d cam_local_pos = p3_world_to_local(movcam.p, ent.tr);
+	point3d cam_local_r = p3_world_to_local_vec(movcam.r, ent.tr);
+	point3d cam_local_d = p3_world_to_local_vec(movcam.d, ent.tr);
+	point3d cam_local_f = p3_world_to_local_vec(movcam.f, ent.tr);
 
 	// Step 2: Apply that same relative transform from the target portal's perspective
 	// Since entry.forward points IN and target.forward points OUT (already opposite),

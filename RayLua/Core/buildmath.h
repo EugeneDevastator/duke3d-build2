@@ -266,15 +266,15 @@ static inline dpoint3d p3d_local_to_world(dpoint3d local_pos, transform *tr) {
 	return world;
 }
 
-static inline point3d p3_world_to_local(point3d world_pos, transform *tr) {
-	float dx = world_pos.x - tr->p.x;
-	float dy = world_pos.y - tr->p.y;
-	float dz = world_pos.z - tr->p.z;
+static inline point3d p3_world_to_local(point3d world_pos, const transform tr) {
+	float dx = world_pos.x - tr.p.x;
+	float dy = world_pos.y - tr.p.y;
+	float dz = world_pos.z - tr.p.z;
 
 	point3d local;
-	local.x = dx * tr->r.x + dy * tr->r.y + dz * tr->r.z;
-	local.y = dx * tr->d.x + dy * tr->d.y + dz * tr->d.z;
-	local.z = dx * tr->f.x + dy * tr->f.y + dz * tr->f.z;
+	local.x = dx * tr.r.x + dy * tr.r.y + dz * tr.r.z;
+	local.y = dx * tr.d.x + dy * tr.d.y + dz * tr.d.z;
+	local.z = dx * tr.f.x + dy * tr.f.y + dz * tr.f.z;
 
 	return local;
 }
@@ -301,11 +301,11 @@ static inline point3d p3d_local_to_world_vector(point3d local_vec, transform *sp
 	return world;
 }
 
-static inline point3d p3_world_to_local_vec(point3d world_vec, transform *space) {
+static inline point3d p3_world_to_local_vec(const point3d world_vec, const transform space) {
 	point3d local;
-	local.x = world_vec.x * space->r.x + world_vec.y * space->r.y + world_vec.z * space->r.z; // right
-	local.y = world_vec.x * space->d.x + world_vec.y * space->d.y + world_vec.z * space->d.z; // forward
-	local.z = world_vec.x * space->f.x + world_vec.y * space->f.y + world_vec.z * space->f.z; // down
+	local.x = world_vec.x * space.r.x + world_vec.y * space.r.y + world_vec.z * space.r.z; // right
+	local.y = world_vec.x * space.d.x + world_vec.y * space.d.y + world_vec.z * space.d.z; // forward
+	local.z = world_vec.x * space.f.x + world_vec.y * space.f.y + world_vec.z * space.f.z; // down
 
 	return local;
 }
@@ -338,7 +338,7 @@ static inline void p3d_transform_wccw(dpoint3d *pinout, transform *ctin, transfo
 }
 
 
-static inline transform tr_world_to_local(const transform transformed, transform *space) {
+static inline transform tr_world_to_local(const transform transformed, const transform space) {
 	// World -> camera space (using ctin)
 	transform ret;
 	ret.p = p3_world_to_local(transformed.p, space);
@@ -412,6 +412,20 @@ static inline void tr_transfrom_wccw(transform *tr, transform *camspace, transfo
 	p3_transform_wccw_vec(&tr->r, camspace, outspace);
 	p3_transform_wccw_vec(&tr->d, camspace, outspace);
 }
+
+static inline transform tr_make_wccw(const transform from, const transform to) {
+	return tr_world_to_local(from, to);
+}
+
+static inline void tr_transform(transform *subject, const transform transformer) {
+
+	subject->p = p3_world_to_local(subject->p, transformer);
+	subject->r = p3_world_to_local_vec(subject->r, transformer);
+	subject->d = p3_world_to_local_vec(subject->d, transformer);
+	subject->f = p3_world_to_local_vec(subject->f, transformer);
+}
+
+
 #endif
 
 #if 1 // =============== MONO PLANE CONVERSIONS ====================

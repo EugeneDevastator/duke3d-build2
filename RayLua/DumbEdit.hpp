@@ -606,10 +606,10 @@ void PickgrabStart() {
 
 		point2d wpos = getwall({grabfoc.wal2, grabfoc.sec}, map)->pos;
 		point3d wpos3d = {wpos.x, wpos.y, 0};
-		localp2 = p3_world_to_local(wpos3d, &cam->tr);
+		localp2 = p3_world_to_local(wpos3d, cam->tr);
 		totalverts2 = getwallsofvert(grabfoc.sec, grabfoc.wal2, verts2, 256, map);
 	}
-	virt_incam_tr = tr_world_to_local(savedwtr, &cam->tr);
+	virt_incam_tr = tr_world_to_local(savedwtr, cam->tr);
 	//virt_incam_tr = savedwtr;
 	//virt_incam_tr.p = p3_make_vector(cam->tr.p,hoverfoc.hitpos);
 }
