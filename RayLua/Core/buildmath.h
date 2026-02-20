@@ -321,7 +321,7 @@ static inline dpoint3d p3d_world_to_local_vec(dpoint3d world_vec, transform *spa
 #endif
 #if 1 // ====================== TRANSFORMS ** 2 =============================
 
-static inline void tr_transform_wccw(dpoint3d *pinout, transform *ctin, transform *ctout) {
+static inline void p3d_transform_wccw(dpoint3d *pinout, transform *ctin, transform *ctout) {
 	// World -> camera space (using ctin)
 	double dx = pinout->x - ctin->p.x;
 	double dy = pinout->y - ctin->p.y;
@@ -374,8 +374,8 @@ static inline void p3_transform_wccw(point3d *pinout, transform *camspace, trans
 	pinout->z = cx * outspace->r.z + cy * outspace->d.z + cz * outspace->f.z + outspace->p.z;
 }
 
-static inline void p3d_transform_wccw(dpoint3d *pinout, cam_t *camspace, cam_t *outspace) {
-	tr_transform_wccw(pinout, &camspace->tr, &outspace->tr);
+static inline void p3d_transform_cam_wccw(dpoint3d *pinout, cam_t *camspace, cam_t *outspace) {
+	p3d_transform_wccw(pinout, &camspace->tr, &outspace->tr);
 }
 
 
@@ -406,7 +406,7 @@ static inline void p3_transform_wccw_vec(point3d *dir, transform *camspace, tran
 	dir->z = cx * outspace->r.z + cy * outspace->d.z + cz * outspace->f.z;
 }
 
-static inline void wccw_transform_full(transform *tr, transform *camspace, transform *outspace) {
+static inline void tr_transfrom_wccw(transform *tr, transform *camspace, transform *outspace) {
 	p3_transform_wccw(&tr->p, camspace, outspace);
 	p3_transform_wccw_vec(&tr->f, camspace, outspace);
 	p3_transform_wccw_vec(&tr->r, camspace, outspace);
@@ -442,7 +442,7 @@ static inline void portal_xform_world_at_z(double *x, double *y, double ref_z, b
 	p.x = *x;
 	p.y = *y;
 	p.z = ref_z;
-	p3d_transform_wccw(&p, &b->cam, &b->orcam);
+	p3d_transform_cam_wccw(&p, &b->cam, &b->orcam);
 	*x = p.x;
 	*y = p.y;
 }

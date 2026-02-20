@@ -23,6 +23,7 @@
 #include <stdarg.h>
 
 #include "buildmath.h"
+#include "rendertypes.h"
 #include "monodebug.h"
 #include "physics.h"
 #include "sectmask.h"
@@ -137,7 +138,7 @@ static inline dpoint3d portal_xform_world_fullr(double x, double y, double z, bd
 	p.x = x;
 	p.y = y;
 	p.z = z;
-	p3d_transform_wccw(&p, &b->cam, &b->orcam);
+	p3d_transform_cam_wccw(&p, &b->cam, &b->orcam);
 	//loops[loopnum] = p;
 	//loopuse[loopnum] = true;
 	//loopnum++;
@@ -149,14 +150,14 @@ static inline void portal_xform_world_full(double *x, double *y, double *z, bdra
 	p.x = *x;
 	p.y = *y;
 	p.z = *z;
-	p3d_transform_wccw(&p, &b->cam, &b->orcam);
+	p3d_transform_cam_wccw(&p, &b->cam, &b->orcam);
 	*x = p.x;
 	*y = p.y;
 	*z = p.z;
 }
 
 static inline void portal_xform_world_fullp(dpoint3d *inp, bdrawctx *b) {
-	p3d_transform_wccw(inp, &b->cam, &b->orcam);
+	p3d_transform_cam_wccw(inp, &b->cam, &b->orcam);
 	//loops[loopnum] = *inp;
 	//loopuse[loopnum] = true;
 	//loopnum++;
@@ -278,6 +279,8 @@ static point3d slightpos[LIGHTMAX], slightdir[LIGHTMAX];
 static float spotwid[LIGHTMAX];
 // define ARENA(t,n) t* n =0; int nmal=0, nn=0;
 ARENA(eyepol_t, eyepol);
+ARENA(spripoly_t, spripol);
+
 ARENA(dpoint3d, eyepolv);
 ARENA(dpoint3d, eyepolvori);
 ARENA(uint32_t, eyepoli);
@@ -554,6 +557,23 @@ static void scansector(int sectnum, bdrawctx *b) {
 	sec = &curMap->sect[sectnum];
 	wal = sec->wall;
 
+	// Emit sprites for frame geo pass
+	int nxs = sec->headspri;
+	ARENA_EXPAND(spripol, 1024);
+	spripoly_t spp;
+	while (nxs >=0 && shadowtest2_rendmode != 4) {
+		spri_t spr = curMap->spri[nxs];
+		spp.tr = spr.tr;
+		spp.galnum = spr.galnum;
+		spp.pal = spr.pal;
+		spp.tilnum = spr.tilnum;
+		spp.sprid = nxs;
+		if (b->has_portal_clip)
+			tr_transfrom_wccw(&spp.tr, &b->movedcam.tr, &b->prevcam.tr);
+		ARENA_ADD(spripol, spp);
+
+		nxs = spr.sectn;
+	}
 
 	// PHASE 1: WALL PROCESSING & INITIAL BUNCHING
 	// Iterate through all walls in sector, performing:
@@ -1003,7 +1023,7 @@ static void emit_wallpoly_func(int rethead0, int rethead1, bdrawctx *b) {
 
 		dpoint3d ret = {retx, rety, retz};
 		eyepolvori[ip] = ret;
-		p3d_transform_wccw(&ret, &b->movedcam, &b->orcam);
+		p3d_transform_cam_wccw(&ret, &b->movedcam, &b->orcam);
 		eyepolv[ip] = ret;
 	}
 
@@ -1109,7 +1129,7 @@ static void emit_lighpol_func(int rethead0, int rethead1, bdrawctx *b) {
 			                                 .f.y) * f + gcam.p.y;
 			glp->ligpolv[ip].z = ((fx - gcam.h.x) * gcam.r.z + (fy - gcam.h.y) * gcam.d.z + (gcam.h.z) * gcam
 			                                 .f.z) * f + gcam.p.z;
-		p3d_transform_wccw(&glp->ligpolv[ip], &b->movedcam, &b->orcam);
+		p3d_transform_cam_wccw(&glp->ligpolv[ip], &b->movedcam, &b->orcam);
 	}
 
 	if (glp->ligpoln + 1 >= glp->ligpolmal) {
@@ -1180,7 +1200,7 @@ static void drawtag_debug(int rethead0, int rethead1, bdrawctx *b) {
 			if (b->recursion_depth > 1) {
 				//	LOOPADD(ret)
 			}
-			p3d_transform_wccw(&ret, &b->cam, &b->orcam);
+			p3d_transform_cam_wccw(&ret, &b->cam, &b->orcam);
 			eyepolv[eyepolvn] = (dpoint3d){ret.x, ret.y, ret.z};
 
 			eyepolvn++;
@@ -1748,7 +1768,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			sectmask_mark_sector(lightsectgot,s);
 			int nxs = sec[s].headspri;
 			while (nxs>0) {
-				if (!(map->spri[nxs].flags & SPRITE_B2_IS_LIGHT))
+				//if (!(map->spri[nxs].flags & SPRITE_B2_IS_LIGHT))
 					drawspriteshadow(nxs,s,s,b->cam.tr, map, b);
 				nxs = map->spri[nxs].sectn;
 			};
@@ -2070,6 +2090,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 
 void reset_context() {
 	ARENA_RESET(eyepol);
+	ARENA_RESET(spripol);
 	ARENA_RESET(eyepolv);
 	ARENA_RESET(eyepolvori);
 	ARENA_RESET(eyepoli);
@@ -2086,8 +2107,10 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy) {
 	if (shadowtest2_rendmode != 4) {
 		sectmask_destroy(framesectgot);
 		framesectgot = sectmask_create();
-
+		reset_context();
+		//ARENA_RESET(spripol);
 	}
+
 	bdrawctx bs;
 	loopnum = 0;
 	//operstopn=-1;
@@ -2118,8 +2141,6 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 		return;
 	}
 
-	sectmask_destroy(lightsectgot);
-	lightsectgot = sectmask_create();
 
 	alphamul=1;
 	int recursiveDepth = newctx->recursion_depth;
@@ -2252,6 +2273,10 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 	int wasclipped = 0;
 	int passcomplete = 0;
 	for (int pass = 0; pass < 2; pass++) {
+
+		sectmask_destroy(lightsectgot);
+		lightsectgot = sectmask_create();
+
 		if (!b->has_portal_clip) {
 			b->currenthalfplane = pass;
 			halfplane = pass;
@@ -2462,7 +2487,7 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 						do {
 							if (h) i = mp[i].p;
 							// must find previous in coords of new, may need previous camera, not orcam.
-							p3d_transform_wccw(&mp[i].pos, &b->prevcam, &b->movedcam);
+							p3d_transform_cam_wccw(&mp[i].pos, &b->prevcam, &b->movedcam);
 							if (!h) i = mp[i].n;
 						} while (i != b->chead[h]);
 					}

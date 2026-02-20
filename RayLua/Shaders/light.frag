@@ -61,6 +61,7 @@ void main()
     * lightIntensity
     * spotAttenuation
     * intens_weight
+    * mix(-0.5,1,fragColor.a) // we us a as custom multiplier .
     ;
 
     finalColor = vec4(lightContribution, 1);

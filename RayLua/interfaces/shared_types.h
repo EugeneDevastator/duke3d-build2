@@ -16,18 +16,9 @@ int name##n = 0; \
 int name##mal = 0; \
 int name##siz = sizeof(typ)
 
-#define ARENA_WRAPPED(typ, name) \
-typ* name; \
-int name##n; \
-int name##mal; \
-int name##siz
-
-#define ARENA_INIT_WRAP(typ, name,wrap) \
-wrap.name = NULL; \
-wrap.name##n =0; \
-wrap.name##mal =0; \
-wrap.name##siz = sizeof(typ)
-
+#define ARENA_DECL(typ, name) \
+extern typ* name; \
+extern int name##n; \
 
 // Add and assign value to arena, returns pointer to new element
 // Expand arena to hold at least 'count' total elements

@@ -1360,9 +1360,11 @@ public:
 		rlEnableDepthTest();
 		// draw sprites.
 		BeginShaderMode(atestShader);
-		for (int i = 0; i < map->numspris; i++) {
-			spri_t *spr = &map->spri[i];
-			if (spr->tilnum >= 0 && sectmask_was_marked(framesectgot, spr->sect)) // sprites
+//		for (int i = 0; i < map->numspris; i++) {
+		for (int i = 0; i < spripoln; i++) {
+			spripoly_t spol = spripol[i];
+			spri_t *spr = &map->spri[spripol[i].sprid];
+			if (spr->tilnum >= 0) // sprites
 			{
 				if (spr->tilnum >= numartiles)
 					spr->tilnum = numartiles - 10;
@@ -1371,12 +1373,13 @@ public:
 				if (spr->view.rflags.is_dblside)
 					rlDisableBackfaceCulling();
 
-				Texture2D spriteTex = galtextures[spr->galnum][spr->tilnum];
+				Texture2D spriteTex = galtextures[spol.galnum][spol.tilnum];
 				// vectors are half a size
-				Vector3 rg = {spr->r.x, -spr->r.z, spr->r.y};
-				Vector3 dw = {spr->d.x, -spr->d.z, spr->d.y};
-				Vector3 frw = {spr->f.x, -spr->f.z, spr->f.y};
-				Vector3 pos = {spr->p.x, -spr->p.z, spr->p.y};
+				transform usetr =  spol.tr;
+				Vector3 rg = {usetr.r.x, -usetr.r.z, usetr.r.y};
+				Vector3 dw = {usetr.d.x, -usetr.d.z, usetr.d.y};
+				Vector3 frw = {usetr.f.x, -usetr.f.z, usetr.f.y};
+				Vector3 pos = {usetr.p.x, -usetr.p.z, usetr.p.y};
 				auto xs = Vector3Length(rg);
 				auto ys = Vector3Length(dw);
 				// pos += frw * 0.00001; // bias agains fighting
@@ -1385,7 +1388,7 @@ public:
 				Vector3 c = pos - rg * (1 - spr->view.anchor.x) * 2 - dw * (1 - spr->view.anchor.z) * 2;
 				Vector3 d = pos - rg * (1 - spr->view.anchor.x) * 2 + dw * spr->view.anchor.z * 2;
 				// Debug vectors
-				DrawTransform(&spr->tr);
+				DrawTransform(&usetr);
 				float mul = 5;
 				rlColor4f(1*mul, 1*mul, 1*mul, 1); // todo update transp.
 
@@ -1418,7 +1421,7 @@ public:
 					ys *= 2;
 					// need to shift view position for raylib's billboard.
 					Vector3 centeroffset = rg * ((spr->view.anchor.x - 0.5)) * 2 + dw * (spr->view.anchor.z - 0.5f) * 2;
-					Vector3 pos = {spr->p.x, -spr->p.z, spr->p.y};
+					Vector3 pos = {usetr.p.x, -usetr.p.z, usetr.p.y};
 					pos += centeroffset;
 					//pos.x+=xs;
 					//pos.z-=ys;
@@ -1437,7 +1440,7 @@ public:
 			lastcamtr2.p.x + lastcamtr2.d.x, lastcamtr2.p.y + lastcamtr2.d.y, lastcamtr2.p.z + lastcamtr2.d.z
 		};
 
-		tr_transform_wccw(&testp, &lastcamtr, &lastcamtr2);
+		p3d_transform_wccw(&testp, &lastcamtr, &lastcamtr2);
 		DrawB2Point(&testp);
 	}
 
@@ -1788,7 +1791,6 @@ public:
 			}
 		}
 
-		// Draw sprites (unchanged - already efficient)
 		for (int i = 0; i < map->numspris; i++) {
 			spri_t *spr = &map->spri[i];
 			if (spr->tilnum >= 0 && spr->tilnum < numartiles) {
