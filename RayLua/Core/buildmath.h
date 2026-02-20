@@ -97,6 +97,14 @@ static inline dpoint3d p3_todbl(const point3d b) {
 	return awrite;
 }
 
+static inline point3d p3d_tosingl(const dpoint3d b) {
+	point3d awrite;
+	awrite.x = (float)b.x;
+	awrite.y = (float)b.y;
+	awrite.z = (float)b.z;
+	return awrite;
+}
+
 static inline dpoint3d p3d_sum(const dpoint3d a, const dpoint3d b) {
 	dpoint3d p;
 	p.x = a.x + b.x;

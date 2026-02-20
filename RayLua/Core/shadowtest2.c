@@ -52,6 +52,7 @@ mono plane has xy as screen coords and z as some sort of depth, but better not u
 eyepols are generated from mono space AND plane equation stored in gouvmat.
 */
 //------ UTILS -------
+#define DP_AND 1
 #define DP_AND_SUB 3
 #define DP_AND_SUBREV 7
 #define DP_NO_SCANSECT 8
@@ -1502,7 +1503,7 @@ static int drawpol_befclip(int fromtag, int newtag, int fromsect, int newsect, i
 
 			// draw solid piece of projection
 			if (shadowtest2_rendmode == 4) {
-				lalphamul = -3;
+				lalphamul = -3; // when drawing surface - scan for all shadowcasters.
 				for (i = mphnum - 1; i >= 0; i--) {
 					if (mph[i].semantic == MPH_SHADE) {
 						mono_bool(mph[i].head[0], mph[i].head[1], plothead[0], plothead[1],MONO_BOOL_AND, b, emit_lighpol_func);
@@ -1578,6 +1579,39 @@ static int drawpol_befclip(int fromtag, int newtag, int fromsect, int newsect, i
 	mono_deloop(plothead[1]);
 	mono_deloop(plothead[0]);
 	return 1;
+}
+static void gentransform_trig(point3d p1, point3d p2, point3d p3, bdrawctx *b) {
+	cam_t *cam = &b->cam;
+
+	// Calculate plane normal via cross product
+	point3d v1 = {p2.x - p1.x, p2.y - p1.y, p2.z - p1.z};
+	point3d v2 = {p3.x - p1.x, p3.y - p1.y, p3.z - p1.z};
+
+	float nx_world = v1.y * v2.z - v1.z * v2.y;
+	float ny_world = v1.z * v2.x - v1.x * v2.z;
+	float nz_world = v1.x * v2.y - v1.y * v2.x;
+
+	// Normalize
+	float len = sqrtf(nx_world * nx_world + ny_world * ny_world + nz_world * nz_world);
+	nx_world /= len;
+	ny_world /= len;
+	nz_world /= len;
+
+	// Transform plane normal to camera space
+	float nx = cam->r.x * nx_world + cam->r.y * ny_world + cam->r.z * nz_world;
+	float ny = cam->d.x * nx_world + cam->d.y * ny_world + cam->d.z * nz_world;
+	float nz = cam->f.x * nx_world + cam->f.y * ny_world + cam->f.z * nz_world;
+
+	// Camera-space plane constant using p1
+	float D_c = nx_world * (p1.x - cam->p.x)
+			  + ny_world * (p1.y - cam->p.y)
+			  + nz_world * (p1.z - cam->p.z);
+
+	// Scale includes h.z for screen-space depth formula
+	float scale = 1.0f / (D_c * cam->h.z);
+	b->gouvmat[0] = nx * scale;
+	b->gouvmat[3] = ny * scale;
+	b->gouvmat[6] = nz / D_c - b->gouvmat[0] * cam->h.x - b->gouvmat[3] * cam->h.y;
 }
 
 static void gentransform_ceilflor(sect_t *sec, wall_t *wal, int isflor, bdrawctx *b) {
@@ -1675,6 +1709,13 @@ static void drawspriteshadow(int sprid, int sectid, int tagid, transform cam, ma
 
 	mono_genfromloop(&ph1,&ph2,poly, 4);
 
+	// for lighting on sprites i would need to store another gentex
+	// clip sprite with current stuff
+	// drawpol AND , noscan, emitmask. preserve loop
+	gentransform_trig(ll,lr,ur,b);
+	int lightflags = DP_AND | DP_NO_SCANSECT | DP_PRESERVE_LOOP;
+int res;
+	res = drawpol_befclip(tagid, -1, tagid, -1, ph1,ph2, lightflags, b);
 	// oh beauty is here - that when i add this - i can clip it same way as other walls
 	// and this will only retain us portion of projection that is wisible. amazing!
 	// we also must store sprite id for this thing in mph unfortunately...
@@ -1688,7 +1729,7 @@ static void drawspriteshadow(int sprid, int sectid, int tagid, transform cam, ma
 	// and obvious - we want to emit light poly when we add projection for sprites - to light them, duh.
 	int flags = DP_NO_SCANSECT | DP_AND_SUB | DP_ADD_AS_PROJECTOR | 3;
 	// newtag is irrelevant here.
-	int res = drawpol_befclip(tagid, sectid, tagid, sectid, ph1,ph2, flags, b);
+	res = drawpol_befclip(tagid, sectid, tagid, sectid, ph1,ph2, flags, b);
 }
 /*
 the mono engine produces camera-space polygons that are clipped to not overlap.
@@ -2035,7 +2076,10 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 					else if (!m) f = sec[verts[0].s].z[0]; //
 					else f = sec[verts[(m - 1) >> 1].s].z[0];
 					b->gflags = 0;
-					gentransform_wall(npol2, sur, b);
+					gentransform_trig(p3d_tosingl(npol2[0]),
+						p3d_tosingl(npol2[1]),
+						p3d_tosingl(npol2[2]),b);
+					//gentransform_wall(npol2, sur, b);
 				}
 				b->gligwall = w;
 				b->gligslab = m;
