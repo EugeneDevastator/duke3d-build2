@@ -2655,14 +2655,17 @@ static void draw_hsr_enter_portal(mapstate_t *map, int myport, int head1, int he
 	tr_normalize(&tgs.tr);
 
 	// this code works
-	transform wtl = tr_world_to_local(movcam.tr, ent.tr);
-	transform ltw = tr_local_to_world(wtl, tgs.tr);
-	movcam.tr = ltw;
+	//transform wtl = tr_world_to_local(movcam.tr, ent.tr);
+	//transform ltw = tr_local_to_world(wtl, tgs.tr);
+	//movcam.tr = ltw;
 
 	// this doesnt work!
-	//transform pform = tr_world_to_local(tgs.tr,ent.tr);
-	//transform res = tr_local_to_world(movcam.tr,pform);
-	//movcam.tr = res;
+	transform tin = tr_local_to_world(tr_invert(ent.tr), ent.tr);
+	transform pform = tr_world_to_local(tgs.tr, ent.tr);
+	transform delta = tr_local_to_world(tr_invertrfd(ent.tr), tgs.tr);
+	//delta = tr_invert(delta);
+	transform res = tr_local_to_world(movcam.tr,delta);
+	movcam.tr = res;
 
 	movcam.cursect = portals[endp].sect;
 	// to avoid winding problems with mono, we render with normalized camera

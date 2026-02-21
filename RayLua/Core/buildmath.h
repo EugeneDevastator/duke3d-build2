@@ -24,8 +24,8 @@ extern "C" {
 
 
 static const point3d BBRIGHT = {1, 0, 0};  // X, RED
-static const point3d BBDOWN = {0, 0, 1};   // Y, GREEN
-static const point3d BBFORWARD = {0, 1, 0};// Z, BLUE
+static const point3d BBFORWARD = {0, 1, 0};// Y, GREEN
+static const point3d BBDOWN = {0, 0, 1};   // Z, BLUE
 
 
 static const point3d BBPZERO = {0, 0, 0};
@@ -241,20 +241,55 @@ static inline point3d p3_normalized(point3d v) {
 #endif
 
 #if 1 // ===================== TRANSFORMS ==========================
-// static inline transform tr_invert(const transform t) {
-// 	transform inv;
-// 	// Transpose rotation
-// 	inv.r = (point3d){t.r.x, t.d.x, t.f.x};
-// 	inv.d = {t.r.y, t.d.y, t.f.y};
-// 	inv.f = {t.r.z, t.d.z, t.f.z};
-// 	// Rotated negative position
-// 	inv.p = {
-// 		-(t.r.x*t.p.x + t.d.x*t.p.y + t.f.x*t.p.z),
-// 		-(t.r.y*t.p.x + t.d.y*t.p.y + t.f.y*t.p.z),
-// 		-(t.r.z*t.p.x + t.d.z*t.p.y + t.f.z*t.p.z)
-// 	};
-// 	return inv;
-// }
+ //static inline transform tr_invert(const transform t) {
+ //	transform inv;
+ //	// Transpose rotation
+ //	inv.r = {t.r.x, t.d.x, t.f.x};
+ //	inv.d = {t.r.y, t.d.y, t.f.y};
+ //	inv.f = {t.r.z, t.d.z, t.f.z};
+ //	// Rotated negative position
+ //	inv.p = {
+ //		-(t.r.x*t.p.x + t.d.x*t.p.y + t.f.x*t.p.z),
+ //		-(t.r.y*t.p.x + t.d.y*t.p.y + t.f.y*t.p.z),
+ //		-(t.r.z*t.p.x + t.d.z*t.p.y + t.f.z*t.p.z)
+ //	};
+ //	return inv;
+ //}
+static inline transform tr_invertrfd(const transform t) {
+    transform inv;
+
+    // Transpose: column i of original becomes row i of inverse
+    // Original matrix columns are [r, d, f] = [X, Z, Y]
+    inv.r.x = t.r.x; inv.r.y = t.d.x; inv.r.z = t.f.x;  // X row
+	inv.d.x = t.r.y; inv.d.y = t.d.y; inv.d.z = t.f.y;  // Y row
+    inv.f.x = t.r.z; inv.f.y = t.d.z; inv.f.z = t.f.z;  // Z row
+
+
+	// inv.p = -M^T * t.p
+	inv.p.x = -(t.p.x * t.r.x + t.p.y * t.r.y + t.p.z * t.r.z);
+	inv.p.y = -(t.p.x * t.d.x + t.p.y * t.d.y + t.p.z * t.d.z);
+	inv.p.z = -(t.p.x * t.f.x + t.p.y * t.f.y + t.p.z * t.f.z);
+
+    return inv;
+}
+static inline transform tr_invert(const transform t) {
+	transform inv;
+
+	// Transpose: [r,d,f] = [X,Y,Z] columns become rows
+	inv.r.x = t.r.x; inv.r.y = t.d.x; inv.r.z = t.f.x;  // X row
+	inv.d.x = t.r.y; inv.d.y = t.d.y; inv.d.z = t.f.y;  // Y row
+	inv.f.x = t.r.z; inv.f.y = t.d.z; inv.f.z = t.f.z;  // Z row
+
+	// Position: -t.p dotted with each transposed row
+	inv.p.x = -(t.p.x * inv.r.x + t.p.y * inv.r.y + t.p.z * inv.r.z);
+	inv.p.y = -(t.p.x * inv.d.x + t.p.y * inv.d.y + t.p.z * inv.d.z);
+	inv.p.z = -(t.p.x * inv.f.x + t.p.y * inv.f.y + t.p.z * inv.f.z);
+
+	return inv;
+}
+
+
+
 static inline bool tr_is_flipped(transform *tr) {
 	// Calculate determinant of the 3x3 rotation matrix
 	// det = r·(d×f)
@@ -286,14 +321,7 @@ static inline void tr_normalize(transform *tr) {
 	if (flen > 0.0001f) p3_scalar_div(&tr->d, flen);
 }
 
-static inline point3d p3_local_to_world(point3d local_pos, transform *tr) {
-	point3d world;
-	world.x = tr->p.x + local_pos.x * tr->r.x + local_pos.y * tr->d.x + local_pos.z * tr->f.x;
-	world.y = tr->p.y + local_pos.x * tr->r.y + local_pos.y * tr->d.y + local_pos.z * tr->f.y;
-	world.z = tr->p.z + local_pos.x * tr->r.z + local_pos.y * tr->d.z + local_pos.z * tr->f.z;
 
-	return world;
-}
 
 static inline dpoint3d p3d_local_to_world(dpoint3d local_pos, transform *tr) {
 	dpoint3d world;
@@ -329,7 +357,14 @@ static inline dpoint3d p3d_world_to_local(dpoint3d world_pos, transform *tr) {
 
 	return local;
 }
+static inline point3d p3_local_to_world(point3d local_pos, transform *tr) {
+	point3d world;
+	world.x = tr->p.x + local_pos.x * tr->r.x + local_pos.y * tr->d.x + local_pos.z * tr->f.x;
+	world.y = tr->p.y + local_pos.x * tr->r.y + local_pos.y * tr->d.y + local_pos.z * tr->f.y;
+	world.z = tr->p.z + local_pos.x * tr->r.z + local_pos.y * tr->d.z + local_pos.z * tr->f.z;
 
+	return world;
+}
 static inline point3d p3_local_to_world_vector(point3d local_vec, transform *space) {
 	point3d world;
 	world.x = local_vec.x * space->r.x + local_vec.y * space->d.x + local_vec.z * space->f.x;
@@ -533,10 +568,6 @@ static inline dpoint3d p3d_normal_of_triangle(dpoint3d p0, dpoint3d p1, dpoint3d
 #endif
 #if 1 // ======================= QUATERNIONS ======================
 
-
-typedef struct {
-	float x, y, z, w;
-} quat;
 
 static inline quat quat_identity() {
 	quat q = {0.0f, 0.0f, 0.0f, 1.0f};
