@@ -407,6 +407,9 @@ typedef struct // surf_t
 	uint8_t tilingkind; // normal, polar, hex etc.
 	enum fragRenderMode frMode;
 // ------------
+	uint8_t reflection_strength;
+	uint8_t ior;
+
 	unsigned short asc, rsc, gsc, bsc; //4096 is no change
 
 // ------- runtime gneerated data

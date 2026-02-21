@@ -94,6 +94,7 @@ typedef struct {
 	unsigned int *sectgot, *sectgotmal;        // Visited sectors per level
 	int sectgotn;
 	int entrysec;
+	transform world_transform;
 	// mono context
 	bool has_mono_out; // Whether portal clipping is active
 	// transform context

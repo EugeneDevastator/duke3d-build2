@@ -279,6 +279,9 @@ public:
 				}
 		}
 
+		// for light portals i also need flag to 'reflect light on surfaces!
+		// and store sector and portal space?
+
 		for (int i = 0; i < portaln; i++) {
 			// portal post pass
 			uint32_t target_tag = portals[i].destpn; // currently stores expected hitag
@@ -297,6 +300,15 @@ public:
 				{
 					map->spri[nextsp].tr = map->spri[hspr].tr;
 					p3_scalar_mul(&map->spri[nextsp].tr.d, -1);
+					//p3_scalar_mul(&map->spri[nextsp].tr.r, -1);
+				}
+				else {
+//wall mirror
+						map->spri[nextsp].tr = map->spri[hspr].tr;
+						//p3_scalar_mul(&map->spri[nextsp].tr.d, -1);
+						//p3_scalar_mul(&map->spri[nextsp].tr.r, -1);
+						p3_scalar_mul(&map->spri[nextsp].tr.f, -1);
+
 				}
 				pcop.anchorspri = nextsp;
 				pcop.destpn = i;

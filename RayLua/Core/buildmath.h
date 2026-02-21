@@ -5,20 +5,37 @@
 
 #ifndef RAYLIB_LUA_IMGUI_BUILDMATH_H
 #define RAYLIB_LUA_IMGUI_BUILDMATH_H
-#include "monoclip.h"
+// PURE C LIB
+#ifdef __cplusplus
+extern "C" {
+#endif
 
+
+
+#include "monoclip.h"
+#ifndef __cplusplus
+#pragma message("Compiling as C")
+#else
+#pragma message("Compiling as C++")
+#endif
 
 #define epsilon 0.0000001f
 #define epsilond 0.000001
 
-static const point3d BBRIGHT = {1, 0, 0};
-static const point3d BBFORWARD = {0, 1, 0};
-static const point3d BBDOWN = {0, 0, 1};
+
+static const point3d BBRIGHT = {1, 0, 0};  // X, RED
+static const point3d BBDOWN = {0, 0, 1};   // Y, GREEN
+static const point3d BBFORWARD = {0, 1, 0};// Z, BLUE
+
+
 static const point3d BBPZERO = {0, 0, 0};
 static const point3d BBPONE = {1, 1, 1};
 
+static const transform TR_ONE = {{0,0,0}, {1,0,0}, {0,0,1}, {0,1,0}};
+
+
 #define BPXY(p3d) {p3d.x, p3d.y}
-// Convention tr = transform, meaning data structure, not operation or anything else.
+	// Convention tr = transform, meaning data structure, not operation or anything else.
 // transfromation is always written as 'transfrom'
 #if 1 // ===================== SCALARS and UNARY ==================
 static inline bool p3_issamexy(point3d a, point3d b) {
@@ -224,7 +241,20 @@ static inline point3d p3_normalized(point3d v) {
 #endif
 
 #if 1 // ===================== TRANSFORMS ==========================
-
+// static inline transform tr_invert(const transform t) {
+// 	transform inv;
+// 	// Transpose rotation
+// 	inv.r = (point3d){t.r.x, t.d.x, t.f.x};
+// 	inv.d = {t.r.y, t.d.y, t.f.y};
+// 	inv.f = {t.r.z, t.d.z, t.f.z};
+// 	// Rotated negative position
+// 	inv.p = {
+// 		-(t.r.x*t.p.x + t.d.x*t.p.y + t.f.x*t.p.z),
+// 		-(t.r.y*t.p.x + t.d.y*t.p.y + t.f.y*t.p.z),
+// 		-(t.r.z*t.p.x + t.d.z*t.p.y + t.f.z*t.p.z)
+// 	};
+// 	return inv;
+// }
 static inline bool tr_is_flipped(transform *tr) {
 	// Calculate determinant of the 3x3 rotation matrix
 	// det = r·(d×f)
@@ -274,23 +304,23 @@ static inline dpoint3d p3d_local_to_world(dpoint3d local_pos, transform *tr) {
 	return world;
 }
 
-static inline point3d p3_world_to_local(point3d world_pos, const transform tr) {
-	float dx = world_pos.x - tr.p.x;
-	float dy = world_pos.y - tr.p.y;
-	float dz = world_pos.z - tr.p.z;
+static inline point3d p3_world_to_local(point3d world_pos, const transform space) {
+	float dx = world_pos.x - space.p.x;
+	float dy = world_pos.y - space.p.y;
+	float dz = world_pos.z - space.p.z;
 
 	point3d local;
-	local.x = dx * tr.r.x + dy * tr.r.y + dz * tr.r.z;
-	local.y = dx * tr.d.x + dy * tr.d.y + dz * tr.d.z;
-	local.z = dx * tr.f.x + dy * tr.f.y + dz * tr.f.z;
+	local.x = dx * space.r.x + dy * space.r.y + dz * space.r.z;
+	local.y = dx * space.d.x + dy * space.d.y + dz * space.d.z;
+	local.z = dx * space.f.x + dy * space.f.y + dz * space.f.z;
 
 	return local;
 }
 
 static inline dpoint3d p3d_world_to_local(dpoint3d world_pos, transform *tr) {
-	float dx = world_pos.x - tr->p.x;
-	float dy = world_pos.y - tr->p.y;
-	float dz = world_pos.z - tr->p.z;
+	double dx = world_pos.x - tr->p.x;
+	double dy = world_pos.y - tr->p.y;
+	double dz = world_pos.z - tr->p.z;
 
 	dpoint3d local;
 	local.x = dx * tr->r.x + dy * tr->r.y + dz * tr->r.z;
@@ -300,7 +330,7 @@ static inline dpoint3d p3d_world_to_local(dpoint3d world_pos, transform *tr) {
 	return local;
 }
 
-static inline point3d p3d_local_to_world_vector(point3d local_vec, transform *space) {
+static inline point3d p3_local_to_world_vector(point3d local_vec, transform *space) {
 	point3d world;
 	world.x = local_vec.x * space->r.x + local_vec.y * space->d.x + local_vec.z * space->f.x;
 	world.y = local_vec.x * space->r.y + local_vec.y * space->d.y + local_vec.z * space->f.y;
@@ -356,13 +386,13 @@ static inline transform tr_world_to_local(const transform transformed, const tra
 	return ret;
 }
 
-static inline transform tr_local_to_world(const transform tin, transform *tfrom) {
+static inline transform tr_local_to_world(const transform subject, transform space) {
 	// World -> camera space (using ctin)
 	transform ret;
-	ret.p = p3_local_to_world(tin.p, tfrom);
-	ret.r = p3d_local_to_world_vector(tin.r, tfrom);
-	ret.d = p3d_local_to_world_vector(tin.d, tfrom);
-	ret.f = p3d_local_to_world_vector(tin.f, tfrom);
+	ret.p = p3_local_to_world(subject.p, &space);
+	ret.r = p3_local_to_world_vector(subject.r, &space);
+	ret.d = p3_local_to_world_vector(subject.d, &space);
+	ret.f = p3_local_to_world_vector(subject.f, &space);
 	return ret;
 }
 
@@ -422,7 +452,8 @@ static inline void tr_transfrom_wccw(transform *tr, transform *camspace, transfo
 }
 
 static inline transform tr_make_wccw(const transform from, const transform to) {
-	return tr_world_to_local(from, to);
+	transform t1 = tr_world_to_local(TR_ONE, from);
+	return tr_local_to_world(t1, to);
 }
 
 static inline void tr_transform(transform *subject, const transform transformer) {
@@ -433,7 +464,9 @@ static inline void tr_transform(transform *subject, const transform transformer)
 	subject->f = p3_world_to_local_vec(subject->f, transformer);
 }
 
-
+static inline void tr_apply(transform *subject, transform portalform) {
+	*subject = tr_local_to_world(*subject, portalform);
+}
 #endif
 
 #if 1 // =============== MONO PLANE CONVERSIONS ====================
@@ -741,5 +774,7 @@ static inline void tr_quat_look_atp3(transform *trsubj, point3d to, float normt)
 
 #endif
 
-
+#ifdef __cplusplus
+}
+#endif
 #endif //RAYLIB_LUA_IMGUI_BUILDMATH_H

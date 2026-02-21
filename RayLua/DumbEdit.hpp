@@ -446,7 +446,7 @@ void PickgrabUpdate() {
 	p3_addto(&localp2, p3_scalar_mul_of(BBDOWN, scrol * 0.2f));
 
 	if (ISGRABSPRI) {
-		map->spri[grabfoc.spri].tr = tr_local_to_world(virt_incam_tr, &cam->tr);
+		map->spri[grabfoc.spri].tr = tr_local_to_world(virt_incam_tr, cam->tr);
 		int s = map->spri[grabfoc.spri].sect;
 		if (hoverfoc.sec >= 0) {
 			GRABSPRI.walcon = (signed char)hoverfoc.wal;

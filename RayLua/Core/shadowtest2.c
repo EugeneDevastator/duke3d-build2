@@ -1694,11 +1694,10 @@ static void drawspriteshadow(int sprid, int sectid, int tagid, transform cam, ma
 	spri_t *spr = &map->spri[sprid];
 	point3d ftocam = p3_make_vector(spr->p, cam.p);
 	transform trf = tr_xyplanar_from_forward(p3_normalized(ftocam));
-	p3_scalar_mul(&trf.r,0.5);
+	p3_scalar_mul(&trf.r,p3_length(&spr->r));
 	point3d upvec =  p3_scalar_mul_of(p3_inv(spr->d),2);
 	point3d ll  = p3_sum(spr->p,trf.r);
 	point3d ul  = p3_sum(ll,upvec);
-
 	point3d lr  = p3_sum(spr->p,p3_inv(trf.r));
 	point3d ur  = p3_sum(lr,upvec);
 
@@ -2172,6 +2171,7 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy) {
 	bs.gmonosemantic = MPH_GEO;
 	bs.ismirrored = false;
 	bs.istrimirror = false;
+	bs.world_transform = TR_ONE;
 	opercurr = 0;
 	int sec=-1,wal=-1,spr =-1;
 	point3d hit;
@@ -2654,20 +2654,16 @@ static void draw_hsr_enter_portal(mapstate_t *map, int myport, int head1, int he
 	tr_normalize(&ent.tr);
 	tr_normalize(&tgs.tr);
 
-	// Step 1: Transform camera to entry portal's local space
-	// This finds the camera's position and orientation RELATIVE to the entry portal
-	point3d cam_local_pos = p3_world_to_local(movcam.p, ent.tr);
-	point3d cam_local_r = p3_world_to_local_vec(movcam.r, ent.tr);
-	point3d cam_local_d = p3_world_to_local_vec(movcam.d, ent.tr);
-	point3d cam_local_f = p3_world_to_local_vec(movcam.f, ent.tr);
+	// this code works
+	transform wtl = tr_world_to_local(movcam.tr, ent.tr);
+	transform ltw = tr_local_to_world(wtl, tgs.tr);
+	movcam.tr = ltw;
 
-	// Step 2: Apply that same relative transform from the target portal's perspective
-	// Since entry.forward points IN and target.forward points OUT (already opposite),
-	// we just transform directly without any flips
-	movcam.p = p3_local_to_world(cam_local_pos, &tgs.tr);
-	movcam.r = p3d_local_to_world_vector(cam_local_r, &tgs.tr);
-	movcam.d = p3d_local_to_world_vector(cam_local_d, &tgs.tr);
-	movcam.f = p3d_local_to_world_vector(cam_local_f, &tgs.tr);
+	// this doesnt work!
+	//transform pform = tr_world_to_local(tgs.tr,ent.tr);
+	//transform res = tr_local_to_world(movcam.tr,pform);
+	//movcam.tr = res;
+
 	movcam.cursect = portals[endp].sect;
 	// to avoid winding problems with mono, we render with normalized camera
 	// then in dra eyepol we can just flip polygons as if camera was really flipped.
