@@ -7,7 +7,6 @@
  *       - added compatibility storage to main types
  */
 #include "loaders.h"
-#include "buildmath.h"
 // TODO : Replace types with stdint like uint8_t
 // TODO : new mapstate should have raylib friendly coords by default. period.
 
