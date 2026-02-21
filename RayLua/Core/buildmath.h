@@ -23,6 +23,10 @@ extern "C" {
 #define epsilond 0.000001
 
 
+// X grows Left to right (screen)
+// Y grows Top to bottom (screen)
+// Z grows DOWN
+
 static const point3d BBRIGHT = {1, 0, 0};  // X, RED
 static const point3d BBFORWARD = {0, 1, 0};// Y, GREEN
 static const point3d BBDOWN = {0, 0, 1};   // Z, BLUE
@@ -241,21 +245,8 @@ static inline point3d p3_normalized(point3d v) {
 #endif
 
 #if 1 // ===================== TRANSFORMS ==========================
- //static inline transform tr_invert(const transform t) {
- //	transform inv;
- //	// Transpose rotation
- //	inv.r = {t.r.x, t.d.x, t.f.x};
- //	inv.d = {t.r.y, t.d.y, t.f.y};
- //	inv.f = {t.r.z, t.d.z, t.f.z};
- //	// Rotated negative position
- //	inv.p = {
- //		-(t.r.x*t.p.x + t.d.x*t.p.y + t.f.x*t.p.z),
- //		-(t.r.y*t.p.x + t.d.y*t.p.y + t.f.y*t.p.z),
- //		-(t.r.z*t.p.x + t.d.z*t.p.y + t.f.z*t.p.z)
- //	};
- //	return inv;
- //}
-static inline transform tr_invertrfd(const transform t) {
+
+static inline transform tr_invert(const transform t) {
     transform inv;
 
     // Transpose: column i of original becomes row i of inverse

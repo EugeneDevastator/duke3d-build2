@@ -913,10 +913,10 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 						//no break intentional
 					case SPRITE_WALL_ALIGNED: //Wall sprite
 						// need to not alter sprite positions, but change view xforms.
-						//		spr->p.z -= (b7spr.yrepeat/4096.0*(float)tilesizy[l]);
+						spr->p.z -= (b7spr.yrepeat/4096.0*(float)tilesizy[l]);
 						spr->r.x = -sin((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)GET_TILSIZEX_PTR(spr));
 						spr->r.y = cos((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)GET_TILSIZEX_PTR(spr));
-						spr->d.z = -(b7spr.yrepeat/4096.0*(float)GET_TILSIZEY_PTR(spr));
+						spr->d.z = -1.0*(b7spr.yrepeat/4096.0*(float)GET_TILSIZEY_PTR(spr));
 						spr->f = buildFW;
 						break;
 					case SPRITE_FLOOR_ALIGNED: //Floor sprite
@@ -937,28 +937,31 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 				if (b7spr.cstat&(SPRITE_FLIP_Y | SPRITE_FLOOR_ALIGNED)) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; spr->flags ^= 8; } //&8: y-flipped?
 				spr->view.uv[0]=1;
 				spr->view.uv[1]=1;
+				// we flip tile inside of anchored space, so it should not affect the final rect of it
+				// currently doesnt work as intended
 				if (b7spr.cstat&SPRITE_FLIP_X) { spr->view.uv[0] = -1; } //&4: x-flipped
 				if (b7spr.cstat&SPRITE_FLIP_Y) { spr->view.uv[1] = -1; } //&8: y-flipped?
 
 				// note - replace with view setup
 				spr->view.anchor.x=0.5f;
 				spr->view.anchor.y=0; // forward
-				spr->view.anchor.z = 0.0f; // 1 on the V to the pivot. - normal duke3d sprite.
+				spr->view.anchor.z = 1.0f; // 1 on the V to the pivot. - normal duke3d sprite.
 				if (b7spr.cstat & SPRITE_TRUE_CENTERED || b7spr.cstat & SPRITE_FLOOR_ALIGNED) {
-					//spr->p.z += (b7spr.yrepeat/4096.0*(float)tilesizy[l]);
+					spr->p.z += (b7spr.yrepeat/4096.0*(float)tilesizy[l]);
 					spr->view.anchor.z = 0.5f;
 				}
 
 				spr->tilnum = l; hitile = max(hitile,l);
 
-				float tileoffu = g_gals[defaultGal].picanm_data[spr->tilnum].x_center_offset/GET_TILSIZEX_PTR(spr);
-				float tileoffv = g_gals[defaultGal].picanm_data[spr->tilnum].y_center_offset/GET_TILSIZEY_PTR(spr);
+				// maybe we must move position?
+				float tileoffu = (float)g_gals[defaultGal].picanm_data[spr->tilnum].x_center_offset/GET_TILSIZEX_PTR(spr);
+				float tileoffv = (float)g_gals[defaultGal].picanm_data[spr->tilnum].y_center_offset/GET_TILSIZEY_PTR(spr);
 				spr->view.anchor.x+=tileoffu;
 				spr->view.anchor.z+=tileoffv;
 
 				//&128: real-centered centering (center at center) - originally half submerged sprite
-				spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; // down is flipped.
-				spr->r.x *= -1; spr->r.y *= -1; spr->r.z *= -1; // also flipping r to restore chirality
+				//spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; // down is flipped.
+				//spr->r.x *= -1; spr->r.y *= -1; spr->r.z *= -1; // also flipping r to restore chirality
 				if ((unsigned)b7spr.sectnum < (unsigned)map->numsects) //Make shade relative to sector
 				{
 					j = b7spr.sectnum; j = 32 - map->sect[j].surf[map->sect[j].surf[0].flags&1^1].rsc/128;

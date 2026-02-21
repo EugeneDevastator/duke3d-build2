@@ -2662,7 +2662,7 @@ static void draw_hsr_enter_portal(mapstate_t *map, int myport, int head1, int he
 	// this doesnt work!
 	transform tin = tr_local_to_world(tr_invert(ent.tr), ent.tr);
 	transform pform = tr_world_to_local(tgs.tr, ent.tr);
-	transform delta = tr_local_to_world(tr_invertrfd(ent.tr), tgs.tr);
+	transform delta = tr_local_to_world(tr_invert(ent.tr), tgs.tr);
 	//delta = tr_invert(delta);
 	transform res = tr_local_to_world(movcam.tr,delta);
 	movcam.tr = res;

@@ -1462,9 +1462,9 @@ public:
 		Vector3 dw = {tr->d.x, -tr->d.z, tr->d.y};
 		Vector3 frw = {tr->f.x, -tr->f.z, tr->f.y};
 		Vector3 pos = {tr->p.x, -tr->p.z, tr->p.y};
-		DrawLine3D(pos, Vector3Add(pos, frw), BLUE); // Forward vector
+		DrawLine3D(pos, Vector3Add(pos, frw), GREEN); // Forward vector
 		DrawLine3D(pos, Vector3Add(pos, rg), RED); // Right vector
-		DrawLine3D(pos, Vector3Add(pos, dw), GREEN); // Down vector
+		DrawLine3D(pos, Vector3Add(pos, dw), SKYBLUE); // Down vector, Z
 		rlEnableDepthTest();
 	}
 

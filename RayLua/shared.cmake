@@ -2,9 +2,9 @@
 # Core files
 set(C_SOURCES
         interfaces/engineapi.c
-        core/mapcore.c
-        core/artloader.c
-        core/kplib.c
+        Core/mapcore.c
+        Core/artloader.c
+        Core/kplib.c
         Core/loaders.c
         Core/physics.c
         Core/monoclip.c
@@ -15,11 +15,11 @@ set(C_SOURCES
         interfaces/eventstore.c
 )
 set(C_HEADERS
-        core/mapcore.h
-        core/artloader.h
-        core/loaders.h
-        core/kplib.h
-        core/physics.h
+        Core/mapcore.h
+        Core/artloader.h
+        Core/loaders.h
+        Core/kplib.h
+        Core/physics.h
         Core/monoclip.h
         Core/scenerender.h
         Core/buildmath.h
@@ -56,6 +56,11 @@ endfunction()
 # Shared C properties
 function(set_c_properties)
     set_source_files_properties(${C_SOURCES} PROPERTIES
+            LANGUAGE C
+            C_STANDARD 99
+            C_STANDARD_REQUIRED ON
+    )
+    set_source_files_properties(${C_HEADERS} PROPERTIES
             LANGUAGE C
             C_STANDARD 99
             C_STANDARD_REQUIRED ON
