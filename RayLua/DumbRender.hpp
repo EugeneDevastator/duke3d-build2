@@ -1496,32 +1496,52 @@ public:
 				auto xs = Vector3Length(rg);
 				auto ys = Vector3Length(dw);
 
+				float zanc = 1-spr->view.anchor.z;
+				float xanc = spr->view.anchor.x;
+
 				// pos += frw * 0.00001; // bias agains fighting
-				Vector3 a = pos + rg * spr->view.anchor.x * 2 + dw * spr->view.anchor.z * 2;
-				Vector3 b = pos + rg * spr->view.anchor.x * 2 - dw * (1 - spr->view.anchor.z) * 2;
-				Vector3 c = pos - rg * (1 - spr->view.anchor.x) * 2 - dw * (1 - spr->view.anchor.z) * 2;
-				Vector3 d = pos - rg * (1 - spr->view.anchor.x) * 2 + dw * spr->view.anchor.z * 2;
+				Vector3 a = pos + rg * spr->view.anchor.x * 2 + dw * zanc * 2;
+				Vector3 b = pos + rg * spr->view.anchor.x * 2 - dw * (1 - zanc) * 2;
+				Vector3 c = pos - rg * (1 - spr->view.anchor.x) * 2 - dw * (1 - zanc) * 2;
+				Vector3 d = pos - rg * (1 - spr->view.anchor.x) * 2 + dw * zanc * 2;
 
 				float rlen = Vector3Length(rg);
 				float dlen = Vector3Length(dw);
-				Vector3 aB = {rlen * spr->view.anchor.x * 2, -dlen * spr->view.anchor.z * 2,0};
-				Vector3 bB = {rlen * spr->view.anchor.x * 2, +dlen * (1 - spr->view.anchor.z) * 2,0};
-				Vector3 cB = {(rlen*-1) * (1 - spr->view.anchor.x) * 2, +dlen * (1 - spr->view.anchor.z) * 2};
-				Vector3 dB = {(rlen*-1) * (1 - spr->view.anchor.x) * 2, - dlen * spr->view.anchor.z * 2};
+				float xwsize = rlen*2;
+				float ywsize = dlen*2;
+			// o,o = draw from pos to right and up.
+				// 0,0 = sprite lower left = pivot.
+				// 0,1 = sprite upper left = pivot
+				float roff = -xanc * xwsize;
+				float doff = -zanc * ywsize;
+
+				Vector3 ll = {roff , doff,0};
+				Vector3 lr = {ll.x + xwsize, ll.y,0};
+				Vector3 ul = {ll.x , ll.y+ ywsize,0};
+				Vector3 ur = {lr.x, ul.y,0};
+
+
+				//Vector3 aB = {rlen * spr->view.anchor.x * 2, -dlen * zanc * 2,0};
+				//Vector3 bB = {rlen * spr->view.anchor.x * 2, +dlen * (1 - zanc) * 2,0};
+				//Vector3 cB = {(rlen*-1) * (1 - spr->view.anchor.x) * 2, +dlen * (1 - zanc) * 2};
+				//Vector3 dB = {(rlen*-1) * (1 - spr->view.anchor.x) * 2, - dlen * zanc * 2};
 
 				// Debug vectors
 				DrawTransform(&usetr);
 				float mul = 5;
 				rlColor4f(1 * mul, 1 * mul, 1 * mul, 1); // todo update transp.
 				if (spr->view.rflags.vert_mode == vmode_billbord) {
-					EnterPlaneBoardSpace(pos, dw*-1, rlcam);
-					a=aB;
-					b=bB;
-					c=cB;
-					d=dB;
+					EnterCylBoardSpace(pos, dw*-1, rlcam);
+					a=ll;
+					b=lr;
+					c=ur;
+					d=ul;
 				}
 				if (spr->view.rflags.vert_mode == vmode_quad) {
-
+					ll = pos + rg * 2 * xanc + dw*2*zanc;
+					lr = pos - rg * 2 * (1-xanc) + dw*2*zanc;
+					ur = pos - rg * 2 * (1-xanc) - dw*2*(1-zanc);
+					ul = pos + rg * 2 * xanc - dw*2*(1-zanc);
 				}
 					{
 					EnableDepthOffset(-2.0);
@@ -1531,13 +1551,13 @@ public:
 					//rlColor4ub(255, 255, 255, 255); // todo update transp.
 
 					rlTexCoord2f(0.0f, spr->view.uv[1] * 1.0f);
-					rlVertex3V(b);
+					rlVertex3V(ll);
 					rlTexCoord2f(spr->view.uv[0] * 1.0f, spr->view.uv[1] * 1.0f);
-					rlVertex3V(c);
+					rlVertex3V(lr);
 					rlTexCoord2f(spr->view.uv[0] * 1.0f, 0.0f);
-					rlVertex3V(d);
+					rlVertex3V(ur);
 					rlTexCoord2f(0.0f, 0.0f);
-					rlVertex3V(a);
+					rlVertex3V(ul);
 
 					rlDrawRenderBatchActive();
 					rlEnd();
