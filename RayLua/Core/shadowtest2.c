@@ -1310,6 +1310,7 @@ static int projectonmono(int *plothead0, int *plothead1, bdrawctx *b) {
 			oy = mp[i].y - gcam.p.y;
 			//if (b->has_portal_clip)
 			//	LOOPADD(mp[i].pos)
+			// position on the camera plane in world space.
 			otp[on].x = oy * xformc - ox * xforms;
 			otp[on].y = mp[i].z - gcam.p.z;
 			otp[on].z = ox * xformc + oy * xforms;
@@ -2075,10 +2076,10 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 					else if (!m) f = sec[verts[0].s].z[0]; //
 					else f = sec[verts[(m - 1) >> 1].s].z[0];
 					b->gflags = 0;
-					gentransform_trig(p3d_tosingl(npol2[0]),
-						p3d_tosingl(npol2[1]),
-						p3d_tosingl(npol2[2]),b);
-					//gentransform_wall(npol2, sur, b);
+					//gentransform_trig(p3d_tosingl(npol2[0]),
+					//	p3d_tosingl(npol2[1]),
+					//	p3d_tosingl(npol2[2]),b);
+					gentransform_wall(npol2, sur, b);
 				}
 				b->gligwall = w;
 				b->gligslab = m;
@@ -2176,6 +2177,17 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy) {
 	int sec=-1,wal=-1,spr =-1;
 	point3d hit;
 	point3d f = p3sum(cc->p,cc->f);
+
+	//transform t = TR_ONE; // p = (0,0,0)
+	//// rotate 90deg around Z: r=(0,1,0), d=(-1,0,0), f=(0,0,1)
+	//t.r = (point3d){0,  1, 0};
+	//t.d = (point3d){0, 0, 1};
+	//t.f = (point3d){-1,  0, 0};
+//
+	//point3d world_pt = {1, 1, 0.5};
+	//point3d local = p3_world_to_local(world_pt, t);
+	//point3d localR = p3_local_to_world(local, &t);
+	//// Expected: (1, 0, 0)
 
 	draw_hsr_polymost_ctx(map, &bs);
 }
