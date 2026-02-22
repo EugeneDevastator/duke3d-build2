@@ -457,7 +457,7 @@ void PickgrabUpdate() {
 		changesprisect_imp(grabfoc.spri, s, map);
 	}
 	else if (ISGRABCAP) {
-		point3d newpos = p3_local_to_world(virt_incam_tr.p, &cam->tr);
+		point3d newpos = p3_local_to_world(virt_incam_tr.p, cam->tr);
 		if (false) // grab entire sect
 		{
 			loopn =2;
@@ -469,7 +469,7 @@ void PickgrabUpdate() {
 		}
 		else if (true)
 		{
-			float newz = p3_local_to_world(virt_incam_tr.p, &cam->tr).z;
+			float newz = p3_local_to_world(virt_incam_tr.p, cam->tr).z;
 			int isflor = grabfoc.wal + 2;
 			GRABSEC.z[isflor] = newz;
 			if (IsKeyDown(KEY_LEFT_SHIFT)) {

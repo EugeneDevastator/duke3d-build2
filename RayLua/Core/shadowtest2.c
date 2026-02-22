@@ -169,6 +169,7 @@ int intersect_traps_mono3d(double x0, double y0, double x1, double y1, double z0
 	double fx, fy, fz;
 	int i, j, h0, h1;
 #define PXF(aa,bb,cc) portal_xform_world_fullr(aa,bb,cc,b)
+#define PXFNEW(aa,bb,cc) p3d_transformed((dpoint3d){aa,bb,cc}, b->world_transform)
 	//0123,0213,0231,2013,2031,2301
 	//LOOPEND
 	if (z0 < z2) {
@@ -958,21 +959,6 @@ static void emit_wallpoly_func(int rethead0, int rethead1, bdrawctx *b) {
 	bool shared_end = iseyeshared(chain_starts[0] + chain_lengths[0] - 1,
 	                              chain_starts[1] + chain_lengths[1] - 1);
 
-//	if (shared_start) {
-//		int clipstart = (chain_lengths[1] >= chain_lengths[0]) ? 1 : 0;
-//		if (chain_lengths[clipstart] > 1) {
-//			chain_starts[clipstart]++;
-//			chain_lengths[clipstart]--;
-//		}
-//	}
-//
-//	if (shared_end) {
-//		int clipend = (chain_lengths[1] >= chain_lengths[0]) ? 1 : 0;
-//		if (chain_lengths[clipend] > 1) {
-//			chain_lengths[clipend]--;
-//		}
-//	}
-
 	int total_vertices = chain_lengths[0] + chain_lengths[1];
 	if (total_vertices < 3) return;
 	int max_triangles = total_vertices;
@@ -1750,6 +1736,12 @@ The b parameter is a bunch index - this function processes one "bunch" (visible 
 // l1 l2 never interact with one another, or we'll explode into multitudes of polys.
 // when l1 is clipped by solid it id clipped for good and emitter as lightpoly, together with main poly.
 // in the end we hack shadows by simple subtraction - not mathematically correct but work for env with lots of lights.
+
+int mono_ins_tf(int i, double nx, double ny, double nz, bdrawctx* b) {
+	dpoint3d np = {nx,ny,nz};
+	portal_xform_world_fullr(nx,ny,nz,b);
+	mono_ins(i,np.x,np.y,np.z);
+}
 
 static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 	alphamul=1;

@@ -299,12 +299,12 @@ static inline void tr_normalize(transform *tr) {
 
 
 
-static inline dpoint3d p3d_local_to_world(dpoint3d local_pos, transform *tr) {
+static inline dpoint3d p3d_local_to_world(dpoint3d local_pos, transform tr) {
 	//RFD FIXED
 	dpoint3d world;
-	world.x = tr->p.x + local_pos.x * tr->r.x + local_pos.y * tr->f.x + local_pos.z * tr->d.x;
-	world.y = tr->p.y + local_pos.x * tr->r.y + local_pos.y * tr->f.y + local_pos.z * tr->d.y;
-	world.z = tr->p.z + local_pos.x * tr->r.z + local_pos.y * tr->f.z + local_pos.z * tr->d.z;
+	world.x = tr.p.x + local_pos.x * tr.r.x + local_pos.y * tr.f.x + local_pos.z * tr.d.x;
+	world.y = tr.p.y + local_pos.x * tr.r.y + local_pos.y * tr.f.y + local_pos.z * tr.d.y;
+	world.z = tr.p.z + local_pos.x * tr.r.z + local_pos.y * tr.f.z + local_pos.z * tr.d.z;
 
 	return world;
 }
@@ -337,16 +337,16 @@ static inline dpoint3d p3d_world_to_local(dpoint3d world_pos, transform *tr) {
 
 	return local;
 }
-static inline point3d p3_local_to_world(point3d local_pos, transform *tr) {
+static inline point3d p3_local_to_world(point3d local_pos, const transform tr) {
 	//RFD FIXED
 	point3d world;
-	world.x = tr->p.x + local_pos.x * tr->r.x + local_pos.y * tr->f.x + local_pos.z * tr->d.x;
-	world.y = tr->p.y + local_pos.x * tr->r.y + local_pos.y * tr->f.y + local_pos.z * tr->d.y;
-	world.z = tr->p.z + local_pos.x * tr->r.z + local_pos.y * tr->f.z + local_pos.z * tr->d.z;
+	world.x = tr.p.x + local_pos.x * tr.r.x + local_pos.y * tr.f.x + local_pos.z * tr.d.x;
+	world.y = tr.p.y + local_pos.x * tr.r.y + local_pos.y * tr.f.y + local_pos.z * tr.d.y;
+	world.z = tr.p.z + local_pos.x * tr.r.z + local_pos.y * tr.f.z + local_pos.z * tr.d.z;
 
 	return world;
 }
-static inline point3d p3_local_to_world_vector(point3d local_vec, transform *space) {
+static inline point3d p3_local_to_world_vec(point3d local_vec, transform *space) {
 	//RFD FIXED
 	point3d world;
 	world.x = local_vec.x * space->r.x + local_vec.y * space->f.x + local_vec.z * space->d.x;
@@ -409,18 +409,34 @@ static inline transform tr_world_to_local(const transform transformed, const tra
 static inline transform tr_local_to_world(const transform subject, transform space) {
 	// World -> camera space (using ctin)
 	transform ret;
-	ret.p = p3_local_to_world(subject.p, &space);
-	ret.r = p3_local_to_world_vector(subject.r, &space);
-	ret.f = p3_local_to_world_vector(subject.f, &space);
-	ret.d = p3_local_to_world_vector(subject.d, &space);
+	ret.p = p3_local_to_world(subject.p, space);
+	ret.r = p3_local_to_world_vec(subject.r, &space);
+	ret.f = p3_local_to_world_vec(subject.f, &space);
+	ret.d = p3_local_to_world_vec(subject.d, &space);
 
 	return ret;
 }
+static inline void tr_transform_apply(transform *subject, transform space) {
+	*subject = tr_local_to_world(*subject,space);
+}
+static inline transform tr_transformed(const transform subject, transform space) {
+	return tr_local_to_world(subject,space);
+}
+static inline point3d p3_transformed(const point3d p, transform space) {
+	return p3_local_to_world(p,space);
+}
 
+static inline void p3d_transform_apply(dpoint3d *dp, transform space) {
+	*dp = p3d_local_to_world(*dp,space);
+}
+
+static inline dpoint3d p3d_transformed(const dpoint3d dp, const transform space) {
+	return p3d_local_to_world(dp,space);
+}
 static inline void p3_transform_wccw(point3d *pinout, transform *camspace, transform *outspace) {
 	// todo - remove
 	point3d pl = p3_world_to_local(*pinout,*camspace);
-	*pinout = p3_local_to_world(pl,outspace);
+	*pinout = p3_local_to_world(pl,*outspace);
 }
 
 static inline void p3d_transform_cam_wccw(dpoint3d *pinout, cam_t *camspace, cam_t *outspace) {
