@@ -2500,10 +2500,17 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 			}
 
 		} else { // SETUP PORTAL ENTRY WITH WCCW TRANSFORM
+			// problem with floors is multiple redraw,
+			// we must be sure that we go into portal only after we submitted all floopr parts fort sector
+			// and then also joined them
+			// but for water it is worse because of sector break, so likely we need wccw for points...
+			// transform all to main cam space
+			// use wccw, replace with bake later. ecause we will be transforming: pt in portal space back to world?
+			// also bord is likely only needed for z clip
+
+
 			//drawpol_befclip(gcam.cursect-taginc, gcam.cursect, gcam.cursect,	b->chead[0],b->chead[1], 8|3 , b);
 			int res = -1;
-
-		//	mphremoveaboveincl(b->tagoffset); // clean anything above.
 			{
 				if (n < 3) {
 					printf("n<3 2");
@@ -2517,7 +2524,6 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 					printf("bordok not");
 					continue;
 				}
-
 
 				int portaltag = b->tagoffset - 1;
 				int newtag = gcam.cursect + b->tagoffset;
@@ -2562,10 +2568,7 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 				}
 
 				mono_bool(whead[0], whead[1], bh1, bh2,MONO_BOOL_AND, b, changetagfunc);
-				//for int
-				//mono_dbg_capture_mph(mphnum - 1, "reprojected");
-				//	mono_deloop(bh1);
-				//	mono_deloop(bh2);
+
 			}
 		}
 
