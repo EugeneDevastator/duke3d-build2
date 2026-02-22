@@ -247,13 +247,13 @@ static inline point3d p3_normalized(point3d v) {
 #if 1 // ===================== TRANSFORMS ==========================
 
 static inline transform tr_invert(const transform t) {
-    transform inv;
+	transform inv;
 
-    // Transpose: column i of original becomes row i of inverse
-    // Original matrix columns are [r, d, f] = [X, Z, Y]
-    inv.r.x = t.r.x; inv.r.y = t.d.x; inv.r.z = t.f.x;  // X row
+	// Transpose: column i of original becomes row i of inverse
+	// Original matrix columns are [r, d, f] = [X, Z, Y]
+	inv.r.x = t.r.x; inv.r.y = t.d.x; inv.r.z = t.f.x;  // X row
 	inv.d.x = t.r.y; inv.d.y = t.d.y; inv.d.z = t.f.y;  // Y row
-    inv.f.x = t.r.z; inv.f.y = t.d.z; inv.f.z = t.f.z;  // Z row
+	inv.f.x = t.r.z; inv.f.y = t.d.z; inv.f.z = t.f.z;  // Z row
 
 
 	// inv.p = -M^T * t.p
@@ -261,25 +261,8 @@ static inline transform tr_invert(const transform t) {
 	inv.p.y = -(t.p.x * t.d.x + t.p.y * t.d.y + t.p.z * t.d.z);
 	inv.p.z = -(t.p.x * t.f.x + t.p.y * t.f.y + t.p.z * t.f.z);
 
-    return inv;
-}
-static inline transform tr_invert(const transform t) {
-	transform inv;
-
-	// Transpose: [r,d,f] = [X,Y,Z] columns become rows
-	inv.r.x = t.r.x; inv.r.y = t.d.x; inv.r.z = t.f.x;  // X row
-	inv.d.x = t.r.y; inv.d.y = t.d.y; inv.d.z = t.f.y;  // Y row
-	inv.f.x = t.r.z; inv.f.y = t.d.z; inv.f.z = t.f.z;  // Z row
-
-	// Position: -t.p dotted with each transposed row
-	inv.p.x = -(t.p.x * inv.r.x + t.p.y * inv.r.y + t.p.z * inv.r.z);
-	inv.p.y = -(t.p.x * inv.d.x + t.p.y * inv.d.y + t.p.z * inv.d.z);
-	inv.p.z = -(t.p.x * inv.f.x + t.p.y * inv.f.y + t.p.z * inv.f.z);
-
 	return inv;
 }
-
-
 
 static inline bool tr_is_flipped(transform *tr) {
 	// Calculate determinant of the 3x3 rotation matrix

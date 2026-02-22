@@ -144,8 +144,8 @@ free((arena).data); \
 #define SPRITE_SEMI_TRANSPARENT (1 << 1)   // 2
 #define SPRITE_FLIP_X           (1 << 2)   // 4
 #define SPRITE_FLIP_Y           (1 << 3)   // 8
-#define SPRITE_WALL_ALIGNED     (1 << 4)   // 16
-#define SPRITE_FLOOR_ALIGNED    (1 << 5)   // 32
+#define SPRITE_IS_WALL_PLANE     (1 << 4)   // 16
+#define SPRITE_IS_FLOOR_PLANE    (1 << 5)   // 32
 #define SPRITE_ONE_SIDED        (1 << 6)   // 64
 #define SPRITE_TRUE_CENTERED    (1 << 7)   // 128
 #define SPRITE_HITSCAN          (1 << 8)   // 256
@@ -412,6 +412,8 @@ typedef struct // surf_t
 	enum fragRenderMode frMode;
 // ------------
 	uint8_t reflection_strength;
+	uint8_t pass_strength;
+	uint8_t absorb_strength; // can be infered 1-pass-refl.
 	uint8_t ior;
 
 	unsigned short asc, rsc, gsc, bsc; //4096 is no change
