@@ -105,15 +105,15 @@ class DumbRender {
 public:
 
 	// ===================== HELPERS
+	// tries to align to camera vertical plane
 	static void EnterPlaneBoardSpace(Vector3 origin, Vector3 verticalAxis, Camera3D cam) {
-		rlDisableBackfaceCulling();
 		// Normalize vertical axis
 		float axisLen = Vector3Length(verticalAxis);
 		if (axisLen < 0.001f) return;
 		Vector3 axis = Vector3Normalize(verticalAxis);
 
-		// Get camera's forward direction (normalized)
-		Vector3 camForward = Vector3Subtract(cam.target, cam.position);
+		// Get camera's forward direction (normalized) and flip it
+		Vector3 camForward = Vector3Subtract(cam.position, cam.target);
 		camForward = Vector3Normalize(camForward);
 
 		// Project camera forward onto plane perpendicular to axis
@@ -135,11 +135,24 @@ public:
 			facing = Vector3CrossProduct(right, axis);
 		} else {
 			facing = Vector3Normalize(camForwardProjected);
-			right = Vector3CrossProduct(axis, facing);
+			right = Vector3CrossProduct(facing, axis);
 			right = Vector3Normalize(right);
 		}
 
-	static void EnterBillboardSpace(Vector3 origin, Vector3 verticalAxis, Camera3D cam) {
+		// Build transformation matrix (column-major)
+		// Local space: X = right, Y = axis (vertical), Z = facing
+		Matrix transform = {
+			-right.x, axis.x, facing.x, origin.x,
+			-right.y, axis.y, facing.y, origin.y,
+			-right.z, axis.z, facing.z, origin.z,
+			0, 0, 0, 1
+		};
+
+		rlPushMatrix();
+		rlMultMatrixf(MatrixToFloat(transform));
+	}
+
+	static void EnterCylBoardSpace(Vector3 origin, Vector3 verticalAxis, Camera3D cam) {
 		// Normalize vertical axis
 		float axisLen = Vector3Length(verticalAxis);
 		if (axisLen < 0.001f) return;
@@ -184,7 +197,7 @@ public:
 		rlMultMatrixf(MatrixToFloat(transform));
 	}
 
-	static void ExitBillboardSpace(void) {
+	static void ExitCylBoardSpace(void) {
 		rlPopMatrix();
 	}
 
@@ -1501,7 +1514,7 @@ public:
 				float mul = 5;
 				rlColor4f(1 * mul, 1 * mul, 1 * mul, 1); // todo update transp.
 				if (spr->view.rflags.vert_mode == vmode_billbord) {
-					EnterBillboardSpace(pos, dw*-1, rlcam);
+					EnterPlaneBoardSpace(pos, dw*-1, rlcam);
 					a=aB;
 					b=bB;
 					c=cB;
@@ -1533,7 +1546,7 @@ public:
 				}
 
 				if (spr->view.rflags.vert_mode == vmode_billbord)
-					ExitBillboardSpace();
+					ExitCylBoardSpace();
 			}
 		}
 		EndShaderMode();
