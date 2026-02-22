@@ -925,7 +925,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 						spr->r.y =-cos((float)b7spr.ang*PI/1024.0)*(b7spr.xrepeat/4096.0*(float)GET_TILSIZEX_PTR(spr));
 						spr->d.x = cos((float)b7spr.ang*PI/1024.0)*(b7spr.yrepeat/4096.0*(float)GET_TILSIZEY_PTR(spr));
 						spr->d.y = sin((float)b7spr.ang*PI/1024.0)*(b7spr.yrepeat/4096.0*(float)GET_TILSIZEY_PTR(spr));
-						int upvec = b7spr.cstat&(SPRITE_FLIP_Y) ? 1 : -1;
+						int upvec = b7spr.cstat&(SPRITE_FLIP_Y) ? -1 : 1;
 						spr->f = (point3d){0,0,upvec}; // facing up
 						spr->r = (point3d){spr->r.x *upvec, spr->r.y*upvec, spr->r.z};
 						//if (b7spr.cstat&SPRITE_HITSCAN) { spr->d.x *= -1; spr->d.y *= -1; spr->d.z*=-1; }
