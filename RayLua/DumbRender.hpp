@@ -1499,12 +1499,6 @@ public:
 				float zanc = 1-spr->view.anchor.z;
 				float xanc = spr->view.anchor.x;
 
-				// pos += frw * 0.00001; // bias agains fighting
-				Vector3 a = pos + rg * spr->view.anchor.x * 2 + dw * zanc * 2;
-				Vector3 b = pos + rg * spr->view.anchor.x * 2 - dw * (1 - zanc) * 2;
-				Vector3 c = pos - rg * (1 - spr->view.anchor.x) * 2 - dw * (1 - zanc) * 2;
-				Vector3 d = pos - rg * (1 - spr->view.anchor.x) * 2 + dw * zanc * 2;
-
 				float rlen = Vector3Length(rg);
 				float dlen = Vector3Length(dw);
 				float xwsize = rlen*2;
@@ -1520,28 +1514,19 @@ public:
 				Vector3 ul = {ll.x , ll.y+ ywsize,0};
 				Vector3 ur = {lr.x, ul.y,0};
 
-
-				//Vector3 aB = {rlen * spr->view.anchor.x * 2, -dlen * zanc * 2,0};
-				//Vector3 bB = {rlen * spr->view.anchor.x * 2, +dlen * (1 - zanc) * 2,0};
-				//Vector3 cB = {(rlen*-1) * (1 - spr->view.anchor.x) * 2, +dlen * (1 - zanc) * 2};
-				//Vector3 dB = {(rlen*-1) * (1 - spr->view.anchor.x) * 2, - dlen * zanc * 2};
-
 				// Debug vectors
 				DrawTransform(&usetr);
 				float mul = 5;
 				rlColor4f(1 * mul, 1 * mul, 1 * mul, 1); // todo update transp.
 				if (spr->view.rflags.vert_mode == vmode_billbord) {
 					EnterCylBoardSpace(pos, dw*-1, rlcam);
-					a=ll;
-					b=lr;
-					c=ur;
-					d=ul;
+
 				}
 				if (spr->view.rflags.vert_mode == vmode_quad) {
-					ll = pos + rg * 2 * xanc + dw*2*zanc;
-					lr = pos - rg * 2 * (1-xanc) + dw*2*zanc;
-					ur = pos - rg * 2 * (1-xanc) - dw*2*(1-zanc);
-					ul = pos + rg * 2 * xanc - dw*2*(1-zanc);
+					ll = pos + rg * 2 * xanc + dw * 2 * zanc;
+					lr = ll - rg * 2;
+					ur = lr - dw * 2;
+					ul = ll - dw * 2;
 				}
 					{
 					EnableDepthOffset(-2.0);
