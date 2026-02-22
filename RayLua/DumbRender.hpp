@@ -105,6 +105,39 @@ class DumbRender {
 public:
 
 	// ===================== HELPERS
+	static void EnterPlaneBoardSpace(Vector3 origin, Vector3 verticalAxis, Camera3D cam) {
+		rlDisableBackfaceCulling();
+		// Normalize vertical axis
+		float axisLen = Vector3Length(verticalAxis);
+		if (axisLen < 0.001f) return;
+		Vector3 axis = Vector3Normalize(verticalAxis);
+
+		// Get camera's forward direction (normalized)
+		Vector3 camForward = Vector3Subtract(cam.target, cam.position);
+		camForward = Vector3Normalize(camForward);
+
+		// Project camera forward onto plane perpendicular to axis
+		float dot = Vector3DotProduct(camForward, axis);
+		Vector3 camForwardProjected = Vector3Subtract(camForward, Vector3Scale(axis, dot));
+		float projLen = Vector3Length(camForwardProjected);
+
+		Vector3 right;
+		Vector3 facing;
+
+		if (projLen < 0.001f) {
+			// Camera forward aligned with axis, use fallback
+			Vector3 up = {0, 1, 0};
+			if (fabsf(Vector3DotProduct(axis, up)) > 0.99f) {
+				up = {1, 0, 0};
+			}
+			right = Vector3CrossProduct(axis, up);
+			right = Vector3Normalize(right);
+			facing = Vector3CrossProduct(right, axis);
+		} else {
+			facing = Vector3Normalize(camForwardProjected);
+			right = Vector3CrossProduct(axis, facing);
+			right = Vector3Normalize(right);
+		}
 
 	static void EnterBillboardSpace(Vector3 origin, Vector3 verticalAxis, Camera3D cam) {
 		// Normalize vertical axis
