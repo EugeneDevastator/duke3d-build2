@@ -418,24 +418,14 @@ static inline transform tr_local_to_world(const transform subject, transform spa
 }
 
 static inline void p3_transform_wccw(point3d *pinout, transform *camspace, transform *outspace) {
-	//RFD FIXED
-	// World -> camera space (using camspace)
-	double dx = pinout->x - camspace->p.x;
-	double dy = pinout->y - camspace->p.y;
-	double dz = pinout->z - camspace->p.z;
-
-	double cx = dx * camspace->r.x + dy * camspace->r.y + dz * camspace->r.z;
-	double cy = dx * camspace->f.x + dy * camspace->f.y + dz * camspace->f.z;
-	double cz = dx * camspace->d.x + dy * camspace->d.y + dz * camspace->d.z;
-
-	// Camera space -> world (using outspace)
-	pinout->x = cx * outspace->r.x + cy * outspace->f.x + cz * outspace->d.x + outspace->p.x;
-	pinout->y = cx * outspace->r.y + cy * outspace->f.y + cz * outspace->d.y + outspace->p.y;
-	pinout->z = cx * outspace->r.z + cy * outspace->f.z + cz * outspace->d.z + outspace->p.z;
+	// todo - remove
+	point3d pl = p3_world_to_local(*pinout,*camspace);
+	*pinout = p3_local_to_world(pl,outspace);
 }
 
 static inline void p3d_transform_cam_wccw(dpoint3d *pinout, cam_t *camspace, cam_t *outspace) {
-	//p3d_transform_wccw(pinout, &camspace->tr, &outspace->tr);
+	// todo - remove
+	p3d_transform_wccw(pinout, &camspace->tr, &outspace->tr);
 }
 
 
