@@ -76,6 +76,7 @@ extern "C" {
 uint16_t edselmode = SEL_ALL; // claude - use this.
 
 #define ISGRABSPRI (grabfoc.spri >= 0)
+#define ISHOVERSPRI (hoverfoc.spri >= 0)
 #define ISGRABWAL (grabfoc.wal >= 0 && grabfoc.sec >= 0)
 #define ISGRABCAP (grabfoc.wal < 0 && grabfoc.sec >= 0)
 #define ISHOVERWAL (hoverfoc.wal >= 0 && hoverfoc.sec >= 0)

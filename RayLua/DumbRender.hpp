@@ -103,6 +103,61 @@ static cam_t localb2cam;
 static Texture2D* galtextures[16];
 class DumbRender {
 public:
+
+	// ===================== HELPERS
+
+	static void EnterBillboardSpace(Vector3 origin, Vector3 verticalAxis, Camera3D cam) {
+		// Normalize vertical axis
+		float axisLen = Vector3Length(verticalAxis);
+		if (axisLen < 0.001f) return;
+		Vector3 axis = Vector3Normalize(verticalAxis);
+
+		// Get direction from origin to camera
+		Vector3 toCamera = Vector3Subtract(cam.position, origin);
+
+		// Project toCamera onto plane perpendicular to axis
+		float dot = Vector3DotProduct(toCamera, axis);
+		Vector3 toCameraProjected = Vector3Subtract(toCamera, Vector3Scale(axis, dot));
+		float projLen = Vector3Length(toCameraProjected);
+
+		Vector3 right;
+		Vector3 facing;
+
+		if (projLen < 0.001f) {
+			// Camera aligned with axis, use fallback
+			Vector3 up = {0, 1, 0};
+			if (fabsf(Vector3DotProduct(axis, up)) > 0.99f) {
+				up = {1, 0, 0};
+			}
+			right = Vector3CrossProduct(axis, up);
+			right = Vector3Normalize(right);
+			facing = Vector3CrossProduct(right, axis);
+		} else {
+			facing = Vector3Normalize(toCameraProjected);
+			right = Vector3CrossProduct(axis, facing);
+			right = Vector3Normalize(right);
+		}
+
+		// Build transformation matrix (column-major)
+		// Local space: X = right, Y = axis (vertical), Z = facing (toward camera)
+		Matrix transform = {
+			right.x, axis.x, facing.x, origin.x,
+			right.y, axis.y, facing.y, origin.y,
+			right.z, axis.z, facing.z, origin.z,
+			0, 0, 0, 1
+		};
+
+		rlPushMatrix();
+		rlMultMatrixf(MatrixToFloat(transform));
+	}
+
+	static void ExitBillboardSpace(void) {
+		rlPopMatrix();
+	}
+
+	// ===================================================
+
+
 	inline static Texture2D* galtextures[16] = {nullptr};
 	static mapstate_t *GetMap() {
 		return map;
@@ -1372,7 +1427,7 @@ public:
 		rlEnableDepthTest();
 		// draw sprites.
 		BeginShaderMode(atestShader);
-//		for (int i = 0; i < map->numspris; i++) {
+		//		for (int i = 0; i < map->numspris; i++) {
 		for (int i = 0; i < spripoln; i++) {
 			spripoly_t spol = spripol[i];
 			spri_t *spr = &map->spri[spripol[i].sprid];
@@ -1387,24 +1442,42 @@ public:
 
 				Texture2D spriteTex = galtextures[spol.galnum][spol.tilnum];
 				// vectors are half a size
-				transform usetr =  spol.tr;
+				transform usetr = spol.tr;
 				Vector3 rg = {usetr.r.x, -usetr.r.z, usetr.r.y};
 				Vector3 dw = {usetr.d.x, -usetr.d.z, usetr.d.y};
 				Vector3 frw = {usetr.f.x, -usetr.f.z, usetr.f.y};
 				Vector3 pos = {usetr.p.x, -usetr.p.z, usetr.p.y};
 				auto xs = Vector3Length(rg);
 				auto ys = Vector3Length(dw);
+
 				// pos += frw * 0.00001; // bias agains fighting
 				Vector3 a = pos + rg * spr->view.anchor.x * 2 + dw * spr->view.anchor.z * 2;
 				Vector3 b = pos + rg * spr->view.anchor.x * 2 - dw * (1 - spr->view.anchor.z) * 2;
 				Vector3 c = pos - rg * (1 - spr->view.anchor.x) * 2 - dw * (1 - spr->view.anchor.z) * 2;
 				Vector3 d = pos - rg * (1 - spr->view.anchor.x) * 2 + dw * spr->view.anchor.z * 2;
+
+				float rlen = Vector3Length(rg);
+				float dlen = Vector3Length(dw);
+				Vector3 aB = {rlen * spr->view.anchor.x * 2, -dlen * spr->view.anchor.z * 2,0};
+				Vector3 bB = {rlen * spr->view.anchor.x * 2, +dlen * (1 - spr->view.anchor.z) * 2,0};
+				Vector3 cB = {(rlen*-1) * (1 - spr->view.anchor.x) * 2, +dlen * (1 - spr->view.anchor.z) * 2};
+				Vector3 dB = {(rlen*-1) * (1 - spr->view.anchor.x) * 2, - dlen * spr->view.anchor.z * 2};
+
 				// Debug vectors
 				DrawTransform(&usetr);
 				float mul = 5;
-				rlColor4f(1*mul, 1*mul, 1*mul, 1); // todo update transp.
-
+				rlColor4f(1 * mul, 1 * mul, 1 * mul, 1); // todo update transp.
+				if (spr->view.rflags.vert_mode == vmode_billbord) {
+					EnterBillboardSpace(pos, dw*-1, rlcam);
+					a=aB;
+					b=bB;
+					c=cB;
+					d=dB;
+				}
 				if (spr->view.rflags.vert_mode == vmode_quad) {
+
+				}
+					{
 					EnableDepthOffset(-2.0);
 
 					rlSetTexture(spriteTex.id);
@@ -1424,25 +1497,10 @@ public:
 					rlEnd();
 					DisableDepthOffset();
 					rlSetTexture(0);
-				} else if (spr->view.rflags.vert_mode == vmode_billbord) // billboards
-				{
-					// Vector3 up =
-					float xscaler = spr->view.uv[0];
-					float yscaler = spr->view.uv[1];
-					xs *= 2;
-					ys *= 2;
-					// need to shift view position for raylib's billboard.
-					Vector3 centeroffset = rg * ((spr->view.anchor.x - 0.5)) * 2 + dw * (spr->view.anchor.z - 0.5f) * 2;
-					Vector3 pos = {usetr.p.x, -usetr.p.z, usetr.p.y};
-					pos += centeroffset;
-					//pos.x+=xs;
-					//pos.z-=ys;
-					rlColor4f(1*mul, 1*mul, 1*mul, 1); // todo update transp.
-
-					Rectangle source = {0.0f, 0.0f, (float) spriteTex.width, (float) spriteTex.height};
-					DrawBillboardRec(rlcam, spriteTex, source, pos, {xs * xscaler, ys * yscaler}, WHITE);
-					//  DrawBillboardPro(rlcam,spriteTex,source, pos, dw, {xs * xscaler, ys * yscaler}, {0,0},30, WHITE);
 				}
+
+				if (spr->view.rflags.vert_mode == vmode_billbord)
+					ExitBillboardSpace();
 			}
 		}
 		EndShaderMode();

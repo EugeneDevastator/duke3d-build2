@@ -790,7 +790,11 @@ if (ISHOVERWAL) {
     ImGui::Text("NCsw:%i %i",HOVERWAL.nschain, HOVERWAL.nwchain);
     ImGui::Text("flags: %i %d", HOVERWAL.surf.asc, HOVERWAL.surf.alpha);// need show as uint32_t binary with zeros.
 }
-
+    if (ISHOVERSPRI) {
+        int til = map->spri[hoverfoc.spri].tilnum;
+        int gal = map->spri[hoverfoc.spri].galnum;
+        ImGui::Text("T: %i, \n xof,yof: %i,%i", til, g_gals[gal].picanm_data[til].x_center_offset,g_gals[gal].picanm_data[til].y_center_offset);
+    }
     ImGui::End();
 }
 
@@ -947,7 +951,7 @@ void MainLoop() {
     loadgal(0, "c:/Eugene/Games/build2/");
     loadgal(1, "c:/Eugene/Games/build2/Content/GAL_002_SW/");
     DumbRender::LoadTexturesToGPU();
-    DumbRender::Init("c:/Eugene/Games/build2/uv.map");
+    DumbRender::Init("c:/Eugene/Games/build2/spr.map");
     auto map = DumbRender::GetMap();
     DumbCore::Init(map);
     SetTargetFPS(60);
