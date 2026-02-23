@@ -30,7 +30,8 @@ typedef struct {
 #define MPH_SHADE 2
 //Mono Polygon Head
 typedef struct {
-	int head[2], tag;
+	int head[2];
+	uint32_t tag;
 	uint8_t semantic; //
 } mph_t;
 
@@ -117,7 +118,7 @@ typedef struct {
 	bool ismirrored;
 	bool istrimirror;
 	int recursion_depth;
-	int tagoffset;
+	uint32_t tagoffset;
 	int testignorewall;
 	int ignorekind;
 	int testignoresec;

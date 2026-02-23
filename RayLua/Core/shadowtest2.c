@@ -61,7 +61,7 @@ eyepols are generated from mono space AND plane equation stored in gouvmat.
 #define DP_PRESERVE_LOOP 64
 #define DP_ADD_AS_PROJECTOR 128
 
-#define MAX_PORTAL_DEPTH 2
+#define MAX_PORTAL_DEPTH 6
 
 #define RM_LIGHTS 4
 #define RM_GEO 1
@@ -1222,9 +1222,6 @@ static int projectonmono(int *plothead0, int *plothead1, bdrawctx *b) {
 		i = plothead[h];
 		do {
 			if (h) i = mp[i].p;
-			if (b->recursion_depth == 2) {
-				//	LOOPADDP(mp[i])
-			}
 			ox = mp[i].x - gcam.p.x;
 			oy = mp[i].y - gcam.p.y;
 			//if (b->has_portal_clip)
@@ -2295,8 +2292,7 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 		}
 
 		memset8(b->sectgot, 0, (map->numsects + 31) >> 3);
-		if (b->recursion_depth == 2)
-			int a = 1;
+
 		int passmphstart;
 		if (!b->has_portal_clip) {  // FIRST PASS ENTRY
 
@@ -2500,7 +2496,7 @@ static void draw_hsr_enter_portal(mapstate_t *map, int myport, int head1, int he
 	bool portalflipped = tr_is_flipped(&tgs.tr) ^ tr_is_flipped(&ent.tr);
 	// we need to know only about flip in current portal switch to flip or not to flip the opening.
 	newctx.ismirrored = portalflipped;
-	newctx.istrimirror = parentctx->ismirrored ^ portalflipped;
+	newctx.istrimirror = parentctx->istrimirror ^ portalflipped;
 	newctx.entrysec = portals[myport].sect;
 	newctx.recursion_depth = parentctx->recursion_depth + 1;
 	newctx.tagoffset = (newctx.recursion_depth) * taginc;
