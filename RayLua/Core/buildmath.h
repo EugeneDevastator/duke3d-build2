@@ -521,16 +521,6 @@ static inline void mp_to_world(double sx, double sy, bdrawctx *b, double *wx, do
 
 #endif
 #if 1 // ======================== MISC OPS ===========================
-// dont delete for now.
-static inline void portal_xform_world_at_z(double *x, double *y, double ref_z, bdrawctx *b) {
-	dpoint3d p;
-	p.x = *x;
-	p.y = *y;
-	p.z = ref_z;
-	p3d_transform_cam_wccw(&p, &b->cam, &b->orcam);
-	*x = p.x;
-	*y = p.y;
-}
 
 static inline dpoint3d p3d_normal_of_triangle(dpoint3d p0, dpoint3d p1, dpoint3d p2) {
 	dpoint3d v1, v2, normal;

@@ -19,21 +19,10 @@ void drawframe (cam_t *cc, player_transform *gdps, mapstate_t *gst) // draws sce
 	dpoint3d dp, dr, dd, df;
 	long i, j, k, l, m, flashlight1st;
 
-//	if (!moveindex) gst = &sst; else gst = &pst;
-	//gdps = &gst->p[viewindex];
-//	memcpy(&cps,&gst->p[viewindex],sizeof(playerstruct_t)); gdps = &cps; //FIX
-
-//	if (((!useLights) || (gdps->cursect < 0)) || (gdps->compact2d > 0.0))
-//	for(i=0,j=cc->z.f;i<cc->c.y;i++,j+=cc->z.p) memset8((void *)j,0x7f7f7f7f,cc->c.x<<2);
-
 	dp.x = 0.0; dp.y = 0.0; dp.z = 0.0;
 	dr.x = 1.0; dr.y = 0.0; dr.z = 0.0;
 	dd.x = 0.0; dd.y = 1.0; dd.z = 0.0;
 	df.x = 0.0; df.y = 0.0; df.z = 1.0;
-	//redundant?
-//	drawpoly_setup(                           (tiletype *)&cc->c,cc->z.f-cc->c.f,&dp,&dr,&dd,&df,gdps->ghx,gdps->ghy,gdps->ghz);
-//	drawcone_setup(cputype,shadowtest2_numcpu,(tiletype *)&cc->c,cc->z.f-cc->c.f,&dp,&dr,&dd,&df,gdps->ghx,gdps->ghy,gdps->ghz);
-//	 drawkv6_setup(&drawkv6_frame,            (tiletype *)&cc->c,cc->z.f-cc->c.f,&dp,&dr,&dd,&df,gdps->ghx,gdps->ghy,gdps->ghz);
 
 	cam.h.x = gdps->ghx; cam.h.y = gdps->ghy; cam.h.z = gdps->ghz;
 	//cam.h.x = gst->p[moveindex].ghx; //Needs many internal hacks! :/
@@ -106,21 +95,6 @@ void drawframe (cam_t *cc, player_transform *gdps, mapstate_t *gst) // draws sce
 					shadowtest2_numlights++;
 				}
 			}
-
-		//	drawkv6_numlights = shadowtest2_numlights;
-		//	for(i=shadowtest2_numlights-1;i>=0;i--)
-		//	{
-		//		drawkv6_light[i].sect      = shadowtest2_light[i].sect;
-		//		drawkv6_light[i].p         = shadowtest2_light[i].p;
-		//		drawkv6_light[i].rgb[0]    = shadowtest2_light[i].rgb[0];
-		//		drawkv6_light[i].rgb[1]    = shadowtest2_light[i].rgb[1];
-		//		drawkv6_light[i].rgb[2]    = shadowtest2_light[i].rgb[2];
-		//		drawkv6_light[i].useshadow =(shadowtest2_light[i].flags&1);
-		//		xformpos(&drawkv6_light[i].p.x,&drawkv6_light[i].p.y,&drawkv6_light[i].p.z);
-		//	}
-		//	drawkv6_ambrgb[0] = shadowtest2_ambrgb[0];
-		//	drawkv6_ambrgb[1] = shadowtest2_ambrgb[1];
-		//	drawkv6_ambrgb[2] = shadowtest2_ambrgb[2];
 
 			shadowtest2_rendmode = 2;
 			cam.cursect = gdps->cursect;

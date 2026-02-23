@@ -151,14 +151,14 @@ static inline void portal_xform_world_full(double *x, double *y, double *z, bdra
 	p.x = *x;
 	p.y = *y;
 	p.z = *z;
-	p3d_transform_cam_wccw(&p, &b->cam, &b->orcam);
+	p3d_transform_cam_wccw(&p, &b->movedcam, &b->orcam);
 	*x = p.x;
 	*y = p.y;
 	*z = p.z;
 }
 
 static inline void portal_xform_world_fullp(dpoint3d *inp, bdrawctx *b) {
-	p3d_transform_cam_wccw(inp, &b->cam, &b->orcam);
+	p3d_transform_cam_wccw(inp, &b->movedcam, &b->orcam);
 	//loops[loopnum] = *inp;
 	//loopuse[loopnum] = true;
 	//loopnum++;
@@ -319,7 +319,7 @@ inline void memset8(void *d, long v, long n) {
 }
 
 static int prepbunch(int id, bunchverts_t *twal, bdrawctx *b) {
-	cam_t gcam = b->cam;
+	cam_t gcam = b->movedcam;
 	wall_t *wal;
 	double f, x, y, x0, y0, x1, y1;
 	int i, n;
@@ -379,7 +379,7 @@ static int prepbunch(int id, bunchverts_t *twal, bdrawctx *b) {
 //   2: FRONT:GREEN(b1)
 //   3: UNSORTABLE!
 static int bunchfront(int b0, int b1, int fixsplitnow, bdrawctx *b) {
-	cam_t gcam = b->cam;
+	cam_t gcam = b->movedcam;
 	bunchverts_t *twal[2];
 	wall_t *wal;
 	double d, a[2], x0, y0, x1, y1, x2, y2, x3, y3, t0, t1, t2, t3;
@@ -541,7 +541,7 @@ static int bunchfront(int b0, int b1, int fixsplitnow, bdrawctx *b) {
 // This reduces draw calls and enables efficient floor/ceiling polygon generation
 
 static void scansector(int sectnum, bdrawctx *b) {
-	cam_t gcam = b->cam;
+	cam_t gcam = b->movedcam;
 
 #define BUNCHNEAR 1e-7
 	sect_t *sec;
@@ -777,7 +777,7 @@ static void scansector(int sectnum, bdrawctx *b) {
 }
 
 static void xformprep(double hang, bdrawctx *b) {
-	cam_t gcam = b->cam;
+	cam_t gcam = b->movedcam;
 	double f;
 	f = atan2(gcam.f.y, gcam.f.x) + hang; //WARNING: "f = 1/sqrt; c *= f; s *= f;" form has singularity - don't use :/
 	b->xformmatc = cos(f);
@@ -988,6 +988,8 @@ static void emit_wallpoly_func(int rethead0, int rethead1, bdrawctx *b) {
 		eyepol[eyepoln].shade = curMap->sect[b->gligsect].surf[b->gisflor].rsc / 8192.0f;
 	} else {
 		eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab % 3].uvcoords;
+		// must  transform uv vectors separately
+		//p3d_transform_wccw(eyepol[eyepoln].worlduvs.)
 		eyepol[eyepoln].uvform = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab % 3].uvform;
 		eyepol[eyepoln].pal = curMap->sect[b->gligsect].wall[b->gligwall].surf.pal;
 		eyepol[eyepoln].shade = curMap->sect[b->gligsect].wall[b->gligwall].surf.rsc / 8192.0f;
@@ -1047,11 +1049,11 @@ static void skytagfunc(int rethead0, int rethead1, bdrawctx *b) {
 static void emit_lighpol_func(int rethead0, int rethead1, bdrawctx *b) {
 
 	// skip polys in unseen sectors. can only skip drawing, to not ruin shadows.
-	if (!sectmask_was_marked(framesectgot, b->gligsect)) {
-		mono_deloop(rethead1);
-		mono_deloop(rethead0);
-		return;
-	}
+	//if (!sectmask_was_marked(framesectgot, b->gligsect)) {
+	//	mono_deloop(rethead1);
+	//	mono_deloop(rethead0);
+	//	return;
+	//}
 
 	cam_t usecam = b->orcam;
 	double *xform = b->oxformmat;
@@ -1240,6 +1242,7 @@ static int projectonmono(int *plothead0, int *plothead1, bdrawctx *b) {
 
 	//clip
 	n = 0;
+	// dont clip inside portal.
 	for (i = on - 1, j = 0; j < on; i = j, j++) {
 		if (otp[i].z >= BSCISDIST) {
 			tp[n] = otp[i];
@@ -1253,6 +1256,7 @@ static int projectonmono(int *plothead0, int *plothead1, bdrawctx *b) {
 			n++;
 		}
 	}
+
 	if (n < 3) {
 		return 0;
 	}
@@ -1312,7 +1316,11 @@ static int drawpol_befclip(int fromtag, int newtag, int fromsect, int newsect, i
 		mono_deloop(plothead1);
 		return 0;
 	}
-
+	if (b->istrimirror) { // flip mono chains if in mirrored world
+		int th = plothead0;
+		plothead0 =plothead1;
+		plothead1=th;
+	}
 	//LOOPEND
 	logstep("drawpol tag:%d nwtag:%d\n", fromtag, newtag);
 	b->gnewtagsect = newsect;
@@ -1625,7 +1633,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 	alphamul=1;
 	gtilenum = 0;
 	ggalnum = 0;
-	cam_t gcam = b->cam;
+	cam_t gcam = b->movedcam;
 	// === VARIABLE DECLARATIONS ===
 	//extern void loadpic (tile_t *);
 #define MAXVERTS 256 //FIX:timebomb: assumes there are never > 256 sectors connected at same vertex
@@ -1680,7 +1688,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			int nxs = sec[s].headspri;
 			while (nxs>0) {
 				//if (!(map->spri[nxs].flags & SPRITE_B2_IS_LIGHT))
-					drawspriteshadow(nxs,s,s,b->cam.tr, map, b);
+					drawspriteshadow(nxs,s,s,b->movedcam.tr, map, b);
 				nxs = map->spri[nxs].sectn;
 			};
 		}
@@ -1710,9 +1718,9 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		ggalnum = sec[s].surf[isflor].galnum;
 
 
-		float surfpos = getslopez(&sec[s], isflor, b->cam.p.x, b->cam.p.y);
+		float surfpos = getslopez(&sec[s], isflor, b->movedcam.p.x, b->movedcam.p.y);
 		bool drawcap=0;
-		if ((b->cam.p.z >= surfpos) == isflor) // ignore backfaces
+		if ((b->movedcam.p.z >= surfpos) == isflor) // ignore backfaces
 		{
 			//if( shadowtest2_rendmode == RM_LIGHTS && b->cam.cursect == s)// dont backface when in own sector for ceil lights,
 			//{
@@ -1751,7 +1759,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		// Build polygon for ceiling/floor using plane equation:
 		plothead[0] = -1;
 		plothead[1] = -1;
-		point3d locnorm = p3_world_to_local_vec(b->gnorm, b->cam.tr);
+		point3d locnorm = p3_world_to_local_vec(b->gnorm, b->movedcam.tr);
 		int ft=0;
 		if (drawcap)
 			ft = 1-isflor;
@@ -1801,7 +1809,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		//	newtag= s +b->tagoffset;
 		}
 		int touchwid = twal[0].i;
-		if (isportal && !noportals) {
+		if (false && isportal && !noportals) {
 			int endpn = portals[myport].destpn;
 			int ttag = b->tagoffset + taginc + portals[endpn].sect;
 			int portalpolyflags = ((isflor << 2) + 3) | DP_NO_SCANSECT;
@@ -1915,9 +1923,9 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			f = 1e-7; //FIXFIXFIXFIX:use ^ ?
 
 
-			if (!intersect_traps_mono(pol[0].x, pol[0].y, pol[1].x, pol[1].y, pol[0].z - f, pol[1].z - f, pol[2].z + f,
+			if (!intersect_traps_mono3d(pol[0].x, pol[0].y, pol[1].x, pol[1].y, pol[0].z - f, pol[1].z - f, pol[2].z + f,
 			                          pol[3].z + f, opolz[0] - f, opolz[1] - f, opolz[2] + f, opolz[3] + f,
-			                          &plothead[0], &plothead[1]))
+			                          &plothead[0], &plothead[1],b))
 				continue;
 
 			// Render wall segment if visible
@@ -1967,18 +1975,24 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			int surflag = ((m > vn) << 2) + 3;
 			int newtag = ns == -1 ? -1 : ns + b->tagoffset;
 			if (isportal) {
+				if (shadowtest2_rendmode == 4)
+					int aaa =1;
 				int endp = portals[myport].destpn;
-				int portalpolyflags = surflag | DP_NO_SCANSECT;
-				int portaltag = +b->tagoffset + taginc - 1;
+				int portalpolyflags = surflag | DP_NO_SCANSECT | DP_PRESERVE_LOOP;
+				int portaltag = b->tagoffset + taginc - 1;
 				int endpn = portals[myport].destpn;
 				int ttag = b->tagoffset + taginc + portals[endpn].sect;
 
-				alphamul = 0.3f;
+				//alphamul = 0.3f;
 				// emit this as poly for eyes only, non destructive unaffects mph.
-				drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1],
-					DP_PRESERVE_LOOP| DP_EMIT_MASK |1, b);
+				//drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1],
+				//	DP_PRESERVE_LOOP| DP_EMIT_MASK |1, b);
+				drawpol_befclip(s + b->tagoffset, ttag, s, portals[endpn].sect,
+					plothead[0], plothead[1], portalpolyflags, b);
 				alphamul = 1;
 				draw_hsr_enter_portal(map, myport, plothead[0], plothead[1], b);
+				// cover uncovered area with wall.
+				drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1], surflag, b);
 			} else if (st2_use_parallax_discards && wal[w].xsurf[m].flags & SURF_PARALLAX_DISCARD) {
 				ns = wal[w].ns;
 				newtag = ns + b->tagoffset;
@@ -2026,13 +2040,13 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy) {
 	bdrawctx bs;
 	loopnum = 0;
 	//operstopn=-1;
-	bs.cam = *cc;
+	bs.movedcam = *cc;
 	cc->fov_h = 1.047f;  // 60 degrees in radians
 	cc->fov_v = 0.785f;  // 45 degrees in radians
 	cc->persp_h = 1.0f;
 	cc->persp_v = 1.0f;
 
-	bs.movedcam = *cc;
+
 	bs.orcam = *cc;
 	bs.recursion_depth = 0;
 	bs.has_portal_clip = false;
@@ -2077,7 +2091,7 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 	b->bunchn = 0;
 	b->bunchmal = 0;
 	b->bunchgrid = 0;
-	cam_t gcam = b->cam;
+	cam_t gcam = b->movedcam;
 
 	if (gcam.cursect >= 0)
 		lastvalidsec = gcam.cursect;
@@ -2128,23 +2142,6 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 		mono_initonce();
 
 	if (shadowtest2_rendmode != 4) {
-		//Horrible hacks for internal build2 global variables
-		dpos.x = 0.0;
-		dpos.y = 0.0;
-		dpos.z = 0.0;
-		drig.x = 1.0;
-		drig.y = 0.0;
-		drig.z = 0.0;
-		ddow.x = 0.0;
-		ddow.y = 1.0;
-		ddow.z = 0.0;
-		dfor.x = 0.0;
-		dfor.y = 0.0;
-		dfor.z = 1.0;
-		//	drawpoly_setup(                           (tiletype *)&cam.c,cam.z.f-cam.c.f,&dpos,&drig,&ddow,&dfor,cam.h.x,cam.h.y,cam.h.z);
-		//drawcone_setup(cputype,shadowtest2_numcpu,(tiletype *)&cam.c,cam.z.f-cam.c.f,&dpos,&drig,&ddow,&dfor,cam.h.x,cam.h.y,cam.h.z);
-		// drawkv6_setup(&drawkv6_frame,            (tiletype *)&cam.c,cam.z.f-cam.c.f,&dpos,&drig,&ddow,&dfor,cam.h.x,cam.h.y,cam.h.z);
-
 		for (i = shadowtest2_numlights - 1; i >= 0; i--) {
 			//Transform shadowtest2_light to screen space
 			fp.x = shadowtest2_light[i].p.x - gcam.p.x;
@@ -2207,36 +2204,30 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 		} else {
 			halfplane = pass;
 		}
-		logstep("Pass start pass:%d, hfp:%d, depth:%d, camsec:%d", pass, halfplane, b->recursion_depth, b->cam.cursect);
+		logstep("Pass start pass:%d, hfp:%d, depth:%d, camsec:%d", pass, halfplane, b->recursion_depth, b->movedcam.cursect);
 		float large_bound = 1e9f;
 		float lightbound = 1e7f;
 		if (shadowtest2_rendmode == 4) {
-			if (!halfplane) gcam.r.x = 1;
-			else gcam.r.x = -1;
-			gcam.d.x = 0;
-			gcam.f.x = 0;
-			gcam.r.y = 0;
-			gcam.d.y = 0;
-			gcam.f.y = -gcam.r.x;
-			gcam.r.z = 0;
-			gcam.d.z = 1;
-			gcam.f.z = 0;
-			gcam.h.z = 21;
-			gcam.h.x = 21;
-			gcam.h.y = 21;
-			b->cam = gcam; // THAT IS IMPORTANT!
-			b->movedcam = gcam;
-			b->orcam = gcam;
-
-			xformprep(0.0, b);
-
-			if (!b->has_portal_clip) {
-				// store original if it is first context;
-				b->oxformmatc = b->xformmatc;
-				b->oxformmats = b->xformmats;
-				b->ognadd = b->gnadd;
-				memcpy(&b->oxformmat, &b->xformmat, sizeof(double) * 9);
+			if (!b->has_portal_clip) { // setup light camera onece per halfplane
+				if (!halfplane) gcam.r.x = 1;
+				else gcam.r.x = -1;
+				gcam.d.x = 0;
+				gcam.f.x = 0;
+				gcam.r.y = 0;
+				gcam.d.y = 0;
+				gcam.f.y = -gcam.r.x;
+				gcam.r.z = 0;
+				gcam.d.z = 1;
+				gcam.f.z = 0;
+				gcam.h.z = 21;
+				gcam.h.x = 21;
+				gcam.h.y = 21;
+				b->orcam = gcam;
+				b->movedcam = gcam;
 			}
+
+			// but do xform for each moved camera because of bunch sorting!
+			xformprep(0.0, b);
 
 			xformbac(-lightbound, -lightbound, 0.0, &bord2[0], b);
 			xformbac(+lightbound, -lightbound, 0.0, &bord2[1], b);
@@ -2247,15 +2238,6 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 		}
 		else{ // geometry pass
 			xformprep(((double) halfplane) * PI, b);
-
-			if (!b->has_portal_clip) {
-				// store original if it is first context;
-				b->oxformmatc = b->xformmatc;
-				b->oxformmats = b->xformmats;
-				b->ognadd = b->gnadd;
-				memcpy(&b->oxformmat, &b->xformmat, sizeof(double) * 9);
-			}
-			// NEW CODE - Use much larger bounds:
 
 			xformbac(-large_bound, -large_bound, gcam.h.z, &bord[0], b);
 			xformbac(+large_bound, -large_bound, gcam.h.z, &bord[1], b);
@@ -2289,13 +2271,23 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 				bord2[j].x = bord2[j].x * f + gcam.h.x;
 				bord2[j].y = bord2[j].y * f + gcam.h.y;
 			}
-		} // need to draw reproject original opening unfortunately.
+		}
+		// save original xforms
+		if (!b->has_portal_clip) {
+			// store original if it is first context;
+			b->oxformmatc = b->xformmatc;
+			b->oxformmats = b->xformmats;
+			b->ognadd = b->gnadd;
+			memcpy(&b->oxformmat, &b->xformmat, sizeof(double) * 9);
+		}
 
 		memset8(b->sectgot, 0, (map->numsects + 31) >> 3);
 		if (b->recursion_depth == 2)
 			int a = 1;
 		int passmphstart;
 		if (!b->has_portal_clip) {  // FIRST PASS ENTRY
+
+
 			//FIX! once means not each frame! (of course it doesn't hurt functionality)
 			// Standard case: clear existing state and create new viewport
 			for (i = mphnum - 1; i >= 0; i--) {
@@ -2324,11 +2316,11 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 			//  rn works for whole wall. at least process is like this.
 			int spnum = map->light_spri[shadowtest2_light[glignum].ligspri];
 			signed char ww = map->spri[spnum].walcon;
-			bool useWallLight = true
+			bool useWallLight = false
 			&& ww>=0
 			&& s>=0 && s < map->numsects
 			&& map->sect[s].n>ww;
-			if (shadowtest2_rendmode ==4)
+			if (shadowtest2_rendmode == 4)
 				if (useWallLight)
 				{ // PREP LIGHT PORTAL
 				mph[0].tag = map->numsects;
@@ -2384,8 +2376,7 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 			}
 
 		} else {
-			bdrawctx_clear(newctx);
-			return;
+
 		}
 
 		b->bunchn = 0;
@@ -2439,7 +2430,7 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 		if (!b->has_portal_clip)
 			if (!didcut) {
 				logstep("break on no cut: pass:%d, hfp:%d, depth:%d, camsec:%d", pass, halfplane, b->recursion_depth,
-				        b->cam.cursect);
+				        b->movedcam.cursect);
 				break;
 			}
 		passcomplete = 1;
@@ -2456,8 +2447,7 @@ static void draw_hsr_enter_portal(mapstate_t *map, int myport, int head1, int he
 	// lights work with portals because we sample final rendered geometry, which is combined in world space.
 	// and distance is calculated correctly for portaled lights
 	// so for mirrors, we shold not do wccw in drawpoly? and draw poly in original cam space.
-	if (parentctx->recursion_depth == 1)
-		lastcamtr = parentctx->orcam.tr;
+
 	OPERLOG;
 	if (parentctx->recursion_depth >= MAX_PORTAL_DEPTH) {
 		return;
@@ -2478,25 +2468,22 @@ static void draw_hsr_enter_portal(mapstate_t *map, int myport, int head1, int he
 	tr_normalize(&tgs.tr);
 
 	// this code works
-	//transform wtl = tr_world_to_local(movcam.tr, ent.tr);
-	//transform ltw = tr_local_to_world(wtl, tgs.tr);
-	//movcam.tr = ltw;
+	transform wtl = tr_world_to_local(movcam.tr, ent.tr);
+	transform ltw = tr_local_to_world(wtl, tgs.tr);
+	movcam.tr = ltw;
 
 	// this doesnt work!
-	transform tin = tr_local_to_world(tr_invert(ent.tr), ent.tr);
-	transform pform = tr_world_to_local(tgs.tr, ent.tr);
-	transform delta = tr_local_to_world(tr_invert(ent.tr), tgs.tr);
-	//delta = tr_invert(delta);
-	transform res = tr_local_to_world(movcam.tr,delta);
-	movcam.tr = res;
+	//transform tin = tr_local_to_world(tr_invert(ent.tr), ent.tr);
+	//transform pform = tr_world_to_local(tgs.tr, ent.tr);
+
+	//transform delta = tr_local_to_world(tr_invert(ent.tr), tgs.tr);
+	//transform res = tr_local_to_world(movcam.tr,delta);
+	//movcam.tr = res;
 
 	movcam.cursect = portals[endp].sect;
 	// to avoid winding problems with mono, we render with normalized camera
 	// then in dra eyepol we can just flip polygons as if camera was really flipped.
 	// the only thing important is board output, as orientation is preserved in movedcam.
-	cam_t rencam = movcam;
-	rencam.r = p3_normalized(p3_cross(movcam.d, movcam.f));
-
 	bool portalflipped = tr_is_flipped(&tgs.tr) ^ tr_is_flipped(&ent.tr);
 	// we need to know only about flip in current portal switch to flip or not to flip the opening.
 	newctx.ismirrored = portalflipped;
@@ -2504,9 +2491,7 @@ static void draw_hsr_enter_portal(mapstate_t *map, int myport, int head1, int he
 	newctx.entrysec = portals[myport].sect;
 	newctx.recursion_depth = parentctx->recursion_depth + 1;
 	newctx.tagoffset = (newctx.recursion_depth) * taginc;
-	newctx.cam = rencam;
 	newctx.movedcam = movcam;
-	newctx.prevcam = parentctx->movedcam;
 	newctx.orcam = parentctx->orcam;
 	newctx.has_portal_clip = true;
 	newctx.sectgotn = 0;

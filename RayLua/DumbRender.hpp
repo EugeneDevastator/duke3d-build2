@@ -395,6 +395,9 @@ public:
 				portal &pcop = portals[portaln];
 				memcpy(&pcop, &portals[i], sizeof(portal));
 				int hspr = map->sect[pcop.sect].headspri;
+				if (hspr<0) {
+					// invalid portal.
+				}
 				int nextsp = map->spri[hspr].sectn;
 				if (nextsp < 0) printf("mirror with just one sprite detected! ERROR!");
 				if (pcop.kind != PORT_WALL) // temp floor mirror hack
