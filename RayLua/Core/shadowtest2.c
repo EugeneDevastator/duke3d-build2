@@ -77,6 +77,10 @@ uint32_t *frame_sprite_ids;
 
 sectmask_t *framesectgot;
 sectmask_t *lightsectgot;
+sectmask_t *portalgot;
+sectmask_t *sprigot;
+int portalsinframe[100];
+int nportalsinframe = 0;
 void bdrawctx_clear(bdrawctx *b) {
 	if (!b) return;
 
@@ -565,14 +569,18 @@ static void scansector(int sectnum, bdrawctx *b) {
 	spripoly_t spp;
 	while (nxs >=0 && shadowtest2_rendmode != 4) {
 		spri_t spr = curMap->spri[nxs];
-		spp.tr = spr.tr;
-		spp.galnum = spr.galnum;
-		spp.pal = spr.pal;
-		spp.tilnum = spr.tilnum;
-		spp.sprid = nxs;
-		if (b->has_portal_clip)
-			tr_transfrom_wccw(&spp.tr, b->movedcam.tr, b->orcam.tr);
-		ARENA_ADD(spripol, spp);
+		if (!sectmask_was_marked(sprigot, nxs)) {
+			sectmask_mark_sector(sprigot, nxs);
+			spp.tr = spr.tr;
+			spp.galnum = spr.galnum;
+			spp.pal = spr.pal;
+			spp.tilnum = spr.tilnum;
+			spp.sprid = nxs;
+
+			if (b->has_portal_clip)
+				tr_transfrom_wccw(&spp.tr, b->movedcam.tr, b->orcam.tr);
+			ARENA_ADD(spripol, spp);
+		}
 
 		nxs = spr.sectn;
 	}
@@ -1166,8 +1174,8 @@ static void changetagfunc(int rethead0, int rethead1, bdrawctx *b) {
 		usetag = b->gnewtag;
 	mph[mphnum].tag = usetag;
 	mph[mphnum].semantic = b->gmonosemantic;
-	if (b->has_portal_clip)
-		mono_dbg_capture_mph(mphnum, "clip in potal");
+//	if (b->has_portal_clip)
+//		mono_dbg_capture_mph(mphnum, "clip in potal");
 	mphnum++;
 
 	logstep("changetag: newMtag:%d, new mphnum:%d", b->gnewtag, mphnum);
@@ -1507,9 +1515,9 @@ static int drawpol_befclip(int fromtag, int newtag, int fromsect, int newsect, i
 static void gentransform_trig(point3d p1, point3d p2, point3d p3, bdrawctx *b) {
 	// all transforms are for orcam space.
 	cam_t *cam = &b->orcam;
-p3_transform_wccw(&p1,b->movedcam.tr,b->orcam.tr);
-p3_transform_wccw(&p2,b->movedcam.tr,b->orcam.tr);
-p3_transform_wccw(&p3,b->movedcam.tr,b->orcam.tr);
+	p3_transform_wccw(&p1,b->movedcam.tr,b->orcam.tr);
+	p3_transform_wccw(&p2,b->movedcam.tr,b->orcam.tr);
+	p3_transform_wccw(&p3,b->movedcam.tr,b->orcam.tr);
 
 	// Calculate plane normal via cross product
 	point3d v1 = {p2.x - p1.x, p2.y - p1.y, p2.z - p1.z};
@@ -1676,8 +1684,6 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 	for (i = bid + 1; i < b->bunchn; i++)
 		b->bunchgrid[(((i - 1) * i) >> 1) + bid] =
 				((b->bunchgrid[j + i] & 1) << 1) + (b->bunchgrid[j + i] >> 1);
-	if (b->has_portal_clip)
-		int a = 0;
 
 #if 1	// === SPRITE SHADOWS ====
 	if (shadowtest2_rendmode == 4) {
@@ -1818,11 +1824,17 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			//if (shadowtest2_rendmode != 4) // no mask with light
 			//drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1], DP_PRESERVE_LOOP| DP_EMIT_MASK |1, b);
 			int portflags = DP_NO_SCANSECT| surflag;// DP_EMIT_MASK|
-			drawpol_befclip(s + b->tagoffset, ttag, s, portals[endpn].sect, plothead[0], plothead[1],  DP_NO_SCANSECT| DP_EMIT_MASK| surflag, b);
+			drawpol_befclip(s + b->tagoffset, ttag, s, -1,
+				plothead[0], plothead[1],  portflags, b);
 			alphamul = 1;// draw as portal, to mark clip space mph
 			// the problem here still remains - because rendering two areas in other spaces can overlap one another.
 			// seems that we need to do wccw for every vert to gurantee shared space.. darn
-			draw_hsr_enter_portal(map, myport, plothead[0], plothead[1], b);
+			if (!sectmask_was_marked(portalgot, myport)) {
+				sectmask_mark_sector(portalgot, myport);
+				portalsinframe[nportalsinframe] = myport;
+				nportalsinframe++;
+			}
+			//draw_hsr_enter_portal(map, myport, plothead[0], plothead[1], b);
 		}
 
 		else if (st2_use_parallax_discards && wal[touchwid].ns >=0
@@ -1973,11 +1985,8 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			int surflag = ((m > vn) << 2) + 3;
 			int newtag = ns == -1 ? -1 : ns + b->tagoffset;
 			if (isportal) {
-				if (shadowtest2_rendmode == 4)
-					int aaa =1;
 				int endp = portals[myport].destpn;
 				int portalpolyflags = surflag | DP_NO_SCANSECT;// | DP_PRESERVE_LOOP; preserve only for backdraws.
-				int portaltag = b->tagoffset + taginc - 1;
 				int endpn = portals[myport].destpn;
 				int ttag = b->tagoffset + taginc + portals[endpn].sect;
 
@@ -1990,12 +1999,18 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 				// good working thing is - we always draw with goodly-winded chains
 				// if we are in mirroerd space we flip them so they are consistently good with existing mono space.
 
-				drawpol_befclip(s + b->tagoffset, ttag, s, portals[endpn].sect,
+				drawpol_befclip(s + b->tagoffset, ttag, s, -1,
 					plothead[0], plothead[1], portalpolyflags, b);
 				alphamul = 1;
 				// preserve gouvmat.
 				//float g0 = b->gouvmat[0]; float g3 = b->gouvmat[3]; float g6 = b->gouvmat[6];
-				draw_hsr_enter_portal(map, myport, plothead[0], plothead[1], b);
+				// need to aggregate floor portals
+				if (!sectmask_was_marked(portalgot, myport)) {
+					sectmask_mark_sector(portalgot, myport);
+					portalsinframe[nportalsinframe] = myport;
+					nportalsinframe++;
+				}
+				//draw_hsr_enter_portal(map, myport, plothead[0], plothead[1], b);
 
 				// cover uncovered area with wall.
 				// restore gouvmat.
@@ -2080,7 +2095,8 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy) {
 	//point3d local = p3_world_to_local(world_pt, t);
 	//point3d localR = p3_local_to_world(local, &t);
 	//// Expected: (1, 0, 0)
-
+	sectmask_destroy(sprigot);
+	sprigot = sectmask_create();
 	draw_hsr_polymost_ctx(map, &bs);
 }
 
@@ -2088,7 +2104,7 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 	if (!newctx) {
 		return;
 	}
-
+	nportalsinframe=0;
 
 	alphamul=1;
 	int recursiveDepth = newctx->recursion_depth;
@@ -2113,7 +2129,6 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 	dpoint3d dpos, drig, ddow, dfor;
 	dpoint3d fp, bord[4], bord2[8];
 	double f, d;
-	unsigned int *uptr;
 	int i, j, k, n, s, w, closest, col, didcut, halfplane;
 	s=-1;
 	if (shadowtest2_rendmode == RM_LIGHTS) {
@@ -2151,54 +2166,48 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 	if (!mphmal)
 		mono_initonce();
 
-	if (shadowtest2_rendmode != 4) {
-		for (i = shadowtest2_numlights - 1; i >= 0; i--) {
-			//Transform shadowtest2_light to screen space
-			fp.x = shadowtest2_light[i].p.x - gcam.p.x;
-			fp.y = shadowtest2_light[i].p.y - gcam.p.y;
-			fp.z = shadowtest2_light[i].p.z - gcam.p.z;
-			slightpos[i].x = fp.x * gcam.r.x + fp.y * gcam.r.y + fp.z * gcam.r.z;
-			slightpos[i].y = fp.x * gcam.d.x + fp.y * gcam.d.y + fp.z * gcam.d.z;
-			slightpos[i].z = fp.x * gcam.f.x + fp.y * gcam.f.y + fp.z * gcam.f.z;
+	if (!b->has_portal_clip) {
+		if(shadowtest2_rendmode != 4) {
+			for (i = shadowtest2_numlights - 1; i >= 0; i--) {
+				//Transform shadowtest2_light to screen space
+				fp.x = shadowtest2_light[i].p.x - gcam.p.x;
+				fp.y = shadowtest2_light[i].p.y - gcam.p.y;
+				fp.z = shadowtest2_light[i].p.z - gcam.p.z;
+				slightpos[i].x = fp.x * gcam.r.x + fp.y * gcam.r.y + fp.z * gcam.r.z;
+				slightpos[i].y = fp.x * gcam.d.x + fp.y * gcam.d.y + fp.z * gcam.d.z;
+				slightpos[i].z = fp.x * gcam.f.x + fp.y * gcam.f.y + fp.z * gcam.f.z;
 
-			fp.x = shadowtest2_light[i].f.x;
-			fp.y = shadowtest2_light[i].f.y;
-			fp.z = shadowtest2_light[i].f.z;
-			f = fp.x * fp.x + fp.y * fp.y + fp.z * fp.z;
-			if (f > 0.f) {
-				f = 1.f / sqrt(f);
-				fp.x *= f;
-				fp.y *= f;
-				fp.z *= f;
+				fp.x = shadowtest2_light[i].f.x;
+				fp.y = shadowtest2_light[i].f.y;
+				fp.z = shadowtest2_light[i].f.z;
+				f = fp.x * fp.x + fp.y * fp.y + fp.z * fp.z;
+				if (f > 0.f) {
+					f = 1.f / sqrt(f);
+					fp.x *= f;
+					fp.y *= f;
+					fp.z *= f;
+				}
+				slightdir[i].x = fp.x * gcam.r.x + fp.y * gcam.r.y + fp.z * gcam.r.z;
+				slightdir[i].y = fp.x * gcam.d.x + fp.y * gcam.d.y + fp.z * gcam.d.z;
+				slightdir[i].z = fp.x * gcam.f.x + fp.y * gcam.f.y + fp.z * gcam.f.z;
+
+				spotwid[i] = shadowtest2_light[i].spotwid;
 			}
-			slightdir[i].x = fp.x * gcam.r.x + fp.y * gcam.r.y + fp.z * gcam.r.z;
-			slightdir[i].y = fp.x * gcam.d.x + fp.y * gcam.d.y + fp.z * gcam.d.z;
-			slightdir[i].z = fp.x * gcam.f.x + fp.y * gcam.f.y + fp.z * gcam.f.z;
 
-			spotwid[i] = shadowtest2_light[i].spotwid;
-		}
-#if (USEGAMMAHACK == 0)
-		f = 1.f;
-#else
-		f = 3072.f;
-#endif
-		g_qamb[0] = shadowtest2_ambrgb[0] * f;
-		g_qamb[1] = shadowtest2_ambrgb[1] * f;
-		g_qamb[2] = shadowtest2_ambrgb[2] * f;
-		g_qamb[3] = 0.f;
-		//eyepoln = 0; eyepolvn = 0;
-	} else {
-		if (map->numsects > glp->sectgotn) {
-			if (glp->sectgotmal) free((void *) glp->sectgotmal);
-			glp->sectgotn = ((map->numsects + 127) & ~127);
-			glp->sectgotmal = (unsigned int *) malloc((glp->sectgotn >> 3) + 16);
-			//NOTE:malloc doesn't guarantee 16-byte alignment!
-			glp->sectgot = (unsigned int *) ((((intptr_t) glp->sectgotmal) + 15) & ~15);
-		}
-		if (glp->lighasheadn <= 0) {
-			glp->lighasheadn = LIGHASHSIZ;
-			glp->lighashead = (int *) realloc(glp->lighashead, glp->lighasheadn * sizeof(glp->lighashead[0]));
-			memset(glp->lighashead, -1, glp->lighasheadn * sizeof(glp->lighashead[0]));
+			//eyepoln = 0; eyepolvn = 0;
+		} else {
+			if (map->numsects > glp->sectgotn) {
+				if (glp->sectgotmal) free((void *) glp->sectgotmal);
+				glp->sectgotn = ((map->numsects + 127) & ~127);
+				glp->sectgotmal = (unsigned int *) malloc((glp->sectgotn >> 3) + 16);
+				//NOTE:malloc doesn't guarantee 16-byte alignment!
+				glp->sectgot = (unsigned int *) ((((intptr_t) glp->sectgotmal) + 15) & ~15);
+			}
+			if (glp->lighasheadn <= 0) {
+				glp->lighasheadn = LIGHASHSIZ;
+				glp->lighashead = (int *) realloc(glp->lighashead, glp->lighasheadn * sizeof(glp->lighashead[0]));
+				memset(glp->lighashead, -1, glp->lighasheadn * sizeof(glp->lighashead[0]));
+			}
 		}
 	}
 	int wasclipped = 0;
@@ -2208,12 +2217,11 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 		sectmask_destroy(lightsectgot);
 		lightsectgot = sectmask_create();
 
-		if (!b->has_portal_clip) {
-			b->currenthalfplane = pass;
-			halfplane = pass;
-		} else {
-			halfplane = pass;
-		}
+		sectmask_destroy(portalgot);
+		portalgot = sectmask_create();
+
+		halfplane = pass;
+
 		logstep("Pass start pass:%d, hfp:%d, depth:%d, camsec:%d", pass, halfplane, b->recursion_depth, b->movedcam.cursect);
 		float large_bound = 1e9f;
 		float lightbound = 1e7f;
@@ -2290,12 +2298,8 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 			b->ognadd = b->gnadd;
 			memcpy(&b->oxformmat, &b->xformmat, sizeof(double) * 9);
 		}
-
-		memset8(b->sectgot, 0, (map->numsects + 31) >> 3);
-
 		int passmphstart;
 		if (!b->has_portal_clip) {  // FIRST PASS ENTRY
-
 
 			//FIX! once means not each frame! (of course it doesn't hurt functionality)
 			// Standard case: clear existing state and create new viewport
@@ -2330,8 +2334,8 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 			&& s>=0 && s < map->numsects
 			&& map->sect[s].n>ww;
 			if (shadowtest2_rendmode == 4)
-				if (useWallLight)
-				{ // PREP LIGHT PORTAL
+				if (useWallLight) // PREP LIGHT PORTAL
+				{
 				mph[0].tag = map->numsects;
 				mph[0].tag = MPH_GEO;
 				// draw surf as initial portal
@@ -2385,8 +2389,10 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 			}
 
 		} else {
-
+// do nothing for portals
 		}
+
+		memset8(b->sectgot, 0, (map->numsects + 31) >> 3);
 
 		b->bunchn = 0;
 		scansector(gcam.cursect, b);
@@ -2407,35 +2413,19 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 
 			drawalls(closest, map, b);
 		}
-
-		if (shadowtest2_rendmode == 4) uptr = glp->sectgot;
-		else uptr = shadowtest2_sectgot;
-
-
-		if (!pass) // write only after first pass.
-		{
-			memcpy(uptr, b->sectgot, (map->numsects + 31) >> 3);
-		} else {
-			if (false) // && !(cputype&(1<<25))) //Got SSE
-			{
-				for (i = ((map->numsects + 31) >> 5) - 1; i >= 0; i--)
-					uptr[i] |= b->sectgot[i];
-			} else {
-				// Convert to portable C - process 16 bytes at a time using uint64_t
-				size_t total_bytes = ((map->numsects + 127) & ~127) >> 3;
-				size_t chunks = total_bytes / 16;
-
-				// Process 16-byte chunks (2 x uint64_t)
-				uint64_t *uptr64 = (uint64_t *) uptr;
-				uint64_t *sectgot64 = (uint64_t *) b->sectgot;
-
-				for (size_t j = 0; j < chunks; j++) {
-					size_t idx = j * 2;
-					uptr64[idx] |= sectgot64[idx];
-					uptr64[idx + 1] |= sectgot64[idx + 1];
-				}
-			}
+		int scan[100];
+		int nscan =0;
+		nscan = nportalsinframe;
+		for (i =0;i < nportalsinframe; i++) {
+			scan[i]= portalsinframe[i];
 		}
+		nportalsinframe=0;
+		sectmask_destroy(portalgot);
+		portalgot=sectmask_create();
+		for (int i = 0;i < nscan; i++) {
+			draw_hsr_enter_portal(map, scan[i],-1, -1, b);
+		}
+
 		if (!b->has_portal_clip)
 			if (!didcut) {
 				logstep("break on no cut: pass:%d, hfp:%d, depth:%d, camsec:%d", pass, halfplane, b->recursion_depth,
@@ -2446,7 +2436,7 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 	}
 	if (b->has_portal_clip) {
 		logstep("mph clean after passes");
-		//mphremoveaboveincl(b->tagoffset - 1);
+		//mphremoveaboveincl(b->tagoffset);
 	}
 	bdrawctx_clear(newctx);
 }
@@ -2456,8 +2446,9 @@ static void draw_hsr_enter_portal(mapstate_t *map, int myport, int head1, int he
 	// lights work with portals because we sample final rendered geometry, which is combined in world space.
 	// and distance is calculated correctly for portaled lights
 	// so for mirrors, we shold not do wccw in drawpoly? and draw poly in original cam space.
-
+	logstep("ENTER PORTAL: %i", myport);
 	OPERLOG;
+
 	if (parentctx->recursion_depth >= MAX_PORTAL_DEPTH) {
 		return;
 	}
@@ -2523,10 +2514,7 @@ static void draw_hsr_enter_portal(mapstate_t *map, int myport, int head1, int he
 	memcpy(&newctx.oxformmat, &parentctx->oxformmat, sizeof(double) * 9);
 	newctx.chead[0] = head1;
 	newctx.chead[1] = head2;
-
 	draw_hsr_polymost_ctx(map, &newctx);
-
-	OPERLOG;
 }
 
 int shadowtest2_isgotsectintersect(int lignum) {
