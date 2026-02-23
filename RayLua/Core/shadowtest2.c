@@ -1765,15 +1765,15 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			ft = isflor;
 
 		for (ww = twaln; ww >= 0; ww -= twaln)
-			plothead[isflor] = mono_ins(
+			plothead[isflor] = mono_ins_tf(
 				plothead[isflor], twal[ww].x, twal[ww].y,
-				b->gnorm.z * -1e9);
+				b->gnorm.z * -1e9,b);
 		//do not replace w/single zenith point - ruins precision
 		i = isflor ^ 1;
 		for (ww = 0; ww <= twaln; ww++) {
-			plothead[i] = mono_ins(plothead[i], twal[ww].x, twal[ww].y,
+			plothead[i] = mono_ins_tf(plothead[i], twal[ww].x, twal[ww].y,
 			                       (wal[0].x - twal[ww].x) * grad->x + (
-				                       wal[0].y - twal[ww].y) * grad->y + fz);
+				                       wal[0].y - twal[ww].y) * grad->y + fz,b);
 		}
 
 		plothead[i] = mp[plothead[i]].n;
@@ -1807,7 +1807,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		//	newtag= s +b->tagoffset;
 		}
 		int touchwid = twal[0].i;
-		if (false && isportal && !noportals) {
+		if (isportal && !noportals) {
 			int endpn = portals[myport].destpn;
 			int ttag = b->tagoffset + taginc + portals[endpn].sect;
 			int portalpolyflags = ((isflor << 2) + 3) | DP_NO_SCANSECT;
@@ -1817,8 +1817,8 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 
 			//if (shadowtest2_rendmode != 4) // no mask with light
 			//drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1], DP_PRESERVE_LOOP| DP_EMIT_MASK |1, b);
-
-			drawpol_befclip(s + b->tagoffset, portaltag, s, portals[endpn].sect, plothead[0], plothead[1],  DP_PRESERVE_LOOP|DP_NO_SCANSECT| DP_EMIT_MASK| surflag, b);
+			int portflags = DP_NO_SCANSECT| surflag;// DP_EMIT_MASK|
+			drawpol_befclip(s + b->tagoffset, ttag, s, portals[endpn].sect, plothead[0], plothead[1],  DP_NO_SCANSECT| DP_EMIT_MASK| surflag, b);
 			alphamul = 1;// draw as portal, to mark clip space mph
 			// the problem here still remains - because rendering two areas in other spaces can overlap one another.
 			// seems that we need to do wccw for every vert to gurantee shared space.. darn
@@ -1976,7 +1976,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 				if (shadowtest2_rendmode == 4)
 					int aaa =1;
 				int endp = portals[myport].destpn;
-				int portalpolyflags = surflag | DP_NO_SCANSECT | DP_PRESERVE_LOOP;
+				int portalpolyflags = surflag | DP_NO_SCANSECT;// | DP_PRESERVE_LOOP; preserve only for backdraws.
 				int portaltag = b->tagoffset + taginc - 1;
 				int endpn = portals[myport].destpn;
 				int ttag = b->tagoffset + taginc + portals[endpn].sect;
