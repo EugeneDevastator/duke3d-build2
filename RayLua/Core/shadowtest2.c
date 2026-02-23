@@ -1602,80 +1602,23 @@ static void gentransform_trig(point3d p1, point3d p2, point3d p3, bdrawctx *b) {
 }
 
 static void gentransform_ceilflor(sect_t *sec, wall_t *wal, int isflor, bdrawctx *b) {
-	cam_t *cam = &b->cam;
 	float gx = sec->grad[isflor].x;
 	float gy = sec->grad[isflor].y;
+	float z0 = sec->z[isflor];
 
-	// Transform plane normal (gx, gy, 1) to camera space
-	float nx = cam->r.x * gx + cam->r.y * gy + cam->r.z;
-	float ny = cam->d.x * gx + cam->d.y * gy + cam->d.z;
-	float nz = cam->f.x * gx + cam->f.y * gy + cam->f.z;
+	point3d p1 = { wal[0].x,        wal[0].y,        z0      };
+	point3d p2 = { wal[0].x + 1.0f, wal[0].y,        z0 - gx };
+	point3d p3 = { wal[0].x,        wal[0].y + 1.0f, z0 - gy };
 
-	// Camera-space plane constant
-	float D_c = gx * (wal[0].x - cam->p.x)
-	            + gy * (wal[0].y - cam->p.y)
-	            + (sec->z[isflor] - cam->p.z);
-
-	// Scale includes h.z for screen-space depth formula
-	float scale = 1.0f / (D_c * cam->h.z);
-	b->gouvmat[0] = nx * scale;
-	b->gouvmat[3] = ny * scale;
-	b->gouvmat[6] = nz / D_c - b->gouvmat[0] * cam->h.x - b->gouvmat[3] * cam->h.y;
+	gentransform_trig(p1, p2, p3, b);
 }
 
 // create plane EQ using GCAM
 static void gentransform_wall(dpoint3d *npol2, surf_t *sur, bdrawctx *b) {
-	cam_t usedcam = b->cam;
-	// we can use camera hack to get plane equation in space of current cam, not necessart clipping cam.
-	float f, g, ox, oy, oz, rdet, fk[24];
-	int i;
-
-	for (i = 0; i < 3; i++) {
-		ox = npol2[i].x - usedcam.p.x;
-		oy = npol2[i].y - usedcam.p.y;
-		oz = npol2[i].z - usedcam.p.z;
-		npol2[i].x = ox * usedcam.r.x + oy * usedcam.r.y + oz * usedcam.r.z;
-		npol2[i].y = ox * usedcam.d.x + oy * usedcam.d.y + oz * usedcam.d.z;
-		npol2[i].z = ox * usedcam.f.x + oy * usedcam.f.y + oz * usedcam.f.z;
-	}
-
-	fk[0] = npol2[0].z;
-	fk[3] = npol2[0].x * usedcam.h.z + npol2[0].z * usedcam.h.x;
-	fk[6] = npol2[0].y * usedcam.h.z + npol2[0].z * usedcam.h.y;
-	fk[1] = npol2[1].z;
-	fk[4] = npol2[1].x * usedcam.h.z + npol2[1].z * usedcam.h.x;
-	fk[7] = npol2[1].y * usedcam.h.z + npol2[1].z * usedcam.h.y;
-	fk[2] = npol2[2].z;
-	fk[5] = npol2[2].x * usedcam.h.z + npol2[2].z * usedcam.h.x;
-	fk[8] = npol2[2].y * usedcam.h.z + npol2[2].z * usedcam.h.y;
-	fk[12] = fk[4] * fk[8] - fk[5] * fk[7];
-	fk[13] = fk[5] * fk[6] - fk[3] * fk[8];
-	fk[14] = fk[3] * fk[7] - fk[4] * fk[6];
-	fk[18] = fk[2] * fk[7] - fk[1] * fk[8];
-	fk[19] = fk[0] * fk[8] - fk[2] * fk[6];
-	fk[20] = fk[1] * fk[6] - fk[0] * fk[7];
-	fk[21] = fk[1] * fk[5] - fk[2] * fk[4];
-	fk[22] = fk[2] * fk[3] - fk[0] * fk[5];
-	fk[23] = fk[0] * fk[4] - fk[1] * fk[3];
-	b->gouvmat[6] = fk[12] + fk[13] + fk[14];
-	b->gouvmat[0] = fk[18] + fk[19] + fk[20];
-	b->gouvmat[3] = fk[21] + fk[22] + fk[23];
-
-	rdet = 1.0 / (fk[0] * fk[12] + fk[1] * fk[13] + fk[2] * fk[14]);
-
-	g = rdet;
-
-	b->gouvmat[0] *= g;
-	b->gouvmat[3] *= g;
-	b->gouvmat[6] *= g;
-
-	if (renderinterp) {
-		// idx 0 3 6 store plane eq?
-
-		//	b->gouvmat[1] -= b->gouvmat[0]*32768.0; b->gouvmat[2] -= b->gouvmat[0]*32768.0;
-		//	b->gouvmat[4] -= b->gouvmat[3]*32768.0; b->gouvmat[5] -= b->gouvmat[3]*32768.0;
-		//	b->gouvmat[7] -= b->gouvmat[6]*32768.0; b->gouvmat[8] -= b->gouvmat[6]*32768.0;
-	}
+		gentransform_trig(p3d_tosingl(npol2[0]),
+	p3d_tosingl(npol2[1]),
+	p3d_tosingl(npol2[2]),
+	b);
 }
 static void drawspriteshadow(int sprid, int sectid, int tagid, transform cam, mapstate_t* map, bdrawctx* b) {
 	spri_t *spr = &map->spri[sprid];
@@ -1739,7 +1682,7 @@ The b parameter is a bunch index - this function processes one "bunch" (visible 
 
 int mono_ins_tf(int i, double nx, double ny, double nz, bdrawctx* b) {
 	dpoint3d np = {nx,ny,nz};
-	portal_xform_world_fullr(nx,ny,nz,b);
+	np = portal_xform_world_fullr(nx,ny,nz,b);
 	mono_ins(i,np.x,np.y,np.z);
 }
 
@@ -2071,9 +2014,6 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 					else if (!m) f = sec[verts[0].s].z[0]; //
 					else f = sec[verts[(m - 1) >> 1].s].z[0];
 					b->gflags = 0;
-					//gentransform_trig(p3d_tosingl(npol2[0]),
-					//	p3d_tosingl(npol2[1]),
-					//	p3d_tosingl(npol2[2]),b);
 					gentransform_wall(npol2, sur, b);
 				}
 				b->gligwall = w;
