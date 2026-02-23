@@ -965,7 +965,7 @@ static void emit_wallpoly_func(int rethead0, int rethead1, bdrawctx *b) {
 	int tridx_start = eyepolin;
 	ARENA_EXPAND(eyepoli, max_triangles * 3);
 	int triangle_count = 0;
-	triangle_count = triangulate(chain_starts,chain_lengths,eyepolv,eyepoli, &eyepolin, !b->istrimirror);
+	triangle_count = triangulate(chain_starts,chain_lengths,eyepolv,eyepoli, &eyepolin, true);
 
 	// --------------- Setup polygon record
 	if (eyepoln + 1 >= eyepolmal) {
@@ -1099,7 +1099,7 @@ static void emit_lighpol_func(int rethead0, int rethead1, bdrawctx *b) {
 	int tridx_start = ligpolin;
 	ARENA_EXPAND(ligpoli, max_triangles * 3);
 	int triangle_count = 0;
-	triangle_count = triangulate(chain_starts,chain_lengths,glp->ligpolv,ligpoli, &ligpolin, !b->istrimirror);
+	triangle_count = triangulate(chain_starts,chain_lengths,glp->ligpolv,ligpoli, &ligpolin, true);
 
 	//Put on FIFO:
 	rethead[0] = rethead0;
@@ -1450,7 +1450,8 @@ static int drawpol_befclip(int fromtag, int newtag, int fromsect, int newsect, i
 
 	if (flags & 2 && !(flags & DP_ADD_AS_PROJECTOR)) // this entire section will chip current off of others with same tag, detalizing clip group.
 	{
-		if (!(flags & 4)) j = MONO_BOOL_SUB;
+		bool usesub = !(flags & 4);
+		if (usesub) j = MONO_BOOL_SUB;
 		else j = MONO_BOOL_SUB_REV; // when floor.
 
 		b->gnewtag = fromtag;
@@ -1841,7 +1842,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 	}
 #endif
 	b->gisflor = 2;
-	// === DRAW WALLS ===
+#if 1	// === DRAW WALLS ===
 	for (ww = 0; ww < twaln; ww++) {
 		// Get wall vertices and setup wall segment
 		vn = getwalls_chain(s, twal[ww].i, verts,MAXVERTS, map);
@@ -1987,12 +1988,23 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 				// emit this as poly for eyes only, non destructive unaffects mph.
 				//drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1],
 				//	DP_PRESERVE_LOOP| DP_EMIT_MASK |1, b);
+				// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! need second  draw with inverted chains! or just flip resulting  mph
+
+				// good working thing is - we always draw with goodly-winded chains
+				// if we are in mirroerd space we flip them so they are consistently good with existing mono space.
+
 				drawpol_befclip(s + b->tagoffset, ttag, s, portals[endpn].sect,
 					plothead[0], plothead[1], portalpolyflags, b);
 				alphamul = 1;
+				// preserve gouvmat.
+				//float g0 = b->gouvmat[0]; float g3 = b->gouvmat[3]; float g6 = b->gouvmat[6];
 				draw_hsr_enter_portal(map, myport, plothead[0], plothead[1], b);
+
 				// cover uncovered area with wall.
-				drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1], surflag, b);
+				// restore gouvmat.
+				//b->gouvmat[0] =g0;				b->gouvmat[3]=g3;				b->gouvmat[6]=g6;
+				//drawpol_befclip(ttag, -1, s, -1, plothead[0], plothead[1], surflag, b);
+
 			} else if (st2_use_parallax_discards && wal[w].xsurf[m].flags & SURF_PARALLAX_DISCARD) {
 				ns = wal[w].ns;
 				newtag = ns + b->tagoffset;
@@ -2012,6 +2024,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			}
 		}
 	}
+#endif
 }
 
 void reset_context() {
