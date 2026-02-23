@@ -571,7 +571,7 @@ static void scansector(int sectnum, bdrawctx *b) {
 		spp.tilnum = spr.tilnum;
 		spp.sprid = nxs;
 		if (b->has_portal_clip)
-			tr_transfrom_wccw(&spp.tr, &b->movedcam.tr, &b->prevcam.tr);
+			tr_transfrom_wccw(&spp.tr, b->movedcam.tr, b->orcam.tr);
 		ARENA_ADD(spripol, spp);
 
 		nxs = spr.sectn;
@@ -1795,7 +1795,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 	if (b->has_portal_clip)
 		int a = 0;
 
-	// === SPRITE SHADOWS ====
+#if 1	// === SPRITE SHADOWS ====
 	if (shadowtest2_rendmode == 4) {
 		if (!sectmask_was_marked(lightsectgot,s)) {
 			sectmask_mark_sector(lightsectgot,s);
@@ -1807,8 +1807,8 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			};
 		}
 	}
-
-	// === DRAW CEILINGS & FLOORS ===
+#endif
+#if 1 // === DRAW CEILINGS & FLOORS ===
 	bool noportals = b->recursion_depth >= MAX_PORTAL_DEPTH;
 	for (isflor = 0; isflor < 2; isflor++) // floor ceil
 	{
@@ -1874,6 +1874,8 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		plothead[0] = -1;
 		plothead[1] = -1;
 		point3d locnorm = p3_world_to_local_vec(b->gnorm, b->cam.tr);
+		point3d wccw_in_orig_norm=  b->gnorm;
+		p3_transform_wccw_vec(&wccw_in_orig_norm, b->cam.tr, b->orcam.tr);
 		int ft=0;
 		if (drawcap)
 			ft = 1-isflor;
@@ -1953,6 +1955,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1], surflag, b);
 		}
 	}
+#endif
 	b->gisflor = 2;
 	// === DRAW WALLS ===
 	for (ww = 0; ww < twaln; ww++) {

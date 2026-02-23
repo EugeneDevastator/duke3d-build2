@@ -1372,8 +1372,8 @@ int updatesect_portmove(transform *tr, int *cursect, mapstate_t *map) {
 
 						//p3_transform_wccw(pos, &map->spri[portals[ow].anchorspri].tr,
 						//                   &map->spri[portals[d].anchorspri].tr);
-						tr_transfrom_wccw(tr, &map->spri[portals[ow].anchorspri].tr,
-										   &map->spri[portals[d].anchorspri].tr);
+						tr_transfrom_wccw(tr, map->spri[portals[ow].anchorspri].tr,
+										   map->spri[portals[d].anchorspri].tr);
 						return 1;
 					}
 				}

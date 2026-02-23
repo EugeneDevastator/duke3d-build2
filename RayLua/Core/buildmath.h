@@ -433,10 +433,10 @@ static inline void p3d_transform_apply(dpoint3d *dp, transform space) {
 static inline dpoint3d p3d_transformed(const dpoint3d dp, const transform space) {
 	return p3d_local_to_world(dp,space);
 }
-static inline void p3_transform_wccw(point3d *pinout, transform *camspace, transform *outspace) {
+static inline void p3_transform_wccw(point3d *pinout, transform camspace, transform outspace) {
 	// todo - remove
-	point3d pl = p3_world_to_local(*pinout,*camspace);
-	*pinout = p3_local_to_world(pl,*outspace);
+	point3d pl = p3_world_to_local(*pinout,camspace);
+	*pinout = p3_local_to_world(pl,outspace);
 }
 
 static inline void p3d_transform_cam_wccw(dpoint3d *pinout, cam_t *camspace, cam_t *outspace) {
@@ -462,19 +462,19 @@ static inline void transform_wccw_vec(dpoint3d *dir, cam_t *ctin, cam_t *ctout) 
 	dir->z = cx * ctout->r.z + cy * ctout->f.z + cz * ctout->d.z;
 }
 
-static inline void p3_transform_wccw_vec(point3d *dir, transform *camspace, transform *outspace) {
+static inline void p3_transform_wccw_vec(point3d *dir, transform camspace, transform outspace) {
 	// Transform direction vector (no translation)
 	//RFD FIXED
-	double cx = dir->x * camspace->r.x + dir->y * camspace->r.y + dir->z * camspace->r.z;
-	double cy = dir->x * camspace->f.x + dir->y * camspace->f.y + dir->z * camspace->f.z;
-	double cz = dir->x * camspace->d.x + dir->y * camspace->d.y + dir->z * camspace->d.z;
+	double cx = dir->x * camspace.r.x + dir->y * camspace.r.y + dir->z * camspace.r.z;
+	double cy = dir->x * camspace.f.x + dir->y * camspace.f.y + dir->z * camspace.f.z;
+	double cz = dir->x * camspace.d.x + dir->y * camspace.d.y + dir->z * camspace.d.z;
 
-	dir->x = cx * outspace->r.x + cy * outspace->f.x + cz * outspace->d.x;
-	dir->y = cx * outspace->r.y + cy * outspace->f.y + cz * outspace->d.y;
-	dir->z = cx * outspace->r.z + cy * outspace->f.z + cz * outspace->d.z;
+	dir->x = cx * outspace.r.x + cy * outspace.f.x + cz * outspace.d.x;
+	dir->y = cx * outspace.r.y + cy * outspace.f.y + cz * outspace.d.y;
+	dir->z = cx * outspace.r.z + cy * outspace.f.z + cz * outspace.d.z;
 }
 
-static inline void tr_transfrom_wccw(transform *tr, transform *camspace, transform *outspace) {
+static inline void tr_transfrom_wccw(transform *tr, transform camspace, transform outspace) {
 	p3_transform_wccw(&tr->p, camspace, outspace);
 	p3_transform_wccw_vec(&tr->f, camspace, outspace);
 	p3_transform_wccw_vec(&tr->r, camspace, outspace);
