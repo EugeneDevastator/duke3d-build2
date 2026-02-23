@@ -139,7 +139,7 @@ static inline dpoint3d portal_xform_world_fullr(double x, double y, double z, bd
 	p.x = x;
 	p.y = y;
 	p.z = z;
-	p3d_transform_cam_wccw(&p, &b->cam, &b->orcam);
+	p3d_transform_cam_wccw(&p, &b->movedcam, &b->orcam);
 	//loops[loopnum] = p;
 	//loopuse[loopnum] = true;
 	//loopnum++;
@@ -919,9 +919,9 @@ static int triangulate(const int *chain_starts, const int *chain_lengths, dpoint
 static void emit_wallpoly_func(int rethead0, int rethead1, bdrawctx *b) {
 	double f, fx, fy;
 	int i, h, rethead[2];
-	cam_t cam = b->cam;
-	double *xform = b->xformmat;
-	point3d add = b->gnadd;
+	cam_t cam = b->orcam;
+	double *xform = b->oxformmat;
+	point3d add = b->ognadd;
 
 	if ((rethead0 | rethead1) < 0) {
 		mono_deloop(rethead1);
@@ -1010,7 +1010,6 @@ static void emit_wallpoly_func(int rethead0, int rethead1, bdrawctx *b) {
 
 		dpoint3d ret = {retx, rety, retz};
 		eyepolvori[ip] = ret;
-		p3d_transform_cam_wccw(&ret, &b->movedcam, &b->orcam);
 		eyepolv[ip] = ret;
 	}
 
@@ -1054,7 +1053,9 @@ static void emit_lighpol_func(int rethead0, int rethead1, bdrawctx *b) {
 		return;
 	}
 
-	cam_t gcam = b->cam;
+	cam_t usecam = b->orcam;
+	double *xform = b->oxformmat;
+	point3d gnadd = b->ognadd;
 	double f, fx, fy, fz;
 	int i, j, rethead[2];
 
@@ -1098,25 +1099,23 @@ static void emit_lighpol_func(int rethead0, int rethead1, bdrawctx *b) {
 	int triangle_count = 0;
 	triangle_count = triangulate(chain_starts,chain_lengths,glp->ligpolv,ligpoli, &ligpolin, !b->istrimirror);
 
-
 	//Put on FIFO:
 	rethead[0] = rethead0;
 	rethead[1] = rethead1;
 	for (int ip = debhl[0]; ip < glp->ligpolvn; ip++) {
 			dpoint3d lv = glp->ligpolv[ip];
-			f = gcam.h.z / (/*lv.x*b->xformmat[6]*/ +lv.y * b->xformmat[7] + b->gnadd.z);
-			fx = (lv.x * b->xformmat[0] + lv.y * b->xformmat[1] + b->gnadd.x) * f + gcam.h.x;
-			fy = (lv.x * b->xformmat[3] + lv.y * b->xformmat[4] + b->gnadd.y) * f + gcam.h.y;
+			f = usecam.h.z / (lv.x*xform[6] +lv.y * xform[7] + gnadd.z);
+			fx = (lv.x * xform[0] + lv.y * xform[1] + gnadd.x) * f + usecam.h.x;
+			fy = (lv.x * xform[3] + lv.y * xform[4] + gnadd.y) * f + usecam.h.y;
 
-			f = 1.0 / ((b->gouvmat[0] * fx + b->gouvmat[3] * fy + b->gouvmat[6]) * gcam.h.z);
+			f = 1.0 / ((b->gouvmat[0] * fx + b->gouvmat[3] * fy + b->gouvmat[6]) * usecam.h.z);
 
-			glp->ligpolv[ip].x = ((fx - gcam.h.x) * gcam.r.x + (fy - gcam.h.y) * gcam.d.x + (gcam.h.z) * gcam
-			                                 .f.x) * f + gcam.p.x;
-			glp->ligpolv[ip].y = ((fx - gcam.h.x) * gcam.r.y + (fy - gcam.h.y) * gcam.d.y + (gcam.h.z) * gcam
-			                                 .f.y) * f + gcam.p.y;
-			glp->ligpolv[ip].z = ((fx - gcam.h.x) * gcam.r.z + (fy - gcam.h.y) * gcam.d.z + (gcam.h.z) * gcam
-			                                 .f.z) * f + gcam.p.z;
-		p3d_transform_cam_wccw(&glp->ligpolv[ip], &b->movedcam, &b->orcam);
+			glp->ligpolv[ip].x = ((fx - usecam.h.x) * usecam.r.x + (fy - usecam.h.y) * usecam.d.x + (usecam.h.z) * usecam
+			                                 .f.x) * f + usecam.p.x;
+			glp->ligpolv[ip].y = ((fx - usecam.h.x) * usecam.r.y + (fy - usecam.h.y) * usecam.d.y + (usecam.h.z) * usecam
+			                                 .f.y) * f + usecam.p.y;
+			glp->ligpolv[ip].z = ((fx - usecam.h.x) * usecam.r.z + (fy - usecam.h.y) * usecam.d.z + (usecam.h.z) * usecam
+			                                 .f.z) * f + usecam.p.z;
 	}
 
 	if (glp->ligpoln + 1 >= glp->ligpolmal) {
@@ -1149,73 +1148,6 @@ static void emit_lighpol_func(int rethead0, int rethead1, bdrawctx *b) {
 	Maintains mph[] (mono polygon hierarchy) for spatial partitioning
 	"tag" refers to sector IDs
 */
-static void drawtag_debug(int rethead0, int rethead1, bdrawctx *b) {
-	float f, fx, fy, g, *fptr;
-	int i, j, k, h, rethead[2];
-	cam_t cam = b->cam;
-	double *xform = b->xformmat;
-	point3d add = b->gnadd;
-	if ((rethead0 | rethead1) < 0) {
-		mono_deloop(rethead1);
-		mono_deloop(rethead0);
-		return;
-	}
-	rethead[0] = rethead0;
-	rethead[1] = rethead1;
-
-	// Put on FIFO in world space:
-	for (h = 0; h < 2; h++) {
-		i = rethead[h];
-		do {
-			if (h)
-				i = mp[i].p;
-
-			if (eyepolvn >= eyepolvmal) {
-				eyepolvmal = max(eyepolvmal<<1, 16384);
-				eyepolv = (dpoint3d *) realloc(eyepolv, eyepolvmal * sizeof(dpoint3d));
-			}
-			f = cam.h.z / (mp[i].x * xform[6] + mp[i].y * xform[7] + add.z);
-			fx = (mp[i].x * xform[0] + mp[i].y * xform[1] + add.x) * f + cam.h.x;
-			fy = (mp[i].x * xform[3] + mp[i].y * xform[4] + add.y) * f + cam.h.y;
-
-			f = 1.0 / ((b->gouvmat[0] * fx + b->gouvmat[3] * fy + b->gouvmat[6]) * cam.h.z);
-
-			float retx = ((fx - cam.h.x) * cam.r.x + (fy - cam.h.y) * cam.d.x + (cam.h.z) * cam.f.x) * f + cam.p.x;
-			float rety = ((fx - cam.h.x) * cam.r.y + (fy - cam.h.y) * cam.d.y + (cam.h.z) * cam.f.y) * f + cam.p.y;
-			float retz = ((fx - cam.h.x) * cam.r.z + (fy - cam.h.y) * cam.d.z + (cam.h.z) * cam.f.z) * f + cam.p.z;
-			dpoint3d ret = {retx, rety, retz};
-			if (b->recursion_depth > 1) {
-				//	LOOPADD(ret)
-			}
-			p3d_transform_cam_wccw(&ret, &b->cam, &b->orcam);
-			eyepolv[eyepolvn] = (dpoint3d){ret.x, ret.y, ret.z};
-
-			eyepolvn++;
-
-			if (!h) i = mp[i].n;
-		} while (i != rethead[h]);
-	}
-
-	if (eyepoln + 1 >= eyepolmal) {
-		eyepolmal = max(eyepolmal<<1, 4096);
-		eyepol = (eyepol_t *) realloc(eyepol, eyepolmal * sizeof(eyepol_t));
-		eyepol[0].vert0 = 0;
-	}
-
-	memcpy((void *) eyepol[eyepoln].ouvmat, (void *) b->gouvmat, sizeof(b->gouvmat[0]) * 9);
-
-	eyepol[eyepoln].tpic = gtpic;
-	eyepol[eyepoln].curcol = gcurcol;
-	eyepol[eyepoln].flags = (b->gflags != 0);
-	eyepol[eyepoln].b2sect = b->gnewtag;
-	eyepol[eyepoln].b2wall = b->gligwall;
-	eyepol[eyepoln].b2slab = b->gligslab;
-	memcpy((void *) &eyepol[eyepoln].norm, (void *) &b->gnorm, sizeof(b->gnorm));
-	eyepoln++;
-	eyepol[eyepoln].vert0 = eyepolvn;
-	eyepol[eyepoln].rdepth = b->recursion_depth;
-	logstep("produce eyepol, depth:%d", b->recursion_depth);
-}
 
 static void changetagfunc(int rethead0, int rethead1, bdrawctx *b) {
 	if ((rethead0 | rethead1) < 0) return;
@@ -1235,8 +1167,7 @@ static void changetagfunc(int rethead0, int rethead1, bdrawctx *b) {
 	if (b->has_portal_clip)
 		mono_dbg_capture_mph(mphnum, "clip in potal");
 	mphnum++;
-	//if (b->recursion_depth >=2)
-	//	drawtag_debug(rethead0,rethead0,b);
+
 	logstep("changetag: newMtag:%d, new mphnum:%d", b->gnewtag, mphnum);
 }
 
@@ -1260,9 +1191,9 @@ static void changetag_andsolid(int rethead0, int rethead1, bdrawctx *b) {
 static int projectonmono(int *plothead0, int *plothead1, bdrawctx *b) {
 	if (!mpcheck(*plothead0, *plothead1))
 		return 0;
-	cam_t gcam = b->cam;
-	double xformc = b->xformmatc;
-	double xforms = b->xformmats;
+	cam_t gcam = b->orcam;
+	double xformc = b->oxformmatc;
+	double xforms = b->oxformmats;
 #define BSCISDIST 0.000001 //Reduces probability of glitch further
 	//#define BSCISDIST 0.0001 //Gaps undetectable
 	//#define BSCISDIST 0.1 //Huge gaps
@@ -1568,7 +1499,11 @@ static int drawpol_befclip(int fromtag, int newtag, int fromsect, int newsect, i
 	return 1;
 }
 static void gentransform_trig(point3d p1, point3d p2, point3d p3, bdrawctx *b) {
-	cam_t *cam = &b->cam;
+	// all transforms are for orcam space.
+	cam_t *cam = &b->orcam;
+p3_transform_wccw(&p1,b->movedcam.tr,b->orcam.tr);
+p3_transform_wccw(&p2,b->movedcam.tr,b->orcam.tr);
+p3_transform_wccw(&p3,b->movedcam.tr,b->orcam.tr);
 
 	// Calculate plane normal via cross product
 	point3d v1 = {p2.x - p1.x, p2.y - p1.y, p2.z - p1.z};
@@ -1817,8 +1752,6 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		plothead[0] = -1;
 		plothead[1] = -1;
 		point3d locnorm = p3_world_to_local_vec(b->gnorm, b->cam.tr);
-		point3d wccw_in_orig_norm=  b->gnorm;
-		p3_transform_wccw_vec(&wccw_in_orig_norm, b->cam.tr, b->orcam.tr);
 		int ft=0;
 		if (drawcap)
 			ft = 1-isflor;
@@ -1977,7 +1910,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			Returns monotone polygon pair representing visible portion
 			If no intersection, wall segment is completely occluded*/
 
-			//if (!intersect_traps_mono(pol[0].x,pol[0].y, pol[1].x,pol[1].y, pol[0].z,pol[1].z,pol[2].z,pol[3].z, opolz[0],opolz[1],opolz[2],opolz[3], &plothead[0],&plothead[1])) continue;
+			//if (!intersect_trintersect_traps_mono(pol[0].x,pol[0].y, pol[1].x,pol[1].y, pol[0].z,pol[1].z,pol[2].z,pol[3].z, opolz[0],opolz[1],opolz[2],opolz[3], &plothead[0],&plothead[1])) continue;
 			// Calculate intersection of wall segment with clipping trapezoids
 			f = 1e-7; //FIXFIXFIXFIX:use ^ ?
 
@@ -2292,10 +2225,18 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 			gcam.h.x = 21;
 			gcam.h.y = 21;
 			b->cam = gcam; // THAT IS IMPORTANT!
-		//	b->movedcam = gcam;
-		//	b->orcam = gcam;
+			b->movedcam = gcam;
+			b->orcam = gcam;
 
 			xformprep(0.0, b);
+
+			if (!b->has_portal_clip) {
+				// store original if it is first context;
+				b->oxformmatc = b->xformmatc;
+				b->oxformmats = b->xformmats;
+				b->ognadd = b->gnadd;
+				memcpy(&b->oxformmat, &b->xformmat, sizeof(double) * 9);
+			}
 
 			xformbac(-lightbound, -lightbound, 0.0, &bord2[0], b);
 			xformbac(+lightbound, -lightbound, 0.0, &bord2[1], b);
@@ -2304,7 +2245,7 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 			n = 4;
 			didcut = 1;
 		}
-		else{
+		else{ // geometry pass
 			xformprep(((double) halfplane) * PI, b);
 
 			if (!b->has_portal_clip) {
@@ -2442,77 +2383,9 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 				drawpol_befclip(mph[0].tag,gcam.cursect,mph[0].tag,gcam.cursect, ph2,ph1, DP_AND_SUBREV | DP_NO_SCANSECT ,b);
 			}
 
-		} else { // SETUP PORTAL ENTRY WITH WCCW TRANSFORM
-			// problem with floors is multiple redraw,
-			// we must be sure that we go into portal only after we submitted all floopr parts fort sector
-			// and then also joined them
-			// but for water it is worse because of sector break, so likely we need wccw for points...
-			// transform all to main cam space
-			// use wccw, replace with bake later. ecause we will be transforming: pt in portal space back to world?
-			// also bord is likely only needed for z clip
-
-
-			//drawpol_befclip(gcam.cursect-taginc, gcam.cursect, gcam.cursect,	b->chead[0],b->chead[1], 8|3 , b);
-			int res = -1;
-			{
-				if (n < 3) {
-					printf("n<3 2");
-					continue;
-				}
-				int bh1 = -1, bh2 = -1;
-
-				mono_genfromloop(&bh1, &bh2, bord2, n);
-				bool bordok = (mpcheck(bh1, bh2));
-				if (!bordok) {
-					printf("bordok not");
-					continue;
-				}
-
-				int portaltag = b->tagoffset - 1;
-				int newtag = gcam.cursect + b->tagoffset;
-				int whead[2] = {-1, -1};
-				int bordar[] = {bh1, bh2};
-				if (!wasclipped) {
-					bool wok = (mpcheck(b->chead[0], b->chead[1])); // invalid window
-					if (!wok) {
-						logstep("failed portal window chain");
-						printf("window not");
-						return;
-					}
-					for (int h = 0; h < 2; h++) {
-						i = b->chead[h];
-						do {
-							if (h) i = mp[i].p;
-							// must find previous in coords of new, may need previous camera, not orcam.
-							p3d_transform_cam_wccw(&mp[i].pos, &b->prevcam, &b->movedcam);
-							if (!h) i = mp[i].n;
-						} while (i != b->chead[h]);
-					}
-					monocopy(b->chead[0], b->chead[1], &whead[0], &whead[1]);
-					// reproject original opening.
-					// MOVE TO ENTER PORTAL, to reproject from previous cam.
-					wasclipped = 1;
-				} else {
-					//
-					whead[0] = b->chead[0];
-					whead[1] = b->chead[1];
-				}
-
-				res = projectonmono(&whead[0], &whead[1], b);
-				if (!res) {
-					continue;
-				}
-				//do AND with board and add only clipped portion to MPH.
-				b->gdoscansector = 0;
-				b->gnewtag = gcam.cursect + b->tagoffset;
-				// and swap of indices is necessary.
-				if (b->ismirrored) { // swap heads;
-					int t = whead[1]; whead[1]=whead[0]; whead[0]=t;
-				}
-
-				mono_bool(whead[0], whead[1], bh1, bh2,MONO_BOOL_AND, b, changetagfunc);
-
-			}
+		} else {
+			bdrawctx_clear(newctx);
+			return;
 		}
 
 		b->bunchn = 0;
