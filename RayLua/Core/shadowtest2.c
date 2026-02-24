@@ -273,7 +273,8 @@ static tile_t *gtpic;
 static int gcurcol, gtilenum, ggalnum;
 static float alphamul;
 static float lalphamul;
-static int taginc = 30000;
+static int portinc = 10000;
+static int taginc =  10000000;
 #define LIGHTMAX 256 //FIX:make dynamic!
 lightpos_t shadowtest2_light[LIGHTMAX];
 static lightpos_t *glp;
@@ -1312,6 +1313,7 @@ static int drawpol_nosect(int overlaptag, int newtag, int *heads, int flags, bdr
 
 static int drawpol_befclip(int fromtag, int newtag, int fromsect, int newsect, int plothead0, int plothead1, int flags,
                            bdrawctx *b) {
+	OPERLOG;
 #if EXLOGS
 	printf("drawpol from:%d, to:%d, h1:%d, h2:%d, depth:%d \n", fromtag, newtag, plothead0, plothead1,
 	       b->recursion_depth);
@@ -1630,7 +1632,7 @@ The b parameter is a bunch index - this function processes one "bunch" (visible 
 // in the end we hack shadows by simple subtraction - not mathematically correct but work for env with lots of lights.
 
 int mono_ins_tf(int i, double nx, double ny, double nz, bdrawctx* b) {
-	dpoint3d np = {nx,ny,nz};
+	dpoint3d np ;
 	np = portal_xform_world_fullr(nx,ny,nz,b);
 	mono_ins(i,np.x,np.y,np.z);
 }
@@ -1763,12 +1765,6 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		// Build polygon for ceiling/floor using plane equation:
 		plothead[0] = -1;
 		plothead[1] = -1;
-		point3d locnorm = p3_world_to_local_vec(b->gnorm, b->movedcam.tr);
-		int ft=0;
-		if (drawcap)
-			ft = 1-isflor;
-		else
-			ft = isflor;
 
 		for (ww = twaln; ww >= 0; ww -= twaln)
 			plothead[isflor] = mono_ins_tf(
@@ -1807,17 +1803,12 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		int newsect=-1;
 		int newtag=-1;
 		int surflag = (((isflor)<< 2) + 3);
-		if ( ft==1) {
-		//	surflag |= DP_EMIT_MASK;
-		//	newsect = s;  // use same flow as for walls with masks - emit lightpoly, and draw it as portal.
-		//	newtag= s +b->tagoffset;
-		}
+
 		int touchwid = twal[0].i;
 		if (isportal && !noportals) {
 			int endpn = portals[myport].destpn;
-			int ttag = b->tagoffset + taginc + portals[endpn].sect;
+			int ttag = (b->recursion_depth+1) * taginc + myport*portinc + portals[endpn].sect;
 			int portalpolyflags = ((isflor << 2) + 3) | DP_NO_SCANSECT;
-			int portaltag = b->tagoffset + taginc - 1;
 
 			alphamul = 0.3f; // only emit mask here
 
@@ -1988,7 +1979,9 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 				int endp = portals[myport].destpn;
 				int portalpolyflags = surflag | DP_NO_SCANSECT;// | DP_PRESERVE_LOOP; preserve only for backdraws.
 				int endpn = portals[myport].destpn;
-				int ttag = b->tagoffset + taginc + portals[endpn].sect;
+				int ttag = (b->recursion_depth+1) * taginc  + myport*portinc + portals[endpn].sect;
+				// we can end up with same tag for mirrors, so
+				// we need more breakdowns - portalNum, depthnum...
 
 				//alphamul = 0.3f;
 				// emit this as poly for eyes only, non destructive unaffects mph.
@@ -1998,18 +1991,18 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 
 				// good working thing is - we always draw with goodly-winded chains
 				// if we are in mirroerd space we flip them so they are consistently good with existing mono space.
-
+				if (!sectmask_was_marked(portalgot, myport)) {
+					sectmask_mark_sector(portalgot, myport);
+					portalsinframe[nportalsinframe] =  myport;
+					nportalsinframe++;
+				}
 				drawpol_befclip(s + b->tagoffset, ttag, s, -1,
 					plothead[0], plothead[1], portalpolyflags, b);
 				alphamul = 1;
 				// preserve gouvmat.
 				//float g0 = b->gouvmat[0]; float g3 = b->gouvmat[3]; float g6 = b->gouvmat[6];
 				// need to aggregate floor portals
-				if (!sectmask_was_marked(portalgot, myport)) {
-					sectmask_mark_sector(portalgot, myport);
-					portalsinframe[nportalsinframe] = myport;
-					nportalsinframe++;
-				}
+
 				//draw_hsr_enter_portal(map, myport, plothead[0], plothead[1], b);
 
 				// cover uncovered area with wall.
@@ -2490,7 +2483,7 @@ static void draw_hsr_enter_portal(mapstate_t *map, int myport, int head1, int he
 	newctx.istrimirror = parentctx->istrimirror ^ portalflipped;
 	newctx.entrysec = portals[myport].sect;
 	newctx.recursion_depth = parentctx->recursion_depth + 1;
-	newctx.tagoffset = (newctx.recursion_depth) * taginc;
+	newctx.tagoffset = (newctx.recursion_depth) * taginc + myport*portinc;
 	newctx.movedcam = movcam;
 	newctx.orcam = parentctx->orcam;
 	newctx.has_portal_clip = true;
