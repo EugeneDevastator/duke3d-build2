@@ -33,7 +33,7 @@ typedef struct {
 	bool hasuvs;
 	int8_t isflor;
 	// uv data
-	point3d *worlduvs; // origin, u ,v
+	point3d worlduvs[3]; // origin, u ,v
 	float* uvform;
 	int slabid;
 	int c1,c2,e1,e2;

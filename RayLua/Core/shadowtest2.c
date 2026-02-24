@@ -991,19 +991,22 @@ static void emit_wallpoly_func(int rethead0, int rethead1, bdrawctx *b) {
 
 	if (b->gisflor < 2) {
 		eyepol[eyepoln].isflor = b->gisflor;
-		eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].surf[b->gisflor].uvcoords;
+		for (int k=0;k<3;k++)
+			eyepol[eyepoln].worlduvs[k] = curMap->sect[b->gligsect].surf[b->gisflor].uvcoords[k];
 		eyepol[eyepoln].uvform = curMap->sect[b->gligsect].surf[b->gisflor].uvform;
 		eyepol[eyepoln].pal = curMap->sect[b->gligsect].surf[b->gisflor].pal;
 		eyepol[eyepoln].shade = curMap->sect[b->gligsect].surf[b->gisflor].rsc / 8192.0f;
 	} else {
-		eyepol[eyepoln].worlduvs = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab % 3].uvcoords;
+		for (int k=0;k<3;k++)
+		eyepol[eyepoln].worlduvs[k] = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab % 3].uvcoords[k];
 		// must  transform uv vectors separately
 		//p3d_transform_wccw(eyepol[eyepoln].worlduvs.)
 		eyepol[eyepoln].uvform = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab % 3].uvform;
 		eyepol[eyepoln].pal = curMap->sect[b->gligsect].wall[b->gligwall].surf.pal;
 		eyepol[eyepoln].shade = curMap->sect[b->gligsect].wall[b->gligwall].surf.rsc / 8192.0f;
 	}
-
+	for (int k=0;k<3;k++)
+	p3_transform_wccw(&eyepol[eyepoln].worlduvs[k],b->movedcam.tr,b->orcam.tr);
 	eyepol[eyepoln].slabid = b->gligslab;
 	if (eyepol[eyepoln].alpha < 0) eyepol[eyepoln].alpha = 1;
 
