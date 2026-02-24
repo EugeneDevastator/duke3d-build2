@@ -754,31 +754,28 @@ void changesprisect_imp (int i, int nsect, mapstate_t *map)
 
 surf_t makeSurfWall(int w1, int wnex) {
 	surf_t s = {0};
-	s.tilnum=0;
-	s.owal = w1;
-	s.uwal = w1;//wnex; // temp diasble must use relative next wall or not.
-	s.vwal = w1;
-	s.otez = 0;
-	s.utez = 0;
-	s.vtez = TEZ_WORLDZ1;
-	s.alpha=1;
-	s.uvcoords[0] = (point3d){0,0,0};
-	s.uvcoords[1] = (point3d){1,0,0};
-	s.uvcoords[2] = (point3d){0,0,1};
+	s.tilnum = 0;
+	s.uvgen.otez = 0;
+	s.uvgen.utez = TEZ_NW;
+	s.uvgen.vtez = TEZ_WORLDZ1;
+	s.alpha = 1;
+	s.rt_uvs[0] = (point3d){0, 0, 0};
+	s.rt_uvs[1] = (point3d){1, 0, 0};
+	s.rt_uvs[2] = (point3d){0, 0, 1};
 
-	s.uvform[0]=1;
-	s.uvform[1]=1;
-	s.uvform[2]=0;
-	s.uvform[3]=0;
-	s.rsc=8192; // FIX THIS CRAP! its shade
+	s.uvform.scale.x = 1;
+	s.uvform.scale.y = 1;
+	s.uvform.pan.x = 0;
+	s.uvform.pan.y = 0;
+	s.rsc = 8192; // FIX THIS CRAP! its shade
 	return s;
 }
 
 surf_t makeSurfCap() {
 	surf_t s = makeSurfWall(0,1);
-	s.uvcoords[0] = (point3d){0,0,0};
-	s.uvcoords[1] = (point3d){1,0,0};
-	s.uvcoords[2] = (point3d){0,1,0};
+	s.rt_uvs[0] = (point3d){0,0,0};
+	s.rt_uvs[1] = (point3d){1,0,0};
+	s.rt_uvs[2] = (point3d){0,1,0};
 	return s;
 }
 
@@ -914,10 +911,10 @@ void makeslabuvform(int surfid, float slabH, wall_t *wal, int dukescales[4], int
 	float px1x = 1.0f/xsize;
 	float px1y = 1.0f/ysize;
 	float ypans_per_px = 256.f/ysize;
-	wal->xsurf[surfid].uvform[0]=scalerx;
-	wal->xsurf[surfid].uvform[1]=scalery;
-	wal->xsurf[surfid].uvform[2]=px1x * dukescales[2];
-	wal->xsurf[surfid].uvform[3]=px1y * (dukescales[3]/ypans_per_px);
+	wal->xsurf[surfid].uvform.scale.x=scalerx;
+	wal->xsurf[surfid].uvform.scale.y=scalery;
+	wal->xsurf[surfid].uvform.pan.x=px1x * dukescales[2];
+	wal->xsurf[surfid].uvform.pan.y=px1y * (dukescales[3]/ypans_per_px);
 
 }
 
@@ -930,8 +927,9 @@ float getzoftez(int tezflags, sect_t *mysec, int thiswall, point2d worldxy, maps
 	//point2d worldxy = tezflags & TEZ_WALNX
 	//	                  ? walnext(mysec, thiswall).pos
 	//	                  : mysec->wall[thiswall].pos;
-	if (tezflags & TEZ_WORLDZ1)
-{		return (tezflags & TEZ_FLOR) ? 1 : -1;}
+	if (tezflags & TEZ_WORLDZ1) {
+		return (tezflags & TEZ_FLOR) ? 1 : -1;
+	}
 
 	sect_t *nsec = &map->sect[mysec->wall[thiswall].ns];
 	sect_t *usedsec = tezflags & TEZ_NS
@@ -972,24 +970,25 @@ float getzoftez(int tezflags, sect_t *mysec, int thiswall, point2d worldxy, maps
 void makewaluvs(sect_t *sect, int wid, mapstate_t *map) {
 	wall_t *w = &sect->wall[wid];
 	surf_t *sur;// = &w->surf;
+	wall_t *nw = &sect->wall[w->n+wid];
 	for (int sl = 0; sl < w->surfn;sl++) {
 		sur = &w->xsurf[sl]; // dope hack to process raw wall surf first.
-		wall_t *usewal = &sect->wall[sur->owal];
-		sur->uvcoords[0] = (point3d) {usewal->x, usewal->y,getzoftez(sur->otez, sect, wid, usewal->pos, map) };
+		wall_t *usewal = (sur->uvgen.otez & TEZ_NW) ? nw : w;
+		sur->rt_uvs[0] = (point3d) {usewal->x, usewal->y,getzoftez(sur->uvgen.otez, sect, wid, usewal->pos, map) };
 
-		usewal = &sect->wall[sur->uwal];
-		sur->uvcoords[1] = (point3d) {usewal->x,usewal->y,getzoftez(sur->utez, sect, wid, usewal->pos, map) };
+		usewal = (sur->uvgen.utez & TEZ_NW) ? nw : w;
+		sur->rt_uvs[1] = (point3d) {usewal->x,usewal->y,getzoftez(sur->uvgen.utez, sect, wid, usewal->pos, map) };
 
-		usewal = &sect->wall[sur->vwal];
-		float z = getzoftez(sur->vtez, sect, wid, usewal->pos, map);
-		if (sur->vtez & TEZ_WORLDZ1)
-			z+=sur->uvcoords[0].z;
-		sur->uvcoords[2] = (point3d) {usewal->x,usewal->y,z };
+		usewal = (sur->uvgen.vtez & TEZ_NW) ? nw : w;
+		float z = getzoftez(sur->uvgen.vtez, sect, wid, usewal->pos, map);
+		if (sur->uvgen.vtez & TEZ_WORLDZ1)
+			z+=sur->rt_uvs[0].z;
+		sur->rt_uvs[2] = (point3d) {usewal->x,usewal->y,z };
 
-		if (sur->vtez & TEZ_INVZ) {
-			float dz = sur->uvcoords[2].z-sur->uvcoords[0].z;
-			sur->uvcoords[2].z = -dz + sur->uvcoords[0].z;
-		}
+		//if (sur->uvgen.vtez & TEZ_INVZ) {
+		//	float dz = sur->rt_uvs[2].z-sur->rt_uvs[0].z;
+		//	sur->rt_uvs[2].z = -dz + sur->rt_uvs[0].z;
+		//}
 
 	}
 
@@ -1003,72 +1002,72 @@ void makesecuvs(sect_t *sect, mapstate_t *map) {
 		surf_t *sur = &sect->surf[fl];
 		float xmul,ymul;
 		if ((sect->mflags[fl] &SECTOR_SWAP_XY)) {
-			 xmul = sur->uvform[1];
-			 ymul = sur->uvform[0];
+			 xmul = sur->uvform.scale.y;
+			 ymul = sur->uvform.scale.x;
 		}else
 			{
-			xmul = sur->uvform[0];
-			ymul = sur->uvform[1];
+			xmul = sur->uvform.scale.x;
+			ymul = sur->uvform.scale.y;
 		}
 
-		float xpan = sur->uvform[2];
-		float ypan = sur->uvform[3];
+		float xpan = sur->uvform.pan.x;
+		float ypan = sur->uvform.pan.y;
 
 
 		ymul *= -1; // world x-flipped
 
 float scaler=1;
-		if (sur->uvmapkind == UV_WORLDXY) {
+		if (sur->uvform.mapping_kind == UV_WORLDXY) {
 			scaler = (sect->mflags[fl] & SECTOR_EXPAND_TEXTURE) ? 1 : 2;
-			sur->uvcoords[0] = (point3d){0, 0, z};
-			sur->uvcoords[1] = (point3d){xmul*scaler, 0, z};
-			sur->uvcoords[2] = (point3d){0, ymul*scaler, z};
-			sur->uvform[0] = 1;
-			sur->uvform[1] = 1;
-		} else if (sur->uvmapkind == UV_TEXELRATE) { //
+			sur->rt_uvs[0] = (point3d){0, 0, z};
+			sur->rt_uvs[1] = (point3d){xmul*scaler, 0, z};
+			sur->rt_uvs[2] = (point3d){0, ymul*scaler, z};
+			sur->uvform.scale.x = 1;
+			sur->uvform.scale.y = 1;
+		} else if (sur->uvform.mapping_kind == UV_TEXELRATE) { //
 			scaler = (sect->mflags[fl] & SECTOR_EXPAND_TEXTURE) ?  2 : 1;
 			point2d nwp = walnext(sect, 0).pos;
-			sur->uvcoords[0] = (point3d){wp.x, wp.y, z};
+			sur->rt_uvs[0] = (point3d){wp.x, wp.y, z};
 			point3d uvec = (point3d){nwp.x, nwp.y, z};
 			// get ortho to wall,
-			point3d normU = p3_diff(uvec, sur->uvcoords[0]);
+			point3d normU = p3_diff(uvec, sur->rt_uvs[0]);
 			normU = p3_normalized(normU);
-			sur->uvcoords[1] = normU;
-			p3_addto(&sur->uvcoords[1], sur->uvcoords[0]);
+			sur->rt_uvs[1] = normU;
+			p3_addto(&sur->rt_uvs[1], sur->rt_uvs[0]);
 
 			p3_rot90_cwz(&normU);
 			// get sloped Z and normalize;
-			float vz = getslopez(sect, fl, normU.x+sur->uvcoords[0].x, normU.y+sur->uvcoords[0].y);
+			float vz = getslopez(sect, fl, normU.x+sur->rt_uvs[0].x, normU.y+sur->rt_uvs[0].y);
 			normU.z = vz-z;
 			normU = p3_normalized(normU);
 
-			sur->uvcoords[2] = normU;
-			p3_addto(&sur->uvcoords[2], sur->uvcoords[0]);
+			sur->rt_uvs[2] = normU;
+			p3_addto(&sur->rt_uvs[2], sur->rt_uvs[0]);
 
-			sur->uvform[0] = xmul * scaler;
-			sur->uvform[1] = ymul * scaler;
+			sur->uvform.scale.x = xmul * scaler;
+			sur->uvform.scale.y = ymul * scaler;
 		}
 
 
-		if ((sect->mflags[fl] & SECTOR_FLIP_X)) sur->uvform[0] *= -1;
-		if ((sect->mflags[fl] & SECTOR_FLIP_Y)) sur->uvform[1] *= -1;
+		if ((sect->mflags[fl] & SECTOR_FLIP_X)) sur->uvform.scale.x *= -1;
+		if ((sect->mflags[fl] & SECTOR_FLIP_Y)) sur->uvform.scale.y *= -1;
 		if (sect->mflags[fl] & SECTOR_SWAP_XY) {
 			if (((sect->mflags[fl] & SECTOR_FLIP_X) != 0) != ((sect->mflags[fl] & SECTOR_FLIP_Y) != 0)) {
-				sur->uvform[0] *= -1;
-				sur->uvform[1] *= -1;
+				sur->uvform.scale.x *= -1;
+				sur->uvform.scale.y *= -1;
 			}
 			float t;
-			t = sur->uvform[0];
-			sur->uvform[0] = sur->uvform[1];
-			sur->uvform[1] = t;
+			t = sur->uvform.scale.x;
+			sur->uvform.scale.x = sur->uvform.scale.y;
+			sur->uvform.scale.y = t;
 			// duh probably thats how duke works - pan is not swapped.
-			//	t = sur->uvform[2];
-			//	sur->uvform[2] = sur->uvform[3];
-			//	sur->uvform[3] = t;
+			//	t = sur->uvform.pan.x;
+			//	sur->uvform.pan.x = sur->uvform.pan.y;
+			//	sur->uvform.pan.y = t;
 
-			point3d tp = sur->uvcoords[1];
-			sur->uvcoords[1] = sur->uvcoords[2];
-			sur->uvcoords[2] = tp;
+			point3d tp = sur->rt_uvs[1];
+			sur->rt_uvs[1] = sur->rt_uvs[2];
+			sur->rt_uvs[2] = tp;
 		}
 	}
 }

@@ -873,8 +873,8 @@ public:
 				float v = Vector3DotProduct(localPos, Vector3Normalize(locV)) / Vector3Length(locV);
 
 				// post-unwrap transformation
-				u = u * eyepol[i].uvform[0] + eyepol[i].uvform[2];
-				v = v * eyepol[i].uvform[1] + eyepol[i].uvform[3];
+				u = u * eyepol[i].uvform.scale.x + eyepol[i].uvform.pan.x;
+				v = v * eyepol[i].uvform.scale.y + eyepol[i].uvform.pan.y;
 
 				rlColor4f(usedcol.x, usedcol.y, usedcol.z, usedcol.w);
 				rlTexCoord2f(u, v);

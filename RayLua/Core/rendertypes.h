@@ -16,6 +16,8 @@ typedef struct {
 	uint32_t sprid;
 } spripoly_t;
 
+
+
 typedef struct {
 	int vert0;                          // Index into first vertex in eyepolv
 	int b2sect, b2wall, b2slab;         // Build2 geometry references
@@ -33,8 +35,8 @@ typedef struct {
 	bool hasuvs;
 	int8_t isflor;
 	// uv data
-	point3d worlduvs[3]; // origin, u ,v
-	float* uvform;
+	point3d worlduvs[5]; // origin, u ,v, c, eye
+	uvform_t uvform;
 	int slabid;
 	int c1,c2,e1,e2;
 	int pal;

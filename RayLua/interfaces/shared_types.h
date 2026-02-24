@@ -212,27 +212,8 @@ free((arena).data); \
 // flor or ceil;
 // raw z or slope z;
 
-// placeholders for readability
-// Dont use in main parser!
-#define TEZ_OS 0
-#define TEZ_RAWZ 0
-#define TEZ_CEIL 0
 
-#define TEZ_NW		 (1<<0)  // use floor or ceil
-#define TEZ_NS		 (1<<1) // this or next sect
-#define TEZ_FLOR	 (1<<2)  // use floor or ceil
-#define TEZ_SLOPE	 (1<<3) // slope or rawz;
-#define TEZ_CLOSEST	 (1<<4) // closest height point instead of arbitrary.
-#define TEZ_FURTHEST (1<<5) // closest height point instead of arbitrary.
-#define TEZ_WORLDZ1	 (1<<6) // use unit world z vector
 
-#define TEZ_INVZ	 (1<<7) // use next continious wall move to multiplier
-
-// auto resolution optioons, written in ouv wal
-#define TEW_WORLDF -1
-#define TEW_WORLDR -2
-#define TEW_WORLDD -3
-#define TEW_ORTHO -4
 //Bit0:Blocking, Bit2:1WayOtherSide, Bit5,Bit4:Face/Wall/Floor/.., Bit6:1side, Bit16:IsLight, Bit17-19:SpotAx(1-6), Bit20-29:SpotWid, Bit31:Invisible
 // ------ Duke Nukem tiling and coords.
 // 1024 build units(x,y) correspond to 64 pixels. at 8,8 repeat.
@@ -287,6 +268,39 @@ typedef struct {
 typedef struct {
 	float x, y, z, w;
 } quat;
+typedef struct {
+	point3d uvpt[5];// Origin Upt Vpt Corner(O+U+V) Eye;
+	float eyebias;
+	float persp_ratio; // 1 = perspective, 0 =ortho
+
+} uvw_cords;
+
+// placeholders for readability
+// Dont use in main parser!
+#define TEZ_OS 0
+#define TEZ_RAWZ 0
+#define TEZ_CEIL 0
+
+#define TEZ_NW		 (1<<0)  // use this or following wall(wal[x].n+x)
+#define TEZ_NS		 (1<<1) // this or next sect
+#define TEZ_FLOR	 (1<<2)  // use floor or ceil
+#define TEZ_SLOPE	 (1<<3) // slope or rawz;
+#define TEZ_CLOSEST	 (1<<4) // closest height point instead of arbitrary.
+#define TEZ_FURTHEST (1<<5) // furthest height point instead of arbitrary.
+#define TEZ_WORLDZ1	 (1<<6) // use unit world z vector
+
+typedef struct {
+	unsigned int otez : 7; // TEZ flags
+	unsigned int utez : 7;
+	unsigned int vtez : 7;
+	unsigned int ctez : 7; // 4th corner vector C = o + v + c
+	unsigned int o_do_regen : 1; // do we regen it on movement, if not, then vectors wont regenerate.
+	unsigned int u_do_regen : 1; // v persp. vp1 = o +v; vp2 = o+v+vp.
+	unsigned int v_do_regen : 1; // v persp. vp1 = o +v; vp2 = o+v+vp.
+	unsigned int c_do_regen : 1; // v persp. vp1 = o +v; vp2 = o+v+vp.
+} procuvgen32_t; // procedural uv data
+
+
 
 typedef struct { double x, y, z; } dpoint3d; 	//Note: pol doesn't support loops as dpoint3d's!
 typedef struct { float x, y; } point2d;
@@ -310,24 +324,25 @@ typedef struct {
 } renderflags32_t;
 
 typedef struct {
+	// use z for possible volumetric tex impostors
+point3d scale;
+point3d pan;
+point3d anchorA;
+point3d anchorB;
+point3d rot; // rot z is for deault uvs
+
+uint8_t mapping_kind; // uv amappings, regular, polar, hex, flipped variants etc. paralax.
+uint16_t tile_ordering; // normal, polar, hex etc.
+
+} uvform_t;
+
+typedef struct {
 	unsigned int is_bunchbreak : 1;
 	unsigned int is_mask_emitter : 1; // can be alpha test
 	unsigned int is_portal : 1; // for new style portals
 	unsigned int is_traversal_blocker : 1; // for full masks for ex.
 	unsigned int RESERVED : 6;    // padding to 32 bits
 } geoflags8_t;
-
-typedef struct {
-	unsigned int otez : 6; // TEZ
-	unsigned int utez : 6;
-	unsigned int vtez : 6;
-	unsigned int ctez : 6; // 4th corner vector C = o + v + c
-	unsigned int o_do_regen : 1; // do we regen it on movement, if not, then vectors wont regenerate.
-	unsigned int u_do_regen : 1; // v persp. vp1 = o +v; vp2 = o+v+vp.
-	unsigned int v_do_regen : 1; // v persp. vp1 = o +v; vp2 = o+v+vp.
-	unsigned int c_do_regen : 1; // v persp. vp1 = o +v; vp2 = o+v+vp.
-	unsigned int _PAD : 4; // v persp. vp1 = o +v; vp2 = o+v+vp.
-} procuv32_t; // procedural uv data
 
 
 typedef struct {
@@ -401,15 +416,18 @@ typedef struct // surf_t
 		};
 		uint32_t packed_tile_data;
 	};
+	enum fragRenderMode frMode;
+	procuvgen32_t uvgen;
+	uvform_t uvform;//[9]; // scale xy, pan xy, crop AB, rotation
+
+
 	//Bit0:Blocking, Bit2:RelativeAlignment, Bit5:1Way, Bit16:IsParallax, Bit17:IsSkybox
 	uint32_t flags;	short lotag, hitag;
 	float alpha;
-	float uvform[9]; // scale xy, pan xy, crop AB, rotation
-	int8_t owal, otez, uwal, utez, vwal, vtez, wtez; // wals are always wals of this sector.
+
 	// wtez is second skew vector, originating at v end. by default parallel to u. but can be inverted for trapezoid map.
-	uint8_t uvmapkind; // uv amappings, regular, polar, hex, flipped variants etc. paralax.
-	uint8_t tilingkind; // normal, polar, hex etc.
-	enum fragRenderMode frMode;
+
+
 // ------------
 	uint8_t reflection_strength;
 	uint8_t pass_strength;
@@ -421,7 +439,7 @@ typedef struct // surf_t
 // ------- runtime gneerated data
 	// for portals case - we dont care and use original world for everything.
 	// interpolator will lerp worldpositions, regardless of poly location
-	point3d uvcoords[3]; // world uv vectors. generated per poly. origin, u ,v, w
+	point3d rt_uvs[5]; // world uv vectors. generated per poly. origin, uv, c, eye
 
 	// can in theory use object space and encode it.
 
@@ -460,7 +478,7 @@ typedef struct // wall t
 	uint8_t surfn;
 	uint8_t geoflags;
 	surf_t surf, xsurf[3]; //additional malloced surfs when (surfn > 1)
-	uint16_t mflags[4]; // modflags
+	int16_t mflags[4]; // modflags
 	int32_t tags[16]; // standard tag is 4bytes
 	int8_t tempflags; // used only in editor for data transfers.
 

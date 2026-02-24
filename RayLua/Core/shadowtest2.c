@@ -992,13 +992,13 @@ static void emit_wallpoly_func(int rethead0, int rethead1, bdrawctx *b) {
 	if (b->gisflor < 2) {
 		eyepol[eyepoln].isflor = b->gisflor;
 		for (int k=0;k<3;k++)
-			eyepol[eyepoln].worlduvs[k] = curMap->sect[b->gligsect].surf[b->gisflor].uvcoords[k];
+			eyepol[eyepoln].worlduvs[k] = curMap->sect[b->gligsect].surf[b->gisflor].rt_uvs[k];
 		eyepol[eyepoln].uvform = curMap->sect[b->gligsect].surf[b->gisflor].uvform;
 		eyepol[eyepoln].pal = curMap->sect[b->gligsect].surf[b->gisflor].pal;
 		eyepol[eyepoln].shade = curMap->sect[b->gligsect].surf[b->gisflor].rsc / 8192.0f;
 	} else {
 		for (int k=0;k<3;k++)
-		eyepol[eyepoln].worlduvs[k] = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab % 3].uvcoords[k];
+		eyepol[eyepoln].worlduvs[k] = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab % 3].rt_uvs[k];
 		// must  transform uv vectors separately
 		//p3d_transform_wccw(eyepol[eyepoln].worlduvs.)
 		eyepol[eyepoln].uvform = curMap->sect[b->gligsect].wall[b->gligwall].xsurf[b->gligslab % 3].uvform;
@@ -2048,6 +2048,17 @@ int lastvalidsec = 0;
 void draw_hsr_polymost_lights(cam_t *cc, mapstate_t *map, int dummy) {
 // prep ctx,
 }
+
+void drawloop() {
+	// setup frame
+	// Do render pass - collect portals.
+	// render portals
+	//    - Do render pass while any portals.
+	// render pass collects portlas
+	// render pass is two halfplanes?
+	// do we need to split mono twice? we could use real plane with two bunchfronts
+}
+
 
 void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy) {
 
