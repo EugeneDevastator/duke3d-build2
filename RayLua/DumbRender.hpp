@@ -757,6 +757,83 @@ public:
 	static Vector3 buildToRaylibPos(dpoint3d buildcoord) {
 		return {(float) buildcoord.x, (float) -buildcoord.z, (float) buildcoord.y};
 	}
+static int bilinear_solve(
+    Vector3 Q00, Vector3 Q10, Vector3 Q01, Vector3 Q11,
+    Vector3 P,
+    float *s_out, float *t_out)
+{
+    Vector3 span = Vector3Subtract(Q11, Q00);
+    float ax = fabsf(span.x), ay = fabsf(span.y), az = fabsf(span.z);
+    int xi, yi;
+    if (ax >= ay && ax >= az) { xi = 1; yi = 2; }
+    else if (ay >= ax && ay >= az) { xi = 0; yi = 2; }
+    else { xi = 0; yi = 1; }
+
+    #define COMP(v, i) ((i)==0?(v).x:(i)==1?(v).y:(v).z)
+
+    float A00x = COMP(Q00,xi), A00y = COMP(Q00,yi);
+    float A10x = COMP(Q10,xi), A10y = COMP(Q10,yi);
+    float A01x = COMP(Q01,xi), A01y = COMP(Q01,yi);
+    float A11x = COMP(Q11,xi), A11y = COMP(Q11,yi);
+    float Px   = COMP(P,  xi), Py   = COMP(P,  yi);
+
+    float Ax = A11x - A10x - A01x + A00x;
+    float Bx = A10x - A00x;
+    float Cx = A01x - A00x;
+    float Dx = A00x - Px;
+
+    float Ay = A11y - A10y - A01y + A00y;
+    float By = A10y - A00y;
+    float Cy = A01y - A00y;
+    float Dy = A00y - Py;
+
+    float qa = Ax*By - Ay*Bx;
+    float qb = Ax*Dy + Cx*By - Ay*Dx - Cy*Bx;
+    float qc = Cx*Dy - Cy*Dx;
+
+    float s;
+    if (fabsf(qa) < 1e-6f) {
+        if (fabsf(qb) < 1e-9f) return 0;
+        s = -qc / qb;
+    } else {
+        float disc = qb*qb - 4.0f*qa*qc;
+        if (disc < 0.0f) disc = 0.0f;
+        float sq = sqrtf(disc);
+        float s0 = (-qb + sq) / (2.0f*qa);
+        float s1 = (-qb - sq) / (2.0f*qa);
+        int s0ok = (s0 >= -0.01f && s0 <= 1.01f);
+        int s1ok = (s1 >= -0.01f && s1 <= 1.01f);
+        if (s0ok && s1ok) {
+            // both valid: pick by which gives t closer to [0,1] center
+            // compute t for each and score
+            float t0, t1;
+            float d0 = Ax*s0 + Cx;
+            t0 = (fabsf(d0) > 1e-6f) ? -(Bx*s0 + Dx)/d0 : -(By*s0 + Dy)/(Ay*s0+Cy);
+            float d1 = Ax*s1 + Cx;
+            t1 = (fabsf(d1) > 1e-6f) ? -(Bx*s1 + Dx)/d1 : -(By*s1 + Dy)/(Ay*s1+Cy);
+            // score = distance from (0.5, 0.5)
+            float sc0 = fabsf(s0-0.5f) + fabsf(t0-0.5f);
+            float sc1 = fabsf(s1-0.5f) + fabsf(t1-0.5f);
+            s = (sc0 <= sc1) ? s0 : s1;
+        } else if (s0ok) s = s0;
+        else s = s1;
+    }
+
+    float denom = Ax*s + Cx;
+    float t;
+    if (fabsf(denom) > 1e-6f)
+        t = -(Bx*s + Dx) / denom;
+    else {
+        denom = Ay*s + Cy;
+        if (fabsf(denom) < 1e-6f) return 0;
+        t = -(By*s + Dy) / denom;
+    }
+
+    *s_out = s;
+    *t_out = t;
+    return 1;
+    #undef COMP
+}
 
 	static bool draw_eyepol_withuvtex(float sw, float sh, int i, int v0, int vertCount, bool isopaque) {
 		rlDrawRenderBatchActive();
@@ -857,22 +934,24 @@ public:
 			eyepol[i].tilnum = 5;
 
 		float z_angle_deg = eyepol[i].uvform.rot.z;
-		Vector3 worldOrigin = bpv3(eyepol[i].worlduvs[0]);
-		Vector3 worldU = bpv3(eyepol[i].worlduvs[1]);
-		Vector3 worldV = bpv3(eyepol[i].worlduvs[2]);
-		Vector3 locU = worldU - worldOrigin;
-		Vector3 locV = worldV - worldOrigin;
-		Vector3 uDir = Vector3Normalize(locU);
-		Vector3 vDir = Vector3Normalize(locV);
+		Vector3 Q00 = bpv3(eyepol[i].worlduvs[0]);
+		Vector3 Q10 = bpv3(eyepol[i].worlduvs[1]);
+		Vector3 Q01 = bpv3(eyepol[i].worlduvs[2]);
+		Vector3 Q11 = bpv3(eyepol[i].worlduvs[3]);
+
+		Vector3 locU = Vector3Subtract(Q10, Q00);
+		Vector3 locV = Vector3Subtract(Q01, Q00);
 		float uLen = Vector3Length(locU);
 		float vLen = Vector3Length(locV);
+		Vector3 uDir = Vector3Normalize(locU);
+		Vector3 vDir = Vector3Normalize(locV);
 
 		float rad = z_angle_deg * DEG2RAD;
 		float cosA = cosf(rad);
 		float sinA = sinf(rad);
+		// Rotated world-space axes (same as original code)
 		Vector3 rotU = Vector3Add(Vector3Scale(uDir, cosA), Vector3Scale(vDir, -sinA));
 		Vector3 rotV = Vector3Add(Vector3Scale(uDir, sinA), Vector3Scale(vDir,  cosA));
-
 
 		for (int locidx = 0; locidx < eyepol[i].tricnt; locidx += 1) {
 			for (int j = 0; j < 3; j++) {
@@ -880,18 +959,27 @@ public:
 				uint32_t idx = eyepoli[iidx];
 				Vector3 vertRlPos = buildToRaylibPos(eyepolv[idx]);
 				Vector3 uvwpos = bpv3(eyepolv[idx]);
-				Vector3 vertlocalpos = uvwpos - worldOrigin;
+				Vector3 lp = Vector3Subtract(uvwpos, Q00);
 
+				// Project vertex onto rotated axes to get rotated local position
+				float ru = Vector3DotProduct(lp, rotU);
+				float rv = Vector3DotProduct(lp, rotV);
+				// Reconstruct rotated world position for bilinear solve
+				Vector3 rotatedP = Vector3Add(Q00,
+								   Vector3Add(Vector3Scale(uDir, ru),
+											  Vector3Scale(vDir, rv)));
 
-				float u = Vector3DotProduct(vertlocalpos, rotU) / uLen;
-				float v = Vector3DotProduct(vertlocalpos, rotV) / vLen;
+				float s, t;
+				if (!bilinear_solve(Q00, Q10, Q01, Q11, rotatedP, &s, &t)) {
+					s = ru / uLen;
+					t = rv / vLen;
+				}
 
-				u = u * eyepol[i].uvform.scale.x + eyepol[i].uvform.pan.x;
-				v = v * eyepol[i].uvform.scale.y + eyepol[i].uvform.pan.y;
+				float u = s * eyepol[i].uvform.scale.x + eyepol[i].uvform.pan.x;
+				float v = t * eyepol[i].uvform.scale.y + eyepol[i].uvform.pan.y;
 
 				rlColor4f(usedcol.x, usedcol.y, usedcol.z, usedcol.w);
 				rlTexCoord2f(u, v);
-				// rlNormal3f(uvwpos.x,uvwpos.y,uvwpos.z); // this bitch gets transformed.
 				rlVertex3f(vertRlPos.x, vertRlPos.y, vertRlPos.z);
 			}
 		}
