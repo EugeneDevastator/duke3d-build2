@@ -757,83 +757,86 @@ public:
 	static Vector3 buildToRaylibPos(dpoint3d buildcoord) {
 		return {(float) buildcoord.x, (float) -buildcoord.z, (float) buildcoord.y};
 	}
-static int bilinear_solve(
+// Project P onto the quad using edge-ratio method.
+// No quadratic, no ambiguous roots.
+static void quad_st(
     Vector3 Q00, Vector3 Q10, Vector3 Q01, Vector3 Q11,
     Vector3 P,
     float *s_out, float *t_out)
 {
-    Vector3 span = Vector3Subtract(Q11, Q00);
-    float ax = fabsf(span.x), ay = fabsf(span.y), az = fabsf(span.z);
+    // Find dominant normal to project to 2D
+    Vector3 e0 = Vector3Subtract(Q10, Q00);
+    Vector3 e1 = Vector3Subtract(Q01, Q00);
+    Vector3 n  = Vector3CrossProduct(e0, e1);
+    float nx = fabsf(n.x), ny = fabsf(n.y), nz = fabsf(n.z);
     int xi, yi;
-    if (ax >= ay && ax >= az) { xi = 1; yi = 2; }
-    else if (ay >= ax && ay >= az) { xi = 0; yi = 2; }
+    if (nx >= ny && nx >= nz) { xi = 1; yi = 2; }
+    else if (ny >= nx && ny >= nz) { xi = 0; yi = 2; }
     else { xi = 0; yi = 1; }
 
-    #define COMP(v, i) ((i)==0?(v).x:(i)==1?(v).y:(v).z)
+    #define C(v,i) ((i)==0?(v).x:(i)==1?(v).y:(v).z)
+    float ax=C(Q00,xi), ay=C(Q00,yi);
+    float bx=C(Q10,xi), by=C(Q10,yi);
+    float cx=C(Q01,xi), cy=C(Q01,yi);
+    float dx=C(Q11,xi), dy=C(Q11,yi);
+    float px=C(P,  xi), py=C(P,  yi);
+    #undef C
 
-    float A00x = COMP(Q00,xi), A00y = COMP(Q00,yi);
-    float A10x = COMP(Q10,xi), A10y = COMP(Q10,yi);
-    float A01x = COMP(Q01,xi), A01y = COMP(Q01,yi);
-    float A11x = COMP(Q11,xi), A11y = COMP(Q11,yi);
-    float Px   = COMP(P,  xi), Py   = COMP(P,  yi);
+    // Bottom edge: Q00->Q10, top edge: Q01->Q11
+    // For a given t, left point = lerp(Q00,Q01,t), right point = lerp(Q10,Q11,t)
+    // Find t: signed area of triangle (left(t), right(t), P) = 0
+    // left(t)  = (ax+t*(cx-ax), ay+t*(cy-ay))
+    // right(t) = (bx+t*(dx-bx), by+t*(dy-by))
+    // vec along edge: (right-left)
+    // vec to P from left: (P-left)
+    // cross = 0 means P is on the line between left and right
+    // cross2d(right-left, P-left) = 0
+    // (rx-lx)*(py-ly) - (ry-ly)*(px-lx) = 0
+    // lx = ax+t*(cx-ax), ly = ay+t*(cy-ay)
+    // rx = bx+t*(dx-bx), ry = by+t*(dy-by)
+    // rx-lx = (bx-ax) + t*((dx-cx)-(bx-ax))  let Ex=(bx-ax), Fx=((dx-cx)-(bx-ax))
+    // ry-ly = (by-ay) + t*((dy-cy)-(by-ay))  let Ey=(by-ay), Fy=((dy-cy)-(by-ay))
+    // px-lx = (px-ax) - t*(cx-ax)             let Gx=(px-ax), Hx=-(cx-ax)
+    // py-ly = (py-ay) - t*(cy-ay)             let Gy=(py-ay), Hy=-(cy-ay)
+    // cross = (Ex+t*Fx)*(Gy+t*Hy) - (Ey+t*Fy)*(Gx+t*Hx) = 0
+    // = Ex*Gy + t*(Ex*Hy+Fx*Gy) + t^2*(Fx*Hy)
+    // - Ey*Gx - t*(Ey*Hx+Fy*Gx) - t^2*(Fy*Hx) = 0
+    // quadratic in t... same problem.
+    //
+    // INSTEAD: iterative 2-step lerp. Converges in 2 iterations for linear quads.
+    // For a trapezoid (linear edges) this is exact in 1-2 Newton steps.
 
-    float Ax = A11x - A10x - A01x + A00x;
-    float Bx = A10x - A00x;
-    float Cx = A01x - A00x;
-    float Dx = A00x - Px;
+    float s = 0.5f, t = 0.5f;
+    for (int iter = 0; iter < 8; iter++) {
+        // Given current t, find s: point on bottom-top lerped edge
+        float lx = ax + t*(cx-ax);  float ly = ay + t*(cy-ay);
+        float rx = bx + t*(dx-bx);  float ry = by + t*(dy-by);
+        float edx = rx-lx, edy = ry-ly;
+        float len2 = edx*edx + edy*edy;
+        s = (len2 > 1e-12f) ? ((px-lx)*edx + (py-ly)*edy) / len2 : 0.0f;
 
-    float Ay = A11y - A10y - A01y + A00y;
-    float By = A10y - A00y;
-    float Cy = A01y - A00y;
-    float Dy = A00y - Py;
-
-    float qa = Ax*By - Ay*Bx;
-    float qb = Ax*Dy + Cx*By - Ay*Dx - Cy*Bx;
-    float qc = Cx*Dy - Cy*Dx;
-
-    float s;
-    if (fabsf(qa) < 1e-6f) {
-        if (fabsf(qb) < 1e-9f) return 0;
-        s = -qc / qb;
-    } else {
-        float disc = qb*qb - 4.0f*qa*qc;
-        if (disc < 0.0f) disc = 0.0f;
-        float sq = sqrtf(disc);
-        float s0 = (-qb + sq) / (2.0f*qa);
-        float s1 = (-qb - sq) / (2.0f*qa);
-        int s0ok = (s0 >= -0.01f && s0 <= 1.01f);
-        int s1ok = (s1 >= -0.01f && s1 <= 1.01f);
-        if (s0ok && s1ok) {
-            // both valid: pick by which gives t closer to [0,1] center
-            // compute t for each and score
-            float t0, t1;
-            float d0 = Ax*s0 + Cx;
-            t0 = (fabsf(d0) > 1e-6f) ? -(Bx*s0 + Dx)/d0 : -(By*s0 + Dy)/(Ay*s0+Cy);
-            float d1 = Ax*s1 + Cx;
-            t1 = (fabsf(d1) > 1e-6f) ? -(Bx*s1 + Dx)/d1 : -(By*s1 + Dy)/(Ay*s1+Cy);
-            // score = distance from (0.5, 0.5)
-            float sc0 = fabsf(s0-0.5f) + fabsf(t0-0.5f);
-            float sc1 = fabsf(s1-0.5f) + fabsf(t1-0.5f);
-            s = (sc0 <= sc1) ? s0 : s1;
-        } else if (s0ok) s = s0;
-        else s = s1;
-    }
-
-    float denom = Ax*s + Cx;
-    float t;
-    if (fabsf(denom) > 1e-6f)
-        t = -(Bx*s + Dx) / denom;
-    else {
-        denom = Ay*s + Cy;
-        if (fabsf(denom) < 1e-6f) return 0;
-        t = -(By*s + Dy) / denom;
+        // Given current s, find t: point on left-right lerped edge
+        float tx2 = ax + s*(bx-ax);  float ty2 = ay + s*(by-ay);
+        float ux2 = cx + s*(dx-cx);  float uy2 = cy + s*(dy-cy);
+        float etx = ux2-tx2, ety = uy2-ty2;
+        float len2t = etx*etx + ety*ety;
+        t = (len2t > 1e-12f) ? ((px-tx2)*etx + (py-ty2)*ety) / len2t : 0.0f;
     }
 
     *s_out = s;
     *t_out = t;
-    return 1;
-    #undef COMP
 }
+
+	// Rotate a point around Q00 in the uDir/vDir plane
+	static Vector3 rotate_in_plane(Vector3 p, Vector3 origin, Vector3 uDir, Vector3 vDir, float cosA, float sinA) {
+		Vector3 lp = Vector3Subtract(p, origin);
+		float pu = Vector3DotProduct(lp, uDir);
+		float pv = Vector3DotProduct(lp, vDir);
+		float ru = pu * cosA + pv * sinA;
+		float rv = -pu * sinA + pv * cosA;
+		return Vector3Add(origin, Vector3Add(Vector3Scale(uDir, ru), Vector3Scale(vDir, rv)));
+	}
+
 
 	static bool draw_eyepol_withuvtex(float sw, float sh, int i, int v0, int vertCount, bool isopaque) {
 		rlDrawRenderBatchActive();
@@ -941,17 +944,19 @@ static int bilinear_solve(
 
 		Vector3 locU = Vector3Subtract(Q10, Q00);
 		Vector3 locV = Vector3Subtract(Q01, Q00);
-		float uLen = Vector3Length(locU);
-		float vLen = Vector3Length(locV);
 		Vector3 uDir = Vector3Normalize(locU);
 		Vector3 vDir = Vector3Normalize(locV);
 
 		float rad = z_angle_deg * DEG2RAD;
 		float cosA = cosf(rad);
 		float sinA = sinf(rad);
-		// Rotated world-space axes (same as original code)
-		Vector3 rotU = Vector3Add(Vector3Scale(uDir, cosA), Vector3Scale(vDir, -sinA));
-		Vector3 rotV = Vector3Add(Vector3Scale(uDir, sinA), Vector3Scale(vDir,  cosA));
+
+		// Rotate the quad corners instead of the vertex
+		// This keeps the solve in a consistent space
+		Vector3 RQ00 = Q00; // origin stays
+		Vector3 RQ10 = rotate_in_plane(Q10, Q00, uDir, vDir, cosA, sinA);
+		Vector3 RQ01 = rotate_in_plane(Q01, Q00, uDir, vDir, cosA, sinA);
+		Vector3 RQ11 = rotate_in_plane(Q11, Q00, uDir, vDir, cosA, sinA);
 
 		for (int locidx = 0; locidx < eyepol[i].tricnt; locidx += 1) {
 			for (int j = 0; j < 3; j++) {
@@ -959,21 +964,9 @@ static int bilinear_solve(
 				uint32_t idx = eyepoli[iidx];
 				Vector3 vertRlPos = buildToRaylibPos(eyepolv[idx]);
 				Vector3 uvwpos = bpv3(eyepolv[idx]);
-				Vector3 lp = Vector3Subtract(uvwpos, Q00);
-
-				// Project vertex onto rotated axes to get rotated local position
-				float ru = Vector3DotProduct(lp, rotU);
-				float rv = Vector3DotProduct(lp, rotV);
-				// Reconstruct rotated world position for bilinear solve
-				Vector3 rotatedP = Vector3Add(Q00,
-								   Vector3Add(Vector3Scale(uDir, ru),
-											  Vector3Scale(vDir, rv)));
 
 				float s, t;
-				if (!bilinear_solve(Q00, Q10, Q01, Q11, rotatedP, &s, &t)) {
-					s = ru / uLen;
-					t = rv / vLen;
-				}
+				quad_st(RQ00, RQ10, RQ01, RQ11, uvwpos, &s, &t);
 
 				float u = s * eyepol[i].uvform.scale.x + eyepol[i].uvform.pan.x;
 				float v = t * eyepol[i].uvform.scale.y + eyepol[i].uvform.pan.y;
