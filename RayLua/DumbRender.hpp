@@ -762,11 +762,8 @@ public:
 		rlDrawRenderBatchActive();
 		rlEnableBackfaceCulling();
 
-		Vector3 worldOrigin = bpv3(eyepol[i].worlduvs[0]);
-		Vector3 worldU = bpv3(eyepol[i].worlduvs[1]);
-		Vector3 worldV = bpv3(eyepol[i].worlduvs[2]);
-		Vector3 locU = worldU - worldOrigin;
-		Vector3 locV = worldV - worldOrigin;
+
+
 		int useGrad = 1;
 		Vector4 usedcol = {1, 1, 1, 1};
 		switch (eyepol[i].pal) {
@@ -859,27 +856,43 @@ public:
 		if (eyepol[i].tilnum > numartiles || eyepol[i].tilnum <0)
 			eyepol[i].tilnum = 5;
 
+		float z_angle_deg = eyepol[i].uvform.rot.z;
+		Vector3 worldOrigin = bpv3(eyepol[i].worlduvs[0]);
+		Vector3 worldU = bpv3(eyepol[i].worlduvs[1]);
+		Vector3 worldV = bpv3(eyepol[i].worlduvs[2]);
+		Vector3 locU = worldU - worldOrigin;
+		Vector3 locV = worldV - worldOrigin;
+		Vector3 uDir = Vector3Normalize(locU);
+		Vector3 vDir = Vector3Normalize(locV);
+		float uLen = Vector3Length(locU);
+		float vLen = Vector3Length(locV);
+
+		float rad = z_angle_deg * DEG2RAD;
+		float cosA = cosf(rad);
+		float sinA = sinf(rad);
+		Vector3 rotU = Vector3Add(Vector3Scale(uDir, cosA), Vector3Scale(vDir, -sinA));
+		Vector3 rotV = Vector3Add(Vector3Scale(uDir, sinA), Vector3Scale(vDir,  cosA));
 
 
 		for (int locidx = 0; locidx < eyepol[i].tricnt; locidx += 1) {
 			for (int j = 0; j < 3; j++) {
 				int iidx = eyepol[i].triidstart + locidx * 3 + j;
 				uint32_t idx = eyepoli[iidx];
-				Vector3 verwpos = buildToRaylibPos(eyepolv[idx]);
-				Vector3 uvwpos = bpv3(eyepolvori[idx]);
-				Vector3 localPos = uvwpos - worldOrigin;
-				// Project onto UV plane using dot products
-				float u = Vector3DotProduct(localPos, Vector3Normalize(locU)) / Vector3Length(locU);
-				float v = Vector3DotProduct(localPos, Vector3Normalize(locV)) / Vector3Length(locV);
+				Vector3 vertRlPos = buildToRaylibPos(eyepolv[idx]);
+				Vector3 uvwpos = bpv3(eyepolv[idx]);
+				Vector3 vertlocalpos = uvwpos - worldOrigin;
 
-				// post-unwrap transformation
+
+				float u = Vector3DotProduct(vertlocalpos, rotU) / uLen;
+				float v = Vector3DotProduct(vertlocalpos, rotV) / vLen;
+
 				u = u * eyepol[i].uvform.scale.x + eyepol[i].uvform.pan.x;
 				v = v * eyepol[i].uvform.scale.y + eyepol[i].uvform.pan.y;
 
 				rlColor4f(usedcol.x, usedcol.y, usedcol.z, usedcol.w);
 				rlTexCoord2f(u, v);
 				// rlNormal3f(uvwpos.x,uvwpos.y,uvwpos.z); // this bitch gets transformed.
-				rlVertex3f(verwpos.x, verwpos.y, verwpos.z);
+				rlVertex3f(vertRlPos.x, vertRlPos.y, vertRlPos.z);
 			}
 		}
 		rlDrawRenderBatchActive();

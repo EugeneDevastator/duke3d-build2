@@ -85,6 +85,7 @@ uint16_t edselmode = SEL_ALL; // claude - use this.
 #define HOVERSPRI map->spri[hoverfoc.spri]
 #define GRABSEC map->sect[grabfoc.sec]
 #define GRABSPRI map->spri[grabfoc.spri]
+#define GRABWAL GRABSEC.wall[grabfoc.wal]
 #define HOVERWAL HOVERSEC.wall[hoverfoc.wal]
 #define HOVERWAL2 HOVERSEC.wall[hoverfoc.wal2]
 
@@ -162,6 +163,7 @@ int K_LOOPDRAW = KEY_SPACE;
 int K_PICKTILE = KEY_V;
 int K_ACCEPT = KEY_SPACE;
 int K_DISCARD = KEY_GRAVE;
+int K_UV = KEY_M;
 
 
 // ------------ shared context
@@ -976,6 +978,25 @@ void WallDrawUpdate() {
    //    }
    //}
 }
+// ------------------ UV MAPPING
+void UvmapDiscard(){}
+void UvmapStart() {
+	grabfoc=hoverfoc;
+}
+void UvmapAccept() {
+
+}
+void UvmapUpdate() {
+	Vector2 dmov = GetMouseDelta();
+	float scrol = GetMouseWheelMove();
+	if (ISGRABWAL) {
+		GRABWAL.xsurf[grabfoc.surf].uvform.rot.z+= scrol/2.0;
+		GRABWAL.xsurf[grabfoc.surf].uvform.pan.x-= dmov.x/512.0;
+		GRABWAL.xsurf[grabfoc.surf].uvform.pan.y-= dmov.y/512.0;
+	//GRABWAL.surf.uvform.rot.z+= scrol;
+	}
+
+}
 // ----------------------- MOVE OPER ---------------------
 point3d savedpos;
 
@@ -1014,6 +1035,7 @@ MAKESTATE(4, Pickgrab);
 MAKESTATE(6, Tilsed);
 // Keep original state name
 MAKESTATE(8, WallDraw);
+MAKESTATE(9, Uvmap);
 
 const estate Empty = {0, empty, empty, empty, empty};
 // ----------------- MAIN
@@ -1168,11 +1190,11 @@ void Editor_DoRaycasts(cam_t *cc) {
 
 void EditorUpdate(const Camera3D rlcam) {
 
-	if (IsKeyPressed(KEY_M) && ISHOVERWAL) {
-		// this works
-		//map_sect_remove_loop_data(hoverfoc.sec,hoverfoc.wal, map);
-		map_loop_move_and_remap(hoverfoc.sec,hoverfoc.sec, hoverfoc.wal, map);
-	}
+	//if (IsKeyPressed(KEY_M) && ISHOVERWAL) {
+	//	// this works
+	//	//map_sect_remove_loop_data(hoverfoc.sec,hoverfoc.wal, map);
+	//	map_loop_move_and_remap(hoverfoc.sec,hoverfoc.sec, hoverfoc.wal, map);
+	//}
 	// process raycasts;
 	HandleSelectionModes();
 	cam3d = rlcam;
@@ -1194,6 +1216,13 @@ void EditorUpdate(const Camera3D rlcam) {
 			// r = read from hover. and refocus selected tile.
 			datstate.op = dTiles;
 			ctx.state = TilsedState;
+			ctx.state.start();
+		}
+		else if (IsKeyPressed(K_UV)) {
+			// dont lock up to the surf.
+			// e = apply tile
+			// r = read from hover. and refocus selected tile.
+			ctx.state = UvmapState;
 			ctx.state.start();
 		}
 		// Add to Empty state in EditorUpdate:
