@@ -842,8 +842,6 @@ static void quad_st(
 		rlDrawRenderBatchActive();
 		rlEnableBackfaceCulling();
 
-
-
 		int useGrad = 1;
 		Vector4 usedcol = {1, 1, 1, 1};
 		switch (eyepol[i].pal) {
@@ -866,7 +864,6 @@ static void quad_st(
 			usedcol *= shd;
 			usedcol.w = 1.0;
 		}
-
 
 		//  if (map->sect[eyepol[i].b2sect].surf[1].lotag==2) // water
 		//  {
@@ -942,21 +939,13 @@ static void quad_st(
 		Vector3 Q01 = bpv3(eyepol[i].worlduvs[2]);
 		Vector3 Q11 = bpv3(eyepol[i].worlduvs[3]);
 
-		Vector3 locU = Vector3Subtract(Q10, Q00);
-		Vector3 locV = Vector3Subtract(Q01, Q00);
-		Vector3 uDir = Vector3Normalize(locU);
-		Vector3 vDir = Vector3Normalize(locV);
+		// Axis lengths for aspect-correct rotation
+		float uLen = Vector3Length(Vector3Subtract(Q10, Q00));
+		float vLen = Vector3Length(Vector3Subtract(Q01, Q00));
 
 		float rad = z_angle_deg * DEG2RAD;
 		float cosA = cosf(rad);
 		float sinA = sinf(rad);
-
-		// Rotate the quad corners instead of the vertex
-		// This keeps the solve in a consistent space
-		Vector3 RQ00 = Q00; // origin stays
-		Vector3 RQ10 = rotate_in_plane(Q10, Q00, uDir, vDir, cosA, sinA);
-		Vector3 RQ01 = rotate_in_plane(Q01, Q00, uDir, vDir, cosA, sinA);
-		Vector3 RQ11 = rotate_in_plane(Q11, Q00, uDir, vDir, cosA, sinA);
 
 		for (int locidx = 0; locidx < eyepol[i].tricnt; locidx += 1) {
 			for (int j = 0; j < 3; j++) {
@@ -966,16 +955,23 @@ static void quad_st(
 				Vector3 uvwpos = bpv3(eyepolv[idx]);
 
 				float s, t;
-				quad_st(RQ00, RQ10, RQ01, RQ11, uvwpos, &s, &t);
+				quad_st(Q00, Q10, Q01, Q11, uvwpos, &s, &t);
 
-				float u = s * eyepol[i].uvform.scale.x + eyepol[i].uvform.pan.x;
-				float v = t * eyepol[i].uvform.scale.y + eyepol[i].uvform.pan.y;
+				// Scale to world space, rotate, scale back
+				float ws = s * uLen;
+				float wt = t * vLen;
+				float rs = (ws * cosA - wt * sinA) / uLen;
+				float rt = (ws * sinA + wt * cosA) / vLen;
+
+				float u = rs * eyepol[i].uvform.scale.x + eyepol[i].uvform.pan.x;
+				float v = rt * eyepol[i].uvform.scale.y + eyepol[i].uvform.pan.y;
 
 				rlColor4f(usedcol.x, usedcol.y, usedcol.z, usedcol.w);
 				rlTexCoord2f(u, v);
 				rlVertex3f(vertRlPos.x, vertRlPos.y, vertRlPos.z);
 			}
 		}
+
 		rlDrawRenderBatchActive();
 		EndBlendMode();
 		EndShaderMode();
