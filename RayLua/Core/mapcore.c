@@ -985,6 +985,10 @@ void makewaluvs(sect_t *sect, int wid, mapstate_t *map) {
 			z+=sur->rt_uvs[0].z;
 		sur->rt_uvs[2] = (point3d) {usewal->x,usewal->y,z };
 
+		point3d localv = p3_diff(sur->rt_uvs[2],sur->rt_uvs[0]);
+		sur->rt_uvs[3] = p3_sum(sur->rt_uvs[1],localv); // corner
+
+
 		//if (sur->uvgen.vtez & TEZ_INVZ) {
 		//	float dz = sur->rt_uvs[2].z-sur->rt_uvs[0].z;
 		//	sur->rt_uvs[2].z = -dz + sur->rt_uvs[0].z;
@@ -1069,6 +1073,9 @@ float scaler=1;
 			sur->rt_uvs[1] = sur->rt_uvs[2];
 			sur->rt_uvs[2] = tp;
 		}
+
+		point3d localv = p3_diff(sur->rt_uvs[2],sur->rt_uvs[0]);
+		sur->rt_uvs[3] = p3_sum(sur->rt_uvs[1],localv); // corner
 	}
 }
 
