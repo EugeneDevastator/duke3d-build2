@@ -1112,7 +1112,7 @@ static void quad_st(
 				validsec = plr.cursect;
 			DumbCore::b2pos = plr.tr.p;
 			camfromb2(camsrc, &plr.tr);
-DumbCore::SetCameraPosition(camsrc);
+
 			//  Vector3 forward = Vector3Normalize(Vector3Subtract(camsrc.target, camsrc.position));
 			//  Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camsrc.up));
 			//  Vector3 up = Vector3CrossProduct(right, forward); // Recalculate orthogonal up
