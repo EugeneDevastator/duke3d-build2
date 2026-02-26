@@ -2,6 +2,7 @@
 #include "mapcore.h"
 
 #include "buildmath.h"
+#include "mapform_duke.h"
 #include "sectmask.h"
 #define USEHEIMAP 1
 #define NOSOUND 1

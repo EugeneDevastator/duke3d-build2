@@ -142,13 +142,9 @@ typedef struct {
 	uint32_t selmode;
 } econtext;
 
-typedef struct {
-	long sect;
-	int wal; // -1 = ceil -2 = fllor;
-	point3d pos;
-} loopt; // draw loop point
 
-inline bool islptoncap(loopt p) { return p.wal >= 0 ? false : true; }
+
+inline bool islptoncap(looploc_t p) { return p.wal >= 0 ? false : true; }
 
 
 typedef struct {
@@ -165,23 +161,17 @@ int K_ACCEPT = KEY_SPACE;
 int K_DISCARD = KEY_GRAVE;
 int K_UV = KEY_M;
 
-
 // ------------ shared context
+
+transform cursor1;
+transform cursor2;
+transform cursor_hover;
+
 
 cam_t *cam;
 econtext ctx;
 econtext ctxprev;
 
-typedef struct {
-	signed int wal;
-	signed int wal2;
-	signed int walprev;
-	int onewall;
-	int sec;
-	int spri;
-	int surf;
-	point3d hitpos;
-} focus_t;
 
 struct selbuffer_t {
 	std::vector<wall_idx> walls;
@@ -198,7 +188,7 @@ struct selbuffer_t {
 };
 
 // shared loop structure
-loopt loopts[100];
+looploc_t loopts[100];
 point2d loopts_p2d[100];
 int loopn = 0;
 
@@ -206,7 +196,6 @@ selbuffer_t selcurrent;
 selbuffer_t selstack[10];
 
 bool hasgrab = false;
-point3d *wcursor;
 focus_t hoverfoc;
 focus_t bufferfoc;
 focus_t grabfoc;
@@ -1143,8 +1132,6 @@ void HandleSelectionModes() {
 	}
 
 }
-
-
 
 void InitEditor(mapstate_t *m) {
 	map = m;

@@ -37,6 +37,7 @@ int shadowtest2_backface_cull = 0; // Toggle backface culling
 int shadowtest2_distance_cull = 0; // Toggle distance-based culling
 int shadowtest2_debug_walls = 1; // Verbose wall logging
 int shadowtest2_debug_block_selfportals = 1; // Verbose wall logging
+int shadowtest2_is_sprites_recv_light = 0; // Verbose wall logging
 static bool st2_use_parallax_discards = 0; // Verbose wall logging
 
 int renderinterp = 1;
@@ -1601,8 +1602,10 @@ static void drawspriteshadow(int sprid, int sectid, int tagid, transform cam, ma
 	// drawpol AND , noscan, emitmask. preserve loop
 	gentransform_trig(ll,lr,ur,b);
 	int lightflags = DP_AND | DP_NO_SCANSECT | DP_PRESERVE_LOOP;
-int res;
-	res = drawpol_befclip(tagid, -1, tagid, -1, ph1,ph2, lightflags, b);
+	int res;
+	if(shadowtest2_is_sprites_recv_light)
+		res = drawpol_befclip(tagid, -1, tagid, -1, ph1,ph2, lightflags, b);
+
 	// oh beauty is here - that when i add this - i can clip it same way as other walls
 	// and this will only retain us portion of projection that is wisible. amazing!
 	// we also must store sprite id for this thing in mph unfortunately...

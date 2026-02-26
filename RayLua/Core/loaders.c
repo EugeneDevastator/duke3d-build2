@@ -7,6 +7,8 @@
  *       - added compatibility storage to main types
  */
 #include "loaders.h"
+
+#include "mapform_duke.h"
 // TODO : Replace types with stdint like uint8_t
 // TODO : new mapstate should have raylib friendly coords by default. period.
 
@@ -473,67 +475,6 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 		for(i=j=0;curmappath[i];i++) if ((curmappath[i] == '/') || (curmappath[i] == '\\')) j = i+1;
 		curmappath[j] = 0;
 
-/*
-		// Modified scanning code; this entire section must be abolished and moved into art loader.
-		arttiles = 0;
-		for(filnum=0;1;filnum++)
-		{
-			sprintf(tbuf,"TILES%03d.ART",filnum);
-			if (!kzopen(tbuf))
-			{
-				sprintf(tbuf,"%sTILES%03d.ART",curmappath,filnum);
-				if (!kzopen(tbuf)) break;
-			}
-			kzread(tbuf,16);
-			if (*(long *)&tbuf[0] != 1) break;
-			loctile0 = *(long *)&tbuf[8];
-			loctile1 = (*(long *)&tbuf[12])+1;
-			if ((loctile0 < 0) || (loctile1 <= arttiles) || (loctile0 >= loctile1)) continue;
-
-			i = arttiles; arttiles = loctile1;
-			tilesizx = (short *)realloc(tilesizx,arttiles*sizeof(tilesizx[0]));
-			tilesizy = (short *)realloc(tilesizy,arttiles*sizeof(tilesizy[0]));
-			tilefile = (short *)realloc(tilefile,arttiles*sizeof(tilefile[0]));
-			picanm = (picanm_t *)realloc(picanm,arttiles*sizeof(picanm[0])); // Add this line
-
-			for(;i<arttiles;i++) {
-				tilesizx[i] = 0;
-				tilesizy[i] = 0;
-				tilefile[i] = 0;
-				picanm[i].asint = 0; // Initialize animdata
-			}
-
-			kzread(&tilesizx[loctile0],(loctile1-loctile0)*sizeof(short));
-			kzread(&tilesizy[loctile0],(loctile1-loctile0)*sizeof(short));
-			kzread(&picanm[loctile0],(loctile1-loctile0)*sizeof(long)); // Read animdata
-
-			for(i=loctile0;i<loctile1;i++) tilefile[i] = filnum;
-		}
-
-		if (!arttiles)
-		{
-			tilesizx = (short *)malloc(sizeof(tilesizx[0]));
-			tilesizy = (short *)malloc(sizeof(tilesizy[0]));
-			tilefile = (short *)malloc(sizeof(tilefile[0]));
-			picanm = (picanm_t *)malloc(sizeof(picanm[0])); // Add this line
-			tilesizx[0] = tilesizy[0] = 2;
-			tilefile[0] = 0;
-			picanm[0].asint = 0; // Initialize
-			arttiles = 1;
-		}
-		else if (arttiles >= 20) //Autodetect KenBuild data
-		{
-			for(i=24-1;i>=0;i--) //If the sizes of the 1st 24 tiles match that of Kenbuild, then that's what it is
-			{
-				x = 32; if (i == 4)               x = 16; if (i >= 20) x = 64;
-				y = 32; if ((i == 3) || (i == 4)) y = 16; if (i >= 18) y = 64;
-				if ((tilesizx[i] != x) || (tilesizy[i] != y)) break;
-			}
-			if (i < 0) iskenbuild = 1;
-		}
-
-		kzclose();
-		*/
 		kzopen(filnam);
 		kzread(&i,4);
 		//------------------------------------------------------------------------
@@ -562,14 +503,6 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 			map->startdow.x = 0.f;
 			map->startdow.y = 0.f;
 			map->startdow.z = 1.f;
-			//	for(i=numplayers-1;i>=0;i--)
-			//	{
-			//		gst->p[i].ipos = gst->startpos;
-			//		gst->p[i].ifor = gst->startfor;
-			//		gst->p[i].irig = gst->startrig;
-			//		gst->p[i].idow = gst->startdow;
-			//		gst->p[i].cursect = cursect;
-			//	}
 
 			kzread(&s,2);
 			map->numsects = (int)s; //numsectors
@@ -641,17 +574,6 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 						//sur->uv[2].y *= -sqrt(f*f + 1.f);
 						sur->flags |= 4;
 					}
-					// if (b7sec.stat[j] & SECTOR_SWAP_XY) //swap x&y
-					// {
-					// 	if (((b7sec.stat[j] & SECTOR_FLIP_X) != 0) != ((b7sec.stat[j] & SECTOR_FLIP_Y) != 0))
-					// 	{ sur->uv[1].x *= -1; sur->uv[2].y *= -1; }
-					// 	sur->uv[1].y = sur->uv[1].x; sur->uv[1].x = 0;
-					// 	sur->uv[2].x = sur->uv[2].y; sur->uv[2].y = 0;
-					// }
-
-					//FIX:This hack corrects an LHS vs. RHS bug in a later stage of texture mapping (drawsectfill?)
-					//if (sur->uv[1].x*sur->uv[2].y < sur->uv[1].y*sur->uv[2].x)
-					//{ sur->uv[2].x *= -1; sur->uv[2].y *= -1; }
 
 					sec[i].surf[j].uvform.mapping_kind = b7sec.stat[j] & SECTOR_TEXWALL_ALIGN ? UV_TEXELRATE : UV_WORLDXY;
 					sec[i].mflags[j] = b7sec.stat[j];
@@ -725,14 +647,6 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 					sur->hitag = b7wal.hitag;
 					sur->pal = b7wal.pal;
 
-					//sur->uv[0].x = b7wal.xpanning;
-					//sur->uv[0].y = b7wal.ypanning;
-					//sur->uv[1].x = b7wal.xrepeat;
-					//if (b7wal.cstat & WALL_FLIP_X) sur->uv[1].x *= -1;
-					//sur->uv[1].y = 0;
-					//sur->uv[2].x = 0;
-					//sur->uv[2].y = b7wal.yrepeat;
-					//if (b7wal.cstat & WALL_FLIP_Y) sur->uv[2].y *= -1;
 					// if wall opens to next sector - we align to 'jawlines' for easier door setup
 					if ((b7wal.nextsect < 0) ^ (!(b7wal.cstat & WALL_ALIGN_FLOOR))) {
 						sur->flags ^= 4;
@@ -855,10 +769,6 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 					f = sqrt(fx*fx + fy*fy);
 					sur = &sec[i].wall[j].surf;
 					l = sur->tilnum;
-					//sur->uv[1].x = ((float)sur->uv[1].x*8.0)/(f*((float)tilesizx[l]));
-					//sur->uv[2].y = ((float)sur->uv[2].y*4.0)/((float)tilesizy[l]);
-					//sur->uv[0].x = ((float)sur->uv[0].x)/((float)tilesizx[l]);
-					//sur->uv[0].y = ((float)sur->uv[0].y)/256.f * (1-2*(sur->uv[2].y < 0));
 				}
 
 				{ // setting sector slope gradient
@@ -1030,15 +940,6 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 			map->startfor.x = s1*c2;
 			map->startfor.y = -c1*c2;
 			map->startfor.z = s2;
-			//	for(i=numplayers-1;i>=0;i--)  //netcode
-			//	{
-			//		gst->p[i].ipos = gst->startpos;
-			//		gst->p[i].irig = gst->startrig;
-			//		gst->p[i].idow = gst->startdow;
-			//		gst->p[i].ifor = gst->startfor;
-			//		gst->p[i].cursect = -1;
-			//	}
-
 
 			//6 faces * BSIZ^3 board map * 2 bytes for picnum
 			//if face 0 is -1, the cube is air
@@ -1120,8 +1021,6 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 							sur = &sec[i].wall[j].surf;
 							sur->tilnum = l; hitile = max(hitile,l);
 							sur->galnum = defaultGal;
-							//sur->uv[1].x = max(64.f/((float)GET_TILSIZEX_PTR(sur)),1.f);
-							//sur->uv[2].y = max(64.f/((float)GET_TILSIZEY_PTR(sur)),1.f);
 						}
 						map->numsects++;
 
