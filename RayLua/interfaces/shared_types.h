@@ -89,45 +89,6 @@ free((arena).data); \
 } while(0)
 
 #define ARENAST_RESET(arena) ((arena).count = 0)
-// ------------------------------------------------
-// duke tags defs.
-#define MT_LAST 15 // index, not count
-
-#define MT_STATCEIL (MT_LAST - 1)
-
-#define MT_STATNUM (MT_LAST - 2)
-#define MT_STATFLOOR (MT_LAST - 2)
-
-
-#define MT_PICLOW (MT_LAST - 3)
-
-#define MT_CSTAT (MT_LAST - 4)
-
-#define MT_PICOVER (MT_LAST - 5)
-
-#define MT_SEC_HNLOW (MT_LAST - 6)
-#define MT_WALLPT2 (MT_LAST - 6)
-#define MT_SPR_XREP (MT_LAST - 6)
-
-#define MT_SEC_HNHI (MT_LAST - 7)
-#define MT_NEXTWALL (MT_LAST - 7)
-#define MT_SPR_YREP (MT_LAST - 7)
-
-#define MT_SHADELOW (MT_LAST - 8)
-#define MT_SPR_CLIPDIST (MT_LAST - 8)
-
-#define MT_SHADEHI (MT_LAST - 9)
-
-#define MT_VIS (MT_LAST - 10)
-#define MT_EXTRA (MT_LAST - 11)
-
-#define MT_SEC_FWALL (MT_LAST - 12)
-#define MT_WAL_WALLIDX (MT_LAST - 12)
-#define MT_SPR_XOFF (MT_LAST - 12)
-
-#define MT_SEC_WALLNUM (MT_LAST - 13)
-#define MT_WAL_NEXTSEC (MT_LAST - 13)
-#define MT_SPR_YOFF (MT_LAST - 12)
 
 #define FLOOR 1
 #define CEIL 0
