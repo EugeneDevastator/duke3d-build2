@@ -477,10 +477,10 @@ public:
 
 	// Updated floor mesh generation with slopes
 	static void InitMapstateTex(void) {
-		plr.ipos = map->startpos;
-		plr.ifor = map->startfor;
-		plr.irig = map->startrig;
-		plr.idow = map->startdow;
+		plr.tr.p = map->startpos;
+		plr.tr.f = map->startfor;
+		plr.tr.r = map->startrig;
+		plr.tr.d = map->startdow;
 		plr.cursect = map->startsectn;
 
 		plr.grdc.x = 0;
@@ -609,45 +609,8 @@ public:
 		cam->h.y = playr->ghy;
 		cam->h.z = playr->ghz;
 
+		cam->cursect = playr->cursect;
 
-		// cam.c = cc->c; cam.z = cc->z;
-
-		cam->c.x = sw;
-		cam->c.y = sh;
-		cam->z.x = sw;
-		cam->z.y = sh;
-
-		if (false) //((!useLights) || (gdps->cursect < 0))
-		{
-			cam->r.x = 1.f;
-			cam->r.y = 0.f;
-			cam->r.z = 0.f;
-			cam->d.x = 0.f;
-			cam->d.y = 1.f;
-			cam->d.z = 0.f;
-			cam->f.x = 0.f;
-			cam->f.y = 0.f;
-			cam->f.z = 1.f;
-			cam->p.x = 0.f;
-			cam->p.y = 0.f;
-			cam->p.z = 0.f;
-			//	drawkv6_numlights = -1;
-			//	drawview(&cam,gdps,0);
-		} else {
-			cam->r.x = playr->irig.x;
-			cam->r.y = playr->irig.y;
-			cam->r.z = playr->irig.z;
-			cam->d.x = playr->idow.x;
-			cam->d.y = playr->idow.y;
-			cam->d.z = playr->idow.z;
-			cam->f.x = playr->ifor.x;
-			cam->f.y = playr->ifor.y;
-			cam->f.z = playr->ifor.z;
-			cam->p.x = playr->ipos.x;
-			cam->p.y = playr->ipos.y;
-			cam->p.z = playr->ipos.z;
-			cam->cursect = playr->cursect;
-		}
 
 		// Main render scope
 		shadowtest2_useshadows = 1; //b2opts.shadows;
@@ -716,10 +679,10 @@ public:
 				draw_hsr_polymost(&ncam, map, 0);
 			}
 		}
-		cam->p = playr->ipos;
-		cam->r = playr->irig;
-		cam->d = playr->idow;
-		cam->f = playr->ifor;
+		//cam->p = playr->ipos;
+		//cam->r = playr->irig;
+		//cam->d = playr->idow;
+		//cam->f = playr->ifor;
 		cam->h.x = playr->ghx;
 		cam->h.y = playr->ghy;
 		cam->h.z = playr->ghz;
@@ -1139,18 +1102,17 @@ static void quad_st(
 	static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
 		if (syncam) {
 			camfromrl(&plr.tr, camsrc);
+			updatesect_imp(plr.tr.p.x, plr.tr.p.y, plr.tr.p.z, &plr.cursect, map);
+			int ported = updatesect_portmove(&plr.tr, &plr.cursect, validsec, map);
+			if(ported)
+				int ytry=1;
+			localb2cam.cursect = plr.cursect;
+			localb2cam.tr = plr.tr;
 			if (plr.cursect>-1)
 				validsec = plr.cursect;
-			int ported = updatesect_portmove(&plr.tr, &plr.cursect, validsec, map);
-			if (!ported)
-				updatesect_imp(plr.ipos.x, plr.ipos.y, plr.ipos.z, &plr.cursect, map);
-			else {
-				localb2cam.cursect = plr.cursect;
-
-				//                updatesect_imp(plr.ipos.x,plr.ipos.y,plr.ipos.z, &plr.cursect, map);
-			}
-			DumbCore::b2pos = plr.ipos;
+			DumbCore::b2pos = plr.tr.p;
 			camfromb2(camsrc, &plr.tr);
+DumbCore::SetCameraPosition(camsrc);
 			//  Vector3 forward = Vector3Normalize(Vector3Subtract(camsrc.target, camsrc.position));
 			//  Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camsrc.up));
 			//  Vector3 up = Vector3CrossProduct(right, forward); // Recalculate orthogonal up
@@ -1159,13 +1121,8 @@ static void quad_st(
 			//  plr.ifor.x = forward.x;  plr.ifor.y = forward.z;  plr.ifor.z = -forward.y;
 			//  plr.irig.x = right.x;    plr.irig.y = right.z;    plr.irig.z = -right.y;
 			//  plr.idow.x = -up.x;       plr.idow.y = -up.z;       plr.idow.z = up.y;
-
-
-			localb2cam.p = plr.ipos;
-			localb2cam.f = plr.ifor;
-			localb2cam.r = plr.irig;
-			localb2cam.d = plr.idow;
 		}
+
 		DrawEyePoly(sw, sh, &plr, &localb2cam); // ken render
 		//rlDisableDepthTest();
 		rlEnableDepthTest();

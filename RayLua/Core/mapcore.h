@@ -46,8 +46,6 @@ long* get_gtilehashead(void);
 
 typedef struct { intptr_t f; int p, x, y; } tiletype;
 typedef struct {
-	// color, zbuf
-	tiltyp c, z;
 	union { transform tr; struct { point3d p, r, d, f; }; };
 	point3d h;
 	int cursect;

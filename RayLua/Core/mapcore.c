@@ -1362,14 +1362,14 @@ int insideloop(double x, double y, wall_t *wal) {
 	} while (idxsum != 0);
 	return(c&1);
 }
+
 int updatesect_portmove(transform *tr, int *cursect, int validsec, mapstate_t *map) {
-	point3d* pos = &tr->p;
+	point3d *pos = &tr->p;
 	long s = *cursect;
 	sect_t *sec = map->sect;
-	bool isinside = s>=0 && insidesect(pos->x, pos->y, sec[s].wall, sec[s].n);
+	bool isinside = s >= 0 && insidesect(pos->x, pos->y, sec[s].wall, sec[s].n);
 	bool scanwall = !isinside && *cursect != validsec;
-	if (isinside && (map->sect[s].destpn[0]>=0 || map->sect[s].destpn[1] >= 0)) {
-
+	if (isinside && (map->sect[s].destpn[0] >= 0 || map->sect[s].destpn[1] >= 0)) {
 		// if we are inside sect by 2d scan then can check caps for portal
 		if (isinside) {
 			for (int j = 0; j < 2; j++) {
@@ -1389,38 +1389,35 @@ int updatesect_portmove(transform *tr, int *cursect, int validsec, mapstate_t *m
 						//p3_transform_wccw(pos, &map->spri[portals[ow].anchorspri].tr,
 						//                   &map->spri[portals[d].anchorspri].tr);
 						tr_transfrom_wccw(tr, map->spri[portals[ow].anchorspri].tr,
-										   map->spri[portals[d].anchorspri].tr);
+						                  map->spri[portals[d].anchorspri].tr);
 						return 1;
 					}
 				}
 			}
 		}
 		// else check walls, since we are not in same sec.
-	}
-	else	// scan wall otherwise
-	if (scanwall)
-	{
-		s = validsec;
-		int minwal = -1;
-		float dmin = 100;
-		for (int i =0;i < sec[s].n ;i++) {
-			float d = distpos2wal(tr->p, sec[s].wall,i);
-			if (d<dmin) {
-				dmin=d;
-				minwal=i;
+	} else // scan wall otherwise
+		if (scanwall) {
+			s = validsec;
+			int minwal = -1;
+			float dmin = 100;
+			for (int i = 0; i < sec[s].n; i++) {
+				float d = distpos2wal(tr->p, sec[s].wall, i);
+				if (d < dmin) {
+					dmin = d;
+					minwal = i;
+				}
+			}
+			int portal = sec[s].wall[minwal].tags[1];
+			if (portal >= 0) {
+				uint32_t destpt = portals[portal].destpn;
+				*cursect = portals[destpt].sect;
+
+				tr_transfrom_wccw(tr, map->spri[portals[portal].anchorspri].tr,
+				                  map->spri[portals[destpt].anchorspri].tr);
+				return 1;
 			}
 		}
-		int portal  =sec[s].wall[minwal].tags[1];
-		if (portal >=0) {
-			uint32_t d = portal;
-			uint32_t ow = portals[d].destpn;
-			*cursect = portals[d].sect;
-
-			tr_transfrom_wccw(tr, map->spri[portals[portal].anchorspri].tr,
-									   map->spri[portals[ow].anchorspri].tr);
-		return 1;
-		}
-	}
 	return 0;
 }
 // regenerates innate portal chain for touching walls.

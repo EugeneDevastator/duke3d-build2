@@ -991,8 +991,11 @@ void UvmapUpdate() {
 	float scrol = GetMouseWheelMove();
 	if (ISGRABWAL) {
 		GRABWAL.xsurf[grabfoc.surf].uvform.rot.z+= scrol/2.0;
-		GRABWAL.xsurf[grabfoc.surf].uvform.pan.x-= dmov.x/512.0;
-		GRABWAL.xsurf[grabfoc.surf].uvform.pan.y-= dmov.y/512.0;
+		//GRABWAL.xsurf[grabfoc.surf].uvform.pan.x-= dmov.x/512.0;
+		//GRABWAL.xsurf[grabfoc.surf].uvform.pan.y-= dmov.y/512.0;
+
+		GRABWAL.xsurf[grabfoc.surf].rt_uvs[3].y-= dmov.x/512.0;
+		GRABWAL.xsurf[grabfoc.surf].rt_uvs[3].z-= dmov.y/512.0;
 	//GRABWAL.surf.uvform.rot.z+= scrol;
 	}
 
