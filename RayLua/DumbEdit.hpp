@@ -477,8 +477,8 @@ void PickgrabUpdate() {
 			// Project camera ray onto horizontal plane
 
 			// Calculate intersection of camera ray with horizontal plane at target_z
-			point3d ray_start = cam->p;
-			point3d ray_dir = cam->f;
+			point3d ray_start = cam->tr.p;
+			point3d ray_dir = cam->tr.f;
 			float target_z;
 
 			if (IsKeyPressed(KEY_F)) // swap mode.
@@ -1162,7 +1162,7 @@ void Editor_DoRaycasts(cam_t *cc) {
 	uint32_t castflags = 0; // mark what we want to hit.
 	if (edselmode & SEL_REDWALLPORTS)
 		castflags |= RHIT_REDWALLS;
-	raycast(&cc->p, &cc->f, 1e32, cc->cursect, &mdl.hover.sec, &mdl.hover.wal, &mdl.hover.spri,&mdl.hover.surf, &mdl.hover.hitpos, castflags, map);
+	raycast(&cc->tr.p, &cc->tr.f, 1e32, cc->cursect, &mdl.hover.sec, &mdl.hover.wal, &mdl.hover.spri,&mdl.hover.surf, &mdl.hover.hitpos, castflags, map);
 	mdl.hover.wal2=-1;
 	if (ISHOVERWAL) {
 		mdl.hover.wal2 = mapwallnextid(mdl.hover.sec,mdl.hover.wal,map);

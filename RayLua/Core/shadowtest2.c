@@ -404,8 +404,8 @@ static int bunchfront(int b0, int b1, int fixsplitnow, bdrawctx *b) {
 	//Offset vertices (BUNCHNEAR of scansector() already puts them safely in front)
 	for (j = 2 - 1; j >= 0; j--)
 		for (i = twaln[j]; i >= 0; i--) {
-			twal[j][i].x -= gcam.p.x;
-			twal[j][i].y -= gcam.p.y;
+			twal[j][i].x -= gcam.tr.p.x;
+			twal[j][i].y -= gcam.tr.p.y;
 		}
 
 	if (twal[0][0].y * twal[1][twaln[1]].x >= twal[1][twaln[1]].y * twal[0][0].x) return (0); //no overlap (whole bunch)
@@ -480,18 +480,18 @@ static int bunchfront(int b0, int b1, int fixsplitnow, bdrawctx *b) {
 					//NOTE:must use original wall vertices to get correct value of t!
 					wal = curMap->sect[b->bunch[b0].sec].wall;
 					i = twal[0][ind[0] - 1].i;
-					x0 = wal[i].x - gcam.p.x;
-					y0 = wal[i].y - gcam.p.y;
+					x0 = wal[i].x - gcam.tr.p.x;
+					y0 = wal[i].y - gcam.tr.p.y;
 					i += wal[i].n;
-					x1 = wal[i].x - gcam.p.x;
-					y1 = wal[i].y - gcam.p.y;
+					x1 = wal[i].x - gcam.tr.p.x;
+					y1 = wal[i].y - gcam.tr.p.y;
 					wal = curMap->sect[b->bunch[b1].sec].wall;
 					i = twal[1][ind[1] - 1].i;
-					x2 = wal[i].x - gcam.p.x;
-					y2 = wal[i].y - gcam.p.y;
+					x2 = wal[i].x - gcam.tr.p.x;
+					y2 = wal[i].y - gcam.tr.p.y;
 					i += wal[i].n;
-					x3 = wal[i].x - gcam.p.x;
-					y3 = wal[i].y - gcam.p.y;
+					x3 = wal[i].x - gcam.tr.p.x;
+					y3 = wal[i].y - gcam.tr.p.y;
 
 					//intersect() inline
 					//(x1-x0)*t + (x2-x3)*u = (x2-x0)
@@ -607,10 +607,10 @@ static void scansector(int sectnum, bdrawctx *b) {
 		double zzz = getwallz(sec, 1, i);
 		dpoint3d wp = {wal[i].x, wal[i].y, zzz};
 
-		dx0 = wal[i].x - gcam.p.x;
-		dy0 = wal[i].y - gcam.p.y;
-		dx1 = wal[j].x - gcam.p.x;
-		dy1 = wal[j].y - gcam.p.y;
+		dx0 = wal[i].x - gcam.tr.p.x;
+		dy0 = wal[i].y - gcam.tr.p.y;
+		dx1 = wal[j].x - gcam.tr.p.x;
+		dy1 = wal[j].y - gcam.tr.p.y;
 		if (dy1 * dx0 <= dx1 * dy0) goto docont; //Back-face cull
 
 		//clip to near plane .. result is parametric fractions f0&f1
@@ -789,18 +789,18 @@ static void scansector(int sectnum, bdrawctx *b) {
 static void xformprep(double hang, bdrawctx *b) {
 	cam_t gcam = b->movedcam;
 	double f;
-	f = atan2(gcam.f.y, gcam.f.x) + hang; //WARNING: "f = 1/sqrt; c *= f; s *= f;" form has singularity - don't use :/
+	f = atan2(gcam.tr.f.y, gcam.tr.f.x) + hang; //WARNING: "f = 1/sqrt; c *= f; s *= f;" form has singularity - don't use :/
 	b->xformmatc = cos(f);
 	b->xformmats = sin(f);
-	b->xformmat[0] = gcam.r.y * b->xformmatc - gcam.r.x * b->xformmats;
-	b->xformmat[1] = gcam.r.z;
-	b->xformmat[2] = gcam.r.x * b->xformmatc + gcam.r.y * b->xformmats;
-	b->xformmat[3] = gcam.d.y * b->xformmatc - gcam.d.x * b->xformmats;
-	b->xformmat[4] = gcam.d.z;
-	b->xformmat[5] = gcam.d.x * b->xformmatc + gcam.d.y * b->xformmats;
-	b->xformmat[6] = gcam.f.y * b->xformmatc - gcam.f.x * b->xformmats;
-	b->xformmat[7] = gcam.f.z;
-	b->xformmat[8] = gcam.f.x * b->xformmatc + gcam.f.y * b->xformmats;
+	b->xformmat[0] = gcam.tr.r.y * b->xformmatc - gcam.tr.r.x * b->xformmats;
+	b->xformmat[1] = gcam.tr.r.z;
+	b->xformmat[2] = gcam.tr.r.x * b->xformmatc + gcam.tr.r.y * b->xformmats;
+	b->xformmat[3] = gcam.tr.d.y * b->xformmatc - gcam.tr.d.x * b->xformmats;
+	b->xformmat[4] = gcam.tr.d.z;
+	b->xformmat[5] = gcam.tr.d.x * b->xformmatc + gcam.tr.d.y * b->xformmats;
+	b->xformmat[6] = gcam.tr.f.y * b->xformmatc - gcam.tr.f.x * b->xformmats;
+	b->xformmat[7] = gcam.tr.f.z;
+	b->xformmat[8] = gcam.tr.f.x * b->xformmatc + gcam.tr.f.y * b->xformmats;
 
 	b->gnadd.x = -gcam.h.x * b->xformmat[0] - gcam.h.y * b->xformmat[1] + gcam.h.z * b->xformmat[2];
 	b->gnadd.y = -gcam.h.x * b->xformmat[3] - gcam.h.y * b->xformmat[4] + gcam.h.z * b->xformmat[5];
@@ -1023,9 +1023,9 @@ static void emit_wallpoly_func(int rethead0, int rethead1, bdrawctx *b) {
 
 		f = 1.0 / ((b->gouvmat[0] * fx + b->gouvmat[3] * fy + b->gouvmat[6]) * cam.h.z);
 
-		double retx = ((fx - cam.h.x) * cam.r.x + (fy - cam.h.y) * cam.d.x + cam.h.z * cam.f.x) * f + cam.p.x;
-		double rety = ((fx - cam.h.x) * cam.r.y + (fy - cam.h.y) * cam.d.y + cam.h.z * cam.f.y) * f + cam.p.y;
-		double retz = ((fx - cam.h.x) * cam.r.z + (fy - cam.h.y) * cam.d.z + cam.h.z * cam.f.z) * f + cam.p.z;
+		double retx = ((fx - cam.h.x) * cam.tr.r.x + (fy - cam.h.y) * cam.tr.d.x + cam.h.z * cam.tr.f.x) * f + cam.tr.p.x;
+		double rety = ((fx - cam.h.x) * cam.tr.r.y + (fy - cam.h.y) * cam.tr.d.y + cam.h.z * cam.tr.f.y) * f + cam.tr.p.y;
+		double retz = ((fx - cam.h.x) * cam.tr.r.z + (fy - cam.h.y) * cam.tr.d.z + cam.h.z * cam.tr.f.z) * f + cam.tr.p.z;
 
 		dpoint3d ret = {retx, rety, retz};
 		eyepolvori[ip] = ret;
@@ -1129,12 +1129,12 @@ static void emit_lighpol_func(int rethead0, int rethead1, bdrawctx *b) {
 
 			f = 1.0 / ((b->gouvmat[0] * fx + b->gouvmat[3] * fy + b->gouvmat[6]) * usecam.h.z);
 
-			glp->ligpolv[ip].x = ((fx - usecam.h.x) * usecam.r.x + (fy - usecam.h.y) * usecam.d.x + (usecam.h.z) * usecam
-			                                 .f.x) * f + usecam.p.x;
-			glp->ligpolv[ip].y = ((fx - usecam.h.x) * usecam.r.y + (fy - usecam.h.y) * usecam.d.y + (usecam.h.z) * usecam
-			                                 .f.y) * f + usecam.p.y;
-			glp->ligpolv[ip].z = ((fx - usecam.h.x) * usecam.r.z + (fy - usecam.h.y) * usecam.d.z + (usecam.h.z) * usecam
-			                                 .f.z) * f + usecam.p.z;
+			glp->ligpolv[ip].x = ((fx - usecam.h.x) * usecam.tr.r.x + (fy - usecam.h.y) * usecam.tr.d.x + (usecam.h.z) * usecam
+			                                 .tr.f.x) * f + usecam.tr.p.x;
+			glp->ligpolv[ip].y = ((fx - usecam.h.x) * usecam.tr.r.y + (fy - usecam.h.y) * usecam.tr.d.y + (usecam.h.z) * usecam
+			                                 .tr.f.y) * f + usecam.tr.p.y;
+			glp->ligpolv[ip].z = ((fx - usecam.h.x) * usecam.tr.r.z + (fy - usecam.h.y) * usecam.tr.d.z + (usecam.h.z) * usecam
+			                                 .tr.f.z) * f + usecam.tr.p.z;
 	}
 
 	if (glp->ligpoln + 1 >= glp->ligpolmal) {
@@ -1239,13 +1239,13 @@ static int projectonmono(int *plothead0, int *plothead1, bdrawctx *b) {
 		i = plothead[h];
 		do {
 			if (h) i = mp[i].p;
-			ox = mp[i].x - gcam.p.x;
-			oy = mp[i].y - gcam.p.y;
+			ox = mp[i].x - gcam.tr.p.x;
+			oy = mp[i].y - gcam.tr.p.y;
 			//if (b->has_portal_clip)
 			//	LOOPADD(mp[i].pos)
 			// position on the camera plane in world space.
 			otp[on].x = oy * xformc - ox * xforms;
-			otp[on].y = mp[i].z - gcam.p.z;
+			otp[on].y = mp[i].z - gcam.tr.p.z;
 			otp[on].z = ox * xformc + oy * xforms;
 			on++;
 
@@ -1524,7 +1524,8 @@ static int drawpol_befclip(int fromtag, int newtag, int fromsect, int newsect, i
 }
 static void gentransform_trig(point3d p1, point3d p2, point3d p3, bdrawctx *b) {
 	// all transforms are for orcam space.
-	cam_t *cam = &b->orcam;
+	transform *cam = &b->orcam.tr;
+	point3d camh = b->orcam.h;
 	p3_transform_wccw(&p1,b->movedcam.tr,b->orcam.tr);
 	p3_transform_wccw(&p2,b->movedcam.tr,b->orcam.tr);
 	p3_transform_wccw(&p3,b->movedcam.tr,b->orcam.tr);
@@ -1554,10 +1555,10 @@ static void gentransform_trig(point3d p1, point3d p2, point3d p3, bdrawctx *b) {
 			  + nz_world * (p1.z - cam->p.z);
 
 	// Scale includes h.z for screen-space depth formula
-	float scale = 1.0f / (D_c * cam->h.z);
+	float scale = 1.0f / (D_c * camh.z);
 	b->gouvmat[0] = nx * scale;
 	b->gouvmat[3] = ny * scale;
-	b->gouvmat[6] = nz / D_c - b->gouvmat[0] * cam->h.x - b->gouvmat[3] * cam->h.y;
+	b->gouvmat[6] = nz / D_c - b->gouvmat[0] * camh.x - b->gouvmat[3] * camh.y;
 }
 
 static void gentransform_ceilflor(sect_t *sec, wall_t *wal, int isflor, bdrawctx *b) {
@@ -1734,9 +1735,9 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		ggalnum = sec[s].surf[isflor].galnum;
 
 
-		float surfpos = getslopez(&sec[s], isflor, b->movedcam.p.x, b->movedcam.p.y);
+		float surfpos = getslopez(&sec[s], isflor, b->movedcam.tr.p.x, b->movedcam.tr.p.y);
 		bool drawcap=0;
-		if ((b->movedcam.p.z >= surfpos) == isflor) // ignore backfaces
+		if ((b->movedcam.tr.p.z >= surfpos) == isflor) // ignore backfaces
 		{
 			//if( shadowtest2_rendmode == RM_LIGHTS && b->cam.cursect == s)// dont backface when in own sector for ceil lights,
 			//{
@@ -2097,7 +2098,7 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy) {
 	opercurr = 0;
 	int sec=-1,wal=-1,spr =-1;
 	point3d hit;
-	point3d f = p3sum(cc->p,cc->f);
+	point3d f = p3sum(cc->tr.p,cc->tr.f);
 
 	//transform t = TR_ONE; // p = (0,0,0)
 	//// rotate 90deg around Z: r=(0,1,0), d=(-1,0,0), f=(0,0,1)
@@ -2184,12 +2185,12 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 		if(shadowtest2_rendmode != 4) {
 			for (i = shadowtest2_numlights - 1; i >= 0; i--) {
 				//Transform shadowtest2_light to screen space
-				fp.x = shadowtest2_light[i].p.x - gcam.p.x;
-				fp.y = shadowtest2_light[i].p.y - gcam.p.y;
-				fp.z = shadowtest2_light[i].p.z - gcam.p.z;
-				slightpos[i].x = fp.x * gcam.r.x + fp.y * gcam.r.y + fp.z * gcam.r.z;
-				slightpos[i].y = fp.x * gcam.d.x + fp.y * gcam.d.y + fp.z * gcam.d.z;
-				slightpos[i].z = fp.x * gcam.f.x + fp.y * gcam.f.y + fp.z * gcam.f.z;
+				fp.x = shadowtest2_light[i].p.x - gcam.tr.p.x;
+				fp.y = shadowtest2_light[i].p.y - gcam.tr.p.y;
+				fp.z = shadowtest2_light[i].p.z - gcam.tr.p.z;
+				slightpos[i].x = fp.x * gcam.tr.r.x + fp.y * gcam.tr.r.y + fp.z * gcam.tr.r.z;
+				slightpos[i].y = fp.x * gcam.tr.d.x + fp.y * gcam.tr.d.y + fp.z * gcam.tr.d.z;
+				slightpos[i].z = fp.x * gcam.tr.f.x + fp.y * gcam.tr.f.y + fp.z * gcam.tr.f.z;
 
 				fp.x = shadowtest2_light[i].f.x;
 				fp.y = shadowtest2_light[i].f.y;
@@ -2201,9 +2202,9 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 					fp.y *= f;
 					fp.z *= f;
 				}
-				slightdir[i].x = fp.x * gcam.r.x + fp.y * gcam.r.y + fp.z * gcam.r.z;
-				slightdir[i].y = fp.x * gcam.d.x + fp.y * gcam.d.y + fp.z * gcam.d.z;
-				slightdir[i].z = fp.x * gcam.f.x + fp.y * gcam.f.y + fp.z * gcam.f.z;
+				slightdir[i].x = fp.x * gcam.tr.r.x + fp.y * gcam.tr.r.y + fp.z * gcam.tr.r.z;
+				slightdir[i].y = fp.x * gcam.tr.d.x + fp.y * gcam.tr.d.y + fp.z * gcam.tr.d.z;
+				slightdir[i].z = fp.x * gcam.tr.f.x + fp.y * gcam.tr.f.y + fp.z * gcam.tr.f.z;
 
 				spotwid[i] = shadowtest2_light[i].spotwid;
 			}
@@ -2241,16 +2242,16 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 		float lightbound = 1e7f;
 		if (shadowtest2_rendmode == 4) {
 			if (!b->has_portal_clip) { // setup light camera onece per halfplane
-				if (!halfplane) gcam.r.x = 1;
-				else gcam.r.x = -1;
-				gcam.d.x = 0;
-				gcam.f.x = 0;
-				gcam.r.y = 0;
-				gcam.d.y = 0;
-				gcam.f.y = -gcam.r.x;
-				gcam.r.z = 0;
-				gcam.d.z = 1;
-				gcam.f.z = 0;
+				if (!halfplane) gcam.tr.r.x = 1;
+				else gcam.tr.r.x = -1;
+				gcam.tr.d.x = 0;
+				gcam.tr.f.x = 0;
+				gcam.tr.r.y = 0;
+				gcam.tr.d.y = 0;
+				gcam.tr.f.y = -gcam.tr.r.x;
+				gcam.tr.r.z = 0;
+				gcam.tr.d.z = 1;
+				gcam.tr.f.z = 0;
 				gcam.h.z = 21;
 				gcam.h.x = 21;
 				gcam.h.y = 21;

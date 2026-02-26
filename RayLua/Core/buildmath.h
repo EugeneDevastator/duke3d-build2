@@ -457,7 +457,7 @@ static inline bool isnpot(int n) {
 	return n <= 0 || (n & (n - 1)) != 0;
 }
 
-static inline void transform_wccw_vec(dpoint3d *dir, cam_t *ctin, cam_t *ctout) {
+static inline void transform_wccw_vec(dpoint3d *dir, transform *ctin, transform *ctout) {
 	// Transform direction vector (no translation)
 	//RFD FIXED
 	double cx = dir->x * ctin->r.x + dir->y * ctin->r.y + dir->z * ctin->r.z;
@@ -507,25 +507,6 @@ static inline void tr_apply(transform *subject, transform portalform) {
 #endif
 
 #if 1 // =============== MONO PLANE CONVERSIONS ====================
-static inline void mp_to_world(double sx, double sy, bdrawctx *b, double *wx, double *wy, double *wz, cam_t *cam) {
-	double denom = (b->gouvmat[0] * sx + b->gouvmat[3] * sy + b->gouvmat[6]) * cam->h.z;
-
-	if (fabs(denom) < 1e-10) {
-		*wx = cam->p.x;
-		*wy = cam->p.y;
-		*wz = cam->p.z;
-		return;
-	}
-
-	double depth = 1.0 / denom;
-	double dx = sx - cam->h.x;
-	double dy = sy - cam->h.y;
-
-	*wx = (dx * cam->r.x + dy * cam->d.x + cam->h.z * cam->f.x) * depth + cam->p.x;
-	*wy = (dx * cam->r.y + dy * cam->d.y + cam->h.z * cam->f.y) * depth + cam->p.y;
-	*wz = (dx * cam->r.z + dy * cam->d.z + cam->h.z * cam->f.z) * depth + cam->p.z;
-}
-
 #endif
 #if 1 // ======================== MISC OPS ===========================
 

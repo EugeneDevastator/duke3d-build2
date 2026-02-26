@@ -673,7 +673,7 @@ public:
 			// shadowtest2_updatelighting = 0; //FIXFIX
 			shadowtest2_ligpolreset(-1);
 			for (glignum = 0; glignum < shadowtest2_numlights; glignum++) {
-				ncam.p = shadowtest2_light[glignum].p;
+				ncam.tr.p = shadowtest2_light[glignum].p;
 				//reset_context();
 				ncam.cursect = shadowtest2_light[glignum].sect;
 				draw_hsr_polymost(&ncam, map, 0);

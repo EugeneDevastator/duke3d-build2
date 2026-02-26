@@ -46,13 +46,15 @@ long* get_gtilehashead(void);
 
 typedef struct { intptr_t f; int p, x, y; } tiletype;
 typedef struct {
-	union { transform tr; struct { point3d p, r, d, f; }; };
+	transform tr;
 	point3d h;
 	int cursect;
 	float fov_h;           // Horizontal FOV in radians
 	float fov_v;           // Vertical FOV in radians
 	float persp_h;         // Horizontal perspectiveness [0.0-1.0]
 	float persp_v;
+	float shift_h;
+	float shift_v;
 } cam_t;
 
 typedef struct {
