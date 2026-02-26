@@ -1007,8 +1007,10 @@ static void emit_wallpoly_func(int rethead0, int rethead1, bdrawctx *b) {
 	}
 	if (eyepol[eyepoln].uvform.rot.z != 0)
 		int sdfgs=2;
-	for (int k=0;k<3;k++)
-	p3_transform_wccw(&eyepol[eyepoln].worlduvs[k],b->movedcam.tr,b->orcam.tr);
+	p3_transform_wccw(&eyepol[eyepoln].worlduvs[0],b->movedcam.tr,b->orcam.tr);
+	for (int k=1;k<5;k++)
+	p3_transform_wccw_vec(&eyepol[eyepoln].worlduvs[k],b->movedcam.tr,b->orcam.tr);
+
 	eyepol[eyepoln].slabid = b->gligslab;
 	if (eyepol[eyepoln].alpha < 0) eyepol[eyepoln].alpha = 1;
 

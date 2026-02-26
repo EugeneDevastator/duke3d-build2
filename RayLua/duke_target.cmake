@@ -13,6 +13,7 @@ add_executable(DukeGame
         ${DUKE_C}
         ${DUKE_H}
         Core/rendertypes.h
+        Core/mapform_duke.h
 
 )
 

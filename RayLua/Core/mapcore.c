@@ -978,15 +978,17 @@ void makewaluvs(sect_t *sect, int wid, mapstate_t *map) {
 
 		usewal = (sur->uvgen.utez & TEZ_NW) ? nw : w;
 		sur->rt_uvs[1] = (point3d) {usewal->x,usewal->y,getzoftez(sur->uvgen.utez, sect, wid, usewal->pos, map) };
+		// store local
+		sur->rt_uvs[1]= p3_diff(sur->rt_uvs[1],sur->rt_uvs[0]);
 
 		usewal = (sur->uvgen.vtez & TEZ_NW) ? nw : w;
 		float z = getzoftez(sur->uvgen.vtez, sect, wid, usewal->pos, map);
 		if (sur->uvgen.vtez & TEZ_WORLDZ1)
 			z+=sur->rt_uvs[0].z;
 		sur->rt_uvs[2] = (point3d) {usewal->x,usewal->y,z };
+		sur->rt_uvs[2]= p3_diff(sur->rt_uvs[2],sur->rt_uvs[0]);
 
-		point3d localv = p3_diff(sur->rt_uvs[2],sur->rt_uvs[0]);
-		sur->rt_uvs[3] = p3_sum(sur->rt_uvs[1],localv); // corner
+		sur->rt_uvs[3] = p3_sum(sur->rt_uvs[1],sur->rt_uvs[2]); // corner
 
 
 		//if (sur->uvgen.vtez & TEZ_INVZ) {
@@ -996,7 +998,7 @@ void makewaluvs(sect_t *sect, int wid, mapstate_t *map) {
 
 	}
 
-}
+}// sec
 void makesecuvs(sect_t *sect, mapstate_t *map) {
 	wall_t *w = &sect->wall[0];
 	point2d wp = w->pos;
@@ -1069,6 +1071,7 @@ float scaler=1;
 			//	sur->uvform.pan.x = sur->uvform.pan.y;
 			//	sur->uvform.pan.y = t;
 
+			// swap
 			point3d tp = sur->rt_uvs[1];
 			sur->rt_uvs[1] = sur->rt_uvs[2];
 			sur->rt_uvs[2] = tp;
@@ -1076,6 +1079,10 @@ float scaler=1;
 
 		point3d localv = p3_diff(sur->rt_uvs[2],sur->rt_uvs[0]);
 		sur->rt_uvs[3] = p3_sum(sur->rt_uvs[1],localv); // corner
+
+		p3_sub_to(&sur->rt_uvs[1],sur->rt_uvs[0]);
+		p3_sub_to(&sur->rt_uvs[2],sur->rt_uvs[0]);
+		p3_sub_to(&sur->rt_uvs[3],sur->rt_uvs[0]);
 	}
 }
 
@@ -1385,6 +1392,8 @@ int updatesect_portmove(transform *tr, int *cursect, mapstate_t *map) {
 				}
 			}
 		}
+		// else check walls
+
 	}
 	return 0;
 }

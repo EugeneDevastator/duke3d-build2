@@ -97,6 +97,13 @@ static inline point3d p3_diff(point3d a, point3d b) {
 	return p;
 }
 
+static inline point3d p3_sub_to(point3d *a, const point3d b) {
+	a->x = a->x - b.x;
+	a->y = a->y - b.y;
+	a->z = a->z - b.z;
+
+}
+
 static inline void p3_addto(point3d *awrite, const point3d b) {
 	awrite->x += b.x;
 	awrite->y += b.y;
