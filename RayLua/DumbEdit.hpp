@@ -74,20 +74,21 @@ extern "C" {
 #define SEL_ALL 1<<13
 
 uint16_t edselmode = SEL_ALL; // claude - use this.
+EditorModel mdl;
 
-#define ISGRABSPRI (grabfoc.spri >= 0)
-#define ISHOVERSPRI (hoverfoc.spri >= 0)
-#define ISGRABWAL (grabfoc.wal >= 0 && grabfoc.sec >= 0)
-#define ISGRABCAP (grabfoc.wal < 0 && grabfoc.sec >= 0)
-#define ISHOVERWAL (hoverfoc.wal >= 0 && hoverfoc.sec >= 0)
-#define ISHOVERCAP (hoverfoc.wal < 0 && hoverfoc.sec >= 0)
-#define HOVERSEC map->sect[hoverfoc.sec]
-#define HOVERSPRI map->spri[hoverfoc.spri]
-#define GRABSEC map->sect[grabfoc.sec]
-#define GRABSPRI map->spri[grabfoc.spri]
-#define GRABWAL GRABSEC.wall[grabfoc.wal]
-#define HOVERWAL HOVERSEC.wall[hoverfoc.wal]
-#define HOVERWAL2 HOVERSEC.wall[hoverfoc.wal2]
+#define ISGRABSPRI (mdl.grab.spri >= 0)
+#define ISHOVERSPRI (mdl.hover.spri >= 0)
+#define ISGRABWAL (mdl.grab.wal >= 0 && mdl.grab.sec >= 0)
+#define ISGRABCAP (mdl.grab.wal < 0 && mdl.grab.sec >= 0)
+#define ISHOVERWAL (mdl.hover.wal >= 0 && mdl.hover.sec >= 0)
+#define ISHOVERCAP (mdl.hover.wal < 0 && mdl.hover.sec >= 0)
+#define HOVERSEC map->sect[mdl.hover.sec]
+#define HOVERSPRI map->spri[mdl.hover.spri]
+#define GRABSEC map->sect[mdl.grab.sec]
+#define GRABSPRI map->spri[mdl.grab.spri]
+#define GRABWAL GRABSEC.wall[mdl.grab.wal]
+#define HOVERWAL HOVERSEC.wall[mdl.hover.wal]
+#define HOVERWAL2 HOVERSEC.wall[mdl.hover.wal2]
 
 // DO LAST VALID HOVER.
 
@@ -196,9 +197,8 @@ selbuffer_t selcurrent;
 selbuffer_t selstack[10];
 
 bool hasgrab = false;
-focus_t hoverfoc;
 focus_t bufferfoc;
-focus_t grabfoc;
+
 
 
 datedit_t datstate;
@@ -390,17 +390,17 @@ float savedHeight;
 Vector2 origVert;
 
 void PickgrabDiscard() {
-	if (grabfoc.spri >= 0) {
-		map->spri[grabfoc.spri].tr = savedwtr;
+	if (mdl.grab.spri >= 0) {
+		map->spri[mdl.grab.spri].tr = savedwtr;
 	} else if (ISGRABWAL) {
-		map->sect[grabfoc.sec].wall[grabfoc.wal].x = savedwtr.p.x;
-		map->sect[grabfoc.sec].wall[grabfoc.wal].y = savedwtr.p.y;
+		map->sect[mdl.grab.sec].wall[mdl.grab.wal].x = savedwtr.p.x;
+		map->sect[mdl.grab.sec].wall[mdl.grab.wal].y = savedwtr.p.y;
 		for (int i = 0; i < totalverts; ++i) {
 			map->sect[verts[i].s].wall[verts[i].w].x = savedwtr.p.x;
 			map->sect[verts[i].s].wall[verts[i].w].y = savedwtr.p.y;
 			// move nextwall
-			//map->sect[grabfoc.sec].wall[grabfoc.wal2].x=tp2.x;
-			//map->sect[grabfoc.sec].wall[grabfoc.wal2].y=tp2.y;
+			//map->sect[mdl.grab.sec].wall[mdl.grab.wal2].x=tp2.x;
+			//map->sect[mdl.grab.sec].wall[mdl.grab.wal2].y=tp2.y;
 			//for (int i = 0; i < totalverts2; ++i) {
 			//	map->sect[verts2[i].s].wall[verts2[i].w].x = tp2.x;
 			//	map->sect[verts2[i].s].wall[verts2[i].w].y = tp2.y;
@@ -410,18 +410,18 @@ void PickgrabDiscard() {
 }
 
 void PickgrabAccept() {
-	if (grabfoc.spri >= 0) {
-		int s = map->spri[grabfoc.spri].sect;
-		updatesect_p(map->spri[grabfoc.spri].p, &s, map);
-		changesprisect_imp(grabfoc.spri, s, map);
-	} else if (grabfoc.wal >= 0 && grabfoc.sec >= 0) {
+	if (mdl.grab.spri >= 0) {
+		int s = map->spri[mdl.grab.spri].sect;
+		updatesect_p(map->spri[mdl.grab.spri].p, &s, map);
+		changesprisect_imp(mdl.grab.spri, s, map);
+	} else if (mdl.grab.wal >= 0 && mdl.grab.sec >= 0) {
 		// need to update sprites here.
-		//		map->sect[grabfoc.sec].wall[grabfoc.wal].x=savedtr.p.x;
-		//	map->sect[grabfoc.sec].wall[grabfoc.wal].y=savedtr.p.y;
+		//		map->sect[mdl.grab.sec].wall[mdl.grab.wal].x=savedtr.p.x;
+		//	map->sect[mdl.grab.sec].wall[mdl.grab.wal].y=savedtr.p.y;
 		checksprisect_imp(-1, map);
 	}
 
-	grabfoc.spri = -1; // jsut do noting now.
+	mdl.grab.spri = -1; // jsut do noting now.
 	ctx.mode = Fly;
 }
 int savedsec =0;
@@ -438,14 +438,14 @@ void PickgrabUpdate() {
 	p3_addto(&localp2, p3_scalar_mul_of(BBDOWN, scrol * 0.2f));
 
 	if (ISGRABSPRI) {
-		map->spri[grabfoc.spri].tr = tr_local_to_world(virt_incam_tr, cam->tr);
-		int s = map->spri[grabfoc.spri].sect;
-		if (hoverfoc.sec >= 0) {
-			GRABSPRI.walcon = (signed char)hoverfoc.wal;
+		map->spri[mdl.grab.spri].tr = tr_local_to_world(virt_incam_tr, cam->tr);
+		int s = map->spri[mdl.grab.spri].sect;
+		if (mdl.hover.sec >= 0) {
+			GRABSPRI.walcon = (signed char)mdl.hover.wal;
 		}
 
-		updatesect_p(map->spri[grabfoc.spri].p, &s, map);
-		changesprisect_imp(grabfoc.spri, s, map);
+		updatesect_p(map->spri[mdl.grab.spri].p, &s, map);
+		changesprisect_imp(mdl.grab.spri, s, map);
 	}
 	else if (ISGRABCAP) {
 		point3d newpos = p3_local_to_world(virt_incam_tr.p, cam->tr);
@@ -455,13 +455,13 @@ void PickgrabUpdate() {
 			loopts[0].pos = newpos;
 			loopts[1].pos = savedwtr.p;
 			point3d offset = p3_diff(newpos, savedwtr.p);
-			map_sect_translate(grabfoc.sec, savedsec, offset,map);
+			map_sect_translate(mdl.grab.sec, savedsec, offset,map);
 			savedwtr.p = newpos;
 		}
 		else if (true)
 		{
 			float newz = p3_local_to_world(virt_incam_tr.p, cam->tr).z;
-			int isflor = grabfoc.wal + 2;
+			int isflor = mdl.grab.wal + 2;
 			GRABSEC.z[isflor] = newz;
 			if (IsKeyDown(KEY_LEFT_SHIFT)) {
 				GRABSEC.z[1 - isflor] = newz + savedHeight * ((1 - isflor) * 2 - 1);
@@ -484,9 +484,9 @@ void PickgrabUpdate() {
 			if (IsKeyPressed(KEY_F)) // swap mode.
 				usehitZ = !usehitZ;
 			if (usehitZ)
-				target_z = grabfoc.hitpos.z; // floor : ceiling
+				target_z = mdl.grab.hitpos.z; // floor : ceiling
 			else
-				target_z = map->sect[grabfoc.sec].z[ray_dir.z > 0]; // floor : ceiling
+				target_z = map->sect[mdl.grab.sec].z[ray_dir.z > 0]; // floor : ceiling
 
 			if (fabsf(ray_dir.z) > 0.001f) {
 				float t = (target_z - ray_start.z) / ray_dir.z;
@@ -506,8 +506,8 @@ void PickgrabUpdate() {
 		}
 
 		if (isConstrainted) { // move along neighbor wallss
-			wall_t wnex = map->sect[grabfoc.sec].wall[grabfoc.wal2];
-			wall_t wprev = map->sect[grabfoc.sec].wall[grabfoc.walprev];
+			wall_t wnex = map->sect[mdl.grab.sec].wall[mdl.grab.wal2];
+			wall_t wprev = map->sect[mdl.grab.sec].wall[mdl.grab.walprev];
 
 			// Calculate vectors from tmp point to each ray
 			Vector2 tmppos = {tmp.p.x, tmp.p.y};
@@ -543,8 +543,8 @@ void PickgrabUpdate() {
 		//    tp2 = p3_local_to_world(localp2, &cam->tr);
 		//}
 
-		map->sect[grabfoc.sec].wall[grabfoc.wal].x = outpos.x;
-		map->sect[grabfoc.sec].wall[grabfoc.wal].y = outpos.y;
+		map->sect[mdl.grab.sec].wall[mdl.grab.wal].x = outpos.x;
+		map->sect[mdl.grab.sec].wall[mdl.grab.wal].y = outpos.y;
 
 		if (pg_graballverts)
 			for (int i = 0; i < totalverts; ++i) {
@@ -554,8 +554,8 @@ void PickgrabUpdate() {
 
 		// Move ahead-wall todo - rework entirely leave section for verts only.
 		if (edselmode & SEL_SURF) {
-			map->sect[grabfoc.sec].wall[grabfoc.wal2].x = tp2.x;
-			map->sect[grabfoc.sec].wall[grabfoc.wal2].y = tp2.y;
+			map->sect[mdl.grab.sec].wall[mdl.grab.wal2].x = tp2.x;
+			map->sect[mdl.grab.sec].wall[mdl.grab.wal2].y = tp2.y;
 			for (int i = 0; i < totalverts2; ++i) {
 				map->sect[verts2[i].s].wall[verts2[i].w].x = tp2.x;
 				map->sect[verts2[i].s].wall[verts2[i].w].y = tp2.y;
@@ -565,45 +565,45 @@ void PickgrabUpdate() {
 
 	if (IsKeyPressed(K_PICKGRAB)) {
 		PickgrabAccept();
-		grabfoc.spri = -1;
+		mdl.grab.spri = -1;
 		ctx.op = accept;
 	}
 }
 
 void PickgrabStart() {
-	if (grabfoc.spri >= 0) {
-		savedwtr = map->spri[grabfoc.spri].tr;
+	if (mdl.grab.spri >= 0) {
+		savedwtr = map->spri[mdl.grab.spri].tr;
 	} else if (ISGRABCAP) {
 		savedwtr = cam->tr;
-		savedwtr.p = hoverfoc.hitpos;
+		savedwtr.p = mdl.hover.hitpos;
 		savedHeight = GRABSEC.z[1] - GRABSEC.z[0];
 		savedsec = cam->cursect;
-	} else if (grabfoc.wal >= 0 && grabfoc.sec >= 0) {
+	} else if (mdl.grab.wal >= 0 && mdl.grab.sec >= 0) {
 		bool grabboth = false;
 		if (!grabboth) // grab both walls
 		{
 			savedwtr = cam->tr;
-			grabfoc.wal = hoverfoc.onewall;
+			mdl.grab.wal = mdl.hover.onewall;
 		}
 
-		grabfoc.wal2 = map->sect[grabfoc.sec].wall[grabfoc.wal].n + grabfoc.wal;
-		grabfoc.walprev = wallprev(&GRABSEC,grabfoc.wal);
+		mdl.grab.wal2 = map->sect[mdl.grab.sec].wall[mdl.grab.wal].n + mdl.grab.wal;
+		mdl.grab.walprev = wallprev(&GRABSEC,mdl.grab.wal);
 		//for red walls we'd need to grab verts of all adjacent walls.
 		// something in build2 was there for it.
 		savedwtr = cam->tr;
-		savedwtr.p.x = map->sect[grabfoc.sec].wall[grabfoc.wal].x;
-		savedwtr.p.y = map->sect[grabfoc.sec].wall[grabfoc.wal].y;
+		savedwtr.p.x = map->sect[mdl.grab.sec].wall[mdl.grab.wal].x;
+		savedwtr.p.y = map->sect[mdl.grab.sec].wall[mdl.grab.wal].y;
 		origVert = {savedwtr.p.x,savedwtr.p.y};
-		totalverts = getwallsofvert(grabfoc.sec, grabfoc.wal, verts, 256, map);
+		totalverts = getwallsofvert(mdl.grab.sec, mdl.grab.wal, verts, 256, map);
 
-		point2d wpos = getwall({grabfoc.wal2, grabfoc.sec}, map)->pos;
+		point2d wpos = getwall({mdl.grab.wal2, mdl.grab.sec}, map)->pos;
 		point3d wpos3d = {wpos.x, wpos.y, 0};
 		localp2 = p3_world_to_local(wpos3d, cam->tr);
-		totalverts2 = getwallsofvert(grabfoc.sec, grabfoc.wal2, verts2, 256, map);
+		totalverts2 = getwallsofvert(mdl.grab.sec, mdl.grab.wal2, verts2, 256, map);
 	}
 	virt_incam_tr = tr_world_to_local(savedwtr, cam->tr);
 	//virt_incam_tr = savedwtr;
-	//virt_incam_tr.p = p3_make_vector(cam->tr.p,hoverfoc.hitpos);
+	//virt_incam_tr.p = p3_make_vector(cam->tr.p,mdl.hover.hitpos);
 }
 
 // ----------------------- draw loop OPER ---------------------
@@ -618,21 +618,21 @@ void LoopDrawUpdate() {
 	}
 	if (IsKeyPressed(KEY_TWO) && loopn == 1) {
 		// split walls
-		if (hoverfoc.wal >= 0) {
-			splitwallat(hoverfoc.sec, hoverfoc.wal, hoverfoc.hitpos, map);
+		if (mdl.hover.wal >= 0) {
+			splitwallat(mdl.hover.sec, mdl.hover.wal, mdl.hover.hitpos, map);
 		}
 		ctx.op = discard;
 	}
 	if (IsKeyPressed(KEY_SPACE)) {
 		//add
-		if (hoverfoc.sec >= 0) {
-			loopts[loopn].sect = hoverfoc.sec;
-			loopts[loopn].wal = hoverfoc.wal;
+		if (mdl.hover.sec >= 0) {
+			loopts[loopn].sect = mdl.hover.sec;
+			loopts[loopn].wal = mdl.hover.wal;
 		} else {
 			loopts[loopn].sect = -1;
 			loopts[loopn].wal = 0;
 		}
-		loopts[loopn].pos = hoverfoc.hitpos;
+		loopts[loopn].pos = mdl.hover.hitpos;
 		loopn++;
 	}
 	if (IsKeyPressed(KEY_R)) {
@@ -648,7 +648,7 @@ void LoopDrawUpdate() {
 		// add bool to not auto insec.
 		bool alsoMakeSec = !IsKeyDown(KEY_LEFT_SHIFT);
 		int isflip = (is_loop2d_ccw(loopts_p2d,loopn));
-		int own_wid_new = sect_appendwall_loop(&map->sect[hoverfoc.sec], loopn, loopts_p2d, isflip);
+		int own_wid_new = sect_appendwall_loop(&map->sect[mdl.hover.sec], loopn, loopts_p2d, isflip);
 
 
 		if (alsoMakeSec) {
@@ -657,7 +657,7 @@ void LoopDrawUpdate() {
 			loopinfo lithis = map_sect_get_loopinfo(loopts[0].sect, own_wid_new, map);
 			loopinfo linew = map_sect_get_loopinfo(newsec, 0, map);
 			int res = map_loops_join_mirrored(lithis, linew, map);
-			map_sect_rearrange_loops(hoverfoc.sec, newsec,own_wid_new,map);
+			map_sect_rearrange_loops(mdl.hover.sec, newsec,own_wid_new,map);
 		}
 		loopn = 0;
 
@@ -692,15 +692,15 @@ void TilsedStart() {
 
 void TilsedUpdate() {
 	if (IsKeyDown(KEY_TAB)) {
-		if (hoverfoc.spri >= 0) {
+		if (mdl.hover.spri >= 0) {
 			datstate.curval = HOVERSPRI.tilnum;
 			datstate.curval2 = HOVERSPRI.galnum;
 		} else if (ISHOVERWAL) {
-			datstate.curval = HOVERWAL.xsurf[hoverfoc.surf].tilnum;
-			datstate.curval2 = HOVERWAL.xsurf[hoverfoc.surf].galnum;
+			datstate.curval = HOVERWAL.xsurf[mdl.hover.surf].tilnum;
+			datstate.curval2 = HOVERWAL.xsurf[mdl.hover.surf].galnum;
 		} else if (ISHOVERCAP) {
-			datstate.curval = HOVERSEC.surf[hoverfoc.surf].tilnum;
-			datstate.curval2 = HOVERSEC.surf[hoverfoc.surf].galnum;
+			datstate.curval = HOVERSEC.surf[mdl.hover.surf].tilnum;
+			datstate.curval2 = HOVERSEC.surf[mdl.hover.surf].galnum;
 		}
 
 		texbstate->selected = datstate.curval;
@@ -709,15 +709,15 @@ void TilsedUpdate() {
 	if (IsKeyPressed(KEY_E)) {
 		datstate.curval = texbstate->selected;
 		datstate.curval2 = texbstate->galnum;
-		if (hoverfoc.spri >= 0) {
+		if (mdl.hover.spri >= 0) {
 			HOVERSPRI.tilnum = datstate.curval;
 			HOVERSPRI.galnum = datstate.curval2;
 		} else if (ISHOVERWAL) {
-			HOVERWAL.xsurf[hoverfoc.surf].tilnum = datstate.curval;
-			HOVERWAL.xsurf[hoverfoc.surf].galnum = datstate.curval2;
+			HOVERWAL.xsurf[mdl.hover.surf].tilnum = datstate.curval;
+			HOVERWAL.xsurf[mdl.hover.surf].galnum = datstate.curval2;
 		} else if (ISHOVERCAP) {
-			HOVERSEC.surf[hoverfoc.surf].tilnum = datstate.curval;
-			HOVERSEC.surf[hoverfoc.surf].galnum = datstate.curval2;
+			HOVERSEC.surf[mdl.hover.surf].tilnum = datstate.curval;
+			HOVERSEC.surf[mdl.hover.surf].galnum = datstate.curval2;
 		}
 	}
 	if (IsKeyPressed(KEY_V)) {
@@ -893,11 +893,11 @@ void WallDrawStart() {
 
 	// Add first point immediately like LoopDraw does
 	if (ISHOVERWAL) {
-		loopts[0].sect = hoverfoc.sec;
-		loopts[0].wal = hoverfoc.onewall;
-		loopts[0].pos.x = map->sect[hoverfoc.sec].wall[hoverfoc.onewall].x;
-		loopts[0].pos.y = map->sect[hoverfoc.sec].wall[hoverfoc.onewall].y;
-		loopts[0].pos.z = hoverfoc.hitpos.z;
+		loopts[0].sect = mdl.hover.sec;
+		loopts[0].wal = mdl.hover.onewall;
+		loopts[0].pos.x = map->sect[mdl.hover.sec].wall[mdl.hover.onewall].x;
+		loopts[0].pos.y = map->sect[mdl.hover.sec].wall[mdl.hover.onewall].y;
+		loopts[0].pos.z = mdl.hover.hitpos.z;
 		loopn = 1;
 	} else {
 		ctx.op = discard;
@@ -907,17 +907,17 @@ void WallDrawStart() {
 void WallDrawUpdate() {
     if (IsKeyPressed(KEY_SPACE)) {
         if (loopn < 100) {
-            point3d add_pos = hoverfoc.hitpos;
+            point3d add_pos = mdl.hover.hitpos;
 
             // Snap to wall vertices if close enough
             if (ISHOVERWAL) {
-                wall_t *w1 = &map->sect[hoverfoc.sec].wall[hoverfoc.wal];
-                wall_t *w2 = &map->sect[hoverfoc.sec].wall[hoverfoc.wal2];
+                wall_t *w1 = &map->sect[mdl.hover.sec].wall[mdl.hover.wal];
+                wall_t *w2 = &map->sect[mdl.hover.sec].wall[mdl.hover.wal2];
 
-                float d1 = (hoverfoc.hitpos.x - w1->x) * (hoverfoc.hitpos.x - w1->x) +
-                          (hoverfoc.hitpos.y - w1->y) * (hoverfoc.hitpos.y - w1->y);
-                float d2 = (hoverfoc.hitpos.x - w2->x) * (hoverfoc.hitpos.x - w2->x) +
-                          (hoverfoc.hitpos.y - w2->y) * (hoverfoc.hitpos.y - w2->y);
+                float d1 = (mdl.hover.hitpos.x - w1->x) * (mdl.hover.hitpos.x - w1->x) +
+                          (mdl.hover.hitpos.y - w1->y) * (mdl.hover.hitpos.y - w1->y);
+                float d2 = (mdl.hover.hitpos.x - w2->x) * (mdl.hover.hitpos.x - w2->x) +
+                          (mdl.hover.hitpos.y - w2->y) * (mdl.hover.hitpos.y - w2->y);
 
                 if (d1 < 4.0f) {
                     add_pos.x = w1->x;
@@ -928,8 +928,8 @@ void WallDrawUpdate() {
                 }
             }
 
-            loopts[loopn].sect = hoverfoc.sec >= 0 ? hoverfoc.sec : -1;
-            loopts[loopn].wal = hoverfoc.wal;
+            loopts[loopn].sect = mdl.hover.sec >= 0 ? mdl.hover.sec : -1;
+            loopts[loopn].wal = mdl.hover.wal;
             loopts[loopn].pos = add_pos;
             loopn++;
         }
@@ -943,11 +943,11 @@ void WallDrawUpdate() {
     if (IsKeyPressed(KEY_B)) {
         if (ISHOVERWAL && loopn >= 1) {
         	if (ISHOVERWAL) {
-        		loopts[loopn].sect = hoverfoc.sec;
-        		loopts[loopn].wal = hoverfoc.onewall;
-        		loopts[loopn].pos.x = map->sect[hoverfoc.sec].wall[hoverfoc.onewall].x;
-        		loopts[loopn].pos.y = map->sect[hoverfoc.sec].wall[hoverfoc.onewall].y;
-        		loopts[loopn].pos.z = hoverfoc.hitpos.z;
+        		loopts[loopn].sect = mdl.hover.sec;
+        		loopts[loopn].wal = mdl.hover.onewall;
+        		loopts[loopn].pos.x = map->sect[mdl.hover.sec].wall[mdl.hover.onewall].x;
+        		loopts[loopn].pos.y = map->sect[mdl.hover.sec].wall[mdl.hover.onewall].y;
+        		loopts[loopn].pos.z = mdl.hover.hitpos.z;
         		loopn++;
         		ctx.op = accept;
         	}
@@ -958,8 +958,8 @@ void WallDrawUpdate() {
 
     // Auto-close check
    //if (loopn > 2) {
-   //    float dx = hoverfoc.hitpos.x - loopts[0].pos.x;
-   //    float dy = hoverfoc.hitpos.y - loopts[0].pos.y;
+   //    float dx = mdl.hover.hitpos.x - loopts[0].pos.x;
+   //    float dy = mdl.hover.hitpos.y - loopts[0].pos.y;
    //    if (dx*dx + dy*dy < 4.0f) {
 
    //        WallDrawAccept();
@@ -970,7 +970,7 @@ void WallDrawUpdate() {
 // ------------------ UV MAPPING
 void UvmapDiscard(){}
 void UvmapStart() {
-	grabfoc=hoverfoc;
+	mdl.grab=mdl.hover;
 }
 void UvmapAccept() {
 
@@ -979,12 +979,12 @@ void UvmapUpdate() {
 	Vector2 dmov = GetMouseDelta();
 	float scrol = GetMouseWheelMove();
 	if (ISGRABWAL) {
-		GRABWAL.xsurf[grabfoc.surf].uvform.rot.z+= scrol/2.0;
-		//GRABWAL.xsurf[grabfoc.surf].uvform.pan.x-= dmov.x/512.0;
-		//GRABWAL.xsurf[grabfoc.surf].uvform.pan.y-= dmov.y/512.0;
+		GRABWAL.xsurf[mdl.grab.surf].uvform.rot.z+= scrol/2.0;
+		//GRABWAL.xsurf[mdl.grab.surf].uvform.pan.x-= dmov.x/512.0;
+		//GRABWAL.xsurf[mdl.grab.surf].uvform.pan.y-= dmov.y/512.0;
 
-		GRABWAL.xsurf[grabfoc.surf].rt_uvs[3].y-= dmov.x/512.0;
-		GRABWAL.xsurf[grabfoc.surf].rt_uvs[3].z-= dmov.y/512.0;
+		GRABWAL.xsurf[mdl.grab.surf].rt_uvs[3].y-= dmov.x/512.0;
+		GRABWAL.xsurf[mdl.grab.surf].rt_uvs[3].z-= dmov.y/512.0;
 	//GRABWAL.surf.uvform.rot.z+= scrol;
 	}
 
@@ -995,22 +995,22 @@ point3d savedpos;
 void MoveObjContextUpdate() {
 	Vector2 dmov = GetMouseDelta();
 	float scrol = GetMouseWheelMove();
-	map->spri[grabfoc.spri].p.x += dmov.x * 0.5f;
-	map->spri[grabfoc.spri].p.y += dmov.y * 0.5f;
-	map->spri[grabfoc.spri].p.z += scrol * 0.5f;
+	map->spri[mdl.grab.spri].p.x += dmov.x * 0.5f;
+	map->spri[mdl.grab.spri].p.y += dmov.y * 0.5f;
+	map->spri[mdl.grab.spri].p.z += scrol * 0.5f;
 }
 
 void MoveObjContextDiscard() {
-	map->spri[grabfoc.spri].p = savedpos;
+	map->spri[mdl.grab.spri].p = savedpos;
 }
 
 void MoveObjContextAccept() {
-	grabfoc.spri = -1; // jsut do noting now.
+	mdl.grab.spri = -1; // jsut do noting now.
 }
 
 void MoveObjContextStart() {
-	grabfoc.spri = grabfoc.spri;
-	savedpos = map->spri[grabfoc.spri].p;
+	mdl.grab.spri = mdl.grab.spri;
+	savedpos = map->spri[mdl.grab.spri].p;
 }
 
 
@@ -1140,11 +1140,11 @@ void InitEditor(mapstate_t *m) {
 }
 
 void SetColorum(uint8_t r, uint8_t g, uint8_t b, int16_t lum) {
-	if (hoverfoc.spri >= 0) {
-		map->spri[hoverfoc.spri].view.color.x = r / 255.0F;
-		map->spri[hoverfoc.spri].view.color.y = g / 255.0F;
-		map->spri[hoverfoc.spri].view.color.z = b / 255.0F;
-		map->spri[hoverfoc.spri].view.lum = lum;
+	if (mdl.hover.spri >= 0) {
+		map->spri[mdl.hover.spri].view.color.x = r / 255.0F;
+		map->spri[mdl.hover.spri].view.color.y = g / 255.0F;
+		map->spri[mdl.hover.spri].view.color.z = b / 255.0F;
+		map->spri[mdl.hover.spri].view.lum = lum;
 	}
 }
 
@@ -1162,18 +1162,18 @@ void Editor_DoRaycasts(cam_t *cc) {
 	uint32_t castflags = 0; // mark what we want to hit.
 	if (edselmode & SEL_REDWALLPORTS)
 		castflags |= RHIT_REDWALLS;
-	raycast(&cc->p, &cc->f, 1e32, cc->cursect, &hoverfoc.sec, &hoverfoc.wal, &hoverfoc.spri,&hoverfoc.surf, &hoverfoc.hitpos, castflags, map);
-	hoverfoc.wal2=-1;
+	raycast(&cc->p, &cc->f, 1e32, cc->cursect, &mdl.hover.sec, &mdl.hover.wal, &mdl.hover.spri,&mdl.hover.surf, &mdl.hover.hitpos, castflags, map);
+	mdl.hover.wal2=-1;
 	if (ISHOVERWAL) {
-		hoverfoc.wal2 = mapwallnextid(hoverfoc.sec,hoverfoc.wal,map);
-		hoverfoc.walprev = wallprev(&HOVERSEC,hoverfoc.wal);
-		float z1 = getwallz(&map->sect[hoverfoc.sec], 1, hoverfoc.wal);
-		float z2 = getwallz(&map->sect[hoverfoc.sec], 1, hoverfoc.wal2);
-		float d1 = p2_distance({HOVERWAL.x, HOVERWAL.y}, BPXY(hoverfoc.hitpos));
-		float d2 = p2_distance({HOVERWAL2.x, HOVERWAL2.y}, BPXY(hoverfoc.hitpos));
-		hoverfoc.onewall = hoverfoc.wal;
+		mdl.hover.wal2 = mapwallnextid(mdl.hover.sec,mdl.hover.wal,map);
+		mdl.hover.walprev = wallprev(&HOVERSEC,mdl.hover.wal);
+		float z1 = getwallz(&map->sect[mdl.hover.sec], 1, mdl.hover.wal);
+		float z2 = getwallz(&map->sect[mdl.hover.sec], 1, mdl.hover.wal2);
+		float d1 = p2_distance({HOVERWAL.x, HOVERWAL.y}, BPXY(mdl.hover.hitpos));
+		float d2 = p2_distance({HOVERWAL2.x, HOVERWAL2.y}, BPXY(mdl.hover.hitpos));
+		mdl.hover.onewall = mdl.hover.wal;
 		if (d2 < d1) {
-			hoverfoc.onewall = hoverfoc.wal2;
+			mdl.hover.onewall = mdl.hover.wal2;
 		}
 	}
 }
@@ -1182,8 +1182,8 @@ void EditorUpdate(const Camera3D rlcam) {
 
 	//if (IsKeyPressed(KEY_M) && ISHOVERWAL) {
 	//	// this works
-	//	//map_sect_remove_loop_data(hoverfoc.sec,hoverfoc.wal, map);
-	//	map_loop_move_and_remap(hoverfoc.sec,hoverfoc.sec, hoverfoc.wal, map);
+	//	//map_sect_remove_loop_data(mdl.hover.sec,mdl.hover.wal, map);
+	//	map_loop_move_and_remap(mdl.hover.sec,mdl.hover.sec, mdl.hover.wal, map);
 	//}
 	// process raycasts;
 	HandleSelectionModes();
@@ -1192,12 +1192,12 @@ void EditorUpdate(const Camera3D rlcam) {
 	if (ctx.state.id == Empty.id) {
 		if (IsKeyPressed(K_PICKGRAB)) {
 			hasgrab = true;
-			grabfoc = hoverfoc;
+			mdl.grab = mdl.hover;
 			ctx.state = PickgrabState;
 			ctx.state.start();
 		} else if (IsKeyPressed(K_LOOPDRAW)) {
 			hasgrab = true;
-			grabfoc = hoverfoc;
+			mdl.grab = mdl.hover;
 			ctx.state = LoopDrawState;
 			ctx.state.start();
 		} 	else if (IsKeyPressed(K_PICKTILE)) {
@@ -1240,7 +1240,7 @@ void EditorUpdate(const Camera3D rlcam) {
 				float florz = HOVERSEC.z[1] - capr * 0.1;
 				//axis grows down to floor.
 				if (HOVERWAL.ns >= 0) {
-					if (hoverfoc.hitpos.z < map->sect[HOVERWAL.ns].z[0]) {
+					if (mdl.hover.hitpos.z < map->sect[HOVERWAL.ns].z[0]) {
 						// upper seg.
 						florz = map->sect[HOVERWAL.ns].z[0];
 						capr = florz - HOVERSEC.z[0];
@@ -1269,10 +1269,10 @@ void EditorUpdate(const Camera3D rlcam) {
 				// Enhanced SOS linking using chain approach
 				if (HOVERWAL.ns < 0) {
 					// First sector on this wall - simple case
-					sec->wall[3].ns = hoverfoc.sec;
-					sec->wall[3].nw = hoverfoc.wal;
-					sec->wall[3].nschain = hoverfoc.sec;
-					sec->wall[3].nwchain = hoverfoc.wal;
+					sec->wall[3].ns = mdl.hover.sec;
+					sec->wall[3].nw = mdl.hover.wal;
+					sec->wall[3].nschain = mdl.hover.sec;
+					sec->wall[3].nwchain = mdl.hover.wal;
 					sec->wall[3].surfn = 3;
 					sec->wall[3].xsurf[1] = sec->wall[3].xsurf[0];
 					sec->wall[3].xsurf[2] = sec->wall[3].xsurf[0];
@@ -1289,11 +1289,11 @@ void EditorUpdate(const Camera3D rlcam) {
 					HOVERWAL.xsurf[2] = HOVERWAL.xsurf[0];
 				} else {
 					// Multiple sectors case - upgrade existing chain first
-					map_wall_regen_nsw_chain(hoverfoc.sec, hoverfoc.wal, map);
+					map_wall_regen_nsw_chain(mdl.hover.sec, mdl.hover.wal, map);
 
 					// Get existing chain using new method
 					vertlist_t existing_chain[32];
-					int chain_count = getwalls_chain(hoverfoc.sec, hoverfoc.wal, existing_chain, 32, map);
+					int chain_count = getwalls_chain(mdl.hover.sec, mdl.hover.wal, existing_chain, 32, map);
 
 					if (chain_count > 0) {
 						// Find insertion point based on height
@@ -1369,8 +1369,8 @@ void EditorUpdate(const Camera3D rlcam) {
 		}
 	}
 	// how to unpress the key here to prevent further intercept?
-	if (hoverfoc.spri >= 0 || grabfoc.spri >= 0) {
-		focus_t usefoc = (ctx.state.id == Empty.id) ? hoverfoc : grabfoc;
+	if (mdl.hover.spri >= 0 || mdl.grab.spri >= 0) {
+		focus_t usefoc = (ctx.state.id == Empty.id) ? mdl.hover : mdl.grab;
 		if (IsKeyPressed(KEY_L)) {
 			if (usefoc.spri <0)
 				return;
@@ -1390,11 +1390,11 @@ void EditorUpdate(const Camera3D rlcam) {
 		}
 	}
 	if (ISHOVERWAL) {
-		hoverfoc.wal2 = map->sect[hoverfoc.sec].wall[hoverfoc.wal].n + hoverfoc.wal;
+		mdl.hover.wal2 = map->sect[mdl.hover.sec].wall[mdl.hover.wal].n + mdl.hover.wal;
 		if (IsKeyPressed(KEY_INSERT)) {
 			// split walls
-			if (hoverfoc.wal >= 0) {
-				splitwallat(hoverfoc.sec, hoverfoc.wal, hoverfoc.hitpos, map);
+			if (mdl.hover.wal >= 0) {
+				splitwallat(mdl.hover.sec, mdl.hover.wal, mdl.hover.hitpos, map);
 			}
 		}
 	}
@@ -1413,8 +1413,8 @@ void EditorUpdate(const Camera3D rlcam) {
 
 void DrawGizmos() {
 	float mv = GetMouseWheelMove();
-	if (hoverfoc.spri >= 0) {
-		transform *sptr = &map->spri[hoverfoc.spri].tr;
+	if (mdl.hover.spri >= 0) {
+		transform *sptr = &map->spri[mdl.hover.spri].tr;
 		tr_quat_rotate_on_axis(sptr, sptr->r, mv);
 
 		Vector3 pos = buildToRaylibPos(sptr->p);
@@ -1434,9 +1434,9 @@ void DrawGizmos() {
 
 	if (ISHOVERWAL || ctx.state.id != Empty.id) {
 		if (ctx.state.id == Empty.id || ctx.state.id == WallDrawState.id)
-			usefoc = hoverfoc;
+			usefoc = mdl.hover;
 		else
-			usefoc = grabfoc;
+			usefoc = mdl.grab;
 		if (usefoc.sec<0)
 			return;
 		if (usefoc.onewall >=map->sect[usefoc.sec].n)
@@ -1460,11 +1460,11 @@ void DrawGizmos() {
 		loopwall = usefoc.onewall;
 	}
 	else if (ISHOVERCAP) {
-		usefoc = hoverfoc;
+		usefoc = mdl.hover;
 		loopwall = 0;
 	}
 	else
-	usefoc = hoverfoc;
+	usefoc = mdl.hover;
 
 	if (usefoc.sec >=0) {
 		loopinfo cloop = map_sect_get_loopinfo(usefoc.sec, loopwall, map);
@@ -1479,7 +1479,7 @@ void DrawGizmos() {
 			drawCylBoard2(rlp1, rlp2, 0.1f, 0.03f);
 		}
 	}
-	DrawPoint3D(buildToRaylibPos(hoverfoc.hitpos), RED);
+	DrawPoint3D(buildToRaylibPos(mdl.hover.hitpos), RED);
 
 	// Draw loops that are userdrawn:
 	int n = 0;
@@ -1496,7 +1496,7 @@ void DrawGizmos() {
 void EditorFrame() {
 	if (ctx.mode == Fly) {
 		if (IsKeyPressed(KEY_G)) {
-			if (grabfoc.spri >= 0) {
+			if (mdl.grab.spri >= 0) {
 				ctx.mode = Move;
 				ctx.state = MoveState;
 			}

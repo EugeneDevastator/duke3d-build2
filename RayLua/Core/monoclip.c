@@ -123,7 +123,7 @@ void mono_deloop2(int* i) {
 }
 
 void mono_deloop(int i) {
-    if (i<0)
+    if (i<0|| i>=mpmal)
         return;
     int j, count = 0;
     // ADD DEBUG - COUNT LOOP SIZE
@@ -131,8 +131,8 @@ void mono_deloop(int i) {
     do {
         count++;
         j = mp[j].n;
-    } while (j != i);
-    if (i < 0) return;
+    } while (j != i && j<mpmal);
+    if (i < 0 || j>=mpmal) return;
     //while (mp[i].n != i) mono_del(mp[i].n); mono_del(i);
 
     //logstep("Mono| DelLoop %d (size=%d), old_empty=%d", i, count, mpempty);
@@ -550,6 +550,7 @@ int mono_join(int hd0, int hd1, int hd2, int hd3, int *ho0, int *ho1) {
             hd[j + 2] = t;
         }
     }
+        if (hd[1]>=mpmal) return 0;
     //(mp[mp[hd[1]].p].x != mp[hd[3]].x)) return (0); hd[1] is out of bounds sometimes.
     if ((mp[mp[hd[0]].p].x != mp[hd[2]].x) || (mp[mp[hd[1]].p].x != mp[hd[3]].x)) return (0);
     for (j = 2 - 1; j >= 0; j--) {
