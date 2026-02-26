@@ -99,6 +99,7 @@ static bool syncam = true;
 static int cureyepoly = 0;
 static int mono_cursnap = 0;
 static int mono_curchain = 0;
+static int validsec  =0;
 static cam_t localb2cam;
 static Texture2D* galtextures[16];
 class DumbRender {
@@ -1137,8 +1138,10 @@ static void quad_st(
 
 	static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
 		if (syncam) {
-			camfromrl(&plr.tri, camsrc);
-			int ported = updatesect_portmove(&plr.tri, &plr.cursect, map);
+			camfromrl(&plr.tr, camsrc);
+			if (plr.cursect>-1)
+				validsec = plr.cursect;
+			int ported = updatesect_portmove(&plr.tr, &plr.cursect, validsec, map);
 			if (!ported)
 				updatesect_imp(plr.ipos.x, plr.ipos.y, plr.ipos.z, &plr.cursect, map);
 			else {
@@ -1147,7 +1150,7 @@ static void quad_st(
 				//                updatesect_imp(plr.ipos.x,plr.ipos.y,plr.ipos.z, &plr.cursect, map);
 			}
 			DumbCore::b2pos = plr.ipos;
-			camfromb2(camsrc, &plr.tri);
+			camfromb2(camsrc, &plr.tr);
 			//  Vector3 forward = Vector3Normalize(Vector3Subtract(camsrc.target, camsrc.position));
 			//  Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camsrc.up));
 			//  Vector3 up = Vector3CrossProduct(right, forward); // Recalculate orthogonal up

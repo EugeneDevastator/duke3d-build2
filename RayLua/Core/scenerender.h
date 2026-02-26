@@ -11,7 +11,7 @@ typedef struct {
     float ghx, ghy, ghz, zoom, ozoom;
     union {
 struct { point3d ipos, irig, idow, ifor;};
-        transform tri;
+        transform tr;
     };
 
     point3d npos, nrig, ndow, nfor; //for 2d/3d swap animation

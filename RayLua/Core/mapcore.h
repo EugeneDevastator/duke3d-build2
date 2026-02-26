@@ -271,6 +271,10 @@ static double distpoint2line2 (double x, double y, double x0, double y0, double 
 	g = dx*dx + dy*dy; if (f >=  g) return((x-x1)*(x-x1) + (y-y1)*(y-y1)); //behind point 1?
 	f = nx*dy - ny*dx; return(f*f/g); //perpendicular distance to line
 }
+static double distpos2wal (point3d pos, wall_t* wal, int iwal) {
+	int nwid = wal[iwal].n+iwal;
+	return distpoint2line2(pos.x,pos.y, wal[iwal].x,wal[iwal].y,wal[nwid].x,wal[nwid].y);
+}
 
 int polyspli (wall_t *owal, int on, wall_t **retwal, double kx, double ky, double ka);
 
@@ -344,7 +348,7 @@ int insidesect(double x, double y, wall_t *wal, int w);
 int insideloop(double x, double y, wall_t *wal);
 
 // first pass updatesect to ONLY check nearest + portals.
-int updatesect_portmove(transform *tr, int *cursect, mapstate_t *map);
+int updatesect_portmove(transform *tr, int *cursect, int validsec, mapstate_t *map);
 void map_wall_regen_nsw_chain(int start_sec,int start_wal, mapstate_t *map);
 
 int getwalls_chain(int s, int w, vertlist_t *ver, int maxverts, mapstate_t *map);

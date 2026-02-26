@@ -439,7 +439,7 @@ typedef struct // surf_t
 // ------- runtime gneerated data
 	// for portals case - we dont care and use original world for everything.
 	// interpolator will lerp worldpositions, regardless of poly location
-	point3d rt_uvs[5]; // world uv vectors. generated per poly. origin, uv, c, eye
+	point3d rt_uvs[5]; // world uv vectors. generated per poly. origin(world), uv(local pos, rot=world), c, eye
 
 	// can in theory use object space and encode it.
 
