@@ -289,18 +289,21 @@ typedef struct {
 #define TEZ_FURTHEST (1<<5) // furthest height point instead of arbitrary.
 #define TEZ_WORLDZ1	 (1<<6) // use unit world z vector
 
+// will only be used for animated entities.
 typedef struct {
+	// 32 bits to encode relativity.
+	unsigned int pkind : 2; // general kind of reference
+	// 0 = self, 1 = wall, 2 = sprite, 3= projector
 	unsigned int otez : 7; // TEZ flags
 	unsigned int utez : 7;
 	unsigned int vtez : 7;
 	unsigned int ctez : 7; // 4th corner vector C = o + v + c
-	unsigned int o_do_regen : 1; // do we regen it on movement, if not, then vectors wont regenerate.
-	unsigned int u_do_regen : 1; // v persp. vp1 = o +v; vp2 = o+v+vp.
-	unsigned int v_do_regen : 1; // v persp. vp1 = o +v; vp2 = o+v+vp.
-	unsigned int c_do_regen : 1; // v persp. vp1 = o +v; vp2 = o+v+vp.
-} procuvgen32_t; // procedural uv data
+	unsigned int flag1 : 1;
+	unsigned int flag2 : 1;
 
-
+	uint32_t entityref1 : 32; // could be sprite, wall, etc.
+	uint32_t entityref2 : 32; // could be sprite, wall, etc.
+} procuvgen96_t; // procedural uv data
 
 typedef struct { double x, y, z; } dpoint3d; 	//Note: pol doesn't support loops as dpoint3d's!
 typedef struct { float x, y; } point2d;
@@ -417,7 +420,7 @@ typedef struct // surf_t
 		uint32_t packed_tile_data;
 	};
 	enum fragRenderMode frMode;
-	procuvgen32_t uvgen;
+	procuvgen96_t uvgen;
 	uvform_t uvform;//[9]; // scale xy, pan xy, crop AB, rotation
 
 
