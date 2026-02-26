@@ -4,6 +4,7 @@
 
 #ifndef RAYLIB_LUA_IMGUI_DUMBEDIT_HPP
 #define RAYLIB_LUA_IMGUI_DUMBEDIT_HPP
+#include "b2rlmath.h"
 #include "Editor/ieditorhudview.h"
 #include "Editor/uimodels.h"
 static TextureBrowser *texbstate;
@@ -1486,10 +1487,10 @@ void DrawGizmos() {
 	for (int i = 0; i < loopn; ++i) {
 		n = (i + 1) % loopn;
 		rlColor4ub(255, 255, 255, 255);
-		drawVert(buildToRaylib(loopts[i].pos));
+		drawVert(vec3_from_p3(loopts[i].pos));
 		rlColor4ub(230, 230, 230, 255);
 		//loop white line
-		drawCylBoard(buildToRaylib(loopts[i].pos), buildToRaylib(loopts[n].pos), 0.01);
+		drawCylBoard(vec3_from_p3(loopts[i].pos), vec3_from_p3(loopts[n].pos), 0.01);
 	}
 }
 

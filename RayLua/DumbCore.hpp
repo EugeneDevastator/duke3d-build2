@@ -44,7 +44,7 @@ public:
         if (initialized) return;
         map = loadedMap;
         b2pos = map->startpos;
-        camera.position = buildToRaylib(b2pos);
+        camera.position = vec3_from_p3(b2pos);
         updatesect_imp(camera.position.x, -camera.position.z, camera.position.y, &cursec, map);
 
         camera.target = {0.0f, 0.0f, 0.0f};

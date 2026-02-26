@@ -1101,7 +1101,7 @@ static void quad_st(
 
 	static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
 		if (syncam) {
-			camfromrl(&plr.tr, camsrc);
+			tr_from_cam3d(&plr.tr, camsrc);
 			updatesect_imp(plr.tr.p.x, plr.tr.p.y, plr.tr.p.z, &plr.cursect, map);
 			int ported = updatesect_portmove(&plr.tr, &plr.cursect, validsec, map);
 			if(ported)
@@ -1111,7 +1111,7 @@ static void quad_st(
 			if (plr.cursect>-1)
 				validsec = plr.cursect;
 			DumbCore::b2pos = plr.tr.p;
-			camfromb2(camsrc, &plr.tr);
+			cam3d_from_tr(camsrc, &plr.tr);
 
 			//  Vector3 forward = Vector3Normalize(Vector3Subtract(camsrc.target, camsrc.position));
 			//  Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camsrc.up));
