@@ -15,6 +15,7 @@
 #define BUILD2_MONOCLIP_H
 
 #include "mapcore.h"
+#include "buildmath.h"
 
 #define MONO_BOOL_AND 0 // result is intersection
 #define MONO_BOOL_SUB 1

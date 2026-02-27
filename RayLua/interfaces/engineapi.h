@@ -4,6 +4,8 @@
 
 #ifndef R_ENGINEAPI_H
 #define R_ENGINEAPI_H
+
+#include "mapform_b2.h"
 #include "shared_types.h"
 #define W_FRW 0
 #define S_BACK 1

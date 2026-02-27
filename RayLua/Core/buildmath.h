@@ -6,13 +6,9 @@
 #ifndef RAYLIB_LUA_IMGUI_BUILDMATH_H
 #define RAYLIB_LUA_IMGUI_BUILDMATH_H
 // PURE C LIB
-#ifdef __cplusplus
-extern "C" {
-#endif
 
+#include <stdbool.h>
 
-
-#include "monoclip.h"
 #ifndef __cplusplus
 #pragma message("Compiling as C")
 #else
@@ -22,6 +18,37 @@ extern "C" {
 #define epsilon 0.0000001f
 #define epsilond 0.000001
 
+typedef struct {
+	float x, y;
+} point2d;
+
+typedef struct {
+	float x, y, z;
+} point3d;
+
+typedef struct {
+	double x, y, z;
+} dpoint3d; //Note: pol doesn't support loops as dpoint3d's!
+
+typedef struct {
+	point3d p, r, d, f;
+} transform;
+
+typedef struct {
+	float x, y, z, w;
+} quat;
+
+typedef struct {
+	transform tr;
+	point3d h;
+	int cursect;
+	float fov_h;           // Horizontal FOV in radians
+	float fov_v;           // Vertical FOV in radians
+	float persp_h;         // Horizontal perspectiveness [0.0-1.0]
+	float persp_v;
+	float shift_h;
+	float shift_v;
+} cam_t;
 
 // X grows Left to right (screen)
 // Y grows Top to bottom (screen)
@@ -776,9 +803,5 @@ static inline void tr_quat_look_atp3(transform *trsubj, point3d to, float normt)
 	tr_quat_slerp_rotate(trsubj, &target, normt);
 }
 
-#endif
-
-#ifdef __cplusplus
-}
 #endif
 #endif //RAYLIB_LUA_IMGUI_BUILDMATH_H

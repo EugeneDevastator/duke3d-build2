@@ -1,11 +1,13 @@
 //
 // Created by omnis on 11/10/2025.
 //
+#ifndef B2_ENGINEAPI_C
+#define B2_ENGINEAPI_C
+
 #include "engineapi.h"
 
-#include <stdlib.h>
-
 #include "mapcore.h"
+
 static mapstate_t *mapref;
 char *inputs;
 float px,py,pz = 0;
@@ -99,3 +101,4 @@ void InitEngineApi(mapstate_t *map) {
 
 
 }
+#endif

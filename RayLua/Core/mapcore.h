@@ -14,6 +14,7 @@
 #include "artloader.h"
 #include "../DukeGame/source/build.h"
 #include "../interfaces/shared_types.h"
+#include "mapform_b2.h"
 #ifndef PI
 #define PI 3.141592653589793
 #endif
@@ -45,17 +46,6 @@ long* get_gtilehashead(void);
 //} tiltyp; //shsc=suggested height scale
 
 typedef struct { intptr_t f; int p, x, y; } tiletype;
-typedef struct {
-	transform tr;
-	point3d h;
-	int cursect;
-	float fov_h;           // Horizontal FOV in radians
-	float fov_v;           // Vertical FOV in radians
-	float persp_h;         // Horizontal perspectiveness [0.0-1.0]
-	float persp_v;
-	float shift_h;
-	float shift_v;
-} cam_t;
 
 typedef struct {
 	long sect;

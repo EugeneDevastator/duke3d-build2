@@ -58,8 +58,9 @@ public:
         camera.projection = CAMERA_PERSPECTIVE;
 
         initialized = true;
-        InitEngineApi(map);
+
 #if IS_DUKE_INCLUDED
+        InitEngineApi(map);
         InitDukeWrapper(&engine);
         InitDuke();
 #endif

@@ -1,7 +1,6 @@
 # Shared definitions and sources
 # Core files
 set(C_SOURCES
-        interfaces/engineapi.c
         Core/mapcore.c
         Core/artloader.c
         Core/kplib.c
@@ -15,6 +14,7 @@ set(C_SOURCES
         interfaces/eventstore.c
 )
 set(C_HEADERS
+        Core/mapform_b2.h
         Core/mapcore.h
         Core/artloader.h
         Core/loaders.h
@@ -24,7 +24,6 @@ set(C_HEADERS
         Core/scenerender.h
         Core/buildmath.h
         Core/shadowtest2.h
-        interfaces/engineapi.h
         interfaces/shared_types.h
         interfaces/eventstore.h
         interfaces/ev_projection.h
