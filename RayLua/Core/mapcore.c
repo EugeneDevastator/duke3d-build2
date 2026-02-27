@@ -753,36 +753,39 @@ void changesprisect_imp (int i, int nsect, mapstate_t *map)
 	spr->sect = nsect;
 }
 
-surf_t makeSurfWall(int w1, int wnex) {
+surf_t init_wall_surf() {
 	surf_t s = {0};
 	s.tilnum = 0;
 	s.uvgen.otez = 0;
 	s.uvgen.utez = TEZ_NW;
 	s.uvgen.vtez = TEZ_WORLDZ1;
+	s.uvgen.ctez = TEZ_WORLDZ1;
 	s.alpha = 1;
-	s.rt_uvs[0] = (point3d){0, 0, 0};
+	//makewaluvs(&map->sect[sec], wid, map);
+	s.rt_uvs[0] = (point3d){0,0,0};
 	s.rt_uvs[1] = (point3d){1, 0, 0};
 	s.rt_uvs[2] = (point3d){0, 0, 1};
+	s.rt_uvs[3] = (point3d){1, 0, 1};
 
-	s.uvform.scale.x = 1;
-	s.uvform.scale.y = 1;
-	s.uvform.pan.x = 0;
-	s.uvform.pan.y = 0;
-	s.rsc = 8192; // FIX THIS CRAP! its shade
+	s.uvform = UVFORM_DEFAULT;
+	s.rsc = 8192; // FIX THIS CRAP! its shade 8k = full bright
 	return s;
 }
 
-surf_t makeSurfCap() {
-	surf_t s = makeSurfWall(0,1);
+surf_t init_cap_surf() {
+	surf_t s = {0};
+	s.tilnum = 0;
 	s.rt_uvs[0] = (point3d){0,0,0};
 	s.rt_uvs[1] = (point3d){1,0,0};
 	s.rt_uvs[2] = (point3d){0,1,0};
+	s.rt_uvs[3] = (point3d){1,1,0};
+	s.uvform = UVFORM_DEFAULT;
+	s.rsc = 8192; // FIX THIS CRAP! its shade 8k = full bright
 	return s;
 }
 
-
 void makewall(wall_t *w, int8_t wid, int8_t nwid) {
-	w->xsurf[0] = makeSurfWall(wid,nwid);
+	w->xsurf[0] = init_wall_surf();
 	w->xsurf[1]=w->xsurf[0];
 	w->xsurf[2]=w->xsurf[0];
 	w->tags[1]=-1;
@@ -887,7 +890,7 @@ int map_append_sect_from_loop(int nwalls, point2d *coords, float floorz, float h
 	int nsec = map_append_sect(map,0);
 	sect_t *s = &map->sect[nsec];
 	sect_appendwall_loop(s, nwalls, coords, invert);
-	s->surf[0] = makeSurfCap();
+	s->surf[0] = init_cap_surf();
 	s->surf[1] = s->surf[0];
 	s->z[0] = floorz - height;
 	s->z[1] = floorz;
@@ -1485,8 +1488,8 @@ void spritemakedefault(spri_t *spr) {
 	spr->phys.fat = .5; spr->phys.mas = spr->phys.moi = 1.0;
 	spr->tilnum=1;
 	spr->view.anchor=(point3d){0.5,0.5,0.5};
-	spr->view.uv[0]=1;
-	spr->view.uv[1]=1;
+	spr->view.uv = (uvform_t){0};
+	spr->view.uv.scale=(point3d){1,1,1};
 	spr->owner = -1; spr->flags = 0;
 }
 

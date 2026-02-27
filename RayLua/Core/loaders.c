@@ -850,12 +850,12 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 				if (b7spr.cstat&(SPRITE_FLIP_Y | SPRITE_IS_FLOOR_PLANE)) {
 					//spr->d.x *= -1; spr->d.y *= -1; spr->d.z *= -1; // dont alter down vector.
 					spr->flags ^= 8; } //&8: y-flipped?
-				spr->view.uv[0]=1;
-				spr->view.uv[1]=1;
+				spr->view.uv.scale=(point3d){1,1,1};
+
 				// we flip tile inside of anchored space, so it should not affect the final rect of it
 				// currently doesnt work as intended
-				if (b7spr.cstat&SPRITE_FLIP_X) { spr->view.uv[0] = -1; } //&4: x-flipped
-				if (b7spr.cstat&SPRITE_FLIP_Y) { spr->view.uv[1] = -1; } //&8: y-flipped?
+				if (b7spr.cstat&SPRITE_FLIP_X) { spr->view.uv.scale.x = -1; } //&4: x-flipped
+				if (b7spr.cstat&SPRITE_FLIP_Y) { spr->view.uv.scale.y = -1; } //&8: y-flipped?
 
 				// note - replace with view setup
 				spr->view.anchor.x=0.5f;

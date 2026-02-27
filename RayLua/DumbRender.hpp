@@ -100,7 +100,6 @@ static int cureyepoly = 0;
 static int mono_cursnap = 0;
 static int mono_curchain = 0;
 static int validsec  =0;
-static cam_t localb2cam;
 static Texture2D* galtextures[16];
 class DumbRender {
 public:
@@ -679,10 +678,10 @@ public:
 				draw_hsr_polymost(&ncam, map, 0);
 			}
 		}
-		//cam->p = playr->ipos;
-		//cam->r = playr->irig;
-		//cam->d = playr->idow;
-		//cam->f = playr->ifor;
+		//b2cam->p = playr->ipos;
+		//b2cam->r = playr->irig;
+		//b2cam->d = playr->idow;
+		//b2cam->f = playr->ifor;
 		cam->h.x = playr->ghx;
 		cam->h.y = playr->ghy;
 		cam->h.z = playr->ghz;
@@ -1098,20 +1097,19 @@ static void quad_st(
 		}
 		rlEnd();
 	}
-
-	static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
+static void MoveCamB2( cam_t *b2cam) {
 		if (syncam) {
-			tr_from_cam3d(&plr.tr, camsrc);
+			plr.tr = b2cam->tr;
 			updatesect_imp(plr.tr.p.x, plr.tr.p.y, plr.tr.p.z, &plr.cursect, map);
 			int ported = updatesect_portmove(&plr.tr, &plr.cursect, validsec, map);
 			if(ported)
 				int ytry=1;
-			localb2cam.cursect = plr.cursect;
-			localb2cam.tr = plr.tr;
+			b2cam->cursect = plr.cursect;
+			b2cam->tr = plr.tr;
 			if (plr.cursect>-1)
 				validsec = plr.cursect;
 			DumbCore::b2pos = plr.tr.p;
-			cam3d_from_tr(camsrc, &plr.tr);
+			//cam3d_from_tr(&b2cam, &plr.tr);
 
 			//  Vector3 forward = Vector3Normalize(Vector3Subtract(camsrc.target, camsrc.position));
 			//  Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camsrc.up));
@@ -1123,7 +1121,10 @@ static void quad_st(
 			//  plr.idow.x = -up.x;       plr.idow.y = -up.z;       plr.idow.z = up.y;
 		}
 
-		DrawEyePoly(sw, sh, &plr, &localb2cam); // ken render
+	}
+	static void DrawKenGeometry(float sw, float sh, cam_t *b2cam) {
+
+		DrawEyePoly(sw, sh, &plr, b2cam); // ken render
 		//rlDisableDepthTest();
 		rlEnableDepthTest();
 		rlEnableDepthMask();
@@ -1623,11 +1624,11 @@ static void quad_st(
 					rlBegin(RL_QUADS);
 					//rlColor4ub(255, 255, 255, 255); // todo update transp.
 
-					rlTexCoord2f(0.0f, spr->view.uv[1] * 1.0f);
+					rlTexCoord2f(0.0f, spr->view.uv.scale.y * 1.0f);
 					rlVertex3V(ll);
-					rlTexCoord2f(spr->view.uv[0] * 1.0f, spr->view.uv[1] * 1.0f);
+					rlTexCoord2f(spr->view.uv.scale.x * 1.0f, spr->view.uv.scale.y * 1.0f);
 					rlVertex3V(lr);
-					rlTexCoord2f(spr->view.uv[0] * 1.0f, 0.0f);
+					rlTexCoord2f(spr->view.uv.scale.x * 1.0f, 0.0f);
 					rlVertex3V(ur);
 					rlTexCoord2f(0.0f, 0.0f);
 					rlVertex3V(ul);

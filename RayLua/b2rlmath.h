@@ -15,10 +15,10 @@ static inline point3d p3_from_vec3(Vector3 rlcoord)
 	return {rlcoord.x, rlcoord.z, -rlcoord.y};
 }
 
-static inline void cam3d_from_tr(Camera3D* rlcam, transform* b2tr){
-	rlcam->position = vec3_from_p3(b2tr->p);
-	Vector3 forward = vec3_from_p3(b2tr->f);
-	Vector3 up = vec3_from_p3(b2tr->d); // Recalculate orthogonal up
+static inline void cam3d_from_tr(Camera3D* rlcam, const transform b2tr){
+	rlcam->position = vec3_from_p3(b2tr.p);
+	Vector3 forward = vec3_from_p3(b2tr.f);
+	Vector3 up = vec3_from_p3(b2tr.d); // Recalculate orthogonal up
 	rlcam->up = Vector3Scale(up,-1);
 	rlcam->target = rlcam->position + forward;
 }

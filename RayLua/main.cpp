@@ -24,7 +24,7 @@
 //#include "MonoTest.hpp"
 //#include "luabinder.hpp"
 // Depends
-#include "DumbCore.hpp"
+//#include "DumbCore.hpp"
 #include "DumbEdit.hpp"
 #include "MonoTest.hpp"
 #include "raymath.h"
@@ -445,7 +445,7 @@ Texture2D lutTexture = {0};
 float lutIntensity = 1.0f;
 CustomRenderTarget finalTarget = {0};
 ImGuiViewport* viewport;
-
+cam_t globCam={0};
 
 int file_exists(const char* path) {
     FILE* file = fopen(path, "r");
@@ -629,6 +629,7 @@ void VisualizeMapstate() {  //unused
     auto map = DumbRender::GetMap();
     //InitWindow(1024, 768, "Mapstate Visualizer");
     SetTargetFPS(60);
+
 
 
     FreeCamera cam = {0};
@@ -920,6 +921,7 @@ sort them together as walls, or just by poss.
 
 
 */
+Camera3D rlcam;
 void RecreateRenderTargets(CustomRenderTarget* albedo, CustomRenderTarget* light, CustomRenderTarget* combined, CustomRenderTarget* final) {
     int w = GetScreenWidth();
     int h = GetScreenHeight();
@@ -953,10 +955,14 @@ void MainLoop() {
     DumbRender::LoadTexturesToGPU();
     DumbRender::Init("c:/Eugene/Games/build2/cubb.map");
     auto map = DumbRender::GetMap();
-    DumbCore::Init(map);
+    //DumbCore::Init(map);
+    globCam.tr.p = map->startpos;
+    globCam.tr.r = map->startrig;
+    globCam.tr.d = map->startdow;
+    globCam.tr.f = map->startfor;
     SetTargetFPS(60);
 
-    InitEditor(map);
+    InitEditor(map, &globCam);
     // Initialize LUT system
     InitLUTSystem();
 
@@ -981,8 +987,8 @@ void MainLoop() {
             RecreateRenderTargets(&albedoTarget, &lightTarget, &combinedTarget, &finalTarget);
         }
 #if !IS_DUKE_INCLUDED
-        Editor_DoRaycasts(&localb2cam);
-        EditorUpdate(*DumbCore::GetCamera());
+        Editor_DoRaycasts(&globCam);
+        EditorUpdate();
 #endif
         // Render albedo pass
         BeginCustomRenderTarget(albedoTarget);
@@ -991,13 +997,17 @@ void MainLoop() {
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             glEnable(GL_DEPTH_TEST);
             ClearBackground(BLACK);
-            if (!showPicker) DumbCore::Update(deltaTime);
+            //if (!showPicker) DumbCore::Update(deltaTime);
 
-            BeginMode3D(*DumbCore::GetCamera());
-
+            DumbRender::MoveCamB2(&globCam);
+            cam3d_from_tr(&rlcam, globCam.tr);
+            rlcam.fovy = 90.0f;
+            rlcam.projection = CAMERA_PERSPECTIVE;
+            BeginMode3D(rlcam);
             if (!showPicker) { DumbRender::ProcessKeys(); }
-            DumbRender::DrawKenGeometry(GetScreenWidth(), GetScreenHeight(), DumbCore::GetCamera());
-            DumbRender::DrawMapstateTex(*DumbCore::GetCamera());
+            DumbRender::DrawKenGeometry(GetScreenWidth(), GetScreenHeight(), &globCam);
+
+            DumbRender::DrawMapstateTex(rlcam);
             DrawGizmos();
             EndMode3D();
         }
@@ -1015,7 +1025,7 @@ void MainLoop() {
             glEnable(GL_BLEND);
             glBlendFunc(GL_ONE, GL_ONE);
 
-            DumbRender::DrawLightsPost3d(w, h, *DumbCore::GetCamera());
+            DumbRender::DrawLightsPost3d(w, h,rlcam);
 
             glDisable(GL_BLEND);
             glDepthMask(GL_TRUE);

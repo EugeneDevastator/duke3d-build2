@@ -19,6 +19,23 @@
 #define SPRITE_B2_IS_LIGHT     (1 << 16)   // 64
 #define SPRITE_B2_IS_DYNAMIC     (1 << 17)    // for dynamic lights and all dynamic stuff.
 
+#define CLIP_MOVE		(1<<0) // blocking
+#define CLIP_HIT		(1<<1) // hitscan
+#define CLIP_SIGHT		(1<<2) // vision block
+#define CLIP_AOE		(1<<3) // aoe, hitradius block.
+#define CLIP_USEACTION	(1<<4) // use raycasts
+#define CLIP_IS_TRIGGER	(1<<5) // doesnt block.
+#define CLIP_USER_1	(1<<6) // doesnt block.
+#define CLIP_USER_2	(1<<7) // doesnt block.
+#define CLIP_USER_3	(1<<8) // doesnt block.
+#define CLIP_TEAM_PLR	(1<<9)
+#define CLIP_TEAM_ENEMY	(1<<10)
+#define CLIP_TEAM_NEUT	(1<<11)
+#define CLIP_TEAM1	(1<<12)
+#define CLIP_TEAM2	(1<<13)
+#define CLIP_TEAM3	(1<<14)
+#define CLIP_TEAM4	(1<<15)
+
 #define SURF_PARALLAX_DISCARD (1<<16) // marker for old build style parallax mode.
 
 #define GEO_NO_BUNCHING (1<<1)
@@ -71,24 +88,21 @@
 #define TEZ_SLOPE	 (1<<3) // slope or rawz;
 #define TEZ_CLOSEST	 (1<<4) // closest height point instead of arbitrary.
 #define TEZ_FURTHEST (1<<5) // furthest height point instead of arbitrary.
-#define TEZ_WORLDZ1	 (1<<6) // use unit world z vector
-#include "buildmath.h"
+#define TEZ_WORLDZ1	 (1<<6)
+#define TEZ_WORLD_X	 ((1<<6) | (1<<0))
+#define TEZ_WORLD_Y	 ((1<<6) | (1<<1))
+#define TEZ_WORLD_Z	 ((1<<6) | (1<<2))
 
 // will only be used for animated entities.
 typedef struct {
-	// 32 bits to encode relativity.
-	unsigned int pkind : 2; // general kind of reference
+	unsigned int refkind : 4;
 	// 0 = self, 1 = wall, 2 = sprite, 3= projector
 	unsigned int otez : 7; // TEZ flags
 	unsigned int utez : 7;
 	unsigned int vtez : 7;
 	unsigned int ctez : 7; // 4th corner vector C = o + v + c
-	unsigned int flag1 : 1;
-	unsigned int flag2 : 1;
 
-	uint32_t entityref1 : 32; // could be sprite, wall, etc.
-	uint32_t entityref2 : 32; // could be sprite, wall, etc.
-} procuvgen96_t; // procedural uv data
+} procuvgen32_t; // procedural uv data
 
 typedef struct {
 	unsigned int is_visible : 1;
@@ -107,14 +121,14 @@ typedef struct {
 	// use z for possible volumetric tex impostors
 	point3d scale;
 	point3d pan;
-	point3d anchorA;
-	point3d anchorB;
+	point3d cropA;
+	point3d cropB;
 	point3d rot; // rot z is for deault uvs
 
 	uint8_t mapping_kind; // uv amappings, regular, polar, hex, flipped variants etc. paralax.
-	uint16_t tile_ordering; // normal, polar, hex etc.
-
+	uint16_t tile_ordering; //
 } uvform_t;
+#define UVFORM_DEFAULT (uvform_t){{1,1,1},{0,0,0},{0,0,0},{1,1,1},{0,0,0},0,0}
 
 typedef struct {
 	unsigned int is_bunchbreak : 1;
@@ -161,18 +175,34 @@ enum blendb2Mode {
 	bmode_error = 4,
 };
 
+typedef struct {
+	uint32_t sectid;
+	uint16_t wid;
+	uint16_t flags;
+} surfref;
+
+typedef struct {
+	point3d colorhdr; // this is color block.
+	float maxdist;
+	float distance_bias; // for intensity calc.
+	float forward_offset;
+	point3d spot_axes;
+	point3d spot_fades; // 1 = fade to center.
+	point3d spot_fadexp; // exponent
+} lightsource_t;
 
 typedef struct {
 	renderflags32_t rflags;
 	// need some geometry flags for build, like do we skip, emit mask etc. could be better than just transparency.
-	float uv[8]; // scale xy, pan xy, crop Axy Bxy
+	uvform_t uv;// scale xy, pan xy, crop Axy Bxy
 	point3d anchor; // normalized
-	point3d color;
+	transform viewtr; // lets go full double transform since view transform is mostly needed.
+	point3d color; // this is color block.
 	int16_t lum; // yes allow negative values, why not.
 } sprview;
 
 typedef struct {
-	point3d v, av;           //Position velocity, Angular velocity (direction=axis, magnitude=vel)
+	point3d v, av, pcenter;           //Position velocity, Angular velocity (direction=axis, magnitude=vel), center of mass
 	float fat, mas, moi;     //Physics (moi=moment of inertia)
 	uint16_t clipmask; // block, hitscan, trigger, - for physics engine // aka layer
 } physdata;
@@ -197,16 +227,12 @@ typedef struct // surf_t
 		uint32_t packed_tile_data;
 	};
 	enum fragRenderMode frMode;
-	procuvgen96_t uvgen;
+	procuvgen32_t uvgen;
 	uvform_t uvform;//[9]; // scale xy, pan xy, crop AB, rotation
-
 
 	//Bit0:Blocking, Bit2:RelativeAlignment, Bit5:1Way, Bit16:IsParallax, Bit17:IsSkybox
 	uint32_t flags;	short lotag, hitag;
 	float alpha;
-
-	// wtez is second skew vector, originating at v end. by default parallel to u. but can be inverted for trapezoid map.
-
 
 // ------------
 	uint8_t reflection_strength;
@@ -227,18 +253,24 @@ typedef struct // surf_t
 
 typedef struct // wall t
 {
-	uint32_t guid; // unique per wall. surfs alway follow top-bottom order.
-	signed long n, ns, nw; //n:rel. wall ind.; ns & nw : nextsect & nextwall_of_sect
-	signed long nschain, nwchain; // for multiportal.
-	long owner; //for dragging while editing, other effects during game
+	// HOT DATA
 	union {
 		point2d pos;
 		struct {
 			float x, y;
 		};
 	};
+	signed long n, ns, nw; //n:rel. wall ind.; ns & nw : nextsect & nextwall_of_sect
+	signed long nschain, nwchain; // references for loops of touching walls.
+	uint8_t surfn; // - remove
+	uint8_t geoflags;
+	surf_t surf, xsurf[3]; //additional malloced surfs when (surfn > 1)
 
-	/* ai
+	// COLD DATA
+	uint32_t guid; // unique per wall. surfs alway follow top-bottom order.
+	long owner; //for dragging while editing, other effects during game
+
+	/*
 	*Positive values: Point to the next wall in the loop
 	wal[Wid].n is relative index to tihs wall's index.
 	wal[Wid].n + Wid gives the absolute index of the next wall
@@ -251,13 +283,6 @@ typedef struct // wall t
 	Looking at the code patterns, ideally only one wall per loop should have a negative n value - the last wall that closes the loop.
 	*/
 
-	// difference between ns and nschain is that ns points right to the target opening
-	// but chains will be looped, similar to walls.
-
-
-	uint8_t surfn;
-	uint8_t geoflags;
-	surf_t surf, xsurf[3]; //additional malloced surfs when (surfn > 1)
 	int16_t mflags[4]; // modflags
 	int32_t tags[16]; // standard tag is 4bytes
 	int8_t tempflags; // used only in editor for data transfers.
@@ -266,27 +291,33 @@ typedef struct // wall t
 
 typedef struct // spri_t
 {
-	uint32_t guid; // uniq per sprite. automatic.
+	// ----- FAST DATA --------------
 	union { transform tr; struct { point3d p, r, d, f; }; };
 
 	//long tilnum;             //Model file. Ex:"TILES000.ART|64","CARDBOARD.PNG","CACO.KV6","HAND.KCM","IMP.MD3"
 	union {
 		uint32_t packed_tile_data;
 		struct {
-			uint32_t tilnum : 15;  // 32k tiles
-			uint32_t galnum : 8;   // 256 gals
+			uint32_t tilnum : 14;  // 16k tiles
+			uint32_t galnum : 9;   // 512 gals
 			uint32_t pal : 9;      // 512 pals.
 		};
 	};
+	sprview view;
 
-	long owner;
-	short lotag, hitag;
 	long sect; //Current sector
 	// to access next or prev sprite in sector of this sprite..
 	// doubly-linked list of indices  inside sprites sector
 	// bounded by -1 on both sides.
 	long sectn, sectp;
 
+	// --------- COLD DATA -----------, probably all move to datablock.
+
+	uint32_t dataptr; // reference to any additional data.
+	uint32_t guid; // uniq per sprite. automatic.
+	long owner;
+	short lotag, hitag;
+	physdata phys;
 	int32_t tags[16];
 	long tim, otim;          //Time (in milliseconds) for animation
 	int8_t walcon; // wall constraint -1 -2 = floor ceil, resolve as 2-wc; -3 = none;
@@ -296,8 +327,7 @@ typedef struct // spri_t
 	uint16_t classid; // instead of implicit class recognition by spritenum or pal - use explicit. so for ex. we can just make 3d rpg rocket as prop.
 	uint8_t linkmask; // damage, signal, use, - everything for linking with other communicators
 
-	sprview view;
-	physdata phys;
+
 } spri_t;
 
 typedef struct
@@ -343,6 +373,7 @@ typedef struct {
 typedef struct
 {
 	point3d startpos, startrig, startdow, startfor;
+	transform startr; // todo - use.
 	long startsectn;
 	int numsects, malsects; sect_t *sect;
 	int numspris, malspris; spri_t *spri;

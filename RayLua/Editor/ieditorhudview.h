@@ -42,6 +42,7 @@ typedef struct {
 	looploc_t loopts[100];
 	point2d loopts_p2d[100];
 	int loopn = 0;
+	bool camera_controls_enabled;
 } EditorModel;
 
 void EditorHudDrawTopInfo(const char* message);

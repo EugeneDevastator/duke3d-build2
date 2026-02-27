@@ -138,8 +138,8 @@ static inline long mapspriteadd (int sect, point3d p, mapstate_t *map) {
 }
 void delspri_imp (int i, mapstate_t *map);
 void changesprisect_imp (int i, int nsect, mapstate_t *map);
-surf_t makeSurfWall(int w1, int wnex);
-surf_t makeSurfCap();
+surf_t init_wall_surf();
+surf_t init_cap_surf();
 void makewall(wall_t* w, int8_t wid , int8_t nwid);
 int is_loop2d_ccw(point2d* points, int count);
 

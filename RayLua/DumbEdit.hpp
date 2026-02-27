@@ -170,7 +170,7 @@ transform cursor2;
 transform cursor_hover;
 
 
-cam_t *cam;
+cam_t *b2cam;
 econtext ctx;
 econtext ctxprev;
 
@@ -432,14 +432,14 @@ void PickgrabUpdate() {
 	// we need more transforms:
 	// 1. define transform on hitpoint or whenever virtr;
 	// 2. save it as copy.
-	// 3. save cam transform as copy.
+	// 3. save b2cam transform as copy.
 	// 4. when we move camera
 
 	p3_addto(&virt_incam_tr.p, p3_scalar_mul_of(BBDOWN, scrol * 0.2f));
 	p3_addto(&localp2, p3_scalar_mul_of(BBDOWN, scrol * 0.2f));
 
 	if (ISGRABSPRI) {
-		map->spri[mdl.grab.spri].tr = tr_local_to_world(virt_incam_tr, cam->tr);
+		map->spri[mdl.grab.spri].tr = tr_local_to_world(virt_incam_tr, b2cam->tr);
 		int s = map->spri[mdl.grab.spri].sect;
 		if (mdl.hover.sec >= 0) {
 			GRABSPRI.walcon = (signed char)mdl.hover.wal;
@@ -449,7 +449,7 @@ void PickgrabUpdate() {
 		changesprisect_imp(mdl.grab.spri, s, map);
 	}
 	else if (ISGRABCAP) {
-		point3d newpos = p3_local_to_world(virt_incam_tr.p, cam->tr);
+		point3d newpos = p3_local_to_world(virt_incam_tr.p, b2cam->tr);
 		if (false) // grab entire sect
 		{
 			loopn =2;
@@ -461,7 +461,7 @@ void PickgrabUpdate() {
 		}
 		else if (true)
 		{
-			float newz = p3_local_to_world(virt_incam_tr.p, cam->tr).z;
+			float newz = p3_local_to_world(virt_incam_tr.p, b2cam->tr).z;
 			int isflor = mdl.grab.wal + 2;
 			GRABSEC.z[isflor] = newz;
 			if (IsKeyDown(KEY_LEFT_SHIFT)) {
@@ -478,8 +478,8 @@ void PickgrabUpdate() {
 			// Project camera ray onto horizontal plane
 
 			// Calculate intersection of camera ray with horizontal plane at target_z
-			point3d ray_start = cam->tr.p;
-			point3d ray_dir = cam->tr.f;
+			point3d ray_start = b2cam->tr.p;
+			point3d ray_dir = b2cam->tr.f;
 			float target_z;
 
 			if (IsKeyPressed(KEY_F)) // swap mode.
@@ -495,8 +495,8 @@ void PickgrabUpdate() {
 				tmp.p.y = ray_start.y + ray_dir.y * t;
 			} else {
 				// Ray parallel to plane, use mouse delta for movement
-				point3d right = cam->tr.r;
-				point3d down = cam->tr.d;
+				point3d right = b2cam->tr.r;
+				point3d down = b2cam->tr.d;
 				tmp.p.x = savedwtr.p.x + dmov.x * 0.1f * right.x + dmov.y * -0.1f * down.x;
 				tmp.p.y = savedwtr.p.y + dmov.x * 0.1f * right.y + dmov.y * -0.1f * down.y;
 			}
@@ -540,8 +540,8 @@ void PickgrabUpdate() {
 		}
 
 		//else {
-		//    tmp = tr_local_to_world(trdiff, &cam->tr);
-		//    tp2 = p3_local_to_world(localp2, &cam->tr);
+		//    tmp = tr_local_to_world(trdiff, &b2cam->tr);
+		//    tp2 = p3_local_to_world(localp2, &b2cam->tr);
 		//}
 
 		map->sect[mdl.grab.sec].wall[mdl.grab.wal].x = outpos.x;
@@ -575,15 +575,15 @@ void PickgrabStart() {
 	if (mdl.grab.spri >= 0) {
 		savedwtr = map->spri[mdl.grab.spri].tr;
 	} else if (ISGRABCAP) {
-		savedwtr = cam->tr;
+		savedwtr = b2cam->tr;
 		savedwtr.p = mdl.hover.hitpos;
 		savedHeight = GRABSEC.z[1] - GRABSEC.z[0];
-		savedsec = cam->cursect;
+		savedsec = b2cam->cursect;
 	} else if (mdl.grab.wal >= 0 && mdl.grab.sec >= 0) {
 		bool grabboth = false;
 		if (!grabboth) // grab both walls
 		{
-			savedwtr = cam->tr;
+			savedwtr = b2cam->tr;
 			mdl.grab.wal = mdl.hover.onewall;
 		}
 
@@ -591,7 +591,7 @@ void PickgrabStart() {
 		mdl.grab.walprev = wallprev(&GRABSEC,mdl.grab.wal);
 		//for red walls we'd need to grab verts of all adjacent walls.
 		// something in build2 was there for it.
-		savedwtr = cam->tr;
+		savedwtr = b2cam->tr;
 		savedwtr.p.x = map->sect[mdl.grab.sec].wall[mdl.grab.wal].x;
 		savedwtr.p.y = map->sect[mdl.grab.sec].wall[mdl.grab.wal].y;
 		origVert = {savedwtr.p.x,savedwtr.p.y};
@@ -599,12 +599,12 @@ void PickgrabStart() {
 
 		point2d wpos = getwall({mdl.grab.wal2, mdl.grab.sec}, map)->pos;
 		point3d wpos3d = {wpos.x, wpos.y, 0};
-		localp2 = p3_world_to_local(wpos3d, cam->tr);
+		localp2 = p3_world_to_local(wpos3d, b2cam->tr);
 		totalverts2 = getwallsofvert(mdl.grab.sec, mdl.grab.wal2, verts2, 256, map);
 	}
-	virt_incam_tr = tr_world_to_local(savedwtr, cam->tr);
+	virt_incam_tr = tr_world_to_local(savedwtr, b2cam->tr);
 	//virt_incam_tr = savedwtr;
-	//virt_incam_tr.p = p3_make_vector(cam->tr.p,mdl.hover.hitpos);
+	//virt_incam_tr.p = p3_make_vector(b2cam->tr.p,mdl.hover.hitpos);
 }
 
 // ----------------------- draw loop OPER ---------------------
@@ -692,7 +692,11 @@ void TilsedStart() {
 }
 
 void TilsedUpdate() {
-	if (IsKeyDown(KEY_TAB)) {
+	if (IsKeyDown(KEY_LEFT_SHIFT))
+		mdl.camera_controls_enabled = false;
+	else
+		mdl.camera_controls_enabled = true;
+	if (IsKeyPressed(KEY_TAB)) {
 		if (mdl.hover.spri >= 0) {
 			datstate.curval = HOVERSPRI.tilnum;
 			datstate.curval2 = HOVERSPRI.galnum;
@@ -727,9 +731,11 @@ void TilsedUpdate() {
 }
 void TilsedAccept() {
 	texbstate->shown = false;
+	mdl.camera_controls_enabled = true;
 }
 void TilsedDiscard() {
 	texbstate->shown = false;
+	mdl.camera_controls_enabled = true;
 }
 
 // ------------------ B-Cutter --------------------------------
@@ -1134,8 +1140,10 @@ void HandleSelectionModes() {
 
 }
 
-void InitEditor(mapstate_t *m) {
+void InitEditor(mapstate_t *m, cam_t *camref) {
 	map = m;
+	b2cam = camref;
+	mdl.camera_controls_enabled=true;
 	ctx.mode = Fly;
 	ctx.state = Empty;
 }
@@ -1149,7 +1157,32 @@ void SetColorum(uint8_t r, uint8_t g, uint8_t b, int16_t lum) {
 	}
 }
 
+void HandleCameraControl() {
+	float move_unitspersec=8;
+	float move_unitspersec_fine=0.5;
+	float ang_per_sec=5;
+	float ang_per_sec_fine=0.5;
+	point3d movec={0};
+	if (mdl.camera_controls_enabled) {
+		float movemag = move_unitspersec*GetFrameTime();
+		if (IsKeyDown(KEY_W))
+			p3_addto(&movec, p3_scalar_mul_of(b2cam->tr.f,movemag));
+		if (IsKeyDown(KEY_S))
+			p3_addto(&movec, p3_scalar_mul_of(b2cam->tr.f,movemag*-1));
+		if (IsKeyDown(KEY_A))
+			p3_addto(&movec, p3_scalar_mul_of(b2cam->tr.r,movemag*-1));
+		if (IsKeyDown(KEY_D))
+			p3_addto(&movec, p3_scalar_mul_of(b2cam->tr.r,movemag));
 
+		p3_addto(&b2cam->tr.p, movec);
+		Vector2 mouseDelta = GetMouseDelta();
+		if (mouseDelta.x != 0 || mouseDelta.y != 0) {
+			float sensitivity = 0.003f;
+			tr_quat_rotate_on_axis(&b2cam->tr,BBDOWN, -mouseDelta.x * ang_per_sec*GetFrameTime()*-1);
+			tr_quat_rotate_on_axis(&b2cam->tr,b2cam->tr.r, -mouseDelta.y * ang_per_sec*GetFrameTime());
+		}
+	}
+}
 
 void EditorSetTileState(TextureBrowser *ts) {
 	texbstate = ts;
@@ -1158,7 +1191,7 @@ void Editor_DoRaycasts(cam_t *cc) {
 	int isec = 0;
 	int iwal = 0;
 	int ispri = 0;
-	cam = cc;
+	b2cam = cc;
 	//ctx.state.discard();// to restore original map state for raycast.
 	uint32_t castflags = 0; // mark what we want to hit.
 	if (edselmode & SEL_REDWALLPORTS)
@@ -1179,7 +1212,7 @@ void Editor_DoRaycasts(cam_t *cc) {
 	}
 }
 
-void EditorUpdate(const Camera3D rlcam) {
+void EditorUpdate() {
 
 	//if (IsKeyPressed(KEY_M) && ISHOVERWAL) {
 	//	// this works
@@ -1188,7 +1221,8 @@ void EditorUpdate(const Camera3D rlcam) {
 	//}
 	// process raycasts;
 	HandleSelectionModes();
-	cam3d = rlcam;
+	HandleCameraControl();
+	 cam3d_from_tr(&cam3d,b2cam->tr);
 	ctx.state.update();
 	if (ctx.state.id == Empty.id) {
 		if (IsKeyPressed(K_PICKGRAB)) {
