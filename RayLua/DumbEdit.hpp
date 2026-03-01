@@ -402,8 +402,19 @@ void PickgrabDiscard() {
 			map->sect[verts[i].s].wall[verts[i].w].x = savedwtr.p.x;
 			map->sect[verts[i].s].wall[verts[i].w].y = savedwtr.p.y;
 		}
+		if (grabbothwalls) {
+			float ox = savedwtr.p.x + secondwalldif.x;
+			float oy = savedwtr.p.y + secondwalldif.y;
+			map->sect[mdl.grab.sec].wall[mdl.grab.wal2].x = ox;
+			map->sect[mdl.grab.sec].wall[mdl.grab.wal2].y = oy;
+			for (int i = 0; i < totalverts2; ++i) {
+				map->sect[verts2[i].s].wall[verts2[i].w].x = ox;
+				map->sect[verts2[i].s].wall[verts2[i].w].y = oy;
+			}
+		}
 	}
 }
+
 
 void PickgrabAccept() {
 	if (mdl.grab.spri >= 0) {
@@ -1265,25 +1276,25 @@ void EditorUpdate() {
 				p2.x += offsx;
 				p2.y += offsy;
 
-
+				float pad = 0.1f;
 				float capr = HOVERSEC.z[1] - HOVERSEC.z[0];
-				float florz = HOVERSEC.z[1] - capr * 0.1;
+				float florz = HOVERSEC.z[1] - capr * pad;
 				//axis grows down to floor.
 				if (HOVERWAL.ns >= 0) {
 					if (mdl.hover.hitpos.z < map->sect[HOVERWAL.ns].z[0]) {
 						// upper seg.
 						florz = map->sect[HOVERWAL.ns].z[0];
 						capr = florz - HOVERSEC.z[0];
-						florz -= capr * 0.1;
+						florz -= capr * pad;
 					} else // lower seg then;
 					{
 						// upper seg.
 						florz = HOVERSEC.z[1];
 						capr = florz - map->sect[HOVERWAL.ns].z[1];
-						florz -= capr * 0.1;
+						florz -= capr * pad;
 					}
 				}
-				float height = capr * 0.2;
+				float height = capr * (1-pad-pad);
 				point2d loop[4] = {p0, p1, p2, p3};
 				int nsid = map_append_sect_from_loop(4, loop, florz, height, map,0);
 				sect_t *sec = &map->sect[nsid];
