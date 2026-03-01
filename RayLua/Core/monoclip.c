@@ -16,6 +16,7 @@
 mph_t *mph = 0;
 int mphnum = 0;
 int mphmal = 0;
+static int mp_bump; /* next slot to hand out */
 
 // pool of heads.
 mp_t *mp = 0;
@@ -32,23 +33,18 @@ void mono_mph_check(int num) {
     }
 }
 static int mp_alloc() {
-    if (mp_freetop == 0) {
-        /* grow */
+    if (mp_bump >= mpmal) {
         int old = mpmal;
         mpmal <<= 1;
-        mp = (mp_t*)realloc(mp, mpmal * sizeof(mp[0]));
+        mp         = (mp_t*)realloc(mp, mpmal * sizeof(mp[0]));
         mp_freestack = (int*)realloc(mp_freestack, mpmal * sizeof(int));
-        for (int i = old; i < mpmal; i++) {
-            mp[i].gen = 0;
-            mp_freestack[mp_freetop++] = i;
-        }
+        /* new slots need no init - bump will reach them fresh */
     }
-    return mp_freestack[--mp_freetop];
+    return mp_bump++;
 }
+
 static void mp_free(int idx) {
-    if (idx < 0 || idx >= mpmal) return;
-    mp[idx].gen++;          /* invalidate all existing handles to this slot */
-    mp_freestack[mp_freetop++] = idx;
+    (void)idx; /* no-op, reset reclaims all */
 }
 
 void mono_initonce() {
@@ -714,16 +710,8 @@ void mono_deloop_safe(mphandle_t start_handle) {
 }
 
 void mp_reset_pool() {
-    int i;
-    /* rebuild free stack with all slots */
-    mp_freetop = 0;
-    for (i = 0; i < mpmal; i++) {
-        mp[i].gen++;  /* invalidate any live handles from previous frame */
-        mp[i].n = -1;
-        mp[i].p = -1;
-        mp_freestack[mp_freetop++] = i;
-    }
-    mphnum = 0;
+        mp_bump = 0;   /* one write */
+        mphnum  = 0;   /* one write */
 }
 
 
