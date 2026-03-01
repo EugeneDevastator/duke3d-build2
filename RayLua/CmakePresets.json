@@ -19,19 +19,25 @@
       "name": "win32-release",
       "inherits": "win32-base",
       "displayName": "RayLua Win32 Release",
-      "binaryDir": "${sourceDir}/bin/RELEASE"
+      "binaryDir": "${sourceDir}/bin"
     },
     {
       "name": "win32-debug",
       "inherits": "win32-base",
       "displayName": "RayLua Win32 Debug",
-      "binaryDir": "${sourceDir}/bin/MYFOLDER"
+      "binaryDir": "${sourceDir}/bin"
     }
   ],
   "buildPresets": [
     {
       "name": "win32-release",
       "displayName": "RayLua Win32 Release Build",
+      "configurePreset": "win32-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "win32-rel-deb",
+      "displayName": "RayLua Win32 RelDeb Build",
       "configurePreset": "win32-release",
       "configuration": "RelWithDebInfo"
     },
