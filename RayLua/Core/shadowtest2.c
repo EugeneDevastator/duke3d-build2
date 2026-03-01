@@ -787,7 +787,7 @@ static void scansector(int sectnum, bdrawctx *b) {
 }
 
 static void xformprep(double hang, bdrawctx *b) {
-	cam_t gcam = b->movedcam;
+	cam_t gcam = b->orcam;
 	double f;
 	f = atan2(gcam.tr.f.y, gcam.tr.f.x) + hang; //WARNING: "f = 1/sqrt; c *= f; s *= f;" form has singularity - don't use :/
 	b->xformmatc = cos(f);
@@ -2115,6 +2115,13 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy) {
 	int sec=-1,wal=-1,spr =-1;
 	point3d hit;
 	point3d f = p3sum(cc->tr.p,cc->tr.f);
+	if (tr_is_flipped(cc->tr)) {
+		bs.movedcam = *cc;
+		p3_scalar_mul(&bs.orcam.tr.r,-1);
+		//p3_scalar_mul(&bs.orcam.tr.d,-1);
+		bs.istrimirror = true;//
+		bs.ismirrored =  true;
+	}
 
 	//transform t = TR_ONE; // p = (0,0,0)
 	//// rotate 90deg around Z: r=(0,1,0), d=(-1,0,0), f=(0,0,1)
@@ -2149,6 +2156,7 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 	b->bunchmal = 0;
 	b->bunchgrid = 0;
 	cam_t gcam = b->movedcam;
+	cam_t orcam = b->orcam;
 
 	if (gcam.cursect >= 0)
 		lastvalidsec = gcam.cursect;
@@ -2288,10 +2296,10 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 		else{ // geometry pass
 			xformprep(((double) halfplane) * PI, b);
 
-			xformbac(-large_bound, -large_bound, gcam.h.z, &bord[0], b);
-			xformbac(+large_bound, -large_bound, gcam.h.z, &bord[1], b);
-			xformbac(+large_bound, +large_bound, gcam.h.z, &bord[2], b);
-			xformbac(-large_bound, +large_bound, gcam.h.z, &bord[3], b);
+			xformbac(-large_bound, -large_bound, orcam.h.z, &bord[0], b);
+			xformbac(+large_bound, -large_bound, orcam.h.z, &bord[1], b);
+			xformbac(+large_bound, +large_bound, orcam.h.z, &bord[2], b);
+			xformbac(-large_bound, +large_bound, orcam.h.z, &bord[3], b);
 
 			//Clip screen to front plane
 			n = 0;
@@ -2316,9 +2324,9 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 			}
 
 			for (j = 0; j < n; j++) {
-				f = gcam.h.z / bord2[j].z;
-				bord2[j].x = bord2[j].x * f + gcam.h.x;
-				bord2[j].y = bord2[j].y * f + gcam.h.y;
+				f = orcam.h.z / bord2[j].z;
+				bord2[j].x = bord2[j].x * f + orcam.h.x;
+				bord2[j].y = bord2[j].y * f + orcam.h.y;
 			}
 		}
 		// save original xforms
@@ -2515,7 +2523,7 @@ static void draw_hsr_enter_portal(mapstate_t *map, int myport, int head1, int he
 	// to avoid winding problems with mono, we render with normalized camera
 	// then in dra eyepol we can just flip polygons as if camera was really flipped.
 	// the only thing important is board output, as orientation is preserved in movedcam.
-	bool portalflipped = tr_is_flipped(&tgs.tr) ^ tr_is_flipped(&ent.tr);
+	bool portalflipped = tr_is_flipped(tgs.tr) ^ tr_is_flipped(ent.tr);
 	// we need to know only about flip in current portal switch to flip or not to flip the opening.
 	newctx.ismirrored = portalflipped;
 	newctx.istrimirror = parentctx->istrimirror ^ portalflipped;
