@@ -301,11 +301,11 @@ static inline transform tr_invert(const transform t) {
 }
 
 
-static inline bool tr_is_flipped(transform *tr) {
+static inline bool tr_is_flipped(const transform tr) {
 	// Calculate determinant of the 3x3 rotation matrix
 	// det = r·(d×f)
-	point3d cross = p3_cross(tr->d, tr->f);
-	float det = p3_dot(tr->r, cross);
+	point3d cross = p3_cross(tr.d, tr.f);
+	float det = p3_dot(tr.r, cross);
 	return det < 0.0f;
 }
 

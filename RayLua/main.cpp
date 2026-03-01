@@ -530,12 +530,10 @@ bool loadifvalid() {
         printf("Error: No tiles*.art files found in %s\n", dir_path);
         return false;
     }
-
+    loadgal(0, dir_path);
     DumbRender::Init(map_path);
     return true;
 }
-
-
 
 void SetImguiFonts()
 {
@@ -947,13 +945,13 @@ void MainLoop() {
     int lightLocation = GetShaderLocation(multiplyShader, "lightTexture");
     InitTexBrowser();
     EditorSetTileState(&texb);
-    //    if (!loadifvalid())
-    //       return;
-    //DumbRender::Init("c:/Eugene/Games/build2/Content/GAL_002/E1L1.MAP ");
-    loadgal(0, "c:/Eugene/Games/build2/");
-    loadgal(1, "c:/Eugene/Games/build2/Content/GAL_002_SW/");
+      if (!loadifvalid()) {
+          loadgal(0, "c:/Eugene/Games/build2/");
+          loadgal(1, "c:/Eugene/Games/build2/Content/GAL_002_SW/");
+
+          DumbRender::Init("c:/Eugene/Games/build2/prt31.map");
+      }
     DumbRender::LoadTexturesToGPU();
-    DumbRender::Init("c:/Eugene/Games/build2/cubb.map");
     auto map = DumbRender::GetMap();
     //DumbCore::Init(map);
     globCam.tr.p = map->startpos;

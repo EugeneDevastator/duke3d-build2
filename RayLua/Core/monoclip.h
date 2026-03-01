@@ -103,7 +103,7 @@ typedef struct {
 	// normalized camera used for clipping
 // true portaled camera used for movements
 	cam_t movedcam;
- 	cam_t orcam; // one true camera, read only.
+ 	cam_t orcam; // one true camera, read only, cannot be mirrored transform.
 	// only oricam xform.
 	// we need xformmat for current frame for bunching!
 	double xformmat[9], xformmatc, xformmats;

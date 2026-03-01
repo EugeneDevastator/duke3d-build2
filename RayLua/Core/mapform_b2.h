@@ -276,8 +276,8 @@ typedef struct // wall t
 	surf_t surf, xsurf[3]; //additional malloced surfs when (surfn > 1)
 
 	// COLD DATA
-	uint32_t guid; // unique per wall. surfs alway follow top-bottom order.
-	long owner; //for dragging while editing, other effects during game
+	uint32_t dataptr; // reference to any additional data.
+	uint32_t tguid; // unique per wall.
 
 	/*
 	*Positive values: Point to the next wall in the loop
@@ -291,7 +291,8 @@ typedef struct // wall t
 
 	Looking at the code patterns, ideally only one wall per loop should have a negative n value - the last wall that closes the loop.
 	*/
-
+// ============= RUNTIME DATA ============
+	long owner; //for dragging while editing, other effects during game
 	int16_t mflags[4]; // modflags
 	int32_t tags[16]; // standard tag is 4bytes
 	int8_t tempflags; // used only in editor for data transfers.
@@ -323,7 +324,7 @@ typedef struct // spri_t
 	// --------- COLD DATA -----------, probably all move to datablock.
 
 	uint32_t dataptr; // reference to any additional data.
-	uint32_t guid; // uniq per sprite. automatic.
+	uint32_t tguid; // uniq per sprite. automatic.
 	long owner;
 	short lotag, hitag;
 	physdata phys;
@@ -342,7 +343,8 @@ typedef struct // spri_t
 typedef struct
 {
 	// BuildEngine base data
-	uint32_t guid; // uniq per sector
+	uint32_t dataptr; // reference to any additional data.
+	uint32_t tguid;   // uniq per sect.
 	uint16_t areaid; // for trigger purposes. 0 = none
 	float z[2];      //ceil&flor height
 	point2d grad[2]; //ceil&flor grad. grad.x = norm.x/norm.z, grad.y = norm.y/norm.z
@@ -381,6 +383,7 @@ typedef struct {
 
 typedef struct {
 	char type[4];
+	uint32_t guid;
 	uint32_t length;
 	unsigned char *data;
 	uint32_t crc;
