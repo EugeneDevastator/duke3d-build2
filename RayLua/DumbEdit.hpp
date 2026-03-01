@@ -292,7 +292,38 @@ void drawVert(int sec, int w) {
 		drawVert(pos);
 	}
 }
+void drawWalsurf(int sec, int w, int xsurfid) {
+	if (sec >= 0 && w >= 0) {
+		wall_t *wal = &map->sect[sec].wall[w];
+		wall_t *nwal = &map->sect[sec].wall[w+wal->n];
+		float z[4];
+		int ns = wal->ns;
 
+		xsurfid = 0;
+		z[0]=(float)getslopezpt(&map->sect[sec], 1, wal->pos);
+		z[1]=(float)getslopezpt(&map->sect[sec], 0, wal->pos);
+		z[2]=(float)getslopezpt(&map->sect[sec], 0, nwal->pos);
+		z[3]=(float)getslopezpt(&map->sect[sec], 1, nwal->pos);
+
+
+		Vector3 p1 = {wal->x, -z[0], wal->y};
+		Vector3 p2 = {wal->x, -z[1], wal->y};
+		Vector3 p3 = {nwal->x, -z[2], nwal->y};
+		Vector3 p4 = {nwal->x, -z[3], nwal->y};
+		rlSetTexture(0);
+		rlDisableDepthTest();
+		rlDisableDepthMask();
+		rlBegin(RL_QUADS);
+
+		rlColor4f(1.0f,0.6f,0.6f,0.1f);
+		rlVertex3f(p1.x,p1.y,p1.z);
+		rlVertex3f(p4.x,p4.y,p4.z);
+		rlVertex3f(p3.x,p3.y,p3.z);
+		rlVertex3f(p2.x,p2.y,p2.z);
+
+		rlEnd();
+	}
+}
 void drawCylBoard2(Vector3 origin, Vector3 endpoint, float width, float width2) {
 	rlSetTexture(0);
 	rlDisableDepthTest();
@@ -1499,6 +1530,10 @@ void DrawGizmos() {
 		drawCylBoard(rlp1, rlp2, 0.1f);
 		// draw loop.
 		loopwall = usefoc.onewall;
+
+		if (edselmode & SEL_SURF) {
+			drawWalsurf(usefoc.sec,usefoc.wal, 0);
+		}
 	}
 	else if (ISHOVERCAP) {
 		usefoc = mdl.hover;
