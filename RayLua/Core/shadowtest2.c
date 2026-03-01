@@ -1581,6 +1581,7 @@ static void gentransform_wall(dpoint3d *npol2, surf_t *sur, bdrawctx *b) {
 	b);
 }
 static void drawspriteshadow(int sprid, int sectid, int tagid, transform cam, mapstate_t* map, bdrawctx* b) {
+	return;
 	spri_t *spr = &map->spri[sprid];
 	point3d ftocam = p3_make_vector(spr->p, cam.p);
 	transform trf = tr_xyplanar_from_forward(p3_normalized(ftocam));
