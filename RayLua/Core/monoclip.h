@@ -29,22 +29,34 @@ typedef struct {
 
 #define MPH_GEO 0
 #define MPH_SHADE 2
-//Mono Polygon Head
-typedef struct {
-	int head[2];
-	uint32_t tag;
-	uint8_t semantic; //
-} mph_t;
+/* monoclip.h additions */
+typedef unsigned int mphandle_t;  /* (gen<<16)|index */
 
 //Mono Polygon (vertex data)
 typedef struct {
 	union {
 		dpoint3d pos;
-		struct {double x, y, z;};
+
+		struct {
+			double x, y, z;
+		};
 	};
 
-	int n, p;  // next, previous indices for doubly-linked list
+	int n, p; /* raw indices, internal only */
+	uint16_t gen; /* generation counter */
 } mp_t;
+//Mono Polygon Head
+typedef struct {
+	mphandle_t head[2];
+	uint32_t tag;
+	uint8_t semantic; //
+} mph_t;
+
+#define MP_NULL 0xFFFFFFFF
+#define MP_IDX(h)  ((h) & 0xFFFF)
+#define MP_GEN(h)  ((h) >> 16)
+#define MP_VALID(h) ((h) != MP_NULL && MP_IDX(h) < mpmal && mp[MP_IDX(h)].gen == MP_GEN(h))
+
 
 // ================================================================================================
 // POLYGONAL SCENE CLIPPING DATA STRUCTURES
@@ -208,8 +220,7 @@ int mono_join (int hd0, int hd1, int hd2, int hd3, int *ho0, int *ho1);
 // Perform boolean operation on two polygon pairs (AND, SUB, SUB_REV)
 // re
 void mono_bool (int subjh0, int subjh1, int cutter0, int cutter1, int boolop, bdrawctx* b, void (*mono_output)(int h0, int h1,bdrawctx* b));
-// Generate triangle strip vertices directly from monotone polygon
-int mono_generate_eyepol(int hd0, int hd1, point3d **out_verts1,  point3d **out_verts2, int *out_count1, int *out_count2);
+
 // adds mono to mph directly
 
 // registers loop into mono heads with tag
@@ -224,4 +235,7 @@ int mphremoveontag(int tag);
 int mphremoveaboveincl(int tag_including);
 void monocopy(int h1, int h2, int *hout1, int *hout2);
 
+void mono_deloop_safe(mphandle_t start_handle);
+
+void mp_reset_pool();
 #endif //BUILD2_MONOCLIP_H

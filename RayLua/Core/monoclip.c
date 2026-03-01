@@ -21,52 +21,66 @@ int mphmal = 0;
 mp_t *mp = 0;
 int mpempty, mpmal = 0;
 
+
+static int *mp_freestack = NULL;
+static int  mp_freetop   = 0;
+
 void mono_mph_check(int num) {
     if (num >= mphmal) {
         mphmal <<= 1;
         mph = (mph_t *) realloc(mph, mphmal * sizeof(mph[0]));
     }
 }
+static int mp_alloc() {
+    if (mp_freetop == 0) {
+        /* grow */
+        int old = mpmal;
+        mpmal <<= 1;
+        mp = (mp_t*)realloc(mp, mpmal * sizeof(mp[0]));
+        mp_freestack = (int*)realloc(mp_freestack, mpmal * sizeof(int));
+        for (int i = old; i < mpmal; i++) {
+            mp[i].gen = 0;
+            mp_freestack[mp_freetop++] = i;
+        }
+    }
+    return mp_freestack[--mp_freetop];
+}
+static void mp_free(int idx) {
+    if (idx < 0 || idx >= mpmal) return;
+    mp[idx].gen++;          /* invalidate all existing handles to this slot */
+    mp_freestack[mp_freetop++] = idx;
+}
 
 void mono_initonce() {
     int i;
+
 
     mphnum = 0;
     mphmal = 512;
     mph = (mph_t *) realloc(mph, mphmal * sizeof(mph[0]));
     mpempty = 0;
     mpmal = 256;
-    mp = (mp_t *) realloc(mp, mpmal * sizeof(mp[0]));
+    mp = (mp_t*)realloc(mp, mpmal * sizeof(mp[0]));
+    mp_freestack = (int*)realloc(mp_freestack, mpmal * sizeof(int));
+    for (i = 0; i < mpmal; i++) {
+        mp[i].gen = 0;
+        mp_freestack[i] = i;
+    }
+    mp_freetop = mpmal;
+
     for (i = 0; i < mpmal; i++) {
         mp[i].n = i + 1;
         mp[i].p = i - 1;
     }
     mp[mpmal - 1].n = 0;
     mp[0].p = mpmal - 1;
-    mono_dbg_init();
+   // mono_dbg_init();
 }
 
 int mono_ins2d(int i, double nx, double ny) {
     int j, p, n, got;
 
-    got = mpempty;
-    p = mp[mpempty].p;
-    n = mp[mpempty].n;
-    if (p == n) {
-        mpempty = mpmal;
-        mpmal <<= 1;
-        mp = (mp_t *) realloc(mp, mpmal * sizeof(mp[0]));
-        for (j = mpempty; j < mpmal; j++) {
-            mp[j].n = j + 1;
-            mp[j].p = j - 1;
-        }
-        mp[mpmal - 1].n = mpempty;
-        mp[mpempty].p = mpmal - 1;
-    } else {
-        mp[n].p = p;
-        mp[p].n = n;
-        mpempty = n;
-    }
+    got = mp_alloc();
     #if EXLOGS
     printf("Mono| MP alloc: got=%d, empty=%d, used=%d \n", got, mpempty, mpmal - (mpempty >= 0 ? 1 : 0));
     #endif
@@ -88,7 +102,6 @@ int mono_ins2d(int i, double nx, double ny) {
 }
 
 int mono_ins(int i, double nx, double ny, double nz) {
-    dpoint3d p = {nx,ny,nz};
    // LOOPADD(p)
     i = mono_ins2d(i, nx, ny);
     mp[i].z = nz;
@@ -111,11 +124,7 @@ logstep("Mono| Del %d",i);
     mp[n].p = p;
     mp[p].n = n;
 
-    n = mp[mpempty].n;
-    mp[i].p = mpempty;
-    mp[i].n = n;
-    mp[n].p = i;
-    mp[mpempty].n = i;
+    mp_free(i);
 }
 void mono_deloop2(int* i) {
     mono_deloop(i[0]);
@@ -123,31 +132,7 @@ void mono_deloop2(int* i) {
 }
 
 void mono_deloop(int i) {
-    if (i<0|| i>=mpmal)
-        return;
-    int j, count = 0;
-    // ADD DEBUG - COUNT LOOP SIZE
-    j = i;
-    do {
-        count++;
-        j = mp[j].n;
-    } while (j != i && j<mpmal);
-    if (i < 0 || j>=mpmal) return;
-    //while (mp[i].n != i) mono_del(mp[i].n); mono_del(i);
-
-    //logstep("Mono| DelLoop %d (size=%d), old_empty=%d", i, count, mpempty);
-
-    //mpempty <-> {i .. mp[i].p} <-> mp[mpempty].n
-    j = mp[i].p; //WARNING:this temp var needed for loops of only 1 element
-    mp[j].n = mp[mpempty].n;
-    mp[mp[mpempty].n].p = j;
-    mp[i].p = mpempty;
-    mp[mpempty].n = i;
-    // ADD DEBUG AFTER BULK FREE
-#if EXLOGS
-    printf("Mono| DelLoop freed %d nodes, new_empty=%d \n", count, mpempty);
-#endif
-
+    mono_deloop_safe(i);
 }
 
 void mono_centroid_addlin(int i0, int i1, double *cx, double *cy, double *area) {
@@ -175,7 +160,6 @@ void mono_genfromloop(int *plothead0, int *plothead1, dpoint3d *tp, int n) {
     if (n<3) {
         *plothead0=-1;
         *plothead1=-1;
-        printf("2 vertices for loop");
         return;
     }
     imin = 0;
@@ -586,9 +570,9 @@ void mono_bool(int hr0, int hr1, int hw0, int hw1, int boolop, bdrawctx* b, void
     if (g_captureframe) {
         char buf[64];
         sprintf(buf, "BEFORE_%s_hr", (boolop==MONO_BOOL_AND)?"AND":(boolop==MONO_BOOL_SUB)?"SUB":"SUBREV");
-        mono_dbg_capture_pair(hr0, hr1, buf, boolop);
+  //      mono_dbg_capture_pair(hr0, hr1, buf, boolop);
         sprintf(buf, "BEFORE_%s_hw", (boolop==MONO_BOOL_AND)?"AND":(boolop==MONO_BOOL_SUB)?"SUB":"SUBREV");
-        mono_dbg_capture_pair(hw0, hw1, buf, boolop);
+   //     mono_dbg_capture_pair(hw0, hw1, buf, boolop);
     }
     //logstep("Mono|> BOOL, op = %d HEADS IN %d:%d %d:%d",boolop,hr0,hr1,hw0,hw1);
     if (boolop == MONO_BOOL_AND) {
@@ -620,78 +604,12 @@ void mono_bool(int hr0, int hr1, int hw0, int hw1, int boolop, bdrawctx* b, void
     }
     //logstep("Mono|< BOOLEND");
 }
-void strip_init(triangle_strip_t *strip) {
-   // strip->indices = NULL;
-    strip->count = 0;
-    strip->capacity = 0;
-}
-
-void strip_free(triangle_strip_t *strip) {
-    if (strip->indices) {
-        free(strip->indices);
-        strip->indices = NULL;
-    }
-    strip->count = 0;
-    strip->capacity = 0;
-}
-
-void strip_add(triangle_strip_t *strip, int index) {
-    if (strip->count >= strip->capacity) {
-        strip->capacity = max(strip->capacity << 1, 16);
-        strip->indices = (int *)realloc(strip->indices, strip->capacity * sizeof(int));
-    }
-    strip->indices[strip->count++] = index;
-}
-int mono_generate_eyepol(int hd0, int hd1, point3d **out_verts1,  point3d **out_verts2, int *out_count1, int *out_count2) {
-    if ((hd0 | hd1) < 0) {
-        *out_verts1 = NULL;
-        *out_verts2 = NULL;
-        *out_count1 = 0;
-        *out_count2 = 0;
-        return 0;
-    }
-
-    point3d *verts1 = (point3d *)malloc((64) * sizeof(point3d));
-    point3d *verts2 = (point3d *)malloc((64) * sizeof(point3d));
-    int v1cnt = 0;
-    // Add chain0 forward
-    int i = hd0;
-    do {
-        verts1[v1cnt].x = (float)mp[i].x;
-        verts1[v1cnt].y = (float)mp[i].y;
-        verts1[v1cnt].z = (float)mp[i].z;
-        v1cnt++;
-        i = mp[i].n;
-    } while (i != hd0);
-    mono_deloop(hd0);
-
-    // Collect chain1 indices
-    i = hd1;
-    int v2cnt = 0;
-    do {
-        i = mp[i].p;
-        verts2[v2cnt].x = (float)mp[i].x;
-        verts2[v2cnt].y = (float)mp[i].y;
-        verts2[v2cnt].z = (float)mp[i].z;
-        v2cnt++;
-    } while (i != hd1);
-
-
-    mono_deloop(hd0);
-  //  free(chain1);
-
-    *out_count1 = v1cnt;
-    *out_count2 = v2cnt;
-    *out_verts1 = verts1;
-    *out_verts2 = verts2;
-    return (v1cnt+v2cnt >= 3) ? 1 : 0;
-}
 // ============= Mono Polygons management ==============
 int mph_appendloop(int *outh1, int *outh2, dpoint3d *tp, int n, int newtag, int semantic) {
     *outh1=-1;
     *outh2=-1;
     mono_mph_check(mphnum);
-    mono_genfromloop(&mph[mphnum].head[0], &mph[mphnum].head[0], tp, n);
+    mono_genfromloop(&mph[mphnum].head[0], &mph[mphnum].head[1], tp, n);
 
     if ((mph[mphnum].head[0] | mph[mphnum].head[1]) < 0)
     { mono_deloop(mph[mphnum].head[0]); mono_deloop(mph[mphnum].head[1]); return 0; }
@@ -739,6 +657,7 @@ int mphremoveontag(int tag) {
         if (mph[i].tag == tag)
             mph_remove(i);
     }
+    return 1;
 }
 
 int mphremoveaboveincl(int tag_including) {
@@ -746,6 +665,7 @@ int mphremoveaboveincl(int tag_including) {
         if (mph[i].tag >= tag_including)
             mph_remove(i);
     }
+    return 1;
 }
 
 void monocopy(int h1, int h2, int *hout1, int *hout2) {
@@ -775,6 +695,35 @@ void monocopy(int h1, int h2, int *hout1, int *hout2) {
         } while (i != h2);
         *hout2 = mp[*hout2].n;
     }
+}
+
+void mono_deloop_safe(mphandle_t start_handle) {
+    if (!MP_VALID(start_handle)) return;
+    int start = MP_IDX(start_handle);
+    int i = start;
+    int steps = mpmal;
+    /* collect then free to avoid reading freed nodes */
+    do {
+        int next = mp[i].n;
+        int next_valid = (next >= 0 && next < mpmal); /* raw bounds only */
+        mp_free(i);
+        if (!next_valid || next == start) break;
+        i = next;
+        if (--steps == 0) break; /* runaway chain */
+    } while (1);
+}
+
+void mp_reset_pool() {
+    int i;
+    /* rebuild free stack with all slots */
+    mp_freetop = 0;
+    for (i = 0; i < mpmal; i++) {
+        mp[i].gen++;  /* invalidate any live handles from previous frame */
+        mp[i].n = -1;
+        mp[i].p = -1;
+        mp_freestack[mp_freetop++] = i;
+    }
+    mphnum = 0;
 }
 
 
