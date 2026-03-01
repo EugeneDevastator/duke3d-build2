@@ -389,8 +389,9 @@ bool pg_graballverts = true;
 bool usehitZ = false;
 float savedHeight;
 Vector2 origVert;
-bool grabbothwalls= false;
+bool grabbothwalls = false;
 point3d constraint_normal;
+
 void PickgrabDiscard() {
 	if (mdl.grab.spri >= 0) {
 		map->spri[mdl.grab.spri].tr = savedwtr;
@@ -400,13 +401,6 @@ void PickgrabDiscard() {
 		for (int i = 0; i < totalverts; ++i) {
 			map->sect[verts[i].s].wall[verts[i].w].x = savedwtr.p.x;
 			map->sect[verts[i].s].wall[verts[i].w].y = savedwtr.p.y;
-			// move nextwall
-			//map->sect[mdl.grab.sec].wall[mdl.grab.wal2].x=tp2.x;
-			//map->sect[mdl.grab.sec].wall[mdl.grab.wal2].y=tp2.y;
-			//for (int i = 0; i < totalverts2; ++i) {
-			//	map->sect[verts2[i].s].wall[verts2[i].w].x = tp2.x;
-			//	map->sect[verts2[i].s].wall[verts2[i].w].y = tp2.y;
-			//}
 		}
 	}
 }
@@ -417,27 +411,26 @@ void PickgrabAccept() {
 		updatesect_p(map->spri[mdl.grab.spri].p, &s, map);
 		changesprisect_imp(mdl.grab.spri, s, map);
 	} else if (mdl.grab.wal >= 0 && mdl.grab.sec >= 0) {
-		// need to update sprites here.
-		//		map->sect[mdl.grab.sec].wall[mdl.grab.wal].x=savedtr.p.x;
-		//	map->sect[mdl.grab.sec].wall[mdl.grab.wal].y=savedtr.p.y;
 		checksprisect_imp(-1, map);
 	}
 
-	mdl.grab.spri = -1; // jsut do noting now.
+	mdl.grab.spri = -1;
 	ctx.mode = Fly;
 }
-int savedsec =0;
+
+int savedsec = 0;
+
 void PickgrabUpdate() {
 	Vector2 dmov = GetMouseDelta();
 	float scrol = GetMouseWheelMove();
-	// we need more transforms:
-	// 1. define transform on hitpoint or whenever virtr;
-	// 2. save it as copy.
-	// 3. save b2cam transform as copy.
-	// 4. when we move camera
-
-	p3_addto(&virt_incam_tr.p, p3_scalar_mul_of(BBDOWN, scrol * 0.2f));
-	p3_addto(&localp2, p3_scalar_mul_of(BBDOWN, scrol * 0.2f));
+// scroll move
+	if (ISGRABWAL) {
+		p3_addto(&virt_incam_tr.p, p3_scalar_mul_of(BBFORWARD, scrol * 0.2f));
+		p3_addto(&localp2, p3_scalar_mul_of(BBFORWARD, scrol * 0.2f));
+	} else {
+		p3_addto(&virt_incam_tr.p, p3_scalar_mul_of(BBDOWN, scrol * -0.2f));
+		p3_addto(&localp2, p3_scalar_mul_of(BBDOWN, scrol * -0.2f));
+	}
 
 	if (ISGRABSPRI) {
 		map->spri[mdl.grab.spri].tr = tr_local_to_world(virt_incam_tr, b2cam->tr);
@@ -445,19 +438,18 @@ void PickgrabUpdate() {
 		if (mdl.hover.sec >= 0) {
 			GRABSPRI.walcon = (signed char)mdl.hover.wal;
 		}
-
 		updatesect_p(map->spri[mdl.grab.spri].p, &s, map);
 		changesprisect_imp(mdl.grab.spri, s, map);
 	}
 	else if (ISGRABCAP) {
 		point3d newpos = p3_local_to_world(virt_incam_tr.p, b2cam->tr);
-		if (false) // grab entire sect
+		if (false)
 		{
-			loopn =2;
+			loopn = 2;
 			loopts[0].pos = newpos;
 			loopts[1].pos = savedwtr.p;
 			point3d offset = p3_diff(newpos, savedwtr.p);
-			map_sect_translate(mdl.grab.sec, savedsec, offset,map);
+			map_sect_translate(mdl.grab.sec, savedsec, offset, map);
 			savedwtr.p = newpos;
 		}
 		else if (true)
@@ -471,93 +463,92 @@ void PickgrabUpdate() {
 		}
 	}
 	else if (ISGRABWAL) {
-		transform tmp;
-		point3d tp2;
-		bool isConstrainted = IsKeyDown(KEY_LEFT_SHIFT);
 		point3d outpos;
-		{
-			// Project camera ray onto horizontal plane
+		bool isConstrainted = IsKeyDown(KEY_LEFT_SHIFT);
 
-			// Calculate intersection of camera ray with horizontal plane at target_z
+		{
 			point3d ray_start = b2cam->tr.p;
 			point3d ray_dir = b2cam->tr.f;
 			float target_z;
 
-			if (IsKeyPressed(KEY_F)) // swap mode.
+			if (IsKeyPressed(KEY_F))
 				usehitZ = !usehitZ;
 			if (usehitZ)
-				target_z = mdl.grab.hitpos.z; // floor : ceiling
+				target_z = mdl.grab.hitpos.z;
 			else
-				target_z = map->sect[mdl.grab.sec].z[ray_dir.z > 0]; // floor : ceiling
+				target_z = map->sect[mdl.grab.sec].z[ray_dir.z > 0];
 
 			if (fabsf(ray_dir.z) > 0.001f) {
 				float t = (target_z - ray_start.z) / ray_dir.z;
-				tmp.p.x = ray_start.x + ray_dir.x * t;
-				tmp.p.y = ray_start.y + ray_dir.y * t;
+				outpos.x = ray_start.x + ray_dir.x * t;
+				outpos.y = ray_start.y + ray_dir.y * t;
+				outpos.z = target_z;
 			} else {
-				// Ray parallel to plane, use mouse delta for movement
 				point3d right = b2cam->tr.r;
 				point3d down = b2cam->tr.d;
-				tmp.p.x = savedwtr.p.x + dmov.x * 0.1f * right.x + dmov.y * -0.1f * down.x;
-				tmp.p.y = savedwtr.p.y + dmov.x * 0.1f * right.y + dmov.y * -0.1f * down.y;
+				outpos.x = savedwtr.p.x + dmov.x * 0.1f * right.x + dmov.y * -0.1f * down.x;
+				outpos.y = savedwtr.p.y + dmov.x * 0.1f * right.y + dmov.y * -0.1f * down.y;
+				outpos.z = savedwtr.p.z;
 			}
-
-			tp2.x = tmp.p.x + localp2.x;
-			tp2.y = tmp.p.y + localp2.y;
-			outpos = tmp.p;
 		}
 
-		if (isConstrainted) { // move along neighbor wallss
-			wall_t wnex = map->sect[mdl.grab.sec].wall[mdl.grab.wal2];
-			wall_t wprev = map->sect[mdl.grab.sec].wall[mdl.grab.walprev];
+		if (isConstrainted) {
+			// when grabbothwalls use constraint_normal (wall normal), else use neighbor walls
+			if (grabbothwalls) {
+				// project outpos onto constraint_normal line through origVert
+				Vector2 cn = {constraint_normal.x, constraint_normal.y};
+				Vector2 topos = {outpos.x - origVert.x, outpos.y - origVert.y};
+				float proj = Vector2DotProduct(topos, cn);
+				outpos.x = origVert.x + cn.x * proj;
+				outpos.y = origVert.y + cn.y * proj;
+			} else {
+				wall_t wnex  = map->sect[mdl.grab.sec].wall[mdl.grab.wal2];
+				wall_t wprev = map->sect[mdl.grab.sec].wall[mdl.grab.walprev];
 
-			// Calculate vectors from tmp point to each ray
-			Vector2 tmppos = {tmp.p.x, tmp.p.y};
-			Vector2 origpos = {origVert.x, origVert.y};
-			Vector2 wnexpos = {wnex.x, wnex.y};
-			Vector2 wprevpos = {wprev.x, wprev.y};
+				Vector2 tmppos  = {outpos.x, outpos.y};
+				Vector2 origpos = {origVert.x, origVert.y};
+				Vector2 wnexpos  = {wnex.x,  wnex.y};
+				Vector2 wprevpos = {wprev.x, wprev.y};
 
-			// Ray directions (normalized)
-			Vector2 ray_wnex = Vector2Normalize(Vector2Subtract(origpos, wnexpos));
-			Vector2 ray_wprev = Vector2Normalize(Vector2Subtract(origpos, wprevpos));
+				Vector2 ray_wnex  = Vector2Normalize(Vector2Subtract(origpos, wnexpos));
+				Vector2 ray_wprev = Vector2Normalize(Vector2Subtract(origpos, wprevpos));
 
-			// Vectors from ray origins to tmp point
-			Vector2 to_tmp_wnex = Vector2Normalize(Vector2Subtract(tmppos, wnexpos));
-			Vector2 to_tmp_wprev = Vector2Normalize(Vector2Subtract(tmppos, wprevpos));
+				Vector2 to_tmp_wnex  = Vector2Normalize(Vector2Subtract(tmppos, wnexpos));
+				Vector2 to_tmp_wprev = Vector2Normalize(Vector2Subtract(tmppos, wprevpos));
 
-			// Dot products (higher = more aligned with ray direction)
-			float dot_wnex = Vector2DotProduct(to_tmp_wnex, ray_wnex);
-			float dot_wprev = Vector2DotProduct(to_tmp_wprev, ray_wprev);
+				float dot_wnex  = Vector2DotProduct(to_tmp_wnex,  ray_wnex);
+				float dot_wprev = Vector2DotProduct(to_tmp_wprev, ray_wprev);
 
-			// Choose ray with higher alignment
-			wall_t tgw = (abs(dot_wnex) > abs(dot_wprev) ? wnex : wprev);
-			Vector2 tgwpos = {tgw.x,tgw.y};
-			Vector2 moverpos =  {tmp.p.x,tmp.p.y};
-			Vector2 toOrig = origVert - tgwpos;
-			Vector2 toCurs = moverpos - tgwpos;
-			float projratio = Vector2DotProduct(toCurs,toOrig)/ Vector2DotProduct(toOrig,toOrig);
-			Vector2 constrpos = Vector2Lerp(tgwpos, origVert, max(projratio,0));
-			outpos = {constrpos.x, constrpos.y, 0};
+				wall_t tgw = (fabsf(dot_wnex) > fabsf(dot_wprev) ? wnex : wprev);
+				Vector2 tgwpos  = {tgw.x, tgw.y};
+				Vector2 moverpos = {outpos.x, outpos.y};
+				Vector2 toOrig = Vector2Subtract(origVert, tgwpos);
+				Vector2 toCurs = Vector2Subtract(moverpos, tgwpos);
+				float projratio = Vector2DotProduct(toCurs, toOrig) / Vector2DotProduct(toOrig, toOrig);
+				Vector2 constrpos = Vector2Lerp(tgwpos, origVert, max(projratio, 0));
+				outpos.x = constrpos.x;
+				outpos.y = constrpos.y;
+			}
 		}
 
+		// Apply wall 1
 		map->sect[mdl.grab.sec].wall[mdl.grab.wal].x = outpos.x;
 		map->sect[mdl.grab.sec].wall[mdl.grab.wal].y = outpos.y;
-
 		if (pg_graballverts)
 			for (int i = 0; i < totalverts; ++i) {
 				map->sect[verts[i].s].wall[verts[i].w].x = outpos.x;
 				map->sect[verts[i].s].wall[verts[i].w].y = outpos.y;
 			}
 
-		// Move ahead-wall todo - rework entirely leave section for verts only.
+		// Apply wall 2 as rigid offset from wall 1
 		if (grabbothwalls) {
-			tmp = tr_local_to_world(virt_incam_tr, b2cam->tr);
-			tp2 = p3_local_to_world(localp2, b2cam->tr);
-			map->sect[mdl.grab.sec].wall[mdl.grab.wal2].x = tp2.x;
-			map->sect[mdl.grab.sec].wall[mdl.grab.wal2].y = tp2.y;
+			float tp2x = outpos.x + secondwalldif.x;
+			float tp2y = outpos.y + secondwalldif.y;
+			map->sect[mdl.grab.sec].wall[mdl.grab.wal2].x = tp2x;
+			map->sect[mdl.grab.sec].wall[mdl.grab.wal2].y = tp2y;
 			for (int i = 0; i < totalverts2; ++i) {
-				map->sect[verts2[i].s].wall[verts2[i].w].x = tp2.x;
-				map->sect[verts2[i].s].wall[verts2[i].w].y = tp2.y;
+				map->sect[verts2[i].s].wall[verts2[i].w].x = tp2x;
+				map->sect[verts2[i].s].wall[verts2[i].w].y = tp2y;
 			}
 		}
 	}
@@ -579,36 +570,35 @@ void PickgrabStart() {
 		savedsec = b2cam->cursect;
 	} else if (mdl.grab.wal >= 0 && mdl.grab.sec >= 0) {
 		grabbothwalls = edselmode & SEL_SURF;
-		if (!grabbothwalls) // grab both walls
-		{
-			savedwtr = b2cam->tr;
+
+		if (!grabbothwalls)
 			mdl.grab.wal = mdl.hover.onewall;
-		}
 
+		mdl.grab.wal2    = GRABSEC.wall[mdl.grab.wal].n + mdl.grab.wal;
+		mdl.grab.walprev = wallprev(&GRABSEC, mdl.grab.wal);
 
-		mdl.grab.wal2 = GRABSEC.wall[mdl.grab.wal].n + mdl.grab.wal;
-		mdl.grab.walprev = wallprev(&GRABSEC,mdl.grab.wal);
 		wall_t* w1 = &GRABSEC.wall[mdl.grab.wal];
-		wall_t* w2 = &GRABSEC.wall[mdl.grab.walprev];
-		constraint_normal = tr_xyplanar_from_segment(w1->pos, w2->pos).f;
+		wall_t* w2 = &GRABSEC.wall[mdl.grab.wal2];
+		constraint_normal = tr_xyplanar_from_segment(w1->pos, w2->pos).r;
 
-		//for red walls we'd need to grab verts of all adjacent walls.
-		// something in build2 was there for it.
-		savedwtr = b2cam->tr;
+		savedwtr   = b2cam->tr;
 		savedwtr.p.x = map->sect[mdl.grab.sec].wall[mdl.grab.wal].x;
 		savedwtr.p.y = map->sect[mdl.grab.sec].wall[mdl.grab.wal].y;
-		origVert = {savedwtr.p.x,savedwtr.p.y};
+		origVert = {savedwtr.p.x, savedwtr.p.y};
 		totalverts = getwallsofvert(mdl.grab.sec, mdl.grab.wal, verts, 256, map);
 
 		point2d wpos = getwall({mdl.grab.wal2, mdl.grab.sec}, map)->pos;
+		// save world-space delta wall2 - wall1
+		secondwalldif.x = wpos.x - savedwtr.p.x;
+		secondwalldif.y = wpos.y - savedwtr.p.y;
+
 		point3d wpos3d = {wpos.x, wpos.y, 0};
 		localp2 = p3_world_to_local(wpos3d, b2cam->tr);
 		totalverts2 = getwallsofvert(mdl.grab.sec, mdl.grab.wal2, verts2, 256, map);
 	}
 	virt_incam_tr = tr_world_to_local(savedwtr, b2cam->tr);
-	//virt_incam_tr = savedwtr;
-	//virt_incam_tr.p = p3_make_vector(b2cam->tr.p,mdl.hover.hitpos);
 }
+
 
 // ----------------------- draw loop OPER ---------------------
 

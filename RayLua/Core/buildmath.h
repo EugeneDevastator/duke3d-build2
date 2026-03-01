@@ -319,7 +319,19 @@ static inline transform tr_xyplanar_from_forward(point3d forwardvec) {
 	tr.p = BBPZERO;
 	return tr;
 }
-
+static inline transform tr_xyplanar_from_segment(point2d pos1, point2d pos2) {
+	point3d forwardvec;
+	forwardvec.z = 0;
+	forwardvec.x = pos2.x-pos1.x;
+	forwardvec.y = pos2.y-pos1.y;
+	point3d newf = p3_normalized(forwardvec);
+	transform tr;
+	tr.f = newf;
+	tr.r = p3_rotated_90_cwz(newf);
+	tr.d = BBDOWN;
+	tr.p = BBPZERO;
+	return tr;
+}
 static inline void tr_normalize(transform *tr) {
 	// Normalize all axes
 	float flen = p3_length(&tr->f);
