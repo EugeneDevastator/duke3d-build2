@@ -110,17 +110,18 @@ int mono_insp(int i, dpoint3d p) {
     return (i);
 }
 void mono_del(int i) {
-    int p, n;
-logstep("Mono| Del %d",i);
-#if EXLOGS
-    printf("Mono| MP dealloc: freeing=%d, old_empty=%d \n", i, mpempty);
-#endif
-    p = mp[i].p;
-    n = mp[i].n;
-    mp[n].p = p;
-    mp[p].n = n;
+    (void)i;
+   //int p, n;
+   //logstep("Mono| Del %d",i);
+   //#if EXLOGS
+   //    printf("Mono| MP dealloc: freeing=%d, old_empty=%d \n", i, mpempty);
+   //#endif
+   //p = mp[i].p;
+   //n = mp[i].n;
+   //mp[n].p = p;
+   //mp[p].n = n;
 
-    mp_free(i);
+   //mp_free(i);
 }
 void mono_deloop2(int* i) {
     mono_deloop(i[0]);
@@ -128,7 +129,8 @@ void mono_deloop2(int* i) {
 }
 
 void mono_deloop(int i) {
-    mono_deloop_safe(i);
+    (void)i;
+    //mono_deloop_safe(i);
 }
 
 void mono_centroid_addlin(int i0, int i1, double *cx, double *cy, double *area) {
