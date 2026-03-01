@@ -125,9 +125,11 @@ typedef struct {
 	point3d cropB;
 	point3d rot; // rot z is for deault uvs
 
-	uint8_t mapping_kind; // uv amappings, regular, polar, hex, flipped variants etc. paralax.
-	uint16_t tile_ordering; //
-} uvform_t;
+	uint8_t scaling_mode; // fit, use texel density,
+	uint8_t mapping_kind; // uv amappings, regular, polar, hex, triang, parallax, etc.
+	uint16_t tile_ordering; // 1 bit = flip, 2 bits = 4 rotations. 3bits X 4n tiles sharing vert. = 12 bits
+} uvform_t; // generic uvform for 2d and 3d volumetric mappings.
+
 #define UVFORM_DEFAULT (uvform_t){{1,1,1},{0,0,0},{0,0,0},{1,1,1},{0,0,0},0,0}
 
 typedef struct {
@@ -138,14 +140,14 @@ typedef struct {
 	unsigned int RESERVED : 6;    // padding to 32 bits
 } geoflags8_t;
 
-
 typedef struct {
 	point3d ori;    // origin
 	point3d u;      // U axis
 	point3d v;		// V axis
-	point3d c;    // 4th corner (BR) - unused in planar/persp mode
+	point3d c;      // 4th corner (O+U+V) - unused in planar/persp mode
 	point3d norm;   // projection direction (normalized)
 	point3d eye;	// eye/apex point (push far along -N for ortho)
+	float eyeratio; // lerp argument for eye distance adjst. mostly for effects.
 } uv_world_t;  // generated uv structure. runtime only.
 
 enum vertRenderMode { // not part of the flags because must be chosen before any flags take place
@@ -183,13 +185,17 @@ typedef struct {
 
 typedef struct {
 	point3d colorhdr; // this is color block.
-	float maxdist;
-	float distance_bias; // for intensity calc.
-	float forward_offset;
-	point3d spot_axes;
-	point3d spot_fades; // 1 = fade to center.
-	point3d spot_fadexp; // exponent
+	float multiplier; // additional mul.
+	float maxdist; // distance to stop clipper; 0 = no stop;
+	float distance_fade_bias; // for intensity calc only! 0 = default light.
+	float forward_offset_power; // for lights that are behind wall, sun, etd. real offset = 2^offset
+	point3d spot_angles; // value = degrees.
+	point3d spot_axisfade; //  0= hard. value = degrees
+	point3d spot_fadepower; // exponent,
 } lightsource_t;
+
+#define LIGHT_SOURCE_DEFAULT (lightsource_t){BBPONE,1,0,1,0,BBPTLEN(360),BBPZERO,BBPONE}
+
 
 typedef struct {
 	renderflags32_t rflags;
@@ -369,6 +375,13 @@ typedef struct {
 	// rotation and position transforms.
 	// use some wall as origin, or even sprite.
 } chunk_t;
+
+typedef struct {
+	char type[4];
+	uint32_t length;
+	unsigned char *data;
+	uint32_t crc;
+} datablock;
 
 typedef struct
 {

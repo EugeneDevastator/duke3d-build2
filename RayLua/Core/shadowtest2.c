@@ -1649,6 +1649,22 @@ int mono_ins_tf(int i, double nx, double ny, double nz, bdrawctx* b) {
 }
 
 static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
+	/*
+	 *Lights in portals solution:
+	1. draw light as is - remember lightpoly in original world space of the sector.
+	1.1 even when it goes through portal save lightpoly per sector
+	2. in drawing phase - when drawing sector - in portal or not - draw its lightpoly
+	3. if it is duplicated in portal - draw lights again.
+	4. probably also need to save lightpos relative to lightpoly for same light...
+
+	5. when rednering portal lights.
+	- if portal is backfaced to light, skip entirely.
+	- draw portal on the light board right away - this will lessen clips.
+	-
+	 *
+	 **/
+
+
 	alphamul=1;
 	gtilenum = 0;
 	ggalnum = 0;

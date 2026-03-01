@@ -7,6 +7,7 @@
 #define RAYLIB_LUA_IMGUI_BUILDMATH_H
 // PURE C LIB
 
+#include <math.h>
 #include <stdbool.h>
 
 #ifndef __cplusplus
@@ -61,7 +62,7 @@ static const point3d BBDOWN = {0, 0, 1};   // Z, BLUE
 
 static const point3d BBPZERO = {0, 0, 0};
 static const point3d BBPONE = {1, 1, 1};
-
+#define BBPTLEN(l) (point3d){l,l,l}
 static const transform TR_ONE = {{0,0,0}, {1,0,0}, {0,0,1}, {0,1,0}};
 
 

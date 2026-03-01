@@ -56,25 +56,25 @@ extern "C" {
 #include "shadowtest2.h"
 }
 
-#define SEL_SPRI 1
-#define SEL_SURF 1<<1
-#define SEL_WAL 1<<2
-#define SEL_SEC 1<<3
-#define SEL_CHUNK 1<<4
-#define SEL_LOOP 1<<5
-#define SEL_UV 1<<6
+#define SEL_SPRI	(1<<0)
+#define SEL_SURF	(1<<1)
+#define SEL_WAL		(1<<2)
+#define SEL_SEC		(1<<3)
+#define SEL_CHUNK	(1<<4)
+#define SEL_LOOP	(1<<5)
+#define SEL_UV		(1<<6)
 
-#define SEL_UP 1<<7
-#define SEL_DOWN 1<<8
-#define SEL_MID 1<<9
+#define SEL_UP (1<<7)
+#define SEL_DOWN (1<<8)
+#define SEL_MID (1<<9)
 
-#define SEL_NEAR 1<<10
-#define SEL_FAR 1<<11
+#define SEL_NEAR (1<<10)
+#define SEL_FAR (1<<11)
 
-#define SEL_REDWALLPORTS 1<<12
-#define SEL_ALL 1<<13
+#define SEL_REDWALLPORTS (1<<12)
+#define SEL_ALL (1<<13)
 
-uint16_t edselmode = SEL_ALL; // claude - use this.
+uint16_t edselmode = SEL_ALL;
 EditorModel mdl;
 
 #define ISGRABSPRI (mdl.grab.spri >= 0)
@@ -389,7 +389,7 @@ bool pg_graballverts = true;
 bool usehitZ = false;
 float savedHeight;
 Vector2 origVert;
-
+bool grabbothwalls= false;
 void PickgrabDiscard() {
 	if (mdl.grab.spri >= 0) {
 		map->spri[mdl.grab.spri].tr = savedwtr;
@@ -539,11 +539,6 @@ void PickgrabUpdate() {
 			outpos = {constrpos.x, constrpos.y, 0};
 		}
 
-		//else {
-		//    tmp = tr_local_to_world(trdiff, &b2cam->tr);
-		//    tp2 = p3_local_to_world(localp2, &b2cam->tr);
-		//}
-
 		map->sect[mdl.grab.sec].wall[mdl.grab.wal].x = outpos.x;
 		map->sect[mdl.grab.sec].wall[mdl.grab.wal].y = outpos.y;
 
@@ -554,7 +549,9 @@ void PickgrabUpdate() {
 			}
 
 		// Move ahead-wall todo - rework entirely leave section for verts only.
-		if (edselmode & SEL_SURF) {
+		if (grabbothwalls) {
+			tmp = tr_local_to_world(virt_incam_tr, b2cam->tr);
+			tp2 = p3_local_to_world(localp2, b2cam->tr);
 			map->sect[mdl.grab.sec].wall[mdl.grab.wal2].x = tp2.x;
 			map->sect[mdl.grab.sec].wall[mdl.grab.wal2].y = tp2.y;
 			for (int i = 0; i < totalverts2; ++i) {
@@ -580,8 +577,8 @@ void PickgrabStart() {
 		savedHeight = GRABSEC.z[1] - GRABSEC.z[0];
 		savedsec = b2cam->cursect;
 	} else if (mdl.grab.wal >= 0 && mdl.grab.sec >= 0) {
-		bool grabboth = false;
-		if (!grabboth) // grab both walls
+		grabbothwalls = edselmode & SEL_SURF;
+		if (!grabbothwalls) // grab both walls
 		{
 			savedwtr = b2cam->tr;
 			mdl.grab.wal = mdl.hover.onewall;
@@ -1160,10 +1157,18 @@ void SetColorum(uint8_t r, uint8_t g, uint8_t b, int16_t lum) {
 void HandleCameraControl() {
 	float move_unitspersec=8;
 	float move_unitspersec_fine=0.5;
-	float ang_per_sec=5;
+	float ang_per_sec=4;
 	float ang_per_sec_fine=0.5;
 	point3d movec={0};
 	if (mdl.camera_controls_enabled) {
+
+		Vector2 mouseDelta = GetMouseDelta();
+		if (mouseDelta.x != 0 || mouseDelta.y != 0) {
+			float sensitivity = 0.003f;
+			tr_quat_rotate_on_axis(&b2cam->tr,BBDOWN, -mouseDelta.x * ang_per_sec*GetFrameTime()*-1);
+			tr_quat_rotate_on_axis(&b2cam->tr,b2cam->tr.r, -mouseDelta.y * ang_per_sec*GetFrameTime());
+		}
+
 		float movemag = move_unitspersec*GetFrameTime();
 		if (IsKeyDown(KEY_W))
 			p3_addto(&movec, p3_scalar_mul_of(b2cam->tr.f,movemag));
@@ -1175,12 +1180,6 @@ void HandleCameraControl() {
 			p3_addto(&movec, p3_scalar_mul_of(b2cam->tr.r,movemag));
 
 		p3_addto(&b2cam->tr.p, movec);
-		Vector2 mouseDelta = GetMouseDelta();
-		if (mouseDelta.x != 0 || mouseDelta.y != 0) {
-			float sensitivity = 0.003f;
-			tr_quat_rotate_on_axis(&b2cam->tr,BBDOWN, -mouseDelta.x * ang_per_sec*GetFrameTime()*-1);
-			tr_quat_rotate_on_axis(&b2cam->tr,b2cam->tr.r, -mouseDelta.y * ang_per_sec*GetFrameTime());
-		}
 	}
 }
 

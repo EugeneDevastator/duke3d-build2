@@ -1050,7 +1050,7 @@ void MainLoop() {
                            {0, 0, (float) w, (float) -h}, {0, 0}, WHITE);
             EndShaderMode();
         }
-        EndCustomRenderTarget(); // END COMBINED
+        EndCustomRenderTarget(); // END POSTPROC COMBINE
 
 
         BeginDrawing();
@@ -1075,42 +1075,47 @@ void MainLoop() {
                                {0, 0, (float) w, (float) -h}, {0, 0}, WHITE); // Keep Y-flip here too
                 EndShaderMode();
             }
-            EndCustomRenderTarget();
+            EndCustomRenderTarget();  // END OF LUT PASS.
             if (IsKeyPressed(KEY_ESCAPE))
                 DisableCursor();
 
 #if !IS_DUKE_INCLUDED
+            {
+                // Restore complete GL state for ImGui
+                glBindFramebuffer(GL_FRAMEBUFFER, 0);
+                glViewport(0, 0, w, h);
+                glDisable(GL_DEPTH_TEST);
+                glEnable(GL_BLEND);
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Standard alpha blending
+                glBlendEquation(GL_FUNC_ADD);
+                DrawFPS(10, 10);
+                // IMGUI SECTION
 
-            // Restore complete GL state for ImGui
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            glViewport(0, 0, w, h);
-            glDisable(GL_DEPTH_TEST);
-            glEnable(GL_BLEND);
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Standard alpha blending
-            glBlendEquation(GL_FUNC_ADD);
-            DrawFPS(10, 10);
-            // IMGUI SECTION
-            viewport = ImGui::GetMainViewport();
-            rlImGuiBegin();
-            DrawInfoUI();
-            DrawInfoMessage();
-            if (showPicker) {
-                DrawPicker();
-                SetColorum(currentColor.r, currentColor.g, currentColor.b, currentColor.luminance);
-            }
-            if (IsKeyPressed(KEY_L)) {
-                SetColorum(currentColor.r, currentColor.g, currentColor.b, currentColor.luminance);
-            }
-            if (IsKeyPressed(KEY_C)) {
-                showPicker = !showPicker;
+                viewport = ImGui::GetMainViewport();
+                rlImGuiBegin();
+                DrawInfoUI();
+                DrawInfoMessage();
                 if (showPicker) {
-                    EnableCursor();
-                } else {
-                    DisableCursor();
+                    DrawPicker();
+                    SetColorum(currentColor.r, currentColor.g, currentColor.b, currentColor.luminance);
                 }
-            }
+                if (IsKeyPressed(KEY_L)) {
+                    SetColorum(currentColor.r, currentColor.g, currentColor.b, currentColor.luminance);
+                }
+                if (IsKeyPressed(KEY_C)) {
 
-            rlImGuiEnd();
+                    showPicker = !showPicker;
+                    if (showPicker) {
+                        mdl.camera_controls_enabled = false;
+                        EnableCursor();
+                    } else {
+                        mdl.camera_controls_enabled = true;
+                        DisableCursor();
+                    }
+                }
+
+                rlImGuiEnd();
+            } // END OF IMGUI PASS
 #endif
         }
 
