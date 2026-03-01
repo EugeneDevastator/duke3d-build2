@@ -75,7 +75,7 @@ extern "C" {
 #define SEL_ALL (1<<13)
 
 uint16_t edselmode = SEL_ALL;
-EditorModel mdl;
+EditorModel mdl ={0};
 
 #define ISGRABSPRI (mdl.grab.spri >= 0)
 #define ISHOVERSPRI (mdl.hover.spri >= 0)
