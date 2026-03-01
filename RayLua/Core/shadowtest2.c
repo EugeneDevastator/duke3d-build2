@@ -1644,9 +1644,8 @@ The b parameter is a bunch index - this function processes one "bunch" (visible 
 // in the end we hack shadows by simple subtraction - not mathematically correct but work for env with lots of lights.
 
 int mono_ins_tf(int i, double nx, double ny, double nz, bdrawctx* b) {
-	dpoint3d np ;
-	np = portal_xform_world_fullr(nx,ny,nz,b);
-	mono_ins(i,np.x,np.y,np.z);
+	dpoint3d np = portal_xform_world_fullr(nx,ny,nz,b);
+	return mono_ins(i,np.x,np.y,np.z);
 }
 
 static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
