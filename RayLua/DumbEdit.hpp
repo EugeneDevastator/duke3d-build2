@@ -390,6 +390,7 @@ bool usehitZ = false;
 float savedHeight;
 Vector2 origVert;
 bool grabbothwalls= false;
+point3d constraint_normal;
 void PickgrabDiscard() {
 	if (mdl.grab.spri >= 0) {
 		map->spri[mdl.grab.spri].tr = savedwtr;
@@ -584,8 +585,13 @@ void PickgrabStart() {
 			mdl.grab.wal = mdl.hover.onewall;
 		}
 
-		mdl.grab.wal2 = map->sect[mdl.grab.sec].wall[mdl.grab.wal].n + mdl.grab.wal;
+
+		mdl.grab.wal2 = GRABSEC.wall[mdl.grab.wal].n + mdl.grab.wal;
 		mdl.grab.walprev = wallprev(&GRABSEC,mdl.grab.wal);
+		wall_t* w1 = &GRABSEC.wall[mdl.grab.wal];
+		wall_t* w2 = &GRABSEC.wall[mdl.grab.walprev];
+		constraint_normal = tr_xyplanar_from_segment(w1->pos, w2->pos).f;
+
 		//for red walls we'd need to grab verts of all adjacent walls.
 		// something in build2 was there for it.
 		savedwtr = b2cam->tr;
