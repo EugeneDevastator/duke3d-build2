@@ -957,7 +957,7 @@ void MainLoop() {
     globCam.tr.r = map->startrig;
     globCam.tr.d = map->startdow;
     globCam.tr.f = map->startfor;
-    SetTargetFPS(60);
+    SetTargetFPS(120);
 
     InitEditor(map, &globCam);
     // Initialize LUT system
