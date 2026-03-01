@@ -189,9 +189,12 @@ typedef struct {
 	float maxdist; // distance to stop clipper; 0 = no stop;
 	float distance_fade_bias; // for intensity calc only! 0 = default light.
 	float forward_offset_power; // for lights that are behind wall, sun, etd. real offset = 2^offset
-	point3d spot_angles; // value = degrees.
-	point3d spot_axisfade; //  0= hard. value = degrees
+	point3d spot_angles_deg; // value = degrees.
+	point3d spot_fage_deg; //  0= hard. value = degrees
 	point3d spot_fadepower; // exponent,
+	point3d distance_smear; // for pillar- lights, format unclear. 0 on axis = pillar. so probably per axis multipliers.
+	// more than 1 will result in shrinking, while 0 will produce a pillar.
+	// and would need shader formula fro local, not world axes.
 } lightsource_t;
 
 #define LIGHT_SOURCE_DEFAULT (lightsource_t){BBPONE,1,0,1,0,BBPTLEN(360),BBPZERO,BBPONE}

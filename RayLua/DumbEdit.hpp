@@ -80,7 +80,7 @@ EditorModel mdl;
 #define ISGRABSPRI (mdl.grab.spri >= 0)
 #define ISHOVERSPRI (mdl.hover.spri >= 0)
 #define ISGRABWAL (mdl.grab.wal >= 0 && mdl.grab.sec >= 0)
-#define ISGRABCAP (mdl.grab.wal < 0 && mdl.grab.sec >= 0)
+#define ISGRABCAP (mdl.grab.wal < 0 && mdl.grab.wal > -3 && mdl.grab.sec >= 0)
 #define ISHOVERWAL (mdl.hover.wal >= 0 && mdl.hover.sec >= 0)
 #define ISHOVERCAP (mdl.hover.wal < 0 && mdl.hover.sec >= 0)
 #define HOVERSEC map->sect[mdl.hover.sec]
@@ -466,14 +466,15 @@ void PickgrabUpdate() {
 	Vector2 dmov = GetMouseDelta();
 	float scrol = GetMouseWheelMove();
 // scroll move
-	if (ISGRABWAL) {
-		p3_addto(&virt_incam_tr.p, p3_scalar_mul_of(BBFORWARD, scrol * 0.2f));
-		p3_addto(&localp2, p3_scalar_mul_of(BBFORWARD, scrol * 0.2f));
-	} else {
-		p3_addto(&virt_incam_tr.p, p3_scalar_mul_of(BBDOWN, scrol * -0.2f));
-		p3_addto(&localp2, p3_scalar_mul_of(BBDOWN, scrol * -0.2f));
-	}
 
+	if (ISGRABSPRI) {
+		p3_addto(&virt_incam_tr.p, p3_scalar_mul_of(BBFORWARD, scrol * -0.2f));
+		p3_addto(&localp2, p3_scalar_mul_of(BBFORWARD, scrol * -0.2f));
+	}else
+	{
+		p3_addto(&virt_incam_tr.p, p3_scalar_mul_of(BBDOWN, scrol * 0.2f));
+		p3_addto(&localp2, p3_scalar_mul_of(BBDOWN, scrol * 0.2f));
+	}
 	if (ISGRABSPRI) {
 		map->spri[mdl.grab.spri].tr = tr_local_to_world(virt_incam_tr, b2cam->tr);
 		int s = map->spri[mdl.grab.spri].sect;
