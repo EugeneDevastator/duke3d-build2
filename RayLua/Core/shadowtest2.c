@@ -62,7 +62,7 @@ eyepols are generated from mono space AND plane equation stored in gouvmat.
 #define DP_PRESERVE_LOOP 64
 #define DP_ADD_AS_PROJECTOR 128
 
-#define MAX_PORTAL_DEPTH 6
+#define MAX_PORTAL_DEPTH 12
 
 #define RM_LIGHTS 4
 #define RM_GEO 1
@@ -1218,18 +1218,22 @@ static int projectonmono(int *plothead0, int *plothead1, bdrawctx *b) {
 	//#define BSCISDIST 0.1 //Huge gaps
 
 	dpoint3d *otp, *tp;
-	double f, ox, oy, oz;
-	int i, j, k, l, h, on, n, plothead[2], imin, imax, i0, i1, omph0, omph1;
+	double f, ox, oy, oz =0;
+	int i, j, k, l, h, on, n, plothead[2], imin, imax, i0, i1, omph0, omph1=0;
 
 	plothead[0] = *plothead0;
 	plothead[1] = *plothead1;
-
+	//if (!MP_VALID(plothead[0]) || !MP_VALID(plothead[1])) {
+	//	mono_deloop_safe(plothead[0]);
+	//	mono_deloop_safe(plothead[1]);
+	//	return 0;
+	//}
 	n = 2;
 	for (h = 0; h < 2; h++)
 		for (i = mp[plothead[h]].n; i != plothead[h]; i = mp[i].n) {
-			//	printf("%d, ",n);
 			n++;
 		}
+
 	otp = (dpoint3d *) _alloca(n * sizeof(dpoint3d));
 	tp = (dpoint3d *) _alloca(n * sizeof(dpoint3d) * 2);
 
@@ -1682,12 +1686,15 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 	wall_t *wal;
 	surf_t *sur;
 	point2d *grad;
-	double f, fz, dx;
-	int i, j, k, l, m, n, s, ns, isflor, plothead[2], wn, w, ww, nw, vn, ws, wi, we, kval[4], imin, imax;
-	int ks[2], ke[2], col, n0, n1;
-
+	double f, fz, dx=0;
+	int i, j, k, l, m, n, s, ns, isflor, plothead[2], wn, w, ww, nw, vn, ws, wi, we, kval[4], imin, imax =0;
+	int ks[2], ke[2], col, n0, n1=0;
+	plothead[0]=-1;
+	plothead[1]=-1;
 	// === SETUP SECTOR AND WALL DATA ===
 	s = b->bunch[bid].sec;
+	if (s<0)
+		return;
 	sec = curMap->sect;
 	wal = sec[s].wall;
 
@@ -1714,7 +1721,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		b->bunchgrid[(((i - 1) * i) >> 1) + bid] =
 				((b->bunchgrid[j + i] & 1) << 1) + (b->bunchgrid[j + i] >> 1);
 
-#if 1	// === SPRITE SHADOWS ====
+#if 0	// === SPRITE SHADOWS ====
 	if (shadowtest2_rendmode == 4) {
 		if (!sectmask_was_marked(lightsectgot,s)) {
 			sectmask_mark_sector(lightsectgot,s);
@@ -1729,10 +1736,11 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 #endif
 #if 1 // === DRAW CEILINGS & FLOORS ===
 	bool noportals = b->recursion_depth >= MAX_PORTAL_DEPTH;
+
 	for (isflor = 0; isflor < 2; isflor++) // floor ceil
 	{
 		b->gisflor = isflor;
-
+		//printf("draw floor %i \n",isflor);
 		int myport = sec[s].tags[1]; // FLOOR PORTAL CHECK
 		bool isportal = myport >= 0
 		                && !noportals
@@ -1796,7 +1804,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 		for (ww = twaln; ww >= 0; ww -= twaln)
 			plothead[isflor] = mono_ins_tf(
 				plothead[isflor], twal[ww].x, twal[ww].y,
-				b->gnorm.z * -1e9,b);
+				b->gnorm.z * -1e12,b);
 		//do not replace w/single zenith point - ruins precision
 		i = isflor ^ 1;
 		for (ww = 0; ww <= twaln; ww++) {
@@ -1809,10 +1817,9 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 
 		// Setup texture and rendering flags
 		sur = &sec[s].surf[isflor];
-		gtpic = &gtile[sur->tilnum];
 		gtilenum = sur->tilnum;
 		ggalnum = sur->galnum;
-		//if (!gtpic->tt.f) loadpic(gtpic);
+
 		if (sec[s].surf[isflor].flags & (1 << 17)) { b->gflags = 2; } //skybox ceil/flor
 		else if (sec[s].surf[isflor].flags & (1 << 16)) {
 			//parallaxing ceil/flor
@@ -1833,6 +1840,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 
 		int touchwid = twal[0].i;
 		if (isportal && !noportals) {
+		//	printf("aha portal! \n");
 			int endpn = portals[myport].destpn;
 			int ttag = (b->recursion_depth+1) * taginc + myport*portinc + portals[endpn].sect;
 			int portalpolyflags = ((isflor << 2) + 3) | DP_NO_SCANSECT;
@@ -1871,6 +1879,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 	b->gisflor = 2;
 #if 1	// === DRAW WALLS ===
 	for (ww = 0; ww < twaln; ww++) {
+		//printf("draw wall %i \n",ww);
 		// Get wall vertices and setup wall segment
 		vn = getwalls_chain(s, twal[ww].i, verts,MAXVERTS, map);
 		w = twal[ww].i;
@@ -2114,9 +2123,9 @@ void draw_hsr_polymost(cam_t *cc, mapstate_t *map, int dummy) {
 	opercurr = 0;
 	int sec=-1,wal=-1,spr =-1;
 	point3d hit;
+
 	point3d f = p3sum(cc->tr.p,cc->tr.f);
 	if (tr_is_flipped(cc->tr)) {
-		bs.movedcam = *cc;
 		p3_scalar_mul(&bs.orcam.tr.r,-1);
 		//p3_scalar_mul(&bs.orcam.tr.d,-1);
 		bs.istrimirror = true;//
@@ -2346,18 +2355,8 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 				mono_deloop(mph[i].head[1]);
 				mono_deloop(mph[i].head[0]);
 			}
-
-			{ // Clean mp state. It seems that this is prone to corruption but also - doesnt really produce that much loops
-				// find way to clean it even faster later.
- 				mpempty = 0;
-				for (i = 0; i < mpmal; i++) {
-					mp[i].n = i + 1;
-					mp[i].p = i - 1;
-				}
-				mp[mpmal - 1].n = 0;
-				mp[0].p = mpmal - 1;
-			}
-
+			mp_reset_pool();
+			mono_mph_check(64);
 			// maybe need second run for alternating mono?
 			mono_genfromloop(&mph[0].head[0], &mph[0].head[1], bord2, n);
 			mph[0].tag = gcam.cursect;
