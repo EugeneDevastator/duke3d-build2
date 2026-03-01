@@ -1373,12 +1373,13 @@ int updatesect_portmove(transform *tr, int *cursect, int validsec, mapstate_t *m
 	sect_t *sec = map->sect;
 	bool isinside = s >= 0 && insidesect(pos->x, pos->y, sec[s].wall, sec[s].n);
 	bool scanwall = !isinside && *cursect != validsec;
-	if (isinside && (map->sect[s].destpn[0] >= 0 || map->sect[s].destpn[1] >= 0)) {
+	bool hascapport = (map->sect[s].destpn[0] >= 0 || map->sect[s].destpn[1] >= 0);
+	if (isinside && hascapport) {
 		// if we are inside sect by 2d scan then can check caps for portal
-		if (isinside) {
+
 			for (int j = 0; j < 2; j++) {
 				if (sec[s].destpn[j] > -1) {
-					float h = getslopez(&sec[s], j, pos->x, pos->y);
+					float h = (float)getslopez(&sec[s], j, pos->x, pos->y);
 					bool crossed = 0;
 					if (!j)
 						crossed = h > pos->z;
@@ -1386,19 +1387,17 @@ int updatesect_portmove(transform *tr, int *cursect, int validsec, mapstate_t *m
 						crossed = h < pos->z;
 
 					if (crossed) {
-						int d = sec[s].destpn[j];
-						int ow = portals[d].destpn;
+						uint32_t d = sec[s].destpn[j];
+						uint32_t ow = portals[d].destpn;
 						*cursect = portals[d].sect;
 
-						//p3_transform_wccw(pos, &map->spri[portals[ow].anchorspri].tr,
-						//                   &map->spri[portals[d].anchorspri].tr);
 						tr_transfrom_wccw(tr, map->spri[portals[ow].anchorspri].tr,
-						                  map->spri[portals[d].anchorspri].tr);
+										  map->spri[portals[d].anchorspri].tr);
 						return 1;
 					}
 				}
 			}
-		}
+
 		// else check walls, since we are not in same sec.
 	} else // scan wall otherwise
 		if (scanwall) {

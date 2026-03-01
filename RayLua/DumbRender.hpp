@@ -1100,8 +1100,8 @@ static void quad_st(
 static void MoveCamB2( cam_t *b2cam) {
 		if (syncam) {
 			plr.tr = b2cam->tr;
-			updatesect_imp(plr.tr.p.x, plr.tr.p.y, plr.tr.p.z, &plr.cursect, map);
 			int ported = updatesect_portmove(&plr.tr, &plr.cursect, validsec, map);
+			updatesect_imp(plr.tr.p.x, plr.tr.p.y, plr.tr.p.z, &plr.cursect, map);
 			if(ported)
 				int ytry=1;
 			b2cam->cursect = plr.cursect;
