@@ -758,16 +758,17 @@ void DrawInfoUI() {
     ImVec2 work_pos = viewport->WorkPos;
     ImVec2 work_size = viewport->WorkSize;
 
-    // Set window position to upper right
-    ImVec2 window_pos = ImVec2(work_pos.x + work_size.x - 200.0f, work_pos.y + 10.0f);
-    ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always);
-
-    // Create window without title bar, resize, move, collapse
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoTitleBar |
-                                   ImGuiWindowFlags_NoResize |
-                                   ImGuiWindowFlags_NoMove |
-                                   ImGuiWindowFlags_NoCollapse |
-                                   ImGuiWindowFlags_AlwaysAutoResize;
+                                    ImGuiWindowFlags_NoResize |
+                                    ImGuiWindowFlags_NoMove |
+                                    ImGuiWindowFlags_NoCollapse |
+                                    ImGuiWindowFlags_AlwaysAutoResize;
+
+    // First pass: begin with a temporary position, let it size itself
+    // Then reposition so it stays top-right without clipping
+    ImGui::SetNextWindowPos(ImVec2(work_pos.x + work_size.x - 10.0f, work_pos.y + 10.0f),
+                            ImGuiCond_Always, ImVec2(1.0f, 0.0f)); // pivot top-right
+
     DrawTextureBrowser(&texb);
     ImGui::Begin("##info_panel", NULL, window_flags);
     ImGui::Text("Q = pick & move");
@@ -866,25 +867,28 @@ void DrawInfoMessage() {
 
     info_timer -= ImGui::GetIO().DeltaTime;
 
-    ImVec2 work_pos = viewport->WorkPos;
-    ImVec2 work_size = viewport->WorkSize;
+    ImGuiViewport* vp = ImGui::GetMainViewport();
+    ImVec2 work_pos  = vp->WorkPos;
+    ImVec2 work_size = vp->WorkSize;
 
-    // Center horizontally at top
-    ImVec2 window_pos = ImVec2(work_pos.x + work_size.x * 0.5f, work_pos.y + 20.0f);
-    ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.5f, 0.0f));
+    // Draw directly on foreground drawlist - no window, no clipping
+    ImDrawList* dl = ImGui::GetForegroundDrawList();
 
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar |
-                            ImGuiWindowFlags_NoResize |
-                            ImGuiWindowFlags_NoMove |
-                            ImGuiWindowFlags_NoCollapse |
-                            ImGuiWindowFlags_AlwaysAutoResize |
-                            ImGuiWindowFlags_NoBackground |
-                            ImGuiWindowFlags_NoInputs;
+    ImVec2 text_size = ImGui::CalcTextSize(info_message);
 
-    ImGui::Begin("##top_info", NULL, flags);
-    ImGui::Text("%s", info_message);
-    ImGui::End();
+    float x = work_pos.x + (work_size.x - text_size.x) * 0.5f;
+    float y = work_pos.y + 20.0f;
+
+    // Shadow for bold effect
+    dl->AddText(ImVec2(x + 1.0f, y + 1.0f), IM_COL32(0, 0, 0, 200), info_message);
+    dl->AddText(ImVec2(x - 1.0f, y + 1.0f), IM_COL32(0, 0, 0, 200), info_message);
+    dl->AddText(ImVec2(x + 1.0f, y - 1.0f), IM_COL32(0, 0, 0, 200), info_message);
+    dl->AddText(ImVec2(x - 1.0f, y - 1.0f), IM_COL32(0, 0, 0, 200), info_message);
+    // Main text
+    dl->AddText(ImVec2(x, y), IM_COL32(255, 255, 255, 255), info_message);
 }
+
+
 
 // ------------------------------------
 

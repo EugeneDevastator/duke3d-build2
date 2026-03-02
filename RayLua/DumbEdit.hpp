@@ -1011,24 +1011,33 @@ void WallDrawUpdate() {
    //}
 }
 // ------------------ UV MAPPING
-void UvmapDiscard(){}
+void UvmapDiscard() {
+	mdl.camera_rotate_enabled = true;
+}
 void UvmapStart() {
 	mdl.grab=mdl.hover;
+	mdl.camera_rotate_enabled = false;
 }
 void UvmapAccept() {
-
+	mdl.camera_rotate_enabled = true;
 }
 void UvmapUpdate() {
 	Vector2 dmov = GetMouseDelta();
 	float scrol = GetMouseWheelMove();
 	if (ISGRABWAL) {
 		GRABWAL.xsurf[mdl.grab.surf].uvform.rot.z+= scrol/2.0;
-		//GRABWAL.xsurf[mdl.grab.surf].uvform.pan.x-= dmov.x/512.0;
-		//GRABWAL.xsurf[mdl.grab.surf].uvform.pan.y-= dmov.y/512.0;
+		if (IsKeyDown(KEY_LEFT_SHIFT)) {
+			GRABWAL.xsurf[mdl.grab.surf].uvform.scale.x -= dmov.x/2048;
+			GRABWAL.xsurf[mdl.grab.surf].uvform.scale.y -= dmov.y/2048;
+		}
+		else {
+			GRABWAL.xsurf[mdl.grab.surf].uvform.pan.x-= dmov.x/512.0;
+			GRABWAL.xsurf[mdl.grab.surf].uvform.pan.y-= dmov.y/512.0;
+		}
 
-		GRABWAL.xsurf[mdl.grab.surf].rt_uvs[3].y-= dmov.x/512.0;
-		GRABWAL.xsurf[mdl.grab.surf].rt_uvs[3].z-= dmov.y/512.0;
-	//GRABWAL.surf.uvform.rot.z+= scrol;
+		//GRABWAL.xsurf[mdl.grab.surf].rt_uvs[3].y-= dmov.x/512.0;
+		//GRABWAL.xsurf[mdl.grab.surf].rt_uvs[3].z-= dmov.y/512.0;
+
 	}
 
 }
@@ -1180,6 +1189,8 @@ void InitEditor(mapstate_t *m, cam_t *camref) {
 	map = m;
 	b2cam = camref;
 	mdl.camera_controls_enabled=true;
+	mdl.camera_rotate_enabled=true;
+	mdl.camera_move_enabled=true;
 	ctx.mode = Fly;
 	ctx.state = Empty;
 }
@@ -1200,25 +1211,27 @@ void HandleCameraControl() {
 	float ang_per_sec_fine=0.5;
 	point3d movec={0};
 	if (mdl.camera_controls_enabled) {
-
-		Vector2 mouseDelta = GetMouseDelta();
-		if (mouseDelta.x != 0 || mouseDelta.y != 0) {
-			float sensitivity = 0.003f;
-			tr_quat_rotate_on_axis(&b2cam->tr,BBDOWN, -mouseDelta.x * ang_per_sec*GetFrameTime()*-1);
-			tr_quat_rotate_on_axis(&b2cam->tr,b2cam->tr.r, -mouseDelta.y * ang_per_sec*GetFrameTime());
+		if (mdl.camera_rotate_enabled) {
+			Vector2 mouseDelta = GetMouseDelta();
+			if (mouseDelta.x != 0 || mouseDelta.y != 0) {
+				float sensitivity = 0.003f;
+				tr_quat_rotate_on_axis(&b2cam->tr,BBDOWN, -mouseDelta.x * ang_per_sec*GetFrameTime()*-1);
+				tr_quat_rotate_on_axis(&b2cam->tr,b2cam->tr.r, -mouseDelta.y * ang_per_sec*GetFrameTime());
+			}
 		}
+		if (mdl.camera_move_enabled) {
+			float movemag = move_unitspersec*GetFrameTime();
+			if (IsKeyDown(KEY_W))
+				p3_addto(&movec, p3_scalar_mul_of(b2cam->tr.f,movemag));
+			if (IsKeyDown(KEY_S))
+				p3_addto(&movec, p3_scalar_mul_of(b2cam->tr.f,movemag*-1));
+			if (IsKeyDown(KEY_A))
+				p3_addto(&movec, p3_scalar_mul_of(b2cam->tr.r,movemag*-1));
+			if (IsKeyDown(KEY_D))
+				p3_addto(&movec, p3_scalar_mul_of(b2cam->tr.r,movemag));
 
-		float movemag = move_unitspersec*GetFrameTime();
-		if (IsKeyDown(KEY_W))
-			p3_addto(&movec, p3_scalar_mul_of(b2cam->tr.f,movemag));
-		if (IsKeyDown(KEY_S))
-			p3_addto(&movec, p3_scalar_mul_of(b2cam->tr.f,movemag*-1));
-		if (IsKeyDown(KEY_A))
-			p3_addto(&movec, p3_scalar_mul_of(b2cam->tr.r,movemag*-1));
-		if (IsKeyDown(KEY_D))
-			p3_addto(&movec, p3_scalar_mul_of(b2cam->tr.r,movemag));
-
-		p3_addto(&b2cam->tr.p, movec);
+			p3_addto(&b2cam->tr.p, movec);
+		}
 	}
 }
 
@@ -1481,6 +1494,7 @@ void EditorUpdate() {
 		ctx.state.accept();
 		ctx.state = Empty;
 		ctx.op = noop;
+		EditorHudDrawTopInfo("accepted.");
 	}
 }
 
