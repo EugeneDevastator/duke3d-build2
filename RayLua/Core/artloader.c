@@ -10,6 +10,7 @@
 #include <string.h>
 #include "mapcore.h"
 gallery g_gals[16] = {0};
+int galcount = 0;
 tile_t* gtile;
 tile_t* getGtile(int i){return &gtile[i];}
 unsigned char* getGalleryColor(int gal_idx, int color_idx) {
@@ -21,7 +22,7 @@ unsigned char* getColor(int idx) {
 }
 void LoadGalleryPal(int gal_idx, const char* basepath) {
 	if (gal_idx < 0 || gal_idx >= 16) return;
-
+	galcount++;
 	gallery* gal = &g_gals[gal_idx];
 	if (gal->gotpal) return;
 

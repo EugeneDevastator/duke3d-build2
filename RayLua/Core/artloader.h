@@ -50,7 +50,7 @@ typedef struct {
 } gallery;
 
 extern gallery g_gals[16];
-
+extern int galcount;
 static long nullpic [64+1][64]; //Null set icon (image not found)
 static __forceinline unsigned int bsf (unsigned int a) { _asm bsf eax, a }
 static __forceinline unsigned int bsr (unsigned int a) { _asm bsr eax, a }

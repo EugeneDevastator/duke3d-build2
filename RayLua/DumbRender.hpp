@@ -1566,10 +1566,11 @@ static void MoveCamB2( cam_t *b2cam) {
 		for (int i = 0; i < spripoln; i++) {
 			spripoly_t spol = spripol[i];
 			spri_t *spr = &map->spri[spripol[i].sprid];
-			if (spr->tilnum >= 0) // sprites
+			if (spol.tilnum >= 0) // sprites
 			{
-				if (spr->tilnum >= numartiles)
-					spr->tilnum = numartiles - 10;
+				spol.galnum %= galcount;
+				if (spol.tilnum >= g_gals[spol.galnum].gmaltiles)
+					spol.tilnum = 5;
 
 				rlEnableBackfaceCulling();
 				if (spr->view.rflags.is_dblside)

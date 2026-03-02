@@ -493,7 +493,6 @@ bool loadifvalid() {
 
     const char* map_path = __argv[1];
 
-    // Check if path points to .map file
     if (!has_extension(map_path, ".map")) {
         printf("Error: File must have .map extension\n");
         return false;
@@ -504,11 +503,9 @@ bool loadifvalid() {
         return false;
     }
 
-    // Extract directory from map path
     char dir_path[512];
     extract_directory(map_path, dir_path, sizeof(dir_path));
 
-    // Check for palette.dat
     char palette_path[512];
     snprintf(palette_path, sizeof(palette_path), "%s/palette.dat", dir_path);
     if (!file_exists(palette_path)) {
@@ -516,23 +513,24 @@ bool loadifvalid() {
         return false;
     }
 
-    // Check for lookup.dat not needed actually!
-   //char lookup_path[512];
-   //snprintf(lookup_path, sizeof(lookup_path), "%s/lookup.dat", dir_path);
-   //if (!file_exists(lookup_path)) {
-   //    printf("Error: lookup.dat not found in %s\n", dir_path);
-   //    return false;
-   //}
-
-    // Check for at least one tiles*.art file
     if (!check_tiles_art_exists(dir_path)) {
         printf("Error: No tiles*.art files found in %s\n", dir_path);
         return false;
     }
+
+    char gal1_path[512];
+    snprintf(gal1_path, sizeof(gal1_path), "%s/Content/GAL_002_SW/", dir_path);
+
     loadgal(0, dir_path);
+    if (!check_tiles_art_exists(gal1_path)) {
+        printf("Error: No tiles*.art files found in %s\n", gal1_path);
+    }
+    else
+        loadgal(1, gal1_path);
     DumbRender::Init(map_path);
     return true;
 }
+
 
 void SetImguiFonts()
 {
@@ -950,8 +948,7 @@ void MainLoop() {
     EditorSetTileState(&texb);
       if (!loadifvalid()) {
           loadgal(0, "c:/Eugene/Games/build2/");
-          loadgal(1, "c:/Eugene/Games/build2/Content/GAL_002_SW/");
-
+         // loadgal(1, "c:/Eugene/Games/build2/Content/GAL_002_SW/");
           DumbRender::Init("c:/Eugene/Games/build2/prt31.map");
       }
     DumbRender::LoadTexturesToGPU();
