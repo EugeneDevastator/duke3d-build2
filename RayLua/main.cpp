@@ -973,6 +973,20 @@ void MainLoop() {
     showPicker = false;
     DisableCursor();
     while (!WindowShouldClose()) {
+        if (IsKeyDown(KEY_LEFT_ALT) && IsKeyPressed(KEY_ENTER))
+        {
+            if (IsWindowFullscreen())
+            {
+                ToggleFullscreen();
+                SetWindowSize(w, h);
+            }
+            else
+            {
+                int mon = GetCurrentMonitor();
+                SetWindowSize(GetMonitorWidth(mon), GetMonitorHeight(mon));
+                ToggleFullscreen();
+            }
+        }
         float deltaTime = GetFrameTime();
         // Check for window resize
         int currentW = GetScreenWidth();
