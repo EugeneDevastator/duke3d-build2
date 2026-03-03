@@ -38,7 +38,8 @@
 
 #define SURF_PARALLAX_DISCARD (1<<16) // marker for old build style parallax mode.
 
-#define GEO_NO_BUNCHING (1<<1)
+#define GEO_NO_BUNCHING (1<<0)
+#define GEO_EMIT_WITHOUT_CLIPPING (1<<1) // will be clipped by zbuffer.
 
 #define UV_TEXELRATE 		0 // pixel-rated = duke default.
 #define UV_NORMRATE 		1 // tile-rated
@@ -214,7 +215,7 @@ typedef struct {
 	point3d v, av, pcenter;           //Position velocity, Angular velocity (direction=axis, magnitude=vel), center of mass
 	float fat, mas, moi;     //Physics (moi=moment of inertia)
 	uint16_t clipmask; // block, hitscan, trigger, - for physics engine // aka layer
-} physdata;
+} physdata_t;
 // on asset loadin.
 // art collection id + tilenum ==> runtime atlasnum and atlaspos.
 // art collections are separate from mods, and mods depend on their id so match is coincidental!
@@ -222,7 +223,66 @@ typedef struct {
 // inside it resolves into raw array of rgba images.
 // then packed into atlases
 // then lookup tables are made.
-	//Map format:
+
+typedef struct {
+	// store it in two walls - in runtime aggregate for simplicity.
+	// for clearcoat - additional surface material, not universal
+	color4f reflect;
+	color4f transmit;
+	color4f scatter;
+	color4f fresnel_f0; // per-channel, needed for gold/copper accurate curves 	// alpha is lerp parameter.
+	float anisotropy; // -1 to 1, for brushed metals
+	float roughness;
+
+	float pass_fade_bias;   // dstance fade bias
+	float pass_distance_bias;   // dstance fade bias
+	float pass_dir_bias;    // lerp between having light source in original pos, and 1 = purely perpendicular.
+
+	//Specular vs diffuse reflect becomes a roughness question - roughness=0 IS mirror, roughness=1 IS full diffuse. One param, physically correct.
+} surfmat_t;
+
+// ================== CORE MAP FORMAT =======================
+typedef struct // spri_t
+{
+	// ----- FAST DATA --------------
+	union { transform tr; struct { point3d p, r, d, f; }; };
+
+	//long tilnum;             //Model file. Ex:"TILES000.ART|64","CARDBOARD.PNG","CACO.KV6","HAND.KCM","IMP.MD3"
+	union {
+		uint32_t packed_tile_data;
+		struct {
+			uint32_t tilnum : 14;  // 16k tiles
+			uint32_t galnum : 9;   // 512 gals
+			uint32_t pal : 9;      // 512 pals.
+		};
+	};
+	sprview view;
+
+	long sect; //Current sector
+	// to access next or prev sprite in sector of this sprite..
+	// doubly-linked list of indices  inside sprites sector
+	// bounded by -1 on both sides.
+	long sectn, sectp;
+
+	// --------- COLD DATA -----------, probably all move to datablock.
+
+	uint32_t dataptr; // reference to any additional data.
+	uint32_t tguid; // uniq per sprite. automatic.
+	uint16_t gameflags; // difficulty modes, classes, multiplayer? there's a lot.
+	long owner;
+	short lotag, hitag;
+	physdata_t phys;
+	int32_t tags[16];
+
+	uint8_t surfcon; // surf constraint 0,1 = ceil,flor, 3+  = wall id -2
+	//Bit0:Blocking, Bit2:1WayOtherSide, Bit5,Bit4:Face/Wall/Floor/.., Bit6:1side, Bit16:IsLight, Bit17-19:SpotAx(1-6), Bit20-29:SpotWid, Bit31:Invisible
+	long flags;
+	uint8_t modid; // mod id - for game processors, like duke, doom, etc. 0 is reserved for core entities.
+	uint16_t classid; // instead of implicit class recognition by spritenum or pal - use explicit. so for ex. we can just make 3d rpg rocket as prop.
+	uint8_t linkmask; // damage, signal, use, - everything for linking with other communicators
+
+
+} spri_t;
 
 typedef struct // surf_t
 {
@@ -299,47 +359,6 @@ typedef struct // wall t
 
 } wall_t;
 
-typedef struct // spri_t
-{
-	// ----- FAST DATA --------------
-	union { transform tr; struct { point3d p, r, d, f; }; };
-
-	//long tilnum;             //Model file. Ex:"TILES000.ART|64","CARDBOARD.PNG","CACO.KV6","HAND.KCM","IMP.MD3"
-	union {
-		uint32_t packed_tile_data;
-		struct {
-			uint32_t tilnum : 14;  // 16k tiles
-			uint32_t galnum : 9;   // 512 gals
-			uint32_t pal : 9;      // 512 pals.
-		};
-	};
-	sprview view;
-
-	long sect; //Current sector
-	// to access next or prev sprite in sector of this sprite..
-	// doubly-linked list of indices  inside sprites sector
-	// bounded by -1 on both sides.
-	long sectn, sectp;
-
-	// --------- COLD DATA -----------, probably all move to datablock.
-
-	uint32_t dataptr; // reference to any additional data.
-	uint32_t tguid; // uniq per sprite. automatic.
-	long owner;
-	short lotag, hitag;
-	physdata phys;
-	int32_t tags[16];
-	long tim, otim;          //Time (in milliseconds) for animation
-	int8_t walcon; // wall constraint -1 -2 = floor ceil, resolve as 2-wc; -3 = none;
-	//Bit0:Blocking, Bit2:1WayOtherSide, Bit5,Bit4:Face/Wall/Floor/.., Bit6:1side, Bit16:IsLight, Bit17-19:SpotAx(1-6), Bit20-29:SpotWid, Bit31:Invisible
-	long flags;
-	uint8_t modid; // mod id - for game processors, like duke, doom, etc. 0 is reserved for core entities.
-	uint16_t classid; // instead of implicit class recognition by spritenum or pal - use explicit. so for ex. we can just make 3d rpg rocket as prop.
-	uint8_t linkmask; // damage, signal, use, - everything for linking with other communicators
-
-
-} spri_t;
-
 typedef struct
 {
 	// BuildEngine base data
@@ -374,13 +393,13 @@ typedef struct
 typedef struct {
 	long nsect;
 	sect_t* sects;
-	long spriorig; // sprite that denotes origin
-	point3d transform[3]; // pos, rot, scale or fdr
+	long spriorig; // sprite that denotes origin and transform
 	uint8_t kind; // 0 - normal. 1 - inverted. 2- procedural subtract, 3- overlay.
 	// rotation and position transforms.
 	// use some wall as origin, or even sprite.
 } chunk_t;
 
+// todo - check ken's png lib;
 typedef struct {
 	char type[4];
 	uint32_t guid;
@@ -388,6 +407,15 @@ typedef struct {
 	unsigned char *data;
 	uint32_t crc;
 } datablock;
+
+
+// game-dependent. but can have in-engine
+typedef struct {
+	char reltype[3]; // PRT, POS, ROT, UVT,
+	uint32_t guid;
+	uint32_t guid2;
+	uint32_t linkageId;
+} relation;
 
 typedef struct
 {

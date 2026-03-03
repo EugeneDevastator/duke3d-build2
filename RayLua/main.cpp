@@ -948,8 +948,8 @@ void MainLoop() {
     EditorSetTileState(&texb);
       if (!loadifvalid()) {
           loadgal(0, "c:/Eugene/Games/build2/");
-         // loadgal(1, "c:/Eugene/Games/build2/Content/GAL_002_SW/");
-          DumbRender::Init("c:/Eugene/Games/build2/prt31.map");
+          loadgal(1, "c:/Eugene/Games/build2/Content/GAL_002_SW/");
+          DumbRender::Init("c:/Eugene/Games/build2/e3l3.map");
       }
     DumbRender::LoadTexturesToGPU();
     auto map = DumbRender::GetMap();

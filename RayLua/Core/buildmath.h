@@ -26,6 +26,9 @@ typedef struct {
 typedef struct {
 	float x, y, z;
 } point3d;
+typedef struct {
+	float r,g,b,a;
+} color4f;
 
 typedef struct {
 	double x, y, z;
