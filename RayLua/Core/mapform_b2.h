@@ -75,7 +75,7 @@
 // 1024 build units(x,y) correspond to 32 pixels. at 4,4 repeat
 // 8192 z build units correspond to 32 pixels at 8x8 repeat.
 
-#define TAG_COUNT_PER_SECT 16
+#define TAG_COUNT_PER_SECT 32
 
 // placeholders for readability
 // Dont use in main parser!
@@ -89,21 +89,20 @@
 #define TEZ_SLOPE	 (1<<3) // slope or rawz;
 #define TEZ_CLOSEST	 (1<<4) // closest height point instead of arbitrary.
 #define TEZ_FURTHEST (1<<5) // furthest height point instead of arbitrary.
-#define TEZ_WORLDZ1	 (1<<6)
-#define TEZ_WORLD_X	 ((1<<6) | (1<<0))
-#define TEZ_WORLD_Y	 ((1<<6) | (1<<1))
-#define TEZ_WORLD_Z	 ((1<<6) | (1<<2))
+#define TEZ_WORLD_X	 (1<<6)
+#define TEZ_WORLD_Y	 (1<<7)
+#define TEZ_WORLDZ1	 (1<<8)
+#define TEZ_WALL_ORTHO	 (1<<9) // aligned to slope if use slope.
 
-// will only be used for animated entities.
+typedef uint64_t uid_t;  // global unique identifier. classless. storage use only.
+typedef uint16_t surfid_t;  // srface reference; 0,1  = caps; rest is wall index *surf index.
 typedef struct {
-	unsigned int refkind : 4;
-	// 0 = self, 1 = wall, 2 = sprite, 3= projector
-	unsigned int otez : 7; // TEZ flags
-	unsigned int utez : 7;
-	unsigned int vtez : 7;
-	unsigned int ctez : 7; // 4th corner vector C = o + v + c
-
-} procuvgen32_t; // procedural uv data
+	unsigned int otez : 10; // TEZ flags
+	unsigned int utez : 10;
+	unsigned int vtez : 10;
+	unsigned int ctez : 10; // 4th corner vector C = o + v + c
+	unsigned int padding : 24; // 4th corner vector C = o + v + c
+} procuvgen64_t; // procedural uv data
 
 typedef struct {
 	unsigned int is_visible : 1;
@@ -184,23 +183,10 @@ typedef struct {
 	uint16_t flags;
 } surfref;
 
-typedef struct {
-	point3d colorhdr; // this is color block.
-	float multiplier; // additional mul.
-	float maxdist; // distance to stop clipper; 0 = no stop;
-	float distance_fade_bias; // for intensity calc only! 0 = default light.
-	float forward_offset_power; // for lights that are behind wall, sun, etd. real offset = 2^offset
-	point3d spot_angles_deg; // value = degrees.
-	point3d spot_fage_deg; //  0= hard. value = degrees
-	point3d spot_fadepower; // exponent,
-	point3d distance_smear; // for pillar- lights, format unclear. 0 on axis = pillar. so probably per axis multipliers.
-	// more than 1 will result in shrinking, while 0 will produce a pillar.
-	// and would need shader formula fro local, not world axes.
-} lightsource_t;
 
 #define LIGHT_SOURCE_DEFAULT (lightsource_t){BBPONE,1,0,1,0,BBPTLEN(360),BBPZERO,BBPONE}
 
-
+#if 1 // ==================== RUNTIME FORMATS, Editor  ====================
 typedef struct {
 	renderflags32_t rflags;
 	// need some geometry flags for build, like do we skip, emit mask etc. could be better than just transparency.
@@ -233,7 +219,6 @@ typedef struct {
 	color4f fresnel_f0; // per-channel, needed for gold/copper accurate curves 	// alpha is lerp parameter.
 	float anisotropy; // -1 to 1, for brushed metals
 	float roughness;
-
 	float pass_fade_bias;   // dstance fade bias
 	float pass_distance_bias;   // dstance fade bias
 	float pass_dir_bias;    // lerp between having light source in original pos, and 1 = purely perpendicular.
@@ -242,8 +227,41 @@ typedef struct {
 } surfmat_t;
 
 // ================== CORE MAP FORMAT =======================
-typedef struct // spri_t
+typedef struct {
+	uint32_t id;
+	uint32_t type;
+	uint32_t data_offset;   // byte offset into blob
+	uint32_t data_size;
+	uint32_t children_offset; // offset into id array
+	uint32_t n_children;
+} ComponentRecord;
+
+typedef struct { // LIGHT SOURCE STORAGE
+	uid_t id;
+	point3d colorhdr; // this is color block.
+	float multiplier; // additional mul.
+	float maxdist; // distance to stop clipper; 0 = no stop;
+	float distance_fade_bias; // for intensity calc only! 0 = default light.
+	float forward_offset_power; // for lights that are behind wall, sun, etd. real offset = 2^offset
+	point3d spot_angles_deg; // value = degrees.
+	point3d spot_fage_deg; //  0= hard. value = degrees
+	point3d spot_fadepower; // exponent,
+	point3d distance_smear; // for pillar- lights, format unclear. 0 on axis = pillar. so probably per axis multipliers.
+	// more than 1 will result in shrinking, while 0 will produce a pillar.
+	// and would need shader formula fro local, not world axes.
+} lightsource_t;
+
+typedef struct {
+	uid_t id;
+	transform tr;
+	uint32_t secid;
+	uid_t data;
+} entity_stored_t;
+
+typedef struct // SPRITE STORAGE
 {
+	uid_t id;
+	uid_t dataid;
 	// ----- FAST DATA --------------
 	union { transform tr; struct { point3d p, r, d, f; }; };
 
@@ -257,35 +275,33 @@ typedef struct // spri_t
 		};
 	};
 	sprview view;
-
 	long sect; //Current sector
+	short lotag, hitag;
+	physdata_t phys;
+	uint16_t gameflags; // difficulty modes, classes, multiplayer? there's a lot.
+	uint16_t signalmask; // damage, signal, use, - everything for linking with other communicators
+
+	// -------------- RUNTIME DATA
+
+	long owner;
+
 	// to access next or prev sprite in sector of this sprite..
 	// doubly-linked list of indices  inside sprites sector
 	// bounded by -1 on both sides.
 	long sectn, sectp;
 
 	// --------- COLD DATA -----------, probably all move to datablock.
-
-	uint32_t dataptr; // reference to any additional data.
-	uint32_t tguid; // uniq per sprite. automatic.
-	uint16_t gameflags; // difficulty modes, classes, multiplayer? there's a lot.
-	long owner;
-	short lotag, hitag;
-	physdata_t phys;
+	long flags;
 	int32_t tags[16];
-
 	uint8_t surfcon; // surf constraint 0,1 = ceil,flor, 3+  = wall id -2
 	//Bit0:Blocking, Bit2:1WayOtherSide, Bit5,Bit4:Face/Wall/Floor/.., Bit6:1side, Bit16:IsLight, Bit17-19:SpotAx(1-6), Bit20-29:SpotWid, Bit31:Invisible
-	long flags;
-	uint8_t modid; // mod id - for game processors, like duke, doom, etc. 0 is reserved for core entities.
-	uint16_t classid; // instead of implicit class recognition by spritenum or pal - use explicit. so for ex. we can just make 3d rpg rocket as prop.
-	uint8_t linkmask; // damage, signal, use, - everything for linking with other communicators
-
+	//long flags;
 
 } spri_t;
 
 typedef struct // surf_t
 {
+	uid_t id;
 	// TEXTURE PARAMS.
 	union {
 		struct {
@@ -296,12 +312,12 @@ typedef struct // surf_t
 		uint32_t packed_tile_data;
 	};
 	enum fragRenderMode frMode;
-	procuvgen32_t uvgen;
+	procuvgen64_t uvgen;
 	uvform_t uvform;//[9]; // scale xy, pan xy, crop AB, rotation
 
 	//Bit0:Blocking, Bit2:RelativeAlignment, Bit5:1Way, Bit16:IsParallax, Bit17:IsSkybox
 	uint32_t flags;	short lotag, hitag;
-	float alpha;
+	surfmat_t defmat; // default material
 
 // ------------
 	uint8_t reflection_strength;
@@ -322,6 +338,7 @@ typedef struct // surf_t
 
 typedef struct // wall t
 {
+	uid_t id;
 	// HOT DATA
 	union {
 		point2d pos;
@@ -361,6 +378,7 @@ typedef struct // wall t
 
 typedef struct
 {
+	uid_t id;
 	// BuildEngine base data
 	uint32_t dataptr; // reference to any additional data.
 	uint32_t tguid;   // uniq per sect.
@@ -387,10 +405,10 @@ typedef struct
 	uint8_t hintw1,hintw2,hintmode; // wall hints for procedural slope.
 	// first is always used as 2verts w, w+nw, second is just as point
 	// mode is follow 1 follow 2 follow 1+2 or ignore.
-
 } sect_t;
 
 typedef struct {
+	uid_t id;
 	long nsect;
 	sect_t* sects;
 	long spriorig; // sprite that denotes origin and transform
@@ -398,11 +416,122 @@ typedef struct {
 	// rotation and position transforms.
 	// use some wall as origin, or even sprite.
 } chunk_t;
+#endif
+#if 1 // =================================== STORAGE FORMATS ==========================
+typedef struct {
+	int64_t x,y,z; // 1 = 1 mm
+} point64_t;
+
+typedef struct {
+	int16_t r,g,b,a;
+} color_hdr;
+
+typedef struct {
+	point64_t p,r,f,d;
+} transform64_t;
+
+typedef struct {
+	int32_t x,y,z; // 1 = 1 mm
+} point32_t;
+typedef struct {
+	int16_t x,y,z; // 1 = 1 mm
+} point16_t;
+
+typedef struct {
+	int32_t n;
+	point64_t* pts;
+} loop64_t;
+
+typedef struct {
+	// use z for possible volumetric tex impostors
+	point16_t scale;
+	point16_t pan;
+	point16_t cropA;
+	point16_t cropB;
+	point16_t rot; // rot z is for deault uvs
+
+	uint8_t scaling_mode; // fit, use texel density, etc
+	uint8_t mapping_kind; // uv amappings, regular, polar, hex, triang, parallax, etc.
+	uint16_t tile_ordering; // 1 bit = flip, 2 bits = 4 rotations. 3bits X 4n tiles sharing vert. = 12 bits
+} uvform_store; // generic uvform for 2d and 3d volumetric mappings.
+
+// basic info on graphic representation
+typedef struct {
+	uint16_t galnum;
+	uint16_t tilnum;
+	uint8_t pal;
+	color_hdr color;
+	renderflags32_t rflags;
+	geoflags8_t geoflags;
+	uint8_t fragRenderMode;
+	uint8_t vertRenderMode;
+	uint8_t blendMode;
+	uvform_t uvform;
+	procuvgen64_t procuv;
+} surf_store;
+
+typedef struct {
+	uid_t id;
+	uid_t dataptr; // reference to any additional composite data.
+	uint32_t commid; // for entire sector entity.
+
+	transform64_t tr;
+
+	point64_t anchor;
+	surf_store surf;
+	int32_t tags[TAG_COUNT_PER_SECT];
+}sprite_store;
+
+typedef struct {
+	uid_t id;
+	uid_t dataptr; // reference to any additional composite data.
+	uint32_t commid; // for entire sector entity.
+
+	int64_t x,y;
+	uint8_t nsurfs;
+	surf_store *surfs; // top mid bottom; but can store any more.
+	int32_t tags[TAG_COUNT_PER_SECT];
+} wall_store;
+
+typedef struct {
+	uint8_t mode;
+	union {
+		uint8_t a,b,c; // wall ids
+		uid_t sprid;
+	};
+} slopehint_t;
+
+typedef struct{
+	int64_t z;      //ceil&flor height pos.
+	point32_t grad; //ceil&flor grad. grad.x = norm.x/norm.z, grad.y = norm.y/norm.z
+	surf_store surf;  //ceil&flor texture info
+	uint32_t commid; // for surfaces.
+	int64_t nextsec; // innate caps portal sect ref
+	surfid_t nextsurf; // innater portal surf ref.
+	slopehint_t slopehint;
+} cap_t;
+
+typedef struct // SECT STORE
+{
+	uid_t id;
+	uid_t dataptr; // reference to any additional composite data.
+	uint32_t sect_commid; // for entire sector entity.
+
+	uint8_t originvert;
+	cap_t caps[2]; // 0=ceil, 1=floor;
+
+	long n_walls;
+	long n_spris;
+	wall_store *walls;
+	uint32_t *spr_indices;
+	int32_t tags[TAG_COUNT_PER_SECT];
+
+} sect_store;
 
 // todo - check ken's png lib;
 typedef struct {
 	char type[4];
-	uint32_t guid;
+	uid_t guid;
 	uint32_t length;
 	unsigned char *data;
 	uint32_t crc;
@@ -417,6 +546,7 @@ typedef struct {
 	uint32_t linkageId;
 } relation;
 
+#endif
 typedef struct
 {
 	point3d startpos, startrig, startdow, startfor;
@@ -431,4 +561,10 @@ typedef struct
 } mapstate_t;
 
 #define pBREAKSBUNCH .flags & SURF_PARALLAX_DISCARD
+
+
+
+
+
+
 #endif //RAYLIB_LUA_IMGUI_MAPFORM_B2_H
