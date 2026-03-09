@@ -1,11 +1,13 @@
 //
 // Created by omnis on 11/10/2025.
 //
+#ifndef B2_ENGINEAPI_C
+#define B2_ENGINEAPI_C
+
 #include "engineapi.h"
 
-#include <stdlib.h>
-
 #include "mapcore.h"
+
 static mapstate_t *mapref;
 char *inputs;
 float px,py,pz = 0;
@@ -51,7 +53,7 @@ void ForwardEngineUpdate(float dt) {
 
 static void InsertSprite(int sectid, float x, float y, float z) {
     long i = insspri_imp(sectid,x,y,z,mapref);
-    if (mapref->spri[i].tilnum > gmaltiles || mapref->spri[i].tilnum < 0)
+    if ((int)mapref->spri[i].tilnum > gmaltiles || mapref->spri[i].tilnum < 0)
         mapref->spri[i].tilnum = 1;
 }
 
@@ -99,3 +101,4 @@ void InitEngineApi(mapstate_t *map) {
 
 
 }
+#endif

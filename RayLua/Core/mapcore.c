@@ -2,6 +2,7 @@
 #include "mapcore.h"
 
 #include "buildmath.h"
+#include "mapform_duke.h"
 #include "sectmask.h"
 #define USEHEIMAP 1
 #define NOSOUND 1
@@ -726,8 +727,9 @@ void changesprisect_imp (int i, int nsect, mapstate_t *map)
 
 	spr = &map->spri[i];
 	// we skip this unless lights is dynamic.
-	if (spr->flags &  SPRITE_B2_IS_LIGHT)
-		return;
+	//if (spr->flags &  SPRITE_B2_IS_LIGHT)
+	//	return;
+	// replace with lights distance bias
 
 	osect = spr->sect;
 
@@ -751,39 +753,39 @@ void changesprisect_imp (int i, int nsect, mapstate_t *map)
 	spr->sect = nsect;
 }
 
-surf_t makeSurfWall(int w1, int wnex) {
+surf_t init_wall_surf() {
 	surf_t s = {0};
-	s.tilnum=0;
-	s.owal = w1;
-	s.uwal = w1;//wnex; // temp diasble must use relative next wall or not.
-	s.vwal = w1;
-	s.otez = 0;
-	s.utez = 0;
-	s.vtez = TEZ_WORLDZ1;
-	s.alpha=1;
-	s.uvcoords[0] = (point3d){0,0,0};
-	s.uvcoords[1] = (point3d){1,0,0};
-	s.uvcoords[2] = (point3d){0,0,1};
+	s.tilnum = 0;
+	s.uvgen.otez = 0;
+	s.uvgen.utez = TEZ_NW;
+	s.uvgen.vtez = TEZ_WORLDZ1;
+	s.uvgen.ctez = TEZ_WORLDZ1;
+	s.alpha = 1;
+	//makewaluvs(&map->sect[sec], wid, map);
+	s.rt_uvs[0] = (point3d){0,0,0};
+	s.rt_uvs[1] = (point3d){1, 0, 0};
+	s.rt_uvs[2] = (point3d){0, 0, 1};
+	s.rt_uvs[3] = (point3d){1, 0, 1};
 
-	s.uvform[0]=1;
-	s.uvform[1]=1;
-	s.uvform[2]=0;
-	s.uvform[3]=0;
-	s.rsc=8192; // FIX THIS CRAP! its shade
+	s.uvform = UVFORM_DEFAULT;
+	s.rsc = 8192; // FIX THIS CRAP! its shade 8k = full bright
 	return s;
 }
 
-surf_t makeSurfCap() {
-	surf_t s = makeSurfWall(0,1);
-	s.uvcoords[0] = (point3d){0,0,0};
-	s.uvcoords[1] = (point3d){1,0,0};
-	s.uvcoords[2] = (point3d){0,1,0};
+surf_t init_cap_surf() {
+	surf_t s = {0};
+	s.tilnum = 0;
+	s.rt_uvs[0] = (point3d){0,0,0};
+	s.rt_uvs[1] = (point3d){1,0,0};
+	s.rt_uvs[2] = (point3d){0,1,0};
+	s.rt_uvs[3] = (point3d){1,1,0};
+	s.uvform = UVFORM_DEFAULT;
+	s.rsc = 8192; // FIX THIS CRAP! its shade 8k = full bright
 	return s;
 }
-
 
 void makewall(wall_t *w, int8_t wid, int8_t nwid) {
-	w->xsurf[0] = makeSurfWall(wid,nwid);
+	w->xsurf[0] = init_wall_surf();
 	w->xsurf[1]=w->xsurf[0];
 	w->xsurf[2]=w->xsurf[0];
 	w->tags[1]=-1;
@@ -888,7 +890,7 @@ int map_append_sect_from_loop(int nwalls, point2d *coords, float floorz, float h
 	int nsec = map_append_sect(map,0);
 	sect_t *s = &map->sect[nsec];
 	sect_appendwall_loop(s, nwalls, coords, invert);
-	s->surf[0] = makeSurfCap();
+	s->surf[0] = init_cap_surf();
 	s->surf[1] = s->surf[0];
 	s->z[0] = floorz - height;
 	s->z[1] = floorz;
@@ -913,10 +915,10 @@ void makeslabuvform(int surfid, float slabH, wall_t *wal, int dukescales[4], int
 	float px1x = 1.0f/xsize;
 	float px1y = 1.0f/ysize;
 	float ypans_per_px = 256.f/ysize;
-	wal->xsurf[surfid].uvform[0]=scalerx;
-	wal->xsurf[surfid].uvform[1]=scalery;
-	wal->xsurf[surfid].uvform[2]=px1x * dukescales[2];
-	wal->xsurf[surfid].uvform[3]=px1y * (dukescales[3]/ypans_per_px);
+	wal->xsurf[surfid].uvform.scale.x=scalerx;
+	wal->xsurf[surfid].uvform.scale.y=scalery;
+	wal->xsurf[surfid].uvform.pan.x=px1x * dukescales[2];
+	wal->xsurf[surfid].uvform.pan.y=px1y * (dukescales[3]/ypans_per_px);
 
 }
 
@@ -929,8 +931,9 @@ float getzoftez(int tezflags, sect_t *mysec, int thiswall, point2d worldxy, maps
 	//point2d worldxy = tezflags & TEZ_WALNX
 	//	                  ? walnext(mysec, thiswall).pos
 	//	                  : mysec->wall[thiswall].pos;
-	if (tezflags & TEZ_WORLDZ1)
-{		return (tezflags & TEZ_FLOR) ? 1 : -1;}
+	if (tezflags & TEZ_WORLDZ1) {
+		return (tezflags & TEZ_FLOR) ? 1 : -1;
+	}
 
 	sect_t *nsec = &map->sect[mysec->wall[thiswall].ns];
 	sect_t *usedsec = tezflags & TEZ_NS
@@ -971,28 +974,35 @@ float getzoftez(int tezflags, sect_t *mysec, int thiswall, point2d worldxy, maps
 void makewaluvs(sect_t *sect, int wid, mapstate_t *map) {
 	wall_t *w = &sect->wall[wid];
 	surf_t *sur;// = &w->surf;
+	wall_t *nw = &sect->wall[w->n+wid];
 	for (int sl = 0; sl < w->surfn;sl++) {
 		sur = &w->xsurf[sl]; // dope hack to process raw wall surf first.
-		wall_t *usewal = &sect->wall[sur->owal];
-		sur->uvcoords[0] = (point3d) {usewal->x, usewal->y,getzoftez(sur->otez, sect, wid, usewal->pos, map) };
+		wall_t *usewal = (sur->uvgen.otez & TEZ_NW) ? nw : w;
+		sur->rt_uvs[0] = (point3d) {usewal->x, usewal->y,getzoftez(sur->uvgen.otez, sect, wid, usewal->pos, map) };
 
-		usewal = &sect->wall[sur->uwal];
-		sur->uvcoords[1] = (point3d) {usewal->x,usewal->y,getzoftez(sur->utez, sect, wid, usewal->pos, map) };
+		usewal = (sur->uvgen.utez & TEZ_NW) ? nw : w;
+		sur->rt_uvs[1] = (point3d) {usewal->x,usewal->y,getzoftez(sur->uvgen.utez, sect, wid, usewal->pos, map) };
+		// store local
+		sur->rt_uvs[1]= p3_diff(sur->rt_uvs[1],sur->rt_uvs[0]);
 
-		usewal = &sect->wall[sur->vwal];
-		float z = getzoftez(sur->vtez, sect, wid, usewal->pos, map);
-		if (sur->vtez & TEZ_WORLDZ1)
-			z+=sur->uvcoords[0].z;
-		sur->uvcoords[2] = (point3d) {usewal->x,usewal->y,z };
+		usewal = (sur->uvgen.vtez & TEZ_NW) ? nw : w;
+		float z = getzoftez(sur->uvgen.vtez, sect, wid, usewal->pos, map);
+		if (sur->uvgen.vtez & TEZ_WORLDZ1)
+			z+=sur->rt_uvs[0].z;
+		sur->rt_uvs[2] = (point3d) {usewal->x,usewal->y,z };
+		sur->rt_uvs[2]= p3_diff(sur->rt_uvs[2],sur->rt_uvs[0]);
 
-		if (sur->vtez & TEZ_INVZ) {
-			float dz = sur->uvcoords[2].z-sur->uvcoords[0].z;
-			sur->uvcoords[2].z = -dz + sur->uvcoords[0].z;
-		}
+		sur->rt_uvs[3] = p3_sum(sur->rt_uvs[1],sur->rt_uvs[2]); // corner
+
+
+		//if (sur->uvgen.vtez & TEZ_INVZ) {
+		//	float dz = sur->rt_uvs[2].z-sur->rt_uvs[0].z;
+		//	sur->rt_uvs[2].z = -dz + sur->rt_uvs[0].z;
+		//}
 
 	}
 
-}
+}// sec
 void makesecuvs(sect_t *sect, mapstate_t *map) {
 	wall_t *w = &sect->wall[0];
 	point2d wp = w->pos;
@@ -1002,73 +1012,81 @@ void makesecuvs(sect_t *sect, mapstate_t *map) {
 		surf_t *sur = &sect->surf[fl];
 		float xmul,ymul;
 		if ((sect->mflags[fl] &SECTOR_SWAP_XY)) {
-			 xmul = sur->uvform[1];
-			 ymul = sur->uvform[0];
+			 xmul = sur->uvform.scale.y;
+			 ymul = sur->uvform.scale.x;
 		}else
 			{
-			xmul = sur->uvform[0];
-			ymul = sur->uvform[1];
+			xmul = sur->uvform.scale.x;
+			ymul = sur->uvform.scale.y;
 		}
 
-		float xpan = sur->uvform[2];
-		float ypan = sur->uvform[3];
+		float xpan = sur->uvform.pan.x;
+		float ypan = sur->uvform.pan.y;
 
 
 		ymul *= -1; // world x-flipped
 
 float scaler=1;
-		if (sur->uvmapkind == UV_WORLDXY) {
+		if (sur->uvform.mapping_kind == UV_WORLDXY) {
 			scaler = (sect->mflags[fl] & SECTOR_EXPAND_TEXTURE) ? 1 : 2;
-			sur->uvcoords[0] = (point3d){0, 0, z};
-			sur->uvcoords[1] = (point3d){xmul*scaler, 0, z};
-			sur->uvcoords[2] = (point3d){0, ymul*scaler, z};
-			sur->uvform[0] = 1;
-			sur->uvform[1] = 1;
-		} else if (sur->uvmapkind == UV_TEXELRATE) { //
+			sur->rt_uvs[0] = (point3d){0, 0, z};
+			sur->rt_uvs[1] = (point3d){xmul*scaler, 0, z};
+			sur->rt_uvs[2] = (point3d){0, ymul*scaler, z};
+			sur->uvform.scale.x = 1;
+			sur->uvform.scale.y = 1;
+		} else if (sur->uvform.mapping_kind == UV_TEXELRATE) { //
 			scaler = (sect->mflags[fl] & SECTOR_EXPAND_TEXTURE) ?  2 : 1;
 			point2d nwp = walnext(sect, 0).pos;
-			sur->uvcoords[0] = (point3d){wp.x, wp.y, z};
+			sur->rt_uvs[0] = (point3d){wp.x, wp.y, z};
 			point3d uvec = (point3d){nwp.x, nwp.y, z};
 			// get ortho to wall,
-			point3d normU = subtract(uvec, sur->uvcoords[0]);
-			normU = normalizep3(normU);
-			sur->uvcoords[1] = normU;
-			addto(&sur->uvcoords[1], sur->uvcoords[0]);
+			point3d normU = p3_diff(uvec, sur->rt_uvs[0]);
+			normU = p3_normalized(normU);
+			sur->rt_uvs[1] = normU;
+			p3_addto(&sur->rt_uvs[1], sur->rt_uvs[0]);
 
-			rot90cwz(&normU);
+			p3_rot90_cwz(&normU);
 			// get sloped Z and normalize;
-			float vz = getslopez(sect, fl, normU.x+sur->uvcoords[0].x, normU.y+sur->uvcoords[0].y);
+			float vz = getslopez(sect, fl, normU.x+sur->rt_uvs[0].x, normU.y+sur->rt_uvs[0].y);
 			normU.z = vz-z;
-			normU = normalizep3(normU);
+			normU = p3_normalized(normU);
 
-			sur->uvcoords[2] = normU;
-			addto(&sur->uvcoords[2], sur->uvcoords[0]);
+			sur->rt_uvs[2] = normU;
+			p3_addto(&sur->rt_uvs[2], sur->rt_uvs[0]);
 
-			sur->uvform[0] = xmul * scaler;
-			sur->uvform[1] = ymul * scaler;
+			sur->uvform.scale.x = xmul * scaler;
+			sur->uvform.scale.y = ymul * scaler;
 		}
 
 
-		if ((sect->mflags[fl] & SECTOR_FLIP_X)) sur->uvform[0] *= -1;
-		if ((sect->mflags[fl] & SECTOR_FLIP_Y)) sur->uvform[1] *= -1;
+		if ((sect->mflags[fl] & SECTOR_FLIP_X)) sur->uvform.scale.x *= -1;
+		if ((sect->mflags[fl] & SECTOR_FLIP_Y)) sur->uvform.scale.y *= -1;
 		if (sect->mflags[fl] & SECTOR_SWAP_XY) {
 			if (((sect->mflags[fl] & SECTOR_FLIP_X) != 0) != ((sect->mflags[fl] & SECTOR_FLIP_Y) != 0)) {
-				sur->uvform[0] *= -1;
-				sur->uvform[1] *= -1;
+				sur->uvform.scale.x *= -1;
+				sur->uvform.scale.y *= -1;
 			}
 			float t;
-			t = sur->uvform[0];
-			sur->uvform[0] = sur->uvform[1];
-			sur->uvform[1] = t;
+			t = sur->uvform.scale.x;
+			sur->uvform.scale.x = sur->uvform.scale.y;
+			sur->uvform.scale.y = t;
 			// duh probably thats how duke works - pan is not swapped.
-			//	t = sur->uvform[2];
-			//	sur->uvform[2] = sur->uvform[3];
-			//	sur->uvform[3] = t;
+			//	t = sur->uvform.pan.x;
+			//	sur->uvform.pan.x = sur->uvform.pan.y;
+			//	sur->uvform.pan.y = t;
 
-			point3d tp = sur->uvcoords[1];
-			sur->uvcoords[1] = sur->uvcoords[2];
-			sur->uvcoords[2] = tp;
+			// swap
+			point3d tp = sur->rt_uvs[1];
+			sur->rt_uvs[1] = sur->rt_uvs[2];
+			sur->rt_uvs[2] = tp;
 		}
+
+		point3d localv = p3_diff(sur->rt_uvs[2],sur->rt_uvs[0]);
+		sur->rt_uvs[3] = p3_sum(sur->rt_uvs[1],localv); // corner
+
+		p3_sub_to(&sur->rt_uvs[1],sur->rt_uvs[0]);
+		p3_sub_to(&sur->rt_uvs[2],sur->rt_uvs[0]);
+		p3_sub_to(&sur->rt_uvs[3],sur->rt_uvs[0]);
 	}
 }
 
@@ -1348,16 +1366,20 @@ int insideloop(double x, double y, wall_t *wal) {
 	} while (idxsum != 0);
 	return(c&1);
 }
-int updatesect_portmove(transform *tr, int *cursect, mapstate_t *map) {
-	point3d* pos = &tr->p;
+
+int updatesect_portmove(transform *tr, int *cursect, int validsec, mapstate_t *map) {
+	point3d *pos = &tr->p;
 	long s = *cursect;
 	sect_t *sec = map->sect;
-	if (s>=0 && (map->sect[s].destpn[0]>=0 || map->sect[s].destpn[1] >= 0)) {
+	bool isinside = s >= 0 && insidesect(pos->x, pos->y, sec[s].wall, sec[s].n);
+	bool scanwall = !isinside && *cursect != validsec;
+	bool hascapport = (map->sect[s].destpn[0] >= 0 || map->sect[s].destpn[1] >= 0);
+	if (isinside && hascapport) {
+		// if we are inside sect by 2d scan then can check caps for portal
 
-		if (insidesect(pos->x, pos->y, sec[s].wall, sec[s].n)) {
 			for (int j = 0; j < 2; j++) {
 				if (sec[s].destpn[j] > -1) {
-					float h = getslopez(&sec[s], j, pos->x, pos->y);
+					float h = (float)getslopez(&sec[s], j, pos->x, pos->y);
 					bool crossed = 0;
 					if (!j)
 						crossed = h > pos->z;
@@ -1365,20 +1387,40 @@ int updatesect_portmove(transform *tr, int *cursect, mapstate_t *map) {
 						crossed = h < pos->z;
 
 					if (crossed) {
-						int d = sec[s].destpn[j];
-						int ow = portals[d].destpn;
+						uint32_t d = sec[s].destpn[j];
+						uint32_t ow = portals[d].destpn;
 						*cursect = portals[d].sect;
 
-						//wccw_transform_trp(pos, &map->spri[portals[ow].anchorspri].tr,
-						//                   &map->spri[portals[d].anchorspri].tr);
-						wccw_transform_full(tr, &map->spri[portals[ow].anchorspri].tr,
-										   &map->spri[portals[d].anchorspri].tr);
+						tr_transfrom_wccw(tr, map->spri[portals[ow].anchorspri].tr,
+										  map->spri[portals[d].anchorspri].tr);
 						return 1;
 					}
 				}
 			}
+
+		// else check walls, since we are not in same sec.
+	} else // scan wall otherwise
+		if (scanwall) {
+			s = validsec;
+			int minwal = -1;
+			float dmin = 100;
+			for (int i = 0; i < sec[s].n; i++) {
+				float d = distpos2wal(tr->p, sec[s].wall, i);
+				if (d < dmin) {
+					dmin = d;
+					minwal = i;
+				}
+			}
+			int portal = sec[s].wall[minwal].tags[1];
+			if (portal >= 0) {
+				uint32_t destpt = portals[portal].destpn;
+				*cursect = portals[destpt].sect;
+
+				tr_transfrom_wccw(tr, map->spri[portals[portal].anchorspri].tr,
+				                  map->spri[portals[destpt].anchorspri].tr);
+				return 1;
+			}
 		}
-	}
 	return 0;
 }
 // regenerates innate portal chain for touching walls.
@@ -1445,8 +1487,8 @@ void spritemakedefault(spri_t *spr) {
 	spr->phys.fat = .5; spr->phys.mas = spr->phys.moi = 1.0;
 	spr->tilnum=1;
 	spr->view.anchor=(point3d){0.5,0.5,0.5};
-	spr->view.uv[0]=1;
-	spr->view.uv[1]=1;
+	spr->view.uv = (uvform_t){0};
+	spr->view.uv.scale=(point3d){1,1,1};
 	spr->owner = -1; spr->flags = 0;
 }
 
@@ -1787,8 +1829,9 @@ static void map_sect_translate_raw(int s, point3d offset, mapstate_t *map) {
 }
 static int sect_translate_border_s;
 // HELPER
+sectmask_t *mask1;
 static void map_sect_translate_recurse(int s_toscan, point3d offset, mapstate_t * map) {
-	sectmask_mark_sector((s_toscan+1)*1000);
+	sectmask_mark_sector(mask1,(s_toscan+1)*1000);
 	map_sect_translate_raw(s_toscan, offset,map);
 
 	int walln= map->sect[s_toscan].n;
@@ -1807,21 +1850,23 @@ static void map_sect_translate_recurse(int s_toscan, point3d offset, mapstate_t 
 			if (nsc<0)
 				break;
 			if (nsc == sect_translate_border_s) {
-				if (!sectmask_was_marked(nwc)) {
-					sectmask_mark_sector(nwc);
+			// using sectmask 0-1000 for walls of block sector.
+				if (!sectmask_was_marked(mask1,nwc)) {
+					sectmask_mark_sector(mask1,nwc);
 					map->sect[nsc].wall[nwc].pos.x += offset.x;
 					map->sect[nsc].wall[nwc].pos.y += offset.y;
 				}
 				// and we also need to move all verts here, not just nextwal.
 				int nexwid = map->sect[nsc].wall[nwc].n +nwc;
 				{
-					if (!sectmask_was_marked(nexwid))
-						sectmask_mark_sector(nexwid);
+					if (!sectmask_was_marked(mask1,nexwid))
+						sectmask_mark_sector(mask1,nexwid);
 					map->sect[nsc].wall[nexwid].pos.x += offset.x;
 					map->sect[nsc].wall[nexwid].pos.y += offset.y;
+					// here we must scan this wall as well i trhink.
 				}
 			}
-			else if (!sectmask_was_marked((nsc+1)*1000)) {
+			else if (!sectmask_was_marked(mask1,(nsc+1)*1000)) {
 				map_sect_translate_recurse(nsc, offset, map);
 			}
 			wall_t *wall = &map->sect[nsc].wall[nwc];
@@ -1833,13 +1878,18 @@ static void map_sect_translate_recurse(int s_toscan, point3d offset, mapstate_t 
 }
 
 void map_sect_translate(int s_start, int outer_ignore, point3d offset, mapstate_t *map) {
-	sectmask_reset();
-	sectmask_mark_sector((outer_ignore+1)*1000);
+	// problem - sectror inside split-space.
+	// we must move only it, its internals and connecting walls,
+	// find sector's outermost loop (enclosing one)
+	// for and make loop-move operation, which will ONLY translate loop verts.
+	// for outer loops we never scan touching sectors, only touching wall chains.
+	// for every opening wall - also move nextwall if it's ns == -1
+	sectmask_t *mask1 = sectmask_create();
+	sectmask_destroy(mask1);
+	sectmask_mark_sector(mask1,(outer_ignore+1)*1000);
 	sect_t *sectr = &map->sect[s_start];
 	sect_translate_border_s = outer_ignore;
 	map_sect_translate_recurse(s_start, offset,map);
-
-
 }
 
 // non destructive loop, but will produce incorrect state due to double pointing.
@@ -1854,6 +1904,7 @@ int map_loop_append_by_info(loopinfo lp, int new_sector, point2d offset, mapstat
 	return tsect_wall_start;
 }
 #endif
+
 // destructive for sector of the moved loop.
 int map_loop_move_by_info(loopinfo lp, int new_sector, point2d offset, mapstate_t *map) {
 	int new_loop_start = map_loop_append_by_info(lp, new_sector, offset, map);
@@ -1905,23 +1956,6 @@ int map_sect_chip_off_loop(int orig_sectid, int walmove, int wallretain, mapstat
 
 	// Determine which loop is smaller (inner loop)
 	int chip_wall_id = walmove;
-
-	// no need
-	// before we do anything we must remap retained walls to point to new sector.
-//wall_t *wcur = &map->sect[orig_sectid].wall[wallretain];
-//int idxsum = 0;
-//do {
-//	if (wcur->ns == orig_sectid || wcur->nschain == orig_sectid) {
-//		wcur->ns = new_sect_id;
-//		wcur->nschain = new_sect_id;
-//	}
-//	else {
-//		// also repoint other sectors to new sector.
-//		map_wall_chain_rename(wcur,orig_sectid,orig_sectid,wallretain+idxsum,new_sect_id,wallretain+idxsum,map);
-//	}
-//	idxsum += wcur->n;
-//	wcur = wcur+wcur->n;
-//} while (idxsum != 0);
 
 	// opy-relocate loop to new sector. and then build it as we go.
 	map_loop_copy_and_remap(new_sect_id,orig_sectid,walmove,map);

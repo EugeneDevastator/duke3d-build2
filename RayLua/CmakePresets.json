@@ -2,8 +2,8 @@
   "version": 3,
   "configurePresets": [
     {
-      "name": "win32-default",
-      "displayName": "RayLua Win32 Build",
+      "name": "win32-base",
+      "hidden": true,
       "generator": "Visual Studio 17 2022",
       "architecture": "Win32",
       "cacheVariables": {
@@ -13,16 +13,39 @@
         "jetbrains.com/clion": {
           "toolchain": "Visual Studio"
         }
-      },
+      }
+    },
+    {
+      "name": "win32-release",
+      "inherits": "win32-base",
+      "displayName": "RayLua Win32 Release",
+      "binaryDir": "${sourceDir}/bin"
+    },
+    {
+      "name": "win32-debug",
+      "inherits": "win32-base",
+      "displayName": "RayLua Win32 Debug",
       "binaryDir": "${sourceDir}/bin"
     }
   ],
   "buildPresets": [
     {
       "name": "win32-release",
-      "displayName": "RayLua Win32 Buildpres",
-      "configurePreset": "win32-default",
+      "displayName": "RayLua Win32 Release Build",
+      "configurePreset": "win32-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "win32-rel-deb",
+      "displayName": "RayLua Win32 RelDeb Build",
+      "configurePreset": "win32-release",
       "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "win32-debug",
+      "displayName": "RayLua Win32 Debug Build",
+      "configurePreset": "win32-debug",
+      "configuration": "Debug"
     }
   ]
 }

@@ -15,6 +15,7 @@
 #define BUILD2_MONOCLIP_H
 
 #include "mapcore.h"
+#include "buildmath.h"
 
 #define MONO_BOOL_AND 0 // result is intersection
 #define MONO_BOOL_SUB 1
@@ -26,20 +27,36 @@ typedef struct {
 } triangle_strip_t;
 
 
-//Mono Polygon Head
-typedef struct {
-	int head[2], tag;
-} mph_t;
+#define MPH_GEO 0
+#define MPH_SHADE 2
+/* monoclip.h additions */
+typedef unsigned int mphandle_t;  /* (gen<<16)|index */
 
 //Mono Polygon (vertex data)
 typedef struct {
 	union {
 		dpoint3d pos;
-		struct {double x, y, z;};
+
+		struct {
+			double x, y, z;
+		};
 	};
 
-	int n, p;  // next, previous indices for doubly-linked list
+	int n, p; /* raw indices, internal only */
+	uint16_t gen; /* generation counter */
 } mp_t;
+//Mono Polygon Head
+typedef struct {
+	mphandle_t head[2];
+	uint32_t tag;
+	uint8_t semantic; //
+} mph_t;
+
+#define MP_NULL 0xFFFFFFFF
+#define MP_IDX(h)  ((h) & 0xFFFF)
+#define MP_GEN(h)  ((h) >> 16)
+#define MP_VALID(h) ((h) != MP_NULL && MP_IDX(h) < mpmal && mp[MP_IDX(h)].gen == MP_GEN(h))
+
 
 // ================================================================================================
 // POLYGONAL SCENE CLIPPING DATA STRUCTURES
@@ -91,15 +108,16 @@ typedef struct {
 	unsigned int *sectgot, *sectgotmal;        // Visited sectors per level
 	int sectgotn;
 	int entrysec;
+	transform world_transform;
 	// mono context
 	bool has_mono_out; // Whether portal clipping is active
 	// transform context
 	// normalized camera used for clipping
-	cam_t cam;                    // Camera per recursion level
 // true portaled camera used for movements
 	cam_t movedcam;
-	cam_t prevcam;                    // Camera per recursion level
- 	cam_t orcam; // one true camera, read only.
+ 	cam_t orcam; // one true camera, read only, cannot be mirrored transform.
+	// only oricam xform.
+	// we need xformmat for current frame for bunching!
 	double xformmat[9], xformmatc, xformmats;
 	double oxformmat[9], oxformmatc, oxformmats;
 	point3d gnadd, ognadd;
@@ -107,12 +125,13 @@ typedef struct {
 	float gouvmat[9]; // 0 3 6 - store plane equation to convert back from monoplane.
 	int gligsect, gligwall, gligslab, gflags, gisflor;
 	int gnewtag, gdoscansector, gnewtagsect;
+	uint8_t gmonosemantic;
 	// n-portals context
 	bool has_portal_clip; // Whether portal clipping is active
 	bool ismirrored;
 	bool istrimirror;
 	int recursion_depth;
-	int tagoffset;
+	uint32_t tagoffset;
 	int testignorewall;
 	int ignorekind;
 	int testignoresec;
@@ -201,15 +220,14 @@ int mono_join (int hd0, int hd1, int hd2, int hd3, int *ho0, int *ho1);
 // Perform boolean operation on two polygon pairs (AND, SUB, SUB_REV)
 // re
 void mono_bool (int subjh0, int subjh1, int cutter0, int cutter1, int boolop, bdrawctx* b, void (*mono_output)(int h0, int h1,bdrawctx* b));
-// Generate triangle strip vertices directly from monotone polygon
-int mono_generate_eyepol(int hd0, int hd1, point3d **out_verts1,  point3d **out_verts2, int *out_count1, int *out_count2);
+
 // adds mono to mph directly
 
 // registers loop into mono heads with tag
-int mph_appendloop(int *outh1, int *outh2, dpoint3d *tp, int n, int newtag);
+int mph_appendloop(int *outh1, int *outh2, dpoint3d *tp, int n, int newtag, int semantic);
 // removes mph and points from mph list.
 int mph_remove(int delid);
-int mph_append( int h1, int h2, int tag);
+int mph_append(int h1, int h2, int tag, uint8_t semantic);
 
 
 int mpcheck(int h1,int h2);
@@ -217,4 +235,7 @@ int mphremoveontag(int tag);
 int mphremoveaboveincl(int tag_including);
 void monocopy(int h1, int h2, int *hout1, int *hout2);
 
+void mono_deloop_safe(mphandle_t start_handle);
+
+void mp_reset_pool();
 #endif //BUILD2_MONOCLIP_H

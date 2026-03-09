@@ -8,6 +8,7 @@ add_executable(RayGame
         MonoTest.hpp
         DumbEdit.hpp
         Editor/uimodels.h
+        Core/rendertypes.h
 
 )
 

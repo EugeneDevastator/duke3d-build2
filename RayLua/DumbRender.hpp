@@ -89,17 +89,121 @@ player_transform plr = {};
 static Shader uvShader_plain;
 static UVShaderDesc uvShaderDesc;
 static Shader lightShader;
+static Shader atestShader;
 static Shader skyShader;
 static int lightPosLoc;
+static int lightForLoc;
 static int lightRangeLoc;
+static int lightIntenseLoc;
 static bool syncam = true;
 static int cureyepoly = 0;
 static int mono_cursnap = 0;
 static int mono_curchain = 0;
-static cam_t localb2cam;
+static int validsec  =0;
 static Texture2D* galtextures[16];
 class DumbRender {
 public:
+
+	// ===================== HELPERS
+	// tries to align to camera vertical plane
+	static void EnterPlaneBoardSpace(Vector3 origin, Vector3 verticalAxis, Camera3D cam) {
+		// Normalize vertical axis
+		float axisLen = Vector3Length(verticalAxis);
+		if (axisLen < 0.001f) return;
+		Vector3 axis = Vector3Normalize(verticalAxis);
+
+		// Get camera's forward direction (normalized) and flip it
+		Vector3 camForward = Vector3Subtract(cam.position, cam.target);
+		camForward = Vector3Normalize(camForward);
+
+		// Project camera forward onto plane perpendicular to axis
+		float dot = Vector3DotProduct(camForward, axis);
+		Vector3 camForwardProjected = Vector3Subtract(camForward, Vector3Scale(axis, dot));
+		float projLen = Vector3Length(camForwardProjected);
+
+		Vector3 right;
+		Vector3 facing;
+
+		if (projLen < 0.001f) {
+			// Camera forward aligned with axis, use fallback
+			Vector3 up = {0, 1, 0};
+			if (fabsf(Vector3DotProduct(axis, up)) > 0.99f) {
+				up = {1, 0, 0};
+			}
+			right = Vector3CrossProduct(axis, up);
+			right = Vector3Normalize(right);
+			facing = Vector3CrossProduct(right, axis);
+		} else {
+			facing = Vector3Normalize(camForwardProjected);
+			right = Vector3CrossProduct(facing, axis);
+			right = Vector3Normalize(right);
+		}
+
+		// Build transformation matrix (column-major)
+		// Local space: X = right, Y = axis (vertical), Z = facing
+		Matrix transform = {
+			-right.x, axis.x, facing.x, origin.x,
+			-right.y, axis.y, facing.y, origin.y,
+			-right.z, axis.z, facing.z, origin.z,
+			0, 0, 0, 1
+		};
+
+		rlPushMatrix();
+		rlMultMatrixf(MatrixToFloat(transform));
+	}
+
+	static void EnterCylBoardSpace(Vector3 origin, Vector3 verticalAxis, Camera3D cam) {
+		// Normalize vertical axis
+		float axisLen = Vector3Length(verticalAxis);
+		if (axisLen < 0.001f) return;
+		Vector3 axis = Vector3Normalize(verticalAxis);
+
+		// Get direction from origin to camera
+		Vector3 toCamera = Vector3Subtract(cam.position, origin);
+
+		// Project toCamera onto plane perpendicular to axis
+		float dot = Vector3DotProduct(toCamera, axis);
+		Vector3 toCameraProjected = Vector3Subtract(toCamera, Vector3Scale(axis, dot));
+		float projLen = Vector3Length(toCameraProjected);
+
+		Vector3 right;
+		Vector3 facing;
+
+		if (projLen < 0.001f) {
+			// Camera aligned with axis, use fallback
+			Vector3 up = {0, 1, 0};
+			if (fabsf(Vector3DotProduct(axis, up)) > 0.99f) {
+				up = {1, 0, 0};
+			}
+			right = Vector3CrossProduct(axis, up);
+			right = Vector3Normalize(right);
+			facing = Vector3CrossProduct(right, axis);
+		} else {
+			facing = Vector3Normalize(toCameraProjected);
+			right = Vector3CrossProduct(axis, facing);
+			right = Vector3Normalize(right);
+		}
+
+		// Build transformation matrix (column-major)
+		// Local space: X = right, Y = axis (vertical), Z = facing (toward camera)
+		Matrix transform = {
+			right.x, axis.x, facing.x, origin.x,
+			right.y, axis.y, facing.y, origin.y,
+			right.z, axis.z, facing.z, origin.z,
+			0, 0, 0, 1
+		};
+
+		rlPushMatrix();
+		rlMultMatrixf(MatrixToFloat(transform));
+	}
+
+	static void ExitCylBoardSpace(void) {
+		rlPopMatrix();
+	}
+
+	// ===================================================
+
+
 	inline static Texture2D* galtextures[16] = {nullptr};
 	static mapstate_t *GetMap() {
 		return map;
@@ -138,9 +242,12 @@ public:
 		LoadUVShader();
 		lightShader = LoadShader("Shaders/light.vert", "Shaders/light.frag");
 		skyShader = LoadShader("Shaders/skyparallax.vert", "Shaders/skyparallax.frag");
+		atestShader = LoadShader(NULL, "Shaders/atest.frag");
 
 		lightPosLoc = GetShaderLocation(lightShader, "lightPosition");
+		lightForLoc = GetShaderLocation(lightShader, "lightForwardVec");
 		lightRangeLoc = GetShaderLocation(lightShader, "lightRange");
+		lightIntenseLoc = GetShaderLocation(lightShader, "lightIntensity");
 		char *lastSlash;
 		// Extract root path from full map path
 		strcpy_s(rootpath, fullmappath);
@@ -262,35 +369,50 @@ public:
 					//  point3d newr = spr->tr.r;
 					//   point3d newd = spr->tr.r;
 					//   point3d newr = spr->tr.d;
-					//   vscalar(&newd,-1.0f);
+					//   p3_scalar_mul(&newd,-1.0f);
 					//   spr->tr.d = newd;
 					//   spr->tr.r = newr;
-					//  vscalar(&spr->tr.f,-1.0f);
-					//  normalize_transform(&spr->tr);
+					//  p3_scalar_mul(&spr->tr.f,-1.0f);
+					//  tr_normalize(&spr->tr);
 					p.destpn = map->sect[i].surf[1].hitag;
 					map->sect[i].tags[1] = portaln;
 					portaln++;
 				}
 		}
 
+		// for light portals i also need flag to 'reflect light on surfaces!
+		// and store sector and portal space?
+
 		for (int i = 0; i < portaln; i++) {
 			// portal post pass
 			uint32_t target_tag = portals[i].destpn; // currently stores expected hitag
 			portals[i].destpn = -1; // mark as unresolved
 			spri_t *spr = &map->spri[portals[i].anchorspri];
-			normalize_transform(&spr->tr);
+			tr_normalize(&spr->tr);
 
 			if (portals[i].id == target_tag) {
 				// handle mirrors.
 				portal &pcop = portals[portaln];
 				memcpy(&pcop, &portals[i], sizeof(portal));
 				int hspr = map->sect[pcop.sect].headspri;
+				if (hspr<0) {
+					// invalid portal.
+				}
 				int nextsp = map->spri[hspr].sectn;
 				if (nextsp < 0) printf("mirror with just one sprite detected! ERROR!");
 				if (pcop.kind != PORT_WALL) // temp floor mirror hack
 				{
 					map->spri[nextsp].tr = map->spri[hspr].tr;
-					vscalar(&map->spri[nextsp].tr.d, -1);
+					p3_scalar_mul(&map->spri[nextsp].tr.d, -1);
+					//p3_scalar_mul(&map->spri[nextsp].tr.r, -1);
+				}
+				else {
+//wall mirror
+						map->spri[nextsp].tr = map->spri[hspr].tr;
+						//p3_scalar_mul(&map->spri[nextsp].tr.d, -1);
+						//p3_scalar_mul(&map->spri[nextsp].tr.r, -1);
+						p3_scalar_mul(&map->spri[nextsp].tr.f, -1);
+
 				}
 				pcop.anchorspri = nextsp;
 				pcop.destpn = i;
@@ -354,10 +476,10 @@ public:
 
 	// Updated floor mesh generation with slopes
 	static void InitMapstateTex(void) {
-		plr.ipos = map->startpos;
-		plr.ifor = map->startfor;
-		plr.irig = map->startrig;
-		plr.idow = map->startdow;
+		plr.tr.p = map->startpos;
+		plr.tr.f = map->startfor;
+		plr.tr.r = map->startrig;
+		plr.tr.d = map->startdow;
 		plr.cursect = map->startsectn;
 
 		plr.grdc.x = 0;
@@ -486,45 +608,8 @@ public:
 		cam->h.y = playr->ghy;
 		cam->h.z = playr->ghz;
 
+		cam->cursect = playr->cursect;
 
-		// cam.c = cc->c; cam.z = cc->z;
-
-		cam->c.x = sw;
-		cam->c.y = sh;
-		cam->z.x = sw;
-		cam->z.y = sh;
-
-		if (false) //((!useLights) || (gdps->cursect < 0))
-		{
-			cam->r.x = 1.f;
-			cam->r.y = 0.f;
-			cam->r.z = 0.f;
-			cam->d.x = 0.f;
-			cam->d.y = 1.f;
-			cam->d.z = 0.f;
-			cam->f.x = 0.f;
-			cam->f.y = 0.f;
-			cam->f.z = 1.f;
-			cam->p.x = 0.f;
-			cam->p.y = 0.f;
-			cam->p.z = 0.f;
-			//	drawkv6_numlights = -1;
-			//	drawview(&cam,gdps,0);
-		} else {
-			cam->r.x = playr->irig.x;
-			cam->r.y = playr->irig.y;
-			cam->r.z = playr->irig.z;
-			cam->d.x = playr->idow.x;
-			cam->d.y = playr->idow.y;
-			cam->d.z = playr->idow.z;
-			cam->f.x = playr->ifor.x;
-			cam->f.y = playr->ifor.y;
-			cam->f.z = playr->ifor.z;
-			cam->p.x = playr->ipos.x;
-			cam->p.y = playr->ipos.y;
-			cam->p.z = playr->ipos.z;
-			cam->cursect = playr->cursect;
-		}
 
 		// Main render scope
 		shadowtest2_useshadows = 1; //b2opts.shadows;
@@ -536,6 +621,7 @@ public:
 				shadowtest2_light[shadowtest2_numlights].sect = map->spri[map->light_spri[i]].sect;
 				shadowtest2_light[shadowtest2_numlights].ligspri = i;
 				shadowtest2_light[shadowtest2_numlights].p = map->spri[map->light_spri[i]].p;
+				shadowtest2_light[shadowtest2_numlights].f = map->spri[map->light_spri[i]].f;
 				//   shadowtest2_light[shadowtest2_numlights].p.x += sin(GetTime()+shadowtest2_light[shadowtest2_numlights].p.y)*3;
 				k = ((map->spri[map->light_spri[i]].flags >> 17) & 7);
 				if (!k) { shadowtest2_light[shadowtest2_numlights].spotwid = -1.0; } else {
@@ -566,7 +652,7 @@ public:
 				shadowtest2_light[shadowtest2_numlights].rgb[2] = map->spri[map->light_spri[i]].view.color.z;
 				//map->spri[map->light_spri[i]].rsc/8192.f;
 				shadowtest2_light[shadowtest2_numlights].lum =
-						(float) map->spri[map->light_spri[i]].view.lum / 32768.0f;
+						(float) map->spri[map->light_spri[i]].view.lum / 256.0f;
 				shadowtest2_light[shadowtest2_numlights].flags = 1;
 				shadowtest2_numlights++;
 			}
@@ -586,16 +672,16 @@ public:
 			// shadowtest2_updatelighting = 0; //FIXFIX
 			shadowtest2_ligpolreset(-1);
 			for (glignum = 0; glignum < shadowtest2_numlights; glignum++) {
-				ncam.p = shadowtest2_light[glignum].p;
+				ncam.tr.p = shadowtest2_light[glignum].p;
 				//reset_context();
 				ncam.cursect = shadowtest2_light[glignum].sect;
 				draw_hsr_polymost(&ncam, map, 0);
 			}
 		}
-		cam->p = playr->ipos;
-		cam->r = playr->irig;
-		cam->d = playr->idow;
-		cam->f = playr->ifor;
+		//b2cam->p = playr->ipos;
+		//b2cam->r = playr->irig;
+		//b2cam->d = playr->idow;
+		//b2cam->f = playr->ifor;
 		cam->h.x = playr->ghx;
 		cam->h.y = playr->ghy;
 		cam->h.z = playr->ghz;
@@ -634,16 +720,123 @@ public:
 	static Vector3 buildToRaylibPos(dpoint3d buildcoord) {
 		return {(float) buildcoord.x, (float) -buildcoord.z, (float) buildcoord.y};
 	}
+// Project P onto the quad using edge-ratio method.
+// No quadratic, no ambiguous roots.
+static void quad_st(
+    Vector3 Q00, Vector3 Q10, Vector3 Q01, Vector3 Q11,
+    Vector3 P,
+    float *s_out, float *t_out)
+{
+    // Find dominant normal to project to 2D
+    Vector3 e0 = Vector3Subtract(Q10, Q00);
+    Vector3 e1 = Vector3Subtract(Q01, Q00);
+    Vector3 n  = Vector3CrossProduct(e0, e1);
+    float nx = fabsf(n.x), ny = fabsf(n.y), nz = fabsf(n.z);
+    int xi, yi;
+    if (nx >= ny && nx >= nz) { xi = 1; yi = 2; }
+    else if (ny >= nx && ny >= nz) { xi = 0; yi = 2; }
+    else { xi = 0; yi = 1; }
 
-	static bool draw_eyepol_withuvtex(float sw, float sh, int i, int v0, int vertCount, bool isopaque) {
-		rlDrawRenderBatchActive();
-		rlEnableBackfaceCulling();
+    #define C(v,i) ((i)==0?(v).x:(i)==1?(v).y:(v).z)
+    float ax=C(Q00,xi), ay=C(Q00,yi);
+    float bx=C(Q10,xi), by=C(Q10,yi);
+    float cx=C(Q01,xi), cy=C(Q01,yi);
+    float dx=C(Q11,xi), dy=C(Q11,yi);
+    float px=C(P,  xi), py=C(P,  yi);
+    #undef C
 
+    // Bottom edge: Q00->Q10, top edge: Q01->Q11
+    // For a given t, left point = lerp(Q00,Q01,t), right point = lerp(Q10,Q11,t)
+    // Find t: signed area of triangle (left(t), right(t), P) = 0
+    // left(t)  = (ax+t*(cx-ax), ay+t*(cy-ay))
+    // right(t) = (bx+t*(dx-bx), by+t*(dy-by))
+    // vec along edge: (right-left)
+    // vec to P from left: (P-left)
+    // cross = 0 means P is on the line between left and right
+    // cross2d(right-left, P-left) = 0
+    // (rx-lx)*(py-ly) - (ry-ly)*(px-lx) = 0
+    // lx = ax+t*(cx-ax), ly = ay+t*(cy-ay)
+    // rx = bx+t*(dx-bx), ry = by+t*(dy-by)
+    // rx-lx = (bx-ax) + t*((dx-cx)-(bx-ax))  let Ex=(bx-ax), Fx=((dx-cx)-(bx-ax))
+    // ry-ly = (by-ay) + t*((dy-cy)-(by-ay))  let Ey=(by-ay), Fy=((dy-cy)-(by-ay))
+    // px-lx = (px-ax) - t*(cx-ax)             let Gx=(px-ax), Hx=-(cx-ax)
+    // py-ly = (py-ay) - t*(cy-ay)             let Gy=(py-ay), Hy=-(cy-ay)
+    // cross = (Ex+t*Fx)*(Gy+t*Hy) - (Ey+t*Fy)*(Gx+t*Hx) = 0
+    // = Ex*Gy + t*(Ex*Hy+Fx*Gy) + t^2*(Fx*Hy)
+    // - Ey*Gx - t*(Ey*Hx+Fy*Gx) - t^2*(Fy*Hx) = 0
+    // quadratic in t... same problem.
+    //
+    // INSTEAD: iterative 2-step lerp. Converges in 2 iterations for linear quads.
+    // For a trapezoid (linear edges) this is exact in 1-2 Newton steps.
+
+    float s = 0.5f, t = 0.5f;
+    for (int iter = 0; iter < 8; iter++) {
+        // Given current t, find s: point on bottom-top lerped edge
+        float lx = ax + t*(cx-ax);  float ly = ay + t*(cy-ay);
+        float rx = bx + t*(dx-bx);  float ry = by + t*(dy-by);
+        float edx = rx-lx, edy = ry-ly;
+        float len2 = edx*edx + edy*edy;
+        s = (len2 > 1e-12f) ? ((px-lx)*edx + (py-ly)*edy) / len2 : 0.0f;
+
+        // Given current s, find t: point on left-right lerped edge
+        float tx2 = ax + s*(bx-ax);  float ty2 = ay + s*(by-ay);
+        float ux2 = cx + s*(dx-cx);  float uy2 = cy + s*(dy-cy);
+        float etx = ux2-tx2, ety = uy2-ty2;
+        float len2t = etx*etx + ety*ety;
+        t = (len2t > 1e-12f) ? ((px-tx2)*etx + (py-ty2)*ety) / len2t : 0.0f;
+    }
+
+    *s_out = s;
+    *t_out = t;
+}
+
+	/*
+	* Simpler code with rotation only and no quad ffd
+		float z_angle_deg = eyepol[i].uvform.rot.z;
 		Vector3 worldOrigin = bpv3(eyepol[i].worlduvs[0]);
 		Vector3 worldU = bpv3(eyepol[i].worlduvs[1]);
 		Vector3 worldV = bpv3(eyepol[i].worlduvs[2]);
 		Vector3 locU = worldU - worldOrigin;
 		Vector3 locV = worldV - worldOrigin;
+		Vector3 uDir = Vector3Normalize(locU);
+		Vector3 vDir = Vector3Normalize(locV);
+		float uLen = Vector3Length(locU);
+		float vLen = Vector3Length(locV);
+
+		float rad = z_angle_deg * DEG2RAD;
+		float cosA = cosf(rad);
+		float sinA = sinf(rad);
+		Vector3 rotU = Vector3Add(Vector3Scale(uDir, cosA), Vector3Scale(vDir, -sinA));
+		Vector3 rotV = Vector3Add(Vector3Scale(uDir, sinA), Vector3Scale(vDir,  cosA));
+
+
+		for (int locidx = 0; locidx < eyepol[i].tricnt; locidx += 1) {
+			for (int j = 0; j < 3; j++) {
+				int iidx = eyepol[i].triidstart + locidx * 3 + j;
+				uint32_t idx = eyepoli[iidx];
+				Vector3 vertRlPos = buildToRaylibPos(eyepolv[idx]);
+				Vector3 uvwpos = bpv3(eyepolv[idx]);
+				Vector3 vertlocalpos = uvwpos - worldOrigin;
+
+
+				float u = Vector3DotProduct(vertlocalpos, rotU) / uLen;
+				float v = Vector3DotProduct(vertlocalpos, rotV) / vLen;
+
+				u = u * eyepol[i].uvform.scale.x + eyepol[i].uvform.pan.x;
+				v = v * eyepol[i].uvform.scale.y + eyepol[i].uvform.pan.y;
+
+				rlColor4f(usedcol.x, usedcol.y, usedcol.z, usedcol.w);
+				rlTexCoord2f(u, v);
+				// rlNormal3f(uvwpos.x,uvwpos.y,uvwpos.z); // this bitch gets transformed.
+				rlVertex3f(vertRlPos.x, vertRlPos.y, vertRlPos.z);
+			}
+		}
+	 */
+
+	static bool draw_eyepol_withuvtex(float sw, float sh, int i, int v0, int vertCount, bool isopaque) {
+		rlDrawRenderBatchActive();
+		rlEnableBackfaceCulling();
+
 		int useGrad = 1;
 		Vector4 usedcol = {1, 1, 1, 1};
 		switch (eyepol[i].pal) {
@@ -655,7 +848,7 @@ public:
 				break;
 			case 8: usedcol = {0.6, 0.9, 0.2, 1};
 				break;
-			case 7: usedcol = {0.3, 0.3, 0, 1};
+			case 7: usedcol = {0.9, 0.9, 0, 1};
 				break;
 			default: useGrad = 0;
 				break;
@@ -666,7 +859,6 @@ public:
 			usedcol *= shd;
 			usedcol.w = 1.0;
 		}
-
 
 		//  if (map->sect[eyepol[i].b2sect].surf[1].lotag==2) // water
 		//  {
@@ -699,7 +891,7 @@ public:
 		//  BeginBlendMode(BLEND_ADDITIVE);        usedcol.w=0.3;
 		int surfid = eyepol[i].isflor;
 		if ((surfid >= 0)
-			&& (map->sect[eyepol[i].b2sect].surf[surfid].rendertype == parallaxcyl))
+			&& (map->sect[eyepol[i].b2sect].surf[surfid].frMode == fmode_parallaxcyl))
 			{
 				BeginShaderMode(skyShader);
 
@@ -736,29 +928,48 @@ public:
 		if (eyepol[i].tilnum > numartiles || eyepol[i].tilnum <0)
 			eyepol[i].tilnum = 5;
 
+		float z_angle_deg = eyepol[i].uvform.rot.z;
+		Vector3 Q00 = bpv3(eyepol[i].worlduvs[0]); // full world pos
+		Vector3 lQ10 = bpv3(eyepol[i].worlduvs[1]); // local offset
+		Vector3 lQ01 = bpv3(eyepol[i].worlduvs[2]); // local offset
+		Vector3 lQ11 = bpv3(eyepol[i].worlduvs[3]); // local offset
 
+		// Axis lengths from local offsets directly (no subtract needed)
+		float uLen = Vector3Length(lQ10);
+		float vLen = Vector3Length(lQ01);
+
+		float rad = z_angle_deg * DEG2RAD;
+		float cosA = cosf(rad);
+		float sinA = sinf(rad);
 
 		for (int locidx = 0; locidx < eyepol[i].tricnt; locidx += 1) {
 			for (int j = 0; j < 3; j++) {
 				int iidx = eyepol[i].triidstart + locidx * 3 + j;
 				uint32_t idx = eyepoli[iidx];
-				Vector3 verwpos = buildToRaylibPos(eyepolv[idx]);
-				Vector3 uvwpos = bpv3(eyepolvori[idx]);
-				Vector3 localPos = uvwpos - worldOrigin;
-				// Project onto UV plane using dot products
-				float u = Vector3DotProduct(localPos, Vector3Normalize(locU)) / Vector3Length(locU);
-				float v = Vector3DotProduct(localPos, Vector3Normalize(locV)) / Vector3Length(locV);
+				Vector3 vertRlPos = buildToRaylibPos(eyepolv[idx]);
+				// local vert pos relative to Q00 for precision
+				Vector3 uvwpos = Vector3Subtract(bpv3(eyepolv[idx]), Q00);
 
-				// post-unwrap transformation
-				u = u * eyepol[i].uvform[0] + eyepol[i].uvform[2];
-				v = v * eyepol[i].uvform[1] + eyepol[i].uvform[3];
+				float s, t;
+				// pass local-space points: origin=zero, offsets as-is
+				quad_st(
+					{0,0,0}, lQ10, lQ01, lQ11,
+					uvwpos, &s, &t);
+
+				float ws = s * uLen;
+				float wt = t * vLen;
+				float rs = (ws * cosA - wt * sinA) / uLen;
+				float rt = (ws * sinA + wt * cosA) / vLen;
+
+				float u = rs * eyepol[i].uvform.scale.x + eyepol[i].uvform.pan.x;
+				float v = rt * eyepol[i].uvform.scale.y + eyepol[i].uvform.pan.y;
 
 				rlColor4f(usedcol.x, usedcol.y, usedcol.z, usedcol.w);
 				rlTexCoord2f(u, v);
-				// rlNormal3f(uvwpos.x,uvwpos.y,uvwpos.z); // this bitch gets transformed.
-				rlVertex3f(verwpos.x, verwpos.y, verwpos.z);
+				rlVertex3f(vertRlPos.x, vertRlPos.y, vertRlPos.z);
 			}
 		}
+
 		rlDrawRenderBatchActive();
 		EndBlendMode();
 		EndShaderMode();
@@ -886,20 +1097,20 @@ public:
 		}
 		rlEnd();
 	}
-
-	static void DrawKenGeometry(float sw, float sh, Camera3D *camsrc) {
+static void MoveCamB2( cam_t *b2cam) {
 		if (syncam) {
-			camfromrl(&plr.tri, camsrc);
-			int ported = updatesect_portmove(&plr.tri, &plr.cursect, map);
-			if (!ported)
-				updatesect_imp(plr.ipos.x, plr.ipos.y, plr.ipos.z, &plr.cursect, map);
-			else {
-				localb2cam.cursect = plr.cursect;
+			plr.tr = b2cam->tr;
+			int ported = updatesect_portmove(&plr.tr, &plr.cursect, validsec, map);
+			updatesect_imp(plr.tr.p.x, plr.tr.p.y, plr.tr.p.z, &plr.cursect, map);
+			if(ported)
+				int ytry=1;
+			b2cam->cursect = plr.cursect;
+			b2cam->tr = plr.tr;
+			if (plr.cursect>-1)
+				validsec = plr.cursect;
+			DumbCore::b2pos = plr.tr.p;
+			//cam3d_from_tr(&b2cam, &plr.tr);
 
-				//                updatesect_imp(plr.ipos.x,plr.ipos.y,plr.ipos.z, &plr.cursect, map);
-			}
-			DumbCore::b2pos = plr.ipos;
-			camfromb2(camsrc, &plr.tri);
 			//  Vector3 forward = Vector3Normalize(Vector3Subtract(camsrc.target, camsrc.position));
 			//  Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camsrc.up));
 			//  Vector3 up = Vector3CrossProduct(right, forward); // Recalculate orthogonal up
@@ -908,14 +1119,12 @@ public:
 			//  plr.ifor.x = forward.x;  plr.ifor.y = forward.z;  plr.ifor.z = -forward.y;
 			//  plr.irig.x = right.x;    plr.irig.y = right.z;    plr.irig.z = -right.y;
 			//  plr.idow.x = -up.x;       plr.idow.y = -up.z;       plr.idow.z = up.y;
-
-
-			localb2cam.p = plr.ipos;
-			localb2cam.f = plr.ifor;
-			localb2cam.r = plr.irig;
-			localb2cam.d = plr.idow;
 		}
-		DrawEyePoly(sw, sh, &plr, &localb2cam); // ken render
+
+	}
+	static void DrawKenGeometry(float sw, float sh, cam_t *b2cam) {
+
+		DrawEyePoly(sw, sh, &plr, b2cam); // ken render
 		//rlDisableDepthTest();
 		rlEnableDepthTest();
 		rlEnableDepthMask();
@@ -1096,21 +1305,28 @@ public:
 			for (int lightIndex = 0; lightIndex < shadowtest2_numlights; lightIndex++) {
 				lightpos_t *lght = &shadowtest2_light[lightIndex];
 				Vector3 lightpos = {lght->p.x, -lght->p.z, lght->p.y};
+				Vector3 lightf = {lght->f.x, -lght->f.z, lght->f.y};
 				SetShaderValue(lightShader, lightPosLoc, &lightpos, SHADER_UNIFORM_VEC3);
+				SetShaderValue(lightShader, lightForLoc, &lightf, SHADER_UNIFORM_VEC3);
 				SetShaderValue(lightShader, lightRangeLoc, &lightRange, SHADER_UNIFORM_FLOAT);
+				SetShaderValue(lightShader, lightIntenseLoc, &lght->lum, SHADER_UNIFORM_FLOAT);
 				//   BeginShaderMode(uvShader_plain);
 				rlBegin(RL_TRIANGLES);
 				for (int i = 0; i < lght->ligpoln; i++) {
 					if (lght->ligpol[i].tricnt < 1) continue;
 
-
+					ligpol_t poly = lght->ligpol[i];
+					float plum = lght->lum*poly.a;
+					//SetShaderValue(lightShader, lightIntenseLoc, &plum, SHADER_UNIFORM_FLOAT);
 					//rlSetTexture(0);
 					for (int locidx = 0; locidx < lght->ligpol[i].tricnt; locidx += 1) {
 						for (int j = 0; j < 3; j++) {
 							int iidx = lght->ligpol[i].tristart + locidx * 3 + j;
 							uint32_t idx = ligpoli[iidx];
+
 							Vector3 pt = buildToRaylibPos(lght->ligpolv[idx]);
-							rlColor4f(lght->rgb[0], lght->rgb[1], lght->rgb[2], lght->lum);
+
+							rlColor4f(lght->rgb[0], lght->rgb[1], lght->rgb[2], poly.a >0 ?1 : 0);
 							//rlColor4f(0.6, 0.2, 0.1, 1);
 							// rlNormal3f(0,1,0);
 							// rlTexCoord2f(0,0.5);
@@ -1342,82 +1558,100 @@ public:
 			}
 		// rlEnableDepthMask();
 		rlEnableBackfaceCulling();
-		rlDisableDepthMask();
+		rlEnableDepthMask();
+		rlEnableDepthTest();
 		// draw sprites.
-		for (int i = 0; i < map->numspris; i++) {
-			spri_t *spr = &map->spri[i];
-			if (spr->tilnum >= 0) // sprites
+		BeginShaderMode(atestShader);
+		//		for (int i = 0; i < map->numspris; i++) {
+		for (int i = 0; i < spripoln; i++) {
+			spripoly_t spol = spripol[i];
+			spri_t *spr = &map->spri[spripol[i].sprid];
+			if (spol.tilnum >= 0) // sprites
 			{
-				if (spr->tilnum >= numartiles)
-					spr->tilnum = numartiles - 10;
+				spol.galnum %= galcount;
+				if (spol.tilnum >= g_gals[spol.galnum].gmaltiles)
+					spol.tilnum = 5;
 
 				rlEnableBackfaceCulling();
-				if (spr->view.isdblside)
+				if (spr->view.rflags.is_dblside)
 					rlDisableBackfaceCulling();
 
-				Texture2D spriteTex = galtextures[spr->galnum][spr->tilnum];
+				Texture2D spriteTex = galtextures[spol.galnum][spol.tilnum];
 				// vectors are half a size
-				Vector3 rg = {spr->r.x, -spr->r.z, spr->r.y};
-				Vector3 dw = {spr->d.x, -spr->d.z, spr->d.y};
-				Vector3 frw = {spr->f.x, -spr->f.z, spr->f.y};
-				Vector3 pos = {spr->p.x, -spr->p.z, spr->p.y};
+				transform usetr = spol.tr;
+				Vector3 rg = {usetr.r.x, -usetr.r.z, usetr.r.y};
+				Vector3 dw = {usetr.d.x, -usetr.d.z, usetr.d.y};
+				Vector3 frw = {usetr.f.x, -usetr.f.z, usetr.f.y};
+				Vector3 pos = {usetr.p.x, -usetr.p.z, usetr.p.y};
 				auto xs = Vector3Length(rg);
 				auto ys = Vector3Length(dw);
-				// pos += frw * 0.00001; // bias agains fighting
-				Vector3 a = pos + rg * spr->view.anchor.x * 2 + dw * spr->view.anchor.z * 2;
-				Vector3 b = pos + rg * spr->view.anchor.x * 2 - dw * (1 - spr->view.anchor.z) * 2;
-				Vector3 c = pos - rg * (1 - spr->view.anchor.x) * 2 - dw * (1 - spr->view.anchor.z) * 2;
-				Vector3 d = pos - rg * (1 - spr->view.anchor.x) * 2 + dw * spr->view.anchor.z * 2;
-				// Debug vectors
-				DrawTransform(&spr->tr);
 
-				if (spr->view.rtype == quad) {
+				float zanc = 1-spr->view.anchor.z;
+				float xanc = spr->view.anchor.x;
+
+				float rlen = Vector3Length(rg);
+				float dlen = Vector3Length(dw);
+				float xwsize = rlen*2;
+				float ywsize = dlen*2;
+			// o,o = draw from pos to right and up.
+				// 0,0 = sprite lower left = pivot.
+				// 0,1 = sprite upper left = pivot
+				float roff = -xanc * xwsize;
+				float doff = -zanc * ywsize;
+
+				Vector3 ll = {roff , doff,0};
+				Vector3 lr = {ll.x + xwsize, ll.y,0};
+				Vector3 ul = {ll.x , ll.y+ ywsize,0};
+				Vector3 ur = {lr.x, ul.y,0};
+
+				// Debug vectors
+				DrawTransform(&usetr);
+				float mul = 5;
+				rlColor4f(1 * mul, 1 * mul, 1 * mul, 1); // todo update transp.
+				if (spr->view.rflags.vert_mode == vmode_billbord) {
+					EnterCylBoardSpace(pos, dw*-1, rlcam);
+
+				}
+				if (spr->view.rflags.vert_mode == vmode_quad) {
+					ll = pos + rg * 2 * xanc + dw * 2 * zanc;
+					lr = ll - rg * 2;
+					ur = lr - dw * 2;
+					ul = ll - dw * 2;
+				}
+					{
 					EnableDepthOffset(-2.0);
 
 					rlSetTexture(spriteTex.id);
 					rlBegin(RL_QUADS);
-					rlColor4ub(255, 255, 255, 255); // todo update transp.
+					//rlColor4ub(255, 255, 255, 255); // todo update transp.
 
-					rlTexCoord2f(0.0f, spr->view.uv[1] * 1.0f);
-					rlVertex3V(b);
-					rlTexCoord2f(spr->view.uv[0] * 1.0f, spr->view.uv[1] * 1.0f);
-					rlVertex3V(c);
-					rlTexCoord2f(spr->view.uv[0] * 1.0f, 0.0f);
-					rlVertex3V(d);
+					rlTexCoord2f(0.0f, spr->view.uv.scale.y * 1.0f);
+					rlVertex3V(ll);
+					rlTexCoord2f(spr->view.uv.scale.x * 1.0f, spr->view.uv.scale.y * 1.0f);
+					rlVertex3V(lr);
+					rlTexCoord2f(spr->view.uv.scale.x * 1.0f, 0.0f);
+					rlVertex3V(ur);
 					rlTexCoord2f(0.0f, 0.0f);
-					rlVertex3V(a);
+					rlVertex3V(ul);
 
 					rlDrawRenderBatchActive();
 					rlEnd();
 					DisableDepthOffset();
 					rlSetTexture(0);
-				} else if (spr->view.rtype == billbord) // billboards
-				{
-					// Vector3 up =
-					float xscaler = spr->view.uv[0];
-					float yscaler = spr->view.uv[1];
-					xs *= 2;
-					ys *= 2;
-					// need to shift view position for raylib's billboard.
-					Vector3 centeroffset = rg * ((spr->view.anchor.x - 0.5)) * 2 + dw * (spr->view.anchor.z - 0.5f) * 2;
-					Vector3 pos = {spr->p.x, -spr->p.z, spr->p.y};
-					pos += centeroffset;
-					//pos.x+=xs;
-					//pos.z-=ys;
-
-					Rectangle source = {0.0f, 0.0f, (float) spriteTex.width, (float) spriteTex.height};
-					DrawBillboardRec(rlcam, spriteTex, source, pos, {xs * xscaler, ys * yscaler}, WHITE);
-					//  DrawBillboardPro(rlcam,spriteTex,source, pos, dw, {xs * xscaler, ys * yscaler}, {0,0},30, WHITE);
 				}
+
+				if (spr->view.rflags.vert_mode == vmode_billbord)
+					ExitCylBoardSpace();
 			}
 		}
+		EndShaderMode();
 		DrawTransform(&lastcamtr);
 		DrawTransform(&lastcamtr2);
 		dpoint3d testp = {
 			lastcamtr2.p.x + lastcamtr2.d.x, lastcamtr2.p.y + lastcamtr2.d.y, lastcamtr2.p.z + lastcamtr2.d.z
 		};
 
-		wccw_transform_tr(&testp, &lastcamtr, &lastcamtr2);
+		p3d_transform_wccw(&testp, &lastcamtr, &lastcamtr2);
 		DrawB2Point(&testp);
 	}
 
@@ -1427,9 +1661,9 @@ public:
 		Vector3 dw = {tr->d.x, -tr->d.z, tr->d.y};
 		Vector3 frw = {tr->f.x, -tr->f.z, tr->f.y};
 		Vector3 pos = {tr->p.x, -tr->p.z, tr->p.y};
-		DrawLine3D(pos, Vector3Add(pos, frw), BLUE); // Forward vector
+		DrawLine3D(pos, Vector3Add(pos, frw), GREEN); // Forward vector
 		DrawLine3D(pos, Vector3Add(pos, rg), RED); // Right vector
-		DrawLine3D(pos, Vector3Add(pos, dw), GREEN); // Down vector
+		DrawLine3D(pos, Vector3Add(pos, dw), SKYBLUE); // Down vector, Z
 		rlEnableDepthTest();
 	}
 
@@ -1768,7 +2002,6 @@ public:
 			}
 		}
 
-		// Draw sprites (unchanged - already efficient)
 		for (int i = 0; i < map->numspris; i++) {
 			spri_t *spr = &map->spri[i];
 			if (spr->tilnum >= 0 && spr->tilnum < numartiles) {

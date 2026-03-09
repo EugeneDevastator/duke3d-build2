@@ -8,6 +8,7 @@
 // attempt portals
 #include "mapcore.h"
 #include "kplib.h"
+#include "buildmath.h"
 
 
 static long crctab32[256] = {0};  //SEE CRC32.C

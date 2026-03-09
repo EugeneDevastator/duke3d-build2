@@ -3,7 +3,9 @@
 
 #include "scenerender.h"
 #include "monoclip.h"
-
+#include "rendertypes.h"
+#include "sectmask.h"
+#include "buildmath.h"
 // ================================================================================================
 // CONSTANTS AND CONFIGURATION
 // ================================================================================================
@@ -19,14 +21,18 @@
 extern int shadowtest2_numlights, shadowtest2_useshadows, shadowtest2_numcpu, shadowtest_curlight;
 extern int shadowtest2_rendmode, eyepoln, glignum;
 extern unsigned int *shadowtest2_sectgot;
+extern sectmask_t *framesectgot;
 // ================================================================================================
 // LIGHT SYSTEM DATA STRUCTURES
 // ================================================================================================
+
+ARENA_DECL(spripoly_t, spripol);
 
 /** Light polygon data for shadow casting */
 typedef struct
 {
     int vert0, b2sect, b2wall, b2slab, b2hashn, tristart, tricnt;
+    float a;
 } ligpol_t;
 /** Light source definition and shadow polygon storage */
 typedef struct {
@@ -55,31 +61,8 @@ typedef struct {
 // SOFTWARE RENDERING DATA STRUCTURES
 // ================================================================================================
 
-/** Polygon data for software rasterization queue */
-typedef struct {
-    int vert0;                          // Index into first vertex in eyepolv
-    int b2sect, b2wall, b2slab;         // Build2 geometry references
-    int b2hashn;                        // Hash chain for polygon matching
-    int curcol, flags;                  // Color and rendering flags
-    tile_t *tpic;                       // Texture tile pointer
-    int tilnum;
-    int galnum;
-    float shade;
-    float ouvmat[9];                    // inverse perspective transformation
-    point3d norm;                       // Surface normal vector
-    int rdepth;
-    // triangulation data
-    int triidstart, tricnt; // start ids and num of indice
-    bool hasuvs;
-    int8_t isflor;
-    // uv data
-    point3d *worlduvs; // origin, u ,v
-    float* uvform;
-    int slabid;
-    int c1,c2,e1,e2;
-    int pal;
-    float alpha;
-} eyepol_t;
+
+
 
 typedef struct {
     union {
@@ -143,7 +126,7 @@ int prepbunch(int id, bunchverts_t *twal, bdrawctx* b);
  * @param plothead1 Second polygon loop head
  * @param flags Clipping flags: &1=do and, &2=do sub, &4=reverse cut for sub
  */
-int drawpol_befclip(int fromtag, int newtag1, int fromsect, int newsect, int plothead0, int plothead1, int flags, bdrawctx* b);
+int drawpol_befclip(int fromtag, int newtag, int fromsect, int newsect, int plothead0, int plothead1, int flags, bdrawctx* b);
 
 /** Main HSR (Hidden Surface Removal) function handling both clipping and rendering
  * @param cc Camera parameters
@@ -163,7 +146,7 @@ void gentex_xform (float *ouvmat, bdrawctx *b);
  * @param rethead0 First polygon loop head from clipping
  * @param rethead1 Second polygon loop head from clipping
  */
-void ligpoltagfunc(int rethead0, int rethead1, bdrawctx *b);
+void emit_lighpol_func(int rethead0, int rethead1, bdrawctx *b);
 
 /** Resets light polygon data structures
  * @param ind Light index to reset (-1 for all lights)
@@ -202,7 +185,7 @@ void eyepol_drawfunc(int ind);
  * @param rethead0 First polygon loop head
  * @param rethead1 Second polygon loop head
  */
-void drawtagfunc_ws(int rethead0, int rethead1, bdrawctx * b);
+void emit_wallpoly_func(int rethead0, int rethead1, bdrawctx * b);
 
 /** Software skybox rendering
  * @param rethead0 First polygon loop head

@@ -24,11 +24,10 @@
 //#include "MonoTest.hpp"
 //#include "luabinder.hpp"
 // Depends
-#include "DumbCore.hpp"
+//#include "DumbCore.hpp"
 #include "DumbEdit.hpp"
 #include "MonoTest.hpp"
 #include "raymath.h"
-#include "cmake-build-custom/_deps/raylib-src/src/external/glad.h"
 #include "DukeGame/source/dukewrap.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -445,7 +444,7 @@ Texture2D lutTexture = {0};
 float lutIntensity = 1.0f;
 CustomRenderTarget finalTarget = {0};
 ImGuiViewport* viewport;
-
+cam_t globCam={0};
 
 int file_exists(const char* path) {
     FILE* file = fopen(path, "r");
@@ -494,7 +493,6 @@ bool loadifvalid() {
 
     const char* map_path = __argv[1];
 
-    // Check if path points to .map file
     if (!has_extension(map_path, ".map")) {
         printf("Error: File must have .map extension\n");
         return false;
@@ -505,11 +503,9 @@ bool loadifvalid() {
         return false;
     }
 
-    // Extract directory from map path
     char dir_path[512];
     extract_directory(map_path, dir_path, sizeof(dir_path));
 
-    // Check for palette.dat
     char palette_path[512];
     snprintf(palette_path, sizeof(palette_path), "%s/palette.dat", dir_path);
     if (!file_exists(palette_path)) {
@@ -517,24 +513,23 @@ bool loadifvalid() {
         return false;
     }
 
-    // Check for lookup.dat not needed actually!
-   //char lookup_path[512];
-   //snprintf(lookup_path, sizeof(lookup_path), "%s/lookup.dat", dir_path);
-   //if (!file_exists(lookup_path)) {
-   //    printf("Error: lookup.dat not found in %s\n", dir_path);
-   //    return false;
-   //}
-
-    // Check for at least one tiles*.art file
     if (!check_tiles_art_exists(dir_path)) {
         printf("Error: No tiles*.art files found in %s\n", dir_path);
         return false;
     }
 
+    char gal1_path[512];
+    snprintf(gal1_path, sizeof(gal1_path), "%s/Content/GAL_002_SW/", dir_path);
+
+    loadgal(0, dir_path);
+    if (!check_tiles_art_exists(gal1_path)) {
+        printf("Error: No tiles*.art files found in %s\n", gal1_path);
+    }
+    else
+        loadgal(1, gal1_path);
     DumbRender::Init(map_path);
     return true;
 }
-
 
 
 void SetImguiFonts()
@@ -631,6 +626,7 @@ void VisualizeMapstate() {  //unused
     SetTargetFPS(60);
 
 
+
     FreeCamera cam = {0};
     cam.position = {map->startpos.x, map->startpos.y, map->startpos.z};
     cam.target = Vector3Add(cam.position, {map->startfor.x, map->startfor.y, map->startfor.z});
@@ -681,19 +677,18 @@ CustomRenderTarget CreateCustomRenderTarget(int width, int height, unsigned int 
     target.width = width;
     target.height = height;
 
-    // Generate framebuffer
     glGenFramebuffers(1, &target.fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, target.fbo);
 
-    // Create color texture
+    // Create HDR color texture (16-bit float)
     glGenTextures(1, &target.colorTexture);
     glBindTexture(GL_TEXTURE_2D, target.colorTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_HALF_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, target.colorTexture, 0);
 
-    // Use shared depth or create new one
+    // Depth buffer remains the same
     if (sharedDepth != 0) {
         target.depthTexture = sharedDepth;
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, sharedDepth, 0);
@@ -706,15 +701,13 @@ CustomRenderTarget CreateCustomRenderTarget(int width, int height, unsigned int 
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, target.depthTexture, 0);
     }
 
-    // Check framebuffer completeness
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        TraceLog(LOG_ERROR, "Framebuffer not complete!");
+        TraceLog(LOG_ERROR, "HDR Framebuffer not complete!");
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     return target;
 }
-
 void BeginCustomRenderTarget(CustomRenderTarget target) {
     rlDrawRenderBatchActive();
     glBindFramebuffer(GL_FRAMEBUFFER, target.fbo);
@@ -763,16 +756,17 @@ void DrawInfoUI() {
     ImVec2 work_pos = viewport->WorkPos;
     ImVec2 work_size = viewport->WorkSize;
 
-    // Set window position to upper right
-    ImVec2 window_pos = ImVec2(work_pos.x + work_size.x - 200.0f, work_pos.y + 10.0f);
-    ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always);
-
-    // Create window without title bar, resize, move, collapse
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoTitleBar |
-                                   ImGuiWindowFlags_NoResize |
-                                   ImGuiWindowFlags_NoMove |
-                                   ImGuiWindowFlags_NoCollapse |
-                                   ImGuiWindowFlags_AlwaysAutoResize;
+                                    ImGuiWindowFlags_NoResize |
+                                    ImGuiWindowFlags_NoMove |
+                                    ImGuiWindowFlags_NoCollapse |
+                                    ImGuiWindowFlags_AlwaysAutoResize;
+
+    // First pass: begin with a temporary position, let it size itself
+    // Then reposition so it stays top-right without clipping
+    ImGui::SetNextWindowPos(ImVec2(work_pos.x + work_size.x - 10.0f, work_pos.y + 10.0f),
+                            ImGuiCond_Always, ImVec2(1.0f, 0.0f)); // pivot top-right
+
     DrawTextureBrowser(&texb);
     ImGui::Begin("##info_panel", NULL, window_flags);
     ImGui::Text("Q = pick & move");
@@ -789,11 +783,15 @@ void DrawInfoUI() {
         ImGui::Text("IsLIGHT.");
     }
 if (ISHOVERWAL) {
-    ImGui::Text("S:%i w:%i w.n:%i \nNs:%i Nw:%i",hoverfoc.sec, hoverfoc.wal, HOVERWAL.n, HOVERWAL.ns, HOVERWAL.nw);
+    ImGui::Text("S:%i w:%i w.n:%i \nNs:%i Nw:%i",mdl.hover.sec, mdl.hover.wal, HOVERWAL.n, HOVERWAL.ns, HOVERWAL.nw);
     ImGui::Text("NCsw:%i %i",HOVERWAL.nschain, HOVERWAL.nwchain);
     ImGui::Text("flags: %i %d", HOVERWAL.surf.asc, HOVERWAL.surf.alpha);// need show as uint32_t binary with zeros.
 }
-
+    if (ISHOVERSPRI) {
+        int til = map->spri[mdl.hover.spri].tilnum;
+        int gal = map->spri[mdl.hover.spri].galnum;
+        ImGui::Text("T: %i, \n xof,yof: %i,%i", til, g_gals[gal].picanm_data[til].x_center_offset,g_gals[gal].picanm_data[til].y_center_offset);
+    }
     ImGui::End();
 }
 
@@ -867,25 +865,28 @@ void DrawInfoMessage() {
 
     info_timer -= ImGui::GetIO().DeltaTime;
 
-    ImVec2 work_pos = viewport->WorkPos;
-    ImVec2 work_size = viewport->WorkSize;
+    ImGuiViewport* vp = ImGui::GetMainViewport();
+    ImVec2 work_pos  = vp->WorkPos;
+    ImVec2 work_size = vp->WorkSize;
 
-    // Center horizontally at top
-    ImVec2 window_pos = ImVec2(work_pos.x + work_size.x * 0.5f, work_pos.y + 20.0f);
-    ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.5f, 0.0f));
+    // Draw directly on foreground drawlist - no window, no clipping
+    ImDrawList* dl = ImGui::GetForegroundDrawList();
 
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar |
-                            ImGuiWindowFlags_NoResize |
-                            ImGuiWindowFlags_NoMove |
-                            ImGuiWindowFlags_NoCollapse |
-                            ImGuiWindowFlags_AlwaysAutoResize |
-                            ImGuiWindowFlags_NoBackground |
-                            ImGuiWindowFlags_NoInputs;
+    ImVec2 text_size = ImGui::CalcTextSize(info_message);
 
-    ImGui::Begin("##top_info", NULL, flags);
-    ImGui::Text("%s", info_message);
-    ImGui::End();
+    float x = work_pos.x + (work_size.x - text_size.x) * 0.5f;
+    float y = work_pos.y + 20.0f;
+
+    // Shadow for bold effect
+    dl->AddText(ImVec2(x + 1.0f, y + 1.0f), IM_COL32(0, 0, 0, 200), info_message);
+    dl->AddText(ImVec2(x - 1.0f, y + 1.0f), IM_COL32(0, 0, 0, 200), info_message);
+    dl->AddText(ImVec2(x + 1.0f, y - 1.0f), IM_COL32(0, 0, 0, 200), info_message);
+    dl->AddText(ImVec2(x - 1.0f, y - 1.0f), IM_COL32(0, 0, 0, 200), info_message);
+    // Main text
+    dl->AddText(ImVec2(x, y), IM_COL32(255, 255, 255, 255), info_message);
 }
+
+
 
 // ------------------------------------
 
@@ -894,8 +895,6 @@ void DrawInfoMessage() {
 1. hdr lights
 2. sprites from portals
 3. render atest and sprite ordering
-4. extrusion ops
-5. floor ceil wall move
 6. linux build
 7. 4. light+portals
 8. 5. duke game fix
@@ -903,8 +902,25 @@ void DrawInfoMessage() {
 10. 7. floor ceil ports mono fix
 11. 8. palforms
 
--- draw original wall on portal failures.
+-- draw original wall on portal failure handling.
+
+sprites:
+1. draw geo to albedo
+2. also collect sprites to draw with portalxforms.
+2. draw geo lights as alpha test, using geo zbuf.
+3. draw sprites to albedo using a-test for all
+4. draw sprite lights using zbuf from albedo.
+
+draw sprites as polys inside light pass.
+sort them together as walls, or just by poss.
+1. collect sprites in camera pass
+2. draw only those sprites in light passes.
+3. sort them together with walls.
+3. dont emit light polys if sect was not in camera pass
+
+
 */
+Camera3D rlcam;
 void RecreateRenderTargets(CustomRenderTarget* albedo, CustomRenderTarget* light, CustomRenderTarget* combined, CustomRenderTarget* final) {
     int w = GetScreenWidth();
     int h = GetScreenHeight();
@@ -923,34 +939,55 @@ void RecreateRenderTargets(CustomRenderTarget* albedo, CustomRenderTarget* light
     *final = CreateCustomRenderTarget(w, h, 0);
 }
 // Draw palette and texture preview on screen
-void MainLoop()
-{
+void MainLoop() {
+    Shader multiplyShader = LoadShader(NULL, "Shaders/lightmul.frag");
+    // Get uniform locations
+    int albedoLocation = GetShaderLocation(multiplyShader, "albedoTexture");
+    int lightLocation = GetShaderLocation(multiplyShader, "lightTexture");
     InitTexBrowser();
     EditorSetTileState(&texb);
-    //    if (!loadifvalid())
- //       return;
-    //DumbRender::Init("c:/Eugene/Games/build2/Content/GAL_002/E1L1.MAP ");
-    loadgal(0,"c:/Eugene/Games/build2/");
-    loadgal(1,"c:/Eugene/Games/build2/Content/GAL_002_SW/");
+      if (!loadifvalid()) {
+          loadgal(0, "c:/Eugene/Games/build2/");
+          loadgal(1, "c:/Eugene/Games/build2/Content/GAL_002_SW/");
+          DumbRender::Init("c:/Eugene/Games/build2/e3l3.map");
+      }
     DumbRender::LoadTexturesToGPU();
-    DumbRender::Init("c:/Eugene/Games/build2/prxl.map");
     auto map = DumbRender::GetMap();
-    DumbCore::Init(map);
-    SetTargetFPS(60);
+    //DumbCore::Init(map);
+    globCam.tr.p = map->startpos;
+    globCam.tr.r = map->startrig;
+    globCam.tr.d = map->startdow;
+    globCam.tr.f = map->startfor;
+    SetTargetFPS(120);
 
-    InitEditor(map);
+    InitEditor(map, &globCam);
     // Initialize LUT system
     InitLUTSystem();
 
     // Create render targets with shared depth
     CustomRenderTarget albedoTarget = CreateCustomRenderTarget(GetScreenWidth(), GetScreenHeight(), 0);
-    CustomRenderTarget lightTarget = CreateCustomRenderTarget(GetScreenWidth(), GetScreenHeight(), albedoTarget.depthTexture);
+    CustomRenderTarget lightTarget = CreateCustomRenderTarget(GetScreenWidth(), GetScreenHeight(),
+                                                              albedoTarget.depthTexture);
     CustomRenderTarget combinedTarget = CreateCustomRenderTarget(GetScreenWidth(), GetScreenHeight(), 0);
     int w = GetScreenWidth();
     int h = GetScreenHeight();
     showPicker = false;
     DisableCursor();
     while (!WindowShouldClose()) {
+        if (IsKeyDown(KEY_LEFT_ALT) && IsKeyPressed(KEY_ENTER))
+        {
+            if (IsWindowFullscreen())
+            {
+                ToggleFullscreen();
+                SetWindowSize(w, h);
+            }
+            else
+            {
+                int mon = GetCurrentMonitor();
+                SetWindowSize(GetMonitorWidth(mon), GetMonitorHeight(mon));
+                ToggleFullscreen();
+            }
+        }
         float deltaTime = GetFrameTime();
         // Check for window resize
         int currentW = GetScreenWidth();
@@ -962,104 +999,137 @@ void MainLoop()
             RecreateRenderTargets(&albedoTarget, &lightTarget, &combinedTarget, &finalTarget);
         }
 #if !IS_DUKE_INCLUDED
-        Editor_DoRaycasts(&localb2cam);
-        EditorUpdate(*DumbCore::GetCamera());
+        Editor_DoRaycasts(&globCam);
+        EditorUpdate();
 #endif
         // Render albedo pass
         BeginCustomRenderTarget(albedoTarget);
+        {
+            // Albedo Geometry
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            glEnable(GL_DEPTH_TEST);
+            ClearBackground(BLACK);
+            //if (!showPicker) DumbCore::Update(deltaTime);
 
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glEnable(GL_DEPTH_TEST);
-        ClearBackground(BLACK);
-        if (!showPicker) DumbCore::Update(deltaTime);
+            DumbRender::MoveCamB2(&globCam);
+            cam3d_from_tr(&rlcam, globCam.tr);
+            rlcam.fovy = 90.0f;
+            rlcam.projection = CAMERA_PERSPECTIVE;
+            BeginMode3D(rlcam);
+            if (!showPicker) { DumbRender::ProcessKeys(); }
+            DumbRender::DrawKenGeometry(GetScreenWidth(), GetScreenHeight(), &globCam);
 
-        BeginMode3D(*DumbCore::GetCamera());
+            DumbRender::DrawMapstateTex(rlcam);
+            DrawGizmos();
+            EndMode3D();
+        }
+        EndCustomRenderTarget(); //END ALBEDO
 
-        if (!showPicker) { DumbRender::ProcessKeys(); }
-        DumbRender::DrawKenGeometry(GetScreenWidth(), GetScreenHeight(), DumbCore::GetCamera());
-        DumbRender::DrawMapstateTex(*DumbCore::GetCamera());
-        DrawGizmos();
-        EndMode3D();
-        EndCustomRenderTarget();
-
-        // Render light pass
         BeginCustomRenderTarget(lightTarget);
-        glClear(GL_COLOR_BUFFER_BIT);
-        glEnable(GL_DEPTH_TEST);
-        glDepthMask(GL_FALSE);
-        // batching improves perf significantly, so atlases are way to go
-        DumbRender::DrawLightsPost3d(w,h,*DumbCore::GetCamera());
+        {
+            // Render light pass (HDR accumulation)
+            glClearColor(0.0f, 0.0f, 0.0f, 0.0f); // Clear to black for light accumulation
+            glClear(GL_COLOR_BUFFER_BIT);
+            glEnable(GL_DEPTH_TEST);
+            glDepthMask(GL_FALSE);
 
-        // DumbRender::DrawPost3d(w,h,*DumbCore::GetCamera());
+            // Enable additive blending for light accumulation
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_ONE, GL_ONE);
 
-        glDepthMask(GL_TRUE);
-        EndCustomRenderTarget();
+            DumbRender::DrawLightsPost3d(w, h,rlcam);
 
-        // Combine albedo and lights
+            glDisable(GL_BLEND);
+            glDepthMask(GL_TRUE);
+        }
+        EndCustomRenderTarget(); // END LIGHT
+
+
         BeginCustomRenderTarget(combinedTarget);
-        glClear(GL_COLOR_BUFFER_BIT);
-        glDisable(GL_DEPTH_TEST);
+        {
+            // combine Lights wit albedo
+            glClear(GL_COLOR_BUFFER_BIT);
+            glDisable(GL_DEPTH_TEST);
 
-        // Draw albedo
-        DrawTextureRec({albedoTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
-                      {0, 0, (float)w, (float)-h}, {0, 0}, WHITE);
+            BeginShaderMode(multiplyShader);
+            SetShaderValueTexture(multiplyShader, GetShaderLocation(multiplyShader, "albedoTexture"),
+                                  {albedoTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R16G16B16A16});
+            SetShaderValueTexture(multiplyShader, GetShaderLocation(multiplyShader, "lightTexture"),
+                                  {lightTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R16G16B16A16});
 
-        // Multiply blend lights
-        BeginBlendMode(RL_BLEND_ADDITIVE);
-
-        DrawTextureRec({lightTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
-                      {0, 0, (float)w, (float)-h}, {0, 0}, WHITE);
-        EndBlendMode();
-        DrawFPS(10, 10);
-        EndCustomRenderTarget();
-
-        // Apply LUT to final result
-        BeginCustomRenderTarget(finalTarget);
-        glClear(GL_COLOR_BUFFER_BIT);
-        glDisable(GL_DEPTH_TEST);
+            // Use DrawTextureRec instead of DrawRectangle for proper UV mapping
+            DrawTextureRec({albedoTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R16G16B16A16},
+                           {0, 0, (float) w, (float) -h}, {0, 0}, WHITE);
+            EndShaderMode();
+        }
+        EndCustomRenderTarget(); // END POSTPROC COMBINE
 
 
-        BeginShaderMode(lutShader);
-        SetShaderValueTexture(lutShader, lutTextureLocation, lutTexture);
-        DrawTextureRec({combinedTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
-                      {0, 0, (float)w, (float)-h}, {0, 0}, WHITE);
-        EndShaderMode();
-
-        EndCustomRenderTarget();
-
-        // Final draw to screen
         BeginDrawing();
-        ClearBackground(BLACK);
-        // draw frame;
-        DrawTextureRec({finalTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
-                      {0, 0, (float)w, (float)-h}, {0, 0}, WHITE);
-        if (IsKeyPressed(KEY_ESCAPE))
-            DisableCursor();
+        {
+            // 2d ops and pp
+            ClearBackground(BLACK);
+
+            // Draw final texture with proper Y-flip for OpenGL framebuffer
+            DrawTextureRec({finalTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
+                           {0, 0, (float) w, (float) -h}, {0, 0}, WHITE); // Keep the -h for Y-flip
+
+            // Also fix the LUT pass:
+            BeginCustomRenderTarget(finalTarget);
+            {
+                // LUT, POSTPROCESSINg
+                glClear(GL_COLOR_BUFFER_BIT);
+                glDisable(GL_DEPTH_TEST);
+
+                BeginShaderMode(lutShader);
+                SetShaderValueTexture(lutShader, lutTextureLocation, lutTexture);
+                DrawTextureRec({combinedTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R16G16B16A16},
+                               {0, 0, (float) w, (float) -h}, {0, 0}, WHITE); // Keep Y-flip here too
+                EndShaderMode();
+            }
+            EndCustomRenderTarget();  // END OF LUT PASS.
+            if (IsKeyPressed(KEY_ESCAPE))
+                DisableCursor();
 
 #if !IS_DUKE_INCLUDED
-        // IMGUI SECTION
-        viewport = ImGui::GetMainViewport();
-        rlImGuiBegin();
-        DrawInfoUI();
-        DrawInfoMessage();
-        if (showPicker) {
-            DrawPicker();
-            SetColorum(currentColor.r, currentColor.g, currentColor.b, currentColor.luminance);
-        }
-        if (IsKeyPressed(KEY_L)) {
-            SetColorum(currentColor.r, currentColor.g, currentColor.b, currentColor.luminance);
-        }
-        if (IsKeyPressed(KEY_C)) {
-            showPicker = !showPicker;
-            if (showPicker) {
-                EnableCursor();
-            } else {
-                DisableCursor();
-            }
-        }
+            {
+                // Restore complete GL state for ImGui
+                glBindFramebuffer(GL_FRAMEBUFFER, 0);
+                glViewport(0, 0, w, h);
+                glDisable(GL_DEPTH_TEST);
+                glEnable(GL_BLEND);
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Standard alpha blending
+                glBlendEquation(GL_FUNC_ADD);
+                DrawFPS(10, 10);
+                // IMGUI SECTION
 
-        rlImGuiEnd();
+                viewport = ImGui::GetMainViewport();
+                rlImGuiBegin();
+                DrawInfoUI();
+                DrawInfoMessage();
+                if (showPicker) {
+                    DrawPicker();
+                    SetColorum(currentColor.r, currentColor.g, currentColor.b, currentColor.luminance);
+                }
+                if (IsKeyPressed(KEY_L)) {
+                    SetColorum(currentColor.r, currentColor.g, currentColor.b, currentColor.luminance);
+                }
+                if (IsKeyPressed(KEY_C)) {
+
+                    showPicker = !showPicker;
+                    if (showPicker) {
+                        mdl.camera_controls_enabled = false;
+                        EnableCursor();
+                    } else {
+                        mdl.camera_controls_enabled = true;
+                        DisableCursor();
+                    }
+                }
+
+                rlImGuiEnd();
+            } // END OF IMGUI PASS
 #endif
+        }
 
         EndDrawing();
     }
@@ -1112,18 +1182,8 @@ int main() {
         BeginDrawing();
         ClearBackground(DARKGRAY);
 
-
-
         // Drawing phase timing
         auto drawStart = std::chrono::high_resolution_clock::now();
-
-     //   for (const auto& rect : transparentRects) {
-     //       Color drawColor = rect.color;
-     //       if (renderOpaque) {
-     //           drawColor.a = 255;
-     //       }
-     //       DrawRectangle(rect.x, rect.y, rect.width, rect.height, drawColor);
-     //   }
 
         // Lua Render timing
         auto luaRenderStart = std::chrono::high_resolution_clock::now();
@@ -1154,7 +1214,7 @@ int main() {
         auto drawEnd = std::chrono::high_resolution_clock::now();
         drawingTime = std::chrono::duration<double, std::milli>(drawEnd - drawStart).count();
 
-        DrawFPS(10, 10);
+
       //  DrawPaletteAndTexture(paltex,tex,600,600);
         EndDrawing();
     }
@@ -1164,3 +1224,29 @@ int main() {
     CloseWindow();
     return 0;
 }
+
+/* mul and additrive buffers.
+Create two light targets
+CustomRenderTarget lightMultiplyTarget = CreateCustomRenderTarget(w, h, albedoTarget.depthTexture);
+CustomRenderTarget lightAdditiveTarget = CreateCustomRenderTarget(w, h, albedoTarget.depthTexture);
+
+// Render multiply lights
+BeginCustomRenderTarget(lightMultiplyTarget);
+glClearColor(1.0f, 1.0f, 1.0f, 1.0f); // Clear to white for multiply
+glClear(GL_COLOR_BUFFER_BIT);
+glEnable(GL_BLEND);
+glBlendFunc(GL_DST_COLOR, GL_ZERO); // Multiply blend
+DumbRender::DrawLightsMultiply(w, h, *DumbCore::GetCamera());
+glDisable(GL_BLEND);
+EndCustomRenderTarget();
+
+// Render additive lights
+BeginCustomRenderTarget(lightAdditiveTarget);
+glClearColor(0.0f, 0.0f, 0.0f, 0.0f); // Clear to black for additive
+glClear(GL_COLOR_BUFFER_BIT);
+glEnable(GL_BLEND);
+glBlendFunc(GL_ONE, GL_ONE); // Additive blend
+DumbRender::DrawLightsAdditive(w, h, *DumbCore::GetCamera());
+glDisable(GL_BLEND);
+EndCustomRenderTarget();
+*/

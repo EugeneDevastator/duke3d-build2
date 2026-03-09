@@ -19,14 +19,14 @@ void main() {
     // vertexTexCoord encodes xyz in same world space, so we need to get 2d out of
     // vertexTexCoord, worldorigin, worldU and worldV vectors;
     // temp hack
-    vec3 worldPos = vertexNormal;  // Assuming this is your world space vertex position
+// vec3 worldPos = vertexNormal;  // Assuming this is your world space vertex position
 
-    vec3 localPos = worldPos - worldOrigin;
-    vec3 locU = worldU - worldOrigin;
-    vec3 locV = worldV - worldOrigin;
-    // Project onto UV plane using dot products
-    float u = dot(localPos, locU) / dot(locU, locU);
-    float v = dot(localPos, locV) / dot(locV, locV);
+// vec3 localPos = worldPos - worldOrigin;
+// vec3 locU = worldU - worldOrigin;
+// vec3 locV = worldV - worldOrigin;
+// // Project onto UV plane using dot products
+// float u = dot(localPos, locU) / dot(locU, locU);
+// float v = dot(localPos, locV) / dot(locV, locV);
 
     uvPosition = vec2(vertexTexCoord.x,vertexTexCoord.y);
     fragColor = vertexColor;  // Pass the default color to fragment shader
