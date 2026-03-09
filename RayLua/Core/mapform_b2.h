@@ -94,7 +94,7 @@
 #define TEZ_WORLDZ1	 (1<<8)
 #define TEZ_WALL_ORTHO	 (1<<9) // aligned to slope if use slope.
 
-typedef uint64_t uid_t;  // global unique identifier. classless. storage use only.
+typedef uint64_t bb_uid_t;  // global unique identifier. classless. storage use only.
 typedef uint16_t surfid_t;  // srface reference; 0,1  = caps; rest is wall index *surf index.
 typedef struct {
 	unsigned int otez : 10; // TEZ flags
@@ -237,7 +237,7 @@ typedef struct {
 } ComponentRecord;
 
 typedef struct { // LIGHT SOURCE STORAGE
-	uid_t id;
+	bb_uid_t id;
 	point3d colorhdr; // this is color block.
 	float multiplier; // additional mul.
 	float maxdist; // distance to stop clipper; 0 = no stop;
@@ -252,16 +252,16 @@ typedef struct { // LIGHT SOURCE STORAGE
 } lightsource_t;
 
 typedef struct {
-	uid_t id;
+	bb_uid_t id;
 	transform tr;
 	uint32_t secid;
-	uid_t data;
+	bb_uid_t data;
 } entity_stored_t;
 
 typedef struct // SPRITE STORAGE
 {
-	uid_t id;
-	uid_t dataid;
+	bb_uid_t id;
+	bb_uid_t dataid;
 	// ----- FAST DATA --------------
 	union { transform tr; struct { point3d p, r, d, f; }; };
 
@@ -293,7 +293,7 @@ typedef struct // SPRITE STORAGE
 	// --------- COLD DATA -----------, probably all move to datablock.
 	long flags;
 	int32_t tags[16];
-	uint8_t surfcon; // surf constraint 0,1 = ceil,flor, 3+  = wall id -2
+	uint8_t walcon; // surf constraint 0,1 = ceil,flor, 3+  = wall id -2
 	//Bit0:Blocking, Bit2:1WayOtherSide, Bit5,Bit4:Face/Wall/Floor/.., Bit6:1side, Bit16:IsLight, Bit17-19:SpotAx(1-6), Bit20-29:SpotWid, Bit31:Invisible
 	//long flags;
 
@@ -301,7 +301,7 @@ typedef struct // SPRITE STORAGE
 
 typedef struct // surf_t
 {
-	uid_t id;
+	bb_uid_t id;
 	// TEXTURE PARAMS.
 	union {
 		struct {
@@ -326,7 +326,7 @@ typedef struct // surf_t
 	uint8_t ior;
 
 	unsigned short asc, rsc, gsc, bsc; //4096 is no change
-
+	float alpha;
 // ------- runtime gneerated data
 	// for portals case - we dont care and use original world for everything.
 	// interpolator will lerp worldpositions, regardless of poly location
@@ -338,7 +338,7 @@ typedef struct // surf_t
 
 typedef struct // wall t
 {
-	uid_t id;
+	bb_uid_t id;
 	// HOT DATA
 	union {
 		point2d pos;
@@ -378,7 +378,7 @@ typedef struct // wall t
 
 typedef struct
 {
-	uid_t id;
+	bb_uid_t id;
 	// BuildEngine base data
 	uint32_t dataptr; // reference to any additional data.
 	uint32_t tguid;   // uniq per sect.
@@ -408,7 +408,7 @@ typedef struct
 } sect_t;
 
 typedef struct {
-	uid_t id;
+	bb_uid_t id;
 	long nsect;
 	sect_t* sects;
 	long spriorig; // sprite that denotes origin and transform
@@ -471,8 +471,8 @@ typedef struct {
 } surf_store;
 
 typedef struct {
-	uid_t id;
-	uid_t dataptr; // reference to any additional composite data.
+	bb_uid_t id;
+	bb_uid_t dataptr; // reference to any additional composite data.
 	uint32_t commid; // for entire sector entity.
 
 	transform64_t tr;
@@ -483,8 +483,8 @@ typedef struct {
 }sprite_store;
 
 typedef struct {
-	uid_t id;
-	uid_t dataptr; // reference to any additional composite data.
+	bb_uid_t id;
+	bb_uid_t dataptr; // reference to any additional composite data.
 	uint32_t commid; // for entire sector entity.
 
 	int64_t x,y;
@@ -497,7 +497,7 @@ typedef struct {
 	uint8_t mode;
 	union {
 		uint8_t a,b,c; // wall ids
-		uid_t sprid;
+		bb_uid_t sprid;
 	};
 } slopehint_t;
 
@@ -513,8 +513,8 @@ typedef struct{
 
 typedef struct // SECT STORE
 {
-	uid_t id;
-	uid_t dataptr; // reference to any additional composite data.
+	bb_uid_t id;
+	bb_uid_t dataptr; // reference to any additional composite data.
 	uint32_t sect_commid; // for entire sector entity.
 
 	uint8_t originvert;
@@ -531,7 +531,7 @@ typedef struct // SECT STORE
 // todo - check ken's png lib;
 typedef struct {
 	char type[4];
-	uid_t guid;
+	bb_uid_t guid;
 	uint32_t length;
 	unsigned char *data;
 	uint32_t crc;

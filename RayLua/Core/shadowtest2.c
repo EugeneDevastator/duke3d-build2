@@ -1848,7 +1848,7 @@ static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 			alphamul = 0.3f; // only emit mask here
 
 			//if (shadowtest2_rendmode != 4) // no mask with light
-			//drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1], DP_PRESERVE_LOOP| DP_EMIT_MASK |1, b);
+			drawpol_befclip(s + b->tagoffset, -1, s, -1, plothead[0], plothead[1], DP_PRESERVE_LOOP| DP_EMIT_MASK |1, b);
 			int portflags = DP_NO_SCANSECT| surflag;// DP_EMIT_MASK|
 			drawpol_befclip(s + b->tagoffset, ttag, s, -1,
 				plothead[0], plothead[1],  portflags, b);

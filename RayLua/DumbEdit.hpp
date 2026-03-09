@@ -1207,14 +1207,14 @@ void SetColorum(uint8_t r, uint8_t g, uint8_t b, int16_t lum) {
 void HandleCameraControl() {
 	float move_unitspersec=8;
 	float move_unitspersec_fine=0.5;
-	float ang_per_sec=4;
-	float ang_per_sec_fine=0.5;
+	float ang_per_sec=15;
+	float ang_per_sec_fine=4;
 	point3d movec={0};
 	if (mdl.camera_controls_enabled) {
 		if (mdl.camera_rotate_enabled) {
 			Vector2 mouseDelta = GetMouseDelta();
 			if (mouseDelta.x != 0 || mouseDelta.y != 0) {
-				float sensitivity = 0.003f;
+				float sensitivity = 0.03f;
 				tr_quat_rotate_on_axis(&b2cam->tr,BBDOWN, -mouseDelta.x * ang_per_sec*GetFrameTime()*-1);
 				tr_quat_rotate_on_axis(&b2cam->tr,b2cam->tr.r, -mouseDelta.y * ang_per_sec*GetFrameTime());
 			}
