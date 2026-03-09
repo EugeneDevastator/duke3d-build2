@@ -94,14 +94,16 @@
 #define TEZ_WORLDZ1	 (1<<8)
 #define TEZ_WALL_ORTHO	 (1<<9) // aligned to slope if use slope.
 
+#if 1 // ================= STABLE DATATYPES =================
 typedef uint64_t bb_uid_t;  // global unique identifier. classless. storage use only.
 typedef uint16_t surfid_t;  // srface reference; 0,1  = caps; rest is wall index *surf index.
+
 typedef struct {
 	unsigned int otez : 10; // TEZ flags
 	unsigned int utez : 10;
 	unsigned int vtez : 10;
 	unsigned int ctez : 10; // 4th corner vector C = o + v + c
-	unsigned int padding : 24; // 4th corner vector C = o + v + c
+	unsigned int padding : 24;
 } procuvgen64_t; // procedural uv data
 
 typedef struct {
@@ -117,20 +119,6 @@ typedef struct {
 	unsigned int RESERVED : 4;    // padding to 32 bits
 } renderflags32_t;
 
-typedef struct {
-	// use z for possible volumetric tex impostors
-	point3d scale;
-	point3d pan;
-	point3d cropA;
-	point3d cropB;
-	point3d rot; // rot z is for deault uvs
-
-	uint8_t scaling_mode; // fit, use texel density,
-	uint8_t mapping_kind; // uv amappings, regular, polar, hex, triang, parallax, etc.
-	uint16_t tile_ordering; // 1 bit = flip, 2 bits = 4 rotations. 3bits X 4n tiles sharing vert. = 12 bits
-} uvform_t; // generic uvform for 2d and 3d volumetric mappings.
-
-#define UVFORM_DEFAULT (uvform_t){{1,1,1},{0,0,0},{0,0,0},{1,1,1},{0,0,0},0,0}
 
 typedef struct {
 	unsigned int is_bunchbreak : 1;
@@ -139,6 +127,157 @@ typedef struct {
 	unsigned int is_traversal_blocker : 1; // for full masks for ex.
 	unsigned int RESERVED : 6;    // padding to 32 bits
 } geoflags8_t;
+#endif
+
+#if 1 // =================================== STORAGE FORMATS ==========================
+
+typedef struct {
+	int64_t x,y,z; // 1 = 1 mm
+} point64_t;
+
+typedef struct {
+	int16_t r,g,b,a;
+} color_hdr16_t;
+
+typedef struct {
+	point64_t p,r,f,d;
+} transform64_t;
+
+typedef struct {
+	int32_t x,y,z; // 1 = 1 mm
+} point32_t;
+typedef struct {
+	int16_t x,y,z; // 1 = 1 mm
+} point16_t;
+
+typedef struct {
+	int32_t n;
+	point64_t* pts;
+} loop64_t;
+
+typedef struct {
+	uint64_t nsec;
+	uint16_t nsurf; // including 0 1 caps;
+	uint8_t nxsurf; // for wall xsurf index
+} surfref_t;
+
+typedef struct {
+	// use z for possible volumetric tex impostors
+	point16_t scale;
+	point16_t pan;
+	point16_t cropA;
+	point16_t cropB;
+	point16_t rot; // rot z is for deault uvs
+
+	uint8_t scaling_mode; // fit, use texel density, etc
+	uint8_t mapping_kind; // uv amappings, regular, polar, hex, triang, parallax, etc.
+	uint16_t tile_ordering; // 1 bit = flip, 2 bits = 4 rotations. 3bits X 4n tiles sharing vert. = 12 bits
+	uint16_t pad; // 1 bit = flip, 2 bits = 4 rotations. 3bits X 4n tiles sharing vert. = 12 bits
+} uvform128_t; // generic uvform for 2d and 3d volumetric mappings.
+
+
+// basic info on graphic representation
+typedef struct {
+	uint16_t galnum;
+	uint16_t tilnum;
+	uint8_t pal;
+	color_hdr16_t color;
+	renderflags32_t rflags;
+	geoflags8_t geoflags;
+	uint8_t fragRenderMode;
+	uint8_t vertRenderMode;
+	uint8_t blendMode;
+	uvform128_t uvform;
+	procuvgen64_t procuv;
+} planemat_store;
+
+// we can render adjacent flor and ceil surfs - after we rendered the sector - submit them as portals.
+typedef struct {
+	uint8_t nlinks; // use 0 o mark as no links.
+	surfref_t item0; // read n refs
+	planemat_store mat0; // read n mats
+} xsurfs_store;
+
+typedef struct {
+	uint8_t mode;
+	union {
+		uint16_t a,b,c; // wall ids
+		bb_uid_t sprid;
+	};
+} slopehint_t;
+
+typedef struct {
+	bb_uid_t id;
+	bb_uid_t dataptr; // reference to any additional composite data.
+	uint32_t commid; // for entire sector entity.
+
+	transform64_t tr;
+
+	point64_t anchor;
+	planemat_store surf;
+	int32_t tags[TAG_COUNT_PER_SECT];
+}sprite_store;
+
+typedef struct {
+	bb_uid_t id;
+	bb_uid_t dataptr; // reference to any additional composite data.
+	uint32_t commid; // for entire sector entity.
+
+	int64_t x,y;
+	int32_t tags[TAG_COUNT_PER_SECT];
+
+	xsurfs_store xsurfs;
+
+} wall_store;
+
+typedef struct{
+	bb_uid_t id;
+	bb_uid_t dataptr; // reference to any additional composite data.
+	uint32_t commid;
+
+	int64_t z;      //ceil&flor height pos.
+	point32_t grad; //ceil&flor grad. grad.x = norm.x/norm.z, grad.y = norm.y/norm.z
+	slopehint_t slopehint;
+	int32_t tags[TAG_COUNT_PER_SECT];
+
+	xsurfs_store links;
+} cap_t;
+
+typedef struct // SECT STORE
+{
+	bb_uid_t id;
+	bb_uid_t dataptr; // reference to any additional composite data.
+	uint32_t sect_commid; // for entire sector entity.
+
+	uint8_t originvert;
+	cap_t caps[2]; // 0=ceil, 1=floor;
+	int32_t tags[TAG_COUNT_PER_SECT];
+
+	long n_walls;
+	long n_spris;
+	//wall_store wall0;
+	//uint32_t spr_indices;
+} sect_store;
+
+// todo - check ken's png lib;
+typedef struct {
+	char type[4];
+	bb_uid_t guid;
+	uint32_t length;
+	unsigned char *data;
+	uint32_t crc;
+} datablock;
+
+
+// game-dependent. but can have in-engine
+typedef struct {
+	char reltype[3]; // PRT, POS, ROT, UVT,
+	uint32_t guid;
+	uint32_t guid2;
+	uint32_t linkageId;
+} relation;
+
+#endif
 
 typedef struct {
 	point3d ori;    // origin
@@ -187,6 +326,22 @@ typedef struct {
 #define LIGHT_SOURCE_DEFAULT (lightsource_t){BBPONE,1,0,1,0,BBPTLEN(360),BBPZERO,BBPONE}
 
 #if 1 // ==================== RUNTIME FORMATS, Editor  ====================
+typedef struct {
+	// use z for possible volumetric tex impostors
+	point3d scale;
+	point3d pan;
+	point3d cropA;
+	point3d cropB;
+	point3d rot; // rot z is for deault uvs
+
+	uint8_t scaling_mode; // fit, use texel density,
+	uint8_t mapping_kind; // uv amappings, regular, polar, hex, triang, parallax, etc.
+	uint16_t tile_ordering; // 1 bit = flip, 2 bits = 4 rotations. 3bits X 4n tiles sharing vert. = 12 bits
+} uvform_t; // generic uvform for 2d and 3d volumetric mappings.
+
+#define UVFORM_DEFAULT (uvform_t){{1,1,1},{0,0,0},{0,0,0},{1,1,1},{0,0,0},0,0}
+
+
 typedef struct {
 	renderflags32_t rflags;
 	// need some geometry flags for build, like do we skip, emit mask etc. could be better than just transparency.
@@ -417,136 +572,7 @@ typedef struct {
 	// use some wall as origin, or even sprite.
 } chunk_t;
 #endif
-#if 1 // =================================== STORAGE FORMATS ==========================
-typedef struct {
-	int64_t x,y,z; // 1 = 1 mm
-} point64_t;
 
-typedef struct {
-	int16_t r,g,b,a;
-} color_hdr;
-
-typedef struct {
-	point64_t p,r,f,d;
-} transform64_t;
-
-typedef struct {
-	int32_t x,y,z; // 1 = 1 mm
-} point32_t;
-typedef struct {
-	int16_t x,y,z; // 1 = 1 mm
-} point16_t;
-
-typedef struct {
-	int32_t n;
-	point64_t* pts;
-} loop64_t;
-
-typedef struct {
-	// use z for possible volumetric tex impostors
-	point16_t scale;
-	point16_t pan;
-	point16_t cropA;
-	point16_t cropB;
-	point16_t rot; // rot z is for deault uvs
-
-	uint8_t scaling_mode; // fit, use texel density, etc
-	uint8_t mapping_kind; // uv amappings, regular, polar, hex, triang, parallax, etc.
-	uint16_t tile_ordering; // 1 bit = flip, 2 bits = 4 rotations. 3bits X 4n tiles sharing vert. = 12 bits
-} uvform_store; // generic uvform for 2d and 3d volumetric mappings.
-
-// basic info on graphic representation
-typedef struct {
-	uint16_t galnum;
-	uint16_t tilnum;
-	uint8_t pal;
-	color_hdr color;
-	renderflags32_t rflags;
-	geoflags8_t geoflags;
-	uint8_t fragRenderMode;
-	uint8_t vertRenderMode;
-	uint8_t blendMode;
-	uvform_t uvform;
-	procuvgen64_t procuv;
-} surf_store;
-
-typedef struct {
-	bb_uid_t id;
-	bb_uid_t dataptr; // reference to any additional composite data.
-	uint32_t commid; // for entire sector entity.
-
-	transform64_t tr;
-
-	point64_t anchor;
-	surf_store surf;
-	int32_t tags[TAG_COUNT_PER_SECT];
-}sprite_store;
-
-typedef struct {
-	bb_uid_t id;
-	bb_uid_t dataptr; // reference to any additional composite data.
-	uint32_t commid; // for entire sector entity.
-
-	int64_t x,y;
-	uint8_t nsurfs;
-	surf_store *surfs; // top mid bottom; but can store any more.
-	int32_t tags[TAG_COUNT_PER_SECT];
-} wall_store;
-
-typedef struct {
-	uint8_t mode;
-	union {
-		uint8_t a,b,c; // wall ids
-		bb_uid_t sprid;
-	};
-} slopehint_t;
-
-typedef struct{
-	int64_t z;      //ceil&flor height pos.
-	point32_t grad; //ceil&flor grad. grad.x = norm.x/norm.z, grad.y = norm.y/norm.z
-	surf_store surf;  //ceil&flor texture info
-	uint32_t commid; // for surfaces.
-	int64_t nextsec; // innate caps portal sect ref
-	surfid_t nextsurf; // innater portal surf ref.
-	slopehint_t slopehint;
-} cap_t;
-
-typedef struct // SECT STORE
-{
-	bb_uid_t id;
-	bb_uid_t dataptr; // reference to any additional composite data.
-	uint32_t sect_commid; // for entire sector entity.
-
-	uint8_t originvert;
-	cap_t caps[2]; // 0=ceil, 1=floor;
-
-	long n_walls;
-	long n_spris;
-	wall_store *walls;
-	uint32_t *spr_indices;
-	int32_t tags[TAG_COUNT_PER_SECT];
-
-} sect_store;
-
-// todo - check ken's png lib;
-typedef struct {
-	char type[4];
-	bb_uid_t guid;
-	uint32_t length;
-	unsigned char *data;
-	uint32_t crc;
-} datablock;
-
-
-// game-dependent. but can have in-engine
-typedef struct {
-	char reltype[3]; // PRT, POS, ROT, UVT,
-	uint32_t guid;
-	uint32_t guid2;
-	uint32_t linkageId;
-} relation;
-
-#endif
 typedef struct
 {
 	point3d startpos, startrig, startdow, startfor;
