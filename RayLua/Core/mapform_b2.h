@@ -8,16 +8,16 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <buildmath.h>
-
-#define SPRITE_B2_BLOCKING         (1 << 0)   // 1
-#define SPRITE_B2_1         (1 << 1)   // 1
-#define SPRITE_B2_FLIP_X           (1 << 2)   // 4
-#define SPRITE_B2_FLIP_Y           (1 << 3)   // 8
-#define SPRITE_B2_FACING        (1 << 4)   // 16
-#define SPRITE_B2_FLAT_POLY    (1 << 5)   // 32
-#define SPRITE_B2_ONE_SIDED        (1 << 6)   // 64
-#define SPRITE_B2_IS_LIGHT     (1 << 16)   // 64
-#define SPRITE_B2_IS_DYNAMIC     (1 << 17)    // for dynamic lights and all dynamic stuff.
+// obsolte flags
+// #define SPRITE_B2_BLOCKING         (1 << 0)   // 1
+// #define SPRITE_B2_1         (1 << 1)   // 1
+// #define SPRITE_B2_FLIP_X           (1 << 2)   // 4
+// #define SPRITE_B2_FLIP_Y           (1 << 3)   // 8
+// #define SPRITE_B2_FACING        (1 << 4)   // 16
+// #define SPRITE_B2_FLAT_POLY    (1 << 5)   // 32
+// #define SPRITE_B2_ONE_SIDED        (1 << 6)   // 64
+ #define SPRITE_B2_IS_LIGHT     (1 << 16)   // 64
+// #define SPRITE_B2_IS_DYNAMIC     (1 << 17)    // for dynamic lights and all dynamic stuff.
 
 #define CLIP_MOVE		(1<<0) // blocking
 #define CLIP_HIT		(1<<1) // hitscan
@@ -67,9 +67,6 @@
 // flor or ceil;
 // raw z or slope z;
 
-
-
-//Bit0:Blocking, Bit2:1WayOtherSide, Bit5,Bit4:Face/Wall/Floor/.., Bit6:1side, Bit16:IsLight, Bit17-19:SpotAx(1-6), Bit20-29:SpotWid, Bit31:Invisible
 // ------ Duke Nukem tiling and coords.
 // 1024 build units(x,y) correspond to 64 pixels. at 8,8 repeat.
 // 1024 build units(x,y) correspond to 32 pixels. at 4,4 repeat
@@ -84,7 +81,7 @@
 #define TEZ_CEIL 0
 
 #define TEZ_NW		 (1<<0)  // use this or following wall(wal[x].n+x)
-#define TEZ_NS		 (1<<1) // this or next sect
+#define TEZ_NS		 (1<<1) // this or next sect, resulting wall is determined by own sector order.
 #define TEZ_FLOR	 (1<<2)  // use floor or ceil
 #define TEZ_SLOPE	 (1<<3) // slope or rawz;
 #define TEZ_CLOSEST	 (1<<4) // closest height point instead of arbitrary.
@@ -93,47 +90,79 @@
 #define TEZ_WORLD_Y	 (1<<7)
 #define TEZ_WORLDZ1	 (1<<8)
 #define TEZ_WALL_ORTHO	 (1<<9) // aligned to slope if use slope.
+#define TEZ_IS_ORTHO_TO_PREV	 (1<<10) // generate ortho in plane V from U, c from v
+#define TEZ_MAKE_UNIT_VECS	 (1<<11) //
 
 #if 1 // ================= STABLE DATATYPES =================
+#pragma pack(push, 1)
 typedef uint64_t bb_uid_t;  // global unique identifier. classless. storage use only.
 typedef uint16_t surfid_t;  // srface reference; 0,1  = caps; rest is wall index *surf index.
 
 typedef struct {
-	unsigned int otez : 10; // TEZ flags
-	unsigned int utez : 10;
-	unsigned int vtez : 10;
-	unsigned int ctez : 10; // 4th corner vector C = o + v + c
-	unsigned int padding : 24;
+	uint16_t otez; // TEZ flags
+	uint16_t utez;
+	uint16_t vtez;
+	uint16_t ctez; // 4th corner vector C = o + v + c
 } procuvgen64_t; // procedural uv data
 
 typedef struct {
-	unsigned int is_visible : 1;
-	unsigned int is_light : 1; // for lights just store them. in separate struct.
+	unsigned int is_renderable : 1;
 	unsigned int shadow_get : 1;
 	unsigned int shadow_cast : 1; //  for lights = ambient
-	unsigned int is_dblside : 1; //  for lights - marks if it appies to backfaces,
-	unsigned int q: 2;        // queue 0-3: opaque, atest, transparent, postproc
-	unsigned int blend_mode : 3;  // 0-7 blend modes
+	unsigned int light_get : 1;
+	unsigned int light_pass : 1;
+	unsigned int is_dblsided : 1; //  for lights - marks if it appies to backfaces,
+	unsigned int q: 3;        // queue 0-3: opaque, atest, transparent, postproc
+	unsigned int blend_mode : 4;  // 0-7 blend modes
 	unsigned int vert_mode : 4; // for anything that affects geometry
-	unsigned int frag_mode : 4;   // for surface effects 1 = parallax.
-	unsigned int RESERVED : 4;    // padding to 32 bits
-} renderflags32_t;
+	unsigned int frag_mode : 5;   // for surface effects 1 = parallax.
+} renderflags32_t; // struct for triangulated rendering options. post-mono
+
+typedef struct {
+	unsigned int shadow_get : 1;
+	unsigned int shadow_cast : 1; //  for lights = ambient
+	unsigned int light_get : 1;
+	unsigned int light_pass : 1;
+	unsigned int is_dblsided : 1; //  for lights - marks if it appies to backfaces,
+	unsigned int pad : 3; //  for lights - marks if it appies to backfaces,
+
+
+} renderflags_resolved8_T; // struct for triangulated rendering options. post-mono
 
 
 typedef struct {
 	unsigned int is_bunchbreak : 1;
 	unsigned int is_mask_emitter : 1; // can be alpha test
-	unsigned int is_portal : 1; // for new style portals
-	unsigned int is_traversal_blocker : 1; // for full masks for ex.
-	unsigned int RESERVED : 6;    // padding to 32 bits
-} geoflags8_t;
+	unsigned int is_tele_portal : 1; // for new style portals
+	unsigned int is_clip_traversal_blocker : 1; // for full masks for ex.
+	unsigned int is_locked_to_sector : 1; // for sprites that can be outside of sector bounds
+	unsigned int RESERVED : 12;    // padding to 8
+} geoflags16_t;
 #endif
+/* ai review:
+procuvgen64_t in material	❌ Move to flexible
+renderflags32_t in material	❌ Move to flexible
+base_physics in sprite	❌ Move to flexible/dataid
+script_flags16_t in sprite	❌ Move to flexible
+xsurfs_store variable tail	❌ Fix layout or move
+Tags: reduce to 4-8 in stable	⚠️ Oversized
+Map header	❌ Missing entirely
+lotag/hitag/extra/shade/cstat	❌ Missing for Build compat
 
+Bitfields are not safe for stable binary format. Replace with explicit uint fields:
+
+*/
 #if 1 // =================================== STORAGE FORMATS ==========================
 
 typedef struct {
 	int64_t x,y,z; // 1 = 1 mm
 } point64_t;
+typedef struct {
+	int32_t x,y,z; // 1 = 1 mm
+} point32_t;
+typedef struct {
+	int16_t x,y,z; // 1 = 1 mm
+} point16_t;
 
 typedef struct {
 	int16_t r,g,b,a;
@@ -144,11 +173,8 @@ typedef struct {
 } transform64_t;
 
 typedef struct {
-	int32_t x,y,z; // 1 = 1 mm
-} point32_t;
-typedef struct {
-	int16_t x,y,z; // 1 = 1 mm
-} point16_t;
+	point16_t p,r,f,d;
+} transform16_t;
 
 typedef struct {
 	int32_t n;
@@ -162,7 +188,7 @@ typedef struct {
 } surfref_t;
 
 typedef struct {
-	// use z for possible volumetric tex impostors
+	// use zdim for possible volumetric textures, impostors,
 	point16_t scale;
 	point16_t pan;
 	point16_t cropA;
@@ -172,7 +198,7 @@ typedef struct {
 	uint8_t scaling_mode; // fit, use texel density, etc
 	uint8_t mapping_kind; // uv amappings, regular, polar, hex, triang, parallax, etc.
 	uint16_t tile_ordering; // 1 bit = flip, 2 bits = 4 rotations. 3bits X 4n tiles sharing vert. = 12 bits
-	uint16_t pad; // 1 bit = flip, 2 bits = 4 rotations. 3bits X 4n tiles sharing vert. = 12 bits
+	uint16_t _pad;
 } uvform128_t; // generic uvform for 2d and 3d volumetric mappings.
 
 
@@ -180,64 +206,90 @@ typedef struct {
 typedef struct {
 	uint16_t galnum;
 	uint16_t tilnum;
-	uint8_t pal;
+	uint16_t pal;
+	uint16_t fx;  // parallax/shader/distortion effects
 	color_hdr16_t color;
-	renderflags32_t rflags;
-	geoflags8_t geoflags;
-	uint8_t fragRenderMode;
-	uint8_t vertRenderMode;
-	uint8_t blendMode;
-	uvform128_t uvform;
+	uint8_t blend_kind;   // compositing mode
+	uint8_t optic_flags;   // getting, light, shadows etc.
+
+	bb_uid_t matdata; //additional extended material data.
+
+	geoflags16_t geoflags;
 	procuvgen64_t procuv;
-} planemat_store;
+	uvform128_t uvform;
+	//renderflags32_t rflags;
+} basic_material_store;
 
 // we can render adjacent flor and ceil surfs - after we rendered the sector - submit them as portals.
 typedef struct {
 	uint8_t nlinks; // use 0 o mark as no links.
-	surfref_t item0; // read n refs
-	planemat_store mat0; // read n mats
+	//surfref_t item0; // read n refs
+	//basic_material_store mat0; // read n mats
+
+	// layout: xsurfstore [sufref*] [planemat*]
 } xsurfs_store;
 
 typedef struct {
 	uint8_t mode;
 	union {
 		uint16_t a,b,c; // wall ids
-		bb_uid_t sprid;
+		uint16_t local_sprite_n;
 	};
 } slopehint_t;
 
 typedef struct {
-	bb_uid_t id;
-	bb_uid_t dataptr; // reference to any additional composite data.
-	uint32_t commid; // for entire sector entity.
+	transform16_t collider;
+	point32_t v, av, pcenter;           //Position velocity, Angular velocity (direction=axis, magnitude=vel), center of mass
+	int32_t mas, drag, restitutionK;
+	uint16_t clipmask; // block, hitscan, trigger, - for physics engine // aka layer
+}base_physics;
 
-	transform64_t tr;
-
-	point64_t anchor;
-	planemat_store surf;
-	int32_t tags[TAG_COUNT_PER_SECT];
-}sprite_store;
+typedef struct {
+	unsigned int active : 1;
+	unsigned int initial_state : 1; // on/off open/closed etc.
+	unsigned int state : 6+8; // custom state for statemachines. 64 shoul
+} script_flags16_t;
 
 typedef struct {
 	bb_uid_t id;
-	bb_uid_t dataptr; // reference to any additional composite data.
-	uint32_t commid; // for entire sector entity.
+	bb_uid_t dataid;
+	uint32_t commtag; // lotag
+	uint32_t hitag; // RX
+
+	uint32_t classid;
+	transform64_t tr;
+	transform16_t view_transform; // always  relative to original transform.
+
+	basic_material_store material;
+	base_physics physics;
+	script_flags16_t scriptflags;
+
+
+} sprite_store;
+
+typedef struct {
+	bb_uid_t id;
+	bb_uid_t dataid; // reference to any additional composite data.
+	uint32_t commtag; // lotag
+	uint32_t hitag; // RX
+
 
 	int64_t x,y;
 	int32_t tags[TAG_COUNT_PER_SECT];
 
 	xsurfs_store xsurfs;
-
 } wall_store;
 
 typedef struct{
 	bb_uid_t id;
-	bb_uid_t dataptr; // reference to any additional composite data.
-	uint32_t commid;
+	bb_uid_t dataid; // reference to any additional composite data.
+	uint32_t commtag; // lotag
+	uint32_t hitag; // RX
+
 
 	int64_t z;      //ceil&flor height pos.
-	point32_t grad; //ceil&flor grad. grad.x = norm.x/norm.z, grad.y = norm.y/norm.z
 	slopehint_t slopehint;
+	point32_t grad; //ceil&flor grad. grad.x = norm.x/norm.z, grad.y = norm.y/norm.z
 	int32_t tags[TAG_COUNT_PER_SECT];
 
 	xsurfs_store links;
@@ -246,10 +298,12 @@ typedef struct{
 typedef struct // SECT STORE
 {
 	bb_uid_t id;
-	bb_uid_t dataptr; // reference to any additional composite data.
-	uint32_t sect_commid; // for entire sector entity.
+	bb_uid_t dataid; // reference to any additional composite data.
+	uint32_t commtag; // lotag
+	uint32_t hitag; // RX
 
-	uint8_t originvert;
+	uint16_t originvert;
+	uint16_t outer_loop_wall_start;
 	cap_t caps[2]; // 0=ceil, 1=floor;
 	int32_t tags[TAG_COUNT_PER_SECT];
 
@@ -277,8 +331,10 @@ typedef struct {
 	uint32_t linkageId;
 } relation;
 
+#pragma pack(pop)
 #endif
 
+#if 1 // ==================== RUNTIME FORMATS, Editor  ====================
 typedef struct {
 	point3d ori;    // origin
 	point3d u;      // U axis
@@ -325,7 +381,7 @@ typedef struct {
 
 #define LIGHT_SOURCE_DEFAULT (lightsource_t){BBPONE,1,0,1,0,BBPTLEN(360),BBPZERO,BBPONE}
 
-#if 1 // ==================== RUNTIME FORMATS, Editor  ====================
+
 typedef struct {
 	// use z for possible volumetric tex impostors
 	point3d scale;
@@ -508,7 +564,7 @@ typedef struct // wall t
 	surf_t surf, xsurf[3]; //additional malloced surfs when (surfn > 1)
 
 	// COLD DATA
-	uint32_t dataptr; // reference to any additional data.
+	uint32_t dataid; // reference to any additional data.
 	uint32_t tguid; // unique per wall.
 
 	/*
@@ -535,7 +591,7 @@ typedef struct
 {
 	bb_uid_t id;
 	// BuildEngine base data
-	uint32_t dataptr; // reference to any additional data.
+	uint32_t dataid; // reference to any additional data.
 	uint32_t tguid;   // uniq per sect.
 	uint16_t areaid; // for trigger purposes. 0 = none
 	float z[2];      //ceil&flor height

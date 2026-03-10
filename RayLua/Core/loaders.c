@@ -813,7 +813,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 					spr->view.rflags.vert_mode = vmode_billbord;
 				if  (flagsw & (SPRITE_IS_WALL_PLANE | SPRITE_IS_FLOOR_PLANE)) {
 					spr->view.rflags.vert_mode  = vmode_quad;
-					spr->view.rflags.is_dblside =  !(b7spr.cstat& SPRITE_ONE_SIDED);
+					spr->view.rflags.is_dblsided =  !(b7spr.cstat& SPRITE_ONE_SIDED);
 				}
 
 				point3d buildFW = (point3d){cos((float)b7spr.ang*PI/1024.0),sin((float)b7spr.ang*PI/1024.0),0};
