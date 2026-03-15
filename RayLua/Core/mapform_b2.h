@@ -129,15 +129,13 @@ typedef struct {
 /* ai review:
 
 script_flags16_t in sprite	❌ Move to flexible
-xsurfs_store variable tail	❌ Fix layout or move
-Tags: reduce to 4-8 in stable	⚠️ Oversized
 Map header	❌ Missing entirely
 lotag/hitag/extra/shade/cstat	❌ Missing for Build compat
 
 Bitfields are not safe for stable binary format. Replace with explicit uint fields:
 
 */
-#if 1 // =================================== STORAGE FORMATS ==========================
+#if 1 // =================================== STABLE STORAGE ==========================
 
 typedef struct {
 	int64_t x,y,z; // 1 = 1 mm
@@ -150,7 +148,7 @@ typedef struct {
 } point16_t;
 
 typedef struct {
-	int16_t r,g,b,a;
+	int16_t r,g,b,a; // YES CAN BE NEGATIVE!
 } color_hdr16_t;
 
 typedef struct {
@@ -165,14 +163,10 @@ typedef struct {
 
 typedef struct {
 	int32_t n;
-	point64_t* pts;
+	//point64_t[n]
 } loop64_t;
 
-typedef struct {
-	uint64_t nsec;
-	uint16_t nsurf; // including 0 1 caps;
-	uint8_t nxsurf; // for wall xsurf index
-} surfref_t;
+
 
 typedef struct {
 	// use zdim for possible volumetric textures, impostors,
@@ -188,6 +182,13 @@ typedef struct {
 	uint16_t _pad;
 } uvform128_t; // generic uvform for 2d and 3d volumetric mappings.
 
+typedef struct {
+	bb_uid_t id;
+	bb_uid_t dataid; // reference to any additional composite data.
+	uint32_t commtag; // lotag
+	uint32_t hitag; // RX, quick send. here, because it is very common in build maps.
+	int32_t basetags[4];
+} dataheader;
 
 // basic info on graphic representation
 typedef struct {
@@ -207,13 +208,19 @@ typedef struct {
 
 } basic_material_store;
 
+typedef struct {
+	uint64_t nsec; // 0 = no link, so offset by 1 after read.
+	uint32_t entersurf; // including 0 1 as caps;
+	uint32_t nextspri; // for arbitrary portal, again 0 means use wall-based unit tr.
+	uint32_t thisspri; // for arbitrary portal.
+} surfref_t;
+
 // we can render adjacent flor and ceil surfs - after we rendered the sector - submit them as portals.
 typedef struct {
 	uint8_t nlinks; // use 0 o mark as no links.
-	//surfref_t item0; // read n refs
-	//basic_material_store mat0; // read n mats
-	// layout: xsurfstore [sufref*] [planemat*]
-} xsurfs_store;
+	// surfref_t[nlinks]; // read n refs
+	// basic_material_store[nlinks] // read n mats
+} xsurfs_header_t;
 
 typedef struct {
 	uint8_t mode;
@@ -236,10 +243,7 @@ typedef struct {
 } script_flags16_t;
 
 typedef struct {
-	bb_uid_t id;
-	bb_uid_t dataid;
-	uint32_t commtag; // lotag
-	uint32_t hitag; // RX
+	dataheader head;
 
 	uint32_t classid;
 	transform64_t tr;
@@ -253,54 +257,40 @@ typedef struct {
 } sprite_store;
 
 typedef struct {
-	bb_uid_t id;
-	bb_uid_t dataid; // reference to any additional composite data.
-	uint32_t commtag; // lotag
-	uint32_t hitag; // RX
-
+	dataheader head;
 
 	int64_t x,y;
-	int32_t tags[TAG_COUNT_PER_SECT];
-
-	xsurfs_store xsurfs;
+	xsurfs_header_t xsurfs;
 } wall_store;
 
 typedef struct{
-	bb_uid_t id;
-	bb_uid_t dataid; // reference to any additional composite data.
-	uint32_t commtag; // lotag
-	uint32_t hitag; // RX
+	dataheader head;
 
 	int64_t z;      //ceil&flor height pos.
 	slopehint_t slopehint;
 	point32_t grad; //ceil&flor grad. grad.x = norm.x/norm.z, grad.y = norm.y/norm.z
-	int32_t tags[TAG_COUNT_PER_SECT];
 
-	xsurfs_store links;
+	xsurfs_header_t xsurfs;
 } cap_t;
 
 typedef struct // SECT STORE
 {
-	bb_uid_t id;
-	bb_uid_t dataid; // reference to any additional composite data.
-	uint32_t commtag; // lotag
-	uint32_t hitag; // RX, quick send. here, because it is very common in build maps.
+	dataheader head;
 
-	uint16_t originwall; // persistent first wall storage.
+	uint32_t originwall; // persistent first wall storage.
 
 	cap_t caps[2]; // 0=ceil, 1=floor;
-	int32_t tags[TAG_COUNT_PER_SECT];
 
-	long n_walls;
-	long n_spris;
-	// wall_store []; // walls
-	// uint32_t []; // sprite indices
+	uint32_t n_walls;
+	uint32_t n_spris;
+	// wall_store [n_walls]; // walls
+	// uint32_t [n_spris]; // sprite indices
 } sect_store;
 
 typedef struct {
 	bb_uid_t id;
 	bb_uid_t entry_sectid;
-	transform64_t origin; //will align to
+	transform64_t origin; //will align origin wall to this transform.
 	uint8_t kind; // 0 - normal. 1 - inverted. 2- procedural subtract, 3- overlay.
 	// rotation and position transforms.
 	// use some wall as origin, or even sprite.
@@ -311,18 +301,20 @@ typedef struct {
 	char type[4];
 	bb_uid_t guid;
 	uint32_t length;
-	unsigned char *data;
+	//unsigned char[length]; // data
 	uint32_t crc;
-} datablock;
+} data_block; // dynamic data store.
 
-
-// game-dependent. but can have in-engine
 typedef struct {
-	char reltype[3]; // PRT, POS, ROT, UVT,
-	uint32_t guid;
-	uint32_t guid2;
-	uint32_t linkageId;
-} relation;
+	uint8_t  magic[4];   // "BB2\0"
+	uint16_t ver_major;
+	uint16_t ver_minor;
+	uint64_t n_chunks;
+	uint64_t n_sects;
+	uint64_t n_sprites;
+	uint64_t data_offset; // start of blob section
+	uint64_t n_blocks; // start of blob section
+} map_b2_store_header_t;
 
 #pragma pack(pop)
 #endif
@@ -337,6 +329,14 @@ typedef struct {
 	point3d eye;	// eye/apex point (push far along -N for ortho)
 	float eyeratio; // lerp argument for eye distance adjst. mostly for effects.
 } uv_world_t;  // generated uv structure. runtime only.
+
+// game-dependent. but can have in-engine
+typedef struct {
+	char reltype[3]; // PRT, POS, ROT, UVT,
+	uint32_t guid;
+	uint32_t guid2;
+	uint32_t linkageId;
+} relation;
 
 enum vertRenderMode { // not part of the flags because must be chosen before any flags take place
 	vmode_billbord = 0,     // also is very sprite- specific.
