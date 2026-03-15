@@ -105,18 +105,6 @@ typedef struct {
 	uint16_t ctez; // 4th corner vector C = o + v + c
 } procuvgen64_t; // procedural uv data
 
-typedef struct {
-	unsigned int is_renderable : 1;
-	unsigned int shadow_get : 1;
-	unsigned int shadow_cast : 1; //  for lights = ambient
-	unsigned int light_get : 1;
-	unsigned int light_pass : 1;
-	unsigned int is_dblsided : 1; //  for lights - marks if it appies to backfaces,
-	unsigned int q: 3;        // queue 0-3: opaque, atest, transparent, postproc
-	unsigned int blend_mode : 4;  // 0-7 blend modes
-	unsigned int vert_mode : 4; // for anything that affects geometry
-	unsigned int frag_mode : 5;   // for surface effects 1 = parallax.
-} renderflags32_t; // struct for triangulated rendering options. post-mono
 
 typedef struct {
 	unsigned int shadow_get : 1;
@@ -124,9 +112,8 @@ typedef struct {
 	unsigned int light_get : 1;
 	unsigned int light_pass : 1;
 	unsigned int is_dblsided : 1; //  for lights - marks if it appies to backfaces,
-	unsigned int pad : 3; //  for lights - marks if it appies to backfaces,
-
-
+	unsigned int q: 2;        // queue 0-3: opaque, atest, transparent, overdraw
+	unsigned int pad : 1; //  for lights - marks if it appies to backfaces,
 } renderflags_resolved8_T; // struct for triangulated rendering options. post-mono
 
 
@@ -140,9 +127,7 @@ typedef struct {
 } geoflags16_t;
 #endif
 /* ai review:
-procuvgen64_t in material	❌ Move to flexible
-renderflags32_t in material	❌ Move to flexible
-base_physics in sprite	❌ Move to flexible/dataid
+
 script_flags16_t in sprite	❌ Move to flexible
 xsurfs_store variable tail	❌ Fix layout or move
 Tags: reduce to 4-8 in stable	⚠️ Oversized
@@ -171,7 +156,9 @@ typedef struct {
 typedef struct {
 	point64_t p,r,f,d;
 } transform64_t;
-
+typedef struct {
+	point32_t p,r,f,d;
+} transform32_t;
 typedef struct {
 	point16_t p,r,f,d;
 } transform16_t;
@@ -217,7 +204,7 @@ typedef struct {
 	geoflags16_t geoflags;
 	procuvgen64_t procuv;
 	uvform128_t uvform;
-	//renderflags32_t rflags;
+
 } basic_material_store;
 
 // we can render adjacent flor and ceil surfs - after we rendered the sector - submit them as portals.
@@ -225,7 +212,6 @@ typedef struct {
 	uint8_t nlinks; // use 0 o mark as no links.
 	//surfref_t item0; // read n refs
 	//basic_material_store mat0; // read n mats
-
 	// layout: xsurfstore [sufref*] [planemat*]
 } xsurfs_store;
 
@@ -238,10 +224,9 @@ typedef struct {
 } slopehint_t;
 
 typedef struct {
-	transform16_t collider;
-	point32_t v, av, pcenter;           //Position velocity, Angular velocity (direction=axis, magnitude=vel), center of mass
+	transform16_t localbounds;
+	point32_t v, av, mcenter;           //Position velocity, Angular velocity (direction=axis, magnitude=vel), center of mass
 	int32_t mas, drag, restitutionK;
-	uint16_t clipmask; // block, hitscan, trigger, - for physics engine // aka layer
 }base_physics;
 
 typedef struct {
@@ -259,11 +244,11 @@ typedef struct {
 	uint32_t classid;
 	transform64_t tr;
 	transform16_t view_transform; // always  relative to original transform.
+	uint16_t scriptflags; // script_flags16_t
+	uint16_t clipmask; // block, hitscan, trigger, - for physics engine // aka layer
 
 	basic_material_store material;
 	base_physics physics;
-	script_flags16_t scriptflags;
-
 
 } sprite_store;
 
@@ -286,7 +271,6 @@ typedef struct{
 	uint32_t commtag; // lotag
 	uint32_t hitag; // RX
 
-
 	int64_t z;      //ceil&flor height pos.
 	slopehint_t slopehint;
 	point32_t grad; //ceil&flor grad. grad.x = norm.x/norm.z, grad.y = norm.y/norm.z
@@ -300,18 +284,27 @@ typedef struct // SECT STORE
 	bb_uid_t id;
 	bb_uid_t dataid; // reference to any additional composite data.
 	uint32_t commtag; // lotag
-	uint32_t hitag; // RX
+	uint32_t hitag; // RX, quick send. here, because it is very common in build maps.
 
-	uint16_t originvert;
-	uint16_t outer_loop_wall_start;
+	uint16_t originwall; // persistent first wall storage.
+
 	cap_t caps[2]; // 0=ceil, 1=floor;
 	int32_t tags[TAG_COUNT_PER_SECT];
 
 	long n_walls;
 	long n_spris;
-	//wall_store wall0;
-	//uint32_t spr_indices;
+	// wall_store []; // walls
+	// uint32_t []; // sprite indices
 } sect_store;
+
+typedef struct {
+	bb_uid_t id;
+	bb_uid_t entry_sectid;
+	transform64_t origin; //will align to
+	uint8_t kind; // 0 - normal. 1 - inverted. 2- procedural subtract, 3- overlay.
+	// rotation and position transforms.
+	// use some wall as origin, or even sprite.
+} chunk_store;
 
 // todo - check ken's png lib;
 typedef struct {
@@ -380,6 +373,18 @@ typedef struct {
 
 
 #define LIGHT_SOURCE_DEFAULT (lightsource_t){BBPONE,1,0,1,0,BBPTLEN(360),BBPZERO,BBPONE}
+typedef struct {
+	unsigned int is_renderable : 1;
+	unsigned int shadow_get : 1;
+	unsigned int shadow_cast : 1; //  for lights = ambient
+	unsigned int light_get : 1;
+	unsigned int light_pass : 1;
+	unsigned int is_dblsided : 1; //  for lights - marks if it appies to backfaces,
+	unsigned int q: 3;        // queue 0-3: opaque, atest, transparent, postproc
+	unsigned int blend_mode : 4;  // 0-7 blend modes
+	unsigned int vert_mode : 4; // for anything that affects geometry
+	unsigned int frag_mode : 5;   // for surface effects 1 = parallax.
+} renderflags32_t; // struct for triangulated rendering options. post-mono
 
 
 typedef struct {
@@ -618,15 +623,6 @@ typedef struct
 	// mode is follow 1 follow 2 follow 1+2 or ignore.
 } sect_t;
 
-typedef struct {
-	bb_uid_t id;
-	long nsect;
-	sect_t* sects;
-	long spriorig; // sprite that denotes origin and transform
-	uint8_t kind; // 0 - normal. 1 - inverted. 2- procedural subtract, 3- overlay.
-	// rotation and position transforms.
-	// use some wall as origin, or even sprite.
-} chunk_t;
 #endif
 
 typedef struct
