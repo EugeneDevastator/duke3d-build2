@@ -148,8 +148,10 @@ typedef struct {
 } point16_t;
 
 typedef struct {
-	int16_t r,g,b,a; // YES CAN BE NEGATIVE!
-} color_hdr16_t;
+	int32_t r,g,b,a; // YES CAN BE NEGATIVE!
+	uint32_t mul; // and even brighter
+	// result = base/div *mul.
+} color_hdr_t;
 
 typedef struct {
 	point64_t p,r,f,d;
@@ -196,7 +198,7 @@ typedef struct {
 	uint16_t tilnum;
 	uint16_t pal;
 	uint16_t fx;  // parallax/shader/distortion effects
-	color_hdr16_t color;
+	color_hdr_t color;
 	uint8_t blend_kind;   // compositing mode
 	uint8_t optic_flags;   // getting, light, shadows etc.
 
