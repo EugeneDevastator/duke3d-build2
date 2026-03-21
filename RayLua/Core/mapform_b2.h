@@ -9,14 +9,14 @@
 #include <stdbool.h>
 #include <buildmath.h>
 // obsolte flags
-// #define SPRITE_B2_BLOCKING         (1 << 0)   // 1
-// #define SPRITE_B2_1         (1 << 1)   // 1
-// #define SPRITE_B2_FLIP_X           (1 << 2)   // 4
-// #define SPRITE_B2_FLIP_Y           (1 << 3)   // 8
-// #define SPRITE_B2_FACING        (1 << 4)   // 16
-// #define SPRITE_B2_FLAT_POLY    (1 << 5)   // 32
-// #define SPRITE_B2_ONE_SIDED        (1 << 6)   // 64
- #define SPRITE_B2_IS_LIGHT     (1 << 16)   // 64
+// #define SPRITE_B2_BLOCKING       (1 << 0)   // 1
+// #define SPRITE_B2_1              (1 << 1)   // 1
+// #define SPRITE_B2_FLIP_X         (1 << 2)   // 4
+// #define SPRITE_B2_FLIP_Y         (1 << 3)   // 8
+// #define SPRITE_B2_FACING         (1 << 4)   // 16
+// #define SPRITE_B2_FLAT_POLY      (1 << 5)   // 32
+// #define SPRITE_B2_ONE_SIDED      (1 << 6)   // 64
+ #define SPRITE_B2_IS_LIGHT			(1 << 16)   // 64
 // #define SPRITE_B2_IS_DYNAMIC     (1 << 17)    // for dynamic lights and all dynamic stuff.
 
 #define CLIP_MOVE		(1<<0) // blocking
@@ -24,7 +24,7 @@
 #define CLIP_SIGHT		(1<<2) // vision block
 #define CLIP_AOE		(1<<3) // aoe, hitradius block.
 #define CLIP_USEACTION	(1<<4) // use raycasts
-#define CLIP_IS_TRIGGER	(1<<5) // doesnt block.
+#define CLIP_IS_TRIGGER	(1<<5) // doesnt block. / dope, would need trigger mask or script.
 #define CLIP_USER_1	(1<<6) // doesnt block.
 #define CLIP_USER_2	(1<<7) // doesnt block.
 #define CLIP_USER_3	(1<<8) // doesnt block.
@@ -40,6 +40,7 @@
 
 #define GEO_NO_BUNCHING (1<<0)
 #define GEO_EMIT_WITHOUT_CLIPPING (1<<1) // will be clipped by zbuffer.
+#define GEO_PARALLAX_DISCAQRD (1<<2)
 
 #define UV_TEXELRATE 		0 // pixel-rated = duke default.
 #define UV_NORMRATE 		1 // tile-rated
@@ -50,8 +51,6 @@
 #define UV_PARALLAX_SPH 	6
 #define UV_SKYBOX 			7
 #define UV_WORLDXY 			7
-
-
 
 #define TILING_SQUARE	(1<<0)
 #define TILING_HEXSQ	(1<<1)
@@ -86,12 +85,13 @@
 #define TEZ_SLOPE	 (1<<3) // slope or rawz;
 #define TEZ_CLOSEST	 (1<<4) // closest height point instead of arbitrary.
 #define TEZ_FURTHEST (1<<5) // furthest height point instead of arbitrary.
-#define TEZ_WORLD_X	 (1<<6)
-#define TEZ_WORLD_Y	 (1<<7)
-#define TEZ_WORLDZ1	 (1<<8)
+#define TEZ_WORLD_X	 (1<<6) // unit x
+#define TEZ_WORLD_Y	 (1<<7)  // unit y
+#define TEZ_WORLDZ1	 (1<<8) // unit z
 #define TEZ_WALL_ORTHO	 (1<<9) // aligned to slope if use slope.
 #define TEZ_IS_ORTHO_TO_PREV	 (1<<10) // generate ortho in plane V from U, c from v
-#define TEZ_MAKE_UNIT_VECS	 (1<<11) //
+#define TEZ_MAKE_UNIT_VEC	 (1<<11) // define as unit vector instead of full vector.
+#define TEZ_TRAP	 (1<<12) //  to fit 4-pointed trap, be it cap or wall surf
 
 #if 1 // ================= STABLE DATATYPES =================
 #pragma pack(push, 1)
@@ -105,36 +105,8 @@ typedef struct {
 	uint16_t ctez; // 4th corner vector C = o + v + c
 } procuvgen64_t; // procedural uv data
 
-
-typedef struct {
-	unsigned int shadow_get : 1;
-	unsigned int shadow_cast : 1; //  for lights = ambient
-	unsigned int light_get : 1;
-	unsigned int light_pass : 1;
-	unsigned int is_dblsided : 1; //  for lights - marks if it appies to backfaces,
-	unsigned int q: 2;        // queue 0-3: opaque, atest, transparent, overdraw
-	unsigned int pad : 1; //  for lights - marks if it appies to backfaces,
-} renderflags_resolved8_T; // struct for triangulated rendering options. post-mono
-
-
-typedef struct {
-	unsigned int is_bunchbreak : 1;
-	unsigned int is_mask_emitter : 1; // can be alpha test
-	unsigned int is_tele_portal : 1; // for new style portals
-	unsigned int is_clip_traversal_blocker : 1; // for full masks for ex.
-	unsigned int is_locked_to_sector : 1; // for sprites that can be outside of sector bounds
-	unsigned int RESERVED : 12;    // padding to 8
-} geoflags16_t;
 #endif
-/* ai review:
 
-script_flags16_t in sprite	❌ Move to flexible
-Map header	❌ Missing entirely
-lotag/hitag/extra/shade/cstat	❌ Missing for Build compat
-
-Bitfields are not safe for stable binary format. Replace with explicit uint fields:
-
-*/
 #if 1 // =================================== STABLE STORAGE ==========================
 
 typedef struct {
@@ -168,15 +140,13 @@ typedef struct {
 	//point64_t[n]
 } loop64_t;
 
-
-
 typedef struct {
 	// use zdim for possible volumetric textures, impostors,
 	point16_t scale;
 	point16_t pan;
 	point16_t cropA;
 	point16_t cropB;
-	point16_t rot; // rot z is for deault uvs
+	point16_t rot; // rot z used for 2d uvs.
 
 	uint8_t scaling_mode; // fit, use texel density, etc
 	uint8_t mapping_kind; // uv amappings, regular, polar, hex, triang, parallax, etc.
@@ -184,13 +154,7 @@ typedef struct {
 	uint16_t _pad;
 } uvform128_t; // generic uvform for 2d and 3d volumetric mappings.
 
-typedef struct {
-	bb_uid_t id;
-	bb_uid_t dataid; // reference to any additional composite data.
-	uint32_t commtag; // lotag
-	uint32_t hitag; // RX, quick send. here, because it is very common in build maps.
-	int32_t basetags[4];
-} dataheader;
+
 
 // basic info on graphic representation
 typedef struct {
@@ -200,28 +164,40 @@ typedef struct {
 	uint16_t fx;  // parallax/shader/distortion effects
 	color_hdr_t color;
 	uint8_t blend_kind;   // compositing mode
-	uint8_t optic_flags;   // getting, light, shadows etc.
+	uint8_t optic_flags;   // optic_flags_resolv8_t
+	uint16_t geoflags; // geoflags16_t
 
-	bb_uid_t matdata; //additional extended material data.
-
-	geoflags16_t geoflags;
 	procuvgen64_t procuv;
 	uvform128_t uvform;
 
-} basic_material_store;
+	bb_uid_t matdata; //additional extended material data.
+} mat_surf_base_store;
+
+typedef struct {
+	uint16_t volpal;
+	uint16_t fx;  // parallax/shader/distortion effects
+	color_hdr_t color_scatter;
+	uint16_t density_mul_f;
+
+	uint8_t blend_kind;   // compositing mode
+	uint8_t optic_flags;   // getting, light, shadows etc.
+	uvform128_t uvform; // for perlin noise for ex.
+
+	bb_uid_t matdata; //additional extended material data.
+} mat_vol_base_store;
 
 typedef struct {
 	uint64_t nsec; // 0 = no link, so offset by 1 after read.
-	uint32_t entersurf; // including 0 1 as caps;
-	uint32_t nextspri; // for arbitrary portal, again 0 means use wall-based unit tr.
-	uint32_t thisspri; // for arbitrary portal.
-} surfref_t;
+	uint16_t entersurf; // including 0 1 as caps;
+	uint16_t thisspri; // for arbitrary portal. pick one from other surf. 0 means use surf-form.
+	uint16_t clipmask; // for this side only!
+} surflink_store; // type for fundamental surface def, non visual.
 
 // we can render adjacent flor and ceil surfs - after we rendered the sector - submit them as portals.
 typedef struct {
 	uint8_t nlinks; // use 0 o mark as no links.
-	// surfref_t[nlinks]; // read n refs
-	// basic_material_store[nlinks] // read n mats
+	// surflink_store[nlinks]; // read n refs
+	// mat_surf_base_store[nlinks] // read n mats
 } xsurfs_header_t;
 
 typedef struct {
@@ -235,26 +211,31 @@ typedef struct {
 typedef struct {
 	transform16_t localbounds;
 	point32_t v, av, mcenter;           //Position velocity, Angular velocity (direction=axis, magnitude=vel), center of mass
-	int32_t mas, drag, restitutionK;
+	int32_t mas, drag, k1, k2; //as float
 }base_physics;
 
+
 typedef struct {
-	unsigned int active : 1;
-	unsigned int initial_state : 1; // on/off open/closed etc.
-	unsigned int state : 6+8; // custom state for statemachines. 64 shoul
-} script_flags16_t;
+	bb_uid_t id;
+	bb_uid_t dataid; // reference to any additional composite data.
+	uint32_t commtag; // rx tax, receiver id
+	uint32_t lotag; // lowtag
+	uint32_t hitag; // tX, quick send. here, because it is very common in build maps.
+	int32_t cmdtag; // some info storage
+	uint8_t typeflags; // some flags related only to this entity.
+} dataheader;
 
 typedef struct {
 	dataheader head;
-
-	uint32_t classid;
+	uint16_t classid;
+	uint16_t surfconstraint; // 0 = none, 1 2 = cceil flor, 3+ = walls; for movement purposes.
 	transform64_t tr;
 	transform16_t view_transform; // always  relative to original transform.
 	uint16_t scriptflags; // script_flags16_t
 	uint16_t clipmask; // block, hitscan, trigger, - for physics engine // aka layer
-
-	basic_material_store material;
 	base_physics physics;
+
+	mat_surf_base_store material;
 
 } sprite_store;
 
@@ -268,10 +249,9 @@ typedef struct {
 typedef struct{
 	dataheader head;
 
-	int64_t z;      //ceil&flor height pos.
 	slopehint_t slopehint;
-	point32_t grad; //ceil&flor grad. grad.x = norm.x/norm.z, grad.y = norm.y/norm.z
-
+	point64_t gradxy_zpos; //ceil&flor grad. grad.x = norm.x/norm.z, grad.y = norm.y/norm.z
+	// grad.z is z value.//ceil&flor height pos.
 	xsurfs_header_t xsurfs;
 } cap_t;
 
@@ -279,11 +259,11 @@ typedef struct // SECT STORE
 {
 	dataheader head;
 
-	uint32_t originwall; // persistent first wall storage.
-
+	uint16_t originwall; // persistent first wall storage.
+	mat_vol_base_store volmat; // volumetric material
 	cap_t caps[2]; // 0=ceil, 1=floor;
 
-	uint32_t n_walls;
+	uint16_t n_walls;
 	uint32_t n_spris;
 	// wall_store [n_walls]; // walls
 	// uint32_t [n_spris]; // sprite indices
@@ -294,6 +274,7 @@ typedef struct {
 	bb_uid_t entry_sectid;
 	transform64_t origin; //will align origin wall to this transform.
 	uint8_t kind; // 0 - normal. 1 - inverted. 2- procedural subtract, 3- overlay.
+	uint8_t flags; // 0 - normal. 1 - inverted. 2- procedural subtract, 3- overlay.
 	// rotation and position transforms.
 	// use some wall as origin, or even sprite.
 } chunk_store;
@@ -311,17 +292,138 @@ typedef struct {
 	uint8_t  magic[4];   // "BB2\0"
 	uint16_t ver_major;
 	uint16_t ver_minor;
+	transform64_t start;
 	uint64_t n_chunks;
 	uint64_t n_sects;
 	uint64_t n_sprites;
 	uint64_t data_offset; // start of blob section
 	uint64_t n_blocks; // start of blob section
 } map_b2_store_header_t;
-
 #pragma pack(pop)
 #endif
 
+#if 1// ======================== UNIT CONVERSIONS ========================
+// 1 unit = 1/65536 meter (shift 16)
+// Max range: ~140 Tm (covers solar system)
+// Resolution: ~0.015 mm (overkill for shooter, good for physics)
+// float safe locally: full precision within ~128m of origin
+// double safe: always
+
+//  The distance to the nearest star, Proxima Centauri, is approximately 4,000,000 Gm.
+//  9,223,372,036,854,775,807 // int64 maxval. signed
+//     ^   ^   ^   ^   ^
+//     tm  gm  mm  km  m
+
+#define SPACE_SCALE_SHIFT 16
+#define SPACE_SCALE_F (1.0f / (float)(1 << SPACE_SCALE_SHIFT))
+#define SPACE_SCALE_D (1.0  / (double)(1 << SPACE_SCALE_SHIFT))
+
+// Convert stored int64 position unit to meters (float)
+// NOTE: precision degrades beyond ~128m from origin due to float mantissa
+float int64_to_space_f(int64_t dim) {
+	return (float)dim * SPACE_SCALE_F;
+}
+
+// Use this when computing distances between two far points
+// subtract in int64 first, THEN convert — keeps precision
+float int64_delta_to_space_f(int64_t a, int64_t b) {
+	return (float)(a - b) * SPACE_SCALE_F;
+}
+
+// Double version for world-level calculations
+double int64_to_space_d(int64_t dim) {
+	return (double)dim * SPACE_SCALE_D;
+}
+
+// Convert meters back to int64 units
+int64_t space_f_to_int64(float meters) {
+	return (int64_t)(meters * (float)(1 << SPACE_SCALE_SHIFT));
+}
+point3d p64_to_point3d(point64_t p) {
+	return point3d{
+	int64_to_space_f(p.x),
+	int64_to_space_f(p.y),
+	int64_to_space_f(p.z),
+	};
+}
+
+transform tr64_to_transform(transform64_t t) {
+	transform ret;
+	ret.p = p64_to_point3d(t.p);
+	ret.r = p64_to_point3d(t.r);
+	ret.f = p64_to_point3d(t.f);
+	ret.d = p64_to_point3d(t.d);
+}
+
+// ---- int64 (defined elsewhere, shown for reference) ----
+// shift 16, res ~0.015mm, max ~140 Tm
+
+// ---- int32 ----
+// shift 10, res ~0.977mm, max ~2100 km
+// use for: large local spaces
+
+#define SPACE32_SCALE_SHIFT 10
+#define SPACE32_SCALE_F (1.0f / (float)(1 << SPACE32_SCALE_SHIFT))
+
+float int32_to_space_f(int32_t dim) {
+	return (float)dim * SPACE32_SCALE_F;
+}
+
+float int32_delta_to_space_f(int32_t a, int32_t b) {
+	return (float)(a - b) * SPACE32_SCALE_F;
+}
+
+int32_t space_f_to_int32(float meters) {
+	return (int32_t)(meters * (float)(1 << SPACE32_SCALE_SHIFT));
+}
+
+// ---- int16 ----
+// shift 10, res ~0.977mm, max ~32 m
+// use for: local offsets, hitboxes, attachment points, bone offsets
+
+#define SPACE16_SCALE_SHIFT 10
+#define SPACE16_SCALE_F (1.0f / (float)(1 << SPACE16_SCALE_SHIFT))
+
+float int16_to_space_f(int16_t dim) {
+	return (float)dim * SPACE16_SCALE_F;
+}
+
+float int16_delta_to_space_f(int16_t a, int16_t b) {
+	return (float)(a - b) * SPACE16_SCALE_F;
+}
+
+int16_t space_f_to_int16(float meters) {
+	return (int16_t)(meters * (float)(1 << SPACE16_SCALE_SHIFT));
+}
+#endif
+
 #if 1 // ==================== RUNTIME FORMATS, Editor  ====================
+typedef struct {
+	unsigned int active : 1;
+	unsigned int initial_state : 1; // on/off open/closed etc.
+	unsigned int state : 6+8; // custom state for statemachines. or user flags
+} script_flags16_t;
+
+typedef struct {
+	unsigned int shadow_get : 1;
+	unsigned int shadow_cast : 1; //  for lights = ambient
+	unsigned int light_get : 1;
+	unsigned int light_pass : 1;
+	unsigned int is_dblsided : 1; //  for lights - marks if it appies to backfaces,
+	unsigned int q: 2;        // queue 0-3: opaque, atest, transparent, overdraw
+	unsigned int pad : 1; //  for lights - marks if it appies to backfaces,
+} optic_flags_resolv8_t; // struct for triangulated rendering options. post-mono
+
+typedef struct {
+	unsigned int is_bunchbreak : 1;
+	unsigned int is_mask_emitter : 1; // can be alpha test
+	unsigned int is_tele_portal : 1; // for new style portals
+	unsigned int is_light_portal : 1; // for new style portals
+	unsigned int is_monoclip_blocker : 1; // for full masks for ex.
+	unsigned int is_locked_to_sector : 1; // for sprites that can be outside of sector bounds
+	unsigned int RESERVED : 12;    // padding to 8
+} geoflags16_t;
+
 typedef struct {
 	point3d ori;    // origin
 	point3d u;      // U axis
@@ -444,7 +546,7 @@ typedef struct {
 	//Specular vs diffuse reflect becomes a roughness question - roughness=0 IS mirror, roughness=1 IS full diffuse. One param, physically correct.
 } surfmat_t;
 
-// ================== CORE MAP FORMAT =======================
+// ================== Additional non-stable data.
 typedef struct {
 	uint32_t id;
 	uint32_t type;
@@ -476,10 +578,8 @@ typedef struct {
 	bb_uid_t data;
 } entity_stored_t;
 
-typedef struct // SPRITE STORAGE
+typedef struct
 {
-	bb_uid_t id;
-	bb_uid_t dataid;
 	// ----- FAST DATA --------------
 	union { transform tr; struct { point3d p, r, d, f; }; };
 
@@ -511,7 +611,7 @@ typedef struct // SPRITE STORAGE
 	// --------- COLD DATA -----------, probably all move to datablock.
 	long flags;
 	int32_t tags[16];
-	uint8_t walcon; // surf constraint 0,1 = ceil,flor, 3+  = wall id -2
+	uint16_t walcon; // surf constraint 0,1 = ceil,flor, 3+  = wall id -2
 	//Bit0:Blocking, Bit2:1WayOtherSide, Bit5,Bit4:Face/Wall/Floor/.., Bit6:1side, Bit16:IsLight, Bit17-19:SpotAx(1-6), Bit20-29:SpotWid, Bit31:Invisible
 	//long flags;
 
