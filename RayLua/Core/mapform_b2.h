@@ -93,52 +93,35 @@
 #define TEZ_MAKE_UNIT_VEC	 (1<<11) // define as unit vector instead of full vector.
 #define TEZ_TRAP	 (1<<12) //  to fit 4-pointed trap, be it cap or wall surf
 
-#if 1 // ================= STABLE DATATYPES =================
+#if 1 // =================================== STABLE STORAGE ==========================
 #pragma pack(push, 1)
 typedef uint64_t bb_uid_t;  // global unique identifier. classless. storage use only.
-typedef uint16_t surfid_t;  // srface reference; 0,1  = caps; rest is wall index *surf index.
 
 typedef struct {
 	uint16_t otez; // TEZ flags
 	uint16_t utez;
 	uint16_t vtez;
 	uint16_t ctez; // 4th corner vector C = o + v + c
+	uint8_t preflags; // quick option?.
 } procuvgen64_t; // procedural uv data
 
-#endif
-
-#if 1 // =================================== STABLE STORAGE ==========================
 
 typedef struct {
-	int64_t x,y,z; // 1 = 1 mm
-} point64_t;
-typedef struct {
-	int32_t x,y,z; // 1 = 1 mm
-} point32_t;
-typedef struct {
-	int16_t x,y,z; // 1 = 1 mm
-} point16_t;
-
-typedef struct {
-	int32_t r,g,b,a; // YES CAN BE NEGATIVE!
-	uint32_t mul; // and even brighter
-	// result = base/div *mul.
+	int16_t r, g, b, a; // /32767.0 = -1..1, can be negative
+	uint16_t mantissa;   // /65535.0 = 0..1
+	int16_t  exp;        // scale = mantissa * 2^exp, negative exp = dim
 } color_hdr_t;
 
-typedef struct {
-	point64_t p,r,f,d;
-} transform64_t;
-typedef struct {
-	point32_t p,r,f,d;
-} transform32_t;
-typedef struct {
-	point16_t p,r,f,d;
-} transform16_t;
+// float scale =  (luma.mantissa / 65535.0f) * powf(2.0f, luma.exp);
+// float R = (chroma.r / 32767.0f) * scale;
 
-typedef struct {
-	int32_t n;
-	//point64_t[n]
-} loop64_t;
+typedef struct { int64_t x,y,z; } point64_t;
+typedef struct { int32_t x,y,z; } point32_t;
+typedef struct { int16_t x,y,z; } point16_t;
+
+typedef struct { point64_t p,r,f,d; } transform64_t;
+typedef struct { point32_t p,r,f,d; } transform32_t;
+typedef struct { point16_t p,r,f,d; } transform16_t;
 
 typedef struct {
 	// use zdim for possible volumetric textures, impostors,
@@ -154,8 +137,6 @@ typedef struct {
 	uint16_t _pad;
 } uvform128_t; // generic uvform for 2d and 3d volumetric mappings.
 
-
-
 // basic info on graphic representation
 typedef struct {
 	uint16_t galnum;
@@ -169,112 +150,97 @@ typedef struct {
 
 	procuvgen64_t procuv;
 	uvform128_t uvform;
-
-	bb_uid_t matdata; //additional extended material data.
-} mat_surf_base_store;
+} mat_surf;
 
 typedef struct {
 	uint16_t volpal;
 	uint16_t fx;  // parallax/shader/distortion effects
 	color_hdr_t color_scatter;
+	color_hdr_t color_transmit;
 	uint16_t density_mul_f;
 
 	uint8_t blend_kind;   // compositing mode
 	uint8_t optic_flags;   // getting, light, shadows etc.
-	uvform128_t uvform; // for perlin noise for ex.
+	uvform128_t uvform; // for 3D perlin noise for ex.
+} mat_volume;
 
-	bb_uid_t matdata; //additional extended material data.
-} mat_vol_base_store;
-
-typedef struct {
-	uint64_t nsec; // 0 = no link, so offset by 1 after read.
-	uint16_t entersurf; // including 0 1 as caps;
-	uint16_t thisspri; // for arbitrary portal. pick one from other surf. 0 means use surf-form.
-	uint16_t clipmask; // for this side only!
-} surflink_store; // type for fundamental surface def, non visual.
-
-// we can render adjacent flor and ceil surfs - after we rendered the sector - submit them as portals.
-typedef struct {
-	uint8_t nlinks; // use 0 o mark as no links.
-	// surflink_store[nlinks]; // read n refs
-	// mat_surf_base_store[nlinks] // read n mats
-} xsurfs_header_t;
 
 typedef struct {
 	uint8_t mode;
-	union {
-		uint16_t a,b,c; // wall ids
-		uint16_t local_sprite_n;
-	};
+	uint16_t a,b,c; // wall ids or local sprite or global sprite.
 } slopehint_t;
 
 typedef struct {
-	transform16_t localbounds;
+	transform32_t localbounds; // relative to transform.
 	point32_t v, av, mcenter;           //Position velocity, Angular velocity (direction=axis, magnitude=vel), center of mass
 	int32_t mas, drag, k1, k2; //as float
-}base_physics;
+} physdata_store;
 
 
 typedef struct {
 	bb_uid_t id;
-	bb_uid_t dataid; // reference to any additional composite data.
-	uint32_t commtag; // rx tax, receiver id
-	uint32_t lotag; // lowtag
+	bb_uid_t dataid; // reference to any additional composite data. not needed, can be in dynamic data.
+	uint32_t lotag; // lowtag usually classid.
 	uint32_t hitag; // tX, quick send. here, because it is very common in build maps.
+	uint32_t commtag; // rx tax, receiver id  by default just dupe it with hitag.
 	int32_t cmdtag; // some info storage
-	uint8_t typeflags; // some flags related only to this entity.
+	uint8_t typeflags; // some flags related only to this instance.
 } dataheader;
 
 typedef struct {
 	dataheader head;
-	uint16_t classid;
+	uint64_t nsec; // 0 = no link, so offset by 1 after read.
+	uint16_t entersurf; // including 0 1 as caps;
+	uint16_t thisspri; // for arbitrary portal. pick one from other surf. 0 means use surf-form.
+	uint16_t clipmask; // for this side only!
+	mat_surf mat;
+} surf_store; // type for fundamental surface def, non visual.
+
+typedef struct {
+	dataheader head;
 	uint16_t surfconstraint; // 0 = none, 1 2 = cceil flor, 3+ = walls; for movement purposes.
 	transform64_t tr;
 	transform16_t view_transform; // always  relative to original transform.
 	uint16_t scriptflags; // script_flags16_t
 	uint16_t clipmask; // block, hitscan, trigger, - for physics engine // aka layer
-	base_physics physics;
-
-	mat_surf_base_store material;
-
+	physdata_store physics;
+	mat_surf material;
 } sprite_store;
 
 typedef struct {
-	dataheader head;
+	surf_store surf0; // must have at least one; will get header from this one as well.
 
 	int64_t x,y;
-	xsurfs_header_t xsurfs;
+	uint8_t nxsurfs;
 } wall_store;
 
 typedef struct{
-	dataheader head;
+	surf_store surf0; // must have at least one; will get header from this one as well.
 
 	slopehint_t slopehint;
 	point64_t gradxy_zpos; //ceil&flor grad. grad.x = norm.x/norm.z, grad.y = norm.y/norm.z
 	// grad.z is z value.//ceil&flor height pos.
-	xsurfs_header_t xsurfs;
+	uint8_t nxsurfs;
 } cap_t;
 
 typedef struct // SECT STORE
 {
 	dataheader head;
-
-	uint16_t originwall; // persistent first wall storage.
-	mat_vol_base_store volmat; // volumetric material
 	cap_t caps[2]; // 0=ceil, 1=floor;
+	uint16_t originwall; // persistent first wall storage.
+	mat_volume volmat; // volumetric material
 
 	uint16_t n_walls;
 	uint32_t n_spris;
 	// wall_store [n_walls]; // walls
-	// uint32_t [n_spris]; // sprite indices
+	// uint32_t [n_spris]; // sprite indices in order
 } sect_store;
 
 typedef struct {
-	bb_uid_t id;
-	bb_uid_t entry_sectid;
+	dataheader head;
 	transform64_t origin; //will align origin wall to this transform.
 	uint8_t kind; // 0 - normal. 1 - inverted. 2- procedural subtract, 3- overlay.
-	uint8_t flags; // 0 - normal. 1 - inverted. 2- procedural subtract, 3- overlay.
+	uint8_t chunkflags; //
 	// rotation and position transforms.
 	// use some wall as origin, or even sprite.
 } chunk_store;
@@ -296,6 +262,7 @@ typedef struct {
 	uint64_t n_chunks;
 	uint64_t n_sects;
 	uint64_t n_sprites;
+	// stable data stored here [chunks][sect1 [ walls1 ].. ][sprites]
 	uint64_t data_offset; // start of blob section
 	uint64_t n_blocks; // start of blob section
 } map_b2_store_header_t;
