@@ -277,26 +277,37 @@ typedef struct {
 // double safe: always
 
 //  The distance to the nearest star, Proxima Centauri, is approximately 4,000,000 Gm.
-//  9,223,372,036,854,775,807 // int64 maxval. signed
+//  9,223,372,036,854,775,807  int64 maxval. signed
 //     ^   ^   ^   ^   ^
 //     tm  gm  mm  km  m
+// ---- int64 (defined elsewhere, shown for reference) ----
+// shift 16, res ~0.015mm, max ~140 Tm
 
+// ---- int32 ----
+// shift 10, res ~0.977mm, max ~2100 km
+// use for: large local spaces
 #define SPACE_SCALE_SHIFT 16
 #define SPACE_SCALE_F (1.0f / (float)(1 << SPACE_SCALE_SHIFT))
 #define SPACE_SCALE_D (1.0  / (double)(1 << SPACE_SCALE_SHIFT))
 
+#define SPACE32_SCALE_SHIFT 10
+#define SPACE32_SCALE_F (1.0f / (float)(1 << SPACE32_SCALE_SHIFT))
+
+#define SPACE16_SCALE_SHIFT 10
+#define SPACE16_SCALE_F (1.0f / (float)(1 << SPACE16_SCALE_SHIFT))
+
 // Convert stored int64 position unit to meters (float)
 // NOTE: precision degrades beyond ~128m from origin due to float mantissa
-float int64_to_space_f(int64_t dim) {
+static float int64_to_space_f(int64_t dim) {
 	return (float)dim * SPACE_SCALE_F;
 }
 
 // Use this when computing distances between two far points
 // subtract in int64 first, THEN convert — keeps precision
-float int64_delta_to_space_f(int64_t a, int64_t b) {
-	return (float)(a - b) * SPACE_SCALE_F;
-}
-
+//float int64_delta_to_space_f(int64_t a, int64_t b) {
+//  return (float)(a - b) * SPACE_SCALE_F;
+//}
+/*
 // Double version for world-level calculations
 double int64_to_space_d(int64_t dim) {
 	return (double)dim * SPACE_SCALE_D;
@@ -307,11 +318,11 @@ int64_t space_f_to_int64(float meters) {
 	return (int64_t)(meters * (float)(1 << SPACE_SCALE_SHIFT));
 }
 point3d p64_to_point3d(point64_t p) {
-	return point3d{
-	int64_to_space_f(p.x),
-	int64_to_space_f(p.y),
-	int64_to_space_f(p.z),
-	};
+	point3d ret;
+	ret.x=int64_to_space_f(p.x);
+	ret.y=int64_to_space_f(p.y);
+	ret.z= int64_to_space_f(p.z);
+	return ret;
 }
 
 transform tr64_to_transform(transform64_t t) {
@@ -320,18 +331,10 @@ transform tr64_to_transform(transform64_t t) {
 	ret.r = p64_to_point3d(t.r);
 	ret.f = p64_to_point3d(t.f);
 	ret.d = p64_to_point3d(t.d);
+	return ret;
 }
-
-// ---- int64 (defined elsewhere, shown for reference) ----
-// shift 16, res ~0.015mm, max ~140 Tm
-
-// ---- int32 ----
-// shift 10, res ~0.977mm, max ~2100 km
-// use for: large local spaces
-
-#define SPACE32_SCALE_SHIFT 10
-#define SPACE32_SCALE_F (1.0f / (float)(1 << SPACE32_SCALE_SHIFT))
-
+*/
+/*
 float int32_to_space_f(int32_t dim) {
 	return (float)dim * SPACE32_SCALE_F;
 }
@@ -344,13 +347,6 @@ int32_t space_f_to_int32(float meters) {
 	return (int32_t)(meters * (float)(1 << SPACE32_SCALE_SHIFT));
 }
 
-// ---- int16 ----
-// shift 10, res ~0.977mm, max ~32 m
-// use for: local offsets, hitboxes, attachment points, bone offsets
-
-#define SPACE16_SCALE_SHIFT 10
-#define SPACE16_SCALE_F (1.0f / (float)(1 << SPACE16_SCALE_SHIFT))
-
 float int16_to_space_f(int16_t dim) {
 	return (float)dim * SPACE16_SCALE_F;
 }
@@ -361,7 +357,7 @@ float int16_delta_to_space_f(int16_t a, int16_t b) {
 
 int16_t space_f_to_int16(float meters) {
 	return (int16_t)(meters * (float)(1 << SPACE16_SCALE_SHIFT));
-}
+}*/
 #endif
 
 #if 1 // ==================== RUNTIME FORMATS, Editor  ====================
