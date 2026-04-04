@@ -134,7 +134,6 @@ typedef struct {
 	uint8_t scaling_mode; // fit, use texel density, etc
 	uint8_t mapping_kind; // uv amappings, regular, polar, hex, triang, parallax, etc.
 	uint16_t tile_ordering; // 1 bit = flip, 2 bits = 4 rotations. 3bits X 4n tiles sharing vert. = 12 bits
-	uint16_t _pad;
 } uvform128_t; // generic uvform for 2d and 3d volumetric mappings.
 
 // basic info on graphic representation
@@ -194,6 +193,7 @@ typedef struct {
 	uint16_t thisspri; // for arbitrary portal. pick one from other surf. 0 means use surf-form.
 	uint16_t clipmask; // for this side only!
 	mat_surf mat;
+	uint8_t npoints; // in theory we can add multi-loop to wall and link it with some cap.
 } surf_store; // type for fundamental surface def, non visual.
 
 typedef struct {
@@ -205,6 +205,8 @@ typedef struct {
 	uint16_t clipmask; // block, hitscan, trigger, - for physics engine // aka layer
 	physdata_store physics;
 	mat_surf material;
+
+	uint8_t dataflex; // for additional data just in case
 } sprite_store;
 
 typedef struct {
@@ -212,6 +214,9 @@ typedef struct {
 
 	int64_t x,y;
 	uint8_t nxsurfs;
+	//[surfs]
+
+	uint8_t dataflex; // for additional data just in case
 } wall_store;
 
 typedef struct{
@@ -221,7 +226,15 @@ typedef struct{
 	point64_t gradxy_zpos; //ceil&flor grad. grad.x = norm.x/norm.z, grad.y = norm.y/norm.z
 	// grad.z is z value.//ceil&flor height pos.
 	uint8_t nxsurfs;
+	//[surfs]
+
+	uint8_t dataflex; // for additional data just in case
 } cap_t;
+typedef struct {
+	uint16_t nwalls;
+	//n x [wall_store]..
+	// last connects to the first implicitly.
+} waloop_header_t;
 
 typedef struct // SECT STORE
 {
@@ -230,10 +243,16 @@ typedef struct // SECT STORE
 	uint16_t originwall; // persistent first wall storage.
 	mat_volume volmat; // volumetric material
 
-	uint16_t n_walls;
-	uint32_t n_spris;
-	// wall_store [n_walls]; // walls
+	uint8_t nloops; // wall loops.
+	// nloops x [waloop_header_t[walls]][..]
+
+	uint8_t nwalls; // separately standing walls. not supported at the moment.
+	// wall_store [walls]
+
+	uint32_t nspris;
 	// uint32_t [n_spris]; // sprite indices in order
+
+	uint8_t dataflex; // for additional data just in case
 } sect_store;
 
 typedef struct {
@@ -243,6 +262,8 @@ typedef struct {
 	uint8_t chunkflags; //
 	// rotation and position transforms.
 	// use some wall as origin, or even sprite.
+
+	uint8_t dataflex; // for additional data just in case
 } chunk_store;
 
 // todo - check ken's png lib;
@@ -255,7 +276,7 @@ typedef struct {
 } data_block; // dynamic data store.
 
 typedef struct {
-	uint8_t  magic[4];   // "BB2\0"
+	uint8_t  magic[4];   // "BE20"
 	uint16_t ver_major;
 	uint16_t ver_minor;
 	transform64_t start;
@@ -267,6 +288,7 @@ typedef struct {
 	uint64_t n_blocks; // start of blob section
 } map_b2_store_header_t;
 #pragma pack(pop)
+
 #endif
 
 #if 1// ======================== UNIT CONVERSIONS ========================
@@ -276,7 +298,7 @@ typedef struct {
 // float safe locally: full precision within ~128m of origin
 // double safe: always
 
-//  The distance to the nearest star, Proxima Centauri, is approximately 4,000,000 Gm.
+//  The distance to the nearest star, Proxima Centauri, is approximately 4,000 Tm.
 //  9,223,372,036,854,775,807  int64 maxval. signed
 //     ^   ^   ^   ^   ^
 //     tm  gm  mm  km  m
@@ -599,7 +621,7 @@ typedef struct // surf_t
 	//Bit0:Blocking, Bit2:RelativeAlignment, Bit5:1Way, Bit16:IsParallax, Bit17:IsSkybox
 	uint32_t flags;	short lotag, hitag;
 	surfmat_t defmat; // default material
-
+	uint16_t geoflags;
 // ------------
 	uint8_t reflection_strength;
 	uint8_t pass_strength;
