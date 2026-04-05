@@ -86,6 +86,42 @@ That is now patched to try Linux font paths first:
 
 If none of those exist, the app falls back to ImGui's default built-in font instead of aborting.
 
+Another startup issue was a hardcoded Windows fallback:
+
+- `c:/Eugene/Games/build2/`
+- `c:/Eugene/Games/build2/Content/GAL_002_SW/`
+- `c:/Eugene/Games/build2/e3l3.map`
+
+That behavior has been removed for Linux portability. `RayGame` now exits cleanly unless you pass a valid map path and matching asset folder.
+
+That was then improved further:
+
+- `RayGame` now opens a startup ImGui screen if paths are missing or invalid
+- the screen lets you set:
+  - map path
+  - install dir
+  - primary asset dir
+  - secondary gallery dir
+- it can auto-fill asset paths from the map dir or install dir
+- it validates before starting the game/editor runtime
+
+## Asset expectations
+
+For a successful run, pass a map path like:
+
+```bash
+./RayLua/build/RayGame /path/to/your.map
+```
+
+The directory containing that map must also contain:
+
+- `palette.dat`
+- `TILES*.ART`
+
+Optional extra content:
+
+- `Content/GAL_002_SW/`
+
 ## Recommended workflow
 
 For Neovim:

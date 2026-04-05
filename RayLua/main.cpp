@@ -21,6 +21,7 @@
 #include <chrono>
 #include <algorithm>
 #include <vector>
+#include <string>
 
 #include "DumbRender.hpp"
 //#include "MonoTest.hpp"
@@ -453,6 +454,14 @@ CustomRenderTarget finalTarget = {0};
 ImGuiViewport* viewport;
 cam_t globCam={0};
 
+typedef struct {
+    char map_path[512];
+    char install_dir[512];
+    char gallery0_dir[512];
+    char gallery1_dir[512];
+    char status[1024];
+} StartupConfig;
+
 int file_exists(const char* path) {
     FILE* file = fopen(path, "r");
     if (file) {
@@ -492,50 +501,152 @@ void extract_directory(const char* filepath, char* dir_path, size_t dir_size) {
     }
 }
 
-bool loadifvalid() {
-    if (g_argc < 2) {
-        printf("Error: No map file path provided\n");
-        return false;
-    }
+void set_status(StartupConfig* cfg, const char* message) {
+    snprintf(cfg->status, sizeof(cfg->status), "%s", message);
+}
 
-    const char* map_path = g_argv[1];
-
-    if (!has_extension(map_path, ".map")) {
-        printf("Error: File must have .map extension\n");
-        return false;
-    }
-
-    if (!file_exists(map_path)) {
-        printf("Error: Map file does not exist: %s\n", map_path);
-        return false;
-    }
-
+void autofill_from_map(StartupConfig* cfg) {
+    if (!cfg->map_path[0]) return;
     char dir_path[512];
-    extract_directory(map_path, dir_path, sizeof(dir_path));
+    extract_directory(cfg->map_path, dir_path, sizeof(dir_path));
+    snprintf(cfg->gallery0_dir, sizeof(cfg->gallery0_dir), "%s", dir_path);
+    snprintf(cfg->gallery1_dir, sizeof(cfg->gallery1_dir), "%s/Content/GAL_002_SW/", dir_path);
+    if (!cfg->install_dir[0]) {
+        snprintf(cfg->install_dir, sizeof(cfg->install_dir), "%s", dir_path);
+    }
+}
+
+void autofill_from_install(StartupConfig* cfg) {
+    if (!cfg->install_dir[0]) return;
+    if (!cfg->gallery0_dir[0]) {
+        snprintf(cfg->gallery0_dir, sizeof(cfg->gallery0_dir), "%s", cfg->install_dir);
+    }
+    if (!cfg->gallery1_dir[0]) {
+        snprintf(cfg->gallery1_dir, sizeof(cfg->gallery1_dir), "%s/Content/GAL_002_SW/", cfg->install_dir);
+    }
+}
+
+bool validate_startup_config(StartupConfig* cfg, bool verbose) {
+    if (!cfg->map_path[0]) {
+        if (verbose) set_status(cfg, "Map path is empty.");
+        return false;
+    }
+
+    if (!has_extension(cfg->map_path, ".map")) {
+        if (verbose) set_status(cfg, "Map file must end with .map");
+        return false;
+    }
+
+    if (!file_exists(cfg->map_path)) {
+        if (verbose) set_status(cfg, "Map file does not exist.");
+        return false;
+    }
+
+    if (!cfg->gallery0_dir[0]) {
+        if (verbose) set_status(cfg, "Primary asset directory is empty.");
+        return false;
+    }
 
     char palette_path[512];
-    snprintf(palette_path, sizeof(palette_path), "%s/palette.dat", dir_path);
+    snprintf(palette_path, sizeof(palette_path), "%s/palette.dat", cfg->gallery0_dir);
     if (!file_exists(palette_path)) {
-        printf("Error: palette.dat not found in %s\n", dir_path);
+        if (verbose) set_status(cfg, "palette.dat was not found in the primary asset directory.");
         return false;
     }
 
-    if (!check_tiles_art_exists(dir_path)) {
-        printf("Error: No tiles*.art files found in %s\n", dir_path);
+    if (!check_tiles_art_exists(cfg->gallery0_dir)) {
+        if (verbose) set_status(cfg, "No TILES*.ART was found in the primary asset directory.");
         return false;
     }
 
-    char gal1_path[512];
-    snprintf(gal1_path, sizeof(gal1_path), "%s/Content/GAL_002_SW/", dir_path);
-
-    loadgal(0, dir_path);
-    if (!check_tiles_art_exists(gal1_path)) {
-        printf("Error: No tiles*.art files found in %s\n", gal1_path);
+    if (verbose) {
+        if (cfg->gallery1_dir[0] && check_tiles_art_exists(cfg->gallery1_dir))
+            set_status(cfg, "Paths look valid. Secondary gallery found.");
+        else
+            set_status(cfg, "Paths look valid. Secondary gallery missing, continuing with primary gallery only.");
     }
-    else
-        loadgal(1, gal1_path);
-    DumbRender::Init(map_path);
     return true;
+}
+
+bool apply_startup_config(StartupConfig* cfg) {
+    if (!validate_startup_config(cfg, true)) return false;
+
+    loadgal(0, cfg->gallery0_dir);
+    if (cfg->gallery1_dir[0] && check_tiles_art_exists(cfg->gallery1_dir)) {
+        loadgal(1, cfg->gallery1_dir);
+    }
+    DumbRender::Init(cfg->map_path);
+    return true;
+}
+
+void init_startup_config_from_cli(StartupConfig* cfg) {
+    memset(cfg, 0, sizeof(*cfg));
+    set_status(cfg, "Provide a map and asset folders, then click Start RayGame.");
+    if (g_argc >= 2) {
+        snprintf(cfg->map_path, sizeof(cfg->map_path), "%s", g_argv[1]);
+        autofill_from_map(cfg);
+        autofill_from_install(cfg);
+        validate_startup_config(cfg, true);
+    }
+}
+
+bool prompt_for_startup_config(StartupConfig* cfg) {
+    while (!WindowShouldClose()) {
+        BeginDrawing();
+        ClearBackground(Color{18, 22, 30, 255});
+
+        rlImGuiBegin();
+        ImGui::SetNextWindowPos(ImVec2(40, 40), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(860, 520), ImGuiCond_Always);
+
+        if (ImGui::Begin("RayGame Startup", nullptr,
+            ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoResize)) {
+
+            ImGui::TextWrapped("RayGame needs a map plus Build/Duke art assets. Dave's old Windows-only fallback was removed, so set the paths here.");
+            ImGui::Separator();
+
+            ImGui::InputText("Map (.map)", cfg->map_path, sizeof(cfg->map_path));
+            ImGui::InputText("Install Dir", cfg->install_dir, sizeof(cfg->install_dir));
+            ImGui::InputText("Primary Assets", cfg->gallery0_dir, sizeof(cfg->gallery0_dir));
+            ImGui::InputText("Secondary Gallery", cfg->gallery1_dir, sizeof(cfg->gallery1_dir));
+
+            if (ImGui::Button("Use Map Dir")) {
+                autofill_from_map(cfg);
+                validate_startup_config(cfg, true);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Use Install Dir")) {
+                autofill_from_install(cfg);
+                validate_startup_config(cfg, true);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Validate")) {
+                validate_startup_config(cfg, true);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Start RayGame")) {
+                if (apply_startup_config(cfg)) {
+                    rlImGuiEnd();
+                    ImGui::End();
+                    EndDrawing();
+                    return true;
+                }
+            }
+
+            ImGui::Spacing();
+            ImGui::TextWrapped("Expected in Primary Assets: palette.dat and TILES*.ART");
+            ImGui::TextWrapped("Optional secondary gallery: Content/GAL_002_SW/");
+            ImGui::Spacing();
+            ImGui::TextWrapped("Status: %s", cfg->status);
+        }
+
+        ImGui::End();
+        rlImGuiEnd();
+        EndDrawing();
+    }
+
+    return false;
 }
 
 
@@ -971,11 +1082,9 @@ void MainLoop() {
     int lightLocation = GetShaderLocation(multiplyShader, "lightTexture");
     InitTexBrowser();
     EditorSetTileState(&texb);
-      if (!loadifvalid()) {
-          loadgal(0, "c:/Eugene/Games/build2/");
-          loadgal(1, "c:/Eugene/Games/build2/Content/GAL_002_SW/");
-          DumbRender::Init("c:/Eugene/Games/build2/e3l3.map");
-      }
+    StartupConfig startup = {0};
+    init_startup_config_from_cli(&startup);
+    if (!prompt_for_startup_config(&startup)) return;
     DumbRender::LoadTexturesToGPU();
     auto map = DumbRender::GetMap();
     //DumbCore::Init(map);

@@ -15,9 +15,34 @@ What you need on this Arch Linux machine:
 How to run it from the repo root:
 
 cd /home/jaba/Documentos/raygame/duke3d-build2-main
-./RayLua/build/RayGame
+./RayLua/build/RayGame /path/to/your.map
 
-If it opens, you are done.
+If you do not pass a map, or the paths are wrong, RayGame now opens a startup menu instead of closing.
+
+Startup menu fields:
+
+- Map (.map)
+- Install Dir
+- Primary Assets
+- Secondary Gallery
+
+Useful buttons:
+
+- Use Map Dir
+- Use Install Dir
+- Validate
+- Start RayGame
+
+Important asset rule:
+
+- the map directory must also contain `palette.dat`
+- the map directory must also contain `TILES*.ART`
+- optional extra gallery directory:
+  `Content/GAL_002_SW/`
+
+Example idea:
+
+./RayLua/build/RayGame /path/to/duke3d/e3l3.map
 
 If you want to rebuild it later:
 
@@ -49,4 +74,5 @@ Quick summary:
 
 - Already compiled: yes
 - Binary: RayLua/build/RayGame
-- Run command: ./RayLua/build/RayGame
+- Run command: ./RayLua/build/RayGame /path/to/your.map
+- If paths are missing, a startup setup screen now appears instead of crashing
