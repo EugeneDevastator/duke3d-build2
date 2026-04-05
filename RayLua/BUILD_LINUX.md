@@ -63,6 +63,7 @@ Pinned revisions:
 - Fixed Windows path separators in includes
 - Replaced several MSVC-only functions and inline asm fragments with portable code
 - Stopped CMake from compiling header files as standalone translation units
+- Patched ImGui font loading so Linux uses system fonts first instead of crashing on a hardcoded Windows font path
 
 ## Known limitations
 
@@ -70,6 +71,20 @@ Pinned revisions:
 - `DukeGame` is not part of the verified Linux build yet.
 - Lua is still disabled for the verified Linux build.
 - The code still carries a lot of legacy Build-era global state and header-defined storage.
+
+## Runtime note
+
+One early runtime crash on Linux was caused by `SetImguiFonts()` trying to load:
+
+- `C:\Windows\Fonts\segoeui.ttf`
+
+That is now patched to try Linux font paths first:
+
+- `/usr/share/fonts/TTF/DejaVuSans.ttf`
+- `/usr/share/fonts/noto/NotoSans-Regular.ttf`
+- `/usr/share/fonts/liberation/LiberationSans-Regular.ttf`
+
+If none of those exist, the app falls back to ImGui's default built-in font instead of aborting.
 
 ## Recommended workflow
 

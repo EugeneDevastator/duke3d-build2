@@ -543,12 +543,30 @@ void SetImguiFonts()
 {
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->Clear();
-    ImFont* font = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\segoeui.ttf", 28.0f);
+
+    const char* font_candidates[] = {
+#if defined(__linux__)
+        "/usr/share/fonts/TTF/DejaVuSans.ttf",
+        "/usr/share/fonts/noto/NotoSans-Regular.ttf",
+        "/usr/share/fonts/liberation/LiberationSans-Regular.ttf",
+#endif
+        "C:\\Windows\\Fonts\\segoeui.ttf"
+    };
+
+    ImFont* font = nullptr;
+    for (size_t i = 0; i < sizeof(font_candidates) / sizeof(font_candidates[0]); ++i) {
+        if (file_exists(font_candidates[i])) {
+            font = io.Fonts->AddFontFromFileTTF(font_candidates[i], 28.0f);
+            if (font != nullptr) break;
+        }
+    }
+
     if (font == nullptr) {
         ImFontConfig config;
         config.SizePixels = 18.0f;
         config.PixelSnapH = true;
         io.Fonts->AddFontDefault(&config);
+        printf("Info: Using ImGui default font fallback\n");
     }
     io.Fonts->Build();
 }
