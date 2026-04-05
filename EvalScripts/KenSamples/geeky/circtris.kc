@@ -1,0 +1,168 @@
+struct { x, y, z; } point3d;
+struct { x, y, z, u, v, col; } poltex_t;
+enum {VTMAX=12288, TRIMAX=24576};
+
+()
+{
+   static poltex_t vt[VTMAX];
+   static tri[TRIMAX][3];
+   static vtn, trin;
+   static point3d ipos, irig, idow, ifor, ihaf;
+   
+   res = 8;
+   while (1)
+   {
+      if (keystatus[0xc9]) { keystatus[0xc9] = 0; res = max(res-1, 1); }
+      if (keystatus[0xd1]) { keystatus[0xd1] = 0; res = min(res+1,48); }
+      
+      cls(0);
+      ha = (mousx/xres-.5)*PI*2;
+      va = (mousy/yres-.5)*PI;
+      ifor.x = cos(va)*cos(ha); irig.x =-sin(ha); ipos.x = ifor.x*-2.5;
+      ifor.y = cos(va)*sin(ha); irig.y = cos(ha); ipos.y = ifor.y*-2.5;
+      ifor.z = sin(va);         irig.z = 0;       ipos.z = ifor.z*-2.5;
+      idow.x = ifor.y*irig.z - ifor.z*irig.y;
+      idow.y = ifor.z*irig.x - ifor.x*irig.z;
+      idow.z = ifor.x*irig.y - ifor.y*irig.x;
+      ihaf.x = xres/2; ihaf.y = yres/2; ihaf.z = ihaf.x;
+      setcam(ipos.x,ipos.y,ipos.z, irig.x,irig.y,irig.z,
+             idow.x,idow.y,idow.z, ifor.x,ifor.y,ifor.z);
+      
+      gensphmesh(res,vt,&vtn,tri,&trin);
+      
+      mode = (bstatus%2); //0:show triangles, 1=show texture
+      
+      clz(1e32); glenable(GL_DEPTH_TEST);
+      //gldisable(GL_DEPTH_TEST); //optimization (FYI:noise requires zbuf for no artifacts)
+      glbegin(GL_TRIANGLES); glcullface(GL_BACK);
+      for(i=0;i<trin;i++)
+      {
+         if (!mode) { setcol((i*73)%192+64,(i*109)%192+64,(i*43)%192+64); }
+         for(j=0;j<3;j++)
+         {
+            v = tri[i][j];
+            gltexcoord(vt[v].u*mode,vt[v].v*mode);
+            glvertex(vt[v].x,vt[v].y,vt[v].z);
+         }
+      }
+      glend();
+
+      if ((bstatus%4) >= 2)
+      {
+         setfont(6,8); setcol(0xffffff);
+         for(i=0;i<vtn;i++)
+         {
+            x = vt[i].x-ipos.x; y = vt[i].y-ipos.y; z = vt[i].z-ipos.z;
+            x2 = x*irig.x + y*irig.y + z*irig.z;
+            y2 = x*idow.x + y*idow.y + z*idow.z;
+            z2 = x*ifor.x + y*ifor.y + z*ifor.z; if (z2 > 1.9) continue;
+            f = ihaf.z/z2;
+            sx = x2*f + ihaf.x;
+            sy = y2*f + ihaf.y;
+            moveto(sx,sy); printf("%g",i);
+            //drawsph(vt[i].x,vt[i].y,vt[i].z,.01);
+         }
+      }
+      
+      setcol(0xffffff); setfont(8,12); moveto(xres-256,0);
+      printf("res:%2g vtn:%5g trin:%5g\n",res,vtn,trin);
+
+         //calc vtn,trin from res
+      dr = 1/res; n = 2;
+      for(y=res-1;y>0;y--) { n += near(sin((y*dr)*(PI/2))*4*res)*2; }
+      n += near(sin((res*dr)*(PI/2))*4*res);
+      printf("\t\t\t%7g %10g\n",n,n*2-4);
+      
+         //Exact approximation (assuming no 'near') ;P
+      printf("\t\t\t%10.2f %10.2f\n",res*res*(16/PI),res*res*(16/PI)*2-4);
+      
+#if 0
+         //   //STL binary format:
+         //char filler[80];
+         //unsigned int numtris;
+         //for(i=0;i<numtris;i++)
+         //{
+         //   point3d norm, v[3]; //vertices are CCW and must be + coords
+         //   short filler;
+         //}
+      for(j=0;j<80;j++) fputc(0);
+      fputc(trin%256); fputc(int(trin/256)%256);
+      fputc(int(trin/2^16)%256); fputc(int(trin/2^24)%256);
+      for(i=0;i<trin;i++)
+      {
+         ax = vt[tri[i][1]].x-vt[tri[i][0]].x; bx = vt[tri[i][2]].x-vt[tri[i][0]].x;
+         ay = vt[tri[i][1]].y-vt[tri[i][0]].y; by = vt[tri[i][2]].y-vt[tri[i][0]].y;
+         az = vt[tri[i][1]].z-vt[tri[i][0]].z; bz = vt[tri[i][2]].z-vt[tri[i][0]].z;
+         nx = ay*bz - az*by;
+         ny = az*bx - ax*bz;
+         nz = ax*by - ay*bx; f = 1/sqrt(nx*nx + ny*ny + nz*nz);
+         fputfloat(nx*f);
+         fputfloat(ny*f);
+         fputfloat(nz*f);
+         for(j=0;j<3;j++)
+         {
+            fputfloat(vt[tri[i][j]].x);
+            fputfloat(vt[tri[i][j]].y);
+            fputfloat(vt[tri[i][j]].z);
+         }
+         fputc(0); fputc(0);
+      }
+#endif
+
+      refresh(); Sleep(15);
+   }
+}
+
+gensphmesh (res, poltex_t vt[VTMAX], &vtn, tri[TRIMAX][3], &trin)
+{
+   r = 0; dr = 1/res; ai1 = 1e32; n = 0; trin = 0;
+   vt[0].x = 0; vt[0].y = 0; vt[0].z = -1; ovtn = 0; vtn = 1;
+   //moveto(xres-256,20);
+   for(y=res;y>-res;y--)
+   {
+      r += dr; z = -cos(r*(PI/2)); f = sin(r*(PI/2));
+      on = n; n = near(f*4*res);
+      ai0 = ai1; ai1 = PI*2/n;
+      for(x=n-1;x>=0;x--)
+      {
+         vt[vtn+x].x = cos(x*ai1)*f;
+         vt[vtn+x].y = sin(x*ai1)*f;
+         vt[vtn+x].z = z;
+      }
+      oovtn = ovtn; ovtn = vtn; vtn += n;
+      v0 = oovtn; v1 = ovtn; d = (ai1-ai0)*.5;
+      //printf("\n");
+      for(i=on+n;i>0;i--)
+      {
+         tri[trin][0] = v0;
+         tri[trin][1] = v1;
+         if (d > 0) { d -= ai0; v0++; if (v0 >= ovtn) { v0 = oovtn; } tri[trin][2] = v0; }
+               else { d += ai1; v1++; if (v1 >=  vtn) { v1 =  ovtn; } tri[trin][2] = v1; }
+         //printf("%g %g %g\n",tri[trin][0],tri[trin][1],tri[trin][2]);
+         trin++;
+      }
+   }
+   vt[vtn].x = 0; vt[vtn].y = 0; vt[vtn].z = 1; vtn++;
+   for(i=0;i<vtn;i++)
+   {
+      x = vt[i].x; y = vt[i].y; z = vt[i].z;
+#if 0
+      vt[i].x = x+noise(x*3.04,y*3.11,z*2.93)*.2;
+      vt[i].y = y+noise(x*3.04,y*3.11,z*2.93)*.2;
+      vt[i].z = z+noise(x*3.04,y*3.11,z*2.93)*.2;
+#endif
+      vt[i].u = y; vt[i].v = z;
+   }
+}
+
+fputfloat (f)
+{
+   if (fabs(f) < 2^-126) { i = 0; } //don't bother with denormals ;P
+   else
+   {
+      sign = (f < 0); f = fabs(f);
+      expo = floor(log(f,2));
+      i = sign*2^31 + (expo+127)*2^23 + (f*2^(23-expo))%2^23;
+   }
+   fputc(i%256); fputc(int(i/256)%256); fputc(int(i/2^16)%256); fputc(int(i/2^24)%256);  
+}

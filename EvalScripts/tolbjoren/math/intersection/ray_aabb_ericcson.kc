@@ -1,0 +1,303 @@
+struct vec
+{
+   x,y,z;
+}
+
+struct camera_t
+{
+   vec pos;
+   horiz_angle;
+   verti_angle;
+}
+
+struct ray_t
+{
+   vec origin;
+   vec dir;
+}
+
+struct box_t
+{
+   vec min;
+   vec max;
+}
+
+//enum{MAX_BOXES = 120}
+//static box_t boxes[MAX_BOXES];
+
+enum{MAX_RAYS = 100}
+static ray_t rays[MAX_RAYS];
+
+static camera_t camera;
+()
+{
+   if (numframes == 0)
+   {
+      set( camera.pos, 0,0,-10 );
+      camera.horiz_angle = 0;
+      camera.verti_angle = 0.0;
+      
+      for(i=0; i<MAX_RAYS; i++)
+      {
+         x = nrnd; y = nrnd; z = nrnd;
+         len = sqrt(x^2+y^2+z^2);
+         r = 3;
+         set( rays[i].origin, .5+r*x/len, .5+r*y/len, .5+r*z/len );
+         //set( rays[i].origin, 0,0,0 );
+         s = -2.5;
+         set( rays[i].dir, s*x/len, s*y/len, s*z/len );
+      }
+   }
+   
+   t = klock(0);
+
+
+   cls(0);
+   clz(1e32);
+
+   playercontrols(camera);
+      
+   a = t;
+   a = mousx/xres * 6.28;
+   r = 3;
+
+   ray_t ray;
+   set( ray.origin, -1.0,-.5,.5 );
+   set( ray.dir, cos(a)*r, sin(a)*r, 0 );
+ 
+   box_t box;
+   set( box.min, 1+(mousx/xres-1)*4,0,0 );
+   set( box.max, 1,1,1 );
+
+   setcol( 255, 255, 255 );
+   for(i=0; i<MAX_RAYS; i++)
+   drawRay( rays[i] );
+   
+   num_hits = 0;
+
+   for(i=0; i<MAX_RAYS; i++)
+   {
+      t = 0;
+      success = isect_ray_box( rays[i], box, t );
+   
+      if ( success == 1 )
+      {
+         if( t >= 0 && t <= 1.0 )
+         {
+            num_hits++;
+            //setcol(255,0,0); 
+            setcol(255,0,0);
+            vec hit;
+            raypoint( hit, rays[i], t );
+            drawsph( hit.x, hit.y, hit.z, .1 ); 
+         }
+      }
+   }
+   
+   setcol(0x439ee9);
+   drawBox( box );
+      
+   vec diff;
+   vecsub( diff, ray.dir, ray.origin );
+   
+   len = length( diff );
+   
+   setcol( 0xf7ab0d );
+   moveto(0,0);
+   printf("ray length = %g\n", len);
+   printf("hits = %g\n", num_hits);
+   printf("tval = %g\n", t);
+}
+
+vecToArray( vec v, a[3] )
+{
+   a[0] = v.x; a[1] = v.y; a[2] = v.z;
+}
+
+// Algoritm from Christer Ericcson's book:
+// RealTime Collision Detection
+// p. 181
+isect_ray_box( ray_t ray, box_t box, &t )
+{
+   #define EPSILON 1e-6
+   tmin = 0.0; // set to -FLT_MAX to get first hit on line
+   tmax = 1e32; // set to max distance ray can travel
+   
+   static box_min[3];
+   vecToArray(box.min, box_min);
+
+   static box_max[3];
+   vecToArray(box.max, box_max);
+   
+   static ray_origin[3];
+   vecToArray(ray.origin, ray_origin);
+   
+   static ray_dir[3];
+   vecToArray(ray.dir, ray_dir);
+
+   // slab test
+   for( i=0; i<3; i++)
+   {     
+      if ( fabs(ray_dir[i]) < EPSILON )
+      {
+         if ( ray_origin[i] < box_min[i] || ray_origin[i] > box_max[i] ) return 0;
+
+      }else{
+         ood = 1.0 / ray_dir[i];
+         t1 = (box_min[i] - ray_origin[i] ) * ood;
+         t2 = (box_max[i] - ray_origin[i] ) * ood;
+         
+         // Make t1 be isect with near plane, t2 with far
+         if (t1 > t2)
+         {
+            tmp = t2;
+            t2 = t1;
+            t1 = tmp;
+         }
+         // compute isect
+         tmin = max(tmin, t1);
+         tmax = min(tmax, t2);
+         // Exit with no collision as soon as slab isect is empty
+         if (tmin > tmax) return 0;
+      }
+   } // end for each slab
+   // Ray isects 3 slabs, return t
+   t = tmin;
+   return 1;  
+}
+
+raypoint( vec out, ray_t r, t )
+{
+   out.x = r.origin.x + t * r.dir.x;
+   out.y = r.origin.y + t * r.dir.y;
+   out.z = r.origin.z + t * r.dir.z;
+}
+
+
+drawray( ray_t r )
+{
+   drawsph(  r.origin.x, r.origin.y, r.origin.z, .05 );
+
+   vec end;
+   vecAdd( end, r.origin, r.dir );
+
+   moveto( r.origin.x, r.origin.y, r.origin.z );
+   lineto(end.x, end.y, end.z );
+   
+}
+
+drawBox( box_t b )
+{
+   r = 0.1;
+   drawsph( b.min.x, b.min.y, b.min.z, r );
+   drawsph( b.min.x, b.min.y, b.max.z, r );
+   drawsph( b.min.x, b.max.y, b.min.z, r );
+   drawsph( b.min.x, b.max.y, b.max.z, r );
+   
+   drawsph( b.max.x, b.min.y, b.min.z, r );
+   drawsph( b.max.x, b.min.y, b.max.z, r );
+   drawsph( b.max.x, b.max.y, b.min.z, r );
+   drawsph( b.max.x, b.max.y, b.max.z, r );
+   
+   r = 0.05;
+   // probably some smart way of looping over xyz axes and (1,1,1) vector to 
+   // produce this:
+   drawcone( b.min.x, b.min.y, b.min.z, r, b.min.x, b.min.y, b.max.z, r );
+   drawcone( b.min.x, b.min.y, b.min.z, r, b.min.x, b.max.y, b.min.z, r );
+   drawcone( b.min.x, b.min.y, b.min.z, r, b.max.x, b.min.y, b.min.z, r );
+
+   drawcone( b.min.x, b.max.y, b.min.z, r, b.min.x, b.max.y, b.max.z, r );
+   drawcone( b.min.x, b.max.y, b.min.z, r, b.max.x, b.max.y, b.min.z, r );
+   drawcone( b.min.x, b.max.y, b.max.z, r, b.min.x, b.min.y, b.max.z, r );
+ 
+   drawcone( b.max.x, b.max.y, b.max.z, r, b.min.x, b.max.y, b.max.z, r );
+   drawcone( b.max.x, b.max.y, b.max.z, r, b.max.x, b.max.y, b.min.z, r );
+   drawcone( b.max.x, b.max.y, b.min.z, r, b.max.x, b.min.y, b.min.z, r );
+   
+   drawcone( b.max.x, b.min.y, b.max.z, r, b.min.x, b.min.y, b.max.z, r );
+   drawcone( b.max.x, b.min.y, b.max.z, r, b.max.x, b.min.y, b.min.z, r );
+   drawcone( b.max.x, b.min.y, b.max.z, r, b.max.x, b.max.y, b.max.z, r );
+ 
+}
+
+vecadd( vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;
+}
+
+vecsub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;
+}
+
+
+dot( vec a, vec b )
+{
+   return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+set( vec a, x, y, z )
+{
+   a.x = x;
+   a.y = y;
+   a.z = z;
+}
+
+length( vec v )
+{
+   return sqrt( dot(v,v) );
+}
+
+
+// Camera and movement code taken from /games/
+//Handle input and player movement
+playercontrols(camera_t cam)
+{
+   static oldMouseX;
+   static oldMouseY;
+   static mouseSpeedX;
+   static mouseSpeedY; 
+
+   f = 0.01;
+   if (keystatus[0x2a]) f /= 4;
+   if (keystatus[0x36]) f *= 4;
+   vx = (keystatus[32]-keystatus[30])*f; //D-A
+   vy = (keystatus[17]-keystatus[31])*f; //W-S  
+   vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   
+   static mat[9]; 
+   ang2mat(cam.horiz_angle, cam.verti_angle, mat); // Convert angles to rotation matrix
+   
+   // find new position
+   cam.pos.x += mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   cam.pos.y += mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   cam.pos.z += mat[2]*vx + mat[5]*vz + mat[8]*vy; 
+   // mousespeed values are tweaked for 60 fps
+   mouseSpeedX = (mousx - oldMouseX) * 0.01;
+   mouseSpeedY = (mousy - oldMouseY) * 0.01;
+   oldMouseX = mousx;
+   oldMouseY = mousy;
+   if(bstatus==1)
+   {
+      cam.horiz_angle += mouseSpeedX;
+      cam.verti_angle += mouseSpeedY;
+   }
+   // Right,down,forwards unit vectors.
+   setcam(cam.pos.x, cam.pos.y, cam.pos.z,
+          mat[0],mat[1],mat[2],
+          mat[3],mat[4],mat[5],
+          mat[6],mat[7],mat[8]);
+}
+/* converts horizontal and vertical angles to a 3x3 rotation matrix */
+ang2mat(hang,vang,mat[9])
+{
+   mat[0] = cos(hang); mat[1] = 0; mat[2]=-sin(hang);
+   mat[6] = cos(vang)*sin(hang); mat[7] = sin(vang); mat[8]=cos(vang)*cos(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}

@@ -1,0 +1,265 @@
+/*
+Subdividing an icosahedron into a sphere.
+converted from a processing applet I made, 
+which in turn was a port of the OpenGL Redbook program
+
+then I saw a better solution on "The Little Grasshopper: Graphics Programmign Tips"
+http://prideout.net/blog/?p=44
+*/
+
+
+// The vertices that make up a icosahedron
+
+// because every value in eval is a struct or double
+// we can have a double "enum" value for initing auto arrays
+enum{   
+   xx = 0.525731112119133606,
+   zz = 0.850650808352039932
+}
+
+// xx and zz constants make sure the distance from the origin to any of the verts of the iscosahedron is 1.0
+static vertexData[12][3] = {    
+      -xx, 0.0, zz   ,  xx, 0.0, zz   ,  -xx, 0.0, -zz  ,  xx, 0.0, -zz  ,    0.0, zz, xx  , 
+      0.0, zz, -xx   , 0.0, -zz, xx   ,  0.0, -zz, -xx   ,  zz, xx, 0.0  ,   -zz, xx, 0.0   , 
+      zz, -xx, 0.0  ,   -zz, -xx, 0.0   
+};
+
+// indices used to construct triangles by linking vertices together
+static tindices[20][3] = { 
+      0,4,1, 0,9,4, 9,5,4, 4,5,8, 4,8,1,
+   8,10,1, 8,3,10, 5,3,8, 5,2,3, 2,7,3,    
+   7,10,3, 7,6,10, 7,11,6, 11,0,6, 0,1,6,
+   6,1,10, 9,0,11, 9,11,2, 9,2,5, 7,2,11   
+};
+ 
+      
+enum{MAX_TRIS = 5120, MAX_VERTS = 5160}
+struct vec{x,y,z;}
+static vec verts[MAX_VERTS];
+static numverts=0;
+
+struct face_t{
+   v1,v2,v3;
+}
+
+enum{MAX_FACES = MAX_TRIS}
+static face_t faces[MAX_FACES];
+static numFaces = 0;
+
+static subDivDepth;
+()
+{
+   cls(0); clz(1e32);
+    // Create ICO
+   numverts = 0;
+   numfaces = 0;
+   readArray = 0;
+   
+   for (i = 19; i >= 0; i--)
+   //for (i = 0; i<1; i++)
+   { 
+      vec v1 = {vertexData[ tindices[i][0] ][0],  vertexData[ tindices[i][0] ][1],  vertexData[ tindices[i][0] ][2] };
+      vec v2 = {vertexData[ tindices[i][1] ][0],  vertexData[ tindices[i][1] ][1],  vertexData[ tindices[i][1] ][2] };
+      vec v3 = {vertexData[ tindices[i][2] ][0],  vertexData[ tindices[i][2] ][1],  vertexData[ tindices[i][2] ][2] };
+      saveTri(v1,v2,v3);
+      id = i*3;
+      saveFace(id+0, id+1, id+2);
+   }
+   
+   max_subdivs = 4;
+   subDivDepth = min( max_subdivs, int( max_subdivs*mousx/xres ) );
+
+  glCullface(GL_NONE);
+  glCullface(GL_FRONT);
+  glCullface(GL_BACK);
+   for (i=0; i<subDivDepth; i++)
+   subdivide();
+
+
+   t = klock(0);
+   a = t;
+   r = -2;
+   setcam(sin(a)*r,0,cos(a)*r,a,0);
+   
+   if ( numframes==0 ) glsettex("cloud.png");
+   
+   vec v1,v2,v3;
+   for (i=0; i<numfaces; i++){
+    
+    v1 = verts[faces[i].v1];
+    v2 = verts[faces[i].v2];
+    v3 = verts[faces[i].v3];
+    setcol( hsv_to_rgb(i/numfaces*360,1,1) );
+    glBegin(GL_TRIANGLES);
+    //glBegin(GL_POINTS);
+    glvertex( v1 );
+    glvertex( v2 );
+    glvertex( v3 );
+    glEnd();
+   }
+  s = 1.003;   
+  setcol(255,255,255);
+  
+  for (i=0; i<numfaces; i++){
+    v1 = verts[faces[i].v1];
+    v2 = verts[faces[i].v2];
+    v3 = verts[faces[i].v3];
+    vecscalar(v1, s);
+    vecscalar(v2, s);
+    vecscalar(v3, s);
+    glBegin(GL_LINE_STRIP);
+      glvertex( v1 );
+      glvertex( v2 );
+      glvertex( v3 );
+    glEnd();
+  }
+  glEnd();
+   
+   moveto(0,0);
+   printf("tris %g\n", numfaces);
+   printf("list 1: %g\n", numverts);
+   printf("MAX_VERTS: %g\n", MAX_VERTS);
+   
+   printnum(subDivDepth);
+   
+}
+
+glvertex(vec v) { 
+  gltexcoord(v.x,v.y); 
+  glvertex(v.x,v.y,v.z); 
+}
+
+saveTri(vec v1, vec v2, vec v3 ){
+   saveVert(v1);
+   saveVert(v2);
+   saveVert(v3);
+}
+
+saveVert( vec v ) {
+  if ( numverts > MAX_VERTS ) err();
+  verts[numverts] = v;
+  numverts++;
+}
+
+saveFace(a,b,c){
+  faces[numfaces].v1 = a;
+  faces[numfaces].v2 = b;
+  faces[numfaces].v3 = c;
+  numfaces++;
+}
+
+subdivide()
+{
+  triangles = numfaces;
+  face_t face;
+  vec a,b,c;
+  vec ab,bc,ac;
+  for(faceIdx=0; faceIdx<triangles; faceIdx++){
+    // Create 3 new verts
+    face = faces[faceIdx];
+    a = verts[face.v1];
+    b = verts[face.v2];
+    c = verts[face.v3];
+    addAndNormalize(ab, a, b); saveVert(ab);
+    addAndNormalize(bc, b, c); saveVert(bc);
+    addAndNormalize(ac, a, c); saveVert(ac);
+    // Split current tri into 4 smaller tri
+    i = numverts - 3;
+    j = i+1; k = i+2;
+    saveFace(i,j,k);
+    saveFace(face.v1,i,k);
+    saveFace(i,face.v2,j);
+    face_t updatedFace = {k, j, face.v3};
+    faces[faceIdx] = updatedFace;
+  }
+}
+
+addAndNormalize(vec out, vec a, vec b ){
+  vecadd(out, a, b); 
+  normalize(out);
+}
+
+err() {
+   while(1){
+      cls(0,0,0);
+      setcol(255,0,0); moveto(xres/2,yres/2); printf("too many verts");
+      refresh();
+   }
+}
+
+vecScalar( vec out, s )
+{
+   out.x *= s;
+   out.y *= s;
+   out.z *= s;
+}
+
+vecScalar( vec out, vec a, s )
+{
+   out.x = a.x * s;
+   out.y = a.y * s;
+   out.z = a.z * s;
+}
+
+vecAdd( vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;   
+}
+vecSub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;   
+}
+
+vecCross( vec out, vec a, vec b)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+
+vecDot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+length( vec v )
+{
+   return sqrt( vecdot(v,v) );
+}
+
+normalize( vec v )
+{
+   len = length(v);
+   if ( len )
+   {
+      v.x /= len; v.y /= len; v.z /= len;
+   }
+}
+
+hsv_to_rgb(h,s,v){ 
+   // expects 360deg and 1,1 hue sat max
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   return rgb(int(r*255),int(g*255),int(b*255));
+}

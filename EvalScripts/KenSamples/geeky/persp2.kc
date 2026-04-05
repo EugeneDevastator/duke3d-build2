@@ -1,0 +1,201 @@
+struct { x, y; } point2d;
+struct { dx, dy, d0, ux, uy, u0, vx, vy, v0; } proj_t;
+
+()
+{
+   static hbuf[2048];
+   static point2d pt[4];
+   static proj_t p0, p1;
+   pt[0].x = xres*.55; pt[0].y = yres*.35;
+   pt[1].x = xres*.90; pt[1].y = yres*.32;
+   pt[2].x = xres*.95; pt[2].y = yres*.90;
+   pt[3].x = xres*.30; pt[3].y = yres*.80;
+   
+   obstatus = 0;
+   while (1)
+   {
+      if (bstatus%2)
+      {
+         if (!(obstatus%2))
+         {
+            dmin = 128^2; igrab = -1;
+            for(i=4-1;i>=0;i--)
+            {
+               d = (pt[i].x-mousx)^2 + (pt[i].y-mousy)^2;
+               if (d < dmin) { dmin = d; igrab = i; }
+            }
+         }
+         if (igrab >= 0) { pt[igrab].x = mousx; pt[igrab].y = mousy; }
+      }
+
+      quadpersp_getxy2uv(pt,&p0);
+      quadpersp_invert(&p0,&p1);
+    //quadpersp_invert(&p1,&p0); //works
+    
+      //cls(0);
+
+         //Draw background dots
+      dxi = p0.dx*4; uxi = p0.ux*4; vxi = p0.vx*4;
+      for(sx=0;sx<xres;sx++) hbuf[sx] = 0;
+      for(sy=0,sx0=0;sy<yres;sy+=2,sx0=2-sx0)
+      {
+         d = p0.dx*sx0 + p0.dy*sy + p0.d0;
+         u = p0.ux*sx0 + p0.uy*sy + p0.u0;
+         v = p0.vx*sx0 + p0.vy*sy + p0.v0;
+         for(sx=0;sx<xres;sx+=4,d+=dxi,u+=uxi,v+=vxi)
+            { f = 32/d; hbuf[sx] = pic(u*f,v*f); }
+         sethlin(sx0,sy,hbuf,xres);
+         setcol(0); if (sx0) { setpix(0,sy); setpix(1,sy); }
+         moveto(0,sy+1); lineto(xres,sy+1);
+      }
+      
+         //Draw quad GL style
+      gldisable(GL_DEPTH_TEST); glcullface(GL_NONE); setcol(0xffffff);
+      glbegin(GL_QUADS); rz = 0;
+      for(i=0;i<4;i++)
+      {
+         u = min(3-i,i); v = (i >= 2); //Just the quad
+#if 0
+            //Whole screen: fails if any corner's opposite horizon
+         sx = xres*u;
+         sy = yres*v;
+         rd = 1/(sx*p0.dx + sy*p0.dy + p0.d0);
+         u  =   (sx*p0.ux + sy*p0.uy + p0.u0)*rd;
+         v  =   (sx*p0.vx + sy*p0.vy + p0.v0)*rd;
+#endif         
+         gltexcoord(u,v);
+         
+         x = u*p1.ux + v*p1.uy + p1.u0;
+         y = u*p1.vx + v*p1.vy + p1.v0;
+         z = u*p1.dx + v*p1.dy + p1.d0;
+         if (!rz) { rz = 1/z; f = 1; } else f = z*rz;
+         x2 = (x/z - xres/2)*f;
+         y2 = (y/z - yres/2)*f;
+         z2 = (      xres/2)*f;
+         glvertex(x2,y2,z2);
+      }
+
+         //Draw grid lines
+      setcol(0xff8080); dt = 1/32;
+      for(t=1-dt;t>0;t-=dt)
+         for(i=0;i<4;i++)
+         {
+            if (i < 2) { u = t; v = i; }
+                  else { u=i-2; v = t; }
+            rd = 1/(u*p1.dx + v*p1.dy + p1.d0);
+            sx =   (u*p1.ux + v*p1.uy + p1.u0)*rd;
+            sy =   (u*p1.vx + v*p1.vy + p1.v0)*rd;
+            if (!(i%2)) moveto(sx,sy);
+                   else lineto(sx,sy);
+         }
+         
+#if 1
+      quadpersp_getxy2uv2(pt,p0);
+      for(sy=0;sy<yres;sy+=3)
+         for(sx=0;sx<xres;sx+=3)
+         {
+            f = 1/(sx*p0.dx + sy*p0.dy + p0.d0);
+            u =   (sx*p0.ux + sy*p0.uy + p0.u0)*f;
+            v =   (sx*p0.vx + sy*p0.vy + p0.v0)*f;
+            setcol((u%1)*256,(v%1)*256,0);
+            //setcol(pic(u*32,v*32));
+            setpix(sx+1,sy+1);
+         }
+#endif
+      
+         //Draw quad border
+      setcol(0xffffff);
+      for(i=4-1,j=0;i>=0;j=i,i--)
+         drawcone(pt[i].x,pt[i].y,1,pt[j].x,pt[j].y,1);
+      
+      obstatus = 0; refresh(); Sleep(5);
+   }
+}
+
+   //Given 4 points in CW loop order, calc 9 consts for transform:
+   //u = (ux*sx + uy*sy + u0)/(dx*sx + dy*sy + d0);
+   //v = (vx*sx + vy*sy + v0)/(dx*sx + dy*sy + d0);
+   //Beware of overflow: constants are large due to no divides!
+quadpersp_getxy2uv (point2d pt[4], proj_t proj)
+{
+   proj.ux = pt[3].y-pt[0].y; proj.uy = pt[0].x-pt[3].x;
+   proj.vx = pt[0].y-pt[1].y; proj.vy = pt[1].x-pt[0].x;
+   proj.u0 = pt[3].x*pt[0].y - pt[0].x*pt[3].y;
+   proj.v0 = pt[0].x*pt[1].y - pt[1].x*pt[0].y;
+   n0 = pt[2].x*pt[3].y - pt[3].x*pt[2].y;
+   n1 = pt[3].x*pt[1].y - pt[1].x*pt[3].y;
+   n2 = pt[1].x*pt[2].y - pt[2].x*pt[1].y;
+   l0 = proj.vx*pt[2].x + proj.vy*pt[2].y + proj.v0;
+   l1 = proj.ux*pt[2].x + proj.uy*pt[2].y + proj.u0;
+   t = n0+n1+n2; dx = t*l0; dy = t*l1;
+   t = l0*l1;
+   l0 *= (proj.ux*pt[1].x + proj.uy*pt[1].y + proj.u0);
+   l1 *= (proj.vx*pt[3].x + proj.vy*pt[3].y + proj.v0);
+   m0 = l1-t; m1 = l0-l1; m2 = t-l0;
+   proj.dx =  m0*pt[1].y + m1*pt[2].y + m2*pt[3].y;
+   proj.dy =-(m0*pt[1].x + m1*pt[2].x + m2*pt[3].x);
+   proj.d0 = n0*l0 + n1*t + n2*l1;
+   proj.ux *= dx; proj.uy *= dx; proj.u0 *= dx;
+   proj.vx *= dy; proj.vy *= dy; proj.v0 *= dy;
+}
+
+   //Alternative method: lots of sqrt & divide but more intuitive?
+   //http://reedbeta.com/blog/quadrilateral-interpolation-part-1/
+quadpersp_getxy2uv2 (point2d pt[4], proj_t proj)
+{
+      //(cx,cy) = intersection of diagonals in screen coords
+      //(x2-x0)*t + (x1-x3)*u = (x1-x0)
+      //(y2-y0)*t + (y1-y3)*u = (y1-y0)
+   x10 = pt[1].x-pt[0].x; x20 = pt[2].x-pt[0].x; x13 = pt[1].x-pt[3].x;
+   y10 = pt[1].y-pt[0].y; y20 = pt[2].y-pt[0].y; y13 = pt[1].y-pt[3].y;
+   t = (x10*y13 - y10*x13)/(x20*y13 - y20*x13);
+   cx = x20*t + pt[0].x;
+   cy = y20*t + pt[0].y;
+   drawsph(cx,cy,-5);
+   
+      //distance from center to each point
+   d0 = sqrt((pt[0].x-cx)^2 + (pt[0].y-cy)^2);
+   d1 = sqrt((pt[1].x-cx)^2 + (pt[1].y-cy)^2);
+   d2 = sqrt((pt[2].x-cx)^2 + (pt[2].y-cy)^2);
+   d3 = sqrt((pt[3].x-cx)^2 + (pt[3].y-cy)^2);
+      
+      //convert distances to inverse z's
+   z0 = d0/d2+1;
+   z1 = d1/d3+1;
+   z2 = d2/d0+1;
+   z3 = d3/d1+1;
+   
+   setcol(0x808080);
+   drawsph(pt[0].x,pt[0].y,z0*10);
+   drawsph(pt[1].x,pt[1].y,z1*10);
+   drawsph(pt[2].x,pt[2].y,z2*10);
+   drawsph(pt[3].x,pt[3].y,z3*10);
+
+      //(pt[1].x-pt[0].x)*u + (pt[3].x-pt[0].x)*v = sx-pt[0].x
+      //(pt[1].y-pt[0].y)*u + (pt[3].y-pt[0].y)*v = sy-pt[0].y
+   f = 1/((pt[1].x-pt[0].x)*(pt[3].y-pt[0].y) - (pt[1].y-pt[0].y)*(pt[3].x-pt[0].x));
+   ux = (pt[3].y-pt[0].y)*f; uy = (pt[0].x-pt[3].x)*f; u0 = -ux*pt[0].x - uy*pt[0].y;
+   vx = (pt[0].y-pt[1].y)*f; vy = (pt[1].x-pt[0].x)*f; v0 = -vx*pt[0].x - vy*pt[0].y;
+   dx = (z1-z0)*ux + (z3-z0)*vx;
+   dy = (z1-z0)*uy + (z3-z0)*vy;
+   d0 = (z1-z0)*u0 + (z3-z0)*v0 + z0;
+   ux *= z1; uy *= z1; u0 *= z1;
+   vx *= z3; vy *= z3; v0 *= z3;
+   
+   proj.ux = ux; proj.uy = uy; proj.u0 = u0;
+   proj.vx = vx; proj.vy = vy; proj.v0 = v0;
+   proj.dx = dx; proj.dy = dy; proj.d0 = d0;
+}
+
+quadpersp_invert (proj_t i, proj_t o)
+{
+   o.dx = i.vx*i.dy - i.vy*i.dx;
+   o.ux = i.vy*i.d0 - i.v0*i.dy;
+   o.vx = i.v0*i.dx - i.vx*i.d0;
+   o.dy = i.dx*i.uy - i.dy*i.ux;
+   o.uy = i.dy*i.u0 - i.d0*i.uy;
+   o.vy = i.d0*i.ux - i.dx*i.u0;
+   o.d0 = i.ux*i.vy - i.uy*i.vx;
+   o.u0 = i.uy*i.v0 - i.u0*i.vy;
+   o.v0 = i.u0*i.vx - i.ux*i.v0;
+}

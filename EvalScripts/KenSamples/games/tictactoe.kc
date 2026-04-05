@@ -1,0 +1,659 @@
+enum {MAXSIZ=16};
+static xsiz, ysiz, wsiz, b[MAXSIZ][MAXSIZ], recurse;
+static turn, left, mode = 2, grav = 0;
+static iscomp[2] = {0,1}, count[3] = {0,0,0}, numgames = 0, netgame = 0;
+
+()
+{
+   if (numframes == 0)
+   {
+      if (net_players >= 2) { netgame = 1; iscomp[0] = 0; iscomp[1] = 0; }
+      turn = 1; from = 0; val = 0; xsiz = 10; ysiz = 10; wsiz = 5; grav = 0;
+
+      while (1)
+      {
+         cls(0); setfont(20,32,1);
+
+         moveto(0,0); sel = floor(mousy/32-1); if (mousx >= 400) sel = -1;
+         setcol(0x806040); printf(" Player setup:\n");
+         for(j=0;j<2;j++)
+         {
+                 if (netgame) setcol(0x505860);
+            else if (sel == j)  setcol(0xa0a0a0);
+            else                setcol(0x606060);
+            if (j == 0) printf("\tX: "); else printf("\tO: ");
+            if (iscomp[j] == 0) printf("Human\n");
+            if ((xsiz <= 3) && (ysiz <= 3) && (wsiz <= 3))
+            {
+               if (iscomp[j] == 1) printf("CPU: Unbeatable\n");
+               if (iscomp[j] == 2) printf("CPU: Drunk\n");
+            }
+            else
+            {
+               if (iscomp[j] == 1) printf("CPU: Paco's AI\n");
+               if (iscomp[j] == 2) printf("CPU: Random Darts\n");
+            }
+         }
+         y = 120;
+         if (net_players >= 2)
+         {
+            setcol(0xa0a0a0);
+            if (netgame)
+            {
+               drawcone(10,y-14,4,45,y-14,4);
+               drawcone(50,y-14,1,35,y-24,4);
+               drawcone(50,y-14,1,35,y- 4,4);
+            }
+            else
+            {
+               drawcone(10,y-62,4,45,y-62,4);
+               drawcone(50,y-62,1,35,y-72,4);
+               drawcone(50,y-62,1,35,y-52,4);
+               setcol(0x505860);
+            }
+            printf("\tPlay over net\n"); y += 32;
+         }
+
+
+         if ((bstatus) && (sel >= 0) && (sel < 2+(net_players>=2)))
+         {
+            bstatus = 0;
+            if (sel < 2) { iscomp[sel]++; if (iscomp[sel] >= 3) iscomp[sel] = 0; netgame = 0; }
+                    else { netgame = 1-netgame; iscomp[0] = 0; iscomp[1] = 0; }
+            playsound("rulinst.wav",100,.5);
+         }
+
+
+         moveto(0,y);
+         setcol(0x806040); printf(" Who goes first?\n");
+         sel = floor((mousy-y)/32-1); if (mousx >= 400) sel = -1;
+         if (sel == 0) setcol(0xa0a0a0); else setcol(0x606060); printf("\tX\n");
+         if (sel == 1) setcol(0xa0a0a0); else setcol(0x606060); printf("\tO\n");
+         if (sel == 2) setcol(0xa0a0a0); else setcol(0x606060); printf("\tRandom\n");
+         if (sel == 3) setcol(0xa0a0a0); else setcol(0x606060); printf("\tWinners\n");
+         if (sel == 4) setcol(0xa0a0a0); else setcol(0x606060); printf("\tLosers\n");
+         if (sel == 5) setcol(0xa0a0a0); else setcol(0x606060); printf("\tEvery other game\n");
+         if ((bstatus) && (sel >= 0) && (sel < 6))
+            { bstatus = 0; mode = sel; playsound("rulinst.wav",100,.5); }
+
+         setcol(0xa0a0a0);
+         drawcone(10,mode*32+y+42,4,45,mode*32+y+42,4);
+         drawcone(50,mode*32+y+42,1,35,mode*32+y+32,4);
+         drawcone(50,mode*32+y+42,1,35,mode*32+y+52,4);
+
+         xof = 432; moveto(xof,0);
+         setcol(0x806040); printf("Select board size:\n");
+         setcol(0x606060); setfont(6,8);
+         sc = 16;
+         if ((bstatus) && (mousx >= xof+48-8) && (mousx <= xof+48+MAXSIZ*sc+8) &&
+                          (mousy >=     32-8) && (mousy <=     32+MAXSIZ*sc+8))
+         {
+            nxsiz = min(max(floor((mousx-(xof+48))/MAXSIZ+.5),1),MAXSIZ);
+            nysiz = min(max(floor((mousy-      32)/MAXSIZ+.5),1),MAXSIZ);
+            if ((xsiz != nxsiz) || (ysiz != nysiz))
+            {
+               xsiz = nxsiz; ysiz = nysiz; wsiz = min(wsiz,min(xsiz,ysiz));
+               playsound("rulinst.wav",100,.5);
+            }
+         }
+         for(i=0;i<=MAXSIZ;i++)
+         {
+            moveto(     i*sc+xof+48,     0*sc+32);
+            lineto(     i*sc+xof+48,MAXSIZ*sc+32);
+            moveto(     0*sc+xof+48,     i*sc+32);
+            lineto(MAXSIZ*sc+xof+48,     i*sc+32);
+         }
+         setcol(0xffffff);
+         moveto(xof+48,32);
+         lineto(xof+xsiz*sc+48,32);
+         lineto(xof+xsiz*sc+48,ysiz*sc+32);
+         lineto(xof+48,ysiz*sc+32);
+         lineto(xof+48,32);
+         setfont(12,16);
+         moveto(xof+48+xsiz*sc/2-(3+(xsiz>=10)+(ysiz>=10))*6,32+ysiz*sc/2-8); printf("%gx%g",xsiz,ysiz);
+
+         if ((bstatus) && (mousx >= xof+48-8) && (mousx <= xof+48+MAXSIZ*sc+8) &&
+                          (mousy >=      300) && (mousy <=                380))
+         {
+            nwsiz = min(max(floor((mousx-32-xof)/sc-.5),2),max(xsiz,ysiz));
+            if (wsiz != nwsiz)
+            {
+               wsiz = nwsiz;
+               playsound("rulinst.wav",100,.5);
+            }
+         }
+         setfont(20,32,1); setcol(0x806040); moveto(xof,300);
+         setcol(0x806040); printf("Get %g in a row:\n",wsiz);
+         setcol(0x808080); setfont(12,16);
+         for(i=0;i<wsiz;i++)
+         {
+            setcol(0x50b050); drawsph(xof+sc*i+56,368,9);
+            setcol(0x000000); drawsph(xof+sc*i+56,368,6);
+            setcol(0xb05050); drawcone(xof+sc*i+49,333,-2.5,xof+sc*i+63,347,-2.5);
+                              drawcone(xof+sc*i+63,333,-2.5,xof+sc*i+49,347,-2.5);
+         }
+         setcol(0xd07070); drawcone(xof+56-sc/2,340,1,xof+wsiz*sc+56-sc/2,340,1);
+         setcol(0x70d070); drawcone(xof+56-sc/2,368,1,xof+wsiz*sc+56-sc/2,368,1);
+         
+         setfont(20,32,1); setcol(0x806040); moveto(xof,384);
+         setcol(0x806040); printf("Gravity:");
+         if ((mousx >= xof) && (mousx <= xof+256) && (mousy >= 380) && (mousy <= 420))
+         {
+            if (bstatus) { bstatus = 0; grav = 1-grav; playsound("rulinst.wav",100,.5); }
+            setcol(0xa0a0a0); 
+         } else setcol(0x606060);
+         if (grav) printf("On"); else printf("Off");
+
+         setfont(20,32,1);
+         setcol(0x403020); drawcone(60,y+264,30,150,y+264,30);
+         setcol(0x605040); drawcone(60,y+264,20,150,y+264,20);
+         if (sel >= 6) setcol(0xa0a0a0); else setcol(0x606060);
+         moveto(0,y+250); printf("\tPlay!");
+         if ((bstatus) && (sel >= 6))
+         {
+            bstatus = 0; playsound("rulinst.wav",100,.5);
+            if (netgame)
+            {
+               net_send(NET_ALL,1000+mode); //Tell other to start game
+               net_send(NET_ALL,2000+xsiz);
+               net_send(NET_ALL,3000+ysiz);
+               net_send(NET_ALL,4000+wsiz);
+               net_send(NET_ALL,5000+grav);
+            }
+            else break;
+         }
+         if (net_players >= 2)
+         {
+            if (net_recv(&from,&val))
+            {                                     mode = val-1000;
+               while (net_recv(&from,&val) == 0); xsiz = val-2000;
+               while (net_recv(&from,&val) == 0); ysiz = val-3000;
+               while (net_recv(&from,&val) == 0); wsiz = val-4000;
+               while (net_recv(&from,&val) == 0); grav = val-5000;
+               netgame = 1; iscomp[0] = 0; iscomp[1] = 0; break;
+            }
+         }
+         refresh();
+      }
+   }
+   //else { wsiz = 4; grav = 1; xsiz = 7; ysiz = 6; mode = 0; } //Connect 4
+
+      //       wsiz recurse grav
+      // 3x3     3     6      0   //tic-tac-toe
+      // 7x6     4     ?      1   //connect 4
+      //10x10    5     2      0   //take 5
+      //15x15    5     2      0   //Gomoku
+   s = max(xsiz,ysiz);
+        if (s <= 3) recurse = 4;
+   else if (s <= 4) recurse = 3;
+   else if (s <= 7) recurse = 2;
+   else             recurse = 1;
+
+   for(y=0;y<ysiz;y++)
+      for(x=0;x<xsiz;x++)
+         b[x][y] = 0;
+
+   if (mode == 0) turn = 1;
+   if (mode == 1) turn = 2;
+   if (mode == 2)
+   {
+      turn = int(2*rnd)+1;
+      if (netgame)
+      {
+         if (net_me == 0) { net_send(NET_ALLELSE,turn+6000); }
+         else { while (net_recv(&from,&val) == 0); turn = val-6000; }
+      }
+   }
+   if (mode == 3) turn = 3-turn;
+   if (mode == 4) turn = turn;
+   if (mode == 5) { turn = (numgames%2)+1; numgames++; }
+   
+   setcam(0,0,-xres/2,0,0);
+   left = xsiz*ysiz;
+   done = 0; wonx0 = -1; wony0 = -1; wonx1 = -1; wony1 = -1;
+   while (1)
+   {
+      cls(0); clz(1e32);
+      siz = min(xres/xsiz,yres/ysiz)*.8;
+     
+      if (done == 0)
+      {
+         movex = -1; movey = -1;
+         if (iscomp[turn-1])
+         {
+            if ((xsiz <= 3) && (ysiz <= 3) && (wsiz <= 3)) //Use old/perfect AI for 3x3
+                 getcompmove(&movex,&movey,iscomp[turn-1]);
+            else if (iscomp[turn-1] == 2)
+                 getcompmove2(&movex,&movey,iscomp[turn-1]);
+            else getcompmove3(&movex,&movey,iscomp[turn-1]);
+         }
+         else
+         {
+            if ((netgame == 0) || (turn == net_me+1))
+            {
+               x = min(max(mousx,0),xres);
+               y = min(max(mousy,0),yres);
+               nx = floor((mousx-xres/2)/siz+xsiz/2);
+               ny = floor((mousy-yres/2)/siz+ysiz/2);
+               //draw_let(x,y,siz/2,turn,1);
+               if ((nx >= 0) && (nx < xsiz) && (ny >= 0) && (ny < ysiz) && (b[nx][ny*(grav==0)] == 0))
+               {
+                  if (grav) { for(ny=0;ny<ysiz-1;ny++) if (b[nx][ny+1]) break; }
+                  nx = (nx+.5-xsiz/2)*siz+xres/2;
+                  ny = (ny+.5-ysiz/2)*siz+yres/2;
+                  tim = klock();
+                  draw_let(nx,ny,siz/2,turn,sin(tim*4)*.25+.75);
+                  //for(dt=1/8,t=1;t>0;t-=dt)
+                  //   draw_let((nx-x)*t+x,(ny-y)*t+y,siz*(t/2+.5),turn,(1-t)/2+.5);
+               }
+            }
+            if (grav) //Allow playing Connect 4 with top number keys
+            {
+               for(i=0;i<12;i++)
+                  if (keystatus[i+0x2])
+                  {
+                     keystatus[i+0x2] = 0;
+                     mousx = (i+1-.5 - xsiz/2)*siz + xres/2;
+                     mousy = (  1-.5 - ysiz/2)*siz + yres/2;
+                     bstatus = 1;
+                     break;
+                  }
+            }
+            if (bstatus)
+            {
+               bstatus = 0;
+               x = floor((mousx-xres/2)/siz+xsiz/2);
+               y = floor((mousy-yres/2)/siz+ysiz/2);
+               if ((x >= 0) && (x < xsiz) &&
+                   (y >= 0) && (y < ysiz) && (b[x][y*(grav==0)] == 0) &&
+                   ((netgame == 0) || (turn == net_me+1)))
+               {
+                  if (grav) { for(y=0;y<ysiz-1;y++) if (b[x][y+1]) break; }
+                  if (netgame) { net_send(NET_ALL,y*xsiz+x); }
+                          else { movex = x; movey = y; }
+               }
+            }
+            if (netgame)
+            {
+               if (net_recv(&from,&val))
+                  if ((val >= 0) && (val < xsiz*ysiz))
+                     { movex = val%xsiz; movey = floor(val/xsiz); }
+            }
+         }
+         if (movex >= 0)
+         {
+            b[movex][movey] = turn;
+            playsound("rulinst.wav",100,2^(turn*(7/12))*.5);
+            if (checkwin(movex,movey))
+            {
+               if (turn == 1) { playtext("X wins"); count[1]++; doneclk = klock(); dir = int(2*rnd)*2-1; }
+               if (turn == 2) { playtext("O wins"); count[2]++; doneclk = klock(); dir = int(2*rnd)*2-1; }
+               getwin(movex,movey,&wonx0,&wony0,&wonx1,&wony1);
+               dx = sgn(wonx1-wonx0); wonx0 -= dx/2; wonx1 += dx/2;
+               dy = sgn(wony1-wony0); wony0 -= dy/2; wony1 += dy/2;
+               done = 1;
+            }
+            else
+            {
+               left--;
+               if (left == 0)
+               {
+                  done = 2; playtext("It's a tie.");
+                  count[0]++; doneclk = klock(); dir = int(2*rnd)*2-1;
+               }
+            }
+            turn = 3-turn;
+         }
+      }
+      
+      moveto(8,8); setfont(12,16);
+      setcol(0xc0c0c0); printf("Stats:\n");
+      setcol(0xc04040); printf("  X: %g\n",count[1]);
+      setcol(0x40c040); printf("  O: %g\n",count[2]);
+      setcol(0xc0c040); printf("Tie: %g\n",count[0]);
+
+      setcol(0x8080a0); r = max(15/max(xsiz,ysiz),2);
+      for(x=1;x<xsiz;x++)
+      {
+         drawcone(-siz*(x-xsiz/2),-siz*ysiz/2,0,r,
+                  -siz*(x-xsiz/2),+siz*ysiz/2,0,r);
+      }
+      if (grav) { setcol(0x404060); r *= .5; }
+      for(y=1;y<ysiz;y++)
+      {
+         drawcone(-siz*xsiz/2,siz*(y-ysiz/2),0,r,
+                  +siz*xsiz/2,siz*(y-ysiz/2),0,r);
+      }
+      for(y=0;y<ysiz;y++)
+         for(x=0;x<xsiz;x++)
+         {
+            if (b[x][y] == 0) continue;
+            sx = xres/2 + (x-(xsiz-1)/2)*siz;
+            sy = yres/2 + (y-(ysiz-1)/2)*siz;
+            draw_let(sx,sy,siz,b[x][y],1);
+            if (iscomp[b[x][y]-1])
+            {
+               h = 0; v = 0;
+               if (iscomp[b[x][y]-1] == 2) { h = sin(klock()*4)*.1; v = sin(klock()*5)*.1; }
+               drawspr("caco.kv6",sx-xres/2,sy-yres/2,0,siz*.35,h,v);
+            }
+         }
+      
+      if (done == 0)
+      {
+         setcam(0,0,-xres/2,0,0);
+         xs = xres/80; setfont(xs,xs*1.5,1); setcol(0xa0a0c0);
+         moveto((xres-14*xs)/2,0); printf("Get %g in a row",wsiz);
+      }
+      else
+      {
+         //t = (cos(min(max((klock()-doneclk)*2,0),PI))*.5-.5)*(PI*2)*dir;
+         t = (klock()-doneclk)*1.5*dir;
+         
+         if (done == 1)
+         {
+            x0 = siz*(wonx0-xsiz/2+.5)+xres/2;
+            y0 = siz*(wony0-ysiz/2+.5)+yres/2;
+            x1 = siz*(wonx1-xsiz/2+.5)+xres/2;
+            y1 = siz*(wony1-ysiz/2+.5)+yres/2;
+            static ax[3], va[3], vb[3], vc[3], vp[3];
+            dx = wonx1-wonx0; dy = wony1-wony0;
+            f = 1/sqrt(dx^2 + dy^2); ax[0] = dx*f; ax[1] = dy*f; ax[2] = 0;
+            va[0] = 1; va[1] = 0; va[2] = 0; axisrotate(va,ax,t);
+            vb[0] = 0; vb[1] = 1; vb[2] = 0; axisrotate(vb,ax,t);
+            vc[0] = 0; vc[1] = 0; vc[2] = 1; axisrotate(vc,ax,t);
+            dx =-ax[1]; dy = ax[0]; f = (x0-xres/2)*dx + (y0-yres/2)*dy; dx *= f; dy *= f;
+            vp[0] = -dx; vp[1] = -dy; vp[2] = -xres/2;
+            axisrotate(vp,ax,t);
+            vp[0] += dx; vp[1] += dy;
+            setcam(vp[0],vp[1],vp[2], va[0],va[1],va[2], vb[0],vb[1],vb[2], vc[0],vc[1],vc[2]);
+            
+            if (turn == 2) setcol(0xff8080); else setcol(0x80ff80);
+            r = 32/max(xsiz,ysiz);
+            drawcone(siz*(wonx0-xsiz/2+.5),siz*(wony0-ysiz/2+.5),0,r,
+                     siz*(wonx1-xsiz/2+.5),siz*(wony1-ysiz/2+.5),0,r);
+
+            setfont(siz*0.5,siz*0.7,1);
+            moveto(xres/2-6*siz*.25,0);
+            if (turn == 2) printf("X wins");
+                      else printf("O wins");
+         }
+         else
+         {
+            setcam(0,0,-xres/2,cos(t),sin(t),0,-sin(t),cos(t),0,0,0,1); //Tie
+
+            setcol(0xffff00);
+            setfont(siz*.35,siz*0.6,1);
+            moveto(xres/2-10*siz/2*.35,0);
+            printf("It's a tie");
+         }
+         if (bstatus)
+         {
+            bstatus = 0;
+            if (netgame) net_send(NET_ALLELSE,7000); //Tell others to start game
+            return;
+         }
+         if (netgame) if (net_recv(&from,&val)) return;
+      }
+      refresh();
+   }
+}
+
+draw_let (x, y, siz, turn, colsc)
+{
+   if (turn == 1)
+   {
+      setcol(colsc*192,colsc*64,colsc*64);
+      f = .35; r = 32/max(xsiz,ysiz);
+      drawcone(x-siz*f-xres/2,y-siz*f-yres/2,0,r,x+siz*f-xres/2,y+siz*f-yres/2,0,r);
+      drawcone(x+siz*f-xres/2,y-siz*f-yres/2,0,r,x-siz*f-xres/2,y+siz*f-yres/2,0,r);
+   }
+   else if (turn == 2)
+   {
+      setcol(colsc*64,colsc*192,colsc*64);
+      n = max(int(100/max(xsiz,ysiz)),12); f = PI*2/n; siz *= .35;
+      r = 32/max(xsiz,ysiz);
+      for(i=0;i<n;i++)
+         drawcone(cos((i  )*f)*siz+x-xres/2,sin((i  )*f)*siz+y-yres/2,0,r,
+                  cos((i+1)*f)*siz+x-xres/2,sin((i+1)*f)*siz+y-yres/2,0,r);
+   }
+}
+
+axisrotate (p[3], ax[3], w) //10/26/2011:optimized algo :)
+{
+   //static ax[3];
+
+   c = cos(w); s = sin(w);
+   //t = axis[0]*axis[0] + axis[1]*axis[1] + axis[2]*axis[2]; if (t == 0) return;
+   //t = 1.0 / sqrt(t); ax[0] = axis[0]*t; ax[1] = axis[1]*t; ax[2] = axis[2]*t;
+      
+      //P = cross(AX,P)*s + dot(AX,P)*(1-c)*AX + P*c;
+   ox = p[0]; oy = p[1]; oz = p[2];
+   f = (ox*ax[0] + oy*ax[1] + oz*ax[2])*(1.0-c);
+   p[0] = (ax[1]*oz - ax[2]*oy)*s + ax[0]*f + ox*c;
+   p[1] = (ax[2]*ox - ax[0]*oz)*s + ax[1]*f + oy*c;
+   p[2] = (ax[0]*oy - ax[1]*ox)*s + ax[2]*f + oz*c;
+}
+
+getwin (cx,cy,&wonx0,&wony0,&wonx1,&wony1)
+{
+   i = b[cx][cy];
+
+   n = 1;
+   for(x=cx-1;(x >= 0) && (b[x][cy] == i);x--)
+      { n++; if (n >= wsiz) { wonx0 = x; wony0 = cy; wonx1 = x+wsiz-1; wony1 = cy; return(1); } }
+   for(x=cx+1;(x < xsiz) && (b[x][cy] == i);x++)
+      { n++; if (n >= wsiz) { wonx0 = x-wsiz+1; wony0 = cy; wonx1 = x; wony1 = cy; return(1); } }
+
+   n = 1;
+   for(y=cy-1;(y >= 0) && (b[cx][y] == i);y--)
+      { n++; if (n >= wsiz) { wonx0 = cx; wony0 = y; wonx1 = cx; wony1 = y+wsiz-1; return(1); } }
+   for(y=cy+1;(y < ysiz) && (b[cx][y] == i);y++)
+      { n++; if (n >= wsiz) { wonx0 = cx; wony0 = y-wsiz+1; wonx1 = cx; wony1 = y; return(1); } }
+
+   n = 1;
+   for(x=cx-1,y=cy-1;(x >= 0) && (y >= 0) && (b[x][y] == i);x--,y--)
+      { n++; if (n >= wsiz) { wonx0 = x; wony0 = y; wonx1 = x+wsiz-1; wony1 = y+wsiz-1; return(1); } }
+   for(x=cx+1,y=cy+1;(x < xsiz) && (y < ysiz) && (b[x][y] == i);x++,y++)
+      { n++; if (n >= wsiz) { wonx0 = x-wsiz+1; wony0 = y-wsiz+1; wonx1 = x; wony1 = y; return(1); } }
+
+   n = 1;
+   for(x=cx+1,y=cy-1;(x < xsiz) && (y >= 0) && (b[x][y] == i);x++,y--)
+      { n++; if (n >= wsiz) { wonx0 = x; wony0 = y; wonx1 = x-wsiz+1; wony1 = y+wsiz-1; return(1); } }
+   for(x=cx-1,y=cy+1;(x >= 0) && (y < ysiz) && (b[x][y] == i);x--,y++)
+      { n++; if (n >= wsiz) { wonx0 = x; wony0 = y; wonx1 = x+wsiz-1; wony1 = y-wsiz+1; return(1); } }
+
+   return(0);
+}
+
+checkwin (cx,cy)
+{
+   i = b[cx][cy];
+
+   n = 1;
+   for(x=cx-1;(x >=   0) && (b[x][cy] == i);x--) { n++; if (n >= wsiz) return(1); }
+   for(x=cx+1;(x < xsiz) && (b[x][cy] == i);x++) { n++; if (n >= wsiz) return(1); }
+
+   n = 1;
+   for(y=cy-1;(y >=   0) && (b[cx][y] == i);y--) { n++; if (n >= wsiz) return(1); }
+   for(y=cy+1;(y < ysiz) && (b[cx][y] == i);y++) { n++; if (n >= wsiz) return(1); }
+
+   n = 1;
+   for(x=cx-1,y=cy-1;(x >=   0) && (y >=   0) && (b[x][y] == i);x--,y--)
+      { n++; if (n >= wsiz) return(1); }
+   for(x=cx+1,y=cy+1;(x < xsiz) && (y < ysiz) && (b[x][y] == i);x++,y++)
+      { n++; if (n >= wsiz) return(1); }
+
+   n = 1;
+   for(x=cx+1,y=cy-1;(x < xsiz) && (y >=   0) && (b[x][y] == i);x++,y--)
+      { n++; if (n >= wsiz) return(1); }
+   for(x=cx-1,y=cy+1;(x >=   0) && (y < ysiz) && (b[x][y] == i);x--,y++)
+      { n++; if (n >= wsiz) return(1); }
+
+   return(0);
+}
+//----------------------------------------------------------------------------
+
+   //Standard game tree, no pruning
+getmovesc (turn,lrecurse)
+{
+   for(x=0;x<xsiz;x++)
+      for(y=0;y<ysiz;y++)
+      {
+         if (b[x][y]) continue;
+         if ((grav) && (y < ysiz-1) && (b[x][y+1] == 0)) continue;
+         b[x][y] = turn; i = checkwin(x,y); b[x][y] = 0;
+         if (i) return(1);
+      }
+   if (lrecurse <= 0) return(0);
+   bsc = 1;
+   for(x=0;x<xsiz;x++)
+      for(y=0;y<ysiz;y++)
+      {
+         if (b[x][y]) continue;
+         if ((grav) && (y < ysiz-1) && (b[x][y+1] == 0)) continue;
+         b[x][y] = turn;
+         bsc = min(bsc,getmovesc(3-turn,lrecurse-1));
+         b[x][y] = 0;
+      }
+   return(-bsc);
+}
+
+   //intel: 1=smart, 2=dumb
+getcompmove (&bestx,&besty,intel)
+{
+   bsc = 1e32; bscnum = 0; maxrec = max(min(left-1,recurse),0);
+   if (intel == 2) maxrec = min(maxrec,1);
+   for(y=0;y<ysiz;y++)
+      for(x=0;x<xsiz;x++)
+      {
+         if (b[x][y]) continue;
+         if ((grav) && (y < ysiz-1) && (b[x][y+1] == 0)) continue;
+         b[x][y] = turn;
+         if (checkwin(x,y)) { b[x][y] = 0; bestx = x; besty = y; return; }
+         nsc = getmovesc(3-turn,maxrec);
+         b[x][y] = 0;
+         if (nsc < bsc) { bsc = nsc; bestx = x; besty = y; bscnum = 0; }
+         else if (nsc == bsc) { bscnum++; if (rnd*bscnum < 1) { bestx = x; besty = y; } }
+      }
+}
+
+getcompmove2 (&bestx,&besty,intel)
+{
+   static g[MAXSIZ][MAXSIZ];
+
+      // -xxxx-        win
+      // -xxx-         must block
+      // -xxx- -xxx-   win
+   for(y=0;y<ysiz;y++)
+      for(x=0;x<xsiz;x++)
+         g[x][y] = 0;
+
+   for(y=0;y<ysiz;y++)
+      for(x=0;x<xsiz;x++)
+      {
+         if (b[x][y]) continue;
+         if ((grav) && (y < ysiz-1) && (b[x][y+1] == 0)) continue;
+         b[x][y] = turn;
+         if (checkwin(x,y)) { b[x][y] = 0; bestx = x; besty = y; return; }
+         b[x][y] = 0;
+      }
+
+   do
+   {
+      bestx = int(xsiz*rnd);
+      besty = int(ysiz*rnd);
+   } while (b[bestx][besty]);
+}
+
+   //Evaluation function written by Francisco Godoy (Paco)
+   //Code shortened and reformatted by Ken Silverman, 06/01/2010
+   //NOTE: Paco's AI was not designed with gravity mode in mind. It is just a hack for now. -Ken S.
+getcompmove3 (&bestx,&besty,intel)
+{
+   static score[MAXSIZ][MAXSIZ];          //score: xsiz, ysiz
+   static acu[2][MAXSIZ][MAXSIZ][MAXSIZ]; //acu: s, wsiz, xsiz, ysiz
+   static pos[2][MAXSIZ][MAXSIZ][MAXSIZ];
+   
+   f0 = 0; f1 = 6; f2 = 0; f3 = 0.5;
+
+   for(side=0;side<2;side++)
+      for(holes=0;holes<=wsiz;holes++)
+         for(y=0;y<ysiz;y++)
+            for(x=0;x<xsiz;x++)
+            {
+               acu[side][holes][x][y] = 0;
+               pos[side][holes][x][y] =-1;
+            }
+
+      //Loop start pos
+   for(side=0;side<2;side++)
+      for(dir=0;dir<4;dir++)
+      {
+         if (dir == 0) { yc1 = ysiz;        xc0 = 0;      xc1 = xsiz-wsiz+1; xi = 1; yi = 0; }
+         if (dir == 1) { yc1 = ysiz-wsiz+1; xc0 = 0;      xc1 = xsiz;        xi = 0; yi = 1; }
+         if (dir == 2) { yc1 = ysiz-wsiz+1; xc0 = wsiz-1; xc1 = xsiz;        xi =-1; yi = 1; }
+         if (dir == 3) { yc1 = ysiz-wsiz+1; xc0 = 0;      xc1 = xsiz-wsiz+1; xi = 1; yi = 1; }
+         for(yc=0;yc<yc1;yc++)
+            for(xc=xc0;xc<xc1;xc++)
+            {
+               holes = 0;
+               for(x=xc,y=yc,c=0;c<wsiz;c++,x+=xi,y+=yi)
+               {
+                  p = b[x][y]; if (p == 2-side) break;
+                  if (p == 0) holes++;
+               }
+               if (c < wsiz) continue;
+               start = yc*xsiz + xc;
+               for(x=xc,y=yc,c=0;c<wsiz;c++,x+=xi,y+=yi)
+               {
+                  if (b[x][y]) continue;
+                  if ((grav) && (y < ysiz-1) && (b[x][y+1] == 0)) continue;
+                  if (pos[side][holes][x][y] == start) continue;
+                  pos[side][holes][x][y] = start;
+                  acu[side][holes][x][y]++;
+               }
+            }
+         for(holes=0;holes<=wsiz;holes++)
+            for(y=0;y<ysiz;y++)
+               for(x=0;x<xsiz;x++)
+                  pos[side][holes][x][y] =-1;
+      }
+
+      //Compute score (weighted sum)
+   for(y=0;y<ysiz;y++) for(x=0;x<xsiz;x++) score[x][y] = 0;
+   w = 1; if (turn == 1) { c0 = f0+1; c1 = 1; } else { c0 = 1; c1 = f0+1; }
+   for(holes=wsiz;holes>=0;holes--)
+   {
+      w0 = w*c0; w1 = w*c1; if (holes == 1) { if (turn == 1) { w0 = w1*2; } else { w1 = w0*2; } }
+      for(y=0;y<ysiz;y++)
+         for(x=0;x<xsiz;x++)
+         {
+            if (b[x][y]) continue;
+            if ((grav) && (y < ysiz-1) && (b[x][y+1] == 0)) continue;
+            ac = acu[0][holes][x][y]; if (ac) score[x][y] += ((ac-1)*f3 + 1)*w0;
+            ac = acu[1][holes][x][y]; if (ac) score[x][y] += ((ac-1)*f3 + 1)*w1;
+         }
+      w = w*f1 + f2;
+   }
+
+      //Return pos with max score (random if > 1)
+   maxsc = -1e32; cont = 0;
+   for(y=0;y<ysiz;y++)
+      for(x=0;x<xsiz;x++)
+      {
+         if (b[x][y]) continue;
+         if ((grav) && (y < ysiz-1) && (b[x][y+1] == 0)) continue;
+         ac = score[x][y]; if (ac <= maxsc) { if (ac == maxsc) cont++; continue; }
+         maxsc = ac; cont = 1; bestx = x; besty = y;
+      }
+   if (cont <= 0) return;
+   c = int(cont*rnd);
+   for(y=0;y<ysiz;y++)
+      for(x=0;x<xsiz;x++)
+      {
+         if (b[x][y]) continue;
+         if ((grav) && (y < ysiz-1) && (b[x][y+1] == 0)) continue;
+         if (score[x][y] == maxsc) { bestx = x; besty = y; c--; if (c < 0) return; }
+      }
+}

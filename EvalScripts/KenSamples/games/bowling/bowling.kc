@@ -1,0 +1,340 @@
+()
+{
+   enum {NPIN=10,NSTARS=1024}
+   static px[NPIN], py[NPIN], pz[NPIN], ph[NPIN], pv[NPIN], phit[NPIN];
+   static pvx[NPIN], pvy[NPIN], pvz[NPIN], pvh[NPIN], pvv[NPIN];
+   static omousx, omousy, obstatus, tim, opincnt = 0, pincnt = 1e32, numturns, nzoom = 1;
+   static bx, by, bz, bvx = 0, bvy = 0, bvz = 0, bmat[9], hitgutter, isrolling, rollsnd = -1;
+   static starx[NSTARS], stary[NSTARS], starz[NSTARS];
+
+   if (numframes == 0)
+   {
+      for(i=0;i<NSTARS;i++)
+      {
+         x = nrnd; y = nrnd; z = nrnd;
+         f = 64/sqrt(x^2+y^2+z^2); starx[i] = x*f; stary[i] = y*f; starz[i] = z*f;
+      }
+   }
+   if (pincnt > NPIN)
+   {
+      for(i=0;i<10;i++)
+      {
+              if (i < 4) px[i] = i-1.5;
+         else if (i < 7) px[i] = i-5.0;
+         else if (i < 9) px[i] = i-7.5;
+         else            px[i] = i-9.0;
+         px[i] *= .7;
+         py[i] = 1-.4;
+         pz[i] = ((i<4)+(i<7)+(i<9))*.6 + 20;
+         ph[i] = 0; pv[i] = 0;
+         pvx[i] = 0; pvy[i] = 0; pvz[i] = 0; pvh[i] = 0; pvv[i] = 0; phit[i] = 0;
+      }
+      bx = 0; by = 1-.2; bz = -2; bxv = 0; byv = 0; bzv = 0;
+      pincnt = 0; opincnt = 0; numturns = 1; hitgutter = 0; isrolling = 0;
+      
+      for(i=0;i<9;i++) bmat[i] = ((i%4)==0);
+   }
+   
+   cls(0); clz(1e32);
+   
+   dtim = tim; tim = klock(); dtim = min(tim-dtim,.05);
+
+   static cx, cy, cz, ch, cv, but;
+   if (isrolling == 0)
+   {
+      f = 1/8;
+      if (but == 0) cx += (bx - cx)*f;
+      cy += (0 - cy)*f;
+      cz += (-5- cz)*f;
+      ch += (0 - ch)*f;
+      cv += (0 - cv)*f;
+   }
+   else
+   {
+      f = 1/8;
+      cx += (bx        - cx)*f;
+      cy += (-bz/8     - cy)*f;
+      cz += ((bz-3)*.8 - cz)*f;
+      ch += (0         - ch)*f;
+      cv += (bz*.02    - cv)*f;
+      i = 4-cz; if (i < -.01) cz += exp(32/i)*i;
+   }
+   
+   nzoom += (1-nzoom)*.1;
+   setview(0,0,xres,yres,xres/2,yres/2,nzoom*xres/2);
+   setcam(0,0,0,ch,cv);
+   for(i=0;i<NSTARS;i++)
+   {
+      j = cos((i+tim)*.5)*64+96; setcol(j,j,j);
+      drawsph(starx[i],stary[i],starz[i],.1);
+      //setpix(((starx[i]+tim*.02)%1)*xres,((stary[i]+tim*.01)%1)*yres);
+   }
+   
+   setcam(cx,cy,cz,ch,cv);
+   
+
+   
+   if (isrolling == 0)
+   {
+      obx = bx; oby = by; obz = bz;
+      if (USING6DOF == 0) //2D mouse
+      {
+         x = 0; y = 0; readmouse(&x,&y);
+         bx += x/128;
+         bz -= y/128;
+         bvx += ((bx-obx)/dtim - bvx)*.25;
+         bvy += ((by-oby)/dtim - bvy)*.25;
+         bvz += ((bz-obz)/dtim - bvz)*.25;
+         if ((bz >= 0) || (bz <= -8) || (abs(bx) >= 4)) isrolling = 1;
+      }
+      else //3D mouse
+      {
+         static obmat[9], bax[3], nbax[3];
+         mag6d_smoothfactor = 0.5;
+         obut = but;
+         for(i=0;i<9;i++) obmat[i] = bmat[i];
+         static cbx, cby, cbz; nbx = 0; nby = 0; nbz = 0;
+         cnt = readmag6d(0,&nbx,&nby,&nbz,&bmat[0],&bmat[1],&bmat[2],
+               &bmat[3],&bmat[4],&bmat[5],&bmat[6],&bmat[7],&bmat[8],&but);
+         if ((bstatus%2) > (but%2)) but++;
+         f = .3;
+         cbx += (nbx-cbx)*f; bx = cbx;
+         cby += (nby-cby)*f; by = cby;
+         cbz += (nbz-cbz)*f; bz = cbz;
+
+         getaxisfromrots(obmat,bmat,nbax);
+         
+         f = 1.2;
+         bx = bx*f;
+         by = min(by*f+0.5,1-.2);
+         bz = bz*f+1;
+         bvx += ((bx-obx)/dtim - bvx)*.25;
+         bvy += ((by-oby)/dtim - bvy)*.25;
+         bvz += ((bz-obz)/dtim - bvz)*.25;
+         bax[0] += (nbax[0]/dtim - bax[0])*.25;
+         bax[1] += (nbax[1]/dtim - bax[1])*.25;
+         bax[2] += (nbax[2]/dtim - bax[2])*.25;
+                  
+         if ((but%2) < (obut%2)) isrolling = 1;
+         if ((but>=2) > (obut>=2)) { pincnt = NPIN; goto resetpins; }
+      }
+      opincnt = pincnt;
+   }
+   else
+   {
+         //Hack to get "but" while rolling
+      cnt = readmag6d(0,&obx,&oby,&obz,&obmat[0],&obmat[1],&obmat[2],
+                         &obmat[3],&obmat[4],&obmat[5],&obmat[6],&obmat[7],&obmat[8],&but);
+
+      bx += bvx*dtim;
+      by += bvy*dtim;
+      bz += bvz*dtim;
+      bvy += dtim*8;
+
+      if ((((bz < 24) && (bz >= 0) && (abs(bx) <= 1.61)) || ((abs(bx) < 4) && (abs(bz+4) < 4))) &&
+         (by > 1-.2) && (by < 1.5) && (bvy > 0) && (hitgutter == 0))
+      {
+         if (isrolling == 1) { isrolling = 2; rollsnd = playsound("roll.wav",-50,1); }
+         by = (1-.2)*2-by; bvy = abs(bvy)*-.25;
+         if (abs(bvy) > .5)
+         {
+            playsound("tapfloor.flac",abs(bvy)*50,1);
+            if (abs(bvy) > 1.25)
+            {
+               playtext("<pitch middle='-5'/>Careful!");
+               nzoom *= 1/abs(bvy);
+            }
+         }
+      }
+      else if ((abs(bx) > 1.61) && (abs(bx) < 1.79) && (bz > 0) && (bz < 24) &&
+              (by >= 1-.2-.1) && (by < 1.5))
+      {
+         if (hitgutter == 0) { playsound("tapfloor.flac",100,.5); hitgutter = 1; }
+         bx += (sgn(bx)*1.70-bx)*.1; bvx = 0;
+         if (by > 1) { by = 1; bvy = 0; }
+      }
+      else if ((by > 1) && (rollsnd >= 0)) { playsoundupdate(rollsnd,-1); rollsnd = -1; }
+      if (rollsnd >= 0)
+      {
+         v = sqrt(bvx^2+bvy^2+bvz^2);
+         playsoundupdate(rollsnd,v*-5,v*.08);
+      }
+      if ((by > 8) || ((but>=2) > (obut>=2)))
+      {
+         if (rollsnd >= 0) { playsoundupdate(rollsnd,-1); rollsnd = -1; }
+         i = pincnt-opincnt;
+         if ((numturns == 2) && (pincnt == 10))
+            playtext("<volume level='75'>You got a <pitch middle='+5'/>spare");
+         else if (i == 0)
+         {
+            if (hitgutter) playtext("<volume level='75'>Gutter <pitch middle='-10'/>ball");
+                      else playtext("<volume level='75'><pitch middle='-10'/>Whiff.");
+         }
+         else if (i == 1) playtext("<volume level='75'>You got 1 lousy pin");
+         else if (i < 10) playtext("<volume level='75'>You got %g pins",i);
+         else             playtext("<volume level='75'>You got a <pitch middle='+5'/>strike");
+resetpins:;         
+         bx = 0; by = 1-.2; bz = -2; bvx = 0; bvy = 0; bvz = 0;
+         if (pincnt == NPIN) pincnt++; //Hack to force restart
+         numturns++; hitgutter = 0; isrolling = 0;
+      }
+   }
+   
+   if ((USING6DOF) && (isrolling == 0) && ((but%2) == 0))
+      { i = cos(tim*16)*32+384; setcol(i,i,i); }
+   else setcol(384,384,384);
+   drawkv6("ball.kv6",bx,by,bz,bmat[0]*.2,bmat[1]*.2,bmat[2]*.2,
+                               bmat[3]*.2,bmat[4]*.2,bmat[5]*.2,
+                               bmat[6]*.2,bmat[7]*.2,bmat[8]*.2);
+
+   //moveto(bx,by,bz); f = 1; lineto(bx+bax[0]*f,by+bax[1]*f,bz+bax[2]*f);
+   
+   if ((isrolling) || (USING6DOF == 0))
+   {
+      static fp[3], dax[3];
+      f = dtim*PI; fp[0] =-bvz*f; fp[1] = 0; fp[2] = bvx*f;
+      
+      for(i=0;i<3;i++) nbax[i] = bax[i]*dtim*4;
+      if (by > 1-.2-.02)
+      {
+         dax[0] = (fp[0]-nbax[0])*.002;
+         dax[1] = (fp[1]-nbax[1])*.002;
+         dax[2] = (fp[2]-nbax[2])*.002;
+         bax[0] += dax[0]/dtim;
+         bax[1] += dax[1]/dtim;
+         bax[2] += dax[2]/dtim;
+      
+      } else { dax[0] = 0; dax[1] = 0; dax[2] = 0; }
+      
+      axisrotate(&bmat[0],nbax);
+      axisrotate(&bmat[3],nbax);
+      axisrotate(&bmat[6],nbax);
+      
+      f = 64; bvx -= dax[2]*f; bvy += 0; bvz += dax[0]*f;
+   }
+
+   for(i=0;i<NPIN;i++)
+   {
+      if (((px[i]-bx)^2 + (py[i]-by)^2 + (pz[i]-bz)^2 < .45^2) && (phit[i] == 0)) 
+      {
+         pvx[i] = (px[i]-bx)*16;
+         pvy[i] = (py[i]-by)*16;
+         pvz[i] = (pz[i]-bz)*16;
+         pvh[i] = nrnd*4;
+         pvv[i] = nrnd*4;
+         phit[i] = 1; pincnt++;
+         playsound("ballfalla.flac",100,3.0+nrnd*.2);
+      }
+      for(j=0;j<NPIN;j++)
+      {
+         if (i == j) continue;
+         if (((px[j]-px[i])^2 + (py[j]-py[i])^2 + (pz[j]-pz[i])^2 < .6^2) && (phit[i] == 0))
+         {
+            pvx[i] = nrnd*4;
+            pvy[i] = nrnd*4;
+            pvz[i] = nrnd*4;
+            pvh[i] = nrnd*4;
+            pvv[i] = nrnd*4;
+            phit[i] = 1; pincnt++;
+            playsound("ballfalla.flac",100,3.0+nrnd*.2);
+         }
+      }
+      odist = (px[i]^2+py[i]^2+pz[i]^2);
+      px[i] += pvx[i]*dtim;
+      py[i] += pvy[i]*dtim;
+      pz[i] += pvz[i]*dtim;
+      ph[i] += pvh[i]*dtim;
+      pv[i] += pvv[i]*dtim;
+      if ((py[i] > 1-.4) && (abs(px[i]) < 1.7) && (pz[i] < 24))
+      {
+         //if (abs(pvy[i]) > .5) playsound("tapfloor.flac",abs(pvy[i])*5,1);
+         py[i] = 1-.4;
+         pvy[i] = -abs(pvy[i]);
+      }
+      dist = (px[i]^2+py[i]^2+pz[i]^2);
+      //if ((odist > 2^2) && (dist <= 2^2)) playtext("ouch");
+      pvy[i] += dtim*8;
+   }
+   
+   setcol(256,256,256);
+   for(i=0;i<NPIN;i++)
+      drawkv6("pin.kv6",-.4,px[i],py[i],pz[i],ph[i],pv[i]);
+         
+   setcol(224,224,240);
+   glsettex("wood.png");
+   glbegin(GL_QUADS);
+   gltexcoord(0,0); glvertex(-1.5,1,24);
+   gltexcoord(0,2); glvertex(+1.5,1,24);
+   gltexcoord(6,2); glvertex(+1.5,1,0);
+   gltexcoord(6,0); glvertex(-1.5,1,0);
+   
+   setcol(192,192,192);
+   gltexcoord(0,0); glvertex(-4,1, 0);
+   gltexcoord(4,0); glvertex(+4,1, 0);
+   gltexcoord(4,4); glvertex(+4,1,-8);
+   gltexcoord(0,4); glvertex(-4,1,-8);
+   
+      //Draw gutter
+   glsettex("cloud.png"); setcol(0x404040);
+   for(i=-1;i<=1;i+=2)
+      for(ia=0;ia<8;ia++)
+      {
+         a0 = ia*(PI/8); a1 = (ia+1)*(PI/8);
+         v = i*(ia-4)*6+80; setcol(v,v,v);
+         gltexcoord(a0, 0); glvertex(cos(a0)*.2+1.7*i,sin(a0)*.15+1, 0);
+         gltexcoord(a1, 0); glvertex(cos(a1)*.2+1.7*i,sin(a1)*.15+1, 0);
+         gltexcoord(a1,32); glvertex(cos(a1)*.2+1.7*i,sin(a1)*.15+1,24);
+         gltexcoord(a0,32); glvertex(cos(a0)*.2+1.7*i,sin(a0)*.15+1,24);
+      }
+      
+   setfont(12,16); moveto(xres/2-96,0); setcol(0xffc0a0);
+   printf("Turn %g, Pins left:%g",numturns,10-pincnt);
+   
+      //Debug only!
+   //moveto(xres/2-96,16); printf("%f %f %f %f %f %f",bx,by,bz,bvx,bvy,bvz);
+   //moveto(xres/2-96,32); printf("%f %f %f %f %f",cx,cy,cz,ch,cv);
+
+   obstatus = bstatus;
+}
+
+axisrotate (p[3],axis[3])
+{
+   static ax[3], k[9];
+
+   t = sqrt(axis[0]^2 + axis[1]^2 + axis[2]^2); if (abs(t) < 1e-6) return;
+   c = cos(t); s = sin(t);
+   t = 1/t; ax[0] = axis[0]*t; ax[1] = axis[1]*t; ax[2] = axis[2]*t;
+
+   t = 1.0-c;
+   k[0] = ax[0]*t; k[7] = ax[0]*s; oz = ax[1]*k[0];
+   k[4] = ax[1]*t; k[2] = ax[1]*s; oy = ax[2]*k[0];
+   k[8] = ax[2]*t; k[3] = ax[2]*s; ox = ax[2]*k[4];
+   k[0] = ax[0]*k[0] + c; k[5] = ox - k[7]; k[7] += ox;
+   k[4] = ax[1]*k[4] + c; k[6] = oy - k[2]; k[2] += oy;
+   k[8] = ax[2]*k[8] + c; k[1] = oz - k[3]; k[3] += oz;
+
+   ox = p[0]; oy = p[1]; oz = p[2];
+   p[0] = ox*k[0] + oy*k[1] + oz*k[2];
+   p[1] = ox*k[3] + oy*k[4] + oz*k[5];
+   p[2] = ox*k[6] + oy*k[7] + oz*k[8];
+}
+
+getaxisfromrots (m0[9],m1[9],ax[3])
+{
+   ax[0] = (m0[1]*m1[2] - m0[2]*m1[1]) + (m0[4]*m1[5] - m0[5]*m1[4]) + (m0[7]*m1[8] - m0[8]*m1[7]);
+   ax[1] = (m0[2]*m1[0] - m0[0]*m1[2]) + (m0[5]*m1[3] - m0[3]*m1[5]) + (m0[8]*m1[6] - m0[6]*m1[8]);
+   ax[2] = (m0[0]*m1[1] - m0[1]*m1[0]) + (m0[3]*m1[4] - m0[4]*m1[3]) + (m0[6]*m1[7] - m0[7]*m1[6]);
+   t = ax[0]^2 + ax[1]^2 + ax[2]^2; if (t == 0) return;
+
+      //Based on the vector suck-out method (see ROTATE2.BAS)
+   ox = m0[0]*ax[0] + m0[1]*ax[1] + m0[2]*ax[2];
+   oy = m0[3]*ax[0] + m0[4]*ax[1] + m0[5]*ax[2];
+   if (abs(ox) < abs(oy)) { c = m0[0]*m1[0] + m0[1]*m1[1] + m0[2]*m1[2]; s = ox*ox; }
+                     else { c = m0[3]*m1[3] + m0[4]*m1[4] + m0[5]*m1[5]; s = oy*oy; }
+   if (t == s) return;
+   c = (c*t - s) / (t-s);
+   if (c < -1) c = -1;
+   if (c > 1) c = 1;
+   f = acos(c);
+   ax[0] *= f; ax[1] *= f; ax[2] *= f;
+}

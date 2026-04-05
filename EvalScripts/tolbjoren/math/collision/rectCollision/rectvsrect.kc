@@ -1,0 +1,67 @@
+()
+{
+   cls(0);
+   
+   x1 = xres/2;
+   y1 = yres/2;
+   w1 = 100;
+   h1 = 50;
+   
+   x2 = mousx-25;
+   y2 = mousy-15;
+   w2 = 50;
+   h2 = 30;
+   
+   setcol(255,255,255);
+   //if(rectcollide(mousx,mousy,x1,y1,w1,h1)){
+   
+   if( intersects(x1,y1,w1,h1,x2,y2,w2,h2) ){
+      setcol(255,255,0);
+   }
+   
+   if( contains(x1,y1,w1,h1,x2,y2,w2,h2) ){
+      setcol(255,0,0);
+   }
+   
+
+   drawrect(x1,y1,w1,h1);
+   drawrect(x2,y2,w2,h2);
+}
+
+  // does this rectangle intersect with the other one?
+intersects(x1,y1,w1,h1,x2,y2,w2,h2) {
+  return ! (( x1 > (x2+w2) ) || ( (x1+w1) < (x2) ) || 
+           ( (y1) > (y2+h2) ) || ( (y1+h1) < (y2) ) )
+}
+
+
+
+  // can rectangle (1) entirely contain the other rectangle (2)?
+contains(x1,y1,w1,h1,x2,y2,w2,h2) {
+ return ( x1 < x2 && (x1+w1) > (x2+w2) &&
+          y1 < y2 && (y1+h1) > (y2+h2) )
+}
+
+
+drawRect(sx, sy, wx, wy)
+{   
+   moveto(sx, sy);
+   lineto(sx+wx, sy+0);
+   
+   moveto(sx, sy+wy);
+   lineto(sx+wx, sy+wy);
+   
+   moveto(sx, sy);
+   lineto(sx, sy+wy);
+   
+   moveto(sx+wx, sy);
+   lineto(sx+wx, sy+wy);
+}
+
+// rect intersects point
+RectCollide(testx,testy,rx,ry,w,h)
+{
+   if(testx >= rx && testx <= rx+w)
+   if(testy >= ry && testy <= ry+h)
+      return 1; 
+}

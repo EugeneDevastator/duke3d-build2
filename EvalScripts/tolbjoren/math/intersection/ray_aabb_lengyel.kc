@@ -1,0 +1,345 @@
+/*
+taken from the very good book
+Mathematics for 3D game Programming & Computer Graphics by Eric Lengyel
+
+evaldraw code written by Torbjoern 23. august 2011
+
+*/
+
+struct vec
+{
+   x,y,z;
+}
+
+struct camera_t
+{
+   vec pos;
+   horiz_angle;
+   verti_angle;
+}
+
+struct ray_t
+{
+   vec origin;
+   vec dir;
+}
+
+struct box_t
+{
+   vec pos;
+   vec dim;
+}
+
+static camera_t camera;
+()
+{
+   if (numframes == 0)
+   {
+      set( camera.pos, 0,0,-10 );
+      camera.horiz_angle = 0;
+      camera.verti_angle = 0.0;
+   }
+
+   cls(0);
+   clz(1e32);
+
+   playercontrols(camera);
+      
+   a = klock(0);
+   a = mousx/xres * 6.28;
+   r = 5;
+
+   ray_t ray;
+   set( ray.origin, -2.0,0,0 );
+   set( ray.dir, cos(a)*r, sin(a)*r, 0 );
+ 
+
+   tx = -5 + 10 * mousy/yres;
+
+   box_t box;
+   set( box.pos, -1.5 ,-1.5,-1.5+tx );
+   set( box.dim, 3 ,3,3);
+   drawsph( box.pos, .2 );
+   vec pos_plus_dim;
+   vecadd( pos_plus_dim, box.pos, box.dim );
+   drawsph( pos_plus_dim, .2 );
+   
+   vec box_cent;
+   vec halfdim; vecscalar( halfdim, box.dim, 0.5 );
+   vecadd( box_cent, box.pos, halfdim );
+   drawsph( box_cent, .1);
+
+   setcol( 255, 255, 255 );
+   drawRay( ray );
+   
+   num_hits = 0;
+  
+
+   t = 0;
+   success = isect_ray_box( ray, box, t );
+   
+   if ( success == 1 )
+   //if (1)
+   {
+      if ( t>=0 && t<=1 )
+      {
+         num_hits++;
+         setcol(255,0,0); 
+         vec hit;
+         raypoint( hit, ray, t );
+         drawsph( hit.x, hit.y, hit.z, .1 );
+      }
+      
+   }else
+   {
+      setcol(0,255,0); 
+   }
+   
+   setcol(0x439ee9);
+   drawBox( box );
+      
+   setcol( 0xf7ab0d );
+   moveto(0,0);
+   printf("hits = %g\n", num_hits);
+   printf("t = %g\n", t);
+}
+
+drawsph( vec a, r )
+{
+  drawsph(a.x, a.y, a.z, r);
+}
+
+vecToArray( vec v, a[3] )
+{
+   a[0] = v.x; a[1] = v.y; a[2] = v.z;
+}
+
+isect_ray_box( ray_t ray, box_t box, &t )
+{
+   #define EPSILON 0.0
+   
+   static gotplane_origin[3];
+   static gotplane_dim[3];
+   
+   for(i=0; i<3; i++)
+   {
+      gotplane_origin[i] = 1;
+      gotplane_dim[i] = 1;
+   }
+   
+   static box_pos[3];
+   vecToArray( box.pos, box_pos );
+   
+   static box_dim[3];
+   vecToArray( box.dim, box_dim );
+   
+   static dir[3];
+   vecToArray( ray.dir, dir );
+  
+   static ray_origin[3];
+   vecToArray( ray.origin, ray_origin );
+   
+   static pt[3];
+   
+   for(i=0; i<3; i++)
+   {
+      if ( fabs(dir[i]) <= EPSILON )
+      {
+         gotplane_origin[i] = 0;
+         gotplane_dim[i] = 0;
+      }else{
+      
+         if( dir[i] > 0 ) 
+         {
+            gotplane_dim[i] = 0;
+         }
+      
+         if ( dir[i] < 0 ) 
+         {
+            gotplane_origin[i] = 0;
+         }
+      }
+      
+      if ( gotplane_dim[i]  )
+      {   
+         t = ( (box_pos[i]+box_dim[i]) - ray_origin[i]) / dir[i];
+         raypointArray( pt, ray, t );
+         got1 = pt[ (i+1)%3 ] >= box_pos[ (i+1)%3 ] && pt[ (i+1)%3 ] <= (box_pos[ (i+1)%3 ]+box_dim[ (i+1)%3]) ;
+         got2 = pt[ (i+2)%3 ] >= box_pos[ (i+2)%3 ] && pt[ (i+2)%3 ] <= (box_pos[ (i+2)%3 ]+box_dim[ (i+2)%3]) ;
+         if ( got1 && got2 )
+         {
+            return 1;
+         }
+      }
+      if ( gotplane_origin[i] )
+      {
+         t = (box_pos[i] - ray_origin[i]) / dir[i];
+         raypointArray( pt, ray, t );
+         got1 = pt[ (i+1)%3 ] >= box_pos[ (i+1)%3 ] && pt[ (i+1)%3 ] <= (box_pos[ (i+1)%3 ]+box_dim[ (i+1)%3]) ;
+         got2 = pt[ (i+2)%3 ] >= box_pos[ (i+2)%3 ] && pt[ (i+2)%3 ] <= (box_pos[ (i+2)%3 ]+box_dim[ (i+2)%3]) ;
+         if ( got1 && got2 )
+         {
+            return 1;
+         }
+      }        
+
+   } // end for 3
+   return 0; 
+}
+
+raypointArray( out[3], ray_t r, t )
+{
+   out[0] = r.origin.x + t * r.dir.x;
+   out[1] = r.origin.y + t * r.dir.y;
+   out[2] = r.origin.z + t * r.dir.z;
+}
+
+raypoint( vec out, ray_t r, t )
+{
+   out.x = r.origin.x + t * r.dir.x;
+   out.y = r.origin.y + t * r.dir.y;
+   out.z = r.origin.z + t * r.dir.z;
+}
+
+
+drawray( ray_t r )
+{
+   //drawsph(  r.origin.x, r.origin.y, r.origin.z, .5 );
+
+   vec end;
+   vecAdd( end, r.origin, r.dir );
+
+   //drawcone( r.s.x, r.s.y, r.s.z, 0.25,
+   //          end.x, end.y, end.z, 0.01 );
+   
+   moveto( r.origin.x, r.origin.y, r.origin.z );
+   lineto(end.x, end.y, end.z );
+   
+}
+
+drawBox( box_t b )
+{
+   vec upper;
+   vecadd( upper, b.pos, b.dim );
+   
+   r = 0.1;
+   drawsph( b.pos.x, b.pos.y, b.pos.z, r );
+   drawsph( b.pos.x, b.pos.y, upper.z, r );
+   drawsph( b.pos.x, upper.y, b.pos.z, r );
+   drawsph( b.pos.x, upper.y, upper.z, r );
+   
+   drawsph( upper.x, b.pos.y, b.pos.z, r );
+   drawsph( upper.x, b.pos.y, upper.z, r );
+   drawsph( upper.x, upper.y, b.pos.z, r );
+   drawsph( upper.x, upper.y, upper.z, r );
+   
+   r = 0.05;
+   // probably some smart way of looping over xyz axes and (1,1,1) vector to 
+   // produce this:
+   drawcone( b.pos.x, b.pos.y, b.pos.z, r, b.pos.x, b.pos.y, upper.z, r );
+   drawcone( b.pos.x, b.pos.y, b.pos.z, r, b.pos.x, upper.y, b.pos.z, r );
+   drawcone( b.pos.x, b.pos.y, b.pos.z, r, upper.x, b.pos.y, b.pos.z, r );
+
+   drawcone( b.pos.x, upper.y, b.pos.z, r, b.pos.x, upper.y, upper.z, r );
+   drawcone( b.pos.x, upper.y, b.pos.z, r, upper.x, upper.y, b.pos.z, r );
+   drawcone( b.pos.x, upper.y, upper.z, r, b.pos.x, b.pos.y, upper.z, r );
+ 
+   drawcone( upper.x, upper.y, upper.z, r, b.pos.x, upper.y, upper.z, r );
+   drawcone( upper.x, upper.y, upper.z, r, upper.x, upper.y, b.pos.z, r );
+   drawcone( upper.x, upper.y, b.pos.z, r, upper.x, b.pos.y, b.pos.z, r );
+   
+   drawcone( upper.x, b.pos.y, upper.z, r, b.pos.x, b.pos.y, upper.z, r );
+   drawcone( upper.x, b.pos.y, upper.z, r, upper.x, b.pos.y, b.pos.z, r );
+   drawcone( upper.x, b.pos.y, upper.z, r, upper.x, upper.y, upper.z, r );
+ 
+}
+
+
+vecscalar( vec out, vec a, s)
+{
+   out.x = s*a.x;
+   out.y = s*a.y;
+   out.z = s*a.z;
+}
+
+vecadd( vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;
+}
+
+vecsub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;
+}
+
+
+dot( vec a, vec b )
+{
+   return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+set( vec a, x, y, z )
+{
+   a.x = x;
+   a.y = y;
+   a.z = z;
+}
+
+length( vec v )
+{
+   return sqrt( dot(v,v) );
+}
+
+
+// Camera and movement code taken from /games/
+//Handle input and player movement
+playercontrols(camera_t cam)
+{
+   static oldMouseX;
+   static oldMouseY;
+   static mouseSpeedX;
+   static mouseSpeedY; 
+
+   f = 0.01;
+   if (keystatus[0x2a]) f /= 4;
+   if (keystatus[0x36]) f *= 4;
+   vx = (keystatus[32]-keystatus[30])*f; //D-A
+   vy = (keystatus[17]-keystatus[31])*f; //W-S  
+   vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   
+   static mat[9]; 
+   ang2mat(cam.horiz_angle, cam.verti_angle, mat); // Convert angles to rotation matrix
+   
+   // find new position
+   cam.pos.x += mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   cam.pos.y += mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   cam.pos.z += mat[2]*vx + mat[5]*vz + mat[8]*vy; 
+   // mousespeed values are tweaked for 60 fps
+   mouseSpeedX = (mousx - oldMouseX) * 0.01;
+   mouseSpeedY = (mousy - oldMouseY) * 0.01;
+   oldMouseX = mousx;
+   oldMouseY = mousy;
+   if(bstatus==1)
+   {
+      cam.horiz_angle += mouseSpeedX;
+      cam.verti_angle += mouseSpeedY;
+   }
+   // Right,down,forwards unit vectors.
+   setcam(cam.pos.x, cam.pos.y, cam.pos.z,
+          mat[0],mat[1],mat[2],
+          mat[3],mat[4],mat[5],
+          mat[6],mat[7],mat[8]);
+}
+/* converts horizontal and vertical angles to a 3x3 rotation matrix */
+ang2mat(hang,vang,mat[9])
+{
+   mat[0] = cos(hang); mat[1] = 0; mat[2]=-sin(hang);
+   mat[6] = cos(vang)*sin(hang); mat[7] = sin(vang); mat[8]=cos(vang)*cos(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}

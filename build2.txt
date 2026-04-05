@@ -1,0 +1,431 @@
+                       BUILD2 default hotkey list
+--------------------------------- Main ---------------------------------
+      ESC..Y: Quit
+      Ctrl+L: Load map (not supported in multiplayer mode)
+      Ctrl+S: Save map
+--------------------------------- Modes --------------------------------
+    KP Enter: Toggle 2D/3D edit mode
+           G: Toggle grid (and also grid snapping)
+      Ctrl+C: Toggle collision
+      Ctrl+T: Toggle view borders in 3D
+           T: Type message/Command mode (see BUILD2.TXT for commands)
+-------------------------- General Navigation --------------------------
+      Arrows: Move forward/backward/left/right
+   RCtrl/KP0: Move up/down
+         A/Z: Move up/down in 2D mode
+   L/R Shift: Move slower/faster
+     KP*,KP/: Zoom in/out
+-------------------------------- Sector --------------------------------
+       Space: Draw new sector vertex
+   Backspace: Delete last wall (when drawing new sector)
+         LMB: Select vertices for dragging / drag vertex or sector
+     Alt+LMB: Select sectors for dragging
+   PGUP/PGDN: Move ceiling/floor up/down
+ Ctrl+Delete: Delete sector
+         [/]: Change ceiling/floor slope (use shift for slower)
+      Ctrl+H: Set hinge for slope
+           /: Flatten slope (when on ceiling/floor)
+      Insert: Insert vertex
+Drag w/mouse: Delete vertex
+           C: Toggle circle tool (if on edge), use -/+ to change # verts
+           F: Insert middle sector (sector over sector)
+       Alt+S: Generate sector on inner loop
+           J: Join sector. (drag mouse; hold J, move mouse, release J)
+         End: Copy ceiling/floor plane's height&slope (drag mouse)
+        Home: Align slope to next sector (drag mouse)
+------------------------------- Texture --------------------------------
+           V: Select texture/model
+         Tab: Copy texture to "tab grab"
+       Enter: Paste texture from "tab grab"
+  Ctrl+Enter: Paste texture from "tab grab" to all walls in loop
+Alt+Sh+Enter: Change all textures under cursor to "tab grab"
+ KP2468,KP17: Change texture scale, rotate 15deg
+Ctrl+(above): Move texture origin, rotate 1deg
+     KP5,KP.: Reset texture, mirror texture
+           /: Reset texture and flatten slope
+           I: Toggle texture filter (nearest/bilinear)
+           H: Toggle heightmap (/lights=off only; buggy)
+         -/+: Change texture brightness
+   RMB+Mouse: Change intensity when selecting color
+           C: Select color (when in middle of polygon)
+         ,/.: Align wall texture left/right (shift for recursive)
+           O: Toggle orientation / texture alignment
+           P: Toggle parallaxing sky mode (0=none, 1=paper, 2=skybox)
+       Alt+T: Edit tag (faster than entering type/command mode manually)
+           1: Toggle 1-way wall (uses bit 31 of color for vis. mask)
+-------------------------------- Sprite --------------------------------
+           S: Spawn sprite
+      Delete: Delete sprite
+     PGUP/DN: Move sprite up/down
+Ctrl+PGUP/DN: Move sprite up/down until contact with ceiling/floor
+         ,/.: Rotate sprite horizontally (hold shift for 1/32 step)
+    Home/End: Rotate sprite vertically   (hold shift for 1/32 step)
+    Ctrl+,/.: Rotate sprite sideways     (hold shift for 1/32 step)
+      KP2468: Change sprite size
+           R: Change sprite orientation (wall, floor, face, billboard)
+           /: Reset size&orientation (when on sprite)
+           B: Make sprite sensitive to collision
+           L: Toggle sprite as light source
+     Shift+L: Toggle spotlight/axis direction (Use [/] to change angle)
+--------------------------------- MISC ---------------------------------
+  ScrollLock: Set start position&orientation (White arrow)
+           \: Change to next player's view (multiplayer only)
+         F12: Screen capture (BLD2####.png)
+      Ctrl+B: Select boolean operation (for debugging mainly)
+      Ctrl+`: Save gamestate (for debug)
+           `: Debug mode
+------------------------------------------------------------------------
+BUILD2 command line options:
+
+   >build2 (.ZIP/.GRP file) [.MAP file] [/XDIMxYDIM] [options...]
+
+Available options and examples:
+   /?                      Display options
+   /640x480(x)             Select resolution ('x' at end specifies fullscreen)
+   /win                    Run in a window
+   /full                   Run fullscreen
+   /host                   Host 2 user server, waiting for join
+   /host:3                 Host 3 user server, waiting for joins
+   /join                   Join server on localhost (local machine)
+   /join:localhost         Join named server using TCP
+   /udp                    Select UDP protocol (default)
+   /tcp                    Select TCP protocol
+   /port:#                 Select port (decimal) for UDP or TCP
+   /simlag                 Simulate lag on network connect (for local testing)
+   /simlag:250             Simulate lag; specify lag in milliseconds
+   /name:xxx or /nick:xxx  Specify name for chat mode
+   /log                    Log chat to build2.log
+   /log:xxx                Log chat to specified filename
+
+Examples:
+   build2 cage2.map /800x600 /full
+   build2 \games\duke3d\duke3d.grp e1l1.map
+   build2 /host
+   build2 /join:127.0.0.1
+
+------------------------------------------------------------------------------
+BUILD2 in-editor commands: (Press 'T' first, then enter command)
+
+  /name=$        select name (for multiuser mode)
+  /nick=$        "
+  /say=$         speak text
+  /keyremap[$]=$ remap key. Use keyboard scan code or name. Parameter inside
+                 [] says which key to reprogram; 2nd says what function (as
+                 listed at the top of BUILD2.TXT) Examples:
+                    /keyremap[SPACE]=KPENTER (space bar now flips 2D/3D)
+                    /keyremap[0x39]=0x9c     (same result as above)
+  /startpos      reset current pos&ori to start pos&ori
+  /oriquant      quantize current orientation to nearest axes (for start pos)
+  /posquant      quantize current position to nearest integers (for start pos)
+  /autojoinall   join any neighboring sectors on map w/matching ceil&floor
+  /x=#           set x coordinate of last grabbed vertex
+  /y=#           " for y
+  /z=#           " for z
+  /tag=#         set tag (NOTE:also accessible by Alt+T hotkey).
+  /texang=#      set texture angle in degrees
+  /bilin={0-1}   set texture filter (0=nearest, 1=bilinear)
+  /numcpu={1-64} set number of threads for rendering
+  /lights={0-1}  set lighting mode (0=off, 1=on)
+  /shadows={0-1} set shadow mode (0=off, 1=on)
+  /showoverlaps  shows all intersecting sectors as Alt+highlighted sectors
+                 (may be useful for finding extraneous sectors)
+  /autojoinall   joins any neighboring sectors with matching ceilings&floors
+  anything else  send message to everybody (for multiuser mode)
+
+The following emoticons can be used in multiuser mode to set your expression:
+  /nose /smile /frown /slant /male /female o-> o-+ 8:-) ^^
+  o.o o.O O.o O.O
+  o_o o_O O_o O_O
+  :|  :)  :(  :/  :P
+  ;|  ;)  ;(  ;/  ;P
+  :-| :-) :-( :-/ :-P
+  ;-| ;-) ;-( ;-/ ;-P
+------------------------------------------------------------------------------
+BUILD2 file description & credits:
+
+build2.exe                 BUILD2 editor
+build2.txt                 This file; F1 in BUILD2.EXE displays info at top
+build2.cfg                 Configuration settings used by BUILD2.EXE
+doortest.map               Build2 map by Ken Silverman
+cage2.map                  Build2 map by Dennis Radon & Ken Silverman
+evaldraw.exe               Game environment
+evaldraw.txt               Help file for EVALDRAW.EXE
+mapinfo.txt                Documentation for EVALDRAW's BUILD2 map functions
+maptest.kc                 Sample game
+mapsimp.kc                 Minimal example (skeleton for new projects)
+data\cloud.png             Generated by Ken Silverman
+data\gothit.wav            Recorded by Ken Silverman
+data\ouch.wav              Recorded by Ken Silverman
+data\pickup.wav            Recorded by Ken Silverman
+data\shoot.wav             Recorded by Ken Silverman
+data\tapfloor.flac         Recorded by Ken Silverman
+data\rpg.kv6               Drawn in SLAB6 by Mike Derrah
+sounds\deleteroom.wav      Made by Dennis Radon
+sounds\drop1.wav           Made by Dennis Radon
+sounds\drop2.wav           Made by Dennis Radon
+sounds\hammer.wav          Made by Dennis Radon
+sounds\key.wav             Made by Dennis Radon
+sounds\rumble.wav          Made by Dennis Radon
+models\rpg.kv6             (duplicate)
+models\caco.kv6            Drawn in SLAB6 by Ken Silverman
+models\key.kv6             Drawn in SLAB6 by Ken Silverman
+models\kmedkit.kv6         Drawn in SLAB6 by Ken Silverman
+models\candle.kv6          Generated in EVALDRAW by Ken Silverman
+models\lightbulb.kv6       Generated in EVALDRAW by Ken Silverman
+tex\cloud.png              (duplicate)
+tex\wood.png               Drawn by Ken Silverman
+tex\skytest.png            Drawn by Ken Silverman
+tex\0190_limesto3.jpg      http://textures.z7server.com/
+tex\0196_0298sidewalk.jpg  http://textures.z7server.com/
+tex\0640_plates.jpg        http://textures.z7server.com/ (floor)
+tex\brick49.jpg            http://local.wasp.uwa.edu.au/~pbourke/ (brick)
+tex\burl.jpg               http://local.wasp.uwa.edu.au/~pbourke/ (wood)
+tex\copper01.jpg           http://local.wasp.uwa.edu.au/~pbourke/ (copp.)
+tex\greycarpet.gif         http://local.wasp.uwa.edu.au/~pbourke/ (fibre)
+tex\kensky.jpg             Made by Ken using Terragen v0.9
+tex\brick_old.png          http://cgtextures.com (cropped/shrunk/edited)
+tex\concrete_rough.png     http://cgtextures.com (cropped/shrunk/edited)
+tex\concrete_floor.png     http://cgtextures.com (cropped/shrunk/edited)
+tex\tiles_plain.png        http://cgtextures.com (cropped/shrunk/edited)
+
+------------------------------------------------------------------------------
+BUILD2 history:
+
+In July 2006, I was contacted by a camp director desperate to find a computer
+counselor. His original pick for counselor had bailed on him. He found me
+through my website. Having done this kind of work years ago, I decided to take
+on the challenge.
+
+There was no way I was going to use someone else's tools, and having them
+install a C compiler was out of the question. The best thing I had at the time
+was EVALDRAW for programming and SLAB6 for modelling. I didn't have much time
+to prepare, but I was able to hack in some OpenGL-style functions along with
+a sample game (MAZE3D.KC) just in time. Most of the kids made a game based on
+MAZE3D.KC with modified art and sounds.
+
+Some wanted to do more, but the OpenGL-style functions were beyond their
+comprehension. So in the middle of the week, I tried to alleviate their pain
+by hacking together a utility called POLYPROTO.KC. It was hardly better than
+typing in each vertex by hand.
+
+In August 2006, I was teaching Jim Grandpre how to do 3D graphics on the CPU.
+In our first session, I showed him how to make a rotating texture-mapped cube.
+The next week, I showed him how to extend the demo to render a single sector,
+with a polygon editor in a 2D view, and a key to flip between 2D and 3D modes.
+Within a month, I had taken control of the project and created the "BUILD2"
+directory. BUILD2 had all of the basic features of the classic BUILD engine
+for the 2007 camp.
+
+Here are some new features of BUILD2 over the classic BUILD engine:
+   * Native Windows, 32-bit color, 6 degrees of freedom
+   * Native support for sector over sector (SOS).
+   * Advanced lighting system with true dynamic shadows, colors, spotlights.
+   * Multi-user editing with client-side prediction.
+   * Powerful scripting compiler (EVALDRAW)
+   * Full RGB color mapping.
+   * Voxel sprite support.
+   * Skybox support.
+   * No sector/wall/sprite count limits.
+
+The controls in BUILD2 are similar to my original BUILD editor. Anyone
+familiar with the original BUILD editor will learn BUILD2 quickly. Here are
+some new or changed controls:
+
+   * Most editing functions in 2D mode are now supported in 3D as well
+   * The 2D grid now adapts to your zoom level
+   * Alt+F for setting a hinge has been remapped to: Ctrl+H
+   * Ctrl+L and Ctrl+S to load/save maps
+   * Ctrl+C: Toggle collision
+   * F: Insert middle sector (sector over sector)
+   * End: Copy ceiling/floor plane's height&slope (drag mouse)
+   * Home: Align slope to next sector (drag mouse)
+   * C: Select color (when in middle of polygon)
+   * Home/End,Ctrl+,/.: Rotate sprite up/down/sideways
+   * L and Shift+L: Toggle sprite as light source/spotlight
+
+Some things worth trying:
+   * Play with lighting in the Build2 editor: press 'L' on a sprite
+   * Native sector over sector: in BUILD2, press 'f' on a ceiling or floor
+   * Build2 multiplayer. See command line options.
+
+I would like to thank:
+* Dennis Radon for his sample maps, textures, sound effects, and beta-testing.
+* Jim Grandpre for helping to jump-start the project and finding bugs.
+
+------------------------------------------------------------------------------
+Detailed milestone/changelog:
+
+08/18/2006: Create single sector editor with Jim.
+08/24/2006: Add insert&delete walls, and inside() function.
+09/03/2006: Create BUILD2.C. Add:insert vertex, drag vertex to delete,
+            Ctrl+Del.
+09/10/2006: Implement smooth animation for 2D/3D flip.
+09/12/2006: Write various functions for 3D editing: dragpoint(), hitscan(),
+            etc.
+09/14/2006: Add join function: hold J key and drag.
+09/18/2006: Multi-user editing works.
+09/19/2006: Create BUILD2 directory. Client-side prediction for multi-user
+            mode works.
+09/21/2006: Loads BUILD (classic) MAP geometry. Add slopes.
+09/22/2006: Sector flow works, allowing fast rendering for large maps.
+10/01/2006: SOS (Sector Over Sector) works.
+10/05/2006: Add Shift+PGUP/PGDN. Add text to speech for chat. Add set hinge
+            key.
+10/09/2006: Add /smile, etc. for setting avatar expressions.
+10/11/2006: Draw user's name over avatar. Can now draw sectors in 3D mode.
+10/15/2006: Finish sector splitting (with space bar).
+10/16/2006: Implement Alt+S.
+10/17/2006: Now save options in BUILD2.CFG. Add F12 for screen capture. >=3
+            users supported.
+10/19/2006: Hinge key works on ceiling&floor. Add Home&End for ceiling&floor
+            alignment.
+10/23/2006: Add console commands: /x=, etc.
+10/26/2006: Drawing loops around loops works. Add circle tool ('C').
+10/29/2006: Do texture alignment for walls. Create 2nd BUILD2 map format with
+            texture information.
+11/01/2006: Do texture scale/offset for ceilings&floors.
+11/02/2006: Texture selection ('V' mode) works.
+11/13/2006: Write savekc() - renders maps using OpenGL style calls.
+06/18/2007: Collision detection fully implemented.
+06/21/2007: Integrate sphere and cylinder rendering functions.
+06/23/2007: Prepare source code for library; create SIMPLE.C and BUILD2.H.
+06/26/2007: Add color selection tool ('C').
+06/27/2007: Write .ART loader for BUILD (classic) MAPs.
+06/28/2007: Add sprites.
+07/02/2007: Write fancy OOS (Out Of Sync) checker.
+07/05/2007: Add BUILD2 functions to EVALDRAW.C.
+07/10/2007: Now supports non power of 2 texture sizes.
+07/12/2007: Create BUILD2.TXT.
+07/14/2007: Add tag display and Alt+T.
+07/17/2007: Add 1-way walls ('1').
+07/28/2007: Finish CUBES5 (.CUB) loader. GRP files now suppoted.
+08/01/2007: Add flat sprites.
+08/05/2007: Add gamma (for classic BUILD maps only)
+08/06/2007: Add Shift+LMB to separate vertices of different sectors (for
+            debugging maps).
+08/17/2007: Write saveasstl().
+06/29/2008: Implement "paper" sky.
+06/30/2008: Add 'V' mode with thumbnails. Add 'P', 'R', Ctrl+`, Home/End
+            (rotate sprite).
+07/02/2008: Add '<'/'>' to align many wall textures.
+07/04/2008: Create MAPINFO.TXT.
+07/16/2008: Integrate first generation shadow code: supports single white
+            light source.
+07/17/2008: Add 'L': pin light source to sprite or you.
+08/01/2008: Now save light information with map.
+08/02/2008: Now support colored lights.
+03/15/2009: Integrate second generation shadow code, with support for many
+            light sources.
+05/13/2009: Now display "tab grab".
+05/23/2009: Finish multiple vertex drag. Can now drag in 3D by holding RMB.
+06/14/2009: Implement multiple sector PGUP/PGDN (Alt+highlighted sectors).
+06/16/2009: Alt+LMB drag now works.
+06/17/2009: Alt+LMB sectors can now be rotated.
+06/26/2009: Alt+highlighted sectors now remain through loadmap.
+07/07/2009: Add Ctrl+,/.
+04/10/2010: Add /port option at cmdline.
+04/27/2010: Add UDP support. Add /simlag option at cmdline.
+06/02/2010: Integrate spotlights. Add Shift+L.
+09/11/2010: Add Alt+Shift+L.Enter (change all textures).
+12/04/2010: Finish implementation of faster HSR, especially complex scenes.
+12/18/2010: Rewrite boolean ops function - sector join function fixed.
+12/31/2010: Finish new/more robust implementation of bunch sorting.
+01/01/2011: Add /autojoinall command.
+01/04/2011: Fix some annoyances with edge snapping.
+01/07/2011: Tab now works in 'V' mode: changes tab grab instead of surface.
+03/09/2011: Add keyremap[#]=# command (edit CFG or use in-editor console).
+            Fix drag verts on ceiling in 3D. Alt+S should no longer freeze.
+03/10/2011: Filename list now uses dynamic alloc.
+03/21/2011: keyremap[] was totally bugged. It now works as expected.
+04/26/2011: LMB+(PGUP/PGDN/[/]) on a vertex in 3D mode now adjusts slope,
+               preserving neighbor vertex heights.
+05/28/2011: Add Shift+F12: surround (skybox) screenshot.
+03/07/2018: Update BUILD2.TXT for first public release (BUILD2_LITE.ZIP)
+03/27/2018: Fix 'c' key for color on floor. (Was wrongly modifying ceiling).
+03/28/2018: Add KP. to mirror texture.
+06/08/2019: Clean source code for release.
+07/29/2019: Updated BUILD2.EXE in BUILD2_LITE.ZIP, which now has fixed mouse
+            code (it was already fixed in the source).
+
+------------------------------------------------------------------------------
+Source code:
+
+Even though I have released the C source code to BUILD2, it is still possible
+(and in fact probably a lot easier) to make a complete game using the EVALDRAW
+environment for scripting. Here is a description of the C source code files:
+
+There are 2 main executables that can be compiled with the code:
+   BUILD2.EXE: The map editor.
+   SIMPLE.EXE: A very minimalistic sample game.
+
+Other library source files, such: DRAWCONE.C, DRAWKV6.C, DRAWPOLY.C, and
+SHADOWTEST2.C include sample standalone programs for debugging. You may be
+interested to check them out ;-)
+
+All source files are intended to be compiled with MS Visual C/C++ 6.0 32-bit
+mode. There is no support for 64-bit, and porting to 64-bit would not be easy
+as there is a ton of in-line assembly code - which of course is not supported
+in the 64-bit version of the MSVC compiler. Sorry, but I wrote most of this
+code in 2006, when MSVC 6.0 wasn't completely 100% obsolete. It may compile in
+32-bit versions of later MSVC compiler versions, but I haven't really tested
+it.
+
+To compile BUILD2.EXE, type "nmake build2.c" at a Visual C 6.0 command prompt.
+To compile SIMPLE.EXE, type "nmake simple.c" at a Visual C 6.0 command prompt.
+
+NOTE: You will need to delete *.OBJ between compiling due to some differences
+in each embedded makefile.
+
+Brief description of source files:
+build2.c       Main editor
+build2.h       Header for external apps
+shadowtest2.c  Integral source file for shadow rendering
+winmain.cpp    Windows layer code
+Sysmain.h      Header for winmain.cpp
+drawpoly.c     Utility to render polygons
+drawpoly.h     Header for "
+drawcone.c     Utility for rendering solid spheres / cones / cylinders
+drawkv6.c      Utility for rendering sprites
+kplib.c        Utility for decoding images (PNG/JPG/etc..) and also ZIP/GRP.
+morph.c        Utility for experimental rendering - don't remember if works?
+
+simple.c       Very minimalistic sample game. There are a few minor issues,
+               such as the drawsph() not appearing to work (there should be a
+               little sphere on the hit surface when you press a button), and
+               the mouse does not seem to take exclusive control. Oh well.
+
+------------------------------------------------------------------------------
+BUILD2 Engine non-commercial license:
+
+[1] Any derivative works based on BUILD2 may be distributed as long as it is
+    free of charge and through noncommercial means.
+
+[2] You must give me proper credit. This line of text is sufficient:
+
+       BUILD2 engine by Ken Silverman (http://advsys.net/ken)
+
+    Make sure it is clearly visible somewhere in your distribution.
+
+[3] If you wish to release modified source code to your game, please add the
+    following line to each source file changed:
+
+   // This file has been modified from Ken Silverman's original release
+
+[4] I am open to commercial applications based on BUILD2, however you must
+    consult with me first to acquire a commercial license. Using BUILD2 as a
+    test platform or as an advertisement to another commercial game is
+    commercial exploitation and prohibited without a commercial license.
+
+------------------------------------------------------------------------------
+Contact info:
+
+If you do anything cool with BUILD2, I would love to hear about it! I prefer
+that you contact me via email, which can be found at the bottom of the main
+page of my website.
+
+If you have any questions or feature requests about for BUILD2, it doesn't
+hurt to ask, although please keep in mind that I haven't really worked on the
+engine since 2012. Also, it is likely that I will be busy with other projects.
+
+------------------------------------------------------------------------------
+BUILD2 by Ken Silverman. Ken's official website: http://advsys.net/ken

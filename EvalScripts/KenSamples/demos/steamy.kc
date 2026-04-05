@@ -1,0 +1,52 @@
+()
+{
+   static px = 0, py = 0, sc = 0;
+   if (sc <= 1e-1) { sc = 64; px = xres-sc*2; py = yres-sc*2; }
+   readmouse(&dx,&dy,&dz); px += dx; py += dy; sc *= pow(2,dz*.002);
+   cls(0); drawsteamy(px,py,sc,klock());
+}
+
+drawsteamy (x, y, sc, tim)
+{
+   sc /= 64; y += sc*32;
+   
+      //body
+   for(u=0;u<5;u++)
+   {
+      f = (1-u*.15)*sc; g = u*sc*0.8; setcol((u+5)*0x100a06);
+      drawcone(x-sc*56-g,y      -g,f*18,x+sc*56-g,y      -g,f*18);
+      drawcone(x-sc*56-g,y      -g,f*18,x+sc*48-g,y-sc*28-g,f*16);
+      drawcone(x-sc*44-g,y-sc*34-g,f*15,x+sc*32-g,y-sc*55-g,f*15);
+      drawcone(x-sc*27-g,y-sc*66-g,f*14,x+sc* 8-g,y-sc*76-g,f*14);
+      drawcone(x+sc* 8-g,y-sc*76-g,f*14,x-sc*10-g,y-sc*99-g,f* 3);
+   }
+      //eyes, background
+   for(u=0;u<3;u++)
+   {
+      setcol(0x404040*u+0x606060);
+      for(s=-1;s<=1;s+=2) drawsph(x-s*sc*20-u*sc*1.1,y-sc*40-u*sc*1.1,(16-u*2)*sc);
+   }
+   
+   setcol(0x000000); //poopils
+   for(s=-1;s<=1;s+=2) drawsph(x-s*sc*20+sin(tim)*sc*6,y-sc*40,sc*8);
+   if (sc <= 1) ds = .5; else ds = .125;
+   for(s=-1;s<1;s+=ds) //mouth
+   {
+      drawcone((s   )*sc*25+x,y+cos(s   )*sc*8-sc*8,cos(s   )*sc*10,
+               (s+ds)*sc*25+x,y+cos(s+ds)*sc*8-sc*8,cos(s+ds)*sc*10);
+   }
+   setcol(0xc0c0c0);
+   for(s=-1;s<1;s+=ds) //teeth
+   {
+      drawcone((s   )*sc*28+x,y+cos(s   )*sc*3-sc*10,cos(s   )^2*sc*3,
+               (s+ds)*sc*28+x,y+cos(s+ds)*sc*3-sc*10,cos(s+ds)^2*sc*3);
+   }
+   setcol(0x806040); dt = min(max(.5/sqrt(sc),1/16),1); //steams
+   for(s=-1;s<=1;s+=2)
+      for(u=0;u<2;u++)
+         for(t=4-u*4;t<10-u*2;t+=dt)
+         {
+            drawcone(((30+u*35)*s+sin(tim)*(t   )*3+sin((t   +tim*4)*1.5)*4)*sc+x,(t   )*sc*-10+y-sc*50,sc*1,
+                     ((30+u*35)*s+sin(tim)*(t+dt)*3+sin((t+dt+tim*4)*1.5)*4)*sc+x,(t+dt)*sc*-10+y-sc*50,sc*1);
+         }
+}

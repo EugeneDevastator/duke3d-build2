@@ -1,0 +1,16 @@
+()
+{
+   while (1)
+   {
+      cls(0); moveto(0,0); setcol(0xffffff);
+      id = -1;
+      while (1)
+      {
+         readtouch(&id,&x,&y); if (id < 0) break;
+         setcol((id%16)*0x523d56+0x3b46f7);
+         printf("%g %g %g\n",id,x,y);
+         drawsph(x,y,-50);
+      }
+      refresh(); Sleep(15);
+   }
+}

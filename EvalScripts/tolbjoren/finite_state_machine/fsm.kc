@@ -1,0 +1,320 @@
+enum{MAXSTATES=6}
+static statx[MAXSTATES];
+static staty[MAXSTATES];
+
+static input[MAXSTATES][2]; // for state, input 0 or 1.
+static output[MAXSTATES][2]; // not yet implemented.
+
+static activeState = 0;
+static activeInput = 0;
+
+static circRadi = 35;
+static doTransition = 0;
+
+enum{numSquareButtons=49+1};
+static squareButtonActive[numSquareButtons];
+
+// todo: add pullers the lines that avoid each other
+// to that graphics dont overlap, and thus become
+// readable.
+
+// or some kind of magnetism
+()
+{
+   cls(0);
+
+   if(numframes==0)
+   {
+      cx = xres/2; cy = yres/2;
+      for(i=0; i<MAXSTATES; i++)
+      {
+         r = 180;
+         statx[i] = cx+r * cos(i*2*PI/MAXSTATES -PI);
+         staty[i] = cy+r * sin(i*2*PI/MAXSTATES -PI);
+      }
+      
+      // Clear input function table
+      for(i=0; i<MAXSTATES; i++)
+      {
+         input[i][0] = i;
+         input[i][1] = i;
+      }
+      
+      input[0][0] = 0; // from state 0, if input 0, goto state 0.
+      input[0][1] = 1; // from state 0, if input 1, goto state 1.
+      
+      input[1][1] = 2;
+      input[2][1] = 3;
+      input[2][0] = 4;
+      input[3][1] = 4;
+      input[4][1] = 5;
+      input[5][1] = 5;
+      input[5][1] = 2;
+      
+      input[4][0] = 0;
+   }
+   
+   if(keystatus[57])
+   {
+      keystatus[57] = 0;
+      doTransition = 1;
+   }
+   
+   
+   
+   if(doTransition)
+   {
+      doTransition = 0;
+      activeState = input[activeState][activeInput];
+   }
+   nextState = input[activeState][activeInput];
+   
+   
+   for(i=0; i<MAXSTATES; i++)
+   {
+      drawstate(i);
+      
+      for(j=0; j<MAXSTATES; j++)
+      {     
+
+         drawLine = 0;
+         signalInput = -1;
+         if( input[i][0] == j)
+         {
+            drawLine = 1;
+            signalInput = 0;
+         }
+         if( input[i][1] == j )
+         {
+            drawLine = 1;
+            signalInput = 1;
+         }
+         
+         isNextState = 0;
+         if( i == activeState)
+         if( j == nextState && signalInput == activeInput) isNextState = 1; 
+         
+         if(drawLine)
+         {
+            x1 = statx[i]; y1 = staty[i];
+            x2 = statx[j]; y2 = staty[j];
+            if(i==j) // points to self
+            {  
+               /*
+               ang = atan2(y1-y1+10, x1-x1-15);
+               remX = cos(ang)*circRadi;
+               remY = sin(ang)*circRadi;
+               ex = x2 + remx; ey = y2 + remy;
+               head(ex,ey, ang, 16); */
+               
+               setcol(0xffffff);
+               if(isNextState==1){
+                  color = 192+(sin( (numframes%40)*2*PI/40 ))*64;
+                  setcol(color,color,0);
+               }
+            
+               
+               px2 = x1-circRadi*6; py2 = y1;
+               moveto(px2, y1); printf("%g,%g",signalInput,output[i][signalInput]);
+               
+               drawCurve(x1-circRadi,y1+circRadi/2,px2,py2,x1-circRadi,y1-circRadi/2,7);
+
+            }
+            else{
+            
+               setcol(0xffffff);
+               if(isNextState==1){
+                  color = 192+(sin( (numframes%40)*2*PI/40 ))*64;
+                  setcol(color,color,0);
+               }
+               
+               drawArrow(x1,x2,y1,y2,i,signalInput);
+            }
+         }
+      }
+   }
+   
+   setfont(7,12);
+   xpos= xres/2-50;
+   ypos= yres/2+250;
+   if( squareButtonActive[0] < 0)
+   {
+      squareBtn(0,xpos,ypos,80,20," INPUT '0'");
+      activeInput = 0;
+   }
+   else
+   {
+      squareBtn(0,xpos,ypos,80,20," INPUT '1'");
+      activeInput = 1;
+   }
+   
+   // trash code begin:
+   oh = 0;
+   if(bstatus==1)
+   {
+    oh = 1;
+   }
+   if( squareBtn(1,xpos,ypos+35,80,20," STEP FSM ") && oh==1)
+   {
+      doTransition = 1;
+   } // trash end.
+
+ 
+   
+   t = klock(); circRadi = 25+sin( t*5 ) * 5;
+}
+head(x,y,ang,len)
+{
+   sharp = PI/6;
+   moveto(x,y);
+   ca = cos(ang - sharp); sa = sin(ang - sharp); 
+   lineto( x+ca*len, y+sa*len ); 
+   moveto(x,y);
+   ca = cos(ang + sharp); sa = sin(ang + sharp); 
+   lineto( x+ca*len, y+sa*len ); 
+}
+rotate(&x,&y, ang)
+{
+   x1 = x; y1 = y; // save x and y.
+   sa = 0; ca = 0;
+   sa = sin(ang); ca = cos(ang); // save 2 c
+   // Rotation matrix applied:
+   x = x1 * ca - y1 * sa;
+   y = y1 * ca + x1 * sa;
+   
+}
+toDeg(rad)
+{
+   rad * 180/PI;
+}
+drawstate(i)
+{
+   x= statx[i]; y= staty[i];
+   if(i == activeState) setcol(0xff0000);
+   else setcol(0xffffff);
+   moveto(x-8,y-3); printf("S%g",i);
+
+   drawsph(statx[i], staty[i], -circRadi);
+   setcol(0xffffff); 
+}
+drawArrow(x1,x2,y1,y2,i,signalInput)
+{
+   dx = x2 - x1;
+   dy = y2 - y1;
+   
+   ang = atan2(y1-y2, x1-x2);
+   remX = cos(ang)*circRadi;
+   remY = sin(ang)*circRadi;
+   
+   sx = x1-remx; sy=y1-remy;
+   moveto(sx,sy);
+   ex = x2 + remx; ey = y2 + remy;
+   lineto(ex,ey);
+   
+   moveto(x1 + dx*.5, y1 + dy*.5);
+   out = output[i];
+   printf("%g,%g",signalInput,output[i][signalInput]);
+   //printf("\nang = %g", toDeg(ang) ); //debug  
+   head(ex,ey, ang, 16);
+}
+drawCurve(x1,y1,x2,y2,x3,y3,lineSegments)
+{
+   segSize = 1.0/lineSegments;
+   posx=0; posy=0;
+   oldpx=x1; oldpy = y1;
+   for(position=segSize; position<1.00001; position+=segSize)
+   {
+      QuadBez(x1,y1,x2,y2,x3,y3, position, posx,posy); 
+      moveto(oldpx,oldpy); lineto(posx,posy);
+      oldpx = posx; oldpy = posy;
+   }
+}
+QuadBez(p1X, p1Y, p2X, p2Y, p3X, p3Y, positionOnCurve, &p123X, &p123Y)
+{
+   // Calc a point on  a quad bezier curve
+   // reqs three control points with X,Y coords
+   // and a current pos on the curve in the range 0..1
+   // coords are returned in P123X and P123Y vars
+   
+   // Calc dists tween control points
+   p12X = p2X-p1X; p12Y = p2Y-p1Y;
+   p23X = p3X-p2X; p23Y = p3Y-p2Y;
+   // Find pos along lines from P1-p2 and P2-P3
+   p12X *= positionOnCurve;
+   p12Y *= positionOnCurve;
+   p23X *= positionOnCurve;
+   p23Y *= positionOnCurve;
+   
+   // Calc dist tween two positions
+   p123X = (P2X+P23X) - (P1X+P12X); // dist in X tween P12X and P23X
+   p123Y = (P2Y+P23Y) - (P1Y+P12Y);
+   
+   // Find a pos along the line from P12-P23
+   p123X *= positionOnCurve;
+   p123Y *= positionOnCurve;
+   
+   // Add up the relative positions to make screen coords
+   p123X += P1X+P12X;
+   p123Y += P1Y+P12Y;
+   
+   // P123X, P123Y is the point on the curve
+}
+
+/*
+ ### goo-ey yuck ###
+*/
+squareBtn(num,x,y,w,h,$txt)
+{
+   //enum{numSquareButtons=49+1};
+   //static squareButtonActive[numSquareButtons];
+   
+   if(numframes==0)
+   {
+      for(i=0; i<numSquareButtons; i++) squareButtonActive[i] = -1;
+   }
+   setcol(0xff);
+   if(squareButtonActive[num]==1) drawRect(x,y,w,h);
+   else fillRect(x, y,w,h);
+   setcol(0xffffff);
+   moveto(x,y+3); printf(txt);  
+   
+   if(bstatus==1)
+   if( RectCollide(mousx,mousy,x,y,w,h) )
+   {
+      squareButtonActive[num] = -squareButtonActive[num];
+      bStatus = 0;
+   }
+   return squareButtonActive[num];
+}
+
+drawRect(sx, sy, wx, wy)
+{   
+   moveto(sx, sy);
+   lineto(sx+wx, sy+0);
+   
+   moveto(sx, sy+wy);
+   lineto(sx+wx, sy+wy);
+   
+   moveto(sx, sy);
+   lineto(sx, sy+wy);
+   
+   moveto(sx+wx, sy);
+   lineto(sx+wx, sy+wy);
+}
+
+// Fastest way is to draw horizontals
+fillRect(sx, sy, wx, wy)
+{
+   for(i=0; i<=wx; i++)
+   {   
+      moveto(sx+i, sy);
+      lineto(sx+i, sy+wy);
+   }
+}
+
+RectCollide(x1,y1,x2,y2,w,h)
+{
+   if(x1 >= x2 && x1 <= x2+w)
+   if(y1 >= y2 && y1 <= y2+h)
+      return 1; 
+}

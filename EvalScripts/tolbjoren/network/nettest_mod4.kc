@@ -1,0 +1,210 @@
+static mx[16], my[16];
+static msg[16], count[16];
+   
+static msg_description_code = 0;
+static netCoordinate  = 0;
+static netColorChange = 1;
+static netSpawnExplosion = 2;
+   
+static net_X = 1;
+static net_Y = 2;
+
+static color = 0;
+
+//explosion
+static explodx, explody, explosionLife;
+
+enum{fps=60};
+static timePerFrame = 0;
+static renderTime, time, dt;
+
+static timer;
+
+() //Net demo. Instructions:
+{  //1. Connect machines using File..Host/Join
+   //2. Move mouse around, staying inside window.
+   //3. Press '1','2',.. to change player's background color
+   //4. Press 'F' to mess up sync. Press Ctrl+Enter to reset
+   
+   timePerFrame = fps/1000.0;
+
+   while(1)
+   {
+      time = klock();
+      if(time > timer)
+      {
+         timer = time + 0.050;
+         tick = 1;
+         sendMousePos();
+         recvData();
+         sendColorChange();
+      }
+      calcDelta();
+      
+      cls(color);
+   
+      // why is the sending/rec-ing mixed? to get a good "flow"?
+      // dont send everything at one, give the other cpu
+      // some time to process incoming?
+      
+   
+      draw();
+      if(tick)
+      {
+         tick = 0;
+         moveto(xres/2, yres/2);
+         printf("tick!");
+      }
+      refresh();
+      while (klock()<numframes/60); //Limit fps
+      
+      
+      
+ 
+   }
+}
+
+calcDelta()
+{
+   timePassed = time-renderTime;
+   dt = timePassed/timePerFrame;
+   renderTime = time;
+   
+}
+
+sendMousePos()
+{
+   //sending mousedata to all
+   //tell recv-rs that two coords are on their way
+   net_send(NET_ALL,netCoordinate); 
+   net_send(NET_ALL,mousx);
+   net_send(NET_ALL,mousy);
+}
+
+// This loop reads a single net_recv message and decides if it
+// 1.   is a beginning of a datastream.
+//      I call the first val recieved the "net_description_code", at this point count is 0
+// 2.   when the descrition code is read, go into one of the if-sentances
+//      that handles a certain code.
+// 3.   for instance. if the following packets are mousecoords
+//      then increase count from 0 to 1
+//      on the next net_recv val contains mx
+//      increase count aggain
+//      now on the next net_recv val contains my
+//      since we now have counted 2 values (mx,my) we got all we need
+//      reset count to 0 for the next data, be it more
+//      mousecoordinates or a color change.
+
+recvData()
+{
+   from = 0;
+   val = 0;
+   while(net_recv(&from,&val))
+   {
+      // The first message, number 0 is the descriptor.
+      if (count[from] == msg_description_code) 
+         msg[from] = val; // remember the type of message.
+            
+      if (msg[from] == netCoordinate) //comparing it to netCoord must be wrong...
+      {
+         //set mouse x,y
+         if (count[from] == net_x) mx[from] = val;
+         if (count[from] == net_y) my[from] = val;
+         
+         count[from]++; //get next message
+         
+         // if we have read both mouse coords
+         // then reset count so that the next message can
+         // be read into val.
+         if (count[from] > 2) count[from] = msg_description_code;
+      }
+      else if(msg[from] == netColorChange) 
+      {
+         color = val;
+         count[from]++; //get next message
+         // color is only one data, so reset now.
+         if (count[from] > 1) count[from] = msg_description_code; 
+      }
+      else if(msg[from] == netSpawnExplosion)
+      {
+         explosionLife = 50;
+         if (count[from] == net_x) explodx = val;
+         if (count[from] == net_y) explody = val;
+         
+         count[from]++;
+         
+         if(count[from] > 2) count[from] = msg_description_code;
+      }
+   }
+   
+}
+
+sendColorChange()
+{
+   // send colorchange to appropriate player
+   for(i=0;i<net_players;i++)
+      if (keystatus[i+2])
+      {
+         keystatus[i+2] = 0;
+         net_send(i,netColorChange); //first say that this is a colorChange
+         net_send(i,int(rnd*16777216)); // then insert the data
+      }
+
+   // if F-key then send bogus data to a random player
+   if (keystatus[0x21]) //'F' up sync; tests Ctrl+Enter
+      net_send(int(net_players*rnd),nrnd*1e3);
+      
+   if (keystatus[18]) //E for explosion
+   {
+      keystatus[18]=0;
+      for(i=0;i<net_players;i++){
+         net_send(i, netSpawnExplosion);
+         net_send(i, rnd*xres);
+         net_send(i, rnd*yres);
+      }
+   }
+}
+
+draw()
+{
+   setcol(0xffffff);
+   moveto(xres-224,0); 
+   setfont(12,16);
+   printf("net_me=%g\n",net_me);
+   printf("net_players=%g\n\n",net_players);
+   
+   
+   for(i=0;i<net_players;i++)
+      printf("Player %g:%+4.f %+4.f\n",i,mx[i],my[i]);
+      
+   // first draw all others.
+   for(i=0;i<net_players;i++)
+   {
+      setcol(0xff0000); 
+      drawsph(mx[i],my[i],20);
+      setcol(0xffffff); 
+      moveto(mx[i]-6,my[i]-7); 
+      printf("%g",i);
+   }
+      
+   setcol(0xffffff); 
+   drawsph(mx[net_me],my[net_me],-20);
+   moveto(mx[net_me], my[net_me] );
+   printf("me");
+   
+   moveto(0,0);
+   tim = klock();
+   printf("klock, numframes/100 -> %g, %g", tim, numframes/60);
+   
+   if(explosionLife > 0) drawExplosion();
+   if(explosionLife > 0) explosionLife--; //should be elsewhere
+}
+
+
+drawExplosion(){
+   setcol(0xffa400);
+   for(i=0; i<6.2;i+=0.5){
+      moveto(explodx, explody);
+      lineto( explodx+cos(i)*explosionLife, explody+sin(i)*explosionLife );
+    }
+}

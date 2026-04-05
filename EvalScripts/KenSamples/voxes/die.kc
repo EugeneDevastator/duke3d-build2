@@ -1,0 +1,24 @@
+(x,y,z,&r,&g,&b)
+ax = x^2; ax *= ax;
+ay = y^2; ay *= ay;
+az = z^2; az *= az;
+d8 = ax^2+ay^2+az^2;
+if (d8 > .95^8) return(0);
+
+o = 0.5; f = 0.99; r2 = .17^2;
+xmo = (x-o)^2; xpo = (x+o)^2; xx = x^2; xf = (abs(x)-f)^2;
+ymo = (y-o)^2; ypo = (y+o)^2; yy = y^2; yf = (abs(y)-f)^2;
+zmo = (z-o)^2; zpo = (z+o)^2; zz = z^2; zf = (abs(z)-f)^2;
+
+if (y > 0) { if (xx+zz                               +yf < r2) return(0); } //1
+      else { if (min(min(xmo,xpo),xx)+min(zmo,zpo)   +yf < r2) return(0); } //6
+if (z > 0) { if (min(xmo+ypo,xpo+ymo)                +zf < r2) return(0); } //2
+      else { if (min(min(xmo,xpo)+min(ymo,ypo),xx+yy)+zf < r2) return(0); } //5
+if (x > 0) { if (min(min(ypo+zmo,ymo+zpo),yy+zz)     +xf < r2) return(0); } //3
+      else { if (min(ymo,ypo)+min(zmo,zpo)           +xf < r2) return(0); } //4
+
+i = 1-min(max((.90^8-d8)*4,0),1);
+r = 255 - i* 52 - (x-rnd)* 8;
+g = 255 - i*154 - (y-rnd)* 5;
+b = 255 - i*154 - (z-rnd)*13;
+return(1);

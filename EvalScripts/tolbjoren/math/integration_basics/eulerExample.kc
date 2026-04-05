@@ -1,0 +1,47 @@
+()
+{
+   // why Euler aint no good:
+   // http://gafferongames.com/game-physics/integration-basics/
+   cls(0);
+   
+    t = 0;
+    dt = 1; // change to 1. see error
+
+    velocity = 0;
+    position = 0;
+    force = 10;
+    mass = 1;
+
+   setfont(12,16);
+   moveto(0,0);
+   i = 0;
+    while ( t < 10 )
+    {
+
+      position = position + velocity * dt;
+      velocity = velocity + ( force / mass ) * dt;
+      t = t + dt;
+         
+       if(t >= i)
+       {
+          printf("\n%t= %5.3f   p=%5.1f   v=%5.1f",t,position,velocity);
+          i++;
+       }         
+    }
+    
+   a = force/mass;
+   accurate = distanceGivenSpeedAccelTime(0,a,10);
+   printf("\naccurate value using physics formula: %.2f",accurate);
+   
+   error = accurate - position;
+   printf("\nerror: %f",error);
+   
+   
+   //printf("\n%g",numframes);
+}
+
+// u = speed, a = accel, t = time
+distanceGivenSpeedAccelTime(u,a,t)
+{
+   return u*t + 0.5*a*t^2;
+}

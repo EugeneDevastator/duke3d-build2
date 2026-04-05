@@ -1,0 +1,279 @@
+// What is a string?
+// it should not stretch forever... but these do :)
+
+// Question about string topology. How do I "tie" parts of a string togheter?
+// Answer: It depends on the neighbours ya wanna check against.
+
+// TODO: add ways to "tie" string-bits togheter. could have a "connections" matrix. nabomultiliste
+// make patches / grids
+// add acceleration -> make it a verlet physics system.
+enum{NUMSTRINGS = 9, NUMPOINTS =16*3-1} // let NUMPOINTS be a power of 2. (want the middle-point be a pow of 2)
+static stringx[NUMSTRINGS][NUMPOINTS];
+static stringy[NUMSTRINGS][NUMPOINTS];
+static stringvx[NUMSTRINGS][NUMPOINTS];
+static stringvy[NUMSTRINGS][NUMPOINTS];
+static copyStringx[NUMSTRINGS][NUMPOINTS]; // temp buffer
+static copyStringy[NUMSTRINGS][NUMPOINTS];
+
+enum{LOOP, LINE, MESH}
+static stringTopo[NUMSTRINGS]; // Loop or line?
+
+static normal_length = 1;
+static gravity = 0;
+static delta = 0.01;
+static damping = 0.95;
+
+// State
+static grabbedPoint = -1; 
+static grabbedString = -1;
+
+// Drawing. Center of screen. Scale. Mouse-grab rect. 
+static   cx = 0;
+static   cy = 0;
+static   drawscale = 10;
+static grabX = 15;
+static grabY = 15;
+
+static time, otime, dt = 0;
+()
+{
+   cls(0); setfont(6,8);
+   
+   cx = xres/2; cy = yres/2;
+   t = klock();
+   otime = time;
+   time = t;
+   dt = time-otime;
+
+   if(numframes == 0)
+   {
+      for(str=0; str < NUMSTRINGS; str++)
+      {
+         stringTopo[str] = int(rnd*2); // it might be a line, it might be a loop
+         for(i=0; i<NUMPOINTS; i++)
+         {
+            bigCircleX = 25*normal_length*cos(str * 2*PI/NUMSTRINGS);
+            bigCircleY = 25*normal_length*sin(str * 2*PI/NUMSTRINGS);
+            
+            stringx[str][i] =  7*normal_length * cos(i * 2*PI/NUMPOINTS) + bigCircleX;
+            stringy[str][i] =  7*normal_length * sin(i * 2*PI/NUMPOINTS) + bigCircleY;
+            if(stringTopo[str] == LINE)
+            {
+               //stringx[str][i] = bigCircleX+rnd*15;
+               //stringy[str][i] = bigCircleY+rnd*15;
+            }
+         }
+      }
+      
+   }
+   
+   // First. Calculate new string node positions:
+   for(str=0; str < NUMSTRINGS; str++)
+   for(iterations = 0; iterations < 10; iterations++) // also makes string stiffer (faster)
+   {
+      for(i=0; i < NUMPOINTS; i++)  
+      {
+         xv = 0;
+         yv = 0;
+         //m1(i,str,&xv,&yv);
+         m2(i,str,&xv,&yv);   
+         // store new pos in str+1
+         stringvx[str][i] = stringvx[str][i]*damping + (xv*delta);
+         stringvy[str][i] = stringvy[str][i]*damping + (yv*delta);
+         copyStringx[str][i] = stringx[str][i] + stringvx[str][i];
+         copyStringy[str][i] = stringy[str][i] + stringvy[str][i];
+      }
+         
+      // copy new position back into working array
+      for(i=0; i<NUMPOINTS; i++)
+      {
+         stringx[str][i] = copyStringx[str][i];
+         stringy[str][i] = copyStringy[str][i];
+      } 
+   }
+   
+   draw();
+   mouseDrag(); 
+   xHair();
+   
+   moveto(0,0);
+   printf("Use mouse to draw nodes.");
+   printf("\nUse mouse to draw nodes. %.3f", dt);
+
+   //sleep(1); // using a laptop? uncomment this line.
+}
+xHair(){
+   moveto(mousx-5,mousy+5);
+   lineto(mousx+4,mousy-4); 
+   moveto(mousx-5,mousy-5);
+   lineto(mousx+4,mousy+4); 
+}
+
+// this function takes Hue (0-360 degrees), Saturation (0.0-1.0) and Value/brightness (0.0-1.0)
+// and returns a RGB int
+hsv_to_rgb(h,s,v){ 
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   r=int(r*255);
+   g=int(g*255);
+   b=int(b*255);
+   return r*2^16 + g*2^8 + b; 
+}
+m1(i,str,&xv,&yv)
+{
+         
+         for(j=1; j<2; j++) // j<2 is minimum. increase j to make stiffer   (not quite working yet)
+         {
+            back = i-j;
+            fwd = i+j;
+            
+            // Is the string a loop or a line?
+            if(stringTopo[str] == LOOP){
+               if(back < 0) back = NUMPOINTS-1-j;
+               if(fwd > (NUMPOINTS-1)) fwd = j;  
+            }
+            else if(stringTopo[str] == LINE){
+               if(back < 0) back = j;
+               if(fwd > (NUMPOINTS-1)) fwd = NUMPOINTS-1-j;
+ 
+            }
+            // Check backwards along string
+            xvec1 = stringx[str][back] - stringx[str][i];
+            yvec1 = stringy[str][back] - stringy[str][i];         
+            mag1 = ( xvec1^2 + yvec1^2 );
+            ext1 = mag1 - normal_length;        
+            // Check forwards
+            xvec2 = stringx[str][fwd] - stringx[str][i];
+            yvec2 = stringy[str][fwd] - stringy[str][i];
+            mag2 = ( xvec2^2 + yvec2^2 );
+            ext2 = mag2 - normal_length;
+             
+            xv += (xvec1/mag1*ext1) + (xvec2/mag2*ext2);
+            yv += (yvec1/mag1*ext1) + (yvec2/mag2*ext2);
+         }
+         
+}
+
+m2(i,str,&xv,&yv)
+{
+         jmax = 1; // increase jmax to make stiffer
+         for(j=-jmax; j<jmax+1; j++) 
+         {
+            if(j==0) continue;
+            
+            fwd = i+j;
+            // Is the string a loop or a line?
+            if(stringTopo[str] == LOOP){
+               if(fwd < 0) fwd = NUMPOINTS-1-abs(j);
+               if(fwd > (NUMPOINTS-1)) fwd = abs(j);  
+            }
+            else if(stringTopo[str] == LINE){
+               if(fwd < 0) fwd = abs(j);
+               if(fwd > (NUMPOINTS-1)) fwd = NUMPOINTS-1-abs(j);
+            }
+            xvec1 = stringx[str][fwd] - stringx[str][i];
+            yvec1 = stringy[str][fwd] - stringy[str][i];         
+            mag1 = ( xvec1^2 + yvec1^2 );
+            ext1 = mag1 - normal_length;        
+             
+            xv += (xvec1/mag1*ext1);
+            yv += (yvec1/mag1*ext1);
+         } 
+
+}
+draw()
+{
+   for(str=0; str < NUMSTRINGS; str++)
+   {
+      if(stringTopo[str] == LOOP) setcol(0xffffff);
+      if(stringTopo[str] == LINE) setcol(0xffff00);
+      moveto(cx + stringx[str][0]*drawscale, cy + stringy[str][0]*drawscale );
+      if(stringTopo[str] == LOOP) printf("IM A LOOP");
+      if(stringTopo[str] == LINE) printf("IM A LINE");
+      for(i=0; i<NUMPOINTS; i++)
+      {
+         xp = cx+stringx[str][i]*drawscale;
+         yp = cy+stringy[str][i]*drawscale;
+         clr = (i/NUMPOINTS*360+numframes)%360;
+         
+         if(i==grabbedPoint && str==grabbedString)
+         {
+            setcol(0xff0000);
+
+         }
+         else
+         {
+            if(stringTopo[str] == LOOP) setcol( hsv_to_rgb(clr,1,1) ); //setcol(0xffffff);
+            if(stringTopo[str] == LINE) setcol( hsv_to_rgb(clr,1,1) ); //setcol(0xffff00);
+         }
+         //drawsph(xp,yp,-3);
+         
+         lineto(xp,yp);
+      }
+      // If loop, draw line to end.
+      if(stringTopo[str] == LOOP) lineto(cx + stringx[str][0]*drawscale, cy + stringy[str][0]*drawscale);
+   }
+}
+mouseDrag()
+{
+   if(bstatus == 1)
+   {
+      // move currently grabbed point
+      if(grabbedPoint > -1)
+      {
+         x = stringx[grabbedString][grabbedPoint]; 
+         y = stringy[grabbedString][grabbedPoint];
+         ang = CircleNormalAtPoint((mousx-cx)/drawscale,(mousy-cy)/drawscale,x,y); // returns angle.
+         distx = (mousx-cx)/drawscale - x;
+         disty = (mousy-cy)/drawscale - y;
+         dist = sqrt(distx^2 + disty^2 );
+         //if(dist > normal_length * 3) dist = normal_length * 3;//
+         stringx[grabbedString][grabbedPoint] += cos(ang) * dist;
+         stringy[grabbedString][grabbedPoint] += sin(ang) * dist;
+      }
+      else if(grabbedPoint < 0) // no point grabbed, but mouse is down, check for collision
+      {
+         for(str=0; str < NUMSTRINGS; str++)
+         for(i=0; i<NUMPOINTS; i++)
+         {
+            x = stringx[str][i]*drawscale+cx; 
+            y = stringy[str][i]*drawscale+cy;
+            
+            if(mousx > x-grabX && mousx < x+grabX && mousy > y-grabY && mousy < y+grabY)
+            {
+               grabbedPoint = i;
+               grabbedString = str;
+               //stringvx[grabbedString][grabbedPoint] = (mousx-cx)/drawscale; //start moving right away.
+               //stringvy[grabbedString][grabbedPoint] = (mousy-cy)/drawscale;
+            }
+            if(grabbedPoint > -1) break;
+         }
+      }
+   }
+   else // mouse not down
+   {
+      grabbedPoint = -1;
+   }
+}
+
+CircleNormalAtPoint(x,y,cx,cy)
+{
+   return (atan2(y-cy, x-cx));        
+}

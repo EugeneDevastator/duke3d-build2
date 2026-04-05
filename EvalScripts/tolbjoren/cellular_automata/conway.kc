@@ -1,0 +1,258 @@
+// Conways Game Of Life
+// code by Torbjoern. 
+// converted from a Java App i made in 2008. Written in evaldraw 15 of august 2009
+
+enum{COLUMNS=50, ROWS=50};
+
+
+static squares = COLUMNS*ROWS;
+static currentCells[COLUMNS][ROWS];
+static nextCells[COLUMNS][ROWS];
+
+enum{numSquareButtons=COLUMNS*ROWS};
+static squareButtonActive[numSquareButtons];
+static squareButtonDirty[numSquareButtons];
+
+static generation=0;
+static mousestatechange = 0;
+static mouseStateOld = 0;
+()
+{ 
+   cls(0); setfont(9,16);
+   if(numframes==0)
+   {
+      mouseStateOld = bstatus;
+      setupCells();
+   }
+   
+   if( mouseStateOld != bstatus )
+   {
+      mouseStateOld = bstatus;
+      mousestatechange = 1; 
+   }
+   else
+   {
+      mousestatechange = 0;
+   }
+   
+   drawCells();
+ 
+   setcol(255,255,255);
+   moveto(0,0); 
+   printf("Press space to step time, hold mouse2 to go fast\n"); 
+   printf("generation = %g", generation);
+     
+   if(bstatus==2 || keystatus[57]==1)
+   {
+      keystatus[57] = 0;
+      //bstatus = 0;
+      generation++;
+      stepLife();
+      refresh();
+      sleep(50);
+   }
+
+}
+setupCells()
+{
+   for(x=0; x<COLUMNS; x++)
+   for(y=0; y<ROWS; y++)
+   { currentCells[x][y] = 0; nextCells[x][y] = 0; }
+}
+stepLife()
+{
+   neightbours = 0;
+   hitNS = 1; // north/south
+   hitLR = 1; // left/right
+   
+   for(row=0; row < ROWS; row++){
+   for(col=0; col < COLUMNS; col++){
+       neighbours = 0;
+       hitNS = 1;
+       hitLR = 1;
+       currentCellIsAlive = 0;
+       
+       if(currentCells[col][row] == 1)
+       {
+           currentCellIsAlive = 1;
+       } // else its default - dead
+                
+       if(col > 0 && col < columns-1)
+           hitLR = 0;
+       if(row > 0 && row < rows-1)
+           hitNS = 0;
+                
+       // check for neighbours
+       if(hitLR==0){
+        if( currentCells[col-1][row] == 1 ){ // EAST
+            neighbours++;
+        }
+        if( currentCells[col+1][row] == 1){ // WEST
+            neighbours++;
+        }
+       }
+       if(hitNS==0){
+                 if( currentCells[col][row-1] == 1 ){ // north
+                        neighbours++;
+                    }
+                    if( currentCells[col][row+1] == 1){ // south
+                        neighbours++;
+                    }
+                    
+                }
+                if(hitNS==0 && hitLR==0){
+                    if( currentCells[col-1][row-1] == 1 ){ // north west
+                        neighbours++;
+                    }
+                    if( currentCells[col-1][row+1] == 1){ // south west
+                        neighbours++;
+                    }
+                    if( currentCells[col+1][row-1] == 1 ){ // north east
+                        neighbours++;
+                    }
+                    if( currentCells[col+1][row+1] == 1){ // south east
+                        neighbours++;
+                    }
+                }
+                // Conways rules:
+                // 1. Any live cell with fewer than two live neighbours dies, as if by loneliness.
+                if(neighbours < 2 && currentCellIsAlive){
+                    currentCellIsAlive = 0;
+                    nextCells[col][row] = 0;
+                }
+                // 2. Any live cell with more than three live neighbours dies, as if by overcrowding.
+                if(neighbours > 2 && currentCellIsAlive){
+                    currentCellIsAlive = 0;
+                    nextCells[col][row] = 0;
+                }
+                // 3. Any live cell with two or three live neighbours lives, unchanged, to the next generation.
+                if(neighbours > 1 && neighbours < 4 && currentCellIsAlive){
+                    nextCells[col][row] = 1;
+                }
+                // 4. Any dead cell with exactly three live neighbours comes to life.
+                if(neighbours == 3 && currentCellIsAlive==0){ // Cell is dead, will it become alive?
+                    currentCellIsAlive = 1;
+                    nextCells[col][row] = 1;
+                }
+            } 
+        }// check all columns
+        updateGeneration();  
+}
+
+updateGeneration()
+{
+   // copy next gen into current
+   for(y=0; y<ROWS; y++)
+   for(x=0; x<COLUMNS; x++)
+   {
+      currentCells[x][y] = nextCells[x][y];
+      if(nextCells[x][y] == 1)
+      {
+         squareButtonActive[x*ROWS+y] = 1;   
+      }
+      else
+      {
+         squareButtonActive[x*ROWS+y] = -1;
+      }
+   }
+}
+
+FlipCell(x,y)
+{
+   if( currentCells[x][y] == 1) currentCells[x][y] = 0; else currentCells[x][y] = 1;  
+}
+
+drawCells()
+{
+   buttonId = 0;
+   
+   cx = xres/2; cy = yres/2;
+   gridWidth = xres;
+   gridHeight = yres;
+   gridIncrementX = gridWidth/COLUMNS;
+   gridIncrementY = gridIncrementX; //gridHeight/ROWS; // make square cells
+   startToDrawAtX = cx-gridWidth/2;
+   startToDrawAtY = cy-gridHeight/2;
+   
+   w = gridIncrementX;
+   h = gridIncrementY;
+   
+   for(ix=0; ix<COLUMNS; ix++)
+   for(iy=0; iy<ROWS; iy++)
+   {
+      if( squareBtn(buttonId,startToDrawAtX+ix*gridIncrementX,startToDrawAtY+iy*gridIncrementY,w,h,"") )
+      {
+         FlipCell(ix,iy);
+      }
+      buttonId++;
+   }
+}
+
+
+squareBtn(num,x,y,w,h,$txt)
+{
+   if(numframes==0)
+   {
+      for(i=0; i<numSquareButtons; i++) squareButtonActive[i] = -1;
+   }
+   
+   if(squareButtonActive[num]==1) 
+   {
+      setcol(0xff);
+      fillRect(x,y,w,h);
+   }
+   else
+   {
+      setcol(0xff0000);
+      drawRect(x,y,w,h);
+   } 
+   
+   if(squareButtonDirty[num]==1 && mousestatechange==1)
+   {
+      squareButtonDirty[num] = 0;
+   }
+   
+   if(bstatus==1 && squareButtonDirty[num]==0)
+   {
+      if( RectCollide(mousx,mousy,x,y,w,h) )
+      {
+         squareButtonDirty[num] = 1;
+         squareButtonActive[num] = -squareButtonActive[num];
+         return 1;
+      }
+
+   }
+   return 0;
+}
+
+drawRect(sx, sy, wx, wy)
+{   
+   moveto(sx, sy);
+   lineto(sx+wx, sy+0);
+   
+   moveto(sx, sy+wy);
+   lineto(sx+wx, sy+wy);
+   
+   moveto(sx, sy);
+   lineto(sx, sy+wy);
+   
+   moveto(sx+wx, sy);
+   lineto(sx+wx, sy+wy);
+}
+
+// Fastest way is to draw horizontal lines
+fillRect(sx, sy, wx, wy)
+{   
+   for(i=0; i<=wy; i++)
+   {   
+      moveto(sx, floor(sy+i));
+      lineto(sx+wx, floor(sy+i));
+   }  
+}
+
+RectCollide(x1,y1,x2,y2,w,h)
+{
+   if(x1 >= x2 && x1 <= x2+w)
+   if(y1 >= y2 && y1 <= y2+h)
+      return 1; 
+}

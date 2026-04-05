@@ -1,0 +1,132 @@
+enum{width=320, height=240};
+static buf[width*height];
+
+static PITCH=0;
+static mode=0; // Change fast/slow :>
+()
+{
+   if(numframes==0) PITCH=320;
+   cls(0);
+   
+   if(mode==0) //SLOW
+   {
+      for(x=10; x<width; x+=20)
+      {
+         for(y=10; y<height; y+=20)
+         {
+            drawcircle(x,y,10,color(x*y%255,x*y%255,255));
+         }
+      }
+      draw();
+   }
+   else if(mode==1) //FAST
+   {
+      for(x=10; x<320; x+=20)
+      for(y=10; y<240; y+=20)
+      {
+         drawcircleBitFaster(x,y,10,color(255,x%255,y%255)); 
+      }
+      draw();
+   }
+   else if(mode==2) // built in drawshp
+   {
+      for(x=10; x<320; x+=20)
+      for(y=10; y<240; y+=20)
+      {
+         setcol(color(x%255,y%255,255));
+         DrawSph(x,y,10);
+      }
+   }
+
+     
+   
+   
+   moveto(width/6,height);
+   setcol(0xffffff);
+   printf("circles scanline style! :)");
+   printf("\nbresenham is better...");
+}
+
+color(r,g,b){return r*2^16 + g*2^8 + b;}
+
+draw()
+{
+   
+   i=0;
+   for(y=0; y<height; y++)
+   {
+      for(x=0; x<width; x++)
+      {
+         setcol( buf[i] );
+         setpix(x,y);
+         i++;
+      }
+   } 
+}
+
+// Algo by Sol at http://sol.gfxile.net
+drawcircle(x,y,r,c)
+{
+   i=0; j=0;
+   for(i=0; i<2*r; i++)
+   {
+      len = int( sqrt(cos(0.5*PI*(i-r)/r))*r*2 );
+      ofs = (y-r+i)*PITCH + x - len/2;
+      for(j=0; j<len; j++)
+      {
+         buf[ofs+j] = c;
+      }
+   }
+}
+
+drawcircleBitFaster(x,y,r,c)
+{
+   i=0; j=0;
+   for(i=0; i<2*r; i++)
+   {
+      len = int( sqrt(r * r - (r - i) * (r - i)) * 2 );
+      ofs = (y-r+i)*PITCH + x - len/2;
+      for(j=0; j<len; j++)
+      {
+         buf[ofs+j] = c;
+      }
+   }
+}
+
+
+// Bresenham circle outline. draw multiple for filled?
+// Slow version from Wikipedia
+rasterCircle(x0,y0,radius,c){
+  f = int(1 - radius);
+  ddfx = 1;
+  ddfy = int(-2 * radius);
+  x = 0;
+  y = int(radius);
+  buf[x0*height+y0+radius] = c;
+  buf[x0*height+y0-radius] = c;
+  buf[(x0+radius)*height+y0] = c;
+  buf[(x0-radius)*height+y0] = c;
+
+  while( x < y ){
+    if(f >= 0){
+      y--;
+      ddfy += 2;
+      f += ddfy;    
+    }
+    x++;
+    ddfx += 2;
+    f+=ddfx;
+
+    buf[ (x0+x)*height + y0+y ]= c;
+    buf[ (x0-x)*height + y0+y ]= c;
+    buf[ (x0+x)*height + y0-y ]= c;
+    buf[ (x0-x)*height + y0-y ]= c;
+
+    buf[ (x0+y)*height + y0+x ]= c;
+    buf[ (x0-y)*height + y0+x ]= c;
+    buf[ (x0+y)*height + y0-x ]= c;
+    buf[ (x0-y)*height + y0-x ]= c;
+    
+  }
+}
+

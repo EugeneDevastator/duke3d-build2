@@ -1,0 +1,156 @@
+enum{MAX_CIRCLES = 10, MAX_POINTS = 10}
+static circlex[MAX_CIRCLES];
+static circley[MAX_CIRCLES];
+// Displacement / velocity
+static circlevx[MAX_CIRCLES];
+static circlevy[MAX_CIRCLES];
+static circleradius[MAX_CIRCLES];
+
+static pointx[MAX_POINTS];
+static pointy[MAX_POINTS];
+static pointvx[MAX_POINTS];
+static pointvy[MAX_POINTS];
+
+static numcircles = 0;
+static numpoints = 0;
+
+enum{INSIDE = 1e32, NONE = 1e31}
+
+static dt, time, oldtime;
+
+static running = 1;
+
+// 02 add keyboard control
+()
+{
+   cls(0);
+
+   time = klock(0);
+   if(running)
+   {
+      dt =  time - oldtime;
+   }
+   else
+   {
+      dt = 0;
+   }  
+   oldtime = time; 
+
+   if(numframes == 0)
+   {
+      circlex[numcircles] = xres * 0.5;
+      circley[numcircles] = yres * 0.5;
+      circlevx[numcircles] = nrnd*20;
+      circlevy[numcircles] = nrnd*20;
+      circleradius[numcircles] = 50;
+      numcircles++;
+      
+      pointx[numpoints] = xres * 0.25;
+      pointy[numpoints] = yres * .5;
+      pointvx[numpoints] = 45;
+      pointvy[numpoints] = 0;
+      numpoints++;
+   }
+   
+   for(i=0; i<numcircles; i++)
+   {
+      setcol(0xff0000);
+      drawsph( circlex[i], circley[i], circleRadius[i]);
+      setcol(0xffffff);
+      moveto(circlex[i], circley[i]);
+      lineto(circlex[i]+circlevx[i], circley[i]+circlevy[i]);
+   }
+   for(i=0; i<numpoints; i++)
+   {
+      setcol(0xffffff);
+      drawsph( pointx[i], pointy[i], -3);
+      moveto(pointx[i], pointy[i]);
+      lineto(pointx[i]+pointvx[i], pointy[i]+pointvy[i]);
+   }
+   
+   // euler integration of motion
+   for(i=0; i<numcircles; i++)
+   {
+      circlex[i] += circlevx[i] * dt;
+      circley[i] += circlevy[i] * dt;
+      
+   }
+   for(i=0; i<numpoints; i++)
+   {
+      pointx[i] += pointvx[i] * dt;
+      pointy[i] += pointvy[i] * dt;
+   }
+   
+   t = pointCircleCollision(0,0);
+   moveto(0,0);
+   printf("COLLISION STATUS: ");
+   if(t==INSIDE) printf("inside");
+   else if(t==NONE) printf("no potential collision");
+   else printf("seconds until collision: %g",t);
+   
+   if(t > 0 && t < 1)
+   {
+      drawsph( pointx[0] +pointvx[0]*t, pointy[0] + pointvy[0]*t, -5);
+   }
+   
+   if(keystatus[203])
+   {
+      rotatePoint(pointvx[0],pointvy[0], -5*pi/180);
+   }
+   if(keystatus[205])
+   {
+      rotatePoint(pointvx[0],pointvy[0], 5*pi/180);
+   }
+   if(keystatus[200])
+   {
+      // 10% faster
+      pointvx[0] *= 1.01;
+      pointvy[0] *= 1.01;
+   }
+   if(keystatus[208])
+   {
+      // 10% faster
+      pointvx[0] *= 0.99;
+      pointvy[0] *= 0.99 ;
+   }
+   
+   if(keystatus[57])
+   {
+      keystatus[57] = 0;
+      if(running) running = 0;
+      else running = 1;
+   }
+   
+   sleep(16);
+   printf("\nctrl+enter to reset");
+}
+
+rotatePoint(&x,&y,ang) // angle in radians
+{
+   newx = x * cos(ang) - y * sin(ang);
+   newy = x * sin(ang) + y * cos(ang);
+   x = newx; y = newy;    
+}
+
+pointCircleCollision(pt, cir)
+{
+   wx = pointx[pt] - circlex[cir];
+   wy = pointy[pt] - circley[cir];
+   ww = dotProduct(wx,wy,wx,wy);
+   if( ww < circleRadius[cir]^2 ) return INSIDE;
+   vx = pointvx[pt] - circlevx[cir];
+   vy = pointvy[pt] - circlevy[cir];
+   a = dotProduct(vx,vy,vx,vy);
+   b = dotProduct(wx,wy,vx,vy);
+   c = ww - circleRadius[cir]^2;
+   root = b*b - a*c;
+   if(root < 0) return NONE;
+   t = (-b - sqrt(root))/a;
+   if(t>1 || t<0) return NONE;
+   return t;
+}
+
+dotProduct(x1,y1,x2,y2)
+{
+   return x1*x2 + y1*y2;
+}

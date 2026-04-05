@@ -1,0 +1,387 @@
+/*
+Code by Torbjoern. Written on the 30. of October 2009.
+revisited 16. nov 2011... 
+now it actually can display lineal elements of a
+direction field correctly using finite differences
+to get gradient at a point (x,y)
+*/
+
+static time = 0;
+
+static xMin, yMin;
+static xMax, yMax;
+static xSize, ySize;
+
+// fix:
+static lineLen;
+
+static e = 2.718281828;
+
+enum{ fieldRes =24 }
+enum{ SIZ = fieldRes }
+enum{ MAX_CONTOURS = 1}
+static discrete_samples[SIZ][SIZ];
+static colcoords[SIZ];
+static rowcoords[SIZ];
+
+()
+{
+   time = klock();
+   cls(0);
+
+   halfRes = fieldRes/2;
+   lineLen = xres/(fieldRes-1)/3;
+
+   xmin = -4; xmax = -4;
+   ymin = -4; ymax = -4;
+   xsize = abs(xmin)+abs(xmax);
+   ysize = abs(ymin)+abs(ymax);
+
+   drawLineSegs();
+   
+   x=0; y=0;
+   screenToCartesian(mousx,yres-mousy,x,y);
+   f = diffyEq(x, y);
+   
+   static zdat[MAX_CONTOURS];
+   for(i=0; i<MAX_CONTOURS; i++)
+   {
+      zdat[i] = -1.0 + (2*i/MAX_CONTOURS);
+      //zdat[i] = (i/(MAX_CONTOURS-1))*.5;
+   }
+   //zdat[MAX_CONTOURS-1] = .01;
+   //zdat[0] = 0.01; // dont use zero, but a number approaching 0...
+   zdat[0] = f;
+
+
+   margin = 50;
+   for(i=0; i<SIZ; i++)
+   {
+      colcoords[i] = margin + (xres-2*margin) * (i/(SIZ-1));
+      rowcoords[i] = margin + (yres-2*margin) * (i/(SIZ-1));
+   }
+   
+   //#define DRAW_DOTS
+   #ifdef DRAW_DOTS
+   for(i=0; i<SIZ; i++)
+   {
+   
+      for(j=0; j<SIZ; j++)
+      {
+         x = colcoords[i];
+         y = rowcoords[j];
+         if ( discrete_samples[i][j] < 0.01 ) continue;
+         setcol( hsv_to_rgb( discrete_samples[i][j]*360, 1, 1) );
+         
+         setpix( x, y );
+      }
+   }
+   #endif
+
+   
+   contour( discrete_samples, 0,SIZ-1,0,SIZ-1, colcoords, rowcoords, MAX_CONTOURS, zdat );
+
+
+   moveto(mousx, mousy);
+   setfont(8,12);
+   setcol(255,255,255);
+   printf("f(%.1f, %.1f) = %.2f", x,y,f);
+
+   sleep(1);
+}
+
+normalize(&x, &y){
+   len = sqrt(x^2+y^2);
+   x /= len;
+   y /= len;
+}
+
+drawLineSegs()
+{
+   for(i=0; i<SIZ; i++)
+   {
+      for(j=0; j<SIZ; j++)
+      {   
+         screen_x = rowcoords[i];
+         screen_y = rowcoords[j];
+         x=0; y=0;
+         screenToCartesian(screen_x,yres-screen_y,x,y);
+         discrete_samples[i][j] = diffyEq(x, y);
+         
+         dt = 1e-7;
+         grad_x = diffyEq(x+dt, y) - diffyEq(x-dt, y);
+         grad_y = diffyEq(x, y+dt) - diffyEq(x, y-dt);
+
+
+         normalize(grad_x,grad_y);
+
+         color = clamp( 0, 360, atan2( fabs(grad_y), grad_x)/pi*360 );
+         setcol( hsv_to_rgb( color,1,1) );
+         
+         half_len = lineLen/2;
+         moveto(screen_x, screen_y);
+         lineto(screen_x + grad_x*half_len, screen_y + grad_y*half_len);
+      
+         moveto(screen_x, screen_y);
+         lineto(screen_x - grad_x*half_len, screen_y - grad_y*half_len);
+      }
+   }
+}
+
+diffyEq(x,y)
+{
+   //x/y + x*y*cos(time); //cool
+   
+   //y^3 + x^3; 
+   //3*y^2 + 3*x^2;
+   
+   //2*x*y + 1;
+   
+   //y * tanh(x) - 2;
+   
+   //(y^2*tanh(x))/2 - 2*y;
+   
+   //0.1 * (1-x^2) - x/y; // Famous "van der Pol" ODE we need dir field for
+   
+   //x^-1 / (-1*x^-2*y);
+   //x*y;
+   //y^2 - x;
+   -y^2 - x^2
+   
+}
+
+screenToCartesian(xin,yin,&gridx,&gridy)
+{
+   gridx = xmin + (xin/xres) * xsize;
+   gridy = ymin + (yin/yres) * ysize;
+}
+
+cartesianToScreen(gridx,gridy,&xin,&yin)
+{
+   xin = (gridx-xmin)/xsize*xres;
+   yin = yres-(gridy-ymin)/ysize*yres;
+}
+
+clamp(lo,hi,value)
+{
+   return min( hi, max( lo, value ) );
+}
+
+
+sinh(x)
+{
+   0.5*(e^x - e^-x )
+}
+
+cosh(x)
+{
+   0.5*(e^x + e^-x )
+}
+
+tanh(x)
+{
+   return sinh(x) / cosh(x);
+}
+
+
+/*
+   http://paulbourke.net/papers/conrec/
+   Derivation from the fortran version of CONREC by Paul Bourke
+   d               ! matrix of data to contour
+   ilb,iub,jlb,jub ! index bounds of data matrix
+   x               ! data matrix column coordinates
+   y               ! data matrix row coordinates
+   nc              ! number of contour levels
+   z               ! contour levels in increasing order
+*/
+
+
+
+Contour( d[SIZ][SIZ], ilb, iub, jlb, jub,
+   x[SIZ],y[SIZ],nc,z[MAX_CONTOURS])
+{
+#define xsect(p1,p2) (h[p2]*xh[p1]-h[p1]*xh[p2])/(h[p2]-h[p1])
+#define ysect(p1,p2) (h[p2]*yh[p1]-h[p1]*yh[p2])/(h[p2]-h[p1])
+   
+   m1 = 0;
+   m2 = 0;
+   m3 = 0;
+   case_value = 0;
+   
+   dmin = 0;
+   dmax = 0;
+   
+   x1=0,x2=0,y1=0,y2=0;
+   
+   
+   static double h[5];
+   static sh[5];
+   static xh[5];
+   static yh[5];
+   static im[4] = {0,1,1,0};
+   static jm[4] = {0,0,1,1};
+   static  castab[3][3][3] = {
+      0,0,8, 0,2,5, 7,6,9 ,
+      0,3,4, 1,3,1, 4,3,0 ,
+      9,6,7, 5,2,0, 8,0,0 
+   };
+   
+   temp1 = 0;
+   temp2 = 0;
+
+   for (j=(jub-1);j>=jlb;j--) {
+      for (i=ilb;i<=iub-1;i++) {
+         temp1 = MIN(d[i][j],d[i][j+1]);
+         temp2 = MIN(d[i+1][j],d[i+1][j+1]);
+         dmin  = MIN(temp1,temp2);
+         temp1 = MAX(d[i][j],d[i][j+1]);
+         temp2 = MAX(d[i+1][j],d[i+1][j+1]);
+         dmax  = MAX(temp1,temp2);
+         if (dmax < z[0] || dmin > z[nc-1])
+            continue;
+         for (k=0;k<nc;k++) {
+            if (z[k] < dmin || z[k] > dmax)
+               continue;
+            for (m=4;m>=0;m--) {
+               if (m > 0) {
+                  h[m]  = d[i+im[m-1]][j+jm[m-1]]-z[k];
+                  xh[m] = x[i+im[m-1]];
+                  yh[m] = y[j+jm[m-1]];
+               } else {
+                  h[0]  = 0.25 * (h[1]+h[2]+h[3]+h[4]);
+                  xh[0] = 0.50 * (x[i]+x[i+1]);
+                  yh[0] = 0.50 * (y[j]+y[j+1]);
+               }
+               if (h[m] > 0.0)
+                  sh[m] = 1;
+               else if (h[m] < 0.0)
+                  sh[m] = -1;
+               else
+                  sh[m] = 0;
+            }
+
+            /*
+               Note: at this stage the relative heights of the corners and the
+               centre are in the h array, and the corresponding coordinates are
+               in the xh and yh arrays. The centre of the box is indexed by 0
+               and the 4 corners by 1 to 4 as shown below.
+               Each triangle is then indexed by the parameter m, and the 3
+               vertices of each triangle are indexed by parameters m1,m2,and m3.
+               It is assumed that the centre of the box is always vertex 2
+               though this isimportant only when all 3 vertices lie exactly on
+               the same contour level, in which case only the side of the box
+               is drawn.
+                  vertex 4 +-------------------+ vertex 3
+                           | \               / |
+                           |   \    m-3    /   |
+                           |     \       /     |
+                           |       \   /       |
+                           |  m=2    X   m=2   |       the centre is vertex 0
+                           |       /   \       |
+                           |     /       \     |
+                           |   /    m=1    \   |
+                           | /               \ |
+                  vertex 1 +-------------------+ vertex 2
+            */
+            /* Scan each triangle in the box */
+            for (m=1;m<=4;m++) {
+               m1 = m;
+               m2 = 0;
+               if (m != 4){
+                  m3 = m + 1;
+               }else{
+                  m3 = 1;
+               }
+                  
+               case_value = castab[sh[m1]+1][sh[m2]+1][sh[m3]+1];
+   
+               if (case_value == 0) continue;
+                  
+               if (case_value == 1) {
+                /* Line between vertices 1 and 2 */
+                   x1 = xh[m1];
+                   y1 = yh[m1];
+                   x2 = xh[m2];
+                   y2 = yh[m2];
+               }else if (case_value == 2) { /* Line between vertices 2 and 3 */
+                   x1 = xh[m2];
+                   y1 = yh[m2];
+                   x2 = xh[m3];
+                   y2 = yh[m3];
+               }else if (case_value == 3) { /* Line between vertices 3 and 1 */
+                   x1 = xh[m3];
+                   y1 = yh[m3];
+                   x2 = xh[m1];
+                   y2 = yh[m1];
+               }else if (case_value == 4) { /* Line between vertex 1 and side 2-3 */
+                   x1 = xh[m1];
+                   y1 = yh[m1];
+                   x2 = xsect(m2,m3);
+                   y2 = ysect(m2,m3);
+               }else if (case_value == 5) { /* Line between vertex 2 and side 3-1 */
+                   x1 = xh[m2];
+                   y1 = yh[m2];
+                   x2 = xsect(m3,m1);
+                   y2 = ysect(m3,m1);
+               }else if (case_value == 6) { /* Line between vertex 3 and side 1-2 */
+                   x1 = xh[m3];
+                   y1 = yh[m3];
+                   x2 = xsect(m1,m2);
+                   y2 = ysect(m1,m2);
+               }else if (case_value == 7) { /* Line between sides 1-2 and 2-3 */
+                   x1 = xsect(m1,m2);
+                   y1 = ysect(m1,m2);
+                   x2 = xsect(m2,m3);
+                   y2 = ysect(m2,m3);
+               }else if (case_value == 8) { /* Line between sides 2-3 and 3-1 */
+                   x1 = xsect(m2,m3);
+                   y1 = ysect(m2,m3);
+                   x2 = xsect(m3,m1);
+                   y2 = ysect(m3,m1);
+               }else if (case_value == 9) { /* Line between sides 3-1 and 1-2 */
+                   x1 = xsect(m3,m1);
+                   y1 = ysect(m3,m1);
+                   x2 = xsect(m1,m2);
+                   y2 = ysect(m1,m2);
+               }
+
+               /* Finally draw the line */
+               kolor = clamp( 0, 360, fabs(z[k])*360 );
+               setcol( hsv_to_rgb( kolor, 1, 1) );
+               //moveto(x1,y1); lineto(x2,y2); //,z[k]);
+               
+               scale = clamp( .5, 2, 3*fabs(z[k]) );
+               drawcone( x1,y1, scale, x2, y2, scale);               
+
+               //scale = max( .5, 3*fabs(z[k]) );
+               //drawcone( x1,y1, scale, x2, y2, scale);
+               
+            } /* m */
+         } /* k - contour */
+      } /* i */
+   } /* j */
+}
+
+hsv_to_rgb(h,s,v){ 
+   // expects 360deg and 1,1 hue sat max
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   return rgb(255*r,255*g,255*b); 
+}

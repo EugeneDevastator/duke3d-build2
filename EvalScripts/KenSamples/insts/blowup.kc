@@ -1,0 +1,32 @@
+(a[16])
+enum {s,sinc,t,tinc,toff,volsc,y0,yi0,yii0,goal0,c0,y1,yi1,yii1,goal1,c1};
+if (a[s] == 0)
+{
+   a[y0] = 0; a[yi0] = 0; a[yii0] = 0; a[goal0] = NRND; a[c0] = 10; a[volsc] = .8;
+   a[y1] = 0; a[yi1] = 0; a[yii1] = 0; a[goal1] = NRND; a[c1] = 10;
+}
+
+if (a[c0] < 0)
+{
+   a[goal0] = NRND*a[volsc]; a[c0] = NRND+8;
+   //p = p0 + v*t + .5*a*t*t, a = ((p-p0-v*t)*2)/(t^2)
+   a[yi0] = a[yi0]*NRND-a[yi1];
+   a[yii0] = (a[goal0]-(a[y0]+a[yi0]*a[c0]))*1.5/(a[c0]^2);
+}
+a[y0] += a[yi0]; a[yi0] += a[yii0]; a[c0]--;
+
+if (a[c1] < 0)
+{
+   a[goal1] = NRND*a[volsc]; a[c1] = NRND+64;
+   a[yi1] = a[yi1]*NRND-a[yi0];
+   a[yii1] = (a[goal1]-(a[y1]+a[yi1]*a[c1]))*1.7/(a[c1]^2);
+}
+a[y1] += a[yi1]; a[yi1] += a[yii1]; a[c1]--;
+
+a[volsc] *= (.99999-a[s]*.0000000011);
+v = 0;
+v += a[y0]*.3;
+v += a[y1]*.7;
+
+a[s]++; a[t] += a[tinc];
+return(v*32768);

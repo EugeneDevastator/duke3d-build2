@@ -1,0 +1,157 @@
+
+
+enum{MAXPTS = 8}
+static ptx[MAXPTS];
+static pty[MAXPTS];
+
+enum{DEGREE=3}
+enum{ORDER = DEGREE+1} // order
+enum{MAX_KNOTS = MAXPTS+DEGREE+1} // must be n+d+1 knots
+static knot[MAX_KNOTS];
+enum{MAXPARAM = (MAXPTS-1 - ORDER + 2)}
+
+()
+{
+   if(numframes==0)
+   {
+      //#define 1
+      #ifdef 1
+      for(i=0; i<=(MAXPTS-1) + ORDER; i++)
+      {
+       if( i < ORDER)
+          knot[i] = 0;
+       else if( ORDER <= i < MAXPTS-1 )
+          knot[i] = i - ORDER + 1; // i is at least degree
+       else if( i > MAXPTS-1)
+          knot[i] = MAXPARAM; // i exceeds degree
+      }
+      #else
+       for(i=0; i<=(MAXPTS-1) + ORDER; i++)
+       {
+        if( i < ORDER)
+           knot[i] = 0;
+        else if( ORDER <=i < MAXPTS-1 )
+          knot[i] = i - ORDER + 1; // i is at least degree
+        else if( i> MAXPTS-1)
+           knot[i] = MAXPTS-1 - ORDER + 2; // i exceeds degree
+       }   
+       #endif
+     
+      srand(0);
+     for(i=0; i<MAXPTS; i++)
+     {
+        ang = i/MAXPTS*2*PI;
+        r = 230;
+        ptx[i] = xres/2 + r*cos(ang);
+        pty[i] = yres/2 + r*sin(ang);
+     }
+   } 
+  
+   cls(0);
+   
+   mindist = 1e32;
+   minIdx = -1;
+   for(i=0; i<MAXPTS; i++)
+   {
+      setcol(128,128,128);
+      moveto(ptx[i], pty[i]); printnum(i);
+      drawsph(ptx[i], pty[i],-2);
+      dist = sqrt( (mousx-ptx[i])^2 +  (mousy-pty[i])^2);
+      if(dist < mindist )
+      {
+         mindist = dist;
+         minIdx = i;
+      }
+   }
+   if(bstatus==1)
+   {
+      ptx[minIdx] = mousx;
+      pty[minIdx] = mousy;
+   }
+   
+   setcol(255,255,255);
+   moveto(ptx[0],pty[0]);
+   for(i=0; i<MAXPTS; i++)
+   {
+      lineto( ptx[i], pty[i] );
+   }
+   
+   // Goto first point. So. eval for t=0
+
+   rez = 100;
+   delta = 1.0 / rez;
+   t=0;
+   
+   for(i=0; i<rez; i++)
+   {
+      t = t + delta;
+      x = 0; y =0;
+     
+      w = t * MAXPARAM;
+     
+      Bspline(degree,w,x,y);
+      
+      setcol( i/rez*255, 255, 0 );
+      drawsph(x,y,-3);
+   }
+   
+   moveto(xres/2,0);
+   printf("numknots = i + d + 1 = %g", MAXPTS+degree+1);
+
+}
+
+Bspline(d,t,&x, &y)
+{
+   x=0; y=0;
+   for(i=0; i<MAXPTS; i++)
+   {
+      weight = bSpline(i,d,t);
+      x = x + weight*ptx[i];
+      y = y + weight*pty[i];
+   }
+}
+
+bSpline(k,m,t) // k-punkt, m-grad
+{
+   if(m==1)
+   {
+      return (t >= knot[k] && t < knot[k+1] ); // 1 or 0
+   }
+   // recurse
+   sum = 0;
+   den1 = knot[k + m - 1] - knot[k];
+   if( den1 != 0.0 )
+   {
+      sum = (t - knot[k]) * bSpline(k,m-1,t) / den1;
+   }
+   den2 = knot[k+m] - knot[k+1];
+   if( den2 != 0.0 )
+   {
+      sum += (knot[k+m] - t) * bSpline(k+1,m-1,t) / den2;
+   }
+   return sum;
+}
+
+/*
+// from Computer Graphics using OpenGL 3.ed p. 631
+bSpline(k,m,t) // k-punkt, m-grad
+{
+   if(m==1)
+   {
+      return (t >= knot[k] && t < knot[k+1] ); // 1 or 0
+   }
+   // recurse
+   sum = 0;
+   den1 = knot[k + m - 1] - knot[k];
+   if( den1 != 0.0 )
+   {
+      sum = (t - knot[k]) * bSpline(k,m-1,t) / den1;
+   }
+   den2 = knot[k+m] - knot[k+1];
+   if( den2 != 0.0 )
+   {
+      sum += (knot[k+m] - t) * bSpline(k+1,m-1,t) / den2;
+   }
+   return sum;
+}
+*/

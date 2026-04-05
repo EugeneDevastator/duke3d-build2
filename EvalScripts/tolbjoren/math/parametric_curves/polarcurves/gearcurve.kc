@@ -1,0 +1,87 @@
+()
+{
+   cls(0);
+   
+   param_start = 0;
+   param_end = 2*pi;
+   param_range = param_end - param_start;
+   
+   anim = klock(0);
+
+   phi = 0;
+   steps = 30;
+   siz = 50;
+   setcol(0,255,0);
+   for(i=0; i<steps+1; i++)
+   {
+      phi = i * param_range / steps + param_start;
+     
+      //r = 1 * cos(7*phi)*cos(phi);
+     
+
+      siz =50;
+      r=gear(phi,8);
+      x = xres/2+siz * r*cos(phi+anim);
+      y = yres/2+siz * r*sin(phi+anim);
+      z = 0;
+      setpix(x,y);
+      
+      siz=55;
+      r=gear(phi,8);
+      x = xres/2+2*siz+siz * r*cos(phi-anim);
+      y = yres/2+siz * r*sin(phi-anim);
+      z = 0;
+      setpix(x,y);
+      
+      siz=55;
+      r=gear(phi,8);
+      x = xres/2+siz * r*cos(phi-anim);
+      y = yres/2-2*siz+siz * r*sin(phi-anim);
+      z = 0;
+      setpix(x,y);
+   
+   }
+   
+   drawGear(mousx,mousy,50,6,0);
+}
+
+drawGear(x,y,radius,nteeth,anim)
+{
+   segs = 100;
+   angle = anim;
+   angledt = 2*PI / (segs-1);
+   for(i=0; i<segs; i++)
+   {
+
+      r = gear(angle, nteeth);
+      // Polar to cartesian
+      tx = x + radius * r*cos(angle);
+      ty = y + radius * r*sin(angle);
+      angle += angleDt;
+            
+      if(i==0)
+      {
+         moveto(tx,ty);
+      }else
+      {
+         lineto(tx,ty);
+      }
+
+
+   }
+   
+}
+
+
+
+sinh(z){ return 0.5 * (exp(z)-exp(-z)); }
+cosh(z){ return 0.5 * (exp(z)+exp(-z)); }
+tanh(z){ return sinh(z)/cosh(z); }
+
+gear(t,nteeth)
+{
+   a = 1;
+   b = 9;
+   r = a+1/b*tanh(b*sin(nteeth*t));
+   return r;
+}

@@ -1,0 +1,197 @@
+// this look like a good explaination
+// http://en.wikipedia.org/wiki/Line-line_intersection
+
+struct vec{x,y,z;}
+
+struct line_t{
+   vec v0;
+   vec v1;
+}
+
+()
+{
+
+   cls(0);
+   time = klock(0);
+   
+ca = cos(time) * 100;
+sa = sin(time) * 100;
+   p1x = xres/2-ca;
+   p1y = yres/2-sa;
+   p2x = xres/2+ca;
+   p2y = yres/2+sa;
+   
+   p3x = xres/2+100;
+   p3y = yres/2-100;
+   p4x = xres/2-150;
+   p4y = yres/2-150;
+   
+   p5x = xres/2+150;
+   p5y = yres/2+200;
+
+   t = cos(time)*0.5 + 0.5;
+   
+   if(1)
+   {
+      p4x = p4x + (p5x-p4x) * t;
+      p4y = p4y + (p5y-p4y) * t;
+   }else
+   {
+      p4x = mousx;
+      p4y = mousy;
+   }
+   
+   moveto(p1x,p1y); lineto(p2x,p2y);
+   
+   moveto(p3x,p3y); lineto(p4x,p4y);
+   
+   hx=0; hy=0;
+   t1=0; t2=0;
+
+   line_t line1, line2;
+   make_line( line1, p1x, p1y, p2x, p2y );   
+   make_line( line2, p3x, p3y, p4x, p4y );
+   vec hit_point;
+
+   hit = find_intersection( line1, line2, hit_point, t1, t2);
+                          
+   setcol(255,255,255);
+
+  if ( hit==1 )
+  {
+     drawsph(hit_point.x,hit_point.y,-60);
+     drawsph(hit_point.x,hit_point.y,3);
+  }else
+  {
+     moveto(0,0); printf("no isect\n");
+  }
+   moveto(0,20); 
+   printf("t1 = %g\n", t1);
+   printf("t2 = %g\n", t2);
+  
+   ofsy = 15;
+   moveto(p1x,p1y + ofsy); printf("p1");
+   moveto(p2x,p2y + ofsy); printf("p2");
+   moveto(p3x,p3y + ofsy); printf("p3");
+   moveto(p4x,p4y + ofsy); printf("p4");
+}
+
+find_intersection(line_t line1, line_t line2, vec hitpoint, &s, &t)
+{
+   vec p1, p2, p3, p4;
+   p1 = line1.v0;
+   p2 = line1.v1;
+   p3 = line2.v0;
+   p4 = line2.v1;
+
+   // written by torb. 13. dec 2011
+   e = p1.x - p3.x;
+   f = p1.y - p3.y;
+   
+   dx1 = p2.x - p1.x;
+   dy1 = p2.y - p1.y;
+   
+   dx2 = p4.x - p3.x;
+   dy2 = p4.y - p3.y;
+   
+   a = -dx1; b = dx2;
+   c = -dy1; d = dy2;
+   
+   det = a*d - b*c;
+   // if det == 0, then there is no soln, (dont div by zero!)
+   if ( det == 0 ) return 0;
+   
+   // http://en.wikipedia.org/wiki/Cramer's_rule#Explicit_formulas_for_small_systems
+   s = (e*d - b*f) / det;
+   t = (a*f - e*c) / det;
+   
+   hitpoint.x = p1.x + s * dx1;
+   hitpoint.y = p1.y + s * dy1;
+   
+   within_s = s >= 0 && s <= 1;
+   within_t = t >= 0 && t <= 1;
+   return within_s && within_t;
+}
+
+
+find_intersection_daft(p1x,p1y, p2x, p2y,
+                  p3x,p3y, p4x, p4y, &hitx, &hity)
+{
+   // 1. Convert to slope form
+   
+   a1 = (p2y-p1y) / (p2x-p1x);
+   b1 = p1y - a1 * p1x;
+   
+   a2 = (p4y-p3y) / (p4x-p3x);
+   b2 = p3y - a2 * p3x;
+   
+   // 2. convert y = ax + b to -ax + y = b and solve matrix
+   det = a1-a2;
+   if ( fabs(det) <= 0.01 ) return 0;
+   
+   hitx = -(b1-b2) / det;
+   hity = (-a2*b1+a1*b2) / det;
+
+   return 1;
+}
+
+
+
+check_lines_minified(p1x,p1y, p2x, p2y, p3x,p3y, p4x, p4y, &hitx, &hity)
+{
+   d1x = p2x-p1x; 
+   d1y = p2y-p1y;
+   dx2 = p4x - p3x;
+   dy2 = p4y - p3y;
+   a1 = d1y / d1x;
+   b1 = p1y - a1 * p1x;
+   
+   a2 = dy2 / dx2;
+   b2 = p3y - a2 * p3x;
+   det = a1-a2;
+   if ( fabs(det) <= 0.01 ) return 0;
+   hitx = -(b1-b2) / det;
+   hity = (-a2*b1+a1*b2) / det;
+
+
+   // Ray. p3 is origin. 
+   
+   ohx = hitx - p3x;
+   ohy = hity - p3y;
+   len_oh = ohx^2 + ohy^2;
+   len_d2 = dx2^2 + dy2^2;
+   if ( len_oh > len_d2 ) return 0;
+
+   
+if(0){
+   max_x = max(p1x,p2x);
+   if ( hitx > max_x ) return 0;   
+   
+   min_x = min(p1x,p2x);
+   if ( hitx < min_x ) return 0;   
+
+   max_y = max(p1y,p2y);
+   if ( hity > max_y ) return 0;   
+   
+   min_y = min(p1y,p2y);
+   if ( hity < min_y ) return 0; 
+} 
+else{
+
+   tx = (hitx-xres/2)/d1x;
+   ty = (hity-yres/2)/d1y;
+   if ( tx < -0.5 || tx > 0.5 ) return 0;
+   if ( ty < -0.5 || ty > 0.5 ) return 0;
+   
+}
+   
+   return 1;
+}
+
+make_line( line_t line, x1, y1, x2, y2 ){
+   line.v0.x = x1;
+   line.v0.y = y1;
+   
+   line.v1.x = x2;
+   line.v1.y = y2;
+}

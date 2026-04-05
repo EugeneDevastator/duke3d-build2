@@ -1,0 +1,6 @@
+(x,y) //GCD (Greatest Common Denominator)
+      //Zoom out using right mouse button
+if ((x < 1) || (y < 1)) return(-.5);
+x = int(x); y = int(y);
+do { z=x; x=y%x; y=z; } while (x > 0);
+y-.5

@@ -1,0 +1,262 @@
+
+struct vec{x,y,z;}
+
+struct line_t{ vec origin, vec dir; }
+// Closest point on line
+()
+{
+   cls(0); clz(1e32);
+   glEnable(GL_DEPTH_TEST);
+   glCullface(GL_NONE);
+   
+   t = klock(0);
+
+   vec a,b,c,d;
+   vecset(a, cos(t), sin(t), 0 );
+   vecset(b, cos(t+pi/2), sin(t+pi/2), 0 );
+   //vecset(b, -.5, -1, .5 );
+   vecset(c, -.5, 1, .5 );
+   vecset(d, -1, -1, -.5 );
+
+
+   setcol(0xffffff);
+
+   r = 0.1;
+   rsq = r^2;   
+   
+   line_t line1, line2;
+   make_line( line1, a, b );
+   make_line( line2, c, d );
+   
+
+
+   vec point1, point2;
+   closestPoints( point1, point2, line1, line2 );
+
+   setcol(0xffffff);
+   
+   drawline( line1 );
+   drawline( line2 );
+   
+   line_t tween;
+   make_line(tween, point1, point2 );
+   vec midp;
+   vecscalar(midp, tween.dir, 0.5 );
+   vecadd( midp, midp, tween.origin );
+   drawsph( midp );
+   
+   drawsph( point1 );
+   drawsph( point2 );
+   
+   r = -3;
+   ang = mousx/xres*2*PI;
+   setcam( sin(ang)*r, 0, cos(ang)*r, ang, 0);
+   
+   vec pos,u,v;
+   vecset(pos, -2, 1.55, -2 );
+   vecset(u, 4, 0, 0 );
+   vecset(v, 0, 0, 4 );
+   
+   drawplane( pos, u, v );
+   
+   moveto(0,0);
+   printnum(d);
+}
+
+drawplane( vec pos, vec u, vec v ){
+   vec a,b,c,d, uv; 
+   vecadd(uv, u, v );
+   
+   a = pos;
+   vecadd(b, pos, u );
+   vecadd(c, pos, uv );
+   vecadd(d, pos, v );
+   glbegin(GL_QUADS);
+      glvertex( a.x, a.y, a.z );
+      glvertex( b.x, b.y, b.z);
+      glvertex( c.x, c.y, c.z);
+      glvertex( d.x, d.y, d.z);
+   glend();
+}
+
+drawsph(vec p){ drawsph(p.x, p.y, p.z, 0.05 ); }
+
+make_line( line_t l, vec a, vec b ){
+   l.origin = a;
+   vecsub( l.dir, b, a );
+}
+
+drawline(line_t l) {
+   moveto( l.origin.x, l.origin.y, l.origin.z );
+   vec endp; vecadd( endp, l.origin, l.dir );
+   lineto( endp.x, endp.y, endp.z );
+   
+   moveto( l.origin.x, l.origin.y*0+1.5, l.origin.z );
+   lineto( endp.x, endp.y*0+1.5, endp.z );
+}
+
+
+ray_point( vec v, line_t r, t ){
+   vecscalar( v, r.dir, t );
+   vecadd( v, v, r.origin );
+}
+
+isZero( val ) {
+   kEpsilon = 1e-7;
+   if ( fabs(val) <= kEpsilon ) return 1;
+   return 0;
+}
+
+// from Essential Maths for Games & Interactive Apps
+// similar code can be found at
+// http://softsurfer.com/Archive/algorithm_0106/algorithm_0106.htm
+closestPoints( vec point0, vec point1, line_t segment0, line_t segment1 ){
+    // compute intermediate parameters
+    vec w0; vecsub(w0, segment0.origin, segment1.origin );
+    double a = vecdot( segment0.dir, segment0.dir );
+    double b = vecdot( segment0.dir, segment1.dir );
+    double c = vecdot( segment1.dir, segment1.dir );
+    double d = vecdot( segment0.dir, w0 );
+    double e = vecdot(segment1.dir, w0 );
+
+    double denom = a*c - b*b;
+    // parameters to compute s_c, t_c
+    double s_c, t_c;
+    double sn, sd, tn, td;
+
+    // if denom is zero, try finding closest point on segment1 to origin0
+    if ( IsZero(denom) )
+    {
+        // clamp s_c to 0
+        sd = td = c;
+        sn = 0.0;
+        tn = e;
+    }
+    else
+    {
+        // clamp s_c within [0,1]
+        sd = td = denom;
+        sn = b*e - c*d;
+        tn = a*e - b*d;
+  
+        // clamp s_c to 0
+        if (sn < 0.0)
+        {
+            sn = 0.0;
+            tn = e;
+            td = c;
+        }
+        // clamp s_c to 1
+        else if (sn > sd)
+        {
+            sn = sd;
+            tn = e + b;
+            td = c;
+        }
+    }
+
+    // clamp t_c within [0,1]
+    // clamp t_c to 0
+    if (tn < 0.0)
+    {
+        t_c = 0.0;
+        // clamp s_c to 0
+        if ( -d < 0.0 )
+        {
+            s_c = 0.0;
+        }
+        // clamp s_c to 1
+        else if ( -d > a )
+        {
+            s_c = 1.0;
+        }
+        else
+        {
+            s_c = -d/a;
+        }
+    }
+    // clamp t_c to 1
+    else if (tn > td)
+    {
+        t_c = 1.0;
+        // clamp s_c to 0
+        if ( (-d+b) < 0.0 )
+        {
+            s_c = 0.0;
+        }
+        // clamp s_c to 1
+        else if ( (-d+b) > a )
+        {
+            s_c = 1.0;
+        }
+        else
+        {
+            s_c = (-d+b)/a;
+        }
+    }
+    else
+    {
+        t_c = tn/td;
+        s_c = sn/sd;
+    }
+
+    // compute closest points
+    ray_point( point0, segment0, s_c );
+    ray_point( point1, segment1, t_c );
+
+}
+
+
+
+//
+// Vector
+//
+vecScalar( vec out, vec a, s )
+{
+   out.x = a.x * s;
+   out.y = a.y * s;
+   out.z = a.z * s;
+}
+
+vecAdd( vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;   
+}
+vecSub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;   
+}
+
+vecCross( vec out, vec a, vec b)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+
+vecSet(vec a, x,y,z){
+   a.x = x; a.y = y; a.z = z;
+}
+
+vecDot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+length( vec v )
+{
+   return sqrt( vecdot(v,v) );
+}
+
+normalize( vec v )
+{
+   len = length(v);
+   if ( len )
+   {
+      v.x /= len; v.y /= len; v.z /= len;
+   }
+}

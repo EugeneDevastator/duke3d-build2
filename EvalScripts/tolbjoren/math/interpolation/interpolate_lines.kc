@@ -1,0 +1,73 @@
+()
+{
+   cls(255,255,255); // clear screen white
+
+   // Linje 1   
+   x1 = 100;
+   y1 = 200;
+
+   x2 = 200;
+   y2 = 200;
+   
+   // Linje 2
+   x3 = 300;
+   y3 = 250;
+
+   x4 = 300;
+   y4 = 250+100;
+
+   // Set color to red 
+   setcol(255,0,0); // full red, zero green, zero blue
+   
+   // Draw first line
+   moveto(x1,y1); lineto(x2,y2);
+   
+   // Draw second line
+   moveto(x3,y3); lineto(x4,y4);
+   
+
+   // number of steps to plot
+   steps = 100;
+   
+   // delta between steps
+   delta = 1 / (steps-1);
+   
+   // interpolation parameter t
+   t=0;
+   
+   // loop
+   for(i=0; i < steps; i++)
+   {
+      
+      // find point (lx1, ly1) on line1
+
+      lx1 = lerp(x1,x2,t);
+      ly1 = lerp(y1,y2,t);
+
+      // find point (lx2, ly2) on line2
+      lx2 = lerp(x3,x4,t);
+      ly2 = lerp(y3,y4,t);
+      
+      // interpolate the two
+      x = lerp(lx1, lx2, t);
+      y = lerp(ly1, ly2, t);
+      
+      // set color black
+      setcol(0,0,0); // zero all colors
+      
+      // draw a circle at x,y, with radius 3
+      setpix(x,y);
+      
+      // increment parameter value for next loop
+      t = t + delta;
+   }
+}
+
+// Linear interpolate - also known as LERP
+// takes 2 numbers to interpolate given the parameter t
+lerp(a,b,t)
+{
+   return a + (b-a)*t;
+
+}
+

@@ -1,0 +1,48 @@
+()
+{
+   static tex[2]; cls(0); t = klock(); glEnable(GL_ALPHA_TEST);
+   
+   if (numframes == 0)
+   {
+      static buf[256][256];
+      for(y=0;y<256;y++)
+         for(x=0;x<256;x++)
+         {
+            r = sqrt((x-128)^2 + (y-128)^2);
+            a = atan2(y-128,x-128)*64/PI;
+            if (r > 128-(a%4<2)*8)
+               { buf[y][x] = -1; continue; }
+            v = 0x8090a0;
+            if (r < 108)
+               v = int(sin(r/4+a*PI/8)*32)*0x20201+0x505050;
+            buf[y][x] = v;
+         }
+      tex[0] = glsettex(buf,256,256);
+      tex[1] = glsettex("caco.png");
+   }
+   
+   mode = min(max(bstatus,0),2);
+   for(i=0;i<2;i++)
+   {
+      glsettex(tex[i]); s = sgn(.5-i)*.25;
+      for(y=int(yres/256)+1;y>=0;y--)
+         for(x=int(xres/256)+1;x>=0;x--)
+         {
+            a = ((x+y)%2-.5)*2*t;
+            if (mode == 0)   drawspr((x+s)*256,(y+s)*256,132,a);
+            if (mode == 1) mydrawspr((x+s)*256,(y+s)*256,132,a);
+            if (mode == 2)   drawsph((x+s)*256,(y+s)*256,132);
+         }
+   }
+}
+
+mydrawspr (x,y,s,a)
+{
+   glbegin(GL_QUADS); glDisable(GL_DEPTH_TEST);
+   c = cos(a)*s; s = sin(a)*s; u = c+s; v = c-s;
+   gltexcoord(0,0); glvertex(x-v,y-u);
+   gltexcoord(1,0); glvertex(x+u,y-v);
+   gltexcoord(1,1); glvertex(x+v,y+u);
+   gltexcoord(0,1); glvertex(x-u,y+v);
+   glEnable(GL_DEPTH_TEST);
+}

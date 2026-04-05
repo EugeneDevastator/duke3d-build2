@@ -1,0 +1,497 @@
+enum{MAX_NODER = 500};
+static naboer[MAX_NODER][MAX_NODER];
+static nodex[MAX_NODER];
+static nodey[MAX_NODER];
+static nodecol[MAX_NODER];
+static numnodes = 0;
+static nodeRadi = 20;
+
+static nodeheight[MAX_NODER];
+static maxdist = 0;
+
+enum{white=0,gray=1,black=2};
+static vertexstate[MAX_NODER];
+
+static clickedNode = -1;
+static time = 0;
+
+static nodeClosed[MAX_NODER*MAX_NODER];
+
+static openList[MAX_NODER*MAX_NODER];
+static numopen = 0;
+static maxopen = 0;
+
+
+
+enum{MAX_STACKS=10, MAX_ELEMENTS=5000}
+static stackarray[MAX_STACKS][MAX_ELEMENTS];
+static stackcount[MAX_STACKS];
+static activestack = 0;
+
+static predecessor[MAX_NODER];
+static foundgoal = 0;
+static startnode = 0;
+static goalnode = 1;
+
+static grabbedNode = -1;
+()
+{
+   if(numframes==0){
+      setfont(12,16);
+      for(i=0; i<MAX_NODER; i++) vertexstate[i] = WHITE;
+ 
+      nodesWide = 10;
+      nodesHigh = 10;
+     
+      for(y=0; y<nodesWide ; y++)
+      for(x=0; x<nodesHigh; x++)
+      {
+         makeNode( (xres/2-nodeRadi*nodesWide*2)+x*nodeRadi*4, (yres/2-nodeRadi*nodesHigh*2)+y*nodeRadi*4);
+      }
+      
+      x = 0;
+      y = 0;    
+      for(i=0; i<numnodes;i++)
+      {
+         // naboer[fra][til]
+         if(x < nodesWide-1) naboer[y*nodesHigh+x][(x+1)+y*nodesHigh] = 1; // venstre
+         //if(x < nodesWide-1) naboer[y*nodesHigh+x][(x+1)+(y+1)*nodesHigh] = 1; // venstre og ned
+         if(x < nodesWide) naboer[y*nodesHigh+x][(x)+(y+1)*nodesHigh] = 1; // ned
+         
+         if( (x != y) && x > 1 ) naboer[y*nodesHigh+x][(x-1)+y*nodesHigh] = 1; // hoyre
+         //if(x < nodesWide && x > 0) naboer[y*nodesHigh+x][(x-1)+(y+1)*nodesHigh] = 1; // venstre og ned
+         if(x < nodesWide && y > 1) naboer[y*nodesHigh+x][(x)+(y-1)*nodesHigh] = 1; // opp
+         
+         x++;
+         if(x>nodesWide-1){
+            x=0;
+            y++;
+         }
+         
+      }  
+      
+      x = 3; y = 2;
+      goalnode = y*nodesHigh+x;
+
+      calcHeight();
+   }
+   
+   
+   // Lage noder DONE
+   // flytte noder DONE
+   // lage connections DONE
+   // gjore sok. BFS og DFS er DONE
+   // vise rute DONE
+   // regne ut hoyde paa node for hillclimbing. DONE. bruker avstand fra maal noden.
+   // vise hoyde DONE
+   // gjore muli for bruker aa endre hoyde med mus. DONE
+   // gjore hillclimbing algoritmen. DONE
+   // feilsjekke: stack overflow
+   // kunne steppe igjennom algoritmen. pause search og returnere on user demand. 
+
+   time = klock(0);
+   
+   if(keystatus[57] == 1 ) // space
+   {
+      keystatus[57] = 0;
+      resetSearch();
+      res = hillclimbing();
+      if(res==goalnode) foundgoal=1;
+   }
+   
+   
+   updateGfx();
+   input();
+}
+input(){
+   if(keystatus[57] == 1 ) // space
+   {
+      keystatus[57] = 0;
+      res = hillclimbing();
+      //res = dfs(startnode,goalnode);
+      if(res==goalnode){foundgoal=1; }
+   }
+
+   if(bstatus==1)
+   {
+      //bstatus=0;
+      resetSearch();
+      goalnode = nodeClosestToMouse();
+      calcHeight();
+   }
+   
+   if(bstatus==2)
+   {
+      bstatus = 0;
+      resetSearch();
+      startnode = nodeClosestToMouse();
+      calcHeight();
+   }
+   
+   if(grabbedNode && bstatus == 4){
+      nodeHeight[grabbedNode] = min(255,max(0,nodey[grabbednode]-mousy)); //255*mousy/yres;
+      setcol(0xffffff); moveto(mousx,mousy); printf("move mouse up&down!");
+   }
+   else
+   {
+      grabbedNode = -1;
+   }
+   
+   if(bstatus==4 && grabbedNode == -1)
+   {
+      resetSearch();
+      node = nodeClosestToMouse();
+      nodeHeight[node] = 255*mousy/yres;
+      grabbedNode = node;
+      //resetSearch();
+      //startnode = nodeClosestToMouse();
+      //calcHeight();
+   }
+}
+
+nodeClosestToMouse()
+{
+   minDist = 1e32;
+   closest = -1;
+   
+   for(i = 0; i<numnodes; i++)
+   {
+      dist = ((mousx-nodex[i])^2 + (mousy-nodey[i])^2 ); // < nodeRadi^2;
+      if( dist < minDist )
+      {
+         minDist = dist;
+         closest = i;  
+      }
+
+   }
+   return closest;
+}
+
+makeNode(x,y)
+{
+   nodex[numnodes] = x; nodey[numnodes] = y; numnodes++; return numnodes-1;
+}
+
+resetGraph(){
+   foundGoal = 0;
+   numnodes = 0;
+   for(i=0; i<MAX_NODER; i++)
+   {
+      vertexstate[i] = WHITE; // reset
+      for(j=0; j<MAX_NODER; j++) 
+      {
+         naboer[i][j] = 0;
+      }
+   }
+
+}
+resetSearch()
+{      
+   foundGoal = 0;
+   numopen = 0; maxopen = 0;
+   for(i=0; i<MAX_NODER*MAX_NODER; i++)
+   {
+      openList[i] = -1; // todo MAX^2
+      if(i<MAX_NODER){ 
+      nodeClosed[i] = 0; 
+      vertexstate[i] = WHITE; }
+       
+   }
+   clearstack();
+}
+
+calcHeight(){
+   // Set hight of all nodes
+   maxdist = 0;
+   for(i=0; i<numnodes; i++){
+      dist = sqrt( ( nodex[i]-nodex[goalnode] )^2 + ( nodey[i]-nodey[goalnode] )^2 );
+      nodeheight[i] = dist;
+      if(dist > maxdist) maxdist = dist;
+   }
+   for(i=0; i<numnodes;i++)
+   {
+      nodeheight[i] = 255-255*nodeheight[i]/maxdist;
+   }
+
+}
+
+bfs(x,goal)
+{
+   search(x);
+   while(stackCount[0] > -1)
+   {
+      
+      w = popFront();
+      
+      if( nodeClosed[w] == 0 )
+      {      
+         search(w);
+      }
+      
+      vertexstate[w] = BLACK; // done
+      if(w==goal) return w;
+   }
+}
+
+dfs(x,goal)
+{
+   search(x);
+   while(stackCount[0] > -1)
+   {
+      w = pop();     
+      if(w==goal){ vertexstate[w]=BLACK; return goal; }      
+
+      if( nodeClosed[w] == 0 )
+      {
+         search(w);
+      }
+      vertexstate[w] = BLACK; // done
+   }
+}
+
+eval(x) // used by hillclimbing
+{
+   return nodeheight[x];
+}
+
+//@returns index to best node found.
+//source psudocode: http://en.wikipedia.org/wiki/Hill_climbing
+hillclimbing()
+{
+   currentNode = startNode;
+   do{
+      search(currentNode); // find neighbours. add to openlist
+      nextEval = -1e32; //-INF
+      nextNode = -1; // null, use to look forward 1 step
+      
+      while(stackCount[0] > 0) // for all neighbours
+      {
+         x = pop();
+         if(x==goalnode){ vertexstate[x]=BLACK; return goalnode; }    // got what we came for.       
+
+         // simple hillclimbing. 
+         if( eval(x) > nextEval ){ // find best node so far.
+            nextNode = x;
+            nextEval = eval(x);
+         }
+         vertexstate[x] = BLACK; // done
+      } 
+      if(nextEval <= eval(currentNode)){
+         return currentNode; // no better neighbour exists.
+      }
+      currentNode = nextNode;
+   
+   }while(1) 
+}
+
+search(v)
+{
+   nodeClosed[v] = 1;
+   vertexstate[v] = GRAY; // visited
+   
+   updateGfx();
+   sleep(50);
+   
+   for(i=0; i<numnodes; i++) // find v's neighbours, add them to open
+   {
+      //if(v != i) //dont push self //hm. if graph is correctly made, shouldnt happen
+      if(naboer[v][i] == 1 || naboer[i][v] == 1)
+      { 
+         push(i); 
+         if(nodeClosed[i] == 0) predecessor[i] = v;
+      }
+   }
+}
+
+
+/*
+drawArrow(sx,sy,ex,ey,thick,l,angle)
+{
+   //angle = atan2(ey-sy,ex-sx);
+   ofs=PI*1.2;
+   drawcone(sx,sy,thick,ex,ey,thick);
+   drawcone(sx,sy,thick,ex+cos(angle+ofs)*l, ey+sin(angle+ofs)*l,thick);
+   drawcone(sx,sy,thick,ex+cos(angle-ofs)*l, ey+sin(angle-ofs)*l,thick);
+}
+*/
+
+updateGfx()
+{
+   cls(0);
+   
+   if(foundGoal==1) showPath();
+  
+
+   setcol(0x777777); 
+   
+   for(i = 0; i<numnodes; i++){
+   for(j=0; j<numnodes;j++){
+         if(naboer[i][j] == 1) drawcone( nodex[i], nodey[i],-1, nodex[j], nodey[j], -1);   
+      }
+   }
+
+   for(i = 0; i<numnodes; i++){
+      drawNode(i);
+      if(i==clickedNode)
+      {
+         //ang = atan2(  nodey[i]-mousy, nodex[i]-mousx );
+         //ants(nodex[i]-cos(ang)*nodeRadi,nodey[i]-sin(ang)*nodeRadi,mousx,mousy,time);
+      }
+      for(j=0; j<numnodes;j++)
+      {
+         // kunne ha tegnet paa det under alt annet og sluppet atan2
+         if(naboer[i][j] == 1){
+         ang = atan2(  nodey[i]-nodey[j], nodex[i]-nodex[j] ); // find angle from node i to node j
+         setcol(0x999999);
+         // use the angle, size of a node to draw a arrow just touching the node
+         drawcone( nodex[j]+cos(ang)*nodeRadi*1.5, nodey[j]+sin(ang)*nodeRadi*1.5, -5, 
+         nodex[j]+cos(ang)*nodeRadi*0.9, nodey[j] + sin(ang)*nodeRadi*0.9, 0.01);
+         
+         //drawArrow( nodex[j]+cos(ang)*nodeRadi*1.0, nodey[j]+sin(ang)*nodeRadi*1.0, nodex[j]+cos(ang)*nodeRadi*2, nodey[j]+sin(ang)*nodeRadi*2, 1, 10, ang );
+         }
+         
+      }
+      
+   }
+   
+   for(i=0; i<255; i++)
+   {
+      setcol(hsv_to_rgb(i,1,1)); moveto(0,i+yres/2); lineto(10, i+yres/2);
+      if( i % 10 == 0){setcol(0xffffff);  moveto(20,i+yres/2); printf("%g", i);}
+   }
+
+   moveto(0,0); 
+   printf("%g / %g nodes used",numnodes,MAX_NODER);
+   //printf("\nopen %g", numopen);
+   //printf("\nmax %g", maxopen);
+   //printf("\nGoal node: %g",goalnode);
+   
+   if(foundGoal==1)
+   {
+      printf("\nfound goal");
+      printPath();
+   }
+   
+   showStack();
+
+   setfont(6,8); moveto(xres-190,0); setcol(0xffffff); 
+   printf("\nPress mouse 1 to set GOAL,\nnotice the height changes\n\npress mouse 2 to set START\n\npress SPACE to begin search\n\nhold mouse 3 over a node and\ndrag to adjust height.");
+   
+   moveto(xres/2, yres/2); 
+
+   refresh();
+}
+
+showStack()
+{
+   setcol(0xffffff);
+   printf("\n\nstackdata:");
+   for(i=0; i<=stackCount[0]; i++)
+   {
+      data = stackarray[0][i];
+      setcol(0xffffff); printf("\n[%g] = %g", i, data );
+      setcol(0xff0000); drawsph(nodex[data], nodey[data], -nodeRadi-3);
+   }
+}
+printPath()
+{
+   printf("\nSti mellom start og\nmaal tilstand:");
+   node = goalnode;
+   ox = nodex[node];
+   oy = nodey[node];
+   while(node != startnode){
+      pred = predecessor[node];
+      setcol(0xffffff); printf("\nforgjenger[%g] = %g",node,pred);
+      node = pred;
+   }
+}
+
+showPath()
+{   
+   node = goalnode;
+   ox = nodex[node];
+   oy = nodey[node];
+   while(node != startnode)
+   {
+      pred = predecessor[node];
+      node = pred;
+      setcol(0x00ff00); drawcone(ox,oy,6,nodex[pred],nodey[pred],6);
+      ox = nodex[node];
+      oy = nodey[node];
+   }
+}
+
+drawNode(i){
+   if( i < 10 ){moveto( nodex[i]-5, nodey[i]-10 );} else{moveto( nodex[i]-14, nodey[i]-12 );} 
+   
+   if(vertexstate[i] == BLACK ){
+      setcol(0xffffff); drawsph( nodex[i], nodey[i], -nodeRadi); setcol(0xffffff); printf("#%g",i); printf("\n%.1f",nodeheight[i]);} // printchar(i+64)
+
+   if(vertexstate[i] == GRAY ){
+      setcol(0x777777); drawsph( nodex[i], nodey[i], nodeRadi); setcol(0xffffff); printf("#%g",i); printf("\n%.1f",nodeheight[i]);}
+   
+   if(vertexstate[i] == WHITE ){
+      setcol(0xffffff); setcol(hsv_to_rgb(nodeheight[i],1,1)); drawsph( nodex[i], nodey[i], nodeRadi); setcol(0x000000); printf("#%g",i); printf("\n%.1f",nodeheight[i]);}   
+
+   //if(i==clickedNode){ setcol(0xffffff); antwheel(nodex[i], nodey[i],nodeRadi+1); }
+   if(i==goalNode){ setcol(0xb33122); moveto(nodex[i]-15,nodey[i]-15+sin(time)*30 );printf("GOAL!"); }
+   if(i==startNode){ setcol(0xb33122); moveto(nodex[i]-15,nodey[i]-15+sin(time)*30 );printf("START!"); }
+}
+
+hsv_to_rgb(h,s,v){ 
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   r=int(r*255);
+   g=int(g*255);
+   b=int(b*255);
+   return r*2^16 + g*2^8 + b; 
+}
+
+clearStack()
+{
+   for(i=0; i<stackcount[activestack]+1; i++)
+   {
+      stackarray[activestack][i] = 0;
+   }
+   stackcount[activestack] = 0;   
+}
+
+push(x)
+{
+   stackarray[activestack][stackcount[activestack]] = x;
+   stackcount[activestack]++;
+}
+
+popFront()
+{
+   val = stackarray[activestack][0];
+   for(i=0; i<stackcount[activestack]; i++)
+   {
+      stackarray[activestack][i] = stackarray[activestack][i+1]; //overwrite current with next
+   }
+   stackcount[activestack]--;
+   return val;
+}
+
+pop()
+{
+   stackcount[activestack]--;
+   return stackarray[activestack][stackcount[activestack]];
+}

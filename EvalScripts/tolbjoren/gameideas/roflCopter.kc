@@ -1,0 +1,665 @@
+static tim, otim, dt;
+
+enum{maxvectors=10};
+static vecX[maxvectors];
+static vecY[maxvectors];
+static vecZ[maxvectors];
+static isDead[maxvectors];
+static aliveVectors;
+
+static prayPos = 0;
+
+// Copter
+static predatorPos = 0;
+static predatorVel = 0;
+static distToTarget = 0; // relax tilt if close to cursor.
+static roflTilt = 0;
+
+// missile specific
+enum{MAXPRAY = 1, MAXPRED = 10}
+static prayx[MAXPRAY];
+static prayy[MAXPRAY];
+
+static predatorx[MAXPRED];
+static predatory[MAXPRED];
+static predatorvx[MAXPRED];
+static predatorvy[MAXPRED];
+static predatorHeading[MAXPRED];
+static predatorAlive[MAXPRED];
+
+static tolerance = 0.001;
+
+// particles
+enum{MAXEMITTERS = MAXPRED} // set maximum no of particle emitters to max num predators.
+enum{MAXPARTICLES = 100}
+// Single particles.
+static pixieDustX[MAXEMITTERS][MAXPARTICLES];
+static pixieDustY[MAXEMITTERS][MAXPARTICLES];
+static pixieDustVx[MAXEMITTERS][MAXPARTICLES];
+static pixieDustVy[MAXEMITTERS][MAXPARTICLES];
+static pixieDustLife[MAXEMITTERS][MAXPARTICLES];
+static pixieDustColor[MAXEMITTERS][MAXPARTICLES];
+// Emitter
+static pixieDustEmitterX[MAXEMITTERS];
+static pixieDustEmitterY[MAXEMITTERS];
+static pixieDustSpreadAngle[MAXEMITTERS];
+static pixieDustEmitAngle[MAXEMITTERS];
+static emitterAlive[MAXEMITTERS];
+static pixieDustMaxLife = 60;
+
+// explo
+static exploCenterX = 0;
+static exploCenterY = 0;
+enum{MAX_EXPLO_PARTICLES = 36}
+static exploPartX[MAX_EXPLO_PARTICLES] = 0;
+static exploPartY[MAX_EXPLO_PARTICLES] = 0;
+static exploPartLife[MAX_EXPLO_PARTICLES] = 0;
+static exploPartVX[MAX_EXPLO_PARTICLES] = 0;
+static exploPartVY[MAX_EXPLO_PARTICLES] = 0;
+static exploPartColor[MAX_EXPLO_PARTICLES];
+
+()
+{
+   static copterTex[120][190];
+   static copterTex2[120][190];
+   
+   cls(0);
+   if(numframes==0){
+      for(i=0; i<maxvectors; i++){
+         isDead[i] = 1;
+      }
+      predatorPos = vec3(xres/2,yres/2,0);
+      predatorVel = vec3(0,0,0);
+      prayPos = vec3(0,0,0);
+      
+      genTex(copterTex,copterTex2);
+      
+      glCullFace(GL_BACK); 
+      glDisable(GL_ALPHA_TEST);
+      glDisable(GL_DEPTH_TEST);
+      
+      setupEmitters();
+   }
+   
+   otim = tim;
+   tim = klock(0);
+   dt = tim-otim;
+   
+   // game logic
+   chase();
+   moveEnemy();
+   for(i=0; i<MAXPRED; i++){
+      doLineOfSight(i,0); // takes pred, pray indices.
+   }
+   if(numframes % 10 == 0){
+      checkForHits();
+   }
+   
+   // Input
+   if(bstatus == 1){
+      bstatus = 0;
+      spawnMissile(vecX[predatorPos]+20, vecY[predatorPos]+70);
+   }  
+
+   drawRoflCopter(copterTex,copterTex2);
+   drawAndUpdateMissiles();
+   drawAndUpdateParticles();
+   drawExplosion();   
+
+   setcol(0xffffff); moveto(0,0);
+   printf("\ndumb missiles, do not try to intercept, but they dont lose 'track-o-target' (TM)\nInstructions: \n      left mouse to fire!\n      move mouse to steer");
+   printf("\n\ntodo:\n-make missiles drop some meters before they activate.");
+   printf("\n-make a game objective. enemies. blimps? SAM-sites to bomb? :S ");
+   printf("\n-TCP/IP multiplayer!");
+}
+
+moveEnemy(){
+   p1x = 50;      p1y = 120;
+   p2x = xres-10; p2y = 50;
+   p3x = xres-10; p3y = yres-100;
+   positionOnCurve =0.5+(sin(tim/2)/2); mousx/xres;
+      
+   p123X = 0; p123Y = 0;
+   QuadBez( p1X, p1Y, p2X, p2Y, p3X, p3Y, positionOnCurve, &p123X, &p123Y );
+   
+   prayx[0] = p123X;
+   prayy[0] = p123Y;
+}
+
+// uses my crappy vector functions
+chase(){
+   vecSet( prayPos, mousx, mousy, 0);
+      
+   diff = vecSub(prayPos, predatorPos); 
+      
+ 
+   vecDelete(predatorVel); 
+   predatorVel = diff;
+ 
+   distToTarget = sqrt(vecX[predatorVel]^2 + vecY[predatorVel] ^2);
+   if(distToTarget  > 10){
+     
+   vecNormalize(predatorVel);
+
+   vecMultiplyBy(predatorVel,dt*100);
+   
+   
+   newP = vecAdd(predatorPos, predatorVel);
+   vecNormalize(predatorVel);
+   
+   
+   vecDelete(predatorPos);
+   predatorPos = newP;
+   } 
+}
+
+drawRoflCopter(copterTex[120][190],copterTex2[120][190]){
+   setcol(0xffffff);
+   moveto( vecX[predatorPos], vecY[predatorPos] );
+
+   //drawrectopen(vecX[predatorPos], vecY[predatorPos],vecX[predatorPos]+190, vecY[predatorPos]+120);
+   //copter();
+   
+   texH = 0;
+   setfont(8,12);
+   // choose animation frame to display based on time (cycle every 1/8 sec)
+   if(tim % .25 > .125){
+      texH = glsettex(copterTex,190,120);
+   }
+   else{
+      texH = glsettex(copterTex2,190,120);
+   }
+
+   // tilt roflcopter according to x-speed. if distance is small, straighten.
+   if(distToTarget < 20){
+    if(roflTilt > 0){ roflTilt -= 1*dt;}else{ roflTilt += 1*dt; }
+   }else{
+      tiltDiff = min(1, max(-1, vecX[predatorVel]) );
+      if( roflTilt > tiltDiff){roflTilt -= 1*dt;}
+      else{ roflTilt += 1*dt; }
+   }
+   
+   setcol( hsv_to_rgb(numframes/3 % 360,1,1) );
+   drawspr(vecX[predatorPos], vecY[predatorPos], 190/1.5,120/1.5, roflTilt);
+   
+   glremovetex(texH);
+
+}
+copter(frameNum){
+   moveto(0,0);
+   if(frameNum==0)
+   { 
+   printf("\nROFL:ROFL:LOL");
+   printf("\n           |         ");
+   printf("\n  L   /--------     ");
+   printf("\n  O ===      []\\    ");
+   printf("\n  L   \\         \\   ");
+   printf("\n       \\_________\\  ");
+   printf("\n          |     |    ");
+   printf("\n       ------------- ");
+   }
+   else
+   {
+   printf("\n          LOL:ROFL:ROFL");
+   printf("\n           |         ");
+   printf("\n      /--------     ");
+   printf("\n LOL===      []\\    ");
+   printf("\n      \\         \\   ");
+   printf("\n       \\_________\\  ");
+   printf("\n          |     |    ");
+   printf("\n       ------------- ");
+   }
+}
+
+genTex(copterTex[120][190],copterTex2[120][190]){
+   copter(0);
+   
+   for(x=0; x<190; x++)
+   for(y=0; y<120; y++){
+      r=0; g=0; b=0;
+      getpix(x,y,r,g,b);
+      copterTex[y][x] = rgb(r,g,b);
+   }
+   
+   cls(0);
+   copter(1);
+   
+   for(x=0; x<190; x++)
+   for(y=0; y<120; y++){
+      r=0; g=0; b=0;
+      getpix(x,y,r,g,b);
+      copterTex2[y][x] = rgb(r,g,b);
+   }
+}
+
+drawrectopen(x0,y0,x1,y1) { moveto(x0,y0); lineto(x1,y0); lineto(x1,y1); lineto(x0,y1); lineto(x0,y0); }
+
+
+setupVecs(){
+   for(i=0; i<maxvectors; i++){
+      isDead[i] = 1;
+   }
+}
+
+/*
+vecDeleteAll(){ 
+aliveVectors = 0;
+for(i=0; i<maxvectors; i++) isDead[i] = 1;
+}
+*/
+
+vecDelete(i)
+{
+   isDead[i] = 1;
+   aliveVectors--;
+}
+
+
+vec3(x,y,z)
+{
+   if(aliveVectors >= maxvectors) return maxVectors-1;
+   i=0;
+   for(i=0; i<maxvectors; i++)
+   {
+      if(isDead[i] == 1){
+         
+         isDead[i] = 0;
+         break;
+      }
+   }
+   
+   vecX[i] = x;
+   vecY[i] = y;
+   vecZ[i] = z;
+   handle = i;
+   
+   aliveVectors++;   
+   return handle;
+}
+
+vecSet(i,x,y,z){
+   vecX[i] = x;
+   vecY[i] = y;
+   vecZ[i] = z;
+}
+
+// hadde gitt mer mening å lage en temp.
+// for å saa kopiere til den på vs
+// og slette temp.
+// vecAdd(a,b) vil da gi a = a+b
+vecAdd(a,b)
+{
+   result = vec3(0,0,0);
+   vecX[result] = vecX[a] + vecX[b];
+   vecY[result] = vecY[a] + vecY[b];
+   vecZ[result] = vecZ[a] + vecZ[b];
+   return result;
+}
+
+vecSub(a,b)
+{
+   i = vec3(0,0,0);
+   vecX[i] = vecX[a] - vecX[b];
+   vecY[i] = vecY[a] - vecY[b];
+   vecZ[i] = vecZ[a] - vecZ[b];
+   return i;
+}
+
+vecMultiplyBy(i,scalar)
+{
+   vecX[i] *= scalar;
+   vecY[i] *= scalar;
+   vecZ[i] *= scalar;
+}
+
+// aka inner product
+vecDot(a,b)
+{
+   result = vecX[a] * vecX[b] + 
+            vecY[a] * vecY[b] +
+            vecZ[a] * vecZ[b];
+   return result;
+}
+
+// Cross product aka Vector product
+vecCross(a,b)
+{
+   result = vec3(0,0,0);
+   vecX[result] = vecY[a]*vecZ[b] - vecZ[a]*vecY[b];
+   vecY[result] = vecZ[a]*vecX[b] - vecX[a]*vecZ[b];
+   vecZ[result] = vecX[a]*vecY[b] - vecY[a]*vecX[b];
+   return result;
+}
+
+vecNormalize(i)
+{
+   l = sqrt(vecX[i]^2+vecY[i]^2+vecZ[i]^2);
+   vecX[i] /= l;
+   vecY[i] /= l;
+   vecZ[i] /= l;
+}
+
+
+// missile specific:
+doLineOfSight(pred,pray){
+   left = 0;
+   right = 0;
+   
+   //ang = atan2(prayy[pray] - predatory[pred],prayx[pray] - predatorx[pred]);
+   ang = atan2(prayx[pray] - predatorx[pred],prayy[pray] - predatory[pred]);
+   vx = cos(ang);
+   vy = sin(ang);
+   //vx = prayx[pray] - predatorx[pred];
+   //vy = prayy[pray] - predatory[pred];
+   
+   ca = cos(predatorHeading[pred]);
+   sa = sin(predatorHeading[pred]);  
+   
+   rotX = vx * ca + vy * sa;
+   rotY = -vx * sa + vy * ca;
+   
+   length = sqrt(rotX^2 + rotY^2);
+   rotX /= length; 
+   rotY /= length;
+   
+   // rotate max 0.5 degrees per frame
+   // 0.5*PI/180/2*PI;
+   maxRot = 5*PI/180;
+
+   if(rotx < -tolerance){
+      left = 1;
+      predatorHeading[pred] += maxRot;
+   }
+   else if(rotx > -tolerance){
+      right = 1;
+      predatorHeading[pred] -= maxRot;
+   }
+    
+   //printf("\n%g\n%g",left,right);   
+}
+
+// draws and moves towards target pray.
+
+drawAndUpdateMissiles(){
+   setcol(0xff0000);
+   moveto(prayx[0]-30, prayy[0] );
+   printf("THE ENEMY"); 
+   
+   for(i=0; i<MAXPRED; i++){
+      if(predatorAlive[i] == 1){
+         // draw
+         drawsph(predatorx[i], predatory[i], -10);
+         moveto(predatorx[i], predatory[i]);
+         lx = cos(-predatorHeading[i])*20;
+         ly = sin(-predatorHeading[i])*20;
+         lineto(predatorx[i]+lx, predatory[i]+ly);
+         
+         // Update velocity
+         predatorx[i] += predatorvx[i];
+         predatory[i] += predatorvy[i];
+         spd = 3*100*dt; // spd in pix per frame 
+         predatorvx[i] = cos(-predatorHeading[i])*spd;
+         predatorvy[i] = sin(-predatorHeading[i])*spd;
+         
+         // update attached emitter
+         setEmitterPosAndHeading(i, predatorx[i], predatory[i], predatorHeading[i]);
+      }
+   }
+}
+
+spawnMissile(x,y){
+   for(i=0; i<MAXPRED; i++)
+   {
+      // find a dead missile we can use.
+      if(predatorAlive[i] == 0)
+      {
+         predatorAlive[i] = 1; // re-animate
+         predatorx[i] = x; // set initial pos
+         predatory[i] = y;
+         predatorvx[i] = 0; // set initial speed vector.
+         predatorvy[i] = 0;
+         spawnEmitter(i,predatorx[i],predatory[i],predatorHeading[i]); //emitterAlive[i] = 1;     // each emitter has a missile. not very dynamic system...    
+         
+         return;
+      }  
+   }
+   // could return a code for no more missiles left.
+
+}
+
+
+// if a hit occurs, kill the particle emitter, predator missile AND create an explosion.
+checkForHits(){
+   for(i=0; i<MAXPRED; i++)
+   {
+      // find a dead missile we can use.
+      if(predatorAlive[i] == 1)
+      {
+         if( dist2d( prayx[0], prayy[0], predatorx[i], predatory[i] ) < 10 )
+         {
+            
+            killEmitter(i);
+            predatorAlive[i] = 0;
+            makeExplosion(predatorx[i], predatory[i]);
+         }
+      }  
+   }
+}
+
+dist2d(x1,y1,x2,y2){
+   return sqrt( (x2-x1)^2 + (y2-y1)^2 );
+}
+
+/////////////// daft particle emitters
+setupEmitters(){
+   if(numframes==0){
+      for(e=0; e<MAXEMITTERS; e++){
+         pixieDustEmitAngle[e] = 0;
+         pixieDustSpreadAngle[e] = PI/4;
+         emitterAlive[e] = 0;
+         
+         for(j=0; j<MAXPARTICLES; j++){
+            pixieDustLife[e][j] = 0;
+         }
+      }
+   }
+}
+
+// should die for good when all particles are dead too
+killEmitter(e){
+   emitterAlive[e] = 0;
+}
+
+// to do: refactor! i just activate and kill emitters with the particles
+
+spawnEmitter(e,x,y,ang){
+   emitterAlive[e] = 1;
+   pixieDustEmitterX[e] = x; 
+   pixieDustEmitterY[e] = y; 
+   pixieDustEmitAngle[e] = ang;
+   for(i=0; i<MAXPARTICLES; i++)
+   {
+      pixieDustLife[e][i] = 0;
+      /*
+      pixieDustX[e][i] = x;
+      pixieDustX[e][i] = y;
+      pixieDustX[e][i] = x;
+      pixieDustX[e][i] = y;
+      */
+   }
+}
+
+
+setEmitterPosAndHeading(i,x,y,ang){
+   pixieDustEmitterX[i] = x; 
+   pixieDustEmitterY[i] = y; 
+   pixieDustEmitAngle[i] = ang;
+}
+
+setSpreadAngle(i,angle){
+   pixieDustSpreadAngle[i] = angle;
+}
+drawAndUpdateParticles(){
+   //texh = glsettex(spriteTex,spriteSize,spriteSize);
+   
+   for(e=0; e<MAXEMITTERS; e++)
+   for(i=0; i<MAXPARTICLES; i++)
+   {
+      if(emitterAlive[e] == 0){ continue; }
+      
+      if(pixieDustLife[e][i] < 1)
+      {
+         if(rnd > 0.1) continue; // limit particles created per frame. daft way! use time.
+         pixieDustLife[e][i] = pixieDustMaxLife;
+         pixieDustX[e][i] = pixieDustEmitterX[e];
+         pixieDustY[e][i] = pixieDustEmitterY[e];
+         //pixieDustColor[e][i] = rgb(rnd*255, rnd*255, rnd*255);
+         pixieDustColor[e][i] = rgb(128+112+16*rnd,164+8*rnd,32*rnd);
+         angle = pixieDustEmitAngle[e] + nrnd*pixieDustSpreadAngle[e];
+         pixieDustVx[e][i] = -cos( angle );
+         pixieDustVy[e][i] = sin( angle );
+         continue;
+      }
+      else{
+      
+      pixieDustX[e][i] += pixieDustVx[e][i];
+      pixieDustY[e][i] += pixieDustVy[e][i];
+      //pixieDustVy[e][i] += 0.01;  
+      
+      r=0; g=0; b=0; 
+      
+      hex2rgb(pixieDustColor[e][i],r,g,b);
+      cooldown = pixieDustLife[e][i] / pixieDustMaxLife;
+      r *= cooldown;
+      g *= cooldown;
+      b *= cooldown;  
+
+
+      setcol(r,g,b);
+      //setpix(pixieDustX[e][i], pixieDustY[e][i]);
+      drawsph(pixieDustX[e][i], pixieDustY[e][i], 5);
+   
+      pixieDustLife[e][i]--;
+      }
+   }
+   //glremovetex(texh);
+}
+
+hex2rgb(mrgb,&r,&g,&b)
+{  
+   r = (mrgb / 2^16);
+   g = (mrgb / 2^8) % 256;
+   b = mrgb % 256;   
+}
+
+hsv_to_rgb(h,s,v){ 
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   r=int(r*255);
+   g=int(g*255);
+   b=int(b*255);
+   return r*2^16 + g*2^8 + b; 
+}
+
+//////////////////////// explosion!
+
+makeExplosion(x,y){
+   exploCenterX = x; // can be moving? no
+   exploCenterY = y;
+   
+   for(i=0; i<MAX_EXPLO_PARTICLES; i++){
+      exploPartX[i] = exploCenterX + 2*nrnd;
+      exploPartY[i] = exploCenterY + 2*nrnd;
+      exploPartLife[i] = 64 + 32*rnd;
+      
+      ang = i*2*PI / MAX_EXPLO_PARTICLES + nrnd*0.15;
+      expSpd = 0.5+0.5*rnd;
+      exploPartVX[i] = cos(ang) * expSpd;
+      exploPartVY[i] = sin(ang) * expSpd;
+      
+      exploPartColor[i] = rgb( 128+rnd*128, 128+rnd*32, 0);
+   }
+}
+
+drawExplosion(){
+   // draws particles from a point (or on the radi of circle?)
+   // particles drop with gravity
+
+   deadYet= exploPartLife[0];
+   for(i=0; i<MAX_EXPLO_PARTICLES; i++){
+      exploPartX[i] += exploPartVX[i];
+      exploPartY[i] += exploPartVY[i];
+      exploPartVY[i] += 0.01;
+      exploPartLife[i]--;
+      if(exploPartLife[i] > deadYet){ deadYet = exploPartLife[i];}
+      
+      r=0; g=0; b=0; 
+
+      hex2rgb(exploPartColor[i],r,g,b);
+      cooldown = exploPartLife[i] / 32;
+      
+      
+      r *= cooldown;
+      g *= cooldown;
+      b *= cooldown;  
+      
+      //xpos = min(xres,max(0,exploPartX[i]/xres*W));
+      //xpos = exploPartX[i]/xres*W;
+      //ypos = exploPartY[i]/yres*H;
+      //wuColor(xpos,ypos,1,r,g,b,screen);
+      setcol(r,g,b);
+      drawsph(exploPartX[i],exploPartY[i],5);    
+   }
+   if( deadYet < 1){
+      // explo is dead.
+   }
+}
+
+
+QuadBez(p1X, p1Y, p2X, p2Y, p3X, p3Y, positionOnCurve, &p123X, &p123Y)
+{
+   // Calc a point on  a quad bezier curve
+   // reqs three control points with X,Y coords
+   // and a current pos on the curve in the range 0..1
+   // coords are returned in P123X and P123Y vars
+   
+   // Calc dists tween control points
+   p12X = p2X-p1X; p12Y = p2Y-p1Y;
+   p23X = p3X-p2X; p23Y = p3Y-p2Y;
+   // Find pos along lines from P1-p2 and P2-P3
+   p12X *= positionOnCurve;
+   p12Y *= positionOnCurve;
+   p23X *= positionOnCurve;
+   p23Y *= positionOnCurve;
+   
+   // Calc dist tween two positions
+   p123X = (P2X+P23X) - (P1X+P12X); // dist in X tween P12X and P23X
+   p123Y = (P2Y+P23Y) - (P1Y+P12Y);
+   
+   // Find a pos along the line from P12-P23
+   p123X *= positionOnCurve;
+   p123Y *= positionOnCurve;
+   
+   // Add up the relative positions to make screen coords
+   p123X += P1X+P12X;
+   p123Y += P1Y+P12Y;
+   
+   // P123X, P123Y is the point on the curve
+}

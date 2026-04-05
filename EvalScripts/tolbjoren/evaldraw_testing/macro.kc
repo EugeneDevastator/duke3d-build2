@@ -1,0 +1,34 @@
+
+
+()
+{
+   cls(0); clz(1e32);
+   
+   setcam(0,0,0,0,0);
+   drawsph(0,0,5,1);
+
+   enum{STRIDE = 8}
+   static array[STRIDE*STRIDE];
+   
+   #define access(x,y) ( array[x*stride+y] )
+
+   if ( numframes == 0 ){
+      for(i=0; i<stride; i++){
+         for(j=0; j<stride; j++){
+            access(i,j) = i*stride+j;
+         }
+      }
+   }
+   
+   setfont(12,2*16,1);
+
+   moveto(0,0);
+   for(i=0; i<stride; i++){
+      for(j=0; j<stride; j++){
+
+         moveto(15+i*35, 15+j*35);      
+
+         printf( "%g", access(i,j) );
+      }
+   }
+}

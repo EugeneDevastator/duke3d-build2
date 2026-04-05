@@ -1,0 +1,389 @@
+struct complex{ r,i; };
+
+static time;
+static E = 2.7182818284590452353602874713527;
+
+static ofsx,ofsy,cost,sint; // globals that modify look
+static numeffects = 7;
+()
+{
+   static effect = 2;
+   static fullscreen = 0;
+   cls(0);
+   time = klock(0);
+   
+   enum{dimx=300, dimy = dimx}
+   static buf[dimx];
+   static screen[dimx][dimy];
+   
+   rmi = -5; rma = 5;
+   imi = -5; ima = 5;
+   
+   ofsx = (mousx-xres/2)/xres*10;
+   ofsy = (mousy-yres/2)/yres*10;
+   
+   cost = cos(time*5)*3;
+   sint = sin(time*5)*3;
+   
+   for(j=0; j<dimx; j++){
+      im = ima - (ima-imi) * j / (dimx-1);   
+      for(i=0; i<dimy; i++){
+         re = rma - (rma-rmi) * i /(dimy-1);
+         
+         a=0; m=0; // affect color
+         Complex c; 
+         c.r = re; c.i = im;
+         Complex v;  
+                   
+         if(effect==0){fun0(c,v);}
+         else if(effect==1){fun1(c,v);}
+         else if(effect==2){fun2(c,v);}
+         else if(effect==3){fun3(c,v);}
+         else if(effect==4){fun4(c,v);}
+         else if(effect==5){fun5(c,v);}
+         else if(effect==6){fun6(c,v);}           
+         //else if(effect==7){fun7(c,v);}
+         
+         a = Cang(v);   
+         
+         m = Cmag(v);         
+         
+            
+         while(a < 0){
+            a+=2*PI;
+         }
+         a/=2*PI;
+         
+         
+         rangeStart = 0;
+         rangeEnd = 1;
+         
+         while(m > rangeEnd){
+            rangeStart = rangeEnd;
+            rangeEnd *= E;
+         }
+         
+         k = (m-rangeStart)/(rangeEnd-rangeStart);
+         
+         sat = 0;
+         if(k<0.5) sat = k*2;
+         else sat = 1-(k-0.5)*2;
+         sat = 1-(1-sat)^3;
+         sat = 0.4 + sat*0.6;
+   
+   
+         val = 0;
+         
+         if(k<.5) 
+            val = k*2;
+         else
+            val = 1-(k-0.5);
+            
+         val = 1-val;
+         val = 1-(1-val)^3; 
+         val = 0.6 + val*0.4;
+         
+         if(fullscreen){
+            screen[j][i] = hsv_to_rgb(a*360,sat,val);
+         }
+         else
+         {
+            buf[i] = hsv_to_rgb( a*360,sat,val);
+         }
+         
+         //buf[i] = hsv_to_rgb( a*360, 1,1);
+         
+         
+      }
+      if(fullscreen==0)
+      sethlin(0,j,buf,dimx);
+   }
+   
+   if(bstatus==1) fullscreen=1;
+   if(bstatus==0) fullscreen=0;
+
+   setcol(0xffffff);   
+
+   if(fullscreen==1)
+   {
+      texhandle=glsettex(screen,dimx,dimy);
+      drawspr(xres/2,yres/2,dimx,0); //
+      //texquad(xres/2-dimx,yres/2-dimy,dimx*2,dimy*2);
+      glremovetex(texhandle);
+   }
+   else{
+   moveto(xres/2-dimx/2,yres/2-dimx); printf("mouse 1 down to 2x rez");
+   }
+   
+   if(bstatus==2){
+      bstatus = 0;
+      effect++;
+      effect %= numeffects;
+   }
+   moveto(0,dimy); printf("mouse 2 to cycle effects. watching %g of %g", effect, numeffects);
+
+}
+
+fun0(complex c, complex result){
+         complex i;
+         i.r = 0; i.i = 0;
+         complex cSq; Cmul(c,c,cSq);
+         cSq.r -= ofsy;
+         cSq.i -= ofsx;
+         
+         complex cmin2;
+         cmin2.r = c.r - ofsy;
+         cmin2.i = c.i - i.i;
+         
+         complex cmin2Sq;  CMul(cmin2,cmin2, cmin2Sq);   
+         complex numerator; CMul(cSq, cmin2, numerator);
+         
+         cSq.r += 2;
+         Complex denom; Cadd(cSq, i, denom );
+         Cdiv(numerator,denom,result); 
+         result.r += sint;  
+}
+
+// z^3 / (1-z)
+fun1(complex z, complex result){
+   
+   complex zSq; cmul(z,z,zSq);
+   complex zCubed; cmul(zSq,z,zCubed);
+
+   complex zNeg; cConj(z,zNeg);
+   zNeg.r += 1 + ofsx;
+   
+   cDiv( zCubed, zNeg, result );   
+
+   //complex zP4; cmul(zCubed,z,zP4);
+   //complex zP5; cmul(zP4,z,zP5);
+   //complex zP5neg; cConj(zP5,zP5neg);
+   //zP5neg.r += ofsx;
+
+   //cDiv(z,zP5neg,result);   
+}
+
+// f(z) = (z^2 + 1)*(z^2 - 1)
+fun2(complex z, complex result){
+      //z.i+=cost/3;
+      //z.r+=sint/3;
+      
+      complex numerator; cmul(z,z,numerator);
+      numerator.r += 1;
+      numerator.i += cost;
+      
+      complex denom; cmul(z,z,denom);
+      denom.r -= 1 + sint;
+      
+      cdiv(numerator,denom,result);
+}
+
+fun3(complex c, complex result){
+      Complex c2; Cmul2(c,c,c2);
+      c2.r -= ofsx;
+      c2.i -= ofsy;
+      
+      complex c22; CMul(c2,c2,c22);
+      
+      complex c22divc; CDiv(c22,c,c22divc);
+      cinv(c22divc,c22divc);
+      complex c33divc; Cdiv(c2,c22divc, c33divc);
+      
+
+      c22divc.r += cost;
+      c22divc.i += sint;
+      
+      result.r = c33divc.r+=cost;
+      result.i = c33divc.i+=sint; 
+}
+
+// unveil flower power
+fun4(complex z, complex result){
+
+   maxiters = 30;
+   iters = 0;
+
+   complex zn; 
+   zn.r = z.r + ofsx; zn.i = z.i + ofsy;
+       
+
+   while( abs(zn.r * zn.i) < 10 && iters < maxiters)
+   {
+      complex tmp; 
+      tmp.r = zn.r * (1+iters); 
+      tmp.i = zn.i * (1+iters);
+      cdiv(tmp,z,zn);
+      iters++;
+   }
+   result.r = zn.r;
+   result.i = zn.i;
+}
+
+fun5(complex z, complex result){
+   complex zSq; cmul(z,z,zSq);
+   complex zn; 
+   zn.r = zSq.r-0.52 * ofsx*5; 
+   zn.i = zSq.i+0.57 * ofsx*5;
+
+   maxiters = 4;
+   iters = 0;
+
+   while( abs(zn.r * zn.i) < 1000 && iters < maxiters)
+   {
+      complex denom; 
+      denom.r = zn.r + (1e-7+iters)/(10+ofsx); 
+      denom.i = zn.i - (1e-7+iters)/(10+ofsy);
+      cdiv(z,denom,zn);
+      iters++;
+   }
+
+   result.r = zn.r;
+   result.i = zn.i;
+}
+
+// z^n
+fun6(complex z, complex result){
+   
+   n = 20;
+   
+   complex zPow;
+   zPow.r = z.r;
+   zPow.i = z.i;
+   
+   for(i=0; i<n; i++)
+   {
+      complex zTmp;
+      zTmp.r = zPow.r;
+      zTmp.i = zPow.i;
+      cmul(z,zTmp,zPow);
+   }
+
+   result.r = zPow.r; 
+   result.i = zPow.i;   
+
+}
+
+// z/(2-z^5)
+fun7(complex z, complex result){
+   
+   complex zSq; cmul(z,z,zSq);
+   complex zCubed; cmul(zSq,z,zCubed);
+   complex zP4; cmul(zCubed,z,zP4);
+   complex zP5; cmul(zP4,z,zP5);
+   complex zP5neg; cConj(zP5,zP5neg);
+   zP5neg.r += 2;
+
+   cDiv(z,zP5neg,result);   
+}
+
+
+hsv_to_rgb(h,s,v){ 
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   r=int(r*255);
+   g=int(g*255);
+   b=int(b*255);
+   return r*2^16 + g*2^8 + b; 
+}
+
+texquad(x,y,width,height){  
+   glBegin(GL_COMPLEX);
+   glTexCoord(0,0);glVertex(x,y);
+   glTexCoord(1,0);glVertex(x+width,y);
+   glTexCoord(1,1);glVertex(x+width,y+height);
+   glTexCoord(0,1);glVertex(x,y+height);
+   glEnd();
+}
+
+// complex number routines:
+// original code 
+// http://www.phanderson.com/complex/cplx_c.html
+// converted to evaldraw by torbjoern 31.march 2010
+// looks kinda assembly-ish now :( ... func(arg1,arg2,result)
+// because evaldraw cant return structs at the moment.
+
+Cconj(complex a, complex result){
+   result.r = a.r;
+   result.i = -a.i;
+}
+
+Cadd(complex a, complex b, complex c){
+   c.r = a.r + b.r;
+   c.i = a.i + b.i;
+}
+
+Csub(complex a, complex b, complex c){
+   c.r = a.r - b.r;
+   c.i = a.i - b.i;
+}
+
+Cmul(complex a, complex b, complex c){
+   c.r = a.r*b.r - a.i*b.i;
+   c.i = a.r*b.i + b.r*a.i;
+}
+
+Cdiv(complex a, complex b, complex result){
+   complex c; Cconj(b,c);
+   complex num;  Cmul(a,c,num);   
+   denom = b.r*b.r + b.i*b.i + 1.2e-63; // to prevent div by 0
+   result.r = num.r/denom;
+   result.i = num.i/denom;
+}
+
+// Grammar school implem of mul
+// used in GCC C++ complex.h template:
+Cmul2(complex a, complex b, complex c)
+{
+   c.r = a.r*b.r - a.i*b.i;
+   c.i = a.r*b.i + a.i*b.r;
+}
+// Grammar school implem of div
+// used in GCC C++ complex.h template:
+Cdiv2(complex a, complex b, complex c)
+{
+   m = Cmag(b);
+   c.r = (a.r*b.r + a.i*b.i)/m;
+   c.i = (a.i*b.r - a.r*b.i)/m;
+}
+
+// returns parallell of complex quantites a,b
+Cpara(complex a, complex b, complex result){
+   complex num; Cmul(a,b,num);
+   complex denom; Cadd(a,b,denom);
+   Cdiv(num,denom,result);
+}
+
+Cinv(complex a, complex result){
+   complex num;
+   num.r=1.0;
+   num.i=0.0;
+   Cdiv(num,a,result);
+}
+
+// Aka. "arg"
+Cang(complex a){
+   //ang = atan2( a.i, a.r + 1e-99 ); // 1e-99 is added to avoid atan of 90 degrees
+   ang = atan2(a.i, a.r);
+}
+
+// Also known as norm
+Cmag(complex a){
+   v = sqrt( a.r^2 + a.i^2 );
+}

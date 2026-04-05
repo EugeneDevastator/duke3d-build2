@@ -1,0 +1,246 @@
+struct vec{x,y,z;}
+()
+{
+   static mtx[9];
+   t = klock(0);
+   makeY( mtx, t );
+   
+   cls(0); clz(1e32);
+   setcam(0,0,-5,0,0);
+   setcol(255,255,255);
+   drawspr("cow.kv6",0,0,0,
+                     mtx[0],mtx[1],mtx[2],
+                     mtx[3],mtx[4],mtx[5],
+                     mtx[6],mtx[7],mtx[8]); 
+                     
+   
+}
+
+// -------------------------------------- MATRIX MATH
+   // X axis
+   // | 1 0  0 |
+   // | 0 c -s |
+   // | 0 s  c |
+makeX(m[9], r)
+{
+   c = cos(r); s=sin(r);
+   m[0] = 1; m[1] = 0;  m[2] = 0;
+   m[3] = 0; m[4] = c;  m[5] = -s;
+   m[6] = 0; m[7] = s;  m[8] = c;
+}
+   // Y axis
+   // | c 0  s |
+   // | 0 1  0 |
+   // | -s 0 c |
+makeY(m[9], r)
+{
+   c = cos(r); s=sin(r);
+   m[0] = c; m[1] = 0; m[2] = s;
+   m[3] = 0; m[4] = 1;  m[5] = 0;
+   m[6] = -s; m[7] = 0;  m[8] = c;
+}
+   // Z axis
+   // | c -s 0 |
+   // | s c  0 |
+   // | 0 0  1 |
+makeZ(m[9], r)
+{
+   c = cos(r); s=sin(r);
+   m[0] = c; m[1] = -s; m[2] = 0;
+   m[3] = s; m[4] = c;  m[5] = 0;
+   m[6] = 0; m[7] = 0;  m[8] = 1;
+}
+
+InitRotationMatrix(mtx[9], vec pAxis, r)
+{
+  // The axis vector must be of unit length
+  x=0, y=0, z=0, m=0;
+  m = sqrt(pAxis.x^2 + pAxis.y^2 + pAxis.z^2);
+  x = pAxis.x/m;
+  y = pAxis.y/m;
+  z = pAxis.z/m;
+
+  // Compute the rotation matrix  
+  c = cos(r);
+  s = sin(r);
+
+  Mtx[0] = (x * x) * (1.0 - c) + c;
+  Mtx[1] = (y * x) * (1.0 - c) + (z * s);
+  Mtx[2] = (z * x) * (1.0 - c) - (y * s);
+
+  Mtx[3] = (x * y) * (1.0 - c) - (z * s);
+  Mtx[4] = (y * y) * (1.0 - c) + c;
+  Mtx[5] = (z * y) * (1.0 - c) + (x * s);
+
+  Mtx[6] = (x * z) * (1.0 - c) + (y * s);
+  Mtx[7] = (y * z) * (1.0 - c) - (x * s);
+  Mtx[8] = (z * z) * (1.0 - c) + c;
+} 
+
+buildMatrix( mtx[9], vec side, vec up, vec fwd )
+{
+   mtx[0] = side.x; mtx[1] = side.y; mtx[2] = side.z;
+   mtx[3] = up.x;   mtx[4] = up.y;   mtx[5] = up.z;
+   mtx[6] = fwd.x;  mtx[7] = fwd.y;  mtx[8] = fwd.z;
+}
+
+// b = a^T
+transpose(b[9],a[9])   
+{             
+   b[0*3+0] = a[0*3+0];       
+   b[0*3+1] = a[1*3+0];       
+   b[0*3+2] = a[2*3+0];       
+                
+   b[1*3+0] = a[0*3+1];       
+   b[1*3+1] = a[1*3+1];      
+   b[1*3+2] = a[2*3+1];       
+                
+   b[2*3+0] = a[0*3+2];       
+   b[2*3+1] = a[1*3+2];       
+   b[2*3+2] = a[2*3+2];             
+}
+
+// C = AB, multiplies A and B, puts result in C
+mult(c[9],a[9],b[9])
+{
+   // mult a row in A with a column in B,
+   // A's row 0 times B's column 0 becomes element [0][0] in C.
+   
+   for(i=0; i<3; i++)
+      for(j=0; j<3; j++)
+      {
+         sum = 0.0;
+         for(k=0; k<3; k++)
+         {
+            sum += A[k*3+i] * B[k*3+j];
+         }
+         C[i*3+j] = sum;
+      }
+}
+
+transformPoint(vec v, thisRot[9])
+{
+   NewX = v.x * thisRot[0] + v.y * thisRot[1] + v.z * thisRot[2];
+   NewY = v.x * thisRot[3] + v.y * thisRot[4] + v.z * thisRot[5];
+   NewZ = v.x * thisRot[6] + v.y * thisRot[7] + v.z * thisRot[8];
+   v.x=newx; v.y=newy; v.z=newz;
+}
+
+// given to points p1 and p2 create a vector out
+// that is perpendicular to (p2-p1)
+createPerp(vec out, vec p1, vec p2)
+{
+    
+   //#define NOT_QUITE_RIGHT
+   #ifdef NOT_QUITE_RIGHT
+      // straightforward method where we have a problem
+      // if the line starts/ends in origin
+      // or is linearly dep in other ways
+      vec dir;
+      vecSub( dir, p2, p1 );   
+      normalize(dir);
+   
+      vec normal;
+      vecCross(normal, p1, p2 );
+      normalize(normal);
+      
+      vecCross( out, normal, dir );
+   #else
+
+      vec invec;
+      vecsub(invec, p2, p1 );
+      normalize(invec);
+    
+      vec zdir; vecset( zdir, 0,0,1);
+      
+      veccross(out, invec, zdir );
+      if ( length(out) == 0 )
+      {
+         vec ydir; vecset( ydir, 0,1,0);
+         veccross(out, invec, ydir);
+      }
+   #endif
+
+}
+
+// -------------------------------------- VECTOR MATH
+vecScalar( vec out, vec a, s )
+{
+   out.x = a.x * s;
+   out.y = a.y * s;
+   out.z = a.z * s;
+}
+
+vecAdd( vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;   
+}
+
+vecAdd( vec out, vec b)
+{
+   out.x += b.x;
+   out.y += b.y;
+   out.z += b.z;   
+}
+
+vecSub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;   
+}
+
+vecCross( vec out, vec a, vec b)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+
+// all you need is =...
+vecSet(vec a, x,y,z){
+   a.x = x; a.y = y; a.z = z;
+}
+
+vecSet(vec a, vec other){
+   a.x = other.x; a.y = other.y; a.z = other.z;
+}
+
+vecDot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+length( vec v )
+{
+   return sqrt( vecdot(v,v) );
+}
+
+normalize( vec v )
+{
+   len = length(v);
+   if ( len )
+   {
+      v.x /= len; v.y /= len; v.z /= len;
+   }
+}
+
+rayPoint( vec out, vec pos, vec dir, t ){
+   out.x = pos.x + t*dir.x;
+   out.y = pos.y + t*dir.y;
+   out.z = pos.z + t*dir.z;
+}
+
+
+angleBetween(vec v1, vec v2)
+{
+   ftol = 1e-7;
+   if( fabs(v1.x-v2.x) < ftol && fabs(v1.y-v2.y) < ftol && fabs(v1.z-v2.z) < ftol) return 0;
+   
+   aLen = length(v1);
+   bLen = length(v2);
+   dpr = vecdot(v1,v2);
+   return acos( dpr / (aLen*bLen) );
+}

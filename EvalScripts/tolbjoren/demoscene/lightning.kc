@@ -1,0 +1,52 @@
+// IDEAS: 
+// Lighting text :)
+// ink-blotch text. openprocessing.org
+()
+{
+   cls(0); clz(1e32);
+   
+   r = -4;
+   ang = klock(0);
+   //ang = mousx/xres*2*PI;
+   setcam( r*sin(ang), 0, r*cos(ang), ang, 0);
+   
+   setcol(0x464646);
+   sx = -2; sy = 0; sz = 0;
+   ex = 2; ey = 0; ez = 0;
+   drawsph(sx,sy,sz,.15);
+   drawsph(ex,ey,ez,.15);
+   
+   drawcone(sx,sy,sz,.05, sx,sy+5,sz,.05);
+   drawcone(ex,ey,ez,.05, ex,ey+5,ez,.05);
+   
+
+
+   
+   setcol(0x2912fa);
+   
+   // Find point on sphere and go frem there...
+   
+   oldHeight = 0;
+   oldDepth = 0;
+   segments = 15;
+   t = klock(0);
+   for(i=0; i<segments-1; i++)
+   {
+      t1 = i/segments;
+      t2 = (i+1)/segments;
+      waveHeight = noise( 5*5*t+200/(i+1))/2;
+      waveDepth = noise( .5+5.5*t+200/(i+1)) / 2;
+      
+      nx1 = lerp(sx,ex,t1);
+      nx2 = lerp(sx,ex,t2);
+      drawcone(nx1,sy+oldHeight,sz+oldDepth,.01, nx2,ey+waveHeight,ez+waveDepth,.01);
+      oldHeight = waveHeight;
+      oldDepth = waveDepth;
+   }
+   drawcone(nx2,sy+oldHeight,sz+oldDepth,.01, ex,ey,ez,.01);
+   
+}
+lerp(x1,x2,t)
+{
+   return x1 + (x2-x1)*t;
+}

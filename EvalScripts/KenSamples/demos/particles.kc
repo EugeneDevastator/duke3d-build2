@@ -1,0 +1,64 @@
+struct { x, y, vx, vy, tim, col; } part_t;
+enum {PARTMAX=4096};
+static part_t part[PARTMAX];
+static partn = 0;
+
+()
+{
+   tim = 0;
+   while (1)
+   {
+      otim = tim; tim = klock(); dtim = tim-otim;
+      
+      cls(0);
+      
+      if (bstatus%2)
+      {
+         for(i=0;i<16;i++)
+         {
+            if (partn >= PARTMAX) break;
+            part[partn].vx = normrand();
+            part[partn].vy = normrand();
+            part[partn].x = mousx + part[partn].vx*16 + normrand()*8;
+            part[partn].y = mousy + part[partn].vy*16 + normrand()*8;
+            part[partn].tim = tim+4;
+            part[partn].col = 2^24*rnd;
+            partn++;
+         }
+      }
+      
+      for(i=partn-1;i>=0;i--)
+      {
+         setcol(part[i].col);
+         drawsph(part[i].x,part[i].y,2);
+         
+            //momentum
+         part[i].x += part[i].vx*dtim*128;
+         part[i].y += part[i].vy*dtim*128;
+         
+            //friction
+         part[i].vx *= pow(.5,dtim);
+         part[i].vy *= pow(.5,dtim);
+            
+            //gravity
+         part[i].vy += dtim*4;
+            
+            //bounce off floor
+         if (part[i].y > yres) { part[i].vy = fabs(part[i].vy)*-.5; }
+         
+         if (tim > part[i].tim) //kill off particle
+         {
+            partn--; part[i] = part[partn];
+         }
+      }
+      
+      refresh(); Sleep(5);
+   }
+}
+
+normrand() //hack approximation!
+{
+   return(rnd+rnd+rnd+rnd+
+          rnd+rnd+rnd+rnd+
+          rnd+rnd+rnd+rnd-6);
+}

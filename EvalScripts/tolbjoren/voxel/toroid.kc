@@ -1,0 +1,99 @@
+(x,y,z,&r,&g,&b)
+{
+   nx=0;
+   ny=0;
+   nz=0;
+   
+   gradient(x,y,z,nx,ny,nz);
+   l = sqrt(nx*nx + ny*ny + nz*nz);
+   nx/=l;
+   ny/=l;
+   nz/=l;
+   
+   #define BAD_LIGHTING
+   #ifdef BAD_LIGHTING
+   ang = 2*PI * 0.1; //mousx/xres*2*PI;
+   r = 3;
+   lightx = cos(ang)*r;
+   lighty = -3;
+   lightz = sin(ang)*r;
+   
+   nDotL = lightx*nx + lighty*ny + lightz*nz;
+   nDotL = max(0,nDotL);
+   
+   //Lighting         
+   tolightVecx = lightx-x;
+   tolightVecy = lighty-y;
+   tolightVecz = lightz-z;
+
+   // R=I-2ND
+   // R=2(ND)*N-I
+   reflectx = toLightVecx - 2* nx * nDotL;
+   reflecty = toLightVecy - 2* ny * nDotL;
+   reflectz = toLightVecz - 2* nz * nDotL;
+   //reflectx = 2*(norm[0] * nDotL) * (norm[0]-toLightVecx);
+   //reflecty = 2*(norm[1] * nDotL) * (norm[1]-toLightVecy);
+   //reflectz = 2*(norm[2] * nDotL) * (norm[2]-toLightVecz);
+   len = sqrt(reflectx^2+reflecty^2+reflectz^2);
+   reflectx/=len; reflecty/len; reflectz/=len;
+   
+   // cSpec=  (v dot r)^mgls * spec cross mspec
+   toEyeVecx = 0;
+   toEyeVecy = 0;
+   toEyeVecz = 5;
+   spec = toEyeVecx*reflectx + toEyeVecy*reflecty + toEyeVecz*reflectz;
+   spec = pow(spec,-10);
+   spec = max(0,spec);
+   spec = min(spec,1);
+
+   r = nDotL*128+128 + spec*255;
+   g = nDotL*128+128 + spec*255;
+   b = nDotL*128+128 + spec*255;
+   #else
+   
+   
+   r = nx*128+128;
+   g = ny*128+128;
+   b = nz*128+128;
+   #endif
+   return implicitTorus(x,y,z);
+}
+
+#define 1
+#ifdef 1
+   implicitTorus(x,y,z)
+   {
+      mar = .5;
+      mir = .2;
+      val = z^2 + (sqrt(x*x + y*y)-mar )^2 - mir^2;
+      
+      return -val;
+      
+      //eps = .01;
+      //if( fabs(val) < eps ) return 1;
+      //return 0;
+   }
+#else
+   implicitTorus(x,y,z)
+   {
+      bigr = .5;
+      smallr = .25;
+      s1 = (x^2 + y^2 + z^2 + bigR^2 - smallr^2)^2;
+      s2 = 4 * bigr^2*(x^2 + z^2);
+      
+      //v = s1 - s2;
+      //eps = 0.01;
+      //if( fabs(v) < eps ) return 1;
+      //return 0;
+      return s1 <= s2;
+      
+   }
+#endif
+
+gradient(x,y,z,&nx,&ny,&nz)
+{
+   s = 0.01;
+   nx = implicitTorus(x-s,y,z) - implicitTorus(x+s,y,z);
+   ny = implicitTorus(x,y-s,z) - implicitTorus(x,y+s,z);
+   nz = implicitTorus(x,y,z-s) - implicitTorus(x,y,z+s);     
+}

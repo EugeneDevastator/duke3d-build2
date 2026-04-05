@@ -1,0 +1,423 @@
+
+struct Vec3{
+   x,y,z;
+};
+
+struct Point{
+   x,y,z;
+};
+enum{NUMPTS = 64}
+static Point pts[NUMPTS];
+
+static time, dt;
+static interpolant = 0;
+()
+{
+   now = klock(0);
+   dt = time - now;
+   time = now;
+
+   cls(0); clz(1e32);
+   
+   
+
+   if( numframes == 0)
+   {
+      glCullface(GL_NONE);
+      glEnable(GL_DEPTH_TEST);
+      
+      static tex[2][2];
+      tex[0][0] = rgb(255,255,255);
+      tex[0][1] = rgb(255,0,0);
+      tex[1][0] = rgb(0,255,0);
+      tex[1][1] = rgb(0,0,255);
+   
+      handle=glsettex(tex,2,2);
+      
+      handle=glsettex("cloud.png");
+   }
+   
+   if (numframes==0)
+   {
+
+      for(i=0; i<NUMPTS; i++)
+      {
+         ang = i * 2 * PI / NUMPTS;
+         r = 10;
+         ofs = sin(time*2+ang*4);
+         pts[i].x = r*cos(ang) + ofs;
+         pts[i].y = cos(time*2+ang*4);
+         pts[i].z = r*sin(ang) + ofs;
+      }
+   }
+   
+   playerx = 0;
+   playery = 0;
+   playerz = 0;
+   
+   //interpolant = mousx/xres;
+   interpolant -= dt * 0.1;
+   //if( interpolant >= 1 ) interpolant = 0;   
+
+   // Calc control pts for a given interpolant
+   t0 = floor( interpolant * numPts);
+   t1 = ceil( interpolant * numPts);   
+
+   currPt = t1;
+   
+   x = interpolant * numPts;
+   t = (x - t0 ) / (t1 - t0);   
+
+   playerx = catmullRomSpline( t, pts[currPt-1].x, pts[currPt].x, pts[currPt+1].x, pts[currPt+2].x ); 
+   playery = catmullRomSpline( t, pts[currPt-1].y, pts[currPt].y, pts[currPt+1].y, pts[currPt+2].y ); 
+   playerz = catmullRomSpline( t, pts[currPt-1].z, pts[currPt].z, pts[currPt+1].z, pts[currPt+2].z ); 
+   
+   dx0 = pts[currPt+1].x - pts[currPt-1].x;
+   dy0 = pts[currPt+1].y - pts[currPt-1].y;
+   dz0 = pts[currPt+1].z - pts[currPt-1].z;   
+
+   dx1 = pts[currPt+2].x - pts[currPt].x;
+   dy1 = pts[currPt+2].y - pts[currPt].y;
+   dz1 = pts[currPt+2].z - pts[currPt].z;
+   
+   fx = dx0 + t*(dx1-dx0);
+   fy = dy0 + t*(dy1-dy0);
+   fz = dz0 + t*(dz1-dz0);
+
+   // Normalize forward dir   
+   len = sqrt(fx^2 + fy^2 + fz^2);
+   rlen = 1/len;
+   fx *= rlen;
+   fy *= rlen;
+   fz *= rlen;
+
+   // Desired up dir
+   upx = 0;
+   upy = 1;
+   upz = 0;
+   // side/right vector
+   rx = fy * upz - fz * upy;
+   ry = fz * upx - fx * upz;
+   rz = fx * upy - fy * upx;
+   // "corrected" up vector
+   ux = fy * rz - fz * ry;
+   uy = fz * rx - fx * rz;
+   uz = fx * ry - fy * rx;
+   
+   t = -(mousx-xres/2)/ (xres/2);
+   t = max(-.8,t);
+   t = min(+.8,t);
+   playerx += t * rx;
+   playery += t * ry;
+   playerz += t * rz;
+      
+   
+
+   // Draw player pos and side, up, forward vectors   
+   setcol(0,0,255);
+   
+   static mr[9];
+   /*
+   static dir[3];
+   dir[0] = 1;
+   dir[1] = -1;
+   dir[2] = 0;
+   InitRotationMatrix(mr,dir,.0);
+   */
+   makeY(mr, 1.57);   
+
+   static mat[9];
+   mr[0] = rx; mr[1] = ry; mr[2] = rz;
+   mr[3] = ux; mr[4] = uy; mr[5] = uz;
+   mr[6] = fx; mr[7] = fy; mr[8] = fz;
+   
+
+   makez(mat, -PI/2); 
+
+   static mz[9];
+   makex(mz, -PI/2); 
+   mult(mat,mz);   
+   
+
+
+   mult(mat,mr);
+   
+   s = 0.7;
+   //drawsph( playerx, playery, playerz, .1);
+   
+           ty = 0.2;
+           setcol(255,255,255);
+            drawspr("bil.kv6", playerx+mat[0]*ty, playery+mat[1]*ty, playerz+mat[2]*ty, 
+            s*mat[0], s*mat[1], s*mat[2],
+            s*mat[3], s*mat[4], s*mat[5],
+            s*mat[6], s*mat[7], s*mat[8]
+            );   
+
+#ifdef DRAW_VECTORS
+   scaler = .5;
+   drawcone( playerx, playery, playerz, -.05,
+            playerx + playerdx*scaler, playery + playerdy*scaler, playerz + playerdz*scaler, -.05 );   
+
+
+   setcol(255,0,0);
+   drawcone( playerx, playery, playerz, -.05,
+             playerx + rx*scaler, playery + ry*scaler, playerz + rz*scaler, -.05 ); 
+   
+   setcol(0,255,0);
+   drawcone( playerx, playery, playerz, -.05,
+             playerx + realUpx*scaler, playery + realUpy*scaler, playerz + realUpz*scaler, -.05 );
+#endif
+
+   // right, down, forwards, RDF
+   if (1)
+   {         
+      f=-2;
+      setcam( playerx+fx*f, playery+fy*f -1, playerz+fz*f, 
+           -rx, -ry, -rz,
+           -ux, -uy, -uz,
+           //Upx, Upy, Upz,
+           fx, fy, fz );
+   }
+   else
+   {
+      setcam(0,-10,-10, 0,PI/3);
+   }     
+           
+
+   // Draw control pts
+   /*
+   setcol(255,255,255);
+   for(i=0; i<NUMPTS; i++){
+      drawsph( pts[i].x, pts[i].y, pts[i].z, .1 );
+   }
+   */
+ 
+
+   iters = 0;
+   glBegin(GL_TRIANGLE_STRIP);
+   for(i=0; i<NUMPTS; i++)
+   {
+      segs = 4;
+      for(j=0; j<segs; j++)
+      {
+         t = j/(segs-1);
+         px = catmullRomSpline( t, pts[i-1].x, pts[i].x, pts[i+1].x, pts[i+2].x ); 
+         py = catmullRomSpline( t, pts[i-1].y, pts[i].y, pts[i+1].y, pts[i+2].y );
+         pz = catmullRomSpline( t, pts[i-1].z, pts[i].z, pts[i+1].z, pts[i+2].z );
+      
+         // find deltas
+         dx0 = pts[i+1].x - pts[i-1].x;
+         dy0 = pts[i+1].y - pts[i-1].y;
+         dz0 = pts[i+1].z - pts[i-1].z;   
+         
+         dx1 = pts[i+2].x - pts[i].x;
+         dy1 = pts[i+2].y - pts[i].y;
+         dz1 = pts[i+2].z - pts[i].z;
+         
+         // lerp based on t
+         fx = dx0 + t*(dx1-dx0);
+         fy = dy0 + t*(dy1-dy0);
+         fz = dz0 + t*(dz1-dz0);
+         
+         // Normalize forward vec, saves us normalizing anything else
+         len = sqrt(fx^2+fy^2+fz^2);
+         fx /= len;
+         fy /= len;
+         fz /= len;
+         // desired up vector
+         upx = 0;
+         upy = 1;
+         upz = 0;
+         // Right vector
+         rx = fy * upz - fz * upy;
+         ry = fz * upx - fx * upz;
+         rz = fx * upy - fy * upx;
+         // Up vector
+         ux = fy * rz - fz * ry;
+         uy = fz * rx - fx * rz;
+         uz = fx * ry - fy * rx;
+         
+   
+         //setcol(128*rx+128, 128*ry+128, 128*rz+128);
+         setcol(127,127,127);
+         gltexcoord(0,0);
+         glVertex( px-rx, py-ry, pz-rz );
+         
+         gltexcoord(1,1);
+         glVertex( px+rx, py+ry, pz+rz );
+         
+            
+
+
+         if( iters % 16 == 0){
+            static m[9];
+            m[0] = rx; m[1] = ry; m[2] = rz;
+            m[3] = ux; m[4] = uy; m[5] = uz;
+            m[6] = fx; m[7] = fy; m[8] = fz;
+            drawring(px,py,pz,m);
+            
+            s = .6;
+            setcol(255,255,255);
+            drawspr("cow.kv6", px, py-.45, pz, 
+            s*rx,s*ry,s*rz,
+            s*-ux,s*-uy,s*-uz,
+            s*fx,s*fy,s*fz);
+
+         }
+
+
+         iters++;
+      }
+   }
+
+}
+
+// Draws a ring in the xy plane, at position tx,ty,tz, and gives it the orientation in mtx
+drawring(tx,ty,tz,mtx[9])
+{
+   segs = 12;
+   r = 2.;
+   
+   for(i=0; i<segs; i++)
+   {
+      ang = i/segs*2*PI;
+      x1 = cos(ang)*r;
+      y1 = sin(ang)*r;
+      z1 = 0;
+      ang = (i+1)/segs*2*PI;
+      x2 = cos(ang)*r;
+      y2 = sin(ang)*r;
+      z2 = 0;
+      
+      // Transform the circle points
+      tformvert(mtx,x1,y1,z1);
+      tformvert(mtx,x2,y2,z2);
+         
+      radi = 0.1;
+      drawcone(tx + x1, ty + y1, tz + z1,radi,
+               tx + x2, ty + y2, tz + z2,radi);
+   }
+}
+
+// Takes a 3x3 rotation matrix and a point xyz
+tformvert(m[9], &x, &y, &z)
+{
+   tx = m[0] * x + m[1] * y +  m[2] * z; 
+   ty = m[3] * x + m[4] * y +  m[5] * z; 
+   tz = m[6] * x + m[7] * y +  m[8] * z; 
+   // put transformed values back into xyz
+   x=tx; y=ty; z=tz;
+}
+
+
+catmullRomSpline(x, v0, v1, v2,v3)
+{
+/* Coefficients for Matrix M */
+static M11 = 0.0;
+static M12 = 1.0;
+static M13 = 0.0;
+static M14 = 0.0;
+static M21 = -0.5;
+static M22 = 0.0;
+static M23 = 0.5;
+static M24 = 0.0;
+static M31 = 1.0;
+static M32 = -2.5;
+static M33 = 2.0;
+static M34 = -0.5;
+static M41 = -0.5;
+static M42 = 1.5;
+static M43 = -1.5;
+static M44 = 0.5;
+
+
+   double c1,c2,c3,c4;
+
+   c1 = M12*v1;
+   c2 = M21*v0          + M23*v2;
+   c3 = M31*v0 + M32*v1 + M33*v2 + M34*v3;
+   c4 = M41*v0 + M42*v1 + M43*v2 + M44*v3;
+
+   return(((c4*x + c3)*x +c2)*x + c1);
+}
+
+InitRotationMatrix(Mtx[9], pAxis[3], r)
+{
+  // The axis vector must be of unit length
+  x=0, y=0, z=0, m=0;
+  m = sqrt(pAxis[0]*pAxis[0] + pAxis[1]*pAxis[1] + pAxis[2]*pAxis[2]);
+  x = pAxis[0]/m;
+  y = pAxis[1]/m;
+  z = pAxis[2]/m;
+
+  // Compute the rotation matrix  
+  c = cos(r);
+  s = sin(r);
+
+  Mtx[0] = (x * x) * (1.0 - c) + c;
+  Mtx[1] = (y * x) * (1.0 - c) + (z * s);
+  Mtx[2] = (z * x) * (1.0 - c) - (y * s);
+
+  Mtx[3] = (x * y) * (1.0 - c) - (z * s);
+  Mtx[4] = (y * y) * (1.0 - c) + c;
+  Mtx[5] = (z * y) * (1.0 - c) + (x * s);
+
+  Mtx[6] = (x * z) * (1.0 - c) + (y * s);
+  Mtx[7] = (y * z) * (1.0 - c) - (x * s);
+  Mtx[8] = (z * z) * (1.0 - c) + c;
+} 
+
+mult(inout[9],other[9])
+{
+   // mult a row in A with a column in B,
+   // A's row 0 times B's column 0 becomes element [0][0] in C.
+   
+   static tmp_mat[9];
+   for(i=0; i<3; i++)
+      for(j=0; j<3; j++)
+      {
+         sum = 0.0;
+         for(k=0; k<3; k++)
+         {
+            sum += inout[k*3+i] * other[k*3+j];
+         }
+         tmp_mat[i*3+j] = sum;
+      }
+   for(i=0; i<9; i++)
+   {
+      inout[i] = tmp_mat[i];
+   }
+}
+   // X axis
+   // | 1 0  0 |
+   // | 0 c -s |
+   // | 0 s  c |
+makeX(m[9], r)
+{
+   c = cos(r); s=sin(r);
+   m[0] = 1; m[1] = 0;  m[2] = 0;
+   m[3] = 0; m[4] = c;  m[5] = -s;
+   m[6] = 0; m[7] = s;  m[8] = c;
+}
+   // Y axis
+   // | c 0  s |
+   // | 0 1  0 |
+   // | -s 0 c |
+makeY(m[9], r)
+{
+   c = cos(r); s=sin(r);
+   m[0] = c; m[1] = 0; m[2] = s;
+   m[3] = 0; m[4] = 1;  m[5] = 0;
+   m[6] = -s; m[7] = 0;  m[8] = c;
+}
+   // Z axis
+   // | c -s 0 |
+   // | s c  0 |
+   // | 0 0  1 |
+makeZ(m[9], r)
+{
+   c = cos(r); s=sin(r);
+   m[0] = c; m[1] = -s; m[2] = 0;
+   m[3] = s; m[4] = c;  m[5] = 0;
+   m[6] = 0; m[7] = 0;  m[8] = 1;
+}

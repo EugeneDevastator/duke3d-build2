@@ -1,0 +1,205 @@
+()
+{
+   enum {XSIZ=7, YSIZ=12, MAXDRUMS=77}
+   static keymap[256];
+   
+   keymap[0x2] = 256+24;
+   keymap[0x3] = 256+27;
+   keymap[0x4] = 256+36;
+   keymap[0x5] = 256+31;
+   keymap[0x6] = 256+46;
+
+   obstatus = 0;
+   while (1)
+   {
+      cls(0x607080);
+      
+      i = 0;
+      for(y=0;y<YSIZ;y++)
+         for(x=0;x<XSIZ;x++,i++)
+         {
+            if (i >= MAXDRUMS) continue;
+            rad = yres/25;
+            setcol(0x000000);
+            drawcone((x+.025)*xres/XSIZ+rad,(y+.5)*yres/YSIZ,rad*1.05,
+                     (x+.975)*xres/XSIZ-rad,(y+.5)*yres/YSIZ,rad*1.05);
+                 if (i < 16) setcol(0x60a0a0);
+            else if (i < 24) setcol(0xa06080);
+            else if (i < 71) setcol(0xa08050);
+            else             setcol(0xa06080);
+            drawcone((x+.025)*xres/XSIZ+rad,(y+.5)*yres/YSIZ,rad,
+                     (x+.975)*xres/XSIZ-rad,(y+.5)*yres/YSIZ,rad);
+            
+            setcol(0x000000);
+            if (i < 16) j = i+112; else j = i-16+27;
+            leng = printdrum(j,1);
+            xs = xres/XSIZ*.90/max(leng,12);
+            ys = xs*1.8; setfont(xs,ys,1);
+            moveto((x+.5)*xres/XSIZ-xs*leng/2,(y+.5)*yres/YSIZ-ys*.4);
+            printdrum(j,0);
+         }
+            
+      j = floor(mousy*YSIZ/yres)*XSIZ + floor(mousx*XSIZ/xres);
+      if ((bstatus%2) > (obstatus%2))
+      {
+         if (j < 16) { playnote(0xc0,j+112,0); playnote(0x90,60,127); }
+         else if (j < MAXDRUMS) { playnote(0x99,j+27-16,127); }
+      }
+      obstatus = bstatus;
+      
+      if (keystatus[0xd3]) //Del: remove keys at cursor
+      {
+         keystatus[0xd3] = 0;
+         for(i=0;i<256;i++) { if (keymap[i] == j+256) keymap[i] = 0; }
+      }
+      if (bstatus>1) //RMB: press key to map key to drum under cursor
+      {
+         if (j < MAXDRUMS)
+         {
+            for(i=0;i<256;i++)
+               if (keystatus[i])
+               {
+                  for(k=0;k<256;k++) if (keymap[k] == j+256) keymap[k] = 0;
+                  keymap[i] = j+256;
+                  break;
+               }
+            setcol(0xffffff); setfont(12,16);
+            moveto(mousx-10*12/2,mousy-8); printf("Press key!");
+         }
+      }
+      else
+      {
+         for(k=0;k<256;k++)
+            if (keystatus[k])
+            {
+               keystatus[k] = 0;
+               if (keymap[k] >= 256)
+               {
+                  keystatus[k] = 0;
+                  l = keymap[k]-256;
+                  if (l < 16) { playnote(0xc0,l+112,0); playnote(0x90,60,127); }
+                  else if (l < MAXDRUMS) { playnote(0x99,l+27-16,127); }
+               }
+            }
+      }
+      
+      for(i=0;i<256;i++)
+         if (keymap[i] >= 256)
+         {
+            k = keymap[i]-256;
+            if (k >= MAXDRUMS) continue;
+            x = k%XSIZ; y = floor(k/XSIZ);
+            setcol(0xffffff); setfont(12,16);
+            moveto((x+.5)*xres/XSIZ-6,(y+.5)*yres/YSIZ-8,10);
+            static scan2asc[84] =
+            {
+               0,27,'1','2','3','4','5','6','7','8','9','0','-','=',8,9,
+               'Q','W','E','R','T','Y','U','I','O','P','[',']',13,255,'A','S',
+               'D','F','G','H','J','K','L',';',39,'`',255,92,'Z','X','C','V',
+               'B','N','M',',','.','/',255,'*',255,32,0,0,0,0,0,0,
+               0,0,0,0,0,0,0,'7','8','9','-','4','5','6','+','1',
+               '2','3','0','.',
+            };
+            printchar(scan2asc[i]);
+         }
+         
+      x = j%XSIZ; y = floor(j/XSIZ); setcol(0xffffff);
+      moveto((x+0)*xres/XSIZ,(y+0)*yres/YSIZ);
+      lineto((x+1)*xres/XSIZ,(y+0)*yres/YSIZ);
+      lineto((x+1)*xres/XSIZ,(y+1)*yres/YSIZ);
+      lineto((x+0)*xres/XSIZ,(y+1)*yres/YSIZ);
+      lineto((x+0)*xres/XSIZ,(y+0)*yres/YSIZ);
+      
+      setcol(0xffffff);
+      moveto(0,yres-40); setfont(12,16);
+      if (j < 16) { printf("playnote(0xc0,%g,0);\nplaynote(0x90,60,127);",j+112); }
+      else if (j < MAXDRUMS) { printf("playnote(0x99,%g,127);",j+27-16); }
+      
+      refresh();
+      //playnote(0xb0,0x7b,0); //notes off
+   }
+}
+
+printdrum (i,j) //True string support would be nice :P
+{
+   if (i ==112) { if (j) return(11); printf("Tinkle Bell"); }
+   if (i ==113) { if (j) return( 5); printf("Agogo"); }
+   if (i ==114) { if (j) return(11); printf("Steel Drums"); }
+   if (i ==115) { if (j) return( 9); printf("Woodblock"); }
+   if (i ==116) { if (j) return(10); printf("Taiko Drum"); }
+   if (i ==117) { if (j) return(11); printf("Melodic Tom"); }
+   if (i ==118) { if (j) return(10); printf("Synth Drum"); }
+   if (i ==119) { if (j) return(14); printf("Reverse Cymbal"); }
+   if (i ==120) { if (j) return(17); printf("Guitar Fret Noise"); }
+   if (i ==121) { if (j) return(12); printf("Breath Noise"); }
+   if (i ==122) { if (j) return( 8); printf("Seashore"); }
+   if (i ==123) { if (j) return(10); printf("Bird Tweet"); }
+   if (i ==124) { if (j) return(14); printf("Telephone Ring"); }
+   if (i ==125) { if (j) return(10); printf("Helicopter"); }
+   if (i ==126) { if (j) return( 8); printf("Applause"); }
+   if (i ==127) { if (j) return( 7); printf("Gunshot"); }
+   //---------------------------------------------------------------
+   if (i == 27) { if (j) return( 6); printf("High Q"); }
+   if (i == 28) { if (j) return( 4); printf("Slap"); }
+   if (i == 29) { if (j) return( 9); printf("Scratch 1"); }
+   if (i == 30) { if (j) return( 9); printf("Scratch 2"); }
+   if (i == 31) { if (j) return( 6); printf("Sticks"); }
+   if (i == 32) { if (j) return( 6); printf("Square"); }
+   if (i == 33) { if (j) return(11); printf("Metronome 1"); }
+   if (i == 34) { if (j) return(11); printf("Metronome 2"); }
+   //---------------------------------------------------------------
+   if (i == 35) { if (j) return(15); printf("Acou. Bass Drum"); }
+   if (i == 36) { if (j) return(11); printf("Bass Drum 1"); }
+   if (i == 37) { if (j) return(10); printf("Side Stick"); }
+   if (i == 38) { if (j) return(14); printf("Acoustic Snare"); }
+   if (i == 39) { if (j) return( 9); printf("Hand Clap"); }
+   if (i == 40) { if (j) return(14); printf("Electric Snare"); }
+   if (i == 41) { if (j) return(13); printf("Low Floor Tom"); }
+   if (i == 42) { if (j) return(13); printf("Closed Hi Hat"); }
+   if (i == 43) { if (j) return(14); printf("High Floor Tom"); }
+   if (i == 44) { if (j) return(12); printf("Pedal Hi-Hat"); }
+   if (i == 45) { if (j) return( 7); printf("Low Tom"); }
+   if (i == 46) { if (j) return(11); printf("Open Hi-Hat"); }
+   if (i == 47) { if (j) return(11); printf("Low-Mid Tom"); }
+   if (i == 48) { if (j) return(10); printf("Hi-Mid Tom"); }
+   if (i == 49) { if (j) return(14); printf("Crash Cymbal 1"); }
+   if (i == 50) { if (j) return( 8); printf("High Tom"); }
+   if (i == 51) { if (j) return(13); printf("Ride Cymbal 1"); }
+   if (i == 52) { if (j) return(14); printf("Chinese Cymbal"); }
+   if (i == 53) { if (j) return( 9); printf("Ride Bell"); }
+   if (i == 54) { if (j) return(10); printf("Tambourine"); }
+   if (i == 55) { if (j) return(13); printf("Splash Cymbal"); }
+   if (i == 56) { if (j) return( 7); printf("Cowbell"); }
+   if (i == 57) { if (j) return(14); printf("Crash Cymbal 2"); }
+   if (i == 58) { if (j) return( 9); printf("Vibraslap"); }
+   if (i == 59) { if (j) return(13); printf("Ride Cymbal 2"); }
+   if (i == 60) { if (j) return( 8); printf("Hi Bongo"); }
+   if (i == 61) { if (j) return( 9); printf("Low Bongo"); }
+   if (i == 62) { if (j) return(13); printf("Mute Hi Conga"); }
+   if (i == 63) { if (j) return(13); printf("Open Hi Conga"); }
+   if (i == 64) { if (j) return( 9); printf("Low Conga"); }
+   if (i == 65) { if (j) return(12); printf("High Timbale"); }
+   if (i == 66) { if (j) return(11); printf("Low Timbale"); }
+   if (i == 67) { if (j) return(10); printf("High Agogo"); }
+   if (i == 68) { if (j) return( 9); printf("Low Agogo"); }
+   if (i == 69) { if (j) return( 6); printf("Cabasa"); }
+   if (i == 70) { if (j) return( 7); printf("Maracas"); }
+   if (i == 71) { if (j) return(13); printf("Short Whistle"); }
+   if (i == 72) { if (j) return(12); printf("Long Whistle"); }
+   if (i == 73) { if (j) return(11); printf("Short Guiro"); }
+   if (i == 74) { if (j) return(10); printf("Long Guiro"); }
+   if (i == 75) { if (j) return( 6); printf("Claves"); }
+   if (i == 76) { if (j) return(13); printf("Hi Wood Block"); }
+   if (i == 77) { if (j) return(14); printf("Low Wood Block"); }
+   if (i == 78) { if (j) return(10); printf("Mute Cuica"); }
+   if (i == 79) { if (j) return(10); printf("Open Cuica"); }
+   if (i == 80) { if (j) return(13); printf("Mute Triangle"); }
+   if (i == 81) { if (j) return(13); printf("Open Triangle"); }
+   //---------------------------------------------------------------
+   if (i == 82) { if (j) return( 6); printf("Shaker"); }
+   if (i == 83) { if (j) return(11); printf("Jingle Bell"); }
+   if (i == 84) { if (j) return( 8); printf("Belltree"); }
+   if (i == 85) { if (j) return( 9); printf("Castanets"); }
+   if (i == 86) { if (j) return(10); printf("Mute Surdo"); }
+   if (i == 87) { if (j) return(10); printf("Open Surdo"); }
+}

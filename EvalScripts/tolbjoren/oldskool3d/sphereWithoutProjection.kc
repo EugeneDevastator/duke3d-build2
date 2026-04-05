@@ -1,0 +1,111 @@
+enum{N=1000};
+static gVtxx[N];
+static gVtxy[N];
+static gVtxz[N];
+static gRvtxx[N];
+static gRvtxy[N];
+static gRvtxz[N];
+
+()
+{
+   if(numframes==0) init();
+   cls(0);
+   
+   // Copy vertex pos into gRvtx
+   for(i=0; i<N; i++)
+   {
+      grVtxx[i] = gVtxx[i];
+      grVtxy[i] = gVtxy[i];
+      grVtxz[i] = gVtxz[i];
+   }
+   
+   t = klock();
+   rotx = t*0.01;
+   roty = t;
+   rotz = t;
+    
+   
+   rotate_x(rotx);
+   rotate_y(roty);
+   rotate_z(rotz);
+   
+   // Draw
+   for(i=0; i<N; i++)
+   {
+      setcol(0xffffff);
+      if(gRVtxz[i] < 0)
+      {
+         setcol(0x7f7f7f);
+      }
+      drawsph(grVtxx[i] * (xres/4)+xres/2,
+              grVtxy[i] * (xres/4)+yres/2,
+              -5);
+   }
+   
+   setcol(0xffffff);
+   drawsph((xres / 3) * cos(rotz) + xres / 2,
+             (xres / 3) * sin(rotz) + yres / 2, 10);
+   
+   
+}
+
+rotate_x(angle)
+{
+   ca = cos(angle);
+   sa = sin(angle);
+   
+   for(i=0; i<N; i++)
+   {
+      y = grVtxy[i] * ca - grVtxz[i] * sa;
+      z = grVtxy[i] * sa + grVtxz[i] * ca;
+      grVtxy[i] = y;
+      grVtxz[i] = z;
+   }
+}
+
+rotate_y(angle)
+{
+   ca = cos(angle);
+   sa = sin(angle);
+   
+   for(i=0; i<N; i++)
+   {
+      z = grVtxz[i] * ca - grVtxx[i] * sa;
+      x = grVtxz[i] * sa + grVtxx[i] * ca;
+      grVtxz[i] = z;
+      grVtxx[i] = x;
+   }
+}
+
+rotate_z(angle)
+{
+   ca = cos(angle);
+   sa = sin(angle);
+   
+   for(i=0; i<N; i++)
+   {
+      x = grVtxx[i] * ca - grVtxy[i] * sa;
+      y = grVtxx[i] * sa + grVtxy[i] * ca;
+      grVtxx[i] = x;
+      grVtxy[i] = y;
+   }
+}
+
+init()
+{
+   for(i=0; i<N; i++)
+   {
+      gVtxx[i] = nrnd*16384;
+      gVtxy[i] = nrnd*16384;
+      gVtxz[i] = nrnd*16384;
+      len = sqrt(gvtxx[i]^2 + gvtxy[i]^2 + gvtxz[i]^2);
+      
+      if(len!=0)
+      {
+         gVtxx[i] /= len;
+         gVtxy[i] /= len;
+         gVtxz[i] /= len;
+      }
+      
+   }   
+}

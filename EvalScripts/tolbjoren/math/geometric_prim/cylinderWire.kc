@@ -1,0 +1,144 @@
+()
+{
+   static tex[64][64];
+   static pixel[10];
+   for(i=0; i<10; i++) pixel[i] = rgb(128+i*128/10,255,0);   
+
+   time = klock(0);
+   cls(0x777777); clz(1e32);
+   //if(numframes==0)
+   {
+      //cls(255,255,255); 
+      //setcol(0,0,255); drawsph(32,32,64);
+      //setcol(255,255,0); 
+      
+      for(x=0;x<64;x++)
+      for(y=0;y<64;y++){
+         //setcol(128+abs(-(x/4)^2),128+abs(-(y/4)^2),0);
+         //setcol(0x0000ff);
+         setcol(0);
+         setpix(x,y);
+      }
+      
+      //setcol(0,0,0);
+      setcol(0xffffff);
+      
+      if(0){
+      for(i=0; i<20; i++)
+      drawsph(3+i*3,3+i*3,-2); 
+      }
+      else{ 
+         for(i=0; i<200; i++)
+         {
+            //drawsph(rnd*64,rnd*64,2);
+            funky = noise( (3+10*mousx/xres)*i/200, sin(time/2%1*2*PI) )+1;
+            drawsph(i/3, funky*32,2);
+         }
+      }
+
+   for(x=0; x<64; x++)
+   for(y=0; y<64; y++)
+   {
+      r=0; g=0; b=0;
+      getpix(x,y,r,g,b);
+      c = rgb(r,g,b);
+      if(c < 1) tex[y][x] = -1;
+      else tex[y][x] = c;
+   }
+   }
+   /*
+   tex[0][0] = rgb(255,255,255);
+   tex[0][1] = rgb(255,0,0);   
+   tex[1][0] = rgb(255,255,0);
+   tex[1][1] = rgb(255,0,0);
+   */
+
+   
+
+   
+   glEnable(GL_ALPHA_TEST); // if tex<1, transparent
+   glEnable(GL_DEPTH_TEST); // take care in what you paint over!
+   //glCullFace(GL_NONE); // wanna se backfaces too!
+   //glCullFace(GL_BACK);
+
+   t=glSetTex(tex,64,64);
+   setcol(0xffffff);
+   cylinder(5,20,8);
+   glRemoveTex(t);
+   
+   setcol(0xeeeeee);
+   t=glSetTex(pixel,10,1);
+   //cylinder(4.9,20,8);
+   glCullFace(GL_NONE); 
+   cylinderSolid(4.9,15,8);
+   glRemoveTex(t);
+
+   //cang = mousx/xres*2*PI;
+   cang = time;
+   dst = -20;
+   setcam(sin(cang)*dst,10,cos(cang)*dst,cang,0);
+}
+
+cylinderSolid(radius,length,segments)
+{
+   a=0;
+   angInc = 2*PI/(segments-1);
+   //glBegin(GL_TRIANGLE_STRIP);
+   //glBegin(GL_TRIANGLE_STRIP)
+   //glTexCoord(0,0); glVertex(radius,0,0);
+   //glTexCoord(0,0); glVertex(radius,length,0);
+   moveto(radius,0,0);
+   for(i=0; i<segments; i++){
+      x = cos(a)*radius;
+      z = sin(a)*radius;      
+      lineto(x,0,z);
+      lineto(x,length,z);
+      a += angInc;
+   }
+   //glend();
+   
+   //glVertex(0,length,0);
+   a=0;
+   moveto(radius,0,0);
+   //glBegin(GL_TRIANGLE_FAN)
+   {
+      for(i=0; i<segments; i++)
+      {
+         x = cos(a)*radius;
+         z = sin(a)*radius;
+         lineto(x,0,z);
+         a += angInc; 
+      } 
+   }   
+   //glEnd();
+
+   a=0;
+   moveto(radius,length,0);
+   //glBegin(GL_TRIANGLE_FAN)
+   {
+      for(i=0; i<segments; i++)
+      {
+         x = cos(a)*radius;
+         z = sin(a)*radius;
+         lineto(x,length,z);
+         a += angInc; 
+      } 
+   }
+   //glEnd();
+}
+
+cylinder(radius,length,segments)
+{
+   a=0;
+   angInc = 2*PI/(segments-1);
+   //glBegin(GL_TRIANGLE_STRIP);
+   glBegin(GL_TRIANGLE_STRIP);
+   //glTexCoord(0,0); glVertex(radius,0,0);
+   for(i=0; i<segments; i++){
+      x = cos(a)*radius;
+      z = sin(a)*radius;      
+      glTexCoord(a/(2*PI),0); glVertex(x,0,z);
+      glTexCoord(a/(2*PI),1); glVertex(x,length,z);
+      a += angInc;
+   }
+}

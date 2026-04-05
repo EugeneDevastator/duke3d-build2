@@ -1,0 +1,41 @@
+static calls=0;
+()
+{
+   cls(0);
+   setcol(0xffffff);
+   
+   calls = 0;
+  fractal1(xres/2,yres*0.25,xres/3,xres/3);
+
+}
+
+fractal1(x,y,w,h)
+{
+   setcol(255,255,255);
+   triangle(x,y,w,h);
+   setcol(0,0,0);
+   drawsph(150,0,100);
+   setcol(255,255,255);
+   moveto(0,0);printf("calls to fractal1() %g",calls);
+   refresh();   
+   sleep(1);
+   calls++;
+
+   if(w < 10 || h < 10) return;
+   
+   halfH = h/2;
+   halfW = w/2;
+   
+   fractal1(x,y,halfW,halfH); // left
+   fractal1(x+halfW/2,y+halfH,halfW,halfH);
+   fractal1(x-halfW/2,y+halfH,halfW,halfH);  
+}
+
+triangle(x,y,w,h)
+{
+   
+   moveto(x,y);
+   lineto(x+w/2, y+h);
+   lineto(x-w/2, y+h);
+   lineto(x,y);
+}

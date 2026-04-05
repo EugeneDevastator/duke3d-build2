@@ -1,0 +1,74 @@
+// quicksort func coded by silverman, see geeky/sorttest.kc
+// simple test code by Torbjoern. 13.september 2009
+
+enum{NMAX = 1000};
+
+
+static nums[10];
+static numssorted[10];
+
+()
+{
+   cls(0);
+   
+   moveto(xres/4, yres/2);
+   printf("Press SPACE to generate RND nums");
+   printf("\nPress 1 to sort the nums.");
+   
+
+   if(keystatus[57])
+   {
+      keystatus[57] = 0;
+      for(i=0; i<10; i++)
+      {
+         nums[i] = int(rnd*100);
+         numssorted[i] = nums[i];
+      }
+   }
+   
+   if(keystatus[2])
+   {
+      keystatus[2] = 0;
+      quicksort(numssorted,0,10);
+   }
+   
+   moveto(0,0);
+   printnums(nums);
+   printf("\nRandom");
+   
+   moveto(100,0);
+   printnums(numsSorted);
+   printf("\nSorted?");
+
+
+   sleep(1);
+
+}
+
+printnums(nums[10])
+{
+   
+   for(i=0; i<10; i++)
+   {
+      printf("%g = %g\n", i, nums[i]);
+      
+   }
+}
+
+quicksort (a[NMAX],i0,i1)
+{
+   if (i1-i0 <= 1) return;
+   v0 = a[i0]; v1 = a[i0+1]; v2 = a[i1-1]; //v = median of 3 elements
+          i = min(v0,v1); if (v2 < i) v = i;
+   else { i = v0+v1-i;    if (v2 > i) v = i;
+   else                               v = v2; }
+
+   j0 = i0; j1 = i1;
+   for(i=i0;i<j1;i++)
+   {
+      if (a[i] > v) { j1--; t = a[j1]; a[j1] = a[i]; a[i] = t; i--; }
+      else if (a[i] < v) { t = a[j0]; a[j0] = a[i]; a[i] = t; j0++; }
+   }
+   quicksort(a,i0,j0);
+   quicksort(a,j1,i1);
+}

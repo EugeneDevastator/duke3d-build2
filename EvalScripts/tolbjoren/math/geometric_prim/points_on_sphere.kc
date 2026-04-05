@@ -1,0 +1,86 @@
+enum{verts=50};
+static vx[verts*verts/2];
+static vy[verts*verts/2];
+static vz[verts*verts/2];
+
+()
+{
+   if(numframes==0)
+   {
+      vertexIndex = 0;
+      r = 50;
+   
+      phi = 0;
+      theta = 0;
+      cphi = cos(phi);
+      sphi = sin(phi);
+      ctheta = cos(theta);  
+      stheta = sin(theta);      
+      oxpos = cphi*stheta*r;
+      ozpos = sphi*stheta*r;
+      oypos = ctheta*r;
+   
+      for(i=0; i<verts/2; i++)
+      {
+         theta = i*2*PI / verts;
+         
+         for(steps=0; steps<verts; steps++)
+         {     
+            phi = steps*2*PI / verts;
+            
+            cphi = cos(phi);
+            sphi = sin(phi);
+            ctheta = cos(theta);  
+            stheta = sin(theta);      
+            
+            
+            xpos = cphi*stheta*r;
+            zpos = sphi*stheta*r;
+            ypos = ctheta*r;
+            vx[vertexIndex] =xpos;
+            vy[vertexIndex] =ypos;
+            vz[vertexIndex] =zpos;
+            vertexIndex++;
+               
+            //displace = 20*noise(sin(t+steps));
+   
+            //drawsph(xpos,ypos,zpos + sin(a*t+steps)*5,.25);
+            
+            //drawsph(xpos,ypos,zpos + displace,.25);
+            
+            //moveto(oxpos,oypos,ozpos);
+            //lineto(xpos,ypos,zpos);
+            
+            
+            oxpos = xpos;
+            ozpos = zpos;
+            oypos = ypos;
+
+         }
+      }
+   }
+   //numverts = 0;
+   t = klock();
+
+   cls(0); clz(1e32);   
+   setcam(0,0,-100,0,0);
+   
+
+   for(i=0; i<verts*verts/2; i++)
+   {
+      x = vx[i];
+      y = vy[i];
+      z = vz[i];
+      drawsph(x,y,z,.25);
+   }
+
+
+   
+   /* todo.
+   
+    save verts
+    draw triangles. quads. or array.
+   */
+   //moveto(0,0); printf("numverts: = %g", numverts);
+   
+}      

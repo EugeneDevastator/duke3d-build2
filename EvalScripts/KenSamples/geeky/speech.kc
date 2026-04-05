@@ -1,0 +1,136 @@
+()
+{
+      //<pitch middle='#'/>
+      //<pitch middle='#'> ... </pitch>
+      //<rate speed='#'/>
+      //<rate speed='#'> ... </rate>
+      //<volume level='#'/>
+      //<volume level='#'> ... <volume>
+      //<silence msec='#'/>
+      //<emph> ... </emph>
+      //<spell> ... </spell>
+      //<voice required='name=Microsoft Sam'>
+
+   tim = 0; obstatus = 0; block = 0; onf = -1; nf = 0; timhak = 0;
+   while (1)
+   {
+      cls(0);
+            
+      xsc = yres/5; ysc = yres/5;
+      for(i=0;i<5;i++)
+      {
+         got = (ptlinedist2(mousx,mousy,xres/2-xsc,(i+.5)*ysc,xres/2+xsc,(i+.5)*ysc) < (ysc*.4)^2);
+         if (got) setcol(0xc0c060); else setcol(0x606060);
+         drawcone(xres/2-xsc,(i+.5)*ysc,ysc*.4,xres/2+xsc,(i+.5)*ysc,ysc*.4);
+         setfont(xsc/6,ysc/3.5,1);
+         if (got) setcol(0xffffff); else setcol(0xc0c0c0);
+         if (i == 0) { moveto(xres/2-xsc*.58,(i+.4)*ysc); printf("Effects"); }
+         if (i == 1) { moveto(xres/2-xsc*.85,(i+.4)*ysc); printf("Do-Re-Mi..."); }
+         if (i == 2) { moveto(xres/2-xsc*.85,(i+.4)*ysc); printf("Mary had..."); }
+         if (i == 3) { moveto(xres/2-xsc*.75,(i+.4)*ysc); printf("Date/Time"); }
+         if (i == 4)
+         {
+            moveto(xres/2-xsc*.64,(i+.4)*ysc); printf("Poetry :)\n");
+            moveto(xres/2-xsc*.83,(i+.70)*ysc);
+            setfont(xsc/16,ysc/9,1); printf("(Requires Mike, Mary, & Sam)");
+         }
+         if ((bstatus > obstatus) && (got))
+         {
+            block = i; onf = -1; nf = 0; timhak = klock(); tim = timhak;
+         }
+      }
+      
+      if (block == 0)
+      {          
+         if (nf == 0)
+         {
+            playtext("Normal<pitch middle='-25'/>low and<pitch middle='+50'/>high!");
+            playtext(",<rate speed='10'/>I talk fast<rate speed='-20'/>or slow.");
+            playtext(",<volume level='100'/>Loud!<volume level='50'/>or soft.");
+            playtext(",And sometimes I like to take<silence msec='1000'/> a break.");
+            playtext(",or talk like <emph>William Schat-ner</emph>");
+            playtext(",or spell <spell>things</spell> out for you.");
+            playtext(",and as Sam, I do onomatopoeia with sinusoidal ocean waves.");
+         }
+      }
+      else if ((block == 1) && (nf != onf))
+      {
+         if (nf ==  0) playtext("<pitch middle='-12'/><rate speed='-5'/>dough");
+         if (nf ==  2) playtext("<pitch middle='- 8'/><rate speed='-5'/>raye");
+         if (nf ==  4) playtext("<pitch middle='- 4'/><rate speed='-5'/>mee");
+         if (nf ==  6) playtext("<pitch middle='- 2'/><rate speed='-5'/>faah");
+         if (nf ==  8) playtext("<pitch middle='+ 2'/><rate speed='-5'/>soh");
+         if (nf == 10) playtext("<pitch middle='+ 6'/><rate speed='-5'/>lah");
+         if (nf == 12) playtext("<pitch middle='+10'/><rate speed='-5'/>tee");
+         if (nf == 14) playtext("<pitch middle='+12'/><rate speed='-5'/>dough");
+      }
+      else if ((block == 2) && (nf != onf))
+      {
+         if (nf ==  0) playtext("<pitch middle='+2'/><rate speed='-6'/>ma");
+         if (nf ==  2) playtext("<pitch middle='-2'/><rate speed='-6'/>ry");
+         if (nf ==  4) playtext("<pitch middle='-6'/><rate speed='-6'/>had");
+         if (nf ==  6) playtext("<pitch middle='-2'/><rate speed='-6'/>uh");
+         if (nf ==  8) playtext("<pitch middle='+2'/><rate speed='-6'/>lit");
+         if (nf == 10) playtext("<pitch middle='+2'/><rate speed='-6'/>tal");
+         if (nf == 12) playtext("<pitch middle='+2'/><rate speed='-6'/>lamb");
+         if (nf == 16) playtext("<pitch middle='-2'/><rate speed='-6'/>lit");
+         if (nf == 18) playtext("<pitch middle='-2'/><rate speed='-6'/>tal");
+         if (nf == 20) playtext("<pitch middle='-2'/><rate speed='-6'/>lam");
+         if (nf == 24) playtext("<pitch middle='+2'/><rate speed='-6'/>lit");
+         if (nf == 26) playtext("<pitch middle='+8'/><rate speed='-6'/>tal");
+         if (nf == 28) playtext("<pitch middle='+8'/><rate speed='-6'/>lamb");
+         if (nf == 32) playtext("<pitch middle='+2'/><rate speed='-6'/>ma");
+         if (nf == 34) playtext("<pitch middle='-2'/><rate speed='-6'/>ry");
+         if (nf == 36) playtext("<pitch middle='-6'/><rate speed='-6'/>had");
+         if (nf == 38) playtext("<pitch middle='-2'/><rate speed='-6'/>uh");
+         if (nf == 40) playtext("<pitch middle='+2'/><rate speed='-6'/>lit");
+         if (nf == 42) playtext("<pitch middle='+2'/><rate speed='-6'/>tal");
+         if (nf == 44) playtext("<pitch middle='+2'/><rate speed='-6'/>lamb");
+         if (nf == 46) playtext("<pitch middle='+2'/><rate speed=' 0'/>and");
+         if (nf == 47) playtext("<pitch middle='+2'/><rate speed=' 0'/>her");
+         if (nf == 48) playtext("<pitch middle='-2'/><rate speed=' 0'/>fleese");
+         if (nf == 50) playtext("<pitch middle='-2'/><rate speed='-6'/>was");
+         if (nf == 52) playtext("<pitch middle='+2'/><rate speed='-6'/>white");
+         if (nf == 54) playtext("<pitch middle='-2'/><rate speed='-6'/>as");
+         if (nf == 56) playtext("<pitch middle='-6'/><rate speed='-6'/>snow");
+      }
+      else if (block == 3)
+      {
+         if (nf == 0)
+         {
+            playtext("<context id='date_mdy'>%g/%g/%g</context>",klock(3),klock(5),klock(2));
+            if (klock(6) < 12) playtext(",<context id='time_hm'>%02g:%02gam</context>",klock(6)   ,klock(7));
+                          else playtext(",<context id='time_hm'>%02g:%02gpm</context>",klock(6)-12,klock(7));
+            playtext(",<pron sym='h eh 1 l ow & w er 1 l d'/>");
+         }
+      }
+      else if (block == 4)
+      {
+         if (nf == 0)
+         {
+            playtext("");
+            playtext(",<voice required='name=Microsoft Mary'>He reads to me, lines of ASCII.");
+            playtext(",<voice required='name=Microsoft Mike'>He came with XP, and was so funny.");
+            playtext(",<voice required='name=Microsoft Mary'>He is hilarious, in many scenarios.");
+            playtext(",<voice required='name=Microsoft Mike'>Like a crank call, to a sleazeball.");
+            playtext(",<voice required='name=Microsoft Mary'>I cannot relax, while Vista lacks.");
+            playtext(",<voice required='name=Microsoft Mike'>The best feature of all, I cannot install.");
+            playtext(",<voice required='name=Microsoft Mary'>The new one's lame, it's not the same.");
+            playtext(",<voice required='name=Microsoft Mike'>New features are spam.");
+            playtext(",<voice required='name=Microsoft Sam'>Without Microsoft Sam!");
+         }
+      }
+      
+      obstatus = bstatus; refresh();
+      otim = tim; tim = (klock()-timhak)*4;
+      onf = nf; if (int(tim) > int(otim)) nf++;
+   }
+}
+
+ptlinedist2 (x,y,x0,y0,x1,y1)
+{
+   x -= x0; y -= y0; x1 -= x0; y1 -= y0;
+   t = x1^2 + y1^2; if (t == 0) return(x^2 + y^2);
+   u = x*x1 + y*y1; v = min(max(u/t,0),1);
+   return((x1*v - x)^2 + (y1*v - y)^2);
+}

@@ -1,0 +1,204 @@
+()
+{
+   cls(0);
+   enum{MAXSPR=48};
+   static px[MAXSPR], py[MAXSPR], pa[MAXSPR];
+   static pxv[MAXSPR], pyv[MAXSPR], pav[MAXSPR];
+   static numspr = 0, tim;
+   static omousx, omousy, obstatus, grabi = -1;
+   
+   ix = 0; iy = 0; nx = 0; ny = 0;
+   if (numframes == 0)
+   {
+      numspr = MAXSPR;
+      if (0)
+      {
+         for(i=0;i<numspr;i++)
+         {
+            do
+            {
+               px[i] = xres*rnd;
+               py[i] = yres*rnd;
+               pa[i] = PI*2*rnd;
+               for(j=i-1;j>=0;j--)
+                  if (isintersect(px[i],py[i],pa[i],px[j],py[j],pa[j],&ix,&iy,&nx,&ny))
+                     break;
+            } while (j >= 0);
+            pxv[i] = nrnd;
+            pyv[i] = nrnd;
+            pav[i] = nrnd;
+         }
+      }
+      else
+      {
+         for(i=0;i<numspr;i++)
+         {
+            px[i] = xres/2;
+            py[i] = yres-32-i*64;
+            pa[i] = 0;
+            pxv[i] = 0;
+            pyv[i] = 0;
+            pav[i] = 0;
+         }
+      }
+   }
+   
+   dtim = tim; tim = klock(); dtim = tim-dtim;
+   
+   if (bstatus%2)
+   {
+      if ((obstatus%2) == 0)
+      {
+         dmin = 32^2;
+         for(i=0;i<numspr;i++)
+         {
+            d = (px[i]-mousx)^2 + (py[i]-mousy)^2;
+            if (d < dmin) { dmin = d; grabi = i; }
+         }
+      }
+      if (grabi >= 0)
+      {
+         pxv[grabi] = (mousx-omousx)/dtim;
+         pyv[grabi] = (mousy-omousy)/dtim;
+         pav[grabi] += (keystatus[0xcd]-keystatus[0xcb])*dtim*8;
+      }
+   }
+   
+   niter = 32; ndtim = dtim/niter;
+   for(iter=0;iter<niter;iter++)
+   {
+      for(i=1;i<numspr;i++)
+         for(j=0;j<i;j++)
+         {
+            if ((px[i]-px[j])^2 + (py[i]-py[j])^2 > (65*sqrt(2))^2) continue;
+            if (isintersect(px[i],py[i],pa[i],px[j],py[j],pa[j],&ix,&iy,&nx,&ny))
+            {
+               rmas = 1/(64*64); rmoi = 1/((64*64)*(64^2 + 64^2)/12);
+               ixv = pxv[i]; iyv = pyv[i]; iav = pav[i];
+               jxv = pxv[j]; jyv = pyv[j]; jav = pav[j];
+               doimpact(1.0,ix,iy,nx,ny,
+                        px[i],py[i],&ixv,&iyv,&iav,rmas,rmoi,
+                        px[j],py[j],&jxv,&jyv,&jav,rmas,rmoi);
+               if ((ixv-pxv[i])*(px[i]-px[j]) + 
+                   (iyv-pyv[i])*(py[i]-py[j]) > 0)
+               {
+                  pxv[i] = ixv; pyv[i] = iyv; pav[i] = iav;
+                  pxv[j] = jxv; pyv[j] = jyv; pav[j] = jav;
+               }
+            }
+         }
+      for(i=0;i<numspr;i++)
+      {
+            //Velocity
+         px[i] += pxv[i]*ndtim;
+         py[i] += pyv[i]*ndtim;
+         pa[i] += pav[i]*ndtim;
+         
+            //Gravity
+         pyv[i] += ndtim*256;
+         
+            //Crappy border clipping
+         if (px[i] <      32) pxv[i] = abs(pxv[i]);
+         if (px[i] > xres-32) pxv[i] =-abs(pxv[i]);
+       //if (py[i] <      32) pyv[i] = abs(pyv[i]);
+         if (py[i] > yres-32) pyv[i] =-abs(pyv[i]);
+         
+            //Friction
+         f = pow(0.6,ndtim);
+         pxv[i] *= f; pyv[i] *= f; pav[i] *= f;
+      }
+   }
+   
+   setcol(0x808080);
+   for(i=0;i<numspr;i++)
+      drawbox(px[i],py[i],pa[i]);
+   
+   omousx = mousx; omousy = mousy; obstatus = bstatus;
+}
+
+drawbox (x,y,a)
+{
+   r = 32;
+   vx = cos(a)*r; vy = sin(a)*r;
+   moveto(x+vx+vy,y+vy-vx);
+   lineto(x+vx-vy,y+vy+vx);
+   lineto(x-vx-vy,y-vy+vx);
+   lineto(x-vx+vy,y-vy-vx);
+   lineto(x+vx+vy,y+vy-vx);
+}
+
+isintersect (x0,y0,a0,x1,y1,a1,&ix,&iy,&nx,&ny)
+{
+   static px[8], py[8];
+   r = 32;
+   vx = cos(a0)*r; vy = sin(a0)*r;
+   px[0] = x0+vx+vy; py[0] = y0+vy-vx;
+   px[1] = x0+vx-vy; py[1] = y0+vy+vx;
+   px[2] = x0-vx-vy; py[2] = y0-vy+vx;
+   px[3] = x0-vx+vy; py[3] = y0-vy-vx;
+   vx = cos(a1)*r; vy = sin(a1)*r;
+   px[4] = x1+vx+vy; py[4] = y1+vy-vx;
+   px[5] = x1+vx-vy; py[5] = y1+vy+vx;
+   px[6] = x1-vx-vy; py[6] = y1-vy+vx;
+   px[7] = x1-vx+vy; py[7] = y1-vy-vx;
+   x = 0; y = 0; tix = 0; tiy = 0; ic = 0; nx = 0; ny = 0;
+   for(i=0;i<4;i++)
+   {
+      j = (i+1)%4;
+      for(k=4;k<8;k++)
+      {
+         l = ((k+1)%4)+4;
+         if (intersect(px[i],py[i],px[j],py[j],
+                       px[k],py[k],px[l],py[l],&x,&y))
+         {
+            if (ic == 1) { nx = tiy-y; ny = x-tix; }
+            tix += x; tiy += y; ic++;
+         }
+      }
+   }
+   if (ic == 0) return(0);
+   f = sqrt(nx^2 + ny^2); if (f > 0) { f = 1/f; nx *= f; ny *= f; }
+   f = 1/ic; ix = tix*f; iy = tiy*f;
+   return(ic);
+}
+
+intersect(x0,y0,x1,y1,x2,y2,x3,y3,&ix,&iy)
+{
+      //(x1-x0)*t + (x2-x3)*u = (x2-x0)
+      //(y1-y0)*t + (y2-y3)*u = (y2-y0)
+   d = (x1-x0)*(y2-y3) - (y1-y0)*(x2-x3); if (d == 0) return(0);
+   d = 1/d;
+   t = ((x2-x0)*(y2-y3) - (y2-y0)*(x2-x3))*d;
+   u = ((x1-x0)*(y2-y0) - (y1-y0)*(x2-x0))*d;
+   if ((t >= 0) && (t < 1) && (u >= 0) && (u < 1))
+   {
+      ix = (x1-x0)*t + x0;
+      iy = (y1-y0)*t + y0;
+      return(1);
+   }
+   return(0);
+}
+
+   //e            Coefficient of restitution: 0=plastic, 1=elastic
+   //cx,cy        Intersection point (screen coords)
+   //nx,ny        Unit normal vector at intersection
+   //px,py        Center of mass
+   //&vx,&vy,&va  Velocity (a=angular velocity in radians)
+   //rmas         Reciprocal of Mass
+   //rmoi         Reciprocal of Moment of inertia
+doimpact (e,cx,cy,nx,ny,
+          ipx,ipy,&ivx,&ivy,&iva,irmas,irmoi,
+          jpx,jpy,&jvx,&jvy,&jva,jrmas,jrmoi)
+{
+   ipx = cx-ipx; ipy = cy-ipy;
+   jpx = cx-jpx; jpy = cy-jpy;
+   cri = ipx*ny - ipy*nx; dvx = (ivx - iva*ipy) - (jvx - jva*jpy);
+   crj = jpx*ny - jpy*nx; dvy = (ivy + iva*ipx) - (jvy + jva*jpx);
+   irmoi *= cri; jrmoi *= crj;
+   f = (dvx*nx + dvy*ny) * (-e-1.0) /
+       (cri*irmoi + irmas + crj*jrmoi + jrmas);
+   irmas *= f; jrmas *= f;
+   ivx += nx*irmas; jvx -= nx*jrmas;
+   ivy += ny*irmas; jvy -= ny*jrmas;
+   iva +=  f*irmoi; jva -=  f*jrmoi;
+}

@@ -1,0 +1,369 @@
+enum{MAXDROPS = 150}
+static rainDropX[MAXDROPS];
+static rainDropY[MAXDROPS];
+// Speed vector
+static rainDropVX[MAXDROPS];
+static rainDropVY[MAXDROPS];
+
+static      lx[MAXDROPS];
+static      ly[MAXDROPS];
+
+static rainAlive[MAXDROPS];
+static rainPixelsPerFrame[MAXDROPS];
+static rainRadi = 3;
+
+// gloebalz
+static x1,y1,x2,y2;
+
+enum{MAXLINES = 150}
+static lineX1[MAXLINES];
+static lineY1[MAXLINES];
+static lineX2[MAXLINES];
+static lineY2[MAXLINES];
+static lineAlive[MAXLINES];
+static lineNumStarted = -1;
+
+enum{ fps = 100};
+static renderTime;
+static dt;
+static timePerFrame = 1000.0 / fps;
+
+static lastValidX, lastValidY;
+()
+{
+   /* source:
+   mathworld.wolfram.com/Point-LineDistance2-Dimensional.html
+   */
+   
+   calcDelta();
+
+   if(numframes==0)
+   {
+      for(i=0; i<MAXDROPS; i++)
+      rainAlive[i] = 0;
+      lineAlive[i] = 0;
+   }
+
+   cls(0);
+   
+// How to make snap to angle?
+   //ang = getLineNormal(xres/2,yres/2, mousx, mousy);
+   //if( ( abs(ang*180.0/PI) ) % 5 < 1e-3 )
+   {
+      lastValidX = mousx;
+      lastValidY = mousy;
+   }
+
+
+   updateRain();
+   drawUserLines();
+
+   sleep(1);
+   
+   if(bstatus == 1){
+      bstatus = 0; // hacky. kills mousedown.
+      spawnDrop();
+   }
+   
+
+   if(bstatus == 2)
+   {
+      bstatus = 0;
+      makeLine(lastValidX,lastValidY);
+   }
+   
+ang = getLineNormal(lineX1[i], lineY1[i], mousx, mousy);
+moveto(15+mousx,mousy);
+printf("%g", (ang*180/PI) % 15 );
+   
+
+}
+
+calcDelta()
+{
+   time = klock();
+   timePassed = time-renderTime; //time used to do frame
+   dt = timePassed/timePerFrame; // calculate the new delta based on expected time
+   renderTime = time; //ready to compare next frame
+}
+
+makeLine(x,y){
+   for(i=0; i<MAXLINES; i++)
+   {
+      if(lineNumStarted == i)
+      {
+         lineNumStarted = -1;
+         lineAlive[i] = 1; // line finished. MAKE IT LIVE!
+         lineX2[i] = x;
+         lineY2[i] = y;
+         return;
+      }
+      
+      if(lineAlive[i] == 0)
+      {
+         lineAlive[i] = 0;
+         lineX1[i] = x;
+         lineY1[i] = y;
+         lineNumStarted = i;
+         return;
+      }
+      
+   }
+}
+
+drawUserLines(){
+   setcol(0xffffff);
+   for(i=0; i<MAXLINES; i++){
+      if(lineAlive[i] == 1){
+         //if( (i % 2) == 0){moveto(lineX1[i], lineY1[i] ); lineto(lineX2[i], lineY2[i] );}
+         //else{drawline(lineX1[i], lineY1[i],lineX2[i], lineY2[i]);}
+         //moveto(lineX1[i], lineY1[i] ); lineto(lineX2[i], lineY2[i] );
+         drawline(lineX1[i], lineY1[i],lineX2[i], lineY2[i]);
+         
+         moveto( lineX1[i]+(lineX2[i]-lineX1[i]) * .5, lineY1[i]+(lineY2[i]-lineY1[i]) * .5 );
+         setcol(0xffffff); printf("\n%g",i);
+      }
+      else if(lineNumStarted==i){
+
+         
+         
+         drawline(lineX1[i], lineY1[i],lastValidX,lastValidY);
+      }
+   }
+}
+
+updateRain()
+{
+   for(i=0; i<MAXDROPS; i++)
+   {
+      if(rainAlive[i]==0) continue;
+      
+      setcol(0x0000ff);
+      
+      
+      rainDropX[i] += rainDropVX[i] ;
+      rainDropY[i] += rainDropVY[i] ;
+      
+      // Is within line seg?
+      for(j=0; j<MAXLINES; j++)
+      {
+         if( lineAlive[j] == 0 ) continue;
+         x1 = lineX1[j]; y1 = lineY1[j];
+         x2 = lineX2[j]; y2 = lineY2[j];      
+         px = rainDropX[i];
+         py = rainDropY[i];
+
+         
+         if( ldist(px,py,x1,y1,x2,y2) < rainRadi^2 )
+         {
+            
+            normalX=0; 
+            normalY=0;
+            getLineNormal2(x1,y1,x2,y2,normalX,normalY);
+            setcol(0xffff00);
+            //normalRadians = getLineNormal(x1,y1,x2,y2);
+            //normalX = cos(normalRadians);
+            //normalY = sin(normalRadians);
+            normalX*=-1; normalY*=-1;
+            dot = rainDropVX[i] * normalX + rainDropVY[i] * normalY;
+            
+            // calc reflection vector
+            // R=I-2*N*D
+            rainDropVX[i] = rainDropVX[i] - 2*normalX*dot;
+            rainDropVY[i] = rainDropVY[i] - 2*normalY*dot;
+
+            moveto(px,py); lineto(px+normalx*25, py+normaly*25);
+            setcol(0xff0000);
+            drawsph(px+normalx*25, py+normaly*25,-50);
+            
+            
+         }
+      }
+      
+      
+      if(rainDropY[i]+rainRadi > yres) rainAlive[i] = 0;
+      if(rainDropY[i]+rainRadi < 0) rainAlive[i] = 0;
+      if(rainDropX[i]+rainRadi > xres) rainAlive[i] = 0;
+      if(rainDropX[i]+rainRadi < 0) rainAlive[i] = 0;
+      
+      drawsph(rainDropX[i], rainDropY[i], -rainRadi);
+      setfont(4,6);
+      moveto(rainDropX[i], rainDropY[i]); printf("  %g",rainPixelsPerFrame[i] );
+      rainPixelsPerFrame[i] = dist(rainDropX[i], rainDropY[i], lx[i], ly[i] );
+      lx[i] = rainDropX[i];
+      ly[i] = rainDropY[i];
+   }
+}
+
+getLineNormal2(ax,ay,bx,by,&nx,&ny){
+   dx = bx - ax;
+   dy = by - ay;
+   
+   perp_x = -dy;
+   perp_y = dx;
+   
+   len = sqrt( dx^2 + dy^2 );
+   if (len){
+      nx = perp_x / len;
+      ny = perp_y / len;
+   }
+}
+
+getLineNormal(ax,ay,bx,by)
+{
+   return (atan2(by-ay, bx-ax) + PI);    
+}
+
+spawnDrop()
+{
+   for(i=0; i<MAXDROPS; i++)
+   {
+      if(rainAlive[i]==0)
+      {
+         rainAlive[i] = 1;
+         rainDropX[i] = mousx; rainDropY[i] = mousy;
+         rainDropVX[i] = 0;
+         rainDropVY[i] = .5;
+         
+         break;
+      }
+   }   
+}
+
+// Taken from match.kc by Robert Rogers
+ldist(x,y,x0,y0,x1,y1)
+{
+   dx=x1-x0;dy=y1-y0;x1+=x0;y1+=y0;nx=x-x0;ny=y-y0;
+   f=nx*dx+ny*dy;if(f<=0)return(nx^2+ny^2);
+   g=dx*dx+dy*dy;if(f> g)return((x-x1)^2+(y-y1)^2);
+   return((nx*dy-ny*dx)^2/g);
+}
+
+dist(x1,y1,x2,y2)
+{
+   return sqrt( (x1-x2)^2 + (y1-y2)^2 );
+} 
+
+
+//////////////////// WU !
+plot(x,y,c)
+{
+   //r=0; g=0; b=0;
+   //getpix(x,y,r,g,b);
+   
+
+   intensity = 255;
+   setcol(c*intensity,c*intensity,c*intensity);
+   
+   //setcol( avg(c*intensity,c*intensity,c*intensity,r,g,b) );
+   
+   setpix(x,y);
+}
+
+avg(r,g,b,ar,ge,be){
+   c = rgb( (r+ge)/2, (g+be)/2, (b+be)/2 );
+   return c;
+}
+
+drawline(x1,y1,x2,y2)
+{
+   dx = x2-x1;
+   dy = y2-y1;
+   
+   if(abs(dx) > abs(dy)){
+      // handle "horizontal" lines
+      if(x2 < x1)
+      {
+         swap(x1,x2);
+         swap(y1,y2);
+      }
+      
+      gradient = dy / dx;
+      
+      // handle first endpoint
+      xend = floor(x1+0.5);
+      yend = y1 + gradient * (xend - x1);
+      xgap = rfpart(x1 + 0.5);
+      xpxl1 = xend; // will be used in main loop
+      ypxl1 = int(yend); // integer part?
+      plot(xpxl1, ypxl1, rfpart(xend) * xgap);
+      plot(xpxl1, ypxl1 + 1, fpart(yend) * xgap);
+      intery = yend + gradient; // first y-sect for main loop
+      
+      // handle second endpoint
+      xend = floor(x2+0.5); // rounded? ipart+0.5;
+      yend = y2 + gradient * (xend - x2);
+      xgap = fpart(x2 + 0.5);
+      xpxl2 = xend; // use
+      ypxl2 = int(yend);
+      plot(xpxl2, ypxl2, rfpart(yend)*xgap);
+      plot(xpxl2, ypxl2 + 1, fpart(yend)*xgap);
+      
+      // main loop
+      for(x=xpxl1+1; x < xpxl2; x++)
+      {
+         plot(x, int(intery), rfpart(intery) );
+         plot(x, int(intery) +1, fpart(intery) );
+         intery += gradient;
+      }
+   }
+   else
+   {
+      /* I have not verifed that this is correct. All i did was: 
+       1. check for y2<y1 instead of x2<x1
+       2. swap the gradient
+       3. interx = xend + gradient;
+       4. and last the main loop.
+      */
+      
+      //handle "vertical" lines  same code as above but X takes the role of Y
+      if(y2 < y1)
+      {
+         swap(x1,x2);
+         swap(y1,y2);
+      }
+      
+      gradient = dx/dy;
+      
+      // handle first endpoint
+      xend = floor(x1+0.5);
+      yend = y1 + gradient * (xend - x1);
+      xgap = rfpart(x1 + 0.5);
+      xpxl1 = xend; // will be used in main loop
+      ypxl1 = int(yend); // integer part?
+      plot(xpxl1, ypxl1, rfpart(xend) * xgap);
+      plot(xpxl1, ypxl1 + 1, fpart(yend) * xgap);
+      interx = xend + gradient; // first y-sect for main loop
+      
+      // handle second endpoint
+      xend = floor(x2+0.5); // rounded? ipart+0.5;
+      yend = y2 + gradient * (xend - x2);
+      xgap = fpart(x2 + 0.5);
+      xpxl2 = xend; // use
+      ypxl2 = int(yend);
+      plot(xpxl2, ypxl2, rfpart(yend)*xgap);
+      plot(xpxl2, ypxl2 + 1, fpart(yend)*xgap);
+      
+      // main loop
+      for(y=ypxl1+1; y < ypxl2; y++)
+      {
+         plot(int(interx), y, rfpart(interx) );
+         plot(int(interx) +1,y, fpart(interx) );
+         interx += gradient;
+      }  
+   }
+}
+// round(x){ return floor(x+0.5); }
+rfpart(x){
+   return 1 - fpart(x);
+}
+fpart(x){
+   // return fractional part of x.
+   return x-int(x);
+}
+swap(&a, &b)
+{
+   tmp = a;
+   a = b;
+   b = tmp;
+}

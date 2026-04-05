@@ -1,0 +1,10 @@
+(x,t,te)
+if (t > te+1) return(0);
+c = cos(x); r = 0;
+for(a=.7;abs(a)>.05;a*=-.65)
+{
+   if (0) { r += cos(x)*a; x *= 2; }
+     else { r += c*a; c = c*c*2-1; }
+}
+if (t > te) r *= exp((t-te)*-5);
+r

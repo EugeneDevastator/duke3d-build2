@@ -1,0 +1,159 @@
+() //Robust 2D collision detection by Ken Silverman
+{  //Uses "Shrinking radius" algorithm, an idea I came up with on 10/28/1999
+   //Can be extended to 3D using ray to plane/cylinder/sphere intersection
+
+   cls(0);
+   enum {NUM=16} static wx[NUM], wy[NUM];
+   PRAD = 32;
+   static px, py, pa, pr;
+   static tim, omousx, omousy, obstatus, grabi;
+   if (numframes == 0)
+   {
+      for(i=0;i<NUM;i++)
+      {
+         r = (min(xres,yres)/2-64)*rnd+64;
+         a = (i+rnd-.5)*(PI*2/NUM);
+         wx[i] = cos(a)*r + xres/2;
+         wy[i] = sin(a)*r + yres/2;
+      }
+      px = xres/2; py = yres/2; pr = PRAD; pa = -PI/2;
+   }
+
+   
+      //Handle controls
+   dtim = tim; tim = klock(); dtim = tim-dtim;
+   pa += (keystatus[0xcd]-keystatus[0xcb])*dtim*4;
+   f = (keystatus[0xc8]-keystatus[0xd0])*dtim*128;
+   if (keystatus[0x2a]) f *= 1/16;
+   if (keystatus[0x36]) f *= 4;
+   vx = cos(pa)*f;
+   vy = sin(pa)*f;
+   if (bstatus>1) { px = mousx; py = mousy; }
+   if (bstatus%2)
+   {
+      if ((obstatus%2) == 0)
+      {
+         grabi = -1; dmin = pr^2;
+         for(i=NUM-1;i>=0;i--)
+         {
+            d = (wx[i]-mousx)^2 + (wy[i]-mousy)^2;
+            if (d < dmin) { dmin = d; grabi = i; }
+         }
+      }
+      if (grabi >= 0)
+      {
+         wx[grabi] += mousx-omousx;
+         wy[grabi] += mousy-omousy;
+      }
+   }
+   omousx = mousx; omousy = mousy; obstatus = bstatus;
+
+      //Collision. Raytrace twice; 2nd time for sliding if needed
+   if (vx || vy)
+   {
+         //pr = min(distance_to_closest_wall - 1e-7,PRAD);
+      mind = 1e32;
+      for(i=NUM-1,j=0;j<NUM;i=j,j++)
+      {
+         x0 = px-wx[i]; y0 = py-wy[i];
+         dis = x0*x0 + y0*y0; if (dis < mind) mind = dis;
+         dx = wx[j]-wx[i]; dy = wy[j]-wy[i];
+         dis = dx*dx + dy*dy;
+         dot = x0*dx + y0*dy; if ((dot <= 0) || (dot >= dis)) continue;
+         d = (x0*dy - y0*dx)^2/dis; if (d < mind) mind = d;
+      }
+      d = sqrt(mind)-1e-7; setcol(0x203040); drawsph(px,py,-d);
+      pr = min(d,PRAD);
+      
+      for(cnt=2;cnt>0;cnt--)
+      {
+         npx = px+vx; npy = py+vy; nx = 0; ny = 0; mint = 1.0; rpr = 1/pr;
+         for(i=NUM-2,j=NUM-1,k=0;k<NUM;i=j,j=k,k++)
+         {
+               //Raytrace lines
+            dx = wy[i]-wy[j]; dy = wx[j]-wx[i];
+            f = pr/sqrt(dx*dx + dy*dy); dx *= f; dy *= f;
+            t = ray_line(px,py,npx,npy,wx[i]+dx,wy[i]+dy,wx[j]+dx,wy[j]+dy);
+            if (t < mint) { mint = t; nx = dx*rpr; ny = dy*rpr; }
+            
+               //Raytrace circles
+            if ((wx[k]-wx[j])*dx + (wy[k]-wy[j])*dy < 0)
+            {
+               t = ray_circ(px,py,npx,npy,wx[j],wy[j],pr);
+               if (t < mint)
+               {
+                  mint = t;
+                  nx = (vx*t + px-wx[j])*rpr;
+                  ny = (vy*t + py-wy[j])*rpr;
+               }
+            }
+         }
+         
+            //Update position to hit point
+            //Filter out tiny steps (helps radius not shrink as fast)
+         if ((vx*vx + vy*vy)*mint^2 > (dtim*1e-3)^2)
+            { px += vx*mint; py += vy*mint; }
+         if (mint >= 1) break;
+         
+            //Sliding vector = amount left, orthogonal to previous hits
+         f = 1-mint; vx *= f; vy *= f;
+         f = vx*nx + vy*ny; vx -= nx*f; vy -= ny*f;
+         pr -= 1e-7; //Shrink radius to avoid precision issues in next test
+      }
+   }
+
+      //Draw dark debug lines
+   setcol(0x502020);
+   for(i=NUM-2,j=NUM-1,k=0;k<NUM;i=j,j=k,k++)
+   {
+      dx = wy[i]-wy[j]; dy = wx[j]-wx[i];
+      f = pr/sqrt(dx*dx + dy*dy); dx *= f; dy *= f;
+      moveto(wx[i]+dx,wy[i]+dy);
+      lineto(wx[j]+dx,wy[j]+dy);
+      
+      if ((wx[k]-wx[j])*dx + (wy[k]-wy[j])*dy < 0) drawsph(wx[j],wy[j],-pr);
+   }
+   
+      //Draw player
+   setcol(0x60a0c0);
+   drawsph(px,py,-2);
+   drawsph(px,py,-pr);
+   moveto(px,py); lineto(px+cos(pa)*16,py+sin(pa)*16);
+
+      //Draw walls
+   setcol(0xff8080);
+   for(i=NUM-1,j=0;j<NUM;i=j,j++) { moveto(wx[i],wy[i]); lineto(wx[j],wy[j]); }
+   setcol(0xffffff);
+   for(i=0;i<NUM;i++) drawsph(wx[i],wy[i],-2);
+
+      //Debug info
+   moveto(xres/2-64,0); printf("player radius=%.7f",pr);
+}
+
+   //Input: Ray: (x0,y0) to (x1,y1)
+   //      Line: (x2,y2), (x3,y3)
+   //Returns: fraction of ray traversed until intersection
+ray_line (x0,y0,x1,y1,x2,y2,x3,y3)
+{
+      //(x1-x0)*t + (x2-x3)*u = (x2-x0)
+      //(y1-y0)*t + (y2-y3)*u = (y2-y0)
+   x10 = x1-x0; x20 = x2-x0; x23 = x2-x3;
+   y10 = y1-y0; y20 = y2-y0; y23 = y2-y3;
+   d = x10*y23 - y10*x23; if (d == 0) return(1); d = 1/d;
+   t = (x20*y23 - y20*x23)*d; if ((t < 0) || (t >= 1)) return(1);
+   u = (x10*y20 - y10*x20)*d; if ((u < 0) || (u >= 1)) return(1);
+   return(max(t,0));
+}
+
+   //Input: Ray: (x0,y0) to (x1,y1)
+   //    Circle: (cx,cy), cr=radius
+   //Returns: fraction of ray traversed until intersection
+ray_circ (x0,y0,x1,y1,cx,cy,cr)
+{
+      //((x1-x0)*t + x0-cx)^2 + ((y1-y0)*t + y0-cy)^2 = cr^2
+   x10 = x1-x0; y10 = y1-y0; Za = x10*x10 + y10*y10;
+   x0c = x0-cx; y0c = y0-cy; Zb = x10*x0c + y10*y0c;
+   f = (cr*cr - x0c*x0c - y0c*y0c)*Za + Zb*Zb; if (f < 0) return(1);
+   t = (-Zb - sqrt(f))/Za; if (t < 0) return(1);
+   return(max(t,0));
+}

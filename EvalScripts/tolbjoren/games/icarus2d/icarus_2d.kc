@@ -1,0 +1,652 @@
+static time, oldtime, dt;
+
+
+struct p3d{
+   x,y,z;
+};
+
+static p3d cam_pos;
+struct player
+{
+   p3d player_pos;
+   p3d player_vel;
+        
+   tang;
+   throttle;
+   airspeed;
+   
+   dead;
+   enginePow;
+   finalPower;
+};
+
+enum{ MAX_PLAYERS = 2 }
+static player player_list[MAX_PLAYERS];
+   
+// Heightmap
+enum{WID=24, DEP=24}
+static heights[WID][DEP];
+   
+enum{MAXBULLETS = 100}
+static bulletX[MAXBULLETS];
+static bulletY[MAXBULLETS];
+static bulletDX[MAXBULLETS];
+static bulletDY[MAXBULLETS];
+static bulletLife[MAXBULLETS];
+static bulletAlive[MAXBULLETS];
+static lastShotTime = 0;
+static liveBullets = 0;
+
+enum{MAX_TREES = 60}
+static p3d treePositions[MAX_TREES];
+static treeType[MAX_TREES];
+
+enum{MAXPARTICLES=64};
+static particleX[MAXPARTICLES];
+static particleY[MAXPARTICLES];
+static particleZ[MAXPARTICLES];
+static particleVX[MAXPARTICLES];
+static particleVY[MAXPARTICLES];
+static particleVZ[MAXPARTICLES];
+static particleLife[MAXPARTICLES];
+static numparticles = 0;
+()
+{
+   if (numframes==0)
+   {      
+      // Draw both sides of billboard quads.
+      // enable alpha test so sprites become 100% transparent
+      glCullFace(GL_NONE);
+      glEnable(GL_DEPTH_TEST);
+      glEnable(GL_ALPHA_TEST);
+
+      set( cam_pos, 0, -5, -4 );
+      set( player_list[net_me].player_pos, 0, -5, 3 );
+      set( player_list[net_me].player_vel, 0,0,0);
+      
+      player_list[net_me].tang = 0;
+      player_list[net_me].throttle = 0;
+      player_list[net_me].airspeed = 0;
+      
+      player_list[net_me].dead = 0;
+      player_list[net_me].enginePow = 0;
+      player_list[net_me].finalPower = 0;
+      
+   }
+   time = klock(0);
+   dt = time - oldtime;
+   oldtime = time;
+   
+   userInput();
+   
+   cls(0); clz(1e32); glCullface(GL_BACK); glEnable(GL_DEPTH_TEST);
+
+   setcam(cam_pos.x,cam_pos.y,cam_pos.z,0,0);
+
+   updateBullets();
+   movePlayer();
+   testCollision();
+   playerPhysics();
+   
+   drawSky();
+   draw_terrain();
+   drawPlayer(); 
+   drawZepp();
+   
+   mpx = 2*(-0.5 + mousx/xres) * 20;
+   mpz = 2*(-0.5 + mousy/yres) * 20;
+   mpy = getHeight(mpx,mpz);
+   drawsph(mpx, mpy, mpz,1 );
+   moveto(xres-100,0); printnum( mpy );
+
+   // too-dee stuff here:
+   doParticles();
+   
+   moveto(0,0);
+   setcol(0xffffff);
+   printnum(livebullets);
+   printf("%g\n", player_list[net_me].tang );
+   
+   
+   setcol(0x667ef4);
+   drawcone( 5, 60, -5,
+             5+player_list[net_me].throttle*100, 60, -5);
+                    
+   setcol(0x828282);
+   drawsph(xres/2, yres/2, -100);
+
+   printf("net_players = %g\n", net_players);
+         
+   doSound();   
+
+   while( klock(0) < numframes / 60)
+   { 
+      // framelimiter
+   }
+}
+
+userInput(){
+   static cooldown = 0;
+   if (bstatus==1 && cooldown <= 0)
+   {
+      cooldown = 1/10;
+      tang = player_list[net_me].tang;
+      spawnBullet( player_list[net_me].player_pos, cos(tang),sin(tang) );
+   }
+   cooldown -= dt;
+}
+
+drawSky(){
+   h = glsettex("cloud.png");
+   tx = 10;
+   ty = -10.;
+   tz = 10;
+   setcol( 0x8ed9fd );
+   
+   glBegin(GL_QUADS);
+   t = (klock()*.05)%1;
+   glTexCoord( 0+t, 0-t); glVertex(-256,-64, 0);
+   glTexCoord(8+t, 0-t); glVertex(+256,-64, 0);
+   glTexCoord(8+t,8-t); glVertex(+256,+64,256);
+   glTexCoord( 0+t,8-t); glVertex(-256,+64,256);
+   glEnd();
+   glremovetex(h);
+}
+
+drawPlayer(){
+
+   for(i=0; i<net_players; i++)
+   {
+      tang = player_list[i].tang;
+      // Up direction
+      upd = 1;
+      if( fabs(tang) > 1.57)
+      {
+         upd*=-1;
+      }
+   
+      static mz[9];
+      makeZ(mz, -player_list[net_me].tang);
+      
+      static mx[9];
+      
+      makeX(mx,  time*35); // turn prop
+      
+      static m[9];
+      mult(m,mx,mz);
+      
+   
+      if (player_list[net_me].dead) {
+         setcol(255,0,0);
+      }else{
+       setcol(0xffffff);
+      }
+      s = 1;
+      drawspr("hurricane_no_prop.kv6", player_list[i].player_pos.x, player_list[i].player_pos.y, player_list[i].player_pos.z,
+      s*mz[0],s*mz[1],s*mz[2],
+      s*mz[3]*upd,s*mz[4]*upd,s*mz[5]*upd,
+      s*mz[6],s*mz[7],s*mz[8] 
+      );
+      
+      s = 0.27;
+      drawspr("plane_prop.kv6", player_list[i].player_pos.x+cos(tang)*.5,player_list[i].player_pos.y+sin(tang)*.5,player_list[i].player_pos.z,
+      s*m[0],s*m[1],s*m[2],
+      s*m[3],s*m[4],s*m[5],
+      s*m[6],s*m[7],s*m[8] 
+      );    
+   }
+
+}
+
+drawZepp(){
+   static m[9];
+   radi = 15;
+   ang = time*0.5;
+   zeppX = cos( ang ) * radi;
+   zeppY = -7;
+   zeppZ = 20 + sin( ang ) * radi;
+   s = 5;
+   static my[9];
+   //makeZ(mz,1.57);
+   makeY(m,ang);
+
+   setcol(255,255,255); drawspr("zeppe.kv6", zeppX,zeppY,zeppZ,
+   s*m[0],s*m[1],s*m[2],
+   s*m[3],s*m[4],s*m[5],
+   s*m[6],s*m[7],s*m[8] 
+   );
+}
+
+movePlayer()
+{
+   if ( !player_list[net_me].dead)
+   {
+      player_list[net_me].tang = atan2( mousy-yres/2, mousx-xres/2) ;
+      tang = player_list[net_me].tang;
+      
+      distCenter = sqrt( (mousy-yres/2)^2 + (mousx-xres/2)^2 );
+      throttle = min(distCenter, 100) / 100.0;
+      enginePow = throttle;
+      
+      enginePow = max( enginePow, .01 );
+      enginePow = min( enginePow, 1);
+      inclination = sin( tang );
+      if (inclination < 0) inclination *= 3;
+      
+      finalPower = (inclination*3 + enginePow*15) * dt;
+      
+      if ( distCenter > 5 )
+      {
+      player_list[net_me].player_vel.x = cos( tang ) * finalPower;
+      player_list[net_me].player_vel.y = sin( tang ) * finalPower;
+      player_list[net_me].player_pos.x += player_list[net_me].player_vel.x;
+      player_list[net_me].player_pos.y += player_list[net_me].player_vel.y;
+    
+      
+      cam_pos.x = player_list[net_me].player_pos.x;
+      cam_pos.y = player_list[net_me].player_pos.y;  
+      }
+   }
+}
+
+testCollision(){
+
+   if ( player_list[net_me].player_pos.y > getHeight( player_list[net_me].player_pos.x, player_list[net_me].player_pos.y) )
+   {
+      
+      player_list[net_me].dead = 1;
+      
+      for (i=0; i<10; i++)
+      {
+         spawnParticle(player_list[net_me].player_pos, rnd*2-1, rnd*2-1, rnd*2-1 );
+      }      
+
+      stall = 0;
+   } 
+}
+
+
+playerPhysics()
+{
+   // Bounce if dead
+   if ( player_list[net_me].dead )
+   {
+      if( player_list[net_me].player_pos.y > getHeight(player_list[net_me].player_pos.x, player_list[net_me].player_pos.y)  )
+      {
+         player_list[net_me].player_vel.y *= -1;
+         player_list[net_me].player_pos.y -= .025;
+      }else
+      {
+         player_list[net_me].player_vel.y += .005; // Dampen vel
+      }
+      
+      player_list[net_me].player_pos.x += player_list[net_me].player_vel.x;
+      player_list[net_me].player_pos.y += player_list[net_me].player_vel.y;
+      player_list[net_me].player_vel.x *= 0.99;
+      player_list[net_me].player_vel.y *= 0.99;
+      
+      player_list[net_me].tang += rnd*(player_list[net_me].player_vel.x^2+player_list[net_me].player_vel.y^2)*6.28;
+   }
+}
+
+doSound()
+{
+   sound = 1;
+   static percent = 0;
+   static sound = 0;
+   
+   static timetoplay = 0;
+   static handle = 0;
+   static totLen = 2.0;
+   
+   if (sound==0)
+       totLen = 2;
+    else
+       totLen = 4;
+
+   frq = player_list[net_me].finalPower*10;
+   percent += (frq*dt) / totLen;
+   
+   if(!player_list[net_me].dead)
+   {
+
+      if (numframes==0 || percent >= 1.0)
+      {
+         percent = 0;
+         timetoplay = klock(0) + totLen;
+         if ( sound == 0 )
+            handle = playsound("engine_idle.wav", 100, frq);   
+         else
+            handle = playsound("engine_accelerate.wav", 100, frq);  
+      }
+      playsoundupdate(handle,100,frq); 
+   }else
+   {
+      playsoundupdate(handle,-1);
+   }
+}
+
+getHeight(ptx,pty)
+{
+   scale = 2;
+   x = (ptx+wid/2*scale)/scale;
+   z = (pty+1*scale)/scale;
+   return heights[ int(x)][ int(z) ];
+}
+
+draw_terrain()
+{   
+   amp = 5;
+   f = 0.5;
+   
+   if (numframes == 0 )
+   {
+      for(i=0; i<wid; i++)
+      for(j=0; j<dep; j++)
+      {
+         // Make terrain more mountainous as distance j
+         // increases
+         y = simplex_noise(4, i/WID * f*(j/DEP*2), j/DEP * f*(j/DEP*2), 0) * amp;  
+         heights[i][j] = y;
+      }
+   }
+   
+   if (numframes == 0 )
+   {
+      for(i=0; i<MAX_TREES; i++)
+      {
+         treepositions[i].x = rnd * wid;
+         treepositions[i].z = rnd * (dep);
+         treepositions[i].y = .05 + heights[ int(treepositions[i].x)][ int(treepositions[i].z)];
+         treeType[i] = int(rnd*2);
+      }
+   }
+   
+   
+   scale = 2;
+   
+   glCullface(GL_NONE);   
+   
+   glBegin(GL_TRIANGLE_STRIP);
+   //glBegin(GL_LINES);
+   
+   for(i=0; i<wid; i++)
+   {
+      
+      for(j=0; j<dep; j++)
+      {
+        //glBegin(GL_COMPLEX);
+         
+        
+        x = i*scale - wid/2*scale;
+        y = heights[i][j];
+        //y = 10 - simplex_noise(4, i/WID , j/DEP * f, 0) * amp; 
+        z = j*scale - 1*scale;
+        setcol(0,160-y*8,0);
+        glTexCoord(x/10,z/10); 
+        glVertex(x,y,z);
+
+
+        x = (i+1)*scale - wid/2*scale;
+        y = heights[(i+1)][j];
+        //y = 10 - simplex_noise(4, (i+1)/WID , j/DEP * f, 0) * amp; 
+        z = j*scale - 1*scale;
+        setcol(0,160-y*8,0);
+        glTexCoord(x/10,z/10); 
+        glVertex(x,y,z);   
+          
+      }
+      glEnd(); 
+      
+   }
+   setcol(200,230,200);
+   for(i=0; i<MAX_TREES; i++)
+   {
+      if (treeType[i]==0)
+      {
+         drawspr("fir.kv6",treePositions[i].x *scale - wid/2*scale
+         ,treePositions[i].y,
+         treePositions[i].z*scale - 1*scale,
+         1,0,0,1.57);
+      }else
+      {
+         drawspr("leaftree.kv6",treePositions[i].x *scale - wid/2*scale
+         ,treePositions[i].y,
+         treePositions[i].z*scale - 1*scale,
+         1,0,0,-1.57);
+      }
+   }
+
+}
+
+simplex_noise(octaves, x, y, z){
+    value = 0.0;
+    for(i=0; i<octaves; i++){
+        value += noise(
+            x*pow(2, i),
+            y*pow(2, i),
+            z*pow(2, i)
+        );
+    }
+    return value;
+}
+
+   // X axis
+   // | 1 0  0 |
+   // | 0 c -s |
+   // | 0 s  c |
+makeX(m[9], r)
+{
+   c = cos(r); s=sin(r);
+   m[0] = 1; m[1] = 0;  m[2] = 0;
+   m[3] = 0; m[4] = c;  m[5] = -s;
+   m[6] = 0; m[7] = s;  m[8] = c;
+}
+   // Y axis
+   // | c 0  s |
+   // | 0 1  0 |
+   // | -s 0 c |
+makeY(m[9], r)
+{
+   c = cos(r); s=sin(r);
+   m[0] = c; m[1] = 0; m[2] = s;
+   m[3] = 0; m[4] = 1;  m[5] = 0;
+   m[6] = -s; m[7] = 0;  m[8] = c;
+}
+   // Z axis
+   // | c -s 0 |
+   // | s c  0 |
+   // | 0 0  1 |
+makeZ(m[9], r)
+{
+   c = cos(r); s=sin(r);
+   m[0] = c; m[1] = -s; m[2] = 0;
+   m[3] = s; m[4] = c;  m[5] = 0;
+   m[6] = 0; m[7] = 0;  m[8] = 1;
+}
+
+// C = AB, multiplies A and B, puts result in C
+mult(c[9],a[9],b[9])
+{
+   C[0] = A[0]*B[0] + A[1]*B[3] + A[2]*B[6];
+   C[1] = A[0]*B[1] + A[1]*B[4] + A[2]*B[7];
+   C[2] = A[0]*B[2] + A[1]*B[5] + A[2]*B[8];
+   
+   C[3] = A[3]*B[0] + A[4]*B[3] + A[5]*B[6];
+   C[4] = A[3]*B[1] + A[4]*B[4] + A[5]*B[7];
+   C[5] = A[3]*B[2] + A[4]*B[5] + A[5]*B[8];
+   
+   C[6] = A[6]*B[0] + A[7]*B[3] + A[8]*B[6];
+   C[7] = A[6]*B[1] + A[7]*B[4] + A[8]*B[7];
+   C[8] = A[6]*B[2] + A[7]*B[5] + A[8]*B[8];
+}
+
+setIdentity(m[9])
+{
+   m[0] = 1; m[1] = 0; m[2] = 0;
+   m[3] = 0; m[4] = 1; m[5] = 0;
+   m[6] = 0; m[7] = 0; m[8] = 1;
+}
+
+spawnBullet(p3d pos,dx,dy)
+{
+   for(i=0; i<MAXBULLETS; i++)
+   {
+      if(bulletAlive[i]==0)
+      {
+         liveBullets++;
+         bulletAlive[i] = 1;
+         bulletLife[i]= 0;
+         bulletX[i] = pos.x; 
+         bulletY[i] = pos.y; 
+         bulletDX[i] = dx * 25; 
+         bulletDY[i] = dy * 25; 
+         // pixels per frame = sqrt( bulletDX^2 + bulletDY^2 )
+         // sqrt 5*5 + 5*5 = sqrt 50 = 25 ppf.   
+         break;
+      }
+   }   
+}
+
+updateBullets(){
+   for(i=0; i<MAXBULLETS; i++)
+   {
+      if(bulletAlive[i]==1)
+      {
+         // Move according to dir vector
+         bulletX[i] += bulletDX[i] * dt;      
+         bulletY[i] += bulletDY[i] * dt; 
+         spd = sqrt(bulletDx[i]^2 + bulletDy[i]^2);
+         dx = bulletDx[i] / spd;
+         dy = bulletDy[i] / spd;
+
+         color = rnd;
+         if(color > .5)
+         {
+            setcol(0xff6600);
+         }
+         else
+         {
+            setcol(0xffff00);
+         }
+         //drawsph(bulletX[i], bulletY[i], player_pos.z, -.05);    
+         drawcone(bulletX[i], bulletY[i], player_list[net_me].player_pos.z, -.02,
+                  bulletX[i]+dx*0.25, bulletY[i]+dy*0.25, player_list[net_me].player_pos.z, -.02);
+         bulletLife[i] += dt;
+         
+         y = getHeight( bulletX[i], bulletY[i] );
+         if ( bulletY[i]+.5 > y )
+         {
+            bulletAlive[i] = 0;
+            liveBullets--;
+            setcol(0,0,0);
+            drawsph(bulletX[i], y, player_list[net_me].player_pos.z, .1); 
+         }         
+
+         
+         if( bulletLife[i] > 2 ){
+            bulletAlive[i] = 0;
+            liveBullets--;
+         }
+      }
+   }     
+}
+
+spawnParticle(p3d p,dx,dy,dz)
+{
+   for(i=0; i<MAXPARTICLES; i++)
+   {
+      if(particleLife[i] <= 0)
+      {
+         particleLife[i] = .5+rnd;
+         particleX[i] = p.x; 
+         particleY[i] = p.y; 
+         particleZ[i] = p.z; 
+         particleVX[i] = dx; 
+         particleVY[i] = dy; 
+         particleVZ[i] = dz; 
+         return;
+      }
+   }   
+}
+
+
+doParticles()
+{
+   static mat[9]; 
+   ang2mat(0,0,mat);
+   // 1. Find point depth relative to camera. 
+   // 2. Sort by depth. 
+   // 3. Draw in order, most distant first.
+   static bdep[MAXPARTICLES];
+   static bord[MAXPARTICLES];
+   
+   for(i=0;i<MAXPARTICLES;i++)
+   {
+      particleX[i] += particleVX[i] * dt;
+      particleY[i] += particleVY[i] * dt;
+      particleZ[i] += particleVZ[i] * dt;
+   }
+   
+   for(i=0;i<MAXPARTICLES;i++)
+   {
+      bdep[i] = (particleX[i]-cam_pos.x)*mat[6] +
+                (particleY[i]-cam_pos.y)*mat[7] +
+                (particleZ[i]-cam_pos.z)*mat[8];
+      bord[i] = i;
+   }
+   //Crap sort
+   for(i=1;i<MAXPARTICLES;i++)
+   for(j=0;j<i;j++)
+      if (bdep[bord[i]] < bdep[bord[j]])
+      { t = bord[i]; bord[i] = bord[j]; bord[j] = t; }
+   
+   
+   setcol(511,511,511);
+   texhand = glsettex("particle.png");
+   for(j=MAXPARTICLES-1;j>=0;j--)
+   {
+      i = bord[j];
+      
+      if (particleLife[i] <= 0) continue;
+      
+      particleLife[i]-=dt;
+
+      // "shadow"
+      setcol(0);
+      drawsph(particleX[i], 0, particleZ[i],.1);      
+
+      x = particleX[i] - cam_pos.x; y = particleY[i] - cam_pos.y; z = particleZ[i] - cam_pos.z;
+      nx = x* mat[0] + y * mat[1] + z * mat[2];
+      ny = x* mat[3] + y * mat[4] + z * mat[5];
+      nz = x* mat[6] + y * mat[7] + z * mat[8];
+      
+      if(nz > 0.1){
+         f = xres/2/nz;
+         setcol(511,511,511); 
+         drawspr(nx*f+xres/2, ny*f+yres/2, min(256/nz,64) , time*10); 
+      }
+   }
+   glRemoveTex(texhand);
+   
+}
+
+/* converts horizontal and vertical angles to a 3x3 rotation matrix */
+ang2mat(hang,vang,mat[9])
+{
+   mat[0] = cos(hang); mat[1] = 0; mat[2]=-sin(hang);
+   mat[6] = cos(vang)*sin(hang); mat[7] = sin(vang); mat[8]=cos(vang)*cos(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}
+
+set(p3d p,x,y,z)
+{ 
+   p.x = x; p.y = y; p.z = z; 
+}
+
+length(p3d p)
+{
+   return sqrt( p.x^2 + p.y^2 + p.z^2 );
+}

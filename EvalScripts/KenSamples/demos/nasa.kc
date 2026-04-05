@@ -1,0 +1,158 @@
+// What did NASA not show us during
+// its moon landing project?
+//
+// This is one of my old scripts (written several years ago).
+// Used to be two scripts, but I combined them into one.
+//
+// -Robert
+
+()
+{
+   nt=klock();
+   do
+   {
+      cls(0); setcol(0xf0f000); t=klock()-nt-.5;
+      setfont(12,16);moveto(xres/2-6*27,max(1+t,1)*yres/2-32);
+      printf("Secret NASA Project, Take 1");
+      refresh();
+   }
+   while(t<1);
+   pl=0; nt=klock();
+   do
+   {
+      cls(0); clz(1e32); c=1;
+      t=(klock()-nt); tm=max(min((t-2)*3,10),0);
+      if (t<2) {c=t*.5;}
+      else if (t>=2 && pl==0)
+      {
+         pl=1; playtext("<rate speed='3'/>T minus five seconds to lift off. <silence msec='1000'/>four. <silence msec='1000'/>three. <silence msec='1000'/>two. <silence msec='1000'/>one. <silence msec='1000'/>zero. <silence msec='1000'/>zero. <silence msec='1000'/>zero. <rate speed='-5'/><silence msec='1000'/>uh, <rate speed='2'/>zero. <rate speed='-4'/><silence msec='1000'/>I said, <rate speed='-3'/>zero.");
+      }
+      setcol(0x80*c,0x80*c,0x80*c);
+      drawcone(0,-10,40,-3,0,10,40,-3);
+      setcol(0x40*c,0x40*c,0x40*c);
+      drawcone(0,10,40,-3,0,17,40,-7);
+      setcol(0x60*c,0,0);
+      drawcone(0,-8,40,-4,0,-18,40,0);
+      setcol(0x50*c,0x50*c,0x50*c);
+      drawcone(10,-15,37,1,10,12.5,37,1);
+      drawcone(10,-15,43,1,10,12.5,43,1);
+      drawcone(10,-4,37,1,10,-4,43,1);
+      drawcone(tm,-4,37,1,10,-4,37,1);
+      setcol(0xf0f000);
+      setfont(12,16);moveto(xres/2-6*27,yres-32);
+      printf("Secret NASA Project, Take 1");
+
+      if (t>20)
+      {
+         c=min(t-20,1)*255;
+         moveto(xres/2-28*12/2,64); setcol(c,c*.7,c*.2);
+         printf("Failure; too much preparation.");
+      }
+      refresh();
+   }
+   while(t<25);
+
+   nt=klock();
+   do
+   {
+      cls(0); setcol(0xf0f000); t=klock()-nt-.5;
+      setfont(12,16);moveto(xres/2-6*27,max(1+t,1)*yres/2-32);
+      printf("Secret NASA Project, Take 2");
+      refresh();
+   }
+   while(t<1);
+   pl=0; nt=klock();
+   do
+   {
+      cls(0); clz(1e32); c=1; lo=0;
+      t=klock()-nt; tm=max(min((t-2)*3,10),0);
+      if (t<2) {c=t*.5;}
+      else if (t>=2 && pl==0)
+      {
+         pl=1;playtext("<rate speed='3'/>T minus five seconds to lift off. <silence msec='1000'/>four. <silence msec='1000'/>three. <silence msec='1000'/>two. <silence msec='1000'/>one. <silence msec='1000'/>zero. <silence msec='2000'/>minus one. <silence msec='1000'/>minus two. <silence msec='1000'/>minus three. <silence msec='1400'/>and we have lift off. <silence msec='1200'/>what <emph>now</emph>");
+      }
+      if (t>=20 && t<22) // pre-timed, don't know if speech's timing is always consistent
+      {
+         lo=sin(((t-20)^2)*PI*.25)*-20;
+      }
+      setcol(0x80*c,0x80*c,0x80*c);
+      drawcone(0,-10+lo,40,-3,0,10+lo,40,-3);
+      setcol(0x40*c,0x40*c,0x40*c);
+      drawcone(0,10+lo,40,-3,0,17+lo,40,-7);
+      setcol(0x60*c,0,0);
+      drawcone(0,-8+lo,40,-4,0,-18+lo,40,0);
+      setcol(0x50*c,0x50*c,0x50*c);
+      drawcone(10,-15,37,1,10,12.5,37,1);
+      drawcone(10,-15,43,1,10,12.5,43,1);
+      drawcone(10,-4,37,1,10,-4,43,1);
+      drawcone(tm,-4,37,1,10,-4,37,1);
+      if (t>=21) {lo=-18;} setcol(0xa08000);
+      drawcone(0,min(18+lo,12),40,1.5-rnd*.75,0,10+lo,40,2.5);
+      setcol(0xf0f000);setfont(12,16);moveto(xres/2-6*27,yres-32);
+      printf("Secret NASA Project, Take 2");
+
+      if (t>22)
+      {
+         c=min(t-22,1)*255; moveto(xres/2-28*12/2,64); setcol(c,c*.7,c*.2);
+         printf("Failure; too much preparation -\nfuel evaporated from waiting.");
+      }
+      refresh();
+   }
+   while(t<27);
+
+   nt=klock();
+   do
+   {
+      cls(0); setcol(0xf0f000); t=klock()-nt-.5;
+      setfont(12,16);moveto(xres/2-6*27,max(1+t,1)*yres/2-32);
+      printf("Secret NASA Project, Take 3");
+      refresh();
+   }
+   while(t<1);
+   pl=0; nt=klock();
+   do
+   {
+      cls(0); clz(1e32); c=1; lo=0;
+      t=klock()-nt; tm=max(min((t-2)*3,10),0);
+      if (t<2) {c=t*.5;}
+      else if (t>=2 && pl==0)
+      {
+         pl=1;playtext("<rate speed='3'/><pitch middle='10'/>T minus fi<pitch middle='-20'/>Just take off. <silence msec='400'/><pitch middle='20'/>Sir! <silence msec='400'/><pitch middle='-10'/><rate speed='2'/>Just taking off.");
+      }
+      if (t>5) {lo=(5-t)*30;}
+      if (t<6.5)
+      {
+         setcol(0x80*c,0x80*c,0x80*c);
+         drawcone(0,-10+lo,40,-3,0,10+lo,40,-3);
+         setcol(0x40*c,0x40*c,0x40*c);
+         drawcone(0,10+lo,40,-3,0,17+lo,40,-7);
+         setcol(0x60*c,0,0);
+         drawcone(0,-8+lo,40,-4,0,-18+lo,40,0);
+         setcol(0xa08000);drawcone(0,min(18+lo,12),40,1.5-rnd*.75,0,10+lo,40,2.5);
+         setcol(0x50*c,0x50*c,0x50*c);
+         drawcone(10,-15,37,1,10,12.5,37,1);
+         drawcone(10,-15,43,1,10,12.5,43,1);
+         drawcone(10,-4,37,1,10,-4,43,1);
+         drawcone(tm,-4,37,1,10,-4,37,1);
+      }
+      if (t>5.5 && t<6.5)
+      {
+         if (pl!=2) {pl=2; playsound("blowup2.flac");}
+         c=1-(t-5.5); setcol(0xff*c,0xaa*c,0); drawsph(0,lo,40,min((t-5.5)*60,60));
+      }
+      setcol(0xf0f000);setfont(12,16);moveto(xres/2-6*27,yres-32);
+      printf("Secret NASA Project, Take 3");
+
+      if (t>7)
+      {
+         c=min(t-7,1)*255; moveto(xres/2-32*12/2,64); setcol(c,c*.7,c*.2);
+         printf("Failure; not enough preparation.");
+      }
+      refresh();
+   }
+   while(t<12);
+
+   setfont(12,16); cls(0); setcol(0xffffff); moveto(xres/2-32*12/2,yres/2-16);
+   printf("  NASA just does not like to\npublish its failures on TV...");
+   while(1) refresh();
+}

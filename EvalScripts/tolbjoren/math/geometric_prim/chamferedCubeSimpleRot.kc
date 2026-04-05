@@ -1,0 +1,397 @@
+  
+//Arc ball
+/*
+static finalTForm[16] = {1,0,0,0,
+                         0,1,0,0,
+                         0,0,1,0,
+                         0,0,0,1};
+                         */
+                         
+static lastRot[9] = {1,0,0,
+                     0,1,0,
+                     0,0,1};
+                         
+static thisRot[9] = {1,0,0,
+                     0,1,0,
+                     0,0,1};
+static stVec[3]; // vec on arcball, Saved chlick
+static endVec[3]; // vec on arcball, Drag Vector
+static adjWidth;
+static adjHeight;
+static newRot = 0;
+
+static isDragging = 0;
+
+static tempx,tempy;
+static startx,starty;
+
+static rotationX = 0;
+static rotationY = 0;
+
+()
+{
+   if(numframes==0){
+      stVec[0] = 0; stVec[1] = 0; stVec[2] = 0;
+      endVec[0] = 0; endVec[1] = 0; endVec[2] = 0;
+   }
+   adjWidth  = 1.0 / ((xres - 1.0) * 0.5);
+   adjHeight = 1.0 / ((yres - 1.0) * 0.5);
+
+
+
+   
+   if(isDragging == 0)
+   {
+      if(bstatus==1){
+         isDragging = 1;
+         startx = mousx; starty = mousy;
+         // lastRot = thisRot
+         //copyInto(lastRot, thisRot);  // dst,src
+      }
+   }
+   else
+   {
+      if(bstatus==1)
+      {
+         rotationX -= (startx-mousx)*0.01;  
+         rotationY -= (starty-mousy)*0.01;    
+
+   
+         static axis1[3] = {0,1,0};
+         
+         setIdentity(thisRot);
+         static mat1[9];
+         InitRotationMatrix(mat1, rotationX*PI/180,axis1);
+         
+         
+         static axis2[3] = {0,0,1};
+         static mat2[9];
+         InitRotationMatrix(mat2, rotationY *PI/180,axis2);         
+         
+         matrix3mulmatrix3(mat2,mat1);
+
+         // thisRot = thisRot * mat
+         matrix3mulmatrix3(thisRot,mat2);         
+      }
+      else{
+         isDragging = 0;
+      }
+   }
+
+
+    cls(0); clz(1e32); glEnable(GL_DEPTH_TEST); 
+    glCullFace(GL_NONE);
+    
+   time = klock(0);
+   //cang = time;
+   cang = 45;
+   dst = -7;
+   setcam(sin(cang)*dst,0,cos(cang)*dst,cang,0);
+   
+   // right,down,forwards
+   
+   /*
+   setcam(0,0,-5,
+          thisRot[ 0],thisRot[1],thisRot[2],
+          thisRot[ 3],thisRot[4],thisRot[5],
+          thisRot[ 6],thisRot[7],thisRot[8]);
+   */
+      
+
+   chamferCube();
+   
+    moveto(mousx,mousy); 
+    setcol(255,255,255);
+    if(isDragging) printf("dragging");
+    else printf("not");
+    
+   x=mousx; y=mousy+25;
+    for(i=0; i<9; i++)
+    {
+       moveto(x,y); printf("%.1f",thisRot[i]);
+       x+=35;
+       if((i+1) % 3==0){
+          x = mousx; y+=25;
+       }
+    }
+    
+   moveto(mousx-100,mousy+110);
+   printf("endvec\n");
+   printf("%.1f\n",endVec[0]);
+   printf("%.1f\n",endVec[1]);
+   printf("%.1f\n",endVec[2]);
+   
+   moveto(mousx+100,mousy+110);
+   printf("stvec\n");
+   printf("%.1f\n",stVec[0]);
+   printf("%.1f\n",stVec[1]);
+   printf("%.1f\n",stVec[2]);
+   
+   moveto(mousx-50,mousy-30);
+   printf("tempx, tempy (%.1f, %.1f",tempx,tempy);
+}
+chamferCube()
+{
+   radius = .6;
+   color=rgb(255,64,32);
+   setcol(color);
+
+   
+   x=0;
+   y=0;
+   z=0;
+   
+   for(cx=-1;cx<=1;cx+=2)
+   for(cy=-1;cy<=1;cy+=2)
+   {
+      //setcol(cx*cy*128,cx*64,cy*64);
+      sx=x+cx; sy = y+cy; sz = z- 1;
+      ex=x+cx; ey = y+cy; ez = z+ 1;
+      transformPoint(sx,sy,sz);
+      transformPoint(ex,ey,ez);
+      drawcone(sx,sy,sz,radius,ex,ey,ez,radius,DRAWCONE_FLAT); //DRAWCONE_NOCAP
+
+      sx=x+cy; sy = y-1; sz = z+cx;
+      ex=x+cy; ey = y+1; ez = z+cx;
+      transformPoint(sx,sy,sz);
+      transformPoint(ex,ey,ez);   
+      drawcone(sx,sy,sz,radius,ex,ey,ez,radius,DRAWCONE_FLAT); //3=nocaps  
+      
+      sx=x- 1; sy = y+cx; sz = z+cy;
+      ex=y+1; ey = z+cx; ez = z+cy;
+      transformPoint(sx,sy,sz);
+      transformPoint(ex,ey,ez);   
+      drawcone(sx,sy,sz,radius,ex,ey,ez,radius,DRAWCONE_FLAT); //3=nocaps  
+    
+  
+   }
+   
+   for(cx=-1;cx<=1;cx+=2)
+   for(cy=-1;cy<=1;cy+=2)
+   {
+      sx = x+cx; sy = y+cy; sz = z-1+.001;
+      transformPoint(sx,sy,sz);
+      drawsph(sx,sy,sz,radius);
+      sx = x+cx; sy = y+cy; sz = z+1+.001;
+      transformPoint(sx,sy,sz);
+      drawsph(sx,sy,sz,radius);
+   }
+   
+   
+   
+   static pix[1][1]; pix[0][0] = color;
+   texHand=glsettex(pix,1,1);
+   setcol(0x18d3390);
+   setcol(300,300,300);
+   extFaceCube(radius-0.01);
+   glremovetex(texHand);
+}
+extFaceCube(radius)
+{
+   glBegin(GL_QUADS); 
+   x=0; y=0; z=0;
+   glTexCoord(0,0); glTransformMe(x-1,y-1,z-1-radius);
+   glTexCoord(1,0); glTransformMe(x+1,y-1,z-1-radius);
+   glTexCoord(1,1); glTransformMe(x+1,y+1,z-1-radius);
+   glTexCoord(0,1); glTransformMe(x-1,y+1,z-1-radius);
+   
+   glTexCoord(0,0); glTransformMe(x-1-radius,y-1,z+1);
+   glTexCoord(1,0); glTransformMe(x-1-radius,y-1,z-1);
+   glTexCoord(1,1); glTransformMe(x-1-radius,y+1,z-1);
+   glTexCoord(0,1); glTransformMe(x-1-radius,y+1,z+1);
+   
+   glTexCoord(0,0); glTransformMe(x-1,y-1-radius,z+1);
+   glTexCoord(1,0); glTransformMe(x+1,y-1-radius,z+1);
+   glTexCoord(1,1); glTransformMe(x+1,y-1-radius,z-1);
+   glTexCoord(0,1); glTransformMe(x-1,y-1-radius,z-1);
+   
+   glTexCoord(0,0); glTransformMe(x+1,y-1,z+1+radius);
+   glTexCoord(1,0); glTransformMe(x-1,y-1,z+1+radius);
+   glTexCoord(1,1); glTransformMe(x-1,y+1,z+1+radius);
+   glTexCoord(0,1); glTransformMe(x+1,y+1,z+1+radius);
+   
+   glTexCoord(0,0); glTransformMe(x+1+radius,y-1,z-1);
+   glTexCoord(1,0); glTransformMe(x+1+radius,y-1,z+1);
+   glTexCoord(1,1); glTransformMe(x+1+radius,y+1,z+1);
+   glTexCoord(0,1); glTransformMe(x+1+radius,y+1,z-1);
+   
+   glTexCoord(0,0); glTransformMe(x-1,y+1+radius,z-1);
+   glTexCoord(1,0); glTransformMe(x+1,y+1+radius,z-1);
+   glTexCoord(1,1); glTransformMe(x+1,y+1+radius,z+1);
+   glTexCoord(0,1); glTransformMe(x-1,y+1+radius,z+1);
+   
+   glEnd();
+}
+
+glTransformMe(x,y,z)
+{
+   /*
+   NewX = X * thisRot[0] + Y * thisRot[3] + Z * thisRot[6];
+   NewY = X * thisRot[1] + Y * thisRot[4] + Z * thisRot[7];
+   NewZ = X * thisRot[2] + Y * thisRot[5] + Z * thisRot[8];
+   */
+   
+   NewX = X * thisRot[0] + Y * thisRot[1] + Z * thisRot[2];
+   NewY = X * thisRot[3] + Y * thisRot[4] + Z * thisRot[5];
+   NewZ = X * thisRot[6] + Y * thisRot[7] + Z * thisRot[8];
+   
+   glVertex(newx,newy,newz);//x=newx; y=newy; z=newz;
+}
+
+transformPoint(&x,&y,&z)
+{
+   NewX = X * thisRot[0] + Y * thisRot[1] + Z * thisRot[2];
+   NewY = X * thisRot[3] + Y * thisRot[4] + Z * thisRot[5];
+   NewZ = X * thisRot[6] + Y * thisRot[7] + Z * thisRot[8];
+   x=newx; y=newy; z=newz;
+}
+
+
+mapToSphere(newvec[3])
+{
+   // map to sphere
+   
+   //tempx = (mousx * adjWidth) - 1.0;
+   //tempy = 1.0 - (mousy * adjHeight);
+   
+   // scale mouse to -1,1
+   tempx = 2*(mousx-xres/2)/xres;
+   tempy = -2*(mousy-yres/2)/yres;
+
+   length = (tempx^2 + tempy^2);
+   if(length > 1.0){ // on outside
+      norm = 1.0/sqrt(length);
+      newvec[0] = tempx*norm;
+      newvec[1] = tempy*norm;
+      newvec[2] = 0.0;
+   }
+   else // on inside
+   {
+      newvec[0] = tempx;
+      newvec[1] = tempy;
+      newvec[2] = sqrt( 1.0-length);
+   }
+}
+
+drag(quatNewRot[4])
+{
+   mapToSphere(endVec);
+   // Return the quaternion equivalent to the rotation
+
+   static perp[3];
+   cross(perp,stvec,endvec);
+   // Compute length of the perpendicular vector
+   if( vecLen(perp) > 0.001 ) // if its non-zero
+   {
+      // Were ok, so return the perp vector as the transform
+      quatNewRot[0] = perp[0];
+      quatNewRot[1] = perp[1];
+      quatNewRot[2] = perp[2];
+      // in the quaternion values, w is cosine(theta/2) where theta is rotation
+      quatNewRot[3] = vec3Dot( stvec, endvec); 
+   }
+   else
+   {
+      // begin and end vectors are same, so return identity transform
+      quatNewRot[0] = 0;
+      quatNewRot[1] = 0;
+      quatNewRot[2] = 0;
+      quatNewRot[3] = 0;
+   }
+      
+   
+}
+
+matrix3FromQuat(mat[9], q[4])
+{
+   // sq Length of quaternion?
+   n = q[0]^2 + q[1]^2 + q[2]^2 + q[3]^2;
+   s = 0.0;
+   if(n>0.0){
+      s = 2.0 / n;
+   }
+
+   xs = q[0] * s;  ys = q[1] * s;  zs = q[2] * s;
+   wx = q[3] * xs; wy = q[3] * ys; wz = q[3] * zs;
+   xx = q[0] * xs; xy = q[0] * ys; xz = q[0] * zs;
+   yy = q[1] * ys; yz = q[1] * zs; zz = q[2] * zs;     
+ 
+   mat[ 0] =1.0-(yy+zz); mat[ 3] =     xy-wz; mat[ 6] =     (xz+wy);
+   mat[ 1] =    (xy+wz); mat[ 4] = 1.0-xx+zz; mat[ 7] =     (yz-wx);
+   mat[ 2] =    (xz-wy); mat[ 5] =     yz+wx; mat[ 8] = 1.0-(xx+yy);
+}
+
+
+cross(result[3],a[3],b[3])
+{
+   result[0] = a[1]*b[2] - a[2]*b[1]; // X=YZZY
+   result[1] = a[2]*b[0] - a[0]*b[2];
+   result[2] = a[0]*b[1] - a[1]*b[0];
+}
+vecLen(a[3])
+{
+   return sqrt( a[0]^2 + a[1]^2 + a[2]^2 );
+}
+vec3Dot(a[3],b[3])
+{
+   return (a[0]*b[0]+a[1]*b[1]+a[2]*b[2]);
+}
+
+// Sets the value of this matrix to the result of multiplying itself
+// newmatrix = newmatrix * m1
+matrix3mulmatrix3(newobj[9], m1[9])
+{
+   static result[9];
+   result[0] = newobj[0] * m1[0] + newobj[3] * m1[1] + newobj[6] * m1[2];
+   result[3] = newobj[0] * m1[3] + newobj[3] * m1[4] + newobj[6] * m1[5];
+   result[6] = newobj[0] * m1[6] + newobj[3] * m1[7] + newobj[6] * m1[8]; 
+     
+   result[1] = newobj[1] * m1[0] + newobj[4] * m1[1] + newobj[7] * m1[2];
+   result[4] = newobj[1] * m1[3] + newobj[4] * m1[4] + newobj[7] * m1[5];
+   result[7] = newobj[1] * m1[6] + newobj[4] * m1[7] + newobj[7] * m1[8]; 
+   
+   result[2] = newobj[2] * m1[0] + newobj[5] * m1[1] + newobj[8] * m1[2];
+   result[5] = newobj[2] * m1[3] + newobj[5] * m1[4] + newobj[8] * m1[5];
+   result[8] = newobj[2] * m1[6] + newobj[5] * m1[7] + newobj[8] * m1[8];   
+   // src, dst
+   copyInto(newobj,result);
+}
+
+copyInto(dst[9],src[9])
+{
+   for(i=0; i<9; i++){
+      dst[i] = src[i];
+   }
+}
+
+InitRotationMatrix(Mtx[9],r,pAxis[3])
+{
+  // The axis vector must be of unit length
+  x=0, y=0, z=0, m=0;
+  m = sqrt(pAxis[0]*pAxis[0] + pAxis[1]*pAxis[1] + pAxis[2]*pAxis[2]);
+  x = pAxis[0]/m;
+  y = pAxis[1]/m;
+  z = pAxis[2]/m;
+
+  // Compute the rotation matrix  
+  c = cos(r);
+  s = sin(r);
+
+  Mtx[0] = (x * x) * (1.0 - c) + c;
+  Mtx[1] = (y * x) * (1.0 - c) + (z * s);
+  Mtx[2] = (z * x) * (1.0 - c) - (y * s);
+
+  Mtx[3] = (x * y) * (1.0 - c) - (z * s);
+  Mtx[4] = (y * y) * (1.0 - c) + c;
+  Mtx[5] = (z * y) * (1.0 - c) + (x * s);
+
+  Mtx[6] = (x * z) * (1.0 - c) + (y * s);
+  Mtx[7] = (y * z) * (1.0 - c) - (x * s);
+  Mtx[8] = (z * z) * (1.0 - c) + c;
+} 
+setIdentity(mat[9])
+{
+   for(i=0; i<9; i++)
+      mat[i] = 0;
+   mat[0] = 1; mat[4] = 1; mat[8] = 1;
+}

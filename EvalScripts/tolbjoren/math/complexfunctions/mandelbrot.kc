@@ -1,0 +1,95 @@
+// todo: panning and zooming
+static time;
+()
+{
+   cls(0);
+   time = klock(0);
+   
+   enum{dimx=400, dimy =dimx}
+   static buf[dimx];
+   static screen[dimx][dimy];
+   
+   rmi = -3; rma = 3;
+   imi = -3; ima = 3;
+   
+   static zoom = 1;
+   if(bstatus==1) zoom *= 0.9;
+   if(bstatus==2) zoom *= 1.1;
+   
+   ofsx = -3 * zoom + mousx/xres * 6 * zoom;
+   ofsy = -3 * zoom + mousy/yres * 6 * zoom;
+   for(j=0; j<dimx; j++){
+   
+      im = ima - (ima-imi) * j / (dimx-1);
+      im*=zoom;   
+   
+      for(i=0; i<dimy; i++)
+      {
+         re = rma - (rma-rmi) * i /(dimy-1);
+         re*=zoom;
+         
+         iter=0; 
+         maxiter=10+exp(zoom^-0.18);
+         x0 = (re - ofsx);
+         y0 = (im - ofsy);
+         x=0;
+         y=0;
+         xtemp =0;
+         m=0;
+         while(x*x + y*y <= 4 && iter < maxiter){
+             xtemp = x*x - y*y + x0 ;
+             y = 2*x*y + y0 +1;
+   
+             x = xtemp;
+   
+            iter++;
+         }
+         if(iter>=maxiter){
+   
+            buf[i] = 0;
+         }
+         else{
+            //r = 255*iter/maxiter;
+            //g = 255*iter/maxiter;
+            //b = 255*iter/maxiter;
+            //buf[i] = rgb(r,g,b);
+            buf[i] = hsv_to_rgb(iter/maxiter*360/2,1,1);
+         }
+         
+      }
+      sethlin(xres/2-dimx/2,yres/2-dimx/2+j,buf,dimx);
+   }
+
+   //texhandle=glsettex(screen,dimx,dimy);
+   //drawspr(xres/2,yres/2,dimx,0); // *xres/dimx
+   //glremovetex(texhandle);
+   
+   moveto(40*xres/100,15); 
+   setcol(0xffffff); printf("maxiter = %g",maxiter);
+}
+
+hsv_to_rgb(h,s,v){ 
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   r=int(r*255);
+   g=int(g*255);
+   b=int(b*255);
+   return r*2^16 + g*2^8 + b; 
+}

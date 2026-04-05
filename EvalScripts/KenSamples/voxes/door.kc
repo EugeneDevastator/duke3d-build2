@@ -1,0 +1,31 @@
+(x,y,z,&r,&g,&b) //Set to 160x160x160
+x -= .38; x *= 1.45; z *= (160/128);
+if (abs(z) > 1) return(0);
+
+if ((x-.46)^2 + (abs(y)-.05)^2 + (z-0)^2 < .07^2)
+{     //doorknob
+   r =  96*.85+nrnd*2;
+   g = 112*.85+nrnd*2;
+   b = 128*.85+nrnd*2;
+   return(1);
+}
+if (abs(y) > .05) return 0;
+if (abs(x) > .55) return 0;
+i = floor((x-.25-.03)/.29);
+     if (i == 0) f = sin(z*7+sin(z*12))*.02;
+else if (i ==-1) f = cos(z*3+cos(z*11))*.02;
+else if (i ==-2) f = sin(z*6+sin(z*7))*.02;
+else if (i ==-3) f = cos(z*5-sin(z*8))*.02;
+r = 112*.85+nrnd*3;
+g =  96*.85+nrnd*3;
+b =  80*.85+nrnd*3;
+if ((abs(x) > .45) || ((z+1.02)%.65 < .10))
+{
+   r =  96*.85+nrnd*2;
+   g = 104*.85+nrnd*2;
+   b = 112*.85+nrnd*2;
+   return(1);
+}
+if (abs(y) > f+.04) return 0;
+if ((x-.25+f*.6)%.29 < .07) return(0);
+return(1);

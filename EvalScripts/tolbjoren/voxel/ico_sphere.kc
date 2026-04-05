@@ -1,0 +1,194 @@
+struct vec{x,y,z;}
+
+enum {NUM_SIDE=16}
+enum {NUM_PTS=NUM_SIDE^2}
+static vec pts[NUM_PTS];
+
+
+static ico[42*3] =
+{
+0.000000,-0.500000,0.000000      ,
+0.361804,-0.223610,0.262863      ,
+-0.138194,-0.223610,0.425325     ,
+-0.447213,-0.223608,0.000000     ,
+-0.138194,-0.223610,-0.425325    ,
+0.361804,-0.223610,-0.262863     ,
+0.138194,0.223610,0.425325       ,
+-0.361804,0.223610,0.262863      ,
+-0.361804,0.223610,-0.262863     ,
+0.138194,0.223610,-0.425325      ,
+0.447213,0.223608,0.000000       ,
+0.000000,0.500000,0.000000       ,
+0.212661,-0.425327,0.154506      ,
+0.131434,-0.262869,0.404506      ,
+-0.081228,-0.425327,0.249998     ,
+0.212661,-0.425327,-0.154506     ,
+0.425324,-0.262868,0.000000      ,
+-0.344095,-0.262868,0.249998     ,
+-0.262865,-0.425326,0.000000     ,
+-0.344095,-0.262868,-0.249998    ,
+-0.081228,-0.425327,-0.249998    ,
+0.131434,-0.262869,-0.404506     ,
+0.475529,0.000000,-0.154506      ,
+0.475529,0.000000,0.154506       ,
+0.293893,0.000000,0.404508       ,
+0.000000,0.000000,0.500000       ,
+-0.293893,0.000000,0.404508      ,
+-0.475529,0.000000,0.154506      ,
+-0.475529,0.000000,-0.154506     ,
+-0.293893,0.000000,-0.404508     ,
+0.000000,0.000000,-0.500000      ,
+0.293893,0.000000,-0.404508      ,
+0.344095,0.262868,0.249998       ,
+-0.131434,0.262869,0.404506      ,
+-0.425324,0.262868,0.000000      ,
+-0.131434,0.262869,-0.404506     ,
+0.344095,0.262868,-0.249998      ,
+0.262865,0.425326,0.000000       ,
+0.081228,0.425327,0.249998       ,
+-0.212661,0.425327,0.154506      ,
+-0.212661,0.425327,-0.154506     ,
+0.081228,0.425327,-0.249998  
+};
+
+
+(x,y,z,&r,&g,&b)
+{
+   r = 255;
+
+   // MAP xyz to UV
+   
+   static gen = 0;
+   
+   if ( !gen ) 
+   {
+      gen = 1;
+      
+      cnt = 0;
+      
+      vec p;
+      for (i=0; i<NUM_SIDE; i++)
+      for (j=0; j<NUM_SIDE; j++)
+      {
+         u = i / (NUM_SIDE-1);
+         v = j / (NUM_SIDE-1);
+         pointOnSphere(u,v,p);
+         pts[cnt] = p;
+         cnt++;
+      }
+   }
+   
+
+   mind = 1e32;
+   closest = -1;
+   
+   //#define SPH
+   #ifdef SPH
+   for (i=0; i<NUM_PTS; i++)
+   {
+      dx = x-pts[i].x;
+      dy = y-pts[i].y;
+      dz = z-pts[i].z;
+      d = (dx^2 + dy^2 + dz^2);
+      if ( d < mind )
+      {
+         mind = d;
+         closest = i;
+      }
+   }
+   #else
+   
+   numIco = 42;
+   for (i=0; i<numIco; i++)
+   {
+      dx = x-ico[3*i+0]*2;
+      dy = y-ico[3*i+1]*2;
+      dz = z-ico[3*i+2]*2;
+      d = (dx^2 + dy^2 + dz^2);
+      if ( d < mind )
+      {
+         mind = d;
+         closest = i;
+      }
+   }
+
+   #endif
+   
+   retVal = 0;
+   if ( closest != -1 ) 
+   {
+      n = numIco;
+      noiz = noise(5*x,5*y,5*z);
+      //#ifndef ICOS n = NUM_PTS;
+      if ( closest%2==0 )
+         hsv_to_rgb( 180 * closest/n, .8, .8, r,g,b);
+      else
+         hsv_to_rgb( 180+180 * closest/n, .8, .8, r,g,b);
+      
+
+// ways of telling patches/elements apart:
+// num corners 5 or 6
+// area    smallest / largest
+// index if they were ordered by previous criterea
+
+
+      
+      distCent = (x^2 + y^2 + z^2);
+      
+      if ( mind < 1.1 ) retVal = 1;
+      if ( distCent > 1^2+ 0.03*noiz ) retVal = 0;
+      
+      //if ( dx^2 + dy^2 + dz^2 < .01 ) return 1;
+
+   }
+   
+/*
+   lim = 0.59;
+   if ( x > lim || x < -lim ) return 0;
+   if ( y > lim || y < -lim ) return 0;
+   if ( z > lim || z < -lim ) return 0;
+*/
+   return retVal;
+}
+
+hsv_to_rgb(h,s,v, &r, &g, &b){ 
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   r*=255; g*=255; b*=255;
+}
+
+pointOnSphere(u,v,vec p)
+{
+   r=.8;
+   #define SPHERICAL
+   #ifdef SPHERICAL
+      u*=2*PI;
+      v*=PI;
+      p.x = r * cos(u) * sin(v);
+      p.y = r * sin(u) * sin(v);
+      p.z = r * cos(v);
+   #else
+      u = -r + u*2*r;
+      v *= 2*PI;
+      p.x = sqrt(r*r - u*u) * cos(v);
+      p.y = sqrt(r*r - u*u) * sin(v);
+      p.z = u;
+   #endif
+}

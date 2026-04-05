@@ -1,0 +1,659 @@
+()
+{
+      //(Original 2D pool game started by Jim Grandpre <= 07/03/2007)
+      //Extensively cleaned up and enhanced by Ken Silverman (07/03/2007-07/04/2007)
+      //Sounds all homemade; many recorded from my brother's pool table. :)
+      //
+      //Goal: sink all balls without scratching or whiffing. Must sink 8-ball last.
+      //
+      //Essential controls:
+      //   Mouse: rotate camera
+      //   Arrows,KP0/RCtrl: movement
+      //   RMB: hold to slow down movement
+      //   LMB: shoot. Note: length of stick determines shot speed
+      //
+      //Extra controls:
+      //   ,/.: rotate horizontal
+      //   PGUP/PGDN: rotate vertical
+      //   KP*,KP/: zoom
+      //   KP5 or /: reset zoom
+      //   L.Enter: toggle angle hints
+      
+      //2,4,7,11,16,22,29,37,46,56,67,79,92,106,121,137,154,172,191,211
+   enum {NUM=16,TABX=54,TABY=27} brad = 1.21; holerad = 3.5; //All units in inches
+   static bx[NUM], by[NUM], bz[NUM], bvx[NUM], bvy[NUM], bvz[NUM], bdx[NUM], bdy[NUM], bi[NUM], bhole[NUM];
+   static bdep[NUM], bord[NUM];
+   static bcol[NUM], obstatus, tim, ozoom = 1, zoom = 1;
+   static ipos[3] = {80,0,-30}, irig[3] = {0,-1,0}, idow[3] = {0,0,1}, ifor[3] = {-1,0,0};
+   static pocketx[6], pockety[6], bcnt[2];
+   static gotballcnt = 0, collideballcnt = 0, collidewallcnt = 0, leftcnt = 0, scratchcnt = 0, whiffcnt = 0;
+   static showangles = 1;
+
+   mag6d_smoothfactor = .5;
+   
+   playtext(""); //Flush speech
+   srand(((klock(-1)*1000)%2^15)*2^16);
+
+   orthorotate(0,.3,0,irig,idow,ifor);
+   
+   for(i=0;i<4;i++)
+   {
+      pocketx[i] = (TABX-2)*sgn(i-1.5);
+      pockety[i] = (TABY-2)*sgn((i%2)-.5);
+   }
+   for(i=4;i<6;i++)
+   {
+      pocketx[i] = 0;
+      pockety[i] = (TABY+0)*sgn(i-4.5);
+   }
+   
+   spacing = brad*2*1.01;
+
+      //NUM = yn*(yn+1)/2+1
+      //yn*yn + yn + (1-NUM)*2 = 0
+   yn = (sqrt(NUM*8-7)-1)/2;
+
+   x = -13; y = 0; ay = (yn-1)*+.5;
+   for(i=1;i<NUM;i++)
+   {
+      bx[i] = x*spacing+(rnd-.5)*.005;
+      by[i] = (y-ay)*spacing+(rnd-.5)*.005;
+      bz[i] = 0;
+      y++; if (y >= yn) { y -= yn; x += sqrt(3)/2; yn--; ay -= .5; }
+   }
+   bx[0] = 30; by[0] = 0; bcol[0] = 0xffffff;
+
+   for(i=0;i<NUM;i++) { bvx[i] = 0; bvy[i] = 0; }
+   j = 0; bcnt[0] = 1; bcnt[1] = 9;
+   for(i=NUM-1;i>0;i--)
+   {
+      if (i == 11) { bcol[i] = 0x484848; bi[i] = 8; }
+      else
+      {
+         if (j == 0) { bcol[i] = 0xf06060; bi[i] = bcnt[0]; bcnt[0]++; }
+                else { bcol[i] = 0x6060f0; bi[i] = bcnt[1]; bcnt[1]++; }
+         if (i == 5) j = 1-j;
+      }
+      j++; if (j >= 2) j = 0;
+   }
+
+   leftcnt = NUM-1;
+
+   static buf[128][128];
+   for(y=0;y<128;y++)
+      for(x=0;x<128;x++)
+         buf[x][y] = int(nrnd*6)+int(nrnd*6)*256+int(nrnd*6)*65536+0x408040;
+   glsettex(buf,128,128);
+
+   //for(i=1;i<16;i++) if (i != 11) { bx[i] = -100; leftcnt--; } //:P
+
+   while (1)
+   {
+      dtim = tim; tim = klock(); dtim = tim-dtim;
+
+      v = max((((ipos[0])-bx[0])/10)^2 + (((ipos[1])-by[0])/10)^2 - 20^2,0);
+      cls(96+v,72,48);
+      clz(1e32);
+
+      if (USING6DOF)
+      {
+         static ostx, osty, ostz, stx, sty, stz, stxv, styv, stzv, stc;
+         static opos[2][3], omat[2][9], pos[2][3], npos[2][3], mat[2][9], nmat[2][9], jnk[3], obut[2], but[2];
+         stleng = 384; stc = 0;
+         for(i=0;i<USING6DOF;i++)
+         {
+            obut[i] = but[i];
+            for(j=0;j<3;j++) { opos[i][j] = pos[i][j]; }
+            for(j=0;j<9;j++) { omat[i][j] = mat[i][j]; }
+            if (i == 0) {       readmag6d(0,&pos[0],&mat[0],&mat[ 3],&mat[ 6],&jnk,&but[0]); }
+            if (i == 1) { stc = readmag6d(1,&pos[3],&mat[9],&mat[12],&mat[15],&jnk,&but[1]); }
+
+            if (but[i] != 0)
+            {
+               f = 64;
+
+               x = (pos[i][0]-opos[i][0])*f;
+               y = (pos[i][1]-opos[i][1])*f;
+               z = (pos[i][2]-opos[i][2])*f;
+               ipos[0] -= irig[0]*x + idow[0]*y + ifor[0]*z;
+               ipos[1] -= irig[1]*x + idow[1]*y + ifor[1]*z;
+               ipos[2] -= irig[2]*x + idow[2]*y + ifor[2]*z;
+
+               for(j=0;j<3;j++)
+               {
+                  x = irig[j]; y = idow[j]; z = ifor[j];
+                  irig[j] = x*omat[i][0] + y*omat[i][1] + z*omat[i][2];
+                  idow[j] = x*omat[i][3] + y*omat[i][4] + z*omat[i][5];
+                  ifor[j] = x*omat[i][6] + y*omat[i][7] + z*omat[i][8];
+
+                  x = irig[j]; y = idow[j]; z = ifor[j];
+                  irig[j] = x*mat[i][0] + y*mat[i][3] + z*mat[i][6];
+                  idow[j] = x*mat[i][1] + y*mat[i][4] + z*mat[i][7];
+                  ifor[j] = x*mat[i][2] + y*mat[i][5] + z*mat[i][8];
+               }
+
+               continue;
+            }
+
+            npos[i][0] = pos[i][0];
+            npos[i][1] = pos[i][1]+.25;
+            npos[i][2] = pos[i][2]+2;
+            f = 256; for(j=0;j<3;j++) npos[i][j] *= f;
+            x = npos[i][0]; y = npos[i][1]; z = npos[i][2];
+            npos[i][0] = irig[0]*x + idow[0]*y + ifor[0]*z + ipos[0];
+            npos[i][1] = irig[1]*x + idow[1]*y + ifor[1]*z + ipos[1];
+            npos[i][2] = irig[2]*x + idow[2]*y + ifor[2]*z + ipos[2];
+            for(j=0;j<9;j+=3)
+            {
+               x = mat[i][j+0]; y = mat[i][j+1]; z = mat[i][j+2];
+               nmat[i][j+0] = irig[0]*x + idow[0]*y + ifor[0]*z;
+               nmat[i][j+1] = irig[1]*x + idow[1]*y + ifor[1]*z;
+               nmat[i][j+2] = irig[2]*x + idow[2]*y + ifor[2]*z;
+            }
+            npos[i][2] = min(npos[i][2],-5-brad);
+         }
+         if ((USING6DOF >= 2) && (but[0] == 0) && (but[1] == 0))
+         {
+            dx = npos[1][0]-npos[0][0];
+            dy = npos[1][1]-npos[0][1];
+            dz = npos[1][2]-npos[0][2];
+            if (npos[0][2]+dz*stleng/sqrt(dx^2+dy^2+dz^2) > -brad)
+               { k = ((npos[0][2]+brad)/stleng)^2; npos[1][2] = sqrt((dx^2+dy^2)*k / (1-k)) + npos[0][2]; }
+            dz = npos[1][2]-npos[0][2];
+            f = stleng/sqrt(dx^2+dy^2+dz^2); dx *= f; dy *= f; dz *= f;
+            g = .2;
+
+            if (stc)
+            {
+               f = 1/(stc*dtim*125);
+               ostx = stx; stx = (npos[0][0]+dx)*g; stxv = (stx-ostx)*f;
+               osty = sty; sty = (npos[0][1]+dy)*g; styv = (sty-osty)*f;
+               ostz = stz; stz = (npos[0][2]+dz)*g; stzv = (stz-ostz)*f;
+            }
+
+            setcol(0x806040); drawcone(npos[0][0]*g,npos[0][1]*g,npos[0][2]*g,-4*g,stx,sty,    stz,+2*g); //Stick
+            setcol(0x000000); drawcone(npos[0][0]*g,npos[0][1]*g,     -brad*g,-4*g,stx,sty,-brad*g,+2*g); //Stick shadow
+            setcol(0xc0c0c0); drawsph(stx,sty,stz,2.1*g); //Stick white tip
+               
+            for(i=0;i<USING6DOF;i++)
+            {
+               g = .2; t0 = 0; t1 = 16;
+               setcol(0x406080);
+               drawcone((npos[i][0]-nmat[i][6]*t1)*g,(npos[i][1]-nmat[i][7]*t1)*g,(npos[i][2]-nmat[i][8]*t1)*g,-4*g,
+                        (npos[i][0]+nmat[i][6]*t0)*g,(npos[i][1]+nmat[i][7]*t0)*g,(npos[i][2]+nmat[i][8]*t0)*g,+2*g);
+            }
+         }
+      }
+
+      g = dtim*64; if (bstatus>1) g *= 1/32;
+      r = (keystatus[0xcd]-keystatus[0xcb])*g; //Right-Left
+      d = (keystatus[0x52]-keystatus[0x9d])*g; //KP0-RCtrl
+      f = (keystatus[0xc8]-keystatus[0xd0])*g; //Up-Down
+      r += (keystatus[0x20]-keystatus[0x1e])*g*.25; //D-A
+      d += (keystatus[0x2a]-keystatus[0x39])*g*.25; //LShift-Space
+      f += (keystatus[0x11]-keystatus[0x1f])*g*.25; //W-S
+      ipos[0] += irig[0]*r + idow[0]*d + ifor[0]*f;
+      ipos[1] += irig[1]*r + idow[1]*d + ifor[1]*f;
+      ipos[2] += irig[2]*r + idow[2]*d + ifor[2]*f; ipos[2] = min(ipos[2],brad*-4);
+      x = 0; y = 0; readmouse(&x,&y); x /= 4; y /= 4;
+      x += (keystatus[0x33]-keystatus[0x34])*g*2; //,-.
+      y += (keystatus[0xc9]-keystatus[0xd1])*g*2; //PGUP-PGDN
+      orthorotate(irig[2]*.2,y*.01,x*.01,irig,idow,ifor);
+      if (keystatus[0x37]) //KP*
+      {
+         zoom = min(zoom*pow(4.0,+dtim),1*8);
+         if ((zoom >= 1) && (ozoom < 1)) zoom = 1;
+      }
+      if (keystatus[0xb5]) //KP/
+      {
+         zoom = max(zoom*pow(4.0,-dtim),1/8);
+         if ((zoom <= 1) && (ozoom > 1)) zoom = 1;
+      }
+      if ((keystatus[0x37] == 0) && (keystatus[0xb5] == 0)) ozoom = zoom;
+      if (keystatus[0x35]||keystatus[0x4c]) { zoom = 1; ozoom = 1; } // /,KP5
+
+      setview(0,0,xres,yres,xres/2,yres/2,xres/2*zoom);
+      setcam(ipos[0],ipos[1],ipos[2],irig[0],irig[1],irig[2],
+                                     idow[0],idow[1],idow[2],
+                                     ifor[0],ifor[1],ifor[2]);
+
+      setcol(0xffffff);
+      glbegin(GL_QUADS);
+      gltexcoord(0  ,0  ); glvertex(-TABX,-TABY,.01);
+      gltexcoord(4.0,0  ); glvertex(+TABX,-TABY,.01);
+      gltexcoord(4.0,3.0); glvertex(+TABX,+TABY,.01);
+      gltexcoord(0  ,3.0); glvertex(-TABX,+TABY,.01);
+
+      setcol(0x222222);
+      for(i=0;i<6;i++) drawcone(pocketx[i],pockety[i],-0.1,-holerad,
+                                pocketx[i],pockety[i],+2.0,-holerad);
+
+      setcol(0x886644);
+      drawcone(-TABX+5.9,-TABY    ,0,1,     -4.3,-TABY    ,0,1);
+      drawcone(     +4.3,-TABY    ,0,1,+TABX-5.9,-TABY    ,0,1);
+      drawcone(+TABX    ,-TABY+5.9,0,1,+TABX    ,+TABY-5.9,0,1);
+      drawcone(+TABX-5.9,+TABY    ,0,1,     +4.3,+TABY    ,0,1);
+      drawcone(     -4.3,+TABY    ,0,1,-TABX+5.9,+TABY    ,0,1);
+      drawcone(-TABX    ,+TABY-5.9,0,1,-TABX    ,-TABY+5.9,0,1);
+
+      drawarcone(pocketx[0],pockety[0],PI*0.67,PI*1.83,4,1,10);
+      drawarcone(pocketx[1],pockety[1],PI*2.17,PI*3.33,4,1,10);
+      drawarcone(pocketx[3],pockety[3],PI*3.67,PI*4.83,4,1,10);
+      drawarcone(pocketx[2],pockety[2],PI*5.17,PI*6.33,4,1,10);
+
+      drawarcone(pocketx[4],pockety[4],PI*1.0,PI*2.0,4,1,7);
+      drawarcone(pocketx[5],pockety[5],PI*0.0,PI*1.0,4,1,7);
+
+      for(i=0;i<NUM;i++)
+      {
+         bdep[i] = (bx[i]-ipos[0])*ifor[0] +
+                   (by[i]-ipos[1])*ifor[1] +
+                   (-brad-ipos[2])*ifor[2];
+         bord[i] = i;
+      }
+          //Crap sort
+      for(i=1;i<NUM;i++)
+         for(j=0;j<i;j++)
+            if (bdep[bord[i]] < bdep[bord[j]])
+               { t = bord[i]; bord[i] = bord[j]; bord[j] = t; }
+      for(j=NUM-1;j>=0;j--)
+      {
+         i = bord[j];
+         if ((i == 0) && (bz[0])) continue;
+         setcol(bcol[i]);
+         drawsph(bx[i],by[i],bz[i]-brad,brad);
+         if (i == 0) continue;
+
+         setcol(bcol[i]/2);
+         x = bx[i]-ipos[0]; y = by[i]-ipos[1]; z = bz[i]-brad-ipos[2];
+         nx = x*irig[0] + y*irig[1] + z*irig[2];
+         ny = x*idow[0] + y*idow[1] + z*idow[2];
+         nz = x*ifor[0] + y*ifor[1] + z*ifor[2]; f = xres/2*zoom/nz;
+         if (nz <= brad) continue;
+
+         fx = xres*.4/nz; fy = fx*1.6;
+         moveto(nx*f+xres/2-((bi[i]>=10)+1)*fx*.5,ny*f+yres/2-fy*.3);
+         setfont(fx,fy,1); printf("%g",bi[i]);
+      }
+
+      if ((fabs(bvx[0]) + fabs(bvy[0]) == 0) && (bz[0] == 0))
+      {
+         if (USING6DOF > 0)
+         {
+            //FUK
+            if ((ptlinedist2(bx[0],by[0],-brad,ostx,osty,ostz,stx,sty,stz) < (brad+2)^2) &&
+                ((npos[1][0]-npos[0][0])*stxv + (npos[1][1]-npos[0][1])*styv + (npos[1][2]-npos[0][2])*stzv > 0))
+            {
+               bvx[0] = stxv; //-(stx-bx[0])/10;
+               bvy[0] = styv; //-(sty-by[0])/10;
+               startvel = sqrt(stxv^2 + styv^2);
+               gotballcnt = 0;
+               collidewallcnt = 0;
+               collideballcnt = 0;
+            }
+         }
+         else
+         {
+            x = 0; y = 0;
+            vx = (x+ipos[0]-bx[0])*.3;
+            vy = (y+ipos[1]-by[0])*.3;
+            vz = (0-      2-    0)*.3;
+            f = sqrt(vx^2 + vy^2); if (f != 0) f = 1/f;
+            setcol(0x806850);
+            drawcone(bx[0]+vx*f*2,by[0]+vy*f*2,+vz*f*2,-.3,x+ipos[0],y+ipos[1],-2,1);
+            setcol(0xa0a0a0);
+            drawcone(bx[0]+vx*f*1.8,by[0]+vy*f*1.8,+vz*f*1.8,-.35,
+                     bx[0]+vx*f*3.0,by[0]+vy*f*3.0,+vz*f*3.0,-.35);
+            if ((bstatus%2) > (obstatus%2))
+            {
+               bvx[0] = -((x+ipos[0])-bx[0])/10+nrnd*.005;
+               bvy[0] = -((y+ipos[1])-by[0])/10+nrnd*.005;
+               startvel = sqrt(bvx[0]^2 + bvy[0]^2);
+               if ((startvel > 24) && (bz[0] == 0))
+               {
+                  bvx[0] = 0; bvy[0] = 0; bz[0] = 1;
+                  playtext("Oh my god. The cue ball has spontaneously exploded. GAME OVER.");
+                  playsound("blowup2.flac",100,.5);
+                  leftcnt = 1/0; whiffcnt = 1/0; scratchcnt = 1/0;
+                  showangles = 0;
+               }
+               gotballcnt = 0;
+               collidewallcnt = 0;
+               collideballcnt = 0;
+            }
+         }
+      }
+
+      for(i=0;i<NUM;i++)
+      {
+         if (bz[i] == 0) continue;
+         
+         bx[i] += bvx[i]*dtim*64; bvx[i] *= pow(.5,dtim);
+         by[i] += bvy[i]*dtim*64; bvy[i] *= pow(.5,dtim);
+         nx = bx[i]-pocketx[bhole[i]];
+         ny = by[i]-pockety[bhole[i]];
+         if (nx^2 + ny^2 >= (holerad-brad)^2)
+         {
+            f = 1/sqrt(nx^2 + ny^2); nx *= f; ny *= f;
+            dot = bvx[i]*nx + bvy[i]*ny;
+            bvx[i] -= nx*dot*1.5;
+            bvy[i] -= ny*dot*1.5;
+            bx[i] = (holerad-brad)*nx + pocketx[bhole[i]];
+            by[i] = (holerad-brad)*ny + pockety[bhole[i]];
+         }
+         
+         bvz[i] += dtim*2;
+         bz[i] += bvz[i]*dtim*64;
+         if (bz[i] > 1)
+         {
+            if (bi[i] == 0) { bx[0] = 30;      by[0] = 0;               }
+                       else { bx[i] = -TABX-8; by[i] = (bi[i]-8)*4.375; }
+            bvx[i] = 0; bvy[i] = 0; bvz[i] = 0; bz[i] = 1;
+         }
+      }
+      
+      tfrac = 1; hit2 = 0;
+      while (1)
+      {
+         f = dtim*64*tfrac;
+         for(i=0;i<NUM;i++)
+         {
+            bdx[i] = bvx[i]*f;
+            bdy[i] = bvy[i]*f;
+            if (bz[i]) { bdx[i] = 0; bdy[i] = 0; } //hack to disable falling balls from regular collision code
+         }
+
+         mint = 1; hit = -3;
+         for(i=0;i<NUM;i++)
+         {
+            x = bx[i]; vx = bdx[i];
+            y = by[i]; vy = bdy[i];
+
+               //collide i with table edges
+                 if (vx > 0) t = (TABX-brad-1-x)/vx;
+            else if (vx < 0) t = (brad+1-TABX-x)/vx;
+            else             t = 1e32;
+            if ((t > 0) && (t < mint)) { mint = t; hit = -1; hit2 = i; }
+
+                 if (vy > 0) t = (TABY-brad-1-y)/vy;
+            else if (vy < 0) t = (brad+1-TABY-y)/vy;
+            else             t = 1e32;
+            if ((t > 0) && (t < mint)) { mint = t; hit = -2; hit2 = i; }
+
+            for(j=0;j<i;j++)
+            {
+               x2 = bx[j]; vx2 = bdx[j];
+               y2 = by[j]; vy2 = bdy[j];
+
+                  //ix0 = vx*t + x;   ix1 = vx2*t + x2;
+                  //iy0 = vy*t + y;   iy1 = vy2*t + y2;
+                  //
+                  //((vx-vx2)*t + (x-x2))^2 +
+                  //((vy-vy2)*t + (y-y2))^2 = (brad*2)^2
+               a = (vx-vx2)^2 + (vy-vy2)^2;
+               b = ((vx-vx2)*(x-x2) + (vy-vy2)*(y-y2))*2;
+               c = (x-x2)^2 + (y-y2)^2 - (brad*2)^2;
+
+               t = b^2 - 4*a*c;
+               if (t > 0)
+               {
+                  t = (-b - sqrt(t))/(2*a);
+                  if ((t > 0) && (t < mint)) { mint = t; hit = i; hit2 = j; }
+               }
+            }
+         }
+
+         for (i=0;i<NUM;i++)
+         {
+            bx[i] += bdx[i]*mint;
+            by[i] += bdy[i]*mint;
+         }
+
+         if (mint >= 1) break;
+
+         if (hit == -1)
+         {
+            collidewallcnt++;
+            bvx[hit2] *= -1; //hit left/right edge
+            playsound("ballwalla.flac",fabs(bvx[hit2])*128,log(fabs(bvx[hit2])+1)+.8);
+         }
+         else if (hit == -2)
+         {
+            collidewallcnt++;
+            bvy[hit2] *= -1; //hit top/bot edge
+            playsound("ballwalla.flac",fabs(bvy[hit2])*128,log(fabs(bvy[hit2])+1)+.8);
+         }
+         else if (hit >= 0)
+         {
+            collideballcnt++;
+            vx0 = bvx[hit ]; vy0 = bvy[hit ];
+            vx1 = bvx[hit2]; vy1 = bvy[hit2];
+            doimpact(0.9,(bx[hit2]-bx[hit])/(brad*2),
+                         (by[hit2]-by[hit])/(brad*2),&vx0,&vy0,&vx1,&vy1);
+            c  = sqrt((bvx[hit ]-vx0)^2 + (bvy[hit ]-vy0)^2);
+            c += sqrt((bvx[hit2]-vx1)^2 + (bvy[hit2]-vy1)^2);
+            playsound("ballballa.flac",c*128,log(c+1)/16+.95);
+            bvx[hit ] = vx0; bvy[hit ] = vy0;
+            bvx[hit2] = vx1; bvy[hit2] = vy1;
+
+         }
+         brad -= 1e-7;
+
+         tfrac *= (1-mint);
+      }
+     
+         //Pocket fall detection
+      for(i=0;i<NUM;i++)
+         for(j=0;j<6;j++)
+            if (((bx[i]-pocketx[j])^2 + (by[i]-pockety[j])^2 < holerad^2) && (bz[i] == 0))
+            {
+               if (bi[i] == 0) { bx[0] = 30; by[0] = 0; bvx[0] = 0; bvy[0] = 0; }
+                          else { bz[i] = 1e-4; bhole[i] = j; }
+               if (rnd < .5) playsound("ballfall.flac" ,100,(rnd-.5)*.2+1);
+                        else playsound("ballfalla.flac",100,(rnd-.5)*.2+1);
+               playsound("chute.flac",100,(rnd-.5)*.2+1);
+               if (bi[i] == 0)
+               {
+                  ipos[0] = 80; ipos[1] = 0; ipos[2] =-30;
+                  irig[0] =  0; irig[1] =-1; irig[2] =  0;
+                  idow[0] =  0; idow[1] = 0; idow[2] =  1;
+                  ifor[0] = -1; ifor[1] = 0; ifor[2] =  0;
+                  orthorotate(0,.3,0,irig,idow,ifor);
+                  zoom = 1; ozoom = 1;
+                  playtext("<pitch middle='-6'/>scratch");
+                  if ((scratchcnt == 0) && (whiffcnt == 0) && (leftcnt == 0))
+                     playtext(",My bad. Actually you lose. What a shame.");
+                  playsound("metalzip.flac");
+                  scratchcnt++;
+                  gotballcnt = -1; //Hack to prevent further insult
+               }
+               else if (bi[i] == 8)
+               {
+                  for(k=NUM-1;k>0;k--)
+                     if (bz[k] == 0) break;
+                  if (k > 0)
+                  {
+                     playsound("blowup2.flac",100,0.5);
+                     playtext("Oh no! You have sunk the <emph>8</emph><pitch middle='-2'/>ball too soon");
+                     leftcnt = 1/0; whiffcnt = 1/0; scratchcnt = 1/0;
+                  }
+                  else
+                  {
+                     leftcnt--;
+                     if ((scratchcnt > 0) || (whiffcnt > 0))
+                     {
+                        playtext("Table cleared. Next time, try not to scratch and whiff so much!");
+                        playtext(", it is <emph>you</emph> who stinks!");
+                     }
+                     else playtext("You win! Seriously, good job!");
+                  }
+                  gotballcnt = -1; //Hack to prevent further insult
+               }
+               else
+               {
+                  leftcnt--;
+                  static oldr0 = -1; do { r = int(5*rnd); } while (r == oldr0); oldr0 = r;
+                  if (j < 4)
+                  {
+                     if (r == 0) playtext(",<volume level='75'/><pitch middle='-6'/>%g disappeared in the corner pocket",bi[i]);
+                     if (r == 1) playtext(",<volume level='75'/><pitch middle='-6'/>got %g in the corner pocket",bi[i]);
+                     if (r == 2) playtext(",<volume level='75'/><pitch middle='-6'/>%g fell in the corner pocket",bi[i]);
+                     if (r == 3) playtext(",<volume level='75'/><pitch middle='-6'/>%g dropped in the corner pocket",bi[i]);
+                     if (r == 4) playtext(",<volume level='75'/><pitch middle='-6'/>%g went down in the corner pocket",bi[i]);
+                  }
+                  else
+                  {
+                     if (r == 0) playtext(",<volume level='75'/><pitch middle='-6'/>%g disappeared in the side pocket",bi[i]);
+                     if (r == 1) playtext(",<volume level='75'/><pitch middle='-6'/>got %g in the side pocket",bi[i]);
+                     if (r == 2) playtext(",<volume level='75'/><pitch middle='-6'/>%g fell in the side pocket",bi[i]);
+                     if (r == 3) playtext(",<volume level='75'/><pitch middle='-6'/>%g dropped in the side pocket",bi[i]);
+                     if (r == 4) playtext(",<volume level='75'/><pitch middle='-6'/>%g went down in the side pocket",bi[i]);
+                  }
+                  gotballcnt++;
+               }
+               break;
+            }
+
+         //Friction
+      allzero = 1; got = 0;
+      for(i=0;i<NUM;i++)
+      {
+         vel2 = bvx[i]^2 + bvy[i]^2;
+         f = .5-exp(vel2*-8)*.35; //Give more friction when moving slower
+         bvx[i] *= pow(f,dtim); //? *= pow(scale_per_second,dtim);
+         bvy[i] *= pow(f,dtim);
+         if ((vel2 > 0) && (vel2 < .01^2)) { bvx[i] = 0; bvy[i] = 0; got = 1; }
+         else if (vel2) allzero = 0;
+      }
+      if ((allzero) && (got))
+      {
+         if (gotballcnt == 0)
+         {
+            whiffcnt++;
+            if (collideballcnt == 0)
+            {
+               static oldr1 = -1; do { r = int(2*rnd); } while (r == oldr1); oldr1 = r;
+               if (r == 0) playtext(",<volume level='75'/>The air says ouch!");
+               if (r == 1) playtext(",<volume level='75'/>What was that?");
+            }
+            else
+            {
+               static oldr2 = -1; do { r = int(3*rnd); } while (r == oldr2); oldr2 = r;
+               if (r == 0) playtext(",<volume level='75'/>Too bad.");
+               if (r == 1) playtext(",<volume level='75'/>That's a shame.");
+               if (r == 2) playtext(",<volume level='75'/>Better luck next time.");
+            }
+         }
+      }
+      
+      if ((keystatus[0x1c]||keystatus[0x9c]) && (leftcnt < 1e32))
+         { keystatus[0x1c] = 0; keystatus[0x9c] = 0; showangles = 1-showangles; }
+      if ((showangles) && (fabs(bvx[0]) + fabs(bvy[0]) == 0))
+      {
+         x = bx[0]; vx = bx[0]-ipos[0];
+         y = by[0]; vy = by[0]-ipos[1];
+         f = 1/sqrt(vx^2+vy^2); vx *= f; vy *= f;
+         setcol(0x808080);
+         for (i=0;i<10;i++)
+         {
+                 if (vx > 0) t0 = (TABX-brad-1-x)/vx;
+            else if (vx < 0) t0 = (brad+1-TABX-x)/vx;
+            else             t0 = 1e32;
+                 if (vy > 0) t1 = (TABY-brad-1-y)/vy;
+            else if (vy < 0) t1 = (brad+1-TABY-y)/vy;
+            else             t1 = 1e32;
+
+            mint = min(t0,t1); hitball = 0;
+            for(j=1;j<NUM;j++)
+            {
+                  //ix0 = vx*t + x;   ix1 = bx[j];
+                  //iy0 = vy*t + y;   iy1 = by[j];
+                  //
+                  //(vx*t + (x - bx[j]))^2 +
+                  //(vy*t + (y - by[j]))^2 = 1^2
+               a = vx^2 + vy^2;
+               b = ((x-bx[j])*vx + (y-by[j])*vy)*2;
+               c = (x-bx[j])^2 + (y-by[j])^2 - (brad*2)^2;
+               t = b^2 - 4*a*c; if (t <= 0) continue;
+               t = (-b - sqrt(t))/(2*a);
+               if ((t > 0) && (t < mint)) { mint = t; hitball = 1; }
+            }
+
+            ox = x; x += vx*mint;
+            oy = y; y += vy*mint;
+            drawcone(ox,oy,-brad,brad*.25,x,y,-brad,brad*.25);
+            if (hitball) { setcol(0xffffff); drawsph(x,y,-brad,brad);  break; }
+            if (t0 < t1) vx = -vx; else vy = -vy;
+         }
+      }
+      setfont(12,16);
+      setcol(0x80c080); moveto(xres-12*17, 0); printf("Balls left:%3g",leftcnt);
+      setcol(0xe08080); moveto(xres-12*16,16); printf("Scratches:%3g",scratchcnt);
+      setcol(0xe08080); moveto(xres-12*13,32); printf("Whiffs:%3g",whiffcnt);
+      if ((leftcnt == 0) && (scratchcnt == 0) && (whiffcnt == 0))
+         { setcol(int(sin(tim*16)*64+191)*0x10101); moveto(xres/2-48,yres/2-8); printf("YOU WIN!"); }
+
+      obstatus = bstatus; refresh();
+   }
+}
+
+   //e            Coefficient of restitution: 0=plastic, 1=elastic
+   //nx,ny        Unit normal vector at intersection
+   //&vx,&vy      Velocity
+doimpact (e,nx,ny,&ivx,&ivy,&jvx,&jvy)
+{
+   dvx = ivx - jvx;
+   dvy = ivy - jvy;
+   f = (dvx*nx + dvy*ny) * (-e-1.0) / 2;
+   ivx += nx*f; jvx -= nx*f;
+   ivy += ny*f; jvy -= ny*f;
+}
+
+drawarcone (cx,cy,a0,a1,r0,r,n)
+{
+   da = (a1-a0)/n; oc = 0; os = 0;
+   for(a=a0;n>=0;a+=da,n--)
+   {
+      c = cos(a)*r0+cx; s = sin(a)*r0+cy;
+      if (a != a0) drawcone(oc,os,0,r,c,s,0,r);
+      oc = c; os = s;
+   }
+}
+
+orthorotate (ox,oy,oz,iri[3],ido[3],ifo[3])
+{
+   static rr[9];
+   dx = sin(ox); ox = cos(ox);
+   dy = sin(oy); oy = cos(oy);
+   dz = sin(oz); oz = cos(oz);
+   f = ox*oz; t = dx*dz; rr[0] =  t*dy + f; rr[7] = -f*dy - t;
+   f = ox*dz; t = dx*oz; rr[1] = -f*dy + t; rr[6] =  t*dy - f;
+   rr[2] = dz*oy; rr[3] = -dx*oy; rr[4] = ox*oy; rr[8] = oz*oy; rr[5] = dy;
+   ox = iri[0]; oy = ido[0]; oz = ifo[0];
+   iri[0] = ox*rr[0] + oy*rr[3] + oz*rr[6];
+   ido[0] = ox*rr[1] + oy*rr[4] + oz*rr[7];
+   ifo[0] = ox*rr[2] + oy*rr[5] + oz*rr[8];
+   ox = iri[1]; oy = ido[1]; oz = ifo[1];
+   iri[1] = ox*rr[0] + oy*rr[3] + oz*rr[6];
+   ido[1] = ox*rr[1] + oy*rr[4] + oz*rr[7];
+   ifo[1] = ox*rr[2] + oy*rr[5] + oz*rr[8];
+   ox = iri[2]; oy = ido[2]; oz = ifo[2];
+   iri[2] = ox*rr[0] + oy*rr[3] + oz*rr[6];
+   ido[2] = ox*rr[1] + oy*rr[4] + oz*rr[7];
+   ifo[2] = ox*rr[2] + oy*rr[5] + oz*rr[8];
+}
+
+ptlinedist2 (x,y,z,x0,y0,z0,x1,y1,z1)
+{
+   t = (x1-x0)^2 + (y1-y0)^2 + (z1-z0)^2;
+   if (t == 0) { cx = x0; cy = y0; cz = z0; }
+   else
+   {
+      t = ((x-x0)*(x1-x0) + (y-y0)*(y1-y0) + (z-z0)*(z1-z0))/t;
+      t = min(max(t,0),1);
+      cx = (x1-x0)*t + x0;
+      cy = (y1-y0)*t + y0;
+      cz = (z1-z0)*t + z0;
+   }
+   return((cx-x)^2 + (cy-y)^2 + (cz-z)^2);
+}

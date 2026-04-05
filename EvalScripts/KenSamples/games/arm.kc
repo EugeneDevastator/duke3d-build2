@@ -1,0 +1,60 @@
+//
+// Arm-wrestling reflex tester. This is an old script.
+// 
+// -Robert
+
+()
+{
+   static keyscan[26]={0x1e,0x30,0x2e,0x20,0x12,0x21,0x22,0x23,0x17,0x24,0x25,
+   0x26,0x32,0x31,0x18,0x19,0x10,0x13,0x1f,0x14,0x16,0x2f,0x11,0x2d,0x15,0x2c};
+   round=1; swing=0; swingb=0; ot=klock(); over=0; ckey=-1; ckt=ot+1.3; otim=0;
+   playtext("Round %g, Go!",round); win=0;
+   do
+   {
+      if (over) {if (swingb<0) cls(0,0xff*otim,0); else cls(0xff*otim,0,0);} else cls(0);
+      clz(1e32); t=klock(); sync=t-ot; ot=t; if (otim) otim-=sync;
+      setcol(0x7000); cx=3; cy=0; setcam(0,0,0,0,0);
+      for (i=1;i<=16;i++)
+      {
+         px=cos(i*PI/8)*3; py=sin(i*PI/8)*3;
+         drawcone(cx+6,cy-3,20,.25, px+6,py-3,20,.25);
+         cx=px; cy=py;
+      }
+      if (over==0)
+      {
+         if ((ckey<0) && (ckt<=t)) {ckt=t; ckey=int(rnd*26);}
+         else if ((ckey>=0) && keystatus[keyscan[ckey]])
+         {
+            keystatus[keyscan[ckey]]=0; z=(.11-min(round*.01,.09));
+            swingb-=z/max(t-ckt,z*4); ckey=-1; ckt = t+rnd+.3;
+         }
+         if (ckey>=0)
+         {
+            setcol(0xd04000); swingb+=sync*(.1+round*.05);
+            cz=(xres/2)/20; cx=cz*6+(xres/2); cy=cz*-3+(yres/2); cz*=3;
+            setfont(cz,cz*(4/3),1); cz*=.5; moveto(cx-cz,cy-cz);
+            printchar(ckey+65);
+         }
+         if (swingb>=.5) {over=1;otim=1;swingb=.5;}
+         else if (swingb<=-.5) {over=1;otim=1;swingb=-.5;}
+      }
+      setcam(3,-1.5,-3,-.5,0); swing+=(swingb-swing)*sync*4;
+      a=min(max(swing,-.5),.5)*PI; if (over==0) a+=noise(t*16)*.05;
+      cx=sin(a); cy=-cos(a); bx=sin(a+.04); by=-cos(a+.04); dx=sin(a-.04); dy=-cos(a-.04);
+      setcol(0xc08000); drawcone(0,-1.2,-1.2,.25,0,0,-.5,.2);
+      drawcone(0,0,-.5,.2,cx,cy,0,.15); drawsph(bx,by,0,.25);
+      setcol(0x0080c0); drawcone(0,0,.5,.2,cx,cy,0,.15);
+      drawcone(0,-1.2,1.2,.25,0,0,.5,.2); drawsph(dx,dy,0,.25);
+      if (over && otim<=0)
+      {
+         otim=0; over=0; round+=(swingb<0);
+         ckey=-1; ckt=t+1.3; playtext("Round %g, Go!",round); swingb=0;
+      }
+      setcol(0x3080d0);moveto(xres-160,16);
+      setfont(16,24,1);printf("Round %g",round);
+      setcol(0xcccccc); moveto(8,8);
+      setfont(12,16); printf("Press the key in the circle as quickly as you can!");
+      refresh();
+   }
+   while(1);
+}

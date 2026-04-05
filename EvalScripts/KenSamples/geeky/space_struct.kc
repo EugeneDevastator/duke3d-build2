@@ -1,0 +1,170 @@
+// A quick test script to see if my implemetation
+// of structures in RSCR is working.
+//
+// It can also be used as a starting point for any
+// script that needs 6dof movement code.
+//
+// -Robert
+
+struct star_t {x,y,z,c;};
+struct p3d_t {x,y,z;};
+struct mat_t {p3d_t r,d,f;};
+
+()
+{
+   enum{STARNUM=512};
+   static mat_t m; static star_t stars[STARNUM];
+   static p3d_t ppos,pvel; avelx=0; avely=0;
+
+   for (i=STARNUM-1;i>=0;i--) // generate a few funky stars
+   {
+      stars[i].x=nrnd*512;
+      stars[i].y=nrnd*512;
+      stars[i].z=nrnd*512;
+      stars[i].c=rgb(rnd*128+64,rnd*128+64,rnd*128+64);
+   }
+
+   m.r.x=1; m.d.y=1; m.f.z=1;
+   
+   // set the speeds here
+   speed=1024;
+   turnspeed=5;
+
+   ot=0;
+   do
+   {
+      t=klock(); sync=max(t-ot,1e-6); ot=t;
+      
+      // game logic
+      
+      mx=0,my=0; readmouse(mx,my);
+      
+      v=turnspeed*sync; avelx+=mx*v; avely+=my*v;         // rotational velocity
+      orthorotate(m.r.y*8*sync,avely*sync,avelx*sync,m);  // rotate view. (+auto-roll)
+      v = 0.02^sync; avelx *= v; avely *= v;              // rotational friction
+
+      v=speed*sync;
+      vf=(keystatus[0xc8]-keystatus[0xd0])*v; // Forward: Up / down
+      vr=(keystatus[0xcd]-keystatus[0xcb])*v; // Strafe: Left / right
+      vd=(keystatus[0x52]-keystatus[0x9d])*v; // Raise/Lower: Right control / numpad 0
+      
+      pvel.x += vr*m.r.x + vd*m.d.x + vf*m.f.x; // add directional matrix vectors
+      pvel.y += vr*m.r.y + vd*m.d.y + vf*m.f.y;
+      pvel.z += vr*m.r.z + vd*m.d.z + vf*m.f.z;
+      
+      pvel.x = min(max(pvel.x,-500),500); // velocity clipping
+      pvel.y = min(max(pvel.y,-500),500);
+      pvel.z = min(max(pvel.z,-500),500);
+      
+      v = 0.006^sync;
+      ppos.x += pvel.x*sync; pvel.x *= v; // add velocity / apply friction
+      ppos.y += pvel.y*sync; pvel.y *= v;
+      ppos.z += pvel.z*sync; pvel.z *= v;
+      
+      // drawing code
+
+      skycol=sin(t*.25)^2;
+      cls(exp(-7*(skycol-.75)^2)*64,
+          exp(-7*(skycol-.25)^2)*64,
+          exp(-7*(skycol-.50)^2)*64); clz(1e32);
+          
+      setcam(ppos.x,ppos.y,ppos.z,
+             m.r.x,m.r.y,m.r.z,
+             m.d.x,m.d.y,m.d.z,
+             m.f.x,m.f.y,m.f.z);
+      
+      for (i=STARNUM-1;i>=0;i--) // draw stars
+      {
+         setcol(stars[i].c);
+         drawsph(stars[i].x,stars[i].y,stars[i].z,4);
+      }
+
+      setcol(0x44aacc);
+      
+      for (i=-256;i<=256;i+=64)
+         for (j=-256;j<=256;j+=64)  // draw orientation grid
+         {
+            if (i==0) continue;
+            drawcone(i,-2,j, 1, i,+5,j,  1);
+            drawcone(i, 0,j,-3, i,-6,j,.01);
+         }
+      
+      
+      // This is actually a butterfly if you have enough iterations.
+      // But here it is an elaborate pendulum. :)
+      
+      dt = sin(t*PI)*.3; ct = cos(dt); st = sin(dt);
+      setcol(0xcc8080); a = 0;
+      v = (cos(a)-2*cos(4*a)-sin(a/12)^5)*16;
+      ox = sin(a)*v; oy = -cos(a)*v;
+      for (i=1;i<=32;i++)
+      {
+         a = i*2*PI/32;
+         v = (cos(a)-2*cos(4*a)-sin(a/12)^5)*16;
+         cx = sin(a)*v; cy = -cos(a)*v;
+         drawcone(ox*ct-oy*st,oy*ct+ox*st,96,.25,
+                  cx*ct-cy*st,cy*ct+cx*st,96,.25);
+         ox = cx; oy = cy;
+      }
+      ox = st*-16; oy = 16*ct; cx = st*-48; cy = 48*ct;
+      drawcone(ox,oy,96,.25, cx,cy,96,.25,);
+      setcol(0x88cc88); drawsph(cx,cy,96,4);
+      
+      refresh();
+   }
+   while(1);
+}
+
+orthorotate(ax,ay,az,mat_t m) // orthonormal matrix rotation
+{
+   mat_t tmp; static ocnt=16;
+   
+   // get basis vectors
+   cosx=cos(ax); sinx=sin(ax);
+   cosy=cos(ay); siny=sin(ay);
+   cosz=cos(az); sinz=sin(az);
+   
+   // setup rotational matrix
+   a=cosx*cosz; b=sinx*sinz; tmp.r.x= b*siny+a; tmp.f.y=-a*siny-b;
+   a=cosx*sinz; b=sinx*cosz; tmp.r.y=-a*siny+b; tmp.f.x= b*siny-a;
+   tmp.r.z=sinz*cosy; tmp.d.x=-sinx*cosy;
+   tmp.d.y=cosx*cosy; tmp.f.z=cosz*cosy; tmp.d.z=siny;
+   
+   // multiply matrices together
+   ox=m.r.x; oy=m.d.x; oz=m.f.x;
+   m.r.x = ox*tmp.r.x + oy*tmp.d.x + oz*tmp.f.x;
+   m.d.x = ox*tmp.r.y + oy*tmp.d.y + oz*tmp.f.y;
+   m.f.x = ox*tmp.r.z + oy*tmp.d.z + oz*tmp.f.z;
+   ox=m.r.y; oy=m.d.y; oz=m.f.y;
+   m.r.y = ox*tmp.r.x + oy*tmp.d.x + oz*tmp.f.x;
+   m.d.y = ox*tmp.r.y + oy*tmp.d.y + oz*tmp.f.y;
+   m.f.y = ox*tmp.r.z + oy*tmp.d.z + oz*tmp.f.z;
+   ox=m.r.z; oy=m.d.z; oz=m.f.z;
+   m.r.z = ox*tmp.r.x + oy*tmp.d.x + oz*tmp.f.x;
+   m.d.z = ox*tmp.r.y + oy*tmp.d.y + oz*tmp.f.y;
+   m.f.z = ox*tmp.r.z + oy*tmp.d.z + oz*tmp.f.z;
+   
+   ocnt--; if (ocnt<=0) {ocnt=16; orthofit(m);}
+}
+
+orthofit(mat_t m) // Ken's code
+{
+   mat_t t; t = m; // init with struct not supported yet.
+
+   m.r.x += t.d.y*t.f.z - t.d.z*t.f.y;
+   m.r.y += t.d.z*t.f.x - t.d.x*t.f.z;
+   m.r.z += t.d.x*t.f.y - t.d.y*t.f.x;
+   
+   m.d.x += t.f.y*t.r.z - t.f.z*t.r.y;
+   m.d.y += t.f.z*t.r.x - t.f.x*t.r.z;
+   m.d.z += t.f.x*t.r.y - t.f.y*t.r.x;
+   
+   m.f.x += t.r.y*t.d.z - t.r.z*t.d.y;
+   m.f.y += t.r.z*t.d.x - t.r.x*t.d.z;
+   m.f.z += t.r.x*t.d.y - t.r.y*t.d.x;
+   
+   f = 1/sqrt(m.r.x^2+m.r.y^2+m.r.z^2);
+   m.r.x *= f; m.r.y *= f; m.r.z *= f;
+   m.d.x *= f; m.d.y *= f; m.d.z *= f;
+   m.f.x *= f; m.f.y *= f; m.f.z *= f;
+}

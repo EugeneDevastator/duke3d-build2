@@ -1,0 +1,290 @@
+struct vec{x,y,z;}
+static time;
+static siz;
+static recip_size;
+static vec campos;
+()
+{
+   time = klock(0);
+   cls(0); 
+   clz(1e32); 
+   glcullface(GL_BACK); 
+   vecset( campos, 0,-2,-2);
+   setcam(campos.x, campos.y, campos.z,0,pi/4);
+   
+   
+   
+   glBegin(GL_QUADS);
+
+   siz = 32;
+   recip_size = 1/siz;
+   for (x = -siz; x <= siz; x+=1 )
+   for (y = -siz; y <= siz; y+=1)
+   {
+      vec start,end;
+      vecset(start, x, -siz, y );
+      vecset(end, x, siz, y );
+
+      //moveto(start.x*recip_size, start.y*recip_size, start.z*recip_size);      
+      //lineto(end.x*recip_size, end.y*recip_size, end.z*recip_size);
+
+      raytrace(start,
+               end);
+   }
+  
+}
+
+visit(x,y,z)
+{
+   x *= recip_size; y *= recip_size; z *= recip_size;
+   dsq = x^2 + z^2;
+   dist = sqrt(dsq);
+   
+   ta = sin( 15 * dist * sin(time) );
+   
+   //glBegin(GL_POINTS);
+   if ( fabs(y-0.1*ta) <= .05 )
+   {
+      c = 0.5 - 0.5 * cos( 15 * dist * sin(time) );
+      r = 128 + c * 128;
+      g = 128 + c * 128;
+      b = 128 + c * 128;
+      setcol(r,g,b);
+      //glvertex(x,y,z);
+      
+      vec pos; vecset(pos,x,y,z);
+      
+      vec normal; 
+      //nx=0; ny=1; nz=0; vecset(normal,nx,ny,nz);
+      vecsub(normal, campos, pos);
+      normalize(normal);
+      drawplane(pos, normal, recip_size);
+      return 0;
+   }
+   
+   return 1;   
+}
+
+drawrectfill(x0,y0,x1,y1) { for(y=y0;y<y1;y++) { moveto(x0,y); lineto(x1,y); } }
+
+raytrace(vec start, vec end)
+{
+   x0 = start.x; y0 = start.y; z0 = start.z;
+   x1 = end.x; y1 = end.y; z1 = end.z;
+   double dx = abs(x1 - x0);
+   double dy = abs(y1 - y0);
+   double dz = abs(z1 - z0);
+   
+   x = int(floor(x0));
+   y = int(floor(y0));
+   z = int(floor(z0));
+   
+   double dt_dx = 1.0 / dx;
+   double dt_dy = 1.0 / dy;
+   double dt_dz = 1.0 / dz;
+   
+   double t = 0;
+   
+   n = 1;
+   x_inc=0; y_inc=0; z_inc=0;
+   double t_next_y=0; 
+   double t_next_x=0;
+   double t_next_z=0;
+   
+   if (dx == 0)
+   {
+      x_inc = 0;
+      t_next_x = dt_dx; // infinity
+   }
+   else if (x1 > x0)
+   {
+      x_inc = 1;
+      n += int(floor(x1)) - x;
+      t_next_x = (floor(x0) + 1 - x0) * dt_dx;
+   }
+   else
+   {
+      x_inc = -1;
+      n += x - int(floor(x1));
+      t_next_x = (x0 - floor(x0)) * dt_dx;
+   } 
+   
+   if (dy == 0)
+   {
+      y_inc = 0;
+      t_next_y = dt_dy; // infinity
+   }
+   else if (y1 > y0)
+   {
+      y_inc = 1;
+      n += int(floor(y1)) - y;
+      t_next_y = (floor(y0) + 1 - y0) * dt_dy;
+   }
+   else
+   {
+      y_inc = -1;
+      n += y - int (floor(y1));
+      t_next_y = (y0 - floor(y0)) * dt_dy;
+   }
+   
+   if (dz == 0)
+   {
+      z_inc = 0;
+      t_next_z = dt_dz; // infinity
+   }
+   else if (z1 > z0)
+   {
+      z_inc = 1;
+      n += int(floor(z1)) - z;
+      t_next_z = (floor(z0) + 1 - z0) * dt_dz;
+   }
+   else
+   {
+      z_inc = -1;
+      n += z - int(floor(z1));
+      t_next_z = (z0 - floor(z0)) * dt_dz;
+   }
+   
+   for (; n > 0; --n)
+   {
+      if ( visit(x, y, z) == 0 )
+      {
+         return;
+      }
+      
+      if (t_next_x <= t_next_y && t_next_x <= t_next_z) // t_next_x is smallest
+      {
+         x += x_inc;
+         t = t_next_x;
+         t_next_x += dt_dx;
+      }
+      else if (t_next_y <= t_next_x && t_next_y <= t_next_z) // t_next_y is smallest
+      {
+         y += y_inc;
+         t = t_next_y;
+         t_next_y += dt_dy;
+      }
+      else // t_next_z is smallest
+      {
+         z += z_inc;
+         t = t_next_z;
+         t_next_z += dt_dz;
+      }
+   }
+}
+
+vecScalar( vec out, vec a, s )
+{
+   out.x = a.x * s;
+   out.y = a.y * s;
+   out.z = a.z * s;
+}
+
+vecAdd( vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;   
+}
+vecSub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;   
+}
+
+vecCross( vec out, vec a, vec b)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+
+vecset(vec a, x,y,z){
+   a.x = x; a.y = y; a.z = z;
+}
+
+vecset(vec a, vec other){
+   a.x = other.x; a.y = other.y; a.z = other.z;
+}
+
+vecDot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+length( vec v )
+{
+   return sqrt( vecdot(v,v) );
+}
+
+normalize( vec v )
+{
+   len = length(v);
+   if ( len )
+   {
+      v.x /= len; v.y /= len; v.z /= len;
+   }
+}
+
+drawplane(vec pos, vec normal, scaler)
+{   
+   // Create two vectors a and c, perpendicular to normal
+   vec not_normal;
+   vecset(not_normal, normal);
+   
+   vec perp;
+   vecset( perp, normal );
+   if (not_normal.x == 0 && not_normal.z == 0){
+      not_normal.x += 1;
+   }else{
+      not_normal.y += 1;
+   }
+   
+   vec a, b;
+   veccross(a,perp,not_normal);
+   normalize(a);
+   veccross(b,perp,a);
+    
+   // scale a and b down to 1/2 as we will use
+   // them in +- dir
+   vecscalar(a,a,0.5 * scaler);
+   vecscalar(b,b,0.5 * scaler);
+   
+   // Create plane vertices from perpendiculars
+   vec neg_a, neg_b;
+   vecscalar(neg_a, a, -1.0);   
+   vecscalar(neg_b, b, -1.0);
+
+   vec ma_mb; // -a - b
+   vec ma_pb; // -a + b
+   vec pa_pb; //  a + b
+   vec pa_mb; //  a - b
+   
+   vecadd( ma_mb, neg_a, neg_b);
+   vecadd( ma_pb, neg_a, b);
+   vecadd( pa_pb, a, b);
+   vecadd( pa_mb, a, neg_b);
+
+   vec u0, u1, u2, u3;
+   vecset(u0, ma_mb);
+   vecset(u1, ma_pb);
+   vecset(u2, pa_pb);
+   vecset(u3, pa_mb);
+
+   // Translate to final position
+   vecadd(u0,pos,u0);
+   vecadd(u1,pos,u1);
+   vecadd(u2,pos,u2);
+   vecadd(u3,pos,u3);
+
+   //glTexcoord(0,1);
+   glVertex( u0.x, u0.y, u0.z );   
+   //glTexcoord(0,0);
+   glVertex( u1.x, u1.y, u1.z );  
+   //glTexcoord(1,0);
+   glVertex( u2.x, u2.y, u2.z );  
+   //glTexcoord(1,1);
+   glVertex( u3.x, u3.y, u3.z );  
+}
+

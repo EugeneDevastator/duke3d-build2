@@ -1,0 +1,150 @@
+enum{W=16, H=16};
+static offsX[W][H];
+static offsY[W][H];
+static offsXV[W][H];
+static offsYV[W][H];
+static offsXINT[W][H];
+static offsYINT[W][H];
+static offsXacc[W][H];
+static offsYacc[W][H];
+static offsC[W][H];
+
+static pal[255];
+
+enum{filterWidth=3, filterHeight=3}
+static filter[filterWidth][filterHeight] =  
+{ 
+     0, .2, 0, 
+     .2,.2,.2, 
+     0, .2, 0 
+};
+static factor = 1;
+static bias = 0;
+
+static img1[256][256];
+
+static imageR[256][256];
+static imageG[256][256];
+static imageB[256][256];
+static result[256][256]; 
+()
+{
+   xs = 8; ys = 8;
+   
+   if(numframes==0){
+      init();
+      DrawTexture(xs,ys);  
+   }
+  
+   xs = 8; ys = 8;
+   xmax = w*xs; ymax = h*ys;
+   
+   for(i=0; i<1; i++)
+   {
+      applyFilter(xs,ys);
+      for(x=0; x<xmax; x++)
+      for(y=0; y<ymax; y++)
+      {
+         img1[x][y] = result[x][y];
+      }
+   }
+   
+
+   for(x=0; x<xmax; x++)
+   for(y=0; y<ymax; y++)
+   {
+      setcol( img1[x][y] );
+      setpix(x,y);
+   }
+   
+}
+
+applyFilter(xs,ys)
+{
+   xmax = w*xs;
+   ymax = h*ys;
+   for(x=0; x<xmax; x++)
+   for(y=0; y<ymax; y++)
+   {
+      r=0; g=0; b=0;
+      
+      for(filterX=0; filterX < filterWidth; filterX++)
+      for(filterY=0; filterY < filterHeight; filterY++)
+      {
+         imageX = (x-filterWidth / 2 + filterX + xmax) % xmax;
+         imageY = (y-filterHeight / 2 + filterY + ymax) % ymax;
+         //r += imageR[imageX][imageY] * filter[filterX][filterY];
+         //g += imageG[imageX][imageY] * filter[filterX][filterY];
+         //b += imageB[imageX][imageY] * filter[filterX][filterY];
+         imgR=0; imgG=0; imgB=0;
+         hex2rgb(img1[imageX+1][imageY+1],&imgr,&imgg,&imgb);
+         r += imgr * filter[filterX][filterY];
+         g += imgg * filter[filterX][filterY];
+         b += imgb * filter[filterX][filterY];
+      }
+      
+      r = min(max(factor*r+bias,0),255);
+      g = min(max(factor*g+bias,0),255);
+      b = min(max(factor*b+bias,0),255);
+      result[x][y] = rgb( r,g,b );
+      //img1[x][y] = rgb( r,g,b );
+   }
+}
+
+hex2rgb(mrgb,&r,&g,&b)
+{  
+   r = (mrgb / 2^16);
+   g = (mrgb / 2^8) % 256;
+   b = mrgb % 256;   
+}
+
+DrawTexture(xs,ys)
+{
+   VLDc=0; VRDc=0; HDc=0;
+   C1=0; C2=0; c=0;
+   x=0; y=0; xi=0; yi=0;
+   
+   for(yi=0; yi<H-1; yi++)
+   for(xi=0; xi<W-1; xi++)
+   {
+      VLDc = (offsC[xi][yi+1] - offsC[xi][yi])/ys;
+      VRDc = (offsC[xi+1][yi+1] - offsC[xi+1][yi])/ys;
+      
+      C1 = offsC[xi][yi];
+      C2 = offsC[xi+1][yi];
+      
+      for(y=yi*ys; y<(yi+1)*ys; y++)
+      {
+         HDc = (C2-C1) / ys;
+         c = C1;
+         
+         for(x=xi*xs; x<(xi+1)*xs; x++)
+         {
+            //setcol( 4*pal[c] ); setpix(x,y);
+            img1[x][y] = 4*pal[c];
+            c += HDc;
+         }
+         C1 += VLDc;
+         C2 += VRDc;
+         
+      }
+   }
+}
+
+Init()
+{
+   // setup garish palette
+   for(i=0; i<64; i++)
+   {
+      pal[i]     = rgb(i,   0,    63-i);
+      pal[i+64]  = rgb(63-i,i,    0);
+      pal[i+128] = rgb(0,   63-i, i);
+      pal[i+192] = rgb(i,   0,    63-i);
+   }   
+
+   for(y=0; y<H; y++)
+   for(x=0; x<W; x++)
+   {
+      offsC[x][y] = int(rnd*255); 
+   }
+}

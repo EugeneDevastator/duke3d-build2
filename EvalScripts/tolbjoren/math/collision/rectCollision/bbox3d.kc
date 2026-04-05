@@ -1,0 +1,189 @@
+// Camera
+static posx = 0;
+static posy = 65;
+static posz = 60;
+static posh = 0; // left right
+static posv = -140*PI/180.0;
+static mat[9];
+
+
+
+struct BBox
+{
+   xmin, ymin;
+   xmax, ymax;
+
+
+};
+
+static sphX, sphY, sphZ;
+
+
+()
+{
+   cls(0); clz(1e32);
+ //  setcam(0,0,-5,
+ //        0,0);
+   playercontrols();     
+
+   
+   nx = (mousx/xres-.5);
+   ny = (mousy/yres-.5); 
+
+   bbox a;
+   a.xmin = -1;
+   a.ymin = -1;
+   a.xmax = 1;
+   a.ymax = 1;
+
+   bbox b;
+   b.xmin = 2 + 5*nx;
+   b.ymin = -.5 + 5*ny;
+   b.xmax = 3 + 5*nx;
+   b.ymax = .5 + 5*ny;
+
+   if( intersects(a,b) )
+   {
+      setcol(255,0,0);
+   }else
+   {
+      setcol(0,255,0);
+   }
+   
+   if( contains(a,b) )
+   {
+      setcol(255,255,0);
+   }
+   drawbox(a);
+   drawbox(b);
+   
+   setcol(255,255,255);
+   gridxz(0);
+   
+   drawsph(sphX, sphY, sphZ, 1 );
+
+   moveto(0,0);
+   gridLoSiz = 15;
+   gridSiz = 30;
+   gridSegs = 6;
+   gx = (gridLoSiz + sphX)/gridSiz * gridSegs;
+   gy = (gridLoSiz + sphY)/gridSiz * gridSegs;
+   gz = (gridLoSiz + sphZ)/gridSiz * gridSegs;
+   
+   setfont(12,16);
+   printf("grid x,y,z %.1f %.1f %.1f", gx,gy,gz);   
+
+}
+
+
+drawbox(bbox a)
+{
+   
+   s =.025;
+      drawcone(a.xmin, a.ymin,0,s,
+               a.xmax, a.ymin,0,s);
+               
+      drawcone(a.xmax, a.ymin,0,s,
+               a.xmax, a.ymax,0,s);
+               
+      drawcone(a.xmax, a.ymax,0,s,
+               a.xmin, a.ymax,0,s);
+               
+      drawcone(a.xmin, a.ymax,0,s,
+               a.xmin, a.ymin,0,s);
+   
+}
+
+intersects(BBox first, BBox second)
+{
+
+   return !( 
+      first.xmin > second.xmax  || first.xmax < second.xmin || 
+      first.ymin > second.ymax  || first.ymax < second.ymin
+      );
+
+}
+
+
+  // can rectangle (1) entirely contain the other rectangle (2)?
+contains(BBox first, BBox second) {
+
+   return ( 
+      first.xmin < second.xmin && first.xmax > second.xmax && 
+      first.ymin < second.ymin && first.ymax > second.ymax
+      );
+      
+
+}
+
+
+gridxz(y)
+{
+   siz = 30;
+   step = 5;
+   ox = -siz;
+   oz = -siz;
+   for(x=-siz; x<=siz; x+=step)
+   {
+      for(z=-siz; z<=siz; z+=step)
+      {
+         moveto(ox,y,oz);
+         lineto(x,y,z);
+   
+         moveto(oz,y,ox);
+         lineto(z,y,x);
+               
+         ox = x;
+      } 
+   }
+}
+
+
+// Camera and movement code taken from /games/
+//Handle input and player movement
+playercontrols()
+{
+   static oldMouseX;
+   static oldMouseY;
+   static mouseSpeedX;
+   static mouseSpeedY; 
+
+   f = .125;
+   if (keystatus[0x2a]) f /= 4;
+   if (keystatus[0x36]) f *= 4;
+   vx = (keystatus[32]-keystatus[30])*f; //D-A
+   vy = (keystatus[17]-keystatus[31])*f; //W-S  
+   vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   
+   //static mat[9]; 
+   ang2mat(posh,posv,mat); // Convert angles to rotation matrix
+   
+   // find new position
+   posx += mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   posy += mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   posz += mat[2]*vx + mat[5]*vz + mat[8]*vy; 
+   // mousespeed values are tweaked for 60 fps
+   mouseSpeedX = (mousx - oldMouseX) * 0.01;
+   mouseSpeedY = (mousy - oldMouseY) * 0.01;
+   oldMouseX = mousx;
+   oldMouseY = mousy;
+   if(bstatus==1)
+   {
+      posh -= mouseSpeedX;
+      posv += mouseSpeedY;
+   }
+   // Right,down,forwards unit vectors.
+   setcam(posx,posy,posz,
+          mat[0],mat[1],mat[2],
+          mat[3],mat[4],mat[5],
+          mat[6],mat[7],mat[8]);
+}
+/* converts horizontal and vertical angles to a 3x3 rotation matrix */
+ang2mat(hang,vang,mat[9])
+{
+   mat[0] = cos(hang); mat[1] = 0; mat[2]=-sin(hang);
+   mat[6] = cos(vang)*sin(hang); mat[7] = sin(vang); mat[8]=cos(vang)*cos(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}

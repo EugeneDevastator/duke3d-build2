@@ -1,0 +1,724 @@
+/*
+beginnings of a bridge builder clone...
+starte 19. nov by Torb
+
+TODOS:
+-[DONE!] actual integration of motion and spring-physics
+-[Hmm works with SOR...] is verlet good enough for stiff and soft springs?
+-[not done] make so you cant create 2 frozen points in same place
+-[not done] add terrain with construction points (just frozen masspoints)
+-[not done] a train or car to drive over, either use SAT collision or ray test?
+-[not done] search for orphaned masspoints/verts after edge/line deletion
+-limit number of connections from vert to edge?
+-stress color based on material strength and stress/force applied
+-multiplayer?
+*/
+
+#define SUCCESSIVE_OVER_RELAX
+struct vec{x,y,z;}
+
+struct vert{
+   vec old_pos;
+   vec pos;
+   vec force;
+   f_len; // Store force magnitude
+   force_exceed_time;
+   frozen;
+}
+
+struct edge{
+   v1, v2;
+   elasticity;
+   desired_dist;
+   force_exceed_time;
+   stretch;
+   dist;
+}
+static MAX_STRETCH = 1.01;
+
+enum{MAX_POINTS = 1024}
+static vert vertices[MAX_POINTS];
+
+enum{MAX_EDGES = 2*MAX_POINTS}
+static edge edges[MAX_EDGES];
+
+static alive_verts[MAX_POINTS];
+static alive_edges[MAX_EDGES];
+
+
+static gridcells = 64;
+static cell_length = 10;
+
+static started_creation = 0;
+
+static cursor_x, cursor_y;
+static vec mouse_vec;
+static vec cursor_vec;
+static vec startVec;
+
+//static num_verts, num_edges;
+
+static obstatus = 0; 
+static grabbed_point, grabbed_idx;
+static sim_just_started = 1;
+static drag_distance = 0;
+static vec drag_begin;
+
+static closest_line = -1;
+
+static vec ball_pos;
+static vec ball_vel;
+
+static sim_running = 0;
+
+static time, old_time, delta_time;
+()
+{
+   time = klock( 0 );
+   delta_time = time - old_time;
+   old_time = time;
+   
+   cls(0);
+   vecset( mouse_vec, mousx, mousy );
+      
+   largest_dim = max(xres,yres);
+   cell_length = largest_dim / (gridcells);
+   cursor_x = floor( (mousx/largest_dim * gridcells) +.5 ) * cell_length;
+   cursor_y = floor( (mousy/largest_dim * gridcells) +.5 ) * cell_length;
+   vecset( cursor_vec, cursor_x, cursor_y );   
+
+   drawgrid();
+   setcol(0,255,0);
+   drawsph(cursor_x, cursor_y, -4);
+   
+   if ( numframes == 0 ){
+      for(i=0; i<7; i++){
+         px1 = cell_length*8 + i*cell_length*8;
+         py1 = 4*8*cell_length;
+         
+         createFrozen(px1,py1);
+      
+
+      }
+      
+      for(i=0; i<6; i++){
+         px1 = cell_length*8 + i*cell_length*8;
+         py1 = 4*8*cell_length;
+         
+         px2 = cell_length*8 + (i+1)*cell_length*8;
+         py2 = 4*8*cell_length;
+         
+         vec p1,p2;
+         vecset(p1, px1, py1);
+         vecset(p2, px2, py2);
+         createEdge( p1, p2 );
+               
+
+      }
+      
+      
+
+
+   }
+  
+   
+   if ( bstatus==1 && !grabbed_point ){
+      grabbed_idx = findClosestVert( mousx, mousy );
+      vert v;
+      v = vertices[grabbed_idx];
+      if ( grabbed_idx != -1 && !v.frozen ){
+         dx = v.pos.x - mousx;
+         dy = v.pos.y - mousy;
+         dist = sqrt(dx^2 + dy^2);
+         if ( dist < 10 ){
+            grabbed_point = 1;
+            drag_distance = 0;
+            vecset( drag_begin, mousx, mousy );
+         }
+      } 
+   } 
+   
+   if ( grabbed_point ){
+      drag_distance = distance( drag_begin, mouse_vec );
+      if ( drag_distance > 1 ){
+         started_creation = 0;
+      }
+      
+      i = grabbed_idx;
+      vertices[i].pos.x = cursor_x;
+      vertices[i].pos.y = cursor_y;
+      vertices[i].old_pos.x = cursor_x;
+      vertices[i].old_pos.y = cursor_y;
+   }
+   
+   if ( bstatus == 0 ){
+      grabbed_point = 0;
+   }
+   
+   if( started_creation && bstatus == 1 && obstatus==0)
+   {
+      endCreate();
+
+   } 
+
+   if ( bstatus == 1 && obstatus==0 )
+   {
+      beginCreate();
+   }
+
+
+   
+   if ( keystatus[1] ){  // ESC to cancel create
+      started_creation = 0;
+   }   
+
+   if ( bstatus==2 && obstatus == 0 && started_creation == 0)
+   {
+      idx = findVertAt( cursor_vec );
+      if ( idx != -1 ){
+         vertices[idx].frozen = 1;
+      }else{
+         createFrozen( cursor_x, cursor_y );
+      }
+   }
+   if ( bstatus==2 ){
+      started_creation = 0;
+   }
+   
+   if ( keystatus[211] ){ // delete key to remove closest line
+      keystatus[211] = 0; // hack
+      if ( closest_line != -1 ){
+         alive_edges[closest_line] = 0;
+      }
+   }
+      
+   draw_edges();
+   
+   relax();
+   
+   sim_running = keystatus[2];
+   
+   if ( sim_running ){
+      if ( sim_just_started ){
+         sim_just_started = 0;
+         init_simulation();
+      }
+      
+      apply_point_forces();
+      
+      simulate();
+      
+      
+   }else{
+      sim_just_started = 1;
+   }
+   
+   search_for_deletion(); 
+   
+
+   setcol(255,255,255);
+   moveto( xres/2-50, 100);
+   printf("bridge builder");
+   
+
+   obstatus = bstatus;
+   
+   //while( numframes/60 > klock(0) ) {} // busy wait
+}
+
+init_simulation(){
+         for ( i=0; i<MAX_POINTS; i++ ){
+            if (alive_verts[i] ){
+            vertices[i].old_pos.x = vertices[i].pos.x;
+            vertices[i].old_pos.y = vertices[i].pos.y;
+            
+            // Reset any forces
+            vertices[i].force.x = 0;
+            vertices[i].force.y = 0;
+            
+            vertices[i].force.x = 0;
+            vertices[i].force.y = 0;
+            
+            vertices[i].force_exceed_time = 0;
+
+            }
+         }
+         for( i=0; i< MAX_EDGES; i++){
+            if( alive_edges[i] ){
+               edges[i].force_exceed_time = 0;
+               edges[i].stretch = 1;
+            }
+         }
+}
+
+search_for_deletion(){
+   closest_line = -1;
+   mind = 1e32;
+   for(i=0; i<MAX_EDGES; i++){
+      if ( alive_edges[i] == 0 ) continue;
+      
+      vec closestPt, v1,v2;
+      v1 = vertices[ edges[i].v1 ].pos;
+      v2 = vertices[ edges[i].v2 ].pos;
+      closestPtOnLine( mouse_vec,  v1,  v2, closestPt );
+      distSq = distanceSq( mouse_vec, closestPt );
+      if ( distSq < mind ){
+         mind = distSq;
+         closest_line = i;
+      }
+      
+      
+   }
+
+}
+
+simulate(){
+   
+   for(i=0; i<MAX_POINTS; i++){
+      if (alive_verts[i] ){
+         vert v;
+         v = vertices[i];
+         if ( v.frozen==0 ){
+            
+            x = v.pos.x;
+            y = v.pos.y;
+            ox = v.old_pos.x;
+            oy = v.old_pos.y;
+            tmpx = x;
+            tmpy = y;
+            
+            
+            ax = 0;
+            ay = 0.01;
+            
+            #ifdef SUCCESSIVE_OVER_RELAX
+            
+            #else
+               x += v.force.x * .5;
+               y += v.force.y * .5;
+               
+               v.force.x = 0;
+               v.force.y = 0;
+            #endif
+            
+            x += (x - ox) + ax;
+            y += (y - oy) + ay;
+                        
+            ox = tmpx;
+            oy = tmpy;
+            vecset( v.pos, x,y);
+            vecset( v.old_pos, ox, oy );
+         }
+         vertices[i] = v; // copy-value back
+      }
+   }
+   
+
+   
+}
+
+apply_point_forces(){
+   for(i=0; i<MAX_POINTS; i++){
+         if (alive_verts[i] ){
+            
+            vert v;
+            v = vertices[i];
+            
+            if ( v.frozen ) continue; // Frozens are unbreakable
+            
+            // how big is the force applied?
+            f_len = sqrt( v.force.x^2 + v.force.y^2 ); 
+            v.f_len = f_len;
+            v.force.x = 0; v.force.y = 0;
+            
+            if ( f_len > .3 ){
+               v.force_exceed_time += delta_time;
+               if ( v.force_exceed_time > .5 ){
+                  // TODO
+                  // find all edges that share this vert
+                  // and insert a new vert at all positions
+                  // should save a list of edge pointers
+                  // in Vert... or a map of
+                  // vert <-> edge connections
+                  // or should edges be killed instead?
+                  //v.frozen = 0; 
+               }
+            }else{
+               v.force_exceed_time = 0;
+            }
+            
+            vertices[i] = v; // copy-value back
+         }
+   }
+}
+
+relax(){
+   Edge e;
+   vec v1,v2;
+   for(i=0; i<MAX_EDGES; i++){
+      if ( alive_edges[i] ){
+         e = edges[i];
+         v1 = vertices[ e.v1 ].pos;
+         v2 = vertices[ e.v2 ].pos;
+         dx = v1.x - v2.x; 
+         dy = v1.y - v2.y; 
+   
+         dist = sqrt(dx^2 + dy^2);
+         e.dist = dist;
+         if ( fabs(dist - e.desired_dist) > 0.1 )
+         {
+            // F = -ky
+            
+            // how much of the force goes to horizontal and vertical vectors..
+            fx = dx / dist;
+            fy = dy / dist;
+            
+            // helper variable, basically this is the force
+            alpha = e.elasticity;
+            if ( !sim_running ){
+               alpha = 1;
+            }
+            intensity = (dist - e.desired_dist) * alpha;
+            
+            // apply
+            fx = fx * intensity;
+            fy = fy * intensity;
+            e.stretch = dist / e.desired_dist;
+            
+            if ( sim_running ){
+            
+               if ( e.stretch > MAX_STRETCH ){
+                  // add to time force exceeded
+                  e.force_exceed_time += delta_time;
+                  if ( e.force_exceed_time > .25 ){
+                     alive_edges[i] = 0;
+                     continue;
+                  }
+               }else{
+                  e.force_exceed_time -= delta_time;
+                  if ( e.force_exceed_time < 0 )
+                  {
+                     // force nolonger exceeding limit.. could do cooldown
+                     e.force_exceed_time = 0;
+                  } 
+               }
+               
+               
+        
+
+               vertices[e.v1].force.x -= fx;
+               vertices[e.v1].force.y -= fy;
+               
+               vertices[e.v2].force.x += fx;
+               vertices[e.v2].force.y += fy;
+            }
+
+            // Move mass points
+            #ifdef SUCCESSIVE_OVER_RELAX
+            
+               if ( vertices[e.v1].frozen == 0 ){
+                  vertices[e.v1].pos.x -= fx *.5;
+                  vertices[e.v1].pos.y -= fy *.5;
+               }
+            
+            
+               if ( vertices[e.v2].frozen == 0 ){
+                  vertices[e.v2].pos.x += fx *.5;
+                  vertices[e.v2].pos.y += fy *.5;
+               }
+            
+            #endif
+            
+         }  // need to relax?
+         edges[i] = e; // copy-value back
+      } // is alive?
+   } // for MAX
+}
+
+draw_edges(){
+   
+   vec v1,v2;
+   for(i=0; i<MAX_EDGES; i++){
+      if (alive_edges[i] ){
+         v1 = vertices[ edges[i].v1 ].pos;
+         v2 = vertices[ edges[i].v2 ].pos;
+         x1 = v1.x; 
+         y1 = v1.y;
+         
+         x2 = v2.x; 
+         y2 = v2.y;
+         //setcol(255,0,0);
+         edges[i].dist = sqrt( (x1-x2)^2 + (y1-y2)^2 );
+         c = (edges[i].stretch-1) / (MAX_STRETCH-1);
+         c = max(0, min(255,c) );
+         
+         if ( edges[i].force_exceed_time > 0.1 && rnd > 0.5 ){
+            setcol(255,255,0);
+         }else{
+            setcol( 255*c, 255-255*c,0);
+         }
+         
+         
+         if ( i==closest_line ){
+            //setcol(255,255,0);
+         }
+         drawcone( x1,y1,2.0, x2, y2, 2.0 );
+      }
+   }
+   
+  
+   vec pos;
+   for(i=0; i<MAX_POINTS; i++){
+      if (alive_verts[i] ){
+         //if ( vertices[i].frozen )
+         {
+         
+            pos = vertices[i].pos;
+            setcol(255,255,255);
+            drawsph( pos.x, pos.y, 6 );
+             setcol(0,255,0);
+            if ( vertices[i].frozen )  setcol(255,0,0);
+            drawsph( pos.x, pos.y, 5 );
+         }
+      }
+   }
+   
+   
+   #if 0
+   for(i=0; i<MAX_POINTS; i++){
+      if (alive_verts[i] ){
+            pos = vertices[i].pos;
+            setcol(255,255,255);
+            moveto( pos.x-12, pos.y-2 ); 
+            printf("%.2f", vertices[i].f_len);
+         
+      }
+   }
+   #endif
+   
+   #if 0
+   for(i=0; i<MAX_EDGES; i++){
+      if (alive_edges[i] ){
+         edge e;
+         e = edges[i];
+         
+         vec pos1, pos2;
+               
+         pos1 = vertices[ e.v1 ].pos;
+         pos2 = vertices[ e.v2 ].pos;
+         setcol(255,255,255);
+         x = pos1.x + (pos2.x - pos1.x)*0.5 ;
+         y = pos1.y + (pos2.y - pos1.y)*0.5 ;
+         moveto( x, y ); 
+         printf("%.2f", edges[i].stretch);
+         
+      }
+   }
+   #endif
+   
+   setcol(0,0,255);
+   if ( started_creation )
+   {
+      //moveto( startVec.x, startVec.y ); lineto( cursor_x, cursor_y );
+      drawcone( startVec.x, startVec.y,2.0, cursor_x, cursor_y, 2.0 );
+   }
+
+}
+
+beginCreate(){
+   if (started_creation == 0){
+      started_creation = 1;
+      vecset(startVec, cursor_x, cursor_y );
+   }
+}
+
+
+endCreate(){
+   if ( started_creation )
+   {
+      started_creation = 0;
+      vec endVec;
+      vecset(endVec, cursor_x, cursor_y );
+      createEdge( startVec, endVec );
+   }
+}
+
+createFrozen(x,y)
+{
+   vec v; vecset(v,x,y);
+   i = getFreeVert();
+   vertices[i].pos = v; 
+   vertices[i].frozen = 1;
+   alive_verts[i] = 1;
+   return i;
+}
+
+createVert( vec v ){
+   i = getFreeVert();
+   vertices[i].pos = v; 
+   vertices[i].old_pos = v; 
+   vertices[i].frozen = 0;
+   alive_verts[i] = 1;
+   return i;
+}
+
+findVertAt( vec pos ){
+   for(i=0; i<MAX_POINTS; i++){
+      if (alive_verts[i] ){
+         if (vertices[i].pos.x == pos.x && vertices[i].pos.y == pos.y ){
+            return i;
+         }
+      }
+   }
+   return -1;
+}
+
+findClosestVert( x,y ){
+   mind = 1e32;
+   idx = -1;
+   for(i=0; i<MAX_POINTS; i++){
+      if (alive_verts[i] ){
+         dx = vertices[i].pos.x - x;
+         dy = vertices[i].pos.y - y;
+         distSq = dx^2 + dy^2;
+         if ( distSq < mind ){
+            mind = distSq;
+            idx = i;
+         }
+      }
+   }
+   return idx;
+}
+
+createEdge( vec startVec, vec endVec )
+{
+   // Could save each "mass" point in grid cell
+   // could then directly look up instead of search...
+
+   idx1 = findVertAt( startVec );
+   idx2 = findVertAt( endVec );
+
+   Edge e;
+   if ( idx1 != -1 ){
+      e.v1 = idx1;
+   }else{
+      e.v1 = createVert( startVec );
+   }
+   if ( idx2 != -1 ){
+      e.v2 = idx2;
+   }else{
+      e.v2 = createVert( endVec );
+   }
+   
+   e.desired_dist = distance(startVec, endVec);
+   e.elasticity = .1;
+   e.stretch = 1;
+   e.force_exceed_time = 0;
+   
+   idx = getFreeEdge();
+   edges[idx] = e;
+   alive_edges[idx] = 1;
+}
+
+getFreeVert(){
+   for(i=0; i<MAX_POINTS; i++){
+      if (alive_verts[i] == 0){
+         return i;
+      }
+   }
+   return -1;
+}
+
+getFreeEdge(){
+   for(i=0; i<MAX_EDGES; i++){
+      if (alive_edges[i] == 0){
+         return i;
+      }
+   }
+   return -1;
+}
+
+drawgrid(){
+   setcol(42,42,42);
+
+   for(i=0; i<gridcells; i++){
+      x = i * cell_length;
+      moveto(x,0);
+      lineto(x,0+yres);
+   }
+   for(i=0; i<gridcells; i++){
+      y = i * cell_length;
+      moveto(0,y);
+      lineto(xres,y);
+   }
+   
+   setcol(0x888b05);
+   for(i=0; i<gridcells; i+=8){
+      x = i * cell_length;
+      moveto(x,0);
+      lineto(x,0+yres);
+   }
+   for(i=0; i<gridcells; i+=8){
+      y = i * cell_length;
+      moveto(0,y);
+      lineto(xres,y);
+   }
+}
+
+
+closestPtOnLine( vec point, vec a, vec b, vec out)
+{
+   // from A to P
+   vec aTop;
+   vecsub( aTop, point, a );
+   // From A to B
+   vec n;
+   vecsub(n, b, a);
+   // normalize Dir A to B
+   distAB = length(n);
+   
+   if( distAB > 0.0 ){
+      vecset( n, n.x/distAb, n.y/distAb );
+   }
+   
+   t = dot(n,aTop); // proj v1 onto norm
+   
+   if( t<= 0){ // A is closest
+      vecset(out,a); 
+      return;
+   }
+   
+   if( t>= distAB){ // B is closest
+      vecset(out,b); 
+      return;
+   }
+   
+   // create new vec, closest pt
+   vecset(out, a.x + n.x*t, a.y + n.y*t);
+}
+
+vecset(vec v, x,y){ v.x = x; v.y = y; }
+vecset(vec v, vec other){ v.x = other.x; v.y = other.y; }
+
+vecSub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y; 
+}
+
+dot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y;
+}
+
+length( vec v )
+{
+   return sqrt( dot(v,v) );
+}
+
+distance(vec a, vec b){
+   return sqrt( (a.x - b.x)^2 + (a.y - b.y)^2 );
+}
+distanceSq(vec a, vec b){
+   return (a.x - b.x)^2 + (a.y - b.y)^2;
+}

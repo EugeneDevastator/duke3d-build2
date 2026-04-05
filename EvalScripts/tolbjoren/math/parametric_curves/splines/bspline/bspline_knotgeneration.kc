@@ -1,0 +1,70 @@
+enum{MAX_KNOTS = 30}
+static knot[MAX_KNOTS];
+
+()
+{
+   cls(255,255,255);
+   
+   for(i=0; i<MAX_KNOTS; i++)
+   {
+      knot[i] = i;
+      /*
+      knot[0] = 0;
+      knot[1] = 0;
+      knot[2] = 1;
+      knot[3] = 2;
+      knot[4] = 3;
+      knot[5] = 3;
+      knot[6] = 4;
+      knot[7] = 4;
+      knot[8] = 4;
+      */
+   }
+
+   
+   setcol(0,0,0);
+   moveto(xres/2,yres/2);
+   
+   steps = 1000;
+   
+   punkter = 4;
+   grad = 1;
+   umax = grad+punkter;
+
+   for(idx=0; idx < punkter; idx++)
+   {
+   for(it=0; it<steps; it++)
+   {
+      x = it;
+      u = it * umax / (steps-1);
+      y = N(idx,grad,u);
+        
+      
+      setpix( 100+x/steps*200, 300-y*100 );
+   }
+   }  
+ 
+}
+
+
+N(i,p,u) // i=hvilket punkt, p=grad, u=[0,1]
+{
+   if(p==0)
+   {
+      if( u >= knot[i] && u < knot[i+1] ) // innenfor intervallet. 
+      {
+         return 1;
+      }else{
+         return 0;
+      }
+   }
+   
+   n1 = u-knot[i];
+   d1 = knot[i+p]-knot[i];
+   
+   n2 = knot[i+p+1] - u;
+   d2 = knot[i+p+1] - knot[i+1];
+   
+   val = n1/d1 * N(i,p-1,u) + n2/d2*N(i+1,p-1,u);
+   return val;
+}

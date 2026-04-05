@@ -1,0 +1,11 @@
+(x,y)
+c = 1; ox = x; oy = y;
+do
+{
+   xx = x*x; yy = y*y;
+   if (xx+yy >= 4) break;
+   y = x*y*2+oy;
+   x = xx-yy+ox;
+   c -= 1/32;
+} while (c > 0);
+c

@@ -1,0 +1,43 @@
+(x,y,z,&r,&g,&b)
+{
+
+   // 6 Cylinders. Implicit cyl is some (axis^2 + otheraxis^2) < radius
+   r0 = 0.05;
+   r1 = 0.03;   
+   
+   distOrigin = sqrt(x^2 + y^2 + z^2);
+
+   a0=0; a1=0;
+   if ( distOrigin < .5 ){
+      a0 = x^2 + y^2 < r0;
+      a1 = x^2 + y^2 < r1;
+   }
+   
+   b0=0; b1=0;
+   if ( distOrigin < .65 ){
+      b0 = x^2 + z^2 < r0;
+      b1 = x^2 + z^2 < r1;
+   }
+   
+   c0=0; c1=0;
+   ty = y + .85;
+   distOrigin = sqrt(x^2 + ty^2 + z^2);
+   if ( distOrigin < .35 ){
+      c0 = ty^2 + z^2 < r0*.5;
+      c1 = ty^2 + z^2 < r1*.5;
+   }
+   
+
+   f = 15;
+   tex = noise(x*f,y*f,z*f);
+   
+   
+   r=128+(tex+a0)*127;
+   g=128+(tex+b0)*127;
+   b=128+(tex+c0)*127;
+   
+   // Last statement is allways the return value ;)
+   //c0-c1;
+   (a0-a1-b1-c1) + (b0-b1-a1-c1) + (c0-c1-a1-b1);
+   //(a0+b0+c0) - (a1+b1+c1);
+}

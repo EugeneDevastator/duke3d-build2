@@ -1,0 +1,155 @@
+()
+{
+   cls(0); setfont(8,12);
+   time = klock(0);
+   
+
+   spd = 10;
+   
+   engineAngle = time*spd;
+      
+   setcol(0xffffff);
+
+   cx=xres/2; cy = yres/2;
+   
+/*
+   segs = 17;
+   r = 150;
+   roundTime = time % (segs-1); /// fmod(time,segs-1);   
+   px = 0 + cx;
+   py = 0 + cy;
+   moveto(px,py);
+   for(i=0; i<segs; i++){
+      v = i*2*PI/(segs-1);
+      px = cx + cos(v)*r;
+      py = cy + sin(v)*r;
+      lineto(px,py);
+      
+      v2 = roundTime * 2 * PI / (segs-1);
+      px = cx + cos(v2)*r;
+      py = cy + sin(v2)*r;
+      drawsph(px,py,5);
+   }
+*/   
+
+   flyWheelRadii = 10*xres/100;
+
+   ofsx1 = sin(engineAngle)*flyWheelRadii;
+   ofsx2 = sin(engineAngle)*flyWheelRadii;
+   x1 = xres-500;
+   x2 = xres-150;
+   
+   y1 = yres/2;
+   y2 = yres/2;
+   ofsy2 = cos(engineAngle)*flyWheelRadii;
+      
+
+   pistonX = x1+ofsx1; 
+   pistonY = y1;   
+
+   // flywheel   
+   drawsph(x2,y2,-flyWheelRadii);
+   // cyl
+   drawrectopen(x1-xres/6,y1-25, x2-xres/4,y1+25);
+   // piston
+   drawrectfill(pistonX-15,pistonY-20,pistonX-60,pistonY+20);
+   
+   // 0-1 = 1 pi. = 180deg. 0-2 = 360deg. 1 rev... 2 sec
+   rpm = 2*60;
+   rounds = time *2;
+   setfont(36,18);
+   moveto(0,0);
+   printf("engine rpm: %g, rounds so far: %.f", rpm,rounds);  
+   printf("\nsecs passed since start: %.f",time);
+   
+   
+   ang = -sin(engineAngle)+.5;
+   
+   if( ang > 0 )
+   {
+      c = (ang)*255;
+      setcol(c,c,0);
+      drawrectfill(x1-115,y1-20,x1-95,y1+20);
+      
+      if(ang > 1.4 ){setcol(0x0000ff); star(x1-110,yres/2,15); }
+   }      
+
+   xpos1 = x1+ofsx1;  
+   xpos2 = x2+ofsx2;
+   
+   ypos1 = y1;
+   ypos2 = y2+ofsy2;   
+   
+   setcol(0xffffff);
+
+   steps = 10;   
+
+   for(i=0; i<steps; i++)
+   {
+      t = i/(steps-1);
+      px = lerp(xpos1,xpos2,t);//xpos1+lerp(xpos1,xpos2,t);
+      py = lerp(ypos1,ypos2,t);//ypos1+lerp(ypos1,ypos2,t);
+
+      drawsph(px,py,-10);   
+   }
+
+   setcol(0xff0000);   
+   steps = 10;
+
+   stepSiz = (xpos2-xpos1)/(steps-1);   
+
+   for(i=0; i<steps; i++){
+      nx = xpos1 + i*stepSiz;
+      ny = 0;               
+      lerp2(xpos1,ypos1,xpos2,ypos2,nx,ny);
+      drawsph(nx,ny,-15);
+   }
+   
+}
+
+lerp(a,b,t)
+{
+	return t*a + (1-t)*b;
+}
+/*
+lerp(x1,x2,t){
+   (x2-x1)*t;
+}*/
+
+lerp2(x1,y1,x2,y2,nx,&ny){
+   ny = y1+(nx-x1)*(y2-y1)/(x2-x1);
+}
+drawrectopen(x0,y0,x1,y1) { moveto(x0,y0); lineto(x1,y0); lineto(x1,y1); lineto(x0,y1); lineto(x0,y0); }
+drawrectfill(x0,y0,x1,y1) { for(y=y0;y<y1;y++) { moveto(x0,y); lineto(x1,y); } }
+
+
+drawTriangle(x,y,size,degrees)
+{
+   scal = PI/180;
+   ang1 = degrees/180*PI;
+   ang2 = ang1+2*PI/3;
+   ang3 = ang1-2*PI/3;
+   v1x = x+sin(ang1)*size;
+   v1y = y+cos(ang1)*size;
+   
+   v2x = x+sin(ang2)*size;
+   v2y = y+cos(ang2)*size;
+   
+   v3x = x+sin(ang3)*size;
+   v3y = y+cos(ang3)*size;
+   moveto(v1x, v1y);
+   lineto(v2x, v2y);
+   lineto(v3x, v3y);
+   moveto(v3x, v3y);
+   lineto(v1x, v1y); 
+}
+
+star(x,y,siz){
+   for(i=0; i<siz; i++){
+      for(j=0; j<4; j++)
+      {
+         //setcol( (j+4)*255/8,j*255/4,0);
+         drawTriangle(x,y,i,j*30);
+      }
+   }
+}

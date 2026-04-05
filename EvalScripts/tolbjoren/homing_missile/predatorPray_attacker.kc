@@ -1,0 +1,85 @@
+enum{MAXPRAY = 1, MAXPRED = 1}
+static prayx[MAXPRAY];
+static prayy[MAXPRAY];
+static predatorx[MAXPRED];
+static predatory[MAXPRED];
+static predatorvx[MAXPRED];
+static predatorvy[MAXPRED];
+static predatorHeading[MAXPRED];
+
+static tolerance = 0.001;
+()
+{
+   if(numframes==0){
+      predatorx[0] = xres/2;
+      predatory[0] = yres/2;
+   
+   }
+   prayx[0] = mousx;
+   prayy[0] = mousy;
+   cls(0);
+   
+   moveto(predatorx[0], predatory[0]);
+   doLineOfSight(0,0);
+   draw();
+   
+   
+   predatorx[0] += predatorvx[0];
+   predatory[0] += predatorvy[0];
+   
+   pred = 0;
+   // spd in pix per frame 
+   spd = 3;
+   predatorvx[pred] = cos(-predatorHeading[pred])*spd;
+   predatorvy[pred] = sin(-predatorHeading[pred])*spd;
+  
+   
+   sleep(16);
+}
+
+doLineOfSight(pred,pray){
+   left = 0;
+   right = 0;
+   
+   //ang = atan2(prayy[pray] - predatory[pred],prayx[pray] - predatorx[pred]);
+   ang = atan2(prayx[pray] - predatorx[pred],prayy[pray] - predatory[pred]);
+   vx = cos(ang);
+   vy = sin(ang);
+   //vx = prayx[pray] - predatorx[pred];
+   //vy = prayy[pray] - predatory[pred];
+   
+   ca = cos(predatorHeading[pred]);
+   sa = sin(predatorHeading[pred]);  
+   
+   rotX = vx * ca + vy * sa;
+   rotY = -vx * sa + vy * ca;
+   
+   length = sqrt(rotX^2 + rotY^2);
+   rotX /= length; 
+   rotY /= length;
+   
+   // rotate max 0.5 degrees per frame
+   // 0.5*PI/180/2*PI;
+   maxRot = 2*PI/180;
+
+   if(rotx < -tolerance){
+      left = 1;
+      predatorHeading[pred] += maxRot;
+   }
+   else if(rotx > -tolerance){
+      right = 1;
+      predatorHeading[pred] -= maxRot;
+   }
+    
+   printf("\n%g\n%g",left,right);   
+}
+
+draw(){
+   for(i=0; i<MAXPRED; i++){
+      drawsph(predatorx[i], predatory[i], -10);
+      moveto(predatorx[i], predatory[i]);
+      lx = cos(-predatorHeading[i])*20;
+      ly = sin(-predatorHeading[i])*20;
+      lineto(predatorx[i]+lx, predatory[i]+ly);
+   }
+}

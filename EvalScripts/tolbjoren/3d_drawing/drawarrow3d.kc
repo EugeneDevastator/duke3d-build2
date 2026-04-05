@@ -1,0 +1,103 @@
+struct vec{x,y,z;}
+()
+{
+	t = klock(0);
+	cls(0); clz(1e32);
+	setcam(0,0,-5,0,0);
+	
+	
+	vec o1 = {0,0,0};
+	vec d1 = {0,0,-1};
+	setcol(127,127,46); drawArrow(o1,d1,.05);
+	
+	vec o2 = {-1,0,0};
+	vec d2 = {o2.x+cos(t),o2.y+sin(t),o2.z+0};
+	setcol(16,128,32); drawArrow(o2,d2,.05);
+
+	vec o2 = {-1,0,0};
+	a = t + pi/2;
+	vec d2 = {o2.x+cos(a),o2.y+sin(a),o2.z+0};
+	setcol(128,16,32); drawArrow(o2,d2,.1);
+}
+
+
+drawArrow(vec s, vec e, scale) // finds direction vector e-s.
+{
+   //moveto(s.x,s.y,s.z);
+   //lineto(e.x,e.y,e.z);
+   vec dir;
+   vecSub(dir, e, s); 
+   
+   arrowlen = length(dir);
+   if(arrowlen < .1) return; // dont draw small arrows.
+   
+   polelen = arrowlen * 0.75;
+   pointerlen = arrowlen - polelen; // not used...
+   normalize(dir);
+   
+   r1=scale;
+   drawcone(s.x,s.y,s.z,r1,
+            s.x+dir.x*polelen,s.y+dir.y*polelen,s.z+dir.z*polelen,r1,DRAWCONE_FLAT );         
+   drawcone(s.x+dir.x*polelen,s.y+dir.y*polelen,s.z+dir.z*polelen, -r1*3, 
+            e.x, e.y, e.z, 0.01,DRAWCONE_CENT);
+   
+}
+
+
+//
+// Vector
+//
+vecScalar( vec out, vec a, s )
+{
+   out.x = a.x * s;
+   out.y = a.y * s;
+   out.z = a.z * s;
+}
+
+vecAdd( vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;   
+}
+vecSub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;   
+}
+
+vecCross( vec out, vec a, vec b)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+
+// all you need is =...
+vecSet(vec a, x,y,z){
+   a.x = x; a.y = y; a.z = z;
+}
+
+vecSet(vec a, vec other){
+   a.x = other.x; a.y = other.y; a.z = other.z;
+}
+
+vecDot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+length( vec v )
+{
+   return sqrt( vecdot(v,v) );
+}
+
+normalize( vec v )
+{
+   len = length(v);
+   if ( len )
+   {
+      v.x /= len; v.y /= len; v.z /= len;
+   }
+}

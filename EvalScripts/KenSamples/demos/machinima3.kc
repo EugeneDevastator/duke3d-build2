@@ -1,0 +1,43 @@
+()
+{
+   static hitx, hity, tim;
+   clz(1e32);
+   otim = tim; tim = klock();
+   
+   f = 255; if (tim > 18) f -= (tim-18)*16;
+   setcol(f,f,f); f /= 255;
+   glsettex("brick.png");
+   glbegin(GL_QUADS);
+   gltexcoord(0,tim*2.0   ); glvertex(-8,-8,8);
+   gltexcoord(6,tim*2.0   ); glvertex(+8,-8,8);
+   gltexcoord(6,tim*2.0+12); glvertex(+8,+8,8);
+   gltexcoord(0,tim*2.0+12); glvertex(-8,+8,8);
+
+   //Tom's DNA:
+   for(i=-64; i<96; i++) // it is nice if endings are visible ok
+   {
+      a = i*.2+tim*8; h = i*.05; r = .5;
+      a2 = a + pi*1.1; // second helix
+      setcol(f*128,f*256,0); drawsph(sin(a *pi/5)*r, h, cos(a *pi/5)*r+5, .05);
+      setcol(f*256,f*128,0); drawsph(sin(a2*pi/5)*r, h, cos(a2*pi/5)*r+5, .05);
+   }
+
+   a = tim*8*pi/5+1.1;
+   setcol(f*192,f*192,f*256); drawkv6("caco.kv6",.02,sin(a)*r,-3.5,cos(a)*r+5,0,PI/2);
+   setcol(f*256,f*256,f*256);
+   a += 4.2;
+   if (tim <= 7.5)
+        drawkv6("caco.kv6",.02,sin(a)*r+hitx,-3.5+hity,cos(a)*r+5,0,PI/2);
+   else drawkv6("caco.kv6",.02,hitx,-3.5+hity,5,hitx,PI/2+hitx);
+
+   if (numframes == 0) playtext("I like double helix spaghetti!<pitch middle='-25'/>Yes. I agree. Now get out of my way! I'm eating!<silence msec='1000'/><pitch middle='+50'/>You bastard! You won't get away with this! Now where's my chainsaw?<pitch middle='-50'/>That's for bugs.. and besides I already ate it.");
+   if (tim > 7.5)
+   {
+      if (hitx == 0) playsound("ouch.wav");
+      hitx += (tim-otim);
+      hity = hitx^2;
+   }
+   if ((tim > 11) && (otim <= 11)) playsound("tapfloor.flac");
+   if (tim > 18)
+      { setcol(0xffffff); moveto(xres/2-42,yres/2-8); setfont(12,16); printf("THE END"); }
+}

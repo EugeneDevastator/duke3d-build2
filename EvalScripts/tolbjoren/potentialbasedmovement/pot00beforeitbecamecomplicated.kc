@@ -1,0 +1,220 @@
+struct coord_t
+{
+ x;
+ y;
+ gamma;
+ alpha;  
+}
+
+static numAttractors = 2;
+static coord_t attractors[2];
+
+static numRepulsors = 6;
+static coord_t repulsors[6];
+()
+{
+   cls(0);
+   
+   nx = xres/100;
+   ny = yres/100;
+   
+   endx = 15*nx;
+   endy = 15*ny;
+
+   if(numframes==0)
+   {
+      attractors[0].x = endx;
+      attractors[0].y = endy;
+      attractors[0].gamma = 0.000005;
+      attractors[0].alpha = 2;
+      
+      attractors[1].x = endx;
+      attractors[1].y = endy;
+      attractors[1].gamma = 0.005;
+      attractors[1].alpha = 20;
+            
+      repulsors[0].x = 50*nx;
+      repulsors[0].y = 50*ny;
+      repulsors[0].gamma = 0.0045;
+      
+      repulsors[1].x = 50*nx;
+      repulsors[1].y = 50*ny;
+      repulsors[1].gamma = 0.0045;
+      
+      repulsors[2].x = 70*nx;
+      repulsors[2].y = 70*ny;
+      repulsors[2].gamma = 0.0045;
+      
+      repulsors[3].x = 70*nx;
+      repulsors[3].y = 70*ny;
+      repulsors[3].gamma = 0.0045;
+      
+      repulsors[4].x = 20*nx;
+      repulsors[4].y = 50*ny;
+      repulsors[4].gamma = 0.0045;
+      
+      repulsors[5].x = 20*nx;
+      repulsors[5].y = 50*ny;
+      repulsors[5].gamma = 0.0045;     
+   }
+   
+   beta = 3;
+   
+   t = klock(0);
+   //attractors[1].x = 50+cos(t)*50;
+   //attractors[1].y = 50+sin(t)*50;   
+   
+   //startx = attractors[0].x;
+   //starty = attractors[0].y; 
+   
+/*
+   repulsors[0].x = mousx;
+   repulsors[0].y = mousy;
+*/   
+
+   //static buf[300];
+   inc = 20;
+   for(y=0; y<yres; y+=inc)
+   {
+      
+      
+      for(x=0; x<xres; x+=inc)
+      {
+         value = -attract(x,y) + repulse(x,y,beta) ;
+         value *= 100;
+         c = rgb(value, value, 255-value);
+         setcol(c);
+         drawsph(x,y,inc/2);
+         
+         //buf[x] = c;
+         //setcol( c );
+         //setpix(x,y);
+         
+         /*
+         xgrad = 0;
+         ygrad = 0;
+         derivative(x,y,beta, xgrad, ygrad);
+         v = 3000 * xgrad*ygrad;
+         buf[x] = rgb(v,v,v);
+         */
+      }
+      //sethlin(0,y,buf,300);
+   }
+   
+   startx = mousx;
+   starty = mousy;
+   x=startx;
+   y=starty;
+   waycosts = 0;
+   dtime = 0;
+   do
+   {
+      time = klock(0);
+      xgrad=0; ygrad=0;
+      derivative(x,y,beta,xgrad,ygrad);
+      
+      if( fabs(xgrad-0) < 0.0001 && fabs(ygrad-0) < 0.0001 ) break;
+      if( x > attractors[0].x -1 && x < attractors[0].x + 1 )
+      {
+         if( y > attractors[0].y -1 && y < attractors[0].y + 1 )
+         {
+            break;
+         }
+      }
+      
+      fact1 = 1/xgrad;
+      fact2 = 1/ygrad;
+      
+      factor = 0;
+      if( abs(fact1) < abs(fact2) )
+         factor = abs(fact1); 
+      else 
+         factor = abs(fact2);
+      
+      x -= xgrad * factor;
+      y -= ygrad * factor;
+      
+      dtime = dtime + klock(0) - time;
+      
+      setcol(0);
+      drawsph(x,y,-10);
+      //setpix( x,y);
+      waycosts++;
+
+   }while(1);
+   
+   
+
+     
+   setcol(0xfa7345);
+   setfont(18,36,1);
+   moveto(0,0);
+   printf("waycosts %g\n",waycosts);
+   printf("millisecs %g",dtime*1000);
+   
+   setcol(0,255,0);
+   drawsph( startx,starty, -5);
+   drawsph( endx,endy, -5);
+   
+/*
+   setcol(0xffffff);
+   for(i=0; i<numAttractors; i++)
+   {
+      drawsph( attractors[i].x, attractors[i].y, -5);
+   }
+   setcol(0xff0000);
+   for(i=0; i<numRepulsors; i++)
+   {
+      drawsph( repulsors[i].x, repulsors[i].y, -5);
+   }
+*/
+}
+
+
+attract(x,y)
+{
+   value = 0;
+   for(i=0; i<numAttractors; i++)
+   {
+      gamma = attractors[i].gamma;
+      alpha = attractors[i].alpha;
+      value += alpha * 2.718281828^(-gamma/2 * ((x-attractors[i].x)^2 + (y-attractors[i].y)^2) );
+   }
+   value = abs(value);
+}
+
+repulse(x,y, beta)
+{
+   value = 0;
+   for(i=0; i<numRepulsors; i++)
+   {
+      gamma = repulsors[i].gamma;
+      value += beta * 2.718281828^(-gamma/2 * ((x-repulsors[i].x)^2 + (y-repulsors[i].y)^2) );
+   }
+   value = abs(value);
+}
+
+derivative(x,y,beta, &coordx, &coordy)
+{
+   xval=0;
+   yval=0;
+   for(i=0; i<numAttractors; i++)
+   {
+      gamma = attractors[i].gamma;
+      alpha = attractors[i].alpha;
+      term = 2.718281828^(-gamma/2 * ((x-attractors[i].x)^2 + (y-attractors[i].y)^2) );
+      xval += alpha*gamma*(x-attractors[i].x) * term;
+      yval += alpha*gamma*(y-attractors[i].y) * term;
+   }
+   
+   for(i=0; i<numRepulsors; i++)
+   {
+      gamma = repulsors[i].gamma;
+      term = 2.718281828^(-gamma/2 * ((x-repulsors[i].x)^2 + (y-repulsors[i].y)^2) );
+      xval -= beta*gamma*(x-repulsors[i].x) * term;
+      yval -= beta*gamma*(y-repulsors[i].y) * term;
+   }
+   
+   coordx = xval;
+   coordy = yval;
+}

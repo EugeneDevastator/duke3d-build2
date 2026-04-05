@@ -1,0 +1,187 @@
+()
+{
+   tim = 0;
+   setcam(0,0,-8,0,0); hsnd = 0; brow = -.05; goalbrow = 0; col = 128;
+   while (1)
+   {
+      otim = tim; tim = klock()-2; dtim = tim-otim;
+      xsc = xres*48/800; ysc = xres*72/800; setfont(xsc,ysc,1);
+      if (tim >= 28)
+      {
+         if (otim < 28) playsound("tapfloor.flac",100,10);
+         if ((tim >= 29.5) && (otim < 29.5))
+            playtext("<pitch middle='-15'/><rate speed='-2'>Awesome.");
+         cls(0); moveto(0,0); setcol(0xffffff); printf("Hi *"); refresh(); continue;
+      }
+      //cls(0x806050);
+      clz(1e32);
+      glbegin(GL_QUADS); glsettex("cloud.png"); setcol(0x608080);
+      t = tim*.1;
+      gltexcoord(0+t,0+t); glvertex(0,0); 
+      gltexcoord(4+t,0+t); glvertex(xres,0);
+      gltexcoord(4+t,3+t); glvertex(xres,yres);
+      gltexcoord(0+t,3+t); glvertex(0,yres);
+      
+      if (goalbrow < brow) brow = max(brow-dtim*0.1,goalbrow);
+      if (goalbrow > brow) brow = min(brow+dtim*0.1,goalbrow);
+      
+      setcol(0xffffc0); moveto(0,32);
+      if (tim >=-1.50) { if (otim <-1.50) playsound("tapfloor.flac",100,10); printf("c"); }
+      if (tim >=-1.35) { if (otim <-1.35) playsound("tapfloor.flac",100,10); printf("l"); }
+      if (tim >=-1.20) { if (otim <-1.20) playsound("tapfloor.flac",100,10); printf("s"); }
+      if (tim >=-1.05) { if (otim <-1.05) playsound("tapfloor.flac",100,10); printf("("); }
+      if (tim >=-.90) { if (otim <-.90) playsound("tapfloor.flac",100,10); printf("0"); }
+      if (tim >=-.75) { if (otim <-.75) playsound("tapfloor.flac",100,10); printf(")"); }
+      if (tim >=-.60) { if (otim <-.60) playsound("tapfloor.flac",100,10); printf(";"); }
+      if (tim >=-.20) { if (otim <-.20) playsound("tapfloor.flac",100,10); printf("\n"); }
+      if (tim >= .20) { if (otim < .20) playsound("tapfloor.flac",100,10); printf("p"); }
+      if (tim >= .35) { if (otim < .35) playsound("tapfloor.flac",100,10); printf("r"); }
+      if (tim >= .50) { if (otim < .50) playsound("tapfloor.flac",100,10); printf("i"); }
+      if (tim >= .65) { if (otim < .65) playsound("tapfloor.flac",100,10); printf("n"); }
+      if (tim >= .80) { if (otim < .80) playsound("tapfloor.flac",100,10); printf("t"); }
+      if (tim >= .95) { if (otim < .95) playsound("tapfloor.flac",100,10); printf("f"); }
+      if (tim >=1.10) { if (otim <1.10) playsound("tapfloor.flac",100,10); printf("("); }
+      if (tim >=25.00) { if (otim <25.00) playsound("tapfloor.flac",100,10);
+                         moveto(xsc*7,32+ysc); printchar(34); moveto(xsc*8,32+ysc); }
+      if (tim >=25.15) { if (otim <25.15) playsound("tapfloor.flac",100,10); printf("H"); }
+      if (tim >=25.30) { if (otim <25.30) playsound("tapfloor.flac",100,10); printf("i"); }
+      if (tim >=25.45) { if (otim <25.45) playsound("tapfloor.flac",100,10); printf(" "); }
+      if (tim >=25.60) { if (otim <25.60) playsound("tapfloor.flac",100,10); printf("*"); }
+      if (tim >=25.75) { if (otim <25.75) playsound("tapfloor.flac",100,10);
+                         moveto(xsc*12,32+ysc); printchar(34); moveto(xsc*13,32+ysc); }
+      if (tim >=25.90) { if (otim <25.90) playsound("tapfloor.flac",100,10); printf(")"); }
+      if (tim >=26.05) { if (otim <26.05) playsound("tapfloor.flac",100,10); printf(";"); }
+      if (((tim < 1.20) || (tim >= 24.50)) && (tim%.3 < .2)) printf("_");
+      
+      if (tim >= 1.20)
+      {
+         if (otim < 1.20)
+         {
+            playtext("<pitch middle='+15'/>It looks like you're trying to write a program.");
+            goalbrow = 0.12;
+         }
+         
+         t = sin(tim*.2)*.5; setcam(sin(t)*-8,0,cos(t)*-8,t,0);
+         u = 17.6;
+         if (tim >= u)
+         {
+            nu = u-tim;
+            t = min(-nu,PI/2); setcam(0,sin(t)*-(8-nu*8),cos(t)*-(8-nu*8)-nu*10,0,t);
+         }
+         if (col > 128) col = max(col-dtim*1024,128);
+         if (tim < u+1.1) drawclippy(brow+(col-128)/512,int(col)*0x010000+0x008080);
+         t = sin(tim*.2)*.5; setcam(sin(t)*-8,0,cos(t)*-8,t,0);
+      }
+      
+      if ((tim >= 4.5) && (otim < 4.5)) { hsnd = playsound("square.wav",-100,3.15); goalbrow = -0.05; }
+      if ((tim >= 4.7) && (otim < 4.7)) playsoundupdate(hsnd,-1);
+      
+      if (tim >= 4.2)
+      {
+         if (otim < 4.2)
+            playtext(",<pitch middle='-15'/>You're a <silence msec='120'/>ing genius. Now get out of my way.");
+         if (tim < 22) { setcol(0xffffff); drawspr("caco.kv6",-5,0,0,2,-PI/2,0); }
+      }
+      if ((tim >= 3.2) && (tim < 4.2))
+         { setcol(0xffffff); drawspr("caco.kv6",(tim-4.2)*4-5,0,0,2,-PI/2,0); }
+      if ((tim >= 22) && (tim < 26))
+         { setcol(0xffffff); drawspr("caco.kv6",(22-tim)*-8-5,0,(22-tim)*-6,2,-PI/2,0); }
+      for(i=0;i<8;i++)
+      {
+         if (i == 0) t =  7.2;
+         if (i == 1) t =  8.3;
+         if (i == 2) t =  9.5;
+         if (i == 3) t =  9.9;
+         if (i == 4) t = 10.4;
+         if (i == 5) t = 11.2;
+         if (i == 6) t = 11.7;
+         if (i == 7) t = 12.2;
+         if ((tim >= t) && (tim < t+0.4))
+         {
+            if (otim < t) playsound("shoot.wav");
+            setcol(0xffffff); drawspr("rpg.kv6",-5+(tim-t)*8,0,0,1,PI/2,0);
+         }
+         if ((tim >= t+0.4) && (otim < t+0.4))
+            { playsound("gothit.wav",50); col = 255; if (i == 0) goalbrow = -0.14; }
+      }
+      if ((tim >= 8.9) && (otim < 8.9)) playtext(",<pitch middle='-15'/>Die!");
+      if (tim >= 9.0)
+      {
+         if ((tim >= 9.8) && (otim < 9.8))
+         {
+            playtext(",<pitch middle='+15'/>It looks like you're trying to get rid of me. Can I help?");
+         }
+      }
+      if (tim >= 13.4)
+      {
+         if (otim < 13.4)
+         {
+            playtext(",<pitch middle='-15'/>Sure. You drop dead while I watch.");
+            goalbrow = +.15;
+         }
+      }
+      if (tim >= 16.7)
+      {
+         if (otim < 16.7)
+            playtext(",<pitch middle='+15'/>Ok.");
+      }
+      if (tim >= 18.5)
+      {
+         if (otim < 18.5)
+            playtext(",<pitch middle='-15'/>What a sucker. I really hate that guy.");
+      }
+      
+      refresh();
+   }
+}
+
+drawarc (cx,cy,cz,r,cr,a0,a1)
+{
+   n = 6;
+   for(i=0;i<n;i++)
+   {
+      na0 = (a1-a0)*(i+0)/n + a0;
+      na1 = (a1-a0)*(i+1)/n + a0;
+      drawcone(cos(na0)*r+cx,sin(na0)*r+cy,cz,cr,
+               cos(na1)*r+cx,sin(na1)*r+cy,cz,cr);
+   }
+}
+
+drawclippy (brows,col)
+{
+   setcol(col);
+   rad = .12;
+   r0 = 1.0; r1 = r0*.7; r2 = r0*.6;
+   drawcone(+1.0,-0.0,0.0,rad,
+            +1.0,+3.5-r0,0.0,rad);
+   drawarc(+1.0-r0,3.5-r0,0,r0,rad,0,PI/2);
+   drawcone(+1.0-r0,+3.5,0.0,rad,
+            -1.0+r0,+3.5,0.0,rad);
+   drawarc(-1.0+r0,3.5-r0,0,r0,rad,PI/2,PI);
+   drawcone(-1.0,+3.5-r0,0.0,rad,
+            -1.0,-3.5+r1,0.0,rad);
+   drawarc(-1.0+r1,-3.5+r1,0,r1,rad,PI,PI*1.5);
+   drawcone(-1.0+r1,-3.5,0.0,rad,
+            +0.6-r1,-3.5,0.0,rad);
+   drawarc(+0.6-r1,-3.5+r1,0,r1,rad,PI*1.5,PI*2);
+   drawcone(+0.6,-3.5+r1,0.0,rad,
+            +0.6,+2.0-r2,0.0,rad);
+   drawarc(+0.6-r2,+2.0-r2,0,r2,rad,0,PI/2);
+   drawcone(+0.6-r2,+2.0,0.0,rad,
+            -0.6+r2,+2.0,0.0,rad);
+   drawarc(-0.6+r2,+2.0-r2,0,r2,rad,PI/2,PI);
+   drawcone(-0.6,+2.0-r2,0.0,rad,
+            -0.6,+0.0,0.0,rad);
+   drawsph (-1.0,-1.5,0.0,0.5);
+   drawsph (+0.6,-1.5,0.0,0.5);
+   setcol(0xffffff);
+   drawsph (-1.0,-1.5,-.17,0.4);
+   drawsph (+0.6,-1.5,-.17,0.4);
+   setcol(0x000000);
+   drawsph (-1.0+brows/2,-1.5,-.3,0.3);
+   drawsph (+0.6+brows/2,-1.5,-.3,0.3);
+   drawcone(-1.3,+brows-2.2,-.3,0.15,
+            -0.7,-brows-2.2,-.3,0.15);
+   drawcone(+0.3,-brows-2.2,-.3,0.15,
+            +0.9,+brows-2.2,-.3,0.15);
+}

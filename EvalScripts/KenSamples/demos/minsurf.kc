@@ -1,0 +1,377 @@
+struct { x, y, z, stuck, listh; } vert_t;
+enum {VTMAX=2^16,TRIMAX=2^16};
+static vert_t vt[VTMAX]; static vtn;
+static tri[TRIMAX*3], trilistn[TRIMAX*3], trin;
+
+static mod3[6] = {0,1,2,0,1,2};
+
+() //Search "minimal surface": catenoid between 2 circs: like soapy liquid on wire ;)
+{
+   selectmodel(4);
+   rendmode = 0;
+   
+   glcullface(GL_NONE);
+   glsettex("cloud.png");
+   
+   tim = 0; posx = 0; posy = 0; posz = -2.5; posh = 0; posv = 0;
+   while (1)
+   {
+      otim = tim; tim = klock(); dtim = tim-otim;
+      
+      for(i=0;i<6;i++) if (keystatus[i+ 2]) { keystatus[i+ 2] = 0; selectmodel(i); }
+      for(i=0;i<3;i++) if (keystatus[i+16]) { keystatus[i+16] = 0; rendmode = i; }
+
+      playercontrols(dtim,&posx,&posy,&posz,&posh,&posv);
+      cls(0); clz(1e32); setcam(posx,posy,posz,posh,posv); glcullface(GL_NONE);
+      
+#if 1
+      if (trin < 16384) { for(c=4;c>0;c--) splittri(); avgverts(); fliptris(); }
+#else      
+      if ((bstatus%2) >= 1) { splittri(); }
+      if ((bstatus%4) >= 2) { avgverts(); /*keepsize();*/ fliptris(); }
+#endif      
+      
+      area = 0;
+      for(t=0;t<trin;t++)
+      {
+         t3 = t*3;
+         if (rendmode < 2)
+         {
+            k = tri[t3];
+            for(j=0,i=3-1;i>=0;j=i,i--)
+            {
+               ok = k; k = tri[t3+i];
+               if (vt[k].stuck && vt[ok].stuck) { setcol(0xffffff); }
+                     else { if (ok < k) continue; setcol(0xa08060); }
+               if (rendmode == 0)
+               {
+                  moveto(vt[ok].x,vt[ok].y,vt[ok].z);
+                  lineto(vt[ k].x,vt[ k].y,vt[ k].z);
+               }
+               else if (rendmode == 1)
+               {
+                  drawcone(vt[ok].x,vt[ok].y,vt[ok].z,.005,
+                           vt[ k].x,vt[ k].y,vt[ k].z,.005);
+               }
+            }
+         }
+         else
+         {
+            glbegin(GL_TRIANGLES);
+            col = (t*0x2c46d3+0x4594e5)%2^24;
+            setcol(int(col/65536)/4+96,(int(col/256)%256)/4+96,(col%256)/4+96);
+            for(j=0;j<3;j++)
+            {
+               gltexcoord(j>0,j==2);
+               k = tri[t3+j]; glvertex(vt[k].x,vt[k].y,vt[k].z);
+            }
+            glend();
+         }
+         k0 = tri[t3]; k1 = tri[t3+1]; k2 = tri[t3+2];
+         ax = vt[k1].x-vt[k0].x; bx = vt[k2].x-vt[k0].x;
+         ay = vt[k1].y-vt[k0].y; by = vt[k2].y-vt[k0].y;
+         az = vt[k1].z-vt[k0].z; bz = vt[k2].z-vt[k0].z;
+         area += sqrt((ay*bz - az*by)^2 + (az*bx - ax*bz)^2 + (ax*by - ay*bx)^2);
+      }
+      area /= 2;
+#if 0
+      for(i=0;i<vtn;i++)
+      {
+         if (!vt[i].stuck) setcol(0x204060); else setcol(0xa08060);
+         drawsph(vt[i].x,vt[i].y,vt[i].z,.015);
+      }
+#endif
+#if 0
+      setcol(0xffffff); moveto(xres-512,16);
+      for(i=0;i<vtn;i++)
+      {
+         printf("%2g: ",i);
+         for(j=vt[i].listh;j>=0;j=trilistn[j]) printf("%2g,",j);
+         printf("\n");
+      }
+#endif
+      
+      setcol(0xffffff);
+      moveto(xres-512,0); printf("VERT:%5g\n TRI:%5g\nAREA: %.6f",vtn,trin,area);
+      
+      refresh(); Sleep(5);
+   }
+}
+//-------------------------------------------------------
+fliptris () //flip neighbor triangle hyptonuse if shorter (toward equilateral)
+{
+   for(t=trin-1;t>=0;t--)
+   {
+      t3 = t*3;
+      for(i=3-1;i>=0;i--)
+      {
+         t2 = getrind(tri[t3+mod3[i+1]],tri[t3+i],&i2); if (t2 < 0) continue;
+         t23 = t2*3;
+
+         a = tri[t3+i]; //e
+         b = tri[t3+mod3[i+1]]; //d
+         c = tri[t3+mod3[i+2]];
+         f = tri[t23+mod3[i2+2]];
+
+            // AE--F     A---F
+            // | \ |  -> | / |
+            // C---BD    C---B
+         if ((vt[a].x - vt[b].x)^2 + (vt[a].y - vt[b].y)^2 + (vt[a].z - vt[b].z)^2 <=
+             (vt[c].x - vt[f].x)^2 + (vt[c].y - vt[f].y)^2 + (vt[c].z - vt[f].z)^2)
+            continue;
+
+         triset(t3 +mod3[i +1],f);
+         triset(t23+mod3[i2+1],c);
+      }
+   }
+}
+
+splittri () //find longest edge and split
+{
+   bt = 0; bi = 0; dmax = -1;
+   for(t=0;t<trin;t++)
+   {
+      t3 = t*3; i1 = tri[t3];
+      for(i=3-1;i>=0;i--)
+      {
+         i0 = i1; i1 = tri[t3+i];
+         d = (vt[i0].x - vt[i1].x)^2 +
+             (vt[i0].y - vt[i1].y)^2 +
+             (vt[i0].z - vt[i1].z)^2;
+         if (d > dmax) { dmax = d; bt = t; bi = i; }
+      }
+   }
+   splittris(bt,bi);
+}   
+
+avgverts () //minimize distances
+{
+   for(v=vtn-1;v>=0;v--)
+   {
+      if (vt[v].stuck) continue;
+      
+         //Use linked list to get exact list of tris touching vert v
+      x = 0; y = 0; z = 0; n = 0;
+      for(j=vt[v].listh;j>=0;j=trilistn[j])
+      {
+         t3 = int(j/3)*3; k = tri[mod3[j-t3+1]+t3];
+         x += vt[k].x;
+         y += vt[k].y;
+         z += vt[k].z;
+         n++;
+      }
+      if (!n) continue;
+      f = 1/n; g = 1;
+      vt[v].x += (x*f - vt[v].x)*g;
+      vt[v].y += (y*f - vt[v].y)*g;
+      vt[v].z += (z*f - vt[v].z)*g;
+   }
+}
+
+keepsize ()
+{
+#if 0
+   x = 0; y = 0; z = 0;
+   for(v=vtn-1;v>=0;v--) { x += vt[v].x; y += vt[v].y; z += vt[v].z; }
+   f = 1/vtn; x *= f; y *= f; z *= f;
+   
+   d = 0;
+   for(v=vtn-1;v>=0;v--)
+      { d += sqrt((vt[v].x-x)^2 + (vt[v].y-y)^2 + (vt[v].z-z)^2); }
+   d /= vtn;
+   f = 1/d;
+   for(v=vtn-1;v>=0;v--) { vt[v].x *= f; vt[v].y *= f; vt[v].z *= f; }
+#else
+   for(v=vtn-1;v>=0;v--)
+   {
+      d = 1/sqrt(vt[v].x^2 + vt[v].y^2 + vt[v].z^2);
+      vt[v].x *= d; vt[v].y *= d; vt[v].z *= d;
+   }
+#endif
+}
+
+list_del (k, v)
+{
+   j = vt[v].listh; if (j == k) { vt[v].listh = trilistn[k]; return; }
+   for(;j>=0;j=nj)
+      { nj = trilistn[j]; if (nj == k) { trilistn[j] = trilistn[k]; return; } }
+}
+list_ins (k, v) { trilistn[k] = vt[v].listh; vt[v].listh = k; }
+triset (k, v)
+{
+   list_del(k,tri[k]); tri[k] = v;
+   list_ins(k,tri[k]);
+}
+
+getrind (v0, v1, &i)
+{
+      //Search linked list of tris touching vert to find edge neighbor: tri&index
+   for(j=vt[v0].listh;j>=0;j=trilistn[j])
+   {
+      t = int(j/3); t3 = t*3; i = j-t3;
+      if (tri[t3+mod3[i+1]] == v1) return(t);
+   }
+   return(-1);
+}
+splittris (t, i)
+{
+   t3 = t*3; j = mod3[i+1];
+   vt[vtn].x = (vt[tri[t3+i]].x + vt[tri[t3+j]].x)*.5;
+   vt[vtn].y = (vt[tri[t3+i]].y + vt[tri[t3+j]].y)*.5;
+   vt[vtn].z = (vt[tri[t3+i]].z + vt[tri[t3+j]].z)*.5;
+   vt[vtn].listh = -1;
+   vt[vtn].stuck = 1;
+   
+   t2 = getrind(tri[t3+mod3[i+1]],tri[t3+i],&i2);
+   do
+   {
+      trin3 = trin*3;
+      tri[trin3+0] = tri[t3+mod3[i+2]];
+      tri[trin3+1] = tri[t3+i];
+      tri[trin3+2] = vtn; trin++;
+      for(j=trin3+3-1;j>=trin3;j--) { list_ins(j,tri[j]); }
+      triset(t3+i,vtn);
+            
+      if (t2 < 0) break;
+      t = t2; t3 = t*3; i = i2; t2 = -1; vt[vtn].stuck = 0; 
+   } while (1);
+
+   vtn++;
+}
+//-----------------------------------------------------------------------------
+selectmodel (mod)
+{
+   trin = 0; stux = 1;
+   
+   if (mod == 0)
+   {
+         //Quad (area=4.315973)
+      vt[0].x =-1; vt[0].y =-1; vt[0].z = 0;
+      vt[1].x =+1; vt[1].y =-1; vt[1].z = 1;
+      vt[2].x =+1; vt[2].y =+1; vt[2].z = 0;
+      vt[3].x =-1; vt[3].y =+1; vt[3].z = 1; vtn = 4;
+   }
+   else if (mod == 1)
+   {
+         //Circ (area=3.141277 (vtn=2^8))
+      vtn = 2^8;
+      for(i=0;i<vtn;i++)
+      {
+         vt[i].x = cos(i/vtn*PI*2);
+         vt[i].y = sin(i/vtn*PI*2);
+         vt[i].z = 0;
+      }
+   }
+   else if (mod == 2)
+   {
+         //Cone (must disable flipverts() for this to work???)
+      n = 32; vtn = 0;
+      for(i=n-1;i>=0;i--)
+      {
+         vt[vtn].x = cos(i/n*PI*2);
+         vt[vtn].y = sin(i/n*PI*2);
+         vt[vtn].z = -1;
+         vtn++;
+      }
+      vt[vtn].x = 0;
+      vt[vtn].y = 0;
+      vt[vtn].z = 1; vtn++;
+      for(i=0;i<n;i++)
+      {
+         tri[i*3+0] = i;
+         tri[i*3+1] = (i+1)%n;
+         tri[i*3+2] = vtn-1; trin++;
+      }
+   }
+   else if (mod == 3)
+   {
+         //Double circle
+      n = 32; vtn = 0;
+      for(s=-1;s<=1;s+=2)
+         for(i=n-1;i>=0;i--)
+         {
+            vt[vtn].x = cos(i/n*PI*2);
+            vt[vtn].y = sin(i/n*PI*2);
+            vt[vtn].z = s*.7;
+            vtn++;
+         }
+      k = 0;
+      for(j=n-1,i=0;i<n;j=i,i++,k+=6)
+      {
+         tri[k+0] = i; tri[k+1] = n+i; tri[k+2] = n+j; trin++;
+         tri[k+3] = i; tri[k+4] = n+j; tri[k+5] =   j; trin++;
+      }
+   }
+   else if (mod == 4)
+   {
+         //Half torus/saddle (area=5.512012)
+      n = 32; vtn = 0;
+      for(i=n/2;i>=0;i--)
+      {
+         vt[vtn].x = cos(i/n*PI*2);
+         vt[vtn].y = sin(i/n*PI*2);
+         vt[vtn].z = 1;
+         vtn++;
+      }
+      for(i=0;i<=n/2;i++)
+      {
+         vt[vtn].x = cos(i/n*PI*2);
+         vt[vtn].y = sin(i/n*PI*2);
+         vt[vtn].z = -1;
+         vtn++;
+      }
+   }
+   else if (mod == 5)
+   {
+         //Tetrahedron?
+      vt[0].x =-1; vt[0].y =-1; vt[0].z =-1;
+      vt[1].x =+1; vt[1].y =-1; vt[1].z =+1;
+      vt[2].x =+1; vt[2].y =+1; vt[2].z =-1;
+      vt[3].x =-1; vt[3].y =+1; vt[3].z =+1; vtn = 4;
+      tri[0] = 0; tri[ 1] = 1; tri[ 2] = 2;
+      tri[3] = 0; tri[ 4] = 3; tri[ 5] = 1;
+      tri[6] = 0; tri[ 7] = 2; tri[ 8] = 3;
+      tri[9] = 1; tri[10] = 3; tri[11] = 2; trin = 4;
+      stux = 0;
+   }
+   
+   bufset(trilistn,-1,sizeof(trilistn));
+   
+   for(i=vtn-1;i>=0;i--) { vt[i].stuck = stux; vt[i].listh = -1; }
+   
+   if (!trin) //assume all verts on 1 loop (tri not filled)
+   {
+      trin = vtn-2;
+      for(i=trin-1;i>=0;i--) { tri[i*3] = 0; tri[i*3+1] = i+1; tri[i*3+2] = i+2; }
+   }
+   
+   for(i=trin*3-1;i>=0;i--) { list_ins(i,tri[i]); }
+}
+//-----------------------------------------------------------------------------
+   //Handle input and player movement
+playercontrols (f,&posx,&posy,&posz,&posh,&posv)
+{
+   if (keystatus[0x2a]) f /= 4;
+   if (keystatus[0x36]) f *= 4;
+   vx = (keystatus[0xcd]-keystatus[0xcb])*f; //Right-Left
+   vy = (keystatus[0xc8]-keystatus[0xd0])*f; //Up-Down
+   vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   static mat[9]; ang2mat(posh,posv,mat);
+   posx += mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   posy += mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   posz += mat[2]*vx + mat[5]*vz + mat[8]*vy;
+   readmouse(&mousx,&mousy);
+   posh += mousx*.01;
+   posv += mousy*.01;
+}
+
+ang2mat (hang,vang,mat[9])
+{
+   mat[6] = cos(vang)*sin(hang); mat[0] = cos(hang);
+   mat[7] = sin(vang);           mat[1] = 0;
+   mat[8] = cos(vang)*cos(hang); mat[2] =-sin(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}
+//-----------------------------------------------------------------------------

@@ -1,0 +1,11 @@
+(x,y,z,&r,&g,&b)
+if (x^2^2^2+y^2^2^2+z^2^2^2>=1) return(0);
+x *= 16; y *= 16; z *= 16; d = 12;
+     if (y > d) g = pic("doubcube.png",16+x, 16+z);
+else if (y <-d) g = pic("doubcube.png",16-x, 48+z);
+else if (z <-d) g = pic("doubcube.png",16+y, 80-x);
+else if (z > d) g = pic("doubcube.png",16-y,112-x);
+else if (x > d) g = pic("doubcube.png",16-y,144+z);
+else if (x <-d) g = pic("doubcube.png",16+y,176+z);
+r = 200; g *= 200/16777216; b = g;
+1

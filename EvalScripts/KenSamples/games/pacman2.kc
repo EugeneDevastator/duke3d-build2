@@ -1,0 +1,427 @@
+enum {PLAYSPEED=1, NLIVES=3, POWERTIME=4.0, NMON=4, MONSPEED=1}; //<-simple game variables to mess with ;)
+
+   //0:' ', 1:dot, 2:pellet, 3:horz_moncage, 4:top-lef, 5:top-rig, 6:bot-rig, 7:bot-lef, 8:horz, 9:vert
+enum {YSIZ=31, XSIZ=28};
+static board[YSIZ][XSIZ] =
+{
+   4,8,8,8,8,8,8,8,8,8,8,8,8,5,4,8,8,8,8,8,8,8,8,8,8,8,8,5,
+   9,1,1,1,1,1,1,1,1,1,1,1,1,9,9,1,1,1,1,1,1,1,1,1,1,1,1,9,
+   9,1,4,8,8,5,1,4,8,8,8,5,1,9,9,1,4,8,8,8,5,1,4,8,8,5,1,9,
+   9,2,9,0,0,9,1,9,0,0,0,9,1,9,9,1,9,0,0,0,9,1,9,0,0,9,2,9,
+   9,1,7,8,8,6,1,7,8,8,8,6,1,7,6,1,7,8,8,8,6,1,7,8,8,6,1,9,
+   9,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,9,
+   9,1,4,8,8,5,1,4,5,1,4,8,8,8,8,8,8,5,1,4,5,1,4,8,8,5,1,9,
+   9,1,7,8,8,6,1,9,9,1,7,8,8,5,4,8,8,6,1,9,9,1,7,8,8,6,1,9,
+   9,1,1,1,1,1,1,9,9,1,1,1,1,9,9,1,1,1,1,9,9,1,1,1,1,1,1,9,
+   7,8,8,8,8,5,1,9,7,8,8,5,0,9,9,0,4,8,8,6,9,1,4,8,8,8,8,6,
+   0,0,0,0,0,9,1,9,4,8,8,6,0,7,6,0,7,8,8,5,9,1,9,0,0,0,0,0,
+   0,0,0,0,0,9,1,9,9,0,0,0,0,0,0,0,0,0,0,9,9,1,9,0,0,0,0,0,
+   0,0,0,0,0,9,1,9,9,0,4,8,8,3,3,8,8,5,0,9,9,1,9,0,0,0,0,0,
+   8,8,8,8,8,6,1,7,6,0,9,0,0,0,0,0,0,9,0,7,6,1,7,8,8,8,8,8,
+   0,0,0,0,0,0,1,0,0,0,9,0,0,0,0,0,0,9,0,0,0,1,0,0,0,0,0,0,
+   8,8,8,8,8,5,1,4,5,0,9,0,0,0,0,0,0,9,0,4,5,1,4,8,8,8,8,8,
+   0,0,0,0,0,9,1,9,9,0,7,8,8,8,8,8,8,6,0,9,9,1,9,0,0,0,0,0,
+   0,0,0,0,0,9,1,9,9,0,0,0,0,0,0,0,0,0,0,9,9,1,9,0,0,0,0,0,
+   0,0,0,0,0,9,1,9,9,0,4,8,8,8,8,8,8,5,0,9,9,1,9,0,0,0,0,0,
+   4,8,8,8,8,6,1,7,6,0,7,8,8,5,4,8,8,6,0,7,6,1,7,8,8,8,8,5,
+   9,1,1,1,1,1,1,1,1,1,1,1,1,9,9,1,1,1,1,1,1,1,1,1,1,1,1,9,
+   9,1,4,8,8,5,1,4,8,8,8,5,1,9,9,1,4,8,8,8,5,1,4,8,8,5,1,9,
+   9,1,7,8,5,9,1,7,8,8,8,6,1,7,6,1,7,8,8,8,6,1,9,4,8,6,1,9,
+   9,2,1,1,9,9,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,9,9,1,1,2,9,
+   7,8,5,1,9,9,1,4,5,1,4,8,8,8,8,8,8,5,1,4,5,1,9,9,1,4,8,6,
+   4,8,6,1,7,6,1,9,9,1,7,8,8,5,4,8,8,6,1,9,9,1,7,6,1,7,8,5,
+   9,1,1,1,1,1,1,9,9,1,1,1,1,9,9,1,1,1,1,9,9,1,1,1,1,1,1,9,
+   9,1,4,8,8,8,8,6,7,8,8,5,1,9,9,1,4,8,8,6,7,8,8,8,8,5,1,9,
+   9,1,7,8,8,8,8,8,8,8,8,6,1,7,6,1,7,8,8,8,8,8,8,8,8,6,1,9,
+   9,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,9,
+   7,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,6,
+};
+static thick, tim, powertim, siz, xof, yof;
+static mx[NMON], my[NMON], mxv[NMON], myv[NMON], mgoalx[NMON], mgoaly[NMON], mstat[NMON];
+
+()
+{
+   pacx = 13.5; pacy = 23;
+   pacxv = -1; pacyv = 0; mouthdir = PI;
+   npacxv = -1; npacyv = 0; nmouthdir = PI;
+   pacgoalx = 13; pacgoaly = pacy;
+   
+   resetghost();
+      
+   numdots = 0;
+   for(y=0;y<YSIZ;y++)
+      for(x=0;x<XSIZ;x++)
+         if ((board[y][x] == 1) || (board[y][x] == 2)) numdots++;
+   
+   //hsnd = playsound("sine.wav",-35,1);
+
+   score = 0; lives = NLIVES;
+   tim = 0; powertim = -1e32; gldisable(GL_DEPTH_TEST);
+   while (1)
+   {
+      if (keystatus[0x2a]) turbo = 1; else turbo = 10;
+      cls(0);
+      otim = tim; tim = klock(); dtim = tim-otim;
+      
+      //playsoundupdate(hsnd,-35,sin(tim*12)*.2+1.2);
+      
+      siz = min(xres/XSIZ,yres/YSIZ);
+      thick = siz/10;
+      xof = (xres-siz*XSIZ)/2; yof = (yres-siz*YSIZ)/2;
+      for(y=0;y<YSIZ;y++)
+         for(x=0;x<XSIZ;x++)
+         {
+            v = board[y][x];
+            if (v == 0) continue;
+            if (v == 1)
+            {
+               setcol(0xffff00);
+               drawsph(x*siz+siz/2+xof,y*siz+siz/2+yof,siz*.10);
+            }
+            if (v == 2)
+            {
+               f = sin(tim*8)*64+192; setcol(f,f,f);
+               drawsph(x*siz+siz/2+xof,y*siz+siz/2+yof,siz*.40);
+            }
+            setcol(0x4040c0);
+            if (v == 3) drawcone(x*siz      +xof,y*siz+siz/2+yof,thick/2,
+                                 x*siz+siz  +xof,y*siz+siz/2+yof,thick/2);
+            if (v == 4) drawarc(x*siz+siz+xof,y*siz+siz+yof,siz/2,2);
+            if (v == 5) drawarc(x*siz    +xof,y*siz+siz+yof,siz/2,3);
+            if (v == 6) drawarc(x*siz    +xof,y*siz    +yof,siz/2,0);
+            if (v == 7) drawarc(x*siz+siz+xof,y*siz    +yof,siz/2,1);
+            if (v == 8) drawcone(x*siz      +xof,y*siz+siz/2+yof,thick,
+                                 x*siz+siz  +xof,y*siz+siz/2+yof,thick);
+            if (v == 9) drawcone(x*siz+siz/2+xof,y*siz      +yof,thick,
+                                 x*siz+siz/2+xof,y*siz+siz  +yof,thick);
+         }
+      
+      setcol(0xffff00);
+      if (pacxv+pacyv)
+      {
+         t = (pacx+pacy)%1;
+         if (pacxv+pacyv > 0) t = 1-t;
+         mouthang = (1-cos(t*PI*2))*.4;
+      } else mouthang = 0;
+      
+         
+      for(i=0;i<min(lives-1,3);i++) drawpac(i*2,11,.6,0);
+
+      setview(xof,yof,XSIZ*siz+xof,YSIZ*siz+yof);
+      if (lives > 0)
+      {
+         drawpac(pacx,pacy,mouthang,mouthdir);
+         if (pacx <      1) drawpac(pacx+XSIZ,pacy,mouthang,mouthdir);
+         if (pacx > XSIZ-1) drawpac(pacx-XSIZ,pacy,mouthang,mouthdir);
+      }
+            
+      for(i=0;i<NMON;i++)
+      {
+         if (tim < powertim)
+         {
+            //if ((tim < powertim-2) || (tim%.4 < .2)) setcol(0x0000ff); else setcol(0x808080);
+            afraid = 1;
+         } else afraid = 0;
+         x = mx[i]*siz+siz/2+xof;
+         y = my[i]*siz+siz/2+yof;
+         a = atan2(myv[i],mxv[i])/(PI/2);
+         drawghost(i,x,y,siz,a,afraid);
+         if (mx[i] <       1) { drawghost(i,x+XSIZ*siz,y,siz,a,afraid); }
+         if (mx[i] >= XSIZ-1) { drawghost(i,x-XSIZ*siz,y,siz,a,afraid); }
+         f = dtim*(0.75-(i%4)*.05)*turbo*MONSPEED;
+         if (tim < powertim) f *= .5;
+         mx[i] += mxv[i]*f;
+         my[i] += myv[i]*f;
+         if (mx[i] <     0) { mx[i] += XSIZ; mgoalx[i] += XSIZ; }
+         if (mx[i] >= XSIZ) { mx[i] -= XSIZ; mgoalx[i] -= XSIZ; }
+         if ((mx[i]-pacx)^2+(my[i]-pacy)^2 < 1^2)
+         {
+            if (tim < powertim)
+            {
+               playsound("shoot.wav",100,2.0);
+               playsound("shoot.wav",100,2.5);
+               playsound("shoot.wav",100,3.0);
+               mx[i] = 13.5; my[i] = 14;
+               mgoalx[i] = floor(mx[i]); mxv[i] = sgn(mgoalx[i]-mx[i]);
+               mgoaly[i] = floor(my[i]); myv[i] = sgn(mgoaly[i]-my[i]);
+               mstat[i] = 0;
+            }
+            else
+            {
+               if (lives > 0)
+               {
+                  playsound("ouch.wav");
+                  lives--; if (lives == 0) playtext("You lose");
+                  resetghost();
+               }
+               pacx = 13.5; pacy = 23;
+               pacxv = -1; pacyv = 0; mouthdir = PI;
+               npacxv = -1; npacyv = 0; nmouthdir = PI;
+               pacgoalx = 13; pacgoaly = pacy;
+            }
+         }
+         
+         doit = 0;
+         if ((mx[i] > mgoalx[i]) && (mxv[i] > 0)) { mx[i] = mgoalx[i]; doit = 1; }
+         if ((mx[i] < mgoalx[i]) && (mxv[i] < 0)) { mx[i] = mgoalx[i]; doit = 1; }
+         if ((my[i] > mgoaly[i]) && (myv[i] > 0)) { my[i] = mgoaly[i]; doit = 1; }
+         if ((my[i] < mgoaly[i]) && (myv[i] < 0)) { my[i] = mgoaly[i]; doit = 1; }
+         if ((mx[i] == mgoalx[i]) && (my[i] == mgoaly[i])) doit = 1;
+         if (doit)
+         {
+            d = getpathdir(mx[i],my[i],pacgoalx,pacgoaly,i);
+            mgoalx[i] = mx[i]+int(cos(d*(PI/2))*1.1);
+            mgoaly[i] = my[i]+int(sin(d*(PI/2))*1.1);
+            if ((board[mgoaly[i]][mgoalx[i]%XSIZ] >= 4) || (lives <= 0)) //|| (rnd < .5))
+            {
+               dirv = 0; n = 0;
+               for(d=0;d<4;d++)
+               {
+                  mgoalx[i] = mx[i]+int(cos(d*(PI/2))*1.1);
+                  mgoaly[i] = my[i]+int(sin(d*(PI/2))*1.1);
+                  if (board[mgoaly[i]][mgoalx[i]%XSIZ] < 4) { dirv += 2^d; n++; }
+               }
+               if (n == 2)
+               {
+                  for(d=0;d<4;d++)
+                  {
+                     mgoalx[i] = mx[i]+int(cos(d*(PI/2))*1.1);
+                     mgoaly[i] = my[i]+int(sin(d*(PI/2))*1.1);
+                     if ((board[mgoaly[i]][mgoalx[i]%XSIZ] < 4) &&
+                         ((sgn(mgoalx[i]-mx[i]) != -mxv[i]) ||
+                          (sgn(mgoaly[i]-my[i]) != -myv[i]))) break;
+                  }
+               }
+               else
+               {
+                  do
+                  {
+                     d = int(4*rnd);
+                     mgoalx[i] = mx[i]+int(cos(d*(PI/2))*1.1);
+                     mgoaly[i] = my[i]+int(sin(d*(PI/2))*1.1);
+                     if (board[mgoaly[i]][mgoalx[i]%XSIZ] < 4) break;
+                  } while (1);
+               }
+            }
+            mxv[i] = sgn(mgoalx[i]-mx[i]);
+            myv[i] = sgn(mgoaly[i]-my[i]);
+         }
+      }
+      setview(0,0,xres,yres);
+      
+      if (keystatus[0xcd]) { npacxv = +1; npacyv =  0; nmouthdir = PI*0.0; } //Right
+      if (keystatus[0xd0]) { npacxv =  0; npacyv = +1; nmouthdir = PI*0.5; } //Down
+      if (keystatus[0xcb]) { npacxv = -1; npacyv =  0; nmouthdir = PI*1.0; } //Left
+      if (keystatus[0xc8]) { npacxv =  0; npacyv = -1; nmouthdir = PI*1.5; } //Up
+      
+      if ((pacx != pacgoalx) && (pacxv == -npacxv)) { pacxv = npacxv; pacgoalx += npacxv; mouthdir = nmouthdir; }
+      if ((pacy != pacgoaly) && (pacyv == -npacyv)) { pacyv = npacyv; pacgoaly += npacyv; mouthdir = nmouthdir; }
+      if (lives > 0)
+      {
+         pacx += pacxv*dtim*PLAYSPEED*turbo;
+         pacy += pacyv*dtim*PLAYSPEED*turbo;
+      }
+      if (pacx <    0) { pacx += XSIZ; pacgoalx += XSIZ; }
+      if (pacx > XSIZ) { pacx -= XSIZ; pacgoalx -= XSIZ; }
+      doit = 0;
+           if ((pacx < pacgoalx) && (pacxv < 0)) { pacx = pacgoalx; doit = 1; }
+      else if ((pacx > pacgoalx) && (pacxv > 0)) { pacx = pacgoalx; doit = 1; }
+      else if ((pacy < pacgoaly) && (pacyv < 0)) { pacy = pacgoaly; doit = 1; }
+      else if ((pacy > pacgoaly) && (pacyv > 0)) { pacy = pacgoaly; doit = 1; }
+      else if ((pacx == pacgoalx) && (pacy == pacgoaly)) { doit = 1; }
+      if (doit)
+      {   
+         v = board[pacy][pacx];
+         if ((v == 1) || (v == 2))
+         {
+            if (v == 2) { powertim = tim+POWERTIME; playsound("pickup.wav"); }
+            //playsound("pickup.wav",100,4);
+            playsound("woodrub.flac",100,16);
+            board[pacy%YSIZ][pacx%XSIZ] = 0;
+            numdots--; score += 10;
+            if (numdots <= 0)
+            {
+               playtext("you win");
+            }
+         }
+         v = board[(pacy+npacyv)%YSIZ][(pacx+npacxv)%XSIZ];
+         if (v < 3)
+         {
+            pacxv = npacxv; pacyv = npacyv; mouthdir = nmouthdir;
+            pacgoalx = pacx+pacxv;
+            pacgoaly = pacy+pacyv;
+         }
+         else
+         {
+            v = board[(pacy+pacyv)%YSIZ][(pacx+pacxv)%XSIZ];
+            if (v < 3)
+            {
+               pacgoalx = pacx+pacxv;
+               pacgoaly = pacy+pacyv;
+            }
+            else
+            {
+               pacxv = 0;
+               pacyv = 0;
+            }
+         }
+      }
+      
+      setcol(0xffffff);
+      setfont(siz*.5,siz*.8,1);
+      moveto(xres/2-siz*2.2-((score>=1e2)+(score>=1e3))*siz*.25,yres/2);
+      printf("Score: %g",score);
+      
+      if (lives <= 0)
+      {
+         setcol(0xff0000);
+         setfont(siz*3.3,siz*6.0,1);
+         moveto(xof+siz*1.3,yof+siz*11.8);
+         printf("You lose");
+      }
+      else if (numdots <= 0)
+      {
+         setcol(0x00ff00);
+         setfont(siz*3.3,siz*6.0,1);
+         moveto(xof+siz*1.3,yof+siz*11.8);
+         printf("You win!");
+      }
+
+      refresh();
+   }
+}
+
+resetghost ()
+{
+   for(i=0;i<NMON;i++)
+   {
+      if (i%4 == 0) { mx[i] = 13.5; my[i] = 11; }
+      if (i%4 == 1) { mx[i] = 13.5; my[i] = 14; }
+      if (i%4 == 2) { mx[i] = 11.5; my[i] = 14; }
+      if (i%4 == 3) { mx[i] = 15.5; my[i] = 14; }
+   }
+   for(i=0;i<NMON;i++)
+   {
+      mgoalx[i] = floor(mx[i]); mxv[i] = sgn(mgoalx[i]-mx[i]);
+      mgoaly[i] = floor(my[i]); myv[i] = sgn(mgoaly[i]-my[i]);
+      mstat[i] = 0;
+   }
+}
+
+drawarc (x, y, siz, a)
+{
+   n = 4; a *= PI/2; ai = PI/(n*2);
+   x1 = cos(a)*siz+x; y1 = sin(a)*siz+y;
+   for(i=1;i<=n;i++)
+   {
+      a += ai;
+      x0 = x1; x1 = cos(a)*siz+x;
+      y0 = y1; y1 = sin(a)*siz+y; 
+      drawcone(x0,y0,thick,x1,y1,-thick);
+   }
+}
+
+drawpac (pacx, pacy, mouthang, mouthdir)
+{   
+   if (1) //powertim < tim)
+   {
+      glsettex("whitepix.tga");
+      glbegin(GL_COMPLEX); n = 32;
+      a0 = mouthang; a1 = PI*2-a0;
+      a0 += mouthdir; a1 += mouthdir;
+      a = mouthdir+PI;
+      glvertex(cos(a)*siz*.2+pacx*siz+siz/2+xof,
+               sin(a)*siz*.2+pacy*siz+siz/2+yof);
+      for(i=0;i<=n;i++)
+      {
+         a = (a1-a0)*i/n + a0;
+         glvertex(cos(a)*siz*.75+pacx*siz+siz/2+xof,
+                  sin(a)*siz*.75+pacy*siz+siz/2+yof);
+      }
+      glend();
+   }
+   else
+   {
+      glenable(GL_ALPHA_TEST);
+      glsettex("caco.png");
+      drawspr(pacx*siz+siz/2+xof,pacy*siz+siz/2+yof,siz,0); //mouthdir+PI/2);
+   }
+}
+
+drawghost (i, x, y, siz, a, afraid)
+{
+   i %= 4;
+   if (i == 0) setcol(0xff0000); //kinky (red)
+   if (i == 1) setcol(0xffb8de); //dinky (pink)
+   if (i == 2) setcol(0x00ffde); //stinky (cyan)
+   if (i == 3) setcol(0xffb847); //fried (orange)
+   if (afraid)
+   {
+      if ((tim < powertim-1.4) || (tim%.4 < .2)) setcol(0x0000ff); else setcol(0x808080);
+   }
+   y += siz*.15;
+   drawcone(x,y-siz*.25,siz*.75,x,y+siz*.60,siz*-.75);
+   for(xx=x-siz*.75+1;xx<x+siz*.75;xx++)
+   {
+      moveto(xx,y+siz*.60);
+      lineto(xx,y+siz*.60+(sin(tim*12+xx*12/siz)+1)*2);
+   }
+   if (afraid)
+   {
+      setcol(0xc0c0c0);
+      y0 = y+siz*.10; y1 = y+siz*.25;
+      for(i=-4;i<4;i++)
+      {
+         f = i*siz*.15 + x;
+         drawcone(f,y1,siz*.05,f+siz*.15,y0,siz*.05);
+         t = y0; y0 = y1; y1 = t;
+      }
+      drawsph(x-siz*.25,y-siz*.40,siz*.08);
+      drawsph(x+siz*.25,y-siz*.40,siz*.08);
+      return;
+   }
+   f = siz*.15; x += cos(a*(PI/2))*f; y += sin(a*(PI/2))*f;
+   setcol(0xdedede);
+   drawsph(x-siz*.30,y-siz*.40,siz*.20);
+   drawsph(x+siz*.30,y-siz*.40,siz*.20);
+   f = siz*.09; x += cos(a*(PI/2))*f; y += sin(a*(PI/2))*f;
+   setcol(0x2121de);
+   drawsph(x-siz*.30,y-siz*.40,siz*.12);
+   drawsph(x+siz*.30,y-siz*.40,siz*.12);
+}
+
+getpathdir (x0, y0, x1, y1, moni)
+{
+   static fifx[XSIZ*YSIZ], fify[XSIZ*YSIZ], follow[YSIZ][XSIZ];
+   for(y=0;y<YSIZ;y++)
+      for(x=0;x<XSIZ;x++)
+      {
+         follow[y][x] = (board[y][x] < 4);
+      }
+   
+   for(i=0;i<NMON;i++)
+   {
+      if (i == moni) continue;
+      follow[mgoaly[i]][mgoalx[i]] = 0;
+   }
+   
+   fifx[0] = x1; fify[0] = y1; fifr = 0; fifw = 1;
+   while (fifr < fifw)
+   {
+      x = fifx[fifr]; y = fify[fifr]; fifr++;
+      for(d=0;d<4;d++)
+      {
+         nx = x+int(cos(d*(PI/2))*1.1);
+         ny = y+int(sin(d*(PI/2))*1.1); nx %= XSIZ;
+         if (follow[ny][nx])
+         {
+            if ((nx == x0) && (ny == y0))
+            {
+               if (tim < powertim) return(d%4);
+               return((d+2)%4);
+            }
+            follow[ny][nx] = 0; fifx[fifw] = nx; fify[fifw] = ny; fifw++;
+         }
+      }
+   }
+}

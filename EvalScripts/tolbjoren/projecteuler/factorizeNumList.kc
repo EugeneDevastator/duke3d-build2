@@ -1,0 +1,73 @@
+// translated from JS code by
+// 1998 Henry Bottomley (written 23 December)
+
+// could remove duplicate entries...
+enum{NUM_IS_PRIME = -1, TOO_MANY = -2}
+enum{MAX_FACTORS=1000}
+static factors[MAX_FACTORS];
+static num_factors;
+()
+{
+
+   cls(0);
+
+   s = 1;
+   for(i=s; i<s+20; i++)
+   {
+      n=i;
+      err = factorize(n);
+      if(err == TOO_MANY) {cls(0); printf("too many factors"); break;}
+
+      if( factors[0] == NUM_IS_PRIME )
+      {
+         printf("%g is prime", n);
+      }else{
+   
+         printf("factors of %f: ", n);
+         for(j=0; j<num_factors; j++)
+         {
+            
+            printf("%g", factors[j]);
+            if(j<num_factors-1) printf(", ");
+         }   
+      }
+      printf("\n");
+   }
+   
+}
+
+
+factorize(num)
+{
+   num_factors = 0;
+   newnum = num;
+   checker=2; // first factor to check
+   while(checker^2 <= newnum) // worth looking for factors?
+   {
+      if(newnum % checker == 0) // is possible factor a factor?
+      {
+         factors[num_factors] = checker;
+         newnum = newnum/checker;
+         
+         if(newnum != 1)
+         {
+            num_factors++; // prep for next factor
+            if(num_factors >  MAX_FACTORS) return TOO_MANY;
+         }
+      }
+      else
+      {
+         checker++; // try next possible factor
+      }
+   }
+   if(newnum != 1) // anything left at the end
+   {
+      factors[num_factors] = newnum; // it must be the last prime factor
+      //num_factors++;
+   }
+   if(factors[num_factors] == num) // the only prime fac is the original
+   {
+      factors[num_factors] = NUM_IS_PRIME;
+   }
+
+}

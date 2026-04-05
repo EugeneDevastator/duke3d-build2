@@ -1,0 +1,326 @@
+enum {NCODES=86};
+static key2morse[NCODES][3] = //scan+256 for shift
+{
+   0x002,0x201111,  '1',
+   0x102,0x2101011, '!',
+   0x003,0x200111,  '2',
+   0x103,0x2011010, '@',
+   0x004,0x200011,  '3',
+   0x005,0x200001,  '4',
+   0x105,0x20001001,'$',
+   0x006,0x200000,  '5',
+   0x106,0x210110,  '%',
+   0x007,0x210000,  '6',
+   0x008,0x211000,  '7',
+   0x108,0x201000,  '&',
+   0x009,0x211100,  '8',
+   0x00a,0x211110,  '9',
+   0x10a,0x2101101, '(',
+   0x00b,0x211111,  '0',
+   0x10b,0x2101101, ')',
+   0x00c,0x2100001, '-',
+   0x10c,0x2001101, '_',
+   0x00d,0x210001,  '=',
+   0x10d,0x201010,  '+',
+   0x00e,0x2000000, ' ',
+   0x010,0x21101,   'Q',
+   0x110,0x21101,   'Q',
+   0x011,0x2011,    'W',
+   0x111,0x2011,    'W',
+   0x012,0x20,      'E',
+   0x112,0x20,      'E',
+   0x013,0x2010,    'R',
+   0x113,0x2010,    'R',
+   0x014,0x21,      'T',
+   0x114,0x21,      'T',
+   0x015,0x21011,   'Y',
+   0x115,0x21011,   'Y',
+   0x016,0x2001,    'U',
+   0x116,0x2001,    'U',
+   0x017,0x200,     'I',
+   0x117,0x200,     'I',
+   0x018,0x2111,    'O',
+   0x118,0x2111,    'O',
+   0x019,0x20110,   'P',
+   0x119,0x20110,   'P',
+   0x01a,0x200010,  '[',
+   0x01b,0x200010,  ']',
+   0x01e,0x201,     'A',
+   0x11e,0x201,     'A',
+   0x01f,0x2000,    'S',
+   0x11f,0x2000,    'S',
+   0x020,0x2100,    'D',
+   0x120,0x2100,    'D',
+   0x021,0x20010,   'F',
+   0x121,0x20010,   'F',
+   0x022,0x2110,    'G',
+   0x122,0x2110,    'G',
+   0x023,0x20000,   'H',
+   0x123,0x20000,   'H',
+   0x024,0x20111,   'J',
+   0x124,0x20111,   'J',
+   0x025,0x2101,    'K',
+   0x125,0x2101,    'K',
+   0x026,0x20100,   'L',
+   0x126,0x20100,   'L',
+   0x027,0x2101010, ';',
+   0x127,0x2111000, ':',
+   0x028,0x2011110, ''',
+   0x128,0x2010010, '\"',
+   0x029,0x2011110, ''',
+ //0x02b,0x2,       '\\',
+   0x02c,0x21100,   'Z',
+   0x12c,0x21100,   'Z',
+   0x02d,0x21001,   'X',
+   0x12d,0x21001,   'X',
+   0x02e,0x21010,   'C',
+   0x12e,0x21010,   'C',
+   0x02f,0x20001,   'V',
+   0x12f,0x20001,   'V',
+   0x030,0x21000,   'B',
+   0x130,0x21000,   'B',
+   0x031,0x210,     'N',
+   0x131,0x210,     'N',
+   0x032,0x211,     'M',
+   0x132,0x211,     'M',
+   0x033,0x2110011, ',',
+   0x034,0x2010101, '.',
+   0x01c,0x2010101, '\n', //'.' or end of message
+   0x035,0x210010,  '/',
+   0x135,0x2001100, '?',
+ //0x039,0x2,       ' ',
+};
+
+()
+{
+   enum {TICHZ=12};
+   static buf[4096], kbuf[4096], bufw, bufr;
+   static cbuf[256], cbufw;
+   
+   tim = 0; ltim = 0; stat = 0;
+   bufw = 0; bufr = 0; obufw = 0; cbufw = 0;
+   sig = 0; sym = 0; dig = 0;
+   rndchar = -1; nextrndtim = -1; gotright = 0; gotwrong = 0;
+   while (1)
+   {
+      otim = tim; tim = klock();
+
+         //morse code reader (press mouse button or ctrl)
+      osig = sig; sig = bstatus || keystatus[0x1d] || keystatus[0x9d];
+      if (sig != osig)
+      {
+         if (!sig)
+         {
+            j = (tim-ltim >= (2/TICHZ));
+            
+            sym = sym*16+j; dig++; 
+
+            j = j*2+1;
+            for(;j>0;j--) { buf[bufw] = 2; kbuf[bufw] = 0; bufw++; }
+            buf[bufw] = 0; kbuf[bufw] = 0; bufw++;
+         }
+         ltim = tim;
+      }
+      if ((!sig) && (tim-ltim >= 3/TICHZ) && (otim-ltim < 3/TICHZ))
+      {
+         playsound("sine.wav");
+         sym += 2*16^dig;
+         for(i=0;i<NCODES;i++)
+            if (key2morse[i][1] == sym)
+            {
+               kbuf[int((obufw+bufw-1)/2)] = key2morse[i][2];
+               cbuf[cbufw] = key2morse[i][2]; cbufw++;
+               break;
+            }
+            
+            //Error/backspace
+         if ((sym == 0x2000000) || (sym == 0x20000000) || (sym == 0x200000000))
+            { cbufw--; playsound("rulinst.wav"); }
+
+         sym = 0; dig = 0;
+         for(j=0;j<2;j++) { buf[bufw] = 0; kbuf[bufw] = 0; bufw++; }
+         obufw = bufw;
+      }
+      if ((!sig) && (tim-ltim >= 9/TICHZ) && (otim-ltim < 9/TICHZ)) //space
+      {
+         cbuf[cbufw] = 32; cbufw++;
+         for(j=0;j<4;j++) { buf[bufw] = 0; kbuf[bufw] = 0; bufw++; }
+         obufw = bufw;
+      }
+      
+         //morse code writer (press letter)
+      if (keystatus[0xd3]) //Del
+      {
+         stat = 0; playsoundupdate(-1,0);
+         bufw = 0; bufr = 0; obufw = 0; cbufw = 0;
+         sig = 0; sym = 0; dig = 0;
+         rndchar = -1; nextrndtim = -1; gotright = 0; gotwrong = 0;
+      }
+      if (keystatus[0x39]) //Space
+      {
+         keystatus[0x39] = 0;
+         for(j=0;j<4;j++) { buf[bufw] = 0; kbuf[bufw] = 0; bufw++; }
+         cbuf[cbufw] = ' '; cbufw++;
+         obufw += 4;
+      }
+      gotshift = (keystatus[0x2a] || keystatus[0x36]);
+         //Tab
+      if ((keystatus[0xf]) || ((otim < nextrndtim) && (tim >= nextrndtim)))
+      {
+         keystatus[0xf] = 0;
+         rndchar = int(26*rnd)+'A';
+         for(i=0;i<NCODES;i++)
+            if (key2morse[i][2] == rndchar) goto in2it;
+      }
+      if (keystatus[0x2b]) //Backslash
+      {
+         keystatus[0x2b] = 0;
+         if (cbufw > 0) saylet(cbuf[cbufw-1]);
+      }
+      if (keystatus[0x0e]) //Backspace
+      {
+         keystatus[0x0e] = 0;
+         cbufw--; playsound("rulinst.wav");
+      }
+      for(i=0;i<NCODES;i++)
+      {
+         ch = key2morse[i][0];
+         if (((ch >= 0x100) == gotshift) && (keystatus[ch%256]))
+         {
+            keystatus[ch%256] = 0;
+            if (rndchar >= 0)
+            {
+               ach = key2morse[i][2];
+               if ((ach >= 'A') && (ach <= 'Z'))
+               {
+                  if (ach == rndchar)
+                  {
+                     gotright++; playsound("pickup.wav");
+                     rndchar = -1; nextrndtim = tim+.4;
+                  }
+                  else { gotwrong++; playsound("gothit.wav"); }
+                  goto gotit;
+               }
+               rndchar = -1;
+            }
+in2it:;     ch = key2morse[i][1]; n = near(log(ch,16));
+            for(k=n-1;k>=0;k--)
+            {
+               v = int(ch/16^k)%16;
+               for(j=v*2;j>=0;j--)
+                  { buf[bufw] = 1; kbuf[bufw] = 0; bufw++; }
+               buf[bufw] = 0; kbuf[bufw] = 0; bufw++;
+            }
+            kbuf[int((obufw+bufw-1)/2)] = key2morse[i][2];
+            cbuf[cbufw] = key2morse[i][2]; cbufw++;
+            for(j=0;j<2;j++) { buf[bufw] = 0; kbuf[bufw] = 0; bufw++; }
+            obufw = bufw;
+gotit:;  }
+      }
+         
+         //stream player..
+      if (int(tim*TICHZ) != int(otim*TICHZ))
+      {
+         if (bufr < bufw)
+         {
+            v = buf[bufr]; bufr++;
+            if (v != 1)
+            {
+               if (stat == 1) { stat = 0; playsoundupdate(-1,0); }
+            }
+            else
+            {
+               if (stat == 0)
+               {
+                  stat = 1;
+                  playsound("sine.wav",-100,2.65);
+                  playsound("sine.wav",-100,2.66);
+               }
+            }
+         }
+      }
+      
+      cls(0);
+         
+         //stream viewer..
+      sc = xres/64; xoff = mousx;
+      setfont(sc*2,sc*3,1);
+      if (bufr < bufw) xoff += ((tim*TICHZ)%1)*-sc;
+      for(i=int(bufr-xres/sc),ie=bufr+xres/sc;i<ie;i++)
+      {
+              if ((i < 0) || (i >= bufw)) setcol(0x206060);
+         else if (!buf[i])                setcol(0x606060);
+         else                             setcol(0xffffff);
+         drawcone((i-bufr+1)*sc+xoff,yres-50,sc*-.5,
+                  (i-bufr+2)*sc+xoff,yres-50,sc*-.5);
+         setcol(0x000000); drawsph((i-bufr+1)*sc+xoff,yres-50-sc/2,sc*.05);
+         setcol(0x000000); drawsph((i-bufr+1)*sc+xoff,yres-50+sc/2,sc*.05);
+         if ((i >= 0) && (i < bufw) && (kbuf[i]))
+         {
+            setcol(0x80ffff);
+            moveto((i-bufr)*sc+xoff,yres-sc*3-50);
+            printchar(kbuf[i]);
+         }
+      }
+      setcol(0xff0000); moveto(mousx,0); lineto(mousx,yres);
+      
+      setfont(9,16);
+      for(i=0;i<cbufw;i++)
+      {
+         moveto(xres+(i-cbufw)*9,0); printchar(cbuf[i]);
+      }
+      
+      moveto(xres-512,32);
+      printf("Mouse but./CTRL: write morse manually\n");
+      printf(" A-Z,0-9,punct.: emit morse of symbol\n");
+      printf("            Del: clear buffers\n");
+      printf("            Tab: start random letter game (close eyes)\n");
+      printf("      Backslash: play last random letter\n");
+      if (gotright+gotwrong)
+         printf("\n\n\t\t\tRight:%g\n\t\t\tWrong:%g\n\t\t\t%6.1f%%",
+                gotright,gotwrong,gotright*100/(gotwrong+gotright));
+ 
+      refresh(); Sleep(1);
+   }
+}
+
+saylet (i)
+{
+   if ((i >= 'a') && (i <= 'z')) i -= 32;
+   if (i == 'A') playtext("a as in Alfa");
+   if (i == 'B') playtext("b as in Bravo");
+   if (i == 'C') playtext("c as in Charlie");
+   if (i == 'D') playtext("d as in Delta");
+   if (i == 'E') playtext("e as in Echo");
+   if (i == 'F') playtext("f as in Foxtrot");
+   if (i == 'G') playtext("g as in Golf");
+   if (i == 'H') playtext("h as in Hotel");
+   if (i == 'I') playtext("i as in India");
+   if (i == 'J') playtext("j as in Juliet");
+   if (i == 'K') playtext("k as in Kilo");
+   if (i == 'L') playtext("l as in Lima");
+   if (i == 'M') playtext("m as in Mike");
+   if (i == 'N') playtext("n as in November");
+   if (i == 'O') playtext("o as in Oscar");
+   if (i == 'P') playtext("p as in Papa");
+   if (i == 'Q') playtext("q as in Quebec");
+   if (i == 'R') playtext("r as in Romeo");
+   if (i == 'S') playtext("s as in Sierra");
+   if (i == 'T') playtext("t as in Tango");
+   if (i == 'U') playtext("u as in Uniform");
+   if (i == 'V') playtext("v as in Victor");
+   if (i == 'W') playtext("w as in Whiskey");
+   if (i == 'X') playtext("x as in Xray");
+   if (i == 'Y') playtext("y as in Yankee");
+   if (i == 'Z') playtext("z as in Zulu");
+   if (i == '0') playtext("0 as in bupkis");
+   if (i == '1') playtext("1 life to live");
+   if (i == '2') playtext("2 to tango");
+   if (i == '3') playtext("3 strikes and you're out");
+   if (i == '4') playtext("4 balls cannot possibly walk");
+   if (i == '5') playtext("5 fingers on a hand");
+   if (i == '6') playtext("6 strings on a guitar");
+   if (i == '7') playtext("7 days in a week");
+   if (i == '8') playtext("8 bits in a byte");
+   if (i == '9') playtext("9 months of pregnancy");
+}

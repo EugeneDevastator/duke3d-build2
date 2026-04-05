@@ -1,0 +1,413 @@
+enum{imgW = 200, imgH = 200, tileSiz = 10} // adjust these according to the image size
+//enum{imgW=320, imgH=200, tileSiz = 10}
+enum{W = 1+(imgW)/(tileSiz), 
+     H = 1+(imgH)/(tileSiz) };
+static offsX[W][H];
+static offsY[W][H];
+static offsXV[W][H];
+static offsYV[W][H];
+static offsColor[W][H];
+
+//1.4142135623730950488016887242097
+static norms[3][3] =
+{
+   0, tileSiz, tileSiz*2,
+   tileSiz*1, tileSiz*1.414214, tileSiz*2.236068,
+   tileSiz*2, tileSiz*2.236068, tileSiz*2*1.414214
+};
+
+
+static pal[255]; // palette for funky texture.
+
+// two temporaries
+static img1[imgW][imgH];
+static img2[imgW][imgH];
+// non-modified image
+static baseimage[imgW][imgH];
+// Tweak em!
+static useImg = 1;
+static randNodeStart = 1;
+static springDampning = 0.995; //.9999;
+static elasticity = 0.000001; //0.00001;
+()
+{
+   cls(0); clz(1e32);
+   
+   if(numframes==0){
+      init();
+      
+      if(useImg==1)
+      {
+         for(x=0; x<imgW; x++)
+         for(y=0; y<imgH; y++)
+         {
+            img1[x][y] = pic(x,y); //pic("pawn1.gif",x,y);
+         }
+      }
+      else
+      {
+         createTexture(tileSiz,tileSiz); 
+      }
+			
+			for(x=0; x<imgW; x++)
+			for(y=0; y<imgH; y++){
+				baseImage[x][y] = img1[x][y];
+			}
+   }
+
+   
+   for(i=0; i<10; i++){
+      Relax();
+   }
+   
+   TextureWarp(); // read img1, store in img2
+   
+	 mix(); // try turning on/off
+	 //#define USE_FILTER
+	 #ifdef USE_FILTER
+	 applyFilter();
+	 #endif
+   
+
+   for(x=0; x<imgw; x++)
+   for(y=0; y<imgh; y++)
+   {
+      setcol( img2[x][y] ); setpix(x,y);
+			#ifdef USE_FILTER 
+			img1[x][y] = img2[x][y];
+			#endif
+   }
+   agitateGrid();   
+   
+	 enum{KEY_D = 32}
+   if(keystatus[KEY_D]) drawGrid();
+   
+}
+
+agitateGrid(){
+   
+  direction = 0;
+   if(bstatus == 1) {
+      direction = 1;
+   } else if(bstatus == 2) {
+      direction = -1;
+   }
+    
+   if(direction != 0)
+   for(x=1; x<W-1; x++)
+   for(y=1; y<H-1; y++)
+   {
+      mx = mousx; //W*mousx/xres;
+      my = mousy; //H*mousy/yres;
+   
+      //xp = x/W*imgw;
+      //yp = y/H*imgh;
+      
+      xp = x*tileSiz;
+      yp = y*tileSiz;
+      
+      dx = xp-mx;
+      dy = yp-my;
+      dSq = dx^2 + dy^2;
+      d = sqrt( dSq );
+      if ( d < tileSiz*2.5 && d > tileSiz*0.01 ) {
+        amount = .02 * direction;
+        //amount = direction * (tileSiz*0.1) / (d+1);
+        offsXV[x][y] += amount * (dx/d);
+        offsYV[x][y] += amount * (dy/d);
+      }
+   } 
+}
+
+drawGrid(){   
+   setcol(255,0,0);
+   for(x=0; x<W-1; x++)
+   {
+      for(y=0; y<H-1; y++) 
+      {
+         Ax=offsX[x][y] ;
+         Ay=offsY[x][y] ;
+
+         Bx=offsX[x+1][y] ;
+         By=offsY[x+1][y] ;
+
+         Cx=offsX[x+1][y+1] ;
+         Cy=offsY[x+1][y+1] ;
+
+         Dx=offsX[x][y+1] ;
+         Dy=offsY[x][y+1] ;
+         moveto(Ax,Ay);
+         lineto(Bx,By);
+         lineto(Cx,Cy);
+         lineto(Dx,Dy);
+         lineto(Ax,Ay);
+      }
+   }
+}
+
+mix()
+{
+   rn=0; gn=0; bn=0; // new RGB
+   ro=0; go=0; bo=0; // old RGB
+   rb=0; gb=0; bb=0; // base RGB
+   for(x=0; x<imgW; x++)
+   for(y=0; y<imgH; y++){
+      getrgb(img2[x][y],rn,gn,bn); // newly warped
+      getrgb(img1[x][y],ro,go,bo); // previous frame
+      getrgb(baseimage[x][y],rb,gb,bb);
+			
+      tnew = .5; // 35% - 50%
+      told = .9-tnew; // 80% - 90%
+			tbase = 1 - tnew - told;
+      
+      red   = tnew*rn + told*ro + tbase*rb;
+      green = tnew*gn + told*go + tbase*gb;
+      blue  = tnew*bn + told*bo + tbase*bb;
+      img1[x][y] = rgb(red,green,blue);
+   }
+}
+
+
+// img1 -> img2
+applyFilter()
+{
+	enum{filterWidth=3, filterHeight=3}
+	static filter[filterWidth][filterHeight] =  
+	{ 
+		  // box?
+			 /*0, .5, 0, 
+			 .5,.5,.5, 
+			 0, .5, 0 */
+			 
+			 // gauss
+			 1/16, 2/16, 1/6,
+			 2/16, 4/16, 2/16,
+			 1/16, 2/16, 1/16
+	};
+	static factor = .95;
+	static bias = 0;
+
+
+   xmax = imgW;
+   ymax = imgH;
+   for(x=0; x<xmax; x++)
+   for(y=0; y<ymax; y++)
+   {
+      r=0; g=0; b=0;
+      
+      for(filterX=0; filterX < filterWidth; filterX++)
+      for(filterY=0; filterY < filterHeight; filterY++)
+      {
+         imageX = (x-filterWidth / 2 + filterX + xmax) % xmax;
+         imageY = (y-filterHeight / 2 + filterY + ymax) % ymax;
+
+         imgR=0; imgG=0; imgB=0;
+         getrgb(img1[imageX][imageY], imgr, imgg, imgb );
+         r += imgr * filter[filterX][filterY];
+         g += imgg * filter[filterX][filterY];
+         b += imgb * filter[filterX][filterY];
+      }
+      
+      r = min(max(factor*r+bias,0),255);
+      g = min(max(factor*g+bias,0),255);
+      b = min(max(factor*b+bias,0),255);
+      img2[x][y] = rgb( r,g,b );
+   }
+}
+
+TextureWarp()
+{
+   for(y=0; y<H-1; y++)
+   for(x=0; x<W-1; x++)
+   {
+      TextureBlock(x,y);
+   }
+}
+
+//round(x) { return int(x-0.5); }
+//round(x) { return floor(x+0.5); }
+//round(x) { return ceil(x-0.5); }
+round(x) { return x; }
+
+// img1 -> img2
+TextureBlock(xo,yo)
+{
+   xi = round(xo * tileSiz);
+   yi = round(yo * tileSiz);
+
+   Ax=offsX[xo][yo];
+   Ay=offsY[xo][yo];
+   
+   Bx=offsX[xo+1][yo];
+   By=offsY[xo+1][yo];
+   
+   Cx=offsX[xo][yo+1];
+   Cy=offsY[xo][yo+1];
+   
+   Dx=offsX[xo+1][yo+1];
+   Dy=offsY[xo+1][yo+1];
+   
+   // Image corners, Left, right
+   // A B
+   // C D
+   TX1=0, TY1=0, TX2=0, TY2=0; tx=0; ty=0;
+
+	// Delta's
+   VLDx = (Cx-Ax)/tileSiz; // Rate of change X down left
+   VRDx = (Dx-Bx)/tileSiz; // X down right
+   VLDy = (Cy-Ay)/tileSiz; // Y down left
+   VRDy = (Dy-By)/tileSiz; // Y down right
+   
+   TX1 = Ax;
+   TY1 = Ay;
+   TX2 = Bx;
+   TY2 = By;
+   
+   for(y=yi; y<yi+tileSiz; y++)
+   {
+      HDx = (TX2-TX1) / tileSiz; // Rate of change across polygon
+      HDy = (TY2-TY1) / tileSiz; // Rate of change across polygon
+      tx = TX1;
+      ty = TY1;
+      
+      
+			for(x=xi; x<xi+tileSiz; x++)
+      {
+         img2[x][y] = img1[tx][ty];
+         tx += HDx;
+         ty += HDy;
+      }
+      
+      TX1 += VLDx;  
+      TY1 += VLDy;
+      TX2 += VRDx;
+      TY2 += VRDy;
+   }  
+}
+
+// Weird texture!
+createTexture(xs,ys)
+{
+   VLDc=0; VRDc=0; HDc=0;
+   C1=0; C2=0; c=0;
+   x=0; y=0; xi=0; yi=0;
+	 // bilinear filtering
+   for(yi=0; yi<H; yi++)
+   for(xi=0; xi<W; xi++)
+   {
+      VLDc = (offsColor[xi][yi+1] - offsColor[xi][yi]) / ys;
+      VRDc = (offsColor[xi+1][yi+1] - offsColor[xi+1][yi]) / ys;
+      
+      C1 = offsColor[xi][yi];
+      C2 = offsColor[xi+1][yi];
+      
+      for(y=yi*ys; y<(yi+1)*ys; y++)
+      {
+         HDc = (C2-C1) / ys;
+         c = C1;
+         
+         for(x=xi*xs; x<(xi+1)*xs; x++)
+         {
+            img1[x][y] = 10*pal[c];
+            c += HDc;
+         }
+         C1 += VLDc;
+         C2 += VRDc;
+         
+      }
+   }
+}
+
+Init()
+{
+// init palette for procedural image
+   for(i=0; i<64; i++)
+   {
+      pal[i]     = rgb(i,   0,    63-i);
+      pal[i+64]  = rgb(63-i,i,    0);
+      pal[i+128] = rgb(0,   63-i, i);
+      pal[i+192] = rgb(i,   0,    63-i);
+   }   
+
+
+   for(y=0; y<H; y++)
+   for(x=0; x<W; x++)
+   {
+      offsColor[x][y] = int(rnd*255); // procedural image color
+	 }
+// init grid
+   for(y=0; y<H; y++)
+   for(x=0; x<W; x++)
+   {
+      if( (x==0) || (x==W-1) || (y==0) || (y==H-1) )
+      {
+         offsX[x][y] = x*tileSiz;;
+         offsY[x][y] = y*tileSiz;;
+         offsXv[x][y] = 0;
+         offsYv[x][y] = 0;
+      }
+      else
+      {
+         offsX[x][y] = x*tileSiz;
+         offsY[x][y] = y*tileSiz;
+         if(randNodeStart==1)
+         {
+            offsX[x][y] += nrnd*2;
+            offsY[x][y] += nrnd*2;
+         }         
+
+         offsXv[x][y] = 0;
+         offsYv[x][y] = 0;
+      }
+   }
+}
+
+Relax()
+{
+   for(y=1; y<H-1; y++)
+   {
+      yh = y+2;
+      yl = y-2;
+      if(yl<0) yl=0;
+      if(yh>H-1) yh = H-1;
+      
+      for(x=1; x<W-1; x++)
+      {
+         xh = x+2;
+         xl = x-2;
+         if(xl<0) xl=0;
+         if(xh>W-1) xh=W-1;
+      
+         for(yi=yl; yi<=yh; yi++)
+         {
+            for(xi=xl; xi<=xh; xi++)
+            {
+               if( (xi != x) || (yi != y) )
+               {
+                  xspring = offsX[xi][yi] - offsX[x][y];
+                  yspring = offsY[xi][yi] - offsY[x][y];
+                  
+                  norm = norms[abs(xi-x)][abs(yi-y)];
+                  length = sqrt(xspring^2 + yspring^2);
+                  scaler = (norm-length) * elasticity; //tweak
+                  
+                  xspring *= scaler;
+                  yspring *= scaler;
+                  
+                  offsXv[xi][yi] += xspring;
+                  offsYv[xi][yi] += yspring;
+               }   
+            }
+         }
+      }
+   }
+   
+   for(y=1; y<H-1; y++)
+   for(x=1; x<W-1; x++)
+   {
+      offsX[x][y] += offsXv[x][y];
+      offsY[x][y] += offsYv[x][y];
+      offsXv[x][y] *= springDampning;
+      offsYv[x][y] *= springDampning;
+   }
+}

@@ -1,0 +1,196 @@
+struct p3d_t{
+   x,y,z;
+}
+
+()
+{
+   cls(0);
+   clz(1e32);
+   glcullface(GL_NONE);
+   
+   
+   //setcam(0,-4,-5,0,pi/4);
+   setcam(0,-.5,-5,0,0);
+   
+   p3d_t norm;
+   norm.x = 0;
+   norm.y = 1;
+   norm.z = 0;
+   
+   x=norm.y;
+   y=norm.z;
+   ang=mousy/yres*6.28;
+   ca=cos(ang);
+   sa=sin(ang);
+   norm.y = ca*x -sa*y;
+   norm.z = sa*x +sa*y;
+   
+   
+   distance=0;
+   
+   p3d_t pos;
+   pos.x = 0;
+   pos.y = mousx/xres*2-1;
+   pos.z = 0;
+   
+   p3d_t point_on_plane;
+   d=nrnd;
+   point_on_plane.x = 0;
+   point_on_plane.y = 0;
+   point_on_plane.z = 0;
+   
+   //drawfloor();
+   texQuadAlignToNormal(0,0,0,norm,1);
+
+   isect = sphere_plane_intersect(pos, norm, point_on_plane, .5, distance);
+
+   if(isect)
+   {
+      setcol(255,0,0);
+   }else{
+      setcol(0,255,0);
+   }
+   
+   drawsph( pos.x, pos.y, pos.z, .5);
+   
+   drawsph( point_on_plane.x, point_on_plane.y, point_on_plane.z, .1);
+
+}
+
+sphere_plane_intersect(p3d_t pos, p3d_t normal, p3d_t point_on_plane, radi, &distance)
+{
+   d = -(normal.x*point_on_plane.x) + 
+        (normal.y*point_on_plane.y) + 
+        (normal.z*point_on_plane.z);
+   
+   distance = normal.x*pos.x + 
+              normal.y*pos.y + 
+              normal.z*pos.z + d;
+   
+   if ( fabs(distance) < radi )
+   {
+      return 1; // isect
+   }else if( distance >= radi )
+   {
+      return 0; // front of plane
+   }
+   return 0; // behind plane
+   
+}
+
+drawfloor()
+{
+   h=glsettex("wood.png");
+   setcol(255,255,255);
+   
+   minim = -2;
+   maxim = 2;
+   sc = 2;
+   y = 0;
+   range = maxim - minim;
+   segs= 2;
+      for(i=0; i<segs; i++)
+      {
+         for(j=0; j<segs; j++)
+         {
+      
+            u0 = i/segs;
+            v0 = j/segs;
+            
+      
+            u1 = (i+1)/segs;
+            v1 = (j+1)/segs;
+            
+            x1 = minim + range * u0;
+            z1 = minim + range * v0;
+            
+            x2 = minim + range * u1;
+            z2 = minim + range * v0;
+            
+            x3 = minim + range * u1;
+            z3 = minim + range * v1;
+      
+            x4 = minim + range * u0;
+            z4 = minim + range * v1;
+
+   glbegin(gl_complex);
+   gltexcoord(sc*u0,sc*v0); glvertex(x1,y,z1); 
+   gltexcoord(sc*u1,sc*v0); glvertex(x2,y,z2);
+   gltexcoord(sc*u1,sc*v1); glvertex(x3,y,z3);
+   gltexcoord(sc*u0,sc*v1); glvertex(x4,y,z4);
+   glend();
+   
+   }
+   }
+   glremovetex(h);
+}
+
+texQuadAlignToNormal(xpos,ypos,zpos,normal[3],s)
+{
+   glEnable(GL_ALPHA_TEST);
+   //glCullface(GL_NONE); // bruker CLOCKWISE, CW. dvs GL_BACK
+
+// 1. choose a vector (w) non-collinear to n .
+// here I just swizzle the normal components around to get something thats NOT collinear to the normal
+   static w[3];
+   w[0] = normal[1]; w[1] = normal[2]; w[2] = normal[0];
+// 2. take cross product of w and n, v=w x n
+   static v[3];
+   cross(w,normal,v);
+// 3. we now have a new vector v, perpendicular to n (and w), now take crossprod u = v x n
+// u is perp to n and v. We now have 2 vectors that describe the normal
+   static u[3];
+   cross(v,normal,u);
+   
+   normalize(v);   
+   normalize(u);
+   
+   // Points on a quad:
+   static p[4][3];
+
+   for(i=0; i<4; i++) 
+   {
+      p[i][0] = xpos;
+      p[i][1] = ypos;
+      p[i][2] = zpos;
+   } 
+   
+   for(i=0; i<3; i++)
+   {
+      u[i] *=s; v[i]*=s;
+      p[0][i] += -1*v[i] -1*u[i];   
+      p[1][i] += -1*v[i] + u[i];   
+      p[2][i] += v[i] + u[i];   
+      p[3][i] += v[i] - 1*u[i];   
+   }
+   
+   handle = glsettex("alphasprite.png");
+   glBegin(GL_QUADS); // clockwise order. really backface..in ogl :(
+   glTexCoord(0,0); glVertex(p[0][0],p[0][1],p[0][2]); // top left
+   glTexCoord(1,0); glVertex(p[1][0],p[1][1],p[1][2]); // top right
+   glTexCoord(1,1); glVertex(p[2][0],p[2][1],p[2][2]); // bottom right
+   glTexCoord(0,1); glVertex(p[3][0],p[3][1],p[3][2]); // bottom left
+   glEnd();
+   glremovetex(handle);
+
+   
+/*
+   setcol(0xffff00);
+   moveto(xpos,ypos,zpos);
+   lineto(xpos+u[0], ypos+u[1],  zpos+u[2] );
+   
+   moveto(xpos,ypos,zpos);
+   lineto(xpos+v[0], ypos+v[1],  zpos+v[2] );
+*/
+   
+}
+
+cross(a[3],b[3],p[3]){
+   p[0] = a[1]*b[2]-a[2]*b[1];
+   p[1] = a[2]*b[0]-a[0]*b[2];
+   p[2] = a[0]*b[1]-a[1]*b[0];  
+}
+normalize(vec[3]){
+   length = sqrt( vec[0]^2 + vec[1]^2 + vec[2]^2);
+   vec[0] /= length; vec[1] /= length; vec[2] /= length; 
+}

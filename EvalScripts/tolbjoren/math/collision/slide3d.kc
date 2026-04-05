@@ -1,0 +1,583 @@
+struct vec
+{
+   x,y,z;
+}
+
+struct ray_t
+{
+   vec origin;
+   vec dir;
+}
+
+struct cyl_t
+{
+   vec e1;
+   vec e2;
+   radi;
+}
+
+static vec hitPoint;
+static hitType = 0;
+
+#define EPSILON 1e-5
+//#define NORMALS_FACE_OUT
+
+() //Robust 2D collision detection by Ken Silverman
+{  //Uses "Shrinking radius" algorithm, an idea I came up with on 10/28/1999
+   //Can be extended to 3D using ray to plane/cylinder/sphere intersection
+
+   cls(0);
+   clz(1e32);
+   //setcam(0,200,0, 0, -pi/2);
+   zoom = 100;
+   
+   
+   enum {NUM=16} 
+   static vec walls[NUM];
+   PRAD = 8;
+   static vec playerpos;
+   static pa, pr;
+   static tim, omousx, omousy, obstatus, grabi;
+   if (numframes == 0)
+   {
+      for(i=0;i<NUM;i++)
+      {
+         r = 32*rnd+64;
+         a = (i+rnd-.5)*(PI*2/NUM);
+         set( walls[i], cos(a)*r, sin(a)*r, 0 );
+      }
+      set( playerpos, 0,0,0 );
+      pr = PRAD; 
+      pa = -PI/2;
+   }
+   
+   setcam( playerpos.x, playerpos.y , -zoom, 0, 0);
+
+   if ( bstatus == 1 )
+   {
+      set( playerpos, ((mousx/xres)-.5)*2.0 * zoom, ((mousy/yres)-.5)*2 * zoom, 0 );
+   }
+   
+      //Handle controls
+   dtim = tim; tim = klock(); dtim = tim-dtim;
+   pa += (keystatus[0xcd]-keystatus[0xcb])*dtim*4;
+   f = (keystatus[0xc8]-keystatus[0xd0])*dtim*64;
+   if (keystatus[0x2a]) f *= 1/16;
+   if (keystatus[0x36]) f *= 4;
+   
+   static vec playerVel;
+   set(playerVel, cos(pa)*f, sin(pa)*f, 0 );
+   
+      //Collision. Raytrace twice; 2nd time for sliding if needed
+   if ( playerVel.x || playerVel.y || playerVel.z )
+   //if ( length(playerVel) > 0.0 )
+   {
+         //pr = min(distance_to_closest_wall - 1e-7,PRAD);
+      mindSq = 1e32;
+      
+      // find dist to closest wall
+      for(i=NUM-1,j=0;j<NUM;i=j,j++)
+      {
+         // Closest to sphere
+         static vec v_wp;
+         vecsub( v_wp, playerpos, walls[i] );
+         distSq = dot( v_wp, v_wp );
+         if (distSq < mindSq ) mindSq = distSq;
+         
+         // closest to line
+         vec v_ij;
+         vecsub(v_ij, walls[j], walls[i] );
+         distIjSq = dot( v_ij, v_ij );
+         wpDotij = dot( v_wp , v_ij);
+         if ( wpDotij <= 0.0 || wpDotij >= distijSq) continue; // Facing away from line, ignore
+         
+         //static vec closest;
+         //closestPtOnLine( playerPos, walls[i], walls[j], closest );
+         //d = dot(closest, closest);
+         
+         perp = v_wp.x * v_ij.y - v_wp.y * v_ij.x;
+         d = perp^2 / distIjSq;
+         if (d < mindSq) mindSq = d;
+      }
+      
+      
+      distClosestWall = sqrt(mindSq) - EPSILON; 
+      setcol(0xFCFC40); drawCirc3D(playerpos, distClosestWall);
+      pr = min(distClosestWall,PRAD);
+      
+      for(cnt=2;cnt>0;cnt--)
+      {
+         static vec nextPos;
+         vecadd( nextPos, playerPos, playerVel );
+
+         static vec isect;
+         set(isect,0,0,0);
+         
+         mint = 1.0; 
+         rpr = 1/pr;
+         
+         for(i=NUM-2,j=NUM-1,k=0;k<NUM;i=j,j=k,k++)
+         {
+           //Raytrace lines
+            static vec wallNormal;
+            
+            #ifdef NORMALS_FACE_OUT
+               wallNormal.x = -walls[i].y + walls[j].y;
+               wallNormal.y = walls[i].x - walls[j].x;
+               wallNormal.z = 0;
+            #else
+               wallNormal.x = walls[i].y - walls[j].y;
+               wallNormal.y = -walls[i].x + walls[j].x;
+               wallNormal.z = 0;
+            #endif
+  
+            // make line "normal" length relative to pr
+            normalize( wallNormal );
+            wallNormal.x *= pr;
+            wallNormal.y *= pr;
+            wallNormal.z *= pr;
+          
+            static vec beginLine;
+            vecAdd(beginLine, walls[i], wallNormal);
+
+            static vec endLine;
+            vecAdd(endLine, walls[j], wallNormal );
+      
+            //#define LINE_TEST;
+            #ifdef LINE_TEST
+               t = ray_line( playerPos, nextPos, beginLine, endLine );
+            #else
+               ray_t ray;
+               set(ray.origin, playerPos );
+               set(ray.dir, playerVel );   
+               
+               cyl_t cyl;
+               set( cyl.e1, walls[i] );
+               set( cyl.e2, walls[j] );
+               cyl.radi = pr;
+               
+               t = isect_ray_cyl( ray, cyl );    
+            #endif
+            
+            if (t < mint ) 
+            { 
+               mint = t; 
+               // TODO, figure out
+               // the t-value is only used to advance the playerpos
+               // isect is not the pos on cyl surf at p(t) but a function of wallNormal & rpr?
+               #ifdef LINE_TEST
+               
+                  isect.x = wallNormal.x * rpr;
+                  isect.y = wallNormal.y * rpr;
+                  isect.z = wallNormal.z * rpr;
+               #else
+                  static vec p_of_t;
+                  raypoint( p_of_t, ray, rpr ); // <- notice use of rpr!
+                  static vec closest;
+                  // Could very possibly do without closestPtOnLine
+                  closestPtOnLine( p_of_t, beginLine, endLine, closest );
+                  static vec cylNormal;
+                  vecsub( cylNormal, p_of_t, closest );
+                  normalize( cylNormal );
+                  
+                  isect.x = cylNormal.x;
+                  isect.y = cylNormal.y;
+                  isect.z = cylNormal.z;   
+               #endif
+               
+               vecAdd( hitPoint, playerPos, isect );
+               hitType = 1;
+            }
+            
+
+            
+            vec walljk;
+            vecsub(walljk, walls[k], walls[j] );
+            
+            //Raytrace circles
+            // TODO
+            // if using 3D cylinders & object isnt closed, allways trace spheres
+            
+            //if ( dot(walljk, wallNormal) < 0.0 )
+            {
+                              
+               t = 0;
+               hit = ray_sphere( playerPos, playerVel, walls[j], pr, t );
+               //t = ray_circ(playerPos, nextPos, walls[j], pr);
+               if(hit)
+               if (t < mint )
+               {
+                  mint = t;
+                  isect.x = (playerVel.x*t + playerpos.x-walls[j].x) * rpr;
+                  isect.y = (playerVel.y*t + playerpos.y-walls[j].y) * rpr;
+                  isect.z = (playerVel.z*t + playerpos.z-walls[j].z) * rpr;
+                  vecAdd( hitPoint, playerPos, isect );
+                  hitType = 2;
+               }
+            }
+         } // eof raytrace
+         
+         // Move Player
+         velSq = dot(playerVel,playerVel);
+         dtSq = (dtim*1e-3)^2;
+         static vec velDelta;
+         if ( (velSq*mint^2) > dtSq )
+         {  
+            playerPos.x += playerVel.x*mint;
+            playerPos.y += playerVel.y*mint;
+            playerPos.z += playerVel.z*mint;
+         }
+         
+         if (mint >= 1) break; // No collision this frame
+         
+         //Sliding vector = amount left, orthogonal to previous hits
+         fracLeft = 1.0 - mint; 
+         
+         // Scale velocity by amount left
+         playerVel.x *= fracLeft; 
+         playerVel.y *= fracLeft;
+         playerVel.z *= fracLeft;
+         
+         // New player force is vel projected onto isect
+         f = dot(playerVel, isect );
+         
+         // Decrement velocity
+         playerVel.x -= isect.x * f;
+         playerVel.y -= isect.y * f;
+         playerVel.z -= isect.z * f;
+         //Shrink radius to avoid precision issues in next test
+         pr -= EPSILON; 
+         
+      }
+   }
+
+      //Draw dark debug lines
+   setcol(0x502020);
+   for(i=NUM-2,j=NUM-1,k=0;k<NUM;i=j,j=k,k++)
+   {
+      #ifdef NORMALS_FACE_OUT
+         wallNormal.x = -walls[i].y + walls[j].y;
+         wallNormal.y = walls[i].x - walls[j].x;
+         wallNormal.z = 0;
+      #else
+         wallNormal.x = walls[i].y - walls[j].y;
+         wallNormal.y = -walls[i].x + walls[j].x;
+         wallNormal.z = 0;
+      #endif
+      
+      f = pr/length(wallNormal);  // length = pr
+      wallNormal.x *= f; 
+      wallNormal.y *= f; 
+      wallNormal.z *= f;
+      
+      vec beginLine;
+      vecAdd(beginLine, walls[i], wallNormal);
+
+      vec endLine;
+      vecAdd(endLine, walls[j], wallNormal );      
+
+      drawline( beginLine, endLine );
+      
+      static vec wallk;
+      vecSub( wallk, walls[k], walls[j] );
+      // do walls face away from each other?
+      //if ( dot( wallk, wallNormal ) < 0 ) 
+      drawCirc3D(walls[j], pr);
+   }
+   
+      //Draw player
+   setcol(0x60a0c0);
+   drawCirc3D(playerpos, 2);
+   drawCirc3D(playerpos, pr);
+   sc = prad/2;
+   vec playerDir;
+   set(playerDir, playerVel);
+   normalize(playerDir);
+   vecAdd(playerdir, playerpos, playerDir);
+   playerVel.x *= sc;
+   playerVel.y *= sc;
+   playerVel.z *= sc;
+   
+   drawline( playerpos, playerdir );
+   
+
+      //Draw walls
+   setcol(0xff8080);
+   for(i=NUM-1,j=0;j<NUM;i=j,j++) { drawline(walls[i], walls[j]); }
+   setcol(0xffffff);
+   for(i=0;i<NUM;i++) drawCirc3D( walls[i] ,2);
+   
+   if (hitType == 1 )
+   {
+      setcol(255,0,0);
+   }else if ( hitType == 2 )
+   {
+      setcol(0,255,0);
+   }
+   //drawSph( hitPoint.x, hitPoint.y, hitPoint.z, 5 ); 
+   drawCirc3D( hitPoint, 3 );
+
+      //Debug info
+   moveto(xres/2-64,0); printf("player radius=%.7f",pr);
+}
+
+raypoint( vec out, ray_t r, t )
+{
+   out.x = r.origin.x + t * r.dir.x;
+   out.y = r.origin.y + t * r.dir.y;
+   out.z = r.origin.z + t * r.dir.z;
+}
+
+drawline( vec a, vec b ){
+   moveto(a.x, a.y, a.z ); lineto( b.x, b.y, b.z );
+}
+
+drawCirc3D( vec pos, rad )
+{
+   segs = 36;
+   angDt = 2*PI / (segs);
+
+   ang = 0;
+   ox = pos.x + cos(ang) * rad;
+   oy = pos.y + sin(ang) * rad;   
+   //oz = pos.z + sin(ang) * rad;   
+
+   for(i=0; i<segs+1; i++)
+   {
+      x = pos.x + cos(ang) * rad;
+      y = pos.y + sin(ang) * rad;
+      //z = pos.z + sin(ang) * rad;
+      //drawcone( ox, pos.y, oz, .5, 
+      //          x,  pos.y, z,  .5 );
+                
+      drawcone( ox, oy, pos.z, .5, 
+                x,  y, pos.z,  .5 );
+                
+      ox = x;
+      oy = y;
+      //oz = z;
+      
+      ang += angDt;
+   }
+}
+
+closestPtOnLine( vec point, vec a, vec b, vec out)
+{
+   // from A to P
+   vec aTop;
+   vecsub( aTop, point, a );
+   // From A to B
+   vec n;
+   vecsub(n, b, a);
+   // normalize Dir A to B
+   distAB = length(n);
+   
+   if( distAB > 0.0 ){
+      set( n, n.x/distAb, n.y/distAb, n.z/distAb );
+   }
+   
+   t = dot(n,aTop); // proj v1 onto norm
+   
+   if( t<= 0){ // A is closest
+      set(out,a); 
+      return;
+   }
+   
+   if( t>= distAB){ // B is closest
+      set(out,b); 
+      return;
+   }
+   
+   // create new vec, closest pt
+   set(out, a.x + n.x*t, 
+            a.y + n.y*t, 
+            a.z + n.z*t); 
+   return;
+}
+
+   //Input: Ray: (x0,y0) to (x1,y1)
+   //      Line: (x2,y2), (x3,y3)
+   //Returns: fraction of ray traversed until intersection
+ray_line (vec s, vec e, vec a, vec b)
+{
+      //(x1-x0)*t + (x2-x3)*u = (x2-x0)
+      //(y1-y0)*t + (y2-y3)*u = (y2-y0)
+   vec se;
+   vec sa;
+   vec ba;
+   vecsub(se, e, s);
+   vecsub(sa, a, s);
+   vecsub(ba, a, b);
+   d = se.x * ba.y - se.y * ba.x; // 2D cross, aka perp?
+   if (fabs(d) < 1e-7) return 1.0;
+   
+   rd = 1.0/d;
+   t = (sa.x*ba.y - sa.y*ba.x) * rd;
+   if (t < 0.0 || t >= 1.0 ) return 1.0;
+   u = (se.x*sa.y - se.y*sa.x) * rd;
+   if (u < 0.0 || u >= 1.0 ) return 1.0;
+   return max( t, 0.0 );
+}
+
+//
+// Returns allways a t-value
+// 1.0 if behind or longer than ray.dir
+//
+isect_ray_cyl( ray_t ray, cyl_t cyl  )
+{
+   vec s0;
+   vecsub( s0, ray.origin, cyl.e1 );
+   vec e2e1;
+   vecsub( e2e1, cyl.e2, cyl.e1 );
+   e2e1Sq = dot(e2e1,e2e1);
+   vDotV = dot(ray.dir, ray.dir);   
+   
+   dirDotAxis = dot(ray.dir, e2e1);   
+   
+   s0DotAxis = dot(s0, e2e1);
+
+   a = vDotV - ( dirDotAxis^2 / e2e1Sq );
+   b = dot(s0, ray.dir) - ( s0DotAxis * dirDotAxis) / e2e1Sq;
+   c = dot(s0,s0) - cyl.radi^2 - (s0DotAxis)^2 / e2e1Sq;
+   
+   D4 = b^2 - a*c;
+   if ( D4 > 0 )
+   {
+
+      t = (-b - sqrt(b^2 - a*c)) / a;  
+      
+      if ( t < 0 || t > 1.0 )
+      {
+         return 1.0;
+      }
+
+      vec pt;
+      raypoint( pt, ray, t );
+      
+      // The signed length L of the projection P(t) - E1 onto A
+      L = dot( pt, e2e1 ) / length(e2e1) ;
+      
+      // The ray isects the cyl if L is positive and less than ||A||
+      // we simply need to check that
+      // 0 < [P(t) - E1] dot A < A^2
+      
+      vec e1pt;
+      vecsub( e1pt, pt, cyl.e1 );
+      proj_pt_e1 = dot( e1pt, e2e1 );
+      if ( proj_pt_e1 > 0 && proj_pt_e1 < e2e1Sq )
+      {
+         return max( t, 0.0 );
+      } 
+      return 1.0;
+   }
+   return 1.0;
+}
+
+
+
+
+ray_sphere(vec origin, vec dir, vec center, radi, &t)
+{
+   vec v;
+   vecsub( v,  origin, center );
+   double b = -dot( v, dir );
+   double det = (b * b) - dot( v, v ) + radi^2;
+   
+   t = -1;
+   
+   if (det > 0)
+   {
+      det = sqrt( det );
+      double i1 = b - det;
+      double i2 = b + det;
+      if (i2 > 0)
+      {
+         if (i1 < 0) 
+         {
+            t = i2; // inside sphere!
+            return 0;   
+         }
+         else
+         {
+            t = i1;
+            return 1;
+            
+         }
+      }
+   }
+
+   return 0;
+}
+
+   //Input: Ray: (x0,y0) to (x1,y1)
+   //    Circle: (cx,cy), cr=radius
+   //Returns: fraction of ray traversed until intersection
+ray_circ (vec origin, vec rayEnd, vec center, radi)
+{
+      //((x1-x0)*t + x0-cx)^2 + ((y1-y0)*t + y0-cy)^2 = cr^2
+   vec dir;
+   vecsub(dir, rayEnd, origin);
+   dirSq = dot(dir,dir);
+   vec co;
+   vecsub(co, origin, center);
+   coSq = dot(dir, co);
+   f = ( radi^2 - co.x^2 - co.y^2) * dirSq + coSq^2;
+   if (f < 0.0) return 1.0;
+   t = (-coSq - sqrt(f))/dirSq;
+   if (t < 0.0) return 1.0;
+   return max(t, 0.0);
+}
+
+vecScalar( vec out, vec a, s )
+{
+   out.x = a.x * s;
+   out.y = a.y * s;
+   out.z = a.z * s;
+}
+
+vecAdd( vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;   
+}
+vecSub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;   
+}
+
+vecCross( vec out, vec a, vec b)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+
+set(vec a, x,y,z){
+   a.x = x; a.y = y; a.z = z;
+}
+set(vec a, vec other){
+   a.x = other.x; a.y = other.y; a.z = other.z;
+}
+
+
+dot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+normalize( vec v )
+{
+   l = length( v );
+   if ( l )
+   {
+      v.x /= l; v.y /= l; v.z /= l;
+   }
+}
+
+length( vec v )
+{
+   return sqrt( dot(v,v) );
+}

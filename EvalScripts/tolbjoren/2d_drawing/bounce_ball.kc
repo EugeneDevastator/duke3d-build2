@@ -1,0 +1,26 @@
+static ballx, bally, balldx, balldy;
+static dt;
+()
+{
+   tim = klock();
+   
+   if(numframes==0)
+   {
+      ballx = xres/2; bally = yres/2;
+      balldx = 30; balldy = 30;
+      
+   }
+   cls(0);
+   
+   diam = 25;
+   drawsph(ballx,bally,diam);
+   
+   ballx += balldx; bally += balldy;
+   if(ballx > xres-diam) balldx*=-1;
+   if(ballx < diam) balldx*=-1;
+   if(bally > yres-diam) balldy*=-1;
+   if(bally < diam) balldy*=-1;
+   
+
+   sleep(16);
+}

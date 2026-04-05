@@ -1,0 +1,176 @@
+// What is a string?
+// it should not stretch forever...
+
+// Question about string topology. How do I "tie" parts of a string togheter?
+// Answer: It depends on the neighbours ya wanna check against.
+enum{NUMSTRINGS = 9, NUMPOINTS =16*1-1} // let NUMPOINTS be a power of 2. (want the middle-point be a pow of 2)
+static stringx[NUMSTRINGS][NUMPOINTS];
+static stringy[NUMSTRINGS][NUMPOINTS];
+static stringvx[NUMSTRINGS][NUMPOINTS];
+static stringvy[NUMSTRINGS][NUMPOINTS];
+static copyStringx[NUMSTRINGS][NUMPOINTS]; // temp buffer
+static copyStringy[NUMSTRINGS][NUMPOINTS];
+
+enum{LOOP, LINE}
+static stringTopo[NUMSTRINGS]; // Loop or line?
+
+static normal_length = 1;
+static gravity = 0;
+static delta = 0.01;
+static damping = 0.95;
+
+// State
+static grabbedPoint = -1; 
+static grabbedString = -1;
+
+// Drawing. Center of screen. Scale. Mouse-grab rect. 
+static   cx = 0;
+static   cy = 0;
+static   drawscale = 10;
+static grabX = 15;
+static grabY = 15;
+()
+{
+   cls(0);
+   
+   cx = xres/2; cy = yres/2;
+
+   if(numframes==0)
+   {
+      for(str=0; str < NUMSTRINGS; str++)
+      {
+         for(i=0; i<NUMPOINTS; i++)
+         {
+            stringTopo[str] = int(rnd*2); // it might be a line, it might be a loop
+            stringx[str][i] =  NUMPOINTS*normal_length^2*cos(i * 2*PI/NUMPOINTS) + 5*normal_length^2*cos(str * 2*PI/NUMSTRINGS);
+            stringy[str][i] =  NUMPOINTS*normal_length^2*sin(i * 2*PI/NUMPOINTS) + 5*normal_length^2*sin(str * 2*PI/NUMSTRINGS);
+         }
+      }
+   }
+   
+   // First. Calculate new string node positions:
+   for(str=0; str < NUMSTRINGS; str++)
+   for(iterations = 0; iterations < 10; iterations++) // also makes string stiffer (faster)
+   {
+      for(i=0; i < NUMPOINTS; i++)  
+      {
+         xv = 0;
+         yv = 0;
+         for(j=1; j<2; j++) // j<2 is minimum. increase j to make stiffer   (not quite working yet)
+         {
+            back = i-j;
+            fwd = i+j;
+            
+            // Is the string a loop or a line?
+            if(stringTopo[str] == LOOP){
+               if(back < 0) back = NUMPOINTS-1-j;
+               if(fwd > (NUMPOINTS-1)) fwd = j;  
+            }
+            else if(stringTopo[str] == LINE){
+               if(back < 0) back = j;
+               if(fwd > (NUMPOINTS-1)) fwd = NUMPOINTS-1-j;
+ 
+            }
+            // Check backwards along string
+            xvec1 = stringx[str][back] - stringx[str][i];
+            yvec1 = stringy[str][back] - stringy[str][i];         
+            mag1 = ( xvec1^2 + yvec1^2 );
+            ext1 = mag1 - normal_length;        
+            // Check forwards
+            xvec2 = stringx[str][fwd] - stringx[str][i];
+            yvec2 = stringy[str][fwd] - stringy[str][i];
+            mag2 = ( xvec2^2 + yvec2^2 );
+            ext2 = mag2 - normal_length;
+             
+            xv += (xvec1/mag1*ext1) + (xvec2/mag2*ext2);
+            yv += (yvec1/mag1*ext1) + (yvec2/mag2*ext2) + gravity;
+         }
+         
+         // store new pos in str+1
+         stringvx[str][i] = stringvx[str][i]*damping + (xv * delta);
+         stringvy[str][i] = stringvy[str][i]*damping + (yv * delta);
+         copyStringx[str][i] = stringx[str][i] + stringvx[str][i];
+         copyStringy[str][i] = stringy[str][i] + stringvy[str][i];
+      }
+         
+      // copy new position back into working array
+      for(i=0; i<NUMPOINTS; i++)
+      {
+         stringx[str][i] = copyStringx[str][i];
+         stringy[str][i] = copyStringy[str][i];
+      } 
+   }
+      
+   draw();
+   mouseDrag(); 
+   
+   moveto(0,0);
+   printf("Use mouse to draw nodes.");
+
+   //sleep(1); // using a laptop? uncomment this line.
+}
+draw()
+{
+   for(str=0; str < NUMSTRINGS; str++)
+   {
+      if(stringTopo[str] == LOOP) setcol(0xffffff);
+      if(stringTopo[str] == LINE) setcol(0x00ff00);
+      moveto(cx + stringx[str][0]*drawscale, cy + stringy[str][0]*drawscale );
+      if(stringTopo[str] == LOOP) printf("IM A LOOP");
+      if(stringTopo[str] == LINE) printf("IM A LINE");
+      for(i=0; i<NUMPOINTS; i++)
+      {
+         xp = cx+stringx[str][i]*drawscale;
+         yp = cy+stringy[str][i]*drawscale;
+         
+         if(i==grabbedPoint && str==grabbedString)
+         {
+            setcol(0xff0000);
+         }
+         else
+         {
+            if(stringTopo[str] == LOOP) setcol(0xffffff);
+            if(stringTopo[str] == LINE) setcol(0x00ff00);
+         }
+         drawsph(xp, yp, -3);
+         
+         lineto(xp,yp);
+      }
+      // If loop, draw line to end.
+      if(stringTopo[str] == LOOP) lineto(cx + stringx[str][0]*drawscale, cy + stringy[str][0]*drawscale);
+   }
+}
+mouseDrag()
+{
+   if(bstatus == 1)
+   {
+      // move currently grabbed point
+      if(grabbedPoint > -1)
+      {
+         stringx[grabbedString][grabbedPoint] = (mousx-cx)/drawscale; 
+         stringy[grabbedString][grabbedPoint] = (mousy-cy)/drawscale;
+      }
+      else if(grabbedPoint < 0) // no point grabbed, but mouse is down, check for collision
+      {
+         for(str=0; str < NUMSTRINGS; str++)
+         for(i=0; i<NUMPOINTS; i++)
+         {
+            x = stringx[str][i]*drawscale+cx; 
+            y = stringy[str][i]*drawscale+cy;
+            
+            if(mousx > x-grabX && mousx < x+grabX && mousy > y-grabY && mousy < y+grabY)
+            {
+               grabbedPoint = i;
+               grabbedString = str;
+               //stringvx[grabbedString][grabbedPoint] = (mousx-cx)/drawscale; //start moving right away.
+               //stringvy[grabbedString][grabbedPoint] = (mousy-cy)/drawscale;
+            }
+            if(grabbedPoint > -1) break;
+         }
+      }
+   }
+   else // mouse not down
+   {
+      grabbedPoint = -1;
+   }
+}

@@ -1,0 +1,43 @@
+()
+{
+static time,oldtime;
+time=klock(0); dt = time-oldtime; oldtime = time;
+
+static tx,ty;
+static vx,vy;
+
+if(numframes==0)
+{
+   tx=xres/2; ty=yres/2;
+   vx = 15;
+   vy = 0;
+}
+
+cls(0);
+drawsph(tx,ty,-10);
+
+// Translate i fartsretning
+tx = tx + vx *dt;
+ty = ty + vy *dt;
+
+// Roter fartsvektor 2 grader pr sek
+rotate2d(vx,vy,2*dt);
+
+// draw velocity vector
+moveto(tx,ty);
+lineto(tx+vx*2, ty+vy*2);
+}
+
+rotate2d(&x,&y,angle)
+{
+   x1=0,y1=0;
+   sa=0,ca=0;
+   
+   x1 = x;
+   y1 = y;
+   sa = sin(angle);
+   ca = cos(angle);
+   
+   x = x1 * ca - y1 * sa;
+   y = y1 * ca + x1 * sa;
+}

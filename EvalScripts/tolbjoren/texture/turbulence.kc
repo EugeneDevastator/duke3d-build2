@@ -1,0 +1,22 @@
+(x,y,&r,&g,&b)
+{
+   turbSize = 32;
+
+   xyValue = turbulence(x,y,turbSize) / 8.0;
+   sineValue = 255 * abs(sin( xyValue *3 ));
+   r = sineValue;
+   g = sineValue;
+   b = sineValue;
+
+}
+
+turbulence(x,y,size)
+{
+   value = 0.0; initialSize = size;
+   while(size >= 1)
+   {
+      value += noise( x/size, y/size ) * size;
+      size /= 2.0;
+   }
+   return (128*value/initialSize);
+}

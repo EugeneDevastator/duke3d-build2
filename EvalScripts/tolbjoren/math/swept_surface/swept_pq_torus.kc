@@ -1,0 +1,162 @@
+//http://www.blackpawn.com/texts/pqtorus/default.html
+/*
+   Given two functions h(v) and g(v), sweep the to inorder to obtain a surface s(u,v)
+
+   s(u,v) = h(v) + A(v)*g(u)
+
+   where A is a 3x3 orthonormal mtx
+   A(v) = [ h'(v) / h(v).length, r, s ]
+   
+   r and s are two vectors you choose. For instance worldUp and one that points in a different direction
+   so you get an orthogonal matrix
+
+*/
+
+static mx,my,mz;
+
+struct vec{ x,y,z; }
+
+()
+{
+   cls(0); clz(1e32);
+      
+   time = klock(0);
+   a = .4 * time;
+   ca = cos(a);
+   sa = sin(a);
+   r = -3;
+   setcam( sa*r, 0, ca*r,a,0);
+   
+   steps = 250;
+   for(i=0; i<steps; i++){
+      t = i / (steps-1);
+      
+      phi = t*2*PI;
+      
+      p = 3;
+      q = 4;
+      
+      r = .5 * (2+sin(q*phi) );
+      x = r * cos(p*phi);
+      y = r * cos(q*phi);
+      z = r * sin(p*phi);
+
+      t2 = (i+1) / (steps-1);
+      phi2 = t2*2*PI;
+      x1 = r * cos(p*phi2);
+      y1 = r * cos(q*phi2);
+      z1 = r * sin(p*phi2);
+
+
+      setcol(255,255,255);
+
+      #ifdef SHOW_LINE
+      if (i==0){
+         moveto(x,y,z);
+      }else
+      {
+         lineto(x,y,z);
+      }
+      #endif
+      
+      
+      tx = x1 - x;
+      ty = y1 - y;
+      tz = z1 - z;
+      
+      nx = x1 + x;
+      ny = y1 + y;
+      nz = z1 + z;
+      
+
+      normalize(tx,ty,tz);
+      
+      
+      bx=0; by=0; bz=0;
+      cross(tx,ty,tz, nx,ny,nz, bx,by,bz);
+      normalize(bx,by,bz);
+      
+      cross(bx,by,bz, tx,ty,tz, nx,ny,nz);
+      normalize(nx,ny,nz);
+
+      
+      
+      normalize(nx,ny,nz);
+      //glBegin(GL_POINTS);
+      //glBegin(GL_LINE_STRIP);
+      
+      inner_radius = 1/8;
+      enum{JSTEPS = 18;}
+      static vec temp_pts[JSTEPS];
+      
+      
+      for(j=0; j<jsteps; j++){
+         jt = j / (jsteps-1);
+         phi_inner = jt * 2 * PI;
+
+         px = inner_radius * cos(phi_inner);
+         py = inner_radius * sin(phi_inner);
+         
+         // Rotate point by 2 ortho vectors
+         npx = x + px*nx + py*bx;
+         npy = y + px*ny + py*by;
+         npz = z + px*nz + py*bz;
+         //glvertex(npx, npy, npz );
+         
+         vec curr_point;
+         curr_point.x = npx;
+         curr_point.y = npy;
+         curr_point.z = npz;
+
+         if (i>0 ){
+            vec prev_point;
+            prev_point = temp_pts[j];
+            moveto(prev_point);
+            lineto(curr_point);
+         }
+
+         temp_pts[j] = curr_point;
+         
+      } //glEnd();
+      
+      
+      
+   }
+}
+
+moveto(vec v){
+   moveto(v.x,v.y,v.z);
+}
+lineto(vec v){
+   lineto(v.x,v.y,v.z);
+}
+
+movetoFAT(x,y,z){
+   mx = x;
+   my = y;
+   mz = z;
+}
+
+
+linetoFAT(x,y,z){
+   f = 0.1;
+   drawcone(mx,my,mz,f,x,y,z,f);
+   mx = x;
+   my = y;
+   mz = z;
+}
+
+// X=YZ-ZY
+cross(x1,y1,z1, x2,y2,z2, &x,&y,&z){
+   x = y1*z2 - z1*y2;
+   y = z1*x2 - x1*z2;
+   z = x1*y2 - y1*x2;
+}
+
+normalize(&x,&y,&z){
+   len = sqrt(x^2+y^2+z^2);
+   x/=len;
+   y/=len;
+   z/=len;
+}
+

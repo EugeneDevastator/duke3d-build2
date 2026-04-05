@@ -1,0 +1,174 @@
+// To get center and radius from 3 pts in the plane 
+// Check out http://local.wasp.uwa.edu.au/~pbourke/geometry/circlefrom3/ 
+
+// incircle and orientation predicates from:
+// http://www.cs.cmu.edu/~quake/robust.html
+
+
+static xpts[3];
+static ypts[3];
+
+struct vert
+{
+   x,y;
+}
+
+()
+{
+   cls(0);
+   
+   if( bstatus == 1 )
+   {
+      mind = 1e32;
+      closest=-1;
+      for(i=0; i<3; i++){
+         d = (mousx-xpts[i])^2 + (mousy-ypts[i])^2;
+         if( d < mind ){ 
+            closest = i; 
+            mind = d; 
+         }
+      }
+      xpts[closest] = mousx;
+      ypts[closest] = mousy;
+   }
+
+   if(numframes==0)
+   {
+      xpts[0] = xres/2;
+      ypts[0]= yres/2;
+      
+      xpts[1]= xres/2+100;
+      ypts[1] = yres/2;
+      
+      xpts[2] = xres/2+50;
+      ypts[2] = yres/2-100;
+   }
+   
+   setcol(255,255,255);
+   xcent=0;
+   ycent=0;
+   for(i=0; i<3; i++)
+   {
+      xcent += xpts[i];
+      ycent += ypts[i];
+      drawsph(xpts[i], ypts[i],-3);
+   }   
+   xcent/=3;
+   ycent/=3;
+   
+   
+  // drawsph(xcent,ycent,-radi*1.3);
+   
+   static testPoint[2];
+   x=0; y=0;
+   i=0;
+   while(y < yres)
+   {
+      testPoint[0]=x;
+      testPoint[1]=y;
+      if( incirclefast(pa,pb,pc,testPoint) < 0 )
+      {
+         setcol(255,255,0);
+         setpix(x,y);
+      }
+      
+      x+=4;
+      if( x>xres ){
+         x=0;
+         y+=4;
+      }      
+   }
+
+   static pd[2];
+   pd[0] = mousx;
+   pd[1] = mousy;
+   
+static pa[2];
+pa[0] = xpts[0];
+pa[1] = ypts[0];
+static pb[2];
+pb[0] = xpts[1];
+pb[1] = ypts[1];
+
+static pc[2];
+pc[0] = xpts[2];
+pc[1] = ypts[2];
+
+   if( incirclefast(pa,pb,pc,pd) > 0 )
+   {
+      setcol(255,0,0);
+   }else{
+      setcol(0,255,0);
+   }
+   
+   drawsph(pd[0], pd[1],10);
+   
+
+   vert p1,p2,p3,center;
+   p1.x = pa[0];
+   p1.y = pa[1];
+   p2.x = pb[0];
+   p2.y = pb[1];
+   p3.x = pc[0];
+   p3.y = pc[1];
+   radius=0;
+   circumCircle(p1,p2,p3,center,radius);
+   setcol(255,255,255);
+   drawsph( center.x, center.y, -radius );
+}
+
+// returns + value if pd lies inside circle passing thru
+// pa,pb,pc, pts must be in ccw order
+incirclefast(pa[2], pb[2], pc[2], pd[2])
+{
+  double adx, ady, bdx, bdy, cdx, cdy;
+  double abdet, bcdet, cadet;
+  double alift, blift, clift;
+
+  adx = pa[0] - pd[0];
+  ady = pa[1] - pd[1];
+  bdx = pb[0] - pd[0];
+  bdy = pb[1] - pd[1];
+  cdx = pc[0] - pd[0];
+  cdy = pc[1] - pd[1];
+
+  abdet = adx * bdy - bdx * ady;
+  bcdet = bdx * cdy - cdx * bdy;
+  cadet = cdx * ady - adx * cdy;
+  alift = adx * adx + ady * ady;
+  blift = bdx * bdx + bdy * bdy;
+  clift = cdx * cdx + cdy * cdy;
+
+  return alift * bcdet + blift * cadet + clift * abdet;
+}
+
+// see: http://goanna.cs.rmit.edu.au/~gl/classes/TriangulationApplet.java
+circumCircle(vert p1, vert p2, vert p3,vert center, &radius) {
+   cp = crossProduct(p1, p2, p3);
+   if (cp != 0.0)
+      {
+      p1Sq = p1.x * p1.x + p1.y * p1.y;
+      p2Sq = p2.x * p2.x + p2.y * p2.y;
+      p3Sq = p3.x * p3.x + p3.y * p3.y;
+      num = p1Sq*(p2.y - p3.y) + p2Sq*(p3.y - p1.y) + p3Sq*(p1.y - p2.y);
+      cx = num / (2.0 * cp);
+      num = p1Sq*(p3.x - p2.x) + p2Sq*(p1.x - p3.x) + p3Sq*(p2.x - p1.x);
+      cy = num / (2.0 * cp);
+
+      center.x = cx;
+      center.y = cy;
+      }
+
+   // Radius 
+   dx = center.x - p1.x;
+   dy = center.y - p1.y;
+   radius = sqrt( dx*dx + dy*dy );
+}
+
+crossProduct(vert p1,vert p2,vert p3) { 
+u1 =  p2.x - p1.x;
+v1 =  p2.y - p1.y;
+u2 =  p3.x - p1.x;
+v2 =  p3.y - p1.y;
+return u1 * v2 - v1 * u2;
+}

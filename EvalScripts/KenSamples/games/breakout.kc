@@ -1,0 +1,174 @@
+()
+{
+   clz(1e32);
+   static b[16][16], px, bx, by, bxv, byv, numb;
+   static startclk, overclk, leftcnt, tim, otim;
+   enum {BULNUM=16}
+   static bulx[BULNUM], buly[BULNUM];
+   
+   if (1)
+   {
+      glsettex("cloud.png"); setcol(0x306050);
+      glBegin(GL_QUADS); 
+      glTexCoord(tim*.1  ,0); glVertex(-256,-256,32);
+      glTexCoord(tim*.1+4,0); glVertex(+256,-256,32);
+      glTexCoord(tim*.1+4,4); glVertex(+256,+256,32);
+      glTexCoord(tim*.1  ,4); glVertex(-256,+256,32);
+      glEnd();
+   } else cls(0x404030);
+   
+   if (numframes == 0)
+   {
+      startclk = klock()+1;
+      playtext("Ready?");
+      for(i=0;i<BULNUM;i++) buly[i] = -1e32;
+   }
+   //if (numframes == 100) playsong("fidsong.mid",-20);
+   if (numb == -1)
+   {
+      if (klock() > overclk)
+      {
+         for(i=0;i<256;i++) b[i] = 0;
+         numb = 3; bxv = 0;
+         startclk = klock()+1;
+         playtext("Ready?");
+      }
+   }
+      
+   if (bxv == 0)
+   {
+      bx = rnd-.5; by = 1;
+      ang = (rnd-.5)+PI/2;
+      bxv = cos(ang)*.02; byv = sin(ang)*.02;
+      px = 0; numb = 3;
+      leftcnt = 256;
+      playtext(",Play!");
+   }
+   
+   otim = tim; tim = klock(); dtim = tim-otim;
+        if (tim < startclk) setcam(0,7,-8,0,(1-(startclk-tim))*-.7);
+   else if (tim <  overclk) setcam(0,7,-8,0,(overclk-tim)/2*-.7);
+   else                     setcam(0,7,-8,0,-.7);
+   
+   t = sin(tim)*32;
+   for(y=0;y<16;y++)
+      for(x=0;x<16;x++)
+      {
+         if (b[y][x]) continue;
+         if ((x+y)%2) glsettex("brick.png");
+                 else glsettex("wood.png");
+         setcol(256-x*3-t,160+y*5+t,256-(x+y)*1-t);
+         glBegin(GL_QUADS); 
+         glTexCoord(0,0); glVertex(x-7.5-.45,(y-14.0)*.4-.15,0);
+         glTexCoord(1,0); glVertex(x-7.5+.45,(y-14.0)*.4-.15,0);
+         glTexCoord(1,1); glVertex(x-7.5+.45,(y-14.0)*.4+.15,0);
+         glTexCoord(0,1); glVertex(x-7.5-.45,(y-14.0)*.4+.15,0);
+         glEnd();
+      }
+   
+   if (numb < 0) return(0);
+
+   setcol(0x607090);
+   drawcone(px-0.75,4.85,0,-.2,px+0.75,4.85,0,-.2);
+   drawcone(px-0.75,4.85,0,.2,px-1.05,4.9,0,.1);
+   drawcone(px+0.75,4.85,0,.2,px+1.05,4.9,0,.1);
+   
+   setcol(0xb0a090); //r = 10;
+   drawsph(bx,by,0,.2);
+   
+   setcol(0x408080);
+   for(i=0;i<numb;i++) drawsph((i-(numb-1)/2)/2,5.4,0,.2);
+   
+   for(i=0;i<16;i++)
+   {
+      setcol(0xc04040);
+      drawcone(bulx[i],buly[i],0,.10,bulx[i],buly[i]+.4,0,.01);
+      buly[i] -= dtim*8;
+    
+      if (killblock(b,bulx[i],buly[i],&leftcnt)) buly[i] = -1e32;
+   }
+   
+   moveto(xres/2-16,0); setfont(12,16); printf("%g",leftcnt);
+   
+   obx = bx; oby = by;
+   if (klock() > startclk)
+   {
+      bx += bxv*dtim*256;
+      by += byv*dtim*256;
+   }
+   if (bx < -8) { bx = -8*2-bx; bxv = -bxv; }
+   if (bx > +8) { bx = +8*2-bx; bxv = -bxv; }
+   if (by < -7) { by = -7*2-by; byv = -byv; }
+   if (by > +7)
+   {
+      bx = rnd-.5; by = 1;
+      ang = (rnd-.5)+PI/2;
+      bxv = cos(ang)*.02; byv = sin(ang)*.02;
+      px = 0;
+      numb--;
+      if (numb > 0)
+      {
+         i = int(4*rnd);
+         if (i == 0) playtext("Darn!");
+         if (i == 1) playtext("Not another!");
+         if (i == 2) playtext("Too bad!");
+         if (i == 3) playtext("Pay attention!");
+      }
+      if (numb == 0) playtext("Last ball.");
+      if (numb ==-1)
+      {
+         byv = 0;
+         overclk = klock()+2;
+         if (leftcnt == 0) playtext("Level 2?");
+                      else playtext("NO! Game over.");
+         return(0);
+      }
+   }
+   if ((byv > 0) && (oby < 4.7) && (by >= 4.7) && (abs(bx-px) < 1.2))
+   {
+      bxv += (bx-px)/48; byv = abs(byv)*-1.02;
+      if (abs(bx-px) >= 1.0)
+      {
+         i = int(3*rnd);
+         if (i == 0) playtext("careful!");
+         if (i == 1) playtext("phew that was close!");
+         if (i == 2) playtext("don't be a daredevil.");
+      }
+      playsound("rulinst.wav",100,1,bx/32,7,-8);
+   }
+   if (keystatus[0xcb]) px = max(px-dtim*8,-7.5); //Left
+   if (keystatus[0xcd]) px = min(px+dtim*8,+7.5); //Right
+   
+   if (keystatus[0x1d]) //LCtrl
+   {
+      keystatus[0x1d] = 0;
+      playsound("shoot.wav",100,1,px/32,7,-8);
+      mini = 0;
+      for(i=BULNUM-1;i>0;i--)
+         if (buly[i] < buly[mini]) mini = i;
+      bulx[mini] = px;
+      buly[mini] = 4.2;
+   }
+      
+   if (killblock(b,bx,by,&leftcnt)) byv *= -1;
+}
+
+killblock(b[16][16],x,y,&leftcnt)
+{
+   x = floor(x+8);
+   y = floor((y+6)/.4);
+   if ((x < 0) || (x >= 16) || (y < 0) || (y >= 16)) return(0);
+   if (b[y][x] != 0) return(0);
+   
+   leftcnt--;
+   playsound("rulinst.wav",50,nrnd*.05+1.5,(x-7.5)/32,7,-8);
+   if ((leftcnt == 200) || (leftcnt == 100) || (leftcnt == 50))
+      playtext("%g blocks left",leftcnt);
+   if (leftcnt == 0)
+   {
+      playtext("Congratulations, you win!");
+      playtext(",Sorry there's no final animation.");
+   }
+   b[y][x] = 1;
+   return(1);
+}

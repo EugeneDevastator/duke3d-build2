@@ -1,0 +1,30 @@
+() clz(1e32); //cls(0);
+hx = 7; hy = 6; hz = hy;
+static px[256], py[256], pz[256]; t = klock()*2;
+for(y=-hy;y<=hy;y++)
+   for(x=-hx;x<=hx;x++)
+   {
+      i = y*16+x;
+      //px[i] = (sin(x*.4+t*.5)+sin(y*.3+t*.4)+cos(x*.6+t*.5)*sin(y*.7+t*.6));
+      //py[i] = (sin(x*.5+t*.6)+sin(y*.4+t*.5)+cos(x*.5+t*.4)*sin(y*.6+t*.5));
+      //pz[i] = (sin(x*.6+t*.7)+sin(y*.5+t*.6)+cos(x*.4+t*.3)*sin(y*.5+t*.4));
+      px[i] = noise3d(x*.21,y*.27,t*.33)*2.5;
+      py[i] = noise3d(x*.25,y*.29,t*.37)*2.5;
+      pz[i] = noise3d(x*.24,y*.21,t*.39)*2.5;
+   }
+
+glsettex("cloud.png");
+for(y=-hy;y<hy;y++)
+   for(x=-hx;x<hx;x++)
+   {
+      glBegin(GL_TRIANGLE_FAN);
+      i0 = (y  )*16+x; i1 = (y  )*16+x+1;
+      i3 = (y+1)*16+x; i2 = (y+1)*16+x+1;
+      glTexCoord(0,0); glVertex(px[i0]+x  ,py[i0]+y  ,pz[i0]+6);
+      glTexCoord(1,0); glVertex(px[i1]+x+1,py[i1]+y  ,pz[i1]+6);
+      v = 192-(pz[i0]+pz[i1]+pz[i2])/3*48; setcol(v,v*1.2,v*1.4);
+      glTexCoord(1,1); glVertex(px[i2]+x+1,py[i2]+y+1,pz[i2]+6);
+      v = 192-(pz[i0]+pz[i2]+pz[i3])/3*48; setcol(v,v*1.2,v*1.4);
+      glTexCoord(0,1); glVertex(px[i3]+x  ,py[i3]+y+1,pz[i3]+6);
+      glEnd();
+   }

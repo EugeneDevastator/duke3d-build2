@@ -1,0 +1,134 @@
+enum{width=160, height=120};
+static pixelSize = 2;
+static buf[width*height];
+()
+{
+   cls(0);     
+   effect();
+   static drawMode=0;
+   
+   if(drawMode==0){drawBig(); setcol(0xffffff); printf("\ndraw big - pixel=filled rect");};
+   if(drawMode==1){drawSlow(); setcol(0xffffff); printf("\ndraw slow - setpix");}
+   if(drawMode==2){drawFast(); setcol(0xffffff); printf("\ndraw fast - sethlin");}
+   
+   if(bstatus)
+   {
+      bstatus=0;
+      drawMode++;
+      if(drawMode>2)drawMode=0;
+   }
+}
+effect()
+{
+   xc = 25;
+   timeDisplacement = klock()*30; //numframes;
+   
+   // no need to do this for every pixel
+   calc1 = sin( rad(timeDisplacement * 0.61655617) );
+   calc2 = sin( rad(timeDisplacement * -3.6352262) );
+   
+   // plasma algo
+   for(x=0; x<width; x++ )
+   {
+      xc += pixelSize;
+      yc = 25;
+      s1 = 128 + 128 * sin( rad(xc)*calc1);
+      
+      for(y=0; y<height; y++)
+      {
+         yc+=pixelSize;
+         s2 = 128+128*sin( rad(yc)*calc2);
+         s3 = 128+128*sin( rad(xc+yc+timeDisplacement*5/2) );
+         s = (s1+s2+s3)/3;
+         buf[y*width+x] = hsv_to_rgb( s*1.5, 1 , 1);
+      }
+   } 
+}
+
+rad(deg)
+{return deg*pi/180;}
+
+drawFast()
+{
+   static lineBuf[width];
+   i=0;
+   for(y=0; y<height; y++)
+   {
+      for(x=0; x<width; x++)
+      {
+      lineBuf[x] = buf[i];
+      i++;
+      }
+   sethlin(0,y, lineBuf, width);
+   } 
+}
+
+drawSlow()
+{
+   i=0;
+   for(y=0; y<height; y++)
+   {
+      for(x=0; x<width; x++)
+      {
+         setcol( buf[i] );
+         setpix(x,y);
+         i++;
+      }
+   } 
+}
+
+drawBig()
+{
+   size=4;
+   i=0;
+   for(y=0; y<height; y++)
+   {
+   for(x=0; x<width; x++)
+   {
+      setcol( buf[i] );
+      fillRect(x*size, y*size, size, size);
+      i++;
+   }
+   }
+   setcol(0);
+   moveto(width/2, height/2);
+   printf("resolution=%gx%g", width*size, height*size); 
+}
+
+fillRect(sx, sy, wx, wy)
+{
+   for(i=0; i<wx; i++)
+   {   
+   moveto(sx+i, sy);
+   lineto(sx+i, sy+wy);
+   }
+}
+
+
+// this function takes Hue (0-360 degrees), Saturation (0.0-1.0) and Value/brightness (0.0-1.0)
+// and returns a RGB int
+hsv_to_rgb(h,s,v){ 
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   r=int(r*255);
+   g=int(g*255);
+   b=int(b*255);
+   return r*2^16 + g*2^8 + b; 
+}

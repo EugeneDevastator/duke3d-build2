@@ -1,0 +1,120 @@
+() //Originally written by Mattheus Nabao; heavily modified by Ken
+{
+   enum {BUFSIZ=2^20};
+   static buf0[BUFSIZ], buf1[BUFSIZ], pic[256][256];
+   
+   for(i=0;i<min(BUFSIZ,10);i++) buf1[i] = i;
+   for(;i<BUFSIZ;i++) buf1[i] = buf1[i-10];
+
+#if 0
+   for(y=0;y<256;y++) for(x=0;x<256;x++) pic[y][x] = pic("caco.png",x,y,PIC_INT32);
+#elif 0
+   for(y=0;y<256;y++) for(x=0;x<256;x++) pic[y][x] = pic("snake.png",x/8,y/8,PIC_INT32);
+#else   
+   for(y=0;y<256;y++)
+      for(x=0;x<256;x++)
+      {
+         a = min(max(255-int(sqrt((x-128)^2 + (y-128)^2))*2,0),255);
+         if (a >= 128) a -= 256;
+         pic[y][x] = x + y*256 + int((x+y)/2)*2^16 + a*2^24;
+      }
+#endif
+
+   tim = 0;
+   while (1)
+   {
+      otim = tim; tim = klock(); dtim = tim-otim;
+      
+      cls(0); setcol(0xffffff);
+
+         //test sethlin(..,SETHLIN_*,)
+      glsettex("wood.png");
+      glbegin(GL_QUADS); gldisable(GL_DEPTH_TEST);
+      gltexcoord(       0,      0); glvertex(   0,  0);
+      gltexcoord(xres/128,      0); glvertex(xres,  0);
+      gltexcoord(xres/128,320/128); glvertex(xres,320);
+      gltexcoord(       0,320/128); glvertex(   0,320);
+      glend();
+      
+      enum {MODES=7}; static tims0[MODES] = {0};
+      alph = sin(tim*2)*.5+.5;
+      amul = (sqrt(5)-1)*PI;
+      for(y=0;y<256;y++) sethlin(0,0,&pic[y][0],256); //precache for undistorted timing
+      for(i=0;i<MODES;i++)
+      {
+         cx = int(cos(tim*2+i*amul)*16) + i*xres/MODES;
+         cy = int(sin(tim*2+i*amul)*16) + 32;
+         t0 = klock();
+         if (i == 0) for(y=0;y<256;y++) sethlin(cx,cy+y,&pic[y][0],256);
+         if (i == 1) for(y=0;y<256;y++) sethlin(cx,cy+y,&pic[y][0],256,0,1);
+         if (i == 2) for(y=0;y<256;y++) sethlin(cx,cy+y,&pic[y][0],256,0,alph);
+         if (i == 3) for(y=0;y<256;y++) sethlin(cx,cy+y,&pic[y][0],256,SETHLIN_ADD);
+         if (i == 4) for(y=0;y<256;y++) sethlin(cx,cy+y,&pic[y][0],256,SETHLIN_MASK);
+         if (i == 5) for(y=0;y<256;y++) sethlin(cx,cy+y,&pic[y][0],256,SETHLIN_MASK,alph);
+         if (i == 6) for(y=0;y<256;y++) sethlin(cx,cy+y,&pic[y][0],256,SETHLIN_BLEND);
+         t1 = klock(); tims0[i] += (t1-t0 - tims0[i])/(numframes+1);
+      }
+         //Ken's i7-5820K: 39.8us 34.8us 49.7us 44.1us 45.4us 55.2us 57.2us (w/SSE4.1)
+         //Ken's ry-5950X: 46.1us 21.9us 30.3us 25.3us 23.3us 29.5us 22.6us "
+         //           5820K:     5950X:
+         //for(set):3.14-3.24ms  6.48ms
+         //for(cpy):3.40-3.48ms  6.36ms
+         //  bufset:0.41-0.42ms  0.11-0.13ms
+         //  bufcpy:0.78-0.79ms  0.20-0.25ms
+      for(i=0;i<MODES;i++)
+      {
+         sx = (i+.3)*xres/MODES; sy = 320; moveto(sx,sy);
+         if (i == 0) printf("sethlin(old)");
+         if (i == 1) printf("sethlin");
+         if (i == 2) printf("alpha"); 
+         if (i == 3) printf("*_ADD"); 
+         if (i == 4) printf("*_MASK"); 
+         if (i == 5) printf("*_MASK&alpha");
+         if (i == 6) printf("*_BLEND"); 
+         fprintf("\n%.1fus",tims0[i]*1e6);
+         drawcone(sx,sy+30,-4,sx+tims0[i]*1e6,sy+30,-4);
+      }
+      
+      setcol(0x6080a0); drawcone(0,372,2,xres,372,2);
+      setcol(0xffffff);
+      
+         //test bufset()&bufcpy()
+      moveto(0,380);
+      static tims1[8] = {0,0,0,0,0,0,0,0};
+      for(j=0;j<8;j++)
+      {
+         if (j == 0) fprintf("\nfor (set)  ");
+         if (j == 1) fprintf("bufset(0   ");
+         if (j == 2) fprintf("bufset(1   ");
+         if (j == 3) fprintf("\nfor (cpy)  ");
+         if (j == 4) fprintf("bufcpy(0,0 ");
+         if (j == 5) fprintf("bufcpy(1,0 ");
+         if (j == 6) fprintf("bufcpy(0,1 ");
+         if (j == 7) fprintf("bufcpy(1,1 ");
+
+         for(i=0;i<BUFSIZ;i++) { buf0[i] = -1; }
+         t0 = klock();
+         if (j == 0) { for(i=0;i<BUFSIZ;i++) { buf0[i] = 2; } }
+         if (j == 1) { bufset(&buf0[0],3,BUFSIZ-2); }
+         if (j == 2) { bufset(&buf0[1],4,BUFSIZ-2); }
+         if (j == 3) { for(i=0;i<BUFSIZ;i++) { buf0[i] = buf1[i]; } }
+         if (j == 4) { bufcpy(&buf0[0],&buf1[0],BUFSIZ-2); }
+         if (j == 5) { bufcpy(&buf0[1],&buf1[0],BUFSIZ-2); }
+         if (j == 6) { bufcpy(&buf0[0],&buf1[1],BUFSIZ-2); }
+         if (j == 7) { bufcpy(&buf0[1],&buf1[1],BUFSIZ-2); }
+         t1 = klock();
+         
+         tims1[j] += (t1-t0 - tims1[j])/(numframes+1);
+         
+         if (BUFSIZ > 9*2)
+         {
+            for(i=       0;i<     9;i++) { fprintf("%2g",buf0[i]); } printf(" ..");
+            for(i=BUFSIZ-9;i<BUFSIZ;i++) { fprintf("%2g",buf0[i]); }
+         } else { for(i=0;i<BUFSIZ;i++) { fprintf("%2g",buf0[i]); } }
+         fprintf("%6.2fms\n",tims1[j]*1e3);
+         sx = 475; sy = ((j>=3)+j)*12+398; drawcone(sx,sy,-4,sx+tims1[j]*1e5,sy,-4);
+      }
+      
+      refresh(); //Sleep(5);
+   }
+}

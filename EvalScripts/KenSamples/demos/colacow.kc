@@ -1,0 +1,168 @@
+// This is a script I wrote a long time ago.
+// It features a few silly characters and
+// an even sillier plot. :)
+//
+// Note: colacow.kc is the sequel to timecow.kc.
+//
+// -Robert
+
+static times[17]={3,1,3,2,1,3,1,1,1,1,2,3,1,4,2,1,1},phtime,phase,sndphase;
+enum{N=128}
+()
+{
+   static hz,lang,ot;t=klock();
+   static botx[N],boty[N],botz[N],botah[N],botav[N],botxv[N],botyv[N],botzv[N],botahv[N],botavv[N];
+   if(numframes==0){phase=0;phtime=t+times[phase];hz=xres/2;}
+   clz(1e32);cls(0);setcol(0xffffff);sync=t-ot;ot=t;
+   if((phase>=6 && phase<=9)||(phase==12)){a=(sin(gtim(t)*PI/2))*255;setcol(a,a,a);}
+   if(phase==13)
+   {
+      a=((phtime-t)/times[phase])*256;
+      setcol(512-a,a,a);
+   }
+   if(phase==14)
+   {
+      a=256-((phtime-t)/times[phase])*256;
+      setcol(a,a,a);
+   }
+   if(phase==16)
+   {
+      a=((phtime-t)/5)*256;
+      setcol(a,a,a);
+   }
+   glsettex("brick.png");glBegin(GL_QUADS);
+   glTexCoord(0,0); glVertex(-4000,-2000,4000);
+   glTexCoord(4,0); glVertex(+4000,-2000,4000);
+   glTexCoord(4,4); glVertex(+4000,+1000,4000);
+   glTexCoord(0,4); glVertex(-4000,+1000,4000);
+   glEnd();glsettex("wood.png");glBegin(GL_QUADS);
+   glTexCoord(0,0); glVertex(-4000,+1000,4000);
+   glTexCoord(4,0); glVertex(+4000,+1000,4000);
+   glTexCoord(4,2); glVertex(+4000,+1000,1000);
+   glTexCoord(0,2); glVertex(-4000,+1000,1000);
+   glTexCoord(0,0); glVertex(-4000,-2000,1000);
+   glTexCoord(4,0); glVertex(+4000,-2000,1000);
+   glTexCoord(4,2); glVertex(+4000,-2000,4000);
+   glTexCoord(0,2); glVertex(-4000,-2000,4000);
+   glEnd();
+   drawkv6("plant.kv6",12,-2000,+600,3000,0,0);
+   drawkv6("plant.kv6",12,+2000,+600,3000,0,0);
+   if (phase==0)
+   {
+      x=gtim(t)*6000/times[0]-3000;a=sin(t*3);if(a>0)a*=.5;
+      if(x>-1000 && sndphase==0){sndphase=1;playsound("moo.flac");}
+      drawkv6("cow.kv6",10,x,500,2000,-PI*.5,a);nex(t);return;
+   }
+   if (phase==1){if(sndphase==0){sndphase=1;playtext("Choo! Choo!");}nex(t);return;}
+   if (phase==2)
+   {
+      x=3000-gtim(t)*3000/times[phase];
+      drawkv6("colabus.kv6",12,x,500,1500,PI*.5,0);
+      nex(t);return;
+   }
+   if (phase==3)
+   {
+      if(sndphase==0){sndphase=1;playtext("Now where did <emph>that</emph> cow go?");}
+      drawkv6("colabus.kv6",12,0,500,1500,PI*.5,0);nex(t);return;
+   }
+   if (phase==4)
+   {
+      x=gtim(t)*PI;drawkv6("colabus.kv6",12,0,500,1500,PI*.5-x,0);nex(t);return;
+   }
+   if (phase==5)
+   {
+      if(sndphase==0){sndphase=1;playtext("I must find her!");}x=gtim(t)*3000/times[phase];
+      drawkv6("colabus.kv6",12,x,500,1500,-PI*.5,0);nex(t);return;
+   }
+   if (phase==6)
+   {
+      if(sndphase==0){sndphase=1;playsound("moo.flac");}
+      drawkv6("cow.kv6",12,-1500,500,2000,-PI*.25,0);nex(t);return;
+   }
+   if (phase==7)
+   {
+      if(sndphase==0){sndphase=1;playsound("moo2.flac");}
+      drawkv6("cow.kv6",12,0,500,2500,0,0);nex(t);return;
+   }
+   if (phase==8)
+   {
+      if(sndphase==0){sndphase=1;playsound("moo.flac");}
+      drawkv6("cow.kv6",12,1500,500,2000,PI*.25,0);nex(t);return;
+   }
+   if (phase==9)
+   {
+      if(sndphase==0){sndphase=1;playtext("There she is!");}nex(t);return;
+   }
+   if (phase==10)
+   {
+      x=gtim(t)*2800/times[phase]-2800;
+      drawkv6("colabus.kv6",12,x,500,1500,-PI*.5,0);nex(t);return;
+   }
+   if (phase==11)
+   {
+      x=sin((gtim(t)/(times[phase]+1))*PI*3)*PI*.25;lang=-PI*.5-x;
+      drawkv6("colabus.kv6",12,0,500,1500,lang,0);nex(t);return;
+   }
+   if (phase==12)
+   {
+      if(sndphase==0){sndphase=1;playsound("moo.flac");}
+      drawkv6("cow.kv6",8,200,500,1700,-PI*.25,0);
+      drawkv6("colabus.kv6",12,0,500,1500,lang,0);nex(t);return;
+   }
+   if (phase==13)
+   {
+      if(sndphase==0){sndphase=1;playsound("moo2.flac",150,.3);playsound("moo.flac",150,.3);}
+      drawkv6("cow.kv6",8,200,500,1700,-PI*.25,0);
+      drawkv6("colabus.kv6",12,0,500,1500,lang,0);nex(t);return;
+   }
+   if (phase==14)
+   {
+      if(sndphase==0)
+      {
+         sndphase=1;playsound("blowup2.flac",200,1);
+         for (i=N-1;i>=0;i--)
+         {
+            botx[i]=350+rnd*100-50;botxv[i]=rnd*1000-500;
+            boty[i]=800-rnd*100; botyv[i]=-rnd*800-1200;
+            botz[i]=2000;        botzv[i]=rnd*1000;
+            botah[i]=rnd*PI*2;botav[i]=rnd*PI*2;
+            botahv[i]=rnd*PI;botavv[i]=rnd*PI;
+         }
+      }
+      nex(t);
+   }
+   ending=0;
+   for(i=N-1;i>=0;i--)
+   {
+      drawkv6("coke.kv6",8,botx[i],boty[i],botz[i],botah[i],botav[i]);
+      botx[i]+=botxv[i]*sync;
+      boty[i]+=botyv[i]*sync;
+      botz[i]+=botzv[i]*sync;
+      if (botz[i]>3800) botzv[i]=-abs(botzv[i]);
+      botav[i]+=botavv[i]*sync;
+      botah[i]+=botahv[i]*sync;
+      botyv[i]+=sync*1000;
+      if(boty[i]>=950 && botyv[i]>0)
+      {
+         if (botyv[i]<500)
+         {
+            boty[i]=950;botyv[i]=0;botavv[i]=0;
+            botxv[i]-=botxv[i]*sync*2;
+            botzv[i]-=botzv[i]*sync*2;
+            botahv[i]-=botahv[i]*sync*2;
+            while(botav[i]>PI*2)botav[i]-=PI*2;
+            while(botav[i]<   0)botav[i]+=PI*2;
+            if (botav[i]>PI*1.5){botav[i]-=(botav[i]-PI*2)*sync*2;}
+            else if (abs(botav[i]-PI)<abs(botav[i])){botav[i]-=(botav[i]-PI)*sync*2;}
+            else {botav[i]-=botav[i]*sync*2;}
+            if (abs(botxv[i])<50) ending++;
+        }
+        else botyv[i]=-abs(botyv[i])*.5; //bounce :)
+      }
+   }
+   if (ending==N && phase<16){if(sndphase==0){sndphase=1;
+   playtext("<pitch middle='-15'/><rate speed='-5'/>The <emph>end.</emph>");}phtime=t+5;phase=16;}
+   if (phase==16){setcol(0xffffff);setfont(24,32,1);moveto((xres-24*3)*.5,yres*.5-16);printf("END");}
+}
+nex(t){if(phtime<=t){phase++;phtime+=times[phase];sndphase=0;}}
+gtim(t){return times[phase]-(phtime-t);}

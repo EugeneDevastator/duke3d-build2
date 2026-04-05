@@ -1,0 +1,73 @@
+Build 2.1 key references
+======================
+ESC  also works as exit for most modes.
+GRAVE is '~' key.
+
+GLOBAL / ALWAYS ACTIVE
+-----------------------
+GRAVE       - reset selection mode to All
+ESC         - discard current operation, return to idle
+RMB (hold)  - fly camera (mouse look + WASD)
+W A S D     - camera move
+INSERT      - split hovered wall at cursor position
+L           - toggle light on hovered/grabbed sprite
+
+SELECTION MODES
+---------------
+1           - sprites only
+2           - wall verts  (press again to toggle: wall verts / surfaces)
+3           - sectors     (press again to toggle: single sector / whole loop)
+4           - UV mode
+5           - toggle red-wall portal visibility (+R suffix shown in HUD)
+GRAVE       - back to quick-any (all types)
+
+IDLE MODE (no operation active)
+--------------------------------
+Q           - enter pickgrab mode (grab hovered wall vert or sprite)
+SPACE       - enter loop draw mode
+V           - enter tile edit mode
+M           - enter UV map mode
+B           - enter wall-cut (B-Cutter) mode
+K           - extrude wall (prototype)
+
+PICKGRAB MODE  (Q to start)
+----------------------------
+mouse move  - move grabbed object
+scroll      - move sprite forward/back  |  move wall vert up/down
+SHIFT hold  - constrain movement to wall normal or neighbor wall axis
+F           - toggle hit-Z vs floor-Z as movement plane
+Q           - accept and finish
+GRAVE       - discard, restore original position
+
+LOOP DRAW MODE  (SPACE to start)
+---------------------------------
+SPACE       - place point
+R           - remove last point
+T           - close loop and create sector
+T + SHIFT   - close loop, add walls only (no new sector)
+2           - split hovered wall (when 1 point placed)
+3           - place sprite at first point (when 1 point placed)
+GRAVE       - discard, clear points
+
+WALL-CUT MODE  (B to start)
+-----------------------------
+SPACE       - place cut point (snaps to nearby wall verts)
+R           - remove last point
+B           - snap end point to hovered wall vert and finish cut
+E           - finish cut (accept)
+GRAVE       - discard, clear points
+
+TILE EDIT MODE  (V to start)
+------------------------------
+SHIFT hold  - disables camera movement (for UI interaction)
+SHIFT A/D   - cycle galleries if you added second set of art files(see howto.txt)
+TAB         - read tile from hovered surface into browser selection
+E           - apply selected tile from browser to hovered surface
+V           - exit tile edit mode
+
+UV MAP MODE  (M to start)
+--------------------------
+mouse move        - pan UV
+SHIFT + mouse     - scale UV
+scroll            - rotate UV
+GRAVE             - discard

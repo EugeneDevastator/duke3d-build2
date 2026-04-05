@@ -1,0 +1,98 @@
+static oldmousx;
+static oldmousy;
+
+enum{MAX_PTS=100}
+struct vec2{
+   x,y;
+};
+
+static vec2 points[MAX_PTS];
+static numPoints=0;
+()
+{
+  cls(0);
+
+  r = 2;
+  if(bstatus==1) r*=2;
+  
+
+  for(pt=0; pt<MAX_PTS-1; pt++)
+  {
+    p1x = points[pt].x;
+    p1y = points[pt].y;
+
+    p2x = points[pt+1].x;
+    p2y = points[pt+1].y;
+
+    //paintbrush(mousx,mousy,2,1);
+    steps = 25;
+    stepSiz = (mousx-oldmousx)/(steps-1); 
+
+    for(i=0; i<steps; i++)
+    {
+      t = i/steps;
+      nx = p1x+lerp(p1x,p2x,t);
+      ny = p1y+lerp(p1y,p2y,t);
+
+      //nx = p1x + i*stepSiz;
+      //ny = 0;             
+      //lerp2(p1x,p1y,p2x,p2y,nx,ny);
+
+      paintbrush(nx,ny,r,0xffffff);
+      //drawsph(nx,ny,-3);
+    }
+  }
+
+;
+  
+   //if(bstatus==1)
+   if( oldmousx != mousx || oldmousy != mousy)
+   {
+   
+      for(i=MAX_PTS-1; i>0; i--)
+      {
+       points[i].x = points[i-1].x;
+       points[i].y = points[i-1].y;
+      }
+      
+      setVec(points[0], mousx,mousy);
+   }
+   
+  oldmousx=mousx; 
+  oldmousy=mousy
+
+}
+
+setVec(vec2 v,x,y)
+{
+  v.x = x; v.y = y;
+}
+
+lerp(x1,x2,t)
+{
+  return (x2-x1)*t;
+}
+
+lerp2(x1,y1,x2,y2,nx,&ny){
+   ny = y1+(nx-x1)*(y2-y1)/(x2-x1);
+}
+
+
+paintbrush(x,y,r,c)
+{
+  setcol(c);
+   i=0; j=0;
+   for(i=0; i<2*r; i++)
+   {
+      len = int( sqrt( cos(0.5*PI*(i-r)/r)) * r * 2 );
+      for(j=0; j<len; j++)
+      {
+         xp = (x+j-len/2);
+         yp = (y-r+i);
+         if(xp > 0 && xp < xres && yp > 0 && yp < yres)
+         {
+            setpix(xp,yp);
+         }
+      }
+   }
+}

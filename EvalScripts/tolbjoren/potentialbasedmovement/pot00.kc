@@ -1,0 +1,290 @@
+enum{START=0,GOAL=1,EMPTY=2,OBSTANCLE;};
+enum{gridres = 65};
+static world[GRIDRES][GRIDRES];
+static potential[GRIDRES][GRIDRES];
+
+enum{MAXMEMORY = 100}
+static rememberStepsX[MAXMEMORY];
+static rememberStepsY[MAXMEMORY];
+static roygbiv[256];
+
+static bestFirstGraph[GRIDRES][GRIDRES];
+enum{NOTVISIT = 0, VISITED =1;}
+static bestx[MAXMEMORY];
+static besty[MAXMEMORY];
+
+
+static time = 0;
+
+static goalx = 35;
+static goaly = 35;
+
+static unitx = 0;
+static unity = 0;
+
+static gridsiz = 0;
+
+static steps = 0;
+()
+{
+   time = klock(0); 
+   
+   if(numframes==0)
+   {
+      hue = 0;
+      hueInc = 6.0/255;
+      v = 1; // value 
+      s = 1; // saturation
+      for(i=0; i<256; i++)
+      {
+         c = v * s;
+         x = c * 1-fabs(fmod(hue,2)-1);
+         x*=255;
+         c*=255;
+         if(hue >= 0 && hue <= 1) roygbiv[i] = rgb(c,x,0); // red->orange
+         if(hue >= 1 && hue <= 2) roygbiv[i] = rgb(x,c,0); // orange->yellow
+         if(hue >= 2 && hue <= 3) roygbiv[i] = rgb(0,c,x); // yellow->green
+         if(hue >= 3 && hue <= 4) roygbiv[i] = rgb(0,x,c); // green->blue
+         if(hue >= 4 && hue <= 5) roygbiv[i] = rgb(x,0,c); // blue->indigo
+         if(hue >= 5 && hue <= 6) roygbiv[i] = rgb(c,0,x); // indigo->violet
+         hue += hueInc;
+      }
+      //roygbiv[255] = 0;
+
+   }
+   if(numframes==0){
+      for(i=0; i<MAXMEMORY; i++){
+         rememberStepsX[i] = 0;
+         rememberStepsY[i] = 0;
+      }   
+
+      gridsiz = xres/gridres;   
+
+      for(x=0; x<gridres; x++)
+      for(y=0; y<gridres; y++)
+      world[x][y] = EMPTY;
+
+      
+      world[0][0] = START;
+      world[goalx][goaly] = GOAL;
+      
+
+      obx = 15; obsx = 2;
+      oby = 20; obsy = 6;
+      for(dx=-obsx; dx <= obsx; dx++)
+      for(dy=-obsy; dy <= obsy; dy++)
+      {
+         world[obx+dx][oby+dy] = OBSTANCLE;
+      }
+      
+      obx = 32; obsx = 20;
+      oby = 20; obsy = 1;
+      for(dx=-obsx; dx <= obsx; dx++)
+      for(dy=-obsy; dy <= obsy; dy++)
+      {
+         world[obx+dx][oby+dy] = OBSTANCLE;
+      }
+      
+      obx = 55; obsx = 6;
+      oby = 30; obsy = 2;
+      for(dx=-obsx; dx <= obsx; dx++)
+      for(dy=-obsy; dy <= obsy; dy++)
+      {
+         world[obx+dx][oby+dy] = OBSTANCLE;
+      }
+
+      
+
+      maxDist = distance(gridres*0, gridres*0, gridres*goalx, gridres*goaly);
+
+      for(x=0; x<gridres; x++)
+      for(y=0; y<gridres; y++)
+      {
+         // Pot from goal to each other.
+         //d = distance(gridres*unitx, gridres*unity, gridres*x, gridres*y);
+         d = distance(gridres*goalx, gridres*goaly, gridres*x, gridres*y);
+         
+         //if( d >= maxDist )
+         {
+            //potential[x][y] = 255;
+         }
+         //else  
+         {
+         //   potential[x][y] = 60 *  (d) / maxDist;
+         }
+         //if( world[x][y] == OBSTANCLE ) potential[x][y] = 255;
+      }
+      //potential[goalx][goaly] = 0; // goal is best, highest value
+      
+      
+      /////////////////////////////// wavefront-expansion begin:
+      intensity = 1;      
+
+      valuex = 0;
+      for(x=goalx; x < gridres; x++)
+      {
+         valuey = 0;
+         for(y=goaly; y >= 0; y--)
+         {
+            potential[x][y] = intensity*valuex + intensity*valuey;
+            
+            valuey++;
+         }
+         valuex++;
+      }
+      valuex = 0;
+      for(x=goalx; x >=0; x--)
+      {
+         valuey = 0;
+         for(y=goaly; y >= 0; y--)
+         {
+            potential[x][y] = intensity*valuex + intensity*valuey;
+
+            valuey++;
+         }
+         valuex++;
+      }
+      
+      valuex = 0;
+      for(x=goalx; x < gridres; x++)
+      {
+         valuey = 0;
+         for(y=goaly; y < gridres; y++)
+         {
+            potential[x][y] = intensity*valuex + intensity*valuey;
+
+            valuey++;
+         }
+         valuex++;
+      }
+      valuex = 0;
+      for(x=goalx; x >= 0; x--)
+      {
+         valuey = 0;
+         for(y=goaly; y < gridres; y++)
+         {
+            potential[x][y] = intensity*valuex + intensity*valuey;
+            valuey++;
+         }
+         valuex++;
+      }
+      
+      for(x=0; x<gridres; x++)
+      for(y=0; y<gridres; y++)
+         if(world[x][y]==OBSTANCLE) potential[x][y] =150;
+      ///////////////////////////////
+      
+   }
+   cls(0);
+   drawobjs();
+   
+   // Gradient search towards top.
+   if(keystatus[57] == 1 )
+   {
+      keystatus[57] = 0;
+      
+      bestdirx = 0;
+      bestdiry = 0;
+      bestPot = 1e32;
+      
+      for(xdir = -1; xdir <= 1; xdir++)
+      {
+      for(ydir = -1; ydir <= 1; ydir++)
+      {
+         if(unitx < 1 && xdir == -1) continue;
+         if(unity < 1 && ydir == -1) continue;         
+
+         //if(xdir==0 && ydir == 0) notgoinganywhere = 1;
+         
+         searchx = (unitx+xdir);
+         searchy = (unity+ydir);
+         potHere = potential[searchx][searchy];
+         if( potHere < bestPot )
+         {
+            bestPot = potHere;
+            bestdirx = xdir;
+            bestdiry = ydir;
+         }
+         
+      }
+      }
+      
+      rememberStepsX[steps] = unitx;
+      rememberStepsY[steps] = unity;
+      unitx += bestdirx;
+      unity += bestdiry;
+      steps++;
+
+   }
+   if(keystatus[205]==1){
+      keystatus[205]=0;
+   unitx++;
+   }
+   if(keystatus[203]==1){
+      keystatus[203]=0;
+   unitx--;
+   }
+   if(keystatus[208]==1){
+      keystatus[208]=0;
+   unity++;
+   }
+   if(keystatus[200]==1){
+      keystatus[200]=0;
+   unity--;
+   }
+      
+   setcol(0x777777); drawsph( (unitx+.5) * gridsiz, (unity+.5) * gridsiz, gridsiz/4);
+
+   moveto(0,0);
+   setcol(0x0);
+   printf("steps %g", steps);
+
+}
+
+distance(x1,y1,x2,y2)
+{
+   return sqrt( (x1-x2)^2 + (y1-y2)^2 );
+}
+
+drawobjs()
+{
+   
+
+   
+   for(x=0; x<gridres; x++)
+   for(y=0; y<gridres; y++)
+   {
+      setcol(0xffffff); drawSq(x*gridsiz, y*gridsiz, gridsiz-2);
+      if(world[x][y] == EMPTY || world[x][y] == OBSTANCLE ){ setcol( roygbiv[ potential[x][y] ] ); drawFilledSq(x*gridsiz+1, y*gridsiz+1, gridSiz-3); }
+      else if(world[x][y] == START ){ setcol(roygbiv[160]); drawFilledSq(x*gridsiz+1, y*gridsiz+1, gridSiz-3);}
+      else if(world[x][y] == GOAL ){ setcol( roygbiv[time * 500 % 255] ); drawFilledSq(x*gridsiz+1, y*gridsiz+1, gridSiz-3);}
+     // else if(world[x][y] == OBSTANCLE){ setcol( roygbiv[ potential[x][y] ] ); drawSq(x*gridsiz, y*gridsiz, gridsiz-2); }
+   }
+   for(i=0; i<steps; i++)
+   {
+      x = rememberStepsX[i];
+      y = rememberStepsY[i];
+      setcol(0xffffff);
+      drawsph( (x+.5) * gridsiz, (y+.5) * gridsiz, 5);
+   }   
+   
+   
+}
+
+drawSq(x,y,siz)
+{
+   moveto(x,y); 
+   lineto(x+siz,y);
+   lineto(x+siz,y+siz);
+   lineto(x,y+siz);
+   lineto(x,y);
+}
+
+drawFilledSq(x,y,siz)
+{
+   for(yo=0; yo<siz; yo++)
+   {
+      moveto(x,y+yo); lineto(x+siz,y+yo);
+   }
+
+}

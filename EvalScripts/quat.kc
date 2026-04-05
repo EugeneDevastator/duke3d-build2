@@ -1,0 +1,149 @@
+// Quaternion utility functions
+
+()
+{
+    tim = 0;
+    setcam(0,0,-8,0,0);
+    
+    // Initialize quaternions for demo objects
+    q1x=0; q1y=0; q1z=0; q1w=1; // Identity quaternion
+    q2x=0; q2y=0; q2z=0; q2w=1;
+    q3x=0; q3y=0; q3z=0; q3w=1;
+    rx=1,ry=0,rz=0,ux=0,uy=1,uz=1;
+    fx=0,fy=0,fz=1;
+    
+    while(1) {
+        otim = tim; tim = klock(); dtim = tim - otim;
+        
+        cls(0x202020);
+        clz(1e32);
+        
+        // Camera orbit
+        camAngle = tim * 0.3;
+        setcam(sin(camAngle)*10, 3, cos(camAngle)*10, 0, 0);
+        
+        // Demo 1: Rotating cube around Y axis
+        RotateAround(q1x,q1y,q1z,q1w, 0,1,0, dtim*30);
+        FromQuat(q1x,q1y,q1z,q1w);
+        setcol(0x808080);
+        //drawCube(-3,0,0, fx,fy,fz, rx,ry,rz, ux,uy,uz, 1);
+        drawAxis(-3,0,0, fx,fy,fz, rx,ry,rz, ux,uy,uz, 1.5);
+        
+        // Demo 2: Rotating around arbitrary axis
+        axisX = sin(tim*0.5); axisY = cos(tim*0.7); axisZ = sin(tim*0.3);
+        len = sqrt(axisX*axisX + axisY*axisY + axisZ*axisZ);
+        axisX /= len; axisY /= len; axisZ /= len;
+        
+        RotateAround(q2x,q2y,q2z,q2w, axisX,axisY,axisZ, dtim*45);
+        FromQuat(q2x,q2y,q2z,q2w);
+        setcol(0x606060);
+        //drawCube(0,0,0, fx,fy,fz, rx,ry,rz, ux,uy,uz, 1);
+        drawAxis(0,0,0, fx,fy,fz, rx,ry,rz, ux,uy,uz, 1.5);
+        
+        // Draw rotation axis
+        setcol(0xffff00);
+        drawcone(-axisX*2, -axisY*2, -axisZ*2, 0.03, axisX*2, axisY*2, axisZ*2, 0.03);
+        
+        // Demo 3: Lerping between orientations
+        targetAngle = sin(tim*0.8) * 90;
+        ToQuat(0,0,1, 1,0,0, 0,1,0); // Identity
+        targetQx = q1x; targetQy = q1y; targetQz = q1z; targetQw = q1w;
+        
+        RotateAround(targetQx,targetQy,targetQz,targetQw, 1,1,1, targetAngle);
+        
+        lerpT = (sin(tim*2) + 1) * 0.5;
+        QLerp(q3x,q3y,q3z,q3w, targetQx,targetQy,targetQz,targetQw, lerpT*0.1);
+      refresh();
+      }
+}
+
+RotateAround (qx,qy,qz,qw, ax,ay,az, angleDeg)
+{
+    // Create rotation quaternion from axis and angle
+    angleRad = angleDeg * PI / 180;
+    s = sin(angleRad * 0.5);
+    c = cos(angleRad * 0.5);
+    
+    rqx = ax * s; rqy = ay * s; rqz = az * s; rqw = c;
+    
+    // Multiply quaternions: rotation * original
+    nqw = rqw*qw - rqx*qx - rqy*qy - rqz*qz;
+    nqx = rqw*qx + rqx*qw + rqy*qz - rqz*qy;
+    nqy = rqw*qy - rqx*qz + rqy*qw + rqz*qx;
+    nqz = rqw*qz + rqx*qy - rqy*qx + rqz*qw;
+    
+    qx = nqx; qy = nqy; qz = nqz; qw = nqw;
+}
+
+ToQuat (fx,fy,fz, rx,ry,rz, ux,uy,uz)
+{
+    // Create rotation matrix from forward, right, up vectors
+    m00 = rx; m01 = ux; m02 = fx;
+    m10 = ry; m11 = uy; m12 = fy;
+    m20 = rz; m21 = uz; m22 = fz;
+    
+    // Convert matrix to quaternion
+    trace = m00 + m11 + m22;
+    if (trace > 0) {
+        s = sqrt(trace + 1.0) * 2;
+        qw = 0.25 * s;
+        qx = (m21 - m12) / s;
+        qy = (m02 - m20) / s;
+        qz = (m10 - m01) / s;
+    } else if ((m00 > m11) && (m00 > m22)) {
+        s = sqrt(1.0 + m00 - m11 - m22) * 2;
+        qw = (m21 - m12) / s;
+        qx = 0.25 * s;
+        qy = (m01 + m10) / s;
+        qz = (m02 + m20) / s;
+    } else if (m11 > m22) {
+        s = sqrt(1.0 + m11 - m00 - m22) * 2;
+        qw = (m02 - m20) / s;
+        qx = (m01 + m10) / s;
+        qy = 0.25 * s;
+        qz = (m12 + m21) / s;
+    } else {
+        s = sqrt(1.0 + m22 - m00 - m11) * 2;
+        qw = (m10 - m01) / s;
+        qx = (m02 + m20) / s;
+        qy = (m12 + m21) / s;
+        qz = 0.25 * s;
+    }
+}
+
+FromQuat (qx,qy,qz,qw)
+{
+    // Extract forward, right, up vectors from quaternion
+    rx = 1 - 2*(qy*qy + qz*qz); ry = 2*(qx*qy + qw*qz); rz = 2*(qx*qz - qw*qy);
+    ux = 2*(qx*qy - qw*qz); uy = 1 - 2*(qx*qx + qz*qz); uz = 2*(qy*qz + qw*qx);
+    fx = 2*(qx*qz + qw*qy); fy = 2*(qy*qz - qw*qx); fz = 1 - 2*(qx*qx + qy*qy);
+}
+
+
+QLerp(q1x,q1y,q1z,q1w, q2x,q2y,q2z,q2w, t)                                 
+{
+    // Quaternion lerp
+    dot = q1x*q2x + q1y*q2y + q1z*q2z + q1w*q2w;
+    if (dot < 0) { q2x = -q2x; q2y = -q2y; q2z = -q2z; q2w = -q2w; }
+    
+    lqx = q1x + t*(q2x - q1x);
+    lqy = q1y + t*(q2y - q1y);
+    lqz = q1z + t*(q2z - q1z);
+    lqw = q1w + t*(q2w - q1w);
+    
+    // Normalize
+    len = sqrt(lqx*lqx + lqy*lqy + lqz*lqz + lqw*lqw);
+    lqx /= len; lqy /= len; lqz /= len; lqw /= len;
+}
+
+drawAxis(x,y,z, fx,fy,fz, rx,ry,rz, ux,uy,uz, scale)
+{
+    // Draw coordinate axes
+    setcol(0xff0000); drawcone(x,y,z,0.02, x+rx*scale,y+ry*scale,z+rz*scale,0.02); // Red X
+    setcol(0x00ff00); drawcone(x,y,z,0.02, x+ux*scale,y+uy*scale,z+uz*scale,0.02); // Green Y
+    setcol(0x0000ff); drawcone(x,y,z,0.02, x+fx*scale,y+fy*scale,z+fz*scale,0.02); // Blue Z
+}
+
+
+        
+        

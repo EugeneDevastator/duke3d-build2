@@ -1,0 +1,776 @@
+   //NOTE:Planets are slightly off (and wrong) compared to GLOBE.C .. enough to ruin eclipse/transit detection :/
+static mylng = -71; //W=-,E=+
+static mylat = -41; //N=-,S=+
+
+#define TIMEZONE -5 //Add this to UT/GMT to get your local standard time
+#define SUNMOONRISETANGLE (-0.833*PI/180.0)
+#define DOTRISETANGLE (-0.583*PI/180.0)   //Don't sub .25ø for small objects
+   // 0ø     Center of Sun's disk touches a mathematical horizon
+   //-0.25ø  Sun's upper limb touches a mathematical horizon
+   //-0.583ø Center of Sun's disk touches the horizon; atmospheric refraction accounted for
+   //-0.833ø Sun's upper limb touches the horizon; atmospheric refraction accounted for (international convention)
+   //-6ø     Civil twilight (one can no longer read outside without artificial illumination)
+   //-12ø    Nautical twilight (navigation using a sea horizon no longer possible)
+   //-15ø    Amateur astronomical twilight (sky dark enough for most astronomical observations)
+   //-18ø    Astronomical twilight (sky completely dark)
+struct { double x, y, z; } dpoint3d;
+
+()
+{
+   static dpoint3d pr = {1,0,0}, pd = {0,1,0}, pf = {0,0,1}, vec, planpos[11];
+   static pind[11];
+   usecurtime = 1; zoom = 1; tim = 0;
+   gldisable(GL_DEPTH_TEST);
+   while (1)
+   {
+      otim = tim; tim = klock(); dtim = tim-otim;
+      
+      playercontrols(&pr,&pd,&pf,&zoom,dtim);
+      
+      if (keystatus[0x35]) { usecurtime = 1; } // /
+      //if (keystatus[0x2c]) { usecurtime = 0; year = 2004; month = 6; day = 8; hour =  7; minute = 17; second = 0; } //Venus transit #1 end (Z)
+      //if (keystatus[0x2d]) { usecurtime = 0; year = 2012; month = 6; day = 5; hour = 18; minute = 16; second = 0; } //Venus transit #2 beg (X)
+      
+      if (usecurtime)
+      {
+         t = klock(1);
+         year   =  floor(t/10^10);
+         month  = (floor(t/10^8)%100);
+         day    = (floor(t/10^6)%100);
+         hour   = (floor(t/10^4)%100);
+         minute = (floor(t/10^2)%100);
+         second =       (t/10^0)%100;
+      }
+         
+      if (keystatus[0x0c])
+      {
+         if (keystatus[0x2a]+keystatus[0x36]) keystatus[0x0c] = 0;
+         usecurtime = 0;
+         if (keystatus[0x1d]+keystatus[0x9d])
+              { second--; if (second < 0) { second += 60; minute--; } }
+         else { minute--; second = 0; }
+         if (minute < 0)
+         {
+            minute = 59; hour--;
+            if (hour < 0) { hour = 23; getdate(getday(year,month,day)-1,&year,&month,&day); }
+         }
+      }
+      if (keystatus[0x0d])
+      {
+         if (keystatus[0x2a]+keystatus[0x36]) keystatus[0x0d] = 0;
+         usecurtime = 0;
+         if (keystatus[0x1d]+keystatus[0x9d])
+              { second++; if (second >= 60) { second -= 60; minute++; } }
+         else { minute++; second = 0; }
+         if (minute >= 60)
+         {
+            minute = 0; hour++;
+            if (hour >= 24) { hour = 0; getdate(getday(year,month,day)+1,&year,&month,&day); }
+         }
+      }
+      if (keystatus[0x1a])
+      {
+         if (keystatus[0x2a]+keystatus[0x36]) keystatus[0x1a] = 0;
+         usecurtime = 0; getdate(getday(year,month,day)-1,&year,&month,&day);
+      }
+      if (keystatus[0x1b])
+      {
+         if (keystatus[0x2a]+keystatus[0x36]) keystatus[0x1b] = 0;
+         usecurtime = 0; getdate(getday(year,month,day)+1,&year,&month,&day);
+      }
+      
+      getobjectspos(year,month,day,hour,minute,second,mylng,mylat,0,10,planpos);
+      for(i=0;i<10;i++) //moon already relative to earth
+      {
+         if (i == 2) continue;
+         planpos[i].x -= planpos[2].x; planpos[i].y -= planpos[2].y; planpos[i].z -= planpos[2].z;
+      }
+
+      for(i=0;i<10;i++) //face planets
+         if (keystatus[i+0x2])
+         {
+            if (i == 2) i = 10;
+            t = 1/sqrt(planpos[i].x^2 + planpos[i].y^2 + planpos[i].z^2);
+            pf.x = planpos[i].x*t; pf.y = planpos[i].y*t; pf.z = planpos[i].z*t;
+            t = 1/sqrt(pf.x^2 + pf.z^2); pr.x = pf.z*t; pr.y = 0; pr.z = -pf.x*t;
+            pd.x = pf.y*pr.z - pf.z*pr.y;
+            pd.y = pf.z*pr.x - pf.x*pr.z;
+            pd.z = pf.x*pr.y - pf.y*pr.x;
+            
+            if (keystatus[0x31]+keystatus[0x1f]+keystatus[0x12]+keystatus[0x11]) //N,S,E,W
+            {
+               usecurtime = 0;
+               az = atan2(-planpos[i].x,sqrt(planpos[i].y^2 + planpos[i].z^2));
+               el = atan2(-planpos[i].y,sqrt(planpos[i].x^2 + planpos[i].z^2));
+
+               if ((i == 9) || (i == 10))
+               {
+                  if (keystatus[0x12]) el -= sin(SUNMOONRISETANGLE);
+                  if (keystatus[0x11]) el -= sin(SUNMOONRISETANGLE);
+               }
+               else
+               {
+                  if (keystatus[0x12]) el += sin(DOTRISETANGLE);
+                  if (keystatus[0x11]) el -= sin(DOTRISETANGLE);
+               }
+
+               if (keystatus[0x31]) addtime(&year,&month,&day,&hour,&minute,&second,az*-3600*12/PI); //N
+               if (keystatus[0x1f]) addtime(&year,&month,&day,&hour,&minute,&second,az*+3600*12/PI); //S
+               if (keystatus[0x12]) addtime(&year,&month,&day,&hour,&minute,&second,el*-3600*12/PI); //E
+               if (keystatus[0x11]) addtime(&year,&month,&day,&hour,&minute,&second,el*+3600*12/PI); //W
+            }
+            break;
+         }
+      if (keystatus[0x2f]) //V: find vernal equinox
+      {
+         usecurtime = 0;
+               
+         v = planpos[2].z*sin(mylat) -
+             planpos[2].y*cos(mylat); //FUK:wrong!
+         addtime(&year,&month,&day,&hour,&minute,&second,v*-3600*12/PI);
+      }
+      
+#if 1
+      setcam(0,0,0, pr.x,pr.y,pr.z, pd.x,pd.y,pd.z, pf.x*zoom,pf.y*zoom,pf.z*zoom);
+      setview(0,0,xres,yres,xres/2,yres/2,xres/2);
+#else
+      setcam(0,0,0, pr.x,pr.y,pr.z, pd.x,pd.y,pd.z, pf.x,pf.y,pf.z);
+      setview(0,0,xres,yres,xres/2,yres/2,xres/2/zoom);
+#endif      
+      lig = sqrt(max(planpos[2].y/sqrt(planpos[2].x^2 + planpos[2].y^2 + planpos[2].z^2)+.1,0));
+      setcol(lig*256+48,lig*224+40,lig*192+32);
+      drawskybox();
+
+      glbegin(GL_POLYGON); glsettex("cloud.png");
+      n = 16; r = 128;
+      for(i=0;i<=n;i++)
+      {
+         a = i*(PI*2)/n;
+         gltexcoord(cos(a)*r,sin(a)*r); glvertex(cos(a)*r,1,-sin(a)*r);
+      }
+      
+      if (bstatus%2)
+      {
+            //Draw analemmas for each hour (and each day)
+         setcol(0xffff40);
+         for(h=0;h<24;h++)
+            for(m=1;m<=12;m++)
+               for(d=1;d<=31;d++)
+               {
+                  getobjectspos(year,m,d,h,minute,second,mylng,mylat,2,2,&vec);
+                  t = -1/sqrt(vec.x^2 + vec.y^2 + vec.z^2); vec.x *= t; vec.y *= t; vec.z *= t;
+                  if (vec.x*pf.x + vec.y*pf.y + vec.z*pf.z < .4) break; //Early-out optimization :)
+                  if (vec.y < .008) setcol(0xffff40); else setcol(0x606018);
+                  //if (vec.z*sin(mylat) - vec.y*cos(mylat) < 0) setcol(0xff0000); else setcol(0x0000ff);
+                  drawsph(vec.x,vec.y,vec.z,.003);
+               }
+      }
+      
+         //Draw direction markers
+      setcol(0x808080); f = 256;
+      drawcone(-.03 *f,-.10 *f,+  1 *f,.005*f,+.03 *f,-.10 *f,+  1 *f,.005*f); //S
+      drawcone(-.03 *f,-.05 *f,+  1 *f,.005*f,+.03 *f,-.05 *f,+  1 *f,.005*f);
+      drawcone(-.03 *f,   0 *f,+  1 *f,.005*f,+.03 *f,   0 *f,+  1 *f,.005*f);
+      drawcone(-.03 *f,-.10 *f,+  1 *f,.005*f,-.04 *f,-.075*f,+  1 *f,.005*f);
+      drawcone(-.04 *f,-.075*f,+  1 *f,.005*f,-.03 *f,-.05 *f,+  1 *f,.005*f);
+      drawcone(+.03 *f,-.05 *f,+  1 *f,.005*f,+.04 *f,-.025*f,+  1 *f,.005*f);
+      drawcone(+.04 *f,-.025*f,+  1 *f,.005*f,+.03 *f,   0 *f,+  1 *f,.005*f);
+      drawcone(+.036*f,   0 *f,-  1 *f,.005*f,+.035*f,-.10 *f,-  1 *f,.005*f); //N
+      drawcone(+.035*f,-.10 *f,-  1 *f,.005*f,-.035*f,   0 *f,-  1 *f,.005*f);
+      drawcone(-.035*f,   0 *f,-  1 *f,.005*f,-.036*f,-.10 *f,-  1 *f,.005*f);
+      drawcone(-   1*f,-.10 *f,-.035*f,.005*f,-  1 *f,-.05 *f,-.036*f,.005*f); //E
+      drawcone(-   1*f,-.05 *f,-.036*f,.005*f,-  1 *f,   0 *f,-.035*f,.005*f);
+      drawcone(-   1*f,-.10 *f,+.035*f,.005*f,-  1 *f,-.10 *f,-.035*f,.005*f);
+      drawcone(-   1*f,-.05 *f,+.035*f,.005*f,-  1 *f,-.05 *f,-.035*f,.005*f);
+      drawcone(-   1*f,   0 *f,+.035*f,.005*f,-  1 *f,   0 *f,-.035*f,.005*f);
+      drawcone(+   1*f,-.10 *f,-.05 *f,.005*f,+  1 *f,   0 *f,-.03 *f,.005*f); //W
+      drawcone(+   1*f,   0 *f,-.03 *f,.005*f,+  1 *f,-.10 *f,+.00 *f,.005*f);
+      drawcone(+   1*f,-.10 *f,+.00 *f,.005*f,+  1 *f,   0 *f,+.03 *f,.005*f);
+      drawcone(+   1*f,   0 *f,+.03 *f,.005*f,+  1 *f,-.10 *f,+.05 *f,.005*f);
+      drawcone(-.05 *f,-  1 *f,   0 *f,.005*f,+.05 *f,-  1 *f,   0 *f,.005*f); //Zenith
+      drawcone(   0 *f,-  1 *f,-.05 *f,.005*f,   0 *f,-  1 *f,+.05 *f,.005*f);
+      
+      moveto(xres-384,0); setfont(12,16); setcol(0xffffff);
+      printf("Date:%g.%02g.%02g\n",year,month,day);
+      printf("Time:%02g:%02g:%04.1f\n",hour,minute,second);
+      printf("Lon:%f\n",mylng);
+      printf("Lat:%f\n",mylat);
+      printf(" Azimuth:%8.3fdeg\nAltitude:%8.3fdeg\n",
+         (atan2(-pf.x,-pf.z)*(180/PI))%360,atan2(-pf.y,sqrt(pf.x^2+pf.z^2))*(180/PI));
+
+      for(i=0;i<10;i++) { pind[i] = i; } pind[2] = 10;
+      for(i=1;i<10;i++)  //Sort out objects by distance from Earth
+         for(j=0;j<i;j++)
+            if (planpos[pind[i]].x^2 + planpos[pind[i]].y^2 + planpos[pind[i]].z^2 < 
+                planpos[pind[j]].x^2 + planpos[pind[j]].y^2 + planpos[pind[j]].z)
+               { k = pind[i]; pind[i] = pind[j]; pind[j] = k; }        
+      
+      setfont(6,8); moveto(0,0);
+      for(j=10-1;j>=0;j--)
+      {
+         i = pind[j];
+         t = 1/sqrt(planpos[i].x^2 + planpos[i].y^2 + planpos[i].z^2);
+         cx = planpos[i].x*t; cy = planpos[i].y*t; cz = planpos[i].z*t;
+         r = plandia[i]*t*0.0000005;
+         r = max(r,zoom/xres*2.5); //hack to make planets visible when small
+         setcol(0xc0c0c0); drawsph(cx,cy,cz,r);
+         if (j == 6) //Saturn's rings..
+         {
+            drawcone(cx,cy-r*.001,cz,r*-2.5, cx,cy+r*.001,cz,r*-1.6, DRAWCONE_CENT+DRAWCONE_NOCAP);
+            drawcone(cx,cy+r*.001,cz,r*-2.5, cx,cy-r*.001,cz,r*-1.6, DRAWCONE_CENT+DRAWCONE_NOCAP);
+         }
+         
+         nx = cx*pr.x + cy*pr.y + cz*pr.z;
+         ny = cx*pd.x + cy*pd.y + cz*pd.z;
+         nz = cx*pf.x + cy*pf.y + cz*pf.z; if (nz < .5) continue;
+         sx = nx/nz/zoom*(xres/2) + xres/2;
+         sy = ny/nz/zoom*(xres/2) + yres/2 + r*xres/2/zoom;
+         moveto(sx-32,sy+4); printf("  ");
+
+         if (i == 0) printf("Mercury");
+         if (i == 1) printf(" Venus");
+         if (i == 2) printf(" Earth");
+         if (i == 3) printf(" Mars");
+         if (i == 4) printf("Jupiter");
+         if (i == 5) printf("Saturn");
+         if (i == 6) printf("Uranus");
+         if (i == 7) printf("Neptune");
+         if (i == 8) printf(" Pluto");
+         if (i == 9) printf("  Sun");
+         if (i ==10) printf(" Moon");
+         printf("\n%7.2fdeg\n%7.2fdeg\n",(atan2(-cx,-cz)*(180/PI))%360,atan2(-cy,sqrt(cx^2+cz^2))*(180/PI));
+      }
+      
+      setcol(0xc0b0a0); drawsph(xres/2,yres/2,-3);
+      
+      refresh(); Sleep(15);
+   }
+}
+
+playercontrols (dpoint3d pr, dpoint3d pd, dpoint3d pf, &zoom, dtim)
+{   
+   if (keystatus[0x37])
+   {
+      ozoom = zoom; zoom *= pow(1/4,dtim);
+      if ((zoom < 1) && (ozoom > 1)) { keystatus[0x37] = 0; zoom = 1; }
+   }
+   if (keystatus[0xb5])
+   {
+      ozoom = zoom; zoom *= pow(4/1,dtim);
+      if ((zoom > 1) && (ozoom < 1)) { keystatus[0xb5] = 0; zoom = 1; }
+   }
+   
+   readmouse(&mx,&my); mx *= .005; my *= .005;
+   if ((bstatus%4) < 2)
+   {
+      mx *= zoom; c = cos(mx); s = sin(mx);
+      t = pr.x; pr.x = t*c - pf.x*s; pf.x = pf.x*c + t*s;
+      t = pr.y; pr.y = t*c - pf.y*s; pf.y = pf.y*c + t*s;
+      t = pr.z; pr.z = t*c - pf.z*s; pf.z = pf.z*c + t*s;
+      
+      f = atan2(-pr.y,pd.y)*.25; c = cos(f); s = sin(f);
+      t = pd.x; pd.x = t*c - pr.x*s; pr.x = pr.x*c + t*s;
+      t = pd.y; pd.y = t*c - pr.y*s; pr.y = pr.y*c + t*s;
+      t = pd.z; pd.z = t*c - pr.z*s; pr.z = pr.z*c + t*s;
+   }
+   else
+   {
+      c = cos(mx); s = sin(mx);
+      t = pd.x; pd.x = t*c - pr.x*s; pr.x = pr.x*c + t*s;
+      t = pd.y; pd.y = t*c - pr.y*s; pr.y = pr.y*c + t*s;
+      t = pd.z; pd.z = t*c - pr.z*s; pr.z = pr.z*c + t*s;
+   }
+   my *= zoom; c = cos(my); s = sin(my);
+   t = pd.x; pd.x = t*c - pf.x*s; pf.x = pf.x*c + t*s;
+   t = pd.y; pd.y = t*c - pf.y*s; pf.y = pf.y*c + t*s;
+   t = pd.z; pd.z = t*c - pf.z*s; pf.z = pf.z*c + t*s;
+}
+
+drawskybox ()
+{
+   glsettex("kensky.jpg");
+   glbegin(GL_QUADS); f = 256; g = .5/384;
+   
+   gltexcoord(  g,(0+g)/6); glvertex(-f,-f,+f);
+   gltexcoord(1-g,(0+g)/6); glvertex(+f,-f,+f);
+   gltexcoord(1-g,(1-g)/6); glvertex(+f,+f,+f);
+   gltexcoord(  g,(1-g)/6); glvertex(-f,+f,+f);
+
+   gltexcoord(  g,(1+g)/6); glvertex(+f,-f,+f);
+   gltexcoord(1-g,(1+g)/6); glvertex(+f,-f,-f);
+   gltexcoord(1-g,(2-g)/6); glvertex(+f,+f,-f);
+   gltexcoord(  g,(2-g)/6); glvertex(+f,+f,+f);
+
+   gltexcoord(  g,(2+g)/6); glvertex(+f,-f,-f);
+   gltexcoord(1-g,(2+g)/6); glvertex(-f,-f,-f);
+   gltexcoord(1-g,(3-g)/6); glvertex(-f,+f,-f);
+   gltexcoord(  g,(3-g)/6); glvertex(+f,+f,-f);
+
+   gltexcoord(  g,(3+g)/6); glvertex(-f,-f,-f);
+   gltexcoord(1-g,(3+g)/6); glvertex(-f,-f,+f);
+   gltexcoord(1-g,(4-g)/6); glvertex(-f,+f,+f);
+   gltexcoord(  g,(4-g)/6); glvertex(-f,+f,-f);
+
+   gltexcoord(  g,(4+g)/6); glvertex(-f,-f,-f);
+   gltexcoord(1-g,(4+g)/6); glvertex(+f,-f,-f);
+   gltexcoord(1-g,(5-g)/6); glvertex(+f,-f,+f);
+   gltexcoord(  g,(5-g)/6); glvertex(-f,-f,+f);
+
+   gltexcoord(  g,(5+g)/6); glvertex(-f,+f,+f);
+   gltexcoord(1-g,(5+g)/6); glvertex(+f,+f,+f);
+   gltexcoord(1-g,(6-g)/6); glvertex(+f,+f,-f);
+   gltexcoord(  g,(6-g)/6); glvertex(-f,+f,-f);
+}
+
+#define AU (149597870/1.609344) //miles
+static plandia[11] = {1516*2,3761*2,3964*2,2109*2,44375*2,37495*2,15885*2,15391*2,715*2,432449*2,1080*2};
+static gd, gcosearthtilt, gsinearthtilt, starang = 0;
+
+tokeplerang (ia, k)
+{
+      //Make sure 0 < ia < PI*2
+   ia %= (PI*2); dacos = cos(ia); dasin = sin(ia);
+   oa = ia - k*dasin * (1 - k*dacos);
+   for(cnt=7;cnt>=0;cnt--) //WARNING! Doesn't work when k = -1
+   {
+      dacos = cos(oa); dasin = sin(oa);
+      ooa = oa; oa += (ia-oa - k*dasin) / (1 + k*dacos);
+      if (ooa == oa) return(oa);
+   }
+   return(oa);
+}
+
+getmoonpos (dpoint3d ipos, &retx, &rety, &retz)
+{
+   nn= (125.1228 - 0.0529538083*gd)*(PI/180.0);  //Long asc. node
+   i = 5.1454*(PI/180.0);                        //Inclination
+   w = (318.0634 + 0.1643573223*gd)*(PI/180.0);  //Arg. of perigee
+   a = 60.2666;                                  //Mean distance
+   e = 0.054900;                                 //Eccentricity
+   mm= (115.3654 + 13.0649929509*gd)*(PI/180.0); //Mean anomaly
+
+   ee = tokeplerang(mm,-e);
+
+   ssw = (282.9404 + 4.70935E-5*gd)*(PI/180.0);   //sun's longitude of perihelion
+   ssmm = (356.0470 + 0.9856002585*gd)*(PI/180.0); //sun's mean anomaly
+   lls = ssw+ssmm;
+   llm = nn+w+mm;
+   mms = ssmm;
+   mmm = mm;
+   dd = llm-lls;
+   ff = llm-nn;
+
+      //Perturbations in longitude (degrees):
+   lonperturb = -1.274*sin(mmm-2*dd)   +0.658*sin(2*dd)       -0.186*sin(mms)
+                -0.059*sin(2*mmm-2*dd) -0.057*sin(mmm-2*dd+mms) +0.053*sin(mmm+2*dd)
+                +0.046*sin(2*dd-mms)   +0.041*sin(mmm-mms)     -0.035*sin(dd)
+                -0.031*sin(mmm+mms)    -0.015*sin(2*ff-2*dd)   +0.011*sin(mmm-4*dd);
+
+      //Perturbations in latitude (degrees):
+   latperturb = -0.173*sin(ff-2*dd)    -0.055*sin(mmm-ff-2*dd)  -0.046*sin(mmm+ff-2*dd)
+                +0.033*sin(ff+2*dd)    +0.017*sin(2*mmm+ff);
+
+      //Perturbations in lunar distance (Earth radii):
+   radperturb = -0.58*cos(mmm-2*dd)    -0.46*cos(2*dd);
+
+   a += radperturb;
+
+   x = a*(cos(ee)-e);
+   y = a*sqrt(1-e*e)*sin(ee);
+
+   dacos = x*cos(w) - y*sin(w);
+   dasin = x*sin(w) + y*cos(w);
+   x = (cos(nn)*dacos - sin(nn)*dasin*cos(i));
+   y = (sin(nn)*dacos + cos(nn)*dasin*cos(i));
+   z = dasin * sin(i);
+
+   dacos = cos(lonperturb*(PI/180.0));
+   dasin = sin(lonperturb*(PI/180.0));
+   ox = x*dacos - y*dasin;
+   oy = y*dacos + x*dasin;
+   oz = z;
+
+   dacos = cos(latperturb*(PI/180.0));
+   dasin = sin(latperturb*(PI/180.0));
+   x = ox*dacos - oz*dasin*(ox/sqrt(ox*ox+oy*oy));
+   y = oy*dacos - oz*dasin*(oy/sqrt(ox*ox+oy*oy));
+   z = oz*dacos + sqrt(ox*ox+oy*oy)*dasin;
+
+   ox = y;
+   oy = -z;
+   oz = -x;
+
+   x = ox*gcosearthtilt + oy*gsinearthtilt;
+   y = oy*gcosearthtilt - ox*gsinearthtilt;
+   z = oz;
+
+      //Geocentric -> Topocentric conversion (don't assume you're at center of earth)
+      //Since ipos is earth radii, must do this when x,y,z are in Earth radii
+   dacos = cos(starang); dasin = sin(starang);
+   x -= (ipos.x*dacos-ipos.z*dasin);
+   y -= ipos.y;
+   z -= (ipos.z*dacos+ipos.x*dasin);
+
+      //Must convert distance from Earth radii to millions of miles
+   t = 0.238857 / 60.2666;
+   retx = x*t; rety = y*t; retz = z*t;
+}
+
+getplanpos (daplan, dpoint3d ipos, &retx, &rety, &retz)
+{
+      //Hack for sun at center
+   if (daplan == 9) { retx = 0; rety = 0; retz = 0; return; }
+   if (daplan == 10) { getmoonpos(ipos,retx,rety,retz); return; }
+   if (daplan < 8)  //Not Pluto
+   {
+      if (daplan == 0) //Mercury
+      {
+         nn= (48.3313 + 3.24587E-5*gd)*(PI/180.0);     //Long asc. node
+         i = (7.0047 + 5.00E-8*gd)*(PI/180.0);         //Inclination
+         w = (29.1241 + 1.01444E-5*gd)*(PI/180.0);     //Arg. of perigee
+         a = 0.387098;                                 //Mean distance (AU)
+         e = 0.205635 + 5.59E-10*gd;                   //Eccentricity
+         mm= (168.6562 + 4.0923344368*gd)*(PI/180.0);  //Mean anomaly
+      }
+      else if (daplan == 1) //Venus
+      {
+         nn=  (76.6799 + 2.46590E-5*gd)*(PI/180.0);    //Long asc. node
+         i = (3.3946 + 2.75E-8*gd)*(PI/180.0);         //Inclination
+         w =  (54.8910 + 1.38374E-5*gd)*(PI/180.0);    //Arg. of perigee
+         a = 0.723330;                                 //Mean distance (AU)
+         e = 0.006773 - 1.302E-9*gd;                   //Eccentricity
+         mm=  (48.0052 + 1.6021302244*gd)*(PI/180.0);  //Mean anomaly
+      }
+      else if (daplan == 2) //Earth
+      {
+         nn= (0.0)*(PI/180.0);                         //Long asc. node
+         i = (0.0)*(PI/180.0);                         //Inclination
+         w = (282.9404 + 4.70935E-5*gd)*(PI/180.0);    //Arg. of perigee
+         a = -1.000000;                                //Mean distance (AU)
+         e = 0.016709 - 1.151E-9*gd;                   //Eccentricity
+         mm= (356.0470 + 0.9856002585*gd)*(PI/180.0);  //Mean anomaly
+      }
+      else if (daplan == 3) //Mars
+      {
+         nn=  (49.5574 + 2.11081E-5*gd)*(PI/180.0);    //Long asc. node
+         i = (1.8497 - 1.78E-8*gd)*(PI/180.0);         //Inclination
+         w = (286.5016 + 2.92961E-5*gd)*(PI/180.0);    //Arg. of perigee
+         a = 1.523688;                                 //Mean distance (AU)
+         e = 0.093405 + 2.516E-9*gd;                   //Eccentricity
+         mm= (18.6021 + 0.5240207766*gd)*(PI/180.0);   //Mean anomaly
+      }
+      else if (daplan == 4) //Jupiter
+      {
+         nn= (100.4542 + 2.76854E-5*gd)*(PI/180.0);    //Long asc. node
+         i = (1.3030 - 1.557E-7*gd)*(PI/180.0);        //Inclination
+         w = (273.8777 + 1.64505E-5*gd)*(PI/180.0);    //Arg. of perigee
+         a = 5.20256;                                  //Mean distance (AU)
+         e = 0.048498 + 4.469E-9*gd;                   //Eccentricity
+         mm= (19.8950 + 0.0830853001*gd)*(PI/180.0);   //Mean anomaly
+      }
+      else if (daplan == 5) //Saturn
+      {
+         nn= (113.6634 + 2.38980E-5*gd)*(PI/180.0);    //Long asc. node
+         i = (2.4886 - 1.081E-7*gd)*(PI/180.0);        //Inclination
+         w = (339.3939 + 2.97661E-5*gd)*(PI/180.0);    //Arg. of perigee
+         a = 9.55475;                                  //Mean distance (AU)
+         e = 0.055546 - 9.499E-9*gd;                   //Eccentricity
+         mm= (316.9670 + 0.0334442282*gd)*(PI/180.0);  //Mean anomaly
+      }
+      else if (daplan == 6) //Uranus
+      {
+         nn= (74.0005 + 1.3978E-5*gd)*(PI/180.0);      //Long asc. node
+         i = (0.7733 + 1.9E-8*gd)*(PI/180.0);          //Inclination
+         w = (96.6612 + 3.0565E-5*gd)*(PI/180.0);      //Arg. of perigee
+         a = 19.18171 - 1.55E-8*gd;                    //Mean distance (AU)
+         e = 0.047318 + 7.45E-9*gd;                    //Eccentricity
+         mm= (142.5905 + 0.011725806*gd)*(PI/180.0);   //Mean anomaly
+      }
+      else if (daplan == 7) //Neptune
+      {
+         nn= (131.7806 + 3.0173E-5*gd)*(PI/180.0);     //Long asc. node
+         i = (1.7700 - 2.55E-7*gd)*(PI/180.0);         //Inclination
+         w = (272.8461 - 6.027E-6*gd)*(PI/180.0);      //Arg. of perigee
+         a = 30.05826 + 3.313E-8*gd;                   //Mean distance (AU)
+         e = 0.008606 + 2.15E-9*gd;                    //Eccentricity
+         mm= (260.2471 + 0.005995147*gd)*(PI/180.0);   //Mean anomaly
+      }
+
+      ee = tokeplerang(mm,-e);
+
+      x = a*(cos(ee)-e);
+      y = a*sqrt(1-e*e)*sin(ee);
+
+      dacos = x*cos(w) - y*sin(w);
+      dasin = x*sin(w) + y*cos(w);
+      x = (cos(nn)*dacos - sin(nn)*dasin*cos(i));
+      y = (sin(nn)*dacos + cos(nn)*dasin*cos(i));
+      z = dasin * sin(i);
+
+      if ((daplan == 4) || (daplan == 5) || (daplan == 6))  //Perturbations
+      {
+         mmj = (19.8950 + 0.0830853001*gd)*(PI/180.0);   //Mean anomaly of Jupiter
+         mms = (316.9670 + 0.0334442282*gd)*(PI/180.0);  //Mean anomaly of Saturn
+         mmu = (142.5905 + 0.011725806*gd)*(PI/180.0);   //Mean anomaly of Uranus
+         if (daplan == 4) //Perturbations for Jupiter. Add these terms to the longitude:
+         {
+            lonperturb = -0.332 * sin(2*mmj - 5*mms - 67.6*(PI/180.0))
+                         -0.056 * sin(2*mmj - 2*mms + 21*(PI/180.0))
+                         +0.042 * sin(3*mmj - 5*mms + 21*(PI/180.0))
+                         -0.036 * sin(mmj - 2*mms)
+                         +0.022 * cos(mmj - mms)
+                         +0.023 * sin(2*mmj - 3*mms + 52*(PI/180.0))
+                         -0.016 * sin(mmj - 5*mms - 69*(PI/180.0));
+            latperturb = 0;
+         }
+         if (daplan == 5) //Perturbations for Saturn. Add these terms to the longitude:
+         {
+            lonperturb = +0.812 * sin(2*mmj - 5*mms - 67.6*(PI/180.0))
+                         -0.229 * cos(2*mmj - 4*mms - 2*(PI/180.0))
+                         +0.119 * sin(mmj - 2*mms - 3*(PI/180.0))
+                         +0.046 * sin(2*mmj - 6*mms - 69*(PI/180.0))
+                         +0.014 * sin(mmj - 3*mms + 32*(PI/180.0));
+
+            latperturb = -0.020 * cos(2*mmj - 4*mms - 2*(PI/180.0))
+                         +0.018 * sin(2*mmj - 6*mms - 49*(PI/180.0));
+         }
+         if (daplan == 6)  //Perturbations for Uranus: Add these terms to the longitude:
+         {
+            lonperturb = +0.040 * sin(mms - 2*mmu + 6*(PI/180.0))
+                         +0.035 * sin(mms - 3*mmu + 33*(PI/180.0))
+                         -0.015 * sin(mmj - mmu + 20*(PI/180.0));
+            latperturb = 0;
+         }
+
+         dacos = cos(lonperturb*(PI/180.0));
+         dasin = sin(lonperturb*(PI/180.0));
+         ox = x*dacos - y*dasin;
+         oy = y*dacos + x*dasin;
+         oz = z;
+
+         dacos = cos(latperturb*(PI/180.0));
+         dasin = sin(latperturb*(PI/180.0));
+         x = ox*dacos - oz*dasin*(ox/sqrt(ox*ox+oy*oy));
+         y = oy*dacos - oz*dasin*(oy/sqrt(ox*ox+oy*oy));
+         z = oz*dacos + sqrt(ox*ox+oy*oy)*dasin;
+      }
+   }
+   else  //Special case for Pluto:
+   {
+      ss = (50.03 + 0.033459652*gd)*(PI/180.0);
+      pp = (238.95 + 0.003968789*gd)*(PI/180.0);
+
+         //heliocentric ecliptic longitude (degrees)
+      lonecl = 238.9508 +0.00400703*gd
+               -19.799*sin(pp)   +19.848*cos(pp)
+                +0.897*sin(2*pp) -4.956*cos(2*pp)
+                +0.610*sin(3*pp) +1.211*cos(3*pp)
+                -0.341*sin(4*pp) -0.190*cos(4*pp)
+                +0.128*sin(5*pp) -0.034*cos(5*pp)
+                -0.038*sin(6*pp) +0.031*cos(6*pp)
+                +0.020*sin(ss-pp) -0.010*cos(ss-pp);
+
+         //heliocentric ecliptic latitude (degrees)
+      latecl =  -3.9082
+                -5.453*sin(pp)   -14.975*cos(pp)
+                +3.527*sin(2*pp) +1.673*cos(2*pp)
+                -1.051*sin(3*pp) +0.328*cos(3*pp)
+                +0.179*sin(4*pp) -0.292*cos(4*pp)
+                +0.019*sin(5*pp) +0.100*cos(5*pp)
+                -0.031*sin(6*pp) -0.026*cos(6*pp)
+                                +0.011*cos(ss-pp);
+
+         //distance (a.u.):
+      r = 40.72 +6.68*sin(pp)    +6.90*cos(pp)
+                -1.18*sin(2*pp)  -0.03*cos(2*pp)
+                +0.15*sin(3*pp)  -0.14*cos(3*pp);
+
+      x = r*cos(lonecl*(PI/180.0))*cos(latecl*(PI/180.0));
+      y = r*sin(lonecl*(PI/180.0))*cos(latecl*(PI/180.0));
+      z = r*sin(latecl*(PI/180.0));
+   }
+
+      //Must convert distance from AU to millions of miles
+   t = AU*.000001;
+   cx = y*t;
+   cy = -z*t;
+   cz = -x*t;
+
+   nx = cx*gcosearthtilt + cy*gsinearthtilt;
+   ny = cy*gcosearthtilt - cx*gsinearthtilt;
+   nz = cz;
+
+   if (daplan == 2)
+   {
+         //Hack to account for your ipos.? position relative to Earth
+         //Note: ipos.? is in earth radii, nx,ny,nz are in millions of miles
+      dacos = cos(starang); dasin = sin(starang);
+      r = plandia[2]*0.5*.000001;   //earth radii to millions of miles
+      nx += (ipos.x*dacos-ipos.z*dasin)*r;
+      ny += ipos.y*r;
+      nz += (ipos.z*dacos+ipos.x*dasin)*r;
+
+         //Hack to make Earth wobble as a result of the Moon orbiting around it
+         //.0123 is mass of Moon relative to Earth
+      getmoonpos(ipos,&ox,&oy,&oz);
+      nx -= .0123*ox; ny -= .0123*oy; nz -= .0123*oz;
+   }
+
+   retx = nx; rety = ny; retz = nz;
+}
+
+getdate (d, &year, &month, &day)
+{
+   year = floor(d/(365+(6+(9.0+9.5/60.0)/60.0)/24.0))+1;
+   do
+   {
+      yday = ((year-1)*365) + floor((year-1)/4) - floor((year-1)/100) + floor((year-1)/400);
+      bad = 0;
+      if (d < yday) { year--; bad = 1; }
+      if ((year%4) || ((!(year%100)) && (year%400)))
+           { if (d >= yday+365) { year++; bad = 1; } }
+      else { if (d >= yday+366) { year++; bad = 1; } }
+   } while (bad);
+
+   day = d-yday;
+
+   month = 1;
+   if ((month == 1) && (day >= 31)) { month = 2; day -= 31; }
+   if ((year%4) || ((!(year%100)) && (year%400)))
+      { if ((month == 2) && (day >= 28)) { month = 3; day -= 28; } }
+   else
+      { if ((month == 2) && (day >= 29)) { month = 3; day -= 29; } }
+   if ((month == 3) && (day >= 31)) { month = 4; day -= 31; }
+   if ((month == 4) && (day >= 30)) { month = 5; day -= 30; }
+   if ((month == 5) && (day >= 31)) { month = 6; day -= 31; }
+   if ((month == 6) && (day >= 30)) { month = 7; day -= 30; }
+   if ((month == 7) && (day >= 31)) { month = 8; day -= 31; }
+   if ((month == 8) && (day >= 31)) { month = 9; day -= 31; }
+   if ((month == 9) && (day >= 30)) { month = 10; day -= 30; }
+   if ((month == 10) && (day >= 31)) { month = 11; day -= 31; }
+   if ((month == 11) && (day >= 30)) { month = 12; day -= 30; }
+   day++;
+}
+getday (year, month, day)
+{
+   static monthday[12] = {0,31,59,90,120,151,181,212,243,273,304,334};
+   d = ((year-1)*365) + floor((year-1)/4) - floor((year-1)/100) + floor((year-1)/400); //add days of previous years
+   d += monthday[month-1]; //add days of previous months of year
+   d += ((month > 2) && (!(year%4)) && ((year%100) || (!(year%400)))); //add leap of current year
+   d += day-1; //add day of current month
+   return(d);
+}
+
+getdayofweek (d) { return((d+1)%7); }
+
+   //USA daylight savings time info (all changes occur at 2AM)
+   //Source: http://en.wikipedia.org/wiki/History_of_time_in_the_United_States
+   //
+   //Year(s):   Spring ahead:           Fall back:
+   //1967-1973  last Sunday in April    last Sunday in October
+   //1974       1st  Sunday in January  last Sunday in October
+   //1975       last Sunday in January  last Sunday in October
+   //1976-1986  last Sunday in April    last Sunday in October
+   //1987-2006  1st  Sunday in April    last Sunday in October
+   //2007-      2nd  Sunday in March    1st  Sunday in November
+   //
+   //Eastern Daylight Time is during summer: EDT = GMT-4
+   //Eastern Standard Time is during winter: EST = GMT-5
+   //Assumes the incoming hour is always Standard Time so there
+   //   aren't any nonexistent or ambiguos times near 2AM
+isdaylight (year, month, day, hour)
+{
+   if (year < 1967) return(0); //N/A
+
+      //Spring ahead..
+        if (year <  1974) { m0 = 4; d0 =  getdayofweek(getday(year,m0,30));      d0 = 30-d0; } //last Sunday in April    !!
+   else if (year == 1974) { m0 = 1; d0 =    6                                              ; } //1st  Sunday in January
+   else if (year == 1975) { m0 = 1; d0 =   26                                              ; } //last Sunday in January
+   else if (year <  1987) { m0 = 4; d0 =  getdayofweek(getday(year,m0,30));      d0 = 30-d0; } //last Sunday in April    !!
+   else if (year <  2007) { m0 = 4; d0 = (getdayofweek(getday(year,m0, 1))+6)%7; d0 =  7-d0; } //1st  Sunday in April
+   else                   { m0 = 3; d0 = (getdayofweek(getday(year,m0, 1))+6)%7; d0 = 14-d0; } //2nd  Sunday in March
+
+      //Fall back..
+        if (year <  2007) { m1 =10; d1 =  getdayofweek(getday(year,m1,31))     ; d1 = 31-d1; } //last Sunday in October
+                     else { m1 =11; d1 = (getdayofweek(getday(year,m1, 1))+6)%7; d1 =  7-d1; } //1st  Sunday in November
+
+   if ((month > m0) && (month < m1)) return(1);
+   if ((month < m0) || (month > m1)) return(0);
+   if (month == m0)
+   {
+      if (day < d0) return(0);
+      if (day > d0) return(1);
+      return(hour >= 2); //1:00 1:30 3:00x 3:30x 4:00x
+   }
+   if (day < d1) return(1);
+   if (day > d1) return(0);
+   return(hour < 1); //1:00x 1:30x 1:00 1:30 2:00
+}
+
+initdatetime (year, month, day, hour, minute, second)
+{
+   dayfrac = (hour+(minute+second/60.0)/60.0
+                    -TIMEZONE-isdaylight(year,month,day,hour))/24.0;
+
+   gd = getday(year,month,day)-getday(1999,12,31) + dayfrac;
+
+   w = (282.9404 + 4.70935e-5*gd)*(PI/180.0);    //Arg. of perigee
+   mm = (356.0470 + 0.9856002585*gd)*(PI/180.0);  //Mean anomaly
+   starang = dayfrac*(PI*2) + w + mm + PI;
+
+   ang = (23.4393 - 3.563e-7*gd)*(PI/180.0);
+   gcosearthtilt = cos(ang);
+   gsinearthtilt = sin(ang);
+}
+
+initpos (lng_deg, lat_deg, dpoint3d r, dpoint3d d, dpoint3d f, dpoint3d p)
+{
+   ang = lat_deg*(PI/180.0);   t = cos(ang); p.y = sin(ang);
+   ang = lng_deg*(PI/180.0); p.z = cos(ang); p.x = sin(ang);
+   p.z *= -t; p.x *= t;
+   
+      //face south:
+   rad = p.x^2 + p.z^2; if (rad <= 0) return;
+   t = 1/sqrt(rad);         r.x = p.z*t; r.y =     0; r.z =-p.x*t;
+   t= -1/sqrt(p.y^2 + rad); d.x = p.x*t; d.y = p.y*t; d.z = p.z*t;
+   f.x = d.z*r.y - d.y*r.z;
+   f.y = d.x*r.z - d.z*r.x;
+   f.z = d.y*r.x - d.x*r.y;
+}
+
+   //year=year, month=1..12, day=1..31, hour=0..23, minute=0..59, second=0<=?<60
+   //lng_deg = longitude in degrees, W=-, E=+
+   //lat_deg = latitude in degrees, N=-, S=+
+   //i0,i1 = range i0<=i<=i1 of objects to calc: 0-8 = Mercury-Pluto, 9=Sun, 10=Moon
+   //vec = calculated 3D coordinate(s) relative to pos on Earth: +x=west, +y=gravity, +z=south
+getobjectspos (year, month, day, hour, minute, second, lng_deg, lat_deg, i0, i1, dpoint3d vec[11])
+{
+   dpoint3d tr, td, tf, tp;
+   
+   initdatetime(year,month,day,hour,minute,second);
+   initpos(lng_deg,lat_deg,&tr,&td,&tf,&tp);
+   
+   cosang = cos(starang); sinang = sin(starang);
+   ox = tp.x; oy = tp.z; tp.x = ox*cosang - oy*sinang; tp.z = oy*cosang + ox*sinang;
+   ox = tr.x; oy = tr.z; tr.x = ox*cosang - oy*sinang; tr.z = oy*cosang + ox*sinang;
+   ox = td.x; oy = td.z; td.x = ox*cosang - oy*sinang; td.z = oy*cosang + ox*sinang;
+   ox = tf.x; oy = tf.z; tf.x = ox*cosang - oy*sinang; tf.z = oy*cosang + ox*sinang;
+
+   for(i=i0;i<=i1;i++)
+   {
+      getplanpos(i,tp,&nx,&ny,&nz);
+      vec[i-i0].x = nx*tr.x + ny*tr.y + nz*tr.z;
+      vec[i-i0].y = nx*td.x + ny*td.y + nz*td.z;
+      vec[i-i0].z = nx*tf.x + ny*tf.y + nz*tf.z;
+   }
+}
+
+addtime (&year, &month, &day, &hour, &minute, &second, sex2add)
+{
+   d = getday(year,month,day);
+   second += sex2add;
+   i = floor(second/60); second -= i*60; minute += i;
+   i = floor(minute/60); minute -= i*60; hour   += i;
+   i = floor(hour  /24); hour   -= i*24; d      += i;
+   getdate(d,&year,&month,&day);
+}

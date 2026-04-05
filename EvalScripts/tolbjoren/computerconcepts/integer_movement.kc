@@ -1,0 +1,100 @@
+enum{SIZ=10}
+static grid[SIZ][SIZ];
+
+struct particle
+{
+  x,y;
+  nx;ny;
+}
+
+static animTimer = 0;
+static animDelta = 0.3;
+
+
+static particle p1;
+static playerControlX = 0;
+static playerControlY = 0;
+
+static tim,oldtim,dt;
+()
+{
+  tim = klock(0); dt = tim-oldtim; oldtim = tim;
+  //dt = 0.01;
+  
+  cls(0);
+  
+  if(numframes==0)
+  {
+    p1.x = SIZ/2;
+    p1.y = 0;
+    p1.nx = 0;
+    p1.ny = 1;
+  }
+  
+  len = 300;
+  cellSiz = len/SIZ;
+
+  // Draw Grid
+  setcol(255,255,255);
+  for(i=0; i<=SIZ; i++)
+  for(j=0; j<=SIZ; j++)
+  {
+    x = i*cellSiz;
+    moveto(x,0); lineto(x,len);
+  
+    y = j*cellSiz;
+    moveto(0,y); lineto(len,y);
+  }
+  
+  x = p1.x * cellSiz;
+  y = p1.y * cellSiz;
+  drawrectfill(x,y,x+cellSiz,y+cellSiz);
+  
+  
+  // Interpolated pos
+  x0 = (p1.x) * cellSiz;
+  y0 = (p1.y) * cellSiz;
+  x1 = (p1.x+p1.nx) * cellSiz;
+  y1 = (p1.y+p1.ny) * cellSiz;
+  
+  t = animTimer/animDelta;
+  x = lerp(x0,x1,t);
+  y = lerp(y0,y1,t);
+  setcol(64,64,64);
+  drawrectfill(x,y,x+cellSiz,y+cellSiz);  
+  
+  if(animTimer >= animDelta )
+  {
+    animTimer = 0;
+    p1.x += p1.nx;
+    p1.y += p1.ny;
+
+    // Reset horiz movement
+    p1.nx = 0;    
+    p1.nx = playerControlX;
+    playerControlX = 0;
+
+    if(p1.y < 1 && p1.ny<0 ) p1.ny*=-1;
+    if(p1.y > siz-2) p1.ny*=-1;
+  }
+  animTimer+=dt;
+  
+
+   
+   if(keystatus[203] ) // LEFT
+   {
+      if(p1.x > 0) playerControlX = -1;
+   }
+   if(keystatus[205] ) // RIGHT
+   {
+      if(p1.x < SIZ-1 )  playerControlX = 1;
+   }
+}
+
+lerp(x1,x2,t)
+{
+  return x1+(x2-x1)*t;
+}
+
+drawrectfill(x0,y0,x1,y1) { for(y=y0;y<y1;y++) { moveto(x0,y); lineto(x1,y); } }
+drawrectopen(x0,y0,x1,y1) { moveto(x0,y0); lineto(x1,y0); lineto(x1,y1); lineto(x0,y1); lineto(x0,y0); }

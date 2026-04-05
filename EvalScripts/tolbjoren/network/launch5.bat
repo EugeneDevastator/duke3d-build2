@@ -1,0 +1,1 @@
+F:\software\evaldraw\evaldraw.exe nettest5.kc /window

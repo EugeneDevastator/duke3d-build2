@@ -1,0 +1,190 @@
+// evaldraw version of javascript examples in this article
+// http://codeflow.org/entries/2010/aug/28/integration-by-example-euler-vs-verlet-vs-runge-kutta/#runge-kutta-method
+
+// how do I calculate the error
+// for each integrator?
+
+struct vec{x,y;}
+
+struct Derivative
+{
+   vec pos;
+   vec vel;
+};
+
+struct body{
+   vec pos;
+   vec oldpos; // for verlet
+   vec vel;
+};
+
+static body one_body;
+
+static vec center;
+
+()
+{
+   setcol(0,255,0);
+   cx = xres/2;
+   cy = yres/2;
+   
+   if ( numframes == 0 ){
+      
+      cls(0);
+      
+      vecset( one_body.pos, cx - 70, cy - 60);
+      
+      // with verlet we setup velocity like so:
+      vecset( one_body.oldpos, cx - 70+1, cy - 60-1 );
+      
+      // other integrators have a velocity term
+      vecset( one_body.vel, -1, 1 );
+      
+      moveto(  one_body.pos.x,  one_body.pos.y );
+   }
+   
+   //cls(0);
+   
+   
+   vecset(center, xres/2, yres/2);
+   
+   enum{
+      EULER=1, VERLET=2, RK4=3, 
+      INTEGRATOR=3; // <-change this!
+   }
+
+   #if INTEGRATOR==EULER
+      steps = 8;
+      delta = 1/steps;
+      for(i=0; i<steps; i++){
+         vec acc;
+         acceleration( acc, center, one_body.pos );
+   
+         one_body.vel.x += acc.x * delta;
+         one_body.vel.y += acc.y * delta;   
+   
+         one_body.pos.x += one_body.vel.x * delta;
+         one_body.pos.y += one_body.vel.y * delta;
+      }
+   #endif
+   
+   #if INTEGRATOR==VERLET
+   
+      vec acc;
+      acceleration( acc, center, one_body.pos );
+   
+      newx = 2*one_body.pos.x - one_body.oldpos.x + acc.x;
+      newy = 2*one_body.pos.y - one_body.oldpos.y + acc.y;
+      
+      vecset( one_body.oldpos, one_body.pos );
+      vecset( one_body.pos, newx, newy );
+   #endif
+   
+   #if INTEGRATOR==RK4
+      derivative d0;
+      vecset( d0.pos, 0,0);
+      vecset( d0.vel, 0,0);
+      
+      steps = 4;
+      delta = 1.0/steps;
+      for(i=0; i<steps; i++){
+         derivative d1,d2,d3,d4;
+         compute( d1, center, one_body, delta*0.0, d0 );
+         compute( d2, center, one_body, delta*0.5, d1 );
+         compute( d3, center, one_body, delta*0.5, d2 );
+         compute( d4, center, one_body, delta*1.0, d3 );
+         
+         dxdt = 1.0 / 6.0 * (d1.pos.x + 2.0*(d2.pos.x + d3.pos.x) + d4.pos.x);
+         dydt = 1.0 / 6.0 * (d1.pos.y + 2.0*(d2.pos.y + d3.pos.y) + d4.pos.y);
+         
+         dvxdt = 1.0 / 6.0 * (d1.vel.x + 2.0*(d2.vel.x + d3.vel.x) + d4.vel.x);
+         dvydt = 1.0 / 6.0 * (d1.vel.y + 2.0*(d2.vel.y + d3.vel.y) + d4.vel.y);
+
+         one_body.pos.x += dxdt* delta;
+         one_body.pos.y += dydt * delta;
+         
+         one_body.vel.x += dvxdt * delta;
+         one_body.vel.y += dvydt * delta;
+
+      }
+   #endif
+   
+   //lineto(  one_body.pos.x,  one_body.pos.y );
+   drawsph(  one_body.pos.x,  one_body.pos.y, .5 );
+   
+   setfont(18,36,1);
+   moveto(xres/2-100, yres-50);
+   if (INTEGRATOR==EULER) {
+      printf("euler\n");
+   }else if (INTEGRATOR==VERLET){
+      printf("verlet\n");
+   }else{ //INTEGRATOR==RK4
+      printf("rk4\n");
+   }
+   
+
+   while( numframes/300 > klock() ) {};
+}
+
+/*
+dervadd( derivative a, derivative b, k ){
+   a.pos.x += b.pos.x * k;
+   a.pos.y += b.pos.y * k;
+   
+   a.vel.x += b.vel.x * k;
+   a.vel.y += b.vel.y * k;
+}
+*/
+
+acceleration(vec out, vec pos1, vec pos2){
+   g = 150.0;
+   vec dir, vec norm;
+   vecsub( dir, pos1, pos2 );
+   len = length( dir );
+   vecset( norm, dir.x/len, dir.y/len);
+   vecset( out, norm.x * (g/len^2), norm.y * (g/len^2) );
+}
+
+compute( derivative calcDerv, vec center, body initial, delta, derivative derv){
+   derivative state;
+   
+   state.pos.x = derv.pos.x * delta + initial.pos.x;
+   state.pos.y = derv.pos.y * delta + initial.pos.y;
+   
+   state.vel.x = derv.vel.x * delta + initial.vel.x;
+   state.vel.y = derv.vel.y * delta + initial.vel.y;
+   
+   vec acc;
+   acceleration( acc, center, state.pos );
+
+   calcDerv.pos = state.vel;
+   calcDerv.vel = acc;
+}
+
+
+
+vecset(vec v, x,y){ v.x = x; v.y = y; }
+vecset(vec v, vec other){ v.x = other.x; v.y = other.y; }
+
+vecSub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y; 
+}
+
+dot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y;
+}
+
+length( vec v )
+{
+   return sqrt( dot(v,v) );
+}
+
+distance(vec a, vec b){
+   return sqrt( (a.x - b.x)^2 + (a.y - b.y)^2 );
+}
+distanceSq(vec a, vec b){
+   return (a.x - b.x)^2 + (a.y - b.y)^2;
+}

@@ -1,0 +1,43 @@
+()
+{
+   static notea[32] =
+   {
+      60,60,62,64,60,64,62,55,60,60,62,64,60, 0,59, 0,
+      60,60,62,64,65,64,62,60,59,55,57,59,60, 0,60, 0,
+   };
+   static noteb[16] = {48,48,48,43,48,48,48,43,48,48,41,41,43,43,48,48};
+   for(inst=0;inst<128;inst++)
+   {
+      playtext("Instrument %g",inst);
+      
+      playnote(0xc0,inst,0); //set inst, chan 0
+      f = inst%12;
+      for(i=0;i<32;i++)
+      {
+         if (notea[i]) playnote(0x90,notea[i]+f,64);
+         if ((i%2) == 0) playnote(0x90,noteb[i/2]+f,64);
+         
+         if ((i% 4) == 0) playnote(0x99,36,72); //Bass drum
+         if ((i% 4) == 2) playnote(0x99,40,64); //Snare drum
+         if ((i%16) ==11) playnote(0x99,36,56); //Bass drum
+         if ((i%32) ==30) playnote(0x99,46,64); //Cymbal
+         
+         if (notea[i]) //Change colors at each notea[]
+         {
+            j = notea[i]-55;
+            cls(j*20,(j*340)%255,255-(j*3566)%255);
+            setcol(rnd*2^24); setfont(xres/14,yres/6,1);
+            moveto(0,yres*.4); printf("Instrument %g",inst); refresh();
+         }
+         
+         for(t=(inst*32+i+1)*.15;klock()<t;); //Delay
+         
+            //Note off
+         if (notea[i]) playnote(0x90,notea[i]+f,0);
+         if ((i%2) == 0) playnote(0x90,noteb[i/2]+f,0);
+      }
+   }
+   playnote(0xb0,0x7b,0); //notes off
+   playtext("All done.");
+   while (1) refresh();
+}

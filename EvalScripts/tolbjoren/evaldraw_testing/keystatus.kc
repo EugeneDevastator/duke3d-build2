@@ -1,0 +1,41 @@
+()
+{
+   cls(0);
+
+   
+   setcol(0xffffff);
+   perline = 50;   
+
+   moveto(0,0);
+   for(i=0; i<perline;i++){
+      doPrint(i);
+   }
+   
+   moveto(xres*.2,0);
+   for(i=perline; i<perline*2;i++){
+      doPrint(i);
+   }
+   
+   moveto(xres*.4,0);
+   for(i=perline*2; i<perline*3;i++){
+      doPrint(i);
+   }
+   
+   moveto(xres*.6,0);
+   for(i=perline*3; i<perline*4;i++){
+      doPrint(i);
+   }
+   
+   moveto(xres*.8,0);
+   for(i=perline*4; i<perline*5;i++){
+      doPrint(i);
+   }   
+     
+
+}
+
+doPrint(i)
+{
+      if(keystatus[i]) setfont(8,14); else setfont(8,12);
+      printf("\n k[%g] = %g", i, keystatus[i]);
+}

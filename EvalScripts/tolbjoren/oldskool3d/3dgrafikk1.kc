@@ -1,0 +1,244 @@
+static vec2[2];
+
+static cube[8][3]; // 8 punkter i en kube
+static cubeVerts[12][2]; // 12 linjer i en kube
+
+static point[3];
+
+()
+{
+   cls(0);
+   
+   if(numframes==0)
+   {
+   cube[0][0] = -1;
+   cube[0][1] = -1;
+   cube[0][2] = .5;
+   
+   cube[1][0] = -1;
+   cube[1][1] = 1;
+   cube[1][2] = .5;
+   
+   cube[2][0] = 1;
+   cube[2][1] = 1;
+   cube[2][2] = .5;
+   
+   cube[3][0] = 1;
+   cube[3][1] = -1;
+   cube[3][2] = .5;
+   
+   // bak, minus z
+   cube[4][0] = -1;
+   cube[4][1] = -1;
+   cube[4][2] = -.5;
+   
+   cube[5][0] = -1;
+   cube[5][1] = 1;
+   cube[5][2] = -.5;
+   
+   cube[6][0] = 1;
+   cube[6][1] = 1;
+   cube[6][2] = -.5;
+   
+   cube[7][0] = 1;
+   cube[7][1] = -1;
+   cube[7][2] = -.5;
+   
+   // front
+   cubeVerts[0][0] = 0; cubeVerts[0][1] = 1;
+   cubeVerts[1][0] = 1; cubeVerts[1][1] = 2;
+   cubeVerts[2][0] = 2; cubeVerts[2][1] = 3;
+   cubeVerts[3][0] = 3; cubeVerts[3][1] = 0;
+   
+   // back
+   cubeVerts[4][0] = 4; cubeVerts[4][1] = 5;
+   cubeVerts[5][0] = 5; cubeVerts[5][1] = 6;
+   cubeVerts[6][0] = 6; cubeVerts[6][1] = 7;
+   cubeVerts[7][0] = 7; cubeVerts[7][1] = 4;
+   
+   // sides
+   cubeVerts[8][0] = 0; cubeVerts[8][1] = 4;
+   cubeVerts[9][0] = 3; cubeVerts[9][1] = 7;
+   cubeVerts[10][0] = 1; cubeVerts[10][1] = 5;
+   cubeVerts[11][0] = 2; cubeVerts[11][1] = 6;
+   
+      for(i=0; i<8; i++)
+      {
+         cube[i][2] * = 1;
+      }
+   }
+
+   t = klock();
+   //point[0] = 5 * sin(t);
+   //point[1] = 5 * cos(t);
+   //point[2] = 25;
+   //Project( 90, point, xres, yres);
+   
+   //setcol(0xffff00);
+   //setpix( vec2[0], vec2[1] );
+   
+   z = 25;
+   
+   
+   setcol(0x00ff00);
+   for(p=0; p<8; p++)
+   {
+      s = 1;
+      point[0] = cube[p][0] * s;
+      point[1] = cube[p][1] * s;
+      point[2] = cube[p][2] * z;
+      if(point[2] < 0) point[2] *= z;
+      ProjectCorrect( 90, point, xres, yres);
+      setpix( vec2[0], vec2[1] ); 
+      moveto( vec2[0], vec2[1] );
+      printf("%g",p);
+   }
+   
+   
+   drawlines(25,t);
+   
+   setcol(0x00ffff);
+   drawlines2(2,10,t);
+   
+   moveto(xres/3+xres/7, yres/2);
+   printf("a cube...");
+}
+
+drawlines(z,t)
+{
+   static p1[3]; static p2[3];
+   scale = 100;
+   for(v=0; v<12; v++)
+   {
+      s1 = z; s2 = z;
+      if(v > 3){s1 = z*2; s2 = z*2;}
+      if(v > 7){s1 = z; s2 = z*2;}
+      p1[0] = cube[ cubeVerts[v][0] ][0] *scale;
+      p1[1] = cube[ cubeVerts[v][0] ][1] *scale;
+      p1[2] = cube[ cubeVerts[v][0] ][2] *scale ; //-s1
+      p2[0] = cube[ cubeVerts[v][1] ][0] *scale;
+      p2[1] = cube[ cubeVerts[v][1] ][1] *scale;
+      p2[2] = cube[ cubeVerts[v][1] ][2] *scale; //-s2
+      
+      rotx( point,p1[0],p1[1],p1[2], t );
+      //roty( p1,p1[0],p1[1],p1[2],t );
+      Project( 90, point, xres, yres);
+      moveto( vec2[0], vec2[1] );
+      setcol(0xff00ff);
+      drawsph(vec2[0], vec2[1] , 2);      
+
+      rotx( point,p2[0],p2[1],p2[2],t );
+      Project( 90, point, xres, yres);
+      setcol(0x00ff00);
+      lineto( vec2[0], vec2[1] );
+      
+      setcol(0xff0000);
+      drawsph(vec2[0], vec2[1] , -5);
+   }
+}
+
+drawlines2(x,z,t)
+{
+   static p1[3]; static p2[3];
+   scale = 100;
+   for(v=0; v<12; v++)
+   {
+      s1 = z; s2 = z;
+      if(v > 3){s1 = z*2; s2 = z*2;}
+      if(v > 7){s1 = z; s2 = z*2;}
+      p1[0] = cube[ cubeVerts[v][0] ][0] ;
+      p1[1] = cube[ cubeVerts[v][0] ][1] ;
+      p1[2] = cube[ cubeVerts[v][0] ][2] *-s1;
+      p2[0] = cube[ cubeVerts[v][1] ][0] ;
+      p2[1] = cube[ cubeVerts[v][1] ][1] ;
+      p2[2] = cube[ cubeVerts[v][1] ][2] *-s2;
+      
+      //p1[0] += x;
+      //p2[0] += x;
+      
+      //rotx( point,p1[0],p1[1],p1[2], t );
+      //roty( p1,p1[0],p1[1],p1[2],t );
+      
+      ProjectCorrect( 90, p1, xres, yres);
+      moveto( vec2[0], vec2[1] );
+    
+
+      //rotx( point,p2[0],p2[1],p2[2],t );
+      ProjectCorrect( 90, p2, xres, yres);
+      
+      lineto( vec2[0], vec2[1] );
+
+   }
+}
+
+rotx(p[3],x,y,z,a)
+{
+   c = cos(a);
+   s = sin(a);
+   
+   p[0] = x; 
+   p[1] = y * c + z * s;
+   p[2] = y * -s + z * c;
+}
+
+roty(p[3],x,y,z,a)
+{
+   c = cos(a);
+   s = sin(a);
+   
+   p[0] = x * c + z* -s; 
+   p[1] = y;
+   p[2] = x * s + z * c;
+}
+
+rotz(p[3],x,y,z,a)
+{
+   c = cos(a);
+   s = sin(a);
+   
+   p[0] = x * c + y * s; 
+   p[1] = x* -s + y * c;
+   p[2] = z;
+}
+
+
+// Field of view er definert ved radianer
+Project(fov, input[3], width, height)
+{
+  aspect_w = width / tan(fov / 2);
+  aspect_h = height / tan(fov / 2);
+ 
+  if(input[2] == 0)
+    vector2(0,0);
+  else 
+    vector2( 256*(-input[0]/(input[2]-256)) +width/2, 
+             256*(input[1]/(input[2]-256)) +height/2);
+    
+    //vector2((input[0] * aspect_w) / input[2] + width / 2, (input[1] * aspect_h) / input[2] + height / 2);
+ 
+}
+
+// Field of view er definert ved radianer
+ProjectCorrect(fov, input[3], width, height)
+{
+  aspect_w = width / tan(fov / 2);
+  aspect_h = height / tan(fov / 2);
+ 
+  if(input[2] == 0)
+    vector2(0,0);
+  else 
+    vector2((input[0] * aspect_w) / input[2] + width / 2, (input[1] * aspect_h) / input[2] + height / 2);
+ 
+}
+
+vector2(x,y)
+{
+   vec2[0] = x; vec2[1] = y;
+}
+
+MultiplyMatrixVector3(mat[4][4], vec[3])
+{
+    point[0] = vec[0] * mat[0][0] + vec[1] * mat[1][0] + vec[2] * mat[2][0] + mat[3][0];
+    point[1] = vec[0] * mat[0][1] + vec[1] * mat[1][1] + vec[2] * mat[2][1] + mat[3][1];
+    point[2] = vec[0] * mat[0][2] + vec[1] * mat[1][2] + vec[2] * mat[2][2] + mat[3][2];
+}

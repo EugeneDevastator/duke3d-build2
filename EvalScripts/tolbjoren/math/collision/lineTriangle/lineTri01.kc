@@ -1,0 +1,225 @@
+struct vec{x,y,z;};
+
+static numverts = 3;
+
+
+()
+{
+   time = klock(0);
+   
+
+static vec verts[3];
+static vec myLine[2];
+static vec poly[3];
+static vec polyNormal;
+
+   verts[0].x = -2; verts[0].y = -1; verts[0].z = .5;
+   verts[1].x = 0; verts[1].y = 2; verts[1].z = .5;
+   verts[2].x = 2; verts[2].y = -1; verts[2].z = .5;
+
+   ofsx = -(mousx-xres/2)/xres/2*15;
+   ofsy = -(mousy-yres/2)/yres/2*15;
+   myLine[0].x = ofsx; myLine[0].y = 0.5 + ofsy; myLine[0].z = -.5;
+   myLine[1].x = ofsx; myLine[1].y = 0.5 + ofsy; myLine[1].z = .5 + cos(time*5)/4;
+   
+   for(i=0; i<3; i++)
+   {
+      poly[i].x = verts[i].x;
+      poly[i].y = verts[i].y;
+      poly[i].z = verts[i].z;
+   }
+   
+   vec v1; v1.x = poly[1].x - poly[0].x; v1.y = poly[1].y - poly[0].y; v1.z = poly[1].z - poly[0].z;
+   vec v2; v2.x = poly[2].x - poly[1].x; v2.y = poly[2].y - poly[1].y; v2.z = poly[2].z - poly[1].z;
+   vecCross(polyNormal,v1,v2); 
+   normalize(polyNormal);
+   
+   cls(0,0,0); clz(1e32); 
+   if(numframes == 0)
+   {
+      glEnable(GL_DEPTH_TEST); // minimal 3D setup.
+      glCullface(GL_NONE);
+   }
+   applyCamera();
+
+   
+   t = 0;
+   colliding = IntersectedPolygon(poly,myline,polynormal, t);
+   
+   moveto(0,0);
+   setcol(0xffffff);
+   if( colliding== 1 )
+   {
+      printf("\ncollided and isects at t=%g",t);
+   }
+   else
+   {
+      printf("\nNo collision...",t);
+   }
+
+   display(poly, polynormal);
+   
+   setcol(0xffff00);
+   moveto(myLine[0].x,myLine[0].y,myLine[0].z);
+   lineto(myLine[1].x,myLine[1].y,myLine[1].z);
+   
+   setcol(0xffffff); drawsph(myLine[0].x,myLine[0].y,myLine[0].z, .1);
+}
+
+applyCamera(){
+   // rotate around center.
+   static t = +PI/4+0.05;
+   if(keystatus[203]) t+= 2*PI/5 * 0.01;
+   if(keystatus[205]) t-= 2*PI/5 * 0.01;
+   spd = 2;
+   r=5;
+   offset = 0;
+   posx = -sin(t*spd) *-r + offset;
+   posy = offset;
+   posz = -cos(t*spd) *-r + offset;
+   posh = t*spd;
+   posv = pi;
+   setcam(posx,posy,posz,posh,posv); 
+}
+
+display(vec poly[3], vec polynormal)
+{ 
+   setcol(0,0,511); 
+   glBegin(GL_TRIANGLES);   
+      for(i=0; i<numverts; i++)
+      glvertex(poly[i].x, poly[i].y, poly[i].z );  
+   glEnd();
+   
+   setcol(0xffffff);
+   moveto((poly[0].x+poly[1].x+poly[2].x) / 3,(poly[0].y+poly[1].y+poly[2].y) / 3, (poly[0].z+poly[1].z+poly[2].z) / 3); 
+   lineto((poly[0].x + poly[1].x+poly[2].x) / 3+polynormal.x, (poly[0].y + poly[1].y+poly[2].y) / 3+polynormal.y, (poly[0].z + poly[1].z+poly[2].z) / 3+polynormal.z); 
+
+   
+
+}
+
+
+// TRI ISECT
+// returns 1 if collision, and changes t variable, point on line for collision
+// returns 0 if not collision
+IntersectedPolygon(vec poly[3], vec myline[2], vec polynormal, &t)
+{
+   vec lineStart; 
+   lineStart = myLine[0];
+   
+   vec lineVec; 
+   vecsub( lineVec, myLine[0], myLine[1] );
+   
+   vec planePt1; 
+   planePt1 = poly[0];
+   
+   hit = linePlaneIntersection( lineStart, lineVec, planePt1, polyNormal, t);
+   if( hit )
+   {
+      if( t < 0 || t > 1) return 0;
+      vec isectPoint;
+      
+      isectPoint.x = myLine[0].x - lineVec.x * t;
+      isectPoint.y = myLine[0].y - lineVec.y * t;
+      isectPoint.z = myLine[0].z - lineVec.z * t;
+      
+      if(InsidePolygon( poly, isectPoint)==1)
+      {
+         setcol(0xff0000); drawsph(isectPoint.x, isectPoint.y, isectPoint.z, .1);
+         return 1;
+      } 
+   }
+   return 0;
+}
+
+linePlaneIntersection(vec linePt, vec lineVec, vec planePt, vec planeNormal, &t)
+{
+   d = vecDot(lineVec,planeNormal); // u*n
+   if( fabs(d) < 1e-7) return 0; // early escape. u and v are perpendicular and will never isect.
+   vec v; v.x = linePt.x - planePt.x; v.y = linePt.y - planePt.y; v.z = linePt.z - planePt.z; // p-q
+   t = vecDot(v,planeNormal) / d; // t = ((p-q)*n) / (u*n)
+   return 1;
+}
+
+InsidePolygon( vec poly[3], vec isectPoint )
+{
+   MATCH_FACTOR = 0.9999; // floatingpoint tolerance
+   angle = 0.0;
+   vec vA;
+   vec vB;
+   
+   vertCount = 3;
+   for(i=0; i<vertCount; i++)
+   {
+      vecsub( vA, poly[i], isectPoint );
+      vecsub( vB, poly[(i+1)%vertCount], isectPoint );
+      angle += angleBetweenVectors(vA,vB);
+   }
+   if(angle >= (MATCH_FACTOR * (2.0*PI) )) return 1;
+   return 0;
+}
+
+angleBetweenVectors(vec a, vec b)
+{
+   dpr = vecDot(a,b);
+   vecMagnitude = length(a)*length(b);
+   angle = acos( dpr/vecMagnitude );
+   //if( isNan(angle ) ) return 0; // angle may become NaN if dpr and magnitude are equal. ->acos(1)
+   if( abs(angle) < 1e-7 ) return 0; // no isNan func in evaldraw.
+   return angle; 
+
+}
+
+//
+// Vector
+//
+vecScalar( vec out, vec a, s )
+{
+   out.x = a.x * s;
+   out.y = a.y * s;
+   out.z = a.z * s;
+}
+
+vecAdd( vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;   
+}
+vecSub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;   
+}
+
+vecCross( vec out, vec a, vec b)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+
+// all you need is =...
+vecSet(vec a, x,y,z){
+   a.x = x; a.y = y; a.z = z;
+}
+
+vecDot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+length( vec v )
+{
+   return sqrt( vecdot(v,v) );
+}
+
+normalize( vec v )
+{
+   len = length(v);
+   if ( len )
+   {
+      v.x /= len; v.y /= len; v.z /= len;
+   }
+}

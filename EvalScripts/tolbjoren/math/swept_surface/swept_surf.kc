@@ -1,0 +1,625 @@
+/*
+s(u,v) = h(v) + A(v)*g(u)
+
+where A is a 3x3 orthonormal mtx
+A(v) = [ h'(v) / h(v).length, r, s ] <-r og s velger du. F.eks oppvektor og en som ikke peker opp. ortho
+
+h'(v) / len normaliserer retninga
+*/
+
+static posx = 0;
+static posy = 0;
+static posz = 15;
+static posh = 0; // left right
+static posv = 1*PI;
+
+static gvec[3];
+static A[9];
+static ang=0;
+static tim,oldtim,dt;
+
+struct vec3{
+   x,y,z;
+};
+
+struct quad
+{
+   vec3 v0,v1,v2,v3;
+};
+
+static anim;
+()
+{
+   anim = mousx/xres*2*PI;
+   cls(0);
+   clz(1e32);
+   tim = klock(0);
+   dt = tim-oldtim;
+   oldtim = tim;
+   ang+=dt;
+   r = -15;
+
+   //setcam(r*sin(ang),0,r*cos(ang),ang,0);
+   playercontrols();
+   
+   
+   //drawsph(0,0,0,0.5);
+   
+   enum{segs=30};
+   rangeU = 2*PI;
+   rangeV = 2*PI;
+   
+   //ox=0; oy=0; oz=0;
+   //s(0,0,ox,oy,oz);
+
+if(0)
+{   
+lightx = -3*cos(tim*.5);
+lighty = -3*sin(tim*.5);
+lightz = 2;
+}
+setcol(255,255,255);
+drawsph(lightx,lighty,lightz,.5);
+   
+glEnable(GL_DEPTH_TEST);
+glDisable(GL_ALPHA_TEST);
+glCullface(GL_NONE);
+//glCullface(GL_FRONT);
+
+   static quad mesh[2*segs*segs];
+   meshpos = 0;
+   for(i=0; i<segs; i++)
+   {
+      //glbegin(GL_TRIANGLE_STRIP);
+      //glbegin(GL_LINE_STRIP);
+      //glBegin(GL_QUAD_STRIP);
+      
+      for(j=0; j<segs; j+=2)
+      {
+/*
+         u = i*rangeU / (segs-1.0);
+         v = j*rangeV / (segs-1.0);
+         p0x=0; p0y=0; p0z=0;
+         s(u,v,0,p0x,p0y,p0z);
+                  
+         u = (i+1)*rangeU / (segs-1.0);
+         v = (j)*rangeV / (segs-1.0);
+         p1x=0; p1y=0; p1z=0;
+         s(u,v,0,p1x,p1y,p1z);        
+*/
+         //glVertex(p0x,p0y,p0z);
+         //glVertex(p1x,p1y,p1z);          
+         
+         // slow way. store 4 pts for a quad
+         u = i*rangeU / (segs-1.0);
+         v = j*rangeV / (segs-1.0);
+         p0x=0; p0y=0; p0z=0;
+         s(u,v,0,p0x,p0y,p0z);
+         
+         mesh[meshpos].v0.x = p0x;
+         mesh[meshpos].v0.y = p0y;
+         mesh[meshpos].v0.z = p0z;
+         
+         u = (i+1)*rangeU / (segs-1.0);
+         v = (j)*rangeV / (segs-1.0);
+         p0x=0; p0y=0; p0z=0;
+         s(u,v,0,p0x,p0y,p0z);
+         
+         mesh[meshpos].v1.x = p0x;
+         mesh[meshpos].v1.y = p0y;
+         mesh[meshpos].v1.z = p0z;
+         
+         u = (i+1)*rangeU / (segs-1.0);
+         v = (j+1)*rangeV / (segs-1.0);
+         p0x=0; p0y=0; p0z=0;
+         s(u,v,0,p0x,p0y,p0z);
+         
+         mesh[meshpos].v2.x = p0x;
+         mesh[meshpos].v2.y = p0y;
+         mesh[meshpos].v2.z = p0z;
+         
+         u = (i)*rangeU / (segs-1.0);
+         v = (j+1)*rangeV / (segs-1.0);
+         p0x=0; p0y=0; p0z=0;
+         s(u,v,0,p0x,p0y,p0z);
+         
+         mesh[meshpos].v3.x = p0x;
+         mesh[meshpos].v3.y = p0y;
+         mesh[meshpos].v3.z = p0z;
+         
+         meshpos++;  
+         
+
+         u = (i+1)*rangeU / (segs-1.0);
+         v = (j+1)*rangeV / (segs-1.0);
+         p0x=0; p0y=0; p0z=0;
+         s(u,v,0,p0x,p0y,p0z);
+         
+         mesh[meshpos].v0.x = p0x;
+         mesh[meshpos].v0.y = p0y;
+         mesh[meshpos].v0.z = p0z;
+         
+         u = (i+2)*rangeU / (segs-1.0);
+         v = (j+1)*rangeV / (segs-1.0);
+         p0x=0; p0y=0; p0z=0;
+         s(u,v,0,p0x,p0y,p0z);
+         
+         mesh[meshpos].v1.x = p0x;
+         mesh[meshpos].v1.y = p0y;
+         mesh[meshpos].v1.z = p0z;
+         
+         u = (i+2)*rangeU / (segs-1.0);
+         v = (j+2)*rangeV / (segs-1.0);
+         p0x=0; p0y=0; p0z=0;
+         s(u,v,0,p0x,p0y,p0z);
+         
+         mesh[meshpos].v2.x = p0x;
+         mesh[meshpos].v2.y = p0y;
+         mesh[meshpos].v2.z = p0z;
+         
+         u = (i+1)*rangeU / (segs-1.0);
+         v = (j+2)*rangeV / (segs-1.0);
+         p0x=0; p0y=0; p0z=0;
+         s(u,v,0,p0x,p0y,p0z);
+         
+         mesh[meshpos].v3.x = p0x;
+         mesh[meshpos].v3.y = p0y;
+         mesh[meshpos].v3.z = p0z;
+         
+         meshpos++; 
+      }
+   }
+   
+   p=0;
+   for(i=0; i<meshpos; i++)
+   {
+      
+      // Calc normal
+      static v0[3];
+      static v1[3];
+      v0[0] = mesh[p].v1.x-mesh[p].v0.x;
+      v0[1] = mesh[p].v1.y-mesh[p].v0.y;
+      v0[2] = mesh[p].v1.z-mesh[p].v0.z;
+
+      v1[0] = mesh[p].v3.x-mesh[p].v0.x;
+      v1[1] = mesh[p].v3.y-mesh[p].v0.y;
+      v1[2] = mesh[p].v3.z-mesh[p].v0.z;
+      static norm[3];
+      vecCross(v0,v1,norm);
+      normalize(norm);
+            
+      //Lighting         
+      tolightVecx = lightx-mesh[p].v0.x;
+      tolightVecy = lighty-mesh[p].v0.y;
+      tolightVecz = lightz-mesh[p].v0.z;
+      
+      len = sqrt(tolightVecx^2+tolightVecy^2+tolightVecz^2);
+      tolightVecx/=len; tolightVecy/len; tolightVecz/=len;
+
+      toEyeVecx = posx-mesh[p].v0.x;
+      toEyeVecy = posy-mesh[p].v0.y;
+      toEyeVecz = posz-mesh[p].v0.z;
+      len = sqrt(toEyeVecx^2+toEyeVecy^2+toEyeVecz^2);
+      toEyeVecx/=len; toEyeVecy/len; toEyeVecz/=len;       
+      
+      nDotL = norm[0]*tolightVecx + norm[1]*tolightVecy + norm[2]*tolightVecz;
+      nDotL = max(0,nDotL);  // prevent backlighting by clamping to zero
+      // R=I-2ND
+      // R=2(ND)*N-I
+      reflectx = toLightVecx - 2* norm[0] * nDotL;
+      reflecty = toLightVecy - 2* norm[1] * nDotL;
+      reflectz = toLightVecz - 2* norm[2] * nDotL;
+      //reflectx = 2*(norm[0] * nDotL) * (norm[0]-toLightVecx);
+      //reflecty = 2*(norm[1] * nDotL) * (norm[1]-toLightVecy);
+      //reflectz = 2*(norm[2] * nDotL) * (norm[2]-toLightVecz);
+      len = sqrt(reflectx^2+reflecty^2+reflectz^2);
+      reflectx/=len; reflecty/len; reflectz/=len;
+      
+      // cSpec=  (v dot r)^mgls * spec cross mspec
+      spec = toEyeVecx*reflectx + toEyeVecy*reflecty + toEyeVecz*reflectz;
+      spec = pow(spec,-10);
+      spec = max(0,spec);
+      spec = min(spec,1);
+      //spec = 0;
+      
+      nx = (norm[0]+1)/2; ny = (norm[1]+1)/2; nz = (norm[2]+1)/2;
+      matR = 255;
+      matG = 255*0;
+      matB = 255*0;
+      
+      // Cdiff = (n dot l) * lightSrcDiff cross matDiff
+      diff = nDotL;         
+      diff = abs(diff);
+      // Clit = Cspec + Cdiff + Camb
+      // wrong do mult spc by dif i guess
+      cr = diff*spec*255 + diff*matR + 10;
+      cg = diff*spec*255 + diff*matG + 10;
+      cb = diff*spec*255 + diff*matB + 10;
+      
+      cr = min(511, 64+diff*511);
+      cg = min(511, 64+diff*511);
+      cb = min(511, 64+diff*511);
+      setcol(cr,cg,cb);
+      //setcol(255*norm[0],255*norm[1],255*norm[2]);  
+
+         
+         if(1){
+         nx = (norm[0]+1)/2; ny = (norm[1]+1)/2; nz = (norm[2]+1)/2;
+         //setcol(255*nx,255*ny,255*nz);
+         setcol(255*norm[0],255*norm[1],255*norm[2]);         
+
+         drawsph( mesh[p].v0.x, mesh[p].v0.y, mesh[p].v0.z,.01 );
+         moveto( mesh[p].v0.x, mesh[p].v0.y, mesh[p].v0.z );
+         lineto( mesh[p].v0.x+norm[0], mesh[p].v0.y+norm[1], mesh[p].v0.z+norm[2] );   
+         }
+     
+      
+      glBegin(GL_LINE_STRIP);
+      glBegin(GL_QUADS);
+      if(0)
+      {
+      glTexCoord(0,0); glVertex( mesh[p].v0.x, mesh[p].v0.y, mesh[p].v0.z );
+      glTexCoord(1,0); glVertex( mesh[p].v1.x, mesh[p].v1.y, mesh[p].v1.z );
+      glTexCoord(1,1); glVertex( mesh[p].v2.x, mesh[p].v2.y, mesh[p].v2.z );
+      glTexCoord(0,1); glVertex( mesh[p].v3.x, mesh[p].v3.y, mesh[p].v3.z );
+      }else{
+      glVertex( mesh[p].v0.x, mesh[p].v0.y, mesh[p].v0.z );
+      glVertex( mesh[p].v1.x, mesh[p].v1.y, mesh[p].v1.z );
+      glVertex( mesh[p].v2.x, mesh[p].v2.y, mesh[p].v2.z );
+      glVertex( mesh[p].v3.x, mesh[p].v3.y, mesh[p].v3.z );
+      }
+      glEnd();
+      p++;
+   }
+   
+
+   
+}
+
+
+// kurve
+/*
+hfunc(t,&x,&y,&z)
+{
+   x = 5*sin(t/2);
+   y = t;
+   z = 5*cos(t/2);
+}
+
+hderivative(t,&x,&y,&z) 
+{
+   x = cos(t/2);
+   y = 1;
+   z = -sin(t/2);
+}
+*/
+
+hfunc(t,&x,&y,&z)
+{
+   x = 2*cos(t);
+   y = 6*sin(t);
+   z = 2*t;
+}
+
+hderivative(t,&x,&y,&z) 
+{
+   x = -sin(t);
+   y = cos(t);
+   z = 2;
+}
+// Rose
+/*
+hfunc(t,&x,&y,&z)
+{
+   r = 3*sin(3*t);
+   x = 4*r*cos(t);
+   y = 4*r*sin(t);
+   z = 5*sin(t);
+}
+
+hderivative(t,&x,&y,&z) 
+{
+   x = 9*cos(t)*cos(3*t)-3*sin(t)*sin(3*t);
+   y = 3*cos(t)*sin(3*t)+9*sin(t)*cos(3*t);
+   z = 5*cos(t);
+}*/
+
+/*
+hfunc(t,&x,&y,&z)
+{
+   x = t*sin(2*t);
+   y = t*cos(2*t);
+   z = t;
+}
+
+hderivative(t,&x,&y,&z) 
+{
+   x = sin(2*t)+2*t*cos(2*t);
+   y = cos(2*t)-2*t*sin(2*t);
+   z = 1;
+}*/
+
+sinh(z){ return 0.5 * (exp(z)-exp(-z)); }
+cosh(z){ return 0.5 * (exp(z)+exp(-z)); }
+tanh(z){ return sinh(z)/cosh(z); }
+
+gear(t)
+{
+   a = 1;
+   b = 11;
+   n = 8;  
+   r = a+1/b*tanh(b*sin(n*t));
+}
+
+// sweep me plz
+gfunc(t,&x,&y,&z)
+{
+
+   r = gear(t);
+   //r = 1;
+   
+   x = r*cos(t+anim);
+   y = 0;
+   z = r*sin(t+anim);
+}
+gderivative(t,&x,&y,&z)
+{
+   //r = gear(t);
+   r = 1;
+   x =-sin(t+anim);
+   y = 0;
+   z = cos(t+anim);
+}
+
+
+gfunc(t,&x,&y,&z)
+{
+
+   r = gear(t);
+   //r = 1;
+   
+   x = r*cos(t+anim);
+   y = 0;
+   z = r*sin(t+anim);
+}
+/*
+gfunc(t,&x,&y,&z)
+{
+
+   //r = gear(t);
+   r = .5;
+   
+   x = r*cos(t+anim);
+   y = 0;
+   z = r*sin(t+anim);
+}*/
+
+// Rotasjonsmtx
+make_A_mtx(t,mtx[9])
+{
+   // finn h'(v) / (h(v).length
+   hdx=0; hdy=0; hdz=0;
+   hderivative(t,hdx,hdy,hdz);
+   len = sqrt(hdx*hdx + hdy*hdy + hdz*hdz);
+   hdx /= len; hdy /= len; hdz /= len;
+   
+   mtx[ 0] = 0;
+   mtx[ 1] = 1;
+   mtx[ 2] = 0;
+      
+   mtx[ 3] = hdx;
+   mtx[ 4] = hdy;
+   mtx[ 5] = hdz;
+   
+   mtx[ 6] = mtx[4]*mtx[1]-mtx[5]*mtx[2]; // X=YZ-ZY
+   mtx[ 7] = mtx[5]*mtx[2]-mtx[3]*mtx[1];
+   mtx[ 8] = mtx[3]*mtx[0]-mtx[4]*mtx[0];
+   
+   // correct up vec
+   mtx[ 0] = mtx[7]*mtx[5]-mtx[8]*mtx[4]; // X=YZ-ZY
+   mtx[ 1] = mtx[8]*mtx[4]-mtx[6]*mtx[5];
+   mtx[ 2] = mtx[6]*mtx[3]-mtx[7]*mtx[3];
+}
+
+
+
+s(u,v,n,&x,&y,&z)
+{
+   //h(v) + A(v)*g(u)
+   hx=0; hy=0; hz=0;
+   gx=0; gy=0; gz=0;
+   
+   if(n==0)
+   {
+      hfunc(v,hx,hy,hz ); // point on the line
+      gfunc(u,gx,gy,gz); // curve
+      make_A_mtx(v, A); // direction frame
+      gvec[0] = gx;
+      gvec[1] = gy;
+      gvec[2] = gz;
+      mx=0;
+      my=0;
+      mz=0;
+      mtx_mult_vec( A, gvec, mx,my,mz ); // transform curve to this point and orientation
+
+
+      // Add transformed curve to point
+      x = hx + mx;
+      y = hy + my;
+      z = hz + mz;
+      
+      //setcol(255,255,255);
+      //moveto(hx,hy,hz); lineto(hx+A[0],hy+A[1],hz+A[2]);
+      //moveto(hx,hy,hz); lineto(hx+A[3],hy+A[4],hz+A[5]);
+      //moveto(hx,hy,hz); lineto(hx+A[6],hy+A[7],hz+A[8]);
+      //drawsph(hx,hy,hz,.08);
+      return;
+   }
+   else if(n==1) // Get Normal, transform normal instead of point on curve.
+   {
+      hfunc(v,hx,hy,hz ); // point on the line
+      gderivative(u,gx,gy,gz); // curve tangent
+      
+      make_A_mtx(v, A); // direction frame
+      gvec[0] = gx;
+      gvec[1] = gy;
+      gvec[2] = gz;
+      mx=0;
+      my=0;
+      mz=0;
+      mtx_mult_vec( A, gvec, mx,my,mz ); // transform curve to this point and orientation      
+      // Add transformed curve to point
+      hderivative(v,hx,hy,hz); 
+
+      d0x = mx;
+      d0y = my;
+      d0z = mz;
+      
+      d1x = hx;
+      d1y = hy;
+      d1z = hz;
+      
+      // Find Surface Normal       
+      // Ikke en ekte normal?
+      static dir[3];
+      dir[0] = hx;
+      dir[1] = hy;
+      dir[2] = hz;
+
+      static tangent[3];
+      tangent[0] = mx;
+      tangent[1] = my;
+      tangent[2] = mz;    
+      
+      static normal[3];
+      vecCross(dir,tangent,normal);
+      normalize(normal); 
+      
+      x=mx;
+      y=my;
+      z=mz; 
+      
+      x=normal[0];
+      y=normal[1];
+      z=normal[2];
+    
+   }   
+}
+
+vecCross(a[3],b[3],c[3])
+{
+   c[0] = a[1]*b[2] - a[2]*b[1];
+   c[1] = a[2]*b[0] - a[0]*b[2];
+   c[2] = a[0]*b[1] - a[1]*b[0];
+}
+normalize(vec[3]){
+   rlen = 1.0/sqrt(vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2]);
+   vec[0] *= rlen;
+   vec[1] *= rlen;
+   vec[2] *= rlen;
+}
+
+
+// tilsvarer rad dottet med kolonne.
+// element00 er raden 0 i matrisen dottet med hele vec
+mtx_mult_vec(mat[9], vec[3], &x, &y, &z)
+{
+
+/* //correct
+   x = mat[0] * vec[0] + mat[1] * vec[1] + mat[2] * vec[2];
+   y = mat[3] * vec[0] + mat[4] * vec[1] + mat[5] * vec[2];
+   z = mat[6] * vec[0] + mat[7] * vec[1] + mat[8] * vec[2];  
+*/
+// looks correct
+   x = mat[0] * vec[0] + mat[3] * vec[1] + mat[6] * vec[2];
+   y = mat[1] * vec[0] + mat[4] * vec[1] + mat[7] * vec[2];
+   z = mat[2] * vec[0] + mat[5] * vec[1] + mat[8] * vec[2];  
+
+// transpose mat and mult
+   x = mat[3] * vec[0] + mat[0] * vec[1] + mat[6] * vec[2];
+   y = mat[4] * vec[0] + mat[1] * vec[1] + mat[7] * vec[2];
+   z = mat[5] * vec[0] + mat[2] * vec[1] + mat[8] * vec[2]; 
+
+//xyz yzx
+/*
+   x = mat[0] * vec[1] + mat[1] * vec[1] + mat[2] * vec[1];
+   y = mat[3] * vec[2] + mat[4] * vec[2] + mat[5] * vec[2];
+   z = mat[6] * vec[0] + mat[7] * vec[0] + mat[8] * vec[0];   
+*/
+   // 0 1 2
+   // 3 4 5
+   // 6 7 8
+
+}
+
+
+/*
+// a1 -- left matrix
+// a2 -- right matrix
+// a3 -- answer matrix
+Matrix_Mult(a1[3][3],a2[3][4],a3[3][3])
+{
+   i=0;
+   j=0;
+   k=0;
+   for(i=0; i<3; i++)
+      for(j=0; j<3; j++)
+      a3[i][j] = 0.0;
+   
+   for(i=0; i<3; i++)
+      for(j=0; j<3; j++)
+         for(k=0; k<3; k++)
+            a3[i][j] += a1[i][k] * a2[k][j];
+
+}
+*/
+
+
+// Camera and movement code taken from /games/
+//Handle input and player movement
+playercontrols()
+{
+   static oldMouseX;
+   static oldMouseY;
+   static mouseSpeedX;
+   static mouseSpeedY; 
+
+   f = .1;
+   if (keystatus[0x2a]) f /= 4;
+   if (keystatus[0x36]) f *= 4;
+   vx = (keystatus[32]-keystatus[30])*f; //D-A
+   vy = (keystatus[17]-keystatus[31])*f; //W-S  
+   vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   
+   static mat[9]; 
+   ang2mat(posh,posv,mat); // Convert angles to rotation matrix
+   
+   // find new position
+   posx += mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   posy += mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   posz += mat[2]*vx + mat[5]*vz + mat[8]*vy; 
+   // mousespeed values are tweaked for 60 fps
+   mouseSpeedX = (mousx - oldMouseX) * 0.01;
+   mouseSpeedY = (mousy - oldMouseY) * 0.01;
+   oldMouseX = mousx;
+   oldMouseY = mousy;
+   if(bstatus==1)
+   {
+      posh -= mouseSpeedX;
+      posv += mouseSpeedY;
+   }
+   // Right,down,forwards unit vectors.
+   setcam(posx,posy,posz,
+          mat[0],mat[1],mat[2],
+          mat[3],mat[4],mat[5],
+          mat[6],mat[7],mat[8]);
+}
+/* converts horizontal and vertical angles to a 3x3 rotation matrix */
+ang2mat(hang,vang,mat[9])
+{
+   mat[0] = cos(hang); mat[1] = 0; mat[2]=-sin(hang);
+   mat[6] = cos(vang)*sin(hang); mat[7] = sin(vang); mat[8]=cos(vang)*cos(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}

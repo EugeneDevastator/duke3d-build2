@@ -1,0 +1,61 @@
+()
+
+
+cls(0); clz(1e32); glCullFace(GL_NONE);
+
+ang = mousx/xres*2*PI;
+r = -5;
+setcam( r*sin(ang),0,r*cos(ang),ang,0);
+
+
+
+radius = 1;
+length = 2.5;
+
+if(1)
+{
+   segs = 18;
+   a=0.0;
+   ainc = 2.0*PI/segs;
+   moveto(radius,0,length);
+   for(i=0; i<segs+1; i++)
+   {
+      x = radius*cos(a);
+      y = radius*sin(a);
+      lineto(x,y,length);
+      a+=ainc;
+   }
+   
+   segs = 10;
+   a=0.0;
+   ainc = 2.0*PI/segs;
+   
+   for(i=0; i<segs+1; i++)
+   {
+      x = radius*cos(a);
+      y = radius*sin(a);
+      moveto(0,0,0);
+      lineto(x,y,length);
+      a+=ainc;
+   }   
+
+}
+
+else
+{
+   segs = 18;
+   a=0.0;
+   ainc = 2.0*PI/segs;
+   
+   glBegin(GL_TRIANGLE_FAN);
+   glVertex(0,0,0);
+   for(i=0; i<segs+1; i++)
+   {
+      x = radius*cos(a);
+      y = radius*sin(a);
+      
+      glTexCoord(x,y); glVertex(x,y,length);
+      a+=ainc;
+   }
+   glEnd();
+}

@@ -1,0 +1,40 @@
+()
+{
+   static px[24] = {-1,+1,+1,-1,+1,-1,-1,+1,-1,-1,-1,-1,
+                    +1,+1,+1,+1,-1,+1,+1,-1,-1,+1,+1,-1};
+   static py[24] = {-1,-1,+1,+1,-1,-1,+1,+1,-1,-1,+1,+1,
+                    -1,-1,+1,+1,-1,-1,-1,-1,+1,+1,+1,+1};
+   static pz[24] = {-1,-1,-1,-1,+1,+1,+1,+1,+1,-1,-1,+1,
+                    -1,+1,+1,-1,+1,+1,-1,-1,-1,-1,+1,+1};
+   static rx[24], ry[24], rz[24], tottim = 0;
+   cls(0); clz(1e32); glsettex("cloud.png");
+           
+   tim = klock();
+   
+   c = cos(tim); s = sin(tim);
+   for(i=24-1;i>=0;i--)
+   {
+         //Rot xz
+      rx[i] = c*px[i] - s*pz[i];
+      rz[i] = c*pz[i] + s*px[i];
+      
+         //Rot yz
+      ry[i] = c*py[i] - s*rz[i];
+      rz[i] = c*rz[i] + s*py[i];
+      
+      //ry[i] += (mousx-xres/2)*.01;
+      rz[i] += 4; //(mousy-yres/2)*.01+2; //fmod(t0,4) + 2;
+   }
+   glbegin(GL_QUADS);
+   for(j=0;j<24;j+=4)
+   {
+      gltexcoord(0,0); glvertex(rx[j  ],ry[j  ],rz[j  ]);
+      gltexcoord(1,0); glvertex(rx[j+1],ry[j+1],rz[j+1]);
+      gltexcoord(1,1); glvertex(rx[j+2],ry[j+2],rz[j+2]);
+      gltexcoord(0,1); glvertex(rx[j+3],ry[j+3],rz[j+3]);
+   }
+   
+   tend = klock(); tottim += tend-tim;
+   setfont(9,16); setcol(0xffffff);
+   moveto(0,0); printf("%.2fms",tottim*1000/(numframes+1));
+}

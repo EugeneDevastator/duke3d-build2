@@ -1,0 +1,51 @@
+RAYGAME - POTATO INSTRUCTIONS
+
+YES, IT IS ALREADY COMPILED.
+
+The built game binary is here:
+
+RayLua/build/RayGame
+
+What you need on this Arch Linux machine:
+
+1. raylib installed
+2. OpenGL working
+3. the files already inside this repo
+
+How to run it from the repo root:
+
+cd /home/jaba/Documentos/raygame/duke3d-build2-main
+./RayLua/build/RayGame
+
+If it opens, you are done.
+
+If you want to rebuild it later:
+
+cd /home/jaba/Documentos/raygame/duke3d-build2-main
+cmake -S RayLua -B RayLua/build -G Ninja -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DDISABLE_LUA=ON -DBUILD_DUKEGAME=OFF
+cmake --build RayLua/build -j4
+
+Important:
+
+- This verified build is RayGame, not DukeGame.
+- Lua is disabled in this Linux build.
+- Shaders are copied into RayLua/build/Shaders automatically.
+- script.lua is copied into RayLua/build automatically.
+
+If you want to run it from inside the build folder instead:
+
+cd /home/jaba/Documentos/raygame/duke3d-build2-main/RayLua/build
+./RayGame
+
+If it says a library is missing, install:
+
+- raylib
+- gcc
+- cmake
+- ninja
+
+Quick summary:
+
+- Already compiled: yes
+- Binary: RayLua/build/RayGame
+- Run command: ./RayLua/build/RayGame

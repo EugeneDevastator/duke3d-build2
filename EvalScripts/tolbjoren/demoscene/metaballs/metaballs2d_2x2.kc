@@ -1,0 +1,146 @@
+
+static screen_width = 400;
+static screen_height = 400;
+static width=400;
+static x_offset_table[5*400];
+static y_offset_table[5*400];
+static blobx[5];
+static bloby[5];
+static number_of_blobs = 4;
+() 
+{
+   if(numframes==0)
+   { 
+   }
+   cls(0);   
+   blobs(); //Calc force field
+   //blobx[0] = mousx;
+   //bloby[0] = mousy;
+   // Move the blobs lissajous style. 3:2, 3:4, 5:4, 5:6, 9:8
+   spd = numframes/1200;
+   x = screen_width/2;
+   y = screen_height/2;
+   s = 50; a=3*s; b=4*s;
+   blobx[0] = x + a * sin(a*spd);
+   bloby[0] = y + b * cos(b*spd);
+   s = 20; a=5*s; b=4*s;
+   blobx[1] = x + -a * sin(a*spd);
+   bloby[1] = y + b * cos(b*spd);
+   s = 25; a=5*s; b=6*s;
+   blobx[2] = x + a * sin(a*spd);
+   bloby[2] = y + -b * cos(b*spd);
+   s = 10; a=9*s; b=8*s;
+   blobx[3] = x + -a * sin(a*spd);
+   bloby[3] = y + -b * cos(b*spd);
+   //blobx[4] = x + a * sin(a*spd + pi/2);
+   //bloby[4] = y + b * cos(b*spd);
+}
+
+blobs()
+{
+   start = klock();
+   // First: compute those tables:
+   
+   // Go through every blob
+   for(i=0; i<number_of_blobs; i++)
+   {
+   
+       // Compute the x-offset2 table:
+       for(x=0; x<screen_width; x++)
+       {
+           x_offset_table[i*width+x] = (x - blobx[i] )^2;
+       }
+   
+       // Compute the y-offset2 table:
+       for(y=0; y<screen_width; y++)
+       {
+           y_offset_table[i*width+y] = (y - bloby[i] )^2;
+       }
+   }
+
+
+   // Now we have those tables, we can use them to calculate the
+   // total multiplied distance2 value.
+   for( y=0; y<screen_height; y++)
+   {
+      for(x=0; x<screen_width; x++)
+      {
+         // Calculate the multiplied distance2:   
+         // Set it to one initially.
+         // This is so that the first time we multiply it
+         // by the first value it becomes that value.
+         
+        distance_squared = 1;
+
+        for(i=0; i<number_of_blobs; i++)
+        {
+            distance_squared=distance_squared*(x_offset_table[i*width+x]+y_offset_table[i*width+y] );
+         
+        }
+
+        // Turn it into a pixel brightness:
+        pixel_brightness = 512 - (distance_squared / 100000000000000);
+        // Notice the HUGE division number!
+
+        // Clip it into the range 0?255:
+        if(pixel_brightness < 0) 
+            pixel_brightness = 0;
+
+        if(pixel_brightness > 255)
+            pixel_brightness = 255;
+
+        // Set the pixel on the screen:
+        //buf[x] = rgb2hex(pixel_brightness, pixel_brightness, pixel_brightness);
+        setcol(pixel_brightness, pixel_brightness, pixel_brightness);
+        setpix(x,y);
+       }
+       //sethlin(0,y,buf,width);
+   }
+   setcol(0xffffff);
+   end = klock() - start;
+   moveto(0,0);
+   setfont(9,16);
+   printf("performance=%g", 1/end);
+   
+   setcol(0xff0000);
+   moveto(70,200);
+   setfont(36,64,0);
+   printf("ITS-ALIVE!");
+}
+
+
+
+
+hsv_to_rgb(h,s,v){
+   if( V == 0 )
+   {
+      R = 0; G = 0; B = 0;
+   }
+   else if( S == 0 )
+   {
+     R = V; G = V; B = V;
+   }
+   else
+   {
+       hf = H / 60;
+          i  = floor( hf );
+       f  = hf - i;
+       pv  = V * ( 1 - S );
+       qv  = V * ( 1 - S * f );
+       tv  = V * ( 1 - S * ( 1 - f ) );
+     /*
+      switch( i )
+      {    
+      case 0: R = V; G = tv; B = pv; break;
+      case 1: R = qv; G = V; B = pv; break;
+      case 2: R = pv; G = V; B = tv; break;
+      case 3: R = pv; G = qv; B = V; break;
+      case 4: R = tv; G = pv; B = V; break;
+      case 5: R = V; G = pv; B = qv; break;
+      case 6: R = V; G = tv; B = pv; break;
+      case -1: R = V; G = pv; B = qv; break;
+      }
+      */
+      }
+      
+}

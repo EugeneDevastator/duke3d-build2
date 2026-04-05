@@ -1,0 +1,130 @@
+// Closest point on line
+
+struct vec
+{
+   x,y,z;
+}
+
+()
+{
+   cls(0); clz(1e32);
+   glEnable(GL_DEPTH_TEST);
+   
+   static vec a;
+   vecset(a, -1, 1,0);
+   
+   static vec b;
+   vecset(b, 1, -1,0);
+   
+   static vec p;
+   vecset(p, 4 * (mousx/xres - .5), 4 * (mousy/yres - .5), 0);
+   
+   setcol(0xffffff);
+   moveto(a.x, a.y, a.z);
+   lineto(b.x, b.y, b.z);
+   r = 0.1;
+   rsq = r^2;   
+
+   static vec closest;
+   vecset(closest, p);
+   closestPtOnLine(p,a,b,closest);
+
+   static vec delta;
+   vecSub(delta, p, closest);
+   d = length(delta); 
+
+   if (d < 2*r )
+   {
+      setcol(255,0,0);   
+   }
+   drawsph(p.x,p.y,p.z,r);
+   
+   setcol(0,0,255); drawsph(closest.x,closest.y,closest.z,r);
+   
+   r = -2;
+   ang = 0;// mousx/xres*2*PI;
+   setcam( sin(ang)*r, 0, cos(ang)*r, ang, 0);
+   
+   
+   moveto(0,0);
+   printnum(d);
+}
+
+closestPtOnLine( vec point, vec a, vec b, vec out)
+{
+   // from A to P
+   vec aTop;
+   vecsub( aTop, point, a );
+   // From A to B
+   vec n;
+   vecsub(n, b, a);
+   // normalize Dir A to B
+   distAB = length(n);
+   
+   if( distAB > 0.0 ){
+      vecset( n, n.x/distAb, n.y/distAb, n.z/distAb );
+   }
+   
+   t = dot(n,aTop); // proj v1 onto norm
+   
+   if( t<= 0){ // A is closest
+      vecset(out,a); 
+      return;
+   }
+   
+   if( t>= distAB){ // B is closest
+      vecset(out,b); 
+      return;
+   }
+   
+   // create new vec, closest pt
+   vecset(out, a.x + n.x*t, 
+            a.y + n.y*t, 
+            a.z + n.z*t); 
+   return;
+}
+
+vecScalar( vec out, vec a, s )
+{
+   out.x = a.x * s;
+   out.y = a.y * s;
+   out.z = a.z * s;
+}
+
+vecAdd( vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;   
+}
+vecSub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;   
+}
+
+vecCross( vec out, vec a, vec b)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+
+vecset(vec a, x,y,z){
+   a.x = x; a.y = y; a.z = z;
+}
+vecset(vec a, vec other){
+   a.x = other.x; a.y = other.y; a.z = other.z;
+}
+
+
+dot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+length( vec v )
+{
+   return sqrt( dot(v,v) );
+}

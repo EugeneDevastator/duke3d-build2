@@ -1,0 +1,576 @@
+
+enum{maxpts=2000};
+static numpts =0;
+static ptc[maxpts];
+static ptx[maxpts];
+static pty[maxpts];
+static ptz[maxpts];
+static ptParent[maxpts];
+
+//static graph[maxpts][maxpts];
+
+enum{GRIDSIZ=128};
+static particleX,particleY,particleZ;
+static voxel[GRIDSIZ][GRIDSIZ][GRIDSIZ]; // bruteforce voxel structure. There are structures that use less mem.
+
+enum{XYZ_FREEDOM=0, SLANT_FREEDOM=1, GREAT_FREEDOM=2, UBER_GREAT_FREEDOM=3  };
+
+static time = 0;
+static freedom = UBER_GREAT_FREEDOM;
+static finish = 0;
+static maxiters = 80000;
+
+static renderSpheres = -1;
+
+static camDist = 10; // increase with size
+
+struct p3d_t{x,y,z;};
+static mat[9]; static p3d_t cam; 
+
+(){   
+   if(numframes==0){ reset();  }
+   time = klock(0);
+   if(finish != 1) iterateDLA();
+   render();
+   if(keystatus[57]==1) {keystatus[57]=0; reset();}
+}
+
+iterateDLA(){
+   for(i=0; i<maxiters; i++)
+   {
+      if(voxel[particleX][particleY][particleZ] == 0) // not allready occupied.
+      if(particleX > 1 && particleX < GRIDSIZ-1)
+      if(particleY > 1 && particleY < GRIDSIZ-1)
+      if(particleZ > 1 && particleZ < GRIDSIZ-1)
+      {
+         x = particleX;
+         y = particleY;
+         z = particleZ;
+         parent = -1;
+         
+         hasNeighbour = 0;
+         if( freedom == XYZ_FREEDOM )
+         {
+            if     ( voxel[x][y][z-1] > 0 ){ parent = voxel[x][y][z-1]; hasNeighbour = 1;}
+            else if( voxel[x][y][z+1] > 0 ){ parent = voxel[x][y][z+1]; hasNeighbour = 1;}
+            else if( voxel[x][y-1][z] > 0 ){ parent = voxel[x][y-1][z]; hasNeighbour = 1;}
+            else if( voxel[x][y+1][z] > 0 ){ parent = voxel[x][y+1][z]; hasNeighbour = 1;}
+            else if( voxel[x-1][y][z] > 0 ){ parent = voxel[x-1][y][z]; hasNeighbour = 1;}
+            else if( voxel[x+1][y][z] > 0 ){ parent = voxel[x+1][y][z]; hasNeighbour = 1;}
+
+         }
+         else if( freedom == SLANT_FREEDOM )
+         {
+            hasNeighbour = 0; //try to disprove it has a neighbour
+            breakAll = 0;
+            
+            for(signx=-1; signx <= 1; signx++){
+               for(signy=-1; signy <= 1; signy++){
+                  signz = 0;
+                  if(signx != 0 && signy != 0){ // dont check self
+                     if( voxel[x+signx][y+signy][z+signz] > 0 ) // found neighbour!!
+                     {
+                        hasNeighbour = 1; // got what we need, now escape those loops:
+                        parent = voxel[x+signx][y+signy][z+signz]; // who's you daddy?
+                        breakAll = 1;
+                        break;
+                     }
+                  }                       
+               } //ey
+               if(breakAll==1)break;
+            } //ex
+            
+            for(signx=-1; signx <= 1; signx++){
+               for(signz=-1; signz <= 1; signz++){
+                  signy = 0;
+                  if(signx != 0 && signz != 0){ // dont check self
+                     if( voxel[x+signx][y+signy][z+signz] > 0 ) // found neighbour!!
+                     {
+                        hasNeighbour = 1; // got what we need, now escape those loops:
+                        parent = voxel[x+signx][y+signy][z+signz]; // who's you daddy?
+                        breakAll = 1;
+                        break;
+                     }
+                  }                       
+               } //ey
+               if(breakAll==1)break;
+            } //ex
+            
+            for(signy=-1; signy <= 1; signy++){
+               for(signz=-1; signz <= 1; signz++){
+                  signx = 0;
+                  if(signy != 0 && signz != 0){ // dont check self
+                     if( voxel[x+signx][y+signy][z+signz] > 0 ) // found neighbour!!
+                     {
+                        hasNeighbour = 1; // got what we need, now escape those loops:
+                        parent = voxel[x+signx][y+signy][z+signz]; // who's you daddy?
+                        breakAll = 1;
+                        break;
+                     }
+                  }                       
+               } //ey
+               if(breakAll==1)break;
+            } //ex
+            
+
+         }
+         else if( freedom == GREAT_FREEDOM ) 
+         {
+            hasNeighbour = 0; //try to disprove it has a neighbour
+            breakAll = 0;
+
+            if     ( voxel[x][y][z-1] > 0 ){ parent = voxel[x][y][z-1]; hasNeighbour = 1;}
+            else if( voxel[x][y][z+1] > 0 ){ parent = voxel[x][y][z+1]; hasNeighbour = 1;}
+            else if( voxel[x][y-1][z] > 0 ){ parent = voxel[x][y-1][z]; hasNeighbour = 1;}
+            else if( voxel[x][y+1][z] > 0 ){ parent = voxel[x][y+1][z]; hasNeighbour = 1;}
+            else if( voxel[x-1][y][z] > 0 ){ parent = voxel[x-1][y][z]; hasNeighbour = 1;}
+            else if( voxel[x+1][y][z] > 0 ){ parent = voxel[x+1][y][z]; hasNeighbour = 1;}
+            
+            if(hasNeighbour==0){
+            for(signx=-1; signx <= 1; signx++){
+               for(signy=-1; signy <= 1; signy++){
+                  signz = 0;
+                  if(signx != 0 && signy != 0){ // dont check self
+                     if( voxel[x+signx][y+signy][z+signz] > 0 ) // found neighbour!!
+                     {
+                        hasNeighbour = 1; // got what we need, now escape those loops:
+                        parent = voxel[x+signx][y+signy][z+signz]; // who's you daddy?
+                        breakAll = 1;
+                        break;
+                     }
+                  }                       
+               } //ey
+               if(breakAll==1)break;
+            } //ex
+            
+            for(signx=-1; signx <= 1; signx++){
+               for(signz=-1; signz <= 1; signz++){
+                  signy = 0;
+                  if(signx != 0 && signz != 0){ // dont check self
+                     if( voxel[x+signx][y+signy][z+signz] > 0 ) // found neighbour!!
+                     {
+                        hasNeighbour = 1; // got what we need, now escape those loops:
+                        parent = voxel[x+signx][y+signy][z+signz]; // who's you daddy?
+                        breakAll = 1;
+                        break;
+                     }
+                  }                       
+               } //ey
+               if(breakAll==1)break;
+            } //ex
+            
+            for(signy=-1; signy <= 1; signy++){
+               for(signz=-1; signz <= 1; signz++){
+                  signx = 0;
+                  if(signy != 0 && signz != 0){ // dont check self
+                     if( voxel[x+signx][y+signy][z+signz] > 0 ) // found neighbour!!
+                     {
+                        hasNeighbour = 1; // got what we need, now escape those loops:
+                        parent = voxel[x+signx][y+signy][z+signz]; // who's you daddy?
+                        breakAll = 1;
+                        break;
+                     }
+                  }                       
+               } //ey
+               if(breakAll==1)break;
+            } //ex
+            } // end still not found neighbour   
+         
+         }         
+         else if( freedom == UBER_GREAT_FREEDOM ) // 3x3 cube - where particle is (0,0,0)
+         {    
+      // could unroll this loop for speed...
+            hasNeighbour = 0; //try to disprove it has a neighbour
+            breakAll = 0;
+            
+         // try limiting the growth dir by changing loop limits in 1 axis
+         // can make it grow upwards like a tree. or lighning bolt..
+            for(signx=-1; signx <= 1; signx++)
+            {
+               for(signy=-1; signy <= 1; signy++)
+               {
+                  for(signz=-1; signz <= 1; signz++)
+                  {
+                     if(signx != 0 && signy != 0 && signz != 0) // dont check self
+                     {
+                        if( voxel[x+signx][y+signy][z+signz] > 0 ) // found neighbour!! yay
+                        {
+                           hasNeighbour = 1; // got what we need, now escape those loops:
+                           parent = voxel[x+signx][y+signy][z+signz];
+                           breakAll = 1;
+                        }
+                     }
+                     if(breakAll==1) break;
+                  } //ez
+                  if(breakAll==1) break;
+               } //ey
+               if(breakAll==1)break;
+            } //ex
+
+         } 
+       
+         if(hasNeighbour)
+         { 
+            // Set Color
+            hue = 360 * numpts/maxpts;
+            r=0; g=0; b=0;
+            hsv_to_rgb(hue % 360,1,1,r,g,b);
+            voxel[particleX][particleY][particleZ] = numpts; // set occupied by this point
+            
+            // Add point to array.
+            if(numpts < maxpts)
+            {
+               if(particleZ-GRIDSIZ/2 < camDist) camDist = particleZ-GRIDSIZ/2;
+               ptc[numpts] = rgb(r,g,b);
+               oneover = 1/GRIDSIZ;
+               ptx[numpts] = 40*( (particleX-GRIDSIZ/2) *oneover);
+               pty[numpts] = 40*( (particleY-GRIDSIZ/2) *oneover);
+               ptz[numpts] = 40*( (particleZ-GRIDSIZ/2) *oneover);
+               ptParent[numpts] = parent;
+               numpts++;
+            }
+            
+            // stop when hit border
+            if(particleX < 10 || particleX > GRIDSIZ-10) finish = 1;
+            if(particleY < 10 || particleY > GRIDSIZ-10) finish = 1;
+            if(particleZ < 10 || particleZ > GRIDSIZ-10) finish = 1;
+            
+            // reset pos
+            setRandomParticle();
+         }
+   }   
+   else
+   {
+      setRandomParticle();
+   }
+
+   moveParticle();
+   } //end iters loop
+
+}
+
+reset(){
+      camdist = 10;
+      numpts = 0;
+      finish = 0;
+      iters = 0;
+
+      for(i=0; i<GRIDSIZ; i++)
+      for(j=0; j<GRIDSIZ; j++)
+      for(k=0; k<GRIDSIZ; k++){
+         voxel[i][j][k] = 0;
+      }
+    
+      // Re-seed  . Create a point in center   
+      center = GRIDSIZ/2;
+      voxel[center][center][center] = rgb(255,255,255);
+      setRandomParticle();
+}
+
+render(){
+   cls(0); clz(1e32);
+   
+   //camDist = -20;
+   cameraAng = time*2; //2*PI*mousx/xres;
+   //setcam( camDist*sin(cameraAng), 0, camDist*cos(cameraAng),cameraAng,0 );
+   updateCamera();
+   
+   for(i=0; i<numpts; i++){
+      parent = ptParent[i];
+      if(parent > -1)
+      {
+         //thick = .05;
+         thick = min(.1,max(0.05, exp(-i/MAXPTS*10)*numpts/maxpts));
+         setcol(ptc[i]);
+         //moveto(ptx[i], pty[i], ptz[i]); lineto(ptx[parent], pty[parent], ptz[parent] );
+         drawcone(ptx[i], pty[i], ptz[i], thick, ptx[parent], pty[parent], ptz[parent], thick );
+      }
+   }
+
+   if(renderSpheres == 1)
+   for(i=0; i<numpts; i++){
+      setcol(ptc[i]);
+      drawsph(ptx[i], pty[i], ptz[i], .1);
+   }
+   //setcol(0xffffff);
+   //drawsph(particleX,particleY,particleZ, 1);
+   
+   nx = xres/100;
+   ny = yres/100;
+   
+   
+
+   
+   setcol(255,255,255);
+   
+   moveto(nx*25,ny*3); setfont(1.5*nx,6*ny,-1); printf("Diffusion Limited Aggregation");
+   setfont(12,16);
+   printf("\n\n\nReset = SPACEBAR");
+   printf("\n\npts used %.1f percent", numpts/maxpts*100);
+   
+   maxiterSlider = maxiters / 1000;
+   setfont(8,12);
+   setcol(255,255,255); moveto(nx*15, ny*80); printf("Speed:"); sliderAdvanced(1,maxiterSlider,0,100,nx*15, ny*85, 100);
+   maxiters = max(1000,maxiterSlider * 1000); 
+   
+   freedomSlider = freedom;
+   setcol(255,255,255); moveto(nx*15, ny*92); printf("freedom of movement:"); sliderAdvanced(0,freedomSlider,0,3,nx*15, ny*95, 100);
+   freedom = int(freedomSlider);
+   
+   if(freedom == XYZ_FREEDOM ) printf("\nfreedom type = XYZ");
+   if(freedom == SLANT_FREEDOM ) printf("\nfreedom type = SLANT");
+   if(freedom == GREAT_FREEDOM ) printf("\nfreedom type = GREAT");
+   if(freedom == UBER_GREAT_FREEDOM ) printf("\nfreedom type = UBER GREAT");
+   
+   if(btn(0,90,30,25,"toggle\nspheres") == 1) renderSpheres *=-1;
+   
+}
+
+moveParticle(){
+   //particleX += cos(rnd+time%1)/4;
+   //particleY += sin(rnd+time%1)/4;
+   //particleZ += sin(rnd+time%1)/4;
+            
+   // organic movement, fast!
+   /*
+   particleX += nrnd;
+   particleY += nrnd;
+   particleZ += nrnd;
+   */
+   
+   
+   dir = int(rnd*6);
+   if(dir==0){ particleX++; }
+   else if(dir==1){ particleX--; }   
+   else if(dir==2){ particleY++; }
+   else if(dir==3){ particleY--; }
+   else if(dir==4){ particleZ++; }
+   else if(dir==5){ particleZ--; }
+   
+   if(particleX < 0 || particleX > GRIDSIZ || 
+      particleY < 0 || particleY > GRIDSIZ || 
+      particleZ < 0 || particleZ > GRIDSIZ){
+         setRandomParticle();// if out of grid, reset pos.
+   }   
+}
+
+setRandomParticle()
+{
+   //particleX = min(GRIDSIZ-10, max(10, rnd*GRIDSIZ ));
+   //particleY = min(GRIDSIZ-10, max(10, rnd*GRIDSIZ )); // START WITHIN
+   //particleZ = min(GRIDSIZ-10, max(10, rnd*GRIDSIZ ));
+   
+   //if(rnd > .5) particleX = GRIDSIZ-20; else particleX = 20;
+   //if(rnd > .5) particleY = GRIDSIZ-20; else particleY = 20; // START ON EDGES, square
+   //if(rnd > .5) particleZ = GRIDSIZ-20; else particleZ = 20;
+
+   pointOnSphere(GRIDSIZ-5,particleX,particleY,particleZ);  
+}
+
+
+hsv_to_rgb(h,s,v,&r,&g,&b){ 
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   r=int(r*255);
+   g=int(g*255);
+   b=int(b*255);
+}
+
+
+sliderAdvanced(sliderNum, &value, minval, maxval, x, y, length)
+{
+   intrinsicRatio = (maxval-minval)/(length-0); // intrinsicRatio = (maxvalue-minvalue)/(endpoint2-endpoint1)
+   sliderval = (value-minval) / intrinsicRatio;
+   slider(sliderNum,sliderval,x,y,length); 
+   value = (sliderval) * intrinsicRatio + minval; // Value = (thisPoint - endPoint1) * intrinsicRatio + minValue
+   //printf("\n intRatio:%g", intrinsicRatio);
+   //printf("\nvalue=%.3f", value);
+   moveto(x+length+5,y-5);
+   setfont(8,12); printf("value=%g",value);
+}
+
+slider(sliderNum,&value,x,y,length)
+{
+   enum{numSliders=10};
+   static mouseLock[numSliders];
+   // Constructor, set slider to mid position
+   if(numframes==0)
+   {
+      //value = .5 * length; // this is what makes the adv slider work. :S
+      mouseLock[sliderNum] = 0;
+   }  
+   // Draw slider
+   setcol(255,255,255);
+   moveto(x,y);
+   lineto(x+length,y);
+   drawsph(x+value,y,-10);
+   //moveto(x+length+5,y-5);
+   //setfont(8,12); printf("value=%g",value);
+   
+   // mouse input
+   //mouseValue = mousx/(xres/2)-1;
+
+   // Check if anyone else has lock, if so exit.
+   if(mouseLock[sliderNum] == 0)
+   for(i=0; i<numSliders; i++)
+   {
+      if(i==sliderNum) continue; // if we have lock no problem
+      if(mouseLock[i]) return; // someone else has lock
+   }   
+
+   if(bstatus==1)
+   {
+      mx = mousx; my = mousy; 
+      if(mouseLock[sliderNum]) // mouse has lock-on, move slider
+      {
+         setcol(255,0,0);
+         drawsph(x+value, y,-5);
+         if(mx <= (x+length) && mx >= x) // limit movement to slider line
+         {
+            intrinsicRatio = (length-0)/( (length+x)-x);
+            value = ( mx-x)*intrinsicRatio + 0;
+         }
+         else if(mx > (x+length) )
+         {
+            value = length;
+         }
+         else if(mx < x)
+         {
+            value = 0;
+         }
+      }
+      else // check for collision
+      {
+         if( isColliding(mx,my,x+value,y,10) ) mouseLock[sliderNum] = 1; 
+      }
+   }
+   else // mouse released
+   {
+      mouseLock[sliderNum] = 0;
+   }
+
+}
+
+isColliding(x1,y1,x2,y2,radius)
+{
+   if((x1-x2)^2 + (y1-y2)^2 < radius^2 ) return 1;
+   return 0;
+}
+
+random(lo,hi)
+{
+   range = hi-lo;
+   return lo + rnd*range;
+}
+
+pointOnSphere(radius,&x,&y,&z) {
+  z = random(-radius, radius);
+  radius_sq = radius * radius;
+  zsq = z * z;
+  theta = random(0, 2*PI);
+  x = sqrt(radius_sq - zsq) * cos(theta);
+  y = sqrt(radius_sq - zsq) * sin(theta);
+}
+
+
+// on/off
+// text
+// x,y, w, h,
+btn(num,x,y,radius,$txt)
+{
+   enum{numButtons=10};
+   static buttonActive[numButtons];
+   
+   if(numframes==0)
+   {
+      for(i=0; i<numButtons; i++) buttonActive[i] = -1;
+   }
+   setcol(0xff);
+   if(buttonActive[num]==1) drawsph(x,y,radius);
+   else drawsph(x,y,-radius);
+   setcol(0xffffff);
+   moveto(x-radius/1.3,y-radius/2); printf(txt);  
+   
+   if(bstatus==1)
+   if( isColliding(x,y,mousx,mousy,radius) )
+   {
+      buttonActive[num] = -buttonActive[num];
+      bStatus = 0; return 1;
+   }
+   return 0;
+}
+
+/* gets the player controls and sets global camera variables. */
+updateCamera()
+{     
+   // horiz and vertical heading (euler angles)  
+   static posh = -PI/2; // left right
+   static posv = -PI/2 - PI/8;
+
+   playercontrols(cam,posh,posv);
+   //if(posv > 1.5) posv = 1.5;
+   //if(posv < -1.5) posv = -1.5;
+   setcam(cam.x,cam.y,cam.z,posh,posv);
+}
+// Camera and movement code taken from /games/
+//Handle input and player movement
+playercontrols(p3d_t campos,&posh,&posv)
+{
+   static oldMouseX;
+   static oldMouseY;
+   static mouseSpeedX;
+   static mouseSpeedY; 
+
+   f = .1;
+   if (keystatus[0x2a]) f *= 4;
+   if (keystatus[0x36]) f *= 8;
+   vx = (keystatus[32]-keystatus[30])*f; //D-A
+   vy = (keystatus[17]-keystatus[31])*f; //W-S  
+   vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   
+   ang2mat(posh,posv,mat);
+   newvx = mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   newvy = mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   newvz = mat[2]*vx + mat[5]*vz + mat[8]*vy; 
+   d = 1/12; 
+   campos.x+=newvx;
+   campos.y+=newvy;
+   campos.z+=newvz;
+   // mousespeed values are tweaked for 60 fps
+   mouseSpeedX = (mousx - oldMouseX) * 0.01;
+   mouseSpeedY = (mousy - oldMouseY) * 0.01;
+   oldMouseX = mousx;
+   oldMouseY = mousy;
+   if(bstatus==2)
+   {
+      posh -= mouseSpeedX;
+      posv += mouseSpeedY;
+   }
+}
+/* converts horizontal and vertical angles to a 3x3 matrix */
+ang2mat(hang,vang,mat[9])
+{
+   mat[6] = cos(vang)*sin(hang); mat[0] = cos(hang);
+   mat[7] = sin(vang);           mat[1] = 0;
+   mat[8] = cos(vang)*cos(hang); mat[2] =-sin(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}

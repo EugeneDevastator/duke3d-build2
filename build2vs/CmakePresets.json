@@ -1,0 +1,34 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "win32cfg",
+      "displayName": "Build-2 by Ken",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "Win32",
+      "cacheVariables": {
+        "CMAKE_POLICY_VERSION_MINIMUM": "3.5"
+      },
+      "vendor": {
+        "jetbrains.com/clion": {
+          "toolchain": "Visual Studio"
+        }
+      },
+      "binaryDir": "${sourceDir}/bin"
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "RelDeb",
+      "displayName": "Build-2 by Ken",
+      "configurePreset": "win32cfg",
+      "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "Debug",
+      "displayName": "Build-2 by Ken",
+      "configurePreset": "win32cfg",
+      "configuration": "Debug"
+    }
+  ]
+}

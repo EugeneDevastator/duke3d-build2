@@ -1,0 +1,102 @@
+// USe a white pixel as texture 
+// could also use drawspr
+
+enum{W=256, H=256};
+//enum{W=5, H=5};
+//static whiteTexture;
+()
+{
+  static buf[1][1]; 
+  static buf2[W][H]; 
+
+  t = klock()*5; 
+
+   //cls();
+   if(numframes==0)
+   {
+      //glCullFace(GL_BACK); 
+      //glDisable(GL_ALPHA_TEST);
+      glDisable(GL_DEPTH_TEST); //overwrite
+      
+      //buf[0][0] = rgb(255,255,255);
+      //whiteTexture = glsettex(buf,1,1);
+      //glremovetex(texhandle);
+   }
+   
+   for(x=0; x<W; x++)
+   for(y=0; y<H; y++)
+   {
+      //f = ((x)^p+(y)^p)*2*PI/W+t;
+      //sine = 2+sin(f);
+      sine = 2+sin(x*1*PI/h*2+t);
+      sine2 = 2+sin(y*2*PI/h*2+t);
+      sine3 = 2+sin(x*2*PI/w*2+t);
+      c = rgb( sine*64, sine2*64, sine3*64); //rgb(rnd*255,rnd*255,rnd*255);
+      /*
+      zoom = 20;
+      c = rgb( noise( (w/sine) /zoom +t, (w/sine2) /zoom)*255 , 
+      noise( (w/sine3) /zoom +t, (w/sine) /zoom )*255, 
+      noise( (w/sine) /zoom +t + x/w, (w/sine3) /zoom + )*255);
+      */
+      buf2[x][y] = c;
+      //setcol(c);
+      //setpix(x,y);
+      
+      //buf2[x][y] = rgb(255*x/W, 255*y/H,0);
+   }
+   
+   scale = 2;
+
+   cls(0); // not needed if fullscreen
+   
+   handle = glsettex(buf2,W,H);
+   setcol(0xffffff);             // draw texture with full brightness
+   //drawspr(xres/2,yres/2,200,0);
+   
+   //texquad(xres/2-W*scale/2,yres/2-H*scale/2,W*scale,H*scale);
+   
+   texquad(0,0,xres,yres);
+   glremovetex(handle);
+ 
+}
+
+texquad(x,y,width,height)
+{
+   
+   glBegin(GL_COMPLEX);
+   glTexCoord(0,0);glVertex(x,y);
+   glTexCoord(1,0);glVertex(x+width,y);
+   glTexCoord(1,1);glVertex(x+width,y+height);
+   glTexCoord(0,1);glVertex(x,y+height);
+   glEnd();
+   
+   /*
+   glBegin(GL_QUADS);
+   glTexCoord(0,0);glVertex(x,y);
+   glTexCoord(1,0);glVertex(x+width,y);
+   glTexCoord(1,1);glVertex(x+width,y+height);
+   glTexCoord(0,1);glVertex(x,y+height);
+   glEnd();
+   */
+}
+
+quad(x,y,siz)
+{
+glBegin(GL_COMPLEX);
+glVertex(x,y);
+glVertex(x+siz,y);
+glVertex(x+siz,y+siz);
+glVertex(x,y+siz);
+glEnd();
+}
+
+quadCentered(x,y,siz)
+{
+glBegin(GL_COMPLEX);
+
+glVertex(x-siz,y-siz);
+glVertex(x+siz,y-siz);
+glVertex(x+siz,y+siz);
+glVertex(x-siz,y+siz);
+glEnd();
+}

@@ -1,0 +1,31 @@
+(x,y,z,&r,&g,&b)
+enum {OVERSAMP=4,VOXSIZ=128}
+d = x^2 + y^2 + z^2;
+if (d >= 1^2) return(0);
+if (d < .98^2) return(1);
+
+xsiz = 0; ysiz = 0; getpicsiz(&xsiz,&ysiz);
+xmul = -xsiz/(PI*2);
+ymul = ysiz/PI; yadd = ysiz/2;
+
+r0 = 0; g0 = 0; b0 = 0;
+rr = 0; gg = 0; bb = 0;
+for(z0=0;z0<OVERSAMP;z0++)
+   for(y0=0;y0<OVERSAMP;y0++)
+      for(x0=0;x0<OVERSAMP;x0++)
+      {
+         x1 = x0/(VOXSIZ*.5*OVERSAMP)+x;
+         y1 = y0/(VOXSIZ*.5*OVERSAMP)+y;
+         z1 = z0/(VOXSIZ*.5*OVERSAMP)+z;
+         u = atan2(y1,x1);
+         v = atan2(z1,sqrt(x1^2 + y1^2));
+         pic(u*xmul,v*ymul+yadd,&r0,&g0,&b0);
+         r0 = (r0/256)^2;
+         g0 = (g0/256)^2;
+         b0 = (b0/256)^2;
+         rr += r0; gg += g0; bb += b0;
+      }
+r = (rr/(OVERSAMP^3))^(1/2)*256;
+g = (gg/(OVERSAMP^3))^(1/2)*256;
+b = (bb/(OVERSAMP^3))^(1/2)*256;
+return(1);

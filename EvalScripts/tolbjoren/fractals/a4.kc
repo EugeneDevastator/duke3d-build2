@@ -1,0 +1,87 @@
+// written 24. september by Torbjoern
+()
+{
+   cls(0);
+   
+   cx=xres/2; cy=yres/2;
+
+   width = 200*4;
+   height =100*4;
+   
+   leftx = cx-width/2;
+   lefty = cy-height/2;   
+
+   
+   a4();
+   
+}
+
+
+// fold fold fold
+a4()
+{
+   width = 840;
+   height = 594; 
+   leftx = xres/2 - width/2;
+   lefty = yres/2 - height/2;
+
+   
+   count = 0;  
+   papersize = 1;
+   
+
+   for(i=0; i<11; i++)
+   {      
+      drawRect(leftx,lefty,width,height);
+      
+      midx = leftx+width/2;
+      
+      if(papersize < 10)
+      setfont(6,10);
+      else
+      setfont(4,6);
+      
+      count++;  
+      if(count % 2 == 0)
+      {  
+         moveto(leftx+width/2, lefty+height/4);
+      
+         lefty += height/2;
+         height /=2;   
+      }
+      else
+      {         
+         moveto(leftx+width/4, lefty+height/2);
+
+         leftx = midx;
+         width /=2;
+      }
+      
+         printf("A%g",papersize);
+         papersize++;
+
+      
+   }
+}
+
+a4Recur(leftx,lefty,width,height,count)
+{
+   // hm... how to do this recusively?
+}
+
+
+
+drawRect(sx, sy, wx, wy)
+{   
+   moveto(sx, sy);
+   lineto(sx+wx, sy+0);
+   
+   moveto(sx, sy+wy);
+   lineto(sx+wx, sy+wy);
+   
+   moveto(sx, sy);
+   lineto(sx, sy+wy);
+   
+   moveto(sx+wx, sy);
+   lineto(sx+wx, sy+wy);
+}

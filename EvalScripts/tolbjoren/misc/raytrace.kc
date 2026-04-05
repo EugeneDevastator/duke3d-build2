@@ -1,0 +1,194 @@
+static aDist = 1e6;
+
+struct plane
+{
+ a,b,c,d; 
+ nx,ny,nz;  
+};
+
+static planeCount=1;
+
+struct sphere
+{
+   x,y,z,r,r2;
+};
+
+static tim,dt;
+
+
+enum{XREZ=320, YREZ=240}
+static buf[XREZ*YREZ];
+
+
+static camx=0;
+static camy=0;
+static camz=0;
+()
+now = klock(0);
+dt = now-tim;
+tim = now;
+
+cls(0);
+
+plane plane1;
+plane1.nx = 0;
+plane1.ny = 1;
+plane1.nz = 0;
+plane1.d = -7; 
+
+
+sphere sph;
+sph.x=0;
+sph.y=0;
+sph.z=5;
+sph.r= 1; //(sin(mousx/xres*20)+1) ;
+sph.r2 = sph.r*sph.r;
+sphereCount = 1;
+
+sunx = -3;
+suny = 5;
+sunz = 0;
+
+
+setcol(255,255,255);
+moveto(xres/2-160, yres/2-120); lineto(xres/2 + 160, yres/2-120);
+lineto(xres/2 + 160, yres/2+120);
+lineto(xres/2 - 160, yres/2+120);
+lineto(xres/2 - 160, yres/2-120);
+
+
+cdy = keystatus[208] - keystatus[200];
+cdx = keystatus[203] - keystatus[205];
+cdz = mousy/yres;
+camx += cdx * dt;
+camy += cdy * dt;
+camz = -cdz * 5;
+
+for(i=0; i<xres*yres; i++)
+{
+   buf[i] = 0;
+}
+
+for(i=0; i<XREZ; i++)
+for(j=0; j<YREZ; j++)
+{
+
+   sx = i;
+   sy = j;
+
+   x = -0.5+i/XREZ;
+   y = -0.5+j/YREZ;
+   x*=3.2;
+   y*=2.4;
+   z = 1;
+   dx = x-camx;
+   dy = y-camy;
+   dz = z-camz;
+   d2 = dx*dx+dy*dy+dz*dz;
+   rlen =1/sqrt(d2);
+   dx*=rlen;
+   dy*=rlen;
+   dz*=rlen;
+   
+   for(k=0; k<planeCount; k++)
+   {
+      d = plane1.nx * dx + plane1.ny * dy + plane1.nz * dz;
+      if( d != 0 )
+      {
+         nDotOrig = plane1.nx * camx + plane1.ny * camy + plane1.nz * camz;
+         dist = -(nDotOrig + plane1.d) / d;
+         if( dist > 0 )
+         {
+            if( dist < aDist )
+            {
+               s = .2;
+               c = 0;
+               
+               px = camx+dx*dist;
+               py = camy+dy*dist;
+               pz = camz+dz*dist;
+               sum = floor(s*px) + floor(s*py) + floor(s*pz);
+               if( -1^(sum) > 0 )
+               {
+                  c = rgb(0,255,0);
+               }else
+               {
+                  c = rgb(0,0,255);
+               }
+               
+               
+               buf[sx*YREZ+sy] = c;      
+            }
+         }
+      }
+   }
+   
+   
+  
+
+   for(k=0; k<sphereCount; k++)
+   { 
+      vx = camx-sph.x;
+      vy = camy-sph.y;
+      vz = camz-sph.z;
+      v2 = vx*vx + vy*vy + vz*vz;   
+   
+      dpr = dx*vx + dy*vy + dz*vz;
+      
+      disc = dpr*dpr - (v2-sph.r2);
+      if( disc < 0 ) continue;
+      
+      t1 = -dpr + sqrt( disc ) ;
+      t2 = -dpr - sqrt( disc ) ;
+      
+      if( t1 < 0 ) continue;
+      if( t2 < 0 ) continue;
+      
+      t = min(t1,t2);
+      
+      if( t > 0 )
+      {
+         yx = camx + t*dx;
+         yy = camy + t*dy;
+         yz = camz + t*dz;
+         
+         ycx = yx - sph.x;
+         ycy = yy - sph.y;
+         ycz = yz - sph.z;
+         
+         yc2 = ycx*ycx + ycy*ycy + ycz*ycz;
+         yc2 = sqrt(yc2);
+         
+         nx = ycx / yc2;
+         ny = ycy / yc2;
+         nz = ycz / yc2;
+         n2 = nx*nx + ny*ny + nz*nz;
+   
+         DOT = nx*dx + ny*dy + nz*dz;
+         rx = dx-2*DOT*nx;         
+         ry = dy-2*DOT*ny;
+         rz = dz-2*DOT*nz;
+         ref2 = rx*rx+ry*ry+rz*rz;
+   
+         c = rgb(128+128*nx,128+128*ny,128+128*nz);
+         buf[sx*YREZ+sy] = c;
+      }
+   } 
+}
+
+   xp = xres/2-XREZ/2;
+   yp = yres/2-YREZ/2;
+
+for(i=0; i<YREZ; i++)
+{
+   static linbuf[XREZ];
+   for(j=0; j<XREZ; j++)
+   {
+      linbuf[j] = buf[j*YREZ+i];
+   }
+   sethlin( xp+1, yp+i, linbuf, (XREZ-1) );
+}
+
+setcol(0xffffff);
+moveto(0,0);
+printf("%g", 1/dt);

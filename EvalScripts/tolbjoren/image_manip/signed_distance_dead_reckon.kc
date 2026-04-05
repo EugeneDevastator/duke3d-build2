@@ -1,0 +1,229 @@
+//
+// Used pseudocode described here:
+// http://www.ensta-paristech.fr/~manzaner/Download/IAD/Grevera_04.pdf
+//
+
+enum{REZ = 256}
+
+static map[REZ][REZ];
+static distmap[REZ][REZ];
+
+struct vec2f
+{
+   x,y;
+};
+static vec2f borderpoint[REZ][REZ];
+
+
+()
+{
+   cls(0);
+   if( numframes == 0 )
+   {
+      dead_reckoning(0,0,REZ,REZ);
+   }
+
+   for(j=0; j<REZ; j++)
+   {
+      static linebuf[REZ*2];
+      for(i=0; i<REZ; i++)
+      {
+         
+         if( map[i][j]>0 )
+         {
+          linebuf[i+REZ] = rgb(255,255,255); 
+         }else{
+            linebuf[i+REZ] = 0;
+         }
+          
+         d = distmap[i][j];
+         //if( d > 0 )
+         {
+          c =  255 - (d/(REZ/8) * 255) ;
+          //c = d * 128;
+          linebuf[i] = rgb( c,c,c );
+          //setpix(i,j);      
+          }
+      }   
+      
+      sethlin( 0, j, linebuf, REZ*2);
+   }
+   
+   
+   if( bstatus==1 )
+   {
+      paint(1,2);
+      
+   }
+   if( bstatus==2 )
+   {
+      paint(0,30);
+   }   
+   
+   
+
+   setcol(255,255,255);
+   moveto(15, REZ+5);
+   printf("draw above this");
+
+}
+
+paint(v,r)
+{
+      rsq = r*r;
+      cx = mousx;
+      cy = mousy;
+      w = r;
+      for(i=-w; i<w; i++)
+      for(j=-w; j<w; j++)
+      {
+         px = cx + i; 
+         py = cy + j;
+         if( px > 1 || py > 1 && px < REZ-1 && py < REZ-1 )
+         {
+            dsq = (px-cx)^2 + (py-cy)^2;
+            if (dsq < rsq)
+               map[px][py] = v;
+         }
+      }
+      
+      //lim = 16;
+      //dead_reckoning(cx-lim,cy-lim,cx+lim,cy+lim);
+      dead_reckoning(1,1,REZ-1,REZ-1);
+}
+
+dead_reckoning(xmin, ymin, xmax, ymax)
+{
+eps = 1e-6;
+   d2 = sqrt(2);
+   
+   // initialize d
+   for(i=xmin-1; i<xmax+1; i++)
+   {
+      for(j=ymin-1; j<ymax+1; j++)
+      {
+         //if( map[i][j] )
+         {
+         distmap [i][j] = 1e32;
+         borderpoint[i][j].x = -1;
+         borderpoint[i][j].y = -1;
+         }
+      }
+   }
+   
+   // initialize interior & exterior elements
+   for(j=ymin; j<ymax; j++)
+   {
+      for(i=xmin; i<xmax; i++)
+      {
+         //if( fabs( map[i-1][j] - map[i][j]) <= eps || fabs(map[i+1][j] - map[i][j]) <= eps ||
+         //    fabs( map[i][j-1] - map[i][j]) <= eps || fabs(map[i][j+1] - map[i][j]) <= eps)      
+
+         if( (map[i-1][j] != map[i][j] || map[i+1][j] != map[i][j])  ||
+              (map[i][j-1] != map[i][j]) || map[i][j+1] != map[i][j] )
+             {
+               distmap [i][j] = 0;
+               borderpoint[i][j].x = i;
+               borderpoint[i][j].y = j;
+            }
+      }
+   }
+   
+   
+   // perform first passs
+   for(j=ymin; j<ymax; j++)
+   {
+      for(i=xmin; i<xmax; i++)
+      {
+         if( (distmap[i-1][j-1] + d2 < distmap[i][j]) )
+         {
+            borderpoint[i][j].x = borderpoint[i-1][j-1].x;
+            borderpoint[i][j].y = borderpoint[i-1][j-1].y;
+            px = borderpoint[i][j].x;
+            py = borderpoint[i][j].y;
+            distmap [i][j] = sqrt( (i-px)*(i-px) + (j-py)*(j-py) );
+         }
+         
+         if( (distmap[i][j-1] + 1 < distmap[i][j]) )
+         {
+            borderpoint[i][j].x = borderpoint[i][j-1].x;
+            borderpoint[i][j].y = borderpoint[i][j-1].y;         
+            px = borderpoint[i][j].x;
+            py = borderpoint[i][j].y;
+            distmap [i][j] = sqrt( (i-px)*(i-px) + (j-py)*(j-py) );
+         }
+         
+         if( (distmap[i+1][j-1] + d2 < distmap[i][j]) )
+         {
+            borderpoint[i][j].x = borderpoint[i+1][j-1].x;
+            borderpoint[i][j].y = borderpoint[i+1][j-1].y;
+            px = borderpoint[i][j].x;
+            py = borderpoint[i][j].y;
+            distmap [i][j] = sqrt( (i-px)*(i-px) +(j-py)*(j-py) );
+         }
+         
+         if( (distmap[i-1][j] + 1 < distmap[i][j]) )
+         {
+            borderpoint[i][j].x = borderpoint[i-1][j].x;
+            borderpoint[i][j].y = borderpoint[i-1][j].y;  
+            px = borderpoint[i][j].x;
+            py = borderpoint[i][j].y;
+            distmap [i][j] = sqrt( (i-px)*(i-px) + (j-py)*(j-py) );
+         }
+
+      }
+   }
+      
+
+   // perform final pass, note iteration dir
+   for(j=ymax; j>ymin; --j)
+   {
+      for(i=xmax; i>xmin; --i)
+      {
+         if( (distmap[i+1][j] + 1 < distmap[i][j]) )
+         {
+            borderpoint[i][j].x = borderpoint[i+1][j].x;
+            borderpoint[i][j].y = borderpoint[i+1][j].y;
+            px = borderpoint[i][j].x;
+            py = borderpoint[i][j].y;
+            distmap [i][j] = sqrt( (i-px)*(i-px) + (j-py)*(j-py) );
+         }
+         
+         if( (distmap[i-1][j+1] + d2 < distmap[i][j]) )
+         {
+            borderpoint[i][j].x = borderpoint[i-1][j+1].x;
+            borderpoint[i][j].y = borderpoint[i-1][j+1].y;         
+            px = borderpoint[i][j].x;
+            py = borderpoint[i][j].y;
+            distmap [i][j] = sqrt( (i-px)*(i-px) + (j-py)*(j-py) );
+         }
+         
+         if( (distmap[i][j+1] + 1 < distmap[i][j]) )
+         {
+            borderpoint[i][j].x = borderpoint[i][j+1].x;
+            borderpoint[i][j].y = borderpoint[i][j+1].y;
+            px = borderpoint[i][j].x;
+            py = borderpoint[i][j].y;
+            distmap [i][j] = sqrt( (i-px)*(i-px) +(j-py)*(j-py) );
+         }
+         
+         if( (distmap[i+1][j+1] + d2 < distmap[i][j]) )
+         {
+            borderpoint[i][j].x = borderpoint[i+1][j+1].x;
+            borderpoint[i][j].y = borderpoint[i+1][j+1].y;  
+            px = borderpoint[i][j].x;
+            py = borderpoint[i][j].y;
+            distmap [i][j] = sqrt( (i-px)*(i-px) + (j-py)*(j-py) );
+         }
+
+      }
+   }
+   
+   for(i=xmin; i<xmax; i++)
+   {
+      for(j=ymin; j<ymax; j++)
+      {
+         if( map[i][j] == 1 ) distmap[i][j] *= -1;
+      }
+   }
+}

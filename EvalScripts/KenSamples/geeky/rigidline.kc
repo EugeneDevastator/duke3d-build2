@@ -1,0 +1,232 @@
+   //Rigidline by Ken Silverman
+
+enum {MAXVERT=256,MAXEDGE=256,PHYSHZ=512,RAD=8};
+struct { x, y, ox, oy, rmass; } vert_t;
+struct { v[2], leng; } edge_t;
+static vert_t vert[MAXVERT]; static vertn = 0;
+static edge_t edge[MAXEDGE]; static edgen = 0;
+
+()
+{
+   obstatus = 0; grabv = -1; tim = 0; paused = 1; grav = 1; newedge = 0; tics = 0;
+   while (1)
+   {
+      otim = tim; tim = klock(); dtim = tim-otim;
+      
+      if (bstatus%2) //LMB
+      {
+         if (!(obstatus%2))
+         {
+            for(i=0;i<vertn;i++)
+               if ((vert[i].x-mousx)^2+(vert[i].y-mousy)^2 < (RAD*2)^2) break;
+            vert[i].x = mousx; vert[i].ox = vert[i].x;
+            vert[i].y = mousy; vert[i].oy = vert[i].y;
+            vert[vertn].rmass = (i < vertn);
+            edge[edgen].v[0] = i;
+            vertn = max(vertn,i+1);
+            edge[edgen].v[1] = vertn;
+            newedge = 1;
+         }
+         vert[edge[edgen].v[1]].x = mousx;
+         vert[edge[edgen].v[1]].y = mousy;
+      }   
+      else if (obstatus%2)
+      {
+         for(i=0;i<vertn;i++)
+            if ((vert[i].x-mousx)^2+(vert[i].y-mousy)^2 < (RAD*2)^2) break;
+         edge[edgen].v[1] = i;
+         if (i >= vertn)
+         {
+            vert[i].x = mousx; vert[i].ox = vert[i].x;
+            vert[i].y = mousy; vert[i].oy = vert[i].y;
+         }
+         vert[i].rmass = 1;
+         vertn = max(vertn,i+1);
+       
+         edge[edgen].leng = max(sqrt((vert[edge[edgen].v[0]].x-vert[i].x)^2+
+                                     (vert[edge[edgen].v[0]].y-vert[i].y)^2),RAD*2);
+         if (edge[edgen].leng > 0) edgen++;
+forgetit:newedge = 0;
+      }
+      
+      if ((bstatus%4) >= 2) //RMB
+      {
+         if ((obstatus%4) < 2)
+         {
+            grabv = -1; dmin = 64^2;
+            for(i=vertn-1;i>=0;i--)
+            {
+               d = (vert[i].x-mousx)^2+(vert[i].y-mousy)^2;
+               if (d < dmin) { dmin = d; grabv = i; }
+            }
+         }
+      }
+      else { grabv = -1; }
+      
+      if (keystatus[0xd2]) //Ins
+      {
+         keystatus[0xd2] = 0;
+         //for(i=0;i<
+      }
+      
+      if (keystatus[0x19]) { keystatus[0x19] = 0; paused = 1-paused; } //P (pause)
+      if (keystatus[0x22]) { keystatus[0x22] = 0; grav   = 1-grav  ; } //G (gravity)
+      if (keystatus[0x2b]) //backslash
+      {
+         keystatus[0x2b] = 0;
+         dmin = 1e32; besti = -1;
+         for(i=vertn-1;i>=0;i--)
+         {
+            d2 = (vert[i].x-mousx)^2+(vert[i].y-mousy)^2;
+            if (d2 < dmin) { dmin = d2; besti = i; }
+         }
+         if (besti >= 0) { vert[besti].rmass = !vert[besti].rmass; }
+      }
+
+      dt = 1/PHYSHZ;
+      for(;tics<tim;tics+=dt)
+      {
+         for(i=0;i<vertn;i++)
+         {
+               //Backup for Verlet
+            ox = vert[i].x;
+            oy = vert[i].y;
+            if (!paused)
+            {
+                  //Momentum
+               vert[i].x = vert[i].x*2-vert[i].ox;
+               vert[i].y = vert[i].y*2-vert[i].oy;
+               
+                  //Gravity
+               vert[i].y += vert[i].rmass*grav/256;
+               
+                  //Border collision
+               vert[i].x = min(max(vert[i].x,RAD),xres-RAD);
+               vert[i].y = min(max(vert[i].y,RAD),yres-RAD);
+                  
+                  //Border friction
+               if ((vert[i].x == RAD) || (vert[i].x == xres-RAD))
+                  vert[i].y += (oy-vert[i].y)*.015;
+               if ((vert[i].y == RAD) || (vert[i].y == yres-RAD))
+                  vert[i].x += (ox-vert[i].x)*.015;
+            }
+               //Save for next frame
+            vert[i].ox = ox;
+            vert[i].oy = oy;
+         }
+   
+            //RMB drag
+         if (grabv >= 0)
+         {
+            vert[grabv].x += (mousx-vert[grabv].x)*.1;
+            vert[grabv].y += (mousy-vert[grabv].y)*.1;
+            vert[grabv].ox = vert[grabv].x;
+            vert[grabv].oy = vert[grabv].y;
+         }
+
+#if 1
+         for(i=edgen-1;i>=0;i--) //Spring force
+         {
+            i0 = edge[i].v[0]; i1 = edge[i].v[1];
+            dx = vert[i1].x-vert[i0].x;
+            dy = vert[i1].y-vert[i0].y;
+            d = dx*dx + dy*dy;
+#if 0
+            if (d <= 0) f = 0; else { d = sqrt(d); f = (edge[i].leng-d)/d; }
+#else            
+            f = edge[i].leng^2; f = f/(f+d) - .5;
+#endif            
+            tot = vert[i0].rmass+vert[i1].rmass; if (tot <= 0) continue;
+            g = f*vert[i0].rmass/tot; vert[i0].x -= dx*g; vert[i0].y -= dy*g;
+            g = f*vert[i1].rmass/tot; vert[i1].x += dx*g; vert[i1].y += dy*g;
+         }
+#endif         
+#if 1
+         for(i1=vertn-1;i1>0;i1--) //Vertex-vertex collision
+            for(i0=i1-1;i0>=0;i0--)
+            {
+               dx = vert[i1].x-vert[i0].x;
+               dy = vert[i1].y-vert[i0].y;
+               d = dx*dx + dy*dy; if (d >= (RAD*2)^2) continue;
+               f = (RAD*2-sqrt(d))/sqrt(d);
+               tot = vert[i0].rmass+vert[i1].rmass; if (tot <= 0) continue; 
+               g = f*vert[i0].rmass/tot; vert[i0].x -= dx*g; vert[i0].y -= dy*g;
+               g = f*vert[i1].rmass/tot; vert[i1].x += dx*g; vert[i1].y += dy*g;
+            }
+#endif
+#if 1
+         for(v=vertn-1;v>=0;v--) //Vertex-edge collision
+            for(e=edgen-1;e>=0;e--)
+            {
+               i0 = edge[e].v[0]; i1 = edge[e].v[1];
+               if ((v == i0) || (v == i1)) continue;
+               
+               dx = vert[i1].x-vert[i0].x;
+               dy = vert[i1].y-vert[i0].y;
+               num = (vert[v].x-vert[i0].x)*dx + (vert[v].y-vert[i0].y)*dy;
+               den = dx*dx + dy*dy; if ((num <= 0) || (num >= den)) continue;
+
+               dx = vert[i1].y-vert[i0].y;
+               dy = vert[i0].x-vert[i1].x;
+               f = 1/sqrt(den); dx *= f; dy *= f;
+               
+               f = (vert[v].x-vert[i0].x)*dx + (vert[v].y-vert[i0].y)*dy;
+               if (fabs(f) >= RAD) continue;
+               if (f < 0) { f = -f; dx = -dx; dy = -dy; }
+               f = RAD-f;
+
+               t = num/den;
+               tot = vert[v].rmass+vert[i0].rmass*(1-t)+vert[i1].rmass*t;
+               if (tot <= 0) continue;
+               g = f*vert[ v].rmass/tot; vert[v ].x += dx*g; vert[v ].y += dy*g;
+               g = f*vert[i0].rmass*(1-t)/tot;
+               vert[i0].x -= dx*g; vert[i0].y -= dy*g;
+               g = f*vert[i1].rmass*(  t)/tot;
+               vert[i1].x -= dx*g; vert[i1].y -= dy*g;
+            }
+#endif            
+      }
+      
+//---------------------------------------------------------------------------
+      cls(0);
+      if (paused)
+      {
+         setfont(xres/6,yres*.4,1); setcol(0x605040);
+         moveto(0,yres*.20); printf("PAUSED");
+      }
+      if (!grav)
+      {
+         setfont(xres/10,yres*.4,1); setcol(0x605040);
+         moveto(0,yres*.50); printf("NO GRAVITY");
+      }
+      for(i=edgen+newedge;i>=0;i--)
+      {
+         i0 = edge[i].v[0]; i1 = edge[i].v[1];
+         setcol(0x406080); drawcone(vert[i0].x,vert[i0].y,3,vert[i1].x,vert[i1].y,3);
+         setcol(0x6080a0); drawcone(vert[i0].x,vert[i0].y,2,vert[i1].x,vert[i1].y,2);
+         if (i >= edgen)
+         {
+            setcol(0xffffff);
+            drawcone(vert[i0].x,vert[i0].y,2,vert[i1].x,vert[i1].y,1);
+         }
+      }
+      for(i=0;i<vertn;i++)
+      {
+         if (vert[i].rmass) setcol(0x80c0ff); else setcol(0xc08080);
+         drawsph(vert[i].x,vert[i].y,+RAD);
+         if (vert[i].rmass) setcol(0x6080a0); else setcol(0xa06060);
+         drawsph(vert[i].x,vert[i].y,-RAD);
+      }
+      setfont(12,16); moveto(xres-256,0); setcol(0x808080);
+      printf("LMB:Draw\n");
+      printf("RMB:Drag\n");
+      printf("  \\\:Node=stuck/free\n");
+      printf("  G:Toggle gravity\n");
+      printf("  P:Pause\n");
+      
+      moveto(xres-512,0);
+      printf("vertn=%g\nedgen=%g",vertn,edgen);
+   
+      obstatus = bstatus; refresh();
+   }
+}

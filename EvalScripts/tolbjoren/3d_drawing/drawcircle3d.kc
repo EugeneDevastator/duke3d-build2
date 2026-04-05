@@ -1,0 +1,304 @@
+struct vec{x,y,z;}
+
+
+
+()
+{
+   cls(0); clz(1e32);
+   t = klock(0);
+   a = mousx/xres*2*PI; ca = cos(a); sa = sin(a ); r = -8;
+   setcam( sa*r, 0, ca*r , a,0);
+   
+   if ( numframes == 0 ){
+      glCullFace(GL_NONE);
+   }
+   
+   
+   vec pos, normal;
+   /*
+   for(i=0; i<4; i++)
+   {
+   zp = -4 + i * 2;
+
+   vecset(pos,0,0,zp);
+   vecset(normal, cos(t), sin(t), 0 );
+   vec line_end; vecadd(line_end,pos,normal);
+   moveto(pos); lineto(line_end);
+   normalize(normal);
+   drawcircle3d( pos, normal, 1 );
+   }
+   */
+   
+   steps = 200;
+   for(i=0; i<=steps; i++)
+   {
+      a = 2*i*pi / steps;
+      ca = cos(a); sa = sin(a);
+
+      r = 3;
+      
+    
+      // XY-plane
+      vecset(pos, ca*r, sa*r, 0);
+      vecset(normal, -sa, ca, 0 ); 
+      normalize(normal);
+      setcol(255,0,0);
+      drawcircle3d( pos, normal, .5 );
+  
+      // XZ-plane
+      vecset(pos, ca*r, 0, sa*r);
+      vecset(normal, -sa, 0, ca ); 
+      normalize(normal);
+      setcol(0,255,0);
+      drawcircle3d( pos, normal, .5 );
+      
+      // YZ-plane
+      vecset(pos, 0, ca*r, sa*r);      
+      vecset(normal, 0, -sa, ca ); 
+      normalize(normal);
+      setcol(0,0,255);
+      drawcircle3d( pos, normal, .5 );
+      
+ 
+   }
+   
+   sc = 5;
+   vecset(pos, 0, 3.5, 0);
+   a = mousy/yres*2*PI; ca = cos(a); sa = sin(a);
+   vecset(normal, 0,1,0);
+   normalize(normal);
+   drawplane( pos, normal, sc );
+}
+
+moveto(vec v){ moveto(v.x, v.y, v.z);
+}
+
+
+lineto(vec v){ lineto(v.x, v.y, v.z);
+}
+
+somePerpVector(vec invec, vec outvec){
+   vec zdir; vecset( zdir, 0,0,1);
+   veccross(outvec, invec, zdir );
+   if ( length(outvec) == 0 )
+   {
+      vec ydir; vecset( ydir, 0,1,0);
+      veccross(outvec, invec, ydir);
+   }
+   
+}
+
+ortho_basis_form_normal( vec inNormal, vec outA, vec outB ){
+
+   #if 1
+      // Create two vectors a and b, perpendicular to normal
+      vec perp;
+      perp = inNormal;
+      
+      if (perp.x == 0 && perp.z == 0){
+         perp.x = 1;
+      }else{
+         perp.y = 1;
+      }
+      
+      veccross(outA,inNormal,perp);
+      normalize(outA);
+      veccross(outB,inNormal,outA);
+   
+   #else
+      // this also works. bit more expensive?
+      somePerpVector(inNormal, outA );
+      normalize(outA);
+      veccross( outB, outA, inNormal );
+   #endif
+}
+
+
+
+
+drawCircle3d(vec pos, vec normal, radi)
+{
+   vec xdir,ydir;
+ 
+   
+   ortho_basis_form_normal( normal, xdir, ydir );
+   
+   segs = 32;
+   
+   glBegin(GL_LINE_STRIP);
+   for(i=0; i<=segs; i++){
+      ang = (i * 2*PI) / segs;
+      vec v;
+      ca = cos(ang);
+      sa = sin(ang);
+
+      v.x = ca * xdir.x + sa * ydir.x;
+      v.y = ca * xdir.y + sa * ydir.y;
+      v.z = ca * xdir.z + sa * ydir.z;
+      
+      v.x *= radi;
+      v.y *= radi;
+      v.z *= radi;
+      
+      glVertex( pos.x + v.x, pos.y + v.y, pos.z + v.z );
+   }
+   glEnd();
+}
+
+buildMatrix( mtx[9], vec side, vec up, vec fwd )
+{
+   mtx[0] = side.x; mtx[1] = side.y; mtx[2] = side.z;
+   mtx[3] = up.x;   mtx[4] = up.y;   mtx[5] = up.z;
+   mtx[6] = fwd.x;  mtx[7] = fwd.y;  mtx[8] = fwd.z;
+}
+transformPoint(vec v, thisRot[9])
+{
+   NewX = v.x * thisRot[0] + v.y * thisRot[1] + v.z * thisRot[2];
+   NewY = v.x * thisRot[3] + v.y * thisRot[4] + v.z * thisRot[5];
+   NewZ = v.x * thisRot[6] + v.y * thisRot[7] + v.z * thisRot[8];
+   v.x=newx; v.y=newy; v.z=newz;
+}
+
+glVertex( vec v ){
+   glVertex( v.x, v.y, v.z );
+}
+
+negate(vec v){
+   v.x = -v.x; v.y = -v.y; v.z = -v.z;
+}
+
+
+vecScalar( vec out, vec a, s )
+{
+   out.x = a.x * s;
+   out.y = a.y * s;
+   out.z = a.z * s;
+}
+
+
+vecAdd( vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;   
+}
+vecSub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;   
+}
+
+vecCross( vec out, vec a, vec b)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+
+vecset(vec a, x,y,z){
+   a.x = x; a.y = y; a.z = z;
+}
+
+vecDot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+length( vec v )
+{
+   return sqrt( vecdot(v,v) );
+}
+
+normalize( vec v )
+{
+   len = length(v);
+   if ( len )
+   {
+      v.x /= len; v.y /= len; v.z /= len;
+   }
+}
+
+
+drawplane(vec pos, vec normal, radius)
+{   
+   
+   vec a, b;
+   ortho_basis_form_normal( normal, a,b );
+   
+   // scale a and b down to 1/2 as we will use
+   // them in +- dir
+   vecscalar(a, a, radius );
+   vecscalar(b, b, radius );
+   
+   // Create plane vertices from perpendiculars
+   vec neg_a, neg_b;
+   neg_a = a; negate(neg_a);
+   neg_b = b; negate(neg_b);
+
+   vec ma_mb; // -a - b
+   vec ma_pb; // -a + b
+   vec pa_pb; //  a + b
+   vec pa_mb; //  a - b
+   
+   vecadd( ma_mb, neg_a, neg_b);
+   vecadd( ma_pb, neg_a, b);
+   vecadd( pa_pb, a, b);
+   vecadd( pa_mb, a, neg_b);
+
+   vec u0, u1, u2, u3;
+   u0 = ma_mb;
+   u1 = ma_pb;
+   u2 = pa_pb;
+   u3 = pa_mb;
+
+   // Translate to final position
+   vecadd(u0,pos,u0);
+   vecadd(u1,pos,u1);
+   vecadd(u2,pos,u2);
+   vecadd(u3,pos,u3);
+
+   vec end;
+   vecadd(end, pos, normal);
+   
+   setcol(255,0,0);
+   
+//#define SHOW_VECTORS
+#ifdef SHOW_VECTORS
+   drawArrow(pos, end, 0.03);
+   
+   vecadd(end, pos, a);
+   setcol(0,255,0);
+   drawArrow( pos, end, 0.03);
+   
+   vecadd(end, pos, b);
+   setcol(0,0,255);
+   drawArrow( pos, end, 0.03);
+#endif
+   
+   setcol(255,255,255);
+   
+   glBegin(GL_QUADS);
+      glTexcoord(0,1);
+      glVertex( u0 );   
+      glTexcoord(0,0);
+      glVertex( u1 );
+      glTexcoord(1,0);
+      glVertex( u2 );
+      glTexcoord(1,1);
+      glVertex( u3 );
+   glEnd();
+
+   glBegin(GL_LINE_LOOP);
+      glTexcoord(0,0);
+      glVertex( u0 );   
+      glTexcoord(0,1);
+      glVertex( u1 );
+      glTexcoord(1,1);
+      glVertex( u2 );
+      glTexcoord(1,0);
+      glVertex( u3 );
+   glEnd();
+   
+
+}

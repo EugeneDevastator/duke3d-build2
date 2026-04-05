@@ -1,0 +1,69 @@
+
+
+//xyz go from -1 to +1
+
+
+/*bool*/ (x,y,z,&r,&g,&b)
+{
+
+   dcent = sqrt(x^2 + z^2);
+   dcent3d = sqrt(x^2 + y^2 + z^2);
+   rotate2d( x,z, pi*(dcent/4)^2);
+   
+// translate away from origin
+   x+=10;
+   z+=10;
+   
+   
+   f = 0;
+   
+   r = 0;
+   g = 0;
+   b = 0;
+   
+   
+   sph = ((x-10)^2 + y^2 + (z-10)^2) < 1;
+   
+   if ( sph ) {
+      f=.125;
+      //f += mnoise(x,y,z);
+      
+    
+   
+      max=12;
+      for(i=max; i>1; i--){
+         s = (max+0.01)/i;
+         wx = x*s;wy = y*s;wz = z*s;
+         f -= mnoise(wx,wy,wz) / i;
+      }
+   }
+   
+   
+   //c = 32+80*(1-f);
+   c = 255-240*dcent3d;
+   r = c:
+   g = c;//128+128*y;   
+   b = c;
+
+   return f;
+}
+
+mnoise(x,y,z)
+{
+   n=noise(x,y,z);
+   if ( n >= 0 ) return n;
+   return 0;
+   
+   //n = 0.5+0.5*noise(x,y,z);
+   //if ( n < 0) return 0;
+   //if ( n > 1) return 1;
+   //return n;
+}
+
+rotate2d(&x,&y,angle)
+{
+   x1 = x; y1 = y;
+   ca = cos(angle); sa = sin(angle);
+   x = x1 * ca - y1 * sa;
+   y = y1 * ca + x1 * sa;
+}

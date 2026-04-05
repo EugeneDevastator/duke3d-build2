@@ -1,0 +1,208 @@
+enum{MAXPRAY = 1, MAXPRED = 1}
+static prayx[MAXPRAY];
+static prayy[MAXPRAY];
+static predatorx[MAXPRED];
+static predatory[MAXPRED];
+static predatorvx[MAXPRED];
+static predatorvy[MAXPRED];
+static predatorHeading[MAXPRED];
+
+static cooldown = 0;
+
+static tolerance = .000000000000000000001;
+
+static time,oldtime,dt;
+static fps=0;
+static sec=0;
+static frameCounter=0;
+
+enum{GOTTARGET = 1}
+
+enum{MAXBULLETS = 500}
+static bulletpx[MAXBULLETS];
+static bulletpy[MAXBULLETS];
+static bulletdx[MAXBULLETS];
+static bulletdy[MAXBULLETS];
+static bulletAlive[MAXBULLETS];
+static numbullets=0;
+()
+{
+   oldtime=time;
+   time=klock(0);
+   dt = time-oldtime;
+   sec+=dt;
+   if(sec >= 1.0){
+      sec = 0;
+      fps = frameCounter;
+      frameCounter=0;
+   }
+   
+   
+
+   if(numframes==0){
+      predatorx[0] = xres/2;
+      predatory[0] = yres/2;
+   
+   }
+   prayx[0] = mousx;
+   prayy[0] = mousy;
+   cls(0);
+   
+   pred = 0;
+   moveto(predatorx[0], predatory[0]);
+   if( doLineOfSight(0,0) == GOTTARGET && cooldown < 0)
+   {
+      cooldown = 150*dt; // millisec cooldown
+      makeBullet(predatorx[0], predatory[0],
+      cos(-predatorHeading[pred]), sin(-predatorHeading[pred]) );
+   }
+   cooldown-=dt;  
+
+   draw();
+   
+   
+   predatorx[0] += predatorvx[0];
+   predatory[0] += predatorvy[0];
+   
+   
+   // spd in pix per frame 
+   spd = 50*dt; // 50 pixels pr sec
+   //predatorvx[pred] = cos(-predatorHeading[pred] )*spd;
+   //predatorvy[pred] = sin(-predatorHeading[pred] )*spd;
+  
+   
+   
+   //sleep(16);
+   moveto(0,0);
+   printf("fps = %g",fps);
+   printf("\numbullets = %g",numbullets);
+   
+   if(fps > 60){
+      //sleep(1);
+   }
+   
+   frameCounter++;
+}
+
+makeBullet(px,py,dx,dy)
+{
+   if(numbullets<MAXBULLETS)
+   {
+      for(i=0; i<MAXBULLETS; i++)
+      {
+         if( bulletAlive[i] == 0 )
+         {
+            bulletAlive[i] = 1;
+            bulletpx[i] = px;
+            bulletpy[i] = py;
+            bulletdx[i] = dx;
+            bulletdy[i] = dy;
+            numbullets++;
+            return;
+         }
+      }
+
+   }
+}
+
+drawbullets()
+{
+   for(i=0; i<MAXBULLETS; i++)
+   {
+      if(bulletAlive[i]==1)
+      {
+         bulletpx[i] += bulletdx[i] * 100 * dt;
+         bulletpy[i] += bulletdy[i] * 100 * dt;
+         drawsph(bulletpx[i], bulletpy[i], -5);
+         
+         if(bulletpx[i] < 0) killBullet(i);
+         if(bulletpy[i] < 0) killBullet(i);
+         if(bulletpx[i] > xres) killBullet(i);
+         if(bulletpy[i] > yres) killBullet(i);
+      }
+   }
+}
+
+killBullet(i)
+{
+   bulletAlive[i] = 0;
+   numbullets--;
+}
+
+doLineOfSight(pred,pray){
+   left = 0;
+   right = 0;
+   
+   angleToPray = atan2(predatorx[pred]-prayx[pray],predatory[pred]-prayy[pray]);
+   angleToPray %= 2*PI;
+   
+   bound = 30;
+   onTarget = 0;
+   // if predator is dead on, no not correct path.
+   deadOnTarget = angleToPray*180/pi - predatorHeading[pred]*180/pi;
+   if(  deadOnTarget < -90+bound &&  deadOnTarget > -90-bound )
+   {
+      onTarget = 1; 
+   } 
+   
+   if(  deadOnTarget > 270-bound &&  deadOnTarget < 270+bound )
+   {
+      onTarget = 1;
+   } 
+
+   PIOVER180 = PI / 180;
+   // koordinatet vi skal rotere til. dit fienden er.
+   vx = cos(angleToPray);
+   vy = sin(angleToPray);
+   
+   ca = -cos( predatorHeading[pred] );
+   sa = -sin( predatorHeading[pred] );  
+   
+   // hvor mye vi roterer.
+   rotX = vx * ca + vy * sa;
+   rotY = -vx * sa + vy * ca;
+
+
+   //vinkel mellom rot og dit vi skal rotere til
+ 
+   // normaliser
+   //length = sqrt(rotX^2 + rotY^2);
+   //rotX /= length; 
+   //rotY /= length;
+   
+   // rotate max 0.5 degrees per frame
+   
+   maxRot = 100 * PIOVER180 * dt; // degrees
+   
+   if(rotx < -tolerance){
+      left = 1;
+      predatorHeading[pred] += maxRot;
+      predatorHeading[pred] %= 2*PI;
+   }
+   else if(rotx > -tolerance){
+      right = 1;
+      predatorHeading[pred] -= maxRot;
+      predatorHeading[pred] %= 2*PI;
+   }
+   
+   if( onTarget ) return GOTTARGET;
+   
+    
+   printf("\n%g\n%g",left,right); 
+   //printf("\n %.3f",angleToPray*180/pi);  
+   //printf("\n %.3f",predatorHeading[pred]*180/pi);
+   printf("\n %.5f",angleToPray*180/pi - predatorHeading[pred]*180/pi); 
+
+}
+
+draw(){
+   for(i=0; i<MAXPRED; i++){
+      drawsph(predatorx[i], predatory[i], -10);
+      moveto(predatorx[i], predatory[i]);
+      lx = cos(-predatorHeading[i])*20;
+      ly = sin(-predatorHeading[i])*20;
+      lineto(predatorx[i]+lx, predatory[i]+ly);
+   }
+   
+   drawbullets();
+}

@@ -1,0 +1,14 @@
+(x,y,z,&r,&g,&b)
+r = 192;
+g = 0;
+b = 0;
+//v = (2*sqrt(x)+sqrt(y)+sqrt(z)-1)^3 - (0.1*sqrt(x)+sqrt(y))*(z)^3;
+
+s = 3;
+x *= s; y *= s; z *= s;
+v1 = (2*x^2 + 2*y^2 + 2*z^2 -2)^3;
+v2 = .5*(2*x^2 + 2*y^2)*z^4;
+v = v1-v2;
+lim = 2/voxres;
+return v<lim;
+//return (v > -lim && v < +lim)

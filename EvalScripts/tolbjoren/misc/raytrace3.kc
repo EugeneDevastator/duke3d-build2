@@ -1,0 +1,281 @@
+struct vec
+{
+   x,y,z;
+}
+
+struct camera_t
+{
+   vec position;
+   vec lookAt;
+   vec lookUp;
+}
+
+struct ray_t
+{
+   vec origin;
+   vec dir;
+}
+
+struct sphere_t
+{
+   vec center;
+   vec diffuseColor;
+   double radius;
+}
+
+struct light_t
+{
+   vec pos;
+}
+
+struct Intersection_t { 
+   vec normal;
+   vec point;
+   ray_t ray;
+   sphere_t sphere;
+   double t;
+}
+
+// Light
+static light_t light;
+static camera_t camera;
+()
+{
+   cls(0);
+   t = klock(0);
+   a = mousx/xres * 2 * PI;
+   set( light.pos, cos(a)*3,2,sin(a)*3 );
+
+    width = 480;
+    height = 320;
+ 
+    // Vertical and horizontal field of view
+    hfov = PI/3.5;
+    vfov = hfov * height/width;
+ 
+    // Pixel width and height
+    pw = 2.0 * tan( hfov/2.0 ) / width;
+    ph = 2.0 * tan( vfov/2.0 ) / height;    
+ 
+
+    // sphere
+    sphere_t sphere;
+    set(sphere.center, 1, 1+cos(t), 1 );
+    set(sphere.diffuseColor, 0.7, 0.1, 0.1 );
+    sphere.radius = 0.4;
+ 
+    // camera   
+    set( camera.position, 0,0,0 );
+    set( camera.lookAt, 1,1,1 );
+    set( camera.lookUp, 0, 1, 0 );
+     
+
+    // set up the coordinate system
+    vec n;
+    vecsub(n, camera.position, camera.lookAt);
+    normalize(n);
+    
+    vec u;
+    veccross(u, camera.lookUp, n);
+    normalize(u);
+    
+    vec v;
+    veccross(v, n, u);
+    normalize(v);
+    
+    vec vpc; // view port center
+    vecsub(vpc, camera.position, n);
+ 
+    for (x = 0; x < width; x++ )
+        for (y=0; y<height; y++)
+        {
+            
+            vec uscaled;
+            vecScalar( uscaled, u, (x-width/2.0)*pw );
+            vec vscaled;
+            vecScalar( vscaled, v, (y-height/2.0)*ph );
+            
+            vec rayPoint;
+            set( rayPoint, vpc.x+uscaled.x+vscaled.x,
+                           vpc.y+uscaled.y+vscaled.y,
+                           vpc.z+uscaled.z+vscaled.z );
+            //vecadd( rayPoint, vpc, uscaled );
+            //vecadd( rayPoint, rayPoint, vscaled );
+            
+            vec rayDir;
+            vecsub( rayDir, rayPoint, camera.position );
+            normalize( rayDir );
+            
+            ray_t ray;
+            set( ray.origin, camera.position );
+            set( ray.dir, rayDir ); 
+            
+            intersection_t isects;
+            if (castRay( ray, sphere, isects ) == 1 )
+            {
+               
+               //setcol(255,0,0);
+               setcol( colorAt(isects) );
+            }else{
+               setcol(127,127,127);
+            }
+            setpix(x,y);
+         }
+}
+
+colorAt( intersection_t isect )
+{
+   vec ambientLight;
+   set( ambientLight, 0.1, 0.1, 0.1 );
+
+    //let closest = List.maxBy(fun i -> i.t) intersections
+    vec kd = isect.sphere.diffuseColor;
+    vec Ia = ambientLight;
+    vec L;
+    vecsub(L, light.pos, isect.point);
+    normalize(L);
+    
+    double Id = max(0.0, dot(L, isect.normal));
+    vec V;
+    vecsub(V, camera.position, isect.point);
+    vec H;
+    vecadd(H, L, V);
+    normalize(H);
+    
+    double Is = pow( max(0.0, dot(H,isect.normal)), 500.0);
+    vec ambient;
+    vecScalar(ambient, kd, Ia);
+    vec diffuse;
+    vecScalar(diffuse, kd, Id);
+    
+    vec specular;
+    set(specular, 1.0,1.0,1.0 );
+    vecScalar(specular, specular, Is );
+    
+    return rgb( 255*(ambient.x + diffuse.x + specular.x) ,
+                255*(ambient.y + diffuse.y + specular.y) ,
+                255*(ambient.z + diffuse.z + specular.z) );
+}    
+
+/// Get the position of a ray at a given time
+pointAtTime (vec pt, ray_t ray, time )
+{
+   vecscalar( pt, ray.dir, time );
+   vecadd( pt, pt, ray.origin );
+}
+
+
+castRay( ray_t ray, sphere_t sphere, Intersection_t isects )
+{
+   vec s;
+   vecsub( s, ray.origin, sphere.center );
+   vec rayDir;
+   set( rayDir, ray.dir );
+   normalize( rayDir );
+   
+   sv = dot(s, rayDir );
+   ss = dot(s,s);
+   discr = sv*sv - ss + sphere.radius^2;
+   if ( discr < 0.0 ) 
+      return 0;
+   else 
+   {
+      sqDsc = sqrt(discr);
+      t1 = -sv + sqDsc;
+      t2 = -sv - sqDsc;
+      
+      t = max(t1,t2);
+      /*
+      vec ray_t1;
+      vec ray_t2;
+      pointAtTime( ray_t1, ray, t1 );      
+      pointAtTime( ray_t2, ray, t2 );
+
+      vec n1;
+      vec n2;
+      vecsub( n1, sphere.center, ray_t1 );
+      vecsub( n2, sphere.center, ray_t2 );
+      normalize(n1);
+      normalize(n2);
+      */
+      
+      vec ray_hit;
+      pointAtTime( ray_hit, ray, t );    
+      
+      vec normal;
+      vecsub( normal, sphere.center, ray_hit );
+      normalize(normal);
+      
+      isects.normal = normal;
+      isects.point = ray_hit;
+      isects.ray = ray;
+      isects.sphere = sphere;
+      isects.t = t;
+
+      return 1;
+   }
+   return 1;
+}
+
+vecscalar( vec out, vec a, s )
+{
+   out.x = a.x * s;
+   out.y = a.y * s;
+   out.z = a.z * s;
+}
+
+vecadd( vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;
+}
+
+vecsub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;
+}
+
+veccross( vec out, vec a, vec b)
+{
+   out.x = a.y * b.z - a.z * b.y;
+   out.y = a.z * b.x - a.x * b.z;
+   out.z = a.x * b.y - a.y * b.x;
+}
+
+
+dot( vec a, vec b )
+{
+   return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+set( vec out, vec a )
+{
+   out.x = a.x;
+   out.y = a.y;
+   out.z = a.z;
+}
+
+set( vec a, x, y, z )
+{
+   a.x = x;
+   a.y = y;
+   a.z = z;
+}
+
+length( vec v )
+{
+   return sqrt( dot(v,v) );
+}
+
+normalize( vec v )
+{
+   l = length(v);
+   if( l ){
+      v.x /= l; 
+      v.y /= l; 
+      v.z /= l;
+   }
+}

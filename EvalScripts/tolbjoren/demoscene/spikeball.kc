@@ -1,0 +1,288 @@
+struct vec
+{
+   x,y,z;
+};
+
+
+static mtx[9];
+enum{MAX_SPIKES = 32}   
+static vec bpos[MAX_SPIKES];
+
+()
+{
+
+   cls(0);
+   clz(1e32);
+   t = klock(0);
+   a = t;
+   r = -15;
+   setcam(sin(a)*r,0,cos(a)*r,a,0);
+   
+   iters = 1 + mousx/xres * 40;
+
+   vec colorvec;
+      
+
+   static vec upvec;
+   //set( upvec, 0,1,0 );
+   
+   static rot_rate = 0.1;
+   
+   if ( bstatus == 1 )
+   {
+      random_unit( upvec );
+      
+      do
+      {
+         random_unit_positive( colorvec );
+         
+      }while( length(colorvec) < .2 );
+      vecscalar( colorvec, 128 );
+      
+      rot_rate = .01 + (rnd * 0.05);
+   }
+   
+
+   //c= 1;
+   //setcol( c*colorvec.x, c*colorvec.y, c*colorvec.z );
+   //drawsph(0,0,0,4);
+
+   u = 0;
+   v = 0;
+   du = 1/sqrt(MAX_SPIKES-1);
+   dv = du;
+   for( i =0; i< MAX_SPIKES; i++ )
+   {
+      
+      if ( numframes == 0 || bstatus==1)
+      {
+         
+         //random_unit( bpos[i] );
+         
+         sphere( u, v, bpos[i]);
+         vecscalar( bpos[i], 2 );
+  
+         u += du;
+         if ( u >= 1 )
+         {
+            u = 0;
+            v += dv;
+         }       
+         
+
+         
+      }
+      r = .5;
+      
+      vec a;
+      vec nul;
+      set( nul, 0,0,0 );
+      lerp( a, nul, bpos[i], 0.8 );
+      
+      
+/*
+      setcol( 0x3cc038 );
+      drawcone( a.x, a.y, a.z, -r,
+                bpos[i].x, bpos[i].y, bpos[i].z, -r );
+           
+
+*/
+      vec newdir;
+      vecsub( newdir, bpos[i], a );
+      
+      vec oldb;
+      set(oldb, bpos[i] );
+      
+
+
+      vec rotdir;
+      vecCross( rotdir, newdir, upvec );
+      vecCross( rotdir, rotdir, upvec );
+      normalize(rotdir);
+      
+      vec rotdir2;
+      set(rotdir2, bpos[i].x, bpos[i].z,0 );
+      InitRotationMatrix( mtx, rotdir2, mousy/yres * 2*PI );
+      tform( mtx, rotdir );
+      normalize(rotdir);
+      
+      
+      rot = 0;
+
+      
+      for(j=0; j<iters; j++)
+      {
+         set(a, oldb);
+         vecadd( oldb, oldb, newdir );
+         
+         InitRotationMatrix( mtx, rotdir, rot );
+         tform( mtx, newdir );
+
+         vecscalar(newdir, 0.995);
+         
+         c = 2-j/iters;
+         setcol( c*colorvec.x, c*colorvec.y, c*colorvec.z );
+         //setcol( c * 0x3c, c * 0xc0, c* 0x38 );
+
+         r *= 0.95;
+         drawcone( a.x, a.y, a.z, -r,
+                oldb.x, oldb.y, oldb.z, -r );   
+                
+         rot += rot_rate;  
+      }
+   }
+
+   moveto( xres*.5 - 50 + cos(t) * 60, yres*0.8 );
+   setfont(8,12);
+   setcol(0xff, 0xff, 0xff);
+   printf("Press stuffs");
+
+   bstatus = 0; // DIRTY!
+}
+
+sphere(u,v,vec out)
+{
+   r=1;
+   //#define SPHERICAL
+   #ifdef SPHERICAL
+      u*=2*PI;
+      v*=PI;
+      out.x = r * cos(u) * sin(v);
+      out.y = r * sin(u) * sin(v);
+      out.z = r * cos(v);
+   #else
+      u = -r + u*2*r;
+      v *= 2*PI;
+      out.x = sqrt(r*r - u*u) * cos(v);
+      out.y = sqrt(r*r - u*u) * sin(v);
+      out.z = u;
+   #endif
+}
+
+lerp(vec out, vec a, vec b, t)
+{
+   out.x = a.x + (b.x-a.x) * t;
+   out.y = a.y + (b.y-a.y) * t;
+   out.z = a.z + (b.z-a.z) * t;
+}
+
+vecadd(vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;
+}
+
+vecsub(vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;
+}
+
+set(vec a, x, y, z)
+{
+   a.x = x;
+   a.y = y;
+   a.z = z;
+}
+
+vecCross( vec out, vec a, vec b)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+
+dot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+set(vec a, vec b)
+{
+   a.x = b.x;
+   a.y = b.y;
+   a.z = b.z;
+}
+
+random_unit( vec v )
+{
+   v.x = nrnd;
+   v.y = nrnd;
+   v.z = nrnd;
+   l = length(v);
+   
+   v.x /= l;
+   v.y /= l;
+   v.z /= l;
+}
+
+random_unit_positive( vec v )
+{
+   v.x = rnd;
+   v.y = rnd;
+   v.z = rnd;
+   l = length(v);
+   
+   v.x /= l;
+   v.y /= l;
+   v.z /= l;
+}
+
+vecscalar(vec v, s ){
+   v.x *= s;
+   v.y *= s;
+   v.z *= s;
+}
+
+length( vec v )
+{
+   return sqrt( v.x^2 + v.y^2 + v.z^2 );
+}
+
+normalize( vec v )
+{
+   rlen = 1.0 / length(v) ;
+   v.x*=rlen;
+   v.y*=rlen;
+   v.z*=rlen;
+}
+
+//
+// Meet the matrices
+//
+
+tform(m[9], vec v)
+{
+   
+   v.x = m[0] * v.x + m[1] * v.y + m[2] * v.z;
+   v.y = m[3] * v.x + m[4] * v.y + m[5] * v.z;
+   v.z = m[6] * v.x + m[7] * v.y + m[8] * v.z;
+}
+
+InitRotationMatrix(Mtx[9], vec pAxis, r)
+{
+  // The axis vector must be of unit length
+  x=0, y=0, z=0, m=0;
+  m = length(pAxis);
+  x = pAxis.x/m;
+  y = pAxis.y/m;
+  z = pAxis.z/m;
+
+  // Compute the rotation matrix  
+  c = cos(r);
+  s = sin(r);
+
+  Mtx[0] = (x * x) * (1.0 - c) + c;
+  Mtx[1] = (y * x) * (1.0 - c) + (z * s);
+  Mtx[2] = (z * x) * (1.0 - c) - (y * s);
+
+  Mtx[3] = (x * y) * (1.0 - c) - (z * s);
+  Mtx[4] = (y * y) * (1.0 - c) + c;
+  Mtx[5] = (z * y) * (1.0 - c) + (x * s);
+
+  Mtx[6] = (x * z) * (1.0 - c) + (y * s);
+  Mtx[7] = (y * z) * (1.0 - c) - (x * s);
+  Mtx[8] = (z * z) * (1.0 - c) + c;
+}

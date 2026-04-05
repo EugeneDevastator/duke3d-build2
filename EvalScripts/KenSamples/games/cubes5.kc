@@ -1,0 +1,201 @@
+enum {BSIZ=10,NMON=1};
+static board[BSIZ][BSIZ][BSIZ];
+
+()
+{
+   struct { x, y, z, h, v; } cam_t;
+   static cam_t mon[NMON], pos;
+   gotcnt = 0;
+   
+   for(x=0;x<BSIZ;x++)
+      for(y=0;y<BSIZ;y++)
+         for(z=0;z<BSIZ;z++) board[x][y][z] = 0;
+   for(x=0;x<BSIZ;x++)
+      for(y=0;y<BSIZ;y++)
+      {
+         board[     x][     y][     0] = rndbrightcol();
+         board[     x][     y][BSIZ-1] = rndbrightcol();
+         board[     x][     0][     y] = rndbrightcol();
+         board[     x][BSIZ-1][     y] = rndbrightcol();
+         board[     0][     x][     y] = rndbrightcol();
+         board[BSIZ-1][     x][     y] = rndbrightcol();
+      }
+   for(i=BSIZ*BSIZ*BSIZ*.3;i>0;i--)
+      board[BSIZ*rnd][BSIZ*rnd][BSIZ*rnd] = rndbrightcol();
+      
+   do
+   {
+      pos.x = int((BSIZ-2)*rnd)+1;
+      pos.y = int((BSIZ-2)*rnd)+1;
+      pos.z = int((BSIZ-2)*rnd)+1;
+   } while (board[pos.x][pos.y][pos.z]);
+   pos.x += .5; pos.y += .5; pos.z += .5;
+   pos.h = 0; pos.v = 0;
+   
+   for(c=0;c<NMON;c++)
+   {
+      do
+      {
+         mon[c].x = int((BSIZ-2)*rnd)+1;
+         mon[c].y = int((BSIZ-2)*rnd)+1;
+         mon[c].z = int((BSIZ-2)*rnd)+1;
+      } while (board[mon[c].x][mon[c].y][mon[c].z]);
+      mon[c].x += .5; mon[c].y += .5; mon[c].z += .5;
+      mon[c].h = 0; mon[c].v = 0;
+   }
+   
+   tim = 0;
+   while (1)
+   {
+      clz(1e32);
+      
+      otim = tim; tim = klock(); dtim = tim-otim;
+      playercontrols(dtim,&pos.x,&pos.y,&pos.z,&pos.h,&pos.v);
+      setcam(pos.x,pos.y,pos.z,pos.h,pos.v);
+      
+      glBegin(GL_QUADS); setcol(0xffffff);
+      for(x=0;x<BSIZ;x++)
+         for(y=0;y<BSIZ;y++)
+            for(z=0;z<BSIZ;z++)
+            {
+               v = board[x][y][z]; if (v == 0) continue;
+               if (v%2) glsettex("cloud.png");
+                   else glsettex("wood.png");
+               setcol(v);
+               if (board[x][y][z-1] == 0)
+               {
+                  glTexCoord(0,0); glVertex(x  ,y  ,z  );
+                  glTexCoord(1,0); glVertex(x+1,y  ,z  );
+                  glTexCoord(1,1); glVertex(x+1,y+1,z  );
+                  glTexCoord(0,1); glVertex(x  ,y+1,z  );
+               }
+               if (board[x][y][z+1] == 0)
+               {
+                  glTexCoord(0,0); glVertex(x+1,y  ,z+1);
+                  glTexCoord(1,0); glVertex(x  ,y  ,z+1);
+                  glTexCoord(1,1); glVertex(x  ,y+1,z+1);
+                  glTexCoord(0,1); glVertex(x+1,y+1,z+1);
+               }
+               setcol((int(v/65536)%256)*1.2,
+                      (int(v/  256)%256)*1.2,
+                      (int(v      )%256)*1.2);
+               if (board[x][y-1][z] == 0)
+               {
+                  glTexCoord(0,0); glVertex(x  ,y  ,z+1);
+                  glTexCoord(1,0); glVertex(x+1,y  ,z+1);
+                  glTexCoord(1,1); glVertex(x+1,y  ,z  );
+                  glTexCoord(0,1); glVertex(x  ,y  ,z  );
+               }
+               if (board[x][y+1][z] == 0)
+               {    
+                  glTexCoord(0,0); glVertex(x  ,y+1,z  );
+                  glTexCoord(1,0); glVertex(x+1,y+1,z  );
+                  glTexCoord(1,1); glVertex(x+1,y+1,z+1);
+                  glTexCoord(0,1); glVertex(x  ,y+1,z+1);
+               }
+               setcol((int(v/65536)%256)*0.8,
+                      (int(v/  256)%256)*0.8,
+                      (int(v      )%256)*0.8);
+               if (board[x-1][y][z] == 0)
+               {
+                  glTexCoord(0,0); glVertex(x  ,y  ,z+1);
+                  glTexCoord(1,0); glVertex(x  ,y  ,z  );
+                  glTexCoord(1,1); glVertex(x  ,y+1,z  );
+                  glTexCoord(0,1); glVertex(x  ,y+1,z+1);
+               }            
+               if (board[x+1][y][z] == 0)
+               {
+                  glTexCoord(0,0); glVertex(x+1,y  ,z  );
+                  glTexCoord(1,0); glVertex(x+1,y  ,z+1);
+                  glTexCoord(1,1); glVertex(x+1,y+1,z+1);
+                  glTexCoord(0,1); glVertex(x+1,y+1,z  );
+               }
+               glEnd();
+            }
+      
+      setcol(0xffffff);
+      for(c=0;c<NMON;c++)
+      {
+         drawkv6("caco.kv6",.01,mon[c].x,mon[c].y,mon[c].z,mon[c].h,mon[c].v);
+         if ((mon[c].x-pos.x)^2 + (mon[c].y-pos.y)^2 + (mon[c].z-pos.z)^2 < .5^2)
+         {
+            gotcnt++;
+            if (gotcnt == 1)
+                 playtext("<pitch middle='-20'/>%g caco found",gotcnt);
+            else playtext("<pitch middle='-20'/>%g cacos found",gotcnt);
+            for(i=0;i<10;i++)
+            {
+               j = int(4*rnd); k = int(25000*rnd)+15000;
+               if (j == 0) playtext(",<silence msec='%g'/>You must be seriously bored",k);
+               if (j == 1) playtext(",<silence msec='%g'/>The game ends when you get bored.",k);
+               if (j == 2) playtext(",<silence msec='%g'/>I think you're lost.",k);
+               if (j == 3) playtext(",<silence msec='%g'/>He's near the cube over there!",k);
+            }
+            playsound("pickup.wav");
+            do
+            {
+               mon[c].x = int((BSIZ-2)*rnd)+1;
+               mon[c].y = int((BSIZ-2)*rnd)+1;
+               mon[c].z = int((BSIZ-2)*rnd)+1;
+            } while (board[mon[c].x][mon[c].y][mon[c].z]);
+            mon[c].x += .5; mon[c].y += .5; mon[c].z += .5;
+         }
+      }
+      if (tim < 2)
+      {
+         if (numframes == 0) playtext("Where's Caco?");
+         setfont(12,16);
+         moveto(xres/2-13*6,yres/2-8);
+         setcol(int(255-min(max(abs(tim-1)*256-128,0),255))*0x10101);
+         printf("Where's CACO?");
+      }
+      
+      refresh();
+   }
+}
+
+rndbrightcol ()
+{
+   r = int(96*rnd)+160;
+   g = int(96*rnd)+160;
+   b = int(96*rnd)+160;
+   return(r*65536+g*256+b);
+}
+
+   //Handle input and player movement
+playercontrols (f,&px,&py,&pz,&ph,&pv)
+{
+   if (keystatus[0x2a]) f /= 4;
+   if (keystatus[0x36]) f *= 4;
+   vx = (keystatus[0xcd]-keystatus[0xcb])*f; //Right-Left
+   vy = (keystatus[0xc8]-keystatus[0xd0])*f; //Up-Down
+   vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   static mat[9];
+   readmouse(&mousx,&mousy);
+   ph += mousx*.01;
+   pv += mousy*.01;
+   ang2mat(ph,pv,mat);
+   nvx = mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   nvy = mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   nvz = mat[2]*vx + mat[5]*vz + mat[8]*vy;
+   d = 1/12;
+   for(i=8-1;i>0;i--) //quick&dirty collision detection
+   {
+      x = px+nvx*(i%2); y = py+nvy*((i%4)>=2); z = pz+nvz*(i>=4);
+      if ((board[x-d][y-d][z-d] == 0) && (board[x+d][y-d][z-d] == 0) &&
+          (board[x-d][y+d][z-d] == 0) && (board[x+d][y+d][z-d] == 0) &&
+          (board[x-d][y-d][z+d] == 0) && (board[x+d][y-d][z+d] == 0) &&
+          (board[x-d][y+d][z+d] == 0) && (board[x+d][y+d][z+d] == 0))
+         { px = x; py = y; pz = z; break; }
+   }
+}
+
+ang2mat (hang,vang,mat[9])
+{
+   mat[6] = cos(vang)*sin(hang); mat[0] = cos(hang);
+   mat[7] = sin(vang);           mat[1] = 0;
+   mat[8] = cos(vang)*cos(hang); mat[2] =-sin(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}

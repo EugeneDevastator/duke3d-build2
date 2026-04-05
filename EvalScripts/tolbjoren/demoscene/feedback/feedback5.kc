@@ -1,0 +1,125 @@
+// would be fast in a shader
+
+enum{resx=128, resy=128};
+
+static buf[resy][resx];
+static copy[resy*2][resx*2];
+static time;
+static picx, picy;
+
+static zoom = 0;
+static zoomdir = 1;
+()
+{
+   cls(0);
+   time = klock(0);
+ 
+   if(numframes==0)
+   {
+      glDisable(GL_DEPTH_TEST); // needed for sprites
+      glDisable(GL_ALPHA_TEST);
+      glsettex("wood.png");
+   }
+  
+   drawFeedback();
+   warp();
+   
+   mix();   
+  scalePic(resx/2,resy/2,256,256,resx*1.05); // resx*1.01 resx*1.05 SCALE!
+   
+   
+   
+   
+}
+
+// mix drains all the juice
+// this could be sped up by only drawing to a buffer.
+// getpix is slo!
+mix()
+{
+   static line[resx];
+   for(y=0; y<resy; y++)
+   {
+      gethlin(0,y,line,resx);
+      for(x=0; x<resx; x++)
+      {     
+         r = line[x] / 2^16;
+         g = line[x] / 2^8 % 256;
+         b = line[x] % 256;
+         nr = buf[y][x] / 2^16;
+         ng = buf[y][x] / 2^8 % 256;
+         nb = buf[y][x] % 256;
+         //buf[y][x] = rgb(nr/2.1,ng/2.1,nb/2.1)+ rgb(r/2,g/2,b/2);
+         buf[y][x] = rgb(nr/2,ng/2,nb/2) + rgb(r/2.2,g/2.2,b/2.2);
+      }
+      
+   }
+}
+
+warp()
+{
+   setcol(0xffffff);
+   moveto(mousx, mousy); printf("IT REALLY KICKS THE LLAMAS ASS!");
+   //drawspr(mousx,mousy,10,0*time);
+   
+   setcol(rnd*255,rnd*255,rnd*255);
+   moveto(resx/4+ 5*cos(5*time), resy/2 + 15*sin(5*time ) );
+   setfont(6,8);
+   printf("numframes %g",numframes);
+   
+}
+
+// i should have a look at this:
+// http://www.compuphase.com/graphic/scale.htm
+scalePic(xpos, ypos, xmax, ymax, scale)
+{
+   sx = scale; sy = scale;
+   deltax = resx/sx;
+   deltay = resy/sy;
+   
+   gx = 0;
+   gy = 0;   
+
+   for(y=resx/2; y<resy*2; y++)
+   {
+      for(x=resy/2; x<resx*2; x++)
+      {
+
+         copy[y-scale/2][x-scale/2] = buf[int(gy) ][int(gx)];
+         //copy[y][x] = buf[int(gy) ][int(gx)];
+         
+         gx += deltax;
+         //if(x > xmax) break;
+      }
+      //if(y > ymax) break;
+      gx = 0;
+      gy += deltay;
+   }
+   
+   // Copy back
+   for(y=0; y<resy; y++)
+   {
+      for(x=0; x<resx; x++)
+      {
+         buf[y][x] = copy[y][x];
+      }
+   }
+}
+
+
+
+drawFeedback()
+{
+   // draw
+   static line[resx];
+   for(y=0; y<resy; y++)
+   {
+      for(x=0; x<resx; x++)
+      {
+         line[x] = buf[y][x];
+      }
+      sethlin(0,y,line,resx);
+   }
+
+}
+

@@ -1,0 +1,65 @@
+()
+{
+   cls(0);
+   t = klock(0);
+   
+   p1x = xres*0.1;
+   p1y = yres*0.1;
+
+
+   p2x = xres*0.5;
+   p2y = yres*1.5;
+   
+   p3x = xres*0.9;
+   p3y = yres*0.1;
+
+   steps = 100;
+   for(i=0; i<steps; i++){
+      t = i / (steps-1);
+      
+      px=0; py=0;
+      evalQuadBez( t, p1x, p1y, p2x, p2y, p3x, p3y, px,py );
+      //geomQuadBez( t, p1x, p1y, p2x, p2y, p3x, p3y, px,py );
+      setpix(px,py);
+   }
+}
+
+evalQuadBez(t,p1x,p1y,p2x,p2y,p3x,p3y,&outX, &outY){
+      a = (1-t)^2;
+      b = 2*t*(1-t);
+      c = t^2;
+      outX = a*p1x + b*p2x + c*p3x;
+      outY = a*p1y + b*p2y + c*p3y;
+}
+
+// taken from an issue 2 of BlitzMax Coder
+geomQuadBez(positionOnCurve, p1X, p1Y, p2X, p2Y, p3X, p3Y, &p123X, &p123Y)
+{
+   // Calc a point on  a quad bezier curve
+   // reqs three control points with X,Y coords
+   // and a current pos on the curve in the range 0..1
+   // coords are returned in P123X and P123Y vars
+   
+   // Calc dists tween control points
+   p12X = p2X-p1X; p12Y = p2Y-p1Y;
+   p23X = p3X-p2X; p23Y = p3Y-p2Y;
+   // Find pos along lines from P1-p2 and P2-P3
+   p12X *= positionOnCurve;
+   p12Y *= positionOnCurve;
+   p23X *= positionOnCurve;
+   p23Y *= positionOnCurve;
+   
+   // Calc dist tween two positions
+   p123X = (P2X+P23X) - (P1X+P12X); // dist in X tween P12X and P23X
+   p123Y = (P2Y+P23Y) - (P1Y+P12Y);
+   
+   // Find a pos along the line from P12-P23
+   p123X *= positionOnCurve;
+   p123Y *= positionOnCurve;
+   
+   // Add up the relative positions to make screen coords
+   p123X += P1X+P12X;
+   p123Y += P1Y+P12Y;
+   
+   // P123X, P123Y is the point on the curve
+}

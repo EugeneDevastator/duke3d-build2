@@ -1,0 +1,436 @@
+// hugo elias' version looks better.
+// 9. nov. using glComplex to draw scaled image. Could use drawspr
+enum {width=256};
+enum {height=256};
+static buf1[width*height];
+static buf2[width*height];
+static picture[width*height];
+static pixelsTotal;
+
+//Taken from fire with metaballs
+enum{text_w = width, text_h=50};
+static textBuf[text_w*text_h];
+
+static swap = 1;
+static dampning = 0.05;
+static maxWave = 100; // absolute max wave height. +- this value.
+static zoom = 1;
+
+
+enum{TEXW=32, TEXH=32};
+enum{NUMBITS=16, MAXNUMS=3};
+static binary[MAXNUMS][NUMBITS]; // little endian. LSB at end.
+static xorTex[TEXW][TEXH];
+static useXor = 1;
+
+// Idea: Draw 3d mesh instead of pixels.
+// add blur filter.
+()
+
+
+{
+   // zoom = max(1, (mousx)/(xres/4) );  
+   zoom = 1;
+   if(numframes==0){
+      genXorTex();   
+
+      pixelsTotal = width*height; 
+      i=0;
+      for(y=0; y<height; y++)
+      for(x=0; x<width; x++)
+      {
+         if(useXor==1)
+            picture[i] = xorTex[x][y];
+         else
+            picture[i] = pic(x,y);
+         i++;
+      } 
+      saveTextToBuf();
+   
+      // setup gl
+      glCullFace(GL_BACK); 
+      glDisable(GL_ALPHA_TEST);
+      glDisable(GL_DEPTH_TEST);
+      
+      
+   }
+   
+   cls(0,0,0);
+   
+   renderSlow(); // looks better 
+   //renderFast();
+   //makeWaves();
+   makeRaindrops();
+   
+   //applyText();
+   
+   if(bstatus==1) 
+   {
+      //bstatus=0; 
+      if(mousx > 0 && mousy > 0)
+      buf2[ ((mousy)%height)*width+((mousx)%width)] = -maxWave;  
+   }
+
+   static t;
+   tim = klock();
+   
+   if(t-klock() < 0)
+   {
+   
+   if(swap==1){
+      processWater1();
+      swap = 0;
+   }
+   else
+   {
+      processWater2();
+      swap = 1;
+   }
+      t = klock() + 1/60;
+   }
+    
+   moveto(width/5*zoom,height*zoom);
+   setfont(12,8);
+   printf("oldskool water fx");
+}
+
+
+genXorTex()
+{
+    for(x = 0; x < TEXW; x++) 
+    for(y = 0; y < TEXH; y++) 
+    {           
+         decToBin(x,0);
+         decToBin(y,1);
+         xor(0,1,2);
+         c = binToDec(2);        
+         xorTex[x][y] = hsv_to_rgb( c%360,.7,1);
+         //xorTex[x][y] = 6*rgb(c,c,c);
+    } 
+}
+
+makeWaves()
+{
+   //Lissajous
+   a = 1;
+   b = 2;
+   s = 30; // scale distance
+   spd = numframes/30;
+   x = width/2+s*a*sin(a*spd + pi/2);
+   y = floor( height/2+s*b*sin(b*spd) );
+   buf2[y*width+x]=-maxWave;
+   
+   a = 3;
+   b = 2;
+   spd = numframes/80;
+   x = width/2+s*a*sin(a*spd + pi/2);
+   y = floor( height/2+s*b*sin(b*spd) );
+   //buf2[y*width+x]=-maxWave;
+}
+
+makeRaindrops()
+{
+   //if( rnd < 0.05)
+   {
+      x = 1+rnd*(width-1);
+      y = 1+rnd*(height-1);
+      buf2[y*width+x] = nrnd*maxWave;
+      //buf1[y*width+x] = nrnd*maxWave;
+   }
+}
+
+applyText()
+{
+   static i;
+   i+=0.005;
+   
+   for(y=0; y<text_h; y++)
+   for(x=0; x<text_w; x++)
+   {
+     if(textBuf[y*text_w+x] > 255 )
+     {
+        nx = x+60+cos(i)*40+rnd*2;
+        ny = height/2+int(sin(i)*50)+y;
+        pos =ny*width+nx;
+        buf1[pos] = 2+buf1[pos];
+        //buf2[pos] = 1+buf2[pos];
+     }
+  }
+}
+
+// rendering algo from Hugo Elias
+// freespace.virgin.net/hugo.elias/
+renderFast()
+{
+   static frame[height][width];
+   for(y=0; y<height; y++)
+   {
+      for(x=0; x<width; x++)
+      {  
+         if(swap==1){
+            xOfs = int( buf2[y*width+(x-1)]-buf2[y*width+(x+1)] );      
+            yOfs = int( buf2[(y-1)*width+x]-buf2[(y+1)*width+x] ); 
+         }
+         else
+         {
+            xOfs = int( buf1[y*width+(x-1)]-buf1[y*width+(x+1)] );      
+            yOfs = int( buf1[(y-1)*width+x]-buf1[(y+1)*width+x] ); 
+         }
+   
+     
+         //texture = pic(x+xOfs, y+yOfs); // or read from buffer:
+         texture = picture[ (y+yOfs) * width + (x+xOfs)]; // uncomment this line.
+         // I want the water too look more distinct.
+         // Use the wave "height" to change color. 
+         // First. Ill get the rgb components and do something...
+         r=0; g=0; b=0;
+         hex2rgb(texture,r,g,b);
+         normalizedHeight = 155*(buf2[y*width+x]/maxWave);
+         frame[y][x] = rgb(r+normalizedHeight,g+normalizedHeight,b+normalizedHeight);
+      }
+   } 
+   
+   texHandle = glsettex(frame,width,height);
+   //drawspr(width,height,width*0.5*zoom,0);
+   quad(0,0,width*zoom,height*zoom);
+   glremovetex(texhandle);
+}
+
+hex2rgb(mrgb,&r,&g,&b)
+{  
+   r = (mrgb / 2^16);
+   g = (mrgb / 2^8) % 256;
+   b = mrgb % 256;   
+}
+
+// check out
+// http://www.gamedev.net/reference/articles/article915.asp
+renderSlow()
+{
+   rIndex = 2.0; // Refraction index of water is actually 1.3
+   texture = 0;
+   static frame[height][width];
+   for(y=0; y<height; y++)
+   {
+      for(x=0; x<width; x++)
+      {
+         // Room for a lot of optimizations here. The trigonometry can be simplyfied.
+         ind=y*width+x;
+
+         if(swap==1){
+            xDiff = ( buf2[y*width+(x+1)]-buf2[ind] );      
+            yDiff = ( buf2[(y+1)*width+x]-buf2[ind] ); 
+         }
+         else
+         {
+            xDiff = ( buf1[y*width+(x+1)]-buf1[ind] );      
+            yDiff = ( buf1[(y+1)*width+x]-buf1[ind] ); 
+         }     
+         
+         xAngle = atan(xDiff);
+         xRefraction = asin( sin(xAngle) / rIndex);
+         xDisplace = int( tan(xRefraction)*xDiff);
+         
+         yAngle = atan(yDiff);
+         yRefraction = asin( sin(yAngle) / rIndex);
+         yDisplace = int( tan(yRefraction)*yDiff);
+         
+         if(xDiff<0)
+         {
+            if(yDiff<0)
+            {
+               texture = picture[ (y-yDisplace)*width+(x-xDisplace) ];
+            }
+            else
+            {
+               texture = picture[ (y+yDisplace)*width+(x-xDisplace) ];
+            }
+         }
+         else
+         {
+            if(yDiff < 0)
+            {
+               texture = picture[ (y-yDisplace)*width+(x+xDisplace) ];
+            }
+            else
+            {
+               texture = picture[ (y+yDisplace)*width+(x+xDisplace) ];
+            }
+         }
+         r=0; g=0; b=0;
+         hex2rgb(texture,r,g,b);
+         normalizedHeight = 155*(buf2[y*width+x]/maxWave);
+         frame[y][x] = rgb(r+normalizedHeight,g+normalizedHeight,b+normalizedHeight);
+         frame[y][x] = texture;                  
+      }
+   } 
+   texHandle = glsettex(frame,width,height);
+   quad(0,0,width*zoom,height*zoom);
+   glremovetex(texhandle);
+}
+
+
+
+
+// Not used because Evaldraw doesnt support
+// pointers to arrays.
+ProcessWater(source[width*height], dest[width*height])
+{
+   for (i=320; i<pixelsTotal-320; i++)
+   {
+      dest[i] = (
+                 ((source[i-1]+
+                 source[i+1]+
+                 source[i-320]+
+                 source[i+320])  /2) )   -dest[i];
+
+      dest[i] -= (dest[i] / 5);
+  }
+}
+
+ProcessWater1()
+{
+   for (i=width; i<pixelsTotal-width; i++)
+   {
+      buf2[i] = (
+                 ((buf1[i-1]+
+                 buf1[i+1]+
+                 buf1[i-width]+
+                 buf1[i+width])  /2) )   -buf2[i];
+
+      buf2[i] -= (buf2[i] * dampning);
+  }
+}
+
+ProcessWater2()
+{
+   for (i=width; i<pixelsTotal-width; i++)
+   {
+      buf1[i] = (
+                 ((buf2[i-1]+
+                 buf2[i+1]+
+                 buf2[i-width]+
+                 buf2[i+width])  /2) )   -buf1[i];
+
+      buf1[i] -= (buf1[i] * dampning);
+  }
+}
+
+saveTextToBuf()
+{
+   cls(0,0,0);
+   setfont(18,32,-1);//setfont(9,16);
+   setcol(0xffffff);
+   moveto(0,0);
+   printf("T O R B");
+   
+   // Grab text
+   for(y=0; y<text_h; y++)
+   for(x=0; x<text_w; x++)
+   {
+     r=0;
+     g=0;
+     b=0;
+     getpix(x,y,r,g,b);
+     textBuf[y*text_w+x] = r*2^16+g*2^8+b;
+  }
+}
+
+
+binToDec(id)
+{
+   num = 0;
+   for(i=0; i<NUMBITS; i++)
+   {
+      if( binary[id][i] == 1)
+      {
+         num += 2^(NUMBITS-i-1);
+      }
+   }   
+   return num;
+}
+
+decToBin(num,id)
+{
+   for(i=0; i<NUMBITS; i++)
+   {
+      binary[id][i] = 0; // clear.
+   }
+   bitpos = NUMBITS-1;
+   
+   while( num > 0 && bitpos >= 0)
+   {
+      if(num % 2 == 1)
+      {
+         binary[id][bitpos] = 1;
+      }
+      else
+      {
+         binary[id][bitpos] = 0;
+      }
+      bitpos--; // ready for next bit
+      
+      num = int(num/2);
+   }
+}
+
+printBin(id)
+{
+   for(i=0; i<NUMBITS; i++)
+   {
+      printf("%g", binary[id][i] );
+   }   
+}
+
+xor(num1,num2,store)
+{
+   for(i=0; i<NUMBITS; i++)
+   {
+      if(binary[num1][i] == binary[num2][i])
+      {
+         binary[store][i] = 0;
+      }
+      else
+      {
+         binary[store][i] = 1;
+      }
+   }   
+   
+}
+hsv_to_rgb(h,s,v)
+{
+   if(v==0){r=0; g=0; b=0;} // no brightness, black
+   else if(s==0){r=v; g=v; b=v;} // grayscale, no saturation
+   else{
+      hf = h / 60.0;
+      i = floor(hf);
+      f = hf - i;
+      pv = v* (1-s);
+      qv = v * (1-s*f);
+      tv = v * (1-s*(1-f));
+      if(i==0){r=v; g=tv; b=pv;}
+      if(i==1){r=qv; g=v; b=pv;}
+      if(i==2){r=pv; g=v; b=pv;}
+      if(i==3){r=pv; g=qv; b=v;}
+      if(i==4){r=tv; g=pv; b=v;}
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}
+   
+   }
+   r = int(r*255);
+   g = int(g*255);
+   b = int(b*255);
+   col =  rgb(r,g,b); // returns last value
+   //return r*2^16 + g*2^8 + b;
+}
+
+quad(x,y,widtha,heighta)
+{
+   glBegin(GL_COMPLEX);
+   glTexCoord(0,0);glVertex(x,y);
+   glTexCoord(1,0);glVertex(x+widtha,y);
+   glTexCoord(1,1);glVertex(x+widtha,y+heighta);
+   glTexCoord(0,1);glVertex(x,y+heighta);
+   glEnd();
+}

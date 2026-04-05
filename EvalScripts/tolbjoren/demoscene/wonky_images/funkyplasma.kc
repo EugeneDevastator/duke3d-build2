@@ -1,0 +1,68 @@
+enum{W=16, H=16};
+static offsX[W][H];
+static offsY[W][H];
+static offsXV[W][H];
+static offsYV[W][H];
+static offsXINT[W][H];
+static offsYINT[W][H];
+static offsXacc[W][H];
+static offsYacc[W][H];
+static offsC[W][H];
+
+static pal[255];
+()
+{
+   if(numframes==0) init();
+   
+   DrawTexture(16,16);
+}
+
+DrawTexture(xs,ys)
+{
+   VLDc=0; VRDc=0; HDc=0;
+   C1=0; C2=0; c=0;
+   x=0; y=0; xi=0; yi=0;
+   
+   for(yi=0; yi<H-1; yi++)
+   for(xi=0; xi<W-1; xi++)
+   {
+      VLDc = (offsC[xi][yi+1] - offsC[xi][yi])/ys;
+      VRDc = (offsC[xi+1][yi+1] - offsC[xi+1][yi])/ys;
+      
+      C1 = offsC[xi][yi];
+      C2 = offsC[xi+1][yi];
+      
+      for(y=yi*ys; y<(yi+1)*ys; y++)
+      {
+         HDc = (C2-C1) / ys;
+         c = C1;
+         
+         for(x=xi*xs; x<(xi+1)*xs; x++)
+         {
+            setcol( 4*pal[c] ); setpix(x,y);
+            c += HDc;
+         }
+         C1 += VLDc;
+         C2 += VRDc;
+         
+      }
+   }
+}
+
+Init()
+{
+   // setup garish palette
+   for(i=0; i<64; i++)
+   {
+      pal[i]     = rgb(i,   0,    63-i);
+      pal[i+64]  = rgb(63-i,i,    0);
+      pal[i+128] = rgb(0,   63-i, i);
+      pal[i+192] = rgb(i,   0,    63-i);
+   }   
+
+   for(y=0; y<H; y++)
+   for(x=0; x<W; x++)
+   {
+      offsC[x][y] = int(rnd*255); 
+   }
+}

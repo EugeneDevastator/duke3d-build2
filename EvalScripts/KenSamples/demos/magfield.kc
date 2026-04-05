@@ -1,0 +1,109 @@
+() cls(0x503070);
+static nx, ny, sx, sy;
+if (nx == 0)
+{
+   nx = xres*.75; ny = yres*(.5-.001);
+   sx = xres*.75; sy = yres*(.5+.001);
+}
+if (bstatus%2)
+{
+   nx = mousx;
+   ny = mousy;
+}
+if ((bstatus%4) >= 2)
+{
+   sx = mousx;
+   sy = mousy;
+}
+setcol(0xc0c0ff);
+moveto(nx-3,ny-5); printchar('N');
+moveto(sx-3,sy-5); printchar('S');
+
+mx = nx-sx; cx = (nx+sx)/2;
+my = ny-sy; cy = (ny+sy)/2;
+f = 1/sqrt(mx^2+my^2); mx *= f; my *= f;
+   
+if (0)
+{
+   //for(y=0;y<yres;y+=16)
+   //   for(x=0;x<xres;x+=16)
+   //   {
+   for(r=32;r<=512;r+=16)
+      for(a=0;a<=PI*2;a+=PI/24)
+      {
+         x = cos(a)*r+((nx+sx)*.5);
+         y = sin(a)*r+((ny+sy)*.5);
+         
+         nd = 1/((x-nx)^2 + (y-ny)^2);
+         sd = 1/((x-sx)^2 + (y-sy)^2);
+         vx = (x-nx)*nd - (x-sx)*sd;
+         vy = (y-ny)*nd - (y-sy)*sd;
+         bx = x-cx; by = y-cy;
+         f = (mx*bx + my*by)^2/(bx^2+by^2);
+         f = (f+1)*6/sqrt(vx^2+vy^2);
+         vx *= f; vy *= f;
+               
+         setcol(0x804040);
+         moveto(x,y);
+         lineto(x+vx,y+vy);
+         setcol(0xff7f7f);
+         setpix(x+vx,y+vy);
+      }
+}
+else
+{   
+   enum {NUMP=8192}
+   static px[NUMP], py[NUMP], otim;
+   
+   if (px[0] == 0)
+   {
+      for(i=0;i<NUMP;i++)
+      {
+         px[i] = xres*rnd;
+         py[i] = yres*rnd;
+      }
+      otim = klock(0);
+   }
+   
+   hx = xres*.5; hy = yres*.5;
+   tim = klock(0); dt = tim-otim; otim = tim;
+   setcol(0xffffff);
+   for(i=0;i<NUMP;i++)
+   {
+      x = px[i]; y = py[i];
+      sd = (x-sx)^2 + (y-sy)^2;
+      if ((abs(x-hx) >= hx) || (abs(y-hy) >= hy))
+      {
+            //Select random point on border
+         j = (xres+yres)*2*rnd;
+              if (j < xres) { x = j; y = 0; }
+         else if (j < xres*2)
+            { x = j-xres; y = yres; }
+         else if (j < xres*2+yres)
+            { x = 0; y = j-xres*2; }
+         else { x = xres; y = j-xres*2-yres; }
+      }
+      if (sd < 16^2)
+      {
+         a = (PI*2)*rnd;
+         x = cos(a)*16+nx;
+         y = sin(a)*16+ny;
+      }
+      nd = 1/((x-nx)^2 + (y-ny)^2);
+      sd = 1/((x-sx)^2 + (y-sy)^2);
+      vx = (x-nx)*nd - (x-sx)*sd;
+      vy = (y-ny)*nd - (y-sy)*sd;
+
+      f = 8/sqrt(vx^2+vy^2);
+      setcol((i%72)*64+64,(i%80)+128,64);
+      moveto(x-vx*f,y-vy*f);
+      lineto(x+vx*f,y+vy*f);
+      
+      f = 128*dt/sqrt(vx^2+vy^2);
+      x += vx*f;
+      y += vy*f;
+      
+      px[i] = x;
+      py[i] = y;
+   }
+}

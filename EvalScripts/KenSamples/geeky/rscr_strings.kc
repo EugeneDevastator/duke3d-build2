@@ -1,0 +1,22 @@
+()
+{
+   static verb[4] = {"awakened","bricked","crashed"};
+   static art[4] = {"n","",""};
+   static noun[4] = {"anvil","bomb","computer"};
+   static fmt = "", fmt2 = "In reality, nobody really did anything.\n";
+   while (1)
+   {
+      cls(0);
+      
+           if (mousx < 400) fmt = "You %s a%s %s.\n";
+      else if (mousx < 600) fmt = "Actually, I %s the %.0s%s.\n";
+      else                  fmt = fmt2;
+      
+      moveto(xres-320,0);
+      for(i=0;i<3;i++)
+         for(j=0;j<3;j++)
+            { printf(fmt,verb[i],art[j],noun[j]); }
+      
+      refresh(); Sleep(15);
+   }
+}

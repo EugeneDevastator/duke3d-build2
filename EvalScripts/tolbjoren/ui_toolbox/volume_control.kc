@@ -1,0 +1,70 @@
+/*
+idea is to create a volume control
+that can inc & dec a value as it is wound...
+*/
+
+()
+{
+
+
+cls(0);
+
+spinner(xres/2, yres/2, 50);
+
+}
+
+spinner(x,y,size)
+{
+   static angle;
+   
+   static grab_ox;
+   static grab_oy;
+
+   static grab_x;
+   static grab_y;
+   
+   static obstatus = 0;
+   
+   if ( bstatus == 1 ){
+      grab_x = mousx;
+      grab_y = mousy;
+   }
+   
+   if ( bstatus==1 && obstatus==1 ){
+      dx = grab_x;// - grab_ox;
+      dy = grab_y;// - grab_oy;
+      angle = atan2( dy-y, dx-x );// / 10;
+      //angle = max(0, angle);
+      //angle = min(2*pi, angle);
+   }
+   
+   grab_ox = grab_x;
+   grab_oy = grab_y;
+   obstatus = bstatus;
+   
+   setcol(128,128,128);
+   drawsph( x,y, size );
+   
+   setcol(158,158,158);
+   sc = 1.6;
+   for(i=0; i<10; i++){
+      sc = 1.6*sc;
+      drawsph( x,y, -sc/4 );
+   }
+   
+   setcol(200,200,200);
+   tx = cos(angle) * (size/2+size/4);
+   ty = sin(angle) * (size/2+size/4);
+   drawsph(x+tx, y+ty, size/4 );
+   
+   setcol(0,128,0);
+   tx = cos(angle) * size/2+5;
+   ty = sin(angle) * size/2+5;
+   //drawsph(x+tx, y+ty, size/8 );  
+   
+   setcol(255,255,255);
+   moveto(0,0);
+   setfont(12,16);
+   printf("angle  = %g\n", angle);
+   printf("angle/PI  = %.0f\n", 100*angle / (2*PI) );
+}

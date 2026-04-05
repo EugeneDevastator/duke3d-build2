@@ -1,0 +1,31 @@
+(x,y,z,&r,&g,&b) 
+c = 0;
+if (0)
+{
+      //Brute-force
+   r = 0; g = 0; b = 0; 
+   for(v=8,a=z*PI;v<11;v++,a+=PI*2/3) 
+      if ((x-cos(a)*.25)^2 + (y-sin(a)*.25)^2 < .25^2) 
+      { 
+         r += v*.05;
+         g += v*.04;
+         b += v*.03;
+         c++; 
+      }
+   if (c) { c = 256/c; r *= c; g *= c; b *= c; }
+}
+else
+{     //Optimized version of algorithm above
+   r = 0; a = z*PI;
+   qc = cos(a)/4;
+   qs = sin(a)/4;
+   for(v=8;v<11;v++)
+   {
+      if ((x-qc)^2 + (y-qs)^2 < .25^2) { r += v; c++; }
+      oqc = qc; //Rotate (qc,qs) 120 degrees
+      qc = qc*cos(PI*2/3) + qs*sin(PI*2/3);
+      qs = qs*cos(PI*2/3) -oqc*sin(PI*2/3);
+   }
+   if (c) { r *= 12.8/c; g = r*.8; b = r*.6; }
+}
+return(c);

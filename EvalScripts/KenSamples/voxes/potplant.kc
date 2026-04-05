@@ -1,0 +1,61 @@
+// I just made this because I wanted plants
+// in colacow.kc; it was also written at the same time.
+//
+// -Robert
+
+(x,y,z,&r,&g,&b) //looks best at high res, no lighting
+if (z>.5)
+{
+   r=0x80;g=0x40;b=0x20;
+   a=x^2+y^2;b=(1.5-z)*.25;
+   if ((z>.8 && a<=b)||(a<=b && a>=b-.0625))
+   {
+      r+=noise(x*8,y*8)*0x40;
+      g+=noise(x*8,y*8)*0x20;
+      return 1;
+   }
+   if (a>b) return 0;
+   if (z>.55)
+   {
+      a=noise(x*20,y*20);
+      if (a<.155)
+      {
+         r=0x40+0x30*noise(x*16,y*16);
+         g=0x10+0x10*noise(x*16,y*16);
+         b=0x00;
+         return 1;
+      }
+   }
+   if (z>.57)
+   {
+      r=0x20;g=0x00;b=0x00;
+      return 1;
+   }
+   if (a<=.012)
+   {
+      c=noise(x*10,y*10,z*10);
+      a=x^2+y^2-c*.008;if (a>.012) return 0;
+      r=0x20+0x20*c;g=0x10+0x10*c;b=0;
+      return 1;
+   }
+   return 0;
+}
+if (z>-.5)
+{
+   if (z<-.25)
+   {
+      c=noise(x*20,y*20,z*20);
+      a=x^2+y^2+((z+.62)*1.7)^2+c*.14;
+      r=0;g=96-96*c;b=0;
+      if (a<.4) return 1;
+   }
+   c=noise(x*10,y*10,z*10);
+   a=x^2+y^2-c*.008;if (a>.012) return 0;
+   r=0x20+0x20*c;g=0x10+0x10*c;b=0;
+   return 1;
+}
+c=noise(x*20,y*20,z*20);
+a=x^2+y^2+((z+.62)*1.7)^2+c*.14;
+r=0;g=96-96*c;b=0;
+if (a<.4) return 1;
+return 0;

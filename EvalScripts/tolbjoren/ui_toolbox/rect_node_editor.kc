@@ -1,0 +1,261 @@
+struct rectangel
+{
+   minx,miny;
+   maxx,maxy;
+   midx,midy;
+};
+ 
+enum{MAX_RECTS=10}
+ 
+static rectangel rectArray[MAX_RECTS];
+static numRects = 0;
+static started = 0;
+static startPx, startPy = 0;
+ 
+static graf[MAX_RECTS][MAX_RECTS];
+static startetGraf=0;
+static startNode=-1;
+()
+{
+   cls(0);
+ 
+   if( bstatus == 1 && started == 0 )
+   {
+      started = 1;
+      bstatus = 0;
+      startPx = mousx;
+      startPy = mousy;
+   }
+   if( started == 1 )
+   {
+      drawrectopen(startPx, startPy,mousx,mousy);
+   }
+ 
+   if( bstatus == 1 && started == 1 )
+   {
+      started = 0;
+      bstatus = 0;
+      makeRect(startPx, startPy, mousx, mousy );
+   }
+ 
+   for(i=0; i<numRects;i++)
+   {
+      x0 = rectArray[i].minx;
+      y0 = rectArray[i].miny;
+      x1 = rectArray[i].maxx;
+      y1 = rectArray[i].maxy;
+      drawrectopen(x0,y0,x1,y1);
+   }
+ 
+   for(i=0; i<numRects;i++)
+   {
+      rectangel temp;
+      temp.minx = rectArray[i].minx;
+      temp.miny = rectArray[i].miny;
+      temp.maxx = rectArray[i].maxx;
+      temp.maxy = rectArray[i].maxy;   
+ 
+      inni = isInsideRect( temp, mousx, mousy );
+      if( inni )
+      {
+         drawsph(mousx,mousy,10);
+      }
+   }
+ 
+   // LAge graf
+   if( bstatus==2 && startetGraf==0 )
+   {
+      bstatus = 0;
+      rect = getRectUnderMouse();
+ 
+      if( rect != -1 )
+      {
+         startetGraf = 1;
+         startNode = rect;
+      }
+ 
+   }
+ 
+   if( startetGraf )
+   {
+      midx = rectArray[startNode].midx;
+      midy = rectArray[startNode].midy;
+      moveto( midx, midy );
+      lineto( mousx, mousy );
+   }
+ 
+   if( bstatus==2 && startetGraf==1 )
+   {
+      bstatus = 0;
+      sluttNode = getRectUnderMouse();
+ 
+      if( sluttNode != -1 )
+      {
+         startetGraf = 0;
+         graf[startNode][sluttNode] = 1;
+         graf[sluttNode][startNode] = 1;
+      }
+ 
+   }
+ 
+drawGraf();
+ 
+ 
+}
+ 
+drawGraf()
+{
+ 
+ 
+ 
+ 
+   for(i=0; i<MAX_RECTS; i++)
+   for(j=0; j<MAX_RECTS; j++)
+   {
+ 
+      moveto(i*25, j*25);
+      printf("%.0f", graf[i][j] );     
+ 
+   }
+ 
+   for(i=0; i<MAX_RECTS; i++)
+   for(j=i; j<MAX_RECTS; j++)
+   {
+ 
+ 
+      if( graf[i][j] == 1 )
+      {
+         isect_0_x = 0;
+         isect_0_y = 0;
+         isect_1_x = 0;
+         isect_1_y = 0;
+         box_i_isects_j = boxIntersect(rectArray[i].midx, rectArray[i].midy, 
+                          rectArray[j].midx, rectArray[j].midy, 
+                          rectArray[j].minx, rectArray[j].miny, 
+                          rectArray[j].maxx, rectArray[j].maxy, isect_0_x, isect_0_y );
+     
+         box_j_isects_i = boxIntersect(rectArray[j].midx, rectArray[j].midy, 
+                          rectArray[i].midx, rectArray[i].midy, 
+                          rectArray[i].minx, rectArray[i].miny, 
+                          rectArray[i].maxx, rectArray[i].maxy, isect_1_x, isect_1_y );
+                          
+                     
+         if ( box_i_isects_j && box_j_isects_i )
+         {
+            moveto( isect_0_x, isect_0_y );
+            lineto( isect_1_x, isect_1_y );
+            drawsph( isect_0_x, isect_0_y, 3 );
+            drawsph( isect_1_x, isect_1_y, 3 );
+         }
+
+      }
+   }
+ 
+}
+ 
+getRectUnderMouse()
+{
+   for(i=0; i<numRects;i++)
+   {
+      rectangel temp;
+      temp.minx = rectArray[i].minx;
+      temp.miny = rectArray[i].miny;
+      temp.maxx = rectArray[i].maxx;
+      temp.maxy = rectArray[i].maxy;   
+ 
+      inni = isInsideRect( temp, mousx, mousy );
+      if( inni )
+      {
+         return i;
+      }
+   }
+ 
+   return -1;
+}
+ 
+drawrectopen(x0,y0,x1,y1) { moveto(x0,y0); lineto(x1,y0); lineto(x1,y1); lineto(x0,y1); lineto(x0,y0); }
+ 
+ 
+makeRect(x1,y1,x2,y2)
+{
+   minx = x1;
+   miny = y1;
+   maxx = x2;
+   maxy = y2;
+ 
+   if( x1 > x2 ){
+      maxx = x1;
+      minx = x2;
+   }
+ 
+   if( y1 > y2 ){
+      maxy = y1;
+      miny = y2;
+   }
+ 
+   rectArray[numRects].minx = minx;
+   rectArray[numRects].miny = miny;
+   rectArray[numRects].maxx = maxx;
+   rectArray[numRects].maxy = maxy;
+ 
+   rectArray[numRects].midx = minx+ (maxx-minx)/2;
+   rectArray[numRects].midy = miny+ (maxy-miny)/2;   
+ 
+   numRects++;
+}
+ 
+isInsideRect( rectangel r, x,y )
+{
+   if( x < r.minx ) return 0;
+   if( x > r.maxx ) return 0;
+   if( y < r.miny ) return 0;
+   if( y > r.maxy ) return 0;
+   return 1;
+ 
+}
+
+boxIntersect(last_x, last_y, x, y, bx1, by1, bx2, by2, &ix, &iy)
+{
+   // Finds the point of intersection of line from (last_x, last_y) to (x,y)
+   // with the box (bx1,by1,bx2,by2). The ix and iy parameters are pointers
+   // which means the function fills in the values of the point of intersection in
+   // the variables that you give.
+   // the funciton also returns true if there is an intersection, false if there is none
+   
+   if( (x>=bx1 && x<=bx2 && y>=by1 && y<=by2) ){}else{return 0;}
+   
+   if(last_x < bx1 && x >= bx1) // does it cross left edge?
+   {
+      iy = last_y + (y - last_y) * (bx1 - last_x)/(x-last_x);
+      if(iy >= by1 && iy <= by2)
+      {
+         ix = bx1; return 1;
+      }
+   }
+   else if(last_x > bx2 && x <= bx2) // cross right edge?
+   {
+      iy = last_y + (y-last_y) * (bx2 - last_x)/(x-last_x);
+      if(iy >= by1 && iy <= by2) // is intersection point on right edge?
+      {
+         ix = bx2; return 1;
+      }
+   }
+   
+   if(last_y < by1 && y >= by1)
+   {
+      ix = last_x + (x-last_x) * (by1 - last_y)/(y-last_y);
+      if(ix >= bx1 && ix <= bx2) // is intersection point on top edge?
+      {
+         iy = by1; return 1;
+      }
+   }
+   else if(last_y > by2 && y <= by2) // does it cross bottom edge?
+   {
+      ix = last_x + (x - last_x) * (by2 - last_y)/(y - last_y);
+
+      if(ix >= bx1 && ix <= bx2) // is intersection point on bottom edge?
+      {
+         iy = by2; return 1;
+      } 
+   }
+}

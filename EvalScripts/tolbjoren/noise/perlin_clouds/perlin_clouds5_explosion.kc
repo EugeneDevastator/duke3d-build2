@@ -1,0 +1,132 @@
+static palette[256]; // black-red-yellow-white
+
+// Render noise
+static pix[3];
+static dest[3];
+static mtx[9]; //rotation matrix
+
+//"locals"
+static axis[3];
+()
+{
+   cls(0);
+   if(numframes==0)
+   {
+      axis[0] = 0.16; axis[1] = 0.67; axis[2] = 0.43;
+      initRotationMatrix(axis, 0.34521);
+      initPalette();
+   }
+   
+   renderNoise(klock()*.2);
+}
+
+renderNoise(z)
+{
+   static linebuf[256];
+   for(iy=0; iy < 256; iy++)
+   {
+      y = iy / 128.0; // divided by scale
+      pix[0] = y*mtx[1] + z*mtx[2];
+      pix[1] = y*mtx[4] + z*mtx[5];
+      pix[2] = y*mtx[7] + z*mtx[8];
+      
+      //motion along x
+      x = 1/128.0;
+      dest[0] = x*mtx[0];
+      dest[1] = x*mtx[3];
+      dest[2] = x*mtx[6];
+
+      for(ix=0; ix < 256; ix++)
+      {          
+         // Add frequency components (octaves)
+         v1 = (noise(pix[0],pix[1],pix[2]));
+         v2 = 0.5*(noise(2*pix[0],2*pix[1],2*pix[2]));
+         v3 = 0.25*(noise(4*pix[0],4*pix[1],4*pix[2]));
+         v4 = 0.125*(noise(8*pix[0],8*pix[1],8*pix[2]));
+         v5 = 1/16*(noise(16*pix[0],16*pix[1],16*pix[2]));
+         value = mousy/(yres);
+          
+         v = 255*sin((abs(v1)+abs(v2)+abs(v3)+abs(v4)+abs(v5))/(value*4));
+         
+         linebuf[ix] = palette[v];
+   
+         // New perlin input, scroll dest
+         pix[0] += dest[0];
+         pix[1] += dest[1];
+         pix[2] += dest[2];
+      }
+      sethlin(0, iy, linebuf, 256);
+   }
+   moveto(0,256);
+   setfont(18,36);
+   printf("v=%g",v);
+   printf("\nvalue=%g",value);
+   printf("\nmove mouse up and down");
+}
+
+initPalette()
+{
+   // Fire palette, taken from a tinyptc or openptc example
+   c = 0;
+   i = 0;
+   
+   // blue
+   while(i<64) 
+   {
+      palette[i] = rgb(c,0,0);
+      c+=4;
+      i++;
+   }
+   
+   // blue to darkblue
+   c = 0;   
+   while(i<96)
+   { 
+      palette[i] = rgb(255,c,0);
+      c+=4;
+      i++;
+   }
+   // from 96-128 yellow to white
+   c = 0;
+   while(i<128)
+   {
+      palette[i] = rgb(255,255,c);
+      c+=4;
+      i++;
+   }
+   // All above 128 white hot!
+   while(i<256)
+   {
+      palette[i] = rgb(255,255,255);
+      c+=4;
+      i++;
+   }  
+}
+
+
+
+InitRotationMatrix(pAxis[3], r)
+{
+  // The axis vector must be of unit length
+  x=0, y=0, z=0, m=0;
+  m = sqrt(pAxis[0]*pAxis[0] + pAxis[1]*pAxis[1] + pAxis[2]*pAxis[2]);
+  x = pAxis[0]/m;
+  y = pAxis[1]/m;
+  z = pAxis[2]/m;
+
+  // Compute the rotation matrix  
+  c = cos(r);
+  s = sin(r);
+
+  Mtx[0] = (x * x) * (1.0 - c) + c;
+  Mtx[1] = (y * x) * (1.0 - c) + (z * s);
+  Mtx[2] = (z * x) * (1.0 - c) - (y * s);
+
+  Mtx[3] = (x * y) * (1.0 - c) - (z * s);
+  Mtx[4] = (y * y) * (1.0 - c) + c;
+  Mtx[5] = (z * y) * (1.0 - c) + (x * s);
+
+  Mtx[6] = (x * z) * (1.0 - c) + (y * s);
+  Mtx[7] = (y * z) * (1.0 - c) - (x * s);
+  Mtx[8] = (z * z) * (1.0 - c) + c;
+} 

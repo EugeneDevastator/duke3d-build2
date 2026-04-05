@@ -1,0 +1,506 @@
+   //Rummiken started 10/12/2014
+   //todo:
+   // * timer
+
+enum {MAXPLAYS=4};
+static grid[8][24], bag[8*13+2]; //1-13,14-26,27-39,40-52,Joker:53-54
+static mytile[MAXPLAYS][2][24], bakgrid[8][24], baktile[2][24], baktile2[2*24];
+static gmul, gxad, gyad;
+static tilecol1[4] = {0xff0000,0x000000,0x0080ff,0xff8000};
+static tilecol2[4] = {0xff8080,0x808080,0x60b0ff,0xc0a080};
+
+()
+{
+   static grabi[MAXPLAYS];
+   static mx[MAXPLAYS], my[MAXPLAYS], bstat[MAXPLAYS], obstat[MAXPLAYS];
+   static grabx[MAXPLAYS], graby[MAXPLAYS], grabi[MAXPLAYS], didmeld[MAXPLAYS];
+
+   from = 0; val = 0;
+   if (net_me == 0) net_send(NET_ALL,((klock(-1)*1000)%2^15)*2^16);
+   while (net_recv(&from,&val) == 0)
+   {
+      cls(0); setfont(9,12);
+      moveto(xres/2,yres/2); printf("Waiting for master..");
+      refresh(); Sleep(1);
+   }
+
+   srand(val);
+
+   bagn = 8*13+2;
+   for(i=bagn-1;i>=0;i--) { bag[i] = i+1-(i>=52)*52; }
+   for(i=bagn-1;i>0;i--)
+      { j = int((i+1)*rnd); k = bag[i]; bag[i] = bag[j]; bag[j] = k; }
+      
+   for(p=0;p<net_players;p++)
+   {
+      for(y=0;y<2;y++) for(x=0;x<24;x++) mytile[p][y][x] = 0;
+      for(y=0;y<2;y++)
+         for(x=0;x<7;x++) { bagn--; mytile[p][y][x+8] = bag[bagn]; }
+      grabi[p] = 0;
+      didmeld[p] = 0;
+   }
+      
+   for(y=0;y<8;y++)
+      for(x=0;x<24;x++) { grid[y][x] = 0; }
+   
+   for(i=0;i<256;i++) keystatus[i] = 0;
+   
+   tim = 0; omousx = 0; omousy = 0; obstatus = 0; turn = 0; gameover = -1;
+   
+   for(y=0;y<8;y++) for(x=0;x<24;x++) bakgrid[y][x] = grid[y][x];
+   for(y=0;y<2;y++) for(x=0;x<24;x++) baktile[y][x] = mytile[turn][y][x];
+
+   while (1)
+   {
+      otim = tim; tim = klock();
+      
+      gmul = int(min((xres-1)/24.0,(yres-1)/13.5)); //block size in pixels
+      gxad = int(xres/2 - gmul*24.0/2);    //pixel offset to top-left block
+      gyad = int(yres/2 - gmul*13.5/2);    //"
+
+      if (gameover < 0)
+      {
+         for(i=0;i<256;i++)
+            if (keystatus[i]) { keystatus[i] = 0; net_send(NET_ALL,i); }
+      }
+      nmousx = min(max(int((mousx-gxad)*64/gmul),0),24*64-1);
+      nmousy = min(max(int((mousy-gyad)*64/gmul),0),14*64-1);
+      if ((nmousx != omousx) || (nmousy != omousy))
+      {
+         net_send(NET_ALL,nmousx+1024);
+         net_send(NET_ALL,nmousy+3072);
+         omousx = nmousx; omousy = nmousy;
+      }
+      if ((gameover < 0) && (bstatus != obstatus))
+         { net_send(NET_ALL,bstatus+256); obstatus = bstatus; }
+         
+      while (net_recv(&from,&v,1))
+      {
+         p = from;
+         if (v < 256)
+         {
+         }
+         else if (v < 256+8)
+         {
+            obstat[from] = bstat[from]; bstat[from] = v-256;
+            x = int(mx[from]);
+            y = int(my[from]);
+            if (bstat[from]%2)
+            {
+               if (!(obstat[from]%2))
+               {
+                  if (y < 8)
+                  {
+                     if ((grid[y][x]) && (from == turn))
+                     {
+                        playsound("grab.flac");
+                        grabx[from] = x; graby[from] = y;
+                        grabi[from] = grid[y][x];
+                     }
+                  }
+                  else if (y < 12)
+                  {
+                     if (mytile[from][y-9][x])
+                     {
+                        if ((from == net_me) || (from == turn))
+                           playsound("grab.flac");
+                        grabx[from] = x; graby[from] = y;
+                        grabi[from] = mytile[from][y-9][x];
+                     }
+                  }
+                  else if ((y == 12) && (((x >=  0) && (x <=  3)) || ((x >=  5) && (x <=  8)) ||
+                                         ((x >= 10) && (x <= 13)) || ((x >= 15) && (x <= 18))))
+                  {
+                     if (((x >= 0) && (x <= 3)) || ((x >= 5) && (x <= 8)))
+                     {
+                        gotbut = (x >= 4);
+                        
+                        n = 0;
+                        for(y=0;y<2;y++)
+                           for(x=0;x<24;x++)
+                              if (mytile[from][y][x])
+                                 { baktile2[n] = mytile[from][y][x]; n++; }
+                           
+                        for(i=1;i<n;i++)
+                           for(j=0;j<i;j++)
+                           {
+                              iv = baktile2[i]; jv = baktile2[j];
+                              if (!gotbut)
+                              {
+                                 if (iv < jv)
+                                    { baktile2[i] = jv; baktile2[j] = iv; }
+                              }
+                              else
+                              {
+                                 if (int((iv-1)/13)+((iv-1)%13)*4 <
+                                     int((jv-1)/13)+((jv-1)%13)*4)
+                                    { baktile2[i] = jv; baktile2[j] = iv; }
+                              }
+                           }
+                        
+                        i = 0;
+                        for(y=0;y<2;y++)
+                           for(x=0;x<24;x++)
+                              if (mytile[from][y][x]) { mytile[from][y][x] = baktile2[i]; i++; }
+                        
+                        if ((from == net_me) || (from == turn)) playsound("tapfloor.flac",100,2);
+                     }
+                     else if ((x >= 10) && (x <= 13) && (from == turn))
+                     {
+                        for(y=0;y<8;y++) for(x=0;x<24;x++) grid[y][x] = bakgrid[y][x];
+                        for(y=0;y<2;y++) for(x=0;x<24;x++) mytile[turn][y][x] = baktile[y][x];
+                        playsound("gothit.wav");
+                     }
+                     else if ((x >= 15) && (x <= 18) && (from == turn))
+                     {
+                        on = 0;
+                        for(y=0;y<2;y++) for(x=0;x<24;x++) if (baktile[y][x]) on++;
+                        n = 0;
+                        for(y=0;y<2;y++) for(x=0;x<24;x++) if (mytile[turn][y][x]) n++;
+                        
+                        v = isbadgrid(&x0,&x1,&y,didmeld[from]);
+                        if ((v == -1) || ((v < -1) && (n != on)))
+                        {
+                           playsound("gothit.wav");
+                        }
+                        else
+                        {
+                           if (n == on)
+                           {
+                              if (bagn > 0)
+                              {
+                                 for(y=0;y<2;y++)
+                                    for(xx=0;xx<24;xx++)
+                                    {
+                                       x = int((xx+1)/2)*((xx%2)*2-1) + 11;
+                                       if (mytile[from][y][x] == 0)
+                                       {
+                                          bagn--; mytile[from][y][x] = bag[bagn];
+                                          goto break2;
+                                       }
+                                    }
+                              }
+break2:;                      playsound("tapfloor.flac");
+                           }
+                           else
+                           {
+                              didmeld[turn] = 1;
+                              if (!n) { gameover = from; }
+                              playsound("pickup.wav");
+                           
+                              for(y=0;y<8;y++)
+                                 for(x=0;x<24;x++) grid[y][x] = -fabs(grid[y][x]);
+                           }
+                        
+                           turn++; if (turn >= net_players) turn = 0;
+                           
+                           for(y=0;y<8;y++) for(x=0;x<24;x++) bakgrid[y][x] = grid[y][x];
+                           for(y=0;y<2;y++) for(x=0;x<24;x++) baktile[y][x] = mytile[turn][y][x];
+                        }
+                     }
+                  }
+               }
+            }
+            else if (obstat[from]%2)
+            {
+               if (grabi[from])
+               {
+                  if ((y < 8) && (!grid[y][x]) && (from == turn))
+                  {
+                        //valid dest
+                     playsound("plop.flac",100,2);
+                     grid[y][x] = grabi[from];
+                     if (graby[from] < 8) grid[graby[from]][grabx[from]] = 0;
+                           else mytile[from][graby[from]-9][grabx[from]] = 0;
+                     grabi[from] = 0;
+                  }
+                  else if ((y >= 9) && (y < 11) && (!mytile[from][y-9][x]) && (grabi[from] > 0))
+                  {
+                     if ((from == net_me) || (from == turn))
+                        playsound("plop.flac",100,2);
+                     mytile[from][y-9][x] = grabi[from];
+                     if (graby[from] < 8) grid[graby[from]][grabx[from]] = 0;
+                           else mytile[from][graby[from]-9][grabx[from]] = 0;
+                     grabi[from] = 0;
+                  }
+                  else
+                  {
+                        //invalid dest
+                     if ((from == net_me) || (from == turn))
+                        playsound("gothit.wav",100,1);
+                     grabi[from] = 0;
+                     
+                        //swap tiles
+                     //for(i=2;i<2.15;i+=.1) playsound("plop.flac",100,i);
+                     //i = grid[y][x];
+                     //grid[y][x] = grabi[from];
+                     //grid[graby[from]][grabx[from]] = i;
+                     //grabi[from] = 0;
+                  }
+               }
+            }
+         }
+         else if (v < 1024) ;
+         else if (v < 3072) mx[from] = (v-1024)/64;
+         else if (v < 5120) my[from] = (v-3072)/64;
+      }
+      
+      cls(0x304050);
+      
+      setcol(0x000000);
+      for(y=0;y<=11;y++)
+      {
+         moveto( 0*gmul+gxad,y*gmul+gyad);
+         lineto(24*gmul+gxad,y*gmul+gyad);
+      }
+      for(x=0;x<=24;x++)
+      {
+         moveto(x*gmul+gxad, 0*gmul+gyad);
+         lineto(x*gmul+gxad, 8*gmul+gyad);
+         moveto(x*gmul+gxad, 9*gmul+gyad);
+         lineto(x*gmul+gxad,11*gmul+gyad);
+      }
+      
+      setcol(0x806040);
+      drawcone( 0.4*gmul+gxad,12.4*gmul+gyad,gmul/2, 3.4*gmul+gxad,12.4*gmul+gyad,gmul/2);
+      drawcone( 5.4*gmul+gxad,12.4*gmul+gyad,gmul/2, 8.4*gmul+gxad,12.4*gmul+gyad,gmul/2);
+      setcol(0xffc080);
+      drawcone( 0.5*gmul+gxad,12.5*gmul+gyad,gmul/2, 3.5*gmul+gxad,12.5*gmul+gyad,gmul/2);
+      drawcone( 5.5*gmul+gxad,12.5*gmul+gyad,gmul/2, 8.5*gmul+gxad,12.5*gmul+gyad,gmul/2);
+      
+      setfont(gmul*.4,gmul*.85,1);
+      moveto( 0.4*gmul+gxad,12.2*gmul+gyad); setcol(0x000000); printf("Sort Col");
+      moveto( 5.4*gmul+gxad,12.2*gmul+gyad); setcol(0x000000); printf("Sort 123");
+         
+      if (net_me == turn)
+      {
+         setcol(0x806040);
+         drawcone(10.4*gmul+gxad,12.4*gmul+gyad,gmul/2,13.4*gmul+gxad,12.4*gmul+gyad,gmul/2);
+         drawcone(15.4*gmul+gxad,12.4*gmul+gyad,gmul/2,18.4*gmul+gxad,12.4*gmul+gyad,gmul/2);
+         setcol(0xffc080);
+         drawcone(10.5*gmul+gxad,12.5*gmul+gyad,gmul/2,13.5*gmul+gxad,12.5*gmul+gyad,gmul/2);
+         drawcone(15.5*gmul+gxad,12.5*gmul+gyad,gmul/2,18.5*gmul+gxad,12.5*gmul+gyad,gmul/2);
+         
+         setfont(gmul*.4,gmul*.85,1);
+         moveto(10.3*gmul+gxad,12.2*gmul+gyad); setcol(0x000000); printf("  Undo");
+         setcol(0x000000);
+
+         on = 0;
+         for(y=0;y<2;y++) for(x=0;x<24;x++) if (baktile[y][x]) on++;
+         n = 0;
+         for(y=0;y<2;y++) for(x=0;x<24;x++) if (mytile[turn][y][x]) n++;
+
+         v = isbadgrid(&x0,&x1,&y,didmeld[turn]);
+         if ((v == -1) || ((v < -1) && (n != on)))
+         {
+            setcol(0xff0000);
+            if (v == -3) //insufficient initial meld score of 30
+            {
+               moveto(11.2*gmul+gxad,8.2*gmul+gyad); 
+               printf("< 30");
+            }
+            else
+            {
+               drawcone((x0+.5)*gmul+gxad,(y+.5)*gmul+gyad,gmul*.6,
+                        (x1-.5)*gmul+gxad,(y+.5)*gmul+gyad,gmul*.6);
+            }
+         }
+
+         moveto(15.2*gmul+gxad,12.2*gmul+gyad);
+         if (n == on) printf("Pick tile"); else printf("Done turn");
+      }
+
+      for(y=0;y<8;y++)
+         for(x=0;x<24;x++)
+         {
+            if (!grid[y][x]) continue;
+            if ((grabi[turn]) && (x == grabx[turn]) && (y == graby[turn])) continue;
+            drawtile(x,y,grid[y][x]);
+         }
+      for(y=0;y<2;y++)
+         for(x=0;x<24;x++)
+         {
+            if (!mytile[net_me][y][x]) continue;
+            if ((grabi[net_me]) && (x == grabx[net_me]) && (y == graby[net_me]-9)) continue;
+            drawtile(x,y+9,mytile[net_me][y][x]);
+         }
+      
+      for(p=0;p<net_players;p++)
+      {
+         if (!grabi[p]) continue;
+         if ((p != net_me) && (my[p] >= 8)) continue;
+         drawtile(mx[p]-.5,my[p]-.5,grabi[p]);
+      }
+      
+      setfont(8,12);
+      for(p=0;p<net_players;p++)
+      {
+         if ((p == net_me) || (my[p] >= 8)) continue;
+         setcol(0xffffff-(p!=net_me)*0x5f5f5f);
+         moveto(mx[p]*gmul+gxad-2,my[p]*gmul+gyad-6);
+         printf("x");
+      }
+      
+      setfont(8,12); moveto(0,11*gmul+gyad+12);
+      setcol(0xffffff); printf("     Bag: %g tiles\n\n",bagn);
+      for(p=0;p<net_players;p++)
+      {
+         setcol(0xffffff-(p!=net_me)*0x5f5f5f);
+         n = 0; for(y=0;y<2;y++) for(x=0;x<24;x++) if (mytile[p][y][x]) n++;
+         printf("Player %g: %g tiles\n",p+1,n);
+      }
+
+      if (gameover < 0)
+      {
+            //Draw turn indicator
+         j = (turn != net_me);
+         if (!j)
+         {
+            f = sin(tim*4)*0.1+1.0; setcol(int(f*128.0)*0x10000+0x008080);
+            for(i=-j;i<2;i++)
+            {
+               drawcone(19.80*gmul+gxad,(i+12.0)*gmul+gyad,gmul*.5,
+                        22.10*gmul+gxad,(i+12.0)*gmul+gyad,gmul*.5);
+            }
+            drawcone(19.80*gmul+gxad,(12.0-j)*gmul+gyad,gmul*.5,
+                     19.80*gmul+gxad,(13.0  )*gmul+gyad,gmul*.5);
+            drawcone(22.10*gmul+gxad,(12.0-j)*gmul+gyad,gmul*.5,
+                     22.10*gmul+gxad,(13.0  )*gmul+gyad,gmul*.5);
+         }
+         else { f = 1.0; setcol(0x808080); }
+         setfont(gmul*f*.65,gmul*f,1);
+         moveto((20.90-f*.65*2)*gmul+gxad,(12.20-j*.6-f/2)*gmul+gyad); setcol(0xa08080);
+         if (!j) printf("YOUR\nTURN"); else printf("NOT\nYOUR\nTURN");
+         moveto((20.95-f*.65*2)*gmul+gxad,(12.15-j*.6-f/2)*gmul+gyad); setcol(0x500000);
+         if (!j) printf("YOUR\nTURN"); else printf("NOT\nYOUR\nTURN");
+      }
+      else
+      {
+         setfont(gmul*0.5,gmul*0.9,1);
+         moveto(8.1*gmul+gxad,8.1*gmul+gyad);
+         setcol(noise(tim,.5)*128+128,noise(tim,1.5)*128+128,noise(tim,2.5)*128+128);
+         printf("Player %g wins!",gameover+1);
+      }
+            
+      refresh(); Sleep(15);
+   }
+}
+
+drawtile (x0, y0, i)
+{   
+   i = fabs(i);
+   x0 = x0*gmul+gxad;
+   y0 = y0*gmul+gyad;
+   
+   for(c=0;c<2;c++)
+   {
+      if (!c) setcol(0xa0a0a0);
+         else setcol(0xe0e0e0);
+      d = c*.06;
+      drawcone(x0+gmul*(d+.02),y0+gmul*(d+.47),gmul*-.30,
+               x0+gmul*(d+.92),y0+gmul*(d+.47),gmul*-.30);
+      drawcone(x0+gmul*(d+.12),y0+gmul*(d+.12),gmul*+.10,
+               x0+gmul*(d+.82),y0+gmul*(d+.12),gmul*+.10);
+      drawcone(x0+gmul*(d+.12),y0+gmul*(d+.82),gmul*+.10,
+               x0+gmul*(d+.82),y0+gmul*(d+.82),gmul*+.10);
+   }
+   
+   setfont(gmul*.50,gmul*.85,1);
+   for(c=0;c<2;c++)
+   {
+      v = ((i-1)%13)+1; 
+      x = (c*.04-.02+((v<10)&&(i<52))*.28)*gmul+x0;
+      y = (c*.04+.20)*gmul+y0;
+      if (i <= 52)
+      {
+         if (!c) setcol(tilecol2[int(i-1)/13]); 
+            else setcol(tilecol1[int(i-1)/13]);
+         moveto(x,y); printf("%g",v); continue;
+      }
+      if (c) break;
+      setcol(tilecol1[i-53]); drawsph(x+gmul*.53,y+gmul*.31,gmul*.40);
+      setcol(0xe0e0e0);       drawsph(x+gmul*.53,y+gmul*.31,gmul*.30);
+      setcol(tilecol1[i-53]); drawsph(x+gmul*.43,y+gmul*.21,gmul*.05);
+                              drawsph(x+gmul*.63,y+gmul*.21,gmul*.05);
+      drawcone(x+gmul*.48,y+gmul*.46,gmul*+.05,x+gmul*.43,y+gmul*.41,gmul*+.05);
+      drawcone(x+gmul*.58,y+gmul*.46,gmul*+.05,x+gmul*.63,y+gmul*.41,gmul*+.05);
+      drawcone(x+gmul*.48,y+gmul*.46,gmul*+.05,x+gmul*.58,y+gmul*.46,gmul*+.05);
+      drawcone(x+gmul*.58,y+gmul*.46,gmul*-.05,x+gmul*.62,y+gmul*.53,gmul*+.05);
+   }
+}
+
+isbadgrid (&x0, &x1, &y, didmeld)
+{
+   for(y=0;y<8;y++)
+      for(x0=0;x0<24;x0++)
+      {
+         v = grid[y][x0]; if (!v) continue;
+         for(x1=x0+1;x1<24;x1++) if (!grid[y][x1]) break;
+         if (x1-x0 < 3) return(-1);
+         
+            //is it: group (7,7,7) or run (1,2,3) ?
+         a = 0; b = 0;
+         for(x=x0;x<x1;x++)
+         {                                       
+            if (fabs(grid[y][x]) > 52) continue; //skip joker
+            if (!a) { a = fabs(grid[y][x]); ai = x-x0; continue; }
+            if (!b) { b = fabs(grid[y][x]); bi = x-x0; break; }
+         }
+         if (!a) return(-1);
+         if ((!b) && (x1-x0 > 3)) return(-1);
+         if ((!b) && (x1-x0 == 3)) { ; } //2 jokers and 1 tile always good
+         else if ((a%13) == (b%13)) //is group (7,7,7)
+         {
+            if (x1-x0 > 4) return(-1);
+            got = 0;
+            for(x=x0;x<x1;x++)
+            {
+               v = fabs(grid[y][x]); if (v > 52) continue; //skip joker
+               if ((v%13) != (a%13)) return(-1);
+               v = int((v-1)/13);
+               if (got%(2^(v+1)) >= 2^v) return(-1);
+               got += 2^v;
+            }
+         }
+         else //is run (1,2,3)
+         {
+            if (((a-1)%13)+1-ai         <  1) return(-1);
+            if (((a-1)%13)+1-ai+x1-1-x0 > 13) return(-1);
+            suit = int((a-1)/13);
+            for(x=x0;x<x1;x++)
+            {
+               v = fabs(grid[y][x]); if (v > 52) continue; //skip joker
+               if (v != a-ai + x-x0) return(-1);
+            }
+         }
+         
+         x0 = x1;
+      }
+   if (!didmeld) 
+   {
+      sc = 0;
+      for(y=0;y<8;y++)
+         for(x0=0;x0<24;x0++)
+         {
+            if (!grid[y][x0]) continue;
+            for(x1=x0+1;x1<24;x1++) if (!grid[y][x1]) break;
+            
+            gotnew = 0; gotold = 0;
+            for(x=x0;x<x1;x++)
+            {
+               v = grid[y][x];
+               if (v < 0) { gotold = 1; continue; }
+               if (v > 0)
+               {
+                  gotnew = 1; if (v > 52) continue; //skip joker (can you play it on 1st meld?)
+                  sc += ((v-1)%13)+1;
+               }
+            }
+            if (gotold && gotnew) return(-2); //can't combine with other tiles on initial meld
+            
+            x0 = x1;
+         }
+      if (sc < 30) { x0 = -1; x1 = 0; y = 0; return(-3); }
+   }
+   return(0);
+}

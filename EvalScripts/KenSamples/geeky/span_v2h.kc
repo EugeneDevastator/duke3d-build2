@@ -1,0 +1,68 @@
+enum {SC=24, RAD=SC/2-1, MAXXDIM=2048, MAXYDIM=1536};
+
+()
+{
+   static ytop[MAXXDIM], ybot[MAXXDIM];
+   
+   cls(0);
+   
+   if ((bstatus) || (numframes == 0))
+   {
+      bstatus = 0;
+      for(x=0;x<xres/SC;x++)
+      {
+         ytop[x] = int((    +yres*.6*rnd)/SC);
+         ybot[x] = int((yres-yres*.6*rnd)/SC);
+      }
+   }
+   setcol(0x800000);
+   for(x=0;x<xres/SC;x++)
+   {
+      drawcone(x*SC,(      0)*SC,RAD,x*SC,(ytop[x]-1)*SC,RAD);
+      drawcone(x*SC,(ybot[x])*SC,RAD,x*SC,      yres    ,RAD);
+   }
+   setcol(0x008080); span_v2h(0,int(xres/SC),ytop,ybot);
+}
+
+hline (x0, x1, y) //callback function for spanlist_vert2horz()
+{
+   if (x0 > x1) return;
+   drawcone(x0*SC,y*SC,RAD,x1*SC,y*SC,RAD);
+}
+
+   //Converts a list of vertical spans defined by x0,x1,umost[],dmost[]
+   //parameters to a list of horizontal spans. Output is the
+   //callback function.
+   //Algo based on Build Engine code. See ENGINE.C:ceilscan()
+span_v2h (x0, x1, ytop[MAXXDIM], ybot[MAXXDIM])
+{
+   static lastx[MAXYDIM];
+   
+   y0 = ytop[x0]; y1 = y0;
+   for(x=x0;x<=x1;x++)
+   {
+      twall = ytop[x]-1; bwall = ybot[x];
+      if (twall < bwall-1)
+      {
+         if (twall >= y1)
+         {
+            while (y0 < y1-1) { y0++; hline(lastx[y0],x-1,y0); }
+            y0 = twall;
+         }
+         else
+         {
+            while (y0 < twall) { y0++; hline(lastx[y0],x-1,y0); }
+            while (y0 > twall) { lastx[y0] = x; y0--; }
+         }
+         while (y1 > bwall) { y1--; hline(lastx[y1],x-1,y1); }
+         while (y1 < bwall) { lastx[y1] = x; y1++; }
+      }
+      else
+      {
+         while (y0 < y1-1) { y0++; hline(lastx[y0],x-1,y0); }
+         if (x == x1) break;
+         y0 = ytop[x+1]; y1 = y0;
+      }
+   }
+   while (y0 < y1-1) { y0++; hline(lastx[y0],x1,y0); }
+}

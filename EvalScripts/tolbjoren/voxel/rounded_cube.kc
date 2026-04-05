@@ -1,0 +1,102 @@
+static lim;
+static re,gr,bl;
+(x,y,z,&r,&g,&b)
+{
+   if ( numframes==0 ) {
+    lim = 2.0/voxres;
+   }
+
+   //nx=0; ny=0; nz=0;
+   //gradient(x,y,z,nx,ny,nz);
+   //normalize(nx,ny,nz);
+   
+   //r=128+(nx)*127;
+   //g=128+(ny)*127;
+   //b=128+(nz)*127;
+   r=re;
+   g=gr;
+   b=bl;
+   return func(x,y,z);
+}
+
+func(x,y,z)
+{ 
+ // Union, points both sets contain
+ //v = union( sphere(x,y,z) , roundedBox(x,y,z) );
+   
+ // Difference, a-b
+ //v = roundedBox(x,y,z) - sphere(x,y,z);
+ //v = box(x,y,z,0.5) - sphere(x,y,z);
+ 
+ s = sphere(x,y,z);
+ a = apple(x,y,z);
+ v = a - s;
+ 
+ if ( s ) {
+   re=192;
+   gr=128;
+   bl=64;
+ } else {
+   re=192;
+   gr=16;
+   bl=32;
+
+ }
+   
+ // Intersection, all points in all sets
+ //v = isect(roundedBox(x,y,z), sphere(x,y,z) );
+ // or
+ //v = roundedBox(x,y,z) + sphere(x,y,z);
+   
+ return v;
+}
+
+sphere(x,y,z){
+ v = .5*( (x - .25)^2 + (y - .25)^2 + (z - .25)^2 );
+ return v <= lim;
+ //return abs(v-lim) <= lim;
+}
+
+roundedBox(x,y,z){
+   v = x^6 + y^6 + z^6 ;
+  return abs(v-lim) <= lim;
+}
+
+apple(x,y,z)
+{
+	s = 3;
+	x *= s; y *= s; z *= s;
+	v1 = (2*x^2 + 2*y^2 + 2*z^2 -2)^3;
+	v2 = .5*(2*x^2 + 2*y^2)*z^4;
+	v = v1-v2;
+	return v<=lim;
+}
+
+box(x,y,z,halfsize){
+    s = halfsize;
+    v = x <= +s && x >= -s &&
+        y <= +s && y >= -s &&
+        z <= +s && z >= -s;
+    
+}
+
+gradient(x,y,z,&nx,&ny,&nz)
+{
+   s = lim;
+   nx = func(x-s,y,z) - func(x+s,y,z);
+   ny = func(x,y-s,z) - func(x,y+s,z);
+   nz = func(x,y,z-s) - func(x,y,z+s);  
+}
+
+normalize(&nx,&ny,&nz)
+{
+   rlen = 1/sqrt(nx^2 + ny^2 + nz^2);
+   nx*=rlen; ny*=rlen; nz*=rlen;
+}
+union(a,b){
+   min(a,b);
+}
+
+isect(a,b){
+   max(a,b);
+}

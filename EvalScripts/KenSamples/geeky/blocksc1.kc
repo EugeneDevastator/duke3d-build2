@@ -1,0 +1,41 @@
+enum {BSIZ=32};
+()
+{
+   x0 = 22.2; y0 = 4.2; x1 = 22.8; y1 = 14.8;
+   while (1)
+   {
+      cls(0);
+      if (bstatus%2) { x0 = mousx/BSIZ; y0 = mousy/BSIZ; }
+      if (bstatus>1) { x1 = mousx/BSIZ; y1 = mousy/BSIZ; }
+      setcol(0x506070); blockscan(x0,y0,x1,y1);
+      setcol(0xffc0c0); drawcone(x0*BSIZ,y0*BSIZ,2,x1*BSIZ,y1*BSIZ,2);
+      refresh();
+   }
+}
+
+blockscan (x0,y0,x1,y1)
+{   
+   enum {PREC=2^16};
+   ix = floor(x0); ix1 = floor(x1)-ix; ixi = (ix1>0)*2-1;
+   iy = floor(y0); iy1 = floor(y1)-iy; iyi = (iy1>0)*2-1;
+   fx = x0-ix; if (ixi > 0) fx = 1-fx;
+   fy = y0-iy; if (iyi > 0) fy = 1-fy;
+   gx = fabs(x1-x0)*PREC; idx = int(gx);
+   gy = fabs(y1-y0)*PREC; idy = int(gy);
+        if (ix1 == 0) { id = -1; idx = 0; }
+   else if (iy1 == 0) { id =  0; idy = 0; }
+   else               { id = int(fy*gx - fx*gy); }
+   for(c=abs(ix1)+abs(iy1);c>=0;c--)
+   {
+      drawblock(ix,iy);
+      if (id >= 0) { ix += ixi; id -= idy; }
+              else { iy += iyi; id += idx; }
+   }
+}
+
+drawblock (x,y)
+{
+   x0 = x*BSIZ; x1 = x0+BSIZ;
+   y0 = y*BSIZ; y1 = y0+BSIZ;
+   for(y=y0+1;y<y1;y++) { moveto(x0+1,y); lineto(x1,y); }
+}

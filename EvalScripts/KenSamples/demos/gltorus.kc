@@ -1,0 +1,24 @@
+cls(0); clz(1e32);
+
+t = klock();
+
+t2 = t*.5; r = 4;
+setcam(sin(t)*cos(t2)*-r,
+       sin(t2)       *-r,
+       cos(t)*cos(t2)*-r,
+       t,t2);
+
+cr = .5; tr = 1; da = PI*2/32;
+for(a=da/2;a<PI*2;a+=da)
+{
+   a0 = a-da/2; ca0 = cos(a0); sa0 = sin(a0); a0 *= 4/PI;
+   a1 = a+da/2; ca1 = cos(a1); sa1 = sin(a1); a1 *= 4/PI;
+   glbegin(GL_TRIANGLE_STRIP);
+   for(b=-da/2;b<PI*2;b+=da)
+   {
+      g = sin(b); i = (g*sa0)*128+256; setcol(i,i,i);
+      f = cos(b)*cr + tr; g *= cr; bb = b*(2/PI);
+      gltexcoord(a0,bb); glvertex(f*ca0,g,f*sa0);
+      gltexcoord(a1,bb); glvertex(f*ca1,g,f*sa1);
+   }
+}

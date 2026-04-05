@@ -1,0 +1,551 @@
+struct vec{x,y,z;}
+
+enum{MAX_TRAILS = 512}
+
+struct wheel_t
+{
+   vec forwardAxis, sideAxis;
+   double wheelTorque, wheelSpeed, wheelAngle, wheelInertia, wheelRadius;
+   vec pos;
+   
+   
+   xtrail[MAX_TRAILS];
+   ytrail[MAX_TRAILS];
+};
+
+struct Rigid_t
+{
+   // Linear
+   vec pos;
+   vec vel;
+   vec forces;
+   mass;
+   
+   // Angular
+   angle;
+   ang_vel;
+   torque;
+   inertia;
+   
+   // Dimensions
+   vec half_size;
+   
+   wheel_t wheels[4];
+}
+
+static rigid_t mycar;
+static time;
+()
+{
+   cls(0x66aed0); clz(1e32);
+   static oldtime;
+   time = klock(0);
+   delta = time - oldtime;
+   oldtime = time;
+   
+   if ( numframes == 0 )
+   {
+      vec size;
+      vecset( size, 20, 30, 0 );
+      rigid_init( mycar, size, 5);
+      
+      vecset( mycar.pos, 0, 0, 0);
+      mycar.angle = 0;
+   }
+   
+
+   draw( mycar );
+   
+   
+   static mtx[9];
+   vec worldup;
+   vecset( worldup, 0, 1, 0 );
+   
+   vec eyeCenter;
+   vec target;
+   vecset( eyeCenter, 250,-50,250 );
+     
+   vecset( target,mycar.pos.x, 0, yres-mycar.pos.y );
+   lookAt( eyeCenter, target, worldUp, mtx );
+   setcam2( eyeCenter, mtx );
+
+   doFrame(mycar, delta);
+}
+
+draw( rigid_t r )
+{
+   
+   vec edges[4];
+   vecset( edges[0], -r.half_size.x, r.half_size.y,0 );
+   vecset( edges[1], r.half_size.x, r.half_size.y,0 );
+   vecset( edges[2], r.half_size.x, -r.half_size.y,0 );   
+   vecset( edges[3], -r.half_size.x, -r.half_size.y,0 );   
+   
+   vec wheel_vecs[4];
+   vec wheel_sidevecs[4];
+   
+   vec pos;
+   vecset(pos, r.pos );
+
+   static make_tail_interval;
+   make_tail = 0;
+   if ( time > make_tail_interval && fabs( length(r.vel) ) > 0.1 )
+   {
+      make_tail_interval = time + 0.01;
+      make_tail = 1;
+   }
+   
+
+   vec worldWheelOffset;
+   vec worldWheelSideVec;
+   vec worldWheelFwdVec;
+   for(i=0; i<4; i++)
+   {
+      relativeToWorld( r, r.wheels[i].pos, worldWheelOffset);
+      
+      relativeToWorld( r, r.wheels[i].sideAxis, worldWheelSideVec);
+
+      relativeToWorld( r, r.wheels[i].forwardAxis, worldWheelFwdVec);      
+
+      vecadd( worldWheelOffset, worldWheelOffset, r.pos );
+      
+      vecscalar( worldWheelSideVec, worldWheelSideVec, r.wheels[i].wheelSpeed );
+      
+      if (numframes==0)
+      {
+        
+         for(j=0; j<MAX_TRAILS; j++){
+          r.wheels[i].xtrail[j] = worldWheelOffset.x;
+          r.wheels[i].ytrail[j] = worldWheelOffset.y;
+         }
+        
+      }
+
+
+      if ( make_tail )
+      {
+         r.wheels[i].xtrail[0] = worldWheelOffset.x;
+         r.wheels[i].ytrail[0] = worldWheelOffset.y;
+
+         // Update body segments
+         for(j=1; j<MAX_TRAILS; j++)
+         {
+          r.wheels[i].xtrail[MAX_TRAILS-j] = r.wheels[i].xtrail[MAX_TRAILS-j-1];
+          r.wheels[i].ytrail[MAX_TRAILS-j] = r.wheels[i].ytrail[MAX_TRAILS-j-1];
+         } 
+      }  
+
+      // Draw trails
+      moveto( r.wheels[i].xtrail[0], 0, yres-r.wheels[i].ytrail[0] );
+      for(j=0; j<MAX_TRAILS; j++)
+      {
+         t = 1 - j/MAX_TRAILS;
+         setcol(255-192*t,255-192*t,255-192*t);
+         x = r.wheels[i].xtrail[j];
+         y = r.wheels[i].ytrail[j];
+         lineto(x,0,yres-y);
+      }
+
+      if ( sgn( r.wheels[i].wheelSpeed ) == 1 )
+      {
+         setcol(0,255,0);
+      }else{
+         setcol(255,0,0);
+      }
+      setcol(255,255,255);
+      wheelAng = atan2(  r.wheels[i].forwardAxis.y -r.wheels[i].sideAxis.y,  r.wheels[i].forwardAxis.x - r.wheels[i].sideAxis.x );
+      drawspr("kmine.kv6", worldWheelOffset.x,-10, yres-worldWheelOffset.y, 9 , -pi/4 + r.angle + wheelAng , r.wheels[i].wheelAngle/(2*PI) ,-pi/2);
+   }
+
+   setcol(255,255,255);   
+   drawspr("volvo.kv6", mycar.pos.x, 0, yres-mycar.pos.y, 55 , -pi/2+mycar.angle, 0, 0 );
+   
+   for(i=0; i<4; i++)
+   {
+      vecset( wheel_vecs[i], r.wheels[i].forwardAxis );
+      vecset( wheel_sidevecs[i], r.wheels[i].sideAxis );
+
+
+      rotate2d( r.angle, edges[i] ); // Apply rotation
+      rotate2d( r.angle, wheel_vecs[i]  ); // Apply rotation
+      rotate2d( r.angle, wheel_sidevecs[i]  ); // Apply rotation
+      vecadd( edges[i], edges[i], pos ); // Translate
+   }
+}
+
+setcam2( vec p, m[9] )
+{
+   setcam(p.x, p.y, p.z,
+          m[0], m[1], m[2],
+          m[3], m[4], m[5],
+          m[6], m[7], m[8]);
+}
+
+lookAt(vec eye, vec pos, vec worldup, mtx[9])
+{
+   vec fwd;
+   vec up;
+   vec side;
+   
+   // find forward dir
+   vecsub( fwd, pos, eye );
+   normalize(fwd);
+   
+   // find up vector as close to world up as possible   
+   dotprod = vecDot(worldUp,fwd);
+   static part2[3];
+   vecscalar( part2, fwd, dotprod);
+   
+   vecsub(up, worldUp, part2);
+   normalize(up);
+
+   static side[3];
+   vecCross(side,fwd,up);
+   normalize(side);
+  
+   buildMatrix( mtx, side, up, fwd ); 
+}
+
+
+wheel_init( wheel_t w, x, y, radius )
+{
+   vecset(w.pos, x, y, 0);
+   w.wheelSpeed = 0;
+   wheel_setSteeringAngle( w, 0 );
+   w.wheelRadius = radius;
+   w.wheelInertia = radius^2; // fake value
+}
+
+wheel_setSteeringAngle( wheel_t w, angle )
+{
+   vec fwd;
+   vecset( fwd, 0, 1, 0 );
+   vec side;
+   vecset( side, -1, 0, 0);
+   
+   rotate2D( angle, fwd );
+   rotate2D( angle, side );
+   
+   vecset( w.forwardAxis, fwd );
+   vecset( w.sideAxis, side );
+}
+
+rigid_init( Rigid_t rigid, vec half_size, mass )
+{
+   
+   rigid.inertia = 1500.0;
+   
+   rigid.half_size = half_size;
+   rigid.mass = mass;
+   //rigid.inertia = (1.0 / 12.0) * (half_size.x^2 * half_size.y^2) * mass;
+   
+   // Front wheels
+   wheelRadius = 5;
+   wheel_init( rigid.wheels[0], half_size.x, half_size.y, wheelRadius );
+   wheel_init( rigid.wheels[1], -half_size.x, half_size.y, wheelRadius );
+   wheel_init( rigid.wheels[2], half_size.x, -half_size.y, wheelRadius );
+   wheel_init( rigid.wheels[3], -half_size.x, -half_size.y, wheelRadius );
+}
+
+
+rigidUpdate( Rigid_t r, time_step )
+{
+   // Integrate physics linear
+   vec accel;
+   vecscalar( accel, r.forces, 1.0 / r.mass );
+   r.vel.x += accel.x * time_step;
+   r.vel.y += accel.y * time_step;
+   r.vel.z = 0;
+
+   r.pos.x += r.vel.x * time_step;
+   r.pos.y += r.vel.y * time_step;
+   r.pos.z = 0;
+
+   vecset( r.forces, 0,0,0 ); // Clear forces
+   
+   friction_factor = exp( min(1,length(r.vel)) * time_step * -0.5 ); 
+   vecscalar(r.vel, r.vel, friction_factor );
+   
+   
+   // Angular
+   double angAcc = r.torque / r.inertia;
+   r.ang_vel += angAcc * time_step;
+   r.angle += r.ang_vel * time_step;
+   r.torque = 0; // clear torque
+   
+}
+
+addForce( Rigid_t r, vec worldForce, vec worldOffset )
+{
+   vecadd( r.forces, r.forces, worldForce );
+   r.torque += wedgeProduct( worldOffset, worldForce );
+}
+
+wedgeProduct( vec a, vec b )
+{
+   return a.x * b.y - a.y * b.x;
+}
+
+doFrame(rigid_t r, time_step)
+{
+   steering = keystatus[205] - keystatus[203];
+   throttle = keystatus[200] - keystatus[208];
+   brakes = keystatus[57];
+
+   setSteering(r, steering );
+   setThrottle(r, throttle );
+   setBrakes(r, brakes );
+   vechicleUpdate( r, time_step * 10.0);
+
+   absvel = length(r.vel);
+   draw_tach_meter( xres-60, yres-60, 50, absvel/100 );
+   
+   moveto(0,0);
+   printf("%g\n", absvel);
+   //printf("%g\n", angle_offset );
+}
+
+
+draw_tach_meter(x,y,size,angle)
+{
+   setcol(255,255,255);
+   drawsph(x,y, -size);
+
+   for(i=0; i<12; i++)
+   {
+      a = i*2*PI/12;
+      ca = cos(a);
+      sa = sin(a);
+      moveto(x + ca*size, y + sa*size );
+      lineto(x + ca*size*.8, y + sa*size*.8 );
+   }   
+
+   setcol(255,0,0);
+   dx = cos( pi/2+angle * 6.28 );
+   dy = sin( pi/2+angle * 6.28 );
+   drawcone( x, y, 10,
+             x + dx*size, y + dy*size, 1);
+             
+}
+
+setSteering(Rigid_t r,steering)
+{
+   steeringLock = 0.75;
+   wheel_setSteeringAngle(r.wheels[0], -steering * steeringLock );
+   wheel_setSteeringAngle(r.wheels[1], -steering * steeringLock );
+}
+
+setThrottle(Rigid_t r,throttle)
+{
+   double torque = 180.0;
+   // aka AddTransmission torque
+   r.wheels[0].wheelTorque += throttle * torque; 
+   r.wheels[1].wheelTorque += throttle * torque; 
+   r.wheels[2].wheelTorque += throttle * torque; 
+   r.wheels[3].wheelTorque += throttle * torque;
+}
+
+setBrakes(Rigid_t r, brakes )
+{
+   brakeTorque = 80.0;
+   for(i=0; i<4; i++)
+   {
+      double wheelVel = r.wheels[i].wheelSpeed; // aka getWheelSpeed()
+      r.wheels[i].wheelTorque += -wheelVel * braketorque * brakes; //aka AddTransmissionTorque(val);
+      
+   }
+}
+
+vechicleUpdate(Rigid_t r, timestep)
+{
+   for(i=0; i<4; i++)
+   {
+      vec worldWheelOffset;
+      relativeToWorld( r, r.wheels[i].pos, worldWheelOffset);
+      
+      vec worldGroundVel;
+      pointVel( r, worldWheelOffset, worldGroundVel );
+      
+      vec relativeGroundSpeed;
+      worldToRelative(-r.angle, worldGroundVel, relativeGroundSpeed);
+      
+      vec relativeResponseForce;
+      CalculateForce( r.wheels[i], relativeGroundSpeed, timestep, relativeResponseForce );
+      
+      vec worldResponseForce;
+      relativeToWorld(r, relativeResponseForce, worldResponseForce);
+      
+      // Add force
+      addForce( r, worldResponseForce, worldWheelOffset );
+      
+   }
+   rigidUpdate( r, timestep );
+}
+
+calculateForce(wheel_t w, vec relativeGroundSpeed, timestep, vec responseForce )
+{
+   // calculate speed of tire patch at ground
+   vec patchSpeed;
+   vecscalar( patchSpeed, w.forwardAxis, -(w.wheelSpeed*w.wheelRadius) );
+   
+   // get vel difference between ground and patch
+   vec velDiff;
+   vecadd( velDiff, relativeGroundSpeed, patchSpeed );
+   
+   // project ground speed onto side axis
+   double forwardMag = 0.0;
+   vec sideVel;
+   project( sideVel, velDiff, w.sideAxis );
+   
+   vec forwardVel;
+   project( forwardVel, velDiff, w.forwardAxis, forwardMag );
+   
+   // Calc super fake dir forces
+   // calc response force
+   
+   //velocity_patch = length( patchspeed ) / 1000;
+   //tololo_friction = -max(0.5, velocity_patch);
+   vecscalar( responseForce, sideVel, -0.5 ); // TODO make friction decrease with velocity
+   vecsub( responseforce, responseforce, forwardVel ); 
+   
+   // calc torque on wheel
+   w.wheelTorque += forwardMag * w.wheelRadius;
+   
+   // integrate total torque
+   w.wheelSpeed += w.wheelTorque / w.wheelInertia * timestep;
+
+   w.wheelAngle += w.wheelSpeed * timestep;
+
+   //clear our transmission torque accumulator
+   w.wheelTorque = 0;
+}
+
+project( vec c, vec a, vec b )
+{
+   //projected vector = (a dot b) * b;
+   //dpr = a.x * b.x + a.y * b.y;
+   dpr = vecdot(a,b);
+   vecscalar( c, b, dpr );
+}
+
+project( vec c, vec a, vec b, &mag )
+{
+   //projected vector = (a dot b) * b;
+   dpr = a.x * b.x + a.y * b.y;
+   mag = dpr;
+   vecscalar( c, b, dpr );
+}
+
+// Velocity of a point on body
+pointVel( Rigid_t r, vec worldOffset, vec tangent )
+{
+   vecset( tangent, -worldOffset.y * r.ang_vel, worldOffset.x * r.ang_vel, 0 );
+   vecadd( tangent, tangent, r.vel );
+}
+
+worldToRelative( angle, vec world, vec out )
+{
+   vecset(out, world);
+   rotate2d( angle, out );
+}
+
+relativeToWorld( Rigid_t r, vec relative, vec out )
+{
+   vecset(out, relative);
+   rotate2d( r.angle, out );
+}
+
+
+drawrectfill(x0,y0,x1,y1) { for(y=y0;y<y1;y++) { moveto(x0,y); lineto(x1,y); } }
+drawrectopen(x0,y0,x1,y1) { moveto(x0,y0); lineto(x1,y0); lineto(x1,y1); lineto(x0,y1); lineto(x0,y0); }
+
+
+// Takes a 3x3 rotation matrix and a point xyz
+tform(m[9], vec v)
+{
+   x = v.x; y = v.y; z = v.z;
+   v.x = m[0] * x + m[1] * y +  m[2] * z; 
+   v.y = m[3] * x + m[4] * y +  m[5] * z; 
+   v.z = m[6] * x + m[7] * y +  m[8] * z; 
+}
+
+vecScalar( vec out, vec a, s )
+{
+   out.x = a.x * s;
+   out.y = a.y * s;
+   out.z = a.z * s;
+}
+
+vecAdd( vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;   
+}
+vecSub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;   
+}
+
+vecCross( vec out, vec a, vec b)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+
+vecset(vec a, x,y,z){
+   a.x = x; a.y = y; a.z = z;
+}
+
+vecset(vec a, vec other){
+   a.x = other.x; a.y = other.y; a.z = other.z;
+}
+
+vecDot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+veclerp( vec out, vec a, vec b, t )
+{
+      out.x = a.x + t*(b.x-a.x);
+      out.y = a.y + t*(b.y-a.y);
+      out.z = a.z + t*(b.z-a.z);
+}
+
+length( vec v )
+{
+   return sqrt( vecdot(v,v) );
+}
+
+normalize( vec v )
+{
+   len = length(v);
+   if ( len )
+   {
+      v.x /= len; v.y /= len; v.z /= len;
+   }
+}
+
+buildMatrix( mtx[9], vec side, vec up, vec fwd )
+{
+   mtx[0] = side.x; mtx[1] = side.y; mtx[2] = side.z;
+   mtx[3] = up.x;   mtx[4] = up.y;   mtx[5] = up.z;
+   mtx[6] = fwd.x;  mtx[7] = fwd.y;  mtx[8] = fwd.z;
+}
+
+
+rotate2d(angle, vec v)
+{
+   x1 = v.x;
+   y1 = v.y;
+   
+   sa = sin(angle);
+   ca = cos(angle);
+   
+   v.x = x1 * ca - y1 * sa;
+   v.y = y1 * ca + x1 * sa;
+}

@@ -1,0 +1,185 @@
+struct ray_t
+{
+   x0, y0, z0;
+   dx, dy, dz;
+}
+
+struct sphere_t
+{
+   x,y,z;
+   radi;
+}
+
+()
+{
+   cls(0); 
+   clz(1e32);
+   glEnable(GL_DEPTH_TEST);
+   
+   setcam(0,-30,0,0,0.5*PI);
+   //setcam(7,-7,-30, 0,0);
+   
+   setcol(255,255,255);
+   
+   //drawgridXZ(-10,20);
+   
+
+
+   p1x = 0;
+   p1y = 0;
+   p1z = -5;
+
+   t = klock(0);
+   r = 3;
+   p2x = p1x+cos(t)*r;
+   p2y = p1y+0;
+   p2z = p1z+sin(t)*r;
+   
+   ray_t ray;
+   ray.x0 = p1x;
+   ray.y0 = p1y;
+   ray.z0 = p1z;
+   
+   
+   ray.dx = (p2x-p1x);
+   ray.dy = (p2y-p1y);
+   ray.dz = (p2z-p1z);
+
+   
+   sphere_t sphere;
+   sphere.x = 0;
+   sphere.y = 0;
+   sphere.z = 0;
+   sphere.radi = 3;
+   
+   moveto(p1x,p1y,p1z);
+   lineto(p2x,p2y,p2z);
+
+   
+   hit = ray_sphere_isect( ray, sphere );
+   
+   if (hit)
+   {
+      setcol(255,0,0);
+   }else
+   {
+      setcol(255,255,255);
+   }
+   //drawsph(0,0,0,3);
+   draw_uv_sphere(3);
+}
+
+ray_sphere_isect( ray_t ray, sphere_t sphere)
+{
+   wx = sphere.x - ray.x0;
+   wy = sphere.y - ray.y0;
+   wz = sphere.z - ray.z0;
+   
+   // dot with self to get distance sphere-ray squared
+   wsq = wx*wx + wy*wy + wz*wz;
+   
+   // proj = w dot raydir
+   proj = wx*ray.dx + wy*ray.dy + wz*ray.dz;
+   
+   // calc sphere radius squared for distance comparison
+   rsq = sphere.radi * sphere.radi;
+   
+   // Behind ray, no isect
+   if (proj < 0.0 && wsq > rsq )
+   {
+      return -1;
+   }
+   
+   vsq = ray.dx*ray.dx + ray.dy*ray.dy + ray.dz*ray.dz;
+   
+   // 
+   return ( vsq*wsq - proj*proj <= vsq*sphere.radi*sphere.radi );
+}
+
+drawgridXZ(min,max)
+{
+   for(i=0; i<10; i++)
+   {
+      t = i/10.0;
+      moveto(min,0, min+t*max );
+      lineto(max,0, min+t*max);
+   
+      moveto(min+t*max,0, min );
+      lineto(min+t*max,0, max);
+   }
+}
+
+draw_uv_sphere(r)
+{
+   enum{dim1=12, dim2=12}
+   static px[dim1][dim2];
+   static py[dim1][dim2];
+   static pz[dim1][dim2];
+
+   if(numframes==0)
+   {
+      deltau = 1 / (dim1-1);
+      deltav = 1 / (dim2-1);  
+      startu = 0;
+      startv = 0;  
+      scaler = r;
+
+      for(i=0; i<dim1; i++)
+      for(j=0; j<dim2; j++)
+      {     
+         u = startu + i * deltau;
+         v = startv + j * deltav;
+         x=0; y=0; z=0;
+         sphere(u,v,x,y,z);
+          
+         
+         x*=scaler;
+         y*=scaler;
+         z*=scaler;         
+
+         px[i][j] = x; 
+         py[i][j] = y; 
+         pz[i][j] = z;
+      }
+   }
+
+
+   for(i=0; i<dim1-1; i++)
+   {
+      sc = 1;
+      for(j=0; j<dim2; j++)  
+      {
+         //glBegin(GL_COMPLEX);
+         glBegin(GL_LINE_STRIP);
+         
+         
+         glVertex( px[i][j], py[i][j], pz[i][j] ); 
+         glVertex( px[i+1][j], py[i+1][j], pz[i+1][j] );   
+         glVertex( px[i+1][j+1], py[i+1][j+1], pz[i+1][j+1] );      
+         glVertex( px[i][j+1], py[i][j+1], pz[i][j+1] );   
+
+         
+         glEnd();
+      } 
+
+   }
+}
+
+sphere(u,v,&x,&y,&z)
+{
+   r=1;
+   #define SPHERICAL
+   #ifdef SPHERICAL
+      u*=2*PI;
+      v*=PI;
+      x = r * cos(u) * sin(v);
+      y = r * sin(u) * sin(v);
+      z = r * cos(v);
+   #else
+      u = -r + u*2*r;
+      v *= 2*PI;
+      x = sqrt(r*r - u*u) * cos(v);
+      y = sqrt(r*r - u*u) * sin(v);
+      z = u;
+   #endif
+}

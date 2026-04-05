@@ -1,0 +1,26 @@
+(x,y,z,&r,&g,&b)
+{
+   r = 128; g = 144; b = 144;
+   if (fabs(z) > .93)
+   {
+      if (max(fabs(x),fabs(y)) > .38-(1-fabs(z))/3) return(0); //Caps
+   }
+   else
+   {
+      rad = .08 - z^2/36; //overall bulge in middle
+      rad += sqrt(max(.04^2-(fabs(z)-.92)^2,0))*.4; //ring bulges
+      rad -= sqrt(max(.04^2-(fabs(z)-.84)^2,0))*.4; //ring bulges
+      rad += sqrt(max(.04^2-(fabs(z)-.76)^2,0))*.4; //ring bulges
+      if (fabs(z) < .67)
+      {
+         rad += min(cos(atan2(y,x)*13),-.4)*.01; //Vertical ridges
+      }
+      if (x^2 + y^2 > rad) return(0);
+   }
+      //Marble texture
+   v = 0;
+   for(i=1.3;i<=8;i*=1.4) v += exp(noise(x*i,y*i,z*i)^2*-512/i)*30/i;
+   r -= v*1.2; g -= v; b -= v;
+   
+   return(1);
+}

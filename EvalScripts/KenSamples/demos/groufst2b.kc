@@ -1,0 +1,65 @@
+() //GROUFST2.KC ported from GROUFST2.BAS by Ken Silverman (09/28/2006)
+{
+   static hei[4096], col[4096]; //64x64 height map; 64x64 color map
+   static posx, posy, posz, ang, horiz, pal[256], otim, tim;
+   
+   if (numframes == 0)
+   {
+         //Generate palette
+      for(z=0;z<64;z++)
+      {
+         pal[z   ] = (z*4)*65536 + (z*4)*256 + (z*2);
+         pal[z+64] = (z*2)*65536 + (z*4)*256 + (z*4);
+      }
+      
+         //Generate interesting height & color maps
+      p = 0;
+      for(y=0;y<64;y++)
+         for(x=0;x<64;x++)
+         {
+            d = 15^2 - ((x%32)-16)^2 - ((y%32)-16)^2;
+            if ((d > 0) && ((int(x/32)+int(y/32))%2))
+                 { hei[p] = 64-sqrt(d); col[p] = (x+y)*.5; }
+            else { hei[p] = 64; col[p] = (cos(x*.2) + sin(y*.3))*3 + 88; }
+            p++;
+         }
+
+      for(i=0;i<4096;i++) col[i] = pal[col[i]];
+
+         //Initialize starting position
+      posx = 0; posy = 0; posz = 40; ang = 0; horiz = -50;
+      tim = klock();
+   }
+   
+   horiz = mousy-yres/2;
+   
+   otim = tim; tim = klock(); dtim = tim-otim;
+   
+   cls(0);
+   dd = 2/xres; //Increment size
+   de = dd*256; //Scan out 256 units
+   sdz = (yres/2-horiz) * dd;
+   cosang = cos(ang); sinang = sin(ang);
+   dx = (sinang+cosang)*64; dxi = sinang*dd*-64;
+   dy =  sinang-cosang    ; dyi = cosang*dd;
+      //For each column...
+   for(sx=0;sx<xres;sx++)
+   {
+         //Fast ray trace! No *'s or /'s in here
+      x = posx*64; y = posy; z = posz; dz = sdz; sy = yres-1;
+      for(d=0;d<=de;d+=dd)
+      {
+         x += dx; y += dy; z += dz;
+         i = fadd(x,3*2^57)-3*2^57 + y; //:P
+         setcol(col[i]);
+         for(h=hei[i];h<z;z-=d) { setpix(sx,sy); sy--; dz -= dd; }
+      }
+      dx += dxi; dy += dyi;
+   }
+
+      //Move position & angle
+   f = (mousy-yres/2)*dtim;
+   if (bstatus == 0) { posx -= cosang*f; posy -= sinang*f; }
+                else { posz = min(max(posz+f,-48),48); }
+   ang += (mousx-xres/2)/xres*dtim*4;
+}

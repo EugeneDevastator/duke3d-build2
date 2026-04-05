@@ -1,0 +1,111 @@
+// terrible triangulation 
+
+struct point {
+    x;
+    y;
+};
+
+struct line {
+    point p1;
+    point p2;
+};
+
+enum{MAX_PTS=32} 
+static numpts=0;
+static point pts[MAX_PTS];
+
+enum{MAX_LINES=128} 
+static numlines=0;
+static line lines[MAX_LINES];
+
+()
+{
+   cls(0);
+   
+   if( bstatus == 1 )
+   {
+      bstatus=0;
+      if( numpts < MAX_PTS)
+      {
+         bstatus=0;
+         
+         pts[numpts].x = mousx;
+         pts[numpts].y = mousy;
+         numpts++;
+      }
+   }
+   
+   numlines = 0;
+   
+   for(i=0; i<numpts; i++)
+   {
+      for(j=0; j<numpts; j++)
+      {
+         if(i==j) continue;
+         if( numlines >= MAX_LINES) continue;
+         
+         line newline;
+          newline.p1.x = pts[i].x;
+          newline.p1.y = pts[i].y;
+          newline.p2.x = pts[j].x;
+          newline.p2.y = pts[j].y;
+         
+         canMake = 1;
+         for(k=0; k<numlines; k++)
+         {
+            point hitp;
+            res = lines_isect(lines[k],newline,hitp);
+            
+            if( res==1e32 || res==1  )
+            {
+               canMake = 0;  
+            }
+         }
+         
+         
+         if( canMake )
+         {
+               lines[numlines].p1.x = newline.p1.x;
+               lines[numlines].p1.y = newline.p1.y;
+               lines[numlines].p2.x = newline.p2.x;
+               lines[numlines].p2.y = newline.p2.y;
+               numlines++;
+         }
+         
+      }      
+   }
+   
+   for(i=0; i<numpts; i++)
+   {
+      setpix( pts[i].x, pts[i].y );
+   }
+   
+   for(k=0; k<numlines; k++)
+   {
+      moveto( lines[k].p1.x, lines[k].p1.y );
+      lineto( lines[k].p2.x, lines[k].p2.y );
+   }
+   
+   moveto(0,0);
+   printf(" %g / %g pts\n", numpts, MAX_PTS);
+   printf(" %g / %g lines\n", numlines, MAX_LINES);
+}
+
+// returns 0 if parallell or not hit
+// returns 1 if hit
+lines_isect(line line1, line line2, point hitp)
+{
+   eps = 1e-16;
+    d   =   (line2.p2.y - line2.p1.y)*(line1.p2.x-line1.p1.x) - (line2.p2.x - line2.p1.x)*(line1.p2.y-line1.p1.y);
+    n_a =   (line2.p2.x - line2.p1.x)*(line1.p1.y-line2.p1.y) - (line2.p2.y - line2.p1.y)*(line1.p1.x-line2.p1.x);
+    n_b =   (line1.p2.x - line1.p1.x)*(line1.p1.y - line2.p1.y) - (line1.p2.y - line1.p1.y)*(line1.p1.x - line2.p1.x);          
+    if(d == 0) return 1e32;
+    ua = n_a/d;
+    ub = n_b/d;
+    if(ua >=eps && ua <= 1-eps && ub >= eps && ub <= 1-eps){
+        hitp.x = line1.p1.x + ua * (line1.p2.x - line1.p1.x);
+        hitp.y = line1.p1.y + ua * (line1.p2.y - line1.p1.y);
+        return 1;
+    }
+    return 0;
+}

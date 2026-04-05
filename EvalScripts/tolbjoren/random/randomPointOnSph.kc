@@ -1,0 +1,44 @@
+()
+{
+   cls(0);
+   
+   clz(1e32);
+   setcam(0,0,-30,0,0);
+   
+   glbegin(GL_POINTS);
+   for(i=0; i<1000; i++)
+   {
+      x=0;y=0;z=0;
+      pointOnSphereUniform(10,x,y,z);
+      glvertex(x,y,z);
+   }
+   
+}
+
+random(lo,hi)
+{
+   range = hi-lo;
+   return lo + rnd*range;
+}
+
+// Not uniform, more points at poles
+pointOnSphere(radius,&x,&y,&z) {
+  z = random(-radius, radius);
+  radius_sq = radius * radius;
+  zsq = z * z;
+  theta = random(0, 2*PI);
+  x = sqrt(radius_sq - zsq) * cos(theta);
+  y = sqrt(radius_sq - zsq) * sin(theta);
+}
+
+// taken from essential maths for games
+// by verth and bishop p. 532
+pointOnSphereUniform(radi,&x,&y,&z) {
+  eps0 = random(0,1);
+  eps1 = random(0,1);
+  z = 1 - 2 * eps0;
+  r = sqrt(1-z*z);
+  phi = 2*PI*eps1;
+  x = r*cos(phi) * radi;
+  y = r*sin(phi) * radi;
+}

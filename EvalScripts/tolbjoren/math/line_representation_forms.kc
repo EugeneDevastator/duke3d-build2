@@ -1,0 +1,40 @@
+(x)
+{
+   /*
+   There are many ways to represente a line! A line goes on forever.
+   A line segment on the other hand does not.
+   
+   1. General form: Ax + By + C = 0
+   2. Standard form: Ax + By = C
+   3. Slope-intercept form: y = mx + b
+   4. Point-slope form: y - y1 = m(x-x1)
+   5. Two-point form: y - y1 = (y2-y1)/(x2-x1) * (x-x1)
+   6. Intercept form: x/a + y/b = 1
+   7. Parametric form: x = Tt + U, y = Vt + W
+   8. Polar form: r = (mr*cos(phi) + b)/sin(phi)
+   9. Normal form.... zzz. so many forms!   
+
+   */
+
+   // slope form:
+   sm = rnd; sb = -1;
+   
+   // slope-to general form:
+   gA = -1/sm; gB = -1/sb; gC = 1;
+   
+   // general to slope form:
+   m = -gC/gA;
+   b = -gC/gB;
+   y = m*x+b; // slope form
+   
+   //y = sm*x+sb; // slopeform
+   
+   // two point form
+   x1 = -1;
+   y1 = 1;
+   x2 = 2;
+   y2 = -1;
+   
+   twoPointM = (y2-y1)/(x2-x1);
+   y = y1 + twoPointM * (x-x1);
+}

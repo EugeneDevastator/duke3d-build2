@@ -1,0 +1,108 @@
+// kinda swirl-o-graph thing
+// would look cool with additive blending!
+// shaders ARE what I need!
+()
+{
+   cls(0); 
+   
+   static val, val2, val3, z;
+
+   // Normal and distance
+   d = val*2;  
+   length = val3*4;  
+
+   for(angle = z; angle < z+val2*2; angle++)
+   {  
+      //setcol(rnd*255, rnd*255, rnd*255);
+      //setcol(angle*5%255,0,0);
+      normAngle = degToRad( angle );
+      
+      distX = cos(normAngle) * d;
+      distY = sin(normAngle) * d;
+      
+      cx = xres/2; cy = yres/2;
+      
+      // 2. Move d units in angle dir
+      moveto(cx+distX, cy-distY);
+      //drawsph(cx+distX, cy-distY, 5); // - causa' cartesian
+      
+      // 3. Line
+      
+      lineto(cx+distX + cos(normAngle)*length, cy-distY + sin(normAngle)*length);
+      lineto(cx+distX - cos(normAngle)*length, cy-distY - sin(normAngle)*length);
+      
+      // Show d
+      /*
+      moveto(cx, cy);
+      lineto(cx+distX, cy-distY);
+      moveto(cx+distX*.5, cy-distY*.5);
+      printf("d");
+      */
+   
+      // Origin
+      //drawsph(cx,cy,-5);
+   }
+   z++;
+ 
+   setcol(0xffffff);
+   slider(0, val, 50,100,100);
+   setcol(0xffffff);
+   slider(1, val2, 50,150,100);
+   setcol(0xffffff);
+   slider(2, val3, 50,200,100);
+   setcol(0xffffff);
+}
+
+degToRad(deg)
+{
+   r = deg/180*PI;
+}
+
+slider(sliderNum, &value,x,y,length)
+{
+   enum{numSliders=3};
+   static mouseLock[numSliders];
+
+   // Constructor, set slider to mid position
+   if(numframes==0)
+   {
+      value = .5 * length;
+      mouseLock[sliderNum] = 0;
+   }  
+   // Draw slider
+   moveto(x,y);
+   lineto(x+length,y);
+   drawsph(x+value,y,-10);
+   moveto(x+value,y+10);
+   printf("val: %g", value);
+   
+   // mouse input
+   //mouseValue = mousx/(xres/2)-1;
+   if(bstatus==1)
+   {
+      mx = mousx; my = mousy; 
+      if(mouseLock[sliderNum]) // mouse has lock-on, move slider
+      {
+         setcol(255,0,0);
+         drawsph(x+value, y,-5);
+         if(mx <= x+length && mx >= x) // limit movement to slider line
+         value = mx-x;
+      }
+      else // check for collision
+      {
+         if( isColliding(mx,my,x+value,y,10) ) mouseLock[sliderNum] = 1; 
+      }
+   }
+   else // mouse released
+   {
+      mouseLock[sliderNum] = 0;
+   }
+
+}
+
+isColliding(x1,y1,x2,y2,radius)
+{
+   if((x1-x2)^2 + (y1-y2)^2 < radius^2 ) return 1;
+   return 0;
+}
+

@@ -1,0 +1,69 @@
+()
+{
+   static roygbiv[256];
+   if(numframes==0)
+   {
+      hue = 0;
+      hueInc = 6/255;
+      v = 1; // value 
+      s = 1; // saturation
+      for(i=0; i<255; i++)
+      {
+         c = v * s;
+         x = c * 1-fabs(fmod(hue,2)-1);
+         x*=255;
+         c*=255;
+         if(hue >= 0 && hue <= 1) roygbiv[i] = rgb(c,x,0); // red->orange
+         if(hue >= 1 && hue <= 2) roygbiv[i] = rgb(x,c,0); // orange->yellow
+         if(hue >= 2 && hue <= 3) roygbiv[i] = rgb(0,c,x); // yellow->green
+         if(hue >= 3 && hue <= 4) roygbiv[i] = rgb(0,x,c); // green->blue
+         if(hue >= 4 && hue <= 5) roygbiv[i] = rgb(x,0,c); // blue->indigo
+         if(hue >= 5 && hue <= 6) roygbiv[i] = rgb(c,0,x); // indigo->violet
+         hue += hueInc;
+      }
+
+   }
+   
+   cls(0);
+   
+   nx = xres/100;
+   ny = yres/100;
+   
+
+   
+   delta = 0;
+   for(y=0; y<yres; y++)
+   {
+      setcol( roygbiv[delta] ); 
+      moveto(0,y); lineto(xres,y);
+      delta += 255/yres;
+   }
+   
+   xpos = xres/2;
+   deltay = yres/7;
+   ypos = deltay;
+   setcol(255,0,0);
+   drawsph( xpos, deltay, 50 );
+   
+   setcol(255,127,0);
+   drawsph( xpos, 2*deltay, 50 );
+
+   setcol(255,255,0);
+   drawsph( xpos, 3*deltay, 50 );
+   
+   setcol(0,255,0);
+   drawsph( xpos, 4*deltay, 50 );
+   
+   setcol(0,0,255);
+   drawsph( xpos, 5*deltay, 50 );
+
+   setcol(96,0,255);
+   drawsph( xpos, 6*deltay, 50 );
+   
+   setcol(143,0,255);
+   drawsph( xpos, 7*deltay, 50 );
+   
+   moveto(0,0); setcol(255,255,255);
+   
+   printf("roggbif\n rod orangsje gul groenn blaa indigo fiolett\n roy g. biv\n red orange yellow green blue indigo violet");
+}

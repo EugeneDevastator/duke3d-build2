@@ -1,0 +1,270 @@
+/* written by Torbjoern
+primitives:
+
+-rect
+-filled rect
+-filled circle (built in drawsph)
+-trapezoid
+-triangle
+-arrow given angle
+-arrow given start/end
+-grid
+
+*/
+()
+{
+   cls(0); clz(1e32);
+   setcol(127,127,127);
+   s = 50;
+   drawgrid( xres/50, 0,0, xres-1, yres-1 ); 
+
+   x=100; y=50; 
+   t = klock();
+
+   setcol(0xff0000);
+   
+   DrawRect(x,y,s,s); y+=s*1.5;
+   FillRect(x,y,50,50); y+=s*1.5;
+   drawrectfill(x,y,x+s,y+s); y+=s*1.5;
+   drawrectopen(x,y,x+s,y+s); y+=s*1.5;
+   Drawcirc(x,y,25); y+=s*1.5;
+   DrawLineTrapezoid(x,y,s,s); y+=s*1.5;
+   DrawTriangle(x,y, s/2, t*300 ); y+=s*1.5;
+   DrawArrow(x,y,t*2,50); y+=s*1.5; //start, angle, length
+   DrawArrow(x,y,x+s,y,10); y+=s*1.5;//start, end, pointerLength
+   spiral(x,y,pi*2*5); y+=s*1.5;
+   
+   
+   // Next Row
+   x = 400;
+   y = 50;
+
+   // drawcone is versatile!
+   drawcone(x,y,15,x+100,y,-.1); y+=s*1.5;
+   drawcone(x,y,-15,x+100,y,-.1); y+=s*1.5;
+   drawcone(x,y,-15,x+100,y,-15); y+=s*1.5;
+   
+   drawcone(x,y,10,x+100,y,.1); y+=s*1.5;
+   mydrawcone(x,y,10,x+100,y,.1); y+=s*1.5;
+   arc(x,y,t,pi/2 + t, s ); y+=s*1.5;
+}
+
+mydrawCone( x0, y0, r1, x1, y1, r2)
+{
+   glBegin(GL_POLYGON);
+   glBegin(GL_LINE_LOOP);
+   //glBegin(GL_POINTS);
+   ang = PI*.5 + atan2( y0-y1, x0-x1 );
+   segs = 24;
+   for(i=0; i<segs+1; i++)
+   {
+      a = ang+i*PI/segs;
+      x = cos(a)*r2;
+      y = sin(a)*r2;
+      glVertex(x1+x,y1+y);
+   }
+   ang+=PI;
+   for(i=0; i<segs+1; i++)
+   {
+      a = ang+i*PI/segs;
+      x = cos(a)*r1;
+      y = sin(a)*r1;
+      glVertex(x0+x,y0+y);
+   }
+   glEnd();
+
+}
+
+drawrectfill(x0,y0,x1,y1) { for(y=y0;y<y1;y++) { moveto(x0,y); lineto(x1,y); } }
+drawrectopen(x0,y0,x1,y1) { moveto(x0,y0); lineto(x1,y0); lineto(x1,y1); lineto(x0,y1); lineto(x0,y0); }
+
+
+drawRect(sx, sy, wx, wy)
+{   
+   moveto(sx, sy);
+   lineto(sx+wx, sy+0);
+   
+   moveto(sx, sy+wy);
+   lineto(sx+wx, sy+wy);
+   
+   moveto(sx, sy);
+   lineto(sx, sy+wy);
+   
+   moveto(sx+wx, sy);
+   lineto(sx+wx, sy+wy);
+}
+
+// Fastest way is to draw horizontals
+fillRect(sx, sy, wx, wy)
+{
+   for(i=0; i<wx+1; i++)
+   {   
+      moveto(sx, sy+i);
+      lineto(sx+wx, sy+i);
+   }
+}
+
+drawCirc(sx,sy,r)
+{
+   ox=sx; oy=sy-r;
+   moveto(sx,sy);
+   ang = 0;
+   segs = 32;
+   angInc = 2*PI / segs;
+   for(i=0; i<segs; i++)
+   {
+      x=cos(ang)*r;
+      y=sin(ang)*r;
+      moveto(ox,oy);
+      lineto( (ox+x), (oy+y) );
+      ox=ox+x; oy=(oy+y);
+      ang += angInc;
+   }
+}
+drawLineTrapezoid(x,y,length,height)
+{
+   topleftx = length/4+x;
+   lowerlefty = y+height;
+   lowerrightx = x+length;
+   lowerrighty = y+height;
+   upperrightx = length/4*3+x;
+   moveto(topleftx, y);
+   lineto( x,lowerlefty);
+   moveto(x,lowerlefty);
+   lineto( lowerrightx,lowerrighty);
+   moveto(lowerrightx, lowerrighty);
+   lineto( upperrightx,y);
+   moveto(upperrightx, y);
+   lineto( topleftx,y);
+}
+
+
+drawTriangle(x,y,psize, playerangle)
+{  
+   drawsph( x, y, -2 );
+   v1x = x+sin( (playerangle)*pi/180)*psize;
+   v1y = y+cos((playerangle)*pi/180)*psize;
+   
+   v2x = x+sin( (playerangle+120)*pi/180)*psize;
+   v2y = y+cos((playerangle+120)*pi/180)*psize;
+   
+   v3x = x+sin( (playerangle-120)*pi/180)*psize;
+   v3y = y+cos((playerangle-120)*pi/180)*psize;
+   
+   //setcol(0x00ff00);
+   drawsph( v1x, v1y, -2);
+   drawsph( v2x, v2y, -2);
+   drawsph( v3x, v3y, -2);
+   
+   //setcol(0x0000ff);
+   moveto(v1x, v1y);
+   printf("v1");
+   lineto(v2x, v2y);
+   printf("v2");
+   lineto(v3x, v3y);
+   moveto(v3x, v3y);
+   printf("v3");
+   lineto(v1x, v1y); 
+}
+
+// start, angle, length
+drawArrow(sx,sy,angle,length)
+{
+   moveto(sx,sy);
+   
+   ex = sx + cos(-angle)*length;
+   ey = sy + sin(-angle)*length;
+   lineto(ex,ey);
+   
+   angle = atan2(ey-sy,ex-sx);
+   //if(angle < 0) angle += 2*PI;
+   ofs=PI*1.1;
+   
+   pointLength = 20;
+   moveto(ex,ey);
+   lineto(ex+cos(angle+ofs)*pointLength, ey+sin(angle+ofs)*pointLength);
+   
+   moveto(ex,ey);
+   lineto(ex+cos(angle-ofs)*pointLength, ey+sin(angle-ofs)*pointLength);
+   
+   moveto(sx,sy);
+}
+
+// start, end, length
+drawArrow(sx,sy,ex,ey,len)
+{
+   moveto(sx,sy);
+   lineto(ex,ey);
+   
+   angle = atan2(ey-sy,ex-sx);
+   //if(angle < 0) angle += 2*PI;
+   ofs=PI*1.1;
+   
+   moveto(ex,ey);
+   lineto(ex+cos(angle+ofs)*len, ey+sin(angle+ofs)*len);
+   
+   moveto(ex,ey);
+   lineto(ex+cos(angle-ofs)*len, ey+sin(angle-ofs)*len);
+   
+   moveto(sx,sy);
+   //printf("angle %g",angle*180/PI);
+}
+
+
+drawGrid( segments, tx, ty, wid, hei)
+{
+   inc = wid / segments;
+   for(i=0; i<segments+1; i++)
+   {
+      moveto(tx,ty + i*inc);
+      lineto(tx+wid, ty+i*inc);
+      
+      moveto(tx + i*inc,ty);
+      lineto(tx + i*inc,ty+hei);
+
+      
+   }
+}
+
+// wants radians
+// can go forwards and backwards
+spiral(x,y,angle)
+{
+   negative = 0;
+   step = 1/36;
+   dist = 5;
+   radiusIncrement = 0.05;
+   if(angle < 0)
+   {
+      angle=-angle;
+      dist = -dist;
+      radiusIncrement *= -1;
+      negative = 1;
+   }   
+
+   moveto(x+sin(0+PI/2)*dist,y+cos(0+PI/2)*dist);
+   for(i=0; i<angle; i+=step)
+   {
+      if(negative)
+      {
+      lineto(x-sin(i+PI/2)*dist, y+cos(i+PI/2)*dist);
+      }
+      else
+      {
+         lineto(x+sin(i+PI/2)*dist, y+cos(i+PI/2)*dist);
+      }
+      dist += radiusIncrement;
+   }
+}
+
+arc(x,y,start,end,radii)
+{
+   moveto(x+cos(start)*radii,y+sin(start)*radii);
+   segs=36;
+   for(i=0; i<segs; i++){
+      ang = i*(end-start) / (segs-1);
+      ca = cos(start+ang)*radii;
+      sa = sin(start+ang)*radii;
+      lineto(x+ca, y+sa);
+   }
+}

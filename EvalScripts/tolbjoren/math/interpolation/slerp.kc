@@ -1,0 +1,442 @@
+struct vec{x,y,z;}
+static vec zeroVec;
+
+()
+{
+   time = klock(0);
+   
+   cls(0); clz(1e32);
+   //static mtx[9];
+   vec pos, targ, up; vecset(pos, 0,0,-2); vecset(targ,0,0,0); vecset(up,0,1,0);
+   //lookAt( pos, targ, up, mtx );
+   //setcam2( pos, mtx );
+   
+   ang = time;
+   ca = cos(ang);
+   sa = sin(ang);
+   setcam(sa*-3,0,ca*-3,ang,0);
+   
+   // Create 2 direction vectors
+   static vec dir1, dir2;
+   
+   // 2 matrices represented as 3 vectors each
+   static vec lft0,upd0,fwd0;
+   static vec lft1,upd1,fwd1;
+   
+   if (numframes==0 ){
+      vecRand(dir1);
+      vecRand(dir2);
+      
+      //vecset(dir1,-.1,-.1,-.1); normalize(dir1);
+      //vecset(dir2,-.1,.01,-.1); normalize(dir2);
+   
+
+      static mtx0[9];
+      static mtx1[9];
+      
+      lookAt( zeroVec, dir1, up, mtx0 );
+      lookAt( zeroVec, dir2, up, mtx1 );
+      
+      // copy matrix x,y,z-directions into vectors
+      vecset( lft0, mtx0[0], mtx0[1], mtx0[2] );
+      vecset( upd0, mtx0[3], mtx0[4], mtx0[5] );
+      vecset( fwd0, mtx0[6], mtx0[7], mtx0[8] );
+   
+      vecset( lft1, mtx1[0], mtx1[1], mtx1[2] );
+      vecset( upd1, mtx1[3], mtx1[4], mtx1[5] );
+      vecset( fwd1, mtx1[6], mtx1[7], mtx1[8] );
+   
+   }
+
+   // The interpolated matrix / vector-triplet
+   vec istr, ihei, ifor;   
+
+   steps = 50;
+   for(i=0; i<steps; i++)
+   {
+      t = i / steps;
+      slerp(lft0,upd0,fwd0,
+            lft1,upd1,fwd1,
+            istr,ihei,ifor, t);
+            
+      drawsph(ifor.x, ifor.y, ifor.z, .01);
+   }
+
+   // Draw an arrow
+   slerp(lft0,upd0,fwd0,
+         lft1,upd1,fwd1,
+         istr,ihei,ifor, sin(5*time)*.5+.5 );
+         
+
+   /*
+   // Draw matrices
+   setcol(255,255,255);
+   drawvec( lft0 );
+   drawvec( upd0 );
+   drawvec( fwd0 );
+
+   setcol(255,0,0);
+   drawvec( lft1 );
+   drawvec( upd1 );
+   drawvec( fwd1 );
+   
+
+   setcol(255,255,0);
+   drawvec( istr );
+   drawvec( ihei );
+   drawvec( ifor );
+   */
+   
+   draw_dot_sphere( zeroVec, 0.95);
+   //ico_sphere( zeroVec, .95);
+
+   setcol(0x23d127);
+   drawArrow( zeroVec, dir1, .01 );
+   drawArrow( zeroVec, dir2, .01 );
+   setcol(0xf18b1b);
+   drawArrow( zeroVec, ifor, .01 );
+}
+
+drawvec(vec v)
+{
+   moveto(0,0,0); lineto(v.x,v.y,v.z);
+}
+
+drawArrow(vec s, vec e, scale) // finds direction vector e-s.
+{
+   vec dir;
+   vecSub(dir, e, s); 
+   
+   arrowlen = length(dir);
+   if(arrowlen < .1) return; // dont draw small arrows.
+   
+   polelen = arrowlen * 0.90;
+   pointerlen = arrowlen - polelen; // not used...
+   normalize(dir);
+   
+   r1=scale;
+   drawcone(s.x,s.y,s.z,r1,
+            s.x+dir.x*polelen,s.y+dir.y*polelen,s.z+dir.z*polelen,r1,DRAWCONE_NOCAP1 );         
+   drawcone(s.x+dir.x*polelen,s.y+dir.y*polelen,s.z+dir.z*polelen, -r1*3, 
+            e.x, e.y, e.z, 0.01,DRAWCONE_CENT);
+   
+}
+
+// Slerp code from voxlap5.c by Ken Silverman
+slerp (vec istr1, vec ihei1, vec ifor1,
+       vec istr2, vec ihei2, vec ifor2,
+       vec istr3, vec ihei3, vec ifor3, double rat)
+{
+   vec ax;
+   double c, s, t, ox, oy, oz, k[9];
+
+   // some kind of quaternion operation?
+   ax.x = istr1.y*istr2.z - istr1.z*istr2.y + ihei1.y*ihei2.z - ihei1.z*ihei2.y + ifor1.y*ifor2.z - ifor1.z*ifor2.y;
+   ax.y = istr1.z*istr2.x - istr1.x*istr2.z + ihei1.z*ihei2.x - ihei1.x*ihei2.z + ifor1.z*ifor2.x - ifor1.x*ifor2.z;
+   ax.z = istr1.x*istr2.y - istr1.y*istr2.x + ihei1.x*ihei2.y - ihei1.y*ihei2.x + ifor1.x*ifor2.y - ifor1.y*ifor2.x;
+   
+   // Check if axis has any length
+   t = ax.x*ax.x + ax.y*ax.y + ax.z*ax.z; 
+   if (t == 0) 
+   { 
+      return;
+   }
+
+   //Based on the vector suck-out method (see ROTATE2.BAS)
+   ox = istr1.x*ax.x + istr1.y*ax.y + istr1.z*ax.z;
+   oy = ihei1.x*ax.x + ihei1.y*ax.y + ihei1.z*ax.z;
+   if (fabs(ox) < fabs(oy))
+      { c = istr1.x*istr2.x + istr1.y*istr2.y + istr1.z*istr2.z; s = ox*ox; }
+   else
+      { c = ihei1.x*ihei2.x + ihei1.y*ihei2.y + ihei1.z*ihei2.z; s = oy*oy; }
+   if (t == s) return;
+   c = (c*t - s) / (t-s);
+   if (c < -1) c = -1;
+   if (c > 1) c = 1;
+   
+   ang = acos(c)*rat;
+   c = cos( ang );
+   s = sin( ang );
+
+   // Normalize axis
+   t = 1.0 / sqrt(t); ax.x *= t; ax.y *= t; ax.z *= t;
+
+   t = 1.0-c;
+   k[0] = ax.x*t; k[7] = ax.x*s; oz = ax.y*k[0];
+   k[4] = ax.y*t; k[2] = ax.y*s; oy = ax.z*k[0];
+   k[8] = ax.z*t; k[3] = ax.z*s; ox = ax.z*k[4];
+   k[0] = ax.x*k[0] + c; k[5] = ox - k[7]; k[7] += ox;
+   k[4] = ax.y*k[4] + c; k[6] = oy - k[2]; k[2] += oy;
+   k[8] = ax.z*k[8] + c; k[1] = oz - k[3]; k[3] += oz;
+
+   // Transform matrix 1 by k
+   
+   ox = istr1.x; oy = istr1.y; oz = istr1.z;
+   istr3.x = ox*k[0] + oy*k[1] + oz*k[2];
+   istr3.y = ox*k[3] + oy*k[4] + oz*k[5];
+   istr3.z = ox*k[6] + oy*k[7] + oz*k[8];
+
+   ox = ihei1.x; oy = ihei1.y; oz = ihei1.z;
+   ihei3.x = ox*k[0] + oy*k[1] + oz*k[2];
+   ihei3.y = ox*k[3] + oy*k[4] + oz*k[5];
+   ihei3.z = ox*k[6] + oy*k[7] + oz*k[8];
+
+   ox = ifor1.x; oy = ifor1.y; oz = ifor1.z;
+   ifor3.x = ox*k[0] + oy*k[1] + oz*k[2];
+   ifor3.y = ox*k[3] + oy*k[4] + oz*k[5];
+   ifor3.z = ox*k[6] + oy*k[7] + oz*k[8];
+}
+
+///////////////////////////// VECTOR MATH
+
+vecScalar( vec out, vec a, s )
+{
+   out.x = a.x * s;
+   out.y = a.y * s;
+   out.z = a.z * s;
+}
+
+vecAdd( vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;   
+}
+vecSub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;   
+}
+
+vecCross( vec out, vec a, vec b)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+
+vecset(vec a, x,y,z){
+   a.x = x; a.y = y; a.z = z;
+}
+
+vecset(vec a, vec other){
+   a.x = other.x; a.y = other.y; a.z = other.z;
+}
+
+vecDot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+length( vec v )
+{
+   return sqrt( vecdot(v,v) );
+}
+
+normalize( vec v )
+{
+   len = length(v);
+   if ( len )
+   {
+      v.x /= len; v.y /= len; v.z /= len;
+   }
+}
+
+lookAt(vec eye, vec pos, vec worldup, mtx[9])
+{
+   vec fwd;
+   vec up;
+   vec side;
+   
+   // find forward dir
+   vecsub( fwd, pos, eye );
+   normalize(fwd);
+   
+   // find up vector as close to world up as possible   
+   dotprod = vecDot(worldUp,fwd);
+   static part2[3];
+   vecscalar( part2, fwd, dotprod);
+   
+   vecsub(up, worldUp, part2);
+   normalize(up);
+
+   static side[3];
+   vecCross(side,fwd,up);
+   normalize(side);
+  
+   buildMatrix( mtx, side, up, fwd ); 
+}
+
+buildMatrix( mtx[9], vec side, vec up, vec fwd )
+{
+   mtx[0] = side.x; mtx[1] = side.y; mtx[2] = side.z;
+   mtx[3] = up.x;   mtx[4] = up.y;   mtx[5] = up.z;
+   mtx[6] = fwd.x;  mtx[7] = fwd.y;  mtx[8] = fwd.z;
+}
+
+InitRotationMatrix(mtx[9], vec pAxis, r)
+{
+  // The axis vector must be of unit length
+  x=0, y=0, z=0, m=0;
+  m = sqrt(pAxis.x^2 + pAxis.y^2 + pAxis.z^2);
+  x = pAxis.x/m;
+  y = pAxis.y/m;
+  z = pAxis.z/m;
+
+  // Compute the rotation matrix  
+  c = cos(r);
+  s = sin(r);
+
+  Mtx[0] = (x * x) * (1.0 - c) + c;
+  Mtx[1] = (y * x) * (1.0 - c) + (z * s);
+  Mtx[2] = (z * x) * (1.0 - c) - (y * s);
+
+  Mtx[3] = (x * y) * (1.0 - c) - (z * s);
+  Mtx[4] = (y * y) * (1.0 - c) + c;
+  Mtx[5] = (z * y) * (1.0 - c) + (x * s);
+
+  Mtx[6] = (x * z) * (1.0 - c) + (y * s);
+  Mtx[7] = (y * z) * (1.0 - c) - (x * s);
+  Mtx[8] = (z * z) * (1.0 - c) + c;
+} 
+
+setcam2( vec p, m[9] )
+{
+   setcam(p.x, p.y, p.z,
+          m[0], m[1], m[2],
+          m[3], m[4], m[5],
+          m[6], m[7], m[8]);
+}
+
+vecRand( vec v )
+{
+   v.x = nrnd;
+   v.y = nrnd;
+   v.z = nrnd;
+   normalize(v);
+}
+
+// given to points p1 and p2 create a vector out
+// that is perpendicular to (p2-p1)
+createPerp(vec out, vec p1, vec p2)
+{
+   vec invec;
+   vecsub(invec, p2, p1 );
+   normalize(invec);
+ 
+   vec zdir; vecset( zdir, 0,0,1);
+   
+   veccross(out, invec, zdir );
+   if ( length(out) == 0 )
+   {
+      vec ydir; vecset( ydir, 0,1,0);
+      veccross(out, invec, ydir);
+   }
+}
+
+///////////////// ICO SPHERE 
+
+
+ico_sphere( vec pos, radi ){
+   subDivDepth = 3;
+   
+   vec v1,v2,v3;
+
+   enum{   
+      xx = 0.525731112119133606,
+      zz = 0.850650808352039932
+   }
+
+   // xx and zz constants make sure the distance from the origin to any of the verts of the iscosahedron is 1.0
+   static vertexData[12][3] = {    
+         -xx, 0.0, zz   ,  xx, 0.0, zz   ,  -xx, 0.0, -zz  ,  xx, 0.0, -zz  ,    0.0, zz, xx  , 
+         0.0, zz, -xx   , 0.0, -zz, xx   ,  0.0, -zz, -xx   ,  zz, xx, 0.0  ,   -zz, xx, 0.0   , 
+         zz, -xx, 0.0  ,   -zz, -xx, 0.0   
+   };
+
+   // indices used to construct triangles by linking vertices together
+   static tindices[20][3] = { 
+      0,4,1,   0,9,4,   9,5,4,   4,5,8,   4,8,1,
+      8,10,1,  8,3,10,  5,3,8,  5,2,3,  2,7,3,    
+      7,10,3,   7,6,10,   7,11,6,   11,0,6,   0,1,6,
+      6,1,10,   9,0,11,  9,11,2,   9,2,5,   7,2,11   
+   };
+
+    for (i = 0; i < 20; i++)
+    { 
+      vecset(v1,  vertexData[ tindices[i][0] ][0],  vertexData[ tindices[i][0] ][1],  vertexData[ tindices[i][0] ][2] ); 
+      vecset(v2,  vertexData[ tindices[i][1] ][0],  vertexData[ tindices[i][1] ][1],  vertexData[ tindices[i][1] ][2] );
+      vecset(v3,  vertexData[ tindices[i][2] ][0],  vertexData[ tindices[i][2] ][1],  vertexData[ tindices[i][2] ][2] );
+
+      subdivide(pos,radi, v1,v2,v3,subDivDepth);
+    }
+}
+
+
+
+drawtriangle(vec pos, radi, vec v1, vec v2, vec v3) 
+{ 
+   /*
+   setcol(255,0,0);
+   s = radi;  
+   
+   glBegin(GL_TRIANGLES); 
+      glvertex(pos.x + v1.x*s, pos.y + v1.y*s, pos.z + v1.z*s); 
+      glvertex(pos.x + v2.x*s, pos.y + v2.y*s, pos.z + v2.z*s); 
+      glvertex(pos.x + v3.x*s, pos.y + v3.y*s, pos.z + v3.z*s);    
+   glEnd();
+   */
+   
+   setcol(255,255,255);
+ 
+   s = radi + 0.01;  
+   glBegin(GL_LINE_STRIP);
+      glvertex(pos.x + v1.x*s, pos.y + v1.y*s, pos.z + v1.z*s); 
+      glvertex(pos.x + v2.x*s, pos.y + v2.y*s, pos.z + v2.z*s); 
+      glvertex(pos.x + v3.x*s, pos.y + v3.y*s, pos.z + v3.z*s);   
+   glEnd();
+
+   //triangleCount++;
+}
+
+subdivide(vec pos, radi, vec v1, vec v2, vec v3, depth) 
+{ 
+  if(depth == 0)
+  {
+    drawtriangle(pos, radi, v1,v2,v3);
+    return;
+  }
+  
+  vec v12; vecadd(v12, v1,v2);
+  vec v23; vecadd(v23, v2,v3);
+  vec v31; vecadd(v31, v1,v3);
+  normalize(v12);    
+  normalize(v23); 
+  normalize(v31); 
+  subdivide(pos, radi, v1,v12,v31, depth-1);
+  subdivide(pos, radi, v2,v23,v12, depth-1);
+  subdivide(pos, radi, v3,v31,v23, depth-1);
+  subdivide(pos, radi, v12,v23,v31, depth-1);
+}
+
+
+
+draw_dot_sphere( vec pos, radi )
+{
+setcol(255,255,255);
+
+   i_steps = 12;
+   j_steps = 24;
+   for(i=0; i<i_steps; i++)
+   for(j=0; j<j_steps; j++){
+      u = 2*PI * i/(i_steps);
+      v = PI * j/(j_steps);
+      
+      x = cos(u) * sin(v) * radi;
+      y = sin(u) * sin(v) * radi;
+      z = cos(v) * radi;
+      
+      drawsph(x,y,z,.01);
+   }
+}

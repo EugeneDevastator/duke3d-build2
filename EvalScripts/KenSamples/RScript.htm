@@ -1,0 +1,215 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<HTML>
+
+<HEAD>
+   <TITLE>Compiler Documentation for RScript</TITLE>
+   <style>
+      BODY {MARGIN: 30px 50px 100px; FONT-STYLE: normal; COLOR: #66ddff; BACKGROUND: #000020 url("../pics/pclasmag.png") fixed; FONT-FAMILY: Verdana; FONT-SIZE: 12pt}
+      H1 {COLOR: #66cc00; FONT-SIZE: 24pt; TEXT-ALIGN: CENTER}
+      H3 {COLOR: #66cc00; FONT-SIZE: 16pt}
+      H4 {COLOR: #66cc00; FONT-WEIGHT: bold}
+      A:link {COLOR: #ffdd66}
+      A:visited {COLOR: #ff66ff}
+   </style>
+</HEAD>
+
+<BODY bgproperties="fixed">
+<H1><font size=5>Compiler Documentation for</font>
+<br>RScript<br><font size=4>(v0.6.0)</font><br><br><font size=2>Last updated: 2020-11-15</font></H1><br><center>
+<font size=2>by Robert Rodgers</font></center><br>
+<center><img width="298" height="27" alt="contactinfo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASoAAAAbCAMAAAD8tTKhAAAAGFBMVEUAAAD/AAD//wAA/wAAAP8A////AP/////ZV2wxAAAC+ElEQVR4Xu3WzW7rMBCDUco/yfu/8a0iEx8mkzFsuEh7g3KlbDjSgSNbp7KuenduI/qWLMsbdjzPc5c6Y9W+ct2J6EoeO1++8hup2shlKbH8SCqsLkpFuN9NRd5NFZ+o20Ur6UOpkLoRrH6KajtP808vph45s6kYKzGaUJKpXDj34P9odm1PlHKkRNUo9VbHL4Z4TKZya0zVyHk6mH8jZa6Zu4oTMVtiKp1QGZ0yW609btbimIq/nn+zyTHI3b3ao5AyV++HCiiswmZTYz5WPt6wGnMTFY+As1WS0URb7yKmWh9BakGKY8lU3i9U4nyByhsX/Ug5YctU5MYWAxWoBRV/wRuhkdHhIUUKqt5aUClTNYkpcjGBymSJqt5yLjxExQVTUEkSUoKK0OORXCGj0qWrROmg4qFipdaElfaouLMqKuOPaI8Kq7gQFxxUgkr5WfZqm1dSzVCJzlR6liouJJkJquJqdZVXZSMjMxWoY57KU0Wq2FZTcQgnUUWpmkqZKl7splLxFoJqrxEqVkgVVLJUpEpHsRVFWLlUSlYlFR8i7hdUrJCqqfSaqtWNgjTaXqeqPzs4A1RgQTWWop+jhfq0QOoCVVgYJlEhG6nWgkpHqGSqnkRVWd1UUQmYROU5T1RLRaVIpVNU0i5VfVcpXSaeBRWhM1T7ndp5tgFIsekdKukEFScvGzGFqp2jUqRSoDISgcrf63RSbSsbGS4gscFANe1T2cqrJ4KqccpvQLVMNfFxIt3v9y5VUwGfqXiuXn6AeCHZihGWKqi8U02ZauYLd+w/fIiUVDT2qBVUYmykuvdoSVaM36hsvgWx/LnOBwhk1Ep050u9oBKvj0g19i+27McKqaKxosJ0lwore2XzhFVSObFWMY3sUckTXlPFTR9r3GBY8ebClo8FP8BIgSXHRVwhzEMr31U41VhsEys9D+JWhMp77lIjlFNXNh4JBzwfE11pwiq/2nUgHey/yBSpLqedoiJ/VB9ohdh1K6JPC1Dfkx+C+gcVlSEz/jwp4gAAAABJRU5ErkJggg=="></center>
+<HR><br><table align=center><tr><td>
+<H3><u>Table of contents</u></H3><ul>
+<li><a href="#syn">Script syntax</a></li>
+<li><a href="#bug">Known bugs and limits</a></li>
+<li><a href="#hist">Update history</a></li>
+</ul></td></tr></table>
+<br>
+
+<a name="syn">
+<HR><TITLE>Script Syntax</TITLE>
+
+<H1>Script Syntax</H1></center><br><br>
+The script syntax is very similar to C and C++. Many keywords and operators have the same meanings, but there are a few differences. The following tables contain information on the supported syntax.<br><br>
+
+<h4>Operators, in order of precedence:</h4>
+<table width=100% cellspacing=0 cellpadding=5 border=1>
+<tr><td width=35>{}</td><td>Code block.</td></tr>
+<tr><td width=35>' '</td><td>Literal; substitutes a character for its integer value.</td></tr>
+<tr><td width=35>""</td><td>Constant string. Strings are concatenated where possible.</td></tr>
+<tr><td width=35>()</td><td>Parenthesis.</td></tr>
+<tr><td width=35>[]</td><td>Array indices.</td></tr>
+<tr><td width=35>.</td><td>The dot is used for referencing elements in a structure.</td></tr>
+<tr><td width=35>,</td><td>The comma separates function parameters. Used outside of function parenthesis, it is a sequential evaluation operator (i.e. "i=(g=sqrt(f),g+1);" means "g=sqrt(f); i=g+1;").</td></tr>
+<tr><td width=35>!</td><td>Logical not; '!x' means 'x==0'.</td></tr>
+<tr><td width=35>++<br>--</td><td>Increment and decrement; '++x' will increment before value is used, 'x++' will increment after value is used.</td></tr>
+<tr><td width=35>^</td><td>Power; 'x^y' means calculate 'x' to the power of 'y'.</td></tr>
+<tr><td width=35>*<br>/</td><td>Multiply.<br>Divide.</td></tr>
+<tr><td width=35>%</td><td>Modulus; 'x % y' means calculate remainder of 'x' after division by 'y'. With the '%' operator, the result is always positive ('fmod(x,y)+|y|' for 'fmod(x,y)<0').</td></tr>
+<tr><td width=35>+<br>-</td><td>Add.<br>Subtract.</td></tr>
+<tr><td width=35>&lt;<br>&lt;=<br>&gt;<br>&gt;=</td><td>Less than.<br>Less than or equal to.<br>Greater than.<br>Greater than or equal to.<br></td></tr>
+<tr><td width=35>==<br>!=</td><td>Equal to.<br>Not equal to.</td></tr>
+<tr><td width=35>&&</td><td>Logical and; 'x && y' is '1' if both values are non-zero.</td></tr>
+<tr><td width=35>||</td><td>Logical or; 'x || y' is '1' if either value is non-zero.</td></tr>
+<tr><td width=35>^=<br>%=<br>*=<br>/=<br>+=<br>-=</td><td>Assignment with calculation. Uses the left hand side as the destination for the calculated value.</td></tr>
+<tr><td width=35>=</td><td>Direct assignment to left hand side.</td></tr>
+</table>
+
+<br><br><h4>Keywords:</h4>
+<table width=100% cellspacing=0 cellpadding=5 border=1>
+<tr><td>auto</td><td>Defines a variable with local extent, using the stack. This is the default. Single variables are implicitly defined on their first use, but arrays must always be explicitly defined.</td></tr>
+<tr><td>break</td><td>Exits the loop it is used in.</td></tr>
+<tr><td>continue</td><td>Continues with the loop it is used in, skipping the code remaining.</td></tr>
+<tr><td>do</td><td>Standard implementation of a 'do' loop.</td></tr>
+<tr><td>double</td><td>Used to define a variable as a double precision floating point number. This is the default type (and currently the only internal type), and may be omitted.</td></tr>
+<tr><td>else</td><td>Used with 'if'; specifies a block of code to execute if the condition at 'if' is false.</td></tr>
+<tr><td>enum</td><td>Can define any constant value, and definitions lacking an explicit assignment have the value of the previous constant plus one.</td></tr>
+<tr><td>for</td><td>Standard implementation of a 'for' loop.</td></tr>
+<tr><td>goto</td><td>Continues execution at the specified label.</td></tr>
+<tr><td>if</td><td>Executes the following block of code if the specified condition is true.</td></tr>
+<tr><td>return</td><td>Ends a function and returns to the caller, with an optional value. Zero is used if no value is supplied.</td></tr>
+<tr><td>static</td><td>Defines a variable with static extent; it is initialized at compile time, and values are retained in the data section of the script. Can be used globally or locally.</td></tr>
+<tr><td>struct</td><td>Used to define a structure, which can be used as a type prefix for variables.</td></tr>
+<tr><td>while</td><td>Standard implementation of a 'while' loop.</td></tr>
+</table>
+
+<br><br><h4>Internal library functions:<br><font size=1>(Note: almost all of these are compiled inline.)</font></h4>
+<table width=100% cellspacing=0 cellpadding=5 border=1>
+<tr><td>abs</td><td>Alias for 'fabs'. Provided for compatibility.</td></tr>
+<tr><td>acos</td><td>Calculates the inverse of a cosine.</td></tr>
+<tr><td>asin</td><td>Calculates the inverse of a sine.</td></tr>
+<tr><td>atan</td><td>Calculates the inverse of a tangent.</td></tr>
+<tr><td>atan2</td><td>Same as 'atan', but with two parameters forming the ratio.</td></tr>
+<tr><td>ceil</td><td>Rounds to the lowest integer not less than the number.</td></tr>
+<tr><td>cos</td><td>Calculates the cosine.</td></tr>
+<tr><td>exp</td><td>Calculates 'e^x'.</td></tr>
+<tr><td>fabs</td><td>Calculates the absolute value; |x|.</td></tr>
+<tr><td>fact</td><td>Calculates the factorial. (Ken's function; fact(x) = gamma(x+1))</td></tr>
+<tr><td>fadd</td><td>Forces addition without interference from the optimizer. (Allows fast quantization tricks like: fadd(x,3*2^51)-3*2^51)</td></tr>
+<tr><td>fdiv</td><td>Family of 'fadd'.</td></tr>
+<tr><td>floor</td><td>Rounds to the highest integer not more than the number.</td></tr>
+<tr><td>fmod</td><td>Calculates the floating point remainder; like '%', but can give a negative result if either parameter is negative.</td></tr>
+<tr><td>fmul</td><td>Family of 'fadd'.</td></tr>
+<tr><td>fsub</td><td>Family of 'fadd'.</td></tr>
+<tr><td>int</td><td>Rounds the number towards zero.</td></tr>
+<tr><td>log</td><td>Calculates the logarithm base 'e'. An optional second parameter form can be used to specify the base.</td></tr>
+<tr><td>log2</td><td>Calculates the logarithm base 2.</td></tr>
+<tr><td>max</td><td>Calculates the greater of two numbers.</td></tr>
+<tr><td>min</td><td>Calculates the smaller of two numbers.</td></tr>
+<tr><td>near</td><td>Rounds the number towards the nearest integer.</td></tr>
+<tr><td>noise</td><td>Continuous noise function; can have one to three parameters. Original algorithm by Ken Perlin, implemented by Tom Dobrowolski, then further optimized for speed.</td></tr>
+<tr><td>nrnd</td><td>Returns a normal random number (avg:0, std:1). Can be used as a variable.</td></tr>
+<tr><td>pow</td><td>Function version of the '^' operator.</td></tr>
+<tr><td>rgb</td><td>Calculates: 'clamp_int(r)*2^16 + clamp_int(g)*2^8 + clamp_int(b)'.</td></tr>
+<tr><td>rnd</td><td>Returns a uniform random number in range: 0&lt;=x&lt;1. Can be used as a variable.</td></tr>
+<tr><td>sgn</td><td>Returns the sign of a number. A two parameter form can be used, where the value is compared to the second parameter instead of zero. Returns -1 for numbers less than zero, 0 for equal to zero, 1 for more than zero.</td></tr>
+<tr><td>sin</td><td>Calculates the sine.</td></tr>
+<tr><td>sqrt</td><td>Calculates the square root of a number.</td></tr>
+<tr><td>srand</td><td>Provides a seed for 'rnd', 'nrnd' and 'noise'.</td></tr>
+<tr><td>tan</td><td>Calculates the tangent.</td></tr>
+<tr><td>unit</td><td>See 'sgn'. Returns: 0 for negative, .5 for zero, 1 for positive.</td></tr>
+</table>
+
+<br><br><h4>String support:</h4>
+String support is limited, but with planned improvements coming up.
+<ul>
+   <li>Strings can be supplied in literal constant form: "string", or as variables, e.g. static x = "String";<br><br></li>
+   <li>String variables must be declared as static. (Local strings not supported yet.)<br><br></li>
+   <li>String variables may be used in any place that string literals are accepted.<br><br></li>
+   <li>String variables must be assigned to a string on declaration, and may be reassigned during program execution to any other string literal or string variable.<br><br></li>
+   <li>Evaldraw's printf now supports "%s" which can be enabled from the Evaldraw menu (or ini config file).<br><br></li>
+   <li>Operations on strings beyond simple assignment are not supported yet.<br><br></li>
+</ul>
+For example:
+<pre>
+   ()
+   static a[4] = {"A","B","C","D"};
+   static fmt = "Random: %s";
+   if (mousx > 500) { fmt = "Hey!"; }
+   cls(0);
+   printf(fmt, a[rnd * 4]);
+   refresh();
+   sleep(1000);
+</pre>
+<br>
+
+<h4>Initialization syntax:</h4>
+Static (and auto) variables can be initialized on declaration. This is supported for both single variables and arrays, and for both numeric and string variables.
+<ul>
+   <li>static x = 1; // Single variable<br><br></li>
+   <li>static x[4] = { 1, 2, 3, 4 }; // Arrays<br><br></li>
+   <li>static x[2][2] = { 11, 12, 21, 22 }; // Multi-dimensional Arrays<br><br></li>
+   <li>static x[2][2] = { { 11, 12 }, { 21, 22 } }; // Multi-dimensional Arrays (explicit)<br><br></li>
+</ul>
+Arrays can also be partially initialized. The uninitialized elements will remain zero:
+<ul>
+   <li>static x[4] = { 1, 2 }; // [ 1, 2, 0, 0 ]<br><br></li>
+   <li>static x[2][2] = { { 11 }, { 21 } }; // [ 11, 0, 21, 0 ] <br><br></li>
+</ul>
+
+<br><h4>Other notes:</h4>
+<ul>
+<li>All names and keywords are case insensitive.<br><br>
+<li>All variables are assumed to be 'double' unless otherwise specified.<br><br>
+<li>Array dimensions that are powers of two are masked (wrapped), otherwise set to zero if they are out of bounds. This occurs per-dimension.<br><br>
+<li>PI is a built-in constant.<br><br>
+<li>The syntax is generally compatible with EVAL (i.e. implicit returns, etc.).<br><br>
+<li>Init syntax for auto variables is computed during run-time, and does not have to be constant.<br><br>
+<li>When assigning structures or passing them as parameters, the compiler will allow the operation only if the size of the source and destination matches.<br><br>
+</ul>
+
+
+<a name="bug">
+<HR><TITLE>Known Bugs and Limits</TITLE>
+
+<H1>Known Bugs and Limits</H1></center><br>
+If you see a bug that is not mentioned here, please notify me via email. Make the subject title "RSCR BUG REPORT", and attach the script that caused the alleged error with a brief description of your observations.<br><br><br>
+<ul>
+<li>Structures may malfunction, but apparently have been stable enough for 10 years - so they probably work fine. Please inform me of such malfunctions.<br><br>
+<li>Unusual syntax may cause crashes. Examples such syntax are welcome.<br><br>
+<li>Keywords are not supported as part of a sequential evaluation chain. Instead of "func(abc), return(abc);" use "func(abc); return(abc);". Keywords can only be used as separate expressions.<br><br>
+<li>String support not fully added yet, but improving. For now, strings can be used as constants for function parameters or as special string variables (which are essentially string pointers). String variables can be used in any place where a string literal is accepted, and can be reassigned.<br><br>
+<li>Checks to prevent stack overflows are not implemented yet, so recursive functions or huge 'auto' arrays may cause a crash.<br><br>
+</ul><br><hr><br>
+Help me find and eliminate bugs, and your name will be mentioned here as well as the number of errors you have helped eliminate.<br><br>
+<ol>
+<!-- <li><b></b>: -->
+<li><b>Ken Silverman</b>: &gt; 40 (and counting...)</li>
+<li><b>Matheus Nabao</b>: 5 (A really helpful beta tester - Thanks!)</li>
+<li><b>Torbj&oslash;rn Haugen</b>: 3</li>
+<li><b>Marcus B</b>: 1</li>
+</ol><br>
+Note: The above tallies are for reported bugs that I have fixed. Fixes may take a considerable amount of time depending on my other workload, so if you have reported a bug (or more bugs than listed above), do not fear - I will eventually get to it. And thank you for helping to make RScript more stable!<br><br>
+
+
+<a name="hist">
+<HR><TITLE>Update History</TITLE>
+
+<H1>Update History</H1></center><br>
+<font size=2>When I started this compiler I also just started studying at a university. Now I work at that university and write software for them. As time allows, I will continue to patch bugs found in RScript. Even if it takes a while. ; )
+</font><br><br><br>
+<table width=100% cellspacing=0 cellpadding=8px border=1>
+   <tr>
+      <td width=60>Nov 2020</td>
+      <td>
+         <strong>Return of the King:</strong> After 10 years, the compiler has finally received its long-awaited update.<br><br>
+         Many accumulated bug reports were dusted off and actually read for a change, and their corresponding fixes were implemented. The foundation for better string support was also added. See the <a href="#syn">syntax reference</a> page for more details on new features.
+      </td>
+   </tr>
+   <tr>
+      <td width=60>Feb 2010</td>
+      <td>
+         Fixed a few crash bugs, as well as an internal corruption bug. Some modification was also done to increase the robustness of type checking.<br><br>Implicit type casting is done when the source and destination fields both have the same size, otherwise a "Type mismatch" error is generated.
+      </td>
+   </tr>
+   <tr>
+      <td width=60>Jan 2010</td>
+      <td>
+         First public release!<br><br>Featuring integration with Ken Silverman's Evaldraw, and a fair amount of compatibility with existing Evaldraw scripts.<br><br>
+         Bug reports and feature suggestions are welcome. My email address is on the index page.
+      </td>
+   </tr>
+</table><br>
+
+</BODY>
+</HTML>

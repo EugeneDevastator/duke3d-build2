@@ -1,0 +1,16 @@
+(x,y,z,&r,&g,&b)
+r = x*128+128;
+g = y*128+128;
+b = z*128+128;
+
+x2 = x+1;
+y2 = y+1;
+z2 = z+1;
+
+freq = 6;
+v = noise(freq*x2/2, freq*y2/2, freq*z2/2);
+
+distCenter = x^2+y^2+z^2;
+if(distCenter > v/2) return 0;
+v = v*distCenter;
+return v > 0;

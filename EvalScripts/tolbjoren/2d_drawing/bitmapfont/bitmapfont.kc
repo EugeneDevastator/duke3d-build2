@@ -1,0 +1,393 @@
+
+static texid = 0;
+static tex_width = 0;
+static tex_height = 0;
+
+struct char_t
+{
+   id;
+   x,y;
+   wid, hgt;
+   yoffset;
+}
+
+static char_t chars[100];
+
+static last_eight_read[8];
+()
+{
+   cls(127,127,127); clz(1e32);
+   glcullface(GL_NONE);
+   glenable(GL_ALPHA_TEST);
+   
+   if ( numframes == 0 )
+   {
+      texid = glsettex( "proggy_0.png" );
+      
+      getpicsiz("proggy_0.png", tex_width, tex_height );
+   
+   chars_read = 0;
+
+   c = 0;
+   prev_prev_char = 0;
+   prevchar = 0;   
+
+
+num=0;
+
+   x = 5;
+   y = 0;
+   setfont(6,8);
+   for(i=0; i<getfilsiz("proggy.fnt"); i++)
+   {
+ 
+
+      prev_prev_char = prevchar;
+      prevchar = c;
+      c = fil( "proggy.fnt", i );
+      
+      
+      for(j=0; j<7; j++)
+      {
+         last_eight_read[j] = last_eight_read[j+1];
+      }  
+      last_eight_read[7] = c;
+      
+      if ( i < 260 ) continue;
+            
+      if ( c == '\r' ) continue;
+      
+      if ( c == '\n'  )
+      {
+         x = 6;
+         y += 8;  
+      }
+      else
+      {
+         moveto(x,y);
+         printchar(c);   
+   
+         x+=6;
+         if ( x > xres-15 )
+         {
+            x = 5;
+            y += 8;
+         }
+      }
+      
+      if ( lastcharsequal( 'c', 'h', 'a', 'r', ' ', 'i', 'd', '=') )
+      {
+         chars[chars_read].id = readnum(i);
+      } 
+      
+      if ( prev_prev_char == ' ' && prevchar == 'x' && c == '=' )
+      {
+         chars[chars_read].x = readnum(i);
+      }
+
+      if ( prev_prev_char == ' ' && prevchar == 'y' && c == '=' )
+      {
+         chars[chars_read].y = readnum(i);
+      }
+      
+      if ( prev_prev_char == 't' && prevchar == 'h' && c == '=' )
+      {
+         chars[chars_read].wid = readnum(i);
+      }
+      
+      if ( prev_prev_char == 'h' && prevchar == 't' && c == '=' )
+      {
+         chars[chars_read].hgt = readnum(i);
+      }
+      
+      if ( lastcharsequal( 'y', 'o', 'f', 'f', 's', 'e', 't', '=') )
+      {
+         chars[chars_read].yoffset = readnum(i);
+         chars_read++;
+      } 
+      
+
+   }
+   
+   
+   
+   texid = glsettex( "proggy_0.png" );
+   
+   for(i=0; i<chars_read; i++)
+   {
+      moveto( xres-200, 15 + 15*i );
+      printf("%g, %g %g, %g .. %g\n", chars[i].x, chars[i].y, chars[i].wid, chars[i].hgt, chars[i].yoffset );
+   }
+   moveto(xres-100,5);
+   printf("chars_read=%g", chars_read);
+   
+   }
+   
+
+   static msg[32];
+   
+   i=0;
+   msg[i] = 'H'; i++;
+   msg[i] = 'e'; i++;
+   msg[i] = 'l'; i++;
+   msg[i] = 'l'; i++;
+   msg[i] = 'o'; i++;
+   msg[i] = '.'; i++;
+   msg[i] = ' '; i++;
+   msg[i] = 'i'; i++; 
+   msg[i] = 's'; i++;
+   msg[i] = 'n'; i++;
+   msg[i] = '''; i++;
+   msg[i] = 't'; i++;
+   msg[i] = ' '; i++;
+   msg[i] = 't'; i++;
+   msg[i] = 'h'; i++;
+   msg[i] = 'i'; i++;
+   msg[i] = 's'; i++;
+   msg[i] = ' '; i++;
+   msg[i] = 'a'; i++;
+   msg[i] = ' '; i++;
+   msg[i] = 'p'; i++;
+   msg[i] = 'r'; i++;
+   msg[i] = 'e'; i++;
+   msg[i] = 't'; i++;
+   msg[i] = 't'; i++;
+   msg[i] = 'y'; i++;
+   msg[i] = ' '; i++;
+   msg[i] = 'f'; i++;
+   msg[i] = 'o'; i++;
+   msg[i] = 'n'; i++;
+   msg[i] = 't'; i++;
+   msg[i] = '?'; i++;
+   setcol(255,255,255);
+   print( msg, i, xres/2 - 200, yres/2-100, 0 );
+   
+
+   i=0;
+   msg[i] = 'o'; i++;
+   msg[i] = 'v'; i++;
+   msg[i] = 'e'; i++;
+   msg[i] = 'r'; i++;
+   msg[i] = 'c'; i++;
+   msg[i] = 'o'; i++;
+   msg[i] = 'm'; i++; 
+   msg[i] = 'p'; i++;
+   msg[i] = 'l'; i++;
+   msg[i] = 'i'; i++;
+   msg[i] = 'c'; i++;
+   msg[i] = 'a'; i++;
+   msg[i] = 't'; i++;
+   msg[i] = 'e'; i++;
+   msg[i] = 'd'; i++;
+   msg[i] = '?'; i++;
+   print( msg, i, xres/2 - 150, yres/2, 1);
+
+
+   i=0;
+   msg[i] = ':'; i++;
+   msg[i] = ')'; i++;
+   setcol( 255, 255, 0);
+   print( msg, i,  mousx, mousy-15, 0);
+   
+   
+   x = 15;
+   y = yres-200;
+   for(i=0; i<95; i++)
+   {
+
+      tx = chars[i].x * 1.0/(tex_width-1);
+      ty = chars[i].y * 1.0/(tex_height-1);
+      
+      wid = chars[i].wid * 1/tex_width;
+      hgt = chars[i].hgt * 1/tex_height;
+   
+      drawquad( x,y, 
+      tx,ty,
+      tx+wid,ty+hgt, chars[i].wid, chars[i].hgt);
+      
+      x+=21;
+      if ( x > xres-200)
+      {
+         x = 15;
+         y += 30;
+      }
+      
+   }
+  
+      
+   glremovetex(texid);
+}
+
+readnum(&idx)
+{
+   idx++;
+   c = fil( "proggy.fnt", idx );
+   
+   enum{ MAX_NUM_LENGTH = 16 }
+   static nums[MAX_NUM_LENGTH];
+   nums_read = 0;
+   num = 0 ;
+   
+   
+   while ( isnum( c, num ) )
+   {
+      if ( nums_read > MAX_NUM_LENGTH-1 ) break;
+      nums[ nums_read ] = num;
+      nums_read++;
+      idx++;
+      c = fil( "proggy.fnt", idx );
+      
+   }
+   
+   final_num = 0;
+   for(i=0; i<nums_read; i++)
+   {
+      final_num += nums[i] * 10^(nums_read-i-1);
+   }
+
+   return final_num;
+}
+
+isnum(c, &num)
+{
+   num = -1;
+   if(c == '0') num = 0;
+   if(c == '1') num = 1;
+   if(c == '2') num = 2;
+   if(c == '3') num = 3;
+   if(c == '4') num = 4;
+   if(c == '5') num = 5;
+   if(c == '6') num = 6;
+   if(c == '7') num = 7;
+   if(c == '8') num = 8;
+   if(c == '9') num = 9;
+   if ( num >= 0 && num <= 9 ) return 1;
+   return 0;
+}
+
+//lastcharsequal( msg[8], count)
+lastcharsequal( a,b,c,d,e,f,g,h )
+{
+   num = 0;
+   if(a == last_eight_read[0]) num++;
+   if(b == last_eight_read[1]) num++;
+   if(c == last_eight_read[2]) num++;
+   if(d == last_eight_read[3]) num++;
+   if(e == last_eight_read[4]) num++;
+   if(f == last_eight_read[5]) num++;
+   if(g == last_eight_read[6]) num++;
+   if(h == last_eight_read[7]) num++;
+   if ( num==8 ) return 1;
+   return 0;
+}
+
+drawquad(x,y, tsx,tsy,tex,tey, w, h, rot)
+{
+   glBegin(GL_QUADS);
+      gltexcoord(tsx,tsy); rotatedVertex( x,y, 0,0, rot );
+      gltexcoord(tsx,tey); rotatedVertex( x,y, 0,h, rot );
+      gltexcoord(tex,tey); rotatedVertex( x,y, w,h, rot );
+      gltexcoord(tex,tsy); rotatedVertex( x,y, w,0, rot );
+   glEnd();
+}
+
+
+drawquad(x,y, tsx,tsy,tex,tey, w, h)
+{
+   glBegin(GL_QUADS);
+      gltexcoord(tsx,tsy); glVertex( x, y );
+      gltexcoord(tsx,tey); glVertex( x, y+h );
+      gltexcoord(tex,tey); glVertex( x+w, y+h );
+      gltexcoord(tex,tsy); glVertex( x+w, y );
+   glEnd();
+}
+
+rotatedVertex(trx, try, x, y, ang)
+{
+   tx = x-10; ty = y-10; 
+   ca = cos(ang); 
+   sa = sin(ang);
+   x = ca*tx - sa*ty;
+   y = sa*tx + ca*ty;
+   glvertex(trx+x,try+y);
+}
+
+print( str[32], count, x, y, FUNKY )
+{
+   t = klock(0);
+   
+   inc = 21;
+   for( i=0; i<count; i++)
+   {
+      if ( str[i] == ' ' )
+      {
+         x+=inc; continue;
+      }
+      cidx = str[i]-33;
+      
+      //moveto( x, y - 60 );
+      //printf("%g", chars[cidx].id);
+      //moveto( x, y - 70 );
+      //printf("%g", str[i]);
+      
+      width = chars[cidx].wid;
+      height = chars[cidx].hgt;
+      
+      xfactor = 1.0/(tex_width-1);
+      yfactor = 1.0/(tex_height-1);
+      
+      tx = chars[cidx].x * xfactor;
+      ty = chars[cidx].y * yfactor;
+   
+      wid = width * xfactor;
+      hgt = height * yfactor;
+      
+      ofs = 0;
+      ofs2 = 0;
+      
+      if ( FUNKY )
+      {
+         ang = 2*t+i;
+         ofs = sin(ang)*15;
+         ofs2 = cos(ang);
+   
+         c = hsv_to_rgb( (t*500 + i/count*360) % 360.0, 1,1);
+         setcol( c );
+      }
+      
+      yofs = chars[cidx].yoffset;
+
+      drawquad( x,y + ofs + yofs, 
+      tx,ty,
+      tx+wid,ty+hgt,
+      width, height, ofs2);
+      
+      x+=inc;
+   }
+}
+
+
+hsv_to_rgb(h,s,v){ 
+   // expects 360deg and 1,1 hue sat max
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   //return rgb( r*255, g*255, b*255 );
+   return rgb( r*511, g*511, b*511 );
+}

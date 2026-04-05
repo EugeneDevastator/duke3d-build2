@@ -1,0 +1,69 @@
+
+static N = 100; // steps
+static A,B;
+
+static dir = 1;
+static i = 0;
+static tim = 0;
+
+()
+{
+   if(numframes==0)
+   {
+      A = 0;
+      B = .5;
+   }
+   otim = tim; tim = klock(); dt = tim-otim;
+     
+   
+   cls(0);
+   
+   i += 50*dt*dir;
+   
+   if(i>N)
+   {
+      dir = -dir;
+   }
+   else if(i<-N)
+   {
+      dir = -dir;
+   }
+
+
+   x=linear(i);
+   setcol(0,0,255);
+   drawsph(xres/2+x*100,yres/2,20); 
+   moveto(xres/2+x*100,yres/2);
+   printf("\n\nX=%g",x);
+   
+   x=smooth(i);
+   setcol(255,0,0);
+   drawsph(xres/2+x*100,yres/2+60,20); 
+   moveto(xres/2+x*100,yres/2+60);
+   printf("\n\nX=%g",x);
+
+   
+   moveto(0,0);
+   printf("\ni=%g",i);
+   printf("\nA=%g",A);
+   printf("\nB=%g",B);
+   printf("\nN=%g",N);
+   
+       
+}
+smooth(i)
+{
+   v=i/N;
+   v=smoothstep(v);
+   return (A*v) + (B*(1-v));
+}
+smoothstep(x)
+{
+   return x*x*(3-2*x);
+}
+
+linear(i)
+{
+   v = i/N;
+   return (A*v) + (B*(1-v));
+}

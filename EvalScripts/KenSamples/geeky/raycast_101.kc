@@ -1,0 +1,121 @@
+answer = 0;
+playtext("So, you have written a Wolfenstein 3D clone. <pitch middle='+5'/>Congratulations.");
+playtext(",Now, which image below best describes your raycasting method?");
+while (1)
+{
+   cls(0); setcol(0xffffff);
+   
+   if (answer == 0)
+   {
+      setfont(xres/61,xres/40,1);
+      moveto(0,yres*.2);
+      printf("So, you have written a Wolfenstein 3D clone. Congratulations.\n");
+      printf("Now, which image below best describes your raycasting method?\n");
+      sel = min(max(floor(mousx/xres*3),0),3-1);
+   }
+   
+   setfont(20,35,1);
+   
+   n = floor(sqrt(xres)/4)*2;
+   if (answer == 0)
+   {
+      setcol(0x808080); for(i=0;i<3;i++) { moveto(xres*(i*2+1)/6-30,yres*.90); printf("eye"); }
+      setcol(0x804040); for(i=0;i<3;i++) { moveto(xres*(i*2+1)/6-60,yres*.57); printf("screen"); }
+   } else setcol(0x804040);
+   
+   if ((answer == 0) || (sel == 1))
+   {
+      for(sx=0;sx<=n;sx++)
+      {
+         a = (sx-n/2)/(n/2)*PI/4;
+         x = xres*(3/6)+sin(a)*xres/6;
+         y = yres*.90-cos(a)*xres/6;
+         if (sx == 0) moveto(x,y); else lineto(x,y);
+      }
+   }
+   if ((answer == 0) || (sel == 0))
+   {
+      moveto(xres*0/6,yres*.90-xres/6);
+      lineto(xres*2/6,yres*.90-xres/6);
+   }
+   if ((answer == 0) || (sel == 2))
+   {
+      moveto(xres*4/6,yres*.90-xres/6);
+      lineto(xres*6/6,yres*.90-xres/6);
+      setcol(0x602020);
+      for(sx=0;sx<=n;sx++)
+      {
+         a = (sx-n/2)/(n/2)*PI/4;
+         x = xres*(5/6)+sin(a)*xres/6;
+         y = yres*.90-cos(a)*xres/6;
+         if (sx == 0) moveto(x,y); else lineto(x,y);
+      }
+   }
+      
+   for(sx=0;sx<=n;sx++)
+   {
+      if (answer) { if (sel == 1) setcol(0xff0000); else setcol(0); }
+      else { if (sel == 1) setcol(0xc0c0c0); else setcol(0x808080); }
+      moveto(xres*(3/6),yres*.90); a = (sx-n/2)/(n/2)*PI/4;
+      x = xres*(3/6)+sin(a)*xres/6;
+      y = yres*.90-cos(a)*xres/6;
+      lineto(x,y); drawsph(x,y,2);
+      
+      if (answer) { if (sel == 0) setcol(0x00ff00); else setcol(0); }
+      else { if (sel == 0) setcol(0xc0c0c0); else setcol(0x808080); }
+      moveto(xres*(1/6),yres*.90);
+      x = xres*(1/6)-xres/6+sx*xres/3/n;
+      y = yres*.90-xres/6;
+      lineto(x,y); drawsph(x,y,2);
+      
+      if (answer) { if (sel == 2) setcol(0xff0000); else setcol(0); }
+      else { if (sel == 2) setcol(0xc0c0c0); else setcol(0x808080); }
+      moveto(xres*(5/6),yres*.90); a = (sx-n/2)/(n/2)*PI/4;
+      x = xres*(5/6)+tan(a)*xres/6;
+      y = yres*.90-xres/6;
+      lineto(x,y); drawsph(x,y,2);
+      x = xres*(5/6)+sin(a)*xres/6;
+      y = yres*.90-cos(a)*xres/6;
+      if (answer) { if (sel == 2) setcol(0xc00000); else setcol(0); }
+      else { if (sel == 2) setcol(0x909090); else setcol(0x606060); }
+      drawsph(x,y,2);
+   }
+   if ((answer) && (sel == 2))
+   {
+      y = yres*.90-xres/6; setcol(0xc0c0c0);
+      sx = 0; a = (sx-n/2)/(n/2)*PI/4; x0 = xres*(5/6)+tan(a)*xres/6;
+      sx = 1; a = (sx-n/2)/(n/2)*PI/4; x1 = xres*(5/6)+tan(a)*xres/6; x2 = x0*.3+x1*.7;
+      drawsph(x0,y,5); drawsph(x1,y,5); drawcone(x0,y,1,x1,y,1);
+      sx = int(n/2); a = (sx-n/2)/(n/2)*PI/4; x0 = xres*(5/6)+tan(a)*xres/6;
+      sx--;          a = (sx-n/2)/(n/2)*PI/4; x1 = xres*(5/6)+tan(a)*xres/6; x3 = x0*.7+x1*.3;
+      drawsph(x0,y,5); drawsph(x1,y,5); drawcone(x0,y,1,x1,y,1);
+      setcol(0xff8080); y -= 20; nx = (x2+x3)/2; ny = yres*.80-xres/6;
+      drawcone(x2,y,1,nx,ny,4);
+      drawcone(x3,y,1,nx,ny,4);
+      
+      drawcone(x2,y,1,x2+(nx-x2)*.1+(y-ny)*.1,y+(ny- y)*.1+(nx-x2)*.1,1);
+      drawcone(x2,y,1,x2+(nx-x2)*.1-(y-ny)*.1,y+(ny- y)*.1-(nx-x2)*.1,1);
+      drawcone(x3,y,1,x3+(nx-x3)*.1+(y-ny)*.1,y+(ny- y)*.1+(nx-x3)*.1,1);
+      drawcone(x3,y,1,x3+(nx-x3)*.1-(y-ny)*.1,y+(ny- y)*.1-(nx-x3)*.1,1);
+      
+      setfont(50,80,1); moveto((x2+x3)/2-25,yres*.80-xres/6-70); printf("?");
+      setfont(20,35,1);
+   }
+    
+   if (bstatus)
+   {
+      bstatus = 0; if (answer) return;
+      answer = 1;
+      if (sel == bstatus+answer) playtext("I'm sorry. That is horribly wrong. Your monitor is NOT a frickin parabolic dish.");
+      if (sel == bstatus*answer) playtext("Very good. Either you are a genius, or you have played this game before.");
+      if (sel ==  answer+answer) playtext("I'm sorry. That is incorrect. The pixels of your monitor are NOT wider at the sides.");
+   }
+   if (answer)
+   {
+      if (sel == bstatus+answer) { setcol(0xff0000); moveto(xres*(3/6)-11*10,yres*.3); printf("Horrible\nProjection:"); }
+      if (sel == bstatus*answer) { setcol(0x00ff00); moveto(xres*(1/6)-11*10,yres*.3); printf("Correct\nProjection:"); }
+      if (sel ==  answer+answer) { setcol(0xff0000); moveto(xres*(5/6)-11*10,yres*.3); printf("Incorrect\nProjection:"); }
+   }
+
+   refresh();
+}

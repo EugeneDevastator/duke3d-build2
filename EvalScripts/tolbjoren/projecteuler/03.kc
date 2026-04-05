@@ -1,0 +1,62 @@
+// What is the largest prime factor of the number 600851475143 ?
+// http://www.btinternet.com/~se16/js/factor.htm
+static factor = 0;
+()
+{
+   cls(0);
+   n = 600000;
+   
+   //printnum(n);
+   //if( isPrime(n) ) printf(" is prime"); else printf(" isn't prime");
+
+   if(numframes==0)
+   {
+      w = 0;
+      printf("working");
+      for(i=0; i<n; i++)
+      {
+         if(i % 1000 == 0)
+         {
+             printf("."); w++;
+             if(w > 50){w=0; printf("\n");}
+         }
+         if( isPrime(n-i) )
+         { 
+            //printnum(i);
+            factor = n-i; 
+            div = n / factor;
+            if( isInteger(div) )
+            {
+               break;
+            }
+         }
+         
+      }
+      
+   }
+   printf("\n%f",n);
+   printf("\n%f",factor);
+   printf("\nn/f = %f",n/factor);
+
+   
+   //n = 3.1;
+   //printf("\n%.6f",n);
+   //if(isInteger(n)) printf(" is int"); else printf(" isn't int");
+
+
+}
+
+isPrime(n)
+{
+   sqRootN = sqrt(n);
+   for(i=2; i<=sqRootN; i++)
+   {
+      div = n/i;
+      if( isInteger(div) ) return 0;
+   }
+   return 1;
+}
+isInteger(n)
+{
+   n == int(n);
+}

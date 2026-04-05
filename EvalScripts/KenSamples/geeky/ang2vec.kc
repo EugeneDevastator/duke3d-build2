@@ -1,0 +1,54 @@
+()
+{
+   cls(0); setfont(8,12); sc = xres/(PI*2);
+   hx = xres/2; hy = yres/2;
+#if 0   
+   mx = mousx-hx; my = mousy-hy;
+   f = sc/sqrt(mx^2+my^2); a = atan2(hy-my,mx-hx);
+   mx = mx*f + hx; my = my*f + hy;
+#else
+   a = mousx/xres*(PI*2)-PI;
+   mx = hx + cos(a)*sc;
+   my = hy - sin(a)*sc;
+#endif
+   
+   setcol(0xffffff);
+   for(x=hx ;x<xres;x+=sc) { moveto(x,0); lineto(x,yres); setcol(0x606060); }
+   for(x=hx-sc;x>=0;x-=sc) { moveto(x,0); lineto(x,yres); }
+   setcol(0xffffff);
+   for(y=hy ;y<yres;y+=sc) { moveto(0,y); lineto(xres,y); setcol(0x606060); }
+   for(y=hy-sc;y>=0;y-=sc) { moveto(0,y); lineto(xres,y); }
+   setcol(0x808080); drawsph(hx,hy,-sc);
+
+   setcol(0xffff80);
+   moveto(hx+a*sc,hy-8); lineto(hx+a*sc,hy+8);
+   moveto(hx+a*sc-35,hy-20); printf("O=%+5.2frad\r-\n",a);
+   moveto(hx+a*sc-35,hy+10); printf("O=%+4.0fdeg\r-\n",a*(180/PI));
+   moveto(hx-PI*sc,hy-cos(-PI)*sc);
+   setcol(0xc03000); for(x=-PI;x<PI+.1;x+=.1) lineto(hx+x*sc,hy-cos(x)*sc);
+   moveto(hx-PI*sc,hy-sin(-PI)*sc);
+   setcol(0x489000); for(x=-PI;x<PI+.1;x+=.1) lineto(hx+x*sc,hy-sin(x)*sc);
+   
+   setcol(0xff6000); drawsph(hx+a*sc,hy-cos(a)*sc,-3);
+   moveto(hx+a*sc-35,hy-cos(a)*sc-16); printf("cos(O)=%+.2f\r\t -\n",cos(a));
+   setcol(0x30ff00); drawsph(hx+a*sc,hy-sin(a)*sc,-3);
+   moveto(hx+a*sc-35,hy-sin(a)*sc-16); printf("sin(O)=%+.2f\r\t -\n",sin(a));
+   
+   setcol(0x808000); drawcone(hx,hy,1.5,mx,my,1.5);
+   setcol(0xc04000); drawcone(hx,hy,1.5,mx,hy,1.5);
+   setcol(0x60c000); drawcone(mx,hy,1.5,mx,my,1.5);
+   setcol(0xffffff); drawsph(hx,hy,-3); drawsph(mx,my,-3); drawsph(mx,hy,-3);
+   
+   setcol(0xffff80); moveto((hx+mx)/2-4,(hy+my)/2-5); printf("1");
+   setcol(0x30ff00); moveto(mx+sgn(mx-hx)*25-22,(hy+my)/2-6); printf("sin(O)\r\t -");
+   setcol(0xff6000); moveto((hx+mx)/2-22,hy-6+sgn(a)*8); printf("cos(O)\r\t -");
+   
+   setcol(0xffff80); got = 0; rad = 24;
+   for(f=a;f*a>0;f-=sgn(a)*.1)
+   {
+      x = hx+cos(f)*rad; y = hy-sin(f)*rad;
+      if (!got) { got = 1; moveto(x,y); } else lineto(x,y);
+   }
+   lineto(hx+rad,hy);
+   moveto(hx+cos(a/2)*rad*1.35-4,hy-sin(a/2)*rad*1.35-5); printf("O\r-");
+}

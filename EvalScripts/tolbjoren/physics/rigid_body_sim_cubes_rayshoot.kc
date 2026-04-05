@@ -1,0 +1,768 @@
+static posx = 0;
+static posy = 0;
+static posz = -150;
+static posh = 0; // left right
+static posv = 0.0;
+
+struct vec{x,y,z;}
+
+
+struct orient_t {
+  vec ui;
+  vec uj;
+  vec uk;
+}
+
+struct cube_t{
+  vec loc;
+  vec vel;
+  vec force;
+  orient_t ori;
+  vec angVel;
+  vec torque;
+  vec color;
+}
+
+enum{MAX_CUBES = 256}
+static cube_t cubes[MAX_CUBES];
+static numCubes = 128;
+
+enum{ cubeSize = 12, 
+      momentOfIniertia = (cubesize^2)/6;
+    }
+
+static pointSampling = 4;
+static double spring = 0.02;
+static double damping = 0.01;
+static double grav = 0.02; //0.02
+
+static vec zero_vec;
+
+static vec upper_bound, lower_bound;
+
+
+()
+{
+
+   
+   if ( numframes==0 ){
+      vecset( zero_vec, 0,0,0 );
+      
+      siz = 16*4;
+      vecset( upper_bound, siz,2*siz,siz); 
+      vecset( lower_bound, -siz, -siz, -siz );
+      
+      reset();
+   }
+   
+
+   if ( keystatus[57] ){
+      keystatus[57]  = 0;
+      reset();
+   }
+   
+   setcol( 0xFF8800 );
+   playercontrols();
+   draw();
+   
+   x=0; y=0; z=0;
+   screen2world(mousx,mousy,posh, posv,x,y,z);
+
+   
+   vec cam_pos; vecset(cam_pos, posx, posy, posz );
+   vec mouse_farplane; vecset(mouse_farplane, x,y,z );
+   vec into_scene; vecsub( into_scene, mouse_farplane, cam_pos );
+   normalize(into_scene );
+   if ( bstatus == 2 ){
+      vecscalar( into_scene, into_scene, 4 );
+      cubes[numcubes-1].loc = cam_pos;
+      cubes[numcubes-1].vel = into_scene;
+      cubes[numcubes-1].angVel = zero_vec;
+   }
+}
+
+
+random(lo,hi){
+   return lo + rnd*(hi-lo);
+}
+
+
+cube_setup(cube_t new_cube, vec pos, vec color){
+   new_cube.loc = pos;
+   new_cube.color = color;    
+   new_cube.vel = zero_vec;
+   new_cube.force = zero_vec;
+   orient_create( new_cube.ori );
+   new_cube.angVel = zero_vec;
+   new_cube.torque = zero_vec;
+}
+
+// F - force
+// R - point at which to apply force
+cube_applyForce(cube_t cube, vec F, vec R){
+   // Add linear component
+   vecadd( cube.force, cube.force, F);
+   vec resultant; vecsub( resultant, R, cube.loc );
+   vec torq; veccross( torq, resultant, F );
+   vecadd( cube.torque, cube.torque, torq );
+}
+
+
+// R is the position of another cube
+cube_isInCube(cube_t cube, vec otherPos){
+    vec loc_to_r; vecsub(loc_to_r, otherPos, cube.loc );
+    vec R; orient_toOri( cube.ori, loc_to_r, R );
+
+    if (abs(R.x) < cubeSize/2 && 
+        abs(R.y) < cubeSize/2 && 
+        abs(R.z) < cubeSize/2 ){
+       return 1;
+    }
+    return 0;
+}
+  
+
+// spring force relative to penetration depth
+cube_forceField(cube_t cube, vec pt, vec out){
+    vec loc_to_pt;
+    vecsub( loc_to_pt, pt, cube.loc);
+    
+    // what is the point in local coords?
+    vec R; orient_toOri(cube.ori, loc_to_pt, R );
+    
+
+    vec F;
+    F = zero_vec;
+    if( abs(R.x) > abs(R.y) && abs(R.x) > abs(R.z) ){
+      
+      if( R.x > 0){
+         F.x = spring*(cubeSize/2-R.x);
+      }else{
+         F.x = -spring*(R.x+cubeSize/2);
+      }
+      
+    }else if( abs(R.y) > abs(R.z) ){
+      if(R.y>0){
+         F.y = spring*(cubeSize/2-R.y);
+      }else{
+         F.y = -spring*(R.y+cubeSize/2);
+      }
+      
+    }else{
+      if(R.z>0){
+         F.z = spring*(cubeSize/2-R.z);
+      }else{
+         F.z = -spring*(R.z+cubeSize/2);
+      }
+    }
+    
+    // what is the force in world coords?
+    orient_toWorld(cube.ori, F, out);
+}
+  
+// Calculate the total velocity at a given point on a cube
+cube_totalVelAt(cube_t cube, vec point, vec out){
+   vec loc_to_point;
+   vecsub( loc_to_point, point, cube.loc );
+   vec angular_at_p;
+   veccross( angular_at_p, cube.angVel, loc_to_point );
+   
+   // add linear and angular velocities
+   vecadd( out, cube.vel, angular_at_p );
+   
+   // C++     : return vel + glm::cross(angVel, (R-loc) );
+   // ORIGINAL: return PVector.add(vel,angVel.cross(PVector.sub(R,loc)));
+}
+
+cube_update(cube_t cube){
+    veclimit( cube.force, 8 );
+    
+    vecadd( cube.vel, cube.vel, cube.force );
+    vecset( cube.force, 0, grav, 0 );
+    vecadd( cube.loc, cube.loc, cube.vel );
+    
+    veclimit( cube.torque, pi/6 );
+    
+    clean( cube.vel );
+    clean( cube.angVel );
+    
+    vec scaledTorque; vecscalar( scaledTorque, cube.torque, 1.0/momentOfIniertia );
+    vecadd( cube.angVel, cube.angVel, scaledTorque );
+    cube.torque = zero_vec; 
+    
+    // helps stability! .. suffering matrix drift :(
+    if ( length( cube.angVel ) > 1e-3 ) 
+       orient_spin(cube.ori, cube.angVel);
+}
+  
+
+clean( vec v ){
+   if ( length(v) < 1e-3 ){
+      v = zero_vec;
+   }
+}
+
+  
+// returns true false
+cube_wallHit(cube_t cube){
+    vec loc;
+    loc = cube.loc;
+    
+    if(loc.x < lower_bound.x+cubeSize*0.866) return 1;
+    if(loc.x > upper_bound.x-cubeSize*0.866) return 1;
+    
+    if(loc.y < lower_bound.y+cubeSize*0.866) return 1;
+    if(loc.y > upper_bound.y-cubeSize*0.866) return 1;
+    
+    if(loc.z < lower_bound.z+cubeSize*0.866) return 1;
+    if(loc.z > upper_bound.z-cubeSize*0.866) return 1;
+    
+    return 0;
+}
+
+  
+cube_wallFeild(cube_t cube, vec R, vec out){
+    vec F;
+    F = zero_vec;
+    stick = 0;
+    
+    if(R.x<lower_bound.x){F.x=-(R.x-lower_bound.x)*spring;stick=1;}
+    if(R.x>upper_bound.x){F.x=-(R.x-upper_bound.x)*spring;stick=1;}
+    
+    if(R.y<lower_bound.y){F.y=-(R.y-lower_bound.y)*spring;stick=1;}
+    if(R.y>upper_bound.y){F.y=-(R.y-upper_bound.y)*spring;stick=1;}
+    
+    if(R.z<lower_bound.z){F.z=-(R.z-lower_bound.z)*spring;}
+    if(R.z>upper_bound.z){F.z=-(R.z-upper_bound.z)*spring;}
+    
+    if(stick){
+       vec velAtR; cube_totalVelAt(cube, R, velAtR);
+       vecscalar(  velAtR, velAtR, damping );
+       vecsub( F, F, velAtR );
+    }
+    out = F;
+}
+
+
+// Apply a force when cube hits boundry walls
+
+cube_walls(cube_t cube){
+    if(cube_wallHit(cube)){
+      
+      for(i=0;i<=pointSampling;i++){
+        for(j=0;j<=pointSampling;j++){
+          for(k=0;k<=pointSampling;k++){
+          
+            vec world_pos;
+            vec sample_loc;
+            vecset(sample_loc, i*cubeSize/pointSampling-cubeSize/2,
+                               j*cubeSize/pointSampling-cubeSize/2,
+                               k*cubeSize/pointSampling-cubeSize/2
+                          );
+            orient_toWorld( cube.ori, sample_loc, world_pos );
+            
+            vec r; vecadd( r, cube.loc, world_pos );
+             
+            // how much is this point outside boundary?
+            vec wall_force; cube_wallFeild(cube, r, wall_force);
+            cube_applyForce(cube, wall_force, r);
+          }
+        }
+      }
+    }
+}
+
+
+cube_collide(cube_t cubeA, cube_t cubeB ){
+    vec pos_diff;
+    vecsub(pos_diff, cubeB.loc, cubeA.loc);
+    
+    if( length(pos_diff) < cubeSize*1.732){
+       
+      for(i=0;i<=pointSampling;i++){
+        for(j=0;j<=pointSampling;j++){
+          for(k=0;k<=pointSampling;k++){
+            
+            vec sample_loc;
+            vecset( sample_loc, i*cubeSize/pointSampling-cubeSize/2,
+                                j*cubeSize/pointSampling-cubeSize/2,
+                                k*cubeSize/pointSampling-cubeSize/2
+             );
+             
+            vec world_out;
+            orient_toWorld( cubeA.ori, sample_loc, world_out );
+            vec R;
+            vecadd( R, cubeA.loc, world_out );
+            
+            if( cube_isInCube(cubeB,R) ){
+              
+              vec velB, velA;
+              cube_totalVelAt( cubeB, R, velB );
+              cube_totalVelAt( cubeA, R, velA );
+              
+              vec vel_diff;
+              vecsub( vel_diff, velB, velA );
+              vecscalar( vel_diff, vel_diff, damping );
+              
+              vec force_at_br;
+              cube_forceField(cubeB, R, force_at_br);
+
+              vec F;
+              vecadd(F, force_at_br, vel_diff );
+              
+              cube_applyForce(cubeA, F, R); 
+              vecscalar( F, F, -1 );
+              cube_applyForce(cubeB, F, R);
+              
+              
+            }
+          } // end for k
+        } // end for j
+      } // end for i
+    } // end dist check
+}
+  
+
+reset(){
+   vec newpos;
+   vec color;
+   
+   xp = 0;
+   yp = 0;
+   zp = 0;
+   
+  for(i=0; i<numCubes; i++){
+    //#define RANDOM_POS
+    #ifdef RANDOM_POS
+    x = random(lower_bound.x+cubeSize/2, upper_bound.x-cubeSize/2);
+    y = random(lower_bound.y+cubeSize/2, upper_bound.y-cubeSize/2);
+    z = random(lower_bound.z+cubeSize/2, upper_bound.z-cubeSize/2);
+    vecset(newpos, x,y,z );
+   
+    #else
+    
+    vecset(newpos, xp * cubeSize*1.01,
+               upper_bound.y-1.2*cubeSize/2 - yp * cubeSize*1.01, 
+               zp * cubeSize*1.01);
+               
+   #endif
+
+
+    r=0; g=0; b=0;
+    c = hsv_to_rgb( i*160/numCubes, .6,.5);
+    getrgb( c, r,g,b );
+    vecset( color, r,g,b );
+    cube_setup( cubes[i], newpos, color );
+    
+   xp++;
+   
+   if ( xp > 3 ){
+      xp = 0;
+      zp++;
+   }
+
+   if ( zp > 3 ){
+      zp = 0;
+      yp++;
+   }
+       
+
+  }
+  
+   vecset( cubes[numCubes-1].loc, -15,0,0 );
+
+   a = pi/4;
+   ca = cos(a);
+   sa = sin(a);
+   /*
+   vecset( cubes[numCubes-1].ori.ui, ca, sa, 0 );
+   vecset( cubes[numCubes-1].ori.uj, sa, -ca, 0 );
+   vecset( cubes[numCubes-1].ori.uk, 0, 0, 1 );
+   */
+   vecset( cubes[numCubes-1].angVel, 0, -ca*0.1, 0.0 );
+   
+
+}
+
+draw(){
+   cls(128,128,128); clz(1e32);
+
+   for(i=0;i<numCubes;i++){
+      for(j=0;j<numCubes;j++){
+         if ( i==j ) continue;
+         cube_collide( cubes[i], cubes[j] );
+      }
+   }  
+
+
+  //double Esum = 0;
+  for(i=0; i < numCubes; i++){
+    if ( i < numCubes-1 )
+       cube_walls( cubes[i] );
+       
+    cube_update( cubes[i] );
+    //Esum += length(cubes[i].vel)^2;
+    
+    vec loc, ui, uj, uk;
+    loc = cubes[i].loc;
+    ui = cubes[i].ori.ui;
+    uj = cubes[i].ori.uj;
+    uk = cubes[i].ori.uk;
+    //drawsph( loc.x, loc.y, loc.z,cubeSize/2 );
+    sc = cubeSize/2;
+    setcol(255,255,255);
+    vec col; col = cubes[i].color;
+    setcol( col.x, col.y, col.z );
+    // evaldraw expects LUF, left, up, forwards      
+    
+    drawspr("single_cube.kv6",loc.x, loc.y, loc.z,
+                              sc*ui.x, sc*ui.y, sc*ui.z,
+                              sc*uj.x, sc*uj.y, sc*uj.z,
+                              sc*uk.x, sc*uk.y, sc*uk.z
+                              );
+                              
+    
+   arrLen = cubeSize;
+   vec uiend;
+   vecscalar( uiend, cubes[i].ori.ui, arrLen );
+   vecadd( uiend, uiend, loc  );
+    
+   vec ujend;
+   vecscalar( ujend, cubes[i].ori.uj, arrLen );
+   vecadd( ujend, ujend, loc );
+    
+   vec ukend;
+   vecscalar( ukend, cubes[i].ori.uk, arrLen );
+   vecadd( ukend, ukend, loc );
+    
+   setcol(255,0,0); moveto( loc ); lineto( uiend );
+   setcol(0,255,0); moveto( loc ); lineto( ujend );
+   setcol(0,0,255); moveto( loc ); lineto( ukend );
+   } // end for each cube
+   
+   setcol(0);
+   glBegin(GL_LINE_LOOP);
+      glVertex( lower_bound.x, lower_bound.y, lower_bound.z  );
+      glVertex( lower_bound.x, lower_bound.y, upper_bound.z  );
+      glVertex( upper_bound.x, lower_bound.y, upper_bound.z  );
+      glVertex( upper_bound.x, lower_bound.y, lower_bound.z  );
+   glEnd();
+   
+   glBegin(GL_LINE_LOOP);
+      glVertex( lower_bound.x, upper_bound.y, lower_bound.z  );
+      glVertex( lower_bound.x, upper_bound.y, upper_bound.z  );
+      glVertex( upper_bound.x, upper_bound.y, upper_bound.z  );
+      glVertex( upper_bound.x, upper_bound.y, lower_bound.z  );
+   glEnd();
+   glBegin(GL_LINES);
+      glVertex( lower_bound.x, lower_bound.y, lower_bound.x  );
+      glVertex( lower_bound.x, upper_bound.y, lower_bound.x  );
+      
+      glVertex( lower_bound.x, lower_bound.y, upper_bound.z  );
+      glVertex( lower_bound.x, upper_bound.y, upper_bound.z  );
+      
+      
+      glVertex( upper_bound.x, lower_bound.y, upper_bound.z  );
+      glVertex( upper_bound.x, upper_bound.y, upper_bound.z  );
+     
+      glVertex( upper_bound.x, lower_bound.y, lower_bound.x  );
+      glVertex( upper_bound.x, upper_bound.y, lower_bound.x  ); 
+   glEnd();
+
+
+
+}
+
+moveto( vec v ){ moveto(v.x, v.y, v.z); }
+lineto( vec v ){ lineto(v.x, v.y, v.z); }
+glvertex( vec v ){ glvertex(v.x, v.y, v.z); }
+
+// Orient
+orient_create(orient_t ori) {
+     vecset( ori.ui, 1,0,0);
+     vecset( ori.uj, 0,1,0);
+     vecset( ori.uk, 0,0,1);
+}
+
+
+// not used. 
+orient_restore(orient_t ori) {
+    veccross( ori.uk, ori.ui, ori.uj );
+    veccross( ori.uj, ori.uk, ori.ui );
+    normalize(ori.ui);
+    normalize(ori.uj);
+    normalize(ori.uk);
+}
+  
+// World to Orientation
+orient_toOri(orient_t ori, vec w, vec out){
+ out.x = w.x * ori.ui.x + w.y * ori.ui.y + w.z * ori.ui.z;
+ out.y = w.x * ori.uj.x + w.y * ori.uj.y + w.z * ori.uj.z;
+ out.z = w.x * ori.uk.x + w.y * ori.uk.y + w.z * ori.uk.z;
+}
+
+// Orientation to World coord
+orient_toWorld(orient_t ori, vec o, vec out){
+ out.x = ori.ui.x * o.x + ori.uj.x * o.y + ori.uk.x * o.z;
+ out.y = ori.ui.y * o.x + ori.uj.y * o.y + ori.uk.y * o.z;
+ out.z = ori.ui.z * o.x + ori.uj.z * o.y + ori.uk.z * o.z;
+}
+
+// Takes an orient and adds the vector phi
+orient_spin(orient_t ori, vec phi) {
+   vec ui, uj, uk;
+   orient_handleturn( ori.ui, phi, ui );
+   orient_handleturn( ori.uj, phi, uj );
+   orient_handleturn( ori.uk, phi, uk );
+    
+   ori.ui = ui;
+   ori.uj = uj;
+   ori.uk = uk;    
+}
+
+// This is similar to some quaternion code... 
+// not sure how it works :(
+// takes an axis r
+// and a vector w
+orient_handleturn(vec r, vec w, vec out) {
+   
+    if ((length(w) != 0.0) && (length(r) != 0.0)) {
+      vec r2, w2; // Copy r and w
+      r2 = r;
+      w2 = w;
+      normalize(r2);
+      normalize(w2);
+      
+      if ( fabs(vecdot(r2,w2) - 1.0) > 1e-7) { // are r & w perpendicular?
+        // if not
+        turn(r, w, out);
+        return;
+      }
+    }else{
+       out = r;
+    }
+    
+}
+
+// takes a unit direction r
+// and an axis-angle w
+turn(vec r, vec w, vec out) {
+    double dw = PI/8;
+    
+    divisions = 0;
+    wmag = length(w);
+    if (wmag > dw) {
+      divisions = ceil(wmag / dw);
+    } else {
+      divisions = 1;
+    }
+    vec uw;
+    uw = w;
+    normalize(uw);
+    vec along; vecscalar(along, uw, vecdot(uw, r) );
+    vec rprime; vecsub(rprime, r, along);
+    vec phi; vecscalar(phi, w, 1.0/divisions);
+    for (i=1; i<=divisions; i++) {
+      vec new_rprime;
+      dturn(rprime, phi, new_rprime);
+      rprime = new_rprime;
+      
+    }
+    
+    vecadd(out, rprime, along);  
+}
+   
+dturn(vec rprime, vec phi, vec out) {
+    vec o2;
+    vecscalar(o2, phi, 1/2 );
+    
+    vec o2_x_rprime;
+    veccross( o2_x_rprime, o2, rprime );
+    
+    vec a; vecadd(a, rprime, o2_x_rprime );
+    normalize(a);
+    
+    vecscalar( a, a, vecdot(a, rprime) );
+    
+    vec ar; vecsub( ar, rprime, a );
+    vec b;  vecscalar( b, ar, -2.0 );
+    vecadd( out, rprime, b );
+}
+
+
+///
+transformPoint(vec v, thisRot[9])
+{
+   NewX = v.x * thisRot[0] + v.y * thisRot[1] + v.z * thisRot[2];
+   NewY = v.x * thisRot[3] + v.y * thisRot[4] + v.z * thisRot[5];
+   NewZ = v.x * thisRot[6] + v.y * thisRot[7] + v.z * thisRot[8];
+   v.x=newx; v.y=newy; v.z=newz;
+}
+
+
+//
+// Vector
+//
+vecLimit( vec v, limit ){
+    mag = length( v );
+    if ( mag > limit ){
+       normalize( v );
+       vecscalar( v, v, limit );
+    }
+}
+
+vecScalar( vec out, vec a, s )
+{
+   out.x = a.x * s;
+   out.y = a.y * s;
+   out.z = a.z * s;
+}
+
+vecAdd( vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;   
+}
+vecSub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;   
+}
+
+vecCross( vec out, vec a, vec b)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+
+vecSet(vec a,x,y,z){
+   a.x = x; a.y = y; a.z = z;
+}
+
+vecDot( vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+length( vec v )
+{
+   return sqrt( vecdot(v,v) );
+}
+
+normalize( vec v )
+{
+   len = length(v);
+   if ( len )
+   {
+      v.x /= len; v.y /= len; v.z /= len;
+   }
+}
+
+err(code){
+   setfont(2*6,4*6,1);
+   while(1){
+      cls(0);
+      moveto(50, yres/2);
+      setcol(255,255,255);
+      
+      if ( code == 42 ){
+         printf("err %g, We have found the answer to the ultimate question!", code);
+      }else{
+         printf("err %g", code);
+      }
+      refresh();
+      sleep(1);
+   }
+}
+
+// Camera and movement code taken from /games/
+//Handle input and player movement
+playercontrols()
+{
+   static oldMouseX;
+   static oldMouseY;
+   static mouseSpeedX;
+   static mouseSpeedY; 
+
+   f = 1;
+   if (keystatus[0x2a]) f /= 4;
+   if (keystatus[0x36]) f *= 4;
+   vx = (keystatus[32]-keystatus[30])*f; //D-A
+   vy = (keystatus[17]-keystatus[31])*f; //W-S  
+   vz = 0;//vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   
+   static mat[9]; 
+   ang2mat(posh,posv,mat); // Convert angles to rotation matrix
+   
+   // find new position
+   posx += mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   posy += mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   posz += mat[2]*vx + mat[5]*vz + mat[8]*vy; 
+   // mousespeed values are tweaked for 60 fps
+   mouseSpeedX = (mousx - oldMouseX) * 0.01;
+   mouseSpeedY = (mousy - oldMouseY) * 0.01;
+   oldMouseX = mousx;
+   oldMouseY = mousy;
+   if(bstatus==1)
+   {
+      posh += mouseSpeedX;
+      posv += mouseSpeedY;
+   }
+   // Right,down,forwards unit vectors.
+   setcam(posx,posy,posz,
+          mat[0],mat[1],mat[2],
+          mat[3],mat[4],mat[5],
+          mat[6],mat[7],mat[8]);
+}
+/* converts horizontal and vertical angles to a 3x3 rotation matrix */
+ang2mat(hang,vang,mat[9])
+{
+   mat[0] = cos(hang); mat[1] = 0; mat[2]=-sin(hang);
+   mat[6] = cos(vang)*sin(hang); mat[7] = sin(vang); mat[8]=cos(vang)*cos(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}
+
+// Screen2World function taken from evaldraw example Polyproto.kc
+screen2world(sx,sy,hang,vang,&x,&y,&z)
+{
+   vx = sx-xres/2; vy = sy-yres/2; 
+   vz = xres/2; 
+   //vz = fov;
+   static mat[9];
+   ang2mat(hang,vang,mat);
+   x = vx*mat[0] + vy*mat[3] + vz*mat[6];
+   y = vx*mat[1] + vy*mat[4] + vz*mat[7];
+   z = vx*mat[2] + vy*mat[5] + vz*mat[8];
+}
+
+hsv_to_rgb(h,s,v){ 
+   // expects 360deg and 1,1 hue sat max
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   r=int(r*255);
+   g=int(g*255);
+   b=int(b*255);
+   return rgb(r,g,b);
+}

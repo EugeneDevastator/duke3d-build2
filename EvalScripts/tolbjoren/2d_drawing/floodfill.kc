@@ -1,0 +1,318 @@
+enum{SIZ=256}
+static bitmap[SIZ][SIZ];
+static bitmap_col[SIZ][SIZ];
+
+static unfilled_x[SIZ*SIZ];
+static unfilled_y[SIZ*SIZ];
+static num = 0;
+
+
+// FAST
+static visit_line0[SIZ];
+static visit_line1[SIZ];
+static visit_toggle = 0;
+
+static launches = 0;
+static iters = 0;
+()
+{
+   cls(0);
+   if ( numframes==0 ) 
+   {
+			clear_bitmap();
+   }
+   
+   draw();
+   
+	 static alg=0;
+	 if (keystatus[1+1]) alg=0;
+	 if (keystatus[1+2]) alg=1;
+	 if (keystatus[1+3]) alg=2;
+	 
+	 clear_bitmap();
+	 
+	 iters=0;
+	 
+	 start_time=klock(0);
+
+	 if ( alg==0 ) {
+		slow_floodfill(mousx, mousy);
+		
+	}else if (alg==1) {
+		launches = 0;
+		
+		fast_floodfill(mousx, mousy);
+		}
+	else if (alg==2)
+	{
+		recursive_fill(mousx,mousy);
+	}
+	time_use = klock(0) - start_time;
+		
+	setcol(255,255,255);
+	moveto(xres/2, SIZ+10 );
+	if ( alg==0 ) {
+		printf("slow\n");
+	}else if (alg==1){
+		printf("fast\n");
+		printf("call stack depth: %g\n", launches);
+	} else {
+		printf("recur");
+	}
+	printf("time in ms: %g\n", 1000.0*time_use);
+}
+
+clear_bitmap()
+{
+	 moveto(SIZ/2-120, SIZ/2-60 );
+   //cls(0);
+   setfont(4*20,4*32,1); //1.66
+   setcol(0x3548ca);
+   printf("ARM");
+   //refresh();
+   setfont(8,12);
+
+      for(i=0; i<SIZ; i++)
+      {
+         for(j=0; j<SIZ; j++)
+         {
+						bitmap[i][j]=0;
+						bitmap_col[i][j]=0;
+						
+						r=0; g=0; b=0; getpix(i,j,r,g,b);
+						
+						if ( 0x3548ca == rgb(r,g,b) )
+						{
+							writePixel(i,j,0x3548ca);
+						}
+						/*
+					  x=i; y=j;
+            dx = (i-siz/2);
+            dy = (j-siz/2);
+            d = sqrt(dx^2 + dy^2);
+            circle1 = d < 60 && d > 40;
+
+            dx = (40+i-siz/2);
+            dy = (40+j-siz/2);
+            d = sqrt(dx^2 + dy^2);
+            circle2 = d < 60 && d > 40;
+
+            if ( circle1 || circle2 ) {
+							if ( (floor(x/5)%2 + floor(y/5)%2) % 2 == 0 )
+								 writePixel( i, j, 0xffffff );
+							else
+								 writePixel( i, j, 0 );
+            }
+						*/
+         }
+      }
+}
+
+recursive_fill(x,y)
+{
+	if (x<0 ) return;
+	if (y<0 ) return;
+	if (x>SIZ ) return;
+	if (y>SIZ ) return;
+	if ( bitmap[x][y] ) return;
+	writePixel(x,y);
+	recursive_fill(x-1,y);
+	recursive_fill(x+1,y);
+	recursive_fill(x,y-1);
+	recursive_fill(x,y+1);
+}
+
+slow_floodfill(x,y)
+{
+	if (x<0 ) return;
+	if (y<0 ) return;
+	if (x>SIZ ) return;
+	if (y>SIZ ) return;
+	if ( bitmap[x][y] ) return;
+	
+   num = 0;
+   getNeighs( x,y );
+   bitmap[x][y] = 1;
+	 
+   while ( num > 0 )
+   {
+      num--;
+      x = unfilled_x[num];
+      y = unfilled_y[num];
+
+			writePixel(x,y);
+      getNeighs(x,y);
+   }
+}
+getNeighs(x,y)
+{
+   if (x > 0 )     if( bitmap[x-1][y]==0 ) {save(x-1,y); }
+   if (x < SIZ-1 ) if( bitmap[x+1][y]==0 ) {save(x+1,y); }
+   if (y > 0 )     if( bitmap[x][y-1]==0 ) {save(x,y-1); }
+   if (y < SIZ-1 ) if( bitmap[x][y+1]==0 ) {save(x,y+1); }
+}
+save(x,y)
+{
+   unfilled_x[num] = x;
+   unfilled_y[num] = y;
+   num++;
+}
+
+
+writePixel(x,y) {
+	//red = rgb(255,0,0);
+	
+	//dx = mousx-x; dy = mousy-y;
+	//dist = sqrt(dx^2 + dy^2);
+	//c = 1+sin( dist/SIZ*10*2*PI ) * 128 + 128;
+	//color = rgb(c,c,c);
+	
+	//color=rgb(0,0,0);
+	//if ( (floor(x/5)%2 + floor(y/5)%2) % 2 == 0 ) color=rgb(255,255,255);
+	
+	frq = 10;
+	c = 128 + 128 * noise( x/SIZ * frq, y/SIZ * frq );
+	color = rgb(c,c,c);
+	
+	bitmap[x][y] = 1;
+	bitmap_col[x][y] = color;
+}
+
+writePixel(x,y,color) {
+	bitmap[x][y] = 1;
+	bitmap_col[x][y] = color;
+}
+
+peekDir(x,y,dir)
+{
+	if ( dir==-1 && y <= 0 ) return;
+	if ( dir==+1 && y >= SIZ-1 ) return;
+	if ( bitmap[x][y+dir]==0 ) 
+	{
+		if ( visit_toggle==0 ) visit_line0[x]=1; else visit_line1[x]=1;
+	}
+}
+
+traverse_row( x, row, dir )
+{
+	// traverse from x and right	
+		for (right=x; right<SIZ; right++) {
+			
+			if ( bitmap[right][row] == 0 ) 
+			{
+				peekDir(right,row,dir);
+				writePixel( right, row );
+				
+			} else {
+				break;
+			}
+		}
+
+  // left of x
+		for (left=x-1; left>0; left--) {
+			if ( bitmap[left][row] == 0 ) 
+			{
+				peekDir(right,row,dir);
+				writePixel( left, row );
+			} else {
+				break;
+			}
+		}	
+
+	for(i=0; i<SIZ; i++)
+	{
+		isEmpty=-1;
+		if (visit_toggle==0) { isEmpty=visit_line0[i]; } else { isEmpty=visit_line1[i]; }
+		if (isEmpty==-1) continue;
+
+		for (x=i; x<SIZ; x++) {
+
+		if ( bitmap[x][row] == 0 ) 
+		{
+			peekDir(x,row,dir);
+			writePixel( x, row );
+		} else {
+			break;
+		}
+		}
+	}
+
+	
+}
+
+fast_floodfill(x,y)
+{
+	if (x<0 ) return;
+	if (y<0 ) return;
+	if (x>SIZ ) return;
+	if (y>SIZ ) return;
+	if ( bitmap[x][y] ) return;
+	
+	if ( launches > 1000 ) return;
+	launches++;
+	
+   // go from Y and UP
+   for ( row=y; row>0; row-- ) 
+	 {
+		if ( bitmap[x][row]==0 ) traverse_row( x, row, -1 );
+		
+
+		if ( bitmap[x][row-1]==1 ) break;
+		
+		//Toggler
+		if (visit_toggle==0) {
+			visit_toggle=1;
+			for (i=0; i<SIZ; i++) { visit_line1[i] = -1; } //clear
+		} else {
+			visit_toggle=0;
+			for (i=0; i<SIZ; i++) { visit_line0[i] = -1; } //clear
+		}
+	 }
+   
+   // go below Y
+	 /*
+   for ( row=y+1; row<SIZ; row++ ) 
+	 {
+		if ( bitmap[x][row]==0 ) traverse_row( x, row, +1 );
+		if ( row+1 < SIZ ) if ( bitmap[x][row+1] ) break;
+	 }
+	 */
+	 
+}
+
+repaint()
+{
+	if ( iters % 100==1 ) {
+		 //cls(0);
+		sleep(1);
+		 draw();
+		 refresh();
+	}
+	
+	iters++;
+}
+
+
+draw()
+{
+   for(i=0; i<SIZ; i++)
+   {
+      for(j=0; j<SIZ; j++)
+      {
+         if ( bitmap[i][j] ) 
+         {
+            setcol( bitmap_col[i][j]);
+         } else {
+            setcol(64,32,32);
+         }
+         setpix(i,j);
+      }
+   }
+}
+
+rotate2d(&x, &y, pivx, pivy, a )
+{
+   ca = cos(a); sa = sin(a); tx=x-pivx; ty=y-pivy;
+   x = ca*tx + sa*ty + pivx;
+   y = sa*tx + ca*ty + pivy;
+}

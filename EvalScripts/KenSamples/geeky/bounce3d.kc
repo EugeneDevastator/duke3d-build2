@@ -1,0 +1,132 @@
+struct { x, y, z; } point3d;
+()
+{
+   point3d pol[4] = {-1,-1,0, 1,-1,0, 1,1,0, -1,1,0};
+   point3d pp = {0,0,-4}, rr = {1,0,0}, dd = {0,1,0}, ff = {0,0,1};
+   point3d norm, vin, vout, laser[2] = {0,0,1, 0,0,2};
+
+   tim = 0; ha = 0; va = 0; obstatus = 0;
+   while (1)
+   {
+      otim = tim; tim = klock(); dtim = tim-otim;
+      playercontrols(dtim,&pp,&rr,&dd,&ff);
+      setcam(pp.x,pp.y,pp.z,rr.x,rr.y,rr.z,dd.x,dd.y,dd.z,ff.x,ff.y,ff.z);
+
+      cls(0); clz(1e32); setcol(0xffffff);
+      
+      if ((bstatus%2) > (obstatus%2)) //LMB: shoot laser
+      {
+         laser[0].x = pp.x + ff.x;
+         laser[0].y = pp.y + ff.y;
+         laser[0].z = pp.z + ff.z;
+            
+            //raytrace to poly - fun :P
+         getnorm(pol,norm);
+            //(ix-pol[0].x)*norm.x + (iy-pol[0].y)*norm.y + (iz-pol[0].z)*norm.z = 0
+            //ix = pp.x + ff.x*t;
+            //iy = pp.y + ff.y*t;
+            //iz = pp.z + ff.z*t;
+            //(pp.x-pol[0].x)*norm.x + ff.x*norm.x * t
+         t = ((pol[0].x-pp.x)*norm.x +
+              (pol[0].y-pp.y)*norm.y +
+              (pol[0].z-pp.z)*norm.z) / (ff.x*norm.x + ff.y*norm.y + ff.z*norm.z);
+         laser[1].x = pp.x + ff.x*t;
+         laser[1].y = pp.y + ff.y*t;
+         laser[1].z = pp.z + ff.z*t;
+      }
+      if ((bstatus%4) >= 2) //RMB: set poly ori
+      {
+         laser[1] = laser[0];
+         for(i=0;i<4;i++)
+         {
+            u = ((i==1)||(i==2))*2-1; v = (i>=2)*2-1;
+            pol[i].x = rr.x*u + dd.x*v;
+            pol[i].y = rr.y*u + dd.y*v;
+            pol[i].z = rr.z*u + dd.z*v;
+         }
+      }
+
+      glbegin(GL_QUADS); glcullface(GL_NONE);
+      for(i=0;i<4;i++)
+      {
+         gltexcoord((i==1)||(i==2),i>=2);
+         glvertex(pol[i].x,pol[i].y,pol[i].z);
+      }
+      
+      getnorm(pol,norm);
+      cx = (pol[0].x+pol[2].x)/2;
+      cy = (pol[0].y+pol[2].y)/2;
+      cz = (pol[0].z+pol[2].z)/2;
+      setcol(0xffffff);
+      drawcone(cx,cy,cz,.05,cx-norm.x,cy-norm.y,cz-norm.z,.05,DRAWCONE_FLAT);
+      drawcone(cx-norm.x,cy-norm.y,cz-norm.z,.08,
+               cx-norm.x*1.2,cy-norm.y*1.2,cz-norm.z*1.2,.00,
+               DRAWCONE_CENT+DRAWCONE_FLAT);
+      
+      setcol(0xff0000);
+      drawcone(laser[0].x,laser[0].y,laser[0].z,.02,
+               laser[1].x,laser[1].y,laser[1].z,.02,DRAWCONE_FLAT);
+      
+      vin.x = laser[1].x-laser[0].x;
+      vin.y = laser[1].y-laser[0].y;
+      vin.z = laser[1].z-laser[0].z;
+      bouncevec(vin,vout,norm);
+      
+      setcol(0x800000);
+      drawcone(laser[1].x,laser[1].y,laser[1].z,.02,
+               laser[1].x+vout.x,laser[1].y+vout.y,laser[1].z+vout.z,
+               .02,DRAWCONE_FLAT);
+
+      obstatus = bstatus; refresh(); Sleep(5);
+   }
+}
+
+   //vin: vector in (can be any length)
+   //vout: vector out
+   //norm: normal of polygon hit: must be normalized!
+bouncevec (point3d vin, point3d vout, point3d norm)
+{
+   f = (vin.x*norm.x + vin.y*norm.y + vin.z*norm.z)*2;
+   vout.x = vin.x - norm.x*f;
+   vout.y = vin.y - norm.y*f;
+   vout.z = vin.z - norm.z*f;
+}
+
+   //Handle input and player movement
+playercontrols (f, point3d pp, point3d rr, point3d dd, point3d ff)
+{
+   f *= 2;
+   if (keystatus[0x2a]) f /= 4;
+   if (keystatus[0x36]) f *= 4;
+   vx = (keystatus[0xcd]-keystatus[0xcb])*f; //Rt-Lt
+   vy = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   vz = (keystatus[0xc8]-keystatus[0xd0])*f; //Up-Dn
+   readmouse(&mx,&my);
+   rotvex(mx*-.01,rr,ff);
+   rotvex(my*-.01,dd,ff);
+   rotvex(rr.y*-.1,rr,dd);
+   pp.x += rr.x*vx + dd.x*vy + ff.x*vz;
+   pp.y += rr.y*vx + dd.y*vy + ff.y*vz;
+   pp.z += rr.z*vx + dd.z*vy + ff.z*vz;
+}
+
+   //Rotate vectors a & b around their common plane, by ang
+rotvex (ang, point3d a, point3d b)
+{
+   c = cos(ang); s = sin(ang);
+   f = a.x; a.x = f*c + b.x*s; b.x = b.x*c - f*s;
+   f = a.y; a.y = f*c + b.y*s; b.y = b.y*c - f*s;
+   f = a.z; a.z = f*c + b.z*s; b.z = b.z*c - f*s;
+}
+
+getnorm (point3d pol[4], point3d norm)
+{
+   ax = pol[1].x-pol[0].x; bx = pol[3].x-pol[0].x;
+   ay = pol[1].y-pol[0].y; by = pol[3].y-pol[0].y;
+   az = pol[1].z-pol[0].z; bz = pol[3].z-pol[0].z;
+   norm.x = ay*bz - az*by;
+   norm.y = az*bx - ax*bz;
+   norm.z = ax*by - ay*bx;
+   f = 1/sqrt(norm.x^2 + norm.y^2 + norm.z^2);
+   norm.x *= f; norm.y *= f; norm.z *= f;
+}

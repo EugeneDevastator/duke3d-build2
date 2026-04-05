@@ -1,0 +1,40 @@
+enum{S=32}
+()
+{
+   cls(0);
+   // setup 2d sprites
+   if(numframes==0)
+   {
+      glCullFace(GL_BACK); 
+      glDisable(GL_ALPHA_TEST);
+      glDisable(GL_DEPTH_TEST);
+   }   
+
+   static buf[S][S];
+
+   if(numframes==0){
+      steps = 36*10;
+      for(r=0; r<S/2; r++){
+      for(i=0; i<steps; i++){
+         gradient = 255-(r*20);
+         
+         x = s/2 + cos(i*2*PI/steps)*r;
+         y = s/2 + sin(i*2*PI/steps)*r;
+         //setcol(gradient, gradient, gradient);
+         //setpix(x,y);
+         buf[x][y] = rgb(gradient,gradient,gradient);
+      }
+      }
+   }
+   
+   t = klock(0);
+
+   texh = glsettex(buf,S,S);
+   setcol(0xffffff);
+   drawspr(mousx,mousy,S*2+cos(t*10)*5,0);
+   glremovetex(texh);
+
+
+
+}
+

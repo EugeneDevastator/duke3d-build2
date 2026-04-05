@@ -1,0 +1,150 @@
+// quicksort func coded by silverman, see geeky/sorttest.kc
+// simple test code by Torbjoern. 13.september 2009
+// implemented radix sort. a simple one. 14. september 2009.
+// this radix sort only uses one digit. space could be saved by using more
+// digits. but that would require multiple passes.
+
+enum{NMAX = 1000, NUMSTOSORT=20};
+
+
+static nums[NUMSTOSORT];
+static numssorted[NUMSTOSORT];
+
+static radixOutput[NUMSTOSORT];
+
+
+static statLargest = 0;
+
+// "make" an array as big as largest
+static countArray[1000]; // swap 1000 with "largest"
+()
+{
+   cls(0);
+   
+   moveto(xres/4, yres/2);
+   printf("Press SPACE to generate RND nums");
+   printf("\nPress 1 to sort the nums.");
+   
+
+   if(keystatus[57])
+   {
+      keystatus[57] = 0;
+      for(i=0; i<NUMSTOSORT; i++)
+      {
+         nums[i] = int(rnd*100);
+         numssorted[i] = nums[i];
+      }
+   }
+   
+   if(keystatus[2])
+   {
+      keystatus[2] = 0;
+      //quicksort(numssorted,0,NUMSTOSORT);
+      //inssort(numsSorted,0,NUMSTOSORT);
+      
+      radix(numsSorted,NUMSTOSORT);
+   }
+   
+   moveto(0,0);
+   printnums(nums,NUMSTOSORT);
+   printf("\nRandom");
+   
+   moveto(100,0);
+   printnums(numsSorted,NUMSTOSORT);
+   printf("\nSorted?");
+   
+   moveto(200,0);
+   printnums(countArray,statLargest+1);
+   printf("\ncountArray");
+   
+   printf("\n\n\n\n\nLargest = %g", statLargest);
+
+
+   sleep(1);
+
+}
+
+printnums(nums[NMAX], max)
+{
+   
+   for(i=0; i<max; i++)
+   {
+      printf("%g = %g\n", i, nums[i]);
+      
+   }
+}
+
+radix(input[NMAX],size)
+{
+   // find largest num
+   largest = input[0];
+   largestPos = 0;
+   for(i=0; i<size; i++)
+   {
+      if(input[i] > largest)
+      {
+         largest = input[i];
+         largestPos = i;
+      }
+   }
+   statLargest = largest;
+ 
+
+   // fill with zeros
+   for(i=0; i<1000; i++)
+   {
+      countArray[i] = 0; 
+   }
+   
+
+   // Phase 1: Count instances
+   for(i=0; i<size; i++)
+   {
+      countArray[ input[i] ]++;
+   }
+
+   // Phase 2: Add adjacent cells
+   for(i=1; i<largest+1; i++)
+   {
+      countArray[i] = countArray[i] + countArray[i-1];
+   }
+ 
+   // Phase 3: Move elements from input to output. Decrement appropriate count value.
+   for(i=0; i<size; i++)
+   {
+      number = input[i];
+      radixOutput[ size-countArray[number] ] = number;
+      countArray[number]--;
+   }      
+
+   // copy radix output back to input :/
+   for(i=0; i<size; i++)
+   {
+      input[size-1-i] = radixOutput[i];
+   }   
+}
+
+quicksort (a[NMAX],i0,i1)
+{
+   if (i1-i0 <= 1) return;
+   v0 = a[i0]; v1 = a[i0+1]; v2 = a[i1-1]; //v = median of 3 elements
+          i = min(v0,v1); if (v2 < i) v = i;
+   else { i = v0+v1-i;    if (v2 > i) v = i;
+   else                               v = v2; }
+
+   j0 = i0; j1 = i1;
+   for(i=i0;i<j1;i++)
+   {
+      if (a[i] > v) { j1--; t = a[j1]; a[j1] = a[i]; a[i] = t; i--; }
+      else if (a[i] < v) { t = a[j0]; a[j0] = a[i]; a[i] = t; j0++; }
+   }
+   quicksort(a,i0,j0);
+   quicksort(a,j1,i1);
+}
+
+inssort (a[NMAX],i0,i1)
+{
+   for(j=i0+1;j<i1;j++)
+      for(i=j;(i>i0)&&(a[i]<a[i-1]);i--)
+         { t = a[i]; a[i] = a[i-1]; a[i-1] = t; }
+}

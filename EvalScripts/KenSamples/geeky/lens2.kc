@@ -1,0 +1,503 @@
+enum {CIRC,RCIRC,FLAT,LENT,FRES,RFRES,NUMTYP};
+
+//https://www.alibaba.com/product-detail/10-20LPI-PS-lenticular-lens-sheet_468766446.html?spm=a2700.7724857.normalList.149.18395774OFhqmE
+
+struct { shape[2], mir, ifrac, rx[2], ry, cx, cy, ang, n; } obj_t;
+enum {OBJMAX=256};
+static obj_t obj[OBJMAX];
+static objn = 0;
+
+   //Indices of refraction of common materials:
+#define VACUUM        1.0
+#define AIR           1.000277 //20C/1atm
+#define COLDAIR       1.000293 // 0C/1atm
+#define HELIUM        1.000036 // 0C/1atm
+#define HYDROGEN      1.000132 // 0C/1atm
+#define CO2           1.00045  // 0C/1atm
+#define ICE           1.31     //Ice Water
+#define WATER         1.333    //20C
+#define ETHANOL       1.36     //20C
+#define QUARTZ        1.46     //FusedSilica
+#define OLIVEOIL      1.47     //20C
+#define PYREX         1.470
+#define ACRYLIC       1.491    //PMMA/Plexiglas/Lucite/Perspex
+#define GLASS         1.52     //Standard window glass
+#define POLYCARBONATE 1.58     //Lexan
+#define FLINTGLASS    1.62
+#define SAPPHIRE      1.77
+#define CUBICZIRCONIA 2.16
+#define DIAMOND       2.417    //20C
+#define MOISSANITE    2.65
+
+()
+{
+   static px[65536], py[65536], pc[65536], poff[256], pn;
+   
+   hx = xres/2; hy = yres/2;
+   
+   objn = 0;
+#if 0
+ //addobj(CIRC,CIRC,0,ACRYLIC,32,32,128,xres*.5,hy    ,0,16);
+ //addobj(RCIRC,FLAT,1,ACRYLIC,16,16, 96,xres*.5,hy    ,0,16); //mirror!
+   addobj(FLAT,FRES,0,ACRYLIC,16,16,256,xres*.5,hy    ,0,16);
+#elif 0
+   addobj(CIRC,CIRC,0,ACRYLIC,64,64,512,xres*.8,hy    ,.5,16);
+#elif 1
+   addobj(CIRC,CIRC,0,ACRYLIC,16,16,128,hx    ,hy    ,0,16);
+   addobj(CIRC,CIRC,0,ACRYLIC, 8, 8, 64,hx+256,hy    ,0,16);
+#elif 0
+   addobj(CIRC,CIRC,0,ACRYLIC,32,32,256,hx    ,hy-128,.5,16);
+   addobj(CIRC,FLAT,0,ACRYLIC,32,16,256,hx+128,hy    ,0,16);
+   addobj(FLAT,CIRC,0,ACRYLIC,16,32,256,hx+256,hy+128,0,16);
+#elif 0
+   addobj(FLAT,LENT,0,ACRYLIC,16, 8,256,hx+256,hy    ,0,16);
+#else
+   siz = 16; //generates very narrow angle lenticular lens
+   for(y=-8;y<=8;y++)
+   {
+      addobj(FLAT,CIRC,0,ACRYLIC,siz/2,siz/2,siz,hx,hy+y*siz*2,0,16);
+   }
+#endif   
+
+   //ifrac = .330; //glass/air
+   //ifrac = .671; //acrylic/air
+      
+   grabo = -1; omousx = mousx; omousy = mousy; obstatus = 0; tim = 0;
+   while (1)
+   {
+      otim = tim; tim = klock(); dtim = tim-otim;
+      
+      if (bstatus%2)
+      {
+         if (!(obstatus%2))
+         {
+            dmin = 64^2; grabo = -1;
+            for(o=0;o<objn;o++)
+            {
+               d2 = (obj[o].cx-mousx)^2 + (obj[o].cy-mousy)^2;
+               if (d2 < dmin) { dmin = d2; grabo = o; }
+            }
+         }
+         if (grabo >= 0)
+         {
+            if (keystatus[0xd3]) //Del
+            {
+               keystatus[0xd3] = 0;
+               objn--; obj[grabo] = obj[objn];
+            }
+            else if (keystatus[0xc9]) //PGUP
+            {
+               keystatus[0xc9] = 0; i = !(keystatus[0x2a] || keystatus[0x36]);
+               obj[grabo].shape[i]--; if (obj[grabo].shape[i] < 0) obj[grabo].shape[i] = NUMTYP-1;
+            }
+            else if (keystatus[0xd1]) //PGDN
+            {
+               keystatus[0xd1] = 0; i = !(keystatus[0x2a] || keystatus[0x36]);
+               obj[grabo].shape[i]++; if (obj[grabo].shape[i] >= NUMTYP) obj[grabo].shape[i] = 0;
+            }
+            else
+            {
+               obj[grabo].cx += mousx-omousx;
+               obj[grabo].cy += mousy-omousy;
+               obj[grabo].ang += (keystatus[0xcd]-keystatus[0xcb])*dtim;
+               obj[grabo].ang += (keystatus[0x34]-keystatus[0x33])*dtim;
+               f = (keystatus[0xc8]-keystatus[0xd0])*.5;
+               obj[grabo].rx[0] *= pow(1.0+f,dtim);
+               obj[grabo].rx[1] *= pow(1.0+f,dtim);
+               obj[grabo].ry    *= pow(1.0+f,dtim);
+            }
+         }
+      }
+      
+      if (keystatus[0xd2]) //Ins
+      {
+         keystatus[0xd2] = 0;
+         if (objn < OBJMAX) { addobj(CIRC,CIRC,0,ACRYLIC,16,16,128,mousx,mousy,0,16); }
+      }
+      
+      cls(0);
+      
+      pn = 0;
+      for(o=0;o<objn;o++)
+         { poff[o] = pn; pn += getobj(&obj[o],&px[pn],&py[pn],&pc[pn]); }
+      poff[objn] = pn;
+
+      setcol(0x808080);
+      if (1) da = PI/256;
+        else da = PI/4096;
+      for(a=da*((tim*4)%1)-PI;a<PI;a+=da)
+      {
+         tx = mousx; vx = cos(a);
+         ty = mousy; vy = sin(a);
+         moveto(tx,ty);
+         
+         for(cnt=16;cnt>0;cnt--)
+         {
+               //Raytrace to first lens hit..
+            tmin = 1e32;
+            for(o=objn-1;o>=0;o--)
+            {
+               i0 = poff[o]; i1 = poff[o+1];
+               t = raytrace(tx,ty,vx,vy,&px[i0],&py[i0],&pc[i0],i1-i0,1,&ix,&iy,&nx,&ny);
+               if (t < tmin) { tmin = t; bo = o; bix = ix; biy = iy; bnx = nx; bny = ny; }
+            }
+            if (tmin >= 1e32) { f = 4096; lineto(tx+vx*f,ty+vy*f); break; }
+            ix = bix; iy = biy; nx = bnx; ny = bny;
+            
+            if (!obj[bo].mir)
+            {
+                  //           |        .
+                  //           |     .
+                  //<nx,ny>    |  . ang1
+                  //<----------+--------->
+                  //     ang0. | 
+                  //       .   |
+                  //  <vx,vy>  |
+                  //
+                  //Refract: air to object: n0*sin(ang0) = n1*sin(ang1) //ang=angle from normal
+                  //vx*vx + vy*vy = 1, nx*nx + ny*ny = 1, nvx*nvx + nvy*nvy = 1
+                  //(vx*ny - vy*nx)*AIR = (nvx*ny - nvy*nx)*obj[bo].ifrac
+                  //nvx*ny - nvy*nx = f
+                  //nvx*ny - nvy*sqrt(1-ny*ny) = f
+                  //sqrt(1-ny*ny) = nvx/nvy*ny
+                  //tan(ang) = nvy/nvx = sqrt(ny*ny / (1 - ny*ny))
+               u = vx*nx + vy*ny;
+               v = vx*ny - vy*nx;
+               v *= AIR/obj[bo].ifrac;
+               vx = u*nx + v*ny; 
+               vy = u*ny - v*nx;
+               f = 1/sqrt(vx*vx + vy*vy); vx *= f; vy *= f;
+               
+               tx = ix; ty = iy; lineto(tx,ty);
+            }
+            else
+            {
+               u = vx*nx + vy*ny;
+               v = vx*ny - vy*nx;
+               v *= -1;
+               vx = u*nx + v*ny; 
+               vy = u*ny - v*nx;
+               f = -1/sqrt(vx*vx + vy*vy); vx *= f; vy *= f;
+                        
+               tx = ix; ty = iy; lineto(tx,ty);
+               continue;
+            }
+
+               //Exit lens..
+            i0 = poff[bo]; i1 = poff[bo+1];
+            t = raytrace(tx,ty,vx,vy,&px[i0],&py[i0],&pc[i0],i1-i0,-1,&ix,&iy,&nx,&ny);
+            
+               //Refract: object to air: n0*sin(ang0) = n1*sin(ang1) //ang=angle from normal
+            u = vx*nx + vy*ny;
+            v = vx*ny - vy*nx;
+            v *= obj[bo].ifrac/AIR;
+            vx = u*nx + v*ny; 
+            vy = u*ny - v*nx;
+            f = 1/sqrt(vx*vx + vy*vy); vx *= f; vy *= f;
+            
+            tx = ix; ty = iy; lineto(tx,ty);
+         }
+      }
+      
+      for(o=0;o<objn;o++)
+      {
+         i0 = poff[o]; i1 = poff[o+1];
+         setcol(0xc0c0c0); moveto(px[i1-1],py[i1-1]);
+         for(i=i0;i<i1;i++)
+         {
+            if (pc[i]) { drawarc(px[i-1],py[i-1],px[i],py[i],px[i+1],py[i+1]); i++; continue; }
+            lineto(px[i],py[i]);
+         }
+         
+         setcol(0xffffff); drawsph(obj[o].cx,obj[o].cy,-2.5);
+         c = cos(obj[o].ang); s = sin(obj[o].ang);
+         //setcol(0xe00000); moveto(obj[o].cx-obj[o].rx[0]*c,obj[o].cy-obj[o].rx[0]*s);
+         //                  lineto(obj[o].cx+obj[o].rx[0]*c,obj[o].cy+obj[o].rx[0]*s);
+         //setcol(0x00c000); moveto(obj[o].cx+obj[o].ry*s,obj[o].cy-obj[o].ry*c);
+         //                  lineto(obj[o].cx-obj[o].ry*s,obj[o].cy+obj[o].ry*c);
+         setcol(0xffff00); moveto(xres-64,o*12); printf("%g",poff[o+1]-poff[o]);
+      }
+      
+      obstatus = bstatus; omousx = mousx; omousy = mousy;
+      refresh(); Sleep(5);
+   }
+}
+
+addobj (shape0, shape1, mir, ifrac, rx0, rx1, ry, cx, cy, ang, n)
+{   
+   obj[objn].shape[0] = shape0;
+   obj[objn].shape[1] = shape1;
+   obj[objn].mir = mir;
+   obj[objn].ifrac = ifrac;
+   obj[objn].rx[0] = rx0;
+   obj[objn].rx[1] = rx1;
+   obj[objn].ry = ry;
+   obj[objn].cx = cx;
+   obj[objn].cy = cy;
+   obj[objn].ang = ang;
+   obj[objn].n = n;
+   objn++;
+}   
+
+getobj (obj_t obj, px[1026], py[1026], pc[1026])
+{
+   pn = 0;
+   c = cos(obj.ang);
+   s = sin(obj.ang);
+   for(sid=0;sid<2;sid++)
+   {
+      sg = sid*2-1;
+      if (obj.shape[sid] == CIRC)
+      {
+         xo = (obj.ry^2 - obj.rx[sid]^2)*.5/obj.rx[sid];
+         r2 = (obj.rx[sid] + xo)^2;
+         n = 1; f = sg/n;
+         for(i=-n;i<=n;i++)
+         {
+            t = i*f;
+            u = (sqrt(r2 - t*t*obj.ry^2) - xo)*sg;
+            v = t*obj.ry;
+            px[pn] = obj.cx + u*c - v*s;
+            py[pn] = obj.cy + v*c + u*s;
+            pc[pn] = 0;
+            pn++;
+         }
+         pc[pn-2] = 1;
+      }
+      else if (obj.shape[sid] == RCIRC)
+      {
+         xo = (obj.ry^2 - obj.rx[sid]^2)*.5/obj.rx[sid];
+         r2 = (obj.rx[sid] + xo)^2;
+         n = 1; f = sg/n;
+         for(i=-n;i<=n;i++)
+         {
+            t = i*f;
+            u = obj.rx[sid]*1.1/*FIX*/*(sid*2-1)-(sqrt(r2 - t*t*obj.ry^2) - xo)*sg;
+            v = t*obj.ry;
+            px[pn] = obj.cx + u*c - v*s;
+            py[pn] = obj.cy + v*c + u*s;
+            pc[pn] = 0;
+            pn++;
+         }
+         pc[pn-2] = 1;
+      }
+      else if (obj.shape[sid] == FLAT)
+      {
+         for(t=-1;t<=1;t+=2)
+         {
+            u = obj.rx[sid]*sg;
+            v = obj.ry*sg*t;
+            px[pn] = obj.cx + u*c - v*s;
+            py[pn] = obj.cy + v*c + u*s;
+            pc[pn] = 0;
+            pn++;
+         }
+      }
+      else if (obj.shape[sid] == LENT)
+      {
+         n = obj.n;
+         //n = obj.ry/obj.rx[sid];
+         //n = 256;
+         f = sg/n;
+         for(i=-n;i<=n;i++)
+         {
+            t = i*f;
+            u = (i%2)*obj.ry/n*sg*.25;
+            //u = sin(t*PI*2*4)*.5;
+            v = t*obj.ry;
+            px[pn] = obj.cx + u*c - v*s;
+            py[pn] = obj.cy + v*c + u*s;
+            pc[pn] = (i%2);
+            pn++;
+         }
+      }
+      else if ((obj.shape[sid] == FRES) || (obj.shape[sid] == RFRES))
+      {
+         n = obj.n; //16; //obj.ry/obj.rx[sid];
+         n = int(n/2+.5)*2;
+         f = sg/n;
+         for(i=-n;i<n;i++)
+         {
+            r = 1.5;
+            //r = 1.0;
+            g = sqrt(r*r - ((i+1)/n)^2) - sqrt(r*r - ((i+0)/n)^2)*1;
+            if (obj.shape[sid] == RFRES) g = -g;
+            
+            u = (1-g)*obj.rx[sid]; v = (i+0)*f*obj.ry;
+            px[pn] = obj.cx + u*c - v*s;
+            py[pn] = obj.cy + v*c + u*s;
+            pc[pn] = 0;
+            pn++;
+            
+            u = (1+g)*obj.rx[sid]; v = (i+1)*f*obj.ry;
+            px[pn] = obj.cx + u*c - v*s;
+            py[pn] = obj.cy + v*c + u*s;
+            pc[pn] = 0;
+            pn++;
+         }
+      }
+   }
+   return(pn);
+}
+
+raytrace (x, y, vx, vy, px[1026], py[1026], pc[1026], pn, isdir, &ix, &iy, &bnx, &bny)
+{
+   tmin = 1e32;
+   for(j=0,i=pn-1;j<pn;i=j,j++)
+   {
+      if (pc[j])
+      {
+         t = raytrace_arc(x,y,vx,vy,px[i],py[i],px[j],py[j],px[j+1],py[j+1],isdir,&ix,&iy,&nx,&ny);
+         if ((t >= 0) && (t < tmin)) { tmin = t; bnx = nx; bny = ny; }
+         i = j; j++;
+         continue;
+      }
+      
+      x0 = px[i]; x1 = px[j];
+      y0 = py[i]; y1 = py[j];
+          
+         //Intersection line
+         //x + vx*t = ix = (x1-x0)*u + x0
+         //y + vy*t = iy = (y1-y0)*u + y0
+         
+         //(vx)*t + (x0-x1)*u = (x0-x)
+         //(vy)*t + (y0-y1)*u = (y0-y)
+
+      det = vx*(y0-y1) - vy*(x0-x1); if (sgn(det) != isdir) continue;
+      rdet = 1/det;
+      u = (vx*(y0-y) - vy*(x0-x))*rdet; if ((u < 0) || (u > 1)) continue;
+      t = ((x0-x)*(y0-y1) - (y0-y)*(x0-x1))*rdet;
+      if ((t >= 0) && (t < tmin)) { tmin = t; bnx = y0-y1; bny = x1-x0; }
+   }
+   if (tmin < 1e32)
+   {
+      ix = tmin*vx + x;
+      iy = tmin*vy + y;
+      f = 1/sqrt(bnx^2 + bny^2); bnx *= f; bny *= f;
+   }
+   return(tmin);
+}
+
+   //See CIRC3PT.KC for derivation.
+drawarc (x0, y0, x1, y1, x2, y2)
+{   
+   vx0 = y1-y0; vy0 = x0-x1;
+   vx1 = y2-y1; vy1 = x1-x2;
+   det = vx0*vy1 - vy0*vx1;
+   if (fabs(det) > 1e-6)
+   {
+      cx0 = (x0+x1)/2; cy0 = (y0+y1)/2;
+      cx1 = (x1+x2)/2; cy1 = (y1+y2)/2;
+
+         //cx = cx0 + vx0*t = cx1 - vx1*u
+         //cy = cy0 + vy0*t = cy1 - vy1*u
+
+         //vx0*t + vx1*u = cx1-cx0
+         //vy0*t + vy1*u = cy1-cy0
+
+      t = ((cx1-cx0)*vy1 - (cy1-cy0)*vx1)/det;
+      cx = vx0*t + cx0;
+      cy = vy0*t + cy0;
+      r = sqrt((x0-cx)^2 + (y0-cy)^2);
+      //drawsph(cx,cy,2);
+
+      a0 = atan2(y0-cy,x0-cx);
+      a1 = atan2(y2-cy,x2-cx);
+      if (a1 < a0) { a1 += PI*2; }
+      if (det < 0) { a1 -= PI*2; }
+      
+      n = min(max(int(fabs(a1-a0)*sqrt(r)/1),4),256);
+      f = (a1-a0)/n;
+      setcol(0xffffff); moveto(x0,y0);
+      for(i=1;i<n;i++)
+      {
+         a0 += f; x = cos(a0)*r+cx; y = sin(a0)*r+cy;
+         lineto(x,y); //drawsph(x,y,2);
+      }
+      lineto(x2,y2);
+   }
+   else
+   {
+      setcol(0xffc0ff);
+      moveto(x0,y0);
+      lineto(x2,y2);
+   }
+}
+
+   //See CIRC3PT.KC for derivation.
+raytrace_arc (px, py, vx, vy, x0, y0, x1, y1, x2, y2, sid, &ix, &iy, &nx, &ny)
+{
+   vx0 = y1-y0; vy0 = x0-x1;
+   vx1 = y2-y1; vy1 = x1-x2;
+   det = vx0*vy1 - vy0*vx1;
+   if (fabs(det) > 1e-6)
+   {
+      cx0 = (x0+x1)/2; cy0 = (y0+y1)/2;
+      cx1 = (x1+x2)/2; cy1 = (y1+y2)/2;
+      
+      t = ((cx1-cx0)*vy1 - (cy1-cy0)*vx1)/det;
+      cx = vx0*t + cx0;
+      cy = vy0*t + cy0;
+      r = sqrt((x0-cx)^2 + (y0-cy)^2);
+
+      a0 = atan2(y0-cy,x0-cx);
+      a1 = atan2(y2-cy,x2-cx);
+      if (a1 < a0) { a1 += PI*2; }
+      if (det < 0) { a1 -= PI*2; }
+
+         //ix = vx*t + px
+         //iy = vy*t + py
+         //(ix-cx)^2 + (iy-cy)^2 = r^2
+
+         //(vx*t + px-cx)^2 + (vy*t + py-cy)^2 = r^2
+      Za = vx^2 + vy^2;
+      Zb = (vx*(px-cx) + vy*(py-cy))*2;
+      Zc = (px-cx)^2 + (py-cy)^2 - r^2;
+      insqr = Zb*Zb - Za*Zc*4; if (insqr < 0) return(1e32);
+      insqr = sqrt(insqr); Za = .5/Za;
+      for(s=-1;s<=1;s+=2)
+      {
+         t = (-Zb + insqr*s)*Za; if (t < 0) continue;
+         ix = vx*t + px;
+         iy = vy*t + py;
+         a = atan2(iy-cy,ix-cx);
+         if (a < min(a0,a1)) a += PI*2;
+         if (a > max(a0,a1)) a -= PI*2;
+         if ((a<a0) != (a<a1))
+         {
+            if ((s < 0) != (det < 0)) { if (sid < 0) return(1e32); } //entering object
+                                 else { if (sid > 0) return(1e32); } //exiting object
+            nx = ix-cx; ny = iy-cy;
+            f = 1/sqrt(nx^2 + ny^2); nx *= f; ny *= f;
+            return(t);
+         }
+      }
+   }
+   else
+   {
+         //Handle line case..
+         //ix = vx*t + px = (x2-x0)*u + x0
+         //iy = vy*t + py = (y2-y0)*u + y0
+      
+         //vx*t + (x0-x2)*u = x0-px
+         //vy*t + (y0-y2)*u = y0-py
+      det = vx*(y0-y2) - vy*(x0-x2);
+      if (fabs(det) > 1e-6)
+      {
+         rdet = 1/det;
+         t = ((x0-px)*(y0-y2) - (y0-py)*(x0-x2))*rdet;
+         u = (vx*(y0-py) - vy*(x0-px))*rdet;
+         if (t < 0) return(1e32);
+         if ((u < 0) || (u > 1)) return(1e32);
+         ix = vx*t + px;
+         iy = vy*t + py;
+         if (det > 0) { if (sid < 0) return(1e32); } //entering object
+                 else { if (sid > 0) return(1e32); } //exiting object
+                 
+         nx = y0-y2; ny = x2-x0;
+         f = 1/sqrt(nx^2 + ny^2); nx *= f; ny *= f;
+         return(t);
+      }
+   }
+   return(1e32);
+}

@@ -1,0 +1,88 @@
+#define NSIDES 12
+#define DIST   1.0
+#define NEARZ  0.1
+#define HEIGHT 0.5
+#define STP    3
+
+static hx, hy, hz;
+
+()
+{
+   while (1)
+   {
+      hx = xres/2; hy = yres/2; hz = hx;
+      cls(0); t = klock();
+      for(i=0;i<NSIDES;i++)
+      {
+         x0 = cos((i+0)*(PI*2/NSIDES)+t)*DIST;
+         y0 =-sin((i+0)*(PI*2/NSIDES)+t)*DIST;
+         x1 = cos((i+1)*(PI*2/NSIDES)+t)*DIST;
+         y1 =-sin((i+1)*(PI*2/NSIDES)+t)*DIST;
+         drawall4dof(x0,y0,x1,y1,32);
+      }
+      refresh();
+   }
+}
+
+drawall4dof (ox0, oy0, ox1, oy1, texsiz)
+{
+      //Show 90 degree field of view
+   setcol(0x808080); f = yres/2;
+   moveto(xres/2-f,yres/2-f);
+   lineto(xres/2  ,yres/2  );
+   lineto(xres/2+f,yres/2-f);
+      
+      //Show near clipping plane
+   moveto(   0,yres/2-NEARZ*256);
+   lineto(xres,yres/2-NEARZ*256);
+   
+      //Show pre-clipped line as brown
+   setcol(0x806040);
+   moveto(xres/2+ox0*256,yres/2-oy0*256);
+   lineto(xres/2+ox1*256,yres/2-oy1*256);
+   
+      //Clip to near plane
+   x0 = ox0; y0 = oy0; x1 = ox1; y1 = oy1;
+   if (y0 < NEARZ)
+   {
+      if (y1 < NEARZ) return;
+      x0 = (x1-x0)*(y0-NEARZ)/(y0-y1) + x0; y0 = NEARZ;
+   }
+   else if (y1 < NEARZ)
+   {
+      x1 = (x1-x0)*(y0-NEARZ)/(y0-y1) + x0; y1 = NEARZ;
+   }
+   
+      //Show clipped line as green
+   setcol(0x00ff00);
+   moveto(xres/2+x0*256,yres/2-y0*256);
+   lineto(xres/2+x1*256,yres/2-y1*256);
+   
+      //Project 3D to 2D
+   sx0 = max(x0/y0*hz + hx,   0);
+   sx1 = min(x1/y1*hz + hx,xres);
+   for(sx=sx0;sx<sx1;sx+=STP)
+   {
+         //Generate vector from eye through screen column sx
+      vx = sx-hx;
+      vy =    hz;
+      
+         //Solve distance (d) and texture coord (u)
+         //hitx = vx*d = (ox1-ox0)*u + ox0
+         //hity = vy*d = (oy1-oy0)*u + oy0
+         //   As 2x2 matrix: (solve using Cramer's rule)
+         //vx*d + (ox0-ox1)*u = ox0
+         //vy*d + (oy0-oy1)*u = oy0
+      rdet = 1/(vx*(oy0-oy1) - vy*(ox0-ox1));
+      d = (ox0*(oy0-oy1) - oy0*(ox0-ox1))*rdet;
+      u = (vx*oy0 - vy*ox0)*rdet;
+      
+      u *= texsiz; h = HEIGHT/d;
+      sy0 = max(hy - h/2,   0);
+      sy1 = min(hy + h/2,yres);
+
+      vi = texsiz/h; v = (sy0-(hy-h/2))*vi;
+      for(sy=sy0;sy<sy1;sy+=STP,v+=vi*STP)
+         { setcol(pic(u,v)); setpix(sx,sy); }
+   }
+}

@@ -1,0 +1,466 @@
+enum{MAX_BODIES=100, MAX_BODY_EDGES = 100}
+static body[MAX_BODIES][MAX_BODY_EDGES];
+static bodyEdges[MAX_BODIES];
+static bodyCount = 0;
+
+enum{MAX_POINTS=1000, MAX_EDGES = 1000}
+static edgeV1[MAX_EDGES];
+static edgeV2[MAX_EDGES];
+static edgeOriginalLength[MAX_EDGES];
+static edgeIsSelected[MAX_EDGES];
+
+static px[MAX_POINTS];
+static py[MAX_POINTS];
+static ox[MAX_POINTS];
+static oy[MAX_POINTS];
+static pointCount = 0;
+static edgeCount = 0;
+
+static linestarted=0;
+static ox,oy;
+
+struct vec2
+{
+  x,y;
+};
+
+static grabi = -1;
+()
+{
+   cls(0);
+   inputMakePoint(); // Make points by LEFT-CLICKing
+   inputDragPoint(); // Drag em about with right mouse
+
+   
+   static selstarted = 0;
+   if( keystatus[57] && selstarted == 0 )
+   {
+      selstarted = 1;
+      ox = mousx; oy = mousy;
+   }
+   if( keystatus[57] == 0 && selstarted==1)
+   {
+      findPointsInRect(1);
+      selstarted = 0;
+   }
+   
+   if(selstarted)
+   {
+      setcol(0,255,0);
+      wx = mousx-ox;
+      wy = mousy-oy;
+      drawRect(ox,oy,wx,wy);
+      
+      findPointsInRect(0);
+   }
+   
+
+   // CTRL + C
+   if( keystatus[29] && keystatus[46] )
+   {
+      ox=0;
+      oy=0;
+      foundPt = 0;
+      //keystatus[29] = 0;
+      keystatus[46] = 0;
+      oldEdgeCount = edgeCount;
+      for(i=0; i<oldEdgeCount; i++){
+         if( edgeIsSelected[i] == 1 ){
+            //edgeIsSelected[i] = 0;
+            //copyEdge(i);
+            x1 = px[ edgeV1[i] ];
+            y1 = py[ edgeV1[i] ];
+            x2 = px[ edgeV2[i] ];
+            y2 = py[ edgeV2[i] ];
+            
+            if(foundPt==0)
+            {
+               foundPt = 1;
+               ox = x1;
+               oy = y1;
+            }
+            tx= mousx-ox; ty=mousy-oy;
+            makEdge(x1+tx,y1+ty,x2+tx,y2+ty); 
+         }
+      }
+   }
+
+
+   
+   
+   for(i=0; i<edgeCount; i++)
+   {
+      if (edgeIsSelected[i]==1){ 
+         setcol(255,0,0);
+      }else{
+         setcol(255,255,255);
+      }
+      moveto( px[edgeV1[i]], py[edgeV1[i]] );
+      lineto( px[edgeV2[i]], py[edgeV2[i]] );
+      drawsph(px[edgeV1[i]], py[edgeV1[i]],3);
+      drawsph(px[edgeV2[i]], py[edgeV2[i]],3);
+   }
+
+   d=1e32;
+   pt = findClosest(mousx,mousy,d);
+   if( d < 20*20 )
+   {
+      drawsph( px[pt], py[pt], -10);
+      //drawsph( px[edgeV2[i]], py[edgeV2[i]], -10);
+   }
+   for(i=0; i<10; i++)
+   updateEdges();
+   constrainPoints();
+   collisionHandling();
+   
+   setfont(8,12);
+   setcol(255,255,255);
+   moveto(0,0);
+   printf("bodycount %g\n",bodycount);
+   printf("edgecount %g\n",edgecount);
+   printf("pointcount %g\n",pointcount);
+   
+}
+
+inputMakePoint(){
+   if( bstatus==1 && linestarted==0 )
+   {
+      bstatus = 0;
+      linestarted = 1;
+      ox = mousx;
+      oy = mousy;
+      
+   }
+   else if( bstatus==1 && linestarted==1 )
+   {
+      bstatus = 0;
+      linestarted = 0;
+      makEdge(ox,oy,mousx,mousy);
+   }
+   
+   blink = rnd;
+   setcol(255*blink,255*blink,255*blink);
+   if( linestarted==1)
+   {
+      moveto(ox,oy); 
+      lineto(mousx,mousy);
+   }
+}
+inputDragPoint(){
+   if( bstatus == 2 && grabi == -1 )
+   {
+      closestPt = -1;
+      closestD = 1e32;
+      for(i=0; i<pointCount; i++)
+      {
+         dSq = (px[i]-mousx)^2 + (py[i]-mousy)^2;
+         
+         if( dSq < closestD ){
+            closestD = dSq;
+            closestPt = i;
+         }
+         
+         
+      }
+      
+      if( closestD < 10*10)
+      {
+         grabi = closestPt;
+         px[closestPt] = mousx;
+         py[closestPt] = mousy;
+      }
+   }
+   else if(bstatus==0){
+      grabi = -1;
+   }
+   else if( grabi > -1)
+   {
+         px[grabi] = mousx;
+         py[grabi] = mousy;
+   }
+}
+
+findPointsInRect(markAsSelected)
+{
+   for(i=0; i<edgeCount; i++)
+   {
+      wx = mousx-ox;
+      wy = mousy-oy;
+      v1 = edgeV1[i];
+      edgeIsSelected[i] = 0;
+      if( RectCollide( px[v1], py[v1], ox,oy, wx,wy ) )
+      {
+         edgeIsSelected[i] = markAsSelected;
+         drawsph( px[v1], py[v1], 5);
+      }
+      v2 = edgeV2[i];
+      if( RectCollide( px[v2], py[v2], ox,oy, wx,wy ) )
+      {
+         drawsph( px[v2], py[v2], 5);
+      }
+   }
+}
+
+RectCollide(testx,testy,rx,ry,w,h) // prolly better ways.
+{
+   gotx=0; goty=0;
+   if(w < 0 )
+   {
+      if(testx <= rx && testx >= rx+w) gotx = 1;
+   }else{
+      if(testx >= rx && testx <= rx+w) gotx = 1;
+   }
+   if(h < 0)
+   {
+      if(testy <= ry && testy >= ry+h) goty = 1;
+   }else{
+      if(testy >= ry && testy <= ry+h) goty  = 1;
+   }
+   if( gotx == 1 && goty == 1 ) return 1;
+}
+drawRect(sx, sy, wx, wy)
+{   
+   moveto(sx, sy);
+   lineto(sx+wx, sy+0);
+   
+   moveto(sx, sy+wy);
+   lineto(sx+wx, sy+wy);
+   
+   moveto(sx, sy);
+   lineto(sx, sy+wy);
+   
+   moveto(sx+wx, sy);
+   lineto(sx+wx, sy+wy);
+}
+
+constrainPoints(){
+   for(i=0; i<pointCount; i++)
+   {
+      if( keystatus[2] ) py[i]+= 1;   
+      
+      //ox[i] = px[i];
+      //oy[i] = py[i];
+
+      if(px[i] < 0) px[i] = 0;
+      if(px[i] > xres) px[i] = xres;
+      if(py[i] < 0) py[i] = 0;
+      if(py[i] > yres) py[i] = yres;
+      
+      
+   }
+   
+}
+
+findClosest(x,y, &closestD)
+{
+   closestPt = -1;
+   closestD = 1e32;
+   for(i=0; i<pointCount; i++)
+   {
+      dSq = (px[i]-x)^2 + (py[i]-y)^2;
+      
+      if( dSq < closestD ){
+         closestD = dSq;
+         closestPt = i;
+      }
+   }
+   
+   return closestPt;
+}
+
+makPoint(x1,y1)
+{
+   px[pointCount] = x1; py[pointCount] = y1; pointCount++;
+   return pointCount-1;
+}
+
+makEdge2(p1,p2)
+{
+   edgeV1[edgeCount] = p1; edgeV2[edgeCount] = p2;
+   edgeOriginalLength[edgeCount] = sqrt( (px[p1]-px[p2])^2 + (py[p1]-py[p2])^2);
+   edgeCount++;
+}
+
+makEdge(x1,y1,x2,y2)
+{
+   // if another point is close enough, merge with it.
+   closestD = 1e32;
+   pt = findClosest(x1,y1, closestD); // merge with start?
+   if(pt != -1 && closestD < 10*10 )
+   {
+      pt2 = findClosest(x2,y2, closestD); // merge with end?
+      if(pt2 != -1 && closestD < 10*10 )
+      {
+         makEdge2( pt, pt2 );
+         return;
+      }
+      else // nop. make new point at end.
+      {
+         p2 = makPoint(x2,y2);
+         makEdge2( pt, p2 );
+         return;
+      }
+   }
+   // did not merge with any, mak 2 new pts.
+   px[pointCount] = x1; py[pointCount] = y1; edgeV1[edgeCount] = pointCount; pointCount++;
+   px[pointCount] = x2; py[pointCount] = y2; edgeV2[edgeCount] = pointCount; pointCount++;
+   edgeOriginalLength[edgeCount] = sqrt( (x1-x2)^2 + (y1-y2)^2);
+   edgeCount++;
+}
+
+
+updateEdges(){
+   for(i=0; i<edgeCount; i++)
+   {
+      edgeV1x = px[edgeV1[i]];  
+      edgeV1y = py[edgeV1[i]];  
+
+      edgeV2x = px[edgeV2[i]];  
+      edgeV2y = py[edgeV2[i]]; 
+
+      // Calculate vector
+      v1v2x = edgeV1x-edgeV2x;
+      v1v2y = edgeV1y-edgeV2y;
+      v1v2length = sqrt( v1v2x^2 + v1v2y^2 );
+      // Calc difference from original length
+      diff = v1v2length - edgeOriginalLength[i];
+      // normalize v1v2
+      v1v2x /= v1v2length;
+      v1v2y /= v1v2length;
+      
+      //dx = edgeV2x - edgeV1x;
+      //dy = edgeV2y - edgeV1y;
+      //midx = edgeV1x+(dx)/2;
+      //midy = edgeV1y+(dy)/2;
+      //drawsph(midx,midy,-5);
+      //moveto( midx,midy );
+      //ang = atan2(v1v2y,v1v2x);
+      
+      //lineto( midx+cos(ang-PI/2)*10, midy+sin(ang-PI/2)*10 );
+      
+      // Put both vertices apart by half of the differance respectively
+      edgeV1x -= v1v2x*diff*0.5;
+      edgeV1y -= v1v2y*diff*0.5;
+      edgeV2x += v1v2x*diff*0.5;
+      edgeV2y += v1v2y*diff*0.5;
+            
+      // copy constrained values back into points.
+      px[edgeV1[i]] = edgeV1x;
+      py[edgeV1[i]] = edgeV1y;
+      
+      px[edgeV2[i]] = edgeV2x;
+      py[edgeV2[i]] = edgeV2y;
+   }
+}
+
+collisionHandling(){
+   for(i=0; i<edgeCount; i++)
+   {
+      e1V1x = px[edgeV1[i]];  
+      e1V1y = py[edgeV1[i]];  
+
+      e1V2x = px[edgeV2[i]];  
+      e1V2y = py[edgeV2[i]]; 
+     
+     for(j=0; j<edgeCount; j++)
+     {
+        if(i==j) continue;
+        
+        // dont collide if they share vertices
+        if( edgeV1[i] == edgeV1[j] ) continue;
+        if( edgeV1[i] == edgeV2[j] ) continue;
+        if( edgeV2[i] == edgeV1[j] ) continue;
+        if( edgeV2[i] == edgeV2[j] ) continue;
+ 
+        e2V1x = px[edgeV1[j]];  
+        e2V1y = py[edgeV1[j]];  
+
+        e2V2x = px[edgeV2[j]];  
+        e2V2y = py[edgeV2[j]]; 
+        
+        // If point is near line, move back to old pos
+        // a better way would be to project point out from line
+        /*
+        d = ldist( e2V1x, e2V1y, e1V1x, e1V1y,e1V2x, e1V2y );
+        d = sqrt(d);
+        if( d < 10 )
+        {
+          px[edgeV1[j]] = ox[edgeV1[j]];
+          py[edgeV1[j]] = oy[edgeV1[j]];
+        }
+        
+        
+        d = ldist( e2V2x, e2V2y, e1V1x, e1V1y,e1V2x, e1V2y );
+        d = sqrt(d);
+        if( d < 10 )
+        {
+          px[edgeV2[j]] = ox[edgeV2[j]];
+          py[edgeV2[j]] = oy[edgeV2[j]];
+        }*/
+        
+        setcol(0,255,0);
+        vec2 a,b,p;
+        a.x = e1V1x; a.y = e1V1y;
+        b.x = e1V2x; b.y = e1V2y;
+        p.x = e2V1x; p.y = e2V1y;
+        collideLinePoint(a,b,p,edgeV1[j]);
+        
+        
+        a.x = e1V1x; a.y = e1V1y;
+        b.x = e1V2x; b.y = e1V2y;
+        p.x = e2V2x; p.y = e2V2y;
+        collideLinePoint(a,b,p,edgeV2[j]);
+      }
+    }
+}
+
+collideLinePoint(vec2 a, vec2 b, vec2 p, idx)
+{
+          cx =0; cy=0;
+          getClosestPoint(a,b,p, 1, cx, cy);
+          drawsph(cx,cy,-5);
+          // vec from point to closest point on line
+          e2cx = cx-p.x;
+          e2cy = cy-p.y;
+          dist = e2cx*e2cx + e2cy*e2cy;
+          if( dist < 5*5 )
+          {
+            //len = sqrt(dist);
+            //e2cx /= len;
+            //e2cy /= len;
+            px[idx] -= e2cx*2;
+            py[idx] -= e2cy*2;
+          }
+}
+
+getClosestPoint(vec2 a, vec2 b, vec2 p, segmentClamp, &cx, &cy)
+{
+  vec2 ap;
+  ap.x = p.x-a.x;
+  ap.y = p.y-a.y;
+  vec2 ab;
+  ab.x = b.x-a.x;
+  ab.y = b.y-a.y;
+  double ab2 = ab.x*ab.x + ab.y*ab.y;
+  double ap_ab = ap.x*ab.x + ap.y*ab.y;
+  double t = ap_ab / ab2;
+  if(segmentClamp)
+  {
+    if(t < 0.0) t = 0.0;
+    if(t > 1.0) t = 1.0;
+  }
+  vec2 closest;
+  closest.x = a.x + ab.x * t;
+  closest.y = a.y + ab.y * t;
+  cx = closest.x;
+  cy = closest.y;
+}
+
+// Taken from match.kc by Robert Rogers
+ldist(x,y,x0,y0,x1,y1)
+{
+   dx=x1-x0;dy=y1-y0;x1+=x0;y1+=y0;nx=x-x0;ny=y-y0;
+   f=nx*dx+ny*dy;if(f<=0)return(nx^2+ny^2);
+   g=dx*dx+dy*dy;if(f> g)return((x-x1)^2+(y-y1)^2);
+   return((nx*dy-ny*dx)^2/g);
+}

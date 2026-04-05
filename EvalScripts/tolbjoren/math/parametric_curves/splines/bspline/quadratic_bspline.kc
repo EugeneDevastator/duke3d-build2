@@ -1,0 +1,127 @@
+enum{MAXPTS = 10}
+static ptx[MAXPTS];
+static pty[MAXPTS];
+static numpts;
+
+static last;
+static first;
+()
+{
+   if(numframes==0)
+   {
+    ptx[0] = xres/100 * 10;
+    pty[0] = yres/100 * 10;
+    
+    ptx[1] = xres/100 * 30;
+    pty[1] = yres/100 * 10;
+    
+    ptx[2] = xres/100 * 10;
+    pty[2] = yres/100 * 30;
+    
+    ptx[3] = xres/100 * 40;
+    pty[3] = yres/100 * 30;
+    
+    ptx[4] = xres/100 * 60;
+    pty[4] = yres/100 * 20;
+    
+    ptx[5] = xres/100 * 70;
+    pty[5] = yres/100 * 20;
+    
+    ptx[6] = xres/100 * 70;
+    pty[6] = yres/100 * 70;
+    
+    ptx[7] = xres/100 * 30;
+    pty[7] = yres/100 * 30;
+    numpts+= 4;
+    
+    first = 0;
+    last = numpts-1;
+   } 
+
+   setcol(0xffffff);   
+   cls(0);
+   
+   mindist = 1e32;
+   minIdx = -1;
+   for(i=0; i<numpts; i++)
+   {
+      drawsph(ptx[i], pty[i],-4);
+      dist = sqrt( (mousx-ptx[i])^2 +  (mousy-pty[i])^2);
+      if(dist < mindist )
+      {
+         mindist = dist;
+         minIdx = i;
+      }
+   }
+   if(bstatus==1)
+   {
+      ptx[minIdx] = mousx;
+      pty[minIdx] = mousy;
+   }
+   
+
+   x1 = 0; y1 =0;
+   bspline(1,0,x1,y1);
+   moveto(x1,y1);
+   
+   for(p=1; p<(numpts-1); p++)
+   {      
+      rez = 30;
+      for(i=0; i<rez; i++)
+      {
+         t = i/(rez-1);
+         x = 0; y =0;
+         bspline(p,t,x,y);
+         
+         setcol( i/20*255, 255, 0 );
+         //drawsph(x,y,-3);
+         lineto(x,y);
+      }
+   }
+}
+
+bspline(p,t,&x, &y)
+{
+   // X coord
+   prv = ptx[p-1];
+   now = ptx[p];
+   nxt = ptx[p+1];
+   now = 0.5*(t^2 - 2*t + 1)*prv + 0.5*(-2*t^2+2*t+1)*now + (t*t)/2 * nxt;
+
+   
+   if(p==first)   
+   {
+      kstart = 0.5 * (prv + now); 
+      x = kstart + now; 
+   }
+   else if(p==last) //next   
+   {
+      kend = 0.5 * (now + nxt); 
+      x = kend + now; 
+   }
+   else
+   {
+      x = now;
+   }
+     
+   // Y coord
+   prv = pty[p-1];
+   now = pty[p];
+   nxt = pty[p+1];
+   now = 0.5*(t^2 - 2*t + 1)*prv + 0.5*(-2*t^2+2*t+1)*now + (t*t)/2 * nxt;
+
+   if(p==first)   
+   {
+      kstart = 0.5 * (prv + now); 
+      y = kstart + now; 
+   }
+   else if(p==last) //next   
+   {
+      kend = 0.5 * (now + nxt); 
+      y = kend + now; 
+   }
+   else
+   {
+      y = now;
+   } 
+}

@@ -1,0 +1,43 @@
+// written 15. august 2009
+// by Torbjoern :P
+()
+{
+   cls(0);
+
+   w = 200;
+   h = 100;
+   rx = xres/2 - w/2;
+   ry = yres/2 - h/2;
+   
+   setcol(0xff0000);
+   drawrect(rx,ry,w,h);
+   
+   if(PointInRect(mousx,mousy,rx,ry,w,h))
+   {
+      moveto(mousx,mousy);
+      printf("collide");
+   }
+}
+
+// Doesnt take negative width/height into account
+PointInRect(testx,testy,rx,ry,w,h)
+{
+   if(testx >= rx && testx <= rx+w)
+   if(testy >= ry && testy <= ry+h)
+      return 1; 
+}
+
+drawRect(sx, sy, wx, wy)
+{   
+   moveto(sx, sy);
+   lineto(sx+wx, sy+0);
+   
+   moveto(sx, sy+wy);
+   lineto(sx+wx, sy+wy);
+   
+   moveto(sx, sy);
+   lineto(sx, sy+wy);
+   
+   moveto(sx+wx, sy);
+   lineto(sx+wx, sy+wy);
+}

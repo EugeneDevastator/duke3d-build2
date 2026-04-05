@@ -1,0 +1,175 @@
+()
+{
+   REFLCOEF = -1.03; COMPSPEED = 600; FILTER = 0.5;
+   static bx, by, bxv, byv, cx, cy, wait, score[2], tim, mx, my, compgoalx = -1, announced;
+   static rbaccol = 0, gbaccol = 0, bbaccol = 0, bouncepitch, cnt[2], ocnt[2];
+   static px, py, pz, rx, ry, rz, dx, dy, dz, fx, fy, fz, but[2], obut[2], serve = 0;
+   otim = tim; tim = klock(); dtim = tim-otim;
+   if (numframes == 0)
+   {
+      oklock = tim; wait = tim+1; setfont(12,16); cx = xres/2; playtext("ready?");
+      mx = xres*.5; my = yres*.75;
+      cx = xres*.5;
+      if (USING6DOF >= 2) cy = yres*.25; else cy = 5;
+   }
+   cls(rbaccol,gbaccol,bbaccol);
+   rbaccol = max(rbaccol-dtim*256,0);
+   gbaccol = max(gbaccol-dtim*256,0);
+   bbaccol = max(bbaccol-dtim*256,0);
+   if (USING6DOF == 0)
+   {
+      dx = mousx-mx;
+      dy = mousy-my;
+      mx = min(max(mx+dx,50),xres-50);
+      my = min(max(my+dy,yres*.25),yres-5);
+   }
+   else
+   {
+      ocnt[0] = cnt[0];
+      cnt[0] = readmag6d(0,&px,&py,&pz,&rx,&ry,&rz,&dx,&dy,&dz,&fx,&fy,&fz,&but[0]);
+      if (1) //cnt[0] > ocnt[0])
+      {
+         if (but[0] > obut[0]) playtext("Bottom player");
+         obut[0] = but[0];
+   
+         hx = xres/2; hy = yres/2; hz = xres/2;
+         f = -pz/fz;
+         x = (px + fx*f)*hz + hx;
+         y = (py + fy*f)*hz + hy;
+         //x = atan(fx/sqrt(fy^2+fz^2))*xres*1.5;
+         //y = atan(fy/sqrt(fx^2+fz^2))*xres*1.5;
+         
+         mx += (min(max(x,50),xres-50)-mx)     *FILTER;
+         my += (min(max(y,yres*.25),yres-5)-my)*FILTER;
+      }
+   }   
+
+   if (wait >= tim)
+   {
+      if (serve == 0) { bx = cx; by = cy+20; bxv = (rnd-.5)*1600; byv = 600; }
+                 else { bx = mx; by = my-20; bxv = (rnd-.5)*1600; byv =-600; }
+      compgoalx = -1; announced = 0;
+      setcol(0xffffff); moveto(xres/2-12*3,yres/2); printf("READY?");
+      bouncepitch = 1;
+   }
+   else
+   {
+      bx += bxv*dtim;
+      by += byv*dtim;
+      if (bx <      15) { bx =       15 *2-bx; bxv *= -1; playsound("rulinst.wav",50,1,-1,0,0); }
+      if (bx > xres-15) { bx = (xres-15)*2-bx; bxv *= -1; playsound("rulinst.wav",50,1,+1,0,0); }
+      if (by < -15)
+      {
+         playsound("pickup.wav"); wait = tim+1; score[0]++; serve = 1-serve;
+         gbaccol = 192; bbaccol = 64;
+         if (announced == 0) playtext("<pitch middle='-3'/><rate speed='-5'/>Damn!");
+      }
+      if (by > yres+15)
+      {
+         playsound("ouch.wav",100,nrnd*.05+1);
+         i = int(4*rnd);
+              if (i == 0) playtext(",<pitch middle='+6'/><rate speed='-3'/>Nice miss!");
+         else if (i == 1) playtext(",<pitch middle='+12'/>Ha<pitch middle='-4'/>Ha");
+         else if (i == 2) playtext(",<pitch middle='+4'/>Awesome!");
+         else if (i == 3) playtext(",<pitch middle='+12'/>Air<pitch middle='-8'/>Ball");
+         wait = tim+1; score[1]++; serve = 1-serve;
+         rbaccol = 192;
+      }
+      if ((byv > 0) && (abs(bx-mx) < 60) && (abs(by-my) < 5+15))
+      {
+         bouncepitch *= 1.01; playsound("rulinst.wav",100,0.8*bouncepitch);
+         bxv += (bx-mx)*10; byv *= REFLCOEF;
+         if (USING6DOF < 2)
+         {
+               //ix = bx + bxv*t = ?
+               //iy = by + byv*t = 20
+            x = (20-by)*bxv/byv + bx;
+            
+            x -= 15; //reflect
+            i = floor(x/(xres-30))%2; //must do mirror image
+            x = x%(xres-30); if (i) x = (xres-30)-x;
+            x += 15;
+   
+               //Computer AI: Find angle that results in ball passing farthest in x
+               // from player's paddle when it would cross player's current paddle y
+            evilj = -1e32; evilsc = -1e32; t = (my-20)/(byv*REFLCOEF);
+            for(j=-60;j<=60;j++)
+            {
+               if ((x+j < 50) || (x+j > xres-50)) continue;
+               if (abs(x+j-cx) > t*COMPSPEED) continue; //find best POSSIBLE move
+               
+                  //nbx = x
+                  //nby = 20
+                  //nbxv = bxv+(bx-cx-j)*10;
+                  //nbyv = byv*REFLCOEF;
+                  //
+                  //ix = (bxv - j*10)*t + x
+                  //iy = (byv*REFLCOEF)*t + 20 = my
+               ix = (bxv - j*10)*t + x;
+               
+               ix -= 15; //reflect
+               i = floor(ix/(xres-30))%2; //must do mirror image
+               ix = ix%(xres-30); if (i) ix = (xres-30)-ix;
+               ix += 15;
+            
+               sc = abs(ix-mx);
+               if (sc > evilsc) { evilsc = sc; evilj = j; }
+            }
+            if (evilj == -1e32)
+            {
+               i = int(4*rnd);
+                    if (i == 0) playtext("<pitch middle='-3'/><rate speed='+3'/>Nice shot.");
+               else if (i == 1) playtext("<pitch middle='-3'/><rate speed='-5'/>Noh!");
+               else if (i == 2) playtext("<pitch middle='-3'/><rate speed='+3'/>Darn!");
+               else if (i == 3) playtext("<pitch middle='-3'/><rate speed='+2'/>Help!");
+               announced = 1;
+            }
+            compgoalx = x+evilj;
+         }
+      }
+      if ((byv < 0) && (abs(bx-cx) < 60) && (abs(by-cy) < 5+15))
+      {
+         bouncepitch *= 1.01; playsound("rulinst.wav",100,bouncepitch*1.2);
+         bxv += (bx-cx)*10; byv *= REFLCOEF;
+         if (USING6DOF < 2)
+         {
+            compgoalx = -1;
+            if (announced) { playtext("phew that was close!"); announced = 0; }
+         }
+      }
+   }
+   
+   if (USING6DOF >= 2) //if 2nd controller, top is human
+   {
+      ocnt[1] = cnt[1];
+      cnt[1] = readmag6d(1,&px,&py,&pz,&rx,&ry,&rz,&dx,&dy,&dz,&fx,&fy,&fz,&but[1]);
+      if (cnt[1] > ocnt[1])
+      {
+         if (but[1] > obut[1]) playtext("Top player");
+         obut[1] = but[1];
+         
+         hx = xres/2; hy = yres/2; hz = xres/2;
+         f = -pz/fz;
+         x = (px + fx*f)*hz + hx;
+         y = (py + fy*f)*hz + hy;
+         //x = atan(fx/sqrt(fy^2+fz^2))*xres*1.5;
+         //y = atan(fy/sqrt(fx^2+fz^2))*xres*1.5;
+         
+         cx += (min(max(x,50),xres-50)-cx)*FILTER;
+         cy += (min(max(y,5),yres*.75)-cy)*FILTER;
+      }
+   }
+   else if (wait < tim)
+   {
+      if (compgoalx >= 0)
+           cx = min(max(cx+sgn(compgoalx-cx)*dtim*COMPSPEED,50),xres-50);
+      else cx = min(max(cx+sgn((bx+mx)/2-cx)*dtim*COMPSPEED,50),xres-50);
+   }
+   setcol(0x00ffff); drawsph(bx,by,15);
+   setcol(0xff0000); drawcone(cx-50,cy,5,cx+50,cy,5);
+   setcol(0x00ff00); drawcone(mx-50,my,5,mx+50,my,5);
+   setcol(0xff0000); moveto(0,yres/2-8);
+   if (USING6DOF < 2) printf("  CPU: %g",score[1]);
+                 else printf("Human: %g",score[1]);
+   setcol(0x00ff00); moveto(0,yres/2+8); printf("Human: %g",score[0]);
+}

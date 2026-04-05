@@ -1,0 +1,112 @@
+/* Buttons
+
+   started 24. july 09 by Torbjoern
+   
+   -update: 9. august 2009 changed button code to work similarily to my sliders... everything
+   is done in one method for easy paste-ability. dont think about the globals or setup!
+
+   -update: 15. august 2009: Added rectangle buttons. 
+   These need 3 helper functions; rectCollide, drawRect, fillRect.
+
+   buttons use -1 and 1 for on/off
+*/
+
+()
+{
+   cls(0); clz(1e32); glEnable(GL_DEPTH_TEST); glCullFace(GL_NONE);
+   
+   setfont(6,8);
+   
+   buttonID = 0;
+   radius = 30;
+   xmax = sqrt(49);
+   ymax = xmax;
+   for(x=0; x<xmax; x++)
+   for(y=0; y<ymax; y++)
+   {
+      xp = x*radius*2.2+radius;
+      yp = y*radius*2.2+radius;
+      btn(buttonID,xp,yp,radius);
+      moveto(xp-radius/1.3,yp-radius/2); printf("Toggle \nme!");  
+      buttonID++;
+   }
+   
+   buttonID2 = 0;
+   for(x=xmax; x<xmax*2; x++)
+   for(y=0; y<ymax; y++)
+   {
+      xp = x*radius*2.2+radius;
+      yp = y*radius*2.2+radius;
+      squareBtn(buttonID2,xp,yp,radius*2,radius);
+      moveto(xp,yp); printf("\n toggle\n      btn\n");
+      buttonID2++;
+   }
+   
+
+   
+}
+
+
+btn(num,x,y,radius)
+{
+   enum{numButtons=64};
+   static buttonActive[numButtons];
+   
+   if(numframes==0)
+   {
+      for(i=0; i<numButtons; i++) buttonActive[i] = -1;
+   }
+   setcol(0xff);
+   if(buttonActive[num]==1) drawsph(x,y,radius);
+   else drawsph(x,y,-radius);
+   setcol(0xffffff);
+   
+   
+   if(bstatus==1)
+   if( isColliding(x,y,mousx,mousy,radius) )
+   {
+      buttonActive[num] = -buttonActive[num];
+      bStatus = 0; return;
+   }
+}
+
+squareBtn(num,x,y,w,h)
+{
+   // Save the state of the buttons
+   enum{numSquareButtons=64};
+   static squareButtonActive[numSquareButtons];
+   
+   if(numframes==0)
+   {
+      for(i=0; i<numSquareButtons; i++) squareButtonActive[i] = -1;
+   }
+   setcol(0x0000ff);
+   if(squareButtonActive[num]==1) drawrectopen(x,y,x+w,y+h);
+   else drawrectfill(x,y,x+w,y+h);
+   setcol(0xffffff);
+   
+   if(bstatus==1)
+   if( PointRectCollide(mousx,mousy,x,y,w,h) )
+   {
+      squareButtonActive[num] = -squareButtonActive[num];
+      bStatus = 0; 
+      return;
+   }
+}
+
+// Two neat functions taken from an evaldraw example game:
+drawrectfill(x0,y0,x1,y1) { for(y=y0;y<y1;y++) { moveto(x0,y); lineto(x1,y); } }
+drawrectopen(x0,y0,x1,y1) { moveto(x0,y0); lineto(x1,y0); lineto(x1,y1); lineto(x0,y1); lineto(x0,y0); }
+
+PointRectCollide(x1,y1,x2,y2,w,h)
+{
+   if(x1 >= x2 && x1 <= x2+w)
+   if(y1 >= y2 && y1 <= y2+h)
+      return 1; 
+}
+
+isColliding(x1,y1,x2,y2,radius)
+{
+   if((x1-x2)^2 + (y1-y2)^2 < radius^2 ) return 1;
+   return 0;
+}

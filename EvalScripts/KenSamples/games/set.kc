@@ -1,0 +1,544 @@
+   //Based on Set card game. See here for rules: http://en.wikipedia.org/wiki/Set_(card_game)
+   //Programmed by Ken Silverman
+   //
+   //tilda, diamond, circle
+   //red, green, blue //purple
+   //empty, shaded, solid
+   //1, 2, 3
+
+enum {MAXPLAYS=16,POTX=7,PAKSIZ=5,MAXYDIM=2048};
+struct { i, x, y; } anim_t;
+struct
+{
+   double deck[81], deckn, ncards, pot[POTX][3], potsc[POTX][3], bi[3];
+   anim_t anim[3]; double animtim, animsc;
+} gs_t;
+struct { double grabx[3], graby[3], ob, score; } ps_t;
+static mod3lut[8] = {0,1,2,0,1,2,0,1};
+static mod3nlut[8] = {0,2,1,0,2,1,0,2};
+
+()
+{
+   static gs_t gs          , pgs;
+   static ps_t ps[MAXPLAYS], pps[MAXPLAYS];
+   
+   enum {PPAKBUF=1024};
+   static lpak[PAKSIZ], ppak[PPAKBUF][PAKSIZ]; //for client-side prediction
+
+   if (net_me == 0) net_send(NET_ALL,((klock(-1)*1000)%2^15)*2^16);
+   while (net_recv(&from,&val) == 0)
+   {
+      cls(0); setfont(9,12);
+      moveto(xres/2,yres/2); printf("Waiting for master..");
+      refresh(); Sleep(1);
+   }
+   srand(val);
+
+      //init&shuffle cards
+   gs.deckn = 0; gs.ncards = 0;
+   for(i3=2*8^3;i3>=0;i3-=8^3)
+      for(i2=i3+2*8^2;i2>=i3;i2-=8^2)
+         for(i1=i2+2*8^1;i1>=i2;i1-=8^1)
+            for(i0=i1+2*8^0;i0>=i1;i0-=8^0)
+               { gs.deck[gs.deckn] = i0; gs.deckn++; }
+   for(i=gs.deckn-1;i>1;i--)
+      { j = int((i+1)*rnd); k = gs.deck[i]; gs.deck[i] = gs.deck[j]; gs.deck[j] = k; }
+      
+      //deal cards
+   for(y=0;y<3;y++) for(x=0;x<POTX;x++) { gs.pot[x][y] = -1; gs.potsc[x][y] = 1; }
+   for(y=0;y<3;y++)
+      for(x=0;x<4;x++)
+         { gs.deckn--; gs.pot[x][y] = gs.deck[gs.deckn]; gs.potsc[x][y] = -.5; gs.ncards++; }
+
+      //init players
+   for(p=0;p<net_players;p++)
+   {
+      for(i=0;i<3;i++) ps[p].grabx[i] = -1;
+      ps[p].score = 0;
+   }
+   
+   gs.animsc = 0;
+   
+      //Copy sync to pred
+   pgs = gs;
+   for(i=0;i<net_players;i++) pps[i] = ps[i];
+   
+   spakn = 0; ppakn = 0; //sync/pred packet counts of own packets
+         
+   obstatus = 0; otim = 0;
+   while (1)
+   {
+      tim = floor(klock()*128);
+
+      if (((net_me == 0) || (ppakn-spakn < PPAKBUF)) && (tim > otim))
+      {
+         sy = yres/3; sx = sy/1.4;
+         hx = int(mousx/sx);
+         hy = int(mousy/sy); 
+         if ((hx < 0) || (hy < 0) || (hx >= POTX) || (hy >= 3)) hx = -15;
+         if (gs.pot[hx][hy] < 0) hx = -15;
+      
+         lpak[0] = net_me;
+         lpak[1] = hx;
+         lpak[2] = hy;
+         lpak[3] = bstatus;
+         lpak[4] = tim-otim; otim = tim;
+         net_send(NET_ALL,lpak,PAKSIZ);
+         
+         if (net_me)
+         {
+            for(i=0;i<PAKSIZ;i++) { ppak[ppakn%PPAKBUF][i] = lpak[i]; } ppakn++;
+            execute_pak(pgs,pps,lpak,1);
+         }
+      }
+
+      gototh = 0;
+      while (net_recv(&from,lpak,PAKSIZ))
+      {
+         if (lpak[0] == net_me) spakn++; else gototh = 1;
+         execute_pak(gs,ps,lpak,(net_me==0)||(net_me!=from));
+      }
+      if ((gototh) && (net_me))
+      {
+            //Copy sync to pred
+         pgs = gs;
+         for(i=0;i<net_players;i++) pps[i] = ps[i];
+
+             //recalculate: apply predicted packs on top of synced state
+         for(j=spakn;j<ppakn;j++) execute_pak(pgs,pps,ppak[j%PPAKBUF][0],0);
+      }
+      
+//-------------------------------------------------      
+      cls(0);
+      if (net_me == 0) draw_player( gs, ps[0],net_me);
+                  else draw_player(pgs,pps[0],net_me);
+
+      setcol(0x806040);
+      drawcone(mousx-12,mousy-12,3,mousx+12,mousy+12,3);
+      drawcone(mousx+12,mousy-12,3,mousx-12,mousy+12,3);
+
+      obstatus = bstatus; refresh(); Sleep(15);
+   }
+}
+
+drawcard (x, y, sx, sy, shape, color, fill, num)
+{
+   static cols[3] = {0xe80000,0x009000,0x00a0c0};
+   static rcp1[3] = {1.0,0.5,1.0/3.0};
+   
+      //ENABLE FOR DEBUG ONLY!     //i7-920@Brown:
+   //shape = 0; fill = 0; num = 2; //29.4M
+   //shape = 2; fill = 0; num = 2; //24.1M
+   //shape = 0; fill = 2; num = 2; //24.0M
+   //shape = 1; fill = 0; num = 2; //24.0M
+   //shape = 0; fill = 1; num = 2; //22.5M
+   //shape = 2; fill = 2; num = 2; //22.1M
+   //shape = 1; fill = 2; num = 2; //21.8M
+   //shape = 2; fill = 1; num = 2; //20.7M
+   //shape = 1; fill = 1; num = 2; //20.5M
+   
+   if ((sx <= 0) || (sy <= 0)) return;
+   rr = sy/40; hsx = sx*.5; hsy = sy*.5;
+   
+   setcol(0xb0b0b0); drawsph(x+hsx,y-hsy,rr);
+                     drawsph(x-hsx,y+hsy,rr);
+   setcol(0xffffff); drawsph(x-hsx,y-hsy,rr);
+                     drawrect(x-hsx   ,y-hsy-rr,x+hsx   ,y-hsy   );
+                     drawrect(x-hsx-rr,y-hsy   ,x-hsx   ,y+hsy   );
+   setcol(0x606060); drawsph(x+hsx,y+hsy,rr);
+                     drawrect(x+hsx   ,y-hsy   ,x+hsx+rr,y+hsy   );
+                     drawrect(x-hsx   ,y+hsy   ,x+hsx   ,y+hsy+rr);
+   
+   setcol(0xe8e8e8); drawrect(x-hsx,y-hsy,x+hsx+1,y+hsy+1);
+   
+   setcol(cols[color]);
+   yi = rcp1[num]*sy; y += yi*.5 - hsy;
+        if (shape == 0) { for(i=num;i>=0;i--,y+=yi) drawtild(x,y,sx,sy,fill); }
+   else if (shape == 1) { for(i=num;i>=0;i--,y+=yi) drawdiam(x,y,sx,sy,fill); }
+   else                 { for(i=num;i>=0;i--,y+=yi) drawcirc(x,y,sx,sy,fill); }
+}
+
+drawtild (x, y, sx, sy, fill)
+{
+   static lmost[MAXYDIM], lmost2[MAXYDIM];
+   fcalcsin_t fc0, fc1;
+   
+   rr = 1; sc = PI/(sx*.8); rr = sx/50;
+   
+   rn = 1/max(int(sx*.8),1);
+   xmul = sx*.8; ymul0 = sy*-.05; ymul1 = sy*.08;
+   sxe = x + sx*.4; sx = ceil(x - sx*.4);
+   osy = int(y); sy0 = osy; sy1 = osy; ty0 = osy; ty1 = osy;
+   fcalcsin_init(fc0,(rn-.5)*(PI*3)     ,rn*(PI*3),ymul0);
+   fcalcsin_init(fc1,(rn-.5)* PI   +PI/2,rn* PI   ,ymul1);
+   if (fill == 0) drawsph(sx ,y+ymul0,rr);
+   for(f=rn-.5;sx<=sxe;sx++,f+=rn)
+   {
+      nsy0 = fc0.s+y-fc1.s;
+      nsy1 = fc0.s+y+fc1.s;
+      fcalcsin_incsin(fc0);
+      fcalcsin_incsin(fc1);
+      if (fill == 0)
+      {
+         g = sqrt((fc0.si-fc1.si)^2+1)*rr; ay0 = nsy0-g; ay1 = nsy0+g;
+         while (ay0 < sy0) { sy0--; lmost[sy0] = sx;        }
+         while (ay1 > sy1) {        lmost[sy1] = sx; sy1++; }
+         while (ay0 > sy0) {        moveto(lmost[sy0],sy0); lineto(sx,sy0); sy0++; }
+         while (ay1 < sy1) { sy1--; moveto(lmost[sy1],sy1); lineto(sx,sy1);        }
+         
+         g = sqrt((fc0.si+fc1.si)^2+1)*rr; ay0 = nsy1-g; ay1 = nsy1+g;
+         while (ay0 < ty0) { ty0--; lmost2[ty0] = sx;        }
+         while (ay1 > ty1) {        lmost2[ty1] = sx; ty1++; }
+         while (ay0 > ty0) {        moveto(lmost2[ty0],ty0); lineto(sx,ty0); ty0++; }
+         while (ay1 < ty1) { ty1--; moveto(lmost2[ty1],ty1); lineto(sx,ty1);        }
+      }
+      else
+      {
+         while (nsy0 < sy0) { sy0--; lmost[sy0] = sx;        }
+         while (nsy1 > sy1) {        lmost[sy1] = sx; sy1++; }
+         while (nsy0 > sy0) {        if ((fill == 2) || (((sy0-osy)%4) < 2)) { moveto(lmost[sy0],sy0); lineto(sx,sy0); } sy0++; }
+         while (nsy1 < sy1) { sy1--; if ((fill == 2) || (((sy1-osy)%4) < 2)) { moveto(lmost[sy1],sy1); lineto(sx,sy1); }        }
+      }
+   }
+   if (fill == 0)
+   {
+      while (nsy0 > sy0) {        moveto(lmost [sy0],sy0); lineto(sx,sy0); sy0++; }
+      while (nsy1 < sy1) { sy1--; moveto(lmost [sy1],sy1); lineto(sx,sy1);        }
+      while (nsy0 > ty0) {        moveto(lmost2[ty0],ty0); lineto(sx,ty0); ty0++; }
+      while (nsy1 < ty1) { ty1--; moveto(lmost2[ty1],ty1); lineto(sx,ty1);        }
+      drawsph(sxe-1,nsy0,rr);
+   }
+}
+drawdiam (x, y, sx, sy, fill)
+{
+   r = 10; rr = sy/70;
+   rx = r*sx/50;
+   ry = r*rr;
+   if (fill == 0)
+   {
+      rr *= sqrt(2); r0 = ry+rr; r1 = ry-rr;
+      y0 = ceil(y-ry-rr); y1 = y+ry+rr;
+      for(yy=y0;yy<y1;yy++)
+      {
+         dy = fabs(yy-y); s0 = fabs(r0-dy);
+         moveto(x-s0,yy);
+         if (r1 >= dy) { s1 = fabs(r1-dy); lineto(x-s1,yy); moveto(x+s1,yy); }
+         lineto(x+s0,yy);
+      }
+      return;
+   }
+   y0 = ceil(y-ry); y1 = y+ry; c = 0;
+   for(yy=y0;yy<y1;yy++,c=(c+1)*(c!=3))
+      if ((fill == 2) || (c < 2))
+         { i = ry-fabs(yy-y); moveto(x-i,yy); lineto(x+i,yy); }
+}
+drawcirc (x, y, sx, sy, fill)
+{
+   r = 10; rr = sy/70;
+   rx = r*sx/50;
+   ry = r*rr;
+   if (fill == 0)
+   {
+      r02 = (ry+rr)^2; r12 = (ry-rr)^2;
+      y0 = ceil(y-ry-rr); y1 = y+ry+rr;
+      for(yy=y0;yy<y1;yy++)
+      {
+         dy2 = (yy-y)^2; s0 = sqrt(r02-dy2);
+         moveto(x-s0,yy);
+         if (r12 >= dy2) { s1 = sqrt(r12-dy2); lineto(x-s1,yy); moveto(x+s1,yy); }
+         lineto(x+s0,yy);
+      }
+      return;
+   }
+   y0 = ceil(y-ry); y1 = y+ry; c = 0;
+   for(yy=y0;yy<y1;yy++,c=(c+1)*(c!=3))
+      if ((fill == 2) || (c < 2))
+         { i = sqrt(ry^2-(yy-y)^2); moveto(x-i,yy); lineto(x+i,yy); }
+}
+
+drawrect (x0, y0, x1, y1)
+{
+   for(y=int(y0);y<y1;y++) { moveto(x0,y); lineto(x1,y); }
+}
+
+//-----------------------------------------------------------------------------
+   //FCALCSIN: Fast CALCulation of SIN table
+struct { c, s, ci, si, m; } fcalcsin_t;
+   //ang0: Angle start (radians, often 0.f)
+   //angi: Angle increment (radians/inc)
+   // amp: Amplitude (usually 1.f)
+fcalcsin_init (fcalcsin_t fcs, ang0, angi, amp)
+{     //4 trig, 9 fmul, 6 fadd (faster)
+   hai = angi*.5; fcs.m = sin(hai);
+   n = cos(hai)*fcs.m*2; fcs.m = fcs.m*fcs.m*-2;
+   fcs.c = cos(ang0)*amp; fcs.s = sin(ang0)*amp;
+   fcs.ci = fcs.c*fcs.m - fcs.s*n;
+   fcs.si = fcs.c*n + fcs.s*fcs.m; fcs.m += fcs.m;
+}
+fcalcsin_inc (fcalcsin_t fcs)
+{
+   fcs.c += fcs.ci; fcs.ci += fcs.c*fcs.m;
+   fcs.s += fcs.si; fcs.si += fcs.s*fcs.m;
+}
+fcalcsin_incsin (fcalcsin_t fcs)
+   { fcs.s += fcs.si; fcs.si += fcs.s*fcs.m; }
+//-----------------------------------------------------------------------------
+
+isset (c0, c1, c2)
+{
+   if ((c0 < 0) || (c1 < 0) || (c2 < 0)) return(0);
+   c = c0+c1+c2;
+   if (mod3lut[int(c/8^0)]) return(0);
+   if (mod3lut[int(c/8^1)]) return(0);
+   if (mod3lut[int(c/8^2)]) return(0);
+   if (mod3lut[int(c/8^3)]) return(0);
+   return(1);
+}
+
+countsets (pot[POTX][3], bi[3], grab0, grab1, grab2)
+{
+   static vpot[POTX*3], ipot[POTX*3];
+   
+   for(n=0,i=0;i<POTX*3;i++)
+      if (pot[int(i/3)][i%3] >= 0) { vpot[n] = pot[int(i/3)][i%3]; ipot[n] = i; n++; }
+   
+   setcnt = 0; bi[0] = -1;
+   for(i0=n-3;i0>=0;i0--)
+   {
+      for(i1=n-2;i1>i0;i1--)
+      {
+         v = vpot[i0] + vpot[i1];
+         v = mod3nlut[int(v/8^0)] * 8^0
+           + mod3nlut[int(v/8^1)] * 8^1
+           + mod3nlut[int(v/8^2)] * 8^2
+           + mod3nlut[int(v/8^3)] * 8^3;
+         for(i2=n-1;i2>i1;i2--)
+         {
+            if (vpot[i2] != v) continue;
+            //if (!isset(vpot[i0],vpot[i1],vpot[i2])) continue;
+            setcnt++;
+            if ((grab0 >= 0) && (grab0 != ipot[i0]) && (grab0 != ipot[i1]) && (grab0 != ipot[i2])) continue;
+            if ((grab1 >= 0) && (grab1 != ipot[i0]) && (grab1 != ipot[i1]) && (grab1 != ipot[i2])) continue;
+            if ((grab2 >= 0) && (grab2 != ipot[i0]) && (grab2 != ipot[i1]) && (grab2 != ipot[i2])) continue;
+            bi[0] = ipot[i0]; bi[1] = ipot[i1]; bi[2] = ipot[i2];
+         }
+      }
+   }
+   return(setcnt);
+}
+
+execute_pak (gs_t gs, ps_t ps[MAXPLAYS], lpak[PAKSIZ], dosound)
+{
+   from = lpak[0];
+   hx   = lpak[1];
+   hy   = lpak[2];
+   hb   = lpak[3];
+   dtim = lpak[4]/128;
+   
+   if (from == 0)
+   {
+      setcnt = countsets(gs.pot,gs.bi,-1,-1,-1);
+      if ((setcnt == 0) && (gs.deckn > 0))
+      {
+         for(i=0;i<POTX*3;i++)
+         {
+            x = int(i/3); y = i%3;
+            if (gs.pot[x][y] < 0)
+               { gs.deckn--; gs.pot[x][y] = gs.deck[gs.deckn]; gs.potsc[x][y] = -1; gs.ncards++; break; }
+         }
+      }
+   }
+   
+   if (from == net_me)
+   {   
+      for(x=0;x<POTX;x++)
+         for(y=0;y<3;y++)
+         {
+            i = gs.pot[x][y]; if (i < 0) continue;
+            gs.potsc[x][y] = min(gs.potsc[x][y]+dtim,1);
+         }
+
+      if (gs.animsc > 0)
+      {
+         gs.animtim += dtim;
+         if (gs.animtim > 1) gs.animsc *= pow(.125,dtim);
+         if (gs.animtim > 2) gs.animsc = 0;
+      }
+   }
+      
+   if (gs.pot[hx][hy] < 0) hx = -15;
+   if ((hb%2) > (ps[from].ob%2))
+   {
+      for(i=3-1;i>=0;i--)
+      {
+         if (ps[from].grabx[i] < 0) continue;
+         if ((ps[from].grabx[i] == hx) && (ps[from].graby[i] == hy)) break;
+      }
+      if (i >= 0)
+      {
+         if ((dosound) && (from == net_me)) playsound("divebord.flac");
+         ps[from].grabx[i] = -1;
+      }
+      else
+      {
+         for(i=0;i<3;i++)
+         {
+            if (ps[from].grabx[i] < 0)
+            {
+               ps[from].grabx[i] = hx; ps[from].graby[i] = hy;
+               if ((ps[from].grabx[0] >= 0) && (ps[from].grabx[1] >= 0) && (ps[from].grabx[2] >= 0))
+               {
+                  if (isset(gs.pot[ps[from].grabx[0]][ps[from].graby[0]],
+                            gs.pot[ps[from].grabx[1]][ps[from].graby[1]],
+                            gs.pot[ps[from].grabx[2]][ps[from].graby[2]]))
+                  {
+                     gs.ncards -= 3;
+                     for(i=0;i<3;i++)
+                     {
+                        x = ps[from].grabx[i]; y = ps[from].graby[i];
+                        
+                        sy = yres/3; sx = sy/1.4;
+                        gs.anim[i].i = gs.pot[x][y];
+                        gs.anim[i].x = (x+.5)*sx;
+                        gs.anim[i].y = (y+.5)*sy;
+                        gs.animsc = 1;
+                        gs.animtim = 0;
+                        
+                        gs.pot[x][y] = -1;
+                     }
+                     
+                     for(x=0;x<POTX;x++)
+                        for(y=0;y<3;y++)
+                        {
+                           if ((gs.pot[x][y] >= 0) || (gs.deckn <= 0) || (gs.ncards >= 12)) continue;
+                           gs.deckn--; gs.pot[x][y] = gs.deck[gs.deckn]; gs.potsc[x][y] = -1; gs.ncards++;
+                        }
+                     
+                     for(i=0;i<2;i++)
+                        for(j=i+1;j<3;j++)
+                        {
+                           if (int(gs.anim[i].i/8^3) <= int(gs.anim[j].i/8^3)) continue;
+                           anim_t tanim;
+                           tanim = gs.anim[i]; gs.anim[i] = gs.anim[j]; gs.anim[j] = tanim;
+                        }
+                     
+                     if (dosound)
+                     {
+                        playtext("Set!");
+                        playsound("pickup.wav",100,.5);
+                        playsound("pickup.wav",100,.6);
+                        playsound("pickup.wav",100,.8);
+                     }
+                     ps[from].score++;
+                  }
+                  else
+                  {
+                     if ((dosound) && (from == net_me)) playsound("gothit.wav",100,1);
+                     //ps[from].score -= .5;
+                  }
+                  for(i=0;i<3;i++) ps[from].grabx[i] = -1;
+               }
+               else
+               {
+                  if ((dosound) && (from == net_me)) playsound("plop.flac");
+               }
+               break;
+            }
+         }
+      }
+   }
+   
+   ps[from].ob = lpak[3];
+}
+
+draw_player (gs_t gs, ps_t ps[MAXPLAYS], p)
+{
+   sy = yres/3; sx = sy/1.4;
+   hx = int(mousx/sx);
+   hy = int(mousy/sy); 
+   if ((hx < 0) || (hy < 0) || (hx >= POTX) || (hy >= 3)) hx = -15;
+   if (gs.pot[hx][hy] < 0) hx = -15;
+   
+   for(x=0;x<POTX;x++)
+      for(y=0;y<3;y++)
+      {
+         i = gs.pot[x][y]; if (i < 0) continue;
+         i0 = int(i/8^0)%8;
+         i1 = int(i/8^1)%8;
+         i2 = int(i/8^2)%8;
+         i3 = int(i/8^3)%8;
+         drawcard((x+.5)*sx,(y+.5)*sy,(sx-17)*gs.potsc[x][y],(sy-20)*gs.potsc[x][y],i0,i1,i2,i3);
+      }
+      
+   setcnt = countsets(gs.pot,gs.bi,ps[p].grabx[0]*3+ps[p].graby[0],
+                                   ps[p].grabx[1]*3+ps[p].graby[1],
+                                   ps[p].grabx[2]*3+ps[p].graby[2]);
+
+   if ((setcnt) || (gs.deckn))
+   {
+      if ((hx >= 0) && (hx < POTX) && (hy >= 0) && (hy < 3) && (klock()%.2 < .15))
+      {
+         setcol(0x808080); x = hx; y = hy; o = 2.5; rr = sy*.01;
+         drawcone( x   *sx+o, y   *sy+o,rr,(x+1)*sx-o, y   *sy+o,rr);
+         drawcone( x   *sx+o,(y+1)*sy-o,rr,(x+1)*sx-o,(y+1)*sy-o,rr);
+         drawcone( x   *sx+o, y   *sy+o,rr, x   *sx+o,(y+1)*sy-o,rr);
+         drawcone((x+1)*sx-o, y   *sy+o,rr,(x+1)*sx-o,(y+1)*sy-o,rr);
+      }
+      
+      setcol(0xc0c040);
+      for(i=0;i<3;i++)
+      {
+         if (ps[p].grabx[i] < 0) continue;
+         x = ps[p].grabx[i]; if ((x < 0) || (x >= POTX)) continue;
+         y = ps[p].graby[i]; if ((y < 0) || (y >= 3)) continue;
+         o = 2.5; rr = sy*.025;
+         drawcone( x   *sx+o, y   *sy+o,rr,(x+1)*sx-o, y   *sy+o,rr);
+         drawcone( x   *sx+o,(y+1)*sy-o,rr,(x+1)*sx-o,(y+1)*sy-o,rr);
+         drawcone( x   *sx+o, y   *sy+o,rr, x   *sx+o,(y+1)*sy-o,rr);
+         drawcone((x+1)*sx-o, y   *sy+o,rr,(x+1)*sx-o,(y+1)*sy-o,rr);
+      }
+   }
+   
+   moveto(xres-60,0); setfont(8,12); printf("sets:%2g\ndeck:%2g",setcnt,gs.deckn);
+   if ((setcnt > 0) && ((bstatus%4) >= 2) && (net_players < 2) && (gs.bi[0] >= 0))
+   {
+      setcol(0xff00ff);
+      for(i=0;i<3;i++)
+      {
+         x = int(gs.bi[i]/3); y = gs.bi[i]%3; rr = sy*.02;
+         drawcone( x   *sx+o, y   *sy+o,rr,(x+1)*sx-o, y   *sy+o,rr);
+         drawcone( x   *sx+o,(y+1)*sy-o,rr,(x+1)*sx-o,(y+1)*sy-o,rr);
+         drawcone( x   *sx+o, y   *sy+o,rr, x   *sx+o,(y+1)*sy-o,rr);
+         drawcone((x+1)*sx-o, y   *sy+o,rr,(x+1)*sx-o,(y+1)*sy-o,rr);
+      }
+   }
+   
+   for(i=0;i<net_players;i++)
+   {
+      setfont(xres*.02,yres*.05,1); moveto(xres*.78,i*32+64);
+      if (i == net_me) setcol(0xffffff); else setcol(0x808080);
+      printf("Player %g",i+1);
+      setcol(0x808080); printf(":%2g",ps[i].score);
+   }
+
+   if (gs.animsc > 0)
+   {
+      for(i=0;i<3;i++)
+      {
+         j = gs.anim[i].i; if (j < 0) continue;
+         i0 = int(j/8^0)%8;
+         i1 = int(j/8^1)%8;
+         i2 = int(j/8^2)%8;
+         i3 = int(j/8^3)%8;
+         x = ((     .91)*xres - gs.anim[i].x)*min(gs.animtim*2,1) + gs.anim[i].x;
+         y = (((i+.5)/3)*yres - gs.anim[i].y)*min(gs.animtim*2,1) + gs.anim[i].y;
+         drawcard(x,y,(sx-17)*gs.animsc,(sy-20)*gs.animsc,i0,i1,i2,i3);
+      }
+   }
+
+   if ((setcnt == 0) && (gs.deckn == 0))
+   {
+      setcol(0xff0000); moveto(0,yres*.4); setfont(xres/9,yres/3,1); printf("GAME OVER");
+      setcol(0xffffff); moveto(0,yres*.4); setfont(xres/9,yres/3,0); printf("GAME OVER");
+   }
+}

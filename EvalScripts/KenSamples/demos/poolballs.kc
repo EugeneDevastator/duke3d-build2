@@ -1,0 +1,79 @@
+()
+{
+   enum {BALLMAX=128};
+   struct { x, y, r, xv, yv, col; } ball_t;
+   static ball_t ball[BALLMAX];
+   
+   n = BALLMAX; tim = 0;
+   for(i=0;i<n;i++)
+   {
+      if (n == 16)
+      {
+         rad = 24;
+         ball[i].x = ((i>5)+(i>9)+(i>12)+(i>14))*rad*2*sqrt(3)/2 + xres/10;
+         ball[i].y = (i-3-(i>5)*4.5-(i>9)*3.5-(i>12)*2.5-(i>14)*1.5)*rad*2 + yres/2;
+         ball[i].r = rad;
+         ball[i].xv = 0;
+         ball[i].yv = 0;
+      }
+      else
+      {
+         ball[i].x = xres*rnd;
+         ball[i].y = yres*rnd;
+         ball[i].r = rnd*32 + 8;
+         ball[i].xv = nrnd*64;
+         ball[i].yv = nrnd*64;
+      }
+      ball[i].col = rgb(rnd*128+128,rnd*128+128,rnd*128+128);
+   }
+   while (1)
+   {
+      otim = tim; tim = klock(); dtim = max(tim-otim,1e-4); rdtim = 1/dtim;
+      ball[0].xv = (mousx-ball[0].x)*rdtim;
+      ball[0].yv = (mousy-ball[0].y)*rdtim;
+      
+      for(i=n-1;i>=0;i--)
+      {
+            //momentum
+         ball[i].x += ball[i].xv*dtim;
+         ball[i].y += ball[i].yv*dtim;
+         
+            //friction
+         ball[i].xv *= exp(dtim*-.1);
+         ball[i].yv *= exp(dtim*-.1);
+            
+            //collide with border
+         if (ball[i].x-ball[i].r <    0) { ball[i].x = (     ball[i].r)*2-ball[i].x; ball[i].xv =+fabs(ball[i].xv); }
+         if (ball[i].y-ball[i].r <    0) { ball[i].y = (     ball[i].r)*2-ball[i].y; ball[i].yv =+fabs(ball[i].yv); }
+         if (ball[i].x+ball[i].r > xres) { ball[i].x = (xres-ball[i].r)*2-ball[i].x; ball[i].xv =-fabs(ball[i].xv); }
+         if (ball[i].y+ball[i].r > yres) { ball[i].y = (yres-ball[i].r)*2-ball[i].y; ball[i].yv =-fabs(ball[i].yv); }
+            
+            //collide with other ball
+         for(j=i-1;j>=0;j--)
+         {
+            dx = ball[i].x-ball[j].x; dy = ball[i].y-ball[j].y;
+            d = sqrt(dx*dx + dy*dy) - (ball[i].r+ball[j].r); if (d >= 0) continue;
+            vx = ball[j].x-ball[i].x;
+            vy = ball[j].y-ball[i].y;
+            f = 1.0/(sqrt(vx*vx + vy*vy)); vx *= f; vy *= f;
+            m = ball[i].r*ball[i].r + ball[j].r*ball[j].r;
+            ball[i].x += vx*d/2; ball[i].xv += vx*d*(ball[j].r*ball[j].r/m)*rdtim;
+            ball[i].y += vy*d/2; ball[i].yv += vy*d*(ball[j].r*ball[j].r/m)*rdtim;
+            ball[j].x -= vx*d/2; ball[j].xv -= vx*d*(ball[i].r*ball[i].r/m)*rdtim;
+            ball[j].y -= vy*d/2; ball[j].yv -= vy*d*(ball[i].r*ball[i].r/m)*rdtim;
+            ball[i].xv = min(max(ball[i].xv,-4096),4096);
+            ball[i].yv = min(max(ball[i].yv,-4096),4096);
+            ball[j].xv = min(max(ball[j].xv,-4096),4096);
+            ball[j].yv = min(max(ball[j].yv,-4096),4096);
+         }
+      }
+//----------------------------------------------      
+      cls(0);
+      for(i=0;i<n;i++)
+      {
+         setcol(ball[i].col);
+         drawsph(ball[i].x,ball[i].y,ball[i].r);
+      }
+      refresh();
+   }
+}

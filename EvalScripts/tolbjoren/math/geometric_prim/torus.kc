@@ -1,0 +1,58 @@
+()
+{
+
+   cls(0); clz(1e32);
+
+   glEnable(GL_DEPTH_TEST);
+   glCullface(GL_NONE);
+   
+   ang = mousx/xres*2*PI;
+   r = -1;
+   setcam( 0,r*sin(ang),r*cos(ang),0,ang);
+   
+   DrawTorus(0.5, 1.0 );
+   
+
+}
+
+// from a NeHe Tutorial
+DrawTorus(MinorRadius, MajorRadius)               // Draw A Torus With Normals
+{
+   //int i, j;
+   segments = 15;
+   glBegin( GL_TRIANGLE_STRIP );                           // Start A Triangle Strip
+   
+   //glBegin(GL_QUADS);
+   for (i=0; i<segments; i++ )                              // Stacks
+   {
+      for (j=-1; j<segments; j++)                           // Slices
+      {
+         double wrapFrac = (j%segments)/segments;
+         double phi = 2*PI*wrapFrac;
+         double sinphi = sin(phi);
+         double cosphi = cos(phi);
+
+         double r = MajorRadius + MinorRadius*cosphi;
+
+         setcol(64+888 * sin(2*PI*(i%segments*2+wrapFrac)/segments)*cosphi, 
+                0, 
+                128+128 * (cos(2*PI*(i%segments*2+wrapFrac)/segments)*cosphi));
+         //glTexCoord2f(cosphi,sinphi);
+         
+         glVertex( 
+         sin(2*PI*(i%segments+wrapFrac)/segments)*r, 
+         MinorRadius*sinphi, 
+         cos(2*PI*(i%segments+wrapFrac)/segments)*r);
+
+         //glNormal(float(sin(2*M_PI*(i+1%segments+wrapFrac)/(float)20))*cosphi, sinphi, float(cos(2*M_PI*(i+1%segments+wrapFrac)/(float)segments))*cosphi);
+         glVertex(
+         
+         sin(2*PI*(i+1%segments+wrapFrac)/segments)*r,
+         
+         MinorRadius*sinphi,
+         
+         cos(2*PI*(i+1%segments+wrapFrac)/segments)*r);
+      }
+   }
+   glEnd();                                          // Done Torus
+}

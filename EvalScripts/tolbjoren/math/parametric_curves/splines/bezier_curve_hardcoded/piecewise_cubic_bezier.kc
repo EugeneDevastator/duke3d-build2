@@ -1,0 +1,289 @@
+/*
+revisited around august 2011 inorder to splice multiple 3. order ( 4 points ) Bezier curves together.
+*/
+
+enum{MAXPTS = 32}
+
+struct point
+{
+   x,y;
+};
+
+struct BezPoint
+{
+   point node;
+   point control;
+   isDupe;
+};
+
+static BezPoint pts[MAXPTS];
+static numpts = 0;
+
+()
+{   
+   cls(0);
+     
+   if(keystatus[57] && numpts < MAXPTS)
+   {
+      keystatus[57] = 0;
+      create_point();
+   }
+   move_points();
+   draw_points();
+   draw_curve();
+   
+   if ( numpts >= 2 ){
+      x=0; y=0;
+      getPt( mousx/xres, x,y );
+      setcol(0xf8ab0c); drawsph(x,y,-6);
+   }
+   
+   if ( numpts == 0 ){
+      setcol(255,255,255);
+      moveto(xres/2-100,yres/2);
+      printf("press spacebar to add points!\n");
+      printf("left to move point\n");
+      printf("right to move control\n");
+   }
+}
+
+clamp(t,lo,hi)
+{
+   return max(lo, min(hi, t) );
+}
+
+err()
+{
+   while(1){
+      cls(255,0,0);
+      setcol(255,255,255);
+      moveto(0,0);
+      printf("assert failed\n");
+   }
+}
+
+getPt(t_in, &x, &y){
+   t_in = clamp(t_in, 0.0, 1.0);
+   p = floor(t_in * (numpts-1) );
+   
+   t = t_in*(numpts-1) - p ;
+   //if ( p > numpts-2 || p < 0 ) return;
+
+   if ( t < 0.0 || t > 1.0 ) err();
+   
+   if ( p%2!=0 ) // odd
+   {
+      dx = pts[p].control.x - pts[p].node.x;
+      dy = pts[p].control.y - pts[p].node.y;
+      Point invNormal0;
+      invNormal0.x = pts[p].node.x - dx;   
+      invNormal0.y = pts[p].node.y - dy;
+      
+      dx = pts[p+1].control.x - pts[p+1].node.x;
+      dy = pts[p+1].control.y - pts[p+1].node.y;
+      Point invNormal1;
+      invNormal1.x = pts[p+1].node.x - dx;   
+      invNormal1.y = pts[p+1].node.y - dy;
+
+      bspline_deg3(pts[p].node, invNormal0, invNormal1, pts[p+1].node, t,x,y);   
+   }else{
+      bspline_deg3(pts[p].node, pts[p].control, pts[p+1].control, pts[p+1].node, t,x,y);
+   }
+   
+   
+   setfont(8,12);
+   moveto(x,y+10); printf("p=%g to %g\nt = %.2f ", p,p+1, t);
+   
+
+}
+
+bspline_deg3(point p0, point p1, point p2, point p3, 
+             t,&x, &y)
+{
+   //   B(t)=(1-t)^3P0+ 3t(1-t)^2P1 + 3t^2(1-t)P2 + t^3P3   
+   double t3 = t * t * t;
+   double tmin1 = 1.0 - t;
+   double tmin13 = tmin1 * tmin1 * tmin1;
+
+   x = tmin13*p0.x + 3.0*t*tmin1*tmin1*p1.x + 3.0*t*t*tmin1*p2.x + t3*p3.x;
+   y = tmin13*p0.y + 3.0*t*tmin1*tmin1*p1.y + 3.0*t*t*tmin1*p2.y + t3*p3.y;
+}
+
+set(point p,x,y){
+   p.x = x;
+   p.y = y;
+}
+
+draw_points(){
+   time = klock(0);
+   setcol(0xffffff);
+   for( i=0; i<numpts; i++)
+   {
+      //if( pts[i].isDupe ) continue;
+      
+      drawsph(pts[i].node.x, pts[i].node.y,-4);
+      moveto(pts[i].node.x, pts[i].node.y);
+      lineto(pts[i].control.x, pts[i].control.y);
+      
+      moveto(pts[i].node.x + cos(time*10+i*3.14)*5, pts[i].node.y + 9 + sin(time*10+i*3.14)*5);
+      
+      setfont(4,6); printf( "%g",i);
+   }
+}
+
+move_points(){
+static isGrab = 0;
+   isGrab = bstatus;
+      mindist = 1e32;
+      minIdx_node = -1;
+      for(i=0; i<numpts; i++)
+      {
+         if( pts[i].isDupe ) continue;
+         dist = sqrt( (mousx-pts[i].node.x)^2 +  (mousy-pts[i].node.y)^2);
+         if (dist < mindist)
+         {
+            mindist = dist;
+            minIdx_node = i;
+         }
+      }
+      
+      mindist = 1e32;
+      minIdx_ctrl = -1;
+      for(i=0; i<numpts; i++)
+      {
+         if( pts[i].isDupe ) continue;
+         
+         dist = sqrt( (mousx-pts[i].control.x)^2 +  (mousy-pts[i].control.y)^2);
+         if (dist < mindist)
+         {
+            mindist = dist;
+            minIdx_ctrl = i;
+         }
+      }
+
+
+      if (isGrab==1 && minIdx_node > -1 )
+      {
+         dx = pts[minIdx_node].control.x - pts[minIdx_node].node.x;
+         dy = pts[minIdx_node].control.y - pts[minIdx_node].node.y;   
+            
+         set(pts[minIdx_node].node, mousx, mousy);
+         set(pts[minIdx_node].control, mousx+dx, mousy+dy);
+         if ( pts[minIdx_node+1].isDupe )
+         {
+           set(pts[minIdx_node+1].node, mousx, mousy);
+           set(pts[minIdx_node+1].control, mousx-dx, mousy-dy);
+         }
+      }else if (isGrab == 2 && minIdx_ctrl > -1  )
+      {
+         set(pts[minIdx_ctrl].control, mousx, mousy);
+         if ( pts[minIdx_node+1].isDupe ) // Make sure dupe point has same control, but opposite dir
+         {
+          // From control to node
+            dx = pts[minIdx_node].node.x - pts[minIdx_node].control.x;
+            dy = pts[minIdx_node].node.y - pts[minIdx_node].control.y;
+            set(pts[minIdx_node+1].control, pts[minIdx_node+1].node.x+dx, pts[minIdx_node+1].node.y+dy);
+         }
+      }
+   
+}
+
+create_point()
+{
+      pts[numpts].node.x = mousx;
+      pts[numpts].node.y = mousy;
+      
+      pts[numpts].control.x = mousx - 10;
+      pts[numpts].control.y = mousy;
+      
+      pts[numpts].isDupe = 0;
+      numpts++;
+      
+      #ifdef MAKE_DUPES
+      if ( numpts>=2 && numpts%2==0 && numpts < MAXPTS ) // duplicate last, but invert control dir
+      {
+         prev_point = numpts-1;  
+         pts[numpts].node.x = pts[prev_point].node.x;
+         pts[numpts].node.y = pts[prev_point].node.y;
+      
+         set( pts[numpts].control, pts[numpts].node.x + pts[prev_point].node.x - pts[prev_point].control.x,
+                                   pts[numpts].node.y + pts[prev_point].node.y - pts[prev_point].control.y );
+                                   
+         
+         pts[numpts].isDupe = 1;
+         numpts++;
+      } 
+      #endif
+}
+
+draw_curve(){
+   x = 0; y =0;
+   for(p=0; p<(numpts-1); p++){
+     if (p==0){
+         bspline_deg3(pts[p].node, pts[p].control, pts[p+1].control, pts[p+1].node, 0.0 , x, y);
+         moveto(x,y);
+      }     
+      rez = 20;
+      for(i=0; i<rez; i++){
+         t = i/(rez-1);
+         
+         if ( p%2!=0 ) // odd
+         {
+            dx = pts[p].control.x - pts[p].node.x;
+            dy = pts[p].control.y - pts[p].node.y;
+            Point invControl0;
+            invControl0.x = pts[p].node.x - dx;   
+            invControl0.y = pts[p].node.y - dy;
+            
+            dx = pts[p+1].control.x - pts[p+1].node.x;
+            dy = pts[p+1].control.y - pts[p+1].node.y;
+            Point invControl1;
+            invControl1.x = pts[p+1].node.x - dx;   
+            invControl1.y = pts[p+1].node.y - dy;
+
+            bspline_deg3(pts[p].node, invControl0, invControl1, pts[p+1].node, t,x,y);   
+         }else{
+            bspline_deg3(pts[p].node, pts[p].control, pts[p+1].control, pts[p+1].node, t,x,y);
+         }
+       
+         
+         setcol(0,0,255);
+         lineto(x,y);
+      }
+   }
+   
+
+   for(p=0; p<(numpts-1); p++){
+     
+      rez = 20;
+      for(i=0; i<rez; i++){
+         t = i/(rez-1);
+         if ( p%2!=0 ) // odd
+         {
+            dx = pts[p].control.x - pts[p].node.x;
+            dy = pts[p].control.y - pts[p].node.y;
+            Point invNormal0;
+            invNormal0.x = pts[p].node.x - dx;   
+            invNormal0.y = pts[p].node.y - dy;
+            
+            dx = pts[p+1].control.x - pts[p+1].node.x;
+            dy = pts[p+1].control.y - pts[p+1].node.y;
+            Point invNormal1;
+            invNormal1.x = pts[p+1].node.x - dx;   
+            invNormal1.y = pts[p+1].node.y - dy;
+
+            bspline_deg3(pts[p].node, invNormal0, invNormal1, pts[p+1].node, t,x,y);   
+         }else{
+            bspline_deg3(pts[p].node, pts[p].control, pts[p+1].control, pts[p+1].node, t,x,y);
+         } 
+         drawplus(x,y);
+      }
+   }
+}
+
+drawplus(x,y)
+{
+   setfont(4,6); setcol(255,0,0);
+   moveto( floor(x-2.5) ,y); lineto( ceil(x+3.5), y);
+   moveto(x, floor(y-2.5) ); lineto(x, ceil(y+3.5) );
+}

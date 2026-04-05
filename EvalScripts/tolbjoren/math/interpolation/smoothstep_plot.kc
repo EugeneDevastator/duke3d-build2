@@ -1,0 +1,11 @@
+(x,t)
+{
+   A = 0;
+   B = 0.2;
+   x=smoothstep(x);
+   x = (A*x) + (B*(1-x));
+}
+smoothstep(x)
+{
+   return x*x*(3-2*x);
+}

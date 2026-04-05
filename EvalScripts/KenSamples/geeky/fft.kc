@@ -1,0 +1,148 @@
+   //FFT variables:
+enum {MAXBLKSIZ=1024} //<-My FFT code only works for power of 2 block sizes :/
+static bitrev[MAXBLKSIZ/2], curblksiz = 0; //<-can be ints
+static coslut[MAXBLKSIZ], sinlut[MAXBLKSIZ];
+
+()
+{
+   enum {NSAMP=MAXBLKSIZ};
+   static smp[NSAMP], real[NSAMP/2+1], imag[NSAMP/2+1], smp2[NSAMP];
+      
+   while (1)
+   {
+      tim = klock();
+      
+      cls(0);
+      setcol(0xffffff); moveto(0,yres/2);
+      printf("LMB: Quantize frequencies to fit interval exactly\n");
+      printf("RMB: Show inverse transform matches original data");
+      
+      setcol(0x404040); moveto(0,yres/4); lineto(NSAMP,yres/4);
+      setcol(0xffff00); moveto(0,0); printf("Generate sum of 2 sine waves:");
+      f0 = cos(tim*.02); f1 = sin(tim*.004);
+      if (bstatus%2) //LMB
+      {
+         f0 = int(f0*NSAMP)/NSAMP;
+         f1 = int(f1*NSAMP)/NSAMP;
+      }
+      for(i=0;i<NSAMP;i++)
+      {
+         smp[i] = sin(i*f0*(PI*2))*2 + sin(i*f1*(PI*2));
+         //smp[i] = nrnd;
+         setcol(0xffff00); setpix(i,smp[i]*yres/16+yres/4);
+      }
+      
+         //Forward Fast Fourier Transform (time -> freq)
+      doforfft(smp,real,imag,NSAMP);
+            
+      setcol(0x00ffff);
+      moveto(0,yres-12); printf("Fourier Transform (magnitude)");
+      moveto(-1,0);
+      for(i=0;i<NSAMP/2;i++)
+      {
+         moveto(i,yres-16+1);
+         lineto(i,yres-16-sqrt(real[i]^2+imag[i]^2)*(2/NSAMP)*64);
+      }
+      
+      if (bstatus>1) //RMB
+      {
+            //Inverse Fast Fourier Transform (freq -> time)
+         doinvfft(smp2,real,imag,NSAMP);
+         setcol(0x00ffff); for(i=0;i<NSAMP;i++) setpix(i,smp2[i]*yres/16+yres/4);
+      }
+         
+      refresh();
+   }
+}
+//----------------------------------------------------------------------------
+initffttables (n)
+{
+   if (curblksiz == n) return;
+   curblksiz = n;
+
+   bitrev[0] = 0; j = 1; k = n/4;
+   do
+   {
+      for(i=0;i<j;i++) bitrev[i+j] = bitrev[i]+k;
+      j *= 2; k /= 2;
+   } while (k >= 1);
+
+   m = PI/n; c = 1; s = 0;
+   ci = sin(m); si = cos(m)*(ci+ci);
+   ci = -ci*ci; ci += ci; m = ci+ci;
+   for(z=0;z<n;z++)
+   {
+      coslut[z] = c; c += ci; ci += c*m;
+      sinlut[z] = s; s += si; si += s*m;
+   }
+}
+
+dofft (r[MAXBLKSIZ/2+1],i[MAXBLKSIZ/2+1],n)
+{
+   for(pw=1,a=0,ainc=n;ainc>1;pw*=2,ainc/=2)
+      for(i0=n-1;i0>=0;i0--)
+      {
+         a -= ainc; if (a < 0) { a += n; i0 -= pw; }
+         i1 = i0+pw;
+         f = coslut[a]*r[i1] + sinlut[a]*i[i1];
+         g = coslut[a]*i[i1] - sinlut[a]*r[i1];
+         r[i1] = r[i0]-f; r[i0] += f;
+         i[i1] = i[i0]-g; i[i0] += g;
+      }
+}
+
+doforfft (smp[MAXBLKSIZ],r[MAXBLKSIZ/2+1],i[MAXBLKSIZ/2+1],n)
+{
+   initffttables(n);
+
+   hn = n/2;
+   for(z=0;z<hn;z++) { t = bitrev[z]*2; r[z] = smp[t]; i[z] = smp[t+1]; }
+   dofft(r,i,hn);
+   
+   r[hn] = 0; i[hn] = 0; //05/01/2020:BUG FIX:remove need to zero by caller
+
+   z = 0; zz = hn;
+   do
+   {
+      re = r[z] + r[zz]; ro = i[z] + i[zz];
+      ie = i[z] - i[zz]; io = r[z] - r[zz];
+      r[z] = (re + ro*coslut[z] - io*sinlut[z])/2;
+      i[z] = (ie - io*coslut[z] - ro*sinlut[z])/2;
+      r[zz] = re - r[z];
+      i[zz] = i[z] - ie;
+      z++; zz--;
+   } while (z < zz);
+   i[z] = -i[z];
+   r[0] -= i[hn]; i[hn] = 0;
+   r[hn] -= i[0]; i[0] = 0;
+}
+
+doinvfft (smp[MAXBLKSIZ],r[MAXBLKSIZ/2+1],i[MAXBLKSIZ/2+1],n)
+{
+   initffttables(n);
+
+   hn = n/2;
+   z = 1; zz = hn-1;
+   do
+   {
+      re = r[z] + r[zz]; ro = i[z] + i[zz];
+      ie = i[zz] - i[z]; io = r[zz] - r[z];
+      r[z] = (re + ro*coslut[z] - io*sinlut[z])/2;
+      i[z] = (ie - io*coslut[z] - ro*sinlut[z])/2;
+      r[zz] = re - r[z];
+      i[zz] = i[z] - ie;
+      z++; zz--;
+   } while (z <= zz);
+   f = r[0]; r[0] = (f + r[hn])/2; i[0] = (f - r[hn])/2;
+
+   for(z=0;z<hn;z++)
+   {
+      j = bitrev[z]; if (z >= j) continue;
+      t = r[z]; r[z] = r[j]; r[j] = t;
+      t = i[z]; i[z] = i[j]; i[j] = t;
+   }
+   dofft(r,i,hn);
+   k = 2.0/n;
+   for(z=0;z<hn;z++) { t = z*2; smp[t] = r[z]*k; smp[t+1] = i[z]*k; }
+}
+//----------------------------------------------------------------------------

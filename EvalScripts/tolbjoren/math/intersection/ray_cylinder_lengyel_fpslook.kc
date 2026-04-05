@@ -1,0 +1,339 @@
+/*
+taken from the very good book
+Mathematics for 3D game Programming & Computer Graphics by Eric Lengyel
+
+evaldraw code written by Torbjoern 22. august 2011
+
+*/
+
+struct vec
+{
+   x,y,z;
+}
+
+struct camera_t
+{
+   vec pos;
+   horiz_angle;
+   verti_angle;
+}
+
+struct ray_t
+{
+   vec origin;
+   vec dir;
+}
+
+struct cyl_t
+{
+   vec e1;
+   vec e2;
+   double radi;
+}
+
+enum{MAX_CYLS = 32}
+static cyl_t cyls[MAX_CYLS];
+
+static camera_t camera;
+()
+{
+   if (numframes == 0)
+   {
+      set( camera.pos, 0,-1,0 );
+      camera.horiz_angle = 0;
+      camera.verti_angle = -2.0;
+         
+
+      for(i=0; i<MAX_CYLS; i++)
+      {
+         cyl_t cyl;
+         
+         a = i/MAX_CYLS * 2*PI;
+         r = 5;
+         xp = cos(a)*r;
+         zp = sin(a)*r;       
+         //xp = nrnd * 4;
+         //zp = nrnd * 4;
+         
+         yp = 1;
+         
+         tx = xp;
+         ty = yp;
+         
+         //rangle = rnd * 2*PI;
+         rangle = 2*a;
+         
+// Rotate XY vector 
+         ca = cos(rangle);
+         sa = sin(rangle);
+         xp2 = tx*ca - ty*sa;
+         yp2 = ty*ca + tx*sa;
+         
+         
+         vec e1;
+         set( e1, - .5*xp2, yp - .5*yp2, 0);
+         normalize(e1);
+         
+
+         vec e2;
+         set( e2, .5*xp2, yp + .5*yp2, 0);
+         normalize(e2);
+
+         
+         
+         set( cyl.e1, xp + e1.x, e1.y, zp + e1.z );
+         set( cyl.e2, xp + e2.x, e2.y, zp + e2.z );
+         
+         
+         //set( cyl.e1, xp+cos(a), 0, zp+sin(a) );
+         //set( cyl.e2, xp-cos(a), 0, zp-sin(a) );         
+         
+         
+         //set( cyl.e1, xp, -.5 + nrnd*0.25,zp );
+         //set( cyl.e2, xp, .5 + nrnd*0.25, zp );           
+         
+         
+         cyl.radi = 0.25 + rnd*.25;
+         cyls[i] = cyl;
+      }
+   }
+
+   cls(0);
+   clz(1e32);
+
+   playercontrols(camera);
+      
+   a = klock(0);
+   a = mousx/xres * 6.28;
+   r = 15;
+
+   ray_t ray;
+   set( ray.origin, 0,0,0 );
+   set( ray.dir, cos(a)*r, 0, sin(a)*r );
+ 
+
+   setcol( 255, 255, 255 );
+   drawRay( ray );
+   
+   num_hits = 0;
+   for( i=0; i<MAX_CYLS; i++)
+   {   
+
+      success = 1;
+      t = isect_ray_cyl( ray, cyls[i], success );
+      
+      if ( success == 1 )
+      {
+         num_hits++;
+         setcol(255,0,0); 
+         vec hit;
+         raypoint( hit, ray, t );
+         drawsph( hit.x, hit.y, hit.z, .1 );
+         
+         
+      }else
+      {
+         setcol(0,255,0); 
+      }
+      
+      drawCyl( cyls[i] );
+      
+      
+      
+   }   
+
+   vec diff;
+   vecsub( diff, ray.dir, ray.origin );
+   
+   len = length( diff );
+   
+   setcol( 0xf7ab0d );
+   moveto(0,0);
+   printf("ray length = %g\n", len);
+   printf("hits = %g\n", num_hits)
+}
+
+isect_ray_cyl( ray_t ray, cyl_t cyl, &success )
+{
+   vec s0;
+   vecsub( s0, ray.origin, cyl.e1 );
+   vec e2e1;
+   vecsub( e2e1, cyl.e2, cyl.e1 );
+   e2e1Sq = dot(e2e1,e2e1);
+   vDotV = dot(ray.dir, ray.dir);   
+   
+   dirDotAxis = dot(ray.dir, e2e1);   
+   
+   s0DotAxis = dot(s0, e2e1);
+
+   a = vDotV - ( dirDotAxis^2 / e2e1Sq );
+   b = dot(s0, ray.dir) - ( s0DotAxis * dirDotAxis) / e2e1Sq;
+   c = dot(s0,s0) - cyl.radi^2 - (s0DotAxis)^2 / e2e1Sq;
+   
+   D4 = b^2 - a*c;
+   if ( D4 > 0 )
+   {
+
+      t = (-b - sqrt(b^2 - a*c)) / a;  // thanks to Trond    
+      
+      if ( t < 0 || t > 1.0 )
+      {
+         success = -1;
+         return;
+      }
+
+      vec pt;
+      raypoint( pt, ray, t );
+      
+      // The signed length L of the projection P(t) - E1 onto A
+      L = dot( pt, e2e1 ) / length(e2e1) ;
+      
+      // The ray isects the cyl if L is positive and less than ||A||
+      // we simply need to check that
+      // 0 < [P(t) - E1] dot A < A^2
+      
+      vec e1pt;
+      vecsub( e1pt, pt, cyl.e1 );
+      proj_pt_e1 = dot( e1pt, e2e1 );
+      if ( proj_pt_e1 > 0 && proj_pt_e1 < e2e1Sq )
+      {
+         success = 1;
+         return t;
+      } 
+      success = -1;
+      return;
+   }
+   
+   
+
+   success = -1;
+   return;
+}
+
+raypoint( vec out, ray_t r, t )
+{
+   out.x = r.origin.x + t * r.dir.x;
+   out.y = r.origin.y + t * r.dir.y;
+   out.z = r.origin.z + t * r.dir.z;
+}
+
+
+drawray( ray_t r )
+{
+   //drawsph(  r.origin.x, r.origin.y, r.origin.z, .5 );
+
+   vec end;
+   vecAdd( end, r.origin, r.dir );
+
+   //drawcone( r.s.x, r.s.y, r.s.z, 0.25,
+   //          end.x, end.y, end.z, 0.01 );
+   
+   moveto( r.origin.x, r.origin.y, r.origin.z );
+   lineto(end.x, end.y, end.z );
+   
+}
+
+drawcyl( cyl_t r )
+{
+   setcol( 128+128*r.e1.x, 128+128*r.e1.y, 128+128*r.e1.z );
+     drawcone( r.e1.x, r.e1.y, r.e1.z, -r.radi,
+               r.e2.x, r.e2.y, r.e2.z, -r.radi ); 
+}
+
+vecadd( vec out, vec a, vec b)
+{
+   out.x = a.x + b.x;
+   out.y = a.y + b.y;
+   out.z = a.z + b.z;
+}
+
+vecsub( vec out, vec a, vec b)
+{
+   out.x = a.x - b.x;
+   out.y = a.y - b.y;
+   out.z = a.z - b.z;
+}
+
+
+dot( vec a, vec b )
+{
+   return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+set( vec a, x, y, z )
+{
+   a.x = x;
+   a.y = y;
+   a.z = z;
+}
+
+set( vec a, vec b )
+{
+   a.x = b.x;
+   a.y = b.y;
+   a.z = b.z;
+}
+
+normalize( vec v )
+{
+   l = length( v );
+   if ( l )
+   {
+      v.x /= l; v.y /= l; v.z /= l;
+   }
+}
+
+length( vec v )
+{
+   return sqrt( dot(v,v) );
+}
+
+
+// Camera and movement code taken from /games/
+//Handle input and player movement
+playercontrols(camera_t cam)
+{
+   static oldMouseX;
+   static oldMouseY;
+   static mouseSpeedX;
+   static mouseSpeedY; 
+
+   f = 0.1;
+   if (keystatus[0x2a]) f /= 4;
+   if (keystatus[0x36]) f *= 4;
+   vx = (keystatus[32]-keystatus[30])*f; //D-A
+   vy = (keystatus[17]-keystatus[31])*f; //W-S  
+   vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   
+   static mat[9]; 
+   ang2mat(cam.horiz_angle, cam.verti_angle, mat); // Convert angles to rotation matrix
+   
+   // find new position
+   cam.pos.x += mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   cam.pos.y += mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   cam.pos.z += mat[2]*vx + mat[5]*vz + mat[8]*vy; 
+   // mousespeed values are tweaked for 60 fps
+   mouseSpeedX = (mousx - oldMouseX) * 0.01;
+   mouseSpeedY = (mousy - oldMouseY) * 0.01;
+   oldMouseX = mousx;
+   oldMouseY = mousy;
+   if(bstatus==1)
+   {
+      cam.horiz_angle -= mouseSpeedX;
+      cam.verti_angle += mouseSpeedY;
+   }
+   // Right,down,forwards unit vectors.
+   setcam(cam.pos.x, cam.pos.y, cam.pos.z,
+          mat[0],mat[1],mat[2],
+          mat[3],mat[4],mat[5],
+          mat[6],mat[7],mat[8]);
+}
+/* converts horizontal and vertical angles to a 3x3 rotation matrix */
+ang2mat(hang,vang,mat[9])
+{
+   mat[0] = cos(hang); mat[1] = 0; mat[2]=-sin(hang);
+   mat[6] = cos(vang)*sin(hang); mat[7] = sin(vang); mat[8]=cos(vang)*cos(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}

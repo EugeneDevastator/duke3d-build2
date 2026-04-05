@@ -1,0 +1,19 @@
+(x,y,z,&r,&g,&b) //This object looks much better with lighting enabled!
+az = abs(z); if (az >= .22) return(0);
+dxy = x^2+y^2; if (dxy > 1.03) return(0);
+d = dxy+z^2; a = atan2(y,x);
+if (sqrt(d)+sin(a*32)*(.25-az)*.12 < .97)
+{
+   d2 = sqrt(dxy);
+        if (d2 < .650) h = min(cos(d2*(6.5*PI)+a*2)*sin(d2*(1.5*PI))*.02+.12,.12);
+   else if (d2 < .775) h = .17-cos((d2-.650)*(8*PI))*.05;
+   else                h = .22;
+   if (h > az)
+   {
+      r = rnd*12 + x*24 + 192;
+      g = rnd*12 + y*24 + 50;
+      b = rnd*12 + z*24 + 25;
+      return(1);
+   }
+}
+0

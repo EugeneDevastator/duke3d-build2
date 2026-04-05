@@ -1,0 +1,214 @@
+
+enum{MAXBALLS=1024*8}
+
+struct vec{x,y;}
+
+struct ball_t{
+   vec pos, acc, vel;
+   // static mass = 1.0;
+}
+
+static ballRadi = 10;
+static restitution = 0.99;
+static num_balls = 0;
+static ball_t balls[MAXBALLS];
+
+static time,dt,oldtime;
+()
+{ 
+   oldTime = time;
+   time = klock(0);   
+   dt = time-oldTime;
+   
+   xmin = ballRadi;
+   xmax = xres-ballRadi;
+   ymin = ballRadi;
+   ymax = yres-ballRadi;
+
+   if(numframes==0)
+   {
+      num_balls = 256;
+   
+      limx = 10;
+      limy = 10;
+      xp=limx; yp=limy;
+      for(a=0; a<num_balls; a++)
+      {
+         balls[a].pos.x = xp;
+         balls[a].pos.y = yp;
+
+         xp += ballRadi*3;
+         if(xp > xmax)
+         {
+            xp = limx;
+            yp += ballRadi*3;
+         }
+      }
+
+
+   }
+   
+
+
+   cls(0);
+   
+   if (keystatus[57]){
+      keystatus[57] = 0;
+      ball_t new_ball;
+      new_ball.pos.x = xres/2 + 10 * rnd;
+      new_ball.pos.y = yres/2;
+      new_ball.vel.x = 0;
+      new_ball.vel.y = 0;
+      
+      balls[num_balls] = new_ball;
+      num_balls++;
+   }
+   
+
+   ballPhysics();   
+   
+
+   // ball dynamics:
+   //setcol(0xff0000);
+   for(i=0; i<num_balls; i++)
+   {
+      vec acc, vel, pos;
+      acc = balls[i].acc;
+      vel = balls[i].vel;
+      pos = balls[i].pos;
+      
+      
+      // integrate
+      
+      acc.y = 4e-3;
+      vecadd( vel, vel, acc ); // v' = v + a
+      vecadd( pos, pos, vel ); // p' = p + v
+
+      // apply boundary conditions  
+      
+      if( pos.x < xmin ){ pos.x = xmin; vel.x=-vel.x*restitution;}  
+      if( pos.x > xmax ){ pos.x = xmax; vel.x=-vel.x*restitution;}
+      
+      if( pos.y < ymin ){ pos.y = ymin; vel.y=-vel.y*restitution;}   
+      if( pos.y > ymax ){ pos.y = ymax; vel.y=-vel.y*restitution;}
+      
+      drawsph(pos.x, pos.y, -ballRadi); 
+
+      balls[i].pos = pos;
+      balls[i].vel = vel;
+      balls[i].acc = acc;
+   }
+   
+   moveto(0,0);
+   setcol(0xff0000);
+   printnum(dt*1000);
+   setcol(0xffffff);
+   
+   //while( klock(0) < numframes/(100.0) );
+}
+
+// original code by Peter Birtles. ported to evaldraw.
+// src at: http://paulbourke.net/miscellaneous/fluid/
+ballPhysics(){
+   
+   ball_t ball_a, ball_b;
+   vec normal;
+   vec papb;
+   vec impulse;
+   vec pos_correction;
+   vec vel_a, vel_b;
+   
+   for(a=0; a<num_balls-1; a++)
+   {
+      ball_a = balls[a];
+
+      for(b=1; b<num_balls ; b++)
+      {
+         if (a==b) continue;
+         ball_b = balls[b];
+           
+         vecsub( papb, ball_b.pos, ball_a.pos );
+         dSq = vecdot( papb, papb );
+         
+         // if  A&B are close enough to collide
+         if(dSq < (ballRadi+ballRadi)^2 ) 
+         {
+            d = sqrt(dSq);
+            normal.x = papb.x / d;
+            normal.y = papb.y / d;
+        
+            dd = ballRadi+ballRadi - d;
+            
+            
+            pos_correction.x = dd * normal.x;
+            pos_correction.y = dd * normal.y;
+
+            vecsub( ball_a.pos, ball_a.pos, pos_correction );
+            vecadd( ball_b.pos, ball_b.pos, pos_correction );
+
+            // accumulate new vel! importante!
+            vel_a = ball_a.vel;
+            vel_b = ball_b.vel;
+            
+            speed_a = vecdot(ball_a.vel, ball_a.vel);
+            if( speed_a > 0)
+            {  
+               j = restitution * vecdot( normal, ball_a.vel );
+               //j = (normal.x * ball_a.vel.x + normal.y * ball_a.vel.y) * restitution;
+               impulse.x = normal.x * j;
+               impulse.y = normal.y * j;
+               vecsub( vel_a, vel_a, impulse );
+               vecadd( vel_b, vel_b, impulse );
+            }
+            
+            speed_b = vecdot(ball_b.vel, ball_b.vel);
+            if( speed_b > 0)
+            {
+               j = restitution * vecdot( normal, ball_b.vel );
+               //j = (normal.x * ball_b.vel.x + normal.y * ball_b.vel.y) * restitution;
+               impulse.x = normal.x * j;
+               impulse.y = normal.y * j;
+               vecadd( vel_a, vel_a, impulse );
+               vecsub( vel_b, vel_b, impulse );
+            }
+         
+            // Importante! 
+            ball_a.vel = vel_a;
+            ball_b.vel = vel_b;
+            
+            
+         } // end square dist check
+
+         balls[b] = ball_b;
+      } // for b
+
+      balls[a] = ball_a;
+   } // for a
+
+}
+
+vecadd(vec o, vec a, vec b ){
+   o.x = a.x + b.x;
+   o.y = a.y + b.y;
+}
+
+vecsub(vec o, vec a, vec b ){
+   o.x = a.x - b.x;
+   o.y = a.y - b.y;
+}
+
+vecdot(vec a, vec b){
+   return a.x * b.x + a.y * b.y;
+}
+
+/*
+vecadd(vec inout, vec o){
+   inout.x = inout.x + o.x;
+   inout.y = inout.y + o.y;
+}
+
+vecsub(vec inout, vec o){
+   inout.x = inout.x + o.x;
+   inout.y = inout.y + o.y;
+}
+*/

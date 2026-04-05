@@ -1,0 +1,276 @@
+static msg[16], count[16];
+
+// Player position
+enum{MAX_COORDS = 1024}
+static posx[16][max_coords];
+static posy[16][max_coords];
+
+static coordsRecvd[16][max_coords];
+
+// Network datadescription codes:   
+static msg_description_code = 0;
+static netPlayerCoord  = 1;
+static netPing = 2;
+static netPong = 3;
+// network datatype enumeration
+static net_X = 1;
+static net_Y = 2;
+
+static time, timer, sendRatePerSec;
+static dt, oldtime;
+static pingStart[16], pingTime[16];
+static pingsSent = 0;
+static pongsRecvd = 0;
+static canPing[16];
+
+static sphRadi = 1;
+//#define FRAMERATE_LIMITER
+//#define USE_LERP
+#define USE_VEL
+() 
+{  
+   sendRatePerSec = 100;
+
+   if (numframes==0)
+   {
+      for(i=0; i<16; i++)
+      {
+         canPing[i] = 1;
+      }
+   }
+   
+   
+   time = klock();
+   dt = time - oldtime;
+   oldtime = time;
+
+   if(time > timer)
+   {
+      timer = time + 1/sendRatePerSec;
+
+      sendPos();
+     
+   }
+     
+   sendPing(); 
+   recvData();
+   
+
+   cls(0); 
+
+
+   draw();
+   setfont(6,10);
+   moveto(0,0);
+   setcol(255,255,255);
+   
+   for(i=0; i<net_players; i++)
+   {
+      if( i==net_me ) continue;
+      printf("ping to player %g = %.f ms\n", i, pingTime[i]);
+   }
+   
+   setfont(6,10);
+   moveto(0,30);
+   printf("%g pings sent\n", pingssent);
+   printf("%g pongs recvd\n", pongsrecvd);
+   //printf("klock, numframes/100 -> %g, %g\n", time, numframes/60);
+   //printf("network send/recv rate = %g times per sec\n", sendRatePerSec );
+   printf("you are player = %g of %g \n", net_me+1, net_players );
+ 
+   //sendBogus();   
+   #ifdef FRAMERATE_LIMITER
+   
+   while (klock(0)<numframes/60)
+   { 
+      // busy wait and limit fps
+      //sleep(1);
+      
+   } 
+   #endif
+}
+
+sendPing(){
+   for(i=0; i<net_players; i++)
+   {
+      if( i==net_me) continue;
+      
+      if (canPing[i])
+      {
+         net_send(i, netPing); 
+         pingStart[i] = klock(0);
+         pingsSent++;
+         canPing[i] = 0;
+      }
+   }
+}
+
+sendPos()
+{
+   net_send(NET_ALLELSE,netPlayerCoord); 
+   net_send(NET_ALLELSE,mousx);
+   net_send(NET_ALLELSE,mousy);
+
+   coordsRecvd[net_me]++;
+
+   posx[net_me][0] = mousx;
+   posy[net_me][0] = mousy;
+
+   // Update body segments
+   for(j=1; j<MAX_COORDS; j++){
+    posx[net_me][MAX_COORDS-j] = posx[net_me][MAX_COORDS-j-1];
+    posy[net_me][MAX_COORDS-j] = posy[net_me][MAX_COORDS-j-1];
+   }   
+}
+
+
+// Taken from evaldraw net demo:
+// This loop reads a single net_recv message and decides if it
+// 1.   is a beginning of a datastream.
+//      I call the first val recieved the "net_description_code", at this point count is 0
+// 2.   when the descrition code is read, go into one of the if-sentances
+//      that handles a certain code.
+// 3.   for instance. if the following packets are mousecoords
+//      then increase count from 0 to 1
+//      on the next net_recv val contains mx
+//      increase count again
+//      now on the next net_recv val contains my
+//      since we now have counted 2 values (mx,my) we got all we need
+//      reset count to 0 for the next data, be it more
+//      mousecoordinates or a color change.
+
+recvData()
+{
+   from = 0;
+   val = 0;
+   while(net_recv(&from,&val))
+   {
+      if( from == NET_ME )
+      {
+      }else{
+   
+         // The first message, number 0 is the descriptor.
+         if (count[from] == msg_description_code) 
+            msg[from] = val; // remember the type of message.
+               
+         if (msg[from] == netPlayerCoord) //comparing it to netCoord must be wrong...
+         {
+            if (count[from] == 0) coordsRecvd[from]++;
+            if (count[from] == 1) posx[from][0] = val;
+            if (count[from] == 2){
+               posy[from][0] = val;
+             
+               // got all vals
+
+               // Update body segments
+               for(j=1; j<MAX_COORDS; j++){
+                posx[from][MAX_COORDS-j] = posx[from][MAX_COORDS-j-1];
+                posy[from][MAX_COORDS-j] = posy[from][MAX_COORDS-j-1];
+               }   
+            }
+            
+            
+
+            count[from]++; //get next message
+            
+            // if we have read XYZ coords
+            // then reset count so that the next message can
+            // be read into val.
+            if (count[from] > 2) count[from] = msg_description_code;
+         }         
+         else if (msg[from] == netPing) //comparing it to netCoord must be wrong...
+         {
+            net_send(from,netPong);
+            count[from]++; //get next message
+            
+            // if we have read XYZ coords
+            // then reset count so that the next message can
+            // be read into val.
+            if (count[from] > 0) count[from] = msg_description_code;
+         }  
+         else if (msg[from] == netPong) //comparing it to netCoord must be wrong...
+         {
+            pingTime[from] = (klock(0) - pingStart[from])/2.0 * 1000.0 ;
+            count[from]++; //get next message
+            pongsRecvd++;
+            canPing[from] = 1;
+            
+            // if we have read XYZ coords
+            // then reset count so that the next message can
+            // be read into val.
+            if (count[from] > 0) count[from] = msg_description_code;
+         }  
+
+      }
+
+   }
+   
+}
+
+sendBogus()
+{
+   // if F-key then send bogus data to a random player
+   if (keystatus[0x21]) //'F' up sync; tests Ctrl+Enter
+  {
+     moveto(0,0);
+     setcol(255,255,255);
+     printf("f-ing up\n");
+      net_send(int(net_players*rnd),nrnd*1e3);
+      
+   net_send(NET_ALLELSE,netPlayerCoord); 
+   net_send(NET_ALLELSE,2*(rnd-0.5)*0.7);
+   net_send(NET_ALLELSE,2*(rnd-0.5)*0.1);
+
+   }
+}
+
+draw()
+{
+   // draw player tails
+   for(i=0;i<net_players;i++)
+   {
+      
+      
+      lim = min(MAX_COORDS-1, coordsRecvd[i]);
+
+      for(j=lim-1; j>0; j--)
+      {
+         pct = 1-j/lim;
+         c = hsv_to_rgb( i/net_players*360 % 360, pct, pct);
+         setcol(c);      
+
+         if(j==lim-1){
+            moveto( posx[i][j], posy[i][j] );
+         }else{
+            lineto( posx[i][j], posy[i][j] );
+         }
+      }
+   }   
+}
+
+hsv_to_rgb(h,s,v){ 
+   // expects 360deg and 1,1 hue sat max
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   r=int(r*255);
+   g=int(g*255);
+   b=int(b*255);
+   return rgb(r,g,b); 
+}

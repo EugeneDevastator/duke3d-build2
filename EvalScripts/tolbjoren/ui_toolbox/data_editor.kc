@@ -1,0 +1,40 @@
+/*
+Capture to file (must use F6 hotkey) now works in /runonly mode and now
+        uses .TXT as default file extension.
+   * Add fprintf() and fputc(). These are now the only functions that write to
+        the capture file. printf() and printchar() are no longer captured when
+        the "capture to file" function is activated. This allows text to be
+        displayed without it going to the capture file.
+*/
+
+enum{MAXPTS=100}
+static pts[MAXPTS];
+()
+{
+   cls(0);
+   
+   moveto(0,yres/2); lineto(xres, yres/2);
+
+   
+   delta = xres/(MAXPTS-1);
+   px = 0;
+   moveto(0,-pts[0]);
+   for(i=0; i<MAXPTS; i++)
+   {
+      drawsph(px, -pts[i],3);
+      lineto(px, -pts[i]);
+      px += delta;
+      
+   }
+   if( bstatus == 1 )
+   {
+      t = MAXPTS * mousx/xres;
+      pts[t] = -mousy;
+   }
+   
+   for(i=0; i<MAXPTS; i++)
+   {
+      fprintf("%.2f\n", 1 - 2*abs(-pts[i] / yres) );
+   }
+   
+}

@@ -1,0 +1,25 @@
+()    //Use this code as a skeleton for synchronized net apps
+{     //Instructions:
+		//1. Connect machines using File..Host/Join
+		//2. Move&click mouse around window.
+	enum {MAXPLAYS=16,PAKSIZ=3,PMAX=1024}; static lpak[PAKSIZ]; from = 0;
+	static mx[MAXPLAYS], my[MAXPLAYS], px[PMAX], py[PMAX], pc[PMAX], pn = 0;
+	while (1)
+	{
+		lpak[0] = mousx; lpak[1] = mousy; lpak[2] = bstatus;
+		net_send(NET_ALL,lpak,PAKSIZ);
+
+		while (net_recv(&from,&lpak,PAKSIZ)) //process packet
+		{
+			mx[from] = lpak[0]; my[from] = lpak[1]; if (lpak[2] == 0) continue;
+			px[pn] = lpak[0]; py[pn] = lpak[1]; pc[pn] = 256^(2-from%3)*255; pn++;
+		}
+
+		cls(0); //draw stuff
+		for(i=max(pn-PMAX,0);i<pn;i++) {setcol(pc[i]);drawsph(px[i],py[i],2);}
+		setcol(0xffffff); setfont(12,16);
+		for(i=0;i<net_players;i++) { moveto(mx[i],my[i]); printf("%g",i); }
+		moveto(0,0); printf("net_me=%g\nnet_players=%g\n",net_me,net_players);
+		refresh(); while (klock()<numframes/60); //Limit fps
+	}
+}

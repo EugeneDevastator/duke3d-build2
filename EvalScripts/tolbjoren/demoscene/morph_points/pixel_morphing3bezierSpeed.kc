@@ -1,0 +1,360 @@
+// Todo: Make the pixels take paths.
+enum{width=250, height=192, steps=1};
+static pixelpos[width*height][3];
+static pixeltarg[width*height][3];
+static pixelcol[width*height];
+
+static pixelstart[width*height][2];
+
+static pictureMode = 1;
+static time = 0;
+
+// control curve:
+static p1x,p1y,p2x,p2y,p3x,p3y;
+static boxSX, boxSY, boxEX, boxEY;
+static mouseGrabbed = 0;
+()
+{
+   if(numframes==0) setup();
+   if(numframes==0)
+   {
+      boxEX = xres-10*xres/100;
+      boxEY = yres-10*yres/100;
+      boxSX = 10*xres/100;
+      boxSY = 10*yres/100;
+      
+      p1x = boxSX;
+      p1y = boxEY;
+      
+      p2x = 30*(boxEX-boxSX)/100;  
+      p2y = 30*(boxEY-boxSY)/100;
+      
+      p3x = boxEX;
+      p3y = boxSY;
+   }
+   cls(0);
+   time = klock(0);   
+
+   //m = (-steps*(mousx-xres/2))/xres;
+   //t = steps*mousx/xres;
+   //t = ( 1+sin(time))/2;
+   //t = log(t)^2;
+   
+   outX = 0;
+   outy = 0;
+   tpos = (1+sin(time))/2;
+   evalBez(tpos,p1x,p1y,p2x,p2y,p3x,p3y,&outX, &outY);
+   drawsph(outX,outY,10);
+   t = outY/((boxEY-boxSY)-1);
+   t = min(1, max(0,t)); // clamp to [0,1] range
+   
+   
+   for(i=0; i<=width*height; i++)
+   {
+      //morph(i,m);
+      setmorph(i,t);
+   }
+   setcol(0xffffff);
+   
+   drawrectopen(boxSX,boxSY,boxEX,boxEY);
+   
+   drawCurve();
+   
+   moveto(0,400);
+   setfont(18,36);
+   printf("%g t=%g",mousx,t);
+   
+   //x2 = 0; x1 = mousx; y2 = 0; y1 = mousy;
+   //dist = sqrt( (x2-x1)^2 + (y2-y1)^2 ); 
+   //printf("\npixel 0,0 dist to targ=%g", dist);
+   input();
+}
+
+drawrectopen(x0,y0,x1,y1){
+moveto(x0,y0); lineto(x1,y0); 
+lineto(x1,y1); lineto(x0,y1); 
+lineto(x0,y0); 
+}
+
+input(){
+   r = 20;
+   if(bstatus == 1)
+   {
+      if( dist(mousx, mousy, p1x, p1y) < r || mouseGrabbed == 1)
+      {
+         mouseGrabbed = 1;
+         p1x = mousx; p1y = mousy;
+      }
+      else if( dist(mousx, mousy, p2x, p2y) < r || mouseGrabbed == 2)
+      {
+         mouseGrabbed = 2;
+         p2x = mousx; p2y = mousy;
+      
+      }
+      else if( dist(mousx, mousy, p3x, p3y) < r || mouseGrabbed == 3)
+      {
+         mouseGrabbed = 3;
+         p3x = mousx; p3y = mousy;
+      
+      }
+   }
+   else{
+      mouseGrabbed = 0;
+   }
+}
+dist(x1,y1,x2,y2){
+   return sqrt( (x1-x2)^2 + (y1-y2)^2 );
+}
+drawCurve(){
+   drawsph(p1x,p1y,-5);
+   drawsph(p2x,p2y,-5);
+   drawsph(p3x,p3y,-5);
+   
+   numSteps = 15;
+   oldX = p1x;
+   oldY = p1y;
+   for(step=0; step < numSteps; step++)
+   {
+      t = step/(numSteps-1);
+      outX =0; outY =0;
+      evalBez(t,p1x,p1y,p2x,p2y,p3x,p3y,&outX, &outY); 
+      //moveto(oldX,oldY);
+      //lineto(outX,outY);
+      drawline(oldx,oldy,outx,outy);
+      oldX=outX, oldY=outY;   
+   }
+
+}
+
+evalBez(t,p1x,p1y,p2x,p2y,p3x,p3y,&outX, &outY){
+      a = (1-t)^2;
+      b = 2*t*(1-t);
+      c = t^2;
+      outX = a*p1x + b*p2x + c*p3x;
+      outY = a*p1y + b*p2y + c*p3y;
+}
+
+drawFirstImage()
+{
+   moveto(10,5);
+   setfont(18,36,1);
+   setcol(0x00ff00);
+   printf("sleep-now?");
+   setcol(0xffffff0);
+   drawRect(0,0,192,36);
+   drawRect(1,1,193,37);
+   drawRect(2,2,194,38);
+   drawRect(1,1,254,254);
+}
+
+// rewrite this to that pixelpos depents on a variable
+// so the effect can easily be set
+morph(pixel,dir)
+{
+   x = pixelpos[pixel][0];
+   y = pixelpos[pixel][1];
+   tx = pixeltarg[pixel][0];
+   ty = pixeltarg[pixel][1];
+   pixelpos[pixel][0] += tx*dir;
+   pixelpos[pixel][1] += ty*dir;
+   setcol( pixelcol[pixel] );
+   setpix(x,y);      
+}
+setmorph(i, t)
+{
+   sx = pixelstart[i][0];
+   sy = pixelstart[i][1];
+   tx = -pixeltarg[i][0] * t + sx;
+   ty = -pixeltarg[i][1] * t + sy;
+   setcol( pixelcol[i] );
+   setpix(tx,ty); 
+}
+morph3d(pixel,dir)
+{
+   x = pixelpos[pixel][0];
+   y = pixelpos[pixel][1];
+   z = pixelpos[pixel][2];
+   tx = pixeltarg[pixel][0];
+   ty = pixeltarg[pixel][1];
+   tz = pixeltarg[pixel][2];
+   pixelpos[pixel][0] += tx*dir;
+   pixelpos[pixel][1] += ty*dir;
+   pixelpos[pixel][2] += tz*dir;
+   
+
+   dx = 256*(x/(z+200) ) + xres/2-width/2;
+   dy = 256*(y/(z+200) ) + yres/2-height/2;    
+   setcol( pixelcol[pixel] );
+   setpix(dx,dy);             
+}
+
+setup()
+{
+   cls(0);
+   drawFirstImage();
+   i=0;
+   for(y=0; y<height; y++)
+   for(x=0; x<width; x++)
+   {
+      // calc start pos and target pos
+      sx = rnd*xres;
+      sy = rnd*yres;
+      pixelstart[i][0] = sx; pixelstart[i][1] = sy;
+      //sx = rnd*xres + cos(i)*xres;
+      //sy = rnd*yres + sin(i)*yres;
+      sz = 0; //cos(i)*200;
+      tx = x+width;
+      ty = y+height/2;
+      tz = 0;
+
+      // store current pixel position
+      pixelpos[i][0] = sx;
+      pixelpos[i][1] = sy;
+      pixelpos[i][2] = sz;
+      
+      // calc and store target vector
+      pixeltarg[i][0] = (sx-tx)/steps;
+      pixeltarg[i][1] = (sy-ty)/steps;
+      pixeltarg[i][2] = (sz-tz)/steps;
+      
+      if(pictureMode)
+      {setcol(pic(x,y)); setpix(x,y);}
+      r=0; g=0; b=0;
+      getpix(x,y,r,g,b);
+      pixelcol[i] = r*2^16+g*2^8+b;
+      i++; 
+   }
+}
+
+drawRect(sx, sy, wx, wy)
+{   
+   moveto(sx, sy);
+   lineto(sx+wx, sy+0);
+   
+   moveto(sx, sy+wy);
+   lineto(sx+wx, sy+wy);
+   
+   moveto(sx, sy);
+   lineto(sx, sy+wy);
+   
+   moveto(sx+wx, sy);
+   lineto(sx+wx, sy+wy);
+}
+
+
+//////////////////// WU !
+plot(x,y,c)
+{
+   intensity = 255;
+   setcol(c*intensity,c*intensity,c*intensity);
+   setpix(x,y);
+}
+plot(x,y,c)
+{
+   intensity = 255;
+   setcol(c*intensity,c*intensity,c*intensity);
+   setpix(x,y);
+}
+
+drawline(x1,y1,x2,y2)
+{
+   dx = x2-x1;
+   dy = y2-y1;
+   
+   if(abs(dx) > abs(dy)){
+      // handle "horizontal" lines
+      if(x2 < x1)
+      {
+         swap(x1,x2);
+         swap(y1,y2);
+      }
+      
+      gradient = dy / dx;
+      
+      // handle first endpoint
+      xend = floor(x1+0.5);
+      yend = y1 + gradient * (xend - x1);
+      xgap = rfpart(x1 + 0.5);
+      xpxl1 = xend; // will be used in main loop
+      ypxl1 = int(yend); // integer part?
+      plot(xpxl1, ypxl1, rfpart(xend) * xgap);
+      plot(xpxl1, ypxl1 + 1, fpart(yend) * xgap);
+      intery = yend + gradient; // first y-sect for main loop
+      
+      // handle second endpoint
+      xend = floor(x2+0.5); // rounded? ipart+0.5;
+      yend = y2 + gradient * (xend - x2);
+      xgap = fpart(x2 + 0.5);
+      xpxl2 = xend; // use
+      ypxl2 = int(yend);
+      plot(xpxl2, ypxl2, rfpart(yend)*xgap);
+      plot(xpxl2, ypxl2 + 1, fpart(yend)*xgap);
+      
+      // main loop
+      for(x=xpxl1+1; x < xpxl2; x++)
+      {
+         plot(x, int(intery), rfpart(intery) );
+         plot(x, int(intery) +1, fpart(intery) );
+         intery += gradient;
+      }
+   }
+   else
+   {
+      /* I have not verifed that this is correct. All i did was: 
+       1. check for y2<y1 instead of x2<x1
+       2. swap the gradient
+       3. interx = xend + gradient;
+       4. and last the main loop.
+      */
+      
+      //handle "vertical" lines  same code as above but X takes the role of Y
+      if(y2 < y1)
+      {
+         swap(x1,x2);
+         swap(y1,y2);
+      }
+      
+      gradient = dx/dy;
+      
+      // handle first endpoint
+      xend = floor(x1+0.5);
+      yend = y1 + gradient * (xend - x1);
+      xgap = rfpart(x1 + 0.5);
+      xpxl1 = xend; // will be used in main loop
+      ypxl1 = int(yend); // integer part?
+      plot(xpxl1, ypxl1, rfpart(xend) * xgap);
+      plot(xpxl1, ypxl1 + 1, fpart(yend) * xgap);
+      interx = xend + gradient; // first y-sect for main loop
+      
+      // handle second endpoint
+      xend = floor(x2+0.5); // rounded? ipart+0.5;
+      yend = y2 + gradient * (xend - x2);
+      xgap = fpart(x2 + 0.5);
+      xpxl2 = xend; // use
+      ypxl2 = int(yend);
+      plot(xpxl2, ypxl2, rfpart(yend)*xgap);
+      plot(xpxl2, ypxl2 + 1, fpart(yend)*xgap);
+      
+      // main loop
+      for(y=ypxl1+1; y < ypxl2; y++)
+      {
+         plot(int(interx), y, rfpart(interx) );
+         plot(int(interx) +1,y, fpart(interx) );
+         interx += gradient;
+      }  
+   }
+}
+// round(x){ return floor(x+0.5); }
+rfpart(x){
+   return 1 - fpart(x);
+}
+fpart(x){
+   // return fractional part of x.
+   return x-int(x);
+}
+swap(&a, &b)
+{
+   tmp = a;
+   a = b;
+   b = tmp;
+}

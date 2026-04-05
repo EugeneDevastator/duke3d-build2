@@ -1,0 +1,321 @@
+enum {maxroids = 100}; // maximum roid particles
+static liveroids; // number to start off with
+static roidx[maxroids];
+static roidy[maxroids];
+static roiddx[maxroids];
+static roiddy[maxroids];
+static roidlife[maxroids];
+static ROIDMAXSPD = 1;
+static rsize = 10;
+// Player ship:
+static playerx;
+static playery;
+static pax;
+static pay;
+static playerangle;
+static psize = 30;
+// Ship trail
+enum {MAXTRAIL = 20};
+static trailx[MAXTRAIL];
+static traily[MAXTRAIL];
+static trailpos = 0;
+// Bullets:
+enum {MAXBULLETS = 10};
+static bulletx[MAXBULLETS];
+static bullety[MAXBULLETS];
+static bulletang[MAXBULLETS];
+static bulletlife[MAXBULLETS];
+static bulletsleft = 10;
+static bsize = 5;
+// Explosion
+static explodx;
+static explody;
+static explosionLife=0;
+// Game
+static oneSec;
+static frames;
+static fps = 0;
+static score;
+static gamestate;
+static GAMEOVER = 0;
+static PLAYING = 1;
+static setupGame = 0;
+static tick = 0;
+static nextTick = 0;
+// debug
+static debugtxt;
+()
+{
+   cls(0);
+   if(numFrames == 0) gamestate = GAMEOVER;
+    
+   if(setupGame){ setupGame = 0; score = 0; setupPlayer(); setupRoids();}
+   
+   if(gamestate == PLAYING){
+    if(tick){
+      updateTrail();
+      updateRoids();
+      updatePlayer();
+      updateBullets();
+      updateExplosion(); 
+     }
+      drawShotsleft();
+      drawTrail();
+      drawRoids();
+      drawPlayer();
+      drawBullets();
+      drawExplosion();
+      moveto(xres/3, 10); setcol(0xffffff); setfont(20,30,0); printf("SCORE:%g",score); 
+      moveto(0,0); setcol(0xffffff); setfont(8,10); printf("liveroids =%g",liveroids); 
+      printf("\nfps =%g",fps);
+      if(keystatus[0x13]) gamestate = GAMEOVER;
+      
+ 
+   }
+   if(gamestate == GAMEOVER){
+      setcol(0xff0000); moveto(xres/3, yres/4); setfont(30,100,0);printf("(DIS)ASTEROIDS");   
+      moveto(xres/3+xres/16, yres/3); setfont(20,30,0); printf("\nGAMEOVER"); 
+      setcol(0xffff00); setfont(8,10); moveto(xres/3+xres/10, yres/3 + yres/12); printf("\npress ENTER");
+      setcol(0xff0000); moveto(xres/4, yres/2); printf("Arrowkeys - move ship");
+      printf("\nCTRL - shoot");
+      printf("\n\n\n06/02/2009 Added game tick (C) Kim");
+      printf("\n\n\n-Torbjoern 06/02/2009");
+      
+      if(keystatus[0x1c]){ // ENTER
+         gamestate = PLAYING;
+         setupGame = 1;
+      }
+   }  
+   if(oneSec < klock() ){
+      oneSec = klock()+1;
+      fps = frames;
+      frames = 0;
+   }
+   tick = 0;
+   if(nextTick < klock() ){
+      nextTick = klock() + 0.0017;
+      tick = 1;
+   }
+   frames++;
+}
+setupRoids(){
+   liveroids = 5;
+   startMax = liveroids;
+   for(i=0; i<startMax;i++){ // Fill roid array
+      roidx[i] = rnd*xres;
+      roidy[i] = rnd*yres;
+      distToPlayerSpawn = sqrt( (roidx[i]-xres/2)^2+(roidy[i]-yres/2)^2 ); // kill roids too close to player spawn
+      if( distToPlayerSpawn < 250 ){
+         roidlife[i] = 0;
+         liveroids--;
+         continue;
+      }
+      roidlife[i] = 3;
+      roiddx[i] = (rnd-.5)*ROIDMAXSPD;
+      roiddy[i] = (rnd-.5)*ROIDMAXSPD;  
+   }
+}
+updateRoids(){
+   for(i=0; i<maxroids;i++){
+      if(roidlife[i] > 0){
+         collidedWith = getCollided(i,roidx[i], roidy[i]);
+         // Reverse direction on collide
+         //if( collidedWith>-1 ){
+         //   roiddx[i] = -roiddx[i]; roiddy[i] = -roiddy[i];
+         //   roiddx[collidedWith] = -roiddx[collidedWith]; roiddy[collidedWith] = -roiddy[collidedWith];
+         //   createExplosion(roidx[i], roidy[i], 25 );
+         //}
+         //add acceleration
+         roidx[i] += roiddx[i]; roidy[i] += roiddy[i];
+         //wrap-around screen   
+         if(roidx[i] > xres) roidx[i] = 0; if(roidy[i] > yres) roidy[i] = 0;
+         if(roidx[i] < 0) roidx[i] = xres; if(roidy[i] < 0) roidy[i] = yres;
+      }  
+   }
+}
+getCollided(thisroid,x,y){
+   for(i=0; i<maxroids;i++){
+      if(i != thisroid && roidlife[i] > 0){
+         dist = sqrt( (roidx[i]-x)^2+(roidy[i]-y)^2 );
+         if( dist < rsize*roidlife[i] )
+          return i;
+      }
+   }
+   return -1;
+}
+addRoid(x,y,life){
+   for(i=0; i<MAXROIDS; i++){
+      if(roidlife[i] < 1){
+         liveroids++;
+         roidlife[i] = life;
+         roidx[i] = x; roidy[i] = y;
+         roiddx[i] = (rnd-.5)*ROIDMAXSPD; 
+         roiddy[i] = (rnd-.5)*ROIDMAXSPD; 
+         return;     
+      }
+   }
+}
+splitRoid( r ){
+   score++;
+   roidlife[r] = roidlife[r]-1;
+   if(roidlife[r] > 0){
+      addRoid( roidx[r], roidy[r], roidlife[r]-1 );
+   }
+   else{
+      liveroids--;
+   }
+}
+
+createExplosion(x,y, life){
+   explodx = x;
+   explody = y;
+   explosionLife = life;
+}
+updateExplosion(){
+   if(explosionLife > 0) explosionLife--;
+}
+setupPlayer(){
+   playerx = xres/2;
+   playery = yres/2;
+   pax = 0;
+   pay = 0;
+   playerangle = 90;
+}
+updatePlayer(){
+   if(keystatus[0xc8]){ // UP
+      pax -= sin(playerAngle*pi/180)*0.025;
+      pay -= cos(playerAngle*pi/180)*0.025;
+   } 
+   if(keystatus[0xd0]){
+      pax -= sin(playerAngle*pi/180)*-0.025; // DOWN
+      pay -= cos(playerAngle*pi/180)*-0.025;
+   } 
+   if(keystatus[0xcb]) playerAngle+=2; // LEFT
+   if(keystatus[0xcd]) playerAngle-=2; // RIGHT
+   // Left ctrl to shoot
+   if(numFrames % 20 == 0)
+   if(keystatus[0x1d] || keystatus[0x9d]) CreateBullet(playerx+sin( (playerangle-180)*pi/180)*psize*1.5, playery+cos((playerangle-180)*pi/180)*psize*1.5, playerangle);
+   
+   playerx += pax;
+   playery += pay;
+   pax *= 0.995;
+   pay *= 0.995;
+   
+   // wrap-around screen
+   if(playerx > xres) playerx = 10;
+   if(playerx < 0) playerx = xres;
+   if(playery > yres) playery = 10;
+   if(playery < 0) playery = yres; 
+   
+   if( playerCollided(playerx, playery) ) gamestate = gameover; 
+}
+
+playerCollided(x,y){
+   for(i=0; i<maxroids;i++){
+      if(roidlife[i] > 0){
+         dist = sqrt( (roidx[i]-x)^2+(roidy[i]-y)^2 );
+         if( dist < psize+rsize*roidlife[i] )
+           return 1;
+      }
+   }
+   return 0;
+}
+
+updateBullets(){
+   for(b=0; b<MAXBULLETS; b++){
+      if( bulletlife[b] > 0){
+         // if bullet outta screen, remove
+         if(bulletx[b]>xres || bulletx[b]<0 || bullety[b]>yres || bullety[b]<0){
+            bulletlife[b] = 0;
+            bulletsleft++;
+            continue;
+         }
+         // update bullet position
+         bulletx[b] -= sin(bulletang[b] *pi/180) *2;
+         bullety[b] -= cos(bulletang[b] *pi/180) *2;
+         
+         // TODO. do all collision in one loop.
+         // check if hit a roid
+         for(r=0; r<MAXROIDS; r++){
+            if(roidlife[r] > 0){
+               dist = sqrt( (roidx[r]-bulletx[b])^2+(roidy[r]-bullety[b])^2 );
+               if( dist < rsize*roidlife[r] ){ // its-a-HIT!
+                  splitRoid( r );
+                  bulletlife[b] = 0;
+                  bulletsleft++;
+                  CreateExplosion( bulletx[b], bullety[b], 75 );
+                  continue;
+               } // eof roid is hit
+            } // eof roid is alive
+         } // eof check all roids         
+      } // if bullet is alive
+   } // eof updating
+} //eof update bullets
+
+CreateBullet(x,y,angle){
+   for(i=0; i<MAXBULLETS; i++){
+      if( bulletlife[i] < 1 ){
+         bulletsleft--;
+         bulletlife[i] = 1; bulletx[i] = x; bullety[i] = y; bulletang[i] = angle;
+         return;
+      }
+   }         
+}
+updateTrail(){
+   trailx[trailpos] = playerx+sin( (playerangle)*pi/180)*psize;
+   traily[trailpos] = playery+cos((playerangle)*pi/180)*psize/2;
+   if(numFrames % 3 == 0){
+   trailpos++; trailpos %= 10;
+   }
+}
+drawRoids(){
+ setcol(0x888888);
+ for( i=0; i<MAXROIDS; i++){
+   if(roidlife[i] > 0){
+      drawsph(roidx[i],roidy[i],-rsize*roidlife[i]); moveto(roidx[i]-6, roidy[i]-5 ); 
+      printf("%g", i);
+   }
+ } 
+}
+drawBullets(){
+   setcol(0xffff00);
+   for( i=0; i<MAXBULLETS; i++ ){
+      if(bulletlife[i] > 0){
+         drawsph(bulletx[i], bullety[i], bsize);
+         moveto(bulletx[i], bullety[i]);
+      }
+   }
+}
+drawExplosion(){
+   setcol(0xffa400);
+   for(i=0; i<6.2;i+=0.5){
+      moveto(explodx, explody);
+      lineto( explodx+cos(i)*explosionLife, explody+sin(i)*explosionLife );
+    }
+}
+drawShotsLeft(){
+   setcol(0xffff00);
+   drawcone(0, yres-10, 10, bulletsleft*25,yres-10, 10);
+   moveto(xres/12, yres - 15);
+   setcol(0xaaaa00);
+   printf("BULLETS");
+
+}
+drawPlayer(){
+   setcol(0x00ff00);
+   dx = Sin( playerangle*pi/180); dy = Cos( playerangle*pi/180);
+   x = playerx; y = playery;
+   //drawsph(x,y,-psize);
+   //playerangle -= 180;
+   moveto(x+sin( (playerangle-180)*pi/180)*psize*1.5, y+cos((playerangle-180)*pi/180)*psize*1.5);
+   lineto(x+sin( (playerangle-300)*pi/180)*psize, y+cos((playerangle-300)*pi/180)*psize);
+   lineto(x+sin( (playerangle-60)*pi/180)*psize, y+cos((playerangle-60)*pi/180)*psize);
+   moveto(x+sin( (playerangle-60)*pi/180)*psize, y+cos((playerangle-60)*pi/180)*psize);
+   lineto(x+sin( (playerangle-180)*pi/180)*psize*1.5, y+cos((playerangle-180)*pi/180)*psize*1.5);
+}
+drawTrail(){
+   setcol(0xdd0000);
+   for(i=0; i<MAXTRAIL; i++){
+      drawsph( trailx[i], traily[i], 10+rnd*5);     
+   }
+}

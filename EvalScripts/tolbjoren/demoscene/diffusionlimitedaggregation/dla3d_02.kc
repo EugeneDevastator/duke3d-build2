@@ -1,0 +1,392 @@
+enum{w=128};
+static img[w][w][w];
+
+enum{maxpts=200};
+static numpts =0;
+static ptc[maxpts];
+static ptx[maxpts];
+static pty[maxpts];
+static ptz[maxpts];
+static separation = 12;
+
+static iters = 1;
+static finish = 0;
+static x,y,z;
+
+
+/////////////////////////////////////////////////////////
+static generatedClosestSets = 0;
+
+enum{SHORTEST_PAIRS=maxpts*maxpts}
+static closestPair[SHORTEST_PAIRS];
+static num_shortest_pairs;
+
+enum{MAXPAIRS=maxpts*maxpts};
+static vertexFrom[MAXPAIRS];
+static vertexTo[MAXPAIRS];
+static pairsLen[MAXPAIRS];
+static num_pairs = 0;
+/////////////////////////////////////////////////////////
+
+static kazoom=0;
+
+static sorted = 0;
+
+()
+{
+   if(numframes==0){
+      reset();   
+   }
+   
+   
+   doDLA();
+   if(bstatus==1)
+   {
+      bstatus= 0;
+      reset();
+   }
+   findClosestPoints();
+   
+   render();
+}
+
+render(){
+   dist = -5;
+   cameraAng = 2*PI*mousx/xres;
+   setcam( dist*sin(cameraAng), 0, dist*cos(cameraAng),cameraAng,0 );
+   
+   cls(0); clz(1e32);
+   glBegin(GL_POINTS);
+   //if(finish==0)
+   for(i=0; i<numpts; i++){
+      setcol(ptc[i]);
+      //drawsph(ptx[i], pty[i], ptz[i], .05);
+      glvertex(ptx[i], pty[i], ptz[i]);
+   }
+   
+   if(finish==1){
+      for(i=0; i<num_shortest_pairs; i++){
+         idx = closestPair[i];
+         a = vertexFrom[idx];
+         b = vertexTo[idx];
+         
+         setcol(ptc[a]);
+         moveto(ptx[a], pty[a], ptz[a]);
+         lineto(ptx[b], pty[b], ptz[b]);
+      }
+   }
+   
+   setcol(255,255,0);
+   
+   moveto(xres*.17,100);
+   setfont(18*2,36*2,-1);
+   printf("Diffusion Limited Aggregation");
+   
+   setfont(12,16);
+   printf("\n\n\nPress mouse to reseed.");
+   printf("\n %g of %g points used",numpts,MAXPTS);
+   
+   printf("\n num_shortest_pairs = %g",num_shortest_pairs);
+   printf("\n num_pairs = %g",num_pairs);
+   printf("\n kazoom = %g",kazoom);
+
+}
+
+reset()
+{
+   generatedClosestSets = 0;
+   kazoom = 0;
+   num_shortest_pairss = 0;
+   num_pairs = 0;
+   sorted = 0;
+   
+   numpts = 0;
+   finish = 0;
+   iters = 0;
+
+   // Clear
+   for(i=0; i<W; i++)
+   for(j=0; j<W; j++)
+   for(k=0; k<W; k++)
+      img[i][j][k] = 0;
+ 
+
+   // Re-seed     
+   x = W/2;
+   y = W/2;
+   z = W/2;
+   img[y][x][z] = rgb(255,255,255);
+}
+
+doDLA()
+{
+xmin = 0;
+ymin = 0;
+zmin = 0;
+
+xmax = W;
+ymax = W;
+zmax = W;
+
+   iters++;
+   itersPerFrame = 50000;
+   if(finish==0)
+   for(i=0; i<itersPerFrame; i++){
+         if(img[y][x][z] == 0) // not allready occupied.
+         if(x > xmin && x < xmax){
+         if(y > ymin && y < ymax){
+         if(z > zmin && z < zmax){
+            // if near pixel
+            if(
+                // her kan man leke mye med kombinatorikk.
+                // {+1,-1}{x,y,z}
+                // limited XYZ freedom
+                
+                img[y-1][x][z] > 0 ||
+                img[y+1][x][z] > 0 ||
+                img[y][x+1][z] > 0 ||
+                img[y][x-1][z] > 0 ||  
+                img[y][x][z+1] > 0 ||
+                img[y][x][z-1] > 0      
+                  /*
+                // paa skraa, pretty good  
+                img[y-1][x-1][z] > 0 ||
+                img[y+1][x+1][z] > 0 ||
+                img[y+1][x-1][z] > 0 ||
+                img[y-1][x+1][z] > 0 ||
+                
+                img[y-1][x][z-1] > 0 ||
+                img[y+1][x][z-1] > 0 ||
+                img[y+1][x][z+1] > 0 ||
+                img[y-1][x][z+1] > 0 ||
+                
+                img[y][x-1][z-1] > 0 ||
+                img[y][x+1][z-1] > 0 ||
+                img[y][x+1][z+1] > 0 ||
+                img[y][x-1][z+1] > 0 
+                */
+                
+            /*
+            // great freedom        
+//z+0
+
+                img[y][x-1][z] > 0 ||
+                img[y][x+1][z] > 0 ||
+                img[y+1][x][z] > 0 ||
+                img[y-1][x][z] > 0 ||                   
+
+                img[y-1][x-1][z] > 0 ||
+                img[y-1][x+1][z] > 0 ||
+                img[y+1][x+1][z] > 0 ||
+                img[y+1][x+1][z] > 0 ||              
+//z-1                   
+                img[y][x-1][z-1] > 0 ||
+                img[y][x+1][z-1] > 0 ||
+                img[y+1][x][z-1] > 0 ||
+                img[y-1][x][z-1] > 0 ||                   
+
+                img[y-1][x-1][z-1] > 0 ||
+                img[y-1][x+1][z-1] > 0 ||
+                img[y+1][x+1][z-1] > 0 ||
+                img[y+1][x+1][z-1] > 0 ||               
+// z+1
+                img[y][x-1][z+1] > 0 ||
+                img[y][x+1][z+1] > 0 ||
+                img[y+1][x][z+1] > 0 ||
+                img[y-1][x][z+1] > 0 ||                   
+
+                img[y-1][x-1][z+1] > 0 ||
+                img[y-1][x+1][z+1] > 0 ||
+                img[y+1][x+1][z+1] > 0 ||
+                img[y+1][x+1][z+1] > 0 
+                */
+                //0
+                )
+            {
+            
+            hue = 360 * iters / (maxpts);
+            r=0; g=0; b=0;
+            hsv_to_rgb(hue % 360,1,1,r,g,b);
+            img[y][x][z] = rgb(r,g,b); // set occupied.
+            
+            // Add point to array.
+            if(numpts < maxpts)
+            {
+               ptc[numpts] = img[y][x][z];
+               ptx[numpts] = separation*( (x-W/2) /W);
+               pty[numpts] = separation*( (y-W/2) /W);
+               ptz[numpts] = separation*( (z-W/2) /W);
+               numpts++;
+            }
+            else // run out of points... so finish
+            {
+               finish = 1;
+            }
+            
+            // stop when hit border
+            //if(x < 10 || x > W-10) finish = 1;
+            //if(y < 10 || y > W-10) finish = 1;
+            //if(z < 10 || z > W-10) finish = 1;
+            // reset pos
+            x = int(rnd*W);
+            y = int(rnd*W);
+            z = int(rnd*W);
+            }
+         }}} //end boundscheck xyz
+         
+         else
+         {
+            x = min( max(0,x), W );
+            y = min( max(0,y), W );
+            z = min( max(0,z), W );
+
+            // reset pos
+            x = int(rnd*W);
+            y = int(rnd*W);
+            z = int(rnd*W);
+         }
+         // move randomly
+         
+         //x += int( 1.2*cos(nrnd+time*15) );
+         //y += int( 1.2*sin(nrnd+time*15) );
+         
+         //x += int( rnd*10*(nrnd) );
+         //y += int( 2.2*(nrnd) );
+
+         //x += 1*noise( 10/time, sin(time) );
+         //y += 1*noise( 10/time, sin(time) );         
+         
+         //x += nrnd;
+         //y += nrnd;
+         //z += nrnd;
+         
+         dir = int(rnd*6);
+         if(dir==0){ x++; }
+         if(dir==1){ x--; }   
+         if(dir==2){ y++; }
+         if(dir==3){ y--; }
+         if(dir==4){ z++; }
+         if(dir==5){ z--; }
+
+
+         if(x < 0 || x > W || y < 0 || y > W || z < 0 || z > W)
+         {
+            // reset pos
+            x = int(rnd*W);
+            y = int(rnd*W);
+            z = int(rnd*W);
+         }   
+   }
+}
+
+hsv_to_rgb(h,s,v,&r,&g,&b){ 
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   r=int(r*255);
+   g=int(g*255);
+   b=int(b*255);
+}
+
+findClosestPoints()
+{
+   // Naive closest points algorithm: loop thru all
+   if(finish==1 && generatedClosestSets == 0)
+   {
+      kazoom = 1;
+      for(i=0; i<numpts; i++)
+      {
+         for(j=0; j<numpts; j++)
+         {
+            //if(i!=j)
+            {
+               vertexFrom[num_pairs] = i;
+               vertexTo[num_pairs] = j;
+               pairsLen[num_pairs] = (ptx[i]-ptx[j])^2 + (pty[i]-pty[j])^2 + (ptz[i]-ptz[j])^2;
+               num_pairs++;   
+            }
+         }
+      }
+      
+      
+      // go thru all pairs and find shortest
+      mindist = 1e32;
+      smallest = -1;
+      for(i=0; i<num_pairs; i++)
+      {
+         if( pairsLen[i] < mindist )
+         {
+            mindist = pairsLen[i];
+            smallest = i;
+         }     
+      }
+         
+      if(smallest > -1)
+      {
+         closestPair[num_shortest_pairs] = smallest;
+         num_shortest_pairs++;
+      }
+      
+   }
+
+   
+
+   
+   // draw line from oldest to newest.
+   /*
+   static sortcriteria[MAXPTS];
+   static order[MAXPTS];
+   
+      if(finish == 1 && sorted == 0)
+      {
+         for(i=0;i<numpts;i++)
+         {
+            sortcriteria[i] = ptc[i];
+            order[i] = i;
+         }
+         
+         //Crap sort
+         for(i=1;i<numpts;i++)
+         for(j=0;j<i;j++)
+            if (sortcriteria[order[i]] < sortcriteria[order[j]]){
+               t = sortcriteria[i]; 
+               sortcriteria[i] = sortcriteria[j]; 
+               sortcriteria[j] = t;
+            }
+         sorted = 1;
+            
+   
+   }
+   
+   if(sorted == 1)
+   {
+      i = order[numpts-1];
+      moveto(ptx[i], pty[i], ptz[i]);
+      for(j=numpts-1;j>=0;j--)
+      {
+         i = order[j];
+         setcol(ptc[i]);
+         lineto(ptx[i], pty[i], ptz[i]);
+      }
+   }
+   */
+   
+
+   generatedClosestSets = 1;
+}

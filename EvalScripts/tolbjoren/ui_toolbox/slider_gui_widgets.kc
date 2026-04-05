@@ -1,0 +1,116 @@
+// written 22.june 09 by Torbjoern
+
+/*
+ -now it isnt possible to select multiple sliders at once, all sliders check if someone else has lock
+ -the slider doesnt stop when the mouse goes past its limits (0,length), it is set to min (0) or max (length)
+
+*/
+
+static scale = 50;
+static r,g,b;
+()
+{
+
+   cls(0);
+   
+   if(numframes==0)
+   { 
+      r = 255;
+      g = 255;
+      b = 0;
+   }
+   
+   cx = xres/2;
+   cy = yres/2;
+   sliderPosX = cx - 150;
+   sliderPosY = cy - 2*50;
+   
+   
+   sliderAdvanced(3,scale,-128,128,sliderPosX, sliderPosY+150, 400);
+   sliderAdvanced(4,r,0,255,sliderPosX, sliderPosY+50*5, 400);
+   sliderAdvanced(5,g,0,255,sliderPosX, sliderPosY+50*6, 400);
+   sliderAdvanced(6,b,0,255,sliderPosX, sliderPosY+50*7, 400);
+   
+   setcol(r,g,b);
+   drawsph(xres/2, yres/2, scale);
+}
+
+sliderAdvanced(sliderNum, &value, minval, maxval, x, y, length)
+{
+   intrinsicRatio = (maxval-minval)/(length-0); // intrinsicRatio = (maxvalue-minvalue)/(endpoint2-endpoint1)
+   sliderval = (value-minval) / intrinsicRatio;
+   slider(sliderNum,sliderval,x,y,length); 
+   value = (sliderval) * intrinsicRatio + minval; // Value = (thisPoint - endPoint1) * intrinsicRatio + minValue
+   //printf("\n intRatio:%g", intrinsicRatio);
+   printf("\nvalue=%.3f", value);
+}
+
+slider(sliderNum,&value,x,y,length)
+{
+   enum{numSliders=10};
+   static mouseLock[numSliders];
+
+
+   // Constructor, set slider to mid position
+   if(numframes==0)
+   {
+      //value = .5 * length; // this is what makes the adv slider work. :S
+      mouseLock[sliderNum] = 0;
+   }  
+   // Draw slider
+   setcol(255,255,255);
+   moveto(x,y);
+   lineto(x+length,y);
+   drawsph(x+value,y,-10);
+   moveto(x+value,y+10);
+   printf("value=%g",value);
+   
+   // mouse input
+   //mouseValue = mousx/(xres/2)-1;
+
+   // Check if anyone else has lock, if so exit.
+   if(mouseLock[sliderNum] == 0)
+   for(i=0; i<numSliders; i++)
+   {
+      if(i==sliderNum) continue; // if we have lock no problem
+      if(mouseLock[i]) return; // someone else has lock
+   }   
+
+   if(bstatus==1)
+   {
+      mx = mousx; my = mousy; 
+      if(mouseLock[sliderNum]) // mouse has lock-on, move slider
+      {
+         setcol(255,0,0);
+         drawsph(x+value, y,-5);
+         if(mx <= (x+length) && mx >= x) // limit movement to slider line
+         {
+            intrinsicRatio = (length-0)/( (length+x)-x);
+            value = ( mx-x)*intrinsicRatio + 0;
+         }
+         else if(mx > (x+length) )
+         {
+            value = length;
+         }
+         else if(mx < x)
+         {
+            value = 0;
+         }
+      }
+      else // check for collision
+      {
+         if( isColliding(mx,my,x+value,y,10) ) mouseLock[sliderNum] = 1; 
+      }
+   }
+   else // mouse released
+   {
+      mouseLock[sliderNum] = 0;
+   }
+
+}
+
+isColliding(x1,y1,x2,y2,radius)
+{
+   if((x1-x2)^2 + (y1-y2)^2 < radius^2 ) return 1;
+   return 0;
+}

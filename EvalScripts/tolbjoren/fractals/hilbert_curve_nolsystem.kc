@@ -1,0 +1,131 @@
+
+enum {
+  UP=1,
+  LEFT,
+  DOWN,
+  RIGHT
+};
+
+static x,y;
+static drawScale=0;
+static levelMax=0;
+()
+{
+  cls(0);
+	
+	x=xres/2;
+	y=yres/2;
+	
+	levelsToDraw = min(9, max(1, int(mousx/xres*9) ) );
+	levelMax = levelsToDraw;
+	
+  curveLen = pow(2,levelMax) - 1/pow(2,levelMax);
+  squareSideLen = 400;
+  drawScale = squareSideLen / curveLen;
+  x = xres/2 + squareSideLen/2;
+  y = yres/2 - squareSideLen/2;
+  setcol(64,64,64);
+  drawrectopen(x-squareSideLen, y+squareSideLen,x,y);
+  moveto(x,y);	
+	
+	setcol(128,128,128);
+	hilbert_level(levelsToDraw,UP);
+}
+
+move(level,dir)
+{
+  setcol( hsv_to_rgb( level/levelMax*240 ,1,1) );
+	
+  if(dir==LEFT) { x+=drawScale;  }
+	else if(dir==RIGHT) { x-=drawScale; }
+	else if(dir==UP) { y-=drawScale; }
+	else if(dir==DOWN) { y+=drawScale; }
+	
+	lineto(x,y);
+}
+
+hilbert_level(level,direction)
+{
+  if (level==1) {
+    if (direction==LEFT) {
+      move(level,RIGHT);
+      move(level,DOWN);
+      move(level,LEFT);
+    }
+    else if (direction==RIGHT) {
+      move(level,LEFT);
+      move(level,UP);
+      move(level,RIGHT);
+    }
+    else if (direction==UP) {
+      move(level,DOWN);
+      move(level,RIGHT);
+      move(level,UP);
+    }
+    else if (direction==DOWN) {
+      move(level,UP);
+      move(level,LEFT);
+      move(level,DOWN);
+    }
+    } else {
+    if (direction==LEFT) {
+      hilbert_level(level-1,UP);
+      move(level,RIGHT);
+      hilbert_level(level-1,LEFT);
+      move(level,DOWN);
+      hilbert_level(level-1,LEFT);
+      move(level,LEFT);
+      hilbert_level(level-1,DOWN);
+    }
+    else if (direction==RIGHT) {
+      hilbert_level(level-1,DOWN);
+      move(level,LEFT);
+      hilbert_level(level-1,RIGHT);
+      move(level,UP);
+      hilbert_level(level-1,RIGHT);
+      move(level,RIGHT);
+      hilbert_level(level-1,UP);
+    }
+    else if (direction==UP) {
+      hilbert_level(level-1,LEFT);
+      move(level,DOWN);
+      hilbert_level(level-1,UP);
+      move(level,RIGHT);
+      hilbert_level(level-1,UP);
+      move(level,UP);
+      hilbert_level(level-1,RIGHT);
+    }
+    else if (direction==DOWN) {
+      hilbert_level(level-1,RIGHT);
+      move(level,UP);
+      hilbert_level(level-1,DOWN);
+      move(level,LEFT);
+      hilbert_level(level-1,DOWN);
+      move(level,DOWN);
+      hilbert_level(level-1,LEFT);
+    }
+  }
+}
+hsv_to_rgb(h,s,v){ 
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   return rgb( r*255, g*255, b*255 ); 
+}
+drawrectopen(x0,y0,x1,y1) { moveto(x0,y0); lineto(x1,y0); lineto(x1,y1); lineto(x0,y1); lineto(x0,y0); }

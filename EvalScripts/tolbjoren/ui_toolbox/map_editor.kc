@@ -1,0 +1,56 @@
+
+enum{nodesWide = 20, nodesHigh = 20}
+static world[nodesWide][nodesHigh];
+static colorTable[3];
+()
+{
+   if(numframes==0)
+   {
+      colorTable[0] = rgb(128,128,128);   
+      colorTable[1] = rgb(255,0,0);
+      colorTable[2] = rgb(0,0,255);
+
+      for(i=0; i<nodesWide; i++)
+      for(j=0; j<nodesHigh; j++)
+      {
+         world[i][j] = 0;
+      }
+   }
+
+   cls(0);
+   
+   blockSiz = xres/nodesWide;
+   
+   for(i=0; i<nodesWide; i++)
+   for(j=0; j<nodesHigh; j++)
+   {
+      blockCol = colorTable[ world[i][j] ];
+      if( blockCol > 0 )
+      {
+         setcol( blockCol );
+         fillRect( i*blockSiz, j*blockSiz, blockSiz-1, blockSiz-1 );
+      }
+   }
+  
+
+   pickX = mousx / blockSiz;
+   pickY = mousy / blockSiz; 
+   if( bstatus == 1 )
+   {
+      world[pickX][pickY] = 1; 
+   }
+   if( bstatus == 2 )
+   {
+      world[pickX][pickY] = 0; 
+   }
+
+}
+
+fillRect(sx, sy, wx, wy)
+{
+   for(i=0; i!=wx; i++)
+   {   
+      moveto(sx, sy+i);
+      lineto(sx+wx, sy+i);
+   }
+}

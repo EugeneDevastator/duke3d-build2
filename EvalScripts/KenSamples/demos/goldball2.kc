@@ -1,0 +1,46 @@
+()clz(1e32);
+cls(0,0,0); ainc = (1-(sqrt(5)-1)/2)*PI*2;
+if (bstatus == 1) { glob[4] = 1;
+   glob[0] += mousx-glob[1];
+   glob[2] += mousy-glob[3];
+}
+if (glob[4] == 0)
+{  t = klock(0)*.1; c1 = cos(t); s1 = sin(t);
+   c2 = 1; s2 = 0;
+}
+else
+{  t = glob[0]*1.4/xres; c1 = cos(t); s1 = sin(t);
+   t = glob[2]*1.4/yres; c2 = cos(t); s2 = sin(t);
+}
+if (bstatus >= 2) glob[5] += (mousy-glob[3])*.01;
+glob[1] = mousx; glob[3] = mousy;
+
+n = 8192; nainc = (n-.5)*ainc; zmul = 2/(n*ainc);
+depth = glob[5]+1.7; culldepth = depth-1/depth;
+hx = xres*.5; hy = yres*.5; hz = hx;
+if (1)
+{
+   c = 1; ci = cos(ainc)-1;
+   s = 0; si = sin(ainc); m = ci*2;
+}
+for(a=nainc;a>0;a-=ainc)
+{
+   z = a*zmul-1; r = sqrt(1-z*z);
+   if (0) { x = cos(a)*r; y = sin(a)*r; } else {
+      x = c*r; c += ci; ci += c*m;
+      y = s*r; s += si; si += s*m;
+   }
+   ox = x; x = c1*x - s1*z; z = c1*z + s1*ox;
+   oy = y; y = c2*y - s2*z; z = c2*z + s2*oy;
+
+   z += depth;
+    
+   col = 256/z; setcol(col,col,col);
+   drawsph(x,y,z,.005);
+}
+setcol(255,255,255);
+for(i=2;i<4;i++)
+{
+   setpix(mousx-i,mousy-i); setpix(mousx+i,mousy-i);
+   setpix(mousx-i,mousy+i); setpix(mousx+i,mousy+i);
+} return(0);

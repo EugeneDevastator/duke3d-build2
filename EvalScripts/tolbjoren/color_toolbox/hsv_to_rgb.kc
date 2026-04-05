@@ -1,0 +1,35 @@
+// this function takes Hue (0-360 degrees), Saturation (0.0-1.0) and Value/brightness (0.0-1.0)
+// and returns a RGB int
+()
+{
+   cls(0);
+   length = 25*20;
+   for(x=0; x<20; x++){
+   c = hsv_to_rgb( (numframes+x*18) % 360, 1,1);
+   setcol(c);
+   drawsph(xres/2,yres/2-length/2+x*25,25);
+   }
+}
+
+hsv_to_rgb(h,s,v){ 
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   return rgb( r*255, g*255, b*255 ); 
+}

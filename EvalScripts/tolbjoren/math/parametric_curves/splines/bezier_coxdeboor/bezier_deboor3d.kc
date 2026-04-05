@@ -1,0 +1,453 @@
+//begin cam
+static posx = 0;
+static posy = 0;
+static posz = 2;
+static posh = 0; // left right
+static posv = 1*PI;
+//end cam
+
+
+enum{PTS = 5}
+
+struct Vec3{
+   x,y,z;
+}
+
+static bpolys[PTS][PTS];
+static result[PTS][PTS];
+static pointmat[PTS][PTS];
+()
+{   
+   cls(0); clz(1e32);
+   playercontrols(); 
+   
+ 
+   static Vec3 Points[PTS];
+   if(numframes==0)
+   for(i=0; i<PTS; i++)
+   {
+      Points[i].x = nrnd;
+      Points[i].y = nrnd;
+      Points[i].z = nrnd;
+   }   
+   
+// Mouse Grab
+   mindist = 1e32;
+   minIdx = -1;
+   for(i=0; i<PTS; i++)
+   {
+      //handle( Points[i].x, Points[i].y, Points[i].z ); 
+      
+
+      dist = sqrt( (mousx-Points[i].x)^2 +  (mousy-Points[i].y)^2);
+      if( dist < 10 )
+      {
+         setcol(0,0,255);
+         drawsph( Points[i].x, Points[i].y, 10);  
+      }else{
+         setcol(128,128,128);
+         drawsph( Points[i].x, Points[i].y, -10); 
+         
+      }
+      setcol(255,128,0);
+      moveto(Points[i].x-4, Points[i].y-3); printf("%.0f",i);
+         
+
+      if(dist < mindist )
+      {
+         mindist = dist;
+         minIdx = i;
+      }
+   }
+   if(bstatus==2)
+   {
+   //   Points[minIdx].x = mousx;
+   //   Points[minIdx].y = mousy;
+   }
+   
+   cls(0); clz(1e32);
+   for(i=0; i<PTS; i++)
+   {
+      //handle( Points[i].x, Points[i].y, Points[i].z ); 
+      drawsph( Points[i].x, Points[i].y, Points[i].z, .1 );
+   }
+   
+   
+   
+  
+   t = 0;
+   numSteps = 50;
+   du = 1.0 / (numSteps-1);
+
+   fatty = 0.05;
+   setcol(255,255,255);
+   //moveto(points[0].x, points[0].y, points[0].z);
+   drawcone(points[0].x, points[0].y, points[0].z, fatty,
+            points[0].x, points[0].y, points[0].z, fatty, 0);
+   px = points[0].x;
+   py = points[0].y;
+   pz = points[0].z;
+   ox=px; oy=py; oz=pz;
+   for(step=0; step<numSteps; step++)
+   {
+      
+      t = step*1.0 / (numSteps-1);
+      c = hsv_to_rgb(t*360,1,1);
+      setcol(c);
+
+      bernstein(bpolys,t,1);
+      //inverse(bpolys,result);
+
+      // Q(t) = UMG
+      // Q - interpolated pt
+      // U - interpolants
+      // M - coeff matrix
+      // G - pts on curve 
+      
+      for(i=0; i<PTS; i++)
+      {
+         pointmat[i][0] = points[i].x;
+         pointmat[i][1] = points[i].y;
+         pointmat[i][2] = points[i].z;
+      }
+      matrixMultiply( bpolys, pointmat, result);
+      px = result[0][0];
+      py = result[0][1];
+      pz = result[0][2];
+      
+      s = 0.08;
+      dx = s*result[1][0];
+      dy = s*result[1][1];
+      dz = s*result[1][2];
+            
+      //setpix( px, 
+      //        py);
+              
+      //lineto( px,py,pz);
+      drawcone(ox,oy,oz, fatty,
+               px,py,pz, fatty, 0);
+      ox=px; oy=py; oz=pz;
+            
+      if(step%10==0)
+      {
+      //lineto( px+dx,py+dy,pz+dz);
+      }
+      //moveto( px,py,pz);
+   } 
+
+   // Vis et punkt
+   t = clamp(mousx/xres,0,1);
+   bernstein(bpolys,t,1);
+      for(i=0; i<PTS; i++)
+      {
+         pointmat[i][0] = points[i].x;
+         pointmat[i][1] = points[i].y;
+         pointmat[i][2] = points[i].z;
+      }
+      matrixMultiply( bpolys, pointmat, result);
+      px = result[0][0];
+      py = result[0][1];
+      pz = result[0][2];
+   drawsph( px, py, 10 );
+   moveto( px, py);
+   printf("t=%.1f",t);
+
+   setcol(128,128,128);
+   drawMatrix();
+
+}
+
+clamp(v,lo,hi)
+{
+   return min(hi,max(lo,v));
+}
+
+drawMatrix()
+{
+   t = mousx/xres;
+   bernstein(bpolys,t,1);
+   
+   
+   moveto(0,0);
+   for(i=0; i<PTS; i++)
+   {
+      for(j=0; j<PTS; j++){
+         b = bpolys[i][j];
+         if( b > -1e-7 )
+         {
+            printf("+%.2f  ", bpolys[i][j]);
+         }else{
+            printf("%.2f  ", bpolys[i][j]);
+         }
+      }
+      printf("\n");
+   }
+   printf("\n");
+   
+   if(0)
+   {
+      inverse(bpolys,result);
+      for(i=0; i<PTS; i++)
+      {
+         for(j=0; j<PTS; j++){
+            b = result[i][j];
+            if( b > -1e-7 )
+            {
+               printf("+%.3f  ", result[i][j]);
+            }else{
+               printf("%.3f  ", result[i][j]);
+            }
+         }
+         printf("\n");
+      }
+   }
+
+   printf("\n");
+   printf("\n");
+   for(i=0; i<PTS; i++)
+   {
+      for(j=0; j<PTS; j++){
+         printf("%.g%g  ", i,j);
+         
+      }
+      printf("\n");
+   }
+}
+
+bernstein(B[PTS][PTS],t,delta) 
+{
+      //_bernsteinPoly.setDim(d+1,d+1);
+      d = pts-1; //d = degree
+      
+//set bottom row
+      B[d-1][0] = 1-t;
+      B[d-1][1] = t;
+// work from bottom and upwards
+      for(i=(d-2); i>=0; i--)
+      {
+            B[i][0] = (1-t) * B[i+1][0];
+            for(j=1; j< (d-i); j++)
+            {
+                  B[i][j] = t*B[i+1][j-1] + (1-t)*B[i+1][j];
+                  
+            }
+            B[i][d-i] = t*B[i+1][d-i-1];
+
+      }
+   
+   if(1) // want derivatives?
+   {
+      B[d][0] = -delta;
+      B[d][1] = delta;
+      
+      for(k=2; k<=d; k++)
+      {
+            s = k*delta;
+            for(i=d; i>d-k; i--)
+            {
+               B[i][k] = s*B[i][k-1];
+               for(j=k-1; j>0; j--)
+               {
+                 B[i][j] = s*(B[i][j-1]-B[i][j]);
+               }
+               B[i][0] = -s*B[i][0];
+            }
+      }
+   }
+}
+
+
+MultiplyMatrixVector3(mat[3][3], vec[3], &x, &y, &z)
+{
+    x = vec[0] * mat[0][0] + vec[1] * mat[1][0] + vec[2] * mat[2][0];
+    y = vec[0] * mat[0][1] + vec[1] * mat[1][1] + vec[2] * mat[2][1];
+    z = vec[0] * mat[0][2] + vec[1] * mat[1][2] + vec[2] * mat[2][2];
+}
+
+//http://stackoverflow.com/questions/983999/simple-3x3-matrix-inverse-code-c
+
+determinantOfMinor( theRowHeightY,
+                    theColumnWidthX,
+                    theMatrix [/*Y*/3] [/*X=*/3] )
+{
+  x1 = theColumnWidthX == 0 ? 1 : 0;  /* always either 0 or 1 */
+  x2 = theColumnWidthX == 2 ? 1 : 2;  /* always either 1 or 2 */
+  y1 = theRowHeightY   == 0 ? 1 : 0;  /* always either 0 or 1 */
+  y2 = theRowHeightY   == 2 ? 1 : 2;  /* always either 1 or 2 */
+
+  return ( theMatrix [y1] [x1]  *  theMatrix [y2] [x2] )
+      -  ( theMatrix [y1] [x2]  *  theMatrix [y2] [x1] );
+}
+
+
+determinant( theMatrix [/*Y=*/3] [/*X=*/3] )
+{
+  return ( theMatrix [0] [0]  *  determinantOfMinor( 0, 0, theMatrix ) )
+      -  ( theMatrix [0] [1]  *  determinantOfMinor( 0, 1, theMatrix ) )
+      +  ( theMatrix [0] [2]  *  determinantOfMinor( 0, 2, theMatrix ) );
+}
+
+
+inverse( theMatrix [/*Y=*/3] [/*X=*/3],
+         theOutput [/*Y=*/3] [/*X=*/3] )
+{
+  det = determinant( theMatrix );
+
+    /* Arbitrary for now.  This should be something nicer... */
+  if ( abs(det) < 1e-2 )
+  {
+    //memset( theOutput, 0, sizeof theOutput );
+    return 0;
+  }
+
+  oneOverDeterminant = 1.0 / det;
+
+  for (   y = 0;  y < 3;  y ++ )
+    for ( x = 0;  x < 3;  x ++   )
+    {
+        /* Rule is inverse = 1/det * minor of the TRANSPOSE matrix.  *
+         * Note (y,x) becomes (x,y) INTENTIONALLY here!              */
+      theOutput [y] [x]
+        = determinantOfMinor( x, y, theMatrix ) * oneOverDeterminant;
+
+        /* (y0,x1)  (y1,x0)  (y1,x2)  and (y2,x1)  all need to be negated. */
+      if( 1 == ((x + y) % 2) )
+        theOutput [y] [x] = - theOutput [y] [x];
+    }
+
+  return 1;
+}
+
+matrixMultiply( theMatrixA [/*Y=*/PTS] [/*X=*/PTS],
+                theMatrixB [/*Y=*/PTS] [/*X=*/PTS],
+                theOutput  [/*Y=*/PTS] [/*X=*/PTS]  )
+{
+  for (   y = 0;  y < PTS;  y ++ )
+    for ( x = 0;  x < PTS;  x ++   )
+    {
+      theOutput [y] [x] = 0;
+      for ( i = 0;  i < PTS;  i ++ )
+        theOutput [y] [x] +=  theMatrixA [y] [i] * theMatrixB [i] [x];
+    }
+}
+hsv_to_rgb(h,s,v){ 
+   // expects 360deg and 1,1 hue sat max
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   r=int(r*255);
+   g=int(g*255);
+   b=int(b*255);
+   return r*2^16 + g*2^8 + b; 
+}
+// Camera and movement code taken from /games/
+//Handle input and player movement
+playercontrols()
+{
+   static oldMouseX;
+   static oldMouseY;
+   static mouseSpeedX;
+   static mouseSpeedY; 
+
+   f = .1;
+   if (keystatus[0x2a]) f /= 4;
+   if (keystatus[0x36]) f *= 4;
+   vx = (keystatus[32]-keystatus[30])*f; //D-A
+   vy = (keystatus[17]-keystatus[31])*f; //W-S  
+   vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   
+   static mat[9]; 
+   ang2mat(posh,posv,mat); // Convert angles to rotation matrix
+   
+   // find new position
+   posx += mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   posy += mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   posz += mat[2]*vx + mat[5]*vz + mat[8]*vy; 
+   // mousespeed values are tweaked for 60 fps
+   mouseSpeedX = (mousx - oldMouseX) * 0.01;
+   mouseSpeedY = (mousy - oldMouseY) * 0.01;
+   oldMouseX = mousx;
+   oldMouseY = mousy;
+   if(bstatus==1)
+   {
+      posh -= mouseSpeedX;
+      posv += mouseSpeedY;
+   }
+   // Right,down,forwards unit vectors.
+   setcam(posx,posy,posz,
+          mat[0],mat[1],mat[2],
+          mat[3],mat[4],mat[5],
+          mat[6],mat[7],mat[8]);
+}
+/* converts horizontal and vertical angles to a 3x3 rotation matrix */
+ang2mat(hang,vang,mat[9])
+{
+   mat[0] = cos(hang); mat[1] = 0; mat[2]=-sin(hang);
+   mat[6] = cos(vang)*sin(hang); mat[7] = sin(vang); mat[8]=cos(vang)*cos(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}
+
+arrow3D(vec3 s, vec3 e, scaler2)
+{
+   scale = 0.05 * scaler2;
+   drawcone(s.x, s.y, s.z,scale,
+            e.x, e.y, e.z,scale);
+   dx = e.x-s.x;
+   dy = e.y-s.y;
+   dz = e.z-s.z;
+   len = sqrt( dx*dx + dy*dy + dz*dz );
+   len = len * 0.1;
+   len = max(0.1,len);
+   drawcone(e.x-len*dx, e.y-len*dy, e.z-len*dz, -scale*2,
+            e.x+len*dx, e.y+len*dy, e.z+len*dz, 0);
+}
+
+handle(x,y,z)
+{
+   scale = 0.7;
+   vec3 st;
+   vec3 en;
+   st.x =x;
+   st.y =y;
+   st.z =z;
+   en.x =x;
+   en.y =y+scale;
+   en.z =z;
+   setcol(255,0,0);
+   arrow3D(st,en,scale);  
+   st.x =x;
+   st.y =y;
+   st.z =z;
+   en.x =x;
+   en.y =y;
+   en.z =z+scale;
+   setcol(0,255,0);
+   arrow3D(st,en,scale);    
+   st.x =x;
+   st.y =y;
+   st.z =z;
+   en.x =x+scale;
+   en.y =y;
+   en.z =z;
+   setcol(0,0,255);
+   arrow3D(st,en,scale);  
+
+}

@@ -1,0 +1,79 @@
+clz(1e32);
+static a0, a1, a2, px, py, pxv, pyv, t, tim = -1, timhack = 0, odklock;
+enum {N=256}; static mx[N], my[N], ma[N], mn;
+
+oklock = klock(); otim = tim; tim = (oklock-timhack)/4; dtim = tim-otim;
+if (keystatus[0x36]) timhack += oklock-odklock;
+odklock = oklock;
+ot = t; t = tim-int(tim);
+
+if (t < .35) i = 0; else i = max(256-(t-.35)/(1-.35)*1024,1);
+cls(0,i,i);
+
+if (numframes == 0) playsong("fidsong.mid",-20);
+if (int(tim) != int(otim))
+{
+   a0 = int(10*rnd);
+   a1 = int(10*rnd);
+   a2 = a0+a1;
+   playtext("%g + %g =",a0,a1);
+   px = xres*rnd; pxv = nrnd/3;
+   py = yres*rnd; pyv = nrnd/3;
+}
+
+setfont(12,16); r = 0; g = 0; b = 0;
+
+px += pxv;
+py += pyv;
+if (px <      16   ) { px = min(  16        *2-px,yres); pxv = abs(pxv); }
+if (px > xres-128*5) { px = max((xres-128*5)*2-px,   0); pxv =-abs(pxv); }
+if (py <      16   ) { py = min(  16        *2-py,yres); pyv = abs(pyv); }
+if (py > yres-16*5 ) { py = max((yres-16*5) *2-py,   0); pyv =-abs(pyv); }
+
+if (t < .35) setcol(0x000001); else setcol(0);
+moveto(1,1); printf("%g + %g = %g",a0,a1,a2);
+setcol(0xa0a0a0);
+xe = 96;
+if (t >= .35) { xe = ((a0>=10)+(a1>=10)+(a2>=10))*12+112; nt = (t-.35)*- 6+4; }
+                                                     else nt = (t-.35)*+10+4;
+for(y=0;y<16;y++)
+   for(x=0;x<xe;x++)
+   {
+      getpix(x,y,&r,&g,&b); if (b == 0) continue;
+      drawsph(px+x*5-xres/2,py+y*5-yres/2,xres/2,nt);
+   }
+
+setcol(0xffffff); r = 90; nt = min(t*4/.35,4);
+
+if ((t >= .35) && (ot < .35))
+{
+   for(i=0;i<a2;i++) playsound("rulinst.wav",50,1.5/1.1^i);
+   playtext(",%g",a2);
+}
+if (t < .35)
+{   
+   mn = 0;
+   for(a=0;a<a0;a++) { mx[mn] = -5+nt; my[mn] = (a-(a0-1)/2)*1.2; ma[mn] = -1.65+nt*.4; mn++; }
+   if (t > .18)
+   for(a=0;a<a1;a++) { mx[mn] = +5-nt; my[mn] = (a-(a1-1)/2)*1.2; ma[mn] = +1.65-nt*.4; mn++; }
+}
+else
+{
+   for(i=0;i<mn;i++)
+      for(j=0;j<i;j++)
+      {
+         dx = mx[j]-mx[i]; dy = my[j]-my[i];
+         d2 = dx^2+dy^2;
+         d = dtim*32/(d2*sqrt(d2));
+         mx[i] -= dx*d; mx[j] += dx*d;
+         my[i] -= dy*d; my[j] += dy*d;
+      }
+   rad = sqrt(mn);
+   for(i=0;i<mn;i++)
+   {
+      d = rad/sqrt(mx[i]^2+my[i]^2);
+      mx[i] += (mx[i]*d - mx[i])*.1;
+      my[i] += (my[i]*d - my[i])*.1;
+   }
+}
+for(i=0;i<mn;i++) drawkv6("caco.kv6",-r,mx[i]*r,my[i]*r,12*r,ma[i],0);

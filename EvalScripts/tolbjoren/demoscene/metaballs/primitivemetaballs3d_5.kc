@@ -1,0 +1,267 @@
+// Try to plot surface and not "everything"
+enum{width=40, number_of_blobs=5};
+static x_offset_table[number_of_blobs*width];
+static y_offset_table[number_of_blobs*width];
+static z_offset_table[number_of_blobs*width];
+static blobx[number_of_blobs];
+static bloby[number_of_blobs];
+static blobz[number_of_blobs];
+
+static fieldStrengthAtPoint[width][width][width];
+
+// Camera position and angle (Y,Z)
+static posx =0;
+static posy =-50;
+static posz = -100;
+static posh = 0;
+static posv = 0.5;
+
+// Mouse speed calc
+static oldMouseX;
+static oldMouseY;
+static mouseSpeedX;
+static mouseSpeedY; 
+
+// FPS calc
+static fps = 0;
+static frames = 0;
+static lastFPSCheck = 0;
+
+static veryBigNum = 200000000000*number_of_blobs;
+ 
+() 
+{
+   if(numframes==0)
+   {      
+      oldMouseX = mousx;
+      oldMouseY = mousy;
+      mouseSpeedX = 0.0;
+      mouseSpeedY = 0.0;
+      
+      lastFPSCheck = klock();
+   }
+
+   cls(0); clz(1e32);
+   playercontrols(&posx,&posy,&posz,&posh,&posv);
+   if(posv > 1.5) posv = 1.5;
+   if(posv < -1.5) posv = -1.5;
+   setcam(posx,posy,posz,posh,posv); 
+
+   moveBlobs();
+   blobs();
+   sleep(1);
+   
+   calcFps();
+}
+
+calcFps()
+{
+   frames++;
+   time = klock();
+   if(time > lastFPSCheck+1.0)
+   {
+      fps = frames;
+      frames = 0;
+      lastFPSCheck = time;
+   }
+}
+
+moveBlobs()
+{
+   a = 2;
+   b = 3; 
+   ofs = width/2; // Move center of movement to middle of "electric" field.
+   blobx[0] = ofs+2*a*sin(a*numframes/150 + pi/3);
+   bloby[0] = ofs-2*b*sin(b*numframes/150 - pi/3);
+   blobz[0] = ofs+2*b*sin(b*numframes/150 + pi/2); 
+
+   blobx[1] = ofs-3*a*sin(a*numframes/100 + pi/2);
+   bloby[1] = ofs+3*b*sin(b*numframes/100);
+   blobz[1] = ofs+3*b*sin(b*numframes/100 + pi/2);
+   
+   blobx[2] = ofs+4*a*sin(a*numframes/50 + pi/2);
+   bloby[2] = ofs+4*b*sin(b*numframes/50);
+   blobz[2] = ofs-4*b*sin(b*numframes/50 + pi/2);
+  
+   blobx[3] = ofs-5*a*sin(a*numframes/50 + pi/3);
+   bloby[3] = ofs-5*b*sin(b*numframes/50);
+   blobz[3] = ofs+5*b*sin(b*numframes/50 + pi/3);
+   
+   blobx[4] = ofs+6*a*sin(a*numframes/150 + pi/3);
+   bloby[4] = ofs-6*b*sin(b*numframes/50);
+   blobz[4] = ofs-6*b*sin(b*numframes/150 + pi/3);
+}
+
+blobs()
+{
+   calcDistanceSquared();
+
+
+   calcFieldPerf = klock();
+   calcFieldStrength();
+   calcFieldPerf = klock() - calcFieldPerf;
+       
+   renderTime = klock();
+   render();
+   renderTime = klock() - renderTime;
+    
+   setcol(0xffffff);
+   setfont(6,8);
+   moveto(0,0);
+   
+   total = calcFieldPerf + renderTime;
+   printf("\nfield strength calc: %.1f", calcFieldPerf/total*100 );
+   printf("\nrender: %.1f", renderTime/total*100 );
+   printf("\nFPS %g",fps);
+   printf("\nthe metaballs have come to eat your cpu for breakfast");
+}
+
+calcDistanceSquared()
+{
+   // First: compute those tables. This is quite cheap.
+   // Go through every blob
+   for(i=0; i<number_of_blobs; i++)
+   {
+   
+       // Compute the x-offset2 table:
+       for(x=0; x<width; x++)
+       {
+           x_offset_table[i*width+x] = (x - blobx[i] )^2;
+       } 
+       // Compute the y-offset2 table:
+       for(y=0; y<width; y++)
+       {
+           y_offset_table[i*width+y] = (y - bloby[i] )^2;
+       }
+       // Compute the z-offset2 table:
+       for(z=0; z<width; z++)
+       {
+           z_offset_table[i*width+z] = (z - blobz[i] )^2;
+       }
+   }
+}
+
+calcFieldStrength()
+{
+   // Now we have those tables, we can use them to calculate the
+   // total multiplied distance2 value.
+   for( z=0; z<width; z++){
+   for( y=0; y<width; y++){
+   for(x=0; x<width; x++){
+      // Calculate the multiplied distance2:   
+      // Set it to one initially.
+      // This is so that the first time we multiply it
+      // by the first value it becomes that value.
+      distance_squared = 1;
+      dist1=1;
+      dist2=1;
+      dist3=1;
+      dist4=1;
+      for(i=0; i<number_of_blobs; i++)
+      {
+         distance_squared *= (x_offset_table[i*width+x]+
+                              y_offset_table[i*width+y]+
+                              z_offset_table[i*width+z] );
+      }
+      /*
+      dist1 = (x_offset_table[0*width+x]+y_offset_table[0*width+y]+z_offset_table[0*width+z]);
+      dist2 = (x_offset_table[1*width+x]+y_offset_table[1*width+y]+z_offset_table[1*width+z]);
+      dist3 = (x_offset_table[2*width+x]+y_offset_table[2*width+y]+z_offset_table[2*width+z]);
+      dist4 = (x_offset_table[3*width+x]+y_offset_table[3*width+y]+z_offset_table[3*width+z]);
+      */      
+
+      fieldStrengthAtPoint[z][y][x] =  (distance_squared / veryBigNum);
+
+      /*
+      m = 12000; // tweak for different colors
+      r = dist4/(dist2*dist3) *m;
+      g = dist2/(dist4*dist3) *m;
+      b = dist3/(dist2*dist4) *m;
+      */
+      
+
+    } // X end of looping thru xyz space 
+    } // Y
+    } // Z
+}
+
+render()
+{
+   drawscale = 2;
+   drawofs = width;
+   thresMin = 0.5;
+   thresMax = 0.3;
+      
+   for( z=0; z<width; z++){
+   for( y=0; y<width; y++){
+   for(x=0; x<width; x++){
+      field = fieldStrengthAtPoint[z][y][x] ;
+
+      if(field > thresMax && field < thresMin)
+      {
+         setcol(field*20*x,field*20*y,field*20*z);
+         //moveto(x*drawscale -drawofs,y*drawscale,z*drawscale);
+         //lineto(x*drawscale -drawofs,y*drawscale,z*drawscale+1);
+         //moveto(x*drawscale -drawofs-1,y*drawscale,z*drawscale);
+         //lineto(x*drawscale -drawofs+1,y*drawscale,z*drawscale);
+         drawsph(x*drawscale -drawofs,y*drawscale,z*drawscale,2);    
+      }
+   
+    } // X end of looping thru xyz space 
+    } // Y
+    } // Z
+ }
+
+
+// Camera and movement code taken from /games/
+//Handle input and player movement
+playercontrols(&posx,&posy,&posz,&posh,&posv)
+{
+   //f *= 100;
+   f = 1;
+   if (keystatus[0x2a]) f /= 4;
+   if (keystatus[0x36]) f *= 4;
+   vx = (keystatus[0xcd]-keystatus[0xcb])*f; //Right-Left
+   vy = (keystatus[0xc8]-keystatus[0xd0])*f; //Up-Down
+   vx2 = (keystatus[32]-keystatus[30])*f; //D-A
+   vy2 = (keystatus[17]-keystatus[31])*f; //W-S
+   if(vx==0) vx=vx2;
+   if(vy==0) vy=vy2;   
+
+   vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   static mat[9]; ang2mat(posh,posv,mat);
+   nvx = mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   nvy = mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   nvz = mat[2]*vx + mat[5]*vz + mat[8]*vy;
+   
+   d = 1/12;
+   
+   x = posx+nvx;
+   y = posy+nvy;
+   z = posz+nvz;
+   posx = x; posy = y; posz = z;
+
+   // mousespeed values are tweaked for 60fps
+   // for instance, sleep(16)
+   mouseSpeedX = (mousx - oldMouseX) * 0.01;
+   mouseSpeedY = (mousy - oldMouseY) * 0.01;
+   oldMouseX = mousx;
+   oldMouseY = mousy;
+
+   if(bstatus==2)
+   {
+      //readmouse(&mousx,&mousy);
+      
+      posh += mouseSpeedX;
+      posv += mouseSpeedY;
+   }
+}
+ang2mat(hang,vang,mat[9])
+{
+   mat[6] = cos(vang)*sin(hang); mat[0] = cos(hang);
+   mat[7] = sin(vang);           mat[1] = 0;
+   mat[8] = cos(vang)*cos(hang); mat[2] =-sin(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}

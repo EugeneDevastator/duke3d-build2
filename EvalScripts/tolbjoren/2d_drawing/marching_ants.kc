@@ -1,0 +1,84 @@
+// original code: "Marching Ants" Selection Line by sswift
+// converted to evaldraw by Torbjoern 27. july 2009
+
+
+()
+{
+   t = klock(0) * 1;
+   cls(0);
+   
+   ants(xres*.5,yres*.2,xres*.7,yres*.2,t);
+   ants(xres*.5,yres*.5,xres*.7,yres*.5,t);
+   
+   ants(xres*.5,yres*.2,xres*.5,yres*.5,t);
+   ants(xres*.7,yres*.2,xres*.7,yres*.5,t);
+   
+
+   static startPosX, startPosY;
+   ants(startPosX, startPosY,mousx,mousy,t);
+   if(bstatus==1)
+   {
+      startPosX = mousx;
+      startPosY = mousy;
+   }
+   
+// Ant wheel
+   tx = mousx;
+   ty = mousy;
+   r = 40;
+   ox = tx + r*sin(0*2*PI/15);
+   oy = ty + r*cos(0*2*PI/15);
+   for(i=1; i<16; i++)
+   {
+      x = tx + r*sin(i*2*PI/15);
+      y = ty + r*cos(i*2*PI/15);
+      ants(ox,oy,x,y,t);
+      ox = x; oy = y;
+   }
+}
+
+
+ants(x1,y1,x2,y2,t)
+{
+   mv = 0;
+   xdist = x1-x2; ydist=y1-y2;
+   if(xdist < 0) xdist=-xdist;
+   if(ydist < 0) ydist=-ydist;
+   
+   if(ydist > xdist)
+   {
+      mv = ydist;
+   }
+   else
+   {
+      mv = xdist;
+   }
+   
+   x = x1;
+   y = y1;
+   
+   stepx = xdist/mv;
+   if(x1 > x2) stepx = -stepx;
+   stepy = ydist/mv;
+   if(y1 > y2) stepy = -stepy;
+   
+   // makes ants move, start val is det by time
+   // ant speed is time in millis taken for 1 move
+   antspeed = 10;
+   antsize = 10;
+   antcounter = abs( (t*1000/antspeed) % antsize);
+   
+   for(nc=0; nc<floor(mv); nc++)
+   {   
+      if( (abs(antcounter) % antsize) < (antsize/2) ){
+         setcol(0); setpix(x,y);
+      }
+      else{
+         setcol(0xffffff); setpix(x,y);
+      }
+   
+      x+=stepx; y+=stepy;
+      antcounter -= 1;
+   }
+      
+}

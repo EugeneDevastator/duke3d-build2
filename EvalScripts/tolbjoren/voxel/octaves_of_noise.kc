@@ -1,0 +1,22 @@
+(x,y,z,&r,&g,&b)
+{
+
+   v = simplex_noise(2,x,y,z);
+   
+   r = 128 + v * 255;
+   g = 255;
+   b = 128 + v * 255;
+   return v;
+}
+
+simplex_noise(octaves, x, y, z){
+    value = 0.0;
+    for(i=0; i<octaves; i++){
+        value += noise(
+            x*pow(2, i),
+            y*pow(2, i),
+            z*pow(2, i)
+        );
+    }
+    return value;
+}

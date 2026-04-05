@@ -1,0 +1,48 @@
+(x,y,z,t,&r,&g,&b)
+
+if (frameinit) //pre-calculate cos&sin
+{     //eat counter :)
+   static gtim, gcos, gsin, otim = 0;
+   moveto(xres*.5,10); printf("%g dot(s)",int(t*2));
+   t *= .7;
+   gcos = cos(t); gsin = sin(t);
+   t += .3; gtim = .5-.5*sin(t*16+cos(t*16)*.5);
+   return;
+}
+
+if (abs(z) > .34) return(0); //early-out
+if (abs(x^2+y^2-.554) > .45) return(0); //early-out
+//r = 128; g = 128; b = 128; return(1);
+
+   //Put dots in motion are circle
+ox = x; oy = y;
+x = gcos*ox + gsin*oy;
+y = gcos*oy - gsin*ox;
+
+ax = abs(x); ay = abs(y); //Draw 8 dots w/symmetry
+if ((max(ax,ay)-cos(PI/8)/sqrt(2))^2
+   +(min(ax,ay)-sin(PI/8)/sqrt(2))^2 + z^2 < .06^2)
+   { r = 192; g = 255; b = 255; return(1); }
+
+   //Put Pacman in motion around circle
+x = (gcos*ox - gsin*oy)*3+2;
+y = (gcos*oy + gsin*ox)*3;
+z *= 3;
+
+   //Render Pacman's eyes
+ix = .40; iy = .50; iz = .70;
+if ((abs(x)-ix)^2 + (y-iy)^2 + (z+iz)^2 < .24^2)
+{
+   if ((abs(x+gcos*.20)-ix)^2 +
+       (y-iy-.10-abs(gsin)*.20)^2 +
+       (z+iz+.10)^2 < .15^2) r = 0; else r = 255; 
+   g = r; b = r; return(1);
+}
+
+d = x^2+y^2+z^2;
+if (d > 1^2) return(0); //Pacman's sphere
+if (abs(z-.1) < y*gtim) return(0); //mouth
+
+if (d < .9^2) { r =  96; g =  96; b = 48; } //Mouth
+         else { r = 192; g = 192; b = 96; } //Body
+return(1);

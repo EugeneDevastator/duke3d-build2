@@ -1,0 +1,477 @@
+// source of inspiration:
+// http://www.openprocessing.org/visuals/?visualID=7022
+// needs blur
+// changing height is fine, but refreaction & world reflection would be kick-ass
+
+// needs a voxel boat to bob-up-n-down in the water.
+// finding wave dir at point
+// draw line with mouse
+//
+enum{len=128}
+static val[len*len];
+static deriv[len*len];
+static valCpy[len*len];
+
+static oldx,oldy;
+static piover180 = pi/180;
+
+enum{maxships=32}
+static shipsX[maxships];
+static shipsZ[maxships];
+static shipVx[maxships];
+static shipVz[maxships];
+
+static time,oldtime;
+
+static lineSx, lineSy;
+static started;
+
+static fistx = len/2;
+static fisty = len/2;
+()
+{
+   time = klock(0);
+   dt = time-oldtime;
+   rdt = 1/dt;
+   oldtime = time;
+
+   if(numframes==0)
+   {
+      wid = int( sqrt(maxships) );
+      x=0;
+      y=0;
+      for(i=0; i<maxships; i++)
+      {
+         shipsX[i] = len/2 - wid*2 + x*4.5;
+         shipsZ[i] = len/2 - wid*2 + y*4.5;  
+         x++;
+         if( x > wid )
+         {
+            x=0;
+            y++;
+         }
+      }
+      
+      /*
+      a = 0;
+      ainc = 2*PI / maxships;
+      r = 35;
+      for(i=0; i<maxships; i++)
+      {
+         x = r*cos(a);
+         y = r*sin(a);
+         shipsX[i] = len/2 + x;
+         shipsZ[i] = len/2 + y;
+         a += ainc;
+      }
+      */
+   }
+
+   cls(0xbfdfff); clz(1e32);
+   camang = mousx/xres * 2*PI;
+   camdist = -120;
+   //setcam( camdist * sin(camang), -20, camdist * cos(camang), camang, 35*piover180 );   
+   updateCamera();
+
+
+   spd=.5*sqrt( (mousx-oldx)^2+(mousy-oldy)^2 );
+   oldx=mousx;
+   oldy=mousy;
+   
+   if(keystatus[57])
+   {
+      x = int(fistx);
+      y = int(fisty);
+      if(x > 5 && x < len-5)
+      if(y > 5 && y < len-5)
+      {
+         val[y*len+x+1] = 1;
+         val[y*len+x-1] = 1;
+         val[y*len+x] = 2;
+         val[y*len+x+len] = 1;
+         val[y*len+x-len] = 1;
+      }
+   }
+   
+   if(bstatus==1 && started==0)
+   if(mousx > 5 && mousx < len-5)
+   if(mousy > 5 && mousy < len-5)
+   {
+      lineSx = mousx; lineSy = mousy;
+      started=1;
+   }
+   /*
+
+   */
+   /*
+   if(bstatus==0 && started==1)
+   {
+      started=0;
+      blockscan(lineSx,lineSy,mousx,mousy);
+   }
+   */
+   
+   y = 10;
+   if(keystatus[57]==1) y = 8;
+   
+   drawspr("fist.kv6", 
+   fistx-len/2 - 5,
+   y, 
+   fisty-len/2 + 5, 
+   5, 0,0,0);
+ 
+   dx = keystatus[205] - keystatus[203];
+   dy = keystatus[208] - keystatus[200];
+   if( fistx > 2 && fistx < len-2 )
+      fistx += dx * 50 * dt;
+   if( fisty > 2 && fisty < len-2 )
+      fisty += dy * 50 * dt;
+
+   if(fistx <= 2) fistx = 3;
+   if(fistx >= len-2) fistx = len-3;
+   if(fisty <= 2) fisty = 3;
+   if(fisty >= len-2) fisty = len-3;
+   doWater();
+   
+
+   
+   
+setcol(255,255,255);
+renderFast3D();
+
+// bruke bilinear interpolering her.
+for(iShip=0; iShip<maxships; iShip++)
+{
+   x=shipsX[iShip];
+   z=shipsZ[iShip];
+
+   // src, interpolate pt on 2 tris: http://www.3dkingdoms.com/weekly/weekly.php?a=6
+   
+   ix = int(x);
+   iz = int(z);
+   
+   h0 = val[len*iz+ix];
+   h1 = val[len*iz+(ix+1)];
+   h2 = val[len*(iz+1)+ix];
+   h3 = val[len*(iz+1)+(ix+1)];
+   // find which of the 2 tris a point is over
+   sqx = x-ix;
+   sqz = z-iz;
+   height = 0;
+   if( (sqx+sqz) < 1 )
+   {
+      height = h0;
+      height += (h1-h0)*sqx;
+      height += (h2-h0)*sqz;
+   }
+   else
+   {
+      height = h3;
+      height += (h1-h3) * (1.0-sqx);
+      height += (h2-h3) * (1.0-sqz);
+   }
+   
+   
+
+   
+   //vx = valCpy[len*iz+(ix-1)] - valCpy[len*iz+(ix+1)];
+   //vy = valCpy[len*(iz-1)+ix] - valCpy[len*(iz+1)+ix];
+
+   // Box filter
+   sumx = 0;
+   sumy = 0;
+   kernSiz = 3;
+
+   for(i=-kernSiz; i<=kernSiz; i++)
+   {
+      
+      for(j=-kernSiz; j<=kernSiz; j++)
+      {
+         ix = i + floor(shipsX[iShip]);
+         iz = j + floor(shipsZ[iShip]);
+         vx=0;
+         vy=0;
+         if(ix > kernSiz && ix < len-kernSiz)
+            vx = valCpy[len*iz+(ix-1)] - valCpy[len*iz+(ix+1)];
+         if(iz> kernSiz && iz < len-kernSiz)
+            vy = valCpy[len*(iz-1)+ix] - valCpy[len*(iz+1)+ix];
+
+         sumx+=vx * 1/9;
+         sumy+=vy * 1/9;
+      }
+   }   
+ 
+   vx = sumx;;
+   vy = sumy;;
+   
+
+
+   spd = 1.0;
+   duckAngle = atan2(vx,vy);
+   setcol(255,255,255); 
+   //drawsph(x-len/2, height, z-len/2, 2);
+   drawspr("duck.kv6", x-len/2, height+1, z-len/2, 2,
+   duckAngle+1.57,
+   -cos(vx*vy)*0.5+0.5,
+   2.1
+    + (cos(vx*vy)*0.5+0.5) ); ;
+   
+   if(x > 1 && x < len-1){
+      shipsX[iShip] += vx*spd;
+      //shipsX[iShip] += shipVX[iShip] * dt;
+   }
+   
+   if(z> 1 && z < len-1){
+      shipsZ[iShip] += vy*spd;
+      //shipsZ[iShip] += shipVZ[iShip] * dt;
+   } 
+   
+
+
+   
+
+}
+
+// Ship to ship collision
+
+radi = 2;
+for(i=0; i<maxships; i++)
+{
+   x1=shipsX[i];
+   z1=shipsZ[i];
+   for(j=0; j<maxships; j++)
+   {
+      if(i==j) continue;
+      x2 = shipsX[j];
+      z2 = shipsZ[j];
+      d = sqrt( (x1-x2)^2 + (z1-z2)^2 ) - radi*radi;
+      if( d < 0)
+      {
+         vx = x2-x1;
+         vy = z2-z1;
+         f = 1/(sqrt(vx^2+vy^2)); 
+         vx *= f; 
+         vy *= f;
+         m = radi^2*2;
+         shipsX[i] += vx*d/2; shipVx[i] += vx*d*(radi^2/m)*rdt;
+         shipsZ[i] += vy*d/2; shipVz[i] += vy*d*(radi^2/m)*rdt;
+         shipsX[j] -= vx*d/2; shipVx[j] -= vx*d*(radi^2/m)*rdt;
+         shipsZ[j] -= vy*d/2; shipVz[j] -= vy*d*(radi^2/m)*rdt;
+      }
+   }
+}
+
+   
+         //xOfs = floor( val[offset-1]-val[offset+1] );      
+         //yOfs = floor( val[offset-len]-val[offset+len] ); 
+
+   static buf[len];
+   for(j=1; j<len-1; j++)
+   {
+   for(i=1; i<len-1; i++)
+   {
+      c = 255*valCpy[len*j+i];
+      buf[i] = rgb(c,c,c);
+   }
+      sethlin(0,j,buf,len);
+   }
+   
+   if(bstatus==1){
+      setcol(0x657b7c);
+      moveto(lineSx,lineSy); lineto(mousx,mousy);
+   } 
+}
+
+
+renderFast3D()
+{   
+   r=0; g=0; b=0;
+   
+   dist =1;
+
+   ox = 0-dist*len;
+   oy = 0;
+   oz = -dist*len;   
+   
+   maxWave = 10;
+
+   for(y=1; y<len-1; y++)
+   {
+      ox = -len/2;
+      oy = 0;
+      oz = y*dist -len/2;
+      moveto(ox,oy,oz);
+      
+      for(x=1; x<len-1; x++)
+      {
+         offset = len*y+x;
+         normalizedHeight = val[offset];
+         
+         moveto(ox,oy,oz);
+         lineto(dist*x-len/2  ,normalizedHeight, dist*y-len/2);
+         
+         moveto(dist*(x)-len/2  ,normalizedHeight, dist*(y)-len/2);
+         lineto(dist*(x)-len/2  ,normalizedHeight, dist*(y+1)-len/2);
+         
+         ox = dist*x-len/2;
+         oy = normalizedHeight;
+         oz = dist*y-len/2;
+      }
+   } 
+}
+
+blockscan(x0,y0,x1,y1)
+{   
+   enum {PREC=2^16};
+   ix = floor(x0); ix1 = floor(x1)-ix; ixi = (ix1>0)*2-1;
+   iy = floor(y0); iy1 = floor(y1)-iy; iyi = (iy1>0)*2-1;
+   fx = x0-ix; if (ixi > 0) fx = 1-fx;
+   fy = y0-iy; if (iyi > 0) fy = 1-fy;
+   gx = fabs(x1-x0)*PREC; idx = int(gx);
+   gy = fabs(y1-y0)*PREC; idy = int(gy);
+        if (ix1 == 0) { id = -1; idx = 0; }
+   else if (iy1 == 0) { id =  0; idy = 0; }
+   else               { id = int(fy*gx - fx*gy); }
+   for(c=abs(ix1)+abs(iy1);c>=0;c--)
+   {
+      //drawblock(ix,iy);
+      val[len*iy+ix] = 2;
+      if (id >= 0) { ix += ixi; id -= idy; }
+              else { iy += iyi; id += idx; }
+   }
+}
+
+
+
+/* gets the player controls and sets global camera variables. */
+updateCamera()
+{
+   static posx = 0;
+   static posy = 75;
+   static posz = 70;
+   //posx = position[0][0];
+   //posy = position[0][1]+5; 
+   //posz = position[0][2]+5;
+     
+
+   // horiz and vertical heading (euler angles)  
+   static posh = 0; // left right
+   static posv = -2.0;
+
+   //posh += velocity[0][0] / 1000;
+   //posv += velocity[0][1] / 1000;
+
+   // end camera
+   playercontrols(&posx,&posy,&posz,&posh,&posv);
+   //if(posv > 1.5) posv = 1.5;
+   //if(posv < -1.5) posv = -1.5;
+   setcam(posx,posy,posz,posh,posv);
+}
+// Camera and movement code taken from /games/
+//Handle input and player movement
+playercontrols(&posx,&posy,&posz,&posh,&posv)
+{
+   static oldMouseX;
+   static oldMouseY;
+   static mouseSpeedX;
+   static mouseSpeedY; 
+
+   f = 1;
+   if (keystatus[0x2a]) f /= 4;
+   if (keystatus[0x36]) f *= 4;
+   vx = (keystatus[32]-keystatus[30])*f; //D-A
+   vy = (keystatus[17]-keystatus[31])*f; //W-S  
+   vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   static mat[9]; ang2mat(posh,posv,mat);
+   newvx = mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   newvy = mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   newvz = mat[2]*vx + mat[5]*vz + mat[8]*vy; 
+   d = 1/12; 
+   x = posx+newvx;
+   y = posy+newvy;
+   z = posz+newvz;
+   posx = x; posy = y; posz = z;
+   // mousespeed values are tweaked for 60 fps
+   mouseSpeedX = (mousx - oldMouseX) * 0.01;
+   mouseSpeedY = (mousy - oldMouseY) * 0.01;
+   oldMouseX = mousx;
+   oldMouseY = mousy;
+   if(bstatus==4)
+   {
+      posh -= mouseSpeedX;
+      posv += mouseSpeedY;
+   }
+}
+/* converts horizontal and vertical angles to a 3x3 matrix */
+ang2mat(hang,vang,mat[9])
+{
+   mat[6] = cos(vang)*sin(hang); mat[0] = cos(hang);
+   mat[7] = sin(vang);           mat[1] = 0;
+   mat[8] = cos(vang)*cos(hang); mat[2] =-sin(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}
+
+doWater()
+{
+   
+   
+   for(j=0; j<len*len; j++){
+      val[j] += deriv[j];
+      valCpy [j] = val[j];
+   }
+   
+   
+
+   
+   for(j=1; j<len-1; j++)
+   for(i=1; i<len-1; i++)
+   {
+      offset = len*j+i;
+      avg = (val[offset-1] + val[offset+1] + val[offset-len] + val[offset+len]) / 4;
+      deriv[offset] -= 0.5 * (val[offset]-avg);
+      deriv[offset] *=  0.95; // Dampening
+   }
+   //DoBlur(); // smooth derivatives and add to val
+
+}
+   
+DoBlur()
+{   
+   
+
+   static ker[3*3] = 
+   {
+      0.08, 0.1, 0.08,
+      0.1, 0.11, 0.1,
+      0.08, 0.1, 0.08
+   };
+
+   ptr = 0;
+   for (y=0; y<len; y++)
+   {
+      for (x=0; x<len; x++)
+      {
+         total=0;
+
+         k = 3;
+         kp = 0;
+         
+         for (j=-k; j<=k; j++)
+         for (i=-k; i<=k; i++)
+         {
+            //if(j==0 && i==0) continue;
+            x2=x+i;
+            y2=y+j; 
+            if (x2>=0 && x2<len && y2>=0 && y2<len) 
+               total += ker[kp] * val[y2*len+x2];
+            kp++;
+         }
+
+         valCpy[y*len+x] = total;
+         ptr++;
+      }
+   }
+}
+

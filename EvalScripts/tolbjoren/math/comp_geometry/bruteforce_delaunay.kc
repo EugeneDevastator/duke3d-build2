@@ -1,0 +1,351 @@
+// To get center and radius from 3 pts in the plane 
+// Check out http://local.wasp.uwa.edu.au/~pbourke/geometry/circlefrom3/ 
+
+// incircle and orientation predicates from:
+// http://www.cs.cmu.edu/~quake/robust.html
+struct vert
+{
+   x,y;
+};
+
+enum{MAX_VERTS = 1024}
+static vert verts[MAX_VERTS];
+static numVerts = 0;
+
+struct edge
+{
+   v1;
+   v2;
+};
+
+struct triangle{
+   v1,v2,v3;
+   isActive;
+};
+
+enum{MAX_TRIS=256*2}
+static triangle triangleList[MAX_TRIS];
+
+static grabi=-1;
+()
+{
+   cls(0);
+   
+   for(i=0; i<MAX_TRIS; i++)
+   {
+      triangleList[i].isActive=0;
+   }
+
+   if(numframes==0){
+   }
+   
+   if( keystatus[57] )
+   {
+      keystatus[57] = 0;
+      verts[numVerts].x = xres/2 + nrnd * 50;
+      verts[numVerts].y = yres/2 + nrnd * 50;
+      numVerts++;
+   }
+   
+   
+   if( bstatus == 1 )
+   {
+      bstatus = 0;
+      verts[numVerts].x = mousx;
+      verts[numVerts].y = mousy;
+      numVerts++;
+   }
+   
+   if( bstatus == 2 && grabi==-1 )
+   {
+      closest=-1;
+      mindist = 1e32;
+      for(i=0; i<numVerts;i++)
+      {
+         dx = verts[i].x - mousx;
+         dy = verts[i].y - mousy;
+         dist = dx*dx+dy*dy;
+         if( dist < mindist){
+            closest = i;
+            mindist = dist;
+         }
+      }
+      grabi = closest;
+   }
+   
+   if( bstatus == 2 && grabi != -1 )
+   {   
+      verts[grabi].x = mousx;
+      verts[grabi].y = mousy;
+   }
+   if( bstatus == 0 ) grabi = -1;
+   
+   static madeGrid = 0;
+   if( keystatus[2] )
+   {
+      keystatus[2];
+      
+      if( madeGrid==0)
+      {
+         madeGrid=1;
+         siz = 60;
+         len = siz*8;
+         
+         for(i=0; i<7; i++)
+         for(j=0; j<7; j++)
+         {
+            verts[numVerts].x = xres/2 + i * siz - len/2;
+            verts[numVerts].y = yres/2 + j * siz - len/2;
+            numVerts++;
+         }
+      }
+   }
+   
+   static madeCircle = 0;
+   if( keystatus[3] )
+   {
+      keystatus[3];
+      
+      if( madeCircle==0)
+      {
+         madeCircle=1;
+         makeCircleVerts(xres/2,yres/2,0,100);
+         makeCircleVerts(xres/2,yres/2,pi,140);
+         makeCircleVerts(xres/2,yres/2,1.5*pi,180);
+           
+            verts[numVerts].x = xres/2 ;
+            verts[numVerts].y = yres/2 ;
+            numVerts++;
+      }
+   }
+   
+   static madeTriGrid = 0;
+   if( keystatus[4] )
+   {
+      keystatus[4];
+      
+      if( madeTriGrid==0)
+      {
+         madeTriGrid=1;
+         siz = 60;
+         divs = 7;
+         len = siz*divs;
+         
+         
+         for(i=0; i<divs; i++)
+         for(j=0; j<divs; j++)
+         {
+            if( (i+j)%2 == 0) verts[numVerts].x = xres/2 + i * siz - len/2;
+            if( (i+j)%2 == 1) verts[numVerts].x = xres/2 + i * (0.5*siz) - len/2;
+            verts[numVerts].y = yres/2 + j * siz - len/2;
+            numVerts++;
+         }
+      }
+   }
+   
+   freq = mousx/xres*100;
+   
+
+   static madeNoise = 0;
+   if( keystatus[5] )
+   {
+      numverts = 0;
+      //keystatus[5];
+      
+      //if( madeNoise==0)
+      {
+         madeNoise=1;
+         siz = 10;
+         divs = 10;
+         len = siz*divs;
+
+         tim = klock(0);         
+
+         for(i=0; i<divs; i++)
+         for(j=0; j<divs; j++)
+         {
+           if( noise( (freq*i/(divs)), freq*j/(divs), tim) > .3)
+           {
+               verts[numVerts].x = xres/2 + i * siz - len/2;
+               verts[numVerts].y = yres/2 + j * siz - len/2;
+               numVerts++;
+           }
+         }
+      }
+   }
+   
+
+   
+   perfTest = klock(0);
+   triangulate();
+   perfTest = klock(0) - perfTest;
+   
+   setcol(255,255,255);
+   for(i=0; i<numVerts; i++)
+   {
+      drawsph( verts[i].x, verts[i].y, -1);
+   }   
+
+   numTriangles=0;
+   for(i=0; i<MAX_TRIS; i++)
+   {
+      if( triangleList[i].isActive){  
+         drawTriangle(i);
+         numTriangles++;
+      }
+   }
+   
+   /*
+   moveto(0,0);
+   for(i=0; i<MAX_TRIS; i++)
+   {
+      if( triangleList[i].isActive ) printf("%g\n", i);
+   }
+   */
+   
+   moveto(0,0);
+   printf("%.2f secs used on delaunay\n", perfTest);
+   printf("%g / %g triangles\n", numTriangles, MAX_TRIS);
+   printf("%g / %g verts\n", numVerts, MAX_VERTS);
+   
+}
+
+makeCircleVerts(x,y,startAng,radi)
+{
+    segs = 18;
+    // increase segments with radius
+    if( fabs(radi) > 50) segs += 6;
+    if( fabs(radi) > 150) segs += 9;
+    
+    for(i=0; i<segs; i++)
+    {
+        verts[numverts].x = x + radi * cos(startAng+i*2*PI/segs) + rnd;
+        verts[numverts].y = y + radi * sin(startAng+i*2*PI/segs);
+        numverts++;
+    }
+}
+
+drawTriangle(i){
+         v1 = triangleList[i].v1; v2 = triangleList[i].v2; v3 = triangleList[i].v3;
+         moveto( verts[v1].x, verts[v1].y );
+         lineto( verts[v2].x, verts[v2].y );
+         lineto( verts[v3].x, verts[v3].y );
+         lineto( verts[v1].x, verts[v1].y );
+}
+drawTriangleFat(i){
+         v1 = triangleList[i].v1; v2 = triangleList[i].v2; v3 = triangleList[i].v3;
+       s = 2;
+         drawcone( verts[v1].x, verts[v1].y, s, verts[v2].x, verts[v2].y , s);
+         drawcone( verts[v2].x, verts[v2].y, s, verts[v3].x, verts[v3].y , s);
+       drawcone( verts[v3].x, verts[v3].y, s, verts[v1].x, verts[v1].y , s);
+}
+
+// naiv, super
+triangulate(){
+   n = numVerts;
+   radiusSq=0;
+   vert center;
+   
+   for(i=0; i<n-2; i++){
+      for(j=i+1; j<n-1; j++){
+         if( i==j ) continue;
+         for(k=j+1; k<n; k++){
+               if( k != i && k != j ){
+               circumCircle(i,j,k,center,radiusSq);
+               //drawsph( center.x, center.y, -sqrt(radiusSq) );
+               //refresh();
+               //sleep(1);
+               pointFree = 1;
+               
+               for(l=0; l<n; l++)
+               {
+                  if( l != i && l != j && l != k ){
+                    inside = 0;
+                    dist = distanceSq( center.x, center.y, verts[l].x, verts[l].y );
+                    if( dist < radiusSq ) inside = 1;
+                    
+                    if( inside )
+                    {
+                      pointFree = 0;
+                      break;
+                    }
+                  }
+               }
+                
+               if( pointFree )
+               {
+                 makeTriangle(i,j,k);
+               }
+            }
+         }
+      }
+   }
+}
+
+distanceSq(x1,y1,x2,y2)
+{
+   dx = x2 - x1;
+   dy = y2 - y1;
+   return dx*dx + dy*dy;
+}
+
+makeTriangle(v1,v2,v3)
+{
+   newTri = getFreeTris();
+   triangleList[newTri].v1 = v1;  
+   triangleList[newTri].v2 = v2;
+   triangleList[newTri].v3 = v3;
+}
+
+getFreeTris()
+{
+   for(i=0; i<MAX_TRIS; i++)
+   {
+      if(triangleList[i].isActive == 0){
+         triangleList[i].isActive = 1;
+         return i;
+      }
+   }
+   return -1;
+}
+
+// see: http://goanna.cs.rmit.edu.au/~gl/classes/TriangulationApplet.java
+circumCircle(idx1,idx2,idx3,vert center,&radiusSq) {
+   vert p1,p2,p3;
+   p1.x = verts[idx1].x;
+   p1.y = verts[idx1].y;
+   
+   p2.x = verts[idx2].x;
+   p2.y = verts[idx2].y;
+   
+   p3.x = verts[idx3].x;
+   p3.y = verts[idx3].y;
+
+   cp = crossProduct(p1, p2, p3);
+   if (cp != 0.0)
+   {
+      p1Sq = p1.x * p1.x + p1.y * p1.y;
+      p2Sq = p2.x * p2.x + p2.y * p2.y;
+      p3Sq = p3.x * p3.x + p3.y * p3.y;
+      num = p1Sq*(p2.y - p3.y) + p2Sq*(p3.y - p1.y) + p3Sq*(p1.y - p2.y);
+      cx = num / (2.0 * cp);
+      num = p1Sq*(p3.x - p2.x) + p2Sq*(p1.x - p3.x) + p3Sq*(p2.x - p1.x);
+      cy = num / (2.0 * cp);
+
+      center.x = cx;
+      center.y = cy;
+   }
+
+   // Radius 
+   dx = center.x - p1.x;
+   dy = center.y - p1.y;
+   radiusSq = dx*dx + dy*dy;
+}
+
+crossProduct(vert p1,vert p2,vert p3) { 
+   u1 =  p2.x - p1.x;
+   v1 =  p2.y - p1.y;
+   u2 =  p3.x - p1.x;
+   v2 =  p3.y - p1.y;
+   return u1 * v2 - v1 * u2;
+}

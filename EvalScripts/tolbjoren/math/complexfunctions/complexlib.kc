@@ -1,0 +1,99 @@
+// original code 
+// http://www.phanderson.com/complex/cplx_c.html
+// converted to evaldraw by torbjoern 31.march 2010
+
+struct complex
+{
+   r,
+   i;
+}
+
+()
+{
+   cls(0);
+}
+// DOESNT WORK!!!!!!!!!!!!!!!!!
+
+
+C_conj(complex a){
+   complex result;
+   result.r = a.r;
+   result.i = -a.i;
+   //return result; // CAnnot do this in evaldraw at the time being!
+}
+
+C_add(complex a, complex b){
+   complex c;
+   c.r = a.r + b.r;
+   c.i = a.i + b.i;
+   //return c;
+}
+
+C_sub(complex a, complex b){
+   complex c;
+   c.r = a.r - b.r;
+   c.i = a.i - b.i;
+   //return c;
+}
+
+C_mul(complex a, complex b){
+   complex c;
+   c.r = a.r*b.r - a.i*b.i;
+   c.i = a.r*b.i + b.r*a.i;
+   //return c;
+}
+
+C_div(complex a, complex b){
+   complex c = C_conj(b);
+   complex num = C_mul(a,c);   
+   denom = b.r*b.r + b.i*b.i + 1.2e-63; // to prevent div by 0
+   complex result;
+   result.r = num.r/denom;
+   result.i = num.i/denom;
+   //return result;
+}
+
+// Grammar school implem of mul
+// used in GCC C++ complex.h template:
+C_mul2(complex a, complex b)
+{
+   complex c;
+   c.r = a.r*b.r -a.i*b.i;
+   c.i = a.r*b.i + a.i*b.r;
+   //return c;
+}
+// Grammar school implem of div
+// used in GCC C++ complex.h template:
+C_div2(complex a, complex b)
+{
+   complex c;
+   m = C_mag(b);
+   c.r = (a.r*b.r + a.i*b.i)/m;
+   c.i = (a.i*b.r - a.r*b.i)/m;
+   //return c;
+}
+
+// returns parallell of complex quantites a,b
+C_para(complex a, complex b){
+   complex num = C_mul(a,b);
+   complex denom = C_add(a,b);
+   result = C_div(num,denom);
+   return result;
+}
+
+C_inv(complex a){
+   complex num;
+   num.r=1.0;
+   num.i=0.0;
+   complex result = C_div(num,a);
+   //return result;
+}
+
+C_ang(complex a){
+   return atan2( a.i, a.r + 1e-99 ); // 1e-99 is added to avoid atan of 90 degrees
+}
+
+// Also known as norm
+C_mag(complex a){
+   return sqrt(a.r*a.r + a.i*a.i);
+}

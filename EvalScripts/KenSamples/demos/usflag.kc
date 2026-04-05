@@ -1,0 +1,263 @@
+()
+{
+   gldisable(GL_DEPTH_TEST);
+   static whitepix = 0xffffff; glsettex(whitepix,1,1);
+   enum {MUSICN=128, COUNTRY=0};
+   static music[MUSICN][3] =
+   {
+      67, 0,1, 64, 0,1, 60,48,2, 64,48,2, 67,47,2, 72,45,4,  0, 0,0,  0, 0,0,
+      76,44,1, 74,44,1, 72,45,2, 64,45,2, 66,38,2, 67,43,4,  0, 0,0,  0, 0,0,
+      67, 0,1, 67, 0,1, 76,48,3, 74,48,1, 72,45,2, 71,43,4,  0, 0,0,  0, 0,0,
+      69,45,1, 71,47,1, 72,48,2, 72,48,2, 67,43,2, 64,40,2, 60,36,2,  0, 0,0,
+      67, 0,1, 64, 0,1, 60,48,2, 64,48,2, 67,47,2, 72,45,4,  0, 0,0,  0, 0,0,
+      76,44,1, 74,44,1, 72,45,2, 64,45,2, 66,38,2, 67,43,4,  0, 0,0,  0, 0,0,
+      67, 0,1, 67, 0,1, 76,48,3, 74,48,1, 72,45,2, 71,43,4,  0, 0,0,  0, 0,0,
+      69,45,1, 71,47,1, 72,48,2, 72,48,2, 67,43,2, 64,40,2, 60,36,2,  0, 0,0,
+      76,48,1, 76,48,1, 76,48,2, 77,50,2, 79,52,2, 79,52,4,  0, 0,0,  0, 0,0,
+      77,50,1, 76,48,1, 74,47,2, 76,48,2, 77,50,2, 77,50,4,  0, 0,0,  0, 0,0,
+      77,50,2, 76,48,3, 74,47,1, 72,45,2, 71,43,4,  0, 0,0,  0, 0,0,  0, 0,0,
+      69,45,1, 71,47,1, 72,48,2, 64,40,2, 66,42,2, 67,43,4,  0, 0,0,  0, 0,0,
+      67,43,2, 72,40,2, 72,40,2, 72,40,1, 71,40,1, 69,41,2, 69,41,2,  0, 0,0,
+      69, 0,2, 74,38,2, 77,38,1, 76,40,1, 74,41,1, 72,42,1, 72,43,2, 71,43,2,
+      67, 0,1, 67, 0,1, 72,45,3, 74,45,1, 76,45,1, 77,45,1, 79,40,4,  0, 0,0,
+      72,40,1, 74,40,1, 76,41,3, 77,41,1, 74,43,2, 72,36,4, 0, 0, 0,  0, 0,12,
+   };
+      //Generate flag texture
+#if (COUNTRY == 0)   
+   enum {FXSIZ=1024,FYSIZ=512};
+#else
+   enum {FXSIZ=800,FYSIZ=400};
+#endif   
+   static flag[FYSIZ][FXSIZ];
+   for(y=1;y<FYSIZ-1;y++)
+      for(x=1;x<FXSIZ-1;x++)
+      {
+#if (COUNTRY == 0)
+         flag[y][x] = genusflag(x/FXSIZ,y/FYSIZ);
+#elif (COUNTRY == 1)        
+         flag[y][x] = genauflag(x/FXSIZ,y/FYSIZ);
+#endif         
+      }
+   hflag = glsettex(flag,FXSIZ,FYSIZ);
+   
+   while (0) //debug!
+   {
+      mountzip("/doc/ken/voxon");
+      mountzip("../voxon");
+      cls(0);
+      for(y=0;y<FYSIZ;y++)
+         for(x=0;x<FXSIZ;x++)
+         {
+#if (COUNTRY == 0)         
+            if (bstatus%2) { setcol(pic("usflag.png",x,y)); }
+                      else { setcol(genusflag(x/FXSIZ,y/FYSIZ)); }
+#elif (COUNTRY == 1)
+            if (bstatus%2) { setcol(pic("auflag.png",x,y)); }
+                      else { setcol(genauflag((x+.5)/FXSIZ,(y+.5)/FYSIZ)); }
+#endif
+            setpix(x,y);
+         }
+      refresh(); Sleep(15);
+   }
+
+   playnote(0xc0,62,0);
+   playnote(0xc1,81,0);
+
+   tim = 0; ind = 0; lng = 0; offs = -6;
+   while (1)
+   {
+      otim = tim; tim = klock();
+      if (int(tim*8) != int(otim*8))
+      {
+         lng--;
+         while (lng <= 0)
+         {
+#if (COUNTRY == 0)
+            playnote(0x90,music[ind-3]+offs,0);
+            playnote(0x91,music[ind-2]+offs,0);
+#endif
+            if (ind < MUSICN*3)
+            {
+#if (COUNTRY == 0)            
+               if (music[ind  ]) playnote(0x90,music[ind  ]+offs,64);
+               if (music[ind+1]) playnote(0x91,music[ind+1]+offs,88);
+#endif               
+               lng = music[ind+2];
+               if (ind == (MUSICN-1)*3)
+               {
+                  playsound("blowup2.flac",100,.25);
+                  playsound("blowup2.flac",100,.30);
+               }
+               ind += 3;
+            } else { ind = 0; offs++; }
+         }
+      }
+
+      //clz(1e32); 
+      gldisable(GL_DEPTH_TEST);
+      
+         //Sky background
+      glsettex("cloud.png"); setcol(0x4090c0);
+      glbegin(GL_QUADS);
+      gltexcoord(tim*-.1+0,tim*-.05+0); glvertex(   0,   0);
+      gltexcoord(tim*-.1+4,tim*-.05+0); glvertex(xres,   0);
+      gltexcoord(tim*-.1+4,tim*-.05+4); glvertex(xres,yres);
+      gltexcoord(tim*-.1+0,tim*-.05+4); glvertex(   0,yres);
+      
+      setfont(xres/52,xres/52*1.75,1);
+      moveto(xres/52*10,yres*.85);
+      i = int(ind/24); setcol(0xffffff);
+#if (COUNTRY == 0)
+      if (i == 0) printf("        O! say can you see");
+      if (i == 1) printf("     by the dawn's early light");
+      if (i == 2) printf("     What so proudly we hailed");
+      if (i == 3) printf("  at the twilight's last gleaming?");
+      if (i == 4) printf("Whose broad stripes and bright stars");
+      if (i == 5) printf("    through the perilous fight,");
+      if (i == 6) printf("    O'er the ramparts we watched");
+      if (i == 7) printf("    were so gallantly streaming?");
+      if (i == 8) printf("    And the rockets' red glare,");
+      if (i == 9) printf("     the bombs bursting in air,");
+      if (i ==10) printf("    Gave proof through the night");
+      if (i ==11) printf("   that our flag was still there.");
+      if (i ==12) printf("   O! say does that star-spangled");
+      if (i ==13) printf("          banner yet wave");
+      if (i ==14) printf("     O'er the land of the free");
+      if (i ==15) printf("    and the home of the brave?");
+#elif (COUNTRY == 1)
+         //Obviously not the national anthem.. funny stereotypes instead ;-P
+      if (i == 0) printf("  G'day from the land of criminals.");
+      if (i == 1) printf("     We ride kangaroos to school.");
+      if (i == 2) printf("    And sleep with koala bears.");
+      if (i == 3) printf("   We eat vegemite for breakfast.");
+      if (i == 4) printf("     And drink Fosters beer.");
+      if (i == 5) printf("   Put the shrimp on the barbie.");
+      if (i == 6) printf("        Now that's a knife.");
+      if (i == 7) printf("   Jackrabbits and frogs galore.");
+      if (i == 8) printf("   Poisonous snakes and spiders.");
+      if (i == 9) printf("      Crocodiles? No worries.");
+      if (i ==10) printf("     We import all our plants,");
+      if (i ==11) printF("      Just to watch them die.");
+      if (i ==12) printf("   While enjoying a UV index of 17.");
+      if (i ==13) printf(" We're just a tiny island down under.");
+      if (i ==14) printf("   So flush that dodgy didgeridoo.");
+      if (i ==15) printf("      Clockwise, of course.");
+#endif
+
+      setcol(0x202020);
+      drawplane(  0,0,94.0-(tim%25.5)*4);
+      drawplane(+.5,0,94.5-(tim%25.5)*4);
+      drawplane(-.5,0,94.5-(tim%25.5)*4);
+      drawplane(  1,0,95.0-(tim%25.5)*4);
+      drawplane( -1,0,95.0-(tim%25.5)*4);
+
+         //Draw flag
+      glsettex(hflag);
+      e = (1-exp(tim*-.5))*6;
+      xn = 15.2; yn = 8; inc = 1/8;
+      for(j=0;j<xn+yn;j+=inc)
+      {
+         glbegin(GL_QUADS);
+         for(i=0;i<4;i++)
+         {
+            if (i >= 2) { if (j < xn) { xt = (i-2)*inc+j   ; yt =  0; }
+                                 else { yt = (i-2)*inc+j-xn; xt = xn; } }
+                   else { if (j < yn) { yt = (1-i)*inc+j   ; xt =  0; }
+                                 else { xt = (1-i)*inc+j-yn; yt = yn; } }
+               //The following wave motion is based on "Waves" by Matt Wandel
+               //http://matt.wandel.ca/artwork/math_art.html
+            t = xt+yt - tim*3;
+            xp = cos(t)*e + xt*32;
+            yp = sin(t)*e + yt*32;
+            sc = 160-sin(t+1.5)*64; setcol(sc,sc,sc);
+            gltexcoord(xt/15.2,yt/8);
+            glvertex(xp-224,yp-128,384);
+         }
+      }
+
+      setcol(0x808080);
+      xt = 0; yt = 0;
+      t = xt+yt - tim*3;
+      xp = cos(t)*e + xt*32;
+      yp = sin(t)*e + yt*32;
+      drawcone(xp-224,yp-128,384,1,-2.8,-1.45,4,.01);
+      xt = 0; yt = yn;
+      t = xt+yt - tim*3;
+      xp = cos(t)*e + xt*32;
+      yp = sin(t)*e + yt*32;
+      drawcone(xp-224,yp-128,384,1,-2.8,+1.45,4,.01);
+         
+         //Draw flagpole
+      setcol(0x505060); drawcone(-2.8,-1.60,4,-.1,-2.8,+3,4,-.1);
+      setcol(0x605040); drawsph(-2.8,-1.60,4,.15);
+      
+      refresh();
+   }
+}
+
+drawplane (x,y,z)
+{
+   f = 1;
+   drawcone(x*f,(y-2)*f,(z+4.0)*f,.02*f,x*f,(y-2)*f,(z+4.5)*f,.025*f);
+   for(s=-1;s<=1;s+=2)
+      drawcone((x-.15*s)*f,(y-2)*f,(z+4.3)*f,.015*f,x*f,(y-2.01)*f,(z+4.2)*f,.03*f);
+   drawcone((x+.05)*f,(y-2)*f,(z+4.5)*f,.02*f,(x-.05)*f,(y-2)*f,(z+4.5)*f,.015*f);
+}
+
+star5 (x,y,r)
+{
+   x = fabs(x); x *= r; y *= r;
+   k0 = x*sin(PI*.2);
+   k1 = y*cos(PI*.2); k2 = cos(PI*.4);
+   if ((max(k1+k0,-y) < k2) || (max(k1-k0,x*sin(PI*.4) - y*k2) < k2)) return 1;
+}
+star7 (x,y,r)
+{
+   d2 = x*x + y*y;
+   r1 = r*(5/90); if (d2 > r1*r1) return 0;
+   r0 = r*(1/40); if (d2 < r0*r0) return 1;
+   x = fabs(x);
+   a = int(atan2(x,y)*(7/PI)); if (a%2) { r = r0; r0 = r1; r1 = r; }
+   static lut[16] =
+   {
+      1,0,
+      cos(PI*1/7),sin(PI*1/7),
+      cos(PI*2/7),sin(PI*2/7),
+      cos(PI*3/7),sin(PI*3/7),
+      cos(PI*4/7),sin(PI*4/7),
+      cos(PI*5/7),sin(PI*5/7),
+      cos(PI*6/7),sin(PI*6/7),
+      -1,0,
+   };
+   a *= 2; x0 = lut[a+1]*r0; y0 = lut[a]*r0;
+   return ((x-x0)*(lut[a+2]*r1-y0) >=
+           (y-y0)*(lut[a+3]*r1-x0));
+}
+genusflag (x,y)
+{
+   if ((x >= .4) || (y >= 7/13)) return (((y*13)%2) >= 1)*0xffff + 0xff0000;
+   xsc = .0333; xx = floor(x/xsc+.5);
+   ysc = .0528; yy = floor(y/ysc+.5);
+   if ((fabs(xx-6) < 6) && (fabs(yy-5) < 5) && ((xx+yy+.5)%2 < 1))
+      if (star5((x-xx*xsc)*86,(y-yy*ysc)*48,1)) return 0xffffff;
+   return 0x000070;
+}
+genauflag (x,y)
+{
+   static star[15] =
+      {-.25,-.375,1.34,-.75,-.083,5/8,-.75,-.416,5/8,-5/8,-.219,5/8,-.861,-.186,5/8};
+   if (max(x,y) >= .5)
+   {
+      y *= .5;
+      for(i=12;i>=0;i-=3) if (star7(x+star[i],y+star[i+1],star[i+2])) return(0xffffff);
+      if (star5(x-.8,y-.271,48)) return(0xffffff);
+      return(0x8b);
+   }
+      //Union jack..
+   if ((fabs(x-.25) < .025) || (fabs(y-.25) < .050)) return(0xff0000);
+   if ((fabs(x-.25) < .041) || (fabs(y-.25) < .082)) return(0xffffff);
+   if ((fabs(x+y-.5+((x>.25)*2-1)*.019) < .019) ||
+       (fabs(x-y   -((x>.25)*2-1)*.019) < .019)) return(0xff0000);
+   if (min(fabs(x+y-.5),fabs(x-y)) < .055) return(0xffffff);
+   return(0x8b);
+}

@@ -1,0 +1,153 @@
+enum{MAXVERTS=100}
+static px[MAXVERTS];
+static py[MAXVERTS];
+static opx[MAXVERTS];
+static opy[MAXVERTS];
+static ax[MAXVERTS];
+static ay[MAXVERTS];
+static pointCount = 0;
+
+
+enum{MAXEDGES=200}
+static edgeV1[MAXEDGES];
+static edgeV2[MAXEDGES];
+
+
+static edgeMap[MAXEDGES][MAXVERTS][MAXVERTS];
+static edgeOriginalLength[MAXEDGES];
+static edgeCount = 0;
+
+static timeStep = 0.01;
+
+static xmin,xmax,ymin,ymax;
+
+static ropeIndex = 0;
+()
+{
+   cls(0);
+   
+   if(numframes==0)
+   {
+      xmin = 10;
+      xmax = xres-10;
+      ymin = 10;
+      ymax = yres-10;   
+
+      for(i=0; i<5; i++)
+      {
+      p1 = createPoint(xres/2-30 + i*85, yres/2);
+      p2 = createPoint(xres/2+30 + i*85, yres/2);
+      p3 = createPoint(xres/2-30 + i*85, yres/2-60);
+      p4 = createPoint(xres/2+30 + i*85, yres/2-60);
+      createContraint(p1,p2);
+      createContraint(p3,p4);
+      createContraint(p1,p3);
+      createContraint(p2,p4);
+      
+      // crossbars
+      createContraint(p1,p4);
+      createContraint(p2,p3);
+      }
+      
+      // rope
+      p1 = createPoint(20*xres/100, yres/2-25);
+      ropeIndex = p1;
+      for(i=0; i<10; i++)
+      {
+         p2 = createPoint(20*xres/100, yres/2-50 + i*25);
+         createContraint(p1,p2);
+         // now move point alittle
+         px[p2] += rnd/2;
+         p1 = p2;
+      }
+      
+   }
+   
+   updateEdges();
+   physiks();
+   
+}
+
+physiks()
+{
+   for(i=0; i<pointCount; i++)
+   {
+      tmpx = px[i];
+      tmpy = py[i];
+      px[i] += px[i] - opx[i] + ax[i]*timeStep^2;
+      py[i] += py[i] - opy[i] + ay[i]*timeStep^2;
+      opx[i] = tmpx;
+      opy[i] = tmpy;
+      
+      if(px[i] < xmin) px[i] = xmin;
+      if(px[i] > xmax) px[i] = xmax;      
+      if(py[i] < ymin) py[i] = ymin;
+      if(py[i] > ymax) {py[i] = ymax;}
+      
+      px[ropeIndex] = 20*xres/100;
+      py[ropeIndex] = yres/2-100;
+      
+      
+      px[ropeIndex] = mousx;
+      py[ropeIndex] = mousy;
+      
+      drawsph(px[i], py[i], -10);
+   }   
+}
+
+updateEdges(){
+   for(i=0; i<edgeCount; i++)
+   {
+      edgeV1x = px[edgeV1[i]];  
+      edgeV1y = py[edgeV1[i]];  
+
+      edgeV2x = px[edgeV2[i]];  
+      edgeV2y = py[edgeV2[i]]; 
+
+      // Calculate vector
+      v1v2x = edgeV1x-edgeV2x;
+      v1v2y = edgeV1y-edgeV2y;
+      v1v2length = sqrt( v1v2x^2 + v1v2y^2 );
+      // Calc difference from original length
+      diff = v1v2length - edgeOriginalLength[i];
+      // normalize v1v2
+      v1v2x /= v1v2length;
+      v1v2y /= v1v2length;
+      
+      // Put both vertices apart by half of the differance respectively
+      edgeV1x -= v1v2x*diff*0.5;
+      edgeV1y -= v1v2y*diff*0.5;
+      edgeV2x += v1v2x*diff*0.5;
+      edgeV2y += v1v2y*diff*0.5;
+      
+      moveto( edgeV1x, edgeV1y );
+      lineto( edgeV2x, edgeV2y );
+      
+      // copy constrained values back into points.
+      px[edgeV1[i]] = edgeV1x;
+      py[edgeV1[i]] = edgeV1y;
+      
+      px[edgeV2[i]] = edgeV2x;
+      py[edgeV2[i]] = edgeV2y;
+   }
+
+}
+
+createPoint(x,y){
+   px[pointCount] = x;
+   py[pointCount] = y;
+   opx[pointCount] = x;
+   opy[pointCount] = y;
+   ax[pointCount] = 0;
+   ay[pointCount] = 55+nrnd;
+   pointCount++;
+   return pointCount-1;
+}
+createContraint(p1,p2){
+   edgeV1[edgeCount] = p1;
+   edgeV2[edgeCount] = p2; 
+
+   edgeOriginalLength[edgeCount] = sqrt( (px[p1]-px[p2])^2 + (py[p1]-py[p2])^2 );
+
+   edgeCount++;
+}

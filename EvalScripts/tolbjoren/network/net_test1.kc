@@ -1,0 +1,39 @@
+static otherx=200, othery=200;
+static localx=200, localy=200;
+()
+{
+   cls();
+   while(klock() < numframes/30 )
+   {
+      //waiting
+   }   
+
+   
+   diameter = 50;
+   if(bstatus==1)
+   {
+      localx = mousx; localy = mousy;
+   }
+   
+   drawsph(localx, localy, -diameter/2);
+   drawsph(otherx, othery, -diameter/2);
+   
+   setcol(0xffffff);
+   if( isColliding(mousx, mousy, otherx, othery, diameter))
+   setcol(0xff0000);
+     
+   setfont(12,16);
+   moveto(0,0);
+   printf("netplayers:%g",net_players);
+   printf("\n\nHold mouse down to move circle");
+   
+   net_send(NET_ALLELSE,localx); net_send(NET_ALLELSE,localy);
+   
+   net_recv(NET_ALLELSE,otherx); net_recv(NET_ALLELSE,othery);
+   
+}
+
+isColliding(x1,y1, x2, y2, radius)
+{
+   if( ((x1-x2)^2 + (y1-y2)^2) < (radius^2) ) return 1;
+}

@@ -1,0 +1,95 @@
+enum{MAXDIGITS = 100}
+static digits[MAXDIGITS];
+static numdigits = 0;
+
+static largestPal;
+()
+{
+   cls(0);
+   
+   if(numframes==0)
+   {
+      largestPal = -1;
+      count1 = 999;
+      count2 = 999;
+      for(i=0; i<=count1; i++)
+      {
+         for(j=0; j<=count2; j++)
+         {
+            product = i*j;
+            if( isPalindrome(product) )
+            if(product > largestPal)
+            {
+               largestPal = product;
+            }
+         }
+      }
+   }
+   
+   num = 44;
+   getDigits(num);
+   for(i=0; i<numdigits; i++)
+      printf("%g\n",digits[i]);
+      
+   printf("\ndigits=%g",numdigits);
+
+   if( isPalindrome(num) ) printf("\n%g is a pal",num); else printf("\n%g is not a pal of mine", num);
+
+   // find largest palindrome
+   
+   printf("\nlargest pal: %g",largestPal);
+}
+
+
+isPalindrome(num)
+{
+   getDigits(num);
+   for(i=0; i<numdigits/2; i++)
+   {
+      if(digits[i] != digits[numdigits-i-1]) return 0;
+      
+      
+      
+   }
+   return 1;
+}
+
+// only good for maximum 10 digit numbers
+// because ints doent exist in evaldraw.
+getDigits(num)
+{
+   if(num == 0) // special case
+   {
+      digits[0] = 0;
+      numdigits=1;
+      return;
+   }
+   
+   numdigits=0; // reset
+   
+   // count number of digits in num
+   siz = 0;
+   mynum = num;
+   while(mynum > 0)
+   {
+      siz++;
+      mynum = int(mynum / 10 );
+   }
+   siz--;
+   
+   depth = 0;
+   digit = num;
+   for(i=0; i<siz+1; i++)
+   {
+      digit = floor( num/10^(siz-depth) );
+      digits[numdigits] = digit; numdigits++;
+      depth++;   
+   }   
+   
+   // choppaz
+   for(i=0; i<numdigits-1; i++)
+   {
+      digits[numdigits-1-i] -= digits[numdigits-1-i-1] * 10;
+   }
+
+}

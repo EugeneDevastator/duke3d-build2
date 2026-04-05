@@ -1,0 +1,20 @@
+(x,y,z,&r,&g,&b) 
+
+n = 1;
+x2 = x*n;
+y2 = y*n;
+z2 = z*n;
+
+b=1;
+
+xf = log( abs( sin(x2) ) )/b;
+yf = log( abs( sin(y2) ) )/b;
+zf = log( abs( sin(z2) ) )/b;
+
+v =  (.5+xf * yf * zf) ;
+
+
+r =32+abs(xf)*128;
+g =32+abs(yf)*128;
+b =32+abs(zf)*128;
+return v;

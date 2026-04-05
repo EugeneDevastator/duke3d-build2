@@ -1,0 +1,100 @@
+// original author unknown.
+// source:http://txd.kung-fu.lt/tunnel/tunnel.html
+// converted to evaldraw by Torbjoern 31. july 2009
+
+
+enum{numRings = 55, numPoints = 20};
+static sins[360]; static coss[360];
+static pointsx[numRings*numPoints];
+static pointsy[numRings*numPoints];
+
+static alpha;  
+static cx, cy; 
+static x = 0, y = 0;
+
+static time;
+()
+{
+   time = klock();   
+   
+   
+   if(numframes==0) setup();
+   
+   draw();
+   //sleep(1);
+}
+
+setup()
+{  
+   // Look up tables neccessary in this day?
+   for(i=0; i < 360; i++)
+   {
+      sins[i] = sin(i * PI / 180);
+      coss[i] = cos(i * PI / 180);
+   }
+   
+   cx = xres/2;
+   cy = yres/2;
+   alpha = 360 / numpoints;
+
+   for(i=0; i<numRings * numPoints; i++){
+      pointsx[i] = 0; pointsy[i] = 0;
+   }
+}
+
+draw(){
+   //cls();
+   clz(1e32); 
+   glDisable(GL_DEPTH_TEST);
+   //glEnable(GL_DEPTH_TEST);
+   glCullFace(GL_FRONT);
+   
+   radadd = 20;
+
+   radius = 0;
+   for(i=0; i < numRings; i++)
+   {
+      for(j=0; j < numPoints; j++)
+      {
+         pointsx[i * numPoints + j] = 
+         int(cx + 60 * coss[(x + 200 - radius + 3600) % 360] + radius * coss[(i * 5 + alpha * j) % 360]);
+         pointsy[i * numPoints + j] = 
+         int(cy + 45 * sins[(y + 200 - radius + 3600) % 360] + radius * sins[(i * 5 + alpha * j) % 360]);         
+      }
+      radius += radadd;
+   }
+   
+
+   for(i = 0; i < numRings - 1; i++)
+   {
+
+      for(j = 0; j < numPoints; j++)
+      {
+         r = i * (radadd-2);
+         g = int( sin((j * alpha / 2) * PI / 180) * 255 * i / numRings );
+         b = 0;
+         
+         setcol(r*5,g*5,b);
+         //setcol(260,260,260);         
+ 
+         //glBegin(GL_LINES);
+         //glBegin(GL_POLYGON);
+         glBegin(GL_COMPLEX);
+
+         glVertex(pointsx[i * numPoints + j], pointsy[i * numPoints + j]);
+         glTexCoord(.5,0);
+         glVertex(pointsx[i * numPoints + (j+1) % numPoints], pointsy[i * numPoints + (j+1) % numPoints]);
+         glTexCoord(0,0);
+         glVertex(pointsx[(i+1) * numPoints + (j+1) % numPoints], pointsy[(i+1) * numPoints + (j + 1) % numPoints]); 
+         glTexCoord(0,0);
+         glVertex(pointsx[(i+1) * numPoints + j], pointsy[(i+1) * numPoints + j]);
+         glTexCoord(0,0);
+         glEnd();
+       
+      }
+      
+      x = (numframes*1) % 360;
+      y = (numframes*2) % 360;
+   }
+}
+

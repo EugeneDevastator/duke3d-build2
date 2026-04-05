@@ -1,0 +1,496 @@
+/*
+revisited around august 2011 inorder to splice multiple 3. order ( 4 points ) Bezier curves together.
+
+Converted piecewize bez to draw roads... removed isDupe-property because it was a stupid wayy
+of creating nodes with 2 control handles
+*/
+
+enum{MAXPTS = 32}
+
+struct point
+{
+   x,y;
+};
+
+struct BezPoint
+{
+   point node;
+   point control;
+};
+
+static BezPoint pts[MAXPTS];
+static numpts = 0;
+
+static road_tex = 0;
+()
+{   
+   if(numframes==0)
+   {
+      road_tex = glsettex("asfalt.png");
+   }
+   cls(0x1d8725); clz(1e32);
+   glDisable(GL_DEPTH_TEST);
+     
+   if(keystatus[57] && numpts < MAXPTS)
+   {
+      keystatus[57] = 0;
+      create_point();
+   }
+   
+   move_points();
+   
+
+ 
+   //if ( keystatus[1] ) 
+   {
+      cls(0); clz(1e32);
+      
+      static hand = 0;
+      if ( numframes == 0 ) {
+         hand = glsettex("F:/repos/github/ProtoWizard/bin/assets/textures/lyngaas_overview.png");
+      }
+      setcol(255,255,255);
+      glsettex(hand);
+      glbegin(GL_QUADS);
+         gltexcoord(0,0); glvertex(0,0);
+         gltexcoord(1,0); glvertex(xres,0);
+         gltexcoord(1,1); glvertex(xres,yres);
+         gltexcoord(0,1);  glvertex(0,yres);
+      glend();
+   
+   }
+   
+   
+   
+   
+   
+   width = 10;
+   rez = 20;
+   glsettex(road_tex);
+   draw_road(width,rez);
+   
+   static debug_draw = 1;
+   if (debug_draw)
+   {
+      draw_curve(width,rez);
+      draw_points();
+   }
+      
+   if (keystatus[2] )
+   {
+      keystatus[2]=0;
+      if (debug_draw==1 ) debug_draw = 0; else debug_draw = 1;
+   }
+   
+
+
+   setfont(6,8);
+   xp = xres - 192;
+   yp = 32;
+   if ( squareBtn(xp,yp,96,32) )
+   {
+      // GLUE last and first points together
+      // Force first point to have same pos as last
+      pts[0].node.x = pts[numpts-1].node.x;
+      pts[0].node.y = pts[numpts-1].node.y;
+      
+      // Create vector from last node to last nodes control
+      dx = pts[numpts-1].control.x - pts[numpts-1].node.x;
+      dy = pts[numpts-1].control.y - pts[numpts-1].node.y;
+      
+      
+      if (numpts%2==0) // even
+      {
+         pts[0].control.x = pts[0].node.x - dx;
+         pts[0].control.y = pts[0].node.y - dy;
+      }else
+      {
+         pts[0].control.x = pts[0].node.x + dx;
+         pts[0].control.y = pts[0].node.y + dy;
+      }
+   }
+   setcol(255,255,255);
+   moveto(xp+8,yp+12); printf("make closed");
+   
+
+   if ( numpts >= 2 ){
+      x=0; y=0;
+      Point curvePt, normal;
+      getPt( mousx/xres, curvePt, normal );
+      setcol(0xf8ab0c); drawsph(curvePt.x,curvePt.y, -10);
+      
+      //setfont(8,12);
+      //moveto(curvePt.x,curvePt.y+10); printf("p=%g to %g\nt = %.2f ", p,p+1, t);
+   }
+
+}
+
+squareBtn(x,y,w,h)
+{
+   setcol(0x0000ff);
+   drawrectfill(x,y,x+w,y+h); 
+
+   if( PointRectCollide(mousx,mousy,x,y,w,h) )
+   {
+      setcol(0xffffff);
+      drawrectopen(x,y,x+w,y+h);
+      return bstatus > 0;
+   }
+   return 0;
+}
+drawrectfill(x0,y0,x1,y1) { for(y=y0;y<y1;y++) { moveto(x0,y); lineto(x1,y); } }
+drawrectopen(x0,y0,x1,y1) { moveto(x0,y0); lineto(x1,y0); lineto(x1,y1); lineto(x0,y1); lineto(x0,y0); }
+
+PointRectCollide(x1,y1,x2,y2,w,h)
+{
+   if(x1 >= x2 && x1 <= x2+w)
+   if(y1 >= y2 && y1 <= y2+h)
+      return 1; 
+}
+
+clamp(t,lo,hi)
+{
+   return max(lo, min(hi, t) );
+}
+
+err()
+{
+   while(1){
+      cls(255,0,0);
+      setcol(255,255,255);
+      moveto(0,0);
+      printf("assert failed\n");
+   }
+}
+
+getPt(t_in, Point curvePt, Point normal){
+
+   t_in = clamp(t_in, 0.0, 1.0);
+   p = floor(t_in * (numpts-1) );
+   
+   t = t_in*(numpts-1) - p ;
+
+   if ( t < 0.0 || t > 1.0 ) err();
+   
+   if ( p%2!=0 ) // odd
+   {
+      dx = pts[p].control.x - pts[p].node.x;
+      dy = pts[p].control.y - pts[p].node.y;
+      Point invNormal0;
+      invNormal0.x = pts[p].node.x - dx;   
+      invNormal0.y = pts[p].node.y - dy;
+      
+      dx = pts[p+1].control.x - pts[p+1].node.x;
+      dy = pts[p+1].control.y - pts[p+1].node.y;
+      Point invNormal1;
+      invNormal1.x = pts[p+1].node.x - dx;   
+      invNormal1.y = pts[p+1].node.y - dy;
+
+      bspline_deg3(pts[p].node, invNormal0, invNormal1, pts[p+1].node, t,curvePt, normal);   
+   }else{
+      bspline_deg3(pts[p].node, pts[p].control, pts[p+1].control, pts[p+1].node, t,curvePt, normal);
+   }
+   
+   
+}
+
+// takes 4 points, gives a curve of degree 3 (cubic)
+bspline_deg3(point p0, point p1, point p2, point p3, 
+             t, point curvePt, point normal)
+{
+   //   B(t)=(1-t)^3P0+ 3t(1-t)^2P1 + 3t^2(1-t)P2 + t^3P3   
+   double t3 = t * t * t;
+   double tmin1 = 1.0 - t;
+   double tmin13 = tmin1 * tmin1 * tmin1;
+
+   curvePt.x = tmin13*p0.x + 3.0*t*tmin1*tmin1*p1.x + 3.0*t*t*tmin1*p2.x + t3*p3.x;
+   curvePt.y = tmin13*p0.y + 3.0*t*tmin1*tmin1*p1.y + 3.0*t*t*tmin1*p2.y + t3*p3.y;
+   
+   double tmin1 = 1.0 - t;
+   normal.x = -3.*(p0.x * tmin1*tmin1 + p1.x * (-3.0 * t*t + 4.0*t - 1.0) + t*(3.0 * p2.x * t - 2.0 * p2.x - p3.x*t) );
+   normal.y = -3.*(p0.y * tmin1*tmin1 + p1.y * (-3.0 * t*t + 4.0*t - 1.0) + t*(3.0 * p2.y * t - 2.0 * p2.y - p3.y*t) );      
+   normalize( normal );
+}
+
+ 
+
+set(point p,x,y){
+   p.x = x;
+   p.y = y;
+}
+
+draw_points(){
+   time = klock(0);
+   setcol(0xffffff);
+   for( i=0; i<numpts; i++)
+   {
+      drawsph(pts[i].node.x, pts[i].node.y,-4);
+      moveto(pts[i].node.x, pts[i].node.y);
+      lineto(pts[i].control.x, pts[i].control.y);
+      
+      moveto(pts[i].node.x + cos(time*10+i*3.14)*5, pts[i].node.y + 9 + sin(time*10+i*3.14)*5);
+      
+      setfont(4,6); printf( "%g",i);
+   }
+}
+
+move_points(){
+   static isGrab = 0;
+   isGrab = bstatus;
+   mindist = 1e32;
+   minIdx_node = -1;
+   for(i=0; i<numpts; i++)
+   {
+      dist = sqrt( (mousx-pts[i].node.x)^2 +  (mousy-pts[i].node.y)^2);
+      if (dist < 10^2 )
+      if (dist < mindist)
+      {
+         mindist = dist;
+         minIdx_node = i;
+      }
+   }
+      
+   mindist = 1e32;
+   minIdx_ctrl = -1;
+   for(i=0; i<numpts; i++)
+   {
+      dist = sqrt( (mousx-pts[i].control.x)^2 +  (mousy-pts[i].control.y)^2);
+      if (dist < 10^2 )
+      if (dist < mindist)
+      {
+         mindist = dist;
+         minIdx_ctrl = i;
+      }
+   }
+
+   if (isGrab==1 && minIdx_node > -1 )
+   {
+      dx = pts[minIdx_node].control.x - pts[minIdx_node].node.x;
+      dy = pts[minIdx_node].control.y - pts[minIdx_node].node.y;   
+         
+      set(pts[minIdx_node].node, mousx, mousy);
+      set(pts[minIdx_node].control, mousx+dx, mousy+dy);
+   }else if (isGrab == 2 && minIdx_ctrl > -1  )
+   {
+      set(pts[minIdx_ctrl].control, mousx, mousy);
+   }
+   
+   
+}
+
+create_point()
+{
+      pts[numpts].node.x = mousx;
+      pts[numpts].node.y = mousy;
+      
+      if ( numpts > 0 )
+      {
+         dx = (mousx - pts[numpts-1].node.x)*.5;
+         dy = (mousy - pts[numpts-1].node.y)*.5;
+         if (numpts % 2 == 0)
+         {
+            pts[numpts].control.x = mousx + dx;
+            pts[numpts].control.y = mousy + dy;
+         }else{
+            pts[numpts].control.x = mousx - dx;
+            pts[numpts].control.y = mousy - dy;
+         }
+      }
+      else
+      {
+         pts[numpts].control.x = mousx;
+         pts[numpts].control.y = mousy;
+      }
+ 
+      numpts++;
+}
+
+draw_road(width, rez){
+
+   Point curvePt, normal;
+   
+   Point oldPt, oldNormal;
+   
+
+   for(p=0; p<(numpts-1); p++){
+     if (p==0){
+         bspline_deg3(pts[p].node, pts[p].control, pts[p+1].control, pts[p+1].node, 0.0 , curvePt, normal);
+         oldPt = curvePt;
+         oldNormal = normal;
+      }     
+      for(i=0; i<rez; i++){
+         t = i/(rez-1);
+         
+         if ( p%2!=0 ) // odd
+         {
+            dx = pts[p].control.x - pts[p].node.x;
+            dy = pts[p].control.y - pts[p].node.y;
+            Point invControl0;
+            invControl0.x = pts[p].node.x - dx;   
+            invControl0.y = pts[p].node.y - dy;
+            
+            dx = pts[p+1].control.x - pts[p+1].node.x;
+            dy = pts[p+1].control.y - pts[p+1].node.y;
+            Point invControl1;
+            invControl1.x = pts[p+1].node.x - dx;   
+            invControl1.y = pts[p+1].node.y - dy;
+
+            bspline_deg3(pts[p].node, invControl0, invControl1, pts[p+1].node, t,curvePt, normal);   
+         }else{
+            bspline_deg3(pts[p].node, pts[p].control, pts[p+1].control, pts[p+1].node, t,curvePt, normal);
+         }
+       
+         
+         scale_factor = distance2d( oldPt, curvePt ) / width;
+         
+         glbegin(GL_COMPLEX);
+         gltexcoord(0,0); glvertex( oldPt.x - oldNormal.y * width,oldPt.y + oldNormal.x * width);
+         gltexcoord(1,0); glvertex( oldPt.x + oldNormal.y * width,oldPt.y - oldNormal.x * width);
+         
+    
+         gltexcoord(1,scale_factor);  glvertex( curvePt.x + normal.y * width,curvePt.y - normal.x * width);
+         gltexcoord(0,scale_factor);  glvertex( curvePt.x - normal.y * width,curvePt.y + normal.x * width);
+         
+         glEnd();
+
+         oldPt = curvePt;
+         oldNormal = normal;
+      }
+   }
+}
+
+draw_curve(scale, rez){
+
+   Point curvePt, normal;
+   
+   Point oldPt, oldNormal;
+  
+
+   for(p=0; p<(numpts-1); p++){
+     if (p==0){
+         bspline_deg3(pts[p].node, pts[p].control, pts[p+1].control, pts[p+1].node, 0.0 , curvePt, normal);
+         oldPt = curvePt;
+         oldNormal = normal;
+      }     
+      for(i=0; i<rez; i++){
+         t = i/(rez-1);
+         
+         if ( p%2!=0 ) // odd
+         {
+            dx = pts[p].control.x - pts[p].node.x;
+            dy = pts[p].control.y - pts[p].node.y;
+            Point invControl0;
+            invControl0.x = pts[p].node.x - dx;   
+            invControl0.y = pts[p].node.y - dy;
+            
+            dx = pts[p+1].control.x - pts[p+1].node.x;
+            dy = pts[p+1].control.y - pts[p+1].node.y;
+            Point invControl1;
+            invControl1.x = pts[p+1].node.x - dx;   
+            invControl1.y = pts[p+1].node.y - dy;
+
+            bspline_deg3(pts[p].node, invControl0, invControl1, pts[p+1].node, t,curvePt, normal);   
+         }else{
+            bspline_deg3(pts[p].node, pts[p].control, pts[p+1].control, pts[p+1].node, t,curvePt, normal);
+         }
+       
+         
+
+         
+         Point pa,pb,pc,pd;
+         set(pa, oldPt.x - oldNormal.y * scale, oldPt.y + oldNormal.x * scale);
+         set(pb, oldPt.x + oldNormal.y * scale,oldPt.y - oldNormal.x * scale);
+         set(pc, curvePt.x + normal.y * scale,curvePt.y - normal.x * scale);
+         set(pd, curvePt.x - normal.y * scale,curvePt.y + normal.x * scale);
+         
+
+         dist_ad = distance2d(pa,pd);
+         dist_bc = distance2d(pb,pc);
+         
+         
+         
+
+         setcol( 255 * scale/dist_ad, 0,0);
+         moveto(pa.x,pa.y);
+         lineto(pd.x,pd.y);
+         
+         setcol( 255 * scale/dist_bc, 0,0);
+         moveto(pb.x,pb.y);
+         lineto(pc.x,pc.y);
+         
+         setcol(255,255,255);
+         moveto(pa.x,pa.y);
+         lineto(pb.x,pb.y);  
+         
+         if ( i > 0 && dist_ad < 2 )
+         {
+            moveto(pa.x + (pd.x-pa.x)*.5,  pa.y + (pd.y-pa.y)*.5); printf("warn!");
+         }
+         if ( i > 0 && dist_bc < 2 )
+         {
+            moveto(pb.x + (pc.x-pb.x)*.5,  pb.y + (pc.y-pb.y)*.5); printf("warn!");
+         }         
+
+         #ifdef REMOVEME
+         if ( p == 0 && i == 1 )
+         {
+            moveto(pa.x, pa.y); printf("\na");
+            moveto(pb.x, pb.y); printf("\nb");
+            moveto(pc.x, pc.y); printf("\nc");
+            moveto(pd.x, pd.y); printf("\nd");
+         }
+         #endif
+         
+         oldPt = curvePt;
+         oldNormal = normal;
+      }
+   }
+   
+   #ifdef draw_plusses
+   for(p=0; p<(numpts-1); p++){
+      for(i=0; i<rez; i++){
+         t = i/(rez-1);
+         if ( p%2!=0 ) // odd
+         {
+            dx = pts[p].control.x - pts[p].node.x;
+            dy = pts[p].control.y - pts[p].node.y;
+            Point invNormal0;
+            invNormal0.x = pts[p].node.x - dx;   
+            invNormal0.y = pts[p].node.y - dy;
+            
+            dx = pts[p+1].control.x - pts[p+1].node.x;
+            dy = pts[p+1].control.y - pts[p+1].node.y;
+            Point invNormal1;
+            invNormal1.x = pts[p+1].node.x - dx;   
+            invNormal1.y = pts[p+1].node.y - dy;
+
+            bspline_deg3(pts[p].node, invNormal0, invNormal1, pts[p+1].node, t, curvePt, normal);   
+         }else{
+            bspline_deg3(pts[p].node, pts[p].control, pts[p+1].control, pts[p+1].node, t, curvePt, normal);
+         } 
+         drawplus(curvePt.x, curvePt.y);
+      }
+   }
+   #endif
+}
+
+drawplus(x,y)
+{
+   setfont(4,6); setcol(255,0,0);
+   moveto( floor(x-2.5) ,y); lineto( ceil(x+3.5), y);
+   moveto(x, floor(y-2.5) ); lineto(x, ceil(y+3.5) );
+}
+
+distance2D(Point a, Point b)
+{
+   return sqrt( (a.x-b.x)^2 + (a.y-b.y)^2 );
+}
+
+normalize(Point p)
+{
+   len = sqrt(p.x^2 + p.y^2);
+   if (len){
+      p.x /= len;
+      p.y /= len;
+   }
+}

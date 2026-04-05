@@ -1,0 +1,662 @@
+struct p3d_t{x,y,z;};
+
+enum{MAX_SPHERES = 100}
+struct sphere_t{x, y, z, vx, vy, vz, mass, radius, color;};
+static sphere_t spheres[MAX_SPHERES];
+static numspheres = 0;
+
+enum{MAX_LINES = 10}
+struct line_t{p3d_t start; p3d_t end, p3d_t normal;};
+static line_t lines[MAX_LINES];
+static numlines = 0;
+
+enum{MAX_PLANES = 10}
+struct plane_t{p3d_t p, p3d_t u, p3d_t v;};
+static plane_t planes[MAX_PLANES];
+static numplanes = 0;
+
+enum{MAX_POT_COLLS = 100}
+struct potentialColl_t{x,y,r;}
+static potentialColl_t potColls[MAX_POT_COLLS];
+static num_pot_colls;
+
+// resolving collisions correctly
+enum{INSIDE = -1, NONE = -2}
+enum{CIRCLECIRCLE = -1, CIRCLELINE = -2}; // Collision types.
+
+static dt, time, oldtime;
+static running = 0;
+static circleCircleCollisions,circleLineColls = 0;
+static recursiveCalls, recurseLimit = 100;
+// 03 Time to add plane-sphere
+()
+{
+   cls(0);
+   time = klock(0);
+   if(running){
+      dt =  time - oldtime;
+   }else{
+      dt = 0;
+   }  
+   oldtime = time; 
+
+   if(numframes == 0)
+   {
+      poolSetup(); //pool, square, sine, cradle
+      createLine(xres * 0.15, yres * 0.10, xres * 0.15, yres * 0.95); //l
+      createLine(xres * 0.73, yres * 0.95, xres * 0.73, yres * 0.10); //r
+      
+      createLine(xres * 0.95, yres * 0.45, xres * 0.05, yres * 0.20); // t
+      createLine(xres * 0.05, yres * 0.75, xres * 0.95, yres * 0.65);  //b
+      
+      
+      planes[numplanes].p.x = xres/2;
+      planes[numplanes].p.y = 10;
+      planes[numplanes].p.z = yres/2;
+      planes[numplanes].u.x = xres/2;
+      planes[numplanes].u.y = 0;
+      planes[numplanes].u.z = 0;
+      planes[numplanes].v.x = 0;
+      planes[numplanes].v.y = 0;
+      planes[numplanes].v.z = yres/2; numplanes++;
+   }
+   
+   display();
+   num_pot_colls = 0; // Reset num potential coll markers.
+
+   static flowOfTime = 1;
+   recursiveCalls = -1;
+   checkCollision(dt * flowOfTime);
+   
+   if(keystatus[2])
+   {
+      keystatus[2] =0;
+      flowOfTime *= -1;
+   }
+   
+   keys();
+
+   //sleep(16);
+   moveto(0,0);
+   setcol(0xffffff);
+   printf("\nctrl+enter to reset");
+   printf("\ncirc circ cols: %g",circleCircleCollisions);
+   printf("\ncir lin cols:   %g",circleLineColls);
+   printf("\nnum_potential_collisions (circ circ both ways):   %g",num_pot_colls);
+   static max_potential_collisions;
+   max_potential_collisions = max(max_potential_collisions, num_pot_colls);
+   printf("\nhighest num potential_collisions:   %g",max_potential_collisions); 
+   printf("\nPRESS 1 TO CONTROL THE FLOW OF THYME"); 
+   static maxRecursiveCalls;
+   maxRecursiveCalls = max(maxRecursiveCalls,recursiveCalls);
+   printf("\nnum recursive steps last dt: %g",recursiveCalls);
+   printf("\nmax recursion:  %g / %g",maxRecursiveCalls, recurseLimit);
+   printf("\nballs  %g / %g",numspheres, MAX_SPHERES);
+   printf("\nlines  %g / %g",numlines, MAX_LINES);
+}
+
+checkCollision( t) // , movable, fixed
+{
+   recursiveCalls++;
+   if( recursiveCalls > recurseLimit) return; // fix calculation of response taking ds innacuracy in account.
+
+   collisionType = NONE;
+   p3d_t collisionNormal;
+   
+   // find first collision
+   mn = 2.0; // time
+   firstColObj1 = -1;
+   firstColObj2 = -1;
+   obj1 = -1; // null
+   obj2 = -1; // null
+   
+   // Repeat for all moveable objects.
+   for( i=0; i<numSpheres; i++)
+   {
+      obj1 = i;
+      // find the displacement vector
+      
+      // search for collisions with other moveableObjs, dont bother with already checked ones.
+      for( j=i+1; j<numSpheres; j++)
+      {
+         obj2 = j;
+         tm = circleCircleCollision(obj1, obj2, t); // use a generic detectCollision func that takes any type of obj.
+         //if(tm == NONE) continue;
+         if(tm >= 0 && tm <= 1)
+         {
+            m = min(mn, tm);
+            if(m < mn)
+            {
+               mn = m;
+               firstColObj1 = obj1;
+               firstColObj2 = obj2;
+               collisionNormal.x = spheres[obj1].x - spheres[obj2].x;
+               collisionNormal.y = spheres[obj1].y - spheres[obj2].y; 
+               collisionNormal.z = spheres[obj1].z - spheres[obj2].z;  
+               normalize(collisionNormal);      
+               collisionType = CIRCLECIRCLE;
+            }
+         }
+         
+         t2 = circleCircleCollision(obj1, obj2, 1);
+         if(t2 >= 0 && t2 <= 1)
+         {
+         createPotentialCollision(spheres[obj1].x+spheres[obj1].vx*t2,spheres[obj1].y+spheres[obj1].vy * t2,spheres[obj1].radius+2);
+         createPotentialCollision(spheres[obj2].x+spheres[obj2].vx*t2,spheres[obj2].y+spheres[obj1].vy * t2,spheres[obj2].radius+2);
+         }
+    
+      }
+      // Static - dynamic collisions
+      for(j=0; j<numLines; j++)
+      {
+         obj2 = j;
+
+         tm = circleLineCollision( obj1, obj2, t );
+         //if(tm==NONE) continue;
+         if(tm >= 0 && tm <= 1)
+         {
+            m = min(mn, tm);
+            if(m < mn)
+            {
+               mn = m;
+               // burde lage kollisjonsobj som vet typen
+               // line vs circle
+               firstColObj1 = obj1;
+               firstColObj2 = obj2;
+               collisionNormal.x = lines[obj2].normal.x;
+               collisionNormal.y = lines[obj2].normal.y;
+               collisionNormal.z = 0;
+               normalize(collisionNormal); // unnecessary?
+               collisionType = CIRCLELINE;
+            }
+         }
+         
+         // Check for collision against end of velocity vec
+         
+         t2 =  circleLineCollision( obj1, obj2, 1);
+         if(t2 >= 0 && t2 <= 1) createPotentialCollision(spheres[obj1].x+spheres[obj1].vx * t2,spheres[obj1].y+spheres[obj1].vy * t2,spheres[obj1].radius+2);     
+      }
+   }
+   
+   tmove = 0;
+   if( mn >= 2.0 ) tmove = 1; // go all the way. No collisions.
+   else tmove = mn * t; // time of collision
+   
+   // Move all movable objects.
+   for(i=0; i<numspheres; i++)
+   {
+      spheres[i].x += spheres[i].vx * tmove *t;
+      spheres[i].y += spheres[i].vy * tmove *t; 
+      spheres[i].z += spheres[i].vz * tmove *t;   
+   }
+   
+   // if there was no collisions, finish. end recursion.
+   if( mn >= 2.0 ) return;
+   // otherwise resolve collision
+   resolveCollision( firstColObj1, firstColObj2, collisionType, collisionNormal);
+   
+   checkCollision( t * (1.0 - mn) ); // moveableObjects, fixedObjects
+}
+
+// know that obj1 always is a circle.
+// should really use a physicsObject.getType()
+// or even better. collisionObject.getCollisionType()
+// that knows which one is a circle and which one is a line
+resolveCollision( obj1, obj2, collisionType, p3d_t normal )
+{
+   if( collisionType == CIRCLECIRCLE )
+   {
+      resolveCollisionFree(obj1,obj2,normal);
+   }
+   else if( collisionType == CIRCLELINE )
+   {
+      resolveFixedCollision(obj1,normal);
+   }
+}
+
+// todo 3D
+resolveCollisionFree(obj1,obj2,p3d_t normal)
+{
+
+   r = spheres[obj1].mass / spheres[obj2].mass;  
+   basex = spheres[obj2].vx; 
+   basey = spheres[obj2].vy;
+   p3d_t u;
+   u.x = spheres[obj1].vx - basex; 
+   u.y = spheres[obj1].vy - basey; 
+   static un[2]; 
+   componentVector(u,normal,un); // un = componentVec( u, normal )
+   
+   // ut = u - un
+   utx = u.x - un[0]; 
+   uty = u.y - un[1]; 
+   // vn = un * (r-1) / (r+1)
+   vnx = un[0] * (r-1) / (r+1); 
+   vny = un[1] * (r-1) / (r+1);
+   // wn = un * 2 * r / (r+1)
+   wnx = un[0] * 2 * r / (r+1); 
+   wny = un[1] * 2 * r / (r+1);
+   
+   spheres[obj1].vx = utx + vnx + basex; 
+   spheres[obj1].vy = uty + vny + basey;
+   spheres[obj2].vx = wnx + basex; 
+   spheres[obj2].vy = wny + basey;   
+   circleCircleCollisions++;
+   playsound("ppbaltab.wav",100);
+}
+
+resolveFixedCollision(obj,p3d_t normal)
+{
+   // calc dot product of incident vector and base top normal
+   dot = spheres[obj].vx * normal.x +spheres[obj].vy * normal.y + spheres[obj].vz * normal.z;
+   
+   // calc reflection vector
+   spheres[obj].vx = spheres[obj].vx - 2*normal.x*dot;
+   spheres[obj].vy = spheres[obj].vy - 2*normal.y*dot;
+   spheres[obj].vz = spheres[obj].vz - 2*normal.z*dot;
+   circleLineColls++;
+   
+   playsound("tapfloor.flac");
+}
+
+// Takes handles of to circles and their displacement vector relative to time; cir1.pos*t - cir2.pos*t
+circleCircleCollision(cir1, cir2, t)
+{
+   r = spheres[cir1].radius + spheres[cir2].radius;
+
+   p3d_t a;
+   a.x = spheres[cir1].x - spheres[cir2].x;
+   a.y = spheres[cir1].y - spheres[cir2].y;
+   a.z = 0;
+   
+   p3d_t b; // blir som getDS(simtime)
+   b.x = spheres[cir1].vx*t - spheres[cir2].vx*t;
+   b.y = spheres[cir1].vy*t - spheres[cir2].vy*t;
+   b.z = 0;
+   
+   aa = dotProduct(a,a);
+   if( aa < r*r ) return INSIDE; // Early escape test.
+   bb = dotProduct(b,b);
+
+   ab = dotProduct(a,b);
+   
+   root = ab*ab - bb * (aa - r*r);
+   if(root < 0) return NONE;
+   t = (-ab - sqrt(root))/bb;  
+   if(t>1 || t<0) return NONE;
+   return t;
+}
+
+circleLineCollision(cir,line, t)
+{
+   p3d_t displacement;
+   displacement.x = spheres[cir].vx * t;
+   displacement.y = spheres[cir].vy * t;
+   displacement.z = 0;
+
+   p3d_t n; 
+   n.x = lines[line].normal.x; 
+   n.y = lines[line].normal.y;
+   n.z = 0;
+   p3d_t a; 
+   a.x = lines[line].start.x - spheres[cir].x; 
+   a.y = lines[line].start.y - spheres[cir].y;
+   a.z = 0;
+   c = dotProduct(a,n);
+   if( abs(c) < spheres[cir].radius ) return INSIDE;
+   rx=0; ry=0;
+   
+   if(c < 0){
+      rx = -n.x * spheres[cir].radius; 
+      ry = -n.y * spheres[cir].radius;
+   }else{
+      rx = n.x * spheres[cir].radius; 
+      ry = n.y * spheres[cir].radius;
+   }
+   
+   // check if circle is approaching line
+   v = dotProduct(displacement, n);
+   if( v > 0) return NONE;
+   
+   // calc vector eq
+   static circlePos[2]; 
+   circlePos[0] = spheres[cir].x+rx; 
+   circlePos[1] = spheres[cir].y+ry;
+   
+   static startPoint[2]; 
+   startPoint[0] = lines[line].start.x; startPoint[1] = lines[line].start.y;
+   
+   static lineVector[2]; 
+   lineVector[0] = lines[line].end.x - lines[line].start.x; lineVector[1] = lines[line].end.y - lines[line].start.y;
+   
+   t = intersectionTime( circlePos, displacement, startPoint, lineVector );
+   if(t > 1 ) return NONE;
+   return t;
+}
+ 
+rotatePoint(&x,&y,ang) // angle in radians
+{
+   newx = x * cos(ang) - y * sin(ang);
+   newy = x * sin(ang) + y * cos(ang);
+   x = newx; y = newy;    
+}
+
+componentVector(p3d_t vector,p3d_t directionVector, out[2])
+{
+   normalize(directionVector);
+   dpr = dotProduct(vector, directionVector);
+   out[0] = dpr * directionVector.x; 
+   out[1] = dpr * directionVector.y;
+}
+// 3D Math
+length(p3d_t v){
+   return sqrt(v.x^2 + v.y^2 + v.z^2);
+}
+
+normalize(p3d_t v)
+{
+   len = sqrt(v.x^2 + v.y^2 + v.z^2); 
+   v.x/=len; v.y/=len; v.z/=len;
+}
+dotProduct(p3d_t a, p3d_t b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+cross(p3d_t a, p3d_t b, p3d_t out)
+{
+   out.x = a.y*b.z - a.z*b.y;
+   out.y = a.z*b.x - a.x*b.z;
+   out.z = a.x*b.y - a.y*b.x;
+}
+copy(p3d_t src, p3d_t dst){
+   src.x = dst.x;
+   src.y = dst.y;
+   src.z = dst.z;
+}
+set(p3d_t p,x,y,z){
+   p.x = x;
+   p.y = y;
+   p.z = z;
+}
+
+// What about the Z coordinate for 3D? TODO!?
+intersectionTime(p1[2], p3d_t v1, p2[2], v2[2])
+{
+   tc1 = v1.x;
+   tc2 = v1.y;
+
+   sc1 = v2[0];
+   sc2 = v2[1];
+
+   con1 = p2[0] - p1[0];
+   con2 = p2[1] - p1[1];
+ 
+   det = tc2*sc1 - tc1 * sc2; // 2x2 determinant.
+   if(det==0) return 1e32; // no isec
+   con = sc1*con2 - sc2 * con1;
+   t = con / det;
+   return t;
+}
+
+antwheel(tx,ty,r,t)
+{
+      ox = tx + r*sin(0*2*PI/15);
+      oy = ty + r*cos(0*2*PI/15);
+      for(i=1; i<16; i++)
+      {
+         x = tx + r*sin(i*2*PI/15);
+         y = ty + r*cos(i*2*PI/15);
+         ants(ox,oy,x,y,time);
+         ox = x; oy = y;
+      }
+}
+
+ants(x1,y1,x2,y2,t)
+{
+   mv = 0;
+   xdist = x1-x2; ydist=y1-y2;
+   if(xdist < 0) xdist=-xdist;
+   if(ydist < 0) ydist=-ydist;
+   
+   if(ydist > xdist)
+   {
+      mv = ydist;
+   }
+   else
+   {
+      mv = xdist;
+   }
+   
+   x = x1;
+   y = y1;
+   
+   stepx = xdist/mv;
+   if(x1 > x2) stepx = -stepx;
+   stepy = ydist/mv;
+   if(y1 > y2) stepy = -stepy;
+   
+   // makes ants move, start val is det by time
+   // ant speed is time in millis taken for 1 move
+   antspeed = 10;
+   antsize = 10;
+   antcounter = abs( (t*1000/antspeed) % antsize);
+   
+   for(nc=0; nc<floor(mv); nc++)
+   {   
+      if( (abs(antcounter) % antsize) < (antsize/2) ){
+         setcol(0xff); drawsph(x,0,y,1);
+      }
+      else{
+         setcol(0xffffff); drawsph(x,0,y,1);
+      }
+   
+      x+=stepx; y+=stepy;
+      antcounter -= 1;
+   }
+      
+}
+
+display()
+{
+    clz(1e32);  
+   setcam(xres/2,-xres/2,yres/2-yres,0,PI/2-PI/4 );
+   for(i=0; i<numspheres; i++)
+   {
+      setcol(spheres[i].color);
+      drawsph( spheres[i].x, spheres[i].z, spheres[i].y, spheres[i].radius);
+      setcol(0xffffff);
+      moveto(spheres[i].x, spheres[i].z, spheres[i].y);
+      lineto(spheres[i].x+spheres[i].vx,spheres[i].z, spheres[i].y+spheres[i].vy);
+   }
+   for(i=0; i<numlines; i++)
+   {
+      setcol(0xffffff);
+      sx = lines[i].start.x; sy = lines[i].start.y;
+      ex = lines[i].end.x; ey = lines[i].end.y;
+      moveto(sx,0,sy);
+      lineto(ex,0,ey);
+      midx = (ex+sx)/2; midy = (ey+sy)/2;
+      moveto( midx,0,midy );
+      lineto( midx+lines[i].normal.x*15,0, midy+lines[i].normal.y*15 );
+   }
+   for(i=0; i<num_pot_colls; i++)
+   {
+      x = potColls[i].x;
+      y = potColls[i].y;
+      r = potColls[i].r;
+      antwheel(x,y,r,time);
+   }
+   for(i=0; i<numplanes;i++){
+      static tex[1][1]; tex[0][0] = 0x000055;
+      handle=glsettex(tex,1,1);
+      // since evaldraw cant yet pass structs inside arrays, need to make new u and v structs.
+      p3d_t u; set(u, planes[i].u.x, planes[i].u.y, planes[i].u.z );
+      p3d_t v; set(v, planes[i].v.x, planes[i].v.y, planes[i].v.z );
+      plane(planes[i].p.x, planes[i].p.y, planes[i].p.z, u,v);
+      glremovetex(handle);
+   }
+}
+
+plane(x,y,z, p3d_t fu, p3d_t fv)
+{
+   p3d_t p0; set(p0,x,y,z);
+   p3d_t p1; set(p1,p0.x-fu.x-fv.x, p0.y-fu.y-fv.y, p0.z-fu.z-fv.z );
+   p3d_t p2; set(p2,p0.x+fu.x-fv.x, p0.y+fu.y-fv.y, p0.z+fu.z-fv.z );
+   p3d_t p3; set(p3,p0.x+fu.x+fv.x, p0.y+fu.y+fv.y, p0.z+fu.z+fv.z );
+   p3d_t p4; set(p4,p0.x-fu.x+fv.x, p0.y-fu.y+fv.y, p0.z-fu.z+fv.z );
+   
+   // Draw normal
+   p3d_t n; cross(fu,fv,n); normalize(n);
+   p3d_t center; set(center, (p1.x+p3.x)/2, (p1.y+p3.y)/2, (p1.z+p3.z)/2 );
+   setcol(0xffff00);moveto(center.x,center.y,center.z);
+   lineto(center.x+n.x, center.y+n.y,center.z+n.z);
+   setcol(0xfffffff);
+   glEnable(GL_ALPHA_TEST); glCullface(GL_NONE);
+   glBegin(GL_QUADS);
+   glTexCoord(0,0); glVertex(p1.x,p1.y,p1.z);  
+   glTexCoord(1,0); glVertex(p2.x,p2.y,p2.z);  
+   glTexCoord(1,1); glVertex(p3.x,p3.y,p3.z);  
+   glTexCoord(0,1); glVertex(p4.x,p4.y,p4.z);   
+   glEnd();
+}
+
+keys()
+{
+   controllball = numspheres-1;
+   if(keystatus[203])
+   {
+      x = spheres[ controllball ].vx; y = spheres[ controllball ].vy;
+      rotatePoint(x,y, -dt*250*pi/180 );
+      spheres[ controllball ].vx = x; spheres[ controllball ].vy = y;
+   }
+   if(keystatus[205])
+   {
+      x = spheres[ controllball ].vx; y = spheres[ controllball ].vy;
+      rotatePoint(x,y, dt*250*pi/180 );
+      spheres[ controllball ].vx = x; spheres[ controllball ].vy = y;
+   }
+   if(keystatus[200])
+   {
+      // 10% faster
+      // jall.
+      spheres[controllball].vx += 100*cos(spheres[controllball].x-xres-spheres[controllball].vx)*dt;
+      spheres[controllball].vy += 100*sin(spheres[controllball].y-yres-spheres[controllball].vy)*dt;
+   }
+   if(keystatus[208])
+   {
+      spheres[controllball].vx *= 0.99 ;
+      spheres[controllball].vy *= 0.99 ;
+   }
+   
+   if(keystatus[57])
+   {
+      keystatus[57] = 0;
+      if(running) running = 0;
+      else running = 1;
+   }
+   
+   if(bstatus == 1)
+   {
+      bstatus = 0;
+      //createBall(mousx,mousy,0,0,15+rnd*5,15,0xff0000);
+   }
+}
+
+createLine(sx,sy,ex,ey)
+{
+   lines[numlines].start.x = sx;
+   lines[numlines].start.y = sy; 
+   lines[numlines].end.x = ex;
+   lines[numlines].end.y = ey;  
+   normalAngle = (atan2(ey-sy, ex-sx) -PI/2); // TODO
+   lines[numlines].normal.x = cos(normalAngle);
+   lines[numlines].normal.y = sin(normalAngle);
+   numlines++;
+}
+
+createBall(x,y,z,vx,vy,vz,r,m,c)
+{
+   if(numspheres > MAX_SPHERES) return;
+   spheres[numspheres].x = x;
+   spheres[numspheres].y = y;
+   spheres[numspheres].z = z;
+   spheres[numspheres].vx = vx;
+   spheres[numspheres].vy = vy;
+   spheres[numspheres].vz = vz;
+   spheres[numspheres].radius = r;
+   spheres[numspheres].mass = m;
+   spheres[numspheres].color = c;
+   numspheres++;
+}
+
+createPotentialCollision(x,y,r)
+{
+   if(num_pot_colls < MAX_POT_COLLS)    
+   {          
+      potColls[num_pot_colls].x = x;
+      potColls[num_pot_colls].y = y;
+      potColls[num_pot_colls].r = r;
+      num_pot_colls++;
+   }  
+}
+
+poolSetup(){       
+      ballTriangleSize=9;
+      numballs = 9+8+7+6+5+4+3+2+1;
+      for(xloop = ballTriangleSize; xloop>1; xloop--)
+      {
+         for(yloop = 1; yloop<xloop; yloop++)
+         {
+         x = xres * 0.35 + (5-xloop)*27; y = yres * 0.5 + yloop*31-(xloop*31)/2.0;
+         color = rgb(255-numspheres*255/numballs, numspheres*255/numballs, yloop*255/6);
+         createBall(x,y,0,0,0,0,15,50,color);
+         }
+      }
+      
+      //  Cue ball 1
+     createBall(xres * 0.65, yres * 0.5, 0, -50, nrnd*5,0, 10, 50, 0xffffff);
+}
+
+sineSetup()
+{
+      len = xres*0.5;
+      circlesToPlace = 25;
+      diam = len / circlesToPlace;
+      for(i=0; i<circlesToPlace; i++)
+      {
+         x = xres*0.2 + i*len/(circlesToPlace-1);
+         y = yres*0.5 + 70*sin(i*2*PI/(circlesToPlace-1));
+         z = 0;
+       createBall(x,y,z,0,0,0,diam/2-0.5, diam/2, rgb(255-i*255/11, i*255/11, 0) );        
+      }  
+      spheres[0].vx = 50*cos(PI/4); 
+      spheres[0].vy = 50*sin(PI/4);
+}
+cradleSetup(){
+      // simplified newtons cradle
+      diam = 25;   
+      for(i=0; i<15; i++)
+      {
+      createBall(xres * 0.2 +i*diam, yres * 0.5, 0, 0, 0,0, diam/2-0.000001, diam/2, rgb(255-i*255/11, i*255/11, 0) );
+      }      
+      spheres[3].vx = 150;
+}
+squareSetup(){
+      diam = 20;  
+      xpos = 0; 
+      ypos = 0;
+      for(i=0; i<25; i++)
+      {
+         createBall(xres * 0.2 + xpos * diam, yres * 0.5 + ypos * diam,0,0, 0, 0, diam/2-0.01, diam/2, rgb(255-i*255/11, i*255/11, 0) );
+         xpos++;
+         if(xpos > 4)
+         {
+            xpos = 0;
+            ypos++;
+         }
+      }  
+      x = xres * 0.2 + (xpos+5) * diam;
+      y = yres * 0.5 + (ypos) * diam;
+      z = 0;
+      createBall(x,y,z,xres * 0.2 + xpos, yres * 0.2 + ypos,0, 10, 10, rgb(255-i*255/11, i*255/11, 0) );
+}

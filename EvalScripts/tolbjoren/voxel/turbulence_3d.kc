@@ -1,0 +1,103 @@
+(x,y,z,&r,&g,&b)
+{
+   //bigr = 1.0;
+   //smallr = 0.5;
+
+   bigr = 0.6;
+   smallr = 0.35;
+
+   s1 = (x^2 + y^2 + z^2 + bigR^2 - smallr^2)^2;
+   s2 = 4 * bigr^2*(x^2 + y^2);
+   
+
+   r = abs(x+.5)*255;
+   g = abs(y+.5)*255;
+   b = abs(z+.5)*255;
+
+/*
+   f = s1*2/s2;
+   l1 = turbulence(x,y,z)*.5+.5;
+   
+   hsv_to_rgb( max(0,min(180+l1*180,360)), 1, 1, r,g,b);
+   r1=int(r*255);
+   g1=int(g*255);
+   b1=int(b*255);
+   
+   f = 4;
+   l2 = turbulence(f*x,f*y,f*z)*.5+.5;
+   hsv_to_rgb( max(0,min(180+l2*180,360)), 1, 1, r,g,b);
+   r2=int(r*255);
+   g2=int(g*255);
+   b2=int(b*255);   
+   r = r1*.5 + r2*.5;
+   g = g1*.5 + g2*.5;
+   b = b1*.5 + b2*.5;
+*/
+   v = s1 - s2;
+   //v = l1 * l2;
+   v = geo(x,y,z);
+   targ = 0.1;
+   //if( v > -targ && v < +targ ) return 1;
+   //return 0;
+   
+   if( v > -targ && v < +targ ) return 0;
+   return 1;
+   
+}
+
+geo(x,y,z)
+{
+ f = 4;
+ return turbulence(x,y,z)*.5+.5 * turbulence(f*x,f*y,f*z)*.5+.5;
+}
+
+
+lumpy(x,y,z)
+{
+   return noise(x,y,z);
+}
+
+turbulence(x,y,z)
+{
+   
+   tex = -0.5; // pref. double precision float
+   for( f=1; f<= xres/96; f*=2)
+      tex += noise(f*x,f*y,f*z) / f ;
+   return tex;
+}
+
+stripes(x,f)
+{
+   t = .5 + .5 * sin(f * 2*PI * x);
+   ret = t*t -.5;
+   return ret;
+}
+
+marbled(x,y,z)
+{
+   tex = stripes(x + 2*turbulence(x,y,z), .8);
+   return tex;
+}
+
+
+hsv_to_rgb(h,s,v,&r,&g,&b){ 
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+}

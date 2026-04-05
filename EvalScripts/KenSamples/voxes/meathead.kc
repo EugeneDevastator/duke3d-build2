@@ -1,0 +1,103 @@
+(x,y,z,&r,&g,&b)
+{
+   r = 128; g = 128; b = 128;
+
+      //Last touch before walking animation on 08/01/2019: 11/01/2010 5:06p 2615By
+   //iswalking = 0; t = 0; //standing
+   iswalking = 1; t = 15/16; //t=0..1 //walking
+      
+      //spring
+   d2 = x^2 + y^2;
+   /*if ((d2 > 0.55^2) && (d2 < 0.65^2) && (z > 0))
+   {
+      //if (z < .05) return(1);
+      if (z > .95) return(1);
+      a = atan2(y,x);
+      n = 2/2; if (fabs((a+PI*0.0-(z%n)*PI*2/n+PI)%(PI*2)-PI) < PI/16) return(1);
+      n = 2/2; if (fabs((a+PI*1.0-(z%n)*PI*2/n+PI)%(PI*2)-PI) < PI/16) return(1);
+      n =-2/2; if (fabs((a+PI*0.0-(z%n)*PI*2/n+PI)%(PI*2)-PI) < PI/16) return(1);
+      n =-2/2; if (fabs((a+PI*1.0-(z%n)*PI*2/n+PI)%(PI*2)-PI) < PI/16) return(1);
+   }*/
+   
+   z += cos(t*PI*2*2)*-.02;
+   
+      //eyebrows
+   if ((fabs(x)-.22+(z+.65)*-1.5)^2*1 + (y-.67)^2*6 + (z+.65)^2*6 < .12^2)
+      { r = 64; g = 64; b = 64; return(1); }
+      
+      //eyes
+   if ((fabs(x)-.22)^2 + (y-.67)^2 + (z+.5)^2 < .12^2)
+   {
+      r = 160; g = 160; b = 160;
+      if (((fabs(x+sin(t*PI*2)*.05)-.22)^2 + (z+.5)^2 < .05^2) && (y > .67)) { r = 0; g = 0; b = 0; }
+      return(1);
+   }
+   
+      //teeth
+   if (((fabs(x)-.06)^2 + (y-.61)^2*4 < .04^2) && (fabs(z+.08) < .05))
+      { r = 192; g = 192; b = 192; return(1); }
+   if (((fabs(x)-.19)^2 + (y-.61)^2*4 < .04^2) && (fabs(z+.08) < .03))
+      { r = 192; g = 192; b = 192; return(1); }
+
+      //tongue
+   if ((x-cos(t*PI*2)*.10)^2*1 + (y-.62-z/1)^2*3 + (z+.02)^2/2 < .10^2)
+      { i = (y-.64)*500; r = 192+i; g = 112+i; b = 112+i; return(1); }
+      
+      //mouth
+   if (x^2/4 + (y-.64)^2*4 + (z+x^2*1.5)^2*2 < .18^2)
+   {
+      if ((x^2/4 + (y-.64)^2*4 + (z+x^2*1.5)^2*2 >= .14^2) && (y < .64))
+         { i = (y-.64)*1000; r = 192+i; g = 112+i; b = 104+i; return(1); }
+      return(0);
+   }
+
+      //hat
+   if (z < -.7)
+   {
+      i = sin(d2*32);
+      if ((x^2 + y^2)^2 + (z+.65+(i-.4)*.03)^2^2*8 < .35^2)
+      {
+         r = 128+i*20;
+         g = 150+i*30;
+         b = 160+i*35;
+         return(1);
+      }
+   }
+      //visor
+   if ((x^2 + (y-.3)^2*.6 < .4^2) && (fabs(z+.78) < .07) && (y < z*4+3.8))
+      { r = 128; g = 150; b = 160; return(1); }
+   
+   walk = sin(t*PI*2)*(1/PI)*sgn(x);
+   nx = x;
+   ny = y*cos(walk) - z*sin(walk) + cos(t*PI*2+sgn(x)*PI/2)*.1*iswalking;
+   nz = z*cos(walk) + y*sin(walk) + sin(t*PI*2+sgn(x)*PI/2)*.1*iswalking;
+   
+      //meatball-like parts
+   a = 0; f = 24; h = 1/64;
+   for(i=0;i<3;i++)
+   {
+      k = noise3d(x*f,y*f,z*f)*h;
+      a -= k; f *= .38; h /= .38;
+      if (i == 0) r = 144+k*512;
+      if (i == 1) g = 108-k*128;
+      if (i == 2) b =  90-k*128;
+   }
+   if (a > (x^2 + y^2 + (z+.25)^2 - .50)) return(1); //head
+   if (a > ((x^2 + (y-1.1-z*1.5)^2 + (z+.28)^2)*6 - .15)) return(1); //nose
+   
+   a = 0; f = 24; h = 1/64;
+   for(i=0;i<3;i++)
+   {
+      k = noise3d(nx*f,ny*f,nz*f)*h;
+      a -= k; f *= .38; h /= .38;
+      if (i == 0) r = 144+k*512;
+      if (i == 1) g = 108-k*128;
+      if (i == 2) b =  90-k*128;
+   }
+ 
+   if (nz > 1) return(0);
+   if (a > (((fabs(nx)-.35)^2*2 + (ny+.2)^2 + (nz-.5)^2/5)*3 - .15)) return(1); //legs
+   if (a > (((fabs(nx)-.35)^2*4 + (ny-.0)^2*1 + (nz-.9)^2*5)*3 - .50)) return(1); //feet
+
+   return(0);
+}

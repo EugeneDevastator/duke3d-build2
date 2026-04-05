@@ -1,0 +1,85 @@
+()
+{
+   clz(1e32);
+   t = klock()/8;
+   lightning = ((t%1) >= .97)*(rnd < .5);
+   srand(int(t));
+
+   glsettex("cloud.png");
+   if (lightning) setcol(0xffffff); else setcol(160,160,192);
+   glBegin(GL_QUADS);
+   t = (klock()*.05)%1;
+   glTexCoord( 0+t, 0-t); glVertex(-256,-4, 0);
+   glTexCoord(32+t, 0-t); glVertex(+256,-4, 0);
+   glTexCoord(32+t,16-t); glVertex(+256,+64,256);
+   glTexCoord( 0+t,16-t); glVertex(-256,+64,256);
+   glEnd();
+   if (lightning) setcol(0x00ff00); else setcol(0x00a000);
+   glTexCoord( 0, 0); glVertex(-256,+64,256);
+   glTexCoord(32, 0); glVertex(+256,+64,256);
+   glTexCoord(32,16); glVertex(+256,+8,-8);
+   glTexCoord( 0,16); glVertex(-256,+8,-8);
+   glEnd();
+
+   gcnt = 0;
+   addbranch(xres/2,yres+xres*.1,xres/2,yres-xres*.1,0,gcnt);
+
+   if (lightning)
+   {
+      x = xres*rnd; moveto(x,0); setcol(0xffffff);
+      for(y=0;y<yres*.7;y+=8)
+      {
+         x += nrnd*8+(xres/2-x)*.03;
+         lineto(x,y);
+      }
+   }
+}
+
+addbranch(x0,y0,x1,y1,n,&gcnt)
+{
+   gcnt++;
+   t = sin(klock()+gcnt*100)*gcnt*.00001; c = cos(t); s = sin(t);
+   odx = x1-x0; ody = y1-y0;
+   dx = odx*c - ody*s; x1 = x0+dx;
+   dy = ody*c + odx*s; y1 = y0+dy;
+   d = sqrt(dx*dx + dy*dy);
+   if (d < 16)
+      line(x0,y0,x1,y1,int(d%3)*4+2); //Draw thin branches as green
+   else
+   {
+      v = int(d/16); //Draw thick branches
+      if (abs(dy) < abs(dx))
+           { for(z=-v;z<=v;z++) line(x0,y0+z,x1,y1+z*.6,(((z == abs(v))%4) >= 2) + 6); }
+      else { for(z=-v;z<=v;z++) line(x0+z,y0,x1+z*.6,y1,(((z == abs(v))%4) >= 2) + 6); }
+   }
+   if ((d > 3) && (n < 8))
+   {
+         //Recursion
+      for(zx=(gcnt%2)+2;zx>=0;zx--)
+      {
+         xj = (rnd-.5)*.3; //length
+         yj = (rnd-.5)*1;  //angle
+         nx = dx*.5 + dx*xj - dy*yj;
+         ny = dy*.5 + dx*yj + dy*xj;
+         addbranch(x1,y1,x1+nx,y1+ny,n+1,gcnt);
+      }
+   }
+   else
+   {
+      dm = d%4; //Draw apples
+      if (dm < .1)
+      {
+         setcol(0xaa0000);
+         drawsph(x1-xres/2,y1-yres/2,xres/2,dm*10+3);
+      }
+   }
+}
+
+line(x0,y0,x1,y1,col)
+{
+   i = (col%2)*0xaa; //VGA 16-color palette :)
+   if (col%4 >= 2) i += ((col!=6)+1)*0x5500;
+   if (col%8 >= 4) i += 0xaa0000;
+   if (col >= 8) i += 0x555555;
+   setcol(i); moveto(x0,y0); lineto(x1,y1);
+}

@@ -1,0 +1,223 @@
+()
+{
+   cls(0); clz(1e32);
+   static posx, posy, posz, hang, vang;
+   static tim, otim, opoint, nump;
+   static gridy, bst, smousx, smousy, testview, testinterp;
+   static px[1024], py[1024], pz[1024], point2[1024];
+   
+   if (numframes == 0)
+   {
+      posx = 0; posy = -4; posz = -4; vang = PI/4;
+      gridy = 0;
+      opoint = 0; gridsiz = 1;
+      tim = klock();
+      testview = 0; testinterp = 1;
+   }
+   
+   otim = tim; tim = klock(); dt = tim-otim;
+ 
+   f = dt*8;
+   if (keystatus[0x2a]) f /= 4;
+   if (keystatus[0x36]) f *= 4;
+   obst = bst; bst = bstatus;
+   if (bst%2)
+   {
+      mousx += .5; mousy += .5;
+      moveto(mousx,mousy-8); lineto(mousx,mousy+8);
+      moveto(mousx-8,mousy); lineto(mousx+8,mousy);
+      moveto(mousx,mousy-8); lineto(mousx-3,mousy-5);
+      moveto(mousx,mousy-8); lineto(mousx+3,mousy-5);
+      moveto(mousx,mousy+8); lineto(mousx-3,mousy+5);
+      moveto(mousx,mousy+8); lineto(mousx+3,mousy+5);
+      moveto(mousx-8,mousy); lineto(mousx-5,mousy-3);
+      moveto(mousx-8,mousy); lineto(mousx-5,mousy+3);
+      moveto(mousx+8,mousy); lineto(mousx+5,mousy-3);
+      moveto(mousx+8,mousy); lineto(mousx+5,mousy+3);
+      mousx -= .5; mousy -= .5;
+      
+      if (obst%2)
+      {
+         hang += (mousx-smousx)*.01;
+         if (hang <-PI) hang += PI*2;
+         if (hang > PI) hang -= PI*2;
+         vang = min(max(vang+(mousy-smousy)*.01,-PI/2),PI/2);
+      }
+      smousx = mousx; smousy = mousy;
+   }
+   vx = (keystatus[0xcd]-keystatus[0xcb])*f; //Right-Left
+   vy = (keystatus[0xc8]-keystatus[0xd0])*f; //Up-Down
+   vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   static mat[9];
+   ang2mat(hang,vang,mat);
+   posx += mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   posy += mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   posz += mat[2]*vx + mat[5]*vz + mat[8]*vy;
+ 
+
+   if (keystatus[0xc9]) { keystatus[0xc9] = 0; gridy--; } //Home
+   if (keystatus[0xd1]) { keystatus[0xd1] = 0; gridy++; } //PGDN
+   if (keystatus[0x1c]) { keystatus[0x1c] = 0; testview = 1-testview; } //L.Enter
+   testinterp += ((1-testview)-testinterp)*.05;
+
+   setcam(posx*testinterp,posy*testinterp,posz*testinterp,hang*testinterp,vang*testinterp);
+   
+   setcol(0x600060);
+   moveto(0,0,0); lineto(-8,-6,+8); lineto(+8,-6,+8);
+   moveto(0,0,0); lineto(+8,-6,+8); lineto(+8,+6,+8);
+   moveto(0,0,0); lineto(+8,+6,+8); lineto(-8,+6,+8);
+   moveto(0,0,0); lineto(-8,+6,+8); lineto(-8,-6,+8);
+
+   setcol(0x00ff00); moveto(0,0,0); lineto(0,gridy,0);
+   for(z=int(posz)-16;z<=int(posz)+16;z++)
+   {
+      if (z == 0) continue;
+      if ((int(z)%4) == 0) setcol(0x808000);
+                      else setcol(0x606000);
+      moveto(int(posx)-16,gridy,z);
+      lineto(int(posx)+16,gridy,z);
+   }
+   setcol(0xff0000);
+   moveto(int(posx)-16,gridy,0);
+   lineto(int(posx)+16,gridy,0);
+   
+   for(x=int(posx)-16;x<=int(posx)+16;x++)
+   {
+      if (x == 0) continue;
+      if ((int(x)%4) == 0) setcol(0x808000);
+                      else setcol(0x606000);
+      moveto(x,gridy,int(posz)-16);
+      lineto(x,gridy,int(posz)+16);
+   }
+   setcol(0x0000ff);
+   moveto(0,gridy,int(posz)-16);
+   lineto(0,gridy,int(posz)+16);
+   
+   
+   setcol(0x606000); drawsph(0,gridy,0,.2);
+   setcol(0x808080); drawsph(0,0,0,.3);
+   setcol(0x006000);
+   for(y=0;y>gridy;y--) drawsph(0,y,0,.2);
+   for(y=0;y<gridy;y++) drawsph(0,y,0,.2);
+         
+   screen2world(mousx,mousy,hang,vang,&x,&y,&z);
+   t = (gridy-posy)/y;
+   intx = floor(posx + x*t+.5);
+   intz = floor(posz + z*t+.5);
+   i = cos(tim*8)*32+128; setcol(i,i,i*.8);
+   drawsph(intx,gridy,intz,.2);
+   
+   setcol(0x808000);
+   moveto(xres/2-16,0); printf("(%.2g,%.2g,%.2g)",intx,gridy,intz);
+   
+   if (keystatus[0x39]) //Space
+   {
+      keystatus[0x39] = 0;
+      px[nump] = intx;
+      py[nump] = gridy;
+      pz[nump] = intz;
+      if ((intx == px[opoint]) && (gridy == py[opoint]) &&
+          (intz == pz[opoint]) && (nump > opoint))
+      {
+         point2[nump-1] = opoint; opoint = nump;
+      }
+      else
+      {
+         point2[nump] = nump+1;
+         nump++;
+      }
+   }
+   px[nump] = intx;
+   py[nump] = gridy;
+   pz[nump] = intz;
+   
+   if (keystatus[0xe]) //Backspace
+   {
+      keystatus[0xe] = 0;
+      if (nump > 0)
+      {
+         nump--;
+         //if (point2[nump] < nump) nump++;
+         if (point2[nump] < nump) opoint = point2[nump];
+      }
+   }
+   
+   if (nump > 0)
+   {
+      moveto(0,0); setcol(0xffffff);
+      fprintf("cls(0); clz(1e32);\n\n");
+
+      setcol(0xffffff); setfont(6,8); i0 = 0;
+      for(i=0;i<nump;i++)
+      {
+         if (i == i0)
+         {
+            glbegin(GL_TRIANGLE_FAN);
+            fprintf("glBegin(GL_TRIANGLE_FAN);\n");
+            ux = px[i+1]-px[i];
+            uy = py[i+1]-py[i];
+            uz = pz[i+1]-pz[i];
+            u = ux^2 + uy^2 + uz^2; if (u) u = 1/sqrt(u);
+            ux *= u; uy *= u; uz *= u;
+            for(j=i0;j<nump;j++) if (point2[j] == i0) break;
+            if ((px[i] == px[j]) && (py[i] == py[j]) && (pz[i] == pz[j])) j--;
+            vx = px[j]-px[i];
+            vy = py[j]-py[i];
+            vz = pz[j]-pz[i];
+            vd = ux*vx + uy*vy + uz*vz;
+            vx -= vd*ux; vy -= vd*uy; vz -= vd*uz;
+            v = vx^2 + vy^2 + vz^2; if (v) v = 1/sqrt(v);
+            vx *= v; vy *= v; vz *= v;
+         }
+         x = px[i]; y = py[i]; z = pz[i];
+         u = (x-px[i0])*ux + (y-py[i0])*uy + (z-pz[i0])*uz;
+         v = (x-px[i0])*vx + (y-py[i0])*vy + (z-pz[i0])*vz;
+         gltexcoord(u,v); glvertex(x,y,z);
+
+         fprintf("glTexCoord(%g,%g); glVertex(%+g,%+g,%+g);\n",u,v,x,y,z);
+            
+         if (point2[i] < i)
+         {
+            glend(); i0 = i+1;
+            fprintf("glEnd();\n");
+         }
+      } 
+
+      setcol(0x808080);
+      t = tim;
+      for(i=0;i<nump;i++)
+      {
+         drawsph(px[i],py[i],pz[i],.1);
+         j = point2[i];
+         d = sqrt((px[j]-px[i])^2 + (py[j]-py[i])^2 + (pz[j]-pz[i])^2);
+         if (d) d = sqrt(d); else d = 1;
+         for(t=t%1;t<d;t++)
+         {
+            drawsph((px[j]-px[i])*t/d + px[i],
+                    (py[j]-py[i])*t/d + py[i],
+                    (pz[j]-pz[i])*t/d + pz[i],.05);
+         }
+         if (j < i) t = tim;
+      }
+   }
+}
+
+screen2world(sx,sy,hang,vang,&x,&y,&z)
+{
+   vx = sx-xres/2; vy = sy-yres/2; vz = xres/2;
+   static mat[9];
+   ang2mat(hang,vang,mat);
+   x = vx*mat[0] + vy*mat[3] + vz*mat[6];
+   y = vx*mat[1] + vy*mat[4] + vz*mat[7];
+   z = vx*mat[2] + vy*mat[5] + vz*mat[8];
+}
+
+ang2mat(hang,vang,mat[9])
+{
+   mat[6] = cos(vang)*sin(hang); mat[0] = cos(hang);
+   mat[7] = sin(vang);           mat[1] = 0;
+   mat[8] = cos(vang)*cos(hang); mat[2] =-sin(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}

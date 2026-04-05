@@ -1,0 +1,945 @@
+/*
+
+   ball -> heightmap collision and collision response
+   this is my playground for testing various techiques:
+GOALS:
+   [X] heightmap/triangle map for collision
+   [X] sphere-trimap collision and reflection
+   [ ] sphere-sphere collision, reflection and conservation of mass
+   [X] numerical integration of motion:
+   [X] simple euler
+   [ ] midpoint/improved euler
+   [ ] rk4
+   [ ] synchronization of physics over network
+   written 20-22. of december 2009
+   
+TODO:
+   [X] - means fixed/done
+   -[X] y axis is inverted.
+   -[ ] create a neat shadow for the ball, proj onto terrain or the B3D last-touch fx.
+   -[ ] per triangle normals
+   -[ ] convert to real opengl
+   -[ ] lighting
+   -[ ] walls? more geometry? bezier patches? checkout nehe 30.
+   -[ ] convert to ch c-code.
+   -[ ] use triangle normal for coll detection
+   -[ ] make balls and terrain use world coordinates
+   -[ ] normals & lines are somewhat off 1 coord.
+   -[ ] spin balls, rotate them. Look up Jeppe Nielsen ballrotation in code arcs.
+   -[ ] LOD-algorithm. different LODS from 1 heightmap for collision and view.
+*/ 
+enum{tsize = 128 }
+enum{terrainGridWidth =tsize, terrainGridLength = tsize}
+enum{terrainSiz = terrainGridWidth*terrainGridLength }
+static terrainHeights[terrainGridWidth*terrainGridLength];
+static terrainColors[terrainGridWidth*terrainGridLength];
+static terrainNormals[terrainGridWidth*terrainGridLength*3];
+static verts[terrainSiz*12];
+
+static fillCenterX = terrainGridWidth/2;
+static fillCenterY = terrainGridLength/2;
+static fillSiz = 32;
+
+// Terrain drawing
+static xOffset = 0, yOffset = 0, zOffset = 0;
+
+// Not really needed
+static startW = terrainGridWidth / 2.0 - terrainGridWidth;
+static startL = -terrainGridLength / 2.0 + terrainGridLength;
+
+// Ball
+enum{NUM_BALLS = 15}
+static position[NUM_BALLS][3];
+static velocity[NUM_BALLS][3];
+static accel[NUM_BALLS][3];
+static gravity = -9.81;
+static ballRadi[NUM_BALLS];
+static ballColor[NUM_BALLS];
+static isColliding[NUM_BALLS];
+
+// Store previous ball positions for drawing trails.
+enum{MAX_FRAMES = 64}
+static oldpos[NUM_BALLS][MAX_FRAMES][3];
+
+// Debug collision
+static lastPosition[NUM_BALLS][3];
+static lastNormal[NUM_BALLS][3];
+static lastReflection[NUM_BALLS][3];
+static lastVelocity[NUM_BALLS][3];
+
+static tim,oldtim,dt;
+static t;
+()
+{
+   if(numframes==0)
+   {
+      loadHeightmap();
+      setupBalls();
+   }
+   dt = tim-oldtim; oldtim = tim; tim = klock();
+   
+   controls();
+   updateCamera();
+   render();
+   simulate(); 
+}
+render()
+{
+   cls(0); clz(1e32);
+   glEnable(GL_DEPTH_TEST); glDisable(GL_ALPHA_TEST); glCullFace(GL_FRONT);
+
+   drawLines();
+   //drawNormals();
+   //quads();
+   
+   for(i=0; i<NUM_BALLS; i++)
+   {
+      drawBall(i);
+      drawOldPositions(i);
+      saveBallPositions(i);
+      //drawDebugLines(i);
+   }
+      
+   setfont(12,16);
+   setcol(0xffffff);
+   moveto(0,0);
+   printf("mspf: %.5f", dt*1000);
+   
+
+printf("\nT = %f", t);
+   
+}
+setupBalls()
+{
+      for(i=0; i<NUM_BALLS; i++)
+      {
+         /*
+         position[i][0] = nrnd;
+         position[i][1] = -20;  
+         position[i][2] = nrnd;
+         */
+         
+         radiiPlacement = 10;
+         
+         position[i][0] = 0 + sin(i*2*PI/(NUM_BALLS))*radiiPlacement;
+         position[i][1] = 10;  
+         position[i][2] = -tsize/2+12 + cos(i*2*PI/(NUM_BALLS))*radiiPlacement;
+         
+         velocity[i][0] = 0;
+         velocity[i][1] = 0;
+         velocity[i][2] = 0;
+         
+         ballRadi[i] = .5;
+       
+          r=0; g=0; b=0;
+          hsv_to_rgb(i/NUM_BALLS*360, 1,1,r,g,b);
+          ballColor[i] = rgb(r*512,g*512,b*512);
+          
+          // set all frames
+          for(j=0; j<MAX_FRAMES; j++)
+          {
+             oldpos[i][j][0] = position[i][0];
+             oldpos[i][j][1] = position[i][1];
+             oldpos[i][j][2] = position[i][2];
+          }
+      }
+}
+/* save the xyz position where the ball is */
+saveBallPositions(i)
+{
+  oldpos[i][0][0] = position[i][0];
+  oldpos[i][0][1] = position[i][1];
+  oldpos[i][0][2] = position[i][2];
+
+  // Only copy old position every n.th frame
+  if(numframes % 4 == 0)
+  for(j=MAX_FRAMES-1; j>0; j--)
+  {
+    oldpos[i][j][0] = oldpos[i][j-1][0];
+    oldpos[i][j][1] = oldpos[i][j-1][1];
+    oldpos[i][j][2] = oldpos[i][j-1][2];    
+  }
+}
+controls()
+{
+   controlX = keystatus[205] - keystatus[203]; // r-l
+   controlY = keystatus[208] - keystatus[200]; // down-up
+}
+simulate()
+{
+   // reset collisions
+   for(i=0; i<NUM_BALLS; i++){
+               isColliding[i] = 0;
+   }
+
+
+   for(simsteps=0; simsteps <2; simsteps++)
+   {
+      
+      for(i=0; i<NUM_BALLS; i++)
+      {
+         for(j=0; j<NUM_BALLS; j++)
+         {
+            if(i==j) continue;
+            
+            t = 10000;
+            if( testMovingSphereSphere(i,j,t) == 1)
+            {
+               if( t < 0.1 )
+               {
+               isColliding[i] = 1;
+               isColliding[j] = 1;   
+               doBounce(i,j);   
+               //playsound("gothit.wav");       
+               }
+            }
+         } 
+         
+      }
+      
+
+      
+      for(i=0; i<NUM_BALLS; i++)
+      {
+         checkCollisionStatic(i);   
+      }
+      for(i=0; i<NUM_BALLS; i++)
+      {
+         euler(i);
+      }
+   }
+}
+
+doBounce(s1,s2)
+{
+   massS1 = 0.5;
+   massS2 = 0.5;
+
+   // find the normalized vector from sph1 to sph2
+   static n[3];   // vector from s1 to s2
+   n[0] = position[s1][0] - position[s2][0];
+   n[1] = position[s1][1] - position[s2][1];
+   n[2] = position[s1][2] - position[s2][2];
+   normalize(n);
+   // Find the length of the component of each of the
+   // movement vectors along n
+   static v1[3], v2[3]; 
+   v1[0] = velocity[s1][0]; v1[1] = velocity[s1][1]; v1[2] = velocity[s1][2];
+   v2[0] = velocity[s2][0]; v2[1] = velocity[s2][1]; v2[2] = velocity[s2][2];
+   a1 = dot(v1,n);
+   a2 = dot(v2,n);
+   optimizedP = (2.0 * (a1 - a2)) / ( massS1+massS2 ); // TODO s1.mass + s2.mass
+   // Calc v1 , the new mov vector of sph1
+   //static v1new[3];
+   velocity[s1][0] = v1[0] - optimizedP * massS2 * n[0];
+   velocity[s1][1] = v1[1] - optimizedP * massS2 * n[1];
+   velocity[s1][2] = v1[2] - optimizedP * massS2 * n[2];
+   //static v2new[3];
+   velocity[s2][0] = v2[0] + optimizedP * massS1 * n[0];
+   velocity[s2][1] = v2[1] + optimizedP * massS1 * n[1];
+   velocity[s2][2] = v2[2] + optimizedP * massS1 * n[2]; 
+}
+
+// P. 224 Real Time Collision Detection by C. Ericsson
+testMovingSphereSphere(s0,s1,&t)
+{
+   EPSILON = 0.000001;
+   static s[3];   // vector between centers. pointing at s0.
+   s[0] = position[s1][0] - position[s0][0];
+   s[1] = position[s1][1] - position[s0][1];
+   s[2] = position[s1][2] - position[s0][2];
+   static v[3]; // relative motion of s1 with respect to s0
+   v[0] = velocity[s1][0] - velocity[s0][0];
+   v[1] = velocity[s1][1] - velocity[s0][1];
+   v[2] = velocity[s1][2] - velocity[s0][2]; 
+   r = ballRadi[s1] + ballRadi[s0];
+   c = dot(s,s) - r^2;
+   if(c<0.0){ t = 0; return 1;} // spheres are initially overlapping
+   a = dot(v,v);
+   if(a < EPSILON) return 0; // spheres are not moving relative to eachother
+   b = dot(v,s);
+   if(b >= 0.0) return 0;
+   d = b^2 - a * c; 
+   if(d < 0.0) return 0; // no real-valued root, no isect.
+   t = (-b-sqrt(d))/a;
+   return 1;
+}
+
+
+// http://www.gamasutra.com/view/feature/3015/pool_hall_lessons_fast_accurate_.php?page=2
+// actually dyn ball (zero) vs static ball (one)
+checkCollisionDynamicStatic(zero, one)
+{
+   // Early Escape test: 
+   // if movevec is < dist between 
+   // centers minus radii, no chance to hit
+   dist = sqrt(
+         (position[zero][0]-position[one][0])^2 + 
+         (position[zero][1]-position[one][1])^2 + 
+         (position[zero][2]-position[one][2])^2 );  
+   sumRadii = ballRadi[zero] + ballRadi[one];
+   dist -= sumRadii;
+  
+   mag = movevecMagnitude(zero);
+   if(mag < dist)
+   {
+      return 0; // no change they can hit
+   } 
+
+   // normalize movevec
+   static N[3]; copyMoveVec(zero,N);
+   normalize(N);
+   
+   // find C, the vector from the center of dynamic A to the center of static B.
+   static C[3];
+   C[0] = position[one][0] - position[zero][0];
+   C[1] = position[one][1] - position[zero][1];
+   C[2] = position[one][2] - position[zero][2];
+   
+   // D = N . C = ||C|| * cos(angle between N and C)
+   D = dot(N,C);
+   
+   // another escape: make sura A is moving towards B!
+   // if the dot prod between movevec and B.center - A.center <= 0, a isn moving towards B.
+   if( D <= 0) return 0;
+   
+   // find len of C
+   lengthC = sqrt( C[0]^2 + C[1]^2 + C[2]^2);
+   
+   F = (lengthC^2) - (D^2);
+   
+   // escape test: if the closest that A will get to B
+   // is more than the sum of their radi, there is no
+   // way they are going to collide
+   sumRadiiSquared = sumRadii^2;
+   if(F >= sumRadiiSquared) return 0;
+   
+   // find T
+   // if there is no such right triangle with sides length of
+   // sumRadii and sqrt(f), T will propably be less than 0.
+   // Better to check now than perform a swrt of a neg. number.
+   T = sumRadiiSquared - F;
+   
+   if(T<0) return 0;
+   
+   // Therefore the distnace the circle has to travel along 
+   // movevec is D -sqrt(T)
+   distance = D-sqrt(T);
+   
+   // get the magnitude of the movement vector.. mag!
+   
+   // Finally make sure that the distance A has to move to 
+   // touch B is not greater than the mag. of the movement vector
+
+   if(mag < distance) return 0;
+   
+   // Set the length of the movevec so that 
+   // the circles just touch
+   // this is if you want the sphere to stop.
+   //normalizeMovevec(zero);
+   
+   return 1;
+}
+checkCollisionStatic(b)
+{
+   x = position[b][0];
+   y = position[b][1];
+   z = position[b][2];
+   height = getHeight(terrainGridWidth/2 + x , terrainGridLength/2 - z);
+   static normal[3];
+   getNormal(terrainGridWidth/2 + x, terrainGridLength/2 - z, normal);
+
+   // draw shadow circle on ground
+   //distToGround = y-height;
+   //setcol(0xaabbcc);
+   //handle = glsettex("alphasprite.png");
+   //texquadAlignToNormal(x,height-.01,z,normal,max(1,min(2,distToGround)) ); // make size dep on ball-ground dist.
+   //glremovetex(handle);
+
+   if(y <= height + ballRadi[b])
+   {
+      static reflect[3];
+      static vel[3]; 
+      vel[0] = velocity[b][0];
+      vel[1] = velocity[b][1];
+      vel[2] = velocity[b][2];
+      collisionResponse(vel, normal, reflect);
+      
+      // save debug data
+      for(j=0; j<3; j++)
+      {
+         lastPosition[b][j] = position[b][j];
+         lastVelocity[b][j] = velocity[b][j];
+         lastNormal[b][j] = normal[j];
+         lastReflection[b][j] = reflect[j];
+      }
+           
+      velocity[b][0] = reflect[0];
+      velocity[b][1] = reflect[1];
+      velocity[b][2] = reflect[2];
+     
+      // dampen veloctiy
+     damp = 1;//0.999;
+     velocity[b][0] *= damp;
+     velocity[b][1] *= damp;
+     velocity[b][2] *= damp;
+  
+      // draw reflection vector
+      /*
+      setcol(0x00ff00);
+      moveto(x,height,z);
+      lineto(x-reflect[0], height-reflect[1], z-reflect[2]); 
+      */
+   }
+   /* Push ball out of ground, it the ball is spawned under ground it is pushed up. 
+   also, if integration of motion "overshoots" and moves the ball into the ground, push up */
+   if( position[b][1] <= height+ballRadi[b] )
+   {
+   position[b][1] = height+ballRadi[b];
+   }
+   
+    /*
+   // Draw line from ball to ground
+   setcol(0xffff00);
+   moveto(x,y,z);
+   lineto(x,height,z);
+   
+   // Normal from ground
+   setcol(0xff0000);
+   moveto(x,height,z);
+   lineto(x-normal[0]*1, height-normal[1]*1, z-normal[2]*1);  
+   */   
+}
+/* calculate the reflection vector given the normal of a surface and the incidence/incoming vector
+r = i - (2*n*dot(i,n))
+src: http://www.gamedev.net/community/forums/topic.asp?topic_id=381041
+*/
+collisionResponse(incidence[3], normal[3], reflect[3])
+{
+   incidenceDotNormal = dot(incidence,normal);
+   reflect[0] = incidence[0] - ( 2 * normal[0] * incidenceDotNormal ); 
+   reflect[1] = incidence[1] - ( 2 * normal[1] * incidenceDotNormal );
+   reflect[2] = incidence[2] - ( 2 * normal[2] * incidenceDotNormal );
+}
+
+
+drawDebugLines(i)
+{
+   x = lastPosition[i][0];
+   y = lastPosition[i][1];
+   z = lastPosition[i][2];
+   setcol(0x00ff00);
+   moveto(x,y,z);
+   lineto(x+lastReflection[i][0], y+lastReflection[i][1], z+lastReflection[i][2] );
+   
+   setcol(0xff0000);
+   moveto(x,y,z);
+   lineto(x+lastVelocity[i][0], y+lastVelocity[i][1], z+lastVelocity[i][2] );
+   
+   setcol(0xffff00);
+   moveto(x,y,z);
+   lineto(x+lastNormal[i][0]*5, y+lastNormal[i][1]*5, z+lastNormal[i][2]*5 );
+}
+
+/* draw a streak where the ball has gone */
+drawOldPositions(ball){
+   i=0;
+   ox = oldpos[ball][i][0];
+   oy = oldpos[ball][i][1];
+   oz = oldpos[ball][i][2];
+
+   r = 0; g = 0; b = 0;
+   hex2rgb( ballColor[ball],r,g,b );
+   setcol(ballColor[ball]);
+   
+   for(i=1; i<MAX_FRAMES; i++)
+   {
+      ratio = (MAX_FRAMES-i)/MAX_FRAMES;
+     
+      setcol(r*ratio, g*ratio, b*ratio);   
+     
+      //col = (MAX_FRAMES-i)*255/MAX_FRAMES;
+      //setcol(col,col,0);   
+
+      x = oldpos[ball][i][0];
+      y = oldpos[ball][i][1];
+      z = oldpos[ball][i][2];
+      moveto(ox,oy,oz);
+      lineto(x,y,z);
+      ox = x; oy = y; oz = z;
+   }
+
+}
+drawBall(b)
+{
+   x = position[b][0];
+   y = position[b][1];
+   z = position[b][2];
+   if(isColliding[b])
+   {
+      setcol(numframes*10 % 255+255, numframes*10 % 255,0);
+   }
+   else
+   {
+   setcol( ballColor[b] );
+   }
+   drawsph(x,y,z,ballRadi[b]);
+}
+texQuadAlignToNormal(xpos,ypos,zpos,normal[3],s){
+   glEnable(GL_ALPHA_TEST);
+   glCullface(GL_NONE);
+
+   nx = normal[0]; 
+   ny = normal[1];
+   nz = normal[2];      
+
+   glBegin(GL_QUADS);
+   glTexCoord(0,0); 
+   glVertex( xpos-.5*s,ypos,zpos-.5*s);  
+   glTexCoord(1,0); 
+   glVertex( xpos+.5*s, ypos,zpos-.5*s); 
+   glTexCoord(1,1); 
+   glVertex( xpos+.5*s, ypos,zpos+.5*s); 
+   glTexCoord(0,1); 
+   glVertex( xpos-.5*s,ypos,zpos+.5*s);  
+   glEnd();
+}
+
+
+/* euler integration of motion with fixed timestep delta */
+euler(b)
+{
+   delta = 0.001;
+   accel[b][1] = gravity;
+   for(j=0; j<3; j++)
+   {
+      velocity[b][j] *= 0.99995;
+      velocity[b][j] += accel[b][j] * delta;
+      position[b][j] += velocity[b][j] * delta;
+   }
+}
+getHeightInt(x,z){
+   // if you get height outside of heightmap
+   if(x < 0 || z < 0 || x > terrainGridWidth || z > terrainGridLength)
+   {
+      return 0;
+   }
+   // using row-major, fastest in c and evaldraw
+   // offset = row*NUMCOLS + column
+   return terrainHeights[z*terrainGridWidth+x];
+}
+// src: http://www.gamedev.net/community/forums/topic.asp?topic_id=451312
+/* bilinear interpolation of a quad height is also explained here
+http://ilovevb.net/Web/blogs/vbxna/archive/2007/12/28/heightmap-collision-sample-posted.aspx
+*/
+getHeight(x,z)
+{  
+   xa = floor(x); za = floor(z);
+   xb = floor(x+1); zb = floor(z+1);   
+
+   xd = x-floor(x);
+   if(xd < 0.0) xd *= -1;
+   zd = z-floor(z);
+   if(zd < 0.0) zd *= -1;
+   // Bilinear interpolation between x and y.
+   b = lerp( getHeightInt(xa,zb), getHeightInt(xb,zb), xd); 
+   a = lerp( getHeightInt(xa,za), getHeightInt(xb,za), xd); 
+   h = lerp(a,b,zd);
+   return h;
+}
+// lerp 1 dimensional. use t-values from 0-1
+lerp(a,b,t)
+{
+   (b-a)*t+a;
+}
+/* get the normal for a quad on the terrain. should really be per triangle. 
+could also interpolate to find best fitting normal like the getHeight func*/
+getNormal(x,z,n[3])
+{
+   if(x < 0 || z < 0 || x > terrainGridWidth || z > terrainGridLength)
+   {
+      nx = 0;
+      ny = 1;
+      nz = 0;
+      return;
+   }
+   x = floor(x); z = floor(z); // hacky?
+   aux = 3*((z)*terrainGridWidth + x);
+   n[0] = terrainNormals[aux+0];
+   n[1] = terrainNormals[aux+1];
+   n[2] = terrainNormals[aux+2];
+}
+/* convert a int to RGB-components. */
+hex2rgb(hex,&r,&g,&b){
+   r = hex / 2^16 % 256;
+   g = hex / 2^8 % 256;
+   b = hex % 256;
+}
+/* normals are drawn with a 0.5 offset in x and z dir to center them on quads. 
+Normals are per quad. should be per triangle in a real app. */
+drawNormals(){
+   setcol(0xffff00);
+   for(i=0; i<terrainGridLength-1; i++)
+   {
+      for(j=0; j<terrainGridWidth; j++)
+      {
+         aux = 3*((i)*terrainGridWidth + j);
+         nx = terrainNormals[aux];
+         ny = terrainNormals[aux+1];
+         nz = terrainNormals[aux+2];
+         siz = .5;
+         nx *= siz;
+         ny *= siz;
+         nz *= siz;
+         
+         x = startW+(j)+xOffset;
+         y = getHeightInt(j,i) + yOffset;   
+         z = startL - (i) + zOffset;   
+         moveto(x,y,z);   
+         
+         x = startW+(j)+xOffset + nx;
+         y = getHeightInt(j,i) + yOffset + ny;   
+         z = startL - (i) + zOffset + nz;     
+         lineto(x,y,z); 
+      } 
+   } 
+}
+// draw bit lower than quads to circumvent z-fighting
+drawLines()
+{
+   lowering = 0; //0.005
+   k = 0;
+   for(i=0; i<terrainGridLength-1; i++)
+   { 
+      for(j=0; j<terrainGridWidth; j++)
+      {
+        setcol( terrainColors[i*terrainGridWidth+j]);
+      //setcol(i*255/terrainGridLength,j*255/terrainGridWidth,255);
+      
+      // use stored vert pos
+       moveto(verts[k+0], verts[k+1], verts[k+2]);
+       lineto(verts[k+3], verts[k+4], verts[k+5]);        
+       lineto(verts[k+6], verts[k+7], verts[k+8]);
+       k += 12;      
+
+      // or find height once more.
+         /*
+       x = startW+(j)+xOffset;
+         y = getHeightInt(j,i) + yOffset -lowering;   
+         z = startL - (i) + zOffset;   
+         moveto(x,y,z);  
+
+         x = startW+(j+1)+xOffset;
+         y = getHeightInt(j+1,i) + yOffset -lowering;   
+         z = startL - (i) + zOffset;     
+         lineto(x,y,z); 
+         
+         x = startW+(j+1)+xOffset;
+         y = getHeightInt(j+1,i+1)+ yOffset -lowering;   
+         z = startL - (i+1) + zOffset;     
+         lineto(x,y,z); 
+       */
+       
+         
+       /*
+         wild
+         x = startW+(j+1)+xOffset;
+         y = getHeightInt(j+1,i) + yOffset -lowering;   
+         z = startL - (i) + zOffset;     
+         lineto(x,y,z); 
+      
+         x = startW+(j)+xOffset;
+         y = getHeightInt(j,i+1)+ yOffset -lowering;   
+         z = startL - (i+1) + zOffset;     
+         lineto(x,y,z);*/
+         
+
+      } 
+   } 
+}
+/* render heightmap with quads. fastest drawing method in evaldraw after complex. cannot use complex?*/
+quads()
+{
+   fillMinX = max(0,fillCenterX-fillSiz);
+   fillMaxX = min(fillCenterX+fillSiz,terrainGridWidth-1);
+   fillMinY = max(0,fillCenterY-fillSiz);
+   fillMaxY = min(fillCenterY+fillSiz,terrainGridLength);
+
+   glBegin(GL_QUADS);  
+   for(i=fillMinY; i<fillMaxY; i++)
+   { 
+      for(j=fillMinX; j<fillMaxX; j++)
+      {
+      setcol( terrainColors[i*terrainGridWidth+j]);
+         x = startW+(j)+xOffset;
+         y = getHeightInt(j,i) + yOffset;   
+         z = startL - (i) + zOffset; 
+         glVertex(x,y,z);  
+         
+         x = startW+(j+1)+xOffset;
+         y = getHeightInt(j+1,i)+ yOffset;   
+         z = startL - (i) + zOffset;  
+         glVertex(x,y,z); 
+
+         x = startW+(j+1)+xOffset;
+         y = getHeightInt(j+1,i+1) + yOffset;   
+         z = startL - (i+1) + zOffset;      
+         glVertex(x,y,z); 
+         
+         x = startW+(j)+xOffset;
+         y = getHeightInt(j,i+1) + yOffset;   
+         z = startL - (i+1) + zOffset;     
+         glVertex(x,y,z); 
+      } 
+   } 
+   glEnd();
+}
+/* gets the player controls and sets global camera variables. */
+updateCamera()
+{
+   static posx = 0;
+   static posy = 75;
+   static posz = 70;
+   //posx = position[0][0];
+   //posy = position[0][1]+5; 
+   //posz = position[0][2]+5;
+     
+
+   // horiz and vertical heading (euler angles)  
+   static posh = 0; // left right
+   static posv = -2.0;
+
+   //posh += velocity[0][0] / 1000;
+   //posv += velocity[0][1] / 1000;
+
+   // end camera
+   playercontrols(&posx,&posy,&posz,&posh,&posv);
+   //if(posv > 1.5) posv = 1.5;
+   //if(posv < -1.5) posv = -1.5;
+   setcam(posx,posy,posz,posh,posv);
+}
+// Camera and movement code taken from /games/
+//Handle input and player movement
+playercontrols(&posx,&posy,&posz,&posh,&posv)
+{
+   static oldMouseX;
+   static oldMouseY;
+   static mouseSpeedX;
+   static mouseSpeedY; 
+
+   f = 1;
+   if (keystatus[0x2a]) f /= 4;
+   if (keystatus[0x36]) f *= 4;
+   vx = (keystatus[32]-keystatus[30])*f; //D-A
+   vy = (keystatus[17]-keystatus[31])*f; //W-S  
+   vz = (keystatus[0x52]-keystatus[0x9d])*f; //KP0-RCtrl
+   static mat[9]; ang2mat(posh,posv,mat);
+   newvx = mat[0]*vx + mat[3]*vz + mat[6]*vy;
+   newvy = mat[1]*vx + mat[4]*vz + mat[7]*vy;
+   newvz = mat[2]*vx + mat[5]*vz + mat[8]*vy; 
+   d = 1/12; 
+   x = posx+newvx;
+   y = posy+newvy;
+   z = posz+newvz;
+   posx = x; posy = y; posz = z;
+   // mousespeed values are tweaked for 60 fps
+   mouseSpeedX = (mousx - oldMouseX) * 0.01;
+   mouseSpeedY = (mousy - oldMouseY) * 0.01;
+   oldMouseX = mousx;
+   oldMouseY = mousy;
+   if(bstatus==2)
+   {
+      posh -= mouseSpeedX;
+      posv += mouseSpeedY;
+   }
+}
+/* converts horizontal and vertical angles to a 3x3 matrix */
+ang2mat(hang,vang,mat[9])
+{
+   mat[6] = cos(vang)*sin(hang); mat[0] = cos(hang);
+   mat[7] = sin(vang);           mat[1] = 0;
+   mat[8] = cos(vang)*cos(hang); mat[2] =-sin(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}
+hsv_to_rgb(h,s,v,&r,&g,&b){ 
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else
+   {
+      hf = h / 60.0;
+      i  = floor( hf );
+      f  = hf - i;
+      pv  = v * ( 1 - s );
+      qv  = v * ( 1 - s * f );
+      tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;} 
+      if(i==1){r=qv; g=v; b=pv;} 
+      if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;} 
+      if(i==4){r=tv; g=pv; b=v;} 
+      if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;}
+      if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+}
+/* read png and store color in heightbuffer */
+loadHeightmap(){
+      i=0;
+      
+      for(x=0; x<terrainGridWidth; x++)
+      for(y=0; y<terrainGridLength; y++)
+      {      
+         height = 0;
+         if( 0 )
+         {
+            r=0; g=0; b=0; 
+            c = pic("heightmap_128.png",x,y);
+            //c = pic("lighthouse3d.gif",x,y);
+            
+            hex2rgb(c,r,g,b);
+            terrainHeights[i] = -r/15;  
+         }else{
+            terrainHeights[i] = -noise(5*x/terrainGridWidth, 5*y/terrainGridLength ) * 255 / 15;
+         }
+                 
+            i++;  
+
+      }
+      storeVerts();
+      calcNormals();
+     calcColors();
+}
+/* stores each quad. gap between each is 1 unit. 1 quad = 12 floats. */
+storeVerts(){
+   k=0;
+   for(i=0; i<terrainGridLength-1; i++) // y
+   {
+      for(j=0; j<terrainGridWidth; j++) // x
+      {
+         x = startW+(j)+xOffset;
+         y = getHeightInt(j,i) + yOffset;   
+         z = startL - (i) + zOffset;  
+
+         verts[k] = x;  
+         verts[k+1] = y; 
+         verts[k+2] = z; 
+         
+         x = startW+(j+1)+xOffset;
+         y = getHeightInt(j+1,i) + yOffset;   
+         z = startL - (i) + zOffset;  
+         
+         verts[k+3] = x;  
+         verts[k+4] = y; 
+         verts[k+5] = z; 
+
+         x = startW+(j+1)+xOffset;
+         y = getHeightInt(j+1,i+1) + yOffset;   
+         z = startL - (i+1) + zOffset;  
+         
+         verts[k+6] = x;  
+         verts[k+7] = y; 
+         verts[k+8] = z;  
+         
+         x = startW+(j)+xOffset;
+         y = getHeightInt(j,i+1) + yOffset;   
+         z = startL - (i+1) + zOffset;  
+         
+         verts[k+9] =  x;  
+         verts[k+10] = y; 
+         verts[k+11] = z; 
+         k+=12;
+      } 
+   } 
+}
+/* go thru all stored verts. For each quad there are 12 floats. xyz*4=12 */
+calcNormals(){
+   j=0;
+   for(i=0; i<terrainSiz*12; i+=12)
+   {
+      static a[3];
+      static b[3];
+      static n1[3];
+      static n2[3];
+      // Calc vectors from vertexes (points)
+      // v1 = t2-t1
+      // v2 = t3-t1
+      a[0] = verts[i+3] - verts[i+0];
+      a[1] = verts[i+4] - verts[i+1];
+      a[2] = verts[i+5] - verts[i+2];
+      b[0] = verts[i+6] - verts[i+0];
+      b[1] = verts[i+7] - verts[i+1];
+      b[2] = verts[i+8] - verts[i+2];
+      cross(a,b,n1);
+      
+      //normalize
+      length = sqrt( n1[0]^2 + n1[1]^2 + n1[2]^2);
+      n1[0] /= length; n1[1] /= length; n1[2] /= length; 
+      
+      terrainNormals[j+0] = n1[0];
+      terrainNormals[j+1] = n1[1];
+      terrainNormals[j+2] = n1[2];
+            
+      j+=3;
+   }   
+
+}
+
+/* Could be put in same loop as store verts, but is on its own for readability.*/
+calcColors()
+{
+   idx = 0;
+   for(i=0; i<terrainGridLength; i++)
+   { 
+      for(j=0; j<terrainGridWidth; j++)
+      {
+         aux = 3*((i)*terrainGridWidth + j);
+                  
+         nx = terrainNormals[aux];
+         ny = terrainNormals[aux+1];
+         nz = terrainNormals[aux+2];
+         s = 60;
+         h = (0+nx*s)+(60+ny+s)+(120+nz*s);
+         r=0; g=0; b=0;
+         hsv_to_rgb(h,1,1,r,g,b);
+         terrainColors[idx] = rgb(r*511,g*511, b*511);
+         idx++;
+      }
+   }
+}
+
+
+// Math
+/* dot product a spefic case of an euclidian inner product 
+   can also be calculated with |a| |b| cos phi, where phi is the angle between vectors a,b
+*/
+dot(a[3],b[3]) // x1*x2 + y1*y2 + z1*z2
+{
+   return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+}
+
+/* Calc vector cross product. AxB = P*/
+cross(a[3],b[3],p[3]){
+   p[0] = a[1]*b[2]-a[2]*b[1];
+   p[1] = a[2]*b[0]-a[0]*b[2];
+   p[2] = a[0]*b[1]-a[1]*b[0];  
+}
+normalize(vec[3]){
+   length = sqrt( vec[0]^2 + vec[1]^2 + vec[2]^2);
+   vec[0] /= length; vec[1] /= length; vec[2] /= length; 
+}
+
+copyMoveVec(b,N[3]){
+   N[0] = velocity[b][0];
+   N[1] = velocity[b][1];
+   N[2] = velocity[b][2];
+}
+
+movevecMagnitude(b)
+{
+   return sqrt(
+         (velocity[b][0])^2 + 
+         (velocity[b][1])^2 + 
+         (velocity[b][2])^2 );  
+}

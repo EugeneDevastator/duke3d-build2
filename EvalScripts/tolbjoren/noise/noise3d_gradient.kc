@@ -1,0 +1,43 @@
+()
+{
+   cls(0); clz(1e32);
+   
+   t = klock(0);
+   a = t;
+   r = -5;
+   setcam(sin(a)*r,0,cos(a)*r,a,0);
+   
+   
+   
+   dep = 20;
+   siz = dep/10;
+   dt = 0.01;
+   
+   for(i=0; i<dep; i++)
+   for(j=0; j<dep; j++)
+   for(k=0; k<dep; k++)
+   {
+      x = -siz + i/dep * 2*siz;
+      y = -siz + j/dep * 2*siz;
+      z = -siz + k/dep * 2*siz;
+
+      // Finne gradient. Mao normal-vektoren i punktet
+      dx = noise(x+dt,y,z) - noise(x-dt,y,z);
+      dy = noise(x,y+dt,z) - noise(x,y-dt,z);
+      dz = noise(x,y,z+dt) - noise(x,y,z-dt);
+ 
+      amp = noise(x,y,z);
+
+      if ( amp > 0 )
+      {
+         setcol(128+dx*128, 128+dy*128, 128+dz*128);      
+         radi = amp / 5;
+         drawsph(x,y,z,radi);
+          
+         //drawcone(x,y,z, radi, x+dx, y+dy+, z+dz, radi );
+         s = 5;
+         moveto( x,y,z );
+         lineto( x+dx*s, y+dy*s, z+dz*s);
+      }
+   }
+}

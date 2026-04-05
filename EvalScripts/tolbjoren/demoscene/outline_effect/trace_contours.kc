@@ -1,0 +1,339 @@
+// Code by Torbjoern Haugen
+// based on psuedo-code on p 365 of Computer Graphics and Geometric Modeling for Engineers by V.B. Anand
+
+enum{GRID_W = 128, GRID_H = 128}
+//enum{GRID_W = 32, GRID_H = 32}
+static griddata[GRID_W * GRID_H];
+static processed[GRID_W][GRID_H];
+
+static contHeight = 16;
+()
+{
+   time = klock(0);
+   contHeight = mousx/xres * 255;
+   
+   for(i=0; i<GRID_W*GRID_H; i++)
+   {
+      processed[i] =  0;
+   }
+   
+
+   if(numframes==0)
+   {
+        for(i=0; i<GRID_W; i++)
+        {
+          for(j=0; j<GRID_H; j++)
+          {
+            v = 255 * ( noise(.2*time+4*i/GRID_W, .2*time+4*j/GRID_H, time) );
+            
+            if( 0 )
+            {
+               dx = i - GRID_W/2;
+               dy = j - GRID_H/2;
+               v = 0;
+               if( dx==0 && dy == 0 )
+                 v = 255;
+               else
+                 v = 255/sqrt(dx^2 + dy^2);
+            }
+               
+            setgrid( i,j, v );
+          }
+        }
+   }
+    
+   //cls(0);  
+   drawField();
+   
+   numpts=0;
+   setcol(255,0,0);
+   setfont(4,6);
+   
+   create_contours1();
+   
+   setfont(12,16);
+   moveto(mousx,mousy);
+   if( bstatus == 1 )
+   {
+      sampX = int(mousx/xres * GRID_W);
+      sampY = int(mousy/yres * GRID_H);
+      val = grid( sampX, sampY ); 
+      printf("\nZ(%g,%g) = %g", sampX, sampY, val);
+      drawsph(mousx,mousy,-5);
+   }else
+   {
+      printf("contour z = %g", contHeight);
+   }
+
+}
+
+grid(x,y)
+{
+   return griddata[x*GRID_H + y];
+}
+
+setgrid(x,y,val)
+{
+   griddata[x*GRID_H + y] = val;
+}
+
+create_contours1()
+{
+   //for(k=0; k<5; k++)
+   {
+      //contHeight = 10 + k * 128 / 5;
+      setcol( hsv_to_rgb( contHeight, 1, 1 ) );
+      
+      for(i=0; i<GRID_W-1; i++)
+      for(j=0; j<GRID_H-1; j++)
+      {
+        L = i+1;
+        P = j+1;
+        test(i,j,L,P);
+
+      }
+
+/*
+      setfont(12,16);
+      moveto(15, yres/2 + k * 19);
+      printf("z = %g", contHeight);
+*/    
+   
+   }
+}
+
+test(i,j,L,P)
+{
+   hc = contHeight;
+   
+   x=0; y=0;
+   if( grid(i,j) < hc && hc < grid(L,j) || grid(i,j) > hc && hc > grid(L,j) )
+   {
+      lerpContour(i,j,L,j,x,y);
+      moveto(x,y);
+      
+      if( grid(L,j) < hc && hc < grid(L,P) || grid(L,j) > hc && hc > grid(L,P) )
+      {
+         lerpContour(L,j,L,P,x,y);
+         lineto(x,y);
+      }
+      
+      if( grid(L,P) < hc && hc < grid(i,P) || grid(L,P) > hc && hc > grid(i,P) )
+      {
+         lerpContour(L,P,i,P,x,y);
+         lineto(x,y);
+      }
+         
+      if( grid(i,P) < hc && hc < grid(i,j) || grid(i,P) > hc && hc > grid(i,j) )
+      {
+         lerpContour(i,P,i,j,x,y);
+         lineto(x,y);
+      }
+      
+      if( grid(i,P) < hc && hc < grid(L,j) || grid(i,P) > hc && hc > grid(L,j) )
+      {
+         lerpContour(i,P,L,j,x,y);
+         lineto(x,y);
+      }
+      
+   }
+   else if( grid(L,j) < hc && hc < grid(L,P) || grid(L,j) > hc && hc > grid(L,P) )
+   {
+      lerpContour(L,j, L, P,x,y);
+      moveto(x,y);
+      
+      if( grid(i,j) < hc && hc < grid(L,j) || grid(i,j) > hc && hc > grid(L,j) )
+      {
+         lerpContour(i,j,L,j,x,y);
+         lineto(x,y);
+      }
+      
+      if( grid(L,P) < hc && hc < grid(i,P) || grid(L,P) > hc && hc > grid(i,P) )
+      {
+         lerpContour(L,P,i,P,x,y);
+         lineto(x,y);
+      }
+         
+      if( grid(i,P) < hc && hc < grid(i,j) || grid(i,P) > hc && hc > grid(i,j) )
+      {
+         lerpContour(i,P,i,j,x,y);
+         lineto(x,y);
+      }
+      
+      if( grid(i,P) < hc && hc < grid(L,j) || grid(i,P) > hc && hc > grid(L,j) )
+      {
+         lerpContour(i,P,L,j,x,y);
+         lineto(x,y);
+      }
+     
+   }
+   else if( grid(L,P) < hc && hc < grid(i,P) || grid(L,P) > hc && hc > grid(i,P) )
+   {
+      lerpContour(L,P, i, P,x,y);
+      moveto(x,y);
+      
+      if( grid(i,j) < hc && hc < grid(L,j) || grid(i,j) > hc && hc > grid(L,j) )
+      {
+         lerpContour(i,j,L,j,x,y);
+         lineto(x,y);
+      }
+
+      if( grid(L,j) < hc && hc < grid(L,P) || grid(L,j) > hc && hc > grid(L,P) )
+      {
+         lerpContour(L,j,L,P,x,y);
+         lineto(x,y);
+      }
+         
+      if( grid(i,P) < hc && hc < grid(i,j) || grid(i,P) > hc && hc > grid(i,j) )
+      {
+         lerpContour(i,P,i,j,x,y);
+         lineto(x,y);
+      }
+      
+      if( grid(i,P) < hc && hc < grid(L,j) || grid(i,P) > hc && hc > grid(L,j) )
+      {
+         lerpContour(i,P,L,j,x,y);
+         lineto(x,y);
+      }
+     
+   }
+   else if( grid(i,P) < hc && hc < grid(i,j) || grid(i,P) > hc && hc > grid(i,j) )
+   {
+      lerpContour(i,P, i, j,x,y);
+      moveto(x,y);
+      
+      if( grid(i,j) < hc && hc < grid(L,j) || grid(i,j) > hc && hc > grid(L,j) )
+      {
+         lerpContour(i,j,L,j,x,y);
+         lineto(x,y);
+      }
+
+      if( grid(L,j) < hc && hc < grid(L,P) || grid(L,j) > hc && hc > grid(L,P) )
+      {
+         lerpContour(L,j,L,P,x,y);
+         lineto(x,y);
+      }
+      
+      if( grid(L,P) < hc && hc < grid(i,P) || grid(L,P) > hc && hc > grid(i,P) )
+      {
+         lerpContour(L,P,i,P,x,y);
+         lineto(x,y);
+      }
+         
+      if( grid(i,P) < hc && hc < grid(L,j) || grid(i,P) > hc && hc > grid(L,j) )
+      {
+         lerpContour(i,P,L,j,x,y);
+         lineto(x,y);
+      }
+     
+   }   
+   else if( grid(i,P) < hc && hc < grid(L,j) || grid(i,P) > hc && hc > grid(L,j) )
+   {
+      lerpContour(i,P, L, j,x,y);
+      
+      moveto(x,y);
+      
+      if( grid(i,j) < hc && hc < grid(L,j) || grid(i,j) > hc && hc > grid(L,j) )
+      {
+         lerpContour(i,j,L,j,x,y);
+         lineto(x,y);
+      }
+      
+      if( grid(L,j) < hc && hc < grid(L,P) || grid(L,j) > hc && hc > grid(L,P) )
+      {
+         lerpContour(L,j,L,P,x,y);
+         lineto(x,y);
+      }
+      
+      if( grid(L,P) < hc && hc < grid(i,P) || grid(L,P) > hc && hc > grid(i,P) )
+      {
+         lerpContour(L,P,i,P,x,y);
+         lineto(x,y);
+      }
+         
+      if( grid(i,P) < hc && hc < grid(i,j) || grid(i,P) > hc && hc > grid(i,j) )
+      {
+         lerpContour(i,P,i,j,x,y);
+         lineto(x,y);
+      }
+      
+   }
+
+}
+
+lerpContour(x1,y1,x2,y2,&x,&y)
+{
+   setprocessed(x1,y1);
+   hc = contHeight;
+   z1 = grid(x1,y1);
+   z2 = grid(x2,y2);
+   h = (hc-z1)/(z2-z1);
+   x = x1 + (x2-x1) * h;
+   y = y1 + (y2-y1) * h;
+   dx = xres / GRID_W;
+   dy = yres / GRID_H;
+   x *= dx;
+   y *= dy;   
+   
+   //setpix(x1*dx,y1*dy);
+}
+
+setprocessed(x,y)
+{
+   processed[x*GRID_H + y] = 1;
+}
+isProcessed(x,y)
+{
+   return processed[x*GRID_H + y];
+}
+
+
+drawField()
+{
+   static pixels[GRID_W][GRID_H]; 
+   if(numframes==0)
+   {
+      glCullFace(GL_BACK); 
+      glDisable(GL_ALPHA_TEST);
+      glDisable(GL_DEPTH_TEST);
+   }
+
+
+   for(x=0; x<GRID_W; x++)
+   {
+      for(y=0; y<GRID_H; y++)
+      {
+         v = grid(x,y);
+         pixels[y][x] = rgb(v,v,v);  
+      }
+   }
+   
+   b = glsettex(pixels,GRID_W,GRID_H);
+   setcol(0xffffff);     
+   texquad(0,0,xres,yres);
+   glremovetex(b);
+}
+
+hsv_to_rgb(h,s,v){ 
+   if( v == 0 ){r=0; g=0; b=0;} //no brightness(value) means black
+   else if( s==0 ){r=v; g=v; b=v;} //grayscale, no colour saturation
+   else{
+      hf = h / 60.0; i  = floor( hf ); f  = hf - i;
+      pv  = v * ( 1 - s ); qv  = v * ( 1 - s * f ); tv  = v * ( 1 - s * ( 1 - f ) );
+      if(i==0){r=v; g=tv; b=pv;}  if(i==1){r=qv; g=v; b=pv;}  if(i==2){r=pv; g=v; b=tv;} 
+      if(i==3){r=pv; g=qv; b=v;}  if(i==4){r=tv; g=pv; b=v;}  if(i==5){r=v; g=pv; b=qv;}
+      if(i==6){r=v; g=tv; b=pv;} if(i==-1){r=v; g=tv; b=qv;}    
+   } 
+   r=int(r*255); g=int(g*255); b=int(b*255);
+   return r*2^16 + g*2^8 + b; 
+}
+
+texquad(x,y,width,height)
+{
+   glBegin(GL_COMPLEX);
+   glTexCoord(0,0);glVertex(x,y);
+   glTexCoord(1,0);glVertex(x+width,y);
+   glTexCoord(1,1);glVertex(x+width,y+height);
+   glTexCoord(0,1);glVertex(x,y+height);
+   glEnd();
+}

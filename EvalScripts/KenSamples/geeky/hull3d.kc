@@ -1,0 +1,230 @@
+enum {ONSPHERE=1};
+enum {MAXPOINTS=2^9*2}; //Leave the *2 here for safety!
+
+struct { x, y, z; } point3d;
+static point3d upt[MAXPOINTS], v[MAXPOINTS]; //POINTS on unit scale
+
+static point3d pt[MAXPOINTS], nm[MAXPOINTS*2+2];
+static nmc[MAXPOINTS*2+2];
+static tri[MAXPOINTS*8+8], lnk[MAXPOINTS*8+8], nump, tricnt;
+
+   //07/14/2020: port of GROUDRAW/HULL3D.C
+
+()
+{
+   nump = int(MAXPOINTS/2);
+   for(i=0;i<nump;i++)
+   {
+#if (ONSPHERE == 0)
+      do  //Uniform distribution on solid sphere
+      {
+         upt[i].x = rnd*2-1;
+         upt[i].y = rnd*2-1;
+         upt[i].z = rnd*2-1;
+      } while (upt[i].x*upt[i].x + upt[i].y*upt[i].y + upt[i].z*upt[i].z > 1.0);
+      do  //Uniform distribution on solid sphere
+      {
+         v[i].x = rnd*2-1;
+         v[i].y = rnd*2-1;
+         v[i].z = rnd*2-1;
+      } while (v[i].x*v[i].x + v[i].y*v[i].y + v[i].z*v[i].z > 1.0);
+      v[i].x *= .005; v[i].y *= .005; v[i].z *= .005;
+#else
+         //Uniform distribution on spherical shell
+      upt[i].z = rnd*2-1;
+      f = sqrt(1 - upt[i].z*upt[i].z); ff = rnd*(PI*2);
+      upt[i].x = cos(ff)*f;
+      upt[i].y = sin(ff)*f;
+
+      do  //Uniform distribution on solid sphere
+      {
+         v[i].x = rnd*2-1;
+         v[i].y = rnd*2-1;
+         v[i].z = rnd*2-1;
+      } while (v[i].x*v[i].x + v[i].y*v[i].y + v[i].z*v[i].z > 1.0);
+
+      fx = upt[i].y*v[i].z - upt[i].z*v[i].y;
+      fy = upt[i].z*v[i].x - upt[i].x*v[i].z;
+      fz = upt[i].x*v[i].y - upt[i].y*v[i].x;
+      //f = .005/sqrt(fx*fx + fy*fy + fz*fz);
+      f = (rnd*(32678*.0000002)+.006) / sqrt(fx*fx + fy*fy + fz*fz);
+      v[i].x = fx*f; v[i].y = fy*f; v[i].z = fz*f;
+#endif
+   }
+   
+   //static whitepix = 0xffffff; glsettex(whitepix,1,1);
+   glsettex("cloud.png");
+
+   while (1)
+   {
+      cls(0); clz(1e32);
+
+      for(i=0;i<nump;i++)
+      {
+#if (ONSPHERE == 0)
+         upt[i].x += v[i].x; upt[i].y += v[i].y; upt[i].z += v[i].z;
+         f = upt[i].x*upt[i].x + upt[i].y*upt[i].y + upt[i].z*upt[i].z;
+         if (f > 1.0)
+         {
+               //Get unit vector from origin to position
+            f = 1/sqrt(f); upt[i].x *= f; upt[i].y *= f; upt[i].z *= f;
+
+               //Reflect velocity
+            f = (v[i].x*upt[i].x + v[i].y*upt[i].y + v[i].z*upt[i].z)*2;
+            v[i].x -= upt[i].x*f; v[i].y -= upt[i].y*f; v[i].z -= upt[i].z*f;
+         }
+#else
+         fx = upt[i].y*v[i].z - upt[i].z*v[i].y;
+         fy = upt[i].z*v[i].x - upt[i].x*v[i].z;
+         fz = upt[i].x*v[i].y - upt[i].y*v[i].x;
+         upt[i].x += fx; upt[i].y += fy; upt[i].z += fz;
+
+            //Make pt a unit vector
+         f = upt[i].x*upt[i].x + upt[i].y*upt[i].y + upt[i].z*upt[i].z;
+         f = 1/sqrt(f); upt[i].x *= f; upt[i].y *= f; upt[i].z *= f;
+#endif
+      }
+
+         //Convert working points on unit scale to actual coordinates
+      siz = yres/2;
+      for(i=0;i<nump;i++)
+      {
+         pt[i].x = upt[i].x*siz+siz;
+         pt[i].y = upt[i].y*siz+siz;
+         pt[i].z = upt[i].z*siz+siz;
+      }
+
+      inithull3d();
+      tmaphulltrisortho();
+
+      refresh(); Sleep(5);
+
+      if (keystatus[0x37]) { keystatus[0x37] = 0; nump = min(nump*2,int(MAXPOINTS/2)); }
+      if (keystatus[0xb5]) { keystatus[0xb5] = 0; nump = max(int(nump/2),4); }
+   }
+}
+
+initetrasid (z)
+{
+   i = tri[z*4]; j = tri[z*4+1]; k = tri[z*4+2];
+   x0 = pt[i].x-pt[k].x; y0 = pt[i].y-pt[k].y; z0 = pt[i].z-pt[k].z;
+   x1 = pt[j].x-pt[k].x; y1 = pt[j].y-pt[k].y; z1 = pt[j].z-pt[k].z;
+   nm[z].x = y0*z1 - z0*y1;
+   nm[z].y = z0*x1 - x0*z1;
+   nm[z].z = x0*y1 - y0*x1;
+   nmc[z] = nm[z].x*pt[k].x + nm[z].y*pt[k].y + nm[z].z*pt[k].z;
+}
+
+inithull3d ()
+{
+   tri[0] = 0; tri[4] = 0; tri[8] = 0; tri[12] = 1;
+   tri[1] = 1; tri[2] = 2; initetrasid(0);
+   if (nm[0].x*pt[3].x + nm[0].y*pt[3].y + nm[0].z*pt[3].z >= nmc[0])
+   {
+      tri[1] = 1; tri[2] = 2; lnk[0] = 10; lnk[1] = 14; lnk[2] = 4;
+      tri[5] = 2; tri[6] = 3; lnk[4] = 2; lnk[5] = 13; lnk[6] = 8;
+      tri[9] = 3; tri[10] = 1; lnk[8] = 6; lnk[9] = 12; lnk[10] = 0;
+      tri[13] = 3; tri[14] = 2; lnk[12] = 9; lnk[13] = 5; lnk[14] = 1;
+   }
+   else
+   {
+      tri[1] = 2; tri[2] = 1; lnk[0] = 6; lnk[1] = 12; lnk[2] = 8;
+      tri[5] = 3; tri[6] = 2; lnk[4] = 10; lnk[5] = 13; lnk[6] = 0;
+      tri[9] = 1; tri[10] = 3; lnk[8] = 2; lnk[9] = 14; lnk[10] = 4;
+      tri[13] = 2; tri[14] = 3; lnk[12] = 1; lnk[13] = 5; lnk[14] = 9;
+   }
+   tricnt = 4*4;
+
+   for(z=0;z<4;z++) initetrasid(z);
+
+   for(z=4;z<nump;z++)
+   {
+      px = pt[z].x; py = pt[z].y; pz = pt[z].z;
+      for(zz=tricnt-4;zz>=0;zz-=4)
+      {
+         i = int(zz/4);
+         if (nm[i].x*px + nm[i].y*py + nm[i].z*pz >= nmc[i]) continue;
+
+         s = 0;
+         for(zx=2;zx>=0;zx--)
+         {
+            i = int(lnk[zz+zx]/4);
+            s += (nm[i].x*px + nm[i].y*py + nm[i].z*pz < nmc[i]) + s;
+         }
+         if (s == 7) continue;
+
+         nzz = (int(0x4a4/2^(s+s))%4); szz = zz; otricnt = tricnt;
+         do
+         {
+            snzz = nzz;
+            do
+            {
+               zzz = nzz+1; if (zzz >= 3) zzz = 0;
+
+                  //Insert triangle tricnt: (p0,p1,z)
+               tri[tricnt+0] = tri[zz+nzz];
+               tri[tricnt+1] = tri[zz+zzz];
+               tri[tricnt+2] = z;
+               initetrasid(int(tricnt/4));
+               k = lnk[zz+nzz]; lnk[tricnt] = k; lnk[k] = tricnt;
+               lnk[tricnt+1] = tricnt+6;
+               lnk[tricnt+2] = tricnt-3;
+               tricnt += 4;
+
+                  //watch out for loop inside single triangle
+               if (zzz == snzz) goto endit;
+               nzz = zzz;
+            } while ((s%(2^(zzz+1))) < 2^zzz);
+            do
+            {
+               i = zz+nzz;
+               zz = int(lnk[i]/4)*4;
+               nzz = (lnk[i]%4)+1; if (nzz == 3) nzz = 0;
+               s = 0;
+               for(zx=2;zx>=0;zx--)
+               {
+                  i = int(lnk[zz+zx]/4);
+                  s += (nm[i].x*px + nm[i].y*py + nm[i].z*pz < nmc[i]) + s;
+               }
+            } while ((s%(2^(nzz+1))) >= 2^nzz);
+         } while (zz != szz);
+endit:;  lnk[tricnt-3] = otricnt+2; lnk[otricnt+2] = tricnt-3;
+
+         for(zz=otricnt-4;zz>=0;zz-=4)
+         {
+            i = int(zz/4);
+            if (nm[i].x*px + nm[i].y*py + nm[i].z*pz < nmc[i])
+            {
+               tricnt -= 4; //Delete triangle zz
+               nm[i] = nm[int(tricnt/4)]; nmc[i] = nmc[int(tricnt/4)];
+               for(i=0;i<3;i++)
+               {
+                  tri[zz+i] = tri[tricnt+i];
+                  lnk[zz+i] = lnk[tricnt+i];
+                  lnk[lnk[zz+i]] = zz+i;
+               }
+            }
+         }
+         break;
+      }
+   }
+   tricnt = int(tricnt/4);
+}
+
+tmaphulltrisortho ()
+{
+   xof = int((xres-yres)/2);
+   glbegin(GL_TRIANGLES);
+   for(k=0;k<tricnt;k++)
+   {
+      if (nm[k].z < 0) continue; //Back-face culling: don't use for voxelization
+      c = ceil(nm[k].z*192.0/sqrt(nm[k].x*nm[k].x + nm[k].y*nm[k].y + nm[k].z*nm[k].z));
+      setcol(c*0x10101);
+      for(i=0;i<3;i++)
+      {
+         gltexcoord(i==1,i==2);
+         glvertex(pt[tri[k*4+i]].x+xof,pt[tri[k*4+i]].y);
+      }
+   }
+   glend();
+}

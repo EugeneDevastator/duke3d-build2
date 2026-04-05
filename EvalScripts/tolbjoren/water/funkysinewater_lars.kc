@@ -1,0 +1,106 @@
+	 enum{colSize=64, rowSize=64}
+   enum{MAXVERTS = colSize*rowSize}
+   static vertx[MAXVERTS];
+   static verty[MAXVERTS];
+   static vertz[MAXVERTS];
+()
+{
+   cls(0);
+	 clz(1e32);
+	 glCullface(GL_FRONT);
+	 
+   
+
+   t = 3*klock(0);
+   
+
+
+
+   idx = 0;
+   rez = colSize/2;
+
+   for(i=-rez; i<rez; i++)
+   for(j=-rez; j<rez; j++)
+   {
+
+      yofs = 0;
+			yofs += sin(t + 0.5*i);
+			yofs += sin(t + 0.5*j);
+      //yofs += 1.0 * sin( t + j*0.5 + i*0.125);
+      //yofs += 2.0 * sin( t + (rez-j)*0.125 + i*0.25 );
+      //yofs += 2.0 * sin( t + (j)*0.125 + (rez-i)*0.125 );
+      //yofs += 0.5 * sin( t + (rez+j)*0.125 + (rez+i)*0.125 );
+            
+      x = i ;
+      y = yofs;
+      z = j ;
+      
+      vertx[idx] = x;
+      verty[idx] = y;
+      vertz[idx] = z;
+						
+      yofs = 0;
+   //   yofs += 1.0 * cos( t + j*0.5 + i*0.125);
+   //   yofs += 2.0 * cos( t + (rez-j)*0.125 + i*0.25 );
+   //   yofs += 2.0 * cos( t + (j)*0.125 + (rez-i)*0.125 );
+   //   yofs += 0.5 * cos( t + (rez+j)*0.125 + (rez+i)*0.125 );
+         
+      nx = i ;
+      ny = yofs;
+      nz = j ;
+			
+			#if 0
+			moveto(x,y,z); lineto(nx,ny,nz);
+			setcol( 255+yofs*-127,255+yofs*127,255 ) ; 
+      drawsph(x,y,z,.2);
+			#endif
+			
+      idx++;
+      
+      
+      
+      //yofs *= 128;
+      //setcol(yofs,yofs,yofs);
+      //setpix(32+i,32+j);
+      
+
+   }
+   
+   #if 1
+   setcol(0xffffff);
+   idx=0;
+	 glBegin(GL_QUADS);
+   for(i=0; i<colSize-1; i++)
+	 for(j=0; j<rowSize-1; j++)
+	 {
+		
+
+         yofs = verty[idx];
+				 setcol( 255+yofs*-127,255+yofs*127,255 ) ; 
+				 
+				 vert(idx+rowSize);
+				 vert(idx+rowSize+1);
+				 vert(idx+1);
+				 vert(idx);
+				 
+				 
+				 idx = i*ColSize + j;
+   }
+	 glEnd();
+   #endif
+   
+
+   ang = mousx/xres*2*PI;
+   r = -50;
+   setcam(r*sin(ang),-40,r*cos(ang),ang, 40*PI/180);
+   //setcam(0,-25,-70, 0,0);
+
+   setcol(255,255,255);
+   moveto(0,150);
+   printf("%g", t);
+}
+
+vert(i)
+{
+ glVertex( vertx[i], verty[i], vertz[i] );
+}

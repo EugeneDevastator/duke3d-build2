@@ -1,0 +1,201 @@
+/*
+
+   Example of a 4dof heightmapping algo used to render
+   a maze-style level. There is one heightmap for the floor,
+   and one for the ceiling.
+
+   Keys:
+   ------
+   W/S/A/D : movement
+     Space : jump
+         Q : fly (press space to rise, release Q to fall)
+
+- Robert
+*/
+
+enum{XS=64,YS=64};
+static cei[XS][YS][2],flo[XS][YS][2],ramp[64][4];
+()
+{
+   posx=XS/2; posy=YS/2; posz=0;
+   
+   for (i=0;i<64;i++)
+   {
+      a=i*1/28; r=exp(-8*(a-.60)^2); g=exp(-8*(a-.40)^2); b=exp(-8*(a-.25)^2);
+      ramp[i][0]=r*255; ramp[i][1]=g*255; ramp[i][2]=b*255;
+   }
+   
+   for (y=0;y<YS;y++)
+      for (x=0;x<XS;x++)
+      {
+         c=0; r=(x-posx)^2+(y-posy)^2;
+         if (r<=10^2) c=sqrt(10^2-r);
+         r=max(abs(y-posy),4-min(XS-x,x)); if (r<4) {c=max(c,sqrt(4^2-r^2));}
+         r=max(abs(x-posx),4-min(YS-y,y)); if (r<4) {c=max(c,sqrt(4^2-r^2));}
+
+         r=max(abs(y-   5),4-min(XS-x,x)); if (r<4) {c=max(c,sqrt(4^2-r^2));}
+         r=max(abs(y-YS+5),4-min(XS-x,x)); if (r<4) {c=max(c,sqrt(4^2-r^2));}
+         r=max(abs(x-   5),4-min(YS-y,y)); if (r<4) {c=max(c,sqrt(4^2-r^2));}
+         r=max(abs(x-XS+5),4-min(YS-y,y)); if (r<4) {c=max(c,sqrt(4^2-r^2));}
+
+         fv=posz+c*.25; flo[y][x][0]=fv;
+         cv=posz-c    ; cei[y][x][0]=cv;
+         
+         fv*=2; cv*=-2; flo[y][x][1]=fv; cei[y][x][1]=cv;
+      }
+
+   ang=0; ot=klock(); vx=0; vy=0; vz=0; gro=0;
+
+   posz=-.5;
+   flo[posy][posx][0]=posz+2.4; flo[posy][posx][1]=13;
+   flo[posy-1][posx][0]=posz+1.8; flo[posy-1][posx][1]=17;
+   flo[posy+1][posx][0]=posz+1.8; flo[posy+1][posx][1]=17;
+   flo[posy][posx-1][0]=posz+.3; flo[posy][posx-1][1]=20;
+   flo[posy+1][posx-1][0]=posz+1; flo[posy+1][posx-1][1]=19;
+   flo[posy-1][posx-1][0]=posz+1; flo[posy-1][posx-1][1]=19;
+   posy+=.5; posx+=.5;
+   
+   do
+   {
+      // movement code starts
+      
+      t=klock(); sync=t-ot; ot=t;
+      
+      mx=0,my=0; readmouse(mx,my); ang+=mx*.008;
+
+      //if (gro) // should player move on ground only?
+      {
+         f = (keystatus[0x11]-keystatus[0x1f]); // forward: W/S
+         s = (keystatus[0x20]-keystatus[0x1e]); // strafe: A/D
+         f+= (keystatus[0xc8]-keystatus[0xd0]); // forward: Up/Down
+         s+= (keystatus[0xcd]-keystatus[0xcb]); // strafe: Right/Left
+         if (bstatus==1) f++; else if (bstatus) f--;
+      
+         co = cos(ang); si = sin(ang);
+         vx += (co*f - si*s)*40*sync;
+         vy += (si*f + co*s)*40*sync;
+      }
+      
+      if (keystatus[0x10]) {gro=1;} // fly
+      
+      if (gro)
+      {
+         vz=25*sync;
+         if (keystatus[0x39]||keystatus[0x9d]) {vz=-10; gro=0;} // jump: space/Rctrl
+      }
+      else {vz+=20*sync;}
+
+      f = vx^2 + vy^2;
+      if (f >= 6^2) {f=6/sqrt(f); vx*=f; vy*=f;}
+      
+      opz = posz;
+      clipmove(posx,posy,posz,vx*sync,vy*sync,vz*sync);
+      if (vz>=0 && (posz<=opz))
+      {
+        // if (gro==0 || (opz-posz>.1)) {playsound("tapfloor.flac",max(vz*10,30),rnd+1);}
+         gro=1;
+      }
+      else {gro=0;}
+
+      if (gro) {f = .005^sync; vx *= f; vy *= f;}
+      
+      setcam(posy,posz,posx,ang,0);
+
+      // movement code ends
+      
+      //
+      castray(posx,posy,posz,ang);
+      //
+      
+      refresh();
+   }
+   while(1);
+}
+
+castray(px,py,pz,ang)
+{
+   hx=xres/2; hy=yres/2; hz=hx;
+
+   c=cos(ang); s=sin(ang);
+   ipx=floor(px); fpx=px-ipx;
+   ipy=floor(py); fpy=py-ipy;
+   
+   vx=c+s; vy=s-c;
+   d=1/hx; c*=d; s*=d; ix=0; iy=0;
+   
+   for (sx=0;sx<xres;sx++,vx-=s,vy+=c)
+   {
+      avx = 1/max(abs(vx),1e-6);
+      avy = 1/max(abs(vy),1e-6);
+      dincx=0; dval0=1e32; dincy=0; dval1=1e32;
+      if (vx<0) {dincx=-1; dval0=fpx*avx;} else if (vx>0) {dincx=1; dval0=(1-fpx)*avx;}
+      if (vy<0) {dincy=-1; dval1=fpy*avy;} else if (vy>0) {dincy=1; dval1=(1-fpy)*avy;}
+      inx=ipx; iny=ipy; d=0;
+      
+      hc=cei[iny][inx][0]; cc=cei[iny][inx][1]; syc=0;
+      hf=flo[iny][inx][0]; cf=flo[iny][inx][1]; syf=yres-1; sh=1;
+
+      while(d<256)
+      {
+         if (dval1>dval0) {inx+=dincx; d=dval0; dval0+=avx;}
+                     else {iny+=dincy; d=dval1; dval1+=avy;}
+
+         id=hz/d;
+
+         dyc=min((hc-pz)*id+hy,syf);
+         if (dyc>syc)
+         {
+            setcol(ramp[cc][0]*sh,ramp[cc][1]*sh,ramp[cc][2]*sh);
+            moveto(sx,syc); lineto(sx,dyc); syc=dyc;
+         }
+         dyf=max((hf-pz)*id+hy,syc);
+         if (dyf<syf)
+         {
+            setcol(ramp[cf][0]*sh,ramp[cf][1]*sh,ramp[cf][2]*sh);
+            moveto(sx,dyf); lineto(sx,syf); syf=dyf;
+         }
+         if (syc>=syf) break;
+
+         hc=cei[iny][inx][0]; cc=cei[iny][inx][1];
+         hf=flo[iny][inx][0]; cf=flo[iny][inx][1]; sh=1.06^-d;
+         
+         dyc=min((hc-pz)*id+hy,syf);
+         if (dyc>syc)
+         {
+            setcol(ramp[cc][0]*sh,ramp[cc][1]*sh,ramp[cc][2]*sh);
+            moveto(sx,syc); lineto(sx,dyc); syc=dyc;
+         }
+         dyf=max((hf-pz)*id+hy,syc);
+         if (dyf<syf)
+         {
+            setcol(ramp[cf][0]*sh,ramp[cf][1]*sh,ramp[cf][2]*sh);
+            moveto(sx,dyf); lineto(sx,syf); syf=dyf;
+         }
+         if (syc>=syf) break;
+      }
+   }
+}
+
+clipmove(&x,&y,&z,vx,vy,vz)
+{
+   tx=x+vx; ty=y+vy; if (clear(tx,ty,z)) {x=tx; y=ty; goto done;}
+   tx=x   ; ty=y+vy; if (clear(tx,ty,z)) {x=tx; y=ty; goto done;}
+   tx=x+vx; ty=y   ; if (clear(tx,ty,z)) {x=tx; y=ty; goto done;}
+done:
+   z=min(max((z+vz),cei[floor(y)][floor(x)][0]+1),
+                    flo[floor(y)][floor(x)][0]-1);
+}
+
+clear(tx,ty,tz)
+{
+   enum{STEPHEI=.5};
+   for (fy=-.25;fy<=.25;fy+=.25)
+      for (fx=-.25;fx<=.25;fx+=.25)
+      {
+         fh=flo[floor(ty+fy)][floor(tx+fx)][0]-.9;
+         ch=cei[floor(ty+fy)][floor(tx+fx)][0]+.9; if (fh<=ch) return(0);
+         if ((tz-fh)>STEPHEI) return(0);
+         if ((ch-tz)>STEPHEI) return(0);
+      }
+   return 1;
+}
