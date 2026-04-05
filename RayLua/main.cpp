@@ -603,7 +603,7 @@ bool prompt_for_startup_config(StartupConfig* cfg) {
             ImGuiWindowFlags_NoCollapse |
             ImGuiWindowFlags_NoResize)) {
 
-            ImGui::TextWrapped("RayGame needs a map plus Build/Duke art assets. Dave's old Windows-only fallback was removed, so set the paths here.");
+            ImGui::TextWrapped("RayGame needs a map plus Build/Duke art assets. Set the paths here to start the application.");
             ImGui::Separator();
 
             ImGui::InputText("Map (.map)", cfg->map_path, sizeof(cfg->map_path));
