@@ -8,6 +8,9 @@
 #include "artloader.h"
 
 #include <string.h>
+#include <ctype.h>
+#include <dirent.h>
+#include <stdio.h>
 #include "mapcore.h"
 gallery g_gals[16] = {0};
 int galcount = 0;
@@ -20,6 +23,33 @@ unsigned char* getGalleryColor(int gal_idx, int color_idx) {
 unsigned char* getColor(int idx) {
     return getGalleryColor(0, idx); // fallback to gallery 0
 }
+
+static int str_equals_ignore_case_local(const char* a, const char* b) {
+	while (*a && *b) {
+		if (tolower((unsigned char)*a) != tolower((unsigned char)*b)) return 0;
+		a++;
+		b++;
+	}
+	return *a == 0 && *b == 0;
+}
+
+static int build_case_insensitive_path(const char* basepath, const char* expected_name, char* out, size_t out_size) {
+	DIR* dir = opendir(basepath);
+	if (!dir) return 0;
+
+	struct dirent* entry;
+	while ((entry = readdir(dir)) != NULL) {
+		if (str_equals_ignore_case_local(entry->d_name, expected_name)) {
+			snprintf(out, out_size, "%s%s", basepath, entry->d_name);
+			closedir(dir);
+			return 1;
+		}
+	}
+
+	closedir(dir);
+	return 0;
+}
+
 void LoadGalleryPal(int gal_idx, const char* basepath) {
 	if (gal_idx < 0 || gal_idx >= 16) return;
 	galcount++;
@@ -32,7 +62,7 @@ void LoadGalleryPal(int gal_idx, const char* basepath) {
 	}
 
 	char tbuf[MAX_PATH*2];
-	sprintf(tbuf, "%spalette.dat", basepath);
+	if (!build_case_insensitive_path(basepath, "palette.dat", tbuf, sizeof(tbuf))) return;
 
 	if (kzopen(tbuf)) {
 		kzread(gal->globalpal, 768);
@@ -217,6 +247,7 @@ void loadpic_raw(tile_t *tpic, char* rootpath, int gal_idx) {
     short *sxsiz, *sysiz;
     unsigned char *uptr;
     char tbuf[MAX_PATH*2];
+    char expected_name[32];
 
     if (gal_idx < 0 || gal_idx >= 16) return;
 
@@ -251,8 +282,8 @@ void loadpic_raw(tile_t *tpic, char* rootpath, int gal_idx) {
         // Find correct ART file and load pixel data
         filnum = 0;
         do {
-            sprintf(tbuf, "%sTILES%03d.ART", rootpath, filnum);
-            if (!kzopen(tbuf)) {
+            sprintf(expected_name, "TILES%03d.ART", filnum);
+            if (!build_case_insensitive_path(rootpath, expected_name, tbuf, sizeof(tbuf)) || !kzopen(tbuf)) {
                 filnum = -1;
                 break;
             }
@@ -322,6 +353,7 @@ void loadpic(tile_t *tpic, char* rootpath, int gal_idx) {
     short *sxsiz, *sysiz;
     unsigned char *uptr;
     char tbuf[MAX_PATH*2];
+    char expected_name[32];
 
 	if (gal_idx < 0 || gal_idx >= 16) return;
 
@@ -360,8 +392,8 @@ void loadpic(tile_t *tpic, char* rootpath, int gal_idx) {
         // Find correct ART file and load pixel data
         filnum = 0;
         do {
-            sprintf(tbuf, "%sTILES%03d.ART", rootpath, filnum);
-            if (!kzopen(tbuf)) {
+            sprintf(expected_name, "TILES%03d.ART", filnum);
+            if (!build_case_insensitive_path(rootpath, expected_name, tbuf, sizeof(tbuf)) || !kzopen(tbuf)) {
                 filnum = -1;
                 break;
             }
@@ -447,7 +479,7 @@ void LoadPal(const char* basepath) {
 	if (gotpal) return;
 	setgammlut(1.0);
 
-	sprintf(tbuf, "%spalette.dat", basepath);
+	if (!build_case_insensitive_path(basepath, "palette.dat", tbuf, sizeof(tbuf))) return;
 
 	if (kzopen(tbuf)) {
 		kzread(globalpal, 768);
@@ -507,13 +539,16 @@ int loadgal(int gal_idx, const char* path) {
         gal->sizey = NULL;
     }
 
-    // Extract directory from path
+    // Treat the provided path as a directory and normalize the trailing separator.
     strcpy(gal->curmappath, path);
-    int j = 0;
-    for(int i = 0; gal->curmappath[i]; i++) {
-        if ((gal->curmappath[i] == '/') || (gal->curmappath[i] == '\\')) j = i + 1;
+    int path_len = (int)strlen(gal->curmappath);
+    if (path_len > 0 &&
+        gal->curmappath[path_len - 1] != '/' &&
+        gal->curmappath[path_len - 1] != '\\' &&
+        path_len + 1 < (int)sizeof(gal->curmappath)) {
+        gal->curmappath[path_len] = '/';
+        gal->curmappath[path_len + 1] = 0;
     }
-    gal->curmappath[j] = 0;
 
     // Load palette first
 	LoadGalleryPal(gal_idx, gal->curmappath);
@@ -525,9 +560,11 @@ int loadgal(int gal_idx, const char* path) {
     uint16_t *tilesizx = NULL, *tilesizy = NULL;
     picanm_t *picanm = NULL;
     char tbuf[MAX_PATH*2];
+    char expected_name[32];
 
     for(int filnum = 0; ; filnum++) {
-        sprintf(tbuf, "%sTILES%03d.ART", gal->curmappath, filnum);
+        sprintf(expected_name, "TILES%03d.ART", filnum);
+        if (!build_case_insensitive_path(gal->curmappath, expected_name, tbuf, sizeof(tbuf))) break;
         if (!kzopen(tbuf)) break;
 
         kzread(tbuf, 16);
@@ -599,7 +636,4 @@ int loadgal(int gal_idx, const char* path) {
 
     return 1;
 }
-
-
-
 

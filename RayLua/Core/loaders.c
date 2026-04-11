@@ -140,7 +140,9 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 	spri_t *spr;
 	float f, fx, fy;
 	int i, j, k, l;
-	long x, y, z, fileid, hitile, warned = 0, altsects, nnumtiles, nnumspris;
+	int32_t x, y, z;
+	uint32_t fileid;
+	int32_t hitile, warned = 0, altsects, nnumtiles, nnumspris;
 	short s, cursect;
 	char och, tbuf[256];
 //	freemap(map);
@@ -433,10 +435,12 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 		} build7surf_t;
 		typedef struct
 		{
-			short wallptr, wallnum;
-			long z[2]; short stat[2]; build7surf_t surf[2];
-			char visibility, filler;
-			short lotag, hitag, extra;
+			int16_t wallptr, wallnum;
+			int32_t z[2];
+			int16_t stat[2];
+			build7surf_t surf[2];
+			int8_t visibility, filler;
+			int16_t lotag, hitag, extra;
 		} build7sect_t;
 		typedef struct
 		{
@@ -448,10 +452,13 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 		} build7wall_t;
 		typedef struct
 		{
-			long x, y, z; short cstat, picnum;
-			signed char shade; char pal, clipdist, filler;
-			unsigned char xrepeat, yrepeat; signed char xoffset, yoffset;
-			short sectnum, statnum, ang, owner, xvel, yvel, zvel, lotag, hitag, extra;
+			int32_t x, y, z;
+			int16_t cstat, picnum;
+			int8_t shade;
+			int8_t pal, clipdist, filler;
+			uint8_t xrepeat, yrepeat;
+			int8_t xoffset, yoffset;
+			int16_t sectnum, statnum, ang, owner, xvel, yvel, zvel, lotag, hitag, extra;
 		} build7spri_t;
 		build7sect_t b7sec;
 		build7wall_t b7wal;
@@ -461,10 +468,10 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 #define BSIZ 16
 		double c1, c2, c3, s1, s2, s3, c1c3, c1s3, s1c3, s1s3;
 		signed short board[6][BSIZ][BSIZ][BSIZ]; //Board layout
-		long posx, posy, posz, a1, a2, a3, oy, yy;
+		int32_t posx, posy, posz, a1, a2, a3, oy, yy;
 
 		//------------------------------------------------------------------------
-		long filnum, arttiles, loctile0, loctile1, iskenbuild = 0;
+		int32_t filnum, arttiles, loctile0, loctile1, iskenbuild = 0;
 		arttiles = g_gals[0].gnumtiles;
         short *tilefile = 0;
 		char tbuf[MAX_PATH*2];

@@ -22,6 +22,8 @@
 #include <algorithm>
 #include <vector>
 #include <string>
+#include <filesystem>
+#include <system_error>
 
 #include "DumbRender.hpp"
 //#include "MonoTest.hpp"
@@ -37,6 +39,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
+#include <dirent.h>
 #include <sys/stat.h>
 #include "Editor/uimodels.h"
 
@@ -471,19 +475,81 @@ int file_exists(const char* path) {
     return 0;
 }
 
+int str_equals_ignore_case(const char* a, const char* b) {
+    while (*a && *b) {
+        if (tolower((unsigned char)*a) != tolower((unsigned char)*b)) return 0;
+        a++;
+        b++;
+    }
+    return *a == '\0' && *b == '\0';
+}
+
+int str_starts_with_ignore_case(const char* str, const char* prefix) {
+    while (*prefix) {
+        if (!*str) return 0;
+        if (tolower((unsigned char)*str) != tolower((unsigned char)*prefix)) return 0;
+        str++;
+        prefix++;
+    }
+    return 1;
+}
+
+int str_ends_with_ignore_case(const char* str, const char* suffix) {
+    size_t str_len = strlen(str);
+    size_t suffix_len = strlen(suffix);
+    if (suffix_len > str_len) return 0;
+    return str_equals_ignore_case(str + str_len - suffix_len, suffix);
+}
+
+void ensure_directory_separator(char* path, size_t path_size) {
+    size_t len;
+
+    if (!path[0]) return;
+    len = strlen(path);
+    if (len == 0) return;
+    if (path[len - 1] == '/' || path[len - 1] == '\\') return;
+    if (len + 1 >= path_size) return;
+
+    path[len] = '/';
+    path[len + 1] = '\0';
+}
+
+int directory_contains_named_file_ignore_case(const char* dir_path, const char* expected_name) {
+    DIR* dir = opendir(dir_path);
+    if (!dir) return 0;
+
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != nullptr) {
+        if (str_equals_ignore_case(entry->d_name, expected_name)) {
+            closedir(dir);
+            return 1;
+        }
+    }
+
+    closedir(dir);
+    return 0;
+}
+
 int has_extension(const char* path, const char* ext) {
     const char* dot = strrchr(path, '.');
-    return dot && strcmp(dot, ext) == 0;
+    return dot && str_equals_ignore_case(dot, ext);
 }
 
 int check_tiles_art_exists(const char* dir_path) {
-    char pattern[512];
-    snprintf(pattern, sizeof(pattern), "%s/tiles*.art", dir_path);
+    DIR* dir = opendir(dir_path);
+    if (!dir) return 0;
 
-    // Simple check for tiles000.art as minimum requirement
-    char tiles_path[512];
-    snprintf(tiles_path, sizeof(tiles_path), "%s/tiles000.art", dir_path);
-    return file_exists(tiles_path);
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != nullptr) {
+        if (str_starts_with_ignore_case(entry->d_name, "tiles") &&
+            str_ends_with_ignore_case(entry->d_name, ".art")) {
+            closedir(dir);
+            return 1;
+        }
+    }
+
+    closedir(dir);
+    return 0;
 }
 
 void extract_directory(const char* filepath, char* dir_path, size_t dir_size) {
@@ -503,6 +569,214 @@ void extract_directory(const char* filepath, char* dir_path, size_t dir_size) {
 
 void set_status(StartupConfig* cfg, const char* message) {
     snprintf(cfg->status, sizeof(cfg->status), "%s", message);
+}
+
+std::string to_lower_copy(const std::string& value) {
+    std::string out = value;
+    std::transform(out.begin(), out.end(), out.begin(),
+        [](unsigned char c) { return (char)std::tolower(c); });
+    return out;
+}
+
+bool is_map_filename(const std::string& name) {
+    return name.size() >= 4 && to_lower_copy(name.substr(name.size() - 4)) == ".map";
+}
+
+bool resolve_path_case_insensitive(const std::filesystem::path& input_path, std::filesystem::path* resolved_path) {
+    if (resolved_path == nullptr || input_path.empty()) return false;
+
+    std::error_code ec;
+    if (std::filesystem::exists(input_path, ec)) {
+        *resolved_path = input_path;
+        return true;
+    }
+
+    std::filesystem::path current;
+    std::filesystem::path normalized = input_path.lexically_normal();
+    if (normalized.is_absolute()) {
+        current = normalized.root_path();
+    } else {
+        current = std::filesystem::current_path(ec);
+        if (ec) return false;
+    }
+
+    bool consumed_root_name = false;
+    bool consumed_root_dir = false;
+
+    for (const auto& part : normalized) {
+        std::string part_str = part.string();
+        if (part_str.empty()) continue;
+        if (!consumed_root_name && normalized.has_root_name() && part == normalized.root_name()) {
+            current = normalized.root_name();
+            consumed_root_name = true;
+            continue;
+        }
+        if (!consumed_root_dir && normalized.has_root_directory() && part == normalized.root_directory()) {
+            if (current.empty()) current = part;
+            consumed_root_dir = true;
+            continue;
+        }
+        if (part_str == ".") continue;
+        if (part_str == "..") {
+            current = current.parent_path();
+            continue;
+        }
+
+        std::filesystem::path exact = current / part;
+        if (std::filesystem::exists(exact, ec)) {
+            current = exact;
+            continue;
+        }
+
+        bool found = false;
+        std::string wanted = to_lower_copy(part_str);
+        for (const auto& entry : std::filesystem::directory_iterator(current, ec)) {
+            if (ec) break;
+            if (to_lower_copy(entry.path().filename().string()) == wanted) {
+                current = entry.path();
+                found = true;
+                break;
+            }
+        }
+
+        if (!found) return false;
+    }
+
+    *resolved_path = current;
+    return true;
+}
+
+bool is_valid_primary_asset_dir(const char* dir_path) {
+    if (!dir_path[0]) return false;
+    return directory_contains_named_file_ignore_case(dir_path, "palette.dat") &&
+           check_tiles_art_exists(dir_path);
+}
+
+void try_set_path(char* dst, size_t dst_size, const std::filesystem::path& path) {
+    std::string normalized = path.lexically_normal().string();
+    snprintf(dst, dst_size, "%s", normalized.c_str());
+}
+
+bool find_first_map_in_tree(const std::filesystem::path& root, std::filesystem::path* found_map) {
+    if (found_map == nullptr) return false;
+
+    std::error_code ec;
+    if (!std::filesystem::exists(root, ec) || !std::filesystem::is_directory(root, ec)) return false;
+
+    for (auto it = std::filesystem::recursive_directory_iterator(
+             root, std::filesystem::directory_options::skip_permission_denied, ec);
+         it != std::filesystem::recursive_directory_iterator(); ++it) {
+        if (ec) break;
+        if (it.depth() > 3) {
+            it.disable_recursion_pending();
+            continue;
+        }
+        if (!it->is_regular_file(ec)) continue;
+        if (is_map_filename(it->path().filename().string())) {
+            *found_map = it->path();
+            return true;
+        }
+    }
+    return false;
+}
+
+bool find_primary_assets_in_tree(const std::filesystem::path& root, std::filesystem::path* found_dir) {
+    if (found_dir == nullptr) return false;
+
+    std::error_code ec;
+    if (!std::filesystem::exists(root, ec) || !std::filesystem::is_directory(root, ec)) return false;
+    if (is_valid_primary_asset_dir(root.string().c_str())) {
+        *found_dir = root;
+        return true;
+    }
+
+    for (auto it = std::filesystem::recursive_directory_iterator(
+             root, std::filesystem::directory_options::skip_permission_denied, ec);
+         it != std::filesystem::recursive_directory_iterator(); ++it) {
+        if (ec) break;
+        if (it.depth() > 3) {
+            it.disable_recursion_pending();
+            continue;
+        }
+        if (!it->is_directory(ec)) continue;
+        if (is_valid_primary_asset_dir(it->path().string().c_str())) {
+            *found_dir = it->path();
+            return true;
+        }
+    }
+    return false;
+}
+
+void try_autodetect_map(StartupConfig* cfg) {
+    std::filesystem::path resolved;
+    if (cfg->map_path[0] && resolve_path_case_insensitive(cfg->map_path, &resolved) &&
+        std::filesystem::is_regular_file(resolved)) {
+        try_set_path(cfg->map_path, sizeof(cfg->map_path), resolved);
+        return;
+    }
+
+    std::vector<std::filesystem::path> roots;
+    std::error_code ec;
+    roots.emplace_back(std::filesystem::current_path(ec));
+    if (g_argv != nullptr && g_argv[0] != nullptr && g_argv[0][0]) {
+        roots.emplace_back(std::filesystem::absolute(g_argv[0]).parent_path());
+    }
+
+    const char* dir_candidates[] = { cfg->install_dir, cfg->gallery0_dir, cfg->gallery1_dir };
+    for (const char* candidate : dir_candidates) {
+        if (!candidate[0]) continue;
+        if (resolve_path_case_insensitive(candidate, &resolved)) {
+            if (std::filesystem::is_regular_file(resolved)) resolved = resolved.parent_path();
+            roots.emplace_back(resolved);
+        }
+    }
+
+    for (const std::filesystem::path& root : roots) {
+        std::filesystem::path found_map;
+        if (find_first_map_in_tree(root, &found_map)) {
+            try_set_path(cfg->map_path, sizeof(cfg->map_path), found_map);
+            return;
+        }
+    }
+}
+
+void try_autodetect_primary_assets(StartupConfig* cfg) {
+    std::filesystem::path resolved;
+    if (cfg->gallery0_dir[0] && resolve_path_case_insensitive(cfg->gallery0_dir, &resolved) &&
+        is_valid_primary_asset_dir(resolved.string().c_str())) {
+        try_set_path(cfg->gallery0_dir, sizeof(cfg->gallery0_dir), resolved);
+        return;
+    }
+
+    std::vector<std::filesystem::path> roots;
+    std::error_code ec;
+    roots.emplace_back(std::filesystem::current_path(ec));
+
+    if (g_argv != nullptr && g_argv[0] != nullptr && g_argv[0][0]) {
+        std::filesystem::path exe_path = std::filesystem::absolute(g_argv[0]);
+        roots.emplace_back(exe_path.parent_path());
+    }
+
+    const char* map_candidates[] = { cfg->map_path, cfg->install_dir };
+    for (const char* candidate : map_candidates) {
+        if (!candidate[0]) continue;
+        std::filesystem::path base(candidate);
+        if (resolve_path_case_insensitive(base, &resolved)) {
+            if (std::filesystem::is_regular_file(resolved)) {
+                roots.emplace_back(resolved.parent_path());
+            } else {
+                roots.emplace_back(resolved);
+            }
+        }
+    }
+
+    for (const std::filesystem::path& root : roots) {
+        std::filesystem::path found_dir;
+        if (find_primary_assets_in_tree(root, &found_dir)) {
+            try_set_path(cfg->gallery0_dir, sizeof(cfg->gallery0_dir), found_dir);
+            return;
+        }
+    }
 }
 
 void autofill_from_map(StartupConfig* cfg) {
@@ -527,6 +801,13 @@ void autofill_from_install(StartupConfig* cfg) {
 }
 
 bool validate_startup_config(StartupConfig* cfg, bool verbose) {
+    try_autodetect_map(cfg);
+    try_autodetect_primary_assets(cfg);
+
+    ensure_directory_separator(cfg->install_dir, sizeof(cfg->install_dir));
+    ensure_directory_separator(cfg->gallery0_dir, sizeof(cfg->gallery0_dir));
+    ensure_directory_separator(cfg->gallery1_dir, sizeof(cfg->gallery1_dir));
+
     if (!cfg->map_path[0]) {
         if (verbose) set_status(cfg, "Map path is empty.");
         return false;
@@ -547,9 +828,7 @@ bool validate_startup_config(StartupConfig* cfg, bool verbose) {
         return false;
     }
 
-    char palette_path[512];
-    snprintf(palette_path, sizeof(palette_path), "%s/palette.dat", cfg->gallery0_dir);
-    if (!file_exists(palette_path)) {
+    if (!directory_contains_named_file_ignore_case(cfg->gallery0_dir, "palette.dat")) {
         if (verbose) set_status(cfg, "palette.dat was not found in the primary asset directory.");
         return false;
     }
@@ -591,6 +870,10 @@ void init_startup_config_from_cli(StartupConfig* cfg) {
 }
 
 bool prompt_for_startup_config(StartupConfig* cfg) {
+    if (g_argc >= 2 && validate_startup_config(cfg, true)) {
+        return apply_startup_config(cfg);
+    }
+
     while (!WindowShouldClose()) {
         BeginDrawing();
         ClearBackground(Color{18, 22, 30, 255});
@@ -1092,6 +1375,8 @@ void MainLoop() {
     globCam.tr.r = map->startrig;
     globCam.tr.d = map->startdow;
     globCam.tr.f = map->startfor;
+    globCam.cursect = map->startsectn;
+    updatesect_imp(globCam.tr.p.x, globCam.tr.p.y, globCam.tr.p.z, &globCam.cursect, map);
     SetTargetFPS(120);
 
     InitEditor(map, &globCam);
@@ -1280,6 +1565,13 @@ void MainLoop() {
 int main(int argc, char **argv) {
     g_argc = argc;
     g_argv = argv;
+    if (argv != nullptr && argv[0] != nullptr && argv[0][0]) {
+        std::error_code ec;
+        std::filesystem::path exe_dir = std::filesystem::absolute(argv[0], ec).parent_path();
+        if (!ec && !exe_dir.empty()) {
+            std::filesystem::current_path(exe_dir, ec);
+        }
+    }
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
     InitWindow(1024, 768, "Raylib + Lua + ImGui");
     SetExitKey(KEY_NULL);

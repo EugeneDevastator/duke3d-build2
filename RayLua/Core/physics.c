@@ -19,11 +19,11 @@ int raycast(point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, i
 	wall_t *wal, *wal2;
 	spri_t *spr;
 	float d, t, u, v, x, y, z, z0, z1, bestt;
-	long *gotsect;
+	uint32_t *gotsect;
 	int i, s, w, nw, bs, bw, passthru, *secfif, secfifw, secfifr;
 
-	i = (((map->numsects + 31) >> 5) << 2);
-	gotsect = (long *) _alloca(i);
+	i = ((map->numsects + 31) >> 5) * (int)sizeof(uint32_t);
+	gotsect = (uint32_t *) _alloca(i);
 	secfif = (int *) _alloca(map->numsects * sizeof(secfif[0]));
 	if ((unsigned) cursect >= (unsigned) map->numsects) {
 		memset(gotsect, -1, i);
@@ -32,7 +32,7 @@ int raycast(point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, i
 		secfifw = map->numsects;
 	} else {
 		memset(gotsect, 0, i);
-		gotsect[cursect >> 5] |= (1 << cursect);
+		gotsect[cursect >> 5] |= (1L << (cursect & 31));
 		secfif[0] = cursect;
 		secfifr = 0;
 		secfifw = 1;
@@ -110,10 +110,10 @@ int raycast(point3d *p0, point3d *pv, float vscale, int cursect, int *hitsect, i
 					islower = (z > getslopez(&sec[current_s], 0, x, y));
 					if (islower && (z < getslopez(&sec[current_s], 1, x, y))) {
 						if (!(wal[w].surf.flags & 32)) {
-							if (!(gotsect[current_s >> 5] & (1 << current_s))) {
+								if (!(gotsect[current_s >> 5] & (1U << (current_s & 31)))) {
 								secfif[secfifw] = current_s;
 								secfifw++;
-								gotsect[current_s >> 5] |= (1 << current_s);
+								gotsect[current_s >> 5] |= (1L << (current_s & 31));
 							}
 							passthru = 1 && !(scanflags & RHIT_REDWALLS);
 						}
@@ -216,11 +216,11 @@ int hitscan_b2 (point3d *p0, point3d *pv, point3d *viewright,point3d *viewdown, 
 	wall_t *wal, *wal2;
 	spri_t *spr;
 	float d, t, u, v, x, y, z, z0, z1, bestt;
-	long *gotsect;
+	uint32_t *gotsect;
 	int i, s, w, nw, bs, bw, passthru, *secfif, secfifw, secfifr;
 
-	i = (((map->numsects+31)>>5)<<2);
-	gotsect = (long *)_alloca(i);
+	i = ((map->numsects+31)>>5) * (int)sizeof(uint32_t);
+	gotsect = (uint32_t *)_alloca(i);
 	secfif = (int *)_alloca(map->numsects*sizeof(secfif[0]));
 	if ((unsigned)cursect >= (unsigned)map->numsects)
 	{
@@ -229,7 +229,7 @@ int hitscan_b2 (point3d *p0, point3d *pv, point3d *viewright,point3d *viewdown, 
 	}
 	else
 	{
-		memset(gotsect,0,i); gotsect[cursect>>5] |= (1<<cursect);
+		memset(gotsect,0,i); gotsect[cursect>>5] |= (1L << (cursect & 31));
 		secfif[0] = cursect; secfifr = 0; secfifw = 1;
 	}
 
@@ -297,8 +297,8 @@ int hitscan_b2 (point3d *p0, point3d *pv, point3d *viewright,point3d *viewdown, 
 						{
 							if (!(wal[w].surf.flags&32)) //If not a 1-way wall..
 							{
-								if (!(gotsect[bs>>5]&(1<<bs)))
-									{ secfif[secfifw] = bs; secfifw++; gotsect[bs>>5] |= (1<<bs); }
+								if (!(gotsect[bs>>5]&(1U << (bs & 31))))
+									{ secfif[secfifw] = bs; secfifw++; gotsect[bs>>5] |= (1L << (bs & 31)); }
 								passthru = 1;
 							}
 						}
@@ -465,15 +465,15 @@ double findmaxcr (dpoint3d *p0, int cursect, double mindist, dpoint3d *hit, maps
 	wall_t *wal, *wal2;
 	spri_t *spr;
 	double d, f, g, dist2, mindist2, mindist2andmaxfat;
-	long *gotsect;
+	uint32_t *gotsect;
 	int i, j, k, s, w, nw, bs, bw, vn, s0, s1, cf0, cf1, *secfif, secfifw, secfifr, hitit;
 
 	if ((unsigned)cursect >= (unsigned)map->numsects) return(mindist);
 
-	i = (((map->numsects+31)>>5)<<2);
-	gotsect = (long *)_alloca(i);
+	i = ((map->numsects+31)>>5) * (int)sizeof(uint32_t);
+	gotsect = (uint32_t *)_alloca(i);
 	memset(gotsect,0,i);
-	gotsect[cursect>>5] |= (1<<cursect);
+	gotsect[cursect>>5] |= (1L << (cursect & 31));
 
 	secfif = (int *)_alloca(map->numsects*sizeof(secfif[0]));
 	secfif[0] = cursect; secfifr = 0; secfifw = 1;
@@ -527,11 +527,11 @@ double findmaxcr (dpoint3d *p0, int cursect, double mindist, dpoint3d *hit, maps
 				pol[0].z = getslopez(&sec[s0],cf0,wal[ w].x,wal[ w].y);
 				pol[1].z = getslopez(&sec[s0],cf0,wal[nw].x,wal[nw].y);
 
-				if ((k) && (!(gotsect[s0>>5]&(1<<s0))))
+				if ((k) && (!(gotsect[s0>>5]&(1U << (s0 & 31)))))
 				{
 						//FIX:Should only test sectors > mindist2 for sprites...
 					if (ptpolydist2(p0,pol,4,&nhit) < mindist2andmaxfat)
-						{ secfif[secfifw] = s0; secfifw++; gotsect[s0>>5] |= (1<<s0); }
+						{ secfif[secfifw] = s0; secfifw++; gotsect[s0>>5] |= (1L << (s0 & 31)); }
 				}
 
 				pol[2].z = getslopez(&sec[s1],cf1,wal[nw].x,wal[nw].y);
@@ -772,15 +772,15 @@ double sphtracerec (dpoint3d *p0, dpoint3d *v0, dpoint3d *hit, int *cursect, dou
 	wall_t *wal, *wal2;
 	spri_t *spr;
 	double d, f, g, t, u, v, wx, wy, wz, nx, ny, nz, mint, Za, Zb, Zc;
-	long *gotsect;
+	uint32_t *gotsect;
 	int i, j, k, s, w, nw, bs, bw, vn, s0, s1, cf0, cf1, *secfif, secfifw, secfifr;
 
 	if ((unsigned)(*cursect) >= (unsigned)map->numsects) return(1.0);
 
-	i = (((map->numsects+31)>>5)<<2);
-	gotsect = (long *)_alloca(i);
+	i = ((map->numsects+31)>>5) * (int)sizeof(uint32_t);
+	gotsect = (uint32_t *)_alloca(i);
 	memset(gotsect,0,i);
-	gotsect[(*cursect)>>5] |= (1<<(*cursect));
+	gotsect[(*cursect)>>5] |= (1L << ((*cursect) & 31));
 
 	secfif = (int *)_alloca(map->numsects*sizeof(secfif[0]));
 	secfif[0] = (*cursect); secfifr = 0; secfifw = 1;
@@ -833,17 +833,17 @@ double sphtracerec (dpoint3d *p0, dpoint3d *v0, dpoint3d *hit, int *cursect, dou
 				if (k)
 				{
 					s0 = s1; cf0 = 1;
-					if (!(gotsect[s0>>5]&(1<<s0)))
+					if (!(gotsect[s0>>5]&(1U << (s0 & 31))))
 					{
 						d = distpoint2line2(p0->x,p0->y,wal[w].x,wal[w].y,wal[nw].x,wal[nw].y);
 						if ((d < cr*cr) || (sphtracewall(p0,v0,cr,s,w,s1,cf1,s0,cf0,&nhit, map) < mint))
-							{ secfif[secfifw] = s0; secfifw++; gotsect[s0>>5] |= (1<<s0); }
+							{ secfif[secfifw] = s0; secfifw++; gotsect[s0>>5] |= (1L << (s0 & 31)); }
 						else
 						{
 								//FIX:Should only test these sectors for sprites...
 							d = roundcylminpath2(p0->x,p0->y,p0->x+v0->x,p0->y+v0->y,wal[w].x,wal[w].y,wal[nw].x,wal[nw].y);
 							if (d < (build2.fattestsprite+cr)*(build2.fattestsprite+cr))
-								{ secfif[secfifw] = s0; secfifw++; gotsect[s0>>5] |= (1<<s0); }
+								{ secfif[secfifw] = s0; secfifw++; gotsect[s0>>5] |= (1L << (s0 & 31)); }
 						}
 					}
 				}
@@ -934,4 +934,3 @@ long sphtrace (dpoint3d *p0,  //start pt
  *point3d *viewright,point3d *viewdown
 those were previously player view vectors for facing sprites.
 */
-
