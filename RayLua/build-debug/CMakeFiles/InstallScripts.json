@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/jaba/Documentos/raygame/duke3d-build2-main/RayLua/build-debug/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

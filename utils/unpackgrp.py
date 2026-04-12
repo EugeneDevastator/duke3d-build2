@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 import struct
-import os
 import sys
 from pathlib import Path
 
 class GRPExtractor:
     def __init__(self):
         self.BLOCK_SIZE = 4096
+
+    def _decode_filename(self, raw_name, index):
+        # GRP entries use 12-byte names padded with NULs; some files contain
+        # garbage after the first NUL, so stop there before building a path.
+        filename = raw_name.split(b'\x00', 1)[0].decode('ascii', errors='ignore')
+        return filename or f"unnamed_{index}"
     
     def extract_grp(self, grp_file_path):
         grp_path = Path(grp_file_path)
@@ -43,15 +48,12 @@ class GRPExtractor:
                         print(f"Error: Unexpected end of file at entry {i}")
                         return False
                     
-                    filename = entry_data[:12].rstrip(b'\x00').decode('ascii', errors='ignore')
+                    filename = self._decode_filename(entry_data[:12], i)
                     file_size = struct.unpack('<I', entry_data[12:16])[0]
                     entries.append((filename, file_size))
                 
                 # Extract files
                 for i, (filename, file_size) in enumerate(entries):
-                    if not filename:
-                        filename = f"unnamed_{i}"
-                    
                     output_path = output_dir / filename
                     self._extract_file(f, output_path, file_size)
                     
@@ -72,14 +74,14 @@ class GRPExtractor:
                 chunk_size = min(self.BLOCK_SIZE, remaining)
                 data = input_file.read(chunk_size)
                 if not data:
-                    break
+                    raise EOFError(f"Unexpected end of GRP while extracting '{output_path.name}'")
                 output.write(data)
                 remaining -= len(data)
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: python grp_extractor.py <grp_file>")
-        print("Example: python grp_extractor.py game.grp")
+        print("Usage: python3 unpackgrp.py <grp_file>")
+        print("Example: python3 unpackgrp.py DUKE3D.GRP")
         sys.exit(1)
     
     extractor = GRPExtractor()

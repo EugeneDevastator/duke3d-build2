@@ -2,7 +2,7 @@
 ## Grp unpacker
 will unpack grp content into subfolder
 
-usage `python unpackgrp duke3d.grp`
+usage `python3 unpackgrp.py DUKE3D.GRP`
 
 you'll need original duke3d.grp from purchased version because its still under copyright law.
 
