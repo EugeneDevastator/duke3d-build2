@@ -239,6 +239,7 @@ public:
 
 	static void Init(const char *fullmappath) {
 		char rootpath[256];
+		portaln = 0;
 		uvShader_plain = LoadShader("Shaders/uv_vis_shader.vert", "Shaders/uv_vis_shader.frag");
 		LoadUVShader();
 		lightShader = LoadShader("Shaders/light.vert", "Shaders/light.frag");
@@ -360,6 +361,11 @@ public:
 					p.sect = i;
 					p.anchorspri = map->sect[i].headspri;
 
+					if (p.anchorspri < 0 || p.anchorspri >= map->numspris) {
+						printf("Warning: sector %d requested temp portal surface but has no anchor sprite\n", i);
+						continue;
+					}
+
 					//p.surfid = map->sect[i].surf[1].lotag; // hak to determine ceil or floor in map lotag1==floor.
 					int sid1 = abs(map->spri[p.anchorspri].p.z - map->sect[i].z[1]);
 					int sid2 = abs(map->spri[p.anchorspri].p.z - map->sect[i].z[0]);
@@ -388,6 +394,10 @@ public:
 			// portal post pass
 			uint32_t target_tag = portals[i].destpn; // currently stores expected hitag
 			portals[i].destpn = -1; // mark as unresolved
+			if (portals[i].anchorspri < 0 || portals[i].anchorspri >= map->numspris) {
+				printf("Warning: Portal %d has invalid anchor sprite %d\n", i, portals[i].anchorspri);
+				continue;
+			}
 			spri_t *spr = &map->spri[portals[i].anchorspri];
 			tr_normalize(&spr->tr);
 

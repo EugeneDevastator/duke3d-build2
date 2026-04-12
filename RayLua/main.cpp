@@ -875,6 +875,8 @@ bool prompt_for_startup_config(StartupConfig* cfg) {
     }
 
     while (!WindowShouldClose()) {
+        bool should_start = false;
+
         BeginDrawing();
         ClearBackground(Color{18, 22, 30, 255});
 
@@ -910,10 +912,7 @@ bool prompt_for_startup_config(StartupConfig* cfg) {
             ImGui::SameLine();
             if (ImGui::Button("Start RayGame")) {
                 if (apply_startup_config(cfg)) {
-                    rlImGuiEnd();
-                    ImGui::End();
-                    EndDrawing();
-                    return true;
+                    should_start = true;
                 }
             }
 
@@ -927,6 +926,10 @@ bool prompt_for_startup_config(StartupConfig* cfg) {
         ImGui::End();
         rlImGuiEnd();
         EndDrawing();
+
+        if (should_start) {
+            return true;
+        }
     }
 
     return false;
@@ -1391,6 +1394,7 @@ void MainLoop() {
     int w = GetScreenWidth();
     int h = GetScreenHeight();
     showPicker = false;
+    int debugViewMode = 0; // 0=final, 1=combined, 2=albedo, 3=light
     DisableCursor();
     while (!WindowShouldClose()) {
         if (IsKeyDown(KEY_LEFT_ALT) && IsKeyPressed(KEY_ENTER))
@@ -1483,30 +1487,44 @@ void MainLoop() {
         }
         EndCustomRenderTarget(); // END POSTPROC COMBINE
 
+        BeginCustomRenderTarget(finalTarget);
+        {
+            // LUT/post-process pass writes the frame that will be presented.
+            glClear(GL_COLOR_BUFFER_BIT);
+            glDisable(GL_DEPTH_TEST);
+
+            BeginShaderMode(lutShader);
+            SetShaderValueTexture(lutShader, lutTextureLocation, lutTexture);
+            DrawTextureRec({combinedTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R16G16B16A16},
+                           {0, 0, (float) w, (float) -h}, {0, 0}, WHITE);
+            EndShaderMode();
+        }
+        EndCustomRenderTarget();  // END OF LUT PASS.
 
         BeginDrawing();
         {
             // 2d ops and pp
             ClearBackground(BLACK);
 
-            // Draw final texture with proper Y-flip for OpenGL framebuffer
-            DrawTextureRec({finalTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8},
-                           {0, 0, (float) w, (float) -h}, {0, 0}, WHITE); // Keep the -h for Y-flip
-
-            // Also fix the LUT pass:
-            BeginCustomRenderTarget(finalTarget);
-            {
-                // LUT, POSTPROCESSINg
-                glClear(GL_COLOR_BUFFER_BIT);
-                glDisable(GL_DEPTH_TEST);
-
-                BeginShaderMode(lutShader);
-                SetShaderValueTexture(lutShader, lutTextureLocation, lutTexture);
-                DrawTextureRec({combinedTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R16G16B16A16},
-                               {0, 0, (float) w, (float) -h}, {0, 0}, WHITE); // Keep Y-flip here too
-                EndShaderMode();
+            if (IsKeyPressed(KEY_F6)) {
+                debugViewMode = (debugViewMode + 1) % 4;
             }
-            EndCustomRenderTarget();  // END OF LUT PASS.
+
+            Texture2D presentTexture = {finalTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R16G16B16A16};
+            if (debugViewMode == 1) {
+                presentTexture = {combinedTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R16G16B16A16};
+            } else if (debugViewMode == 2) {
+                presentTexture = {albedoTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R16G16B16A16};
+            } else if (debugViewMode == 3) {
+                presentTexture = {lightTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R16G16B16A16};
+            }
+
+            DrawTextureRec(presentTexture, {0, 0, (float) w, (float) -h}, {0, 0}, WHITE);
+            if (debugViewMode == 0) DrawText("F6: final", 10, 30, 20, WHITE);
+            if (debugViewMode == 1) DrawText("F6: combined", 10, 30, 20, YELLOW);
+            if (debugViewMode == 2) DrawText("F6: albedo", 10, 30, 20, ORANGE);
+            if (debugViewMode == 3) DrawText("F6: light", 10, 30, 20, GREEN);
+
             if (IsKeyPressed(KEY_ESCAPE))
                 DisableCursor();
 
