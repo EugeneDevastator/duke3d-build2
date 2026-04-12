@@ -83,9 +83,12 @@ static int numFloorMeshes = 0;
 static Texture2D *runtimeTextures;
 static mapstate_t *map;
 static long numartiles, gmaltiles_i, gtilehashead_i[1024];
+// These flags were re-enabled during debugging because the scene was effectively
+// rendering as empty/black with walls and ceilings turned off.
 static bool drawWalls = true;
 static bool drawSpris = true;
 static bool drawCeils = true;
+// Temporary geometry visibility fallback while the real material path is still unstable.
 static bool useDebugTextureFallback = true;
 static Texture2D debugCheckerTexture = {0};
 player_transform plr = {};
@@ -241,8 +244,11 @@ public:
 
 	static void Init(const char *fullmappath) {
 		char rootpath[256];
+		// Reset portal state on each load so simple test maps do not inherit stale data.
 		portaln = 0;
 		if (!IsTextureValid(debugCheckerTexture)) {
+			// Runtime checkerboard used to verify that geometry is present even when
+			// tile/material sampling is still broken.
 			Image checker = GenImageChecked(64, 64, 8, 8, MAGENTA, BLACK);
 			debugCheckerTexture = LoadTextureFromImage(checker);
 			UnloadImage(checker);
@@ -1370,7 +1376,8 @@ static void MoveCamB2( cam_t *b2cam) {
 		rlDrawRenderBatchActive();
 		rlDisableBackfaceCulling();
 
-		// Draw floors and ceilings with slopes
+		// Draw floors and ceilings with slopes. This path had been effectively disabled
+		// during debugging, which made large parts of the map disappear.
 		for (int s = 0; s < map->numsects; s++) {
 			for (int isFloor = 0; isFloor < 2; isFloor++) {
 				int meshIdx = s * 2 + isFloor;
@@ -1442,6 +1449,7 @@ static void MoveCamB2( cam_t *b2cam) {
 					if (wall->ns == -1 || wall->ns >= map->malsects) {
 						// Solid wall - draw full wall
 						if (texIndex >= 0 && texIndex < get_gnumtiles()) {
+							// Debug fallback makes wall quads visible even when the real art path is black.
 							Texture2D wallTex = useDebugTextureFallback ? debugCheckerTexture : runtimeTextures[texIndex];
 							rlSetTexture(wallTex.id);
 							rlBegin(RL_QUADS);
@@ -1481,6 +1489,7 @@ static void MoveCamB2( cam_t *b2cam) {
 							Vector3 bottom_right = {nextwall->x, nextTopRightZ, nextwall->y};
 
 							if (hitile >= 0 && hitile < get_gnumtiles()) {
+								// Portal upper section uses the same fallback so split walls remain readable.
 								Texture2D upperTex = useDebugTextureFallback ? debugCheckerTexture : runtimeTextures[hitile];
 								rlSetTexture(upperTex.id);
 								rlBegin(RL_QUADS);
@@ -1505,6 +1514,7 @@ static void MoveCamB2( cam_t *b2cam) {
 							Vector3 thisTopRight = {nextwall->x, nextBottomRightZ, nextwall->y};
 
 							if (lowtile >= 0 && lowtile < get_gnumtiles()) {
+								// Portal lower section uses the same fallback so split walls remain readable.
 								Texture2D lowerTex = useDebugTextureFallback ? debugCheckerTexture : runtimeTextures[lowtile];
 
 								rlSetTexture(lowerTex.id);

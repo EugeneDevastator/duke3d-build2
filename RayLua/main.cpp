@@ -454,6 +454,8 @@ typedef struct {
 Shader lutShader = {0};
 Texture2D lutTexture = {0};
 float lutIntensity = 1.0f;
+// Main presentation target migrated from the legacy manual FBO path to raylib's
+// RenderTexture2D workflow so we can debug the pipeline with standard API behavior.
 RenderTexture2D finalTarget = {0};
 ImGuiViewport* viewport;
 cam_t globCam={0};
@@ -1174,6 +1176,7 @@ void CleanupLUTSystem() {
     UnloadRenderTexture(finalTarget);
 }
 
+// Debug capture helper used by F7 and the on-screen debug panel.
 static void SaveDebugTexture(Texture2D texture, const char* path) {
     Image image = LoadImageFromTexture(texture);
     ImageFlipVertical(&image);
@@ -1204,6 +1207,8 @@ typedef struct DebugImageState {
     bool chartLoaded;
 } DebugImageState;
 
+// Lightweight raylib-only image diagnostics used to confirm that the final
+// presentation path still works even when the map renderer is suspect.
 static DebugImageState LoadDebugImages() {
     DebugImageState state = {};
 
@@ -1256,6 +1261,7 @@ static const char* GetDebugImageModeLabel(int mode) {
     }
 }
 
+// Small persistent overlay so we can tell which debug buffer/image mode is active.
 static void DrawDebugStatusOverlay(int debugViewMode, int debugImageMode) {
     DrawRectangle(8, 8, 320, 132, Fade(BLACK, 0.72f));
     DrawText("RayGame Debug Status", 18, 16, 24, WHITE);
@@ -1448,6 +1454,7 @@ sort them together as walls, or just by poss.
 
 */
 Camera3D rlcam;
+// Resize path for the raylib render targets that replaced the older custom FBO setup.
 void RecreateRenderTargets(RenderTexture2D* albedo, RenderTexture2D* light, RenderTexture2D* combined, RenderTexture2D* final) {
     int w = GetScreenWidth();
     int h = GetScreenHeight();
@@ -1488,6 +1495,8 @@ void MainLoop() {
     // Initialize LUT system
     InitLUTSystem();
 
+    // These pass targets are part of the current raylib-native debugable pipeline:
+    // albedo -> light -> combined -> final.
     RenderTexture2D albedoTarget = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
     RenderTexture2D lightTarget = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
     RenderTexture2D combinedTarget = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
@@ -1529,6 +1538,7 @@ void MainLoop() {
         EditorUpdate();
 #endif
         // Render albedo pass
+        // Geometry/color pass.
         BeginTextureMode(albedoTarget);
         {
             // Albedo Geometry
@@ -1549,6 +1559,7 @@ void MainLoop() {
         }
         EndTextureMode(); //END ALBEDO
 
+        // Light accumulation pass.
         BeginTextureMode(lightTarget);
         {
             // Render light pass (HDR accumulation)
@@ -1562,6 +1573,7 @@ void MainLoop() {
         EndTextureMode(); // END LIGHT
 
 
+        // Lighting combine pass.
         BeginTextureMode(combinedTarget);
         {
             // combine Lights wit albedo
@@ -1578,6 +1590,7 @@ void MainLoop() {
         }
         EndTextureMode(); // END POSTPROC COMBINE
 
+        // Final LUT/post-process pass that is presented to the window.
         BeginTextureMode(finalTarget);
         {
             // LUT/post-process pass writes the frame that will be presented.
@@ -1596,6 +1609,8 @@ void MainLoop() {
             // 2d ops and pp
             ClearBackground(BLACK);
 
+            // F6/F7/F8 are the persistent diagnostics we kept after removing the
+            // noisier experimental debug modes.
             if (IsKeyPressed(KEY_F6)) {
                 debugViewMode = (debugViewMode + 1) % 4;
             }
