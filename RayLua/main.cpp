@@ -454,7 +454,7 @@ typedef struct {
 Shader lutShader = {0};
 Texture2D lutTexture = {0};
 float lutIntensity = 1.0f;
-CustomRenderTarget finalTarget = {0};
+RenderTexture2D finalTarget = {0};
 ImGuiViewport* viewport;
 cam_t globCam={0};
 
@@ -1164,14 +1164,119 @@ void InitLUTSystem() {
     SetShaderValueTexture(lutShader, lutTextureLocation, lutTexture);
 
     // Create final render target for post-processing
-    finalTarget = CreateCustomRenderTarget(GetScreenWidth(), GetScreenHeight(), 0);
+    finalTarget = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
 }
 
 // Add this function to cleanup LUT resources
 void CleanupLUTSystem() {
     UnloadShader(lutShader);
     UnloadTexture(lutTexture);
-    UnloadCustomRenderTarget(finalTarget);
+    UnloadRenderTexture(finalTarget);
+}
+
+static void SaveDebugTexture(Texture2D texture, const char* path) {
+    Image image = LoadImageFromTexture(texture);
+    ImageFlipVertical(&image);
+    ExportImage(image, path);
+    UnloadImage(image);
+}
+
+static std::filesystem::path FindDebugAssetPath(const char* filename) {
+    const std::filesystem::path candidates[] = {
+        std::filesystem::current_path() / ".." / ".." / "debug_assets" / filename,
+        std::filesystem::current_path() / ".." / "debug_assets" / filename,
+        std::filesystem::current_path() / "debug_assets" / filename
+    };
+
+    std::error_code ec;
+    for (const std::filesystem::path& candidate : candidates) {
+        if (std::filesystem::exists(candidate, ec)) {
+            return std::filesystem::weakly_canonical(candidate, ec);
+        }
+    }
+    return {};
+}
+
+typedef struct DebugImageState {
+    Texture2D checker;
+    Texture2D chart;
+    bool checkerLoaded;
+    bool chartLoaded;
+} DebugImageState;
+
+static DebugImageState LoadDebugImages() {
+    DebugImageState state = {};
+
+    std::filesystem::path checkerPath = FindDebugAssetPath("checkerboard_16.png");
+    if (!checkerPath.empty()) {
+        state.checker = LoadTexture(checkerPath.string().c_str());
+        state.checkerLoaded = IsTextureValid(state.checker);
+    }
+
+    std::filesystem::path chartPath = FindDebugAssetPath("rgb12_chart.png");
+    if (!chartPath.empty()) {
+        state.chart = LoadTexture(chartPath.string().c_str());
+        state.chartLoaded = IsTextureValid(state.chart);
+    }
+
+    return state;
+}
+
+static void UnloadDebugImages(DebugImageState* state) {
+    if (state->checkerLoaded) UnloadTexture(state->checker);
+    if (state->chartLoaded) UnloadTexture(state->chart);
+    *state = {};
+}
+
+static void DrawDiagnosticImage(Texture2D texture, const char* label, int screenW, int screenH) {
+    Rectangle src = {0, 0, (float)texture.width, (float)texture.height};
+    Rectangle dst = {0, 0, (float)screenW, (float)screenH};
+    DrawTexturePro(texture, src, dst, {0, 0}, 0.0f, WHITE);
+    DrawRectangle(0, 0, 420, 84, Fade(BLACK, 0.65f));
+    DrawText("F8: raylib texture diagnostic", 10, 10, 24, WHITE);
+    DrawText(label, 10, 40, 22, YELLOW);
+}
+
+static const char* GetDebugViewModeLabel(int mode) {
+    switch (mode) {
+        case 0: return "final";
+        case 1: return "combined";
+        case 2: return "albedo";
+        case 3: return "light";
+        default: return "unknown";
+    }
+}
+
+static const char* GetDebugImageModeLabel(int mode) {
+    switch (mode) {
+        case 0: return "off";
+        case 1: return "checkerboard";
+        case 2: return "rgb chart";
+        default: return "unknown";
+    }
+}
+
+static void DrawDebugStatusOverlay(int debugViewMode, int debugImageMode) {
+    DrawRectangle(8, 8, 320, 132, Fade(BLACK, 0.72f));
+    DrawText("RayGame Debug Status", 18, 16, 24, WHITE);
+    DrawText(TextFormat("F6 buffer: %s", GetDebugViewModeLabel(debugViewMode)), 18, 48, 20, YELLOW);
+    DrawText(TextFormat("F8 image: %s", GetDebugImageModeLabel(debugImageMode)), 18, 74, 20, SKYBLUE);
+    DrawText("F7 saves debug PNGs", 18, 100, 20, WHITE);
+}
+
+static void SaveDebugRenderTargets(const RenderTexture2D* finalTargetRef,
+                                   const RenderTexture2D* combinedTargetRef,
+                                   const RenderTexture2D* albedoTargetRef,
+                                   const RenderTexture2D* lightTargetRef,
+                                   int width, int height) {
+    std::filesystem::path out_dir = std::filesystem::current_path() / "debug_captures";
+    std::error_code ec;
+    std::filesystem::create_directories(out_dir, ec);
+
+    SaveDebugTexture(finalTargetRef->texture, (out_dir / "final.png").string().c_str());
+    SaveDebugTexture(combinedTargetRef->texture, (out_dir / "combined.png").string().c_str());
+    SaveDebugTexture(albedoTargetRef->texture, (out_dir / "albedo.png").string().c_str());
+    SaveDebugTexture(lightTargetRef->texture, (out_dir / "light.png").string().c_str());
 }
 
 void DrawInfoUI() {
@@ -1343,22 +1448,19 @@ sort them together as walls, or just by poss.
 
 */
 Camera3D rlcam;
-void RecreateRenderTargets(CustomRenderTarget* albedo, CustomRenderTarget* light, CustomRenderTarget* combined, CustomRenderTarget* final) {
+void RecreateRenderTargets(RenderTexture2D* albedo, RenderTexture2D* light, RenderTexture2D* combined, RenderTexture2D* final) {
     int w = GetScreenWidth();
     int h = GetScreenHeight();
 
-    // Cleanup old targets
-    glDeleteTextures(1, &albedo->depthTexture);
-    UnloadCustomRenderTarget(*albedo);
-    UnloadCustomRenderTarget(*light);
-    UnloadCustomRenderTarget(*combined);
-    UnloadCustomRenderTarget(*final);
+    UnloadRenderTexture(*albedo);
+    UnloadRenderTexture(*light);
+    UnloadRenderTexture(*combined);
+    UnloadRenderTexture(*final);
 
-    // Create new targets with current screen size
-    *albedo = CreateCustomRenderTarget(w, h, 0);
-    *light = CreateCustomRenderTarget(w, h, albedo->depthTexture);
-    *combined = CreateCustomRenderTarget(w, h, 0);
-    *final = CreateCustomRenderTarget(w, h, 0);
+    *albedo = LoadRenderTexture(w, h);
+    *light = LoadRenderTexture(w, h);
+    *combined = LoadRenderTexture(w, h);
+    *final = LoadRenderTexture(w, h);
 }
 // Draw palette and texture preview on screen
 void MainLoop() {
@@ -1386,15 +1488,15 @@ void MainLoop() {
     // Initialize LUT system
     InitLUTSystem();
 
-    // Create render targets with shared depth
-    CustomRenderTarget albedoTarget = CreateCustomRenderTarget(GetScreenWidth(), GetScreenHeight(), 0);
-    CustomRenderTarget lightTarget = CreateCustomRenderTarget(GetScreenWidth(), GetScreenHeight(),
-                                                              albedoTarget.depthTexture);
-    CustomRenderTarget combinedTarget = CreateCustomRenderTarget(GetScreenWidth(), GetScreenHeight(), 0);
+    RenderTexture2D albedoTarget = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
+    RenderTexture2D lightTarget = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
+    RenderTexture2D combinedTarget = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
     int w = GetScreenWidth();
     int h = GetScreenHeight();
     showPicker = false;
     int debugViewMode = 0; // 0=final, 1=combined, 2=albedo, 3=light
+    int debugImageMode = 0; // 0=off, 1=checker, 2=chart
+    DebugImageState debugImages = LoadDebugImages();
     DisableCursor();
     while (!WindowShouldClose()) {
         if (IsKeyDown(KEY_LEFT_ALT) && IsKeyPressed(KEY_ENTER))
@@ -1421,16 +1523,15 @@ void MainLoop() {
             h = currentH;
             RecreateRenderTargets(&albedoTarget, &lightTarget, &combinedTarget, &finalTarget);
         }
+
 #if !IS_DUKE_INCLUDED
         Editor_DoRaycasts(&globCam);
         EditorUpdate();
 #endif
         // Render albedo pass
-        BeginCustomRenderTarget(albedoTarget);
+        BeginTextureMode(albedoTarget);
         {
             // Albedo Geometry
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            glEnable(GL_DEPTH_TEST);
             ClearBackground(BLACK);
             //if (!showPicker) DumbCore::Update(deltaTime);
 
@@ -1446,60 +1547,49 @@ void MainLoop() {
             DrawGizmos();
             EndMode3D();
         }
-        EndCustomRenderTarget(); //END ALBEDO
+        EndTextureMode(); //END ALBEDO
 
-        BeginCustomRenderTarget(lightTarget);
+        BeginTextureMode(lightTarget);
         {
             // Render light pass (HDR accumulation)
-            glClearColor(0.0f, 0.0f, 0.0f, 0.0f); // Clear to black for light accumulation
-            glClear(GL_COLOR_BUFFER_BIT);
-            glEnable(GL_DEPTH_TEST);
-            glDepthMask(GL_FALSE);
+            ClearBackground(BLACK);
 
             // Enable additive blending for light accumulation
-            glEnable(GL_BLEND);
-            glBlendFunc(GL_ONE, GL_ONE);
-
+            rlSetBlendFactors(GL_ONE, GL_ONE, GL_FUNC_ADD);
             DumbRender::DrawLightsPost3d(w, h,rlcam);
-
-            glDisable(GL_BLEND);
-            glDepthMask(GL_TRUE);
+            rlSetBlendMode(BLEND_ALPHA);
         }
-        EndCustomRenderTarget(); // END LIGHT
+        EndTextureMode(); // END LIGHT
 
 
-        BeginCustomRenderTarget(combinedTarget);
+        BeginTextureMode(combinedTarget);
         {
             // combine Lights wit albedo
-            glClear(GL_COLOR_BUFFER_BIT);
-            glDisable(GL_DEPTH_TEST);
+            ClearBackground(BLACK);
 
             BeginShaderMode(multiplyShader);
-            SetShaderValueTexture(multiplyShader, GetShaderLocation(multiplyShader, "albedoTexture"),
-                                  {albedoTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R16G16B16A16});
-            SetShaderValueTexture(multiplyShader, GetShaderLocation(multiplyShader, "lightTexture"),
-                                  {lightTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R16G16B16A16});
+            SetShaderValueTexture(multiplyShader, albedoLocation, albedoTarget.texture);
+            SetShaderValueTexture(multiplyShader, lightLocation, lightTarget.texture);
 
             // Use DrawTextureRec instead of DrawRectangle for proper UV mapping
-            DrawTextureRec({albedoTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R16G16B16A16},
+            DrawTextureRec(albedoTarget.texture,
                            {0, 0, (float) w, (float) -h}, {0, 0}, WHITE);
             EndShaderMode();
         }
-        EndCustomRenderTarget(); // END POSTPROC COMBINE
+        EndTextureMode(); // END POSTPROC COMBINE
 
-        BeginCustomRenderTarget(finalTarget);
+        BeginTextureMode(finalTarget);
         {
             // LUT/post-process pass writes the frame that will be presented.
-            glClear(GL_COLOR_BUFFER_BIT);
-            glDisable(GL_DEPTH_TEST);
+            ClearBackground(BLACK);
 
             BeginShaderMode(lutShader);
             SetShaderValueTexture(lutShader, lutTextureLocation, lutTexture);
-            DrawTextureRec({combinedTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R16G16B16A16},
+            DrawTextureRec(combinedTarget.texture,
                            {0, 0, (float) w, (float) -h}, {0, 0}, WHITE);
             EndShaderMode();
         }
-        EndCustomRenderTarget();  // END OF LUT PASS.
+        EndTextureMode();  // END OF LUT PASS.
 
         BeginDrawing();
         {
@@ -1509,24 +1599,34 @@ void MainLoop() {
             if (IsKeyPressed(KEY_F6)) {
                 debugViewMode = (debugViewMode + 1) % 4;
             }
+            if (IsKeyPressed(KEY_F8)) {
+                debugImageMode = (debugImageMode + 1) % 3;
+            }
 
-            Texture2D presentTexture = {finalTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R16G16B16A16};
+            Texture2D presentTexture = finalTarget.texture;
             if (debugViewMode == 1) {
-                presentTexture = {combinedTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R16G16B16A16};
+                presentTexture = combinedTarget.texture;
             } else if (debugViewMode == 2) {
-                presentTexture = {albedoTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R16G16B16A16};
+                presentTexture = albedoTarget.texture;
             } else if (debugViewMode == 3) {
-                presentTexture = {lightTarget.colorTexture, w, h, 1, PIXELFORMAT_UNCOMPRESSED_R16G16B16A16};
+                presentTexture = lightTarget.texture;
             }
 
             DrawTextureRec(presentTexture, {0, 0, (float) w, (float) -h}, {0, 0}, WHITE);
-            if (debugViewMode == 0) DrawText("F6: final", 10, 30, 20, WHITE);
-            if (debugViewMode == 1) DrawText("F6: combined", 10, 30, 20, YELLOW);
-            if (debugViewMode == 2) DrawText("F6: albedo", 10, 30, 20, ORANGE);
-            if (debugViewMode == 3) DrawText("F6: light", 10, 30, 20, GREEN);
+            if (debugImageMode == 1 && debugImages.checkerLoaded) {
+                DrawDiagnosticImage(debugImages.checker, "checkerboard_16.png", w, h);
+            } else if (debugImageMode == 2 && debugImages.chartLoaded) {
+                DrawDiagnosticImage(debugImages.chart, "rgb12_chart.png", w, h);
+            }
+            DrawDebugStatusOverlay(debugViewMode, debugImageMode);
 
             if (IsKeyPressed(KEY_ESCAPE))
                 DisableCursor();
+
+            if (IsKeyPressed(KEY_F7)) {
+                SaveDebugRenderTargets(&finalTarget, &combinedTarget, &albedoTarget, &lightTarget, w, h);
+                EditorHudDrawTopInfo("Saved debug_captures/*.png");
+            }
 
 #if !IS_DUKE_INCLUDED
             {
@@ -1544,6 +1644,21 @@ void MainLoop() {
                 rlImGuiBegin();
                 DrawInfoUI();
                 DrawInfoMessage();
+                ImGui::SetNextWindowPos(ImVec2(12, 150), ImGuiCond_Always);
+                ImGui::SetNextWindowBgAlpha(0.72f);
+                ImGuiWindowFlags debug_flags = ImGuiWindowFlags_NoResize |
+                                              ImGuiWindowFlags_NoMove |
+                                              ImGuiWindowFlags_NoTitleBar |
+                                              ImGuiWindowFlags_AlwaysAutoResize;
+                if (ImGui::Begin("##debug_controls", nullptr, debug_flags)) {
+                    ImGui::Text("Buffer: %s", GetDebugViewModeLabel(debugViewMode));
+                    ImGui::Text("Image: %s", GetDebugImageModeLabel(debugImageMode));
+                    if (ImGui::Button("Save Debug PNGs (F7)")) {
+                        SaveDebugRenderTargets(&finalTarget, &combinedTarget, &albedoTarget, &lightTarget, w, h);
+                        EditorHudDrawTopInfo("Saved debug_captures/*.png");
+                    }
+                }
+                ImGui::End();
                 if (showPicker) {
                     DrawPicker();
                     SetColorum(currentColor.r, currentColor.g, currentColor.b, currentColor.luminance);
@@ -1572,10 +1687,10 @@ void MainLoop() {
     }
 
     // Cleanup
-    glDeleteTextures(1, &albedoTarget.depthTexture);
-    UnloadCustomRenderTarget(albedoTarget);
-    UnloadCustomRenderTarget(lightTarget);
-    UnloadCustomRenderTarget(combinedTarget);
+    UnloadRenderTexture(albedoTarget);
+    UnloadRenderTexture(lightTarget);
+    UnloadRenderTexture(combinedTarget);
+    UnloadDebugImages(&debugImages);
     CleanupLUTSystem();
     DumbRender::CleanupMapstateTex();
 }

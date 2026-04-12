@@ -83,9 +83,11 @@ static int numFloorMeshes = 0;
 static Texture2D *runtimeTextures;
 static mapstate_t *map;
 static long numartiles, gmaltiles_i, gtilehashead_i[1024];
-static bool drawWalls = false;
+static bool drawWalls = true;
 static bool drawSpris = true;
-static bool drawCeils = false;
+static bool drawCeils = true;
+static bool useDebugTextureFallback = true;
+static Texture2D debugCheckerTexture = {0};
 player_transform plr = {};
 static Shader uvShader_plain;
 static UVShaderDesc uvShaderDesc;
@@ -240,6 +242,11 @@ public:
 	static void Init(const char *fullmappath) {
 		char rootpath[256];
 		portaln = 0;
+		if (!IsTextureValid(debugCheckerTexture)) {
+			Image checker = GenImageChecked(64, 64, 8, 8, MAGENTA, BLACK);
+			debugCheckerTexture = LoadTextureFromImage(checker);
+			UnloadImage(checker);
+		}
 		uvShader_plain = LoadShader("Shaders/uv_vis_shader.vert", "Shaders/uv_vis_shader.frag");
 		LoadUVShader();
 		lightShader = LoadShader("Shaders/light.vert", "Shaders/light.frag");
@@ -1364,13 +1371,13 @@ static void MoveCamB2( cam_t *b2cam) {
 		rlDisableBackfaceCulling();
 
 		// Draw floors and ceilings with slopes
-		if (false)
 		for (int s = 0; s < map->numsects; s++) {
 			for (int isFloor = 0; isFloor < 2; isFloor++) {
 				int meshIdx = s * 2 + isFloor;
 				FloorMeshData *meshData = &floorMeshes[meshIdx];
 
 				if (meshData->isValid) {
+					if (!drawCeils && isFloor == 0) continue;
 					const Texture2D tex = runtimeTextures[meshData->textureIndex];
 
 
@@ -1435,21 +1442,18 @@ static void MoveCamB2( cam_t *b2cam) {
 					if (wall->ns == -1 || wall->ns >= map->malsects) {
 						// Solid wall - draw full wall
 						if (texIndex >= 0 && texIndex < get_gnumtiles()) {
-							float dy = topLeftZ - bottomLeftZ; // Use actual height difference
-
-							Texture2D wallTex = runtimeTextures[texIndex];
+							Texture2D wallTex = useDebugTextureFallback ? debugCheckerTexture : runtimeTextures[texIndex];
 							rlSetTexture(wallTex.id);
 							rlBegin(RL_QUADS);
 							rlColor4ub(255, 255, 255, 255);
-
-							//rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y * dy);
-							//rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
-							//rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 1.0f * wall->surf.uv[2].y * dy);
-							//rlVertex3f(bottomRight.x, bottomRight.y, bottomRight.z);
-							//rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 0.0f);
-							//rlVertex3f(topRight.x, topRight.y, topRight.z);
-							//rlTexCoord2f(0.0f, 0.0f);
-							//rlVertex3f(topLeft.x, topLeft.y, topLeft.z);
+							rlTexCoord2f(0.0f, 1.0f);
+							rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
+							rlTexCoord2f(dx * 0.25f, 1.0f);
+							rlVertex3f(bottomRight.x, bottomRight.y, bottomRight.z);
+							rlTexCoord2f(dx * 0.25f, 0.0f);
+							rlVertex3f(topRight.x, topRight.y, topRight.z);
+							rlTexCoord2f(0.0f, 0.0f);
+							rlVertex3f(topLeft.x, topLeft.y, topLeft.z);
 
 							rlEnd();
 							rlSetTexture(0);
@@ -1477,24 +1481,17 @@ static void MoveCamB2( cam_t *b2cam) {
 							Vector3 bottom_right = {nextwall->x, nextTopRightZ, nextwall->y};
 
 							if (hitile >= 0 && hitile < get_gnumtiles()) {
-								float upperDy = topLeftZ - nextTopLeftZ; // affects other paart
-								float selfDy = topLeftZ - topRightZ; // affects upper part
-								float dh = nextTopLeftZ - nextTopRightZ;
-								Texture2D upperTex = runtimeTextures[hitile];
+								Texture2D upperTex = useDebugTextureFallback ? debugCheckerTexture : runtimeTextures[hitile];
 								rlSetTexture(upperTex.id);
 								rlBegin(RL_QUADS);
 								rlColor4ub(255, 255, 255, 255);
-
-							//rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y * (upperDy + selfDy));
-							//rlVertex3f(bottom_left.x, bottom_left.y, bottom_left.z);
-
-							//rlTexCoord2f(wall->surf.uv[1].x * dx, wall->surf.uv[2].y * (upperDy + dh));
-							//rlVertex3f(bottom_right.x, bottom_right.y, bottom_right.z);
-
-							//rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 0.0f);
-							//rlVertex3f(topRight.x, topRight.y, topRight.z);
-
-								rlTexCoord2f(0.0f, 0.0);
+								rlTexCoord2f(0.0f, 1.0f);
+								rlVertex3f(bottom_left.x, bottom_left.y, bottom_left.z);
+								rlTexCoord2f(dx * 0.25f, 1.0f);
+								rlVertex3f(bottom_right.x, bottom_right.y, bottom_right.z);
+								rlTexCoord2f(dx * 0.25f, 0.0f);
+								rlVertex3f(topRight.x, topRight.y, topRight.z);
+								rlTexCoord2f(0.0f, 0.0f);
 								rlVertex3f(topLeft.x, topLeft.y, topLeft.z);
 								rlEnd();
 								rlSetTexture(0);
@@ -1508,26 +1505,19 @@ static void MoveCamB2( cam_t *b2cam) {
 							Vector3 thisTopRight = {nextwall->x, nextBottomRightZ, nextwall->y};
 
 							if (lowtile >= 0 && lowtile < get_gnumtiles()) {
-								float largeDy = bottomLeftZ - nextBottomLeftZ; // affects other paart
-								float selfDy = bottomLeftZ - bottomRightZ; // affects upper part
-								float dh = nextBottomLeftZ - nextBottomRightZ;
-								Texture2D lowerTex = runtimeTextures[lowtile];
+								Texture2D lowerTex = useDebugTextureFallback ? debugCheckerTexture : runtimeTextures[lowtile];
 
 								rlSetTexture(lowerTex.id);
 								rlBegin(RL_QUADS);
 
 								rlColor4ub(255, 255, 255, 255);
-								// CW starting from upper left
-								//rlTexCoord2f(0.0f, 1.0f * wall->surf.uv[2].y * (largeDy + selfDy));
+								rlTexCoord2f(0.0f, 0.0f);
 								rlVertex3f(thisTopLeft.x, thisTopLeft.y, thisTopLeft.z);
-
-								//rlTexCoord2f(wall->surf.uv[1].x * dx, wall->surf.uv[2].y * (largeDy + dh));
+								rlTexCoord2f(dx * 0.25f, 0.0f);
 								rlVertex3f(thisTopRight.x, thisTopRight.y, thisTopRight.z);
-
-								//rlTexCoord2f(1.0f * wall->surf.uv[1].x * dx, 0.0f);
+								rlTexCoord2f(dx * 0.25f, 1.0f);
 								rlVertex3f(bottomRight.x, bottomRight.y, bottomRight.z);
-
-								//rlTexCoord2f(0.0f, 0.0);
+								rlTexCoord2f(0.0f, 1.0f);
 								rlVertex3f(bottomLeft.x, bottomLeft.y, bottomLeft.z);
 								rlEnd();
 								rlSetTexture(0);
