@@ -91,6 +91,8 @@ static bool drawCeils = true;
 // Temporary geometry visibility fallback while the real material path is still unstable.
 static bool useDebugTextureFallback = true;
 static Texture2D debugCheckerTexture = {0};
+static Texture2D debugProjectTextures[8] = {0};
+static int debugProjectTextureCount = 0;
 player_transform plr = {};
 static Shader uvShader_plain;
 static UVShaderDesc uvShaderDesc;
@@ -109,6 +111,54 @@ static int validsec  =0;
 static Texture2D* galtextures[16];
 class DumbRender {
 public:
+	static Texture2D GetDebugFallbackTexture(int selector) {
+		if (debugProjectTextureCount > 0) {
+			int idx = selector % debugProjectTextureCount;
+			if (idx < 0) idx += debugProjectTextureCount;
+			if (IsTextureValid(debugProjectTextures[idx])) return debugProjectTextures[idx];
+		}
+		return debugCheckerTexture;
+	}
+
+	static void LoadProjectDebugTextures() {
+		static const char *filenames[] = {
+			"tiles_plain.jpg",
+			"brick49.jpg",
+			"concrete_floor.jpg",
+			"wood.png",
+			"greycarpet.png",
+			"0196_0298sidewalk.jpg",
+			"concrete_rough.jpg",
+			"0640_plates.jpg"
+		};
+
+		static const char *prefixes[] = {
+			"../../tex/",
+			"../tex/",
+			"tex/"
+		};
+
+		debugProjectTextureCount = 0;
+		for (int i = 0; i < 8; i++) {
+			debugProjectTextures[i] = {0};
+		}
+
+		for (const char *filename: filenames) {
+			char candidate[512];
+			bool loaded = false;
+			for (const char *prefix: prefixes) {
+				snprintf(candidate, sizeof(candidate), "%s%s", prefix, filename);
+				if (!FileExists(candidate)) continue;
+				Texture2D tex = LoadTexture(candidate);
+				if (!IsTextureValid(tex)) continue;
+				debugProjectTextures[debugProjectTextureCount++] = tex;
+				loaded = true;
+				break;
+			}
+			if (debugProjectTextureCount >= 8) break;
+			(void)loaded;
+		}
+	}
 
 	// ===================== HELPERS
 	// tries to align to camera vertical plane
@@ -253,6 +303,7 @@ public:
 			debugCheckerTexture = LoadTextureFromImage(checker);
 			UnloadImage(checker);
 		}
+		LoadProjectDebugTextures();
 		uvShader_plain = LoadShader("Shaders/uv_vis_shader.vert", "Shaders/uv_vis_shader.frag");
 		LoadUVShader();
 		lightShader = LoadShader("Shaders/light.vert", "Shaders/light.frag");
@@ -272,9 +323,13 @@ public:
 		}
 		if (lastSlash) {
 			*(lastSlash + 1) = '\0';
-		}
-		LoadMapAndTiles(fullmappath);
-		shadowtest2_numlights = 0;
+			}
+			LoadMapAndTiles(fullmappath);
+			if (!map) {
+				TraceLog(LOG_ERROR, "RayGame failed to load map: %s", fullmappath);
+				return;
+			}
+			shadowtest2_numlights = 0;
 		//init lights
 		for (int i = 0; i < map->numspris; i++) {
 			map->spri[i].owner = -1;
@@ -1450,7 +1505,7 @@ static void MoveCamB2( cam_t *b2cam) {
 						// Solid wall - draw full wall
 						if (texIndex >= 0 && texIndex < get_gnumtiles()) {
 							// Debug fallback makes wall quads visible even when the real art path is black.
-							Texture2D wallTex = useDebugTextureFallback ? debugCheckerTexture : runtimeTextures[texIndex];
+							Texture2D wallTex = useDebugTextureFallback ? GetDebugFallbackTexture(texIndex) : runtimeTextures[texIndex];
 							rlSetTexture(wallTex.id);
 							rlBegin(RL_QUADS);
 							rlColor4ub(255, 255, 255, 255);
@@ -1490,7 +1545,7 @@ static void MoveCamB2( cam_t *b2cam) {
 
 							if (hitile >= 0 && hitile < get_gnumtiles()) {
 								// Portal upper section uses the same fallback so split walls remain readable.
-								Texture2D upperTex = useDebugTextureFallback ? debugCheckerTexture : runtimeTextures[hitile];
+								Texture2D upperTex = useDebugTextureFallback ? GetDebugFallbackTexture(hitile) : runtimeTextures[hitile];
 								rlSetTexture(upperTex.id);
 								rlBegin(RL_QUADS);
 								rlColor4ub(255, 255, 255, 255);
@@ -1515,7 +1570,7 @@ static void MoveCamB2( cam_t *b2cam) {
 
 							if (lowtile >= 0 && lowtile < get_gnumtiles()) {
 								// Portal lower section uses the same fallback so split walls remain readable.
-								Texture2D lowerTex = useDebugTextureFallback ? debugCheckerTexture : runtimeTextures[lowtile];
+								Texture2D lowerTex = useDebugTextureFallback ? GetDebugFallbackTexture(lowtile) : runtimeTextures[lowtile];
 
 								rlSetTexture(lowerTex.id);
 								rlBegin(RL_QUADS);

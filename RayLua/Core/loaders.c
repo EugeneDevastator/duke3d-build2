@@ -265,6 +265,14 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 	}
 	else if (fileid == 0x3242534b) //KSB2 (current BUILD2 map format)
 	{
+		if (sizeof(long) != 4)
+		{
+			printf("Error: KSB2 map loading currently assumes 32-bit long fields. ");
+			printf("This build uses %zu-byte long, so this map format is not safe to read yet.\n", sizeof(long));
+			kzclose();
+			return NULL;
+		}
+
 		kzread(&map->startpos,sizeof(map->startpos));
 		kzread(&map->startrig,sizeof(map->startrig));
 		kzread(&map->startdow,sizeof(map->startdow));
