@@ -470,13 +470,21 @@ static void checksprisect_imp (int s, mapstate_t *map)
 	}
 #endif
 	for(s=map->numsects-1;s>=0;s--) sec[s].headspri = -1;
-	for(w=nw=0;w<map->numspris;w++)
-	{
-		ns = spr[w].sect; if (ns < 0) continue;
-		updatesect_imp(spr[w].p.x,spr[w].p.y,spr[w].p.z,&ns,map);
-		if ((unsigned)ns >= (unsigned)map->numsects) ns = spr[w].sect;
+		for(w=nw=0;w<map->numspris;w++)
+		{
+			ns = spr[w].sect;
+			if ((unsigned)ns >= (unsigned)map->numsects) {
+				spr[w].sect = -1;
+				continue;
+			}
+			updatesect_imp(spr[w].p.x,spr[w].p.y,spr[w].p.z,&ns,map);
+			if ((unsigned)ns >= (unsigned)map->numsects) ns = spr[w].sect;
+			if ((unsigned)ns >= (unsigned)map->numsects) {
+				spr[w].sect = -1;
+				continue;
+			}
 
-		spr[nw] = spr[w];
+			spr[nw] = spr[w];
 		spr[nw].sect = ns;
 		spr[nw].sectn = sec[ns].headspri;
 		spr[nw].sectp = -1;

@@ -73,6 +73,111 @@ surf_t* alloc_surfs(surf_allocator_t *alloc, int count) {
 	alloc->used += count;
 	return result;
 }
+
+#pragma pack(push,4)
+typedef struct {
+	int32_t tilnum, tilanm;
+	int32_t flags;
+	int32_t tag;
+	point2d uv[3];
+	uint16_t asc, rsc, gsc, bsc;
+} legacy_ksb2_surf_t;
+
+typedef struct {
+	float x, y;
+	int32_t n, ns, nw;
+	int32_t owner;
+	int32_t surfn;
+	legacy_ksb2_surf_t surf;
+	uint32_t xsurf_ptr;
+} legacy_ksb2_wall_t;
+
+typedef struct {
+	float minx, miny, maxx, maxy;
+	float z[2];
+	point2d grad[2];
+	legacy_ksb2_surf_t surf[2];
+	uint32_t wall_ptr;
+	int32_t n, nmax;
+	int32_t headspri;
+	int32_t foglev;
+	int32_t owner;
+} legacy_ksb2_sect_t;
+
+typedef struct {
+	point3d p, r, d, f;
+	point3d v, av;
+	float fat, mas, moi;
+	int32_t tilnum;
+	uint16_t asc, rsc, gsc, bsc;
+	int32_t owner, tag;
+	int32_t tim, otim;
+	int32_t flags;
+	int32_t sect, sectn, sectp;
+} legacy_ksb2_spri_t;
+#pragma pack(pop)
+
+static void convert_legacy_ksb2_surf(const legacy_ksb2_surf_t *src, surf_t *dst) {
+	memset(dst, 0, sizeof(*dst));
+	dst->tilnum = src->tilnum;
+	dst->galnum = 0;
+	dst->flags = src->flags;
+	dst->lotag = (short)(src->tag & 0xffff);
+	dst->hitag = (short)((src->tag >> 16) & 0xffff);
+	dst->asc = src->asc;
+	dst->rsc = src->rsc;
+	dst->gsc = src->gsc;
+	dst->bsc = src->bsc;
+	dst->alpha = 1.0f;
+}
+
+static void convert_legacy_ksb2_wall(const legacy_ksb2_wall_t *src, wall_t *dst) {
+	memset(dst, 0, sizeof(*dst));
+	dst->x = src->x;
+	dst->y = src->y;
+	dst->n = src->n;
+	dst->ns = src->ns;
+	dst->nw = src->nw;
+	dst->owner = src->owner;
+	dst->surfn = (uint8_t)src->surfn;
+	dst->nschain = -1;
+	dst->nwchain = -1;
+	convert_legacy_ksb2_surf(&src->surf, &dst->surf);
+}
+
+static void convert_legacy_ksb2_sect(const legacy_ksb2_sect_t *src, sect_t *dst) {
+	memset(dst, 0, sizeof(*dst));
+	dst->minx = src->minx;
+	dst->miny = src->miny;
+	dst->maxx = src->maxx;
+	dst->maxy = src->maxy;
+	dst->z[0] = src->z[0];
+	dst->z[1] = src->z[1];
+	dst->grad[0] = src->grad[0];
+	dst->grad[1] = src->grad[1];
+	convert_legacy_ksb2_surf(&src->surf[0], &dst->surf[0]);
+	convert_legacy_ksb2_surf(&src->surf[1], &dst->surf[1]);
+	dst->n = src->n;
+	dst->nmax = src->nmax;
+	dst->headspri = src->headspri;
+	dst->owner = src->owner;
+}
+
+static void convert_legacy_ksb2_spri(const legacy_ksb2_spri_t *src, spri_t *dst) {
+	memset(dst, 0, sizeof(*dst));
+	dst->p = src->p;
+	dst->r = src->r;
+	dst->d = src->d;
+	dst->f = src->f;
+	dst->tilnum = src->tilnum;
+	dst->sect = src->sect;
+	dst->sectn = src->sectn;
+	dst->sectp = src->sectp;
+	dst->owner = src->owner;
+	dst->flags = src->flags;
+	dst->lotag = (short)(src->tag & 0xffff);
+	dst->hitag = (short)((src->tag >> 16) & 0xffff);
+}
 void initTiles()
 {
 	gnumtiles = 0;
@@ -265,14 +370,6 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 	}
 	else if (fileid == 0x3242534b) //KSB2 (current BUILD2 map format)
 	{
-		if (sizeof(long) != 4)
-		{
-			printf("Error: KSB2 map loading currently assumes 32-bit long fields. ");
-			printf("This build uses %zu-byte long, so this map format is not safe to read yet.\n", sizeof(long));
-			kzclose();
-			return NULL;
-		}
-
 		kzread(&map->startpos,sizeof(map->startpos));
 		kzread(&map->startrig,sizeof(map->startrig));
 		kzread(&map->startdow,sizeof(map->startdow));
@@ -306,16 +403,23 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 			sec = map->sect = (sect_t *)realloc(sec,map->malsects*sizeof(sect_t));
 			memset(&sec[i],0,(map->malsects-i)*sizeof(sect_t));
 		}
-		kzread(&sec[altsects],(map->numsects-altsects)*sizeof(sect_t));
+			for (i = altsects; i < map->numsects; i++)
+			{
+				legacy_ksb2_sect_t oldsect;
+				kzread(&oldsect, sizeof(oldsect));
+				convert_legacy_ksb2_sect(&oldsect, &sec[i]);
+			}
 
 			//Load walls
-		for(i=altsects;i<map->numsects;i++)
-		{
-			sec[i].wall = (wall_t *)malloc(sec[i].nmax*sizeof(wall_t));
-			sec[i].owner = -1;
-			for(j=0;j<sec[i].n;j++)
+			for(i=altsects;i<map->numsects;i++)
 			{
-				kzread(&sec[i].wall[j],sizeof(wall_t));
+				sec[i].wall = (wall_t *)malloc(sec[i].nmax*sizeof(wall_t));
+				memset(sec[i].wall, 0, sec[i].nmax * sizeof(wall_t));
+				for(j=0;j<sec[i].n;j++)
+				{
+					legacy_ksb2_wall_t oldwall;
+					kzread(&oldwall,sizeof(oldwall));
+					convert_legacy_ksb2_wall(&oldwall, &sec[i].wall[j]);
 
 				if (!sec[i].wall[j].n)
 				{
@@ -331,36 +435,37 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 					}
 				}
 
-				sec[i].wall[j].owner = -1;
-				if (sec[i].wall[j].surfn > 1)
-				{
-					//sec[i].wall[j].xsurf = (surf_t *)malloc((sec[i].wall[j].surfn-1)*sizeof(surf_t));
-					//kzread(sec[i].wall[j].xsurf,(sec[i].wall[j].surfn-1)*sizeof(surf_t));
-					// replaced to simplify xsurfs and stick to 3 per wall max.
-					kzread(sec[i].wall[j].xsurf,(3)*sizeof(surf_t));
+					if (sec[i].wall[j].surfn > 1)
+					{
+						int extra_surfs = min((int)sec[i].wall[j].surfn - 1, 3);
+						for (k = 0; k < extra_surfs; k++) {
+							legacy_ksb2_surf_t oldxsurf;
+							kzread(&oldxsurf, sizeof(oldxsurf));
+							convert_legacy_ksb2_surf(&oldxsurf, &sec[i].wall[j].xsurf[k]);
+						}
+						for (; k < sec[i].wall[j].surfn - 1; k++) {
+							legacy_ksb2_surf_t discard;
+							kzread(&discard, sizeof(discard));
+						}
+					}
 				}
 			}
-		}
 
 			//Load tiles
-		kzread(&nnumtiles,4); gnumtiles += nnumtiles;
-		if (false) // dont read tile data.
-		{
-		//	if (gnumtiles > gmaltiles)
-		//	{
-		//		gmaltiles = max(gnumtiles+1,gmaltiles<<1);
-		//		gtile = (tile_t *)realloc(gtile,gmaltiles*sizeof(tile_t));
-		//	}
-		//	tile_t* gtpic;
-		//	for(i=gnumtiles-nnumtiles;i<gnumtiles;i++)
-		//	{
-		//		kzread(&s,2); kzread(gtile[i].filnam,s); gtile[i].filnam[s] = 0; //FIX:possible buffer overflow here
-		//		gtile[i].tt.f = 0;
-		//		gtile[i].namcrc32 = getcrc32z(0,(unsigned char *)gtile[i].filnam);
-		//		gtpic = &gtile[sur->tilnum];
-		//		if (!gtpic->tt.f) loadpic(gtpic,curmappath);
-		//	}
-		}
+			kzread(&nnumtiles,4); gnumtiles += nnumtiles;
+			if (gnumtiles > gmaltiles)
+			{
+				gmaltiles = max(gnumtiles+1,gmaltiles<<1);
+				gtile = (tile_t *)realloc(gtile,gmaltiles*sizeof(tile_t));
+			}
+			for(i=gnumtiles-nnumtiles;i<gnumtiles;i++)
+			{
+				kzread(&s,2);
+				kzread(gtile[i].filnam,s);
+				gtile[i].filnam[s] = 0;
+				gtile[i].tt.f = 0;
+				gtile[i].namcrc32 = getcrc32z(0,(unsigned char *)gtile[i].filnam);
+			}
 
 			//Load sprites
 		kzread(&nnumspris,4); map->numspris += nnumspris;
@@ -374,8 +479,12 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 			for(;i<map->malspris;i++) map->spri[i].sect = -1;
 #endif
 		}
-		kzread(&map->spri[map->numspris-nnumspris],nnumspris*sizeof(spri_t));
-		for(i=map->numspris-nnumspris;i<map->numspris;i++) map->spri[i].sect += altsects;
+			for(i=map->numspris-nnumspris;i<map->numspris;i++) {
+				legacy_ksb2_spri_t oldspr;
+				kzread(&oldspr, sizeof(oldspr));
+				convert_legacy_ksb2_spri(&oldspr, &map->spri[i]);
+				map->spri[i].sect += altsects;
+			}
 
 
 			// | 0 ..       altsects ..  gst->numsects   |
@@ -388,11 +497,16 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 			// |   ^old_tiles^    |     ^new_tiles^      |
 
 			//Adjust tile indices for new sectors(/walls) & sprites
-		for(i=altsects;i<map->numsects;i++)
-		{
-			for(j=0;j<2       ;j++) sec[i].surf[j].tilnum      += gnumtiles-nnumtiles;
-			for(j=0;j<sec[i].n;j++) sec[i].wall[j].surf.tilnum += gnumtiles-nnumtiles;
-		}
+			for(i=altsects;i<map->numsects;i++)
+			{
+				for(j=0;j<2       ;j++) sec[i].surf[j].tilnum      += gnumtiles-nnumtiles;
+				for(j=0;j<sec[i].n;j++) {
+					sec[i].wall[j].surf.tilnum += gnumtiles-nnumtiles;
+					for (k = 0; k < min((int)sec[i].wall[j].surfn - 1, 3); k++) {
+						sec[i].wall[j].xsurf[k].tilnum += gnumtiles-nnumtiles;
+					}
+				}
+			}
 		for(i=map->numspris-nnumspris;i<map->numspris;i++)
 			if (map->spri[i].tilnum >= 0)
 				map->spri[i].tilnum += gnumtiles-nnumtiles;

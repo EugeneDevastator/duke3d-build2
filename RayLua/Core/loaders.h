@@ -45,11 +45,17 @@ static void compacttilelist_tilenums_imp (mapstate_t *map) //uses gtile[?].namcr
     sec = map->sect;
     for(s=map->numsects-1;s>=0;s--)
     {
-        for(w=2-1;w>=0;w--)        { sec[s].surf[w].tilnum      = gtile[sec[s].surf[w].tilnum].namcrc32; }
-        for(w=sec[s].n-1;w>=0;w--) { sec[s].wall[w].surf.tilnum = gtile[sec[s].wall[w].surf.tilnum].namcrc32; }
+        for(w=2-1;w>=0;w--) {
+            if ((unsigned)sec[s].surf[w].tilnum < (unsigned)gnumtiles)
+                sec[s].surf[w].tilnum = gtile[sec[s].surf[w].tilnum].namcrc32;
+        }
+        for(w=sec[s].n-1;w>=0;w--) {
+            if ((unsigned)sec[s].wall[w].surf.tilnum < (unsigned)gnumtiles)
+                sec[s].wall[w].surf.tilnum = gtile[sec[s].wall[w].surf.tilnum].namcrc32;
+        }
 #ifndef STANDALONE
         for(w=sec[s].headspri;w>=0;w=map->spri[w].sectn)
-            if (map->spri[w].tilnum >= 0) map->spri[w].tilnum = gtile[map->spri[w].tilnum].namcrc32;
+            if ((unsigned)map->spri[w].tilnum < (unsigned)gnumtiles) map->spri[w].tilnum = gtile[map->spri[w].tilnum].namcrc32;
     }
 #else
     }
@@ -102,10 +108,10 @@ static void compacttilelist_imp (long flags, mapstate_t* map)
 	{
 		for(i=0;i<gnumtiles;i++) gtile[i].namcrc32 = 0;
 		gtile[0].namcrc32 = 1; //Keep default tile (cloud.png)
-		for(s=map->numsects-1;s>=0;s--)
-		{
-			for(w=2-1;w>=0;w--) gtile[sec[s].surf[w].tilnum].namcrc32 = 1;
-			for(w=sec[s].n-1;w>=0;w--) gtile[sec[s].wall[w].surf.tilnum].namcrc32 = 1;
+			for(s=map->numsects-1;s>=0;s--)
+			{
+				for(w=2-1;w>=0;w--) if ((unsigned)sec[s].surf[w].tilnum < (unsigned)gnumtiles) gtile[sec[s].surf[w].tilnum].namcrc32 = 1;
+				for(w=sec[s].n-1;w>=0;w--) if ((unsigned)sec[s].wall[w].surf.tilnum < (unsigned)gnumtiles) gtile[sec[s].wall[w].surf.tilnum].namcrc32 = 1;
 #ifndef STANDALONE
 			for(w=sec[s].headspri;w>=0;w=map->spri[w].sectn)
 				if (map->spri[w].tilnum >= 0) gtile[map->spri[w].tilnum].namcrc32 = 1;
