@@ -1,5 +1,0 @@
-/home/jaba/Documentos/raygame/duke3d-build2-main/RayLua/build/CMakeFiles/imgui.dir
-/home/jaba/Documentos/raygame/duke3d-build2-main/RayLua/build/CMakeFiles/rlimgui.dir
-/home/jaba/Documentos/raygame/duke3d-build2-main/RayLua/build/CMakeFiles/RayGame.dir
-/home/jaba/Documentos/raygame/duke3d-build2-main/RayLua/build/CMakeFiles/edit_cache.dir
-/home/jaba/Documentos/raygame/duke3d-build2-main/RayLua/build/CMakeFiles/rebuild_cache.dir

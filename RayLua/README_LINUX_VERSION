@@ -1,0 +1,109 @@
+# RayLua Linux Version
+
+This file is for Dave. It documents how this Linux-oriented `RayLua` variant was built locally and how to reproduce that build on another Linux machine.
+
+## What was verified
+
+The `RayGame` target was compiled successfully as a native Linux build from this repository.
+
+Verified target:
+
+- `RayLua/build/RayGame`
+
+Verified configuration:
+
+- generator: `Ninja`
+- C compiler: `gcc`
+- C++ compiler: `g++`
+- Lua support: disabled for the verified build
+- Duke target: disabled for the verified build
+
+## Required dependencies
+
+Install these before configuring the project:
+
+- `gcc`
+- `g++`
+- `cmake`
+- `ninja`
+- `pkg-config`
+- `raylib` development package
+- OpenGL development libraries
+
+Depending on the distro, `raylib` will also pull the usual windowing/runtime dependencies used by raylib on Linux, such as X11/GL-related packages.
+
+If you want Lua enabled later, you will also need:
+
+- `luajit`
+- LuaJIT headers/dev package
+
+## Vendored dependencies used by this project
+
+This tree also uses local copies of:
+
+- `RayLua/External/imgui`
+- `RayLua/External/rlImGui`
+
+These are part of the project layout used for this Linux build.
+
+## Configure
+
+From the repository root:
+
+```bash
+cmake -S RayLua -B RayLua/build -G Ninja \
+  -DCMAKE_C_COMPILER=gcc \
+  -DCMAKE_CXX_COMPILER=g++ \
+  -DDISABLE_LUA=ON \
+  -DBUILD_DUKEGAME=OFF
+```
+
+## Build
+
+```bash
+cmake --build RayLua/build -j4
+```
+
+## Why these flags were used
+
+- `-DDISABLE_LUA=ON`
+  The verified Linux build did not rely on LuaJIT. The old flow was Windows/MSVC-oriented, so Lua was disabled for the known-good Linux build.
+
+- `-DBUILD_DUKEGAME=OFF`
+  The Linux work in this tree was validated against `RayGame`, not `DukeGame`.
+
+## Run
+
+```bash
+./RayLua/build/RayGame
+```
+
+You can also pass a map path:
+
+```bash
+./RayLua/build/RayGame /path/to/your.map
+```
+
+## Asset expectations at runtime
+
+For maps to load correctly, the runtime data directory is expected to contain:
+
+- `palette.dat`
+- `TILES*.ART`
+
+Optional extra content may also be used depending on the map/setup.
+
+## Linux-specific changes already present in this branch
+
+- Standard `CMakeLists.txt` entry for `RayLua`
+- Linux/OpenGL linkage in CMake
+- case-sensitive path fixes such as `Core` vs `core`
+- Windows-specific include/path cleanup
+- several portability fixes for GCC/Clang
+- runtime path handling that is more tolerant on Linux filesystems
+
+## Notes
+
+- This README only documents the Linux build flow that was actually verified locally.
+- `RayGame` is the known-good Linux target in this version.
+- If Dave wants to enable Lua or build other targets, that should be treated as follow-up work rather than assumed to already be verified.

@@ -13,3 +13,20 @@ build2vs/.vs/VSWorkspaceState.json
 build2vs/.vs/build2vs/
 *.ART
 PALETTE.DAT
+
+# Local build outputs
+RayLua/build/
+RayLua/build-debug/
+RayLua/imgui.ini
+RayLua/External/imgui/.git/
+RayLua/External/rlImGui/.git/
+
+# Local agent/Codex context
+.codex
+**/.codex
+RayLua/RUN_CONTEXT.md
+RayLua/RUN_RAYGAME.txt
+
+# Personal / non-redistributable assets
+utils/DUKE3D.GRP
+utils/DUKE3D-grp/
