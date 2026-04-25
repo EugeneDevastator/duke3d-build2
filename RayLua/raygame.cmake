@@ -9,6 +9,8 @@ add_executable(RayGame
         DumbEdit.hpp
         Editor/uimodels.h
         Core/rendertypes.h
+        Core/mapserial.h
+        Core/mapserial.c
 
 )
 

@@ -1573,7 +1573,7 @@ static void MoveCamB2( cam_t *b2cam) {
 					spol.tilnum = 5;
 
 				rlEnableBackfaceCulling();
-				if (spr->view.rflags.is_dblside)
+				if (spr->view.rflags.is_dblsided)
 					rlDisableBackfaceCulling();
 
 				Texture2D spriteTex = galtextures[spol.galnum][spol.tilnum];

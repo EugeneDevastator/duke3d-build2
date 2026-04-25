@@ -1,4 +1,6 @@
 // monodebug.c
+#ifndef MONODEBUG_C
+#define MONODEBUG_C
 #include "monodebug.h"
 #include <stdlib.h>
 #include <string.h>
@@ -183,3 +185,4 @@ void mono_dbg_capture_mph(int id, const char *label) {
       //  mono_deloop(rethead[h]);
     }
 }
+#endif
