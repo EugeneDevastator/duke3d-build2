@@ -59,7 +59,6 @@ unsigned char globalpal[256][4];
 
 void scaletex_boxsum_intr(tiltyp *rt, tiltyp *wt)
 {
-
 }
 
 void fixtex4grou_intr(tiltyp *tt)
@@ -78,7 +77,6 @@ void kpzload4grou_intr(const char *filnam, tiltyp *tt, float shsc, int flags)
     unsigned char *buf = LoadFileData(filnam, &leng);
     if (!buf || leng == 0) return;
 
-    /* +4 avoids bug in KPLIB overrunning */
     char *kbuf = (char *)malloc(leng+4);
     if (!kbuf) { UnloadFileData(buf); return; }
     memcpy(kbuf, buf, leng);
@@ -121,216 +119,58 @@ void kpzload4grou_intr(const char *filnam, tiltyp *tt, float shsc, int flags)
 
 void CleanTiles(){ }
 
-/* -----------------------------------------------------------------------
-   ART loading helpers: operate on already-loaded file data in memory
-   ----------------------------------------------------------------------- */
-
-/* Walk ART data in memory, return pointer to pixel data for tilenum.
-   Returns NULL on failure. Fills out sx/sy. */
-static const unsigned char* art_find_tile(
+/* Decode all tiles from one already-loaded ART buffer into gal->gtile[].
+   loctile0/loctile1 are the tile range from the ART header.
+   arttiles is the total allocated tile count (bounds check). */
+static void decode_art_tiles(
+    gallery *gal,
     const unsigned char *artdata, int artsize,
-    int tilenum_global, int loctile0, int loctile1,
-    int *out_sx, int *out_sy)
+    int loctile0, int loctile1,
+    int arttiles)
 {
-    int local = tilenum_global - loctile0;
-    if (local < 0 || local >= loctile1) return NULL;
-
+    int count = loctile1 - loctile0;
     const short *sxsiz = (const short *)(artdata + 16);
-    const short *sysiz = sxsiz + loctile1;
-    /* skip picanm: loctile1 * 4 bytes after sysiz */
-    int pixel_base = 16 + (loctile1 * 4); /* sxsiz+sysiz = loctile1*2*2 */
-    /* actually: 16 + loctile1*sizeof(short) + loctile1*sizeof(short) + loctile1*sizeof(picanm) */
-    /* = 16 + loctile1*2 + loctile1*2 + loctile1*4 = 16 + loctile1*8 */
-    pixel_base = 16 + (loctile1 << 3);
+    const short *sysiz = sxsiz + count;
+    /* pixel data starts after: 16 + count*2 (sx) + count*2 (sy) + count*4 (picanm) = 16 + count*8 */
+    int pixel_offset = 16 + (count << 3);
 
-    int offset = pixel_base;
-    for(int i = 0; i < local; i++)
-        offset += (int)sxsiz[i] * (int)sysiz[i];
+    for (int i = 0; i < count; i++) {
+        int tilenum = loctile0 + i;
+        if (tilenum >= arttiles) break;
 
-    *out_sx = sxsiz[local];
-    *out_sy = sysiz[local];
-    if (*out_sx <= 0 || *out_sy <= 0) return NULL;
-    if (offset + (*out_sx) * (*out_sy) > artsize) return NULL;
-    return artdata + offset;
-}
+        int sx = sxsiz[i];
+        int sy = sysiz[i];
 
-void loadpic_raw(tile_t *tpic, char* rootpath, int gal_idx) {
-    long i, j, filnum, tilenum, loctile0, loctile1;
-    char tbuf[MAX_PATH*2];
+        tiltyp *pic = &gal->gtile[tilenum].tt;
 
-    if (gal_idx < 0 || gal_idx >= 16) return;
-
-    gallery* gal = &g_gals[gal_idx];
-    tiltyp *pic = &tpic->tt;
-
-    if (pic->f && pic->f != (long)nullpic) {
-        free((void *)pic->f);
-        pic->f = 0;
-    }
-
-    strcpy(tbuf, tpic->filnam);
-
-    for(i=j=0;tbuf[i];i++) if (tbuf[i] == '|') j = i;
-    if (!j) { tilenum = 0; } else { tilenum = atol(&tbuf[j+1]); tbuf[j] = 0; i = j; }
-
-    if ((i >= 5) && (!stricmp(&tbuf[i-4],".ART"))) {
-        pic->x = g_gals[gal_idx].sizex[tilenum];
-        pic->y = g_gals[gal_idx].sizey[tilenum];
-
-        if (pic->x <= 0 || pic->y <= 0) {
-            pic->f = (long)nullpic; pic->x = 4; pic->y = 4;
-            pic->p = (pic->x<<2); pic->lowermip = 0;
-            return;
+        /* skip zero-size tiles — nullpic assigned later in loadgal */
+        if (sx <= 0 || sy <= 0) {
+            pixel_offset += 0; /* no pixels */
+            continue;
         }
 
-        filnum = 0;
-        do {
-            sprintf(tbuf, "%sTILES%03d.ART", rootpath, filnum);
+        int pixel_count = sx * sy;
+        if (pixel_offset + pixel_count > artsize) break; /* corrupt */
 
-            int artsize = 0;
-            unsigned char *artdata = LoadFileData(tbuf, &artsize);
-            if (!artdata) { filnum = -1; break; }
-            if (artsize < 16 || *(long*)artdata != 1) { UnloadFileData(artdata); filnum = -1; break; }
+        const unsigned char *pixels = artdata + pixel_offset;
+        pixel_offset += pixel_count;
 
-            loctile0 = *(long*)(artdata + 8);
-            loctile1 = (*(long*)(artdata + 12)) - loctile0 + 1;
-            i = tilenum - loctile0;
+        pic->x = sx;
+        pic->y = sy;
+        pic->p = (sx << 2);
+        pic->f = (long)malloc((sy + 1) * pic->p + 4);
+        if (!pic->f) continue;
+        memset((void*)pic->f, 0, (sy + 1) * pic->p + 4);
 
-            if ((unsigned)i < (unsigned)loctile1) {
-                /* found the right ART file */
-                int sx, sy;
-                const unsigned char *pixels = art_find_tile(artdata, artsize, tilenum, loctile0, loctile1, &sx, &sy);
-
-                if (pixels && sx > 0 && sy > 0) {
-                    pic->p = (pic->x<<2);
-                    pic->f = (uint32_t)malloc((pic->y+1)*pic->p+4);
-                    memset((void*)pic->f, 0, (pic->y+1)*pic->p+4);
-
-                    for(int x=0;x<pic->x;x++) {
-                        for(int y=0;y<pic->y;y++) {
-                            long *pixel_ptr = (long*)(pic->f + y*pic->p + (x<<2));
-                            *pixel_ptr = *(long*)&gal->globalpal[(long)pixels[x*pic->y + y]][0];
-                        }
-                    }
-                }
-                UnloadFileData(artdata);
-                break;
+        for (int x = 0; x < sx; x++) {
+            for (int y = 0; y < sy; y++) {
+                long *dst = (long*)(pic->f + y * pic->p + (x << 2));
+                *dst = *(long*)&gal->globalpal[(long)pixels[x * sy + y]][0];
             }
-            filnum++;
-            UnloadFileData(artdata);
-        } while (1);
-
-        if (filnum < 0 || !pic->f) {
-            pic->f = (long)nullpic; pic->x = 4; pic->y = 4;
-            pic->p = (pic->x<<2); pic->lowermip = 0;
-            return;
         }
 
-        fixtex4grou_intr((tiltyp *)pic);
+        fixtex4grou_intr(pic);
         pic->lowermip = 0;
-    } else {
-        tiltyp gtt;
-        kpzload4grou_intr(tbuf,&gtt,1.0,2);
-        pic->f = gtt.f; pic->p = gtt.p; pic->x = gtt.x; pic->y = gtt.y; pic->lowermip = gtt.lowermip;
-    }
-
-    if (!pic->f) {
-        pic->f = (long)nullpic; pic->x = 4; pic->y = 4;
-        pic->p = (pic->x<<2); pic->lowermip = 0;
-    }
-}
-
-void loadpic(tile_t *tpic, char* rootpath, int gal_idx) {
-    long i, j, filnum, tilenum, loctile0, loctile1, lnx, lny, nx, ny;
-    char tbuf[MAX_PATH*2];
-
-    if (gal_idx < 0 || gal_idx >= 16) return;
-
-    gallery* gal = &g_gals[gal_idx];
-    tiltyp *pic = &tpic->tt;
-
-    if (pic->f && pic->f != (long)nullpic) {
-        free((void *)pic->f);
-        pic->f = 0;
-    }
-
-    strcpy(tbuf, tpic->filnam);
-
-    for(i=j=0;tbuf[i];i++) if (tbuf[i] == '|') j = i;
-    if (!j) { tilenum = 0; } else { tilenum = atol(&tbuf[j+1]); tbuf[j] = 0; i = j; }
-
-    if ((i >= 5) && (!stricmp(&tbuf[i-4],".ART"))) {
-        pic->x = g_gals[gal_idx].sizex[tilenum];
-        pic->y = g_gals[gal_idx].sizey[tilenum];
-
-        if (pic->x <= 0 || pic->y <= 0) {
-            pic->f = (long)nullpic; pic->x = 4; pic->y = 4;
-            pic->p = (pic->x<<2); pic->lowermip = 0;
-            return;
-        }
-
-        if (pic->x <= 1) lnx = 0; else lnx = bsr(pic->x-1)+1;
-        if (pic->y <= 1) lny = 0; else lny = bsr(pic->y-1)+1;
-        nx = (1<<lnx); ny = (1<<lny);
-
-        filnum = 0;
-        do {
-            sprintf(tbuf, "%sTILES%03d.ART", rootpath, filnum);
-
-            int artsize = 0;
-            unsigned char *artdata = LoadFileData(tbuf, &artsize);
-            if (!artdata) { filnum = -1; break; }
-            if (artsize < 16 || *(long*)artdata != 1) { UnloadFileData(artdata); filnum = -1; break; }
-
-            loctile0 = *(long*)(artdata + 8);
-            loctile1 = (*(long*)(artdata + 12)) - loctile0 + 1;
-            i = tilenum - loctile0;
-
-            if ((unsigned)i < (unsigned)loctile1) {
-                int sx, sy;
-                const unsigned char *pixels = art_find_tile(artdata, artsize, tilenum, loctile0, loctile1, &sx, &sy);
-
-                if (pixels && sx > 0 && sy > 0) {
-                    pic->p = (nx<<2);
-                    pic->f = (uint32_t)malloc((ny+1)*pic->p+4);
-
-                    for(int x=0;x<pic->x;x++) {
-                        long base = (x<<2) + pic->f;
-                        for(int y=0;y<pic->y;y++, base+=pic->p)
-                            *(long*)base = *(long*)&gal->globalpal[(long)pixels[x*pic->y + y]][0];
-                    }
-
-                    if ((pic->x != nx) || (pic->y != ny)) {
-                        tiltyp pow2t;
-                        pow2t.f = pic->f; pow2t.p = pic->p; pow2t.x = nx; pow2t.y = ny;
-                        scaletex_boxsum_intr((tiltyp *)pic, &pow2t);
-                        pic->x = nx; pic->y = ny;
-                    }
-                }
-                UnloadFileData(artdata);
-                break;
-            }
-            filnum++;
-            UnloadFileData(artdata);
-        } while (1);
-
-        if (filnum < 0 || !pic->f) {
-            pic->f = (long)nullpic; pic->x = 4; pic->y = 4;
-            pic->p = (pic->x<<2); pic->lowermip = 0;
-            return;
-        }
-
-        fixtex4grou_intr((tiltyp *)pic);
-        pic->lowermip = 0;
-    } else {
-        tiltyp gtt;
-        kpzload4grou_intr(tbuf,&gtt,1.0,2);
-        pic->f = gtt.f; pic->p = gtt.p; pic->x = gtt.x; pic->y = gtt.y; pic->lowermip = gtt.lowermip;
-    }
-
-    if (!pic->f) {
-        pic->f = (long)nullpic; pic->x = 4; pic->y = 4;
-        pic->p = (pic->x<<2); pic->lowermip = 0;
     }
 }
 
@@ -408,6 +248,7 @@ int loadgal(int gal_idx, const char* path) {
     LoadGalleryPal(gal_idx, gal->curmappath);
     gal->gotpal = 1;
 
+    /* --- Pass 1: count total tiles across all ART files --- */
     int arttiles = 0;
     uint16_t *tilesizx = NULL, *tilesizy = NULL;
     picanm_t *picanm = NULL;
@@ -439,7 +280,6 @@ int loadgal(int gal_idx, const char* path) {
             tilesizx[i] = 0; tilesizy[i] = 0; picanm[i].asint = 0;
         }
 
-        /* read directly from in-memory artdata */
         int count = loctile1 - loctile0;
         const short *sx = (const short*)(artdata + 16);
         const short *sy = sx + count;
@@ -472,14 +312,39 @@ int loadgal(int gal_idx, const char* path) {
     gal->gtile = (tile_t*)malloc(arttiles * sizeof(tile_t));
     memset(gal->gtile, 0, arttiles * sizeof(tile_t));
 
+    /* set filnam and zero tt for all tiles */
     for(int i = 0; i < arttiles; i++) {
         sprintf(gal->gtile[i].filnam, "tiles000.art|%d", i);
         gal->gtile[i].tt.f = 0;
     }
 
+    /* --- Pass 2: one file open per ART, decode all tiles from it --- */
+    for(int filnum = 0; ; filnum++) {
+        sprintf(tbuf, "%sTILES%03d.ART", gal->curmappath, filnum);
+
+        int artsize = 0;
+        unsigned char *artdata = LoadFileData(tbuf, &artsize);
+        if (!artdata) break;
+        if (artsize < 16 || *(long*)artdata != 1) { UnloadFileData(artdata); break; }
+
+        int loctile0 = *(long*)(artdata + 8);
+        int loctile1 = (*(long*)(artdata + 12)) + 1;
+
+        if (loctile0 >= 0 && loctile1 > loctile0)
+            decode_art_tiles(gal, artdata, artsize, loctile0, loctile1, arttiles);
+
+        UnloadFileData(artdata);
+    }
+
+    /* assign nullpic to any tile with no pixel data */
     for(int i = 0; i < arttiles; i++) {
-        if (tilesizx[i] > 0 && tilesizy[i] > 0)
-            loadpic_raw(&gal->gtile[i], gal->curmappath, gal_idx);
+        if (!gal->gtile[i].tt.f) {
+            gal->gtile[i].tt.f = (long)nullpic;
+            gal->gtile[i].tt.x = 4;
+            gal->gtile[i].tt.y = 4;
+            gal->gtile[i].tt.p = (4<<2);
+            gal->gtile[i].tt.lowermip = 0;
+        }
     }
 
     return 1;
