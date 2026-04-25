@@ -11,6 +11,43 @@
 #include "mapform_duke.h"
 // TODO : Replace types with stdint like uint8_t
 // TODO : new mapstate should have raylib friendly coords by default. period.
+/* loaders.c */
+#include "loaders.h"
+#include "mapform_duke.h"
+#include "raylib.h"
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <math.h>
+
+/* ── in-memory stream shim ─────────────────────────────────────── */
+static unsigned char *_mb  = NULL;   /* map buffer                 */
+static int            _ms  = 0;      /* map buffer size            */
+static int            _mp  = 0;      /* current read position      */
+
+static int  mb_open(const char *path) {
+	if (_mb) { UnloadFileData(_mb); _mb = NULL; }
+	_mb = LoadFileData(path, &_ms);
+	_mp = 0;
+	return (_mb && _ms > 0) ? 1 : 0;
+}
+static void mb_read(void *dst, int n) {
+	int avail = _ms - _mp;
+	if (n > avail) n = avail;
+	if (n > 0) { memcpy(dst, _mb + _mp, n); _mp += n; }
+}
+static void mb_seek_cur(int n)  { _mp += n; if (_mp < 0) _mp = 0; if (_mp > _ms) _mp = _ms; }
+static int  mb_tell(void)       { return _mp; }
+static void mb_close(void)      { if (_mb) { UnloadFileData(_mb); _mb = NULL; } _ms = _mp = 0; }
+
+/* replace old macros */
+#define kzopen(f)       mb_open(f)
+#define kzread(d,n)     mb_read(d,n)
+#define kzseek(n,w)     mb_seek_cur(n)   /* only SEEK_CUR used in loader */
+#define kztell()        mb_tell()
+#define kzclose()       mb_close()
+#define kzaddstack(f)   /* no-op: ZIP stacking not needed for map load */
+/* ─────────────────────────────────────────────────────────────── */
 
 // build format 7 flags.
 #define TILSIZEX(g,t) g_gals[g].sizex[t]
@@ -1261,3 +1298,9 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 		else { return(NULL); } //MessageBox(ghwnd,"Invalid MAP format",prognam,MB_OK);
 	}
 }
+#undef kzopen
+#undef kzread
+#undef kzseek
+#undef kztell
+#undef kzclose
+#undef kzaddstack
