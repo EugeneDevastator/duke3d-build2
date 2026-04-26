@@ -1,21 +1,15 @@
-# name[counter_type] stored_type [resolved_type [suffix]]
-# name              stored_type [resolved_type [suffix]]
+STRUCT png_header:
+    sig     char[8]
+    width   int32
+    height  int32
 
 STRUCT point2d:
-    x int64 double
-    y int64 double
-
-STRUCT myflags:
-    # user defined
-
-STRUCT color:
-    red   uint8 float norm
-    green uint8 float norm
-    blue  uint8 float norm
+    x       int64 double
+    y       int64 double
 
 STRUCT loop:
-    points[uint32] point2d
+    points  point2d[uint32]
 
 STRUCT sector:
-    loops[uint8] loop
-    flags uint8 myflags
+    loops   loop[uint8]
+    flags   uint8 myflags

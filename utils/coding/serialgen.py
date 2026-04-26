@@ -12,6 +12,7 @@ SCALAR_TO_C = {
     'uint64': 'uint64_t',
     'float':  'float',
     'double': 'double',
+    'char':   'char',
 }
 
 KNOWN_STORED = set(SCALAR_TO_C.keys()) | {'bytes', 'string'}
@@ -34,19 +35,25 @@ def parse(path):
                 continue
             if current is None:
                 continue
-            m = re.match(r'(\w+)(?:\[(\w+)\])?\s+(\w+)(?:\s+(\w+))?(?:\s+(\w+))?', line)
+            # name  stype[N or counter_type]  [rtype [suffix]]
+            # name  stype                     [rtype [suffix]]
+            m = re.match(r'(\w+)\s+(\w+)(?:\[(\w+)\])?(?:\s+(\w+))?(?:\s+(\w+))?', line)
             if not m:
                 print(f'WARN: cannot parse: {line}')
                 continue
-            fname, counter, stype, rtype, suffix = m.groups()
+            fname, stype, arr, rtype, suffix = m.groups()
+            is_fixed  = arr is not None and re.match(r'^\d+$', arr) is not None
+            is_dynamic = arr is not None and not is_fixed
+            is_struct  = stype not in KNOWN_STORED
             current['fields'].append({
                 'name':    fname,
-                'counter': counter,
                 'stype':   stype,
+                'arr':     arr,          # None | literal int str | counter type str
+                'fixed':   is_fixed,
+                'dynamic': is_dynamic,
                 'rtype':   rtype,
                 'suffix':  suffix,
-                'array':   counter is not None,
-                'struct':  stype not in KNOWN_STORED,
+                'struct':  is_struct,
             })
     return structs
 
@@ -59,8 +66,8 @@ def conv_write(stype, rtype, suffix):
     return s + (f'_{suffix}' if suffix else '')
 
 def runtime_c_type(f):
-    if f['rtype']:   return c_type(f['rtype'])
-    if f['struct']:  return f['stype']
+    if f['rtype']:  return c_type(f['rtype'])
+    if f['struct']: return f['stype']
     return c_type(f['stype'])
 
 def emit_h(structs, guard):
@@ -80,18 +87,20 @@ def emit_h(structs, guard):
         for f in s['fields']:
             rt = runtime_c_type(f)
             n  = f['name']
-            if f['stype'] == 'bytes':
+            if f['fixed']:
+                ct = c_type(f['stype'])
+                L.append(f'    {ct} {n}[{f["arr"]}];')
+            elif f['dynamic']:
+                L.append(f'    {c_type(f["arr"])} {n}_n;')
+                if f['stype'] == 'string':
+                    L.append(f'    char** {n};')
+                else:
+                    L.append(f'    {rt}* {n};')
+            elif f['stype'] == 'bytes':
                 L.append(f'    int32_t {n}_len;')
                 L.append(f'    uint8_t* {n};')
             elif f['stype'] == 'string':
-                if f['array']:
-                    L.append(f'    {c_type(f["counter"])} {n}_n;')
-                    L.append(f'    char** {n};')
-                else:
-                    L.append(f'    char* {n};')
-            elif f['array']:
-                L.append(f'    {c_type(f["counter"])} {n}_n;')
-                L.append(f'    {rt}* {n};')
+                L.append(f'    char* {n};')
             else:
                 L.append(f'    {rt} {n};')
         L.append(f'}};')
@@ -108,9 +117,15 @@ def emit_read_field(f, L):
     stype = f['stype']
     rtype = f['rtype']
 
+    if f['fixed']:
+        ct   = c_type(stype)
+        size = f['arr']
+        L.append(f'    memcpy(out->{n},buf+pos,sizeof({ct})*{size}); pos+=sizeof({ct})*{size};')
+        return
+
     if f['struct']:
-        if f['array']:
-            ct = c_type(f['counter'])
+        if f['dynamic']:
+            ct = c_type(f['arr'])
             L.append(f'    {{ {ct} cnt; memcpy(&cnt,buf+pos,sizeof({ct})); pos+=sizeof({ct});')
             L.append(f'    out->{n}_n=cnt; out->{n}=({stype}*)malloc(sizeof({stype})*cnt);')
             L.append(f'    for(int i=0;i<(int)cnt;i++){{ pos+={stype}_read(buf+pos,&out->{n}[i]); }} }}')
@@ -119,8 +134,8 @@ def emit_read_field(f, L):
         return
 
     if stype == 'string':
-        if f['array']:
-            ct = c_type(f['counter'])
+        if f['dynamic']:
+            ct = c_type(f['arr'])
             L.append(f'    {{ {ct} cnt; memcpy(&cnt,buf+pos,sizeof({ct})); pos+=sizeof({ct});')
             L.append(f'    out->{n}_n=cnt; out->{n}=(char**)malloc(sizeof(char*)*cnt);')
             L.append(f'    for(int i=0;i<(int)cnt;i++){{ int32_t sl; memcpy(&sl,buf+pos,sizeof(int32_t)); pos+=sizeof(int32_t);')
@@ -137,8 +152,8 @@ def emit_read_field(f, L):
 
     st = c_type(stype)
     rt = c_type(rtype) if rtype else st
-    if f['array']:
-        ct = c_type(f['counter'])
+    if f['dynamic']:
+        ct = c_type(f['arr'])
         L.append(f'    {{ {ct} cnt; memcpy(&cnt,buf+pos,sizeof({ct})); pos+=sizeof({ct});')
         L.append(f'    out->{n}_n=cnt; out->{n}=({rt}*)malloc(sizeof({rt})*cnt);')
         L.append(f'    for(int i=0;i<(int)cnt;i++){{ {st} raw; memcpy(&raw,buf+pos,sizeof({st})); pos+=sizeof({st});')
@@ -158,9 +173,15 @@ def emit_write_field(f, L):
     stype = f['stype']
     rtype = f['rtype']
 
+    if f['fixed']:
+        ct   = c_type(stype)
+        size = f['arr']
+        L.append(f'    memcpy(buf+pos,in->{n},sizeof({ct})*{size}); pos+=sizeof({ct})*{size};')
+        return
+
     if f['struct']:
-        if f['array']:
-            ct = c_type(f['counter'])
+        if f['dynamic']:
+            ct = c_type(f['arr'])
             L.append(f'    memcpy(buf+pos,&in->{n}_n,sizeof({ct})); pos+=sizeof({ct});')
             L.append(f'    for(int i=0;i<(int)in->{n}_n;i++){{ pos+={stype}_write(buf+pos,&in->{n}[i]); }}')
         else:
@@ -168,8 +189,8 @@ def emit_write_field(f, L):
         return
 
     if stype == 'string':
-        if f['array']:
-            ct = c_type(f['counter'])
+        if f['dynamic']:
+            ct = c_type(f['arr'])
             L.append(f'    memcpy(buf+pos,&in->{n}_n,sizeof({ct})); pos+=sizeof({ct});')
             L.append(f'    for(int i=0;i<(int)in->{n}_n;i++){{ int32_t sl=(int32_t)strlen(in->{n}[i]);')
             L.append(f'    memcpy(buf+pos,&sl,sizeof(int32_t)); pos+=sizeof(int32_t);')
@@ -186,8 +207,8 @@ def emit_write_field(f, L):
         return
 
     st = c_type(stype)
-    if f['array']:
-        ct = c_type(f['counter'])
+    if f['dynamic']:
+        ct = c_type(f['arr'])
         L.append(f'    memcpy(buf+pos,&in->{n}_n,sizeof({ct})); pos+=sizeof({ct});')
         L.append(f'    for(int i=0;i<(int)in->{n}_n;i++){{')
         if rtype:
@@ -227,17 +248,19 @@ def emit_c(structs, hname):
         L.append(f'void {sname}_free({sname}* v) {{')
         for f in s['fields']:
             n = f['name']
-            if f['struct']:
-                if f['array']:
+            if f['fixed']:
+                pass  # stack array, nothing to free
+            elif f['struct']:
+                if f['dynamic']:
                     L.append(f'    for(int i=0;i<(int)v->{n}_n;i++) {f["stype"]}_free(&v->{n}[i]);')
                     L.append(f'    free(v->{n}); v->{n}=0;')
                 else:
                     L.append(f'    {f["stype"]}_free(&v->{n});')
             elif f['stype'] in ('string', 'bytes'):
-                if f['array'] and f['stype'] == 'string':
+                if f['dynamic'] and f['stype'] == 'string':
                     L.append(f'    for(int i=0;i<(int)v->{n}_n;i++) free(v->{n}[i]);')
                 L.append(f'    free(v->{n}); v->{n}=0;')
-            elif f['array']:
+            elif f['dynamic']:
                 L.append(f'    free(v->{n}); v->{n}=0;')
         L.append(f'}}')
         L.append('')
