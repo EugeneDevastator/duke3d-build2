@@ -1,6 +1,16 @@
-#!/bin/sh
+#!/usr/bin/env bash
 set -e
 cd "$(dirname "$0")"
+
+# On MSYS2/Windows the MinGW64 toolchain (cmake, gcc, g++, mingw32-make)
+# lives in /mingw64/bin.  When the script is invoked from a plain MSYS2 bash
+# session (e.g. via mingw64.exe or usr/bin/bash -c "...") that directory is
+# not always on PATH.  Prepend it when we are running under MSYS2/MinGW/Cygwin.
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+        export PATH="/mingw64/bin:$PATH"
+        ;;
+esac
 
 PRESET="$1"
 BUILD_DIR="$2"
