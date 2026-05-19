@@ -1819,8 +1819,7 @@ void map_sect_loop_erase(int sectid, int wall_of_loop, mapstate_t *map) {
 static void map_sect_translate_raw(int s, point3d offset, mapstate_t *map) {
 	sect_t *sectr = &map->sect[s];
 	for (int i = 0; i < sectr->n; ++i) {
-		if (offset.x > 0.4f)
-			int a = 1;
+
 		sectr->wall[i].pos.x += offset.x;
 		sectr->wall[i].pos.y += offset.y;
 	}

@@ -1,55 +1,52 @@
 cmake_minimum_required(VERSION 3.21)
 cmake_policy(VERSION 3.5)
-set(CMAKE_GENERATOR_PLATFORM Win32)
-set(CMAKE_VERBOSE_MAKEFILE ON)
-set(CMAKE_SIZEOF_VOID_P 4)
-project(raylib_lua_imgui C CXX)
+project(BuildEditor2 C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
 option(DISABLE_LUA "Disable Lua support" ON)
-#add_compile_definitions(DISABLE_LUA)
 
+# ── dependencies ──────────────────────────────────────────────────────────────
 include(FetchContent)
 
-# Try to find raylib first, fallback to FetchContent
-find_package(raylib QUIET)
-if (NOT raylib_FOUND)
-    message(STATUS "raylib not found, fetching...")
-    FetchContent_Declare(
-            raylib
-            GIT_REPOSITORY https://github.com/raysan5/raylib.git
-            GIT_TAG 6.0
-    )
-    FetchContent_MakeAvailable(raylib)
-endif ()
-
-# ImGui - always use FetchContent since it doesn't have find_package support
+# raylib 6.0
 FetchContent_Declare(
-        imgui
-        GIT_REPOSITORY https://github.com/ocornut/imgui.git
-        GIT_TAG v1.92.1
+    raylib
+    URL https://github.com/raysan5/raylib/archive/refs/tags/6.0.tar.gz
+    URL_HASH SHA256=2b3ee1e2120c7a0796b33062c7e9a694dd8a8caa56a96319ac8c8ecf54a90d0b
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_GAMES    OFF CACHE BOOL "" FORCE)
+set(INSTALL_RAYLIB OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(raylib)
+
+# imgui v1.92.7
+FetchContent_Declare(
+    imgui
+    URL https://github.com/ocornut/imgui/archive/refs/tags/v1.92.7.tar.gz
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 FetchContent_MakeAvailable(imgui)
 
-# Create imgui target
 add_library(imgui STATIC
-        ${imgui_SOURCE_DIR}/imgui.cpp
-        ${imgui_SOURCE_DIR}/imgui_demo.cpp
-        ${imgui_SOURCE_DIR}/imgui_draw.cpp
-        ${imgui_SOURCE_DIR}/imgui_tables.cpp
-        ${imgui_SOURCE_DIR}/imgui_widgets.cpp
-        ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
+    ${imgui_SOURCE_DIR}/imgui.cpp
+    ${imgui_SOURCE_DIR}/imgui_demo.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
 )
 target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
 
-# RlImGui
+# rlImGui — Raylib_6_0
 FetchContent_Declare(
-        rlimgui
-        GIT_REPOSITORY https://github.com/raylib-extras/rlImGui.git
-        GIT_TAG 4d8a618
+    rlimgui
+    URL https://github.com/raylib-extras/rlImGui/archive/refs/tags/Raylib_6_0.tar.gz
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 FetchContent_MakeAvailable(rlimgui)
 
@@ -57,40 +54,22 @@ add_library(rlimgui STATIC ${rlimgui_SOURCE_DIR}/rlImGui.cpp)
 target_link_libraries(rlimgui PUBLIC raylib imgui)
 target_include_directories(rlimgui PUBLIC ${rlimgui_SOURCE_DIR})
 
-include(luajit.cmake) # will handle directive.
-
+# ── project sources ───────────────────────────────────────────────────────────
+include(luajit.cmake)
 include(shared.cmake)
-
 include(raygame.cmake)
 include(duke_target.cmake)
-# Debug file copying
-message(STATUS "Source directory: ${CMAKE_CURRENT_SOURCE_DIR}")
-#get_filename_component(EXE_FOLDER_PATH ${TARGET_FILE} DIRECTORY)
-set(EXE_FOLDER_PATH "${CMAKE_CURRENT_SOURCE_DIR}/Bin/Debug")
-message(STATUS "Binary directory: ${EXE_FOLDER_PATH}")
 
-# Copy with verbose output
-# Define shader files
-file(GLOB SHADER_FILES "Shaders/*.vert" "Shaders/*.glsl" "Shaders/*.frag" "Shaders/*.png")
-
-# Create custom target that always runs
-add_custom_target(copy_shaders ALL
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${EXE_FOLDER_PATH}/Shaders"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SHADER_FILES} "${EXE_FOLDER_PATH}/Shaders"
-        COMMENT "Copying shader files"
-        VERBATIM
+# ── resource copies ───────────────────────────────────────────────────────────
+file(GLOB TILE_FILES "${CMAKE_SOURCE_DIR}/TILES???.ART")
+add_custom_target(copy_content ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/Shaders" "${CMAKE_BINARY_DIR}/Shaders"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/e3l3.map" "${CMAKE_BINARY_DIR}/e3l3.map"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/palette.dat" "${CMAKE_BINARY_DIR}/palette.dat"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/fonts" "${CMAKE_BINARY_DIR}/fonts"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/Content" "${CMAKE_BINARY_DIR}/Content"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${TILE_FILES} "${CMAKE_BINARY_DIR}"
+    COMMENT "Copying runtime content to build dir"
+    VERBATIM
 )
-
-# Make your executable depend on this target
-add_dependencies(RayGame copy_shaders)
-
-message(STATUS "Install destination: ${CMAKE_INSTALL_PREFIX}/bin")
-message(STATUS "Current binary dir: ${CMAKE_CURRENT_BINARY_DIR}")
-message(STATUS "EXE_FOLDER_PATH: ${EXE_FOLDER_PATH}")
-message(STATUS "cmake cur bin dir:" ${CMAKE_CURRENT_BINARY_DIR})
-message(STATUS "cmake cur out dir: ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_${CMAKE_BUILD_TYPE}}")
-# configure_file(Shaders/uv_vis_shader.vert ${EXE_FOLDER_PATH}/uv_vis_shader.vert COPYONLY)
-# configure_file(Shaders/uv_vis_shader.vert ${EXE_FOLDER_PATH}/uv_vis_shader.vert COPYONLY)
-# configure_file(Shaders/light.vert ${EXE_FOLDER_PATH}/light.vert COPYONLY)
-# configure_file(Shaders/light.frag ${EXE_FOLDER_PATH}/light.frag COPYONLY)
-
+add_dependencies(RayGame copy_content)

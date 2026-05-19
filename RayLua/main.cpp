@@ -33,6 +33,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #include "Editor/uimodels.h"
 
 // Implements
@@ -44,6 +45,9 @@ extern "C" {
 #include "Core/artloader.h"
 
 }
+static int g_argc;
+static char** g_argv;
+
 // make parallax
 // for floors and walls - if own flor is paralax - tag floor trap and wall trap as ns portal.
 //
@@ -486,12 +490,12 @@ void extract_directory(const char* filepath, char* dir_path, size_t dir_size) {
 }
 
 bool loadifvalid() {
-    if (__argc < 2) {
+    if (g_argc < 2) {
         printf("Error: No map file path provided\n");
         return false;
     }
 
-    const char* map_path = __argv[1];
+    const char* map_path = g_argv[1];
 
     if (!has_extension(map_path, ".map")) {
         printf("Error: File must have .map extension\n");
@@ -536,11 +540,10 @@ void SetImguiFonts()
 {
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->Clear();
-    ImFont* font = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\segoeui.ttf", 28.0f);
+    ImFont* font = io.Fonts->AddFontFromFileTTF("fonts/Cadman_Bold.otf", 28.0f);
     if (font == nullptr) {
         ImFontConfig config;
-        config.SizePixels = 18.0f;
-        config.PixelSnapH = true;
+        config.SizePixels = 28.0f;
         io.Fonts->AddFontDefault(&config);
     }
     io.Fonts->Build();
@@ -619,7 +622,7 @@ void UpdateFreeCamera(FreeCamera* cam, float deltaTime) {
 }
 
 void VisualizeMapstate() {  //unused
-    DumbRender::Init("c:/Eugene/Games/build2/e3l3,map");
+    DumbRender::Init("e3l3.map");
 
     auto map = DumbRender::GetMap();
     //InitWindow(1024, 768, "Mapstate Visualizer");
@@ -947,13 +950,13 @@ void MainLoop() {
     InitTexBrowser();
     EditorSetTileState(&texb);
       if (!loadifvalid()) {
-          loadgal(0, "c:/Eugene/Games/build2/");
-          loadgal(1, "c:/Eugene/Games/build2/Content/GAL_002_SW/");
-          DumbRender::Init("c:/Eugene/Games/build2/e3l3.map");
+          loadgal(0, ".");
+          loadgal(1, "Content/GAL_002_SW/");
+          DumbRender::Init("e3l3.map");
       }
     DumbRender::LoadTexturesToGPU();
     auto map = DumbRender::GetMap();
-    //DumbCore::Init(map);
+    if (!map) return;
     globCam.tr.p = map->startpos;
     globCam.tr.r = map->startrig;
     globCam.tr.d = map->startdow;
@@ -1143,9 +1146,106 @@ void MainLoop() {
     DumbRender::CleanupMapstateTex();
 }
 
-int main() {
+static int TestArtMode() {
+    static char map_file[] = "e3l3.map";
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    InitWindow(640, 480, "TestArt");
+    SetTargetFPS(10);
+
+    // Load everything
+    printf("TestArt: loading assets...\n");
+    loadgal(0, ".");
+    loadgal(1, "Content/GAL_002_SW/");
+    DumbRender::Init(map_file);
+    mapstate_t *map = DumbRender::GetMap();
+
+    // --- Validate (before LoadTexturesToGPU frees pixel data) ---
+    bool pass = true;
+    FILE *log = fopen("testart_report.txt", "w");
+    if (!log) { printf("TestArt: cannot create report\n"); CloseWindow(); return 1; }
+
+    fprintf(log, "=== TestArt Report ===\n\n");
+    fprintf(log, "--- Map ---\n");
+    fprintf(log, "  map: %p\n", (void*)map);
+    if (map) {
+        fprintf(log, "  sectors: %d\n", map->numsects);
+        fprintf(log, "  sprites: %d\n", map->numspris);
+        fprintf(log, "  startpos: %.2f %.2f %.2f\n", map->startpos.x, map->startpos.y, map->startpos.z);
+        fprintf(log, "  startfor: %.4f %.4f %.4f\n", map->startfor.x, map->startfor.y, map->startfor.z);
+        fprintf(log, "  startrig: %.4f %.4f %.4f\n", map->startrig.x, map->startrig.y, map->startrig.z);
+        fprintf(log, "  startdow: %.4f %.4f %.4f\n", map->startdow.x, map->startdow.y, map->startdow.z);
+        fprintf(log, "  startsect: %d\n", map->startsectn);
+        bool map_ok = map->numsects > 0 && map->numspris > 0;
+        fprintf(log, "  status: %s\n", map_ok ? "PASS" : "FAIL");
+        if (!map_ok) pass = false;
+    } else {
+        fprintf(log, "  status: FAIL (null)\n");
+        pass = false;
+    }
+
+    fprintf(log, "\n--- Gallery ---\n");
+    for (int gn = 0; gn < 2; gn++) {
+        int nt = g_gals[gn].gnumtiles;
+        fprintf(log, "  Gal %d: tiles=%d\n", gn, nt);
+        if (nt <= 0) { fprintf(log, "    status: FAIL (no tiles)\n"); pass = false; continue; }
+        int check = nt < 3 ? nt : 3;
+        for (int i = 0; i < check; i++) {
+            tile_t *til = &g_gals[gn].gtile[i];
+            bool ok = til->tt.f && til->tt.f != (intptr_t)nullpic;
+            fprintf(log, "    Tile %d: %dx%d stride=%d %s\n",
+                i, til->tt.x, til->tt.y, til->tt.p, ok ? "OK" : "EMPTY");
+            if (!ok) pass = false;
+        }
+    }
+
+    fprintf(log, "\n=== Overall: %s ===\n", pass ? "PASS" : "FAIL");
+    fclose(log);
+    printf("TestArt: %s — see testart_report.txt\n", pass ? "PASS" : "FAIL");
+
+    // --- Render first 10 tiles of gal 0 on clear screen ---
+    BeginDrawing();
+    ClearBackground((Color){40,40,40,255});
+    int ntiles = g_gals[0].gnumtiles;
+    int n = ntiles < 10 ? ntiles : 10;
+    int cols = 5;
+    int cell_w = 120;
+    for (int i = 0; i < n; i++) {
+        tile_t *til = &g_gals[0].gtile[i];
+        if (!til->tt.f || til->tt.f == (intptr_t)nullpic) continue;
+        Texture2D tex = DumbRender::ConvertPicToTexture(til);
+        int x = (i % cols) * cell_w + 10;
+        int y = (i / cols) * 100 + 10;
+        DrawTextureEx(tex, (Vector2){(float)x, (float)y}, 0, 4.0f, WHITE);
+        DrawText(TextFormat("%d", i), x, y + tex.height * 4 + 2, 10, WHITE);
+        UnloadTexture(tex);
+    }
+    TakeScreenshot("testart_tiles.png");
+    EndDrawing();
+    printf("TestArt: screenshot -> testart_tiles.png\n");
+
+    CloseWindow();
+    return pass ? 0 : 1;
+}
+
+int main(int argc, char* argv[]) {
+    g_argc = argc;
+    g_argv = argv;
+    // Chdir to binary's directory so relative paths resolve from build folder
+    char *slash = strrchr(argv[0], '/');
+    if (!slash) slash = strrchr(argv[0], '\\');
+    if (slash) { char saved = *slash; *slash = '\0'; chdir(argv[0]); *slash = saved; }
+    // TestArt mode — validate tile loading
+    if (g_argc >= 2 && strcmp(g_argv[1], "testart") == 0) {
+        return TestArtMode();
+    }
+    // Default map when no args
+    if (g_argc < 2) {
+        static char default_map[] = "e3l3.map";
+        g_argc = 2;
+        g_argv[1] = default_map;
+    }
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
-    InitWindow(1024, 768, "Raylib + Lua + ImGui");
+    InitWindow(1024, 768, "BuildEditor2");
     SetExitKey(KEY_NULL);
     SetTargetFPS(120);
     rlImGuiSetup(true);

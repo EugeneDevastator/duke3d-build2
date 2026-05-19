@@ -1,17 +1,16 @@
 add_executable(RayGame
         main.cpp
-        FileWatcher.h
         ${CORE_SOURCES}
-        ${CORE_HEADERS}
-        ${C_HEADERS}
         ${C_SOURCES}
-        MonoTest.hpp
-        DumbEdit.hpp
-        Editor/uimodels.h
-        Core/rendertypes.h
-        Core/mapserial.h
         Core/mapserial.c
+)
 
+# Mark header-only files so CMake doesn't compile them standalone
+set_source_files_properties(
+        ${CORE_HEADERS} ${C_HEADERS}
+        MonoTest.hpp DumbEdit.hpp FileWatcher.h
+        Editor/uimodels.h Core/rendertypes.h Core/mapserial.h
+    PROPERTIES HEADER_FILE_ONLY TRUE
 )
 
 add_shared_definitions(RayGame)

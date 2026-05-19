@@ -2,50 +2,36 @@
   "version": 3,
   "configurePresets": [
     {
-      "name": "win32-base",
-      "hidden": true,
-      "generator": "Visual Studio 17 2022",
-      "architecture": "Win32",
+      "name": "linux-debug",
+      "displayName": "Linux Debug",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/editor-linux-deb",
       "cacheVariables": {
-        "CMAKE_POLICY_VERSION_MINIMUM": "3.5"
-      },
-      "vendor": {
-        "jetbrains.com/clion": {
-          "toolchain": "Visual Studio"
-        }
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_COMPILER": "g++"
       }
     },
     {
-      "name": "win32-release",
-      "inherits": "win32-base",
-      "displayName": "RayLua Win32 Release",
-      "binaryDir": "${sourceDir}/bin"
+      "name": "win64-debug",
+      "displayName": "Windows x64 Debug (MSYS2 GCC)",
+      "generator": "MinGW Makefiles",
+      "binaryDir": "${sourceDir}/build/editor-win-deb",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_COMPILER": "g++",
+        "CMAKE_C_COMPILER": "gcc"
+      }
     },
     {
-      "name": "win32-debug",
-      "inherits": "win32-base",
-      "displayName": "RayLua Win32 Debug",
-      "binaryDir": "${sourceDir}/bin"
-    }
-  ],
-  "buildPresets": [
-    {
-      "name": "win32-release",
-      "displayName": "RayLua Win32 Release Build",
-      "configurePreset": "win32-release",
-      "configuration": "Release"
-    },
-    {
-      "name": "win32-rel-deb",
-      "displayName": "RayLua Win32 RelDeb Build",
-      "configurePreset": "win32-release",
-      "configuration": "RelWithDebInfo"
-    },
-    {
-      "name": "win32-debug",
-      "displayName": "RayLua Win32 Debug Build",
-      "configurePreset": "win32-debug",
-      "configuration": "Debug"
+      "name": "win64-release",
+      "displayName": "Windows x64 Release (MSYS2 GCC)",
+      "generator": "MinGW Makefiles",
+      "binaryDir": "${sourceDir}/build/editor-win-rel",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_COMPILER": "g++",
+        "CMAKE_C_COMPILER": "gcc"
+      }
     }
   ]
 }

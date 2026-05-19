@@ -250,7 +250,8 @@ public:
 		lightIntenseLoc = GetShaderLocation(lightShader, "lightIntensity");
 		char *lastSlash;
 		// Extract root path from full map path
-		strcpy_s(rootpath, fullmappath);
+		strncpy(rootpath, fullmappath, sizeof(rootpath) - 1);
+		rootpath[sizeof(rootpath) - 1] = '\0';
 		lastSlash = strrchr(rootpath, '/');
 		if (!lastSlash) {
 			lastSlash = strrchr(rootpath, '\\');
@@ -2239,16 +2240,13 @@ private:
 		for (int gn=0;gn<2;gn++) {
 			numartiles = g_gals[gn].gnumtiles;
 
-			// static long gnumtiles, gmaltiles, gtilehashead[1024];
-			// static *long get_gtilehashead() { return gtilehashead; } // in outer file
-			//long *source = get_gtilehashead();
-			//memcpy(gtilehashead_i, source, sizeof(long) * 1024);
+			if (numartiles <= 0) continue;
 			Texture2D *arr = static_cast<Texture2D *>(malloc(sizeof(Texture2D) * numartiles));
 			int end = numartiles;
 			for (int i = 0; i < end; ++i) {
 				tile_t *til;
 				til = &g_gals[gn].gtile[i];
-				if (!til->tt.f || til->tt.f == (long)nullpic)
+				if (!til->tt.f || til->tt.f == (intptr_t)nullpic)
 					arr[i]=arr[0];
 				arr[i] = ConvertPicToTexture(til); // returns Texture2D
 			} // end = gallery.nutiles; tile_t* getGtile(int i){return &gtile[i];}

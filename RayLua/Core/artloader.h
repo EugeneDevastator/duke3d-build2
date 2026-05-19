@@ -52,8 +52,13 @@ typedef struct {
 extern gallery g_gals[16];
 extern int galcount;
 static long nullpic [64+1][64]; //Null set icon (image not found)
+#if defined(_MSC_VER)
 static __forceinline unsigned int bsf (unsigned int a) { _asm bsf eax, a }
 static __forceinline unsigned int bsr (unsigned int a) { _asm bsr eax, a }
+#else
+static inline unsigned int bsf (unsigned int a) { return __builtin_ctz(a); }
+static inline unsigned int bsr (unsigned int a) { return 31 - __builtin_clz(a); }
+#endif
 
 static unsigned char gammlut[256], gotpal = 0;
 extern tile_t *gtile;

@@ -2826,11 +2826,10 @@ intptr_t kzopen (const char *filnam)
 	FILE *fil;
 	int i, j, fileoffs, fileleng;
 	char tempbuf[46+260], *zipnam, iscomp;
-errno_t err;
 	//kzfs.fil = 0;
 	if (filnam[0] != '|') //Search standalone file first
 	{
-		err = fopen_s(&kzfs.fil, filnam,"rb");
+		kzfs.fil = fopen(filnam,"rb");
 		if (kzfs.fil)
 		{
 			kzfs.comptyp = 0;

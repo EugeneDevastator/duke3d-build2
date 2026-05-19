@@ -10,6 +10,16 @@
 #include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#ifndef _WIN32
+#include <alloca.h>
+#define _alloca alloca
+#define stricmp strcasecmp
+#define strcpy_s(dst,sz,src) strncpy(dst,src,sz)
+#else
+#define stricmp _stricmp
+#endif
+
 #define MAX_PATH 260
 enum //kpgetdim() return values:
 {
@@ -65,10 +75,10 @@ static __inline int filelength (int h)
 #ifndef O_BINARY
 #define O_BINARY 0
 #endif
-#if !defined(max)
+#if !defined(__cplusplus) && !defined(max)
 #define max(a,b) (((a) > (b)) ? (a) : (b))
 #endif
-#if !defined(min)
+#if !defined(__cplusplus) && !defined(min)
 #define min(a,b) (((a) < (b)) ? (a) : (b))
 #endif
 
@@ -106,7 +116,7 @@ static const int pow2long[32] =
 	0x00010000,0x00020000,0x00040000,0x00080000,
 	0x00100000,0x00200000,0x00400000,0x00800000,
 	0x01000000,0x02000000,0x04000000,0x08000000,
-	0x10000000,0x20000000,0x40000000,0x80000000,
+	0x10000000,0x20000000,0x40000000,(int)0x80000000,
 };
 
 	//Hack for peekbits,getbits,suckbits (to prevent lots of duplicate code)
@@ -139,7 +149,7 @@ int kprender (const char *, int, intptr_t, int, int, int, int, int);
 int kzaddstack (const char *);
 void kzuninit (void);
 void kzsetfil (FILE *);
-int kzopen (const char *);
+intptr_t kzopen (const char *);
 int kzread (void *, int);
 int kzfilelength (void);
 int kzseek (int, int);

@@ -2,7 +2,7 @@
 1. youll need luajit in external\luajit folder
 2. for windows compile using `msvcbuild.bat static`
 
-Should be run from here: `.\RayLua\External\LuaJIT\src\msvcbuild.bat`
+Should be run from here: `.\External\LuaJIT\src\msvcbuild.bat`
 
 # Lua scripting limitations
 1. no threading, - means we do only occasional modifications or event reactions, C side does updating based on state.

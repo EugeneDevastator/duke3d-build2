@@ -2,10 +2,10 @@
 // Created by omnis on 2/20/2026.
 //
 
-#ifndef RAYLIB_LUA_IMGUI_RENDER_TYPES_H
-#define RAYLIB_LUA_IMGUI_RENDER_TYPES_H
+#ifndef BUILDEDITOR2_RENDER_TYPES_H
+#define BUILDEDITOR2_RENDER_TYPES_H
 
-#include "..\interfaces\shared_types.h"
+#include "../interfaces/shared_types.h"
 typedef struct {
 	transform tr;
 	uint16_t tilnum;

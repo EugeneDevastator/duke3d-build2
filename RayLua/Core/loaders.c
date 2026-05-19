@@ -177,7 +177,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 	spri_t *spr;
 	float f, fx, fy;
 	int i, j, k, l;
-	long x, y, z, fileid, hitile, warned = 0, altsects, nnumtiles, nnumspris;
+	int32_t x, y, z, fileid, hitile, warned = 0, altsects, nnumtiles, nnumspris;
 	short s, cursect;
 	char och, tbuf[256];
 //	freemap(map);
@@ -471,7 +471,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 		typedef struct
 		{
 			short wallptr, wallnum;
-			long z[2]; short stat[2]; build7surf_t surf[2];
+			int32_t z[2]; short stat[2]; build7surf_t surf[2];
 			char visibility, filler;
 			short lotag, hitag, extra;
 		} build7sect_t;
@@ -485,7 +485,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 		} build7wall_t;
 		typedef struct
 		{
-			long x, y, z; short cstat, picnum;
+			int32_t x, y, z; short cstat, picnum;
 			signed char shade; char pal, clipdist, filler;
 			unsigned char xrepeat, yrepeat; signed char xoffset, yoffset;
 			short sectnum, statnum, ang, owner, xvel, yvel, zvel, lotag, hitag, extra;
@@ -518,7 +518,7 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 
 		hitile = 0;
 		int defaultGal=0;
-		arttiles = g_gals[defaultGal].numtiles;
+		arttiles = g_gals[defaultGal].gnumtiles;
 		if (fileid == 0x00000007) //Build1 .MAP format 7
 		{
 			kzread(&x,4); //posx
@@ -655,7 +655,6 @@ mapstate_t* loadmap_imp (char *filnam, mapstate_t* oldmap)
 				sec[i].tags[MT_SEC_WALLNUM] = b7sec.wallnum;
 			}
 			kzread(&s,2); //numwalls
-			printf("walls:%d",s);
 			int wallidx =0;
 			for(i=k=0;i<map->numsects;i++) // Parse walls
 			{

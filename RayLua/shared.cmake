@@ -47,9 +47,15 @@ function(add_shared_definitions target_name)
             USEHEIMAP=0
             NOSOUND=0
             OOS_CHECK=0
-            _WIN32
-            _WINDOWS
     )
+    if(WIN32)
+        target_compile_definitions(${target_name} PRIVATE
+                _WIN32
+                _WINDOWS
+        )
+    else()
+        target_compile_options(${target_name} PRIVATE -fcommon)
+    endif()
 endfunction()
 
 # Shared C properties

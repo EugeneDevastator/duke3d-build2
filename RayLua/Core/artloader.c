@@ -88,7 +88,7 @@ void kpzload4grou_intr(const char *filnam, tiltyp *tt, float shsc, int flags)
     if (tt->y <= 1) lny = 0; else lny = bsr(tt->y-1)+1;
     nx = (1<<lnx); ny = (1<<lny);
 
-    tt->p = (nx<<2); tt->f = (long)malloc((ny+1)*tt->p + 4);
+    tt->p = (nx<<2); tt->f = (intptr_t)malloc((ny+1)*tt->p + 4);
     if (!tt->f) { free(kbuf); return; }
     if (kprender(kbuf, leng, tt->f, tt->p, nx, ny, 0, 0) < 0)
     { free(kbuf); free((void *)tt->f); tt->f = 0; return; }
@@ -158,7 +158,7 @@ static void decode_art_tiles(
         pic->x = sx;
         pic->y = sy;
         pic->p = (sx << 2);
-        pic->f = (long)malloc((sy + 1) * pic->p + 4);
+        pic->f = (intptr_t)malloc((sy + 1) * pic->p + 4);
         if (!pic->f) continue;
         memset((void*)pic->f, 0, (sy + 1) * pic->p + 4);
 
@@ -214,7 +214,7 @@ void galfreetextures(int gal_idx) {
     gallery* gal = &g_gals[gal_idx];
     if (gal->gtile) {
         for (int i = 0; i < gal->gnumtiles; i++) {
-            if (gal->gtile[i].tt.f && gal->gtile[i].tt.f != (long)nullpic) {
+            if (gal->gtile[i].tt.f && gal->gtile[i].tt.f != (intptr_t)nullpic) {
                 free((void*)gal->gtile[i].tt.f);
                 gal->gtile[i].tt.f = 0;
             }
@@ -260,10 +260,10 @@ int loadgal(int gal_idx, const char* path) {
         int artsize = 0;
         unsigned char *artdata = LoadFileData(tbuf, &artsize);
         if (!artdata) break;
-        if (artsize < 16 || *(long*)artdata != 1) { UnloadFileData(artdata); break; }
+        if (artsize < 16 || *(int*)artdata != 1) { UnloadFileData(artdata); break; }
 
-        int loctile0 = *(long*)(artdata + 8);
-        int loctile1 = (*(long*)(artdata + 12)) + 1;
+        int loctile0 = *(int*)(artdata + 8);
+        int loctile1 = (*(int*)(artdata + 12)) + 1;
 
         if ((loctile0 < 0) || (loctile1 <= arttiles) || (loctile0 >= loctile1)) {
             UnloadFileData(artdata); continue;
@@ -325,10 +325,10 @@ int loadgal(int gal_idx, const char* path) {
         int artsize = 0;
         unsigned char *artdata = LoadFileData(tbuf, &artsize);
         if (!artdata) break;
-        if (artsize < 16 || *(long*)artdata != 1) { UnloadFileData(artdata); break; }
+        if (artsize < 16 || *(int*)artdata != 1) { UnloadFileData(artdata); break; }
 
-        int loctile0 = *(long*)(artdata + 8);
-        int loctile1 = (*(long*)(artdata + 12)) + 1;
+        int loctile0 = *(int*)(artdata + 8);
+        int loctile1 = (*(int*)(artdata + 12)) + 1;
 
         if (loctile0 >= 0 && loctile1 > loctile0)
             decode_art_tiles(gal, artdata, artsize, loctile0, loctile1, arttiles);
@@ -339,7 +339,7 @@ int loadgal(int gal_idx, const char* path) {
     /* assign nullpic to any tile with no pixel data */
     for(int i = 0; i < arttiles; i++) {
         if (!gal->gtile[i].tt.f) {
-            gal->gtile[i].tt.f = (long)nullpic;
+            gal->gtile[i].tt.f = (intptr_t)nullpic;
             gal->gtile[i].tt.x = 4;
             gal->gtile[i].tt.y = 4;
             gal->gtile[i].tt.p = (4<<2);

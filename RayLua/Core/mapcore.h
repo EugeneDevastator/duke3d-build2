@@ -5,7 +5,11 @@
 #define BUILD2_MAPCORE_H
 #pragma once
 #include <math.h>
+#ifdef _WIN32
 #include <malloc.h>
+#else
+#include <alloca.h>
+#endif
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,11 +33,11 @@ long get_gmaltiles(void);
 long* get_gtilehashead(void);
 
 
-#ifndef max
+#if !defined(__cplusplus) && !defined(max)
 #define max(a,b)            (((a) > (b)) ? (a) : (b))
 #endif
 
-#ifndef min
+#if !defined(__cplusplus) && !defined(min)
 #define min(a,b)            (((a) < (b)) ? (a) : (b))
 #endif
 
@@ -103,6 +107,7 @@ extern uint16_t portaln;
 extern portal portals[100];
 
 
+#if defined(_MSC_VER)
 static _inline void dcossin (double a, double *c, double *s)
 {
 	_asm
@@ -115,6 +120,9 @@ static _inline void dcossin (double a, double *c, double *s)
 		fstp qword ptr [eax]
 	}
 }
+#else
+static inline void dcossin (double a, double *c, double *s) { *c = cos(a); *s = sin(a); }
+#endif
 //General point-polygon distance function. Single loops only. For multi, use genpoly_t and .n for next
 double ptpolydist2 (dpoint3d *pt, dpoint3d *pol, int n, dpoint3d *closest);
 
