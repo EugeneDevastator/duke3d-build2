@@ -108,7 +108,7 @@ enum editorop {
 	back,
 };
 
-typedef struct estate {
+struct estate {
 	uint8_t id;
 
 	void (*start)();

@@ -82,7 +82,7 @@ static __inline int filelength (int h)
 #define min(a,b) (((a) < (b)) ? (a) : (b))
 #endif
 
-#if defined(__GNUC__)
+#if defined(__GNUC__) && !defined(_inline)
 #define _inline inline
 #endif
 

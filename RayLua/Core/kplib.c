@@ -3364,7 +3364,7 @@ void kpzload (const char *filnam, long *pic, long *bpl, int *xsiz, int *ysiz)
 	kpgetdim(buf,leng,xsiz,ysiz);
 	(*bpl) = ((*xsiz)<<2);
 	(*pic) = (intptr_t)malloc((*ysiz)*(*bpl)); if (!(*pic)) { free(buf); return; }
-	if (kprender(buf,leng,*pic,*bpl,*xsiz,*ysiz,0,0) < 0) { free(buf); free((void *)*pic); (*pic) = 0; return; }
+	if (kprender(buf,leng,*pic,*bpl,*xsiz,*ysiz,0,0) < 0) { free(buf); free((void *)(intptr_t)*pic); (*pic) = 0; return; }
 	free(buf);
 }
 //====================== HANDY PICTURE function ends =========================

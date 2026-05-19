@@ -27,7 +27,9 @@
 #include "monodebug.h"
 #include "physics.h"
 #include "sectmask.h"
+#ifndef PI
 #define PI 3.14159265358979323
+#endif
 #ifdef _MSC_VER
 #pragma warning(disable:4731)
 #endif

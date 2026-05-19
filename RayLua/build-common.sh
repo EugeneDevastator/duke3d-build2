@@ -42,5 +42,7 @@ fi
 
 echo "==> Building preset '$PRESET' into $BUILD_DIR"
 cmake -B "$BUILD_DIR" --preset "$PRESET"
-cmake --build "$BUILD_DIR" --target RayGame --parallel
+# MinGW Makefiles can race on dep-file directories with --parallel;
+# use $(nproc) explicit jobs instead which is stable across generators.
+cmake --build "$BUILD_DIR" --target RayGame -- -j"$(nproc 2>/dev/null || echo 4)"
 echo "==> Done: $BUILD_DIR/RayGame"

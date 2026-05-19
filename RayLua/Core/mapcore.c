@@ -4,10 +4,18 @@
 #include "buildmath.h"
 #include "mapform_duke.h"
 #include "sectmask.h"
+#ifndef USEHEIMAP
 #define USEHEIMAP 1
+#endif
+#ifndef NOSOUND
 #define NOSOUND 1
+#endif
+#ifndef STANDALONE
 #define STANDALONE 1
+#endif
+#ifndef OOS_CHECK
 #define OOS_CHECK 1
+#endif
 
 uint16_t portaln=0;
 portal portals[100] ={};
