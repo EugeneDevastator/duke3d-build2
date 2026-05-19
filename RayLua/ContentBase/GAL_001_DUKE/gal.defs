@@ -1,0 +1,25 @@
+// tile_number name_string center_px_x center_px_y, gloss_a_bias, gloos_a_mul,gloss_b_bias, gloos_b_mul
+// all ints16 or letters, like MIN MAX CENTER, or discard '-'
+001 - CENTER CENTER 
+002 - CENTER MAX
+002 - CENTER MAX 
+5340 "some_human_tile_name with tags"
+
+GLOSS                               // procedural gloss params
+//1001 bias_a bias_b mul_a mul_b exponent algo(?)
+1000 0 0 2 1 1.45 NOISY
+
+DEPTH                               // procedural sdf depthj params
+//1001 bias_a mul_a bias_b mul_b algo
+
+GROUPS
+1000 1200 // will hint engine to group those tiles in same atlas. 
+
+TAGS
+1000 any number of tags go here separated by space
+
+ANIMS
+//idtile from to looptime_sec looptype
+// looptype = REPEAT PONG absent = repeat
+1000 1000 1003 0.4
+1002 1000 1003 0.9 PONG // if we put tile 1002 then it will animate 1000-1003 but slower and with pong.
