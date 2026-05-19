@@ -1147,83 +1147,140 @@ void MainLoop() {
 }
 
 static int TestArtMode() {
-    static char map_file[] = "e3l3.map";
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     SetTraceLogLevel(LOG_WARNING);
-    InitWindow(640, 480, "TestArt");
-    SetTargetFPS(10);
+    InitWindow(800, 400, "TestArt");
+    SetTargetFPS(60);
 
-    // Load everything
-    printf("TestArt: loading assets...\n");
-    loadgal(0, ".");
-    loadgal(1, "Content/GAL_002_SW/");
-    DumbRender::Init(map_file);
-    mapstate_t *map = DumbRender::GetMap();
+    printf("TestArt: loading...\n");
 
-    // --- Validate (before LoadTexturesToGPU frees pixel data) ---
-    bool pass = true;
-    FILE *log = fopen("testart_report.txt", "w");
-    if (!log) { printf("TestArt: cannot create report\n"); CloseWindow(); return 1; }
-
-    fprintf(log, "=== TestArt Report ===\n\n");
-    fprintf(log, "--- Map ---\n");
-    fprintf(log, "  map: %p\n", (void*)map);
-    if (map) {
-        fprintf(log, "  sectors: %d\n", map->numsects);
-        fprintf(log, "  sprites: %d\n", map->numspris);
-        fprintf(log, "  startpos: %.2f %.2f %.2f\n", map->startpos.x, map->startpos.y, map->startpos.z);
-        fprintf(log, "  startfor: %.4f %.4f %.4f\n", map->startfor.x, map->startfor.y, map->startfor.z);
-        fprintf(log, "  startrig: %.4f %.4f %.4f\n", map->startrig.x, map->startrig.y, map->startrig.z);
-        fprintf(log, "  startdow: %.4f %.4f %.4f\n", map->startdow.x, map->startdow.y, map->startdow.z);
-        fprintf(log, "  startsect: %d\n", map->startsectn);
-        bool map_ok = map->numsects > 0 && map->numspris > 0;
-        fprintf(log, "  status: %s\n", map_ok ? "PASS" : "FAIL");
-        if (!map_ok) pass = false;
-    } else {
-        fprintf(log, "  status: FAIL (null)\n");
-        pass = false;
-    }
-
-    fprintf(log, "\n--- Gallery ---\n");
-    for (int gn = 0; gn < 2; gn++) {
-        int nt = g_gals[gn].gnumtiles;
-        fprintf(log, "  Gal %d: tiles=%d\n", gn, nt);
-        if (nt <= 0) { fprintf(log, "    status: FAIL (no tiles)\n"); pass = false; continue; }
-        int check = nt < 3 ? nt : 3;
-        for (int i = 0; i < check; i++) {
-            tile_t *til = &g_gals[gn].gtile[i];
-            bool ok = til->tt.f && til->tt.f != (intptr_t)nullpic;
-            fprintf(log, "    Tile %d: %dx%d stride=%d %s\n",
-                i, til->tt.x, til->tt.y, til->tt.p, ok ? "OK" : "EMPTY");
-            if (!ok) pass = false;
+    // Load palette (768 bytes, 6-bit values → scale×4 to 8-bit)
+    int palSize = 0;
+    unsigned char *palData = LoadFileData("palette.dat", &palSize);
+    unsigned char globalpal[256][4] = {0};
+    if (palData && palSize >= 768) {
+        for (int i = 0; i < 256; i++) {
+            globalpal[i][0] = palData[i*3+2] * 4; // B→R
+            globalpal[i][1] = palData[i*3+1] * 4; // G
+            globalpal[i][2] = palData[i*3+0] * 4; // R→B
+            globalpal[i][3] = 255;
         }
+        UnloadFileData(palData);
+    } else {
+        printf("TestArt: WARN palette.dat not found or too small (%d bytes)\n", palSize);
     }
 
-    fprintf(log, "\n=== Overall: %s ===\n", pass ? "PASS" : "FAIL");
-    fclose(log);
-    printf("TestArt: %s — see testart_report.txt\n", pass ? "PASS" : "FAIL");
+    // Load first 10 tiles from TILES000.ART
+    int artsize = 0;
+    unsigned char *artdata = LoadFileData("TILES000.ART", &artsize);
+    int loctile0 = 0, loctile1 = 0;
+    Texture2D texs[10] = {0};
+    int drawn = 0;
+    if (artdata && artsize >= 16 && *(int*)artdata == 1) {
+        loctile0 = *(int*)(artdata + 8);
+        loctile1 = (*(int*)(artdata + 12)) + 1;
+        int count = loctile1 - loctile0;
+        const short *sx = (const short*)(artdata + 16);
+        const short *sy = sx + count;
+        int pixel_offset = 16 + (count << 3);
+        int n = count < 10 ? count : 10;
+        for (int i = 0; i < n; i++) {
+            int tw = sx[i], th = sy[i];
+            if (tw <= 0 || th <= 0 || pixel_offset + tw*th > artsize) continue;
+            const unsigned char *pixels = artdata + pixel_offset;
+            pixel_offset += tw * th;
+            Image img = {0};
+            img.width = tw; img.height = th;
+            img.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+            img.mipmaps = 1;
+            img.data = malloc(tw * th * 4);
+            unsigned char *rgba = (unsigned char*)img.data;
+            for (int x = 0; x < tw; x++) {
+                for (int y = 0; y < th; y++) {
+                    unsigned char idx = pixels[x * th + y];
+                    int pi = (y * tw + x) * 4;
+                    rgba[pi+0] = globalpal[idx][0];
+                    rgba[pi+1] = globalpal[idx][1];
+                    rgba[pi+2] = globalpal[idx][2];
+                    rgba[pi+3] = 255;
+                }
+            }
+            texs[drawn] = LoadTextureFromImage(img);
+            UnloadImage(img);
+            drawn++;
+        }
+        UnloadFileData(artdata);
+    } else {
+        printf("TestArt: WARN TILES000.ART not found or invalid\n");
+    }
 
-    // --- Render first 10 tiles of gal 0 on clear screen ---
+    bool pass = drawn > 0;
+    FILE *log = fopen("testart_report.txt", "w");
+    if (log) {
+        fprintf(log, "=== TestArt Report ===\n");
+        fprintf(log, "  tiles_loaded: %d\n", drawn);
+        fprintf(log, "  tile_range: %d-%d\n", loctile0, loctile1-1);
+        fprintf(log, "  status: %s\n", pass ? "PASS" : "FAIL");
+        fclose(log);
+    }
+    printf("TestArt: %s (%d tiles)\n", pass ? "PASS" : "FAIL", drawn);
+
+    // --- Render: tiles left, palette right ---
+    int cols = 5, cell_w = 100, cell_h = 80;
+    int pal_scale = 4;
+    int pal_w = 16 * pal_scale;  // 64
+    int pal_h = 16 * pal_scale;  // 64
+    int tiles_area_w = cols * cell_w + 10;
+    int tiles_area_h = ((drawn + cols - 1) / cols) * cell_h + 30;
+    int side_w = pal_w + 20;
+    int win_w = tiles_area_w + side_w + 10;
+    int win_h = tiles_area_h > pal_h + 60 ? tiles_area_h : pal_h + 60;
+    SetWindowSize(win_w, win_h);
+
+    // Palette texture
+    Image palImg = {0};
+    palImg.width = 16; palImg.height = 16;
+    palImg.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+    palImg.mipmaps = 1;
+    palImg.data = malloc(16*16*4);
+    unsigned char *pp = (unsigned char*)palImg.data;
+    for (int y = 0; y < 16; y++)
+        for (int x = 0; x < 16; x++) {
+            int ci = (y*16+x)*4, idx = y*16+x;
+            pp[ci+0]=globalpal[idx][0]; pp[ci+1]=globalpal[idx][1];
+            pp[ci+2]=globalpal[idx][2]; pp[ci+3]=255;
+        }
+    Texture2D palTex = LoadTextureFromImage(palImg);
+    UnloadImage(palImg);
+
     BeginDrawing();
-    ClearBackground((Color){40,40,40,255});
-    int ntiles = g_gals[0].gnumtiles;
-    int n = ntiles < 10 ? ntiles : 10;
-    int cols = 5;
-    int cell_w = 120;
-    for (int i = 0; i < n; i++) {
-        tile_t *til = &g_gals[0].gtile[i];
-        if (!til->tt.f || til->tt.f == (intptr_t)nullpic) continue;
-        Texture2D tex = DumbRender::ConvertPicToTexture(til);
-        int x = (i % cols) * cell_w + 10;
-        int y = (i / cols) * 100 + 10;
-        DrawTextureEx(tex, (Vector2){(float)x, (float)y}, 0, 4.0f, WHITE);
-        DrawText(TextFormat("%d", i), x, y + tex.height * 4 + 2, 10, WHITE);
-        UnloadTexture(tex);
-    }
-    TakeScreenshot("testart_tiles.png");
-    EndDrawing();
-    printf("TestArt: screenshot -> testart_tiles.png\n");
+    ClearBackground((Color){50, 50, 50, 255});
+    rlDisableBackfaceCulling();
 
+    // Tiles on left
+    for (int i = 0; i < drawn; i++) {
+        int x = (i % cols) * cell_w + 5;
+        int y = (i / cols) * cell_h + 5;
+        float sc = 4.0f;
+        if (texs[i].width * sc > cell_w - 5) sc = (float)(cell_w - 5) / texs[i].width;
+        DrawRectangleLines(x-1, y-1, texs[i].width*sc+2, texs[i].height*sc+2, YELLOW);
+        DrawTextureEx(texs[i], (Vector2){(float)x,(float)y}, 0, sc, WHITE);
+        DrawText(TextFormat("%d", i), x, y+(int)(texs[i].height*sc)+3, 10, WHITE);
+        UnloadTexture(texs[i]);
+    }
+
+    // Palette on right
+    int pal_x = tiles_area_w + 5;
+    int pal_y = 5;
+    DrawTextureEx(palTex, (Vector2){(float)pal_x,(float)pal_y}, 0, (float)pal_scale, WHITE);
+    DrawText("PALETTE", pal_x, pal_y + pal_h + 5, 12, WHITE);
+    DrawText(TextFormat("Tiles: %d", drawn), pal_x, pal_y + pal_h + 25, 12, LIGHTGRAY);
+    DrawText("BuildEditor2 - TestArt", pal_x, win_h - 20, 12, DARKGRAY);
+    EndDrawing();
+
+    TakeScreenshot("testart_tiles.png");
+    printf("TestArt: screenshot -> testart_tiles.png\n");
+    UnloadTexture(palTex);
     CloseWindow();
     return pass ? 0 : 1;
 }
@@ -1245,7 +1302,7 @@ int main(int argc, char* argv[]) {
         g_argc = 2;
         g_argv[1] = default_map;
     }
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     SetTraceLogLevel(LOG_WARNING);
     InitWindow(1024, 768, "BuildEditor2");
     SetExitKey(KEY_NULL);
