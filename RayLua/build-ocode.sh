@@ -2,24 +2,13 @@
 set -e
 cd "$(dirname "$0")"
 
-# On MSYS2/Windows the MinGW64 toolchain (cmake, gcc, g++, mingw32-make)
-# lives in /mingw64/bin.  When the script is invoked from a plain MSYS2 bash
-# session (e.g. via mingw64.exe or usr/bin/bash -c "...") that directory is
-# not always on PATH.  Prepend it when we are running under MSYS2/MinGW/Cygwin.
 case "$(uname -s)" in
     MINGW*|MSYS*|CYGWIN*)
         export PATH="/mingw64/bin:$PATH"
         ;;
 esac
 
-PRESET="$1"
-BUILD_DIR="$2"
-
-if [ -z "$PRESET" ] || [ -z "$BUILD_DIR" ]; then
-    echo "Usage: $0 <preset> <build_dir>"
-    echo "Presets: linux-debug, win64-debug, win64-release"
-    exit 1
-fi
+BUILD_DIR="build/editor-win-deb"
 
 # detect stale cache + fix path format (MSYS2 /c/... vs Windows C:/...)
 if [ -f "$BUILD_DIR/CMakeCache.txt" ]; then
@@ -32,7 +21,7 @@ if [ -f "$BUILD_DIR/CMakeCache.txt" ]; then
         lc_current=$(printf '%s' "$norm_current" | tr 'A-Z' 'a-z')
 
         if [ "$lc_cached" != "$lc_current" ]; then
-            echo "==> Stale cache detected (different machine), removing $BUILD_DIR"
+            echo "==> Stale cache detected, removing $BUILD_DIR"
             rm -rf "$BUILD_DIR"
         elif [ "$cached" != "$norm_cached" ]; then
             # same dir, wrong format — fix to Windows format for CMake
@@ -41,9 +30,7 @@ if [ -f "$BUILD_DIR/CMakeCache.txt" ]; then
     fi
 fi
 
-echo "==> Building preset '$PRESET' into $BUILD_DIR"
-cmake -B "$BUILD_DIR" --preset "$PRESET"
-# MinGW Makefiles can race on dep-file directories with --parallel;
-# use $(nproc) explicit jobs instead which is stable across generators.
+echo "==> Building RayGame..."
+cmake -B "$BUILD_DIR" --preset win64-debug
 cmake --build "$BUILD_DIR" --target RayGame -- -j"$(nproc 2>/dev/null || echo 4)"
 echo "==> Done: $BUILD_DIR/RayGame"

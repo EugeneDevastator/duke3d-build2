@@ -47,6 +47,10 @@ typedef struct {
 	unsigned char gammlut[256];
 	unsigned char gotpal;
 	uint16_t numtiles;
+	/* Raw ART file data kept alive for GPU upload; freed by galfreetextures */
+	unsigned char **artbufs;
+	int            *artsizes;
+	int             nartbufs;
 } gallery;
 
 extern gallery g_gals[16];

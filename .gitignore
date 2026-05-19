@@ -13,3 +13,8 @@ build2vs/.vs/VSWorkspaceState.json
 build2vs/.vs/build2vs/
 *.ART
 PALETTE.DAT
+/.idea/*
+/RayLua/.idea/*
+/RayLua/build/*
+/RayLua/build-linux/*
+/RayLua/dist/*

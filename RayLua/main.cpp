@@ -330,7 +330,7 @@ void DrawTextureBrowser(TextureBrowser* browser) {
     for (int i = startIndex; i < endIndex; i++) {
         ImGui::PushID(i);
 
-        Texture2D tex = DumbRender::galtextures[browser->galnum][i];
+        Texture2D tex = DumbRender::GetGalTex(browser->galnum, i);
         bool isValidTexture = !(tex.id == 0 || tex.width == 0 || tex.height == 0);
         bool isSelected = (browser->selected == i);
 
@@ -1149,6 +1149,7 @@ void MainLoop() {
 static int TestArtMode() {
     static char map_file[] = "e3l3.map";
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    SetTraceLogLevel(LOG_WARNING);
     InitWindow(640, 480, "TestArt");
     SetTargetFPS(10);
 
@@ -1245,6 +1246,7 @@ int main(int argc, char* argv[]) {
         g_argv[1] = default_map;
     }
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
+    SetTraceLogLevel(LOG_WARNING);
     InitWindow(1024, 768, "BuildEditor2");
     SetExitKey(KEY_NULL);
     SetTargetFPS(120);

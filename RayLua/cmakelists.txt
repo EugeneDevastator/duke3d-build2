@@ -61,15 +61,30 @@ include(raygame.cmake)
 include(duke_target.cmake)
 
 # ── resource copies ───────────────────────────────────────────────────────────
+# Use a stamp file so the copy step is skipped when nothing has changed.
+# add_custom_target is always considered out-of-date; add_custom_command with
+# OUTPUT lets make track whether the stamp is older than any source file.
 file(GLOB TILE_FILES "${CMAKE_SOURCE_DIR}/TILES???.ART")
-add_custom_target(copy_content ALL
+file(GLOB SHADER_FILES "${CMAKE_SOURCE_DIR}/Shaders/*")
+file(GLOB FONT_FILES   "${CMAKE_SOURCE_DIR}/fonts/*")
+file(GLOB CONTENT_FILES "${CMAKE_SOURCE_DIR}/Content/*" "${CMAKE_SOURCE_DIR}/Content/**/*")
+
+set(COPY_STAMP "${CMAKE_BINARY_DIR}/copy_content.stamp")
+
+add_custom_command(
+    OUTPUT  "${COPY_STAMP}"
+    DEPENDS ${TILE_FILES} ${SHADER_FILES} ${FONT_FILES} ${CONTENT_FILES}
+            "${CMAKE_SOURCE_DIR}/e3l3.map"
+            "${CMAKE_SOURCE_DIR}/palette.dat"
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/Shaders" "${CMAKE_BINARY_DIR}/Shaders"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/e3l3.map" "${CMAKE_BINARY_DIR}/e3l3.map"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/palette.dat" "${CMAKE_BINARY_DIR}/palette.dat"
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/fonts" "${CMAKE_BINARY_DIR}/fonts"
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/Content" "${CMAKE_BINARY_DIR}/Content"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${TILE_FILES} "${CMAKE_BINARY_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E touch "${COPY_STAMP}"
     COMMENT "Copying runtime content to build dir"
     VERBATIM
 )
+add_custom_target(copy_content ALL DEPENDS "${COPY_STAMP}")
 add_dependencies(RayGame copy_content)
