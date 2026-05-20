@@ -355,7 +355,7 @@ int getwalls_chain(int s, int w, vertlist_t *ver, int maxverts, mapstate_t *map)
 static int updatesect_imp (float x, float y, float z, int *cursect, mapstate_t* map)
 {
 	sect_t *sec;
-	long *gotsect;
+	unsigned int *gotsect;
 	int i, s, w, ns, nw, allsec, cnt, *secfif, secfifw, secfifr;
 	int max_iterations;
 
@@ -381,12 +381,12 @@ static int updatesect_imp (float x, float y, float z, int *cursect, mapstate_t* 
 		if ((z > 1e30) || ((z >= getslopez(&sec[s],0,x,y)) && (z <= getslopez(&sec[s],1,x,y))))
 			return s;
 
-	w = (((map->numsects+31)>>5)<<2);
-	gotsect = (long *)_alloca(w);
+	w = ((map->numsects+31)>>5);
+	gotsect = (unsigned int *)_alloca(w * sizeof(gotsect[0]));
 	if (!gotsect) return -1;
 
-	memset(gotsect,0,w);
-	gotsect[s>>5] |= (1<<s);
+	memset(gotsect,0,w * sizeof(gotsect[0]));
+	gotsect[s>>5] |= (1u << (s&31));
 
 	secfif = (int *)_alloca(map->numsects*sizeof(secfif[0]));
 	if (!secfif) return -1;
@@ -408,9 +408,9 @@ static int updatesect_imp (float x, float y, float z, int *cursect, mapstate_t* 
 			while (((unsigned)ns < (unsigned)map->numsects) && (ns != s) && wall_iterations < map->numsects)
 			{
 				wall_iterations++;
-				if (!(gotsect[ns>>5]&(1<<ns)))
+				if (!(gotsect[ns>>5]&(1u << (ns&31))))
 				{
-					gotsect[ns>>5] |= (1<<ns);
+					gotsect[ns>>5] |= (1u << (ns&31));
 					if (secfifw < map->numsects) {
 						secfif[secfifw] = ns;
 						secfifw++;
@@ -433,10 +433,10 @@ static int updatesect_imp (float x, float y, float z, int *cursect, mapstate_t* 
 		}
 		else
 		{
-			while ((allsec >= 0) && (gotsect[allsec>>5]&(1<<allsec))) allsec--;
+			while ((allsec >= 0) && (gotsect[allsec>>5]&(1u << (allsec&31)))) allsec--;
 			s = allsec;
 			if (s < 0) break;
-			gotsect[s>>5] |= (1<<s);
+			gotsect[s>>5] |= (1u << (s&31));
 		}
 
 		if (s >= 0 && s < map->numsects && insidesect(x,y,sec[s].wall,sec[s].n))
