@@ -1,0 +1,37 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "linux-debug",
+      "displayName": "Linux Debug",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/editor-linux-deb",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_COMPILER": "g++"
+      }
+    },
+    {
+      "name": "win64-debug",
+      "displayName": "Windows x64 Debug (MSYS2 GCC)",
+      "generator": "MinGW Makefiles",
+      "binaryDir": "${sourceDir}/build/editor-win-deb",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_COMPILER": "g++",
+        "CMAKE_C_COMPILER": "gcc"
+      }
+    },
+    {
+      "name": "win64-release",
+      "displayName": "Windows x64 Release (MSYS2 GCC)",
+      "generator": "MinGW Makefiles",
+      "binaryDir": "${sourceDir}/build/editor-win-rel",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_COMPILER": "g++",
+        "CMAKE_C_COMPILER": "gcc"
+      }
+    }
+  ]
+}
