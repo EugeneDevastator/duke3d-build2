@@ -1285,6 +1285,8 @@ static void SaveDebugRenderTargets(const RenderTexture2D* finalTargetRef,
     SaveDebugTexture(lightTargetRef->texture, (out_dir / "light.png").string().c_str());
 }
 
+bool cursor_locked = false;
+
 void DrawInfoUI() {
     ImVec2 work_pos = viewport->WorkPos;
     ImVec2 work_size = viewport->WorkSize;
@@ -1310,7 +1312,7 @@ void DrawInfoUI() {
     ImGui::Text("V tile pick");
     ImGui::Text("G geo ops.");
     ImGui::Text("K - temp extrude");
-
+    ImGui::Text("Click viewport: %s", cursor_locked ? "LOCKED" : "FREE");
 
     if (ISGRABSPRI && GRABSPRI.flags&SPRITE_B2_IS_LIGHT) {
         ImGui::Text("IsLIGHT.");
@@ -1506,7 +1508,6 @@ void MainLoop() {
     int debugViewMode = 0; // 0=final, 1=combined, 2=albedo, 3=light
     int debugImageMode = 0; // 0=off, 1=checker, 2=chart
     DebugImageState debugImages = LoadDebugImages();
-    DisableCursor();
     while (!WindowShouldClose()) {
         if (IsKeyDown(KEY_LEFT_ALT) && IsKeyPressed(KEY_ENTER))
         {
@@ -1635,8 +1636,10 @@ void MainLoop() {
             }
             DrawDebugStatusOverlay(debugViewMode, debugImageMode);
 
-            if (IsKeyPressed(KEY_ESCAPE))
-                DisableCursor();
+            if (IsKeyPressed(KEY_ESCAPE) && cursor_locked) {
+                cursor_locked = false;
+                EnableCursor();
+            }
 
             if (IsKeyPressed(KEY_F7)) {
                 SaveDebugRenderTargets(&finalTarget, &combinedTarget, &albedoTarget, &lightTarget, w, h);
@@ -1690,6 +1693,18 @@ void MainLoop() {
                     } else {
                         mdl.camera_controls_enabled = true;
                         DisableCursor();
+                    }
+                }
+
+                ImGuiIO& io = ImGui::GetIO();
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !io.WantCaptureMouse && !showPicker) {
+                    cursor_locked = !cursor_locked;
+                    if (cursor_locked) {
+                        mdl.camera_controls_enabled = true;
+                        DisableCursor();
+                    } else {
+                        mdl.camera_controls_enabled = false;
+                        EnableCursor();
                     }
                 }
 
