@@ -2,8 +2,9 @@
 // Created by omnis on 11/13/2025.
 //
 
-#ifndef RAYLIB_LUA_IMGUI_EVENTSTORE_H
-#define RAYLIB_LUA_IMGUI_EVENTSTORE_H
+#ifndef BUILDEDITOR2_EVENTSTORE_H
+#define BUILDEDITOR2_EVENTSTORE_H
+#include <stddef.h>
 #include "event_types.h"
 #include "ev_projection.h"
 

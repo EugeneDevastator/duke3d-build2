@@ -27,8 +27,12 @@
 #include "monodebug.h"
 #include "physics.h"
 #include "sectmask.h"
+#ifndef PI
 #define PI 3.14159265358979323
+#endif
+#ifdef _MSC_VER
 #pragma warning(disable:4731)
+#endif
 #define EXLOGS 0
 #define USESSE2 0
 #define USENEWLIGHT 1 //FIXFIXFIX
@@ -260,7 +264,7 @@ int shadowtest2_updatelighting = 1;
 
 unsigned int *shadowtest2_sectgot = 0; //WARNING:code uses x86-32 bit shift trick!
 static unsigned int *shadowtest2_sectgotmal = 0;
-static int shadowtest2_sectgotn = 0;
+int shadowtest2_sectgotn = 0;
 
 //Translation & rotation
 static mapstate_t *curMap;
@@ -281,7 +285,12 @@ lightpos_t shadowtest2_light[LIGHTMAX];
 static lightpos_t *glp;
 int shadowtest2_numlights = 0, shadowtest2_useshadows = 1, shadowtest2_numcpu = 0;
 float shadowtest2_ambrgb[3] = {32.0, 32.0, 32.0};
-__declspec(align(16)) static float g_qamb[4]; //holder for SSE to avoid degenerates
+#ifdef _MSC_VER
+__declspec(align(16))
+#else
+__attribute__((aligned(16)))
+#endif
+static float g_qamb[4]; //holder for SSE to avoid degenerates
 static point3d slightpos[LIGHTMAX], slightdir[LIGHTMAX];
 
 static float spotwid[LIGHTMAX];
@@ -308,23 +317,15 @@ extern void htrun(void (*dacallfunc)(int), int v0, int v1, int danumcpu);
 extern double distpoint2line2(double x, double y, double x0, double y0, double x1, double y1);
 
 //--------------------------------------------------------------------------------------------------
-inline void memset8(void *d, long v, long n) {
-	_asm
-			{
-			mov edx, d
-			mov ecx, n
-			movd mm0, v
-			punpckldq mm0, mm0
-			memset8beg:
-			movntq qword ptr [edx], mm0
-			add edx, 8
-			sub ecx, 8
-			jg short memset8beg
-			emms
-			}
+static inline void memset8(void *d, long v, long n) {
+	unsigned long long val = (unsigned int)v | ((unsigned long long)(unsigned int)v << 32);
+	unsigned long long *ptr = (unsigned long long *)d;
+	long i;
+	for (i = 0; i < n; i += 8)
+		ptr[i / 8] = val;
 }
 
-static int prepbunch(int id, bunchverts_t *twal, bdrawctx *b) {
+int prepbunch(int id, bunchverts_t *twal, bdrawctx *b) {
 	cam_t gcam = b->movedcam;
 	wall_t *wal;
 	double f, x, y, x0, y0, x1, y1;
@@ -384,7 +385,7 @@ static int prepbunch(int id, bunchverts_t *twal, bdrawctx *b) {
 //   1: FRONT:RED(b0)
 //   2: FRONT:GREEN(b1)
 //   3: UNSORTABLE!
-static int bunchfront(int b0, int b1, int fixsplitnow, bdrawctx *b) {
+int bunchfront(int b0, int b1, int fixsplitnow, bdrawctx *b) {
 	cam_t gcam = b->movedcam;
 	bunchverts_t *twal[2];
 	wall_t *wal;
@@ -546,7 +547,7 @@ static int bunchfront(int b0, int b1, int fixsplitnow, bdrawctx *b) {
 // Each bunch represents a continuous span of walls that can be drawn together
 // This reduces draw calls and enables efficient floor/ceiling polygon generation
 
-static void scansector(int sectnum, bdrawctx *b) {
+void scansector(int sectnum, bdrawctx *b) {
 	cam_t gcam = b->movedcam;
 
 #define BUNCHNEAR 1e-7
@@ -926,7 +927,7 @@ static int triangulate(const int *chain_starts, const int *chain_lengths, dpoint
 	return triangle_count;
 }
 
-static void emit_wallpoly_func(int rethead0, int rethead1, bdrawctx *b) {
+void emit_wallpoly_func(int rethead0, int rethead1, bdrawctx *b) {
 	double f, fx, fy;
 	int i, h, rethead[2];
 	cam_t cam = b->orcam;
@@ -1006,8 +1007,7 @@ static void emit_wallpoly_func(int rethead0, int rethead1, bdrawctx *b) {
 		eyepol[eyepoln].pal = curMap->sect[b->gligsect].wall[b->gligwall].surf.pal;
 		eyepol[eyepoln].shade = curMap->sect[b->gligsect].wall[b->gligwall].surf.rsc / 8192.0f;
 	}
-	if (eyepol[eyepoln].uvform.rot.z != 0)
-		int sdfgs=2;
+
 	p3_transform_wccw(&eyepol[eyepoln].worlduvs[0],b->movedcam.tr,b->orcam.tr);
 	for (int k=1;k<5;k++)
 	p3_transform_wccw_vec(&eyepol[eyepoln].worlduvs[k],b->movedcam.tr,b->orcam.tr);
@@ -1055,7 +1055,7 @@ static void emit_wallpoly_func(int rethead0, int rethead1, bdrawctx *b) {
 	logstep("produce eyepol, depth:%d", b->recursion_depth);
 }
 
-static void skytagfunc(int rethead0, int rethead1, bdrawctx *b) {
+void skytagfunc(int rethead0, int rethead1, bdrawctx *b) {
 }
 
 // There is way to do masks and semitransparency. At least for walls.
@@ -1063,7 +1063,7 @@ static void skytagfunc(int rethead0, int rethead1, bdrawctx *b) {
 // if then we cut masked mph with another masked mph - we produce two mph pieces:
 // with mask1 and mask2, and both have light value divided by 2. - tho will overblend..
 //
-static void emit_lighpol_func(int rethead0, int rethead1, bdrawctx *b) {
+void emit_lighpol_func(int rethead0, int rethead1, bdrawctx *b) {
 
 	// skip polys in unseen sectors. can only skip drawing, to not ruin shadows.
 	//if (!sectmask_was_marked(framesectgot, b->gligsect)) {
@@ -1147,8 +1147,8 @@ static void emit_lighpol_func(int rethead0, int rethead1, bdrawctx *b) {
 	glp->ligpol[glp->ligpoln].b2sect = b->gligsect;
 	glp->ligpol[glp->ligpoln].b2wall = b->gligwall;
 	glp->ligpol[glp->ligpoln].b2slab = b->gligslab;
-	if (lalphamul <0)
-		int bnnn=1;
+	if (lalphamul <0) {
+	}
 	glp->ligpol[glp->ligpoln].a = lalphamul;
 	i = lighash(b->gligsect, b->gligwall, b->gligslab);
 	glp->ligpol[glp->ligpoln].b2hashn = glp->lighashead[i];
@@ -1168,7 +1168,7 @@ static void emit_lighpol_func(int rethead0, int rethead1, bdrawctx *b) {
 	"tag" refers to sector IDs
 */
 
-static void changetagfunc(int rethead0, int rethead1, bdrawctx *b) {
+void changetagfunc(int rethead0, int rethead1, bdrawctx *b) {
 	if ((rethead0 | rethead1) < 0) return;
 	int mapsect = b->gnewtagsect;
 	if ((b->gdoscansector)
@@ -1323,7 +1323,7 @@ static int drawpol_nosect(int overlaptag, int newtag, int *heads, int flags, bdr
 	return drawpol_befclip(overlaptag, newtag, -1, -1, heads[0], heads[1], flags, b);
 }
 
-static int drawpol_befclip(int fromtag, int newtag, int fromsect, int newsect, int plothead0, int plothead1, int flags,
+int drawpol_befclip(int fromtag, int newtag, int fromsect, int newsect, int plothead0, int plothead1, int flags,
                            bdrawctx *b) {
 	OPERLOG;
 #if EXLOGS
@@ -1652,7 +1652,7 @@ int mono_ins_tf(int i, double nx, double ny, double nz, bdrawctx* b) {
 	return mono_ins(i,np.x,np.y,np.z);
 }
 
-static void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
+void drawalls(int bid, mapstate_t *map, bdrawctx *b) {
 	/*
 	 *Lights in portals solution:
 	1. draw light as is - remember lightpoly in original world space of the sector.
@@ -2479,7 +2479,7 @@ void draw_hsr_polymost_ctx(mapstate_t *map, bdrawctx *newctx) {
 	bdrawctx_clear(newctx);
 }
 
-static void draw_hsr_enter_portal(mapstate_t *map, int myport, int head1, int head2, bdrawctx *parentctx) {
+void draw_hsr_enter_portal(mapstate_t *map, int myport, int head1, int head2, bdrawctx *parentctx) {
 // Lights and portals
 	// lights work with portals because we sample final rendered geometry, which is combined in world space.
 	// and distance is calculated correctly for portaled lights
@@ -2564,35 +2564,8 @@ int shadowtest2_isgotsectintersect(int lignum) {
 	u1 = shadowtest2_light[lignum].sectgot;
 	i = (leng >> 5);
 	if (u0[i] & u1[i] & ((1 << leng) - 1)) return (1); //WARNING:code uses x86-32 bit shift trick!
-#if 0
 	for (i--; i >= 0; i--) if (u0[i] & u1[i]) return (1);
 	return (0);
-#else
-	for (i--; ((i & 3) != 3); i--) if (u0[i] & u1[i]) return (1);
-	if (i < 0) return (0);
-	_asm
-			{
-			push esi
-			mov eax, i
-			mov ecx, u0
-			mov edx, u1
-			xorps xmm7, xmm7
-
-			begit:movaps xmm0, [ecx+eax*4-12]
-			andps xmm0, [edx+eax*4-12]
-			cmpneqps xmm0, xmm7
-			movmskps esi, xmm0
-			test esi, esi
-			jnz endit
-			sub eax, 4
-			jg short begit
-
-			xor eax, eax
-			jmp short skpit
-			endit:mov eax, 1
-			skpit:pop esi
-			}
-#endif
 }
 
 void shadowtest2_dellight(int i) {

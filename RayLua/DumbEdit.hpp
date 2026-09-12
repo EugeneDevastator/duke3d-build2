@@ -2,11 +2,13 @@
 // Created by omnis on 1/7/2026.
 //
 
-#ifndef RAYLIB_LUA_IMGUI_DUMBEDIT_HPP
-#define RAYLIB_LUA_IMGUI_DUMBEDIT_HPP
+#ifndef BUILDEDITOR2_DUMBEDIT_HPP
+#define BUILDEDITOR2_DUMBEDIT_HPP
+#include <algorithm>
 #include "b2rlmath.h"
 #include "Editor/ieditorhudview.h"
 #include "Editor/uimodels.h"
+#include <vector>
 static TextureBrowser *texbstate;
 static Vector3 buildToRaylibPos(point3d buildcoord) {
 	return {buildcoord.x, -buildcoord.z, buildcoord.y};
@@ -106,7 +108,7 @@ enum editorop {
 	back,
 };
 
-typedef struct estate {
+struct estate {
 	uint8_t id;
 
 	void (*start)();
@@ -568,7 +570,7 @@ void PickgrabUpdate() {
 				Vector2 toOrig = Vector2Subtract(origVert, tgwpos);
 				Vector2 toCurs = Vector2Subtract(moverpos, tgwpos);
 				float projratio = Vector2DotProduct(toCurs, toOrig) / Vector2DotProduct(toOrig, toOrig);
-				Vector2 constrpos = Vector2Lerp(tgwpos, origVert, max(projratio, 0));
+				Vector2 constrpos = Vector2Lerp(tgwpos, origVert, (projratio > 0.0f) ? projratio : 0.0f);
 				outpos.x = constrpos.x;
 				outpos.y = constrpos.y;
 			}
@@ -674,7 +676,7 @@ void LoopDrawUpdate() {
 	}
 	if (IsKeyPressed(KEY_R)) {
 		// del last;
-		loopn = max(0, loopn-1);
+		loopn = (loopn > 0) ? (loopn - 1) : 0;
 	}
 
 	if (IsKeyPressed(KEY_T)) {

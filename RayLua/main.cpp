@@ -33,6 +33,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #include "Editor/uimodels.h"
 
 // Implements
@@ -44,6 +45,9 @@ extern "C" {
 #include "Core/artloader.h"
 
 }
+static int g_argc;
+static char** g_argv;
+
 // make parallax
 // for floors and walls - if own flor is paralax - tag floor trap and wall trap as ns portal.
 //
@@ -326,7 +330,7 @@ void DrawTextureBrowser(TextureBrowser* browser) {
     for (int i = startIndex; i < endIndex; i++) {
         ImGui::PushID(i);
 
-        Texture2D tex = DumbRender::galtextures[browser->galnum][i];
+        Texture2D tex = DumbRender::GetGalTex(browser->galnum, i);
         bool isValidTexture = !(tex.id == 0 || tex.width == 0 || tex.height == 0);
         bool isSelected = (browser->selected == i);
 
@@ -486,12 +490,12 @@ void extract_directory(const char* filepath, char* dir_path, size_t dir_size) {
 }
 
 bool loadifvalid() {
-    if (__argc < 2) {
+    if (g_argc < 2) {
         printf("Error: No map file path provided\n");
         return false;
     }
 
-    const char* map_path = __argv[1];
+    const char* map_path = g_argv[1];
 
     if (!has_extension(map_path, ".map")) {
         printf("Error: File must have .map extension\n");
@@ -536,11 +540,10 @@ void SetImguiFonts()
 {
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->Clear();
-    ImFont* font = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\segoeui.ttf", 28.0f);
+    ImFont* font = io.Fonts->AddFontFromFileTTF("fonts/Cadman_Bold.otf", 28.0f);
     if (font == nullptr) {
         ImFontConfig config;
-        config.SizePixels = 18.0f;
-        config.PixelSnapH = true;
+        config.SizePixels = 28.0f;
         io.Fonts->AddFontDefault(&config);
     }
     io.Fonts->Build();
@@ -619,7 +622,7 @@ void UpdateFreeCamera(FreeCamera* cam, float deltaTime) {
 }
 
 void VisualizeMapstate() {  //unused
-    DumbRender::Init("c:/Eugene/Games/build2/e3l3,map");
+    DumbRender::Init("e3l3.map");
 
     auto map = DumbRender::GetMap();
     //InitWindow(1024, 768, "Mapstate Visualizer");
@@ -947,13 +950,13 @@ void MainLoop() {
     InitTexBrowser();
     EditorSetTileState(&texb);
       if (!loadifvalid()) {
-          loadgal(0, "c:/Eugene/Games/build2/");
-          loadgal(1, "c:/Eugene/Games/build2/Content/GAL_002_SW/");
-          DumbRender::Init("c:/Eugene/Games/build2/e3l3.map");
+          loadgal(0, ".");
+          loadgal(1, "Content/GAL_002_SW/");
+          DumbRender::Init("e3l3.map");
       }
     DumbRender::LoadTexturesToGPU();
     auto map = DumbRender::GetMap();
-    //DumbCore::Init(map);
+    if (!map) return;
     globCam.tr.p = map->startpos;
     globCam.tr.r = map->startrig;
     globCam.tr.d = map->startdow;
@@ -1143,9 +1146,165 @@ void MainLoop() {
     DumbRender::CleanupMapstateTex();
 }
 
-int main() {
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
-    InitWindow(1024, 768, "Raylib + Lua + ImGui");
+static int TestArtMode() {
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    SetTraceLogLevel(LOG_WARNING);
+    InitWindow(800, 400, "TestArt");
+    SetTargetFPS(60);
+
+    printf("TestArt: loading...\n");
+
+    // Load palette (768 bytes, 6-bit values → scale×4 to 8-bit)
+    int palSize = 0;
+    unsigned char *palData = LoadFileData("palette.dat", &palSize);
+    unsigned char globalpal[256][4] = {0};
+    if (palData && palSize >= 768) {
+        for (int i = 0; i < 256; i++) {
+            globalpal[i][0] = palData[i*3+2] * 4; // B→R
+            globalpal[i][1] = palData[i*3+1] * 4; // G
+            globalpal[i][2] = palData[i*3+0] * 4; // R→B
+            globalpal[i][3] = 255;
+        }
+        UnloadFileData(palData);
+    } else {
+        printf("TestArt: WARN palette.dat not found or too small (%d bytes)\n", palSize);
+    }
+
+    // Load first 10 tiles from TILES000.ART
+    int artsize = 0;
+    unsigned char *artdata = LoadFileData("TILES000.ART", &artsize);
+    int loctile0 = 0, loctile1 = 0;
+    Texture2D texs[10] = {0};
+    int drawn = 0;
+    if (artdata && artsize >= 16 && *(int*)artdata == 1) {
+        loctile0 = *(int*)(artdata + 8);
+        loctile1 = (*(int*)(artdata + 12)) + 1;
+        int count = loctile1 - loctile0;
+        const short *sx = (const short*)(artdata + 16);
+        const short *sy = sx + count;
+        int pixel_offset = 16 + (count << 3);
+        int n = count < 10 ? count : 10;
+        for (int i = 0; i < n; i++) {
+            int tw = sx[i], th = sy[i];
+            if (tw <= 0 || th <= 0 || pixel_offset + tw*th > artsize) continue;
+            const unsigned char *pixels = artdata + pixel_offset;
+            pixel_offset += tw * th;
+            Image img = {0};
+            img.width = tw; img.height = th;
+            img.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+            img.mipmaps = 1;
+            img.data = malloc(tw * th * 4);
+            unsigned char *rgba = (unsigned char*)img.data;
+            for (int x = 0; x < tw; x++) {
+                for (int y = 0; y < th; y++) {
+                    unsigned char idx = pixels[x * th + y];
+                    int pi = (y * tw + x) * 4;
+                    rgba[pi+0] = globalpal[idx][0];
+                    rgba[pi+1] = globalpal[idx][1];
+                    rgba[pi+2] = globalpal[idx][2];
+                    rgba[pi+3] = 255;
+                }
+            }
+            texs[drawn] = LoadTextureFromImage(img);
+            UnloadImage(img);
+            drawn++;
+        }
+        UnloadFileData(artdata);
+    } else {
+        printf("TestArt: WARN TILES000.ART not found or invalid\n");
+    }
+
+    bool pass = drawn > 0;
+    FILE *log = fopen("testart_report.txt", "w");
+    if (log) {
+        fprintf(log, "=== TestArt Report ===\n");
+        fprintf(log, "  tiles_loaded: %d\n", drawn);
+        fprintf(log, "  tile_range: %d-%d\n", loctile0, loctile1-1);
+        fprintf(log, "  status: %s\n", pass ? "PASS" : "FAIL");
+        fclose(log);
+    }
+    printf("TestArt: %s (%d tiles)\n", pass ? "PASS" : "FAIL", drawn);
+
+    // --- Render: tiles left, palette right ---
+    int cols = 5, cell_w = 100, cell_h = 80;
+    int pal_scale = 4;
+    int pal_w = 16 * pal_scale;  // 64
+    int pal_h = 16 * pal_scale;  // 64
+    int tiles_area_w = cols * cell_w + 10;
+    int tiles_area_h = ((drawn + cols - 1) / cols) * cell_h + 30;
+    int side_w = pal_w + 20;
+    int win_w = tiles_area_w + side_w + 10;
+    int win_h = tiles_area_h > pal_h + 60 ? tiles_area_h : pal_h + 60;
+    SetWindowSize(win_w, win_h);
+
+    // Palette texture
+    Image palImg = {0};
+    palImg.width = 16; palImg.height = 16;
+    palImg.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+    palImg.mipmaps = 1;
+    palImg.data = malloc(16*16*4);
+    unsigned char *pp = (unsigned char*)palImg.data;
+    for (int y = 0; y < 16; y++)
+        for (int x = 0; x < 16; x++) {
+            int ci = (y*16+x)*4, idx = y*16+x;
+            pp[ci+0]=globalpal[idx][0]; pp[ci+1]=globalpal[idx][1];
+            pp[ci+2]=globalpal[idx][2]; pp[ci+3]=255;
+        }
+    Texture2D palTex = LoadTextureFromImage(palImg);
+    UnloadImage(palImg);
+
+    BeginDrawing();
+    ClearBackground((Color){50, 50, 50, 255});
+    rlDisableBackfaceCulling();
+
+    // Tiles on left
+    for (int i = 0; i < drawn; i++) {
+        int x = (i % cols) * cell_w + 5;
+        int y = (i / cols) * cell_h + 5;
+        float sc = 4.0f;
+        if (texs[i].width * sc > cell_w - 5) sc = (float)(cell_w - 5) / texs[i].width;
+        DrawRectangleLines(x-1, y-1, texs[i].width*sc+2, texs[i].height*sc+2, YELLOW);
+        DrawTextureEx(texs[i], (Vector2){(float)x,(float)y}, 0, sc, WHITE);
+        DrawText(TextFormat("%d", i), x, y+(int)(texs[i].height*sc)+3, 10, WHITE);
+        UnloadTexture(texs[i]);
+    }
+
+    // Palette on right
+    int pal_x = tiles_area_w + 5;
+    int pal_y = 5;
+    DrawTextureEx(palTex, (Vector2){(float)pal_x,(float)pal_y}, 0, (float)pal_scale, WHITE);
+    DrawText("PALETTE", pal_x, pal_y + pal_h + 5, 12, WHITE);
+    DrawText(TextFormat("Tiles: %d", drawn), pal_x, pal_y + pal_h + 25, 12, LIGHTGRAY);
+    DrawText("BuildEditor2 - TestArt", pal_x, win_h - 20, 12, DARKGRAY);
+    EndDrawing();
+
+    TakeScreenshot("testart_tiles.png");
+    printf("TestArt: screenshot -> testart_tiles.png\n");
+    UnloadTexture(palTex);
+    CloseWindow();
+    return pass ? 0 : 1;
+}
+
+int main(int argc, char* argv[]) {
+    g_argc = argc;
+    g_argv = argv;
+    // Chdir to binary's directory so relative paths resolve from build folder
+    char *slash = strrchr(argv[0], '/');
+    if (!slash) slash = strrchr(argv[0], '\\');
+    if (slash) { char saved = *slash; *slash = '\0'; chdir(argv[0]); *slash = saved; }
+    // TestArt mode — validate tile loading
+    if (g_argc >= 2 && strcmp(g_argv[1], "testart") == 0) {
+        return TestArtMode();
+    }
+    // Default map when no args
+    if (g_argc < 2) {
+        static char default_map[] = "e3l3.map";
+        g_argc = 2;
+        g_argv[1] = default_map;
+    }
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    SetTraceLogLevel(LOG_WARNING);
+    InitWindow(1024, 768, "BuildEditor2");
     SetExitKey(KEY_NULL);
     SetTargetFPS(120);
     rlImGuiSetup(true);

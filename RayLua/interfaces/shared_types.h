@@ -116,6 +116,7 @@ free((arena).data); \
 static inline float GetPxOffsetVertical(int ysize, int ypan) {
 	int pansPerPx = 256.0/ysize;  // ex 32 size, pans per px = 8
 	float pxoffset = ypan / pansPerPx;  // ypan is 16; 16/8 = 2px offset.
+	return pxoffset;
 }
 static inline float GetPxOffsetHorizontal(int ypan) {
 	return ypan;

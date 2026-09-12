@@ -18,7 +18,7 @@ extern transform lastcamtr2;
 #define LOOPEND loopuse[loopnum]=false;loopnum++;
 extern signed int operstopn;
 extern int opercurr;
-#define OPERLOG opercurr++; if (operstopn >=0 && opercurr >= operstopn) return
+#define OPERLOG ((void)0)
 #define OPERONLYLAST (opercurr < operstopn && opercurr > operstopn-2)
 #define OPERISOK (opercurr < operstopn || operstopn < 0)
 

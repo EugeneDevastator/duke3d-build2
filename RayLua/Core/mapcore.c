@@ -4,10 +4,18 @@
 #include "buildmath.h"
 #include "mapform_duke.h"
 #include "sectmask.h"
+#ifndef USEHEIMAP
 #define USEHEIMAP 1
+#endif
+#ifndef NOSOUND
 #define NOSOUND 1
+#endif
+#ifndef STANDALONE
 #define STANDALONE 1
+#endif
+#ifndef OOS_CHECK
 #define OOS_CHECK 1
+#endif
 
 uint16_t portaln=0;
 portal portals[100] ={};
@@ -1819,8 +1827,7 @@ void map_sect_loop_erase(int sectid, int wall_of_loop, mapstate_t *map) {
 static void map_sect_translate_raw(int s, point3d offset, mapstate_t *map) {
 	sect_t *sectr = &map->sect[s];
 	for (int i = 0; i < sectr->n; ++i) {
-		if (offset.x > 0.4f)
-			int a = 1;
+
 		sectr->wall[i].pos.x += offset.x;
 		sectr->wall[i].pos.y += offset.y;
 	}

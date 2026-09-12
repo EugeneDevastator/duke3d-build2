@@ -2826,11 +2826,10 @@ intptr_t kzopen (const char *filnam)
 	FILE *fil;
 	int i, j, fileoffs, fileleng;
 	char tempbuf[46+260], *zipnam, iscomp;
-errno_t err;
 	//kzfs.fil = 0;
 	if (filnam[0] != '|') //Search standalone file first
 	{
-		err = fopen_s(&kzfs.fil, filnam,"rb");
+		kzfs.fil = fopen(filnam,"rb");
 		if (kzfs.fil)
 		{
 			kzfs.comptyp = 0;
@@ -3365,7 +3364,7 @@ void kpzload (const char *filnam, long *pic, long *bpl, int *xsiz, int *ysiz)
 	kpgetdim(buf,leng,xsiz,ysiz);
 	(*bpl) = ((*xsiz)<<2);
 	(*pic) = (intptr_t)malloc((*ysiz)*(*bpl)); if (!(*pic)) { free(buf); return; }
-	if (kprender(buf,leng,*pic,*bpl,*xsiz,*ysiz,0,0) < 0) { free(buf); free((void *)*pic); (*pic) = 0; return; }
+	if (kprender(buf,leng,*pic,*bpl,*xsiz,*ysiz,0,0) < 0) { free(buf); free((void *)(intptr_t)*pic); (*pic) = 0; return; }
 	free(buf);
 }
 //====================== HANDY PICTURE function ends =========================

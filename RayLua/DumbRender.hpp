@@ -250,7 +250,8 @@ public:
 		lightIntenseLoc = GetShaderLocation(lightShader, "lightIntensity");
 		char *lastSlash;
 		// Extract root path from full map path
-		strcpy_s(rootpath, fullmappath);
+		strncpy(rootpath, fullmappath, sizeof(rootpath) - 1);
+		rootpath[sizeof(rootpath) - 1] = '\0';
 		lastSlash = strrchr(rootpath, '/');
 		if (!lastSlash) {
 			lastSlash = strrchr(rootpath, '\\');
@@ -1576,7 +1577,7 @@ static void MoveCamB2( cam_t *b2cam) {
 				if (spr->view.rflags.is_dblsided)
 					rlDisableBackfaceCulling();
 
-				Texture2D spriteTex = galtextures[spol.galnum][spol.tilnum];
+				Texture2D spriteTex = GetGalTex(spol.galnum, spol.tilnum);
 				// vectors are half a size
 				transform usetr = spol.tr;
 				Vector3 rg = {usetr.r.x, -usetr.r.z, usetr.r.y};
@@ -2183,48 +2184,50 @@ static void MoveCamB2( cam_t *b2cam) {
 
 		//  EndDrawing();
 	}
-	static Texture2D ConvertPicToTexture(tile_t *tpic) {
+	static Texture2D ConvertPicToTexture(tile_t *tpic, gallery *gal = nullptr) {
 		if (!tpic || !tpic->tt.f) {
 			Texture2D invalid = {0};
-			invalid.id = 0;
-			invalid.width = 0;
-			invalid.height = 0;
-			invalid.mipmaps = 0;
-			invalid.format = 0;
 			return invalid;
 		}
+		if (!gal) gal = &g_gals[0];
 
 		tiltyp *pic = &tpic->tt;
+		int w = max(4, pic->x);
+		int h = max(4, pic->y);
 
 		Image picImage = {0};
-		int x = max(4, pic->x);
-		int y = max(4, pic->y);
-		picImage.width = x;
-		picImage.height = y;
-		picImage.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+		picImage.width   = w;
+		picImage.height  = h;
+		picImage.format  = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
 		picImage.mipmaps = 1;
+		picImage.data    = malloc(w * h * 4);
+		auto *out = static_cast<unsigned char *>(picImage.data);
 
-		picImage.data = malloc(x * y * 4);
-		auto *pixels = static_cast<unsigned char *>(picImage.data);
-
-		// pic->f points to RGBA data, pic->p is stride in bytes
-		for (int y = 0; y < pic->y; y++) {
-			unsigned char *srcRow = (unsigned char *) (pic->f + y * pic->p);
+		if (pic->p == 0) {
+			/* Raw palette-indexed pixels from ART buffer (column-major: x*sy+y) */
+			const unsigned char *raw = reinterpret_cast<const unsigned char *>(pic->f);
 			for (int x = 0; x < pic->x; x++) {
-				int srcIndex = x * 4; // 4 bytes per pixel in source, even tho we need only byte 1 as index.
-				// i guess Ken used it for rgba textures too, since build2 can do them.
-				int dstIndex = (y * pic->x + x) * 4;
-
-				// Source is already RGBA, just copy and potentially reorder
-				// tried replacing with those, and for a split second it is orange, but then falls back to green and still debugs everywhere
-				//    pixels[dstIndex + 0] = 255;
-				//    pixels[dstIndex + 1] = 122;
-				//    pixels[dstIndex + 2] = 44;
-
-				pixels[dstIndex + 0] = srcRow[srcIndex + 2]; // R (from B)
-				pixels[dstIndex + 1] = srcRow[srcIndex + 1]; // G
-				pixels[dstIndex + 2] = srcRow[srcIndex + 0]; // B (from R)
-				pixels[dstIndex + 3] = srcRow[srcIndex + 3]; // A
+				for (int y = 0; y < pic->y; y++) {
+					int dst = (y * pic->x + x) * 4;
+					const unsigned char *c = gal->globalpal[raw[x * pic->y + y]];
+					/* palette is stored BGR after LoadGalleryPal, swap back to RGB for raylib */
+					out[dst+0] = c[0];
+					out[dst+1] = c[1];
+					out[dst+2] = c[2];
+					out[dst+3] = c[3];
+				}
+			}
+		} else {
+			/* RGBA-expanded legacy data (e.g. nullpic has p != 0 from old code) */
+			for (int y = 0; y < pic->y; y++) {
+				const unsigned char *srcRow = reinterpret_cast<const unsigned char *>(pic->f + y * pic->p);
+				for (int x = 0; x < pic->x; x++) {
+					int s = x * 4, d = (y * pic->x + x) * 4;
+					out[d+0] = srcRow[s+2];
+					out[d+1] = srcRow[s+1];
+					out[d+2] = srcRow[s+0];
+					out[d+3] = srcRow[s+3];
+				}
 			}
 		}
 
@@ -2235,29 +2238,55 @@ static void MoveCamB2( cam_t *b2cam) {
 
 private:
 	static void GenerateTextures() {
-		// todo: make tile arrays per gal.
-		for (int gn=0;gn<2;gn++) {
-			numartiles = g_gals[gn].gnumtiles;
+		double t0 = GetTime();
 
-			// static long gnumtiles, gmaltiles, gtilehashead[1024];
-			// static *long get_gtilehashead() { return gtilehashead; } // in outer file
-			//long *source = get_gtilehashead();
-			//memcpy(gtilehashead_i, source, sizeof(long) * 1024);
+		for (int gn = 0; gn < 2; gn++) {
+			numartiles = g_gals[gn].gnumtiles;
+			if (numartiles <= 0) continue;
+			gallery *gal = &g_gals[gn];
 			Texture2D *arr = static_cast<Texture2D *>(malloc(sizeof(Texture2D) * numartiles));
-			int end = numartiles;
-			for (int i = 0; i < end; ++i) {
-				tile_t *til;
-				til = &g_gals[gn].gtile[i];
-				if (!til->tt.f || til->tt.f == (long)nullpic)
-					arr[i]=arr[0];
-				arr[i] = ConvertPicToTexture(til); // returns Texture2D
-			} // end = gallery.nutiles; tile_t* getGtile(int i){return &gtile[i];}
-			if (gn==0)
-				runtimeTextures = arr;
-			galtextures[gn]=arr;
+
+			for (int i = 0; i < numartiles; i++) {
+				tiltyp *pic = &gal->gtile[i].tt;
+
+				if (!pic->f || pic->f == (intptr_t)nullpic) {
+					arr[i] = {0};
+					continue;
+				}
+
+				int w = pic->x > 0 ? pic->x : 4;
+				int h = pic->y > 0 ? pic->y : 4;
+				int stride = pic->p > 0 ? pic->p : w * 4;
+
+				// pixel data is BGRA, stride may be > w*4.
+				// allocate contiguous buffer, copy row-by-row, swap BGRA→RGBA
+				Image img = {0};
+				img.width = w;
+				img.height = h;
+				img.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+				img.mipmaps = 1;
+				img.data = malloc(w * h * 4);
+				unsigned char *dst = (unsigned char *)img.data;
+				for (int y = 0; y < h; y++) {
+					unsigned char *src = (unsigned char *)(pic->f + y * stride);
+					for (int x = 0; x < w; x++) {
+						*dst++ = src[2];  // R
+						*dst++ = src[1];  // G
+						*dst++ = src[0];  // B
+						*dst++ = src[3];  // A
+						src += 4;
+					}
+				}
+				arr[i] = LoadTextureFromImage(img);
+				UnloadImage(img);
+			}
+
+			if (gn == 0) runtimeTextures = arr;
+			galtextures[gn] = arr;
 			galfreetextures(gn);
-			// Look for gals[0] usages elsewhere!
 		}
+
+		printf("GenerateTextures: %.3fs\n", GetTime() - t0);
 	}
 
 	static void LoadMapAndTiles(const char *fullmapname) {

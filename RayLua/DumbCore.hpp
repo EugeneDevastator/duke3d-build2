@@ -10,6 +10,13 @@
 #include "raylib.h"
 #include "raymath.h"
 
+#ifndef max
+#define max(a,b) (((a) > (b)) ? (a) : (b))
+#endif
+#ifndef min
+#define min(a,b) (((a) < (b)) ? (a) : (b))
+#endif
+
 extern "C" {
 #include "shadowtest2.h"
 #include "monodebug.h"
@@ -23,6 +30,13 @@ extern "C" {
 #include "DukeGame/source/game.h"
 #endif
 }
+
+#undef max
+#undef min
+
+#include <algorithm>
+using std::max;
+using std::min;
 
 class DumbCore {
 
