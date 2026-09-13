@@ -14,13 +14,18 @@ int map_load_b2(const char *path, mapstate_t *map);
 note, sept 2026:
 make it chunked:
 // -- fundamental markup, most stable ---
-sector[] : nwalls, id 
-walls[] : xy, nporals, nwallid[nportals], ownid //mapped to sector 1-1 by nwalls
-xfrom[] : transform, sectorid, ownid // xforms of the sprites with id. basic markup
+sector[] : nwalls, id
+capform[] : z, xnorm, ynorm x2 maps to sector 2-1
+walls[] : xy, chainwal //mapped to sector 1-1 by nwalls
+walink[] : nlinks, (nsid, nwid) - maps to walls 1-1 // portal linkage
+xform[] : transform, sectorid, ownid // xforms of the sprites with id. basic markup
 // -- attached data, volataile ----
-capart[] // floors and ceils of each sector
-wallart[] //
+capdata[]
+walldata[]
 spritedata[] : spriteid, data..
 sprlightdata[] : spriteid, data..
-
+// -- arts
+capart[] // floors and ceils of each sector
+wallart[] //
+spriteart[] //
 */
