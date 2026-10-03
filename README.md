@@ -2,6 +2,16 @@
 Welcome to the repo of Build2 on Raylib
 
 This is next step for Build 2 engine by Ken Silverman: https://www.advsys.net/ken/build.htm <br>
+Build 2 right now is ported from DX to Raylib + openGL, preserving Ken's monotone poly clipping and forward rendering pipeline.
+Same way ShadowTest is preseved and adapted for poly light. Added triangulation of emitted polygons.
+Rendering is done in HDR space, with Duke's LUT on top.
+Support for multiple art projects, now called 'Galleries' allowing to mix tiles from different games
+
+Next Steps:
+- find money to eat
+- Implement map format (i finally converged on making it classic chunked format)
+- Finish passing light recursively through portals - solution is found!
+- Make good first user expirience
 
 ## Contacts
 Want to develop? - contact me on discord server here: https://discord.gg/wmM444UU <br>
