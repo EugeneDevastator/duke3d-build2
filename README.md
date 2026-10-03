@@ -11,6 +11,7 @@ Next Steps:
 - find money to eat
 - Implement map format (i finally converged on making it classic chunked format)
 - Finish passing light recursively through portals - solution is found!
+- Do proper ROR light clipping (test on Tier Drops and Lunatic Fringe)
 - Make good first user expirience
 
 ## Contacts
