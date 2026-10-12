@@ -12,7 +12,11 @@ Next Steps:
 - Implement map format (i finally converged on making it classic chunked format)
 - Finish passing light recursively through portals - solution is found!
 - Do proper ROR light clipping (test on Tier Drops and Lunatic Fringe)
+- implement polygonal raytracing:
+   - surface translucency
+   - light reflection
 - Make good first user expirience
+- make directional light sources
 
 ## Contacts
 Want to develop? - contact me on discord server here: https://discord.gg/wmM444UU <br>
